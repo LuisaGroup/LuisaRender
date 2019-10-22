@@ -7,5 +7,6 @@
 #include "../src/compatibility.h"
 
 struct MaterialData {  // for now, only lambert is supported
-    Vec3f albedo;
+    PackedVec3f albedo;
+    uint is_mirror;
 };

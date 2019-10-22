@@ -13,6 +13,7 @@ struct MeshDescriptor {
     std::filesystem::path path;
     glm::mat4 transform;
     glm::vec3 albedo;
+    bool is_mirror;
 };
 
 struct Mesh {

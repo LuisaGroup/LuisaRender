@@ -63,16 +63,16 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     auto transform_bottom = glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, -10.0f, 0.0f}) * scaling;
     auto transform_left = glm::translate(glm::mat4{1.0f}, glm::vec3{-10.0f, 0.0f, 0.0f}) * scaling;
     auto transform_right = glm::translate(glm::mat4{1.0f}, glm::vec3{10.0f, 0.0f, 0.0f}) * scaling;
-    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_back, glm::vec3{1.0f}});
-    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_top, glm::vec3{1.0f}});
-    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_bottom, glm::vec3{1.0f}});
-    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_left, glm::vec3{1.0f, 0.0f, 0.0f}});
-    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_right, glm::vec3{0.0f, 1.0f, 0.0f}});
+    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_back, glm::vec3{1.0f}, false});
+    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_top, glm::vec3{1.0f}, false});
+    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_bottom, glm::vec3{1.0f}, false});
+    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_left, glm::vec3{1.0f, 0.0f, 0.0f}, false});
+    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_right, glm::vec3{0.0f, 1.0f, 0.0f}, false});
     auto bunny_obj_path = std::filesystem::path{working_dir}.append("data").append("meshes").append("bunny").append("bunny.obj");
     auto bunny_transform = glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, -5.0f, -1.0f}) *
                            glm::rotate(glm::mat4{1.0f}, glm::radians(30.0f), glm::vec3{0.0f, 1.0f, 0.0f}) *
                            glm::scale(glm::mat4{1.0f}, glm::vec3{4.0f});
-    mesh_list.emplace_back(MeshDescriptor{bunny_obj_path, bunny_transform, glm::vec3{1.0f}});
+    mesh_list.emplace_back(MeshDescriptor{bunny_obj_path, bunny_transform, glm::vec3{1.0f}, true});
     auto mesh = Mesh::load(mesh_list);
     
     auto position_buffer = [device newBufferWithBytes:mesh.positions.data() length:mesh.positions.size() * sizeof(Vec3f) options:MTLResourceStorageModeManaged];
@@ -106,8 +106,8 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     accelerator.triangleCount = mesh.material_ids.size();
     [accelerator rebuild];
     
-    constexpr auto width = 1024u;
-    constexpr auto height = 768u;
+    constexpr auto width = 1000u;
+    constexpr auto height = 800u;
     
     constexpr auto ray_count = width * height;
     auto ray_buffer = [device newBufferWithLength:ray_count * sizeof(RayData) options:MTLResourceStorageModePrivate];
@@ -137,7 +137,7 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     camera_data.left = {-1.0f, 0.0f, 0.0f};
     camera_data.up = {0.0f, 1.0f, 0.0f};
     camera_data.near_plane = 0.1f;
-    camera_data.fov = glm::radians(60.0f);
+    camera_data.fov = glm::radians(52.5f);
     
     FrameData frame{};
     frame.size = {width, height};
@@ -155,8 +155,7 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     
     constexpr auto spp = 128u;
     
-    static auto frames_in_flight = 0u;
-    constexpr auto max_frames_in_flight = 8u;
+    static auto available_frame_count = 8u;
     static std::mutex mutex;
     static std::condition_variable cond_var;
     static auto count = 0u;
@@ -170,7 +169,7 @@ int main(int argc [[maybe_unused]], char *argv[]) {
         {
             std::unique_lock lock{mutex};
             cond_var.wait(lock, [] {
-                return frames_in_flight < max_frames_in_flight;
+                return available_frame_count != 0;
             });
         }
         
@@ -178,7 +177,7 @@ int main(int argc [[maybe_unused]], char *argv[]) {
         [command_buffer addCompletedHandler:^(id<MTLCommandBuffer>) {
             {
                 std::lock_guard guard{mutex};
-                frames_in_flight--;
+                available_frame_count++;
             }
             cond_var.notify_one();
             std::cout << "Progress: " << (++count) << "/" << spp << std::endl;
@@ -253,7 +252,7 @@ int main(int argc [[maybe_unused]], char *argv[]) {
         
         [command_buffer commit];
         std::lock_guard guard{mutex};
-        frames_in_flight++;
+        available_frame_count--;
     }
     
     auto result_buffer = [device newBufferWithLength:ray_count * sizeof(Vec4f) options:MTLResourceStorageModeManaged];

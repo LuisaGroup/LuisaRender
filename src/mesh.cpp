@@ -43,7 +43,7 @@ Mesh Mesh::load(const std::vector<MeshDescriptor> &mesh_list) {
             for (auto i = 0ul; i < shape.mesh.material_ids.size(); i++) {
                 material_ids.emplace_back(material_id);
             }
-            materials.emplace_back(MaterialData{desc.albedo});
+            materials.emplace_back(MaterialData{desc.albedo, desc.is_mirror});
         }
     }
     Mesh mesh;
@@ -51,5 +51,8 @@ Mesh Mesh::load(const std::vector<MeshDescriptor> &mesh_list) {
     mesh.normals = std::move(normals);
     mesh.material_ids = std::move(material_ids);
     mesh.materials = std::move(materials);
+    
+    std::cout << "Total: " << mesh.material_ids.size() << " triangles" << std::endl;
+    
     return mesh;
 }

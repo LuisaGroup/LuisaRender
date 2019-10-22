@@ -70,9 +70,9 @@ kernel void trace_radiance(
         
         if (ray.max_distance <= 0.0f || its.distance <= 0.0f) {  // no intersection
             ray.max_distance = -1.0f;  // terminate the ray
-            if (ray.depth == 0) {
-                ray.radiance = PackedVec3f{0.3f, 0.2f, 0.1f};  // background
-            }
+//            if (ray.depth == 0) {
+//                ray.radiance = PackedVec3f{0.3f, 0.2f, 0.1f};  // background
+//            }
         } else {
             auto uvw = Vec3f(its.barycentric, 1.0f - its.barycentric.x - its.barycentric.y);
             auto P = ray.origin + ray.direction * its.distance;
@@ -80,11 +80,15 @@ kernel void trace_radiance(
             auto V = normalize(-ray.direction);
             auto i0 = its.triangle_index * 3;
             auto N = normalize(uvw.x * n_buffer[i0] + uvw.y * n_buffer[i0 + 1] + uvw.z * n_buffer[i0 + 2]);
-            if (dot(N, V) < 0.0f) { N = -N; }
+            auto NdotV = dot(N, V);
+            if (NdotV < 0.0f) {
+                N = -N;
+                NdotV = -NdotV;
+            }
             
             // direct lighting
             auto shadow_its = shadow_its_buffer[index];
-            if (shadow_its.distance < 0.0f) {  // not occluded
+            if (!material.is_mirror && shadow_its.distance < 0.0f) {  // not occluded
                 auto shadow_ray = shadow_ray_buffer[index];
                 auto L = shadow_ray.direction;
                 auto NdotL = max(dot(N, L), 0.0f);
@@ -92,23 +96,24 @@ kernel void trace_radiance(
             }
             
             // sampling brdf
-            auto L = normalize(Onb{N}.inverse_transform(Vec3f(cosine_sample_hemisphere(halton(ray.seed), halton(ray.seed)))));
-            auto NdotL = dot(N, L);
-            auto pdf = max(NdotL * M_1_PIf, 1e-3f);
-            ray.direction = L;
-            ray.origin = P + 1e-3f * L;
             ray.max_distance = INFINITY;
-            ray.throughput *= material.albedo * NdotL * M_1_PIf / pdf;
-            if (ray.depth >= 3) {  // RR
-                auto q = max(0.05f, 1.0f - luminance(ray.throughput));
-                if (halton(ray.seed) < q) {
-                    ray.max_distance = -1.0f;
-                } else {
-                    ray.throughput /= 1.0f - q;
+            if (material.is_mirror) {
+                ray.direction = normalize(2.0f * NdotV * N - V);
+            } else {
+                ray.direction = normalize(Onb{N}.inverse_transform(Vec3f(cosine_sample_hemisphere(halton(ray.seed), halton(ray.seed)))));
+                ray.depth++;
+                if (ray.depth > 3) {  // RR
+                    auto q = max(0.05f, 1.0f - luminance(ray.throughput));
+                    if (halton(ray.seed) < q) {
+                        ray.max_distance = -1.0f;
+                    } else {
+                        ray.throughput /= 1.0f - q;
+                    }
                 }
             }
+            ray.throughput *= material.albedo;
+            ray.origin = P + 1e-3f * ray.direction;
         }
-        ray.depth++;
         ray_buffer[index] = ray;
     }
     
