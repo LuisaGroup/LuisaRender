@@ -150,14 +150,13 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     [light_buffer autorelease];
     auto light_count = 1u;
     
-    auto threads_per_group = MTLSizeMake(16, 16, 1);
+    auto threads_per_group = MTLSizeMake(32, 32, 1);
     auto thread_groups = MTLSizeMake((width + threads_per_group.width - 1) / threads_per_group.width, (height + threads_per_group.height - 1) / threads_per_group.height, 1);
     
-    constexpr auto batch_size = 16u;
-    constexpr auto spp = 512u;
+    constexpr auto spp = 128u;
     
-    static auto batches_in_flight = 0u;
-    constexpr auto max_batches_in_flight = 8u;
+    static auto frames_in_flight = 0u;
+    constexpr auto max_frames_in_flight = 8u;
     static std::mutex mutex;
     static std::condition_variable cond_var;
     static auto count = 0u;
@@ -165,100 +164,96 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     std::cout << "Rendering..." << std::endl;
     auto t0 = std::chrono::steady_clock::now();
     
-    for (auto frame_index = 0u; frame_index < spp; frame_index += batch_size) {
+    for (auto i = 0u; i < spp; i++) {
         
-        // wait until there are available batches
+        // wait until max_frames_in_flight not exceeded
         {
             std::unique_lock lock{mutex};
             cond_var.wait(lock, [] {
-                return batches_in_flight < max_batches_in_flight;
+                return frames_in_flight < max_frames_in_flight;
             });
         }
         
         auto command_buffer = [command_queue commandBuffer];
-        [command_buffer autorelease];
-        
         [command_buffer addCompletedHandler:^(id<MTLCommandBuffer>) {
             {
                 std::lock_guard guard{mutex};
-                batches_in_flight--;
+                frames_in_flight--;
             }
             cond_var.notify_one();
-            std::cout << "Progress: " << (++count) * batch_size << "/" << spp << std::endl;
+            std::cout << "Progress: " << (++count) << "/" << spp << std::endl;
         }];
-    
-        for (auto i = frame_index; i < std::min(frame_index + batch_size, spp); i++) {
+        
+        frame.index = i;
+        
+        auto command_encoder = [command_buffer computeCommandEncoder];
+        [command_encoder setBuffer:ray_buffer offset:0 atIndex:0];
+        [command_encoder setBytes:&camera_data length:sizeof(CameraData) atIndex:1];
+        [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:2];
+        [command_encoder setComputePipelineState:generate_ray_pso];
+        [command_encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
+        [command_encoder endEncoding];
+        
+        for (auto bounce = 0u; bounce < 10u; bounce++) {
             
-            frame.index = i;
+            // intersection
+            [ray_intersector encodeIntersectionToCommandBuffer:command_buffer
+                                              intersectionType:MPSIntersectionTypeNearest
+                                                     rayBuffer:ray_buffer
+                                               rayBufferOffset:0
+                                            intersectionBuffer:its_buffer
+                                      intersectionBufferOffset:0
+                                                      rayCount:ray_count
+                                         accelerationStructure:accelerator];
             
-            auto command_encoder = [command_buffer computeCommandEncoder];
+            // sample lights
+            command_encoder = [command_buffer computeCommandEncoder];
             [command_encoder setBuffer:ray_buffer offset:0 atIndex:0];
-            [command_encoder setBytes:&camera_data length:sizeof(CameraData) atIndex:1];
-            [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:2];
-            [command_encoder setComputePipelineState:generate_ray_pso];
+            [command_encoder setBuffer:its_buffer offset:0 atIndex:1];
+            [command_encoder setBuffer:light_buffer offset:0 atIndex:2];
+            [command_encoder setBuffer:shadow_ray_buffer offset:0 atIndex:3];
+            [command_encoder setBytes:&light_count length:sizeof(uint) atIndex:4];
+            [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:5];
+            [command_encoder setComputePipelineState:sample_lights_pso];
             [command_encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
             [command_encoder endEncoding];
             
-            for (auto bounce = 0u; bounce < 10u; bounce++) {
-                
-                // intersection
-                [ray_intersector encodeIntersectionToCommandBuffer:command_buffer
-                                                  intersectionType:MPSIntersectionTypeNearest
-                                                         rayBuffer:ray_buffer
-                                                   rayBufferOffset:0
-                                                intersectionBuffer:its_buffer
-                                          intersectionBufferOffset:0
-                                                          rayCount:ray_count
-                                             accelerationStructure:accelerator];
-                
-                // sample lights
-                command_encoder = [command_buffer computeCommandEncoder];
-                [command_encoder setBuffer:ray_buffer offset:0 atIndex:0];
-                [command_encoder setBuffer:its_buffer offset:0 atIndex:1];
-                [command_encoder setBuffer:light_buffer offset:0 atIndex:2];
-                [command_encoder setBuffer:shadow_ray_buffer offset:0 atIndex:3];
-                [command_encoder setBytes:&light_count length:sizeof(uint) atIndex:4];
-                [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:5];
-                [command_encoder setComputePipelineState:sample_lights_pso];
-                [command_encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
-                [command_encoder endEncoding];
-                
-                // intersection
-                [shadow_ray_intersector encodeIntersectionToCommandBuffer:command_buffer
-                                                         intersectionType:MPSIntersectionTypeAny
-                                                                rayBuffer:shadow_ray_buffer
-                                                          rayBufferOffset:0
-                                                       intersectionBuffer:shadow_its_buffer
-                                                 intersectionBufferOffset:0
-                                                                 rayCount:ray_count
-                                                    accelerationStructure:accelerator];
-                
-                // trace radiance
-                command_encoder = [command_buffer computeCommandEncoder];
-                [command_encoder setBuffer:ray_buffer offset:0 atIndex:0];
-                [command_encoder setBuffer:shadow_ray_buffer offset:0 atIndex:1];
-                [command_encoder setBuffer:its_buffer offset:0 atIndex:2];
-                [command_encoder setBuffer:shadow_its_buffer offset:0 atIndex:3];
-                [command_encoder setBuffer:normal_buffer offset:0 atIndex:4];
-                [command_encoder setBuffer:material_id_buffer offset:0 atIndex:5];
-                [command_encoder setBuffer:material_buffer offset:0 atIndex:6];
-                [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:7];
-                [command_encoder setComputePipelineState:trace_radiance_pso];
-                [command_encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
-                [command_encoder endEncoding];
-            }
+            // intersection
+            [shadow_ray_intersector encodeIntersectionToCommandBuffer:command_buffer
+                                                     intersectionType:MPSIntersectionTypeAny
+                                                            rayBuffer:shadow_ray_buffer
+                                                      rayBufferOffset:0
+                                                   intersectionBuffer:shadow_its_buffer
+                                             intersectionBufferOffset:0
+                                                             rayCount:ray_count
+                                                accelerationStructure:accelerator];
             
+            // trace radiance
             command_encoder = [command_buffer computeCommandEncoder];
             [command_encoder setBuffer:ray_buffer offset:0 atIndex:0];
-            [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:1];
-            [command_encoder setTexture:result_texture atIndex:0];
-            [command_encoder setComputePipelineState:accumulate_pso];
+            [command_encoder setBuffer:shadow_ray_buffer offset:0 atIndex:1];
+            [command_encoder setBuffer:its_buffer offset:0 atIndex:2];
+            [command_encoder setBuffer:shadow_its_buffer offset:0 atIndex:3];
+            [command_encoder setBuffer:normal_buffer offset:0 atIndex:4];
+            [command_encoder setBuffer:material_id_buffer offset:0 atIndex:5];
+            [command_encoder setBuffer:material_buffer offset:0 atIndex:6];
+            [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:7];
+            [command_encoder setComputePipelineState:trace_radiance_pso];
             [command_encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
             [command_encoder endEncoding];
         }
+        
+        command_encoder = [command_buffer computeCommandEncoder];
+        [command_encoder setBuffer:ray_buffer offset:0 atIndex:0];
+        [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:1];
+        [command_encoder setTexture:result_texture atIndex:0];
+        [command_encoder setComputePipelineState:accumulate_pso];
+        [command_encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
+        [command_encoder endEncoding];
+        
         [command_buffer commit];
         std::lock_guard guard{mutex};
-        batches_in_flight++;
+        frames_in_flight++;
     }
     
     auto result_buffer = [device newBufferWithLength:ray_count * sizeof(Vec4f) options:MTLResourceStorageModeManaged];
