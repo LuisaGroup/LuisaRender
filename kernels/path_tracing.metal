@@ -28,13 +28,13 @@ kernel void sample_lights(
         auto index = tid.y * frame_data.size.x + tid.x;
         
         auto ray = ray_buffer[index];
-        auto its = intersection_buffer[index];
+        auto its_dist = intersection_buffer[index].distance;
         
         ShadowRayData shadow_ray{};
-        if (ray.max_distance <= 0.0f || its.distance <= 0.0f) {  // no intersection
+        if (ray.max_distance <= 0.0f || its_dist <= 0.0f) {  // no intersection
             shadow_ray.max_distance = -1.0f;  // terminate the ray
         } else {  // has an intersection
-            auto P = ray.origin + its.distance * ray.direction;
+            auto P = ray.origin + its_dist * ray.direction;
             auto light = light_buffer[min(static_cast<uint>(halton(ray.seed) * light_count), light_count - 1u)];
             auto L = light.position - P;
             auto dist = length(L);
