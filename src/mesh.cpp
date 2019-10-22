@@ -26,6 +26,9 @@ Mesh Mesh::load(const std::vector<MeshDescriptor> &mesh_list) {
         reader.ParseFromFile(desc.path, config);
         
         auto attributes = reader.GetAttrib();
+        if (!reader.Valid()) {
+            std::cerr << "Failed to load: " << desc.path << std::endl;
+        }
         for (auto &&shape : reader.GetShapes()) {
             std::cout << "Processing shape: " << shape.name << std::endl;
             for (auto &&index : shape.mesh.indices) {

@@ -49,7 +49,7 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     [accumulate_pso autorelease];
     
     std::vector<MeshDescriptor> mesh_list;
-    auto cube_obj_path = working_dir.append("data").append("meshes").append("cube").append("cube.obj");
+    auto cube_obj_path = std::filesystem::path{working_dir}.append("data").append("meshes").append("cube").append("cube.obj");
     auto scaling = glm::scale(glm::mat4{1.0f}, glm::vec3{10.0f});
     auto transform_back = glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, 0.0f, -10.0f}) * scaling;
     auto transform_top = glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, 10.0f, 0.0f}) * scaling;
@@ -61,22 +61,23 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_bottom, glm::vec3{1.0f}});
     mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_left, glm::vec3{1.0f, 0.0f, 0.0f}});
     mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_right, glm::vec3{0.0f, 1.0f, 0.0f}});
+    auto bunny_obj_path = std::filesystem::path{working_dir}.append("data").append("meshes").append("bunny").append("bunny.obj");
+    auto bunny_transform = glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, -5.0f, -1.0f}) *
+                           glm::rotate(glm::mat4{1.0f}, glm::radians(30.0f), glm::vec3{0.0f, 1.0f, 0.0f}) *
+                           glm::scale(glm::mat4{1.0f}, glm::vec3{4.0f});
+    mesh_list.emplace_back(MeshDescriptor{bunny_obj_path, bunny_transform, glm::vec3{1.0f}});
     auto mesh = Mesh::load(mesh_list);
     
     auto position_buffer = [device newBufferWithBytes:mesh.positions.data() length:mesh.positions.size() * sizeof(Vec3f) options:MTLResourceStorageModeManaged];
-    [position_buffer didModifyRange:NSMakeRange(0, position_buffer.length)];
     [position_buffer autorelease];
     
     auto normal_buffer = [device newBufferWithBytes:mesh.normals.data() length:mesh.normals.size() * sizeof(Vec3f) options:MTLResourceStorageModeManaged];
-    [normal_buffer didModifyRange:NSMakeRange(0, normal_buffer.length)];
     [normal_buffer autorelease];
     
     auto material_id_buffer = [device newBufferWithBytes:mesh.material_ids.data() length:mesh.material_ids.size() * sizeof(uint) options:MTLResourceStorageModeManaged];
-    [material_id_buffer didModifyRange:NSMakeRange(0, material_id_buffer.length)];
     [material_id_buffer autorelease];
     
     auto material_buffer = [device newBufferWithBytes:mesh.materials.data() length:mesh.materials.size() * sizeof(MaterialData) options:MTLResourceStorageModeManaged];
-    [material_buffer didModifyRange:NSMakeRange(0, material_buffer.length)];
     [material_buffer autorelease];
     
     auto ray_intersector = [[MPSRayIntersector alloc] initWithDevice:device];
@@ -136,10 +137,9 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     frame.index = 0;
     
     LightData light;
-    light.position = {0.0f, 0.0f, 0.0f};
+    light.position = {0.0f, 4.0f, 0.0f};
     light.emission = {10.0f, 10.0f, 10.0f};
     auto light_buffer = [device newBufferWithBytes:&light length:sizeof(LightData) options:MTLResourceStorageModeManaged];
-    [light_buffer didModifyRange:NSMakeRange(0, light_buffer.length)];
     [light_buffer autorelease];
     auto light_count = 1u;
     
@@ -179,10 +179,9 @@ int main(int argc [[maybe_unused]], char *argv[]) {
             [command_encoder setBuffer:ray_buffer offset:0 atIndex:0];
             [command_encoder setBuffer:its_buffer offset:0 atIndex:1];
             [command_encoder setBuffer:light_buffer offset:0 atIndex:2];
-            [command_encoder setBuffer:position_buffer offset:0 atIndex:3];
-            [command_encoder setBuffer:shadow_ray_buffer offset:0 atIndex:4];
-            [command_encoder setBytes:&light_count length:sizeof(uint) atIndex:5];
-            [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:6];
+            [command_encoder setBuffer:shadow_ray_buffer offset:0 atIndex:3];
+            [command_encoder setBytes:&light_count length:sizeof(uint) atIndex:4];
+            [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:5];
             [command_encoder setComputePipelineState:sample_lights_pso];
             [command_encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
             [command_encoder endEncoding];
@@ -203,11 +202,10 @@ int main(int argc [[maybe_unused]], char *argv[]) {
             [command_encoder setBuffer:shadow_ray_buffer offset:0 atIndex:1];
             [command_encoder setBuffer:its_buffer offset:0 atIndex:2];
             [command_encoder setBuffer:shadow_its_buffer offset:0 atIndex:3];
-            [command_encoder setBuffer:position_buffer offset:0 atIndex:4];
-            [command_encoder setBuffer:normal_buffer offset:0 atIndex:5];
-            [command_encoder setBuffer:material_id_buffer offset:0 atIndex:6];
-            [command_encoder setBuffer:material_buffer offset:0 atIndex:7];
-            [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:8];
+            [command_encoder setBuffer:normal_buffer offset:0 atIndex:4];
+            [command_encoder setBuffer:material_id_buffer offset:0 atIndex:5];
+            [command_encoder setBuffer:material_buffer offset:0 atIndex:6];
+            [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:7];
             [command_encoder setComputePipelineState:trace_radiance_pso];
             [command_encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
             [command_encoder endEncoding];

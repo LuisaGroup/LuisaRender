@@ -28,12 +28,9 @@ kernel void pinhole_camera_generate_rays(
         auto x = sensor_x * half_sensor_width;
         auto y = sensor_y * half_sensor_height;
         
-        auto w_world = normalize(x * camera_data.left + y * camera_data.up + z * camera_data.front);
-        auto o_world = camera_data.position;
-        
         RayData ray{};
-        ray.origin = o_world;
-        ray.direction = w_world;
+        ray.origin = camera_data.position;
+        ray.direction = normalize(x * camera_data.left + y * camera_data.up + z * camera_data.front);
         ray.min_distance = 1e-3f;
         ray.max_distance = INFINITY;
         ray.throughput = PackedVec3f{1.0f, 1.0f, 1.0f};
