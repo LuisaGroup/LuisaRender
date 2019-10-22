@@ -5,17 +5,22 @@
 #pragma once
 
 #include <vector>
-#include <glm/glm.hpp>
-#include <tinyobjloader/tiny_obj_loader.h>
+#include <filesystem>
+#include "compatibility.h"
+#include "material_data.h"
 
-class Mesh {
+struct MeshDescriptor {
+    std::filesystem::path path;
+    glm::mat4 transform;
+    glm::vec3 albedo;
+};
 
-private:
-    std::vector<glm::vec4> _positions;  // for padding
-    std::vector<glm::vec4> _normals;
-    std::vector<glm::vec2> _tex_coords;
-    std::vector<uint32_t> _material_ids;
-
+struct Mesh {
+    std::vector<Vec3f> positions;
+    std::vector<Vec3f> normals;
+    std::vector<uint> material_ids;
+    std::vector<MaterialData> materials;
+    static Mesh load(const std::vector<MeshDescriptor> &mesh_list);
 };
 
 

@@ -6,9 +6,7 @@
 
 #include "compatibility.h"
 
-struct LightData {
-    
+struct LightData {  // for now, only point light is supported
     Vec3f position;
-    
-    
+    Vec3f emission;
 };

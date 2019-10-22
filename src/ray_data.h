@@ -13,4 +13,15 @@ struct RayData {
     float max_distance;
     PackedVec3f throughput;
     uint seed;
+    PackedVec3f radiance;
+    uint depth;
+};
+
+struct ShadowRayData {
+    PackedVec3f origin;
+    float min_distance;
+    PackedVec3f direction;
+    float max_distance;
+    PackedVec3f light_radiance;
+    float light_pdf;
 };

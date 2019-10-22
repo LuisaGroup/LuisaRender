@@ -6,10 +6,6 @@
 
 #include "../src/compatibility.h"
 
-struct MaterialData {
-    
+struct MaterialData {  // for now, only lambert is supported
     Vec3f albedo;
-    Vec3f specular;
-    float roughness;
-    
 };

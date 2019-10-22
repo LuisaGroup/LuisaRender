@@ -17,6 +17,8 @@ inline unsigned int tea(uint v0, uint v1) {
     return v0;
 }
 
+#include "address_spaces.h"
+
 constexpr constant unsigned int primes[] = {
     2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53,
     59, 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131,
