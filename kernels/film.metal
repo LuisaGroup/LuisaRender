@@ -9,10 +9,10 @@
 
 using namespace metal;
 
-inline float Mitchell1D(float x) {
+constexpr float Mitchell1D(float x) {
     constexpr auto B = 1.0f / 3.0f;
     constexpr auto C = 1.0f / 3.0f;
-    x = abs(2 * x);
+    x = 2.0f * (x > 0.0f ? x : -x);
     return (x > 1 ?
             (-B - 6 * C) * x * x * x + (6 * B + 30 * C) * x * x + (-12 * B - 48 * C) * x + (8 * B + 24 * C) :
             (12 - 9 * B - 6 * C) * x * x * x + (-18 + 12 * B + 6 * C) * x * x + (6 - 2 * B)) *

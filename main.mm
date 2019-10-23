@@ -154,7 +154,7 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     auto threads_per_group = MTLSizeMake(32, 32, 1);
     auto thread_groups = MTLSizeMake((width + threads_per_group.width - 1) / threads_per_group.width, (height + threads_per_group.height - 1) / threads_per_group.height, 1);
     
-    constexpr auto spp = 64u;
+    constexpr auto spp = 128u;
     
     static auto available_frame_count = 4u;
     static std::mutex mutex;
