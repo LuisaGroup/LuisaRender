@@ -29,7 +29,7 @@ add_subdirectory(thirdparty/tinyobjloader)
 add_subdirectory(kernels)
 include_directories(src)
 
-file(GLOB SOURCE_FILES src/*.cpp src/*.h src/*.mm src/*.m)
+file(GLOB_RECURSE SOURCE_FILES src/*.cpp src/*.h src/*.mm src/*.m)
 add_executable(Metalight ${SOURCE_FILES} main.mm)
 add_dependencies(Metalight kernels)
 

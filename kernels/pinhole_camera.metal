@@ -22,21 +22,22 @@ kernel void pinhole_camera_generate_rays(
         auto half_sensor_width = tan(0.5f * camera_data.fov) * z;
         auto half_sensor_height = half_sensor_width * h / w;
         
-        auto sensor_x = 1.0f - (static_cast<float>(tid.x) + halton(seed)) / w * 2.0f;
-        auto sensor_y = 1.0f - (static_cast<float>(tid.y) + halton(seed)) / h * 2.0f;
-        
-        auto x = sensor_x * half_sensor_width;
-        auto y = sensor_y * half_sensor_height;
+        auto px = static_cast<float>(tid.x) + halton(seed);
+        auto py = static_cast<float>(tid.y) + halton(seed);
+    
+        auto x = (1.0f - px / w * 2.0f) * half_sensor_width;
+        auto y = (1.0f - py / h * 2.0f) * half_sensor_height;
         
         RayData ray{};
         ray.origin = camera_data.position;
         ray.direction = normalize(x * camera_data.left + y * camera_data.up + z * camera_data.front);
-        ray.min_distance = 1e-3f;
+        ray.min_distance = 0.0f;
         ray.max_distance = INFINITY;
         ray.throughput = PackedVec3f{1.0f, 1.0f, 1.0f};
         ray.seed = seed;
         ray.radiance = PackedVec3f{0.0f, 0.0f, 0.0f};
         ray.depth = 0;
+        ray.pixel = Vec2f{px, py};
         
         ray_buffer[tid.y * w + tid.x] = ray;
     }

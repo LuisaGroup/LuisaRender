@@ -68,10 +68,11 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_bottom, glm::vec3{1.0f}, false});
     mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_left, glm::vec3{1.0f, 0.0f, 0.0f}, false});
     mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_right, glm::vec3{0.0f, 1.0f, 0.0f}, false});
-    auto bunny_obj_path = std::filesystem::path{working_dir}.append("data").append("meshes").append("bunny").append("bunny.obj");
+//    auto bunny_obj_path = std::filesystem::path{working_dir}.append("data").append("meshes").append("bunny").append("bunny.obj");
+    auto bunny_obj_path = std::filesystem::path{working_dir}.append("data").append("meshes").append("nanosuit").append("nanosuit.obj");
     auto bunny_transform = glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, -5.0f, -1.0f}) *
                            glm::rotate(glm::mat4{1.0f}, glm::radians(30.0f), glm::vec3{0.0f, 1.0f, 0.0f}) *
-                           glm::scale(glm::mat4{1.0f}, glm::vec3{4.0f});
+                           glm::scale(glm::mat4{1.0f}, glm::vec3{0.5f});
     mesh_list.emplace_back(MeshDescriptor{bunny_obj_path, bunny_transform, glm::vec3{1.0f}, true});
     auto mesh = Mesh::load(mesh_list);
     
@@ -153,9 +154,9 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     auto threads_per_group = MTLSizeMake(32, 32, 1);
     auto thread_groups = MTLSizeMake((width + threads_per_group.width - 1) / threads_per_group.width, (height + threads_per_group.height - 1) / threads_per_group.height, 1);
     
-    constexpr auto spp = 128u;
+    constexpr auto spp = 64u;
     
-    static auto available_frame_count = 8u;
+    static auto available_frame_count = 4u;
     static std::mutex mutex;
     static std::condition_variable cond_var;
     static auto count = 0u;
@@ -168,9 +169,7 @@ int main(int argc [[maybe_unused]], char *argv[]) {
         // wait until max_frames_in_flight not exceeded
         {
             std::unique_lock lock{mutex};
-            cond_var.wait(lock, [] {
-                return available_frame_count != 0;
-            });
+            cond_var.wait(lock, [] { return available_frame_count != 0; });
         }
         
         auto command_buffer = [command_queue commandBuffer];
@@ -210,9 +209,10 @@ int main(int argc [[maybe_unused]], char *argv[]) {
             [command_encoder setBuffer:ray_buffer offset:0 atIndex:0];
             [command_encoder setBuffer:its_buffer offset:0 atIndex:1];
             [command_encoder setBuffer:light_buffer offset:0 atIndex:2];
-            [command_encoder setBuffer:shadow_ray_buffer offset:0 atIndex:3];
-            [command_encoder setBytes:&light_count length:sizeof(uint) atIndex:4];
-            [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:5];
+            [command_encoder setBuffer:position_buffer offset:0 atIndex:3];
+            [command_encoder setBuffer:shadow_ray_buffer offset:0 atIndex:4];
+            [command_encoder setBytes:&light_count length:sizeof(uint) atIndex:5];
+            [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:6];
             [command_encoder setComputePipelineState:sample_lights_pso];
             [command_encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
             [command_encoder endEncoding];
@@ -233,15 +233,17 @@ int main(int argc [[maybe_unused]], char *argv[]) {
             [command_encoder setBuffer:shadow_ray_buffer offset:0 atIndex:1];
             [command_encoder setBuffer:its_buffer offset:0 atIndex:2];
             [command_encoder setBuffer:shadow_its_buffer offset:0 atIndex:3];
-            [command_encoder setBuffer:normal_buffer offset:0 atIndex:4];
-            [command_encoder setBuffer:material_id_buffer offset:0 atIndex:5];
-            [command_encoder setBuffer:material_buffer offset:0 atIndex:6];
-            [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:7];
+            [command_encoder setBuffer:position_buffer offset:0 atIndex:4];
+            [command_encoder setBuffer:normal_buffer offset:0 atIndex:5];
+            [command_encoder setBuffer:material_id_buffer offset:0 atIndex:6];
+            [command_encoder setBuffer:material_buffer offset:0 atIndex:7];
+            [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:8];
             [command_encoder setComputePipelineState:trace_radiance_pso];
             [command_encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
             [command_encoder endEncoding];
         }
         
+        // accumulate
         command_encoder = [command_buffer computeCommandEncoder];
         [command_encoder setBuffer:ray_buffer offset:0 atIndex:0];
         [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:1];
@@ -280,10 +282,10 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     using namespace std::chrono_literals;
     std::cout << "Done in " << (t1 - t0) / 1ns * 1e-9f << "s" << std::endl;
     
-    auto src_data = reinterpret_cast<Vec4f *>(result_buffer.contents);
     cv::Mat image;
     image.create(cv::Size{width, height}, CV_32FC3);
-    auto dest_data = reinterpret_cast<glm::vec3 *>(image.data);
+    auto src_data = reinterpret_cast<Vec4f *>(result_buffer.contents);
+    auto dest_data = reinterpret_cast<PackedVec3f *>(image.data);
     for (auto row = 0u; row < height; row++) {
         for (auto col = 0u; col < width; col++) {
             auto index = row * width + col;
@@ -292,7 +294,7 @@ int main(int argc [[maybe_unused]], char *argv[]) {
         }
     }
     cv::imwrite("result.exr", image);
-    
+
     cv::pow(image, 1.0f / 2.2f, image);
     cv::imshow("Image", image);
     cv::waitKey();

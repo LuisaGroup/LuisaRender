@@ -12,7 +12,7 @@ endforeach ()
 foreach (SOURCE_FILE ${KERNEL_SOURCE_FILES})
     add_custom_command(TARGET kernels
                        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${SOURCE_FILE}
-                       COMMAND xcrun -sdk macosx metal -std=macos-metal2.2 -c ${CMAKE_CURRENT_SOURCE_DIR}/${SOURCE_FILE} -o ${CMAKE_CURRENT_BINARY_DIR}/${SOURCE_FILE}.air
+                       COMMAND xcrun -sdk macosx metal -std=macos-metal2.2 -Ofast -Wall -Wextra -ffast-math -c ${CMAKE_CURRENT_SOURCE_DIR}/${SOURCE_FILE} -o ${CMAKE_CURRENT_BINARY_DIR}/${SOURCE_FILE}.air
                        COMMENT "Generating Metal IR file: ${CMAKE_CURRENT_BINARY_DIR}/${SOURCE_FILE}.air")
 endforeach ()
 

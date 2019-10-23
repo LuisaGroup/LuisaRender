@@ -15,6 +15,9 @@ struct RayData {
     uint seed;
     PackedVec3f radiance;
     uint depth;
+    Vec2f pixel;
+    float pdf;
+    float padding;
 };
 
 struct ShadowRayData {
