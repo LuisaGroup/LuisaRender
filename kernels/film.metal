@@ -19,22 +19,22 @@ inline float Mitchell1D(float x) {
            (1.f / 6.f);
 }
 
-kernel void accumulate(
+kernel void mitchell_natravali_filter(
     device const RayData *ray_buffer [[buffer(0)]],
     constant FrameData &frame_data [[buffer(1)]],
-    texture2d<float, access::read_write> result [[texture(0)]],
+    constant uint &pixel_radius [[buffer(2)]],
+    texture2d<float, access::write> filtered [[texture(0)]],
     uint2 tid [[thread_position_in_grid]]) {
     
     if (tid.x < frame_data.size.x && tid.y < frame_data.size.y) {
-        
+    
         auto weight_sum = 0.0f;
         Vec3f radiance_sum{};
-        
+    
         auto px = tid.x + 0.5f;
         auto py = tid.y + 0.5f;
-        constexpr auto pixel_radius = 2u;
-        constexpr auto filter_radius = pixel_radius + 0.5f;
-        constexpr auto inv_filter_radius = 1.0f / filter_radius;
+        auto filter_radius = pixel_radius + 0.5f;
+        auto inv_filter_radius = 1.0f / filter_radius;
         for (auto y = max(tid.y, pixel_radius) - pixel_radius; y <= min(tid.y + pixel_radius, frame_data.size.y - 1u); y++) {
             for (auto x = max(tid.x, pixel_radius) - pixel_radius; x <= min(tid.x + pixel_radius, frame_data.size.x - 1u); x++) {
                 auto index = y * frame_data.size.x + x;
@@ -44,11 +44,22 @@ kernel void accumulate(
                 radiance_sum += weight * ray_buffer[index].radiance;
             }
         }
-        auto radiance = radiance_sum / weight_sum;
-        
-        auto old = Vec3f(result.read(tid));
+        filtered.write(Vec4f(radiance_sum / weight_sum, 1.0f), tid);
+    }
+    
+}
+
+kernel void accumulate(
+    constant FrameData &frame_data [[buffer(0)]],
+    texture2d<float, access::read> new_frame [[texture(0)]],
+    texture2d<float, access::read_write> result [[texture(1)]],
+    uint2 tid [[thread_position_in_grid]]) {
+    
+    if (tid.x < frame_data.size.x && tid.y < frame_data.size.y) {
+        auto old_val = result.read(tid);
+        auto new_val = new_frame.read(tid);
         auto t = 1.0f / (frame_data.index + 1.0f);  // should work even if index == 0
-        result.write(Vec4f(old * (1.0f - t) + radiance * t, 1.0f), tid);
+        result.write(old_val * (1.0f - t) + new_val * t, tid);
     }
     
 }

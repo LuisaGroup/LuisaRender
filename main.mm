@@ -55,6 +55,10 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     auto accumulate_pso = [device newComputePipelineStateWithDescriptor:pipeline_desc options:MTLPipelineOptionNone reflection:nullptr error:nullptr];
     [accumulate_pso autorelease];
     
+    pipeline_desc.computeFunction = [library newFunctionWithName:@"mitchell_natravali_filter"];
+    auto filter_pso = [device newComputePipelineStateWithDescriptor:pipeline_desc options:MTLPipelineOptionNone reflection:nullptr error:nullptr];
+    [filter_pso autorelease];
+    
     std::vector<MeshDescriptor> mesh_list;
     auto cube_obj_path = std::filesystem::path{working_dir}.append("data").append("meshes").append("cube").append("cube.obj");
     auto scaling = glm::scale(glm::mat4{1.0f}, glm::vec3{10.1f});
@@ -127,9 +131,11 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     texture_desc.width = width;
     texture_desc.height = height;
     texture_desc.storageMode = MTLStorageModePrivate;
-    texture_desc.usage = MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite;
     texture_desc.allowGPUOptimizedContents = true;
+    texture_desc.usage = MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite;
+    auto filter_texture = [device newTextureWithDescriptor:texture_desc];
     auto result_texture = [device newTextureWithDescriptor:texture_desc];
+    [filter_texture autorelease];
     [result_texture autorelease];
     
     CameraData camera_data{};
@@ -154,9 +160,9 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     auto threads_per_group = MTLSizeMake(32, 32, 1);
     auto thread_groups = MTLSizeMake((width + threads_per_group.width - 1) / threads_per_group.width, (height + threads_per_group.height - 1) / threads_per_group.height, 1);
     
-    constexpr auto spp = 64u;
+    constexpr auto spp = 128u;
     
-    static auto available_frame_count = 4u;
+    static auto available_frame_count = 8u;
     static std::mutex mutex;
     static std::condition_variable cond_var;
     static auto count = 0u;
@@ -243,11 +249,22 @@ int main(int argc [[maybe_unused]], char *argv[]) {
             [command_encoder endEncoding];
         }
         
-        // accumulate
+        // filter
+        auto pixel_radius = 2u;
         command_encoder = [command_buffer computeCommandEncoder];
         [command_encoder setBuffer:ray_buffer offset:0 atIndex:0];
         [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:1];
-        [command_encoder setTexture:result_texture atIndex:0];
+        [command_encoder setBytes:&pixel_radius length:sizeof(uint) atIndex:2];
+        [command_encoder setTexture:filter_texture atIndex:0];
+        [command_encoder setComputePipelineState:filter_pso];
+        [command_encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
+        [command_encoder endEncoding];
+    
+        // accumulate
+        command_encoder = [command_buffer computeCommandEncoder];
+        [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:0];
+        [command_encoder setTexture:filter_texture atIndex:0];
+        [command_encoder setTexture:result_texture atIndex:1];
         [command_encoder setComputePipelineState:accumulate_pso];
         [command_encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
         [command_encoder endEncoding];
