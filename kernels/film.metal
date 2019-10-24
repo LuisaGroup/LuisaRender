@@ -2,6 +2,7 @@
 // Created by Mike Smith on 2019/10/21.
 //
 
+#include "../src/color_spaces.h"
 #include "../src/frame_data.h"
 #include "../src/ray_data.h"
 
@@ -45,7 +46,7 @@ kernel void mitchell_natravali_filter(
                 radiance_sum += weight * ray_buffer[index].radiance;
             }
         }
-        filtered.write(Vec4f(radiance_sum / weight_sum, 1.0f), tid);
+        filtered.write(Vec4f(xyz2rgb(radiance_sum / weight_sum), 1.0f), tid);
     }
     
 }

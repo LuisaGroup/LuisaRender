@@ -6,8 +6,12 @@
 
 #include "compatibility.h"
 
-inline float luminance(Vec3f rgb) {
+inline float luminance_rgb(Vec3f rgb) {
     return rgb.x * 0.212671f + rgb.y * 0.715160f + rgb.z * 0.072169f;
+}
+
+inline float luminance_xyz(Vec3f xyz) {
+    return xyz.y;
 }
 
 inline Vec3f xyz2rgb(Vec3f xyz) {

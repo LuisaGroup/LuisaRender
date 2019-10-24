@@ -10,7 +10,7 @@
 #include "../src/light_data.h"
 #include "../src/onb.h"
 #include "../src/sampling.h"
-#include "color_spaces.h"
+#include "../src/color_spaces.h"
 
 using namespace metal;
 
@@ -46,7 +46,7 @@ kernel void sample_lights(
             shadow_ray.origin = P + 1e-4f * shadow_ray.direction;
             shadow_ray.min_distance = 0.0f;
             shadow_ray.max_distance = dist - 1e-4f;
-            shadow_ray.light_radiance = light.emission * inv_dist * inv_dist;
+            shadow_ray.light_radiance = rgb2xyz(light.emission) * inv_dist * inv_dist;
             shadow_ray.light_pdf = 1.0f / light_count;
         }
         ray_buffer[index].seed = ray.seed;
@@ -79,6 +79,7 @@ kernel void trace_radiance(
 //            }
         } else {
             auto material = material_buffer[material_id_buffer[its.triangle_index]];
+            material.albedo = rgb2xyz(material.albedo);
             auto i0 = its.triangle_index * 3;
             auto uvw = Vec3f(its.barycentric, 1.0f - its.barycentric.x - its.barycentric.y);
             auto P = uvw.x * p_buffer[i0] + uvw.y * p_buffer[i0 + 1] + uvw.z * p_buffer[i0 + 2];
@@ -109,7 +110,7 @@ kernel void trace_radiance(
                 ray.throughput *= material.albedo;
                 ray.depth++;
                 if (ray.depth > 3) {  // RR
-                    auto q = max(0.05f, 1.0f - luminance(ray.throughput));
+                    auto q = max(0.05f, 1.0f - luminance_xyz(ray.throughput));
                     if (halton(ray.seed) < q) {
                         ray.max_distance = -1.0f;
                     } else {
