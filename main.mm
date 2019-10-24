@@ -160,7 +160,7 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     auto threads_per_group = MTLSizeMake(32, 32, 1);
     auto thread_groups = MTLSizeMake((width + threads_per_group.width - 1) / threads_per_group.width, (height + threads_per_group.height - 1) / threads_per_group.height, 1);
     
-    constexpr auto spp = 128u;
+    constexpr auto spp = 8192u;
     
     static auto available_frame_count = 8u;
     static std::mutex mutex;
@@ -250,7 +250,7 @@ int main(int argc [[maybe_unused]], char *argv[]) {
         }
         
         // filter
-        auto pixel_radius = 2u;
+        auto pixel_radius = 1u;
         command_encoder = [command_buffer computeCommandEncoder];
         [command_encoder setBuffer:ray_buffer offset:0 atIndex:0];
         [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:1];

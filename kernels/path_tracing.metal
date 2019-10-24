@@ -10,7 +10,7 @@
 #include "../src/light_data.h"
 #include "../src/onb.h"
 #include "../src/sampling.h"
-#include "../src/luminance.h"
+#include "color_spaces.h"
 
 using namespace metal;
 
