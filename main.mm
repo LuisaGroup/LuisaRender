@@ -67,11 +67,11 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     auto transform_bottom = glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, -10.0f, 0.0f}) * scaling;
     auto transform_left = glm::translate(glm::mat4{1.0f}, glm::vec3{-10.0f, 0.0f, 0.0f}) * scaling;
     auto transform_right = glm::translate(glm::mat4{1.0f}, glm::vec3{10.0f, 0.0f, 0.0f}) * scaling;
-    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_back, glm::vec3{1.0f}, false});
-    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_top, glm::vec3{1.0f}, false});
-    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_bottom, glm::vec3{1.0f}, false});
-    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_left, glm::vec3{1.0f, 0.0f, 0.0f}, false});
-    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_right, glm::vec3{0.0f, 1.0f, 0.0f}, false});
+    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_back, glm::vec3{0.725f, 0.71f, 0.68f}, false});
+    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_top, glm::vec3{0.725f, 0.71f, 0.68f}, false});
+    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_bottom, glm::vec3{0.725f, 0.71f, 0.68f}, false});
+    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_left, glm::vec3{0.63f, 0.065f, 0.05f}, false});
+    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_right, glm::vec3{0.14f, 0.45f, 0.091f}, false});
 //    auto bunny_obj_path = std::filesystem::path{working_dir}.append("data").append("meshes").append("bunny").append("bunny.obj");
     auto bunny_obj_path = std::filesystem::path{working_dir}.append("data").append("meshes").append("nanosuit").append("nanosuit.obj");
     auto bunny_transform = glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, -5.0f, -1.0f}) *
@@ -152,7 +152,7 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     
     LightData light;
     light.position = {0.0f, 4.0f, 0.0f};
-    light.emission = {10.0f, 10.0f, 10.0f};
+    light.emission = {15.0f, 15.0f, 15.0f};
     auto light_buffer = [device newBufferWithBytes:&light length:sizeof(LightData) options:MTLResourceStorageModeManaged];
     [light_buffer autorelease];
     auto light_count = 1u;
@@ -259,7 +259,7 @@ int main(int argc [[maybe_unused]], char *argv[]) {
         [command_encoder setComputePipelineState:filter_pso];
         [command_encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
         [command_encoder endEncoding];
-    
+        
         // accumulate
         command_encoder = [command_buffer computeCommandEncoder];
         [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:0];
@@ -311,7 +311,6 @@ int main(int argc [[maybe_unused]], char *argv[]) {
         }
     }
     cv::imwrite("result.exr", image);
-
     cv::pow(image, 1.0f / 2.2f, image);
     cv::imshow("Image", image);
     cv::waitKey();

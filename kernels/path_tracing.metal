@@ -107,7 +107,7 @@ kernel void trace_radiance(
                 ray.direction = normalize(2.0f * NdotV * N - V);
             } else {
                 ray.direction = normalize(Onb{N}.inverse_transform(Vec3f(cosine_sample_hemisphere(halton(ray.seed), halton(ray.seed)))));
-                ray.throughput *= material.albedo;
+                ray.throughput *= material.albedo;  // simplified for lambertian materials
                 ray.depth++;
                 if (ray.depth > 3) {  // RR
                     auto q = max(0.05f, 1.0f - luminance_xyz(ray.throughput));
