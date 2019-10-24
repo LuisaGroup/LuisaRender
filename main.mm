@@ -40,8 +40,12 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     pipeline_desc.threadGroupSizeIsMultipleOfThreadExecutionWidth = true;
     
     pipeline_desc.computeFunction = [library newFunctionWithName:@"pinhole_camera_generate_rays"];
-    auto generate_ray_pso = [device newComputePipelineStateWithDescriptor:pipeline_desc options:MTLPipelineOptionNone reflection:nullptr error:nullptr];
+    MTLAutoreleasedComputePipelineReflection reflection;
+    auto generate_ray_pso = [device newComputePipelineStateWithDescriptor:pipeline_desc options:MTLPipelineOptionArgumentInfo reflection:&reflection error:nullptr];
     [generate_ray_pso autorelease];
+    for (MTLArgument *argument in reflection.arguments) {
+        NSLog(@"%@", argument);
+    }
     
     pipeline_desc.computeFunction = [library newFunctionWithName:@"sample_lights"];
     auto sample_lights_pso = [device newComputePipelineStateWithDescriptor:pipeline_desc options:MTLPipelineOptionNone reflection:nullptr error:nullptr];
