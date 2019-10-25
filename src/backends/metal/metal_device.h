@@ -20,6 +20,8 @@ public:
     MetalDevice();
     std::shared_ptr<Kernel> create_kernel(std::string_view function_name) override;
     std::shared_ptr<Texture> create_texture() override;
+    std::shared_ptr<Acceleration> create_acceleration(Buffer &position_buffer, size_t stride, size_t triangle_count) override;
+    std::shared_ptr<Buffer> create_buffer(size_t capacity, StorageTag storage) override;
     
     void launch(std::function<void(KernelDispatcher &)> dispatch) override;
     void launch_async(std::function<void(KernelDispatcher &)> dispatch, std::function<void()> callback) override;

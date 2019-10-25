@@ -4,8 +4,20 @@
 
 #pragma once
 
-class Texture {
+#include <util/noncopyable.h>
 
+enum struct TextureFormat {
+    RGBA32F,
+    RGBA8U,
+    RGB32F,
+    RGB8U,
+    GRAYSCALE32F,
+    GRAYSCALE8U
 };
 
+class Texture : Noncopyable {
 
+public:
+    virtual ~Texture() noexcept = default;
+    
+};

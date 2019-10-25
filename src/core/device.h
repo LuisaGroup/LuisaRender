@@ -13,6 +13,7 @@
 
 #include "kernel.h"
 #include "texture.h"
+#include "acceleration.h"
 
 #include <util/noncopyable.h>
 
@@ -29,12 +30,14 @@ protected:
 public:
     virtual ~Device() = default;
     
-    static std::shared_ptr<Device> create(std::string_view name) {
+    [[nodiscard]] static std::shared_ptr<Device> create(std::string_view name) {
         return _device_creators.at(name)();
     }
     
-    virtual std::shared_ptr<Kernel> create_kernel(std::string_view function_name) = 0;
-    virtual std::shared_ptr<Texture> create_texture() = 0;
+    [[nodiscard]] virtual std::shared_ptr<Kernel> create_kernel(std::string_view function_name) = 0;
+    [[nodiscard]] virtual std::shared_ptr<Texture> create_texture() = 0;
+    [[nodiscard]] virtual std::shared_ptr<Buffer> create_buffer(size_t capacity, StorageTag storage) = 0;
+    [[nodiscard]] virtual std::shared_ptr<Acceleration> create_acceleration(Buffer &position_buffer, size_t stride, size_t triangle_count) = 0;
     
     static void print() {
         for (auto &&creator : _device_creators) {
@@ -52,5 +55,5 @@ public:
         inline static struct _reg_helper_impl {                                                         \
             _reg_helper_impl() noexcept { Device::_register_creator(name, [] { return _create(); }); }  \
         } _reg_helper{};                                                                                \
-        static std::shared_ptr<Device> _create()
+        [[nodiscard]] static std::shared_ptr<Device> _create()
         

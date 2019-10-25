@@ -12,8 +12,8 @@
 
 struct KernelArgumentProxy : Noncopyable {
     virtual ~KernelArgumentProxy() = default;
-    virtual void set_buffer(const Buffer &buffer) = 0;
-    virtual void set_texture(const Texture &texture) = 0;
+    virtual void set_buffer(Buffer &buffer) = 0;
+    virtual void set_texture(Texture &texture) = 0;
     virtual void set_bytes(const void *bytes, size_t size) = 0;
 };
 
@@ -38,16 +38,16 @@ public:
     }
 };
 
-struct KernelArgumentEncoder {
+struct KernelArgumentEncoder : Noncopyable {
     virtual ~KernelArgumentEncoder() noexcept = default;
-    virtual KernelArgumentProxyWrapper operator[](std::string_view argument_name) = 0;
+    [[nodiscard]] virtual KernelArgumentProxyWrapper operator[](std::string_view argument_name) = 0;
 };
 
 struct Kernel : Noncopyable {
     virtual ~Kernel() = default;
 };
 
-struct KernelDispatcher {
+struct KernelDispatcher : Noncopyable {
     virtual ~KernelDispatcher() noexcept = default;
     virtual void operator()(Kernel &kernel, uint2 grids, uint2 grid_size, std::function<void(KernelArgumentEncoder &)> encode) = 0;
 };

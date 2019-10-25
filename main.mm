@@ -15,13 +15,23 @@
 #import <light_data.h>
 
 #import <core/device.h>
+#import <util/resource_manager.h>
 
 int main(int argc [[maybe_unused]], char *argv[]) {
     
+    ResourceManager::instance().set_working_directory(std::filesystem::current_path());
+    ResourceManager::instance().set_binary_directory(std::filesystem::absolute(argv[0]).parent_path());
+    
+    auto dev = Device::create("Metal");
+    
+    auto generate_rays_kernel = dev->create_kernel("pinhole_camera_generate_rays");
+    auto sample_lights_kernel = dev->create_kernel("sample_lights");
+    auto trace_radiance_kernel = dev->create_kernel("trace_radiance");
+    auto reconstruct_kernel = dev->create_kernel("mitchell_natravali_filter");
+    auto accumulate_kernel = dev->create_kernel("accumulate");
+    
     auto working_dir = std::filesystem::current_path();
     auto binary_dir = std::filesystem::absolute(argv[0]).parent_path();
-    
-    Device::print();
     
     id<MTLDevice> device = nullptr;
     for (id<MTLDevice> potential_device in MTLCopyAllDevices()) {
