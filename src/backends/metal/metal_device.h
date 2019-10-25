@@ -7,25 +7,21 @@
 #include <memory>
 #include <core/device.h>
 
-struct MetalDeviceWrapper;
-struct MetalLibraryWrapper;
-
 class MetalDevice : public Device {
 
 private:
-    std::unique_ptr<MetalDeviceWrapper> _device_wrapper;
-    std::unique_ptr<MetalLibraryWrapper> _library_wrapper;
+    std::unique_ptr<struct MetalDeviceWrapper> _device_wrapper;
+    std::unique_ptr<struct MetalLibraryWrapper> _library_wrapper;
+    std::unique_ptr<struct MetalCommandQueueWrapper> _command_queue_wrapper;
     
     DEVICE_CREATOR("Metal") { return std::make_shared<MetalDevice>(); }
 
 public:
     MetalDevice();
-
-public:
     std::shared_ptr<Kernel> create_kernel(std::string_view function_name) override;
+    std::shared_ptr<Texture> create_texture() override;
     
-    std::shared_ptr<Texture> create_texture() override {
-        return std::shared_ptr<Texture>();
-    }
+    void launch(std::function<void(KernelDispatcher &)> dispatch) override;
+    void launch_async(std::function<void(KernelDispatcher &)> dispatch, std::function<void()> callback) override;
     
 };

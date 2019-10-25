@@ -14,10 +14,14 @@
 #import <frame_data.h>
 #import <light_data.h>
 
+#import <core/device.h>
+
 int main(int argc [[maybe_unused]], char *argv[]) {
     
     auto working_dir = std::filesystem::current_path();
     auto binary_dir = std::filesystem::absolute(argv[0]).parent_path();
+    
+    Device::print();
     
     id<MTLDevice> device = nullptr;
     for (id<MTLDevice> potential_device in MTLCopyAllDevices()) {
@@ -40,12 +44,8 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     pipeline_desc.threadGroupSizeIsMultipleOfThreadExecutionWidth = true;
     
     pipeline_desc.computeFunction = [library newFunctionWithName:@"pinhole_camera_generate_rays"];
-    MTLAutoreleasedComputePipelineReflection reflection;
-    auto generate_ray_pso = [device newComputePipelineStateWithDescriptor:pipeline_desc options:MTLPipelineOptionArgumentInfo reflection:&reflection error:nullptr];
+    auto generate_ray_pso = [device newComputePipelineStateWithDescriptor:pipeline_desc options:MTLPipelineOptionNone reflection:nullptr error:nullptr];
     [generate_ray_pso autorelease];
-    for (MTLArgument *argument in reflection.arguments) {
-        NSLog(@"%@", argument);
-    }
     
     pipeline_desc.computeFunction = [library newFunctionWithName:@"sample_lights"];
     auto sample_lights_pso = [device newComputePipelineStateWithDescriptor:pipeline_desc options:MTLPipelineOptionNone reflection:nullptr error:nullptr];
@@ -60,8 +60,10 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     [accumulate_pso autorelease];
     
     pipeline_desc.computeFunction = [library newFunctionWithName:@"mitchell_natravali_filter"];
-    auto filter_pso = [device newComputePipelineStateWithDescriptor:pipeline_desc options:MTLPipelineOptionNone reflection:nullptr error:nullptr];
+    MTLAutoreleasedComputePipelineReflection reflection;
+    auto filter_pso = [device newComputePipelineStateWithDescriptor:pipeline_desc options:MTLPipelineOptionArgumentInfo reflection:&reflection error:nullptr];
     [filter_pso autorelease];
+    NSLog(@"%@", reflection);
     
     std::vector<MeshDescriptor> mesh_list;
     auto cube_obj_path = std::filesystem::path{working_dir}.append("data").append("meshes").append("cube").append("cube.obj");
@@ -71,11 +73,11 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     auto transform_bottom = glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, -10.0f, 0.0f}) * scaling;
     auto transform_left = glm::translate(glm::mat4{1.0f}, glm::vec3{-10.0f, 0.0f, 0.0f}) * scaling;
     auto transform_right = glm::translate(glm::mat4{1.0f}, glm::vec3{10.0f, 0.0f, 0.0f}) * scaling;
-    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_back, glm::vec3{0.725f, 0.71f, 0.68f}, false});
-    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_top, glm::vec3{0.725f, 0.71f, 0.68f}, false});
-    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_bottom, glm::vec3{0.725f, 0.71f, 0.68f}, false});
-    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_left, glm::vec3{0.63f, 0.065f, 0.05f}, false});
-    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_right, glm::vec3{0.14f, 0.45f, 0.091f}, false});
+    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_back, glm::vec3{1.0f}, false});
+    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_top, glm::vec3{1.0f}, false});
+    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_bottom, glm::vec3{1.0f}, false});
+    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_left, glm::vec3{1.0f, 0.0f, 0.0f}, false});
+    mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_right, glm::vec3{0.0f, 1.0f, 0.0f}, false});
 //    auto bunny_obj_path = std::filesystem::path{working_dir}.append("data").append("meshes").append("bunny").append("bunny.obj");
     auto bunny_obj_path = std::filesystem::path{working_dir}.append("data").append("meshes").append("nanosuit").append("nanosuit.obj");
     auto bunny_transform = glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, -5.0f, -1.0f}) *
@@ -115,7 +117,7 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     accelerator.triangleCount = mesh.material_ids.size();
     [accelerator rebuild];
     
-    constexpr auto width = 1000u;
+    constexpr auto width = 1280u;
     constexpr auto height = 800u;
     
     constexpr auto ray_count = width * height;
@@ -143,12 +145,12 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     [result_texture autorelease];
     
     CameraData camera_data{};
-    camera_data.position = {0.0f, 0.0f, 15.0f};
+    camera_data.position = {0.0f, -1.2f, 15.0f};
     camera_data.front = {0.0f, 0.0f, -1.0f};
     camera_data.left = {-1.0f, 0.0f, 0.0f};
     camera_data.up = {0.0f, 1.0f, 0.0f};
     camera_data.near_plane = 0.1f;
-    camera_data.fov = glm::radians(52.5f);
+    camera_data.fov = glm::radians(37.5f);
     
     FrameData frame{};
     frame.size = {width, height};
@@ -156,7 +158,7 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     
     LightData light;
     light.position = {0.0f, 4.0f, 0.0f};
-    light.emission = {15.0f, 15.0f, 15.0f};
+    light.emission = {10.0f, 10.0f, 10.0f};
     auto light_buffer = [device newBufferWithBytes:&light length:sizeof(LightData) options:MTLResourceStorageModeManaged];
     [light_buffer autorelease];
     auto light_count = 1u;
@@ -164,9 +166,9 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     auto threads_per_group = MTLSizeMake(32, 32, 1);
     auto thread_groups = MTLSizeMake((width + threads_per_group.width - 1) / threads_per_group.width, (height + threads_per_group.height - 1) / threads_per_group.height, 1);
     
-    constexpr auto spp = 4096u;
+    constexpr auto spp = 2048u;
     
-    static auto available_frame_count = 8u;
+    static auto available_frame_count = 4u;
     static std::mutex mutex;
     static std::condition_variable cond_var;
     static auto count = 0u;
@@ -315,9 +317,9 @@ int main(int argc [[maybe_unused]], char *argv[]) {
         }
     }
     cv::imwrite("result.exr", image);
-    cv::pow(image, 1.0f / 2.2f, image);
-    cv::imshow("Image", image);
-    cv::waitKey();
+//    cv::pow(image, 1.0f / 2.2f, image);
+//    cv::imshow("Image", image);
+//    cv::waitKey();
     
     return 0;
 }

@@ -19,8 +19,8 @@ kernel void pinhole_camera_generate_rays(
         auto seed = (tea<4>(tid.x, tid.y) + frame_data.index) << 8u;
         
         auto z = camera_data.near_plane;
-        auto half_sensor_width = tan(0.5f * camera_data.fov) * z;
-        auto half_sensor_height = half_sensor_width * h / w;
+        auto half_sensor_height = tan(0.5f * camera_data.fov) * z;
+        auto half_sensor_width = half_sensor_height * w / h;
         
         auto px = static_cast<float>(tid.x) + halton(seed);
         auto py = static_cast<float>(tid.y) + halton(seed);

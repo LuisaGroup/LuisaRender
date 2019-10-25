@@ -4,8 +4,8 @@
 
 #pragma once
 
-class Buffer {
+
+
+struct Buffer {
 
 };
-
-

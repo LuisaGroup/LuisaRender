@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <functional>
 #include <utility>
+#include <iostream>
 
 #include "kernel.h"
 #include "texture.h"
@@ -34,6 +35,15 @@ public:
     
     virtual std::shared_ptr<Kernel> create_kernel(std::string_view function_name) = 0;
     virtual std::shared_ptr<Texture> create_texture() = 0;
+    
+    static void print() {
+        for (auto &&creator : _device_creators) {
+            std::cout << creator.first << std::endl;
+        }
+    }
+    
+    virtual void launch(std::function<void(KernelDispatcher &)> dispatch) = 0;
+    virtual void launch_async(std::function<void(KernelDispatcher &)> dispatch, std::function<void()> callback) = 0;
 };
 
 #define DEVICE_CREATOR(name)                                                                            \
