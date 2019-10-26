@@ -46,7 +46,7 @@ kernel void mitchell_natravali_filter(
                 radiance_sum += weight * ray_buffer[index].radiance;
             }
         }
-        filtered.write(Vec4f(xyz2rgb(radiance_sum / weight_sum), 1.0f), tid);
+        filtered.write(Vec4f(radiance_sum / weight_sum, 1.0f), tid);
     }
     
 }
@@ -58,7 +58,7 @@ kernel void accumulate(
     uint2 tid [[thread_position_in_grid]]) {
     
     if (tid.x < frame_data.size.x && tid.y < frame_data.size.y) {
-        result.write(mix(result.read(tid), new_frame.read(tid), 1.0f / (frame_data.index + 1.0f)), tid);
+        result.write(mix(result.read(tid), Vec4f(XYZ2RGB(ACEScg2XYZ(Vec3f(new_frame.read(tid)))), 1.0f), 1.0f / (frame_data.index + 1.0f)), tid);
     }
     
 }

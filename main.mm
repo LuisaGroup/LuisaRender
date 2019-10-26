@@ -127,8 +127,8 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     accelerator.triangleCount = mesh.material_ids.size();
     [accelerator rebuild];
     
-    constexpr auto width = 1280u;
-    constexpr auto height = 800u;
+    constexpr auto width = 1024u;
+    constexpr auto height = 768u;
     
     constexpr auto ray_count = width * height;
     auto ray_buffer = [device newBufferWithLength:ray_count * sizeof(RayData) options:MTLResourceStorageModePrivate];
@@ -155,12 +155,12 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     [result_texture autorelease];
     
     CameraData camera_data{};
-    camera_data.position = {0.0f, -1.2f, 15.0f};
+    camera_data.position = {0.0f, -1.0f, 15.0f};
     camera_data.front = {0.0f, 0.0f, -1.0f};
     camera_data.left = {-1.0f, 0.0f, 0.0f};
     camera_data.up = {0.0f, 1.0f, 0.0f};
     camera_data.near_plane = 0.1f;
-    camera_data.fov = glm::radians(37.5f);
+    camera_data.fov = glm::radians(35.0f);
     
     FrameData frame{};
     frame.size = {width, height};
@@ -176,9 +176,9 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     auto threads_per_group = MTLSizeMake(32, 32, 1);
     auto thread_groups = MTLSizeMake((width + threads_per_group.width - 1) / threads_per_group.width, (height + threads_per_group.height - 1) / threads_per_group.height, 1);
     
-    constexpr auto spp = 2048u;
+    constexpr auto spp = 128u;
     
-    static auto available_frame_count = 4u;
+    static auto available_frame_count = 8u;
     static std::mutex mutex;
     static std::condition_variable cond_var;
     static auto count = 0u;
