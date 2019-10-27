@@ -135,6 +135,7 @@ kernel void sort_rays(
     device const uint &ray_count [[buffer(1)]],
     device RayData *output_ray_buffer [[buffer(2)]],
     device atomic_uint &output_ray_count [[buffer(3)]],
+    constant uint &max_ray_count [[buffer(4)]],
     uint tid [[thread_index_in_threadgroup]],
     uint2 tgsize [[threads_per_threadgroup]],
     uint2 tgid [[threadgroup_position_in_grid]],
@@ -143,6 +144,15 @@ kernel void sort_rays(
     auto index = (tgsize.x * tgsize.y) * (tgid.y * gsize.x + tgid.x) + tid;
     
     if (index < ray_count) {
-    
+        auto ray = ray_buffer[index];
+        if (ray.max_distance <= 0.0f) {
+            auto i = atomic_load_explicit(&output_ray_count, memory_order_relaxed);
+            output_ray_buffer[ray_count - 1u + i - index] = ray;
+        } else {  // active
+            auto i = atomic_fetch_add_explicit(&output_ray_count, 1, memory_order_relaxed);
+            output_ray_buffer[i] = ray;
+        }
+    } else if (index < max_ray_count) {
+        output_ray_buffer[index] = ray_buffer[index];
     }
 }

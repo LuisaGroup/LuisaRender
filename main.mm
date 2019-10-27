@@ -138,7 +138,7 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     constexpr auto width = 1000u;
     constexpr auto height = 800u;
     
-    constexpr auto ray_count = width * height;
+    auto ray_count = width * height;
     auto ray_buffer = [device newBufferWithLength:ray_count * sizeof(RayData) options:MTLResourceStorageModePrivate];
     [ray_buffer autorelease];
     auto output_ray_buffer = [device newBufferWithLength:ray_count * sizeof(RayData) options:MTLResourceStorageModePrivate];
@@ -187,7 +187,7 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     auto thread_groups = MTLSizeMake((width + threads_per_group.width - 1) / threads_per_group.width, (height + threads_per_group.height - 1) / threads_per_group.height, 1);
     
     constexpr auto spp = 128u;
-    constexpr auto max_depth = 2u;
+    constexpr auto max_depth = 10u;
     
     static auto available_frame_count = 8u;
     static std::mutex mutex;
@@ -289,7 +289,15 @@ int main(int argc [[maybe_unused]], char *argv[]) {
             [command_encoder endEncoding];
             
             // sort rays
-            
+            command_encoder = [command_buffer computeCommandEncoder];
+            [command_encoder setBuffer:ray_buffer offset:0 atIndex:0];
+            [command_encoder setBuffer:ray_count_buffer offset:curr_ray_count_offset atIndex:1];
+            [command_encoder setBuffer:output_ray_buffer offset:0 atIndex:2];
+            [command_encoder setBuffer:ray_count_buffer offset:next_ray_count_offset atIndex:3];
+            [command_encoder setBytes:&ray_count length:sizeof(uint) atIndex:4];
+            [command_encoder setComputePipelineState:sort_rays_pso];
+            [command_encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
+            [command_encoder endEncoding];
             
             auto t = ray_buffer;
             ray_buffer = output_ray_buffer;

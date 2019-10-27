@@ -49,19 +49,20 @@ kernel void mitchell_natravali_filter(
         auto radiance = ray_buffer[index].radiance;
         
         auto screen = uint2(pixel);
-        auto filter_radius = pixel_radius + 0.5f;
-        auto inv_filter_radius = 1.0f / filter_radius;
-        auto min_x = max(screen.x, pixel_radius) - pixel_radius;
-        auto min_y = max(screen.y, pixel_radius) - pixel_radius;
-        auto max_x = min(screen.x + pixel_radius, frame_data.size.x - 1u);
-        auto max_y = min(screen.y + pixel_radius, frame_data.size.y - 1u);
-        for (auto y = min_y; y <= max_y; y++) {
-            for (auto x = min_x; x <= max_x; x++) {
-                auto weight = Mitchell1D(abs(x + 0.5f - pixel.x) * inv_filter_radius) * Mitchell1D(abs(y + 0.5f - pixel.y) * inv_filter_radius);
-                auto f = filtered.read(screen);
-                filtered.write(Vec4f(Vec3f(f) + weight * radiance, f.a + weight), screen);
-            }
-        }
+        filtered.write(Vec4f(radiance, 1.0f), screen);
+//        auto filter_radius = pixel_radius + 0.5f;
+//        auto inv_filter_radius = 1.0f / filter_radius;
+//        auto min_x = max(screen.x, pixel_radius) - pixel_radius;
+//        auto min_y = max(screen.y, pixel_radius) - pixel_radius;
+//        auto max_x = min(screen.x + pixel_radius, frame_data.size.x - 1u);
+//        auto max_y = min(screen.y + pixel_radius, frame_data.size.y - 1u);
+//        for (auto y = min_y; y <= max_y; y++) {
+//            for (auto x = min_x; x <= max_x; x++) {
+//                auto weight = Mitchell1D(abs(x + 0.5f - pixel.x) * inv_filter_radius) * Mitchell1D(abs(y + 0.5f - pixel.y) * inv_filter_radius);
+//                auto f = filtered.read(screen);
+//                filtered.write(Vec4f(Vec3f(f) + weight * radiance, f.a + weight), screen);
+//            }
+//        }
     }
     
 }
