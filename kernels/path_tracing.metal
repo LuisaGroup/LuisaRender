@@ -21,24 +21,28 @@ kernel void sample_lights(
     device const Vec3f *p_buffer[[buffer(3)]],
     device ShadowRayData *shadow_ray_buffer [[buffer(4)]],
     constant uint &light_count [[buffer(5)]],
-    constant FrameData &frame_data [[buffer(6)]],
-    uint2 tid [[thread_position_in_grid]]) {
+    device const uint &ray_count [[buffer(6)]],
+    uint tid [[thread_index_in_threadgroup]],
+    uint2 tgsize [[threads_per_threadgroup]],
+    uint2 tgid [[threadgroup_position_in_grid]],
+    uint2 gsize [[threadgroups_per_grid]]) {
     
-    if (tid.x < frame_data.size.x && tid.y < frame_data.size.y) {
+    auto index = (tgsize.x * tgsize.y) * (tgid.y * gsize.x + tgid.x) + tid;
+    
+    if (index < ray_count) {
         
-        auto index = tid.y * frame_data.size.x + tid.x;
-        
-        auto ray = ray_buffer[index];
         auto its = intersection_buffer[index];
+        auto ray_seed = ray_buffer[index].seed;
         
         ShadowRayData shadow_ray{};
-        if (ray.max_distance <= 0.0f || its.distance <= 0.0f) {  // no intersection
+        
+        if (ray_buffer[index].max_distance <= 0.0f || its.distance <= 0.0f) {  // no intersection
             shadow_ray.max_distance = -1.0f;  // terminate the ray
         } else {  // has an intersection
             auto uvw = Vec3f(its.barycentric, 1.0f - its.barycentric.x - its.barycentric.y);
             auto i0 = its.triangle_index * 3u;
             auto P = uvw.x * p_buffer[i0] + uvw.y * p_buffer[i0 + 1] + uvw.z * p_buffer[i0 + 2];
-            auto light = light_buffer[min(static_cast<uint>(halton(ray.seed) * light_count), light_count - 1u)];
+            auto light = light_buffer[min(static_cast<uint>(halton(ray_seed) * light_count), light_count - 1u)];
             auto L = light.position - P;
             auto dist = length(L);
             auto inv_dist = 1.0f / dist;
@@ -49,13 +53,13 @@ kernel void sample_lights(
             shadow_ray.light_radiance = XYZ2ACEScg(RGB2XYZ(light.emission)) * inv_dist * inv_dist;
             shadow_ray.light_pdf = 1.0f / light_count;
         }
-        ray_buffer[index].seed = ray.seed;
+        ray_buffer[index].seed = ray_seed;
         shadow_ray_buffer[index] = shadow_ray;
     }
 }
 
 kernel void trace_radiance(
-    device RayData *ray_buffer [[buffer(0)]],
+    device const RayData *ray_buffer [[buffer(0)]],
     device const ShadowRayData *shadow_ray_buffer [[buffer(1)]],
     device const IntersectionData *its_buffer [[buffer(2)]],
     device const ShadowIntersectionData *shadow_its_buffer [[buffer(3)]],
@@ -63,20 +67,25 @@ kernel void trace_radiance(
     device const Vec3f *n_buffer [[buffer(5)]],
     device const uint *material_id_buffer [[buffer(6)]],
     device const MaterialData *material_buffer [[buffer(7)]],
-    constant FrameData &frame_data [[buffer(8)]],
-    uint2 tid [[thread_position_in_grid]]) {
+    device RayData *output_ray_buffer [[buffer(8)]],
+    device const uint &ray_count [[buffer(9)]],
+    device atomic_uint &output_ray_count [[buffer(10)]],
+    uint tid [[thread_index_in_threadgroup]],
+    uint2 tgsize [[threads_per_threadgroup]],
+    uint2 tgid [[threadgroup_position_in_grid]],
+    uint2 gsize [[threadgroups_per_grid]]) {
     
-    if (tid.x < frame_data.size.x && tid.y < frame_data.size.y) {
+    auto index = (tgsize.x * tgsize.y) * (tgid.y * gsize.x + tgid.x) + tid;
+    
+    if (index < ray_count) {
         
-        auto index = tid.y * frame_data.size.x + tid.x;
         auto ray = ray_buffer[index];
         auto its = its_buffer[index];
         
         if (ray.max_distance <= 0.0f || its.distance <= 0.0f) {  // no intersection
             ray.max_distance = -1.0f;  // terminate the ray
-//            if (ray.depth == 0) {
-//                ray.radiance = PackedVec3f{0.3f, 0.2f, 0.1f};  // background
-//            }
+            auto output_count = atomic_load_explicit(&output_ray_count, memory_order_relaxed);
+            output_ray_buffer[ray_count - 1u + output_count - index] = ray;
         } else {
             auto material = material_buffer[material_id_buffer[its.triangle_index]];
             material.albedo = XYZ2ACEScg(RGB2XYZ(material.albedo));
@@ -120,8 +129,9 @@ kernel void trace_radiance(
             }
             ray.origin = P + 1e-4f * ray.direction;
             ray.min_distance = 0.0f;
+            auto i = atomic_fetch_add_explicit(&output_ray_count, 1, memory_order_relaxed);
+            output_ray_buffer[i] = ray;
         }
-        ray_buffer[index] = ray;
     }
     
 }

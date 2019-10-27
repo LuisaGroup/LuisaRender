@@ -36,11 +36,15 @@ kernel void mitchell_natravali_filter(
     constant FrameData &frame_data [[buffer(1)]],
     constant uint &pixel_radius [[buffer(2)]],
     texture2d<float, access::read_write> filtered [[texture(0)]],
-    uint2 tid [[thread_position_in_grid]]) {
+    uint tid [[thread_index_in_threadgroup]],
+    uint2 tgsize [[threads_per_threadgroup]],
+    uint2 tgid [[threadgroup_position_in_grid]],
+    uint2 gsize [[threadgroups_per_grid]]) {
     
-    if (tid.x < frame_data.size.x && tid.y < frame_data.size.y) {
+    auto index = (tgsize.x * tgsize.y) * (tgid.y * gsize.x + tgid.x) + tid;
+    
+    if (index < frame_data.size.x * frame_data.size.y) {
         
-        auto index = tid.y * frame_data.size.x + tid.x;
         auto pixel = ray_buffer[index].pixel;
         auto radiance = ray_buffer[index].radiance;
         

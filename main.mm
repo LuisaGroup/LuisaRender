@@ -131,12 +131,14 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     accelerator.triangleCount = mesh.material_ids.size();
     [accelerator rebuild];
     
-    constexpr auto width = 1280u;
+    constexpr auto width = 1000u;
     constexpr auto height = 800u;
     
     constexpr auto ray_count = width * height;
     auto ray_buffer = [device newBufferWithLength:ray_count * sizeof(RayData) options:MTLResourceStorageModePrivate];
     [ray_buffer autorelease];
+    auto output_ray_buffer = [device newBufferWithLength:ray_count * sizeof(RayData) options:MTLResourceStorageModePrivate];
+    [output_ray_buffer autorelease];
     auto shadow_ray_buffer = [device newBufferWithLength:ray_count * sizeof(ShadowRayData) options:MTLResourceStorageModePrivate];
     [shadow_ray_buffer autorelease];
     auto its_buffer = [device newBufferWithLength:ray_count * sizeof(IntersectionData) options:MTLResourceStorageModePrivate];
@@ -180,8 +182,8 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     auto threads_per_group = MTLSizeMake(32, 32, 1);
     auto thread_groups = MTLSizeMake((width + threads_per_group.width - 1) / threads_per_group.width, (height + threads_per_group.height - 1) / threads_per_group.height, 1);
     
-    constexpr auto spp = 4096u;
-    constexpr auto max_depth = 10u;
+    constexpr auto spp = 128u;
+    constexpr auto max_depth = 2u;
     
     static auto available_frame_count = 8u;
     static std::mutex mutex;
@@ -192,9 +194,9 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     auto t0 = std::chrono::steady_clock::now();
     
     std::vector<uint> initial_ray_counts;
-    initial_ray_counts.resize(spp * max_depth, 0u);
-    for (auto i = 0; i < spp; i++) {
-        initial_ray_counts[i * max_depth] = ray_count;
+    initial_ray_counts.resize(spp * (max_depth + 1u), 0u);
+    for (auto i = 0u; i < spp; i++) {
+        initial_ray_counts[i * (max_depth + 1u)] = ray_count;
     }
     
     auto ray_count_buffer = [device newBufferWithBytes:initial_ray_counts.data() length:initial_ray_counts.size() * sizeof(uint) options:MTLResourceStorageModeManaged];
@@ -228,18 +230,21 @@ int main(int argc [[maybe_unused]], char *argv[]) {
         [command_encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
         [command_encoder endEncoding];
         
-        for (auto bounce = 0u; bounce < 10u; bounce++) {
+        for (auto bounce = 0u; bounce < max_depth; bounce++) {
             
-            // intersection
+            auto curr_ray_count_offset = (i * (max_depth + 1u) + bounce) * sizeof(uint);
+            auto next_ray_count_offset = curr_ray_count_offset + sizeof(uint);
+            
             [ray_intersector encodeIntersectionToCommandBuffer:command_buffer
                                               intersectionType:MPSIntersectionTypeNearest
                                                      rayBuffer:ray_buffer
-                                               rayBufferOffset:0
+                                               rayBufferOffset:0u
                                             intersectionBuffer:its_buffer
-                                      intersectionBufferOffset:0
-                                                      rayCount:ray_count
+                                      intersectionBufferOffset:0u
+                                                rayCountBuffer:ray_count_buffer
+                                          rayCountBufferOffset:curr_ray_count_offset
                                          accelerationStructure:accelerator];
-    
+            
             // sample lights
             command_encoder = [command_buffer computeCommandEncoder];
             [command_encoder setBuffer:ray_buffer offset:0 atIndex:0];
@@ -248,7 +253,7 @@ int main(int argc [[maybe_unused]], char *argv[]) {
             [command_encoder setBuffer:position_buffer offset:0 atIndex:3];
             [command_encoder setBuffer:shadow_ray_buffer offset:0 atIndex:4];
             [command_encoder setBytes:&light_count length:sizeof(uint) atIndex:5];
-            [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:6];
+            [command_encoder setBuffer:ray_count_buffer offset:curr_ray_count_offset atIndex:6];
             [command_encoder setComputePipelineState:sample_lights_pso];
             [command_encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
             [command_encoder endEncoding];
@@ -260,7 +265,8 @@ int main(int argc [[maybe_unused]], char *argv[]) {
                                                       rayBufferOffset:0
                                                    intersectionBuffer:shadow_its_buffer
                                              intersectionBufferOffset:0
-                                                             rayCount:ray_count
+                                                       rayCountBuffer:ray_count_buffer
+                                                 rayCountBufferOffset:curr_ray_count_offset
                                                 accelerationStructure:accelerator];
             
             // trace radiance
@@ -273,17 +279,24 @@ int main(int argc [[maybe_unused]], char *argv[]) {
             [command_encoder setBuffer:normal_buffer offset:0 atIndex:5];
             [command_encoder setBuffer:material_id_buffer offset:0 atIndex:6];
             [command_encoder setBuffer:material_buffer offset:0 atIndex:7];
-            [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:8];
+            [command_encoder setBuffer:output_ray_buffer offset:0 atIndex:8];
+            [command_encoder setBuffer:ray_count_buffer offset:curr_ray_count_offset atIndex:9];
+            [command_encoder setBuffer:ray_count_buffer offset:next_ray_count_offset atIndex:10];
             [command_encoder setComputePipelineState:trace_radiance_pso];
             [command_encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
             [command_encoder endEncoding];
+            
+            auto t = ray_buffer;
+            ray_buffer = output_ray_buffer;
+            output_ray_buffer = t;
         }
         
         command_encoder = [command_buffer computeCommandEncoder];
         [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:0];
         [command_encoder setTexture:filter_texture atIndex:0];
+        [command_encoder setComputePipelineState:clear_pso];
         [command_encoder endEncoding];
-    
+        
         // filter
         auto pixel_radius = 1u;
         command_encoder = [command_buffer computeCommandEncoder];
