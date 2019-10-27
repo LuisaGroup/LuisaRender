@@ -65,6 +65,10 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     auto trace_radiance_pso = [device newComputePipelineStateWithDescriptor:pipeline_desc options:MTLPipelineOptionNone reflection:nullptr error:nullptr];
     [trace_radiance_pso autorelease];
     
+    pipeline_desc.computeFunction = [library newFunctionWithName:@"sort_rays"];
+    auto sort_rays_pso = [device newComputePipelineStateWithDescriptor:pipeline_desc options:MTLPipelineOptionNone reflection:nullptr error:nullptr];
+    [sort_rays_pso autorelease];
+    
     pipeline_desc.computeFunction = [library newFunctionWithName:@"accumulate"];
     auto accumulate_pso = [device newComputePipelineStateWithDescriptor:pipeline_desc options:MTLPipelineOptionNone reflection:nullptr error:nullptr];
     [accumulate_pso autorelease];
@@ -279,12 +283,13 @@ int main(int argc [[maybe_unused]], char *argv[]) {
             [command_encoder setBuffer:normal_buffer offset:0 atIndex:5];
             [command_encoder setBuffer:material_id_buffer offset:0 atIndex:6];
             [command_encoder setBuffer:material_buffer offset:0 atIndex:7];
-            [command_encoder setBuffer:output_ray_buffer offset:0 atIndex:8];
-            [command_encoder setBuffer:ray_count_buffer offset:curr_ray_count_offset atIndex:9];
-            [command_encoder setBuffer:ray_count_buffer offset:next_ray_count_offset atIndex:10];
+            [command_encoder setBuffer:ray_count_buffer offset:curr_ray_count_offset atIndex:8];
             [command_encoder setComputePipelineState:trace_radiance_pso];
             [command_encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
             [command_encoder endEncoding];
+            
+            // sort rays
+            
             
             auto t = ray_buffer;
             ray_buffer = output_ray_buffer;
@@ -295,6 +300,7 @@ int main(int argc [[maybe_unused]], char *argv[]) {
         [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:0];
         [command_encoder setTexture:filter_texture atIndex:0];
         [command_encoder setComputePipelineState:clear_pso];
+        [command_encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
         [command_encoder endEncoding];
         
         // filter

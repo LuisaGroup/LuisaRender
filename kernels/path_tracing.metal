@@ -59,7 +59,7 @@ kernel void sample_lights(
 }
 
 kernel void trace_radiance(
-    device const RayData *ray_buffer [[buffer(0)]],
+    device RayData *ray_buffer [[buffer(0)]],
     device const ShadowRayData *shadow_ray_buffer [[buffer(1)]],
     device const IntersectionData *its_buffer [[buffer(2)]],
     device const ShadowIntersectionData *shadow_its_buffer [[buffer(3)]],
@@ -67,9 +67,7 @@ kernel void trace_radiance(
     device const Vec3f *n_buffer [[buffer(5)]],
     device const uint *material_id_buffer [[buffer(6)]],
     device const MaterialData *material_buffer [[buffer(7)]],
-    device RayData *output_ray_buffer [[buffer(8)]],
-    device const uint &ray_count [[buffer(9)]],
-    device atomic_uint &output_ray_count [[buffer(10)]],
+    device const uint &ray_count [[buffer(8)]],
     uint tid [[thread_index_in_threadgroup]],
     uint2 tgsize [[threads_per_threadgroup]],
     uint2 tgid [[threadgroup_position_in_grid]],
@@ -78,15 +76,12 @@ kernel void trace_radiance(
     auto index = (tgsize.x * tgsize.y) * (tgid.y * gsize.x + tgid.x) + tid;
     
     if (index < ray_count) {
-        
-        auto ray = ray_buffer[index];
-        auto its = its_buffer[index];
-        
-        if (ray.max_distance <= 0.0f || its.distance <= 0.0f) {  // no intersection
-            ray.max_distance = -1.0f;  // terminate the ray
-            auto output_count = atomic_load_explicit(&output_ray_count, memory_order_relaxed);
-            output_ray_buffer[ray_count - 1u + output_count - index] = ray;
+    
+        if (ray_buffer[index].max_distance <= 0.0f || its_buffer[index].distance <= 0.0f) {  // no intersection
+            ray_buffer[index].max_distance = -1.0f;  // terminate the ray
         } else {
+            auto ray = ray_buffer[index];
+            auto its = its_buffer[index];
             auto material = material_buffer[material_id_buffer[its.triangle_index]];
             material.albedo = XYZ2ACEScg(RGB2XYZ(material.albedo));
             auto i0 = its.triangle_index * 3;
@@ -129,9 +124,25 @@ kernel void trace_radiance(
             }
             ray.origin = P + 1e-4f * ray.direction;
             ray.min_distance = 0.0f;
-            auto i = atomic_fetch_add_explicit(&output_ray_count, 1, memory_order_relaxed);
-            output_ray_buffer[i] = ray;
+            ray_buffer[index] = ray;
         }
     }
     
+}
+
+kernel void sort_rays(
+    device const RayData *ray_buffer [[buffer(0)]],
+    device const uint &ray_count [[buffer(1)]],
+    device RayData *output_ray_buffer [[buffer(2)]],
+    device atomic_uint &output_ray_count [[buffer(3)]],
+    uint tid [[thread_index_in_threadgroup]],
+    uint2 tgsize [[threads_per_threadgroup]],
+    uint2 tgid [[threadgroup_position_in_grid]],
+    uint2 gsize [[threadgroups_per_grid]]) {
+    
+    auto index = (tgsize.x * tgsize.y) * (tgid.y * gsize.x + tgid.x) + tid;
+    
+    if (index < ray_count) {
+    
+    }
 }
