@@ -35,8 +35,8 @@ public:
     }
     
     [[nodiscard]] virtual std::shared_ptr<Kernel> create_kernel(std::string_view function_name) = 0;
-    [[nodiscard]] virtual std::shared_ptr<Texture> create_texture() = 0;
-    [[nodiscard]] virtual std::shared_ptr<Buffer> create_buffer(size_t capacity, StorageTag storage) = 0;
+    [[nodiscard]] virtual std::shared_ptr<Texture> create_texture(uint2 size, TextureFormatTag format_tag, TextureAccessTag access_tag) = 0;
+    [[nodiscard]] virtual std::shared_ptr<Buffer> create_buffer(size_t capacity, BufferStorageTag storage) = 0;
     [[nodiscard]] virtual std::shared_ptr<Acceleration> create_acceleration(Buffer &position_buffer, size_t stride, size_t triangle_count) = 0;
     
     static void print() {

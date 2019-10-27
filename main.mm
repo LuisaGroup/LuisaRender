@@ -45,7 +45,7 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     auto command_queue = [device newCommandQueue];
     [command_queue autorelease];
     
-    auto library_path = [[[NSString alloc] initWithCString:(binary_dir / "kernels.metallib").c_str() encoding:NSUTF8StringEncoding] autorelease];
+    auto library_path = [[[NSString alloc] initWithCString:(working_dir / "kernels/bin/kernels.metallib").c_str() encoding:NSUTF8StringEncoding] autorelease];
     auto library = [device newLibraryWithFile:library_path error:nullptr];
     [library autorelease];
     
@@ -68,6 +68,10 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     pipeline_desc.computeFunction = [library newFunctionWithName:@"accumulate"];
     auto accumulate_pso = [device newComputePipelineStateWithDescriptor:pipeline_desc options:MTLPipelineOptionNone reflection:nullptr error:nullptr];
     [accumulate_pso autorelease];
+    
+    pipeline_desc.computeFunction = [library newFunctionWithName:@"clear_frame"];
+    auto clear_pso = [device newComputePipelineStateWithDescriptor:pipeline_desc options:MTLPipelineOptionNone reflection:nullptr error:nullptr];
+    [clear_pso autorelease];
     
     pipeline_desc.computeFunction = [library newFunctionWithName:@"mitchell_natravali_filter"];
     MTLAutoreleasedComputePipelineReflection reflection;
@@ -127,8 +131,8 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     accelerator.triangleCount = mesh.material_ids.size();
     [accelerator rebuild];
     
-    constexpr auto width = 1024u;
-    constexpr auto height = 768u;
+    constexpr auto width = 1280u;
+    constexpr auto height = 800u;
     
     constexpr auto ray_count = width * height;
     auto ray_buffer = [device newBufferWithLength:ray_count * sizeof(RayData) options:MTLResourceStorageModePrivate];
@@ -176,7 +180,8 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     auto threads_per_group = MTLSizeMake(32, 32, 1);
     auto thread_groups = MTLSizeMake((width + threads_per_group.width - 1) / threads_per_group.width, (height + threads_per_group.height - 1) / threads_per_group.height, 1);
     
-    constexpr auto spp = 128u;
+    constexpr auto spp = 4096u;
+    constexpr auto max_depth = 10u;
     
     static auto available_frame_count = 8u;
     static std::mutex mutex;
@@ -185,6 +190,15 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     
     std::cout << "Rendering..." << std::endl;
     auto t0 = std::chrono::steady_clock::now();
+    
+    std::vector<uint> initial_ray_counts;
+    initial_ray_counts.resize(spp * max_depth, 0u);
+    for (auto i = 0; i < spp; i++) {
+        initial_ray_counts[i * max_depth] = ray_count;
+    }
+    
+    auto ray_count_buffer = [device newBufferWithBytes:initial_ray_counts.data() length:initial_ray_counts.size() * sizeof(uint) options:MTLResourceStorageModeManaged];
+    [ray_count_buffer autorelease];
     
     for (auto i = 0u; i < spp; i++) {
         
@@ -225,7 +239,7 @@ int main(int argc [[maybe_unused]], char *argv[]) {
                                       intersectionBufferOffset:0
                                                       rayCount:ray_count
                                          accelerationStructure:accelerator];
-            
+    
             // sample lights
             command_encoder = [command_buffer computeCommandEncoder];
             [command_encoder setBuffer:ray_buffer offset:0 atIndex:0];
@@ -265,6 +279,11 @@ int main(int argc [[maybe_unused]], char *argv[]) {
             [command_encoder endEncoding];
         }
         
+        command_encoder = [command_buffer computeCommandEncoder];
+        [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:0];
+        [command_encoder setTexture:filter_texture atIndex:0];
+        [command_encoder endEncoding];
+    
         // filter
         auto pixel_radius = 1u;
         command_encoder = [command_buffer computeCommandEncoder];

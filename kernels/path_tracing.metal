@@ -2,15 +2,15 @@
 // Created by Mike Smith on 2019/10/21.
 //
 
-#include "../src/random.h"
-#include "../src/frame_data.h"
-#include "../src/ray_data.h"
-#include "../src/intersection_data.h"
-#include "../src/material_data.h"
-#include "../src/light_data.h"
-#include "../src/onb.h"
-#include "../src/sampling.h"
-#include "../src/color_spaces.h"
+#include <random.h>
+#include <frame_data.h>
+#include <ray_data.h>
+#include <intersection_data.h>
+#include <material_data.h>
+#include <light_data.h>
+#include <onb.h>
+#include <sampling.h>
+#include <color_spaces.h>
 
 using namespace metal;
 

@@ -6,16 +6,20 @@
 
 #include <vector>
 #include <util/noncopyable.h>
-#include "resource_tags.h"
+
+enum struct BufferStorageTag {
+    DEVICE_PRIVATE,
+    MANAGED
+};
 
 class Buffer : Noncopyable {
 
 protected:
     size_t _capacity;
-    StorageTag _storage;
+    BufferStorageTag _storage;
 
 public:
-    Buffer(size_t capacity, StorageTag storage) noexcept : _capacity{capacity}, _storage{storage} {};
+    Buffer(size_t capacity, BufferStorageTag storage) noexcept : _capacity{capacity}, _storage{storage} {};
     virtual ~Buffer() noexcept = default;
     virtual void upload(const void *host_data, size_t size, size_t offset) = 0;
     virtual void synchronize(struct KernelDispatcher &dispatch) = 0;

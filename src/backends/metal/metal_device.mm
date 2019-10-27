@@ -25,7 +25,7 @@ MetalDevice::MetalDevice()
     _device_wrapper->device = MTLCreateSystemDefaultDevice();
     _command_queue_wrapper->queue = [_device_wrapper->device newCommandQueue];
     
-    auto library_path = make_objc_string(ResourceManager::instance().binary_path("kernels.metallib").c_str());
+    auto library_path = make_objc_string(ResourceManager::instance().working_path("kernels/bin/kernels.metallib").c_str());
     _library_wrapper->library = [_device_wrapper->device newLibraryWithFile:library_path error:nullptr];
     
 }
@@ -49,10 +49,6 @@ std::shared_ptr<Kernel> MetalDevice::create_kernel(std::string_view function_nam
     [pipeline autorelease];
     return std::make_shared<MetalKernel>(pipeline, reflection);
     
-}
-
-std::shared_ptr<Texture> MetalDevice::create_texture() {
-    return std::shared_ptr<Texture>();
 }
 
 void MetalDevice::launch(std::function<void(KernelDispatcher &)> dispatch) {
@@ -95,10 +91,48 @@ std::shared_ptr<Acceleration> MetalDevice::create_acceleration(Buffer &position_
     return std::make_shared<MetalAcceleration>(accelerator, ray_intersector, shadow_ray_intersector);
 }
 
-std::shared_ptr<Buffer> MetalDevice::create_buffer(size_t capacity, StorageTag storage) {
+std::shared_ptr<Buffer> MetalDevice::create_buffer(size_t capacity, BufferStorageTag storage) {
     
     auto buffer = [_device_wrapper->device newBufferWithLength:capacity
-                                                       options:storage == StorageTag::DEVICE_PRIVATE ? MTLResourceStorageModePrivate : MTLResourceStorageModeManaged];
+                                                       options:storage == BufferStorageTag::DEVICE_PRIVATE ? MTLResourceStorageModePrivate : MTLResourceStorageModeManaged];
     [buffer autorelease];
     return std::make_shared<MetalBuffer>(buffer, capacity, storage);
+}
+
+std::shared_ptr<Texture> MetalDevice::create_texture(uint2 size, TextureFormatTag format_tag, TextureAccessTag access_tag) {
+    
+    auto descriptor = [[MTLTextureDescriptor alloc] init];
+    [descriptor autorelease];
+    
+    switch (format_tag) {
+        case TextureFormatTag::RGBA32F:
+            descriptor.pixelFormat = MTLPixelFormatRGBA32Float;
+            break;
+        case TextureFormatTag::GRAYSCALE32F:
+            descriptor.pixelFormat = MTLPixelFormatR32Float;
+            break;
+    }
+    
+    descriptor.textureType = MTLTextureType2D;
+    descriptor.width = size.x;
+    descriptor.height = size.y;
+    descriptor.storageMode = MTLStorageModePrivate;
+    descriptor.allowGPUOptimizedContents = true;
+    
+    switch (access_tag) {
+        case TextureAccessTag::READ_ONLY:
+            descriptor.usage = MTLTextureUsageShaderRead;
+            break;
+        case TextureAccessTag::WRITE_ONLY:
+            descriptor.usage = MTLTextureUsageShaderWrite;
+            break;
+        case TextureAccessTag::READ_WRITE:
+            descriptor.usage = MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite;
+            break;
+    }
+    
+    auto texture = [_device_wrapper->device newTextureWithDescriptor:descriptor];
+    [texture autorelease];
+    
+    return std::shared_ptr<Texture>();
 }

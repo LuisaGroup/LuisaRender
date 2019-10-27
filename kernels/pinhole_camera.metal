@@ -1,7 +1,7 @@
-#include "../src/ray_data.h"
-#include "../src/camera_data.h"
-#include "../src/frame_data.h"
-#include "../src/random.h"
+#include <ray_data.h>
+#include <camera_data.h>
+#include <frame_data.h>
+#include <random.h>
 
 using namespace metal;
 

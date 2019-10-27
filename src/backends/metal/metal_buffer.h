@@ -4,6 +4,10 @@
 
 #pragma once
 
+#ifndef __OBJC__
+#error "This file should only be used in Objective-C/C++ sources."
+#endif
+
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
 #import <core/buffer.h>
 
@@ -13,7 +17,7 @@ private:
     id<MTLBuffer> _buffer;
 
 public:
-    MetalBuffer(id<MTLBuffer> buffer, size_t capacity, StorageTag storage) noexcept
+    MetalBuffer(id<MTLBuffer> buffer, size_t capacity, BufferStorageTag storage) noexcept
         : Buffer(capacity, storage), _buffer{buffer} {}
     
     void upload(const void *host_data, size_t size, size_t offset) override;
