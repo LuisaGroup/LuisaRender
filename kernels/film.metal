@@ -24,7 +24,7 @@ kernel void mitchell_natravali_filter(
     device const GatherRayData *ray_buffer [[buffer(0)]],
     constant FrameData &frame_data [[buffer(1)]],
     constant uint &pixel_radius [[buffer(2)]],
-    texture2d<float, access::read_write> filtered [[texture(0)]],
+    texture2d<float, access::read_write> result [[texture(0)]],
     uint2 tid [[thread_position_in_grid]]) {
     
     if (tid.x < frame_data.size.x && tid.y < frame_data.size.y) {
@@ -34,11 +34,9 @@ kernel void mitchell_natravali_filter(
         auto max_x = min(tid.x + pixel_radius, frame_data.size.x - 1u);
         auto max_y = min(tid.y + pixel_radius, frame_data.size.y - 1u);
         
-        auto count = (max_x - min_x) * (max_y - min_y);
-
         auto filter_radius = pixel_radius + 0.5f;
         auto inv_filter_radius = 1.0f / filter_radius;
-
+        
         auto radiance_sum = Vec3f(0.0f);
         auto weight_sum = 0.0f;
         auto center = Vec2f(tid) + 0.5f;
@@ -54,20 +52,19 @@ kernel void mitchell_natravali_filter(
                 weight_sum += weight;
             }
         }
-        radiance_sum = max(radiance_sum, 0.0f);
-        weight_sum = max(weight_sum, 1e-3f);
-        filtered.write(Vec4f(radiance_sum / weight_sum, 1.0f), tid);
+        result.write(mix(result.read(tid), Vec4f(radiance_sum, weight_sum), 1.0f / (frame_data.index + 1.0f)), tid);
     }
 }
 
-kernel void accumulate(
+kernel void convert_colorspace_rgb(
     constant FrameData &frame_data [[buffer(0)]],
-    texture2d<float, access::read> new_frame [[texture(0)]],
-    texture2d<float, access::read_write> result [[texture(1)]],
+    texture2d<float, access::read_write> result [[texture(0)]],
     uint2 tid [[thread_position_in_grid]]) {
     
     if (tid.x < frame_data.size.x && tid.y < frame_data.size.y) {
-        result.write(mix(result.read(tid), Vec4f(XYZ2RGB(ACEScg2XYZ(Vec3f(new_frame.read(tid)))), 1.0f), 1.0f / (frame_data.index + 1.0f)), tid);
+        auto f = result.read(tid);
+        if (f.a == 0.0f) { f.a = 1e-3f; }
+        result.write(Vec4f(XYZ2RGB(ACEScg2XYZ(Vec3f(f) / f.a)), 1.0f), tid);
     }
     
 }

@@ -5,7 +5,7 @@
 #pragma once
 
 #ifndef __OBJC__
-#error "This file should only be used in Objective-C/C++ sources."
+#error This file should only be used in Objective-C/C++ sources.
 #endif
 
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
@@ -14,16 +14,16 @@
 class MetalTexture : public Texture {
 
 private:
-    id<MTLTexture> _texture;
+    id<MTLTexture> _handle;
 
 public:
     MetalTexture(id<MTLTexture> texture, uint2 size, TextureFormatTag format_tag, TextureAccessTag access_tag)
-        : _texture{texture}, Texture{size, format_tag, access_tag} {}
+        : Texture{size, format_tag, access_tag}, _handle{texture} {}
     
     void copy_from_buffer(struct KernelDispatcher &dispatch, Buffer &buffer) override;
     void copy_to_buffer(struct KernelDispatcher &dispatch, Buffer &buffer) override;
     
-    [[nodiscard]] id<MTLTexture> texture() const noexcept { return _texture; }
+    [[nodiscard]] id<MTLTexture> handle() const noexcept { return _handle; }
     
 };
 

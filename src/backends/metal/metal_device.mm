@@ -71,7 +71,7 @@ std::shared_ptr<Acceleration> MetalDevice::create_acceleration(Buffer &position_
     
     auto accelerator = [[MPSTriangleAccelerationStructure alloc] initWithDevice:_device_wrapper->device];
     [accelerator autorelease];
-    accelerator.vertexBuffer = dynamic_cast<MetalBuffer &>(position_buffer).buffer();
+    accelerator.vertexBuffer = dynamic_cast<MetalBuffer &>(position_buffer).handle();
     accelerator.vertexStride = stride;
     accelerator.triangleCount = triangle_count;
     [accelerator rebuild];

@@ -5,7 +5,7 @@
 #pragma once
 
 #ifndef __OBJC__
-#error "This file should only be used in Objective-C/C++ sources."
+#error This file should only be used in Objective-C/C++ sources.
 #endif
 
 #import <memory>

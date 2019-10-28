@@ -22,7 +22,7 @@ enum struct TextureAccessTag {
 
 class Texture : Noncopyable {
 
-private:
+protected:
     uint2 _size;
     TextureFormatTag _format;
     TextureAccessTag _access;
@@ -33,4 +33,22 @@ public:
     virtual ~Texture() noexcept = default;
     virtual void copy_from_buffer(struct KernelDispatcher &dispatch, Buffer &buffer) = 0;
     virtual void copy_to_buffer(struct KernelDispatcher &dispatch, Buffer &buffer) = 0;
+    
+    [[nodiscard]] size_t bytes_per_pixel() const noexcept {
+        switch (_format) {
+            case TextureFormatTag::RGBA32F:
+                return sizeof(Vec4f);
+            case TextureFormatTag::GRAYSCALE32F:
+                return sizeof(float);
+        }
+    }
+    
+    [[nodiscard]] size_t bytes_per_row() const noexcept {
+        return bytes_per_pixel() * _size.x;
+    }
+    
+    [[nodiscard]] size_t bytes_per_image() const noexcept {
+        return bytes_per_row() * _size.y;
+    }
+    
 };

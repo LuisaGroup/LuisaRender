@@ -22,14 +22,6 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     ResourceManager::instance().set_working_directory(std::filesystem::current_path());
     ResourceManager::instance().set_binary_directory(std::filesystem::absolute(argv[0]).parent_path());
     
-    auto dev = Device::create("Metal");
-    
-    auto generate_rays_kernel = dev->create_kernel("pinhole_camera_generate_rays");
-    auto sample_lights_kernel = dev->create_kernel("sample_lights");
-    auto trace_radiance_kernel = dev->create_kernel("trace_radiance");
-    auto reconstruct_kernel = dev->create_kernel("mitchell_natravali_filter");
-    auto accumulate_kernel = dev->create_kernel("accumulate");
-    
     auto working_dir = std::filesystem::current_path();
     auto binary_dir = std::filesystem::absolute(argv[0]).parent_path();
     
@@ -69,13 +61,13 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     auto sort_rays_pso = [device newComputePipelineStateWithDescriptor:pipeline_desc options:MTLPipelineOptionNone reflection:nullptr error:nullptr];
     [sort_rays_pso autorelease];
     
-    pipeline_desc.computeFunction = [library newFunctionWithName:@"accumulate"];
-    auto accumulate_pso = [device newComputePipelineStateWithDescriptor:pipeline_desc options:MTLPipelineOptionNone reflection:nullptr error:nullptr];
-    [accumulate_pso autorelease];
-    
     pipeline_desc.computeFunction = [library newFunctionWithName:@"mitchell_natravali_filter"];
     auto filter_pso = [device newComputePipelineStateWithDescriptor:pipeline_desc options:MTLPipelineOptionNone reflection:nullptr error:nullptr];
     [filter_pso autorelease];
+    
+    pipeline_desc.computeFunction = [library newFunctionWithName:@"convert_colorspace_rgb"];
+    auto convert_pso = [device newComputePipelineStateWithDescriptor:pipeline_desc options:MTLPipelineOptionNone reflection:nullptr error:nullptr];
+    [convert_pso autorelease];
     
     std::vector<MeshDescriptor> mesh_list;
     auto cube_obj_path = std::filesystem::path{working_dir}.append("data").append("meshes").append("cube").append("cube.obj");
@@ -155,9 +147,7 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     texture_desc.storageMode = MTLStorageModePrivate;
     texture_desc.allowGPUOptimizedContents = true;
     texture_desc.usage = MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite;
-    auto filter_texture = [device newTextureWithDescriptor:texture_desc];
     auto result_texture = [device newTextureWithDescriptor:texture_desc];
-    [filter_texture autorelease];
     [result_texture autorelease];
     
     CameraData camera_data{};
@@ -182,10 +172,10 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     auto threads_per_group = MTLSizeMake(16, 16, 1);
     auto thread_groups = MTLSizeMake((width + threads_per_group.width - 1) / threads_per_group.width, (height + threads_per_group.height - 1) / threads_per_group.height, 1);
     
-    constexpr auto spp = 65536u;
+    constexpr auto spp = 8192u;
     constexpr auto max_depth = 31u;
     
-    static auto available_frame_count = 8u;
+    static auto available_frame_count = 16u;
     static std::mutex mutex;
     static std::condition_variable cond_var;
     static auto count = 0u;
@@ -307,21 +297,13 @@ int main(int argc [[maybe_unused]], char *argv[]) {
         [command_encoder setBuffer:gather_ray_buffer offset:0 atIndex:0];
         [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:1];
         [command_encoder setBytes:&pixel_radius length:sizeof(uint) atIndex:2];
-        [command_encoder setTexture:filter_texture atIndex:0];
+        [command_encoder setTexture:result_texture atIndex:0];
         [command_encoder setComputePipelineState:filter_pso];
         [command_encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
         [command_encoder endEncoding];
         
-        // accumulate
-        command_encoder = [command_buffer computeCommandEncoder];
-        [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:0];
-        [command_encoder setTexture:filter_texture atIndex:0];
-        [command_encoder setTexture:result_texture atIndex:1];
-        [command_encoder setComputePipelineState:accumulate_pso];
-        [command_encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
-        [command_encoder endEncoding];
-        
         [command_buffer commit];
+        
         std::lock_guard guard{mutex};
         available_frame_count--;
     }
@@ -330,6 +312,14 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     [result_buffer autorelease];
     
     auto command_buffer = [command_queue commandBuffer];
+    
+    auto command_encoder = [command_buffer computeCommandEncoder];
+    [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:0];
+    [command_encoder setTexture:result_texture atIndex:0];
+    [command_encoder setComputePipelineState:convert_pso];
+    [command_encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
+    [command_encoder endEncoding];
+    
     auto blit_encoder = [command_buffer blitCommandEncoder];
     [blit_encoder copyFromTexture:result_texture
                       sourceSlice:0
@@ -374,9 +364,6 @@ int main(int argc [[maybe_unused]], char *argv[]) {
         }
     }
     cv::imwrite("result.exr", image);
-//    cv::pow(image, 1.0f / 2.2f, image);
-//    cv::imshow("Image", image);
-//    cv::waitKey();
     
     return 0;
 }

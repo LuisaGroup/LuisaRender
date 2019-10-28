@@ -27,7 +27,7 @@ KernelArgumentProxyWrapper MetalKernelArgumentEncoder::operator[](std::string_vi
 }
 
 void MetalKernelArgumentProxy::set_buffer(Buffer &buffer) {
-    [_encoder setBuffer:dynamic_cast<const MetalBuffer &>(buffer).buffer() offset:0 atIndex:_argument.index];
+    [_encoder setBuffer:dynamic_cast<const MetalBuffer &>(buffer).handle() offset:0 atIndex:_argument.index];
 }
 
 void MetalKernelArgumentProxy::set_texture(Texture &texture) {
