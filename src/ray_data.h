@@ -17,7 +17,7 @@ struct RayData {
     uint depth;
     Vec2f pixel;
     float pdf;
-    float padding;
+    float padding{};
 };
 
 struct ShadowRayData {
@@ -27,4 +27,10 @@ struct ShadowRayData {
     float max_distance;
     PackedVec3f light_radiance;
     float light_pdf;
+};
+
+struct GatherRayData {
+    Vec3f radiance;
+    Vec2f pixel;
+    Vec2f padding{};
 };

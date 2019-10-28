@@ -76,7 +76,7 @@ kernel void trace_radiance(
     auto index = (tgsize.x * tgsize.y) * (tgid.y * gsize.x + tgid.x) + tid;
     
     if (index < ray_count) {
-    
+        
         if (ray_buffer[index].max_distance <= 0.0f || its_buffer[index].distance <= 0.0f) {  // no intersection
             ray_buffer[index].max_distance = -1.0f;  // terminate the ray
         } else {
@@ -135,7 +135,8 @@ kernel void sort_rays(
     device const uint &ray_count [[buffer(1)]],
     device RayData *output_ray_buffer [[buffer(2)]],
     device atomic_uint &output_ray_count [[buffer(3)]],
-    constant uint &max_ray_count [[buffer(4)]],
+    constant FrameData &frame_data [[buffer(4)]],
+    device GatherRayData *gather_ray_data [[buffer(5)]],
     uint tid [[thread_index_in_threadgroup]],
     uint2 tgsize [[threads_per_threadgroup]],
     uint2 tgid [[threadgroup_position_in_grid]],
@@ -145,14 +146,13 @@ kernel void sort_rays(
     
     if (index < ray_count) {
         auto ray = ray_buffer[index];
-        if (ray.max_distance <= 0.0f) {
-            auto i = atomic_load_explicit(&output_ray_count, memory_order_relaxed);
-            output_ray_buffer[ray_count - 1u + i - index] = ray;
-        } else {  // active
-            auto i = atomic_fetch_add_explicit(&output_ray_count, 1, memory_order_relaxed);
-            output_ray_buffer[i] = ray;
+        auto screen = uint2(ray.pixel);
+        auto gather_index = screen.y * frame_data.size.x + screen.x;
+        gather_ray_data[gather_index] = {ray.radiance, ray.pixel};
+        if (ray.max_distance > 0.0f) {  // add active rays to next bounce
+            auto output_index = atomic_fetch_add_explicit(&output_ray_count, 1, memory_order_relaxed);
+            output_ray_buffer[output_index] = ray;
         }
-    } else if (index < max_ray_count) {
-        output_ray_buffer[index] = ray_buffer[index];
     }
+    
 }

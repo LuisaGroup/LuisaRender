@@ -12,7 +12,7 @@ using namespace metal;
 inline float Mitchell1D(float x) {
     constexpr auto B = 1.0f / 3.0f;
     constexpr auto C = 1.0f / 3.0f;
-    x = abs(2 * x);
+    x = min(abs(2 * x), 2.0f);
     auto xx = x * x;
     return (1.0f / 6.0f) *
            (x > 1 ?
@@ -20,51 +20,40 @@ inline float Mitchell1D(float x) {
             ((12 - 9 * B - 6 * C) * xx + (-18 + 12 * B + 6 * C) * x) * x + (6 - 2 * B));
 }
 
-kernel void clear_frame(
-    constant FrameData &frame_data [[buffer(0)]],
-    texture2d<float, access::write> tex [[texture(0)]],
-    uint2 tid [[thread_position_in_grid]]) {
-    
-    if (tid.x < frame_data.size.x && tid.y < frame_data.size.y) {
-        tex.write(Vec4f{}, tid);
-    }
-    
-}
-
 kernel void mitchell_natravali_filter(
-    device const RayData *ray_buffer [[buffer(0)]],
+    device const GatherRayData *ray_buffer [[buffer(0)]],
     constant FrameData &frame_data [[buffer(1)]],
     constant uint &pixel_radius [[buffer(2)]],
     texture2d<float, access::read_write> filtered [[texture(0)]],
-    uint tid [[thread_index_in_threadgroup]],
-    uint2 tgsize [[threads_per_threadgroup]],
-    uint2 tgid [[threadgroup_position_in_grid]],
-    uint2 gsize [[threadgroups_per_grid]]) {
+    uint2 tid [[thread_position_in_grid]]) {
     
-    auto index = (tgsize.x * tgsize.y) * (tgid.y * gsize.x + tgid.x) + tid;
-    
-    if (index < frame_data.size.x * frame_data.size.y) {
+    if (tid.x < frame_data.size.x && tid.y < frame_data.size.y) {
         
-        auto pixel = ray_buffer[index].pixel;
-        auto radiance = ray_buffer[index].radiance;
+        auto min_x = max(tid.x, pixel_radius) - pixel_radius;
+        auto min_y = max(tid.y, pixel_radius) - pixel_radius;
+        auto max_x = min(tid.x + pixel_radius, frame_data.size.x - 1u);
+        auto max_y = min(tid.y + pixel_radius, frame_data.size.y - 1u);
+
+        auto filter_radius = pixel_radius + 0.5f;
+        auto inv_filter_radius = 1.0f / filter_radius;
         
-        auto screen = uint2(pixel);
-        filtered.write(Vec4f(radiance, 1.0f), screen);
-//        auto filter_radius = pixel_radius + 0.5f;
-//        auto inv_filter_radius = 1.0f / filter_radius;
-//        auto min_x = max(screen.x, pixel_radius) - pixel_radius;
-//        auto min_y = max(screen.y, pixel_radius) - pixel_radius;
-//        auto max_x = min(screen.x + pixel_radius, frame_data.size.x - 1u);
-//        auto max_y = min(screen.y + pixel_radius, frame_data.size.y - 1u);
-//        for (auto y = min_y; y <= max_y; y++) {
-//            for (auto x = min_x; x <= max_x; x++) {
-//                auto weight = Mitchell1D(abs(x + 0.5f - pixel.x) * inv_filter_radius) * Mitchell1D(abs(y + 0.5f - pixel.y) * inv_filter_radius);
-//                auto f = filtered.read(screen);
-//                filtered.write(Vec4f(Vec3f(f) + weight * radiance, f.a + weight), screen);
-//            }
-//        }
+        auto radiance_sum = Vec3f(0.0f);
+        auto weight_sum = 0.0f;
+        auto center = Vec2f(tid) + 0.5f;
+        for (auto y = min_y; y <= max_y; y++) {
+            for (auto x = min_x; x <= max_x; x++) {
+                auto index = y * frame_data.size.x + x;
+                auto radiance = ray_buffer[index].radiance;
+                auto pixel = ray_buffer[index].pixel;
+                auto dx = (center.x - pixel.x) * inv_filter_radius;
+                auto dy = (center.y - pixel.y) * inv_filter_radius;
+                auto weight = Mitchell1D(dx) * Mitchell1D(dy);
+                radiance_sum += weight * radiance;
+                weight_sum += weight;
+            }
+        }
+        filtered.write(Vec4f(radiance_sum / weight_sum, 1.0f), tid);
     }
-    
 }
 
 kernel void accumulate(
@@ -74,8 +63,7 @@ kernel void accumulate(
     uint2 tid [[thread_position_in_grid]]) {
     
     if (tid.x < frame_data.size.x && tid.y < frame_data.size.y) {
-        auto f = new_frame.read(tid);
-        result.write(mix(result.read(tid), Vec4f(XYZ2RGB(ACEScg2XYZ(Vec3f(Vec3f(f) / max(f.a, 1e-4f)))), 1.0f), 1.0f / (frame_data.index + 1.0f)), tid);
+        result.write(mix(result.read(tid), Vec4f(XYZ2RGB(ACEScg2XYZ(Vec3f(new_frame.read(tid)))), 1.0f), 1.0f / (frame_data.index + 1.0f)), tid);
     }
     
 }

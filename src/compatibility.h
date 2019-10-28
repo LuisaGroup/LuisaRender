@@ -7,6 +7,7 @@
 #ifdef __METAL_VERSION__
 
 #include <metal_stdlib>
+
 using Vec2f = float2;
 using Vec3f = float3;
 using Vec4f = float4;
