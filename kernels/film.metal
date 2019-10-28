@@ -52,6 +52,10 @@ kernel void mitchell_natravali_filter(
                 weight_sum += weight;
             }
         }
+        if (weight_sum == 0.0f) {
+            radiance_sum = {};
+            weight_sum = 1e-3f;
+        }
         filtered.write(Vec4f(radiance_sum / weight_sum, 1.0f), tid);
     }
 }

@@ -74,10 +74,8 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     [accumulate_pso autorelease];
     
     pipeline_desc.computeFunction = [library newFunctionWithName:@"mitchell_natravali_filter"];
-    MTLAutoreleasedComputePipelineReflection reflection;
-    auto filter_pso = [device newComputePipelineStateWithDescriptor:pipeline_desc options:MTLPipelineOptionArgumentInfo reflection:&reflection error:nullptr];
+    auto filter_pso = [device newComputePipelineStateWithDescriptor:pipeline_desc options:MTLPipelineOptionNone reflection:nullptr error:nullptr];
     [filter_pso autorelease];
-    NSLog(@"%@", reflection);
     
     std::vector<MeshDescriptor> mesh_list;
     auto cube_obj_path = std::filesystem::path{working_dir}.append("data").append("meshes").append("cube").append("cube.obj");
@@ -163,12 +161,12 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     [result_texture autorelease];
     
     CameraData camera_data{};
-    camera_data.position = {0.0f, -1.0f, 15.0f};
+    camera_data.position = {0.0f, 0.0f, 15.0f};
     camera_data.front = {0.0f, 0.0f, -1.0f};
     camera_data.left = {-1.0f, 0.0f, 0.0f};
     camera_data.up = {0.0f, 1.0f, 0.0f};
     camera_data.near_plane = 0.1f;
-    camera_data.fov = glm::radians(35.0f);
+    camera_data.fov = glm::radians(42.5f);
     
     FrameData frame{};
     frame.size = {width, height};
@@ -181,11 +179,11 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     [light_buffer autorelease];
     auto light_count = 1u;
     
-    auto threads_per_group = MTLSizeMake(32, 32, 1);
+    auto threads_per_group = MTLSizeMake(16, 16, 1);
     auto thread_groups = MTLSizeMake((width + threads_per_group.width - 1) / threads_per_group.width, (height + threads_per_group.height - 1) / threads_per_group.height, 1);
     
-    constexpr auto spp = 128u;
-    constexpr auto max_depth = 15u;
+    constexpr auto spp = 8192u;
+    constexpr auto max_depth = 31u;
     
     static auto available_frame_count = 8u;
     static std::mutex mutex;
@@ -344,14 +342,26 @@ int main(int argc [[maybe_unused]], char *argv[]) {
          destinationBytesPerImage:width * height * sizeof(Vec4f)
                           options:MTLBlitOptionNone];
     [blit_encoder synchronizeResource:result_buffer];
+    [blit_encoder synchronizeResource:ray_count_buffer];
     [blit_encoder endEncoding];
     
     [command_buffer commit];
     [command_buffer waitUntilCompleted];
     auto t1 = std::chrono::steady_clock::now();
     
+    auto total_ray_count = 0ul;
+    auto final_ray_count_buffer = reinterpret_cast<uint *>(ray_count_buffer.contents);
+    for (auto i = 0ul; i < initial_ray_counts.size(); i++) {
+        total_ray_count += final_ray_count_buffer[i];
+    }
+    total_ray_count *= 2;  // two rays per bounce
+    
     using namespace std::chrono_literals;
-    std::cout << "Done in " << (t1 - t0) / 1ns * 1e-9f << "s" << std::endl;
+    auto total_time = (t1 - t0) / 1ns * 1e-9f;
+    std::cout << "Total time:      " << total_time << "s" << std::endl;
+    std::cout << "Total rays:      " << total_ray_count * 1e-6 << "M" << std::endl;
+    std::cout << "Rays per second: " << static_cast<double>(total_ray_count) * 1e-6 / total_time << "M" << std::endl;
+    
     
     cv::Mat image;
     image.create(cv::Size{width, height}, CV_32FC3);

@@ -9,5 +9,5 @@
 struct FrameData {
     uint2 size;
     uint index;
-    uint padding;
+    uint padding{};
 };
