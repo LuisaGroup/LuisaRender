@@ -127,7 +127,6 @@ kernel void trace_radiance(
             ray_buffer[index] = ray;
         }
     }
-    
 }
 
 kernel void sort_rays(
@@ -150,7 +149,7 @@ kernel void sort_rays(
         auto gather_index = screen.y * frame_data.size.x + screen.x;
         gather_ray_data[gather_index] = {ray.radiance, ray.pixel};
         if (ray.max_distance > 0.0f) {  // add active rays to next bounce
-            auto output_index = atomic_fetch_add_explicit(&output_ray_count, 1, memory_order_relaxed);
+            auto output_index = atomic_fetch_add_explicit(&output_ray_count, 1u, memory_order_relaxed);
             output_ray_buffer[output_index] = ray;
         }
     }

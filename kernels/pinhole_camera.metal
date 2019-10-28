@@ -16,7 +16,7 @@ kernel void pinhole_camera_generate_rays(
     
     if (tid.x < w && tid.y < h) {
         
-        auto seed = (tea<4>(tid.x, tid.y) + frame_data.index) << 8u;
+        auto seed = (tea<5>(tid.x, tid.y) + frame_data.index) << 8u;
         
         auto z = camera_data.near_plane;
         auto half_sensor_height = tan(0.5f * camera_data.fov) * z;

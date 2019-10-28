@@ -29,6 +29,8 @@ kernel void mitchell_natravali_filter(
     
     if (tid.x < frame_data.size.x && tid.y < frame_data.size.y) {
         
+//        filtered.write(Vec4f(ray_buffer[tid.y * frame_data.size.x + tid.x].radiance, 1.0f), tid);
+        
         auto min_x = max(tid.x, pixel_radius) - pixel_radius;
         auto min_y = max(tid.y, pixel_radius) - pixel_radius;
         auto max_x = min(tid.x + pixel_radius, frame_data.size.x - 1u);
@@ -36,7 +38,7 @@ kernel void mitchell_natravali_filter(
 
         auto filter_radius = pixel_radius + 0.5f;
         auto inv_filter_radius = 1.0f / filter_radius;
-        
+
         auto radiance_sum = Vec3f(0.0f);
         auto weight_sum = 0.0f;
         auto center = Vec2f(tid) + 0.5f;
@@ -52,10 +54,8 @@ kernel void mitchell_natravali_filter(
                 weight_sum += weight;
             }
         }
-        if (weight_sum == 0.0f) {
-            radiance_sum = {};
-            weight_sum = 1e-3f;
-        }
+        radiance_sum = max(radiance_sum, 0.0f);
+        weight_sum = max(weight_sum, 1e-3f);
         filtered.write(Vec4f(radiance_sum / weight_sum, 1.0f), tid);
     }
 }

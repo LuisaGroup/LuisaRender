@@ -166,7 +166,7 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     camera_data.left = {-1.0f, 0.0f, 0.0f};
     camera_data.up = {0.0f, 1.0f, 0.0f};
     camera_data.near_plane = 0.1f;
-    camera_data.fov = glm::radians(42.5f);
+    camera_data.fov = glm::radians(42.7f);
     
     FrameData frame{};
     frame.size = {width, height};
@@ -182,8 +182,8 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     auto threads_per_group = MTLSizeMake(16, 16, 1);
     auto thread_groups = MTLSizeMake((width + threads_per_group.width - 1) / threads_per_group.width, (height + threads_per_group.height - 1) / threads_per_group.height, 1);
     
-    constexpr auto spp = 8192u;
-    constexpr auto max_depth = 31u;
+    constexpr auto spp = 4096u;
+    constexpr auto max_depth = 63u;
     
     static auto available_frame_count = 8u;
     static std::mutex mutex;

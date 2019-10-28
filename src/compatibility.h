@@ -18,6 +18,11 @@ using PackedVec4f = packed_float4;
 #else
 
 #include <glm/glm.hpp>
+#include <atomic>
+
+using atomic_uint = std::atomic_uint;
+using std::atomic_fetch_add_explicit;
+using std::memory_order_relaxed;
 
 namespace metal {
 using namespace glm;
