@@ -135,7 +135,7 @@ kernel void sort_rays(
     device RayData *output_ray_buffer [[buffer(2)]],
     device atomic_uint &output_ray_count [[buffer(3)]],
     constant FrameData &frame_data [[buffer(4)]],
-    device GatherRayData *gather_ray_data [[buffer(5)]],
+    device GatherRayData *gather_ray_buffer [[buffer(5)]],
     uint tid [[thread_index_in_threadgroup]],
     uint2 tgsize [[threads_per_threadgroup]],
     uint2 tgid [[threadgroup_position_in_grid]],
@@ -147,7 +147,7 @@ kernel void sort_rays(
         auto ray = ray_buffer[index];
         auto screen = uint2(ray.pixel);
         auto gather_index = screen.y * frame_data.size.x + screen.x;
-        gather_ray_data[gather_index] = {ray.radiance, ray.pixel};
+        gather_ray_buffer[gather_index] = {ray.radiance, ray.pixel};
         if (ray.max_distance > 0.0f) {  // add active rays to next bounce
             auto output_index = atomic_fetch_add_explicit(&output_ray_count, 1u, memory_order_relaxed);
             output_ray_buffer[output_index] = ray;

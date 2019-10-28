@@ -22,55 +22,16 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     ResourceManager::instance().set_working_directory(std::filesystem::current_path());
     ResourceManager::instance().set_binary_directory(std::filesystem::absolute(argv[0]).parent_path());
     
-    auto working_dir = std::filesystem::current_path();
-    auto binary_dir = std::filesystem::absolute(argv[0]).parent_path();
-    
-    id<MTLDevice> device = nullptr;
-    for (id<MTLDevice> potential_device in MTLCopyAllDevices()) {
-        if (!potential_device.isLowPower) {
-            device = potential_device;
-            break;
-        }
-    }
-    NSLog(@"%@", device);
-    
-    auto command_queue = [device newCommandQueue];
-    [command_queue autorelease];
-    
-    auto library_path = [[[NSString alloc] initWithCString:(working_dir / "kernels/bin/kernels.metallib").c_str() encoding:NSUTF8StringEncoding] autorelease];
-    auto library = [device newLibraryWithFile:library_path error:nullptr];
-    [library autorelease];
-    
-    auto pipeline_desc = [[MTLComputePipelineDescriptor alloc] init];
-    [pipeline_desc autorelease];
-    pipeline_desc.threadGroupSizeIsMultipleOfThreadExecutionWidth = true;
-    
-    pipeline_desc.computeFunction = [library newFunctionWithName:@"pinhole_camera_generate_rays"];
-    auto generate_ray_pso = [device newComputePipelineStateWithDescriptor:pipeline_desc options:MTLPipelineOptionNone reflection:nullptr error:nullptr];
-    [generate_ray_pso autorelease];
-    
-    pipeline_desc.computeFunction = [library newFunctionWithName:@"sample_lights"];
-    auto sample_lights_pso = [device newComputePipelineStateWithDescriptor:pipeline_desc options:MTLPipelineOptionNone reflection:nullptr error:nullptr];
-    [sample_lights_pso autorelease];
-    
-    pipeline_desc.computeFunction = [library newFunctionWithName:@"trace_radiance"];
-    auto trace_radiance_pso = [device newComputePipelineStateWithDescriptor:pipeline_desc options:MTLPipelineOptionNone reflection:nullptr error:nullptr];
-    [trace_radiance_pso autorelease];
-    
-    pipeline_desc.computeFunction = [library newFunctionWithName:@"sort_rays"];
-    auto sort_rays_pso = [device newComputePipelineStateWithDescriptor:pipeline_desc options:MTLPipelineOptionNone reflection:nullptr error:nullptr];
-    [sort_rays_pso autorelease];
-    
-    pipeline_desc.computeFunction = [library newFunctionWithName:@"mitchell_natravali_filter"];
-    auto filter_pso = [device newComputePipelineStateWithDescriptor:pipeline_desc options:MTLPipelineOptionNone reflection:nullptr error:nullptr];
-    [filter_pso autorelease];
-    
-    pipeline_desc.computeFunction = [library newFunctionWithName:@"convert_colorspace_rgb"];
-    auto convert_pso = [device newComputePipelineStateWithDescriptor:pipeline_desc options:MTLPipelineOptionNone reflection:nullptr error:nullptr];
-    [convert_pso autorelease];
+    auto device = Device::create("Metal");
+    auto generate_rays_kernel = device->create_kernel("pinhole_camera_generate_rays");
+    auto sample_light_kernel = device->create_kernel("sample_lights");
+    auto trace_radiance_kernel = device->create_kernel("trace_radiance");
+    auto sort_rays_kernel = device->create_kernel("sort_rays");
+    auto filter_kernel = device->create_kernel("mitchell_natravali_filter");
+    auto convert_colorspace_kernel = device->create_kernel("convert_colorspace_rgb");
     
     std::vector<MeshDescriptor> mesh_list;
-    auto cube_obj_path = std::filesystem::path{working_dir}.append("data").append("meshes").append("cube").append("cube.obj");
+    auto cube_obj_path = ResourceManager::instance().working_path("data/meshes/cube/cube.obj");
     auto scaling = glm::scale(glm::mat4{1.0f}, glm::vec3{10.1f});
     auto transform_back = glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, 0.0f, -10.0f}) * scaling;
     auto transform_top = glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, 10.0f, 0.0f}) * scaling;
@@ -82,73 +43,43 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_bottom, glm::vec3{1.0f}, false});
     mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_left, glm::vec3{1.0f, 0.0f, 0.0f}, false});
     mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_right, glm::vec3{0.0f, 1.0f, 0.0f}, false});
-//    auto bunny_obj_path = std::filesystem::path{working_dir}.append("data").append("meshes").append("bunny").append("bunny.obj");
-    auto bunny_obj_path = std::filesystem::path{working_dir}.append("data").append("meshes").append("nanosuit").append("nanosuit.obj");
+    auto bunny_obj_path = ResourceManager::instance().working_path("data/meshes/nanosuit/nanosuit.obj");
     auto bunny_transform = glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, -5.0f, -1.0f}) *
                            glm::rotate(glm::mat4{1.0f}, glm::radians(30.0f), glm::vec3{0.0f, 1.0f, 0.0f}) *
                            glm::scale(glm::mat4{1.0f}, glm::vec3{0.5f});
     mesh_list.emplace_back(MeshDescriptor{bunny_obj_path, bunny_transform, glm::vec3{1.0f}, true});
     auto mesh = Mesh::load(mesh_list);
     
-    auto position_buffer = [device newBufferWithBytes:mesh.positions.data() length:mesh.positions.size() * sizeof(Vec3f) options:MTLResourceStorageModeManaged];
-    [position_buffer autorelease];
+    auto position_buffer_size = mesh.positions.size() * sizeof(Vec3f);
+    auto position_buffer = device->create_buffer(position_buffer_size, BufferStorageTag::MANAGED);
+    position_buffer->upload(mesh.positions.data(), position_buffer_size);
     
-    auto normal_buffer = [device newBufferWithBytes:mesh.normals.data() length:mesh.normals.size() * sizeof(Vec3f) options:MTLResourceStorageModeManaged];
-    [normal_buffer autorelease];
+    auto normal_buffer_size = mesh.normals.size() * sizeof(Vec3f);
+    auto normal_buffer = device->create_buffer(normal_buffer_size, BufferStorageTag::MANAGED);
+    normal_buffer->upload(mesh.normals.data(), normal_buffer_size);
     
-    auto material_id_buffer = [device newBufferWithBytes:mesh.material_ids.data() length:mesh.material_ids.size() * sizeof(uint) options:MTLResourceStorageModeManaged];
-    [material_id_buffer autorelease];
+    auto material_id_buffer_size = mesh.material_ids.size() * sizeof(uint);
+    auto material_id_buffer = device->create_buffer(material_id_buffer_size, BufferStorageTag::MANAGED);
+    material_id_buffer->upload(mesh.material_ids.data(), material_id_buffer_size);
     
-    auto material_buffer = [device newBufferWithBytes:mesh.materials.data() length:mesh.materials.size() * sizeof(MaterialData) options:MTLResourceStorageModeManaged];
-    [material_buffer autorelease];
+    auto material_buffer_size = mesh.materials.size() * sizeof(MaterialData);
+    auto material_buffer = device->create_buffer(material_buffer_size, BufferStorageTag::MANAGED);
+    material_buffer->upload(mesh.materials.data(), material_buffer_size);
     
-    auto ray_intersector = [[MPSRayIntersector alloc] initWithDevice:device];
-    [ray_intersector autorelease];
-    ray_intersector.rayDataType = MPSRayDataTypeOriginMinDistanceDirectionMaxDistance;
-    ray_intersector.intersectionDataType = MPSIntersectionDataTypeDistancePrimitiveIndexCoordinates;
-    ray_intersector.rayStride = sizeof(RayData);
-    
-    auto shadow_ray_intersector = [[MPSRayIntersector alloc] initWithDevice:device];
-    [shadow_ray_intersector autorelease];
-    shadow_ray_intersector.rayDataType = MPSRayDataTypeOriginMinDistanceDirectionMaxDistance;
-    shadow_ray_intersector.intersectionDataType = MPSIntersectionDataTypeDistance;
-    shadow_ray_intersector.rayStride = sizeof(ShadowRayData);
-    
-    auto accelerator = [[MPSTriangleAccelerationStructure alloc] initWithDevice:device];
-    [accelerator autorelease];
-    accelerator.vertexBuffer = position_buffer;
-    accelerator.vertexStride = sizeof(Vec3f);
-    accelerator.triangleCount = mesh.material_ids.size();
-    [accelerator rebuild];
+    auto accelerator = device->create_acceleration(*position_buffer, sizeof(Vec3f), mesh.material_ids.size());
     
     constexpr auto width = 1000u;
     constexpr auto height = 800u;
     
-    constexpr auto ray_count = width * height;
-    auto ray_buffer = [device newBufferWithLength:ray_count * sizeof(RayData) options:MTLResourceStorageModePrivate];
-    [ray_buffer autorelease];
-    auto output_ray_buffer = [device newBufferWithLength:ray_count * sizeof(RayData) options:MTLResourceStorageModePrivate];
-    [output_ray_buffer autorelease];
-    auto gather_ray_buffer = [device newBufferWithLength:ray_count * sizeof(GatherRayData) options:MTLResourceStorageModePrivate];
-    [gather_ray_buffer autorelease];
-    auto shadow_ray_buffer = [device newBufferWithLength:ray_count * sizeof(ShadowRayData) options:MTLResourceStorageModePrivate];
-    [shadow_ray_buffer autorelease];
-    auto its_buffer = [device newBufferWithLength:ray_count * sizeof(IntersectionData) options:MTLResourceStorageModePrivate];
-    [its_buffer autorelease];
-    auto shadow_its_buffer = [device newBufferWithLength:ray_count * sizeof(ShadowIntersectionData) options:MTLResourceStorageModePrivate];
-    [shadow_its_buffer autorelease];
+    constexpr auto max_ray_count = width * height;
+    auto ray_buffer = device->create_buffer(max_ray_count * sizeof(RayData), BufferStorageTag::DEVICE_PRIVATE);
+    auto swap_ray_buffer = device->create_buffer(max_ray_count * sizeof(RayData), BufferStorageTag::DEVICE_PRIVATE);
+    auto gather_ray_buffer = device->create_buffer(max_ray_count * sizeof(GatherRayData), BufferStorageTag::DEVICE_PRIVATE);
+    auto shadow_ray_buffer = device->create_buffer(max_ray_count * sizeof(ShadowRayData), BufferStorageTag::DEVICE_PRIVATE);
+    auto its_buffer = device->create_buffer(max_ray_count * sizeof(IntersectionData), BufferStorageTag::DEVICE_PRIVATE);
+    auto shadow_its_buffer = device->create_buffer(max_ray_count * sizeof(ShadowIntersectionData), BufferStorageTag::DEVICE_PRIVATE);
     
-    auto texture_desc = [[MTLTextureDescriptor alloc] init];
-    [texture_desc autorelease];
-    texture_desc.pixelFormat = MTLPixelFormatRGBA32Float;
-    texture_desc.textureType = MTLTextureType2D;
-    texture_desc.width = width;
-    texture_desc.height = height;
-    texture_desc.storageMode = MTLStorageModePrivate;
-    texture_desc.allowGPUOptimizedContents = true;
-    texture_desc.usage = MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite;
-    auto result_texture = [device newTextureWithDescriptor:texture_desc];
-    [result_texture autorelease];
+    auto result_texture = device->create_texture(uint2{width, height}, TextureFormatTag::RGBA32F, TextureAccessTag::READ_WRITE);
     
     CameraData camera_data{};
     camera_data.position = {0.0f, 0.0f, 15.0f};
@@ -162,17 +93,17 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     frame.size = {width, height};
     frame.index = 0;
     
+    auto light_count = 1u;
     LightData light;
     light.position = {0.0f, 4.0f, 0.0f};
     light.emission = {10.0f, 10.0f, 10.0f};
-    auto light_buffer = [device newBufferWithBytes:&light length:sizeof(LightData) options:MTLResourceStorageModeManaged];
-    [light_buffer autorelease];
-    auto light_count = 1u;
+    auto light_buffer = device->create_buffer(sizeof(LightData), BufferStorageTag::MANAGED);
+    light_buffer->upload(&light, sizeof(LightData));
     
-    auto threads_per_group = MTLSizeMake(16, 16, 1);
-    auto thread_groups = MTLSizeMake((width + threads_per_group.width - 1) / threads_per_group.width, (height + threads_per_group.height - 1) / threads_per_group.height, 1);
+    auto threadgroup_size = uint2(16, 16);
+    auto threadgroups = uint2((width + threadgroup_size.x - 1) / threadgroup_size.x, (height + threadgroup_size.y - 1) / threadgroup_size.y);
     
-    constexpr auto spp = 8192u;
+    constexpr auto spp = 128u;
     constexpr auto max_depth = 31u;
     
     static auto available_frame_count = 16u;
@@ -186,11 +117,12 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     std::vector<uint> initial_ray_counts;
     initial_ray_counts.resize(spp * (max_depth + 1u), 0u);
     for (auto i = 0u; i < spp; i++) {
-        initial_ray_counts[i * (max_depth + 1u)] = ray_count;
+        initial_ray_counts[i * (max_depth + 1u)] = max_ray_count;
     }
     
-    auto ray_count_buffer = [device newBufferWithBytes:initial_ray_counts.data() length:initial_ray_counts.size() * sizeof(uint) options:MTLResourceStorageModeManaged];
-    [ray_count_buffer autorelease];
+    auto ray_count_buffer_size = initial_ray_counts.size() * sizeof(uint);
+    auto ray_count_buffer = device->create_buffer(ray_count_buffer_size, BufferStorageTag::MANAGED);
+    ray_count_buffer->upload(initial_ray_counts.data(), ray_count_buffer_size);
     
     for (auto i = 0u; i < spp; i++) {
         
@@ -200,147 +132,96 @@ int main(int argc [[maybe_unused]], char *argv[]) {
             cond_var.wait(lock, [] { return available_frame_count != 0; });
         }
         
-        auto command_buffer = [command_queue commandBuffer];
-        [command_buffer addCompletedHandler:^(id<MTLCommandBuffer>) {
-            {
-                std::lock_guard guard{mutex};
-                available_frame_count++;
-            }
-            cond_var.notify_one();
-            std::cout << "Progress: " << (++count) << "/" << spp << std::endl;
-        }];
-        
-        frame.index = i;
-        
-        auto command_encoder = [command_buffer computeCommandEncoder];
-        [command_encoder setBuffer:ray_buffer offset:0 atIndex:0];
-        [command_encoder setBytes:&camera_data length:sizeof(CameraData) atIndex:1];
-        [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:2];
-        [command_encoder setComputePipelineState:generate_ray_pso];
-        [command_encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
-        [command_encoder endEncoding];
-        
-        for (auto bounce = 0u; bounce < max_depth; bounce++) {
-            
-            auto curr_ray_count_offset = (i * (max_depth + 1u) + bounce) * sizeof(uint);
-            auto next_ray_count_offset = curr_ray_count_offset + sizeof(uint);
-            
-            [ray_intersector encodeIntersectionToCommandBuffer:command_buffer
-                                              intersectionType:MPSIntersectionTypeNearest
-                                                     rayBuffer:ray_buffer
-                                               rayBufferOffset:0u
-                                            intersectionBuffer:its_buffer
-                                      intersectionBufferOffset:0u
-                                                rayCountBuffer:ray_count_buffer
-                                          rayCountBufferOffset:curr_ray_count_offset
-                                         accelerationStructure:accelerator];
-            
-            // sample lights
-            command_encoder = [command_buffer computeCommandEncoder];
-            [command_encoder setBuffer:ray_buffer offset:0 atIndex:0];
-            [command_encoder setBuffer:its_buffer offset:0 atIndex:1];
-            [command_encoder setBuffer:light_buffer offset:0 atIndex:2];
-            [command_encoder setBuffer:position_buffer offset:0 atIndex:3];
-            [command_encoder setBuffer:shadow_ray_buffer offset:0 atIndex:4];
-            [command_encoder setBytes:&light_count length:sizeof(uint) atIndex:5];
-            [command_encoder setBuffer:ray_count_buffer offset:curr_ray_count_offset atIndex:6];
-            [command_encoder setComputePipelineState:sample_lights_pso];
-            [command_encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
-            [command_encoder endEncoding];
-            
-            // intersection
-            [shadow_ray_intersector encodeIntersectionToCommandBuffer:command_buffer
-                                                     intersectionType:MPSIntersectionTypeAny
-                                                            rayBuffer:shadow_ray_buffer
-                                                      rayBufferOffset:0
-                                                   intersectionBuffer:shadow_its_buffer
-                                             intersectionBufferOffset:0
-                                                       rayCountBuffer:ray_count_buffer
-                                                 rayCountBufferOffset:curr_ray_count_offset
-                                                accelerationStructure:accelerator];
-            
-            // trace radiance
-            command_encoder = [command_buffer computeCommandEncoder];
-            [command_encoder setBuffer:ray_buffer offset:0 atIndex:0];
-            [command_encoder setBuffer:shadow_ray_buffer offset:0 atIndex:1];
-            [command_encoder setBuffer:its_buffer offset:0 atIndex:2];
-            [command_encoder setBuffer:shadow_its_buffer offset:0 atIndex:3];
-            [command_encoder setBuffer:position_buffer offset:0 atIndex:4];
-            [command_encoder setBuffer:normal_buffer offset:0 atIndex:5];
-            [command_encoder setBuffer:material_id_buffer offset:0 atIndex:6];
-            [command_encoder setBuffer:material_buffer offset:0 atIndex:7];
-            [command_encoder setBuffer:ray_count_buffer offset:curr_ray_count_offset atIndex:8];
-            [command_encoder setComputePipelineState:trace_radiance_pso];
-            [command_encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
-            [command_encoder endEncoding];
-            
-            // sort rays
-            command_encoder = [command_buffer computeCommandEncoder];
-            [command_encoder setBuffer:ray_buffer offset:0 atIndex:0];
-            [command_encoder setBuffer:ray_count_buffer offset:curr_ray_count_offset atIndex:1];
-            [command_encoder setBuffer:output_ray_buffer offset:0 atIndex:2];
-            [command_encoder setBuffer:ray_count_buffer offset:next_ray_count_offset atIndex:3];
-            [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:4];
-            [command_encoder setBuffer:gather_ray_buffer offset:0 atIndex:5];
-            [command_encoder setComputePipelineState:sort_rays_pso];
-            [command_encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
-            [command_encoder endEncoding];
-            
-            auto t = ray_buffer;
-            ray_buffer = output_ray_buffer;
-            output_ray_buffer = t;
-        }
-        
-        // filter
-        auto pixel_radius = 1u;
-        command_encoder = [command_buffer computeCommandEncoder];
-        [command_encoder setBuffer:gather_ray_buffer offset:0 atIndex:0];
-        [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:1];
-        [command_encoder setBytes:&pixel_radius length:sizeof(uint) atIndex:2];
-        [command_encoder setTexture:result_texture atIndex:0];
-        [command_encoder setComputePipelineState:filter_pso];
-        [command_encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
-        [command_encoder endEncoding];
-        
-        [command_buffer commit];
+        device->launch_async(
+            [&](KernelDispatcher &dispatch) {
+                
+                frame.index = i;
+                
+                dispatch(*generate_rays_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
+                    encoder["ray_buffer"]->set_buffer(*ray_buffer);
+                    encoder["camera_data"]->set_bytes(&camera_data, sizeof(CameraData));
+                    encoder["frame_data"]->set_bytes(&frame, sizeof(FrameData));
+                });
+                
+                for (auto bounce = 0u; bounce < max_depth; bounce++) {
+                    
+                    auto curr_ray_count_offset = (i * (max_depth + 1u) + bounce) * sizeof(uint);
+                    auto next_ray_count_offset = curr_ray_count_offset + sizeof(uint);
+                    
+                    accelerator->trace_nearest(dispatch, *ray_buffer, *its_buffer, *ray_count_buffer, curr_ray_count_offset);
+                    
+                    dispatch(*sample_light_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
+                        encoder["ray_buffer"]->set_buffer(*ray_buffer);
+                        encoder["intersection_buffer"]->set_buffer(*its_buffer);
+                        encoder["light_buffer"]->set_buffer(*light_buffer);
+                        encoder["p_buffer"]->set_buffer(*position_buffer);
+                        encoder["shadow_ray_buffer"]->set_buffer(*shadow_ray_buffer);
+                        encoder["light_count"]->set_bytes(&light_count, sizeof(uint));
+                        encoder["ray_count"]->set_buffer(*ray_count_buffer, curr_ray_count_offset);
+                    });
+                    
+                    accelerator->trace_any(dispatch, *shadow_ray_buffer, *shadow_its_buffer, *ray_count_buffer, curr_ray_count_offset);
+                    
+                    dispatch(*trace_radiance_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
+                        encoder["ray_buffer"]->set_buffer(*ray_buffer);
+                        encoder["shadow_ray_buffer"]->set_buffer(*shadow_ray_buffer);
+                        encoder["its_buffer"]->set_buffer(*its_buffer);
+                        encoder["shadow_its_buffer"]->set_buffer(*shadow_its_buffer);
+                        encoder["p_buffer"]->set_buffer(*position_buffer);
+                        encoder["n_buffer"]->set_buffer(*normal_buffer);
+                        encoder["material_id_buffer"]->set_buffer(*material_id_buffer);
+                        encoder["material_buffer"]->set_buffer(*material_buffer);
+                        encoder["ray_count"]->set_buffer(*ray_count_buffer, curr_ray_count_offset);
+                    });
+                    
+                    dispatch(*sort_rays_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
+                        encoder["ray_buffer"]->set_buffer(*ray_buffer);
+                        encoder["ray_count"]->set_buffer(*ray_count_buffer, curr_ray_count_offset);
+                        encoder["output_ray_buffer"]->set_buffer(*swap_ray_buffer);
+                        encoder["output_ray_count"]->set_buffer(*ray_count_buffer, next_ray_count_offset);
+                        encoder["frame_data"]->set_bytes(&frame, sizeof(FrameData));
+                        encoder["gather_ray_buffer"]->set_buffer(*gather_ray_buffer);
+                    });
+                    
+                    std::swap(ray_buffer, swap_ray_buffer);
+                }
+                
+                // filter
+                auto pixel_radius = 1u;
+                dispatch(*filter_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
+                    encoder["ray_buffer"]->set_buffer(*gather_ray_buffer);
+                    encoder["frame_data"]->set_bytes(&frame, sizeof(FrameData));
+                    encoder["pixel_radius"]->set_bytes(&pixel_radius, sizeof(uint));
+                    encoder["result"]->set_texture(*result_texture);
+                });
+            }, [] {
+                {
+                    std::lock_guard guard{mutex};
+                    available_frame_count++;
+                }
+                cond_var.notify_one();
+                std::cout << "Progress: " << (++count) << "/" << spp << std::endl;
+            });
         
         std::lock_guard guard{mutex};
         available_frame_count--;
     }
     
-    auto result_buffer = [device newBufferWithLength:ray_count * sizeof(Vec4f) options:MTLResourceStorageModeManaged];
-    [result_buffer autorelease];
+    auto result_buffer = device->create_buffer(max_ray_count * sizeof(Vec4f), BufferStorageTag::MANAGED);
+    device->launch([&] (KernelDispatcher &dispatch) {
+        dispatch(*convert_colorspace_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
+            encoder["frame_data"]->set_bytes(&frame, sizeof(FrameData));
+            encoder["result"]->set_texture(*result_texture);
+        });
+        result_texture->copy_to_buffer(dispatch, *result_buffer);
+        result_buffer->synchronize(dispatch);
+        ray_count_buffer->synchronize(dispatch);
+    });
     
-    auto command_buffer = [command_queue commandBuffer];
-    
-    auto command_encoder = [command_buffer computeCommandEncoder];
-    [command_encoder setBytes:&frame length:sizeof(FrameData) atIndex:0];
-    [command_encoder setTexture:result_texture atIndex:0];
-    [command_encoder setComputePipelineState:convert_pso];
-    [command_encoder dispatchThreadgroups:thread_groups threadsPerThreadgroup:threads_per_group];
-    [command_encoder endEncoding];
-    
-    auto blit_encoder = [command_buffer blitCommandEncoder];
-    [blit_encoder copyFromTexture:result_texture
-                      sourceSlice:0
-                      sourceLevel:0
-                     sourceOrigin:MTLOriginMake(0, 0, 0)
-                       sourceSize:MTLSizeMake(width, height, 1)
-                         toBuffer:result_buffer
-                destinationOffset:0
-           destinationBytesPerRow:width * sizeof(Vec4f)
-         destinationBytesPerImage:width * height * sizeof(Vec4f)
-                          options:MTLBlitOptionNone];
-    [blit_encoder synchronizeResource:result_buffer];
-    [blit_encoder synchronizeResource:ray_count_buffer];
-    [blit_encoder endEncoding];
-    
-    [command_buffer commit];
-    [command_buffer waitUntilCompleted];
     auto t1 = std::chrono::steady_clock::now();
     
     auto total_ray_count = 0ul;
-    auto final_ray_count_buffer = reinterpret_cast<uint *>(ray_count_buffer.contents);
+    auto final_ray_count_buffer = reinterpret_cast<const uint *>(ray_count_buffer->data());
     for (auto i = 0ul; i < initial_ray_counts.size(); i++) {
         total_ray_count += final_ray_count_buffer[i];
     }
@@ -354,7 +235,7 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     
     cv::Mat image;
     image.create(cv::Size{width, height}, CV_32FC3);
-    auto src_data = reinterpret_cast<Vec4f *>(result_buffer.contents);
+    auto src_data = reinterpret_cast<const Vec4f *>(result_buffer->data());
     auto dest_data = reinterpret_cast<PackedVec3f *>(image.data);
     for (auto row = 0u; row < height; row++) {
         for (auto col = 0u; col < width; col++) {

@@ -20,7 +20,7 @@ private:
 public:
     MetalKernelArgumentProxy(MTLArgument *argument, id<MTLComputeCommandEncoder> encoder) : _argument{argument}, _encoder{encoder} {}
     
-    void set_buffer(Buffer &buffer) override;
+    void set_buffer(Buffer &buffer, size_t offset) override;
     void set_texture(Texture &texture) override;
     void set_bytes(const void *bytes, size_t size) override;
     
@@ -34,7 +34,7 @@ private:
 
 public:
     explicit MetalKernelArgumentEncoder(MTLAutoreleasedComputePipelineReflection info, id<MTLComputeCommandEncoder> encoder) noexcept : _info{info}, _encoder{encoder} {}
-    [[nodiscard]] KernelArgumentProxyWrapper operator[](std::string_view name) override;
+    [[nodiscard]] std::unique_ptr<KernelArgumentProxy> operator[](std::string_view name) override;
     
 };
 

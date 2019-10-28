@@ -11,6 +11,7 @@
 #import "metal_device.h"
 #import "metal_buffer.h"
 #import "metal_kernel.h"
+#import "metal_texture.h"
 #import "metal_acceleration.h"
 
 struct MetalDeviceWrapper { id<MTLDevice> device; };
@@ -134,5 +135,5 @@ std::shared_ptr<Texture> MetalDevice::create_texture(uint2 size, TextureFormatTa
     auto texture = [_device_wrapper->device newTextureWithDescriptor:descriptor];
     [texture autorelease];
     
-    return std::shared_ptr<Texture>();
+    return std::make_shared<MetalTexture>(texture, size, format_tag, access_tag);
 }
