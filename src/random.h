@@ -38,11 +38,12 @@ constexpr constant unsigned int primes[256] = {
     1523, 1531, 1543, 1549, 1553, 1559, 1567, 1571, 1579, 1583, 1597, 1601, 1607, 1609, 1613, 1619};
 
 inline float halton(thread uint &seed) {
+    
     auto b = primes[seed & 0xffu];
     auto f = 1.0f;
     auto inv_b = 1.0f / b;
     auto r = 0.0f;
-    for (auto i = seed >> 8u; i > 0; i /= b) {
+    for (auto i = seed >> 8u; i != 0u; i /= b) {
         f = f * inv_b;
         r = r + f * static_cast<float>(i % b);
     }

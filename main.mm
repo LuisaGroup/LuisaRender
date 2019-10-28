@@ -182,8 +182,8 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     auto threads_per_group = MTLSizeMake(16, 16, 1);
     auto thread_groups = MTLSizeMake((width + threads_per_group.width - 1) / threads_per_group.width, (height + threads_per_group.height - 1) / threads_per_group.height, 1);
     
-    constexpr auto spp = 4096u;
-    constexpr auto max_depth = 63u;
+    constexpr auto spp = 65536u;
+    constexpr auto max_depth = 31u;
     
     static auto available_frame_count = 8u;
     static std::mutex mutex;
@@ -361,7 +361,6 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     std::cout << "Total time:      " << total_time << "s" << std::endl;
     std::cout << "Total rays:      " << total_ray_count * 1e-6 << "M" << std::endl;
     std::cout << "Rays per second: " << static_cast<double>(total_ray_count) * 1e-6 / total_time << "M" << std::endl;
-    
     
     cv::Mat image;
     image.create(cv::Size{width, height}, CV_32FC3);
