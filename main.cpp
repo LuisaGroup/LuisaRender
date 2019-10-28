@@ -1,21 +1,17 @@
-#import <chrono>
-#import <iostream>
-#import <opencv2/opencv.hpp>
-#import <glm/glm.hpp>
-#import <glm/ext.hpp>
-
-#import <MetalPerformanceShaders/MetalPerformanceShaders.h>
-
-#import <compatibility.h>
-#import <mesh.h>
-#import <ray_data.h>
-#import <intersection_data.h>
-#import <camera_data.h>
-#import <frame_data.h>
-#import <light_data.h>
-
-#import <core/device.h>
-#import <util/resource_manager.h>
+#include <chrono>
+#include <iostream>
+#include <opencv2/opencv.hpp>
+#include <glm/glm.hpp>
+#include <glm/ext.hpp>
+#include <compatibility.h>
+#include <mesh.h>
+#include <ray_data.h>
+#include <intersection_data.h>
+#include <camera_data.h>
+#include <frame_data.h>
+#include <light_data.h>
+#include <core/device.h>
+#include <util/resource_manager.h>
 
 int main(int argc [[maybe_unused]], char *argv[]) {
     

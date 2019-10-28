@@ -30,7 +30,7 @@ add_subdirectory(kernels)
 include_directories(src)
 
 file(GLOB_RECURSE SOURCE_FILES src/*.cpp src/*.h src/*.mm src/*.m)
-add_executable(Metalight ${SOURCE_FILES} main.mm)
+add_executable(Metalight ${SOURCE_FILES} main.cpp)
 add_dependencies(Metalight kernels)
 
 target_link_libraries(Metalight glm_static tinyobjloader "-framework Foundation" "-framework Metal" "-framework MetalPerformanceShaders")
