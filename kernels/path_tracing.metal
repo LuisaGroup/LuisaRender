@@ -77,10 +77,10 @@ kernel void trace_radiance(
     
     if (index < ray_count) {
         
-        if (ray_buffer[index].max_distance <= 0.0f || its_buffer[index].distance <= 0.0f) {  // no intersection
-            ray_buffer[index].max_distance = -1.0f;  // terminate the ray
+        auto ray = ray_buffer[index];
+        if (ray.max_distance <= 0.0f || its_buffer[index].distance <= 0.0f) {  // no intersection
+            ray.max_distance = -1.0f;  // terminate the ray
         } else {
-            auto ray = ray_buffer[index];
             auto its = its_buffer[index];
             auto material = material_buffer[material_id_buffer[its.triangle_index]];
             material.albedo = XYZ2ACEScg(RGB2XYZ(material.albedo));
@@ -124,8 +124,8 @@ kernel void trace_radiance(
             }
             ray.origin = P + 1e-4f * ray.direction;
             ray.min_distance = 0.0f;
-            ray_buffer[index] = ray;
         }
+        ray_buffer[index] = ray;
     }
 }
 
@@ -145,13 +145,32 @@ kernel void sort_rays(
     
     if (index < ray_count) {
         auto ray = ray_buffer[index];
-        auto screen = uint2(ray.pixel);
-        auto gather_index = screen.y * frame_data.size.x + screen.x;
-        gather_ray_buffer[gather_index] = {ray.radiance, ray.pixel};
         if (ray.max_distance > 0.0f) {  // add active rays to next bounce
-            auto output_index = atomic_fetch_add_explicit(&output_ray_count, 1u, memory_order_relaxed);
-            output_ray_buffer[output_index] = ray;
+            output_ray_buffer[atomic_fetch_add_explicit(&output_ray_count, 1u, memory_order_relaxed)] = ray;
+        } else {
+            auto screen = uint2(ray.pixel);
+            auto gather_index = screen.y * frame_data.size.x + screen.x;
+            gather_ray_buffer[gather_index] = {ray.radiance, ray.pixel};
         }
     }
+}
+
+kernel void gather_rays(
+    device const RayData *ray_buffer [[buffer(0)]],
+    device const uint &ray_count [[buffer(1)]],
+    device GatherRayData *gather_ray_buffer [[buffer(2)]],
+    constant FrameData &frame_data [[buffer(3)]],
+    uint tid [[thread_index_in_threadgroup]],
+    uint2 tgsize [[threads_per_threadgroup]],
+    uint2 tgid [[threadgroup_position_in_grid]],
+    uint2 gsize [[threadgroups_per_grid]]) {
     
+    auto index = (tgsize.x * tgsize.y) * (tgid.y * gsize.x + tgid.x) + tid;
+    
+    if (index < ray_count) {
+        auto pixel = ray_buffer[index].pixel;
+        auto screen = uint2(pixel);
+        auto gather_index = screen.y * frame_data.size.x + screen.x;
+        gather_ray_buffer[gather_index] = {ray_buffer[index].radiance, pixel};
+    }
 }

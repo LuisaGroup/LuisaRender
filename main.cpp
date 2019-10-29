@@ -13,7 +13,7 @@
 #include <core/device.h>
 #include <util/resource_manager.h>
 
-int main(int argc [[maybe_unused]], char *argv[]) {
+int main(int argc, char *argv[]) {
     
     ResourceManager::instance().set_working_directory(std::filesystem::current_path());
     ResourceManager::instance().set_binary_directory(std::filesystem::absolute(argv[0]).parent_path());
@@ -23,6 +23,7 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     auto sample_light_kernel = device->create_kernel("sample_lights");
     auto trace_radiance_kernel = device->create_kernel("trace_radiance");
     auto sort_rays_kernel = device->create_kernel("sort_rays");
+    auto gather_rays_kernel = device->create_kernel("gather_rays");
     auto filter_kernel = device->create_kernel("mitchell_natravali_filter");
     auto convert_colorspace_kernel = device->create_kernel("convert_colorspace_rgb");
     
@@ -99,7 +100,7 @@ int main(int argc [[maybe_unused]], char *argv[]) {
     auto threadgroup_size = uint2(16, 16);
     auto threadgroups = uint2((width + threadgroup_size.x - 1) / threadgroup_size.x, (height + threadgroup_size.y - 1) / threadgroup_size.y);
     
-    constexpr auto spp = 128u;
+    constexpr auto spp = 1024u;
     constexpr auto max_depth = 31u;
     
     static auto available_frame_count = 16u;
@@ -129,6 +130,7 @@ int main(int argc [[maybe_unused]], char *argv[]) {
         }
         
         device->launch_async(
+            
             [&](KernelDispatcher &dispatch) {
                 
                 frame.index = i;
@@ -144,8 +146,10 @@ int main(int argc [[maybe_unused]], char *argv[]) {
                     auto curr_ray_count_offset = (i * (max_depth + 1u) + bounce) * sizeof(uint);
                     auto next_ray_count_offset = curr_ray_count_offset + sizeof(uint);
                     
+                    // intersection
                     accelerator->trace_nearest(dispatch, *ray_buffer, *its_buffer, *ray_count_buffer, curr_ray_count_offset);
-                    
+    
+                    // sample lights
                     dispatch(*sample_light_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
                         encoder["ray_buffer"]->set_buffer(*ray_buffer);
                         encoder["intersection_buffer"]->set_buffer(*its_buffer);
@@ -156,8 +160,10 @@ int main(int argc [[maybe_unused]], char *argv[]) {
                         encoder["ray_count"]->set_buffer(*ray_count_buffer, curr_ray_count_offset);
                     });
                     
+                    // shadow
                     accelerator->trace_any(dispatch, *shadow_ray_buffer, *shadow_its_buffer, *ray_count_buffer, curr_ray_count_offset);
                     
+                    // trace radiance
                     dispatch(*trace_radiance_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
                         encoder["ray_buffer"]->set_buffer(*ray_buffer);
                         encoder["shadow_ray_buffer"]->set_buffer(*shadow_ray_buffer);
@@ -170,6 +176,7 @@ int main(int argc [[maybe_unused]], char *argv[]) {
                         encoder["ray_count"]->set_buffer(*ray_count_buffer, curr_ray_count_offset);
                     });
                     
+                    // sort rays
                     dispatch(*sort_rays_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
                         encoder["ray_buffer"]->set_buffer(*ray_buffer);
                         encoder["ray_count"]->set_buffer(*ray_count_buffer, curr_ray_count_offset);
@@ -178,9 +185,16 @@ int main(int argc [[maybe_unused]], char *argv[]) {
                         encoder["frame_data"]->set_bytes(&frame, sizeof(FrameData));
                         encoder["gather_ray_buffer"]->set_buffer(*gather_ray_buffer);
                     });
-                    
                     std::swap(ray_buffer, swap_ray_buffer);
                 }
+                
+                // gather rays
+                dispatch(*gather_rays_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
+                    encoder["ray_buffer"]->set_buffer(*ray_buffer);
+                    encoder["ray_count"]->set_buffer(*ray_count_buffer, (i * (max_depth + 1u) + max_depth) * sizeof(uint));
+                    encoder["gather_ray_buffer"]->set_buffer(*gather_ray_buffer);
+                    encoder["frame_data"]->set_bytes(&frame, sizeof(FrameData));
+                });
                 
                 // filter
                 auto pixel_radius = 1u;

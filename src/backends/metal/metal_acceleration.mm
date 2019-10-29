@@ -2,7 +2,7 @@
 // Created by Mike Smith on 2019/10/25.
 //
 
-#include "metal_acceleration.h"
+#import "metal_acceleration.h"
 #import "metal_kernel.h"
 #import "metal_buffer.h"
 
