@@ -9,6 +9,7 @@
 #define constant const
 #define device
 #define thread
+#define threadgroup
 #define kernel
 
 #endif

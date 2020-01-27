@@ -146,7 +146,14 @@ kernel void sort_rays(
     if (index < ray_count) {
         auto ray = ray_buffer[index];
         if (ray.max_distance > 0.0f) {  // add active rays to next bounce
-            output_ray_buffer[atomic_fetch_add_explicit(&output_ray_count, 1u, memory_order_relaxed)] = ray;
+            auto vote = static_cast<simd_vote::vote_t>(simd_active_threads_mask());
+            auto offset = 0u;
+            if (simd_is_first()) {
+                auto count = popcount(static_cast<uint>(vote)) + popcount(static_cast<uint>(vote >> 32u));
+                offset = atomic_fetch_add_explicit(&output_ray_count, count, memory_order_relaxed);
+            }
+            offset = simd_broadcast_first(offset);
+            output_ray_buffer[offset + simd_prefix_exclusive_sum(1u)] = ray;
         } else {
             auto screen = uint2(ray.pixel);
             auto gather_index = screen.y * frame_data.size.x + screen.x;

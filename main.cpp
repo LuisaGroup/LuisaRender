@@ -41,10 +41,23 @@ int main(int argc, char *argv[]) {
     mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_left, glm::vec3{1.0f, 0.0f, 0.0f}, false});
     mesh_list.emplace_back(MeshDescriptor{cube_obj_path, transform_right, glm::vec3{0.0f, 1.0f, 0.0f}, false});
     auto bunny_obj_path = ResourceManager::instance().working_path("data/meshes/nanosuit/nanosuit.obj");
-    auto bunny_transform = glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, -5.0f, -1.0f}) *
-                           glm::rotate(glm::mat4{1.0f}, glm::radians(30.0f), glm::vec3{0.0f, 1.0f, 0.0f}) *
-                           glm::scale(glm::mat4{1.0f}, glm::vec3{0.5f});
+    auto bunny_transform = glm::translate(glm::mat4{1.0f}, glm::vec3{1.0f, -5.0f, -1.0f}) *
+                           glm::rotate(glm::mat4{1.0f}, glm::radians(-30.0f), glm::vec3{0.0f, 1.0f, 0.0f}) *
+                           glm::scale(glm::mat4{1.0f}, glm::vec3{0.2f});
     mesh_list.emplace_back(MeshDescriptor{bunny_obj_path, bunny_transform, glm::vec3{1.0f}, true});
+
+    auto house_obj_path = "/Users/mike/Downloads/PUP_Woodville.obj";
+    auto house_transform = glm::translate(glm::mat4{1.0f}, glm::vec3{-1.5f, -5.0f, -1.0f}) *
+                           glm::rotate(glm::mat4{1.0f}, glm::radians(40.0f), glm::vec3{0.0f, 1.0f, 0.0f}) *
+                           glm::scale(glm::mat4{1.0f}, glm::vec3{0.0075f});
+    mesh_list.emplace_back(MeshDescriptor{house_obj_path, house_transform, glm::vec3{0.5f, 0.6f, 0.2f}, false});
+    
+    auto sphere_obj_path = ResourceManager::instance().working_path("data/meshes/sphere/sphere.obj");
+    auto sphere_transform = glm::translate(glm::mat4{1.0f}, glm::vec3{3.0f, -4.0f, 1.0f}) *
+                           glm::rotate(glm::mat4{1.0f}, glm::radians(0.0f), glm::vec3{0.0f, 1.0f, 0.0f}) *
+                           glm::scale(glm::mat4{1.0f}, glm::vec3{1.0f});
+    mesh_list.emplace_back(MeshDescriptor{sphere_obj_path, sphere_transform, glm::vec3{1.0f}, true});
+    
     auto mesh = Mesh::load(mesh_list);
     
     auto position_buffer_size = mesh.positions.size() * sizeof(Vec3f);
@@ -100,8 +113,8 @@ int main(int argc, char *argv[]) {
     auto threadgroup_size = uint2(16, 16);
     auto threadgroups = uint2((width + threadgroup_size.x - 1) / threadgroup_size.x, (height + threadgroup_size.y - 1) / threadgroup_size.y);
     
-    constexpr auto spp = 1024u;
-    constexpr auto max_depth = 31u;
+    constexpr auto spp = 256u;
+    constexpr auto max_depth = 15u;
     
     static auto available_frame_count = 16u;
     static std::mutex mutex;
