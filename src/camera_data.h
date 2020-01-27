@@ -13,5 +13,6 @@ struct CameraData {
     Vec3f up;
     float near_plane;
     float fov;
-    Vec2f padding;
+    float aperture;
+    float focal_distance;
 };

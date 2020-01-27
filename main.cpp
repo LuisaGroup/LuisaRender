@@ -106,6 +106,8 @@ int main(int argc, char *argv[]) {
     camera_data.up = {0.0f, 1.0f, 0.0f};
     camera_data.near_plane = 0.1f;
     camera_data.fov = glm::radians(42.7f);
+    camera_data.focal_distance = 16.0f;
+    camera_data.aperture = 0.07f;
     
     FrameData frame{};
     frame.size = {width, height};
@@ -122,7 +124,7 @@ int main(int argc, char *argv[]) {
     auto threadgroups = uint2((width + threadgroup_size.x - 1) / threadgroup_size.x, (height + threadgroup_size.y - 1) / threadgroup_size.y);
     
     constexpr auto spp = 256u;
-    constexpr auto max_depth = 15u;
+    constexpr auto max_depth = 9u;
     
     static auto available_frame_count = 16u;
     static std::mutex mutex;

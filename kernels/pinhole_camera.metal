@@ -2,6 +2,7 @@
 #include <camera_data.h>
 #include <frame_data.h>
 #include <random.h>
+#include <sampling.h>
 
 using namespace metal;
 
@@ -27,19 +28,19 @@ kernel void pinhole_camera_generate_rays(
         ray_index_buffer[ray_index] = ray_index;
         
         auto seed = (tea<5>(tid.x, tid.y) + frame_data.index) << 8u;
-        auto z = camera_data.near_plane;
-        auto half_sensor_height = tan(0.5f * camera_data.fov) * z;
+        auto half_sensor_height = tan(0.5f * camera_data.fov) * camera_data.focal_distance;
         auto half_sensor_width = half_sensor_height * w / h;
         
         auto px = static_cast<float>(tid.x) + halton(seed);
         auto py = static_cast<float>(tid.y) + halton(seed);
-    
-        auto x = (1.0f - px / w * 2.0f) * half_sensor_width;
-        auto y = (1.0f - py / h * 2.0f) * half_sensor_height;
+        
+        Vec3f focal_plane_p{(1.0f - px / w * 2.0f) * half_sensor_width, (1.0f - py / h * 2.0f) * half_sensor_height, camera_data.focal_distance};
+        auto origin = Vec3f(camera_data.aperture / camera_data.near_plane * concentric_sample_disk(halton(seed), halton(seed)), 0.0f);
+        auto d = focal_plane_p - origin;
         
         Ray ray{};
-        ray.origin = camera_data.position;
-        ray.direction = normalize(x * camera_data.left + y * camera_data.up + z * camera_data.front);
+        ray.origin = origin.x * camera_data.left + origin.y * camera_data.up + origin.z * camera_data.front + camera_data.position;
+        ray.direction = normalize(d.x * camera_data.left + d.y * camera_data.up + d.z * camera_data.front);
         ray.min_distance = 0.0f;
         ray.max_distance = INFINITY;
         

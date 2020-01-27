@@ -13,13 +13,6 @@ struct Ray {
     float max_distance;
 };
 
-struct LightSample {
-    PackedVec3f radiance;
-    float pdf;
-    PackedVec3f direction;
-    float distance;
-};
-
 struct GatherRayData {
     Vec3f radiance;
     Vec2f pixel;
