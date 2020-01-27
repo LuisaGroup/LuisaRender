@@ -45,7 +45,7 @@ int main(int argc, char *argv[]) {
                            glm::rotate(glm::mat4{1.0f}, glm::radians(-30.0f), glm::vec3{0.0f, 1.0f, 0.0f}) *
                            glm::scale(glm::mat4{1.0f}, glm::vec3{0.2f});
     mesh_list.emplace_back(MeshDescriptor{bunny_obj_path, bunny_transform, glm::vec3{1.0f}, true});
-
+    
     auto house_obj_path = "/Users/mike/Downloads/PUP_Woodville.obj";
     auto house_transform = glm::translate(glm::mat4{1.0f}, glm::vec3{-1.5f, -5.0f, -1.0f}) *
                            glm::rotate(glm::mat4{1.0f}, glm::radians(40.0f), glm::vec3{0.0f, 1.0f, 0.0f}) *
@@ -54,8 +54,8 @@ int main(int argc, char *argv[]) {
     
     auto sphere_obj_path = ResourceManager::instance().working_path("data/meshes/sphere/sphere.obj");
     auto sphere_transform = glm::translate(glm::mat4{1.0f}, glm::vec3{3.0f, -4.0f, 1.0f}) *
-                           glm::rotate(glm::mat4{1.0f}, glm::radians(0.0f), glm::vec3{0.0f, 1.0f, 0.0f}) *
-                           glm::scale(glm::mat4{1.0f}, glm::vec3{1.0f});
+                            glm::rotate(glm::mat4{1.0f}, glm::radians(0.0f), glm::vec3{0.0f, 1.0f, 0.0f}) *
+                            glm::scale(glm::mat4{1.0f}, glm::vec3{1.0f});
     mesh_list.emplace_back(MeshDescriptor{sphere_obj_path, sphere_transform, glm::vec3{1.0f}, true});
     
     auto mesh = Mesh::load(mesh_list);
@@ -82,20 +82,15 @@ int main(int argc, char *argv[]) {
     constexpr auto height = 800u;
     
     constexpr auto max_ray_count = width * height;
+    auto ray_index_buffer = device->create_buffer(max_ray_count * sizeof(uint), BufferStorageTag::DEVICE_PRIVATE);
+    auto output_ray_index_buffer = device->create_buffer(max_ray_count * sizeof(uint), BufferStorageTag::DEVICE_PRIVATE);
     auto ray_buffer = device->create_buffer(max_ray_count * sizeof(Ray), BufferStorageTag::DEVICE_PRIVATE);
-    auto swap_ray_buffer = device->create_buffer(max_ray_count * sizeof(Ray), BufferStorageTag::DEVICE_PRIVATE);
     auto ray_throughput_buffer = device->create_buffer(max_ray_count * sizeof(Vec3f), BufferStorageTag::DEVICE_PRIVATE);
-    auto swap_ray_throughput_buffer = device->create_buffer(max_ray_count * sizeof(Vec3f), BufferStorageTag::DEVICE_PRIVATE);
     auto ray_seed_buffer = device->create_buffer(max_ray_count * sizeof(uint), BufferStorageTag::DEVICE_PRIVATE);
-    auto swap_ray_seed_buffer = device->create_buffer(max_ray_count * sizeof(uint), BufferStorageTag::DEVICE_PRIVATE);
     auto ray_radiance_buffer = device->create_buffer(max_ray_count * sizeof(Vec3f), BufferStorageTag::DEVICE_PRIVATE);
-    auto swap_ray_radiance_buffer = device->create_buffer(max_ray_count * sizeof(Vec3f), BufferStorageTag::DEVICE_PRIVATE);
     auto ray_depth_buffer = device->create_buffer(max_ray_count * sizeof(uint), BufferStorageTag::DEVICE_PRIVATE);
-    auto swap_ray_depth_buffer = device->create_buffer(max_ray_count * sizeof(uint), BufferStorageTag::DEVICE_PRIVATE);
     auto ray_pixel_buffer = device->create_buffer(max_ray_count * sizeof(Vec2f), BufferStorageTag::DEVICE_PRIVATE);
-    auto swap_ray_pixel_buffer = device->create_buffer(max_ray_count * sizeof(Vec2f), BufferStorageTag::DEVICE_PRIVATE);
     auto ray_pdf_buffer = device->create_buffer(max_ray_count * sizeof(float), BufferStorageTag::DEVICE_PRIVATE);
-    auto swap_ray_pdf_buffer = device->create_buffer(max_ray_count * sizeof(float), BufferStorageTag::DEVICE_PRIVATE);
     auto gather_ray_buffer = device->create_buffer(max_ray_count * sizeof(GatherRayData), BufferStorageTag::DEVICE_PRIVATE);
     auto light_sample_buffer = device->create_buffer(max_ray_count * sizeof(LightSample), BufferStorageTag::DEVICE_PRIVATE);
     auto shadow_ray_buffer = device->create_buffer(max_ray_count * sizeof(Ray), BufferStorageTag::DEVICE_PRIVATE);
@@ -127,7 +122,7 @@ int main(int argc, char *argv[]) {
     auto threadgroups = uint2((width + threadgroup_size.x - 1) / threadgroup_size.x, (height + threadgroup_size.y - 1) / threadgroup_size.y);
     
     constexpr auto spp = 256u;
-    constexpr auto max_depth = 15u;
+    constexpr auto max_depth = 2u;
     
     static auto available_frame_count = 16u;
     static std::mutex mutex;
@@ -163,6 +158,7 @@ int main(int argc, char *argv[]) {
                 
                 dispatch(*generate_rays_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
                     encoder["ray_buffer"]->set_buffer(*ray_buffer);
+                    encoder["ray_index_buffer"]->set_buffer(*ray_index_buffer);
                     encoder["ray_throughput_buffer"]->set_buffer(*ray_throughput_buffer);
                     encoder["ray_seed_buffer"]->set_buffer(*ray_seed_buffer);
                     encoder["ray_radiance_buffer"]->set_buffer(*ray_radiance_buffer);
@@ -179,10 +175,11 @@ int main(int argc, char *argv[]) {
                     auto next_ray_count_offset = curr_ray_count_offset + sizeof(uint);
                     
                     // intersection
-                    accelerator->trace_nearest(dispatch, *ray_buffer, *its_buffer, *ray_count_buffer, curr_ray_count_offset);
-    
+                    accelerator->trace_nearest(dispatch, *ray_buffer, *ray_index_buffer, *its_buffer, *ray_count_buffer, curr_ray_count_offset);
+                    
                     // sample lights
                     dispatch(*sample_light_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
+                        encoder["ray_index_buffer"]->set_buffer(*ray_index_buffer);
                         encoder["ray_buffer"]->set_buffer(*ray_buffer);
                         encoder["ray_seed_buffer"]->set_buffer(*ray_seed_buffer);
                         encoder["intersection_buffer"]->set_buffer(*its_buffer);
@@ -199,6 +196,7 @@ int main(int argc, char *argv[]) {
                     
                     // trace radiance
                     dispatch(*trace_radiance_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
+                        encoder["ray_index_buffer"]->set_buffer(*ray_index_buffer);
                         encoder["ray_buffer"]->set_buffer(*ray_buffer);
                         encoder["ray_radiance_buffer"]->set_buffer(*ray_radiance_buffer);
                         encoder["ray_throughput_buffer"]->set_buffer(*ray_throughput_buffer);
@@ -216,36 +214,22 @@ int main(int argc, char *argv[]) {
                     
                     // sort rays
                     dispatch(*sort_rays_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
+                        encoder["ray_index_buffer"]->set_buffer(*ray_index_buffer);
                         encoder["ray_buffer"]->set_buffer(*ray_buffer);
-                        encoder["output_ray_buffer"]->set_buffer(*swap_ray_buffer);
-                        encoder["ray_throughput_buffer"]->set_buffer(*ray_throughput_buffer);
-                        encoder["output_ray_throughput_buffer"]->set_buffer(*swap_ray_throughput_buffer);
-                        encoder["ray_seed_buffer"]->set_buffer(*ray_seed_buffer);
-                        encoder["output_ray_seed_buffer"]->set_buffer(*swap_ray_seed_buffer);
                         encoder["ray_radiance_buffer"]->set_buffer(*ray_radiance_buffer);
-                        encoder["output_ray_radiance_buffer"]->set_buffer(*swap_ray_radiance_buffer);
-                        encoder["ray_depth_buffer"]->set_buffer(*ray_depth_buffer);
-                        encoder["output_ray_depth_buffer"]->set_buffer(*swap_ray_depth_buffer);
                         encoder["ray_pixel_buffer"]->set_buffer(*ray_pixel_buffer);
-                        encoder["output_ray_pixel_buffer"]->set_buffer(*swap_ray_pixel_buffer);
-                        encoder["ray_pdf_buffer"]->set_buffer(*ray_pdf_buffer);
-                        encoder["output_ray_pdf_buffer"]->set_buffer(*swap_ray_pdf_buffer);
+                        encoder["output_ray_index_buffer"]->set_buffer(*output_ray_index_buffer);
                         encoder["ray_count"]->set_buffer(*ray_count_buffer, curr_ray_count_offset);
                         encoder["output_ray_count"]->set_buffer(*ray_count_buffer, next_ray_count_offset);
                         encoder["frame_data"]->set_bytes(&frame, sizeof(FrameData));
                         encoder["gather_ray_buffer"]->set_buffer(*gather_ray_buffer);
                     });
-                    std::swap(ray_buffer, swap_ray_buffer);
-                    std::swap(ray_throughput_buffer, swap_ray_throughput_buffer);
-                    std::swap(ray_seed_buffer, swap_ray_seed_buffer);
-                    std::swap(ray_radiance_buffer, swap_ray_radiance_buffer);
-                    std::swap(ray_depth_buffer, swap_ray_depth_buffer);
-                    std::swap(ray_pixel_buffer, swap_ray_pixel_buffer);
-                    std::swap(ray_pdf_buffer, swap_ray_pdf_buffer);
+                    std::swap(ray_index_buffer, output_ray_index_buffer);
                 }
                 
                 // gather rays
                 dispatch(*gather_rays_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
+                    encoder["ray_index_buffer"]->set_buffer(*ray_index_buffer);
                     encoder["ray_radiance_buffer"]->set_buffer(*ray_radiance_buffer);
                     encoder["ray_pixel_buffer"]->set_buffer(*ray_pixel_buffer);
                     encoder["ray_count"]->set_buffer(*ray_count_buffer, (i * (max_depth + 1u) + max_depth) * sizeof(uint));
@@ -275,7 +259,7 @@ int main(int argc, char *argv[]) {
     }
     
     auto result_buffer = device->create_buffer(max_ray_count * sizeof(Vec4f), BufferStorageTag::MANAGED);
-    device->launch([&] (KernelDispatcher &dispatch) {
+    device->launch([&](KernelDispatcher &dispatch) {
         dispatch(*convert_colorspace_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
             encoder["frame_data"]->set_bytes(&frame, sizeof(FrameData));
             encoder["result"]->set_texture(*result_texture);

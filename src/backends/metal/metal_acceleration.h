@@ -21,7 +21,7 @@ private:
 public:
     MetalAcceleration(MPSTriangleAccelerationStructure *structure, MPSRayIntersector *nearest_its, MPSRayIntersector *any_its) noexcept
         : _structure{structure}, _nearest_intersector{nearest_its}, _any_intersector{any_its} {}
-        
+    
     void trace_any(KernelDispatcher &dispatch, Buffer &ray_buffer, Buffer &intersection_buffer, size_t ray_count) override;
     void trace_nearest(KernelDispatcher &dispatch, Buffer &ray_buffer, Buffer &intersection_buffer, size_t ray_count) override;
     void trace_any(KernelDispatcher &dispatch, Buffer &ray_buffer, Buffer &intersection_buffer, Buffer &ray_count_buffer, size_t ray_count_buffer_offset) override;

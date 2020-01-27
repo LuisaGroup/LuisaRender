@@ -80,7 +80,7 @@ void MetalAcceleration::trace_nearest(KernelDispatcher &dispatch,
                                       Buffer &ray_count_buffer,
                                       size_t ray_count_buffer_offset) {
     
-    [_any_intersector encodeIntersectionToCommandBuffer:dynamic_cast<MetalKernelDispatcher &>(dispatch).command_buffer()
+    [_nearest_intersector encodeIntersectionToCommandBuffer:dynamic_cast<MetalKernelDispatcher &>(dispatch).command_buffer()
                                        intersectionType:MPSIntersectionTypeNearest
                                               rayBuffer:dynamic_cast<MetalBuffer &>(ray_buffer).handle()
                                         rayBufferOffset:0u

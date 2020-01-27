@@ -7,6 +7,7 @@ using namespace metal;
 
 kernel void pinhole_camera_generate_rays(
     device Ray *ray_buffer,
+    device uint *ray_index_buffer,
     device Vec3f *ray_throughput_buffer,
     device uint *ray_seed_buffer,
     device Vec3f *ray_radiance_buffer,
@@ -23,9 +24,9 @@ kernel void pinhole_camera_generate_rays(
     if (tid.x < w && tid.y < h) {
         
         auto ray_index = tid.y * w + tid.x;
+        ray_index_buffer[ray_index] = ray_index;
         
         auto seed = (tea<5>(tid.x, tid.y) + frame_data.index) << 8u;
-        
         auto z = camera_data.near_plane;
         auto half_sensor_height = tan(0.5f * camera_data.fov) * z;
         auto half_sensor_width = half_sensor_height * w / h;
