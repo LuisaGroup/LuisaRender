@@ -26,6 +26,18 @@ public:
     void trace_nearest(KernelDispatcher &dispatch, Buffer &ray_buffer, Buffer &intersection_buffer, size_t ray_count) override;
     void trace_any(KernelDispatcher &dispatch, Buffer &ray_buffer, Buffer &intersection_buffer, Buffer &ray_count_buffer, size_t ray_count_buffer_offset) override;
     void trace_nearest(KernelDispatcher &dispatch, Buffer &ray_buffer, Buffer &intersection_buffer, Buffer &ray_count_buffer, size_t ray_count_buffer_offset) override;
+    void trace_any(KernelDispatcher &dispatch,
+                   Buffer &ray_buffer,
+                   Buffer &ray_index_buffer,
+                   Buffer &intersection_buffer,
+                   Buffer &ray_count_buffer,
+                   size_t ray_count_buffer_offset) override;
+    void trace_nearest(KernelDispatcher &dispatch,
+                       Buffer &ray_buffer,
+                       Buffer &ray_index_buffer,
+                       Buffer &intersection_buffer,
+                       Buffer &ray_count_buffer,
+                       size_t ray_count_buffer_offset) override;
 };
 
 

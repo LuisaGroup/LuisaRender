@@ -146,10 +146,20 @@ kernel void trace_radiance(
 
 kernel void sort_rays(
     device const Ray *ray_buffer,
-    device const Vec3f *ray_radiance_buffer,
-    device const Vec2f *ray_pixel_buffer,
-    device const uint &ray_count,
     device Ray *output_ray_buffer,
+    device const Vec3f *ray_throughput_buffer,
+    device Vec3f *output_ray_throughput_buffer,
+    device const uint *ray_seed_buffer,
+    device uint *output_ray_seed_buffer,
+    device const Vec3f *ray_radiance_buffer,
+    device Vec3f *output_ray_radiance_buffer,
+    device const uint *ray_depth_buffer,
+    device uint *output_ray_depth_buffer,
+    device const Vec2f *ray_pixel_buffer,
+    device Vec2f *output_ray_pixel_buffer,
+    device const float *ray_pdf_buffer,
+    device float *output_ray_pdf_buffer,
+    device const uint &ray_count,
     device atomic_uint &output_ray_count,
     constant FrameData &frame_data,
     device GatherRayData *gather_ray_buffer,
@@ -164,13 +174,19 @@ kernel void sort_rays(
         auto ray = ray_buffer[index];
         if (ray.max_distance > 0.0f) {  // add active rays to next bounce
             auto vote = static_cast<simd_vote::vote_t>(simd_active_threads_mask());
-            auto offset = 0u;
+            auto output_index = 0u;
             if (simd_is_first()) {
                 auto count = popcount(static_cast<uint>(vote)) + popcount(static_cast<uint>(vote >> 32u));
-                offset = atomic_fetch_add_explicit(&output_ray_count, count, memory_order_relaxed);
+                output_index = atomic_fetch_add_explicit(&output_ray_count, count, memory_order_relaxed);
             }
-            offset = simd_broadcast_first(offset);
-            output_ray_buffer[offset + simd_prefix_exclusive_sum(1u)] = ray;
+            output_index = simd_broadcast_first(output_index) + simd_prefix_exclusive_sum(1u);
+            output_ray_buffer[output_index] = ray;
+            output_ray_throughput_buffer[output_index] = ray_throughput_buffer[index];
+            output_ray_seed_buffer[output_index] = ray_seed_buffer[index];
+            output_ray_radiance_buffer[output_index] = ray_radiance_buffer[index];
+            output_ray_depth_buffer[output_index] = ray_depth_buffer[index];
+            output_ray_pixel_buffer[output_index] = ray_pixel_buffer[index];
+            output_ray_pdf_buffer[output_index] = ray_pdf_buffer[index];
         } else {
             auto ray_pixel = ray_pixel_buffer[index];
             auto screen = uint2(ray_pixel);

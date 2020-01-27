@@ -85,11 +85,17 @@ int main(int argc, char *argv[]) {
     auto ray_buffer = device->create_buffer(max_ray_count * sizeof(Ray), BufferStorageTag::DEVICE_PRIVATE);
     auto swap_ray_buffer = device->create_buffer(max_ray_count * sizeof(Ray), BufferStorageTag::DEVICE_PRIVATE);
     auto ray_throughput_buffer = device->create_buffer(max_ray_count * sizeof(Vec3f), BufferStorageTag::DEVICE_PRIVATE);
+    auto swap_ray_throughput_buffer = device->create_buffer(max_ray_count * sizeof(Vec3f), BufferStorageTag::DEVICE_PRIVATE);
     auto ray_seed_buffer = device->create_buffer(max_ray_count * sizeof(uint), BufferStorageTag::DEVICE_PRIVATE);
+    auto swap_ray_seed_buffer = device->create_buffer(max_ray_count * sizeof(uint), BufferStorageTag::DEVICE_PRIVATE);
     auto ray_radiance_buffer = device->create_buffer(max_ray_count * sizeof(Vec3f), BufferStorageTag::DEVICE_PRIVATE);
+    auto swap_ray_radiance_buffer = device->create_buffer(max_ray_count * sizeof(Vec3f), BufferStorageTag::DEVICE_PRIVATE);
     auto ray_depth_buffer = device->create_buffer(max_ray_count * sizeof(uint), BufferStorageTag::DEVICE_PRIVATE);
+    auto swap_ray_depth_buffer = device->create_buffer(max_ray_count * sizeof(uint), BufferStorageTag::DEVICE_PRIVATE);
     auto ray_pixel_buffer = device->create_buffer(max_ray_count * sizeof(Vec2f), BufferStorageTag::DEVICE_PRIVATE);
+    auto swap_ray_pixel_buffer = device->create_buffer(max_ray_count * sizeof(Vec2f), BufferStorageTag::DEVICE_PRIVATE);
     auto ray_pdf_buffer = device->create_buffer(max_ray_count * sizeof(float), BufferStorageTag::DEVICE_PRIVATE);
+    auto swap_ray_pdf_buffer = device->create_buffer(max_ray_count * sizeof(float), BufferStorageTag::DEVICE_PRIVATE);
     auto gather_ray_buffer = device->create_buffer(max_ray_count * sizeof(GatherRayData), BufferStorageTag::DEVICE_PRIVATE);
     auto light_sample_buffer = device->create_buffer(max_ray_count * sizeof(LightSample), BufferStorageTag::DEVICE_PRIVATE);
     auto shadow_ray_buffer = device->create_buffer(max_ray_count * sizeof(Ray), BufferStorageTag::DEVICE_PRIVATE);
@@ -211,15 +217,31 @@ int main(int argc, char *argv[]) {
                     // sort rays
                     dispatch(*sort_rays_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
                         encoder["ray_buffer"]->set_buffer(*ray_buffer);
-                        encoder["ray_radiance_buffer"]->set_buffer(*ray_radiance_buffer);
-                        encoder["ray_pixel_buffer"]->set_buffer(*ray_pixel_buffer);
-                        encoder["ray_count"]->set_buffer(*ray_count_buffer, curr_ray_count_offset);
                         encoder["output_ray_buffer"]->set_buffer(*swap_ray_buffer);
+                        encoder["ray_throughput_buffer"]->set_buffer(*ray_throughput_buffer);
+                        encoder["output_ray_throughput_buffer"]->set_buffer(*swap_ray_throughput_buffer);
+                        encoder["ray_seed_buffer"]->set_buffer(*ray_seed_buffer);
+                        encoder["output_ray_seed_buffer"]->set_buffer(*swap_ray_seed_buffer);
+                        encoder["ray_radiance_buffer"]->set_buffer(*ray_radiance_buffer);
+                        encoder["output_ray_radiance_buffer"]->set_buffer(*swap_ray_radiance_buffer);
+                        encoder["ray_depth_buffer"]->set_buffer(*ray_depth_buffer);
+                        encoder["output_ray_depth_buffer"]->set_buffer(*swap_ray_depth_buffer);
+                        encoder["ray_pixel_buffer"]->set_buffer(*ray_pixel_buffer);
+                        encoder["output_ray_pixel_buffer"]->set_buffer(*swap_ray_pixel_buffer);
+                        encoder["ray_pdf_buffer"]->set_buffer(*ray_pdf_buffer);
+                        encoder["output_ray_pdf_buffer"]->set_buffer(*swap_ray_pdf_buffer);
+                        encoder["ray_count"]->set_buffer(*ray_count_buffer, curr_ray_count_offset);
                         encoder["output_ray_count"]->set_buffer(*ray_count_buffer, next_ray_count_offset);
                         encoder["frame_data"]->set_bytes(&frame, sizeof(FrameData));
                         encoder["gather_ray_buffer"]->set_buffer(*gather_ray_buffer);
                     });
                     std::swap(ray_buffer, swap_ray_buffer);
+                    std::swap(ray_throughput_buffer, swap_ray_throughput_buffer);
+                    std::swap(ray_seed_buffer, swap_ray_seed_buffer);
+                    std::swap(ray_radiance_buffer, swap_ray_radiance_buffer);
+                    std::swap(ray_depth_buffer, swap_ray_depth_buffer);
+                    std::swap(ray_pixel_buffer, swap_ray_pixel_buffer);
+                    std::swap(ray_pdf_buffer, swap_ray_pdf_buffer);
                 }
                 
                 // gather rays
