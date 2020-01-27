@@ -35,10 +35,10 @@ kernel void sample_lights(
     if (thread_index < ray_count) {
         
         auto ray_index = ray_index_buffer[thread_index];
-        auto its = intersection_buffer[ray_index];
+        auto its = intersection_buffer[thread_index];
         
         if (ray_buffer[ray_index].max_distance <= 0.0f || its.distance <= 0.0f) {  // no intersection
-            shadow_ray_buffer[ray_index].max_distance = -1.0f;  // terminate the ray
+            shadow_ray_buffer[ray_index].max_distance = -1.0f;
         } else {  // has an intersection
             auto uvw = Vec3f(its.barycentric, 1.0f - its.barycentric.x - its.barycentric.y);
             auto i0 = its.triangle_index * 3u;
@@ -94,10 +94,10 @@ kernel void trace_radiance(
         
         auto ray_index = ray_index_buffer[thread_index];
         auto ray = ray_buffer[ray_index];
-        if (ray.max_distance <= 0.0f || its_buffer[ray_index].distance <= 0.0f) {  // no intersection
+        if (ray.max_distance <= 0.0f || its_buffer[thread_index].distance <= 0.0f) {  // no intersection
             ray_buffer[ray_index].max_distance = -1.0f;  // terminate the ray
         } else {
-            auto its = its_buffer[ray_index];
+            auto its = its_buffer[thread_index];
             auto material = material_buffer[material_id_buffer[its.triangle_index]];
             material.albedo = XYZ2ACEScg(RGB2XYZ(material.albedo));
             auto i0 = its.triangle_index * 3;
@@ -155,7 +155,7 @@ kernel void sort_rays(
     device const Vec2f *ray_pixel_buffer,
     device uint *output_ray_index_buffer,
     device const uint &ray_count,
-    device atomic_uint &output_ray_count,
+    device atomic_uint *output_ray_count,
     constant FrameData &frame_data,
     device GatherRayData *gather_ray_buffer,
     uint tid [[thread_index_in_threadgroup]],
@@ -168,13 +168,7 @@ kernel void sort_rays(
     if (thread_index < ray_count) {
         auto ray_index = ray_index_buffer[thread_index];
         if (ray_buffer[ray_index].max_distance > 0.0f) {  // add active rays to next bounce
-            auto vote = static_cast<simd_vote::vote_t>(simd_active_threads_mask());
-            auto output_index = 0u;
-            if (simd_is_first()) {
-                auto count = popcount(static_cast<uint>(vote)) + popcount(static_cast<uint>(vote >> 32u));
-                output_index = atomic_fetch_add_explicit(&output_ray_count, count, memory_order_relaxed);
-            }
-            output_index = simd_broadcast_first(output_index) + simd_prefix_exclusive_sum(1u);
+            auto output_index = atomic_fetch_add_explicit(output_ray_count, 1u, memory_order_relaxed);
             output_ray_index_buffer[output_index] = ray_index;
         } else {
             auto ray_pixel = ray_pixel_buffer[ray_index];

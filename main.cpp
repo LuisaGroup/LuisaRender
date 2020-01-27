@@ -122,7 +122,7 @@ int main(int argc, char *argv[]) {
     auto threadgroups = uint2((width + threadgroup_size.x - 1) / threadgroup_size.x, (height + threadgroup_size.y - 1) / threadgroup_size.y);
     
     constexpr auto spp = 256u;
-    constexpr auto max_depth = 2u;
+    constexpr auto max_depth = 15u;
     
     static auto available_frame_count = 16u;
     static std::mutex mutex;
