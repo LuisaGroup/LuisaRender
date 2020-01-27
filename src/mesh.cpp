@@ -26,6 +26,7 @@ Mesh Mesh::load(const std::vector<MeshDescriptor> &mesh_list) {
         reader.ParseFromFile(desc.path, config);
         
         auto attributes = reader.GetAttrib();
+        
         if (!reader.Valid()) {
             std::cerr << "Failed to load: " << desc.path << std::endl;
         }

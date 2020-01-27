@@ -6,6 +6,7 @@
 
 #include <vector>
 #include <filesystem>
+
 #include "compatibility.h"
 #include "material_data.h"
 
@@ -23,5 +24,3 @@ struct Mesh {
     std::vector<MaterialData> materials;
     static Mesh load(const std::vector<MeshDescriptor> &mesh_list);
 };
-
-

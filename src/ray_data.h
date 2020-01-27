@@ -6,27 +6,18 @@
 
 #include "compatibility.h"
 
-struct RayData {
+struct Ray {
     PackedVec3f origin;
     float min_distance;
     PackedVec3f direction;
     float max_distance;
-    PackedVec3f throughput;
-    uint seed;
-    PackedVec3f radiance;
-    uint depth;
-    Vec2f pixel;
-    float pdf;
-    float padding{};
 };
 
-struct ShadowRayData {
-    PackedVec3f origin;
-    float min_distance;
+struct LightSample {
+    PackedVec3f radiance;
+    float pdf;
     PackedVec3f direction;
-    float max_distance;
-    PackedVec3f light_radiance;
-    float light_pdf;
+    float distance;
 };
 
 struct GatherRayData {

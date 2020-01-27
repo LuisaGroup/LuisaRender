@@ -15,13 +15,15 @@
 using namespace metal;
 
 kernel void sample_lights(
-    device RayData *ray_buffer [[buffer(0)]],
-    device const IntersectionData *intersection_buffer [[buffer(1)]],
-    device const LightData *light_buffer [[buffer(2)]],
-    device const Vec3f *p_buffer[[buffer(3)]],
-    device ShadowRayData *shadow_ray_buffer [[buffer(4)]],
-    constant uint &light_count [[buffer(5)]],
-    device const uint &ray_count [[buffer(6)]],
+    device Ray *ray_buffer,
+    device uint *ray_seed_buffer,
+    device const IntersectionData *intersection_buffer,
+    device const LightData *light_buffer,
+    device const Vec3f *p_buffer,
+    device Ray *shadow_ray_buffer,
+    device LightSample *light_sample_buffer,
+    constant uint &light_count,
+    device const uint &ray_count,
     uint tid [[thread_index_in_threadgroup]],
     uint2 tgsize [[threads_per_threadgroup]],
     uint2 tgid [[threadgroup_position_in_grid]],
@@ -32,42 +34,52 @@ kernel void sample_lights(
     if (index < ray_count) {
         
         auto its = intersection_buffer[index];
-        auto ray_seed = ray_buffer[index].seed;
-        
-        ShadowRayData shadow_ray{};
         
         if (ray_buffer[index].max_distance <= 0.0f || its.distance <= 0.0f) {  // no intersection
-            shadow_ray.max_distance = -1.0f;  // terminate the ray
+            shadow_ray_buffer[index].max_distance = -1.0f;  // terminate the ray
         } else {  // has an intersection
             auto uvw = Vec3f(its.barycentric, 1.0f - its.barycentric.x - its.barycentric.y);
             auto i0 = its.triangle_index * 3u;
             auto P = uvw.x * p_buffer[i0] + uvw.y * p_buffer[i0 + 1] + uvw.z * p_buffer[i0 + 2];
-            auto light = light_buffer[min(static_cast<uint>(halton(ray_seed) * light_count), light_count - 1u)];
+            auto seed = ray_seed_buffer[index];
+            auto light = light_buffer[min(static_cast<uint>(halton(seed) * light_count), light_count - 1u)];
+            ray_seed_buffer[index] = seed;
             auto L = light.position - P;
             auto dist = length(L);
             auto inv_dist = 1.0f / dist;
-            shadow_ray.direction = L * inv_dist;
-            shadow_ray.origin = P + 1e-4f * shadow_ray.direction;
+            auto wi = normalize(L);
+            
+            Ray shadow_ray{};
+            shadow_ray.direction = wi;
+            shadow_ray.origin = P + 1e-4f * wi;
             shadow_ray.min_distance = 0.0f;
             shadow_ray.max_distance = dist - 1e-4f;
-            shadow_ray.light_radiance = XYZ2ACEScg(RGB2XYZ(light.emission)) * inv_dist * inv_dist;
-            shadow_ray.light_pdf = 1.0f / light_count;
+            shadow_ray_buffer[index] = shadow_ray;
+            
+            LightSample light_sample{};
+            light_sample.radiance = XYZ2ACEScg(RGB2XYZ(light.emission)) * inv_dist * inv_dist * static_cast<float>(light_count);
+            light_sample.pdf = 1.0f;
+            light_sample.direction = wi;
+            light_sample.distance = dist;
+            light_sample_buffer[index] = light_sample;
         }
-        ray_buffer[index].seed = ray_seed;
-        shadow_ray_buffer[index] = shadow_ray;
     }
 }
 
 kernel void trace_radiance(
-    device RayData *ray_buffer [[buffer(0)]],
-    device const ShadowRayData *shadow_ray_buffer [[buffer(1)]],
-    device const IntersectionData *its_buffer [[buffer(2)]],
-    device const ShadowIntersectionData *shadow_its_buffer [[buffer(3)]],
-    device const Vec3f *p_buffer [[buffer(4)]],
-    device const Vec3f *n_buffer [[buffer(5)]],
-    device const uint *material_id_buffer [[buffer(6)]],
-    device const MaterialData *material_buffer [[buffer(7)]],
-    device const uint &ray_count [[buffer(8)]],
+    device Ray *ray_buffer,
+    device Vec3f *ray_radiance_buffer,
+    device Vec3f *ray_throughput_buffer,
+    device uint *ray_seed_buffer,
+    device uint *ray_depth_buffer,
+    device const LightSample *light_sample_buffer,
+    device const IntersectionData *its_buffer,
+    device const ShadowIntersectionData *shadow_its_buffer,
+    device const Vec3f *p_buffer,
+    device const Vec3f *n_buffer,
+    device const uint *material_id_buffer,
+    device const MaterialData *material_buffer,
+    device const uint &ray_count,
     uint tid [[thread_index_in_threadgroup]],
     uint2 tgsize [[threads_per_threadgroup]],
     uint2 tgid [[threadgroup_position_in_grid]],
@@ -79,7 +91,7 @@ kernel void trace_radiance(
         
         auto ray = ray_buffer[index];
         if (ray.max_distance <= 0.0f || its_buffer[index].distance <= 0.0f) {  // no intersection
-            ray.max_distance = -1.0f;  // terminate the ray
+            ray_buffer[index].max_distance = -1.0f;  // terminate the ray
         } else {
             auto its = its_buffer[index];
             auto material = material_buffer[material_id_buffer[its.triangle_index]];
@@ -98,11 +110,11 @@ kernel void trace_radiance(
             
             // direct lighting
             auto shadow_its = shadow_its_buffer[index];
+            auto ray_throughput = ray_throughput_buffer[index];
             if (!material.is_mirror && shadow_its.distance < 0.0f) {  // not occluded
-                auto shadow_ray = shadow_ray_buffer[index];
-                auto L = shadow_ray.direction;
-                auto NdotL = max(dot(N, L), 0.0f);
-                ray.radiance += ray.throughput * material.albedo * NdotL * shadow_ray.light_radiance / shadow_ray.light_pdf;
+                auto light_sample = light_sample_buffer[index];
+                auto NdotL = max(dot(N, light_sample.direction), 0.0f);
+                ray_radiance_buffer[index] += ray_throughput * material.albedo * NdotL * light_sample.radiance / light_sample.pdf;
             }
             
             // sampling brdf
@@ -110,32 +122,37 @@ kernel void trace_radiance(
             if (material.is_mirror) {
                 ray.direction = normalize(2.0f * NdotV * N - V);
             } else {
-                ray.direction = normalize(Onb{N}.inverse_transform(Vec3f(cosine_sample_hemisphere(halton(ray.seed), halton(ray.seed)))));
-                ray.throughput *= material.albedo;  // simplified for lambertian materials
-                ray.depth++;
-                if (ray.depth > 3) {  // RR
-                    auto q = max(0.05f, 1.0f - ACEScg2Luminance(ray.throughput));
-                    if (halton(ray.seed) < q) {
+                auto seed = ray_seed_buffer[index];
+                ray.direction = normalize(Onb{N}.inverse_transform(Vec3f(cosine_sample_hemisphere(halton(seed), halton(seed)))));
+                ray_throughput *= material.albedo;  // simplified for lambertian materials
+                auto ray_depth = (++ray_depth_buffer[index]);
+                if (ray_depth > 3) {  // RR
+                    auto q = max(0.05f, 1.0f - ACEScg2Luminance(ray_throughput));
+                    if (halton(seed) < q) {
                         ray.max_distance = -1.0f;
                     } else {
-                        ray.throughput /= 1.0f - q;
+                        ray_throughput /= 1.0f - q;
                     }
                 }
+                ray_seed_buffer[index] = seed;
             }
+            ray_throughput_buffer[index] = ray_throughput;
             ray.origin = P + 1e-4f * ray.direction;
             ray.min_distance = 0.0f;
+            ray_buffer[index] = ray;
         }
-        ray_buffer[index] = ray;
     }
 }
 
 kernel void sort_rays(
-    device const RayData *ray_buffer [[buffer(0)]],
-    device const uint &ray_count [[buffer(1)]],
-    device RayData *output_ray_buffer [[buffer(2)]],
-    device atomic_uint &output_ray_count [[buffer(3)]],
-    constant FrameData &frame_data [[buffer(4)]],
-    device GatherRayData *gather_ray_buffer [[buffer(5)]],
+    device const Ray *ray_buffer,
+    device const Vec3f *ray_radiance_buffer,
+    device const Vec2f *ray_pixel_buffer,
+    device const uint &ray_count,
+    device Ray *output_ray_buffer,
+    device atomic_uint &output_ray_count,
+    constant FrameData &frame_data,
+    device GatherRayData *gather_ray_buffer,
     uint tid [[thread_index_in_threadgroup]],
     uint2 tgsize [[threads_per_threadgroup]],
     uint2 tgid [[threadgroup_position_in_grid]],
@@ -155,15 +172,17 @@ kernel void sort_rays(
             offset = simd_broadcast_first(offset);
             output_ray_buffer[offset + simd_prefix_exclusive_sum(1u)] = ray;
         } else {
-            auto screen = uint2(ray.pixel);
+            auto ray_pixel = ray_pixel_buffer[index];
+            auto screen = uint2(ray_pixel);
             auto gather_index = screen.y * frame_data.size.x + screen.x;
-            gather_ray_buffer[gather_index] = {ray.radiance, ray.pixel};
+            gather_ray_buffer[gather_index] = {ray_radiance_buffer[index], ray_pixel};
         }
     }
 }
 
 kernel void gather_rays(
-    device const RayData *ray_buffer [[buffer(0)]],
+    device const Vec3f *ray_radiance_buffer,
+    device const Vec2f *ray_pixel_buffer,
     device const uint &ray_count [[buffer(1)]],
     device GatherRayData *gather_ray_buffer [[buffer(2)]],
     constant FrameData &frame_data [[buffer(3)]],
@@ -175,9 +194,9 @@ kernel void gather_rays(
     auto index = (tgsize.x * tgsize.y) * (tgid.y * gsize.x + tgid.x) + tid;
     
     if (index < ray_count) {
-        auto pixel = ray_buffer[index].pixel;
+        auto pixel = ray_pixel_buffer[index];
         auto screen = uint2(pixel);
         auto gather_index = screen.y * frame_data.size.x + screen.x;
-        gather_ray_buffer[gather_index] = {ray_buffer[index].radiance, pixel};
+        gather_ray_buffer[gather_index] = {ray_radiance_buffer[index], pixel};
     }
 }

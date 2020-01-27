@@ -81,13 +81,13 @@ std::shared_ptr<Acceleration> MetalDevice::create_acceleration(Buffer &position_
     [ray_intersector autorelease];
     ray_intersector.rayDataType = MPSRayDataTypeOriginMinDistanceDirectionMaxDistance;
     ray_intersector.intersectionDataType = MPSIntersectionDataTypeDistancePrimitiveIndexCoordinates;
-    ray_intersector.rayStride = sizeof(RayData);
+    ray_intersector.rayStride = sizeof(Ray);
     
     auto shadow_ray_intersector = [[MPSRayIntersector alloc] initWithDevice:_device_wrapper->device];
     [shadow_ray_intersector autorelease];
     shadow_ray_intersector.rayDataType = MPSRayDataTypeOriginMinDistanceDirectionMaxDistance;
     shadow_ray_intersector.intersectionDataType = MPSIntersectionDataTypeDistance;
-    shadow_ray_intersector.rayStride = sizeof(ShadowRayData);
+    shadow_ray_intersector.rayStride = sizeof(Ray);
     
     return std::make_shared<MetalAcceleration>(accelerator, ray_intersector, shadow_ray_intersector);
 }

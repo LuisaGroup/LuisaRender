@@ -82,10 +82,17 @@ int main(int argc, char *argv[]) {
     constexpr auto height = 800u;
     
     constexpr auto max_ray_count = width * height;
-    auto ray_buffer = device->create_buffer(max_ray_count * sizeof(RayData), BufferStorageTag::DEVICE_PRIVATE);
-    auto swap_ray_buffer = device->create_buffer(max_ray_count * sizeof(RayData), BufferStorageTag::DEVICE_PRIVATE);
+    auto ray_buffer = device->create_buffer(max_ray_count * sizeof(Ray), BufferStorageTag::DEVICE_PRIVATE);
+    auto swap_ray_buffer = device->create_buffer(max_ray_count * sizeof(Ray), BufferStorageTag::DEVICE_PRIVATE);
+    auto ray_throughput_buffer = device->create_buffer(max_ray_count * sizeof(Vec3f), BufferStorageTag::DEVICE_PRIVATE);
+    auto ray_seed_buffer = device->create_buffer(max_ray_count * sizeof(uint), BufferStorageTag::DEVICE_PRIVATE);
+    auto ray_radiance_buffer = device->create_buffer(max_ray_count * sizeof(Vec3f), BufferStorageTag::DEVICE_PRIVATE);
+    auto ray_depth_buffer = device->create_buffer(max_ray_count * sizeof(uint), BufferStorageTag::DEVICE_PRIVATE);
+    auto ray_pixel_buffer = device->create_buffer(max_ray_count * sizeof(Vec2f), BufferStorageTag::DEVICE_PRIVATE);
+    auto ray_pdf_buffer = device->create_buffer(max_ray_count * sizeof(float), BufferStorageTag::DEVICE_PRIVATE);
     auto gather_ray_buffer = device->create_buffer(max_ray_count * sizeof(GatherRayData), BufferStorageTag::DEVICE_PRIVATE);
-    auto shadow_ray_buffer = device->create_buffer(max_ray_count * sizeof(ShadowRayData), BufferStorageTag::DEVICE_PRIVATE);
+    auto light_sample_buffer = device->create_buffer(max_ray_count * sizeof(LightSample), BufferStorageTag::DEVICE_PRIVATE);
+    auto shadow_ray_buffer = device->create_buffer(max_ray_count * sizeof(Ray), BufferStorageTag::DEVICE_PRIVATE);
     auto its_buffer = device->create_buffer(max_ray_count * sizeof(IntersectionData), BufferStorageTag::DEVICE_PRIVATE);
     auto shadow_its_buffer = device->create_buffer(max_ray_count * sizeof(ShadowIntersectionData), BufferStorageTag::DEVICE_PRIVATE);
     
@@ -150,6 +157,12 @@ int main(int argc, char *argv[]) {
                 
                 dispatch(*generate_rays_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
                     encoder["ray_buffer"]->set_buffer(*ray_buffer);
+                    encoder["ray_throughput_buffer"]->set_buffer(*ray_throughput_buffer);
+                    encoder["ray_seed_buffer"]->set_buffer(*ray_seed_buffer);
+                    encoder["ray_radiance_buffer"]->set_buffer(*ray_radiance_buffer);
+                    encoder["ray_depth_buffer"]->set_buffer(*ray_depth_buffer);
+                    encoder["ray_pixel_buffer"]->set_buffer(*ray_pixel_buffer);
+                    encoder["ray_pdf_buffer"]->set_buffer(*ray_pdf_buffer);
                     encoder["camera_data"]->set_bytes(&camera_data, sizeof(CameraData));
                     encoder["frame_data"]->set_bytes(&frame, sizeof(FrameData));
                 });
@@ -165,8 +178,10 @@ int main(int argc, char *argv[]) {
                     // sample lights
                     dispatch(*sample_light_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
                         encoder["ray_buffer"]->set_buffer(*ray_buffer);
+                        encoder["ray_seed_buffer"]->set_buffer(*ray_seed_buffer);
                         encoder["intersection_buffer"]->set_buffer(*its_buffer);
                         encoder["light_buffer"]->set_buffer(*light_buffer);
+                        encoder["light_sample_buffer"]->set_buffer(*light_sample_buffer);
                         encoder["p_buffer"]->set_buffer(*position_buffer);
                         encoder["shadow_ray_buffer"]->set_buffer(*shadow_ray_buffer);
                         encoder["light_count"]->set_bytes(&light_count, sizeof(uint));
@@ -179,7 +194,11 @@ int main(int argc, char *argv[]) {
                     // trace radiance
                     dispatch(*trace_radiance_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
                         encoder["ray_buffer"]->set_buffer(*ray_buffer);
-                        encoder["shadow_ray_buffer"]->set_buffer(*shadow_ray_buffer);
+                        encoder["ray_radiance_buffer"]->set_buffer(*ray_radiance_buffer);
+                        encoder["ray_throughput_buffer"]->set_buffer(*ray_throughput_buffer);
+                        encoder["ray_seed_buffer"]->set_buffer(*ray_seed_buffer);
+                        encoder["ray_depth_buffer"]->set_buffer(*ray_depth_buffer);
+                        encoder["light_sample_buffer"]->set_buffer(*light_sample_buffer);
                         encoder["its_buffer"]->set_buffer(*its_buffer);
                         encoder["shadow_its_buffer"]->set_buffer(*shadow_its_buffer);
                         encoder["p_buffer"]->set_buffer(*position_buffer);
@@ -192,6 +211,8 @@ int main(int argc, char *argv[]) {
                     // sort rays
                     dispatch(*sort_rays_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
                         encoder["ray_buffer"]->set_buffer(*ray_buffer);
+                        encoder["ray_radiance_buffer"]->set_buffer(*ray_radiance_buffer);
+                        encoder["ray_pixel_buffer"]->set_buffer(*ray_pixel_buffer);
                         encoder["ray_count"]->set_buffer(*ray_count_buffer, curr_ray_count_offset);
                         encoder["output_ray_buffer"]->set_buffer(*swap_ray_buffer);
                         encoder["output_ray_count"]->set_buffer(*ray_count_buffer, next_ray_count_offset);
@@ -203,7 +224,8 @@ int main(int argc, char *argv[]) {
                 
                 // gather rays
                 dispatch(*gather_rays_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
-                    encoder["ray_buffer"]->set_buffer(*ray_buffer);
+                    encoder["ray_radiance_buffer"]->set_buffer(*ray_radiance_buffer);
+                    encoder["ray_pixel_buffer"]->set_buffer(*ray_pixel_buffer);
                     encoder["ray_count"]->set_buffer(*ray_count_buffer, (i * (max_depth + 1u) + max_depth) * sizeof(uint));
                     encoder["gather_ray_buffer"]->set_buffer(*gather_ray_buffer);
                     encoder["frame_data"]->set_bytes(&frame, sizeof(FrameData));
