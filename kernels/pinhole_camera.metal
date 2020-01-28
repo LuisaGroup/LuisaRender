@@ -6,21 +6,33 @@
 
 using namespace metal;
 
+struct Argument {
+    device uint32_t *buffer;
+    device uint32_t *buffer2;
+    texture2d<float, access::read> texture;
+};
+
 kernel void pinhole_camera_generate_rays(
     device uint *ray_index_buffer,
     device Ray *ray_buffer,
+    device uint &ray_count,
     device Vec3f *ray_throughput_buffer,
     device uint *ray_seed_buffer,
     device Vec3f *ray_radiance_buffer,
     device uint *ray_depth_buffer,
     device Vec2f *ray_pixel_buffer,
     device float *ray_pdf_buffer,
+    device const Argument *arguments,
     constant CameraData &camera_data,
     constant FrameData &frame_data,
     uint2 tid [[thread_position_in_grid]]) {
     
     auto w = frame_data.size.x;
     auto h = frame_data.size.y;
+    
+    if (tid.x == 0u && tid.y == 0u) {
+        ray_count = w * h;
+    }
     
     if (tid.x < w && tid.y < h) {
         

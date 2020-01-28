@@ -25,12 +25,9 @@ kernel void sample_lights(
     device LightSample *light_sample_buffer,
     constant uint &light_count,
     device const uint &ray_count,
-    uint tid [[thread_index_in_threadgroup]],
-    uint2 tgsize [[threads_per_threadgroup]],
-    uint2 tgid [[threadgroup_position_in_grid]],
-    uint2 gsize [[threadgroups_per_grid]]) {
+    uint2 tid [[thread_position_in_grid]]) {
     
-    auto thread_index = (tgsize.x * tgsize.y) * (tgid.y * gsize.x + tgid.x) + tid;
+    auto thread_index = tid.x;
     
     if (thread_index < ray_count) {
         
@@ -83,13 +80,9 @@ kernel void trace_radiance(
     device const uint *material_id_buffer,
     device const MaterialData *material_buffer,
     device const uint &ray_count,
-    uint tid [[thread_index_in_threadgroup]],
-    uint2 tgsize [[threads_per_threadgroup]],
-    uint2 tgid [[threadgroup_position_in_grid]],
-    uint2 gsize [[threadgroups_per_grid]]) {
+    uint2 tid [[thread_position_in_grid]]) {
     
-    auto thread_index = (tgsize.x * tgsize.y) * (tgid.y * gsize.x + tgid.x) + tid;
-    
+    auto thread_index = tid.x;
     if (thread_index < ray_count) {
         
         auto ray_index = ray_index_buffer[thread_index];
@@ -158,13 +151,9 @@ kernel void sort_rays(
     device atomic_uint *output_ray_count,
     constant FrameData &frame_data,
     device GatherRayData *gather_ray_buffer,
-    uint tid [[thread_index_in_threadgroup]],
-    uint2 tgsize [[threads_per_threadgroup]],
-    uint2 tgid [[threadgroup_position_in_grid]],
-    uint2 gsize [[threadgroups_per_grid]]) {
+    uint2 tid [[thread_position_in_grid]]) {
     
-    auto thread_index = (tgsize.x * tgsize.y) * (tgid.y * gsize.x + tgid.x) + tid;
-    
+    auto thread_index = tid.x;
     if (thread_index < ray_count) {
         auto ray_index = ray_index_buffer[thread_index];
         if (ray_buffer[ray_index].max_distance > 0.0f) {  // add active rays to next bounce
@@ -179,18 +168,6 @@ kernel void sort_rays(
     }
 }
 
-kernel void update_ray_count(
-    device uint &current_ray_count,
-    device uint &next_ray_count,
-    uint2 tid [[thread_position_in_grid]]) {
-    
-    if (tid.x == 0u && tid.y == 0u) {
-        current_ray_count = next_ray_count;
-        next_ray_count = 0u;
-    }
-    
-}
-
 kernel void gather_rays(
     device const uint *ray_index_buffer,
     device const Vec3f *ray_radiance_buffer,
@@ -198,13 +175,9 @@ kernel void gather_rays(
     device const uint &ray_count,
     device GatherRayData *gather_ray_buffer,
     constant FrameData &frame_data,
-    uint tid [[thread_index_in_threadgroup]],
-    uint2 tgsize [[threads_per_threadgroup]],
-    uint2 tgid [[threadgroup_position_in_grid]],
-    uint2 gsize [[threadgroups_per_grid]]) {
+    uint2 tid [[thread_position_in_grid]]) {
     
-    auto thread_index = (tgsize.x * tgsize.y) * (tgid.y * gsize.x + tgid.x) + tid;
-    
+    auto thread_index = tid.x;
     if (thread_index < ray_count) {
         auto ray_index = ray_index_buffer[thread_index];
         auto pixel = ray_pixel_buffer[ray_index];

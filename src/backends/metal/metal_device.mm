@@ -48,7 +48,22 @@ std::shared_ptr<Kernel> MetalDevice::create_kernel(std::string_view function_nam
                                                                         reflection:&reflection
                                                                              error:nullptr];
     [pipeline autorelease];
-    return std::make_shared<MetalKernel>(pipeline, reflection);
+    
+    std::cout << "Function: " << function_name << std::endl;
+    for (MTLArgument *argument in reflection.arguments) {
+        if (argument.type == MTLArgumentTypeBuffer) {
+            std::cout << "  [" << argument.index << "] " << to_string(argument.name) << ": " << argument.bufferDataSize << "(" << argument.bufferAlignment << ")";
+            if (argument.bufferPointerType.elementIsArgumentBuffer) {
+                auto encoder = [function newArgumentEncoderWithBufferIndex:argument.index];
+                [encoder autorelease];
+                std::cout << " " << encoder.encodedLength;
+            }
+            std::cout << std::endl;
+        }
+    }
+    std::cout << std::endl;
+    
+    return std::make_shared<MetalKernel>(function, pipeline, reflection);
     
 }
 

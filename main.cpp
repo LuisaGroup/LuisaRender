@@ -43,14 +43,14 @@ int main(int argc, char *argv[]) {
     auto bunny_obj_path = ResourceManager::instance().working_path("data/meshes/nanosuit/nanosuit.obj");
     auto bunny_transform = glm::translate(glm::mat4{1.0f}, glm::vec3{1.0f, -5.0f, -1.0f}) *
                            glm::rotate(glm::mat4{1.0f}, glm::radians(-30.0f), glm::vec3{0.0f, 1.0f, 0.0f}) *
-                           glm::scale(glm::mat4{1.0f}, glm::vec3{0.2f});
+                           glm::scale(glm::mat4{1.0f}, glm::vec3{0.25f});
     mesh_list.emplace_back(MeshDescriptor{bunny_obj_path, bunny_transform, glm::vec3{1.0f}, true});
     
-    auto house_obj_path = "/Users/mike/Downloads/PUP_Woodville.obj";
-    auto house_transform = glm::translate(glm::mat4{1.0f}, glm::vec3{-1.5f, -5.0f, -1.0f}) *
+    auto house_obj_path = "data/meshes/cow/cow.obj";
+    auto house_transform = glm::translate(glm::mat4{1.0f}, glm::vec3{-1.5f, -5.0f, 0.0f}) *
                            glm::rotate(glm::mat4{1.0f}, glm::radians(40.0f), glm::vec3{0.0f, 1.0f, 0.0f}) *
-                           glm::scale(glm::mat4{1.0f}, glm::vec3{0.0075f});
-    mesh_list.emplace_back(MeshDescriptor{house_obj_path, house_transform, glm::vec3{0.5f, 0.6f, 0.2f}, false});
+                           glm::scale(glm::mat4{1.0f}, glm::vec3{25.0f});
+    mesh_list.emplace_back(MeshDescriptor{house_obj_path, house_transform, glm::vec3{0.9f, 0.7f, 0.2f}, false});
     
     auto sphere_obj_path = ResourceManager::instance().working_path("data/meshes/sphere/sphere.obj");
     auto sphere_transform = glm::translate(glm::mat4{1.0f}, glm::vec3{3.0f, -4.0f, 1.0f}) *
@@ -122,8 +122,10 @@ int main(int argc, char *argv[]) {
     
     auto threadgroup_size = uint2(16, 16);
     auto threadgroups = uint2((width + threadgroup_size.x - 1) / threadgroup_size.x, (height + threadgroup_size.y - 1) / threadgroup_size.y);
+    auto threadgroup_size_1D = 256u;
+    auto threadgroups_1D = (width * height + threadgroup_size_1D - 1) / threadgroup_size_1D;
     
-    constexpr auto spp = 1024u;
+    constexpr auto spp = 128u;
     constexpr auto max_depth = 11u;
     
     static auto available_frame_count = 16u;
@@ -134,12 +136,7 @@ int main(int argc, char *argv[]) {
     std::cout << "Rendering..." << std::endl;
     auto t0 = std::chrono::steady_clock::now();
     
-    std::vector<uint> initial_ray_counts;
-    initial_ray_counts.resize(spp * (max_depth + 1u), 0u);
-    for (auto i = 0u; i < spp; i++) {
-        initial_ray_counts[i * (max_depth + 1u)] = max_ray_count;
-    }
-    
+    std::vector<uint> initial_ray_counts(spp * (max_depth + 1u), 0u);
     auto ray_count_buffer_size = initial_ray_counts.size() * sizeof(uint);
     auto ray_count_buffer = device->create_buffer(ray_count_buffer_size, BufferStorageTag::MANAGED);
     ray_count_buffer->upload(initial_ray_counts.data(), ray_count_buffer_size);
@@ -161,6 +158,7 @@ int main(int argc, char *argv[]) {
                 dispatch(*generate_rays_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
                     encoder["ray_index_buffer"]->set_buffer(*ray_index_buffer);
                     encoder["ray_buffer"]->set_buffer(*ray_buffer);
+                    encoder["ray_count"]->set_buffer(*ray_count_buffer, i * (max_depth + 1u) * sizeof(uint));
                     encoder["ray_throughput_buffer"]->set_buffer(*ray_throughput_buffer);
                     encoder["ray_seed_buffer"]->set_buffer(*ray_seed_buffer);
                     encoder["ray_radiance_buffer"]->set_buffer(*ray_radiance_buffer);
@@ -180,7 +178,7 @@ int main(int argc, char *argv[]) {
                     accelerator->trace_nearest(dispatch, *ray_buffer, *ray_index_buffer, *its_buffer, *ray_count_buffer, curr_ray_count_offset);
                     
                     // sample lights
-                    dispatch(*sample_light_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
+                    dispatch(*sample_light_kernel, threadgroups_1D, threadgroup_size_1D, [&](KernelArgumentEncoder &encoder) {
                         encoder["ray_index_buffer"]->set_buffer(*ray_index_buffer);
                         encoder["ray_buffer"]->set_buffer(*ray_buffer);
                         encoder["ray_seed_buffer"]->set_buffer(*ray_seed_buffer);
@@ -197,7 +195,7 @@ int main(int argc, char *argv[]) {
                     accelerator->trace_any(dispatch, *shadow_ray_buffer, *shadow_its_buffer, *ray_count_buffer, curr_ray_count_offset);
                     
                     // trace radiance
-                    dispatch(*trace_radiance_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
+                    dispatch(*trace_radiance_kernel, threadgroups_1D, threadgroup_size_1D, [&](KernelArgumentEncoder &encoder) {
                         encoder["ray_index_buffer"]->set_buffer(*ray_index_buffer);
                         encoder["ray_buffer"]->set_buffer(*ray_buffer);
                         encoder["ray_radiance_buffer"]->set_buffer(*ray_radiance_buffer);
@@ -215,7 +213,7 @@ int main(int argc, char *argv[]) {
                     });
                     
                     // sort rays
-                    dispatch(*sort_rays_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
+                    dispatch(*sort_rays_kernel, threadgroups_1D, threadgroup_size_1D, [&](KernelArgumentEncoder &encoder) {
                         encoder["ray_index_buffer"]->set_buffer(*ray_index_buffer);
                         encoder["ray_buffer"]->set_buffer(*ray_buffer);
                         encoder["ray_radiance_buffer"]->set_buffer(*ray_radiance_buffer);
@@ -230,7 +228,7 @@ int main(int argc, char *argv[]) {
                 }
                 
                 // gather rays
-                dispatch(*gather_rays_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
+                dispatch(*gather_rays_kernel, threadgroups_1D, threadgroup_size_1D, [&](KernelArgumentEncoder &encoder) {
                     encoder["ray_index_buffer"]->set_buffer(*ray_index_buffer);
                     encoder["ray_radiance_buffer"]->set_buffer(*ray_radiance_buffer);
                     encoder["ray_pixel_buffer"]->set_buffer(*ray_pixel_buffer);

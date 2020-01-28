@@ -46,7 +46,9 @@ public:
     }
     
     virtual void launch(std::function<void(KernelDispatcher &)> dispatch) = 0;
-    virtual void launch_async(std::function<void(KernelDispatcher &)> dispatch, std::function<void()> callback = []{}) = 0;
+    virtual void launch_async(std::function<void(KernelDispatcher &)> dispatch, std::function<void()> callback) = 0;
+    virtual void launch_async(std::function<void(KernelDispatcher &)> dispatch) { launch_async(std::move(dispatch), []{}); }
+    
 };
 
 #define DEVICE_CREATOR(name)                                                                            \
