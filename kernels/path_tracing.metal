@@ -179,6 +179,18 @@ kernel void sort_rays(
     }
 }
 
+kernel void update_ray_count(
+    device uint &current_ray_count,
+    device uint &next_ray_count,
+    uint2 tid [[thread_position_in_grid]]) {
+    
+    if (tid.x == 0u && tid.y == 0u) {
+        current_ray_count = next_ray_count;
+        next_ray_count = 0u;
+    }
+    
+}
+
 kernel void gather_rays(
     device const uint *ray_index_buffer,
     device const Vec3f *ray_radiance_buffer,

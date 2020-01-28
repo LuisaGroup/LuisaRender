@@ -78,8 +78,8 @@ int main(int argc, char *argv[]) {
     
     auto accelerator = device->create_acceleration(*position_buffer, sizeof(Vec3f), mesh.material_ids.size());
     
-    constexpr auto width = 1000u;
-    constexpr auto height = 800u;
+    constexpr auto width = 1440u;
+    constexpr auto height = 768u;
     
     constexpr auto max_ray_count = width * height;
     auto ray_index_buffer = device->create_buffer(max_ray_count * sizeof(uint), BufferStorageTag::DEVICE_PRIVATE);
@@ -100,14 +100,14 @@ int main(int argc, char *argv[]) {
     auto result_texture = device->create_texture(uint2{width, height}, TextureFormatTag::RGBA32F, TextureAccessTag::READ_WRITE);
     
     CameraData camera_data{};
-    camera_data.position = {0.0f, 0.0f, 15.0f};
+    camera_data.position = {0.8f, -2.5f, 15.0f};
     camera_data.front = {0.0f, 0.0f, -1.0f};
     camera_data.left = {-1.0f, 0.0f, 0.0f};
     camera_data.up = {0.0f, 1.0f, 0.0f};
     camera_data.near_plane = 0.1f;
-    camera_data.fov = glm::radians(42.7f);
+    camera_data.fov = glm::radians(23.7f);
     camera_data.focal_distance = 16.0f;
-    camera_data.aperture = 0.07f;
+    camera_data.aperture = 0.035f;
     
     FrameData frame{};
     frame.size = {width, height};
@@ -123,8 +123,8 @@ int main(int argc, char *argv[]) {
     auto threadgroup_size = uint2(16, 16);
     auto threadgroups = uint2((width + threadgroup_size.x - 1) / threadgroup_size.x, (height + threadgroup_size.y - 1) / threadgroup_size.y);
     
-    constexpr auto spp = 256u;
-    constexpr auto max_depth = 9u;
+    constexpr auto spp = 1024u;
+    constexpr auto max_depth = 11u;
     
     static auto available_frame_count = 16u;
     static std::mutex mutex;
@@ -159,8 +159,8 @@ int main(int argc, char *argv[]) {
                 frame.index = i;
                 
                 dispatch(*generate_rays_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
-                    encoder["ray_buffer"]->set_buffer(*ray_buffer);
                     encoder["ray_index_buffer"]->set_buffer(*ray_index_buffer);
+                    encoder["ray_buffer"]->set_buffer(*ray_buffer);
                     encoder["ray_throughput_buffer"]->set_buffer(*ray_throughput_buffer);
                     encoder["ray_seed_buffer"]->set_buffer(*ray_seed_buffer);
                     encoder["ray_radiance_buffer"]->set_buffer(*ray_radiance_buffer);

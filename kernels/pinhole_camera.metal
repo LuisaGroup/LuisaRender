@@ -7,8 +7,8 @@
 using namespace metal;
 
 kernel void pinhole_camera_generate_rays(
-    device Ray *ray_buffer,
     device uint *ray_index_buffer,
+    device Ray *ray_buffer,
     device Vec3f *ray_throughput_buffer,
     device uint *ray_seed_buffer,
     device Vec3f *ray_radiance_buffer,
