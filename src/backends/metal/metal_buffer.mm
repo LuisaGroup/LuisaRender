@@ -19,6 +19,6 @@ void MetalBuffer::synchronize(KernelDispatcher &dispatch) {
     [blit_encoder endEncoding];
 }
 
-const void *MetalBuffer::data() const {
+void *MetalBuffer::data() {
     return _handle.contents;
 }

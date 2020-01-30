@@ -22,7 +22,7 @@ public:
     
     void upload(const void *host_data, size_t size, size_t offset) override;
     void synchronize(struct KernelDispatcher &dispatch) override;
-    [[nodiscard]] const void *data() const override;
+    [[nodiscard]] void *data() override;
     [[nodiscard]] id<MTLBuffer> handle() const noexcept { return _handle; }
     
 };

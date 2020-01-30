@@ -20,14 +20,44 @@ inline float Mitchell1D(float x) {
             ((12 - 9 * B - 6 * C) * xx + (-18 + 12 * B + 6 * C) * x) * x + (6 - 2 * B));
 }
 
-kernel void gather_terminated_rays(
-    device const Vec3f *ray_buffer,
-    constant FrameData &frame_data,
-    constant uint &pixel_radius,
-    device atomic_int *result,
+kernel void rgb_film_clear(
+    device uint4 *accum_buffer,
+    constant uint &ray_count,
     uint2 tid [[thread_position_in_grid]]) {
     
+    if (tid.x < ray_count) {
+        accum_buffer[tid.x] = {};
+    }
     
+}
+
+kernel void rgb_film_gather_rays(
+    device const GatherRayData *ray_buffer,
+    constant FrameData &frame_data,
+    device atomic_int *accum_buffer,
+    uint2 tid [[thread_position_in_grid]]) {
+    
+    if (tid.x < frame_data.size.x && tid.y < frame_data.size.y) {
+        auto index = tid.x + tid.y * frame_data.size.x;
+        auto new_value = int4(int3(round(ACEScg2XYZ(ray_buffer[index].radiance) * 1024.0f)), 1);
+        atomic_fetch_add_explicit(&accum_buffer[index * 4u + 0u], new_value.x, memory_order_relaxed);
+        atomic_fetch_add_explicit(&accum_buffer[index * 4u + 1u], new_value.y, memory_order_relaxed);
+        atomic_fetch_add_explicit(&accum_buffer[index * 4u + 2u], new_value.z, memory_order_relaxed);
+        atomic_fetch_add_explicit(&accum_buffer[index * 4u + 3u], new_value.w, memory_order_relaxed);
+    }
+}
+
+kernel void rgb_film_convert_colorspace(
+    constant FrameData &frame_data,
+    device const int4 *accum_buffer,
+    texture2d<float, access::write> result,
+    uint2 tid [[thread_position_in_grid]]) {
+    
+    if (tid.x < frame_data.size.x && tid.y < frame_data.size.y) {
+        auto index = tid.x + tid.y * frame_data.size.x;
+        auto f = Vec4f(accum_buffer[index]);
+        result.write(Vec4f(XYZ2RGB(Vec3f(f) / (1024.0f * f.a)), 1.0f), tid);
+    }
     
 }
 

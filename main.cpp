@@ -25,8 +25,9 @@ int main(int argc, char *argv[]) {
     auto trace_radiance_kernel = device->create_kernel("trace_radiance");
     auto sort_rays_kernel = device->create_kernel("sort_rays");
     auto gather_rays_kernel = device->create_kernel("gather_rays");
-    auto filter_kernel = device->create_kernel("mitchell_natravali_filter");
-    auto convert_colorspace_kernel = device->create_kernel("convert_colorspace_rgb");
+    auto film_clear_kernel = device->create_kernel("rgb_film_clear");
+    auto film_gather_rays_kernel = device->create_kernel("rgb_film_gather_rays");
+    auto film_convert_colorspace_kernel = device->create_kernel("rgb_film_convert_colorspace");
     
     std::vector<MeshDescriptor> mesh_list;
     auto cube_obj_path = ResourceManager::instance().working_path("data/meshes/cube/cube.obj");
@@ -97,8 +98,8 @@ int main(int argc, char *argv[]) {
     auto shadow_ray_buffer = device->create_buffer(max_ray_count * sizeof(Ray), BufferStorageTag::DEVICE_PRIVATE);
     auto its_buffer = device->create_buffer(max_ray_count * sizeof(IntersectionData), BufferStorageTag::DEVICE_PRIVATE);
     auto shadow_its_buffer = device->create_buffer(max_ray_count * sizeof(ShadowIntersectionData), BufferStorageTag::DEVICE_PRIVATE);
-    
-    auto result_texture = device->create_texture(uint2{width, height}, TextureFormatTag::RGBA32F, TextureAccessTag::READ_WRITE);
+    auto accum_buffer = device->create_buffer(max_ray_count * sizeof(glm::ivec4), BufferStorageTag::DEVICE_PRIVATE);
+    auto result_texture = device->create_texture(uint2{width, height}, TextureFormatTag::RGBA32F, TextureAccessTag::WRITE_ONLY);
     
     CameraData camera_data{};
     camera_data.position = {0.8f, -2.5f, 15.0f};
@@ -126,7 +127,7 @@ int main(int argc, char *argv[]) {
     auto threadgroup_size_1D = 256u;
     auto threadgroups_1D = (width * height + threadgroup_size_1D - 1) / threadgroup_size_1D;
     
-    constexpr auto spp = 1024u;
+    constexpr auto spp = 64u;
     constexpr auto max_depth = 11u;
     
     static auto available_frame_count = 16u;
@@ -141,6 +142,13 @@ int main(int argc, char *argv[]) {
     auto ray_count_buffer_size = initial_ray_counts.size() * sizeof(uint);
     auto ray_count_buffer = device->create_buffer(ray_count_buffer_size, BufferStorageTag::MANAGED);
     ray_count_buffer->upload(initial_ray_counts.data(), ray_count_buffer_size);
+    
+    device->launch_async([&](KernelDispatcher &dispatch) {
+        dispatch(*film_clear_kernel, threadgroups_1D, threadgroup_size_1D, [&](KernelArgumentEncoder &encoder) {
+            encoder["accum_buffer"]->set_buffer(*accum_buffer);
+            encoder["ray_count"]->set_bytes(&max_ray_count, sizeof(max_ray_count));
+        });
+    });
     
     for (auto i = 0u; i < spp; i++) {
         
@@ -238,13 +246,10 @@ int main(int argc, char *argv[]) {
                     encoder["frame_data"]->set_bytes(&frame, sizeof(FrameData));
                 });
                 
-                // filter
-                auto pixel_radius = 1u;
-                dispatch(*filter_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
+                dispatch(*film_gather_rays_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
                     encoder["ray_buffer"]->set_buffer(*gather_ray_buffer);
                     encoder["frame_data"]->set_bytes(&frame, sizeof(FrameData));
-                    encoder["pixel_radius"]->set_bytes(&pixel_radius, sizeof(uint));
-                    encoder["result"]->set_texture(*result_texture);
+                    encoder["accum_buffer"]->set_buffer(*accum_buffer);
                 });
             }, [] {
                 {
@@ -261,8 +266,9 @@ int main(int argc, char *argv[]) {
     
     auto result_buffer = device->create_buffer(max_ray_count * sizeof(Vec4f), BufferStorageTag::MANAGED);
     device->launch([&](KernelDispatcher &dispatch) {
-        dispatch(*convert_colorspace_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
+        dispatch(*film_convert_colorspace_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
             encoder["frame_data"]->set_bytes(&frame, sizeof(FrameData));
+            encoder["accum_buffer"]->set_buffer(*accum_buffer);
             encoder["result"]->set_texture(*result_texture);
         });
         result_texture->copy_to_buffer(dispatch, *result_buffer);
