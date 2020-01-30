@@ -1,9 +1,6 @@
 #include <chrono>
 #include <iostream>
 #include <opencv2/opencv.hpp>
-#include <glm/glm.hpp>
-#include <glm/ext.hpp>
-#include <compatibility.h>
 #include <mesh.h>
 #include <ray_data.h>
 #include <intersection_data.h>
@@ -13,7 +10,17 @@
 #include <core/device.h>
 #include <util/resource_manager.h>
 
+#include <core/data_types.h>
+#include <core/mathematics.h>
+
+#include <glm/glm.hpp>
+
+using namespace luisa;
+
 int main(int argc, char *argv[]) {
+    
+    luisa::float3 v;
+    v = luisa::math::cos(v);
     
     ResourceManager::instance().set_working_directory(std::filesystem::current_path());
     ResourceManager::instance().set_binary_directory(std::filesystem::absolute(argv[0]).parent_path());
@@ -52,7 +59,7 @@ int main(int argc, char *argv[]) {
     auto house_transform = glm::translate(glm::mat4{1.0f}, glm::vec3{-1.5f, -5.0f, 0.0f}) *
                            glm::rotate(glm::mat4{1.0f}, glm::radians(40.0f), glm::vec3{0.0f, 1.0f, 0.0f}) *
                            glm::scale(glm::mat4{1.0f}, glm::vec3{25.0f});
-    mesh_list.emplace_back(MeshDescriptor{house_obj_path, house_transform, glm::vec3{0.9f, 0.7f, 0.2f}, false});
+    mesh_list.emplace_back(MeshDescriptor{house_obj_path, house_transform, glm::vec3{0.5f, 0.4f, 0.3f}, false});
     
     auto sphere_obj_path = ResourceManager::instance().working_path("data/meshes/sphere/sphere.obj");
     auto sphere_transform = glm::translate(glm::mat4{1.0f}, glm::vec3{3.0f, -4.0f, 1.0f}) *
@@ -62,11 +69,11 @@ int main(int argc, char *argv[]) {
     
     auto mesh = Mesh::load(mesh_list);
     
-    auto position_buffer_size = mesh.positions.size() * sizeof(Vec3f);
+    auto position_buffer_size = mesh.positions.size() * sizeof(float3);
     auto position_buffer = device->create_buffer(position_buffer_size, BufferStorageTag::MANAGED);
     position_buffer->upload(mesh.positions.data(), position_buffer_size);
     
-    auto normal_buffer_size = mesh.normals.size() * sizeof(Vec3f);
+    auto normal_buffer_size = mesh.normals.size() * sizeof(float3);
     auto normal_buffer = device->create_buffer(normal_buffer_size, BufferStorageTag::MANAGED);
     normal_buffer->upload(mesh.normals.data(), normal_buffer_size);
     
@@ -78,7 +85,7 @@ int main(int argc, char *argv[]) {
     auto material_buffer = device->create_buffer(material_buffer_size, BufferStorageTag::MANAGED);
     material_buffer->upload(mesh.materials.data(), material_buffer_size);
     
-    auto accelerator = device->create_acceleration(*position_buffer, sizeof(Vec3f), mesh.material_ids.size());
+    auto accelerator = device->create_acceleration(*position_buffer, sizeof(float3), mesh.material_ids.size());
     
     constexpr auto width = 1440u;
     constexpr auto height = 768u;
@@ -87,11 +94,11 @@ int main(int argc, char *argv[]) {
     auto ray_index_buffer = device->create_buffer(max_ray_count * sizeof(uint), BufferStorageTag::DEVICE_PRIVATE);
     auto output_ray_index_buffer = device->create_buffer(max_ray_count * sizeof(uint), BufferStorageTag::DEVICE_PRIVATE);
     auto ray_buffer = device->create_buffer(max_ray_count * sizeof(Ray), BufferStorageTag::DEVICE_PRIVATE);
-    auto ray_throughput_buffer = device->create_buffer(max_ray_count * sizeof(Vec3f), BufferStorageTag::DEVICE_PRIVATE);
+    auto ray_throughput_buffer = device->create_buffer(max_ray_count * sizeof(float3), BufferStorageTag::DEVICE_PRIVATE);
     auto ray_seed_buffer = device->create_buffer(max_ray_count * sizeof(uint), BufferStorageTag::DEVICE_PRIVATE);
-    auto ray_radiance_buffer = device->create_buffer(max_ray_count * sizeof(Vec3f), BufferStorageTag::DEVICE_PRIVATE);
+    auto ray_radiance_buffer = device->create_buffer(max_ray_count * sizeof(float3), BufferStorageTag::DEVICE_PRIVATE);
     auto ray_depth_buffer = device->create_buffer(max_ray_count * sizeof(uint), BufferStorageTag::DEVICE_PRIVATE);
-    auto ray_pixel_buffer = device->create_buffer(max_ray_count * sizeof(Vec2f), BufferStorageTag::DEVICE_PRIVATE);
+    auto ray_pixel_buffer = device->create_buffer(max_ray_count * sizeof(float2), BufferStorageTag::DEVICE_PRIVATE);
     auto ray_pdf_buffer = device->create_buffer(max_ray_count * sizeof(float), BufferStorageTag::DEVICE_PRIVATE);
     auto gather_ray_buffer = device->create_buffer(max_ray_count * sizeof(GatherRayData), BufferStorageTag::DEVICE_PRIVATE);
     auto light_sample_buffer = device->create_buffer(max_ray_count * sizeof(LightSample), BufferStorageTag::DEVICE_PRIVATE);
@@ -264,7 +271,7 @@ int main(int argc, char *argv[]) {
         available_frame_count--;
     }
     
-    auto result_buffer = device->create_buffer(max_ray_count * sizeof(Vec4f), BufferStorageTag::MANAGED);
+    auto result_buffer = device->create_buffer(max_ray_count * sizeof(float4), BufferStorageTag::MANAGED);
     device->launch([&](KernelDispatcher &dispatch) {
         dispatch(*film_convert_colorspace_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
             encoder["frame_data"]->set_bytes(&frame, sizeof(FrameData));
@@ -293,8 +300,8 @@ int main(int argc, char *argv[]) {
     
     cv::Mat image;
     image.create(cv::Size{width, height}, CV_32FC3);
-    auto src_data = reinterpret_cast<const Vec4f *>(result_buffer->data());
-    auto dest_data = reinterpret_cast<PackedVec3f *>(image.data);
+    auto src_data = reinterpret_cast<const float4 *>(result_buffer->data());
+    auto dest_data = reinterpret_cast<packed_float3 *>(image.data);
     for (auto row = 0u; row < height; row++) {
         for (auto col = 0u; col < width; col++) {
             auto index = row * width + col;

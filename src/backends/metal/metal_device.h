@@ -7,6 +7,8 @@
 #include <memory>
 #include <core/device.h>
 
+namespace luisa::metal {
+
 class MetalDevice : public Device {
 
 private:
@@ -27,3 +29,5 @@ public:
     void launch_async(std::function<void(KernelDispatcher &)> dispatch, std::function<void()> callback) override;
     
 };
+
+}

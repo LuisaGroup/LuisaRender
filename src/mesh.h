@@ -6,9 +6,11 @@
 
 #include <vector>
 #include <filesystem>
+#include <core/data_types.h>
 
-#include "compatibility.h"
 #include "material_data.h"
+
+namespace luisa {
 
 struct MeshDescriptor {
     std::filesystem::path path;
@@ -18,9 +20,11 @@ struct MeshDescriptor {
 };
 
 struct Mesh {
-    std::vector<Vec3f> positions;
-    std::vector<Vec3f> normals;
+    std::vector<float3> positions;
+    std::vector<float3> normals;
     std::vector<uint> material_ids;
     std::vector<MaterialData> materials;
     static Mesh load(const std::vector<MeshDescriptor> &mesh_list);
 };
+
+}

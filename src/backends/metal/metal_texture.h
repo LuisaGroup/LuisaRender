@@ -11,6 +11,8 @@
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
 #import <core/texture.h>
 
+namespace luisa::metal {
+
 class MetalTexture : public Texture {
 
 private:
@@ -27,4 +29,4 @@ public:
     
 };
 
-
+}

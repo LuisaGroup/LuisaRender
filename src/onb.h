@@ -4,36 +4,45 @@
 
 #pragma once
 
-#include "compatibility.h"
+#include <core/data_types.h>
+#include <core/mathematics.h>
 
-struct Onb {
-    explicit Onb(Vec3f normal) : m_normal{normal} {
+namespace luisa {
+
+class Onb {
+
+private:
+    float3 _tangent{};
+    float3 _binormal{};
+    float3 _normal{};
+
+public:
+    LUISA_DEVICE_CALLABLE explicit Onb(float3 normal) : _normal{normal} {
         
-        using namespace metal;
+        using namespace math;
         
-        if (abs(m_normal.x) > abs(m_normal.z)) {
-            m_binormal.x = -m_normal.y;
-            m_binormal.y = m_normal.x;
-            m_binormal.z = 0;
+        if (abs(_normal.x) > abs(_normal.z)) {
+            _binormal.x = -_normal.y;
+            _binormal.y = _normal.x;
+            _binormal.z = 0;
         } else {
-            m_binormal.x = 0;
-            m_binormal.y = -m_normal.z;
-            m_binormal.z = m_normal.y;
+            _binormal.x = 0;
+            _binormal.y = -_normal.z;
+            _binormal.z = _normal.y;
         }
-        m_binormal = normalize(m_binormal);
-        m_tangent = cross(m_binormal, m_normal);
+        _binormal = normalize(_binormal);
+        _tangent = cross(_binormal, _normal);
     }
     
-    [[nodiscard]] Vec3f inverse_transform(Vec3f p) const {
-        return p.x * m_tangent + p.y * m_binormal + p.z * m_normal;
+    [[nodiscard]] LUISA_DEVICE_CALLABLE float3 inverse_transform(float3 p) const {
+        return p.x * _tangent + p.y * _binormal + p.z * _normal;
     }
     
-    [[nodiscard]] Vec3f transform(Vec3f p) const {
-        using namespace metal;
-        return {dot(p, m_tangent), dot(p, m_binormal), dot(p, m_normal)};
+    [[nodiscard]] LUISA_DEVICE_CALLABLE float3 transform(float3 p) const {
+        using namespace math;
+        return {dot(p, _tangent), dot(p, _binormal), dot(p, _normal)};
     }
     
-    Vec3f m_tangent{};
-    Vec3f m_binormal{};
-    Vec3f m_normal{};
 };
+
+}

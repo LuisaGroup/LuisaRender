@@ -2,12 +2,17 @@
 // Created by Mike Smith on 2019/10/21.
 //
 
+#include "compatibility.h"
+
+#include <core/data_types.h>
+#include <core/mathematics.h>
+
 #include <color_spaces.h>
 #include <frame_data.h>
 #include <ray_data.h>
-#include <address_spaces.h>
 
-using namespace metal;
+using namespace luisa;
+using namespace luisa::math;
 
 inline float Mitchell1D(float x) {
     constexpr auto B = 1.0f / 3.0f;
@@ -20,9 +25,9 @@ inline float Mitchell1D(float x) {
             ((12 - 9 * B - 6 * C) * xx + (-18 + 12 * B + 6 * C) * x) * x + (6 - 2 * B));
 }
 
-kernel void rgb_film_clear(
-    device uint4 *accum_buffer,
-    constant uint &ray_count,
+LUISA_KERNEL void rgb_film_clear(
+    LUISA_DEVICE_SPACE uint4 *accum_buffer,
+    LUISA_CONSTANT_SPACE uint &ray_count,
     uint2 tid [[thread_position_in_grid]]) {
     
     if (tid.x < ray_count) {
@@ -31,10 +36,10 @@ kernel void rgb_film_clear(
     
 }
 
-kernel void rgb_film_gather_rays(
-    device const GatherRayData *ray_buffer,
-    constant FrameData &frame_data,
-    device atomic_int *accum_buffer,
+LUISA_KERNEL void rgb_film_gather_rays(
+    LUISA_DEVICE_SPACE const GatherRayData *ray_buffer,
+    LUISA_CONSTANT_SPACE FrameData &frame_data,
+    LUISA_DEVICE_SPACE atomic_int *accum_buffer,
     uint2 tid [[thread_position_in_grid]]) {
     
     if (tid.x < frame_data.size.x && tid.y < frame_data.size.y) {
@@ -47,24 +52,24 @@ kernel void rgb_film_gather_rays(
     }
 }
 
-kernel void rgb_film_convert_colorspace(
-    constant FrameData &frame_data,
-    device const int4 *accum_buffer,
+LUISA_KERNEL void rgb_film_convert_colorspace(
+    LUISA_CONSTANT_SPACE FrameData &frame_data,
+    LUISA_DEVICE_SPACE const int4 *accum_buffer,
     texture2d<float, access::write> result,
     uint2 tid [[thread_position_in_grid]]) {
     
     if (tid.x < frame_data.size.x && tid.y < frame_data.size.y) {
         auto index = tid.x + tid.y * frame_data.size.x;
-        auto f = Vec4f(accum_buffer[index]);
-        result.write(Vec4f(XYZ2RGB(Vec3f(f) / (1024.0f * f.a)), 1.0f), tid);
+        auto f = make_float4(accum_buffer[index]);
+        result.write(make_float4(XYZ2RGB(make_float3(f) / (1024.0f * f.a)), 1.0f), tid);
     }
     
 }
 
-kernel void mitchell_natravali_filter(
-    device const GatherRayData *ray_buffer [[buffer(0)]],
-    constant FrameData &frame_data [[buffer(1)]],
-    constant uint &pixel_radius [[buffer(2)]],
+LUISA_KERNEL void mitchell_natravali_filter(
+    LUISA_DEVICE_SPACE const GatherRayData *ray_buffer [[buffer(0)]],
+    LUISA_CONSTANT_SPACE FrameData &frame_data [[buffer(1)]],
+    LUISA_CONSTANT_SPACE uint &pixel_radius [[buffer(2)]],
     texture2d<float, access::read_write> result [[texture(0)]],
     uint2 tid [[thread_position_in_grid]]) {
     
@@ -72,8 +77,8 @@ kernel void mitchell_natravali_filter(
         
         auto index = tid.x + tid.y * frame_data.size.x;
         auto new_value = int4(int3(round(ray_buffer[index].radiance * 1024.0f)), 1);
-        auto old_value = as_type<int4>(result.read(tid));
-        result.write(as_type<Vec4f>(new_value + old_value), tid);
+        auto old_value = as<int4>(result.read(tid));
+        result.write(as<float4>(new_value + old_value), tid);
         
 //        auto min_x = max(tid.x, pixel_radius) - pixel_radius;
 //        auto min_y = max(tid.y, pixel_radius) - pixel_radius;
@@ -102,15 +107,15 @@ kernel void mitchell_natravali_filter(
     }
 }
 
-kernel void convert_colorspace_rgb(
-    constant FrameData &frame_data [[buffer(0)]],
+LUISA_KERNEL void convert_colorspace_rgb(
+    LUISA_CONSTANT_SPACE FrameData &frame_data [[buffer(0)]],
     texture2d<float, access::read_write> result [[texture(0)]],
     uint2 tid [[thread_position_in_grid]]) {
     
     if (tid.x < frame_data.size.x && tid.y < frame_data.size.y) {
-        auto f = Vec4f(as_type<int4>(result.read(tid)));
+        auto f = make_float4(as<int4>(result.read(tid)));
 //        if (f.a == 0.0f) { f.a = 1e-3f; }
-        result.write(Vec4f(XYZ2RGB(ACEScg2XYZ(Vec3f(f) / (1024.0f * f.a))), 1.0f), tid);
+        result.write(make_float4(XYZ2RGB(ACEScg2XYZ(make_float3(f) / (1024.0f * f.a))), 1.0f), tid);
     }
     
 }

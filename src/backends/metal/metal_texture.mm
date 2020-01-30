@@ -6,6 +6,8 @@
 #import "metal_kernel.h"
 #import "metal_buffer.h"
 
+namespace luisa::metal {
+
 void MetalTexture::copy_from_buffer(KernelDispatcher &dispatch, Buffer &buffer) {
     
     auto encoder = [dynamic_cast<MetalKernelDispatcher &>(dispatch).command_buffer() blitCommandEncoder];
@@ -37,4 +39,6 @@ void MetalTexture::copy_to_buffer(KernelDispatcher &dispatch, Buffer &buffer) {
                      options:MTLBlitOptionNone];
     [encoder endEncoding];
     
+}
+
 }

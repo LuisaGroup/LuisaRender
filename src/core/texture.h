@@ -4,10 +4,12 @@
 
 #pragma once
 
-#include <compatibility.h>
+#include <core/data_types.h>
 #include <util/noncopyable.h>
 
 #include "buffer.h"
+
+namespace luisa {
 
 enum struct TextureFormatTag {
     RGBA32F,
@@ -37,7 +39,7 @@ public:
     [[nodiscard]] size_t bytes_per_pixel() const noexcept {
         switch (_format) {
             case TextureFormatTag::RGBA32F:
-                return sizeof(Vec4f);
+                return sizeof(float4);
             case TextureFormatTag::GRAYSCALE32F:
                 return sizeof(float);
         }
@@ -52,3 +54,5 @@ public:
     }
     
 };
+
+}

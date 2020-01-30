@@ -6,9 +6,10 @@
 
 #include <string_view>
 #include <util/noncopyable.h>
-#include <compatibility.h>
 #include "buffer.h"
 #include "texture.h"
+
+namespace luisa {
 
 struct KernelArgumentProxy : Noncopyable {
     virtual ~KernelArgumentProxy() = default;
@@ -55,3 +56,5 @@ struct KernelDispatcher : Noncopyable {
         (*this)(kernel, {threadgroups, 1u}, {threadgroup_size, 1u}, std::move(encode));
     }
 };
+
+}

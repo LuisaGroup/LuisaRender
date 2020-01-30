@@ -5,6 +5,8 @@
 #import "metal_buffer.h"
 #import "metal_kernel.h"
 
+namespace luisa::metal {
+
 void MetalBuffer::upload(const void *host_data, size_t size, size_t offset) {
     if (_storage != BufferStorageTag::MANAGED) { throw std::runtime_error{"only managed buffers can be update."}; }
     if (offset + size > _capacity) { throw std::runtime_error{"buffer data overflowed"}; }
@@ -21,4 +23,6 @@ void MetalBuffer::synchronize(KernelDispatcher &dispatch) {
 
 void *MetalBuffer::data() {
     return _handle.contents;
+}
+
 }

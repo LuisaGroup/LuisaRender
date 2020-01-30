@@ -7,6 +7,8 @@
 #include <vector>
 #include <util/noncopyable.h>
 
+namespace luisa {
+
 enum struct BufferStorageTag {
     DEVICE_PRIVATE,
     MANAGED
@@ -29,3 +31,5 @@ public:
     [[nodiscard]] virtual void *data() = 0;
     [[nodiscard]] virtual size_t capacity() const noexcept { return _capacity; }
 };
+
+}

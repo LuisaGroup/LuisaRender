@@ -4,8 +4,12 @@
 
 #pragma once
 
+namespace luisa {
+
 struct Noncopyable {
     Noncopyable() = default;
     Noncopyable(const Noncopyable &) = delete;
     Noncopyable &operator=(const Noncopyable &) = delete;
 };
+
+}

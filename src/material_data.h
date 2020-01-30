@@ -4,7 +4,9 @@
 
 #pragma once
 
-#include "compatibility.h"
+#include <core/data_types.h>
+
+namespace luisa {
 
 using BRDFTag = uint32_t;
 
@@ -15,6 +17,8 @@ struct BRDFData {
 static_assert(sizeof(BRDFData) == 256ul);
 
 struct MaterialData {  // for now, only lambert is supported
-    PackedVec3f albedo;
+    packed_float3 albedo;
     uint is_mirror;
 };
+
+}

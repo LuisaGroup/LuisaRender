@@ -1,28 +1,27 @@
+#include "compatibility.h"
+
+#include <core/data_types.h>
+#include <core/mathematics.h>
+
 #include <ray_data.h>
 #include <camera_data.h>
 #include <frame_data.h>
 #include <random.h>
 #include <sampling.h>
 
-using namespace metal;
+using namespace luisa;
+using namespace luisa::math;
 
-struct Argument {
-    device uint32_t *buffer;
-    device uint32_t *buffer2;
-    texture2d<float, access::read> texture;
-};
-
-kernel void pinhole_camera_generate_rays(
+LUISA_KERNEL void pinhole_camera_generate_rays(
     device uint *ray_index_buffer,
     device Ray *ray_buffer,
     device uint &ray_count,
-    device Vec3f *ray_throughput_buffer,
+    device float3 *ray_throughput_buffer,
     device uint *ray_seed_buffer,
-    device Vec3f *ray_radiance_buffer,
+    device float3 *ray_radiance_buffer,
     device uint *ray_depth_buffer,
-    device Vec2f *ray_pixel_buffer,
+    device float2 *ray_pixel_buffer,
     device float *ray_pdf_buffer,
-    device const Argument *arguments,
     constant CameraData &camera_data,
     constant FrameData &frame_data,
     uint2 tid [[thread_position_in_grid]]) {
@@ -46,8 +45,8 @@ kernel void pinhole_camera_generate_rays(
         auto px = static_cast<float>(tid.x) + halton(seed);
         auto py = static_cast<float>(tid.y) + halton(seed);
         
-        Vec3f focal_plane_p{(1.0f - px / w * 2.0f) * half_sensor_width, (1.0f - py / h * 2.0f) * half_sensor_height, camera_data.focal_distance};
-        auto origin = Vec3f(camera_data.aperture / camera_data.near_plane * concentric_sample_disk(halton(seed), halton(seed)), 0.0f);
+        auto focal_plane_p = make_float3((1.0f - px / w * 2.0f) * half_sensor_width, (1.0f - py / h * 2.0f) * half_sensor_height, camera_data.focal_distance);
+        auto origin = make_float3(camera_data.aperture / camera_data.near_plane * concentric_sample_disk(halton(seed), halton(seed)), 0.0f);
         auto d = focal_plane_p - origin;
         
         Ray ray{};
@@ -58,8 +57,8 @@ kernel void pinhole_camera_generate_rays(
         
         ray_buffer[ray_index] = ray;
         ray_seed_buffer[ray_index] = seed;
-        ray_pixel_buffer[ray_index] = Vec2f{px, py};
-        ray_throughput_buffer[ray_index] = Vec3f{1.0f, 1.0f, 1.0f};
+        ray_pixel_buffer[ray_index] = make_float2(px, py);
+        ray_throughput_buffer[ray_index] = make_float3(1.0f);
         ray_radiance_buffer[ray_index] = {};
         ray_depth_buffer[ray_index] = 0;
         ray_pdf_buffer[ray_index] = 1.0f;

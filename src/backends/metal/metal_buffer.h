@@ -11,6 +11,8 @@
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
 #import <core/buffer.h>
 
+namespace luisa::metal {
+
 class MetalBuffer : public Buffer {
 
 private:
@@ -26,3 +28,5 @@ public:
     [[nodiscard]] id<MTLBuffer> handle() const noexcept { return _handle; }
     
 };
+
+}

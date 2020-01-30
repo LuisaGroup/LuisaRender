@@ -14,6 +14,8 @@
 #import "metal_texture.h"
 #import "metal_acceleration.h"
 
+namespace luisa::metal {
+
 struct MetalDeviceWrapper { id<MTLDevice> device; };
 struct MetalLibraryWrapper { id<MTLLibrary> library; };
 struct MetalCommandQueueWrapper { id<MTLCommandQueue> queue; };
@@ -151,4 +153,6 @@ std::shared_ptr<Texture> MetalDevice::create_texture(uint2 size, TextureFormatTa
     [texture autorelease];
     
     return std::make_shared<MetalTexture>(texture, size, format_tag, access_tag);
+}
+
 }

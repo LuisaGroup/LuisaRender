@@ -8,6 +8,8 @@
 #import "metal_buffer.h"
 #import "metal_texture.h"
 
+namespace luisa::metal {
+
 void MetalKernelDispatcher::operator()(Kernel &kernel, uint2 grids, uint2 grid_size, std::function<void(KernelArgumentEncoder &)> encode) {
     auto encoder = [_command_buffer computeCommandEncoder];
     auto &&metal_kernel = dynamic_cast<MetalKernel &>(kernel);
@@ -78,4 +80,6 @@ void MetalKernelArgumentBufferMemberProxy::set_bytes(Buffer &argument_buffer, si
     [_encoder setArgumentBuffer:dynamic_cast<MetalBuffer &>(argument_buffer).handle() offset:argument_buffer_offset];
     auto p = [_encoder constantDataAtIndex:_argument_index];
     std::memmove(p, bytes, size);
+}
+
 }

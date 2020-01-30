@@ -4,10 +4,14 @@
 
 #pragma once
 
-#include "compatibility.h"
+#include <core/data_types.h>
+
+namespace luisa {
 
 struct FrameData {
-    uint2 size;
-    uint index;
+    uint2 size{};
+    uint index{};
     uint padding{};
 };
+
+}

@@ -11,6 +11,8 @@
 #import <memory>
 #import <core/kernel.h>
 
+namespace luisa::metal {
+
 class MetalKernelArgumentProxy : public KernelArgumentProxy {
 
 private:
@@ -72,7 +74,7 @@ private:
 public:
     MetalKernel(id<MTLFunction> function, id<MTLComputePipelineState> pipeline, MTLAutoreleasedComputePipelineReflection reflection) noexcept
         : _function{function}, _pipeline{pipeline}, _reflection{reflection} {}
-        
+    
     std::unique_ptr<KernelArgumentBufferEncoder> argument_buffer_encoder(std::string_view argument_name) override;
     
     [[nodiscard]] auto reflection() const noexcept { return _reflection; }
@@ -91,3 +93,5 @@ public:
     void operator()(Kernel &kernel, uint2 grids, uint2 grid_size, std::function<void(KernelArgumentEncoder &)> encode) override;
     
 };
+
+}

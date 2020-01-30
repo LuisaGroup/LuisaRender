@@ -11,6 +11,8 @@
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
 #import <core/acceleration.h>
 
+namespace luisa::metal {
+
 class MetalAcceleration : public Acceleration {
 
 private:
@@ -40,4 +42,4 @@ public:
                        size_t ray_count_buffer_offset) override;
 };
 
-
+}

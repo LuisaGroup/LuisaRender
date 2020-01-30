@@ -8,6 +8,8 @@
 
 #include "noncopyable.h"
 
+namespace luisa {
+
 class ResourceManager : Noncopyable {
 
 private:
@@ -35,7 +37,7 @@ public:
     [[nodiscard]] std::filesystem::path working_path(std::string_view file_name) const noexcept {
         return _working_directory / file_name;
     }
-
+    
 };
 
-
+}

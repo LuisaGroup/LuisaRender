@@ -4,16 +4,20 @@
 
 #pragma once
 
-#include "compatibility.h"
+#include <core/data_types.h>
+
+namespace luisa {
 
 struct LightData {  // for now, only point light is supported
-    Vec3f position;
-    Vec3f emission;
+    float3 position;
+    float3 emission;
 };
 
 struct LightSample {
-    PackedVec3f radiance;
+    packed_float3 radiance;
     float pdf;
-    PackedVec3f direction;
+    packed_float3 direction;
     float distance;
 };
+
+}

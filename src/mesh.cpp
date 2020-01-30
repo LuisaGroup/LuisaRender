@@ -2,23 +2,30 @@
 // Created by Mike Smith on 2019/10/19.
 //
 
-#include <tinyobjloader/tiny_obj_loader.h>
 #include <iostream>
+#include <tinyobjloader/tiny_obj_loader.h>
+
+#include <core/mathematics.h>
+
 #include "mesh.h"
 
+namespace luisa {
+
 Mesh Mesh::load(const std::vector<MeshDescriptor> &mesh_list) {
+    
+    using namespace math;
     
     tinyobj::ObjReaderConfig config;
     config.triangulate = true;
     config.vertex_color = true;
     
-    std::vector<Vec3f> positions;
-    std::vector<Vec3f> normals;
+    std::vector<float3> positions;
+    std::vector<float3> normals;
     std::vector<uint> material_ids;
     std::vector<MaterialData> materials;
     
     for (auto &&desc : mesh_list) {
-    
+        
         auto model_matrix = desc.transform;
         auto normal_matrix = glm::transpose(glm::inverse(glm::mat3{model_matrix}));
         
@@ -56,4 +63,6 @@ Mesh Mesh::load(const std::vector<MeshDescriptor> &mesh_list) {
     std::cout << "Total: " << mesh.material_ids.size() << " triangles" << std::endl;
     
     return mesh;
+}
+
 }

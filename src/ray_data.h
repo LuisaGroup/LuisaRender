@@ -4,19 +4,21 @@
 
 #pragma once
 
-#include "compatibility.h"
+#include <core/data_types.h>
+
+namespace luisa {
 
 struct Ray {
-    PackedVec3f origin;
+    packed_float3 origin;
     float min_distance;
-    PackedVec3f direction;
+    packed_float3 direction;
     float max_distance;
 };
 
 struct GatherRayData {
-    Vec3f radiance;
-    Vec2f pixel;
-    Vec2f padding{};
+    float3 radiance;
+    float2 pixel;
+    float2 padding{};
 };
 
 enum struct RayState : uint8_t {
@@ -26,3 +28,5 @@ enum struct RayState : uint8_t {
     SHADED,
     FINISHED
 };
+
+}
