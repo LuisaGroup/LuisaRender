@@ -24,7 +24,6 @@ set(GLM_QUIET ON CACHE BOOL "" FORCE)
 set(GLM_TEST_ENABLE_CXX_17 ON CACHE BOOL "" FORCE)
 add_compile_definitions(GLM_FORCE_AVX2)
 add_compile_definitions(GLM_FORCE_CXX17)
-add_compile_definitions(GLM_FORCE_DEFAULT_ALIGNED_GENTYPES)
 add_subdirectory(thirdparty/glm)
 
 add_subdirectory(thirdparty/tinyobjloader)
