@@ -4,10 +4,13 @@
 
 #pragma once
 
-#include "compatibility.h"
+#include <core/data_types.h>
+#include <core/mathematics.h>
+
+namespace luisa {
 
 template<uint N>
-inline unsigned int tea(uint v0, uint v1) {
+LUISA_DEVICE_CALLABLE inline unsigned int tea(uint v0, uint v1) {
     auto s0 = 0u;
     for (auto n = 0u; n < N; n++) {
         s0 += 0x9e3779b9u;
@@ -17,9 +20,7 @@ inline unsigned int tea(uint v0, uint v1) {
     return v0;
 }
 
-#include "address_spaces.h"
-
-constexpr constant unsigned int primes[] = {
+LUISA_CONSTANT_SPACE unsigned int primes[256] = {
     2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53,
     59, 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131,
     137, 139, 149, 151, 157, 163, 167, 173, 179, 181, 191, 193, 197, 199, 211, 223,
@@ -37,15 +38,24 @@ constexpr constant unsigned int primes[] = {
     1427, 1429, 1433, 1439, 1447, 1451, 1453, 1459, 1471, 1481, 1483, 1487, 1489, 1493, 1499, 1511,
     1523, 1531, 1543, 1549, 1553, 1559, 1567, 1571, 1579, 1583, 1597, 1601, 1607, 1609, 1613, 1619};
 
-inline float halton(thread uint &seed) {
+LUISA_DEVICE_CALLABLE inline float halton(LUISA_THREAD_SPACE uint &seed) {
+    
     auto b = primes[seed & 0xffu];
     auto f = 1.0f;
     auto inv_b = 1.0f / b;
     auto r = 0.0f;
-    for (auto i = seed >> 8u; i > 0; i /= b) {
+    for (auto i = seed >> 8u; i != 0u; i /= b) {
         f = f * inv_b;
         r = r + f * static_cast<float>(i % b);
     }
     seed++;
-    return r;
+    return math::clamp(r, 0.0f, 1.0f);
+}
+
+using SamplerState = uint;
+
+LUISA_DEVICE_CALLABLE inline float sampler_generate_sample(LUISA_THREAD_SPACE SamplerState &state) noexcept {
+    return halton(state);
+}
+
 }

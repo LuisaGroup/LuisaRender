@@ -2,85 +2,167 @@
 // Created by Mike Smith on 2019/10/21.
 //
 
-#include "../src/random.h"
-#include "../src/frame_data.h"
-#include "../src/ray_data.h"
-#include "../src/intersection_data.h"
-#include "../src/material_data.h"
-#include "../src/light_data.h"
-#include "../src/onb.h"
-#include "../src/sampling.h"
-#include "../src/luminance.h"
+#include "compatibility.h"
 
-using namespace metal;
+#include <random.h>
+#include <frame_data.h>
+#include <ray_data.h>
+#include <intersection_data.h>
+#include <material_data.h>
+#include <light_data.h>
+#include <onb.h>
+#include <sampling.h>
+#include <color_spaces.h>
 
-kernel void sample_lights(
-    device RayData *ray_buffer [[buffer(0)]],
-    device const IntersectionData *intersection_buffer [[buffer(1)]],
-    device const LightData *light_buffer [[buffer(2)]],
-    device const Vec3f *p_buffer[[buffer(3)]],
-    device ShadowRayData *shadow_ray_buffer [[buffer(4)]],
-    constant uint &light_count [[buffer(5)]],
-    constant FrameData &frame_data [[buffer(6)]],
+using namespace luisa;
+using namespace luisa::math;
+
+template<typename T>
+void queue_emplace(LUISA_DEVICE_SPACE T *queue, LUISA_DEVICE_SPACE atomic_uint *queue_size, T element) {
+    queue[atomic_fetch_add_explicit(queue_size, 1u, memory_order_relaxed)] = element;
+}
+
+struct PathTracingUpdateRayStatesKernelUniforms {
+    uint2 frame_size;
+    uint spp;
+    uint ray_pool_size;
+};
+
+LUISA_KERNEL void update_ray_states(
+    LUISA_DEVICE_SPACE RayState *ray_state_buffer,
+    LUISA_DEVICE_SPACE SamplerState *ray_sampler_state_buffer,
+    LUISA_DEVICE_SPACE const float3 *ray_throughput_buffer,
+    LUISA_DEVICE_SPACE uint *camera_queue,
+    LUISA_DEVICE_SPACE atomic_uint *camera_queue_size,
+    LUISA_DEVICE_SPACE uint *trace_closest_queue,
+    LUISA_DEVICE_SPACE atomic_uint *trace_closest_queue_size,
+    LUISA_DEVICE_SPACE uint *gather_queue,
+    LUISA_DEVICE_SPACE atomic_uint *gather_queue_size,
+    LUISA_DEVICE_SPACE uint *shading_queues,
+    LUISA_DEVICE_SPACE atomic_uint *shading_queue_size,
+    LUISA_DEVICE_SPACE atomic_uint *finished_ray_count,
+    LUISA_CONSTANT_SPACE uint &ray_pool_size,
     uint2 tid [[thread_position_in_grid]]) {
     
-    if (tid.x < frame_data.size.x && tid.y < frame_data.size.y) {
+    auto index = tid.x;
+    if (index < ray_pool_size) {
+        switch (ray_state_buffer[index]) {
+            case RayState::UNINITIALIZED: {
+                queue_emplace(camera_queue, camera_queue_size, index);
+                ray_state_buffer[index] = RayState::GENERATED;
+                break;
+            }
+            case RayState::GENERATED: {
+                if (all(ray_throughput_buffer[index] == float3{})) {  // no more rays can be generated...
+                    atomic_fetch_add_explicit(finished_ray_count, 1u, memory_order_relaxed);
+                    ray_state_buffer[index] = RayState::FINISHED;
+                } else {
+                    queue_emplace(trace_closest_queue, trace_closest_queue_size, index);
+                    ray_state_buffer[index] = RayState::TRACED;
+                }
+                break;
+            }
+            case RayState::TRACED: {
+                queue_emplace(shading_queues, shading_queue_size, index);
+                ray_state_buffer[index] = RayState::SHADED;
+                break;
+            }
+            case RayState::SHADED: {
+                if (all(ray_throughput_buffer[index] == float3{})) {  // finished
+                
+                } else {
+                
+                }
+                // RR
+            }
+            case RayState::FINISHED:
+                break;
+        }
+    }
+    
+}
+
+LUISA_KERNEL void sample_lights(
+    LUISA_DEVICE_SPACE const uint *ray_index_buffer,
+    LUISA_DEVICE_SPACE const Ray *ray_buffer,
+    LUISA_DEVICE_SPACE uint *ray_seed_buffer,
+    LUISA_DEVICE_SPACE const IntersectionData *intersection_buffer,
+    LUISA_DEVICE_SPACE const LightData *light_buffer,
+    LUISA_DEVICE_SPACE const float3 *p_buffer,
+    LUISA_DEVICE_SPACE Ray *shadow_ray_buffer,
+    LUISA_DEVICE_SPACE LightSample *light_sample_buffer,
+    LUISA_CONSTANT_SPACE uint &light_count,
+    LUISA_DEVICE_SPACE const uint &ray_count,
+    uint2 tid [[thread_position_in_grid]]) {
+    
+    auto thread_index = tid.x;
+    
+    if (thread_index < ray_count) {
         
-        auto index = tid.y * frame_data.size.x + tid.x;
+        auto ray_index = ray_index_buffer[thread_index];
+        auto its = intersection_buffer[thread_index];
         
-        auto ray = ray_buffer[index];
-        auto its = intersection_buffer[index];
-        
-        ShadowRayData shadow_ray{};
-        if (ray.max_distance <= 0.0f || its.distance <= 0.0f) {  // no intersection
-            shadow_ray.max_distance = -1.0f;  // terminate the ray
+        if (ray_buffer[ray_index].max_distance <= 0.0f || its.distance <= 0.0f) {  // no intersection
+            shadow_ray_buffer[ray_index].max_distance = -1.0f;
         } else {  // has an intersection
-            auto uvw = Vec3f(its.barycentric, 1.0f - its.barycentric.x - its.barycentric.y);
+            auto uvw = float3(its.barycentric, 1.0f - its.barycentric.x - its.barycentric.y);
             auto i0 = its.triangle_index * 3u;
             auto P = uvw.x * p_buffer[i0] + uvw.y * p_buffer[i0 + 1] + uvw.z * p_buffer[i0 + 2];
-            auto light = light_buffer[min(static_cast<uint>(halton(ray.seed) * light_count), light_count - 1u)];
+            auto seed = ray_seed_buffer[ray_index];
+            auto light = light_buffer[min(static_cast<uint>(halton(seed) * light_count), light_count - 1u)];
+            ray_seed_buffer[ray_index] = seed;
             auto L = light.position - P;
             auto dist = length(L);
             auto inv_dist = 1.0f / dist;
-            shadow_ray.direction = L * inv_dist;
-            shadow_ray.origin = P + 1e-4f * shadow_ray.direction;
+            auto wi = normalize(L);
+            
+            Ray shadow_ray{};
+            shadow_ray.direction = wi;
+            shadow_ray.origin = P + 1e-4f * wi;
             shadow_ray.min_distance = 0.0f;
             shadow_ray.max_distance = dist - 1e-4f;
-            shadow_ray.light_radiance = light.emission * inv_dist * inv_dist;
-            shadow_ray.light_pdf = 1.0f / light_count;
+            shadow_ray_buffer[thread_index] = shadow_ray;
+            
+            LightSample light_sample{};
+            light_sample.radiance = XYZ2ACEScg(RGB2XYZ(light.emission)) * inv_dist * inv_dist * static_cast<float>(light_count);
+            light_sample.pdf = 1.0f;
+            light_sample.direction = wi;
+            light_sample.distance = dist;
+            light_sample_buffer[thread_index] = light_sample;
         }
-        ray_buffer[index].seed = ray.seed;
-        shadow_ray_buffer[index] = shadow_ray;
     }
 }
 
-kernel void trace_radiance(
-    device RayData *ray_buffer [[buffer(0)]],
-    device const ShadowRayData *shadow_ray_buffer [[buffer(1)]],
-    device const IntersectionData *its_buffer [[buffer(2)]],
-    device const ShadowIntersectionData *shadow_its_buffer [[buffer(3)]],
-    device const Vec3f *p_buffer [[buffer(4)]],
-    device const Vec3f *n_buffer [[buffer(5)]],
-    device const uint *material_id_buffer [[buffer(6)]],
-    device const MaterialData *material_buffer [[buffer(7)]],
-    constant FrameData &frame_data [[buffer(8)]],
+LUISA_KERNEL void trace_radiance(
+    LUISA_DEVICE_SPACE const uint *ray_index_buffer,
+    LUISA_DEVICE_SPACE Ray *ray_buffer,
+    LUISA_DEVICE_SPACE float3 *ray_radiance_buffer,
+    LUISA_DEVICE_SPACE float3 *ray_throughput_buffer,
+    LUISA_DEVICE_SPACE uint *ray_seed_buffer,
+    LUISA_DEVICE_SPACE uint *ray_depth_buffer,
+    LUISA_DEVICE_SPACE const LightSample *light_sample_buffer,
+    LUISA_DEVICE_SPACE const IntersectionData *its_buffer,
+    LUISA_DEVICE_SPACE const ShadowIntersectionData *shadow_its_buffer,
+    LUISA_DEVICE_SPACE const float3 *p_buffer,
+    LUISA_DEVICE_SPACE const float3 *n_buffer,
+    LUISA_DEVICE_SPACE const uint *material_id_buffer,
+    LUISA_DEVICE_SPACE const MaterialData *material_buffer,
+    LUISA_DEVICE_SPACE const uint &ray_count,
     uint2 tid [[thread_position_in_grid]]) {
     
-    if (tid.x < frame_data.size.x && tid.y < frame_data.size.y) {
+    auto thread_index = tid.x;
+    if (thread_index < ray_count) {
         
-        auto index = tid.y * frame_data.size.x + tid.x;
-        auto ray = ray_buffer[index];
-        auto its = its_buffer[index];
-        
-        if (ray.max_distance <= 0.0f || its.distance <= 0.0f) {  // no intersection
-            ray.max_distance = -1.0f;  // terminate the ray
-//            if (ray.depth == 0) {
-//                ray.radiance = PackedVec3f{0.3f, 0.2f, 0.1f};  // background
-//            }
+        auto ray_index = ray_index_buffer[thread_index];
+        auto ray = ray_buffer[ray_index];
+        if (ray.max_distance <= 0.0f || its_buffer[thread_index].distance <= 0.0f) {  // no intersection
+            ray_buffer[ray_index].max_distance = -1.0f;  // terminate the ray
         } else {
+            auto its = its_buffer[thread_index];
             auto material = material_buffer[material_id_buffer[its.triangle_index]];
+            auto albedo = XYZ2ACEScg(RGB2XYZ(make_float3(material.albedo)));
             auto i0 = its.triangle_index * 3;
-            auto uvw = Vec3f(its.barycentric, 1.0f - its.barycentric.x - its.barycentric.y);
+            auto uvw = float3(its.barycentric, 1.0f - its.barycentric.x - its.barycentric.y);
             auto P = uvw.x * p_buffer[i0] + uvw.y * p_buffer[i0 + 1] + uvw.z * p_buffer[i0 + 2];
             auto N = normalize(uvw.x * n_buffer[i0] + uvw.y * n_buffer[i0 + 1] + uvw.z * n_buffer[i0 + 2]);
             auto V = -ray.direction;
@@ -92,12 +174,12 @@ kernel void trace_radiance(
             }
             
             // direct lighting
-            auto shadow_its = shadow_its_buffer[index];
+            auto shadow_its = shadow_its_buffer[thread_index];
+            auto ray_throughput = ray_throughput_buffer[ray_index];
             if (!material.is_mirror && shadow_its.distance < 0.0f) {  // not occluded
-                auto shadow_ray = shadow_ray_buffer[index];
-                auto L = shadow_ray.direction;
-                auto NdotL = max(dot(N, L), 0.0f);
-                ray.radiance += ray.throughput * material.albedo * NdotL * shadow_ray.light_radiance / shadow_ray.light_pdf;
+                auto light_sample = light_sample_buffer[thread_index];
+                auto NdotL = max(dot(N, make_float3(light_sample.direction)), 0.0f);
+                ray_radiance_buffer[ray_index] += ray_throughput * albedo * NdotL * light_sample.radiance / light_sample.pdf;
             }
             
             // sampling brdf
@@ -105,22 +187,70 @@ kernel void trace_radiance(
             if (material.is_mirror) {
                 ray.direction = normalize(2.0f * NdotV * N - V);
             } else {
-                ray.direction = normalize(Onb{N}.inverse_transform(Vec3f(cosine_sample_hemisphere(halton(ray.seed), halton(ray.seed)))));
-                ray.throughput *= material.albedo;
-                ray.depth++;
-                if (ray.depth > 3) {  // RR
-                    auto q = max(0.05f, 1.0f - luminance(ray.throughput));
-                    if (halton(ray.seed) < q) {
+                auto seed = ray_seed_buffer[ray_index];
+                ray.direction = normalize(Onb{N}.inverse_transform(float3(cosine_sample_hemisphere(halton(seed), halton(seed)))));
+                ray_throughput *= albedo;  // simplified for lambertian materials
+                auto ray_depth = (++ray_depth_buffer[ray_index]);
+                if (ray_depth > 3) {  // RR
+                    auto q = max(0.05f, 1.0f - max_component(ray_throughput));
+                    if (halton(seed) < q) {
                         ray.max_distance = -1.0f;
                     } else {
-                        ray.throughput /= 1.0f - q;
+                        ray_throughput /= 1.0f - q;
                     }
                 }
+                ray_seed_buffer[ray_index] = seed;
             }
-            ray.origin = P + 1e-4f * ray.direction;
+            ray_throughput_buffer[ray_index] = ray_throughput;
+            ray.origin = P + make_float3(1e-4f * ray.direction);
             ray.min_distance = 0.0f;
+            ray_buffer[ray_index] = ray;
         }
-        ray_buffer[index] = ray;
     }
+}
+
+LUISA_KERNEL void sort_rays(
+    LUISA_DEVICE_SPACE const uint *ray_index_buffer,
+    LUISA_DEVICE_SPACE const Ray *ray_buffer,
+    LUISA_DEVICE_SPACE const float3 *ray_radiance_buffer,
+    LUISA_DEVICE_SPACE const float2 *ray_pixel_buffer,
+    LUISA_DEVICE_SPACE uint *output_ray_index_buffer,
+    LUISA_DEVICE_SPACE const uint &ray_count,
+    LUISA_DEVICE_SPACE atomic_uint *output_ray_count,
+    LUISA_CONSTANT_SPACE FrameData &frame_data,
+    LUISA_DEVICE_SPACE GatherRayData *gather_ray_buffer,
+    uint2 tid [[thread_position_in_grid]]) {
     
+    auto thread_index = tid.x;
+    if (thread_index < ray_count) {
+        auto ray_index = ray_index_buffer[thread_index];
+        if (ray_buffer[ray_index].max_distance > 0.0f) {  // add active rays to next bounce
+            auto output_index = atomic_fetch_add_explicit(output_ray_count, 1u, memory_order_relaxed);
+            output_ray_index_buffer[output_index] = ray_index;
+        } else {
+            auto ray_pixel = ray_pixel_buffer[ray_index];
+            auto screen = uint2(ray_pixel);
+            auto gather_index = screen.y * frame_data.size.x + screen.x;
+            gather_ray_buffer[gather_index] = {ray_radiance_buffer[ray_index], ray_pixel};
+        }
+    }
+}
+
+LUISA_KERNEL void gather_rays(
+    LUISA_DEVICE_SPACE const uint *ray_index_buffer,
+    LUISA_DEVICE_SPACE const float3 *ray_radiance_buffer,
+    LUISA_DEVICE_SPACE const float2 *ray_pixel_buffer,
+    LUISA_DEVICE_SPACE const uint &ray_count,
+    LUISA_DEVICE_SPACE GatherRayData *gather_ray_buffer,
+    LUISA_CONSTANT_SPACE FrameData &frame_data,
+    uint2 tid [[thread_position_in_grid]]) {
+    
+    auto thread_index = tid.x;
+    if (thread_index < ray_count) {
+        auto ray_index = ray_index_buffer[thread_index];
+        auto pixel = ray_pixel_buffer[ray_index];
+        auto screen = uint2(pixel);
+        auto gather_index = screen.y * frame_data.size.x + screen.x;
+        gather_ray_buffer[gather_index] = {ray_radiance_buffer[ray_index], pixel};
+    }
 }

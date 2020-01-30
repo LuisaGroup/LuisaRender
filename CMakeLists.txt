@@ -22,6 +22,8 @@ include_directories(thirdparty/glm)
 
 set(GLM_QUIET ON CACHE BOOL "" FORCE)
 set(GLM_TEST_ENABLE_CXX_17 ON CACHE BOOL "" FORCE)
+add_compile_definitions(GLM_FORCE_AVX2)
+add_compile_definitions(GLM_FORCE_CXX17)
 add_subdirectory(thirdparty/glm)
 
 add_subdirectory(thirdparty/tinyobjloader)
@@ -30,7 +32,7 @@ add_subdirectory(kernels)
 include_directories(src)
 
 file(GLOB_RECURSE SOURCE_FILES src/*.cpp src/*.h src/*.mm src/*.m)
-add_executable(Metalight ${SOURCE_FILES} main.mm)
+add_executable(Metalight ${SOURCE_FILES} main.cpp)
 add_dependencies(Metalight kernels)
 
 target_link_libraries(Metalight glm_static tinyobjloader "-framework Foundation" "-framework Metal" "-framework MetalPerformanceShaders")

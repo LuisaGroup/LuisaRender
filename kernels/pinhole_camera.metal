@@ -1,44 +1,66 @@
-#include "../src/ray_data.h"
-#include "../src/camera_data.h"
-#include "../src/frame_data.h"
-#include "../src/random.h"
+#include "compatibility.h"
 
-using namespace metal;
+#include <core/data_types.h>
+#include <core/mathematics.h>
 
-kernel void pinhole_camera_generate_rays(
-    device RayData *ray_buffer [[buffer(0)]],
-    constant CameraData &camera_data [[buffer(1)]],
-    constant FrameData &frame_data [[buffer(2)]],
+#include <ray_data.h>
+#include <camera_data.h>
+#include <frame_data.h>
+#include <random.h>
+#include <sampling.h>
+
+using namespace luisa;
+using namespace luisa::math;
+
+LUISA_KERNEL void pinhole_camera_generate_rays(
+    device uint *ray_index_buffer,
+    device Ray *ray_buffer,
+    device uint &ray_count,
+    device float3 *ray_throughput_buffer,
+    device uint *ray_seed_buffer,
+    device float3 *ray_radiance_buffer,
+    device uint *ray_depth_buffer,
+    device float2 *ray_pixel_buffer,
+    device float *ray_pdf_buffer,
+    constant CameraData &camera_data,
+    constant FrameData &frame_data,
     uint2 tid [[thread_position_in_grid]]) {
     
     auto w = frame_data.size.x;
     auto h = frame_data.size.y;
     
+    if (tid.x == 0u && tid.y == 0u) {
+        ray_count = w * h;
+    }
+    
     if (tid.x < w && tid.y < h) {
         
-        auto seed = (tea<4>(tid.x, tid.y) + frame_data.index) << 8u;
+        auto ray_index = tid.y * w + tid.x;
+        ray_index_buffer[ray_index] = ray_index;
         
-        auto z = camera_data.near_plane;
-        auto half_sensor_width = tan(0.5f * camera_data.fov) * z;
-        auto half_sensor_height = half_sensor_width * h / w;
+        auto seed = (tea<5>(tid.x, tid.y) + frame_data.index) << 8u;
+        auto half_sensor_height = tan(0.5f * camera_data.fov) * camera_data.focal_distance;
+        auto half_sensor_width = half_sensor_height * w / h;
         
         auto px = static_cast<float>(tid.x) + halton(seed);
         auto py = static_cast<float>(tid.y) + halton(seed);
-    
-        auto x = (1.0f - px / w * 2.0f) * half_sensor_width;
-        auto y = (1.0f - py / h * 2.0f) * half_sensor_height;
         
-        RayData ray{};
-        ray.origin = camera_data.position;
-        ray.direction = normalize(x * camera_data.left + y * camera_data.up + z * camera_data.front);
+        auto focal_plane_p = make_float3((1.0f - px / w * 2.0f) * half_sensor_width, (1.0f - py / h * 2.0f) * half_sensor_height, camera_data.focal_distance);
+        auto origin = make_float3(camera_data.aperture / camera_data.near_plane * concentric_sample_disk(halton(seed), halton(seed)), 0.0f);
+        auto d = focal_plane_p - origin;
+        
+        Ray ray{};
+        ray.origin = origin.x * camera_data.left + origin.y * camera_data.up + origin.z * camera_data.front + camera_data.position;
+        ray.direction = normalize(d.x * camera_data.left + d.y * camera_data.up + d.z * camera_data.front);
         ray.min_distance = 0.0f;
         ray.max_distance = INFINITY;
-        ray.throughput = PackedVec3f{1.0f, 1.0f, 1.0f};
-        ray.seed = seed;
-        ray.radiance = PackedVec3f{0.0f, 0.0f, 0.0f};
-        ray.depth = 0;
-        ray.pixel = Vec2f{px, py};
         
-        ray_buffer[tid.y * w + tid.x] = ray;
+        ray_buffer[ray_index] = ray;
+        ray_seed_buffer[ray_index] = seed;
+        ray_pixel_buffer[ray_index] = make_float2(px, py);
+        ray_throughput_buffer[ray_index] = make_float3(1.0f);
+        ray_radiance_buffer[ray_index] = {};
+        ray_depth_buffer[ray_index] = 0;
+        ray_pdf_buffer[ray_index] = 1.0f;
     }
 }

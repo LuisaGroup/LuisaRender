@@ -4,14 +4,28 @@
 
 #pragma once
 
-#include "compatibility.h"
+#include <core/data_types.h>
+
+namespace luisa {
+
+struct Intersection {
+    float distance;
+    uint triangle_index;
+    float2 barycentric;
+};
+
+struct ShadowIntersection {
+    float distance;
+};
 
 struct IntersectionData {
     float distance;
     uint triangle_index;
-    Vec2f barycentric;
+    float2 barycentric;
 };
 
 struct ShadowIntersectionData {
     float distance;
 };
+
+}

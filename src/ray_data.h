@@ -4,27 +4,29 @@
 
 #pragma once
 
-#include "compatibility.h"
+#include <core/data_types.h>
 
-struct RayData {
-    PackedVec3f origin;
+namespace luisa {
+
+struct Ray {
+    packed_float3 origin;
     float min_distance;
-    PackedVec3f direction;
+    packed_float3 direction;
     float max_distance;
-    PackedVec3f throughput;
-    uint seed;
-    PackedVec3f radiance;
-    uint depth;
-    Vec2f pixel;
-    float pdf;
-    float padding;
 };
 
-struct ShadowRayData {
-    PackedVec3f origin;
-    float min_distance;
-    PackedVec3f direction;
-    float max_distance;
-    PackedVec3f light_radiance;
-    float light_pdf;
+struct GatherRayData {
+    float3 radiance;
+    float2 pixel;
+    float2 padding{};
 };
+
+enum struct RayState : uint8_t {
+    UNINITIALIZED,
+    GENERATED,
+    TRACED,
+    SHADED,
+    FINISHED
+};
+
+}

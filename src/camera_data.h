@@ -4,13 +4,19 @@
 
 #pragma once
 
-#include "compatibility.h"
+#include <core/data_types.h>
+
+namespace luisa {
 
 struct CameraData {
-    Vec3f position;
-    Vec3f front;
-    Vec3f left;
-    Vec3f up;
+    float3 position;
+    float3 front;
+    float3 left;
+    float3 up;
     float near_plane;
     float fov;
+    float aperture;
+    float focal_distance;
 };
+
+}
