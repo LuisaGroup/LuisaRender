@@ -21,6 +21,7 @@ int main(int argc, char *argv[]) {
     auto device = Device::create("Metal");
     auto generate_rays_kernel = device->create_kernel("pinhole_camera_generate_rays");
     auto sample_light_kernel = device->create_kernel("sample_lights");
+    auto update_ray_state_kernel = device->create_kernel("update_ray_states");
     auto trace_radiance_kernel = device->create_kernel("trace_radiance");
     auto sort_rays_kernel = device->create_kernel("sort_rays");
     auto gather_rays_kernel = device->create_kernel("gather_rays");
@@ -125,7 +126,7 @@ int main(int argc, char *argv[]) {
     auto threadgroup_size_1D = 256u;
     auto threadgroups_1D = (width * height + threadgroup_size_1D - 1) / threadgroup_size_1D;
     
-    constexpr auto spp = 128u;
+    constexpr auto spp = 1024u;
     constexpr auto max_depth = 11u;
     
     static auto available_frame_count = 16u;

@@ -18,3 +18,11 @@ struct GatherRayData {
     Vec2f pixel;
     Vec2f padding{};
 };
+
+enum struct RayState : uint8_t {
+    UNINITIALIZED,
+    GENERATED,
+    TRACED_CLOSEST,
+    SHADED,
+    FINISHED
+};

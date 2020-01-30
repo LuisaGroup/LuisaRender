@@ -6,6 +6,16 @@
 
 #include "compatibility.h"
 
+struct Intersection {
+    float distance;
+    uint triangle_index;
+    Vec2f barycentric;
+};
+
+struct ShadowIntersection {
+    float distance;
+};
+
 struct IntersectionData {
     float distance;
     uint triangle_index;

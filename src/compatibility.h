@@ -20,12 +20,15 @@ using PackedVec4f = packed_float4;
 #include <glm/glm.hpp>
 #include <atomic>
 
+namespace metal {
+
+using namespace glm;
+
 using atomic_uint = std::atomic_uint;
+using atomic_int = std::atomic_int;
 using std::atomic_fetch_add_explicit;
 using std::memory_order_relaxed;
 
-namespace metal {
-using namespace glm;
 }
 
 using uint = uint32_t;

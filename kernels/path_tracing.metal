@@ -14,6 +14,80 @@
 
 using namespace metal;
 
+template<typename T>
+void queue_emplace(device T *queue, device atomic_uint *queue_size, T element) {
+    queue[atomic_fetch_add_explicit(queue_size, 1u, memory_order_relaxed)] = element;
+}
+
+struct PathTracingUpdateRayStatesKernelUniforms {
+    uint2 frame_size;
+    uint spp;
+    uint ray_pool_size;
+};
+
+kernel void update_ray_states(
+    device RayState *ray_state_buffer,
+    device SamplerState *ray_sampler_state_buffer,
+    device const Vec3f *ray_throughput_buffer,
+    device uint *camera_queue,
+    device atomic_uint *camera_queue_size,
+    device uint *trace_closest_queue,
+    device atomic_uint *trace_closest_queue_size,
+    device atomic_uint *background_queue_size,
+    device uint *background_queue,
+    device const IntersectionData *closest_hits,
+    device uint *gather_queue,
+    device atomic_uint *gather_queue_size,
+    device uint *shading_queues,
+    device atomic_uint *shading_queue_size,
+    device atomic_uint *finished_ray_count,
+    constant uint &ray_pool_size,
+    uint2 tid [[thread_position_in_grid]]) {
+    
+    auto index = tid.x;
+    if (index < ray_pool_size) {
+        switch (ray_state_buffer[index]) {
+            case RayState::UNINITIALIZED: {
+                queue_emplace(camera_queue, camera_queue_size, index);
+                ray_state_buffer[index] = RayState::GENERATED;
+                break;
+            }
+            case RayState::GENERATED: {
+                if (all(ray_throughput_buffer[index] == Vec3f{})) {  // no more rays can be generated...
+                    atomic_fetch_add_explicit(finished_ray_count, 1u, memory_order_relaxed);
+                    ray_state_buffer[index] = RayState::FINISHED;
+                } else {
+                    queue_emplace(trace_closest_queue, trace_closest_queue_size, index);
+                    ray_state_buffer[index] = RayState::TRACED_CLOSEST;
+                }
+                break;
+            }
+            case RayState::TRACED_CLOSEST: {
+                auto its = closest_hits[index];
+                if (its.distance <= 0.0f) {  // miss, gather and terminate the ray
+                    queue_emplace(background_queue, background_queue_size, index);
+                    ray_state_buffer[index] = RayState::UNINITIALIZED;  // terminate ray
+                } else {  // hit, do shading
+                    queue_emplace(shading_queues, shading_queue_size, index);
+                    ray_state_buffer[index] = RayState::SHADED;
+                }
+                break;
+            }
+            case RayState::SHADED: {
+                if (all(ray_throughput_buffer[index] == Vec3f{})) {  // finished
+                
+                } else {
+                
+                }
+                // RR
+            }
+            case RayState::FINISHED:
+                break;
+        }
+    }
+    
+}
+
 kernel void sample_lights(
     device const uint *ray_index_buffer,
     device const Ray *ray_buffer,

@@ -50,3 +50,6 @@ inline float halton(thread uint &seed) {
     seed++;
     return metal::clamp(r, 0.0f, 1.0f);
 }
+
+using SamplerState = uint;
+#define sampler_generate_sample halton

@@ -26,5 +26,3 @@ public:
     [[nodiscard]] id<MTLBuffer> handle() const noexcept { return _handle; }
     
 };
-
-
