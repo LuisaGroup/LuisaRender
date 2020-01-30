@@ -22,7 +22,7 @@ struct GatherRayData {
 enum struct RayState : uint8_t {
     UNINITIALIZED,
     GENERATED,
-    TRACED_CLOSEST,
+    TRACED,
     SHADED,
     FINISHED
 };

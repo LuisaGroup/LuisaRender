@@ -23,6 +23,7 @@ public:
     virtual ~Buffer() noexcept = default;
     virtual void upload(const void *host_data, size_t size, size_t offset) = 0;
     virtual void upload(const void *host_data, size_t size) { upload(host_data, size, 0ul); }
+    virtual void upload() { upload(nullptr, 0ul); }
     virtual void synchronize(struct KernelDispatcher &dispatch) = 0;
     [[nodiscard]] virtual const void *data() const { return const_cast<Buffer *>(this)->data(); }
     [[nodiscard]] virtual void *data() = 0;

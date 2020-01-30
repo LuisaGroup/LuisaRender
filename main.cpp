@@ -127,10 +127,10 @@ int main(int argc, char *argv[]) {
     auto threadgroup_size_1D = 256u;
     auto threadgroups_1D = (width * height + threadgroup_size_1D - 1) / threadgroup_size_1D;
     
-    constexpr auto spp = 64u;
+    constexpr auto spp = 128u;
     constexpr auto max_depth = 11u;
     
-    static auto available_frame_count = 16u;
+    static auto available_frame_count = 4u;
     static std::mutex mutex;
     static std::condition_variable cond_var;
     static auto count = 0u;

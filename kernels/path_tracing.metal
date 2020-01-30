@@ -33,9 +33,6 @@ kernel void update_ray_states(
     device atomic_uint *camera_queue_size,
     device uint *trace_closest_queue,
     device atomic_uint *trace_closest_queue_size,
-    device atomic_uint *background_queue_size,
-    device uint *background_queue,
-    device const IntersectionData *closest_hits,
     device uint *gather_queue,
     device atomic_uint *gather_queue_size,
     device uint *shading_queues,
@@ -58,19 +55,13 @@ kernel void update_ray_states(
                     ray_state_buffer[index] = RayState::FINISHED;
                 } else {
                     queue_emplace(trace_closest_queue, trace_closest_queue_size, index);
-                    ray_state_buffer[index] = RayState::TRACED_CLOSEST;
+                    ray_state_buffer[index] = RayState::TRACED;
                 }
                 break;
             }
-            case RayState::TRACED_CLOSEST: {
-                auto its = closest_hits[index];
-                if (its.distance <= 0.0f) {  // miss, gather and terminate the ray
-                    queue_emplace(background_queue, background_queue_size, index);
-                    ray_state_buffer[index] = RayState::UNINITIALIZED;  // terminate ray
-                } else {  // hit, do shading
-                    queue_emplace(shading_queues, shading_queue_size, index);
-                    ray_state_buffer[index] = RayState::SHADED;
-                }
+            case RayState::TRACED: {
+                queue_emplace(shading_queues, shading_queue_size, index);
+                ray_state_buffer[index] = RayState::SHADED;
                 break;
             }
             case RayState::SHADED: {
