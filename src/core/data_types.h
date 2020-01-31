@@ -7,7 +7,7 @@
 #ifndef LUISA_DEVICE_COMPATIBLE
 
 // address spaces, ineffective on host
-#define LUISA_CONSTANT_SPACE constexpr
+#define LUISA_CONSTANT_SPACE
 #define LUISA_PRIVATE_SPACE
 #define LUISA_THREAD_SPACE
 #define LUISA_DEVICE_SPACE

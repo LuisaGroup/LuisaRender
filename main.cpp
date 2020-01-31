@@ -31,7 +31,6 @@ int main(int argc, char *argv[]) {
     auto update_ray_state_kernel = device->create_kernel("update_ray_states");
     auto trace_radiance_kernel = device->create_kernel("trace_radiance");
     auto sort_rays_kernel = device->create_kernel("sort_rays");
-    auto gather_rays_kernel = device->create_kernel("gather_rays");
     auto film_clear_kernel = device->create_kernel("rgb_film_clear");
     auto film_gather_rays_kernel = device->create_kernel("rgb_film_gather_rays");
     auto film_convert_colorspace_kernel = device->create_kernel("rgb_film_convert_colorspace");
@@ -87,8 +86,8 @@ int main(int argc, char *argv[]) {
     
     auto accelerator = device->create_acceleration(*position_buffer, sizeof(float3), mesh.material_ids.size());
     
-    constexpr auto width = 1440u;
-    constexpr auto height = 768u;
+    constexpr auto width = 640u;
+    constexpr auto height = 360u;
     
     constexpr auto max_ray_count = width * height;
     auto ray_index_buffer = device->create_buffer(max_ray_count * sizeof(uint), BufferStorageTag::DEVICE_PRIVATE);
@@ -123,7 +122,7 @@ int main(int argc, char *argv[]) {
     frame.index = 0;
     
     auto light_count = 1u;
-    LightData light;
+    LightData light{};
     light.position = {0.0f, 4.0f, 0.0f};
     light.emission = {10.0f, 10.0f, 10.0f};
     auto light_buffer = device->create_buffer(sizeof(LightData), BufferStorageTag::MANAGED);
@@ -134,7 +133,7 @@ int main(int argc, char *argv[]) {
     auto threadgroup_size_1D = 256u;
     auto threadgroups_1D = (width * height + threadgroup_size_1D - 1) / threadgroup_size_1D;
     
-    constexpr auto spp = 128u;
+    constexpr auto spp = 8192u;
     constexpr auto max_depth = 11u;
     
     static auto available_frame_count = 4u;
@@ -232,29 +231,18 @@ int main(int argc, char *argv[]) {
                     dispatch(*sort_rays_kernel, threadgroups_1D, threadgroup_size_1D, [&](KernelArgumentEncoder &encoder) {
                         encoder["ray_index_buffer"]->set_buffer(*ray_index_buffer);
                         encoder["ray_buffer"]->set_buffer(*ray_buffer);
-                        encoder["ray_radiance_buffer"]->set_buffer(*ray_radiance_buffer);
-                        encoder["ray_pixel_buffer"]->set_buffer(*ray_pixel_buffer);
                         encoder["output_ray_index_buffer"]->set_buffer(*output_ray_index_buffer);
                         encoder["ray_count"]->set_buffer(*ray_count_buffer, curr_ray_count_offset);
                         encoder["output_ray_count"]->set_buffer(*ray_count_buffer, next_ray_count_offset);
-                        encoder["frame_data"]->set_bytes(&frame, sizeof(FrameData));
-                        encoder["gather_ray_buffer"]->set_buffer(*gather_ray_buffer);
                     });
                     std::swap(ray_index_buffer, output_ray_index_buffer);
                 }
                 
-                // gather rays
-                dispatch(*gather_rays_kernel, threadgroups_1D, threadgroup_size_1D, [&](KernelArgumentEncoder &encoder) {
-                    encoder["ray_index_buffer"]->set_buffer(*ray_index_buffer);
+                dispatch(*film_gather_rays_kernel, threadgroups_1D, threadgroup_size_1D, [&](KernelArgumentEncoder &encoder) {
                     encoder["ray_radiance_buffer"]->set_buffer(*ray_radiance_buffer);
                     encoder["ray_pixel_buffer"]->set_buffer(*ray_pixel_buffer);
-                    encoder["ray_count"]->set_buffer(*ray_count_buffer, (i * (max_depth + 1u) + max_depth) * sizeof(uint));
-                    encoder["gather_ray_buffer"]->set_buffer(*gather_ray_buffer);
-                    encoder["frame_data"]->set_bytes(&frame, sizeof(FrameData));
-                });
-                
-                dispatch(*film_gather_rays_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
-                    encoder["ray_buffer"]->set_buffer(*gather_ray_buffer);
+                    auto filter_radius = 3.0f;
+                    encoder["filter_radius"]->set_bytes(&filter_radius, sizeof(float));
                     encoder["frame_data"]->set_bytes(&frame, sizeof(FrameData));
                     encoder["accum_buffer"]->set_buffer(*accum_buffer);
                 });

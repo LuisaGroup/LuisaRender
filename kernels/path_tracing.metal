@@ -210,13 +210,9 @@ LUISA_KERNEL void trace_radiance(
 LUISA_KERNEL void sort_rays(
     LUISA_DEVICE_SPACE const uint *ray_index_buffer,
     LUISA_DEVICE_SPACE const Ray *ray_buffer,
-    LUISA_DEVICE_SPACE const float3 *ray_radiance_buffer,
-    LUISA_DEVICE_SPACE const float2 *ray_pixel_buffer,
     LUISA_DEVICE_SPACE uint *output_ray_index_buffer,
     LUISA_DEVICE_SPACE const uint &ray_count,
     LUISA_DEVICE_SPACE Atomic<uint> &output_ray_count,
-    LUISA_PRIVATE_SPACE FrameData &frame_data,
-    LUISA_DEVICE_SPACE GatherRayData *gather_ray_buffer,
     uint2 tid [[thread_position_in_grid]]) {
     
     auto thread_index = tid.x;
@@ -225,30 +221,6 @@ LUISA_KERNEL void sort_rays(
         if (ray_buffer[ray_index].max_distance > 0.0f) {  // add active rays to next bounce
             auto output_index = luisa_atomic_fetch_add(output_ray_count, 1u);
             output_ray_index_buffer[output_index] = ray_index;
-        } else {
-            auto ray_pixel = ray_pixel_buffer[ray_index];
-            auto screen = uint2(ray_pixel);
-            auto gather_index = screen.y * frame_data.size.x + screen.x;
-            gather_ray_buffer[gather_index] = {ray_radiance_buffer[ray_index], ray_pixel};
         }
-    }
-}
-
-LUISA_KERNEL void gather_rays(
-    LUISA_DEVICE_SPACE const uint *ray_index_buffer,
-    LUISA_DEVICE_SPACE const float3 *ray_radiance_buffer,
-    LUISA_DEVICE_SPACE const float2 *ray_pixel_buffer,
-    LUISA_DEVICE_SPACE const uint &ray_count,
-    LUISA_DEVICE_SPACE GatherRayData *gather_ray_buffer,
-    LUISA_PRIVATE_SPACE FrameData &frame_data,
-    uint2 tid [[thread_position_in_grid]]) {
-    
-    auto thread_index = tid.x;
-    if (thread_index < ray_count) {
-        auto ray_index = ray_index_buffer[thread_index];
-        auto pixel = ray_pixel_buffer[ray_index];
-        auto screen = uint2(pixel);
-        auto gather_index = screen.y * frame_data.size.x + screen.x;
-        gather_ray_buffer[gather_index] = {ray_radiance_buffer[ray_index], pixel};
     }
 }

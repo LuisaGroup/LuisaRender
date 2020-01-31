@@ -44,7 +44,7 @@ using namespace metal;
 
 #define noexcept
 
-#define LUISA_CONSTANT_SPACE  constant constexpr
+#define LUISA_CONSTANT_SPACE  constant
 #define LUISA_PRIVATE_SPACE   constant
 #define LUISA_THREAD_SPACE    thread
 #define LUISA_DEVICE_SPACE    device
