@@ -106,7 +106,7 @@ int main(int argc, char *argv[]) {
     auto its_buffer = device->create_buffer(max_ray_count * sizeof(IntersectionData), BufferStorageTag::DEVICE_PRIVATE);
     auto shadow_its_buffer = device->create_buffer(max_ray_count * sizeof(ShadowIntersectionData), BufferStorageTag::DEVICE_PRIVATE);
     auto accum_buffer = device->create_buffer(max_ray_count * sizeof(glm::ivec4), BufferStorageTag::DEVICE_PRIVATE);
-    auto result_texture = device->create_texture(uint2{width, height}, TextureFormatTag::RGBA32F, TextureAccessTag::WRITE_ONLY);
+    auto result_buffer = device->create_buffer(max_ray_count * sizeof(packed_float3), BufferStorageTag::MANAGED);
     
     CameraData camera_data{};
     camera_data.position = {0.8f, -2.5f, 15.0f};
@@ -271,14 +271,12 @@ int main(int argc, char *argv[]) {
         available_frame_count--;
     }
     
-    auto result_buffer = device->create_buffer(max_ray_count * sizeof(float4), BufferStorageTag::MANAGED);
     device->launch([&](KernelDispatcher &dispatch) {
         dispatch(*film_convert_colorspace_kernel, threadgroups, threadgroup_size, [&](KernelArgumentEncoder &encoder) {
             encoder["frame_data"]->set_bytes(&frame, sizeof(FrameData));
             encoder["accum_buffer"]->set_buffer(*accum_buffer);
-            encoder["result"]->set_texture(*result_texture);
+            encoder["result_buffer"]->set_buffer(*result_buffer);
         });
-        result_texture->copy_to_buffer(dispatch, *result_buffer);
         result_buffer->synchronize(dispatch);
         ray_count_buffer->synchronize(dispatch);
     });
@@ -298,17 +296,8 @@ int main(int argc, char *argv[]) {
     std::cout << "Total rays:      " << total_ray_count * 1e-6 << "M" << std::endl;
     std::cout << "Rays per second: " << static_cast<double>(total_ray_count) * 1e-6 / total_time << "M" << std::endl;
     
-    cv::Mat image;
-    image.create(cv::Size{width, height}, CV_32FC3);
-    auto src_data = reinterpret_cast<const float4 *>(result_buffer->data());
-    auto dest_data = reinterpret_cast<packed_float3 *>(image.data);
-    for (auto row = 0u; row < height; row++) {
-        for (auto col = 0u; col < width; col++) {
-            auto index = row * width + col;
-            auto src = src_data[index];
-            dest_data[index] = {src.b, src.g, src.r};
-        }
-    }
+    cv::Mat image(cv::Size{width, height}, CV_32FC3, result_buffer->data());
+    cv::cvtColor(image, image, cv::COLOR_RGB2BGR);
     cv::imwrite("result.exr", image);
     
     return 0;

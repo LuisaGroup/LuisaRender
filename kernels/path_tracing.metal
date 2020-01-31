@@ -3,6 +3,7 @@
 //
 
 #include "compatibility.h"
+#include <core/data_types.h>
 
 #include <random.h>
 #include <frame_data.h>
@@ -17,10 +18,7 @@
 using namespace luisa;
 using namespace luisa::math;
 
-template<typename T>
-void queue_emplace(LUISA_DEVICE_SPACE T *queue, LUISA_DEVICE_SPACE atomic_uint *queue_size, T element) {
-    queue[atomic_fetch_add_explicit(queue_size, 1u, memory_order_relaxed)] = element;
-}
+#define queue_emplace(queue, queue_size, element)  static_cast<void>(queue[luisa_atomic_fetch_add(*queue_size, 1u)] = element)
 
 struct PathTracingUpdateRayStatesKernelUniforms {
     uint2 frame_size;
@@ -33,15 +31,15 @@ LUISA_KERNEL void update_ray_states(
     LUISA_DEVICE_SPACE SamplerState *ray_sampler_state_buffer,
     LUISA_DEVICE_SPACE const float3 *ray_throughput_buffer,
     LUISA_DEVICE_SPACE uint *camera_queue,
-    LUISA_DEVICE_SPACE atomic_uint *camera_queue_size,
+    LUISA_DEVICE_SPACE Atomic<uint> *camera_queue_size,
     LUISA_DEVICE_SPACE uint *trace_closest_queue,
-    LUISA_DEVICE_SPACE atomic_uint *trace_closest_queue_size,
+    LUISA_DEVICE_SPACE Atomic<uint> *trace_closest_queue_size,
     LUISA_DEVICE_SPACE uint *gather_queue,
-    LUISA_DEVICE_SPACE atomic_uint *gather_queue_size,
+    LUISA_DEVICE_SPACE Atomic<uint> *gather_queue_size,
     LUISA_DEVICE_SPACE uint *shading_queues,
-    LUISA_DEVICE_SPACE atomic_uint *shading_queue_size,
-    LUISA_DEVICE_SPACE atomic_uint *finished_ray_count,
-    LUISA_UNIFORM_SPACE uint &ray_pool_size,
+    LUISA_DEVICE_SPACE Atomic<uint> *shading_queue_size,
+    LUISA_DEVICE_SPACE Atomic<uint> *finished_ray_count,
+    LUISA_PRIVATE_SPACE uint &ray_pool_size,
     uint2 tid [[thread_position_in_grid]]) {
     
     auto index = tid.x;
@@ -53,8 +51,8 @@ LUISA_KERNEL void update_ray_states(
                 break;
             }
             case RayState::GENERATED: {
-                if (all(ray_throughput_buffer[index] == float3{})) {  // no more rays can be generated...
-                    atomic_fetch_add_explicit(finished_ray_count, 1u, memory_order_relaxed);
+                if (all_zero(ray_throughput_buffer[index])) {  // no more rays can be generated...
+                    luisa_atomic_fetch_add(*finished_ray_count, 1u);
                     ray_state_buffer[index] = RayState::FINISHED;
                 } else {
                     queue_emplace(trace_closest_queue, trace_closest_queue_size, index);
@@ -68,7 +66,7 @@ LUISA_KERNEL void update_ray_states(
                 break;
             }
             case RayState::SHADED: {
-                if (all(ray_throughput_buffer[index] == float3{})) {  // finished
+                if (all_zero(ray_throughput_buffer[index])) {  // finished
                 
                 } else {
                 
@@ -91,7 +89,7 @@ LUISA_KERNEL void sample_lights(
     LUISA_DEVICE_SPACE const float3 *p_buffer,
     LUISA_DEVICE_SPACE Ray *shadow_ray_buffer,
     LUISA_DEVICE_SPACE LightSample *light_sample_buffer,
-    LUISA_UNIFORM_SPACE uint &light_count,
+    LUISA_PRIVATE_SPACE uint &light_count,
     LUISA_DEVICE_SPACE const uint &ray_count,
     uint2 tid [[thread_position_in_grid]]) {
     
@@ -165,7 +163,7 @@ LUISA_KERNEL void trace_radiance(
             auto uvw = float3(its.barycentric, 1.0f - its.barycentric.x - its.barycentric.y);
             auto P = uvw.x * p_buffer[i0] + uvw.y * p_buffer[i0 + 1] + uvw.z * p_buffer[i0 + 2];
             auto N = normalize(uvw.x * n_buffer[i0] + uvw.y * n_buffer[i0 + 1] + uvw.z * n_buffer[i0 + 2]);
-            auto V = -ray.direction;
+            auto V = -make_float3(ray.direction);
             
             auto NdotV = dot(N, V);
             if (NdotV < 0.0f) {
@@ -179,7 +177,7 @@ LUISA_KERNEL void trace_radiance(
             if (!material.is_mirror && shadow_its.distance < 0.0f) {  // not occluded
                 auto light_sample = light_sample_buffer[thread_index];
                 auto NdotL = max(dot(N, make_float3(light_sample.direction)), 0.0f);
-                ray_radiance_buffer[ray_index] += ray_throughput * albedo * NdotL * light_sample.radiance / light_sample.pdf;
+                ray_radiance_buffer[ray_index] += ray_throughput * albedo * NdotL * make_float3(light_sample.radiance) / light_sample.pdf;
             }
             
             // sampling brdf
@@ -216,8 +214,8 @@ LUISA_KERNEL void sort_rays(
     LUISA_DEVICE_SPACE const float2 *ray_pixel_buffer,
     LUISA_DEVICE_SPACE uint *output_ray_index_buffer,
     LUISA_DEVICE_SPACE const uint &ray_count,
-    LUISA_DEVICE_SPACE atomic_uint *output_ray_count,
-    LUISA_UNIFORM_SPACE FrameData &frame_data,
+    LUISA_DEVICE_SPACE Atomic<uint> &output_ray_count,
+    LUISA_PRIVATE_SPACE FrameData &frame_data,
     LUISA_DEVICE_SPACE GatherRayData *gather_ray_buffer,
     uint2 tid [[thread_position_in_grid]]) {
     
@@ -225,7 +223,7 @@ LUISA_KERNEL void sort_rays(
     if (thread_index < ray_count) {
         auto ray_index = ray_index_buffer[thread_index];
         if (ray_buffer[ray_index].max_distance > 0.0f) {  // add active rays to next bounce
-            auto output_index = atomic_fetch_add_explicit(output_ray_count, 1u, memory_order_relaxed);
+            auto output_index = luisa_atomic_fetch_add(output_ray_count, 1u);
             output_ray_index_buffer[output_index] = ray_index;
         } else {
             auto ray_pixel = ray_pixel_buffer[ray_index];
@@ -242,7 +240,7 @@ LUISA_KERNEL void gather_rays(
     LUISA_DEVICE_SPACE const float2 *ray_pixel_buffer,
     LUISA_DEVICE_SPACE const uint &ray_count,
     LUISA_DEVICE_SPACE GatherRayData *gather_ray_buffer,
-    LUISA_UNIFORM_SPACE FrameData &frame_data,
+    LUISA_PRIVATE_SPACE FrameData &frame_data,
     uint2 tid [[thread_position_in_grid]]) {
     
     auto thread_index = tid.x;

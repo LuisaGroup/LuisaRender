@@ -44,15 +44,15 @@ using namespace metal;
 
 #define noexcept
 
-#define LUISA_CONSTANT_SPACE  constant
-#define LUISA_UNIFORM_SPACE   constant
+#define LUISA_CONSTANT_SPACE  constant constexpr
+#define LUISA_PRIVATE_SPACE   constant
 #define LUISA_THREAD_SPACE    thread
 #define LUISA_DEVICE_SPACE    device
 
 // function scopes
 #define LUISA_CONSTEXPR        inline
 #define LUISA_KERNEL           kernel
-#define LUISA_DEVICE_CALLABLE  device
+#define LUISA_DEVICE_CALLABLE
 
 namespace luisa {
 

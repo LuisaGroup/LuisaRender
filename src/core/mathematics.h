@@ -120,6 +120,19 @@ using glm::clamp;
 
 namespace luisa::math {
 
+LUISA_DEVICE_CALLABLE inline bool all_zero(float2 v) noexcept { return v.x == 0 && v.y == 0; }
+LUISA_DEVICE_CALLABLE inline bool all_zero(float3 v) noexcept { return v.x == 0 && v.y == 0 && v.z == 0; }
+LUISA_DEVICE_CALLABLE inline bool all_zero(packed_float3 v) noexcept { return v.x == 0 && v.y == 0 && v.z == 0; }
+LUISA_DEVICE_CALLABLE inline bool all_zero(float4 v) noexcept { return v.x == 0 && v.y == 0 && v.z == 0 && v.w == 0; }
+LUISA_DEVICE_CALLABLE inline bool all_zero(uint2 v) noexcept { return v.x == 0 && v.y == 0; }
+LUISA_DEVICE_CALLABLE inline bool all_zero(uint3 v) noexcept { return v.x == 0 && v.y == 0 && v.z == 0; }
+LUISA_DEVICE_CALLABLE inline bool all_zero(packed_uint3 v) noexcept { return v.x == 0 && v.y == 0 && v.z == 0; }
+LUISA_DEVICE_CALLABLE inline bool all_zero(uint4 v) noexcept { return v.x == 0 && v.y == 0 && v.z == 0 && v.w == 0; }
+LUISA_DEVICE_CALLABLE inline bool all_zero(int2 v) noexcept { return v.x == 0 && v.y == 0; }
+LUISA_DEVICE_CALLABLE inline bool all_zero(int3 v) noexcept { return v.x == 0 && v.y == 0 && v.z == 0; }
+LUISA_DEVICE_CALLABLE inline bool all_zero(packed_int3 v) noexcept { return v.x == 0 && v.y == 0 && v.z == 0; }
+LUISA_DEVICE_CALLABLE inline bool all_zero(int4 v) noexcept { return v.x == 0 && v.y == 0 && v.z == 0 && v.w == 0; }
+
 LUISA_DEVICE_CALLABLE inline float max_component(float2 v) noexcept { return max(v.x, v.y); }
 LUISA_DEVICE_CALLABLE inline float min_component(float2 v) noexcept { return min(v.x, v.y); }
 LUISA_DEVICE_CALLABLE inline float max_component(float3 v) noexcept { return max(max(v.x, v.y), v.z); }
