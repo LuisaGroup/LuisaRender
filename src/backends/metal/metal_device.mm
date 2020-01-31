@@ -33,7 +33,7 @@ MetalDevice::MetalDevice()
     
 }
 
-std::shared_ptr<Kernel> MetalDevice::create_kernel(std::string_view function_name) {
+std::unique_ptr<Kernel> MetalDevice::create_kernel(std::string_view function_name) {
     
     auto descriptor = [[MTLComputePipelineDescriptor alloc] init];
     [descriptor autorelease];
@@ -65,7 +65,7 @@ std::shared_ptr<Kernel> MetalDevice::create_kernel(std::string_view function_nam
     }
     std::cout << std::endl;
     
-    return std::make_shared<MetalKernel>(function, pipeline, reflection);
+    return std::make_unique<MetalKernel>(function, pipeline, reflection);
     
 }
 
@@ -85,7 +85,7 @@ void MetalDevice::launch_async(std::function<void(KernelDispatcher &)> dispatch,
     [command_buffer commit];
 }
 
-std::shared_ptr<Acceleration> MetalDevice::create_acceleration(Buffer &position_buffer, size_t stride, size_t triangle_count) {
+std::unique_ptr<Acceleration> MetalDevice::create_acceleration(Buffer &position_buffer, size_t stride, size_t triangle_count) {
     
     auto accelerator = [[MPSTriangleAccelerationStructure alloc] initWithDevice:_device_wrapper->device];
     [accelerator autorelease];
@@ -106,18 +106,18 @@ std::shared_ptr<Acceleration> MetalDevice::create_acceleration(Buffer &position_
     shadow_ray_intersector.intersectionDataType = MPSIntersectionDataTypeDistance;
     shadow_ray_intersector.rayStride = sizeof(Ray);
     
-    return std::make_shared<MetalAcceleration>(accelerator, ray_intersector, shadow_ray_intersector);
+    return std::make_unique<MetalAcceleration>(accelerator, ray_intersector, shadow_ray_intersector);
 }
 
-std::shared_ptr<Buffer> MetalDevice::create_buffer(size_t capacity, BufferStorageTag storage) {
+std::unique_ptr<Buffer> MetalDevice::create_buffer(size_t capacity, BufferStorage storage) {
     
     auto buffer = [_device_wrapper->device newBufferWithLength:capacity
-                                                       options:storage == BufferStorageTag::DEVICE_PRIVATE ? MTLResourceStorageModePrivate : MTLResourceStorageModeManaged];
+                                                       options:storage == BufferStorage::DEVICE_PRIVATE ? MTLResourceStorageModePrivate : MTLResourceStorageModeManaged];
     [buffer autorelease];
-    return std::make_shared<MetalBuffer>(buffer, capacity, storage);
+    return std::make_unique<MetalBuffer>(buffer, capacity, storage);
 }
 
-std::shared_ptr<Texture> MetalDevice::create_texture(uint2 size, TextureFormatTag format_tag, TextureAccessTag access_tag) {
+std::unique_ptr<Texture> MetalDevice::create_texture(uint2 size, TextureFormatTag format_tag, TextureAccessTag access_tag) {
     
     auto descriptor = [[MTLTextureDescriptor alloc] init];
     [descriptor autorelease];
@@ -152,7 +152,7 @@ std::shared_ptr<Texture> MetalDevice::create_texture(uint2 size, TextureFormatTa
     auto texture = [_device_wrapper->device newTextureWithDescriptor:descriptor];
     [texture autorelease];
     
-    return std::make_shared<MetalTexture>(texture, size, format_tag, access_tag);
+    return std::make_unique<MetalTexture>(texture, size, format_tag, access_tag);
 }
 
 }

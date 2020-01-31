@@ -19,7 +19,7 @@ private:
     id<MTLBuffer> _handle;
 
 public:
-    MetalBuffer(id<MTLBuffer> buffer, size_t capacity, BufferStorageTag storage) noexcept
+    MetalBuffer(id<MTLBuffer> buffer, size_t capacity, BufferStorage storage) noexcept
         : Buffer(capacity, storage), _handle{buffer} {}
     
     void upload(const void *host_data, size_t size, size_t offset) override;

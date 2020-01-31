@@ -16,12 +16,12 @@ namespace luisa::metal {
 class MetalAcceleration : public Acceleration {
 
 private:
-    MPSTriangleAccelerationStructure *_structure;
+    MPSAccelerationStructure *_structure;
     MPSRayIntersector *_nearest_intersector;
     MPSRayIntersector *_any_intersector;
 
 public:
-    MetalAcceleration(MPSTriangleAccelerationStructure *structure, MPSRayIntersector *nearest_its, MPSRayIntersector *any_its) noexcept
+    MetalAcceleration(MPSAccelerationStructure *structure, MPSRayIntersector *nearest_its, MPSRayIntersector *any_its) noexcept
         : _structure{structure}, _nearest_intersector{nearest_its}, _any_intersector{any_its} {}
     
     void trace_any(KernelDispatcher &dispatch, Buffer &ray_buffer, Buffer &intersection_buffer, size_t ray_count) override;

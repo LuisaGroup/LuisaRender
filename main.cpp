@@ -69,19 +69,19 @@ int main(int argc, char *argv[]) {
     auto mesh = Mesh::load(mesh_list);
     
     auto position_buffer_size = mesh.positions.size() * sizeof(float3);
-    auto position_buffer = device->create_buffer(position_buffer_size, BufferStorageTag::MANAGED);
+    auto position_buffer = device->create_buffer(position_buffer_size, BufferStorage::MANAGED);
     position_buffer->upload(mesh.positions.data(), position_buffer_size);
     
     auto normal_buffer_size = mesh.normals.size() * sizeof(float3);
-    auto normal_buffer = device->create_buffer(normal_buffer_size, BufferStorageTag::MANAGED);
+    auto normal_buffer = device->create_buffer(normal_buffer_size, BufferStorage::MANAGED);
     normal_buffer->upload(mesh.normals.data(), normal_buffer_size);
     
     auto material_id_buffer_size = mesh.material_ids.size() * sizeof(uint);
-    auto material_id_buffer = device->create_buffer(material_id_buffer_size, BufferStorageTag::MANAGED);
+    auto material_id_buffer = device->create_buffer(material_id_buffer_size, BufferStorage::MANAGED);
     material_id_buffer->upload(mesh.material_ids.data(), material_id_buffer_size);
     
     auto material_buffer_size = mesh.materials.size() * sizeof(MaterialData);
-    auto material_buffer = device->create_buffer(material_buffer_size, BufferStorageTag::MANAGED);
+    auto material_buffer = device->create_buffer(material_buffer_size, BufferStorage::MANAGED);
     material_buffer->upload(mesh.materials.data(), material_buffer_size);
     
     auto accelerator = device->create_acceleration(*position_buffer, sizeof(float3), mesh.material_ids.size());
@@ -90,22 +90,22 @@ int main(int argc, char *argv[]) {
     constexpr auto height = 360u;
     
     constexpr auto max_ray_count = width * height;
-    auto ray_index_buffer = device->create_buffer(max_ray_count * sizeof(uint), BufferStorageTag::DEVICE_PRIVATE);
-    auto output_ray_index_buffer = device->create_buffer(max_ray_count * sizeof(uint), BufferStorageTag::DEVICE_PRIVATE);
-    auto ray_buffer = device->create_buffer(max_ray_count * sizeof(Ray), BufferStorageTag::DEVICE_PRIVATE);
-    auto ray_throughput_buffer = device->create_buffer(max_ray_count * sizeof(float3), BufferStorageTag::DEVICE_PRIVATE);
-    auto ray_seed_buffer = device->create_buffer(max_ray_count * sizeof(uint), BufferStorageTag::DEVICE_PRIVATE);
-    auto ray_radiance_buffer = device->create_buffer(max_ray_count * sizeof(float3), BufferStorageTag::DEVICE_PRIVATE);
-    auto ray_depth_buffer = device->create_buffer(max_ray_count * sizeof(uint), BufferStorageTag::DEVICE_PRIVATE);
-    auto ray_pixel_buffer = device->create_buffer(max_ray_count * sizeof(float2), BufferStorageTag::DEVICE_PRIVATE);
-    auto ray_pdf_buffer = device->create_buffer(max_ray_count * sizeof(float), BufferStorageTag::DEVICE_PRIVATE);
-    auto gather_ray_buffer = device->create_buffer(max_ray_count * sizeof(GatherRayData), BufferStorageTag::DEVICE_PRIVATE);
-    auto light_sample_buffer = device->create_buffer(max_ray_count * sizeof(LightSample), BufferStorageTag::DEVICE_PRIVATE);
-    auto shadow_ray_buffer = device->create_buffer(max_ray_count * sizeof(Ray), BufferStorageTag::DEVICE_PRIVATE);
-    auto its_buffer = device->create_buffer(max_ray_count * sizeof(IntersectionData), BufferStorageTag::DEVICE_PRIVATE);
-    auto shadow_its_buffer = device->create_buffer(max_ray_count * sizeof(ShadowIntersectionData), BufferStorageTag::DEVICE_PRIVATE);
-    auto accum_buffer = device->create_buffer(max_ray_count * sizeof(glm::ivec4), BufferStorageTag::DEVICE_PRIVATE);
-    auto result_buffer = device->create_buffer(max_ray_count * sizeof(packed_float3), BufferStorageTag::MANAGED);
+    auto ray_index_buffer = device->create_buffer(max_ray_count * sizeof(uint), BufferStorage::DEVICE_PRIVATE);
+    auto output_ray_index_buffer = device->create_buffer(max_ray_count * sizeof(uint), BufferStorage::DEVICE_PRIVATE);
+    auto ray_buffer = device->create_buffer(max_ray_count * sizeof(Ray), BufferStorage::DEVICE_PRIVATE);
+    auto ray_throughput_buffer = device->create_buffer(max_ray_count * sizeof(float3), BufferStorage::DEVICE_PRIVATE);
+    auto ray_seed_buffer = device->create_buffer(max_ray_count * sizeof(uint), BufferStorage::DEVICE_PRIVATE);
+    auto ray_radiance_buffer = device->create_buffer(max_ray_count * sizeof(float3), BufferStorage::DEVICE_PRIVATE);
+    auto ray_depth_buffer = device->create_buffer(max_ray_count * sizeof(uint), BufferStorage::DEVICE_PRIVATE);
+    auto ray_pixel_buffer = device->create_buffer(max_ray_count * sizeof(float2), BufferStorage::DEVICE_PRIVATE);
+    auto ray_pdf_buffer = device->create_buffer(max_ray_count * sizeof(float), BufferStorage::DEVICE_PRIVATE);
+    auto gather_ray_buffer = device->create_buffer(max_ray_count * sizeof(GatherRayData), BufferStorage::DEVICE_PRIVATE);
+    auto light_sample_buffer = device->create_buffer(max_ray_count * sizeof(LightSample), BufferStorage::DEVICE_PRIVATE);
+    auto shadow_ray_buffer = device->create_buffer(max_ray_count * sizeof(Ray), BufferStorage::DEVICE_PRIVATE);
+    auto its_buffer = device->create_buffer(max_ray_count * sizeof(IntersectionData), BufferStorage::DEVICE_PRIVATE);
+    auto shadow_its_buffer = device->create_buffer(max_ray_count * sizeof(ShadowIntersectionData), BufferStorage::DEVICE_PRIVATE);
+    auto accum_buffer = device->create_buffer(max_ray_count * sizeof(glm::ivec4), BufferStorage::DEVICE_PRIVATE);
+    auto result_buffer = device->create_buffer(max_ray_count * sizeof(packed_float3), BufferStorage::MANAGED);
     
     CameraData camera_data{};
     camera_data.position = {0.8f, -2.5f, 15.0f};
@@ -125,7 +125,7 @@ int main(int argc, char *argv[]) {
     LightData light{};
     light.position = {0.0f, 4.0f, 0.0f};
     light.emission = {10.0f, 10.0f, 10.0f};
-    auto light_buffer = device->create_buffer(sizeof(LightData), BufferStorageTag::MANAGED);
+    auto light_buffer = device->create_buffer(sizeof(LightData), BufferStorage::MANAGED);
     light_buffer->upload(&light, sizeof(LightData));
     
     auto threadgroup_size = uint2(16, 16);
@@ -146,7 +146,7 @@ int main(int argc, char *argv[]) {
     
     std::vector<uint> initial_ray_counts(spp * (max_depth + 1u), 0u);
     auto ray_count_buffer_size = initial_ray_counts.size() * sizeof(uint);
-    auto ray_count_buffer = device->create_buffer(ray_count_buffer_size, BufferStorageTag::MANAGED);
+    auto ray_count_buffer = device->create_buffer(ray_count_buffer_size, BufferStorage::MANAGED);
     ray_count_buffer->upload(initial_ray_counts.data(), ray_count_buffer_size);
     
     device->launch_async([&](KernelDispatcher &dispatch) {
