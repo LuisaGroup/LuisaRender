@@ -13,17 +13,17 @@ using namespace luisa;
 using namespace luisa::math;
 
 LUISA_KERNEL void pinhole_camera_generate_rays(
-    device uint *ray_index_buffer,
-    device Ray *ray_buffer,
-    device uint &ray_count,
-    device float3 *ray_throughput_buffer,
-    device uint *ray_seed_buffer,
-    device float3 *ray_radiance_buffer,
-    device uint *ray_depth_buffer,
-    device float2 *ray_pixel_buffer,
-    device float *ray_pdf_buffer,
-    constant CameraData &camera_data,
-    constant FrameData &frame_data,
+    LUISA_DEVICE_SPACE uint *ray_index_buffer,
+    LUISA_DEVICE_SPACE Ray *ray_buffer,
+    LUISA_DEVICE_SPACE uint &ray_count,
+    LUISA_DEVICE_SPACE float3 *ray_throughput_buffer,
+    LUISA_DEVICE_SPACE uint *ray_seed_buffer,
+    LUISA_DEVICE_SPACE float3 *ray_radiance_buffer,
+    LUISA_DEVICE_SPACE uint *ray_depth_buffer,
+    LUISA_DEVICE_SPACE float2 *ray_pixel_buffer,
+    LUISA_DEVICE_SPACE float *ray_pdf_buffer,
+    LUISA_UNIFORM_SPACE CameraData &camera_data,
+    LUISA_UNIFORM_SPACE FrameData &frame_data,
     uint2 tid [[thread_position_in_grid]]) {
     
     auto w = frame_data.size.x;

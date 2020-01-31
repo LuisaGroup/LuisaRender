@@ -27,8 +27,8 @@ inline float Mitchell1D(float x) {
 }
 
 LUISA_KERNEL void rgb_film_clear(
-    LUISA_DEVICE_SPACE uint4 *accum_buffer,
-    LUISA_CONSTANT_SPACE uint &ray_count,
+    LUISA_DEVICE_SPACE int4 *accum_buffer,
+    LUISA_UNIFORM_SPACE uint &ray_count,
     uint2 tid [[thread_position_in_grid]]) {
     
     if (tid.x < ray_count) {
@@ -39,22 +39,22 @@ LUISA_KERNEL void rgb_film_clear(
 
 LUISA_KERNEL void rgb_film_gather_rays(
     LUISA_DEVICE_SPACE const GatherRayData *ray_buffer,
-    LUISA_CONSTANT_SPACE FrameData &frame_data,
-    LUISA_DEVICE_SPACE atomic_int *accum_buffer,
+    LUISA_UNIFORM_SPACE FrameData &frame_data,
+    LUISA_DEVICE_SPACE Atomic<int> *accum_buffer,
     uint2 tid [[thread_position_in_grid]]) {
     
     if (tid.x < frame_data.size.x && tid.y < frame_data.size.y) {
         auto index = tid.x + tid.y * frame_data.size.x;
         auto new_value = int4(int3(round(ACEScg2XYZ(ray_buffer[index].radiance) * 1024.0f)), 1);
-        atomic_fetch_add_explicit(&accum_buffer[index * 4u + 0u], new_value.x, memory_order_relaxed);
-        atomic_fetch_add_explicit(&accum_buffer[index * 4u + 1u], new_value.y, memory_order_relaxed);
-        atomic_fetch_add_explicit(&accum_buffer[index * 4u + 2u], new_value.z, memory_order_relaxed);
-        atomic_fetch_add_explicit(&accum_buffer[index * 4u + 3u], new_value.w, memory_order_relaxed);
+        accum_buffer[index * 4u + 0u] += new_value.x;
+        accum_buffer[index * 4u + 1u] += new_value.y;
+        accum_buffer[index * 4u + 2u] += new_value.z;
+        accum_buffer[index * 4u + 3u] += new_value.w;
     }
 }
 
 LUISA_KERNEL void rgb_film_convert_colorspace(
-    LUISA_CONSTANT_SPACE FrameData &frame_data,
+    LUISA_UNIFORM_SPACE FrameData &frame_data,
     LUISA_DEVICE_SPACE const int4 *accum_buffer,
     texture2d<float, access::write> result,
     uint2 tid [[thread_position_in_grid]]) {
@@ -68,8 +68,8 @@ LUISA_KERNEL void rgb_film_convert_colorspace(
 
 LUISA_KERNEL void mitchell_natravali_filter(
     LUISA_DEVICE_SPACE const GatherRayData *ray_buffer [[buffer(0)]],
-    LUISA_CONSTANT_SPACE FrameData &frame_data [[buffer(1)]],
-    LUISA_CONSTANT_SPACE uint &pixel_radius [[buffer(2)]],
+    LUISA_UNIFORM_SPACE FrameData &frame_data [[buffer(1)]],
+    LUISA_UNIFORM_SPACE uint &pixel_radius [[buffer(2)]],
     texture2d<float, access::read_write> result [[texture(0)]],
     uint2 tid [[thread_position_in_grid]]) {
     
@@ -108,7 +108,7 @@ LUISA_KERNEL void mitchell_natravali_filter(
 }
 
 LUISA_KERNEL void convert_colorspace_rgb(
-    LUISA_CONSTANT_SPACE FrameData &frame_data [[buffer(0)]],
+    LUISA_UNIFORM_SPACE FrameData &frame_data [[buffer(0)]],
     texture2d<float, access::read_write> result [[texture(0)]],
     uint2 tid [[thread_position_in_grid]]) {
     

@@ -41,7 +41,7 @@ LUISA_KERNEL void update_ray_states(
     LUISA_DEVICE_SPACE uint *shading_queues,
     LUISA_DEVICE_SPACE atomic_uint *shading_queue_size,
     LUISA_DEVICE_SPACE atomic_uint *finished_ray_count,
-    LUISA_CONSTANT_SPACE uint &ray_pool_size,
+    LUISA_UNIFORM_SPACE uint &ray_pool_size,
     uint2 tid [[thread_position_in_grid]]) {
     
     auto index = tid.x;
@@ -91,7 +91,7 @@ LUISA_KERNEL void sample_lights(
     LUISA_DEVICE_SPACE const float3 *p_buffer,
     LUISA_DEVICE_SPACE Ray *shadow_ray_buffer,
     LUISA_DEVICE_SPACE LightSample *light_sample_buffer,
-    LUISA_CONSTANT_SPACE uint &light_count,
+    LUISA_UNIFORM_SPACE uint &light_count,
     LUISA_DEVICE_SPACE const uint &ray_count,
     uint2 tid [[thread_position_in_grid]]) {
     
@@ -217,7 +217,7 @@ LUISA_KERNEL void sort_rays(
     LUISA_DEVICE_SPACE uint *output_ray_index_buffer,
     LUISA_DEVICE_SPACE const uint &ray_count,
     LUISA_DEVICE_SPACE atomic_uint *output_ray_count,
-    LUISA_CONSTANT_SPACE FrameData &frame_data,
+    LUISA_UNIFORM_SPACE FrameData &frame_data,
     LUISA_DEVICE_SPACE GatherRayData *gather_ray_buffer,
     uint2 tid [[thread_position_in_grid]]) {
     
@@ -242,7 +242,7 @@ LUISA_KERNEL void gather_rays(
     LUISA_DEVICE_SPACE const float2 *ray_pixel_buffer,
     LUISA_DEVICE_SPACE const uint &ray_count,
     LUISA_DEVICE_SPACE GatherRayData *gather_ray_buffer,
-    LUISA_CONSTANT_SPACE FrameData &frame_data,
+    LUISA_UNIFORM_SPACE FrameData &frame_data,
     uint2 tid [[thread_position_in_grid]]) {
     
     auto thread_index = tid.x;

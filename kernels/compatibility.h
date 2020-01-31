@@ -38,23 +38,46 @@ using namespace metal;
 #define LUISA_MATH_HAS_BUILTIN_VECTOR_ABS
 #define LUISA_MATH_HAS_BUILTIN_VECTOR_CLAMP
 
+#define LUISA_MATH_HAS_BUILTIN_MATRIX_TRANSPOSE
+
 }}
 
 #define noexcept
 
 #define LUISA_CONSTANT_SPACE  constant
+#define LUISA_UNIFORM_SPACE   constant
 #define LUISA_THREAD_SPACE    thread
 #define LUISA_DEVICE_SPACE    device
 
 // function scopes
 #define LUISA_CONSTEXPR        inline
 #define LUISA_KERNEL           kernel
-#define LUISA_DEVICE_CALLABLE
+#define LUISA_DEVICE_CALLABLE  device
 
 namespace luisa {
 
 template<typename D, typename S>
 inline D as(S s) { return as_type<D>(s); }
+
+#define LUISA_STD_ATOMIC_COMPATIBLE
+
+namespace _impl {
+
+using atomic_int = metal::atomic_int;
+using atomic_uint = metal::atomic_uint;
+
+using metal::atomic_load_explicit;
+using metal::atomic_store_explicit;
+using metal::atomic_exchange_explicit;
+using metal::atomic_fetch_add_explicit;
+using metal::atomic_fetch_sub_explicit;
+using metal::atomic_fetch_or_explicit;
+using metal::atomic_fetch_and_explicit;
+using metal::atomic_fetch_xor_explicit;
+
+using metal::memory_order_relaxed;
+
+}
 
 }
 

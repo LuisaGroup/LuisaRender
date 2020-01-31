@@ -8,6 +8,7 @@
 
 // address spaces, ineffective on host
 #define LUISA_CONSTANT_SPACE constexpr
+#define LUISA_UNIFORM_SPACE
 #define LUISA_THREAD_SPACE
 #define LUISA_DEVICE_SPACE
 
@@ -49,6 +50,35 @@ inline DestT as(SrcT s) noexcept {
 
 }
 
+#endif
+
+// make sure the necessary memory space and function scope keywords are defined
+#ifndef LUISA_CONSTANT_SPACE
+#error Marco LUISA_CONSTANT_SPACE not defined.
+#endif
+
+#ifndef LUISA_UNIFORM_SPACE
+#error Marco LUISA_UNIFORM_SPACE not defined.
+#endif
+
+#ifndef LUISA_THREAD_SPACE
+#error Marco LUISA_THREAD_SPACE not defined.
+#endif
+
+#ifndef LUISA_DEVICE_SPACE
+#error Marco LUISA_DEVICE_SPACE not defined.
+#endif
+
+#ifndef LUISA_CONSTEXPR
+#error Marco LUISA_CONSTEXPR not defined.
+#endif
+
+#ifndef LUISA_KERNEL
+#error Marco LUISA_KERNEL not defined.
+#endif
+
+#ifndef LUISA_DEVICE_CALLABLE
+#error Marco LUISA_DEVICE_CALLABLE not defined.
 #endif
 
 namespace luisa {
@@ -261,3 +291,78 @@ LUISA_DEVICE_CALLABLE inline auto make_float4x4(float3x3 m) noexcept {
 }
 
 }
+
+#ifndef LUISA_DEVICE_COMPATIBLE
+
+#include <atomic>
+
+namespace luisa {
+
+#define LUISA_STD_ATOMIC_COMPATIBLE
+
+namespace _impl {
+
+using atomic_int = std::atomic_int;
+using atomic_uint = std::atomic_uint;
+
+using std::atomic_load_explicit;
+using std::atomic_store_explicit;
+using std::atomic_exchange_explicit;
+using std::atomic_fetch_add_explicit;
+using std::atomic_fetch_sub_explicit;
+using std::atomic_fetch_or_explicit;
+using std::atomic_fetch_and_explicit;
+using std::atomic_fetch_xor_explicit;
+
+using std::memory_order_relaxed;
+
+}
+
+}
+
+#endif
+
+#ifdef LUISA_STD_ATOMIC_COMPATIBLE
+
+namespace luisa {
+
+namespace _impl {
+
+template<typename T>
+struct BuiltinAtomicTypeImpl {};
+
+template<>
+struct BuiltinAtomicTypeImpl<int> {
+    using Type = atomic_int;
+};
+
+template<>
+struct BuiltinAtomicTypeImpl<uint> {
+    using Type = atomic_uint;
+};
+
+}
+
+template<typename T>
+using BuiltinAtomicType = typename _impl::BuiltinAtomicTypeImpl<T>::Type;
+
+template<typename T>
+class Atomic {
+
+private:
+    BuiltinAtomicType<T> _atomic;
+
+public:
+    T operator+=(T val) noexcept LUISA_DEVICE_CALLABLE { return _impl::atomic_fetch_add_explicit(&_atomic, val, _impl::memory_order_relaxed); }
+    T operator-=(T val) noexcept LUISA_DEVICE_CALLABLE { return _impl::atomic_fetch_sub_explicit(&_atomic, val, _impl::memory_order_relaxed); }
+    T operator&=(T val) noexcept LUISA_DEVICE_CALLABLE { return _impl::atomic_fetch_and_explicit(&_atomic, val, _impl::memory_order_relaxed); }
+    T operator|=(T val) noexcept LUISA_DEVICE_CALLABLE { return _impl::atomic_fetch_or_explicit(&_atomic, val, _impl::memory_order_relaxed); }
+    T operator^=(T val) noexcept LUISA_DEVICE_CALLABLE { return _impl::atomic_fetch_xor_explicit(&_atomic, val, _impl::memory_order_relaxed); }
+    void store(T val) noexcept LUISA_DEVICE_CALLABLE { return _impl::atomic_store_explicit(&_atomic, val, _impl::memory_order_relaxed); }
+    [[nodiscard]] T load() noexcept LUISA_DEVICE_CALLABLE { return _impl::atomic_load_explicit(&_atomic, _impl::memory_order_relaxed); }
+    [[nodiscard]] T exchange(T val) noexcept LUISA_DEVICE_CALLABLE { return _impl::atomic_exchange_explicit(&_atomic, val, _impl::memory_order_relaxed); }
+};
+
+}
+
+#endif
