@@ -14,11 +14,12 @@
 using namespace luisa;
 using namespace luisa::math;
 
-constexpr float Mitchell1D(float x) {
+inline float Mitchell1D(float x) {
     constexpr auto B = 1.0f / 3.0f;
     constexpr auto C = 1.0f / 3.0f;
     x = min(abs(2 * x), 2.0f);
     auto xx = x * x;
+    
     return (1.0f / 6.0f) *
            (x > 1 ?
             ((-B - 6 * C) * xx + (6 * B + 30 * C) * x + (-12 * B - 48 * C)) * x + (8 * B + 24 * C) :

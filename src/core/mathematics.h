@@ -15,7 +15,7 @@ LUISA_CONSTANT_SPACE float INV_PI[[maybe_unused]] = 0.31830988618379067153776752
 LUISA_CONSTANT_SPACE float TWO_OVER_PI[[maybe_unused]] = 0.636619772367581343075535053490057448f;
 LUISA_CONSTANT_SPACE float SQRT_TWO[[maybe_unused]] = 1.41421356237309504880168872420969808f;
 LUISA_CONSTANT_SPACE float INV_SQRT_TWO[[maybe_unused]] = 0.707106781186547524400844362104849039f;
-
+    
 }}
 
 #ifndef LUISA_DEVICE_COMPATIBLE
@@ -61,6 +61,7 @@ using glm::normalize;
 using glm::length;
 using glm::dot;
 using glm::cross;
+using glm::distance;
 
 #define LUISA_MATH_HAS_BUILTIN_VECTOR_COS
 using glm::cos;
@@ -112,9 +113,7 @@ using glm::abs;
 
 #define LUISA_MATH_HAS_BUILTIN_VECTOR_CLAMP
 using glm::clamp;
-
-// matrix functions
-
+    
 }
 
 #endif
@@ -143,144 +142,281 @@ LUISA_DEVICE_CALLABLE inline uint max_component(uint4 v) noexcept { return max(m
 LUISA_DEVICE_CALLABLE inline uint min_component(uint4 v) noexcept { return min(min(v.x, v.y), min(v.z, v.w)); }
 
 #ifndef LUISA_MATH_HAS_BUILTIN_VECTOR_COS
-LUISA_DEVICE_CALLABLE inline float2 cos(float2 v) noexcept { return make_float2(luisa::math::cos(v.x), luisa::math::cos(v.y)); }
-LUISA_DEVICE_CALLABLE inline float3 cos(float3 v) noexcept { return make_float3(luisa::math::cos(v.x), luisa::math::cos(v.y), luisa::math::cos(v.z)); }
-LUISA_DEVICE_CALLABLE inline float4 cos(float4 v) noexcept { return make_float4(luisa::math::cos(v.x), luisa::math::cos(v.y), luisa::math::cos(v.z), luisa::math::cos(v.w)); }
+LUISA_DEVICE_CALLABLE inline float2 cos(float2 v) noexcept { return make_float2(math::cos(v.x), math::cos(v.y)); }
+LUISA_DEVICE_CALLABLE inline float3 cos(float3 v) noexcept { return make_float3(math::cos(v.x), math::cos(v.y), math::cos(v.z)); }
+LUISA_DEVICE_CALLABLE inline float4 cos(float4 v) noexcept { return make_float4(math::cos(v.x), math::cos(v.y), math::cos(v.z), math::cos(v.w)); }
 #endif
 
 #ifndef LUISA_MATH_HAS_BUILTIN_VECTOR_SIN
-LUISA_DEVICE_CALLABLE inline float2 sin(float2 v) noexcept { return make_float2(luisa::math::sin(v.x), luisa::math::sin(v.y)); }
-LUISA_DEVICE_CALLABLE inline float3 sin(float3 v) noexcept { return make_float3(luisa::math::sin(v.x), luisa::math::sin(v.y), luisa::math::sin(v.z)); }
-LUISA_DEVICE_CALLABLE inline float4 sin(float4 v) noexcept { return make_float4(luisa::math::sin(v.x), luisa::math::sin(v.y), luisa::math::sin(v.z), luisa::math::sin(v.w)); }
+LUISA_DEVICE_CALLABLE inline float2 sin(float2 v) noexcept { return make_float2(math::sin(v.x), math::sin(v.y)); }
+LUISA_DEVICE_CALLABLE inline float3 sin(float3 v) noexcept { return make_float3(math::sin(v.x), math::sin(v.y), math::sin(v.z)); }
+LUISA_DEVICE_CALLABLE inline float4 sin(float4 v) noexcept { return make_float4(math::sin(v.x), math::sin(v.y), math::sin(v.z), math::sin(v.w)); }
 #endif
 
 #ifndef LUISA_MATH_HAS_BUILTIN_VECTOR_TAN
-LUISA_DEVICE_CALLABLE inline float2 tan(float2 v) noexcept { return make_float2(luisa::math::tan(v.x), luisa::math::tan(v.y)); }
-LUISA_DEVICE_CALLABLE inline float3 tan(float3 v) noexcept { return make_float3(luisa::math::tan(v.x), luisa::math::tan(v.y), luisa::math::tan(v.z)); }
-LUISA_DEVICE_CALLABLE inline float4 tan(float4 v) noexcept { return make_float4(luisa::math::tan(v.x), luisa::math::tan(v.y), luisa::math::tan(v.z), luisa::math::tan(v.w)); }
+LUISA_DEVICE_CALLABLE inline float2 tan(float2 v) noexcept { return make_float2(math::tan(v.x), math::tan(v.y)); }
+LUISA_DEVICE_CALLABLE inline float3 tan(float3 v) noexcept { return make_float3(math::tan(v.x), math::tan(v.y), math::tan(v.z)); }
+LUISA_DEVICE_CALLABLE inline float4 tan(float4 v) noexcept { return make_float4(math::tan(v.x), math::tan(v.y), math::tan(v.z), math::tan(v.w)); }
 #endif
 
 #ifndef LUISA_MATH_HAS_BUILTIN_VECTOR_ACOS
-LUISA_DEVICE_CALLABLE inline float2 acos(float2 v) noexcept { return make_float2(luisa::math::acos(v.x), luisa::math::acos(v.y)); }
-LUISA_DEVICE_CALLABLE inline float3 acos(float3 v) noexcept { return make_float3(luisa::math::acos(v.x), luisa::math::acos(v.y), luisa::math::acos(v.z)); }
-LUISA_DEVICE_CALLABLE inline float4 acos(float4 v) noexcept { return make_float4(luisa::math::acos(v.x), luisa::math::acos(v.y), luisa::math::acos(v.z), luisa::math::acos(v.w)); }
+LUISA_DEVICE_CALLABLE inline float2 acos(float2 v) noexcept { return make_float2(math::acos(v.x), math::acos(v.y)); }
+LUISA_DEVICE_CALLABLE inline float3 acos(float3 v) noexcept { return make_float3(math::acos(v.x), math::acos(v.y), math::acos(v.z)); }
+LUISA_DEVICE_CALLABLE inline float4 acos(float4 v) noexcept { return make_float4(math::acos(v.x), math::acos(v.y), math::acos(v.z), math::acos(v.w)); }
 #endif
 
 #ifndef LUISA_MATH_HAS_BUILTIN_VECTOR_ASIN
-LUISA_DEVICE_CALLABLE inline float2 asin(float2 v) noexcept { return make_float2(luisa::math::asin(v.x), luisa::math::asin(v.y)); }
-LUISA_DEVICE_CALLABLE inline float3 asin(float3 v) noexcept { return make_float3(luisa::math::asin(v.x), luisa::math::asin(v.y), luisa::math::asin(v.z)); }
-LUISA_DEVICE_CALLABLE inline float4 asin(float4 v) noexcept { return make_float4(luisa::math::asin(v.x), luisa::math::asin(v.y), luisa::math::asin(v.z), luisa::math::asin(v.w)); }
+LUISA_DEVICE_CALLABLE inline float2 asin(float2 v) noexcept { return make_float2(math::asin(v.x), math::asin(v.y)); }
+LUISA_DEVICE_CALLABLE inline float3 asin(float3 v) noexcept { return make_float3(math::asin(v.x), math::asin(v.y), math::asin(v.z)); }
+LUISA_DEVICE_CALLABLE inline float4 asin(float4 v) noexcept { return make_float4(math::asin(v.x), math::asin(v.y), math::asin(v.z), math::asin(v.w)); }
 #endif
 
 #ifndef LUISA_MATH_HAS_BUILTIN_VECTOR_ATAN
-LUISA_DEVICE_CALLABLE inline float2 atan(float2 v) noexcept { return make_float2(luisa::math::atan(v.x), luisa::math::atan(v.y)); }
-LUISA_DEVICE_CALLABLE inline float3 atan(float3 v) noexcept { return make_float3(luisa::math::atan(v.x), luisa::math::atan(v.y), luisa::math::atan(v.z)); }
-LUISA_DEVICE_CALLABLE inline float4 atan(float4 v) noexcept { return make_float4(luisa::math::atan(v.x), luisa::math::atan(v.y), luisa::math::atan(v.z), luisa::math::atan(v.w)); }
+LUISA_DEVICE_CALLABLE inline float2 atan(float2 v) noexcept { return make_float2(math::atan(v.x), math::atan(v.y)); }
+LUISA_DEVICE_CALLABLE inline float3 atan(float3 v) noexcept { return make_float3(math::atan(v.x), math::atan(v.y), math::atan(v.z)); }
+LUISA_DEVICE_CALLABLE inline float4 atan(float4 v) noexcept { return make_float4(math::atan(v.x), math::atan(v.y), math::atan(v.z), math::atan(v.w)); }
 #endif
 
 #ifndef LUISA_MATH_HAS_BUILTIN_VECTOR_ATAN2
-LUISA_DEVICE_CALLABLE inline float2 atan2(float2 y, float2 x) noexcept { return make_float2(luisa::math::atan2(y.x, x.x), luisa::math::atan2(y.y, x.y)); }
+LUISA_DEVICE_CALLABLE inline float2 atan2(float2 y, float2 x) noexcept { return make_float2(math::atan2(y.x, x.x), math::atan2(y.y, x.y)); }
 LUISA_DEVICE_CALLABLE inline float3 atan2(float3 y, float3 x) noexcept {
-    return make_float3(luisa::math::atan2(y.x, x.x),
-                       luisa::math::atan2(y.y, x.y),
-                       luisa::math::atan2(y.z, x.z));
+    return make_float3(math::atan2(y.x, x.x),
+                       math::atan2(y.y, x.y),
+                       math::atan2(y.z, x.z));
 }
 LUISA_DEVICE_CALLABLE inline float4 atan2(float4 y, float4 x) noexcept {
-    return make_float4(luisa::math::atan2(y.x, x.x),
-                       luisa::math::atan2(y.y, x.y),
-                       luisa::math::atan2(y.z, x.z),
-                       luisa::math::atan2(y.w, x.w));
+    return make_float4(math::atan2(y.x, x.x),
+                       math::atan2(y.y, x.y),
+                       math::atan2(y.z, x.z),
+                       math::atan2(y.w, x.w));
 }
 #endif
 
 #ifndef LUISA_MATH_HAS_BUILTIN_VECTOR_CEIL
-LUISA_DEVICE_CALLABLE inline float2 ceil(float2 v) noexcept { return make_float2(luisa::math::ceil(v.x), luisa::math::ceil(v.y)); }
-LUISA_DEVICE_CALLABLE inline float3 ceil(float3 v) noexcept { return make_float3(luisa::math::ceil(v.x), luisa::math::ceil(v.y), luisa::math::ceil(v.z)); }
-LUISA_DEVICE_CALLABLE inline float4 ceil(float4 v) noexcept { return make_float4(luisa::math::ceil(v.x), luisa::math::ceil(v.y), luisa::math::ceil(v.z), luisa::math::ceil(v.w)); }
+LUISA_DEVICE_CALLABLE inline float2 ceil(float2 v) noexcept { return make_float2(math::ceil(v.x), math::ceil(v.y)); }
+LUISA_DEVICE_CALLABLE inline float3 ceil(float3 v) noexcept { return make_float3(math::ceil(v.x), math::ceil(v.y), math::ceil(v.z)); }
+LUISA_DEVICE_CALLABLE inline float4 ceil(float4 v) noexcept { return make_float4(math::ceil(v.x), math::ceil(v.y), math::ceil(v.z), math::ceil(v.w)); }
 #endif
 
 #ifndef LUISA_MATH_HAS_BUILTIN_VECTOR_FLOOR
-LUISA_DEVICE_CALLABLE inline float2 floor(float2 v) noexcept { return make_float2(luisa::math::floor(v.x), luisa::math::floor(v.y)); }
-LUISA_DEVICE_CALLABLE inline float3 floor(float3 v) noexcept { return make_float3(luisa::math::floor(v.x), luisa::math::floor(v.y), luisa::math::floor(v.z)); }
-LUISA_DEVICE_CALLABLE inline float4 floor(float4 v) noexcept { return make_float4(luisa::math::floor(v.x), luisa::math::floor(v.y), luisa::math::floor(v.z), luisa::math::floor(v.w)); }
+LUISA_DEVICE_CALLABLE inline float2 floor(float2 v) noexcept { return make_float2(math::floor(v.x), math::floor(v.y)); }
+LUISA_DEVICE_CALLABLE inline float3 floor(float3 v) noexcept { return make_float3(math::floor(v.x), math::floor(v.y), math::floor(v.z)); }
+LUISA_DEVICE_CALLABLE inline float4 floor(float4 v) noexcept { return make_float4(math::floor(v.x), math::floor(v.y), math::floor(v.z), math::floor(v.w)); }
 #endif
 
 #ifndef LUISA_MATH_HAS_BUILTIN_VECTOR_ROUND
-LUISA_DEVICE_CALLABLE inline float2 round(float2 v) noexcept { return make_float2(luisa::math::round(v.x), luisa::math::round(v.y)); }
-LUISA_DEVICE_CALLABLE inline float3 round(float3 v) noexcept { return make_float3(luisa::math::round(v.x), luisa::math::round(v.y), luisa::math::round(v.z)); }
-LUISA_DEVICE_CALLABLE inline float4 round(float4 v) noexcept { return make_float4(luisa::math::round(v.x), luisa::math::round(v.y), luisa::math::round(v.z), luisa::math::round(v.w)); }
+LUISA_DEVICE_CALLABLE inline float2 round(float2 v) noexcept { return make_float2(math::round(v.x), math::round(v.y)); }
+LUISA_DEVICE_CALLABLE inline float3 round(float3 v) noexcept { return make_float3(math::round(v.x), math::round(v.y), math::round(v.z)); }
+LUISA_DEVICE_CALLABLE inline float4 round(float4 v) noexcept { return make_float4(math::round(v.x), math::round(v.y), math::round(v.z), math::round(v.w)); }
 #endif
 
 #ifndef LUISA_MATH_HAS_BUILTIN_VECTOR_LOG
-LUISA_DEVICE_CALLABLE inline float2 log(float2 v) noexcept { return make_float2(luisa::math::log(v.x), luisa::math::log(v.y)); }
-LUISA_DEVICE_CALLABLE inline float3 log(float3 v) noexcept { return make_float3(luisa::math::log(v.x), luisa::math::log(v.y), luisa::math::log(v.z)); }
-LUISA_DEVICE_CALLABLE inline float4 log(float4 v) noexcept { return make_float4(luisa::math::log(v.x), luisa::math::log(v.y), luisa::math::log(v.z), luisa::math::log(v.w)); }
+LUISA_DEVICE_CALLABLE inline float2 log(float2 v) noexcept { return make_float2(math::log(v.x), math::log(v.y)); }
+LUISA_DEVICE_CALLABLE inline float3 log(float3 v) noexcept { return make_float3(math::log(v.x), math::log(v.y), math::log(v.z)); }
+LUISA_DEVICE_CALLABLE inline float4 log(float4 v) noexcept { return make_float4(math::log(v.x), math::log(v.y), math::log(v.z), math::log(v.w)); }
 #endif
 
 #ifndef LUISA_MATH_HAS_BUILTIN_VECTOR_EXP
-LUISA_DEVICE_CALLABLE inline float2 exp(float2 v) noexcept { return make_float2(luisa::math::exp(v.x), luisa::math::exp(v.y)); }
-LUISA_DEVICE_CALLABLE inline float3 exp(float3 v) noexcept { return make_float3(luisa::math::exp(v.x), luisa::math::exp(v.y), luisa::math::exp(v.z)); }
-LUISA_DEVICE_CALLABLE inline float4 exp(float4 v) noexcept { return make_float4(luisa::math::exp(v.x), luisa::math::exp(v.y), luisa::math::exp(v.z), luisa::math::exp(v.w)); }
+LUISA_DEVICE_CALLABLE inline float2 exp(float2 v) noexcept { return make_float2(math::exp(v.x), math::exp(v.y)); }
+LUISA_DEVICE_CALLABLE inline float3 exp(float3 v) noexcept { return make_float3(math::exp(v.x), math::exp(v.y), math::exp(v.z)); }
+LUISA_DEVICE_CALLABLE inline float4 exp(float4 v) noexcept { return make_float4(math::exp(v.x), math::exp(v.y), math::exp(v.z), math::exp(v.w)); }
 #endif
 
 #ifndef LUISA_MATH_HAS_BUILTIN_VECTOR_LOG2
-LUISA_DEVICE_CALLABLE inline float2 log2(float2 v) noexcept { return make_float2(luisa::math::log2(v.x), luisa::math::log2(v.y)); }
-LUISA_DEVICE_CALLABLE inline float3 log2(float3 v) noexcept { return make_float3(luisa::math::log2(v.x), luisa::math::log2(v.y), luisa::math::log2(v.z)); }
-LUISA_DEVICE_CALLABLE inline float4 log2(float4 v) noexcept { return make_float4(luisa::math::log2(v.x), luisa::math::log2(v.y), luisa::math::log2(v.z), luisa::math::log2(v.w)); }
+LUISA_DEVICE_CALLABLE inline float2 log2(float2 v) noexcept { return make_float2(math::log2(v.x), math::log2(v.y)); }
+LUISA_DEVICE_CALLABLE inline float3 log2(float3 v) noexcept { return make_float3(math::log2(v.x), math::log2(v.y), math::log2(v.z)); }
+LUISA_DEVICE_CALLABLE inline float4 log2(float4 v) noexcept { return make_float4(math::log2(v.x), math::log2(v.y), math::log2(v.z), math::log2(v.w)); }
 #endif
 
 #ifndef LUISA_MATH_HAS_BUILTIN_VECTOR_LOG10
-LUISA_DEVICE_CALLABLE inline float2 log10(float2 v) noexcept { return make_float2(luisa::math::log10(v.x), luisa::math::log10(v.y)); }
-LUISA_DEVICE_CALLABLE inline float3 log10(float3 v) noexcept { return make_float3(luisa::math::log10(v.x), luisa::math::log10(v.y), luisa::math::log10(v.z)); }
+LUISA_DEVICE_CALLABLE inline float2 log10(float2 v) noexcept { return make_float2(math::log10(v.x), math::log10(v.y)); }
+LUISA_DEVICE_CALLABLE inline float3 log10(float3 v) noexcept { return make_float3(math::log10(v.x), math::log10(v.y), math::log10(v.z)); }
 LUISA_DEVICE_CALLABLE inline float4 log10(float4 v) noexcept {
-    return make_float4(luisa::math::log10(v.x),
-                       luisa::math::log10(v.y),
-                       luisa::math::log10(v.z),
-                       luisa::math::log10(v.w));
+    return make_float4(math::log10(v.x),
+                       math::log10(v.y),
+                       math::log10(v.z),
+                       math::log10(v.w));
 }
 #endif
 
 #ifndef LUISA_MATH_HAS_BUILTIN_VECTOR_POW
-LUISA_DEVICE_CALLABLE inline float2 pow(float2 a, float2 b) noexcept { return make_float2(luisa::math::pow(a.x, b.x), luisa::math::pow(a.y, b.y)); }
-LUISA_DEVICE_CALLABLE inline float3 pow(float3 a, float3 b) noexcept { return make_float3(luisa::math::pow(a.x, b.x), luisa::math::pow(a.y, b.y), luisa::math::pow(a.z, b.z)); }
-LUISA_DEVICE_CALLABLE inline float4 pow(float4 a, float4 b) noexcept { return make_float4(luisa::math::pow(a.x, b.x), luisa::math::pow(a.y, b.y), luisa::math::pow(a.z, b.z), luisa::math::pow(a.w, b.w)); }
+LUISA_DEVICE_CALLABLE inline float2 pow(float2 a, float2 b) noexcept { return make_float2(math::pow(a.x, b.x), math::pow(a.y, b.y)); }
+LUISA_DEVICE_CALLABLE inline float3 pow(float3 a, float3 b) noexcept { return make_float3(math::pow(a.x, b.x), math::pow(a.y, b.y), math::pow(a.z, b.z)); }
+LUISA_DEVICE_CALLABLE inline float4 pow(float4 a, float4 b) noexcept { return make_float4(math::pow(a.x, b.x), math::pow(a.y, b.y), math::pow(a.z, b.z), math::pow(a.w, b.w)); }
 #endif
 
 #ifndef LUISA_MATH_HAS_BUILTIN_VECTOR_MIN
-LUISA_DEVICE_CALLABLE inline float2 min(float2 a, float2 b) noexcept { return make_float2(luisa::math::min(a.x, b.x), luisa::math::min(a.y, b.y)); }
-LUISA_DEVICE_CALLABLE inline float3 min(float3 a, float3 b) noexcept { return make_float3(luisa::math::min(a.x, b.x), luisa::math::min(a.y, b.y), luisa::math::min(a.z, b.z)); }
-LUISA_DEVICE_CALLABLE inline float4 min(float4 a, float4 b) noexcept { return make_float4(luisa::math::min(a.x, b.x), luisa::math::min(a.y, b.y), luisa::math::min(a.z, b.z), luisa::math::min(a.w, b.w)); }
+LUISA_DEVICE_CALLABLE inline float2 min(float2 a, float2 b) noexcept { return make_float2(math::min(a.x, b.x), math::min(a.y, b.y)); }
+LUISA_DEVICE_CALLABLE inline float3 min(float3 a, float3 b) noexcept { return make_float3(math::min(a.x, b.x), math::min(a.y, b.y), math::min(a.z, b.z)); }
+LUISA_DEVICE_CALLABLE inline float4 min(float4 a, float4 b) noexcept { return make_float4(math::min(a.x, b.x), math::min(a.y, b.y), math::min(a.z, b.z), math::min(a.w, b.w)); }
 #endif
 
 #ifndef LUISA_MATH_HAS_BUILTIN_VECTOR_MAX
-LUISA_DEVICE_CALLABLE inline float2 max(float2 a, float2 b) noexcept { return make_float2(luisa::math::max(a.x, b.x), luisa::math::max(a.y, b.y)); }
-LUISA_DEVICE_CALLABLE inline float3 max(float3 a, float3 b) noexcept { return make_float3(luisa::math::max(a.x, b.x), luisa::math::max(a.y, b.y), luisa::math::max(a.z, b.z)); }
-LUISA_DEVICE_CALLABLE inline float4 max(float4 a, float4 b) noexcept { return make_float4(luisa::math::max(a.x, b.x), luisa::math::max(a.y, b.y), luisa::math::max(a.z, b.z), luisa::math::max(a.w, b.w)); }
+LUISA_DEVICE_CALLABLE inline float2 max(float2 a, float2 b) noexcept { return make_float2(math::max(a.x, b.x), math::max(a.y, b.y)); }
+LUISA_DEVICE_CALLABLE inline float3 max(float3 a, float3 b) noexcept { return make_float3(math::max(a.x, b.x), math::max(a.y, b.y), math::max(a.z, b.z)); }
+LUISA_DEVICE_CALLABLE inline float4 max(float4 a, float4 b) noexcept { return make_float4(math::max(a.x, b.x), math::max(a.y, b.y), math::max(a.z, b.z), math::max(a.w, b.w)); }
 #endif
 
 #ifndef LUISA_MATH_HAS_BUILTIN_VECTOR_ABS
-LUISA_DEVICE_CALLABLE inline float2 abs(float2 v) noexcept { return make_float2(luisa::math::abs(v.x), luisa::math::abs(v.y)); }
-LUISA_DEVICE_CALLABLE inline float3 abs(float3 v) noexcept { return make_float3(luisa::math::abs(v.x), luisa::math::abs(v.y), luisa::math::abs(v.z)); }
-LUISA_DEVICE_CALLABLE inline float4 abs(float4 v) noexcept { return make_float4(luisa::math::abs(v.x), luisa::math::abs(v.y), luisa::math::abs(v.z), luisa::math::abs(v.w)); }
+LUISA_DEVICE_CALLABLE inline float2 abs(float2 v) noexcept { return make_float2(math::abs(v.x), math::abs(v.y)); }
+LUISA_DEVICE_CALLABLE inline float3 abs(float3 v) noexcept { return make_float3(math::abs(v.x), math::abs(v.y), math::abs(v.z)); }
+LUISA_DEVICE_CALLABLE inline float4 abs(float4 v) noexcept { return make_float4(math::abs(v.x), math::abs(v.y), math::abs(v.z), math::abs(v.w)); }
 #endif
 
 #ifndef LUISA_MATH_HAS_BUILTIN_VECTOR_CLAMP
-LUISA_DEVICE_CALLABLE inline float2 clamp(float2 v, float lo, float hi) noexcept { return make_float2(luisa::math::clamp(v.x, lo, hi), luisa::math::clamp(v.y, lo, hi)); }
-LUISA_DEVICE_CALLABLE inline float3 clamp(float3 v, float lo, float hi) noexcept { return make_float3(luisa::math::clamp(v.x, lo, hi), luisa::math::clamp(v.y, lo, hi), luisa::math::clamp(v.z, lo, hi)); }
+LUISA_DEVICE_CALLABLE inline float2 clamp(float2 v, float lo, float hi) noexcept { return make_float2(math::clamp(v.x, lo, hi), math::clamp(v.y, lo, hi)); }
+LUISA_DEVICE_CALLABLE inline float3 clamp(float3 v, float lo, float hi) noexcept { return make_float3(math::clamp(v.x, lo, hi), math::clamp(v.y, lo, hi), math::clamp(v.z, lo, hi)); }
 LUISA_DEVICE_CALLABLE inline float4 clamp(float4 v, float lo, float hi) noexcept {
-    return make_float4(luisa::math::clamp(v.x, lo, hi),
-                       luisa::math::clamp(v.y, lo, hi),
-                       luisa::math::clamp(v.z, lo, hi),
-                       luisa::math::clamp(v.w, lo, hi));
+    return make_float4(math::clamp(v.x, lo, hi),
+                       math::clamp(v.y, lo, hi),
+                       math::clamp(v.z, lo, hi),
+                       math::clamp(v.w, lo, hi));
 }
-LUISA_DEVICE_CALLABLE inline float2 clamp(float2 v, float2 lo, float2 hi) noexcept { return make_float2(luisa::math::clamp(v.x, lo.x, hi.x), luisa::math::clamp(v.y, lo.y, hi.y)); }
-LUISA_DEVICE_CALLABLE inline float3 clamp(float3 v, float3 lo, float3 hi) noexcept { return make_float3(luisa::math::clamp(v.x, lo.x, hi.x), luisa::math::clamp(v.y, lo.y, hi.y), luisa::math::clamp(v.z, lo.z, hi.z)); }
+LUISA_DEVICE_CALLABLE inline float2 clamp(float2 v, float2 lo, float2 hi) noexcept { return make_float2(math::clamp(v.x, lo.x, hi.x), math::clamp(v.y, lo.y, hi.y)); }
+LUISA_DEVICE_CALLABLE inline float3 clamp(float3 v, float3 lo, float3 hi) noexcept { return make_float3(math::clamp(v.x, lo.x, hi.x), math::clamp(v.y, lo.y, hi.y), math::clamp(v.z, lo.z, hi.z)); }
 LUISA_DEVICE_CALLABLE inline float4 clamp(float4 v, float4 lo, float4 hi) noexcept {
-    return make_float4(luisa::math::clamp(v.x, lo.x, hi.x),
-                       luisa::math::clamp(v.y, lo.y, hi.y),
-                       luisa::math::clamp(v.z, lo.z, hi.z),
-                       luisa::math::clamp(v.w, lo.w, hi.w));
+    return make_float4(math::clamp(v.x, lo.x, hi.x),
+                       math::clamp(v.y, lo.y, hi.y),
+                       math::clamp(v.z, lo.z, hi.z),
+                       math::clamp(v.w, lo.w, hi.w));
 }
 #endif
 
+#ifndef LUISA_MATH_HAS_BUILTIN_MATRIX_TRANSPOSE
+
+LUISA_DEVICE_CALLABLE inline auto transpose(float3x3 m) noexcept {
+    return make_float3x3(
+        m[0].x, m[1].x, m[2].x,
+        m[0].y, m[1].y, m[2].y,
+        m[0].z, m[1].z, m[2].z);
+}
+
+LUISA_DEVICE_CALLABLE inline auto transpose(float4x4 m) noexcept {
+    return make_float4x4(
+        m[0].x, m[1].x, m[2].x, m[3].x,
+        m[0].y, m[1].y, m[2].y, m[3].y,
+        m[0].z, m[1].z, m[2].z, m[3].z,
+        m[0].w, m[1].w, m[2].w, m[3].w);
+}
+
+#endif
+
+#ifndef LUISA_MATH_HAS_BUILTIN_MATRIX_INVERSE
+
+LUISA_DEVICE_CALLABLE inline auto inverse(float3x3 m) noexcept {  // from GLM
+    
+    auto one_over_determinant = 1.0f / (m[0].x * (m[1].y * m[2].z - m[2].y * m[1].z) -
+                                        m[1].x * (m[0].y * m[2].z - m[2].y * m[0].z) +
+                                        m[2].x * (m[0].y * m[1].z - m[1].y * m[0].z));
+    
+    return make_float3x3(
+        (m[1].y * m[2].z - m[2].y * m[1].z) * one_over_determinant,
+        (m[2].y * m[0].z - m[0].y * m[2].z) * one_over_determinant,
+        (m[0].y * m[1].z - m[1].y * m[0].z) * one_over_determinant,
+        (m[2].x * m[1].z - m[1].x * m[2].z) * one_over_determinant,
+        (m[0].x * m[2].z - m[2].x * m[0].z) * one_over_determinant,
+        (m[1].x * m[0].z - m[0].x * m[1].z) * one_over_determinant,
+        (m[1].x * m[2].y - m[2].x * m[1].y) * one_over_determinant,
+        (m[2].x * m[0].y - m[0].x * m[2].y) * one_over_determinant,
+        (m[0].x * m[1].y - m[1].x * m[0].y) * one_over_determinant);
+}
+
+LUISA_DEVICE_CALLABLE inline auto inverse(float4x4 m) noexcept {  // from GLM
+    
+    auto coef00 = m[2].z * m[3].w - m[3].z * m[2].w;
+    auto coef02 = m[1].z * m[3].w - m[3].z * m[1].w;
+    auto coef03 = m[1].z * m[2].w - m[2].z * m[1].w;
+    auto coef04 = m[2].y * m[3].w - m[3].y * m[2].w;
+    auto coef06 = m[1].y * m[3].w - m[3].y * m[1].w;
+    auto coef07 = m[1].y * m[2].w - m[2].y * m[1].w;
+    auto coef08 = m[2].y * m[3].z - m[3].y * m[2].z;
+    auto coef10 = m[1].y * m[3].z - m[3].y * m[1].z;
+    auto coef11 = m[1].y * m[2].z - m[2].y * m[1].z;
+    auto coef12 = m[2].x * m[3].w - m[3].x * m[2].w;
+    auto coef14 = m[1].x * m[3].w - m[3].x * m[1].w;
+    auto coef15 = m[1].x * m[2].w - m[2].x * m[1].w;
+    auto coef16 = m[2].x * m[3].z - m[3].x * m[2].z;
+    auto coef18 = m[1].x * m[3].z - m[3].x * m[1].z;
+    auto coef19 = m[1].x * m[2].z - m[2].x * m[1].z;
+    auto coef20 = m[2].x * m[3].y - m[3].x * m[2].y;
+    auto coef22 = m[1].x * m[3].y - m[3].x * m[1].y;
+    auto coef23 = m[1].x * m[2].y - m[2].x * m[1].y;
+    
+    auto fac0 = make_float4(coef00, coef00, coef02, coef03);
+    auto fac1 = make_float4(coef04, coef04, coef06, coef07);
+    auto fac2 = make_float4(coef08, coef08, coef10, coef11);
+    auto fac3 = make_float4(coef12, coef12, coef14, coef15);
+    auto fac4 = make_float4(coef16, coef16, coef18, coef19);
+    auto fac5 = make_float4(coef20, coef20, coef22, coef23);
+    
+    auto Vec0 = make_float4(m[1].x, m[0].x, m[0].x, m[0].x);
+    auto Vec1 = make_float4(m[1].y, m[0].y, m[0].y, m[0].y);
+    auto Vec2 = make_float4(m[1].z, m[0].z, m[0].z, m[0].z);
+    auto Vec3 = make_float4(m[1].w, m[0].w, m[0].w, m[0].w);
+    
+    auto inv0 = Vec1 * fac0 - Vec2 * fac1 + Vec3 * fac2;
+    auto inv1 = Vec0 * fac0 - Vec2 * fac3 + Vec3 * fac4;
+    auto inv2 = Vec0 * fac1 - Vec1 * fac3 + Vec3 * fac5;
+    auto inv3 = Vec0 * fac2 - Vec1 * fac4 + Vec2 * fac5;
+    
+    auto sign_a = make_float4(+1, -1, +1, -1);
+    auto sign_b = make_float4(-1, +1, -1, +1);
+    
+    auto inv = make_float4x4(inv0 * sign_a, inv1 * sign_b, inv2 * sign_a, inv3 * sign_b);
+    
+    auto dot0 = m[0] * make_float4(inv[0].x, inv[1].x, inv[2].x, inv[3].x);
+    auto dot1 = dot0.x + dot0.y + dot0.z + dot0.w;
+    
+    auto one_over_determinant = 1.0f / dot1;
+    return inv * one_over_determinant;
+}
+
+#endif
+
+LUISA_DEVICE_CALLABLE inline auto identity() noexcept {
+    return make_float4x4();
+}
+
+LUISA_DEVICE_CALLABLE inline auto translation(float3 v) noexcept {
+    return make_float4x4(
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        v.x, v.y, v.z, 1.0f);
+}
+
+LUISA_DEVICE_CALLABLE inline auto translation(float tx, float ty, float tz) noexcept {
+    return translation(make_float3(tx, ty, tz));
+}
+
+LUISA_DEVICE_CALLABLE inline auto scaling(float3 s) noexcept {
+    return make_float4x4(
+        s.x, 0.0f, 0.0f, 0.0f,
+        0.0f, s.y, 0.0f, 0.0f,
+        0.0f, 0.0f, s.z, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f);
+}
+
+LUISA_DEVICE_CALLABLE inline auto scaling(float sx, float sy, float sz) noexcept {
+    return scaling(make_float3(sx, sy, sz));
+}
+
+LUISA_DEVICE_CALLABLE inline auto scaling(float s) noexcept {
+    return scaling(make_float3(s));
+}
+
+LUISA_DEVICE_CALLABLE inline auto rotation(float3 axis, float angle) noexcept {
+    
+    auto c = cos(angle);
+    auto s = sin(angle);
+    auto a = normalize(axis);
+    auto t = (1.0f - c) * a;
+    
+    return make_float4x4(
+        c + t.x * a.x, t.x * a.y + s * a.z, t.x * a.z - s * a.y, 0.0f,
+        t.y * a.x - s * a.z, c + t.y * a.y, t.y * a.z + s * a.x, 0.0f,
+        t.z * a.x + s * a.y, t.z * a.y - s * a.x, c + t.z * a.z, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f);
+}
+    
 }

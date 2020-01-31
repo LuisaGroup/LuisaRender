@@ -27,7 +27,7 @@ Mesh Mesh::load(const std::vector<MeshDescriptor> &mesh_list) {
     for (auto &&desc : mesh_list) {
         
         auto model_matrix = desc.transform;
-        auto normal_matrix = glm::transpose(glm::inverse(glm::mat3{model_matrix}));
+        auto normal_matrix = math::transpose(math::inverse(make_float3x3(model_matrix)));
         
         tinyobj::ObjReader reader;
         reader.ParseFromFile(desc.path, config);

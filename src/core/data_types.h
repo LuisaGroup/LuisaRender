@@ -18,7 +18,7 @@
 
 #include <type_traits>
 #include <glm/glm.hpp>
-#include <glm/glm/ext.hpp>
+#include <glm/ext.hpp>
 
 namespace luisa {
 
@@ -39,14 +39,7 @@ using uint3 = glm::aligned_highp_uvec3;
 using uint4 = glm::aligned_highp_uvec4;
 using packed_uint3 = glm::packed_highp_uvec3;
 
-using float2x2 = glm::aligned_highp_mat2x2;
-using float2x3 = glm::aligned_highp_mat2x3;
-using float2x4 = glm::aligned_highp_mat2x4;
-using float3x2 = glm::aligned_highp_mat3x2;
 using float3x3 = glm::aligned_highp_mat3x3;
-using float3x4 = glm::aligned_highp_mat3x4;
-using float4x2 = glm::aligned_highp_mat4x2;
-using float4x3 = glm::aligned_highp_mat4x3;
 using float4x4 = glm::aligned_highp_mat4x4;
 
 template<typename DestT, typename SrcT, std::enable_if_t<sizeof(SrcT) == sizeof(DestT), int> = 0>
@@ -96,24 +89,9 @@ static_assert(alignof(uint3) == 16ul);
 static_assert(alignof(uint4) == 16ul);
 static_assert(alignof(packed_uint3) == 4ul);
 
-static_assert(sizeof(float2x2) == 16ul);
-static_assert(sizeof(float2x3) == 32ul);
-static_assert(sizeof(float2x4) == 32ul);
-static_assert(sizeof(float3x2) == 24ul);
 static_assert(sizeof(float3x3) == 48ul);
-static_assert(sizeof(float3x4) == 48ul);
-static_assert(sizeof(float4x2) == 32ul);
-static_assert(sizeof(float4x3) == 64ul);
 static_assert(sizeof(float4x4) == 64ul);
-
-static_assert(alignof(float2x2) == 8ul);
-static_assert(alignof(float2x3) == 16ul);
-static_assert(alignof(float2x4) == 16ul);
-static_assert(alignof(float3x2) == 8ul);
 static_assert(alignof(float3x3) == 16ul);
-static_assert(alignof(float3x4) == 16ul);
-static_assert(alignof(float4x2) == 8ul);
-static_assert(alignof(float4x3) == 16ul);
 static_assert(alignof(float4x4) == 16ul);
 
 LUISA_DEVICE_CALLABLE inline float2 make_float2() noexcept { return {}; }
@@ -232,5 +210,54 @@ LUISA_DEVICE_CALLABLE inline packed_uint3 make_packed_uint3(int3 v) noexcept { r
 LUISA_DEVICE_CALLABLE inline packed_uint3 make_packed_uint3(float3 v) noexcept { return {static_cast<uint>(v.x), static_cast<uint>(v.y), static_cast<uint>(v.z)}; }
 LUISA_DEVICE_CALLABLE inline packed_uint3 make_packed_uint3(packed_int3 v) noexcept { return {static_cast<uint>(v.x), static_cast<uint>(v.y), static_cast<uint>(v.z)}; }
 LUISA_DEVICE_CALLABLE inline packed_uint3 make_packed_uint3(packed_float3 v) noexcept { return {static_cast<uint>(v.x), static_cast<uint>(v.y), static_cast<uint>(v.z)}; }
+
+LUISA_DEVICE_CALLABLE inline auto make_float3x3(float val = 1.0f) noexcept {
+    return float3x3{val};
+}
+
+LUISA_DEVICE_CALLABLE inline auto make_float3x3(float3 c0, float3 c1, float3 c2) noexcept {
+    return float3x3{c0, c1, c2};
+}
+
+LUISA_DEVICE_CALLABLE inline auto make_float3x3(
+    float m00, float m01, float m02,
+    float m10, float m11, float m12,
+    float m20, float m21, float m22) noexcept {
+    
+    return float3x3{m00, m01, m02, m10, m11, m12, m20, m21, m22};
+}
+
+LUISA_DEVICE_CALLABLE inline auto make_float3x3(float4x4 m) noexcept {
+    return make_float3x3(make_float3(m[0]), make_float3(m[1]), make_float3(m[2]));
+}
+
+LUISA_DEVICE_CALLABLE inline auto make_float4x4(float val = 1.0f) noexcept {
+    return float4x4{val};
+}
+
+LUISA_DEVICE_CALLABLE inline auto make_float4x4(float4 c0, float4 c1, float4 c2, float4 c3) noexcept {
+    return float4x4{c0, c1, c2, c3};
+}
+
+LUISA_DEVICE_CALLABLE inline auto make_float4x4(
+    float m00, float m01, float m02, float m03,
+    float m10, float m11, float m12, float m13,
+    float m20, float m21, float m22, float m23,
+    float m30, float m31, float m32, float m33) noexcept {
+    
+    return float4x4{
+        m00, m01, m02, m03,
+        m10, m11, m12, m13,
+        m20, m21, m22, m23,
+        m30, m31, m32, m33};
+}
+
+LUISA_DEVICE_CALLABLE inline auto make_float4x4(float3x3 m) noexcept {
+    return make_float4x4(
+        make_float4(m[0], 0.0f),
+        make_float4(m[1], 0.0f),
+        make_float4(m[2], 0.0f),
+        make_float4(0.0f, 0.0f, 0.0f, 1.0f));
+}
 
 }

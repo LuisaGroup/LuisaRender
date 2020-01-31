@@ -56,10 +56,10 @@ int main(int argc, char *argv[]) {
     mesh_list.emplace_back(MeshDescriptor{bunny_obj_path, bunny_transform, glm::vec3{1.0f}, true});
     
     auto house_obj_path = "data/meshes/cow/cow.obj";
-    auto house_transform = glm::translate(glm::mat4{1.0f}, glm::vec3{-1.5f, -5.0f, 0.0f}) *
-                           glm::rotate(glm::mat4{1.0f}, glm::radians(40.0f), glm::vec3{0.0f, 1.0f, 0.0f}) *
-                           glm::scale(glm::mat4{1.0f}, glm::vec3{25.0f});
-    mesh_list.emplace_back(MeshDescriptor{house_obj_path, house_transform, glm::vec3{0.5f, 0.4f, 0.3f}, false});
+    auto cow_transform = math::translation(-1.5f, -5.0f, 0.0f) *
+                         math::rotation(make_float3(0.0f, 1.0f, 0.0f), math::radians(40.0f)) *
+                         math::scaling(25.0f);
+    mesh_list.emplace_back(MeshDescriptor{house_obj_path, cow_transform, glm::vec3{0.5f, 0.4f, 0.3f}, false});
     
     auto sphere_obj_path = ResourceManager::instance().working_path("data/meshes/sphere/sphere.obj");
     auto sphere_transform = glm::translate(glm::mat4{1.0f}, glm::vec3{3.0f, -4.0f, 1.0f}) *
