@@ -1,0 +1,14 @@
+Film film : RGB {
+  size { 1280, 720 }
+  filter : MitchellNetravali {
+    radius { 2.0 }
+  }
+}
+
+Camera camera : ThinLens {
+  fov {  }
+}
+
+Shape geometry : TriangleMesh {
+
+}

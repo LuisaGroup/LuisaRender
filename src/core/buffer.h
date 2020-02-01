@@ -14,6 +14,27 @@ enum struct BufferStorage {
     MANAGED
 };
 
+class Buffer;
+
+template<typename T>
+class BufferView {
+
+private:
+    Buffer *_buffer;
+    size_t _element_offset;
+    size_t _element_count;
+
+public:
+    BufferView(Buffer *buffer, size_t element_offset, size_t element_count)
+        : _buffer{buffer}, _element_offset{element_offset}, _element_count{element_count} {}
+    
+    [[nodiscard]] size_t size() const noexcept { return _element_count * sizeof(T); }
+    [[nodiscard]] size_t offset() const noexcept { return _element_offset * sizeof(T); }
+    [[nodiscard]] size_t element_count() const noexcept { return _element_count; }
+    [[nodiscard]] size_t element_offset() const noexcept { return _element_offset; }
+    [[nodiscard]] Buffer &buffer() noexcept { return *_buffer; }
+};
+
 class Buffer : Noncopyable {
 
 protected:
@@ -30,6 +51,18 @@ public:
     [[nodiscard]] virtual const void *data() const { return const_cast<Buffer *>(this)->data(); }
     [[nodiscard]] virtual void *data() = 0;
     [[nodiscard]] virtual size_t capacity() const noexcept { return _capacity; }
+    
+    template<typename T>
+    [[nodiscard]] BufferView<T> view(size_t element_offset = 0ul) noexcept {
+        assert(_capacity % sizeof(T) == 0ul);
+        return {this, element_offset, _capacity / sizeof(T) - element_offset};
+    };
+    
+    template<typename T>
+    [[nodiscard]] BufferView<T> view(size_t element_offset, size_t element_count) noexcept {
+        assert((element_count + element_offset) * sizeof(T) <= _capacity);
+        return {this, element_offset, element_count};
+    }
 };
 
 }

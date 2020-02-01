@@ -49,6 +49,8 @@ LUISA_KERNEL void pinhole_camera_generate_rays(
         auto origin = make_float3(camera_data.aperture / camera_data.near_plane * concentric_sample_disk(halton(seed), halton(seed)), 0.0f);
         auto d = focal_plane_p - origin;
         
+//        auto camera_position = make_float3(make_float2(camera_data.position), camera_data.position.z - 2.0f + 4.0f * halton(seed));
+        
         Ray ray{};
         ray.origin = origin.x * camera_data.left + origin.y * camera_data.up + origin.z * camera_data.front + camera_data.position;
         ray.direction = normalize(d.x * camera_data.left + d.y * camera_data.up + d.z * camera_data.front);
