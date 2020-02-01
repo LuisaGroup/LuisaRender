@@ -349,3 +349,19 @@ using Atomic = typename _impl::BuiltinAtomicTypeImpl<T>::Type;
 #define luisa_atomic_fetch_or(a, val)   luisa::_impl::atomic_fetch_or_explicit(&a, val, luisa::_impl::memory_order_relaxed)
 
 #endif
+
+namespace luisa {
+
+struct AtomicCounter {
+    Atomic<uint> hi;
+    Atomic<uint> lo;
+};
+
+#define luisa_atomic_counter_increase(ac)                        \
+    do {                                                         \
+        if (luisa_atomic_fetch_add(ac.lo, 1u) == 0xffffffffu) {  \
+            luisa_atomic_fetch_add(ac.hi, 1u);                   \
+        }                                                        \
+    } while (false)
+
+}

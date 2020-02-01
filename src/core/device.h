@@ -12,7 +12,6 @@
 #include <iostream>
 
 #include "kernel.h"
-#include "texture.h"
 #include "acceleration.h"
 
 #include <util/noncopyable.h>
@@ -37,14 +36,12 @@ public:
     }
     
     [[nodiscard]] virtual std::unique_ptr<Kernel> create_kernel(std::string_view function_name) = 0;
-    [[nodiscard]] virtual std::unique_ptr<Texture> create_texture(uint2 size, TextureFormatTag format_tag, TextureAccessTag access_tag) = 0;
-    [[nodiscard]] virtual std::unique_ptr<Buffer> create_buffer(size_t capacity, BufferStorage storage) = 0;
+    [[nodiscard]] virtual std::unique_ptr<Buffer> allocate_buffer(size_t capacity, BufferStorage storage) = 0;
     [[nodiscard]] virtual std::unique_ptr<Acceleration> create_acceleration(Buffer &position_buffer, size_t stride, size_t triangle_count) = 0;
     
-    static void print() {
-        for (auto &&creator : _device_creators) {
-            std::cout << creator.first << std::endl;
-        }
+    template<typename T>
+    [[nodiscard]] std::unique_ptr<Buffer> create_buffer(size_t element_count, BufferStorage buffer_storage) {
+        return allocate_buffer(element_count * sizeof(T), buffer_storage);
     }
     
     virtual void launch(std::function<void(KernelDispatcher &)> dispatch) = 0;

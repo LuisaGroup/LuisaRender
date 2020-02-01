@@ -26,6 +26,7 @@ struct Acceleration : Noncopyable {
                                Buffer &intersection_buffer,
                                Buffer &ray_count_buffer,
                                size_t ray_count_buffer_offset) = 0;
+    
 };
 
 }

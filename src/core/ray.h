@@ -20,7 +20,7 @@ enum struct RayState : uint8_t {
     GENERATED,
     TRACED,
     SHADED,
-    FINISHED
+    INVALIDATED
 };
 
 }
@@ -56,7 +56,7 @@ public:
     template<typename T>
     void add_attribute_buffer(const std::string &name) {
         assert(_attribute_buffers.count(name) == 0ul);
-        _attribute_buffers.emplace(name, _device->create_buffer(_capacity * sizeof(T), BufferStorage::DEVICE_PRIVATE));
+        _attribute_buffers.emplace(name, _device->create_buffer<T>(_capacity, BufferStorage::DEVICE_PRIVATE));
     }
     
     Buffer &attribute_buffer(const std::string &name) {

@@ -28,8 +28,8 @@ public:
     BufferView(Buffer *buffer, size_t element_offset, size_t element_count)
         : _buffer{buffer}, _element_offset{element_offset}, _element_count{element_count} {}
     
-    [[nodiscard]] size_t size() const noexcept { return _element_count * sizeof(T); }
-    [[nodiscard]] size_t offset() const noexcept { return _element_offset * sizeof(T); }
+    [[nodiscard]] size_t byte_size() const noexcept { return _element_count * sizeof(T); }
+    [[nodiscard]] size_t byte_offset() const noexcept { return _element_offset * sizeof(T); }
     [[nodiscard]] size_t element_count() const noexcept { return _element_count; }
     [[nodiscard]] size_t element_offset() const noexcept { return _element_offset; }
     [[nodiscard]] Buffer &buffer() noexcept { return *_buffer; }
@@ -53,15 +53,15 @@ public:
     [[nodiscard]] virtual size_t capacity() const noexcept { return _capacity; }
     
     template<typename T>
-    [[nodiscard]] BufferView<T> view(size_t element_offset = 0ul) noexcept {
+    [[nodiscard]] auto view(size_t element_offset = 0ul) noexcept {
         assert(_capacity % sizeof(T) == 0ul);
-        return {this, element_offset, _capacity / sizeof(T) - element_offset};
+        return BufferView<T>{this, element_offset, _capacity / sizeof(T) - element_offset};
     };
     
     template<typename T>
     [[nodiscard]] BufferView<T> view(size_t element_offset, size_t element_count) noexcept {
         assert((element_count + element_offset) * sizeof(T) <= _capacity);
-        return {this, element_offset, element_count};
+        return BufferView<T>{this, element_offset, element_count};
     }
 };
 

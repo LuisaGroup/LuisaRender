@@ -3,11 +3,11 @@
 //
 
 #include "compatibility.h"
+
 #include <core/data_types.h>
+#include <core/ray.h>
 
 #include <random.h>
-#include <frame_data.h>
-#include <ray_data.h>
 #include <intersection_data.h>
 #include <material_data.h>
 #include <light_data.h>
@@ -18,27 +18,30 @@
 using namespace luisa;
 using namespace luisa::math;
 
-#define queue_emplace(queue, queue_size, element)  static_cast<void>(queue[luisa_atomic_fetch_add(*queue_size, 1u)] = element)
+#define queue_emplace(queue, queue_size, element)  static_cast<void>(queue[luisa_atomic_fetch_add(queue_size, 1u)] = element)
 
-struct PathTracingUpdateRayStatesKernelUniforms {
-    uint2 frame_size;
-    uint spp;
-    uint ray_pool_size;
-};
+LUISA_KERNEL void path_tracing_clear_ray_queue_sizes(
+    LUISA_DEVICE_SPACE uint *queue_sizes,
+    LUISA_PRIVATE_SPACE uint &ray_queue_count,
+    uint2 tid [[thread_position_in_grid]]) {
+    
+    if (tid.x < ray_queue_count) {
+        queue_sizes[tid.x] = 0u;
+    }
+}
 
-LUISA_KERNEL void update_ray_states(
+LUISA_KERNEL void path_tracing_update_ray_states(
     LUISA_DEVICE_SPACE RayState *ray_state_buffer,
-    LUISA_DEVICE_SPACE SamplerState *ray_sampler_state_buffer,
-    LUISA_DEVICE_SPACE const float3 *ray_throughput_buffer,
+    LUISA_DEVICE_SPACE const bool *ray_done_buffer,
     LUISA_DEVICE_SPACE uint *camera_queue,
-    LUISA_DEVICE_SPACE Atomic<uint> *camera_queue_size,
-    LUISA_DEVICE_SPACE uint *trace_closest_queue,
-    LUISA_DEVICE_SPACE Atomic<uint> *trace_closest_queue_size,
+    LUISA_DEVICE_SPACE Atomic<uint> &camera_queue_size,
+    LUISA_DEVICE_SPACE uint *tracing_queue,
+    LUISA_DEVICE_SPACE Atomic<uint> &tracing_queue_size,
     LUISA_DEVICE_SPACE uint *gather_queue,
-    LUISA_DEVICE_SPACE Atomic<uint> *gather_queue_size,
+    LUISA_DEVICE_SPACE Atomic<uint> &gather_queue_size,
     LUISA_DEVICE_SPACE uint *shading_queues,
-    LUISA_DEVICE_SPACE Atomic<uint> *shading_queue_size,
-    LUISA_DEVICE_SPACE Atomic<uint> *finished_ray_count,
+    LUISA_DEVICE_SPACE Atomic<uint> &shading_queue_size,
+    LUISA_DEVICE_SPACE AtomicCounter &global_pixel_sample_count,
     LUISA_PRIVATE_SPACE uint &ray_pool_size,
     uint2 tid [[thread_position_in_grid]]) {
     
@@ -46,16 +49,16 @@ LUISA_KERNEL void update_ray_states(
     if (index < ray_pool_size) {
         switch (ray_state_buffer[index]) {
             case RayState::UNINITIALIZED: {
+                luisa_atomic_counter_increase(global_pixel_sample_count);
                 queue_emplace(camera_queue, camera_queue_size, index);
                 ray_state_buffer[index] = RayState::GENERATED;
                 break;
             }
             case RayState::GENERATED: {
-                if (all_zero(ray_throughput_buffer[index])) {  // no more rays can be generated...
-                    luisa_atomic_fetch_add(*finished_ray_count, 1u);
-                    ray_state_buffer[index] = RayState::FINISHED;
+                if (ray_done_buffer[index]) {  // no more rays can be generated... TODO: smarter criteria
+                    ray_state_buffer[index] = RayState::INVALIDATED;
                 } else {
-                    queue_emplace(trace_closest_queue, trace_closest_queue_size, index);
+                    queue_emplace(tracing_queue, tracing_queue_size, index);
                     ray_state_buffer[index] = RayState::TRACED;
                 }
                 break;
@@ -66,18 +69,18 @@ LUISA_KERNEL void update_ray_states(
                 break;
             }
             case RayState::SHADED: {
-                if (all_zero(ray_throughput_buffer[index])) {  // finished
-                
+                if (ray_done_buffer[index]) {
+                    queue_emplace(gather_queue, gather_queue_size, index);
+                    ray_state_buffer[index] = RayState::UNINITIALIZED;
                 } else {
-                
+                    queue_emplace(tracing_queue, tracing_queue_size, index);
+                    ray_state_buffer[index] = RayState::TRACED;
                 }
-                // RR
             }
-            case RayState::FINISHED:
+            case RayState::INVALIDATED:
                 break;
         }
     }
-    
 }
 
 LUISA_KERNEL void sample_lights(

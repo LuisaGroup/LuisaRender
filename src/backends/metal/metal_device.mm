@@ -4,14 +4,14 @@
 
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
 
+#import <core/ray.h>
+
 #import <util/resource_manager.h>
 #import <util/string_manipulation.h>
-#import <ray_data.h>
 
 #import "metal_device.h"
 #import "metal_buffer.h"
 #import "metal_kernel.h"
-#import "metal_texture.h"
 #import "metal_acceleration.h"
 
 namespace luisa::metal {
@@ -109,50 +109,12 @@ std::unique_ptr<Acceleration> MetalDevice::create_acceleration(Buffer &position_
     return std::make_unique<MetalAcceleration>(accelerator, ray_intersector, shadow_ray_intersector);
 }
 
-std::unique_ptr<Buffer> MetalDevice::create_buffer(size_t capacity, BufferStorage storage) {
+std::unique_ptr<Buffer> MetalDevice::allocate_buffer(size_t capacity, BufferStorage storage) {
     
     auto buffer = [_device_wrapper->device newBufferWithLength:capacity
                                                        options:storage == BufferStorage::DEVICE_PRIVATE ? MTLResourceStorageModePrivate : MTLResourceStorageModeManaged];
     [buffer autorelease];
     return std::make_unique<MetalBuffer>(buffer, capacity, storage);
-}
-
-std::unique_ptr<Texture> MetalDevice::create_texture(uint2 size, TextureFormatTag format_tag, TextureAccessTag access_tag) {
-    
-    auto descriptor = [[MTLTextureDescriptor alloc] init];
-    [descriptor autorelease];
-    
-    switch (format_tag) {
-        case TextureFormatTag::RGBA32F:
-            descriptor.pixelFormat = MTLPixelFormatRGBA32Float;
-            break;
-        case TextureFormatTag::GRAYSCALE32F:
-            descriptor.pixelFormat = MTLPixelFormatR32Float;
-            break;
-    }
-    
-    descriptor.textureType = MTLTextureType2D;
-    descriptor.width = size.x;
-    descriptor.height = size.y;
-    descriptor.storageMode = MTLStorageModePrivate;
-    descriptor.allowGPUOptimizedContents = true;
-    
-    switch (access_tag) {
-        case TextureAccessTag::READ_ONLY:
-            descriptor.usage = MTLTextureUsageShaderRead;
-            break;
-        case TextureAccessTag::WRITE_ONLY:
-            descriptor.usage = MTLTextureUsageShaderWrite;
-            break;
-        case TextureAccessTag::READ_WRITE:
-            descriptor.usage = MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite;
-            break;
-    }
-    
-    auto texture = [_device_wrapper->device newTextureWithDescriptor:descriptor];
-    [texture autorelease];
-    
-    return std::make_unique<MetalTexture>(texture, size, format_tag, access_tag);
 }
 
 }

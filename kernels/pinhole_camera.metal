@@ -2,8 +2,8 @@
 
 #include <core/data_types.h>
 #include <core/mathematics.h>
+#include <core/ray.h>
 
-#include <ray_data.h>
 #include <camera_data.h>
 #include <frame_data.h>
 #include <random.h>
@@ -48,8 +48,6 @@ LUISA_KERNEL void pinhole_camera_generate_rays(
         auto focal_plane_p = make_float3((1.0f - px / w * 2.0f) * half_sensor_width, (1.0f - py / h * 2.0f) * half_sensor_height, camera_data.focal_distance);
         auto origin = make_float3(camera_data.aperture / camera_data.near_plane * concentric_sample_disk(halton(seed), halton(seed)), 0.0f);
         auto d = focal_plane_p - origin;
-        
-//        auto camera_position = make_float3(make_float2(camera_data.position), camera_data.position.z - 2.0f + 4.0f * halton(seed));
         
         Ray ray{};
         ray.origin = origin.x * camera_data.left + origin.y * camera_data.up + origin.z * camera_data.front + camera_data.position;
