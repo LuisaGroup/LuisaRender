@@ -14,7 +14,7 @@ namespace luisa {
 
 using namespace simd;
 
-namespace math {
+inline namespace math {
 
 using namespace metal;
 
@@ -45,7 +45,7 @@ using namespace metal;
 #define noexcept
 
 #define LUISA_CONSTANT_SPACE  constant
-#define LUISA_PRIVATE_SPACE   constant
+#define LUISA_UNIFORM_SPACE   constant
 #define LUISA_THREAD_SPACE    thread
 #define LUISA_DEVICE_SPACE    device
 

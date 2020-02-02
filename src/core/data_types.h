@@ -8,7 +8,7 @@
 
 // address spaces, ineffective on host
 #define LUISA_CONSTANT_SPACE
-#define LUISA_PRIVATE_SPACE
+#define LUISA_UNIFORM_SPACE
 #define LUISA_THREAD_SPACE
 #define LUISA_DEVICE_SPACE
 
@@ -57,8 +57,8 @@ inline DestT as(SrcT s) noexcept {
 #error Marco LUISA_CONSTANT_SPACE not defined.
 #endif
 
-#ifndef LUISA_PRIVATE_SPACE
-#error Marco LUISA_PRIVATE_SPACE not defined.
+#ifndef LUISA_UNIFORM_SPACE
+#error Marco LUISA_UNIFORM_SPACE not defined.
 #endif
 
 #ifndef LUISA_THREAD_SPACE

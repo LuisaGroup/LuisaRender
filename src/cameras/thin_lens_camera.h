@@ -6,9 +6,21 @@
 
 #include <core/data_types.h>
 
-struct ThinLensCameraParameters {
+namespace luisa {
 
+struct ThinLensCameraGenerateRaysKernelUniforms {
+    float3 position;
+    float3 axis_x;
+    float3 axis_y;
+    float3 axis_z;
+    float2 frame_size;
+    float2 sensor_size;
+    float near_plane;
+    float focal_plane;
+    float lens_radius;
 };
+
+}
 
 #ifndef LUISA_DEVICE_COMPATIBLE
 
@@ -20,7 +32,6 @@ class ThinLensCamera : public Camera {
 
 private:
     float _fov;
-    Device *_device;
 
 public:
 

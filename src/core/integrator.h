@@ -3,3 +3,16 @@
 //
 
 #pragma once
+
+#include "data_types.h"
+#include "node.h"
+
+namespace luisa {
+
+class Integrator : public Node {
+
+
+
+};
+
+}

@@ -2,15 +2,14 @@
 
 #include <core/data_types.h>
 #include <core/mathematics.h>
+#include <core/sampling.h>
 #include <core/ray.h>
 
 #include <camera_data.h>
 #include <frame_data.h>
 #include <random.h>
-#include <sampling.h>
 
 using namespace luisa;
-using namespace luisa::math;
 
 LUISA_KERNEL void pinhole_camera_generate_rays(
     LUISA_DEVICE_SPACE uint *ray_index_buffer,
@@ -22,8 +21,8 @@ LUISA_KERNEL void pinhole_camera_generate_rays(
     LUISA_DEVICE_SPACE uint *ray_depth_buffer,
     LUISA_DEVICE_SPACE float2 *ray_pixel_buffer,
     LUISA_DEVICE_SPACE float *ray_pdf_buffer,
-    LUISA_PRIVATE_SPACE CameraData &camera_data,
-    LUISA_PRIVATE_SPACE FrameData &frame_data,
+    LUISA_UNIFORM_SPACE CameraData &camera_data,
+    LUISA_UNIFORM_SPACE FrameData &frame_data,
     uint2 tid [[thread_position_in_grid]]) {
     
     auto w = frame_data.size.x;

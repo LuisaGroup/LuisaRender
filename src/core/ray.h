@@ -15,6 +15,10 @@ struct Ray {
     float max_distance;
 };
 
+LUISA_DEVICE_CALLABLE inline auto make_ray(float3 o, float3 d, float t_min = 1e-4f, float t_max = INFINITY) noexcept {
+    return Ray{make_packed_float3(o), t_min, make_packed_float3(d), t_max};
+}
+
 enum struct RayState : uint8_t {
     UNINITIALIZED,
     GENERATED,

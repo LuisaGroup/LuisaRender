@@ -7,12 +7,13 @@
 #include "data_types.h"
 #include "device.h"
 #include "ray.h"
+#include "node.h"
 
 namespace luisa {
 
-class Film {
+class Film : public Node {
 
-private:
+protected:
     uint2 _size;
 
 public:

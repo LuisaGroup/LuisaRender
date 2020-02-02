@@ -12,7 +12,6 @@
 #include <frame_data.h>
 
 using namespace luisa;
-using namespace luisa::math;
 
 inline float Mitchell1D(float x) {
     constexpr auto B = 1.0f / 3.0f;
@@ -28,7 +27,7 @@ inline float Mitchell1D(float x) {
 
 LUISA_KERNEL void rgb_film_clear(
     LUISA_DEVICE_SPACE int4 *accum_buffer,
-    LUISA_PRIVATE_SPACE uint &ray_count,
+    LUISA_UNIFORM_SPACE uint &ray_count,
     uint2 tid [[thread_position_in_grid]]) {
     
     if (tid.x < ray_count) {
@@ -40,8 +39,8 @@ LUISA_KERNEL void rgb_film_clear(
 LUISA_KERNEL void rgb_film_gather_rays(
     LUISA_DEVICE_SPACE const float2 *ray_pixel_buffer,
     LUISA_DEVICE_SPACE const float3 *ray_radiance_buffer,
-    LUISA_PRIVATE_SPACE float &filter_radius,
-    LUISA_PRIVATE_SPACE FrameData &frame_data,
+    LUISA_UNIFORM_SPACE float &filter_radius,
+    LUISA_UNIFORM_SPACE FrameData &frame_data,
     LUISA_DEVICE_SPACE Atomic<int> *accum_buffer,
     uint2 tid [[thread_position_in_grid]]) {
     
@@ -76,7 +75,7 @@ LUISA_KERNEL void rgb_film_gather_rays(
 }
 
 LUISA_KERNEL void rgb_film_convert_colorspace(
-    LUISA_PRIVATE_SPACE FrameData &frame_data,
+    LUISA_UNIFORM_SPACE FrameData &frame_data,
     LUISA_DEVICE_SPACE const int4 *accum_buffer,
     LUISA_DEVICE_SPACE packed_float3 *result_buffer,
     uint2 tid [[thread_position_in_grid]]) {

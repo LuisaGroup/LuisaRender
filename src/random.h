@@ -38,7 +38,7 @@ LUISA_CONSTANT_SPACE unsigned int primes[256] = {
     1427, 1429, 1433, 1439, 1447, 1451, 1453, 1459, 1471, 1481, 1483, 1487, 1489, 1493, 1499, 1511,
     1523, 1531, 1543, 1549, 1553, 1559, 1567, 1571, 1579, 1583, 1597, 1601, 1607, 1609, 1613, 1619};
 
-LUISA_DEVICE_CALLABLE inline float halton(LUISA_THREAD_SPACE uint &seed) {
+LUISA_DEVICE_CALLABLE static float halton(LUISA_THREAD_SPACE uint &seed) {
     
     auto b = primes[seed & 0xffu];
     auto f = 1.0f;
