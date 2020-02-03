@@ -7,7 +7,7 @@
 #include <core/data_types.h>
 #include <core/mathematics.h>
 
-namespace luisa {
+namespace luisa { inline namespace sampling {
 
 LUISA_DEVICE_CALLABLE inline float3 cosine_sample_hemisphere(float u1, float u2) {
     using namespace math;
@@ -38,4 +38,4 @@ LUISA_DEVICE_CALLABLE inline float2 concentric_sample_disk(float r1, float r2) {
     return make_float2(r * cos(theta), r * sin(theta));
 }
 
-}
+}}

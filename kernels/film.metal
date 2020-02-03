@@ -6,7 +6,6 @@
 
 #include <core/data_types.h>
 #include <core/mathematics.h>
-#include <core/prime_numbers.h>
 
 #include <color_spaces.h>
 #include <frame_data.h>

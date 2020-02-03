@@ -13,12 +13,19 @@
 
 #include <core/data_types.h>
 #include <core/mathematics.h>
+#include <core/camera.h>
+#include <core/parser.h>
+
+#include <cameras/thin_lens_camera.h>
 
 #include <glm/glm.hpp>
 
 using namespace luisa;
 
 int main(int argc, char *argv[]) {
+    
+    ParameterSet p;
+    p.parse_node<Camera>("");
     
     luisa::float3 v;
     v = luisa::math::cos(v);

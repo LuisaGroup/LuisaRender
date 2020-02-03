@@ -48,10 +48,24 @@ struct Kernel : Noncopyable {
 };
 
 struct KernelDispatcher : Noncopyable {
+    
     virtual ~KernelDispatcher() noexcept = default;
+    
     virtual void operator()(Kernel &kernel, uint2 threadgroups, uint2 threadgroup_size, std::function<void(KernelArgumentEncoder &)> encode) = 0;
     virtual void operator()(Kernel &kernel, uint threadgroups, uint threadgroup_size, std::function<void(KernelArgumentEncoder &)> encode) {
         (*this)(kernel, {threadgroups, 1u}, {threadgroup_size, 1u}, std::move(encode));
+    }
+    
+    void operator()(Kernel &kernel, uint2 extent, std::function<void(KernelArgumentEncoder &)> encode) {
+        auto threadgroup_size = make_uint2(16u, 16u);
+        auto threadgroups = (extent + threadgroup_size - make_uint2(1u)) / threadgroup_size;
+        (*this)(kernel, threadgroups, threadgroup_size, std::move(encode));
+    }
+    
+    void operator()(Kernel &kernel, uint extent, std::function<void(KernelArgumentEncoder &)> encode) {
+        auto threadgroup_size = 128u;
+        auto threadgroups = (extent + threadgroup_size - 1u) / threadgroup_size;
+        (*this)(kernel, threadgroups, threadgroup_size, std::move(encode));
     }
 };
 

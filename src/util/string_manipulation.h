@@ -4,13 +4,24 @@
 
 #pragma once
 
+#include <string>
+#include <string_view>
+#include <sstream>
+
+namespace luisa { inline namespace utility {
+
+template<typename ...Args>
+inline std::string serialize(Args &&...args) noexcept {
+    std::ostringstream ss;
+    static_cast<void>((ss << ... << std::forward<Args>(args)));
+    return ss.str();
+}
+
+}}
+
 #ifdef __OBJC__
 
-#import <string>
-#import <string_view>
-#import <Foundation/Foundation.h>
-
-namespace luisa {
+namespace luisa { inline namespace utility {
 
 [[nodiscard]] inline NSString *make_objc_string(const char *s) noexcept {
     return [[[NSString alloc] initWithCString:s encoding:NSUTF8StringEncoding] autorelease];
@@ -28,6 +39,6 @@ namespace luisa {
     return {s.UTF8String, s.length};
 }
 
-}
+}}
 
 #endif

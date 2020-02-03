@@ -8,7 +8,7 @@
 
 #include "noncopyable.h"
 
-namespace luisa {
+namespace luisa { inline namespace utility {
 
 class ResourceManager : Noncopyable {
 
@@ -40,4 +40,4 @@ public:
     
 };
 
-}
+}}

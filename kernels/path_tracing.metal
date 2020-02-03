@@ -15,10 +15,10 @@ using namespace luisa;
 
 LUISA_KERNEL void path_tracing_clear_ray_queues(
     LUISA_DEVICE_SPACE uint *queue_sizes,
-    LUISA_UNIFORM_SPACE PathTracingClearRayQueuesKernelUniforms &uniforms,
+    LUISA_UNIFORM_SPACE uint &ray_queue_count,
     uint2 tid [[thread_position_in_grid]]) {
     
-    if (tid.x < uniforms.ray_queue_count) {
+    if (tid.x < ray_queue_count) {
         queue_sizes[tid.x] = 0u;
     }
 }
@@ -38,13 +38,13 @@ LUISA_KERNEL void path_tracing_generate_pixel_samples(
     if (tid.x < ray_queue_size) {
         
         auto global_sample_index = make_u64(global_pixel_sample_count) - ray_queue_size + tid.x;
-        auto pixel_sample_index = static_cast<uint>(global_sample_index % uniforms.spp);
-        auto pixel_id = static_cast<uint>(global_sample_index / uniforms.spp);
-        auto pixel_x = pixel_id % uniforms.frame_size.x;
-        auto pixel_y = pixel_id / uniforms.frame_size.y;
+        auto pixel_sample_index = static_cast<uint>(global_sample_index % uniforms.samples_per_pixel);
+        auto pixel_id = static_cast<uint>(global_sample_index / uniforms.samples_per_pixel);
+        auto pixel_x = pixel_id % uniforms.film_resolution.x;
+        auto pixel_y = pixel_id / uniforms.film_resolution.y;
         
         auto ray_index = ray_queue[tid.x];
-        if (pixel_y < uniforms.frame_size.y) {
+        if (pixel_y < uniforms.film_resolution.y) {
             auto sampler_state = (tea<5>(pixel_x, pixel_y) + pixel_sample_index) << 8u;
             auto px = pixel_x + sampler_generate_sample(sampler_state);
             auto py = pixel_y + sampler_generate_sample(sampler_state);
@@ -103,11 +103,11 @@ LUISA_KERNEL void path_tracing_update_ray_states(
     LUISA_DEVICE_SPACE uint *shading_queues,
     LUISA_DEVICE_SPACE Atomic<uint> &shading_queue_size,
     LUISA_DEVICE_SPACE AtomicCounter &global_pixel_sample_count,
-    LUISA_UNIFORM_SPACE PathTracingUpdateRayStatesKernelUniforms &uniforms,
+    LUISA_UNIFORM_SPACE uint &ray_pool_size,
     uint2 tid [[thread_position_in_grid]]) {
     
     auto index = tid.x;
-    if (index < uniforms.ray_pool_size) {
+    if (index < ray_pool_size) {
         switch (ray_state_buffer[index]) {
             case RayState::UNINITIALIZED: {
                 luisa_atomic_counter_increase(global_pixel_sample_count);

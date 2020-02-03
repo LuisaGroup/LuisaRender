@@ -8,17 +8,9 @@
 
 namespace luisa {
 
-struct PathTracingClearRayQueuesKernelUniforms {
-    uint ray_queue_count;
-};
-
 struct PathTracingGeneratePixelSamplesKernelUniforms {
-    uint2 frame_size;
-    uint spp;
-};
-
-struct PathTracingUpdateRayStatesKernelUniforms {
-    uint ray_pool_size;
+    uint2 film_resolution;
+    uint samples_per_pixel;
 };
 
 }
@@ -27,8 +19,12 @@ struct PathTracingUpdateRayStatesKernelUniforms {
 
 #include <core/integrator.h>
 
-class PathTracing {
+namespace luisa {
+
+class PathTracing : public Integrator {
 
 };
+
+}
 
 #endif
