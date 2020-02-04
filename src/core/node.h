@@ -21,9 +21,7 @@ namespace luisa {
 class ParameterSet;
 
 template<typename BaseClass>
-using NodeCreator = std::function<
-std::unique_ptr<BaseClass>(Device
-*, const ParameterSet &)>;
+using NodeCreator = std::function<std::unique_ptr<BaseClass>(Device*, const ParameterSet &)>;
 
 template<typename BaseClass>
 class NodeCreatorRegistry {

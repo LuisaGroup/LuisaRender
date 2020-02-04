@@ -54,7 +54,7 @@ std::string_view Parser::_peek() {
             _peeked = _remaining.substr(0, 1);
             _remaining = _remaining.substr(1);
             _next_col++;
-        } else if (_remaining.front() == '_' || std::isalpha(_remaining.front())) {  // Keywords or identifiers
+        } else if (_remaining.front() == '_' || _remaining.front() == '$' || std::isalpha(_remaining.front())) {  // Keywords or identifiers
             auto i = 1ul;
             for (; i < _remaining.size() && (_remaining[i] == '_' || std::isalnum(_remaining[i])); i++) {}
             _peeked = _remaining.substr(0, i);
@@ -75,6 +75,8 @@ std::string_view Parser::_peek() {
             LUISA_ERROR_IF(i >= _remaining.size() || _remaining[i] != '"', "expected '\"' at (", _next_line, ", ", _next_col, ")");
             _peeked = _remaining.substr(0, i + 1);
             _remaining = _remaining.substr(i + 1);
+        } else {
+            LUISA_ERROR("invalid character: ", _remaining.front());
         }
     }
     return _peeked;
@@ -105,6 +107,7 @@ std::vector<std::shared_ptr<Task>> Parser::_parse_top_level() {
 #define LUISA_PARSER_PARSE_GLOBAL_NODE(Type)                                                                                                                    \
     if (token == #Type) {                                                                                                                                       \
         auto node_name = _peek_and_pop();                                                                                                                       \
+        LUISA_ERROR_IF_NOT(_is_identifier(node_name), "invalid identifier: ", node_name);                                                                       \
         LUISA_WARNING_IF_NOT(_global_nodes.find(node_name) == _global_nodes.end(), "duplicated global node, overwriting the one defined before: ", node_name);  \
         _global_nodes.emplace(node_name, _parse_parameter_set()->parse<Type>());                                                                                \
         continue;                                                                                                                                               \
@@ -155,6 +158,7 @@ std::unique_ptr<ParameterSet> Parser::_parse_parameter_set() {
         std::map<std::string_view, std::unique_ptr<ParameterSet>> parameters;
         while (_peek() != "}") {
             auto parameter_name = _peek_and_pop();
+            LUISA_ERROR_IF_NOT(_is_identifier(parameter_name), "invalid identifier: ", parameter_name);
             LUISA_WARNING_IF_NOT(parameters.find(parameter_name) == parameters.end(), "duplicated parameter: ", parameter_name);
             parameters.emplace(parameter_name, _parse_parameter_set());
         }
@@ -185,6 +189,13 @@ std::string_view Parser::_peek_and_pop() {
 void Parser::_match_and_pop(std::string_view token) {
     _match(token);
     _pop();
+}
+
+bool Parser::_is_identifier(std::string_view sv) noexcept {
+    if (sv.empty()) { return false; }
+    if (sv.front() != '_' && sv.front() != '$' && !std::isalpha(sv.front())) { return false; }
+    sv = sv.substr(1);
+    return std::all_of(sv.cbegin(), sv.cend(), [](char c) noexcept { return c == '_' || c == '$' || std::isalnum(c); });
 }
 
 }

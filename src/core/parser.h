@@ -344,6 +344,7 @@ private:
     void _pop();
     void _match(std::string_view token);
     void _match_and_pop(std::string_view token);
+    [[nodiscard]] static bool _is_identifier(std::string_view sv) noexcept;
     [[nodiscard]] std::string_view _peek();
     [[nodiscard]] std::string_view _peek_and_pop();
     [[nodiscard]] std::vector<std::shared_ptr<Task>> _parse_top_level();
