@@ -44,19 +44,20 @@ public:
     }
 };
 
-#define MAKE_BASE_NODE_CLASS_MATCHER(BaseClass)  \
-    class BaseClass;  \
+#define LUISA_MAKE_BASE_NODE_CLASS_MATCHER(BaseClass)                                                                                                       \
+    class BaseClass;                                                                                                                                        \
     namespace _impl { template<typename T, std::enable_if_t<std::is_base_of_v<BaseClass, T>, int> = 0> auto base_node_class_impl(T &&) -> BaseClass * {} }
 
-MAKE_BASE_NODE_CLASS_MATCHER(Filter)
-MAKE_BASE_NODE_CLASS_MATCHER(Film)
-MAKE_BASE_NODE_CLASS_MATCHER(Camera)
-MAKE_BASE_NODE_CLASS_MATCHER(Geometry)
-MAKE_BASE_NODE_CLASS_MATCHER(Light)
-MAKE_BASE_NODE_CLASS_MATCHER(Material)
-MAKE_BASE_NODE_CLASS_MATCHER(Integrator)
+LUISA_MAKE_BASE_NODE_CLASS_MATCHER(Filter)
+LUISA_MAKE_BASE_NODE_CLASS_MATCHER(Film)
+LUISA_MAKE_BASE_NODE_CLASS_MATCHER(Camera)
+LUISA_MAKE_BASE_NODE_CLASS_MATCHER(Geometry)
+LUISA_MAKE_BASE_NODE_CLASS_MATCHER(Light)
+LUISA_MAKE_BASE_NODE_CLASS_MATCHER(Material)
+LUISA_MAKE_BASE_NODE_CLASS_MATCHER(Integrator)
+LUISA_MAKE_BASE_NODE_CLASS_MATCHER(Task)
 
-#undef MAKE_BASE_NODE_CLASS_MATCHER
+#undef LUISA_MAKE_BASE_NODE_CLASS_MATCHER
 
 namespace _impl {
 

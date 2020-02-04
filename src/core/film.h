@@ -14,6 +14,9 @@ namespace luisa {
 
 class Film : public Node {
 
+private:
+    LUISA_MAKE_NODE_CREATOR_REGISTRY(Film);
+
 protected:
     uint2 _resolution;
     std::unique_ptr<Buffer> _accumulation_buffer;

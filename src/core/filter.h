@@ -15,6 +15,9 @@ class Film;
 
 class Filter : public Node {
 
+private:
+    LUISA_MAKE_NODE_CREATOR_REGISTRY(Filter);
+
 protected:
     float _radius;
 

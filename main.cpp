@@ -24,8 +24,8 @@ using namespace luisa;
 
 int main(int argc, char *argv[]) {
     
-    ParameterSet p;
-    p.parse_node<Camera>("");
+    std::unique_ptr<ParameterSet> p;
+    p->parse_child<Camera>("");
     
     luisa::float3 v;
     v = luisa::math::cos(v);

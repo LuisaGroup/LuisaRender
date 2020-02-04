@@ -7,6 +7,8 @@
 #include <string>
 #include <string_view>
 #include <sstream>
+#include <fstream>
+#include <filesystem>
 
 namespace luisa { inline namespace utility {
 
@@ -16,6 +18,8 @@ inline std::string serialize(Args &&...args) noexcept {
     static_cast<void>((ss << ... << std::forward<Args>(args)));
     return ss.str();
 }
+
+std::string text_file_contents(const std::filesystem::path &file_path);
 
 }}
 
