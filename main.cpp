@@ -24,12 +24,6 @@ using namespace luisa;
 
 int main(int argc, char *argv[]) {
     
-    std::unique_ptr<ParameterSet> p;
-    p->parse_child<Camera>("");
-    
-    luisa::float3 v;
-    v = luisa::math::cos(v);
-    
     ResourceManager::instance().set_working_directory(std::filesystem::current_path());
     ResourceManager::instance().set_binary_directory(std::filesystem::absolute(argv[0]).parent_path());
     

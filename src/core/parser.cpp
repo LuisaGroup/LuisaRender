@@ -170,10 +170,22 @@ std::unique_ptr<ParameterSet> Parser::_parse_parameter_set() {
     std::vector<std::string_view> value_list;
     _match_and_pop("{");
     if (_peek() != "}") {
-        value_list.emplace_back(_peek_and_pop());
-        while (_peek() != "}") {
-            _match_and_pop(",");
+        if (_peek() == "@") {  // references
+            _pop();  // pop "@"
+            LUISA_ERROR_IF_NOT(_is_identifier(_peek()), "invalid reference: ", _peek());
             value_list.emplace_back(_peek_and_pop());
+            while (_peek() != "}") {
+                _match_and_pop(",");
+                _match_and_pop("@");
+                LUISA_ERROR_IF_NOT(_is_identifier(_peek()), "invalid reference: ", _peek());
+                value_list.emplace_back(_peek_and_pop());
+            }
+        } else {  // values
+            value_list.emplace_back(_peek_and_pop());
+            while (_peek() != "}") {
+                _match_and_pop(",");
+                value_list.emplace_back(_peek_and_pop());
+            }
         }
     }
     _pop();  // pop "}"

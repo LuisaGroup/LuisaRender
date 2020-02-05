@@ -13,7 +13,7 @@ void MitchellNetravaliFilter::add_samples(KernelDispatcher &dispatch, RayPool &r
         encode("ray_queue", ray_queue.index_buffer);
         encode("ray_queue_size", ray_queue.size_buffer);
         encode("accumulation_buffer", film.accumulation_buffer());
-        encode("uniforms", MitchellNetravaliFilterAddSamplesKernelUniforms{film.resolution(), _a, _b, _c});
+        encode("uniforms", MitchellNetravaliFilterAddSamplesKernelUniforms{film.resolution(), _radius, _b, _c});
     });
 }
 

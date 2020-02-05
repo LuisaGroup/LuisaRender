@@ -8,6 +8,7 @@
 #include "node.h"
 #include "kernel.h"
 #include "ray.h"
+#include "parser.h"
 
 namespace luisa {
 
@@ -22,7 +23,8 @@ protected:
     float _radius;
 
 public:
-    Filter(Device *device, float radius) noexcept : Node{device}, _radius{radius} {}
+    Filter(Device *device, const ParameterSet &parameters)
+        : Node{device}, _radius{parameters["radius"].parse_float_or_default(1.0f)} {}
     virtual void add_samples(KernelDispatcher &dispatch, RayPool &ray_pool, RayQueueView ray_queue, Film &film) = 0;
     [[nodiscard]] float radius() const noexcept { return _radius; }
 };

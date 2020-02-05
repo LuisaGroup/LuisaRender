@@ -69,6 +69,12 @@ private:
         }
         return value;
     }
+    
+    [[nodiscard]] const ParameterSet &_child(std::string_view parameter_name) const {
+        auto iter = _parameters.find(parameter_name);
+        LUISA_ERROR_IF(iter == _parameters.cend(), "undefined parameter: ", parameter_name);
+        return *iter->second;
+    }
 
 public:
     ParameterSet(Parser *parser, std::vector<std::string_view> value_list) noexcept : _parser{parser}, _value_list{std::move(value_list)} {}
@@ -76,19 +82,10 @@ public:
     ParameterSet(Parser *parser, std::string_view derived_type_name, std::map<std::string_view, std::unique_ptr<ParameterSet>> params) noexcept
         : _parser{parser}, _derived_type_name{derived_type_name}, _parameters{std::move(params)} {}
     
+    [[nodiscard]] const ParameterSet &operator[](std::string_view parameter_name) const { return _child(parameter_name); }
+    
     template<typename BaseClass>
     [[nodiscard]] std::shared_ptr<BaseClass> parse() const;
-    
-    template<typename BaseClass>
-    [[nodiscard]] std::shared_ptr<BaseClass> parse_child(std::string_view parameter_name) const;
-    
-    template<typename BaseClass>
-    [[nodiscard]] std::shared_ptr<BaseClass> parse_child_or_default(std::string_view parameter_name, const std::shared_ptr<BaseClass> &default_node) const noexcept {
-        try { return parse_child<BaseClass>(parameter_name); } catch (const std::runtime_error &e) {
-            LUISA_WARNING("error occurred while parsing node: ", e.what(), ", using default");
-            return default_node;
-        }
-    }
     
     template<typename BaseClass>
     [[nodiscard]] std::vector<std::shared_ptr<BaseClass>> parse_reference_list() const;
@@ -357,7 +354,7 @@ public:
     [[nodiscard]] std::vector<std::shared_ptr<Task>> parse(const std::filesystem::path &file_path);
     
     template<typename T>
-    [[nodiscard]] const std::shared_ptr<T> &global_node(std::string_view node_name) const noexcept {
+    [[nodiscard]] std::shared_ptr<T> global_node(std::string_view node_name) const {
         if (auto iter = _global_nodes.find(node_name); iter != _global_nodes.end()) {
             if (auto p = std::dynamic_pointer_cast<T>(iter->second)) { return p; }
             LUISA_ERROR("incompatible type for node: ", node_name);
@@ -374,19 +371,9 @@ template<typename BaseClass>
 }
 
 template<typename BaseClass>
-std::shared_ptr<BaseClass> ParameterSet::parse_child(std::string_view parameter_name) const {
-    if (auto iter = _parameters.find(parameter_name); iter != _parameters.end()) {
-        return iter->second->parse<BaseClass>();
-    }
-    LUISA_ERROR("undefined parameter: ", parameter_name);
-}
-
-template<typename BaseClass>
 std::vector<std::shared_ptr<BaseClass>> ParameterSet::parse_reference_list() const {
     std::vector<std::shared_ptr<BaseClass>> node_list;
     for (auto sv : _value_list) {
-        LUISA_ERROR_IF(sv.empty() || sv.front() != '@', "invalid reference: ", sv);
-        do { sv = sv.substr(1); } while (!sv.empty() && std::isblank(sv.front()));
         node_list.emplace_back(_parser->global_node<BaseClass>(sv));
     }
     return node_list;

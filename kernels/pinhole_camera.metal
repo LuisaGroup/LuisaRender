@@ -7,7 +7,7 @@
 
 #include <camera_data.h>
 #include <frame_data.h>
-#include <random.h>
+#include <core/sampler.h>
 
 using namespace luisa;
 

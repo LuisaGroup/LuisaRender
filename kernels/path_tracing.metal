@@ -9,7 +9,7 @@
 
 #include <integrators/path_tracing.h>
 
-#include <random.h>
+#include <core/sampler.h>
 
 using namespace luisa;
 

@@ -4,13 +4,13 @@
 
 #pragma once
 
-#include <core/data_types.h>
-#include <core/mathematics.h>
+#include "data_types.h"
+#include "mathematics.h"
 
 namespace luisa {
 
 template<uint N>
-LUISA_DEVICE_CALLABLE inline unsigned int tea(uint v0, uint v1) {
+LUISA_DEVICE_CALLABLE inline uint tea(uint v0, uint v1) {
     auto s0 = 0u;
     for (auto n = 0u; n < N; n++) {
         s0 += 0x9e3779b9u;
@@ -20,7 +20,7 @@ LUISA_DEVICE_CALLABLE inline unsigned int tea(uint v0, uint v1) {
     return v0;
 }
 
-LUISA_CONSTANT_SPACE unsigned int primes[256] = {
+LUISA_CONSTANT_SPACE uint primes[256] = {
     2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53,
     59, 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131,
     137, 139, 149, 151, 157, 163, 167, 173, 179, 181, 191, 193, 197, 199, 211, 223,
@@ -38,7 +38,7 @@ LUISA_CONSTANT_SPACE unsigned int primes[256] = {
     1427, 1429, 1433, 1439, 1447, 1451, 1453, 1459, 1471, 1481, 1483, 1487, 1489, 1493, 1499, 1511,
     1523, 1531, 1543, 1549, 1553, 1559, 1567, 1571, 1579, 1583, 1597, 1601, 1607, 1609, 1613, 1619};
 
-LUISA_DEVICE_CALLABLE static float halton(LUISA_THREAD_SPACE uint &seed) {
+LUISA_DEVICE_CALLABLE inline float halton(LUISA_THREAD_SPACE uint &seed) {
     
     auto b = primes[seed & 0xffu];
     auto f = 1.0f;

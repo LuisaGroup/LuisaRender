@@ -8,6 +8,7 @@
 #include "device.h"
 #include "film.h"
 #include "node.h"
+#include "parser.h"
 
 namespace luisa {
 
@@ -20,10 +21,10 @@ protected:
     std::shared_ptr<Film> _film;
 
 public:
-    explicit Camera(Device *device, const ParameterSet &parameters) : Node{device} {}
-    explicit Camera(Device *device, std::shared_ptr<Film> film) : Node{device}, _film{std::move(film)} {}
+    explicit Camera(Device *device, const ParameterSet &parameters)
+        : Node{device}, _film{parameters["film"].parse<Film>()} {}
     virtual void update(float time[[maybe_unused]]) { /* doing nothing by default */ }
-    virtual void generate_rays(KernelDispatcher &dispatch, RayPool &ray_pool, RayQueueView ray_queue) = 0;
+    virtual void generate_rays(KernelDispatcher &dispatch, BufferView<Ray> ray_buffer, RayPool &ray_pool, RayQueueView ray_queue) = 0;
     [[nodiscard]] Film &film() { return *_film; }
 };
 

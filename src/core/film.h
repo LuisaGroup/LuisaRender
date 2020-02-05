@@ -9,6 +9,7 @@
 #include "ray.h"
 #include "node.h"
 #include "filter.h"
+#include "parser.h"
 
 namespace luisa {
 
@@ -19,21 +20,25 @@ private:
 
 protected:
     uint2 _resolution;
-    std::unique_ptr<Buffer> _accumulation_buffer;
     std::shared_ptr<Filter> _filter;
+    std::unique_ptr<Buffer> _accumulation_buffer;
     std::unique_ptr<Kernel> _clear_accumulation_buffer_kernel;
 
 public:
-    Film(Device *device, uint2 resolution, std::shared_ptr<Filter> filter)
-        : Node{device}, _resolution{resolution}, _filter{std::move(filter)} {
-        _accumulation_buffer = device->create_buffer<uint4>(resolution.x * resolution.y, BufferStorage::DEVICE_PRIVATE);
-        _clear_accumulation_buffer_kernel = device->create_kernel("film_clear_accumulation_kernel");
+    Film(Device *device, const ParameterSet &parameters)
+        : Node{device},
+          _resolution{parameters["resolution"].parse_uint2_or_default(make_uint2(1280, 720))},
+          _filter{parameters["filter"].parse<Filter>()} {
+        
+        _accumulation_buffer = device->create_buffer<uint4>(_resolution.x * _resolution.y, BufferStorage::DEVICE_PRIVATE);
+        _clear_accumulation_buffer_kernel = device->create_kernel("film_clear_accumulation_buffer");
     }
     
     void clear_accumulation_buffer(KernelDispatcher &dispatch) {
-        dispatch(*_clear_accumulation_buffer_kernel, _resolution, [&](KernelArgumentEncoder &encode) {
+        auto pixel_count = _resolution.x * _resolution.y;
+        dispatch(*_clear_accumulation_buffer_kernel, pixel_count, [&](KernelArgumentEncoder &encode) {
             encode("accumulation_buffer", *_accumulation_buffer);
-            encode("resolution", _resolution);
+            encode("pixel_count", pixel_count);
         });
     }
     

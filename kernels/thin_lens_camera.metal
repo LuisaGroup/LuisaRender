@@ -4,10 +4,9 @@
 #include <core/mathematics.h>
 #include <core/ray.h>
 #include <core/sampling.h>
+#include <core/sampler.h>
 
 #include <cameras/thin_lens_camera.h>
-
-#include <random.h>
 
 using namespace luisa;
 
