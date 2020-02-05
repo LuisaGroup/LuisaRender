@@ -50,6 +50,11 @@ public:
     [[nodiscard]] Filter &filter() noexcept { return *_filter; }
     [[nodiscard]] BufferView<uint4> accumulation_buffer() noexcept { return _accumulation_buffer->view<uint4>(); }
     [[nodiscard]] uint2 resolution() noexcept { return _resolution; }
+
+#ifndef NDEBUG
+    static void debug() noexcept { _creators.debug(); }
+#endif
+
 };
 
 }

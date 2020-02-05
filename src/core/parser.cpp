@@ -96,12 +96,14 @@ void Parser::_match(std::string_view token) {
 
 std::vector<std::shared_ptr<Task>> Parser::_parse_top_level() {
     
+    std::vector<std::shared_ptr<Task>> tasks;
+    
     while (!_eof()) {
         auto token = _peek_and_pop();
         if (token == "tasks") {
-            auto tasks = _parse_parameter_set()->parse_reference_list<Task>();
-            LUISA_WARNING_IF_NOT(_eof(), "skipping node declarations after tasks");
-            return tasks;
+            tasks = _parse_parameter_set()->parse_reference_list<Task>();
+            LUISA_WARNING_IF_NOT(_eof(), "nodes declared after tasks will be ignored");
+            break;
         }
 
 #define LUISA_PARSER_PARSE_GLOBAL_NODE(Type)                                                                                                                    \
@@ -124,8 +126,8 @@ std::vector<std::shared_ptr<Task>> Parser::_parse_top_level() {
 #undef LUISA_PARSER_PARSE_GLOBAL_NODE
     }
     
-    LUISA_WARNING("no tasks defined, nothing will be rendered");
-    return {};
+    LUISA_WARNING_IF(tasks.empty(), "no tasks defined, nothing will be rendered");
+    return tasks;
 }
 
 bool Parser::_eof() const noexcept {

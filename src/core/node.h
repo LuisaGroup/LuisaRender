@@ -10,9 +10,10 @@
 #include <type_traits>
 #include <functional>
 #include <memory>
+#include <iostream>
 
 #include <util/noncopyable.h>
-
+#include <util/exception.h>
 #include "data_types.h"
 #include "device.h"
 
@@ -31,15 +32,27 @@ private:
 
 public:
     NodeCreatorRegistry() noexcept = default;
+    
     void emplace(std::string_view derived_name, NodeCreator<BaseClass> creator) noexcept {
-        assert(_creators.find(derived_name) == _creators.end());
+        assert(_creators.find(derived_name) == _creators.end());  // FIXME: Failure on ThinLensCamera
         _creators.emplace(derived_name, std::move(creator));
     }
+    
     NodeCreator<BaseClass> &operator[](std::string_view derived_name) noexcept {
         auto iter = _creators.find(derived_name);
-        assert(iter != _creators.end());
+        LUISA_ERROR_IF(iter == _creators.end(), "unregistered node creator for derived class: ", derived_name);
         return iter->second;
     }
+
+#ifndef NDEBUG
+    void debug() const noexcept {
+        for (auto &&item : _creators) {
+            std::cout << item.first << "\n";
+        }
+        std::cout << std::endl;
+    }
+#endif
+    
 };
 
 #define LUISA_MAKE_BASE_NODE_CLASS_MATCHER(BaseClass)                                                                                                       \
@@ -61,7 +74,7 @@ namespace _impl {
 
 template<typename BaseClass>
 void register_node_creator(std::string_view derived_name, NodeCreator<BaseClass> creator) noexcept {
-    BaseClass::creators.emplace(derived_name, std::move(creator));
+    BaseClass::_creators.emplace(derived_name, std::move(creator));
 }
 
 template<typename T>
@@ -72,7 +85,7 @@ using BaseNodeClass = std::remove_pointer_t<decltype(base_node_class_impl(std::d
 #define LUISA_MAKE_NODE_CREATOR_REGISTRY(BaseClass)                                                                               \
     friend class ParameterSet;                                                                                                    \
     friend void _impl::register_node_creator<BaseClass>(std::string_view derived_name, NodeCreator<BaseClass> creator) noexcept;  \
-    inline static NodeCreatorRegistry<BaseClass> creators
+    inline static NodeCreatorRegistry<BaseClass> _creators
 
 #define LUISA_REGISTER_NODE_CREATOR(derived_type_name, DerivedClass)                                                                    \
     namespace _impl {                                                                                                                   \

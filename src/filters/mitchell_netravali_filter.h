@@ -53,7 +53,7 @@ public:
     
 };
 
-LUISA_REGISTER_NODE_CREATOR("MitchellNetravali", MitchellNetravaliFilter);
+LUISA_REGISTER_NODE_CREATOR("MitchellNetravali", MitchellNetravaliFilter)
 
 }
 

@@ -23,7 +23,7 @@ ThinLensCamera::ThinLensCamera(Device *device, const ParameterSet &parameters)
     _lens_radius = 0.5f * focal_length / f_number;
     
     _position = parameters["position"].parse_float3();
-    _up = parameters["up"].parse_float3();
+    _up = parameters["up"].parse_float3_or_default(make_float3(0.0f, 1.0f, 0.0f));
     auto target = parameters["target"].parse_float3();
     auto forward = target - _position;
     _front = normalize(forward);

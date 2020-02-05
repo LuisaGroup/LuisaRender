@@ -26,6 +26,11 @@ public:
     virtual void update(float time[[maybe_unused]]) { /* doing nothing by default */ }
     virtual void generate_rays(KernelDispatcher &dispatch, BufferView<Ray> ray_buffer, RayPool &ray_pool, RayQueueView ray_queue) = 0;
     [[nodiscard]] Film &film() { return *_film; }
+
+#ifndef NDEBUG
+    static void debug() noexcept { _creators.debug(); }
+#endif
+
 };
 
 }

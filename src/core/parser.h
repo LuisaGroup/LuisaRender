@@ -25,6 +25,7 @@ private:
     std::string_view _derived_type_name;
     std::vector<std::string_view> _value_list;
     std::map<std::string_view, std::unique_ptr<ParameterSet>> _parameters;
+    bool _is_value_list{};
     
     [[nodiscard]] static bool _parse_bool(std::string_view sv) {
         if (sv == "true") {
@@ -72,15 +73,26 @@ private:
     
     [[nodiscard]] const ParameterSet &_child(std::string_view parameter_name) const {
         auto iter = _parameters.find(parameter_name);
-        LUISA_ERROR_IF(iter == _parameters.cend(), "undefined parameter: ", parameter_name);
+        if (iter == _parameters.cend()) {
+            LUISA_WARNING("undefined parameter: ", parameter_name);
+            return *_empty;
+        }
         return *iter->second;
     }
 
+private:
+    std::unique_ptr<ParameterSet> _empty{};
+    ParameterSet(Parser *parser) noexcept : _parser{parser} {}  // only for making _empty
+
 public:
-    ParameterSet(Parser *parser, std::vector<std::string_view> value_list) noexcept : _parser{parser}, _value_list{std::move(value_list)} {}
+    ParameterSet(Parser *parser, std::vector<std::string_view> value_list) noexcept : _parser{parser}, _value_list{std::move(value_list)}, _is_value_list{true} {
+        _empty = std::unique_ptr<ParameterSet>{new ParameterSet{parser}};
+    }
     
     ParameterSet(Parser *parser, std::string_view derived_type_name, std::map<std::string_view, std::unique_ptr<ParameterSet>> params) noexcept
-        : _parser{parser}, _derived_type_name{derived_type_name}, _parameters{std::move(params)} {}
+        : _parser{parser}, _derived_type_name{derived_type_name}, _parameters{std::move(params)}, _is_value_list{false} {
+        _empty = std::unique_ptr<ParameterSet>{new ParameterSet{parser}};
+    }
     
     [[nodiscard]] const ParameterSet &operator[](std::string_view parameter_name) const { return _child(parameter_name); }
     
@@ -277,7 +289,7 @@ public:
     
     [[nodiscard]] std::string parse_string_or_default(std::string_view default_value) const noexcept {
         try { return parse_string(); } catch (const std::runtime_error &e) {
-            LUISA_WARNING("error occurred while parsing string: ", e.what(), ", using default");
+            LUISA_WARNING("error occurred while parsing string, using default:\n    ", e.what());
             return std::string{default_value};
         }
     }
@@ -294,7 +306,7 @@ public:
 #define LUISA_PARAMETER_SET_PARSE_OR_DEFAULT(Type)                                                 \
     [[nodiscard]] Type parse_##Type##_or_default(Type default_value) const noexcept {              \
         try { return parse_##Type(); } catch (const std::runtime_error &e) {                       \
-            LUISA_WARNING("error occurred while parsing "#Type": ", e.what(), ", using default");  \
+            LUISA_WARNING("error occurred while parsing "#Type", using default:\n    ", e.what());  \
             return default_value;                                                                  \
         }                                                                                          \
     }
@@ -367,7 +379,11 @@ public:
 
 template<typename BaseClass>
 [[nodiscard]] std::shared_ptr<BaseClass> ParameterSet::parse() const {
-    return BaseClass::creators[_derived_type_name](&_parser->device(), *this);
+    if (_is_value_list) {
+        LUISA_WARNING_IF_NOT(_value_list.size() == 1, "too many references given, using only the first 1");
+        return _parser->global_node<BaseClass>(_value_list.front());
+    }
+    return BaseClass::_creators[_derived_type_name](&_parser->device(), *this);
 }
 
 template<typename BaseClass>
