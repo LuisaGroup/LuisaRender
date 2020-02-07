@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include <core/data_types.h>
-#include <core/mathematics.h>
+#include "data_types.h"
+#include "mathematics.h"
 
 namespace luisa {
 
@@ -17,7 +17,7 @@ private:
     float3 _normal{};
 
 public:
-    LUISA_DEVICE_CALLABLE explicit Onb(float3 normal) : _normal{normal} {
+    LUISA_DEVICE_CALLABLE explicit Onb(float3 normal) noexcept : _normal{normal} {
         
         using namespace math;
         
@@ -34,11 +34,11 @@ public:
         _tangent = cross(_binormal, _normal);
     }
     
-    [[nodiscard]] LUISA_DEVICE_CALLABLE float3 inverse_transform(float3 p) const {
+    [[nodiscard]] LUISA_DEVICE_CALLABLE float3 inverse_transform(float3 p) const noexcept {
         return p.x * _tangent + p.y * _binormal + p.z * _normal;
     }
     
-    [[nodiscard]] LUISA_DEVICE_CALLABLE float3 transform(float3 p) const {
+    [[nodiscard]] LUISA_DEVICE_CALLABLE float3 transform(float3 p) const noexcept {
         using namespace math;
         return {dot(p, _tangent), dot(p, _binormal), dot(p, _normal)};
     }

@@ -21,7 +21,7 @@ protected:
     std::shared_ptr<Film> _film;
 
 public:
-    explicit Camera(Device *device, const ParameterSet &parameters)
+    Camera(Device *device, const ParameterSet &parameters)
         : Node{device}, _film{parameters["film"].parse<Film>()} {}
     virtual void update(float time[[maybe_unused]]) { /* doing nothing by default */ }
     virtual void generate_rays(KernelDispatcher &dispatch, BufferView<Ray> ray_buffer, RayPool &ray_pool, RayQueueView ray_queue) = 0;

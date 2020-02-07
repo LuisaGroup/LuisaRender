@@ -17,4 +17,38 @@ Camera camera : ThinLens {
   up { 0, 1, 0 }
 }
 
+Integrator integrator : PathTracing {
+
+
+}
+
+Geometry cube : TriangleMesh {
+  file {}
+  transform : TRS {
+    scaling {  }
+    rotation {  }
+    translation {  }
+  }
+}
+
+Geometry left_wall : Replica {
+
+}
+
+Geometry right_wall : Instance {
+
+}
+
+Light light : Point {
+
+}
+
+Task task : SingleShot {
+  integrator { @integrator }
+  camera { @camera }
+  geometries { @left_wall, @right_wall }
+  lights { @light }
+  label { "helloworld" }
+}
+
 tasks {}
