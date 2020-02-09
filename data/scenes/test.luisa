@@ -8,7 +8,18 @@ Film film : RGB {
 }
 
 Camera camera : ThinLens {
-  film { @film }
+
+//  film { @film }
+
+  film : RGB {
+    filter : MitchellNetravali {
+        radius { 2.0 }
+        b { 0.33333333333333 }
+        c { 0.33333333333333 }
+    }
+    resolution { 1280, 800 }
+  }
+
   position { 0, 0, 15 }
   target { 0, 0, 0 }
   sensor_size { 36, 24 }

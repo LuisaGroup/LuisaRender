@@ -33,6 +33,8 @@ public:
     [[nodiscard]] size_t element_count() const noexcept { return _element_count; }
     [[nodiscard]] size_t element_offset() const noexcept { return _element_offset; }
     [[nodiscard]] Buffer &buffer() noexcept { return *_buffer; }
+    [[nodiscard]] T *data();
+    [[nodiscard]] const T *data() const { return const_cast<BufferView<T> *>(this)->data(); }
 };
 
 class Buffer : Noncopyable {
@@ -64,5 +66,10 @@ public:
         return BufferView<T>{this, element_offset, element_count};
     }
 };
+
+template<typename T>
+T *BufferView<T>::data() {
+    return &reinterpret_cast<T *>(_buffer->data())[_element_offset];
+}
 
 }

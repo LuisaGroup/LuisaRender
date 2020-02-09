@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(Metalight)
+project(LuisaRender)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
@@ -32,7 +32,7 @@ add_subdirectory(kernels)
 include_directories(src)
 
 file(GLOB_RECURSE SOURCE_FILES src/*.cpp src/*.h src/*.mm src/*.m)
-add_executable(Metalight ${SOURCE_FILES} main.cpp)
-add_dependencies(Metalight kernels)
+add_executable(LuisaRender ${SOURCE_FILES} main.cpp)
+add_dependencies(LuisaRender kernels)
 
-target_link_libraries(Metalight glm_static tinyobjloader "-framework Foundation" "-framework Metal" "-framework MetalPerformanceShaders")
+target_link_libraries(LuisaRender glm_static tinyobjloader "-framework Foundation" "-framework Metal" "-framework MetalPerformanceShaders")

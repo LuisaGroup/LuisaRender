@@ -4,3 +4,6 @@
 [submodule "thirdparty/tinyobjloader"]
 	path = thirdparty/tinyobjloader
 	url = https://github.com/syoyo/tinyobjloader.git
+[submodule "thirdparty/assimp"]
+	path = thirdparty/assimp
+	url = https://github.com/assimp/assimp.git

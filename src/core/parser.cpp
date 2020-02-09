@@ -7,9 +7,10 @@
 #include "filter.h"
 #include "film.h"
 #include "camera.h"
-#include "geometry.h"
+#include "shape.h"
 #include "integrator.h"
 #include "material.h"
+#include "transform.h"
 #include "task.h"
 
 namespace luisa {
@@ -118,7 +119,8 @@ std::vector<std::shared_ptr<Task>> Parser::_parse_top_level() {
         LUISA_PARSER_PARSE_GLOBAL_NODE(Filter)
         LUISA_PARSER_PARSE_GLOBAL_NODE(Film)
         LUISA_PARSER_PARSE_GLOBAL_NODE(Camera)
-        LUISA_PARSER_PARSE_GLOBAL_NODE(Geometry)
+        LUISA_PARSER_PARSE_GLOBAL_NODE(Shape)
+        LUISA_PARSER_PARSE_GLOBAL_NODE(Transform)
         LUISA_PARSER_PARSE_GLOBAL_NODE(Integrator)
         LUISA_PARSER_PARSE_GLOBAL_NODE(Material)
         LUISA_PARSER_PARSE_GLOBAL_NODE(Task)
