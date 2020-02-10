@@ -22,6 +22,7 @@ public:
     MetalDevice();
     std::unique_ptr<Kernel> create_kernel(std::string_view function_name) override;
     std::unique_ptr<Acceleration> create_acceleration(Buffer &position_buffer, size_t stride, size_t triangle_count) override;
+    std::unique_ptr<Acceleration> create_acceleration(Geometry &geometry) override;
     std::unique_ptr<Buffer> allocate_buffer(size_t capacity, BufferStorage storage) override;
     
     void launch(std::function<void(KernelDispatcher &)> dispatch) override;

@@ -36,6 +36,7 @@ public:
         return _geometry_view;
     }
     
+    void unload() { _geometry_view.invalidate(); }
     virtual void load(GeometryEncoder encoder) = 0;
     [[nodiscard]] virtual bool is_instance() const noexcept { return false; }
 };

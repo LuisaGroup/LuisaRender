@@ -117,4 +117,9 @@ std::unique_ptr<Buffer> MetalDevice::allocate_buffer(size_t capacity, BufferStor
     return std::make_unique<MetalBuffer>(buffer, capacity, storage);
 }
 
+std::unique_ptr<Acceleration> MetalDevice::create_acceleration(Geometry &geometry) {
+    auto acceleration_group = 0;
+    return std::unique_ptr<Acceleration>();
+}
+
 }
