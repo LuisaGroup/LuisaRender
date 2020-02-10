@@ -20,7 +20,7 @@ private:
 protected:
     std::shared_ptr<Transform> _transform;
     std::shared_ptr<Material> _material;
-    GeometryView _geometry_view;
+    GeometryEntity _geometry_view;
 
 public:
     Shape(Device *device, const ParameterSet &parameter_set) : Node{device} {
@@ -31,7 +31,7 @@ public:
     [[nodiscard]] Transform &transform() noexcept { return *_transform; }
     [[nodiscard]] Material &material() noexcept { return *_material; }
     [[nodiscard]] bool loaded() const noexcept { return _geometry_view.valid(); }
-    [[nodiscard]] GeometryView geometry_view() const {
+    [[nodiscard]] GeometryEntity geometry_view() const {
         LUISA_ERROR_IF_NOT(loaded(), "shape not loaded");
         return _geometry_view;
     }

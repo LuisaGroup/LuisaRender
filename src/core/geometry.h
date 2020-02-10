@@ -17,7 +17,7 @@ namespace luisa {
 class Geometry {
 
 public:
-    friend class GeometryView;
+    friend class GeometryEntity;
     friend class GeometryEncoder;
 
 private:
@@ -34,7 +34,7 @@ public:
     Geometry(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes);
 };
 
-class GeometryView {
+class GeometryEntity {
 
 public:
     friend class GeometryEncoder;
@@ -47,8 +47,8 @@ private:
     uint _index_count{};
 
 public:
-    GeometryView() noexcept = default;
-    GeometryView(Geometry *geometry, uint vertex_offset, uint vertex_count, uint index_offset, uint index_count)
+    GeometryEntity() noexcept = default;
+    GeometryEntity(Geometry *geometry, uint vertex_offset, uint vertex_count, uint index_offset, uint index_count)
         : _geometry{geometry}, _vertex_offset{vertex_offset}, _vertex_count{vertex_count}, _index_offset{index_offset}, _index_count{index_count} {}
     
     [[nodiscard]] bool valid() const noexcept { return _geometry != nullptr; }
@@ -95,16 +95,16 @@ public:
     
     void add_indices(uint3 indices) noexcept { _indices.emplace_back(make_packed_uint3(indices)); }
     
-    [[nodiscard]] GeometryView create() {
-        GeometryView view{_geometry,
-                          _vertex_offset, static_cast<uint>(_positions.size() - _vertex_offset),
-                          _index_offset, (static_cast<uint>(_indices.size() - _index_offset))};
+    [[nodiscard]] GeometryEntity create() {
+        GeometryEntity view{_geometry,
+                            _vertex_offset, static_cast<uint>(_positions.size() - _vertex_offset),
+                            _index_offset, (static_cast<uint>(_indices.size() - _index_offset))};
         _vertex_offset = static_cast<uint>(_positions.size());
         _index_offset = static_cast<uint>(_indices.size());
         return view;
     }
     
-    [[nodiscard]] GeometryView replicate(GeometryView another_view, float4x4 static_transform) {
+    [[nodiscard]] GeometryEntity replicate(GeometryEntity another_view, float4x4 static_transform) {
         LUISA_ERROR_IF_NOT(_geometry == another_view._geometry, "shapes are from different geometry group");
         auto normal_matrix = transpose(inverse(make_float3x3(static_transform)));
         for (auto i = another_view._vertex_offset; i < another_view._vertex_offset + another_view._vertex_count; i++) {
@@ -118,7 +118,7 @@ public:
         return create();
     }
     
-    [[nodiscard]] GeometryView instantiate(GeometryView another_view) {
+    [[nodiscard]] GeometryEntity instantiate(GeometryEntity another_view) {
         LUISA_ERROR_IF_NOT(_geometry == another_view._geometry, "shapes are from different geometry group");
         return another_view;
     }
