@@ -13,6 +13,9 @@ class Task : public Node {
 private:
     LUISA_MAKE_NODE_CREATOR_REGISTRY(Task);
 
+public:
+
+
 };
 
 }

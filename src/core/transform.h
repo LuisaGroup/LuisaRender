@@ -6,6 +6,7 @@
 
 #include "node.h"
 #include "parser.h"
+#include "mathematics.h"
 
 namespace luisa {
 
@@ -16,7 +17,12 @@ private:
 
 public:
     Transform(Device *device, const ParameterSet &) : Node{device} {}
-    [[nodiscard]] virtual float4x4 matrix(float time) const = 0;
+    [[nodiscard]] virtual float4x4 static_matrix() const { return math::identity(); }
+    [[nodiscard]] virtual float4x4 dynamic_matrix(float time[[maybe_unused]]) const {
+        LUISA_ERROR_IF_NOT(is_static(), "Transform::dynamic_matrix() not implemented in dynamic transform");
+        return math::identity();
+    }
+    [[nodiscard]] virtual bool is_static() const noexcept { return true; }
 
 };
 

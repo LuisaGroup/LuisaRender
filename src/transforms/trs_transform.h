@@ -15,8 +15,7 @@ protected:
 
 public:
     TRSTransform(Device *device, const ParameterSet &parameter_set);
-    [[nodiscard]] float4x4 matrix(float time[[maybe_unused]]) const noexcept override { return _matrix; }
-    
+    [[nodiscard]] float4x4 static_matrix() const noexcept override { return _matrix; }
 };
 
 LUISA_REGISTER_NODE_CREATOR("TRS", TRSTransform)

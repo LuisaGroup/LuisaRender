@@ -8,18 +8,7 @@ Film film : RGB {
 }
 
 Camera camera : ThinLens {
-
-//  film { @film }
-
-  film : RGB {
-    filter : MitchellNetravali {
-        radius { 2.0 }
-        b { 0.33333333333333 }
-        c { 0.33333333333333 }
-    }
-    resolution { 1280, 800 }
-  }
-
+  film { @film }
   position { 0, 0, 15 }
   target { 0, 0, 0 }
   sensor_size { 36, 24 }
@@ -30,23 +19,20 @@ Camera camera : ThinLens {
 
 Integrator integrator : PathTracing {
 
-
 }
 
-Geometry cube : TriangleMesh {
-  file {}
-  transform : TRS {
-    scaling {  }
-    rotation {  }
-    translation {  }
-  }
+Shape cube : TriangleMesh {
+  file { "data/meshes/cube/cube.obj" }
+  transform : Identity {}
+  subdiv_level { 2 }
 }
 
-Geometry left_wall : Replica {
-
+Shape left_wall : Replica {
+  reference { @cube }
+  transform :
 }
 
-Geometry right_wall : Instance {
+Shape right_wall : Instance {
 
 }
 
@@ -57,7 +43,7 @@ Light light : Point {
 Task task : SingleShot {
   integrator { @integrator }
   camera { @camera }
-  geometries { @left_wall, @right_wall }
+  shapes { @left_wall, @right_wall }
   lights { @light }
   label { "helloworld" }
 }

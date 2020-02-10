@@ -7,10 +7,6 @@
 
 namespace luisa {
 
-float4x4 IdentityTransform::matrix(float time[[maybe_unused]]) const {
-    return math::identity();
-}
-
 IdentityTransform::IdentityTransform(Device *device, const ParameterSet &parameter_set) noexcept
     : Transform{device, parameter_set} {}
     

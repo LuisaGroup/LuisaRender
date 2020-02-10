@@ -95,14 +95,14 @@ void Parser::_match(std::string_view token) {
     LUISA_ERROR_IF_NOT(_peek() == token, "expected \"", token, "\", got \"", _peek(), "\" at (", _curr_line, ", ", _curr_col, ")");
 }
 
-std::vector<std::shared_ptr<Task>> Parser::_parse_top_level() {
+std::shared_ptr<Task> Parser::_parse_top_level() {
     
-    std::vector<std::shared_ptr<Task>> tasks;
+    std::shared_ptr<Task> task;
     
     while (!_eof()) {
         auto token = _peek_and_pop();
         if (token == "tasks") {
-            tasks = _parse_parameter_set()->parse_reference_list<Task>();
+            task = _parse_parameter_set()->parse<Task>();
             LUISA_WARNING_IF_NOT(_eof(), "nodes declared after tasks will be ignored");
             break;
         }
@@ -128,15 +128,15 @@ std::vector<std::shared_ptr<Task>> Parser::_parse_top_level() {
 #undef LUISA_PARSER_PARSE_GLOBAL_NODE
     }
     
-    LUISA_WARNING_IF(tasks.empty(), "no tasks defined, nothing will be rendered");
-    return tasks;
+    LUISA_WARNING_IF(task == nullptr, "no tasks defined, nothing will be rendered");
+    return task;
 }
 
 bool Parser::_eof() const noexcept {
     return _peeked.empty() && _remaining.empty();
 }
 
-std::vector<std::shared_ptr<Task>> Parser::parse(const std::filesystem::path &file_path) {
+std::shared_ptr<Task> Parser::parse(const std::filesystem::path &file_path) {
     _curr_line = 0;
     _curr_col = 0;
     _next_line = 0;

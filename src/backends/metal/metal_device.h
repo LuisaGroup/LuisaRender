@@ -16,7 +16,7 @@ private:
     std::unique_ptr<struct MetalLibraryWrapper> _library_wrapper;
     std::unique_ptr<struct MetalCommandQueueWrapper> _command_queue_wrapper;
     
-    DEVICE_CREATOR("Metal") { return std::make_unique<MetalDevice>(); }
+    LUISA_DEVICE_CREATOR("Metal") { return std::make_unique<MetalDevice>(); }
 
 public:
     MetalDevice();

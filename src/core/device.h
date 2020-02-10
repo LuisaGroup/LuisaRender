@@ -38,6 +38,7 @@ public:
     [[nodiscard]] virtual std::unique_ptr<Kernel> create_kernel(std::string_view function_name) = 0;
     [[nodiscard]] virtual std::unique_ptr<Buffer> allocate_buffer(size_t capacity, BufferStorage storage) = 0;
     [[nodiscard]] virtual std::unique_ptr<Acceleration> create_acceleration(Buffer &position_buffer, size_t stride, size_t triangle_count) = 0;
+//    [[nodiscard]] virtual std::unique_ptr<Acceleration> create_acceleration() = 0;
     
     template<typename T>
     [[nodiscard]] std::unique_ptr<Buffer> create_buffer(size_t element_count, BufferStorage buffer_storage) {
@@ -52,7 +53,7 @@ public:
 
 }
 
-#define DEVICE_CREATOR(name)                                                                            \
+#define LUISA_DEVICE_CREATOR(name)                                                                      \
         static_assert(true);                                                                            \
     private:                                                                                            \
         inline static struct _reg_helper_impl {                                                         \
