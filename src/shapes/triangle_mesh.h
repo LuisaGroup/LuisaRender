@@ -16,7 +16,7 @@ private:
     uint _subdiv_level;
 
 public:
-    void load(GeometryEncoder encoder) override;
+    void load(GeometryEncoder &encoder) override;
     TriangleMesh(Device *device, const ParameterSet &parameter_set);
 
 };

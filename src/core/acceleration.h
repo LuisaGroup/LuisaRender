@@ -5,28 +5,16 @@
 #pragma once
 
 #include "kernel.h"
+#include "ray.h"
+#include "intersection.h"
 
 namespace luisa {
 
 struct Acceleration : Noncopyable {
     virtual ~Acceleration() = default;
-    virtual void trace_any(KernelDispatcher &dispatch, Buffer &ray_buffer, Buffer &intersection_buffer, size_t ray_count) = 0;
-    virtual void trace_nearest(KernelDispatcher &dispatch, Buffer &ray_buffer, Buffer &intersection_buffer, size_t ray_count) = 0;
-    virtual void trace_any(KernelDispatcher &dispatch, Buffer &ray_buffer, Buffer &intersection_buffer, Buffer &ray_count_buffer, size_t ray_count_buffer_offset) = 0;
-    virtual void trace_nearest(KernelDispatcher &dispatch, Buffer &ray_buffer, Buffer &intersection_buffer, Buffer &ray_count_buffer, size_t ray_count_buffer_offset) = 0;
-    virtual void trace_any(KernelDispatcher &dispatch,
-                           Buffer &ray_buffer,
-                           Buffer &ray_index_buffer,
-                           Buffer &intersection_buffer,
-                           Buffer &ray_count_buffer,
-                           size_t ray_count_buffer_offset) = 0;
-    virtual void trace_nearest(KernelDispatcher &dispatch,
-                               Buffer &ray_buffer,
-                               Buffer &ray_index_buffer,
-                               Buffer &intersection_buffer,
-                               Buffer &ray_count_buffer,
-                               size_t ray_count_buffer_offset) = 0;
-    
+    virtual void refit(KernelDispatcher &dispatch) = 0;
+    virtual void trace_any(KernelDispatcher &dispatch, BufferView<Ray> ray_buffer, BufferView<Intersection> its_buffer, BufferView<uint> ray_count_buffer) = 0;
+    virtual void trace_closest(KernelDispatcher &dispatch, BufferView<Ray> ray_buffer, BufferView<Intersection> its_buffer, BufferView<uint> ray_count_buffer) = 0;
 };
 
 }

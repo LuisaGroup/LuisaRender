@@ -25,6 +25,8 @@ std::string text_file_contents(const std::filesystem::path &file_path);
 
 #ifdef __OBJC__
 
+#import <Foundation/Foundation.h>
+
 namespace luisa { inline namespace utility {
 
 [[nodiscard]] inline NSString *make_objc_string(const char *s) noexcept {

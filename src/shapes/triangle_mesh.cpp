@@ -16,7 +16,7 @@ TriangleMesh::TriangleMesh(Device *device, const ParameterSet &parameter_set) : 
     _subdiv_level = parameter_set["subdiv_level"].parse_uint_or_default(0u);
 }
 
-void TriangleMesh::load(GeometryEncoder encoder) {
+void TriangleMesh::load(GeometryEncoder &encoder) {
     
     Assimp::Importer ai_importer;
     ai_importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS,
@@ -86,7 +86,7 @@ void TriangleMesh::load(GeometryEncoder encoder) {
         }
     }
     
-    _geometry_view = encoder.create();
+    _entity_index = encoder.create();
 }
 
 }

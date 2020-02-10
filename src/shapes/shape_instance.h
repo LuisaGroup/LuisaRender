@@ -15,7 +15,7 @@ private:
 
 public:
     ShapeInstance(Device *device, const ParameterSet &parameter_set);
-    void load(GeometryEncoder encoder) override;
+    void load(GeometryEncoder &encoder) override;
     [[nodiscard]] bool is_instance() const noexcept override { return true; }
 };
 

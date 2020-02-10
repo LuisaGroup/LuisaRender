@@ -15,7 +15,7 @@ private:
 
 public:
     ShapeReplica(Device *device, const ParameterSet &parameter_set);
-    void load(GeometryEncoder encoder) override;
+    void load(GeometryEncoder &encoder) override;
     
 };
 

@@ -11,13 +11,13 @@
 #include <utility>
 #include <iostream>
 
-#include "kernel.h"
-#include "acceleration.h"
-
 #include <util/noncopyable.h>
+
+#include "kernel.h"
 
 namespace luisa {
 class Geometry;
+struct Acceleration;
 }
 
 namespace luisa {
@@ -41,7 +41,6 @@ public:
     
     [[nodiscard]] virtual std::unique_ptr<Kernel> create_kernel(std::string_view function_name) = 0;
     [[nodiscard]] virtual std::unique_ptr<Buffer> allocate_buffer(size_t capacity, BufferStorage storage) = 0;
-    [[nodiscard]] virtual std::unique_ptr<Acceleration> create_acceleration(Buffer &position_buffer, size_t stride, size_t triangle_count) = 0;
     [[nodiscard]] virtual std::unique_ptr<Acceleration> create_acceleration(Geometry &geometry) = 0;
     
     template<typename T>

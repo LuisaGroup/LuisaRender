@@ -87,16 +87,13 @@ private:
 
 public:
     RayQueueManager(Device *device, size_t max_queue_count)
-        : _device{device},
-          _queue_size_buffer{device->create_buffer<uint>(max_queue_count, BufferStorage::DEVICE_PRIVATE)} {}
-    
+        : _device{device}, _queue_size_buffer{device->create_buffer<uint>(max_queue_count, BufferStorage::DEVICE_PRIVATE)} {}
     [[nodiscard]] RayQueueView allocate_queue(size_t capacity) {
         assert(_queue_index_buffers.size() < _queue_size_buffer->view<uint>().element_count());
         auto size_buffer_view = _queue_size_buffer->view<uint>(_queue_index_buffers.size());
         auto index_buffer_view = _queue_index_buffers.emplace_back(_device->create_buffer<uint>(capacity, BufferStorage::DEVICE_PRIVATE))->view<uint>();
         return {index_buffer_view, size_buffer_view};
     }
-    
     [[nodiscard]] size_t allocated_queue_count() const noexcept { return _queue_index_buffers.size(); }
     [[nodiscard]] BufferView<uint> allocated_queue_size_buffer() { return _queue_size_buffer->view<uint>(0ul, _queue_index_buffers.size()); }
 };

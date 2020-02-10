@@ -22,7 +22,7 @@ public:
     MetalBuffer(id<MTLBuffer> buffer, size_t capacity, BufferStorage storage) noexcept
         : Buffer(capacity, storage), _handle{buffer} {}
     
-    void upload(const void *host_data, size_t size, size_t offset) override;
+    void upload(size_t offset, size_t size) override;
     void synchronize(struct KernelDispatcher &dispatch) override;
     [[nodiscard]] void *data() override;
     [[nodiscard]] id<MTLBuffer> handle() const noexcept { return _handle; }

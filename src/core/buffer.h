@@ -35,6 +35,9 @@ public:
     [[nodiscard]] Buffer &buffer() noexcept { return *_buffer; }
     [[nodiscard]] T *data();
     [[nodiscard]] const T *data() const { return const_cast<BufferView<T> *>(this)->data(); }
+    [[nodiscard]] T &operator[](size_t index) { return data()[index]; }
+    [[nodiscard]] const T &operator[](size_t index) const { return data()[index]; }
+    void upload();
 };
 
 class Buffer : Noncopyable {
@@ -46,13 +49,13 @@ protected:
 public:
     Buffer(size_t capacity, BufferStorage storage) noexcept : _capacity{capacity}, _storage{storage} {};
     virtual ~Buffer() noexcept = default;
-    virtual void upload(const void *host_data, size_t size, size_t offset) = 0;
-    virtual void upload(const void *host_data, size_t size) { upload(host_data, size, 0ul); }
-    virtual void upload() { upload(nullptr, 0ul); }
+    virtual void upload(size_t offset, size_t size) = 0;
+    virtual void upload() { upload(0ul, capacity()); }
     virtual void synchronize(struct KernelDispatcher &dispatch) = 0;
     [[nodiscard]] virtual const void *data() const { return const_cast<Buffer *>(this)->data(); }
     [[nodiscard]] virtual void *data() = 0;
-    [[nodiscard]] virtual size_t capacity() const noexcept { return _capacity; }
+    [[nodiscard]] size_t capacity() const noexcept { return _capacity; }
+    [[nodiscard]] BufferStorage storage() const noexcept { return _storage; }
     
     template<typename T>
     [[nodiscard]] auto view(size_t element_offset = 0ul) noexcept {
@@ -71,5 +74,8 @@ template<typename T>
 T *BufferView<T>::data() {
     return &reinterpret_cast<T *>(_buffer->data())[_element_offset];
 }
+
+template<typename T>
+void BufferView<T>::upload() { _buffer->upload(byte_offset(), byte_size()); }
 
 }

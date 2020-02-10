@@ -5,6 +5,8 @@
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
 
 #import <core/ray.h>
+#import <core/intersection.h>
+#import <core/geometry.h>
 
 #import <util/resource_manager.h>
 #import <util/string_manipulation.h>
@@ -85,30 +87,6 @@ void MetalDevice::launch_async(std::function<void(KernelDispatcher &)> dispatch,
     [command_buffer commit];
 }
 
-std::unique_ptr<Acceleration> MetalDevice::create_acceleration(Buffer &position_buffer, size_t stride, size_t triangle_count) {
-    
-    auto accelerator = [[MPSTriangleAccelerationStructure alloc] initWithDevice:_device_wrapper->device];
-    [accelerator autorelease];
-    accelerator.vertexBuffer = dynamic_cast<MetalBuffer &>(position_buffer).handle();
-    accelerator.vertexStride = stride;
-    accelerator.triangleCount = triangle_count;
-    [accelerator rebuild];
-    
-    auto ray_intersector = [[MPSRayIntersector alloc] initWithDevice:_device_wrapper->device];
-    [ray_intersector autorelease];
-    ray_intersector.rayDataType = MPSRayDataTypeOriginMinDistanceDirectionMaxDistance;
-    ray_intersector.intersectionDataType = MPSIntersectionDataTypeDistancePrimitiveIndexCoordinates;
-    ray_intersector.rayStride = sizeof(Ray);
-    
-    auto shadow_ray_intersector = [[MPSRayIntersector alloc] initWithDevice:_device_wrapper->device];
-    [shadow_ray_intersector autorelease];
-    shadow_ray_intersector.rayDataType = MPSRayDataTypeOriginMinDistanceDirectionMaxDistance;
-    shadow_ray_intersector.intersectionDataType = MPSIntersectionDataTypeDistance;
-    shadow_ray_intersector.rayStride = sizeof(Ray);
-    
-    return std::make_unique<MetalAcceleration>(accelerator, ray_intersector, shadow_ray_intersector);
-}
-
 std::unique_ptr<Buffer> MetalDevice::allocate_buffer(size_t capacity, BufferStorage storage) {
     
     auto buffer = [_device_wrapper->device newBufferWithLength:capacity
@@ -118,8 +96,53 @@ std::unique_ptr<Buffer> MetalDevice::allocate_buffer(size_t capacity, BufferStor
 }
 
 std::unique_ptr<Acceleration> MetalDevice::create_acceleration(Geometry &geometry) {
-    auto acceleration_group = 0;
-    return std::unique_ptr<Acceleration>();
+    
+    auto acceleration_group = [[MPSAccelerationStructureGroup alloc] initWithDevice:_device_wrapper->device];
+    [acceleration_group autorelease];
+    
+    auto instance_acceleration = [[MPSInstanceAccelerationStructure alloc] initWithGroup:acceleration_group];
+    [instance_acceleration autorelease];
+    
+    auto acceleration_structures = [NSMutableArray array];
+    instance_acceleration.accelerationStructures = acceleration_structures;
+    for (auto &&entity : geometry.entities()) {
+        auto triangle_acceleration = [[MPSTriangleAccelerationStructure alloc] initWithGroup:acceleration_group];
+        [triangle_acceleration autorelease];
+        triangle_acceleration.vertexBuffer = dynamic_cast<MetalBuffer &>(entity->position_buffer().buffer()).handle();
+        triangle_acceleration.vertexBufferOffset = entity->position_buffer().byte_offset();
+        triangle_acceleration.vertexStride = sizeof(float4);
+        triangle_acceleration.indexBuffer = dynamic_cast<MetalBuffer &>(entity->index_buffer().buffer()).handle();
+        triangle_acceleration.indexBufferOffset = entity->index_buffer().byte_offset();
+        triangle_acceleration.indexType = MPSDataTypeUInt32;
+        triangle_acceleration.triangleCount = entity->triangle_count();
+        [triangle_acceleration rebuild];
+        [acceleration_structures addObject:triangle_acceleration];
+    }
+    
+    instance_acceleration.instanceBuffer = dynamic_cast<MetalBuffer &>(geometry.entity_index_buffer().buffer()).handle();
+    instance_acceleration.instanceBufferOffset = geometry.entity_index_buffer().byte_offset();
+    instance_acceleration.instanceCount = geometry.entity_index_buffer().element_count();
+    instance_acceleration.transformBuffer = dynamic_cast<MetalBuffer &>(geometry.transform_buffer().buffer()).handle();
+    instance_acceleration.transformBufferOffset = geometry.transform_buffer().byte_offset();
+    instance_acceleration.transformType = geometry.dynamic_shapes().empty() && geometry.dynamic_instances().empty() ? MPSTransformTypeIdentity : MPSTransformTypeFloat4x4;
+    
+    [instance_acceleration rebuild];
+    
+    auto ray_intersector = [[MPSRayIntersector alloc] initWithDevice:_device_wrapper->device];
+    [ray_intersector autorelease];
+    ray_intersector.rayDataType = MPSRayDataTypeOriginMinDistanceDirectionMaxDistance;
+    ray_intersector.rayStride = sizeof(Ray);
+    ray_intersector.intersectionDataType = MPSIntersectionDataTypeDistancePrimitiveIndexInstanceIndexCoordinates;
+    ray_intersector.intersectionStride = sizeof(Intersection);
+    
+    auto shadow_ray_intersector = [[MPSRayIntersector alloc] initWithDevice:_device_wrapper->device];
+    [shadow_ray_intersector autorelease];
+    shadow_ray_intersector.rayDataType = MPSRayDataTypeOriginMinDistanceDirectionMaxDistance;
+    shadow_ray_intersector.rayStride = sizeof(Ray);
+    shadow_ray_intersector.intersectionDataType = MPSIntersectionDataTypeDistance;
+    shadow_ray_intersector.intersectionStride = sizeof(float);
+    
+    return std::make_unique<MetalAcceleration>(acceleration_group, instance_acceleration, ray_intersector, shadow_ray_intersector);
 }
 
 }
