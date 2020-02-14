@@ -3,13 +3,7 @@
 //
 
 #include "compatibility.h"
-
-#include <core/data_types.h>
-#include <core/ray.h>
-
 #include <integrators/path_tracing.h>
-
-#include <core/sampler.h>
 
 using namespace luisa;
 
@@ -32,7 +26,7 @@ LUISA_KERNEL void path_tracing_generate_pixel_samples(
     LUISA_DEVICE_SPACE float2 *ray_pixel_buffer,
     LUISA_DEVICE_SPACE const uint *ray_queue,
     LUISA_DEVICE_SPACE const uint &ray_queue_size,
-    LUISA_UNIFORM_SPACE PathTracingGeneratePixelSamplesKernelUniforms &uniforms,
+    LUISA_UNIFORM_SPACE path_tracing::GeneratePixelSamplesKernelUniforms &uniforms,
     uint2 tid [[thread_position_in_grid]]) {
     
     if (tid.x < ray_queue_size) {

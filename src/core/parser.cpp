@@ -12,6 +12,7 @@
 #include "material.h"
 #include "transform.h"
 #include "render.h"
+#include "sampler.h"
 
 namespace luisa {
 
@@ -124,6 +125,7 @@ std::shared_ptr<Render> Parser::_parse_top_level() {
         LUISA_PARSER_PARSE_GLOBAL_NODE(Integrator)
         LUISA_PARSER_PARSE_GLOBAL_NODE(Material)
         LUISA_PARSER_PARSE_GLOBAL_NODE(Render)
+        LUISA_PARSER_PARSE_GLOBAL_NODE(Sampler)
         
 #undef LUISA_PARSER_PARSE_GLOBAL_NODE
     }

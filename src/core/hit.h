@@ -12,7 +12,8 @@ struct ClosestHit {
     float distance;
     uint triangle_index;
     uint instance_index;
-    float2 coordinates;
+    float bary_u;
+    float bary_v;
 };
 
 struct AnyHit {

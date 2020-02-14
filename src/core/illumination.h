@@ -5,6 +5,15 @@
 #pragma once
 
 #include "data_types.h"
+
+namespace luisa::illumination {
+
+LUISA_DEVICE_CALLABLE inline void sample_lights() {}
+
+}
+
+#ifndef LUISA_DEVICE_COMPATIBLE
+
 #include "device.h"
 #include "light.h"
 
@@ -27,3 +36,5 @@ public:
 };
 
 }
+
+#endif

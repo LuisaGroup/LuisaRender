@@ -50,7 +50,7 @@ void ThinLensCamera::generate_rays(KernelDispatcher &dispatch,
         encode("ray_pixel_buffer", pixel_buffer);
         encode("ray_queue", ray_queue_buffer);
         encode("ray_queue_size", ray_queue_size_buffer);
-        encode("uniforms", ThinLensCameraGenerateRaysKernelUniforms{
+        encode("uniforms", thin_lens_camera::GenerateRaysKernelUniforms{
             _position, _left, _up, _front,
             _film->resolution(), _effective_sensor_size,
             _near_plane_distance, _focal_plane_distance, _lens_radius});

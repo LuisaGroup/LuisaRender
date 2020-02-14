@@ -9,7 +9,10 @@
 namespace luisa {
 
 struct Interaction {
-
+    float3 position;
+    float3 normal;
+    float3 wo;
+    float2 uv;
 };
 
 }

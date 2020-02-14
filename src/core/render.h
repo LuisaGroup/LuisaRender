@@ -7,6 +7,9 @@
 #include "node.h"
 #include "parser.h"
 #include "geometry.h"
+#include "camera.h"
+#include "integrator.h"
+#include "shape.h"
 #include "illumination.h"
 
 namespace luisa {

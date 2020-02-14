@@ -5,13 +5,12 @@
 #pragma once
 
 #include <core/data_types.h>
+#include <core/ray.h>
+#include <core/sampler.h>
 
-namespace luisa {
+namespace luisa::path_tracing {
 
-struct PathTracingGeneratePixelSamplesKernelUniforms {
-    uint2 film_resolution;
-    uint samples_per_pixel;
-};
+
 
 }
 
@@ -40,7 +39,6 @@ protected:
 
 public:
     PathTracing(Device *device, const ParameterSet &parameter_set);
-    
     void render() override;
 };
 
