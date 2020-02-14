@@ -12,7 +12,7 @@ void MetalAcceleration::refit(KernelDispatcher &dispatch) {
     [_structure encodeRefitToCommandBuffer:dynamic_cast<MetalKernelDispatcher &>(dispatch).command_buffer()];
 }
 
-void MetalAcceleration::trace_any(KernelDispatcher &dispatch, BufferView<Ray> ray_buffer, BufferView<Intersection> its_buffer, BufferView<uint> ray_count_buffer) {
+void MetalAcceleration::trace_any(KernelDispatcher &dispatch, BufferView<Ray> ray_buffer, BufferView<AnyHit> its_buffer, BufferView<uint> ray_count_buffer) {
     [_any_intersector encodeIntersectionToCommandBuffer:dynamic_cast<MetalKernelDispatcher &>(dispatch).command_buffer()
                                        intersectionType:MPSIntersectionTypeAny
                                               rayBuffer:dynamic_cast<MetalBuffer &>(ray_buffer.buffer()).handle()
@@ -24,7 +24,7 @@ void MetalAcceleration::trace_any(KernelDispatcher &dispatch, BufferView<Ray> ra
                                   accelerationStructure:_structure];
 }
 
-void MetalAcceleration::trace_closest(KernelDispatcher &dispatch, BufferView<Ray> ray_buffer, BufferView<Intersection> its_buffer, BufferView<uint> ray_count_buffer) {
+void MetalAcceleration::trace_closest(KernelDispatcher &dispatch, BufferView<Ray> ray_buffer, BufferView<ClosestHit> its_buffer, BufferView<uint> ray_count_buffer) {
     [_nearest_intersector encodeIntersectionToCommandBuffer:dynamic_cast<MetalKernelDispatcher &>(dispatch).command_buffer()
                                            intersectionType:MPSIntersectionTypeNearest
                                                   rayBuffer:dynamic_cast<MetalBuffer &>(ray_buffer.buffer()).handle()

@@ -11,7 +11,7 @@
 #include "integrator.h"
 #include "material.h"
 #include "transform.h"
-#include "task.h"
+#include "render.h"
 
 namespace luisa {
 
@@ -95,14 +95,14 @@ void Parser::_match(std::string_view token) {
     LUISA_ERROR_IF_NOT(_peek() == token, "expected \"", token, "\", got \"", _peek(), "\" at (", _curr_line, ", ", _curr_col, ")");
 }
 
-std::shared_ptr<Task> Parser::_parse_top_level() {
+std::shared_ptr<Render> Parser::_parse_top_level() {
     
-    std::shared_ptr<Task> task;
+    std::shared_ptr<Render> task;
     
     while (!_eof()) {
         auto token = _peek_and_pop();
-        if (token == "tasks") {
-            task = _parse_parameter_set()->parse<Task>();
+        if (token == "renderer") {
+            task = _parse_parameter_set()->parse<Render>();
             LUISA_WARNING_IF_NOT(_eof(), "nodes declared after tasks will be ignored");
             break;
         }
@@ -123,7 +123,7 @@ std::shared_ptr<Task> Parser::_parse_top_level() {
         LUISA_PARSER_PARSE_GLOBAL_NODE(Transform)
         LUISA_PARSER_PARSE_GLOBAL_NODE(Integrator)
         LUISA_PARSER_PARSE_GLOBAL_NODE(Material)
-        LUISA_PARSER_PARSE_GLOBAL_NODE(Task)
+        LUISA_PARSER_PARSE_GLOBAL_NODE(Render)
         
 #undef LUISA_PARSER_PARSE_GLOBAL_NODE
     }
@@ -136,7 +136,7 @@ bool Parser::_eof() const noexcept {
     return _peeked.empty() && _remaining.empty();
 }
 
-std::shared_ptr<Task> Parser::parse(const std::filesystem::path &file_path) {
+std::shared_ptr<Render> Parser::parse(const std::filesystem::path &file_path) {
     _curr_line = 0;
     _curr_col = 0;
     _next_line = 0;

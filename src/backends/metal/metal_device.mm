@@ -5,7 +5,7 @@
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
 
 #import <core/ray.h>
-#import <core/intersection.h>
+#import <core/hit.h>
 #import <core/geometry.h>
 
 #import <util/resource_manager.h>
@@ -124,6 +124,8 @@ std::unique_ptr<Acceleration> MetalDevice::create_acceleration(Geometry &geometr
     instance_acceleration.instanceCount = geometry.entity_index_buffer().element_count();
     instance_acceleration.transformBuffer = dynamic_cast<MetalBuffer &>(geometry.transform_buffer().buffer()).handle();
     instance_acceleration.transformBufferOffset = geometry.transform_buffer().byte_offset();
+    
+    // Note: metal provides optimization for static scenes without instanced shapes
     instance_acceleration.transformType = geometry.dynamic_shapes().empty() && geometry.dynamic_instances().empty() ? MPSTransformTypeIdentity : MPSTransformTypeFloat4x4;
     
     [instance_acceleration rebuild];
@@ -133,14 +135,14 @@ std::unique_ptr<Acceleration> MetalDevice::create_acceleration(Geometry &geometr
     ray_intersector.rayDataType = MPSRayDataTypeOriginMinDistanceDirectionMaxDistance;
     ray_intersector.rayStride = sizeof(Ray);
     ray_intersector.intersectionDataType = MPSIntersectionDataTypeDistancePrimitiveIndexInstanceIndexCoordinates;
-    ray_intersector.intersectionStride = sizeof(Intersection);
+    ray_intersector.intersectionStride = sizeof(ClosestHit);
     
     auto shadow_ray_intersector = [[MPSRayIntersector alloc] initWithDevice:_device_wrapper->device];
     [shadow_ray_intersector autorelease];
     shadow_ray_intersector.rayDataType = MPSRayDataTypeOriginMinDistanceDirectionMaxDistance;
     shadow_ray_intersector.rayStride = sizeof(Ray);
     shadow_ray_intersector.intersectionDataType = MPSIntersectionDataTypeDistance;
-    shadow_ray_intersector.intersectionStride = sizeof(float);
+    shadow_ray_intersector.intersectionStride = sizeof(AnyHit);
     
     return std::make_unique<MetalAcceleration>(acceleration_group, instance_acceleration, ray_intersector, shadow_ray_intersector);
 }

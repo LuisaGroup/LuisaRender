@@ -25,7 +25,14 @@ protected:
 public:
     Filter(Device *device, const ParameterSet &parameters)
         : Node{device}, _radius{parameters["radius"].parse_float_or_default(1.0f)} {}
-    virtual void add_samples(KernelDispatcher &dispatch, RayPool &ray_pool, RayQueueView ray_queue, Film &film) = 0;
+        
+    virtual void add_samples(KernelDispatcher &dispatch,
+                             BufferView<float2> pixel_buffer,
+                             BufferView<float3> radiance_buffer,
+                             BufferView<uint> ray_queue_buffer,
+                             BufferView<uint> ray_queue_size_buffer,
+                             Film &film) = 0;
+    
     [[nodiscard]] float radius() const noexcept { return _radius; }
 };
 

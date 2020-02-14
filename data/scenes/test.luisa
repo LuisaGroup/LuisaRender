@@ -40,12 +40,10 @@ Light light : Point {
 
 }
 
-Task task : SingleShot {
+renderer : SingleShot {
   integrator { @integrator }
   camera { @camera }
   shapes { @left_wall, @right_wall }
   lights { @light }
-  label { "helloworld" }
+  time_span { 0.0f, 0.0f }
 }
-
-tasks {}

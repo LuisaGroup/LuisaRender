@@ -8,11 +8,15 @@
 
 namespace luisa {
 
-struct Intersection {
+struct ClosestHit {
     float distance;
     uint triangle_index;
     uint instance_index;
     float2 coordinates;
+};
+
+struct AnyHit {
+    float distance;
 };
 
 }

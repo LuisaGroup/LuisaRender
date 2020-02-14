@@ -46,7 +46,13 @@ protected:
 
 public:
     ThinLensCamera(Device *device, const ParameterSet &parameters);
-    void generate_rays(KernelDispatcher &dispatch, BufferView<Ray> ray_buffer, RayPool &ray_pool, RayQueueView ray_queue) override;
+    void generate_rays(KernelDispatcher &dispatch,
+                       BufferView<float2> pixel_buffer,
+                       BufferView<SamplerState> sampler_state_buffer,
+                       BufferView<float3> throughput_buffer,
+                       BufferView<uint> ray_queue_buffer,
+                       BufferView<uint> ray_queue_size_buffer,
+                       BufferView<Ray> ray_buffer) override;
     
 };
 

@@ -7,6 +7,7 @@
 #include "node.h"
 #include "acceleration.h"
 #include "transform.h"
+#include "interaction.h"
 
 namespace luisa {
 class Shape;
@@ -15,7 +16,7 @@ class GeometryEntity;
 
 namespace luisa {
 
-class Geometry {
+class Geometry : Noncopyable {
 
 public:
     friend class GeometryEntity;
@@ -27,12 +28,14 @@ private:
     std::vector<std::shared_ptr<Shape>> _static_instances;
     std::vector<std::shared_ptr<Shape>> _dynamic_shapes;
     std::vector<std::shared_ptr<Shape>> _dynamic_instances;
+    
     std::unique_ptr<Buffer> _position_buffer;
     std::unique_ptr<Buffer> _normal_buffer;
     std::unique_ptr<Buffer> _tex_coord_buffer;
     std::unique_ptr<Buffer> _index_buffer;
     std::unique_ptr<Buffer> _dynamic_transform_buffer;
     std::unique_ptr<Buffer> _entity_index_buffer;
+    
     std::unique_ptr<Acceleration> _acceleration;
     std::vector<std::unique_ptr<GeometryEntity>> _entities;
 
@@ -46,9 +49,17 @@ public:
     [[nodiscard]] BufferView<float4x4> transform_buffer() { return _dynamic_transform_buffer->view<float4x4>(); }
     [[nodiscard]] BufferView<uint> entity_index_buffer() { return _entity_index_buffer->view<uint>(); }
     void update(KernelDispatcher &dispatch, float time);
+    
+    static std::unique_ptr<Geometry> create(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, float initial_time = 0.0f) {
+        return std::make_unique<Geometry>(device, shapes, initial_time);
+    }
+    
+    void closest_hit(KernelDispatcher &dispatch, BufferView<Ray> ray_buffer, BufferView<ClosestHit> hit_buffer);
+    void any_hit(KernelDispatcher &dispatch, BufferView<Ray> ray_buffer, BufferView<AnyHit> hit_buffer);
+    void evaluate_interactions(KernelDispatcher &dispatch, BufferView<Ray> ray_buffer, BufferView<ClosestHit> hit_buffer, BufferView<Interaction> interaction_buffer);
 };
 
-class GeometryEntity {
+class GeometryEntity : Noncopyable {
 
 public:
     friend class GeometryEncoder;

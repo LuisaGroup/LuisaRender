@@ -69,7 +69,7 @@ LUISA_MAKE_BASE_NODE_CLASS_MATCHER(Transform)
 LUISA_MAKE_BASE_NODE_CLASS_MATCHER(Light)
 LUISA_MAKE_BASE_NODE_CLASS_MATCHER(Material)
 LUISA_MAKE_BASE_NODE_CLASS_MATCHER(Integrator)
-LUISA_MAKE_BASE_NODE_CLASS_MATCHER(Task)
+LUISA_MAKE_BASE_NODE_CLASS_MATCHER(Render)
 
 #undef LUISA_MAKE_BASE_NODE_CLASS_MATCHER
 
@@ -106,7 +106,7 @@ class Node : public Noncopyable {
 public:
     friend class ParameterSet;
 
-private:
+protected:
     Device *_device;
 
 public:

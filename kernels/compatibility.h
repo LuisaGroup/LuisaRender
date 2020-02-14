@@ -81,4 +81,6 @@ using metal::memory_order_relaxed;
 
 }
 
+#define static_assert(pred) static_assert(pred, "")
+
 #endif

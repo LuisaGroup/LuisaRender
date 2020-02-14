@@ -20,7 +20,12 @@ void RGBFilm::postprocess(KernelDispatcher &dispatch) {
 void RGBFilm::save(const std::filesystem::path &filename) {
     cv::Mat image(cv::Size2l{_resolution.x, _resolution.y}, CV_32FC3, _framebuffer->data());
     cv::cvtColor(image, image, cv::COLOR_RGB2BGR);
-    cv::imwrite(filename, image);
+    auto path = std::filesystem::absolute(filename);
+    if (path.extension() != ".exr") {
+        LUISA_WARNING("file name not ended with .exr: ", filename);
+        path += ".exr";
+    }
+    cv::imwrite(path, image);
 }
 
 RGBFilm::RGBFilm(Device *device, const ParameterSet &parameters) : Film{device, parameters} {

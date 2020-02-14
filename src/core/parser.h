@@ -289,7 +289,7 @@ public:
     
     [[nodiscard]] std::string parse_string_or_default(std::string_view default_value) const noexcept {
         try { return parse_string(); } catch (const std::runtime_error &e) {
-            LUISA_WARNING("error occurred while parsing string, using default:\n    ", e.what());
+            LUISA_WARNING("error occurred while parsing string, using default value, reason:\n    ", e.what());
             return std::string{default_value};
         }
     }
@@ -303,12 +303,12 @@ public:
         return string_list;
     }
 
-#define LUISA_PARAMETER_SET_PARSE_OR_DEFAULT(Type)                                                 \
-    [[nodiscard]] Type parse_##Type##_or_default(Type default_value) const noexcept {              \
-        try { return parse_##Type(); } catch (const std::runtime_error &e) {                       \
-            LUISA_WARNING("error occurred while parsing "#Type", using default:\n    ", e.what());  \
-            return default_value;                                                                  \
-        }                                                                                          \
+#define LUISA_PARAMETER_SET_PARSE_OR_DEFAULT(Type)                                                                \
+    [[nodiscard]] Type parse_##Type##_or_default(Type default_value) const noexcept {                             \
+        try { return parse_##Type(); } catch (const std::runtime_error &e) {                                      \
+            LUISA_WARNING("error occurred while parsing "#Type", using default value, reason:\n    ", e.what());  \
+            return default_value;                                                                                 \
+        }                                                                                                         \
     }
     
     LUISA_PARAMETER_SET_PARSE_OR_DEFAULT(bool)
@@ -334,7 +334,7 @@ public:
 
 };
 
-class Task;
+class Render;
 
 class Parser {
 
@@ -356,14 +356,14 @@ private:
     [[nodiscard]] static bool _is_identifier(std::string_view sv) noexcept;
     [[nodiscard]] std::string_view _peek();
     [[nodiscard]] std::string_view _peek_and_pop();
-    [[nodiscard]] std::shared_ptr<Task> _parse_top_level();
+    [[nodiscard]] std::shared_ptr<Render> _parse_top_level();
     [[nodiscard]] bool _eof() const noexcept;
     [[nodiscard]] std::unique_ptr<ParameterSet> _parse_parameter_set();
 
 public:
     explicit Parser(Device *device) noexcept : _device{device} {}
     
-    [[nodiscard]] std::shared_ptr<Task> parse(const std::filesystem::path &file_path);
+    [[nodiscard]] std::shared_ptr<Render> parse(const std::filesystem::path &file_path);
     
     template<typename T>
     [[nodiscard]] std::shared_ptr<T> global_node(std::string_view node_name) const {

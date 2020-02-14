@@ -9,6 +9,7 @@
 #include "film.h"
 #include "node.h"
 #include "parser.h"
+#include "sampler.h"
 
 namespace luisa {
 
@@ -24,12 +25,16 @@ public:
     Camera(Device *device, const ParameterSet &parameters)
         : Node{device}, _film{parameters["film"].parse<Film>()} {}
     virtual void update(float time[[maybe_unused]]) { /* doing nothing by default */ }
-    virtual void generate_rays(KernelDispatcher &dispatch, BufferView<Ray> ray_buffer, RayPool &ray_pool, RayQueueView ray_queue) = 0;
+    
+    virtual void generate_rays(KernelDispatcher &dispatch,
+                               BufferView<float2> pixel_buffer,
+                               BufferView<SamplerState> sampler_state_buffer,
+                               BufferView<float3> throughput_buffer,
+                               BufferView<uint> ray_queue_buffer,
+                               BufferView<uint> ray_queue_size_buffer,
+                               BufferView<Ray> ray_buffer) = 0;
+    
     [[nodiscard]] Film &film() { return *_film; }
-
-#ifndef NDEBUG
-    static void debug() noexcept { _creators.debug(); }
-#endif
 
 };
 

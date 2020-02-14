@@ -42,15 +42,14 @@ protected:
     std::unique_ptr<Kernel> _add_samples_kernel;
 
 public:
-    MitchellNetravaliFilter(Device *device, const ParameterSet &parameters)
-        : Filter{device, parameters},
-          _b{parameters["b"].parse_float_or_default(1.0f / 3.0f)},
-          _c{parameters["c"].parse_float_or_default(1.0f / 3.0f)} {
-        
-        _add_samples_kernel = device->create_kernel("mitchell_netravali_filter_add_samples");
-    }
-    void add_samples(KernelDispatcher &dispatch, RayPool &ray_pool, RayQueueView ray_queue, Film &film) override;
+    MitchellNetravaliFilter(Device *device, const ParameterSet &parameters);
     
+    void add_samples(KernelDispatcher &dispatch,
+                     BufferView<float2> pixel_buffer,
+                     BufferView<float3> radiance_buffer,
+                     BufferView<uint> ray_queue_buffer,
+                     BufferView<uint> ray_queue_size_buffer,
+                     Film &film) override;
 };
 
 LUISA_REGISTER_NODE_CREATOR("MitchellNetravali", MitchellNetravaliFilter)

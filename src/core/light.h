@@ -4,8 +4,19 @@
 
 #pragma once
 
-class Light {
+#include "node.h"
+#include "parser.h"
+
+namespace luisa {
+
+class Light : public Node {
+
+private:
+    LUISA_MAKE_NODE_CREATOR_REGISTRY(Light);
+
+public:
+    
 
 };
 
-
+}

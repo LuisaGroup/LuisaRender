@@ -42,9 +42,6 @@ public:
         });
     }
     
-    virtual void gather_rays(KernelDispatcher &dispatch, RayPool &ray_pool, RayQueueView ray_queue) {
-        _filter->add_samples(dispatch, ray_pool, ray_queue, *this);
-    }
     virtual void postprocess(KernelDispatcher &dispatch) = 0;
     virtual void save(const std::filesystem::path &filename) = 0;
     [[nodiscard]] Filter &filter() noexcept { return *_filter; }

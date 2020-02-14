@@ -31,20 +31,25 @@ ThinLensCamera::ThinLensCamera(Device *device, const ParameterSet &parameters)
     _up = normalize(cross(_front, _left));
     
     _focal_plane_distance = length(forward);
-    _near_plane_distance = 2.0f / focal_length - 1.0f / _focal_plane_distance;
+    _near_plane_distance = 1.0f / (2.0f / focal_length - 1.0f / _focal_plane_distance);
     _generate_rays_kernel = device->create_kernel("thin_lens_camera_generate_rays");
 }
 
-void ThinLensCamera::generate_rays(KernelDispatcher &dispatch, BufferView<Ray> ray_buffer, RayPool &ray_pool, RayQueueView ray_queue) {
+void ThinLensCamera::generate_rays(KernelDispatcher &dispatch,
+                                   BufferView<float2> pixel_buffer,
+                                   BufferView<SamplerState> sampler_state_buffer,
+                                   BufferView<float3> throughput_buffer,
+                                   BufferView<uint> ray_queue_buffer,
+                                   BufferView<uint> ray_queue_size_buffer,
+                                   BufferView<Ray> ray_buffer) {
     
-    dispatch(*_generate_rays_kernel, ray_queue.capacity(), [&](KernelArgumentEncoder &encode) {
-        
+    dispatch(*_generate_rays_kernel, ray_queue_buffer.element_count(), [&](KernelArgumentEncoder &encode) {
         encode("ray_buffer", ray_buffer);
-        encode("ray_throughput_buffer", ray_pool.attribute_buffer<float3>("throughput"));
-        encode("ray_sampler_state_buffer", ray_pool.attribute_buffer<SamplerState>("sampler_state"));
-        encode("ray_pixel_buffer", ray_pool.attribute_buffer<SamplerState>("pixel"));
-        encode("ray_queue", ray_queue.index_buffer);
-        encode("ray_queue_size", ray_queue.size_buffer);
+        encode("ray_throughput_buffer", throughput_buffer);
+        encode("ray_sampler_state_buffer", sampler_state_buffer);
+        encode("ray_pixel_buffer", pixel_buffer);
+        encode("ray_queue", ray_queue_buffer);
+        encode("ray_queue_size", ray_queue_size_buffer);
         encode("uniforms", ThinLensCameraGenerateRaysKernelUniforms{
             _position, _left, _up, _front,
             _film->resolution(), _effective_sensor_size,
