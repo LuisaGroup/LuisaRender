@@ -6,7 +6,6 @@
 
 #include <core/data_types.h>
 #include <core/ray.h>
-#include <core/sampler.h>
 
 namespace luisa::path_tracing {
 

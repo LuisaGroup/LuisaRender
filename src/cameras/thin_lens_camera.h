@@ -7,11 +7,8 @@
 #include <core/data_types.h>
 #include <core/ray.h>
 #include <core/sampling.h>
-#include <core/sampler.h>
 
-namespace luisa {
-
-namespace thin_lens_camera {
+namespace luisa::thin_lens_camera {
 
 struct GenerateRaysKernelUniforms {
     float3 camera_position;
@@ -26,36 +23,28 @@ struct GenerateRaysKernelUniforms {
 };
 
 LUISA_DEVICE_CALLABLE inline void thin_lens_camera_generate_rays(
+    LUISA_DEVICE_SPACE const float4 *sample_buffer,
     LUISA_DEVICE_SPACE float3 *ray_throughput_buffer,
     LUISA_DEVICE_SPACE Ray *ray_buffer,
-    LUISA_DEVICE_SPACE SamplerState *ray_sampler_state_buffer,
-    LUISA_DEVICE_SPACE const float2 *ray_pixel_buffer,
-    LUISA_DEVICE_SPACE const uint *ray_queue,
-    uint ray_queue_size,
+    LUISA_DEVICE_SPACE float2 *ray_pixel_buffer,
     LUISA_UNIFORM_SPACE GenerateRaysKernelUniforms &uniforms,
     uint tid) {
     
-    if (tid < ray_queue_size) {
+    if (tid < uniforms.film_resolution.x * uniforms.film_resolution.y) {
         
-        auto ray_index = ray_queue[tid];
-        auto pixel = ray_pixel_buffer[ray_index];
+        auto sample = sample_buffer[tid];
+        
+        auto pixel = make_float2(tid % uniforms.film_resolution.x, tid / uniforms.film_resolution.y) + make_float2(sample);
         auto p_focal = (make_float2(0.5f) - pixel / make_float2(uniforms.film_resolution)) * (uniforms.focal_plane / uniforms.near_plane);
         auto p_focal_world = p_focal.x * uniforms.camera_left + p_focal.y * uniforms.camera_up + uniforms.focal_plane * uniforms.camera_front;
         
-        auto sampler_state = ray_sampler_state_buffer[ray_index];
-        auto r1 = sampler_generate_sample(sampler_state);
-        auto r2 = sampler_generate_sample(sampler_state);
-        auto p_lens = concentric_sample_disk(r1, r2) * uniforms.lens_radius;
+        auto p_lens = concentric_sample_disk(sample.z, sample.w) * uniforms.lens_radius;
         auto p_lens_world = p_lens.x * uniforms.camera_left + p_lens.y * uniforms.camera_up + uniforms.camera_position;
         
         ray_buffer[tid] = make_ray(p_lens_world, normalize(p_focal_world - p_lens_world));
-        ray_sampler_state_buffer[ray_index] = sampler_state;
-        ray_throughput_buffer[ray_index] = make_float3(1.0f);
+        ray_pixel_buffer[tid] = pixel;
+        ray_throughput_buffer[tid] = make_float3(1.0f);
     }
-    
-}
-
-
 }
 
 }
@@ -85,12 +74,10 @@ protected:
 public:
     ThinLensCamera(Device *device, const ParameterSet &parameters);
     void generate_rays(KernelDispatcher &dispatch,
+                       BufferView<float4> sample_buffer,
                        BufferView<float2> pixel_buffer,
-                       BufferView<SamplerState> sampler_state_buffer,
-                       BufferView<float3> throughput_buffer,
-                       BufferView<uint> ray_queue_buffer,
-                       BufferView<uint> ray_queue_size_buffer,
-                       BufferView<Ray> ray_buffer) override;
+                       BufferView<Ray> ray_buffer,
+                       BufferView<float3> throughput_buffer) override;
     
 };
 

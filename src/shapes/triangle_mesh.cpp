@@ -27,6 +27,8 @@ void TriangleMesh::load(GeometryEncoder &encoder) {
                                    aiComponent_CAMERAS |
                                    aiComponent_TEXTURES |
                                    aiComponent_MATERIALS);
+    
+    std::cout << "Loading: " << _path << std::endl;
     auto ai_scene = ai_importer.ReadFile(_path.c_str(),
                                          aiProcess_JoinIdenticalVertices |
                                          aiProcess_Triangulate |
@@ -85,7 +87,6 @@ void TriangleMesh::load(GeometryEncoder &encoder) {
             }
         }
     }
-    
     _entity_index = encoder.create();
 }
 

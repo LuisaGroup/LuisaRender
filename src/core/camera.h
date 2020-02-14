@@ -27,12 +27,10 @@ public:
     virtual void update(float time[[maybe_unused]]) { /* doing nothing by default */ }
     
     virtual void generate_rays(KernelDispatcher &dispatch,
+                               BufferView<float4> sampler_buffer,
                                BufferView<float2> pixel_buffer,
-                               BufferView<SamplerState> sampler_state_buffer,
-                               BufferView<float3> throughput_buffer,
-                               BufferView<uint> ray_queue_buffer,
-                               BufferView<uint> ray_queue_size_buffer,
-                               BufferView<Ray> ray_buffer) = 0;
+                               BufferView<Ray> ray_buffer,
+                               BufferView<float3> throughput_buffer) = 0;
     
     [[nodiscard]] Film &film() { return *_film; }
 

@@ -18,7 +18,7 @@ void RGBFilm::postprocess(KernelDispatcher &dispatch) {
 }
 
 void RGBFilm::save(const std::filesystem::path &filename) {
-    cv::Mat image(cv::Size2l{_resolution.x, _resolution.y}, CV_32FC3, _framebuffer->data());
+    cv::Mat image(cv::Size2l{_resolution.x, _resolution.y}, CV_32FC4, _framebuffer->data());
     cv::cvtColor(image, image, cv::COLOR_RGB2BGR);
     auto path = std::filesystem::absolute(filename);
     if (path.extension() != ".exr") {
@@ -29,7 +29,6 @@ void RGBFilm::save(const std::filesystem::path &filename) {
 }
 
 RGBFilm::RGBFilm(Device *device, const ParameterSet &parameters) : Film{device, parameters} {
-    _framebuffer = device->create_buffer<packed_float3>(_resolution.x * _resolution.y, BufferStorage::DEVICE_PRIVATE);
     _postprocess_kernel = device->create_kernel("rgb_film_postprocess");
 }
 

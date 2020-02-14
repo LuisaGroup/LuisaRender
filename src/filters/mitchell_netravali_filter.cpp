@@ -11,23 +11,20 @@ MitchellNetravaliFilter::MitchellNetravaliFilter(Device *device, const Parameter
       _b{parameters["b"].parse_float_or_default(1.0f / 3.0f)},
       _c{parameters["c"].parse_float_or_default(1.0f / 3.0f)} {
     
-    _add_samples_kernel = device->create_kernel("mitchell_netravali_filter_add_samples");
+    _apply_kernel = device->create_kernel("mitchell_netravali_filter_apply");
 }
 
-void MitchellNetravaliFilter::add_samples(KernelDispatcher &dispatch,
-                                          BufferView<float2> pixel_buffer,
-                                          BufferView<float3> radiance_buffer,
-                                          BufferView<uint> ray_queue_buffer,
-                                          BufferView<uint> ray_queue_size_buffer,
-                                          Film &film) {
+void MitchellNetravaliFilter::apply(KernelDispatcher &dispatch,
+                                    BufferView<float2> pixel_buffer,
+                                    BufferView<float3> radiance_buffer,
+                                    BufferView<float4> frame,
+                                    uint2 film_resolution) {
     
-    dispatch(*_add_samples_kernel, ray_queue_buffer.element_count(), [&](KernelArgumentEncoder &encode) {
+    dispatch(*_apply_kernel, film_resolution, [&](KernelArgumentEncoder &encode) {
         encode("ray_radiance_buffer", radiance_buffer);
         encode("ray_pixel_buffer", pixel_buffer);
-        encode("ray_queue", ray_queue_buffer);
-        encode("ray_queue_size", ray_queue_size_buffer);
-        encode("accumulation_buffer", film.accumulation_buffer());
-        encode("uniforms", MitchellNetravaliFilterAddSamplesKernelUniforms{film.resolution(), _radius, _b, _c});
+        encode("frame", frame);
+        encode("uniforms", mitchell_netravali_filter::ApplyKernelUniforms{film_resolution, _radius, _b, _c});
     });
 }
 

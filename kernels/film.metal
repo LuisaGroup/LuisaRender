@@ -3,26 +3,23 @@
 //
 
 #include "compatibility.h"
-
-#include <core/data_types.h>
+#include <core/film.h>
 
 using namespace luisa;
 
-inline void film_clear_accumulation_buffer_impl(LUISA_DEVICE_SPACE int4 *accumulation_buffer, uint pixel_count, uint2 tid) {
-    if (tid.x < pixel_count) {
-        accumulation_buffer[tid.x] = {};
-    }
-}
-
 LUISA_KERNEL void film_clear_accumulation_buffer(
-    LUISA_DEVICE_SPACE int4 *accumulation_buffer,
+    LUISA_DEVICE_SPACE float4 *accumulation_buffer,
     LUISA_UNIFORM_SPACE uint &pixel_count,
     uint2 tid [[thread_position_in_grid]]) {
     
-    film_clear_accumulation_buffer_impl(accumulation_buffer, pixel_count, tid);
+    film::clear_accumulation_buffer(accumulation_buffer, pixel_count, tid.x);
+}
+
+LUISA_KERNEL void film_accumulate_frame(
+    LUISA_DEVICE_SPACE const float4 *frame,
+    LUISA_DEVICE_SPACE float4 *accumulation_buffer,
+    LUISA_UNIFORM_SPACE uint &pixel_count,
+    uint2 tid [[thread_position_in_grid]]) {
     
-//    if (tid.x < pixel_count) {
-//        accumulation_buffer[tid.x] = {};
-//    }
-    
+    film::accumulate_frame(frame, accumulation_buffer, pixel_count, tid.x);
 }
