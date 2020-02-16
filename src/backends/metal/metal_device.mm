@@ -121,7 +121,7 @@ std::unique_ptr<Acceleration> MetalDevice::create_acceleration(Geometry &geometr
     
     instance_acceleration.instanceBuffer = dynamic_cast<MetalBuffer &>(geometry.entity_index_buffer().typeless_buffer()).handle();
     instance_acceleration.instanceBufferOffset = geometry.entity_index_buffer().byte_offset();
-    instance_acceleration.instanceCount = geometry.entity_index_buffer().element_count();
+    instance_acceleration.instanceCount = geometry.entity_index_buffer().size();
     instance_acceleration.transformBuffer = dynamic_cast<MetalBuffer &>(geometry.transform_buffer().typeless_buffer()).handle();
     instance_acceleration.transformBufferOffset = geometry.transform_buffer().byte_offset();
     

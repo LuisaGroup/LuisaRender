@@ -15,7 +15,7 @@ IndependentSampler::IndependentSampler(Device *device, const ParameterSet &param
       _generate_4d_samples_kernel{device->create_kernel("independent_sampler_generate_4d_samples")} {}
 
 void IndependentSampler::generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float> sample_buffer) {
-    dispatch(*_generate_1d_samples_kernel, ray_queue_buffer.element_count(), [&](KernelArgumentEncoder &encode) {
+    dispatch(*_generate_1d_samples_kernel, ray_queue_buffer.size(), [&](KernelArgumentEncoder &encode) {
         encode("sampler_state_buffer", *_state_buffer);
         encode("ray_queue", ray_queue_buffer);
         encode("ray_count", ray_count_buffer);
@@ -25,7 +25,7 @@ void IndependentSampler::generate_samples(KernelDispatcher &dispatch, BufferView
 }
 
 void IndependentSampler::generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float2> sample_buffer) {
-    dispatch(*_generate_2d_samples_kernel, ray_queue_buffer.element_count(), [&](KernelArgumentEncoder &encode) {
+    dispatch(*_generate_2d_samples_kernel, ray_queue_buffer.size(), [&](KernelArgumentEncoder &encode) {
         encode("sampler_state_buffer", *_state_buffer);
         encode("ray_queue", ray_queue_buffer);
         encode("ray_count", ray_count_buffer);
@@ -35,7 +35,7 @@ void IndependentSampler::generate_samples(KernelDispatcher &dispatch, BufferView
 }
 
 void IndependentSampler::generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float3> sample_buffer) {
-    dispatch(*_generate_3d_samples_kernel, ray_queue_buffer.element_count(), [&](KernelArgumentEncoder &encode) {
+    dispatch(*_generate_3d_samples_kernel, ray_queue_buffer.size(), [&](KernelArgumentEncoder &encode) {
         encode("sampler_state_buffer", *_state_buffer);
         encode("ray_queue", ray_queue_buffer);
         encode("ray_count", ray_count_buffer);
@@ -45,7 +45,7 @@ void IndependentSampler::generate_samples(KernelDispatcher &dispatch, BufferView
 }
 
 void IndependentSampler::generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float4> sample_buffer) {
-    dispatch(*_generate_4d_samples_kernel, ray_queue_buffer.element_count(), [&](KernelArgumentEncoder &encode) {
+    dispatch(*_generate_4d_samples_kernel, ray_queue_buffer.size(), [&](KernelArgumentEncoder &encode) {
         encode("sampler_state_buffer", *_state_buffer);
         encode("ray_queue", ray_queue_buffer);
         encode("ray_count", ray_count_buffer);
@@ -57,7 +57,7 @@ void IndependentSampler::generate_samples(KernelDispatcher &dispatch, BufferView
 void IndependentSampler::reset_states(KernelDispatcher &dispatch, uint2 film_resolution) {
     auto pixel_count = film_resolution.x * film_resolution.y;
     Sampler::reset_states(dispatch, film_resolution);
-    if (_state_buffer == nullptr || _state_buffer->view().element_count() < pixel_count) {
+    if (_state_buffer == nullptr || _state_buffer->view().size() < pixel_count) {
         _state_buffer = _device->create_buffer<independent_sampler::SamplerState>(pixel_count, BufferStorage::DEVICE_PRIVATE);
     }
     dispatch(*_reset_states_kernel, pixel_count, [&](KernelArgumentEncoder &encode) {

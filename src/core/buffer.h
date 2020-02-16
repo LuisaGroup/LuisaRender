@@ -8,13 +8,11 @@
 #include <util/noncopyable.h>
 
 namespace luisa {
-
-enum struct BufferStorage {
-    DEVICE_PRIVATE,
-    MANAGED
-};
-
 class TypelessBuffer;
+struct KernelDispatcher;
+}
+
+namespace luisa {
 
 template<typename T>
 class BufferView {
@@ -30,14 +28,18 @@ public:
     
     [[nodiscard]] size_t byte_size() const noexcept { return _element_count * sizeof(T); }
     [[nodiscard]] size_t byte_offset() const noexcept { return _element_offset * sizeof(T); }
-    [[nodiscard]] size_t element_count() const noexcept { return _element_count; }
-    [[nodiscard]] size_t element_offset() const noexcept { return _element_offset; }
+    [[nodiscard]] size_t size() const noexcept { return _element_count; }
     [[nodiscard]] TypelessBuffer &typeless_buffer() noexcept { return *_buffer; }
     [[nodiscard]] T *data();
     [[nodiscard]] const T *data() const { return const_cast<BufferView<T> *>(this)->data(); }
     [[nodiscard]] T &operator[](size_t index) { return data()[index]; }
     [[nodiscard]] const T &operator[](size_t index) const { return data()[index]; }
     void upload();
+};
+
+enum struct BufferStorage {
+    DEVICE_PRIVATE,
+    MANAGED
 };
 
 class TypelessBuffer : Noncopyable {
@@ -50,8 +52,7 @@ public:
     TypelessBuffer(size_t capacity, BufferStorage storage) noexcept : _capacity{capacity}, _storage{storage} {};
     virtual ~TypelessBuffer() noexcept = default;
     virtual void upload(size_t offset, size_t size) = 0;
-    virtual void upload() { upload(0ul, capacity()); }
-    virtual void synchronize(struct KernelDispatcher &dispatch) = 0;
+    virtual void synchronize(KernelDispatcher &dispatch) = 0;
     [[nodiscard]] virtual const void *data() const { return const_cast<TypelessBuffer *>(this)->data(); }
     [[nodiscard]] virtual void *data() = 0;
     [[nodiscard]] size_t capacity() const noexcept { return _capacity; }
@@ -91,11 +92,13 @@ public:
         return BufferView<T>{_typeless_buffer.get(), element_offset, element_count};
     }
     
-    void synchronize(struct KernelDispatcher &dispatch) { _typeless_buffer->synchronize(dispatch); }
-    void upload() { _typeless_buffer->upload(); }
+    void synchronize(KernelDispatcher &dispatch) { _typeless_buffer->synchronize(dispatch); }
+    void upload() { view().upload(); }
     void upload(size_t offset, size_t size) { view(offset, size).upload(); }
     
-    [[nodiscard]] size_t capacity() const noexcept { return _typeless_buffer->capacity() / sizeof(Element); }
+    [[nodiscard]] size_t size() const noexcept { return _typeless_buffer->capacity() / sizeof(Element); }
+    [[nodiscard]] Element *data() { return view().data(); }
+    [[nodiscard]] const Element *data() const { return const_cast<Buffer<Element> *>(this)->data(); }
 };
 
 template<typename T>
