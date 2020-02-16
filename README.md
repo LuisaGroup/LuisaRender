@@ -1,2 +1,2 @@
-# Metalight
-Path tracer implemented in C++ using Apple's Metal API
+# LuisaRender
+High-performance renderer on GPU.
