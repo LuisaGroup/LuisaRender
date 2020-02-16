@@ -16,16 +16,21 @@ struct KernelArgumentEncoder : Noncopyable {
     
     virtual ~KernelArgumentEncoder() noexcept = default;
     
-    virtual void set_buffer(std::string_view argument_name, Buffer &buffer, size_t offset) = 0;
+    virtual void set_buffer(std::string_view argument_name, TypelessBuffer &buffer, size_t offset) = 0;
     virtual void set_bytes(std::string_view argument_name, const void *data, size_t size) = 0;
     
-    void operator()(std::string_view argument_name, Buffer &buffer, size_t offset = 0ul) {
+    void operator()(std::string_view argument_name, TypelessBuffer &buffer, size_t offset = 0ul) {
         set_buffer(argument_name, buffer, offset);
     }
     
     template<typename T>
     void operator()(std::string_view argument_name, BufferView<T> buffer_view) {
-        set_buffer(argument_name, buffer_view.buffer(), buffer_view.byte_offset());
+        set_buffer(argument_name, buffer_view.typeless_buffer(), buffer_view.byte_offset());
+    }
+    
+    template<typename T>
+    void operator()(std::string_view argument_name, Buffer<T> &buffer) {
+        set_buffer(argument_name, buffer.view().typeless_buffer(), buffer.view().byte_offset());
     }
     
     void operator()(std::string_view argument_name, const void *bytes, size_t size) {

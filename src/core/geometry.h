@@ -79,12 +79,12 @@ private:
     std::vector<std::shared_ptr<Shape>> _dynamic_shapes;
     std::vector<std::shared_ptr<Shape>> _dynamic_instances;
     
-    std::unique_ptr<Buffer> _position_buffer;
-    std::unique_ptr<Buffer> _normal_buffer;
-    std::unique_ptr<Buffer> _tex_coord_buffer;
-    std::unique_ptr<Buffer> _index_buffer;
-    std::unique_ptr<Buffer> _dynamic_transform_buffer;
-    std::unique_ptr<Buffer> _entity_index_buffer;
+    std::unique_ptr<Buffer<float3>> _position_buffer;
+    std::unique_ptr<Buffer<float3>> _normal_buffer;
+    std::unique_ptr<Buffer<float2>> _tex_coord_buffer;
+    std::unique_ptr<Buffer<packed_uint3>> _index_buffer;
+    std::unique_ptr<Buffer<float4x4>> _dynamic_transform_buffer;
+    std::unique_ptr<Buffer<uint>> _entity_index_buffer;
     
     std::unique_ptr<Acceleration> _acceleration;
     std::vector<std::unique_ptr<GeometryEntity>> _entities;
@@ -96,8 +96,8 @@ public:
     [[nodiscard]] const std::vector<std::shared_ptr<Shape>> &dynamic_shapes() const noexcept { return _dynamic_shapes; }
     [[nodiscard]] const std::vector<std::shared_ptr<Shape>> &dynamic_instances() const noexcept { return _dynamic_instances; }
     [[nodiscard]] const std::vector<std::unique_ptr<GeometryEntity>> &entities() const noexcept { return _entities; }
-    [[nodiscard]] BufferView<float4x4> transform_buffer() { return _dynamic_transform_buffer->view<float4x4>(); }
-    [[nodiscard]] BufferView<uint> entity_index_buffer() { return _entity_index_buffer->view<uint>(); }
+    [[nodiscard]] BufferView<float4x4> transform_buffer() { return _dynamic_transform_buffer->view(); }
+    [[nodiscard]] BufferView<uint> entity_index_buffer() { return _entity_index_buffer->view(); }
     void update(KernelDispatcher &dispatch, float time);
     
     static std::unique_ptr<Geometry> create(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, float initial_time = 0.0f) {
@@ -125,10 +125,10 @@ public:
     GeometryEntity(Geometry *geometry, uint vertex_offset, uint vertex_count, uint index_offset, uint index_count)
         : _geometry{geometry}, _vertex_offset{vertex_offset}, _vertex_count{vertex_count}, _index_offset{index_offset}, _index_count{index_count} {}
     
-    [[nodiscard]] BufferView<float3> position_buffer() { return _geometry->_position_buffer->view<float3>(_vertex_offset, _vertex_count); }
-    [[nodiscard]] BufferView<float3> normal_buffer() { return _geometry->_normal_buffer->view<float3>(_vertex_offset, _vertex_count); }
-    [[nodiscard]] BufferView<float2> texture_coord_buffer() { return _geometry->_tex_coord_buffer->view<float2>(_vertex_offset, _vertex_count); }
-    [[nodiscard]] BufferView<packed_uint3> index_buffer() { return _geometry->_index_buffer->view<packed_uint3>(_index_offset, _index_count); }
+    [[nodiscard]] BufferView<float3> position_buffer() { return _geometry->_position_buffer->view(_vertex_offset, _vertex_count); }
+    [[nodiscard]] BufferView<float3> normal_buffer() { return _geometry->_normal_buffer->view(_vertex_offset, _vertex_count); }
+    [[nodiscard]] BufferView<float2> texture_coord_buffer() { return _geometry->_tex_coord_buffer->view(_vertex_offset, _vertex_count); }
+    [[nodiscard]] BufferView<packed_uint3> index_buffer() { return _geometry->_index_buffer->view(_index_offset, _index_count); }
     [[nodiscard]] uint triangle_count() const noexcept { return _index_count; }
 };
 

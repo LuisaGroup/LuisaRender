@@ -92,7 +92,7 @@ protected:
     std::unique_ptr<Kernel> _generate_2d_samples_kernel;
     std::unique_ptr<Kernel> _generate_3d_samples_kernel;
     std::unique_ptr<Kernel> _generate_4d_samples_kernel;
-    std::unique_ptr<Buffer> _state_buffer;
+    std::unique_ptr<Buffer<independent_sampler::SamplerState>> _state_buffer;
 
 public:
     IndependentSampler(Device *device, const ParameterSet &parameter_set);

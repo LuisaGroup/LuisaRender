@@ -40,12 +40,12 @@ public:
     }
     
     [[nodiscard]] virtual std::unique_ptr<Kernel> create_kernel(std::string_view function_name) = 0;
-    [[nodiscard]] virtual std::unique_ptr<Buffer> allocate_buffer(size_t capacity, BufferStorage storage) = 0;
+    [[nodiscard]] virtual std::unique_ptr<TypelessBuffer> allocate_buffer(size_t capacity, BufferStorage storage) = 0;
     [[nodiscard]] virtual std::unique_ptr<Acceleration> create_acceleration(Geometry &geometry) = 0;
     
     template<typename T>
-    [[nodiscard]] std::unique_ptr<Buffer> create_buffer(size_t element_count, BufferStorage buffer_storage) {
-        return allocate_buffer(element_count * sizeof(T), buffer_storage);
+    [[nodiscard]] auto create_buffer(size_t element_count, BufferStorage buffer_storage) {
+        return std::make_unique<Buffer<T>>(allocate_buffer(element_count * sizeof(T), buffer_storage));
     }
     
     virtual void launch(std::function<void(KernelDispatcher &)> dispatch) = 0;

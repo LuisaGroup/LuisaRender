@@ -87,7 +87,7 @@ void MetalDevice::launch_async(std::function<void(KernelDispatcher &)> dispatch,
     [command_buffer commit];
 }
 
-std::unique_ptr<Buffer> MetalDevice::allocate_buffer(size_t capacity, BufferStorage storage) {
+std::unique_ptr<TypelessBuffer> MetalDevice::allocate_buffer(size_t capacity, BufferStorage storage) {
     
     auto buffer = [_device_wrapper->device newBufferWithLength:capacity
                                                        options:storage == BufferStorage::DEVICE_PRIVATE ? MTLResourceStorageModePrivate : MTLResourceStorageModeManaged];
@@ -108,10 +108,10 @@ std::unique_ptr<Acceleration> MetalDevice::create_acceleration(Geometry &geometr
     for (auto &&entity : geometry.entities()) {
         auto triangle_acceleration = [[MPSTriangleAccelerationStructure alloc] initWithGroup:acceleration_group];
         [triangle_acceleration autorelease];
-        triangle_acceleration.vertexBuffer = dynamic_cast<MetalBuffer &>(entity->position_buffer().buffer()).handle();
+        triangle_acceleration.vertexBuffer = dynamic_cast<MetalBuffer &>(entity->position_buffer().typeless_buffer()).handle();
         triangle_acceleration.vertexBufferOffset = entity->position_buffer().byte_offset();
         triangle_acceleration.vertexStride = sizeof(float4);
-        triangle_acceleration.indexBuffer = dynamic_cast<MetalBuffer &>(entity->index_buffer().buffer()).handle();
+        triangle_acceleration.indexBuffer = dynamic_cast<MetalBuffer &>(entity->index_buffer().typeless_buffer()).handle();
         triangle_acceleration.indexBufferOffset = entity->index_buffer().byte_offset();
         triangle_acceleration.indexType = MPSDataTypeUInt32;
         triangle_acceleration.triangleCount = entity->triangle_count();
@@ -119,10 +119,10 @@ std::unique_ptr<Acceleration> MetalDevice::create_acceleration(Geometry &geometr
         [acceleration_structures addObject:triangle_acceleration];
     }
     
-    instance_acceleration.instanceBuffer = dynamic_cast<MetalBuffer &>(geometry.entity_index_buffer().buffer()).handle();
+    instance_acceleration.instanceBuffer = dynamic_cast<MetalBuffer &>(geometry.entity_index_buffer().typeless_buffer()).handle();
     instance_acceleration.instanceBufferOffset = geometry.entity_index_buffer().byte_offset();
     instance_acceleration.instanceCount = geometry.entity_index_buffer().element_count();
-    instance_acceleration.transformBuffer = dynamic_cast<MetalBuffer &>(geometry.transform_buffer().buffer()).handle();
+    instance_acceleration.transformBuffer = dynamic_cast<MetalBuffer &>(geometry.transform_buffer().typeless_buffer()).handle();
     instance_acceleration.transformBufferOffset = geometry.transform_buffer().byte_offset();
     
     // Note: metal provides optimization for static scenes without instanced shapes

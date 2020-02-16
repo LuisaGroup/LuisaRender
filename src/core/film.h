@@ -45,8 +45,8 @@ private:
 protected:
     uint2 _resolution;
     std::shared_ptr<Filter> _filter;
-    std::unique_ptr<Buffer> _accumulation_buffer;
-    std::unique_ptr<Buffer> _framebuffer;
+    std::unique_ptr<Buffer<float4>> _accumulation_buffer;
+    std::unique_ptr<Buffer<float4>> _framebuffer;
     std::unique_ptr<Kernel> _clear_accumulation_buffer_kernel;
     std::unique_ptr<Kernel> _accumulate_frame_kernel;
 
@@ -56,8 +56,8 @@ public:
           _resolution{parameters["resolution"].parse_uint2_or_default(make_uint2(1280, 720))},
           _filter{parameters["filter"].parse<Filter>()} {
         
-        _accumulation_buffer = device->create_buffer<uint4>(_resolution.x * _resolution.y, BufferStorage::DEVICE_PRIVATE);
-        _framebuffer = device->create_buffer<uint4>(_resolution.x * _resolution.y, BufferStorage::DEVICE_PRIVATE);
+        _accumulation_buffer = device->create_buffer<float4>(_resolution.x * _resolution.y, BufferStorage::DEVICE_PRIVATE);
+        _framebuffer = device->create_buffer<float4>(_resolution.x * _resolution.y, BufferStorage::DEVICE_PRIVATE);
         _clear_accumulation_buffer_kernel = device->create_kernel("film_clear_accumulation_buffer");
         _accumulate_frame_kernel = device->create_kernel("film_accumulate_frame");
     }
@@ -71,7 +71,7 @@ public:
     }
     
     virtual void accumulate_frame(KernelDispatcher &dispatch, BufferView<float2> pixel_buffer, BufferView<float3> radiance_buffer) {
-        _filter->apply(dispatch, pixel_buffer, radiance_buffer, _framebuffer->view<float4>(), _resolution);
+        _filter->apply(dispatch, pixel_buffer, radiance_buffer, _framebuffer->view(), _resolution);
         auto pixel_count = _resolution.x * _resolution.y;
         dispatch(*_accumulate_frame_kernel, pixel_count, [&](KernelArgumentEncoder &encode) {
             encode("accumulation_buffer", *_accumulation_buffer);
@@ -83,7 +83,7 @@ public:
     virtual void postprocess(KernelDispatcher &dispatch) = 0;
     virtual void save(const std::filesystem::path &filename) = 0;
     [[nodiscard]] Filter &filter() noexcept { return *_filter; }
-    [[nodiscard]] BufferView<uint4> accumulation_buffer() noexcept { return _accumulation_buffer->view<uint4>(); }
+    [[nodiscard]] BufferView<float4> accumulation_buffer() noexcept { return _accumulation_buffer->view(); }
     [[nodiscard]] uint2 resolution() noexcept { return _resolution; }
 
 };

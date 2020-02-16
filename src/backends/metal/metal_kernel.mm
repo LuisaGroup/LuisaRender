@@ -19,7 +19,7 @@ void MetalKernelDispatcher::operator()(Kernel &kernel, uint2 grids, uint2 grid_s
     [encoder endEncoding];
 }
 
-void MetalKernelArgumentEncoder::set_buffer(std::string_view argument_name, Buffer &buffer, size_t offset) {
+void MetalKernelArgumentEncoder::set_buffer(std::string_view argument_name, TypelessBuffer &buffer, size_t offset) {
     [_encoder setBuffer:dynamic_cast<MetalBuffer &>(buffer).handle() offset:offset atIndex:_argument_index(argument_name)];
 }
 

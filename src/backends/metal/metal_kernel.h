@@ -23,7 +23,7 @@ private:
 
 public:
     explicit MetalKernelArgumentEncoder(MTLAutoreleasedComputePipelineReflection info, id<MTLComputeCommandEncoder> encoder) noexcept : _info{info}, _encoder{encoder} {}
-    void set_buffer(std::string_view argument_name, Buffer &buffer, size_t offset) override;
+    void set_buffer(std::string_view argument_name, TypelessBuffer &buffer, size_t offset) override;
     void set_bytes(std::string_view argument_name, const void *bytes, size_t size) override;
 };
 

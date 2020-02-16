@@ -13,14 +13,14 @@
 
 namespace luisa::metal {
 
-class MetalBuffer : public Buffer {
+class MetalBuffer : public TypelessBuffer {
 
 private:
     id<MTLBuffer> _handle;
 
 public:
     MetalBuffer(id<MTLBuffer> buffer, size_t capacity, BufferStorage storage) noexcept
-        : Buffer(capacity, storage), _handle{buffer} {}
+        : TypelessBuffer(capacity, storage), _handle{buffer} {}
     
     void upload(size_t offset, size_t size) override;
     void synchronize(struct KernelDispatcher &dispatch) override;

@@ -57,7 +57,7 @@ void IndependentSampler::generate_samples(KernelDispatcher &dispatch, BufferView
 void IndependentSampler::reset_states(KernelDispatcher &dispatch, uint2 film_resolution) {
     auto pixel_count = film_resolution.x * film_resolution.y;
     Sampler::reset_states(dispatch, film_resolution);
-    if (_state_buffer == nullptr || _state_buffer->view<independent_sampler::SamplerState>().element_count() < pixel_count) {
+    if (_state_buffer == nullptr || _state_buffer->view().element_count() < pixel_count) {
         _state_buffer = _device->create_buffer<independent_sampler::SamplerState>(pixel_count, BufferStorage::DEVICE_PRIVATE);
     }
     dispatch(*_reset_states_kernel, pixel_count, [&](KernelArgumentEncoder &encode) {
