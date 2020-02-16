@@ -14,9 +14,7 @@ LUISA_DEVICE_CALLABLE inline void clear_accumulation_buffer(
     uint pixel_count,
     uint tid) noexcept {
     
-    if (tid < pixel_count) {
-        accumulation_buffer[tid] = make_float4();
-    }
+    if (tid < pixel_count) { accumulation_buffer[tid] = make_float4(); }
 }
 
 LUISA_DEVICE_CALLABLE inline void accumulate_frame(
@@ -25,9 +23,7 @@ LUISA_DEVICE_CALLABLE inline void accumulate_frame(
     uint pixel_count,
     uint tid) noexcept {
     
-    if (tid < pixel_count) {
-        accumulation_buffer[tid] += frame[tid];
-    }
+    if (tid < pixel_count) { accumulation_buffer[tid] += frame[tid]; }
 }
 
 }

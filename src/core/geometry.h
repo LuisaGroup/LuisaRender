@@ -24,12 +24,12 @@ LUISA_DEVICE_CALLABLE inline void evaluate_interactions(
     LUISA_DEVICE_SPACE float3 *interaction_position_buffer,
     LUISA_DEVICE_SPACE float3 *interaction_normal_buffer,
     LUISA_DEVICE_SPACE float2 *interaction_uv_buffer,
-    LUISA_DEVICE_SPACE float3 *interaction_wo_buffer,
+    LUISA_DEVICE_SPACE float4 *interaction_wo_and_distance_buffer,
     LUISA_DEVICE_SPACE int16_t *interaction_material_id_buffer,
     uint tid) noexcept {
     
     if (tid < ray_count) {
-    
+        
         auto hit = hit_buffer[tid];
         if (hit.distance <= 0.0f) {
             return;
@@ -39,13 +39,13 @@ LUISA_DEVICE_CALLABLE inline void evaluate_interactions(
         auto p = hit.bary_u * position_buffer[indices.x] + hit.bary_v * position_buffer[indices.y] + (1.0f - hit.bary_u - hit.bary_v) * position_buffer[indices.z];
         auto n = hit.bary_u * normal_buffer[indices.x] + hit.bary_v * normal_buffer[indices.y] + (1.0f - hit.bary_u - hit.bary_v) * normal_buffer[indices.z];
         auto uv = hit.bary_u * tex_coord_buffer[indices.x] + hit.bary_v * tex_coord_buffer[indices.y] + (1.0f - hit.bary_u - hit.bary_v) * tex_coord_buffer[indices.z];
-    
+        
         auto transform = transform_buffer[hit.instance_index];
         
         interaction_position_buffer[tid] = make_float3(transform * make_float4(p, 1.0f));
         interaction_normal_buffer[tid] = normalize(transpose(inverse(make_float3x3(transform))) * n);
         interaction_uv_buffer[tid] = uv;
-        interaction_wo_buffer[tid] = normalize(make_float3(ray_buffer[tid].origin) - p);
+        interaction_wo_and_distance_buffer[tid] = make_float4(normalize(make_float3(ray_buffer[tid].origin) - p), hit.distance);
         interaction_material_id_buffer[tid] = material_id_buffer[hit.instance_index];
     }
 }
@@ -84,7 +84,6 @@ private:
     std::unique_ptr<Buffer> _tex_coord_buffer;
     std::unique_ptr<Buffer> _index_buffer;
     std::unique_ptr<Buffer> _dynamic_transform_buffer;
-    std::unique_ptr<Buffer> _material_id_buffer;
     std::unique_ptr<Buffer> _entity_index_buffer;
     
     std::unique_ptr<Acceleration> _acceleration;
