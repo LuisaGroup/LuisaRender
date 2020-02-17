@@ -27,7 +27,9 @@ public:
     virtual void update(float time[[maybe_unused]]) { /* doing nothing by default */ }
     
     virtual void generate_rays(KernelDispatcher &dispatch,
-                               BufferView<float4> sampler_buffer,
+                               Sampler &sampler,
+                               BufferView<uint> ray_queue,
+                               BufferView<uint> ray_queue_size,
                                BufferView<float2> pixel_buffer,
                                BufferView<Ray> ray_buffer,
                                BufferView<float3> throughput_buffer) = 0;

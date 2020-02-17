@@ -5,7 +5,7 @@
 #pragma once
 
 #include <core/data_types.h>
-#include <core/color_spaces.h>
+#include <core/colorspaces.h>
 
 namespace luisa::rgb_film {
 

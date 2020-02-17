@@ -6,7 +6,7 @@
 
 #include <core/data_types.h>
 #include <core/mathematics.h>
-#include <core/color_spaces.h>
+#include <core/colorspaces.h>
 
 namespace luisa::mitchell_netravali_filter {
 

@@ -93,14 +93,15 @@ protected:
     std::unique_ptr<Kernel> _generate_3d_samples_kernel;
     std::unique_ptr<Kernel> _generate_4d_samples_kernel;
     std::unique_ptr<Buffer<independent_sampler::SamplerState>> _state_buffer;
+    
+    void _generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float> sample_buffer) override;
+    void _generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float2> sample_buffer) override;
+    void _generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float3> sample_buffer) override;
+    void _generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float4> sample_buffer) override;
 
 public:
     IndependentSampler(Device *device, const ParameterSet &parameter_set);
     void reset_states(KernelDispatcher &dispatch, uint2 film_resolution) override;
-    void generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float> sample_buffer) override;
-    void generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float2> sample_buffer) override;
-    void generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float3> sample_buffer) override;
-    void generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float4> sample_buffer) override;
 };
 
 LUISA_REGISTER_NODE_CREATOR("Independent", IndependentSampler);

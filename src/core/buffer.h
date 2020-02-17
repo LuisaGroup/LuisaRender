@@ -35,6 +35,12 @@ public:
     [[nodiscard]] T &operator[](size_t index) { return data()[index]; }
     [[nodiscard]] const T &operator[](size_t index) const { return data()[index]; }
     void upload();
+    
+    template<typename U>
+    [[nodiscard]] auto view_as() noexcept {
+        assert(byte_size() % sizeof(U) == 0u && byte_offset() % sizeof(U) == 0u);
+        return BufferView<U>{_buffer, byte_offset() / sizeof(U), byte_size() / sizeof(U)};
+    };
 };
 
 enum struct BufferStorage {
