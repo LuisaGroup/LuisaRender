@@ -19,8 +19,7 @@ private:
     std::unordered_map<std::string_view, uint32_t> _bsdf_type_ids;
 
 public:
-
-    
+    [[nodiscard]] virtual bool is_emissive() const noexcept { return false; }
 };
 
 }

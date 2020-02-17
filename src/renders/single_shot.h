@@ -10,7 +10,6 @@
 #include <core/light.h>
 #include <core/geometry.h>
 #include <core/camera.h>
-#include <core/illumination.h>
 
 namespace luisa {
 

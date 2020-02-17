@@ -57,6 +57,18 @@ public:
     [[nodiscard]] virtual void *data() = 0;
     [[nodiscard]] size_t capacity() const noexcept { return _capacity; }
     [[nodiscard]] BufferStorage storage() const noexcept { return _storage; }
+    
+    template<typename T>
+    [[nodiscard]] auto view_as(size_t element_offset = 0ul) noexcept {
+        assert(_capacity % sizeof(T) == 0ul);
+        return BufferView<T>{this, element_offset, _capacity / sizeof(T) - element_offset};
+    };
+    
+    template<typename T>
+    [[nodiscard]] BufferView<T> view_as(size_t element_offset, size_t element_count) noexcept {
+        assert((element_count + element_offset) * sizeof(T) <= _capacity);
+        return BufferView<T>{this, element_offset, element_count};
+    }
 };
 
 template<typename Element>
@@ -76,13 +88,13 @@ public:
         return BufferView<Element>{_typeless_buffer.get(), element_offset, element_count};
     }
     [[nodiscard]] auto view(size_t element_offset = 0ul) noexcept {
-        assert(_capacity % sizeof(Element) == 0ul);
+        assert(_typeless_buffer->capacity() % sizeof(Element) == 0ul);
         return BufferView<Element>{_typeless_buffer.get(), element_offset, _typeless_buffer->capacity() / sizeof(Element) - element_offset};
     };
     
     template<typename T>
     [[nodiscard]] auto view_as(size_t element_offset = 0ul) noexcept {
-        assert(_capacity % sizeof(T) == 0ul);
+        assert(_typeless_buffer->capacity() % sizeof(T) == 0ul);
         return BufferView<T>{_typeless_buffer.get(), element_offset, _typeless_buffer->capacity() / sizeof(T) - element_offset};
     };
     

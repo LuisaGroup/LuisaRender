@@ -16,23 +16,19 @@ namespace luisa::path_tracing {
 #ifndef LUISA_DEVICE_COMPATIBLE
 
 #include <core/integrator.h>
+#include <core/hit.h>
 
 namespace luisa {
 
 class PathTracing : public Integrator {
 
 protected:
-    std::unique_ptr<TypelessBuffer> _ray_state_buffer;
-    std::unique_ptr<TypelessBuffer> _ray_pixel_buffer;
-    std::unique_ptr<TypelessBuffer> _ray_sampler_state_buffer;
-    std::unique_ptr<TypelessBuffer> _ray_throughput_buffer;
-    std::unique_ptr<TypelessBuffer> _ray_radiance_buffer;
-    std::unique_ptr<TypelessBuffer> _ray_depth_buffer;
-    std::unique_ptr<TypelessBuffer> _ray_buffer;
-    std::unique_ptr<TypelessBuffer> _shadow_ray_buffer;
-    std::unique_ptr<TypelessBuffer> _closest_hit_buffer;
-    std::unique_ptr<TypelessBuffer> _any_hit_buffer;
-    std::unique_ptr<TypelessBuffer> _interaction_buffer;
+    std::unique_ptr<Buffer<float2>> _ray_pixel_buffer;
+    std::unique_ptr<Buffer<float3>> _ray_throughput_buffer;
+    std::unique_ptr<Buffer<float3>> _ray_radiance_buffer;
+    std::unique_ptr<Buffer<uint8_t>> _ray_depth_buffer;
+    std::unique_ptr<Buffer<float>> _ray_pdf_buffer;
+    std::unique_ptr<Buffer<Ray>> _ray_buffer;
     
     uint _max_depth;
 
