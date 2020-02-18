@@ -11,14 +11,13 @@ void RGBFilm::postprocess(KernelDispatcher &dispatch) {
     auto pixel_count = _resolution.x * _resolution.y;
     dispatch(*_postprocess_kernel, pixel_count, [&](KernelArgumentEncoder &encode) {
         encode("accumulation_buffer", *_accumulation_buffer);
-        encode("framebuffer", *_framebuffer);
         encode("pixel_count", pixel_count);
     });
-    _framebuffer->synchronize(dispatch);
+    _accumulation_buffer->synchronize(dispatch);
 }
 
 void RGBFilm::save(const std::filesystem::path &filename) {
-    cv::Mat image(cv::Size2l{_resolution.x, _resolution.y}, CV_32FC4, _framebuffer->view().data());
+    cv::Mat image(cv::Size2l{_resolution.x, _resolution.y}, CV_32FC4, _accumulation_buffer->data());
     cv::cvtColor(image, image, cv::COLOR_RGB2BGR);
     auto path = std::filesystem::absolute(filename);
     if (path.extension() != ".exr") {

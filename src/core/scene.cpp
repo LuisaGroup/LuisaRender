@@ -6,7 +6,10 @@
 
 namespace luisa {
 
-Scene::Scene(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, float initial_time) : _device{device} {
+Scene::Scene(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, const std::vector<std::shared_ptr<Light>> &lights, float initial_time) : _device{device} {
+    
+    LUISA_WARNING_IF(shapes.empty(), "no shape in scene");
+    LUISA_WARNING_IF(lights.empty(), "no light in scene");
     
     for (auto &&shape : shapes) {
         if (shape->is_instance()) {
@@ -89,7 +92,7 @@ Scene::Scene(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, 
     _acceleration = _device->create_acceleration(*this);
 }
 
-void Scene::update(KernelDispatcher &dispatch, float time) {
+void Scene::update(float time) {
     if (!_dynamic_shapes.empty() || !_dynamic_instances.empty()) {
         auto dynamic_shape_offset = _static_shapes.size() + _static_instances.size();
         auto dynamic_instance_offset = dynamic_shape_offset + _dynamic_shapes.size();
@@ -100,7 +103,9 @@ void Scene::update(KernelDispatcher &dispatch, float time) {
             transform_buffer()[dynamic_instance_offset + i] = _dynamic_instances[i]->transform().dynamic_matrix(time) * _dynamic_instances[i]->transform().static_matrix();
         }
         _dynamic_transform_buffer->view(dynamic_shape_offset, _dynamic_shapes.size() + _dynamic_instances.size()).upload();
-        _acceleration->refit(dispatch);
+        _device->launch_async([&](KernelDispatcher &dispatch) {
+            _acceleration->refit(dispatch);
+        });
     }
 }
 

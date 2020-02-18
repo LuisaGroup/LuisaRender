@@ -43,7 +43,7 @@ void ThinLensCamera::generate_rays(KernelDispatcher &dispatch,
                                    BufferView<Ray> ray_buffer,
                                    BufferView<float3> throughput_buffer) {
     
-    auto sample_buffer = sampler.generate_samples(dispatch, 2u, ray_queue, ray_queue_size);
+    auto sample_buffer = sampler.generate_samples(dispatch, 4u, ray_queue, ray_queue_size);
     
     dispatch(*_generate_rays_kernel, _film->resolution(), [&](KernelArgumentEncoder &encode) {
         encode("ray_buffer", ray_buffer);
@@ -52,7 +52,7 @@ void ThinLensCamera::generate_rays(KernelDispatcher &dispatch,
         encode("ray_queue", ray_queue);
         encode("ray_queue_size", ray_queue_size);
         encode("ray_pixel_buffer", pixel_buffer);
-        encode("uniforms", thin_lens_camera::GenerateRaysKernelUniforms{
+        encode("uniforms", camera::thin_lens::GenerateRaysKernelUniforms{
             _position, _left, _up, _front,
             _film->resolution(), _effective_sensor_size,
             _near_plane_distance, _focal_plane_distance, _lens_radius});

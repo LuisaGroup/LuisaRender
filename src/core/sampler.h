@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "viewport.h"
 #include "node.h"
 #include "parser.h"
 #include "device.h"
@@ -17,38 +18,53 @@ private:
 
 protected:
     uint _spp;
-    uint _current_dimension{};
     uint _frame_index{};
     uint2 _film_resolution{};
-    std::unique_ptr<Buffer<float>> _sample_buffer;
+    Viewport _film_viewport{};
+    Viewport _tile_viewport{};
+    std::unique_ptr<Buffer<float4>> _sample_buffer;
     
     virtual void _generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float> sample_buffer) = 0;
     virtual void _generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float2> sample_buffer) = 0;
     virtual void _generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float3> sample_buffer) = 0;
     virtual void _generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float4> sample_buffer) = 0;
 
+    virtual void _reset_states() = 0;
+    virtual void _start_next_frame(KernelDispatcher &dispatch) = 0;
+    virtual void _prepare_for_tile(KernelDispatcher &dispatch) = 0;
+    
 public:
     Sampler(Device *device, const ParameterSet &parameter_set)
         : Node{device}, _spp{parameter_set["spp"].parse_uint_or_default(1024u)} {}
     
-    virtual void reset_states(KernelDispatcher &dispatch[[maybe_unused]], uint2 film_resolution) {
-        _current_dimension = 0u;
+    [[nodiscard]] uint spp() const noexcept { return _spp; }
+    [[nodiscard]] uint frame_index() const noexcept { return _frame_index; }
+    
+    void reset_states(uint2 film_resolution, Viewport film_viewport) {
         _frame_index = 0u;
         _film_resolution = film_resolution;
-        if (_sample_buffer->size() < film_resolution.x * film_resolution.y * 4ul) {
-            _sample_buffer = _device->create_buffer<float>(film_resolution.x * film_resolution.y * 4ul, BufferStorage::DEVICE_PRIVATE);
+        _film_viewport = film_viewport;
+        auto film_viewport_pixel_count = _film_viewport.size.x * _film_viewport.size.y;
+        if (_sample_buffer->size() < film_viewport_pixel_count) {
+            _sample_buffer = _device->create_buffer<float4>(film_viewport_pixel_count, BufferStorage::DEVICE_PRIVATE);
         }
+        _reset_states();
     }
     
-    virtual void start_frame(KernelDispatcher &dispatch[[maybe_unused]], BufferView<uint> ray_queue_buffer[[maybe_unused]], BufferView<uint> ray_count_buffer[[maybe_unused]]) {
+    void start_next_frame(KernelDispatcher &dispatch) {
         _frame_index++;
-        _current_dimension = 0u;
+        _start_next_frame(dispatch);
+    }
+    
+    void prepare_for_tile(KernelDispatcher &dispatch, Viewport tile_viewport) {
+        _tile_viewport = tile_viewport;
+        _prepare_for_tile(dispatch);
     }
     
     BufferView<float> generate_samples(KernelDispatcher &dispatch, uint dimensions, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer) {
         switch (dimensions) {
             case 1:
-                _generate_samples(dispatch, ray_queue_buffer, ray_count_buffer, _sample_buffer->view());
+                _generate_samples(dispatch, ray_queue_buffer, ray_count_buffer, _sample_buffer->view_as<float>());
                 break;
             case 2:
                 _generate_samples(dispatch, ray_queue_buffer, ray_count_buffer, _sample_buffer->view_as<float2>());
@@ -62,7 +78,7 @@ public:
             default:
                 LUISA_ERROR("bad sample dimensions: ", dimensions);
         }
-        return _sample_buffer->view();
+        return _sample_buffer->view_as<float>();
     }
 };
 

@@ -4,10 +4,17 @@
 
 #pragma once
 
+#include <vector>
+#include <random>
+#include <filesystem>
+#include <condition_variable>
+
+#include "mathematics.h"
 #include "node.h"
 #include "parser.h"
 #include "scene.h"
 #include "camera.h"
+#include "sampler.h"
 #include "integrator.h"
 
 namespace luisa {
@@ -18,20 +25,15 @@ private:
     LUISA_MAKE_NODE_CREATOR_REGISTRY(Render);
 
 protected:
-    float2 _time_span;
-    std::shared_ptr<Camera> _camera;
+    std::shared_ptr<Sampler> _sampler;
     std::shared_ptr<Integrator> _integrator;
     std::unique_ptr<Scene> _scene;
 
 public:
     Render(Device *device, const ParameterSet &parameter_set[[maybe_unused]])
         : Node{device},
-          _time_span{parameter_set["time_span"].parse_float2_or_default(make_float2(0.0f))},
-          _camera{parameter_set["camera"].parse<Camera>()},
-          _integrator{parameter_set["integrator"].parse<Integrator>()} {
-    
-        _scene = Scene::create(_device, parameter_set["shapes"].parse_reference_list<Shape>(), _time_span.x);
-    }
+          _sampler{parameter_set["sampler"].parse<Sampler>()},
+          _integrator{parameter_set["integrator"].parse<Integrator>()} {}
     
     virtual void execute() = 0;
     

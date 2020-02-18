@@ -467,6 +467,11 @@ LUISA_DEVICE_CALLABLE inline auto inverse(float4x4 m) noexcept {  // from GLM
 
 #endif
 
+template<typename T>
+LUISA_DEVICE_CALLABLE inline auto lerp(T a, T b, float t) noexcept {
+    return (1.0f - t) * a + t * b;
+}
+
 LUISA_DEVICE_CALLABLE inline auto identity() noexcept {
     return make_float4x4();
 }

@@ -6,11 +6,11 @@
 
 namespace luisa {
 
-void PathTracing::render() {
-
-}
-
 PathTracing::PathTracing(Device *device, const ParameterSet &parameter_set)
     : Integrator{device, parameter_set} {}
+
+void PathTracing::render_frame(Viewport viewport, Scene &scene, Camera &camera, Sampler &sampler) {
+
+}
     
 }

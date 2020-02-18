@@ -7,7 +7,7 @@
 #include <core/ray.h>
 #include <core/mathematics.h>
 
-namespace luisa::point_light {
+namespace luisa::light::point {
 
 struct Data {
     float3 position;

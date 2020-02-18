@@ -6,18 +6,18 @@
 
 #include <core/data_types.h>
 #include <core/colorspaces.h>
+#include <core/mathematics.h>
 
-namespace luisa::rgb_film {
+namespace luisa::film::rgb {
 
 LUISA_DEVICE_CALLABLE inline void postprocess(
-    LUISA_DEVICE_SPACE const float4 *accumulation_buffer,
-    LUISA_DEVICE_SPACE float4 *framebuffer,
+    LUISA_DEVICE_SPACE float4 *accumulation_buffer,
     uint pixel_count,
     uint tid) noexcept {
     
     if (tid < pixel_count) {
         auto f = accumulation_buffer[tid];
-        framebuffer[tid] = make_float4(ACEScg2XYZ(XYZ2RGB(make_float3(f) / f.a)), 1.0f);
+        accumulation_buffer[tid] = make_float4(XYZ2RGB(ACEScg2XYZ(make_float3(f) / max(f.a, 1e-3f))), 1.0f);
     }
 }
 

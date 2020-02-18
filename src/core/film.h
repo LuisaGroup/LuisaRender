@@ -9,21 +9,12 @@
 
 namespace luisa::film {
 
-LUISA_DEVICE_CALLABLE inline void clear_accumulation_buffer(
+LUISA_DEVICE_CALLABLE inline void reset_accumulation_buffer(
     LUISA_DEVICE_SPACE float4 *accumulation_buffer,
     uint pixel_count,
     uint tid) noexcept {
     
     if (tid < pixel_count) { accumulation_buffer[tid] = make_float4(); }
-}
-
-LUISA_DEVICE_CALLABLE inline void accumulate_frame(
-    LUISA_DEVICE_SPACE const float4 *frame,
-    LUISA_DEVICE_SPACE float4 *accumulation_buffer,
-    uint pixel_count,
-    uint tid) noexcept {
-    
-    if (tid < pixel_count) { accumulation_buffer[tid] += frame[tid]; }
 }
 
 }
@@ -34,6 +25,7 @@ LUISA_DEVICE_CALLABLE inline void accumulate_frame(
 #include "node.h"
 #include "filter.h"
 #include "parser.h"
+#include "viewport.h"
 
 namespace luisa {
 
@@ -41,14 +33,13 @@ class Film : public Node {
 
 private:
     LUISA_MAKE_NODE_CREATOR_REGISTRY(Film);
-
+    
 protected:
+    Viewport _film_viewport{};
     uint2 _resolution;
     std::shared_ptr<Filter> _filter;
     std::unique_ptr<Buffer<float4>> _accumulation_buffer;
-    std::unique_ptr<Buffer<float4>> _framebuffer;
-    std::unique_ptr<Kernel> _clear_accumulation_buffer_kernel;
-    std::unique_ptr<Kernel> _accumulate_frame_kernel;
+    std::unique_ptr<Kernel> _reset_accumulation_buffer_kernel;
 
 public:
     Film(Device *device, const ParameterSet &parameters)
@@ -57,27 +48,22 @@ public:
           _filter{parameters["filter"].parse<Filter>()} {
         
         _accumulation_buffer = device->create_buffer<float4>(_resolution.x * _resolution.y, BufferStorage::DEVICE_PRIVATE);
-        _framebuffer = device->create_buffer<float4>(_resolution.x * _resolution.y, BufferStorage::DEVICE_PRIVATE);
-        _clear_accumulation_buffer_kernel = device->create_kernel("film_clear_accumulation_buffer");
-        _accumulate_frame_kernel = device->create_kernel("film_accumulate_frame");
+        _reset_accumulation_buffer_kernel = device->create_kernel("film_reset_accumulation_buffer");
     }
     
-    virtual void clear_accumulation_buffer(KernelDispatcher &dispatch) {
-        auto pixel_count = _resolution.x * _resolution.y;
-        dispatch(*_clear_accumulation_buffer_kernel, pixel_count, [&](KernelArgumentEncoder &encode) {
-            encode("accumulation_buffer", *_accumulation_buffer);
-            encode("pixel_count", pixel_count);
+    virtual void reset_accumulation_buffer(Viewport film_viewport) {
+        _film_viewport = film_viewport;
+        _device->launch_async([&](KernelDispatcher &dispatch) {
+            auto pixel_count = _resolution.x * _resolution.y;
+            dispatch(*_reset_accumulation_buffer_kernel, pixel_count, [&](KernelArgumentEncoder &encode) {
+                encode("accumulation_buffer", *_accumulation_buffer);
+                encode("pixel_count", pixel_count);
+            });
         });
     }
     
-    virtual void accumulate_frame(KernelDispatcher &dispatch, BufferView<float2> pixel_buffer, BufferView<float3> radiance_buffer) {
-        _filter->apply(dispatch, pixel_buffer, radiance_buffer, _framebuffer->view(), _resolution);
-        auto pixel_count = _resolution.x * _resolution.y;
-        dispatch(*_accumulate_frame_kernel, pixel_count, [&](KernelArgumentEncoder &encode) {
-            encode("accumulation_buffer", *_accumulation_buffer);
-            encode("frame", *_framebuffer);
-            encode("pixel_count", pixel_count);
-        });
+    virtual void accumulate_tile(KernelDispatcher &dispatch, BufferView<float2> pixel_buffer, BufferView<float3> radiance_buffer, Viewport tile_viewport) {
+        _filter->apply_and_accumulate(dispatch, _resolution, tile_viewport, tile_viewport, pixel_buffer, radiance_buffer, _accumulation_buffer->view());
     }
     
     virtual void postprocess(KernelDispatcher &dispatch) = 0;

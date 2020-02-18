@@ -7,7 +7,7 @@
 #include <core/data_types.h>
 #include <core/ray.h>
 
-namespace luisa::path_tracing {
+namespace luisa::integrator::path_tracing {
 
 
 
@@ -34,7 +34,7 @@ protected:
 
 public:
     PathTracing(Device *device, const ParameterSet &parameter_set);
-    void render() override;
+    void render_frame(Viewport viewport, Scene &scene, Camera &camera, Sampler &sampler) override;
 };
 
 LUISA_REGISTER_NODE_CREATOR("PathTracing", PathTracing)

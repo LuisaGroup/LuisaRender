@@ -4,10 +4,10 @@
 
 #pragma once
 
-#include <core/data_types.h>
+#include <core/viewport.h>
 #include <core/mathematics.h>
 
-namespace luisa::independent_sampler {
+namespace luisa::sampler::independent {
 
 LUISA_CONSTANT_SPACE constexpr auto PCG32_DEFAULT_STATE = 0x853c49e6748fea9bull;
 LUISA_CONSTANT_SPACE constexpr auto PCG32_MULT = 0x5851f42d4c957f2dull;
@@ -24,12 +24,12 @@ LUISA_DEVICE_CALLABLE inline uint tea(uint v0, uint v1) {
     return v0;
 }
 
-struct SamplerState {
+struct State {
     uint64_t seed;
     uint64_t inc;
 };
 
-LUISA_DEVICE_CALLABLE inline uint generate_uniform_uint(LUISA_THREAD_SPACE SamplerState &state) noexcept {
+LUISA_DEVICE_CALLABLE inline uint generate_uniform_uint(LUISA_THREAD_SPACE State &state) noexcept {
     auto old = state.seed;
     state.seed = old * PCG32_MULT + state.inc;
     auto xor_shifted = static_cast<uint32_t>(((old >> 18u) ^ old) >> 27u);
@@ -37,10 +37,10 @@ LUISA_DEVICE_CALLABLE inline uint generate_uniform_uint(LUISA_THREAD_SPACE Sampl
     return (xor_shifted >> rot) | (xor_shifted << ((~rot + 1u) & 31u));
 }
 
-LUISA_DEVICE_CALLABLE inline SamplerState make_sampler_state(uint64_t init_seq) noexcept {
+LUISA_DEVICE_CALLABLE inline State make_sampler_state(uint64_t init_seq) noexcept {
     auto seed = 0ull;
     auto inc = (init_seq << 1u) | 1ull;
-    SamplerState state{seed, inc};
+    State state{seed, inc};
     generate_uniform_uint(state);
     state.seed += PCG32_DEFAULT_STATE;
     generate_uniform_uint(state);
@@ -48,26 +48,37 @@ LUISA_DEVICE_CALLABLE inline SamplerState make_sampler_state(uint64_t init_seq) 
 }
 
 LUISA_DEVICE_CALLABLE inline void reset_states(
-    uint2 film_resolution,
-    LUISA_DEVICE_SPACE SamplerState *sampler_state_buffer,
+    Viewport film_viewport,
+    LUISA_DEVICE_SPACE State *sampler_state_buffer,
     uint tid) {
     
-    if (tid < film_resolution.x * film_resolution.y) {
-        sampler_state_buffer[tid] = make_sampler_state(tea<5>(tid % film_resolution.x, tid / film_resolution.x));
+    if (tid < film_viewport.size.x * film_viewport.size.y) {
+        auto pixel_x = tid % film_viewport.size.x + film_viewport.origin.x;
+        auto pixel_y = tid / film_viewport.size.x + film_viewport.origin.y;
+        sampler_state_buffer[tid] = make_sampler_state(tea<5>(pixel_x, pixel_y));
     }
     
 }
 
+struct GenerateSamplesKernelUniforms {
+    Viewport tile_viewport;
+    Viewport film_viewport;
+};
+
 template<uint dimension>
 LUISA_DEVICE_CALLABLE inline void generate_samples(
-    LUISA_DEVICE_SPACE SamplerState *sampler_state_buffer,
+    LUISA_DEVICE_SPACE State *sampler_state_buffer,
     LUISA_DEVICE_SPACE const uint *ray_queue,
     uint ray_count,
     LUISA_DEVICE_SPACE float *sample_buffer,
+    LUISA_UNIFORM_SPACE GenerateSamplesKernelUniforms &uniforms,
     uint tid) {
     
     if (tid < ray_count) {
-        auto ray_index = ray_queue[tid];
+        auto ray_index_in_tile = ray_queue[tid];
+        auto ray_x = uniforms.tile_viewport.origin.x + ray_index_in_tile % uniforms.tile_viewport.size.x;
+        auto ray_y = uniforms.tile_viewport.origin.y + ray_index_in_tile / uniforms.tile_viewport.size.x;
+        auto ray_index = ray_y * uniforms.film_viewport.size.x + ray_x;
         auto state = sampler_state_buffer[ray_index];
         for (auto i = 0u; i < dimension; i++) {
             sample_buffer[tid * dimension + i] = min(ONE_MINUS_EPSILON, generate_uniform_uint(state) * 0x1p-32f);
@@ -92,16 +103,20 @@ protected:
     std::unique_ptr<Kernel> _generate_2d_samples_kernel;
     std::unique_ptr<Kernel> _generate_3d_samples_kernel;
     std::unique_ptr<Kernel> _generate_4d_samples_kernel;
-    std::unique_ptr<Buffer<independent_sampler::SamplerState>> _state_buffer;
+    std::unique_ptr<Buffer<sampler::independent::State>> _state_buffer;
     
     void _generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float> sample_buffer) override;
     void _generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float2> sample_buffer) override;
     void _generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float3> sample_buffer) override;
     void _generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float4> sample_buffer) override;
+    
+    void _reset_states() override;
+    
+    void _start_next_frame(KernelDispatcher &dispatch[[maybe_unused]]) override {}
+    void _prepare_for_tile(KernelDispatcher &dispatch[[maybe_unused]]) override {}
 
 public:
     IndependentSampler(Device *device, const ParameterSet &parameter_set);
-    void reset_states(KernelDispatcher &dispatch, uint2 film_resolution) override;
 };
 
 LUISA_REGISTER_NODE_CREATOR("Independent", IndependentSampler);

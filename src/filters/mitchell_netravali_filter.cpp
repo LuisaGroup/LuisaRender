@@ -11,20 +11,23 @@ MitchellNetravaliFilter::MitchellNetravaliFilter(Device *device, const Parameter
       _b{parameters["b"].parse_float_or_default(1.0f / 3.0f)},
       _c{parameters["c"].parse_float_or_default(1.0f / 3.0f)} {
     
-    _apply_kernel = device->create_kernel("mitchell_netravali_filter_apply");
+    _apply_and_accumulate_kernel = device->create_kernel("mitchell_netravali_filter_apply_and_accumulate");
 }
 
-void MitchellNetravaliFilter::apply(KernelDispatcher &dispatch,
-                                    BufferView<float2> pixel_buffer,
-                                    BufferView<float3> radiance_buffer,
-                                    BufferView<float4> frame,
-                                    uint2 film_resolution) {
+void MitchellNetravaliFilter::apply_and_accumulate(KernelDispatcher &dispatch,
+                                                   uint2 film_resolution,
+                                                   Viewport film_viewport,
+                                                   Viewport tile_viewport,
+                                                   BufferView<float2> pixel_buffer,
+                                                   BufferView<float3> radiance_buffer,
+                                                   BufferView<float4> accumulation_buffer) {
     
-    dispatch(*_apply_kernel, film_resolution, [&](KernelArgumentEncoder &encode) {
+    dispatch(*_apply_and_accumulate_kernel, film_resolution, [&](KernelArgumentEncoder &encode) {
         encode("ray_radiance_buffer", radiance_buffer);
         encode("ray_pixel_buffer", pixel_buffer);
-        encode("frame", frame);
-        encode("uniforms", mitchell_netravali_filter::ApplyKernelUniforms{film_resolution, _radius, _b, _c});
+        encode("accumulation_buffer", accumulation_buffer);
+        encode("uniforms", filter::mitchell_netravali::ApplyAndAccumulateKernelUniforms{
+            _filter_viewport(film_viewport, tile_viewport), tile_viewport, film_resolution, _radius, _b, _c});
     });
 }
 

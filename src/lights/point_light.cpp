@@ -16,11 +16,11 @@ std::unique_ptr<Kernel> PointLight::create_generate_samples_kernel() {
 }
 
 void PointLight::encode_data(TypelessBuffer &buffer, size_t index) {
-    buffer.view_as<point_light::Data>(index)[0] = {_position, _emission};
+    buffer.view_as<light::point::Data>(index)[0] = {_position, _emission};
 }
 
 size_t PointLight::data_stride() const noexcept {
-    return sizeof(point_light::Data);
+    return sizeof(light::point::Data);
 }
 
 size_t PointLight::sample_dimensions() const noexcept {
