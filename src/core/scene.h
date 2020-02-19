@@ -6,9 +6,9 @@
 
 #include "ray.h"
 #include "hit.h"
-#include "interaction.h"
 #include "material.h"
-#include "acceleration.h"
+#include "interaction.h"
+#include "mathematics.h"
 
 namespace luisa::scene {
 
@@ -43,7 +43,8 @@ LUISA_DEVICE_CALLABLE inline void evaluate_interactions(
             auto transform = transform_buffer[hit.instance_index];
             if (attribute_flags & NORMAL_BIT) {
                 auto n = hit.bary_u * normal_buffer[indices.x] + hit.bary_v * normal_buffer[indices.y] + (1.0f - hit.bary_u - hit.bary_v) * normal_buffer[indices.z];
-                interaction_normal_buffer[tid] = normalize(transpose(inverse(make_float3x3(transform))) * n);
+//                interaction_normal_buffer[tid] = normalize(transpose(inverse(make_float3x3(transform))) * n);
+                interaction_normal_buffer[tid] = n;
             }
             if ((attribute_flags & POSITION_BIT) || (attribute_flags & WO_AND_DISTANCE_BIT)) {
                 auto p = hit.bary_u * position_buffer[indices.x] + hit.bary_v * position_buffer[indices.y] + (1.0f - hit.bary_u - hit.bary_v) * position_buffer[indices.z];
@@ -75,6 +76,7 @@ LUISA_DEVICE_CALLABLE inline void evaluate_interactions(
 #include "shape.h"
 #include "light.h"
 #include "geometry.h"
+#include "acceleration.h"
 
 namespace luisa {
 class GeometryEntity;

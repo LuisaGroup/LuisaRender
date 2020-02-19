@@ -5,20 +5,30 @@
 #pragma once
 
 #include <core/data_types.h>
+#include <core/colorspaces.h>
 
 namespace luisa::integrator::normal {
 
 LUISA_DEVICE_CALLABLE inline void prepare_for_frame(
     LUISA_DEVICE_SPACE uint *ray_queue,
-    LUISA_DEVICE_SPACE uint &ray_queue_size,
     uint pixel_count,
     uint tid) noexcept {
     
     if (tid < pixel_count) {
-        if (tid == 0u) { ray_queue_size = 0u; }
         ray_queue[tid] = tid;
     }
+}
 
+LUISA_DEVICE_CALLABLE inline void colorize_normals(
+    LUISA_DEVICE_SPACE float3 *normals,
+    uint pixel_count,
+    uint tid) noexcept {
+    
+    if (tid < pixel_count) {
+        auto n = normals[tid];
+        normals[tid] = XYZ2ACEScg(RGB2XYZ(n * 0.5f + 0.5f));
+    }
+    
 }
 
 }
@@ -38,8 +48,12 @@ protected:
     std::unique_ptr<Buffer<Ray>> _ray_buffer;
     std::unique_ptr<Buffer<float2>> _ray_pixel_buffer;
     std::unique_ptr<Buffer<float3>> _ray_throughput_buffer;
+    std::unique_ptr<Buffer<ClosestHit>> _hit_buffer;
     InteractionBufferSet _interaction_buffers;
+    
+    // kernels
     std::unique_ptr<Kernel> _prepare_for_frame_kernel;
+    std::unique_ptr<Kernel> _colorize_normals_kernel;
     
     void _prepare_for_frame() override;
 

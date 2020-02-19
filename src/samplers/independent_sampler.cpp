@@ -55,8 +55,12 @@ void IndependentSampler::_generate_samples(KernelDispatcher &dispatch, BufferVie
 }
 
 void IndependentSampler::_reset_states() {
+    auto size = _film_viewport.size.x * _film_viewport.size.y;
+    if (_state_buffer == nullptr || _state_buffer->size() < size) {
+        _state_buffer = _device->create_buffer<sampler::independent::State>(size, BufferStorage::DEVICE_PRIVATE);
+    }
     _device->launch_async([&](KernelDispatcher &dispatch) {
-        dispatch(*_reset_states_kernel, _film_viewport.size.x * _film_viewport.size.y, [&](KernelArgumentEncoder &encode) {
+        dispatch(*_reset_states_kernel, size, [&](KernelArgumentEncoder &encode) {
             encode("film_viewport", _film_viewport);
             encode("sampler_state_buffer", *_state_buffer);
         });

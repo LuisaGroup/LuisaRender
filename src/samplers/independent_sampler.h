@@ -24,28 +24,18 @@ LUISA_DEVICE_CALLABLE inline uint tea(uint v0, uint v1) {
     return v0;
 }
 
-struct State {
-    uint64_t seed;
-    uint64_t inc;
-};
-
-LUISA_DEVICE_CALLABLE inline uint generate_uniform_uint(LUISA_THREAD_SPACE State &state) noexcept {
-    auto old = state.seed;
-    state.seed = old * PCG32_MULT + state.inc;
-    auto xor_shifted = static_cast<uint32_t>(((old >> 18u) ^ old) >> 27u);
-    auto rot = static_cast<uint32_t>(old >> 59u);
-    return (xor_shifted >> rot) | (xor_shifted << ((~rot + 1u) & 31u));
+LUISA_DEVICE_CALLABLE inline uint lcg(LUISA_THREAD_SPACE uint &prev) {
+    constexpr auto LCG_A = 1664525u;
+    constexpr auto LCG_C = 1013904223u;
+    prev = (LCG_A * prev + LCG_C);
+    return prev & 0x00FFFFFF;
 }
 
-LUISA_DEVICE_CALLABLE inline State make_sampler_state(uint64_t init_seq) noexcept {
-    auto seed = 0ull;
-    auto inc = (init_seq << 1u) | 1ull;
-    State state{seed, inc};
-    generate_uniform_uint(state);
-    state.seed += PCG32_DEFAULT_STATE;
-    generate_uniform_uint(state);
-    return state;
+LUISA_DEVICE_CALLABLE inline float rnd(LUISA_THREAD_SPACE unsigned int &prev) {
+    return ((float) lcg(prev) / (float) 0x01000000);
 }
+
+using State = uint;
 
 LUISA_DEVICE_CALLABLE inline void reset_states(
     Viewport film_viewport,
@@ -55,7 +45,7 @@ LUISA_DEVICE_CALLABLE inline void reset_states(
     if (tid < film_viewport.size.x * film_viewport.size.y) {
         auto pixel_x = tid % film_viewport.size.x + film_viewport.origin.x;
         auto pixel_y = tid / film_viewport.size.x + film_viewport.origin.y;
-        sampler_state_buffer[tid] = make_sampler_state(tea<5>(pixel_x, pixel_y));
+        sampler_state_buffer[tid] = tea<5>(pixel_x, pixel_y);
     }
     
 }
@@ -81,7 +71,7 @@ LUISA_DEVICE_CALLABLE inline void generate_samples(
         auto ray_index = ray_y * uniforms.film_viewport.size.x + ray_x;
         auto state = sampler_state_buffer[ray_index];
         for (auto i = 0u; i < dimension; i++) {
-            sample_buffer[tid * dimension + i] = min(ONE_MINUS_EPSILON, generate_uniform_uint(state) * 0x1p-32f);
+            sample_buffer[tid * dimension + i] = min(ONE_MINUS_EPSILON, rnd(state));
         }
         sampler_state_buffer[ray_index] = state;
     }

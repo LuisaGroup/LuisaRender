@@ -60,11 +60,18 @@ void Scene::_initialize_geometry(const std::vector<std::shared_ptr<Shape>> &shap
         _index_buffer->upload();
     }
     
+    std::cout << "vertex count = " << _position_buffer->size() << std::endl;
+    std::cout << "triangle count = " << _index_buffer->size() << std::endl;
+    
     _dynamic_transform_buffer = _device->create_buffer<float4x4>(shapes.size(), BufferStorage::MANAGED);
     _entity_index_buffer = _device->create_buffer<uint>(shapes.size(), BufferStorage::MANAGED);
+    _material_info_buffer = _device->create_buffer<MaterialInfo>(shapes.size(), BufferStorage::MANAGED);
     auto offset = 0u;
     auto transform_buffer = _dynamic_transform_buffer->view();
     auto entity_index_buffer = _entity_index_buffer->view();
+    auto material_info_buffer = _material_info_buffer->view();
+    
+    // todo: materials
     for (auto &&shape : _static_shapes) {
         transform_buffer[offset] = math::identity();
         entity_index_buffer[offset] = shape->entity_index();
@@ -88,6 +95,7 @@ void Scene::_initialize_geometry(const std::vector<std::shared_ptr<Shape>> &shap
     
     transform_buffer.upload();
     entity_index_buffer.upload();
+    material_info_buffer.upload();
 }
 
 Scene::Scene(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, const std::vector<std::shared_ptr<Light>> &lights, float initial_time) : _device{device} {

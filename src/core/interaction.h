@@ -18,7 +18,7 @@ LUISA_CONSTANT_SPACE constexpr auto ALL_BITS = POSITION_BIT | NORMAL_BIT | UV_BI
 
 }
 
-#ifndef LUISA_DEVICE_COMAPTIBLE
+#ifndef LUISA_DEVICE_COMPATIBLE
 
 #include "material.h"
 

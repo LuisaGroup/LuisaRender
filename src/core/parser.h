@@ -100,13 +100,14 @@ public:
     [[nodiscard]] std::shared_ptr<BaseClass> parse() const;
     
     template<typename BaseClass>
-    [[nodiscard]] std::shared_ptr<BaseClass> parse_or_null() const {
+    [[nodiscard]] auto parse_or_null() const {
+        std::shared_ptr<BaseClass> p = nullptr;
         try {
-            return parse<BaseClass>();
+            p = parse<BaseClass>();
         } catch (const std::runtime_error &e) {
             LUISA_WARNING("error occurred while parsing, returning null, reason:\n    ", e.what());
         }
-        return nullptr;
+        return p;
     }
     
     template<typename BaseClass>

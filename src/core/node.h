@@ -40,7 +40,7 @@ public:
         _creators.emplace(derived_name, std::move(creator));
     }
     
-    NodeCreator<BaseClass> &operator[](std::string_view derived_name) noexcept {
+    NodeCreator<BaseClass> &operator[](std::string_view derived_name) {
         auto iter = _creators.find(derived_name);
         LUISA_ERROR_IF(iter == _creators.end(), "unregistered node creator for derived class: ", derived_name);
         return iter->second;

@@ -32,7 +32,7 @@ void TriangleMesh::load(GeometryEncoder &encoder) {
     auto ai_scene = ai_importer.ReadFile(_path.c_str(),
                                          aiProcess_JoinIdenticalVertices |
                                          aiProcess_Triangulate |
-                                         aiProcess_GenNormals |
+                                         //                                         aiProcess_GenNormals |
                                          aiProcess_GenSmoothNormals |
                                          aiProcess_PreTransformVertices |
                                          aiProcess_ImproveCacheLocality |
@@ -41,7 +41,7 @@ void TriangleMesh::load(GeometryEncoder &encoder) {
                                          aiProcess_GenUVCoords |
                                          aiProcess_TransformUVCoords |
                                          aiProcess_OptimizeMeshes |
-                                         aiProcess_OptimizeGraph |
+                                         //                                         aiProcess_OptimizeGraph |
                                          aiProcess_FlipUVs);
     
     LUISA_ERROR_IF(ai_scene == nullptr || (ai_scene->mFlags & static_cast<uint>(AI_SCENE_FLAGS_INCOMPLETE)) || ai_scene->mRootNode == nullptr,
@@ -50,7 +50,7 @@ void TriangleMesh::load(GeometryEncoder &encoder) {
     std::vector<aiMesh *> ai_meshes(ai_scene->mNumMeshes);
     if (_subdiv_level != 0u) {
         auto subdiv = Assimp::Subdivider::Create(Assimp::Subdivider::CATMULL_CLARKE);
-        subdiv->Subdivide(ai_scene->mMeshes, ai_scene->mNumMeshes, ai_meshes.data(), _subdiv_level, true);
+        subdiv->Subdivide(ai_scene->mMeshes, ai_scene->mNumMeshes, ai_meshes.data(), _subdiv_level);
     } else {
         std::copy(ai_scene->mMeshes, ai_scene->mMeshes + ai_scene->mNumMeshes, ai_meshes.begin());
     }
@@ -59,6 +59,9 @@ void TriangleMesh::load(GeometryEncoder &encoder) {
     auto n = transpose(inverse(make_float3x3(m)));
     
     for (auto ai_mesh : ai_meshes) {
+        std::cout << "processing: " << ai_mesh->mName.C_Str() << std::endl;
+        std::cout << "bounding box: (" << ai_mesh->mAABB.mMin.x << ", " << ai_mesh->mAABB.mMin.y << ", " << ai_mesh->mAABB.mMin.z << ")"
+                  << " -> (" << ai_mesh->mAABB.mMax.x << ", " << ai_mesh->mAABB.mMax.y << ", " << ai_mesh->mAABB.mMax.z << ")" << std::endl;
         if (ai_mesh->mTextureCoords[0] == nullptr) {
             LUISA_WARNING("no texture coordinates in mesh, setting to (0, 0): ", ai_mesh->mName.data);
             for (auto i = 0u; i < ai_mesh->mNumVertices; i++) {
@@ -81,9 +84,13 @@ void TriangleMesh::load(GeometryEncoder &encoder) {
         }
         for (auto f = 0u; f < ai_mesh->mNumFaces; f++) {
             auto ai_face = ai_mesh->mFaces[f];
-            LUISA_ERROR_IF_NOT(ai_face.mNumIndices % 3 == 0, "the mesh is not properly triangulated: ", ai_mesh->mName.data);
-            for (auto i = 0u; i < ai_face.mNumIndices; i += 3) {
-                encoder.add_indices(make_uint3(ai_face.mIndices[i], ai_face.mIndices[i + 1], ai_face.mIndices[i + 1]));
+            if (ai_face.mNumIndices == 3) {
+                encoder.add_indices(make_uint3(ai_face.mIndices[0], ai_face.mIndices[1], ai_face.mIndices[2]));
+            } else if (ai_face.mNumIndices == 4) {
+                encoder.add_indices(make_uint3(ai_face.mIndices[0], ai_face.mIndices[1], ai_face.mIndices[2]));
+                encoder.add_indices(make_uint3(ai_face.mIndices[0], ai_face.mIndices[2], ai_face.mIndices[3]));
+            } else {
+                LUISA_ERROR("only triangles and quads supported: ", ai_mesh->mName.data);
             }
         }
     }

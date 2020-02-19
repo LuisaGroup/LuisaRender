@@ -1,15 +1,14 @@
 //
-// Created by Mike Smith on 2020/2/1.
+// Created by Mike Smith on 2020/2/20.
 //
 
 #pragma once
 
-#include <core/data_types.h>
 #include <core/ray.h>
-#include <core/sampling.h>
+#include <core/mathematics.h>
 #include <core/viewport.h>
 
-namespace luisa::camera::thin_lens {
+namespace luisa::camera::pinhole {
 
 struct GenerateRaysKernelUniforms {
     float3 camera_position;
@@ -19,8 +18,6 @@ struct GenerateRaysKernelUniforms {
     uint2 film_resolution;
     float2 sensor_size;
     float near_plane;
-    float focal_plane;
-    float lens_radius;
     Viewport tile_viewport;
 };
 
@@ -39,13 +36,10 @@ LUISA_DEVICE_CALLABLE inline void generate_rays(
         auto pixel = make_float2(sample) + make_float2(uniforms.tile_viewport.origin)
                      + make_float2(make_uint2(tid % uniforms.tile_viewport.size.x, tid / uniforms.tile_viewport.size.x));
         
-        auto p_focal = (make_float2(0.5f) - pixel / make_float2(uniforms.film_resolution)) * uniforms.sensor_size * 0.5f * (uniforms.focal_plane / uniforms.near_plane);
-        auto p_focal_world = p_focal.x * uniforms.camera_left + p_focal.y * uniforms.camera_up + uniforms.focal_plane * uniforms.camera_front + uniforms.camera_position;
+        auto p_film = (make_float2(0.5f) - pixel / make_float2(uniforms.film_resolution)) * uniforms.sensor_size * 0.5f;
+        auto d = p_film.x * uniforms.camera_left + p_film.y * uniforms.camera_up + uniforms.near_plane * uniforms.camera_front;
         
-        auto p_lens = concentric_sample_disk(sample.z, sample.w) * uniforms.lens_radius;
-        auto p_lens_world = p_lens.x * uniforms.camera_left + p_lens.y * uniforms.camera_up + uniforms.camera_position;
-        
-        ray_buffer[tid] = make_ray(p_lens_world, normalize(p_focal_world - p_lens_world));
+        ray_buffer[tid] = make_ray(uniforms.camera_position, normalize(d));
         
         ray_pixel_buffer[tid] = pixel;
         ray_throughput_buffer[tid] = make_float3(1.0f);
@@ -57,27 +51,23 @@ LUISA_DEVICE_CALLABLE inline void generate_rays(
 #ifndef LUISA_DEVICE_COMPATIBLE
 
 #include <core/camera.h>
-#include <core/mathematics.h>
 
 namespace luisa {
 
-class ThinLensCamera : public Camera {
+class PinholeCamera : public Camera {
 
 protected:
-    float3 _position{};
+    float3 _position;
     float3 _front{};
     float3 _up{};
     float3 _left{};
-    float _focal_plane_distance{};
-    float _near_plane_distance{};
-    float _lens_radius{};
     float2 _sensor_size{};
-    float2 _effective_sensor_size{};
+    float _near_plane;
     
     std::unique_ptr<Kernel> _generate_rays_kernel;
 
 public:
-    ThinLensCamera(Device *device, const ParameterSet &parameters);
+    PinholeCamera(Device *device, const ParameterSet &parameter_set);
     void generate_rays(KernelDispatcher &dispatch,
                        Sampler &sampler,
                        Viewport tile_viewport,
@@ -86,10 +76,9 @@ public:
                        BufferView<float3> throughput_buffer,
                        BufferView<uint> ray_queue,
                        BufferView<uint> ray_queue_size) override;
-    
 };
 
-LUISA_REGISTER_NODE_CREATOR("ThinLens", ThinLensCamera)
+LUISA_REGISTER_NODE_CREATOR("Pinhole", PinholeCamera)
 
 }
 

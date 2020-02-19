@@ -37,25 +37,26 @@ ThinLensCamera::ThinLensCamera(Device *device, const ParameterSet &parameters)
 
 void ThinLensCamera::generate_rays(KernelDispatcher &dispatch,
                                    Sampler &sampler,
-                                   BufferView<uint> ray_queue,
-                                   BufferView<uint> ray_queue_size,
+                                   Viewport tile_viewport,
                                    BufferView<float2> pixel_buffer,
                                    BufferView<Ray> ray_buffer,
-                                   BufferView<float3> throughput_buffer) {
+                                   BufferView<float3> throughput_buffer,
+                                   BufferView<uint> ray_queue,
+                                   BufferView<uint> ray_queue_size) {
     
+    auto pixel_count = tile_viewport.size.x * tile_viewport.size.y;
     auto sample_buffer = sampler.generate_samples(dispatch, 4u, ray_queue, ray_queue_size);
     
-    dispatch(*_generate_rays_kernel, _film->resolution(), [&](KernelArgumentEncoder &encode) {
+    dispatch(*_generate_rays_kernel, pixel_count, [&](KernelArgumentEncoder &encode) {
         encode("ray_buffer", ray_buffer);
         encode("ray_throughput_buffer", throughput_buffer);
         encode("sample_buffer", sample_buffer);
-        encode("ray_queue", ray_queue);
-        encode("ray_queue_size", ray_queue_size);
         encode("ray_pixel_buffer", pixel_buffer);
         encode("uniforms", camera::thin_lens::GenerateRaysKernelUniforms{
             _position, _left, _up, _front,
             _film->resolution(), _effective_sensor_size,
-            _near_plane_distance, _focal_plane_distance, _lens_radius});
+            _near_plane_distance, _focal_plane_distance, _lens_radius,
+            tile_viewport});
     });
 }
 

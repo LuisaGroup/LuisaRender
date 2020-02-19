@@ -1,0 +1,44 @@
+Film film : RGB {
+  resolution { 1280, 800 }
+}
+
+Camera camera : ThinLens {
+  film { @film }
+  position { 0, 0, 2 }
+  target { 0, 0, 0 }
+  sensor_size { 36, 24 }
+  f_number { 1.2 }
+  focal_length { 50 }
+  up { 0, 1, 0 }
+}
+
+Integrator integrator : Normal {}
+
+Shape bunny : TriangleMesh {
+  path { "data/meshes/bunny/bunny.obj" }
+  transform : TRS {
+    scaling { 0.5, 0.5, 0.5 }
+    translation { 0.2, -0.3, 0.0 }
+    rotation { 0.0, 1.0, 0.0, -75.0 }
+  }
+  subdiv_level { 4 }
+}
+
+Shape bunny2 : TriangleMesh {
+  path { "data/meshes/bunny/bunny.obj" }
+  transform : TRS {
+    scaling { 0.5, 0.5, 0.5 }
+    translation { -0.7, -0.3, -2.0 }
+    rotation { 0.0, 1.0, 0.0, 15.0 }
+  }
+  subdiv_level { 2 }
+}
+
+renderer : SingleShot {
+  integrator { @integrator }
+  sampler : Independent {
+    spp { 128 }
+  }
+  camera { @camera }
+  shapes { @bunny, @bunny2 }
+}

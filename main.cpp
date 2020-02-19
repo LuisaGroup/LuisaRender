@@ -1,6 +1,5 @@
 #include <core/render.h>
 
-
 using namespace luisa;
 
 int main(int argc, char *argv[]) {

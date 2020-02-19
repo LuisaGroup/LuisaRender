@@ -67,7 +67,7 @@ public:
           _resolution{parameters["resolution"].parse_uint2_or_default(make_uint2(1280, 720))},
           _filter{parameters["filter"].parse_or_null<Filter>()} {
         
-        _accumulation_buffer = device->create_buffer<float4>(_resolution.x * _resolution.y, BufferStorage::DEVICE_PRIVATE);
+        _accumulation_buffer = device->create_buffer<float4>(_resolution.x * _resolution.y, BufferStorage::MANAGED);
         _reset_accumulation_buffer_kernel = device->create_kernel("film_reset_accumulation_buffer");
         _accumulate_tile_kernel = device->create_kernel("film_accumulate_tile");
     }
