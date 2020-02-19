@@ -54,17 +54,26 @@ private:
     LUISA_MAKE_NODE_CREATOR_REGISTRY(Integrator);
 
 protected:
-    uint _max_depth;
-    std::unique_ptr<Buffer<uint>> _ray_queue;
-    std::unique_ptr<Buffer<uint>> _ray_queue_size;
+    Scene *_scene{nullptr};
+    Camera *_camera{nullptr};
+    Sampler *_sampler{nullptr};
+    Viewport _viewport{};
+    
+    virtual void _prepare_for_frame() = 0;
 
 public:
-    Integrator(Device *device, const ParameterSet &parameter_set)
-        : Node{device},
-          _max_depth{parameter_set["max_depth"].parse_uint_or_default(15u)},
-          _ray_queue_size{device->create_buffer<uint>(1u, BufferStorage::DEVICE_PRIVATE)} {}
+    Integrator(Device *device, const ParameterSet &parameter_set[[maybe_unused]]) noexcept
+        : Node{device} {}
     
-    virtual void render_frame(Viewport viewport, Scene &scene, Camera &camera, Sampler &sampler) = 0;
+    void prepare_for_frame(Scene *scene, Camera *camera, Sampler *sampler, Viewport viewport) {
+        _scene = scene;
+        _camera = camera;
+        _sampler = sampler;
+        _viewport = viewport;
+        _prepare_for_frame();
+    }
+    
+    virtual void render_frame(KernelDispatcher &dispatch) = 0;
 };
 
 }

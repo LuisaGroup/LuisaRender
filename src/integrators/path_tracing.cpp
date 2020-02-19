@@ -7,9 +7,14 @@
 namespace luisa {
 
 PathTracing::PathTracing(Device *device, const ParameterSet &parameter_set)
-    : Integrator{device, parameter_set} {}
+    : Integrator{device, parameter_set},
+      _max_depth{parameter_set["max_depth"].parse_uint_or_default(8u)} {}
 
-void PathTracing::render_frame(Viewport viewport, Scene &scene, Camera &camera, Sampler &sampler) {
+void PathTracing::render_frame(KernelDispatcher &dispatch) {
+
+}
+
+void PathTracing::_prepare_for_frame() {
 
 }
     

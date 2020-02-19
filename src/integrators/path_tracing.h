@@ -31,10 +31,12 @@ protected:
     std::unique_ptr<Buffer<Ray>> _ray_buffer;
     
     uint _max_depth;
+    
+    void _prepare_for_frame() override;
 
 public:
     PathTracing(Device *device, const ParameterSet &parameter_set);
-    void render_frame(Viewport viewport, Scene &scene, Camera &camera, Sampler &sampler) override;
+    void render_frame(KernelDispatcher &dispatch) override;
 };
 
 LUISA_REGISTER_NODE_CREATOR("PathTracing", PathTracing)

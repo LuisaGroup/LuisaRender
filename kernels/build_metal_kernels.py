@@ -2,10 +2,10 @@ from os import listdir, mkdir, system
 from os.path import exists
 from sys import argv
 
-source_directory = argv[0][:argv[0].rfind("/") + 1]
+source_directory = argv[0][:argv[0].rfind("/") + 1] + "metal/"
 build_directory = source_directory + "build/"
 binary_directory = source_directory + "bin/"
-include_directory = source_directory + "../src"
+include_directory = source_directory + "../../src"
 
 if not exists(build_directory):
     mkdir(build_directory)

@@ -31,7 +31,7 @@ struct ApplyAndAccumulateKernelUniforms {
 
 // todo: viewport
 LUISA_DEVICE_CALLABLE inline void apply_and_accumulate(
-    LUISA_DEVICE_SPACE const float3 *ray_radiance_buffer,
+    LUISA_DEVICE_SPACE const float3 *ray_color_buffer,
     LUISA_DEVICE_SPACE const float2 *ray_pixel_buffer,
     LUISA_DEVICE_SPACE float4 *accumulation_buffer,
     LUISA_UNIFORM_SPACE ApplyAndAccumulateKernelUniforms &uniforms,
@@ -54,7 +54,7 @@ LUISA_DEVICE_CALLABLE inline void apply_and_accumulate(
                 auto wx = mitchell_netravali_1d(d.x * inv_radius, uniforms.b, uniforms.c);
                 auto wy = mitchell_netravali_1d(d.y * inv_radius, uniforms.b, uniforms.c);
                 auto weight = wx * wy;
-                value += make_float4(ray_radiance_buffer[index_in_tile] * weight, weight);
+                value += make_float4(ray_color_buffer[index_in_tile] * weight, weight);
             }
         }
         accumulation_buffer[raster.y * uniforms.film_resolution.x + raster.x] += value;
@@ -85,7 +85,7 @@ public:
                               Viewport film_viewport,
                               Viewport tile_viewport,
                               BufferView<float2> pixel_buffer,
-                              BufferView<float3> radiance_buffer,
+                              BufferView<float3> color_buffer,
                               BufferView<float4> accumulation_buffer) override;
 };
 

@@ -41,7 +41,7 @@ public:
                                       Viewport film_viewport,
                                       Viewport tile_viewport,
                                       BufferView<float2> pixel_buffer,
-                                      BufferView<float3> radiance_buffer,
+                                      BufferView<float3> color_buffer,
                                       BufferView<float4> accumulation_buffer) = 0;
     [[nodiscard]] float radius() const noexcept { return _radius; }
 };

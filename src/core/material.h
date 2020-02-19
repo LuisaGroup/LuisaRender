@@ -4,6 +4,20 @@
 
 #pragma once
 
+#include "data_types.h"
+
+namespace luisa {
+
+struct MaterialInfo {
+    bool valid;
+    uint8_t tag;
+    uint16_t index;
+};
+
+}
+
+#ifndef LUISA_DEVICE_COMPATIBLE
+
 #include <string_view>
 #include <unordered_map>
 #include "node.h"
@@ -23,3 +37,5 @@ public:
 };
 
 }
+
+#endif

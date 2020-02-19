@@ -17,9 +17,7 @@ Camera camera : ThinLens {
   up { 0, 1, 0 }
 }
 
-Integrator integrator : PathTracing {
-
-}
+Integrator integrator : Normal {}
 
 Shape cube : TriangleMesh {
   file { "data/meshes/cube/cube.obj" }
@@ -29,7 +27,6 @@ Shape cube : TriangleMesh {
 
 Shape left_wall : Replica {
   reference { @cube }
-  transform :
 }
 
 Shape right_wall : Instance {
@@ -37,13 +34,16 @@ Shape right_wall : Instance {
 }
 
 Light light : Point {
-
+  position {0, 0, 0}
+  emission {10, 10, 10}
 }
 
 renderer : SingleShot {
   integrator { @integrator }
+  sampler : Independent {
+    spp { 128 }
+  }
   camera { @camera }
   shapes { @left_wall, @right_wall }
   lights { @light }
-  time_span { 0.0f, 0.0f }
 }

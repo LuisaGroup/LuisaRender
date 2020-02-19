@@ -21,7 +21,7 @@ private:
 public:
     MetalBuffer(id<MTLBuffer> buffer, size_t capacity, BufferStorage storage) noexcept
         : TypelessBuffer(capacity, storage), _handle{buffer} {}
-    
+    ~MetalBuffer() noexcept override { [_handle release]; }
     void upload(size_t offset, size_t size) override;
     void synchronize(struct KernelDispatcher &dispatch) override;
     [[nodiscard]] void *data() override;

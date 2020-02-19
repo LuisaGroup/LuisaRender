@@ -18,9 +18,20 @@
 
 namespace luisa::metal {
 
-struct MetalDeviceWrapper { id<MTLDevice> device; };
-struct MetalLibraryWrapper { id<MTLLibrary> library; };
-struct MetalCommandQueueWrapper { id<MTLCommandQueue> queue; };
+struct MetalDeviceWrapper {
+    id<MTLDevice> device;
+    ~MetalDeviceWrapper() noexcept { [device release]; }
+};
+
+struct MetalLibraryWrapper {
+    id<MTLLibrary> library;
+    ~MetalLibraryWrapper() noexcept { [library release]; }
+};
+
+struct MetalCommandQueueWrapper {
+    id<MTLCommandQueue> queue;
+    ~MetalCommandQueueWrapper() noexcept { [queue release]; }
+};
 
 MetalDevice::MetalDevice()
     : _device_wrapper{std::make_unique<MetalDeviceWrapper>()},
@@ -30,7 +41,7 @@ MetalDevice::MetalDevice()
     _device_wrapper->device = MTLCreateSystemDefaultDevice();
     _command_queue_wrapper->queue = [_device_wrapper->device newCommandQueue];
     
-    auto library_path = make_objc_string(ResourceManager::instance().working_path("kernels/bin/kernels.metallib").c_str());
+    auto library_path = make_objc_string(ResourceManager::instance().working_path("kernels/metal/bin/kernels.metallib").c_str());
     _library_wrapper->library = [_device_wrapper->device newLibraryWithFile:library_path error:nullptr];
     
 }

@@ -24,17 +24,16 @@ struct AccumulateTileKernelUniforms {
 };
 
 LUISA_DEVICE_CALLABLE inline void accumulate_tile(
-    LUISA_DEVICE_SPACE const float3 *ray_radiance_buffer,
+    LUISA_DEVICE_SPACE const float3 *ray_color_buffer,
     LUISA_DEVICE_SPACE float4 *accumulation_buffer,
     LUISA_UNIFORM_SPACE AccumulateTileKernelUniforms &uniforms,
     uint tid) noexcept {
     
     if (tid < uniforms.tile_viewport.size.x * uniforms.tile_viewport.size.y) {
         auto pixel = uniforms.tile_viewport.origin + make_uint2(tid % uniforms.tile_viewport.size.x, tid / uniforms.tile_viewport.size.x);
-        auto radiance = ray_radiance_buffer[tid];
+        auto radiance = ray_color_buffer[tid];
         accumulation_buffer[pixel.y * uniforms.film_resolution.x + pixel.x] += make_float4(radiance, 1.0f);
     }
-    
 }
 
 }
@@ -84,12 +83,12 @@ public:
         });
     }
     
-    virtual void accumulate_tile(KernelDispatcher &dispatch, BufferView<float2> pixel_buffer, BufferView<float3> radiance_buffer, Viewport tile_viewport) {
+    virtual void accumulate_tile(KernelDispatcher &dispatch, BufferView<float2> pixel_buffer, BufferView<float3> color_buffer, Viewport tile_viewport) {
         if (_filter != nullptr) {
-            _filter->apply_and_accumulate(dispatch, _resolution, tile_viewport, tile_viewport, pixel_buffer, radiance_buffer, _accumulation_buffer->view());
-        } else {
+            _filter->apply_and_accumulate(dispatch, _resolution, tile_viewport, tile_viewport, pixel_buffer, color_buffer, _accumulation_buffer->view());
+        } else {  // no filtering
             dispatch(*_accumulate_tile_kernel, tile_viewport.size.x * tile_viewport.size.y, [&](KernelArgumentEncoder &encode) {
-                encode("ray_radiance_buffer", radiance_buffer);
+                encode("ray_color_buffer", color_buffer);
                 encode("accumulation_buffer", *_accumulation_buffer);
                 encode("uniforms", film::AccumulateTileKernelUniforms{tile_viewport, _resolution});
             });

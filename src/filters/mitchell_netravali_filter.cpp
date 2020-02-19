@@ -19,11 +19,11 @@ void MitchellNetravaliFilter::apply_and_accumulate(KernelDispatcher &dispatch,
                                                    Viewport film_viewport,
                                                    Viewport tile_viewport,
                                                    BufferView<float2> pixel_buffer,
-                                                   BufferView<float3> radiance_buffer,
+                                                   BufferView<float3> color_buffer,
                                                    BufferView<float4> accumulation_buffer) {
     
     dispatch(*_apply_and_accumulate_kernel, film_resolution, [&](KernelArgumentEncoder &encode) {
-        encode("ray_radiance_buffer", radiance_buffer);
+        encode("ray_color_buffer", color_buffer);
         encode("ray_pixel_buffer", pixel_buffer);
         encode("accumulation_buffer", accumulation_buffer);
         encode("uniforms", filter::mitchell_netravali::ApplyAndAccumulateKernelUniforms{

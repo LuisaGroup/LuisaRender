@@ -41,6 +41,8 @@ void SingleShot::execute() {
         _camera->update(time);
         _scene->update(time);
         
+        _integrator->prepare_for_frame(_scene.get(), _camera.get(), _sampler.get(), _viewport);
+        
         // wait for command queue
         {
             std::unique_lock lock{_mutex};
@@ -51,7 +53,7 @@ void SingleShot::execute() {
         // render frame
         _device->launch_async([&](KernelDispatcher &dispatch) {
             _sampler->start_next_frame(dispatch);
-            _integrator->render_frame(_viewport, *_scene, *_camera, *_sampler);
+            _integrator->render_frame(dispatch);
         }, [this, frame_index = _sampler->frame_index()] {  // notify that one frame has been rendered
             {
                 std::lock_guard lock_guard{_mutex};
