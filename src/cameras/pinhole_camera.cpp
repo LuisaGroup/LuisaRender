@@ -17,7 +17,7 @@ void PinholeCamera::generate_rays(KernelDispatcher &dispatch,
                                   BufferView<uint> ray_queue_size) {
     
     auto pixel_count = tile_viewport.size.x * tile_viewport.size.y;
-    auto sample_buffer = sampler.generate_samples(dispatch, 4u, ray_queue, ray_queue_size);
+    auto sample_buffer = sampler.generate_samples(dispatch, 2u, ray_queue, ray_queue_size);
     
     dispatch(*_generate_rays_kernel, pixel_count, [&](KernelArgumentEncoder &encode) {
         encode("sample_buffer", sample_buffer);
