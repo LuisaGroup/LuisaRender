@@ -3,13 +3,13 @@
 //
 
 #include "scene.h"
+#include "geometry.h"
 
 namespace luisa {
 
-Scene::Scene(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, const std::vector<std::shared_ptr<Light>> &lights, float initial_time) : _device{device} {
+void Scene::_initialize_geometry(const std::vector<std::shared_ptr<Shape>> &shapes, float initial_time) {
     
     LUISA_WARNING_IF(shapes.empty(), "no shape in scene");
-    LUISA_WARNING_IF(lights.empty(), "no light in scene");
     
     for (auto &&shape : shapes) {
         if (shape->is_instance()) {
@@ -31,7 +31,7 @@ Scene::Scene(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, 
     for (auto &&shape : _dynamic_shapes) { if (!shape->loaded()) { shape->load(geometry_encoder); }}
     for (auto &&shape : _dynamic_instances) { shape->load(geometry_encoder); }
     
-    // create buffers
+    // create geometry buffers
     {
         auto positions = geometry_encoder.steal_positions();
         _position_buffer = _device->create_buffer<float3>(positions.size(), BufferStorage::MANAGED);
@@ -88,8 +88,19 @@ Scene::Scene(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, 
     
     transform_buffer.upload();
     entity_index_buffer.upload();
+}
+
+Scene::Scene(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, const std::vector<std::shared_ptr<Light>> &lights, float initial_time) : _device{device} {
     
+    _initialize_geometry(shapes, initial_time);
+    
+    LUISA_WARNING_IF(lights.empty(), "no light in scene");
+    
+    // create acceleration
     _acceleration = _device->create_acceleration(*this);
+    
+    // create kernels
+    _evaluate_interactions_kernel = _device->create_kernel("scene_evaluate_interactions");
 }
 
 void Scene::update(float time) {
@@ -107,6 +118,40 @@ void Scene::update(float time) {
             _acceleration->refit(dispatch);
         });
     }
+}
+
+void Scene::trace_closest(KernelDispatcher &dispatch, BufferView<Ray> ray_buffer, BufferView<uint> ray_count, BufferView<ClosestHit> hit_buffer) {
+    _acceleration->trace_closest(dispatch, ray_buffer, hit_buffer, ray_count);
+}
+
+void Scene::trace_any(KernelDispatcher &dispatch, BufferView<Ray> ray_buffer, BufferView<uint> ray_count, BufferView<AnyHit> hit_buffer) {
+    _acceleration->trace_any(dispatch, ray_buffer, hit_buffer, ray_count);
+}
+
+void Scene::evaluate_interactions(KernelDispatcher &dispatch,
+                                  BufferView<Ray> ray_buffer,
+                                  BufferView<uint> ray_count,
+                                  BufferView<ClosestHit> hit_buffer,
+                                  InteractionBufferSet &interaction_buffers) {
+    
+    dispatch(*_evaluate_interactions_kernel, ray_buffer.size(), [&](KernelArgumentEncoder &encode) {
+        encode("ray_buffer", ray_buffer);
+        encode("ray_count", ray_count);
+        encode("hit_buffer", hit_buffer);
+        encode("position_buffer", *_position_buffer);
+        encode("normal_buffer", *_normal_buffer);
+        encode("uv_buffer", *_tex_coord_buffer);
+        encode("index_buffer", *_index_buffer);
+        encode("transform_buffer", *_dynamic_transform_buffer);
+        encode("material_info_buffer", *_material_info_buffer);
+        if (interaction_buffers.has_position_buffer()) { encode("interaction_position_buffer", interaction_buffers.position_buffer()); }
+        if (interaction_buffers.has_normal_buffer()) { encode("interaction_normal_buffer", interaction_buffers.normal_buffer()); }
+        if (interaction_buffers.has_uv_buffer()) { encode("interaction_uv_buffer", interaction_buffers.uv_buffer()); }
+        if (interaction_buffers.has_wo_and_distance_buffer()) { encode("interaction_wo_and_distance_buffer", interaction_buffers.wo_and_distance_buffer()); }
+        if (interaction_buffers.has_material_info_buffer()) { encode("interaction_material_info_buffer", interaction_buffers.material_info_buffer()); }
+        encode("attribute_flags", interaction_buffers.attribute_flags());
+    });
+    
 }
 
 }

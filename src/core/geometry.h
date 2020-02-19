@@ -7,7 +7,6 @@
 #ifndef LUISA_DEVICE_COMPATIBLE
 
 #include "node.h"
-#include "acceleration.h"
 #include "transform.h"
 
 namespace luisa {
@@ -29,8 +28,8 @@ private:
     uint _index_count{};
 
 public:
-    GeometryEntity(Scene *geometry, uint vertex_offset, uint vertex_count, uint index_offset, uint index_count)
-        : _scene{geometry}, _vertex_offset{vertex_offset}, _vertex_count{vertex_count}, _index_offset{index_offset}, _index_count{index_count} {}
+    GeometryEntity(Scene *scene, uint vertex_offset, uint vertex_count, uint index_offset, uint index_count)
+        : _scene{scene}, _vertex_offset{vertex_offset}, _vertex_count{vertex_count}, _index_offset{index_offset}, _index_count{index_count} {}
     
     [[nodiscard]] BufferView<float3> position_buffer();
     [[nodiscard]] BufferView<float3> normal_buffer();

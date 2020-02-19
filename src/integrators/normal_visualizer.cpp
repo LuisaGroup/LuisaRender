@@ -39,7 +39,7 @@ void NormalVisualizer::_prepare_for_frame() {
         _ray_pixel_buffer = _device->create_buffer<float2>(viewport_pixel_count, BufferStorage::DEVICE_PRIVATE);
     }
     if (_interaction_buffers.size() < viewport_pixel_count || !_interaction_buffers.has_normal_buffer()) {
-        _interaction_buffers = InteractionBufferSet{_device, viewport_pixel_count, scene::interaction_attribute_flags::NORMAL_BIT};
+        _interaction_buffers = InteractionBufferSet{_device, viewport_pixel_count, interaction_attribute_flags::NORMAL_BIT};
     }
 }
 
