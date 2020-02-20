@@ -31,8 +31,6 @@ void TriangleMesh::load(GeometryEncoder &encoder) {
     std::cout << "Loading: " << _path << std::endl;
     auto ai_scene = ai_importer.ReadFile(_path.c_str(),
                                          aiProcess_JoinIdenticalVertices |
-                                         aiProcess_Triangulate |
-                                         //                                         aiProcess_GenNormals |
                                          aiProcess_GenSmoothNormals |
                                          aiProcess_PreTransformVertices |
                                          aiProcess_ImproveCacheLocality |
@@ -41,7 +39,6 @@ void TriangleMesh::load(GeometryEncoder &encoder) {
                                          aiProcess_GenUVCoords |
                                          aiProcess_TransformUVCoords |
                                          aiProcess_OptimizeMeshes |
-                                         //                                         aiProcess_OptimizeGraph |
                                          aiProcess_FlipUVs);
     
     LUISA_ERROR_IF(ai_scene == nullptr || (ai_scene->mFlags & static_cast<uint>(AI_SCENE_FLAGS_INCOMPLETE)) || ai_scene->mRootNode == nullptr,

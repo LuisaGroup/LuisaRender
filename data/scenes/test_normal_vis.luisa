@@ -17,7 +17,7 @@ Integrator integrator : Normal {}
 Shape bunny_ref : TriangleMesh {
   path { "data/meshes/bunny/bunny.obj" }
   transform : Identity {}
-  subdiv_level { 3 }
+  subdiv_level { 1 }
 }
 
 Shape bunny : Instance {
@@ -41,7 +41,7 @@ Shape bunny2 : Instance {
 renderer : SingleShot {
   integrator { @integrator }
   sampler : Independent {
-    spp { 128 }
+    spp { 1024 }
   }
   camera { @camera }
   shapes { @bunny, @bunny2 }
