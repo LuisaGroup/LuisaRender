@@ -23,21 +23,43 @@ Shape bunny_ref : TriangleMesh {
   subdiv_level { 2 }
 }
 
+Transform a1 : TRS {
+  scaling { 0.5, 0.5, 0.5 }
+  translation { 0.2, -0.3, 0.0 }
+  rotation { 0.0, 1.0, 0.0, 15.0 }
+}
+
+Transform a2 : TRS {
+  scaling { 0.5, 0.5, 0.5 }
+  translation { 0.2, -0.27, 0.0 }
+  rotation { 0.0, 1.0, 0.0, 15.0 }
+}
+
 Shape bunny : Instance {
   reference { @bunny_ref }
-  transform : TRS {
-    scaling { 0.5, 0.5, 0.5 }
-    translation { 0.2, -0.3, 0.0 }
-    rotation { 0.0, 1.0, 0.0, -75.0 }
+  transform : LinearTRSAnimation {
+    time_points { 1.0, 2.0 }
+    transforms { @a1, @a2 }
   }
+}
+
+Transform b1 : TRS {
+ scaling { 0.5, 0.5, 0.5 }
+ translation { -0.7, -0.3, -2.0 }
+ rotation { 0.0, 1.0, 0.0, -15.0 }
+}
+
+Transform b2 : TRS {
+ scaling { 0.5, 0.5, 0.5 }
+ translation { -0.3, -0.3, -1.0 }
+ rotation { 0.0, 1.0, 0.0, -15.0 }
 }
 
 Shape bunny2 : Instance {
   reference { @bunny_ref }
-  transform : TRS {
-    scaling { 0.5, 0.5, 0.5 }
-    translation { -0.7, -0.3, -2.0 }
-    rotation { 0.0, 1.0, 0.0, -15.0 }
+  transform : LinearTRSAnimation {
+    time_points { 1.0, 2.0 }
+    transforms { @b1, @b2 }
   }
 }
 
@@ -49,4 +71,6 @@ renderer : SingleShot {
   camera { @camera }
   shapes { @bunny, @bunny2 }
   output { "bunny_normal" }
+  shutter_open { 1.0 }
+  shutter_close { 2.0 }
 }

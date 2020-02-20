@@ -113,6 +113,7 @@ std::unique_ptr<Acceleration> MetalDevice::create_acceleration(Scene &scene) {
     auto instance_acceleration = [[MPSInstanceAccelerationStructure alloc] initWithGroup:acceleration_group];
     [instance_acceleration autorelease];
     
+    
     auto acceleration_structures = [NSMutableArray array];
     instance_acceleration.accelerationStructures = acceleration_structures;
     for (auto &&entity : scene.entities()) {
@@ -135,10 +136,10 @@ std::unique_ptr<Acceleration> MetalDevice::create_acceleration(Scene &scene) {
     instance_acceleration.transformBuffer = dynamic_cast<MetalBuffer &>(scene.transform_buffer().typeless_buffer()).handle();
     instance_acceleration.transformBufferOffset = scene.transform_buffer().byte_offset();
     
-    // Note: metal provides optimization for static scenes without instanced shapes
+    // Note: metal provides optimization for static scenes without instances and dynamic transforms
     instance_acceleration.transformType = scene.static_instances().empty() && scene.dynamic_shapes().empty() && scene.dynamic_instances().empty() ?
-                                          MPSTransformTypeIdentity :
-                                          MPSTransformTypeFloat4x4;
+                                          MPSTransformTypeIdentity : MPSTransformTypeFloat4x4;
+    instance_acceleration.usage = scene.dynamic_shapes().empty() && scene.dynamic_instances().empty() ? MPSAccelerationStructureUsageNone : MPSAccelerationStructureUsageRefit;
     
     [instance_acceleration rebuild];
     
