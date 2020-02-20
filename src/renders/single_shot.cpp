@@ -11,7 +11,7 @@ SingleShot::SingleShot(Device *device, const ParameterSet &parameter_set)
       _shutter_open{parameter_set["shutter_open"].parse_float_or_default(0.0f)},
       _shutter_close{parameter_set["shutter_close"].parse_float_or_default(0.0f)},
       _camera{parameter_set["camera"].parse<Camera>()},
-      _output_path_prefix{std::filesystem::absolute(parameter_set["output_prefix"].parse_string_or_default("output"))} {
+      _output_path{std::filesystem::absolute(parameter_set["output"].parse_string())} {
     
     auto viewport = parameter_set["viewport"].parse_uint4_or_default(make_uint4(0u, 0u, _camera->film().resolution()));
     _viewport = {make_uint2(viewport.x, viewport.y), make_uint2(viewport.z, viewport.w)};
@@ -54,11 +54,7 @@ void SingleShot::_execute() {
     _device->launch([&](KernelDispatcher &dispatch) {  // film postprocess
         _camera->film().postprocess(dispatch);
     });
-    
-    if (!std::filesystem::exists(_output_path_prefix)) {
-        std::filesystem::create_directory(_output_path_prefix);
-    }
-    _camera->film().save(_output_path_prefix / "result");
+    _camera->film().save(_output_path);
     
 }
 

@@ -1,7 +1,7 @@
 Film film : RGB {
   resolution { 1200, 800 }
   filter : MitchellNetravali {
-    radius { 2.0 }
+    radius { 1.0 }
     b { 0.33333333333333 }
     c { 0.33333333333333 }
   }
@@ -48,4 +48,5 @@ renderer : SingleShot {
   }
   camera { @camera }
   shapes { @bunny, @bunny2 }
+  output { "bunny_normal" }
 }

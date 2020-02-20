@@ -18,7 +18,7 @@ protected:
     float _shutter_open;
     float _shutter_close;
     std::shared_ptr<Camera> _camera;
-    std::filesystem::path _output_path_prefix;
+    std::filesystem::path _output_path;
     Viewport _viewport{};
     
     void _execute() override;
