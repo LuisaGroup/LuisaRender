@@ -57,7 +57,7 @@ void ThinLensCamera::generate_rays(KernelDispatcher &dispatch,
             _position, _left, _up, _front,
             _film->resolution(), _effective_sensor_size,
             _near_plane_distance, _focal_plane_distance, _lens_radius,
-            tile_viewport});
+            tile_viewport, _camera_to_world});
     });
 }
 

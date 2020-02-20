@@ -19,6 +19,7 @@ struct GenerateRaysKernelUniforms {
     float2 sensor_size;
     float near_plane;
     Viewport tile_viewport;
+    float4x4 transform;
 };
 
 LUISA_DEVICE_CALLABLE inline void generate_rays(
@@ -35,9 +36,11 @@ LUISA_DEVICE_CALLABLE inline void generate_rays(
                      + make_float2(make_uint2(tid % uniforms.tile_viewport.size.x, tid / uniforms.tile_viewport.size.x));
         
         auto p_film = (make_float2(0.5f) - pixel / make_float2(uniforms.film_resolution)) * uniforms.sensor_size * 0.5f;
-        auto d = p_film.x * uniforms.camera_left + p_film.y * uniforms.camera_up + uniforms.near_plane * uniforms.camera_front;
+        auto o_world = make_float3(uniforms.transform * make_float4(uniforms.camera_position, 1.0f));
+        auto p_film_world = make_float3(uniforms.transform * make_float4(
+            p_film.x * uniforms.camera_left + p_film.y * uniforms.camera_up + uniforms.near_plane * uniforms.camera_front + uniforms.camera_position, 1.0f));
         
-        ray_buffer[tid] = make_ray(uniforms.camera_position, normalize(d));
+        ray_buffer[tid] = make_ray(o_world, normalize(p_film_world - o_world));
         
         ray_pixel_buffer[tid] = pixel;
         ray_throughput_buffer[tid] = make_float3(1.0f);

@@ -10,6 +10,7 @@
 #include "node.h"
 #include "parser.h"
 #include "sampler.h"
+#include "transform.h"
 
 namespace luisa {
 
@@ -20,12 +21,21 @@ private:
 
 protected:
     std::shared_ptr<Film> _film;
+    std::shared_ptr<Transform> _transform;
+    float4x4 _camera_to_world{};
 
 public:
     Camera(Device *device, const ParameterSet &parameters)
-        : Node{device}, _film{parameters["film"].parse<Film>()} {}
-    virtual void update(float time[[maybe_unused]]) { /* doing nothing by default */ }
+        : Node{device},
+        _film{parameters["film"].parse<Film>()},
+        _transform{parameters["transform"].parse_or_null<Transform>()} {
+        
+        if (_transform == nullptr) {
+            _transform = std::make_shared<Transform>(_device);
+        }
+    }
     
+    virtual void update(float time) { _camera_to_world = _transform->dynamic_matrix(time) * _transform->static_matrix(); }
     virtual void generate_rays(KernelDispatcher &dispatch,
                                Sampler &sampler,
                                Viewport tile_viewport,

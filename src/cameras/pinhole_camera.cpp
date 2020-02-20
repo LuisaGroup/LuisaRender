@@ -23,8 +23,7 @@ void PinholeCamera::generate_rays(KernelDispatcher &dispatch,
         encode("ray_buffer", ray_buffer);
         encode("ray_throughput_buffer", throughput_buffer);
         encode("uniforms", camera::pinhole::GenerateRaysKernelUniforms{
-            _position, _left, _up, _front, _film->resolution(), _sensor_size, _near_plane, tile_viewport
-        });
+            _position, _left, _up, _front, _film->resolution(), _sensor_size, _near_plane, tile_viewport, _camera_to_world});
     });
 }
 
