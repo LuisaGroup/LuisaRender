@@ -1,5 +1,5 @@
 Film film : RGB {
-  resolution { 1280, 800 }
+  resolution { 1200, 800 }
 }
 
 Camera camera : ThinLens {
@@ -14,24 +14,28 @@ Camera camera : ThinLens {
 
 Integrator integrator : Normal {}
 
-Shape bunny : TriangleMesh {
+Shape bunny_ref : TriangleMesh {
   path { "data/meshes/bunny/bunny.obj" }
+  transform : Identity {}
+  subdiv_level { 3 }
+}
+
+Shape bunny : Instance {
+  reference { @bunny_ref }
   transform : TRS {
     scaling { 0.5, 0.5, 0.5 }
     translation { 0.2, -0.3, 0.0 }
     rotation { 0.0, 1.0, 0.0, -75.0 }
   }
-  subdiv_level { 4 }
 }
 
-Shape bunny2 : TriangleMesh {
-  path { "data/meshes/bunny/bunny.obj" }
+Shape bunny2 : Instance {
+  reference { @bunny_ref }
   transform : TRS {
     scaling { 0.5, 0.5, 0.5 }
     translation { -0.7, -0.3, -2.0 }
     rotation { 0.0, 1.0, 0.0, -15.0 }
   }
-  subdiv_level { 2 }
 }
 
 renderer : SingleShot {

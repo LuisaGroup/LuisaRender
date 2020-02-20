@@ -37,7 +37,6 @@ public:
         return _entity_index;
     }
     
-    void unload() noexcept { _entity_index = INVALID_ENTITY_INDEX; }
     virtual void load(GeometryEncoder &encoder) = 0;
     [[nodiscard]] virtual bool is_instance() const noexcept { return false; }
 };

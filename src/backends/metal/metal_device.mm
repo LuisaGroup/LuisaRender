@@ -137,7 +137,9 @@ std::unique_ptr<Acceleration> MetalDevice::create_acceleration(Scene &scene) {
     instance_acceleration.transformBufferOffset = scene.transform_buffer().byte_offset();
     
     // Note: metal provides optimization for static scenes without instanced shapes
-    instance_acceleration.transformType = scene.dynamic_shapes().empty() && scene.dynamic_instances().empty() ? MPSTransformTypeIdentity : MPSTransformTypeFloat4x4;
+    instance_acceleration.transformType = scene.static_instances().empty() && scene.dynamic_shapes().empty() && scene.dynamic_instances().empty() ?
+                                          MPSTransformTypeIdentity :
+                                          MPSTransformTypeFloat4x4;
     
     [instance_acceleration rebuild];
     

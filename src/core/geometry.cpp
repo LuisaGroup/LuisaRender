@@ -37,20 +37,14 @@ uint GeometryEncoder::create() {
 uint GeometryEncoder::replicate(uint reference_index, float4x4 static_transform) {
     LUISA_ERROR_IF_NOT(reference_index < _scene->_entities.size(), "invalid reference entity index for replicating: ", reference_index);
     auto &&reference = *_scene->_entities[reference_index];
-    if (static_transform == math::identity()) {
-        for (auto i = reference._vertex_offset; i < reference._vertex_offset + reference._vertex_count; i++) {
-            add_vertex(_positions[i], _normals[i], _tex_coords[i]);
-        }
-    } else {
-        auto normal_matrix = transpose(inverse(make_float3x3(static_transform)));
-        for (auto i = reference._vertex_offset; i < reference._vertex_offset + reference._vertex_count; i++) {
-            add_vertex(make_float3(static_transform * make_float4(_positions[i], 1.0f)),
-                       normalize(normal_matrix * _normals[i]),
-                       _tex_coords[i]);
-        }
+    auto normal_matrix = transpose(inverse(make_float3x3(static_transform)));
+    for (auto i = reference._vertex_offset; i < reference._vertex_offset + reference._vertex_count; i++) {
+        add_vertex(make_float3(static_transform * make_float4(_positions[i], 1.0f)),
+                   normalize(normal_matrix * _normals[i]),
+                   _tex_coords[i]);
     }
     for (auto i = 0u; i < reference._index_count; i++) {
-        add_indices(make_uint3(_indices[i + reference._index_offset]) - make_uint3(reference._vertex_offset));
+        add_indices(make_uint3(_indices[i + reference._index_offset]));
     }
     return create();
 }

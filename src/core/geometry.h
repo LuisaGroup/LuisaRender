@@ -36,6 +36,8 @@ public:
     [[nodiscard]] BufferView<float2> texture_coord_buffer();
     [[nodiscard]] BufferView<packed_uint3> index_buffer();
     [[nodiscard]] uint triangle_count() const noexcept { return _index_count; }
+    [[nodiscard]] uint triangle_offset() const noexcept { return _index_offset; }
+    [[nodiscard]] uint vertex_offset() const noexcept { return _vertex_offset; }
 };
 
 class GeometryEncoder : Noncopyable {

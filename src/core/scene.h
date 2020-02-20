@@ -20,8 +20,11 @@ LUISA_DEVICE_CALLABLE inline void evaluate_interactions(
     LUISA_DEVICE_SPACE const float3 *normal_buffer,
     LUISA_DEVICE_SPACE const float2 *uv_buffer,
     LUISA_DEVICE_SPACE const packed_uint3 *index_buffer,
+    LUISA_DEVICE_SPACE const uint *vertex_offset_buffer,
+    LUISA_DEVICE_SPACE const uint *index_offset_buffer,
     LUISA_DEVICE_SPACE const float4x4 *transform_buffer,
     LUISA_DEVICE_SPACE const MaterialInfo *material_info_buffer,
+    LUISA_DEVICE_SPACE bool *interaction_valid_buffer,
     LUISA_DEVICE_SPACE float3 *interaction_position_buffer,
     LUISA_DEVICE_SPACE float3 *interaction_normal_buffer,
     LUISA_DEVICE_SPACE float2 *interaction_uv_buffer,
@@ -33,9 +36,13 @@ LUISA_DEVICE_CALLABLE inline void evaluate_interactions(
     if (tid < ray_count) {
         
         auto hit = hit_buffer[tid];
-        if (hit.distance <= 0.0f) { return; }
+        if (hit.distance <= 0.0f) {
+            interaction_valid_buffer[tid] = false;
+            return;
+        }
         
-        auto indices = index_buffer[hit.triangle_index];
+        interaction_valid_buffer[tid] = true;
+        auto indices = index_buffer[hit.triangle_index + index_offset_buffer[hit.instance_index]] + vertex_offset_buffer[hit.instance_index];
         
         using namespace interaction_attribute_flags;
         
@@ -43,8 +50,7 @@ LUISA_DEVICE_CALLABLE inline void evaluate_interactions(
             auto transform = transform_buffer[hit.instance_index];
             if (attribute_flags & NORMAL_BIT) {
                 auto n = hit.bary_u * normal_buffer[indices.x] + hit.bary_v * normal_buffer[indices.y] + (1.0f - hit.bary_u - hit.bary_v) * normal_buffer[indices.z];
-//                interaction_normal_buffer[tid] = normalize(transpose(inverse(make_float3x3(transform))) * n);
-                interaction_normal_buffer[tid] = n;
+                interaction_normal_buffer[tid] = normalize(transpose(inverse(make_float3x3(transform))) * n);
             }
             if ((attribute_flags & POSITION_BIT) || (attribute_flags & WO_AND_DISTANCE_BIT)) {
                 auto p = hit.bary_u * position_buffer[indices.x] + hit.bary_v * position_buffer[indices.y] + (1.0f - hit.bary_u - hit.bary_v) * position_buffer[indices.z];
@@ -110,6 +116,8 @@ private:
     std::unique_ptr<Buffer<float4x4>> _dynamic_transform_buffer;
     std::unique_ptr<Buffer<uint>> _entity_index_buffer;
     std::unique_ptr<Buffer<MaterialInfo>> _material_info_buffer;
+    std::unique_ptr<Buffer<uint>> _vertex_offset_buffer;
+    std::unique_ptr<Buffer<uint>> _index_offset_buffer;
     
     // light and material data buffers
     std::vector<std::unique_ptr<TypelessBuffer>> _light_data_buffers;

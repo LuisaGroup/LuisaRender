@@ -14,14 +14,14 @@ void Scene::_initialize_geometry(const std::vector<std::shared_ptr<Shape>> &shap
     for (auto &&shape : shapes) {
         if (shape->is_instance()) {
             if (shape->transform().is_static()) {
-                _static_instances.emplace_back(shape)->unload();
+                _static_instances.emplace_back(shape);
             } else {
-                _dynamic_instances.emplace_back(shape)->unload();
+                _dynamic_instances.emplace_back(shape);
             }
         } else if (shape->transform().is_static()) {
-            _static_shapes.emplace_back(shape)->unload();
+            _static_shapes.emplace_back(shape);
         } else {
-            _dynamic_shapes.emplace_back(shape)->unload();
+            _dynamic_shapes.emplace_back(shape);
         }
     }
     
@@ -66,36 +66,51 @@ void Scene::_initialize_geometry(const std::vector<std::shared_ptr<Shape>> &shap
     _dynamic_transform_buffer = _device->create_buffer<float4x4>(shapes.size(), BufferStorage::MANAGED);
     _entity_index_buffer = _device->create_buffer<uint>(shapes.size(), BufferStorage::MANAGED);
     _material_info_buffer = _device->create_buffer<MaterialInfo>(shapes.size(), BufferStorage::MANAGED);
+    _index_offset_buffer = _device->create_buffer<uint>(shapes.size(), BufferStorage::MANAGED);
+    _vertex_offset_buffer = _device->create_buffer<uint>(shapes.size(), BufferStorage::MANAGED);
+    
     auto offset = 0u;
     auto transform_buffer = _dynamic_transform_buffer->view();
     auto entity_index_buffer = _entity_index_buffer->view();
     auto material_info_buffer = _material_info_buffer->view();
+    auto index_offset_buffer = _index_offset_buffer->view();
+    auto vertex_offset_buffer = _vertex_offset_buffer->view();
     
     // todo: materials
     for (auto &&shape : _static_shapes) {
         transform_buffer[offset] = math::identity();
         entity_index_buffer[offset] = shape->entity_index();
+        index_offset_buffer[offset] = _entities[shape->entity_index()]->triangle_offset();
+        vertex_offset_buffer[offset] = _entities[shape->entity_index()]->vertex_offset();
         offset++;
     }
     for (auto &&shape : _static_instances) {
         transform_buffer[offset] = shape->transform().static_matrix();
         entity_index_buffer[offset] = shape->entity_index();
+        index_offset_buffer[offset] = _entities[shape->entity_index()]->triangle_offset();
+        vertex_offset_buffer[offset] = _entities[shape->entity_index()]->vertex_offset();
         offset++;
     }
     for (auto &&shape : _dynamic_shapes) {
         transform_buffer[offset] = shape->transform().dynamic_matrix(initial_time);
         entity_index_buffer[offset] = shape->entity_index();
+        index_offset_buffer[offset] = _entities[shape->entity_index()]->triangle_offset();
+        vertex_offset_buffer[offset] = _entities[shape->entity_index()]->vertex_offset();
         offset++;
     }
     for (auto &&shape : _dynamic_instances) {
-        transform_buffer[offset++] = shape->transform().dynamic_matrix(initial_time) * shape->transform().static_matrix();
+        transform_buffer[offset] = shape->transform().dynamic_matrix(initial_time) * shape->transform().static_matrix();
         entity_index_buffer[offset] = shape->entity_index();
+        index_offset_buffer[offset] = _entities[shape->entity_index()]->triangle_offset();
+        vertex_offset_buffer[offset] = _entities[shape->entity_index()]->vertex_offset();
         offset++;
     }
     
     transform_buffer.upload();
     entity_index_buffer.upload();
     material_info_buffer.upload();
+    index_offset_buffer.upload();
+    vertex_offset_buffer.upload();
 }
 
 Scene::Scene(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, const std::vector<std::shared_ptr<Light>> &lights, float initial_time) : _device{device} {
@@ -150,8 +165,11 @@ void Scene::evaluate_interactions(KernelDispatcher &dispatch,
         encode("normal_buffer", *_normal_buffer);
         encode("uv_buffer", *_tex_coord_buffer);
         encode("index_buffer", *_index_buffer);
+        encode("vertex_offset_buffer", *_vertex_offset_buffer);
+        encode("index_offset_buffer", *_index_offset_buffer);
         encode("transform_buffer", *_dynamic_transform_buffer);
         encode("material_info_buffer", *_material_info_buffer);
+        encode("interaction_valid_buffer", interaction_buffers.valid_buffer());
         if (interaction_buffers.has_position_buffer()) { encode("interaction_position_buffer", interaction_buffers.position_buffer()); }
         if (interaction_buffers.has_normal_buffer()) { encode("interaction_normal_buffer", interaction_buffers.normal_buffer()); }
         if (interaction_buffers.has_uv_buffer()) { encode("interaction_uv_buffer", interaction_buffers.uv_buffer()); }
@@ -159,7 +177,6 @@ void Scene::evaluate_interactions(KernelDispatcher &dispatch,
         if (interaction_buffers.has_material_info_buffer()) { encode("interaction_material_info_buffer", interaction_buffers.material_info_buffer()); }
         encode("attribute_flags", interaction_buffers.attribute_flags());
     });
-    
 }
 
 }

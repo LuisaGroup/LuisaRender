@@ -11,7 +11,7 @@ namespace luisa {
 class TRSTransform : public Transform {
 
 protected:
-    float4x4 _matrix;
+    float4x4 _matrix{};
 
 public:
     TRSTransform(Device *device, const ParameterSet &parameter_set);

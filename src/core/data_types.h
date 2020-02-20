@@ -254,7 +254,7 @@ LUISA_DEVICE_CALLABLE inline auto make_float3x3(
     float m10, float m11, float m12,
     float m20, float m21, float m22) noexcept {
     
-    return float3x3{m00, m01, m02, m10, m11, m12, m20, m21, m22};
+    return float3x3{make_float3(m00, m01, m02), make_float3(m10, m11, m12), make_float3(m20, m21, m22)};
 }
 
 LUISA_DEVICE_CALLABLE inline auto make_float3x3(float4x4 m) noexcept {

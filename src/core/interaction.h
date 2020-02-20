@@ -30,6 +30,7 @@ private:
     size_t _size{0ul};
     uint _attribute_flags{0x0u};
     
+    std::unique_ptr<Buffer<bool>> _valid_buffer;
     std::unique_ptr<Buffer<float3>> _position_buffer;
     std::unique_ptr<Buffer<float3>> _normal_buffer;
     std::unique_ptr<Buffer<float2>> _uv_buffer;
@@ -42,6 +43,7 @@ public:
     InteractionBufferSet(Device *device, size_t capacity, uint flags = interaction_attribute_flags::ALL_BITS)
         : _size{capacity},
           _attribute_flags{flags},
+          _valid_buffer{device->create_buffer<bool>(capacity, BufferStorage::DEVICE_PRIVATE)},
           _position_buffer{(flags & interaction_attribute_flags::POSITION_BIT) ? device->create_buffer<float3>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
           _normal_buffer{(flags & interaction_attribute_flags::NORMAL_BIT) ? device->create_buffer<float3>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
           _uv_buffer{(flags & interaction_attribute_flags::UV_BIT) ? device->create_buffer<float2>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
@@ -82,6 +84,10 @@ public:
     [[nodiscard]] auto wo_and_distance_buffer() const noexcept {
         LUISA_ERROR_IF_NOT(has_wo_and_distance_buffer(), "no wo and distance buffer present");
         return _wo_and_distance_buffer->view();
+    }
+    
+    [[nodiscard]] auto valid_buffer() const noexcept {
+        return _valid_buffer->view();
     }
 };
 

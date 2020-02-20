@@ -21,12 +21,12 @@ LUISA_DEVICE_CALLABLE inline void prepare_for_frame(
 
 LUISA_DEVICE_CALLABLE inline void colorize_normals(
     LUISA_DEVICE_SPACE float3 *normals,
+    LUISA_DEVICE_SPACE const bool *valid_buffer,
     uint pixel_count,
     uint tid) noexcept {
     
     if (tid < pixel_count) {
-        auto n = normals[tid];
-        normals[tid] = XYZ2ACEScg(RGB2XYZ(n * 0.5f + 0.5f));
+        normals[tid] = XYZ2ACEScg(RGB2XYZ(valid_buffer[tid] ? normals[tid] * 0.5f + 0.5f : make_float3()));
     }
     
 }
