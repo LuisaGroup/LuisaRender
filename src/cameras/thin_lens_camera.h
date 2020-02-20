@@ -70,7 +70,6 @@ protected:
     float _focal_plane_distance{};
     float _near_plane_distance{};
     float _lens_radius{};
-    float2 _sensor_size{};
     float2 _effective_sensor_size{};
     
     std::unique_ptr<Kernel> _generate_rays_kernel;

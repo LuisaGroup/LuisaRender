@@ -22,7 +22,7 @@ void MitchellNetravaliFilter::apply_and_accumulate(KernelDispatcher &dispatch,
                                                    BufferView<float3> color_buffer,
                                                    BufferView<float4> accumulation_buffer) {
     
-    dispatch(*_apply_and_accumulate_kernel, film_resolution, [&](KernelArgumentEncoder &encode) {
+    dispatch(*_apply_and_accumulate_kernel, tile_viewport.size.x * tile_viewport.size.y, [&](KernelArgumentEncoder &encode) {
         encode("ray_color_buffer", color_buffer);
         encode("ray_pixel_buffer", pixel_buffer);
         encode("accumulation_buffer", accumulation_buffer);

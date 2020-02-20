@@ -10,13 +10,17 @@ namespace luisa {
 ThinLensCamera::ThinLensCamera(Device *device, const ParameterSet &parameters)
     : Camera{device, parameters} {
     
-    _sensor_size = 1e-3f * parameters["sensor_size"].parse_float2_or_default(make_float2(36.0f, 24.0f));
+    auto sensor_size = 1e-3f * parameters["sensor_size"].parse_float2_or_default(make_float2(36.0f, 24.0f));
     auto film_resolution = make_float2(_film->resolution());
     auto film_aspect = film_resolution.x / film_resolution.y;
-    auto sensor_aspect = _sensor_size.x / _sensor_size.y;
+    auto sensor_aspect = sensor_size.x / sensor_size.y;
+    if ((sensor_aspect < 1.0f && film_aspect > 1.0f) || (sensor_aspect > 1.0f && film_aspect < 1.0f)) {
+        sensor_aspect = 1.0f / sensor_aspect;
+        std::swap(sensor_size.x, sensor_size.y);
+    }
     _effective_sensor_size = sensor_aspect < film_aspect ?
-                             make_float2(_sensor_size.x, _sensor_size.x / film_aspect) :
-                             make_float2(_sensor_size.y * film_aspect, _sensor_size.y);
+                             make_float2(sensor_size.x, sensor_size.x / film_aspect) :
+                             make_float2(sensor_size.y * film_aspect, sensor_size.y);
     
     auto focal_length = 1e-3f * parameters["focal_length"].parse_float_or_default(50.0f);
     auto f_number = parameters["f_number"].parse_float_or_default(1.2f);
