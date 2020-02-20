@@ -79,7 +79,6 @@ std::unique_ptr<Kernel> MetalDevice::create_kernel(std::string_view function_nam
     std::cout << std::endl;
     
     return std::make_unique<MetalKernel>(function, pipeline, reflection);
-    
 }
 
 void MetalDevice::launch(std::function<void(KernelDispatcher &)> dispatch) {
@@ -90,7 +89,7 @@ void MetalDevice::launch(std::function<void(KernelDispatcher &)> dispatch) {
     [command_buffer waitUntilCompleted];
 }
 
-void MetalDevice::launch_async(std::function<void(KernelDispatcher &)> dispatch, std::function<void()> callback) {
+void MetalDevice::_launch_async(std::function<void(KernelDispatcher &)> dispatch, std::function<void()> callback) {
     auto command_buffer = [_command_queue_wrapper->queue commandBuffer];
     [command_buffer addCompletedHandler:^(id<MTLCommandBuffer>) { callback(); }];
     MetalKernelDispatcher dispatcher{command_buffer};
@@ -149,6 +148,8 @@ std::unique_ptr<Acceleration> MetalDevice::create_acceleration(Scene &scene) {
     ray_intersector.rayStride = sizeof(Ray);
     ray_intersector.intersectionDataType = MPSIntersectionDataTypeDistancePrimitiveIndexInstanceIndexCoordinates;
     ray_intersector.intersectionStride = sizeof(ClosestHit);
+    ray_intersector.boundingBoxIntersectionTestType = MPSBoundingBoxIntersectionTestTypeAxisAligned;
+    ray_intersector.triangleIntersectionTestType = MPSTriangleIntersectionTestTypeWatertight;
     
     auto shadow_ray_intersector = [[MPSRayIntersector alloc] initWithDevice:_device_wrapper->device];
     [shadow_ray_intersector autorelease];
@@ -156,6 +157,8 @@ std::unique_ptr<Acceleration> MetalDevice::create_acceleration(Scene &scene) {
     shadow_ray_intersector.rayStride = sizeof(Ray);
     shadow_ray_intersector.intersectionDataType = MPSIntersectionDataTypeDistance;
     shadow_ray_intersector.intersectionStride = sizeof(AnyHit);
+    shadow_ray_intersector.boundingBoxIntersectionTestType = MPSBoundingBoxIntersectionTestTypeAxisAligned;
+    shadow_ray_intersector.triangleIntersectionTestType = MPSTriangleIntersectionTestTypeWatertight;
     
     return std::make_unique<MetalAcceleration>(acceleration_group, instance_acceleration, ray_intersector, shadow_ray_intersector);
 }

@@ -4,11 +4,6 @@
 
 #pragma once
 
-#include <vector>
-#include <random>
-#include <filesystem>
-#include <condition_variable>
-
 #include "mathematics.h"
 #include "node.h"
 #include "parser.h"

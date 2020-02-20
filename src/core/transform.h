@@ -16,6 +16,7 @@ private:
     LUISA_MAKE_NODE_CREATOR_REGISTRY(Transform);
 
 public:
+    Transform(Device *device) noexcept : Node{device} {}
     Transform(Device *device, const ParameterSet &) : Node{device} {}
     [[nodiscard]] virtual float4x4 static_matrix() const { return math::identity(); }
     [[nodiscard]] virtual float4x4 dynamic_matrix(float time[[maybe_unused]]) const {

@@ -80,6 +80,7 @@ public:
         }
         return _sample_buffer->view_as<float>();
     }
+    virtual BufferView<float4> generate_camera_samples(KernelDispatcher &dispatch) = 0;
 };
 
 }

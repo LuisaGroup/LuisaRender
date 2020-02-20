@@ -18,6 +18,9 @@ private:
     
     LUISA_DEVICE_CREATOR("Metal") { return std::make_unique<MetalDevice>(); }
 
+protected:
+    void _launch_async(std::function<void(KernelDispatcher &)> dispatch, std::function<void()> callback) override;
+
 public:
     MetalDevice();
     ~MetalDevice() noexcept override = default;
@@ -26,8 +29,6 @@ public:
     std::unique_ptr<TypelessBuffer> allocate_buffer(size_t capacity, BufferStorage storage) override;
     
     void launch(std::function<void(KernelDispatcher &)> dispatch) override;
-    void launch_async(std::function<void(KernelDispatcher &)> dispatch, std::function<void()> callback) override;
-    
 };
 
 }

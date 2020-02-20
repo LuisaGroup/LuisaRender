@@ -25,8 +25,11 @@ protected:
 
 public:
     Shape(Device *device, const ParameterSet &parameter_set) : Node{device} {
-        _transform = parameter_set["transform"].parse<Transform>();
         _material = parameter_set["material"].parse_or_null<Material>();
+        _transform = parameter_set["transform"].parse_or_null<Transform>();
+        if (_transform == nullptr) {
+            _transform = std::make_shared<Transform>(_device);
+        }
     }
     
     [[nodiscard]] Transform &transform() noexcept { return *_transform; }

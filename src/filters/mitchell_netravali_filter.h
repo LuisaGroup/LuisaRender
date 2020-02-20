@@ -29,7 +29,7 @@ struct ApplyAndAccumulateKernelUniforms {
     float c;
 };
 
-// todo: viewport
+// todo: fix
 LUISA_DEVICE_CALLABLE inline void apply_and_accumulate(
     LUISA_DEVICE_SPACE const float3 *ray_color_buffer,
     LUISA_DEVICE_SPACE const float2 *ray_pixel_buffer,

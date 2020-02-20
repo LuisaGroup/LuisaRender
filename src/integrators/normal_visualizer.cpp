@@ -16,11 +16,9 @@ void NormalVisualizer::render_frame(KernelDispatcher &dispatch) {
                            _viewport,
                            _ray_pixel_buffer->view(),
                            _ray_buffer->view(),
-                           _ray_throughput_buffer->view(),
-                           _ray_queue->view(),
-                           _ray_queue_size->view());
-    _scene->trace_closest(dispatch, _ray_buffer->view(), _ray_queue_size->view(), _hit_buffer->view());
-    _scene->evaluate_interactions(dispatch, _ray_buffer->view(), _ray_queue_size->view(), _hit_buffer->view(), _interaction_buffers);
+                           _ray_throughput_buffer->view());
+    _scene->trace_closest(dispatch, _ray_buffer->view(), _ray_count->view(), _hit_buffer->view());
+    _scene->evaluate_interactions(dispatch, _ray_buffer->view(), _ray_count->view(), _hit_buffer->view(), _interaction_buffers);
     
     dispatch(*_colorize_normals_kernel, pixel_count, [&](KernelArgumentEncoder &encode) {
         encode("pixel_count", pixel_count);
@@ -33,19 +31,16 @@ void NormalVisualizer::render_frame(KernelDispatcher &dispatch) {
 
 void NormalVisualizer::_prepare_for_frame() {
     
-    if (_ray_queue_size == nullptr) {
-        _ray_queue_size = _device->create_buffer<uint>(1u, BufferStorage::MANAGED);
+    if (_ray_count == nullptr) {
+        _ray_count = _device->create_buffer<uint>(1u, BufferStorage::MANAGED);
     }
     
     auto viewport_pixel_count = _viewport.size.x * _viewport.size.y;
-    if (*_ray_queue_size->data() != viewport_pixel_count) {
-        *_ray_queue_size->data() = viewport_pixel_count;
-        _ray_queue_size->upload();
+    if (*_ray_count->data() != viewport_pixel_count) {
+        *_ray_count->data() = viewport_pixel_count;
+        _ray_count->upload();
     }
     
-    if (_ray_queue == nullptr || _ray_queue->size() < viewport_pixel_count) {
-        _ray_queue = _device->create_buffer<uint>(viewport_pixel_count, BufferStorage::DEVICE_PRIVATE);
-    }
     if (_ray_buffer == nullptr || _ray_buffer->size() < viewport_pixel_count) {
         _ray_buffer = _device->create_buffer<Ray>(viewport_pixel_count, BufferStorage::DEVICE_PRIVATE);
     }
@@ -61,19 +56,10 @@ void NormalVisualizer::_prepare_for_frame() {
     if (_interaction_buffers.size() < viewport_pixel_count || !_interaction_buffers.has_normal_buffer()) {
         _interaction_buffers = InteractionBufferSet{_device, viewport_pixel_count, interaction_attribute_flags::NORMAL_BIT};
     }
-    
-    _device->launch_async([&](KernelDispatcher &dispatch) {
-        auto pixel_count = _viewport.size.x * _viewport.size.y;
-        dispatch(*_prepare_for_frame_kernel, pixel_count, [&](KernelArgumentEncoder &encode) {
-            encode("pixel_count", pixel_count);
-            encode("ray_queue", *_ray_queue);
-        });
-    });
 }
 
 NormalVisualizer::NormalVisualizer(Device *device, const ParameterSet &parameter_set)
     : Integrator{device, parameter_set},
-      _prepare_for_frame_kernel{device->create_kernel("normal_visualizer_prepare_for_frame")},
       _colorize_normals_kernel{device->create_kernel("normal_visualizer_colorize_normals")} {}
     
 }

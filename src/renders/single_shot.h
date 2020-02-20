@@ -4,6 +4,10 @@
 
 #pragma once
 
+#include <vector>
+#include <random>
+#include <filesystem>
+
 #include <core/render.h>
 
 namespace luisa {
@@ -16,10 +20,6 @@ protected:
     std::shared_ptr<Camera> _camera;
     std::filesystem::path _output_path_prefix;
     Viewport _viewport{};
-    uint _command_queue_size;
-    uint _working_command_count{0u};
-    std::condition_variable _cv;
-    std::mutex _mutex;
 
 public:
     SingleShot(Device *device, const ParameterSet &parameter_set);

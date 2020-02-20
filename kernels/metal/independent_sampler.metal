@@ -52,3 +52,12 @@ LUISA_KERNEL void independent_sampler_generate_4d_samples(
     
     luisa::sampler::independent::generate_samples<4u>(sampler_state_buffer, ray_queue, ray_count, sample_buffer, uniforms, tid.x);
 }
+
+LUISA_KERNEL void independent_sampler_generate_camera_samples(
+    LUISA_DEVICE_SPACE luisa::sampler::independent::State *sampler_state_buffer,
+    LUISA_DEVICE_SPACE luisa::float4 *sample_buffer,
+    LUISA_UNIFORM_SPACE luisa::sampler::independent::GenerateSamplesKernelUniforms &uniforms,
+    luisa::uint2 tid [[thread_position_in_grid]]) {
+    
+    luisa::sampler::independent::generate_camera_samples(sampler_state_buffer, sample_buffer, uniforms, tid.x);
+}

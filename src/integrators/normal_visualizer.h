@@ -9,16 +9,6 @@
 
 namespace luisa::integrator::normal {
 
-LUISA_DEVICE_CALLABLE inline void prepare_for_frame(
-    LUISA_DEVICE_SPACE uint *ray_queue,
-    uint pixel_count,
-    uint tid) noexcept {
-    
-    if (tid < pixel_count) {
-        ray_queue[tid] = tid;
-    }
-}
-
 LUISA_DEVICE_CALLABLE inline void colorize_normals(
     LUISA_DEVICE_SPACE float3 *normals,
     LUISA_DEVICE_SPACE const bool *valid_buffer,
@@ -26,7 +16,8 @@ LUISA_DEVICE_CALLABLE inline void colorize_normals(
     uint tid) noexcept {
     
     if (tid < pixel_count) {
-        normals[tid] = XYZ2ACEScg(RGB2XYZ(valid_buffer[tid] ? normals[tid] * 0.5f + 0.5f : make_float3()));
+        auto n = valid_buffer[tid] ? normals[tid] : make_float3(-1.0f);
+        normals[tid] = XYZ2ACEScg(RGB2XYZ(n * 0.5f + 0.5f));
     }
     
 }
@@ -43,8 +34,7 @@ namespace luisa {
 class NormalVisualizer : public Integrator {
 
 protected:
-    std::unique_ptr<Buffer<uint>> _ray_queue_size;
-    std::unique_ptr<Buffer<uint>> _ray_queue;
+    std::unique_ptr<Buffer<uint>> _ray_count;
     std::unique_ptr<Buffer<Ray>> _ray_buffer;
     std::unique_ptr<Buffer<float2>> _ray_pixel_buffer;
     std::unique_ptr<Buffer<float3>> _ray_throughput_buffer;
@@ -52,7 +42,6 @@ protected:
     InteractionBufferSet _interaction_buffers;
     
     // kernels
-    std::unique_ptr<Kernel> _prepare_for_frame_kernel;
     std::unique_ptr<Kernel> _colorize_normals_kernel;
     
     void _prepare_for_frame() override;

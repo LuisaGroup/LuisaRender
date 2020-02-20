@@ -31,9 +31,7 @@ public:
                                Viewport tile_viewport,
                                BufferView<float2> pixel_buffer,
                                BufferView<Ray> ray_buffer,
-                               BufferView<float3> throughput_buffer,
-                               BufferView<uint> ray_queue,
-                               BufferView<uint> ray_queue_size) = 0;
+                               BufferView<float3> throughput_buffer) = 0;
     
     [[nodiscard]] Film &film() { return *_film; }
 

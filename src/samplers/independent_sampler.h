@@ -9,10 +9,6 @@
 
 namespace luisa::sampler::independent {
 
-LUISA_CONSTANT_SPACE constexpr auto PCG32_DEFAULT_STATE = 0x853c49e6748fea9bull;
-LUISA_CONSTANT_SPACE constexpr auto PCG32_MULT = 0x5851f42d4c957f2dull;
-LUISA_CONSTANT_SPACE constexpr auto ONE_MINUS_EPSILON = 0x1.fffffep-1f;
-
 template<uint N>
 LUISA_DEVICE_CALLABLE inline uint tea(uint v0, uint v1) {
     auto s0 = 0u;
@@ -28,11 +24,12 @@ LUISA_DEVICE_CALLABLE inline uint lcg(LUISA_THREAD_SPACE uint &prev) {
     constexpr auto LCG_A = 1664525u;
     constexpr auto LCG_C = 1013904223u;
     prev = (LCG_A * prev + LCG_C);
-    return prev & 0x00FFFFFF;
+    return prev & 0x00ffffffu;
 }
 
 LUISA_DEVICE_CALLABLE inline float rnd(LUISA_THREAD_SPACE unsigned int &prev) {
-    return ((float) lcg(prev) / (float) 0x01000000);
+    constexpr auto inv = 1.0f / static_cast<float>(0x01000000);
+    return static_cast<float>(lcg(prev)) * inv;
 }
 
 using State = uint;
@@ -45,7 +42,7 @@ LUISA_DEVICE_CALLABLE inline void reset_states(
     if (tid < film_viewport.size.x * film_viewport.size.y) {
         auto pixel_x = tid % film_viewport.size.x + film_viewport.origin.x;
         auto pixel_y = tid / film_viewport.size.x + film_viewport.origin.y;
-        sampler_state_buffer[tid] = tea<5>(pixel_x, pixel_y);
+        sampler_state_buffer[tid] = tea<4>(pixel_x, pixel_y);
     }
     
 }
@@ -71,8 +68,28 @@ LUISA_DEVICE_CALLABLE inline void generate_samples(
         auto ray_index = ray_y * uniforms.film_viewport.size.x + ray_x;
         auto state = sampler_state_buffer[ray_index];
         for (auto i = 0u; i < dimension; i++) {
-            sample_buffer[tid * dimension + i] = min(ONE_MINUS_EPSILON, rnd(state));
+            sample_buffer[tid * dimension + i] = rnd(state);
         }
+        sampler_state_buffer[ray_index] = state;
+    }
+}
+
+LUISA_DEVICE_CALLABLE inline void generate_camera_samples(
+    LUISA_DEVICE_SPACE State *sampler_state_buffer,
+    LUISA_DEVICE_SPACE float4 *sample_buffer,
+    LUISA_UNIFORM_SPACE GenerateSamplesKernelUniforms &uniforms,
+    uint tid) {
+    
+    if (tid < uniforms.tile_viewport.size.x * uniforms.tile_viewport.size.y) {
+        auto ray_x = uniforms.tile_viewport.origin.x + tid % uniforms.tile_viewport.size.x;
+        auto ray_y = uniforms.tile_viewport.origin.y + tid / uniforms.tile_viewport.size.x;
+        auto ray_index = ray_y * uniforms.film_viewport.size.x + ray_x;
+        auto state = sampler_state_buffer[ray_index];
+        auto r0 = rnd(state);
+        auto r1 = rnd(state);
+        auto r2 = rnd(state);
+        auto r3 = rnd(state);
+        sample_buffer[tid] = make_float4(r0, r1, r2, r3);
         sampler_state_buffer[ray_index] = state;
     }
 }
@@ -93,6 +110,7 @@ protected:
     std::unique_ptr<Kernel> _generate_2d_samples_kernel;
     std::unique_ptr<Kernel> _generate_3d_samples_kernel;
     std::unique_ptr<Kernel> _generate_4d_samples_kernel;
+    std::unique_ptr<Kernel> _generate_camera_samples_kernel;
     std::unique_ptr<Buffer<sampler::independent::State>> _state_buffer;
     
     void _generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float> sample_buffer) override;
@@ -107,6 +125,7 @@ protected:
 
 public:
     IndependentSampler(Device *device, const ParameterSet &parameter_set);
+    BufferView<float4> generate_camera_samples(KernelDispatcher &dispatch) override;
 };
 
 LUISA_REGISTER_NODE_CREATOR("Independent", IndependentSampler);

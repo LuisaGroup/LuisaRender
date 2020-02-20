@@ -46,7 +46,6 @@ LUISA_DEVICE_CALLABLE inline void generate_rays(
         auto p_lens_world = p_lens.x * uniforms.camera_left + p_lens.y * uniforms.camera_up + uniforms.camera_position;
         
         ray_buffer[tid] = make_ray(p_lens_world, normalize(p_focal_world - p_lens_world));
-        
         ray_pixel_buffer[tid] = pixel;
         ray_throughput_buffer[tid] = make_float3(1.0f);
     }
@@ -83,9 +82,7 @@ public:
                        Viewport tile_viewport,
                        BufferView<float2> pixel_buffer,
                        BufferView<Ray> ray_buffer,
-                       BufferView<float3> throughput_buffer,
-                       BufferView<uint> ray_queue,
-                       BufferView<uint> ray_queue_size) override;
+                       BufferView<float3> throughput_buffer) override;
     
 };
 

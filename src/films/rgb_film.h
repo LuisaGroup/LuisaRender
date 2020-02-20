@@ -17,7 +17,7 @@ LUISA_DEVICE_CALLABLE inline void postprocess(
     
     if (tid < pixel_count) {
         auto f = accumulation_buffer[tid];
-        accumulation_buffer[tid] = make_float4(XYZ2RGB(ACEScg2XYZ(make_float3(f) / max(f.a, 1e-3f))), 1.0f);
+        accumulation_buffer[tid] = f.w == 0.0f ? make_float4() : make_float4(XYZ2RGB(ACEScg2XYZ(make_float3(f) / f.w)), 1.0f);
     }
 }
 

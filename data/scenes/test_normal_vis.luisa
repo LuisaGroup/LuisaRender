@@ -9,15 +9,13 @@ Camera camera : ThinLens {
   sensor_size { 36, 24 }
   f_number { 1.2 }
   focal_length { 50 }
-  up { 0, 1, 0 }
 }
 
 Integrator integrator : Normal {}
 
 Shape bunny_ref : TriangleMesh {
   path { "data/meshes/bunny/bunny.obj" }
-  transform : Identity {}
-  subdiv_level { 1 }
+  subdiv_level { 2 }
 }
 
 Shape bunny : Instance {

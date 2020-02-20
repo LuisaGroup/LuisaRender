@@ -31,8 +31,8 @@ LUISA_DEVICE_CALLABLE inline void accumulate_tile(
     
     if (tid < uniforms.tile_viewport.size.x * uniforms.tile_viewport.size.y) {
         auto pixel = uniforms.tile_viewport.origin + make_uint2(tid % uniforms.tile_viewport.size.x, tid / uniforms.tile_viewport.size.x);
-        auto radiance = ray_color_buffer[tid];
-        accumulation_buffer[pixel.y * uniforms.film_resolution.x + pixel.x] += make_float4(radiance, 1.0f);
+        auto color = ray_color_buffer[tid];
+        accumulation_buffer[pixel.y * uniforms.film_resolution.x + pixel.x] += make_float4(color, 1.0f);
     }
 }
 
