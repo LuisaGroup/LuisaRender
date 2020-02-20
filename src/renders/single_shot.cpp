@@ -23,7 +23,7 @@ SingleShot::SingleShot(Device *device, const ParameterSet &parameter_set)
     _scene = Scene::create(_device, shapes, lights, _shutter_open);
 }
 
-void SingleShot::execute() {
+void SingleShot::_execute() {
     
     std::vector<float> time_samples(_sampler->spp());
     std::default_random_engine random_engine{std::random_device{}()};

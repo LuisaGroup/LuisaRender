@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <chrono>
+
 #include "mathematics.h"
 #include "node.h"
 #include "parser.h"
@@ -23,6 +25,8 @@ protected:
     std::shared_ptr<Sampler> _sampler;
     std::shared_ptr<Integrator> _integrator;
     std::unique_ptr<Scene> _scene;
+    
+    virtual void _execute() = 0;
 
 public:
     Render(Device *device, const ParameterSet &parameter_set[[maybe_unused]])
@@ -30,8 +34,17 @@ public:
           _sampler{parameter_set["sampler"].parse<Sampler>()},
           _integrator{parameter_set["integrator"].parse<Integrator>()} {}
     
-    virtual void execute() = 0;
-    
+    void execute() noexcept {
+        auto t0 = std::chrono::high_resolution_clock::now();
+        try {
+            _execute();
+        } catch (const std::runtime_error &e) {
+            LUISA_WARNING("error occurred, render terminated, reason:\n    ", e.what());
+        }
+        auto t1 = std::chrono::high_resolution_clock::now();
+        using namespace std::chrono_literals;
+        std::cout << "render time: " << (t1 - t0) / 1ns * 1e-9 << "s" << std::endl;
+    }
 };
 
 }

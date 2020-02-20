@@ -29,7 +29,7 @@ class Device : Noncopyable {
 private:
     std::condition_variable _cv;
     std::mutex _mutex;
-    uint _command_queue_size{16u};
+    uint _command_queue_size{8u};
     uint _working_command_count{0u};
     inline static std::unordered_map<std::string_view, std::function<std::unique_ptr<Device>()>> _device_creators{};
 

@@ -20,10 +20,11 @@ protected:
     std::shared_ptr<Camera> _camera;
     std::filesystem::path _output_path_prefix;
     Viewport _viewport{};
-
+    
+    void _execute() override;
+    
 public:
     SingleShot(Device *device, const ParameterSet &parameter_set);
-    void execute() override;
 };
 
 LUISA_REGISTER_NODE_CREATOR("SingleShot", SingleShot);
