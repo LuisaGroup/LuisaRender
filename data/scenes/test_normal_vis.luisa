@@ -80,6 +80,11 @@ Shape bunny2 : Instance {
   }
 }
 
+Light light : Point {
+  position { 0.0, 3.0, 3.0 }
+  emission { 15 }
+}
+
 renderer : SingleShot {
   integrator { @integrator }
   sampler : Independent {
@@ -87,6 +92,7 @@ renderer : SingleShot {
   }
   camera { @camera }
   shapes { @bunny, @bunny2 }
+  lights { @light }
   output { "bunny_camera.exr" }
   shutter_open { 1.0 }
   shutter_close { 2.0 }

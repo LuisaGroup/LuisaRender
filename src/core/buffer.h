@@ -58,6 +58,7 @@ public:
     TypelessBuffer(size_t capacity, BufferStorage storage) noexcept : _capacity{capacity}, _storage{storage} {};
     virtual ~TypelessBuffer() noexcept = default;
     virtual void upload(size_t offset, size_t size) = 0;
+    void upload() { upload(0ul, _capacity); }
     virtual void synchronize(KernelDispatcher &dispatch) = 0;
     [[nodiscard]] virtual const void *data() const { return const_cast<TypelessBuffer *>(this)->data(); }
     [[nodiscard]] virtual void *data() = 0;

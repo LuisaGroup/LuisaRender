@@ -16,6 +16,7 @@
 #include "shape.h"
 #include "light.h"
 #include "geometry.h"
+#include "illumination.h"
 #include "acceleration.h"
 
 namespace luisa {
@@ -24,6 +25,7 @@ class Scene : Noncopyable {
 
 private:
     std::unique_ptr<Geometry> _geometry;
+    std::unique_ptr<Illumination> _illumination;
 
 public:
     Scene(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, const std::vector<std::shared_ptr<Light>> &lights, float initial_time);

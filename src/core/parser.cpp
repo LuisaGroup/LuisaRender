@@ -126,6 +126,7 @@ std::shared_ptr<Render> Parser::_parse_top_level() {
         LUISA_PARSER_PARSE_GLOBAL_NODE(Material)
         LUISA_PARSER_PARSE_GLOBAL_NODE(Render)
         LUISA_PARSER_PARSE_GLOBAL_NODE(Sampler)
+        LUISA_PARSER_PARSE_GLOBAL_NODE(Light)
         
 #undef LUISA_PARSER_PARSE_GLOBAL_NODE
     }

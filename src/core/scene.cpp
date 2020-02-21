@@ -24,7 +24,8 @@ void Scene::trace_any(KernelDispatcher &dispatch, BufferView<Ray> ray_buffer, Bu
 }
 
 Scene::Scene(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, const std::vector<std::shared_ptr<Light>> &lights, float initial_time) {
-    _geometry = std::make_unique<Geometry>(device, shapes, initial_time);
+    _geometry = std::make_unique<Geometry>(device, shapes, lights, initial_time);
+    _illumination = std::make_unique<Illumination>(device, lights, _geometry.get());
 }
 
 }

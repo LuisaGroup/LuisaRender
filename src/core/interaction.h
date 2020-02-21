@@ -11,9 +11,18 @@ namespace luisa::interaction_attribute_flags {
 LUISA_CONSTANT_SPACE constexpr auto POSITION_BIT = 0x01u;
 LUISA_CONSTANT_SPACE constexpr auto NORMAL_BIT = 0x02u;
 LUISA_CONSTANT_SPACE constexpr auto UV_BIT = 0x04u;
-LUISA_CONSTANT_SPACE constexpr auto WO_AND_DISTANCE_BIT = 0x10u;
+LUISA_CONSTANT_SPACE constexpr auto WO_AND_DISTANCE_BIT = 0x08u;
 
 LUISA_CONSTANT_SPACE constexpr auto ALL_BITS = POSITION_BIT | NORMAL_BIT | UV_BIT | WO_AND_DISTANCE_BIT;
+
+}
+
+namespace luisa::interaction_state_flags {
+
+
+LUISA_CONSTANT_SPACE constexpr auto MISS = static_cast<uint8_t>(0x00u);
+LUISA_CONSTANT_SPACE constexpr auto VALID_BIT = static_cast<uint8_t>(0x01u);
+LUISA_CONSTANT_SPACE constexpr auto EMISSIVE_BIT = static_cast<uint8_t>(0x02u);
 
 }
 
@@ -29,7 +38,7 @@ private:
     size_t _size{0ul};
     uint _attribute_flags{0x0u};
     
-    std::unique_ptr<Buffer<bool>> _valid_buffer;
+    std::unique_ptr<Buffer<uint8_t>> _state_buffer;
     std::unique_ptr<Buffer<float3>> _position_buffer;
     std::unique_ptr<Buffer<float3>> _normal_buffer;
     std::unique_ptr<Buffer<float2>> _uv_buffer;
@@ -41,7 +50,7 @@ public:
     InteractionBufferSet(Device *device, size_t capacity, uint flags = interaction_attribute_flags::ALL_BITS)
         : _size{capacity},
           _attribute_flags{flags},
-          _valid_buffer{device->create_buffer<bool>(capacity, BufferStorage::DEVICE_PRIVATE)},
+          _state_buffer{device->create_buffer<uint8_t>(capacity, BufferStorage::DEVICE_PRIVATE)},
           _position_buffer{(flags & interaction_attribute_flags::POSITION_BIT) ? device->create_buffer<float3>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
           _normal_buffer{(flags & interaction_attribute_flags::NORMAL_BIT) ? device->create_buffer<float3>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
           _uv_buffer{(flags & interaction_attribute_flags::UV_BIT) ? device->create_buffer<float2>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
@@ -76,8 +85,8 @@ public:
         return _wo_and_distance_buffer->view();
     }
     
-    [[nodiscard]] auto valid_buffer() const noexcept {
-        return _valid_buffer->view();
+    [[nodiscard]] auto state_buffer() const noexcept {
+        return _state_buffer->view();
     }
 };
 

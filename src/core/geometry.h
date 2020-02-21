@@ -11,6 +11,18 @@
 
 namespace luisa::geometry {
 
+struct EvaluateInteractionsKernelUniforms {
+    uint attribute_flags;
+    uint static_shape_light_begin;
+    uint static_shape_light_end;
+    uint dynamic_shape_light_begin;
+    uint dynamic_shape_light_end;
+    uint static_instance_light_begin;
+    uint static_instance_light_end;
+    uint dynamic_instance_light_begin;
+    uint dynamic_instance_light_end;
+};
+
 LUISA_DEVICE_CALLABLE inline void evaluate_interactions(
     uint ray_count,
     LUISA_DEVICE_SPACE const Ray *ray_buffer,
@@ -22,29 +34,38 @@ LUISA_DEVICE_CALLABLE inline void evaluate_interactions(
     LUISA_DEVICE_SPACE const uint *vertex_offset_buffer,
     LUISA_DEVICE_SPACE const uint *index_offset_buffer,
     LUISA_DEVICE_SPACE const float4x4 *transform_buffer,
-    LUISA_DEVICE_SPACE bool *interaction_valid_buffer,
+    LUISA_DEVICE_SPACE uint8_t *interaction_state_buffer,
     LUISA_DEVICE_SPACE float3 *interaction_position_buffer,
     LUISA_DEVICE_SPACE float3 *interaction_normal_buffer,
     LUISA_DEVICE_SPACE float2 *interaction_uv_buffer,
     LUISA_DEVICE_SPACE float4 *interaction_wo_and_distance_buffer,
-    uint attribute_flags,
+    LUISA_UNIFORM_SPACE EvaluateInteractionsKernelUniforms &uniforms,
     uint tid) noexcept {
     
     if (tid < ray_count) {
         
         auto hit = hit_buffer[tid];
         if (hit.distance <= 0.0f) {
-            interaction_valid_buffer[tid] = false;
+            interaction_state_buffer[tid] = interaction_state_flags::MISS;
             return;
         }
         
-        interaction_valid_buffer[tid] = true;
-        auto indices = index_buffer[hit.triangle_index + index_offset_buffer[hit.instance_index]] + vertex_offset_buffer[hit.instance_index];
+        auto instance_index = static_cast<uint>(hit.instance_index);
+        uint8_t state_flags = interaction_state_flags::VALID_BIT;
+        if ((static_cast<uint>(instance_index >= uniforms.static_shape_light_begin) & static_cast<uint>(instance_index < uniforms.static_shape_light_end)) |
+            (static_cast<uint>(instance_index >= uniforms.dynamic_shape_light_begin) & static_cast<uint>(instance_index < uniforms.dynamic_shape_light_end)) |
+            (static_cast<uint>(instance_index >= uniforms.static_instance_light_begin) & static_cast<uint>(instance_index < uniforms.static_instance_light_end)) |
+            (static_cast<uint>(instance_index >= uniforms.dynamic_instance_light_begin) & static_cast<uint>(instance_index < uniforms.dynamic_instance_light_end))) {
+            state_flags |= interaction_state_flags::EMISSIVE_BIT;
+        }
+        interaction_state_buffer[tid] = state_flags;
+        
+        auto indices = index_buffer[hit.triangle_index + index_offset_buffer[instance_index]] + vertex_offset_buffer[instance_index];
         
         using namespace interaction_attribute_flags;
-        
+        auto attribute_flags = uniforms.attribute_flags;
         if ((attribute_flags & POSITION_BIT) || (attribute_flags & NORMAL_BIT) || (attribute_flags & WO_AND_DISTANCE_BIT)) {
-            auto transform = transform_buffer[hit.instance_index];
+            auto transform = transform_buffer[instance_index];
             if (attribute_flags & NORMAL_BIT) {
                 auto n = hit.bary_u * normal_buffer[indices.x] + hit.bary_v * normal_buffer[indices.y] + (1.0f - hit.bary_u - hit.bary_v) * normal_buffer[indices.z];
                 interaction_normal_buffer[tid] = normalize(transpose(inverse(make_float3x3(transform))) * n);
@@ -73,7 +94,6 @@ LUISA_DEVICE_CALLABLE inline void evaluate_interactions(
 
 #include "node.h"
 #include "transform.h"
-#include "material.h"
 #include "acceleration.h"
 
 namespace luisa {
@@ -151,6 +171,16 @@ private:
     std::vector<std::shared_ptr<Shape>> _dynamic_shapes;
     std::vector<std::shared_ptr<Shape>> _dynamic_instances;
     
+    // for determining whether a light is hit
+    uint _static_shape_light_begin{};
+    uint _static_shape_light_end{};
+    uint _dynamic_shape_light_begin{};
+    uint _dynamic_shape_light_end{};
+    uint _static_instance_light_begin{};
+    uint _static_instance_light_end{};
+    uint _dynamic_instance_light_begin{};
+    uint _dynamic_instance_light_end{};
+    
     // per-vertex attributes
     std::unique_ptr<Buffer<float3>> _position_buffer;
     std::unique_ptr<Buffer<float3>> _normal_buffer;
@@ -160,6 +190,7 @@ private:
     std::unique_ptr<Buffer<packed_uint3>> _index_buffer;
     
     // per-instance attributes
+    std::unique_ptr<Buffer<uint8_t>> _is_light_buffer;
     std::unique_ptr<Buffer<float4x4>> _dynamic_transform_buffer;
     std::unique_ptr<Buffer<uint>> _entity_index_buffer;
     std::unique_ptr<Buffer<uint>> _vertex_offset_buffer;
@@ -171,9 +202,9 @@ private:
     
     // kernels
     std::unique_ptr<Kernel> _evaluate_interactions_kernel;
-    
+
 public:
-    Geometry(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, float initial_time);
+    Geometry(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, const std::vector<std::shared_ptr<Light>> &lights, float initial_time);
     [[nodiscard]] const std::vector<std::shared_ptr<Shape>> &static_shapes() const noexcept { return _static_shapes; }
     [[nodiscard]] const std::vector<std::shared_ptr<Shape>> &static_instances() const noexcept { return _static_instances; }
     [[nodiscard]] const std::vector<std::shared_ptr<Shape>> &dynamic_shapes() const noexcept { return _dynamic_shapes; }

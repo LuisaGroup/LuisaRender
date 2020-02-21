@@ -54,7 +54,7 @@ uint GeometryEncoder::instantiate(uint reference_index) noexcept {
     return reference_index;
 }
 
-Geometry::Geometry(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, float initial_time)
+Geometry::Geometry(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, const std::vector<std::shared_ptr<Light>> &lights, float initial_time)
     : _device{device},
       _evaluate_interactions_kernel{device->create_kernel("geometry_evaluate_interactions")} {
     
@@ -74,6 +74,32 @@ Geometry::Geometry(Device *device, const std::vector<std::shared_ptr<Shape>> &sh
             _dynamic_shapes.emplace_back(shape);
         }
     }
+    
+    _static_shape_light_begin = _static_shapes.size();
+    _static_instance_light_begin = _static_instances.size();
+    _dynamic_shape_light_begin = _dynamic_shapes.size();
+    _dynamic_instance_light_begin = _dynamic_instances.size();
+    
+    for (auto &&light : lights) {
+        if (auto shape = light->shape(); shape != nullptr) {
+            if (shape->is_instance()) {
+                if (shape->transform() == nullptr || shape->transform()->is_static()) {
+                    _static_instances.emplace_back(shape);
+                } else {
+                    _dynamic_instances.emplace_back(shape);
+                }
+            } else if (shape->transform() == nullptr || shape->transform()->is_static()) {
+                _static_shapes.emplace_back(shape);
+            } else {
+                _dynamic_shapes.emplace_back(shape);
+            }
+        }
+    }
+    
+    _static_shape_light_end = _static_shapes.size();
+    _static_instance_light_end = _static_instances.size();
+    _dynamic_shape_light_end = _dynamic_shapes.size();
+    _dynamic_instance_light_end = _dynamic_instances.size();
     
     GeometryEncoder geometry_encoder{this};
     for (auto &&shape : _static_shapes) { if (!shape->loaded()) { shape->load(geometry_encoder); }}
@@ -205,12 +231,17 @@ void Geometry::evaluate_interactions(KernelDispatcher &dispatch,
         encode("vertex_offset_buffer", *_vertex_offset_buffer);
         encode("index_offset_buffer", *_index_offset_buffer);
         encode("transform_buffer", *_dynamic_transform_buffer);
-        encode("interaction_valid_buffer", interaction_buffers.valid_buffer());
+        encode("interaction_state_buffer", interaction_buffers.state_buffer());
         if (interaction_buffers.has_position_buffer()) { encode("interaction_position_buffer", interaction_buffers.position_buffer()); }
         if (interaction_buffers.has_normal_buffer()) { encode("interaction_normal_buffer", interaction_buffers.normal_buffer()); }
         if (interaction_buffers.has_uv_buffer()) { encode("interaction_uv_buffer", interaction_buffers.uv_buffer()); }
         if (interaction_buffers.has_wo_and_distance_buffer()) { encode("interaction_wo_and_distance_buffer", interaction_buffers.wo_and_distance_buffer()); }
-        encode("attribute_flags", interaction_buffers.attribute_flags());
+        encode("uniforms", geometry::EvaluateInteractionsKernelUniforms{
+            interaction_buffers.attribute_flags(),
+            _static_shape_light_begin, _static_shape_light_end,
+            _dynamic_shape_light_begin, _dynamic_shape_light_end,
+            _static_instance_light_begin, _static_instance_light_end,
+            _dynamic_instance_light_begin, _dynamic_instance_light_end});
     });
     
 }

@@ -28,20 +28,26 @@ public:
 
 class Light : public Node {
 
+public:
+    static constexpr auto MAX_LIGHT_TAG_COUNT = 16u;
+
 private:
     LUISA_MAKE_NODE_CREATOR_REGISTRY(Light);
 
 protected:
-    inline static auto _used_tag_count = 0u;
-
+    static uint _assign_tag() {
+        static auto next_tag = 0u;
+        LUISA_ERROR_IF(next_tag == MAX_LIGHT_TAG_COUNT, "too many light tags assigned, limit: ", MAX_LIGHT_TAG_COUNT);
+        return next_tag++;
+    }
+    
 public:
     Light(Device *device, const ParameterSet &parameter_set[[maybe_unused]]) : Node{device} {}
-    [[nodiscard]] static uint used_tag_count() noexcept { return _used_tag_count; }
     [[nodiscard]] virtual uint tag() const noexcept = 0;
     [[nodiscard]] virtual std::unique_ptr<Kernel> create_generate_samples_kernel() = 0;
     [[nodiscard]] virtual size_t data_stride() const noexcept = 0;
     [[nodiscard]] virtual size_t sample_dimensions() const noexcept = 0;
-    [[nodiscard]] virtual bool is_shape_applicable() const noexcept { return false; }
+    [[nodiscard]] virtual std::shared_ptr<Shape> shape() const noexcept { return nullptr; }
     virtual void encode_data(TypelessBuffer &buffer, size_t index) = 0;
 };
     

@@ -24,7 +24,7 @@ void NormalVisualizer::render_frame(KernelDispatcher &dispatch) {
     
     dispatch(*_colorize_normals_kernel, pixel_count, [&](KernelArgumentEncoder &encode) {
         encode("pixel_count", pixel_count);
-        encode("valid_buffer", _interaction_buffers.valid_buffer());
+        encode("state_buffer", _interaction_buffers.state_buffer());
         encode("normals", _interaction_buffers.normal_buffer());
     });
     

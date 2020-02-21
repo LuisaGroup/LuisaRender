@@ -30,7 +30,7 @@ size_t PointLight::sample_dimensions() const noexcept {
 }
 
 uint PointLight::tag() const noexcept {
-    static auto t = Light::_used_tag_count++;
+    static auto t = Light::_assign_tag();
     return t;
 }
 
