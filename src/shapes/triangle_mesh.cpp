@@ -54,7 +54,7 @@ void TriangleMesh::load(GeometryEncoder &encoder) {
         std::copy(ai_scene->mMeshes, ai_scene->mMeshes + ai_scene->mNumMeshes, ai_meshes.begin());
     }
     
-    auto m = _transform->static_matrix();
+    auto m = _transform == nullptr ? math::identity() : _transform->static_matrix();
     auto n = transpose(inverse(make_float3x3(m)));
     
     for (auto ai_mesh : ai_meshes) {

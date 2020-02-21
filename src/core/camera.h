@@ -22,20 +22,20 @@ private:
 protected:
     std::shared_ptr<Film> _film;
     std::shared_ptr<Transform> _transform;
-    float4x4 _camera_to_world{};
+    float4x4 _camera_to_world{1.0f};
 
 public:
     Camera(Device *device, const ParameterSet &parameters)
         : Node{device},
-        _film{parameters["film"].parse<Film>()},
-        _transform{parameters["transform"].parse_or_null<Transform>()} {
-        
-        if (_transform == nullptr) {
-            _transform = std::make_shared<Transform>(_device);
+          _film{parameters["film"].parse<Film>()},
+          _transform{parameters["transform"].parse_or_null<Transform>()} {}
+    
+    virtual void update(float time) {
+        if (_transform != nullptr) {
+            _camera_to_world = _transform->dynamic_matrix(time) * _transform->static_matrix();
         }
     }
     
-    virtual void update(float time) { _camera_to_world = _transform->dynamic_matrix(time) * _transform->static_matrix(); }
     virtual void generate_rays(KernelDispatcher &dispatch,
                                Sampler &sampler,
                                Viewport tile_viewport,
@@ -44,7 +44,7 @@ public:
                                BufferView<float3> throughput_buffer) = 0;
     
     [[nodiscard]] Film &film() { return *_film; }
-
+    
 };
 
 }

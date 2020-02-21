@@ -63,12 +63,12 @@ Geometry::Geometry(Device *device, const std::vector<std::shared_ptr<Shape>> &sh
     
     for (auto &&shape : shapes) {
         if (shape->is_instance()) {
-            if (shape->transform().is_static()) {
+            if (shape->transform() == nullptr || shape->transform()->is_static()) {
                 _static_instances.emplace_back(shape);
             } else {
                 _dynamic_instances.emplace_back(shape);
             }
-        } else if (shape->transform().is_static()) {
+        } else if (shape->transform() == nullptr || shape->transform()->is_static()) {
             _static_shapes.emplace_back(shape);
         } else {
             _dynamic_shapes.emplace_back(shape);
@@ -132,21 +132,21 @@ Geometry::Geometry(Device *device, const std::vector<std::shared_ptr<Shape>> &sh
         offset++;
     }
     for (auto &&shape : _static_instances) {
-        transform_buffer[offset] = shape->transform().static_matrix();
+        transform_buffer[offset] = shape->transform() == nullptr ? math::identity() : shape->transform()->static_matrix();
         entity_index_buffer[offset] = shape->entity_index();
         index_offset_buffer[offset] = _entities[shape->entity_index()]->triangle_offset();
         vertex_offset_buffer[offset] = _entities[shape->entity_index()]->vertex_offset();
         offset++;
     }
     for (auto &&shape : _dynamic_shapes) {
-        transform_buffer[offset] = shape->transform().dynamic_matrix(initial_time);
+        transform_buffer[offset] = shape->transform()->dynamic_matrix(initial_time);  // Note: dynamic shapes will not have null transforms
         entity_index_buffer[offset] = shape->entity_index();
         index_offset_buffer[offset] = _entities[shape->entity_index()]->triangle_offset();
         vertex_offset_buffer[offset] = _entities[shape->entity_index()]->vertex_offset();
         offset++;
     }
     for (auto &&shape : _dynamic_instances) {
-        transform_buffer[offset] = shape->transform().dynamic_matrix(initial_time) * shape->transform().static_matrix();
+        transform_buffer[offset] = shape->transform()->dynamic_matrix(initial_time) * shape->transform()->static_matrix();  // Note: dynamic shapes will not have null transforms
         entity_index_buffer[offset] = shape->entity_index();
         index_offset_buffer[offset] = _entities[shape->entity_index()]->triangle_offset();
         vertex_offset_buffer[offset] = _entities[shape->entity_index()]->vertex_offset();
@@ -168,10 +168,10 @@ void Geometry::update(float time) {
         auto dynamic_shape_offset = _static_shapes.size() + _static_instances.size();
         auto dynamic_instance_offset = dynamic_shape_offset + _dynamic_shapes.size();
         for (auto i = 0ul; i < _dynamic_shapes.size(); i++) {
-            transform_buffer()[dynamic_shape_offset + i] = _dynamic_shapes[i]->transform().dynamic_matrix(time);
+            transform_buffer()[dynamic_shape_offset + i] = _dynamic_shapes[i]->transform()->dynamic_matrix(time);
         }
         for (auto i = 0ul; i < _dynamic_instances.size(); i++) {
-            transform_buffer()[dynamic_instance_offset + i] = _dynamic_instances[i]->transform().dynamic_matrix(time) * _dynamic_instances[i]->transform().static_matrix();
+            transform_buffer()[dynamic_instance_offset + i] = _dynamic_instances[i]->transform()->dynamic_matrix(time) * _dynamic_instances[i]->transform()->static_matrix();
         }
         _dynamic_transform_buffer->view(dynamic_shape_offset, _dynamic_shapes.size() + _dynamic_instances.size()).upload();
         _device->launch_async([&](KernelDispatcher &dispatch) {

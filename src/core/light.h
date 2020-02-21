@@ -41,6 +41,7 @@ public:
     [[nodiscard]] virtual std::unique_ptr<Kernel> create_generate_samples_kernel() = 0;
     [[nodiscard]] virtual size_t data_stride() const noexcept = 0;
     [[nodiscard]] virtual size_t sample_dimensions() const noexcept = 0;
+    [[nodiscard]] virtual bool is_shape_applicable() const noexcept { return false; }
     virtual void encode_data(TypelessBuffer &buffer, size_t index) = 0;
 };
     

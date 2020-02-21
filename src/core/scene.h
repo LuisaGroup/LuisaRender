@@ -23,11 +23,10 @@ namespace luisa {
 class Scene : Noncopyable {
 
 private:
-    Geometry _geometry;
+    std::unique_ptr<Geometry> _geometry;
 
 public:
-    Scene(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, const std::vector<std::shared_ptr<Light>> &lights, float initial_time)
-        : _geometry{device, shapes, initial_time} {}
+    Scene(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, const std::vector<std::shared_ptr<Light>> &lights, float initial_time);
     
     void update(float time);
     
