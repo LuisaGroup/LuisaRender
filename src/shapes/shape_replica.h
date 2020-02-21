@@ -19,6 +19,4 @@ public:
     
 };
 
-LUISA_REGISTER_NODE_CREATOR("Replica", ShapeReplica)
-
 }

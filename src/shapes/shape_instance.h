@@ -19,6 +19,4 @@ public:
     [[nodiscard]] bool is_instance() const noexcept override { return true; }
 };
 
-LUISA_REGISTER_NODE_CREATOR("Instance", ShapeInstance)
-
 }

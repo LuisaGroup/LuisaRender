@@ -27,6 +27,4 @@ public:
     SingleShot(Device *device, const ParameterSet &parameter_set);
 };
 
-LUISA_REGISTER_NODE_CREATOR("SingleShot", SingleShot);
-
 }

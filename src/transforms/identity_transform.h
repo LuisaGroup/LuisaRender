@@ -12,6 +12,4 @@ struct IdentityTransform : public Transform {
     IdentityTransform(Device *device, const ParameterSet &parameter_set) noexcept;
 };
 
-LUISA_REGISTER_NODE_CREATOR("Identity", IdentityTransform)
-
 }

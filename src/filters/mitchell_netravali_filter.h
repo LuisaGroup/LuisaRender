@@ -88,8 +88,6 @@ public:
                               BufferView<float4> accumulation_buffer) override;
 };
 
-LUISA_REGISTER_NODE_CREATOR("MitchellNetravali", MitchellNetravaliFilter)
-
 }
 
 #endif

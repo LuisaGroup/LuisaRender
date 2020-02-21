@@ -65,8 +65,6 @@ public:
     [[nodiscard]] uint tag() const noexcept override;
 };
 
-LUISA_REGISTER_NODE_CREATOR("Point", PointLight)
-
 }
 
 #endif

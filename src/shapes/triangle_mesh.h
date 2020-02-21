@@ -21,6 +21,4 @@ public:
 
 };
 
-LUISA_REGISTER_NODE_CREATOR("TriangleMesh", TriangleMesh)
-
 }

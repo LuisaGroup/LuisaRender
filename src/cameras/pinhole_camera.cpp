@@ -7,6 +7,8 @@
 
 namespace luisa {
 
+LUISA_REGISTER_NODE_CREATOR("Pinhole", PinholeCamera)
+
 void PinholeCamera::generate_rays(KernelDispatcher &dispatch,
                                   Sampler &sampler,
                                   Viewport tile_viewport,

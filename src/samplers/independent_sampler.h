@@ -128,8 +128,6 @@ public:
     BufferView<float4> generate_camera_samples(KernelDispatcher &dispatch) override;
 };
 
-LUISA_REGISTER_NODE_CREATOR("Independent", IndependentSampler);
-
 }
 
 #endif

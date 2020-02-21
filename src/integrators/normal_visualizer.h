@@ -52,8 +52,6 @@ public:
     
 };
 
-LUISA_REGISTER_NODE_CREATOR("Normal", NormalVisualizer)
-
 }
 
 #endif

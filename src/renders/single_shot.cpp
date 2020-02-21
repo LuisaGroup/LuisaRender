@@ -6,6 +6,8 @@
 
 namespace luisa {
 
+LUISA_REGISTER_NODE_CREATOR("SingleShot", SingleShot)
+
 SingleShot::SingleShot(Device *device, const ParameterSet &parameter_set)
     : Render{device, parameter_set},
       _shutter_open{parameter_set["shutter_open"].parse_float_or_default(0.0f)},

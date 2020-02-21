@@ -6,6 +6,8 @@
 
 namespace luisa {
 
+LUISA_REGISTER_NODE_CREATOR("Independent", IndependentSampler)
+
 IndependentSampler::IndependentSampler(Device *device, const ParameterSet &parameter_set)
     : Sampler{device, parameter_set},
       _reset_states_kernel{device->create_kernel("independent_sampler_reset_states")},

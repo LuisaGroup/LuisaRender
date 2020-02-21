@@ -7,6 +7,8 @@
 
 namespace luisa {
 
+LUISA_REGISTER_NODE_CREATOR("Identity", IdentityTransform)
+
 IdentityTransform::IdentityTransform(Device *device, const ParameterSet &parameter_set) noexcept
     : Transform{device, parameter_set} {}
     

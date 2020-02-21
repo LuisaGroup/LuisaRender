@@ -6,6 +6,8 @@
 
 namespace luisa {
 
+LUISA_REGISTER_NODE_CREATOR("Point", PointLight)
+
 PointLight::PointLight(Device *device, const ParameterSet &parameter_set)
     : Light{device, parameter_set},
       _position{parameter_set["position"].parse_float3()},

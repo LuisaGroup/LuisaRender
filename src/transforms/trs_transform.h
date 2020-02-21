@@ -24,6 +24,4 @@ public:
     [[nodiscard]] auto scaling() const noexcept { return _s; }
 };
 
-LUISA_REGISTER_NODE_CREATOR("TRS", TRSTransform)
-
 }

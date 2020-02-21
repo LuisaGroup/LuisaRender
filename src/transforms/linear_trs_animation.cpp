@@ -7,6 +7,8 @@
 
 namespace luisa {
 
+LUISA_REGISTER_NODE_CREATOR("LinearTRSAnimation", LinearTRSAnimation)
+
 LinearTRSAnimation::LinearTRSAnimation(Device *device, const ParameterSet &parameter_set)
     : Transform{device, parameter_set} {
     

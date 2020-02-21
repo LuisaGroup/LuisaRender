@@ -24,6 +24,4 @@ public:
     [[nodiscard]] float4x4 dynamic_matrix(float time) const override;
 };
 
-LUISA_REGISTER_NODE_CREATOR("LinearTRSAnimation", LinearTRSAnimation)
-
 }

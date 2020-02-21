@@ -87,8 +87,6 @@ public:
     
 };
 
-LUISA_REGISTER_NODE_CREATOR("ThinLens", ThinLensCamera)
-
 }
 
 #endif

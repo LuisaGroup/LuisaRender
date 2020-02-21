@@ -6,6 +6,8 @@
 
 namespace luisa {
 
+LUISA_REGISTER_NODE_CREATOR("MitchellNetravali", MitchellNetravaliFilter)
+
 MitchellNetravaliFilter::MitchellNetravaliFilter(Device *device, const ParameterSet &parameters)
     : Filter{device, parameters},
       _b{parameters["b"].parse_float_or_default(1.0f / 3.0f)},

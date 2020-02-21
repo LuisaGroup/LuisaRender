@@ -18,7 +18,7 @@
 #include "kernel.h"
 
 namespace luisa {
-class Scene;
+class Geometry;
 struct Acceleration;
 }
 
@@ -49,7 +49,7 @@ public:
     
     [[nodiscard]] virtual std::unique_ptr<Kernel> create_kernel(std::string_view function_name) = 0;
     [[nodiscard]] virtual std::unique_ptr<TypelessBuffer> allocate_buffer(size_t capacity, BufferStorage storage) = 0;
-    [[nodiscard]] virtual std::unique_ptr<Acceleration> create_acceleration(Scene &scene) = 0;
+    [[nodiscard]] virtual std::unique_ptr<Acceleration> create_acceleration(Geometry &geometry) = 0;
     
     template<typename T>
     [[nodiscard]] auto create_buffer(size_t element_count, BufferStorage buffer_storage) {

@@ -39,8 +39,6 @@ public:
     void render_frame(KernelDispatcher &dispatch) override;
 };
 
-LUISA_REGISTER_NODE_CREATOR("PathTracing", PathTracing)
-
 }
 
 #endif

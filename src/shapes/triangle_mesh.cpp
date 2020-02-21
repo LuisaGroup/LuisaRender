@@ -11,6 +11,8 @@
 
 namespace luisa {
 
+LUISA_REGISTER_NODE_CREATOR("TriangleMesh", TriangleMesh)
+
 TriangleMesh::TriangleMesh(Device *device, const ParameterSet &parameter_set) : Shape{device, parameter_set} {
     _path = std::filesystem::absolute(parameter_set["path"].parse_string());
     _subdiv_level = parameter_set["subdiv_level"].parse_uint_or_default(0u);

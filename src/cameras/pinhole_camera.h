@@ -77,8 +77,6 @@ public:
                        BufferView<float3> throughput_buffer) override;
 };
 
-LUISA_REGISTER_NODE_CREATOR("Pinhole", PinholeCamera)
-
 }
 
 #endif

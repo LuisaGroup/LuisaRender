@@ -6,6 +6,8 @@
 
 namespace luisa {
 
+LUISA_REGISTER_NODE_CREATOR("Normal", NormalVisualizer)
+
 void NormalVisualizer::render_frame(KernelDispatcher &dispatch) {
     
     _sampler->prepare_for_tile(dispatch, _viewport);

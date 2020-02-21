@@ -7,6 +7,8 @@
 
 namespace luisa {
 
+LUISA_REGISTER_NODE_CREATOR("RGB", RGBFilm)
+
 void RGBFilm::postprocess(KernelDispatcher &dispatch) {
     auto pixel_count = _resolution.x * _resolution.y;
     dispatch(*_postprocess_kernel, pixel_count, [&](KernelArgumentEncoder &encode) {

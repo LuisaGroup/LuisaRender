@@ -4,9 +4,7 @@
 
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
 
-#import <core/ray.h>
-#import <core/hit.h>
-#import <core/scene.h>
+#import <core/geometry.h>
 
 #import <util/resource_manager.h>
 #import <util/string_manipulation.h>
@@ -105,7 +103,7 @@ std::unique_ptr<TypelessBuffer> MetalDevice::allocate_buffer(size_t capacity, Bu
     return std::make_unique<MetalBuffer>(buffer, capacity, storage);
 }
 
-std::unique_ptr<Acceleration> MetalDevice::create_acceleration(Scene &scene) {
+std::unique_ptr<Acceleration> MetalDevice::create_acceleration(Geometry &geometry) {
     
     auto acceleration_group = [[MPSAccelerationStructureGroup alloc] initWithDevice:_device_wrapper->device];
     [acceleration_group autorelease];
@@ -113,10 +111,9 @@ std::unique_ptr<Acceleration> MetalDevice::create_acceleration(Scene &scene) {
     auto instance_acceleration = [[MPSInstanceAccelerationStructure alloc] initWithGroup:acceleration_group];
     [instance_acceleration autorelease];
     
-    
     auto acceleration_structures = [NSMutableArray array];
     instance_acceleration.accelerationStructures = acceleration_structures;
-    for (auto &&entity : scene.entities()) {
+    for (auto &&entity : geometry.entities()) {
         auto triangle_acceleration = [[MPSTriangleAccelerationStructure alloc] initWithGroup:acceleration_group];
         [triangle_acceleration autorelease];
         triangle_acceleration.vertexBuffer = dynamic_cast<MetalBuffer &>(entity->position_buffer().typeless_buffer()).handle();
@@ -130,16 +127,16 @@ std::unique_ptr<Acceleration> MetalDevice::create_acceleration(Scene &scene) {
         [acceleration_structures addObject:triangle_acceleration];
     }
     
-    instance_acceleration.instanceBuffer = dynamic_cast<MetalBuffer &>(scene.entity_index_buffer().typeless_buffer()).handle();
-    instance_acceleration.instanceBufferOffset = scene.entity_index_buffer().byte_offset();
-    instance_acceleration.instanceCount = scene.entity_index_buffer().size();
-    instance_acceleration.transformBuffer = dynamic_cast<MetalBuffer &>(scene.transform_buffer().typeless_buffer()).handle();
-    instance_acceleration.transformBufferOffset = scene.transform_buffer().byte_offset();
+    instance_acceleration.instanceBuffer = dynamic_cast<MetalBuffer &>(geometry.entity_index_buffer().typeless_buffer()).handle();
+    instance_acceleration.instanceBufferOffset = geometry.entity_index_buffer().byte_offset();
+    instance_acceleration.instanceCount = geometry.entity_index_buffer().size();
+    instance_acceleration.transformBuffer = dynamic_cast<MetalBuffer &>(geometry.transform_buffer().typeless_buffer()).handle();
+    instance_acceleration.transformBufferOffset = geometry.transform_buffer().byte_offset();
     
     // Note: metal provides optimization for static scenes without instances and dynamic transforms
-    instance_acceleration.transformType = scene.static_instances().empty() && scene.dynamic_shapes().empty() && scene.dynamic_instances().empty() ?
+    instance_acceleration.transformType = geometry.static_instances().empty() && geometry.dynamic_shapes().empty() && geometry.dynamic_instances().empty() ?
                                           MPSTransformTypeIdentity : MPSTransformTypeFloat4x4;
-    instance_acceleration.usage = scene.dynamic_shapes().empty() && scene.dynamic_instances().empty() ? MPSAccelerationStructureUsageNone : MPSAccelerationStructureUsageRefit;
+    instance_acceleration.usage = geometry.dynamic_shapes().empty() && geometry.dynamic_instances().empty() ? MPSAccelerationStructureUsageNone : MPSAccelerationStructureUsageRefit;
     
     [instance_acceleration rebuild];
     

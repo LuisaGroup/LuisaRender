@@ -7,6 +7,8 @@
 
 namespace luisa {
 
+LUISA_REGISTER_NODE_CREATOR("ThinLens", ThinLensCamera)
+
 ThinLensCamera::ThinLensCamera(Device *device, const ParameterSet &parameters)
     : Camera{device, parameters} {
     
