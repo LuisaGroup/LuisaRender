@@ -53,9 +53,6 @@ namespace luisa {
 class PointLight : public Light {
 
 protected:
-    LUISA_MAKE_LIGHT_TAG_ASSIGNMENT("Point")
-
-protected:
     float3 _position;
     float3 _emission;
 
@@ -65,6 +62,7 @@ public:
     [[nodiscard]] size_t data_stride() const noexcept override;
     void encode_data(TypelessBuffer &buffer, size_t index) override;
     [[nodiscard]] size_t sample_dimensions() const noexcept override;
+    [[nodiscard]] uint tag() const noexcept override;
 };
 
 LUISA_REGISTER_NODE_CREATOR("Point", PointLight)

@@ -11,29 +11,19 @@
 
 namespace luisa {
 
-struct LightSampleBufferSetView {
-    BufferView<float4> Li_and_pdf_w_buffer;
-    BufferView<bool> is_delta_buffer;
-    BufferView<Ray> shadow_ray_buffer;
-};
+class LightSampleBufferSet {
 
-struct LightSampleBufferSet {
-    
-    std::unique_ptr<Buffer<float4>> Li_and_pdf_w_buffer;
-    std::unique_ptr<Buffer<bool>> is_delta_buffer;
-    std::unique_ptr<Buffer<Ray>> shadow_ray_buffer;
-    
+private:
+    std::unique_ptr<Buffer<float4>> _radiance_and_pdf_w_buffer;
+    std::unique_ptr<Buffer<bool>> _is_delta_buffer;
+    std::unique_ptr<Buffer<Ray>> _shadow_ray_buffer;
+
+public:
     LightSampleBufferSet(Device *device, size_t capacity)
-        : Li_and_pdf_w_buffer{device->create_buffer<float4>(capacity, BufferStorage::DEVICE_PRIVATE)},
-          is_delta_buffer{device->create_buffer<bool>(capacity, BufferStorage::DEVICE_PRIVATE)},
-          shadow_ray_buffer{device->create_buffer<Ray>(capacity, BufferStorage::DEVICE_PRIVATE)} {}
+        : _radiance_and_pdf_w_buffer{device->create_buffer<float4>(capacity, BufferStorage::DEVICE_PRIVATE)},
+          _is_delta_buffer{device->create_buffer<bool>(capacity, BufferStorage::DEVICE_PRIVATE)},
+          _shadow_ray_buffer{device->create_buffer<Ray>(capacity, BufferStorage::DEVICE_PRIVATE)} {}
     
-    [[nodiscard]] auto view() {
-        return LightSampleBufferSetView{
-            Li_and_pdf_w_buffer->view(),
-            is_delta_buffer->view(),
-            shadow_ray_buffer->view()};
-    }
 };
 
 class Light : public Node {
@@ -43,26 +33,15 @@ private:
 
 protected:
     inline static auto _used_tag_count = 0u;
-    [[nodiscard]] virtual uint _assign_tag() const noexcept = 0;
-
-protected:
-    uint _tag = _assign_tag();
 
 public:
     Light(Device *device, const ParameterSet &parameter_set[[maybe_unused]]) : Node{device} {}
     [[nodiscard]] static uint used_tag_count() noexcept { return _used_tag_count; }
-    [[nodiscard]] uint tag() const noexcept { return _tag; }
+    [[nodiscard]] virtual uint tag() const noexcept = 0;
     [[nodiscard]] virtual std::unique_ptr<Kernel> create_generate_samples_kernel() = 0;
     [[nodiscard]] virtual size_t data_stride() const noexcept = 0;
     [[nodiscard]] virtual size_t sample_dimensions() const noexcept = 0;
     virtual void encode_data(TypelessBuffer &buffer, size_t index) = 0;
 };
-
-#define LUISA_MAKE_LIGHT_TAG_ASSIGNMENT(name)                                  \
-    [[nodiscard]] uint _assign_tag() const noexcept override {                 \
-        static auto t = _used_tag_count++;                                     \
-        std::cout << "[INFO] assigned tag " << t << " to " name << std::endl;  \
-        return t;                                                              \
-    }
     
 }

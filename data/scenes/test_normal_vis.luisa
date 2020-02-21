@@ -1,5 +1,5 @@
 Film film : RGB {
-  resolution { 1200, 800 }
+  resolution { 1200, 600 }
   filter : MitchellNetravali {
     radius { 1.0 }
     b { 0.33333333333333 }
@@ -21,7 +21,7 @@ Camera camera : ThinLens {
   target { 0, 0, 0 }
   sensor_size { 36, 24 }
   f_number { 1.2 }
-  focal_length { 50 }
+  focal_length { 35 }
   transform : LinearTRSAnimation {
     time_points { 1.0, 2.0 }
     transforms { @a1, @a2 }
@@ -39,6 +39,11 @@ Camera camera : ThinLens {
 //   }
 // }
 
+Light light : Point {
+  position { 0, 2, 0 }
+  emission { 10, 10, 10 }
+}
+
 Integrator integrator : Normal {}
 
 Shape bunny_ref : TriangleMesh {
@@ -49,22 +54,22 @@ Shape bunny_ref : TriangleMesh {
 Shape bunny : Instance {
   reference { @bunny_ref }
   transform : TRS {
-    scaling { 0.5, 0.5, 0.5 }
+    scaling { 0.5 }
     translation { 0.2, -0.3, 0.0 }
     rotation { 0.0, 1.0, 0.0, 15.0 }
   }
 }
 
 Transform b1 : TRS {
- scaling { 0.5, 0.5, 0.5 }
- translation { -0.7, -0.3, -2.0 }
- rotation { 0.0, 1.0, 0.0, -15.0 }
+  scaling { 0.5 }
+  translation { -0.7, -0.3, -2.0 }
+  rotation { 0.0, 1.0, 0.0, -15.0 }
 }
 
 Transform b2 : TRS {
- scaling { 0.5, 0.5, 0.5 }
- translation { -0.3, -0.3, -1.0 }
- rotation { 0.0, 1.0, 0.0, -15.0 }
+  scaling { 0.5 }
+  translation { -0.3, -0.3, -1.0 }
+  rotation { 0.0, 1.0, 0.0, -15.0 }
 }
 
 Shape bunny2 : Instance {
@@ -82,7 +87,7 @@ renderer : SingleShot {
   }
   camera { @camera }
   shapes { @bunny, @bunny2 }
-  output { "bunny_camera_motion_blur" }
+  output { "bunny_camera.exr" }
   shutter_open { 1.0 }
   shutter_close { 2.0 }
 }

@@ -3,3 +3,9 @@
 //
 
 #pragma once
+
+namespace luisa {
+
+
+
+}
