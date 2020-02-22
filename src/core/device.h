@@ -29,7 +29,7 @@ class Device : Noncopyable {
 private:
     std::condition_variable _cv;
     std::mutex _mutex;
-    uint _command_queue_size{16u};
+    uint _command_queue_size{32u};
     uint _working_command_count{0u};
     inline static std::unordered_map<std::string_view, std::function<std::unique_ptr<Device>()>> _device_creators{};
 
@@ -87,8 +87,6 @@ public:
     
 };
 
-}
-
 #define LUISA_DEVICE_CREATOR(name)                                                                      \
         static_assert(true);                                                                            \
     private:                                                                                            \
@@ -96,4 +94,6 @@ public:
             _reg_helper_impl() noexcept { Device::_register_creator(name, [] { return _create(); }); }  \
         } _reg_helper{};                                                                                \
         [[nodiscard]] static std::unique_ptr<Device> _create()
+
+}
         
