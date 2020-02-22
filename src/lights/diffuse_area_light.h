@@ -33,7 +33,6 @@ public:
     [[nodiscard]] Shape *shape() const noexcept override;
     [[nodiscard]] uint sampling_dimensions() const noexcept override;
     void encode_data(TypelessBuffer &buffer, size_t index) override;
-    
 };
 
 }

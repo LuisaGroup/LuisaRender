@@ -200,7 +200,7 @@ private:
     std::unique_ptr<Buffer<uint>> _vertex_offset_buffer;
     std::unique_ptr<Buffer<uint>> _index_offset_buffer;
     
-    std::unordered_map<Shape *, uint> _instance_to_entity_index;
+    std::unordered_map<Shape *, uint> _shape_to_entity_index;
     
     // acceleration
     std::unique_ptr<Acceleration> _acceleration;
