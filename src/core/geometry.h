@@ -135,8 +135,12 @@ public:
 
 class GeometryEncoder : Noncopyable {
 
-public:
-
+private:
+    friend class Geometry;
+    [[nodiscard]] std::vector<float3> _steal_positions() noexcept { return std::move(_positions); }
+    [[nodiscard]] std::vector<float3> _steal_normals() noexcept { return std::move(_normals); }
+    [[nodiscard]] std::vector<float2> _steal_texture_coords() noexcept { return std::move(_tex_coords); }
+    [[nodiscard]] std::vector<packed_uint3> _steal_indices() noexcept { return std::move(_indices); }
 
 private:
     Geometry *_geometry;
@@ -149,24 +153,11 @@ private:
 
 public:
     explicit GeometryEncoder(Geometry *geometry) noexcept : _geometry{geometry} {}
-    
-    [[nodiscard]] std::vector<float3> steal_positions() noexcept { return std::move(_positions); }
-    [[nodiscard]] std::vector<float3> steal_normals() noexcept { return std::move(_normals); }
-    [[nodiscard]] std::vector<float2> steal_texture_coords() noexcept { return std::move(_tex_coords); }
-    [[nodiscard]] std::vector<packed_uint3> steal_indices() noexcept { return std::move(_indices); }
-    [[nodiscard]] uint entity_index(Shape *shape) const noexcept;
-    
-    void add_vertex(float3 position, float3 normal, float2 tex_coord) noexcept {
-        _positions.emplace_back(position);
-        _normals.emplace_back(normal);
-        _tex_coords.emplace_back(tex_coord);
-    }
-    
-    void add_indices(uint3 indices) noexcept { _indices.emplace_back(make_packed_uint3(indices)); }
-    
+    void add_vertex(float3 position, float3 normal, float2 tex_coord) noexcept;
+    void add_indices(uint3 indices) noexcept;
     void create(Shape *shape);
     void replicate(Shape *shape, Shape *reference);
-    void instantiate(Shape *shape, Shape *reference) noexcept;
+    void instantiate(Shape *shape, Shape *reference);
     
 };
 
@@ -204,7 +195,6 @@ private:
     std::unique_ptr<Buffer<packed_uint3>> _index_buffer;
     
     // per-instance attributes
-    std::unique_ptr<Buffer<uint8_t>> _is_light_buffer;
     std::unique_ptr<Buffer<float4x4>> _dynamic_transform_buffer;
     std::unique_ptr<Buffer<uint>> _entity_index_buffer;
     std::unique_ptr<Buffer<uint>> _vertex_offset_buffer;

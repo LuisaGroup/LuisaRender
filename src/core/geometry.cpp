@@ -63,7 +63,7 @@ void GeometryEncoder::replicate(Shape *shape, Shape *reference) {
     create(shape);
 }
 
-void GeometryEncoder::instantiate(Shape *shape, Shape *reference) noexcept {
+void GeometryEncoder::instantiate(Shape *shape, Shape *reference) {
     
     LUISA_ERROR_IF_NOT(_geometry->_instance_to_entity_index.count(shape) == 0u, "recreating shape");
     LUISA_ERROR_IF(shape == reference || reference->is_instance(), "cannot instantiate the shape itself or an instance");
@@ -78,6 +78,14 @@ void GeometryEncoder::instantiate(Shape *shape, Shape *reference) noexcept {
     LUISA_ERROR_IF_NOT(_vertex_offset == _positions.size() && _index_offset == _indices.size(), "adding vertices or indices before making an instance is not allowed");
     _geometry->_instance_to_entity_index.emplace(shape, iter->second);
 }
+
+void GeometryEncoder::add_vertex(float3 position, float3 normal, float2 tex_coord) noexcept {
+    _positions.emplace_back(position);
+    _normals.emplace_back(normal);
+    _tex_coords.emplace_back(tex_coord);
+}
+
+void GeometryEncoder::add_indices(uint3 indices) noexcept { _indices.emplace_back(make_packed_uint3(indices)); }
 
 uint Geometry::entity_index(Shape *shape) const {
     auto iter = _instance_to_entity_index.find(shape);
@@ -153,28 +161,28 @@ Geometry::Geometry(Device *device, const std::vector<std::shared_ptr<Shape>> &sh
     
     // create geometry buffers
     {
-        auto positions = geometry_encoder.steal_positions();
+        auto positions = geometry_encoder._steal_positions();
         _position_buffer = _device->create_buffer<float3>(positions.size(), BufferStorage::MANAGED);
         std::copy(positions.cbegin(), positions.cend(), _position_buffer->view().data());
         _position_buffer->upload();
     }
     
     {
-        auto normals = geometry_encoder.steal_normals();
+        auto normals = geometry_encoder._steal_normals();
         _normal_buffer = _device->create_buffer<float3>(normals.size(), BufferStorage::MANAGED);
         std::copy(normals.cbegin(), normals.cend(), _normal_buffer->view().data());
         _normal_buffer->upload();
     }
     
     {
-        auto tex_coords = geometry_encoder.steal_texture_coords();
+        auto tex_coords = geometry_encoder._steal_texture_coords();
         _tex_coord_buffer = _device->create_buffer<float2>(tex_coords.size(), BufferStorage::MANAGED);
         std::copy(tex_coords.cbegin(), tex_coords.cend(), _tex_coord_buffer->view().data());
         _tex_coord_buffer->upload();
     }
     
     {
-        auto indices = geometry_encoder.steal_indices();
+        auto indices = geometry_encoder._steal_indices();
         _index_buffer = _device->create_buffer<packed_uint3>(indices.size(), BufferStorage::MANAGED);
         std::copy(indices.cbegin(), indices.cend(), _index_buffer->view().data());
         _index_buffer->upload();
@@ -263,11 +271,8 @@ void Geometry::trace_any(KernelDispatcher &dispatch, BufferView<Ray> ray_buffer,
     _acceleration->trace_any(dispatch, ray_buffer, hit_buffer, ray_count);
 }
 
-void Geometry::evaluate_interactions(KernelDispatcher &dispatch,
-                                     BufferView<Ray> ray_buffer,
-                                     BufferView<uint> ray_count,
-                                     BufferView<ClosestHit> hit_buffer,
-                                     InteractionBufferSet &interaction_buffers) {
+void Geometry::evaluate_interactions(KernelDispatcher &dispatch, BufferView<Ray> ray_buffer, BufferView<uint> ray_count,
+                                     BufferView<ClosestHit> hit_buffer, InteractionBufferSet &interaction_buffers) {
     
     dispatch(*_evaluate_interactions_kernel, ray_buffer.size(), [&](KernelArgumentEncoder &encode) {
         encode("ray_buffer", ray_buffer);
@@ -293,7 +298,6 @@ void Geometry::evaluate_interactions(KernelDispatcher &dispatch,
             _static_instance_light_begin, _static_instance_light_end,
             _dynamic_instance_light_begin, _dynamic_instance_light_end});
     });
-    
 }
 
 }
