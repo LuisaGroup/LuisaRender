@@ -98,6 +98,8 @@ LUISA_DEVICE_CALLABLE inline void evaluate_interactions(
 
 #ifndef LUISA_DEVICE_COMPATIBLE
 
+#include <unordered_map>
+
 #include "node.h"
 #include "transform.h"
 #include "acceleration.h"
@@ -133,6 +135,9 @@ public:
 
 class GeometryEncoder : Noncopyable {
 
+public:
+
+
 private:
     Geometry *_geometry;
     std::vector<float3> _positions;
@@ -149,6 +154,7 @@ public:
     [[nodiscard]] std::vector<float3> steal_normals() noexcept { return std::move(_normals); }
     [[nodiscard]] std::vector<float2> steal_texture_coords() noexcept { return std::move(_tex_coords); }
     [[nodiscard]] std::vector<packed_uint3> steal_indices() noexcept { return std::move(_indices); }
+    [[nodiscard]] uint entity_index(Shape *shape) const noexcept;
     
     void add_vertex(float3 position, float3 normal, float2 tex_coord) noexcept {
         _positions.emplace_back(position);
@@ -158,17 +164,19 @@ public:
     
     void add_indices(uint3 indices) noexcept { _indices.emplace_back(make_packed_uint3(indices)); }
     
-    [[nodiscard]] uint create();
-    [[nodiscard]] uint replicate(uint reference_index, float4x4 static_transform);
-    [[nodiscard]] uint instantiate(uint reference_index) noexcept;
+    void create(Shape *shape);
+    void replicate(Shape *shape, Shape *reference);
+    void instantiate(Shape *shape, Shape *reference) noexcept;
     
 };
 
 class Geometry : Noncopyable {
 
-private:
+public:
     friend class GeometryEncoder;
     friend class GeometryEntity;
+    
+    static constexpr auto INVALID_ENTITY_INDEX = std::numeric_limits<uint>::max();
 
 private:
     Device *_device;
@@ -202,6 +210,8 @@ private:
     std::unique_ptr<Buffer<uint>> _vertex_offset_buffer;
     std::unique_ptr<Buffer<uint>> _index_offset_buffer;
     
+    std::unordered_map<Shape *, uint> _instance_to_entity_index;
+    
     // acceleration
     std::unique_ptr<Acceleration> _acceleration;
     std::vector<std::unique_ptr<GeometryEntity>> _entities;
@@ -228,6 +238,7 @@ public:
                                BufferView<uint> ray_count,
                                BufferView<ClosestHit> hit_buffer,
                                InteractionBufferSet &interaction_buffers);
+    [[nodiscard]] uint entity_index(Shape *shape) const;
 };
     
 }

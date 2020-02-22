@@ -58,9 +58,6 @@ void TriangleMesh::load(GeometryEncoder &encoder) {
     auto n = transpose(inverse(make_float3x3(m)));
     
     for (auto ai_mesh : ai_meshes) {
-        std::cout << "processing: " << ai_mesh->mName.C_Str() << std::endl;
-        std::cout << "bounding box: (" << ai_mesh->mAABB.mMin.x << ", " << ai_mesh->mAABB.mMin.y << ", " << ai_mesh->mAABB.mMin.z << ")"
-                  << " -> (" << ai_mesh->mAABB.mMax.x << ", " << ai_mesh->mAABB.mMax.y << ", " << ai_mesh->mAABB.mMax.z << ")" << std::endl;
         if (ai_mesh->mTextureCoords[0] == nullptr) {
             LUISA_WARNING("no texture coordinates in mesh, setting to (0, 0): ", ai_mesh->mName.data);
             for (auto i = 0u; i < ai_mesh->mNumVertices; i++) {
@@ -93,7 +90,7 @@ void TriangleMesh::load(GeometryEncoder &encoder) {
             }
         }
     }
-    _entity_index = encoder.create();
+    encoder.create(this);
 }
 
 }

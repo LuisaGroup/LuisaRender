@@ -43,7 +43,7 @@ public:
         }
         auto t1 = std::chrono::high_resolution_clock::now();
         using namespace std::chrono_literals;
-        std::cout << "render time: " << (t1 - t0) / 1ns * 1e-9 << "s" << std::endl;
+        std::cout << "Render Time: " << (t1 - t0) / 1ns * 1e-9 << "s" << std::endl;
     }
 };
 

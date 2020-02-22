@@ -23,35 +23,66 @@ BufferView<packed_uint3> GeometryEntity::index_buffer() {
     return _geometry->_index_buffer->view(_index_offset, _index_count);
 }
 
-uint GeometryEncoder::create() {
+void GeometryEncoder::create(Shape *shape) {
     auto entity_index = static_cast<uint>(_geometry->_entities.size());
     _geometry->_entities.emplace_back(std::make_unique<GeometryEntity>(
         _geometry,
         _vertex_offset, static_cast<uint>(_positions.size() - _vertex_offset),
-        _index_offset, (static_cast<uint>(_indices.size() - _index_offset))));
+        _index_offset, static_cast<uint>(_indices.size() - _index_offset)));
     _vertex_offset = static_cast<uint>(_positions.size());
     _index_offset = static_cast<uint>(_indices.size());
-    return entity_index;
+    LUISA_ERROR_IF_NOT(_geometry->_instance_to_entity_index.count(shape) == 0u, "recreating shape");
+    _geometry->_instance_to_entity_index.emplace(shape, entity_index);
 }
 
-uint GeometryEncoder::replicate(uint reference_index, float4x4 static_transform) {
-    LUISA_ERROR_IF_NOT(reference_index < _geometry->_entities.size(), "invalid reference entity index for replicating: ", reference_index);
-    auto &&reference = *_geometry->_entities[reference_index];
+void GeometryEncoder::replicate(Shape *shape, Shape *reference) {
+    
+    LUISA_ERROR_IF_NOT(_geometry->_instance_to_entity_index.count(shape) == 0u, "recreating shape");
+    LUISA_ERROR_IF(shape == reference || reference->is_instance(), "cannot replicate the shape itself or an instance");
+    LUISA_ERROR_IF_NOT(reference->transform() == nullptr || reference->transform()->is_static(), "only static shapes can be replicated");
+    auto iter = _geometry->_instance_to_entity_index.find(reference);
+    if (iter == _geometry->_instance_to_entity_index.end()) {
+        reference->load(*this);
+        iter = _geometry->_instance_to_entity_index.find(reference);
+        LUISA_ERROR_IF(iter == _geometry->_instance_to_entity_index.end(), "reference shape not properly loaded");
+    }
+    
+    LUISA_ERROR_IF_NOT(_geometry->_instance_to_entity_index.count(shape) == 0u, "recreating shape");
+    LUISA_ERROR_IF_NOT(_vertex_offset == _positions.size() && _index_offset == _indices.size(), "adding vertices or indices before making a replica is not allowed");
+    auto &&ref_entity = *_geometry->_entities[iter->second];
+    auto static_transform = shape->transform() == nullptr ? math::identity() : shape->transform()->static_matrix();
     auto normal_matrix = transpose(inverse(make_float3x3(static_transform)));
-    for (auto i = reference.vertex_offset(); i < reference.vertex_offset() + reference.vertex_count(); i++) {
+    for (auto i = ref_entity.vertex_offset(); i < ref_entity.vertex_offset() + ref_entity.vertex_count(); i++) {
         add_vertex(make_float3(static_transform * make_float4(_positions[i], 1.0f)),
                    normalize(normal_matrix * _normals[i]),
                    _tex_coords[i]);
     }
-    for (auto i = 0u; i < reference.triangle_count(); i++) {
-        add_indices(make_uint3(_indices[i + reference.triangle_offset()]));
+    for (auto i = ref_entity.triangle_offset(); i < ref_entity.triangle_offset() + ref_entity.triangle_count(); i++) {
+        add_indices(make_uint3(_indices[i]));
     }
-    return create();
+    create(shape);
 }
 
-uint GeometryEncoder::instantiate(uint reference_index) noexcept {
-    LUISA_ERROR_IF_NOT(reference_index < _geometry->_entities.size(), "invalid reference entity index for instancing: ", reference_index);
-    return reference_index;
+void GeometryEncoder::instantiate(Shape *shape, Shape *reference) noexcept {
+    
+    LUISA_ERROR_IF_NOT(_geometry->_instance_to_entity_index.count(shape) == 0u, "recreating shape");
+    LUISA_ERROR_IF(shape == reference || reference->is_instance(), "cannot instantiate the shape itself or an instance");
+    LUISA_ERROR_IF_NOT(reference->transform() == nullptr || reference->transform()->is_static(), "only static shapes can be instantiate");
+    
+    auto iter = _geometry->_instance_to_entity_index.find(reference);
+    if (iter == _geometry->_instance_to_entity_index.end()) {
+        reference->load(*this);
+        iter = _geometry->_instance_to_entity_index.find(reference);
+        LUISA_ERROR_IF(iter == _geometry->_instance_to_entity_index.end(), "reference shape not properly loaded");
+    }
+    LUISA_ERROR_IF_NOT(_vertex_offset == _positions.size() && _index_offset == _indices.size(), "adding vertices or indices before making an instance is not allowed");
+    _geometry->_instance_to_entity_index.emplace(shape, iter->second);
+}
+
+uint Geometry::entity_index(Shape *shape) const {
+    auto iter = _instance_to_entity_index.find(shape);
+    LUISA_ERROR_IF(iter == _instance_to_entity_index.cend(), "shape not loaded");
+    return iter->second;
 }
 
 Geometry::Geometry(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, const std::vector<std::shared_ptr<Light>> &lights, float initial_time)
@@ -101,11 +132,24 @@ Geometry::Geometry(Device *device, const std::vector<std::shared_ptr<Shape>> &sh
     _dynamic_shape_light_end = _dynamic_shapes.size();
     _dynamic_instance_light_end = _dynamic_instances.size();
     
+    // load shapes
     GeometryEncoder geometry_encoder{this};
-    for (auto &&shape : _static_shapes) { if (!shape->loaded()) { shape->load(geometry_encoder); }}
-    for (auto &&shape : _static_instances) { shape->load(geometry_encoder); }
-    for (auto &&shape : _dynamic_shapes) { if (!shape->loaded()) { shape->load(geometry_encoder); }}
-    for (auto &&shape : _dynamic_instances) { shape->load(geometry_encoder); }
+    for (auto &&shape : _static_shapes) {
+        if (_instance_to_entity_index.count(shape.get()) == 0u) {
+            shape->load(geometry_encoder);
+        }
+    }
+    for (auto &&shape : _static_instances) {
+        shape->load(geometry_encoder);
+    }
+    for (auto &&shape : _dynamic_shapes) {
+        if (_instance_to_entity_index.count(shape.get()) == 0u) {
+            shape->load(geometry_encoder);
+        }
+    }
+    for (auto &&shape : _dynamic_instances) {
+        shape->load(geometry_encoder);
+    }
     
     // create geometry buffers
     {
@@ -136,8 +180,9 @@ Geometry::Geometry(Device *device, const std::vector<std::shared_ptr<Shape>> &sh
         _index_buffer->upload();
     }
     
-    std::cout << "vertex count = " << _position_buffer->size() << std::endl;
-    std::cout << "triangle count = " << _index_buffer->size() << std::endl;
+    std::cout << "Geometry loaded\n"
+              << "  Vertices:  " << _position_buffer->size() << "\n"
+              << "  Triangles: " << _index_buffer->size() << std::endl;
     
     _dynamic_transform_buffer = _device->create_buffer<float4x4>(shapes.size(), BufferStorage::MANAGED);
     _entity_index_buffer = _device->create_buffer<uint>(shapes.size(), BufferStorage::MANAGED);
@@ -152,30 +197,34 @@ Geometry::Geometry(Device *device, const std::vector<std::shared_ptr<Shape>> &sh
     
     for (auto &&shape : _static_shapes) {
         transform_buffer[offset] = math::identity();
-        entity_index_buffer[offset] = shape->entity_index();
-        index_offset_buffer[offset] = _entities[shape->entity_index()]->triangle_offset();
-        vertex_offset_buffer[offset] = _entities[shape->entity_index()]->vertex_offset();
+        auto id = entity_index(shape.get());
+        entity_index_buffer[offset] = id;
+        index_offset_buffer[offset] = _entities[id]->triangle_offset();
+        vertex_offset_buffer[offset] = _entities[id]->vertex_offset();
         offset++;
     }
     for (auto &&shape : _static_instances) {
+        auto id = entity_index(shape.get());
         transform_buffer[offset] = shape->transform() == nullptr ? math::identity() : shape->transform()->static_matrix();
-        entity_index_buffer[offset] = shape->entity_index();
-        index_offset_buffer[offset] = _entities[shape->entity_index()]->triangle_offset();
-        vertex_offset_buffer[offset] = _entities[shape->entity_index()]->vertex_offset();
+        entity_index_buffer[offset] = id;
+        index_offset_buffer[offset] = _entities[id]->triangle_offset();
+        vertex_offset_buffer[offset] = _entities[id]->vertex_offset();
         offset++;
     }
     for (auto &&shape : _dynamic_shapes) {
+        auto id = entity_index(shape.get());
         transform_buffer[offset] = shape->transform()->dynamic_matrix(initial_time);  // Note: dynamic shapes will not have null transforms
-        entity_index_buffer[offset] = shape->entity_index();
-        index_offset_buffer[offset] = _entities[shape->entity_index()]->triangle_offset();
-        vertex_offset_buffer[offset] = _entities[shape->entity_index()]->vertex_offset();
+        entity_index_buffer[offset] = id;
+        index_offset_buffer[offset] = _entities[id]->triangle_offset();
+        vertex_offset_buffer[offset] = _entities[id]->vertex_offset();
         offset++;
     }
     for (auto &&shape : _dynamic_instances) {
+        auto id = entity_index(shape.get());
         transform_buffer[offset] = shape->transform()->dynamic_matrix(initial_time) * shape->transform()->static_matrix();  // Note: dynamic shapes will not have null transforms
-        entity_index_buffer[offset] = shape->entity_index();
-        index_offset_buffer[offset] = _entities[shape->entity_index()]->triangle_offset();
-        vertex_offset_buffer[offset] = _entities[shape->entity_index()]->vertex_offset();
+        entity_index_buffer[offset] = id;
+        index_offset_buffer[offset] = _entities[id]->triangle_offset();
+        vertex_offset_buffer[offset] = _entities[id]->vertex_offset();
         offset++;
     }
     

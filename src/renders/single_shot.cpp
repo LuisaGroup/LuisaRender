@@ -49,13 +49,15 @@ void SingleShot::_execute() {
             _sampler->start_next_frame(dispatch);
             _integrator->render_frame(dispatch);
         }, [frame_index = _sampler->frame_index(), spp = _sampler->spp()] {  // notify that one frame has been rendered
-            std::cout << "Progress: " << frame_index + 1u << "/" << spp << std::endl;
+            std::cout << "Progress: " << frame_index + 1u << "/" << spp << "\r";
         });
     }
     
     _device->launch([&](KernelDispatcher &dispatch) {  // film postprocess
         _camera->film().postprocess(dispatch);
     });
+    
+    std::cout << "\nSaving..." << std::endl;
     _camera->film().save(_output_path);
     
 }

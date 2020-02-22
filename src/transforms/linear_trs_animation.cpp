@@ -35,7 +35,6 @@ LinearTRSAnimation::LinearTRSAnimation(Device *device, const ParameterSet &param
     auto prev = INFINITY;
     for (auto &&f : _key_frames) {
         LUISA_ERROR_IF(f.time_point == prev, "duplicated time point: ", f.time_point);
-        std::cout << "time point: " << f.time_point << std::endl;
     }
 }
 

@@ -16,13 +16,11 @@ namespace luisa {
 class Shape : public Node {
 
 private:
-    static constexpr auto INVALID_ENTITY_INDEX = std::numeric_limits<uint>::max();
     LUISA_MAKE_NODE_CREATOR_REGISTRY(Shape);
 
 protected:
     std::shared_ptr<Transform> _transform;
     std::shared_ptr<Material> _material;
-    uint _entity_index{INVALID_ENTITY_INDEX};
 
 public:
     Shape(Device *device, const ParameterSet &parameter_set)
@@ -32,13 +30,6 @@ public:
     
     [[nodiscard]] Transform *transform() noexcept { return _transform.get(); }
     [[nodiscard]] Material *material() noexcept { return _material.get(); }
-    
-    [[nodiscard]] bool loaded() const noexcept { return _entity_index != INVALID_ENTITY_INDEX; }
-    [[nodiscard]] uint entity_index() const {
-        LUISA_ERROR_IF_NOT(loaded(), "shape not loaded");
-        return _entity_index;
-    }
-    
     virtual void load(GeometryEncoder &encoder) = 0;
     [[nodiscard]] virtual bool is_instance() const noexcept { return false; }
 };

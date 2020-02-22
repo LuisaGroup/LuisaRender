@@ -9,12 +9,7 @@ namespace luisa {
 LUISA_REGISTER_NODE_CREATOR("Instance", ShapeInstance)
 
 void ShapeInstance::load(GeometryEncoder &encoder) {
-    LUISA_ERROR_IF(_reference->is_instance(), "cannot make shape instance from instance");
-    LUISA_ERROR_IF_NOT(_reference->transform() == nullptr || _reference->transform()->is_static(), "cannot make shape instance from shapes with non-static transforms");
-    if (!_reference->loaded()) {
-        _reference->load(encoder);
-    }
-    _entity_index = encoder.instantiate(_reference->entity_index());
+    encoder.instantiate(this, _reference.get());
 }
 
 ShapeInstance::ShapeInstance(Device *device, const ParameterSet &parameter_set) : Shape{device, parameter_set} {
