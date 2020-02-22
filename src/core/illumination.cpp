@@ -45,7 +45,7 @@ void Illumination::uniform_select_lights(KernelDispatcher &dispatch,
                                          BufferView<uint> ray_queue,
                                          BufferView<uint> ray_queue_size,
                                          Sampler &sampler,
-                                         BufferView<light::Selection> queues,
+                                         BufferView<Selection> queues,
                                          BufferView<uint> queue_sizes) {
     
     LUISA_ERROR_IF(queue_sizes.size() < tag_count(), "no enough space in queue_sizes");
@@ -66,7 +66,7 @@ void Illumination::sample_lights(KernelDispatcher &dispatch,
                                  Sampler &sampler,
                                  BufferView<uint> ray_indices,
                                  BufferView<uint> ray_count,
-                                 BufferView<light::Selection> queues,
+                                 BufferView<Selection> queues,
                                  BufferView<uint> queue_sizes,
                                  uint max_queue_size,
                                  InteractionBufferSet &interactions,

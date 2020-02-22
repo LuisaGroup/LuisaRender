@@ -5,7 +5,7 @@
 #pragma once
 
 #include <core/ray.h>
-#include <core/light.h>
+#include <core/selection.h>
 #include <core/interaction.h>
 #include <core/mathematics.h>
 
@@ -49,6 +49,8 @@ LUISA_DEVICE_CALLABLE inline void generate_samples(
 }
 
 #ifndef LUISA_DEVICE_COMPATIBLE
+
+#include <core/light.h>
 
 namespace luisa {
 

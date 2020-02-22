@@ -31,6 +31,16 @@ struct MetalCommandQueueWrapper {
     ~MetalCommandQueueWrapper() noexcept { [queue release]; }
 };
 
+struct MetalFunctionWrapper {
+    
+    id<MTLFunction> function;
+    id<MTLComputePipelineState> pipeline;
+    MTLAutoreleasedComputePipelineReflection reflection;
+    
+    MetalFunctionWrapper(id<MTLFunction> f, id<MTLComputePipelineState> p, MTLAutoreleasedComputePipelineReflection r) noexcept
+        : function{f}, pipeline{p}, reflection{r} {}
+};
+
 MetalDevice::MetalDevice()
     : _device_wrapper{std::make_unique<MetalDeviceWrapper>()},
       _library_wrapper{std::make_unique<MetalLibraryWrapper>()},
@@ -46,37 +56,31 @@ MetalDevice::MetalDevice()
 
 std::unique_ptr<Kernel> MetalDevice::create_kernel(std::string_view function_name) {
     
-    auto descriptor = [[MTLComputePipelineDescriptor alloc] init];
-    [descriptor autorelease];
+    std::string name{function_name};
+    auto iter = _function_wrappers.find(name);
     
-    auto function = [_library_wrapper->library newFunctionWithName:make_objc_string(function_name)];
-    [function autorelease];
-    
-    descriptor.computeFunction = function;
-    descriptor.threadGroupSizeIsMultipleOfThreadExecutionWidth = true;
-    
-    MTLAutoreleasedComputePipelineReflection reflection;
-    auto pipeline = [_device_wrapper->device newComputePipelineStateWithDescriptor:descriptor
-                                                                           options:MTLPipelineOptionArgumentInfo | MTLPipelineOptionBufferTypeInfo
-                                                                        reflection:&reflection
-                                                                             error:nullptr];
-    [pipeline autorelease];
-    
-    std::cout << "Function: " << function_name << std::endl;
-    for (MTLArgument *argument in reflection.arguments) {
-        if (argument.type == MTLArgumentTypeBuffer) {
-            std::cout << "  [" << argument.index << "] " << to_string(argument.name) << ": " << argument.bufferDataSize << "(" << argument.bufferAlignment << ")";
-            if (argument.bufferPointerType.elementIsArgumentBuffer) {
-                auto encoder = [function newArgumentEncoderWithBufferIndex:argument.index];
-                [encoder autorelease];
-                std::cout << " " << encoder.encodedLength;
-            }
-            std::cout << std::endl;
-        }
+    if (iter == _function_wrappers.end()) {
+        auto descriptor = [[MTLComputePipelineDescriptor alloc] init];
+        auto function = [_library_wrapper->library newFunctionWithName:make_objc_string(name)];
+        
+        descriptor.computeFunction = function;
+        descriptor.threadGroupSizeIsMultipleOfThreadExecutionWidth = true;
+        
+        MTLAutoreleasedComputePipelineReflection reflection;
+        auto pipeline = [_device_wrapper->device newComputePipelineStateWithDescriptor:descriptor
+                                                                               options:MTLPipelineOptionArgumentInfo | MTLPipelineOptionBufferTypeInfo
+                                                                            reflection:&reflection
+                                                                                 error:nullptr];
+        
+        [descriptor autorelease];
+        [function autorelease];
+        [pipeline autorelease];
+        
+        iter = _function_wrappers.emplace(std::move(name), std::make_unique<MetalFunctionWrapper>(function, pipeline, reflection)).first;
     }
-    std::cout << std::endl;
     
-    return std::make_unique<MetalKernel>(function, pipeline, reflection);
+    auto function_wrapper = iter->second.get();
+    return std::make_unique<MetalKernel>(function_wrapper->function, function_wrapper->pipeline, function_wrapper->reflection);
 }
 
 void MetalDevice::launch(std::function<void(KernelDispatcher &)> dispatch) {
@@ -136,7 +140,8 @@ std::unique_ptr<Acceleration> MetalDevice::create_acceleration(Geometry &geometr
     // Note: metal provides optimization for static scenes without instances and dynamic transforms
     instance_acceleration.transformType = geometry.static_instances().empty() && geometry.dynamic_shapes().empty() && geometry.dynamic_instances().empty() ?
                                           MPSTransformTypeIdentity : MPSTransformTypeFloat4x4;
-    instance_acceleration.usage = geometry.dynamic_shapes().empty() && geometry.dynamic_instances().empty() ? MPSAccelerationStructureUsageNone : MPSAccelerationStructureUsageRefit;
+    instance_acceleration.usage =
+        geometry.dynamic_shapes().empty() && geometry.dynamic_instances().empty() ? MPSAccelerationStructureUsageNone : MPSAccelerationStructureUsageRefit;
     
     [instance_acceleration rebuild];
     

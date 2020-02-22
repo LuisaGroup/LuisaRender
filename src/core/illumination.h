@@ -6,7 +6,7 @@
 
 #include "data_types.h"
 #include "mathematics.h"
-#include "light.h"
+#include "selection.h"
 
 namespace luisa::illumination {
 
@@ -37,7 +37,7 @@ LUISA_DEVICE_CALLABLE inline void uniform_select_lights(
     LUISA_DEVICE_SPACE const float *sample_buffer,
     LUISA_DEVICE_SPACE const Info *info_buffer,
     LUISA_DEVICE_SPACE Atomic<uint> *queue_sizes,
-    LUISA_DEVICE_SPACE light::Selection *queues,
+    LUISA_DEVICE_SPACE Selection *queues,
     uint ray_count,
     SelectLightsKernelUniforms uniforms,
     uint tid) {
@@ -58,6 +58,7 @@ LUISA_DEVICE_CALLABLE inline void uniform_select_lights(
 #include "geometry.h"
 #include "kernel.h"
 #include "viewport.h"
+#include "light.h"
 
 namespace luisa {
 
@@ -86,14 +87,14 @@ public:
                                BufferView<uint> ray_queue,
                                BufferView<uint> ray_queue_size,
                                Sampler &sampler,
-                               BufferView<light::Selection> queues,
+                               BufferView<Selection> queues,
                                BufferView<uint> queue_sizes);
     
     void sample_lights(KernelDispatcher &dispatch,
                        Sampler &sampler,
                        BufferView<uint> ray_indices,
                        BufferView<uint> ray_count,
-                       BufferView<light::Selection> queues,
+                       BufferView<Selection> queues,
                        BufferView<uint> queue_sizes,
                        uint max_queue_size,
                        InteractionBufferSet &interactions,

@@ -5,16 +5,26 @@
 #pragma once
 
 #include <memory>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+
 #include <core/device.h>
 
 namespace luisa::metal {
 
+struct MetalDeviceWrapper;
+struct MetalLibraryWrapper;
+struct MetalCommandQueueWrapper;
+struct MetalFunctionWrapper;
+
 class MetalDevice : public Device {
 
 private:
-    std::unique_ptr<struct MetalDeviceWrapper> _device_wrapper;
-    std::unique_ptr<struct MetalLibraryWrapper> _library_wrapper;
-    std::unique_ptr<struct MetalCommandQueueWrapper> _command_queue_wrapper;
+    std::unique_ptr<MetalDeviceWrapper> _device_wrapper;
+    std::unique_ptr<MetalLibraryWrapper> _library_wrapper;
+    std::unique_ptr<MetalCommandQueueWrapper> _command_queue_wrapper;
+    std::unordered_map<std::string, std::unique_ptr<MetalFunctionWrapper>> _function_wrappers;
     
     LUISA_DEVICE_CREATOR("Metal") { return std::make_unique<MetalDevice>(); }
 

@@ -4,20 +4,8 @@
 
 #pragma once
 
-#include "data_types.h"
-
-namespace luisa::light {
-
-struct Selection {
-    uint data_index;
-    uint ray_index;
-};
-
-}
-
-#ifndef LUISA_DEVICE_COMPATIBLE
-
 #include "ray.h"
+#include "selection.h"
 #include "node.h"
 #include "parser.h"
 #include "device.h"
@@ -50,7 +38,7 @@ public:
     
     using SampleLightsDispatch = std::function<void(
         KernelDispatcher &dispatch, Kernel &kernel, uint dispatch_extent, BufferView<float> sample_buffer,
-        TypelessBuffer &light_data_buffer, BufferView<light::Selection> queue, BufferView<uint> queue_size,
+        TypelessBuffer &light_data_buffer, BufferView<Selection> queue, BufferView<uint> queue_size,
         InteractionBufferSet &interactions, Geometry *geometry, LightSampleBufferSet &light_samples)>;
 
 private:
@@ -75,5 +63,3 @@ public:
 };
     
 }
-
-#endif

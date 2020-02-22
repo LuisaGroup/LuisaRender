@@ -33,7 +33,7 @@ uint PointLight::tag() const noexcept {
 Light::SampleLightsDispatch PointLight::create_generate_samples_dispatch() {
     
     return [](KernelDispatcher &dispatch, Kernel &kernel, uint dispatch_extent, BufferView<float>,
-              TypelessBuffer &light_data_buffer, BufferView<light::Selection> queue, BufferView<uint> queue_size,
+              TypelessBuffer &light_data_buffer, BufferView<Selection> queue, BufferView<uint> queue_size,
               InteractionBufferSet &interactions, Geometry *, LightSampleBufferSet &light_samples) {
         
         dispatch(kernel, dispatch_extent, [&](KernelArgumentEncoder &encode) {
