@@ -36,6 +36,13 @@ public:
     [[nodiscard]] const T &operator[](size_t index) const { return data()[index]; }
     void upload();
     
+    [[nodiscard]] auto subview(size_t offset, size_t size);
+    
+    [[nodiscard]] auto subview(size_t offset) {
+        LUISA_ERROR_IF(offset >= _element_count, "buffer overflow");
+        return subview(offset, _element_count - offset);
+    }
+    
     template<typename U>
     [[nodiscard]] auto view_as() noexcept {
         assert(byte_size() % sizeof(U) == 0u && byte_offset() % sizeof(U) == 0u);
@@ -127,5 +134,11 @@ T *BufferView<T>::data() {
 
 template<typename T>
 void BufferView<T>::upload() { _buffer->upload(byte_offset(), byte_size()); }
+template<typename T>
+
+auto BufferView<T>::subview(size_t offset, size_t size) {
+    LUISA_ERROR_IF(offset + size > _element_count, "buffer overflow");
+    return _buffer->view_as<T>(_element_offset + offset, size);
+}
 
 }

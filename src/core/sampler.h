@@ -28,11 +28,11 @@ protected:
     virtual void _generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float2> sample_buffer) = 0;
     virtual void _generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float3> sample_buffer) = 0;
     virtual void _generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float4> sample_buffer) = 0;
-
+    
     virtual void _reset_states() = 0;
     virtual void _start_next_frame(KernelDispatcher &dispatch) = 0;
     virtual void _prepare_for_tile(KernelDispatcher &dispatch) = 0;
-    
+
 public:
     Sampler(Device *device, const ParameterSet &parameter_set)
         : Node{device}, _spp{parameter_set["spp"].parse_uint_or_default(1024u)} {}
@@ -63,6 +63,8 @@ public:
     
     BufferView<float> generate_samples(KernelDispatcher &dispatch, uint dimensions, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer) {
         switch (dimensions) {
+            case 0:
+                break;
             case 1:
                 _generate_samples(dispatch, ray_queue_buffer, ray_count_buffer, _sample_buffer->view_as<float>());
                 break;

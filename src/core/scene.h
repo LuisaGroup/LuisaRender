@@ -39,6 +39,7 @@ public:
     void trace_closest(KernelDispatcher &dispatch, BufferView<Ray> ray_buffer, BufferView<uint> ray_count, BufferView<ClosestHit> hit_buffer);
     void trace_any(KernelDispatcher &dispatch, BufferView<Ray> ray_buffer, BufferView<uint> ray_count, BufferView<AnyHit> hit_buffer);
     void evaluate_interactions(KernelDispatcher &dispatch, BufferView<Ray> rays, BufferView<uint> ray_count, BufferView<ClosestHit> hits, InteractionBufferSet &interactions);
+    [[nodiscard]] uint light_tag_count() const noexcept { return _illumination->tag_count(); }
 };
 
 }

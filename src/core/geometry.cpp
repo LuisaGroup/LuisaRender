@@ -236,6 +236,7 @@ void Geometry::evaluate_interactions(KernelDispatcher &dispatch,
         if (interaction_buffers.has_normal_buffer()) { encode("interaction_normal_buffer", interaction_buffers.normal_buffer()); }
         if (interaction_buffers.has_uv_buffer()) { encode("interaction_uv_buffer", interaction_buffers.uv_buffer()); }
         if (interaction_buffers.has_wo_and_distance_buffer()) { encode("interaction_wo_and_distance_buffer", interaction_buffers.wo_and_distance_buffer()); }
+        if (interaction_buffers.has_instance_id_buffer()) { encode("interaction_instance_id_buffer", interaction_buffers.instance_id_buffer()); }
         encode("uniforms", geometry::EvaluateInteractionsKernelUniforms{
             interaction_buffers.attribute_flags(),
             _static_shape_light_begin, _static_shape_light_end,

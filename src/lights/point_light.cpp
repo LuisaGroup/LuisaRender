@@ -25,13 +25,32 @@ size_t PointLight::data_stride() const noexcept {
     return sizeof(light::point::Data);
 }
 
-size_t PointLight::sample_dimensions() const noexcept {
-    return 0;
-}
-
 uint PointLight::tag() const noexcept {
     static auto t = Light::_assign_tag();
     return t;
+}
+
+Light::SampleLightsDispatch PointLight::create_generate_samples_dispatch() {
+    
+    return [](KernelDispatcher &dispatch, Kernel &kernel, uint dispatch_extent, BufferView<float>,
+              TypelessBuffer &light_data_buffer, BufferView<light::Selection> queue, BufferView<uint> queue_size,
+              InteractionBufferSet &interactions, Geometry *, LightSampleBufferSet &light_samples) {
+        
+        dispatch(kernel, dispatch_extent, [&](KernelArgumentEncoder &encode) {
+            encode("data_buffer", light_data_buffer.view_as<light::point::Data>());
+            encode("queue", queue);
+            encode("queue_size", queue_size);
+            encode("its_state_buffer", interactions.state_buffer());
+            encode("its_position_buffer", interactions.position_buffer());
+            encode("Li_and_pdf_w_buffer", light_samples.radiance_and_pdf_w_buffer());
+            encode("is_delta_buffer", light_samples.is_delta_buffer());
+            encode("shadow_ray_buffer", light_samples.shadow_ray_buffer());
+        });
+    };
+}
+
+uint PointLight::sampling_dimensions() const noexcept {
+    return 0;
 }
 
 }

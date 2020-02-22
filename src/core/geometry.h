@@ -39,6 +39,7 @@ LUISA_DEVICE_CALLABLE inline void evaluate_interactions(
     LUISA_DEVICE_SPACE float3 *interaction_normal_buffer,
     LUISA_DEVICE_SPACE float2 *interaction_uv_buffer,
     LUISA_DEVICE_SPACE float4 *interaction_wo_and_distance_buffer,
+    LUISA_DEVICE_SPACE uint *interaction_instance_id_buffer,
     LUISA_UNIFORM_SPACE EvaluateInteractionsKernelUniforms &uniforms,
     uint tid) noexcept {
     
@@ -64,6 +65,11 @@ LUISA_DEVICE_CALLABLE inline void evaluate_interactions(
         
         using namespace interaction_attribute_flags;
         auto attribute_flags = uniforms.attribute_flags;
+    
+        if (attribute_flags & INSTANCE_ID_BIT) {
+            interaction_instance_id_buffer[tid] = instance_index;
+        }
+        
         if ((attribute_flags & POSITION_BIT) || (attribute_flags & NORMAL_BIT) || (attribute_flags & WO_AND_DISTANCE_BIT)) {
             auto transform = transform_buffer[instance_index];
             if (attribute_flags & NORMAL_BIT) {
