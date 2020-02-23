@@ -7,17 +7,25 @@
 
 namespace luisa {
 
-Illumination::Illumination(Device *device, std::vector<std::shared_ptr<Light>> lights, Geometry *geometry)
+Illumination::Illumination(Device *device, const std::vector<std::shared_ptr<Light>> &lights, Geometry *geometry)
     : _device{device},
       _geometry{geometry},
-      _lights{std::move(lights)},
       _info_buffer{device->create_buffer<illumination::Info>(lights.size(), BufferStorage::MANAGED)},
       _uniform_select_lights_kernel{device->create_kernel("illumination_uniform_select_lights")} {
     
+    _lights.reserve(lights.size());
+    for (auto &&light : lights) {  // collect abstract lights
+        if (light->shape() == nullptr) { _lights.emplace_back(light); }
+    }
+    _abstract_light_count = _lights.size();
+    for (auto &&light : lights) {
+        if (light->shape() != nullptr) { _lights.emplace_back(light); }
+    }
+    
     std::array<uint, Light::MAX_LIGHT_TAG_COUNT> light_counts{};
     std::array<uint, Light::MAX_LIGHT_TAG_COUNT> light_data_strides{};
-    for (auto i = 0ul; i < lights.size(); i++) {
-        auto &&light = lights[i];
+    for (auto i = 0ul; i < _lights.size(); i++) {
+        auto &&light = _lights[i];
         auto tag = light->tag();
         if (light_counts[tag] == 0u) {
             LUISA_ERROR_IF_NOT(tag == _light_sampling_kernels.size(), "incorrect light tag assigned: ", tag);
@@ -36,7 +44,7 @@ Illumination::Illumination(Device *device, std::vector<std::shared_ptr<Light>> l
     for (auto tag = 0u; tag < _light_sampling_kernels.size(); tag++) {
         _light_data_buffers.emplace_back(_device->allocate_buffer(light_data_strides[tag] * light_counts[tag], BufferStorage::MANAGED));
     }
-    for (auto &&light : lights) { light->encode_data(*_light_data_buffers[light->tag()], encoded_light_counts[light->tag()]++); }
+    for (auto &&light : _lights) { light->encode_data(*_light_data_buffers[light->tag()], encoded_light_counts[light->tag()]++); }
     for (auto &&buffer : _light_data_buffers) { buffer->upload(); }
 }
 

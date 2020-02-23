@@ -62,24 +62,31 @@ LUISA_DEVICE_CALLABLE inline void uniform_select_lights(
 
 namespace luisa {
 
-class Illumination {
+class Illumination : Noncopyable {
 
 private:
     Device *_device;
     Geometry *_geometry;
     std::vector<std::shared_ptr<Light>> _lights;
+    size_t _abstract_light_count;  // area_light_count = _lights.size() - _abstract_light_count
     
     std::unique_ptr<Buffer<illumination::Info>> _info_buffer;
     std::vector<uint> _light_sampling_dimensions;
     std::vector<std::unique_ptr<Kernel>> _light_sampling_kernels;
     std::vector<Light::SampleLightsDispatch> _light_sampling_dispatches;
+    std::vector<std::unique_ptr<Kernel>> _light_evaluation_kernels;
     std::vector<std::unique_ptr<TypelessBuffer>> _light_data_buffers;
+    
+    // CDFs for light sampling
+    std::unique_ptr<Buffer<float>> _cdf_buffer;
+    std::unique_ptr<Buffer<uint2>> _cdf_range_buffer;
+    std::unique_ptr<Buffer<uint>> _cdf_triangle_index;
     
     // kernels
     std::unique_ptr<Kernel> _uniform_select_lights_kernel;
 
 public:
-    Illumination(Device *device, std::vector<std::shared_ptr<Light>> lights, Geometry *geometry);
+    Illumination(Device *device, const std::vector<std::shared_ptr<Light>> &lights, Geometry *geometry);
     [[nodiscard]] uint tag_count() const noexcept { return static_cast<uint>(_light_data_buffers.size()); }
     
     void uniform_select_lights(KernelDispatcher &dispatch,

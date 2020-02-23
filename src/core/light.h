@@ -40,6 +40,9 @@ public:
         KernelDispatcher &dispatch, Kernel &kernel, uint dispatch_extent, BufferView<float> sample_buffer,
         TypelessBuffer &light_data_buffer, BufferView<Selection> queue, BufferView<uint> queue_size,
         InteractionBufferSet &interactions, Geometry *geometry, LightSampleBufferSet &light_samples)>;
+    
+    // todo
+    using EvaluateLightsDispatch = std::function<void()>;
 
 private:
     LUISA_MAKE_NODE_CREATOR_REGISTRY(Light);

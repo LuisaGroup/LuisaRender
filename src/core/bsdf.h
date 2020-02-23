@@ -4,8 +4,18 @@
 
 #pragma once
 
+#include "data_types.h"
+
 namespace luisa {
 
+class BSDF {
 
+private:
+
+
+public:
+
+
+};
 
 }
