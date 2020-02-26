@@ -1,5 +1,5 @@
 # LuisaRender
-High-performance renderer on GPU.
+High-Performance Renderer on GPU.
 
 ## Features
 
