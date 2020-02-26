@@ -41,7 +41,7 @@ Nothing
 - [x] Single-Shot Rendering
 - [ ] Animation Rendering
 
-## Galary
+## Gallery
 
 - Normal Visualizer + Subdivision + Instancing + Dynamic Transforms + Thin-Lens Camera + Motion-Blur (7.0s @ 1024spp)
 ![](gallery/bunny-motion-blur-normal.png)
