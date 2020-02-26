@@ -60,6 +60,11 @@ Shape bunny : Instance {
   }
 }
 
+Light area_light : DiffuseArea {
+  emission { 10 }
+  shape { @bunny }
+}
+
 Transform b1 : TRS {
   scaling { 0.5 }
   translation { -0.7, -0.3, -2.0 }

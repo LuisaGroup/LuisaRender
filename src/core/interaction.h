@@ -13,8 +13,9 @@ LUISA_CONSTANT_SPACE constexpr auto NORMAL_BIT = 0x02u;
 LUISA_CONSTANT_SPACE constexpr auto UV_BIT = 0x04u;
 LUISA_CONSTANT_SPACE constexpr auto WO_AND_DISTANCE_BIT = 0x08u;
 LUISA_CONSTANT_SPACE constexpr auto INSTANCE_ID_BIT = 0x10u;
+LUISA_CONSTANT_SPACE constexpr auto EMISSION_BIT = 0x20u;
 
-LUISA_CONSTANT_SPACE constexpr auto ALL_BITS = POSITION_BIT | NORMAL_BIT | UV_BIT | WO_AND_DISTANCE_BIT | INSTANCE_ID_BIT;
+LUISA_CONSTANT_SPACE constexpr auto ALL_BITS = POSITION_BIT | NORMAL_BIT | UV_BIT | WO_AND_DISTANCE_BIT | INSTANCE_ID_BIT | EMISSION_BIT;
 
 }
 
@@ -23,6 +24,7 @@ namespace luisa::interaction_state_flags {
 LUISA_CONSTANT_SPACE constexpr auto MISS = static_cast<uint8_t>(0x00u);
 LUISA_CONSTANT_SPACE constexpr auto VALID_BIT = static_cast<uint8_t>(0x01u);
 LUISA_CONSTANT_SPACE constexpr auto EMISSIVE_BIT = static_cast<uint8_t>(0x02u);
+LUISA_CONSTANT_SPACE constexpr auto DELTA_LIGHT_BIT = static_cast<uint8_t>(0x04u);
 
 }
 
@@ -44,6 +46,7 @@ private:
     std::unique_ptr<Buffer<float2>> _uv_buffer;
     std::unique_ptr<Buffer<float4>> _wo_and_distance_buffer;
     std::unique_ptr<Buffer<uint>> _instance_id_buffer;
+    std::unique_ptr<Buffer<float3>> _emission_buffer;
 
 public:
     InteractionBufferSet() noexcept = default;
@@ -57,7 +60,8 @@ public:
           _uv_buffer{(flags & interaction_attribute_flags::UV_BIT) ? device->create_buffer<float2>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
           _wo_and_distance_buffer{(flags & interaction_attribute_flags::WO_AND_DISTANCE_BIT) ?
                                   device->create_buffer<float4>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
-          _instance_id_buffer{(flags & interaction_attribute_flags::INSTANCE_ID_BIT) ? device->create_buffer<uint>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr} {}
+          _instance_id_buffer{(flags & interaction_attribute_flags::INSTANCE_ID_BIT) ? device->create_buffer<uint>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
+          _emission_buffer{(flags & interaction_attribute_flags::EMISSION_BIT) ? device->create_buffer<float3>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr} {}
     
     [[nodiscard]] size_t size() const noexcept { return _size; }
     [[nodiscard]] uint attribute_flags() const noexcept { return _attribute_flags; }
@@ -67,6 +71,7 @@ public:
     [[nodiscard]] bool has_uv_buffer() const noexcept { return (_attribute_flags & interaction_attribute_flags::UV_BIT) != 0u; }
     [[nodiscard]] bool has_wo_and_distance_buffer() const noexcept { return (_attribute_flags & interaction_attribute_flags::WO_AND_DISTANCE_BIT) != 0u; }
     [[nodiscard]] bool has_instance_id_buffer() const noexcept { return (_attribute_flags & interaction_attribute_flags::INSTANCE_ID_BIT) != 0u; }
+    [[nodiscard]] bool has_emission_buffer() const noexcept { return (_attribute_flags & interaction_attribute_flags::EMISSION_BIT) != 0u; }
     
     [[nodiscard]] auto position_buffer() const noexcept {
         LUISA_ERROR_IF_NOT(has_position_buffer(), "no position buffer present");
@@ -91,6 +96,11 @@ public:
     [[nodiscard]] auto instance_id_buffer() const noexcept {
         LUISA_ERROR_IF_NOT(has_instance_id_buffer(), "no instance id buffer present");
         return _instance_id_buffer->view();
+    }
+    
+    [[nodiscard]] auto emission_buffer() const noexcept {
+        LUISA_ERROR_IF_NOT(has_emission_buffer(), "no instance emission present");
+        return _emission_buffer->view();
     }
     
     [[nodiscard]] auto state_buffer() const noexcept {

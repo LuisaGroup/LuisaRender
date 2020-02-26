@@ -175,6 +175,7 @@ private:
     std::vector<std::shared_ptr<Shape>> _static_instances;
     std::vector<std::shared_ptr<Shape>> _dynamic_shapes;
     std::vector<std::shared_ptr<Shape>> _dynamic_instances;
+    std::unordered_map<Shape *, uint> _shape_to_instance_id;
     
     // for determining whether a light is hit
     uint _static_shape_light_begin{};
@@ -217,6 +218,9 @@ public:
     [[nodiscard]] const std::vector<std::shared_ptr<Shape>> &dynamic_instances() const noexcept { return _dynamic_instances; }
     [[nodiscard]] const std::vector<std::unique_ptr<GeometryEntity>> &entities() const noexcept { return _entities; }
     [[nodiscard]] BufferView<float4x4> transform_buffer() { return _dynamic_transform_buffer->view(); }
+    [[nodiscard]] BufferView<packed_uint3> index_buffer() { return _index_buffer->view(); }
+    [[nodiscard]] BufferView<float3> position_buffer() { return _position_buffer->view(); }
+    [[nodiscard]] BufferView<float3> normal_buffer() { return _normal_buffer->view(); }
     [[nodiscard]] BufferView<uint> entity_index_buffer() { return _entity_index_buffer->view(); }
     
     void update(float time);
@@ -229,6 +233,9 @@ public:
                                BufferView<ClosestHit> hit_buffer,
                                InteractionBufferSet &interaction_buffers);
     [[nodiscard]] uint entity_index(Shape *shape) const;
+    [[nodiscard]] uint instance_index(Shape *shape) const;
+    [[nodiscard]] uint instance_count() const noexcept;
+    [[nodiscard]] GeometryEntity &entity(uint index);
 };
     
 }

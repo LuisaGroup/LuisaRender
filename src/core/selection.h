@@ -10,7 +10,7 @@ namespace luisa {
 
 struct Selection {
     uint data_index;
-    uint ray_index;
+    uint interaction_index;
 };
 
 }

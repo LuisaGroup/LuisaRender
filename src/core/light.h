@@ -17,17 +17,14 @@ class LightSampleBufferSet {
 
 private:
     std::unique_ptr<Buffer<float4>> _radiance_and_pdf_w_buffer;
-    std::unique_ptr<Buffer<bool>> _is_delta_buffer;
     std::unique_ptr<Buffer<Ray>> _shadow_ray_buffer;
 
 public:
     LightSampleBufferSet(Device *device, size_t capacity)
         : _radiance_and_pdf_w_buffer{device->create_buffer<float4>(capacity, BufferStorage::DEVICE_PRIVATE)},
-          _is_delta_buffer{device->create_buffer<bool>(capacity, BufferStorage::DEVICE_PRIVATE)},
           _shadow_ray_buffer{device->create_buffer<Ray>(capacity, BufferStorage::DEVICE_PRIVATE)} {}
     
     [[nodiscard]] auto radiance_and_pdf_w_buffer() { return _radiance_and_pdf_w_buffer->view(); }
-    [[nodiscard]] auto is_delta_buffer() { return _is_delta_buffer->view(); }
     [[nodiscard]] auto shadow_ray_buffer() { return _shadow_ray_buffer->view(); }
 };
 
@@ -39,10 +36,13 @@ public:
     using SampleLightsDispatch = std::function<void(
         KernelDispatcher &dispatch, Kernel &kernel, uint dispatch_extent, BufferView<float> sample_buffer,
         TypelessBuffer &light_data_buffer, BufferView<Selection> queue, BufferView<uint> queue_size,
+        BufferView<float> cdf_buffer,
         InteractionBufferSet &interactions, Geometry *geometry, LightSampleBufferSet &light_samples)>;
     
-    // todo
-    using EvaluateLightsDispatch = std::function<void()>;
+    using EvaluateLightsDispatch = std::function<void(
+        KernelDispatcher &dispatch, Kernel &kernel, uint dispatch_extent,
+        TypelessBuffer &light_data_buffer, BufferView<Selection> queue, BufferView<uint> queue_size,
+        InteractionBufferSet &interactions)>;
 
 private:
     LUISA_MAKE_NODE_CREATOR_REGISTRY(Light);
@@ -59,10 +59,13 @@ public:
     [[nodiscard]] virtual uint tag() const noexcept = 0;
     [[nodiscard]] virtual std::unique_ptr<Kernel> create_generate_samples_kernel() = 0;
     [[nodiscard]] virtual SampleLightsDispatch create_generate_samples_dispatch() = 0;
+    [[nodiscard]] virtual std::unique_ptr<Kernel> create_evaluate_emissions_kernel() { return nullptr; }
+    [[nodiscard]] virtual EvaluateLightsDispatch create_evaluate_emissions_dispatch() { return {}; }
     [[nodiscard]] virtual size_t data_stride() const noexcept = 0;
     [[nodiscard]] virtual Shape *shape() const noexcept { return nullptr; }
     [[nodiscard]] virtual uint sampling_dimensions() const noexcept = 0;
-    virtual void encode_data(TypelessBuffer &buffer, size_t index) = 0;
+    [[nodiscard]] virtual bool is_sky() const noexcept { return false; }
+    virtual void encode_data(TypelessBuffer &buffer, size_t data_index, uint2 cdf_range, uint instance_id, uint triangle_offset, uint vertex_offset, float shape_area) = 0;
 };
     
 }

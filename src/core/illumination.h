@@ -6,6 +6,7 @@
 
 #include "data_types.h"
 #include "mathematics.h"
+#include "interaction.h"
 #include "selection.h"
 
 namespace luisa::illumination {
@@ -38,14 +39,43 @@ LUISA_DEVICE_CALLABLE inline void uniform_select_lights(
     LUISA_DEVICE_SPACE const Info *info_buffer,
     LUISA_DEVICE_SPACE Atomic<uint> *queue_sizes,
     LUISA_DEVICE_SPACE Selection *queues,
-    uint ray_count,
+    uint its_count,
     SelectLightsKernelUniforms uniforms,
     uint tid) {
     
-    if (tid < ray_count) {
+    if (tid < its_count) {
         auto light_info = info_buffer[min(static_cast<uint>(sample_buffer[tid] * uniforms.light_count), uniforms.light_count - 1u)];
         auto queue_index = luisa_atomic_fetch_add(queue_sizes[light_info.tag()], 1u);
         queues[light_info.tag() * uniforms.max_queue_size + queue_index] = {light_info.index(), tid};
+    }
+}
+
+struct CollectLightInteractionsKernelUniforms {
+    uint max_queue_size;
+    uint sky_tag;
+    bool has_sky;
+};
+
+LUISA_DEVICE_CALLABLE inline void collect_light_interactions(
+    LUISA_DEVICE_SPACE const uint *its_instance_id_buffer,
+    LUISA_DEVICE_SPACE const uint8_t *its_state_buffer,
+    LUISA_DEVICE_SPACE const Info *instance_to_info_buffer,
+    LUISA_DEVICE_SPACE Atomic<uint> *queue_sizes,
+    LUISA_DEVICE_SPACE Selection *queues,
+    uint its_count,
+    CollectLightInteractionsKernelUniforms uniforms,
+    uint tid) {
+    
+    if (tid < its_count) {
+        auto state = its_state_buffer[tid];
+        if (state & interaction_state_flags::EMISSIVE_BIT) {  // hit on lights
+            auto light_info = instance_to_info_buffer[its_instance_id_buffer[tid]];
+            auto queue_index = luisa_atomic_fetch_add(queue_sizes[light_info.tag()], 1u);
+            queues[light_info.tag() * uniforms.max_queue_size + queue_index] = {light_info.index(), tid};
+        } else if (state == interaction_state_flags::MISS && uniforms.has_sky) {  // background
+            auto queue_index = luisa_atomic_fetch_add(queue_sizes[uniforms.sky_tag], 1u);
+            queues[uniforms.sky_tag * uniforms.max_queue_size + queue_index] = {0u, tid};
+        }
     }
 }
 
@@ -69,28 +99,35 @@ private:
     Geometry *_geometry;
     std::vector<std::shared_ptr<Light>> _lights;
     size_t _abstract_light_count;  // area_light_count = _lights.size() - _abstract_light_count
+    bool _has_sky;
+    uint _sky_tag;
     
     std::unique_ptr<Buffer<illumination::Info>> _info_buffer;
+    std::vector<std::unique_ptr<TypelessBuffer>> _light_data_buffers;
+    
+    // for light sampling
     std::vector<uint> _light_sampling_dimensions;
     std::vector<std::unique_ptr<Kernel>> _light_sampling_kernels;
     std::vector<Light::SampleLightsDispatch> _light_sampling_dispatches;
+    
+    // for light evaluation
     std::vector<std::unique_ptr<Kernel>> _light_evaluation_kernels;
-    std::vector<std::unique_ptr<TypelessBuffer>> _light_data_buffers;
+    std::vector<Light::EvaluateLightsDispatch> _light_evaluation_dispatches;
     
     // CDFs for light sampling
     std::unique_ptr<Buffer<float>> _cdf_buffer;
-    std::unique_ptr<Buffer<uint2>> _cdf_range_buffer;
-    std::unique_ptr<Buffer<uint>> _cdf_triangle_index;
+    std::unique_ptr<Buffer<illumination::Info>> _instance_to_light_info_buffer;
     
     // kernels
     std::unique_ptr<Kernel> _uniform_select_lights_kernel;
+    std::unique_ptr<Kernel> _collect_light_interactions_kernel;
 
 public:
     Illumination(Device *device, const std::vector<std::shared_ptr<Light>> &lights, Geometry *geometry);
     [[nodiscard]] uint tag_count() const noexcept { return static_cast<uint>(_light_data_buffers.size()); }
     
     void uniform_select_lights(KernelDispatcher &dispatch,
-                               uint max_ray_count,
+                               uint dispatch_extent,
                                BufferView<uint> ray_queue,
                                BufferView<uint> ray_queue_size,
                                Sampler &sampler,
@@ -98,14 +135,22 @@ public:
                                BufferView<uint> queue_sizes);
     
     void sample_lights(KernelDispatcher &dispatch,
+                       uint dispatch_extent,
                        Sampler &sampler,
                        BufferView<uint> ray_indices,
                        BufferView<uint> ray_count,
                        BufferView<Selection> queues,
                        BufferView<uint> queue_sizes,
-                       uint max_queue_size,
                        InteractionBufferSet &interactions,
                        LightSampleBufferSet &light_samples);
+    
+    void evaluate_light_emissions(KernelDispatcher &dispatch,
+                                  uint dispatch_extent,
+                                  BufferView<uint> ray_queue_size,
+                                  BufferView<Selection> queues,
+                                  BufferView<uint> queue_sizes,
+                                  InteractionBufferSet &interactions);
+    
 };
 
 }

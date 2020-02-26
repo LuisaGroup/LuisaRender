@@ -7,7 +7,7 @@ LUISA_KERNEL void point_light_generate_samples(
     LUISA_DEVICE_SPACE const light::point::Data *data_buffer,
     LUISA_DEVICE_SPACE const Selection *queue,
     LUISA_DEVICE_SPACE const uint &queue_size,
-    LUISA_DEVICE_SPACE const uint8_t *its_state_buffer,
+    LUISA_DEVICE_SPACE uint8_t *its_state_buffer,
     LUISA_DEVICE_SPACE const float3 *its_position_buffer,
     LUISA_DEVICE_SPACE float4 *Li_and_pdf_w_buffer,
     LUISA_DEVICE_SPACE bool *is_delta_buffer,

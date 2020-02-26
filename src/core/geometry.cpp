@@ -93,6 +93,16 @@ uint Geometry::entity_index(Shape *shape) const {
     return iter->second;
 }
 
+uint Geometry::instance_index(Shape *shape) const {
+    auto iter = _shape_to_instance_id.find(shape);
+    LUISA_ERROR_IF(iter == _shape_to_instance_id.cend(), "shape not found");
+    return iter->second;
+}
+
+GeometryEntity &Geometry::entity(uint index) {
+    return *_entities[index];
+}
+
 Geometry::Geometry(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, const std::vector<std::shared_ptr<Light>> &lights, float initial_time)
     : _device{device},
       _evaluate_interactions_kernel{device->create_kernel("geometry_evaluate_interactions")} {
@@ -158,6 +168,12 @@ Geometry::Geometry(Device *device, const std::vector<std::shared_ptr<Shape>> &sh
     for (auto &&shape : _dynamic_instances) {
         shape->load(geometry_encoder);
     }
+    
+    // create shape-to-instance_id map
+    for (auto &&shape : _static_shapes) { _shape_to_instance_id.emplace(shape.get(), static_cast<uint>(_shape_to_instance_id.size())); }
+    for (auto &&shape : _static_instances) { _shape_to_instance_id.emplace(shape.get(), static_cast<uint>(_shape_to_instance_id.size())); }
+    for (auto &&shape : _dynamic_shapes) { _shape_to_instance_id.emplace(shape.get(), static_cast<uint>(_shape_to_instance_id.size())); }
+    for (auto &&shape : _dynamic_instances) { _shape_to_instance_id.emplace(shape.get(), static_cast<uint>(_shape_to_instance_id.size())); }
     
     // create geometry buffers
     {
@@ -298,6 +314,10 @@ void Geometry::evaluate_interactions(KernelDispatcher &dispatch, BufferView<Ray>
             _static_instance_light_begin, _static_instance_light_end,
             _dynamic_instance_light_begin, _dynamic_instance_light_end});
     });
+}
+
+uint Geometry::instance_count() const noexcept {
+    return _shape_to_instance_id.size();
 }
 
 }
