@@ -69,6 +69,7 @@ High-performance renderer on GPU.
 - [ ] Denoisers
 
 ### Renders
+- [x] Scene Description Language
 - [x] Single-Shot Rendering
 - [ ] Animation Rendering
 - [ ] Interactive Rendering
