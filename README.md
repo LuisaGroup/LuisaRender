@@ -7,10 +7,14 @@ High-performance renderer on GPU.
 - [x] Apple Metal
 - [ ] Intel Embree
 - [ ] NVIDIA OptiX & OptiX-Prime
+- [ ] ...
 
 ### Cameras
 - [x] Pinhole Cameras
 - [x] Thin-Lens Cameras
+- [ ] Realistic Cameras
+- [ ] Fish-Eye Cameras
+- [ ] ...
 - [x] Camera Transform, Animation & Motion-Blur
 - [ ] Shutter Curves
 
@@ -19,11 +23,13 @@ High-performance renderer on GPU.
 - [x] Catmull-Clarke Subdivision (with ASSIMP)
 - [x] Instancing
 - [x] Static and Dynamic Transforms & Motion-Blur
+- [ ] Curves
 - [ ] Out-of-Core Ray Tracing
 
 ### Illumination
 - [x] Point Lights
 - [x] Diffuse Area Lights
+- [ ] Realistic Lights
 - [ ] HDRI Environment Maps
 - [ ] Procedural Skylights
 - [x] Uniform-Distribution Light Selection Strategy
@@ -32,6 +38,7 @@ High-performance renderer on GPU.
 ### Appearance
 - [ ] BSDFs
 - [ ] Materials
+- [ ] Spectral Rendering
 - [ ] Textures & Filters
 - [ ] Shading Language Integration
 - [ ] Texture Caches & Streaming
@@ -39,15 +46,22 @@ High-performance renderer on GPU.
 ### Samplers
 - [x] Independent Sampler
 - [ ] Halton Sampler
+- [ ] ...
 
 ### Filters
 - [x] Mitchell-Netravali Filter
+- [ ] Box Filter
+- [ ] Triangle Filter
+- [ ] Gaussian Filter
+- [ ] ...
 
 ### Integrators
 - [x] Normal Visualizer
 - [ ] Path Tracing
 - [ ] SPPM
 - [ ] PSSMLT
+- [ ] ...
+- [ ] AOV Support
 
 ### Postprocessing
 - [ ] Colorspace Management & Tone Mapping
