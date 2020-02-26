@@ -43,5 +43,5 @@ Nothing
 
 ## Galary
 
-### Animated Subdivided Bunny Instances Rendered with Normal Visualizer using a Thin-Lens Camera
+- Normal Visualizer + Subdivision + Instancing + Dynamic Transforms + Thin-Lens Camera + Motion-Blur (7.0s @ 1024spp)
 ![](gallery/bunny-motion-blur-normal.png)
