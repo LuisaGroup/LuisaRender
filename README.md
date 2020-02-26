@@ -19,27 +19,46 @@ High-performance renderer on GPU.
 - [x] Catmull-Clarke Subdivision (with ASSIMP)
 - [x] Instancing
 - [x] Static and Dynamic Transforms & Motion-Blur
+- [ ] Out-of-Core Ray Tracing
 
-### Lights
+### Illumination
 - [x] Point Lights
 - [x] Diffuse Area Lights
 - [ ] HDRI Environment Maps
 - [ ] Procedural Skylights
+- [x] Uniform-Distribution Light Selection Strategy
+- [ ] Power-Distribution Light Selection Strategy
 
-### Materials
-Nothing
+### Appearance
+- [ ] BSDFs
+- [ ] Materials
+- [ ] Textures & Filters
+- [ ] Shading Language Integration
+- [ ] Texture Caches & Streaming
 
 ### Samplers
 - [x] Independent Sampler
 - [ ] Halton Sampler
 
+### Filters
+- [x] Mitchell-Netravali Filter
+
 ### Integrators
 - [x] Normal Visualizer
 - [ ] Path Tracing
+- [ ] SPPM
+- [ ] PSSMLT
+
+### Postprocessing
+- [ ] Colorspace Management & Tone Mapping
+- [ ] Postprocess Effects
+- [ ] Denoisers
 
 ### Renders
 - [x] Single-Shot Rendering
 - [ ] Animation Rendering
+- [ ] Interactive Rendering
+- [ ] Remote Rendering
 
 ## Gallery
 
