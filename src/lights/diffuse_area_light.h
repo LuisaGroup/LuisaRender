@@ -19,6 +19,7 @@ struct Data {
     uint triangle_offset;
     uint vertex_offset;
     float shape_area;
+    bool two_sided
 };
 
 LUISA_DEVICE_CALLABLE inline void generate_samples(
@@ -41,7 +42,7 @@ LUISA_DEVICE_CALLABLE inline void generate_samples(
         
         auto selection = queue[tid];
         
-        if (its_state_buffer[selection.interaction_index] & interaction_state_flags::VALID_BIT) {
+        if (its_state_buffer[selection.interaction_index] & interaction_state_flags::HIT_BIT) {
             auto light_data = data_buffer[selection.data_index];
             auto r = sample_buffer[tid];
             auto cdf_offset = sample_discrete(cdf_buffer, light_data.cdf_range.x, light_data.cdf_range.y, r.x);
@@ -56,14 +57,14 @@ LUISA_DEVICE_CALLABLE inline void generate_samples(
             auto L = p_light - p_hit;
             auto wi = normalize(L);
             auto cos_theta = dot(-wi, n_light);
-            
-            if (cos_theta < 1e-4f) {
-                shadow_ray_buffer[selection.interaction_index].max_distance = -1.0f;
-            } else {
-                auto distance = length(L);
-                auto pdf_w = distance * distance / (light_data.shape_area * cos_theta);
+            auto distance = length(L);
+            auto pdf_w = distance * distance / (light_data.shape_area * max(abs(cos_theta), 1e-4f));
+            if (light_data.two_sided || cos_theta > 1e-4f) {
                 Li_and_pdf_w_buffer[selection.interaction_index] = make_float4(light_data.emission, pdf_w);
                 shadow_ray_buffer[selection.interaction_index] = make_ray(p_hit, wi, 1e-4f, distance - 1e-4f);
+            } else {
+                Li_and_pdf_w_buffer[selection.interaction_index] = make_float4(make_float3(), pdf_w);
+                shadow_ray_buffer[selection.interaction_index].max_distance = -1.0f;
             }
         } else {
             shadow_ray_buffer[selection.interaction_index].max_distance = -1.0f;
@@ -75,15 +76,15 @@ LUISA_DEVICE_CALLABLE inline void evaluate_emissions(
     LUISA_DEVICE_SPACE const Data *data_buffer,
     LUISA_DEVICE_SPACE const Selection *queue,
     uint queue_size,
-    LUISA_DEVICE_SPACE const uint8_t *its_state_buffer,
+    LUISA_DEVICE_SPACE uint8_t *its_state_buffer,
     LUISA_DEVICE_SPACE float3 *its_emission_buffer,
     uint tid) {
     
     if (tid < queue_size) {
         auto selection = queue[tid];
-        if (its_state_buffer[selection.interaction_index] & interaction_state_flags::EMISSIVE_BIT) {
-            its_emission_buffer[selection.interaction_index] = data_buffer[selection.data_index].emission;
-        }
+        auto light_data = data_buffer[selection.data_index];
+        its_emission_buffer[selection.interaction_index] = light_data.emission;
+        if (light_data.two_sided) { its_state_buffer[selection.interaction_index] |= interaction_state_flags::TWO_SIDED_BIT; }
     }
 }
 
@@ -101,6 +102,7 @@ class DiffuseAreaLight : public Light {
 protected:
     float3 _emission;
     std::shared_ptr<Shape> _shape;
+    bool _two_sided;
 
 public:
     DiffuseAreaLight(Device *device, const ParameterSet &parameter_set);

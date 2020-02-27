@@ -72,7 +72,7 @@ LUISA_DEVICE_CALLABLE inline void collect_light_interactions(
             auto light_info = instance_to_info_buffer[its_instance_id_buffer[tid]];
             auto queue_index = luisa_atomic_fetch_add(queue_sizes[light_info.tag()], 1u);
             queues[light_info.tag() * uniforms.max_queue_size + queue_index] = {light_info.index(), tid};
-        } else if (state == interaction_state_flags::MISS && uniforms.has_sky) {  // background
+        } else if (!(state & interaction_state_flags::HIT_BIT) && uniforms.has_sky) {  // background
             auto queue_index = luisa_atomic_fetch_add(queue_sizes[uniforms.sky_tag], 1u);
             queues[uniforms.sky_tag * uniforms.max_queue_size + queue_index] = {0u, tid};
         }

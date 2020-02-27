@@ -54,13 +54,14 @@ uint DiffuseAreaLight::sampling_dimensions() const noexcept {
 }
 
 void DiffuseAreaLight::encode_data(TypelessBuffer &buffer, size_t data_index, uint2 cdf_range, uint instance_id, uint triangle_offset, uint vertex_offset, float shape_area) {
-    buffer.view_as<light::diffuse_area::Data>(data_index)[0] = {_emission, cdf_range, instance_id, triangle_offset, vertex_offset, shape_area};
+    buffer.view_as<light::diffuse_area::Data>(data_index)[0] = {_emission, cdf_range, instance_id, triangle_offset, vertex_offset, shape_area, _two_sided};
 }
 
 DiffuseAreaLight::DiffuseAreaLight(Device *device, const ParameterSet &parameter_set)
     : Light{device, parameter_set},
       _emission{parameter_set["emission"].parse_float3_or_default(make_float3(parameter_set["emission"].parse_float()))},
-      _shape{parameter_set["shape"].parse<Shape>()} {}
+      _shape{parameter_set["shape"].parse<Shape>()},
+      _two_sided{parameter_set["two_sided"].parse_bool_or_default(false)} {}
 
 std::unique_ptr<Kernel> DiffuseAreaLight::create_evaluate_emissions_kernel() {
     return _device->create_kernel("diffuse_area_light_evaluate_emissions");

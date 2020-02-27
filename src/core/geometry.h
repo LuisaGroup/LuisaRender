@@ -52,7 +52,7 @@ LUISA_DEVICE_CALLABLE inline void evaluate_interactions(
         }
         
         auto instance_index = static_cast<uint>(hit.instance_index);
-        uint8_t state_flags = interaction_state_flags::VALID_BIT;
+        uint8_t state_flags = interaction_state_flags::HIT_BIT;
         if ((static_cast<uint>(instance_index >= uniforms.static_shape_light_begin) & static_cast<uint>(instance_index < uniforms.static_shape_light_end)) |
             (static_cast<uint>(instance_index >= uniforms.dynamic_shape_light_begin) & static_cast<uint>(instance_index < uniforms.dynamic_shape_light_end)) |
             (static_cast<uint>(instance_index >= uniforms.static_instance_light_begin) & static_cast<uint>(instance_index < uniforms.static_instance_light_end)) |

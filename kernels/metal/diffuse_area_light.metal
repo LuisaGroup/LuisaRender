@@ -32,7 +32,7 @@ LUISA_KERNEL void diffuse_area_light_evaluate_emissions(
     LUISA_DEVICE_SPACE const light::diffuse_area::Data *data_buffer,
     LUISA_DEVICE_SPACE const Selection *queue,
     LUISA_DEVICE_SPACE const uint &queue_size,
-    LUISA_DEVICE_SPACE const uint8_t *its_state_buffer,
+    LUISA_DEVICE_SPACE uint8_t *its_state_buffer,
     LUISA_DEVICE_SPACE float3 *its_emission_buffer,
     uint2 tid [[thread_position_in_grid]]) {
     

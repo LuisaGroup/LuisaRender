@@ -37,7 +37,7 @@ LUISA_DEVICE_CALLABLE inline float2 concentric_sample_disk(float r1, float r2) n
 }
 
 LUISA_DEVICE_CALLABLE inline float balance_heuristic(float pa, float pb) noexcept {
-    return pa / (pa + pb);
+    return pa / max(pa + pb, 1e-4f);
 }
 
 LUISA_DEVICE_CALLABLE inline uint sample_discrete(LUISA_DEVICE_SPACE const float *cdf, uint begin, uint end, float value) noexcept {

@@ -29,7 +29,7 @@ LUISA_DEVICE_CALLABLE inline void generate_samples(
     
     if (tid < queue_size) {
         auto selection = queue[tid];
-        if (its_state_buffer[selection.interaction_index] & interaction_state_flags::VALID_BIT) {
+        if (its_state_buffer[selection.interaction_index] & interaction_state_flags::HIT_BIT) {
             auto light_data = data_buffer[selection.data_index];
             auto its_p = its_position_buffer[selection.interaction_index];
             auto d = light_data.position - its_p;
