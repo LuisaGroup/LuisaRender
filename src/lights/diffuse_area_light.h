@@ -19,7 +19,7 @@ struct Data {
     uint triangle_offset;
     uint vertex_offset;
     float shape_area;
-    bool two_sided
+    bool two_sided;
 };
 
 LUISA_DEVICE_CALLABLE inline void generate_samples(
