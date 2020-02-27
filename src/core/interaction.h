@@ -22,9 +22,10 @@ LUISA_CONSTANT_SPACE constexpr auto ALL_BITS = POSITION_BIT | NORMAL_BIT | UV_BI
 namespace luisa::interaction_state_flags {
 
 LUISA_CONSTANT_SPACE constexpr auto MISS = static_cast<uint8_t>(0x00u);
-LUISA_CONSTANT_SPACE constexpr auto VALID_BIT = static_cast<uint8_t>(0x01u);
+LUISA_CONSTANT_SPACE constexpr auto HIT_BIT = static_cast<uint8_t>(0x01u);
 LUISA_CONSTANT_SPACE constexpr auto EMISSIVE_BIT = static_cast<uint8_t>(0x02u);
 LUISA_CONSTANT_SPACE constexpr auto DELTA_LIGHT_BIT = static_cast<uint8_t>(0x04u);
+LUISA_CONSTANT_SPACE constexpr auto TWO_SIDED_BIT = static_cast<uint8_t>(0x08u);
 
 }
 
