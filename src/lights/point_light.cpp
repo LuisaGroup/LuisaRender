@@ -17,7 +17,7 @@ std::unique_ptr<Kernel> PointLight::create_generate_samples_kernel() {
     return _device->create_kernel("point_light_generate_samples");
 }
 
-void PointLight::encode_data(TypelessBuffer &buffer, size_t data_index, uint2, uint, uint triangle_offset, uint vertex_offset, float) {
+void PointLight::encode_data(TypelessBuffer &buffer, size_t data_index, uint2, uint, uint, uint, float) {
     buffer.view_as<light::point::Data>(data_index)[0] = {_position, _emission};
 }
 
@@ -33,7 +33,7 @@ uint PointLight::tag() const noexcept {
 Light::SampleLightsDispatch PointLight::create_generate_samples_dispatch() {
     
     return [](KernelDispatcher &dispatch, Kernel &kernel, uint dispatch_extent, BufferView<float>,
-              TypelessBuffer &light_data_buffer, BufferView<Selection> queue, BufferView<uint> queue_size,
+              TypelessBuffer &light_data_buffer, BufferView<light::Selection> queue, BufferView<uint> queue_size,
               BufferView<float>, InteractionBufferSet &interactions, Geometry *, LightSampleBufferSet &light_samples) {
         
         dispatch(kernel, dispatch_extent, [&](KernelArgumentEncoder &encode) {

@@ -17,7 +17,7 @@ LUISA_DEVICE_CALLABLE inline void colorize_normals(
     uint tid) noexcept {
     
     if (tid < pixel_count) {
-        auto n = (state_buffer[tid] & interaction_state_flags::HIT_BIT) != 0u ? normals[tid] : make_float3(-1.0f);
+        auto n = (state_buffer[tid] & interaction::state::HIT) != 0u ? normals[tid] : make_float3(-1.0f);
         normals[tid] = XYZ2ACEScg(RGB2XYZ(n * 0.5f + 0.5f));
     }
     

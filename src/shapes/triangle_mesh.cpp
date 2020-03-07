@@ -15,7 +15,7 @@ LUISA_REGISTER_NODE_CREATOR("TriangleMesh", TriangleMesh)
 
 TriangleMesh::TriangleMesh(Device *device, const ParameterSet &parameter_set) : Shape{device, parameter_set} {
     _path = std::filesystem::absolute(parameter_set["path"].parse_string());
-    _subdiv_level = parameter_set["subdiv_level"].parse_uint_or_default(0u);
+    _subdiv_level = parameter_set["subdiv"].parse_uint_or_default(0u);
 }
 
 void TriangleMesh::load(GeometryEncoder &encoder) {
@@ -33,7 +33,7 @@ void TriangleMesh::load(GeometryEncoder &encoder) {
     std::cout << "Loading: " << _path << std::endl;
     auto ai_scene = ai_importer.ReadFile(_path.c_str(),
                                          aiProcess_JoinIdenticalVertices |
-                                         aiProcess_GenSmoothNormals |
+                                         aiProcess_GenNormals |
                                          aiProcess_PreTransformVertices |
                                          aiProcess_ImproveCacheLocality |
                                          aiProcess_FixInfacingNormals |

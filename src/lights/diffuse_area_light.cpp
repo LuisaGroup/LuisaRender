@@ -19,7 +19,7 @@ std::unique_ptr<Kernel> DiffuseAreaLight::create_generate_samples_kernel() {
 
 Light::SampleLightsDispatch DiffuseAreaLight::create_generate_samples_dispatch() {
     return [](KernelDispatcher &dispatch, Kernel &kernel, uint dispatch_extent, BufferView<float> sample_buffer,
-              TypelessBuffer &light_data_buffer, BufferView<Selection> queue, BufferView<uint> queue_size,
+              TypelessBuffer &light_data_buffer, BufferView<light::Selection> queue, BufferView<uint> queue_size,
               BufferView<float> cdf_buffer,
               InteractionBufferSet &interactions, Geometry *geometry, LightSampleBufferSet &light_samples) {
         
@@ -69,7 +69,7 @@ std::unique_ptr<Kernel> DiffuseAreaLight::create_evaluate_emissions_kernel() {
 
 Light::EvaluateLightsDispatch DiffuseAreaLight::create_evaluate_emissions_dispatch() {
     return [](KernelDispatcher &dispatch, Kernel &kernel, uint dispatch_extent,
-              TypelessBuffer &light_data_buffer, BufferView<Selection> queue, BufferView<uint> queue_size,
+              TypelessBuffer &light_data_buffer, BufferView<light::Selection> queue, BufferView<uint> queue_size,
               InteractionBufferSet &interactions) {
         
         dispatch(kernel, dispatch_extent, [&](KernelArgumentEncoder &encode) {

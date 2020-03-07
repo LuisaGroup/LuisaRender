@@ -47,47 +47,47 @@ LUISA_DEVICE_CALLABLE inline void evaluate_interactions(
         
         auto hit = hit_buffer[tid];
         if (hit.distance <= 0.0f) {
-            interaction_state_buffer[tid] = interaction_state_flags::MISS;
+            interaction_state_buffer[tid] = interaction::state::MISS;
             return;
         }
         
         auto instance_index = static_cast<uint>(hit.instance_index);
-        uint8_t state_flags = interaction_state_flags::HIT_BIT;
+        uint8_t state_flags = interaction::state::HIT;
         if ((static_cast<uint>(instance_index >= uniforms.static_shape_light_begin) & static_cast<uint>(instance_index < uniforms.static_shape_light_end)) |
             (static_cast<uint>(instance_index >= uniforms.dynamic_shape_light_begin) & static_cast<uint>(instance_index < uniforms.dynamic_shape_light_end)) |
             (static_cast<uint>(instance_index >= uniforms.static_instance_light_begin) & static_cast<uint>(instance_index < uniforms.static_instance_light_end)) |
             (static_cast<uint>(instance_index >= uniforms.dynamic_instance_light_begin) & static_cast<uint>(instance_index < uniforms.dynamic_instance_light_end))) {
-            state_flags |= interaction_state_flags::EMISSIVE_BIT;
+            state_flags |= interaction::state::EMISSIVE;
         }
         interaction_state_buffer[tid] = state_flags;
         
         auto indices = index_buffer[hit.triangle_index + index_offset_buffer[instance_index]] + vertex_offset_buffer[instance_index];
         
-        using namespace interaction_attribute_flags;
+        using namespace interaction::attribute;
         auto attribute_flags = uniforms.attribute_flags;
     
-        if (attribute_flags & INSTANCE_ID_BIT) {
+        if (attribute_flags & INSTANCE_ID) {
             interaction_instance_id_buffer[tid] = instance_index;
         }
         
-        if ((attribute_flags & POSITION_BIT) || (attribute_flags & NORMAL_BIT) || (attribute_flags & WO_AND_DISTANCE_BIT)) {
+        if ((attribute_flags & POSITION) || (attribute_flags & NORMAL) || (attribute_flags & WO_AND_DISTANCE)) {
             auto transform = transform_buffer[instance_index];
-            if (attribute_flags & NORMAL_BIT) {
+            if (attribute_flags & NORMAL) {
                 auto n = hit.bary_u * normal_buffer[indices.x] + hit.bary_v * normal_buffer[indices.y] + (1.0f - hit.bary_u - hit.bary_v) * normal_buffer[indices.z];
                 interaction_normal_buffer[tid] = normalize(transpose(inverse(make_float3x3(transform))) * n);
             }
-            if ((attribute_flags & POSITION_BIT) || (attribute_flags & WO_AND_DISTANCE_BIT)) {
+            if ((attribute_flags & POSITION) || (attribute_flags & WO_AND_DISTANCE)) {
                 auto p = hit.bary_u * position_buffer[indices.x] + hit.bary_v * position_buffer[indices.y] + (1.0f - hit.bary_u - hit.bary_v) * position_buffer[indices.z];
-                if (attribute_flags & POSITION_BIT) {
+                if (attribute_flags & POSITION) {
                     interaction_position_buffer[tid] = make_float3(transform * make_float4(p, 1.0f));
                 }
-                if (attribute_flags & WO_AND_DISTANCE_BIT) {
+                if (attribute_flags & WO_AND_DISTANCE) {
                     interaction_wo_and_distance_buffer[tid] = make_float4(normalize(make_float3(ray_buffer[tid].origin) - p), hit.distance);
                 }
             }
         }
         
-        if (attribute_flags & UV_BIT) {
+        if (attribute_flags & UV) {
             auto uv = hit.bary_u * uv_buffer[indices.x] + hit.bary_v * uv_buffer[indices.y] + (1.0f - hit.bary_u - hit.bary_v) * uv_buffer[indices.z];
             interaction_uv_buffer[tid] = uv;
         }

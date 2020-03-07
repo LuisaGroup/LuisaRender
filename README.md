@@ -20,7 +20,7 @@ High-Performance Renderer on GPU.
 
 ### Geometry
 - [x] Triangle Meshes
-- [x] Catmull-Clarke Subdivision (with ASSIMP)
+- [x] Catmull-Clark Subdivision (with ASSIMP)
 - [x] Instancing
 - [x] Static and Dynamic Transforms & Motion-Blur
 - [ ] Curves
@@ -32,6 +32,7 @@ High-Performance Renderer on GPU.
 - [ ] Realistic Lights
 - [ ] HDRI Environment Maps
 - [ ] Procedural Skylights
+- [ ] ...
 - [x] Uniform-Distribution Light Selection Strategy
 - [ ] Power-Distribution Light Selection Strategy
 

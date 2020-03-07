@@ -11,7 +11,7 @@ LUISA_KERNEL void diffuse_area_light_generate_samples(
     LUISA_DEVICE_SPACE const packed_uint3 *index_buffer,
     LUISA_DEVICE_SPACE const float3 *position_buffer,
     LUISA_DEVICE_SPACE const float3 *normal_buffer,
-    LUISA_DEVICE_SPACE const Selection *queue,
+    LUISA_DEVICE_SPACE const light::Selection *queue,
     LUISA_DEVICE_SPACE const uint &queue_size,
     LUISA_DEVICE_SPACE const uint8_t *its_state_buffer,
     LUISA_DEVICE_SPACE const float3 *its_position_buffer,
@@ -30,7 +30,7 @@ LUISA_KERNEL void diffuse_area_light_generate_samples(
 
 LUISA_KERNEL void diffuse_area_light_evaluate_emissions(
     LUISA_DEVICE_SPACE const light::diffuse_area::Data *data_buffer,
-    LUISA_DEVICE_SPACE const Selection *queue,
+    LUISA_DEVICE_SPACE const light::Selection *queue,
     LUISA_DEVICE_SPACE const uint &queue_size,
     LUISA_DEVICE_SPACE uint8_t *its_state_buffer,
     LUISA_DEVICE_SPACE float3 *its_emission_buffer,

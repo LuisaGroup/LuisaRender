@@ -6,26 +6,30 @@
 
 #include "data_types.h"
 
-namespace luisa::interaction_attribute_flags {
+namespace luisa::interaction {
 
-LUISA_CONSTANT_SPACE constexpr auto POSITION_BIT = 0x01u;
-LUISA_CONSTANT_SPACE constexpr auto NORMAL_BIT = 0x02u;
-LUISA_CONSTANT_SPACE constexpr auto UV_BIT = 0x04u;
-LUISA_CONSTANT_SPACE constexpr auto WO_AND_DISTANCE_BIT = 0x08u;
-LUISA_CONSTANT_SPACE constexpr auto INSTANCE_ID_BIT = 0x10u;
-LUISA_CONSTANT_SPACE constexpr auto EMISSION_BIT = 0x20u;
+namespace attribute {
 
-LUISA_CONSTANT_SPACE constexpr auto ALL_BITS = POSITION_BIT | NORMAL_BIT | UV_BIT | WO_AND_DISTANCE_BIT | INSTANCE_ID_BIT | EMISSION_BIT;
+LUISA_CONSTANT_SPACE constexpr auto POSITION = 0x01u;
+LUISA_CONSTANT_SPACE constexpr auto NORMAL = 0x02u;
+LUISA_CONSTANT_SPACE constexpr auto UV = 0x04u;
+LUISA_CONSTANT_SPACE constexpr auto WO_AND_DISTANCE = 0x08u;
+LUISA_CONSTANT_SPACE constexpr auto INSTANCE_ID = 0x10u;
+LUISA_CONSTANT_SPACE constexpr auto EMISSION = 0x20u;
+
+LUISA_CONSTANT_SPACE constexpr auto ALL = POSITION | NORMAL | UV | WO_AND_DISTANCE | INSTANCE_ID | EMISSION;
 
 }
 
-namespace luisa::interaction_state_flags {
+namespace state {
 
 LUISA_CONSTANT_SPACE constexpr auto MISS = static_cast<uint8_t>(0x00u);
-LUISA_CONSTANT_SPACE constexpr auto HIT_BIT = static_cast<uint8_t>(0x01u);
-LUISA_CONSTANT_SPACE constexpr auto EMISSIVE_BIT = static_cast<uint8_t>(0x02u);
-LUISA_CONSTANT_SPACE constexpr auto DELTA_LIGHT_BIT = static_cast<uint8_t>(0x04u);
-LUISA_CONSTANT_SPACE constexpr auto TWO_SIDED_BIT = static_cast<uint8_t>(0x08u);
+LUISA_CONSTANT_SPACE constexpr auto HIT = static_cast<uint8_t>(0x01u);
+LUISA_CONSTANT_SPACE constexpr auto EMISSIVE = static_cast<uint8_t>(0x02u);
+LUISA_CONSTANT_SPACE constexpr auto DELTA_LIGHT = static_cast<uint8_t>(0x04u);
+LUISA_CONSTANT_SPACE constexpr auto TWO_SIDED_LIGHT = static_cast<uint8_t>(0x08u);
+
+}
 
 }
 
@@ -52,27 +56,27 @@ private:
 public:
     InteractionBufferSet() noexcept = default;
     
-    InteractionBufferSet(Device *device, size_t capacity, uint flags = interaction_attribute_flags::ALL_BITS)
+    InteractionBufferSet(Device *device, size_t capacity, uint flags = interaction::attribute::ALL)
         : _size{capacity},
           _attribute_flags{flags},
           _state_buffer{device->create_buffer<uint8_t>(capacity, BufferStorage::DEVICE_PRIVATE)},
-          _position_buffer{(flags & interaction_attribute_flags::POSITION_BIT) ? device->create_buffer<float3>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
-          _normal_buffer{(flags & interaction_attribute_flags::NORMAL_BIT) ? device->create_buffer<float3>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
-          _uv_buffer{(flags & interaction_attribute_flags::UV_BIT) ? device->create_buffer<float2>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
-          _wo_and_distance_buffer{(flags & interaction_attribute_flags::WO_AND_DISTANCE_BIT) ?
+          _position_buffer{(flags & interaction::attribute::POSITION) ? device->create_buffer<float3>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
+          _normal_buffer{(flags & interaction::attribute::NORMAL) ? device->create_buffer<float3>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
+          _uv_buffer{(flags & interaction::attribute::UV) ? device->create_buffer<float2>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
+          _wo_and_distance_buffer{(flags & interaction::attribute::WO_AND_DISTANCE) ?
                                   device->create_buffer<float4>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
-          _instance_id_buffer{(flags & interaction_attribute_flags::INSTANCE_ID_BIT) ? device->create_buffer<uint>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
-          _emission_buffer{(flags & interaction_attribute_flags::EMISSION_BIT) ? device->create_buffer<float3>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr} {}
+          _instance_id_buffer{(flags & interaction::attribute::INSTANCE_ID) ? device->create_buffer<uint>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
+          _emission_buffer{(flags & interaction::attribute::EMISSION) ? device->create_buffer<float3>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr} {}
     
     [[nodiscard]] size_t size() const noexcept { return _size; }
     [[nodiscard]] uint attribute_flags() const noexcept { return _attribute_flags; }
     
-    [[nodiscard]] bool has_position_buffer() const noexcept { return (_attribute_flags & interaction_attribute_flags::POSITION_BIT) != 0u; }
-    [[nodiscard]] bool has_normal_buffer() const noexcept { return (_attribute_flags & interaction_attribute_flags::NORMAL_BIT) != 0u; }
-    [[nodiscard]] bool has_uv_buffer() const noexcept { return (_attribute_flags & interaction_attribute_flags::UV_BIT) != 0u; }
-    [[nodiscard]] bool has_wo_and_distance_buffer() const noexcept { return (_attribute_flags & interaction_attribute_flags::WO_AND_DISTANCE_BIT) != 0u; }
-    [[nodiscard]] bool has_instance_id_buffer() const noexcept { return (_attribute_flags & interaction_attribute_flags::INSTANCE_ID_BIT) != 0u; }
-    [[nodiscard]] bool has_emission_buffer() const noexcept { return (_attribute_flags & interaction_attribute_flags::EMISSION_BIT) != 0u; }
+    [[nodiscard]] bool has_position_buffer() const noexcept { return (_attribute_flags & interaction::attribute::POSITION) != 0u; }
+    [[nodiscard]] bool has_normal_buffer() const noexcept { return (_attribute_flags & interaction::attribute::NORMAL) != 0u; }
+    [[nodiscard]] bool has_uv_buffer() const noexcept { return (_attribute_flags & interaction::attribute::UV) != 0u; }
+    [[nodiscard]] bool has_wo_and_distance_buffer() const noexcept { return (_attribute_flags & interaction::attribute::WO_AND_DISTANCE) != 0u; }
+    [[nodiscard]] bool has_instance_id_buffer() const noexcept { return (_attribute_flags & interaction::attribute::INSTANCE_ID) != 0u; }
+    [[nodiscard]] bool has_emission_buffer() const noexcept { return (_attribute_flags & interaction::attribute::EMISSION) != 0u; }
     
     [[nodiscard]] auto position_buffer() const noexcept {
         LUISA_ERROR_IF_NOT(has_position_buffer(), "no position buffer present");

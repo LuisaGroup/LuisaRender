@@ -5,9 +5,9 @@
 #pragma once
 
 #include <core/ray.h>
-#include <core/selection.h>
 #include <core/interaction.h>
 #include <core/mathematics.h>
+#include <core/light.h>
 
 namespace luisa::light::point {
 
@@ -18,7 +18,7 @@ struct Data {
 
 LUISA_DEVICE_CALLABLE inline void generate_samples(
     LUISA_DEVICE_SPACE const Data *data_buffer,
-    LUISA_DEVICE_SPACE const Selection *queue,
+    LUISA_DEVICE_SPACE const light::Selection *queue,
     uint queue_size,
     LUISA_DEVICE_SPACE uint8_t *its_state_buffer,
     LUISA_DEVICE_SPACE const float3 *its_position_buffer,
@@ -29,7 +29,7 @@ LUISA_DEVICE_CALLABLE inline void generate_samples(
     
     if (tid < queue_size) {
         auto selection = queue[tid];
-        if (its_state_buffer[selection.interaction_index] & interaction_state_flags::HIT_BIT) {
+        if (its_state_buffer[selection.interaction_index] & interaction::state::HIT) {
             auto light_data = data_buffer[selection.data_index];
             auto its_p = its_position_buffer[selection.interaction_index];
             auto d = light_data.position - its_p;
@@ -39,7 +39,7 @@ LUISA_DEVICE_CALLABLE inline void generate_samples(
             auto distance = sqrt(dd);
             auto wo = d * (1.0f / distance);
             shadow_ray_buffer[selection.interaction_index] = make_ray(its_p, wo, 1e-4f, distance);
-            its_state_buffer[selection.interaction_index] |= interaction_state_flags::DELTA_LIGHT_BIT;
+            its_state_buffer[selection.interaction_index] |= interaction::state::DELTA_LIGHT;
         } else {
             shadow_ray_buffer[selection.interaction_index].max_distance = -1.0f;
         }
@@ -49,8 +49,6 @@ LUISA_DEVICE_CALLABLE inline void generate_samples(
 }
 
 #ifndef LUISA_DEVICE_COMPATIBLE
-
-#include <core/light.h>
 
 namespace luisa {
 

@@ -5,10 +5,10 @@
 #pragma once
 
 #include <core/mathematics.h>
-#include <core/selection.h>
 #include <core/ray.h>
 #include <core/interaction.h>
 #include <core/sampling.h>
+#include <core/light.h>
 
 namespace luisa::light::diffuse_area {
 
@@ -22,6 +22,8 @@ struct Data {
     bool two_sided;
 };
 
+static_assert(sizeof(Data) == 48ul);
+
 LUISA_DEVICE_CALLABLE inline void generate_samples(
     LUISA_DEVICE_SPACE const Data *data_buffer,
     LUISA_DEVICE_SPACE const float3 *sample_buffer,
@@ -30,7 +32,7 @@ LUISA_DEVICE_CALLABLE inline void generate_samples(
     LUISA_DEVICE_SPACE const packed_uint3 *index_buffer,
     LUISA_DEVICE_SPACE const float3 *position_buffer,
     LUISA_DEVICE_SPACE const float3 *normal_buffer,
-    LUISA_DEVICE_SPACE const Selection *queue,
+    LUISA_DEVICE_SPACE const light::Selection *queue,
     uint queue_size,
     LUISA_DEVICE_SPACE const uint8_t *its_state_buffer,
     LUISA_DEVICE_SPACE const float3 *its_position_buffer,
@@ -42,10 +44,10 @@ LUISA_DEVICE_CALLABLE inline void generate_samples(
         
         auto selection = queue[tid];
         
-        if (its_state_buffer[selection.interaction_index] & interaction_state_flags::HIT_BIT) {
+        if (its_state_buffer[selection.interaction_index] & interaction::state::HIT) {
             auto light_data = data_buffer[selection.data_index];
             auto r = sample_buffer[tid];
-            auto cdf_offset = sample_discrete(cdf_buffer, light_data.cdf_range.x, light_data.cdf_range.y, r.x);
+            auto cdf_offset = sample_discrete(cdf_buffer, light_data.cdf_range.x, light_data.cdf_range.y, r.x) - light_data.cdf_range.x;
             auto indices = index_buffer[light_data.triangle_offset + cdf_offset] + light_data.vertex_offset;
             auto b = uniform_sample_triangle(r.y, r.z);
             auto p_entity = b.x * position_buffer[indices.x] + b.y * position_buffer[indices.y] + (1.0f - b.x - b.y) * position_buffer[indices.z];
@@ -74,7 +76,7 @@ LUISA_DEVICE_CALLABLE inline void generate_samples(
 
 LUISA_DEVICE_CALLABLE inline void evaluate_emissions(
     LUISA_DEVICE_SPACE const Data *data_buffer,
-    LUISA_DEVICE_SPACE const Selection *queue,
+    LUISA_DEVICE_SPACE const light::Selection *queue,
     uint queue_size,
     LUISA_DEVICE_SPACE uint8_t *its_state_buffer,
     LUISA_DEVICE_SPACE float3 *its_emission_buffer,
@@ -84,7 +86,7 @@ LUISA_DEVICE_CALLABLE inline void evaluate_emissions(
         auto selection = queue[tid];
         auto light_data = data_buffer[selection.data_index];
         its_emission_buffer[selection.interaction_index] = light_data.emission;
-        if (light_data.two_sided) { its_state_buffer[selection.interaction_index] |= interaction_state_flags::TWO_SIDED_BIT; }
+        if (light_data.two_sided) { its_state_buffer[selection.interaction_index] |= interaction::state::TWO_SIDED_LIGHT; }
     }
 }
 
@@ -93,7 +95,6 @@ LUISA_DEVICE_CALLABLE inline void evaluate_emissions(
 #ifndef LUISA_DEVICE_COMPATIBLE
 
 #include <core/shape.h>
-#include <core/light.h>
 
 namespace luisa {
 

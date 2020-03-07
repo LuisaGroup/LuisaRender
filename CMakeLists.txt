@@ -25,8 +25,8 @@ include_directories(thirdparty/glm)
 
 set(GLM_QUIET ON CACHE BOOL "" FORCE)
 set(GLM_TEST_ENABLE_CXX_17 ON CACHE BOOL "" FORCE)
-add_compile_definitions(GLM_FORCE_AVX2)
-add_compile_definitions(GLM_FORCE_CXX17)
+add_definitions(-DGLM_FORCE_AVX2)
+add_definitions(-DGLM_FORCE_CXX17)
 add_subdirectory(thirdparty/glm)
 link_libraries(glm_static)
 

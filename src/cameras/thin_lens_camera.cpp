@@ -25,7 +25,7 @@ ThinLensCamera::ThinLensCamera(Device *device, const ParameterSet &parameters)
                              make_float2(sensor_size.y * film_aspect, sensor_size.y);
     
     auto focal_length = 1e-3f * parameters["focal_length"].parse_float_or_default(50.0f);
-    auto f_number = parameters["f_number"].parse_float_or_default(1.2f);
+    auto f_number = parameters["f_number"].parse_float_or_default(parameters["f_stop"].parse_float_or_default(1.2f));
     _lens_radius = 0.5f * focal_length / f_number;
     
     _position = parameters["position"].parse_float3();

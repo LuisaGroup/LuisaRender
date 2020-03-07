@@ -1,18 +1,18 @@
 Film film : RGB {
   resolution { 1200, 600 }
   filter : MitchellNetravali {
-    radius { 1.0 }
+    radius { 2.0 }
     b { 0.33333333333333 }
     c { 0.33333333333333 }
   }
 }
 
 Transform a1 : TRS {
-  rotation { 0.0, 0.0, 1.0, -10.0 }
+  rotation { 0.0, 0.0, 1.0, -2.0 }
 }
 
 Transform a2 : TRS {
-  rotation { 0.0, 0.0, 1.0, 10.0 }
+  rotation { 0.0, 0.0, 1.0, 2.0 }
 }
 
 Camera camera : ThinLens {
@@ -22,10 +22,10 @@ Camera camera : ThinLens {
   sensor_size { 36, 24 }
   f_number { 1.2 }
   focal_length { 35 }
-  transform : LinearTRSAnimation {
-    time_points { 1.0, 2.0 }
-    transforms { @a1, @a2 }
-  }
+//   transform : LinearTRSAnimation {
+//     time_points { 1.0, 2.0 }
+//     transforms { @a1, @a2 }
+//   }
 }
 
 // Camera camera : Pinhole {
@@ -48,7 +48,7 @@ Integrator integrator : Normal {}
 
 Shape bunny_ref : TriangleMesh {
   path { "data/meshes/bunny/bunny.obj" }
-  subdiv_level { 2 }
+  subdiv { 2 }
 }
 
 Shape bunny : Instance {
@@ -85,6 +85,15 @@ Shape bunny2 : Instance {
   }
 }
 
+Shape cube : TriangleMesh {
+  path { "data/meshes/cube/cube.obj" }
+  transform : TRS {
+    scaling { 0.5 }
+    translation { -0.3, 0.0, 0.0 }
+  }
+  subdiv { 2 }
+}
+
 Light light : Point {
   position { 0.0, 3.0, 3.0 }
   emission { 15 }
@@ -96,7 +105,7 @@ renderer : SingleShot {
     spp { 1024 }
   }
   camera { @camera }
-  shapes { @bunny, @bunny2 }
+  shapes { @bunny, @bunny2, @cube }
   lights { @light }
   output { "bunny_camera.exr" }
   shutter_open { 1.0 }
