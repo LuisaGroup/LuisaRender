@@ -38,7 +38,7 @@ LUISA_DEVICE_CALLABLE inline void evaluate_interactions(
     LUISA_DEVICE_SPACE float3 *interaction_position_buffer,
     LUISA_DEVICE_SPACE float3 *interaction_normal_buffer,
     LUISA_DEVICE_SPACE float2 *interaction_uv_buffer,
-    LUISA_DEVICE_SPACE float4 *interaction_wo_and_distance_buffer,
+    LUISA_DEVICE_SPACE float4 *interaction_wo_and_pdf_buffer,
     LUISA_DEVICE_SPACE uint *interaction_instance_id_buffer,
     LUISA_UNIFORM_SPACE EvaluateInteractionsKernelUniforms &uniforms,
     uint tid) noexcept {
@@ -59,7 +59,6 @@ LUISA_DEVICE_CALLABLE inline void evaluate_interactions(
             (static_cast<uint>(instance_index >= uniforms.dynamic_instance_light_begin) & static_cast<uint>(instance_index < uniforms.dynamic_instance_light_end))) {
             state_flags |= interaction::state::EMISSIVE;
         }
-        interaction_state_buffer[tid] = state_flags;
         
         auto indices = index_buffer[hit.triangle_index + index_offset_buffer[instance_index]] + vertex_offset_buffer[instance_index];
         
@@ -70,20 +69,32 @@ LUISA_DEVICE_CALLABLE inline void evaluate_interactions(
             interaction_instance_id_buffer[tid] = instance_index;
         }
         
-        if ((attribute_flags & POSITION) || (attribute_flags & NORMAL) || (attribute_flags & WO_AND_DISTANCE)) {
+        if ((attribute_flags & POSITION) || (attribute_flags & NORMAL) || (attribute_flags & WO_AND_PDF)) {
+    
             auto transform = transform_buffer[instance_index];
-            if (attribute_flags & NORMAL) {
-                auto n = hit.bary_u * normal_buffer[indices.x] + hit.bary_v * normal_buffer[indices.y] + (1.0f - hit.bary_u - hit.bary_v) * normal_buffer[indices.z];
-                interaction_normal_buffer[tid] = normalize(transpose(inverse(make_float3x3(transform))) * n);
-            }
-            if ((attribute_flags & POSITION) || (attribute_flags & WO_AND_DISTANCE)) {
+            if (attribute_flags & POSITION) {
                 auto p = hit.bary_u * position_buffer[indices.x] + hit.bary_v * position_buffer[indices.y] + (1.0f - hit.bary_u - hit.bary_v) * position_buffer[indices.z];
                 if (attribute_flags & POSITION) {
                     interaction_position_buffer[tid] = make_float3(transform * make_float4(p, 1.0f));
                 }
-                if (attribute_flags & WO_AND_DISTANCE) {
-                    interaction_wo_and_distance_buffer[tid] = make_float4(normalize(make_float3(ray_buffer[tid].origin) - p), hit.distance);
+            }
+    
+            auto normal = make_float3();
+            if ((attribute_flags & NORMAL) || (attribute_flags & WO_AND_PDF)) {
+                auto n = hit.bary_u * normal_buffer[indices.x] + hit.bary_v * normal_buffer[indices.y] + (1.0f - hit.bary_u - hit.bary_v) * normal_buffer[indices.z];
+                normal = normalize(transpose(inverse(make_float3x3(transform))) * n);
+                if (attribute_flags & NORMAL) {
+                    interaction_normal_buffer[tid] = normal;
                 }
+            }
+            
+            if (attribute_flags & WO_AND_PDF) {
+                auto wo = make_float3(-ray_buffer[tid].direction);
+                auto distance = max(hit.distance, 1e-3f);
+                auto cos_theta = dot(wo, normal);
+                if (cos_theta <= 0.0f) { state_flags |= interaction::state::BACK_FACE; }
+                auto pdf = abs(cos_theta) / (distance * distance);  // pdf <= 0 indicates a back-face hit
+                interaction_wo_and_pdf_buffer[tid] = make_float4(wo, pdf);
             }
         }
         
@@ -91,6 +102,8 @@ LUISA_DEVICE_CALLABLE inline void evaluate_interactions(
             auto uv = hit.bary_u * uv_buffer[indices.x] + hit.bary_v * uv_buffer[indices.y] + (1.0f - hit.bary_u - hit.bary_v) * uv_buffer[indices.z];
             interaction_uv_buffer[tid] = uv;
         }
+        
+        interaction_state_buffer[tid] = state_flags;
     }
 }
 

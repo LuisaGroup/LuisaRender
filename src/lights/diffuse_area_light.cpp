@@ -76,9 +76,8 @@ Light::EvaluateLightsDispatch DiffuseAreaLight::create_evaluate_emissions_dispat
             encode("data_buffer", light_data_buffer);
             encode("queue", queue);
             encode("queue_size", queue_size);
-            encode("its_normal_buffer", interactions.normal_buffer());
-            encode("its_wo_and_distance_buffer", interactions.wo_and_distance_buffer());
-            encode("its_emission_and_pdf_buffer", interactions.emission_and_pdf_buffer());
+            encode("its_emission_buffer", interactions.emission_buffer());
+            encode("its_state_buffer", interactions.state_buffer());
         });
     };
 }
