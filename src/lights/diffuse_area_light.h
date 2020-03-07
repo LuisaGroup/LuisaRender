@@ -78,15 +78,22 @@ LUISA_DEVICE_CALLABLE inline void evaluate_emissions(
     LUISA_DEVICE_SPACE const Data *data_buffer,
     LUISA_DEVICE_SPACE const light::Selection *queue,
     uint queue_size,
-    LUISA_DEVICE_SPACE uint8_t *its_state_buffer,
-    LUISA_DEVICE_SPACE float3 *its_emission_buffer,
+    LUISA_DEVICE_SPACE const float3 *its_normal_buffer,
+    LUISA_DEVICE_SPACE const float4 *its_wo_and_distance_buffer,
+    LUISA_DEVICE_SPACE float4 *its_emission_and_pdf_buffer,
     uint tid) {
     
     if (tid < queue_size) {
         auto selection = queue[tid];
         auto light_data = data_buffer[selection.data_index];
-        its_emission_buffer[selection.interaction_index] = light_data.emission;
-        if (light_data.two_sided) { its_state_buffer[selection.interaction_index] |= interaction::state::TWO_SIDED_LIGHT; }
+        auto normal = its_normal_buffer[selection.interaction_index];
+        auto wo_and_distance = its_wo_and_distance_buffer[selection.interaction_index];
+        auto wo = make_float3(wo_and_distance);
+        auto distance = max(wo_and_distance.w, 1e-3f);
+        auto cos_theta = dot(normal, wo);
+        auto emission = (cos_theta > 1e-4f || light_data.two_sided) ? light_data.emission : make_float3();
+        auto pdf = abs(cos_theta) / (distance * distance);
+        its_emission_and_pdf_buffer[selection.interaction_index] = make_float4(emission, pdf);
     }
 }
 
