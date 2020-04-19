@@ -78,15 +78,15 @@ LUISA_DEVICE_CALLABLE inline void evaluate_emissions(
     LUISA_DEVICE_SPACE const Data *data_buffer,
     LUISA_DEVICE_SPACE const light::Selection *queue,
     uint queue_size,
-    LUISA_DEVICE_SPACE uint8_t *its_state_buffer,
+    LUISA_DEVICE_SPACE const uint8_t *its_state_buffer,
     LUISA_DEVICE_SPACE float3 *its_emission_buffer,
     uint tid) {
     
     if (tid < queue_size) {
         auto selection = queue[tid];
         auto light_data = data_buffer[selection.data_index];
-        if (light_data.two_sided) { its_state_buffer[selection.interaction_index] |= interaction::state::TWO_SIDED_LIGHT; }
-        its_emission_buffer[selection.interaction_index] = light_data.emission;
+        auto invalid = !light_data.two_sided && static_cast<bool>(its_state_buffer[selection.interaction_index] & interaction::state::BACK_FACE);
+        its_emission_buffer[selection.interaction_index] = invalid ? make_float3() : light_data.emission;
     }
 }
 

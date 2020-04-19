@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(LuisaRender)
+project(LuisaRender LANGUAGES C CXX OBJC OBJCXX)
 
 cmake_policy(VERSION 3.10)
 set(CMAKE_MACOSX_RPATH ON)

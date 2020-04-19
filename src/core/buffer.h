@@ -5,6 +5,7 @@
 #pragma once
 
 #include <vector>
+#include <util/exception.h>
 #include <util/noncopyable.h>
 
 namespace luisa {

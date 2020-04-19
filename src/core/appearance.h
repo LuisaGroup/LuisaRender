@@ -8,15 +8,24 @@
 
 namespace luisa::appearance {
 
-static constexpr auto MAX_BSDF_LAYER_COUNT = 8u;
+class Info {
 
-struct Info {
-    uint16_t weights[MAX_BSDF_LAYER_COUNT];  // weights of BSDF layers, scaled by 65535
-    uint8_t tags[MAX_BSDF_LAYER_COUNT];      // tags of BSDF layers
-    uint32_t indices[MAX_BSDF_LAYER_COUNT];  // indices of data of BSDF layers, counting from zero individually for each BSDF type
+private:
+    uint8_t _tag;
+    uint8_t _index_hi;
+    uint16_t _index_lo;
+
+public:
+    constexpr Info(uint tag, uint data_index)
+        : _tag{static_cast<uint8_t>(tag)},
+          _index_hi{static_cast<uint8_t>(data_index >> 16u)},
+          _index_lo{static_cast<uint16_t>(data_index)} {}
+    
+    [[nodiscard]] LUISA_DEVICE_CALLABLE constexpr auto tag() const noexcept { return _tag; }
+    [[nodiscard]] LUISA_DEVICE_CALLABLE constexpr auto index() const noexcept { return (static_cast<uint>(_index_hi) << 16u) | static_cast<uint>(_index_lo); }
 };
 
-static_assert(sizeof(Info) == (sizeof(uint16_t) + sizeof(uint8_t) + sizeof(uint32_t)) * MAX_BSDF_LAYER_COUNT);
+static_assert(sizeof(Info) == 4ul);
 
 }
 
@@ -25,6 +34,12 @@ static_assert(sizeof(Info) == (sizeof(uint16_t) + sizeof(uint8_t) + sizeof(uint3
 namespace luisa {
 
 class Appearance {
+
+private:
+
+
+public:
+
 
 };
 

@@ -86,9 +86,9 @@ Shape bunny2 : Instance {
 }
 
 Shape cube : TriangleMesh {
-  path { "data/meshes/cube/cube.obj" }
+  path { "data/meshes/sphere/sphere.obj" }
   transform : TRS {
-    scaling { 0.5 }
+    scaling { 0.2 }
     translation { -0.3, 0.0, 0.0 }
   }
   subdiv { 2 }

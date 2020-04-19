@@ -92,8 +92,8 @@ LUISA_DEVICE_CALLABLE inline void evaluate_interactions(
                 auto wo = make_float3(-ray_buffer[tid].direction);
                 auto distance = max(hit.distance, 1e-3f);
                 auto cos_theta = dot(wo, normal);
-                if (cos_theta <= 0.0f) { state_flags |= interaction::state::BACK_FACE; }
-                auto pdf = abs(cos_theta) / (distance * distance);  // pdf <= 0 indicates a back-face hit
+                if (cos_theta <= 0.0f) { state_flags |= interaction::state::BACK_FACE; }  // assumed that all faces have an out-pointing normal
+                auto pdf = abs(cos_theta) / (distance * distance);
                 interaction_wo_and_pdf_buffer[tid] = make_float4(wo, pdf);
             }
         }
@@ -179,8 +179,6 @@ class Geometry : Noncopyable {
 public:
     friend class GeometryEncoder;
     friend class GeometryEntity;
-    
-    static constexpr auto INVALID_ENTITY_INDEX = std::numeric_limits<uint>::max();
 
 private:
     Device *_device;

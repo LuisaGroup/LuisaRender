@@ -20,7 +20,9 @@ private:
 
 public:
     constexpr Info(uint tag, uint index) noexcept
-        : _tag{static_cast<uint8_t>(tag)}, _index_hi{static_cast<uint8_t>(index >> 16u)}, _index_lo{static_cast<uint16_t>(index)} {}
+        : _tag{static_cast<uint8_t>(tag)},
+          _index_hi{static_cast<uint8_t>(index >> 16u)},
+          _index_lo{static_cast<uint16_t>(index)} {}
 
 public:
     [[nodiscard]] LUISA_DEVICE_CALLABLE constexpr auto tag() const noexcept { return static_cast<uint>(_tag); }
