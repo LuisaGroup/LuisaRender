@@ -18,26 +18,26 @@ namespace luisa::metal {
 
 struct MetalDeviceWrapper {
     id<MTLDevice> device;
-    ~MetalDeviceWrapper() noexcept { [device release]; }
+    ~MetalDeviceWrapper() noexcept = default;
 };
 
 struct MetalLibraryWrapper {
     id<MTLLibrary> library;
-    ~MetalLibraryWrapper() noexcept { [library release]; }
+    ~MetalLibraryWrapper() noexcept = default;
 };
 
 struct MetalCommandQueueWrapper {
     id<MTLCommandQueue> queue;
-    ~MetalCommandQueueWrapper() noexcept { [queue release]; }
+    ~MetalCommandQueueWrapper() noexcept = default;
 };
 
 struct MetalFunctionWrapper {
     
     id<MTLFunction> function;
     id<MTLComputePipelineState> pipeline;
-    MTLAutoreleasedComputePipelineReflection reflection;
+    MTLComputePipelineReflection *reflection;
     
-    MetalFunctionWrapper(id<MTLFunction> f, id<MTLComputePipelineState> p, MTLAutoreleasedComputePipelineReflection r) noexcept
+    MetalFunctionWrapper(id<MTLFunction> f, id<MTLComputePipelineState> p, MTLComputePipelineReflection *r) noexcept
         : function{f}, pipeline{p}, reflection{r} {}
 };
 
@@ -72,10 +72,6 @@ std::unique_ptr<Kernel> MetalDevice::create_kernel(std::string_view function_nam
                                                                             reflection:&reflection
                                                                                  error:nullptr];
         
-        [descriptor autorelease];
-        [function autorelease];
-        [pipeline autorelease];
-        
         iter = _function_wrappers.emplace(std::move(name), std::make_unique<MetalFunctionWrapper>(function, pipeline, reflection)).first;
     }
     
@@ -103,23 +99,18 @@ std::unique_ptr<TypelessBuffer> MetalDevice::allocate_buffer(size_t capacity, Bu
     
     auto buffer = [_device_wrapper->device newBufferWithLength:capacity
                                                        options:storage == BufferStorage::DEVICE_PRIVATE ? MTLResourceStorageModePrivate : MTLResourceStorageModeManaged];
-    [buffer autorelease];
     return std::make_unique<MetalBuffer>(buffer, capacity, storage);
 }
 
 std::unique_ptr<Acceleration> MetalDevice::create_acceleration(Geometry &geometry) {
     
     auto acceleration_group = [[MPSAccelerationStructureGroup alloc] initWithDevice:_device_wrapper->device];
-    [acceleration_group autorelease];
-    
     auto instance_acceleration = [[MPSInstanceAccelerationStructure alloc] initWithGroup:acceleration_group];
-    [instance_acceleration autorelease];
     
     auto acceleration_structures = [NSMutableArray array];
     instance_acceleration.accelerationStructures = acceleration_structures;
     for (auto &&entity : geometry.entities()) {
         auto triangle_acceleration = [[MPSTriangleAccelerationStructure alloc] initWithGroup:acceleration_group];
-        [triangle_acceleration autorelease];
         triangle_acceleration.vertexBuffer = dynamic_cast<MetalBuffer &>(entity->position_buffer().typeless_buffer()).handle();
         triangle_acceleration.vertexBufferOffset = entity->position_buffer().byte_offset();
         triangle_acceleration.vertexStride = sizeof(float4);
@@ -146,7 +137,6 @@ std::unique_ptr<Acceleration> MetalDevice::create_acceleration(Geometry &geometr
     [instance_acceleration rebuild];
     
     auto ray_intersector = [[MPSRayIntersector alloc] initWithDevice:_device_wrapper->device];
-    [ray_intersector autorelease];
     ray_intersector.rayDataType = MPSRayDataTypeOriginMinDistanceDirectionMaxDistance;
     ray_intersector.rayStride = sizeof(Ray);
     ray_intersector.intersectionDataType = MPSIntersectionDataTypeDistancePrimitiveIndexInstanceIndexCoordinates;
@@ -155,7 +145,6 @@ std::unique_ptr<Acceleration> MetalDevice::create_acceleration(Geometry &geometr
     ray_intersector.triangleIntersectionTestType = MPSTriangleIntersectionTestTypeWatertight;
     
     auto shadow_ray_intersector = [[MPSRayIntersector alloc] initWithDevice:_device_wrapper->device];
-    [shadow_ray_intersector autorelease];
     shadow_ray_intersector.rayDataType = MPSRayDataTypeOriginMinDistanceDirectionMaxDistance;
     shadow_ray_intersector.rayStride = sizeof(Ray);
     shadow_ray_intersector.intersectionDataType = MPSIntersectionDataTypeDistance;

@@ -3,6 +3,8 @@ cmake_policy(VERSION 3.16)
 
 project(LuisaRender LANGUAGES C CXX VERSION 0.1.0)
 
+set(CMAKE_INSTALL_PREFIX "${CMAKE_SOURCE_DIR}/install")
+
 if (${CMAKE_HOST_SYSTEM_NAME} MATCHES "Darwin")
     set(ENABLE_METAL_DEFAULT ON)
 else ()
@@ -26,10 +28,10 @@ target_compile_definitions(glm INTERFACE GLM_FORCE_AVX2 GLM_FORCE_CXX17)
 target_link_libraries(LuisaRender PRIVATE glm::glm)
 
 set(ASSIMP_NO_EXPORT ON CACHE BOOL "" FORCE)
-set(ASSIMP_BUILD_ZLIB ON CACHE BOOL "" FORCE)
 set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
 set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_ZLIB ON CACHE BOOL "" FORCE)
 add_subdirectory(thirdparty/assimp)
 target_link_libraries(LuisaRender PRIVATE assimp)
 
@@ -43,5 +45,8 @@ if (ENABLE_METAL)
     enable_language(OBJCXX)
     file(GLOB OC_SOURCE_FILES src/backends/metal/*.mm src/backends/metal/*.h)
     target_sources(LuisaRender PRIVATE ${OC_SOURCE_FILES})
+    target_compile_options(LuisaRender PRIVATE $<$<OR:$<COMPILE_LANGUAGE:OBJC>,$<COMPILE_LANGUAGE:OBJCXX>>:-fobjc-arc>)
     target_link_libraries(LuisaRender PRIVATE "-framework Foundation" "-framework Metal" "-framework MetalPerformanceShaders")
 endif ()
+
+install(DIRECTORY src/core/ DESTINATION include/core FILES_MATCHING PATTERN "*.h")

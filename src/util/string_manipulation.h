@@ -30,11 +30,11 @@ std::string text_file_contents(const std::filesystem::path &file_path);
 namespace luisa { inline namespace utility {
 
 [[nodiscard]] inline NSString *make_objc_string(const char *s) noexcept {
-    return [[[NSString alloc] initWithCString:s encoding:NSUTF8StringEncoding] autorelease];
+    return [[NSString alloc] initWithCString:s encoding:NSUTF8StringEncoding];
 }
 
 [[nodiscard]] inline NSString *make_objc_string(std::string_view sv) noexcept {
-    return [[[NSString alloc] initWithBytes:sv.data() length:sv.size() encoding:NSUTF8StringEncoding] autorelease];
+    return [[NSString alloc] initWithBytes:sv.data() length:sv.size() encoding:NSUTF8StringEncoding];
 }
 
 [[nodiscard]] inline std::string to_string(NSString *s) noexcept {

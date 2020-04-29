@@ -25,4 +25,8 @@ if (ENABLE_METAL)
     
     add_custom_target(metal_kernels DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/metal/bin/kernels.metallib SOURCES ${KERNEL_SOURCE_FILES} metal/compatibility.h)
     add_dependencies(kernels metal_kernels)
+
+    install(DIRECTORY metal/ DESTINATION kernels/metal FILES_MATCHING PATTERN "*.h")
+    install(DIRECTORY metal/ DESTINATION kernels/metal FILES_MATCHING PATTERN "*.metal")
+    
 endif ()

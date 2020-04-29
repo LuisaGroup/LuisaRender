@@ -16,13 +16,13 @@ namespace luisa::metal {
 class MetalKernelArgumentEncoder : public KernelArgumentEncoder {
 
 private:
-    MTLAutoreleasedComputePipelineReflection _info;
+    MTLComputePipelineReflection *_info;
     id<MTLComputeCommandEncoder> _encoder;
     
     [[nodiscard]] size_t _argument_index(std::string_view argument_name);
 
 public:
-    explicit MetalKernelArgumentEncoder(MTLAutoreleasedComputePipelineReflection info, id<MTLComputeCommandEncoder> encoder) noexcept : _info{info}, _encoder{encoder} {}
+    explicit MetalKernelArgumentEncoder(MTLComputePipelineReflection *info, id<MTLComputeCommandEncoder> encoder) noexcept : _info{info}, _encoder{encoder} {}
     void set_buffer(std::string_view argument_name, TypelessBuffer &buffer, size_t offset) override;
     void set_bytes(std::string_view argument_name, const void *bytes, size_t size) override;
 };
@@ -32,10 +32,10 @@ class MetalKernel : public Kernel {
 private:
     id<MTLFunction> _function;
     id<MTLComputePipelineState> _pipeline;
-    MTLAutoreleasedComputePipelineReflection _reflection;
+    MTLComputePipelineReflection *_reflection;
 
 public:
-    MetalKernel(id<MTLFunction> function, id<MTLComputePipelineState> pipeline, MTLAutoreleasedComputePipelineReflection reflection) noexcept
+    MetalKernel(id<MTLFunction> function, id<MTLComputePipelineState> pipeline, MTLComputePipelineReflection *reflection) noexcept
         : _function{function}, _pipeline{pipeline}, _reflection{reflection} {}
     
     [[nodiscard]] auto reflection() const noexcept { return _reflection; }
