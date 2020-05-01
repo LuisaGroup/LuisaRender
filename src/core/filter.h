@@ -118,7 +118,7 @@ protected:
     bool _lut_computed{false};
 
 protected:
-    // Filter 1D weight function, offset normalized to [-1, 1]
+    // Filter 1D weight function, offset is in range [-radius, radius)
     [[nodiscard]] virtual float _weight(float offset) const noexcept = 0;
     
     virtual void _compute_lut_if_necessary();
