@@ -19,7 +19,7 @@ void SeparableFilter::importance_sample_pixels(KernelDispatcher &dispatch,
         encode("random_buffer", sample_buffer);
         encode("pixel_location_buffer", pixel_location_buffer);
         encode("pixel_weight_buffer", pixel_weight_buffer);
-        encode("uniforms", filter::separable::ImportanceSamplePixelsKernelUniforms{tile_viewport, _radius});
+        encode("uniforms", filter::separable::ImportanceSamplePixelsKernelUniforms{tile_viewport, _radius, _scale});
     });
 }
 
@@ -31,25 +31,30 @@ void SeparableFilter::_compute_lut_if_necessary() {
     
     if (!_lut_computed) {
         
-        for (auto i = 1u; i <= filter::separable::WEIGHT_TABLE_SIZE; i++) {
-            auto offset = (static_cast<float>(i) / static_cast<float>(filter::separable::WEIGHT_TABLE_SIZE) * 2.0f - 1.0f) / _radius;
-            _lut.w[i] = _weight(offset);
-        }
-        for (auto i = 0u; i < filter::separable::CDF_TABLE_SIZE; i++) {
-            auto offset = (static_cast<float>(i) / static_cast<float>(filter::separable::CDF_TABLE_SIZE) * 2.0f - 1.0f) / _radius;
-            _lut.cdf[i] = std::abs(_weight(offset));
-        }
-        auto sum = 0.0f;
-        for (float &cdf : _lut.cdf) {
-            sum += cdf;
-            cdf = sum;
-        }
+        constexpr auto inv_table_size = 1.0f / static_cast<float>(filter::separable::TABLE_SIZE);
         
-        auto inv_sum = 1.0f / sum;
+        auto abs_sum = 0.0f;
+        for (auto i = 0u; i < filter::separable::TABLE_SIZE; i++) {
+            auto offset = static_cast<float>(i) * inv_table_size * 2.0f - 1.0f;
+            auto w = _weight(offset);
+            _lut.w[i] = w;
+            _lut.cdf[i] = (abs_sum += std::abs(w));
+        }
+        auto inv_sum = 1.0f / abs_sum;
         for (float &cdf : _lut.cdf) { cdf *= inv_sum; }
+        
+        auto absolute_volume = 0.0f;
+        auto signed_volume = 0.0f;
+        for (float u : _lut.w) {
+            for (float v : _lut.w) {
+                signed_volume += u * v;
+                absolute_volume += std::abs(u * v);
+            }
+        }
+        _scale = absolute_volume / signed_volume;
+        
+        _lut_computed = true;
     }
-    
-    _lut_computed = true;
 }
     
 }

@@ -10,23 +10,23 @@
 
 namespace luisa::filter::separable {
 
-LUISA_CONSTANT_SPACE constexpr auto WEIGHT_TABLE_SIZE = 32u;
-LUISA_CONSTANT_SPACE constexpr auto CDF_TABLE_SIZE = 32u;
+LUISA_CONSTANT_SPACE constexpr auto TABLE_SIZE = 64u;
 
 struct LUT {
-    alignas(16) float w[WEIGHT_TABLE_SIZE];
-    alignas(16) float cdf[CDF_TABLE_SIZE];
+    alignas(16) float w[TABLE_SIZE];
+    alignas(16) float cdf[TABLE_SIZE];
 };
 
 struct ImportanceSamplePixelsKernelUniforms {
     Viewport tile;
     float radius;
+    float scale;
 };
 
 LUISA_DEVICE_CALLABLE inline float2 sample_1d(float u, LUISA_UNIFORM_SPACE LUT &lut) noexcept {
     
     auto p = 0u;
-    for (auto count = CDF_TABLE_SIZE; count > 0;) {
+    for (auto count = static_cast<int>(TABLE_SIZE); count > 0;) {
         auto step = count / 2;
         auto mid = p + step;
         if (lut.cdf[mid] < u) {
@@ -37,18 +37,22 @@ LUISA_DEVICE_CALLABLE inline float2 sample_1d(float u, LUISA_UNIFORM_SPACE LUT &
         }
     }
     
-    constexpr auto inv_cdf_table_size = 1.0f / static_cast<float>(CDF_TABLE_SIZE);
+    constexpr auto inv_table_size = 1.0f / static_cast<float>(TABLE_SIZE);
     
-    auto lb = math::clamp(p, 0u, CDF_TABLE_SIZE - 1u);
+    auto lb = math::clamp(p, 0u, TABLE_SIZE - 1u);
     auto cdf_lower = lut.cdf[lb];
-    auto cdf_upper = (lb == CDF_TABLE_SIZE - 1u) ? 1.0f : lut.cdf[lb + 1u];
-    auto offset = math::clamp((static_cast<float>(lb) + (u - cdf_lower) / (cdf_upper - cdf_lower)) * inv_cdf_table_size, 0.0f, 1.0f);
+    auto cdf_upper = (lb == TABLE_SIZE - 1u) ? 1.0f : lut.cdf[lb + 1u];
+    auto offset = math::clamp((static_cast<float>(lb) + (u - cdf_lower) / (cdf_upper - cdf_lower)) * inv_table_size, 0.0f, 1.0f);
     
-    constexpr auto weight_table_size_float = static_cast<float>(WEIGHT_TABLE_SIZE);
-    auto index_w = offset * weight_table_size_float - 1.0f;
-    auto index_w_lower = math::max(math::floor(index_w), 0.0f);
-    auto index_w_upper = math::min(math::ceil(index_w), weight_table_size_float - 1.0f);
-    auto w = lerp(lut.w[static_cast<uint>(index_w_lower)], lut.w[static_cast<uint>(index_w_upper)], index_w - index_w_lower);
+    constexpr auto weight_table_size_float = static_cast<float>(TABLE_SIZE);
+    auto index_w = offset * weight_table_size_float;
+    auto index_w_lower = math::floor(index_w);
+    auto index_w_upper = math::ceil(index_w);
+    auto w = lerp(
+        lut.w[static_cast<uint>(index_w_lower)],
+        index_w_upper >= weight_table_size_float ? 0.0f : lut.w[static_cast<uint>(index_w_upper)],
+        index_w - index_w_lower);
+    
     return make_float2(offset * 2.0f - 1.0f, w >= 0.0f ? 1.0f : -1.0f);
 }
 
@@ -65,9 +69,9 @@ LUISA_DEVICE_CALLABLE inline void importance_sample_pixels(
         auto x_and_wx = sample_1d(u.x, lut);
         auto y_and_wy = sample_1d(u.y, lut);
         pixel_location_buffer[tid] = make_float2(
-            static_cast<float>(tid % uniforms.tile.size.x + uniforms.tile.origin.y) + x_and_wx.x * uniforms.radius,
-            static_cast<float>(tid / uniforms.tile.size.x + uniforms.tile.origin.y) + y_and_wy.x * uniforms.radius);
-        pixel_weight_buffer[tid] = make_float3(x_and_wx.y * y_and_wy.y);
+            static_cast<float>(tid % uniforms.tile.size.x + uniforms.tile.origin.y) + 0.5f + x_and_wx.x * uniforms.radius,
+            static_cast<float>(tid / uniforms.tile.size.x + uniforms.tile.origin.y) + 0.5f + y_and_wy.x * uniforms.radius);
+        pixel_weight_buffer[tid] = make_float3(x_and_wx.y * y_and_wy.y * uniforms.scale);
     }
 }
 
@@ -110,6 +114,7 @@ class SeparableFilter : public Filter {
 protected:
     filter::separable::LUT _lut{};
     std::unique_ptr<Kernel> _importance_sample_pixels_kernel;
+    float _scale{1.0f};
     bool _lut_computed{false};
 
 protected:
