@@ -41,7 +41,7 @@ ThinLensCamera::ThinLensCamera(Device *device, const ParameterSet &parameters)
     _generate_rays_kernel = device->create_kernel("thin_lens_camera_generate_rays");
 }
 
-void ThinLensCamera::generate_rays(KernelDispatcher &dispatch,
+void ThinLensCamera::_generate_rays(KernelDispatcher &dispatch,
                                    Sampler &sampler,
                                    Viewport tile_viewport,
                                    BufferView<float2> pixel_buffer,
@@ -49,10 +49,9 @@ void ThinLensCamera::generate_rays(KernelDispatcher &dispatch,
                                    BufferView<float3> throughput_buffer) {
     
     auto pixel_count = tile_viewport.size.x * tile_viewport.size.y;
-    auto sample_buffer = sampler.generate_camera_samples(dispatch);
+    auto sample_buffer = sampler.generate_samples(dispatch, 2);
     dispatch(*_generate_rays_kernel, pixel_count, [&](KernelArgumentEncoder &encode) {
         encode("ray_buffer", ray_buffer);
-        encode("ray_throughput_buffer", throughput_buffer);
         encode("sample_buffer", sample_buffer);
         encode("ray_pixel_buffer", pixel_buffer);
         encode("uniforms", camera::thin_lens::GenerateRaysKernelUniforms{

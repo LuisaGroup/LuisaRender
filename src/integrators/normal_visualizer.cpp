@@ -26,9 +26,10 @@ void NormalVisualizer::render_frame(KernelDispatcher &dispatch) {
         encode("pixel_count", pixel_count);
         encode("state_buffer", _interaction_buffers.state_buffer());
         encode("normals", _interaction_buffers.normal_buffer());
+        encode("throughput_buffer", _ray_throughput_buffer->view());
     });
     
-    _camera->film().accumulate_tile(dispatch, _ray_pixel_buffer->view(), _interaction_buffers.normal_buffer(), _viewport);
+    _camera->film().accumulate_tile(dispatch, _interaction_buffers.normal_buffer(), _viewport);
 }
 
 void NormalVisualizer::_prepare_for_frame() {

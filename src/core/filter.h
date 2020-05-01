@@ -4,17 +4,84 @@
 
 #pragma once
 
-#include "data_types.h"
+#include "viewport.h"
+#include "mathematics.h"
+#include "sampling.h"
+
+namespace luisa::filter::separable {
+
+LUISA_CONSTANT_SPACE constexpr auto WEIGHT_TABLE_SIZE = 32u;
+LUISA_CONSTANT_SPACE constexpr auto CDF_TABLE_SIZE = 32u;
+
+struct LUT {
+    alignas(16) float w[WEIGHT_TABLE_SIZE];
+    alignas(16) float cdf[CDF_TABLE_SIZE];
+};
+
+struct ImportanceSamplePixelsKernelUniforms {
+    Viewport tile;
+    float radius;
+};
+
+LUISA_DEVICE_CALLABLE inline float2 sample_1d(float u, LUISA_UNIFORM_SPACE LUT &lut) noexcept {
+    
+    auto p = 0u;
+    for (auto count = CDF_TABLE_SIZE; count > 0;) {
+        auto step = count / 2;
+        auto mid = p + step;
+        if (lut.cdf[mid] < u) {
+            p = mid + 1;
+            count -= step + 1;
+        } else {
+            count = step;
+        }
+    }
+    
+    constexpr auto inv_cdf_table_size = 1.0f / static_cast<float>(CDF_TABLE_SIZE);
+    
+    auto lb = math::clamp(p, 0u, CDF_TABLE_SIZE - 1u);
+    auto cdf_lower = lut.cdf[lb];
+    auto cdf_upper = (lb == CDF_TABLE_SIZE - 1u) ? 1.0f : lut.cdf[lb + 1u];
+    auto offset = math::clamp((static_cast<float>(lb) + (u - cdf_lower) / (cdf_upper - cdf_lower)) * inv_cdf_table_size, 0.0f, 1.0f);
+    
+    constexpr auto weight_table_size_float = static_cast<float>(WEIGHT_TABLE_SIZE);
+    auto index_w = offset * weight_table_size_float - 1.0f;
+    auto index_w_lower = math::max(math::floor(index_w), 0.0f);
+    auto index_w_upper = math::min(math::ceil(index_w), weight_table_size_float - 1.0f);
+    auto w = lerp(lut.w[static_cast<uint>(index_w_lower)], lut.w[static_cast<uint>(index_w_upper)], index_w - index_w_lower);
+    return make_float2(offset * 2.0f - 1.0f, w >= 0.0f ? 1.0f : -1.0f);
+}
+
+LUISA_DEVICE_CALLABLE inline void importance_sample_pixels(
+    LUISA_DEVICE_SPACE const float2 *random_buffer,
+    LUISA_DEVICE_SPACE float2 *pixel_location_buffer,
+    LUISA_DEVICE_SPACE float3 *pixel_weight_buffer,
+    LUISA_UNIFORM_SPACE LUT &lut,
+    LUISA_UNIFORM_SPACE ImportanceSamplePixelsKernelUniforms &uniforms,
+    uint tid) {
+    
+    if (tid < uniforms.tile.size.x * uniforms.tile.size.y) {
+        auto u = random_buffer[tid];
+        auto x_and_wx = sample_1d(u.x, lut);
+        auto y_and_wy = sample_1d(u.y, lut);
+        pixel_location_buffer[tid] = make_float2(
+            static_cast<float>(tid % uniforms.tile.size.x + uniforms.tile.origin.y) + x_and_wx.x * uniforms.radius,
+            static_cast<float>(tid / uniforms.tile.size.x + uniforms.tile.origin.y) + y_and_wy.x * uniforms.radius);
+        pixel_weight_buffer[tid] = make_float3(x_and_wx.y * y_and_wy.y);
+    }
+}
+
+}
+
+#ifndef LUISA_DEVICE_COMPATIBLE
+
 #include "node.h"
 #include "kernel.h"
 #include "ray.h"
 #include "parser.h"
-#include "viewport.h"
-#include "mathematics.h"
+#include "sampler.h"
 
 namespace luisa {
-
-class Film;
 
 class Filter : public Node {
 
@@ -23,27 +90,43 @@ private:
 
 protected:
     float _radius;
-    
-    [[nodiscard]] auto _filter_viewport(Viewport film_viewport, Viewport tile_viewport) const {
-        auto x_min = max(film_viewport.origin.x, static_cast<uint>(max(0.0f, tile_viewport.origin.x - _radius + 0.5f)));
-        auto x_max = min(film_viewport.origin.x + film_viewport.size.x - 1u, static_cast<uint>(static_cast<float>(tile_viewport.origin.x + tile_viewport.size.x) + _radius - 0.5f));
-        auto y_min = max(film_viewport.origin.y, static_cast<uint>(max(0.0f, tile_viewport.origin.y - _radius + 0.5f)));
-        auto y_max = min(film_viewport.origin.y + film_viewport.size.y - 1u, static_cast<uint>(static_cast<float>(tile_viewport.origin.y + tile_viewport.size.y) + _radius - 0.5f));
-        return Viewport{make_uint2(x_min, y_min), make_uint2(x_max - x_min + 1u, y_max - y_min + 1u)};
-    }
 
 public:
     Filter(Device *device, const ParameterSet &parameters)
         : Node{device}, _radius{parameters["radius"].parse_float_or_default(1.0f)} {}
     
-    virtual void apply_and_accumulate(KernelDispatcher &dispatch,
-                                      uint2 film_resolution,
-                                      Viewport film_viewport,
-                                      Viewport tile_viewport,
-                                      BufferView<float2> pixel_buffer,
-                                      BufferView<float3> color_buffer,
-                                      BufferView<float4> accumulation_buffer) = 0;
     [[nodiscard]] float radius() const noexcept { return _radius; }
+    
+    virtual void importance_sample_pixels(KernelDispatcher &dispatch,
+                                          Viewport tile_viewport,
+                                          Sampler &sampler,
+                                          BufferView<float2> pixel_location_buffer,
+                                          BufferView<float3> pixel_weight_buffer) = 0;
+    
+};
+
+class SeparableFilter : public Filter {
+
+protected:
+    filter::separable::LUT _lut{};
+    std::unique_ptr<Kernel> _importance_sample_pixels_kernel;
+    bool _lut_computed{false};
+
+protected:
+    // Filter 1D weight function, offset normalized to [-1, 1]
+    [[nodiscard]] virtual float _weight(float offset) const noexcept = 0;
+    
+    virtual void _compute_lut_if_necessary();
+
+public:
+    SeparableFilter(Device *device, const ParameterSet &parameters);
+    void importance_sample_pixels(KernelDispatcher &dispatch,
+                                  Viewport tile_viewport,
+                                  Sampler &sampler,
+                                  BufferView<float2> pixel_location_buffer,
+                                  BufferView<float3> pixel_weight_buffer) override;
 };
     
 }
+
+#endif

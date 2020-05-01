@@ -83,16 +83,12 @@ public:
         });
     }
     
-    virtual void accumulate_tile(KernelDispatcher &dispatch, BufferView<float2> pixel_buffer, BufferView<float3> color_buffer, Viewport tile_viewport) {
-        if (_filter != nullptr) {
-            _filter->apply_and_accumulate(dispatch, _resolution, tile_viewport, tile_viewport, pixel_buffer, color_buffer, _accumulation_buffer->view());
-        } else {  // no filtering
-            dispatch(*_accumulate_tile_kernel, tile_viewport.size.x * tile_viewport.size.y, [&](KernelArgumentEncoder &encode) {
-                encode("ray_color_buffer", color_buffer);
-                encode("accumulation_buffer", *_accumulation_buffer);
-                encode("uniforms", film::AccumulateTileKernelUniforms{tile_viewport, _resolution});
-            });
-        }
+    virtual void accumulate_tile(KernelDispatcher &dispatch, BufferView<float3> color_buffer, Viewport tile_viewport) {
+        dispatch(*_accumulate_tile_kernel, tile_viewport.size.x * tile_viewport.size.y, [&](KernelArgumentEncoder &encode) {
+            encode("ray_color_buffer", color_buffer);
+            encode("accumulation_buffer", *_accumulation_buffer);
+            encode("uniforms", film::AccumulateTileKernelUniforms{tile_viewport, _resolution});
+        });
     }
     
     virtual void postprocess(KernelDispatcher &dispatch) = 0;

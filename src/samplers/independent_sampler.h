@@ -50,9 +50,10 @@ LUISA_DEVICE_CALLABLE inline void reset_states(
 struct GenerateSamplesKernelUniforms {
     Viewport tile_viewport;
     Viewport film_viewport;
+    uint num_dimensions;
+    bool uses_ray_queue;
 };
 
-template<uint dimension>
 LUISA_DEVICE_CALLABLE inline void generate_samples(
     LUISA_DEVICE_SPACE State *sampler_state_buffer,
     LUISA_DEVICE_SPACE const uint *ray_queue,
@@ -61,35 +62,35 @@ LUISA_DEVICE_CALLABLE inline void generate_samples(
     LUISA_UNIFORM_SPACE GenerateSamplesKernelUniforms &uniforms,
     uint tid) {
     
-    if (tid < ray_count) {
-        auto ray_index_in_tile = ray_queue[tid];
+    auto max_ray_count = uniforms.uses_ray_queue ? ray_count : uniforms.tile_viewport.size.x * uniforms.tile_viewport.size.y;
+    if (tid < max_ray_count) {
+        auto ray_index_in_tile = uniforms.uses_ray_queue ? ray_queue[tid] : tid;
         auto ray_x = uniforms.tile_viewport.origin.x + ray_index_in_tile % uniforms.tile_viewport.size.x;
         auto ray_y = uniforms.tile_viewport.origin.y + ray_index_in_tile / uniforms.tile_viewport.size.x;
         auto ray_index = ray_y * uniforms.film_viewport.size.x + ray_x;
         auto state = sampler_state_buffer[ray_index];
-        for (auto i = 0u; i < dimension; i++) {
-            sample_buffer[tid * dimension + i] = rnd(state);
+        switch (uniforms.num_dimensions) {
+            case 1:
+                sample_buffer[tid] = rnd(state);
+                break;
+            case 2:
+                sample_buffer[tid * 2] = rnd(state);
+                sample_buffer[tid * 2 + 1] = rnd(state);
+                break;
+            case 3:
+                sample_buffer[tid * 3] = rnd(state);
+                sample_buffer[tid * 3 + 1] = rnd(state);
+                sample_buffer[tid * 3 + 2] = rnd(state);
+                break;
+            case 4:
+                sample_buffer[tid * 4] = rnd(state);
+                sample_buffer[tid * 4 + 1] = rnd(state);
+                sample_buffer[tid * 4 + 2] = rnd(state);
+                sample_buffer[tid * 4 + 3] = rnd(state);
+                break;
+            default:
+                break;
         }
-        sampler_state_buffer[ray_index] = state;
-    }
-}
-
-LUISA_DEVICE_CALLABLE inline void generate_camera_samples(
-    LUISA_DEVICE_SPACE State *sampler_state_buffer,
-    LUISA_DEVICE_SPACE float4 *sample_buffer,
-    LUISA_UNIFORM_SPACE GenerateSamplesKernelUniforms &uniforms,
-    uint tid) {
-    
-    if (tid < uniforms.tile_viewport.size.x * uniforms.tile_viewport.size.y) {
-        auto ray_x = uniforms.tile_viewport.origin.x + tid % uniforms.tile_viewport.size.x;
-        auto ray_y = uniforms.tile_viewport.origin.y + tid / uniforms.tile_viewport.size.x;
-        auto ray_index = ray_y * uniforms.film_viewport.size.x + ray_x;
-        auto state = sampler_state_buffer[ray_index];
-        auto r0 = rnd(state);
-        auto r1 = rnd(state);
-        auto r2 = rnd(state);
-        auto r3 = rnd(state);
-        sample_buffer[tid] = make_float4(r0, r1, r2, r3);
         sampler_state_buffer[ray_index] = state;
     }
 }
@@ -106,26 +107,18 @@ class IndependentSampler : public Sampler {
 
 protected:
     std::unique_ptr<Kernel> _reset_states_kernel;
-    std::unique_ptr<Kernel> _generate_1d_samples_kernel;
-    std::unique_ptr<Kernel> _generate_2d_samples_kernel;
-    std::unique_ptr<Kernel> _generate_3d_samples_kernel;
-    std::unique_ptr<Kernel> _generate_4d_samples_kernel;
-    std::unique_ptr<Kernel> _generate_camera_samples_kernel;
+    std::unique_ptr<Kernel> _generate_samples_kernel;
     std::unique_ptr<Buffer<sampler::independent::State>> _state_buffer;
     
-    void _generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float> sample_buffer) override;
-    void _generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float2> sample_buffer) override;
-    void _generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float3> sample_buffer) override;
-    void _generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float4> sample_buffer) override;
+    void _generate_samples(KernelDispatcher &dispatch, BufferView<float> sample_buffer, uint d) override;
+    void _generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float> sample_buffer, uint d) override;
     
     void _reset_states() override;
-    
     void _start_next_frame(KernelDispatcher &dispatch[[maybe_unused]]) override {}
     void _prepare_for_tile(KernelDispatcher &dispatch[[maybe_unused]]) override {}
 
 public:
     IndependentSampler(Device *device, const ParameterSet &parameter_set);
-    BufferView<float4> generate_camera_samples(KernelDispatcher &dispatch) override;
 };
 
 }

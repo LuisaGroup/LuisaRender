@@ -1,7 +1,7 @@
 Film film : RGB {
   resolution { 1200, 600 }
   filter : MitchellNetravali {
-    radius { 2.0 }
+    radius { 10.0 }
     b { 0.33333333333333 }
     c { 0.33333333333333 }
   }

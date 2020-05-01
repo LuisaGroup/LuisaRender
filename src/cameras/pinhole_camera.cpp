@@ -9,21 +9,17 @@ namespace luisa {
 
 LUISA_REGISTER_NODE_CREATOR("Pinhole", PinholeCamera)
 
-void PinholeCamera::generate_rays(KernelDispatcher &dispatch,
-                                  Sampler &sampler,
+void PinholeCamera::_generate_rays(KernelDispatcher &dispatch,
+                                  Sampler &sampler [[maybe_unused]],
                                   Viewport tile_viewport,
                                   BufferView<float2> pixel_buffer,
                                   BufferView<Ray> ray_buffer,
                                   BufferView<float3> throughput_buffer) {
     
     auto pixel_count = tile_viewport.size.x * tile_viewport.size.y;
-    auto sample_buffer = sampler.generate_camera_samples(dispatch);
-    
     dispatch(*_generate_rays_kernel, pixel_count, [&](KernelArgumentEncoder &encode) {
-        encode("sample_buffer", sample_buffer);
         encode("ray_pixel_buffer", pixel_buffer);
         encode("ray_buffer", ray_buffer);
-        encode("ray_throughput_buffer", throughput_buffer);
         encode("uniforms", camera::pinhole::GenerateRaysKernelUniforms{
             _position, _left, _up, _front, _film->resolution(), _sensor_size, _near_plane, tile_viewport, _camera_to_world});
     });
