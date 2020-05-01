@@ -64,29 +64,26 @@ LUISA_DEVICE_CALLABLE inline void evaluate_interactions(
         
         using namespace interaction::attribute;
         auto attribute_flags = uniforms.attribute_flags;
-    
-        if (attribute_flags & INSTANCE_ID) {
-            interaction_instance_id_buffer[tid] = instance_index;
-        }
+        
+        if (attribute_flags & INSTANCE_ID) { interaction_instance_id_buffer[tid] = instance_index; }
         
         if ((attribute_flags & POSITION) || (attribute_flags & NORMAL) || (attribute_flags & WO_AND_PDF)) {
-    
+            
             auto transform = transform_buffer[instance_index];
+            auto normal_transform = transpose(inverse(make_float3x3(transform)));
+            auto n = hit.bary_u * normal_buffer[indices.x] + hit.bary_v * normal_buffer[indices.y] + (1.0f - hit.bary_u - hit.bary_v) * normal_buffer[indices.z];
+            auto normal = normalize(normal_transform * n);
+            
             if (attribute_flags & POSITION) {
-                auto p = hit.bary_u * position_buffer[indices.x] + hit.bary_v * position_buffer[indices.y] + (1.0f - hit.bary_u - hit.bary_v) * position_buffer[indices.z];
-                if (attribute_flags & POSITION) {
-                    interaction_position_buffer[tid] = make_float3(transform * make_float4(p, 1.0f));
-                }
+                auto p0 = position_buffer[indices.x];
+                auto p1 = position_buffer[indices.y];
+                auto p2 = position_buffer[indices.z];
+                auto p = hit.bary_u * p0 + hit.bary_v * p1 + (1.0f - hit.bary_u - hit.bary_v) * p2;
+                auto position = offset_ray_origin(make_float3(transform * make_float4(p, 1.0f)), normalize(normal_transform * math::cross(p1 - p0, p2 - p0)));
+                interaction_position_buffer[tid] = position;
             }
-    
-            auto normal = make_float3();
-            if ((attribute_flags & NORMAL) || (attribute_flags & WO_AND_PDF)) {
-                auto n = hit.bary_u * normal_buffer[indices.x] + hit.bary_v * normal_buffer[indices.y] + (1.0f - hit.bary_u - hit.bary_v) * normal_buffer[indices.z];
-                normal = normalize(transpose(inverse(make_float3x3(transform))) * n);
-                if (attribute_flags & NORMAL) {
-                    interaction_normal_buffer[tid] = normal;
-                }
-            }
+            
+            if (attribute_flags & NORMAL) { interaction_normal_buffer[tid] = normal; }
             
             if (attribute_flags & WO_AND_PDF) {
                 auto wo = make_float3(-ray_buffer[tid].direction);
@@ -165,7 +162,7 @@ private:
     uint _index_offset{0u};
 
 public:
-    explicit GeometryEncoder(Geometry *geometry) noexcept : _geometry{geometry} {}
+    explicit GeometryEncoder(Geometry *geometry) noexcept: _geometry{geometry} {}
     void add_vertex(float3 position, float3 normal, float2 tex_coord) noexcept;
     void add_indices(uint3 indices) noexcept;
     void create(Shape *shape);

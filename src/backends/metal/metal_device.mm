@@ -2,6 +2,9 @@
 // Created by Mike Smith on 2019/10/24.
 //
 
+#import <string>
+#import <string_view>
+
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
 
 #import <core/geometry.h>
