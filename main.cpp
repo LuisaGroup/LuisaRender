@@ -4,6 +4,8 @@ using namespace luisa;
 
 int main(int argc, char *argv[]) {
     
+    LUISA_INFO("Welcome!");
+    
     try {
         LUISA_EXCEPTION_IF(argc != 2, "No input file specific");
         Parser{Device::create("Metal").get()}.parse(argv[1])->execute();

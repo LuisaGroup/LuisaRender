@@ -14,7 +14,7 @@
 namespace luisa {
 
 inline spdlog::logger &logger() noexcept {
-    static auto l = spdlog::stdout_color_mt("console");
+    static auto l = spdlog::stdout_color_mt("LuisaRender");
     return *l;
 }
 

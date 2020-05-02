@@ -13,6 +13,7 @@ void Device::_register_creator(std::string_view name, std::function<std::unique_
 Device::~Device() noexcept { synchronize(); }
 
 std::unique_ptr<Device> Device::create(std::string_view name) {
+    LUISA_INFO("Creating backend: ", name);
     return _device_creators.at(name)();
 }
 
