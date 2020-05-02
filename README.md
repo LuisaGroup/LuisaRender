@@ -49,7 +49,7 @@ High-Performance Renderer on GPU.
 - [ ] Halton Sampler
 - [ ] ...
 
-### Filters
+### Reconstruction Filters
 - [x] Filter Importance Sampling
 - [x] Mitchell-Netravali Filter
 - [x] Box Filter
