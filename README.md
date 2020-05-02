@@ -50,11 +50,12 @@ High-Performance Renderer on GPU.
 - [ ] ...
 
 ### Filters
+- [x] Filter Importance Sampling
 - [x] Mitchell-Netravali Filter
-- [ ] Box Filter
-- [ ] Triangle Filter
-- [ ] Gaussian Filter
-- [ ] ...
+- [x] Box Filter
+- [x] Triangle Filter
+- [x] Gaussian Filter
+- [x] Lanczos Windowed Sinc Filter 
 
 ### Integrators
 - [x] Normal Visualizer
