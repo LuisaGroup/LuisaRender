@@ -3,9 +3,26 @@
 //
 
 #include <algorithm>
-#include "linear_trs_animation.h"
+
+#include "trs_transform.h"
 
 namespace luisa {
+
+struct LinearTRSKeyFrame {
+    float time_point;
+    std::shared_ptr<TRSTransform> transform;
+};
+
+class LinearTRSAnimation : public Transform {
+
+private:
+    std::vector<LinearTRSKeyFrame> _key_frames;
+
+public:
+    LinearTRSAnimation(Device *device, const ParameterSet &parameter_set);
+    [[nodiscard]] bool is_static() const noexcept override { return false; }
+    [[nodiscard]] float4x4 dynamic_matrix(float time) const override;
+};
 
 LUISA_REGISTER_NODE_CREATOR("LinearTRSAnimation", LinearTRSAnimation)
 
@@ -36,10 +53,6 @@ LinearTRSAnimation::LinearTRSAnimation(Device *device, const ParameterSet &param
     for (auto &&f : _key_frames) {
         LUISA_ERROR_IF(f.time_point == prev, "Duplicated time point: ", f.time_point);
     }
-}
-
-bool LinearTRSAnimation::is_static() const noexcept {
-    return false;
 }
 
 float4x4 LinearTRSAnimation::dynamic_matrix(float time) const {

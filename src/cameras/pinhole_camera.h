@@ -42,37 +42,3 @@ LUISA_DEVICE_CALLABLE inline void generate_rays(
 }
 
 }
-
-#ifndef LUISA_DEVICE_COMPATIBLE
-
-#include <core/camera.h>
-
-namespace luisa {
-
-class PinholeCamera : public Camera {
-
-protected:
-    float3 _position;
-    float3 _front{};
-    float3 _up{};
-    float3 _left{};
-    float2 _sensor_size{};
-    float _near_plane;
-    
-    std::unique_ptr<Kernel> _generate_rays_kernel;
-    
-protected:
-    void _generate_rays(KernelDispatcher &dispatch,
-                       Sampler &sampler,
-                       Viewport tile_viewport,
-                       BufferView<float2> pixel_buffer,
-                       BufferView<Ray> ray_buffer,
-                       BufferView<float3> throughput_buffer) override;
-
-public:
-    PinholeCamera(Device *device, const ParameterSet &parameter_set);
-};
-
-}
-
-#endif

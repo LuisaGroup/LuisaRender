@@ -96,31 +96,3 @@ LUISA_DEVICE_CALLABLE inline void generate_samples(
 }
 
 }
-
-#ifndef LUISA_DEVICE_COMPATIBLE
-
-#include <core/sampler.h>
-
-namespace luisa {
-
-class IndependentSampler : public Sampler {
-
-protected:
-    std::unique_ptr<Kernel> _reset_states_kernel;
-    std::unique_ptr<Kernel> _generate_samples_kernel;
-    std::unique_ptr<Buffer<sampler::independent::State>> _state_buffer;
-    
-    void _generate_samples(KernelDispatcher &dispatch, BufferView<float> sample_buffer, uint d) override;
-    void _generate_samples(KernelDispatcher &dispatch, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer, BufferView<float> sample_buffer, uint d) override;
-    
-    void _reset_states() override;
-    void _start_next_frame(KernelDispatcher &dispatch[[maybe_unused]]) override {}
-    void _prepare_for_tile(KernelDispatcher &dispatch[[maybe_unused]]) override {}
-
-public:
-    IndependentSampler(Device *device, const ParameterSet &parameter_set);
-};
-
-}
-
-#endif

@@ -22,25 +22,3 @@ LUISA_DEVICE_CALLABLE inline void postprocess(
 }
 
 }
-
-#ifndef LUISA_DEVICE_COMPATIBLE
-
-#include <core/film.h>
-
-namespace luisa {
-
-class RGBFilm : public Film {
-
-private:
-    std::unique_ptr<Kernel> _postprocess_kernel;
-
-public:
-    RGBFilm(Device *device, const ParameterSet &parameters);
-    void postprocess(KernelDispatcher &dispatch) override;
-    void save(const std::filesystem::path &filename) override;
-    
-};
-
-}
-
-#endif

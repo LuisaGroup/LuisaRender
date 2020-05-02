@@ -3,9 +3,38 @@
 //
 
 #include <core/sampler.h>
+#include <core/camera.h>
+#include <core/mathematics.h>
+
 #include "thin_lens_camera.h"
 
 namespace luisa {
+
+class ThinLensCamera : public Camera {
+
+protected:
+    float3 _position{};
+    float3 _front{};
+    float3 _up{};
+    float3 _left{};
+    float _focal_plane_distance{};
+    float _near_plane_distance{};
+    float _lens_radius{};
+    float2 _effective_sensor_size{};
+    
+    std::unique_ptr<Kernel> _generate_rays_kernel;
+
+protected:
+    void _generate_rays(KernelDispatcher &dispatch,
+                        Sampler &sampler,
+                        Viewport tile_viewport,
+                        BufferView<float2> pixel_buffer,
+                        BufferView<Ray> ray_buffer,
+                        BufferView<float3> throughput_buffer) override;
+
+public:
+    ThinLensCamera(Device *device, const ParameterSet &parameters);
+};
 
 LUISA_REGISTER_NODE_CREATOR("ThinLens", ThinLensCamera)
 

@@ -91,33 +91,3 @@ LUISA_DEVICE_CALLABLE inline void evaluate_emissions(
 }
 
 }
-
-#ifndef LUISA_DEVICE_COMPATIBLE
-
-#include <core/shape.h>
-
-namespace luisa {
-
-class DiffuseAreaLight : public Light {
-
-protected:
-    float3 _emission;
-    std::shared_ptr<Shape> _shape;
-    bool _two_sided;
-
-public:
-    DiffuseAreaLight(Device *device, const ParameterSet &parameter_set);
-    [[nodiscard]] uint tag() const noexcept override;
-    [[nodiscard]] std::unique_ptr<Kernel> create_generate_samples_kernel() override;
-    [[nodiscard]] SampleLightsDispatch create_generate_samples_dispatch() override;
-    std::unique_ptr<Kernel> create_evaluate_emissions_kernel() override;
-    EvaluateLightsDispatch create_evaluate_emissions_dispatch() override;
-    [[nodiscard]] size_t data_stride() const noexcept override;
-    [[nodiscard]] Shape *shape() const noexcept override;
-    [[nodiscard]] uint sampling_dimensions() const noexcept override;
-    void encode_data(TypelessBuffer &buffer, size_t data_index, uint2 cdf_range, uint instance_id, uint triangle_offset, uint vertex_offset, float shape_area) override;
-};
-
-}
-
-#endif

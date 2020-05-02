@@ -3,9 +3,23 @@
 //
 
 #include <opencv2/opencv.hpp>
+#include <core/film.h>
+
 #include "rgb_film.h"
 
 namespace luisa {
+
+class RGBFilm : public Film {
+
+private:
+    std::unique_ptr<Kernel> _postprocess_kernel;
+
+public:
+    RGBFilm(Device *device, const ParameterSet &parameters);
+    void postprocess(KernelDispatcher &dispatch) override;
+    void save(const std::filesystem::path &filename) override;
+    
+};
 
 LUISA_REGISTER_NODE_CREATOR("RGB", RGBFilm)
 

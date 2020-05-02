@@ -47,27 +47,3 @@ LUISA_DEVICE_CALLABLE inline void generate_samples(
 }
 
 }
-
-#ifndef LUISA_DEVICE_COMPATIBLE
-
-namespace luisa {
-
-class PointLight : public Light {
-
-protected:
-    float3 _position;
-    float3 _emission;
-
-public:
-    PointLight(Device *device, const ParameterSet &parameter_set);
-    std::unique_ptr<Kernel> create_generate_samples_kernel() override;
-    [[nodiscard]] size_t data_stride() const noexcept override;
-    void encode_data(TypelessBuffer &buffer, size_t data_index, uint2 cdf_range, uint instance_id, uint triangle_offset, uint vertex_offset, float shape_area) override;
-    [[nodiscard]] uint tag() const noexcept override;
-    [[nodiscard]] SampleLightsDispatch create_generate_samples_dispatch() override;
-    [[nodiscard]] uint sampling_dimensions() const noexcept override;
-};
-
-}
-
-#endif

@@ -7,16 +7,26 @@
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
 
-#include "triangle_mesh.h"
+#include <core/shape.h>
 
 namespace luisa {
 
-LUISA_REGISTER_NODE_CREATOR("TriangleMesh", TriangleMesh)
+class TriangleMesh : public Shape {
 
-TriangleMesh::TriangleMesh(Device *device, const ParameterSet &parameter_set) : Shape{device, parameter_set} {
-    _path = std::filesystem::absolute(parameter_set["path"].parse_string());
-    _subdiv_level = parameter_set["subdiv"].parse_uint_or_default(0u);
-}
+private:
+    std::filesystem::path _path;
+    uint _subdiv_level;
+
+public:
+    void load(GeometryEncoder &encoder) override;
+    TriangleMesh(Device *device, const ParameterSet &parameter_set) : Shape{device, parameter_set} {
+        _path = std::filesystem::absolute(parameter_set["path"].parse_string());
+        _subdiv_level = parameter_set["subdiv"].parse_uint_or_default(0u);
+    }
+    
+};
+
+LUISA_REGISTER_NODE_CREATOR("TriangleMesh", TriangleMesh)
 
 void TriangleMesh::load(GeometryEncoder &encoder) {
     

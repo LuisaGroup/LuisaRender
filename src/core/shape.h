@@ -26,9 +26,15 @@ public:
     Shape(Device *device, const ParameterSet &parameter_set)
         : Node{device},
           _transform{parameter_set["transform"].parse_or_null<Transform>()},
-          _material{parameter_set["material"].parse_or_null<Material>()} {}
+          _material{parameter_set["material"].parse_or_null<Material>()} {
+        
+        if (_transform == nullptr) {
+            LUISA_WARNING("No transform specific for shape, using IdentityTransform by default");
+            _transform = std::make_shared<IdentityTransform>(_device);
+        }
+    }
     
-    [[nodiscard]] Transform *transform() noexcept { return _transform.get(); }
+    [[nodiscard]] Transform &transform() noexcept { return *_transform; }
     [[nodiscard]] Material *material() noexcept { return _material.get(); }
     virtual void load(GeometryEncoder &encoder) = 0;
     [[nodiscard]] virtual bool is_instance() const noexcept { return false; }

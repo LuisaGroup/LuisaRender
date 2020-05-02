@@ -15,6 +15,9 @@ class Transform : public Node {
 private:
     LUISA_MAKE_NODE_CREATOR_REGISTRY(Transform);
 
+protected:
+    explicit Transform(Device *device) : Node{device} {}
+
 public:
     Transform(Device *device, const ParameterSet &) : Node{device} {}
     [[nodiscard]] virtual float4x4 static_matrix() const { return math::identity(); }
@@ -23,6 +26,13 @@ public:
         return math::identity();
     }
     [[nodiscard]] virtual bool is_static() const noexcept { return true; }
+};
+
+class IdentityTransform : public Transform {
+
+public:
+    explicit IdentityTransform(Device *device) noexcept;
+    IdentityTransform(Device *device, const ParameterSet &parameter_set) noexcept;
 };
 
 }
