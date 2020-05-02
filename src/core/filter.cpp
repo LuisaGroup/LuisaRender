@@ -36,7 +36,7 @@ void SeparableFilter::_compute_lut_if_necessary() {
         auto abs_sum = 0.0f;
         for (auto i = 0u; i < filter::separable::TABLE_SIZE; i++) {
             auto offset = (static_cast<float>(i) * inv_table_size * 2.0f - 1.0f) * _radius;
-            auto w = _weight(offset);
+            auto w = _weight_1d(offset);
             _lut.w[i] = w;
             _lut.cdf[i] = (abs_sum += std::abs(w));
         }
