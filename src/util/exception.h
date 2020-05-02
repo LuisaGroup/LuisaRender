@@ -39,12 +39,6 @@ template<typename ...Args>
 }
 
 template<typename ...Args>
-[[noreturn]] inline void LUISA_FATAL_ERROR(Args &&...args) {
-    spdlog::error(serialize(std::forward<Args>(args)...));
-    exit(-1);
-}
-
-template<typename ...Args>
 inline void LUISA_ERROR_IF(bool predicate, Args &&...args) {
     if (predicate) { LUISA_ERROR(std::forward<Args>(args)...); }
 }
@@ -52,6 +46,22 @@ inline void LUISA_ERROR_IF(bool predicate, Args &&...args) {
 template<typename ...Args>
 inline void LUISA_ERROR_IF_NOT(bool predicate, Args &&...args) {
     LUISA_ERROR_IF(!predicate, std::forward<Args>(args)...);
+}
+
+template<typename ...Args>
+[[noreturn]] inline void LUISA_FATAL_ERROR(Args &&...args) {
+    spdlog::error(serialize(std::forward<Args>(args)...));
+    exit(-1);
+}
+
+template<typename ...Args>
+inline void LUISA_FATAL_ERROR_IF(bool predicate, Args &&...args) {
+    if (predicate) { LUISA_FATAL_ERROR(std::forward<Args>(args)...); }
+}
+
+template<typename ...Args>
+inline void LUISA_FATAL_ERROR_IF_NOT(bool predicate, Args &&...args) {
+    LUISA_FATAL_ERROR_IF(!predicate, std::forward<Args>(args)...);
 }
 
 }

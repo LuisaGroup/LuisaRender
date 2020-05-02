@@ -36,13 +36,13 @@ public:
     NodeCreatorRegistry() noexcept = default;
     
     void emplace(std::string_view derived_name, NodeCreator<BaseClass> creator) noexcept {
-        assert(_creators.find(derived_name) == _creators.end());  // FIXME: Failure on ThinLensCamera
+        LUISA_FATAL_ERROR_IF_NOT(_creators.find(derived_name) == _creators.end(), "Duplicated class \"", derived_name, "\"");
         _creators.emplace(derived_name, std::move(creator));
     }
     
     NodeCreator<BaseClass> &operator[](std::string_view derived_name) {
         auto iter = _creators.find(derived_name);
-        LUISA_ERROR_IF(iter == _creators.end(), "Unregistered node creator for derived class: ", derived_name);
+        LUISA_ERROR_IF(iter == _creators.end(), "Unregistered node creator for derived class: \"", derived_name, "\"");
         return iter->second;
     }
 };

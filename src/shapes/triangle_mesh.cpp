@@ -59,7 +59,7 @@ void TriangleMesh::load(GeometryEncoder &encoder) {
     
     for (auto ai_mesh : ai_meshes) {
         if (ai_mesh->mTextureCoords[0] == nullptr) {
-            LUISA_WARNING("No texture coordinates in mesh, setting to (0, 0): ", ai_mesh->mName.data);
+            LUISA_WARNING("No texture coordinates in mesh, setting to (0, 0), name: \"", ai_mesh->mName.data, "\"");
             for (auto i = 0u; i < ai_mesh->mNumVertices; i++) {
                 auto ai_position = ai_mesh->mVertices[i];
                 auto ai_normal = ai_mesh->mNormals[i];
