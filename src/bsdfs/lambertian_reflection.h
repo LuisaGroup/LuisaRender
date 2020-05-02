@@ -30,7 +30,6 @@ LUISA_DEVICE_CALLABLE void evaluate(
         
         }
     }
-
 }
 
 }
