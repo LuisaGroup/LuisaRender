@@ -5,7 +5,7 @@
 #pragma once
 
 #include <vector>
-#include <util/exception.h>
+#include <util/logging.h>
 #include <util/noncopyable.h>
 
 namespace luisa {
@@ -40,7 +40,7 @@ public:
     [[nodiscard]] auto subview(size_t offset, size_t size);
     
     [[nodiscard]] auto subview(size_t offset) {
-        LUISA_ERROR_IF(offset >= _element_count, "Buffer overflow");
+        LUISA_EXCEPTION_IF(offset >= _element_count, "Buffer overflow");
         return subview(offset, _element_count - offset);
     }
     
@@ -138,7 +138,7 @@ void BufferView<T>::upload() { _buffer->upload(byte_offset(), byte_size()); }
 template<typename T>
 
 auto BufferView<T>::subview(size_t offset, size_t size) {
-    LUISA_ERROR_IF(offset + size > _element_count, "Buffer overflow");
+    LUISA_EXCEPTION_IF(offset + size > _element_count, "Buffer overflow");
     return _buffer->view_as<T>(_element_offset + offset, size);
 }
 

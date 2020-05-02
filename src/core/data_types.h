@@ -18,8 +18,10 @@
 #define LUISA_DEVICE_CALLABLE
 
 #include <type_traits>
+
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
+#include <glm/gtx/string_cast.hpp>
 
 namespace luisa {
 

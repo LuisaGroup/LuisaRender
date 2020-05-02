@@ -28,7 +28,7 @@ target_compile_definitions(glm INTERFACE GLM_FORCE_AVX2 GLM_FORCE_CXX17)
 target_link_libraries(LuisaRender PRIVATE glm::glm)
 
 add_subdirectory(thirdparty/spdlog)
-target_link_libraries(LuisaRender PRIVATE spdlog::spdlog)
+target_link_libraries(LuisaRender PRIVATE spdlog)
 
 set(ASSIMP_NO_EXPORT ON CACHE BOOL "" FORCE)
 set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)

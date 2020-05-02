@@ -88,42 +88,42 @@ public:
     [[nodiscard]] bool has_scattering_buffer() const noexcept { return (_attribute_flags & interaction::attribute::SCATTERING) != 0u; }
     
     [[nodiscard]] auto position_buffer() const noexcept {
-        LUISA_ERROR_IF_NOT(has_position_buffer(), "No position buffer present");
+        LUISA_EXCEPTION_IF_NOT(has_position_buffer(), "No position buffer present");
         return _position_buffer->view();
     }
     
     [[nodiscard]] auto normal_buffer() const noexcept {
-        LUISA_ERROR_IF_NOT(has_normal_buffer(), "No normal buffer present");
+        LUISA_EXCEPTION_IF_NOT(has_normal_buffer(), "No normal buffer present");
         return _normal_buffer->view();
     }
     
     [[nodiscard]] auto uv_buffer() const noexcept {
-        LUISA_ERROR_IF_NOT(has_uv_buffer(), "No UV buffer present");
+        LUISA_EXCEPTION_IF_NOT(has_uv_buffer(), "No UV buffer present");
         return _uv_buffer->view();
     }
     
     [[nodiscard]] auto wo_and_pdf_buffer() const noexcept {
-        LUISA_ERROR_IF_NOT(has_wo_and_pdf_buffer(), "No wo and pdf buffer present");
+        LUISA_EXCEPTION_IF_NOT(has_wo_and_pdf_buffer(), "No wo and pdf buffer present");
         return _wo_and_pdf_buffer->view();
     }
     
     [[nodiscard]] auto wi_and_pdf_buffer() const noexcept {
-        LUISA_ERROR_IF_NOT(has_wi_and_pdf_buffer(), "No wi and pdf buffer present");
+        LUISA_EXCEPTION_IF_NOT(has_wi_and_pdf_buffer(), "No wi and pdf buffer present");
         return _wi_and_pdf_buffer->view();
     }
     
     [[nodiscard]] auto instance_id_buffer() const noexcept {
-        LUISA_ERROR_IF_NOT(has_instance_id_buffer(), "No instance id buffer present");
+        LUISA_EXCEPTION_IF_NOT(has_instance_id_buffer(), "No instance id buffer present");
         return _instance_id_buffer->view();
     }
     
     [[nodiscard]] auto emission_buffer() const noexcept {
-        LUISA_ERROR_IF_NOT(has_emission_buffer(), "No instance emission present");
+        LUISA_EXCEPTION_IF_NOT(has_emission_buffer(), "No instance emission present");
         return _emission_buffer->view();
     }
     
     [[nodiscard]] auto scattering_buffer() const noexcept {
-        LUISA_ERROR_IF_NOT(has_scattering_buffer(), "No instance scattering present");
+        LUISA_EXCEPTION_IF_NOT(has_scattering_buffer(), "No instance scattering present");
         return _scattering_buffer->view();
     }
     

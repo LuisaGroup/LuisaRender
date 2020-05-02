@@ -49,7 +49,7 @@ LUISA_DEVICE_CALLABLE inline float3 offset_ray_origin(float3 p, float3 n) noexce
 #include <string_view>
 #include <map>
 
-#include <util/exception.h>
+#include <util/logging.h>
 
 #include "device.h"
 #include "buffer.h"
@@ -68,16 +68,16 @@ public:
     
     template<typename T>
     void add(std::string name) {
-        LUISA_ERROR_IF_NOT(_buffers.find(name) == _buffers.end(), "Ray attribute already exists: ", name);
+        LUISA_EXCEPTION_IF_NOT(_buffers.find(name) == _buffers.end(), "Ray attribute already exists: ", name);
         _buffers.emplace(name, _device->allocate_buffer(sizeof(T) * _capacity, BufferStorage::DEVICE_PRIVATE));
     }
     
     template<typename T>
     BufferView<T> view(std::string_view name) {
         auto iter = _buffers.find(name);
-        LUISA_ERROR_IF(iter == _buffers.end(), "Ray attribute not found: ", name);
+        LUISA_EXCEPTION_IF(iter == _buffers.end(), "Ray attribute not found: ", name);
         auto buffer = iter->second->view_as<T>();
-        LUISA_ERROR_IF_NOT(buffer.size() == _capacity, "Incorrect ray attribute buffer type");
+        LUISA_EXCEPTION_IF_NOT(buffer.size() == _capacity, "Incorrect ray attribute buffer type");
         return buffer;
     }
 };

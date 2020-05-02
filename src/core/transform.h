@@ -22,7 +22,7 @@ public:
     Transform(Device *device, const ParameterSet &) : Node{device} {}
     [[nodiscard]] virtual float4x4 static_matrix() const { return math::identity(); }
     [[nodiscard]] virtual float4x4 dynamic_matrix(float time[[maybe_unused]]) const {
-        LUISA_ERROR_IF_NOT(is_static(), "Transform::dynamic_matrix() not implemented in dynamic transform");
+        LUISA_EXCEPTION_IF_NOT(is_static(), "Transform::dynamic_matrix() not implemented in dynamic transform");
         return math::identity();
     }
     [[nodiscard]] virtual bool is_static() const noexcept { return true; }

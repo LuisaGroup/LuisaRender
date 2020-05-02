@@ -104,12 +104,12 @@ Light light : Point {
 renderer : SingleShot {
   integrator { @integrator }
   sampler : Independent {
-    spp { 1024 }
+    spp { 16384 }
   }
   camera { @camera }
   shapes { @bunny, @bunny2, @cube }
   lights { @light }
   output { "bunny_camera.exr" }
-  shutter_open { 1.0 }
-  shutter_close { 2.0 }
+  shutter_duration { 1.0, 2.0 }
+  shutter_samples { 256 }
 }

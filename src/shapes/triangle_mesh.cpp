@@ -53,7 +53,7 @@ void TriangleMesh::load(GeometryEncoder &encoder) {
                                          aiProcess_OptimizeMeshes |
                                          aiProcess_FlipUVs);
     
-    LUISA_ERROR_IF(ai_scene == nullptr || (ai_scene->mFlags & static_cast<uint>(AI_SCENE_FLAGS_INCOMPLETE)) || ai_scene->mRootNode == nullptr,
+    LUISA_EXCEPTION_IF(ai_scene == nullptr || (ai_scene->mFlags & static_cast<uint>(AI_SCENE_FLAGS_INCOMPLETE)) || ai_scene->mRootNode == nullptr,
                    "Failed to load triangle mesh: ", ai_importer.GetErrorString());
     
     std::vector<aiMesh *> ai_meshes(ai_scene->mNumMeshes);
@@ -96,7 +96,7 @@ void TriangleMesh::load(GeometryEncoder &encoder) {
                 encoder.add_indices(make_uint3(ai_face.mIndices[0], ai_face.mIndices[1], ai_face.mIndices[2]));
                 encoder.add_indices(make_uint3(ai_face.mIndices[0], ai_face.mIndices[2], ai_face.mIndices[3]));
             } else {
-                LUISA_ERROR("Only triangles and quads supported: ", ai_mesh->mName.data);
+                LUISA_EXCEPTION("Only triangles and quads supported: ", ai_mesh->mName.data);
             }
         }
     }

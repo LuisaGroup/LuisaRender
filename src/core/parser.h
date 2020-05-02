@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include <util/exception.h>
+#include <util/logging.h>
 
 #include "data_types.h"
 #include "node.h"
@@ -33,39 +33,39 @@ private:
         } else if (sv == "false") {
             return false;
         }
-        LUISA_ERROR("Invalid bool value: ", sv);
+        LUISA_EXCEPTION("Invalid bool value: ", sv);
     }
     
     [[nodiscard]] static float _parse_float(std::string_view sv) {
         size_t offset = 0;
         auto value = std::stof(std::string{sv}, &offset);
-        LUISA_ERROR_IF(offset != sv.size(), "Invalid float value: ", sv);
+        LUISA_EXCEPTION_IF(offset != sv.size(), "Invalid float value: ", sv);
         return value;
     }
     
     [[nodiscard]] static int32_t _parse_int(std::string_view sv) {
         size_t offset = 0;
         auto value = std::stoi(std::string{sv}, &offset);
-        LUISA_ERROR_IF(offset != sv.size(), "Invalid integer value: ", sv);
+        LUISA_EXCEPTION_IF(offset != sv.size(), "Invalid integer value: ", sv);
         return value;
     }
     
     [[nodiscard]] static uint32_t _parse_uint(std::string_view sv) {
         size_t offset = 0;
         auto value = std::stol(std::string{sv}, &offset);
-        LUISA_ERROR_IF(value < 0 || value > 0xffffffff || offset != sv.size(), "Invalid integer value: ", sv);
+        LUISA_EXCEPTION_IF(value < 0 || value > 0xffffffff || offset != sv.size(), "Invalid integer value: ", sv);
         return static_cast<uint32_t>(value);
     }
     
     [[nodiscard]] static std::string _parse_string(std::string_view sv) {
-        LUISA_ERROR_IF(sv.size() < 2 || sv.front() != sv.back() || (sv.front() != '"' && sv.front() != '\''), "invalid string value: ", sv);
+        LUISA_EXCEPTION_IF(sv.size() < 2 || sv.front() != sv.back() || (sv.front() != '"' && sv.front() != '\''), "invalid string value: ", sv);
         auto raw = sv.substr(1, sv.size() - 2);
         std::string value;
         for (auto i = 0ul; i < raw.size(); i++) {
             if (raw[i] != '\'' || ++i < raw.size()) {  // TODO: Smarter handling of escape characters
                 value.push_back(raw[i]);
             } else {
-                LUISA_ERROR("Extra escape at the end of string: ", sv);
+                LUISA_EXCEPTION("Extra escape at the end of string: ", sv);
             }
         }
         return value;
@@ -74,7 +74,7 @@ private:
     [[nodiscard]] const ParameterSet &_child(std::string_view parameter_name) const {
         auto iter = _parameters.find(parameter_name);
         if (iter == _parameters.cend()) {
-            LUISA_WARNING("Undefined parameter: ", parameter_name);
+            LUISA_WARNING("Parameter \"", parameter_name, "\" is not specific");
             return *_empty;
         }
         return *iter->second;
@@ -82,10 +82,10 @@ private:
 
 private:
     std::unique_ptr<ParameterSet> _empty{};
-    ParameterSet(Parser *parser) noexcept : _parser{parser} {}  // only for making _empty
+    ParameterSet(Parser *parser) noexcept: _parser{parser} {}  // only for making _empty
 
 public:
-    ParameterSet(Parser *parser, std::vector<std::string_view> value_list) noexcept : _parser{parser}, _value_list{std::move(value_list)}, _is_value_list{true} {
+    ParameterSet(Parser *parser, std::vector<std::string_view> value_list) noexcept: _parser{parser}, _value_list{std::move(value_list)}, _is_value_list{true} {
         _empty = std::unique_ptr<ParameterSet>{new ParameterSet{parser}};
     }
     
@@ -94,7 +94,10 @@ public:
         _empty = std::unique_ptr<ParameterSet>{new ParameterSet{parser}};
     }
     
-    [[nodiscard]] const ParameterSet &operator[](std::string_view parameter_name) const { return _child(parameter_name); }
+    [[nodiscard]] const ParameterSet &operator[](std::string_view parameter_name) const {
+        LUISA_INFO("Processing parameter \"", parameter_name, "\"");
+        return _child(parameter_name);
+    }
     
     template<typename BaseClass>
     [[nodiscard]] std::shared_ptr<BaseClass> parse() const;
@@ -105,7 +108,7 @@ public:
         try {
             p = parse<BaseClass>();
         } catch (const std::runtime_error &e) {
-            LUISA_WARNING("Error occurred while parsing, returning null, reason: ", e.what());
+            LUISA_WARNING("Error occurred while parsing parameter, returning null");
         }
         return p;
     }
@@ -114,7 +117,7 @@ public:
     [[nodiscard]] std::vector<std::shared_ptr<BaseClass>> parse_reference_list() const;
     
     [[nodiscard]] bool parse_bool() const {
-        LUISA_ERROR_IF(_value_list.empty(), "No bool values given, expected exactly 1");
+        LUISA_EXCEPTION_IF(_value_list.empty(), "No bool values given, expected exactly 1");
         LUISA_WARNING_IF(_value_list.size() != 1ul, "Too many bool values, using only the first 1");
         return _parse_bool(_value_list.front());
     }
@@ -129,13 +132,13 @@ public:
     }
     
     [[nodiscard]] float parse_float() const {
-        LUISA_ERROR_IF(_value_list.empty(), "No float values given, expected exactly 1");
+        LUISA_EXCEPTION_IF(_value_list.empty(), "No float values given, expected exactly 1");
         LUISA_WARNING_IF(_value_list.size() != 1, "Too many float values, using only the first 1");
         return _parse_float(_value_list.front());
     }
     
     [[nodiscard]] float2 parse_float2() const {
-        LUISA_ERROR_IF(_value_list.size() < 2, "No enough float values given, expected exactly 2");
+        LUISA_EXCEPTION_IF(_value_list.size() < 2, "No enough float values given, expected exactly 2");
         LUISA_WARNING_IF(_value_list.size() != 2, "Too many float values, using only the first 2");
         auto x = _parse_float(_value_list[0]);
         auto y = _parse_float(_value_list[1]);
@@ -143,7 +146,7 @@ public:
     }
     
     [[nodiscard]] float3 parse_float3() const {
-        LUISA_ERROR_IF(_value_list.size() < 3, "No enough float values given, expected exactly 3");
+        LUISA_EXCEPTION_IF(_value_list.size() < 3, "No enough float values given, expected exactly 3");
         LUISA_WARNING_IF(_value_list.size() != 3, "Too many float values, using only the first 3");
         auto x = _parse_float(_value_list[0]);
         auto y = _parse_float(_value_list[1]);
@@ -152,7 +155,7 @@ public:
     }
     
     [[nodiscard]] float4 parse_float4() const {
-        LUISA_ERROR_IF(_value_list.size() < 4, "No enough float values given, expected exactly 4");
+        LUISA_EXCEPTION_IF(_value_list.size() < 4, "No enough float values given, expected exactly 4");
         LUISA_WARNING_IF(_value_list.size() != 4, "Too many float values, using only the first 4");
         auto x = _parse_float(_value_list[0]);
         auto y = _parse_float(_value_list[1]);
@@ -162,7 +165,7 @@ public:
     }
     
     [[nodiscard]] float3x3 parse_float3x3() const {
-        LUISA_ERROR_IF(_value_list.size() < 9, "No enough float values given, expected exactly 16");
+        LUISA_EXCEPTION_IF(_value_list.size() < 9, "No enough float values given, expected exactly 16");
         LUISA_WARNING_IF(_value_list.size() != 9, "Too many float values, using only the first 16");
         auto m00 = _parse_float(_value_list[0]);
         auto m01 = _parse_float(_value_list[1]);
@@ -177,7 +180,7 @@ public:
     }
     
     [[nodiscard]] float4x4 parse_float4x4() const {
-        LUISA_ERROR_IF(_value_list.size() < 16, "No enough float values given, expected exactly 16");
+        LUISA_EXCEPTION_IF(_value_list.size() < 16, "No enough float values given, expected exactly 16");
         LUISA_WARNING_IF(_value_list.size() != 16, "Too many float values, using only the first 16");
         auto m00 = _parse_float(_value_list[0]);
         auto m01 = _parse_float(_value_list[1]);
@@ -208,13 +211,13 @@ public:
     }
     
     [[nodiscard]] int parse_int() const {
-        LUISA_ERROR_IF(_value_list.empty(), "No int values given, expected exactly 1");
+        LUISA_EXCEPTION_IF(_value_list.empty(), "No int values given, expected exactly 1");
         LUISA_WARNING_IF(_value_list.size() != 1, "Too many int values, using only the first 1");
         return _parse_int(_value_list.front());
     }
     
     [[nodiscard]] int2 parse_int2() const {
-        LUISA_ERROR_IF(_value_list.size() < 2, "No enough int values given, expected exactly 2");
+        LUISA_EXCEPTION_IF(_value_list.size() < 2, "No enough int values given, expected exactly 2");
         LUISA_WARNING_IF(_value_list.size() != 2, "Too many int values, using only the first 2");
         auto x = _parse_int(_value_list[0]);
         auto y = _parse_int(_value_list[1]);
@@ -222,7 +225,7 @@ public:
     }
     
     [[nodiscard]] int3 parse_int3() const {
-        LUISA_ERROR_IF(_value_list.size() < 3, "No enough int values given, expected exactly 3");
+        LUISA_EXCEPTION_IF(_value_list.size() < 3, "No enough int values given, expected exactly 3");
         LUISA_WARNING_IF(_value_list.size() != 3, "Too many int values, using only the first 3");
         auto x = _parse_int(_value_list[0]);
         auto y = _parse_int(_value_list[1]);
@@ -232,7 +235,7 @@ public:
     
     [[nodiscard]] int4 parse_int4() const {
         
-        LUISA_ERROR_IF(_value_list.size() < 4, "No enough int values given, expected exactly 4");
+        LUISA_EXCEPTION_IF(_value_list.size() < 4, "No enough int values given, expected exactly 4");
         LUISA_WARNING_IF(_value_list.size() != 4, "Too many int values, using only the first 4");
         auto x = _parse_int(_value_list[0]);
         auto y = _parse_int(_value_list[1]);
@@ -251,13 +254,13 @@ public:
     }
     
     [[nodiscard]] uint parse_uint() const {
-        LUISA_ERROR_IF(_value_list.empty(), "No uint values given, expected exactly 1");
+        LUISA_EXCEPTION_IF(_value_list.empty(), "No uint values given, expected exactly 1");
         LUISA_WARNING_IF(_value_list.size() != 1, "Too many uint values, using only the first 1");
         return _parse_uint(_value_list.front());
     }
     
     [[nodiscard]] uint2 parse_uint2() const {
-        LUISA_ERROR_IF(_value_list.size() < 2, "No enough uint values given, expected exactly 2");
+        LUISA_EXCEPTION_IF(_value_list.size() < 2, "No enough uint values given, expected exactly 2");
         LUISA_WARNING_IF(_value_list.size() != 2, "Too many uint values, using only the first 2");
         auto x = _parse_uint(_value_list[0]);
         auto y = _parse_uint(_value_list[1]);
@@ -265,7 +268,7 @@ public:
     }
     
     [[nodiscard]] uint3 parse_uint3() const {
-        LUISA_ERROR_IF(_value_list.size() < 3, "No enough uint values given, expected exactly 3");
+        LUISA_EXCEPTION_IF(_value_list.size() < 3, "No enough uint values given, expected exactly 3");
         LUISA_WARNING_IF(_value_list.size() != 3, "Too many uint values, using only the first 3");
         auto x = _parse_uint(_value_list[0]);
         auto y = _parse_uint(_value_list[1]);
@@ -274,7 +277,7 @@ public:
     }
     
     [[nodiscard]] uint4 parse_uint4() const {
-        LUISA_ERROR_IF(_value_list.size() < 4, "No enough uint values given, expected exactly 4");
+        LUISA_EXCEPTION_IF(_value_list.size() < 4, "No enough uint values given, expected exactly 4");
         LUISA_WARNING_IF(_value_list.size() != 4, "Too many uint values, using only the first 4");
         auto x = _parse_uint(_value_list[0]);
         auto y = _parse_uint(_value_list[1]);
@@ -293,14 +296,14 @@ public:
     }
     
     [[nodiscard]] std::string parse_string() const {
-        LUISA_ERROR_IF(_value_list.empty(), "No uint values given, expected exactly 1");
+        LUISA_EXCEPTION_IF(_value_list.empty(), "No uint values given, expected exactly 1");
         LUISA_WARNING_IF(_value_list.size() != 1, "Too many uint values, using only the first 1");
         return _parse_string(_value_list.front());
     }
     
     [[nodiscard]] std::string parse_string_or_default(std::string_view default_value) const noexcept {
         try { return parse_string(); } catch (const std::runtime_error &e) {
-            LUISA_WARNING("Error occurred while parsing string, using default value, reason: ", e.what());
+            LUISA_WARNING("Error occurred while parsing parameter, using default value: \"", default_value, "\"");
             return std::string{default_value};
         }
     }
@@ -314,34 +317,43 @@ public:
         return string_list;
     }
 
-#define LUISA_PARAMETER_SET_PARSE_OR_DEFAULT(Type)                                                                \
-    [[nodiscard]] Type parse_##Type##_or_default(Type default_value) const noexcept {                             \
-        try { return parse_##Type(); } catch (const std::runtime_error &e) {                                      \
-            LUISA_WARNING("Error occurred while parsing "#Type", using default value, reason: ", e.what());  \
-            return default_value;                                                                                 \
-        }                                                                                                         \
+#define LUISA_PARAMETER_SET_PARSE_OR_DEFAULT(Type, TO_STRING)                                                        \
+    [[nodiscard]] Type parse_##Type##_or_default(Type default_value) const noexcept {                                \
+        try { return parse_##Type(); } catch (const std::runtime_error &e) {                                         \
+            LUISA_WARNING("Error occurred while parsing parameter, using default value: ", TO_STRING(default_value));  \
+            return default_value;                                                                                    \
+        }                                                                                                            \
     }
+
+#define LUISA_PARAMETER_SET_PARSE_OR_DEFAULT_SCALAR(Type)  \
+    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT(Type, std::to_string)
+
+#define LUISA_PARAMETER_SET_PARSE_OR_DEFAULT_VECTOR(Type)  \
+    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT(Type, glm::to_string)
     
-    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT(bool)
+    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT(bool, [](bool v) noexcept { return v ? "true" : "false"; })
     
-    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT(float)
-    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT(float2)
-    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT(float3)
-    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT(float4)
-    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT(float3x3)
-    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT(float4x4)
+    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT_SCALAR(float)
+    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT_SCALAR(int)
+    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT_SCALAR(uint)
     
-    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT(int)
-    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT(int2)
-    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT(int3)
-    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT(int4)
+    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT_VECTOR(float2)
+    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT_VECTOR(float3)
+    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT_VECTOR(float4)
+    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT_VECTOR(float3x3)
+    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT_VECTOR(float4x4)
     
-    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT(uint)
-    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT(uint2)
-    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT(uint3)
-    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT(uint4)
+    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT_VECTOR(int2)
+    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT_VECTOR(int3)
+    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT_VECTOR(int4)
+    
+    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT_VECTOR(uint2)
+    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT_VECTOR(uint3)
+    LUISA_PARAMETER_SET_PARSE_OR_DEFAULT_VECTOR(uint4)
 
 #undef LUISA_PARAMETER_SET_PARSE_OR_DEFAULT
+#undef LUISA_PARAMETER_SET_PARSE_OR_DEFAULT_SCALAR
+#undef LUISA_PARAMETER_SET_PARSE_OR_DEFAULT_VECTOR
 
 };
 
@@ -372,7 +384,7 @@ private:
     [[nodiscard]] std::unique_ptr<ParameterSet> _parse_parameter_set();
 
 public:
-    explicit Parser(Device *device) noexcept : _device{device} {}
+    explicit Parser(Device *device) noexcept: _device{device} {}
     
     [[nodiscard]] std::shared_ptr<Render> parse(const std::filesystem::path &file_path);
     
@@ -380,9 +392,9 @@ public:
     [[nodiscard]] std::shared_ptr<T> global_node(std::string_view node_name) const {
         if (auto iter = _global_nodes.find(node_name); iter != _global_nodes.end()) {
             if (auto p = std::dynamic_pointer_cast<T>(iter->second)) { return p; }
-            LUISA_ERROR("Incompatible type for node: ", node_name);
+            LUISA_EXCEPTION("Incompatible type for node: ", node_name);
         }
-        LUISA_ERROR("Undefined node: ", node_name);
+        LUISA_EXCEPTION("Undefined node: ", node_name);
     }
     
     [[nodiscard]] Device &device() noexcept { return *_device; }

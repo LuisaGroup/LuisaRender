@@ -62,7 +62,7 @@ private:
 protected:
     static uint _assign_tag() {
         static auto next_tag = 0u;
-        LUISA_ERROR_IF(next_tag == MAX_LIGHT_TAG_COUNT, "Too many light tags assigned, limit: ", MAX_LIGHT_TAG_COUNT);
+        LUISA_EXCEPTION_IF(next_tag == MAX_LIGHT_TAG_COUNT, "Too many light tags assigned, limit: ", MAX_LIGHT_TAG_COUNT);
         return next_tag++;
     }
 

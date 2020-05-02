@@ -2,15 +2,15 @@
 // Created by Mike Smith on 2019/10/25.
 //
 
-#import <util/exception.h>
+#import <util/logging.h>
 #import "metal_buffer.h"
 #import "metal_kernel.h"
 
 namespace luisa::metal {
 
 void MetalBuffer::upload(size_t offset, size_t size) {
-    LUISA_ERROR_IF_NOT(_storage == BufferStorage::MANAGED, "Only managed buffers can be update.");
-    LUISA_ERROR_IF_NOT(offset + size <= _capacity, "Buffer data overflowed");
+    LUISA_EXCEPTION_IF_NOT(_storage == BufferStorage::MANAGED, "Only managed buffers can be update.");
+    LUISA_EXCEPTION_IF_NOT(offset + size <= _capacity, "Buffer data overflowed");
     [_handle didModifyRange:NSMakeRange(offset, size)];
 }
 

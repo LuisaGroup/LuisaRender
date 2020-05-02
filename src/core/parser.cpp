@@ -17,7 +17,7 @@
 namespace luisa {
 
 void Parser::_skip_blanks_and_comments() {
-    LUISA_ERROR_IF_NOT(_peeked.empty(), "Peeked token \"", _peeked, "\" should not be skipped at (", _curr_line, ", ", _curr_col, ")");
+    LUISA_EXCEPTION_IF_NOT(_peeked.empty(), "Peeked token \"", _peeked, "\" should not be skipped at (", _curr_line, ", ", _curr_col, ")");
     while (!_remaining.empty()) {
         if (_remaining.front() == '\r') {
             _remaining = _remaining.substr(1);
@@ -36,7 +36,7 @@ void Parser::_skip_blanks_and_comments() {
         } else if (_remaining.front() == '/') {
             _remaining = _remaining.substr(1);
             _next_col++;
-            LUISA_ERROR_IF(_remaining.empty() || _remaining.front() != '/', "Expected '/' at the beginning of comments at (", _next_line, ",", _next_col, ")");
+            LUISA_EXCEPTION_IF(_remaining.empty() || _remaining.front() != '/', "Expected '/' at the beginning of comments at (", _next_line, ",", _next_col, ")");
             while (!_remaining.empty() && _remaining.front() != '\r' && _remaining.front() != '\n') {
                 _remaining = _remaining.substr(1);
                 _next_col++;
@@ -51,7 +51,7 @@ void Parser::_skip_blanks_and_comments() {
 
 std::string_view Parser::_peek() {
     if (_peeked.empty()) {
-        LUISA_ERROR_IF(_remaining.empty(), "Peek at the end of the file at (", _curr_line, ", ", _curr_col, ")");
+        LUISA_EXCEPTION_IF(_remaining.empty(), "Peek at the end of the file at (", _curr_line, ", ", _curr_col, ")");
         if (_remaining.front() == '{' || _remaining.front() == '}' || _remaining.front() == ':' || _remaining.front() == ',' || _remaining.front() == '@') {  // symbols
             _peeked = _remaining.substr(0, 1);
             _remaining = _remaining.substr(1);
@@ -74,18 +74,18 @@ std::string_view Parser::_peek() {
                 if (_remaining[i] == '\\') { i++; }  // TODO: Smarter handling of escape characters
             }
             _next_col += i + 1;
-            LUISA_ERROR_IF(i >= _remaining.size() || _remaining[i] != '"', "Expected '\"' at (", _next_line, ", ", _next_col, ")");
+            LUISA_EXCEPTION_IF(i >= _remaining.size() || _remaining[i] != '"', "Expected '\"' at (", _next_line, ", ", _next_col, ")");
             _peeked = _remaining.substr(0, i + 1);
             _remaining = _remaining.substr(i + 1);
         } else {
-            LUISA_ERROR("Invalid character: ", _remaining.front());
+            LUISA_EXCEPTION("Invalid character: ", _remaining.front());
         }
     }
     return _peeked;
 }
 
 void Parser::_pop() {
-    LUISA_ERROR_IF(_peeked.empty(), "Token not peeked before being popped at (", _curr_line, ", ", _curr_col, ")");
+    LUISA_EXCEPTION_IF(_peeked.empty(), "Token not peeked before being popped at (", _curr_line, ", ", _curr_col, ")");
     _peeked = {};
     _curr_line = _next_line;
     _curr_col = _next_col;
@@ -93,7 +93,7 @@ void Parser::_pop() {
 }
 
 void Parser::_match(std::string_view token) {
-    LUISA_ERROR_IF_NOT(_peek() == token, "Expected \"", token, "\", got \"", _peek(), "\" at (", _curr_line, ", ", _curr_col, ")");
+    LUISA_EXCEPTION_IF_NOT(_peek() == token, "Expected \"", token, "\", got \"", _peek(), "\" at (", _curr_line, ", ", _curr_col, ")");
 }
 
 std::shared_ptr<Render> Parser::_parse_top_level() {
@@ -111,8 +111,9 @@ std::shared_ptr<Render> Parser::_parse_top_level() {
 #define LUISA_PARSER_PARSE_GLOBAL_NODE(Type)                                                                                                                    \
     if (token == #Type) {                                                                                                                                       \
         auto node_name = _peek_and_pop();                                                                                                                       \
-        LUISA_ERROR_IF_NOT(_is_identifier(node_name), "Invalid identifier: ", node_name);                                                                       \
+        LUISA_EXCEPTION_IF_NOT(_is_identifier(node_name), "Invalid identifier: ", node_name);                                                                       \
         LUISA_WARNING_IF_NOT(_global_nodes.find(node_name) == _global_nodes.end(), "Duplicated global node, overwriting the one defined before: ", node_name);  \
+        LUISA_INFO("Parsing global node \"", node_name, "\", type: ", #Type);                                                                                   \
         _global_nodes.emplace(node_name, _parse_parameter_set()->parse<Type>());                                                                                \
         continue;                                                                                                                                               \
     }
@@ -140,6 +141,7 @@ bool Parser::_eof() const noexcept {
 }
 
 std::shared_ptr<Render> Parser::parse(const std::filesystem::path &file_path) {
+    
     _curr_line = 0;
     _curr_col = 0;
     _next_line = 0;
@@ -151,6 +153,8 @@ std::shared_ptr<Render> Parser::parse(const std::filesystem::path &file_path) {
     _source = text_file_contents(file_path);
     _remaining = _source;
     _skip_blanks_and_comments();
+    
+    LUISA_INFO("Start parsing scene description file: ", file_path);
     return _parse_top_level();
 }
 
@@ -165,7 +169,7 @@ std::unique_ptr<ParameterSet> Parser::_parse_parameter_set() {
         std::map<std::string_view, std::unique_ptr<ParameterSet>> parameters;
         while (_peek() != "}") {
             auto parameter_name = _peek_and_pop();
-            LUISA_ERROR_IF_NOT(_is_identifier(parameter_name), "Invalid identifier: ", parameter_name);
+            LUISA_EXCEPTION_IF_NOT(_is_identifier(parameter_name), "Invalid identifier: ", parameter_name);
             LUISA_WARNING_IF_NOT(parameters.find(parameter_name) == parameters.end(), "Duplicated parameter: ", parameter_name);
             parameters.emplace(parameter_name, _parse_parameter_set());
         }
@@ -179,12 +183,12 @@ std::unique_ptr<ParameterSet> Parser::_parse_parameter_set() {
     if (_peek() != "}") {
         if (_peek() == "@") {  // references
             _pop();  // pop "@"
-            LUISA_ERROR_IF_NOT(_is_identifier(_peek()), "Invalid reference: ", _peek());
+            LUISA_EXCEPTION_IF_NOT(_is_identifier(_peek()), "Invalid reference: ", _peek());
             value_list.emplace_back(_peek_and_pop());
             while (_peek() != "}") {
                 _match_and_pop(",");
                 _match_and_pop("@");
-                LUISA_ERROR_IF_NOT(_is_identifier(_peek()), "Invalid reference: ", _peek());
+                LUISA_EXCEPTION_IF_NOT(_is_identifier(_peek()), "Invalid reference: ", _peek());
                 value_list.emplace_back(_peek_and_pop());
             }
         } else {  // values

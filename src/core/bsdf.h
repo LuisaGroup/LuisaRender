@@ -51,7 +51,7 @@ protected:
     
     static uint _assign_tag() {
         static auto next_tag = 0u;
-        LUISA_ERROR_IF(next_tag == MAX_BSDF_TAG_COUNT, "Too many BSDF tags assigned, limit: ", MAX_BSDF_TAG_COUNT);
+        LUISA_EXCEPTION_IF(next_tag == MAX_BSDF_TAG_COUNT, "Too many BSDF tags assigned, limit: ", MAX_BSDF_TAG_COUNT);
         return next_tag++;
     }
 
