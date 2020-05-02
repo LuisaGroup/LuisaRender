@@ -46,31 +46,47 @@ SingleShot::SingleShot(Device *device, const ParameterSet &parameter_set)
 
 void SingleShot::_execute() {
     
-    std::vector<float> time_samples(_sampler->spp());
     std::default_random_engine random_engine{std::random_device{}()};
-    std::uniform_real_distribution<float> uniform{0.0f, 1.0f};
     
-    for (auto i = 0u; i < time_samples.size(); i++) { time_samples[i] = lerp(_shutter_open, _shutter_close, (i + uniform(random_engine)) / time_samples.size()); }
-    std::shuffle(time_samples.begin(), time_samples.end(), random_engine);
+    auto spp = _sampler->spp();
+    auto film_resolution = _camera->film().resolution();
+    constexpr auto power_two_le = [](uint x) noexcept {
+        for (auto i = 31u; i > 0u; i--) { if (auto v = 1u << i; v <= x) { return v; }}
+        return 1u;
+    };
+    auto time_sample_bucket_count = std::clamp(spp, 1u, power_two_le(std::max(film_resolution.x, film_resolution.y) / 4u));
+    LUISA_INFO("Time samples for rendering: ", time_sample_bucket_count);
     
-    _sampler->reset_states(_camera->film().resolution(), _viewport);
+    std::vector<float> time_sample_buckets(time_sample_bucket_count);
+    for (auto i = 0u; i < time_sample_buckets.size(); i++) {
+        time_sample_buckets[i] = lerp(_shutter_open, _shutter_close, (i + std::uniform_real_distribution{0.0f, 1.0f}(random_engine)) / time_sample_buckets.size());
+    }
+    std::vector<uint> time_sample_counts(time_sample_bucket_count, 0u);
+    for (auto i = 0u; i < spp; i++) { time_sample_counts[std::uniform_int_distribution{0u, time_sample_bucket_count - 1u}(random_engine)]++; }
+    
+    _sampler->reset_states(film_resolution, _viewport);
     _camera->film().reset_accumulation_buffer(_viewport);
     
-    for (auto time : time_samples) {
+    for (auto i = 0u; i < time_sample_bucket_count; i++) {
+        
+        auto time = time_sample_buckets[i];
         
         _camera->update(time);
         _scene->update(time);
         
-        _integrator->prepare_for_frame(_scene.get(), _camera.get(), _sampler.get(), _viewport);
-        
-        // render frame
-        _device->launch_async([&](KernelDispatcher &dispatch) {
-            _sampler->start_next_frame(dispatch);
-            _integrator->render_frame(dispatch);
-        }, [frame_index = _sampler->frame_index(), spp = _sampler->spp()] {  // notify that one frame has been rendered
-            auto report_interval = std::max(spp / 32u, 1u);
-            if (frame_index % report_interval == 0u || frame_index == spp - 1u) { LUISA_INFO("Render progress: ", frame_index + 1u, "/", spp); }
-        });
+        for (auto s = 0u; s < time_sample_counts[i]; s++) {
+            
+            _integrator->prepare_for_frame(_scene.get(), _camera.get(), _sampler.get(), _viewport);
+            
+            // render frame
+            _device->launch_async([&](KernelDispatcher &dispatch) {
+                _sampler->start_next_frame(dispatch);
+                _integrator->render_frame(dispatch);
+            }, [frame_index = _sampler->frame_index(), spp] {  // notify that one frame has been rendered
+                auto report_interval = std::max(spp / 32u, 64u);
+                if (frame_index % report_interval == 0u || frame_index == spp - 1u) { LUISA_INFO("Render progress: ", frame_index + 1u, "/", spp); }
+            });
+        }
     }
     
     _device->launch([&](KernelDispatcher &dispatch) {  // film postprocess
