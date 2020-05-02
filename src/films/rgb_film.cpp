@@ -23,7 +23,7 @@ void RGBFilm::save(const std::filesystem::path &filename) {
     cv::cvtColor(image, image, cv::COLOR_RGB2BGR);
     auto path = std::filesystem::absolute(filename);
     if (path.extension() != ".exr") {
-        LUISA_WARNING("file name not ended with .exr: ", filename);
+        LUISA_WARNING("File name not ended with .exr: ", filename);
         path += ".exr";
     }
     cv::imwrite(path, image);

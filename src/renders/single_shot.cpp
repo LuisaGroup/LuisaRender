@@ -49,7 +49,8 @@ void SingleShot::_execute() {
             _sampler->start_next_frame(dispatch);
             _integrator->render_frame(dispatch);
         }, [frame_index = _sampler->frame_index(), spp = _sampler->spp()] {  // notify that one frame has been rendered
-            std::cout << "Progress: " << frame_index + 1u << "/" << spp << "\r";
+            auto report_interval = std::max(spp / 32u, 1u);
+            if (frame_index % report_interval == 0u || frame_index == spp - 1u) { LUISA_INFO("Render progress: ", frame_index + 1u, "/", spp); }
         });
     }
     
@@ -57,7 +58,7 @@ void SingleShot::_execute() {
         _camera->film().postprocess(dispatch);
     });
     
-    std::cout << "\nSaving..." << std::endl;
+    LUISA_INFO("Saving results...");
     _camera->film().save(_output_path);
     
 }

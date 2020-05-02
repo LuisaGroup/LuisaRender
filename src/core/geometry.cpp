@@ -31,24 +31,24 @@ void GeometryEncoder::create(Shape *shape) {
         _index_offset, static_cast<uint>(_indices.size() - _index_offset)));
     _vertex_offset = static_cast<uint>(_positions.size());
     _index_offset = static_cast<uint>(_indices.size());
-    LUISA_ERROR_IF_NOT(_geometry->_shape_to_entity_index.count(shape) == 0u, "recreating shape");
+    LUISA_ERROR_IF_NOT(_geometry->_shape_to_entity_index.count(shape) == 0u, "Recreating shape");
     _geometry->_shape_to_entity_index.emplace(shape, entity_index);
 }
 
 void GeometryEncoder::replicate(Shape *shape, Shape *reference) {
     
-    LUISA_ERROR_IF_NOT(_geometry->_shape_to_entity_index.count(shape) == 0u, "recreating shape");
-    LUISA_ERROR_IF(shape == reference || reference->is_instance(), "cannot replicate the shape itself or an instance");
-    LUISA_ERROR_IF_NOT(reference->transform() == nullptr || reference->transform()->is_static(), "only static shapes can be replicated");
+    LUISA_ERROR_IF_NOT(_geometry->_shape_to_entity_index.count(shape) == 0u, "Recreating shape");
+    LUISA_ERROR_IF(shape == reference || reference->is_instance(), "Cannot replicate the shape itself or an instance");
+    LUISA_ERROR_IF_NOT(reference->transform() == nullptr || reference->transform()->is_static(), "Only static shapes can be replicated");
     auto iter = _geometry->_shape_to_entity_index.find(reference);
     if (iter == _geometry->_shape_to_entity_index.end()) {
         reference->load(*this);
         iter = _geometry->_shape_to_entity_index.find(reference);
-        LUISA_ERROR_IF(iter == _geometry->_shape_to_entity_index.end(), "reference shape not properly loaded");
+        LUISA_ERROR_IF(iter == _geometry->_shape_to_entity_index.end(), "Reference shape not properly loaded");
     }
     
-    LUISA_ERROR_IF_NOT(_geometry->_shape_to_entity_index.count(shape) == 0u, "recreating shape");
-    LUISA_ERROR_IF_NOT(_vertex_offset == _positions.size() && _index_offset == _indices.size(), "adding vertices or indices before making a replica is not allowed");
+    LUISA_ERROR_IF_NOT(_geometry->_shape_to_entity_index.count(shape) == 0u, "Recreating shape");
+    LUISA_ERROR_IF_NOT(_vertex_offset == _positions.size() && _index_offset == _indices.size(), "Adding vertices or indices before making a replica is not allowed");
     auto &&ref_entity = *_geometry->_entities[iter->second];
     auto static_transform = shape->transform() == nullptr ? math::identity() : shape->transform()->static_matrix();
     auto normal_matrix = transpose(inverse(make_float3x3(static_transform)));
@@ -65,17 +65,17 @@ void GeometryEncoder::replicate(Shape *shape, Shape *reference) {
 
 void GeometryEncoder::instantiate(Shape *shape, Shape *reference) {
     
-    LUISA_ERROR_IF_NOT(_geometry->_shape_to_entity_index.count(shape) == 0u, "recreating shape");
-    LUISA_ERROR_IF(shape == reference || reference->is_instance(), "cannot instantiate the shape itself or an instance");
-    LUISA_ERROR_IF_NOT(reference->transform() == nullptr || reference->transform()->is_static(), "only static shapes can be instantiate");
+    LUISA_ERROR_IF_NOT(_geometry->_shape_to_entity_index.count(shape) == 0u, "Recreating shape");
+    LUISA_ERROR_IF(shape == reference || reference->is_instance(), "Cannot instantiate the shape itself or an instance");
+    LUISA_ERROR_IF_NOT(reference->transform() == nullptr || reference->transform()->is_static(), "Only static shapes can be instantiate");
     
     auto iter = _geometry->_shape_to_entity_index.find(reference);
     if (iter == _geometry->_shape_to_entity_index.end()) {
         reference->load(*this);
         iter = _geometry->_shape_to_entity_index.find(reference);
-        LUISA_ERROR_IF(iter == _geometry->_shape_to_entity_index.end(), "reference shape not properly loaded");
+        LUISA_ERROR_IF(iter == _geometry->_shape_to_entity_index.end(), "Reference shape not properly loaded");
     }
-    LUISA_ERROR_IF_NOT(_vertex_offset == _positions.size() && _index_offset == _indices.size(), "adding vertices or indices before making an instance is not allowed");
+    LUISA_ERROR_IF_NOT(_vertex_offset == _positions.size() && _index_offset == _indices.size(), "Adding vertices or indices before making an instance is not allowed");
     _geometry->_shape_to_entity_index.emplace(shape, iter->second);
 }
 
@@ -89,13 +89,13 @@ void GeometryEncoder::add_indices(uint3 indices) noexcept { _indices.emplace_bac
 
 uint Geometry::entity_index(Shape *shape) const {
     auto iter = _shape_to_entity_index.find(shape);
-    LUISA_ERROR_IF(iter == _shape_to_entity_index.cend(), "shape not loaded");
+    LUISA_ERROR_IF(iter == _shape_to_entity_index.cend(), "Shape not loaded");
     return iter->second;
 }
 
 uint Geometry::instance_index(Shape *shape) const {
     auto iter = _shape_to_instance_id.find(shape);
-    LUISA_ERROR_IF(iter == _shape_to_instance_id.cend(), "shape not found");
+    LUISA_ERROR_IF(iter == _shape_to_instance_id.cend(), "Shape not found");
     return iter->second;
 }
 
@@ -108,7 +108,7 @@ Geometry::Geometry(Device *device, const std::vector<std::shared_ptr<Shape>> &sh
       _evaluate_interactions_kernel{device->create_kernel("geometry_evaluate_interactions")} {
     
     // load geometry
-    LUISA_WARNING_IF(shapes.empty(), "no shape in scene");
+    LUISA_WARNING_IF(shapes.empty(), "No shape in scene");
     
     for (auto &&shape : shapes) {
         if (shape->is_instance()) {
@@ -204,9 +204,7 @@ Geometry::Geometry(Device *device, const std::vector<std::shared_ptr<Shape>> &sh
         _index_buffer->upload();
     }
     
-    std::cout << "Geometry loaded\n"
-              << "  Vertices:  " << _position_buffer->size() << "\n"
-              << "  Triangles: " << _index_buffer->size() << std::endl;
+    LUISA_INFO("Geometry loaded: vertex_count = ", _position_buffer->size(), ", triangle_count = ", _index_buffer->size());
     
     _dynamic_transform_buffer = _device->create_buffer<float4x4>(shapes.size(), BufferStorage::MANAGED);
     _entity_index_buffer = _device->create_buffer<uint>(shapes.size(), BufferStorage::MANAGED);

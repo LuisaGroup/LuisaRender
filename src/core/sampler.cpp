@@ -7,13 +7,13 @@
 namespace luisa {
 
 BufferView<float> Sampler::generate_samples(KernelDispatcher &dispatch, uint dimensions) {
-    LUISA_ERROR_IF_NOT(dimensions >= 1 && dimensions <= 4, "bad sample dimensions: ", dimensions);
+    LUISA_ERROR_IF_NOT(dimensions >= 1 && dimensions <= 4, "Bad sample dimensions: ", dimensions);
     _generate_samples(dispatch, _sample_buffer->view_as<float>(), dimensions);
     return _sample_buffer->view_as<float>();
 }
 
 BufferView<float> Sampler::generate_samples(KernelDispatcher &dispatch, uint dimensions, BufferView<uint> ray_queue_buffer, BufferView<uint> ray_count_buffer) {
-    LUISA_ERROR_IF_NOT(dimensions >= 1 && dimensions <= 4, "bad sample dimensions: ", dimensions);
+    LUISA_ERROR_IF_NOT(dimensions >= 1 && dimensions <= 4, "Bad sample dimensions: ", dimensions);
     _generate_samples(dispatch, ray_queue_buffer, ray_count_buffer, _sample_buffer->view_as<float>(), dimensions);
     return _sample_buffer->view_as<float>();
 }

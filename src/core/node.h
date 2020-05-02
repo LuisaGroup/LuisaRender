@@ -42,19 +42,9 @@ public:
     
     NodeCreator<BaseClass> &operator[](std::string_view derived_name) {
         auto iter = _creators.find(derived_name);
-        LUISA_ERROR_IF(iter == _creators.end(), "unregistered node creator for derived class: ", derived_name);
+        LUISA_ERROR_IF(iter == _creators.end(), "Unregistered node creator for derived class: ", derived_name);
         return iter->second;
     }
-
-#ifndef NDEBUG
-    void debug() const noexcept {
-        for (auto &&item : _creators) {
-            std::cout << item.first << "\n";
-        }
-        std::cout << std::endl;
-    }
-#endif
-    
 };
 
 #define LUISA_MAKE_BASE_NODE_CLASS_MATCHER(BaseClass)                                                                                                       \

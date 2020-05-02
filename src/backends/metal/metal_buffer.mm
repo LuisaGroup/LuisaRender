@@ -9,8 +9,8 @@
 namespace luisa::metal {
 
 void MetalBuffer::upload(size_t offset, size_t size) {
-    LUISA_ERROR_IF_NOT(_storage == BufferStorage::MANAGED, "only managed buffers can be update.");
-    LUISA_ERROR_IF_NOT(offset + size <= _capacity, "buffer data overflowed");
+    LUISA_ERROR_IF_NOT(_storage == BufferStorage::MANAGED, "Only managed buffers can be update.");
+    LUISA_ERROR_IF_NOT(offset + size <= _capacity, "Buffer data overflowed");
     [_handle didModifyRange:NSMakeRange(offset, size)];
 }
 

@@ -39,11 +39,11 @@ public:
         try {
             _execute();
         } catch (const std::runtime_error &e) {
-            LUISA_WARNING("error occurred, render terminated, reason:\n    ", e.what());
+            LUISA_WARNING("Error occurred, render terminated, reason: ", e.what());
         }
         auto t1 = std::chrono::high_resolution_clock::now();
         using namespace std::chrono_literals;
-        std::cout << "Render Time: " << (t1 - t0) / 1ns * 1e-9 << "s" << std::endl;
+        LUISA_INFO("Render Time: ", (t1 - t0) / 1ns * 1e-9, "s");
     }
 };
 

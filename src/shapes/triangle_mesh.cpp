@@ -30,7 +30,7 @@ void TriangleMesh::load(GeometryEncoder &encoder) {
                                    aiComponent_TEXTURES |
                                    aiComponent_MATERIALS);
     
-    std::cout << "Loading: " << _path << std::endl;
+    LUISA_INFO("Loading: ", _path);
     auto ai_scene = ai_importer.ReadFile(_path.c_str(),
                                          aiProcess_JoinIdenticalVertices |
                                          aiProcess_GenNormals |
@@ -44,7 +44,7 @@ void TriangleMesh::load(GeometryEncoder &encoder) {
                                          aiProcess_FlipUVs);
     
     LUISA_ERROR_IF(ai_scene == nullptr || (ai_scene->mFlags & static_cast<uint>(AI_SCENE_FLAGS_INCOMPLETE)) || ai_scene->mRootNode == nullptr,
-                   "failed to load triangle mesh: ", ai_importer.GetErrorString());
+                   "Failed to load triangle mesh: ", ai_importer.GetErrorString());
     
     std::vector<aiMesh *> ai_meshes(ai_scene->mNumMeshes);
     if (_subdiv_level != 0u) {
@@ -59,7 +59,7 @@ void TriangleMesh::load(GeometryEncoder &encoder) {
     
     for (auto ai_mesh : ai_meshes) {
         if (ai_mesh->mTextureCoords[0] == nullptr) {
-            LUISA_WARNING("no texture coordinates in mesh, setting to (0, 0): ", ai_mesh->mName.data);
+            LUISA_WARNING("No texture coordinates in mesh, setting to (0, 0): ", ai_mesh->mName.data);
             for (auto i = 0u; i < ai_mesh->mNumVertices; i++) {
                 auto ai_position = ai_mesh->mVertices[i];
                 auto ai_normal = ai_mesh->mNormals[i];
@@ -86,7 +86,7 @@ void TriangleMesh::load(GeometryEncoder &encoder) {
                 encoder.add_indices(make_uint3(ai_face.mIndices[0], ai_face.mIndices[1], ai_face.mIndices[2]));
                 encoder.add_indices(make_uint3(ai_face.mIndices[0], ai_face.mIndices[2], ai_face.mIndices[3]));
             } else {
-                LUISA_ERROR("only triangles and quads supported: ", ai_mesh->mName.data);
+                LUISA_ERROR("Only triangles and quads supported: ", ai_mesh->mName.data);
             }
         }
     }

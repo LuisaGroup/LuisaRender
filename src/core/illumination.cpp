@@ -19,7 +19,7 @@ Illumination::Illumination(Device *device, const std::vector<std::shared_ptr<Lig
     for (auto &&light : lights) {  // collect abstract lights
         if (light->shape() == nullptr) {
             if (light->is_sky()) {
-                LUISA_ERROR_IF(_has_sky, "only one sky light can exist");
+                LUISA_ERROR_IF(_has_sky, "Only one sky light can exist");
                 _has_sky = true;
                 _sky_tag = _lights.size();
             }
@@ -112,8 +112,8 @@ void Illumination::uniform_select_lights(KernelDispatcher &dispatch,
                                          BufferView<light::Selection> queues,
                                          BufferView<uint> queue_sizes) {
     
-    LUISA_ERROR_IF(queue_sizes.size() < tag_count(), "no enough space in queue_sizes");
-    LUISA_ERROR_IF(queues.size() < tag_count() * dispatch_extent, "no enough space in queues");
+    LUISA_ERROR_IF(queue_sizes.size() < tag_count(), "No enough space in queue_sizes");
+    LUISA_ERROR_IF(queues.size() < tag_count() * dispatch_extent, "No enough space in queues");
     
     auto sample_buffer = sampler.generate_samples(dispatch, 1u, ray_queue, ray_queue_size);
     dispatch(*_uniform_select_lights_kernel, dispatch_extent, [&](KernelArgumentEncoder &encode) {
