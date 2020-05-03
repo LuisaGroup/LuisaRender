@@ -5,7 +5,7 @@
 #pragma once
 
 #include <string_view>
-#include <util/noncopyable.h>
+#include <util/concepts.h>
 
 #include "data_types.h"
 #include "buffer.h"

@@ -98,7 +98,7 @@ void SingleShot::_execute() {
             }, [frame_count = _sampler->frame_index() + 1, spp] {  // notify that one frame has been rendered
                 auto report_interval = std::max(spp / 32u, 64u);
                 if (frame_count % report_interval == 0u || frame_count == spp) {
-                    LUISA_INFO("Rendering progress: ", frame_count, "/", spp);
+                    LUISA_INFO("Rendering progress: ", frame_count, "/", spp, " (", static_cast<double>(frame_count) / static_cast<double>(spp) * 100.0, "%)");
                 }
             });
         }
@@ -108,9 +108,8 @@ void SingleShot::_execute() {
         film.postprocess(dispatch);
     });
     
-    LUISA_INFO("Saving results...");
+    LUISA_INFO("Saving film: ", _output_path);
     film.save(_output_path);
-    
 }
 
 }

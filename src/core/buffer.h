@@ -6,7 +6,7 @@
 
 #include <vector>
 #include <util/logging.h>
-#include <util/noncopyable.h>
+#include <util/concepts.h>
 
 namespace luisa {
 class TypelessBuffer;

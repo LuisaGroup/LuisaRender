@@ -72,6 +72,7 @@ High-Performance Renderer on GPU.
 
 ### Renders
 - [x] Scene Description Language
+- [ ] Wavefront Architecture
 - [x] Single-Shot Rendering
 - [ ] Animation Rendering
 - [ ] Interactive Rendering

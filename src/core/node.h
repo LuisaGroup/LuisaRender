@@ -12,7 +12,7 @@
 #include <memory>
 #include <iostream>
 
-#include <util/noncopyable.h>
+#include <util/concepts.h>
 #include <util/logging.h>
 #include "data_types.h"
 #include "device.h"

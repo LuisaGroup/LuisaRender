@@ -11,7 +11,7 @@
 
 #include "string_manipulation.h"
 
-namespace luisa {
+namespace luisa { inline namespace utility {
 
 inline spdlog::logger &logger() noexcept {
     static auto l = spdlog::stdout_color_mt("LuisaRender");
@@ -69,4 +69,4 @@ inline void LUISA_ERROR_IF_NOT(bool predicate, Args &&...args) {
     LUISA_ERROR_IF(!predicate, std::forward<Args>(args)...);
 }
 
-}
+}}
