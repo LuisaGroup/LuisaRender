@@ -105,7 +105,7 @@ GeometryEntity &Geometry::entity(uint index) {
 
 Geometry::Geometry(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, const std::vector<std::shared_ptr<Light>> &lights, float initial_time)
     : _device{device},
-      _evaluate_interactions_kernel{device->create_kernel("geometry_evaluate_interactions")} {
+      _evaluate_interactions_kernel{device->load_kernel("geometry_evaluate_interactions")} {
     
     // load geometry
     LUISA_WARNING_IF(shapes.empty(), "No shape in scene");
@@ -178,38 +178,38 @@ Geometry::Geometry(Device *device, const std::vector<std::shared_ptr<Shape>> &sh
     // create geometry buffers
     {
         auto positions = geometry_encoder._steal_positions();
-        _position_buffer = _device->create_buffer<float3>(positions.size(), BufferStorage::MANAGED);
+        _position_buffer = _device->allocate_buffer<float3>(positions.size(), BufferStorage::MANAGED);
         std::copy(positions.cbegin(), positions.cend(), _position_buffer->view().data());
         _position_buffer->upload();
     }
     
     {
         auto normals = geometry_encoder._steal_normals();
-        _normal_buffer = _device->create_buffer<float3>(normals.size(), BufferStorage::MANAGED);
+        _normal_buffer = _device->allocate_buffer<float3>(normals.size(), BufferStorage::MANAGED);
         std::copy(normals.cbegin(), normals.cend(), _normal_buffer->view().data());
         _normal_buffer->upload();
     }
     
     {
         auto tex_coords = geometry_encoder._steal_texture_coords();
-        _tex_coord_buffer = _device->create_buffer<float2>(tex_coords.size(), BufferStorage::MANAGED);
+        _tex_coord_buffer = _device->allocate_buffer<float2>(tex_coords.size(), BufferStorage::MANAGED);
         std::copy(tex_coords.cbegin(), tex_coords.cend(), _tex_coord_buffer->view().data());
         _tex_coord_buffer->upload();
     }
     
     {
         auto indices = geometry_encoder._steal_indices();
-        _index_buffer = _device->create_buffer<packed_uint3>(indices.size(), BufferStorage::MANAGED);
+        _index_buffer = _device->allocate_buffer<packed_uint3>(indices.size(), BufferStorage::MANAGED);
         std::copy(indices.cbegin(), indices.cend(), _index_buffer->view().data());
         _index_buffer->upload();
     }
     
     LUISA_INFO("Geometry loaded, vertices: ", _position_buffer->size(), ", triangles: ", _index_buffer->size());
     
-    _dynamic_transform_buffer = _device->create_buffer<float4x4>(shapes.size(), BufferStorage::MANAGED);
-    _entity_index_buffer = _device->create_buffer<uint>(shapes.size(), BufferStorage::MANAGED);
-    _index_offset_buffer = _device->create_buffer<uint>(shapes.size(), BufferStorage::MANAGED);
-    _vertex_offset_buffer = _device->create_buffer<uint>(shapes.size(), BufferStorage::MANAGED);
+    _dynamic_transform_buffer = _device->allocate_buffer<float4x4>(shapes.size(), BufferStorage::MANAGED);
+    _entity_index_buffer = _device->allocate_buffer<uint>(shapes.size(), BufferStorage::MANAGED);
+    _index_offset_buffer = _device->allocate_buffer<uint>(shapes.size(), BufferStorage::MANAGED);
+    _vertex_offset_buffer = _device->allocate_buffer<uint>(shapes.size(), BufferStorage::MANAGED);
     
     auto offset = 0u;
     auto transform_buffer = _dynamic_transform_buffer->view();
@@ -256,7 +256,7 @@ Geometry::Geometry(Device *device, const std::vector<std::shared_ptr<Shape>> &sh
     vertex_offset_buffer.upload();
     
     // create acceleration
-    _acceleration = _device->create_acceleration(*this);
+    _acceleration = _device->build_acceleration(*this);
 }
 
 void Geometry::update(float time) {

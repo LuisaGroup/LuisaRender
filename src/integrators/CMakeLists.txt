@@ -1,0 +1,1 @@
+luisa_render_add_plugin(normal_visualizer SOURCES normal_visualizer.cpp normal_visualizer.h)

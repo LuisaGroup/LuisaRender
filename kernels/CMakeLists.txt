@@ -1,6 +1,6 @@
 add_library(kernels INTERFACE)
 
-if (ENABLE_METAL)
+if (LUISA_RENDER_ENABLE_METAL)
     
     set(INCLUDE_DIRECTORY "${CMAKE_SOURCE_DIR}/src")
     

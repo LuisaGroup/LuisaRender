@@ -1,0 +1,11 @@
+add_library(metal_backend INTERFACE)
+
+if (LUISA_RENDER_ENABLE_METAL)
+    enable_language(OBJC)
+    enable_language(OBJCXX)
+    file(GLOB SOURCE_FILES *.cpp *.mm *.h)
+    add_library(metal_backend_dll SHARED ${SOURCE_FILES})
+    target_compile_options(metal_backend_dll PRIVATE $<$<OR:$<COMPILE_LANGUAGE:OBJC>,$<COMPILE_LANGUAGE:OBJCXX>>:-fobjc-arc>)
+    target_link_libraries(metal_backend_dll PRIVATE luisarender::core "-framework Foundation" "-framework Metal" "-framework MetalPerformanceShaders")
+    target_link_libraries(metal_backend INTERFACE metal_backend_dll)
+endif ()

@@ -69,7 +69,7 @@ public:
     template<typename T>
     void add(std::string name) {
         LUISA_EXCEPTION_IF_NOT(_buffers.find(name) == _buffers.end(), "Ray attribute already exists: ", name);
-        _buffers.emplace(name, _device->allocate_buffer(sizeof(T) * _capacity, BufferStorage::DEVICE_PRIVATE));
+        _buffers.emplace(name, _device->allocate_typeless_buffer(sizeof(T) * _capacity, BufferStorage::DEVICE_PRIVATE));
     }
     
     template<typename T>

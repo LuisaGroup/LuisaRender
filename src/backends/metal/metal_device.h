@@ -34,9 +34,9 @@ protected:
 public:
     MetalDevice();
     ~MetalDevice() noexcept override = default;
-    std::unique_ptr<Kernel> create_kernel(std::string_view function_name) override;
-    std::unique_ptr<Acceleration> create_acceleration(Geometry &geometry) override;
-    std::unique_ptr<TypelessBuffer> allocate_buffer(size_t capacity, BufferStorage storage) override;
+    std::unique_ptr<Kernel> load_kernel(std::string_view function_name) override;
+    std::unique_ptr<Acceleration> build_acceleration(Geometry &geometry) override;
+    std::unique_ptr<TypelessBuffer> allocate_typeless_buffer(size_t capacity, BufferStorage storage) override;
     
     void launch(std::function<void(KernelDispatcher &)> dispatch) override;
 };

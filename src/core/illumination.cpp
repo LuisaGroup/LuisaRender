@@ -11,9 +11,9 @@ namespace luisa {
 Illumination::Illumination(Device *device, const std::vector<std::shared_ptr<Light>> &lights, Geometry *geometry)
     : _device{device},
       _geometry{geometry},
-      _info_buffer{device->create_buffer<illumination::Info>(lights.size(), BufferStorage::MANAGED)},
-      _uniform_select_lights_kernel{device->create_kernel("illumination_uniform_select_lights")},
-      _collect_light_interactions_kernel{device->create_kernel("illumination_collect_light_interactions")} {
+      _info_buffer{device->allocate_buffer<illumination::Info>(lights.size(), BufferStorage::MANAGED)},
+      _uniform_select_lights_kernel{device->load_kernel("illumination_uniform_select_lights")},
+      _collect_light_interactions_kernel{device->load_kernel("illumination_collect_light_interactions")} {
     
     _lights.reserve(lights.size());
     for (auto &&light : lights) {  // collect abstract lights
@@ -33,7 +33,7 @@ Illumination::Illumination(Device *device, const std::vector<std::shared_ptr<Lig
         }
     }
     
-    _instance_to_light_info_buffer = _device->create_buffer<illumination::Info>(_geometry->instance_count(), BufferStorage::MANAGED);
+    _instance_to_light_info_buffer = _device->allocate_buffer<illumination::Info>(_geometry->instance_count(), BufferStorage::MANAGED);
     
     std::array<uint, Light::MAX_LIGHT_TAG_COUNT> light_counts{};
     std::array<uint, Light::MAX_LIGHT_TAG_COUNT> light_data_strides{};
@@ -67,7 +67,7 @@ Illumination::Illumination(Device *device, const std::vector<std::shared_ptr<Lig
         }
     }
     
-    _cdf_buffer = _device->create_buffer<float>(std::max(cdf_offset, 1u), BufferStorage::MANAGED);
+    _cdf_buffer = _device->allocate_buffer<float>(std::max(cdf_offset, 1u), BufferStorage::MANAGED);
     for (auto &&entity : entity_to_cdf_range_and_area) {
         for (auto i = 0u; i < entity.first->triangle_count(); i++) {
             auto indices = entity.first->index_buffer()[i];
@@ -88,7 +88,7 @@ Illumination::Illumination(Device *device, const std::vector<std::shared_ptr<Lig
     std::array<uint, Light::MAX_LIGHT_TAG_COUNT> encoded_light_counts{};
     _light_data_buffers.reserve(_light_sampling_kernels.size());
     for (auto tag = 0u; tag < _light_sampling_kernels.size(); tag++) {
-        _light_data_buffers.emplace_back(_device->allocate_buffer(light_data_strides[tag] * light_counts[tag], BufferStorage::MANAGED));
+        _light_data_buffers.emplace_back(_device->allocate_typeless_buffer(light_data_strides[tag] * light_counts[tag], BufferStorage::MANAGED));
     }
     for (auto &&light : _lights) {
         if (auto shape = light->shape(); shape == nullptr) {

@@ -29,8 +29,8 @@ LUISA_REGISTER_NODE_CREATOR("Independent", IndependentSampler)
 
 IndependentSampler::IndependentSampler(Device *device, const ParameterSet &parameter_set)
     : Sampler{device, parameter_set},
-      _reset_states_kernel{device->create_kernel("independent_sampler_reset_states")},
-      _generate_samples_kernel{device->create_kernel("independent_sampler_generate_samples")} {}
+      _reset_states_kernel{device->load_kernel("independent_sampler_reset_states")},
+      _generate_samples_kernel{device->load_kernel("independent_sampler_generate_samples")} {}
 
 void IndependentSampler::_generate_samples(
     KernelDispatcher &dispatch,
@@ -50,7 +50,7 @@ void IndependentSampler::_generate_samples(
 void IndependentSampler::_reset_states() {
     auto size = _film_viewport.size.x * _film_viewport.size.y;
     if (_state_buffer == nullptr || _state_buffer->size() < size) {
-        _state_buffer = _device->create_buffer<sampler::independent::State>(size, BufferStorage::DEVICE_PRIVATE);
+        _state_buffer = _device->allocate_buffer<sampler::independent::State>(size, BufferStorage::DEVICE_PRIVATE);
     }
     _device->launch_async([&](KernelDispatcher &dispatch) {
         dispatch(*_reset_states_kernel, size, [&](KernelArgumentEncoder &encode) {

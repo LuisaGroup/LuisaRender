@@ -1,0 +1,1 @@
+luisa_render_add_plugin(single_shot SOURCES single_shot.cpp)

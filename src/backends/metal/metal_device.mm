@@ -55,9 +55,10 @@ MetalDevice::MetalDevice()
     auto library_path = make_objc_string(ResourceManager::instance().working_path("kernels/metal/bin/kernels.metallib").c_str());
     _library_wrapper->library = [_device_wrapper->device newLibraryWithFile:library_path error:nullptr];
     
+    LUISA_ERROR_IF(_library_wrapper->library == nullptr, "Failed to load Metal library");
 }
 
-std::unique_ptr<Kernel> MetalDevice::create_kernel(std::string_view function_name) {
+std::unique_ptr<Kernel> MetalDevice::load_kernel(std::string_view function_name) {
     
     std::string name{function_name};
     auto iter = _function_wrappers.find(name);
@@ -98,14 +99,14 @@ void MetalDevice::_launch_async(std::function<void(KernelDispatcher &)> dispatch
     [command_buffer commit];
 }
 
-std::unique_ptr<TypelessBuffer> MetalDevice::allocate_buffer(size_t capacity, BufferStorage storage) {
+std::unique_ptr<TypelessBuffer> MetalDevice::allocate_typeless_buffer(size_t capacity, BufferStorage storage) {
     
     auto buffer = [_device_wrapper->device newBufferWithLength:capacity
                                                        options:storage == BufferStorage::DEVICE_PRIVATE ? MTLResourceStorageModePrivate : MTLResourceStorageModeManaged];
     return std::make_unique<MetalBuffer>(buffer, capacity, storage);
 }
 
-std::unique_ptr<Acceleration> MetalDevice::create_acceleration(Geometry &geometry) {
+std::unique_ptr<Acceleration> MetalDevice::build_acceleration(Geometry &geometry) {
     
     auto acceleration_group = [[MPSAccelerationStructureGroup alloc] initWithDevice:_device_wrapper->device];
     auto instance_acceleration = [[MPSInstanceAccelerationStructure alloc] initWithGroup:acceleration_group];

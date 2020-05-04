@@ -65,7 +65,7 @@ public:
         : Node{device},
           _film{parameters["film"].parse<Film>()},
           _transform{parameters["transform"].parse_or_null<Transform>()},
-          _generate_pixel_samples_without_filter_kernel{device->create_kernel("camera_generate_pixel_samples_without_filter")} {}
+          _generate_pixel_samples_without_filter_kernel{device->load_kernel("camera_generate_pixel_samples_without_filter")} {}
     
     virtual void update(float time) {
         if (_transform != nullptr) {

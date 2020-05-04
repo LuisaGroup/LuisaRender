@@ -34,7 +34,7 @@ void Sampler::reset_states(uint2 film_resolution, Viewport film_viewport) {
     _film_viewport = film_viewport;
     auto film_viewport_pixel_count = _film_viewport.size.x * _film_viewport.size.y;
     if (_sample_buffer == nullptr || _sample_buffer->size() < film_viewport_pixel_count) {
-        _sample_buffer = _device->create_buffer<float4>(film_viewport_pixel_count, BufferStorage::DEVICE_PRIVATE);
+        _sample_buffer = _device->allocate_buffer<float4>(film_viewport_pixel_count, BufferStorage::DEVICE_PRIVATE);
     }
     _reset_states();
 }

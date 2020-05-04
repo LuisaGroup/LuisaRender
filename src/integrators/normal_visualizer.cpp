@@ -59,7 +59,7 @@ void NormalVisualizer::render_frame(KernelDispatcher &dispatch) {
 void NormalVisualizer::_prepare_for_frame() {
     
     if (_ray_count == nullptr) {
-        _ray_count = _device->create_buffer<uint>(1u, BufferStorage::MANAGED);
+        _ray_count = _device->allocate_buffer<uint>(1u, BufferStorage::MANAGED);
     }
     
     auto viewport_pixel_count = _viewport.size.x * _viewport.size.y;
@@ -69,16 +69,16 @@ void NormalVisualizer::_prepare_for_frame() {
     }
     
     if (_ray_buffer == nullptr || _ray_buffer->size() < viewport_pixel_count) {
-        _ray_buffer = _device->create_buffer<Ray>(viewport_pixel_count, BufferStorage::DEVICE_PRIVATE);
+        _ray_buffer = _device->allocate_buffer<Ray>(viewport_pixel_count, BufferStorage::DEVICE_PRIVATE);
     }
     if (_ray_pixel_buffer == nullptr || _ray_pixel_buffer->size() < viewport_pixel_count) {
-        _ray_pixel_buffer = _device->create_buffer<float2>(viewport_pixel_count, BufferStorage::DEVICE_PRIVATE);
+        _ray_pixel_buffer = _device->allocate_buffer<float2>(viewport_pixel_count, BufferStorage::DEVICE_PRIVATE);
     }
     if (_hit_buffer == nullptr || _hit_buffer->size() < viewport_pixel_count) {
-        _hit_buffer = _device->create_buffer<ClosestHit>(viewport_pixel_count, BufferStorage::DEVICE_PRIVATE);
+        _hit_buffer = _device->allocate_buffer<ClosestHit>(viewport_pixel_count, BufferStorage::DEVICE_PRIVATE);
     }
     if (_ray_throughput_buffer == nullptr || _ray_throughput_buffer->size() < viewport_pixel_count) {
-        _ray_throughput_buffer = _device->create_buffer<float3>(viewport_pixel_count, BufferStorage::DEVICE_PRIVATE);
+        _ray_throughput_buffer = _device->allocate_buffer<float3>(viewport_pixel_count, BufferStorage::DEVICE_PRIVATE);
     }
     if (_interaction_buffers.size() < viewport_pixel_count || !_interaction_buffers.has_normal_buffer()) {
         _interaction_buffers = InteractionBufferSet{_device, viewport_pixel_count, interaction::attribute::NORMAL};
@@ -87,6 +87,6 @@ void NormalVisualizer::_prepare_for_frame() {
 
 NormalVisualizer::NormalVisualizer(Device *device, const ParameterSet &parameter_set)
     : Integrator{device, parameter_set},
-      _colorize_normals_kernel{device->create_kernel("normal_visualizer_colorize_normals")} {}
+      _colorize_normals_kernel{device->load_kernel("normal_visualizer_colorize_normals")} {}
     
 }

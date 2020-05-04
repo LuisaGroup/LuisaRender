@@ -1,0 +1,2 @@
+luisa_render_add_plugin(pinhole_camera SOURCES pinhole_camera.cpp pinhole_camera.h)
+luisa_render_add_plugin(thin_lens_camera SOURCES thin_lens_camera.cpp thin_lens_camera.h)

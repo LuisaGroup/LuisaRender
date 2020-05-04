@@ -1,0 +1,32 @@
+add_library(headers INTERFACE)
+target_include_directories(headers INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+add_library(luisarender::headers ALIAS headers)
+
+add_subdirectory(util)
+add_subdirectory(core)
+add_subdirectory(backends)
+
+add_library(plugins INTERFACE)
+function(luisa_render_add_plugin name)
+    cmake_parse_arguments(PLUGIN "" "" "SOURCES" ${ARGN})
+    add_library(${name} SHARED ${PLUGIN_SOURCES})
+    target_compile_features(${name} PRIVATE c_std_11 cxx_std_17)
+    target_link_libraries(${name} PRIVATE luisarender::core)
+    target_link_libraries(plugins INTERFACE ${name})
+endfunction()
+
+add_subdirectory(bsdfs)
+add_subdirectory(cameras)
+add_subdirectory(films)
+add_subdirectory(filters)
+add_subdirectory(integrators)
+add_subdirectory(lights)
+add_subdirectory(renders)
+add_subdirectory(samplers)
+add_subdirectory(shapes)
+add_subdirectory(transforms)
+
+add_library(luisarender INTERFACE)
+target_link_libraries(luisarender INTERFACE luisarender::util luisarender::core luisarender::backends plugins)
+
+add_library(luisarender::luisarender ALIAS luisarender)

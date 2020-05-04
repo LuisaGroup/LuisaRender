@@ -1,0 +1,2 @@
+luisa_render_add_plugin(trs_transform SOURCES trs_transform.cpp trs_transform.h)
+luisa_render_add_plugin(linear_trs_animation SOURCES linear_trs_animation.cpp trs_transform.h)

@@ -1,0 +1,3 @@
+luisa_render_add_plugin(shape_instance SOURCES shape_instance.cpp)
+luisa_render_add_plugin(shape_replica SOURCES shape_replica.cpp)
+luisa_render_add_plugin(triangle_mesh SOURCES triangle_mesh.cpp)

@@ -33,8 +33,8 @@ private:
 
 public:
     LightSampleBufferSet(Device *device, size_t capacity)
-        : _radiance_and_pdf_w_buffer{device->create_buffer<float4>(capacity, BufferStorage::DEVICE_PRIVATE)},
-          _shadow_ray_buffer{device->create_buffer<Ray>(capacity, BufferStorage::DEVICE_PRIVATE)} {}
+        : _radiance_and_pdf_w_buffer{device->allocate_buffer<float4>(capacity, BufferStorage::DEVICE_PRIVATE)},
+          _shadow_ray_buffer{device->allocate_buffer<Ray>(capacity, BufferStorage::DEVICE_PRIVATE)} {}
     
     [[nodiscard]] auto radiance_and_pdf_w_buffer() { return _radiance_and_pdf_w_buffer->view(); }
     [[nodiscard]] auto shadow_ray_buffer() { return _shadow_ray_buffer->view(); }

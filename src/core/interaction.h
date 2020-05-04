@@ -65,15 +65,15 @@ public:
     InteractionBufferSet(Device *device, size_t capacity, uint flags = interaction::attribute::ALL)
         : _size{capacity},
           _attribute_flags{flags},
-          _state_buffer{device->create_buffer<uint8_t>(capacity, BufferStorage::DEVICE_PRIVATE)},
-          _position_buffer{(flags & interaction::attribute::POSITION) ? device->create_buffer<float3>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
-          _normal_buffer{(flags & interaction::attribute::NORMAL) ? device->create_buffer<float3>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
-          _uv_buffer{(flags & interaction::attribute::UV) ? device->create_buffer<float2>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
-          _wo_and_pdf_buffer{(flags & interaction::attribute::WO_AND_PDF) ? device->create_buffer<float4>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
-          _instance_id_buffer{(flags & interaction::attribute::INSTANCE_ID) ? device->create_buffer<uint>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
-          _emission_buffer{(flags & interaction::attribute::EMISSION) ? device->create_buffer<float3>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
-          _scattering_buffer{(flags & interaction::attribute::SCATTERING) ? device->create_buffer<float3>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
-          _wi_and_pdf_buffer{(flags & interaction::attribute::WI_AND_PDF) ? device->create_buffer<float4>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr} {}
+          _state_buffer{device->allocate_buffer<uint8_t>(capacity, BufferStorage::DEVICE_PRIVATE)},
+          _position_buffer{(flags & interaction::attribute::POSITION) ? device->allocate_buffer<float3>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
+          _normal_buffer{(flags & interaction::attribute::NORMAL) ? device->allocate_buffer<float3>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
+          _uv_buffer{(flags & interaction::attribute::UV) ? device->allocate_buffer<float2>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
+          _wo_and_pdf_buffer{(flags & interaction::attribute::WO_AND_PDF) ? device->allocate_buffer<float4>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
+          _instance_id_buffer{(flags & interaction::attribute::INSTANCE_ID) ? device->allocate_buffer<uint>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
+          _emission_buffer{(flags & interaction::attribute::EMISSION) ? device->allocate_buffer<float3>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
+          _scattering_buffer{(flags & interaction::attribute::SCATTERING) ? device->allocate_buffer<float3>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr},
+          _wi_and_pdf_buffer{(flags & interaction::attribute::WI_AND_PDF) ? device->allocate_buffer<float4>(capacity, BufferStorage::DEVICE_PRIVATE) : nullptr} {}
     
     [[nodiscard]] size_t size() const noexcept { return _size; }
     [[nodiscard]] uint attribute_flags() const noexcept { return _attribute_flags; }
