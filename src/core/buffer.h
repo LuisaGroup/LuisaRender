@@ -63,7 +63,7 @@ protected:
     BufferStorage _storage;
 
 public:
-    TypelessBuffer(size_t capacity, BufferStorage storage) noexcept : _capacity{capacity}, _storage{storage} {};
+    TypelessBuffer(size_t capacity, BufferStorage storage) noexcept: _capacity{capacity}, _storage{storage} {};
     virtual ~TypelessBuffer() noexcept = default;
     virtual void upload(size_t offset, size_t size) = 0;
     void upload() { upload(0ul, _capacity); }
@@ -94,7 +94,7 @@ private:
 
 public:
     Buffer() = delete;
-    explicit Buffer(std::unique_ptr<TypelessBuffer> mem) noexcept : _typeless_buffer{std::move(mem)} {
+    explicit Buffer(std::unique_ptr<TypelessBuffer> mem) noexcept: _typeless_buffer{std::move(mem)} {
         assert(_typeless_buffer->capacity() % sizeof(Element) == 0);
     }
     
@@ -102,6 +102,7 @@ public:
         assert((element_count + element_offset) * sizeof(Element) <= _typeless_buffer->capacity());
         return BufferView<Element>{_typeless_buffer.get(), element_offset, element_count};
     }
+    
     [[nodiscard]] auto view(size_t element_offset = 0ul) noexcept {
         assert(_typeless_buffer->capacity() % sizeof(Element) == 0ul);
         return BufferView<Element>{_typeless_buffer.get(), element_offset, _typeless_buffer->capacity() / sizeof(Element) - element_offset};
@@ -135,8 +136,8 @@ T *BufferView<T>::data() {
 
 template<typename T>
 void BufferView<T>::upload() { _buffer->upload(byte_offset(), byte_size()); }
-template<typename T>
 
+template<typename T>
 auto BufferView<T>::subview(size_t offset, size_t size) {
     LUISA_EXCEPTION_IF(offset + size > _element_count, "Buffer overflow");
     return _buffer->view_as<T>(_element_offset + offset, size);

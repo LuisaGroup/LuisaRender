@@ -113,7 +113,7 @@ std::shared_ptr<Render> Parser::_parse_top_level() {
         auto node_name = _peek_and_pop();                                                                                                                       \
         LUISA_EXCEPTION_IF_NOT(_is_identifier(node_name), "Invalid identifier: ", node_name);                                                                       \
         LUISA_WARNING_IF_NOT(_global_nodes.find(node_name) == _global_nodes.end(), "Duplicated global node, overwriting the one defined before: ", node_name);  \
-        LUISA_INFO("Parsing global node \"", node_name, "\", type: ", #Type);                                                                                   \
+        LUISA_INFO("Parsing global node: \"", node_name, "\", type: ", #Type);                                                                                   \
         _global_nodes.emplace(node_name, _parse_parameter_set()->parse<Type>());                                                                                \
         continue;                                                                                                                                               \
     }

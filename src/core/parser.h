@@ -82,7 +82,7 @@ private:
 
 private:
     std::unique_ptr<ParameterSet> _empty{};
-    ParameterSet(Parser *parser) noexcept: _parser{parser} {}  // only for making _empty
+    explicit ParameterSet(Parser *parser) noexcept: _parser{parser} {}  // only for making _empty
 
 public:
     ParameterSet(Parser *parser, std::vector<std::string_view> value_list) noexcept: _parser{parser}, _value_list{std::move(value_list)}, _is_value_list{true} {
@@ -95,7 +95,7 @@ public:
     }
     
     [[nodiscard]] const ParameterSet &operator[](std::string_view parameter_name) const {
-        LUISA_INFO("Processing parameter \"", parameter_name, "\"");
+        LUISA_INFO("Processing parameter: \"", parameter_name, "\"");
         return _child(parameter_name);
     }
     
@@ -125,9 +125,7 @@ public:
     [[nodiscard]] std::vector<bool> parse_bool_list() const {
         std::vector<bool> bool_list;
         bool_list.reserve(_value_list.size());
-        for (auto sv : _value_list) {
-            bool_list.emplace_back(_parse_bool(sv));
-        }
+        for (auto sv : _value_list) { bool_list.emplace_back(_parse_bool(sv)); }
         return bool_list;
     }
     
