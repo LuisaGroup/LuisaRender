@@ -28,7 +28,7 @@ LUISA_KERNEL void generate_samples(
         tid.x);
 }
 
-LUISA_KERNEL void diffuse_area_light_evaluate_emissions(
+LUISA_KERNEL void evaluate_emissions(
     LUISA_DEVICE_SPACE const light::diffuse_area::Data *data_buffer,
     LUISA_DEVICE_SPACE const light::Selection *queue,
     LUISA_DEVICE_SPACE const uint &queue_size,
