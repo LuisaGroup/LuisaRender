@@ -3,7 +3,7 @@
 //
 
 #include <core/sampler.h>
-#include "independent_sampler.h"
+#include "independent.h"
 
 namespace luisa {
 

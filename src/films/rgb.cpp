@@ -5,7 +5,7 @@
 #include <opencv2/opencv.hpp>
 #include <core/film.h>
 
-#include "rgb_film.h"
+#include "rgb.h"
 
 namespace luisa {
 

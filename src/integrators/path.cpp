@@ -4,7 +4,7 @@
 
 #include <core/integrator.h>
 
-#include "path_tracing.h"
+#include "path.h"
 
 namespace luisa {
 

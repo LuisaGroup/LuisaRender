@@ -1,5 +1,5 @@
 #include "compatibility.h"
-#include <lights/diffuse_area_light.h>
+#include <lights/diffuse_area.h>
 
 using namespace luisa;
 

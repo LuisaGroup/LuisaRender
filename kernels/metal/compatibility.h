@@ -4,9 +4,7 @@
 
 #pragma once
 
-#ifdef __METAL_VERSION__
-
-#define LUISA_DEVICE_COMPATIBLE
+#ifdef LUISA_DEVICE_COMPATIBLE
 
 #include <metal_stdlib>
 
@@ -16,29 +14,66 @@ using namespace simd;
 
 inline namespace math {
 
-using namespace metal;
-
+using metal::cos;
 #define LUISA_MATH_HAS_BUILTIN_VECTOR_COS
+
+using metal::sin;
 #define LUISA_MATH_HAS_BUILTIN_VECTOR_SIN
+
+using metal::tan;
 #define LUISA_MATH_HAS_BUILTIN_VECTOR_TAN
+
+using metal::acos;
 #define LUISA_MATH_HAS_BUILTIN_VECTOR_ACOS
+
+using metal::asin;
 #define LUISA_MATH_HAS_BUILTIN_VECTOR_ASIN
+
+using metal::atan;
 #define LUISA_MATH_HAS_BUILTIN_VECTOR_ATAN
+
+using metal::atan2;
 #define LUISA_MATH_HAS_BUILTIN_VECTOR_ATAN2
+
+using metal::ceil;
 #define LUISA_MATH_HAS_BUILTIN_VECTOR_CEIL
+
+using metal::floor;
 #define LUISA_MATH_HAS_BUILTIN_VECTOR_FLOOR
+
+using metal::round;
 #define LUISA_MATH_HAS_BUILTIN_VECTOR_ROUND
+
+using metal::log;
 #define LUISA_MATH_HAS_BUILTIN_VECTOR_LOG
+
+using metal::exp;
 #define LUISA_MATH_HAS_BUILTIN_VECTOR_EXP
+
+using metal::log2;
 #define LUISA_MATH_HAS_BUILTIN_VECTOR_LOG2
+
+using metal::log10;
 #define LUISA_MATH_HAS_BUILTIN_VECTOR_LOG10
+
+using metal::pow;
 #define LUISA_MATH_HAS_BUILTIN_VECTOR_POW
+
+using metal::min;
 #define LUISA_MATH_HAS_BUILTIN_VECTOR_MIN
+
+using metal::max;
 #define LUISA_MATH_HAS_BUILTIN_VECTOR_MAX
+
+using metal::abs;
 #define LUISA_MATH_HAS_BUILTIN_VECTOR_ABS
+
+using metal::clamp;
 #define LUISA_MATH_HAS_BUILTIN_VECTOR_CLAMP
 
 #define LUISA_MATH_HAS_BUILTIN_MATRIX_TRANSPOSE
+
+using metal::cross;
 
 }}
 

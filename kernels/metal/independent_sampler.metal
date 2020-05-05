@@ -1,5 +1,5 @@
 #include "compatibility.h"
-#include <samplers/independent_sampler.h>
+#include <samplers/independent.h>
 
 LUISA_KERNEL void reset_states(
     LUISA_UNIFORM_SPACE luisa::Viewport &film_viewport,

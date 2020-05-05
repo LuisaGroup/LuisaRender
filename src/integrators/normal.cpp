@@ -5,7 +5,7 @@
 #include <core/integrator.h>
 #include <core/geometry.h>
 
-#include "normal_visualizer.h"
+#include "normal.h"
 
 namespace luisa {
 

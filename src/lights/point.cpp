@@ -2,7 +2,7 @@
 // Created by Mike Smith on 2020/2/17.
 //
 
-#include "point_light.h"
+#include "point.h"
 
 namespace luisa {
 

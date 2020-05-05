@@ -1,5 +1,5 @@
 #include "compatibility.h"
-#include <cameras/pinhole_camera.h>
+#include <cameras/pinhole.h>
 
 using namespace luisa;
 

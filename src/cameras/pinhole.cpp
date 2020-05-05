@@ -5,7 +5,7 @@
 #include <core/mathematics.h>
 #include <core/camera.h>
 
-#include "pinhole_camera.h"
+#include "pinhole.h"
 
 namespace luisa {
 

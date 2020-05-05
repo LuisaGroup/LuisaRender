@@ -1,2 +1,2 @@
-luisa_render_add_plugin(diffuse_area_light SOURCES diffuse_area_light.cpp diffuse_area_light.h)
-luisa_render_add_plugin(point_light SOURCES point_light.cpp point_light.h)
+luisa_render_add_plugin(diffuse_area SOURCES diffuse_area.cpp diffuse_area.h)
+luisa_render_add_plugin(point SOURCES point.cpp point.h)

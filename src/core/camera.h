@@ -68,9 +68,7 @@ public:
           _generate_pixel_samples_without_filter_kernel{device->load_kernel("camera::generate_pixel_samples_without_filter")} {}
     
     virtual void update(float time) {
-        if (_transform != nullptr) {
-            _camera_to_world = _transform->dynamic_matrix(time) * _transform->static_matrix();
-        }
+        if (_transform != nullptr) { _camera_to_world = _transform->dynamic_matrix(time) * _transform->static_matrix(); }
     }
     
     virtual void generate_rays(KernelDispatcher &dispatch,

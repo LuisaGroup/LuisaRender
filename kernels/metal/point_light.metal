@@ -1,5 +1,5 @@
 #include "compatibility.h"
-#include <lights/point_light.h>
+#include <lights/point.h>
 
 using namespace luisa;
 

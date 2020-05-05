@@ -4,7 +4,7 @@
 
 #include <core/shape.h>
 
-#include "diffuse_area_light.h"
+#include "diffuse_area.h"
 
 namespace luisa {
 

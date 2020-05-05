@@ -1,4 +1,4 @@
-luisa_render_add_plugin(rgb_film SOURCES rgb_film.cpp rgb_film.h)
+luisa_render_add_plugin(rgb SOURCES rgb.cpp rgb.h)
 
 find_package(OpenCV REQUIRED)
-target_link_libraries(rgb_film PRIVATE ${OpenCV_LIBS})
+target_link_libraries(rgb PRIVATE ${OpenCV_LIBS})

@@ -6,7 +6,7 @@
 #include <core/camera.h>
 #include <core/mathematics.h>
 
-#include "thin_lens_camera.h"
+#include "thin_lens.h"
 
 namespace luisa {
 

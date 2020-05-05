@@ -1,5 +1,5 @@
 #include "compatibility.h"
-#include <integrators/normal_visualizer.h>
+#include <integrators/normal.h>
 
 using namespace luisa;
 

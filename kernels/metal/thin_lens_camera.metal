@@ -1,5 +1,5 @@
 #include "compatibility.h"
-#include <cameras/thin_lens_camera.h>
+#include <cameras/thin_lens.h>
 
 using namespace luisa;
 

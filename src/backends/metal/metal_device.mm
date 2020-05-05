@@ -171,7 +171,6 @@ id<MTLLibrary> MetalDevice::_load_library(std::string_view library_name) {
         auto source_path = ResourceManager::instance().working_path(serialize("kernels/metal/", library_name, ".metal"));
         auto ir_path = ResourceManager::instance().working_path(serialize("kernels/metal/", library_name, ".air"));
         auto library_path = ResourceManager::instance().working_path(serialize("kernels/metal/", library_name, ".metallib"));
-        auto log_path = ResourceManager::instance().working_path(serialize("kernels/metal/", library_name, ".log"));
         auto include_path = ResourceManager::instance().working_path(serialize("src"));
         
         RAII raii{[&] {
@@ -181,16 +180,13 @@ id<MTLLibrary> MetalDevice::_load_library(std::string_view library_name) {
         }};
         
         auto compile_command = serialize("xcrun -sdk macosx metal -Wall -Wextra -Wno-c++17-extensions -O3 -ffast-math -I ", include_path,
-                                         " -c ", source_path, " -o ", ir_path, " -D DEVICE_COMPATIBLE > ", log_path);
+                                         " -c ", source_path, " -o ", ir_path, " -D LUISA_DEVICE_COMPATIBLE");
         LUISA_INFO("Compiling Metal source: ", source_path);
-        LUISA_EXCEPTION_IF(system(compile_command.c_str()) != 0, "Failed to compile Metal source, see log: ", log_path);
+        LUISA_EXCEPTION_IF(system(compile_command.c_str()) != 0, "Failed to compile Metal source, command: ", compile_command);
         
-        auto archive_command = serialize("xcrun -sdk macosx metallib ", ir_path, " -o ", library_path, " > ", log_path);
+        auto archive_command = serialize("xcrun -sdk macosx metallib ", ir_path, " -o ", library_path);
         LUISA_INFO("Archiving Metal library: ", ir_path);
-        LUISA_EXCEPTION_IF(system(archive_command.c_str()) != 0, "Failed to archive Metal library, see log: ", log_path);
-        
-        std::error_code error;
-        std::filesystem::remove(log_path, error);
+        LUISA_EXCEPTION_IF(system(archive_command.c_str()) != 0, "Failed to archive Metal library, command: ", archive_command);
         
         auto library = [_device_wrapper->device newLibraryWithFile:make_objc_string(library_path.string()) error:nullptr];
         LUISA_EXCEPTION_IF(library == nullptr, "Failed to load library: ", library_path);

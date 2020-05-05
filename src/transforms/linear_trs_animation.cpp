@@ -4,7 +4,7 @@
 
 #include <algorithm>
 
-#include "trs_transform.h"
+#include "trs.h"
 
 namespace luisa {
 

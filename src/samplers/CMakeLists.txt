@@ -1,1 +1,1 @@
-luisa_render_add_plugin(independent_sampler SOURCES independent_sampler.cpp independent_sampler.h)
+luisa_render_add_plugin(independent SOURCES independent.cpp independent.h)

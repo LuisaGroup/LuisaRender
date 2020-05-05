@@ -1,5 +1,5 @@
 #include "compatibility.h"
-#include <films/rgb_film.h>
+#include <films/rgb.h>
 
 using namespace luisa;
 
