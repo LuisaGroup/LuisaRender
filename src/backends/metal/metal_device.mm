@@ -183,15 +183,11 @@ id<MTLLibrary> MetalDevice::_load_library(std::string_view library_name) {
         auto compile_command = serialize("xcrun -sdk macosx metal -Wall -Wextra -Wno-c++17-extensions -O3 -ffast-math -I ", include_path,
                                          " -c ", source_path, " -o ", ir_path, " -D DEVICE_COMPATIBLE > ", log_path);
         LUISA_INFO("Compiling Metal source: ", source_path);
-        if (system(compile_command.c_str()) != 0) {
-            LUISA_EXCEPTION("Failed to compile Metal source, see log: ", log_path);
-        }
+        LUISA_EXCEPTION_IF(system(compile_command.c_str()) != 0, "Failed to compile Metal source, see log: ", log_path);
         
         auto archive_command = serialize("xcrun -sdk macosx metallib ", ir_path, " -o ", library_path, " > ", log_path);
         LUISA_INFO("Archiving Metal library: ", ir_path);
-        if (system(archive_command.c_str()) != 0) {
-            LUISA_EXCEPTION("Failed to archive Metal library, see log: ", log_path);
-        }
+        LUISA_EXCEPTION_IF(system(archive_command.c_str()) != 0, "Failed to archive Metal library, see log: ", log_path);
         
         std::error_code error;
         std::filesystem::remove(log_path, error);
