@@ -2,6 +2,7 @@
 // Created by Mike Smith on 2019/10/24.
 //
 
+#import <cstdlib>
 #import <string>
 #import <string_view>
 
@@ -68,6 +69,7 @@ std::unique_ptr<Kernel> MetalDevice::load_kernel(std::string_view function_name)
         
         auto descriptor = [[MTLComputePipelineDescriptor alloc] init];
         auto function = [_load_library(library_name) newFunctionWithName:make_objc_string(kernel_name)];
+        LUISA_ERROR_IF(function == nullptr, "Failed to load kernel: \"", kernel_name, "\", library: \"", library_name, "\"");
         
         descriptor.computeFunction = function;
         descriptor.threadGroupSizeIsMultipleOfThreadExecutionWidth = true;
@@ -162,9 +164,38 @@ std::unique_ptr<Acceleration> MetalDevice::build_acceleration(Geometry &geometry
 }
 
 id<MTLLibrary> MetalDevice::_load_library(std::string_view library_name) {
+    
     auto library_iter = _library_wrappers.find(library_name);
     if (library_iter == _library_wrappers.end()) {
-        auto library_path = ResourceManager::instance().working_path(serialize("kernels/metal/bin/", library_name, ".metallib"));
+        
+        auto source_path = ResourceManager::instance().working_path(serialize("kernels/metal/", library_name, ".metal"));
+        auto ir_path = ResourceManager::instance().working_path(serialize("kernels/metal/", library_name, ".air"));
+        auto library_path = ResourceManager::instance().working_path(serialize("kernels/metal/", library_name, ".metallib"));
+        auto log_path = ResourceManager::instance().working_path(serialize("kernels/metal/", library_name, ".log"));
+        auto include_path = ResourceManager::instance().working_path(serialize("src"));
+        
+        RAII raii{[&] {
+            std::error_code error;
+            std::filesystem::remove(ir_path, error);
+            std::filesystem::remove(library_path, error);
+        }};
+        
+        auto compile_command = serialize("xcrun -sdk macosx metal -Wall -Wextra -Wno-c++17-extensions -O3 -ffast-math -I ", include_path,
+                                         " -c ", source_path, " -o ", ir_path, " -D DEVICE_COMPATIBLE > ", log_path);
+        LUISA_INFO("Compiling Metal source: ", source_path);
+        if (system(compile_command.c_str()) != 0) {
+            LUISA_EXCEPTION("Failed to compile Metal source, see log: ", log_path);
+        }
+        
+        auto archive_command = serialize("xcrun -sdk macosx metallib ", ir_path, " -o ", library_path, " > ", log_path);
+        LUISA_INFO("Archiving Metal library: ", ir_path);
+        if (system(archive_command.c_str()) != 0) {
+            LUISA_EXCEPTION("Failed to archive Metal library, see log: ", log_path);
+        }
+        
+        std::error_code error;
+        std::filesystem::remove(log_path, error);
+        
         auto library = [_device_wrapper->device newLibraryWithFile:make_objc_string(library_path.string()) error:nullptr];
         LUISA_EXCEPTION_IF(library == nullptr, "Failed to load library: ", library_path);
         library_iter = _library_wrappers.emplace(library_name, std::make_unique<MetalLibraryWrapper>(library)).first;

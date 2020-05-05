@@ -5,10 +5,23 @@
 #pragma once
 
 #include <filesystem>
+#include <functional>
 
 #include "concepts.h"
 
 namespace luisa { inline namespace utility {
+
+class RAII : Noncopyable {
+
+private:
+    std::function<void()> _on_destroy;
+
+public:
+    template<typename F>
+    explicit RAII(F &&f) noexcept : _on_destroy{std::forward<F>(f)} {}
+    
+    ~RAII() noexcept { _on_destroy(); }
+};
 
 class ResourceManager : Noncopyable {
 
