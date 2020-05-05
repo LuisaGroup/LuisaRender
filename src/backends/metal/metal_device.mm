@@ -26,6 +26,7 @@ struct MetalDeviceWrapper {
 
 struct MetalLibraryWrapper {
     id<MTLLibrary> library;
+    explicit MetalLibraryWrapper(id<MTLLibrary> l) noexcept: library{l} {}
     ~MetalLibraryWrapper() noexcept = default;
 };
 
@@ -46,26 +47,27 @@ struct MetalFunctionWrapper {
 
 MetalDevice::MetalDevice()
     : _device_wrapper{std::make_unique<MetalDeviceWrapper>()},
-      _library_wrapper{std::make_unique<MetalLibraryWrapper>()},
       _command_queue_wrapper{std::make_unique<MetalCommandQueueWrapper>()} {
     
     _device_wrapper->device = MTLCreateSystemDefaultDevice();
     _command_queue_wrapper->queue = [_device_wrapper->device newCommandQueue];
-    
-    auto library_path = make_objc_string(ResourceManager::instance().working_path("kernels/metal/bin/kernels.metallib").c_str());
-    _library_wrapper->library = [_device_wrapper->device newLibraryWithFile:library_path error:nullptr];
-    
-    LUISA_ERROR_IF(_library_wrapper->library == nullptr, "Failed to load Metal library");
 }
 
 std::unique_ptr<Kernel> MetalDevice::load_kernel(std::string_view function_name) {
     
-    std::string name{function_name};
-    auto iter = _function_wrappers.find(name);
+    auto separator_pos = function_name.find("::");
+    LUISA_EXCEPTION_IF(separator_pos == std::string_view::npos, "Expected separator \"::\" in function name: ", function_name);
     
+    auto library_name = function_name.substr(0, separator_pos);
+    auto kernel_name = function_name.substr(separator_pos + 2u);
+    
+    LUISA_INFO("Loading kernel: \"", kernel_name, "\", library: \"", library_name, "\"");
+    
+    auto iter = _function_wrappers.find(function_name);
     if (iter == _function_wrappers.end()) {
+        
         auto descriptor = [[MTLComputePipelineDescriptor alloc] init];
-        auto function = [_library_wrapper->library newFunctionWithName:make_objc_string(name)];
+        auto function = [_load_library(library_name) newFunctionWithName:make_objc_string(kernel_name)];
         
         descriptor.computeFunction = function;
         descriptor.threadGroupSizeIsMultipleOfThreadExecutionWidth = true;
@@ -76,7 +78,7 @@ std::unique_ptr<Kernel> MetalDevice::load_kernel(std::string_view function_name)
                                                                             reflection:&reflection
                                                                                  error:nullptr];
         
-        iter = _function_wrappers.emplace(std::move(name), std::make_unique<MetalFunctionWrapper>(function, pipeline, reflection)).first;
+        iter = _function_wrappers.emplace(std::string{function_name}, std::make_unique<MetalFunctionWrapper>(function, pipeline, reflection)).first;
     }
     
     auto function_wrapper = iter->second.get();
@@ -157,6 +159,17 @@ std::unique_ptr<Acceleration> MetalDevice::build_acceleration(Geometry &geometry
     shadow_ray_intersector.triangleIntersectionTestType = MPSTriangleIntersectionTestTypeWatertight;
     
     return std::make_unique<MetalAcceleration>(acceleration_group, instance_acceleration, ray_intersector, shadow_ray_intersector);
+}
+
+id<MTLLibrary> MetalDevice::_load_library(std::string_view library_name) {
+    auto library_iter = _library_wrappers.find(library_name);
+    if (library_iter == _library_wrappers.end()) {
+        auto library_path = ResourceManager::instance().working_path(serialize("kernels/metal/bin/", library_name, ".metallib"));
+        auto library = [_device_wrapper->device newLibraryWithFile:make_objc_string(library_path.string()) error:nullptr];
+        LUISA_EXCEPTION_IF(library == nullptr, "Failed to load library: ", library_path);
+        library_iter = _library_wrappers.emplace(library_name, std::make_unique<MetalLibraryWrapper>(library)).first;
+    }
+    return library_iter->second->library;
 }
 
 }

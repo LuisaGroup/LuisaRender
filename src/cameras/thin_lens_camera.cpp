@@ -67,7 +67,7 @@ ThinLensCamera::ThinLensCamera(Device *device, const ParameterSet &parameters)
     
     _focal_plane_distance = length(forward);
     _near_plane_distance = 1.0f / (2.0f / focal_length - 1.0f / _focal_plane_distance);
-    _generate_rays_kernel = device->load_kernel("thin_lens_camera_generate_rays");
+    _generate_rays_kernel = device->load_kernel("thin_lens_camera::generate_rays");
 }
 
 void ThinLensCamera::_generate_rays(KernelDispatcher &dispatch,

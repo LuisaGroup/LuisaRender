@@ -12,8 +12,8 @@ Illumination::Illumination(Device *device, const std::vector<std::shared_ptr<Lig
     : _device{device},
       _geometry{geometry},
       _info_buffer{device->allocate_buffer<illumination::Info>(lights.size(), BufferStorage::MANAGED)},
-      _uniform_select_lights_kernel{device->load_kernel("illumination_uniform_select_lights")},
-      _collect_light_interactions_kernel{device->load_kernel("illumination_collect_light_interactions")} {
+      _uniform_select_lights_kernel{device->load_kernel("illumination::uniform_select_lights")},
+      _collect_light_interactions_kernel{device->load_kernel("illumination::collect_light_interactions")} {
     
     _lights.reserve(lights.size());
     for (auto &&light : lights) {  // collect abstract lights

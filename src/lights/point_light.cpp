@@ -30,7 +30,7 @@ PointLight::PointLight(Device *device, const ParameterSet &parameter_set)
       _emission{parameter_set["emission"].parse_float3_or_default(make_float3(parameter_set["emission"].parse_float()))} {}
 
 std::unique_ptr<Kernel> PointLight::create_generate_samples_kernel() {
-    return _device->load_kernel("point_light_generate_samples");
+    return _device->load_kernel("point_light::generate_samples");
 }
 
 void PointLight::encode_data(TypelessBuffer &buffer, size_t data_index, uint2, uint, uint, uint, float) {

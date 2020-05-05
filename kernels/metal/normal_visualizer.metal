@@ -3,7 +3,7 @@
 
 using namespace luisa;
 
-LUISA_KERNEL void normal_visualizer_colorize_normals(
+LUISA_KERNEL void colorize_normals(
     LUISA_DEVICE_SPACE float3 *normals,
     LUISA_DEVICE_SPACE const float3 *throughput_buffer,
     LUISA_DEVICE_SPACE const uint8_t *state_buffer,

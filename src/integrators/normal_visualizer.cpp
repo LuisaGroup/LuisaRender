@@ -87,6 +87,6 @@ void NormalVisualizer::_prepare_for_frame() {
 
 NormalVisualizer::NormalVisualizer(Device *device, const ParameterSet &parameter_set)
     : Integrator{device, parameter_set},
-      _colorize_normals_kernel{device->load_kernel("normal_visualizer_colorize_normals")} {}
+      _colorize_normals_kernel{device->load_kernel("normal_visualizer::colorize_normals")} {}
     
 }

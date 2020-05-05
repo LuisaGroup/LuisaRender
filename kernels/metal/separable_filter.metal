@@ -5,7 +5,7 @@
 #include "compatibility.h"
 #include <core/filter.h>
 
-LUISA_KERNEL void separable_filter_importance_sample_pixels(
+LUISA_KERNEL void importance_sample_pixels(
     LUISA_DEVICE_SPACE const luisa::float2 *random_buffer,
     LUISA_DEVICE_SPACE luisa::float2 *pixel_location_buffer,
     LUISA_DEVICE_SPACE luisa::float3 *pixel_weight_buffer,

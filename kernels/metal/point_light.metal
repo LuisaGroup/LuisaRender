@@ -3,7 +3,7 @@
 
 using namespace luisa;
 
-LUISA_KERNEL void point_light_generate_samples(
+LUISA_KERNEL void generate_samples(
     LUISA_DEVICE_SPACE const light::point::Data *data_buffer,
     LUISA_DEVICE_SPACE const light::Selection *queue,
     LUISA_DEVICE_SPACE const uint &queue_size,

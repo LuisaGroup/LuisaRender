@@ -7,7 +7,7 @@
 
 using namespace luisa;
 
-LUISA_KERNEL void camera_generate_pixel_samples_without_filter(
+LUISA_KERNEL void generate_pixel_samples_without_filter(
     LUISA_DEVICE_SPACE const float2 *sample_buffer,
     LUISA_DEVICE_SPACE float2 *pixel_buffer,
     LUISA_DEVICE_SPACE float3 *throughput_buffer,

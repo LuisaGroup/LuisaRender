@@ -44,7 +44,7 @@ void RGBFilm::save(const std::filesystem::path &filename) {
 }
 
 RGBFilm::RGBFilm(Device *device, const ParameterSet &parameters) : Film{device, parameters} {
-    _postprocess_kernel = device->load_kernel("rgb_film_postprocess");
+    _postprocess_kernel = device->load_kernel("rgb_film::postprocess");
 }
 
 }

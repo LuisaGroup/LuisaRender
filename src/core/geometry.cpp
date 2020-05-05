@@ -105,7 +105,7 @@ GeometryEntity &Geometry::entity(uint index) {
 
 Geometry::Geometry(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, const std::vector<std::shared_ptr<Light>> &lights, float initial_time)
     : _device{device},
-      _evaluate_interactions_kernel{device->load_kernel("geometry_evaluate_interactions")} {
+      _evaluate_interactions_kernel{device->load_kernel("geometry::evaluate_interactions")} {
     
     // load geometry
     LUISA_WARNING_IF(shapes.empty(), "No shape in scene");

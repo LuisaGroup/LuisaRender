@@ -3,7 +3,7 @@
 
 using namespace luisa;
 
-LUISA_KERNEL void rgb_film_postprocess(
+LUISA_KERNEL void postprocess(
     LUISA_DEVICE_SPACE float4 *accumulation_buffer,
     LUISA_UNIFORM_SPACE uint &pixel_count,
     uint2 tid [[thread_position_in_grid]]) {

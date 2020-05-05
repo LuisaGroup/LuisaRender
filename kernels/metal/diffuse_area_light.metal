@@ -3,7 +3,7 @@
 
 using namespace luisa;
 
-LUISA_KERNEL void diffuse_area_light_generate_samples(
+LUISA_KERNEL void generate_samples(
     LUISA_DEVICE_SPACE const light::diffuse_area::Data *data_buffer,
     LUISA_DEVICE_SPACE const float3 *sample_buffer,
     LUISA_DEVICE_SPACE const float4x4 *transform_buffer,

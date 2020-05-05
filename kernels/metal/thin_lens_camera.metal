@@ -3,7 +3,7 @@
 
 using namespace luisa;
 
-LUISA_KERNEL void thin_lens_camera_generate_rays(
+LUISA_KERNEL void generate_rays(
     LUISA_DEVICE_SPACE const float2 *sample_buffer,
     LUISA_DEVICE_SPACE const float2 *ray_pixel_buffer,
     LUISA_DEVICE_SPACE Ray *ray_buffer,

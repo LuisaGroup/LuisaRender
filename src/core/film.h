@@ -68,8 +68,8 @@ public:
           _filter{parameters["filter"].parse_or_null<Filter>()} {
         
         _accumulation_buffer = device->allocate_buffer<float4>(_resolution.x * _resolution.y, BufferStorage::MANAGED);
-        _reset_accumulation_buffer_kernel = device->load_kernel("film_reset_accumulation_buffer");
-        _accumulate_tile_kernel = device->load_kernel("film_accumulate_tile");
+        _reset_accumulation_buffer_kernel = device->load_kernel("film::reset_accumulation_buffer");
+        _accumulate_tile_kernel = device->load_kernel("film::accumulate_tile");
     }
     
     virtual void reset_accumulation_buffer(Viewport film_viewport) {

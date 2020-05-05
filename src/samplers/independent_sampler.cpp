@@ -29,8 +29,8 @@ LUISA_REGISTER_NODE_CREATOR("Independent", IndependentSampler)
 
 IndependentSampler::IndependentSampler(Device *device, const ParameterSet &parameter_set)
     : Sampler{device, parameter_set},
-      _reset_states_kernel{device->load_kernel("independent_sampler_reset_states")},
-      _generate_samples_kernel{device->load_kernel("independent_sampler_generate_samples")} {}
+      _reset_states_kernel{device->load_kernel("independent_sampler::reset_states")},
+      _generate_samples_kernel{device->load_kernel("independent_sampler::generate_samples")} {}
 
 void IndependentSampler::_generate_samples(
     KernelDispatcher &dispatch,

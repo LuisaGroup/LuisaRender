@@ -3,7 +3,7 @@
 
 using namespace luisa;
 
-LUISA_KERNEL void geometry_evaluate_interactions(
+LUISA_KERNEL void evaluate_interactions(
     LUISA_DEVICE_SPACE const uint &ray_count,
     LUISA_DEVICE_SPACE const Ray *ray_buffer,
     LUISA_DEVICE_SPACE const ClosestHit *hit_buffer,

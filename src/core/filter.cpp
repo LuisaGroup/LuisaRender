@@ -25,7 +25,7 @@ void SeparableFilter::importance_sample_pixels(KernelDispatcher &dispatch,
 
 SeparableFilter::SeparableFilter(Device *device, const ParameterSet &parameters)
     : Filter{device, parameters},
-      _importance_sample_pixels_kernel{device->load_kernel("separable_filter_importance_sample_pixels")} {}
+      _importance_sample_pixels_kernel{device->load_kernel("separable_filter::importance_sample_pixels")} {}
 
 void SeparableFilter::_compute_lut_if_necessary() {
     

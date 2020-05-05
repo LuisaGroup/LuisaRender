@@ -7,7 +7,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
-#include <unordered_map>
+#include <map>
 
 #include <core/device.h>
 
@@ -22,13 +22,14 @@ class MetalDevice : public Device {
 
 private:
     std::unique_ptr<MetalDeviceWrapper> _device_wrapper;
-    std::unique_ptr<MetalLibraryWrapper> _library_wrapper;
     std::unique_ptr<MetalCommandQueueWrapper> _command_queue_wrapper;
-    std::unordered_map<std::string, std::unique_ptr<MetalFunctionWrapper>> _function_wrappers;
+    std::map<std::string, std::unique_ptr<MetalLibraryWrapper>, std::less<>> _library_wrappers;
+    std::map<std::string, std::unique_ptr<MetalFunctionWrapper>, std::less<>> _function_wrappers;
     
     LUISA_DEVICE_CREATOR("Metal") { return std::make_unique<MetalDevice>(); }
 
 protected:
+    id<MTLLibrary> _load_library(std::string_view library_name);
     void _launch_async(std::function<void(KernelDispatcher &)> dispatch, std::function<void()> callback) override;
 
 public:
