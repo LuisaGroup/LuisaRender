@@ -36,7 +36,7 @@ uint DiffuseAreaLight::tag() const noexcept {
 }
 
 std::unique_ptr<Kernel> DiffuseAreaLight::create_generate_samples_kernel() {
-    return _device->load_kernel("diffuse_area_light::generate_samples");
+    return _device->load_kernel("light::diffuse_area::generate_samples");
 }
 
 Light::SampleLightsDispatch DiffuseAreaLight::create_generate_samples_dispatch() {
@@ -86,7 +86,7 @@ DiffuseAreaLight::DiffuseAreaLight(Device *device, const ParameterSet &parameter
       _two_sided{parameter_set["two_sided"].parse_bool_or_default(false)} {}
 
 std::unique_ptr<Kernel> DiffuseAreaLight::create_evaluate_emissions_kernel() {
-    return _device->load_kernel("diffuse_area::light_evaluate_emissions");
+    return _device->load_kernel("light::diffuse_area::evaluate_emissions");
 }
 
 Light::EvaluateLightsDispatch DiffuseAreaLight::create_evaluate_emissions_dispatch() {

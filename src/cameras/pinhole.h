@@ -22,23 +22,4 @@ struct GenerateRaysKernelUniforms {
     float4x4 transform;
 };
 
-LUISA_DEVICE_CALLABLE inline void generate_rays(
-    LUISA_DEVICE_SPACE const float2 *ray_pixel_buffer,
-    LUISA_DEVICE_SPACE Ray *ray_buffer,
-    LUISA_UNIFORM_SPACE GenerateRaysKernelUniforms &uniforms,
-    uint tid) noexcept {
-    
-    if (tid < uniforms.tile_viewport.size.x * uniforms.tile_viewport.size.y) {
-        
-        auto pixel = ray_pixel_buffer[tid];
-        
-        auto p_film = (make_float2(0.5f) - pixel / make_float2(uniforms.film_resolution)) * uniforms.sensor_size * 0.5f;
-        auto o_world = make_float3(uniforms.transform * make_float4(uniforms.camera_position, 1.0f));
-        auto p_film_world = make_float3(uniforms.transform * make_float4(
-            p_film.x * uniforms.camera_left + p_film.y * uniforms.camera_up + uniforms.near_plane * uniforms.camera_front + uniforms.camera_position, 1.0f));
-        
-        ray_buffer[tid] = make_ray(o_world, normalize(p_film_world - o_world));
-    }
-}
-
 }

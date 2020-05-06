@@ -10,31 +10,10 @@
 
 namespace luisa::film {
 
-LUISA_DEVICE_CALLABLE inline void reset_accumulation_buffer(
-    LUISA_DEVICE_SPACE float4 *accumulation_buffer,
-    uint pixel_count,
-    uint tid) noexcept {
-    
-    if (tid < pixel_count) { accumulation_buffer[tid] = make_float4(); }
-}
-
 struct AccumulateTileKernelUniforms {
     Viewport tile_viewport;
     uint2 film_resolution;
 };
-
-LUISA_DEVICE_CALLABLE inline void accumulate_tile(
-    LUISA_DEVICE_SPACE const float3 *ray_color_buffer,
-    LUISA_DEVICE_SPACE float4 *accumulation_buffer,
-    LUISA_UNIFORM_SPACE AccumulateTileKernelUniforms &uniforms,
-    uint tid) noexcept {
-    
-    if (tid < uniforms.tile_viewport.size.x * uniforms.tile_viewport.size.y) {
-        auto pixel = uniforms.tile_viewport.origin + make_uint2(tid % uniforms.tile_viewport.size.x, tid / uniforms.tile_viewport.size.x);
-        auto color = ray_color_buffer[tid];
-        accumulation_buffer[pixel.y * uniforms.film_resolution.x + pixel.x] += make_float4(color, 1.0f);
-    }
-}
 
 }
 

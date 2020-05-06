@@ -1,4 +1,4 @@
-file(GLOB SOURCE_FILES *.cpp *.h)
+file(GLOB SOURCE_FILES *.cpp *.h *.sk)
 
 add_library(core SHARED ${SOURCE_FILES})
 target_compile_features(core PUBLIC c_std_11 cxx_std_17)

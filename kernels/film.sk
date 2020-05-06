@@ -1,0 +1,25 @@
+#include <core/film.h>
+
+using namespace luisa;
+using namespace luisa::film;
+
+LUISA_KERNEL void reset_accumulation_buffer(
+    LUISA_DEVICE_SPACE float4 *accumulation_buffer,
+    LUISA_UNIFORM_SPACE uint &pixel_count,
+    LUISA_THREAD_ID_DECL) noexcept {
+    
+    if (LUISA_THREAD_ID < pixel_count) { accumulation_buffer[LUISA_THREAD_ID] = make_float4(); }
+}
+
+LUISA_KERNEL void accumulate_tile(
+    LUISA_DEVICE_SPACE const float3 *ray_color_buffer,
+    LUISA_DEVICE_SPACE float4 *accumulation_buffer,
+    LUISA_UNIFORM_SPACE AccumulateTileKernelUniforms &uniforms,
+    LUISA_THREAD_ID_DECL) noexcept {
+    
+    if (LUISA_THREAD_ID < uniforms.tile_viewport.size.x * uniforms.tile_viewport.size.y) {
+        auto pixel = uniforms.tile_viewport.origin + make_uint2(LUISA_THREAD_ID % uniforms.tile_viewport.size.x, LUISA_THREAD_ID / uniforms.tile_viewport.size.x);
+        auto color = ray_color_buffer[LUISA_THREAD_ID];
+        accumulation_buffer[pixel.y * uniforms.film_resolution.x + pixel.x] += make_float4(color, 1.0f);
+    }
+}

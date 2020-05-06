@@ -5,8 +5,6 @@
 #include <opencv2/opencv.hpp>
 #include <core/film.h>
 
-#include "rgb.h"
-
 namespace luisa {
 
 class RGBFilm : public Film {
@@ -44,7 +42,7 @@ void RGBFilm::save(const std::filesystem::path &filename) {
 }
 
 RGBFilm::RGBFilm(Device *device, const ParameterSet &parameters) : Film{device, parameters} {
-    _postprocess_kernel = device->load_kernel("rgb_film::postprocess");
+    _postprocess_kernel = device->load_kernel("film::rgb::postprocess");
 }
 
 }

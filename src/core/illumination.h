@@ -34,50 +34,11 @@ struct SelectLightsKernelUniforms {
     uint max_queue_size;
 };
 
-LUISA_DEVICE_CALLABLE inline void uniform_select_lights(
-    LUISA_DEVICE_SPACE const float *sample_buffer,
-    LUISA_DEVICE_SPACE const Info *info_buffer,
-    LUISA_DEVICE_SPACE Atomic<uint> *queue_sizes,
-    LUISA_DEVICE_SPACE light::Selection *queues,
-    uint its_count,
-    SelectLightsKernelUniforms uniforms,
-    uint tid) {
-    
-    if (tid < its_count) {
-        auto light_info = info_buffer[min(static_cast<uint>(sample_buffer[tid] * uniforms.light_count), uniforms.light_count - 1u)];
-        auto queue_index = luisa_atomic_fetch_add(queue_sizes[light_info.tag()], 1u);
-        queues[light_info.tag() * uniforms.max_queue_size + queue_index] = {light_info.index(), tid};
-    }
-}
-
 struct CollectLightInteractionsKernelUniforms {
     uint max_queue_size;
     uint sky_tag;
     bool has_sky;
 };
-
-LUISA_DEVICE_CALLABLE inline void collect_light_interactions(
-    LUISA_DEVICE_SPACE const uint *its_instance_id_buffer,
-    LUISA_DEVICE_SPACE const uint8_t *its_state_buffer,
-    LUISA_DEVICE_SPACE const Info *instance_to_info_buffer,
-    LUISA_DEVICE_SPACE Atomic<uint> *queue_sizes,
-    LUISA_DEVICE_SPACE light::Selection *queues,
-    uint its_count,
-    CollectLightInteractionsKernelUniforms uniforms,
-    uint tid) {
-    
-    if (tid < its_count) {
-        auto state = its_state_buffer[tid];
-        if (state & interaction::state::EMISSIVE) {  // hit on lights
-            auto light_info = instance_to_info_buffer[its_instance_id_buffer[tid]];
-            auto queue_index = luisa_atomic_fetch_add(queue_sizes[light_info.tag()], 1u);
-            queues[light_info.tag() * uniforms.max_queue_size + queue_index] = {light_info.index(), tid};
-        } else if (!(state & interaction::state::HIT) && uniforms.has_sky) {  // background
-            auto queue_index = luisa_atomic_fetch_add(queue_sizes[uniforms.sky_tag], 1u);
-            queues[uniforms.sky_tag * uniforms.max_queue_size + queue_index] = {0u, tid};
-        }
-    }
-}
 
 }
 

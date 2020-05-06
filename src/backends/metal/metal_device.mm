@@ -4,6 +4,7 @@
 
 #import <cstdlib>
 #import <string>
+#import <fstream>
 #import <string_view>
 
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
@@ -56,7 +57,7 @@ MetalDevice::MetalDevice()
 
 std::unique_ptr<Kernel> MetalDevice::load_kernel(std::string_view function_name) {
     
-    auto separator_pos = function_name.find("::");
+    auto separator_pos = function_name.rfind("::");
     LUISA_EXCEPTION_IF(separator_pos == std::string_view::npos, "Expected separator \"::\" in function name: ", function_name);
     
     auto library_name = function_name.substr(0, separator_pos);
@@ -168,21 +169,31 @@ id<MTLLibrary> MetalDevice::_load_library(std::string_view library_name) {
     auto library_iter = _library_wrappers.find(library_name);
     if (library_iter == _library_wrappers.end()) {
         
-        auto source_path = ResourceManager::instance().working_path(serialize("kernels/metal/", library_name, ".metal"));
-        auto ir_path = ResourceManager::instance().working_path(serialize("kernels/metal/", library_name, ".air"));
-        auto library_path = ResourceManager::instance().working_path(serialize("kernels/metal/", library_name, ".metallib"));
+        auto compatibility_header_path = ResourceManager::instance().working_path(serialize("backends/metal/metal_compatibility.h"));
+        auto source = text_file_contents(ResourceManager::instance().working_path(serialize("kernels/", library_name, ".sk")));
+        auto source_path = ResourceManager::instance().working_path(serialize("kernels/", library_name, ".metal"));
+        
+        LUISA_INFO("Generating Metal shader: ", library_name);
+        if (std::ofstream source_file{source_path}; source_file.is_open()) {
+            source_file << "#define LUISA_DEVICE_COMPATIBLE\n"
+                        << "#include <" << compatibility_header_path.string() << ">\n"
+                        << source << std::endl;
+        } else { LUISA_EXCEPTION("Failed to create file for Metal shader: ", source_path); }
+        
+        auto ir_path = ResourceManager::instance().working_path(serialize("kernels/", library_name, ".air"));
+        auto library_path = ResourceManager::instance().working_path(serialize("kernels/", library_name, ".metallib"));
         auto include_path = ResourceManager::instance().working_path(serialize("src"));
         
         RAII raii{[&] {
             std::error_code error;
+            std::filesystem::remove(source_path, error);
             std::filesystem::remove(ir_path, error);
             std::filesystem::remove(library_path, error);
         }};
         
-        auto compile_command = serialize("xcrun -sdk macosx metal -Wall -Wextra -Wno-c++17-extensions -O3 -ffast-math -I ", include_path,
-                                         " -c ", source_path, " -o ", ir_path, " -D LUISA_DEVICE_COMPATIBLE");
+        auto compile_command = serialize("xcrun -sdk macosx metal -Wall -Wextra -Wno-c++17-extensions -O3 -ffast-math -I ", include_path, " -c ", source_path, " -o ", ir_path);
         LUISA_INFO("Compiling Metal source: ", source_path);
-        LUISA_EXCEPTION_IF(system(compile_command.c_str()) != 0, "Failed to compile Metal source, command: ", compile_command);
+        LUISA_EXCEPTION_IF(system(compile_command.c_str()) != 0, "Failed to compile Metal shader source, command: ", compile_command);
         
         auto archive_command = serialize("xcrun -sdk macosx metallib ", ir_path, " -o ", library_path);
         LUISA_INFO("Archiving Metal library: ", ir_path);

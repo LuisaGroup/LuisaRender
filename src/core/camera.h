@@ -13,21 +13,6 @@ struct GeneratePixelSamplesWithoutFilterKernelUniforms {
     Viewport tile_viewport;
 };
 
-LUISA_DEVICE_CALLABLE inline void generate_pixel_samples_without_filter(
-    LUISA_DEVICE_SPACE const float2 *sample_buffer,
-    LUISA_DEVICE_SPACE float2 *pixel_buffer,
-    LUISA_DEVICE_SPACE float3 *throughput_buffer,
-    LUISA_UNIFORM_SPACE GeneratePixelSamplesWithoutFilterKernelUniforms &uniforms,
-    uint tid) {
-    
-    if (tid < uniforms.tile_viewport.size.x * uniforms.tile_viewport.size.y) {
-        auto offset_x = static_cast<float>(tid % uniforms.tile_viewport.size.x);
-        auto offset_y = static_cast<float>(tid / uniforms.tile_viewport.size.x);
-        pixel_buffer[tid] = make_float2(uniforms.tile_viewport.origin + make_uint2(offset_x, offset_y)) + sample_buffer[tid];
-        throughput_buffer[tid] = make_float3(1.0f);
-    }
-}
-
 }
 
 #ifndef LUISA_DEVICE_COMPATIBLE

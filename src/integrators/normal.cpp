@@ -5,8 +5,6 @@
 #include <core/integrator.h>
 #include <core/geometry.h>
 
-#include "normal.h"
-
 namespace luisa {
 
 class NormalVisualizer : public Integrator {
@@ -87,6 +85,6 @@ void NormalVisualizer::_prepare_for_frame() {
 
 NormalVisualizer::NormalVisualizer(Device *device, const ParameterSet &parameter_set)
     : Integrator{device, parameter_set},
-      _colorize_normals_kernel{device->load_kernel("normal_visualizer::colorize_normals")} {}
+      _colorize_normals_kernel{device->load_kernel("integrator::normal::colorize_normals")} {}
     
 }

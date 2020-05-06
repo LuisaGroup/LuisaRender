@@ -12,9 +12,12 @@
 #define LUISA_THREAD_SPACE
 #define LUISA_DEVICE_SPACE
 
+#define LUISA_THREAD_ID_DECL  uint $tid$
+#define LUISA_THREAD_ID       $tid$
+
 // function scopes
 #define LUISA_CONSTEXPR        constexpr
-#define LUISA_KERNEL
+#define LUISA_KERNEL           static
 #define LUISA_DEVICE_CALLABLE
 
 #include <type_traits>
