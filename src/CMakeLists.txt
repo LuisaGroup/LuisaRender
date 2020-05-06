@@ -30,5 +30,13 @@ add_subdirectory(kernels)
 
 add_library(luisarender INTERFACE)
 target_link_libraries(luisarender INTERFACE luisarender::util luisarender::core luisarender::backends luisarender::kernels plugins)
-
 add_library(luisarender::luisarender ALIAS luisarender)
+
+function(luisa_render_add_application name)
+    cmake_parse_arguments(APP "" "" "SOURCES" ${ARGN})
+    add_executable(${name} ${APP_SOURCES})
+    target_compile_features(${name} PRIVATE c_std_11 cxx_std_17)
+    target_link_libraries(${name} PRIVATE luisarender::luisarender)
+endfunction()
+
+add_subdirectory(apps)
