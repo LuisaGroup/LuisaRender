@@ -26,7 +26,9 @@ add_subdirectory(samplers)
 add_subdirectory(shapes)
 add_subdirectory(transforms)
 
+add_subdirectory(kernels)
+
 add_library(luisarender INTERFACE)
-target_link_libraries(luisarender INTERFACE luisarender::util luisarender::core luisarender::backends plugins)
+target_link_libraries(luisarender INTERFACE luisarender::util luisarender::core luisarender::backends luisarender::kernels plugins)
 
 add_library(luisarender::luisarender ALIAS luisarender)

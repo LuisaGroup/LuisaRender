@@ -14,7 +14,6 @@ option(LUISA_RENDER_ENABLE_METAL "Build with Apple Metal support" ${LUISA_RENDER
 
 add_subdirectory(thirdparty)
 add_subdirectory(src)
-add_subdirectory(kernels)
 
 add_executable(LuisaRender main.cpp)
-target_link_libraries(LuisaRender PRIVATE luisarender::luisarender luisarender::kernels)
+target_link_libraries(LuisaRender PRIVATE luisarender::luisarender)
