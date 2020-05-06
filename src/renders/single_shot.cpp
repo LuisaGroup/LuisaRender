@@ -58,7 +58,7 @@ SingleShot::SingleShot(Device *device, const ParameterSet &parameter_set)
         };
         auto film_resolution = _camera->film().resolution();
         _shutter_samples = std::clamp(_sampler->spp(), 1u, power_two_le(std::max(film_resolution.x, film_resolution.y) / 4u));
-        LUISA_WARNING("Shutter samples not specific, using heuristic value: ", _shutter_samples);
+        LUISA_WARNING("Shutter samples not specified, using heuristic value: ", _shutter_samples);
     }
 }
 

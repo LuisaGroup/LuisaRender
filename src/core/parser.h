@@ -74,7 +74,7 @@ private:
     [[nodiscard]] const ParameterSet &_child(std::string_view parameter_name) const {
         auto iter = _parameters.find(parameter_name);
         if (iter == _parameters.cend()) {
-            LUISA_WARNING("Parameter \"", parameter_name, "\" is not specific");
+            LUISA_WARNING("Parameter \"", parameter_name, "\" is not specified");
             return *_empty;
         }
         return *iter->second;
