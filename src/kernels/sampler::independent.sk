@@ -50,8 +50,7 @@ LUISA_KERNEL void generate_samples(
     
     auto max_ray_count = uniforms.uses_ray_queue ? ray_count : uniforms.tile_viewport.size.x * uniforms.tile_viewport.size.y;
     
-    auto tid = LUISA_THREAD_ID;
-    if (tid < max_ray_count) {
+    if (auto tid = LUISA_THREAD_ID; tid < max_ray_count) {
         auto ray_index_in_tile = uniforms.uses_ray_queue ? ray_queue[tid] : tid;
         auto ray_x = uniforms.tile_viewport.origin.x + ray_index_in_tile % uniforms.tile_viewport.size.x;
         auto ray_y = uniforms.tile_viewport.origin.y + ray_index_in_tile / uniforms.tile_viewport.size.x;

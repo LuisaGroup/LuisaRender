@@ -23,8 +23,7 @@ LUISA_KERNEL void evaluate_interactions(
     LUISA_UNIFORM_SPACE EvaluateInteractionsKernelUniforms &uniforms,
     LUISA_THREAD_ID_DECL) noexcept {
     
-    auto tid = LUISA_THREAD_ID;
-    if (tid < ray_count) {
+    if (auto tid = LUISA_THREAD_ID; tid < ray_count) {
         
         auto hit = hit_buffer[tid];
         if (hit.distance <= 0.0f) {

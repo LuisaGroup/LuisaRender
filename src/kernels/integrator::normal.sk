@@ -11,8 +11,7 @@ LUISA_KERNEL void colorize_normals(
     LUISA_UNIFORM_SPACE uint &pixel_count,
     LUISA_THREAD_ID_DECL) noexcept {
     
-    auto tid = LUISA_THREAD_ID;
-    if (tid < pixel_count) {
+    if (auto tid = LUISA_THREAD_ID; tid < pixel_count) {
         auto n = (state_buffer[tid] & interaction::state::HIT) != 0u ? normals[tid] : make_float3(-1.0f);
         auto w = throughput_buffer[tid];
         normals[tid] = w * XYZ2ACEScg(RGB2XYZ(n * 0.5f + 0.5f));

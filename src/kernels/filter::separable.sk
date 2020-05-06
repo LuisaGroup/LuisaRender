@@ -44,8 +44,7 @@ LUISA_KERNEL void importance_sample_pixels(
     LUISA_UNIFORM_SPACE ImportanceSamplePixelsKernelUniforms &uniforms,
     LUISA_THREAD_ID_DECL) {
     
-    auto tid = LUISA_THREAD_ID;
-    if (tid < uniforms.tile.size.x * uniforms.tile.size.y) {
+    if (auto tid = LUISA_THREAD_ID; tid < uniforms.tile.size.x * uniforms.tile.size.y) {
         auto u = random_buffer[tid];
         auto x_and_wx = sample_1d(u.x, lut);
         auto y_and_wy = sample_1d(u.y, lut);

@@ -14,8 +14,7 @@ LUISA_KERNEL void generate_samples(
     LUISA_DEVICE_SPACE Ray *shadow_ray_buffer,
     LUISA_THREAD_ID_DECL) {
     
-    auto tid = LUISA_THREAD_ID;
-    if (tid < queue_size) {
+    if (auto tid = LUISA_THREAD_ID; tid < queue_size) {
         auto selection = queue[tid];
         if (its_state_buffer[selection.interaction_index] & interaction::state::HIT) {
             auto light_data = data_buffer[selection.data_index];
