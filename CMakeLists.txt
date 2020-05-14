@@ -12,5 +12,4 @@ else ()
 endif ()
 option(LUISA_RENDER_ENABLE_METAL "Build with Apple Metal support" ${LUISA_RENDER_ENABLE_METAL_DEFAULT})
 
-add_subdirectory(thirdparty)
 add_subdirectory(src)

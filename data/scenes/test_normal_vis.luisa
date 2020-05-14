@@ -1,9 +1,10 @@
 Film film : RGB {
   resolution { 1200, 600 }
-// filter : MitchellNetravali {
+   filter : MitchellNetravali {
 // filter : Triangle {
-  filter : Gaussian {
-    radius { 2.0 }
+// filter : Gaussian {
+    radius { 16.0 }
+    alpha { 16.0 }
     b { 0.33333333333333 }
     c { 0.33333333333333 }
   }

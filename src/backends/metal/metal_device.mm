@@ -140,8 +140,9 @@ std::unique_ptr<Acceleration> MetalDevice::build_acceleration(Geometry &geometry
     // Note: metal provides optimization for static scenes without instances and dynamic transforms
     instance_acceleration.transformType = geometry.static_instances().empty() && geometry.dynamic_shapes().empty() && geometry.dynamic_instances().empty() ?
                                           MPSTransformTypeIdentity : MPSTransformTypeFloat4x4;
-    instance_acceleration.usage =
-        geometry.dynamic_shapes().empty() && geometry.dynamic_instances().empty() ? MPSAccelerationStructureUsageNone : MPSAccelerationStructureUsageRefit;
+    instance_acceleration.usage = geometry.dynamic_shapes().empty() && geometry.dynamic_instances().empty() ?
+                                  MPSAccelerationStructureUsageNone :
+                                  MPSAccelerationStructureUsageRefit;
     
     [instance_acceleration rebuild];
     

@@ -8,6 +8,7 @@
 #include <iostream>
 
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 
 #include "string_manipulation.h"
 
@@ -55,7 +56,7 @@ inline void LUISA_EXCEPTION_IF_NOT(bool predicate, Args &&...args) {
 
 template<typename ...Args>
 [[noreturn]] inline void LUISA_ERROR(Args &&...args) {
-    logger().critical(serialize(std::forward<Args>(args)...));
+    logger().error(serialize(std::forward<Args>(args)...));
     exit(-1);
 }
 

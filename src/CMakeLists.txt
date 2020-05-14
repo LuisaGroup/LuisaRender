@@ -4,7 +4,6 @@ add_library(luisarender::headers ALIAS headers)
 
 add_subdirectory(util)
 add_subdirectory(core)
-add_subdirectory(backends)
 
 add_library(plugins INTERFACE)
 function(luisa_render_add_plugin name)
@@ -26,6 +25,7 @@ add_subdirectory(samplers)
 add_subdirectory(shapes)
 add_subdirectory(transforms)
 
+add_subdirectory(backends)
 add_subdirectory(kernels)
 
 add_library(luisarender INTERFACE)
@@ -37,6 +37,7 @@ function(luisa_render_add_application name)
     add_executable(${name} ${APP_SOURCES})
     target_compile_features(${name} PRIVATE c_std_11 cxx_std_17)
     target_link_libraries(${name} PRIVATE luisarender::luisarender)
+    set_target_properties(${name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 endfunction()
 
 add_subdirectory(apps)
