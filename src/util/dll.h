@@ -21,7 +21,7 @@ using DynamicModuleHandle = void *;
 
 inline DynamicModuleHandle load_dynamic_module(const std::filesystem::path &path) {
     LUISA_INFO("Loading dynamic module: ", path);
-    auto module = dlopen(std::filesystem::absolute(path).string().c_str(), RTLD_LAZY);
+    auto module = dlopen(std::filesystem::canonical(path).string().c_str(), RTLD_LAZY);
     LUISA_EXCEPTION_IF(module == nullptr, "Failed to load dynamic module ", path, ", reason: ", dlerror());
     return module;
 }

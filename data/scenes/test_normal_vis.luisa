@@ -25,7 +25,7 @@ Light light : Point {
 Integrator integrator : Normal {}
 
 Shape bunny_ref : TriangleMesh {
-  path { "data/meshes/bunny/bunny.obj" }
+  path { "../meshes/bunny/bunny.obj" }
   subdiv { 2 }
 }
 
@@ -64,7 +64,7 @@ Shape bunny2 : Instance {
 }
 
 Shape cube : TriangleMesh {
-  path { "data/meshes/sphere/sphere.obj" }
+  path { "../meshes/sphere/sphere.obj" }
   transform : TRS {
     scaling { 0.2 }
     translation { -0.3, 0.0, 0.0 }

@@ -7,8 +7,8 @@
 namespace luisa {
 
 Context::Context(const std::filesystem::path &runtime_dir, const std::filesystem::path &working_dir)
-    : _runtime_directory{std::filesystem::absolute(runtime_dir)},
-      _working_directory{std::filesystem::absolute(working_dir)} {
+    : _runtime_directory{std::filesystem::canonical(runtime_dir)},
+      _working_directory{std::filesystem::canonical(working_dir)} {
     
     LUISA_EXCEPTION_IF(!std::filesystem::exists(runtime_dir) || !std::filesystem::is_directory(runtime_dir), "Invalid runtime directory: ", runtime_dir);
     LUISA_EXCEPTION_IF(!std::filesystem::exists(working_dir) || !std::filesystem::is_directory(working_dir), "Invalid working directory: ", working_dir);

@@ -14,16 +14,15 @@ namespace luisa {
 class TriangleMesh : public Shape {
 
 private:
-    std::filesystem::path _path;
+    std::string _path;
     uint _subdiv_level;
 
 public:
     void load(GeometryEncoder &encoder) override;
-    TriangleMesh(Device *device, const ParameterSet &parameter_set) : Shape{device, parameter_set} {
-        _path = std::filesystem::absolute(parameter_set["path"].parse_string());
-        _subdiv_level = parameter_set["subdiv"].parse_uint_or_default(0u);
-    }
-    
+    TriangleMesh(Device *device, const ParameterSet &parameter_set)
+        : Shape{device, parameter_set},
+          _path{parameter_set["path"].parse_string()},
+          _subdiv_level{parameter_set["subdiv"].parse_uint_or_default(0u)} {}
 };
 
 void TriangleMesh::load(GeometryEncoder &encoder) {
@@ -38,8 +37,9 @@ void TriangleMesh::load(GeometryEncoder &encoder) {
                                    aiComponent_TEXTURES |
                                    aiComponent_MATERIALS);
     
-    LUISA_INFO("Loading: ", _path);
-    auto ai_scene = ai_importer.ReadFile(_path.c_str(),
+    auto path = _device->context().working_path(_path);
+    LUISA_INFO("Loading triangle mesh: ", path);
+    auto ai_scene = ai_importer.ReadFile(path.string().c_str(),
                                          aiProcess_JoinIdenticalVertices |
                                          aiProcess_GenNormals |
                                          aiProcess_PreTransformVertices |
@@ -52,7 +52,7 @@ void TriangleMesh::load(GeometryEncoder &encoder) {
                                          aiProcess_FlipUVs);
     
     LUISA_EXCEPTION_IF(ai_scene == nullptr || (ai_scene->mFlags & static_cast<uint>(AI_SCENE_FLAGS_INCOMPLETE)) || ai_scene->mRootNode == nullptr,
-                   "Failed to load triangle mesh: ", ai_importer.GetErrorString());
+                       "Failed to load triangle mesh: ", ai_importer.GetErrorString());
     
     std::vector<aiMesh *> ai_meshes(ai_scene->mNumMeshes);
     if (_subdiv_level != 0u) {
