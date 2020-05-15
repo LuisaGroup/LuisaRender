@@ -15,6 +15,7 @@
 
 #include <util/concepts.h>
 
+#include "context.h"
 #include "kernel.h"
 
 namespace luisa {
@@ -34,13 +35,12 @@ private:
     inline static std::unordered_map<std::string_view, std::function<std::unique_ptr<Device>()>> _device_creators{};
 
 protected:
-    static void _register_creator(std::string_view name, std::function<std::unique_ptr<Device>()> creator);
+    Context *_context;
     virtual void _launch_async(std::function<void(KernelDispatcher &)> dispatch, std::function<void()> callback) = 0;
 
 public:
-    Device() noexcept;
+    explicit Device(Context *context) noexcept;
     virtual ~Device() noexcept;
-    [[nodiscard]] static std::unique_ptr<Device> create(std::string_view name);
     [[nodiscard]] virtual std::unique_ptr<Kernel> load_kernel(std::string_view function_name) = 0;
     [[nodiscard]] virtual std::unique_ptr<TypelessBuffer> allocate_typeless_buffer(size_t capacity, BufferStorage storage) = 0;
     [[nodiscard]] virtual std::unique_ptr<Acceleration> build_acceleration(Geometry &geometry) = 0;
@@ -54,14 +54,14 @@ public:
     void synchronize();
     void launch_async(std::function<void(KernelDispatcher &)> dispatch, std::function<void()> callback = [] {});
     void set_command_queue_size(uint size);
+    [[nodiscard]] const Context &context() const noexcept { return *_context; }
+    
+    static std::unique_ptr<Device> create(Context *context, std::string_view name);
 };
 
-#define LUISA_DEVICE_CREATOR(name)                                                                      \
-        static_assert(true);                                                                            \
-    private:                                                                                            \
-        inline static struct _reg_helper_impl {                                                         \
-            _reg_helper_impl() noexcept { Device::_register_creator(name, [] { return _create(); }); }  \
-        } _reg_helper{};                                                                                \
-        [[nodiscard]] static std::unique_ptr<Device> _create()
+using DeviceCreator = Device *(Context *);
+
+#define LUISA_EXPORT_DEVICE_CREATOR(DeviceClass)  \
+    LUISA_DLL_EXPORT ::luisa::Device *create(::luisa::Context *context) { return new DeviceClass{context}; }
 
 }

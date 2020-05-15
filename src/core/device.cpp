@@ -6,16 +6,7 @@
 
 namespace luisa {
 
-void Device::_register_creator(std::string_view name, std::function<std::unique_ptr<Device>()> creator) {
-    _device_creators[name] = std::move(creator);
-}
-
 Device::~Device() noexcept { synchronize(); }
-
-std::unique_ptr<Device> Device::create(std::string_view name) {
-    LUISA_INFO("Creating backend: ", name);
-    return _device_creators.at(name)();
-}
 
 void Device::launch(std::function<void(KernelDispatcher &)> dispatch) {
     launch_async(std::move(dispatch));
@@ -55,7 +46,12 @@ void Device::set_command_queue_size(uint size) {
     _command_queue_size = std::max(size, 1u);
 }
 
-Device::Device() noexcept
-    : _command_queue_size{16u}, _working_command_count{0u} {}
+Device::Device(Context *context) noexcept
+    : _context{context}, _command_queue_size{16u}, _working_command_count{0u} {}
+
+std::unique_ptr<Device> Device::create(Context *context, std::string_view name) {
+    auto create_device = context->load_dynamic_function<DeviceCreator>(context->runtime_path("backends") / name, name, "create");
+    return std::unique_ptr<Device>{create_device(context)};
+}
 
 }

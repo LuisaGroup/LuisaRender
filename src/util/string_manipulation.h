@@ -19,7 +19,15 @@ inline std::string serialize(Args &&...args) noexcept {
     return ss.str();
 }
 
-std::string text_file_contents(const std::filesystem::path &file_path);
+inline std::string text_file_contents(const std::filesystem::path &file_path) {
+    std::ifstream file{file_path};
+    if (!file.is_open()) {
+        std::ostringstream ss;
+        ss << "Failed to open file: " << file_path;
+        throw std::runtime_error{ss.str()};
+    }
+    return {std::istreambuf_iterator<char>{file}, std::istreambuf_iterator<char>{}};
+}
 
 }}
 
