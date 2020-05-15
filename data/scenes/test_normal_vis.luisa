@@ -43,6 +43,11 @@ Light area_light : DiffuseArea {
   shape { @bunny }
 }
 
+Light area_light_2 : DiffuseArea {
+  emission { 10 }
+  shape { @bunny }
+}
+
 Transform b1 : TRS {
   scaling { 0.5 }
   translation { -0.7, -0.3, -2.0 }
@@ -77,6 +82,11 @@ Light light : Point {
   emission { 15 }
 }
 
+Light light2 : Point {
+  position { 0.0, 3.0, 3.0 }
+  emission { 15 }
+}
+
 Filter filter : MitchellNetravali {
 // filter : Triangle {
 // filter : Gaussian {
@@ -104,7 +114,7 @@ Camera camera : ThinLens {
 //   }
 }
 
-renderer : SingleShot {
+render : SingleShot {
   integrator { @integrator }
   sampler : Independent {
     spp { 1024 }

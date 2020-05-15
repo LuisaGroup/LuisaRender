@@ -27,7 +27,7 @@ namespace luisa {
     class BaseClass;                                                                      \
     namespace detail {                                                                    \
         template<typename T, std::enable_if_t<std::is_base_of_v<BaseClass, T>, int> = 0>  \
-        auto plugin_base_class_match(T *) -> BaseClass * {}                               \
+        auto plugin_base_class_match(T *) { return static_cast<BaseClass *>(nullptr); }   \
                                                                                           \
         template<typename T, std::enable_if_t<std::is_same_v<BaseClass, T>, int> = 0>     \
         constexpr std::string_view plguin_base_class_name(T *) {                          \

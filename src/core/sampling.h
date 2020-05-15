@@ -12,8 +12,8 @@ namespace luisa { inline namespace sampling {
 LUISA_DEVICE_CALLABLE inline float3 cosine_sample_hemisphere(float u1, float u2) noexcept {
     auto r = sqrt(u1);
     auto phi = 2.0f * PI * u2;
-    auto x = r * cos(phi);
-    auto y = r * sin(phi);
+    auto x = static_cast<float>(r * cos(phi));
+    auto y = static_cast<float>(r * sin(phi));
     return make_float3(x, y, sqrt(max(0.0f, 1.0f - x * x - y * y)));
 }
 

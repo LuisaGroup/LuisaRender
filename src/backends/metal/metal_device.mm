@@ -22,22 +22,6 @@
 
 namespace luisa::metal {
 
-struct MetalDeviceWrapper {
-    id<MTLDevice> device;
-    ~MetalDeviceWrapper() noexcept = default;
-};
-
-struct MetalLibraryWrapper {
-    id<MTLLibrary> library;
-    explicit MetalLibraryWrapper(id<MTLLibrary> l) noexcept: library{l} {}
-    ~MetalLibraryWrapper() noexcept = default;
-};
-
-struct MetalCommandQueueWrapper {
-    id<MTLCommandQueue> queue;
-    ~MetalCommandQueueWrapper() noexcept = default;
-};
-
 struct MetalFunctionWrapper {
     
     id<MTLFunction> function;
@@ -51,10 +35,10 @@ struct MetalFunctionWrapper {
 class MetalDevice : public Device {
 
 private:
-    std::unique_ptr<MetalDeviceWrapper> _device_wrapper;
-    std::unique_ptr<MetalCommandQueueWrapper> _command_queue_wrapper;
-    std::map<std::string, std::unique_ptr<MetalLibraryWrapper>, std::less<>> _library_wrappers;
-    std::map<std::string, std::unique_ptr<MetalFunctionWrapper>, std::less<>> _function_wrappers;
+    id<MTLDevice> _handle;
+    id<MTLCommandQueue> _command_queue;
+    std::map<std::string, id<MTLLibrary>, std::less<>> _loaded_libraries;
+    std::map<std::string, std::unique_ptr<MetalFunctionWrapper>, std::less<>> _loaded_functions;
 
 protected:
     id<MTLLibrary> _load_library(std::string_view library_name);
@@ -70,13 +54,9 @@ public:
     void launch(std::function<void(KernelDispatcher &)> dispatch) override;
 };
 
-MetalDevice::MetalDevice(Context *context)
-    : Device{context},
-      _device_wrapper{std::make_unique<MetalDeviceWrapper>()},
-      _command_queue_wrapper{std::make_unique<MetalCommandQueueWrapper>()} {
-    
-    _device_wrapper->device = MTLCreateSystemDefaultDevice();
-    _command_queue_wrapper->queue = [_device_wrapper->device newCommandQueue];
+MetalDevice::MetalDevice(Context *context) : Device{context} {
+    _handle = MTLCreateSystemDefaultDevice();
+    _command_queue = [_handle newCommandQueue];
 }
 
 std::unique_ptr<Kernel> MetalDevice::load_kernel(std::string_view function_name) {
@@ -89,8 +69,8 @@ std::unique_ptr<Kernel> MetalDevice::load_kernel(std::string_view function_name)
     
     LUISA_INFO("Loading kernel: \"", kernel_name, "\", library: \"", library_name, "\"");
     
-    auto iter = _function_wrappers.find(function_name);
-    if (iter == _function_wrappers.end()) {
+    auto iter = _loaded_functions.find(function_name);
+    if (iter == _loaded_functions.end()) {
         
         auto descriptor = [[MTLComputePipelineDescriptor alloc] init];
         auto function = [_load_library(library_name) newFunctionWithName:make_objc_string(kernel_name)];
@@ -100,12 +80,12 @@ std::unique_ptr<Kernel> MetalDevice::load_kernel(std::string_view function_name)
         descriptor.threadGroupSizeIsMultipleOfThreadExecutionWidth = true;
         
         MTLAutoreleasedComputePipelineReflection reflection;
-        auto pipeline = [_device_wrapper->device newComputePipelineStateWithDescriptor:descriptor
-                                                                               options:MTLPipelineOptionArgumentInfo | MTLPipelineOptionBufferTypeInfo
-                                                                            reflection:&reflection
-                                                                                 error:nullptr];
+        auto pipeline = [_handle newComputePipelineStateWithDescriptor:descriptor
+                                                               options:MTLPipelineOptionArgumentInfo | MTLPipelineOptionBufferTypeInfo
+                                                            reflection:&reflection
+                                                                 error:nullptr];
         
-        iter = _function_wrappers.emplace(std::string{function_name}, std::make_unique<MetalFunctionWrapper>(function, pipeline, reflection)).first;
+        iter = _loaded_functions.emplace(function_name, std::make_unique<MetalFunctionWrapper>(function, pipeline, reflection)).first;
     }
     
     auto function_wrapper = iter->second.get();
@@ -113,7 +93,7 @@ std::unique_ptr<Kernel> MetalDevice::load_kernel(std::string_view function_name)
 }
 
 void MetalDevice::launch(std::function<void(KernelDispatcher &)> dispatch) {
-    auto command_buffer = [_command_queue_wrapper->queue commandBuffer];
+    auto command_buffer = [_command_queue commandBuffer];
     MetalKernelDispatcher dispatcher{command_buffer};
     dispatch(dispatcher);
     [command_buffer commit];
@@ -121,7 +101,7 @@ void MetalDevice::launch(std::function<void(KernelDispatcher &)> dispatch) {
 }
 
 void MetalDevice::_launch_async(std::function<void(KernelDispatcher &)> dispatch, std::function<void()> callback) {
-    auto command_buffer = [_command_queue_wrapper->queue commandBuffer];
+    auto command_buffer = [_command_queue commandBuffer];
     [command_buffer addCompletedHandler:^(id<MTLCommandBuffer>) { callback(); }];
     MetalKernelDispatcher dispatcher{command_buffer};
     dispatch(dispatcher);
@@ -130,14 +110,14 @@ void MetalDevice::_launch_async(std::function<void(KernelDispatcher &)> dispatch
 
 std::unique_ptr<TypelessBuffer> MetalDevice::allocate_typeless_buffer(size_t capacity, BufferStorage storage) {
     
-    auto buffer = [_device_wrapper->device newBufferWithLength:capacity
-                                                       options:storage == BufferStorage::DEVICE_PRIVATE ? MTLResourceStorageModePrivate : MTLResourceStorageModeManaged];
+    auto buffer = [_handle newBufferWithLength:capacity
+                                       options:storage == BufferStorage::DEVICE_PRIVATE ? MTLResourceStorageModePrivate : MTLResourceStorageModeManaged];
     return std::make_unique<MetalBuffer>(buffer, capacity, storage);
 }
 
 std::unique_ptr<Acceleration> MetalDevice::build_acceleration(Geometry &geometry) {
     
-    auto acceleration_group = [[MPSAccelerationStructureGroup alloc] initWithDevice:_device_wrapper->device];
+    auto acceleration_group = [[MPSAccelerationStructureGroup alloc] initWithDevice:_handle];
     auto instance_acceleration = [[MPSInstanceAccelerationStructure alloc] initWithGroup:acceleration_group];
     
     auto acceleration_structures = [NSMutableArray array];
@@ -170,7 +150,7 @@ std::unique_ptr<Acceleration> MetalDevice::build_acceleration(Geometry &geometry
     
     [instance_acceleration rebuild];
     
-    auto ray_intersector = [[MPSRayIntersector alloc] initWithDevice:_device_wrapper->device];
+    auto ray_intersector = [[MPSRayIntersector alloc] initWithDevice:_handle];
     ray_intersector.rayDataType = MPSRayDataTypeOriginMinDistanceDirectionMaxDistance;
     ray_intersector.rayStride = sizeof(Ray);
     ray_intersector.intersectionDataType = MPSIntersectionDataTypeDistancePrimitiveIndexInstanceIndexCoordinates;
@@ -178,7 +158,7 @@ std::unique_ptr<Acceleration> MetalDevice::build_acceleration(Geometry &geometry
     ray_intersector.boundingBoxIntersectionTestType = MPSBoundingBoxIntersectionTestTypeAxisAligned;
     ray_intersector.triangleIntersectionTestType = MPSTriangleIntersectionTestTypeWatertight;
     
-    auto shadow_ray_intersector = [[MPSRayIntersector alloc] initWithDevice:_device_wrapper->device];
+    auto shadow_ray_intersector = [[MPSRayIntersector alloc] initWithDevice:_handle];
     shadow_ray_intersector.rayDataType = MPSRayDataTypeOriginMinDistanceDirectionMaxDistance;
     shadow_ray_intersector.rayStride = sizeof(Ray);
     shadow_ray_intersector.intersectionDataType = MPSIntersectionDataTypeDistance;
@@ -191,8 +171,8 @@ std::unique_ptr<Acceleration> MetalDevice::build_acceleration(Geometry &geometry
 
 id<MTLLibrary> MetalDevice::_load_library(std::string_view library_name) {
     
-    auto library_iter = _library_wrappers.find(library_name);
-    if (library_iter == _library_wrappers.end()) {
+    auto library_iter = _loaded_libraries.find(library_name);
+    if (library_iter == _loaded_libraries.end()) {
         
         auto compatibility_header_path = _context->include_path("backends") / "metal" / "metal_compatibility.h";
         auto source = text_file_contents(_context->runtime_path("lib") / "kernels" / serialize(library_name, ".sk"));
@@ -218,11 +198,11 @@ id<MTLLibrary> MetalDevice::_load_library(std::string_view library_name) {
         LUISA_EXCEPTION_IF(system(archive_command.c_str()) != 0, "Failed to archive Metal library, command: ", archive_command);
         LUISA_INFO("Generated Metal shader: ", library_path);
         
-        auto library = [_device_wrapper->device newLibraryWithFile:make_objc_string(library_path.string()) error:nullptr];
+        auto library = [_handle newLibraryWithFile:make_objc_string(library_path.string()) error:nullptr];
         LUISA_EXCEPTION_IF(library == nullptr, "Failed to load library: ", library_path);
-        library_iter = _library_wrappers.emplace(library_name, std::make_unique<MetalLibraryWrapper>(library)).first;
+        library_iter = _loaded_libraries.emplace(library_name, library).first;
     }
-    return library_iter->second->library;
+    return library_iter->second;
 }
 
 }

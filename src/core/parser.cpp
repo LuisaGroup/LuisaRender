@@ -102,7 +102,7 @@ std::shared_ptr<Render> Parser::_parse_top_level() {
     
     while (!_eof()) {
         auto token = _peek_and_pop();
-        if (token == "renderer") {
+        if (token == "render") {
             task = _parse_parameter_set()->parse<Render>();
             LUISA_WARNING_IF_NOT(_eof(), "Nodes declared after tasks will be ignored");
             break;
