@@ -30,9 +30,10 @@ inline void destroy_dynamic_module(DynamicModuleHandle handle) { if (handle != n
 
 template<typename F>
 inline auto load_dynamic_symbol(DynamicModuleHandle handle, const std::string &name) {
+    LUISA_EXCEPTION_IF(name.empty(), "Empty name given for dynamic symbol");
     LUISA_INFO("Loading dynamic symbol: ", name);
     auto symbol = dlsym(handle, name.c_str());
-    LUISA_ERROR_IF(symbol == nullptr, "Failed to load dynamic symbol \"", name, "\", reason: ", dlerror());
+    LUISA_EXCEPTION_IF(symbol == nullptr, "Failed to load dynamic symbol \"", name, "\", reason: ", dlerror());
     return reinterpret_cast<F *>(symbol);
 }
 

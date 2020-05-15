@@ -53,7 +53,7 @@ template<typename T>
 using PluginBaseClass = std::remove_pointer_t<decltype(detail::plugin_base_class_match(static_cast<T *>(nullptr)))>;
 
 template<typename T>
-constexpr auto plugin_base_class_name() noexcept { return detail::plguin_base_class_name(static_cast<T *>(nullptr)); }
+constexpr auto plugin_base_class_name() noexcept { return detail::plguin_base_class_name(static_cast<PluginBaseClass<T> *>(nullptr)); }
 
 class Plugin : Noncopyable {
 
@@ -65,24 +65,25 @@ public:
     virtual ~Plugin() noexcept = default;
     [[nodiscard]] Device &device() { return *_device; }
     
-    [[nodiscard]] static std::unique_ptr<Plugin> create(
+    template<typename T>
+    [[nodiscard]] static std::unique_ptr<T> create(
         Device *device,
-        std::string_view base_name_pascal_case,
         std::string_view derived_name_pascal_case,
         const ParameterSet &params) {
         
-        auto base_name = pascal_to_snake_case(base_name_pascal_case);
+        auto base_name = pascal_to_snake_case(plugin_base_class_name<T>());
         auto derived_name = pascal_to_snake_case(derived_name_pascal_case);
         auto plugin_dir = device->context().runtime_path("lib") / base_name.append("s");
-        using PluginCreator = Plugin *(Device *, const ParameterSet &);
+        using PluginCreator = T *(Device *, const ParameterSet &);
         auto creator = device->context().load_dynamic_function<PluginCreator>(plugin_dir, derived_name, "create");
-        return std::unique_ptr<Plugin>{creator(device, params)};
+        return std::unique_ptr<T>{creator(device, params)};
     }
 };
 
 }
 
-#define LUISA_EXPORT_PLUGIN_CREATOR(PluginClass)                                                              \
-    LUISA_DLL_EXPORT ::luisa::Plugin *create(::luisa::Device *device, const ::luisa::ParameterSet &params) {  \
-        return new PluginClass{device, params};                                                               \
+#define LUISA_EXPORT_PLUGIN_CREATOR(PluginClass)                                                                                        \
+    LUISA_DLL_EXPORT ::luisa::Plugin *create(::luisa::Device *device, const ::luisa::ParameterSet &params) {                            \
+        luisa::LUISA_INFO("Creating instance of class ", #PluginClass, ", catalog: ", ::luisa::plugin_base_class_name<PluginClass>());  \
+        return new PluginClass{device, params};                                                                                         \
     }

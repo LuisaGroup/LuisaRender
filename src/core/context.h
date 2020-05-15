@@ -33,6 +33,7 @@ public:
     
     template<typename F>
     [[nodiscard]] auto load_dynamic_function(const std::filesystem::path &path, std::string_view module, std::string_view function) const {
+        LUISA_EXCEPTION_IF(module.empty(), "Empty name given for dynamic module");
         auto module_path = std::filesystem::absolute(path / serialize(LUISA_DLL_PREFIX, module, LUISA_DLL_EXTENSION));
         auto iter = _loaded_modules.find(module_path);
         if (iter == _loaded_modules.cend()) { iter = _loaded_modules.emplace(module_path, load_dynamic_module(module_path)).first; }

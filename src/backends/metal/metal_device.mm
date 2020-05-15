@@ -218,9 +218,7 @@ id<MTLLibrary> MetalDevice::_load_library(std::string_view library_name) {
         LUISA_EXCEPTION_IF(system(archive_command.c_str()) != 0, "Failed to archive Metal library, command: ", archive_command);
         LUISA_INFO("Generated Metal shader: ", library_path);
         
-        auto p = make_objc_string(library_path.string());
-        NSLog(@"%@", p);
-        auto library = [_device_wrapper->device newLibraryWithFile:p error:nullptr];
+        auto library = [_device_wrapper->device newLibraryWithFile:make_objc_string(library_path.string()) error:nullptr];
         LUISA_EXCEPTION_IF(library == nullptr, "Failed to load library: ", library_path);
         library_iter = _library_wrappers.emplace(library_name, std::make_unique<MetalLibraryWrapper>(library)).first;
     }

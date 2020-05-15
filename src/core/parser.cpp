@@ -221,4 +221,269 @@ bool Parser::_is_identifier(std::string_view sv) noexcept {
     return std::all_of(sv.cbegin(), sv.cend(), [](char c) noexcept { return c == '_' || c == '$' || std::isalnum(c); });
 }
 
+bool ParameterSet::_parse_bool(std::string_view sv) {
+    if (sv == "true") {
+        return true;
+    } else if (sv == "false") {
+        return false;
+    }
+    LUISA_EXCEPTION("Invalid bool value: ", sv);
+}
+
+float ParameterSet::_parse_float(std::string_view sv) {
+    size_t offset = 0;
+    auto value = std::stof(std::string{sv}, &offset);
+    LUISA_EXCEPTION_IF(offset != sv.size(), "Invalid float value: ", sv);
+    return value;
+}
+
+int32_t ParameterSet::_parse_int(std::string_view sv) {
+    size_t offset = 0;
+    auto value = std::stoi(std::string{sv}, &offset);
+    LUISA_EXCEPTION_IF(offset != sv.size(), "Invalid integer value: ", sv);
+    return value;
+}
+
+uint32_t ParameterSet::_parse_uint(std::string_view sv) {
+    size_t offset = 0;
+    auto value = std::stol(std::string{sv}, &offset);
+    LUISA_EXCEPTION_IF(value < 0 || value > 0xffffffff || offset != sv.size(), "Invalid integer value: ", sv);
+    return static_cast<uint32_t>(value);
+}
+
+std::string ParameterSet::_parse_string(std::string_view sv) {
+    LUISA_EXCEPTION_IF(sv.size() < 2 || sv.front() != sv.back() || (sv.front() != '"' && sv.front() != '\''), "invalid string value: ", sv);
+    auto raw = sv.substr(1, sv.size() - 2);
+    std::string value;
+    for (auto i = 0ul; i < raw.size(); i++) {
+        if (raw[i] != '\'' || ++i < raw.size()) {  // TODO: Smarter handling of escape characters
+            value.push_back(raw[i]);
+        } else {
+            LUISA_EXCEPTION("Extra escape at the end of string: ", sv);
+        }
+    }
+    return value;
+}
+
+const ParameterSet &ParameterSet::_child(std::string_view parameter_name) const {
+    auto iter = _parameters.find(parameter_name);
+    if (iter == _parameters.cend()) {
+        LUISA_WARNING("Parameter \"", parameter_name, "\" is not specified");
+        return *_empty;
+    }
+    return *iter->second;
+}
+
+bool ParameterSet::parse_bool() const {
+    LUISA_EXCEPTION_IF(_value_list.empty(), "No bool values given, expected exactly 1");
+    LUISA_WARNING_IF(_value_list.size() != 1ul, "Too many bool values, using only the first 1");
+    return _parse_bool(_value_list.front());
+}
+
+float2 ParameterSet::parse_float2() const {
+    LUISA_EXCEPTION_IF(_value_list.size() < 2, "No enough float values given, expected exactly 2");
+    LUISA_WARNING_IF(_value_list.size() != 2, "Too many float values, using only the first 2");
+    auto x = _parse_float(_value_list[0]);
+    auto y = _parse_float(_value_list[1]);
+    return make_float2(x, y);
+}
+
+std::vector<bool> ParameterSet::parse_bool_list() const {
+    std::vector<bool> bool_list;
+    bool_list.reserve(_value_list.size());
+    for (auto sv : _value_list) { bool_list.emplace_back(_parse_bool(sv)); }
+    return bool_list;
+}
+
+ParameterSet::ParameterSet(Parser *parser, std::vector<std::string_view> value_list) noexcept: _parser{parser}, _value_list{std::move(value_list)}, _is_value_list{true} {
+    _empty = std::unique_ptr<ParameterSet>{new ParameterSet{parser}};
+}
+
+ParameterSet::ParameterSet(Parser *parser, std::string_view derived_type_name, std::map<std::string_view, std::unique_ptr<ParameterSet>> params) noexcept
+    : _parser{parser}, _derived_type_name{derived_type_name}, _parameters{std::move(params)}, _is_value_list{false} {
+    _empty = std::unique_ptr<ParameterSet>{new ParameterSet{parser}};
+}
+
+const ParameterSet &ParameterSet::operator[](std::string_view parameter_name) const {
+    LUISA_INFO("Processing parameter: \"", parameter_name, "\"");
+    return _child(parameter_name);
+}
+
+float ParameterSet::parse_float() const {
+    LUISA_EXCEPTION_IF(_value_list.empty(), "No float values given, expected exactly 1");
+    LUISA_WARNING_IF(_value_list.size() != 1, "Too many float values, using only the first 1");
+    return _parse_float(_value_list.front());
+}
+
+float3 ParameterSet::parse_float3() const {
+    LUISA_EXCEPTION_IF(_value_list.size() < 3, "No enough float values given, expected exactly 3");
+    LUISA_WARNING_IF(_value_list.size() != 3, "Too many float values, using only the first 3");
+    auto x = _parse_float(_value_list[0]);
+    auto y = _parse_float(_value_list[1]);
+    auto z = _parse_float(_value_list[2]);
+    return make_float3(x, y, z);
+}
+
+float4 ParameterSet::parse_float4() const {
+    LUISA_EXCEPTION_IF(_value_list.size() < 4, "No enough float values given, expected exactly 4");
+    LUISA_WARNING_IF(_value_list.size() != 4, "Too many float values, using only the first 4");
+    auto x = _parse_float(_value_list[0]);
+    auto y = _parse_float(_value_list[1]);
+    auto z = _parse_float(_value_list[2]);
+    auto w = _parse_float(_value_list[3]);
+    return make_float4(x, y, z, w);
+}
+
+float3x3 ParameterSet::parse_float3x3() const {
+    LUISA_EXCEPTION_IF(_value_list.size() < 9, "No enough float values given, expected exactly 16");
+    LUISA_WARNING_IF(_value_list.size() != 9, "Too many float values, using only the first 16");
+    auto m00 = _parse_float(_value_list[0]);
+    auto m01 = _parse_float(_value_list[1]);
+    auto m02 = _parse_float(_value_list[2]);
+    auto m10 = _parse_float(_value_list[3]);
+    auto m11 = _parse_float(_value_list[4]);
+    auto m12 = _parse_float(_value_list[5]);
+    auto m20 = _parse_float(_value_list[6]);
+    auto m21 = _parse_float(_value_list[7]);
+    auto m22 = _parse_float(_value_list[8]);
+    return make_float3x3(m00, m01, m02, m10, m11, m12, m20, m21, m22);
+}
+
+float4x4 ParameterSet::parse_float4x4() const {
+    LUISA_EXCEPTION_IF(_value_list.size() < 16, "No enough float values given, expected exactly 16");
+    LUISA_WARNING_IF(_value_list.size() != 16, "Too many float values, using only the first 16");
+    auto m00 = _parse_float(_value_list[0]);
+    auto m01 = _parse_float(_value_list[1]);
+    auto m02 = _parse_float(_value_list[2]);
+    auto m03 = _parse_float(_value_list[3]);
+    auto m10 = _parse_float(_value_list[4]);
+    auto m11 = _parse_float(_value_list[5]);
+    auto m12 = _parse_float(_value_list[6]);
+    auto m13 = _parse_float(_value_list[7]);
+    auto m20 = _parse_float(_value_list[8]);
+    auto m21 = _parse_float(_value_list[9]);
+    auto m22 = _parse_float(_value_list[10]);
+    auto m23 = _parse_float(_value_list[11]);
+    auto m30 = _parse_float(_value_list[12]);
+    auto m31 = _parse_float(_value_list[13]);
+    auto m32 = _parse_float(_value_list[14]);
+    auto m33 = _parse_float(_value_list[15]);
+    return make_float4x4(m00, m01, m02, m03, m10, m11, m12, m13, m20, m21, m22, m23, m30, m31, m32, m33);
+}
+
+std::vector<float> ParameterSet::parse_float_list() const {
+    std::vector<float> float_list;
+    float_list.reserve(_value_list.size());
+    for (auto sv : _value_list) {
+        float_list.emplace_back(_parse_float(sv));
+    }
+    return float_list;
+}
+
+int ParameterSet::parse_int() const {
+    LUISA_EXCEPTION_IF(_value_list.empty(), "No int values given, expected exactly 1");
+    LUISA_WARNING_IF(_value_list.size() != 1, "Too many int values, using only the first 1");
+    return _parse_int(_value_list.front());
+}
+
+int2 ParameterSet::parse_int2() const {
+    LUISA_EXCEPTION_IF(_value_list.size() < 2, "No enough int values given, expected exactly 2");
+    LUISA_WARNING_IF(_value_list.size() != 2, "Too many int values, using only the first 2");
+    auto x = _parse_int(_value_list[0]);
+    auto y = _parse_int(_value_list[1]);
+    return make_int2(x, y);
+}
+
+int3 ParameterSet::parse_int3() const {
+    LUISA_EXCEPTION_IF(_value_list.size() < 3, "No enough int values given, expected exactly 3");
+    LUISA_WARNING_IF(_value_list.size() != 3, "Too many int values, using only the first 3");
+    auto x = _parse_int(_value_list[0]);
+    auto y = _parse_int(_value_list[1]);
+    auto z = _parse_int(_value_list[2]);
+    return make_int3(x, y, z);
+}
+
+int4 ParameterSet::parse_int4() const {
+    LUISA_EXCEPTION_IF(_value_list.size() < 4, "No enough int values given, expected exactly 4");
+    LUISA_WARNING_IF(_value_list.size() != 4, "Too many int values, using only the first 4");
+    auto x = _parse_int(_value_list[0]);
+    auto y = _parse_int(_value_list[1]);
+    auto z = _parse_int(_value_list[2]);
+    auto w = _parse_int(_value_list[3]);
+    return make_int4(x, y, z, w);
+}
+
+std::vector<int32_t> ParameterSet::parse_int_list() const {
+    std::vector<int32_t> int_list;
+    int_list.reserve(_value_list.size());
+    for (auto sv : _value_list) {
+        int_list.emplace_back(_parse_int(sv));
+    }
+    return int_list;
+}
+
+uint ParameterSet::parse_uint() const {
+    LUISA_EXCEPTION_IF(_value_list.empty(), "No uint values given, expected exactly 1");
+    LUISA_WARNING_IF(_value_list.size() != 1, "Too many uint values, using only the first 1");
+    return _parse_uint(_value_list.front());
+}
+
+uint2 ParameterSet::parse_uint2() const {
+    LUISA_EXCEPTION_IF(_value_list.size() < 2, "No enough uint values given, expected exactly 2");
+    LUISA_WARNING_IF(_value_list.size() != 2, "Too many uint values, using only the first 2");
+    auto x = _parse_uint(_value_list[0]);
+    auto y = _parse_uint(_value_list[1]);
+    return make_uint2(x, y);
+}
+
+uint3 ParameterSet::parse_uint3() const {
+    LUISA_EXCEPTION_IF(_value_list.size() < 3, "No enough uint values given, expected exactly 3");
+    LUISA_WARNING_IF(_value_list.size() != 3, "Too many uint values, using only the first 3");
+    auto x = _parse_uint(_value_list[0]);
+    auto y = _parse_uint(_value_list[1]);
+    auto z = _parse_uint(_value_list[2]);
+    return make_uint3(x, y, z);
+}
+
+uint4 ParameterSet::parse_uint4() const {
+    LUISA_EXCEPTION_IF(_value_list.size() < 4, "No enough uint values given, expected exactly 4");
+    LUISA_WARNING_IF(_value_list.size() != 4, "Too many uint values, using only the first 4");
+    auto x = _parse_uint(_value_list[0]);
+    auto y = _parse_uint(_value_list[1]);
+    auto z = _parse_uint(_value_list[2]);
+    auto w = _parse_uint(_value_list[3]);
+    return make_uint4(x, y, z, w);
+}
+
+std::vector<uint32_t> ParameterSet::parse_uint_list() const {
+    std::vector<uint32_t> uint_list;
+    uint_list.reserve(_value_list.size());
+    for (auto sv : _value_list) {
+        uint_list.emplace_back(_parse_uint(sv));
+    }
+    return uint_list;
+}
+
+std::string ParameterSet::parse_string() const {
+    LUISA_EXCEPTION_IF(_value_list.empty(), "No string values given, expected exactly 1");
+    LUISA_WARNING_IF(_value_list.size() != 1, "Too many uint values, using only the first 1");
+    return _parse_string(_value_list.front());
+}
+
+std::string ParameterSet::parse_string_or_default(std::string_view default_value) const noexcept {
+    try { return parse_string(); } catch (const std::runtime_error &e) {
+        LUISA_WARNING("Error occurred while parsing parameter, using default value: \"", default_value, "\"");
+        return std::string{default_value};
+    }
+}
+
+std::vector<std::string> ParameterSet::parse_string_list() const {
+    std::vector<std::string> string_list;
+    string_list.reserve(_value_list.size());
+    for (auto sv : _value_list) {
+        string_list.emplace_back(_parse_string(sv));
+    }
+    return string_list;
+}
+
 }
