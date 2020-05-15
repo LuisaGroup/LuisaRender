@@ -19,6 +19,22 @@ inline std::string serialize(Args &&...args) noexcept {
     return ss.str();
 }
 
+inline std::string pascal_to_snake_case(std::string_view s) noexcept {  // TODO: Robustness
+    std::string result;
+    auto lower_met = false;
+    for (auto i = 0u; i < s.size(); i++) {
+        auto c = s[i];
+        if (std::isupper(c)) {
+            if (lower_met || (i != 0u && i != s.size() - 1u && !std::isupper(s[i + 1]))) { result.push_back('_'); }
+            lower_met = false;
+        } else {
+            lower_met = true;
+        }
+        result.push_back(std::tolower(c));
+    }
+    return result;
+}
+
 inline std::string text_file_contents(const std::filesystem::path &file_path) {
     std::ifstream file{file_path};
     if (!file.is_open()) {

@@ -12,7 +12,7 @@
 #include <util/logging.h>
 
 #include "data_types.h"
-#include "node.h"
+#include "plugin.h"
 
 namespace luisa {
 
@@ -294,7 +294,7 @@ public:
     }
     
     [[nodiscard]] std::string parse_string() const {
-        LUISA_EXCEPTION_IF(_value_list.empty(), "No uint values given, expected exactly 1");
+        LUISA_EXCEPTION_IF(_value_list.empty(), "No string values given, expected exactly 1");
         LUISA_WARNING_IF(_value_list.size() != 1, "Too many uint values, using only the first 1");
         return _parse_string(_value_list.front());
     }

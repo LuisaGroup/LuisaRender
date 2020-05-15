@@ -27,7 +27,7 @@ struct ImportanceSamplePixelsKernelUniforms {
 
 #ifndef LUISA_DEVICE_COMPATIBLE
 
-#include "node.h"
+#include "plugin.h"
 #include "kernel.h"
 #include "ray.h"
 #include "parser.h"
@@ -35,17 +35,14 @@ struct ImportanceSamplePixelsKernelUniforms {
 
 namespace luisa {
 
-class Filter : public Node {
-
-private:
-    LUISA_MAKE_NODE_CREATOR_REGISTRY(Filter);
+class Filter : public Plugin {
 
 protected:
     float _radius;
 
 public:
     Filter(Device *device, const ParameterSet &parameters)
-        : Node{device}, _radius{parameters["radius"].parse_float_or_default(1.0f)} {}
+        : Plugin{device}, _radius{parameters["radius"].parse_float_or_default(1.0f)} {}
     
     [[nodiscard]] float radius() const noexcept { return _radius; }
     

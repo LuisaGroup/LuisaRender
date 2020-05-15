@@ -1,8 +1,84 @@
 //
-// Created by Mike Smith on 2020/5/4.
+// Created by Mike Smith on 2020/2/2.
 //
 
 #pragma once
 
-#define LUISA_EXPORT [[gnu::visibility("default")]]
-#define LUISA_IMPORT
+#include <variant>
+#include <string>
+#include <unordered_map>
+#include <type_traits>
+#include <functional>
+#include <memory>
+#include <iostream>
+
+#include <util/concepts.h>
+#include <util/logging.h>
+#include "data_types.h"
+#include "device.h"
+
+namespace luisa {
+class ParameterSet;
+}
+
+namespace luisa {
+
+#define LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(BaseClass)                          \
+    class BaseClass;                                                                      \
+    namespace detail {                                                                    \
+        template<typename T, std::enable_if_t<std::is_base_of_v<BaseClass, T>, int> = 0>  \
+        auto plugin_base_class_match(T &&) -> BaseClass * {}                              \
+                                                                                          \
+        constexpr std::string_view plguin_base_class_name(const BaseClass &) {            \
+            return #BaseClass;                                                            \
+        }                                                                                 \
+    }
+
+LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Filter)
+LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Film)
+LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Camera)
+LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Shape)
+LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Transform)
+LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Light)
+LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Material)
+LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Integrator)
+LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Render)
+LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Sampler)
+
+#undef LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME
+
+template<typename T>
+using PluginBaseClass = std::remove_pointer_t<decltype(detail::plugin_base_class_match(std::declval<T>()))>;
+
+template<typename T>
+constexpr auto plugin_base_class_name = detail::plguin_base_class_name(std::declval<PluginBaseClass<T>>());
+
+template<typename BaseClass>
+using PluginCreator = BaseClass *(Device *, const ParameterSet &);
+
+class Plugin : Noncopyable {
+
+protected:
+    Device *_device;
+
+public:
+    explicit Plugin(Device *device) noexcept : _device{device} {}
+    virtual ~Plugin() noexcept = default;
+    [[nodiscard]] Device &device() { return *_device; }
+    
+    template<typename T>
+    [[nodiscard]] std::unique_ptr<T> create(std::string_view derived_name_pascal_case) {
+        auto base_name = pascal_to_snake_case(plugin_base_class_name<T>);
+        auto derived_name = pascal_to_snake_case(derived_name_pascal_case);
+        auto plugin_dir = _device->context().runtime_path("lib") / base_name.append("s");
+        auto creator = _device->context().load_dynamic_function<PluginCreator<T>>(plugin_dir, derived_name, "create");
+        return std::unique_ptr<T>{creator()};
+    }
+};
+
+}
+
+#define LUISA_EXPORT_PLUGIN_CREATOR(PluginClass)                                                                                    \
+    LUISA_DLL_EXPORT ::luisa::PluginBaseClass<PluginClass> *create(::luisa::Device *device, const ::luisa::ParameterSet &params) {  \
+        return new PluginClass{device, params};                                                                                     \
+    }

@@ -19,17 +19,17 @@ private:
     std::filesystem::path _working_directory;
     mutable std::map<std::filesystem::path, DynamicModuleHandle, std::less<>> _loaded_modules;
     
-    static bool _create_folder_if_necessary(const std::filesystem::path &path) noexcept;
+    static bool _create_folder_if_necessary(const std::filesystem::path &path) const noexcept;
 
 public:
     Context(const std::filesystem::path &runtime_dir, const std::filesystem::path &working_dir);
     ~Context() noexcept;
-    bool create_working_folder(const std::filesystem::path &name) noexcept;
-    bool create_cache_folder(const std::filesystem::path &name) noexcept;
-    [[nodiscard]] std::filesystem::path include_path(const std::filesystem::path &name = {}) noexcept;
-    [[nodiscard]] std::filesystem::path working_path(const std::filesystem::path &name = {}) noexcept;
-    [[nodiscard]] std::filesystem::path runtime_path(const std::filesystem::path &name = {}) noexcept;
-    [[nodiscard]] std::filesystem::path cache_path(const std::filesystem::path &name = {}) noexcept;
+    bool create_working_folder(const std::filesystem::path &name) const noexcept;
+    bool create_cache_folder(const std::filesystem::path &name) const noexcept;
+    [[nodiscard]] std::filesystem::path include_path(const std::filesystem::path &name = {}) const noexcept;
+    [[nodiscard]] std::filesystem::path working_path(const std::filesystem::path &name = {}) const noexcept;
+    [[nodiscard]] std::filesystem::path runtime_path(const std::filesystem::path &name = {}) const noexcept;
+    [[nodiscard]] std::filesystem::path cache_path(const std::filesystem::path &name = {}) const noexcept;
     
     template<typename F>
     [[nodiscard]] auto load_dynamic_function(const std::filesystem::path &path, std::string_view module, std::string_view function) const {

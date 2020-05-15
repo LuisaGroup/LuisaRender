@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "node.h"
+#include "plugin.h"
 #include "buffer.h"
 #include "transform.h"
 #include "material.h"
@@ -13,10 +13,7 @@
 
 namespace luisa {
 
-class Shape : public Node {
-
-private:
-    LUISA_MAKE_NODE_CREATOR_REGISTRY(Shape);
+class Shape : public Plugin {
 
 protected:
     std::shared_ptr<Transform> _transform;
@@ -24,7 +21,7 @@ protected:
 
 public:
     Shape(Device *device, const ParameterSet &parameter_set)
-        : Node{device},
+        : Plugin{device},
           _transform{parameter_set["transform"].parse_or_null<Transform>()},
           _material{parameter_set["material"].parse_or_null<Material>()} {
         

@@ -20,17 +20,14 @@ struct AccumulateTileKernelUniforms {
 #ifndef LUISA_DEVICE_COMPATIBLE
 
 #include "device.h"
-#include "node.h"
+#include "plugin.h"
 #include "filter.h"
 #include "parser.h"
 #include "viewport.h"
 
 namespace luisa {
 
-class Film : public Node {
-
-private:
-    LUISA_MAKE_NODE_CREATOR_REGISTRY(Film);
+class Film : public Plugin {
 
 protected:
     Viewport _film_viewport{};
@@ -42,7 +39,7 @@ protected:
 
 public:
     Film(Device *device, const ParameterSet &parameters)
-        : Node{device},
+        : Plugin{device},
           _resolution{parameters["resolution"].parse_uint2_or_default(make_uint2(1280, 720))},
           _filter{parameters["filter"].parse_or_null<Filter>()} {
         

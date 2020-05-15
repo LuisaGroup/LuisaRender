@@ -5,16 +5,13 @@
 #pragma once
 
 #include "viewport.h"
-#include "node.h"
+#include "plugin.h"
 #include "parser.h"
 #include "device.h"
 
 namespace luisa {
 
-class Sampler : public Node {
-
-private:
-    LUISA_MAKE_NODE_CREATOR_REGISTRY(Sampler);
+class Sampler : public Plugin {
 
 protected:
     uint _spp;
@@ -33,7 +30,7 @@ protected:
 
 public:
     Sampler(Device *device, const ParameterSet &parameter_set)
-        : Node{device}, _spp{parameter_set["spp"].parse_uint_or_default(1024u)} {}
+        : Plugin{device}, _spp{parameter_set["spp"].parse_uint_or_default(1024u)} {}
     
     [[nodiscard]] uint spp() const noexcept { return _spp; }
     [[nodiscard]] uint frame_index() const noexcept { return _frame_index; }
