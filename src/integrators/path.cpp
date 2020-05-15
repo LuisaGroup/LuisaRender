@@ -27,8 +27,6 @@ public:
     void render_frame(KernelDispatcher &dispatch) override;
 };
 
-LUISA_REGISTER_NODE_CREATOR("PathTracing", PathTracing)
-
 PathTracing::PathTracing(Device *device, const ParameterSet &parameter_set)
     : Integrator{device, parameter_set},
       _max_depth{parameter_set["max_depth"].parse_uint_or_default(8u)} {}
@@ -42,3 +40,5 @@ void PathTracing::_prepare_for_frame() {
 }
     
 }
+
+LUISA_EXPORT_PLUGIN_CREATOR(luisa::PathTracing)

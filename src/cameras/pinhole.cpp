@@ -33,8 +33,6 @@ public:
     PinholeCamera(Device *device, const ParameterSet &parameter_set);
 };
 
-LUISA_REGISTER_NODE_CREATOR("Pinhole", PinholeCamera)
-
 void PinholeCamera::_generate_rays(KernelDispatcher &dispatch,
                                   Sampler &sampler [[maybe_unused]],
                                   Viewport tile_viewport,
@@ -70,3 +68,5 @@ PinholeCamera::PinholeCamera(Device *device, const ParameterSet &parameter_set)
 }
 
 }
+
+LUISA_EXPORT_PLUGIN_CREATOR(luisa::PinholeCamera)

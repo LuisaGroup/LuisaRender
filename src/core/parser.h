@@ -315,12 +315,12 @@ public:
         return string_list;
     }
 
-#define LUISA_PARAMETER_SET_PARSE_OR_DEFAULT(Type, TO_STRING)                                                        \
-    [[nodiscard]] Type parse_##Type##_or_default(Type default_value) const noexcept {                                \
-        try { return parse_##Type(); } catch (const std::runtime_error &e) {                                         \
+#define LUISA_PARAMETER_SET_PARSE_OR_DEFAULT(Type, TO_STRING)                                                          \
+    [[nodiscard]] Type parse_##Type##_or_default(Type default_value) const noexcept {                                  \
+        try { return parse_##Type(); } catch (const std::runtime_error &e) {                                           \
             LUISA_WARNING("Error occurred while parsing parameter, using default value: ", TO_STRING(default_value));  \
-            return default_value;                                                                                    \
-        }                                                                                                            \
+            return default_value;                                                                                      \
+        }                                                                                                              \
     }
 
 #define LUISA_PARAMETER_SET_PARSE_OR_DEFAULT_SCALAR(Type)  \
@@ -368,7 +368,7 @@ private:
     std::string _source;
     std::string_view _peeked;
     std::string_view _remaining;
-    std::unordered_map<std::string_view, std::shared_ptr<Node>> _global_nodes;
+    std::unordered_map<std::string_view, std::shared_ptr<Plugin>> _global_nodes;
     
     void _skip_blanks_and_comments();
     void _pop();
@@ -404,7 +404,8 @@ template<typename BaseClass>
         LUISA_WARNING_IF_NOT(_value_list.size() == 1, "Too many references given, using only the first 1");
         return _parser->global_node<BaseClass>(_value_list.front());
     }
-    return BaseClass::_creators[_derived_type_name](&_parser->device(), *this);
+    std::shared_ptr<Plugin> p = Plugin::create(&_parser->device(), plugin_base_class_name<BaseClass>(), _derived_type_name, *this);
+    return std::dynamic_pointer_cast<BaseClass>(p);
 }
 
 template<typename BaseClass>

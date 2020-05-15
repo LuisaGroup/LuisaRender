@@ -195,7 +195,7 @@ id<MTLLibrary> MetalDevice::_load_library(std::string_view library_name) {
     if (library_iter == _library_wrappers.end()) {
         
         auto compatibility_header_path = _context->include_path("backends") / "metal" / "metal_compatibility.h";
-        auto source = text_file_contents(_context->include_path("kernels") / serialize(library_name, ".sk"));
+        auto source = text_file_contents(_context->runtime_path("lib") / "kernels" / serialize(library_name, ".sk"));
         
         _context->create_cache_folder("shaders");
         auto source_path = _context->cache_path("shaders") / serialize(library_name, ".metal");
@@ -216,8 +216,11 @@ id<MTLLibrary> MetalDevice::_load_library(std::string_view library_name) {
         auto archive_command = serialize("xcrun -sdk macosx metallib ", ir_path, " -o ", library_path);
         LUISA_INFO("Archiving Metal library: ", ir_path);
         LUISA_EXCEPTION_IF(system(archive_command.c_str()) != 0, "Failed to archive Metal library, command: ", archive_command);
+        LUISA_INFO("Generated Metal shader: ", library_path);
         
-        auto library = [_device_wrapper->device newLibraryWithFile:make_objc_string(library_path.string()) error:nullptr];
+        auto p = make_objc_string(library_path.string());
+        NSLog(@"%@", p);
+        auto library = [_device_wrapper->device newLibraryWithFile:p error:nullptr];
         LUISA_EXCEPTION_IF(library == nullptr, "Failed to load library: ", library_path);
         library_iter = _library_wrappers.emplace(library_name, std::make_unique<MetalLibraryWrapper>(library)).first;
     }

@@ -19,7 +19,7 @@ private:
     std::filesystem::path _working_directory;
     mutable std::map<std::filesystem::path, DynamicModuleHandle, std::less<>> _loaded_modules;
     
-    static bool _create_folder_if_necessary(const std::filesystem::path &path) const noexcept;
+    static bool _create_folder_if_necessary(const std::filesystem::path &path) noexcept;
 
 public:
     Context(const std::filesystem::path &runtime_dir, const std::filesystem::path &working_dir);

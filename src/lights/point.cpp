@@ -22,8 +22,6 @@ public:
     [[nodiscard]] uint sampling_dimensions() const noexcept override;
 };
 
-LUISA_REGISTER_NODE_CREATOR("Point", PointLight)
-
 PointLight::PointLight(Device *device, const ParameterSet &parameter_set)
     : Light{device, parameter_set},
       _position{parameter_set["position"].parse_float3()},
@@ -69,3 +67,5 @@ uint PointLight::sampling_dimensions() const noexcept {
 }
 
 }
+
+LUISA_EXPORT_PLUGIN_CREATOR(luisa::PointLight)

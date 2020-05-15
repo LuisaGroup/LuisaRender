@@ -28,8 +28,6 @@ public:
     void encode_data(TypelessBuffer &buffer, size_t data_index, uint2 cdf_range, uint instance_id, uint triangle_offset, uint vertex_offset, float shape_area) override;
 };
 
-LUISA_REGISTER_NODE_CREATOR("DiffuseArea", DiffuseAreaLight)
-
 uint DiffuseAreaLight::tag() const noexcept {
     static auto t = Light::_assign_tag();
     return t;
@@ -105,3 +103,5 @@ Light::EvaluateLightsDispatch DiffuseAreaLight::create_evaluate_emissions_dispat
 }
     
 }
+
+LUISA_EXPORT_PLUGIN_CREATOR(luisa::DiffuseAreaLight)

@@ -36,8 +36,6 @@ public:
     ThinLensCamera(Device *device, const ParameterSet &parameters);
 };
 
-LUISA_REGISTER_NODE_CREATOR("ThinLens", ThinLensCamera)
-
 ThinLensCamera::ThinLensCamera(Device *device, const ParameterSet &parameters)
     : Camera{device, parameters} {
     
@@ -92,3 +90,5 @@ void ThinLensCamera::_generate_rays(KernelDispatcher &dispatch,
 }
 
 }
+
+LUISA_EXPORT_PLUGIN_CREATOR(luisa::ThinLensCamera)

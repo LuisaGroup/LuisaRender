@@ -28,8 +28,6 @@ public:
     
 };
 
-LUISA_REGISTER_NODE_CREATOR("Normal", NormalVisualizer)
-
 void NormalVisualizer::render_frame(KernelDispatcher &dispatch) {
     
     _sampler->prepare_for_tile(dispatch, _viewport);
@@ -88,3 +86,5 @@ NormalVisualizer::NormalVisualizer(Device *device, const ParameterSet &parameter
       _colorize_normals_kernel{device->load_kernel("integrator::normal::colorize_normals")} {}
     
 }
+
+LUISA_EXPORT_PLUGIN_CREATOR(luisa::NormalVisualizer)

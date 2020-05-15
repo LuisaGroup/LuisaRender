@@ -22,6 +22,6 @@ public:
           _alpha{parameters["alpha"].parse_float_or_default(2.0f)} {}
 };
 
-LUISA_REGISTER_NODE_CREATOR("Gaussian", GaussianFilter)
-
 }
+
+LUISA_EXPORT_PLUGIN_CREATOR(luisa::GaussianFilter)

@@ -28,6 +28,6 @@ public:
           _c{parameters["c"].parse_float_or_default(1.0f / 3.0f)} {}
 };
 
-LUISA_REGISTER_NODE_CREATOR("MitchellNetravali", MitchellNetravaliFilter)
-
 }
+
+LUISA_EXPORT_PLUGIN_CREATOR(luisa::MitchellNetravaliFilter)

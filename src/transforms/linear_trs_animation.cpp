@@ -24,8 +24,6 @@ public:
     [[nodiscard]] float4x4 dynamic_matrix(float time) const override;
 };
 
-LUISA_REGISTER_NODE_CREATOR("LinearTRSAnimation", LinearTRSAnimation)
-
 LinearTRSAnimation::LinearTRSAnimation(Device *device, const ParameterSet &parameter_set)
     : Transform{device, parameter_set} {
     
@@ -74,3 +72,5 @@ float4x4 LinearTRSAnimation::dynamic_matrix(float time) const {
 }
 
 }
+
+LUISA_EXPORT_PLUGIN_CREATOR(luisa::LinearTRSAnimation)

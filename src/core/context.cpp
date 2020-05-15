@@ -20,7 +20,7 @@ Context::Context(const std::filesystem::path &runtime_dir, const std::filesystem
     LUISA_EXCEPTION_IF(!_create_folder_if_necessary(cache_directory), "Failed to create cache directory: ", cache_directory);
 }
 
-bool Context::_create_folder_if_necessary(const std::filesystem::path &path) const noexcept {
+bool Context::_create_folder_if_necessary(const std::filesystem::path &path) noexcept {
     if (std::filesystem::exists(path)) { return true; }
     try {
         LUISA_INFO("Creating folder: ", path);

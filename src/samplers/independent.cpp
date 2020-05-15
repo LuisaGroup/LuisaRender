@@ -25,8 +25,6 @@ public:
     IndependentSampler(Device *device, const ParameterSet &parameter_set);
 };
 
-LUISA_REGISTER_NODE_CREATOR("Independent", IndependentSampler)
-
 IndependentSampler::IndependentSampler(Device *device, const ParameterSet &parameter_set)
     : Sampler{device, parameter_set},
       _reset_states_kernel{device->load_kernel("sampler::independent::reset_states")},
@@ -69,3 +67,5 @@ void IndependentSampler::_generate_samples(KernelDispatcher &dispatch, BufferVie
 }
 
 }
+
+LUISA_EXPORT_PLUGIN_CREATOR(luisa::IndependentSampler)

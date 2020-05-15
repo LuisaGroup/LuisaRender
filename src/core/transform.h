@@ -28,7 +28,7 @@ public:
 class IdentityTransform : public Transform {
 
 public:
-    explicit IdentityTransform(Device *device) noexcept : Transform{device};
+    explicit IdentityTransform(Device *device) noexcept : Transform{device} {}
 };
 
 }

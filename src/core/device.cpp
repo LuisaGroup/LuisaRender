@@ -50,7 +50,7 @@ Device::Device(Context *context) noexcept
     : _context{context}, _command_queue_size{16u}, _working_command_count{0u} {}
 
 std::unique_ptr<Device> Device::create(Context *context, std::string_view name) {
-    auto create_device = context->load_dynamic_function<DeviceCreator>(context->runtime_path("backends") / name, name, "create");
+    auto create_device = context->load_dynamic_function<DeviceCreator>(context->runtime_path("lib") / "backends", name, "create");
     return std::unique_ptr<Device>{create_device(context)};
 }
 

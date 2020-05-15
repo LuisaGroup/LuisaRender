@@ -26,8 +26,6 @@ public:
     
 };
 
-LUISA_REGISTER_NODE_CREATOR("TriangleMesh", TriangleMesh)
-
 void TriangleMesh::load(GeometryEncoder &encoder) {
     
     Assimp::Importer ai_importer;
@@ -104,3 +102,5 @@ void TriangleMesh::load(GeometryEncoder &encoder) {
 }
 
 }
+
+LUISA_EXPORT_PLUGIN_CREATOR(luisa::TriangleMesh)

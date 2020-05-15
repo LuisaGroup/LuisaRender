@@ -12,7 +12,7 @@ int main(int argc, char *argv[]) {
     
     try {
         LUISA_EXCEPTION_IF(argc != 2, "No input file specified");
-        Parser{Device::create(&context, "Metal").get()}.parse(context.working_path(argv[1]))->execute();
+        Parser{Device::create(&context, "metal").get()}.parse(context.working_path(argv[1]))->execute();
     } catch (const std::exception &e) {
         LUISA_ERROR(e.what());
     }

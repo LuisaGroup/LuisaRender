@@ -22,7 +22,7 @@ using DynamicModuleHandle = void *;
 inline DynamicModuleHandle load_dynamic_module(const std::filesystem::path &path) {
     LUISA_INFO("Loading dynamic module: ", path);
     auto module = dlopen(std::filesystem::absolute(path).string().c_str(), RTLD_LAZY);
-    LUISA_EXCEPTION_IF(module == nullptr, "Failed to load dynamic module: ", path);
+    LUISA_EXCEPTION_IF(module == nullptr, "Failed to load dynamic module ", path, ", reason: ", dlerror());
     return module;
 }
 
@@ -32,7 +32,7 @@ template<typename F>
 inline auto load_dynamic_symbol(DynamicModuleHandle handle, const std::string &name) {
     LUISA_INFO("Loading dynamic symbol: ", name);
     auto symbol = dlsym(handle, name.c_str());
-    LUISA_ERROR_IF(symbol == nullptr, "Failed to load dynamic symbol: ", name);
+    LUISA_ERROR_IF(symbol == nullptr, "Failed to load dynamic symbol \"", name, "\", reason: ", dlerror());
     return reinterpret_cast<F *>(symbol);
 }
 

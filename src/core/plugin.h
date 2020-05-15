@@ -27,10 +27,12 @@ namespace luisa {
     class BaseClass;                                                                      \
     namespace detail {                                                                    \
         template<typename T, std::enable_if_t<std::is_base_of_v<BaseClass, T>, int> = 0>  \
-        auto plugin_base_class_match(T &&) -> BaseClass * {}                              \
+        auto plugin_base_class_match(T *) -> BaseClass * {}                               \
                                                                                           \
-        constexpr std::string_view plguin_base_class_name(const BaseClass &) {            \
-            return #BaseClass;                                                            \
+        template<typename T, std::enable_if_t<std::is_same_v<BaseClass, T>, int> = 0>     \
+        constexpr std::string_view plguin_base_class_name(T *) {                          \
+            using namespace std::string_view_literals;                                    \
+            return #BaseClass""sv;                                                        \
         }                                                                                 \
     }
 
@@ -48,13 +50,10 @@ LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Sampler)
 #undef LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME
 
 template<typename T>
-using PluginBaseClass = std::remove_pointer_t<decltype(detail::plugin_base_class_match(std::declval<T>()))>;
+using PluginBaseClass = std::remove_pointer_t<decltype(detail::plugin_base_class_match(static_cast<T *>(nullptr)))>;
 
 template<typename T>
-constexpr auto plugin_base_class_name = detail::plguin_base_class_name(std::declval<PluginBaseClass<T>>());
-
-template<typename BaseClass>
-using PluginCreator = BaseClass *(Device *, const ParameterSet &);
+constexpr auto plugin_base_class_name() noexcept { return detail::plguin_base_class_name(static_cast<T *>(nullptr)); }
 
 class Plugin : Noncopyable {
 
@@ -62,23 +61,28 @@ protected:
     Device *_device;
 
 public:
-    explicit Plugin(Device *device) noexcept : _device{device} {}
+    explicit Plugin(Device *device) noexcept: _device{device} {}
     virtual ~Plugin() noexcept = default;
     [[nodiscard]] Device &device() { return *_device; }
     
-    template<typename T>
-    [[nodiscard]] std::unique_ptr<T> create(std::string_view derived_name_pascal_case) {
-        auto base_name = pascal_to_snake_case(plugin_base_class_name<T>);
+    [[nodiscard]] static std::unique_ptr<Plugin> create(
+        Device *device,
+        std::string_view base_name_pascal_case,
+        std::string_view derived_name_pascal_case,
+        const ParameterSet &params) {
+        
+        auto base_name = pascal_to_snake_case(base_name_pascal_case);
         auto derived_name = pascal_to_snake_case(derived_name_pascal_case);
-        auto plugin_dir = _device->context().runtime_path("lib") / base_name.append("s");
-        auto creator = _device->context().load_dynamic_function<PluginCreator<T>>(plugin_dir, derived_name, "create");
-        return std::unique_ptr<T>{creator()};
+        auto plugin_dir = device->context().runtime_path("lib") / base_name.append("s");
+        using PluginCreator = Plugin *(Device *, const ParameterSet &);
+        auto creator = device->context().load_dynamic_function<PluginCreator>(plugin_dir, derived_name, "create");
+        return std::unique_ptr<Plugin>{creator(device, params)};
     }
 };
 
 }
 
-#define LUISA_EXPORT_PLUGIN_CREATOR(PluginClass)                                                                                    \
-    LUISA_DLL_EXPORT ::luisa::PluginBaseClass<PluginClass> *create(::luisa::Device *device, const ::luisa::ParameterSet &params) {  \
-        return new PluginClass{device, params};                                                                                     \
+#define LUISA_EXPORT_PLUGIN_CREATOR(PluginClass)                                                              \
+    LUISA_DLL_EXPORT ::luisa::Plugin *create(::luisa::Device *device, const ::luisa::ParameterSet &params) {  \
+        return new PluginClass{device, params};                                                               \
     }
