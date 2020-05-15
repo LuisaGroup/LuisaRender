@@ -18,7 +18,7 @@ struct Selection {
 #ifndef LUISA_DEVICE_COMPATIBLE
 
 #include "ray.h"
-#include "node.h"
+#include "plugin.h"
 #include "parser.h"
 #include "device.h"
 #include "interaction.h"
@@ -40,7 +40,7 @@ public:
     [[nodiscard]] auto shadow_ray_buffer() { return _shadow_ray_buffer->view(); }
 };
 
-class Light : public Node {
+class Light : public Plugin {
 
 public:
     static constexpr auto MAX_LIGHT_TAG_COUNT = 16u;
@@ -56,9 +56,6 @@ public:
         TypelessBuffer &light_data_buffer, BufferView<light::Selection> queue, BufferView<uint> queue_size,
         InteractionBufferSet &interactions)>;
 
-private:
-    LUISA_MAKE_NODE_CREATOR_REGISTRY(Light);
-
 protected:
     static uint _assign_tag() {
         static auto next_tag = 0u;
@@ -67,7 +64,7 @@ protected:
     }
 
 public:
-    Light(Device *device, const ParameterSet &parameter_set[[maybe_unused]]) : Node{device} {}
+    Light(Device *device, const ParameterSet &parameter_set[[maybe_unused]]) : Plugin{device} {}
     [[nodiscard]] virtual uint tag() const noexcept = 0;
     [[nodiscard]] virtual std::unique_ptr<Kernel> create_generate_samples_kernel() = 0;
     [[nodiscard]] virtual SampleLightsDispatch create_generate_samples_dispatch() = 0;

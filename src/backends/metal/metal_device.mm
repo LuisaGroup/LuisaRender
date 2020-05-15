@@ -6,15 +6,16 @@
 #import <string>
 #import <fstream>
 #import <string_view>
+#import <memory>
+#import <map>
 
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
 
+#import <core/device.h>
 #import <core/geometry.h>
 
-#import <util/resource_manager.h>
 #import <util/string_manipulation.h>
 
-#import "metal_device.h"
 #import "metal_buffer.h"
 #import "metal_kernel.h"
 #import "metal_acceleration.h"
@@ -47,8 +48,31 @@ struct MetalFunctionWrapper {
         : function{f}, pipeline{p}, reflection{r} {}
 };
 
-MetalDevice::MetalDevice()
-    : _device_wrapper{std::make_unique<MetalDeviceWrapper>()},
+class MetalDevice : public Device {
+
+private:
+    std::unique_ptr<MetalDeviceWrapper> _device_wrapper;
+    std::unique_ptr<MetalCommandQueueWrapper> _command_queue_wrapper;
+    std::map<std::string, std::unique_ptr<MetalLibraryWrapper>, std::less<>> _library_wrappers;
+    std::map<std::string, std::unique_ptr<MetalFunctionWrapper>, std::less<>> _function_wrappers;
+
+protected:
+    id<MTLLibrary> _load_library(std::string_view library_name);
+    void _launch_async(std::function<void(KernelDispatcher &)> dispatch, std::function<void()> callback) override;
+
+public:
+    explicit MetalDevice(Context *context);
+    ~MetalDevice() noexcept override = default;
+    std::unique_ptr<Kernel> load_kernel(std::string_view function_name) override;
+    std::unique_ptr<Acceleration> build_acceleration(Geometry &geometry) override;
+    std::unique_ptr<TypelessBuffer> allocate_typeless_buffer(size_t capacity, BufferStorage storage) override;
+    
+    void launch(std::function<void(KernelDispatcher &)> dispatch) override;
+};
+
+MetalDevice::MetalDevice(Context *context)
+    : Device{context},
+      _device_wrapper{std::make_unique<MetalDeviceWrapper>()},
       _command_queue_wrapper{std::make_unique<MetalCommandQueueWrapper>()} {
     
     _device_wrapper->device = MTLCreateSystemDefaultDevice();
@@ -170,23 +194,21 @@ id<MTLLibrary> MetalDevice::_load_library(std::string_view library_name) {
     auto library_iter = _library_wrappers.find(library_name);
     if (library_iter == _library_wrappers.end()) {
         
-        auto compatibility_header_path = ResourceManager::instance().working_path(serialize("backends/metal/metal_compatibility.h"));
-        auto source = text_file_contents(ResourceManager::instance().working_path(serialize("src/kernels/", library_name, ".sk")));
+        auto compatibility_header_path = _context->include_path("backends") / "metal" / "metal_compatibility.h";
+        auto source = text_file_contents(_context->runtime_path("lib") / "kernels" / serialize(library_name, ".sk"));
         
-        auto cache_dir = ResourceManager::instance().working_path("cache");
-        if (!std::filesystem::exists(cache_dir)) { LUISA_WARNING_IF_NOT(std::filesystem::create_directory(cache_dir), "Failed to create cache folder: ", cache_dir); }
-        
-        auto source_path = cache_dir / serialize(library_name, ".metal");
+        _context->create_cache_folder("shaders");
+        auto source_path = _context->cache_path("shaders") / serialize(library_name, ".metal");
         LUISA_INFO("Generating Metal shader: ", library_name);
         if (std::ofstream source_file{source_path}; source_file.is_open()) {
             source_file << "#define LUISA_DEVICE_COMPATIBLE\n"
-                        << "#include <" << compatibility_header_path.string() << ">\n"
+                        << "#include " << compatibility_header_path << "\n"
                         << source << std::endl;
         } else { LUISA_EXCEPTION("Failed to create file for Metal shader: ", source_path); }
         
-        auto ir_path = cache_dir / serialize(library_name, ".air");
-        auto library_path = cache_dir / serialize(library_name, ".metallib");
-        auto include_path = ResourceManager::instance().working_path(serialize("src"));
+        auto ir_path = _context->cache_path("shaders") / serialize(library_name, ".air");
+        auto library_path = _context->cache_path("shaders") / serialize(library_name, ".metallib");
+        auto include_path = _context->include_path();
         auto compile_command = serialize("xcrun -sdk macosx metal -Wall -Wextra -Wno-c++17-extensions -O3 -ffast-math -I ", include_path, " -c ", source_path, " -o ", ir_path);
         LUISA_INFO("Compiling Metal source: ", source_path);
         LUISA_EXCEPTION_IF(system(compile_command.c_str()) != 0, "Failed to compile Metal shader source, command: ", compile_command);
@@ -194,6 +216,7 @@ id<MTLLibrary> MetalDevice::_load_library(std::string_view library_name) {
         auto archive_command = serialize("xcrun -sdk macosx metallib ", ir_path, " -o ", library_path);
         LUISA_INFO("Archiving Metal library: ", ir_path);
         LUISA_EXCEPTION_IF(system(archive_command.c_str()) != 0, "Failed to archive Metal library, command: ", archive_command);
+        LUISA_INFO("Generated Metal shader: ", library_path);
         
         auto library = [_device_wrapper->device newLibraryWithFile:make_objc_string(library_path.string()) error:nullptr];
         LUISA_EXCEPTION_IF(library == nullptr, "Failed to load library: ", library_path);
@@ -203,3 +226,5 @@ id<MTLLibrary> MetalDevice::_load_library(std::string_view library_name) {
 }
 
 }
+
+LUISA_EXPORT_DEVICE_CREATOR(luisa::metal::MetalDevice)

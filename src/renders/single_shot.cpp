@@ -26,8 +26,6 @@ public:
     SingleShot(Device *device, const ParameterSet &parameter_set);
 };
 
-LUISA_REGISTER_NODE_CREATOR("SingleShot", SingleShot)
-
 SingleShot::SingleShot(Device *device, const ParameterSet &parameter_set)
     : Render{device, parameter_set},
       _shutter_samples{parameter_set["shutter_samples"].parse_uint_or_default(0u)},
@@ -113,3 +111,5 @@ void SingleShot::_execute() {
 }
 
 }
+
+LUISA_EXPORT_PLUGIN_CREATOR(luisa::SingleShot)

@@ -20,17 +20,14 @@ struct GeneratePixelSamplesWithoutFilterKernelUniforms {
 #include "ray.h"
 #include "device.h"
 #include "film.h"
-#include "node.h"
+#include "plugin.h"
 #include "parser.h"
 #include "sampler.h"
 #include "transform.h"
 
 namespace luisa {
 
-class Camera : public Node {
-
-private:
-    LUISA_MAKE_NODE_CREATOR_REGISTRY(Camera);
+class Camera : public Plugin {
 
 protected:
     std::shared_ptr<Film> _film;
@@ -47,7 +44,7 @@ protected:
 
 public:
     Camera(Device *device, const ParameterSet &parameters)
-        : Node{device},
+        : Plugin{device},
           _film{parameters["film"].parse<Film>()},
           _transform{parameters["transform"].parse_or_null<Transform>()},
           _generate_pixel_samples_without_filter_kernel{device->load_kernel("camera::generate_pixel_samples_without_filter")} {}

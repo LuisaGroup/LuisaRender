@@ -21,6 +21,6 @@ public:
     
 };
 
-LUISA_REGISTER_NODE_CREATOR("Replica", ShapeReplica)
-
 }
+
+LUISA_EXPORT_PLUGIN_CREATOR(luisa::ShapeReplica)

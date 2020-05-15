@@ -173,3 +173,4 @@ _deps
 **/build
 **/bin
 /cache/
+/install/

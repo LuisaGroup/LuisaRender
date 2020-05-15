@@ -15,6 +15,6 @@ public:
     BoxFilter(Device *device, const ParameterSet &params) : SeparableFilter{device, params} {}
 };
 
-LUISA_REGISTER_NODE_CREATOR("Box", BoxFilter)
-
 }
+
+LUISA_EXPORT_PLUGIN_CREATOR(luisa::BoxFilter)

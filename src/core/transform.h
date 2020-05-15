@@ -4,22 +4,19 @@
 
 #pragma once
 
-#include "node.h"
+#include "plugin.h"
 #include "parser.h"
 #include "mathematics.h"
 
 namespace luisa {
 
-class Transform : public Node {
-
-private:
-    LUISA_MAKE_NODE_CREATOR_REGISTRY(Transform);
+class Transform : public Plugin {
 
 protected:
-    explicit Transform(Device *device) : Node{device} {}
+    explicit Transform(Device *device) : Plugin{device} {}
 
 public:
-    Transform(Device *device, const ParameterSet &) : Node{device} {}
+    Transform(Device *device, const ParameterSet &) : Plugin{device} {}
     [[nodiscard]] virtual float4x4 static_matrix() const { return math::identity(); }
     [[nodiscard]] virtual float4x4 dynamic_matrix(float time[[maybe_unused]]) const {
         LUISA_EXCEPTION_IF_NOT(is_static(), "Transform::dynamic_matrix() not implemented in dynamic transform");
@@ -31,8 +28,7 @@ public:
 class IdentityTransform : public Transform {
 
 public:
-    explicit IdentityTransform(Device *device) noexcept;
-    IdentityTransform(Device *device, const ParameterSet &parameter_set) noexcept;
+    explicit IdentityTransform(Device *device) noexcept : Transform{device} {}
 };
 
 }

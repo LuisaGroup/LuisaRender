@@ -14,10 +14,7 @@
 
 namespace luisa {
 
-class Integrator : public Node {
-
-private:
-    LUISA_MAKE_NODE_CREATOR_REGISTRY(Integrator);
+class Integrator : public Plugin {
 
 protected:
     Scene *_scene{nullptr};
@@ -29,7 +26,7 @@ protected:
 
 public:
     Integrator(Device *device, const ParameterSet &parameter_set[[maybe_unused]]) noexcept
-        : Node{device} {}
+        : Plugin{device} {}
     
     void prepare_for_frame(Scene *scene, Camera *camera, Sampler *sampler, Viewport viewport) {
         _scene = scene;

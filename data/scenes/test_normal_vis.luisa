@@ -1,34 +1,9 @@
-Film film : RGB {
-  resolution { 1200, 600 }
-   filter : MitchellNetravali {
-// filter : Triangle {
-// filter : Gaussian {
-    radius { 16.0 }
-    alpha { 16.0 }
-    b { 0.33333333333333 }
-    c { 0.33333333333333 }
-  }
-}
-
 Transform a1 : TRS {
   rotation { 0.0, 0.0, 1.0, -2.0 }
 }
 
 Transform a2 : TRS {
   rotation { 0.0, 0.0, 1.0, 2.0 }
-}
-
-Camera camera : ThinLens {
-  film { @film }
-  position { 0, 0, 2 }
-  target { 0, 0, 0 }
-  sensor_size { 36, 24 }
-  f_number { 1.2 }
-  focal_length { 35 }
-//   transform : LinearTRSAnimation {
-//     time_points { 1.0, 2.0 }
-//     transforms { @a1, @a2 }
-//   }
 }
 
 // Camera camera : Pinhole {
@@ -100,6 +75,33 @@ Shape cube : TriangleMesh {
 Light light : Point {
   position { 0.0, 3.0, 3.0 }
   emission { 15 }
+}
+
+Filter filter : MitchellNetravali {
+// filter : Triangle {
+// filter : Gaussian {
+  radius { 16.0 }
+  alpha { 16.0 }
+  b { 0.33333333333333 }
+  c { 0.33333333333333 }
+}
+
+Film film : RGB {
+  resolution { 1200, 600 }
+  filter { @filter }
+}
+
+Camera camera : ThinLens {
+  film { @film }
+  position { 0, 0, 2 }
+  target { 0, 0, 0 }
+  sensor_size { 36, 24 }
+  f_number { 1.2 }
+  focal_length { 35 }
+//   transform : LinearTRSAnimation {
+//     time_points { 1.0, 2.0 }
+//     transforms { @a1, @a2 }
+//   }
 }
 
 renderer : SingleShot {

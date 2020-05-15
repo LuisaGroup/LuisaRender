@@ -27,6 +27,6 @@ public:
           _tau{params["tau"].parse_float_or_default(3.0f)} {}
 };
 
-LUISA_REGISTER_NODE_CREATOR("LanczosSinc", LanczosSincFilter)
-
 }
+
+LUISA_EXPORT_PLUGIN_CREATOR(luisa::LanczosSincFilter)

@@ -7,8 +7,6 @@
 
 namespace luisa {
 
-LUISA_REGISTER_NODE_CREATOR("TRS", TRSTransform)
-
 TRSTransform::TRSTransform(Device *device, const ParameterSet &parameter_set)
     : Transform{device, parameter_set},
       _t{parameter_set["translation"].parse_float3_or_default(make_float4())},
@@ -20,3 +18,5 @@ TRSTransform::TRSTransform(Device *device, const ParameterSet &parameter_set)
 }
 
 }
+
+LUISA_EXPORT_PLUGIN_CREATOR(luisa::TRSTransform)

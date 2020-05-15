@@ -7,7 +7,7 @@
 #include <chrono>
 
 #include "mathematics.h"
-#include "node.h"
+#include "plugin.h"
 #include "parser.h"
 #include "scene.h"
 #include "camera.h"
@@ -16,10 +16,7 @@
 
 namespace luisa {
 
-class Render : public Node {
-
-private:
-    LUISA_MAKE_NODE_CREATOR_REGISTRY(Render);
+class Render : public Plugin {
 
 protected:
     std::shared_ptr<Sampler> _sampler;
@@ -30,7 +27,7 @@ protected:
 
 public:
     Render(Device *device, const ParameterSet &parameter_set[[maybe_unused]])
-        : Node{device},
+        : Plugin{device},
           _sampler{parameter_set["sampler"].parse<Sampler>()},
           _integrator{parameter_set["integrator"].parse<Integrator>()} {}
     

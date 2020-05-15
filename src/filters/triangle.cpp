@@ -15,6 +15,6 @@ public:
     TriangleFilter(Device *device, const ParameterSet &params) : SeparableFilter{device, params} {}
 };
 
-LUISA_REGISTER_NODE_CREATOR("Triangle", TriangleFilter)
-
 }
+
+LUISA_EXPORT_PLUGIN_CREATOR(luisa::TriangleFilter)
