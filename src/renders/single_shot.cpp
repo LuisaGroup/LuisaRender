@@ -17,7 +17,7 @@ protected:
     float _shutter_close;
     uint _shutter_samples;
     std::shared_ptr<Camera> _camera;
-    std::filesystem::path _output_path;
+    std::string _output_path;
     Viewport _viewport{};
     
     void _execute() override;
@@ -30,7 +30,7 @@ SingleShot::SingleShot(Device *device, const ParameterSet &parameter_set)
     : Render{device, parameter_set},
       _shutter_samples{parameter_set["shutter_samples"].parse_uint_or_default(0u)},
       _camera{parameter_set["camera"].parse<Camera>()},
-      _output_path{std::filesystem::absolute(parameter_set["output"].parse_string())} {
+      _output_path{parameter_set["output"].parse_string()} {
     
     auto viewport = parameter_set["viewport"].parse_uint4_or_default(make_uint4(0u, 0u, _camera->film().resolution()));
     _viewport = {make_uint2(viewport.x, viewport.y), make_uint2(viewport.z, viewport.w)};
@@ -106,7 +106,6 @@ void SingleShot::_execute() {
         film.postprocess(dispatch);
     });
     
-    LUISA_INFO("Saving film: ", _output_path);
     film.save(_output_path);
 }
 

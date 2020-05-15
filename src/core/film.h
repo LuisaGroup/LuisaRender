@@ -68,7 +68,7 @@ public:
     }
     
     virtual void postprocess(KernelDispatcher &dispatch) = 0;
-    virtual void save(const std::filesystem::path &filename) = 0;
+    virtual void save(std::string_view filename) = 0;
     [[nodiscard]] Filter *filter() noexcept { return _filter.get(); }
     [[nodiscard]] BufferView<float4> accumulation_buffer() noexcept { return _accumulation_buffer->view(); }
     [[nodiscard]] uint2 resolution() noexcept { return _resolution; }

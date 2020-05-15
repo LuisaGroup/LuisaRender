@@ -15,7 +15,7 @@ private:
 public:
     RGBFilm(Device *device, const ParameterSet &parameters);
     void postprocess(KernelDispatcher &dispatch) override;
-    void save(const std::filesystem::path &filename) override;
+    void save(std::string_view filename) override;
     
 };
 
@@ -28,15 +28,12 @@ void RGBFilm::postprocess(KernelDispatcher &dispatch) {
     _accumulation_buffer->synchronize(dispatch);
 }
 
-void RGBFilm::save(const std::filesystem::path &filename) {
+void RGBFilm::save(std::string_view filename) {
     cv::Mat image(cv::Size2l{_resolution.x, _resolution.y}, CV_32FC4, _accumulation_buffer->data());
     cv::cvtColor(image, image, cv::COLOR_RGB2BGR);
-    auto path = std::filesystem::absolute(filename);
-    if (path.extension() != ".exr") {
-        LUISA_WARNING("File name not ended with .exr: ", filename);
-        path += ".exr";
-    }
-    cv::imwrite(path, image);
+    auto path = _device->context().working_path(filename);
+    LUISA_INFO("Saving film: ", path);
+    cv::imwrite(path.string(), image);
 }
 
 RGBFilm::RGBFilm(Device *device, const ParameterSet &parameters) : Film{device, parameters} {
