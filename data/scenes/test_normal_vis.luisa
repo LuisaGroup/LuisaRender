@@ -97,8 +97,8 @@ Filter filter : MitchellNetravali {
 }
 
 Film film : RGB {
-  resolution { 1200, 600 }
-  filter { @filter }
+  resolution { 1200, 800 }
+//  filter { @filter }
 }
 
 Camera camera : ThinLens {

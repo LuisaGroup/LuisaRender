@@ -38,7 +38,7 @@ private:
     id<MTLDevice> _handle;
     id<MTLCommandQueue> _command_queue;
     std::map<std::string, id<MTLLibrary>, std::less<>> _loaded_libraries;
-    std::map<std::string, std::unique_ptr<MetalFunctionWrapper>, std::less<>> _loaded_functions;
+    std::map<std::string, MetalFunctionWrapper, std::less<>> _loaded_functions;
 
 protected:
     id<MTLLibrary> _load_library(std::string_view library_name);
@@ -85,11 +85,11 @@ std::unique_ptr<Kernel> MetalDevice::load_kernel(std::string_view function_name)
                                                             reflection:&reflection
                                                                  error:nullptr];
         
-        iter = _loaded_functions.emplace(function_name, std::make_unique<MetalFunctionWrapper>(function, pipeline, reflection)).first;
+        iter = _loaded_functions.emplace(function_name, MetalFunctionWrapper{function, pipeline, reflection}).first;
     }
     
-    auto function_wrapper = iter->second.get();
-    return std::make_unique<MetalKernel>(function_wrapper->function, function_wrapper->pipeline, function_wrapper->reflection);
+    auto function_wrapper = iter->second;
+    return std::make_unique<MetalKernel>(function_wrapper.function, function_wrapper.pipeline, function_wrapper.reflection);
 }
 
 void MetalDevice::launch(std::function<void(KernelDispatcher &)> dispatch) {
