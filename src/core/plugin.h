@@ -84,6 +84,6 @@ public:
 
 #define LUISA_EXPORT_PLUGIN_CREATOR(PluginClass)                                                                                        \
     LUISA_DLL_EXPORT ::luisa::Plugin *create(::luisa::Device *device, const ::luisa::ParameterSet &params) {                            \
-        luisa::LUISA_INFO("Creating instance of class ", #PluginClass, ", catalog: ", ::luisa::plugin_base_class_name<PluginClass>());  \
+        luisa::LUISA_INFO("Creating instance of class ", #PluginClass, ", category: ", ::luisa::plugin_base_class_name<PluginClass>());  \
         return new PluginClass{device, params};                                                                                         \
     }

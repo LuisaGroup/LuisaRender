@@ -1,15 +1,10 @@
 Film film : RGB {
-  filter : MitchellNetravali {
-    radius { 2.0 }
-    b { 0.33333333333333 }
-    c { 0.33333333333333 }
-  }
   resolution { 1280, 800 }
 }
 
 Camera camera : ThinLens {
   film { @film }
-  position { 0, 0, 15 }
+  position { 0, 0, 25 }
   target { 0, 0, 0 }
   sensor_size { 36, 24 }
   f_number { 1.2 }
@@ -20,30 +15,77 @@ Camera camera : ThinLens {
 Integrator integrator : Normal {}
 
 Shape cube : TriangleMesh {
-  file { "data/meshes/cube/cube.obj" }
-  transform : Identity {}
-  subdiv_level { 2 }
+  path { "../meshes/cube/cube.obj" }
+  transform : TRS {
+    scaling { 10, 10, 10 }
+  }
 }
 
-Shape left_wall : Replica {
+Shape ceiling : Instance {
   reference { @cube }
+  transform : TRS {
+    translation { 0, 10, 0 }
+  }
+}
+
+Shape floor : Instance {
+  reference { @cube }
+  transform : TRS {
+    translation { 0, -10, 0 }
+  }
+}
+
+Shape back_wall : Instance {
+  reference { @cube }
+  transform : TRS {
+    translation { 0, 0, -10 }
+  }
+}
+
+Shape left_wall : Instance {
+  reference { @cube }
+  transform : TRS {
+    translation { -10, 0, 0 }
+  }
 }
 
 Shape right_wall : Instance {
+  reference { @cube }
+  transform : TRS {
+    translation { 10, 0, 0 }
+  }
+}
 
+Shape cow : TriangleMesh {
+  path { "../meshes/cow/cow.ply" }
+  transform : TRS {
+    scaling { 35, 35, 35 }
+    rotation { 0, 1, 0, -45 }
+    translation { -1, -5, 2 }
+  }
+}
+
+Shape nanosuit : TriangleMesh {
+  path { "../meshes/nanosuit/nanosuit.ply" }
+  transform : TRS {
+    scaling { 0.35, 0.35, 0.35 }
+    rotation { 0, 1, 0, -30 }
+    translation { 2.5, -5, 0 }
+  }
 }
 
 Light light : Point {
-  position {0, 0, 0}
-  emission {10, 10, 10}
+  position { 0, 0, 0 }
+  emission { 10, 10, 10 }
 }
 
-renderer : SingleShot {
+render : SingleShot {
   integrator { @integrator }
   sampler : Independent {
-    spp { 128 }
+    spp { 1024 }
   }
   camera { @camera }
-  shapes { @left_wall, @right_wall }
+  shapes { @left_wall, @right_wall, @back_wall, @ceiling, @floor, @cow, @nanosuit }
   lights { @light }
+  output { "test.exr" }
 }

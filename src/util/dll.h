@@ -20,6 +20,7 @@ namespace luisa { inline namespace utility {
 using DynamicModuleHandle = void *;
 
 inline DynamicModuleHandle load_dynamic_module(const std::filesystem::path &path) {
+    LUISA_EXCEPTION_IF_NOT(std::filesystem::exists(path), "Dynamic module not found: ", path);
     LUISA_INFO("Loading dynamic module: ", path);
     auto module = dlopen(std::filesystem::canonical(path).string().c_str(), RTLD_LAZY);
     LUISA_EXCEPTION_IF(module == nullptr, "Failed to load dynamic module ", path, ", reason: ", dlerror());

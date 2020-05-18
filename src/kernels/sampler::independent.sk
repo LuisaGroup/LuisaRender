@@ -31,13 +31,11 @@ LUISA_KERNEL void reset_states(
     LUISA_DEVICE_SPACE State *sampler_state_buffer,
     LUISA_THREAD_ID_DECL) {
     
-    auto tid = LUISA_THREAD_ID;
-    if (tid < film_viewport.size.x * film_viewport.size.y) {
+    if (auto tid = LUISA_THREAD_ID; tid < film_viewport.size.x * film_viewport.size.y) {
         auto pixel_x = tid % film_viewport.size.x + film_viewport.origin.x;
         auto pixel_y = tid / film_viewport.size.x + film_viewport.origin.y;
         sampler_state_buffer[tid] = tea<4>(pixel_x, pixel_y);
     }
-    
 }
 
 LUISA_KERNEL void generate_samples(

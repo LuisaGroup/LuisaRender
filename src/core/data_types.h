@@ -228,6 +228,7 @@ LUISA_DEVICE_CALLABLE inline uint3 make_uint3(packed_int3 v) noexcept { return {
 LUISA_DEVICE_CALLABLE inline uint3 make_uint3(packed_uint3 v) noexcept { return {v.x, v.y, v.z}; }
 LUISA_DEVICE_CALLABLE inline uint3 make_uint3(packed_float3 v) noexcept { return {static_cast<uint>(v.x), static_cast<uint>(v.y), static_cast<uint>(v.z)}; }
 
+LUISA_DEVICE_CALLABLE inline packed_float3 make_packed_float3() noexcept { return {}; }
 LUISA_DEVICE_CALLABLE inline packed_float3 make_packed_float3(int3 v) noexcept { return {static_cast<float>(v.x), static_cast<float>(v.y), static_cast<float>(v.z)}; }
 LUISA_DEVICE_CALLABLE inline packed_float3 make_packed_float3(uint3 v) noexcept { return {static_cast<float>(v.x), static_cast<float>(v.y), static_cast<float>(v.z)}; }
 LUISA_DEVICE_CALLABLE inline packed_float3 make_packed_float3(float3 v) noexcept { return {v.x, v.y, v.z}; }
