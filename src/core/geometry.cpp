@@ -261,7 +261,7 @@ Geometry::Geometry(Device *device, const std::vector<std::shared_ptr<Shape>> &sh
 
 void Geometry::update(float time) {
     
-    if (!_dynamic_shapes.empty() || !_dynamic_instances.empty()) {
+    if ((!_dynamic_shapes.empty() || !_dynamic_instances.empty()) && time != _last_motion_time) {
         auto dynamic_shape_offset = _static_shapes.size() + _static_instances.size();
         auto dynamic_instance_offset = dynamic_shape_offset + _dynamic_shapes.size();
         for (auto i = 0ul; i < _dynamic_shapes.size(); i++) {
@@ -271,17 +271,18 @@ void Geometry::update(float time) {
             transform_buffer()[dynamic_instance_offset + i] = _dynamic_instances[i]->transform().dynamic_matrix(time) * _dynamic_instances[i]->transform().static_matrix();
         }
         _dynamic_transform_buffer->view(dynamic_shape_offset, _dynamic_shapes.size() + _dynamic_instances.size()).upload();
-        _device->launch_async([&](KernelDispatcher &dispatch) {
-            _acceleration->refit(dispatch);
-        });
+        _motion_dirty = true;
+        _last_motion_time = time;
     }
 }
 
 void Geometry::trace_closest(KernelDispatcher &dispatch, BufferView<Ray> ray_buffer, BufferView<uint> ray_count, BufferView<ClosestHit> hit_buffer) {
+    if (_motion_dirty) { _acceleration->refit(dispatch); }
     _acceleration->trace_closest(dispatch, ray_buffer, hit_buffer, ray_count);
 }
 
 void Geometry::trace_any(KernelDispatcher &dispatch, BufferView<Ray> ray_buffer, BufferView<uint> ray_count, BufferView<AnyHit> hit_buffer) {
+    if (_motion_dirty) { _acceleration->refit(dispatch); }
     _acceleration->trace_any(dispatch, ray_buffer, hit_buffer, ray_count);
 }
 

@@ -105,7 +105,6 @@ void SingleShot::_execute() {
     _device->launch([&](KernelDispatcher &dispatch) {  // film postprocess
         film.postprocess(dispatch);
     });
-    
     film.save(_output_path);
 }
 

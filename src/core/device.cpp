@@ -47,7 +47,7 @@ void Device::set_command_queue_size(uint size) {
 }
 
 Device::Device(Context *context) noexcept
-    : _context{context}, _command_queue_size{16u}, _working_command_count{0u} {}
+    : _context{context}, _command_queue_size{8u}, _working_command_count{0u} {}
 
 std::unique_ptr<Device> Device::create(Context *context, std::string_view name) {
     auto create_device = context->load_dynamic_function<DeviceCreator>(context->runtime_path("lib") / "backends", name, "create");

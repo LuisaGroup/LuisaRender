@@ -4,7 +4,7 @@ Film film : RGB {
 
 Camera camera : ThinLens {
   film { @film }
-  position { 0, 0, 25 }
+  position { 0, 0, 2.5 }
   target { 0, 0, 0 }
   sensor_size { 36, 24 }
   f_number { 1.2 }
@@ -16,61 +16,58 @@ Integrator integrator : Normal {}
 
 Shape cube : TriangleMesh {
   path { "../meshes/cube/cube.obj" }
-  transform : TRS {
-    scaling { 10, 10, 10 }
-  }
 }
 
 Shape ceiling : Instance {
   reference { @cube }
   transform : TRS {
-    translation { 0, 10, 0 }
+    translation { 0, 1, 0 }
   }
 }
 
 Shape floor : Instance {
   reference { @cube }
   transform : TRS {
-    translation { 0, -10, 0 }
+    translation { 0, -1, 0 }
   }
 }
 
 Shape back_wall : Instance {
   reference { @cube }
   transform : TRS {
-    translation { 0, 0, -10 }
+    translation { 0, 0, -1 }
   }
 }
 
 Shape left_wall : Instance {
   reference { @cube }
   transform : TRS {
-    translation { -10, 0, 0 }
+    translation { -1, 0, 0 }
   }
 }
 
 Shape right_wall : Instance {
   reference { @cube }
   transform : TRS {
-    translation { 10, 0, 0 }
+    translation { 1, 0, 0 }
   }
 }
 
 Shape cow : TriangleMesh {
   path { "../meshes/cow/cow.ply" }
   transform : TRS {
-    scaling { 35, 35, 35 }
+    scaling { 3.5, 3.5, 3.5 }
     rotation { 0, 1, 0, -45 }
-    translation { -1, -5, 2 }
+    translation { -0.1, -0.5, 0.1 }
   }
 }
 
 Shape nanosuit : TriangleMesh {
   path { "../meshes/nanosuit/nanosuit.ply" }
   transform : TRS {
-    scaling { 0.35, 0.35, 0.35 }
+    scaling { 0.035, 0.035, 0.035 }
     rotation { 0, 1, 0, -30 }
-    translation { 2.5, -5, 0 }
+    translation { 0.25, -0.5, 0 }
   }
 }
 

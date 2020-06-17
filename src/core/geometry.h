@@ -87,7 +87,6 @@ public:
     void create(Shape *shape);
     void replicate(Shape *shape, Shape *reference);
     void instantiate(Shape *shape, Shape *reference);
-    
 };
 
 class Geometry : Noncopyable {
@@ -103,6 +102,10 @@ private:
     std::vector<std::shared_ptr<Shape>> _dynamic_shapes;
     std::vector<std::shared_ptr<Shape>> _dynamic_instances;
     std::unordered_map<Shape *, uint> _shape_to_instance_id;
+    
+    // for Motion-blur
+    float _last_motion_time{};
+    bool _motion_dirty{};
     
     // for determining whether a light is hit
     uint _static_shape_light_begin{};

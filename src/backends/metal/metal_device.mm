@@ -64,7 +64,8 @@ std::unique_ptr<Kernel> MetalDevice::load_kernel(std::string_view function_name)
     auto separator_pos = function_name.rfind("::");
     LUISA_EXCEPTION_IF(separator_pos == std::string_view::npos, "Expected separator \"::\" in function name: ", function_name);
     
-    auto library_name = function_name.substr(0, separator_pos);
+    std::string library_name{function_name.substr(0, separator_pos)};
+    if (auto sep_pos = library_name.find("::"); sep_pos != std::string::npos) { library_name.replace(sep_pos, 2, "__");  }
     auto kernel_name = function_name.substr(separator_pos + 2u);
     
     LUISA_INFO("Loading kernel: \"", kernel_name, "\", library: \"", library_name, "\"");
