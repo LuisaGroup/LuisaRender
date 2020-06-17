@@ -3,8 +3,8 @@ target_include_directories(headers INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 add_library(luisarender::headers ALIAS headers)
 
 add_subdirectory(util)
-add_subdirectory(core)
 add_subdirectory(compute)
+add_subdirectory(core)
 
 add_library(plugins INTERFACE)
 function(luisa_render_add_plugin name)

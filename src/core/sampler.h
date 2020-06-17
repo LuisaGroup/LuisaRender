@@ -7,7 +7,7 @@
 #include "viewport.h"
 #include "plugin.h"
 #include "parser.h"
-#include "device.h"
+#include <compute/device.h>
 
 namespace luisa {
 

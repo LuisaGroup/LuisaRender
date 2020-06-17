@@ -1,4 +1,4 @@
-#include <core/data_types.h>
+#include <compute/data_types.h>
 #include <core/colorspaces.h>
 #include <core/interaction.h>
 

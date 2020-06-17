@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "kernel.h"
+#include <compute/kernel.h>
 #include "ray.h"
 #include "hit.h"
 

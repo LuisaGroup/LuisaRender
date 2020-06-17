@@ -6,7 +6,7 @@
 
 #include <core/ray.h>
 #include <core/interaction.h>
-#include <core/mathematics.h>
+#include <compute/mathematics.h>
 #include <core/light.h>
 
 namespace luisa::light::point {

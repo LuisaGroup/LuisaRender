@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <core/data_types.h>
+#include <compute/data_types.h>
 #include <core/ray.h>
 #include <core/sampling.h>
 #include <core/viewport.h>

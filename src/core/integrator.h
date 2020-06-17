@@ -5,7 +5,7 @@
 #pragma once
 
 #include "ray.h"
-#include "mathematics.h"
+#include <compute/mathematics.h>
 #include "viewport.h"
 #include "parser.h"
 #include "scene.h"

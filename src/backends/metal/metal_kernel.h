@@ -9,7 +9,7 @@
 #endif
 
 #import <memory>
-#import <core/kernel.h>
+#import <compute/kernel.h>
 
 namespace luisa::metal {
 

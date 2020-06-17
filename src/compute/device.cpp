@@ -2,7 +2,7 @@
 // Created by Mike Smith on 2020/2/29.
 //
 
-#include "device.h"
+#include <compute/device.h>
 
 namespace luisa {
 

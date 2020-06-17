@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "data_types.h"
-#include "mathematics.h"
+#include <compute/data_types.h>
+#include <compute/mathematics.h>
 
 namespace luisa {
 

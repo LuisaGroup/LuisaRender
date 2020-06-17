@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "data_types.h"
+#include <compute/data_types.h>
 #include "ray.h"
 #include "viewport.h"
 
@@ -19,7 +19,7 @@ struct AccumulateTileKernelUniforms {
 
 #ifndef LUISA_DEVICE_COMPATIBLE
 
-#include "device.h"
+#include <compute/device.h>
 #include "plugin.h"
 #include "filter.h"
 #include "parser.h"

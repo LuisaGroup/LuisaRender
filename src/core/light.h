@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "data_types.h"
+#include <compute/data_types.h>
 
 namespace luisa::light {
 
@@ -20,7 +20,7 @@ struct Selection {
 #include "ray.h"
 #include "plugin.h"
 #include "parser.h"
-#include "device.h"
+#include <compute/device.h>
 #include "interaction.h"
 
 namespace luisa {

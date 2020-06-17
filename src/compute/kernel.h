@@ -7,8 +7,8 @@
 #include <string_view>
 #include <util/concepts.h>
 
-#include "data_types.h"
-#include "buffer.h"
+#include <compute/data_types.h>
+#include <compute/buffer.h>
 
 namespace luisa {
 

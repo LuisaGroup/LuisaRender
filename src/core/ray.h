@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "data_types.h"
-#include "mathematics.h"
+#include <compute/data_types.h>
+#include <compute/mathematics.h>
 
 namespace luisa {
 
@@ -51,8 +51,8 @@ LUISA_DEVICE_CALLABLE inline float3 offset_ray_origin(float3 p, float3 n) noexce
 
 #include <util/logging.h>
 
-#include "device.h"
-#include "buffer.h"
+#include <compute/device.h>
+#include <compute/buffer.h>
 
 namespace luisa {
 

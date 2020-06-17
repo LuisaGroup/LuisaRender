@@ -5,7 +5,7 @@
 #pragma once
 
 #include "plugin.h"
-#include "buffer.h"
+#include <compute/buffer.h>
 #include "transform.h"
 #include "material.h"
 #include "geometry.h"

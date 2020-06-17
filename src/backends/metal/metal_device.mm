@@ -11,7 +11,7 @@
 
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
 
-#import <core/device.h>
+#import <compute/device.h>
 #import <core/geometry.h>
 
 #import <util/string_manipulation.h>

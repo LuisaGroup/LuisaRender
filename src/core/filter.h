@@ -5,7 +5,7 @@
 #pragma once
 
 #include "viewport.h"
-#include "mathematics.h"
+#include <compute/mathematics.h>
 #include "sampling.h"
 
 namespace luisa::filter::separable {
@@ -28,7 +28,7 @@ struct ImportanceSamplePixelsKernelUniforms {
 #ifndef LUISA_DEVICE_COMPATIBLE
 
 #include "plugin.h"
-#include "kernel.h"
+#include <compute/kernel.h>
 #include "ray.h"
 #include "parser.h"
 #include "sampler.h"

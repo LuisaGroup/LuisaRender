@@ -6,7 +6,7 @@
 
 #include <util/logging.h>
 
-namespace luisa::compute {
+namespace luisa {
 
 struct TypeDescVisitor;
 

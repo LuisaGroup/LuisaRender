@@ -6,7 +6,7 @@
 
 #include "plugin.h"
 #include "parser.h"
-#include "mathematics.h"
+#include <compute/mathematics.h>
 
 namespace luisa {
 

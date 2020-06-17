@@ -7,7 +7,7 @@
 #include <compute/type_desc.h>
 #include <compute/scalar.h>
 
-namespace luisa::compute {
+namespace luisa {
 
 enum struct MemorySpace {
     DEVICE,
@@ -16,7 +16,7 @@ enum struct MemorySpace {
 };
 
 template<typename T, MemorySpace mspace>
-struct DeviceBuffer {
+struct Buffer {
 
 };
 
@@ -34,7 +34,7 @@ struct BufferDesc : public TypeDesc {
 namespace detail {
 
 template<typename T, MemorySpace mspace>
-struct TypeDescCreator<DeviceBuffer<T, mspace>> {
+struct TypeDescCreator<Buffer<T, mspace>> {
     static std::unique_ptr<TypeDesc> create() noexcept {
         return std::make_unique<BufferDesc>(TypeDescCreator<T>::create(), mspace);
     }
@@ -182,10 +182,10 @@ public:
 
 int main() {
     
-    luisa::compute::Device device;
+    luisa::Device device;
     device.compile_kernel("film::clear", [&](
-        luisa::compute::Argument<luisa::compute::DeviceBuffer<float, luisa::compute::MemorySpace::DEVICE>> framebuffer,
-        luisa::compute::Argument<uint32_t> size) {
+        luisa::Argument<luisa::Buffer<float, luisa::MemorySpace::DEVICE>> framebuffer,
+        luisa::Argument<uint32_t> size) {
         
         
         

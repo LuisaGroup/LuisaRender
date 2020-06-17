@@ -8,11 +8,11 @@
 #include "hit.h"
 #include "material.h"
 #include "interaction.h"
-#include "mathematics.h"
+#include <compute/mathematics.h>
 
 #ifndef LUISA_DEVICE_COMPATIBLE
 
-#include "buffer.h"
+#include <compute/buffer.h>
 #include "shape.h"
 #include "light.h"
 #include "geometry.h"

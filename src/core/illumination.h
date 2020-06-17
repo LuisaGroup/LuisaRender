@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "data_types.h"
-#include "mathematics.h"
+#include <compute/data_types.h>
+#include <compute/mathematics.h>
 #include "interaction.h"
 #include "light.h"
 
@@ -47,7 +47,7 @@ struct CollectLightInteractionsKernelUniforms {
 #include <vector>
 
 #include "geometry.h"
-#include "kernel.h"
+#include <compute/kernel.h>
 #include "viewport.h"
 
 namespace luisa {

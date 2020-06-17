@@ -4,7 +4,7 @@
 
 #include <core/sampler.h>
 #include <core/camera.h>
-#include <core/mathematics.h>
+#include <compute/mathematics.h>
 
 #include "thin_lens.h"
 

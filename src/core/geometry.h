@@ -6,7 +6,7 @@
 
 #include "hit.h"
 #include "ray.h"
-#include "mathematics.h"
+#include <compute/mathematics.h>
 #include "interaction.h"
 
 namespace luisa::geometry {

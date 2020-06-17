@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "data_types.h"
+#include <compute/data_types.h>
 #include "viewport.h"
 
 namespace luisa::camera {
@@ -18,7 +18,7 @@ struct GeneratePixelSamplesWithoutFilterKernelUniforms {
 #ifndef LUISA_DEVICE_COMPATIBLE
 
 #include "ray.h"
-#include "device.h"
+#include <compute/device.h>
 #include "film.h"
 #include "plugin.h"
 #include "parser.h"

@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "data_types.h"
+#include <compute/data_types.h>
 
 namespace luisa::bsdf {
 
@@ -35,7 +35,7 @@ static_assert(sizeof(Selection) == 8ul);
 #ifndef LUISA_DEVICE_COMAPTIBLE
 
 #include <functional>
-#include "device.h"
+#include <compute/device.h>
 
 namespace luisa {
 

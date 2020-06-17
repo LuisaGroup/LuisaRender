@@ -14,8 +14,8 @@
 
 #include <util/concepts.h>
 #include <util/logging.h>
-#include "data_types.h"
-#include "device.h"
+#include <compute/data_types.h>
+#include <compute/device.h>
 
 namespace luisa {
 class ParameterSet;

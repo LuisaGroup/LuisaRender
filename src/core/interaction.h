@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "data_types.h"
+#include <compute/data_types.h>
 
 namespace luisa::interaction {
 

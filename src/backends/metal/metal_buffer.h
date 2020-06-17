@@ -9,7 +9,7 @@
 #endif
 
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
-#import <core/buffer.h>
+#import <compute/buffer.h>
 
 namespace luisa::metal {
 

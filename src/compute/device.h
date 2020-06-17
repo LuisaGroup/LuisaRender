@@ -14,9 +14,9 @@
 #include <mutex>
 
 #include <util/concepts.h>
+#include <core/context.h>
 
-#include "context.h"
-#include "kernel.h"
+#include <compute/kernel.h>
 
 namespace luisa {
 class Geometry;

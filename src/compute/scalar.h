@@ -7,7 +7,7 @@
 #include <memory>
 #include "type_desc.h"
 
-namespace luisa::compute {
+namespace luisa {
 
 enum struct ScalarType {
     BYTE, UBYTE,
