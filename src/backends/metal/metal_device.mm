@@ -12,9 +12,9 @@
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
 
 #import <compute/device.h>
-#import <core/geometry.h>
+#import <render/geometry.h>
 
-#import <util/string_manipulation.h>
+#import <core/string_manipulation.h>
 
 #import "metal_buffer.h"
 #import "metal_kernel.h"

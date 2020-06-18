@@ -12,8 +12,8 @@
 #include <memory>
 #include <iostream>
 
-#include <util/concepts.h>
-#include <util/logging.h>
+#include <core/concepts.h>
+#include <core/logging.h>
 #include <compute/data_types.h>
 #include <compute/device.h>
 
@@ -44,7 +44,7 @@ LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Transform)
 LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Light)
 LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Material)
 LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Integrator)
-LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Render)
+LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Task)
 LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Sampler)
 
 #undef LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME

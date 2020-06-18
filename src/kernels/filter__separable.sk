@@ -1,4 +1,4 @@
-#include <core/filter.h>
+#include <render/filter.h>
 
 using namespace luisa;
 using namespace luisa::filter::separable;

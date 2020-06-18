@@ -7,8 +7,8 @@
 #include <filesystem>
 #include <map>
 
-#include <util/concepts.h>
-#include <util/dll.h>
+#include <core/concepts.h>
+#include <core/dll.h>
 
 namespace luisa {
 

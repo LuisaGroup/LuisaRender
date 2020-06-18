@@ -3,7 +3,7 @@
 //
 
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
-#import <util/string_manipulation.h>
+#import <core/string_manipulation.h>
 #import "metal_kernel.h"
 #import "metal_buffer.h"
 

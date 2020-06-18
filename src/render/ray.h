@@ -49,7 +49,7 @@ LUISA_DEVICE_CALLABLE inline float3 offset_ray_origin(float3 p, float3 n) noexce
 #include <string_view>
 #include <map>
 
-#include <util/logging.h>
+#include <core/logging.h>
 
 #include <compute/device.h>
 #include <compute/buffer.h>

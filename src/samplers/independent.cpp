@@ -2,7 +2,7 @@
 // Created by Mike Smith on 2020/2/14.
 //
 
-#include <core/sampler.h>
+#include <render/sampler.h>
 #include "independent.h"
 
 namespace luisa {

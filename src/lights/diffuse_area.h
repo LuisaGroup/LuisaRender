@@ -5,10 +5,10 @@
 #pragma once
 
 #include <compute/mathematics.h>
-#include <core/ray.h>
-#include <core/interaction.h>
-#include <core/sampling.h>
-#include <core/light.h>
+#include <render/ray.h>
+#include <render/interaction.h>
+#include <render/sampling.h>
+#include <render/light.h>
 
 namespace luisa::light::diffuse_area {
 

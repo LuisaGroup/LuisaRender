@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <core/bsdf.h>
+#include <render/bsdf.h>
 
 namespace luisa::bsdf::lambertian_reflection {
 

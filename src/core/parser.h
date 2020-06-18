@@ -9,7 +9,7 @@
 #include <vector>
 #include <memory>
 
-#include <util/logging.h>
+#include <core/logging.h>
 
 #include <compute/data_types.h>
 #include "plugin.h"
@@ -123,7 +123,7 @@ public:
 
 };
 
-class Render;
+class Task;
 
 class Parser {
 
@@ -145,14 +145,14 @@ private:
     [[nodiscard]] static bool _is_identifier(std::string_view sv) noexcept;
     [[nodiscard]] std::string_view _peek();
     [[nodiscard]] std::string_view _peek_and_pop();
-    [[nodiscard]] std::shared_ptr<Render> _parse_top_level();
+    [[nodiscard]] std::shared_ptr<Task> _parse_top_level();
     [[nodiscard]] bool _eof() const noexcept;
     [[nodiscard]] std::unique_ptr<ParameterSet> _parse_parameter_set();
 
 public:
     explicit Parser(Device *device) noexcept: _device{device} {}
     
-    [[nodiscard]] std::shared_ptr<Render> parse(const std::filesystem::path &file_path);
+    [[nodiscard]] std::shared_ptr<Task> parse(const std::filesystem::path &file_path);
     
     template<typename T>
     [[nodiscard]] std::shared_ptr<T> global_node(std::string_view node_name) const {

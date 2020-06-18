@@ -7,7 +7,7 @@
 #include "ray.h"
 #include <compute/mathematics.h>
 #include "viewport.h"
-#include "parser.h"
+#include "core/parser.h"
 #include "scene.h"
 #include "camera.h"
 #include "sampler.h"

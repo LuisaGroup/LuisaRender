@@ -1,4 +1,4 @@
-#include <core/geometry.h>
+#include <render/geometry.h>
 
 using namespace luisa;
 using namespace luisa::geometry;

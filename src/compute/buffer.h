@@ -5,8 +5,9 @@
 #pragma once
 
 #include <vector>
-#include <util/logging.h>
-#include <util/concepts.h>
+
+#include <core/logging.h>
+#include <core/concepts.h>
 
 namespace luisa {
 class TypelessBuffer;

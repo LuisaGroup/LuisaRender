@@ -2,7 +2,7 @@
 // Created by Mike Smith on 2020/2/2.
 //
 
-#include <core/filter.h>
+#include <render/filter.h>
 
 namespace luisa {
 

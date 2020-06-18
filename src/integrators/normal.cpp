@@ -2,8 +2,8 @@
 // Created by Mike Smith on 2020/2/19.
 //
 
-#include <core/integrator.h>
-#include <core/geometry.h>
+#include <render/integrator.h>
+#include <render/geometry.h>
 
 namespace luisa {
 

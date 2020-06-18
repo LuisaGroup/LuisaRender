@@ -1,4 +1,4 @@
-#include <core/film.h>
+#include <render/film.h>
 
 using namespace luisa;
 using namespace luisa::film;

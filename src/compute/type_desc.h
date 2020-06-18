@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <util/logging.h>
+#include <core/logging.h>
 
 namespace luisa {
 

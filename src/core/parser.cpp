@@ -4,15 +4,15 @@
 
 #include "parser.h"
 
-#include "filter.h"
-#include "film.h"
-#include "camera.h"
-#include "shape.h"
-#include "integrator.h"
-#include "material.h"
-#include "transform.h"
-#include "render.h"
-#include "sampler.h"
+#include "render/filter.h"
+#include "render/film.h"
+#include "render/camera.h"
+#include "render/shape.h"
+#include "render/integrator.h"
+#include "render/material.h"
+#include "render/transform.h"
+#include "render/task.h"
+#include "render/sampler.h"
 
 namespace luisa {
 
@@ -96,14 +96,14 @@ void Parser::_match(std::string_view token) {
     LUISA_EXCEPTION_IF_NOT(_peek() == token, "Expected \"", token, "\", got \"", _peek(), "\" at (", _curr_line, ", ", _curr_col, ")");
 }
 
-std::shared_ptr<Render> Parser::_parse_top_level() {
+std::shared_ptr<Task> Parser::_parse_top_level() {
     
-    std::shared_ptr<Render> task;
+    std::shared_ptr<Task> task;
     
     while (!_eof()) {
         auto token = _peek_and_pop();
         if (token == "render") {
-            task = _parse_parameter_set()->parse<Render>();
+            task = _parse_parameter_set()->parse<Task>();
             LUISA_WARNING_IF_NOT(_eof(), "Nodes declared after tasks will be ignored");
             break;
         }
@@ -125,7 +125,7 @@ std::shared_ptr<Render> Parser::_parse_top_level() {
         LUISA_PARSER_PARSE_GLOBAL_NODE(Transform)
         LUISA_PARSER_PARSE_GLOBAL_NODE(Integrator)
         LUISA_PARSER_PARSE_GLOBAL_NODE(Material)
-        LUISA_PARSER_PARSE_GLOBAL_NODE(Render)
+        LUISA_PARSER_PARSE_GLOBAL_NODE(Task)
         LUISA_PARSER_PARSE_GLOBAL_NODE(Sampler)
         LUISA_PARSER_PARSE_GLOBAL_NODE(Light)
         
@@ -140,7 +140,7 @@ bool Parser::_eof() const noexcept {
     return _peeked.empty() && _remaining.empty();
 }
 
-std::shared_ptr<Render> Parser::parse(const std::filesystem::path &file_path) {
+std::shared_ptr<Task> Parser::parse(const std::filesystem::path &file_path) {
     
     _curr_line = 0;
     _curr_col = 0;

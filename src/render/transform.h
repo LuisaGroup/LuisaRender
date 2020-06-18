@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "plugin.h"
-#include "parser.h"
+#include "core/plugin.h"
+#include "core/parser.h"
 #include <compute/mathematics.h>
 
 namespace luisa {

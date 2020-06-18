@@ -3,7 +3,7 @@
 //
 
 #include <compute/mathematics.h>
-#include <core/camera.h>
+#include <render/camera.h>
 
 #include "pinhole.h"
 

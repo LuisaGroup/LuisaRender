@@ -1,6 +1,6 @@
 #include <compute/data_types.h>
-#include <core/colorspaces.h>
-#include <core/interaction.h>
+#include <render/colorspaces.h>
+#include <render/interaction.h>
 
 using namespace luisa;
 

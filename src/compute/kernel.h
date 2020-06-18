@@ -5,7 +5,7 @@
 #pragma once
 
 #include <string_view>
-#include <util/concepts.h>
+#include <core/concepts.h>
 
 #include <compute/data_types.h>
 #include <compute/buffer.h>

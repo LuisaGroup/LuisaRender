@@ -20,9 +20,9 @@ struct AccumulateTileKernelUniforms {
 #ifndef LUISA_DEVICE_COMPATIBLE
 
 #include <compute/device.h>
-#include "plugin.h"
+#include "core/plugin.h"
 #include "filter.h"
-#include "parser.h"
+#include "core/parser.h"
 #include "viewport.h"
 
 namespace luisa {

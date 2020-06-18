@@ -7,7 +7,7 @@
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
 
-#include <core/shape.h>
+#include <render/shape.h>
 
 namespace luisa {
 

@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "plugin.h"
+#include "core/plugin.h"
 #include <compute/buffer.h>
 #include "transform.h"
 #include "material.h"

@@ -2,8 +2,8 @@
 // Created by Mike Smith on 2020/2/1.
 //
 
-#include <core/sampler.h>
-#include <core/camera.h>
+#include <render/sampler.h>
+#include <render/camera.h>
 #include <compute/mathematics.h>
 
 #include "thin_lens.h"

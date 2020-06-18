@@ -13,7 +13,7 @@
 #include <condition_variable>
 #include <mutex>
 
-#include <util/concepts.h>
+#include <core/concepts.h>
 #include <core/context.h>
 
 #include <compute/kernel.h>

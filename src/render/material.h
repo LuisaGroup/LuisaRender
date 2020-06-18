@@ -7,7 +7,7 @@
 #include <string_view>
 #include <unordered_map>
 
-#include "plugin.h"
+#include "core/plugin.h"
 #include "bsdf.h"
 
 namespace luisa {

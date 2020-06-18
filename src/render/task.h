@@ -7,8 +7,8 @@
 #include <chrono>
 
 #include <compute/mathematics.h>
-#include "plugin.h"
-#include "parser.h"
+#include "core/plugin.h"
+#include "core/parser.h"
 #include "scene.h"
 #include "camera.h"
 #include "sampler.h"
@@ -16,7 +16,7 @@
 
 namespace luisa {
 
-class Render : public Plugin {
+class Task : public Plugin {
 
 protected:
     std::shared_ptr<Sampler> _sampler;
@@ -26,7 +26,7 @@ protected:
     virtual void _execute() = 0;
 
 public:
-    Render(Device *device, const ParameterSet &parameter_set[[maybe_unused]])
+    Task(Device *device, const ParameterSet &parameter_set[[maybe_unused]])
         : Plugin{device},
           _sampler{parameter_set["sampler"].parse<Sampler>()},
           _integrator{parameter_set["integrator"].parse<Integrator>()} {}

@@ -1,4 +1,4 @@
-#include <core/illumination.h>
+#include <render/illumination.h>
 
 using namespace luisa;
 using namespace luisa::illumination;

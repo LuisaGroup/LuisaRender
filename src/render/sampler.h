@@ -5,8 +5,8 @@
 #pragma once
 
 #include "viewport.h"
-#include "plugin.h"
-#include "parser.h"
+#include "core/plugin.h"
+#include "core/parser.h"
 #include <compute/device.h>
 
 namespace luisa {

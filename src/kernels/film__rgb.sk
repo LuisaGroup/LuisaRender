@@ -1,5 +1,5 @@
 #include <compute/data_types.h>
-#include <core/colorspaces.h>
+#include <render/colorspaces.h>
 #include <compute/mathematics.h>
 
 using namespace luisa;

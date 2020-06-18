@@ -5,9 +5,9 @@
 #pragma once
 
 #include <compute/data_types.h>
-#include <core/ray.h>
-#include <core/sampling.h>
-#include <core/viewport.h>
+#include <render/ray.h>
+#include <render/sampling.h>
+#include <render/viewport.h>
 
 namespace luisa::camera::thin_lens {
 

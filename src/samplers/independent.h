@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <core/viewport.h>
+#include <render/viewport.h>
 #include <compute/mathematics.h>
 
 namespace luisa::sampler::independent {

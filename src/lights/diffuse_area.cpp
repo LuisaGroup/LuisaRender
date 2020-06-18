@@ -2,7 +2,7 @@
 // Created by Mike Smith on 2020/2/22.
 //
 
-#include <core/shape.h>
+#include <render/shape.h>
 
 #include "diffuse_area.h"
 

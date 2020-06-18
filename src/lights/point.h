@@ -4,10 +4,10 @@
 
 #pragma once
 
-#include <core/ray.h>
-#include <core/interaction.h>
+#include <render/ray.h>
+#include <render/interaction.h>
 #include <compute/mathematics.h>
-#include <core/light.h>
+#include <render/light.h>
 
 namespace luisa::light::point {
 

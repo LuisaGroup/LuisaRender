@@ -3,7 +3,7 @@
 //
 
 #include <OpenImageIO/imageio.h>
-#include <core/film.h>
+#include <render/film.h>
 
 namespace luisa {
 

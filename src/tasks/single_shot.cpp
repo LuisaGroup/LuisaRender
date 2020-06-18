@@ -6,11 +6,11 @@
 #include <random>
 #include <filesystem>
 
-#include <core/render.h>
+#include <render/task.h>
 
 namespace luisa {
 
-class SingleShot : public Render {
+class SingleShot : public Task {
 
 protected:
     float _shutter_open;
@@ -27,7 +27,7 @@ public:
 };
 
 SingleShot::SingleShot(Device *device, const ParameterSet &parameter_set)
-    : Render{device, parameter_set},
+    : Task{device, parameter_set},
       _shutter_samples{parameter_set["shutter_samples"].parse_uint_or_default(0u)},
       _camera{parameter_set["camera"].parse<Camera>()},
       _output_path{parameter_set["output"].parse_string()} {

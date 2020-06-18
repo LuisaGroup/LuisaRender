@@ -5,8 +5,8 @@
 #pragma once
 
 #include <compute/data_types.h>
-#include <core/ray.h>
-#include <core/hit.h>
+#include <render/ray.h>
+#include <render/hit.h>
 
 namespace luisa::integrator::path_tracing {
 
