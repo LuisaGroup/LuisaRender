@@ -3,6 +3,7 @@
 #include <vector>
 #include <functional>
 #include <sstream>
+#include <memory>
 
 #include <compute/type_desc.h>
 #include <compute/scalar.h>
@@ -183,7 +184,7 @@ public:
 int main() {
     
     luisa::Device device;
-    device.compile_kernel("film::clear", [&](
+    auto kernel = device.compile_kernel("film::clear", [&](
         luisa::Argument<luisa::Buffer<float, luisa::MemorySpace::DEVICE>> framebuffer,
         luisa::Argument<uint32_t> size) {
         
