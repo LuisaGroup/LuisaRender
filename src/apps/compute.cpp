@@ -9,9 +9,7 @@ struct Foo {
 };
 
 namespace luisa::dsl {
-
 LUISA_STRUCT(Foo, a, b, p, n, m)
-
 }
 
 int main() {
