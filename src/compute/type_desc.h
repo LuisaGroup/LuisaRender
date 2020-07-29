@@ -23,6 +23,8 @@ enum struct TypeCatalog {
     
     UNKNOWN,
     
+    AUTO,  // deduced type
+    
     BOOL,
     
     FLOAT,
@@ -60,6 +62,13 @@ struct TypeDesc : Noncopyable {
     std::vector<std::string> member_names;
     std::vector<const TypeDesc *> member_types;
     size_t alignment{0u};
+};
+
+struct Auto {
+    [[nodiscard]] static const TypeDesc *desc() noexcept {
+        static TypeDesc d{.type = TypeCatalog::AUTO};
+        return &d;
+    }
 };
 
 template<typename T>
@@ -231,6 +240,12 @@ struct MakeTypeDescImpl<glm::tvec3<T, glm::packed_highp>> {
 template<typename T>
 inline const TypeDesc *type_desc = detail::MakeTypeDescImpl<T>::Desc::desc();
 
+inline const TypeDesc *type_desc_auto = Auto::desc();
+inline const TypeDesc *type_desc_auto_ptr = Pointer<Auto>::desc();
+inline const TypeDesc *type_desc_auto_ref = Reference<Auto>::desc();
+inline const TypeDesc *type_desc_auto_const_ptr = Pointer<Const<Auto>>::desc();
+inline const TypeDesc *type_desc_auto_const_ref = Reference<Const<Auto>>::desc();
+
 #define LUISA_STRUCT_BEGIN(S)                                                                    \
     template<>                                                                                   \
     struct Structure<S> {                                                                        \
@@ -296,6 +311,8 @@ inline const TypeDesc *type_desc = detail::MakeTypeDescImpl<T>::Desc::desc();
     switch (desc->type) {
         case TypeCatalog::UNKNOWN:
             return "[UNKNOWN]";
+        case TypeCatalog::AUTO:
+            return "auto";
         case TypeCatalog::BOOL:
             return "bool";
         case TypeCatalog::FLOAT:
@@ -350,7 +367,9 @@ inline const TypeDesc *type_desc = detail::MakeTypeDescImpl<T>::Desc::desc();
             auto s = std::string{"struct alignas("}.append(std::to_string(desc->alignment)).append(") ").append(desc->struct_name).append(" {");
             if (!desc->member_names.empty()) { s.append("\n"); }
             for (auto i = 0u; i < desc->member_names.size(); i++) {
-                s.append("    ").append(to_string(desc->member_types[i], depth + 1)).append(" ").append(desc->member_names[i]).append(";\n");
+                s.append("    ").append(to_string(desc->member_types[i], depth + 1));
+                if (s.back() != '*' && s.back() != '&') { s.push_back(' '); }
+                s.append(desc->member_names[i]).append(";\n");
             }
             return s.append("};");
         }
