@@ -295,6 +295,30 @@ inline const TypeDesc *type_desc = detail::MakeTypeDescImpl<T>::Desc::desc();
         }                                                          \
     };                                                             \
 
+// Magic from https://github.com/swansontec/map-macro
+#define LUISA_MAP_MACRO_EVAL0(...) __VA_ARGS__
+#define LUISA_MAP_MACRO_EVAL1(...) LUISA_MAP_MACRO_EVAL0(LUISA_MAP_MACRO_EVAL0(LUISA_MAP_MACRO_EVAL0(__VA_ARGS__)))
+#define LUISA_MAP_MACRO_EVAL2(...) LUISA_MAP_MACRO_EVAL1(LUISA_MAP_MACRO_EVAL1(LUISA_MAP_MACRO_EVAL1(__VA_ARGS__)))
+#define LUISA_MAP_MACRO_EVAL3(...) LUISA_MAP_MACRO_EVAL2(LUISA_MAP_MACRO_EVAL2(LUISA_MAP_MACRO_EVAL2(__VA_ARGS__)))
+#define LUISA_MAP_MACRO_EVAL4(...) LUISA_MAP_MACRO_EVAL3(LUISA_MAP_MACRO_EVAL3(LUISA_MAP_MACRO_EVAL3(__VA_ARGS__)))
+#define LUISA_MAP_MACRO_EVAL(...)  LUISA_MAP_MACRO_EVAL4(LUISA_MAP_MACRO_EVAL4(LUISA_MAP_MACRO_EVAL4(__VA_ARGS__)))
+#define LUISA_MAP_MACRO_END(...)
+#define LUISA_MAP_MACRO_OUT
+#define LUISA_MAP_MACRO_GET_END2() 0, LUISA_MAP_MACRO_END
+#define LUISA_MAP_MACRO_GET_END1(...) LUISA_MAP_MACRO_GET_END2
+#define LUISA_MAP_MACRO_GET_END(...) LUISA_MAP_MACRO_GET_END1
+#define LUISA_MAP_MACRO_NEXT0(test, next, ...) next LUISA_MAP_MACRO_OUT
+#define LUISA_MAP_MACRO_NEXT1(test, next) LUISA_MAP_MACRO_NEXT0(test, next, 0)
+#define LUISA_MAP_MACRO_NEXT(test, next)  LUISA_MAP_MACRO_NEXT1(LUISA_MAP_MACRO_GET_END test, next)
+#define LUISA_MAP_MACRO0(f, x, peek, ...) f(x) LUISA_MAP_MACRO_NEXT(peek, LUISA_MAP_MACRO1)(f, peek, __VA_ARGS__)
+#define LUISA_MAP_MACRO1(f, x, peek, ...) f(x) LUISA_MAP_MACRO_NEXT(peek, LUISA_MAP_MACRO0)(f, peek, __VA_ARGS__)
+#define LUISA_MAP_MACRO(f, ...) LUISA_MAP_MACRO_EVAL(LUISA_MAP_MACRO1(f, __VA_ARGS__, ()()(), ()()(), ()()(), 0))
+
+#define LUISA_STRUCT(S, ...)                            \
+     LUISA_STRUCT_BEGIN(S)                              \
+     LUISA_MAP_MACRO(LUISA_STRUCT_MEMBER, __VA_ARGS__)  \
+     LUISA_STRUCT_END()                                 \
+
 inline std::string to_string(const TypeDesc *desc, int depth = 0) {
     
     switch (desc->type) {
