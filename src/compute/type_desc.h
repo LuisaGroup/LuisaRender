@@ -231,30 +231,30 @@ struct MakeTypeDescImpl<glm::tvec3<T, glm::packed_highp>> {
 template<typename T>
 inline const TypeDesc *type_desc = detail::MakeTypeDescImpl<T>::Desc::desc();
 
-#define LUISA_STRUCT_BEGIN(S)                                                                 \
-    template<>                                                                                \
-    class Structure<S> {                                                                      \
-    private:                                                                                  \
-        using This = S;                                                                       \
-        TypeDesc _td;                                                                         \
-    public:                                                                                   \
-        [[nodiscard]] static const TypeDesc *desc() noexcept {                                \
-            static Structure instance{};                                                      \
-            return &instance._td;                                                             \
-        }                                                                                     \
-    private:                                                                                  \
-        Structure() {                                                                         \
-            _td.type = TypeCatalog::STRUCTURE;                                                \
-            _td.struct_name = #S;                                                             \
-            _td.alignment = std::alignment_of_v<S>;                                           \
+#define LUISA_STRUCT_BEGIN(S)                                                                    \
+    template<>                                                                                   \
+    struct Structure<S> {                                                                        \
+        [[nodiscard]] static const TypeDesc *desc() noexcept {                                   \
+            using This = S;                                                                      \
+            static TypeDesc td;                                                                  \
+            static int depth = 0;                                                                \
+            if (depth++ == 0) {                                                                  \
+                td.type = TypeCatalog::STRUCTURE;                                                \
+                td.struct_name = #S;                                                             \
+                td.alignment = std::alignment_of_v<S>;                                           \
+                td.member_names.clear();                                                         \
+                td.member_types.clear();                                                         \
 
-#define LUISA_STRUCT_MEMBER(member)                                                           \
-            _td.member_names.emplace_back(#member);                                           \
-            _td.member_types.emplace_back(type_desc<decltype(std::declval<This>().member)>);  \
+#define LUISA_STRUCT_MEMBER(member)                                                              \
+                td.member_names.emplace_back(#member);                                           \
+                td.member_types.emplace_back(type_desc<decltype(std::declval<This>().member)>);  \
 
-#define LUISA_STRUCT_END()                                                                    \
-        }                                                                                     \
-    };                                                                                        \
+#define LUISA_STRUCT_END()                                                                       \
+            }                                                                                    \
+            depth--;                                                                             \
+            return &td;                                                                          \
+        }                                                                                        \
+    };                                                                                           \
 
 // Magic from https://github.com/swansontec/map-macro
 #define LUISA_MAP_MACRO_EVAL0(...) __VA_ARGS__
