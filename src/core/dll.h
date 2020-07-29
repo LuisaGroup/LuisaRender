@@ -7,7 +7,7 @@
 #include <filesystem>
 #include "logging.h"
 
-#if __has_include(<unistd.h>)
+#if !defined(_WIN32) && (defined(__unix__) || defined(__unix) || (defined(__APPLE__) && defined(__MACH__)))
 
 #include <dlfcn.h>
 
@@ -40,12 +40,10 @@ inline auto load_dynamic_symbol(DynamicModuleHandle handle, const std::string &n
 
 }}
 
-#elif __has_include(<windows.h>)
+#elif defined(_WIN32) || defined(_WIN64)
 
 // TODO: DLL handling on Windows
 
 #else
 #error Unsupported platform for DLL exporting and importing
 #endif
-
-

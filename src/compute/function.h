@@ -14,6 +14,26 @@ class Statement;
 
 namespace luisa {
 
+namespace detail {
+
+template<typename F>
+constexpr auto to_std_function(F &&f) noexcept {
+    return std::function{f};
+}
+
+template<typename F>
+struct FunctionArgumentsImpl {};
+
+template<typename R, typename ...Args>
+struct FunctionArgumentsImpl<std::function<R(Args...)>> {
+    using Type = std::tuple<Args...>;
+};
+
+}
+
+template<typename F>
+using FunctionArguments = typename detail::FunctionArgumentsImpl<decltype(detail::to_std_function(std::declval<F>()))>::Type;
+
 class Function {
 
 private:
