@@ -46,4 +46,28 @@ public:
     [[nodiscard]] BinaryOp op() const noexcept { return _op; }
 };
 
+class MemberExpr : public Expression {
+
+private:
+    Variable _self;
+    std::string _member;
+
+public:
+    MemberExpr(Variable self, std::string member) noexcept : Expression{self.function()}, _self{self}, _member{std::move(member)} {}
+    [[nodiscard]] Variable self() const noexcept { return _self; }
+    [[nodiscard]] const std::string &member() const noexcept { return _member; }
+};
+
+class ArrowExpr : public Expression {
+
+private:
+    Variable _self;
+    std::string _member;
+
+public:
+    ArrowExpr(Variable self, std::string member) noexcept : Expression{self.function()}, _self{self}, _member{std::move(member)} {}
+    [[nodiscard]] Variable self() const noexcept { return _self; }
+    [[nodiscard]] const std::string &member() const noexcept { return _member; }
+};
+
 }

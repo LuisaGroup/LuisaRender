@@ -10,21 +10,15 @@ namespace luisa::dsl {
 void if_(Variable cond, const std::function<void()> &true_branch, const std::function<void()> &false_branch) {
     auto f = cond.function();
     f->add_statement(std::make_unique<IfStmt>(cond.expression()));
-    f->add_statement(std::make_unique<ScopeBeginStmt>());
-    true_branch();
-    f->add_statement(std::make_unique<ScopeEndStmt>());
+    f->block(true_branch);
     f->add_statement(std::make_unique<ElseStmt>());
-    f->add_statement(std::make_unique<ScopeBeginStmt>());
-    false_branch();
-    f->add_statement(std::make_unique<ScopeEndStmt>());
+    f->block(false_branch);
 }
 
 void if_(Variable cond, const std::function<void()> &true_branch) {
     auto f = cond.function();
     f->add_statement(std::make_unique<IfStmt>(cond.expression()));
-    f->add_statement(std::make_unique<ScopeBeginStmt>());
-    true_branch();
-    f->add_statement(std::make_unique<ScopeEndStmt>());
+    f->block(true_branch);
 }
 
 }

@@ -28,13 +28,9 @@ public:
     [[nodiscard]] Expression *init_expr() const noexcept { return _init_expr; }
 };
 
-class ScopeBeginStmt : public Statement {
+class BlockBeginStmt : public Statement {};
 
-};
-
-class ScopeEndStmt : public Statement {
-
-};
+class BlockEndStmt : public Statement {};
 
 class IfStmt : public Statement {
 
@@ -53,16 +49,24 @@ class ElseStmt : public Statement {
 void if_(Variable cond, const std::function<void()> &true_branch);
 void if_(Variable cond, const std::function<void()> &true_branch, const std::function<void()> &false_branch);
 
+enum struct AssignOp {
+    ASSIGN,
+    ADD_ASSIGN, SUB_ASSIGN, MUL_ASSIGN, DIV_ASSIGN, MOD_ASSIGN,             // arithmetic
+    BIT_AND_ASSIGN, BIT_OR_ASSIGN, BIT_XOR_ASSIGN, SHL_ASSIGN, SHR_ASSIGN,  // bit-wise
+};
+
 class AssignStmt : public Statement {
 
 private:
     Variable _lvalue;
+    AssignOp _op;
     Expression *_expr;
 
 public:
-    AssignStmt(Variable lvalue, Expression *expr) noexcept : _lvalue{std::move(lvalue)}, _expr{expr} {}
+    AssignStmt(AssignOp op, Variable lvalue, Expression *expr) noexcept : _lvalue{std::move(lvalue)}, _op{op}, _expr{expr} {}
     [[nodiscard]] Variable lvalue() const noexcept { return _lvalue; }
     [[nodiscard]] Expression *expression() const noexcept { return _expr; }
+    [[nodiscard]] AssignOp op() const noexcept { return _op; }
 };
 
 }

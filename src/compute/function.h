@@ -6,6 +6,7 @@
 
 #include <map>
 #include <memory>
+
 #include <compute/statement.h>
 
 namespace luisa::dsl {
@@ -66,6 +67,16 @@ public:
     void add_statement(std::unique_ptr<Statement> stmt) noexcept {
         _statements.emplace_back(std::move(stmt));
     }
+    
+    template<typename S, std::enable_if_t<std::is_invocable_v<S>, int> = 0>
+    void block(S &&s) noexcept {
+        add_statement(std::make_unique<BlockBeginStmt>());
+        s();
+        add_statement(std::make_unique<BlockEndStmt>());
+    }
+    
+    [[nodiscard]] const std::vector<Variable> &arguments() const noexcept { return _arguments; }
+    [[nodiscard]] const std::vector<std::unique_ptr<Statement>> &statements() const noexcept { return _statements; }
 };
 
 }

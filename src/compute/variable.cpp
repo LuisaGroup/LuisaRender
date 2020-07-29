@@ -45,9 +45,32 @@ MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD([], ACCESS)
 
 Variable::Variable(Function *func, const TypeDesc *type, BuiltinTag tag) noexcept
     : _function{func}, _type{type}, _builtin_tag{tag} {}
-    
-void Variable::operator=(Variable rhs) const noexcept {
-    _function->add_statement(std::make_unique<AssignStmt>(*this, rhs._expression));
+
+#define MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD(op, op_tag)  \
+void Variable::operator op(Variable rhs) const noexcept {  \
+    _function->add_statement(std::make_unique<AssignStmt>(AssignOp::op_tag, *this, rhs._expression));  \
+}
+
+MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD(=, ASSIGN)
+MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD(+=, ADD_ASSIGN)
+MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD(-=, SUB_ASSIGN)
+MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD(*=, MUL_ASSIGN)
+MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD(/=, DIV_ASSIGN)
+MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD(%=, MOD_ASSIGN)
+MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD(&=, BIT_AND_ASSIGN)
+MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD(|=, BIT_OR_ASSIGN)
+MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD(^=, BIT_XOR_ASSIGN)
+MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD(<<=, SHL_ASSIGN)
+MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD(>>=, SHR_ASSIGN)
+
+#undef MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD
+
+Variable Variable::member(std::string m) const noexcept {
+    return _function->add_expression(std::make_unique<MemberExpr>(*this, std::move(m)));
+}
+
+Variable Variable::arrow(std::string m) const noexcept {
+    return _function->add_expression(std::make_unique<ArrowExpr>(*this, std::move(m)));
 }
     
 }

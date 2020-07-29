@@ -48,16 +48,21 @@ public:
     [[nodiscard]] bool is_temporary() const noexcept { return _expression != nullptr; }
     [[nodiscard]] bool is_builtin() const noexcept { return _builtin_tag != BuiltinTag::NOT_BUILTIN; }
     
-    [[nodiscard]] Variable operator+ (Variable rhs) const noexcept;
-    [[nodiscard]] Variable operator- (Variable rhs) const noexcept;
-    [[nodiscard]] Variable operator* (Variable rhs) const noexcept;
-    [[nodiscard]] Variable operator/ (Variable rhs) const noexcept;
-    [[nodiscard]] Variable operator% (Variable rhs) const noexcept;
+    [[nodiscard]] Variable member(std::string m) const noexcept;
+    [[nodiscard]] Variable arrow(std::string m) const noexcept;
+    [[nodiscard]] Variable $(std::string m) const noexcept { return member(std::move(m)); }
+    [[nodiscard]] Variable p$(std::string m) const noexcept { return arrow(std::move(m)); }
+    
+    [[nodiscard]] Variable operator+(Variable rhs) const noexcept;
+    [[nodiscard]] Variable operator-(Variable rhs) const noexcept;
+    [[nodiscard]] Variable operator*(Variable rhs) const noexcept;
+    [[nodiscard]] Variable operator/(Variable rhs) const noexcept;
+    [[nodiscard]] Variable operator%(Variable rhs) const noexcept;
     [[nodiscard]] Variable operator<<(Variable rhs) const noexcept;
     [[nodiscard]] Variable operator>>(Variable rhs) const noexcept;
-    [[nodiscard]] Variable operator& (Variable rhs) const noexcept;
-    [[nodiscard]] Variable operator| (Variable rhs) const noexcept;
-    [[nodiscard]] Variable operator^ (Variable rhs) const noexcept;
+    [[nodiscard]] Variable operator&(Variable rhs) const noexcept;
+    [[nodiscard]] Variable operator|(Variable rhs) const noexcept;
+    [[nodiscard]] Variable operator^(Variable rhs) const noexcept;
     [[nodiscard]] Variable operator&&(Variable rhs) const noexcept;
     [[nodiscard]] Variable operator||(Variable rhs) const noexcept;
     [[nodiscard]] Variable operator==(Variable rhs) const noexcept;
@@ -69,6 +74,16 @@ public:
     [[nodiscard]] Variable operator[](Variable rhs) const noexcept;
     
     void operator=(Variable rhs) const noexcept;
+    void operator+=(Variable rhs) const noexcept;
+    void operator-=(Variable rhs) const noexcept;
+    void operator*=(Variable rhs) const noexcept;
+    void operator/=(Variable rhs) const noexcept;
+    void operator%=(Variable rhs) const noexcept;
+    void operator&=(Variable rhs) const noexcept;
+    void operator|=(Variable rhs) const noexcept;
+    void operator^=(Variable rhs) const noexcept;
+    void operator<<=(Variable rhs) const noexcept;
+    void operator>>=(Variable rhs) const noexcept;
 };
 
 }

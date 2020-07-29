@@ -33,19 +33,19 @@ int main() {
     std::cout << to_string(type_desc<Foo>) << std::endl;
     std::cout << to_string(type_desc<Bar>) << std::endl;
     
-    auto kernel = [](Function *f) {
+    auto kernel = [](Function &f) {
         
-        auto buffer_a = f->arg<const float *>();
-        auto buffer_b = f->arg<float *>();
-        auto count = f->arg<uint32_t>();
+        auto buffer_a = f.arg<const float *>();
+        auto buffer_b = f.arg<float *>();
+        auto count = f.arg<uint32_t>();
         
-        auto tid = f->thread_id();
+        auto tid = f.thread_id();
         if_(tid < count, [&] {
-            auto x = f->auto_var(buffer_a[tid]);
+            auto x = f.auto_var(buffer_a[tid]);
             buffer_b[tid] = x * x + x;
         });
     };
     
     Function f;
-    kernel(&f);
+    kernel(f);
 }
