@@ -14,6 +14,7 @@
 #include <mutex>
 
 #include <core/logging.h>
+#include <core/concepts.h>
 #include <compute/data_types.h>
 
 namespace luisa::dsl {
@@ -46,7 +47,7 @@ enum struct TypeCatalog {
     STRUCTURE
 };
 
-struct TypeDesc {
+struct TypeDesc : Noncopyable {
     
     TypeCatalog type{TypeCatalog::UNKNOWN};
     
@@ -63,77 +64,56 @@ struct TypeDesc {
 
 template<typename T>
 struct Scalar {
-    
     static_assert(std::is_arithmetic_v<T>);
-    
-    static const TypeDesc *desc() noexcept {
-        
-        static auto d = [] {
-            TypeDesc td;
-
-#define MAKE_TYPE_TAG_FOR_TYPE(t, tag)             \
-            if constexpr (std::is_same_v<T, t>) {  \
-                td.type = TypeCatalog::tag;        \
-            }
-            MAKE_TYPE_TAG_FOR_TYPE(bool, BOOL)
-            MAKE_TYPE_TAG_FOR_TYPE(float, FLOAT)
-            MAKE_TYPE_TAG_FOR_TYPE(int8_t, INT8)
-            MAKE_TYPE_TAG_FOR_TYPE(uint8_t, UINT8)
-            MAKE_TYPE_TAG_FOR_TYPE(int16_t, INT16)
-            MAKE_TYPE_TAG_FOR_TYPE(uint16_t, UINT16)
-            MAKE_TYPE_TAG_FOR_TYPE(int32_t, INT32)
-            MAKE_TYPE_TAG_FOR_TYPE(uint32_t, UINT32)
-            MAKE_TYPE_TAG_FOR_TYPE(int64_t, INT64)
-            MAKE_TYPE_TAG_FOR_TYPE(uint64_t, UINT64)
-#undef MAKE_TYPE_TAG_FOR_TYPE
-            
-            return td;
-        }();
-        
-        return &d;
+    [[nodiscard]] static const TypeDesc *desc() noexcept {
+        static TypeDesc td;
+        static std::once_flag flag;
+        std::call_once(flag, [] {
+            if constexpr (std::is_same_v<bool, T>) { td.type = TypeCatalog::BOOL; }
+            else if constexpr (std::is_same_v<float, T>) { td.type = TypeCatalog::FLOAT; }
+            else if constexpr (std::is_same_v<int8_t, T>) { td.type = TypeCatalog::INT8; }
+            else if constexpr (std::is_same_v<uint8_t, T>) { td.type = TypeCatalog::UINT8; }
+            else if constexpr (std::is_same_v<int16_t, T>) { td.type = TypeCatalog::INT16; }
+            else if constexpr (std::is_same_v<uint16_t, T>) { td.type = TypeCatalog::UINT16; }
+            else if constexpr (std::is_same_v<int32_t, T>) { td.type = TypeCatalog::INT32; }
+            else if constexpr (std::is_same_v<uint32_t, T>) { td.type = TypeCatalog::UINT32; }
+            else if constexpr (std::is_same_v<int64_t, T>) { td.type = TypeCatalog::INT64; }
+            else if constexpr (std::is_same_v<uint64_t, T>) { td.type = TypeCatalog::UINT64; }
+        });
+        return &td;
     }
 };
 
 template<typename T>
 struct Const {
-    static const TypeDesc *desc() noexcept {
-        static auto d = [] {
-            TypeDesc td;
-            td.type = TypeCatalog::CONST;
-            td.element_type = T::desc();
-            return td;
-        }();
+    [[nodiscard]] static const TypeDesc *desc() noexcept {
+        static TypeDesc d{.type = TypeCatalog::CONST, .element_type = T::desc()};
         return &d;
     }
 };
 
 struct Matrix3 {
-    static const TypeDesc *desc() noexcept {
+    [[nodiscard]] static const TypeDesc *desc() noexcept {
         static TypeDesc d{.type = TypeCatalog::MATRIX3};
         return &d;
     }
 };
 
 struct Matrix4 {
-    static const TypeDesc *desc() noexcept {
+    [[nodiscard]] static const TypeDesc *desc() noexcept {
         static TypeDesc d{.type = TypeCatalog::MATRIX4};
         return &d;
     }
 };
 
-#define MAKE_VECTOR_TYPE_DESC(n)                      \
-    template<typename T>                              \
-    struct Vector##n {                                \
-        static_assert(std::is_arithmetic_v<T>);       \
-        static const TypeDesc *desc() noexcept {      \
-            static auto d = [] {                      \
-                TypeDesc td;                          \
-                td.type = TypeCatalog::VECTOR##n;     \
-                td.element_type = Scalar<T>::desc();  \
-                return td;                            \
-            }();                                      \
-            return &d;                                \
-        }                                             \
+#define MAKE_VECTOR_TYPE_DESC(n)                                                                   \
+    template<typename T>                                                                           \
+    struct Vector##n {                                                                             \
+        static_assert(std::is_arithmetic_v<T>);                                                    \
+        [[nodiscard]] static const TypeDesc *desc() noexcept {                                     \
+            static TypeDesc d{.type = TypeCatalog::VECTOR##n, .element_type = Scalar<T>::desc()};  \
+            return &d;                                                                             \
+        }                                                                                          \
     };
 
 MAKE_VECTOR_TYPE_DESC(2)
@@ -145,40 +125,24 @@ MAKE_VECTOR_TYPE_DESC(3_PACKED)
 
 template<typename T, size_t N>
 struct Array {
-    static const TypeDesc *desc() noexcept {
-        static auto d = [] {
-            TypeDesc td;
-            td.type = TypeCatalog::ARRAY;
-            td.element_count = N;
-            td.element_type = T::desc();
-            return td;
-        }();
+    [[nodiscard]] static const TypeDesc *desc() noexcept {
+        static TypeDesc d{.type = TypeCatalog::ARRAY, .element_count = N, .element_type = T::desc()};
         return &d;
     }
 };
 
 template<typename T>
 struct Pointer {
-    static const TypeDesc *desc() noexcept {
-        static auto d = [] {
-            TypeDesc td;
-            td.type = TypeCatalog::POINTER;
-            td.element_type = T::desc();
-            return td;
-        }();
+    [[nodiscard]] static const TypeDesc *desc() noexcept {
+        static TypeDesc d{.type = TypeCatalog::POINTER, .element_type = T::desc()};
         return &d;
     }
 };
 
 template<typename T>
 struct Reference {
-    static const TypeDesc *desc() noexcept {
-        static auto d = [] {
-            TypeDesc td;
-            td.type = TypeCatalog::REFERENCE;
-            td.element_type = T::desc();
-            return td;
-        }();
+    [[nodiscard]] static const TypeDesc *desc() noexcept {
+        static TypeDesc d{.type = TypeCatalog::REFERENCE, .element_type = T::desc()};
         return &d;
     }
 };
@@ -199,15 +163,11 @@ struct MakeTypeDescImpl {
 
 private:
     static constexpr auto _scalar_or_struct() noexcept {
-        if constexpr (std::is_arithmetic_v<T>) {
-            return Scalar<T>{};
-        } else {
-            return Structure<T>{};
-        }
+        if constexpr (std::is_arithmetic_v<T>) { return static_cast<Scalar<T> *>(nullptr); } else { return static_cast<Structure<T> *>(nullptr); }
     }
 
 public:
-    using Desc = decltype(_scalar_or_struct());
+    using Desc = std::remove_pointer_t<decltype(_scalar_or_struct())>;
     
 };
 
@@ -271,29 +231,30 @@ struct MakeTypeDescImpl<glm::tvec3<T, glm::packed_highp>> {
 template<typename T>
 inline const TypeDesc *type_desc = detail::MakeTypeDescImpl<T>::Desc::desc();
 
-#define LUISA_STRUCT_BEGIN(S)                                      \
-    template<>                                                     \
-    struct Structure<S> {                                          \
-        using This = S;                                            \
-        static const TypeDesc *desc() noexcept {                   \
-            static std::once_flag flag;                            \
-            static TypeDesc td;                                    \
-            std::call_once(flag, [] {                              \
-                td.type = TypeCatalog::STRUCTURE;                  \
-                td.struct_name = #S;                               \
-                td.alignment = std::alignment_of_v<S>;             \
+#define LUISA_STRUCT_BEGIN(S)                                                                 \
+    template<>                                                                                \
+    class Structure<S> {                                                                      \
+    private:                                                                                  \
+        using This = S;                                                                       \
+        TypeDesc _td;                                                                         \
+    public:                                                                                   \
+        [[nodiscard]] static const TypeDesc *desc() noexcept {                                \
+            static Structure instance{};                                                      \
+            return &instance._td;                                                             \
+        }                                                                                     \
+    private:                                                                                  \
+        Structure() {                                                                         \
+            _td.type = TypeCatalog::STRUCTURE;                                                \
+            _td.struct_name = #S;                                                             \
+            _td.alignment = std::alignment_of_v<S>;                                           \
 
-#define LUISA_STRUCT_MEMBER(member)                                \
-                td.member_names.emplace_back(#member);             \
-                td.member_types.emplace_back(type_desc<            \
-                    std::remove_reference_t<                       \
-                        decltype(std::declval<This>().member)>>);  \
+#define LUISA_STRUCT_MEMBER(member)                                                           \
+            _td.member_names.emplace_back(#member);                                           \
+            _td.member_types.emplace_back(type_desc<decltype(std::declval<This>().member)>);  \
 
-#define LUISA_STRUCT_END()                                         \
-            });                                                    \
-            return &td;                                            \
-        }                                                          \
-    };                                                             \
+#define LUISA_STRUCT_END()                                                                    \
+        }                                                                                     \
+    };                                                                                        \
 
 // Magic from https://github.com/swansontec/map-macro
 #define LUISA_MAP_MACRO_EVAL0(...) __VA_ARGS__
@@ -329,11 +290,12 @@ inline const TypeDesc *type_desc = detail::MakeTypeDescImpl<T>::Desc::desc();
      LUISA_MAP_MACRO(LUISA_STRUCT_MEMBER, __VA_ARGS__)  \
      LUISA_STRUCT_END()                                 \
 
-inline std::string to_string(const TypeDesc *desc, int depth = 0) {
+[[nodiscard]] inline std::string to_string(const TypeDesc *desc, int depth = 0) {
     
+    if (desc == nullptr) { return "[MISSING]"; }
     switch (desc->type) {
         case TypeCatalog::UNKNOWN:
-            return "unknown";
+            return "[UNKNOWN]";
         case TypeCatalog::BOOL:
             return "bool";
         case TypeCatalog::FLOAT:
@@ -393,7 +355,6 @@ inline std::string to_string(const TypeDesc *desc, int depth = 0) {
             return s.append("};");
         }
     }
-    
     return "[BAD]";
 }
 

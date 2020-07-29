@@ -6,7 +6,4 @@
 
 namespace luisa {
 
-Variable::Variable(Function *function, uint32_t id) noexcept
-    : _function{function}, _id{id} {}
-
 }

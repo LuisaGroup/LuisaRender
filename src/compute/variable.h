@@ -4,35 +4,17 @@
 
 #pragma once
 
-#include <cstdint>
-#include <memory>
+#include <compute/type_desc.h>
 
-namespace luisa {
-class Function;
-}
-
-namespace luisa {
+namespace luisa::dsl {
 
 class Variable {
-    
-    friend class Function;
 
 private:
-    Function *_function;
-    uint32_t _id;
+    const TypeDesc *_type;
+    uint32_t _uid;
     
-protected:
-    Variable(Function *function, uint32_t id) noexcept;
-
-public:
-    virtual ~Variable() noexcept = default;
-    [[nodiscard]] uint32_t id() const noexcept { return _id; }
-    [[nodiscard]] Function *function() const noexcept { return _function; }
-};
-
-template<typename T>
-struct Var : public Variable {  // for user-defined structs
-
+    Variable(const TypeDesc *type, uint32_t uid) : _type{type}, _uid{uid} {}
 };
 
 }
