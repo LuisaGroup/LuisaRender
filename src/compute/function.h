@@ -19,6 +19,7 @@ private:
     std::vector<Variable> _arguments;
     std::vector<std::unique_ptr<Expression>> _expressions;
     std::vector<std::unique_ptr<Statement>> _statements;
+    std::vector<const TypeDesc *> _used_structs;
     
     uint32_t _used_builtins{0u};
     uint32_t _uid_counter{0u};
@@ -28,6 +29,16 @@ private:
 public:
     template<typename T>
     Variable arg() noexcept { return _arguments.emplace_back(this, type_desc<T>, _get_uid()); }
+    
+    template<typename T>
+    void use() noexcept {
+        auto desc = type_desc<T>;
+        if (desc->type == TypeCatalog::STRUCTURE) {
+            _used_structs.emplace_back(desc);
+        } else {
+            LUISA_WARNING("Type \"", to_string(desc), "\" is not a user-defined structure, usage ignored.");
+        }
+    }
     
     Variable thread_id() noexcept {
         Variable tid{this, type_desc<uint32_t>, BuiltinTag::THREAD_ID};
@@ -77,6 +88,7 @@ public:
     
     [[nodiscard]] const std::vector<Variable> &arguments() const noexcept { return _arguments; }
     [[nodiscard]] const std::vector<std::unique_ptr<Statement>> &statements() const noexcept { return _statements; }
+    [[nodiscard]] const std::vector<const TypeDesc *> &used_structures() const noexcept { return _used_structs; }
 };
 
 }

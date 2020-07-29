@@ -35,6 +35,9 @@ int main() {
     
     auto kernel = [](Function &f) {
         
+        f.use<Bar>();
+        f.use<Foo>();
+        
         auto buffer_a = f.arg<const float *>();
         auto buffer_b = f.arg<float *>();
         auto count = f.arg<uint32_t>();
