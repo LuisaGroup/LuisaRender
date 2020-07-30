@@ -43,7 +43,7 @@ int main() {
     std::cout << to_string(type_desc<Foo>) << std::endl;
     std::cout << to_string(type_desc<Bar>) << std::endl;
     
-    pretend_to_compile_kernel([](Function &f) {
+    pretend_to_compile_kernel(LUISA_FUNC {
         
         auto buffer_a = f.arg<const float *>();
         auto buffer_b = f.arg<float *>();
@@ -52,9 +52,12 @@ int main() {
         auto tid = f.thread_id();
         if_(tid < count, [&] {
             auto x = f.var<Auto>(buffer_a[tid]);
-            auto c = f.var<Auto>(1234);
+            loop_(f.$(0), f.$(5), [&](Variable i) {
+                void_(x += i);
+            });
             auto k = f.var<const float>(1.5f);
             void_(buffer_b[tid] = k * x * x + sin_(x) * clamp_(x, f.$(0.0f), f.$(1.0f)));
         });
     });
 }
+

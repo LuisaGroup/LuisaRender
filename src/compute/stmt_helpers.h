@@ -49,4 +49,25 @@ inline void void_(Variable v) {
     f->add_statement(std::make_unique<ExprStmt>(v));
 }
 
+template<typename Body,
+    std::enable_if_t<std::is_invocable_v<Body, Variable>, int> = 0>
+inline void loop_(Variable begin, Variable end, Variable step, Body &&body) {
+    auto f = begin.function();
+    auto i = f->var<Auto>(begin);
+    f->add_statement(std::make_unique<LoopStmt>(i, end, step));
+    f->block([&] { body(i); });
+}
+
+template<typename Body>
+inline void loop_(Variable begin, Variable end, Body &&body) {
+    auto f = begin.function();
+    loop_(std::move(begin), std::move(end), f->$(1), std::forward<Body>(body));
+}
+
+#ifndef LUISA_STMT_HELPERS_NO_CONTROL
+#define break_       f.add_break()
+#define continue_    f.add_continue()
+#define return_      f.add_return()
+#endif
+
 }

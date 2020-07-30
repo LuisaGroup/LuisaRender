@@ -26,6 +26,7 @@ class DeclareStmt;
 class KeywordStmt;
 class IfStmt;
 class WhileStmt;
+class LoopStmt;
 class ExprStmt;
 
 // Statement visitor interface
@@ -34,6 +35,7 @@ struct StmtVisitor {
     virtual void visit(const KeywordStmt &stmt) const = 0;
     virtual void visit(const IfStmt &if_stmt) const = 0;
     virtual void visit(const WhileStmt &while_stmt) const = 0;
+    virtual void visit(const LoopStmt &loop_stmt) const = 0;
     virtual void visit(const ExprStmt &expr_stmt) const = 0;
 };
 
@@ -75,13 +77,29 @@ public:
     MAKE_STATEMENT_ACCEPT_VISITOR()
 };
 
+class LoopStmt : public Statement {
+
+private:
+    Variable _i;
+    Variable _end;
+    Variable _step;
+
+public:
+    LoopStmt(Variable i, Variable end, Variable step) noexcept
+        : _i{std::move(i)}, _end{std::move(end)}, _step{std::move(step)} {}
+    [[nodiscard]] Variable i() const noexcept { return _i; }
+    [[nodiscard]] Variable end() const noexcept { return _end; }
+    [[nodiscard]] Variable step() const noexcept { return _step; }
+    MAKE_STATEMENT_ACCEPT_VISITOR()
+};
+
 class KeywordStmt : public Statement {
 
 private:
     std::string_view _keyword;
 
 public:
-    explicit KeywordStmt(std::string_view keyword) noexcept : _keyword{keyword} {}
+    explicit KeywordStmt(std::string_view keyword) noexcept: _keyword{keyword} {}
     [[nodiscard]] std::string_view keyword() const noexcept { return _keyword; }
     MAKE_STATEMENT_ACCEPT_VISITOR()
 };
@@ -92,7 +110,7 @@ private:
     Variable _expr;
 
 public:
-    explicit ExprStmt(Variable expr) noexcept : _expr{std::move(expr)} {}
+    explicit ExprStmt(Variable expr) noexcept: _expr{std::move(expr)} {}
     [[nodiscard]] Variable expression() const noexcept { return _expr; }
     MAKE_STATEMENT_ACCEPT_VISITOR()
 };
