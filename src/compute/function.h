@@ -30,7 +30,14 @@ public:
     template<typename T>
     Variable arg() noexcept { return _arguments.emplace_back(this, type_desc<T>, _get_uid()); }
     
-    Variable literal(std::string l) noexcept { return add_expression(std::make_unique<LiteralExpr>(this, std::move(l))); }
+    template<typename ...Literals, std::enable_if_t<std::conjunction_v<std::is_convertible<Literals, LiteralExpr::Value>...>, int> = 0>
+    Variable literal(Literals &&...vs) noexcept {
+        std::vector<LiteralExpr::Value> values{std::forward<Literals>(vs)...};
+        return add_expression(std::make_unique<LiteralExpr>(this, std::move(values)));
+    }
+    
+    template<typename ...Literals>
+    Variable $(Literals &&...vs) noexcept { return literal(std::forward<Literals>(vs)...); }
     
     template<typename T>
     void use() noexcept {
@@ -58,9 +65,9 @@ public:
         return v;
     }
     
-    template<typename T>
-    Variable var(std::string init_literal) noexcept {
-        return var<T>(literal(std::move(init_literal)));
+    template<typename T, typename ...Literals, typename std::enable_if_t<std::is_constructible_v<T, Literals...>, int> = 0>
+    Variable var(Literals &&...vs) noexcept {
+        return var<T>(literal(std::forward<Literals>(vs)...));
     }
 
 #define MAKE_AUTO_VAR_DECLARE(func, T)                          \
@@ -69,8 +76,9 @@ public:
         add_statement(std::make_unique<DeclareStmt>(v, init));  \
         return v;                                               \
     }                                                           \
-    Variable func(std::string init_literal) noexcept {          \
-        return func(literal(std::move(init_literal)));          \
+    template<typename ...Literals>                              \
+    Variable func(Literals &&...vs) noexcept {                  \
+        return func(literal(std::forward<Literals>(vs)...));    \
     }                                                           \
 
     MAKE_AUTO_VAR_DECLARE(auto_var, auto)

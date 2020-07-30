@@ -5,6 +5,8 @@
 #pragma once
 
 #include <utility>
+#include <variant>
+
 #include <compute/variable.h>
 
 namespace luisa::dsl {
@@ -132,14 +134,17 @@ public:
 
 class LiteralExpr : public Expression {
 
+public:
+    using Value = std::variant<bool, float, int8_t, uint8_t, int16_t, uint16_t, int32_t, uint32_t, int64_t, uint64_t>;
+
 private:
-    std::string _literal;
+    std::vector<Value> _values;
 
 public:
-    LiteralExpr(Function *function, std::string literal) noexcept
-        : Expression{function}, _literal{std::move(literal)} {}
+    LiteralExpr(Function *f, std::vector<Value> values) noexcept
+        : Expression{f}, _values{std::move(values)} {}
     
-    [[nodiscard]] const std::string &literal() const noexcept { return _literal; }
+    [[nodiscard]] const std::vector<Value> &values() const noexcept { return _values; }
     MAKE_EXPRESSION_ACCEPT_VISITOR()
 };
 

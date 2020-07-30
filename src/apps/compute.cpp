@@ -51,8 +51,8 @@ int main() {
         auto tid = f.thread_id();
         if_(tid < count, [&] {
             auto x = f.auto_var(buffer_a[tid]);
-            auto k = f.var<const float>("1234");
-            void_(buffer_b[tid] = k * x * x + x);
+            auto k = f.var<const float>(1.5f);
+            void_(buffer_b[tid] = k * x * x + sin_(x) * clamp_(x, f.$(0.0f), f.$(1.0f)));
         });
     });
 }
