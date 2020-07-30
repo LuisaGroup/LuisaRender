@@ -12,9 +12,35 @@
 
 namespace luisa::dsl {
 
-class Statement {
+// fwd-decl
+struct StmtVisitor;
 
+// Statement interface
+struct Statement {
+    virtual ~Statement() noexcept = default;
+    virtual void accept(const StmtVisitor &visitor) const = 0;
 };
+
+// fwd-decl of derived statments
+class DeclareStmt;
+class BlockBeginStmt;
+class BlockEndStmt;
+class IfStmt;
+class ElseStmt;
+class ExprStmt;
+
+// Statement visitor interface
+struct StmtVisitor {
+    virtual void visit(const DeclareStmt &declare_stmt) const = 0;
+    virtual void visit(const BlockBeginStmt &block_begin_stmt) const = 0;
+    virtual void visit(const BlockEndStmt &block_end_stmt) const = 0;
+    virtual void visit(const IfStmt &if_stmt) const = 0;
+    virtual void visit(const ElseStmt &else_stmt) const = 0;
+    virtual void visit(const ExprStmt &expr_stmt) const = 0;
+};
+
+#define MAKE_STATEMENT_ACCEPT_VISITOR()                                           \
+void accept(const StmtVisitor &visitor) const override { visitor.visit(*this); }  \
 
 class DeclareStmt : public Statement {
 
@@ -26,11 +52,16 @@ public:
     DeclareStmt(Variable var, Expression *init) noexcept: _var{std::move(var)}, _init_expr{init} {}
     [[nodiscard]] Variable var() const noexcept { return _var; }
     [[nodiscard]] Expression *init_expr() const noexcept { return _init_expr; }
+    MAKE_STATEMENT_ACCEPT_VISITOR()
 };
 
-class BlockBeginStmt : public Statement {};
+struct BlockBeginStmt : public Statement {
+    MAKE_STATEMENT_ACCEPT_VISITOR()
+};
 
-class BlockEndStmt : public Statement {};
+struct BlockEndStmt : public Statement {
+    MAKE_STATEMENT_ACCEPT_VISITOR()
+};
 
 class IfStmt : public Statement {
 
@@ -40,33 +71,29 @@ private:
 public:
     explicit IfStmt(Expression *cond) noexcept: _condition{cond} {}
     [[nodiscard]] Expression *condition() const noexcept { return _condition; }
+    MAKE_STATEMENT_ACCEPT_VISITOR()
 };
 
-class ElseStmt : public Statement {
-
+struct ElseStmt : public Statement {
+    MAKE_STATEMENT_ACCEPT_VISITOR()
 };
 
 void if_(Variable cond, const std::function<void()> &true_branch);
 void if_(Variable cond, const std::function<void()> &true_branch, const std::function<void()> &false_branch);
 
-enum struct AssignOp {
-    ASSIGN,
-    ADD_ASSIGN, SUB_ASSIGN, MUL_ASSIGN, DIV_ASSIGN, MOD_ASSIGN,             // arithmetic
-    BIT_AND_ASSIGN, BIT_OR_ASSIGN, BIT_XOR_ASSIGN, SHL_ASSIGN, SHR_ASSIGN,  // bit-wise
-};
-
-class AssignStmt : public Statement {
+class ExprStmt : public Statement {
 
 private:
-    Variable _lvalue;
-    AssignOp _op;
     Expression *_expr;
 
 public:
-    AssignStmt(AssignOp op, Variable lvalue, Expression *expr) noexcept : _lvalue{std::move(lvalue)}, _op{op}, _expr{expr} {}
-    [[nodiscard]] Variable lvalue() const noexcept { return _lvalue; }
+    explicit ExprStmt(Expression *expr) noexcept : _expr{expr} {}
     [[nodiscard]] Expression *expression() const noexcept { return _expr; }
-    [[nodiscard]] AssignOp op() const noexcept { return _op; }
+    MAKE_STATEMENT_ACCEPT_VISITOR()
 };
+
+void void_(Variable v);
+
+#undef MAKE_STATEMENT_ACCEPT_VISITOR
 
 }

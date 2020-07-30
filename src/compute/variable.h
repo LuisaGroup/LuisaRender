@@ -53,6 +53,13 @@ public:
     [[nodiscard]] Variable $(std::string m) const noexcept { return member(std::move(m)); }
     [[nodiscard]] Variable p$(std::string m) const noexcept { return arrow(std::move(m)); }
     
+    [[nodiscard]] Variable operator*() const noexcept;
+    [[nodiscard]] Variable operator&() const noexcept;
+    [[nodiscard("Use \"void_(++x)\" to add this assignment into function statements.")]] Variable operator++() const noexcept;
+    [[nodiscard("Use \"void_(--x)\" to add this assignment into function statements.")]] Variable operator--() const noexcept;
+    [[nodiscard("Use \"void_(x++)\" to add this assignment into function statements.")]] Variable operator++(int) const noexcept;
+    [[nodiscard("Use \"void_(x--)\" to add this assignment into function statements.")]] Variable operator--(int) const noexcept;
+    
     [[nodiscard]] Variable operator+(Variable rhs) const noexcept;
     [[nodiscard]] Variable operator-(Variable rhs) const noexcept;
     [[nodiscard]] Variable operator*(Variable rhs) const noexcept;
@@ -72,18 +79,25 @@ public:
     [[nodiscard]] Variable operator<=(Variable rhs) const noexcept;
     [[nodiscard]] Variable operator>=(Variable rhs) const noexcept;
     [[nodiscard]] Variable operator[](Variable rhs) const noexcept;
+
+#define MAKE_ASSIGNMENT_OPERATOR_DECL(op)                                                             \
+    [[nodiscard("Use \"void_(lhs " #op " rhs)\" to add this assignment into function statements.")]]  \
+    Variable operator op(Variable rhs) const noexcept;                                                \
     
-    void operator=(Variable rhs) const noexcept;
-    void operator+=(Variable rhs) const noexcept;
-    void operator-=(Variable rhs) const noexcept;
-    void operator*=(Variable rhs) const noexcept;
-    void operator/=(Variable rhs) const noexcept;
-    void operator%=(Variable rhs) const noexcept;
-    void operator&=(Variable rhs) const noexcept;
-    void operator|=(Variable rhs) const noexcept;
-    void operator^=(Variable rhs) const noexcept;
-    void operator<<=(Variable rhs) const noexcept;
-    void operator>>=(Variable rhs) const noexcept;
+    MAKE_ASSIGNMENT_OPERATOR_DECL(=)
+    MAKE_ASSIGNMENT_OPERATOR_DECL(+=)
+    MAKE_ASSIGNMENT_OPERATOR_DECL(-=)
+    MAKE_ASSIGNMENT_OPERATOR_DECL(*=)
+    MAKE_ASSIGNMENT_OPERATOR_DECL(/=)
+    MAKE_ASSIGNMENT_OPERATOR_DECL(%=)
+    MAKE_ASSIGNMENT_OPERATOR_DECL(&=)
+    MAKE_ASSIGNMENT_OPERATOR_DECL(|=)
+    MAKE_ASSIGNMENT_OPERATOR_DECL(^=)
+    MAKE_ASSIGNMENT_OPERATOR_DECL(<<=)
+    MAKE_ASSIGNMENT_OPERATOR_DECL(>>=)
+    
+#undef MAKE_ASSIGNMENT_OPERATOR_DECL
+
 };
 
 }

@@ -10,6 +10,9 @@
 
 namespace luisa::dsl {
 
+Variable::Variable(Function *func, const TypeDesc *type, BuiltinTag tag) noexcept
+    : _function{func}, _type{type}, _builtin_tag{tag} {}
+
 Variable::Variable(Function *func, const TypeDesc *type, uint32_t uid) noexcept
     : _function{func}, _type{type}, _uid{uid} {}
 
@@ -40,37 +43,28 @@ MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD(>, GREATER)
 MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD(<=, LESS_EQUAL)
 MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD(>=, GREATER_EQUAL)
 MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD([], ACCESS)
+MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD(=, ASSIGN)
+MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD(+=, ADD_ASSIGN)
+MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD(-=, SUB_ASSIGN)
+MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD(*=, MUL_ASSIGN)
+MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD(/=, DIV_ASSIGN)
+MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD(%=, MOD_ASSIGN)
+MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD(&=, BIT_AND_ASSIGN)
+MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD(|=, BIT_OR_ASSIGN)
+MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD(^=, BIT_XOR_ASSIGN)
+MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD(<<=, SHL_ASSIGN)
+MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD(>>=, SHR_ASSIGN)
 
 #undef MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD
 
-Variable::Variable(Function *func, const TypeDesc *type, BuiltinTag tag) noexcept
-    : _function{func}, _type{type}, _builtin_tag{tag} {}
+Variable Variable::member(std::string m) const noexcept { return _function->add_expression(std::make_unique<MemberExpr>(*this, std::move(m))); }
+Variable Variable::arrow(std::string m) const noexcept { return _function->add_expression(std::make_unique<ArrowExpr>(*this, std::move(m))); }
 
-#define MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD(op, op_tag)  \
-void Variable::operator op(Variable rhs) const noexcept {  \
-    _function->add_statement(std::make_unique<AssignStmt>(AssignOp::op_tag, *this, rhs._expression));  \
-}
-
-MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD(=, ASSIGN)
-MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD(+=, ADD_ASSIGN)
-MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD(-=, SUB_ASSIGN)
-MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD(*=, MUL_ASSIGN)
-MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD(/=, DIV_ASSIGN)
-MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD(%=, MOD_ASSIGN)
-MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD(&=, BIT_AND_ASSIGN)
-MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD(|=, BIT_OR_ASSIGN)
-MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD(^=, BIT_XOR_ASSIGN)
-MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD(<<=, SHL_ASSIGN)
-MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD(>>=, SHR_ASSIGN)
-
-#undef MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD
-
-Variable Variable::member(std::string m) const noexcept {
-    return _function->add_expression(std::make_unique<MemberExpr>(*this, std::move(m)));
-}
-
-Variable Variable::arrow(std::string m) const noexcept {
-    return _function->add_expression(std::make_unique<ArrowExpr>(*this, std::move(m)));
-}
+Variable Variable::operator*() const noexcept { return _function->add_expression(std::make_unique<UnaryExpr>(UnaryOp::DEREFERENCE, *this)); }
+Variable Variable::operator&() const noexcept { return _function->add_expression(std::make_unique<UnaryExpr>(UnaryOp::ADDRESS_OF, *this)); }
+Variable Variable::operator++() const noexcept { return _function->add_expression(std::make_unique<UnaryExpr>(UnaryOp::PREFIX_INC, *this)); }
+Variable Variable::operator--() const noexcept { return _function->add_expression(std::make_unique<UnaryExpr>(UnaryOp::PREFIX_DEC, *this)); }
+Variable Variable::operator++(int) const noexcept { return _function->add_expression(std::make_unique<UnaryExpr>(UnaryOp::POSTFIX_INC, *this)); }
+Variable Variable::operator--(int) const noexcept { return _function->add_expression(std::make_unique<UnaryExpr>(UnaryOp::POSTFIX_DEC, *this)); }
     
 }

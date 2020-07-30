@@ -37,6 +37,7 @@ int main() {
         
         f.use<Bar>();
         f.use<Foo>();
+        f.use<float3>();
         
         auto buffer_a = f.arg<const float *>();
         auto buffer_b = f.arg<float *>();
@@ -45,7 +46,7 @@ int main() {
         auto tid = f.thread_id();
         if_(tid < count, [&] {
             auto x = f.auto_var(buffer_a[tid]);
-            buffer_b[tid] = x * x + x;
+            void_(buffer_b[tid] = x * x + x);
         });
     };
     

@@ -21,4 +21,9 @@ void if_(Variable cond, const std::function<void()> &true_branch) {
     f->block(true_branch);
 }
 
+void void_(Variable v) {
+    auto f = v.function();
+    f->add_statement(std::make_unique<ExprStmt>(v.expression()));
+}
+
 }
