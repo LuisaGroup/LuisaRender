@@ -35,6 +35,8 @@ int main(int argc, char *argv[]) {
     Context context{runtime_directory, working_directory};
     auto device = Device::create(&context, "metal");
     
+    std::cout << "\n================= CODEGEN =================\n" << std::endl;
+    
     auto kernel = device->compile_kernel("foo", LUISA_FUNC {
         
         f.use<Foo>();

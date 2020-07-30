@@ -298,7 +298,10 @@ void CppCodegen::_emit_struct_decl(const TypeDesc *desc) {
     for (auto i = 0u; i < desc->member_names.size(); i++) {
         _os << "    ";
         _emit_type(desc->member_types[i]);
-        _os << " " << desc->member_names[i] << ";\n";
+        if (auto mt = desc->member_types[i];
+            mt != nullptr &&
+            mt->type != TypeCatalog::REFERENCE && mt->type != TypeCatalog::POINTER) { _os << " "; }
+        _os << desc->member_names[i] << ";\n";
     }
     _os << "};\n";
     
@@ -402,7 +405,7 @@ void CppCodegen::_emit_type(const TypeDesc *desc) {
             _emit_type(desc->element_type);
             _os << 3;
             break;
-        case TypeCatalog::VECTOR4 :
+        case TypeCatalog::VECTOR4:
             _emit_type(desc->element_type);
             _os << 4;
             break;
@@ -418,7 +421,7 @@ void CppCodegen::_emit_type(const TypeDesc *desc) {
             _os << "float4x4";
             break;
         case TypeCatalog::ARRAY:
-            _os << "array<";
+            _os << "Array<";
             _emit_type(desc->element_type);
             _os << ", " << desc->element_count << ">";
             break;
