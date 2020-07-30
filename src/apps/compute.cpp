@@ -23,21 +23,26 @@ LUISA_STRUCT(Bar, a, foo, bar)
 LUISA_STRUCT(Foo, a, b, p, n, m, bar, foo)
 }
 
-int main() {
+using namespace luisa;
+using namespace luisa::dsl;
+
+template<typename Def, std::enable_if_t<std::is_invocable_v<Def, Function &>, int> = 0>
+void pretend_to_compile_kernel(Def &&def) {
     
-    using namespace luisa;
-    using namespace luisa::dsl;
+    Function function;
+    def(function);
+    
+    // Now do something to the defined function, e.g. feed it to codegen...
+}
+
+int main() {
     
     std::cout << to_string(type_desc<Foo const *(*[5])[5]>) << std::endl;
     std::cout << to_string(type_desc<const Bar *const *(&)[5]>) << std::endl;
     std::cout << to_string(type_desc<Foo>) << std::endl;
     std::cout << to_string(type_desc<Bar>) << std::endl;
     
-    auto kernel = [](Function &f) {
-        
-        f.use<Bar>();
-        f.use<Foo>();
-        f.use<float3>();
+    pretend_to_compile_kernel([](Function &f) {
         
         auto buffer_a = f.arg<const float *>();
         auto buffer_b = f.arg<float *>();
@@ -46,11 +51,8 @@ int main() {
         auto tid = f.thread_id();
         if_(tid < count, [&] {
             auto x = f.auto_var(buffer_a[tid]);
-            auto y = f.auto_const_var("1234");
-            void_(buffer_b[tid] = y * x * x + x);
+            auto k = f.var<const float>("1234");
+            void_(buffer_b[tid] = k * x * x + x);
         });
-    };
-    
-    Function f;
-    kernel(f);
+    });
 }
