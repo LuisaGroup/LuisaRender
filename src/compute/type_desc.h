@@ -291,6 +291,8 @@ inline const TypeDesc *type_desc_auto_const_ref = Reference<Const<Auto>>::desc()
 
 #define LUISA_MAP_MACRO_END(...)
 #define LUISA_MAP_MACRO_OUT
+#define LUISA_MAP_MACRO_COMMA ,
+
 #define LUISA_MAP_MACRO_GET_END2() 0, LUISA_MAP_MACRO_END
 #define LUISA_MAP_MACRO_GET_END1(...) LUISA_MAP_MACRO_GET_END2
 #define LUISA_MAP_MACRO_GET_END(...) LUISA_MAP_MACRO_GET_END1
@@ -300,6 +302,13 @@ inline const TypeDesc *type_desc_auto_const_ref = Reference<Const<Auto>>::desc()
 #define LUISA_MAP_MACRO0(f, x, peek, ...) f(x) LUISA_MAP_MACRO_NEXT(peek, LUISA_MAP_MACRO1)(f, peek, __VA_ARGS__)
 #define LUISA_MAP_MACRO1(f, x, peek, ...) f(x) LUISA_MAP_MACRO_NEXT(peek, LUISA_MAP_MACRO0)(f, peek, __VA_ARGS__)
 #define LUISA_MAP_MACRO(f, ...) LUISA_MAP_MACRO_EVAL(LUISA_MAP_MACRO1(f, __VA_ARGS__, ()()(), ()()(), ()()(), 0))
+
+#define LUISA_MAP_MACRO_LIST_MEXT1(test, next) LUISA_MAP_MACRO_NEXT0(test, LUISA_MAP_MACRO_COMMA next, 0)
+#define LUISA_MAP_MACRO_LIST_MEXT(test, next)  LUISA_MAP_MACRO_LIST_MEXT1(LUISA_MAP_MACRO_GET_END test, next)
+#define LUISA_MAP_MACRO_LIST0(f, x, peek, ...) f(x) LUISA_MAP_MACRO_LIST_MEXT(peek, LUISA_MAP_MACRO_LIST1)(f, peek, __VA_ARGS__)
+#define LUISA_MAP_MACRO_LIST1(f, x, peek, ...) f(x) LUISA_MAP_MACRO_LIST_MEXT(peek, LUISA_MAP_MACRO_LIST0)(f, peek, __VA_ARGS__)
+
+#define LUISA_MAP_MACRO_LIST(f, ...) LUISA_MAP_MACRO_EVAL(LUISA_MAP_MACRO_LIST1(f, __VA_ARGS__, ()()(), ()()(), ()()(), 0))
 
 #define LUISA_STRUCT(S, ...)                            \
      LUISA_STRUCT_BEGIN(S)                              \

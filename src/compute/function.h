@@ -54,7 +54,7 @@ public:
     template<typename T>
     Variable var(Variable init) noexcept {
         Variable v{this, type_desc<T>, _get_uid()};
-        add_statement(std::make_unique<DeclareStmt>(v, init.expression()));
+        add_statement(std::make_unique<DeclareStmt>(v, init));
         return v;
     }
     
@@ -63,15 +63,15 @@ public:
         return var<T>(literal(std::move(init_literal)));
     }
 
-#define MAKE_AUTO_VAR_DECLARE(func, T)                                       \
-    Variable func(Variable init) noexcept {                                  \
-        Variable v{this, type_desc_##T, _get_uid()};                         \
-        add_statement(std::make_unique<DeclareStmt>(v, init.expression()));  \
-        return v;                                                            \
-    }                                                                        \
-    Variable func(std::string init_literal) noexcept {                       \
-        return func(literal(std::move(init_literal)));                       \
-    }                                                                        \
+#define MAKE_AUTO_VAR_DECLARE(func, T)                          \
+    Variable func(Variable init) noexcept {                     \
+        Variable v{this, type_desc_##T, _get_uid()};            \
+        add_statement(std::make_unique<DeclareStmt>(v, init));  \
+        return v;                                               \
+    }                                                           \
+    Variable func(std::string init_literal) noexcept {          \
+        return func(literal(std::move(init_literal)));          \
+    }                                                           \
 
     MAKE_AUTO_VAR_DECLARE(auto_var, auto)
     MAKE_AUTO_VAR_DECLARE(auto_const_var, auto_const)
@@ -90,10 +90,10 @@ public:
         _statements.emplace_back(std::move(stmt));
     }
     
-    template<typename S, std::enable_if_t<std::is_invocable_v<S>, int> = 0>
-    void block(S &&s) noexcept {
+    template<typename Block, std::enable_if_t<std::is_invocable_v<Block>, int> = 0>
+    void block(Block &&def_block) noexcept {
         add_statement(std::make_unique<BlockBeginStmt>());
-        s();
+        def_block();
         add_statement(std::make_unique<BlockEndStmt>());
     }
     
