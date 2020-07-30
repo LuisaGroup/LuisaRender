@@ -55,27 +55,32 @@ MAKE_BUILTIN_FUNCTION_DEF(make_mat4_, MAKE_MAT4, c0, c1, c2, c3)
 MAKE_BUILTIN_FUNCTION_DEF(make_mat4_, MAKE_MAT4, m00, m01, m02, m03, m10, m11, m12, m13, m20, m21, m22, m23, m30, m31, m32, m33)
 
 // make_vec2
-#define MAKE_BUILTIN_FUNCTION_DEF_MAKE_VEC2(T, tag)                 \
-MAKE_BUILTIN_FUNCTION_DEF(make_##T##2_, MAKE_##tag##2, v)           \
-MAKE_BUILTIN_FUNCTION_DEF(make_##T##2_, MAKE_##tag##2, x, y)        \
+#define MAKE_BUILTIN_FUNCTION_DEF_MAKE_VEC2(T, tag)                      \
+MAKE_BUILTIN_FUNCTION_DEF(make_##T##2_, MAKE_##tag##2, v)                \
+MAKE_BUILTIN_FUNCTION_DEF(make_##T##2_, MAKE_##tag##2, x, y)             \
 
 // make_vec3
-#define MAKE_BUILTIN_FUNCTION_DEF_MAKE_VEC3(T, tag)                 \
-MAKE_BUILTIN_FUNCTION_DEF(make_##T##3_, MAKE_##tag##3, v)           \
-MAKE_BUILTIN_FUNCTION_DEF(make_##T##3_, MAKE_##tag##3, x, y)        \
-MAKE_BUILTIN_FUNCTION_DEF(make_##T##3_, MAKE_##tag##3, x, y, z)     \
+#define MAKE_BUILTIN_FUNCTION_DEF_MAKE_VEC3(T, tag)                      \
+MAKE_BUILTIN_FUNCTION_DEF(make_##T##3_, MAKE_##tag##3, v)                \
+MAKE_BUILTIN_FUNCTION_DEF(make_##T##3_, MAKE_##tag##3, x, y)             \
+MAKE_BUILTIN_FUNCTION_DEF(make_##T##3_, MAKE_##tag##3, x, y, z)          \
 
 // make_vec4
-#define MAKE_BUILTIN_FUNCTION_DEF_MAKE_VEC4(T, tag)                 \
-MAKE_BUILTIN_FUNCTION_DEF(make_##T##4_, MAKE_##tag##4, v)           \
-MAKE_BUILTIN_FUNCTION_DEF(make_##T##4_, MAKE_##tag##4, x, y)        \
-MAKE_BUILTIN_FUNCTION_DEF(make_##T##4_, MAKE_##tag##4, x, y, z)     \
-MAKE_BUILTIN_FUNCTION_DEF(make_##T##4_, MAKE_##tag##4, x, y, z, w)  \
+#define MAKE_BUILTIN_FUNCTION_DEF_MAKE_VEC4(T, tag)                      \
+MAKE_BUILTIN_FUNCTION_DEF(make_##T##4_, MAKE_##tag##4, v)                \
+MAKE_BUILTIN_FUNCTION_DEF(make_##T##4_, MAKE_##tag##4, x, y)             \
+MAKE_BUILTIN_FUNCTION_DEF(make_##T##4_, MAKE_##tag##4, x, y, z)          \
+MAKE_BUILTIN_FUNCTION_DEF(make_##T##4_, MAKE_##tag##4, x, y, z, w)       \
 
-#define MAKE_BUILTIN_FUNCTION_DEF_MAKE_VEC(T, tag)                  \
-MAKE_BUILTIN_FUNCTION_DEF_MAKE_VEC2(T, tag)                         \
-MAKE_BUILTIN_FUNCTION_DEF_MAKE_VEC3(T, tag)                         \
-MAKE_BUILTIN_FUNCTION_DEF_MAKE_VEC4(T, tag)                         \
+// make_packed_vec3
+#define MAKE_BUILTIN_FUNCTION_DEF_MAKE_PACKED_VEC3(T, tag)               \
+MAKE_BUILTIN_FUNCTION_DEF(make_packed_##T##3_, MAKE_PACKED_##tag##3, v)  \
+
+#define MAKE_BUILTIN_FUNCTION_DEF_MAKE_VEC(T, tag)                       \
+MAKE_BUILTIN_FUNCTION_DEF_MAKE_VEC2(T, tag)                              \
+MAKE_BUILTIN_FUNCTION_DEF_MAKE_VEC3(T, tag)                              \
+MAKE_BUILTIN_FUNCTION_DEF_MAKE_VEC4(T, tag)                              \
+MAKE_BUILTIN_FUNCTION_DEF_MAKE_PACKED_VEC3(T, tag)                       \
 
 MAKE_BUILTIN_FUNCTION_DEF_MAKE_VEC(bool, BOOL)
 MAKE_BUILTIN_FUNCTION_DEF_MAKE_VEC(float, FLOAT)
@@ -92,6 +97,9 @@ MAKE_BUILTIN_FUNCTION_DEF_MAKE_VEC(ulong, ULONG)
 #undef MAKE_BUILTIN_FUNCTION_DEF_MAKE_VEC4
 #undef MAKE_BUILTIN_FUNCTION_DEF_MAKE_VEC3
 #undef MAKE_BUILTIN_FUNCTION_DEF_MAKE_VEC2
+
+MAKE_BUILTIN_FUNCTION_DEF(inverse, INVERSE, m)
+MAKE_BUILTIN_FUNCTION_DEF(transpose, TRANSPOSE, m)
 
 #undef MAKE_BUILTIN_FUNCTION_DEF
 #undef MAP_VARIABLE_NAMES_TO_ARGUMENT_LIST
