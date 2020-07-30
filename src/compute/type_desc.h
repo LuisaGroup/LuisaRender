@@ -6,6 +6,7 @@
 
 #include <array>
 #include <iostream>
+#include <sstream>
 #include <memory>
 #include <string>
 #include <type_traits>
@@ -317,77 +318,5 @@ inline const TypeDesc *type_desc = detail::MakeTypeDescImpl<T>::Desc::desc();
      LUISA_STRUCT_BEGIN(S)                              \
      LUISA_MAP_MACRO(LUISA_STRUCT_MEMBER, __VA_ARGS__)  \
      LUISA_STRUCT_END()                                 \
-
-[[nodiscard]] inline std::string to_string(const TypeDesc *desc, int depth = 0) {
-    
-    if (desc == nullptr) { return "[MISSING]"; }
-    switch (desc->type) {
-        case TypeCatalog::UNKNOWN:
-            return "[UNKNOWN]";
-        case TypeCatalog::AUTO:
-            return "auto";
-        case TypeCatalog::BOOL:
-            return "bool";
-        case TypeCatalog::FLOAT:
-            return "float";
-        case TypeCatalog::INT8:
-            return "byte";
-        case TypeCatalog::UINT8:
-            return "ubyte";
-        case TypeCatalog::INT16:
-            return "short";
-        case TypeCatalog::UINT16:
-            return "ushort";
-        case TypeCatalog::INT32:
-            return "int";
-        case TypeCatalog::UINT32:
-            return "uint";
-        case TypeCatalog::INT64:
-            return "long";
-        case TypeCatalog::UINT64:
-            return "ulong";
-        case TypeCatalog::VECTOR2:
-            return std::string{to_string(desc->element_type, depth + 1)}.append("2");
-        case TypeCatalog::VECTOR3:
-            return std::string{to_string(desc->element_type, depth + 1)}.append("3");
-        case TypeCatalog::VECTOR4 :
-            return std::string{to_string(desc->element_type, depth + 1)}.append("4");
-        case TypeCatalog::VECTOR3_PACKED:
-            return std::string{"packed_"}.append(to_string(desc->element_type, depth + 1)).append("3");
-        case TypeCatalog::MATRIX3:
-            return "float3x3";
-        case TypeCatalog::MATRIX4:
-            return "float4x4";
-        case TypeCatalog::ARRAY:
-            return std::string{"array<"}.append(to_string(desc->element_type, depth + 1)).append(", ").append(std::to_string(desc->element_count)).append(">");
-        case TypeCatalog::CONST: {
-            std::string s{to_string(desc->element_type, depth + 1)};
-            if (s.back() != '*' && s.back() != '&') { s.push_back(' '); }
-            return s.append("const");
-        }
-        case TypeCatalog::POINTER: {
-            std::string s{to_string(desc->element_type, depth + 1)};
-            if (s.back() != '*' && s.back() != '&') { s.push_back(' '); }
-            return s.append("*");
-        }
-        case TypeCatalog::REFERENCE: {
-            std::string s{to_string(desc->element_type, depth + 1)};
-            if (s.back() != '*' && s.back() != '&') { s.push_back(' '); }
-            return s.append("&");
-        }
-        case TypeCatalog::STRUCTURE: {
-            if (depth != 0) { return desc->struct_name; }
-            auto s = std::string{"struct alignas("}.append(std::to_string(desc->alignment)).append(") ").append(desc->struct_name).append(" {");
-            if (!desc->member_names.empty()) { s.append("\n"); }
-            for (auto i = 0u; i < desc->member_names.size(); i++) {
-                s.append("    ").append(to_string(desc->member_types[i], depth + 1));
-                if (s.back() != '*' && s.back() != '&') { s.push_back(' '); }
-                s.append(desc->member_names[i]).append(";\n");
-            }
-            return s.append("};");
-        }
-    }
-    return "[BAD]";
-}
 
 }

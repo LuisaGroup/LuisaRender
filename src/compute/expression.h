@@ -23,7 +23,7 @@ public:
     explicit Expression(Function *func) noexcept: _function{func} {}
     [[nodiscard]] Function *function() const noexcept { return _function; }
     
-    virtual void accept(const ExprVisitor &) const = 0;
+    virtual void accept(ExprVisitor &) const = 0;
 };
 
 // fwd-decl of derived expressions
@@ -32,21 +32,21 @@ class BinaryExpr;
 class MemberExpr;
 class ArrowExpr;
 class LiteralExpr;
-class BuiltinFuncExpr;
+class CallExpr;
 class CastExpr;
 
 struct ExprVisitor {
-    virtual void visit(const UnaryExpr &unary_expr) const = 0;
-    virtual void visit(const BinaryExpr &binary_expr) const = 0;
-    virtual void visit(const MemberExpr &member_expr) const = 0;
-    virtual void visit(const ArrowExpr &arrow_expr) const = 0;
-    virtual void visit(const LiteralExpr &literal_expr) const = 0;
-    virtual void visit(const BuiltinFuncExpr &func_expr) const = 0;
-    virtual void visit(const CastExpr &cast_expr) const = 0;
+    virtual void visit(const UnaryExpr &unary_expr) = 0;
+    virtual void visit(const BinaryExpr &binary_expr) = 0;
+    virtual void visit(const MemberExpr &member_expr) = 0;
+    virtual void visit(const ArrowExpr &arrow_expr) = 0;
+    virtual void visit(const LiteralExpr &literal_expr) = 0;
+    virtual void visit(const CallExpr &func_expr) = 0;
+    virtual void visit(const CastExpr &cast_expr) = 0;
 };
 
-#define MAKE_EXPRESSION_ACCEPT_VISITOR()                                          \
-void accept(const ExprVisitor &visitor) const override { visitor.visit(*this); }  \
+#define MAKE_EXPRESSION_ACCEPT_VISITOR()                                    \
+void accept(ExprVisitor &visitor) const override { visitor.visit(*this); }  \
 
 enum struct UnaryOp {
     NOT,          // !x
@@ -152,46 +152,17 @@ public:
     MAKE_EXPRESSION_ACCEPT_VISITOR()
 };
 
-enum struct BuiltinFunc {
-    
-    SELECT,
-    
-    SIN, COS, TAN, ASIN, ACOS, ATAN, ATAN2,
-    CEIL, FLOOR, ROUND,
-    POW, EXP, LOG, LOG2, LOG10,
-    MIN, MAX,
-    ABS, CLAMP, LERP,
-    
-    RADIANS, DEGREES,
-    
-    NORMALIZE, LENGTH, DOT, CROSS,
-    MAKE_MAT3, MAKE_MAT4, INVERSE, TRANSPOSE,
-
-#define BUILTIN_FUNC_MAKE_VECTOR(T)  \
-    MAKE_##T##2, MAKE_##T##3, MAKE_##T##4, MAKE_PACKED_##T##3
-    
-    BUILTIN_FUNC_MAKE_VECTOR(FLOAT),
-    BUILTIN_FUNC_MAKE_VECTOR(BOOL),
-    BUILTIN_FUNC_MAKE_VECTOR(BYTE), BUILTIN_FUNC_MAKE_VECTOR(UBYTE),
-    BUILTIN_FUNC_MAKE_VECTOR(SHORT), BUILTIN_FUNC_MAKE_VECTOR(USHORT),
-    BUILTIN_FUNC_MAKE_VECTOR(INT), BUILTIN_FUNC_MAKE_VECTOR(UINT),
-    BUILTIN_FUNC_MAKE_VECTOR(LONG), BUILTIN_FUNC_MAKE_VECTOR(ULONG),
-
-#undef BUILTIN_FUNC_MAKE_VECTOR
-    
-};
-
-class BuiltinFuncExpr : public Expression {
+class CallExpr : public Expression {
 
 private:
+    std::string _name;
     std::vector<Variable> _arguments;
-    BuiltinFunc _func;
 
 public:
-    BuiltinFuncExpr(BuiltinFunc func, std::vector<Variable> args) noexcept
-        : Expression{args.front().function()}, _func{func}, _arguments{std::move(args)} {}
+    CallExpr(std::string name, std::vector<Variable> args) noexcept
+        : Expression{args.front().function()}, _name{std::move(name)}, _arguments{std::move(args)} {}
     
-    [[nodiscard]] BuiltinFunc builtin_function() const noexcept { return _func; }
+    [[nodiscard]] const std::string &name() const noexcept { return _name; }
     [[nodiscard]] const std::vector<Variable> &arguments() const noexcept { return _arguments; }
     MAKE_EXPRESSION_ACCEPT_VISITOR()
 };

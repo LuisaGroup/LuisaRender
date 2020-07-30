@@ -10,7 +10,7 @@
 
 namespace luisa::dsl {
 
-Variable::Variable(Function *func, const TypeDesc *type, BuiltinTag tag) noexcept
+Variable::Variable(Function *func, const TypeDesc *type, BuiltinVariable tag) noexcept
     : _function{func}, _type{type}, _builtin_tag{tag} {}
 
 Variable::Variable(Function *func, const TypeDesc *type, uint32_t uid) noexcept

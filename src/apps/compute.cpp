@@ -10,7 +10,7 @@ struct Bar {
     Bar &bar;
 };
 
-struct Foo {
+struct alignas(32) Foo {
     int a;
     int b;
     luisa::float3 p;
@@ -30,22 +30,21 @@ using namespace luisa::dsl;
 
 int main(int argc, char *argv[]) {
     
-    std::cout << to_string(type_desc<Foo const *(*[5])[5]>) << std::endl;
-    std::cout << to_string(type_desc<const Bar *const *(&)[5]>) << std::endl;
-    std::cout << to_string(type_desc<Foo>) << std::endl;
-    std::cout << to_string(type_desc<Bar>) << std::endl;
-    
     auto runtime_directory = std::filesystem::canonical(argv[0]).parent_path().parent_path();
     auto working_directory = std::filesystem::canonical(std::filesystem::current_path());
     Context context{runtime_directory, working_directory};
     auto device = Device::create(&context, "metal");
     
-    auto kernel = device->compile_kernel(LUISA_FUNC {
+    auto kernel = device->compile_kernel("foo", LUISA_FUNC {
+        
+        f.use<Foo>();
+        f.use<Bar>();
         
         auto buffer_a = f.arg<const float *>();
         auto buffer_b = f.arg<float *>();
         auto count = f.arg<uint32_t>();
         
+        auto zero = f.var<uint32_t>();
         auto tid = f.thread_id();
         if_(tid < count, [&] {
             auto x = f.var<Auto>(buffer_a[tid]);
@@ -53,7 +52,7 @@ int main(int argc, char *argv[]) {
                 void_(x += i);
             });
             auto k = f.var<const float>(1.5f);
-            void_(buffer_b[tid] = k * x * x + sin_(x) * clamp_(x, f.$(0.0f), f.$(1.0f)));
+            void_(buffer_b[tid] = k * x * x + sin(x) * clamp(x, f.$(0.0f), f.$(1.0f)));
         });
     });
 }

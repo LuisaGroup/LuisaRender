@@ -12,7 +12,7 @@ namespace luisa::metal {
 class MetalCodegen : public dsl::CppCodegen {
 
 public:
-    explicit MetalCodegen(Device *device) noexcept : dsl::CppCodegen{device} {}
+    MetalCodegen(std::ostream &os, Device *device) noexcept : dsl::CppCodegen{os, device} {}
     
 };
 

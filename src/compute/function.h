@@ -16,7 +16,9 @@ class Function {
     friend class Variable;
 
 private:
+    std::string _name;
     std::vector<Variable> _arguments;
+    std::vector<Variable> _builtin_vars;
     std::vector<std::unique_ptr<Expression>> _expressions;
     std::vector<std::unique_ptr<Statement>> _statements;
     std::vector<const TypeDesc *> _used_structs;
@@ -25,8 +27,21 @@ private:
     uint32_t _uid_counter{0u};
     
     [[nodiscard]] uint32_t _get_uid() noexcept { return _uid_counter++; }
+    
+    [[nodiscard]] Variable _builtin_var(BuiltinVariable tag) noexcept {
+        Variable v{this, type_desc<uint32_t>, tag};
+        if (auto bit = static_cast<uint32_t>(tag); (_used_builtins & bit) == 0u) {
+            _used_builtins |= bit;
+            _builtin_vars.emplace_back(v);
+        }
+        return v;
+    }
 
 public:
+    explicit Function(std::string name) noexcept: _name{std::move(name)} {}
+    
+    [[nodiscard]] const std::string &name() const noexcept { return _name; }
+    
     template<typename T>
     Variable arg() noexcept { return _arguments.emplace_back(this, type_desc<T>, _get_uid()); }
     
@@ -45,18 +60,11 @@ public:
         if (desc->type == TypeCatalog::STRUCTURE) {
             _used_structs.emplace_back(desc);
         } else {
-            LUISA_WARNING("Type \"", to_string(desc), "\" is not a user-defined structure, usage ignored.");
+            LUISA_WARNING("Given type is not a user-defined structure, usage ignored.");
         }
     }
     
-    Variable thread_id() noexcept {
-        Variable tid{this, type_desc<uint32_t>, BuiltinTag::THREAD_ID};
-        if (auto bit = static_cast<uint32_t>(BuiltinTag::THREAD_ID); (_used_builtins & bit) == 0u) {
-            _used_builtins |= bit;
-            _arguments.emplace_back(tid);
-        }
-        return tid;
-    }
+    Variable thread_id() noexcept { return _builtin_var(BuiltinVariable::THREAD_ID); }
     
     template<typename T>
     Variable var(Variable init) noexcept {
@@ -90,6 +98,7 @@ public:
     void add_return() noexcept { add_statement(std::make_unique<KeywordStmt>("return;")); }
     
     [[nodiscard]] const std::vector<Variable> &arguments() const noexcept { return _arguments; }
+    [[nodiscard]] const std::vector<Variable> &builtin_variables() const noexcept { return _arguments; }
     [[nodiscard]] const std::vector<std::unique_ptr<Statement>> &statements() const noexcept { return _statements; }
     [[nodiscard]] const std::vector<const TypeDesc *> &used_structures() const noexcept { return _used_structs; }
 };

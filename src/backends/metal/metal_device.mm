@@ -209,8 +209,8 @@ id<MTLLibrary> MetalDevice::_load_library(std::string_view library_name) {
 }
 
 std::unique_ptr<Kernel> MetalDevice::_compile_kernel(const dsl::Function &f) {
-    MetalCodegen codegen{this};
-    codegen.emit(std::cout, f);
+    MetalCodegen codegen{std::cout, this};
+    codegen.emit(f);
     return nullptr;
 }
 

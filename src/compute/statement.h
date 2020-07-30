@@ -18,7 +18,7 @@ struct StmtVisitor;
 // Statement interface
 struct Statement {
     virtual ~Statement() noexcept = default;
-    virtual void accept(const StmtVisitor &visitor) const = 0;
+    virtual void accept(StmtVisitor &visitor) const = 0;
 };
 
 // fwd-decl of derived statments
@@ -31,16 +31,16 @@ class ExprStmt;
 
 // Statement visitor interface
 struct StmtVisitor {
-    virtual void visit(const DeclareStmt &declare_stmt) const = 0;
-    virtual void visit(const KeywordStmt &stmt) const = 0;
-    virtual void visit(const IfStmt &if_stmt) const = 0;
-    virtual void visit(const WhileStmt &while_stmt) const = 0;
-    virtual void visit(const LoopStmt &loop_stmt) const = 0;
-    virtual void visit(const ExprStmt &expr_stmt) const = 0;
+    virtual void visit(const DeclareStmt &declare_stmt) = 0;
+    virtual void visit(const KeywordStmt &stmt) = 0;
+    virtual void visit(const IfStmt &if_stmt) = 0;
+    virtual void visit(const WhileStmt &while_stmt) = 0;
+    virtual void visit(const LoopStmt &loop_stmt) = 0;
+    virtual void visit(const ExprStmt &expr_stmt) = 0;
 };
 
-#define MAKE_STATEMENT_ACCEPT_VISITOR()                                           \
-void accept(const StmtVisitor &visitor) const override { visitor.visit(*this); }  \
+#define MAKE_STATEMENT_ACCEPT_VISITOR()                                     \
+void accept(StmtVisitor &visitor) const override { visitor.visit(*this); }  \
 
 class DeclareStmt : public Statement {
 
