@@ -241,6 +241,7 @@ template<typename T>
 inline const TypeDesc *type_desc = detail::MakeTypeDescImpl<T>::Desc::desc();
 
 inline const TypeDesc *type_desc_auto = Auto::desc();
+inline const TypeDesc *type_desc_auto_const = Const<Auto>::desc();
 inline const TypeDesc *type_desc_auto_ptr = Pointer<Auto>::desc();
 inline const TypeDesc *type_desc_auto_ref = Reference<Auto>::desc();
 inline const TypeDesc *type_desc_auto_const_ptr = Pointer<Const<Auto>>::desc();

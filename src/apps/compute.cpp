@@ -46,7 +46,8 @@ int main() {
         auto tid = f.thread_id();
         if_(tid < count, [&] {
             auto x = f.auto_var(buffer_a[tid]);
-            void_(buffer_b[tid] = x * x + x);
+            auto y = f.auto_const_var("1234");
+            void_(buffer_b[tid] = y * x * x + x);
         });
     };
     

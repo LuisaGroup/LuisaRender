@@ -8,10 +8,8 @@
 #include <compute/variable.h>
 
 namespace luisa::dsl {
-class Variable;
-}
 
-namespace luisa::dsl {
+struct ExprVisitor;
 
 class Expression {
 
@@ -22,7 +20,27 @@ public:
     virtual ~Expression() noexcept = default;
     explicit Expression(Function *func) noexcept: _function{func} {}
     [[nodiscard]] Function *function() const noexcept { return _function; }
+    
+    virtual void accept(const ExprVisitor &) const = 0;
 };
+
+// fwd-decl of derived expressions
+class UnaryExpr;
+class BinaryExpr;
+class MemberExpr;
+class ArrowExpr;
+class LiteralExpr;
+
+struct ExprVisitor {
+    virtual void visit(const UnaryExpr &unary_expr) const = 0;
+    virtual void visit(const BinaryExpr &binary_expr) const = 0;
+    virtual void visit(const MemberExpr &member_expr) const = 0;
+    virtual void visit(const ArrowExpr &arrow_expr) const = 0;
+    virtual void visit(const LiteralExpr &literal_expr) const = 0;
+};
+
+#define MAKE_EXPRESSION_ACCEPT_VISITOR()                                          \
+void accept(const ExprVisitor &visitor) const override { visitor.visit(*this); }  \
 
 enum struct UnaryOp {
     ADDRESS_OF,   // &x
@@ -45,6 +63,7 @@ public:
     
     [[nodiscard]] Variable operand() const noexcept { return _operand; }
     [[nodiscard]] UnaryOp op() const noexcept { return _op; }
+    MAKE_EXPRESSION_ACCEPT_VISITOR()
 };
 
 enum struct BinaryOp {
@@ -80,6 +99,7 @@ public:
     [[nodiscard]] Variable lhs() const noexcept { return _lhs; }
     [[nodiscard]] Variable rhs() const noexcept { return _rhs; }
     [[nodiscard]] BinaryOp op() const noexcept { return _op; }
+    MAKE_EXPRESSION_ACCEPT_VISITOR()
 };
 
 class MemberExpr : public Expression {
@@ -92,6 +112,7 @@ public:
     MemberExpr(Variable self, std::string member) noexcept: Expression{self.function()}, _self{self}, _member{std::move(member)} {}
     [[nodiscard]] Variable self() const noexcept { return _self; }
     [[nodiscard]] const std::string &member() const noexcept { return _member; }
+    MAKE_EXPRESSION_ACCEPT_VISITOR()
 };
 
 class ArrowExpr : public Expression {
@@ -104,6 +125,22 @@ public:
     ArrowExpr(Variable self, std::string member) noexcept: Expression{self.function()}, _self{self}, _member{std::move(member)} {}
     [[nodiscard]] Variable self() const noexcept { return _self; }
     [[nodiscard]] const std::string &member() const noexcept { return _member; }
+    MAKE_EXPRESSION_ACCEPT_VISITOR()
 };
+
+class LiteralExpr : public Expression {
+
+private:
+    std::string _literal;
+
+public:
+    LiteralExpr(Function *function, std::string literal) noexcept
+        : Expression{function}, _literal{std::move(literal)} {}
+    
+    [[nodiscard]] const std::string &literal() const noexcept { return _literal; }
+    MAKE_EXPRESSION_ACCEPT_VISITOR()
+};
+
+#undef MAKE_EXPRESSION_ACCEPT_VISITOR
 
 }

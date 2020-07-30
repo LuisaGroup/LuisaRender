@@ -30,6 +30,8 @@ public:
     template<typename T>
     Variable arg() noexcept { return _arguments.emplace_back(this, type_desc<T>, _get_uid()); }
     
+    Variable literal(std::string l) noexcept { return add_expression(std::make_unique<LiteralExpr>(this, std::move(l))); }
+    
     template<typename T>
     void use() noexcept {
         auto desc = type_desc<T>;
@@ -55,6 +57,11 @@ public:
         add_statement(std::make_unique<DeclareStmt>(v, init.expression()));
         return v;
     }
+    
+    template<typename T>
+    Variable var(std::string init_literal) noexcept {
+        return var<T>(literal(std::move(init_literal)));
+    }
 
 #define MAKE_AUTO_VAR_DECLARE(func, T)                                       \
     Variable func(Variable init) noexcept {                                  \
@@ -62,8 +69,12 @@ public:
         add_statement(std::make_unique<DeclareStmt>(v, init.expression()));  \
         return v;                                                            \
     }                                                                        \
+    Variable func(std::string init_literal) noexcept {                       \
+        return func(literal(std::move(init_literal)));                       \
+    }                                                                        \
 
     MAKE_AUTO_VAR_DECLARE(auto_var, auto)
+    MAKE_AUTO_VAR_DECLARE(auto_const_var, auto_const)
     MAKE_AUTO_VAR_DECLARE(auto_ptr, auto_ptr)
     MAKE_AUTO_VAR_DECLARE(auto_ref, auto_ref)
     MAKE_AUTO_VAR_DECLARE(auto_const_ptr, auto_const_ptr)

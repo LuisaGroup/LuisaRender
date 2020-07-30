@@ -23,10 +23,10 @@ struct Statement {
 
 // fwd-decl of derived statments
 class DeclareStmt;
-class BlockBeginStmt;
-class BlockEndStmt;
+struct BlockBeginStmt;
+struct BlockEndStmt;
 class IfStmt;
-class ElseStmt;
+struct ElseStmt;
 class ExprStmt;
 
 // Statement visitor interface
