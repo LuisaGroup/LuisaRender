@@ -1,3 +1,4 @@
+#include <compute/device.h>
 #include <compute/expr_helpers.h>
 #include <compute/stmt_helpers.h>
 
@@ -27,23 +28,19 @@ LUISA_STRUCT(Foo, a, b, p, n, m, bar, foo)
 using namespace luisa;
 using namespace luisa::dsl;
 
-template<typename Def, std::enable_if_t<std::is_invocable_v<Def, Function &>, int> = 0>
-void pretend_to_compile_kernel(Def &&def) {
-    
-    Function function;
-    def(function);
-    
-    // Now do something to the defined function, e.g. feed it to codegen...
-}
-
-int main() {
+int main(int argc, char *argv[]) {
     
     std::cout << to_string(type_desc<Foo const *(*[5])[5]>) << std::endl;
     std::cout << to_string(type_desc<const Bar *const *(&)[5]>) << std::endl;
     std::cout << to_string(type_desc<Foo>) << std::endl;
     std::cout << to_string(type_desc<Bar>) << std::endl;
     
-    pretend_to_compile_kernel(LUISA_FUNC {
+    auto runtime_directory = std::filesystem::canonical(argv[0]).parent_path().parent_path();
+    auto working_directory = std::filesystem::canonical(std::filesystem::current_path());
+    Context context{runtime_directory, working_directory};
+    auto device = Device::create(&context, "metal");
+    
+    auto kernel = device->compile_kernel(LUISA_FUNC {
         
         auto buffer_a = f.arg<const float *>();
         auto buffer_b = f.arg<float *>();
@@ -60,4 +57,3 @@ int main() {
         });
     });
 }
-

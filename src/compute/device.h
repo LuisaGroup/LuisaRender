@@ -17,6 +17,7 @@
 #include <core/context.h>
 
 #include <compute/kernel.h>
+#include <compute/function.h>
 
 namespace luisa {
 class Geometry;
@@ -37,10 +38,19 @@ private:
 protected:
     Context *_context;
     virtual void _launch_async(std::function<void(KernelDispatcher &)> dispatch, std::function<void()> callback) = 0;
+    [[nodiscard]] virtual std::unique_ptr<Kernel> _compile_kernel(const dsl::Function &f) = 0;
 
 public:
     explicit Device(Context *context) noexcept;
     virtual ~Device() noexcept;
+    
+    template<typename Def, std::enable_if_t<std::is_invocable_v<Def, dsl::Function &>, int> = 0>
+    [[nodiscard]] std::unique_ptr<Kernel> compile_kernel(Def &&def) {
+        dsl::Function function;
+        def(function);
+        return _compile_kernel(function);
+    }
+    
     [[nodiscard]] virtual std::unique_ptr<Kernel> load_kernel(std::string_view function_name) = 0;
     [[nodiscard]] virtual std::unique_ptr<TypelessBuffer> allocate_typeless_buffer(size_t capacity, BufferStorage storage) = 0;
     [[nodiscard]] virtual std::unique_ptr<Acceleration> build_acceleration(Geometry &geometry) = 0;

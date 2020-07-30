@@ -19,6 +19,7 @@
 #import "metal_buffer.h"
 #import "metal_kernel.h"
 #import "metal_acceleration.h"
+#import "metal_codegen.h"
 
 namespace luisa::metal {
 
@@ -43,6 +44,7 @@ private:
 protected:
     id<MTLLibrary> _load_library(std::string_view library_name);
     void _launch_async(std::function<void(KernelDispatcher &)> dispatch, std::function<void()> callback) override;
+    std::unique_ptr<Kernel> _compile_kernel(const dsl::Function &f) override;
 
 public:
     explicit MetalDevice(Context *context);
@@ -204,6 +206,12 @@ id<MTLLibrary> MetalDevice::_load_library(std::string_view library_name) {
         library_iter = _loaded_libraries.emplace(library_name, library).first;
     }
     return library_iter->second;
+}
+
+std::unique_ptr<Kernel> MetalDevice::_compile_kernel(const dsl::Function &f) {
+    MetalCodegen codegen{this};
+    codegen.emit(std::cout, f);
+    return nullptr;
 }
 
 }

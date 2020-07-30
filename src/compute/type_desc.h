@@ -165,9 +165,9 @@ template<typename T>
 struct Structure {
     
     template<typename>
-    static constexpr auto FALSE = false;
+    static constexpr auto ALWAYS_FALSE = false;
     
-    static_assert(FALSE<T>, "Unregistered structure");
+    static_assert(ALWAYS_FALSE<T>, "Unregistered structure");
 };
 
 namespace detail {
