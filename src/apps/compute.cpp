@@ -1,4 +1,5 @@
-#include <compute/function.h>
+#include <compute/expr_helpers.h>
+#include <compute/stmt_helpers.h>
 
 struct Foo;
 
@@ -50,7 +51,8 @@ int main() {
         
         auto tid = f.thread_id();
         if_(tid < count, [&] {
-            auto x = f.auto_var(buffer_a[tid]);
+            auto x = f.var<Auto>(buffer_a[tid]);
+            auto c = f.var<Auto>(1234);
             auto k = f.var<const float>(1.5f);
             void_(buffer_b[tid] = k * x * x + sin_(x) * clamp_(x, f.$(0.0f), f.$(1.0f)));
         });

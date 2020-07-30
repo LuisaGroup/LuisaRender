@@ -1,9 +1,10 @@
 //
-// Created by Mike Smith on 2020/7/10.
+// Created by Mike Smith on 2020/7/30.
 //
 
+#pragma once
+
 #include <compute/function.h>
-#include "expression.h"
 
 namespace luisa::dsl {
 
@@ -11,7 +12,7 @@ namespace luisa::dsl {
 #define MAP_VARIABLE_NAMES_TO_ARGUMENT_LIST(...) LUISA_MAP_MACRO_LIST(MAP_VARIABLE_NAME_TO_ARGUMENT_DEF, __VA_ARGS__)
 
 #define MAKE_BUILTIN_FUNCTION_DEF(func, func_tag, ...)                                                    \
-Variable func(MAP_VARIABLE_NAMES_TO_ARGUMENT_LIST(__VA_ARGS__)) {                                         \
+inline Variable func(MAP_VARIABLE_NAMES_TO_ARGUMENT_LIST(__VA_ARGS__)) {                                  \
     std::vector<Variable> args{__VA_ARGS__};                                                              \
     auto f = args.front().function();                                                                     \
     return f->add_expression(std::make_unique<BuiltinFuncExpr>(BuiltinFunc::func_tag, std::move(args)));  \
@@ -104,5 +105,20 @@ MAKE_BUILTIN_FUNCTION_DEF(transpose, TRANSPOSE, m)
 #undef MAKE_BUILTIN_FUNCTION_DEF
 #undef MAP_VARIABLE_NAMES_TO_ARGUMENT_LIST
 #undef MAP_VARIABLE_NAME_TO_ARGUMENT_DEF
+
+template<typename T>
+[[nodiscard]] inline Variable static_cast_(Variable v) {
+    return v.function()->add_expression(std::make_unique<CastExpr>(CastOp::STATIC, v, type_desc<T>));
+}
+
+template<typename T>
+[[nodiscard]] inline Variable reinterpret_cast_(Variable v) {
+    return v.function()->add_expression(std::make_unique<CastExpr>(CastOp::REINTERPRET, v, type_desc<T>));
+}
+
+template<typename T>
+[[nodiscard]] inline Variable bitwise_cast_(Variable v) {
+    return v.function()->add_expression(std::make_unique<CastExpr>(CastOp::BITWISE, v, type_desc<T>));
+}
 
 }

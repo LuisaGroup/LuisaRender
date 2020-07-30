@@ -65,10 +65,15 @@ struct TypeDesc : Noncopyable {
 };
 
 struct Auto {
+    
     [[nodiscard]] static const TypeDesc *desc() noexcept {
         static TypeDesc d{.type = TypeCatalog::AUTO};
         return &d;
     }
+    
+    // For initialization type checking in Function::var<Auto>
+    template<typename ...Args>
+    Auto(Args &&...) {}
 };
 
 template<typename T>
@@ -180,6 +185,11 @@ public:
     
 };
 
+template<>
+struct MakeTypeDescImpl<Auto> {
+    using Desc = Auto;
+};
+
 template<typename T>
 struct MakeTypeDescImpl<T *> {
     using Desc = Pointer<typename MakeTypeDescImpl<T>::Desc>;
@@ -239,13 +249,6 @@ struct MakeTypeDescImpl<glm::tvec3<T, glm::packed_highp>> {
 
 template<typename T>
 inline const TypeDesc *type_desc = detail::MakeTypeDescImpl<T>::Desc::desc();
-
-inline const TypeDesc *type_desc_auto = Auto::desc();
-inline const TypeDesc *type_desc_auto_const = Const<Auto>::desc();
-inline const TypeDesc *type_desc_auto_ptr = Pointer<Auto>::desc();
-inline const TypeDesc *type_desc_auto_ref = Reference<Auto>::desc();
-inline const TypeDesc *type_desc_auto_const_ptr = Pointer<Const<Auto>>::desc();
-inline const TypeDesc *type_desc_auto_const_ref = Reference<Const<Auto>>::desc();
 
 #define LUISA_STRUCT_BEGIN(S)                                                                    \
     template<>                                                                                   \

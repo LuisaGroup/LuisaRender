@@ -23,19 +23,17 @@ struct Statement {
 
 // fwd-decl of derived statments
 class DeclareStmt;
-struct BlockBeginStmt;
-struct BlockEndStmt;
+class KeywordStmt;
 class IfStmt;
-struct ElseStmt;
+class WhileStmt;
 class ExprStmt;
 
 // Statement visitor interface
 struct StmtVisitor {
     virtual void visit(const DeclareStmt &declare_stmt) const = 0;
-    virtual void visit(const BlockBeginStmt &block_begin_stmt) const = 0;
-    virtual void visit(const BlockEndStmt &block_end_stmt) const = 0;
+    virtual void visit(const KeywordStmt &stmt) const = 0;
     virtual void visit(const IfStmt &if_stmt) const = 0;
-    virtual void visit(const ElseStmt &else_stmt) const = 0;
+    virtual void visit(const WhileStmt &while_stmt) const = 0;
     virtual void visit(const ExprStmt &expr_stmt) const = 0;
 };
 
@@ -55,14 +53,6 @@ public:
     MAKE_STATEMENT_ACCEPT_VISITOR()
 };
 
-struct BlockBeginStmt : public Statement {
-    MAKE_STATEMENT_ACCEPT_VISITOR()
-};
-
-struct BlockEndStmt : public Statement {
-    MAKE_STATEMENT_ACCEPT_VISITOR()
-};
-
 class IfStmt : public Statement {
 
 private:
@@ -74,12 +64,27 @@ public:
     MAKE_STATEMENT_ACCEPT_VISITOR()
 };
 
-struct ElseStmt : public Statement {
+class WhileStmt : public Statement {
+
+private:
+    Variable _condition;
+
+public:
+    explicit WhileStmt(Variable cond) noexcept: _condition{std::move(cond)} {}
+    [[nodiscard]] Variable condition() const noexcept { return _condition; }
     MAKE_STATEMENT_ACCEPT_VISITOR()
 };
 
-void if_(Variable cond, const std::function<void()> &true_branch);
-void if_(Variable cond, const std::function<void()> &true_branch, const std::function<void()> &false_branch);
+class KeywordStmt : public Statement {
+
+private:
+    std::string_view _keyword;
+
+public:
+    explicit KeywordStmt(std::string_view keyword) noexcept : _keyword{keyword} {}
+    [[nodiscard]] std::string_view keyword() const noexcept { return _keyword; }
+    MAKE_STATEMENT_ACCEPT_VISITOR()
+};
 
 class ExprStmt : public Statement {
 
@@ -91,8 +96,6 @@ public:
     [[nodiscard]] Variable expression() const noexcept { return _expr; }
     MAKE_STATEMENT_ACCEPT_VISITOR()
 };
-
-void void_(Variable v);
 
 #undef MAKE_STATEMENT_ACCEPT_VISITOR
 

@@ -33,6 +33,7 @@ class MemberExpr;
 class ArrowExpr;
 class LiteralExpr;
 class BuiltinFuncExpr;
+class CastExpr;
 
 struct ExprVisitor {
     virtual void visit(const UnaryExpr &unary_expr) const = 0;
@@ -41,12 +42,15 @@ struct ExprVisitor {
     virtual void visit(const ArrowExpr &arrow_expr) const = 0;
     virtual void visit(const LiteralExpr &literal_expr) const = 0;
     virtual void visit(const BuiltinFuncExpr &func_expr) const = 0;
+    virtual void visit(const CastExpr &cast_expr) const = 0;
 };
 
 #define MAKE_EXPRESSION_ACCEPT_VISITOR()                                          \
 void accept(const ExprVisitor &visitor) const override { visitor.visit(*this); }  \
 
 enum struct UnaryOp {
+    NOT,          // !x
+    BIT_NOT,      // ~x
     ADDRESS_OF,   // &x
     DEREFERENCE,  // *x
     PREFIX_INC,   // ++x
@@ -192,101 +196,28 @@ public:
     MAKE_EXPRESSION_ACCEPT_VISITOR()
 };
 
+enum struct CastOp {
+    STATIC,
+    REINTERPRET,
+    BITWISE
+};
+
+class CastExpr : public Expression {
+
+private:
+    Variable _source;
+    CastOp _op;
+    const TypeDesc *_dest_type;
+
+public:
+    CastExpr(CastOp op, Variable src, const TypeDesc *dest) noexcept
+        : Expression{src.function()}, _op{op}, _source{std::move(src)}, _dest_type{dest} {}
+    [[nodiscard]] CastOp op() const noexcept { return _op; }
+    [[nodiscard]] Variable source() const noexcept { return _source; }
+    [[nodiscard]] const TypeDesc *dest_type() const noexcept { return _dest_type; }
+    MAKE_EXPRESSION_ACCEPT_VISITOR()
+};
+
 #undef MAKE_EXPRESSION_ACCEPT_VISITOR
-
-// Built-in Function Declarations
-#define MAP_VARIABLE_NAME_TO_ARGUMENT_DECL(name) Variable name
-#define MAP_VARIABLE_NAMES_TO_ARGUMENT_LIST(...) LUISA_MAP_MACRO_LIST(MAP_VARIABLE_NAME_TO_ARGUMENT_DECL, __VA_ARGS__)
-
-#define MAKE_BUILTIN_FUNCTION_DECL(func, ...)                                   \
-[[nodiscard]] Variable func(MAP_VARIABLE_NAMES_TO_ARGUMENT_LIST(__VA_ARGS__));  \
-
-MAKE_BUILTIN_FUNCTION_DECL(select_, cond, tv, fv)
-
-MAKE_BUILTIN_FUNCTION_DECL(sin_, x)
-MAKE_BUILTIN_FUNCTION_DECL(cos_, x)
-MAKE_BUILTIN_FUNCTION_DECL(tan_, x)
-MAKE_BUILTIN_FUNCTION_DECL(asin_, x)
-MAKE_BUILTIN_FUNCTION_DECL(acos_, x)
-MAKE_BUILTIN_FUNCTION_DECL(atan_, x)
-MAKE_BUILTIN_FUNCTION_DECL(atan2_, y, x)
-MAKE_BUILTIN_FUNCTION_DECL(ceil_, x)
-MAKE_BUILTIN_FUNCTION_DECL(floor_, x)
-MAKE_BUILTIN_FUNCTION_DECL(round_, x)
-MAKE_BUILTIN_FUNCTION_DECL(pow_, x)
-MAKE_BUILTIN_FUNCTION_DECL(exp_, x)
-MAKE_BUILTIN_FUNCTION_DECL(log_, x)
-MAKE_BUILTIN_FUNCTION_DECL(log2_, x)
-MAKE_BUILTIN_FUNCTION_DECL(log10_, x)
-MAKE_BUILTIN_FUNCTION_DECL(min_, x, y)
-MAKE_BUILTIN_FUNCTION_DECL(max_, x, y)
-MAKE_BUILTIN_FUNCTION_DECL(abs_, x)
-MAKE_BUILTIN_FUNCTION_DECL(clamp_, x, a, b)
-MAKE_BUILTIN_FUNCTION_DECL(lerp_, a, b, t)
-MAKE_BUILTIN_FUNCTION_DECL(radians_, deg)
-MAKE_BUILTIN_FUNCTION_DECL(degrees_, rad)
-MAKE_BUILTIN_FUNCTION_DECL(normalize_, v)
-MAKE_BUILTIN_FUNCTION_DECL(length_, v)
-MAKE_BUILTIN_FUNCTION_DECL(dot_, u, v)
-MAKE_BUILTIN_FUNCTION_DECL(cross_, u, v)
-
-MAKE_BUILTIN_FUNCTION_DECL(make_mat3_, val_or_mat4)
-MAKE_BUILTIN_FUNCTION_DECL(make_mat3_, c0, c1, c2)
-MAKE_BUILTIN_FUNCTION_DECL(make_mat3_, m00, m01, m02, m10, m11, m12, m20, m21, m22)
-
-MAKE_BUILTIN_FUNCTION_DECL(make_mat4_, val_or_mat3)
-MAKE_BUILTIN_FUNCTION_DECL(make_mat4_, c0, c1, c2, c3)
-MAKE_BUILTIN_FUNCTION_DECL(make_mat4_, m00, m01, m02, m03, m10, m11, m12, m13, m20, m21, m22, m23, m30, m31, m32, m33)
-
-// make_vec2
-#define MAKE_BUILTIN_FUNCTION_DECL_MAKE_VEC2(T)         \
-MAKE_BUILTIN_FUNCTION_DECL(make_##T##2_, v)             \
-MAKE_BUILTIN_FUNCTION_DECL(make_##T##2_, x, y)          \
-
-// make_vec3
-#define MAKE_BUILTIN_FUNCTION_DECL_MAKE_VEC3(T)         \
-MAKE_BUILTIN_FUNCTION_DECL(make_##T##3_, v)             \
-MAKE_BUILTIN_FUNCTION_DECL(make_##T##3_, x, y)          \
-MAKE_BUILTIN_FUNCTION_DECL(make_##T##3_, x, y, z)       \
-
-// make_vec4
-#define MAKE_BUILTIN_FUNCTION_DECL_MAKE_VEC4(T)         \
-MAKE_BUILTIN_FUNCTION_DECL(make_##T##4_, v)             \
-MAKE_BUILTIN_FUNCTION_DECL(make_##T##4_, x, y)          \
-MAKE_BUILTIN_FUNCTION_DECL(make_##T##4_, x, y, z)       \
-MAKE_BUILTIN_FUNCTION_DECL(make_##T##4_, x, y, z, w)    \
-
-// make_packed_vec3
-#define MAKE_BUILTIN_FUNCTION_DECL_MAKE_PACKED_VEC3(T)  \
-MAKE_BUILTIN_FUNCTION_DECL(make_##T##3_, v)             \
-
-#define MAKE_BUILTIN_FUNCTION_DECL_MAKE_VEC(T)          \
-MAKE_BUILTIN_FUNCTION_DECL_MAKE_VEC2(T)                 \
-MAKE_BUILTIN_FUNCTION_DECL_MAKE_VEC3(T)                 \
-MAKE_BUILTIN_FUNCTION_DECL_MAKE_VEC4(T)                 \
-MAKE_BUILTIN_FUNCTION_DECL_MAKE_PACKED_VEC3(T)          \
-
-MAKE_BUILTIN_FUNCTION_DECL_MAKE_VEC(bool)
-MAKE_BUILTIN_FUNCTION_DECL_MAKE_VEC(float)
-MAKE_BUILTIN_FUNCTION_DECL_MAKE_VEC(byte)
-MAKE_BUILTIN_FUNCTION_DECL_MAKE_VEC(ubyte)
-MAKE_BUILTIN_FUNCTION_DECL_MAKE_VEC(short)
-MAKE_BUILTIN_FUNCTION_DECL_MAKE_VEC(ushort)
-MAKE_BUILTIN_FUNCTION_DECL_MAKE_VEC(int)
-MAKE_BUILTIN_FUNCTION_DECL_MAKE_VEC(uint)
-MAKE_BUILTIN_FUNCTION_DECL_MAKE_VEC(long)
-MAKE_BUILTIN_FUNCTION_DECL_MAKE_VEC(ulong)
-
-#undef MAKE_BUILTIN_FUNCTION_DECL_MAKE_VEC
-#undef MAKE_BUILTIN_FUNCTION_DECL_MAKE_VEC4
-#undef MAKE_BUILTIN_FUNCTION_DECL_MAKE_VEC3
-#undef MAKE_BUILTIN_FUNCTION_DECL_MAKE_VEC2
-
-MAKE_BUILTIN_FUNCTION_DECL(inverse, m)
-MAKE_BUILTIN_FUNCTION_DECL(transpose, m)
-
-#undef MAKE_BUILTIN_FUNCTION_DECL
-#undef MAP_VARIABLE_NAMES_TO_ARGUMENT_LIST
-#undef MAP_VARIABLE_NAME_TO_ARGUMENT_DECL
 
 }

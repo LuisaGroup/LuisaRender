@@ -69,26 +69,6 @@ public:
     Variable var(Literals &&...vs) noexcept {
         return var<T>(literal(std::forward<Literals>(vs)...));
     }
-
-#define MAKE_AUTO_VAR_DECLARE(func, T)                          \
-    Variable func(Variable init) noexcept {                     \
-        Variable v{this, type_desc_##T, _get_uid()};            \
-        add_statement(std::make_unique<DeclareStmt>(v, init));  \
-        return v;                                               \
-    }                                                           \
-    template<typename ...Literals>                              \
-    Variable func(Literals &&...vs) noexcept {                  \
-        return func(literal(std::forward<Literals>(vs)...));    \
-    }                                                           \
-
-    MAKE_AUTO_VAR_DECLARE(auto_var, auto)
-    MAKE_AUTO_VAR_DECLARE(auto_const_var, auto_const)
-    MAKE_AUTO_VAR_DECLARE(auto_ptr, auto_ptr)
-    MAKE_AUTO_VAR_DECLARE(auto_ref, auto_ref)
-    MAKE_AUTO_VAR_DECLARE(auto_const_ptr, auto_const_ptr)
-    MAKE_AUTO_VAR_DECLARE(auto_const_ref, auto_const_ref)
-
-#undef MAKE_AUTO_VAR_DECLARE
     
     [[nodiscard]] Variable add_expression(std::unique_ptr<Expression> expr) noexcept {
         return Variable{_expressions.emplace_back(std::move(expr)).get()};
@@ -100,9 +80,9 @@ public:
     
     template<typename Block, std::enable_if_t<std::is_invocable_v<Block>, int> = 0>
     void block(Block &&def_block) noexcept {
-        add_statement(std::make_unique<BlockBeginStmt>());
+        add_statement(std::make_unique<KeywordStmt>("{"));
         def_block();
-        add_statement(std::make_unique<BlockEndStmt>());
+        add_statement(std::make_unique<KeywordStmt>("}"));
     }
     
     [[nodiscard]] const std::vector<Variable> &arguments() const noexcept { return _arguments; }
