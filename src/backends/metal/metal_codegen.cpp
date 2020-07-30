@@ -55,7 +55,7 @@ void MetalCodegen::_emit_argument_decl(Variable v) {
     } else {
         _os << "constant Uniform<";
         _emit_type(vt);
-        _os << "> $" << v.uid();
+        _os << "> v" << v.uid();
     }
 }
 
