@@ -139,7 +139,7 @@ public:
 class LiteralExpr : public Expression {
 
 public:
-    using Value = std::variant<bool, float, int8_t, uint8_t, int16_t, uint16_t, int32_t, uint32_t, int64_t, uint64_t>;
+    using Value = std::variant<Variable, bool, float, int8_t, uint8_t, int16_t, uint16_t, int32_t, uint32_t, int64_t, uint64_t>;
 
 private:
     std::vector<Value> _values;

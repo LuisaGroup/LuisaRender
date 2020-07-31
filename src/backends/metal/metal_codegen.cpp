@@ -53,7 +53,7 @@ void MetalCodegen::_emit_argument_decl(Variable v) {
         _os << "device ";
         _emit_variable_decl(v);
     } else {
-        _os << "constant Uniform<";
+        _os << "constant LUISA_UNIFORM<";
         _emit_type(vt);
         _os << "> v" << v.uid();
     }
@@ -67,11 +67,20 @@ void MetalCodegen::emit(const Function &f) {
            "\n"
            "#ifndef LUISA_COMPUTE_METAL_STABS\n"
            "#define LUISA_COMPUTE_METAL_STABS\n"
-           "template<typename T, size_t N> using Array<T, N> = T[N];\n"
-           "template<typename T> using Uniform = T &;\n"
+           "template<typename T> using LUISA_UNIFORM = T &;\n"
            "#endif\n"
            "\n";
     CppCodegen::emit(f);
+}
+
+void MetalCodegen::_emit_type(const TypeDesc *desc) {
+    if (desc != nullptr && desc->type == TypeCatalog::ARRAY) {
+        _os << "array<";
+        _emit_type(desc->element_type);
+        _os << ", " << desc->element_count << ">";
+    } else {
+        CppCodegen::_emit_type(desc);
+    }
 }
 
 }

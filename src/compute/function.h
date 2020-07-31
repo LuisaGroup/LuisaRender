@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include <map>
 #include <memory>
+#include <unordered_set>
 
 #include <compute/statement.h>
 
@@ -21,19 +21,41 @@ private:
     std::vector<Variable> _builtin_vars;
     std::vector<std::unique_ptr<Expression>> _expressions;
     std::vector<std::unique_ptr<Statement>> _statements;
-    std::vector<const TypeDesc *> _used_structs;
+    std::unordered_set<const TypeDesc *> _used_structs;
     
     uint32_t _used_builtins{0u};
     uint32_t _uid_counter{0u};
     
     [[nodiscard]] uint32_t _get_uid() noexcept { return _uid_counter++; }
     
+    template<typename T>
     [[nodiscard]] Variable _builtin_var(BuiltinVariable tag) noexcept {
-        Variable v{this, type_desc<uint32_t>, tag};
+        auto type = type_desc<T>;
+        _use_type(type);
+        Variable v{this, type, tag};
         if (auto bit = static_cast<uint32_t>(tag); (_used_builtins & bit) == 0u) {
             _used_builtins |= bit;
             _builtin_vars.emplace_back(v);
         }
+        return v;
+    }
+    
+    void _use_type(const TypeDesc *desc) noexcept {
+        if (desc == nullptr || _used_structs.find(desc) != _used_structs.end()) { return; }
+        if (desc->type == TypeCatalog::STRUCTURE) {
+            _used_structs.emplace(desc);
+            for (auto member : desc->member_types) { _use_type(member); }
+        } else {
+            _use_type(desc->element_type);
+        }
+    }
+    
+    template<typename T, bool is_const, typename ...Literals>
+    Variable _var_or_const(Literals &&...vs) noexcept {
+        auto type = type_desc<T>;
+        _use_type(type);
+        Variable v{this, type, _get_uid()};
+        add_statement(std::make_unique<DeclareStmt>(v, literal(std::forward<Literals>(vs)...), is_const));
         return v;
     }
 
@@ -43,9 +65,14 @@ public:
     [[nodiscard]] const std::string &name() const noexcept { return _name; }
     
     template<typename T>
-    Variable arg() noexcept { return _arguments.emplace_back(this, type_desc<T>, _get_uid()); }
+    Variable arg() noexcept {
+        auto type = type_desc<T>;
+        _use_type(type);
+        return _arguments.emplace_back(this, type, _get_uid());
+    }
     
-    template<typename ...Literals, std::enable_if_t<std::conjunction_v<std::is_convertible<Literals, LiteralExpr::Value>...>, int> = 0>
+    template<typename ...Literals,
+        std::enable_if_t<std::conjunction_v<std::is_convertible<Literals, LiteralExpr::Value>...>, int> = 0>
     Variable literal(Literals &&...vs) noexcept {
         std::vector<LiteralExpr::Value> values{std::forward<Literals>(vs)...};
         return add_expression(std::make_unique<LiteralExpr>(this, std::move(values)));
@@ -54,29 +81,13 @@ public:
     template<typename ...Literals>
     Variable $(Literals &&...vs) noexcept { return literal(std::forward<Literals>(vs)...); }
     
-    template<typename T>
-    void use() noexcept {
-        auto desc = type_desc<T>;
-        if (desc->type == TypeCatalog::STRUCTURE) {
-            _used_structs.emplace_back(desc);
-        } else {
-            LUISA_WARNING("Given type is not a user-defined structure, usage ignored.");
-        }
-    }
+    Variable thread_id() noexcept { return _builtin_var<uint32_t>(BuiltinVariable::THREAD_ID); }
     
-    Variable thread_id() noexcept { return _builtin_var(BuiltinVariable::THREAD_ID); }
+    template<typename T, typename ...Literals>
+    Variable var(Literals &&...vs) noexcept { return _var_or_const<T, false>(std::forward<Literals>(vs)...); }
     
-    template<typename T>
-    Variable var(Variable init) noexcept {
-        Variable v{this, type_desc<T>, _get_uid()};
-        add_statement(std::make_unique<DeclareStmt>(v, init));
-        return v;
-    }
-    
-    template<typename T, typename ...Literals, typename std::enable_if_t<std::is_constructible_v<T, Literals...>, int> = 0>
-    Variable var(Literals &&...vs) noexcept {
-        return var<T>(literal(std::forward<Literals>(vs)...));
-    }
+    template<typename T, typename ...Literals>
+    Variable constant(Literals &&...vs) noexcept { return _var_or_const<T, true>(std::forward<Literals>(vs)...); }
     
     [[nodiscard]] Variable add_expression(std::unique_ptr<Expression> expr) noexcept {
         return Variable{_expressions.emplace_back(std::move(expr)).get()};
@@ -100,7 +111,7 @@ public:
     [[nodiscard]] const std::vector<Variable> &arguments() const noexcept { return _arguments; }
     [[nodiscard]] const std::vector<Variable> &builtin_variables() const noexcept { return _builtin_vars; }
     [[nodiscard]] const std::vector<std::unique_ptr<Statement>> &statements() const noexcept { return _statements; }
-    [[nodiscard]] const std::vector<const TypeDesc *> &used_structures() const noexcept { return _used_structs; }
+    [[nodiscard]] const std::unordered_set<const TypeDesc *> &used_structures() const noexcept { return _used_structs; }
 };
 
 #define LUISA_FUNC [&](Function &f)

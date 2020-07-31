@@ -47,11 +47,14 @@ class DeclareStmt : public Statement {
 private:
     Variable _var;
     Variable _init;
+    bool _is_constant;
 
 public:
-    DeclareStmt(Variable var, Variable init) noexcept: _var{std::move(var)}, _init{std::move(init)} {}
+    DeclareStmt(Variable var, Variable init, bool is_const) noexcept
+        : _var{std::move(var)}, _init{std::move(init)}, _is_constant{is_const} {}
     [[nodiscard]] Variable var() const noexcept { return _var; }
     [[nodiscard]] Variable initialization() const noexcept { return _init; }
+    [[nodiscard]] bool is_constant() const noexcept { return _is_constant; }
     MAKE_STATEMENT_ACCEPT_VISITOR()
 };
 

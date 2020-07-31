@@ -186,7 +186,8 @@ void CppCodegen::visit(const LiteralExpr &literal_expr) {
     for (auto i = 0ul; i < values.size(); i++) {
         std::visit([this](auto &&v) {
             using T = std::decay_t<decltype(v)>;
-            if constexpr (std::is_same_v<T, bool>) { _os << v; }
+            if constexpr (std::is_same_v<T, Variable>) { _emit_variable(v); }
+            else if constexpr (std::is_same_v<T, bool>) { _os << v; }
             else if constexpr (std::is_same_v<T, float>) { _os << v << "f"; }
             else if constexpr (std::is_same_v<T, int8_t>) { _os << "static_cast<int8_t>(" << v << ")"; }
             else if constexpr (std::is_same_v<T, uint8_t>) { _os << "static_cast<uint8_t>(" << v << ")"; }
@@ -235,6 +236,7 @@ void CppCodegen::visit(const CastExpr &cast_expr) {
 
 void CppCodegen::visit(const DeclareStmt &declare_stmt) {
     _emit_indent();
+    if (declare_stmt.is_constant()) { _os << "constexpr "; }
     _emit_variable_decl(declare_stmt.var());
     _os << "{";
     _emit_variable(declare_stmt.initialization());
@@ -421,7 +423,7 @@ void CppCodegen::_emit_type(const TypeDesc *desc) {
             _os << "float4x4";
             break;
         case TypeCatalog::ARRAY:
-            _os << "Array<";
+            _os << "std::array<";
             _emit_type(desc->element_type);
             _os << ", " << desc->element_count << ">";
             break;

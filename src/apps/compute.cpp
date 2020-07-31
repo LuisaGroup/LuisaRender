@@ -16,7 +16,7 @@ struct alignas(32) Foo {
     luisa::float3 p;
     luisa::packed_float3 n;
     luisa::float3x3 m;
-    const Bar &bar;
+    const Bar *bar;
     Foo *foo;
 };
 
@@ -39,20 +39,16 @@ int main(int argc, char *argv[]) {
     
     auto kernel = device->compile_kernel("foo", LUISA_FUNC {
         
-        f.use<Foo>();
-        f.use<Bar>();
-        
         auto buffer_a = f.arg<const float *>();
         auto buffer_b = f.arg<float *>();
         auto count = f.arg<uint32_t>();
         
-        auto zero = f.var<uint32_t>();
+        auto zero = f.var<Foo>();
+        auto array = f.constant<int[5]>(1,2,3,4,5);
         auto tid = f.thread_id();
         if_(tid < count, [&] {
             auto x = f.var<Auto>(buffer_a[tid]);
-            loop_(f.$(0), f.$(5), [&](Variable i) {
-                void_(x += i);
-            });
+            for (auto i = 0; i < 5; i++) { void_(x += f.$(i)); }
             auto k = f.var<const float>(1.5f);
             void_(buffer_b[tid] = k * x * x + sin(x) * clamp(x, f.$(0.0f), f.$(1.0f)));
         });
