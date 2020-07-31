@@ -205,7 +205,7 @@ void CppCodegen::visit(const LiteralExpr &literal_expr) {
 
 void CppCodegen::visit(const CallExpr &call_expr) {
     _emit_function_call(call_expr.name());
-    _os << " (";
+    _os << "(";
     auto &&args = call_expr.arguments();
     for (auto i = 0ul; i < args.size(); i++) {
         _emit_variable(args[i]);
@@ -249,7 +249,7 @@ void CppCodegen::visit(const KeywordStmt &stmt) {
     if (kw == "}") { _indent--; }
     if (kw != "{") { _emit_indent(); }
     _os << kw;
-    if (kw == "else") { _os << " "; } else { _os << "\n"; }
+    if (kw == "else" || kw == "do") { _os << " "; } else { _os << "\n"; }
     if (kw == "{") { _indent++; }
 }
 

@@ -25,10 +25,10 @@ int main(int argc, char *argv[]) {
     
     std::cout << "\n================= CODEGEN =================\n" << std::endl;
     
-    auto sample_1d = LUISA_LAMBDA(Arg<float> u, Arg<const Auto> lut) {
+    auto sample_1d = LUISA_LAMBDA(Copy<float> u, Ref lut) {
         
         auto p = f.var<Auto>(0u);
-        auto count = f.var<int32_t>(TABLE_SIZE);
+        auto count = f.var<Auto>(static_cast<int32_t>(TABLE_SIZE));
         while_(count > f.$(0), [&]{
             auto step = f.var<Auto>(count / f.$(2));
             auto mid = f.var<Auto>(p + step);

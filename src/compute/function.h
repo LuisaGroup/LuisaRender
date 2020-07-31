@@ -130,7 +130,9 @@ struct LambdaArgument : public Variable {
 };
 
 template<typename T>
-using Arg = LambdaArgument<T>;
+using Copy = LambdaArgument<T>;
+
+using Ref = Variable;
 
 #define LUISA_FUNC        [&](Function &f)
 #define LUISA_LAMBDA(...) [&](Function &f, __VA_ARGS__)

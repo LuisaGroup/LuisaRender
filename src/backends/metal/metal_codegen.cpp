@@ -68,7 +68,7 @@ void MetalCodegen::emit(const Function &f) {
            "#ifndef LUISA_COMPUTE_METAL_STABS\n"
            "#define LUISA_COMPUTE_METAL_STABS\n"
            "template<typename T, typename F> inline auto select(bool p, T t, F f) { return p ? t : f; }\n"
-           "template<typename A, typename B> inline auto lerp(float t, A a, B b) { return (1.0f - t) * a + t * b; }\n"
+           "template<typename A, typename B> inline auto lerp(A a, B b, float t) { return (1.0f - t) * a + t * b; }\n"
            "#endif\n"
            "\n";
     CppCodegen::emit(f);
