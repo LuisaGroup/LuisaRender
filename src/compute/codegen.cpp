@@ -10,7 +10,7 @@ void CppCodegen::emit(const Function &f) {
     
     // used structs
     for (auto &&s : f.used_structures()) { _emit_struct_fwd_decl(s); }
-    for (auto &&s : f.used_structures()) { _emit_struct_decl(s); }
+    for (auto &&s : f.used_structures()) { _emit_struct_decl(s); }  // FIXME: Topological Sort
     
     // function head
     _emit_function_decl(f);
@@ -204,7 +204,8 @@ void CppCodegen::visit(const LiteralExpr &literal_expr) {
 }
 
 void CppCodegen::visit(const CallExpr &call_expr) {
-    _os << call_expr.name() << "(";
+    _emit_function_call(call_expr.name());
+    _os << " (";
     auto &&args = call_expr.arguments();
     for (auto i = 0ul; i < args.size(); i++) {
         _emit_variable(args[i]);
@@ -247,7 +248,8 @@ void CppCodegen::visit(const KeywordStmt &stmt) {
     auto &&kw = stmt.keyword();
     if (kw == "}") { _indent--; }
     if (kw != "{") { _emit_indent(); }
-    _os << kw << "\n";
+    _os << kw;
+    if (kw == "else") { _os << " "; } else { _os << "\n"; }
     if (kw == "{") { _indent++; }
 }
 
@@ -469,6 +471,10 @@ void CppCodegen::_emit_function_decl(const Function &f) {
         if (i != args.size() - 1u) { _os << ", "; }
     }
     _os << ") ";
+}
+
+void CppCodegen::_emit_function_call(const std::string &name) {
+    _os << name;
 }
 
 }

@@ -41,6 +41,7 @@ protected:
     virtual void _emit_variable_decl(Variable v);
     virtual void _emit_argument_decl(Variable v) { _emit_variable_decl(std::move(v)); }
     virtual void _emit_type(const TypeDesc *desc);
+    virtual void _emit_function_call(const std::string &name);
 
 public:
     CppCodegen(std::ostream &os, Device *device) noexcept : Codegen{os, device} {}

@@ -4,6 +4,8 @@
 
 #pragma once
 
+#ifndef LUISA_DEVICE_COMPATIBLE
+
 #include <array>
 #include <iostream>
 #include <sstream>
@@ -320,3 +322,5 @@ inline const TypeDesc *type_desc = detail::MakeTypeDescImpl<T>::Desc::desc();
      LUISA_STRUCT_END()                                 \
 
 }
+
+#endif

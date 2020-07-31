@@ -17,6 +17,7 @@ class Function {
 
 private:
     std::string _name;
+    std::vector<std::string> _arg_names;
     std::vector<Variable> _arguments;
     std::vector<Variable> _builtin_vars;
     std::vector<std::unique_ptr<Expression>> _expressions;
@@ -51,7 +52,7 @@ private:
     }
     
     template<typename T, bool is_const, typename ...Literals>
-    Variable _var_or_const(Literals &&...vs) noexcept {
+    [[nodiscard]] Variable _var_or_const(Literals &&...vs) noexcept {
         auto type = type_desc<T>;
         _use_type(type);
         Variable v{this, type, _get_uid()};
@@ -65,7 +66,7 @@ public:
     [[nodiscard]] const std::string &name() const noexcept { return _name; }
     
     template<typename T>
-    Variable arg() noexcept {
+    [[nodiscard]] Variable arg(std::string name = {}) noexcept {
         auto type = type_desc<T>;
         _use_type(type);
         return _arguments.emplace_back(this, type, _get_uid());
@@ -73,21 +74,30 @@ public:
     
     template<typename ...Literals,
         std::enable_if_t<std::conjunction_v<std::is_convertible<Literals, LiteralExpr::Value>...>, int> = 0>
-    Variable literal(Literals &&...vs) noexcept {
+    [[nodiscard]] Variable literal(Literals &&...vs) noexcept {
         std::vector<LiteralExpr::Value> values{std::forward<Literals>(vs)...};
         return add_expression(std::make_unique<LiteralExpr>(this, std::move(values)));
     }
     
+    template<typename Container,
+             typename = std::void_t<
+                 std::pair<decltype(std::begin(std::declval<Container>())),
+                           decltype(std::end(std::declval<Container>()))>>>
+    [[nodiscard]] Variable literal(Container &&container) noexcept {
+        std::vector<LiteralExpr::Value> values{std::begin(container), std::end(container)};
+        return add_expression(std::make_unique<LiteralExpr>(this, std::move(values)));
+    }
+    
     template<typename ...Literals>
-    Variable $(Literals &&...vs) noexcept { return literal(std::forward<Literals>(vs)...); }
+    [[nodiscard]] Variable $(Literals &&...vs) noexcept { return literal(std::forward<Literals>(vs)...); }
     
-    Variable thread_id() noexcept { return _builtin_var<uint32_t>(BuiltinVariable::THREAD_ID); }
-    
-    template<typename T, typename ...Literals>
-    Variable var(Literals &&...vs) noexcept { return _var_or_const<T, false>(std::forward<Literals>(vs)...); }
+    [[nodiscard]] Variable thread_id() noexcept { return _builtin_var<uint32_t>(BuiltinVariable::THREAD_ID); }
     
     template<typename T, typename ...Literals>
-    Variable constant(Literals &&...vs) noexcept { return _var_or_const<T, true>(std::forward<Literals>(vs)...); }
+    [[nodiscard]] Variable var(Literals &&...vs) noexcept { return _var_or_const<T, false>(std::forward<Literals>(vs)...); }
+    
+    template<typename T, typename ...Literals>
+    [[nodiscard]] Variable constant(Literals &&...vs) noexcept { return _var_or_const<T, true>(std::forward<Literals>(vs)...); }
     
     [[nodiscard]] Variable add_expression(std::unique_ptr<Expression> expr) noexcept {
         return Variable{_expressions.emplace_back(std::move(expr)).get()};
@@ -114,6 +124,15 @@ public:
     [[nodiscard]] const std::unordered_set<const TypeDesc *> &used_structures() const noexcept { return _used_structs; }
 };
 
-#define LUISA_FUNC [&](Function &f)
+template<typename T>
+struct LambdaArgument : public Variable {
+    LambdaArgument(Variable v) noexcept : Variable{v.function()->var<T>(v)} {}
+};
+
+template<typename T>
+using Arg = LambdaArgument<T>;
+
+#define LUISA_FUNC        [&](Function &f)
+#define LUISA_LAMBDA(...) [&](Function &f, __VA_ARGS__)
 
 }

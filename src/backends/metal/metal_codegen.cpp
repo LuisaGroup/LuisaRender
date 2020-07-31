@@ -53,9 +53,9 @@ void MetalCodegen::_emit_argument_decl(Variable v) {
         _os << "device ";
         _emit_variable_decl(v);
     } else {
-        _os << "constant LUISA_UNIFORM<";
+        _os << "constant ";
         _emit_type(vt);
-        _os << "> v" << v.uid();
+        _os << " &v" << v.uid();
     }
 }
 
@@ -67,7 +67,8 @@ void MetalCodegen::emit(const Function &f) {
            "\n"
            "#ifndef LUISA_COMPUTE_METAL_STABS\n"
            "#define LUISA_COMPUTE_METAL_STABS\n"
-           "template<typename T> using LUISA_UNIFORM = T &;\n"
+           "template<typename T, typename F> inline auto select(bool p, T t, F f) { return p ? t : f; }\n"
+           "template<typename A, typename B> inline auto lerp(float t, A a, B b) { return (1.0f - t) * a + t * b; }\n"
            "#endif\n"
            "\n";
     CppCodegen::emit(f);
@@ -80,6 +81,14 @@ void MetalCodegen::_emit_type(const TypeDesc *desc) {
         _os << ", " << desc->element_count << ">";
     } else {
         CppCodegen::_emit_type(desc);
+    }
+}
+
+void MetalCodegen::_emit_function_call(const std::string &name) {
+    if (name.find("make_") == 0u) {
+        _os << std::string_view{name.c_str()}.substr(5);
+    } else {
+        _os << name;
     }
 }
 

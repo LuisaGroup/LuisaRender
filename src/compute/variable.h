@@ -20,7 +20,7 @@ namespace luisa::dsl {
 
 class Variable {
 
-private:
+protected:
     Function *_function{nullptr};
     
     // For variable declarations
