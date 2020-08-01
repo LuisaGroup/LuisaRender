@@ -321,6 +321,16 @@ inline const TypeDesc *type_desc = detail::MakeTypeDescImpl<T>::Desc::desc();
      LUISA_MAP_MACRO(LUISA_STRUCT_MEMBER, __VA_ARGS__)  \
      LUISA_STRUCT_END()                                 \
 
+
+template<typename Container,
+    std::enable_if_t<
+        std::conjunction_v<
+            std::is_convertible<decltype(*std::cbegin(std::declval<Container>())), const TypeDesc *>,
+            std::is_convertible<decltype(*std::cend(std::declval<Container>())), const TypeDesc *>>, int> = 0>
+[[nodiscard]] inline std::vector<const TypeDesc *> toposort_structs(Container &&container) {
+    return {};
+}
+
 }
 
 #endif

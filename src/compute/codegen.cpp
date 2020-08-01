@@ -10,7 +10,9 @@ void CppCodegen::emit(const Function &f) {
     
     // used structs
     for (auto &&s : f.used_structures()) { _emit_struct_fwd_decl(s); }
-    for (auto &&s : f.used_structures()) { _emit_struct_decl(s); }  // FIXME: Topological Sort
+    
+    auto sorted_structs = toposort_structs(f.used_structures());
+    for (auto &&s : f.used_structures()) { _emit_struct_decl(s); }  // FIXME: Topological Sorting
     
     // function head
     _emit_function_decl(f);

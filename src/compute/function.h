@@ -80,9 +80,10 @@ public:
     }
     
     template<typename Container,
-             typename = std::void_t<
-                 std::pair<decltype(std::begin(std::declval<Container>())),
-                           decltype(std::end(std::declval<Container>()))>>>
+        std::enable_if_t<
+            std::conjunction_v<
+                std::is_convertible<decltype(*std::cbegin(std::declval<Container>())), LiteralExpr::Value>,
+                std::is_convertible<decltype(*std::cend(std::declval<Container>())), LiteralExpr::Value>>, int> = 0>
     [[nodiscard]] Variable literal(Container &&container) noexcept {
         std::vector<LiteralExpr::Value> values{std::begin(container), std::end(container)};
         return add_expression(std::make_unique<LiteralExpr>(this, std::move(values)));
@@ -126,7 +127,7 @@ public:
 
 template<typename T>
 struct LambdaArgument : public Variable {
-    LambdaArgument(Variable v) noexcept : Variable{v.function()->var<T>(v)} {}
+    LambdaArgument(Variable v) noexcept: Variable{v.function()->var<T>(v)} {}
 };
 
 template<typename T>
