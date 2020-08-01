@@ -24,7 +24,7 @@ function(luisa_render_add_plugin name)
     add_dependencies(plugins ${name})
     list(FILTER PLUGIN_SOURCES INCLUDE REGEX ".*\\.h")
     set_target_properties(${name} PROPERTIES PUBLIC_HEADER "${PLUGIN_SOURCES}")
-    install(TARGETS ${name} LIBRARY DESTINATION lib/${PLUGIN_CATEGORY} PUBLIC_HEADER DESTINATION include/${PLUGIN_CATEGORY})
+    install(TARGETS ${name} LIBRARY DESTINATION lib/plugins/${PLUGIN_CATEGORY} PUBLIC_HEADER DESTINATION include/${PLUGIN_CATEGORY})
 endfunction()
 
 add_subdirectory(bsdfs)

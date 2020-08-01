@@ -31,12 +31,12 @@ bool Context::_create_folder_if_necessary(const std::filesystem::path &path) noe
     return false;
 }
 
-bool Context::create_working_folder(const std::filesystem::path &name) const noexcept { return _create_folder_if_necessary(_working_directory / name); }
-bool Context::create_cache_folder(const std::filesystem::path &name) const noexcept { return _create_folder_if_necessary(_working_directory / "cache" / name); }
+bool Context::create_working_folder(const std::filesystem::path &name) const noexcept { return _create_folder_if_necessary(working_path(name)); }
+bool Context::create_cache_folder(const std::filesystem::path &name) const noexcept { return _create_folder_if_necessary(cache_path(name)); }
 std::filesystem::path Context::include_path(const std::filesystem::path &name) const noexcept { return _runtime_directory / "include" / name; }
 std::filesystem::path Context::working_path(const std::filesystem::path &name) const noexcept { return _working_directory / name; }
 std::filesystem::path Context::runtime_path(const std::filesystem::path &name) const noexcept { return _runtime_directory / name; }
-std::filesystem::path Context::cache_path(const std::filesystem::path &name) const noexcept { return _working_directory / "cache" / name; }
+std::filesystem::path Context::cache_path(const std::filesystem::path &name) const noexcept { return _runtime_directory / "cache" / name; }
 
 Context::~Context() noexcept { for (auto &&module_item : _loaded_modules) { destroy_dynamic_module(module_item.second); }}
 
