@@ -17,7 +17,6 @@ class Function {
 
 private:
     std::string _name;
-    std::vector<std::string> _arg_names;
     std::vector<Variable> _arguments;
     std::vector<Variable> _builtin_vars;
     std::vector<std::unique_ptr<Expression>> _expressions;
@@ -66,7 +65,7 @@ public:
     [[nodiscard]] const std::string &name() const noexcept { return _name; }
     
     template<typename T>
-    [[nodiscard]] Variable arg(std::string name = {}) noexcept {
+    [[nodiscard]] Variable arg() noexcept {
         auto type = type_desc<T>;
         _use_type(type);
         return _arguments.emplace_back(this, type, _get_uid());
