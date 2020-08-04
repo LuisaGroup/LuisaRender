@@ -1,6 +1,7 @@
 #include <cameras/thin_lens.h>
 
 using namespace luisa;
+using namespace luisa::math;
 using namespace luisa::camera::thin_lens;
 
 LUISA_KERNEL void generate_rays(

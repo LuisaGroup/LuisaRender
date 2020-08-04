@@ -1,6 +1,7 @@
 #include <render/filter.h>
 
 using namespace luisa;
+using namespace luisa::math;
 using namespace luisa::filter::separable;
 
 LUISA_DEVICE_CALLABLE float2 sample_1d(float u, LUISA_UNIFORM_SPACE LUT &lut) noexcept {
@@ -28,7 +29,7 @@ LUISA_DEVICE_CALLABLE float2 sample_1d(float u, LUISA_UNIFORM_SPACE LUT &lut) no
     auto index_w = offset * weight_table_size_float;
     auto index_w_lower = math::floor(index_w);
     auto index_w_upper = math::ceil(index_w);
-    auto w = lerp(
+    auto w = math::lerp(
         lut.w[static_cast<uint>(index_w_lower)],
         index_w_upper >= weight_table_size_float ? 0.0f : lut.w[static_cast<uint>(index_w_upper)],
         index_w - index_w_lower);

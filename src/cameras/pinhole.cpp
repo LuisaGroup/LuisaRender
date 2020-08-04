@@ -55,7 +55,7 @@ PinholeCamera::PinholeCamera(Device *device, const ParameterSet &parameter_set)
       _near_plane{parameter_set["near_plane"].parse_float_or_default(0.1f)},
       _generate_rays_kernel{device->load_kernel("camera::pinhole::generate_rays")} {
     
-    auto fov = radians(parameter_set["fov"].parse_float_or_default(35.0f));
+    auto fov = math::radians(parameter_set["fov"].parse_float_or_default(35.0f));
     auto res = make_float2(_film->resolution());
     auto sensor_height = 2.0f * _near_plane * tan(0.5f * fov);
     auto sensor_width = sensor_height * res.x / res.y;

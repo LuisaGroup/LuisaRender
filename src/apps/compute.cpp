@@ -40,23 +40,23 @@ int main(int argc, char *argv[]) {
             });
         });
         
-        auto inv_table_size = $let<Auto>(1.0f / static_cast<float>(TABLE_SIZE));
+        constexpr auto inv_table_size = 1.0f / static_cast<float>(TABLE_SIZE);
         
-        auto lb = $auto(clamp(p, $$(0u), $$(TABLE_SIZE - 1u)));
+        auto lb = $auto(clamp(p, 0u, TABLE_SIZE - 1u));
         auto cdf_lower = $auto(lut.$(cdf)[lb]);
-        auto cdf_upper = $auto(select(lb == TABLE_SIZE - 1u, $$(1.0f), lut.$(cdf)[lb + 1u]));
+        auto cdf_upper = $auto(select(lb == TABLE_SIZE - 1u, 1.0f, lut.$(cdf)[lb + 1u]));
         auto offset = $auto(
-            clamp(cast<float>(lb) + (u - cdf_lower) / (cdf_upper - cdf_lower) * inv_table_size, $$(0.0f), $$(1.0f)));
+            clamp(cast<float>(lb) + (u - cdf_lower) / (cdf_upper - cdf_lower) * inv_table_size, 0.0f, 1.0f));
         
-        auto weight_table_size_float = $let<float>(TABLE_SIZE);
+        constexpr auto weight_table_size_float = static_cast<float>(TABLE_SIZE);
         auto index_w = $auto(offset * weight_table_size_float);
         auto index_w_lower = $auto(floor(index_w));
         auto index_w_upper = $auto(ceil(index_w));
         auto w = $auto(lerp(
             lut.$(w)[cast<uint32_t>(index_w_lower)],
-            select(index_w_upper >= weight_table_size_float, $$(0.0f), lut.$(w)[cast<uint32_t>(index_w_upper)]),
+            select(index_w_upper >= weight_table_size_float, 0.0f, lut.$(w)[cast<uint32_t>(index_w_upper)]),
             index_w - index_w_lower));
-        return make_float2(offset * 2.0f - 1.0f, select(w >= 0.0f, $$(1.0f), $$(-1.0f)));
+        return make_float2(offset * 2.0f - 1.0f, select(w >= 0.0f, 1.0f, -1.0f));
     };
     
     auto kernel = device->compile_kernel("foo", LUISA_FUNC {

@@ -1,6 +1,7 @@
 #include <lights/diffuse_area.h>
 
 using namespace luisa;
+using namespace luisa::math;
 using namespace luisa::light::diffuse_area;
 
 LUISA_KERNEL void generate_samples(

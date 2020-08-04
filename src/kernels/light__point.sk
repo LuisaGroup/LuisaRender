@@ -1,6 +1,7 @@
 #include <lights/point.h>
 
 using namespace luisa;
+using namespace luisa::math;
 using namespace luisa::light::point;
 
 LUISA_KERNEL void generate_samples(

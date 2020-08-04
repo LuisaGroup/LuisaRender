@@ -6,7 +6,7 @@
 
 #include <compute/data_types.h>
 
-namespace luisa { inline namespace math { inline namespace constants {
+namespace luisa::math { inline namespace constants {
 
 LUISA_CONSTANT_SPACE constexpr auto PI[[maybe_unused]] = 3.14159265358979323846264338327950288f;
 LUISA_CONSTANT_SPACE constexpr auto PI_OVER_TWO[[maybe_unused]] = 1.57079632679489661923132169163975144f;
@@ -97,7 +97,7 @@ LUISA_CONSTANT_SPACE constexpr uint prime_number_prefix_sums[[maybe_unused]][PRI
     796317, 799846, 803379, 806918, 810459, 814006, 817563, 821122, 824693, 828274, 831857,
     835450, 839057, 842670, 846287, 849910, 853541, 857178, 860821, 864480};
     
-}}}
+}}
 
 #ifndef LUISA_DEVICE_COMPATIBLE
 
@@ -105,7 +105,7 @@ LUISA_CONSTANT_SPACE constexpr uint prime_number_prefix_sums[[maybe_unused]][PRI
 #include <algorithm>
 #include <glm/glm.hpp>
 
-namespace luisa { inline namespace math {
+namespace luisa::math {
 
 // scalar functions
 
@@ -116,6 +116,8 @@ using glm::acos;
 using glm::asin;
 using glm::atan;
 using std::atan2;
+
+using glm::sqrt;
 
 using glm::ceil;
 using glm::floor;
@@ -194,12 +196,12 @@ using glm::abs;
 
 #define LUISA_MATH_HAS_BUILTIN_VECTOR_CLAMP
 using glm::clamp;
-    
-}}
+
+}
 
 #endif
 
-namespace luisa { inline namespace math {
+namespace luisa::math {
 
 LUISA_DEVICE_CALLABLE inline bool all_zero(float2 v) noexcept { return v.x == 0 && v.y == 0; }
 LUISA_DEVICE_CALLABLE inline bool all_zero(float3 v) noexcept { return v.x == 0 && v.y == 0 && v.z == 0; }
@@ -518,4 +520,4 @@ LUISA_DEVICE_CALLABLE inline auto rotation(float3 axis, float angle) noexcept {
         0.0f, 0.0f, 0.0f, 1.0f);
 }
     
-}}
+}

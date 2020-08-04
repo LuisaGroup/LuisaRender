@@ -1,6 +1,7 @@
 #include <cameras/pinhole.h>
 
 using namespace luisa;
+using namespace luisa::math;
 using namespace luisa::camera::pinhole;
 
 LUISA_KERNEL void generate_rays(

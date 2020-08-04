@@ -1,6 +1,7 @@
 #include <render/illumination.h>
 
 using namespace luisa;
+using namespace luisa::math;
 using namespace luisa::illumination;
 
 LUISA_KERNEL void uniform_select_lights(

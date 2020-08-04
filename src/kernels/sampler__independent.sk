@@ -1,6 +1,7 @@
 #include <samplers/independent.h>
 
 using namespace luisa;
+using namespace luisa::math;
 using namespace luisa::sampler::independent;
 
 template<uint N>

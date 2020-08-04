@@ -3,6 +3,7 @@
 #include <render/interaction.h>
 
 using namespace luisa;
+using namespace luisa::math;
 
 LUISA_KERNEL void colorize_normals(
     LUISA_DEVICE_SPACE float3 *normals,

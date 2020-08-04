@@ -12,7 +12,14 @@ namespace luisa {
 
 using namespace simd;
 
-inline namespace math {
+namespace math {
+
+using metal::sqrt;
+
+template<typename A, typename B>
+auto lerp(A a, B b, float t) {
+    return (1.0f - t) * a + t * b;
+}
 
 using metal::cos;
 #define LUISA_MATH_HAS_BUILTIN_VECTOR_COS

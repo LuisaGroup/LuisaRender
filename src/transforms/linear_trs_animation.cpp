@@ -64,11 +64,11 @@ float4x4 LinearTRSAnimation::dynamic_matrix(float time) const {
     auto &&prev = *(--iter);
     auto alpha = (time - prev.time_point) / (next.time_point - prev.time_point);
     
-    auto t = lerp(prev.transform->translation(), next.transform->translation(), alpha);
-    auto r = lerp(prev.transform->rotation(), next.transform->rotation(), alpha);
-    auto s = lerp(prev.transform->scaling(), next.transform->scaling(), alpha);
+    auto t = math::lerp(prev.transform->translation(), next.transform->translation(), alpha);
+    auto r = math::lerp(prev.transform->rotation(), next.transform->rotation(), alpha);
+    auto s = math::lerp(prev.transform->scaling(), next.transform->scaling(), alpha);
     
-    return translation(t) * rotation(make_float3(r), r.a) * scaling(s);
+    return math::translation(t) * math::rotation(make_float3(r), r.a) * math::scaling(s);
 }
 
 }

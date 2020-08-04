@@ -11,13 +11,15 @@ namespace luisa { inline namespace sampling {
 
 LUISA_DEVICE_CALLABLE inline float3 cosine_sample_hemisphere(float u1, float u2) noexcept {
     auto r = sqrt(u1);
-    auto phi = 2.0f * PI * u2;
+    auto phi = 2.0f * math::PI * u2;
     auto x = static_cast<float>(r * cos(phi));
     auto y = static_cast<float>(r * sin(phi));
-    return make_float3(x, y, sqrt(max(0.0f, 1.0f - x * x - y * y)));
+    return make_float3(x, y, math::sqrt(math::max(0.0f, 1.0f - x * x - y * y)));
 }
 
 LUISA_DEVICE_CALLABLE inline float2 concentric_sample_disk(float r1, float r2) noexcept {
+    
+    using namespace math;
     
     auto offset = 2.0f * make_float2(r1, r2) - make_float2(1.0f, 1.0f);
     
@@ -28,7 +30,7 @@ LUISA_DEVICE_CALLABLE inline float2 concentric_sample_disk(float r1, float r2) n
     
     if (abs(offset.x) > abs(offset.y)) {
         r = offset.x;
-        theta = PI_OVER_FOUR * (offset.y / offset.x);
+        theta = math::PI_OVER_FOUR * (offset.y / offset.x);
     } else {
         r = offset.y;
         theta = PI_OVER_TWO - PI_OVER_FOUR * (offset.x / offset.y);
@@ -37,6 +39,7 @@ LUISA_DEVICE_CALLABLE inline float2 concentric_sample_disk(float r1, float r2) n
 }
 
 LUISA_DEVICE_CALLABLE inline float balance_heuristic(float pa, float pb) noexcept {
+    using namespace math;
     return pa / max(pa + pb, 1e-4f);
 }
 

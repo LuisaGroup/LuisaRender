@@ -1,6 +1,7 @@
 #include <render/camera.h>
 
 using namespace luisa;
+using namespace luisa::math;
 using namespace luisa::camera;
 
 LUISA_KERNEL void generate_pixel_samples_without_filter(

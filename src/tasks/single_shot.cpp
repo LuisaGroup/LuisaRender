@@ -69,7 +69,7 @@ void SingleShot::_execute() {
     
     std::vector<float> time_sample_buckets(_shutter_samples);
     for (auto i = 0u; i < time_sample_buckets.size(); i++) {
-        time_sample_buckets[i] = lerp(_shutter_open, _shutter_close, (i + std::uniform_real_distribution{0.0f, 1.0f}(random_engine)) / time_sample_buckets.size());
+        time_sample_buckets[i] = math::lerp(_shutter_open, _shutter_close, (i + std::uniform_real_distribution{0.0f, 1.0f}(random_engine)) / time_sample_buckets.size());
     }
     std::vector<uint> time_sample_counts(_shutter_samples, 0u);
     for (auto i = 0u; i < spp; i++) { time_sample_counts[std::uniform_int_distribution{0u, _shutter_samples - 1u}(random_engine)]++; }

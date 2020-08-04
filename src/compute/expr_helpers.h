@@ -6,6 +6,17 @@
 
 #include <compute/function.h>
 
+// binary operators for Variable in global namespace
+#define MAKE_VARIABLE_BINARY_OPERATOR_IMPL(op)                                       \
+template<typename T, luisa::dsl::detail::EnableIfLiteralOperand<T> = 0>              \
+[[nodiscard]] inline auto operator op(T &&lhs, luisa::dsl::Variable rhs) noexcept {  \
+    return rhs.function()->literal(std::forward<T>(lhs)).operator op(rhs);           \
+}                                                                                    \
+
+LUISA_MAP_MACRO(MAKE_VARIABLE_BINARY_OPERATOR_IMPL, +, -, *, /, %, <<, >>, &, |, ^, &&, ||, ==, !=, <, >, <=, >=)
+
+#undef MAKE_VARIABLE_BINARY_OPERATOR_IMPL
+
 namespace luisa::dsl {
 
 // binary and assignment operators for Variable
@@ -15,20 +26,13 @@ template<typename T, detail::EnableIfLiteralOperand<T>>                       \
     return this->operator op(_function->literal(std::forward<T>(rhs)));       \
 }                                                                             \
 
-#define MAKE_VARIABLE_BINARY_OPERATOR_IMPL(op)                                \
-template<typename T, detail::EnableIfLiteralOperand<T>>                       \
-[[nodiscard]] inline Variable operator op(T &&lhs, Variable rhs) noexcept {   \
-    return rhs.function()->literal(std::forward<T>(lhs)).operator op(rhs);    \
-}                                                                             \
-
 #define MAKE_VARIABLE_ASSIGNMENT_OPERATOR_IMPL(op)                            \
 template<typename T, detail::EnableIfLiteralOperand<T>>                       \
 inline void Variable::operator op(T &&rhs) const noexcept{                    \
     this->operator op(_function->literal(std::forward<T>(rhs)));              \
 }                                                                             \
 
-LUISA_MAP_MACRO(MAKE_VARIABLE_BINARY_OPERATOR_IMPL, +, -, *, /, %, <<, >>, &, |, ^, &&, ||, ==, !=, <,>, <=, >=)
-LUISA_MAP_MACRO(MAKE_VARIABLE_MEMBER_BINARY_OPERATOR_IMPL, +, -, *, /, %, <<, >>, &, |, ^, &&, ||, ==, !=, <,>, <=, >=, [])
+LUISA_MAP_MACRO(MAKE_VARIABLE_MEMBER_BINARY_OPERATOR_IMPL, +, -, *, /, %, <<, >>, &, |, ^, &&, ||, ==, !=, <, >, <=, >=, [])
 LUISA_MAP_MACRO(MAKE_VARIABLE_ASSIGNMENT_OPERATOR_IMPL, =, +=, -=, *=, /=, %=, &=, |=, ^=, <<=, >>=)
 
 #undef MAKE_VARIABLE_BINARY_OPERATOR_IMPL
@@ -36,15 +40,27 @@ LUISA_MAP_MACRO(MAKE_VARIABLE_ASSIGNMENT_OPERATOR_IMPL, =, +=, -=, *=, /=, %=, &
 #undef MAKE_VARIABLE_ASSIGNMENT_OPERATOR_IMPL
 
 // built-in functions
-#define MAP_VARIABLE_NAME_TO_ARGUMENT_DEF(name) Variable name
+#define MAP_VARIABLE_NAME_TO_ARGUMENT_DEF(name) LiteralExpr::Value name
 #define MAP_VARIABLE_NAMES_TO_ARGUMENT_LIST(...) LUISA_MAP_MACRO_LIST(MAP_VARIABLE_NAME_TO_ARGUMENT_DEF, __VA_ARGS__)
 
-#define MAKE_BUILTIN_FUNCTION_DEF(func, ...)                                       \
-inline Variable func(MAP_VARIABLE_NAMES_TO_ARGUMENT_LIST(__VA_ARGS__)) {           \
-    std::vector<Variable> args{__VA_ARGS__};                                       \
-    auto f = args.front().function();                                              \
-    return f->add_expression(std::make_unique<CallExpr>(#func, std::move(args)));  \
-}                                                                                  \
+#define MAP_VARIABLE_NAME_TO_VARIABLE(name) f->literal(name)
+#define MAP_VARIABLE_NAMES_TO_VARIABLE_LIST(...) LUISA_MAP_MACRO_LIST(MAP_VARIABLE_NAME_TO_VARIABLE, __VA_ARGS__)
+
+#define MAKE_BUILTIN_FUNCTION_DEF(func, ...)                                                 \
+inline Variable func(MAP_VARIABLE_NAMES_TO_ARGUMENT_LIST(__VA_ARGS__)) {                     \
+    Function *f = nullptr;                                                                   \
+    for (auto &&v : {__VA_ARGS__}) {                                                         \
+        std::visit([&f](auto &&v) {                                                          \
+            using T = std::decay_t<decltype(v)>;                                             \
+            if constexpr (std::is_same_v<T, Variable>) {                                     \
+                f = v.function();                                                            \
+            }                                                                                \
+        }, v);                                                                               \
+    }                                                                                        \
+    LUISA_ERROR_IF(f == nullptr, "No given argument is of type \"luisa::dsl::Variable\".");  \
+    std::vector<Variable> args{MAP_VARIABLE_NAMES_TO_VARIABLE_LIST(__VA_ARGS__)};            \
+    return f->add_expression(std::make_unique<CallExpr>(#func , std::move(args)));           \
+}                                                                                            \
 
 MAKE_BUILTIN_FUNCTION_DEF(select, cond, tv, fv)
 MAKE_BUILTIN_FUNCTION_DEF(sin, x)
@@ -130,6 +146,8 @@ MAKE_BUILTIN_FUNCTION_DEF(transpose, TRANSPOSE, m)
 #undef MAKE_BUILTIN_FUNCTION_DEF
 #undef MAP_VARIABLE_NAMES_TO_ARGUMENT_LIST
 #undef MAP_VARIABLE_NAME_TO_ARGUMENT_DEF
+#undef MAP_VARIABLE_NAMES_TO_ARGUMENT_LIST
+#undef MAP_VARIABLE_NAME_TO_VARIABLE
 
 template<typename T>
 [[nodiscard]] inline Variable cast(Variable v) {

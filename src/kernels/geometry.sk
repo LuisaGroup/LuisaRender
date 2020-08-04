@@ -1,6 +1,7 @@
 #include <render/geometry.h>
 
 using namespace luisa;
+using namespace luisa::math;
 using namespace luisa::geometry;
 
 LUISA_KERNEL void evaluate_interactions(

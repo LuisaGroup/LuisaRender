@@ -1,6 +1,7 @@
 #include <render/film.h>
 
 using namespace luisa;
+using namespace luisa::math;
 using namespace luisa::film;
 
 LUISA_KERNEL void accumulate_tile(
