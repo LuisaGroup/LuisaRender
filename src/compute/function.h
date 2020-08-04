@@ -93,11 +93,12 @@ public:
     template<typename T, typename ...Literals>
     [[nodiscard]] Variable var(Literals &&...vs) noexcept { return _var_or_const<T, false>(std::forward<Literals>(vs)...); }
     
-    template<typename ...Literals>
-    [[nodiscard]] Variable var(Literals &&...vs) noexcept { return _var_or_const<Auto, false>(std::forward<Literals>(vs)...); }
+    [[nodiscard]] Variable var(LiteralExpr::Value v) noexcept { return _var_or_const<Auto, false>(std::move(v)); }
     
     template<typename T, typename ...Literals>
     [[nodiscard]] Variable constant(Literals &&...vs) noexcept { return _var_or_const<T, true>(std::forward<Literals>(vs)...); }
+    
+    [[nodiscard]] Variable constant(LiteralExpr::Value v) noexcept { return _var_or_const<Auto, true>(std::move(v)); }
     
     [[nodiscard]] Variable add_expression(std::unique_ptr<Expression> expr) noexcept {
         return Variable{_expressions.emplace_back(std::move(expr)).get()};

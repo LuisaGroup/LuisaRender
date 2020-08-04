@@ -27,7 +27,7 @@ int main(int argc, char *argv[]) {
     
     auto sample_1d = LUISA_LAMBDA(Copy<float> u, Ref lut) {
         
-        auto p = $var(0u);
+        auto p = $var<int32_t>(0);
         auto count = $var(static_cast<int32_t>(TABLE_SIZE));
         While(count > 0, [&] {
             auto step = $var(count / 2);
