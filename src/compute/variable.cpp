@@ -11,19 +11,19 @@
 
 namespace luisa::dsl {
 
-Variable::Variable(Function *func, const TypeDesc *type, BuiltinVariable tag) noexcept
-    : _function{func}, _type{type}, _builtin_tag{tag} {}
+Variable::Variable(const TypeDesc *type, BuiltinVariable tag) noexcept
+    : _type{type}, _builtin_tag{tag} {}
 
-Variable::Variable(Function *func, const TypeDesc *type, uint32_t uid) noexcept
-    : _function{func}, _type{type}, _uid{uid} {}
+Variable::Variable(const TypeDesc *type, uint32_t uid) noexcept
+    : _type{type}, _uid{uid} {}
 
 Variable::Variable(Expression *expr) noexcept
-    : _function{expr->function()}, _expression{expr} {}
+    : _expression{expr} {}
 
-#define MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD_IMPL(op, op_tag)                                    \
-Variable Variable::operator op(Variable rhs) const noexcept {                                      \
-    return _function->add_expression(std::make_unique<BinaryExpr>(BinaryOp::op_tag, *this, rhs));  \
-}                                                                                                  \
+#define MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD_IMPL(op, op_tag)                                             \
+Variable Variable::operator op(Variable rhs) const noexcept {                                               \
+    return Function::current().add_expression(std::make_unique<BinaryExpr>(BinaryOp::op_tag, *this, rhs));  \
+}                                                                                                           \
 
 #define MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD(op_and_tag) \
 MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD_IMPL op_and_tag
@@ -39,10 +39,10 @@ LUISA_MAP_MACRO(
 #undef MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD
 #undef MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD_IMPL
 
-#define MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD_IMPL(op, op_tag)                                   \
-void Variable::operator op(Variable rhs) const noexcept {                                         \
-    Void(_function->add_expression(std::make_unique<BinaryExpr>(BinaryOp::op_tag, *this, rhs)));  \
-}                                                                                                 \
+#define MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD_IMPL(op, op_tag)                                            \
+void Variable::operator op(Variable rhs) const noexcept {                                                  \
+    Void(Function::current().add_expression(std::make_unique<BinaryExpr>(BinaryOp::op_tag, *this, rhs)));  \
+}                                                                                                          \
 
 #define MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD(op_and_tag) \
 MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD_IMPL op_and_tag
@@ -55,13 +55,13 @@ LUISA_MAP_MACRO(MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD,
 #undef MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD
 #undef MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD_IMPL
 
-Variable Variable::member(std::string m) const noexcept { return _function->add_expression(std::make_unique<MemberExpr>(*this, std::move(m))); }
+Variable Variable::member(std::string m) const noexcept { return Function::current().add_expression(std::make_unique<MemberExpr>(*this, std::move(m))); }
 
-Variable Variable::operator+() const noexcept { return _function->add_expression(std::make_unique<UnaryExpr>(UnaryOp::PLUS, *this)); }
-Variable Variable::operator-() const noexcept { return _function->add_expression(std::make_unique<UnaryExpr>(UnaryOp::MINUS, *this)); }
-Variable Variable::operator~() const noexcept { return _function->add_expression(std::make_unique<UnaryExpr>(UnaryOp::BIT_NOT, *this)); }
-Variable Variable::operator!() const noexcept { return _function->add_expression(std::make_unique<UnaryExpr>(UnaryOp::NOT, *this)); }
-Variable Variable::operator*() const noexcept { return _function->add_expression(std::make_unique<UnaryExpr>(UnaryOp::DEREFERENCE, *this)); }
-Variable Variable::operator&() const noexcept { return _function->add_expression(std::make_unique<UnaryExpr>(UnaryOp::ADDRESS_OF, *this)); }
+Variable Variable::operator+() const noexcept { return Function::current().add_expression(std::make_unique<UnaryExpr>(UnaryOp::PLUS, *this)); }
+Variable Variable::operator-() const noexcept { return Function::current().add_expression(std::make_unique<UnaryExpr>(UnaryOp::MINUS, *this)); }
+Variable Variable::operator~() const noexcept { return Function::current().add_expression(std::make_unique<UnaryExpr>(UnaryOp::BIT_NOT, *this)); }
+Variable Variable::operator!() const noexcept { return Function::current().add_expression(std::make_unique<UnaryExpr>(UnaryOp::NOT, *this)); }
+Variable Variable::operator*() const noexcept { return Function::current().add_expression(std::make_unique<UnaryExpr>(UnaryOp::DEREFERENCE, *this)); }
+Variable Variable::operator&() const noexcept { return Function::current().add_expression(std::make_unique<UnaryExpr>(UnaryOp::ADDRESS_OF, *this)); }
     
 }

@@ -26,13 +26,15 @@ private:
     uint32_t _used_builtins{0u};
     uint32_t _uid_counter{0u};
     
+    inline static thread_local Function *_current{nullptr};
+    
     [[nodiscard]] uint32_t _get_uid() noexcept { return _uid_counter++; }
     
     template<typename T>
     [[nodiscard]] Variable _builtin_var(BuiltinVariable tag) noexcept {
         auto type = type_desc<T>;
         _use_type(type);
-        Variable v{this, type, tag};
+        Variable v{type, tag};
         if (auto bit = static_cast<uint32_t>(tag); (_used_builtins & bit) == 0u) {
             _used_builtins |= bit;
             _builtin_vars.emplace_back(v);
@@ -54,13 +56,17 @@ private:
     [[nodiscard]] Variable _var_or_const(Literals &&...vs) noexcept {
         auto type = type_desc<T>;
         _use_type(type);
-        Variable v{this, type, _get_uid()};
+        Variable v{type, _get_uid()};
         add_statement(std::make_unique<DeclareStmt>(v, literal(std::forward<Literals>(vs)...), is_const));
         return v;
     }
 
 public:
-    explicit Function(std::string name) noexcept: _name{std::move(name)} {}
+    explicit Function(std::string name) noexcept: _name{std::move(name)} {
+        _current = this;
+    }
+    
+    [[nodiscard]] static Function &current() noexcept { return *_current; }
     
     [[nodiscard]] const std::string &name() const noexcept { return _name; }
     
@@ -68,14 +74,14 @@ public:
     [[nodiscard]] Variable arg() noexcept {
         auto type = type_desc<T>;
         _use_type(type);
-        return _arguments.emplace_back(this, type, _get_uid());
+        return _arguments.emplace_back(type, _get_uid());
     }
     
     template<typename ...Literals,
         std::enable_if_t<std::conjunction_v<std::is_convertible<Literals, LiteralExpr::Value>...>, int> = 0>
     [[nodiscard]] Variable literal(Literals &&...vs) noexcept {
         std::vector<LiteralExpr::Value> values{std::forward<Literals>(vs)...};
-        return add_expression(std::make_unique<LiteralExpr>(this, std::move(values)));
+        return add_expression(std::make_unique<LiteralExpr>(std::move(values)));
     }
     
     template<typename Container,
@@ -127,7 +133,7 @@ public:
 
 template<typename T>
 struct LambdaArgument : public Variable {
-    LambdaArgument(Variable v) noexcept: Variable{v.function()->var<T>(v)} {}
+    LambdaArgument(Variable v) noexcept: Variable{Function::current().var<T>(v)} {}
 };
 
 // Used for arguments passed by value
@@ -139,11 +145,6 @@ using Ref = Variable;
 
 #define Copy Copy
 #define Ref Ref
-
-#define $arg f.arg
-#define $var f.var
-#define $$ f.literal
-#define $let f.constant
 
 #define LUISA_FUNC        [&](Function &f)
 #define LUISA_LAMBDA(...) [&](Function &f, __VA_ARGS__)

@@ -13,16 +13,8 @@ namespace luisa::dsl {
 
 struct ExprVisitor;
 
-class Expression {
-
-private:
-    Function *_function;
-
-public:
+struct Expression {
     virtual ~Expression() noexcept = default;
-    explicit Expression(Function *func) noexcept: _function{func} {}
-    [[nodiscard]] Function *function() const noexcept { return _function; }
-    
     virtual void accept(ExprVisitor &) const = 0;
 };
 
@@ -63,9 +55,7 @@ private:
     UnaryOp _op;
 
 public:
-    UnaryExpr(UnaryOp op, Variable operand) noexcept
-        : Expression{operand.function()}, _operand{std::move(operand)}, _op{op} {}
-    
+    UnaryExpr(UnaryOp op, Variable operand) noexcept: _operand{std::move(operand)}, _op{op} {}
     [[nodiscard]] Variable operand() const noexcept { return _operand; }
     [[nodiscard]] UnaryOp op() const noexcept { return _op; }
     MAKE_EXPRESSION_ACCEPT_VISITOR()
@@ -99,7 +89,7 @@ private:
 
 public:
     BinaryExpr(BinaryOp op, Variable lhs, Variable rhs) noexcept
-        : Expression{lhs.function()}, _op{op}, _lhs{std::move(lhs)}, _rhs{std::move(rhs)} {}
+        : _op{op}, _lhs{std::move(lhs)}, _rhs{std::move(rhs)} {}
     
     [[nodiscard]] Variable lhs() const noexcept { return _lhs; }
     [[nodiscard]] Variable rhs() const noexcept { return _rhs; }
@@ -114,7 +104,7 @@ private:
     std::string _member;
 
 public:
-    MemberExpr(Variable self, std::string member) noexcept: Expression{self.function()}, _self{self}, _member{std::move(member)} {}
+    MemberExpr(Variable self, std::string member) noexcept: _self{self}, _member{std::move(member)} {}
     [[nodiscard]] Variable self() const noexcept { return _self; }
     [[nodiscard]] const std::string &member() const noexcept { return _member; }
     MAKE_EXPRESSION_ACCEPT_VISITOR()
@@ -129,8 +119,7 @@ private:
     std::vector<Value> _values;
 
 public:
-    LiteralExpr(Function *f, std::vector<Value> values) noexcept
-        : Expression{f}, _values{std::move(values)} {}
+    explicit LiteralExpr(std::vector<Value> values) noexcept : _values{std::move(values)} {}
     
     [[nodiscard]] const std::vector<Value> &values() const noexcept { return _values; }
     MAKE_EXPRESSION_ACCEPT_VISITOR()
@@ -144,7 +133,7 @@ private:
 
 public:
     CallExpr(std::string name, std::vector<Variable> args) noexcept
-        : Expression{args.front().function()}, _name{std::move(name)}, _arguments{std::move(args)} {}
+        : _name{std::move(name)}, _arguments{std::move(args)} {}
     
     [[nodiscard]] const std::string &name() const noexcept { return _name; }
     [[nodiscard]] const std::vector<Variable> &arguments() const noexcept { return _arguments; }
@@ -166,7 +155,7 @@ private:
 
 public:
     CastExpr(CastOp op, Variable src, const TypeDesc *dest) noexcept
-        : Expression{src.function()}, _op{op}, _source{std::move(src)}, _dest_type{dest} {}
+        : _op{op}, _source{std::move(src)}, _dest_type{dest} {}
     [[nodiscard]] CastOp op() const noexcept { return _op; }
     [[nodiscard]] Variable source() const noexcept { return _source; }
     [[nodiscard]] const TypeDesc *dest_type() const noexcept { return _dest_type; }

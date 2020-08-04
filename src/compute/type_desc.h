@@ -102,7 +102,7 @@ struct Scalar {
 };
 
 template<typename T>
-struct Const {
+struct Constant {
     [[nodiscard]] static const TypeDesc *desc() noexcept {
         static TypeDesc d{.type = TypeCatalog::CONST, .element_type = T::desc()};
         return &d;
@@ -200,7 +200,7 @@ struct MakeTypeDescImpl<T *> {
 
 template<typename T>
 struct MakeTypeDescImpl<const T> {
-    using Desc = Const<typename MakeTypeDescImpl<T>::Desc>;
+    using Desc = Constant<typename MakeTypeDescImpl<T>::Desc>;
 };
 
 template<typename T>

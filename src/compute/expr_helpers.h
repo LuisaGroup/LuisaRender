@@ -6,14 +6,30 @@
 
 #include <compute/function.h>
 
+namespace luisa::dsl {
+
+template<typename ...Args>
+inline Variable literal(Args &&...args) noexcept {
+    return Function::current().literal(std::forward<Args>(args)...);
+}
+
+[[nodiscard]] inline Variable thread_id() noexcept {
+    return Function::current().thread_id();
+}
+
+#define literal   literal
+#define thread_id thread_id
+
+}
+
 // binary operators for Variable in global namespace
 #define MAKE_VARIABLE_BINARY_OPERATOR_IMPL(op)                                       \
 template<typename T, luisa::dsl::detail::EnableIfLiteralOperand<T> = 0>              \
 [[nodiscard]] inline auto operator op(T &&lhs, luisa::dsl::Variable rhs) noexcept {  \
-    return rhs.function()->literal(std::forward<T>(lhs)).operator op(rhs);           \
+    return luisa::dsl::literal(std::forward<T>(lhs)).operator op(rhs);               \
 }                                                                                    \
 
-LUISA_MAP_MACRO(MAKE_VARIABLE_BINARY_OPERATOR_IMPL, +, -, *, /, %, <<, >>, &, |, ^, &&, ||, ==, !=, <, >, <=, >=)
+LUISA_MAP_MACRO(MAKE_VARIABLE_BINARY_OPERATOR_IMPL, +, -, *, /, %, <<, >>, &, |, ^, &&, ||, ==, !=, <,>, <=, >=)
 
 #undef MAKE_VARIABLE_BINARY_OPERATOR_IMPL
 
@@ -23,16 +39,16 @@ namespace luisa::dsl {
 #define MAKE_VARIABLE_MEMBER_BINARY_OPERATOR_IMPL(op)                         \
 template<typename T, detail::EnableIfLiteralOperand<T>>                       \
 [[nodiscard]] inline Variable Variable::operator op(T &&rhs) const noexcept{  \
-    return this->operator op(_function->literal(std::forward<T>(rhs)));       \
+    return this->operator op(literal(std::forward<T>(rhs)));                  \
 }                                                                             \
 
 #define MAKE_VARIABLE_ASSIGNMENT_OPERATOR_IMPL(op)                            \
 template<typename T, detail::EnableIfLiteralOperand<T>>                       \
 inline void Variable::operator op(T &&rhs) const noexcept{                    \
-    this->operator op(_function->literal(std::forward<T>(rhs)));              \
+    this->operator op(literal(std::forward<T>(rhs)));                         \
 }                                                                             \
 
-LUISA_MAP_MACRO(MAKE_VARIABLE_MEMBER_BINARY_OPERATOR_IMPL, +, -, *, /, %, <<, >>, &, |, ^, &&, ||, ==, !=, <, >, <=, >=, [])
+LUISA_MAP_MACRO(MAKE_VARIABLE_MEMBER_BINARY_OPERATOR_IMPL, +, -, *, /, %, <<, >>, &, |, ^, &&, ||, ==, !=, <,>, <=, >=, [])
 LUISA_MAP_MACRO(MAKE_VARIABLE_ASSIGNMENT_OPERATOR_IMPL, =, +=, -=, *=, /=, %=, &=, |=, ^=, <<=, >>=)
 
 #undef MAKE_VARIABLE_BINARY_OPERATOR_IMPL
@@ -43,24 +59,15 @@ LUISA_MAP_MACRO(MAKE_VARIABLE_ASSIGNMENT_OPERATOR_IMPL, =, +=, -=, *=, /=, %=, &
 #define MAP_VARIABLE_NAME_TO_ARGUMENT_DEF(name) LiteralExpr::Value name
 #define MAP_VARIABLE_NAMES_TO_ARGUMENT_LIST(...) LUISA_MAP_MACRO_LIST(MAP_VARIABLE_NAME_TO_ARGUMENT_DEF, __VA_ARGS__)
 
-#define MAP_VARIABLE_NAME_TO_VARIABLE(name) f->literal(name)
+#define MAP_VARIABLE_NAME_TO_VARIABLE(name) literal(name)
 #define MAP_VARIABLE_NAMES_TO_VARIABLE_LIST(...) LUISA_MAP_MACRO_LIST(MAP_VARIABLE_NAME_TO_VARIABLE, __VA_ARGS__)
 
-#define MAKE_BUILTIN_FUNCTION_DEF(func, ...)                                                 \
-inline Variable func(MAP_VARIABLE_NAMES_TO_ARGUMENT_LIST(__VA_ARGS__)) {                     \
-    Function *f = nullptr;                                                                   \
-    for (auto &&v : {__VA_ARGS__}) {                                                         \
-        std::visit([&f](auto &&v) {                                                          \
-            using T = std::decay_t<decltype(v)>;                                             \
-            if constexpr (std::is_same_v<T, Variable>) {                                     \
-                f = v.function();                                                            \
-            }                                                                                \
-        }, v);                                                                               \
-    }                                                                                        \
-    LUISA_ERROR_IF(f == nullptr, "No given argument is of type \"luisa::dsl::Variable\".");  \
-    std::vector<Variable> args{MAP_VARIABLE_NAMES_TO_VARIABLE_LIST(__VA_ARGS__)};            \
-    return f->add_expression(std::make_unique<CallExpr>(#func , std::move(args)));           \
-}                                                                                            \
+#define MAKE_BUILTIN_FUNCTION_DEF(func, ...)                                       \
+inline Variable func(MAP_VARIABLE_NAMES_TO_ARGUMENT_LIST(__VA_ARGS__)) {           \
+    auto &&f = Function::current();                                                \
+    std::vector<Variable> args{MAP_VARIABLE_NAMES_TO_VARIABLE_LIST(__VA_ARGS__)};  \
+    return f.add_expression(std::make_unique<CallExpr>(#func, std::move(args)));   \
+}                                                                                  \
 
 MAKE_BUILTIN_FUNCTION_DEF(select, cond, tv, fv)
 MAKE_BUILTIN_FUNCTION_DEF(sin, x)
@@ -151,22 +158,22 @@ MAKE_BUILTIN_FUNCTION_DEF(transpose, TRANSPOSE, m)
 
 template<typename T>
 [[nodiscard]] inline Variable cast(Variable v) {
-    return v.function()->add_expression(std::make_unique<CastExpr>(CastOp::STATIC, v, type_desc<T>));
+    return Function::current().add_expression(std::make_unique<CastExpr>(CastOp::STATIC, v, type_desc<T>));
 }
 
 template<typename T>
 [[nodiscard]] inline Variable reinterpret(Variable v) {
-    return v.function()->add_expression(std::make_unique<CastExpr>(CastOp::REINTERPRET, v, type_desc<T>));
+    return Function::current().add_expression(std::make_unique<CastExpr>(CastOp::REINTERPRET, v, type_desc<T>));
 }
 
 template<typename T>
 [[nodiscard]] inline Variable bitcast(Variable v) {
-    return v.function()->add_expression(std::make_unique<CastExpr>(CastOp::BITWISE, v, type_desc<T>));
+    return Function::current().add_expression(std::make_unique<CastExpr>(CastOp::BITWISE, v, type_desc<T>));
 }
 
 // Define macros just for highlighting...
-#define cast cast
+#define cast        cast
 #define reinterpret reinterpret
-#define bitcast bitcast
+#define bitcast     bitcast
 
 }

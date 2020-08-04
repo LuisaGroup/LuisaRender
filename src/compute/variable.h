@@ -31,8 +31,6 @@ using EnableIfLiteralOperand = std::enable_if_t<
 class Variable {
 
 protected:
-    Function *_function{nullptr};
-    
     // For variable declarations
     const TypeDesc *_type{nullptr};
     uint32_t _uid{0u};
@@ -44,13 +42,12 @@ protected:
     Expression *_expression{nullptr};
 
 public:
-    Variable(Function *func, const TypeDesc *type, uint32_t uid) noexcept;
-    Variable(Function *func, const TypeDesc *type, BuiltinVariable tag) noexcept;
+    Variable(const TypeDesc *type, uint32_t uid) noexcept;
+    Variable(const TypeDesc *type, BuiltinVariable tag) noexcept;
     explicit Variable(Expression *expr) noexcept;
     Variable(Variable &&) = default;
     Variable(const Variable &) = default;
     
-    [[nodiscard]] Function *function() const noexcept { return _function; }
     [[nodiscard]] Expression *expression() const noexcept { return _expression; }
     [[nodiscard]] const TypeDesc *type() const noexcept { return _type; }
     [[nodiscard]] uint32_t uid() const noexcept { return _uid; }
