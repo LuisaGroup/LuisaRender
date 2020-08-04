@@ -129,9 +129,11 @@ struct LambdaArgument : public Variable {
     LambdaArgument(Variable v) noexcept: Variable{v.function()->var<T>(v)} {}
 };
 
+// Used for arguments passed by value
 template<typename T>
 using Copy = LambdaArgument<T>;
 
+// Used for arguments passed by value
 using Ref = Variable;
 
 #define LUISA_FUNC        [&](Function &f)

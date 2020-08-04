@@ -13,7 +13,7 @@ class Device;
 
 namespace luisa::dsl {
 
-class Codegen {
+class Codegen : Noncopyable {
 
 protected:
     std::ostream &_os;
@@ -30,7 +30,7 @@ public:
 class CppCodegen : public Codegen, public ExprVisitor, public StmtVisitor {
 
 protected:
-    mutable int32_t _indent{0};
+    int32_t _indent{0};
     
     virtual void _emit_indent();
     virtual void _emit_function_decl(const Function &f);

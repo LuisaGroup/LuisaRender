@@ -53,20 +53,26 @@ public:
     [[nodiscard]] Variable $(std::string m) const noexcept { return member(std::move(m)); }
     [[nodiscard]] Variable p$(std::string m) const noexcept { return arrow(std::move(m)); }
     
+    // Convenient methods for accessing vector members
+    [[nodiscard]] Variable x() const noexcept { return $("x"); }
+    [[nodiscard]] Variable y() const noexcept { return $("y"); }
+    [[nodiscard]] Variable z() const noexcept { return $("z"); }
+    [[nodiscard]] Variable w() const noexcept { return $("w"); }
+    
     [[nodiscard]] Variable operator~() const noexcept;
     [[nodiscard]] Variable operator!() const noexcept;
     [[nodiscard]] Variable operator*() const noexcept;
     [[nodiscard]] Variable operator&() const noexcept;
-    [[nodiscard("Use \"void_(++x)\" to add it into function statements.")]] Variable operator++() const noexcept;
-    [[nodiscard("Use \"void_(--x)\" to add it into function statements.")]] Variable operator--() const noexcept;
-    [[nodiscard("Use \"void_(x++)\" to add it into function statements.")]] Variable operator++(int) const noexcept;
-    [[nodiscard("Use \"void_(x--)\" to add it into function statements.")]] Variable operator--(int) const noexcept;
+    [[nodiscard("Use \"Void(++x)\" to add it into function statements.")]] Variable operator++() const noexcept;
+    [[nodiscard("Use \"Void(--x)\" to add it into function statements.")]] Variable operator--() const noexcept;
+    [[nodiscard("Use \"Void(x++)\" to add it into function statements.")]] Variable operator++(int) const noexcept;
+    [[nodiscard("Use \"Void(x--)\" to add it into function statements.")]] Variable operator--(int) const noexcept;
 
 #define MAKE_BINARY_OPERATOR_DECL(op) [[nodiscard]] Variable operator op(Variable rhs) const noexcept;
     LUISA_MAP_MACRO(MAKE_BINARY_OPERATOR_DECL, +, -, *, /, %, <<, >>, &, |, ^, &&, ||, ==, !=, <,>, <=, >=, [])
 #undef MAKE_BINARY_OPERATOR_DECL
 
-#define MAKE_ASSIGNMENT_OPERATOR_DECL(op) [[nodiscard("Use \"void_(lhs " #op " rhs)\" to add it into function statements.")]] Variable operator op(Variable rhs) const noexcept;
+#define MAKE_ASSIGNMENT_OPERATOR_DECL(op) [[nodiscard("Use \"Void(lhs " #op " rhs)\" to add it into function statements.")]] Variable operator op(Variable rhs) const noexcept;
     LUISA_MAP_MACRO(MAKE_ASSIGNMENT_OPERATOR_DECL, =, +=, -=, *=, /=, %=, &=, |=, ^=, <<=, >>=)
 #undef MAKE_ASSIGNMENT_OPERATOR_DECL
 

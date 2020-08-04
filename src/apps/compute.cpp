@@ -29,14 +29,14 @@ int main(int argc, char *argv[]) {
         
         auto p = f.var<Auto>(0u);
         auto count = f.var<Auto>(static_cast<int32_t>(TABLE_SIZE));
-        while_(count > f.$(0), [&]{
+        While(count > f.$(0), [&] {
             auto step = f.var<Auto>(count / f.$(2));
             auto mid = f.var<Auto>(p + step);
-            if_(lut.$("cdf")[mid] < u, [&]{
-                void_(p = mid + f.$(1));
-                void_(count -= step + f.$(1));
-            }, [&]{
-                void_(count = step);
+            If(lut.$("cdf")[mid] < u, [&] {
+                Void(p = mid + f.$(1));
+                Void(count -= step + f.$(1));
+            }, [&] {
+                Void(count = step);
             });
         });
         
@@ -68,14 +68,15 @@ int main(int argc, char *argv[]) {
         auto uniforms = f.arg<ImportanceSamplePixelsKernelUniforms>();
         
         auto tid = f.thread_id();
-        if_(tid < uniforms.$("tile").$("size").$("x") * uniforms.$("tile").$("size").$("x"), [&]{
+        auto tile = uniforms.$("tile");
+        If(tid < tile.$("size").$("x") * tile.$("size").$("x"), [&] {
             auto u = f.var<Auto>(random_buffer[tid]);
-            auto x_and_wx = f.var<Auto>(sample_1d(f, u.$("x"), lut));
-            auto y_and_wy = f.var<Auto>(sample_1d(f, u.$("y"), lut));
-            void_(pixel_location_buffer[tid] = make_float2(
-                static_cast_<float>(tid % uniforms.$("tile").$("size").$("x") + uniforms.$("tile").$("origin").$("y")) + f.$(0.5f) + x_and_wx.$("x") * uniforms.$("radius"),
-                static_cast_<float>(tid / uniforms.$("tile").$("size").$("x") + uniforms.$("tile").$("origin").$("y")) + f.$(0.5f) + y_and_wy.$("x") * uniforms.$("radius")));
-            void_(pixel_weight_buffer[tid] = make_float3(x_and_wx.$("y") * y_and_wy.$("y") * uniforms.$("scale")));
+            auto x_and_wx = f.var<Auto>(sample_1d(f, u.x(), lut));
+            auto y_and_wy = f.var<Auto>(sample_1d(f, u.y(), lut));
+            Void(pixel_location_buffer[tid] = make_float2(
+                static_cast_<float>(tid % tile.$("size").x() + tile.$("origin").y()) + f.$(0.5f) + x_and_wx.x() * uniforms.$("radius"),
+                static_cast_<float>(tid / tile.$("size").x() + tile.$("origin").y()) + f.$(0.5f) + y_and_wy.x() * uniforms.$("radius")));
+            Void(pixel_weight_buffer[tid] = make_float3(x_and_wx.$("y") * y_and_wy.$("y") * uniforms.$("scale")));
         });
     });
 }

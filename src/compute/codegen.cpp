@@ -8,6 +8,8 @@ namespace luisa::dsl {
 
 void CppCodegen::emit(const Function &f) {
     
+    _indent = 0;
+    
     // used structs
     for (auto &&s : f.used_structures()) { _emit_struct_fwd_decl(s); }
     
@@ -18,8 +20,8 @@ void CppCodegen::emit(const Function &f) {
     _emit_function_decl(f);
     
     // function body
-    _indent = 1;
     _os << "{\n";
+    _indent++;
     for (auto &&stmt : f.statements()) { stmt->accept(*this); }
     _os << "}\n\n";
 }
