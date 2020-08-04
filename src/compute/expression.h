@@ -30,7 +30,6 @@ public:
 class UnaryExpr;
 class BinaryExpr;
 class MemberExpr;
-class ArrowExpr;
 class LiteralExpr;
 class CallExpr;
 class CastExpr;
@@ -39,7 +38,6 @@ struct ExprVisitor {
     virtual void visit(const UnaryExpr &unary_expr) = 0;
     virtual void visit(const BinaryExpr &binary_expr) = 0;
     virtual void visit(const MemberExpr &member_expr) = 0;
-    virtual void visit(const ArrowExpr &arrow_expr) = 0;
     virtual void visit(const LiteralExpr &literal_expr) = 0;
     virtual void visit(const CallExpr &func_expr) = 0;
     virtual void visit(const CastExpr &cast_expr) = 0;
@@ -49,14 +47,13 @@ struct ExprVisitor {
 void accept(ExprVisitor &visitor) const override { visitor.visit(*this); }  \
 
 enum struct UnaryOp {
+    PLUS, MINUS,  // +x, -x
     NOT,          // !x
     BIT_NOT,      // ~x
     ADDRESS_OF,   // &x
-    DEREFERENCE,  // *x
-    PREFIX_INC,   // ++x
-    PREFIX_DEC,   // --x
-    POSTFIX_INC,  // x++
-    POSTFIX_DEC   // x--
+    DEREFERENCE   // *x
+    
+    // Note: We deliberately support *NO* pre- and postfix inc/dec operators to avoid possible abuse
 };
 
 class UnaryExpr : public Expression {
@@ -118,19 +115,6 @@ private:
 
 public:
     MemberExpr(Variable self, std::string member) noexcept: Expression{self.function()}, _self{self}, _member{std::move(member)} {}
-    [[nodiscard]] Variable self() const noexcept { return _self; }
-    [[nodiscard]] const std::string &member() const noexcept { return _member; }
-    MAKE_EXPRESSION_ACCEPT_VISITOR()
-};
-
-class ArrowExpr : public Expression {
-
-private:
-    Variable _self;
-    std::string _member;
-
-public:
-    ArrowExpr(Variable self, std::string member) noexcept: Expression{self.function()}, _self{self}, _member{std::move(member)} {}
     [[nodiscard]] Variable self() const noexcept { return _self; }
     [[nodiscard]] const std::string &member() const noexcept { return _member; }
     MAKE_EXPRESSION_ACCEPT_VISITOR()

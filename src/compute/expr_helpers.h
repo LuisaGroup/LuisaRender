@@ -8,6 +8,34 @@
 
 namespace luisa::dsl {
 
+// binary and assignment operators for Variable
+#define MAKE_VARIABLE_MEMBER_BINARY_OPERATOR_IMPL(op)                         \
+template<typename T, detail::EnableIfLiteralOperand<T>>                       \
+[[nodiscard]] inline Variable Variable::operator op(T &&rhs) const noexcept{  \
+    return this->operator op(_function->literal(std::forward<T>(rhs)));       \
+}                                                                             \
+
+#define MAKE_VARIABLE_BINARY_OPERATOR_IMPL(op)                                \
+template<typename T, detail::EnableIfLiteralOperand<T>>                       \
+[[nodiscard]] inline Variable operator op(T &&lhs, Variable rhs) noexcept {   \
+    return rhs.function()->literal(std::forward<T>(lhs)).operator op(rhs);    \
+}                                                                             \
+
+#define MAKE_VARIABLE_ASSIGNMENT_OPERATOR_IMPL(op)                            \
+template<typename T, detail::EnableIfLiteralOperand<T>>                       \
+inline void Variable::operator op(T &&rhs) const noexcept{                    \
+    this->operator op(_function->literal(std::forward<T>(rhs)));              \
+}                                                                             \
+
+LUISA_MAP_MACRO(MAKE_VARIABLE_BINARY_OPERATOR_IMPL, +, -, *, /, %, <<, >>, &, |, ^, &&, ||, ==, !=, <,>, <=, >=)
+LUISA_MAP_MACRO(MAKE_VARIABLE_MEMBER_BINARY_OPERATOR_IMPL, +, -, *, /, %, <<, >>, &, |, ^, &&, ||, ==, !=, <,>, <=, >=, [])
+LUISA_MAP_MACRO(MAKE_VARIABLE_ASSIGNMENT_OPERATOR_IMPL, =, +=, -=, *=, /=, %=, &=, |=, ^=, <<=, >>=)
+
+#undef MAKE_VARIABLE_BINARY_OPERATOR_IMPL
+#undef MAKE_VARIABLE_MEMBER_BINARY_OPERATOR_IMPL
+#undef MAKE_VARIABLE_ASSIGNMENT_OPERATOR_IMPL
+
+// built-in functions
 #define MAP_VARIABLE_NAME_TO_ARGUMENT_DEF(name) Variable name
 #define MAP_VARIABLE_NAMES_TO_ARGUMENT_LIST(...) LUISA_MAP_MACRO_LIST(MAP_VARIABLE_NAME_TO_ARGUMENT_DEF, __VA_ARGS__)
 
@@ -104,18 +132,23 @@ MAKE_BUILTIN_FUNCTION_DEF(transpose, TRANSPOSE, m)
 #undef MAP_VARIABLE_NAME_TO_ARGUMENT_DEF
 
 template<typename T>
-[[nodiscard]] inline Variable static_cast_(Variable v) {
+[[nodiscard]] inline Variable cast(Variable v) {
     return v.function()->add_expression(std::make_unique<CastExpr>(CastOp::STATIC, v, type_desc<T>));
 }
 
 template<typename T>
-[[nodiscard]] inline Variable reinterpret_cast_(Variable v) {
+[[nodiscard]] inline Variable reinterpret(Variable v) {
     return v.function()->add_expression(std::make_unique<CastExpr>(CastOp::REINTERPRET, v, type_desc<T>));
 }
 
 template<typename T>
-[[nodiscard]] inline Variable bitwise_cast_(Variable v) {
+[[nodiscard]] inline Variable bitcast(Variable v) {
     return v.function()->add_expression(std::make_unique<CastExpr>(CastOp::BITWISE, v, type_desc<T>));
 }
+
+// Define macros just for highlighting...
+#define cast cast
+#define reinterpret reinterpret
+#define bitcast bitcast
 
 }

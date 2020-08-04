@@ -51,7 +51,6 @@ public:
     void visit(const UnaryExpr &unary_expr) override;
     void visit(const BinaryExpr &binary_expr) override;
     void visit(const MemberExpr &member_expr) override;
-    void visit(const ArrowExpr &arrow_expr) override;
     void visit(const LiteralExpr &v) override;
     void visit(const CallExpr &call_expr) override;
     void visit(const CastExpr &cast_expr) override;

@@ -88,9 +88,6 @@ public:
         return add_expression(std::make_unique<LiteralExpr>(this, std::move(values)));
     }
     
-    template<typename ...Literals>
-    [[nodiscard]] Variable $(Literals &&...vs) noexcept { return literal(std::forward<Literals>(vs)...); }
-    
     [[nodiscard]] Variable thread_id() noexcept { return _builtin_var<uint32_t>(BuiltinVariable::THREAD_ID); }
     
     template<typename T, typename ...Literals>
@@ -135,6 +132,15 @@ using Copy = LambdaArgument<T>;
 
 // Used for arguments passed by value
 using Ref = Variable;
+
+#define Copy Copy
+#define Ref Ref
+
+#define $arg f.arg
+#define $var f.var
+#define $auto f.var<Auto>
+#define $$ f.literal
+#define $let f.constant
 
 #define LUISA_FUNC        [&](Function &f)
 #define LUISA_LAMBDA(...) [&](Function &f, __VA_ARGS__)

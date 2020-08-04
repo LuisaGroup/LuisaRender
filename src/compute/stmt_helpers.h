@@ -61,8 +61,15 @@ inline void Loop(Variable begin, Variable end, Variable step, Body &&body) {
 template<typename Body>
 inline void Loop(Variable begin, Variable end, Body &&body) {
     auto f = begin.function();
-    Loop(std::move(begin), std::move(end), f->$(1), std::forward<Body>(body));
+    Loop(std::move(begin), std::move(end), f->literal(1), std::forward<Body>(body));
 }
+
+// For highlighting...
+#define If If
+#define While While
+#define Loop Loop
+#define DoWhile DoWhile
+#define Void Void
 
 #ifndef LUISA_STMT_HELPERS_NO_CONTROL
 #define Break     f.add_break()

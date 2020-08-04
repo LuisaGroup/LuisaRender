@@ -28,6 +28,14 @@ void CppCodegen::emit(const Function &f) {
 
 void CppCodegen::visit(const UnaryExpr &unary_expr) {
     switch (unary_expr.op()) {
+        case UnaryOp::PLUS:
+            _os << "+";
+            _emit_variable(unary_expr.operand());
+            break;
+        case UnaryOp::MINUS:
+            _os << "-";
+            _emit_variable(unary_expr.operand());
+            break;
         case UnaryOp::NOT:
             _os << "!";
             _emit_variable(unary_expr.operand());
@@ -45,22 +53,6 @@ void CppCodegen::visit(const UnaryExpr &unary_expr) {
             _os << "(*";
             _emit_variable(unary_expr.operand());
             _os << ")";
-            break;
-        case UnaryOp::PREFIX_INC:
-            _os << "++";
-            _emit_variable(unary_expr.operand());
-            break;
-        case UnaryOp::PREFIX_DEC:
-            _os << "--";
-            _emit_variable(unary_expr.operand());
-            break;
-        case UnaryOp::POSTFIX_INC:
-            _emit_variable(unary_expr.operand());
-            _os << "++";
-            break;
-        case UnaryOp::POSTFIX_DEC:
-            _emit_variable(unary_expr.operand());
-            _os << "--";
             break;
         default:
             break;
@@ -174,12 +166,6 @@ void CppCodegen::visit(const MemberExpr &member_expr) {
     _os << "(";
     _emit_variable(member_expr.self());
     _os << "." << member_expr.member() << ")";
-}
-
-void CppCodegen::visit(const ArrowExpr &arrow_expr) {
-    _os << "(";
-    _emit_variable(arrow_expr.self());
-    _os << "->" << arrow_expr.member() << ")";
 }
 
 void CppCodegen::visit(const LiteralExpr &literal_expr) {
