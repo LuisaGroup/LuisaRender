@@ -14,7 +14,9 @@ namespace luisa::dsl {
 namespace detail {
 
 struct TypeDescCmp {
-    bool operator()(const TypeDesc *lhs, const TypeDesc *rhs) const noexcept { return lhs->uid < rhs->uid; }
+    bool operator()(const TypeDesc *lhs, const TypeDesc *rhs) const noexcept {
+        return lhs->uid < rhs->uid;
+    }
 };
 
 }
@@ -70,11 +72,13 @@ private:
     }
 
 public:
-    explicit Function(std::string name) noexcept: _name{std::move(name)} {
-        _current = this;
-    }
+    explicit Function(std::string name) noexcept: _name{std::move(name)} { _current = this; }
+    ~Function() noexcept { _current = nullptr; }
     
-    [[nodiscard]] static Function &current() noexcept { return *_current; }
+    [[nodiscard]] static Function &current() noexcept {
+        assert(_current != nullptr);
+        return *_current;
+    }
     
     [[nodiscard]] const std::string &name() const noexcept { return _name; }
     
