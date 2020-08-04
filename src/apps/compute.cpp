@@ -27,11 +27,11 @@ int main(int argc, char *argv[]) {
     
     auto sample_1d = LUISA_LAMBDA(Copy<float> u, Ref lut) {
         
-        auto p = $auto(0u);
-        auto count = $auto(static_cast<int32_t>(TABLE_SIZE));
+        auto p = $var(0u);
+        auto count = $var(static_cast<int32_t>(TABLE_SIZE));
         While(count > 0, [&] {
-            auto step = $auto(count / 2);
-            auto mid = $auto(p + step);
+            auto step = $var(count / 2);
+            auto mid = $var(p + step);
             If(lut.$(cdf)[mid] < u, [&] {
                 p = mid + 1;
                 count -= step + 1;
@@ -42,17 +42,17 @@ int main(int argc, char *argv[]) {
         
         constexpr auto inv_table_size = 1.0f / static_cast<float>(TABLE_SIZE);
         
-        auto lb = $auto(clamp(p, 0u, TABLE_SIZE - 1u));
-        auto cdf_lower = $auto(lut.$(cdf)[lb]);
-        auto cdf_upper = $auto(select(lb == TABLE_SIZE - 1u, 1.0f, lut.$(cdf)[lb + 1u]));
-        auto offset = $auto(
+        auto lb = $var(clamp(p, 0u, TABLE_SIZE - 1u));
+        auto cdf_lower = $var(lut.$(cdf)[lb]);
+        auto cdf_upper = $var(select(lb == TABLE_SIZE - 1u, 1.0f, lut.$(cdf)[lb + 1u]));
+        auto offset = $var(
             clamp(cast<float>(lb) + (u - cdf_lower) / (cdf_upper - cdf_lower) * inv_table_size, 0.0f, 1.0f));
         
         constexpr auto weight_table_size_float = static_cast<float>(TABLE_SIZE);
-        auto index_w = $auto(offset * weight_table_size_float);
-        auto index_w_lower = $auto(floor(index_w));
-        auto index_w_upper = $auto(ceil(index_w));
-        auto w = $auto(lerp(
+        auto index_w = $var(offset * weight_table_size_float);
+        auto index_w_lower = $var(floor(index_w));
+        auto index_w_upper = $var(ceil(index_w));
+        auto w = $var(lerp(
             lut.$(w)[cast<uint32_t>(index_w_lower)],
             select(index_w_upper >= weight_table_size_float, 0.0f, lut.$(w)[cast<uint32_t>(index_w_upper)]),
             index_w - index_w_lower));
@@ -70,9 +70,9 @@ int main(int argc, char *argv[]) {
         auto tid = f.thread_id();
         auto tile = uniforms.$(tile);
         If(tid < tile.$(size).x() * tile.$(size).y(), [&] {
-            auto u = $auto(random_buffer[tid]);
-            auto x_and_wx = $auto(sample_1d(f, u.x(), lut));
-            auto y_and_wy = $auto(sample_1d(f, u.y(), lut));
+            auto u = $var(random_buffer[tid]);
+            auto x_and_wx = $var(sample_1d(f, u.x(), lut));
+            auto y_and_wy = $var(sample_1d(f, u.y(), lut));
             pixel_location_buffer[tid] = make_float2(
                 cast<float>(tid % tile.$(size).x() + tile.$(origin).y()) + 0.5f + x_and_wx.x() * uniforms.$(radius),
                 cast<float>(tid / tile.$(size).x() + tile.$(origin).y()) + 0.5f + y_and_wy.x() * uniforms.$(radius));

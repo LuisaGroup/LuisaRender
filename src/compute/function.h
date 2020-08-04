@@ -93,6 +93,9 @@ public:
     template<typename T, typename ...Literals>
     [[nodiscard]] Variable var(Literals &&...vs) noexcept { return _var_or_const<T, false>(std::forward<Literals>(vs)...); }
     
+    template<typename ...Literals>
+    [[nodiscard]] Variable var(Literals &&...vs) noexcept { return _var_or_const<Auto, false>(std::forward<Literals>(vs)...); }
+    
     template<typename T, typename ...Literals>
     [[nodiscard]] Variable constant(Literals &&...vs) noexcept { return _var_or_const<T, true>(std::forward<Literals>(vs)...); }
     
@@ -138,7 +141,6 @@ using Ref = Variable;
 
 #define $arg f.arg
 #define $var f.var
-#define $auto f.var<Auto>
 #define $$ f.literal
 #define $let f.constant
 
