@@ -67,7 +67,7 @@ struct TypeDesc : Noncopyable {
     size_t alignment{0u};
 };
 
-struct Auto {
+struct AutoType {
     
     [[nodiscard]] static const TypeDesc *desc() noexcept {
         static TypeDesc d{.type = TypeCatalog::AUTO};
@@ -76,7 +76,7 @@ struct Auto {
     
     // For initialization type checking in Function::var<Auto>
     template<typename ...Args>
-    Auto(Args &&...) {}
+    AutoType(Args &&...) {}
 };
 
 template<typename T>
@@ -189,8 +189,8 @@ public:
 };
 
 template<>
-struct MakeTypeDescImpl<Auto> {
-    using Desc = Auto;
+struct MakeTypeDescImpl<AutoType> {
+    using Desc = AutoType;
 };
 
 template<typename T>

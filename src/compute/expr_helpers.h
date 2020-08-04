@@ -35,25 +35,17 @@ LUISA_MAP_MACRO(MAKE_VARIABLE_BINARY_OPERATOR_IMPL, +, -, *, /, %, <<, >>, &, |,
 
 namespace luisa::dsl {
 
-// binary and assignment operators for Variable
+// binary operators for Variable
 #define MAKE_VARIABLE_MEMBER_BINARY_OPERATOR_IMPL(op)                         \
 template<typename T, detail::EnableIfLiteralOperand<T>>                       \
 [[nodiscard]] inline Variable Variable::operator op(T &&rhs) const noexcept{  \
     return this->operator op(literal(std::forward<T>(rhs)));                  \
 }                                                                             \
 
-#define MAKE_VARIABLE_ASSIGNMENT_OPERATOR_IMPL(op)                            \
-template<typename T, detail::EnableIfLiteralOperand<T>>                       \
-inline void Variable::operator op(T &&rhs) const noexcept{                    \
-    this->operator op(literal(std::forward<T>(rhs)));                         \
-}                                                                             \
-
 LUISA_MAP_MACRO(MAKE_VARIABLE_MEMBER_BINARY_OPERATOR_IMPL, +, -, *, /, %, <<, >>, &, |, ^, &&, ||, ==, !=, <,>, <=, >=, [])
-LUISA_MAP_MACRO(MAKE_VARIABLE_ASSIGNMENT_OPERATOR_IMPL, =, +=, -=, *=, /=, %=, &=, |=, ^=, <<=, >>=)
 
 #undef MAKE_VARIABLE_BINARY_OPERATOR_IMPL
 #undef MAKE_VARIABLE_MEMBER_BINARY_OPERATOR_IMPL
-#undef MAKE_VARIABLE_ASSIGNMENT_OPERATOR_IMPL
 
 // built-in functions
 #define MAP_VARIABLE_NAME_TO_ARGUMENT_DEF(name) LiteralExpr::Value name

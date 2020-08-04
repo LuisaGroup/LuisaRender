@@ -56,6 +56,7 @@ public:
     [[nodiscard]] bool is_builtin() const noexcept { return _builtin_tag != BuiltinVariable::NOT_BUILTIN; }
     
     [[nodiscard]] Variable member(std::string m) const noexcept;
+    [[nodiscard]] Variable operator[](std::string m) const noexcept { return member(std::move(m)); }
     
     // Convenient methods for accessing vector members
     [[nodiscard]] Variable x() const noexcept { return member("x"); }

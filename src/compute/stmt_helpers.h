@@ -9,6 +9,17 @@
 
 namespace luisa::dsl {
 
+inline void Void(Variable v) { Function::current().add_statement(std::make_unique<ExprStmt>(v)); }
+
+#define MAKE_VARIABLE_ASSIGNMENT_OPERATOR_IMPL(op)                            \
+template<typename T, detail::EnableIfLiteralOperand<T>>                       \
+inline void Variable::operator op(T &&rhs) const noexcept{                    \
+    this->operator op(literal(std::forward<T>(rhs)));                         \
+}                                                                             \
+
+LUISA_MAP_MACRO(MAKE_VARIABLE_ASSIGNMENT_OPERATOR_IMPL, =, +=, -=, *=, /=, %=, &=, |=, ^=, <<=, >>=)
+#undef MAKE_VARIABLE_ASSIGNMENT_OPERATOR_IMPL
+
 template<typename T>
 [[nodiscard]] inline Variable arg() noexcept {
     return Function::current().arg<T>();
@@ -31,6 +42,69 @@ template<typename T, typename ...Literals>
 [[nodiscard]] inline Variable let(LiteralExpr::Value v) noexcept {
     return Function::current().constant(std::move(v));
 }
+
+#define MAKE_VARIABLE_ASSIGNMENT_OPERATOR()                                                                \
+void operator=(Variable rhs) const noexcept {                                                              \
+    Void(Function::current().add_expression(std::make_unique<BinaryExpr>(BinaryOp::ASSIGN, *this, rhs)));  \
+}                                                                                                          \
+template<typename U, detail::EnableIfLiteralOperand<U> = 0> void operator=(U &&rhs) const noexcept {       \
+    this->operator=(literal(std::forward<U>(rhs)));                                                        \
+}                                                                                                          \
+
+template<typename T>
+struct Arg : public Variable {
+    Arg() noexcept: Variable{arg<T>()} {}
+    MAKE_VARIABLE_ASSIGNMENT_OPERATOR()
+};
+
+template<typename T>
+struct Var : public Variable {
+    
+    template<typename ...Literals>
+    explicit Var(Literals &&...vs) noexcept : Variable{var<T>(std::forward<Literals>(vs)...)} {}
+    
+    MAKE_VARIABLE_ASSIGNMENT_OPERATOR()
+};
+
+using Bool = Var<bool>;
+using Float = Var<float>;
+using Int8 = Var<int8_t>;
+using UInt8 = Var<uint8_t>;
+using Int16 = Var<int16_t>;
+using UInt16 = Var<uint16_t>;
+using Int32 = Var<int32_t>;
+using UInt32 = Var<uint32_t>;
+using Int64 = Var<int64_t>;
+using UInt64 = Var<uint64_t>;
+
+struct Auto : public Variable {
+    explicit Auto(LiteralExpr::Value v) noexcept: Variable{var(std::move(v))} {}
+    MAKE_VARIABLE_ASSIGNMENT_OPERATOR()
+};
+
+template<typename T>
+struct Let : public Variable {
+    
+    template<typename ...Literals>
+    explicit Let(Literals &&...vs) noexcept : Variable{let(std::forward<Literals>(vs)...)} {}
+    
+    MAKE_VARIABLE_ASSIGNMENT_OPERATOR()
+};
+
+template<typename T>
+struct LambdaArgument : public Variable {
+    LambdaArgument(Variable v) noexcept: Variable{Function::current().var<T>(v)} {}
+    MAKE_VARIABLE_ASSIGNMENT_OPERATOR()
+};
+
+// Used for arguments passed by value
+template<typename T>
+using Copy = LambdaArgument<T>;
+
+// Used for arguments passed by value
+using Ref = Variable;
+
+#undef MAKE_VARIABLE_ASSIGNMENT_OPERATOR
 
 template<typename True, typename False,
     std::enable_if_t<std::conjunction_v<std::is_invocable<True>, std::is_invocable<False>>, int> = 0>
@@ -68,13 +142,11 @@ inline void DoWhile(Body &&body, Variable cond) {
     f.add_statement(std::make_unique<KeywordStmt>(";"));
 }
 
-inline void Void(Variable v) { Function::current().add_statement(std::make_unique<ExprStmt>(v)); }
-
 template<typename Body,
     std::enable_if_t<std::is_invocable_v<Body, Variable>, int> = 0>
 inline void Loop(Variable begin, Variable end, Variable step, Body &&body) {
     auto &&f = Function::current();
-    auto i = f.var<Auto>(begin);
+    auto i = f.var<AutoType>(begin);
     f.add_statement(std::make_unique<LoopStmt>(i, end, step));
     f.block([&] { body(i); });
 }

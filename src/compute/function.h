@@ -99,12 +99,12 @@ public:
     template<typename T, typename ...Literals>
     [[nodiscard]] Variable var(Literals &&...vs) noexcept { return _var_or_const<T, false>(std::forward<Literals>(vs)...); }
     
-    [[nodiscard]] Variable var(LiteralExpr::Value v) noexcept { return _var_or_const<Auto, false>(std::move(v)); }
+    [[nodiscard]] Variable var(LiteralExpr::Value v) noexcept { return _var_or_const<AutoType, false>(std::move(v)); }
     
     template<typename T, typename ...Literals>
     [[nodiscard]] Variable constant(Literals &&...vs) noexcept { return _var_or_const<T, true>(std::forward<Literals>(vs)...); }
     
-    [[nodiscard]] Variable constant(LiteralExpr::Value v) noexcept { return _var_or_const<Auto, true>(std::move(v)); }
+    [[nodiscard]] Variable constant(LiteralExpr::Value v) noexcept { return _var_or_const<AutoType, true>(std::move(v)); }
     
     [[nodiscard]] Variable add_expression(std::unique_ptr<Expression> expr) noexcept {
         return Variable{_expressions.emplace_back(std::move(expr)).get()};
@@ -131,22 +131,7 @@ public:
     [[nodiscard]] const std::unordered_set<const TypeDesc *> &used_structures() const noexcept { return _used_structs; }
 };
 
-template<typename T>
-struct LambdaArgument : public Variable {
-    LambdaArgument(Variable v) noexcept: Variable{Function::current().var<T>(v)} {}
-};
-
-// Used for arguments passed by value
-template<typename T>
-using Copy = LambdaArgument<T>;
-
-// Used for arguments passed by value
-using Ref = Variable;
-
-#define Copy Copy
-#define Ref Ref
-
 #define LUISA_FUNC        [&](Function &f)
-#define LUISA_LAMBDA(...) [&](Function &f, __VA_ARGS__)
+#define LUISA_LAMBDA(...) [&](__VA_ARGS__)
 
 }
