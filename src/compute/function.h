@@ -5,11 +5,19 @@
 #pragma once
 
 #include <memory>
-#include <unordered_set>
+#include <set>
 
 #include <compute/statement.h>
 
 namespace luisa::dsl {
+
+namespace detail {
+
+struct TypeDescCmp {
+    bool operator()(const TypeDesc *lhs, const TypeDesc *rhs) const noexcept { return lhs->uid < rhs->uid; }
+};
+
+}
 
 class Function {
     
@@ -21,7 +29,7 @@ private:
     std::vector<Variable> _builtin_vars;
     std::vector<std::unique_ptr<Expression>> _expressions;
     std::vector<std::unique_ptr<Statement>> _statements;
-    std::unordered_set<const TypeDesc *> _used_structs;
+    std::set<const TypeDesc *, detail::TypeDescCmp> _used_structs;
     
     uint32_t _used_builtins{0u};
     uint32_t _uid_counter{0u};
@@ -128,7 +136,7 @@ public:
     [[nodiscard]] const std::vector<Variable> &arguments() const noexcept { return _arguments; }
     [[nodiscard]] const std::vector<Variable> &builtin_variables() const noexcept { return _builtin_vars; }
     [[nodiscard]] const std::vector<std::unique_ptr<Statement>> &statements() const noexcept { return _statements; }
-    [[nodiscard]] const std::unordered_set<const TypeDesc *> &used_structures() const noexcept { return _used_structs; }
+    [[nodiscard]] const auto &used_structures() const noexcept { return _used_structs; }
 };
 
 #define LUISA_FUNC        [&](Function &f)

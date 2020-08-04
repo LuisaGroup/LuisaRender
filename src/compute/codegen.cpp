@@ -12,8 +12,6 @@ void CppCodegen::emit(const Function &f) {
     
     // used structs
     for (auto &&s : f.used_structures()) { _emit_struct_fwd_decl(s); }
-    
-    auto sorted_structs = toposort_structs(f.used_structures());
     for (auto &&s : f.used_structures()) { _emit_struct_decl(s); }  // FIXME: Topological Sorting
     
     // function head
@@ -278,14 +276,13 @@ void CppCodegen::visit(const ExprStmt &expr_stmt) {
 
 void CppCodegen::_emit_struct_decl(const TypeDesc *desc) {
     
-    auto struct_name_upper_case = desc->struct_name;
-    for (auto &&c : struct_name_upper_case) { c = static_cast<char>(std::toupper(c)); }
+    auto struct_guard = serialize("LUISA_STRUCT_DECL_STRUCT_", desc->uid);
     
     // guard begin
-    _os << "#ifndef LUISA_STRUCT_DECL_" << struct_name_upper_case << "\n"
-        << "#define LUISA_STRUCT_DECL_" << struct_name_upper_case << "\n";
+    _os << "#ifndef " << struct_guard << "\n"
+        << "#define " << struct_guard << "\n";
     
-    _os << "struct alignas(" << desc->alignment << ") " << desc->struct_name << " {";
+    _os << "struct alignas(" << desc->alignment << ") Struct$" << desc->uid << " {";
     if (!desc->member_names.empty()) { _os << "\n"; }
     
     // for each member
@@ -313,13 +310,12 @@ void CppCodegen::_emit_variable_decl(Variable v) {
 
 void CppCodegen::_emit_struct_fwd_decl(const TypeDesc *desc) {
     
-    auto struct_name_upper_case = desc->struct_name;
-    for (auto &&c : struct_name_upper_case) { c = static_cast<char>(std::toupper(c)); }
+    auto struct_guard = serialize("LUISA_STRUCT_FWD_DECL_STRUCT_", desc->uid);
     
     // guard begin
-    _os << "#ifndef LUISA_STRUCT_FWD_DECL_" << struct_name_upper_case << "\n"
-        << "#define LUISA_STRUCT_FWD_DECL_" << struct_name_upper_case << "\n"
-        << "struct " << desc->struct_name << ";\n"
+    _os << "#ifndef " << struct_guard << "\n"
+        << "#define " << struct_guard << "\n"
+        << "struct Struct$" << desc->uid << ";\n"
         << "#endif\n\n";
 }
 
@@ -444,7 +440,7 @@ void CppCodegen::_emit_type(const TypeDesc *desc) {
             _os << "&";
             break;
         case TypeCatalog::STRUCTURE:
-            _os << desc->struct_name;
+            _os << "Struct$" << desc->uid;
             break;
         default:
             _os << "[BAD]";

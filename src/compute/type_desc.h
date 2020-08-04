@@ -61,10 +61,15 @@ struct TypeDesc : Noncopyable {
     const TypeDesc *element_type{nullptr};
     
     // for structure
-    std::string struct_name;
     std::vector<std::string> member_names;
     std::vector<const TypeDesc *> member_types;
-    size_t alignment{0u};
+    uint32_t alignment{0u};
+    
+    // uid
+    uint32_t uid{_uid_counter++};
+
+private:
+    inline static uint32_t _uid_counter{1u};
 };
 
 struct AutoType {
@@ -262,8 +267,7 @@ inline const TypeDesc *type_desc = detail::MakeTypeDescImpl<T>::Desc::desc();
             static int depth = 0;                                                                \
             if (depth++ == 0) {                                                                  \
                 td.type = TypeCatalog::STRUCTURE;                                                \
-                td.struct_name = #S;                                                             \
-                td.alignment = std::alignment_of_v<S>;                                           \
+                td.alignment = static_cast<uint32_t>(std::alignment_of_v<S>);                    \
                 td.member_names.clear();                                                         \
                 td.member_types.clear();                                                         \
 
@@ -328,7 +332,7 @@ template<typename Container,
             std::is_convertible<decltype(*std::cbegin(std::declval<Container>())), const TypeDesc *>,
             std::is_convertible<decltype(*std::cend(std::declval<Container>())), const TypeDesc *>>, int> = 0>
 [[nodiscard]] inline std::vector<const TypeDesc *> toposort_structs(Container &&container) {
-    return {};
+    return {};  // TODO
 }
 
 }
