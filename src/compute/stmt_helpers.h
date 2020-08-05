@@ -106,66 +106,86 @@ using Ref = Variable;
 
 #undef MAKE_VARIABLE_ASSIGNMENT_OPERATOR
 
-template<typename True, typename False,
-    std::enable_if_t<std::conjunction_v<std::is_invocable<True>, std::is_invocable<False>>, int> = 0>
-inline void If(Variable cond, True &&true_branch, False &&false_branch) {
-    auto &&f = Function::current();
-    f.add_statement(std::make_unique<IfStmt>(cond));
-    f.block(std::forward<True>(true_branch));
-    f.add_statement(std::make_unique<KeywordStmt>("else"));
-    f.block(std::forward<False>(false_branch));
-}
+struct IfStmtBuilder {
+    
+    explicit IfStmtBuilder(Variable cond) noexcept { Function::current().add_statement(std::make_unique<IfStmt>(std::move(cond))); }
+    
+    template<typename True, std::enable_if_t<std::is_invocable_v<True>, int> = 0>
+    const IfStmtBuilder &operator<<(True &&t) const noexcept {
+        Function::current().block(std::forward<True>(t));
+        return *this;
+    }
+    
+    template<typename False, std::enable_if_t<std::is_invocable_v<False>, int> = 0>
+    void operator>>(False &&f) const noexcept {
+        Function::current().add_statement(std::make_unique<KeywordStmt>("else"));
+        Function::current().block(std::forward<False>(f));
+    }
+};
 
-template<typename True,
-    std::enable_if_t<std::is_invocable_v<True>, int> = 0>
-inline void If(Variable cond, True &&true_branch) {
-    auto &&f = Function::current();
-    f.add_statement(std::make_unique<IfStmt>(cond));
-    f.block(std::forward<True>(true_branch));
-}
+struct WhileStmtBuilder {
+    
+    explicit WhileStmtBuilder(Variable cond) noexcept { Function::current().add_statement(std::make_unique<WhileStmt>(std::move(cond))); }
+    
+    template<typename Body, std::enable_if_t<std::is_invocable_v<Body>, int> = 0>
+    void operator<<(Body &&body) const noexcept {
+        Function::current().block(std::forward<Body>(body));
+    }
+};
 
-template<typename Body,
-    std::enable_if_t<std::is_invocable_v<Body>, int> = 0>
-inline void While(Variable cond, Body &&body) {
-    auto &&f = Function::current();
-    f.add_statement(std::make_unique<WhileStmt>(cond));
-    f.block(std::forward<Body>(body));
-}
+struct LoopWhenStmtBuilder {
+    
+    LoopWhenStmtBuilder() noexcept { Function::current().add_statement(std::make_unique<KeywordStmt>("do")); }
+    
+    template<typename Body, std::enable_if_t<std::is_invocable_v<Body>, int> = 0>
+    const LoopWhenStmtBuilder &operator<<(Body &&body) const noexcept {
+        Function::current().block(std::forward<Body>(body));
+    }
+    
+    void operator>>(Variable cond) const noexcept {
+        Function::current().add_statement(std::make_unique<WhileStmt>(std::move(cond)));
+        Function::current().add_statement(std::make_unique<KeywordStmt>(";"));
+    }
+};
 
-template<typename Body,
-    std::enable_if_t<std::is_invocable_v<Body>, int> = 0>
-inline void DoWhile(Body &&body, Variable cond) {
-    auto &&f = Function::current();
-    f.add_statement(std::make_unique<KeywordStmt>("do"));
-    f.block(std::forward<Body>(body));
-    f.add_statement(std::make_unique<WhileStmt>(cond));
-    f.add_statement(std::make_unique<KeywordStmt>(";"));
-}
+class ForStmtBuilder {
 
-template<typename Body,
-    std::enable_if_t<std::is_invocable_v<Body, Variable>, int> = 0>
-inline void Loop(Variable begin, Variable end, Variable step, Body &&body) {
-    auto &&f = Function::current();
-    auto i = f.var<AutoType>(begin);
-    f.add_statement(std::make_unique<LoopStmt>(i, end, step));
-    f.block([&] { body(i); });
-}
+private:
+    Variable _i;
 
-template<typename Body>
-inline void Loop(Variable begin, Variable end, Body &&body) {
-    Loop(std::move(begin), std::move(end), literal(1), std::forward<Body>(body));
-}
+public:
+    
+    template<typename Begin, typename End, typename Step>
+    ForStmtBuilder(Begin &&begin, End &&end, Step &&step) noexcept
+        : _i{var<AutoType>(std::forward<Begin>(begin))} {
+        Function::current().add_statement(std::make_unique<LoopStmt>(_i, literal(std::forward<End>(end)), literal(std::forward<Step>(step))));
+    }
+    
+    template<typename Begin, typename End>
+    ForStmtBuilder(Begin &&begin, End &&end) noexcept
+        : ForStmtBuilder(std::forward<Begin>(begin), std::forward<End>(end), literal(1)) {}
+    
+    template<typename Body,
+        std::enable_if_t<std::is_invocable_v<Body, Variable>, int> = 0>
+    void operator<<(Body &&body) const noexcept {
+        Function::current().block([&] { body(_i); });
+    }
+};
 
 // For highlighting...
 #define arg arg
 #define var var
 #define let let
 
-#define If If
-#define While While
-#define Loop Loop
-#define DoWhile DoWhile
-#define Void Void
+#define If(...) IfStmtBuilder{__VA_ARGS__} << [&]
+#define Else    >> [&]
+
+#define While(...) WhileStmtBuilder{__VA_ARGS__} << [&]
+
+#define Loop LoopWhenStmtBuilder{} << [&]
+#define When(...) >> (__VA_ARGS__)
+
+#define For(v, ...) ForStmtBuilder{__VA_ARGS__} << [&](Variable v)
 
 inline void Break() noexcept { Function::current().add_break(); }
 inline void Continue() noexcept { Function::current().add_continue(); }

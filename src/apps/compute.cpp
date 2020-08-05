@@ -25,16 +25,16 @@ int main(int argc, char *argv[]) {
         
         Int32 p{0};
         Auto count{static_cast<int32_t>(TABLE_SIZE)};
-        While(count > 0, [&] {
+        While(count > 0) {
             Auto step{count / 2};
             Auto mid{p + step};
-            If(lut.$(cdf)[mid] < u, [&] {
+            If(lut.$(cdf)[mid] < u) {
                 p = mid + 1;
                 count -= step + 1;
-            }, [&] {
+            } Else {
                 count = step;
-            });
-        });
+            };
+        };
         
         constexpr auto inv_table_size = 1.0f / static_cast<float>(TABLE_SIZE);
         
@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
         
         auto tid = thread_id();
         auto tile = uniforms.$(tile);
-        If(tid < tile.$(size).x() * tile.$(size).y(), [&] {
+        If(tid < tile.$(size).x() * tile.$(size).y()) {
             Auto u{random_buffer[tid]};
             Auto x_and_wx{sample_1d(u.x(), lut)};
             Auto y_and_wy{sample_1d(u.y(), lut)};
@@ -73,6 +73,6 @@ int main(int argc, char *argv[]) {
                 cast<float>(tid % tile.$(size).x() + tile.$(origin).y()) + 0.5f + x_and_wx.x() * uniforms.$(radius),
                 cast<float>(tid / tile.$(size).x() + tile.$(origin).y()) + 0.5f + y_and_wy.x() * uniforms.$(radius));
             pixel_weight_buffer[tid] = make_float3(x_and_wx.y() * y_and_wy.y() * uniforms.$(scale));
-        });
+        };
     });
 }

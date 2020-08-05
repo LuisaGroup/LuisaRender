@@ -143,7 +143,7 @@ public:
     [[nodiscard]] const auto &used_structures() const noexcept { return _used_structs; }
 };
 
-#define LUISA_FUNC        [&](Function &f)
-#define LUISA_LAMBDA(...) [&](__VA_ARGS__)
+#define LUISA_FUNC   [&](Function &f)
+#define LUISA_LAMBDA [&]
 
 }
