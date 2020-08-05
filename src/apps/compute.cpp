@@ -23,8 +23,8 @@ int main(int argc, char *argv[]) {
     
     auto sample_1d = LUISA_LAMBDA(Copy<float> u, Ref lut) {
         
-        Int32 p{0};
-        Auto count{static_cast<int32_t>(TABLE_SIZE)};
+        UInt32 p{0u};
+        Auto count{static_cast<uint32_t>(TABLE_SIZE)};
         While(count > 0) {
             Auto step{count / 2};
             Auto mid{p + step};
@@ -41,8 +41,7 @@ int main(int argc, char *argv[]) {
         Auto lb{clamp(p, 0u, TABLE_SIZE - 1u)};
         Auto cdf_lower{lut.$(cdf)[lb]};
         Auto cdf_upper{select(lb == TABLE_SIZE - 1u, 1.0f, lut.$(cdf)[lb + 1u])};
-        Auto offset{
-            clamp(cast<float>(lb) + (u - cdf_lower) / (cdf_upper - cdf_lower) * inv_table_size, 0.0f, 1.0f)};
+        Auto offset{clamp(cast<float>(lb) + (u - cdf_lower) / (cdf_upper - cdf_lower) * inv_table_size, 0.0f, 1.0f)};
         
         constexpr auto weight_table_size_float = static_cast<float>(TABLE_SIZE);
         Auto index_w{offset * weight_table_size_float};

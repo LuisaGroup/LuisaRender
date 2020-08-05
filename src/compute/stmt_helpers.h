@@ -9,7 +9,7 @@
 
 namespace luisa::dsl {
 
-inline void Void(Variable v) { Function::current().add_statement(std::make_unique<ExprStmt>(v)); }
+inline void void_(Variable v) { Function::current().add_statement(std::make_unique<ExprStmt>(v)); }
 
 #define MAKE_VARIABLE_ASSIGNMENT_OPERATOR_IMPL(op)                            \
 template<typename T, detail::EnableIfLiteralOperand<T>>                       \
@@ -43,13 +43,13 @@ template<typename T, typename ...Literals>
     return Function::current().constant(std::move(v));
 }
 
-#define MAKE_VARIABLE_ASSIGNMENT_OPERATOR()                                                                \
-void operator=(Variable rhs) const noexcept {                                                              \
-    Void(Function::current().add_expression(std::make_unique<BinaryExpr>(BinaryOp::ASSIGN, *this, rhs)));  \
-}                                                                                                          \
-template<typename U, detail::EnableIfLiteralOperand<U> = 0> void operator=(U &&rhs) const noexcept {       \
-    this->operator=(literal(std::forward<U>(rhs)));                                                        \
-}                                                                                                          \
+#define MAKE_VARIABLE_ASSIGNMENT_OPERATOR()                                                                 \
+void operator=(Variable rhs) const noexcept {                                                               \
+    void_(Function::current().add_expression(std::make_unique<BinaryExpr>(BinaryOp::ASSIGN, *this, rhs)));  \
+}                                                                                                           \
+template<typename U, detail::EnableIfLiteralOperand<U> = 0> void operator=(U &&rhs) const noexcept {        \
+    this->operator=(literal(std::forward<U>(rhs)));                                                         \
+}                                                                                                           \
 
 template<typename T>
 struct Arg : public Variable {
@@ -76,24 +76,20 @@ using Int32 = Var<int32_t>;
 using UInt32 = Var<uint32_t>;
 using Int64 = Var<int64_t>;
 using UInt64 = Var<uint64_t>;
-
-struct Auto : public Variable {
-    explicit Auto(LiteralExpr::Value v) noexcept: Variable{var(std::move(v))} {}
-    MAKE_VARIABLE_ASSIGNMENT_OPERATOR()
-};
+using Auto = Var<AutoType>;
 
 template<typename T>
 struct Let : public Variable {
     
     template<typename ...Literals>
-    explicit Let(Literals &&...vs) noexcept : Variable{let(std::forward<Literals>(vs)...)} {}
+    explicit Let(Literals &&...vs) noexcept : Variable{let<T>(std::forward<Literals>(vs)...)} {}
     
     MAKE_VARIABLE_ASSIGNMENT_OPERATOR()
 };
 
 template<typename T>
 struct LambdaArgument : public Variable {
-    LambdaArgument(Variable v) noexcept: Variable{Function::current().var<T>(v)} {}
+    LambdaArgument(Variable v) noexcept: Variable{var<T>(std::move(v))} {}
     MAKE_VARIABLE_ASSIGNMENT_OPERATOR()
 };
 
@@ -158,7 +154,7 @@ public:
     template<typename Begin, typename End, typename Step>
     ForStmtBuilder(Begin &&begin, End &&end, Step &&step) noexcept
         : _i{var<AutoType>(std::forward<Begin>(begin))} {
-        Function::current().add_statement(std::make_unique<LoopStmt>(_i, literal(std::forward<End>(end)), literal(std::forward<Step>(step))));
+        Function::current().add_statement(std::make_unique<ForStmt>(_i, literal(std::forward<End>(end)), literal(std::forward<Step>(step))));
     }
     
     template<typename Begin, typename End>

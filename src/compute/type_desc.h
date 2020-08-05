@@ -22,7 +22,7 @@
 
 namespace luisa::dsl {
 
-enum struct TypeCatalog {
+enum struct TypeCatalog : uint32_t {
     
     UNKNOWN,
     
@@ -55,6 +55,7 @@ enum struct TypeCatalog {
 struct TypeDesc : Noncopyable {
     
     TypeCatalog type{TypeCatalog::UNKNOWN};
+    uint32_t size{0u};
     
     // for const, array, pointer and reference
     size_t element_count{0u};
@@ -74,23 +75,24 @@ private:
 
 struct AutoType {
     
-    [[nodiscard]] static const TypeDesc *desc() noexcept {
+    [[nodiscard]] static TypeDesc *desc() noexcept {
         static TypeDesc d{.type = TypeCatalog::AUTO};
         return &d;
     }
     
     // For initialization type checking in Function::var<Auto>
     template<typename ...Args>
-    AutoType(Args &&...) {}
+    explicit AutoType(Args &&...) {}
 };
 
 template<typename T>
 struct Scalar {
     static_assert(std::is_arithmetic_v<T>);
-    [[nodiscard]] static const TypeDesc *desc() noexcept {
+    [[nodiscard]] static TypeDesc *desc() noexcept {
         static TypeDesc td;
         static std::once_flag flag;
         std::call_once(flag, [] {
+            td.size = static_cast<uint32_t>(sizeof(T));
             if constexpr (std::is_same_v<bool, T>) { td.type = TypeCatalog::BOOL; }
             else if constexpr (std::is_same_v<float, T>) { td.type = TypeCatalog::FLOAT; }
             else if constexpr (std::is_same_v<int8_t, T>) { td.type = TypeCatalog::INT8; }
@@ -108,46 +110,49 @@ struct Scalar {
 
 template<typename T>
 struct Constant {
-    [[nodiscard]] static const TypeDesc *desc() noexcept {
-        static TypeDesc d{.type = TypeCatalog::CONST, .element_type = T::desc()};
+    [[nodiscard]] static TypeDesc *desc() noexcept {
+        static TypeDesc d{
+            .type = TypeCatalog::CONST,
+            .element_type = T::desc()
+        };
         return &d;
     }
 };
 
 struct Matrix3 {
-    [[nodiscard]] static const TypeDesc *desc() noexcept {
+    [[nodiscard]] static TypeDesc *desc() noexcept {
         static TypeDesc d{.type = TypeCatalog::MATRIX3};
         return &d;
     }
 };
 
 struct Matrix4 {
-    [[nodiscard]] static const TypeDesc *desc() noexcept {
+    [[nodiscard]] static TypeDesc *desc() noexcept {
         static TypeDesc d{.type = TypeCatalog::MATRIX4};
         return &d;
     }
 };
 
-#define MAKE_VECTOR_TYPE_DESC(n)                                                                   \
-    template<typename T>                                                                           \
-    struct Vector##n {                                                                             \
-        static_assert(std::is_arithmetic_v<T>);                                                    \
-        [[nodiscard]] static const TypeDesc *desc() noexcept {                                     \
-            static TypeDesc d{.type = TypeCatalog::VECTOR##n, .element_type = Scalar<T>::desc()};  \
-            return &d;                                                                             \
-        }                                                                                          \
+#define MAKE_VECTOR_TYPE_DESC(n, postfix)                                                           \
+    template<typename T>                                                                            \
+    struct Vector##n##postfix {                                                                     \
+        static_assert(std::is_arithmetic_v<T>);                                                     \
+        [[nodiscard]] static TypeDesc *desc() noexcept {                                            \
+            static TypeDesc d{.type = TypeCatalog::VECTOR##n, .element_type = Scalar<T>::desc()};   \
+            return &d;                                                                              \
+        }                                                                                           \
     };
 
-MAKE_VECTOR_TYPE_DESC(2)
-MAKE_VECTOR_TYPE_DESC(3)
-MAKE_VECTOR_TYPE_DESC(4)
-MAKE_VECTOR_TYPE_DESC(3_PACKED)
+MAKE_VECTOR_TYPE_DESC(2,)
+MAKE_VECTOR_TYPE_DESC(3,)
+MAKE_VECTOR_TYPE_DESC(4,)
+MAKE_VECTOR_TYPE_DESC(3, _PACKED)
 
 #undef MAKE_VECTOR_TYPE_DESC
 
 template<typename T, size_t N>
 struct Array {
-    [[nodiscard]] static const TypeDesc *desc() noexcept {
+    [[nodiscard]] static TypeDesc *desc() noexcept {
         static TypeDesc d{.type = TypeCatalog::ARRAY, .element_count = N, .element_type = T::desc()};
         return &d;
     }
@@ -155,7 +160,7 @@ struct Array {
 
 template<typename T>
 struct Pointer {
-    [[nodiscard]] static const TypeDesc *desc() noexcept {
+    [[nodiscard]] static TypeDesc *desc() noexcept {
         static TypeDesc d{.type = TypeCatalog::POINTER, .element_type = T::desc()};
         return &d;
     }
@@ -163,7 +168,7 @@ struct Pointer {
 
 template<typename T>
 struct Reference {
-    [[nodiscard]] static const TypeDesc *desc() noexcept {
+    [[nodiscard]] static TypeDesc *desc() noexcept {
         static TypeDesc d{.type = TypeCatalog::REFERENCE, .element_type = T::desc()};
         return &d;
     }
@@ -185,89 +190,181 @@ struct MakeTypeDescImpl {
 
 private:
     static constexpr auto _scalar_or_struct() noexcept {
-        if constexpr (std::is_arithmetic_v<T>) { return static_cast<Scalar<T> *>(nullptr); } else { return static_cast<Structure<T> *>(nullptr); }
+        if constexpr (std::is_arithmetic_v<T>) {
+            return static_cast<Scalar<T> *>(nullptr);
+        } else {
+            return static_cast<Structure<T> *>(nullptr);
+        }
     }
 
 public:
-    using Desc = std::remove_pointer_t<decltype(_scalar_or_struct())>;
+    using Type = std::remove_pointer_t<decltype(_scalar_or_struct())>;
     
+    [[nodiscard]] TypeDesc *operator()() const noexcept {
+        auto desc = Type::desc();
+        desc->size = static_cast<uint32_t>(sizeof(T));
+        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<T>);
+        return desc;
+    }
 };
 
 template<>
 struct MakeTypeDescImpl<AutoType> {
-    using Desc = AutoType;
+    
+    using Type = AutoType;
+    
+    [[nodiscard]] TypeDesc *operator()() const noexcept {
+        return Type::desc();
+    }
 };
 
 template<typename T>
 struct MakeTypeDescImpl<T *> {
-    using Desc = Pointer<typename MakeTypeDescImpl<T>::Desc>;
+    
+    using Type = Pointer<typename MakeTypeDescImpl<T>::Type>;
+    
+    [[nodiscard]] TypeDesc *operator()() const noexcept {
+        auto desc = Type::desc();
+        desc->size = static_cast<uint32_t>(sizeof(T *));
+        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<T *>);
+        return desc;
+    }
 };
 
 template<typename T>
 struct MakeTypeDescImpl<const T> {
-    using Desc = Constant<typename MakeTypeDescImpl<T>::Desc>;
+    
+    using Type = Constant<typename MakeTypeDescImpl<T>::Type>;
+    
+    [[nodiscard]] TypeDesc *operator()() const noexcept {
+        auto desc = Type::desc();
+        desc->size = static_cast<uint32_t>(sizeof(const T));
+        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<const T>);
+        return desc;
+    }
 };
 
 template<typename T>
 struct MakeTypeDescImpl<T &> {
-    using Desc = Reference<typename MakeTypeDescImpl<T>::Desc>;
-};
-
-template<typename T, size_t N>
-struct MakeTypeDescImpl<T[N]> {
-    using Desc = Array<typename MakeTypeDescImpl<T>::Desc, N>;
+    
+    using Type = Reference<typename MakeTypeDescImpl<T>::Type>;
+    
+    [[nodiscard]] TypeDesc *operator()() const noexcept {
+        auto desc = Type::desc();
+        desc->size = static_cast<uint32_t>(sizeof(T &));
+        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<T &>);
+        return desc;
+    }
 };
 
 template<typename T, size_t N>
 struct MakeTypeDescImpl<std::array<T, N>> {
-    using Desc = Array<typename MakeTypeDescImpl<T>::Desc, N>;
+    
+    using Type = Array<typename MakeTypeDescImpl<T>::Type, N>;
+    
+    [[nodiscard]] TypeDesc *operator()() const noexcept {
+        auto desc = Type::desc();
+        desc->size = static_cast<uint32_t>(sizeof(std::array<T, N>));
+        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<std::array<T, N>>);
+        return desc;
+    }
 };
+
+template<typename T, size_t N>
+struct MakeTypeDescImpl<T[N]> : public MakeTypeDescImpl<std::array<T, N>> {};
 
 template<>
 struct MakeTypeDescImpl<float3x3> {
-    using Desc = Matrix3;
+    
+    using Type = Matrix3;
+    
+    [[nodiscard]] TypeDesc *operator()() const noexcept {
+        auto desc = Type::desc();
+        desc->size = static_cast<uint32_t>(sizeof(float3x3));
+        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<float3x3>);
+        return desc;
+    }
 };
 
 template<>
 struct MakeTypeDescImpl<float4x4> {
-    using Desc = Matrix4;
+    
+    using Type = Matrix4;
+    
+    [[nodiscard]] TypeDesc *operator()() const noexcept {
+        auto desc = Type::desc();
+        desc->size = static_cast<uint32_t>(sizeof(float4x4));
+        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<float4x4>);
+        return desc;
+    }
 };
 
 template<typename T>
 struct MakeTypeDescImpl<glm::tvec2<T, glm::aligned_highp>> {
-    using Desc = Vector2<T>;
+    
+    using Type = Vector2<T>;
+    
+    [[nodiscard]] TypeDesc *operator()() const noexcept {
+        auto desc = Type::desc();
+        desc->size = static_cast<uint32_t>(sizeof(glm::tvec2<T, glm::aligned_highp>));
+        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<glm::tvec2<T, glm::aligned_highp>>);
+        return desc;
+    }
 };
 
 template<typename T>
 struct MakeTypeDescImpl<glm::tvec3<T, glm::aligned_highp>> {
-    using Desc = Vector3<T>;
+    
+    using Type = Vector3<T>;
+    
+    [[nodiscard]] TypeDesc *operator()() const noexcept {
+        auto desc = Type::desc();
+        desc->size = static_cast<uint32_t>(sizeof(glm::tvec3<T, glm::aligned_highp>));
+        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<glm::tvec3<T, glm::aligned_highp>>);
+        return desc;
+    }
 };
 
 template<typename T>
 struct MakeTypeDescImpl<glm::tvec4<T, glm::aligned_highp>> {
-    using Desc = Vector4<T>;
+    
+    using Type = Vector4<T>;
+    
+    [[nodiscard]] TypeDesc *operator()() const noexcept {
+        auto desc = Type::desc();
+        desc->size = static_cast<uint32_t>(sizeof(glm::tvec4<T, glm::aligned_highp>));
+        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<glm::tvec4<T, glm::aligned_highp>>);
+        return desc;
+    }
 };
 
 template<typename T>
 struct MakeTypeDescImpl<glm::tvec3<T, glm::packed_highp>> {
-    using Desc = Vector3_PACKED<T>;
+    
+    using Type = Vector3_PACKED<T>;
+    
+    [[nodiscard]] TypeDesc *operator()() const noexcept {
+        auto desc = Type::desc();
+        desc->size = static_cast<uint32_t>(sizeof(glm::tvec3<T, glm::packed_highp>));
+        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<glm::tvec3<T, glm::packed_highp>>);
+        return desc;
+    }
 };
 
 }
 
 template<typename T>
-inline const TypeDesc *type_desc = detail::MakeTypeDescImpl<T>::Desc::desc();
+inline const TypeDesc *type_desc = detail::MakeTypeDescImpl<T>{}();
 
 #define LUISA_STRUCT_BEGIN(S)                                                                    \
     template<>                                                                                   \
     struct Structure<S> {                                                                        \
-        [[nodiscard]] static const TypeDesc *desc() noexcept {                                   \
+        [[nodiscard]] static TypeDesc *desc() noexcept {                                         \
             using This = S;                                                                      \
             static TypeDesc td;                                                                  \
             static int depth = 0;                                                                \
             if (depth++ == 0) {                                                                  \
                 td.type = TypeCatalog::STRUCTURE;                                                \
-                td.alignment = static_cast<uint32_t>(std::alignment_of_v<S>);                    \
                 td.member_names.clear();                                                         \
                 td.member_types.clear();                                                         \
 
@@ -324,7 +421,7 @@ inline const TypeDesc *type_desc = detail::MakeTypeDescImpl<T>::Desc::desc();
      LUISA_STRUCT_BEGIN(S)                              \
      LUISA_MAP_MACRO(LUISA_STRUCT_MEMBER, __VA_ARGS__)  \
      LUISA_STRUCT_END()                                 \
-     
+
 template<typename Container,
     std::enable_if_t<
         std::conjunction_v<

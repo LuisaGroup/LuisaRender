@@ -57,6 +57,7 @@ void MetalCodegen::_emit_argument_decl(Variable v) {
         _emit_type(vt);
         _os << " &v" << v.uid();
     }
+    _os << " [[buffer(" << v.uid() << ")]]";
 }
 
 void MetalCodegen::emit(const Function &f) {

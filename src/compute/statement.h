@@ -26,7 +26,7 @@ class DeclareStmt;
 class KeywordStmt;
 class IfStmt;
 class WhileStmt;
-class LoopStmt;
+class ForStmt;
 class ExprStmt;
 
 // Statement visitor interface
@@ -35,7 +35,7 @@ struct StmtVisitor {
     virtual void visit(const KeywordStmt &stmt) = 0;
     virtual void visit(const IfStmt &if_stmt) = 0;
     virtual void visit(const WhileStmt &while_stmt) = 0;
-    virtual void visit(const LoopStmt &loop_stmt) = 0;
+    virtual void visit(const ForStmt &loop_stmt) = 0;
     virtual void visit(const ExprStmt &expr_stmt) = 0;
 };
 
@@ -83,7 +83,7 @@ public:
     MAKE_STATEMENT_ACCEPT_VISITOR()
 };
 
-class LoopStmt : public Statement {
+class ForStmt : public Statement {
 
 private:
     Variable _i;
@@ -91,7 +91,7 @@ private:
     Variable _step;
 
 public:
-    LoopStmt(Variable i, Variable end, Variable step) noexcept
+    ForStmt(Variable i, Variable end, Variable step) noexcept
         : _i{std::move(i)}, _end{std::move(end)}, _step{std::move(step)} {}
     [[nodiscard]] Variable i() const noexcept { return _i; }
     [[nodiscard]] Variable end() const noexcept { return _end; }

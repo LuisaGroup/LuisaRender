@@ -4,13 +4,44 @@
 
 #pragma once
 
+#include <variant>
+#include <vector>
 #include <string_view>
+
 #include <core/concepts.h>
 
 #include <compute/data_types.h>
 #include <compute/buffer.h>
 
 namespace luisa {
+
+enum struct KernelArgumentTag {
+    BUFFER, UNIFORM
+};
+
+class KernelArgument {
+
+private:
+    KernelArgumentTag _tag;
+    
+    TypelessBuffer *_buffer{nullptr};
+    size_t _buffer_offset{0u};
+    
+    template<typename T>
+    KernelArgument(BufferView<T> view) noexcept
+        : _tag{KernelArgumentTag::BUFFER}, _buffer{std::addressof(view.typeless_buffer())}, _buffer_offset{view.byte_offset()} {}
+    
+        
+};
+
+struct UniformArgument {
+    
+    const void *data{nullptr};
+    size_t size{0u};
+    
+};
+
+using KernelArgumentList = std::vector<std::variant<BufferArgument, UniformArgument>>;
 
 struct KernelArgumentEncoder : Noncopyable {
     

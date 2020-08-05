@@ -103,7 +103,7 @@ public:
                 std::is_convertible<decltype(*std::cend(std::declval<Container>())), LiteralExpr::Value>>, int> = 0>
     [[nodiscard]] Variable literal(Container &&container) noexcept {
         std::vector<LiteralExpr::Value> values{std::begin(container), std::end(container)};
-        return add_expression(std::make_unique<LiteralExpr>(this, std::move(values)));
+        return add_expression(std::make_unique<LiteralExpr>(std::move(values)));
     }
     
     [[nodiscard]] Variable thread_id() noexcept { return _builtin_var<uint32_t>(BuiltinVariable::THREAD_ID); }
@@ -143,7 +143,7 @@ public:
     [[nodiscard]] const auto &used_structures() const noexcept { return _used_structs; }
 };
 
-#define LUISA_FUNC   [&](Function &f)
+#define LUISA_FUNC   [&](Function &f[[maybe_unused]])
 #define LUISA_LAMBDA [&]
 
 }

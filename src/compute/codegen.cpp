@@ -11,7 +11,6 @@ void CppCodegen::emit(const Function &f) {
     _indent = 0;
     
     // used structs
-    for (auto &&s : f.used_structures()) { _emit_struct_fwd_decl(s); }
     for (auto &&s : f.used_structures()) { _emit_struct_decl(s); }  // FIXME: Topological Sorting
     
     // function head
@@ -256,7 +255,7 @@ void CppCodegen::visit(const WhileStmt &while_stmt) {
     if (while_stmt.is_do_while()) { _os << ";\n"; } else { _os << " "; }
 }
 
-void CppCodegen::visit(const LoopStmt &loop_stmt) {
+void CppCodegen::visit(const ForStmt &loop_stmt) {
     _emit_indent();
     _os << "for (; ";
     _emit_variable(loop_stmt.i());
@@ -307,17 +306,6 @@ void CppCodegen::_emit_variable_decl(Variable v) {
         v.type()->type != TypeCatalog::POINTER &&
         v.type()->type != TypeCatalog::REFERENCE) { _os << " "; }
     _os << "v" << v.uid();
-}
-
-void CppCodegen::_emit_struct_fwd_decl(const TypeDesc *desc) {
-    
-    auto struct_guard = serialize("LUISA_STRUCT_FWD_DECL_STRUCT_", desc->uid);
-    
-    // guard begin
-    _os << "#ifndef " << struct_guard << "\n"
-        << "#define " << struct_guard << "\n"
-        << "struct Struct$" << desc->uid << ";\n"
-        << "#endif\n\n";
 }
 
 void CppCodegen::_emit_variable(Variable v) {

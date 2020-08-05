@@ -39,10 +39,10 @@ LUISA_MAP_MACRO(
 #undef MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD
 #undef MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD_IMPL
 
-#define MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD_IMPL(op, op_tag)                                            \
-void Variable::operator op(Variable rhs) const noexcept {                                                  \
-    Void(Function::current().add_expression(std::make_unique<BinaryExpr>(BinaryOp::op_tag, *this, rhs)));  \
-}                                                                                                          \
+#define MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD_IMPL(op, op_tag)                                             \
+void Variable::operator op(Variable rhs) const noexcept {                                                   \
+    void_(Function::current().add_expression(std::make_unique<BinaryExpr>(BinaryOp::op_tag, *this, rhs)));  \
+}                                                                                                           \
 
 #define MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD(op_and_tag) \
 MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD_IMPL op_and_tag

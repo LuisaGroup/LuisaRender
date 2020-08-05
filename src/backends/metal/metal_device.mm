@@ -209,8 +209,25 @@ id<MTLLibrary> MetalDevice::_load_library(std::string_view library_name) {
 }
 
 std::unique_ptr<Kernel> MetalDevice::_compile_kernel(const dsl::Function &f) {
-    MetalCodegen codegen{std::cout, this};
+    
+    LUISA_INFO("Generating...");
+    std::ostringstream os;
+    MetalCodegen codegen{os, this};
     codegen.emit(f);
+    auto s = os.str();
+    
+    LUISA_INFO("Compiling...");
+    NSError *error = nullptr;
+    auto library = [_handle newLibraryWithSource:make_objc_string(s) options:nullptr error:&error];
+    if (error != nullptr) {
+        NSLog(@"%@", error);
+    } else {
+        NSLog(@"%@", library);
+    }
+    
+    LUISA_INFO("Done.");
+    auto digest = sha1_digest(s);
+    std::cout << "Digest: " << digest << "\n\n" << s << std::endl;
     return nullptr;
 }
 

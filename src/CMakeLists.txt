@@ -11,6 +11,10 @@ add_library(glm_config INTERFACE)
 target_link_libraries(glm_config INTERFACE glm)
 target_compile_definitions(glm_config INTERFACE GLM_FORCE_AVX2 GLM_FORCE_CXX17)
 
+find_package(OpenSSL REQUIRED)
+add_library(openssl_config INTERFACE)
+target_link_libraries(openssl_config INTERFACE OpenSSL::Crypto)
+
 add_subdirectory(core)
 add_subdirectory(compute)
 add_subdirectory(render)
