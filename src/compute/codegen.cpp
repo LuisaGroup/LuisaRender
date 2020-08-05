@@ -252,7 +252,8 @@ void CppCodegen::visit(const WhileStmt &while_stmt) {
     _emit_indent();
     _os << "while (";
     _emit_variable(while_stmt.condition());
-    _os << ") ";
+    _os << ")";
+    if (while_stmt.is_do_while()) { _os << ";\n"; } else { _os << " "; }
 }
 
 void CppCodegen::visit(const LoopStmt &loop_stmt) {

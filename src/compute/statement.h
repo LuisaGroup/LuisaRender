@@ -73,10 +73,13 @@ class WhileStmt : public Statement {
 
 private:
     Variable _condition;
+    bool _is_do_while;
 
 public:
-    explicit WhileStmt(Variable cond) noexcept: _condition{std::move(cond)} {}
+    explicit WhileStmt(Variable cond, bool is_do_while = false) noexcept
+        : _condition{std::move(cond)}, _is_do_while{is_do_while} {}
     [[nodiscard]] Variable condition() const noexcept { return _condition; }
+    [[nodiscard]] bool is_do_while() const noexcept { return _is_do_while; }
     MAKE_STATEMENT_ACCEPT_VISITOR()
 };
 

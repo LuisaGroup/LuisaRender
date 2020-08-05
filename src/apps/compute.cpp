@@ -63,6 +63,10 @@ int main(int argc, char *argv[]) {
         Arg<LUT> lut;
         Arg<ImportanceSamplePixelsKernelUniforms> uniforms;
         
+        Loop {
+            Auto i{5};
+        } When(true);
+        
         auto tid = thread_id();
         auto tile = uniforms.$(tile);
         If(tid < tile.$(size).x() * tile.$(size).y()) {

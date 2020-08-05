@@ -140,11 +140,11 @@ struct LoopWhenStmtBuilder {
     template<typename Body, std::enable_if_t<std::is_invocable_v<Body>, int> = 0>
     const LoopWhenStmtBuilder &operator<<(Body &&body) const noexcept {
         Function::current().block(std::forward<Body>(body));
+        return *this;
     }
     
     void operator>>(Variable cond) const noexcept {
-        Function::current().add_statement(std::make_unique<WhileStmt>(std::move(cond)));
-        Function::current().add_statement(std::make_unique<KeywordStmt>(";"));
+        Function::current().add_statement(std::make_unique<WhileStmt>(std::move(cond), true));
     }
 };
 
@@ -165,8 +165,7 @@ public:
     ForStmtBuilder(Begin &&begin, End &&end) noexcept
         : ForStmtBuilder(std::forward<Begin>(begin), std::forward<End>(end), literal(1)) {}
     
-    template<typename Body,
-        std::enable_if_t<std::is_invocable_v<Body, Variable>, int> = 0>
+    template<typename Body, std::enable_if_t<std::is_invocable_v<Body, Variable>, int> = 0>
     void operator<<(Body &&body) const noexcept {
         Function::current().block([&] { body(_i); });
     }
@@ -177,22 +176,22 @@ public:
 #define var var
 #define let let
 
-#define If(...) IfStmtBuilder{__VA_ARGS__} << [&]
+#define If(...) IfStmtBuilder{literal(__VA_ARGS__)} << [&]
 #define Else    >> [&]
 
-#define While(...) WhileStmtBuilder{__VA_ARGS__} << [&]
+#define While(...) WhileStmtBuilder{literal(__VA_ARGS__)} << [&]
 
 #define Loop LoopWhenStmtBuilder{} << [&]
-#define When(...) >> (__VA_ARGS__)
+#define When(...) >> literal(__VA_ARGS__)
 
 #define For(v, ...) ForStmtBuilder{__VA_ARGS__} << [&](Variable v)
 
-inline void Break() noexcept { Function::current().add_break(); }
-inline void Continue() noexcept { Function::current().add_continue(); }
-inline void Return() noexcept { Function::current().add_return(); }
+inline void break_() noexcept { Function::current().add_break(); }
+inline void continue_() noexcept { Function::current().add_continue(); }
+inline void return_() noexcept { Function::current().add_return(); }
 
-#define Break    Break
-#define Continue Continue
-#define Return   Return
+#define Break    break_()
+#define Continue continue_()
+#define Return   return_()
 
 }
