@@ -324,8 +324,7 @@ inline const TypeDesc *type_desc = detail::MakeTypeDescImpl<T>::Desc::desc();
      LUISA_STRUCT_BEGIN(S)                              \
      LUISA_MAP_MACRO(LUISA_STRUCT_MEMBER, __VA_ARGS__)  \
      LUISA_STRUCT_END()                                 \
-
-
+     
 template<typename Container,
     std::enable_if_t<
         std::conjunction_v<
