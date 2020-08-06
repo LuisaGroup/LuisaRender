@@ -24,24 +24,29 @@ class KernelArgument {
 private:
     KernelArgumentTag _tag;
     
+    // buffer data
     TypelessBuffer *_buffer{nullptr};
     size_t _buffer_offset{0u};
     
+    // uniform data
+    std::vector<std::byte> _data;
+
+public:
     template<typename T>
     KernelArgument(BufferView<T> view) noexcept
         : _tag{KernelArgumentTag::BUFFER}, _buffer{std::addressof(view.typeless_buffer())}, _buffer_offset{view.byte_offset()} {}
     
-        
-};
-
-struct UniformArgument {
+    template<typename T>
+    KernelArgument(T &&data) noexcept : _tag{KernelArgumentTag::UNIFORM} {
+        _data.resize(sizeof(T));
+        std::memmove(_data.data(), &data, _data.size());
+    }
     
-    const void *data{nullptr};
-    size_t size{0u};
-    
+    [[nodiscard]] KernelArgumentTag tag() const noexcept { return _tag; }
+    [[nodiscard]] TypelessBuffer *buffer() const noexcept { return _buffer; }
+    [[nodiscard]] size_t buffer_offset() const noexcept { return _buffer_offset; }
+    [[nodiscard]] const std::vector<std::byte> &data() const noexcept { return _data; }
 };
-
-using KernelArgumentList = std::vector<std::variant<BufferArgument, UniformArgument>>;
 
 struct KernelArgumentEncoder : Noncopyable {
     
@@ -86,6 +91,8 @@ struct Kernel : Noncopyable {
 struct KernelDispatcher : Noncopyable {
     
     virtual ~KernelDispatcher() noexcept = default;
+    
+//    virtual void operator()(Kernel &kernel, uint2 threadgroups, uint2 threadgroup_size, const std::vector<KernelArgument> &arguments) = 0;
     
     virtual void operator()(Kernel &kernel, uint2 threadgroups, uint2 threadgroup_size, std::function<void(KernelArgumentEncoder &)> encode) = 0;
     virtual void operator()(Kernel &kernel, uint threadgroups, uint threadgroup_size, std::function<void(KernelArgumentEncoder &)> encode) {

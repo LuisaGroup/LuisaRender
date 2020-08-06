@@ -11,7 +11,14 @@ void CppCodegen::emit(const Function &f) {
     _indent = 0;
     
     // used structs
-    for (auto &&s : f.used_structures()) { _emit_struct_decl(s); }  // FIXME: Topological Sorting
+    auto used_structs = toposort_structs(f.used_types());
+    for (auto s : used_structs) { _emit_struct_fwd_decl(s); }
+    
+    _os << "\n";
+    for (auto s : used_structs) {
+        _emit_struct_decl(s);
+        _os << "\n";
+    }
     
     // function head
     _emit_function_decl(f);
@@ -276,12 +283,6 @@ void CppCodegen::visit(const ExprStmt &expr_stmt) {
 
 void CppCodegen::_emit_struct_decl(const TypeDesc *desc) {
     
-    auto struct_guard = serialize("LUISA_STRUCT_DECL_STRUCT_", desc->uid);
-    
-    // guard begin
-    _os << "#ifndef " << struct_guard << "\n"
-        << "#define " << struct_guard << "\n";
-    
     _os << "struct alignas(" << desc->alignment << ") Struct$" << desc->uid << " {";
     if (!desc->member_names.empty()) { _os << "\n"; }
     
@@ -295,9 +296,6 @@ void CppCodegen::_emit_struct_decl(const TypeDesc *desc) {
         _os << desc->member_names[i] << ";\n";
     }
     _os << "};\n";
-    
-    // guard end
-    _os << "#endif\n\n";
 }
 
 void CppCodegen::_emit_variable_decl(Variable v) {
@@ -450,6 +448,10 @@ void CppCodegen::_emit_function_decl(const Function &f) {
 
 void CppCodegen::_emit_function_call(const std::string &name) {
     _os << name;
+}
+
+void CppCodegen::_emit_struct_fwd_decl(const TypeDesc *desc) {
+    _os << "struct Struct$" << desc->uid << ";\n";
 }
 
 }

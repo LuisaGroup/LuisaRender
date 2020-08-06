@@ -31,7 +31,7 @@ private:
     std::vector<Variable> _builtin_vars;
     std::vector<std::unique_ptr<Expression>> _expressions;
     std::vector<std::unique_ptr<Statement>> _statements;
-    std::set<const TypeDesc *, detail::TypeDescCmp> _used_structs;
+    std::vector<const TypeDesc *> _used_types;
     
     uint32_t _used_builtins{0u};
     uint32_t _uid_counter{0u};
@@ -43,7 +43,7 @@ private:
     template<typename T>
     [[nodiscard]] Variable _builtin_var(BuiltinVariable tag) noexcept {
         auto type = type_desc<T>;
-        _use_type(type);
+        _used_types.emplace_back(type);
         Variable v{type, tag};
         if (auto bit = static_cast<uint32_t>(tag); (_used_builtins & bit) == 0u) {
             _used_builtins |= bit;
@@ -52,20 +52,10 @@ private:
         return v;
     }
     
-    void _use_type(const TypeDesc *desc) noexcept {
-        if (desc == nullptr || _used_structs.find(desc) != _used_structs.end()) { return; }
-        if (desc->type == TypeCatalog::STRUCTURE) {
-            _used_structs.emplace(desc);
-            for (auto member : desc->member_types) { _use_type(member); }
-        } else {
-            _use_type(desc->element_type);
-        }
-    }
-    
     template<typename T, bool is_const, typename ...Literals>
     [[nodiscard]] Variable _var_or_const(Literals &&...vs) noexcept {
         auto type = type_desc<T>;
-        _use_type(type);
+        _used_types.emplace_back(type);
         Variable v{type, _get_uid()};
         add_statement(std::make_unique<DeclareStmt>(v, literal(std::forward<Literals>(vs)...), is_const));
         return v;
@@ -85,7 +75,7 @@ public:
     template<typename T>
     [[nodiscard]] Variable arg() noexcept {
         auto type = type_desc<T>;
-        _use_type(type);
+        _used_types.emplace_back(type);
         return _arguments.emplace_back(type, _get_uid());
     }
     
@@ -140,7 +130,7 @@ public:
     [[nodiscard]] const std::vector<Variable> &arguments() const noexcept { return _arguments; }
     [[nodiscard]] const std::vector<Variable> &builtin_variables() const noexcept { return _builtin_vars; }
     [[nodiscard]] const std::vector<std::unique_ptr<Statement>> &statements() const noexcept { return _statements; }
-    [[nodiscard]] const auto &used_structures() const noexcept { return _used_structs; }
+    [[nodiscard]] const auto &used_types() const noexcept { return _used_types; }
 };
 
 #define LUISA_FUNC   [&](Function &f[[maybe_unused]])

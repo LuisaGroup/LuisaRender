@@ -7,6 +7,7 @@
 #ifndef LUISA_DEVICE_COMPATIBLE
 
 #include <array>
+#include <queue>
 #include <iostream>
 #include <sstream>
 #include <memory>
@@ -14,6 +15,9 @@
 #include <type_traits>
 #include <string_view>
 #include <vector>
+#include <set>
+#include <unordered_set>
+#include <unordered_map>
 #include <mutex>
 
 #include <core/logging.h>
@@ -428,7 +432,67 @@ template<typename Container,
             std::is_convertible<decltype(*std::cbegin(std::declval<Container>())), const TypeDesc *>,
             std::is_convertible<decltype(*std::cend(std::declval<Container>())), const TypeDesc *>>, int> = 0>
 [[nodiscard]] inline std::vector<const TypeDesc *> toposort_structs(Container &&container) {
-    return {};  // TODO
+    
+    // gather all used structs
+    std::queue<const TypeDesc *> types_to_process;
+    for (auto iter = std::cbegin(container); iter != std::cend(container); iter++) {
+        types_to_process.emplace(*iter);
+    }
+    
+    std::set<const TypeDesc *> processed;
+    
+    std::vector<const TypeDesc *> structs;
+    std::unordered_map<const TypeDesc *, int> struct_ids;
+    while (!types_to_process.empty()) {
+        auto type = types_to_process.front();
+        types_to_process.pop();
+        if (type != nullptr && processed.find(type) == processed.end()) {
+            processed.emplace(type);
+            if (type->type == TypeCatalog::STRUCTURE) {
+                struct_ids.emplace(type, static_cast<int32_t>(structs.size()));
+                structs.emplace_back(type);
+                for (auto m : type->member_types) { types_to_process.emplace(m); }
+            } else if (type->element_type != nullptr) {
+                types_to_process.emplace(type->element_type);
+            }
+        }
+    }
+    
+    processed.clear();
+    std::vector<std::set<int>> refs(struct_ids.size());
+    std::vector<int> in_degrees(struct_ids.size(), 0);
+    std::function<void(const TypeDesc *, int)> find_refs{[&](const TypeDesc *t, int referrer) {
+        if (t == nullptr || processed.find(t) != processed.end()) { return; }
+        processed.emplace(t);
+        if (t->type == TypeCatalog::STRUCTURE) {
+            auto id = struct_ids[t];
+            if (referrer >= 0 && refs[referrer].find(id) == refs[referrer].end()) {
+                refs[id].emplace(referrer);
+                in_degrees[referrer]++;
+            }
+            for (auto m : t->member_types) { find_refs(m, id); }
+        } else if (t->type == TypeCatalog::ARRAY || t->type == TypeCatalog::CONST) {
+            find_refs(t->element_type, referrer);
+        }
+    }};
+    for (auto s : structs) { find_refs(s, -1); }
+    
+    std::queue<int> zero_degree_nodes;
+    for (auto i = 0; i < static_cast<int>(in_degrees.size()); i++) {
+        if (in_degrees[i] == 0) { zero_degree_nodes.emplace(i); }
+    }
+    
+    std::vector<const TypeDesc *> sorted;
+    while (!zero_degree_nodes.empty()) {
+        auto id = zero_degree_nodes.front();
+        zero_degree_nodes.pop();
+        sorted.emplace_back(structs[id]);
+        for (auto to : refs[id]) {
+            if (--in_degrees[to] == 0) { zero_degree_nodes.emplace(to); }
+        }
+    }
+    
+    return sorted;
 }
 
 }

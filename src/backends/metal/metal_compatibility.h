@@ -90,8 +90,8 @@ using metal::cross;
 #define LUISA_UNIFORM_SPACE   constant
 #define LUISA_THREAD_SPACE    thread
 #define LUISA_DEVICE_SPACE    device
-#define LUISA_THREAD_ID_DECL  uint2 $tid$ [[thread_position_in_grid]]
-#define LUISA_THREAD_ID       $tid$.x
+#define LUISA_THREAD_ID_DECL  uint $tid$ [[thread_position_in_grid]]
+#define LUISA_THREAD_ID       $tid$
 
 // function scopes
 #define LUISA_CONSTEXPR        inline
