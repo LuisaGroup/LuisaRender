@@ -466,7 +466,7 @@ template<typename Container,
         processed.emplace(t);
         if (t->type == TypeCatalog::STRUCTURE) {
             auto id = struct_ids[t];
-            if (referrer >= 0 && refs[referrer].find(id) == refs[referrer].end()) {
+            if (referrer >= 0 && refs[id].find(referrer) == refs[id].end()) {
                 refs[id].emplace(referrer);
                 in_degrees[referrer]++;
             }
