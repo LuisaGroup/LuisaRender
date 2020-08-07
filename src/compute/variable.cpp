@@ -14,8 +14,8 @@ namespace luisa::dsl {
 Variable::Variable(const TypeDesc *type, BuiltinVariable tag) noexcept
     : _type{type}, _builtin_tag{tag} {}
 
-Variable::Variable(const TypeDesc *type, uint32_t uid) noexcept
-    : _type{type}, _uid{uid} {}
+Variable::Variable(const TypeDesc *type, uint32_t uid, bool is_argument) noexcept
+    : _type{type}, _uid{uid}, _is_argument{is_argument} {}
 
 Variable::Variable(Expression *expr) noexcept
     : _expression{expr} {}

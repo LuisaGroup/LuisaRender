@@ -17,8 +17,9 @@ void CppCodegen::emit(const Function &f) {
     _os << "\n";
     for (auto s : used_structs) {
         _emit_struct_decl(s);
-        _os << "\n";
     }
+    
+    _emit_argument_struct_decl(f);
     
     // function head
     _emit_function_decl(f);
@@ -295,7 +296,7 @@ void CppCodegen::_emit_struct_decl(const TypeDesc *desc) {
             mt->type != TypeCatalog::REFERENCE && mt->type != TypeCatalog::POINTER) { _os << " "; }
         _os << desc->member_names[i] << ";\n";
     }
-    _os << "};\n";
+    _os << "};\n\n";
 }
 
 void CppCodegen::_emit_variable_decl(Variable v) {
@@ -311,6 +312,8 @@ void CppCodegen::_emit_variable(Variable v) {
         _emit_builtin_variable(v.builtin_tag());
     } else if (v.is_temporary()) {
         v.expression()->accept(*this);
+    } else if (v.is_argument()) {
+        _os << "arg.v" << v.uid();
     } else {
         _os << "v" << v.uid();
     }
@@ -436,14 +439,7 @@ void CppCodegen::_emit_type(const TypeDesc *desc) {
 }
 
 void CppCodegen::_emit_function_decl(const Function &f) {
-    _os << "void " << f.name() << "(";
-    auto &&args = f.arguments();
-    for (auto i = 0ul; i < args.size(); i++) {
-        auto &&arg = args[i];
-        _emit_argument_decl(arg);
-        if (i != args.size() - 1u) { _os << ", "; }
-    }
-    _os << ") ";
+    _os << "void " << f.name() << "(const Argument &arg) ";
 }
 
 void CppCodegen::_emit_function_call(const std::string &name) {
@@ -452,6 +448,16 @@ void CppCodegen::_emit_function_call(const std::string &name) {
 
 void CppCodegen::_emit_struct_fwd_decl(const TypeDesc *desc) {
     _os << "struct Struct$" << desc->uid << ";\n";
+}
+
+void CppCodegen::_emit_argument_struct_decl(const Function &f) {
+    _os << "struct Argument {\n";
+    for (auto &&arg : f.arguments()) {
+        _os << "    ";
+        _emit_argument_member_decl(arg);
+        _os << ";\n";
+    }
+    _os << "};\n\n";
 }
 
 }

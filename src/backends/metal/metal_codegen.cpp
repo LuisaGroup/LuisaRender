@@ -11,13 +11,7 @@ using namespace luisa::dsl;
 void MetalCodegen::_emit_function_decl(const Function &f) {
     
     // kernel head
-    _os << "kernel void " << f.name() << "(";
-    auto &&args = f.arguments();
-    for (auto i = 0ul; i < args.size(); i++) {
-        auto &&arg = args[i];
-        _emit_argument_decl(arg);
-        if (i != args.size() - 1u) { _os << ", "; }
-    }
+    _os << "kernel void " << f.name() << "(device const Argument &arg [[buffer(0)]]";
     for (auto &&v : f.builtin_variables()) {
         _os << ", ";
         switch (v.builtin_tag()) {
@@ -43,21 +37,9 @@ void MetalCodegen::_emit_builtin_variable(BuiltinVariable tag) {
     }
 }
 
-void MetalCodegen::_emit_argument_decl(Variable v) {
-    auto vt = v.type();
-    auto is_ptr_or_ref = (vt != nullptr) &&
-                         (vt->type == TypeCatalog::POINTER || vt->type == TypeCatalog::REFERENCE ||
-                          (vt->type == TypeCatalog::CONST &&
-                           (vt->element_type->type == TypeCatalog::POINTER || vt->element_type->type == TypeCatalog::REFERENCE)));
-    if (is_ptr_or_ref) {
-        _os << "device ";
-        _emit_variable_decl(v);
-    } else {
-        _os << "constant ";
-        _emit_type(vt);
-        _os << " &v" << v.uid();
-    }
-    _os << " [[buffer(" << v.uid() << ")]]";
+void MetalCodegen::_emit_argument_member_decl(Variable v) {
+    if (auto vt = v.type(); is_ptr_or_ref(vt)) { _os << "device "; }
+    _emit_variable_decl(v);
 }
 
 void MetalCodegen::emit(const Function &f) {

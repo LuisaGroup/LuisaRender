@@ -422,9 +422,16 @@ inline const TypeDesc *type_desc = detail::MakeTypeDescImpl<T>{}();
 #define LUISA_MAP_MACRO_LIST(f, ...) LUISA_MAP_MACRO_EVAL(LUISA_MAP_MACRO_LIST1(f, __VA_ARGS__, ()()(), ()()(), ()()(), 0))
 
 #define LUISA_STRUCT(S, ...)                            \
-     LUISA_STRUCT_BEGIN(S)                              \
+LUISA_STRUCT_BEGIN(S)                                   \
      LUISA_MAP_MACRO(LUISA_STRUCT_MEMBER, __VA_ARGS__)  \
-     LUISA_STRUCT_END()                                 \
+LUISA_STRUCT_END()                                      \
+
+inline bool is_ptr_or_ref(const TypeDesc *type) noexcept {
+    if (type == nullptr) { return false; }
+    if (type->type == TypeCatalog::POINTER || type->type == TypeCatalog::REFERENCE) { return true; }
+    else if (type->type == TypeCatalog::CONST) { return is_ptr_or_ref(type->element_type); }
+    return false;
+}
 
 template<typename Container,
     std::enable_if_t<
@@ -433,7 +440,7 @@ template<typename Container,
             std::is_convertible<decltype(*std::cend(std::declval<Container>())), const TypeDesc *>>, int> = 0>
 [[nodiscard]] inline std::vector<const TypeDesc *> toposort_structs(Container &&container) {
     
-    // gather all used structs
+    // Gather all used structs
     std::queue<const TypeDesc *> types_to_process;
     for (auto iter = std::cbegin(container); iter != std::cend(container); iter++) {
         types_to_process.emplace(*iter);
@@ -458,6 +465,7 @@ template<typename Container,
         }
     }
     
+    // Build DAG
     processed.clear();
     std::vector<std::set<int>> refs(struct_ids.size());
     std::vector<int> in_degrees(struct_ids.size(), 0);
@@ -477,6 +485,7 @@ template<typename Container,
     }};
     for (auto s : structs) { find_refs(s, -1); }
     
+    // Sort
     std::queue<int> zero_degree_nodes;
     for (auto i = 0; i < static_cast<int>(in_degrees.size()); i++) {
         if (in_degrees[i] == 0) { zero_degree_nodes.emplace(i); }

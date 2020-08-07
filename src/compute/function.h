@@ -11,16 +11,6 @@
 
 namespace luisa::dsl {
 
-namespace detail {
-
-struct TypeDescCmp {
-    bool operator()(const TypeDesc *lhs, const TypeDesc *rhs) const noexcept {
-        return lhs->uid < rhs->uid;
-    }
-};
-
-}
-
 class Function {
     
     friend class Variable;
@@ -76,7 +66,7 @@ public:
     [[nodiscard]] Variable arg() noexcept {
         auto type = type_desc<T>;
         _used_types.emplace_back(type);
-        return _arguments.emplace_back(type, _get_uid());
+        return _arguments.emplace_back(type, _get_uid(), true);
     }
     
     template<typename ...Literals,
