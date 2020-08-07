@@ -54,10 +54,10 @@ void MetalCodegen::emit(const Function &f) {
 }
 
 void MetalCodegen::_emit_type(const TypeDesc *desc) {
-    if (desc != nullptr && desc->type == TypeCatalog::ARRAY) {
-        _os << "array<";
+    if (desc->type == TypeCatalog::ATOMIC) {
+        _os << "_atomic<";
         _emit_type(desc->element_type);
-        _os << ", " << desc->element_count << ">";
+        _os << ">";
     } else {
         CppCodegen::_emit_type(desc);
     }

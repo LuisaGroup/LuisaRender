@@ -206,6 +206,12 @@ void CppCodegen::visit(const CallExpr &call_expr) {
         _emit_variable(args[i]);
         if (i != args.size() - 1u) { _os << ", "; }
     }
+    if (call_expr.name().find("atomic_") == 0) {
+        _os << ", memory_order_relaxed";
+        if (call_expr.name() == "atomic_compare_exchange_weak_explicit") {
+            _os << ", memory_order_relaxed";
+        }
+    }
     _os << ")";
 }
 
@@ -401,7 +407,7 @@ void CppCodegen::_emit_type(const TypeDesc *desc) {
             _os << "float4x4";
             break;
         case TypeCatalog::ARRAY:
-            _os << "std::array<";
+            _os << "array<";
             _emit_type(desc->element_type);
             _os << ", " << desc->element_count << ">";
             break;
@@ -429,6 +435,10 @@ void CppCodegen::_emit_type(const TypeDesc *desc) {
                 et->type != TypeCatalog::REFERENCE) { _os << " "; }
             _os << "&";
             break;
+        case TypeCatalog ::ATOMIC:
+            _os << "atomic<";
+            _emit_type(desc->element_type);
+            _os << ">";
         case TypeCatalog::STRUCTURE:
             _os << "Struct$" << desc->uid;
             break;

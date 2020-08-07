@@ -54,12 +54,19 @@ LUISA_MAP_MACRO(MAKE_VARIABLE_MEMBER_BINARY_OPERATOR_IMPL, +, -, *, /, %, <<, >>
 #define MAP_VARIABLE_NAME_TO_VARIABLE(name) literal(name)
 #define MAP_VARIABLE_NAMES_TO_VARIABLE_LIST(...) LUISA_MAP_MACRO_LIST(MAP_VARIABLE_NAME_TO_VARIABLE, __VA_ARGS__)
 
-#define MAKE_BUILTIN_FUNCTION_DEF(func, ...)                                       \
-inline Variable func(MAP_VARIABLE_NAMES_TO_ARGUMENT_LIST(__VA_ARGS__)) {           \
-    auto &&f = Function::current();                                                \
-    std::vector<Variable> args{MAP_VARIABLE_NAMES_TO_VARIABLE_LIST(__VA_ARGS__)};  \
-    return f.add_expression(std::make_unique<CallExpr>(#func, std::move(args)));   \
-}                                                                                  \
+#define MAKE_BUILTIN_FUNCTION_DEF(func, ...)                                                                            \
+[[nodiscard]] inline Variable func(MAP_VARIABLE_NAMES_TO_ARGUMENT_LIST(__VA_ARGS__)) {                                  \
+    auto &&f = Function::current();                                                                                     \
+    std::vector<Variable> args{MAP_VARIABLE_NAMES_TO_VARIABLE_LIST(__VA_ARGS__)};                                       \
+    return f.add_expression(std::make_unique<CallExpr>(#func, std::move(args)));                                        \
+}                                                                                                                       \
+
+#define MAKE_BUILTIN_VOID_FUNCTION_DEF(func, ...)                                                                       \
+inline void func(MAP_VARIABLE_NAMES_TO_ARGUMENT_LIST(__VA_ARGS__)) {                                                    \
+    auto &&f = Function::current();                                                                                     \
+    std::vector<Variable> args{MAP_VARIABLE_NAMES_TO_VARIABLE_LIST(__VA_ARGS__)};                                       \
+    f.add_statement(std::make_unique<ExprStmt>(f.add_expression(std::make_unique<CallExpr>(#func, std::move(args)))));  \
+}                                                                                                                       \
 
 MAKE_BUILTIN_FUNCTION_DEF(select, cond, tv, fv)
 MAKE_BUILTIN_FUNCTION_DEF(sin, x)
@@ -96,6 +103,20 @@ MAKE_BUILTIN_FUNCTION_DEF(make_float3x3, m00, m01, m02, m10, m11, m12, m20, m21,
 MAKE_BUILTIN_FUNCTION_DEF(make_float4x4, val_or_mat3)
 MAKE_BUILTIN_FUNCTION_DEF(make_float4x4, c0, c1, c2, c3)
 MAKE_BUILTIN_FUNCTION_DEF(make_float4x4, m00, m01, m02, m03, m10, m11, m12, m13, m20, m21, m22, m23, m30, m31, m32, m33)
+
+// atomic functions
+MAKE_BUILTIN_VOID_FUNCTION_DEF(atomic_store_explicit, object, desired)
+MAKE_BUILTIN_FUNCTION_DEF(atomic_load_explicit, object)
+MAKE_BUILTIN_FUNCTION_DEF(atomic_exchange_explicit, object, desired)
+MAKE_BUILTIN_FUNCTION_DEF(atomic_compare_exchange_weak_explicit, object, expected, desired)
+
+MAKE_BUILTIN_FUNCTION_DEF(atomic_fetch_add_explicit, object, operand)
+MAKE_BUILTIN_FUNCTION_DEF(atomic_fetch_sub_explicit, object, operand)
+MAKE_BUILTIN_FUNCTION_DEF(atomic_fetch_and_explicit, object, operand)
+MAKE_BUILTIN_FUNCTION_DEF(atomic_fetch_or_explicit, object, operand)
+MAKE_BUILTIN_FUNCTION_DEF(atomic_fetch_xor_explicit, object, operand)
+MAKE_BUILTIN_FUNCTION_DEF(atomic_fetch_min_explicit, object, operand)
+MAKE_BUILTIN_FUNCTION_DEF(atomic_fetch_max_explicit, object, operand)
 
 // make_vec2
 #define MAKE_BUILTIN_FUNCTION_DEF_MAKE_VEC2(T)         \
@@ -143,6 +164,8 @@ MAKE_BUILTIN_FUNCTION_DEF(inverse, INVERSE, m)
 MAKE_BUILTIN_FUNCTION_DEF(transpose, TRANSPOSE, m)
 
 #undef MAKE_BUILTIN_FUNCTION_DEF
+#undef MAKE_BUILTIN_VOID_FUNCTION_DEF
+
 #undef MAP_VARIABLE_NAMES_TO_ARGUMENT_LIST
 #undef MAP_VARIABLE_NAME_TO_ARGUMENT_DEF
 #undef MAP_VARIABLE_NAMES_TO_ARGUMENT_LIST

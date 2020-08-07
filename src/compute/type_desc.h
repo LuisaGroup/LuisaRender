@@ -19,6 +19,7 @@
 #include <unordered_set>
 #include <unordered_map>
 #include <mutex>
+#include <atomic>
 
 #include <core/logging.h>
 #include <core/concepts.h>
@@ -52,6 +53,8 @@ enum struct TypeCatalog : uint32_t {
     CONST,
     POINTER,
     REFERENCE,
+    
+    ATOMIC,
     
     STRUCTURE
 };
@@ -117,6 +120,17 @@ struct Constant {
     [[nodiscard]] static TypeDesc *desc() noexcept {
         static TypeDesc d{
             .type = TypeCatalog::CONST,
+            .element_type = T::desc()
+        };
+        return &d;
+    }
+};
+
+template<typename T>
+struct Atomic {
+    [[nodiscard]] static TypeDesc *desc() noexcept {
+        static TypeDesc d{
+            .type = TypeCatalog::ATOMIC,
             .element_type = T::desc()
         };
         return &d;
@@ -244,6 +258,21 @@ struct MakeTypeDescImpl<const T> {
         auto desc = Type::desc();
         desc->size = static_cast<uint32_t>(sizeof(const T));
         desc->alignment = static_cast<uint32_t>(std::alignment_of_v<const T>);
+        return desc;
+    }
+};
+
+template<typename T>
+struct MakeTypeDescImpl<std::atomic<T>> {
+    
+    static_assert(std::is_same_v<T, int32_t> || std::is_same_v<T, uint32_t>);
+    
+    using Type = Atomic<typename MakeTypeDescImpl<T>::Type>;
+    
+    [[nodiscard]] TypeDesc *operator()() const noexcept {
+        auto desc = Type::desc();
+        desc->size = static_cast<uint32_t>(sizeof(std::atomic<T>));
+        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<std::atomic<T>>);
         return desc;
     }
 };
