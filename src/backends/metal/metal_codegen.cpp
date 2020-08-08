@@ -37,11 +37,6 @@ void MetalCodegen::_emit_builtin_variable(BuiltinVariable tag) {
     }
 }
 
-void MetalCodegen::_emit_argument_member_decl(Variable v) {
-    if (auto vt = v.type(); is_ptr_or_ref(vt)) { _os << "device "; }
-    _emit_variable_decl(v);
-}
-
 void MetalCodegen::emit(const Function &f) {
     // stabs
     _os << "#include <metal_stdlib>\n"
@@ -54,6 +49,7 @@ void MetalCodegen::emit(const Function &f) {
 }
 
 void MetalCodegen::_emit_type(const TypeDesc *desc) {
+    if (is_ptr_or_ref(desc)) { _os << "device "; }
     if (desc->type == TypeCatalog::ATOMIC) {
         _os << "_atomic<";
         _emit_type(desc->element_type);

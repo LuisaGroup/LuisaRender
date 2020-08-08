@@ -225,6 +225,14 @@ std::unique_ptr<Kernel> MetalDevice::_compile_kernel(const dsl::Function &f) {
         NSLog(@"%@", library);
     }
     
+    auto function = [library newFunctionWithName:make_objc_string(f.name())];
+    NSLog(@"%@", function);
+    
+    MTLAutoreleasedArgument reflection;
+    auto argument_encoder = [function newArgumentEncoderWithBufferIndex:0 reflection:&reflection];
+    
+    NSLog(@"%@", reflection);
+    
     LUISA_INFO("Done.");
     auto digest = sha1_digest(s);
     std::cout << "Digest: " << digest << "\n\n" << s << std::endl;

@@ -39,7 +39,7 @@ protected:
     virtual void _emit_variable(Variable v);
     virtual void _emit_builtin_variable(BuiltinVariable tag);
     virtual void _emit_variable_decl(Variable v);
-    virtual void _emit_argument_member_decl(Variable v) { _emit_variable_decl(std::move(v)); }
+    virtual void _emit_argument_member_decl(Variable v);
     virtual void _emit_type(const TypeDesc *desc);
     virtual void _emit_function_call(const std::string &name);
     virtual void _emit_argument_struct_decl(const dsl::Function &f);

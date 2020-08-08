@@ -342,6 +342,7 @@ void CppCodegen::_emit_variable(Variable v) {
         _os << "v" << v.uid();
     }
 }
+
 void CppCodegen::_emit_builtin_variable(BuiltinVariable tag) {
     switch (tag) {
         case BuiltinVariable::THREAD_ID:
@@ -486,6 +487,10 @@ void CppCodegen::_emit_argument_struct_decl(const Function &f) {
         _os << ";\n";
     }
     _os << "};\n\n";
+}
+
+void CppCodegen::_emit_argument_member_decl(Variable v) {
+    _emit_variable_decl(std::move(v));
 }
 
 }

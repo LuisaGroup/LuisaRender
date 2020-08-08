@@ -62,12 +62,22 @@ int main(int argc, char *argv[]) {
         Arg<LUT> lut;
         Arg<ImportanceSamplePixelsKernelUniforms> uniforms;
         
+        Auto a{0};
+        Switch(a) {
+            Case(0) {
+                Break;
+            };
+            Default {
+                Break;
+            };
+        };
+        
         auto tid = thread_id();
         auto tile = uniforms.$(tile);
         If(tid < tile.$(size).x() * tile.$(size).y()) {
             Auto u{random_buffer[tid]};
-            auto [x, wx] = sample_1d(u.x(), lut);
-            auto [y, wy] = sample_1d(u.y(), lut);
+            auto[x, wx] = sample_1d(u.x(), lut);
+            auto[y, wy] = sample_1d(u.y(), lut);
             pixel_location_buffer[tid] = make_float2(
                 cast<float>(tid % tile.$(size).x() + tile.$(origin).y()) + 0.5f + x * uniforms.$(radius),
                 cast<float>(tid / tile.$(size).x() + tile.$(origin).y()) + 0.5f + y * uniforms.$(radius));
