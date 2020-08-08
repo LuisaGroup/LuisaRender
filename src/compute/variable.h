@@ -36,6 +36,7 @@ protected:
     uint32_t _uid{0u};
     
     bool _is_argument{false};
+    bool _is_valid{true};
     
     // For builtin variables
     BuiltinVariable _builtin_tag{BuiltinVariable::NOT_BUILTIN};
@@ -44,6 +45,7 @@ protected:
     Expression *_expression{nullptr};
 
 public:
+    Variable() noexcept : _is_valid{false} {}
     Variable(const TypeDesc *type, uint32_t uid, bool is_argument = false) noexcept;
     Variable(const TypeDesc *type, BuiltinVariable tag) noexcept;
     explicit Variable(Expression *expr) noexcept;
@@ -51,6 +53,7 @@ public:
     Variable(const Variable &) = default;
     
     [[nodiscard]] bool is_argument() const noexcept { return _is_argument; }
+    [[nodiscard]] bool is_valid() const noexcept { return _is_valid; }
     [[nodiscard]] Expression *expression() const noexcept { return _expression; }
     [[nodiscard]] const TypeDesc *type() const noexcept { return _type; }
     [[nodiscard]] uint32_t uid() const noexcept { return _uid; }

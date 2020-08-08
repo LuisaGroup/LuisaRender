@@ -63,6 +63,8 @@ public:
     void visit(const WhileStmt &while_stmt) override;
     void visit(const ForStmt &loop_stmt) override;
     void visit(const ExprStmt &expr_stmt) override;
+    void visit(const SwitchStmt &switch_stmt) override;
+    void visit(const CaseStmt &case_stmt) override;
 };
 
 }

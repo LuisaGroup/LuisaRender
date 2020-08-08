@@ -6,6 +6,7 @@
 
 #include <functional>
 #include <utility>
+#include <optional>
 
 #include <compute/variable.h>
 #include <compute/expression.h>
@@ -28,6 +29,8 @@ class IfStmt;
 class WhileStmt;
 class ForStmt;
 class ExprStmt;
+class SwitchStmt;
+class CaseStmt;
 
 // Statement visitor interface
 struct StmtVisitor {
@@ -37,6 +40,8 @@ struct StmtVisitor {
     virtual void visit(const WhileStmt &while_stmt) = 0;
     virtual void visit(const ForStmt &loop_stmt) = 0;
     virtual void visit(const ExprStmt &expr_stmt) = 0;
+    virtual void visit(const SwitchStmt &switch_stmt) = 0;
+    virtual void visit(const CaseStmt &case_stmt) = 0;
 };
 
 #define MAKE_STATEMENT_ACCEPT_VISITOR()                                     \
@@ -62,10 +67,36 @@ class IfStmt : public Statement {
 
 private:
     Variable _condition;
+    bool _is_elif;
 
 public:
-    explicit IfStmt(Variable cond) noexcept: _condition{std::move(cond)} {}
+    explicit IfStmt(Variable cond, bool is_elif = false) noexcept: _condition{std::move(cond)}, _is_elif{is_elif} {}
     [[nodiscard]] Variable condition() const noexcept { return _condition; }
+    [[nodiscard]] bool is_elif() const noexcept { return _is_elif; }
+    MAKE_STATEMENT_ACCEPT_VISITOR()
+};
+
+class SwitchStmt : public Statement {
+
+private:
+    Variable _expr;
+
+public:
+    explicit SwitchStmt(Variable expr) noexcept : _expr{std::move(expr)} {}
+    [[nodiscard]] Variable expression() const noexcept { return _expr; }
+    MAKE_STATEMENT_ACCEPT_VISITOR()
+};
+
+class CaseStmt : public Statement {
+
+private:
+    Variable _expr;
+
+public:
+    CaseStmt() noexcept = default;
+    explicit CaseStmt(Variable expr) noexcept : _expr{std::move(expr)} {}
+    [[nodiscard]] Variable expression() const noexcept { return _expr; }
+    [[nodiscard]] bool is_default() const noexcept { return !_expr.is_valid(); }
     MAKE_STATEMENT_ACCEPT_VISITOR()
 };
 

@@ -117,6 +117,34 @@ struct IfStmtBuilder {
         Function::current().add_statement(std::make_unique<KeywordStmt>("else"));
         Function::current().block(std::forward<False>(f));
     }
+    
+    // for else if
+    const IfStmtBuilder &operator>>(Variable else_cond) const noexcept {
+        Function::current().add_statement(std::make_unique<KeywordStmt>("else"));
+        Function::current().add_statement(std::make_unique<IfStmt>(std::move(else_cond), true));
+        return *this;
+    }
+};
+
+struct SwitchStmtBuilder {
+    
+    explicit SwitchStmtBuilder(Variable expr) noexcept { Function::current().add_statement(std::make_unique<SwitchStmt>(std::move(expr))); }
+    
+    template<typename Body, std::enable_if_t<std::is_invocable_v<Body>, int> = 0>
+    void operator<<(Body &&body) const noexcept {
+        Function::current().block(std::forward<Body>(body));
+    }
+};
+
+struct CaseStmtBuilder {
+    
+    explicit CaseStmtBuilder(Variable expr) noexcept { Function::current().add_statement(std::make_unique<CaseStmt>(std::move(expr))); }
+    CaseStmtBuilder() noexcept { Function::current().add_statement(std::make_unique<CaseStmt>()); }
+    
+    template<typename Body, std::enable_if_t<std::is_invocable_v<Body>, int> = 0>
+    void operator<<(Body &&body) const noexcept {
+        Function::current().block(std::forward<Body>(body));
+    }
 };
 
 struct WhileStmtBuilder {
@@ -172,13 +200,18 @@ public:
 #define var var
 #define let let
 
-#define If(...) IfStmtBuilder{literal(__VA_ARGS__)} << [&]
-#define Else    >> [&]
+#define If(...)     IfStmtBuilder{literal(__VA_ARGS__)} << [&]
+#define Else        >> [&]
+#define Elif(...)   >> literal(__VA_ARGS__) << [&]
 
-#define While(...) WhileStmtBuilder{literal(__VA_ARGS__)} << [&]
+#define Switch(...) SwitchStmtBuilder{literal(__VA_ARGS__)} << [&]
+#define Case(...)   CaseStmtBuilder{literal(__VA_ARGS__)} << [&]
+#define Default     CaseStmtBuilder{} << [&]
 
-#define Loop LoopWhenStmtBuilder{} << [&]
-#define When(...) >> literal(__VA_ARGS__)
+#define While(...)  WhileStmtBuilder{literal(__VA_ARGS__)} << [&]
+
+#define Loop        LoopWhenStmtBuilder{} << [&]
+#define When(...)   >> literal(__VA_ARGS__)
 
 #define For(v, ...) ForStmtBuilder{__VA_ARGS__} << [&](Variable v)
 

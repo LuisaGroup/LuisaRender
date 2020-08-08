@@ -255,10 +255,28 @@ void CppCodegen::visit(const KeywordStmt &stmt) {
 }
 
 void CppCodegen::visit(const IfStmt &if_stmt) {
-    _emit_indent();
+    if (!if_stmt.is_elif()) { _emit_indent(); }
     _os << "if (";
     _emit_variable(if_stmt.condition());
     _os << ") ";
+}
+
+void CppCodegen::visit(const SwitchStmt &switch_stmt) {
+    _emit_indent();
+    _os << "switch (";
+    _emit_variable(switch_stmt.expression());
+    _os << ") ";
+}
+
+void CppCodegen::visit(const CaseStmt &case_stmt) {
+    _emit_indent();
+    if (case_stmt.is_default()) {
+        _os << "default: ";
+    } else {
+        _os << "case ";
+        _emit_variable(case_stmt.expression());
+        _os << ": ";
+    }
 }
 
 void CppCodegen::visit(const WhileStmt &while_stmt) {
@@ -435,7 +453,7 @@ void CppCodegen::_emit_type(const TypeDesc *desc) {
                 et->type != TypeCatalog::REFERENCE) { _os << " "; }
             _os << "&";
             break;
-        case TypeCatalog ::ATOMIC:
+        case TypeCatalog::ATOMIC:
             _os << "atomic<";
             _emit_type(desc->element_type);
             _os << ">";
