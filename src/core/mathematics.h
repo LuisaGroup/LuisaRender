@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <compute/data_types.h>
+#include <core/data_types.h>
 
 namespace luisa::math { inline namespace constants {
 

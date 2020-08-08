@@ -9,7 +9,7 @@
 
 #include <compute/statement.h>
 
-namespace luisa::dsl {
+namespace luisa::compute::dsl {
 
 class Function {
     

@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <compute/data_types.h>
+#include <core/data_types.h>
 #include <compute/type_desc.h>
 
 namespace luisa {
@@ -16,7 +16,7 @@ struct Viewport {
 
 #ifndef LUISA_DEVICE_COMPATIBLE
 
-namespace dsl {
+namespace compute::dsl {
 LUISA_STRUCT(Viewport, origin, size)
 }
 

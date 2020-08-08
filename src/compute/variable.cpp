@@ -9,7 +9,7 @@
 
 #include "variable.h"
 
-namespace luisa::dsl {
+namespace luisa::compute::dsl {
 
 Variable::Variable(const TypeDesc *type, BuiltinVariable tag) noexcept
     : _type{type}, _builtin_tag{tag} {}

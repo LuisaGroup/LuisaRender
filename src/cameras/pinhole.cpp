@@ -2,7 +2,7 @@
 // Created by Mike Smith on 2020/2/20.
 //
 
-#include <compute/mathematics.h>
+#include <core/mathematics.h>
 #include <render/camera.h>
 
 #include "pinhole.h"

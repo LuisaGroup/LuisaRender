@@ -3,14 +3,14 @@
 
 #include <render/filter.h>
 
-namespace luisa::dsl {
+namespace luisa::compute::dsl {
 using namespace luisa::filter::separable;
 LUISA_STRUCT(LUT, w, cdf)
 LUISA_STRUCT(ImportanceSamplePixelsKernelUniforms, tile, radius, scale)
 }
 
 using namespace luisa;
-using namespace luisa::dsl;
+using namespace luisa::compute::dsl;
 
 int main(int argc, char *argv[]) {
     

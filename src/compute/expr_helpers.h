@@ -6,7 +6,7 @@
 
 #include <compute/function.h>
 
-namespace luisa::dsl {
+namespace luisa::compute::dsl {
 
 template<typename ...Args>
 inline Variable literal(Args &&...args) noexcept {
@@ -23,17 +23,17 @@ inline Variable literal(Args &&...args) noexcept {
 }
 
 // binary operators for Variable in global namespace
-#define MAKE_VARIABLE_BINARY_OPERATOR_IMPL(op)                                       \
-template<typename T, luisa::dsl::detail::EnableIfLiteralOperand<T> = 0>              \
-[[nodiscard]] inline auto operator op(T &&lhs, luisa::dsl::Variable rhs) noexcept {  \
-    return luisa::dsl::literal(std::forward<T>(lhs)).operator op(rhs);               \
-}                                                                                    \
+#define MAKE_VARIABLE_BINARY_OPERATOR_IMPL(op)                                                \
+template<typename T, luisa::compute::dsl::detail::EnableIfLiteralOperand<T> = 0>              \
+[[nodiscard]] inline auto operator op(T &&lhs, luisa::compute::dsl::Variable rhs) noexcept {  \
+    return luisa::compute::dsl::literal(std::forward<T>(lhs)).operator op(rhs);               \
+}                                                                                             \
 
 LUISA_MAP_MACRO(MAKE_VARIABLE_BINARY_OPERATOR_IMPL, +, -, *, /, %, <<, >>, &, |, ^, &&, ||, ==, !=, <,>, <=, >=)
 
 #undef MAKE_VARIABLE_BINARY_OPERATOR_IMPL
 
-namespace luisa::dsl {
+namespace luisa::compute::dsl {
 
 // binary operators for Variable
 #define MAKE_VARIABLE_MEMBER_BINARY_OPERATOR_IMPL(op)                         \

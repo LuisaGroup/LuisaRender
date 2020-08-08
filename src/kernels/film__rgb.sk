@@ -1,6 +1,6 @@
-#include <compute/data_types.h>
+#include <core/data_types.h>
 #include <render/colorspaces.h>
-#include <compute/mathematics.h>
+#include <core/mathematics.h>
 
 using namespace luisa;
 using namespace luisa::math;

@@ -18,7 +18,6 @@ private:
     std::filesystem::path _runtime_directory;
     std::filesystem::path _working_directory;
     mutable std::map<std::filesystem::path, DynamicModuleHandle, std::less<>> _loaded_modules;
-    std::map<std::string, uint32_t, std::less<>> _counters;
     
     static bool _create_folder_if_necessary(const std::filesystem::path &path) noexcept;
 

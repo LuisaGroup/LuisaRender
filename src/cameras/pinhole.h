@@ -5,7 +5,7 @@
 #pragma once
 
 #include <render/ray.h>
-#include <compute/mathematics.h>
+#include <core/mathematics.h>
 #include <render/viewport.h>
 
 namespace luisa::camera::pinhole {

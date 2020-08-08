@@ -10,7 +10,7 @@
 
 #include <core/concepts.h>
 
-#include <compute/data_types.h>
+#include <core/data_types.h>
 #include <compute/buffer.h>
 
 namespace luisa {

@@ -9,12 +9,16 @@
 #include <core/logging.h>
 #include <core/concepts.h>
 
-namespace luisa {
-class TypelessBuffer;
-struct KernelDispatcher;
+namespace luisa::compute {
+
+
+
 }
 
 namespace luisa {
+
+class TypelessBuffer;
+struct KernelDispatcher;
 
 template<typename T>
 class BufferView {

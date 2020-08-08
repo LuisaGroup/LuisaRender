@@ -9,7 +9,7 @@
 
 #include <compute/variable.h>
 
-namespace luisa::dsl {
+namespace luisa::compute::dsl {
 
 struct ExprVisitor;
 

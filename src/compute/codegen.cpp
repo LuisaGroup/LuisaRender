@@ -4,7 +4,7 @@
 
 #include "codegen.h"
 
-namespace luisa::dsl {
+namespace luisa::compute::dsl {
 
 void CppCodegen::emit(const Function &f) {
     

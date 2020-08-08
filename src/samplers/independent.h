@@ -5,7 +5,7 @@
 #pragma once
 
 #include <render/viewport.h>
-#include <compute/mathematics.h>
+#include <core/mathematics.h>
 
 namespace luisa::sampler::independent {
 

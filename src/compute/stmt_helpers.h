@@ -7,7 +7,7 @@
 #include <compute/function.h>
 #include <compute/expr_helpers.h>
 
-namespace luisa::dsl {
+namespace luisa::compute::dsl {
 
 inline void void_(Variable v) { Function::current().add_statement(std::make_unique<ExprStmt>(v)); }
 

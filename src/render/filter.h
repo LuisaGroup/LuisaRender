@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <compute/mathematics.h>
+#include <core/mathematics.h>
 
 #include "viewport.h"
 #include "sampling.h"

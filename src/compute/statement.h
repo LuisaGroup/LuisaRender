@@ -11,7 +11,7 @@
 #include <compute/variable.h>
 #include <compute/expression.h>
 
-namespace luisa::dsl {
+namespace luisa::compute::dsl {
 
 // fwd-decl
 struct StmtVisitor;

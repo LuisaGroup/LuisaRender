@@ -38,15 +38,15 @@ private:
 protected:
     Context *_context;
     virtual void _launch_async(std::function<void(KernelDispatcher &)> dispatch, std::function<void()> callback) = 0;
-    [[nodiscard]] virtual std::unique_ptr<Kernel> _compile_kernel(const dsl::Function &f) = 0;
+    [[nodiscard]] virtual std::unique_ptr<Kernel> _compile_kernel(const compute::dsl::Function &f) = 0;
 
 public:
     explicit Device(Context *context) noexcept;
     virtual ~Device() noexcept;
     
-    template<typename Def, std::enable_if_t<std::is_invocable_v<Def, dsl::Function &>, int> = 0>
+    template<typename Def, std::enable_if_t<std::is_invocable_v<Def, compute::dsl::Function &>, int> = 0>
     [[nodiscard]] std::unique_ptr<Kernel> compile_kernel(std::string_view name, Def &&def) {
-        dsl::Function function{std::string{name}};
+        compute::dsl::Function function{std::string{name}};
         def(function);
         return _compile_kernel(function);
     }

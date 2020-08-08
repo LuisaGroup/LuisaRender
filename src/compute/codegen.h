@@ -11,7 +11,7 @@ namespace luisa {
 class Device;
 }
 
-namespace luisa::dsl {
+namespace luisa::compute::dsl {
 
 class Codegen : Noncopyable {
 
@@ -42,7 +42,7 @@ protected:
     virtual void _emit_argument_member_decl(Variable v);
     virtual void _emit_type(const TypeDesc *desc);
     virtual void _emit_function_call(const std::string &name);
-    virtual void _emit_argument_struct_decl(const dsl::Function &f);
+    virtual void _emit_argument_struct_decl(const compute::dsl::Function &f);
 
 public:
     CppCodegen(std::ostream &os, Device *device) noexcept : Codegen{os, device} {}

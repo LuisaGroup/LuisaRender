@@ -6,7 +6,7 @@
 
 #include <chrono>
 
-#include <compute/mathematics.h>
+#include <core/mathematics.h>
 #include "core/plugin.h"
 #include "core/parser.h"
 #include "scene.h"

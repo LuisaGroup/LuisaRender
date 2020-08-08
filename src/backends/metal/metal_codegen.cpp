@@ -6,7 +6,7 @@
 
 namespace luisa::metal {
 
-using namespace luisa::dsl;
+using namespace luisa::compute::dsl;
 
 void MetalCodegen::_emit_function_decl(const Function &f) {
     

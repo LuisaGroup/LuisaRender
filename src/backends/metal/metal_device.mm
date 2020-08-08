@@ -44,7 +44,7 @@ private:
 protected:
     id<MTLLibrary> _load_library(std::string_view library_name);
     void _launch_async(std::function<void(KernelDispatcher &)> dispatch, std::function<void()> callback) override;
-    std::unique_ptr<Kernel> _compile_kernel(const dsl::Function &f) override;
+    std::unique_ptr<Kernel> _compile_kernel(const compute::dsl::Function &f) override;
 
 public:
     explicit MetalDevice(Context *context);
@@ -208,7 +208,7 @@ id<MTLLibrary> MetalDevice::_load_library(std::string_view library_name) {
     return library_iter->second;
 }
 
-std::unique_ptr<Kernel> MetalDevice::_compile_kernel(const dsl::Function &f) {
+std::unique_ptr<Kernel> MetalDevice::_compile_kernel(const compute::dsl::Function &f) {
     
     LUISA_INFO("Generating...");
     std::ostringstream os;

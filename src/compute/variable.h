@@ -7,7 +7,7 @@
 #include <variant>
 #include <compute/type_desc.h>
 
-namespace luisa::dsl {
+namespace luisa::compute::dsl {
 class Expression;
 class Function;
 }
@@ -17,7 +17,7 @@ enum struct BuiltinVariable : uint32_t {
     THREAD_ID = 1u,
 };
 
-namespace luisa::dsl {
+namespace luisa::compute::dsl {
 
 namespace detail {
 

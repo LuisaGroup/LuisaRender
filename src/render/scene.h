@@ -8,7 +8,7 @@
 #include "hit.h"
 #include "material.h"
 #include "interaction.h"
-#include <compute/mathematics.h>
+#include <core/mathematics.h>
 
 #ifndef LUISA_DEVICE_COMPATIBLE
 

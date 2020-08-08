@@ -2,7 +2,7 @@
 // Created by Mike Smith on 2020/2/9.
 //
 
-#include <compute/mathematics.h>
+#include <core/mathematics.h>
 #include "trs.h"
 
 namespace luisa {

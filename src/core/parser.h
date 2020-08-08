@@ -11,7 +11,7 @@
 
 #include <core/logging.h>
 
-#include <compute/data_types.h>
+#include <core/data_types.h>
 #include "plugin.h"
 
 namespace luisa {

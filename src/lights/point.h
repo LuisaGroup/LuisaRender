@@ -6,7 +6,7 @@
 
 #include <render/ray.h>
 #include <render/interaction.h>
-#include <compute/mathematics.h>
+#include <core/mathematics.h>
 #include <render/light.h>
 
 namespace luisa::light::point {
