@@ -5,19 +5,15 @@
 #pragma once
 
 #include <variant>
+
 #include <compute/type_desc.h>
+#include <compute/v2/buffer.h>
+#include <compute/v2/texture.h>
 
 namespace luisa::compute::dsl {
+
 class Expression;
 class Function;
-}
-
-enum struct BuiltinVariable : uint32_t {
-    NOT_BUILTIN = 0u,
-    THREAD_ID = 1u,
-};
-
-namespace luisa::compute::dsl {
 
 namespace detail {
 
@@ -28,39 +24,115 @@ using EnableIfLiteralOperand = std::enable_if_t<
     
 }
 
+enum struct VariableTag {
+    
+    INVALID,    // invalid
+    
+    // for arguments
+    BUFFER,     // device buffers
+    TEXTURE,    // textures
+    UNIFORM,    // uniforms
+    IMMUTABLE,  // immutable data, i.e. constant uniforms
+    
+    // for local variables
+    LOCAL,      // local variables
+    
+    // for expression nodes
+    TEMPORARY,  // temporary variables, i.e. expression nodes
+    
+    // for builtin variables
+    THREAD_ID,  // built-in thread id
+};
+
 class Variable {
 
 protected:
-    // For variable declarations
     const TypeDesc *_type{nullptr};
     uint32_t _uid{0u};
+    VariableTag _tag{VariableTag::INVALID};
     
-    bool _is_argument{false};
-    bool _is_valid{true};
-    
-    // For builtin variables
-    BuiltinVariable _builtin_tag{BuiltinVariable::NOT_BUILTIN};
+    // For kernel argument bindings
+    BufferView<std::byte> _buffer;
+    Texture *_texture{nullptr};
+    void *_data_ref{nullptr};
+    std::vector<std::byte> _immutable_data;
     
     // For temporary variables in expressions
     Expression *_expression{nullptr};
 
 public:
-    Variable() noexcept : _is_valid{false} {}
-    Variable(const TypeDesc *type, uint32_t uid, bool is_argument = false) noexcept;
-    Variable(const TypeDesc *type, BuiltinVariable tag) noexcept;
-    explicit Variable(Expression *expr) noexcept;
+    // Empty (i.e. invalid) variables, do not use unless necessary
+    Variable() noexcept = default;
+    
+    // Local variables
+    Variable(const TypeDesc *type, uint32_t uid) noexcept
+        : _type{type}, _uid{uid}, _tag{VariableTag::LOCAL} {}
+    
+    // Buffer arguments
+    Variable(const TypeDesc *type, uint32_t uid, Buffer *buffer, size_t offset, size_t size) noexcept
+        : _type{type}, _uid{uid}, _buffer{buffer->view<std::byte>(offset, size)}, _tag{VariableTag::BUFFER} {}
+    
+    // Texture arguments
+    Variable(const TypeDesc *type, uint32_t uid, Texture *texture) noexcept
+        : _type{type}, _uid{uid}, _texture{texture}, _tag{VariableTag::TEXTURE} {}
+    
+    // Immutable uniforms
+    Variable(const TypeDesc *type, uint32_t uid, const void *data, size_t size) noexcept
+        : _type{type}, _uid{uid}, _tag{VariableTag::IMMUTABLE} {
+        _immutable_data.resize(size);
+        std::memmove(_immutable_data.data(), data, size);
+    }
+    
+    // Uniforms
+    Variable(const TypeDesc *type, uint32_t uid, void *data_ref) noexcept
+        : _type{type}, _uid{uid}, _data_ref{data_ref}, _tag{VariableTag::UNIFORM} {}
+    
+    // Built-in variables
+    Variable(const TypeDesc *type, VariableTag tag) noexcept
+        : _type{type}, _tag{tag} {}
+    
+    // For temporary variables, i.e. expression nodes
+    explicit Variable(Expression *expr) noexcept
+        : _expression{expr}, _tag{VariableTag::TEMPORARY} {}
+    
     Variable(Variable &&) = default;
     Variable(const Variable &) = default;
     
-    [[nodiscard]] bool is_argument() const noexcept { return _is_argument; }
-    [[nodiscard]] bool is_valid() const noexcept { return _is_valid; }
+    [[nodiscard]] auto tag() const noexcept { return _tag; }
+    
+    [[nodiscard]] bool is_valid() const noexcept { return _tag != VariableTag::INVALID; }
+    [[nodiscard]] bool is_temporary() const noexcept { return _tag == VariableTag::TEMPORARY; }
+    [[nodiscard]] bool is_local() const noexcept { return _tag == VariableTag::LOCAL; }
+    
+    [[nodiscard]] bool is_buffer_argument() const noexcept { return _tag == VariableTag::BUFFER; }
+    [[nodiscard]] bool is_texture_argument() const noexcept { return _tag == VariableTag::TEXTURE; }
+    [[nodiscard]] bool is_uniform_argument() const noexcept { return _tag == VariableTag::UNIFORM; }
+    [[nodiscard]] bool is_immutable_argument() const noexcept { return _tag == VariableTag::IMMUTABLE; }
+    
+    [[nodiscard]] bool is_argument() const noexcept {
+        return is_buffer_argument() || is_texture_argument() || is_uniform_argument() || is_immutable_argument();
+    }
+    
+    [[nodiscard]] bool is_thread_id() const noexcept { return _tag == VariableTag::THREAD_ID; }
+    [[nodiscard]] bool is_builtin() const noexcept { return is_thread_id(); }
+    
     [[nodiscard]] Expression *expression() const noexcept { return _expression; }
     [[nodiscard]] const TypeDesc *type() const noexcept { return _type; }
     [[nodiscard]] uint32_t uid() const noexcept { return _uid; }
-    [[nodiscard]] BuiltinVariable builtin_tag() const noexcept { return _builtin_tag; }
-    [[nodiscard]] bool is_temporary() const noexcept { return _expression != nullptr; }
-    [[nodiscard]] bool is_builtin() const noexcept { return _builtin_tag != BuiltinVariable::NOT_BUILTIN; }
     
+    // for buffers
+    [[nodiscard]] BufferView<std::byte> buffer() const noexcept { return _buffer; }
+    
+    // for textures
+    [[nodiscard]] Texture *texture() const noexcept { return _texture; }
+    
+    // for uniforms
+    [[nodiscard]] void *uniform_data() const noexcept { return _data_ref; }
+    
+    // for immutable data
+    [[nodiscard]] const std::vector<std::byte> &immutable_data() const noexcept { return _immutable_data; }
+    
+    // Member access operators
     [[nodiscard]] Variable member(std::string m) const noexcept;
     [[nodiscard]] Variable operator[](std::string m) const noexcept { return member(std::move(m)); }
     

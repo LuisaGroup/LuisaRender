@@ -28,10 +28,10 @@ struct ImportanceSamplePixelsKernelUniforms {
 
 #ifndef LUISA_DEVICE_COMPATIBLE
 
-#include "core/plugin.h"
+#include "plugin.h"
 #include <compute/kernel.h>
 #include "ray.h"
-#include "core/parser.h"
+#include "parser.h"
 #include "sampler.h"
 
 namespace luisa {

@@ -218,14 +218,14 @@ std::unique_ptr<Kernel> MetalDevice::_compile_kernel(const compute::dsl::Functio
     
     LUISA_INFO("Compiling...");
     NSError *error = nullptr;
-    auto library = [_handle newLibraryWithSource:make_objc_string(s) options:nullptr error:&error];
+    auto library = [_handle newLibraryWithSource:@(s.c_str()) options:nullptr error:&error];
     if (error != nullptr) {
         NSLog(@"%@", error);
     } else {
         NSLog(@"%@", library);
     }
     
-    auto function = [library newFunctionWithName:make_objc_string(f.name())];
+    auto function = [library newFunctionWithName:@(f.name().c_str())];
     NSLog(@"%@", function);
     
     MTLAutoreleasedArgument reflection;

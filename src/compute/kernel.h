@@ -91,7 +91,7 @@ struct Kernel : Noncopyable {
 struct KernelDispatcher : Noncopyable {
     
     virtual ~KernelDispatcher() noexcept = default;
-    
+
 //    virtual void operator()(Kernel &kernel, uint2 threadgroups, uint2 threadgroup_size, const std::vector<KernelArgument> &arguments) = 0;
     
     virtual void operator()(Kernel &kernel, uint2 threadgroups, uint2 threadgroup_size, std::function<void(KernelArgumentEncoder &)> encode) = 0;

@@ -20,11 +20,9 @@
 #include <compute/function.h>
 
 namespace luisa {
+
 class Geometry;
 struct Acceleration;
-}
-
-namespace luisa {
 
 class Device : Noncopyable {
 
@@ -33,7 +31,6 @@ private:
     std::mutex _mutex;
     uint _command_queue_size;
     uint _working_command_count;
-    inline static std::unordered_map<std::string_view, std::function<std::unique_ptr<Device>()>> _device_creators{};
 
 protected:
     Context *_context;

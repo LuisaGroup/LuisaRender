@@ -18,8 +18,8 @@ struct Selection {
 #ifndef LUISA_DEVICE_COMPATIBLE
 
 #include "ray.h"
-#include "core/plugin.h"
-#include "core/parser.h"
+#include "plugin.h"
+#include "parser.h"
 #include <compute/device.h>
 #include "interaction.h"
 

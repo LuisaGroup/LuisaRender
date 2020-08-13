@@ -23,7 +23,7 @@ private:
     std::vector<std::unique_ptr<Statement>> _statements;
     std::vector<const TypeDesc *> _used_types;
     
-    uint32_t _used_builtins{0u};
+    std::vector<VariableTag> _used_builtins;
     uint32_t _uid_counter{0u};
     
     inline static thread_local Function *_current{nullptr};
@@ -31,12 +31,12 @@ private:
     [[nodiscard]] uint32_t _get_uid() noexcept { return _uid_counter++; }
     
     template<typename T>
-    [[nodiscard]] Variable _builtin_var(BuiltinVariable tag) noexcept {
+    [[nodiscard]] Variable _builtin_var(VariableTag tag) noexcept {
         auto type = type_desc<T>;
         _used_types.emplace_back(type);
         Variable v{type, tag};
-        if (auto bit = static_cast<uint32_t>(tag); (_used_builtins & bit) == 0u) {
-            _used_builtins |= bit;
+        if (std::find(_used_builtins.cbegin(), _used_builtins.cend(), tag) == _used_builtins.cend()) {
+            _used_builtins.emplace_back(tag);
             _builtin_vars.emplace_back(v);
         }
         return v;
@@ -62,11 +62,32 @@ public:
     
     [[nodiscard]] const std::string &name() const noexcept { return _name; }
     
-    template<typename T>
-    [[nodiscard]] Variable arg() noexcept {
+    template<typename T, typename U>
+    [[nodiscard]] Variable arg(BufferView<U> bv) noexcept {
         auto type = type_desc<T>;
         _used_types.emplace_back(type);
-        return _arguments.emplace_back(type, _get_uid(), true);
+        return _arguments.emplace_back(type, _get_uid(), bv.buffer(), bv.byte_offset(), bv.byte_size());
+    }
+    
+    template<typename T>
+    [[nodiscard]] Variable arg(Texture *tex) noexcept {
+        auto type = type_desc<T>;
+        _used_types.emplace_back(type);
+        return _arguments.emplace_back(type, _get_uid(), tex);
+    }
+    
+    template<typename T>
+    [[nodiscard]] Variable arg(void *data) noexcept {
+        auto type = type_desc<T>;
+        _used_types.emplace_back(type);
+        return _arguments.emplace_back(type, _get_uid(), data);
+    }
+    
+    template<typename T>
+    [[nodiscard]] Variable arg(const void *data, size_t size) noexcept {
+        auto type = type_desc<T>;
+        _used_types.emplace_back(type);
+        return _arguments.emplace_back(type, _get_uid(), data, size);
     }
     
     template<typename ...Literals,
@@ -86,17 +107,13 @@ public:
         return add_expression(std::make_unique<LiteralExpr>(std::move(values)));
     }
     
-    [[nodiscard]] Variable thread_id() noexcept { return _builtin_var<uint32_t>(BuiltinVariable::THREAD_ID); }
+    [[nodiscard]] Variable thread_id() noexcept { return _builtin_var<uint32_t>(VariableTag::THREAD_ID); }
     
     template<typename T, typename ...Literals>
     [[nodiscard]] Variable var(Literals &&...vs) noexcept { return _var_or_const<T, false>(std::forward<Literals>(vs)...); }
     
-    [[nodiscard]] Variable var(LiteralExpr::Value v) noexcept { return _var_or_const<AutoType, false>(std::move(v)); }
-    
     template<typename T, typename ...Literals>
     [[nodiscard]] Variable constant(Literals &&...vs) noexcept { return _var_or_const<T, true>(std::forward<Literals>(vs)...); }
-    
-    [[nodiscard]] Variable constant(LiteralExpr::Value v) noexcept { return _var_or_const<AutoType, true>(std::move(v)); }
     
     [[nodiscard]] Variable add_expression(std::unique_ptr<Expression> expr) noexcept {
         return Variable{_expressions.emplace_back(std::move(expr)).get()};

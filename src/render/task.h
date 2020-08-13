@@ -7,8 +7,8 @@
 #include <chrono>
 
 #include <core/mathematics.h>
-#include "core/plugin.h"
-#include "core/parser.h"
+#include "plugin.h"
+#include "parser.h"
 #include "scene.h"
 #include "camera.h"
 #include "sampler.h"

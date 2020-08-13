@@ -332,25 +332,16 @@ void CppCodegen::_emit_variable_decl(Variable v) {
 }
 
 void CppCodegen::_emit_variable(Variable v) {
-    if (v.is_builtin()) {
-        _emit_builtin_variable(v.builtin_tag());
-    } else if (v.is_temporary()) {
+    if (v.is_temporary()) {
         v.expression()->accept(*this);
     } else if (v.is_argument()) {
         _os << "arg.v" << v.uid();
-    } else {
+    } else if (v.is_local()) {
         _os << "v" << v.uid();
-    }
-}
-
-void CppCodegen::_emit_builtin_variable(BuiltinVariable tag) {
-    switch (tag) {
-        case BuiltinVariable::THREAD_ID:
-            _os << "$tid";
-            break;
-        default:
-            _os << "$unknown";
-            break;
+    } else if (v.is_thread_id()) {
+        _os << "$tid";
+    } else {
+        _os << "$unknown";
     }
 }
 
@@ -453,6 +444,14 @@ void CppCodegen::_emit_type(const TypeDesc *desc) {
                 et->type != TypeCatalog::POINTER &&
                 et->type != TypeCatalog::REFERENCE) { _os << " "; }
             _os << "&";
+            break;
+        case TypeCatalog::TEXTURE:
+            _os << "texture2d<float, access::";
+            if (desc->access == AccessMode::READ_ONLY) { _os << "read"; }
+            else if (desc->access == AccessMode::WRITE_ONLY) { _os << "write"; }
+            else if (desc->access == AccessMode::READ_WRITE) { _os << "read_write"; }
+            else if (desc->access == AccessMode::SAMPLE) { _os << "sample"; }
+            _os << ">";
             break;
         case TypeCatalog::ATOMIC:
             _os << "atomic<";

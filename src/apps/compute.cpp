@@ -54,15 +54,21 @@ int main(int argc, char *argv[]) {
         return std::make_pair(Auto{offset * 2.0f - 1.0f}, Auto{select(w >= 0.0f, 1.0f, -1.0f)});
     };
     
+    luisa::compute::BufferView<int> empty;
+    
     auto kernel = device->compile_kernel("foo", LUISA_FUNC {
         
-        Arg<const float2 *> random_buffer;
-        Arg<float2 *> pixel_location_buffer;
-        Arg<float3 *> pixel_weight_buffer;
-        Arg<LUT> lut;
-        Arg<ImportanceSamplePixelsKernelUniforms> uniforms;
+        Arg<const float2 *> random_buffer{empty};
+        Arg<float2 *> pixel_location_buffer{empty};
+        Arg<float3 *> pixel_weight_buffer{empty};
+        Arg<LUT> lut{empty};
+        Arg<ImportanceSamplePixelsKernelUniforms> uniforms{empty};
+        
+        Arg<std::array<Tex2D<luisa::compute::AccessMode::READ_WRITE>, 10>> texture{empty};
         
         Auto a{0};
+        Auto p{&a};
+        
         Switch(a) {
             Case(0) {
                 Break;

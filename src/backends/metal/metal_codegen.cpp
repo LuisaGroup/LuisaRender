@@ -13,28 +13,12 @@ void MetalCodegen::_emit_function_decl(const Function &f) {
     // kernel head
     _os << "kernel void " << f.name() << "(device const Argument &arg [[buffer(0)]]";
     for (auto &&v : f.builtin_variables()) {
-        _os << ", ";
-        switch (v.builtin_tag()) {
-            case BuiltinVariable::THREAD_ID:
-                _os << "uint $tid [[thread_position_in_grid]]";
-                break;
-            default:
-                _os << "int $unknown";
-                break;
+        if (v.is_thread_id()) {
+            _os << ", ";
+            _os << "uint $tid [[thread_position_in_grid]]";
         }
     }
     _os << ") ";
-}
-
-void MetalCodegen::_emit_builtin_variable(BuiltinVariable tag) {
-    switch (tag) {
-        case BuiltinVariable::THREAD_ID:
-            _os << "$tid";
-            break;
-        default:
-            _os << "$unknown";
-            break;
-    }
 }
 
 void MetalCodegen::emit(const Function &f) {

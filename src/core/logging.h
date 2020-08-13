@@ -14,10 +14,7 @@
 
 namespace luisa { inline namespace utility {
 
-inline spdlog::logger &logger() noexcept {
-    static auto l = spdlog::stdout_color_mt("LuisaRender");
-    return *l;
-}
+spdlog::logger &logger() noexcept;
 
 template<typename ...Args>
 inline void LUISA_INFO(Args &&...args) noexcept {

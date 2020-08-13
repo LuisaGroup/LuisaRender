@@ -26,6 +26,8 @@
 #include <core/data_types.h>
 #include <core/map_macro.h>
 
+#include <compute/v2/access_mode.h>
+
 namespace luisa::compute::dsl {
 
 enum struct TypeCatalog : uint32_t {
@@ -55,6 +57,8 @@ enum struct TypeCatalog : uint32_t {
     POINTER,
     REFERENCE,
     
+    TEXTURE,
+    
     ATOMIC,
     
     STRUCTURE
@@ -66,8 +70,11 @@ struct TypeDesc : Noncopyable {
     uint32_t size{0u};
     
     // for const, array, pointer and reference
-    size_t element_count{0u};
     const TypeDesc *element_type{nullptr};
+    uint32_t element_count{0u};
+    
+    // for textures
+    AccessMode access{AccessMode::READ_WRITE};
     
     // for structure
     std::vector<std::string> member_names;
@@ -79,6 +86,14 @@ struct TypeDesc : Noncopyable {
 
 private:
     inline static uint32_t _uid_counter{1u};
+};
+
+template<AccessMode access>
+struct Tex2D {
+    [[nodiscard]] static TypeDesc *desc() noexcept {
+        static TypeDesc d{.type = TypeCatalog::TEXTURE, .access = access};
+        return &d;
+    }
 };
 
 struct AutoType {
@@ -172,7 +187,7 @@ MAKE_VECTOR_TYPE_DESC(3, _PACKED)
 template<typename T, size_t N>
 struct Array {
     [[nodiscard]] static TypeDesc *desc() noexcept {
-        static TypeDesc d{.type = TypeCatalog::ARRAY, .element_count = N, .element_type = T::desc()};
+        static TypeDesc d{.type = TypeCatalog::ARRAY, .element_type = T::desc(), .element_count = static_cast<uint32_t>(N)};
         return &d;
     }
 };
@@ -259,6 +274,19 @@ struct MakeTypeDescImpl<const T> {
         auto desc = Type::desc();
         desc->size = static_cast<uint32_t>(sizeof(const T));
         desc->alignment = static_cast<uint32_t>(std::alignment_of_v<const T>);
+        return desc;
+    }
+};
+
+template<AccessMode access>
+struct MakeTypeDescImpl<Tex2D<access>> {
+    
+    using Type = Tex2D<access>;
+    
+    [[nodiscard]] TypeDesc *operator()() const noexcept {
+        auto desc = Type::desc();
+        desc->size = 32u;
+        desc->alignment = 32u;
         return desc;
     }
 };
@@ -418,11 +446,20 @@ LUISA_STRUCT_BEGIN(S)                                   \
      LUISA_MAP_MACRO(LUISA_STRUCT_MEMBER, __VA_ARGS__)  \
 LUISA_STRUCT_END()                                      \
 
+inline const TypeDesc *remove_const(const TypeDesc *type) noexcept {
+    if (type == nullptr) { return nullptr; }
+    if (type->type == TypeCatalog::CONST) { return remove_const(type->element_type); }
+    return type;
+}
+
 inline bool is_ptr_or_ref(const TypeDesc *type) noexcept {
-    if (type == nullptr) { return false; }
-    if (type->type == TypeCatalog::POINTER || type->type == TypeCatalog::REFERENCE) { return true; }
-    else if (type->type == TypeCatalog::CONST) { return is_ptr_or_ref(type->element_type); }
-    return false;
+    auto t = remove_const(type);
+    return t != nullptr && (t->type == TypeCatalog::POINTER || t->type == TypeCatalog::REFERENCE);
+}
+
+inline bool is_const_ptr_or_ref(const TypeDesc *type) noexcept {
+    auto t = remove_const(type);
+    return is_ptr_or_ref(t) && t->element_type != nullptr && t->element_type->type == TypeCatalog::CONST;
 }
 
 template<typename Container,

@@ -20,8 +20,8 @@ struct GeneratePixelSamplesWithoutFilterKernelUniforms {
 #include "ray.h"
 #include <compute/device.h>
 #include "film.h"
-#include "core/plugin.h"
-#include "core/parser.h"
+#include "plugin.h"
+#include "parser.h"
 #include "sampler.h"
 #include "transform.h"
 

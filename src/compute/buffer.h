@@ -9,12 +9,6 @@
 #include <core/logging.h>
 #include <core/concepts.h>
 
-namespace luisa::compute {
-
-
-
-}
-
 namespace luisa {
 
 class TypelessBuffer;

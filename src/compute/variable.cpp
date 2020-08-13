@@ -11,15 +11,6 @@
 
 namespace luisa::compute::dsl {
 
-Variable::Variable(const TypeDesc *type, BuiltinVariable tag) noexcept
-    : _type{type}, _builtin_tag{tag} {}
-
-Variable::Variable(const TypeDesc *type, uint32_t uid, bool is_argument) noexcept
-    : _type{type}, _uid{uid}, _is_argument{is_argument} {}
-
-Variable::Variable(Expression *expr) noexcept
-    : _expression{expr} {}
-
 #define MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD_IMPL(op, op_tag)                                             \
 Variable Variable::operator op(Variable rhs) const noexcept {                                               \
     return Function::current().add_expression(std::make_unique<BinaryExpr>(BinaryOp::op_tag, *this, rhs));  \

@@ -29,7 +29,7 @@ struct EvaluateInteractionsKernelUniforms {
 
 #include <unordered_map>
 
-#include "core/plugin.h"
+#include "plugin.h"
 #include "transform.h"
 #include "acceleration.h"
 

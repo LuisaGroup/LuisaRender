@@ -37,7 +37,6 @@ protected:
     virtual void _emit_struct_decl(const TypeDesc *desc);
     virtual void _emit_struct_fwd_decl(const TypeDesc *desc);
     virtual void _emit_variable(Variable v);
-    virtual void _emit_builtin_variable(BuiltinVariable tag);
     virtual void _emit_variable_decl(Variable v);
     virtual void _emit_argument_member_decl(Variable v);
     virtual void _emit_type(const TypeDesc *desc);
