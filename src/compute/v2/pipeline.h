@@ -7,31 +7,30 @@
 #include <vector>
 
 #include <compute/v2/buffer.h>
-#include <compute/v2/kernel.h>
 #include <compute/v2/dispatcher.h>
 
 namespace luisa::compute {
 
-class PipelineStage {
-
-private:
-    Kernel *_kernel{nullptr};
-    std::vector<Buffer *> _readonly_buffers;
-    std::vector<Buffer *> _readwrite_buffers;
-
-public:
-    void add_readonly_buffer(Buffer *buffer) noexcept { _readonly_buffers.emplace_back(buffer); }
-    void add_readwrite_buffer(Buffer *buffer) noexcept { _readwrite_buffers.emplace_back(buffer); }
-    [[nodiscard]] const std::vector<Buffer *> &readonly_buffers() const noexcept { return _readonly_buffers; }
-    [[nodiscard]] const std::vector<Buffer *> &readwrite_buffers() const noexcept { return _readwrite_buffers; }
-    [[nodiscard]] Kernel *kernel() const noexcept { return _kernel; }
+struct PipelineStage : Noncopyable {
+    virtual ~PipelineStage() noexcept = default;
+    virtual void run(Dispatcher &dispatcher) = 0;
 };
 
 class Pipeline {
 
 private:
+    std::vector<std::unique_ptr<PipelineStage>> _stages;
 
-
+public:
+    void add(std::unique_ptr<PipelineStage> stage) noexcept { _stages.emplace_back(std::move(stage)); }
+    void run(Dispatcher &d) { std::for_each(_stages.begin(), _stages.end(), [&d](auto &&stage) { stage->run(d); }); }
+    
+    Pipeline &operator<<(std::unique_ptr<PipelineStage> stage) noexcept {
+        add(std::move(stage));
+        return *this;
+    }
+    
+    void operator()(Dispatcher &dispatcher) { run(dispatcher); }
 };
 
 }

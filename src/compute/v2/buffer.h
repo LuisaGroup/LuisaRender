@@ -20,7 +20,7 @@ class Buffer : Noncopyable {
 public:
     static constexpr auto npos = std::numeric_limits<size_t>::max();
 
-private:
+protected:
     size_t _size;
     StorageMode _storage;
 
@@ -33,7 +33,7 @@ public:
     template<typename T>
     [[nodiscard]] BufferView<T> view(size_t offset = 0u, size_t size = npos) noexcept;
     
-    virtual void modify_range(size_t begin, size_t end, std::function<void(void *, size_t)>) = 0;
+    virtual void with_device_ptr(size_t offset, size_t size, std::function<void(void *)>) = 0;
 };
 
 template<typename T>
@@ -50,7 +50,7 @@ private:
 public:
     BufferView() noexcept = default;
     
-    BufferView(Buffer *buffer, size_t offset = 0u, size_t size = npos) noexcept: _buffer{buffer}, _offset{offset}, _size{size} {
+    explicit BufferView(Buffer *buffer, size_t offset = 0u, size_t size = npos) noexcept: _buffer{buffer}, _offset{offset}, _size{size} {
         if (size == npos) { _size = (_buffer->size() - byte_offset()) % sizeof(T); }
     }
     
@@ -60,6 +60,13 @@ public:
     [[nodiscard]] size_t size() const noexcept { return _size; }
     [[nodiscard]] size_t byte_offset() const noexcept { return _offset * sizeof(T); }
     [[nodiscard]] size_t byte_size() const noexcept { return _size * sizeof(T); }
+    [[nodiscard]] StorageMode storage() const noexcept { return _buffer->storage(); }
+    
+    template<typename F, std::enable_if_t<std::is_invocable_v<F, T *>, int> = 0>
+    void with_device_ptr(F &&f) {
+        _buffer->with_device_ptr(byte_offset(), byte_size(), [&](void *p) { f(reinterpret_cast<T *>(p)); });
+    }
+    
 };
 
 template<typename T>

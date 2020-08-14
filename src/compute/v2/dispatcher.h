@@ -4,10 +4,12 @@
 
 #pragma once
 
+#include <core/concepts.h>
+
 namespace luisa::compute {
 
-class Dispatcher {
-
+struct Dispatcher : Noncopyable {
+    virtual void synchronize() = 0;
 };
 
 }

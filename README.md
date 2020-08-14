@@ -3,80 +3,84 @@ High-Performance Renderer on GPU.
 
 ## Features
 
+### Architecture
+- Plugin System [[Completed]]
+- Embedded DSL for Runtime Kernel Generation & Compilation [[Completed]]
+- Scene Description Language [[Completed]]
+- Wavefront Path Tracing [[Planned]]
+
 ### Backends
-- [x] Apple Metal
-- [ ] Intel Embree
-- [ ] NVIDIA OptiX & OptiX-Prime
-- [ ] ...
+- Apple Metal [[Refactoring]]
+- NVIDIA OptiX & OptiX-Prime [[Planned]]
+- Intel Embree
+- ...
 
 ### Cameras
-- [x] Pinhole Cameras
-- [x] Thin-Lens Cameras
-- [ ] Realistic Cameras
-- [ ] Fish-Eye Cameras
-- [ ] ...
-- [x] Camera Transform, Animation & Motion-Blur
-- [ ] Shutter Curves
+- Pinhole Cameras [[Refactoring]]
+- Thin-Lens Cameras [[Refactoring]]
+- Realistic Cameras
+- Fish-Eye Cameras
+- ...
+- Camera Transform, Animation & Motion-Blur [[Refactoring]]
+- Shutter Curves
 
 ### Geometry
-- [x] Triangle Meshes
-- [x] Catmull-Clark Subdivision (with ASSIMP)
-- [x] Instancing
-- [x] Static and Dynamic Transforms & Motion-Blur
-- [ ] Curves
-- [ ] Out-of-Core Ray Tracing
+- Triangle Meshes [[Refactoring]]
+- Catmull-Clark Subdivision (with ASSIMP) [[Refactoring]]
+- Instancing [[Refactoring]]
+- Static and Dynamic Transforms & Motion-Blur [[Refactoring]]
+- Curves
+- Out-of-Core Ray Tracing
 
 ### Illumination
-- [x] Point Lights
-- [x] Diffuse Area Lights
-- [ ] Realistic Lights
-- [ ] HDRI Environment Maps
-- [ ] Procedural Skylights
-- [ ] ...
-- [x] Uniform-Distribution Light Selection Strategy
-- [ ] Power-Distribution Light Selection Strategy
+- Point Lights [[Refactoring]]
+- Diffuse Area Lights [[Refactoring]]
+- Realistic Lights
+- HDRI Environment Maps
+- Procedural Skylights
+- ...
+- Uniform-Distribution Light Selection Strategy [[Refactoring]]
+- Power-Distribution Light Selection Strategy
 
 ### Appearance
-- [ ] BSDFs
-- [ ] Materials
-- [ ] Spectral Rendering
-- [ ] Textures & Filters
-- [ ] Shading Language Integration
-- [ ] Texture Caches & Streaming
+- BSDFs [[Planned]]
+- Materials [[Planned]]
+- Spectral Rendering
+- Textures & Filters
+- Shading Language Integration
+- Texture Caches & Streaming
 
 ### Samplers
-- [x] Independent Sampler
-- [ ] Halton Sampler
-- [ ] ...
+- Independent Sampler [[Refactoring]]
+- Halton Sampler [[Planned]]
+- ...
 
 ### Reconstruction Filters
-- [x] Filter Importance Sampling
-- [x] Mitchell-Netravali Filter
-- [x] Box Filter
-- [x] Triangle Filter
-- [x] Gaussian Filter
-- [x] Lanczos Windowed Sinc Filter 
+- Filter Importance Sampling [[Refactoring]]
+- Mitchell-Netravali Filter [[Refactoring]]
+- Box Filter [[Refactoring]]
+- Triangle Filter [[Refactoring]]
+- Gaussian Filter [[Refactoring]]
+- Lanczos Windowed Sinc Filter [[Refactoring]]
 
 ### Integrators
-- [x] Normal Visualizer
-- [ ] Path Tracing
-- [ ] SPPM
-- [ ] PSSMLT
-- [ ] ...
-- [ ] AOV Support
+- Normal Visualizer [[Refactoring]]
+- Path Tracing [[Planned]]
+- SPPM
+- PSSMLT
+- ...
+- AOV Support [[Planned]]
 
 ### Postprocessing
-- [ ] Colorspace Management & Tone Mapping
-- [ ] Postprocess Effects
-- [ ] Denoisers
+- Colorspace Management & Tone Mapping
+- Postprocessing Effects
+- Denoisers
 
 ### Renders
-- [x] Scene Description Language
-- [ ] Wavefront Architecture
-- [x] Single-Shot Rendering
-- [ ] Animation Rendering
-- [ ] Interactive Rendering
-- [ ] Remote Rendering
+- Single-Shot Rendering [[Refactoring]]
+- Animation Rendering
+- Interactive Rendering
+- Remote Rendering
 
 ## Gallery
 
