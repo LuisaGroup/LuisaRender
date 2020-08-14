@@ -4,55 +4,39 @@
 
 #pragma once
 
-#ifndef __OBJC__
-#error This file should only be used in Objective-C/C++ sources.
-#endif
+#import <MetalPerformanceShaders/MetalPerformanceShaders.h>
 
 #import <memory>
 #import <compute/kernel.h>
 
 namespace luisa::metal {
 
-class MetalKernelArgumentEncoder : public KernelArgumentEncoder {
-
-private:
-    MTLComputePipelineReflection *_info;
-    id<MTLComputeCommandEncoder> _encoder;
-    
-    [[nodiscard]] size_t _argument_index(std::string_view argument_name);
-
-public:
-    explicit MetalKernelArgumentEncoder(MTLComputePipelineReflection *info, id<MTLComputeCommandEncoder> encoder) noexcept : _info{info}, _encoder{encoder} {}
-    void set_buffer(std::string_view argument_name, TypelessBuffer &buffer, size_t offset) override;
-    void set_bytes(std::string_view argument_name, const void *bytes, size_t size) override;
-};
+using compute::Kernel;
 
 class MetalKernel : public Kernel {
 
-private:
-    id<MTLFunction> _function;
-    id<MTLComputePipelineState> _pipeline;
-    MTLComputePipelineReflection *_reflection;
-
 public:
-    MetalKernel(id<MTLFunction> function, id<MTLComputePipelineState> pipeline, MTLComputePipelineReflection *reflection) noexcept
-        : _function{function}, _pipeline{pipeline}, _reflection{reflection} {}
+    struct UniformBinding {
+        void *dst{nullptr};
+        const void *src{nullptr};
+        size_t size{0ul};
+    };
     
-    [[nodiscard]] auto reflection() const noexcept { return _reflection; }
-    [[nodiscard]] auto pipeline() const noexcept { return _pipeline; }
-    [[nodiscard]] auto function() const noexcept { return _function; }
-};
-
-class MetalKernelDispatcher : public KernelDispatcher {
+    struct ResourceUsage {
+        id<MTLResource> res{nullptr};
+        MTLResourceUsage usage{MTLResourceUsageRead | MTLResourceUsageWrite};
+    };
 
 private:
-    id<MTLCommandBuffer> _command_buffer;
+    id<MTLComputePipelineState> _handle;
+    id<MTLBuffer> _argument_buffer;
+    std::vector<UniformBinding> _argument_bindings;
+    std::vector<ResourceUsage> _argument_resources;
 
 public:
-    explicit MetalKernelDispatcher(id<MTLCommandBuffer> command_buffer) noexcept : _command_buffer{command_buffer} {}
-    [[nodiscard]] auto command_buffer() const noexcept { return _command_buffer; }
-    void operator()(Kernel &kernel, uint2 grids, uint2 grid_size, std::function<void(KernelArgumentEncoder &)> encode) override;
-    
+    MetalKernel(id<MTLComputePipelineState> handle, id<MTLBuffer> arg_buffer, std::vector<UniformBinding> uniforms, std::vector<ResourceUsage> res) noexcept;
+    void dispatch(compute::Dispatcher &dispatcher, uint3 threadgroups, uint3 threadgroup_size) override;
+    [[nodiscard]] id<MTLComputePipelineState> handle() const noexcept { return _handle; }
 };
 
 }

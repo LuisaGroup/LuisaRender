@@ -3,11 +3,8 @@
 
 #include <render/filter.h>
 
-namespace luisa::compute::dsl {
-using namespace luisa::filter::separable;
-LUISA_STRUCT(LUT, w, cdf)
-LUISA_STRUCT(ImportanceSamplePixelsKernelUniforms, tile, radius, scale)
-}
+LUISA_STRUCT(luisa::filter::separable::LUT, w, cdf)
+LUISA_STRUCT(luisa::filter::separable::ImportanceSamplePixelsKernelUniforms, tile, radius, scale)
 
 using namespace luisa;
 using namespace luisa::compute::dsl;

@@ -7,8 +7,8 @@
 #include <variant>
 
 #include <compute/type_desc.h>
-#include <compute/v2/buffer.h>
-#include <compute/v2/texture.h>
+#include <compute/buffer.h>
+#include <compute/texture.h>
 
 namespace luisa::compute::dsl {
 
@@ -65,27 +65,33 @@ public:
     Variable() noexcept = default;
     
     // Local variables
-    Variable(const TypeDesc *type, uint32_t uid) noexcept
-        : _type{type}, _uid{uid}, _tag{VariableTag::LOCAL} {}
+    Variable(const TypeDesc *type, uint32_t uid) noexcept: _type{type}, _uid{uid}, _tag{VariableTag::LOCAL} {
+        LUISA_ERROR_IF(is_ptr_or_ref(_type), "Declaring local variable v", uid, " as a pointer or reference is not allowed.");
+    }
     
     // Buffer arguments
     Variable(const TypeDesc *type, uint32_t uid, Buffer *buffer, size_t offset, size_t size) noexcept
-        : _type{type}, _uid{uid}, _buffer{buffer->view<std::byte>(offset, size)}, _tag{VariableTag::BUFFER} {}
+        : _type{type}, _uid{uid}, _buffer{buffer->view<std::byte>(offset, size)}, _tag{VariableTag::BUFFER} {
+        
+        LUISA_ERROR_IF_NOT(is_ptr_or_ref(_type), "Argument v", uid, " bound to a buffer is not declared as a pointer or reference.");
+    }
     
     // Texture arguments
-    Variable(const TypeDesc *type, uint32_t uid, Texture *texture) noexcept
-        : _type{type}, _uid{uid}, _texture{texture}, _tag{VariableTag::TEXTURE} {}
+    Variable(const TypeDesc *type, uint32_t uid, Texture *texture) noexcept: _type{type}, _uid{uid}, _texture{texture}, _tag{VariableTag::TEXTURE} {
+        LUISA_ERROR_IF_NOT(_type->type == TypeCatalog::TEXTURE, "Argument v", uid, " bound to a texture is not declared as a texture.");
+    }
     
     // Immutable uniforms
-    Variable(const TypeDesc *type, uint32_t uid, const void *data, size_t size) noexcept
-        : _type{type}, _uid{uid}, _tag{VariableTag::IMMUTABLE} {
+    Variable(const TypeDesc *type, uint32_t uid, const void *data, size_t size) noexcept: _type{type}, _uid{uid}, _tag{VariableTag::IMMUTABLE} {
+        LUISA_ERROR_IF(is_ptr_or_ref(_type) || _type->type == TypeCatalog::TEXTURE, "Argument v", uid, " bound to constant data is not declared as is.");
         _immutable_data.resize(size);
         std::memmove(_immutable_data.data(), data, size);
     }
     
     // Uniforms
-    Variable(const TypeDesc *type, uint32_t uid, void *data_ref) noexcept
-        : _type{type}, _uid{uid}, _data_ref{data_ref}, _tag{VariableTag::UNIFORM} {}
+    Variable(const TypeDesc *type, uint32_t uid, void *data_ref) noexcept : _type{type}, _uid{uid}, _data_ref{data_ref}, _tag{VariableTag::UNIFORM} {
+        LUISA_ERROR_IF(is_ptr_or_ref(_type) || _type->type == TypeCatalog::TEXTURE, "Argument v", uid, " bound to constant data is not declared as is.");
+    }
     
     // Built-in variables
     Variable(const TypeDesc *type, VariableTag tag) noexcept

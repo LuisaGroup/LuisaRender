@@ -4,29 +4,25 @@
 
 #pragma once
 
-#ifndef __OBJC__
-#error This file should only be used in Objective-C/C++ sources.
-#endif
-
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
 #import <compute/buffer.h>
 
 namespace luisa::metal {
 
-class MetalBuffer : public TypelessBuffer {
+using compute::Buffer;
+using compute::Dispatcher;
+
+class MetalBuffer : public Buffer {
 
 private:
-    id<MTLBuffer> _handle;
+    id<MTLBuffer> _handle{nullptr};
+    mutable id<MTLBuffer> _cache{nullptr};
 
 public:
-    MetalBuffer(id<MTLBuffer> buffer, size_t capacity, BufferStorage storage) noexcept
-        : TypelessBuffer(capacity, storage), _handle{buffer} {}
-    ~MetalBuffer() noexcept override = default;
-    void upload(size_t offset, size_t size) override;
-    void synchronize(struct KernelDispatcher &dispatch) override;
-    [[nodiscard]] void *data() override;
+    MetalBuffer(id<MTLBuffer> buffer, size_t size) noexcept: Buffer{size}, _handle{buffer} {}
     [[nodiscard]] id<MTLBuffer> handle() const noexcept { return _handle; }
-    
+    void upload(compute::Dispatcher &dispatcher, size_t offset, size_t size, const void *host_data) override;
+    void download(compute::Dispatcher &dispatcher, size_t offset, size_t size, void *host_buffer) const override;
 };
 
 }

@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include <compute/device.h>
-#include <compute/codegen.h>
+#import <compute/device.h>
+#import <compute/codegen.h>
 
 namespace luisa::metal {
 

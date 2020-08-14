@@ -1,145 +1,75 @@
 //
-// Created by Mike Smith on 2019/10/24.
+// Created by Mike Smith on 2020/8/8.
 //
 
 #pragma once
 
-#include <vector>
+#include <limits>
+#include <functional>
 
-#include <core/logging.h>
 #include <core/concepts.h>
+#include <compute/dispatcher.h>
 
-namespace luisa {
+namespace luisa::compute {
 
-class TypelessBuffer;
-struct KernelDispatcher;
+template<typename T>
+class BufferView;
+
+class Buffer : Noncopyable {
+
+public:
+    static constexpr auto npos = std::numeric_limits<size_t>::max();
+
+protected:
+    size_t _size;
+
+public:
+    explicit Buffer(size_t size) noexcept: _size{size} {}
+    virtual ~Buffer() noexcept = default;
+    
+    [[nodiscard]] size_t size() const noexcept { return _size; }
+    
+    template<typename T>
+    [[nodiscard]] auto view(size_t offset = 0u, size_t size = npos) noexcept;
+    
+    virtual void upload(Dispatcher &dispatcher, size_t offset, size_t size, const void *host_data) = 0;
+    virtual void download(Dispatcher &dispatcher, size_t offset, size_t size, void *host_buffer) const = 0;
+};
 
 template<typename T>
 class BufferView {
 
-private:
-    TypelessBuffer *_buffer;
-    size_t _element_offset;
-    size_t _element_count;
-
 public:
-    BufferView(TypelessBuffer *buffer, size_t element_offset, size_t element_count)
-        : _buffer{buffer}, _element_offset{element_offset}, _element_count{element_count} {}
-    
-    [[nodiscard]] size_t byte_size() const noexcept { return _element_count * sizeof(T); }
-    [[nodiscard]] size_t byte_offset() const noexcept { return _element_offset * sizeof(T); }
-    [[nodiscard]] size_t size() const noexcept { return _element_count; }
-    [[nodiscard]] TypelessBuffer &typeless_buffer() noexcept { return *_buffer; }
-    [[nodiscard]] T *data();
-    [[nodiscard]] const T *data() const { return const_cast<BufferView<T> *>(this)->data(); }
-    [[nodiscard]] T &operator[](size_t index) { return data()[index]; }
-    [[nodiscard]] const T &operator[](size_t index) const { return data()[index]; }
-    void upload();
-    
-    [[nodiscard]] auto subview(size_t offset, size_t size);
-    
-    [[nodiscard]] auto subview(size_t offset) {
-        LUISA_EXCEPTION_IF(offset >= _element_count, "Buffer overflow");
-        return subview(offset, _element_count - offset);
-    }
-    
-    template<typename U>
-    [[nodiscard]] auto view_as() noexcept {
-        assert(byte_size() % sizeof(U) == 0u && byte_offset() % sizeof(U) == 0u);
-        return BufferView<U>{_buffer, byte_offset() / sizeof(U), byte_size() / sizeof(U)};
-    };
-};
-
-enum struct BufferStorage {
-    DEVICE_PRIVATE,
-    MANAGED
-};
-
-class TypelessBuffer : Noncopyable {
-
-protected:
-    size_t _capacity;
-    BufferStorage _storage;
-
-public:
-    TypelessBuffer(size_t capacity, BufferStorage storage) noexcept: _capacity{capacity}, _storage{storage} {};
-    virtual ~TypelessBuffer() noexcept = default;
-    virtual void upload(size_t offset, size_t size) = 0;
-    void upload() { upload(0ul, _capacity); }
-    virtual void synchronize(KernelDispatcher &dispatch) = 0;
-    [[nodiscard]] virtual const void *data() const { return const_cast<TypelessBuffer *>(this)->data(); }
-    [[nodiscard]] virtual void *data() = 0;
-    [[nodiscard]] size_t capacity() const noexcept { return _capacity; }
-    [[nodiscard]] BufferStorage storage() const noexcept { return _storage; }
-    
-    template<typename T>
-    [[nodiscard]] auto view_as(size_t element_offset = 0ul) noexcept {
-        assert(_capacity % sizeof(T) == 0ul);
-        return BufferView<T>{this, element_offset, _capacity / sizeof(T) - element_offset};
-    };
-    
-    template<typename T>
-    [[nodiscard]] BufferView<T> view_as(size_t element_offset, size_t element_count) noexcept {
-        assert((element_count + element_offset) * sizeof(T) <= _capacity);
-        return BufferView<T>{this, element_offset, element_count};
-    }
-};
-
-template<typename Element>
-class Buffer {
+    static constexpr auto npos = std::numeric_limits<size_t>::max();
 
 private:
-    std::unique_ptr<TypelessBuffer> _typeless_buffer;
+    Buffer *_buffer{nullptr};
+    size_t _offset{0u};
+    size_t _size{0u};
 
 public:
-    Buffer() = delete;
-    explicit Buffer(std::unique_ptr<TypelessBuffer> mem) noexcept: _typeless_buffer{std::move(mem)} {
-        assert(_typeless_buffer->capacity() % sizeof(Element) == 0);
+    BufferView() noexcept = default;
+    
+    explicit BufferView(Buffer *buffer, size_t offset = 0u, size_t size = npos) noexcept: _buffer{buffer}, _offset{offset}, _size{size} {
+        if (size == npos) { _size = (_buffer->size() - byte_offset()) % sizeof(T); }
     }
     
-    [[nodiscard]] auto view(size_t element_offset, size_t element_count) noexcept {
-        assert((element_count + element_offset) * sizeof(Element) <= _typeless_buffer->capacity());
-        return BufferView<Element>{_typeless_buffer.get(), element_offset, element_count};
-    }
+    [[nodiscard]] BufferView subview(size_t offset, size_t size = npos) noexcept { return {_buffer, _offset + offset, size}; }
     
-    [[nodiscard]] auto view(size_t element_offset = 0ul) noexcept {
-        assert(_typeless_buffer->capacity() % sizeof(Element) == 0ul);
-        return BufferView<Element>{_typeless_buffer.get(), element_offset, _typeless_buffer->capacity() / sizeof(Element) - element_offset};
-    };
+    [[nodiscard]] bool empty() const noexcept { return _buffer == nullptr || _size == 0u; }
+    [[nodiscard]] Buffer *buffer() const noexcept { return _buffer; }
+    [[nodiscard]] size_t offset() const noexcept { return _offset; }
+    [[nodiscard]] size_t size() const noexcept { return _size; }
+    [[nodiscard]] size_t byte_offset() const noexcept { return _offset * sizeof(T); }
+    [[nodiscard]] size_t byte_size() const noexcept { return _size * sizeof(T); }
     
-    template<typename T>
-    [[nodiscard]] auto view_as(size_t element_offset = 0ul) noexcept {
-        assert(_typeless_buffer->capacity() % sizeof(T) == 0ul);
-        return BufferView<T>{_typeless_buffer.get(), element_offset, _typeless_buffer->capacity() / sizeof(T) - element_offset};
-    };
-    
-    template<typename T>
-    [[nodiscard]] BufferView<T> view_as(size_t element_offset, size_t element_count) noexcept {
-        assert((element_count + element_offset) * sizeof(T) <= _typeless_buffer->capacity());
-        return BufferView<T>{_typeless_buffer.get(), element_offset, element_count};
-    }
-    
-    void synchronize(KernelDispatcher &dispatch) { _typeless_buffer->synchronize(dispatch); }
-    void upload() { view().upload(); }
-    void upload(size_t offset, size_t size) { view(offset, size).upload(); }
-    
-    [[nodiscard]] size_t size() const noexcept { return _typeless_buffer->capacity() / sizeof(Element); }
-    [[nodiscard]] Element *data() { return view().data(); }
-    [[nodiscard]] const Element *data() const { return const_cast<Buffer<Element> *>(this)->data(); }
+    void upload(Dispatcher &dispatcher, const void *host_data) { _buffer->upload(dispatcher, byte_offset(), byte_size(), host_data); }
+    void download(Dispatcher &dispatcher, void *host_buffer) const { _buffer->download(dispatcher, byte_offset(), byte_size(), host_buffer); }
 };
 
 template<typename T>
-T *BufferView<T>::data() {
-    return &reinterpret_cast<T *>(_buffer->data())[_element_offset];
-}
-
-template<typename T>
-void BufferView<T>::upload() { _buffer->upload(byte_offset(), byte_size()); }
-
-template<typename T>
-auto BufferView<T>::subview(size_t offset, size_t size) {
-    LUISA_EXCEPTION_IF(offset + size > _element_count, "Buffer overflow");
-    return _buffer->view_as<T>(_element_offset + offset, size);
+inline auto Buffer::view(size_t offset, size_t size) noexcept {
+    return BufferView<T>{this, offset, size};
 }
 
 }

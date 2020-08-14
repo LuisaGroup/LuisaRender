@@ -23,17 +23,12 @@ inline std::string serialize(Args &&...args) noexcept {
     return ss.str();
 }
 
-inline std::string sha1_digest(std::string_view s) noexcept {
-    std::array<uint8_t, SHA_DIGEST_LENGTH> digest{};
+using DigestSHA1 = std::array<uint8_t, SHA_DIGEST_LENGTH>;
+
+inline auto sha1_digest(std::string_view s) noexcept {
+    DigestSHA1 digest{};
     SHA1(reinterpret_cast<const uint8_t *>(s.data()), s.size(), digest.data());
-    std::string digest_str;
-    digest_str.resize(SHA_DIGEST_LENGTH * 2);
-    for (auto i = 0; i < SHA_DIGEST_LENGTH; i++) {
-        auto to_hex_char = [](uint8_t c) { return static_cast<char>(c < 10 ? c + '0' : c - 10 + 'A'); };
-        digest_str[i * 2] = to_hex_char(digest[i] & 0x0fu);
-        digest_str[i * 2 + 1] = to_hex_char(digest[i] >> 4u);
-    }
-    return digest_str;
+    return digest;
 }
 
 inline std::string pascal_to_snake_case(std::string_view s) noexcept {  // TODO: Robustness

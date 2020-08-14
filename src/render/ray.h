@@ -4,10 +4,20 @@
 
 #pragma once
 
+#include <string>
+#include <memory>
+#include <string_view>
+#include <map>
+
 #include <core/data_types.h>
 #include <core/mathematics.h>
+#include <core/logging.h>
 
-namespace luisa {
+#include <compute/device.h>
+#include <compute/buffer.h>
+#include <compute/type_desc.h>
+
+namespace luisa::render {
 
 struct Ray {
     packed_float3 origin;
@@ -16,12 +26,19 @@ struct Ray {
     float max_distance;
 };
 
-LUISA_DEVICE_CALLABLE inline auto make_ray(float3 o, float3 d, float t_min = 1e-4f, float t_max = INFINITY) noexcept {
+}
+
+// Register ray struct
+LUISA_STRUCT(render::Ray, origin, min_distance, direction, max_distance)
+
+namespace luisa::render {
+
+inline auto make_ray(float3 o, float3 d, float t_min = 1e-4f, float t_max = INFINITY) noexcept {
     return Ray{make_packed_float3(o), t_min, make_packed_float3(d), t_max};
 }
 
 // Adapted from Ray Tracing Gems
-LUISA_DEVICE_CALLABLE inline float3 offset_ray_origin(float3 p, float3 n) noexcept {
+inline float3 offset_ray_origin(float3 p, float3 n) noexcept {
     
     constexpr auto origin = 1.0f / 32.0f;
     constexpr auto float_scale = 1.0f / 65536.0f;
@@ -29,10 +46,13 @@ LUISA_DEVICE_CALLABLE inline float3 offset_ray_origin(float3 p, float3 n) noexce
     
     auto of_i = make_int3(static_cast<int>(int_scale * n.x), static_cast<int>(int_scale * n.y), static_cast<int>(int_scale * n.z));
     
+    auto as_float = [](auto x) noexcept { return *reinterpret_cast<float *>(&x); };
+    auto as_int = [](auto x) noexcept { return *reinterpret_cast<int *>(&x); };
+    
     auto p_i = make_float3(
-        as<float>(as<int>(p.x) + (p.x < 0 ? -of_i.x : of_i.x)),
-        as<float>(as<int>(p.y) + (p.y < 0 ? -of_i.y : of_i.y)),
-        as<float>(as<int>(p.z) + (p.z < 0 ? -of_i.z : of_i.z)));
+        as_float(as_int(p.x) + (p.x < 0 ? -of_i.x : of_i.x)),
+        as_float(as_int(p.y) + (p.y < 0 ? -of_i.y : of_i.y)),
+        as_float(as_int(p.z) + (p.z < 0 ? -of_i.z : of_i.z)));
     
     return make_float3(
         math::abs(p.x) < origin ? p.x + float_scale * n.x : p_i.x,
@@ -41,47 +61,3 @@ LUISA_DEVICE_CALLABLE inline float3 offset_ray_origin(float3 p, float3 n) noexce
 }
 
 }
-
-#ifndef LUISA_DEVICE_COMPATIBLE
-
-#include <string>
-#include <memory>
-#include <string_view>
-#include <map>
-
-#include <core/logging.h>
-
-#include <compute/device.h>
-#include <compute/buffer.h>
-
-namespace luisa {
-
-class RayAttributeBufferSet {
-
-private:
-    Device *_device;
-    size_t _capacity;
-    std::map<std::string, std::unique_ptr<TypelessBuffer>, std::less<>> _buffers;
-
-public:
-    RayAttributeBufferSet(Device *device, size_t capacity) noexcept : _device{device}, _capacity{capacity} {}
-    
-    template<typename T>
-    void add(std::string name) {
-        LUISA_EXCEPTION_IF_NOT(_buffers.find(name) == _buffers.end(), "Ray attribute already exists: ", name);
-        _buffers.emplace(name, _device->allocate_typeless_buffer(sizeof(T) * _capacity, BufferStorage::DEVICE_PRIVATE));
-    }
-    
-    template<typename T>
-    BufferView<T> view(std::string_view name) {
-        auto iter = _buffers.find(name);
-        LUISA_EXCEPTION_IF(iter == _buffers.end(), "Ray attribute not found: ", name);
-        auto buffer = iter->second->view_as<T>();
-        LUISA_EXCEPTION_IF_NOT(buffer.size() == _capacity, "Incorrect ray attribute buffer type");
-        return buffer;
-    }
-};
-
-}
-
-#endif

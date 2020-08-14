@@ -4,14 +4,17 @@
 
 #pragma once
 
-#ifndef __OBJC__
-#error This file should only be used in Objective-C/C++ sources.
-#endif
-
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
 #import <render/acceleration.h>
 
 namespace luisa::metal {
+
+using compute::Buffer;
+using compute::BufferView;
+using compute::Dispatcher;
+
+using render::Ray;
+using render::Acceleration;
 
 class MetalAcceleration : public Acceleration {
 
@@ -27,9 +30,9 @@ public:
         
     ~MetalAcceleration() noexcept override = default;
     
-    void refit(KernelDispatcher &dispatch) override;
-    void trace_any(KernelDispatcher &dispatch, BufferView<Ray> ray_buffer, BufferView<AnyHit> its_buffer, BufferView<uint> ray_count_buffer) override;
-    void trace_closest(KernelDispatcher &dispatch, BufferView<Ray> ray_buffer, BufferView<ClosestHit> its_buffer, BufferView<uint> ray_count_buffer) override;
+    void refit(Dispatcher &dispatch) override;
+    void intersect_any(Dispatcher &dispatch, BufferView<Ray> ray_buffer, BufferView<AnyHit> its_buffer, BufferView<uint> ray_count_buffer) override;
+    void intersect_closest(Dispatcher &dispatch, BufferView<Ray> ray_buffer, BufferView<ClosestHit> its_buffer, BufferView<uint> ray_count_buffer) override;
 };
 
 }

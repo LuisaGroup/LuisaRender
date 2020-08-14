@@ -5,24 +5,26 @@
 #import <core/logging.h>
 #import "metal_buffer.h"
 #import "metal_kernel.h"
+#import "metal_dispatcher.h"
 
 namespace luisa::metal {
 
-void MetalBuffer::upload(size_t offset, size_t size) {
-    LUISA_EXCEPTION_IF_NOT(_storage == BufferStorage::MANAGED, "Only managed buffers can be update.");
-    LUISA_EXCEPTION_IF_NOT(offset + size <= _capacity, "Buffer data overflowed");
-    [_handle didModifyRange:NSMakeRange(offset, size)];
-}
-
-void MetalBuffer::synchronize(KernelDispatcher &dispatch) {
-    auto command_buffer = dynamic_cast<MetalKernelDispatcher &>(dispatch).command_buffer();
+void MetalBuffer::upload(compute::Dispatcher &dispatcher, size_t offset, size_t size, const void *host_data) {
+    if (_cache == nullptr) { _cache = [[_handle device] newBufferWithLength:_size options:MTLResourceStorageModeShared]; }
+    memmove([_cache contents], host_data, size);
+    auto command_buffer = dynamic_cast<MetalDispatcher &>(dispatcher).handle();
     auto blit_encoder = [command_buffer blitCommandEncoder];
-    [blit_encoder synchronizeResource:_handle];
+    [blit_encoder copyFromBuffer:_cache sourceOffset:0 toBuffer:_handle destinationOffset:offset size:size];
     [blit_encoder endEncoding];
 }
 
-void *MetalBuffer::data() {
-    return _handle.contents;
+void MetalBuffer::download(compute::Dispatcher &dispatcher, size_t offset, size_t size, void *host_buffer) const {
+    if (_cache == nullptr) { _cache = [[_handle device] newBufferWithLength:_size options:MTLResourceStorageModeShared]; }
+    auto command_buffer = dynamic_cast<MetalDispatcher &>(dispatcher).handle();
+    auto blit_encoder = [command_buffer blitCommandEncoder];
+    [blit_encoder copyFromBuffer:_handle sourceOffset:offset toBuffer:_cache destinationOffset:offset size:size];
+    [blit_encoder endEncoding];
+    dispatcher.add_callback([src = [_cache contents], dst = host_buffer, size] { std::memmove(dst, src, size); });
 }
 
 }

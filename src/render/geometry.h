@@ -31,7 +31,6 @@ struct EvaluateInteractionsKernelUniforms {
 
 #include "plugin.h"
 #include "transform.h"
-#include "acceleration.h"
 
 namespace luisa {
 class Geometry;

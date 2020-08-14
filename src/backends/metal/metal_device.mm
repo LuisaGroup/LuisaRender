@@ -5,8 +5,8 @@
 #import <cstdlib>
 #import <string>
 #import <fstream>
-#import <string_view>
-#import <memory>
+#import <queue>
+#import <cstring>
 #import <map>
 
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
@@ -14,108 +14,59 @@
 #import <compute/device.h>
 #import <render/geometry.h>
 
-#import <core/string_manipulation.h>
-
 #import "metal_buffer.h"
 #import "metal_kernel.h"
 #import "metal_acceleration.h"
 #import "metal_codegen.h"
+#import "metal_dispatcher.h"
 
 namespace luisa::metal {
 
-struct MetalFunctionWrapper {
-    
-    id<MTLFunction> function;
-    id<MTLComputePipelineState> pipeline;
-    MTLComputePipelineReflection *reflection;
-    
-    MetalFunctionWrapper(id<MTLFunction> f, id<MTLComputePipelineState> p, MTLComputePipelineReflection *r) noexcept
-        : function{f}, pipeline{p}, reflection{r} {}
-};
+using compute::Device;
+using render::Geometry;
 
 class MetalDevice : public Device {
+
+public:
+    struct MTLFunctionWrapper {
+        id<MTLComputePipelineState> pipeline_state;
+        id<MTLArgumentEncoder> argument_encoder;
+        std::map<std::string, uint32_t> argument_to_id;
+    };
+    
+    static constexpr auto max_command_queue_size = 8u;
 
 private:
     id<MTLDevice> _handle;
     id<MTLCommandQueue> _command_queue;
-    std::map<std::string, id<MTLLibrary>, std::less<>> _loaded_libraries;
-    std::map<std::string, MetalFunctionWrapper, std::less<>> _loaded_functions;
+    std::map<DigestSHA1, MTLFunctionWrapper> _kernel_cache;
+    std::vector<MetalDispatcher> _dispatchers;
+    uint32_t _next_dispatcher{0u};
+    
+    [[nodiscard]] MetalDispatcher &next_dispatcher() noexcept {
+        auto id = _next_dispatcher;
+        _next_dispatcher = (_next_dispatcher + 1u) % max_command_queue_size;
+        auto &&dispatcher = _dispatchers[id];
+        dispatcher.synchronize();
+        return dispatcher;
+    }
 
 protected:
-    id<MTLLibrary> _load_library(std::string_view library_name);
-    void _launch_async(std::function<void(KernelDispatcher &)> dispatch, std::function<void()> callback) override;
     std::unique_ptr<Kernel> _compile_kernel(const compute::dsl::Function &f) override;
+    std::unique_ptr<Buffer> _allocate_buffer(size_t size) override;
 
 public:
     explicit MetalDevice(Context *context);
     ~MetalDevice() noexcept override = default;
-    std::unique_ptr<Kernel> load_kernel(std::string_view function_name) override;
     std::unique_ptr<Acceleration> build_acceleration(Geometry &geometry) override;
-    std::unique_ptr<TypelessBuffer> allocate_typeless_buffer(size_t capacity, BufferStorage storage) override;
-    
-    void launch(std::function<void(KernelDispatcher &)> dispatch) override;
+    void launch(const std::function<void(Dispatcher &)> &dispatch) override;
+    void synchronize() override;
 };
 
 MetalDevice::MetalDevice(Context *context) : Device{context} {
     _handle = MTLCreateSystemDefaultDevice();
     _command_queue = [_handle newCommandQueue];
-}
-
-std::unique_ptr<Kernel> MetalDevice::load_kernel(std::string_view function_name) {
-    
-    auto separator_pos = function_name.rfind("::");
-    LUISA_EXCEPTION_IF(separator_pos == std::string_view::npos, "Expected separator \"::\" in function name: ", function_name);
-    
-    std::string library_name{function_name.substr(0, separator_pos)};
-    if (auto sep_pos = library_name.find("::"); sep_pos != std::string::npos) { library_name.replace(sep_pos, 2, "__");  }
-    auto kernel_name = function_name.substr(separator_pos + 2u);
-    
-    LUISA_INFO("Loading kernel: \"", kernel_name, "\", library: \"", library_name, "\"");
-    
-    auto iter = _loaded_functions.find(function_name);
-    if (iter == _loaded_functions.end()) {
-        
-        auto descriptor = [[MTLComputePipelineDescriptor alloc] init];
-        auto function = [_load_library(library_name) newFunctionWithName:make_objc_string(kernel_name)];
-        LUISA_ERROR_IF(function == nullptr, "Failed to load kernel: \"", kernel_name, "\", library: \"", library_name, "\"");
-        
-        descriptor.computeFunction = function;
-        descriptor.threadGroupSizeIsMultipleOfThreadExecutionWidth = true;
-        
-        MTLAutoreleasedComputePipelineReflection reflection;
-        auto pipeline = [_handle newComputePipelineStateWithDescriptor:descriptor
-                                                               options:MTLPipelineOptionArgumentInfo | MTLPipelineOptionBufferTypeInfo
-                                                            reflection:&reflection
-                                                                 error:nullptr];
-        
-        iter = _loaded_functions.emplace(function_name, MetalFunctionWrapper{function, pipeline, reflection}).first;
-    }
-    
-    auto function_wrapper = iter->second;
-    return std::make_unique<MetalKernel>(function_wrapper.function, function_wrapper.pipeline, function_wrapper.reflection);
-}
-
-void MetalDevice::launch(std::function<void(KernelDispatcher &)> dispatch) {
-    auto command_buffer = [_command_queue commandBuffer];
-    MetalKernelDispatcher dispatcher{command_buffer};
-    dispatch(dispatcher);
-    [command_buffer commit];
-    [command_buffer waitUntilCompleted];
-}
-
-void MetalDevice::_launch_async(std::function<void(KernelDispatcher &)> dispatch, std::function<void()> callback) {
-    auto command_buffer = [_command_queue commandBuffer];
-    [command_buffer addCompletedHandler:^(id<MTLCommandBuffer>) { callback(); }];
-    MetalKernelDispatcher dispatcher{command_buffer};
-    dispatch(dispatcher);
-    [command_buffer commit];
-}
-
-std::unique_ptr<TypelessBuffer> MetalDevice::allocate_typeless_buffer(size_t capacity, BufferStorage storage) {
-    
-    auto buffer = [_handle newBufferWithLength:capacity
-                                       options:storage == BufferStorage::DEVICE_PRIVATE ? MTLResourceStorageModePrivate : MTLResourceStorageModeManaged];
-    return std::make_unique<MetalBuffer>(buffer, capacity, storage);
+    _dispatchers.resize(max_command_queue_size);
 }
 
 std::unique_ptr<Acceleration> MetalDevice::build_acceleration(Geometry &geometry) {
@@ -172,71 +123,106 @@ std::unique_ptr<Acceleration> MetalDevice::build_acceleration(Geometry &geometry
     return std::make_unique<MetalAcceleration>(acceleration_group, instance_acceleration, ray_intersector, shadow_ray_intersector);
 }
 
-id<MTLLibrary> MetalDevice::_load_library(std::string_view library_name) {
-    
-    auto library_iter = _loaded_libraries.find(library_name);
-    if (library_iter == _loaded_libraries.end()) {
-        
-        auto compatibility_header_path = _context->include_path("backends") / "metal" / "metal_compatibility.h";
-        auto source = text_file_contents(_context->runtime_path("lib") / "kernels" / serialize(library_name, ".sk"));
-        
-        _context->create_cache_folder("shaders");
-        auto source_path = _context->cache_path("shaders") / serialize(library_name, ".metal");
-        LUISA_INFO("Generating Metal shader: ", library_name);
-        if (std::ofstream source_file{source_path}; source_file.is_open()) {
-            source_file << "#define LUISA_DEVICE_COMPATIBLE\n"
-                        << "#include " << compatibility_header_path << "\n"
-                        << source << std::endl;
-        } else { LUISA_EXCEPTION("Failed to create file for Metal shader: ", source_path); }
-        
-        auto ir_path = _context->cache_path("shaders") / serialize(library_name, ".air");
-        auto library_path = _context->cache_path("shaders") / serialize(library_name, ".metallib");
-        auto include_path = _context->include_path();
-        auto compile_command = serialize("xcrun -sdk macosx metal -Wall -Wextra -Wno-c++17-extensions -O3 -ffast-math -I ", include_path, " -c ", source_path, " -o ", ir_path);
-        LUISA_INFO("Compiling Metal source: ", source_path);
-        LUISA_EXCEPTION_IF(system(compile_command.c_str()) != 0, "Failed to compile Metal shader source, command: ", compile_command);
-        
-        auto archive_command = serialize("xcrun -sdk macosx metallib ", ir_path, " -o ", library_path);
-        LUISA_INFO("Archiving Metal library: ", ir_path);
-        LUISA_EXCEPTION_IF(system(archive_command.c_str()) != 0, "Failed to archive Metal library, command: ", archive_command);
-        LUISA_INFO("Generated Metal shader: ", library_path);
-        
-        auto library = [_handle newLibraryWithFile:make_objc_string(library_path.string()) error:nullptr];
-        LUISA_EXCEPTION_IF(library == nullptr, "Failed to load library: ", library_path);
-        library_iter = _loaded_libraries.emplace(library_name, library).first;
-    }
-    return library_iter->second;
-}
-
 std::unique_ptr<Kernel> MetalDevice::_compile_kernel(const compute::dsl::Function &f) {
     
-    LUISA_INFO("Generating...");
+    LUISA_INFO("Generating source for kernel \"", f.name(), "\"...");
+    
     std::ostringstream os;
     MetalCodegen codegen{os};
     codegen.emit(f);
     auto s = os.str();
     
-    LUISA_INFO("Compiling...");
-    NSError *error = nullptr;
-    auto library = [_handle newLibraryWithSource:@(s.c_str()) options:nullptr error:&error];
-    if (error != nullptr) {
-        NSLog(@"%@", error);
+    auto digest = sha1_digest(s);
+    auto iter = _kernel_cache.find(digest);
+    if (iter == _kernel_cache.cend()) {
+        
+        LUISA_INFO("No compilation cache found for kernel \"", f.name(), "\", compiling from source...");
+        NSError *error = nullptr;
+        auto library = [_handle newLibraryWithSource:@(s.c_str()) options:nullptr error:&error];
+        if (error != nullptr) {
+            LUISA_WARNING("Compilation output:");
+            NSLog(@"%@", error);
+        }
+        LUISA_INFO("Compilation for kernel \"", f.name(), "\" succeeded.");
+        
+        // Create PSO
+        auto function = [library newFunctionWithName:@(f.name().c_str())];
+        auto desc = [[MTLComputePipelineDescriptor alloc] init];
+        desc.computeFunction = function;
+        desc.threadGroupSizeIsMultipleOfThreadExecutionWidth = true;
+        desc.label = @(f.name().c_str());
+        
+        error = nullptr;
+        auto pso = [_handle newComputePipelineStateWithDescriptor:desc options:MTLPipelineOptionNone reflection:nullptr error:&error];
+        if (error != nullptr) {
+            LUISA_WARNING("Error occurred while creating pipeline state object, reason:");
+            NSLog(@"%@", error);
+            LUISA_EXCEPTION("Failed to create pipeline state object for kernel \"", f.name(), "\".");
+        }
+        
+        MTLAutoreleasedArgument reflection;
+        auto argument_encoder = [function newArgumentEncoderWithBufferIndex:0 reflection:&reflection];
+        MTLFunctionWrapper wrapper{.pipeline_state = pso, .argument_encoder = argument_encoder};
+        
+        auto arg_struct = reflection.bufferStructType;
+        for (auto &&arg : f.arguments()) {
+            auto arg_name = serialize("v", arg.uid());
+            auto arg_reflection = [arg_struct memberByName:@(arg_name.c_str())];
+            if (compute::dsl::is_ptr_or_ref(arg.type())) {
+                LUISA_EXCEPTION_IF([arg_reflection pointerType] == nullptr, "Argument \"", arg_name, "\" bound to a buffer is not declared as a pointer or reference.");
+            } else if (arg.type()->type == compute::dsl::TypeCatalog::TEXTURE) {
+                LUISA_EXCEPTION_IF([arg_reflection textureReferenceType] == nullptr, "Argument \"", arg_name, "\" bound to a texture is not declared as a texture.");
+            }
+            wrapper.argument_to_id.emplace(arg_name, arg_reflection.argumentIndex);
+        }
+        iter = _kernel_cache.emplace(digest, wrapper).first;
     } else {
-        NSLog(@"%@", library);
+        LUISA_INFO("Cache hit for kernel \"", f.name(), "\", compilation skipped.");
     }
     
-    auto function = [library newFunctionWithName:@(f.name().c_str())];
-    NSLog(@"%@", function);
+    auto pso = iter->second.pipeline_state;
+    auto arg_enc = iter->second.argument_encoder;
+    auto &&arg_ids = iter->second.argument_to_id;
+    auto arg_buffer = [_handle newBufferWithLength:arg_enc.encodedLength options:MTLResourceOptionCPUCacheModeWriteCombined];
+    [arg_enc setArgumentBuffer:arg_buffer offset:0u];
+    std::vector<MetalKernel::UniformBinding> uniforms;
+    std::vector<MetalKernel::ResourceUsage> resources;
+    for (auto &&arg : f.arguments()) {
+        auto arg_name = serialize("v", arg.uid());
+        auto arg_index = arg_ids.at(arg_name);
+        if (arg.is_buffer_argument()) {
+            auto usage = compute::dsl::is_const_ptr_or_ref(arg.type()) ? MTLResourceUsageRead : (MTLResourceUsageRead | MTLResourceUsageWrite);
+            auto buffer = dynamic_cast<MetalBuffer *>(arg.buffer().buffer())->handle();
+            resources.emplace_back(MetalKernel::ResourceUsage{buffer, usage});
+            [arg_enc setBuffer:buffer offset:0u atIndex:arg_index];
+        } else if (arg.is_texture_argument()) {
+            // TODO...
+            LUISA_ERROR("Not implemented...");
+        } else if (arg.is_immutable_argument()) {
+            std::memmove([arg_enc constantDataAtIndex:arg_index], arg.immutable_data().data(), arg.immutable_data().size());
+        } else if (arg.is_uniform_argument()) {
+            uniforms.emplace_back(MetalKernel::UniformBinding{[arg_enc constantDataAtIndex:arg_index], arg.uniform_data(), arg.type()->size});
+        }
+    }
     
-    MTLAutoreleasedArgument reflection;
-    auto argument_encoder = [function newArgumentEncoderWithBufferIndex:0 reflection:&reflection];
-    
-    NSLog(@"%@", reflection);
-    
-    LUISA_INFO("Done.");
-    auto digest = sha1_digest(s);
-    std::cout << "Digest: " << digest << "\n\n" << s << std::endl;
-    return nullptr;
+    return std::make_unique<MetalKernel>(pso, arg_buffer, std::move(uniforms), std::move(resources));
+}
+
+void MetalDevice::launch(const std::function<void(Dispatcher &)> &dispatch) {
+    auto &&dispatcher = next_dispatcher();
+    auto command_buffer = [_command_queue commandBuffer];
+    dispatcher.reset(command_buffer);
+    dispatch(dispatcher);
+    dispatcher.commit();
+}
+
+void MetalDevice::synchronize() {
+    for (auto i = 0u; i < max_command_queue_size; i++) { next_dispatcher().reset(); }
+}
+
+std::unique_ptr<Buffer> MetalDevice::_allocate_buffer(size_t size) {
+    auto buffer = [_handle newBufferWithLength:size options:MTLResourceStorageModePrivate];
+    return std::make_unique<MetalBuffer>(buffer, size);
 }
 
 }

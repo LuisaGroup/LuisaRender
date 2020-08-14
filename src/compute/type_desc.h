@@ -26,7 +26,7 @@
 #include <core/data_types.h>
 #include <core/map_macro.h>
 
-#include <compute/v2/texture.h>
+#include <compute/texture.h>
 
 namespace luisa::compute::dsl {
 
@@ -419,6 +419,7 @@ template<typename T>
 inline const TypeDesc *type_desc = detail::MakeTypeDescImpl<T>{}();
 
 #define LUISA_STRUCT_BEGIN(S)                                                                    \
+namespace luisa::compute::dsl {                                                                  \
     template<>                                                                                   \
     struct Structure<S> {                                                                        \
         [[nodiscard]] static TypeDesc *desc() noexcept {                                         \
@@ -440,6 +441,7 @@ inline const TypeDesc *type_desc = detail::MakeTypeDescImpl<T>{}();
             return &td;                                                                          \
         }                                                                                        \
     };                                                                                           \
+}                                                                                                \
 
 #define LUISA_STRUCT(S, ...)                            \
 LUISA_STRUCT_BEGIN(S)                                   \
