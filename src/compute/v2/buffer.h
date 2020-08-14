@@ -25,6 +25,7 @@ protected:
 
 public:
     explicit Buffer(size_t size) noexcept: _size{size} {}
+    virtual ~Buffer() noexcept = default;
     
     [[nodiscard]] size_t size() const noexcept { return _size; }
     

@@ -5,7 +5,9 @@
 #pragma once
 
 #include <vector>
+#include <tuple>
 
+#include <core/data_types.h>
 #include <compute/v2/buffer.h>
 #include <compute/v2/dispatcher.h>
 
@@ -13,24 +15,19 @@ namespace luisa::compute {
 
 struct PipelineStage : Noncopyable {
     virtual ~PipelineStage() noexcept = default;
-    virtual void run(Dispatcher &dispatcher) = 0;
+    virtual void run(Dispatcher &dispatcher, uint3 threadgroups, uint3 threadgroup_size) = 0;
 };
 
 class Pipeline {
 
 private:
-    std::vector<std::unique_ptr<PipelineStage>> _stages;
+    std::vector<std::tuple<PipelineStage *, uint3, uint3>> _stages;
 
 public:
-    void add(std::unique_ptr<PipelineStage> stage) noexcept { _stages.emplace_back(std::move(stage)); }
-    void run(Dispatcher &d) { std::for_each(_stages.begin(), _stages.end(), [&d](auto &&stage) { stage->run(d); }); }
-    
-    Pipeline &operator<<(std::unique_ptr<PipelineStage> stage) noexcept {
-        add(std::move(stage));
-        return *this;
-    }
-    
-    void operator()(Dispatcher &dispatcher) { run(dispatcher); }
+    Pipeline &append(PipelineStage *stage, uint threadgroups, uint threadgroup_size) noexcept;
+    Pipeline &append(PipelineStage *stage, uint2 threadgroups, uint2 threadgroup_size) noexcept;
+    Pipeline &append(PipelineStage *stage, uint3 threadgroups, uint3 threadgroup_size) noexcept;
+    void run(Dispatcher &d);
 };
 
 }

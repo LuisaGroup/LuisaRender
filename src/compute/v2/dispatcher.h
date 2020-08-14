@@ -10,6 +10,7 @@
 namespace luisa::compute {
 
 struct Dispatcher : Noncopyable {
+    virtual ~Dispatcher() noexcept = default;
     virtual void commit(std::function<void()> callback) = 0;
     virtual void commit() { commit([] {}); }
     virtual void synchronize() = 0;
