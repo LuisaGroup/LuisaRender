@@ -4,105 +4,105 @@ High-Performance Renderer on GPU.
 ## Features
 
 ### Architecture
-| Feature | Progress |
-|---------|----------|
-| Plugin System | Completed |
+| Feature                                                  | Progress  |
+|----------------------------------------------------------|-----------|
+| Plugin System                                            | Completed |
 | Embedded DSL for Runtime Kernel Generation & Compilation | Completed |
-| Scene Description Language | Completed |
-| Wavefront Path Tracing | Planned |
+| Scene Description Language                               | Completed |
+| Wavefront Path Tracing                                   | Planned   |
 
 ### Backends
-| Feature | Progress |
-|---------|----------|
-| Apple Metal | Refactoring |
-| NVIDIA OptiX & OptiX-Prime | Planned |
-| Intel Embree | |
-| ... | |
+| Feature                    | Progress    |
+|----------------------------|-------------|
+| Apple Metal                | Refactoring |
+| NVIDIA OptiX & OptiX-Prime | Planned     |
+| Intel Embree               |             |
+| ...                        |             |
 
 ### Cameras
-| Feature | Progress |
-|---------|----------|
-| Pinhole Cameras | Refactoring |
-| Thin-Lens Cameras | Refactoring |
-| Realistic Cameras | |
-| Fish-Eye Cameras | |
-| ... | |
+| Feature                                   | Progress    |
+|-------------------------------------------|-------------|
+| Pinhole Cameras                           | Refactoring |
+| Thin-Lens Cameras                         | Refactoring |
+| Realistic Cameras                         |             |
+| Fish-Eye Cameras                          |             |
+| ...                                       |             |
 | Camera Transform, Animation & Motion-Blur | Refactoring |
-| Shutter Curves | |
+| Shutter Curves                            |             |
 
 ### Geometry
-| Feature | Progress |
-|---------|----------|
-| Triangle Meshes | Refactoring |
-| Catmull-Clark Subdivision (with ASSIMP) | Refactoring |
-| Instancing | Refactoring |
+| Feature                                     | Progress    |
+|---------------------------------------------|-------------|
+| Triangle Meshes                             | Refactoring |
+| Catmull-Clark Subdivision (with ASSIMP)     | Refactoring |
+| Instancing                                  | Refactoring |
 | Static and Dynamic Transforms & Motion-Blur | Refactoring |
-| Curves | |
-| Out-of-Core Ray Tracing | |
+| Curves                                      |             |
+| Out-of-Core Ray Tracing                     |             |
 
 ### Illumination
-| Feature | Progress |
-|---------|----------|
-| Point Lights | Refactoring |
-| Diffuse Area Lights | Refactoring |
-| Realistic Lights | |
-| HDRI Environment Maps | |
-| Procedural Skylights | |
-| ... | |
+| Feature                                       | Progress    |
+|-----------------------------------------------|-------------|
+| Point Lights                                  | Refactoring |
+| Diffuse Area Lights                           | Refactoring |
+| Realistic Lights                              |             |
+| HDRI Environment Maps                         |             |
+| Procedural Skylights                          |             |
+| ...                                           |             |
 | Uniform-Distribution Light Selection Strategy | Refactoring |
-| Power-Distribution Light Selection Strategy | |
+| Power-Distribution Light Selection Strategy   |             |
 
 ### Appearance
-| Feature | Progress |
-|---------|----------|
-| BSDFs | Planned |
-| Materials | Planned |
-| Spectral Rendering | |
-| Textures & Filters | |
-| Shading Language Integration | |
-| Texture Caches & Streaming | |
+| Feature                      | Progress |
+|------------------------------|----------|
+| BSDFs                        | Planned  |
+| Materials                    | Planned  |
+| Spectral Rendering           |          |
+| Textures & Filters           |          |
+| Shading Language Integration |          |
+| Texture Caches & Streaming   |          |
 
 ### Samplers
-| Feature | Progress |
-|---------|----------|
+| Feature             | Progress    |
+|---------------------|-------------|
 | Independent Sampler | Refactoring |
-| Halton Sampler | Planned |
-| ... | |
+| Halton Sampler      | Planned     |
+| ...                 |             |
 
 ### Reconstruction Filters
-| Feature | Progress |
-|---------|----------|
-| Filter Importance Sampling | Refactoring |
-| Mitchell-Netravali Filter | Refactoring |
-| Box Filter | Refactoring |
-| Triangle Filter | Refactoring |
-| Gaussian Filter | Refactoring |
+| Feature                      | Progress    |
+|------------------------------|-------------|
+| Filter Importance Sampling   | Refactoring |
+| Mitchell-Netravali Filter    | Refactoring |
+| Box Filter                   | Refactoring |
+| Triangle Filter              | Refactoring |
+| Gaussian Filter              | Refactoring |
 | Lanczos Windowed Sinc Filter | Refactoring |
 
 ### Integrators
-| Feature | Progress |
-|---------|----------|
+| Feature           | Progress    |
+|-------------------|-------------|
 | Normal Visualizer | Refactoring |
-| Path Tracing | Planned |
-| SPPM | |
-| PSSMLT | |
-| ... | |
-| AOV Support | Planned |
+| Path Tracing      | Planned     |
+| SPPM              |             |
+| PSSMLT            |             |
+| ...               |             |
+| AOV Support       | Planned     |
 
 ### Postprocessing
-| Feature | Progress |
-|---------|----------|
-| Colorspace Management & Tone Mapping | |
-| Postprocessing Effects | |
-| Denoising | |
+| Feature                              | Progress |
+|--------------------------------------|----------|
+| Colorspace Management & Tone Mapping |          |
+| Postprocessing Effects               |          |
+| Denoising                            |          |
 
 ### Renders
-| Feature | Progress |
-|---------|----------|
+| Feature               | Progress    |
+|-----------------------|-------------|
 | Single-Shot Rendering | Refactoring |
-| Animation Rendering | |
-| Interactive Rendering | |
-| Remote Rendering | |
+| Animation Rendering   |             |
+| Interactive Rendering |             |
+| Remote Rendering      |             |
 
 ## Gallery
 
