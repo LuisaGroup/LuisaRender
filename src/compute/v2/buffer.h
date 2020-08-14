@@ -8,7 +8,7 @@
 #include <functional>
 
 #include <core/concepts.h>
-#include <compute/v2/storage_mode.h>
+#include <compute/v2/dispatcher.h>
 
 namespace luisa::compute {
 
@@ -22,18 +22,17 @@ public:
 
 protected:
     size_t _size;
-    StorageMode _storage;
 
 public:
-    Buffer(size_t size, StorageMode storage) noexcept: _size{size}, _storage{storage} {}
+    explicit Buffer(size_t size) noexcept: _size{size} {}
     
     [[nodiscard]] size_t size() const noexcept { return _size; }
-    [[nodiscard]] StorageMode storage() const noexcept { return _storage; }
     
     template<typename T>
-    [[nodiscard]] BufferView<T> view(size_t offset = 0u, size_t size = npos) noexcept;
+    [[nodiscard]] auto view(size_t offset = 0u, size_t size = npos) noexcept;
     
-    virtual void with_device_ptr(size_t offset, size_t size, std::function<void(void *)>) = 0;
+    virtual void upload(Dispatcher &dispatcher, size_t offset, size_t size, const void *host_data) = 0;
+    virtual void download(Dispatcher &dispatcher, size_t offset, size_t size, void *host_buffer) const = 0;
 };
 
 template<typename T>
@@ -54,24 +53,22 @@ public:
         if (size == npos) { _size = (_buffer->size() - byte_offset()) % sizeof(T); }
     }
     
+    [[nodiscard]] BufferView subview(size_t offset, size_t size = npos) noexcept { return {_buffer, _offset + offset, size}; }
+    
     [[nodiscard]] bool empty() const noexcept { return _buffer == nullptr || _size == 0u; }
     [[nodiscard]] Buffer *buffer() const noexcept { return _buffer; }
     [[nodiscard]] size_t offset() const noexcept { return _offset; }
     [[nodiscard]] size_t size() const noexcept { return _size; }
     [[nodiscard]] size_t byte_offset() const noexcept { return _offset * sizeof(T); }
     [[nodiscard]] size_t byte_size() const noexcept { return _size * sizeof(T); }
-    [[nodiscard]] StorageMode storage() const noexcept { return _buffer->storage(); }
     
-    template<typename F, std::enable_if_t<std::is_invocable_v<F, T *>, int> = 0>
-    void with_device_ptr(F &&f) {
-        _buffer->with_device_ptr(byte_offset(), byte_size(), [&](void *p) { f(reinterpret_cast<T *>(p)); });
-    }
-    
+    void upload(Dispatcher &dispatcher, const void *host_data) { _buffer->upload(dispatcher, byte_offset(), byte_size(), host_data); }
+    void download(Dispatcher &dispatcher, void *host_buffer) const { _buffer->download(dispatcher, byte_offset(), byte_size(), host_buffer); }
 };
 
 template<typename T>
-inline BufferView<T> Buffer::view(size_t offset, size_t size) noexcept {
-    return {this, offset, size};
+inline auto Buffer::view(size_t offset, size_t size) noexcept {
+    return BufferView<T>{this, offset, size};
 }
 
 }

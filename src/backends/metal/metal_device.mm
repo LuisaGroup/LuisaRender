@@ -212,7 +212,7 @@ std::unique_ptr<Kernel> MetalDevice::_compile_kernel(const compute::dsl::Functio
     
     LUISA_INFO("Generating...");
     std::ostringstream os;
-    MetalCodegen codegen{os, this};
+    MetalCodegen codegen{os};
     codegen.emit(f);
     auto s = os.str();
     

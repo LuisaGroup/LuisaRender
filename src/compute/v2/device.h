@@ -15,7 +15,7 @@ class Device : Noncopyable {
 protected:
     std::vector<std::unique_ptr<Buffer>> _buffers;
     
-    [[nodiscard]] virtual std::unique_ptr<Buffer> _allocate_buffer(size_t size, StorageMode storage) = 0;
+    [[nodiscard]] virtual std::unique_ptr<Buffer> _allocate_buffer(size_t size) = 0;
     [[nodiscard]] virtual std::unique_ptr<PipelineStage> _compile_kernel(const dsl::Function &function) = 0;
     
 private:
@@ -23,12 +23,12 @@ private:
     [[nodiscard]] std::unique_ptr<PipelineStage> compile_kernel(std::string name, Def &&def) {
         dsl::Function function{std::move(name)};
         def(function);
-        _compile_kernel(function);
+        return _compile_kernel(function);
     }
     
     template<typename T>
-    [[nodiscard]] BufferView<T> allocate_buffer(size_t size, StorageMode storage) {
-        return _buffers.emplace_back(_allocate_buffer(size * sizeof(T), storage))->view<T>();
+    [[nodiscard]] BufferView<T> create_buffer(size_t size) {
+        return _buffers.emplace_back(_allocate_buffer(size * sizeof(T)))->view<T>();
     }
     
     virtual void launch(const std::function<void(Dispatcher &)> &dispatch) = 0;

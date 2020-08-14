@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
         Arg<LUT> lut{empty};
         Arg<ImportanceSamplePixelsKernelUniforms> uniforms{empty};
         
-        Arg<std::array<Tex2D<luisa::compute::AccessMode::READ_WRITE>, 10>> texture{empty};
+        Arg<std::array<Tex2D<luisa::compute::TextureAccess::READ_WRITE>, 10>> texture{empty};
         
         Auto a{0};
         Auto p{&a};

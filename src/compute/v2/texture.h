@@ -4,10 +4,16 @@
 
 #pragma once
 
-#include <compute/v2/access_mode.h>
-#include <compute/v2/storage_mode.h>
+#include <cstdint>
 
 namespace luisa::compute {
+
+enum struct TextureAccess : uint32_t {
+    READ_ONLY,
+    WRITE_ONLY,
+    READ_WRITE,
+    SAMPLE
+};
 
 class Texture {
     

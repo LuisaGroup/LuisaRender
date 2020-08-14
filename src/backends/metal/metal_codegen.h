@@ -17,7 +17,7 @@ protected:
     void _emit_function_call(const std::string &name) override;
 
 public:
-    MetalCodegen(std::ostream &os, Device *device) noexcept : compute::dsl::CppCodegen{os, device} {}
+    explicit MetalCodegen(std::ostream &os) noexcept : compute::dsl::CppCodegen{os} {}
     void emit(const compute::dsl::Function &f) override;
 };
 

@@ -17,13 +17,11 @@ class Codegen : Noncopyable {
 
 protected:
     std::ostream &_os;
-    Device *_device{nullptr};
 
 public:
-    Codegen(std::ostream &os, Device *device) noexcept : _os{os}, _device{device} {}
+    explicit Codegen(std::ostream &os) noexcept : _os{os} {}
     virtual ~Codegen() noexcept = default;
     virtual void emit(const Function &function) = 0;
-    [[nodiscard]] Device *device() const noexcept { return _device; }
 };
 
 // Example codegen for C++
@@ -44,7 +42,7 @@ protected:
     virtual void _emit_argument_struct_decl(const compute::dsl::Function &f);
 
 public:
-    CppCodegen(std::ostream &os, Device *device) noexcept : Codegen{os, device} {}
+    explicit CppCodegen(std::ostream &os) noexcept : Codegen{os} {}
     void emit(const Function &f) override;
     
     // expression visitors

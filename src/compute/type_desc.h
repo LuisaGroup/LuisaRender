@@ -26,7 +26,7 @@
 #include <core/data_types.h>
 #include <core/map_macro.h>
 
-#include <compute/v2/access_mode.h>
+#include <compute/v2/texture.h>
 
 namespace luisa::compute::dsl {
 
@@ -74,7 +74,7 @@ struct TypeDesc : Noncopyable {
     uint32_t element_count{0u};
     
     // for textures
-    AccessMode access{AccessMode::READ_WRITE};
+    TextureAccess access{TextureAccess::READ_WRITE};
     
     // for structure
     std::vector<std::string> member_names;
@@ -88,7 +88,7 @@ private:
     inline static uint32_t _uid_counter{1u};
 };
 
-template<AccessMode access>
+template<TextureAccess access>
 struct Tex2D {
     [[nodiscard]] static TypeDesc *desc() noexcept {
         static TypeDesc d{.type = TypeCatalog::TEXTURE, .access = access};
@@ -278,7 +278,7 @@ struct MakeTypeDescImpl<const T> {
     }
 };
 
-template<AccessMode access>
+template<TextureAccess access>
 struct MakeTypeDescImpl<Tex2D<access>> {
     
     using Type = Tex2D<access>;
