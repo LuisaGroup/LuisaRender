@@ -451,8 +451,8 @@ void CppCodegen::_emit_type(const TypeDesc *desc) {
             break;
         case TypeCatalog::TEXTURE:
             _os << "texture2d<float, access::";
-            if (desc->access == TextureAccess::READ_ONLY) { _os << "read"; }
-            else if (desc->access == TextureAccess::WRITE_ONLY) { _os << "write"; }
+            if (desc->access == TextureAccess::READ) { _os << "read"; }
+            else if (desc->access == TextureAccess::WRITE) { _os << "write"; }
             else if (desc->access == TextureAccess::READ_WRITE) { _os << "read_write"; }
             else if (desc->access == TextureAccess::SAMPLE) { _os << "sample"; }
             _os << ">";

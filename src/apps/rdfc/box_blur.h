@@ -21,8 +21,8 @@ inline void box_blur_x_or_y(int rx, int ry, Texture &input, Texture &output) noe
     using namespace luisa::compute;
     using namespace luisa::compute::dsl;
     
-    Arg<Tex2D<TextureAccess::READ_ONLY>> in{input};
-    Arg<Tex2D<TextureAccess::WRITE_ONLY>> out{output};
+    Arg<Tex2D<TextureAccess::READ>> in{input};
+    Arg<Tex2D<TextureAccess::WRITE>> out{output};
     
     auto width = static_cast<int>(input.width());
     auto height = static_cast<int>(input.height());

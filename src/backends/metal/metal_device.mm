@@ -145,10 +145,10 @@ std::unique_ptr<Kernel> MetalDevice::_compile_kernel(const compute::dsl::Functio
         } else if (arg.is_texture_argument()) {
             MTLResourceUsage usage;
             switch (arg.type()->access) {
-                case compute::TextureAccess::READ_ONLY:
+                case compute::TextureAccess::READ:
                     usage = MTLResourceUsageRead;
                     break;
-                case compute::TextureAccess::WRITE_ONLY:
+                case compute::TextureAccess::WRITE:
                     usage = MTLResourceUsageWrite;
                     break;
                 case compute::TextureAccess::READ_WRITE:

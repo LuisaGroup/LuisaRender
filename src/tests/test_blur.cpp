@@ -9,8 +9,10 @@ using namespace luisa::compute::dsl;
 
 void blur_x_or_y(Texture &input, Texture &output, int width, int height, int rx, int ry) noexcept {
     
-    Arg<Tex2D<TextureAccess::READ_ONLY>> in{input};
-    Arg<Tex2D<TextureAccess::WRITE_ONLY>> out{output};
+    LUISA_ERROR_IF_NOT(rx * ry == 0, "At least one of rx and ry should be zero (got rx = ", rx, ", ry = ", ry, ").");
+    
+    Arg<Tex2D<TextureAccess::READ>> in{input};
+    Arg<Tex2D<TextureAccess::WRITE>> out{output};
     
     Auto tx = cast<int>(thread_xy().x());
     Auto ty = cast<int>(thread_xy().y());

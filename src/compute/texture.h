@@ -12,8 +12,8 @@
 namespace luisa::compute {
 
 enum struct TextureAccess : uint32_t {
-    READ_ONLY,
-    WRITE_ONLY,
+    READ,
+    WRITE,
     READ_WRITE,
     SAMPLE
 };

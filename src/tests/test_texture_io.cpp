@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
     };
     
     auto kernel = device->compile_kernel([&] {
-        Arg<Tex2D<TextureAccess::WRITE_ONLY>> image{*texture};
+        Arg<Tex2D<TextureAccess::WRITE>> image{*texture};
         Arg<uint2> image_size{make_uint2(width, height)};
         Auto txy = thread_xy();
         If(txy.x() < image_size.x() && txy.y() < image_size.y()) {
