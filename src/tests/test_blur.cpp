@@ -7,7 +7,7 @@ using namespace luisa;
 using namespace luisa::compute;
 using namespace luisa::compute::dsl;
 
-void blur(Texture &input, Texture &output, int width, int height, int rx, int ry) noexcept {
+void blur_x_or_y(Texture &input, Texture &output, int width, int height, int rx, int ry) noexcept {
     
     Arg<Tex2D<TextureAccess::READ_ONLY>> in{input};
     Arg<Tex2D<TextureAccess::WRITE_ONLY>> out{output};
@@ -52,8 +52,8 @@ int main(int argc, char *argv[]) {
     
     constexpr auto rx = 5;
     constexpr auto ry = 10;
-    auto blur_x = device->compile_kernel([&] { blur(*texture, *temp_texture, width, height, rx, 0); });
-    auto blur_y = device->compile_kernel([&] { blur(*texture, *temp_texture, width, height, 0, ry); });
+    auto blur_x = device->compile_kernel([&] { blur_x_or_y(*texture, *temp_texture, width, height, rx, 0); });
+    auto blur_y = device->compile_kernel([&] { blur_x_or_y(*texture, *temp_texture, width, height, 0, ry); });
     
     device->launch([&](Dispatcher &dispatch) {
         dispatch(*blur_x, make_uint2(width, height));
