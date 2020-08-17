@@ -13,12 +13,16 @@ inline Variable literal(Args &&...args) noexcept {
     return Function::current().literal(std::forward<Args>(args)...);
 }
 
-[[nodiscard]] inline Variable thread_id() noexcept {
-    return Function::current().thread_id();
-}
+[[nodiscard]] inline Variable thread_id() noexcept { return Function::current().thread_id(); }
+[[nodiscard]] inline Variable thread_x() noexcept { return thread_id(); }
+[[nodiscard]] inline Variable thread_xy() noexcept { return Function::current().thread_xy(); }
+[[nodiscard]] inline Variable thread_xyz() noexcept { return Function::current().thread_xyz(); }
 
-#define literal   literal
-#define thread_id thread_id
+#define literal    literal
+#define thread_id  thread_id
+#define thread_x   thread_x
+#define thread_xy  thread_xy
+#define thread_xyz thread_xyz
 
 }
 
@@ -103,6 +107,10 @@ MAKE_BUILTIN_FUNCTION_DEF(make_float3x3, m00, m01, m02, m10, m11, m12, m20, m21,
 MAKE_BUILTIN_FUNCTION_DEF(make_float4x4, val_or_mat3)
 MAKE_BUILTIN_FUNCTION_DEF(make_float4x4, c0, c1, c2, c3)
 MAKE_BUILTIN_FUNCTION_DEF(make_float4x4, m00, m01, m02, m03, m10, m11, m12, m13, m20, m21, m22, m23, m30, m31, m32, m33)
+
+// texture functions
+MAKE_BUILTIN_FUNCTION_DEF(read, texture, coord)
+MAKE_BUILTIN_VOID_FUNCTION_DEF(write, texture, coord, value)
 
 // atomic functions
 MAKE_BUILTIN_VOID_FUNCTION_DEF(atomic_store_explicit, object, desired)

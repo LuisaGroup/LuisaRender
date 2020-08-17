@@ -108,6 +108,8 @@ public:
     }
     
     [[nodiscard]] Variable thread_id() noexcept { return _builtin_var<uint32_t>(VariableTag::THREAD_ID); }
+    [[nodiscard]] Variable thread_xy() noexcept { return _builtin_var<uint32_t>(VariableTag::THREAD_XY); }
+    [[nodiscard]] Variable thread_xyz() noexcept { return _builtin_var<uint32_t>(VariableTag::THREAD_XYZ); }
     
     template<typename T, typename ...Literals>
     [[nodiscard]] Variable var(Literals &&...vs) noexcept { return _var_or_const<T, false>(std::forward<Literals>(vs)...); }
@@ -139,8 +141,5 @@ public:
     [[nodiscard]] const std::vector<std::unique_ptr<Statement>> &statements() const noexcept { return _statements; }
     [[nodiscard]] const auto &used_types() const noexcept { return _used_types; }
 };
-
-#define LUISA_FUNC   [&](Function &f[[maybe_unused]])
-#define LUISA_LAMBDA [&]
 
 }

@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <iostream>
 #include <limits>
 #include <functional>
 
@@ -22,9 +23,11 @@ public:
 
 protected:
     size_t _size;
+    size_t _max_host_cache_count;
 
 public:
-    explicit Buffer(size_t size) noexcept: _size{size} {}
+    explicit Buffer(size_t size, size_t max_host_cache_count) noexcept
+        : _size{size}, _max_host_cache_count{max_host_cache_count} {}
     virtual ~Buffer() noexcept = default;
     
     [[nodiscard]] size_t size() const noexcept { return _size; }
@@ -33,7 +36,8 @@ public:
     [[nodiscard]] auto view(size_t offset = 0u, size_t size = npos) noexcept;
     
     virtual void upload(Dispatcher &dispatcher, size_t offset, size_t size, const void *host_data) = 0;
-    virtual void download(Dispatcher &dispatcher, size_t offset, size_t size, void *host_buffer) const = 0;
+    virtual void download(Dispatcher &dispatcher, size_t offset, size_t size, void *host_buffer) = 0;
+    virtual void clear_cache() noexcept = 0;
 };
 
 template<typename T>
@@ -51,10 +55,10 @@ public:
     BufferView() noexcept = default;
     
     explicit BufferView(Buffer *buffer, size_t offset = 0u, size_t size = npos) noexcept: _buffer{buffer}, _offset{offset}, _size{size} {
-        if (size == npos) { _size = (_buffer->size() - byte_offset()) % sizeof(T); }
+        if (_size == npos) { _size = (_buffer->size() - byte_offset()) / sizeof(T); }
     }
     
-    [[nodiscard]] BufferView subview(size_t offset, size_t size = npos) noexcept { return {_buffer, _offset + offset, size}; }
+    [[nodiscard]] BufferView subview(size_t offset, size_t size = npos) const noexcept { return {_buffer, _offset + offset, size}; }
     
     [[nodiscard]] bool empty() const noexcept { return _buffer == nullptr || _size == 0u; }
     [[nodiscard]] Buffer *buffer() const noexcept { return _buffer; }
@@ -63,8 +67,12 @@ public:
     [[nodiscard]] size_t byte_offset() const noexcept { return _offset * sizeof(T); }
     [[nodiscard]] size_t byte_size() const noexcept { return _size * sizeof(T); }
     
-    void upload(Dispatcher &dispatcher, const void *host_data) { _buffer->upload(dispatcher, byte_offset(), byte_size(), host_data); }
-    void download(Dispatcher &dispatcher, void *host_buffer) const { _buffer->download(dispatcher, byte_offset(), byte_size(), host_buffer); }
+    void copy_from(Dispatcher &dispatcher, const void *host_data) const { _buffer->upload(dispatcher, byte_offset(), byte_size(), host_data); }
+    void copy_to(Dispatcher &dispatcher, void *host_buffer) const { _buffer->download(dispatcher, byte_offset(), byte_size(), host_buffer); }
+    [[nodiscard]] auto copy_from(const void *data) const { return [this, data](Dispatcher &d) { copy_from(d, data); }; }
+    [[nodiscard]] auto copy_to(void *data) const { return [this, data](Dispatcher &d) { copy_to(d, data); }; }
+    
+    void clear_cache() const noexcept { _buffer->clear_cache(); }
 };
 
 template<typename T>

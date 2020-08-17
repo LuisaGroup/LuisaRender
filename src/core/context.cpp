@@ -40,4 +40,8 @@ std::filesystem::path Context::cache_path(const std::filesystem::path &name) con
 
 Context::~Context() noexcept { for (auto &&module_item : _loaded_modules) { destroy_dynamic_module(module_item.second); }}
 
+Context::Context(int argc, const char *const argv[])
+    : Context{std::filesystem::canonical(argv[0]).parent_path().parent_path(),
+              std::filesystem::canonical(std::filesystem::current_path())} {}
+    
 }

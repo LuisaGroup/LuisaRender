@@ -22,6 +22,7 @@ private:
     static bool _create_folder_if_necessary(const std::filesystem::path &path) noexcept;
 
 public:
+    Context(int argc, const char *const argv[]);
     Context(const std::filesystem::path &runtime_dir, const std::filesystem::path &working_dir);
     ~Context() noexcept;
     bool create_working_folder(const std::filesystem::path &name) const noexcept;

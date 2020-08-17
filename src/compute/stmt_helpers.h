@@ -34,9 +34,7 @@ struct Arg : public Variable {
     template<typename U>
     explicit Arg(BufferView<U> bv) noexcept: Variable{Function::current().arg<T>(bv)} {}
     
-    explicit Arg(Buffer *buffer) noexcept : Variable{Function::current().arg<T>(buffer->view<std::byte>())} {}
-    
-    explicit Arg(Texture *tex) noexcept : Variable{Function::current().arg<T>(tex)} {}
+    explicit Arg(Texture &tex) noexcept : Variable{Function::current().arg<T>(&tex)} {}
     
     template<typename U, std::enable_if_t<std::negation_v<std::is_pointer<U>>, int> = 0>
     explicit Arg(U data) noexcept: Variable{Function::current().arg<T>(&data, sizeof(data))} {}
@@ -50,7 +48,7 @@ template<typename T>
 struct Var : public Variable {
     
     template<typename ...Literals>
-    explicit Var(Literals &&...vs) noexcept : Variable{Function::current().var<T>(std::forward<Literals>(vs)...)} {}
+    Var(Literals &&...vs) noexcept : Variable{Function::current().var<T>(std::forward<Literals>(vs)...)} {}
     
     MAKE_VARIABLE_ASSIGNMENT_OPERATOR()
 };
@@ -67,6 +65,10 @@ using Int64 = Var<int64_t>;
 using UInt64 = Var<uint64_t>;
 using Auto = Var<AutoType>;
 
+using Float2 = Var<float2>;
+using Float3 = Var<float3>;
+using Float4 = Var<float4>;
+
 template<typename T>
 struct Let : public Variable {
     
@@ -76,18 +78,9 @@ struct Let : public Variable {
     MAKE_VARIABLE_ASSIGNMENT_OPERATOR()
 };
 
-template<typename T>
-struct LambdaArgument : public Variable {
-    LambdaArgument(Variable v) noexcept: Variable{Function::current().var<T>(std::move(v))} {}
-    MAKE_VARIABLE_ASSIGNMENT_OPERATOR()
-};
-
 // Used for arguments passed by value
 template<typename T>
-using Copy = LambdaArgument<T>;
-
-// Used for arguments passed by value
-using Ref = Variable;
+using ExprRef = Variable;
 
 #undef MAKE_VARIABLE_ASSIGNMENT_OPERATOR
 

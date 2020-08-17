@@ -14,6 +14,17 @@ namespace luisa {
 
 using uint = uint32_t;
 
+using uchar = uint8_t;
+using uchar2 = glm::vec<2, uchar, glm::aligned_highp>;
+using uchar3 = glm::vec<3, uchar, glm::aligned_highp>;
+using uchar4 = glm::vec<4, uchar, glm::aligned_highp>;
+using packed_uchar3 = glm::vec<3, uchar, glm::packed_highp>;
+
+static_assert(sizeof(uchar2) == 2u);
+static_assert(sizeof(uchar3) == 4u);
+static_assert(sizeof(uchar4) == 4u);
+static_assert(sizeof(packed_uchar3) == 3u);
+
 using float2 = glm::aligned_highp_vec2;
 using float3 = glm::aligned_highp_vec3;
 using float4 = glm::aligned_highp_vec4;

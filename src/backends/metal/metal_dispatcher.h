@@ -9,22 +9,25 @@
 
 namespace luisa::metal {
 
+class MetalDevice;
+
 using compute::Dispatcher;
 
 class MetalDispatcher : public Dispatcher {
+
+public:
+    friend class MetalDevice;
 
 private:
     id<MTLCommandBuffer> _handle{nullptr};
 
 protected:
-    void _synchronize() override { [_handle waitUntilCompleted]; }
-    void _commit() override { [_handle commit]; }
+    void _do_synchronize() override { [_handle waitUntilCompleted]; }
+    void _do_commit() override { [_handle commit]; }
 
 public:
     explicit MetalDispatcher() noexcept = default;
     [[nodiscard]] id<MTLCommandBuffer> handle() const noexcept { return _handle; }
-    void commit() override { if (_handle != nullptr) { Dispatcher::commit(); }}
-    void synchronize() override { if (_handle != nullptr) { Dispatcher::synchronize(); }}
     void reset(id<MTLCommandBuffer> handle = nullptr) noexcept {
         _callbacks.clear();
         _handle = handle;

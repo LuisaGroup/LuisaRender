@@ -42,6 +42,8 @@ enum struct VariableTag {
     
     // for builtin variables
     THREAD_ID,  // built-in thread id
+    THREAD_XY,  // built-in thread coord
+    THREAD_XYZ  // built-in thread 3d coord
 };
 
 class Variable {
@@ -120,6 +122,8 @@ public:
     }
     
     [[nodiscard]] bool is_thread_id() const noexcept { return _tag == VariableTag::THREAD_ID; }
+    [[nodiscard]] bool is_thread_xy() const noexcept { return _tag == VariableTag::THREAD_XY; }
+    [[nodiscard]] bool is_thread_xyz() const noexcept { return _tag == VariableTag::THREAD_XYZ; }
     [[nodiscard]] bool is_builtin() const noexcept { return is_thread_id(); }
     
     [[nodiscard]] Expression *expression() const noexcept { return _expression; }
