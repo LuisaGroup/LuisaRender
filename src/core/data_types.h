@@ -251,20 +251,4 @@ inline auto make_float4x4(float3x3 m) noexcept {
         make_float4(0.0f, 0.0f, 0.0f, 1.0f));
 }
 
-inline auto to_fixed_point(float v, float scale = 1024.0f) noexcept {
-    return static_cast<int>(round(v * scale));
-}
-
-inline auto from_fixed_point(int v, float scale = 1024.0f) noexcept {
-    return static_cast<float>(v) / scale;
-}
-
-inline auto make_u64(uint2 v) noexcept {
-    return (static_cast<uint64_t>(v.x) << 32u) | static_cast<uint64_t>(v.y);
-}
-
-inline auto make_uint2(uint64_t v) noexcept {
-    return make_uint2(static_cast<uint>(v >> 32u), static_cast<uint>(v));
-}
-
 }

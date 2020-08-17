@@ -50,19 +50,18 @@ int main(int argc, char *argv[]) {
         dispatch(texture->copy_from(image.data));
     });
     
-    constexpr auto rx = 10;
-    constexpr auto ry = 3;
+    constexpr auto rx = 5;
+    constexpr auto ry = 10;
     auto blur_x = device->compile_kernel([&] { blur(*texture, *temp_texture, width, height, rx, 0); });
-    auto blur_xx = device->compile_kernel([&] { blur(*temp_texture, *texture, width, height, rx, 0); });
-    
     auto blur_y = device->compile_kernel([&] { blur(*texture, *temp_texture, width, height, 0, ry); });
     
     device->launch([&](Dispatcher &dispatch) {
-        for (auto i = 0; i < 10; i++) {
-            dispatch(*blur_x, make_uint2(width, height));
-            dispatch(*blur_xx, make_uint2(width, height));
+        dispatch(*blur_x, make_uint2(width, height));
+        dispatch(temp_texture->copy_to(*texture));
+        for (auto i = 0; i < 20; i++) {
+            dispatch(*blur_y, make_uint2(width, height));
+            dispatch(temp_texture->copy_to(*texture));
         }
-        dispatch(*blur_y, make_uint2(width, height));
         dispatch(temp_texture->copy_to(image.data));
     });
     device->synchronize();

@@ -20,7 +20,7 @@ int main(int argc, char *argv[]) {
     auto height = static_cast<uint32_t>(cv_image.rows);
     auto texture = device->allocate_texture<uchar4>(width, height);
     auto temp_texture = device->allocate_texture<uchar4>(width, height);
-    BoxBlur blur{*device, 20, 10, *texture, *temp_texture};
+    BoxBlur blur{*device, 20, 100, *texture, *temp_texture};
     
     device->launch([&](Dispatcher &dispatch) noexcept {
         dispatch(texture->copy_from(cv_image.data));

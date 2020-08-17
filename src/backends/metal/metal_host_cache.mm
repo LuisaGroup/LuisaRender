@@ -20,7 +20,7 @@ id<MTLBuffer> MetalHostCache::get() noexcept {
     lock.unlock();
     if (cache == nullptr) {
         cache = [_device newBufferWithLength:_cache_size options:MTLResourceStorageModeShared];
-        LUISA_INFO("Created host cache buffer #", _cache_count++, " with length ", _cache_size, " for buffer content synchronization.");
+        LUISA_INFO("Created host cache buffer #", _cache_count++, " with length ", _cache_size, " for device content synchronization.");
     }
     return cache;
 }
