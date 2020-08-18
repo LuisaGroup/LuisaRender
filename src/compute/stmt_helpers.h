@@ -20,16 +20,8 @@ inline void Variable::operator op(T &&rhs) const noexcept{                    \
 LUISA_MAP_MACRO(MAKE_VARIABLE_ASSIGNMENT_OPERATOR_IMPL, =, +=, -=, *=, /=, %=, &=, |=, ^=, <<=, >>=)
 #undef MAKE_VARIABLE_ASSIGNMENT_OPERATOR_IMPL
 
-#define MAKE_VARIABLE_ASSIGNMENT_OPERATOR()                                                                 \
-void operator=(Variable rhs) const noexcept {                                                               \
-    void_(Function::current().add_expression(std::make_unique<BinaryExpr>(BinaryOp::ASSIGN, *this, rhs)));  \
-}                                                                                                           \
-template<typename U, detail::EnableIfLiteralOperand<U> = 0> void operator=(U &&rhs) const noexcept {        \
-    this->operator=(literal(std::forward<U>(rhs)));                                                         \
-}                                                                                                           \
-
 template<typename T>
-struct Arg : public Variable {
+struct Arg : public Variable, Noncopyable {
     
     template<typename U>
     explicit Arg(BufferView<U> bv) noexcept: Variable{Function::current().arg<T>(bv)} {}
@@ -40,8 +32,6 @@ struct Arg : public Variable {
     explicit Arg(U data) noexcept: Variable{Function::current().arg<T>(&data, sizeof(data))} {}
     
     explicit Arg(void *p) noexcept : Variable{Function::current().arg<T>(p)} {}
-    
-    MAKE_VARIABLE_ASSIGNMENT_OPERATOR()
 };
 
 template<typename T>
@@ -49,8 +39,6 @@ struct Var : public Variable {
     
     template<typename ...Literals>
     Var(Literals &&...vs) noexcept : Variable{Function::current().var<T>(std::forward<Literals>(vs)...)} {}
-    
-    MAKE_VARIABLE_ASSIGNMENT_OPERATOR()
 };
 
 using Bool = Var<bool>;
@@ -74,15 +62,11 @@ struct Let : public Variable {
     
     template<typename ...Literals>
     explicit Let(Literals &&...vs) noexcept : Variable{Function::current().constant<T>(std::forward<Literals>(vs)...)} {}
-    
-    MAKE_VARIABLE_ASSIGNMENT_OPERATOR()
 };
 
 // Used for arguments passed by value
 template<typename T>
 using ExprRef = Variable;
-
-#undef MAKE_VARIABLE_ASSIGNMENT_OPERATOR
 
 struct IfStmtBuilder {
     

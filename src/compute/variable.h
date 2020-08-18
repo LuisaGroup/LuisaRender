@@ -151,10 +151,10 @@ public:
     [[nodiscard]] Variable y() const noexcept { return member("y"); }
     [[nodiscard]] Variable z() const noexcept { return member("z"); }
     [[nodiscard]] Variable w() const noexcept { return member("w"); }
-    [[nodiscard]] Variable r() const noexcept { return member("r"); }
-    [[nodiscard]] Variable g() const noexcept { return member("g"); }
-    [[nodiscard]] Variable b() const noexcept { return member("b"); }
-    [[nodiscard]] Variable a() const noexcept { return member("a"); }
+    [[nodiscard]] Variable r() const noexcept { return member("x"); }
+    [[nodiscard]] Variable g() const noexcept { return member("y"); }
+    [[nodiscard]] Variable b() const noexcept { return member("z"); }
+    [[nodiscard]] Variable a() const noexcept { return member("w"); }
     
     [[nodiscard]] Variable operator+() const noexcept;
     [[nodiscard]] Variable operator-() const noexcept;

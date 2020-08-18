@@ -56,12 +56,15 @@ private:
     int _height;
     std::unique_ptr<Kernel> _blur_x;
     std::unique_ptr<Kernel> _blur_y;
+    std::unique_ptr<Texture> _temp;
 
 public:
-    BoxBlur(Device &device, int rx, int ry, Texture &input, Texture &temp) noexcept
-        : _width{static_cast<int>(input.width())}, _height{static_cast<int>(input.height())} {
-        _blur_x = device.compile_kernel([&] { detail::box_blur_x_or_y(rx, 0, input, temp); });
-        _blur_y = device.compile_kernel([&] { detail::box_blur_x_or_y(0, ry, temp, input); });
+    BoxBlur(Device &device, int rx, int ry, Texture &input) noexcept
+        : _width{static_cast<int>(input.width())},
+          _height{static_cast<int>(input.height())},
+          _temp{device.allocate_texture<luisa::float4>(input.width(), input.height())} {
+        _blur_x = device.compile_kernel([&] { detail::box_blur_x_or_y(rx, 0, input, *_temp); });
+        _blur_y = device.compile_kernel([&] { detail::box_blur_x_or_y(0, ry, *_temp, input); });
     }
     
     void operator()(Dispatcher &dispatch) noexcept {

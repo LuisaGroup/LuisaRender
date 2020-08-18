@@ -3,7 +3,7 @@
 //
 
 #include <opencv2/opencv.hpp>
-#include "box_blur.h"
+#include "nlm_filter.h"
 
 using namespace luisa;
 using namespace luisa::compute;
@@ -13,23 +13,30 @@ int main(int argc, char *argv[]) {
     Context context{argc, argv};
     auto device = Device::create(&context, "metal");
     
-    auto cv_image = cv::imread("data/images/luisa.png", cv::IMREAD_COLOR);
-    cv::cvtColor(cv_image, cv_image, cv::COLOR_BGR2RGBA);
+    auto feature_name = "visibility";
     
-    auto width = static_cast<uint32_t>(cv_image.cols);
-    auto height = static_cast<uint32_t>(cv_image.rows);
-    auto texture = device->allocate_texture<uchar4>(width, height);
-    auto temp_texture = device->allocate_texture<uchar4>(width, height);
-    BoxBlur blur{*device, 20, 100, *texture, *temp_texture};
+    auto color_image = cv::imread(serialize("data/images/", feature_name, ".exr"), cv::IMREAD_UNCHANGED);
+    auto variance_image = cv::imread(serialize("data/images/", feature_name, "Variance.exr"), cv::IMREAD_UNCHANGED);
+    
+    cv::cvtColor(color_image, color_image, color_image.channels() == 1 ? cv::COLOR_GRAY2RGBA : cv::COLOR_BGR2RGBA);
+    cv::cvtColor(variance_image, variance_image, variance_image.channels() == 1 ? cv::COLOR_GRAY2RGBA : cv::COLOR_BGR2RGBA);
+    
+    auto width = static_cast<uint32_t>(color_image.cols);
+    auto height = static_cast<uint32_t>(color_image.rows);
+    auto color_texture = device->allocate_texture<float4>(width, height);
+    auto variance_texture = device->allocate_texture<float4>(width, height);
+    
+    NonLocalMeansFilter filter{*device, 10, 3, 1.0f, *color_texture, *variance_texture};
     
     device->launch([&](Dispatcher &dispatch) noexcept {
-        dispatch(texture->copy_from(cv_image.data));
-        dispatch(blur);
-        dispatch(texture->copy_to(cv_image.data));
+        dispatch(color_texture->copy_from(color_image.data));
+        dispatch(variance_texture->copy_from(variance_image.data));
+        dispatch(filter);
+        dispatch(color_texture->copy_to(color_image.data));
     });
     
     device->synchronize();
     
-    cv::cvtColor(cv_image, cv_image, cv::COLOR_RGBA2BGR);
-    cv::imwrite("data/images/luisa-box-blur.png", cv_image);
+    cv::cvtColor(color_image, color_image, cv::COLOR_RGBA2BGR);
+    cv::imwrite(serialize("data/images/", feature_name, "-nlm.exr"), color_image);
 }
