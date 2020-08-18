@@ -113,9 +113,7 @@ public:
     
     void apply() {
         using namespace luisa;
-        _device->launch([this](Dispatcher &dispatch) {
-            dispatch(*_clear_accum_kernel, make_uint2(_width, _height));
-        });
+        _device->launch(*_clear_accum_kernel, make_uint2(_width, _height));
         for (auto dy = -_filter_radius; dy <= _filter_radius; dy++) {
             _device->launch([this, dy](Dispatcher &dispatch) {
                 for (auto dx = -_filter_radius; dx <= _filter_radius; dx++) {
@@ -126,8 +124,6 @@ public:
                 }
             });
         }
-        _device->launch([this](Dispatcher &dispatch) {
-            dispatch(*_blit_kernel, make_uint2(_width, _height));
-        });
+        _device->launch(*_blit_kernel, make_uint2(_width, _height));
     }
 };
