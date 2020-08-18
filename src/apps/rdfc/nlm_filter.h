@@ -18,6 +18,7 @@ using luisa::compute::dsl::Function;
 class NonLocalMeansFilter {
 
 private:
+    Device *_device;
     int _width;
     int _height;
     int _filter_radius{0};
@@ -32,7 +33,8 @@ private:
 
 public:
     NonLocalMeansFilter(Device &device, int filter_radius, int patch_radius, float kc, Texture &color, Texture &variance)
-        : _width{static_cast<int>(color.width())},
+        : _device{&device},
+          _width{static_cast<int>(color.width())},
           _height{static_cast<int>(color.height())},
           _filter_radius{filter_radius},
           _distance_texture{device.allocate_texture<float>(color.width(), color.height())},
@@ -45,7 +47,7 @@ public:
         _blur = std::make_unique<BoxBlur>(device, patch_radius, patch_radius, *_distance_texture);
         
         _distance_kernel = device.compile_kernel([&] {
-    
+            
             Arg<Tex2D<TextureAccess::READ>> variance_texture{variance};
             Arg<Tex2D<TextureAccess::READ>> color_texture{color};
             Arg<Tex2D<TextureAccess::WRITE>> diff_texture{*_distance_texture};
@@ -62,7 +64,7 @@ public:
                 Auto var_q = make_float3(read(variance_texture, q));
                 Auto var_pq = min(var_p, var_q);
                 Auto diff = make_float3(read(color_texture, p) - read(color_texture, q));
-                constexpr auto epsilon = 1e-3f;
+                constexpr auto epsilon = 1e-6f;
                 Auto distance = (diff * diff - (var_p + var_pq)) / (epsilon + kc * (var_p + var_q));
                 Auto sum_distance = (distance.r() + distance.g() + distance.b()) * (1.0f / 3.0f);
                 write(diff_texture, q, make_float4(sum_distance));
@@ -109,17 +111,23 @@ public:
         });
     }
     
-    void operator()(Dispatcher &dispatch) {
+    void apply() {
         using namespace luisa;
-        dispatch(*_clear_accum_kernel, make_uint2(_width, _height));
+        _device->launch([this](Dispatcher &dispatch) {
+            dispatch(*_clear_accum_kernel, make_uint2(_width, _height));
+        });
         for (auto dy = -_filter_radius; dy <= _filter_radius; dy++) {
-            for (auto dx = -_filter_radius; dx <= _filter_radius; dx++) {
-                _current_offset = make_int2(dx, dy);
-                dispatch(*_distance_kernel, make_uint2(_width, _height));
-                dispatch(*_blur);
-                dispatch(*_accum_kernel, make_uint2(_width, _height));
-            }
+            _device->launch([this, dy](Dispatcher &dispatch) {
+                for (auto dx = -_filter_radius; dx <= _filter_radius; dx++) {
+                    _current_offset = make_int2(dx, dy);
+                    dispatch(*_distance_kernel, make_uint2(_width, _height));
+                    dispatch(*_blur);
+                    dispatch(*_accum_kernel, make_uint2(_width, _height));
+                }
+            });
         }
-        dispatch(*_blit_kernel, make_uint2(_width, _height));
+        _device->launch([this](Dispatcher &dispatch) {
+            dispatch(*_blit_kernel, make_uint2(_width, _height));
+        });
     }
 };

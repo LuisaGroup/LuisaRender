@@ -13,7 +13,7 @@ int main(int argc, char *argv[]) {
     Context context{argc, argv};
     auto device = Device::create(&context, "metal");
     
-    auto feature_name = "visibility";
+    auto feature_name = "albedo";
     
     auto color_image = cv::imread(serialize("data/images/", feature_name, ".exr"), cv::IMREAD_UNCHANGED);
     auto variance_image = cv::imread(serialize("data/images/", feature_name, "Variance.exr"), cv::IMREAD_UNCHANGED);
@@ -26,16 +26,19 @@ int main(int argc, char *argv[]) {
     auto color_texture = device->allocate_texture<float4>(width, height);
     auto variance_texture = device->allocate_texture<float4>(width, height);
     
-    NonLocalMeansFilter filter{*device, 10, 3, 1.0f, *color_texture, *variance_texture};
+    NonLocalMeansFilter filter{*device, 5, 3, 1.0f, *color_texture, *variance_texture};
     
-    device->launch([&](Dispatcher &dispatch) noexcept {
+    device->launch([&](Dispatcher &dispatch) {
         dispatch(color_texture->copy_from(color_image.data));
         dispatch(variance_texture->copy_from(variance_image.data));
-        dispatch(filter);
+    });
+    filter.apply();
+    device->launch([&](Dispatcher &dispatch) {
         dispatch(color_texture->copy_to(color_image.data));
     });
     
     device->synchronize();
+    LUISA_INFO("Done.");
     
     cv::cvtColor(color_image, color_image, cv::COLOR_RGBA2BGR);
     cv::imwrite(serialize("data/images/", feature_name, "-nlm.exr"), color_image);

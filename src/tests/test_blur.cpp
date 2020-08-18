@@ -16,17 +16,17 @@ void blur_x_or_y(Texture &input, Texture &output, int width, int height, int rx,
     
     Auto tx = cast<int>(thread_xy().x());
     Auto ty = cast<int>(thread_xy().y());
-    If(tx < width && ty < height) {
+    If (tx < width && ty < height) {
         Float4 sum;
         for (auto dx = -rx; dx <= rx; dx++) {
             auto x = tx + dx;
-            If(x >= 0 && x < width) {
+            If (x >= 0 && x < width) {
                 sum += read(in, make_uint2(x, ty));
             };
         }
         for (auto dy = -ry; dy <= ry; dy++) {
             auto y = ty + dy;
-            If(y >= 0 && y < height) {
+            If (y >= 0 && y < height) {
                 sum += read(in, make_uint2(tx, y));
             };
         }
