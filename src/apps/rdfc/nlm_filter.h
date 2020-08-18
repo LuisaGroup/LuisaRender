@@ -114,7 +114,6 @@ public:
         dispatch(*_clear_accum_kernel, make_uint2(_width, _height));
         for (auto dy = -_filter_radius; dy <= _filter_radius; dy++) {
             for (auto dx = -_filter_radius; dx <= _filter_radius; dx++) {
-                LUISA_INFO("Calculating distance with offset (", dx, ", ", dy, ")...");
                 _current_offset = make_int2(dx, dy);
                 dispatch(*_distance_kernel, make_uint2(_width, _height));
                 dispatch(*_blur);
