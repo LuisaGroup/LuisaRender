@@ -22,7 +22,7 @@ inline std::string serialize(Args &&...args) noexcept {
     return ss.str();
 }
 
-inline auto sha1_digest(const std::string &s) noexcept {
+inline auto sha1_digest(std::string_view s) noexcept {
     return SHA1{s}.digest();
 }
 
