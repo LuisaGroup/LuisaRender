@@ -32,7 +32,8 @@ private:
     std::unique_ptr<BoxBlur> _blur;
 
 public:
-    NonLocalMeansFilter(Device &device, int filter_radius, int patch_radius, float kc, Texture &color, Texture &variance)
+    // Note: "color" and "output" can be referencing the same texture.
+    NonLocalMeansFilter(Device &device, int filter_radius, int patch_radius, float kc, Texture &color, Texture &variance, Texture &output)
         : _device{&device},
           _width{static_cast<int>(color.width())},
           _height{static_cast<int>(color.height())},
@@ -44,7 +45,7 @@ public:
         using namespace luisa::compute;
         using namespace luisa::compute::dsl;
         
-        _blur = std::make_unique<BoxBlur>(device, patch_radius, patch_radius, *_distance_texture);
+        _blur = std::make_unique<BoxBlur>(device, patch_radius, patch_radius, *_distance_texture, *_distance_texture);
         
         _distance_kernel = device.compile_kernel([&] {
             
@@ -65,10 +66,10 @@ public:
                 Auto var_q = make_float3(read(variance_texture, q));
                 Auto var_pq = min(var_p, var_q);
                 Auto diff = make_float3(read(color_texture, p) - read(color_texture, q));
-                constexpr auto epsilon = 1e-6f;
-                Auto distance = (diff * diff - (var_p + var_pq)) / (epsilon + kc * (var_p + var_q));
+                constexpr auto epsilon = 1e-4f;
+                Auto distance = (diff * diff - (var_p + var_pq)) / (epsilon + kc * kc * (var_p + var_q));
                 Auto sum_distance = (distance.r() + distance.g() + distance.b()) * (1.0f / 3.0f);
-                write(diff_texture, q, make_float4(sum_distance));
+                write(diff_texture, q, make_float4(make_float3(sum_distance), 1.0f));
             };
         });
         
@@ -83,7 +84,7 @@ public:
         _accum_kernel = device.compile_kernel([&] {
             
             Arg<ReadOnlyTex2D> blurred_distance_texture{*_distance_texture};
-            Arg<ReadOnlyTex2D> color_texture{color};
+            Arg<ReadOnlyTex2D> color_texture{output};
             Arg<ReadWriteTex2D> accum_texture{*_accum_texture};
             
             // Pointer to offset, will be updated before each launches
@@ -103,13 +104,13 @@ public:
         _blit_kernel = device.compile_kernel([&] {
             
             Arg<ReadOnlyTex2D> accum_texture{*_accum_texture};
-            Arg<WriteOnlyTex2D> color_texture{color};
+            Arg<WriteOnlyTex2D> output_texture{output};
             
             auto p = thread_xy();
             If (p.x() < _width && p.y() < _height) {
                 Auto accum = read(accum_texture, p);
-                Auto filtered = select(accum.w() == 0.0f, dsl::make_float3(0.0f), make_float3(accum) / accum.w());
-                write(color_texture, p, make_float4(filtered, 1.0f));
+                Auto filtered = select(accum.w() <= 0.0f, dsl::make_float3(0.0f), make_float3(accum) / accum.w());
+                write(output_texture, p, make_float4(filtered, 1.0f));
             };
         });
     }

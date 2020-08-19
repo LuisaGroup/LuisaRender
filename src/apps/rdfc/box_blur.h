@@ -4,13 +4,13 @@
 
 #pragma once
 
-#include <compute/dsl.h>
 #include <compute/device.h>
+#include <compute/dsl.h>
 
-using luisa::compute::Texture;
 using luisa::compute::Device;
-using luisa::compute::Kernel;
 using luisa::compute::Dispatcher;
+using luisa::compute::Kernel;
+using luisa::compute::Texture;
 using luisa::compute::dsl::Function;
 
 namespace detail {
@@ -30,24 +30,24 @@ inline void box_blur_x_or_y(int rx, int ry, Texture &input, Texture &output) noe
     Auto tx = cast<int>(thread_xy().x());
     Auto ty = cast<int>(thread_xy().y());
     If(tx < width && ty < height) {
-        Float4 sum;
+        Float4 sum{0.0f};
         for (auto dx = -rx; dx <= rx; dx++) {
             auto x = tx + dx;
             If(x >= 0 && x < width) {
-                sum += read(in, make_uint2(x, ty));
+                sum += make_float4(make_float3(read(in, make_uint2(x, ty))), 1.0f);
             };
         }
         for (auto dy = -ry; dy <= ry; dy++) {
             auto y = ty + dy;
             If(y >= 0 && y < height) {
-                sum += read(in, make_uint2(tx, y));
+                sum += make_float4(make_float3(read(in, make_uint2(tx, y))), 1.0f);
             };
         }
         write(out, thread_xy(), make_float4(make_float3(sum) / sum.a(), 1.0f));
     };
 }
 
-}
+}// namespace detail
 
 class BoxBlur {
 
@@ -59,12 +59,13 @@ private:
     std::unique_ptr<Texture> _temp;
 
 public:
-    BoxBlur(Device &device, int rx, int ry, Texture &input) noexcept
+    // Note: "input" and "output" may alias
+    BoxBlur(Device &device, int rx, int ry, Texture &input, Texture &output) noexcept
         : _width{static_cast<int>(input.width())},
           _height{static_cast<int>(input.height())},
           _temp{device.allocate_texture<luisa::float4>(input.width(), input.height())} {
         _blur_x = device.compile_kernel([&] { detail::box_blur_x_or_y(rx, 0, input, *_temp); });
-        _blur_y = device.compile_kernel([&] { detail::box_blur_x_or_y(0, ry, *_temp, input); });
+        _blur_y = device.compile_kernel([&] { detail::box_blur_x_or_y(0, ry, *_temp, output); });
     }
     
     void operator()(Dispatcher &dispatch) noexcept {

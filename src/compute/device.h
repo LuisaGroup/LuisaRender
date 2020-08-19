@@ -23,9 +23,11 @@ protected:
     [[nodiscard]] virtual std::unique_ptr<Buffer> _allocate_buffer(size_t size, size_t max_host_caches) = 0;
     [[nodiscard]] virtual std::unique_ptr<Texture> _allocate_texture(uint32_t width, uint32_t height, PixelFormat format, size_t max_caches) = 0;
     [[nodiscard]] virtual std::unique_ptr<Kernel> _compile_kernel(const dsl::Function &function) = 0;
+    
+    virtual void _launch(const std::function<void(Dispatcher &)> &dispatch) = 0;
 
 public:
-    explicit Device(Context *context) noexcept : _context{context} {}
+    explicit Device(Context *context) noexcept: _context{context} {}
     virtual ~Device() noexcept = default;
     
     [[nodiscard]] Context &context() const noexcept { return *_context; }
@@ -56,11 +58,14 @@ public:
         return _allocate_texture(width, height, format, max_caches);
     }
     
-    virtual void launch(const std::function<void(Dispatcher &)> &dispatch) = 0;
+    template<typename Work, std::enable_if_t<std::is_invocable_v<Work, Dispatcher &>, int> = 0>
+    void launch(Work &&work) {
+        _launch([&work, this](Dispatcher &dispatch) { work(dispatch); });
+    }
     
-    void launch(Kernel &kernel, uint threads, uint tg_size = 128u) { launch([&](Dispatcher &dispatch) { dispatch(kernel, threads, tg_size); }); }
-    void launch(Kernel &kernel, uint2 threads, uint2 tg_size = make_uint2(8u, 8u)) { launch([&](Dispatcher &dispatch) { dispatch(kernel, threads, tg_size); }); }
-    void launch(Kernel &kernel, uint3 threads, uint3 tg_size) { launch([&](Dispatcher &dispatch) { dispatch(kernel, threads, tg_size); }); }
+    void launch(Kernel &kernel, uint threads, uint tg_size = 128u) { _launch([&](Dispatcher &dispatch) { dispatch(kernel, threads, tg_size); }); }
+    void launch(Kernel &kernel, uint2 threads, uint2 tg_size = make_uint2(8u, 8u)) { _launch([&](Dispatcher &dispatch) { dispatch(kernel, threads, tg_size); }); }
+    void launch(Kernel &kernel, uint3 threads, uint3 tg_size) { _launch([&](Dispatcher &dispatch) { dispatch(kernel, threads, tg_size); }); }
     
     virtual void synchronize() = 0;
     
@@ -71,5 +76,5 @@ using DeviceCreator = Device *(Context *);
 
 #define LUISA_EXPORT_DEVICE_CREATOR(DeviceClass)  \
     LUISA_DLL_EXPORT ::luisa::compute::Device *create(::luisa::Context *context) { return new DeviceClass{context}; }
-
+    
 }
