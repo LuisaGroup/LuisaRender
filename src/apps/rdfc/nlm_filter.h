@@ -28,18 +28,22 @@ private:
     std::unique_ptr<Kernel> _accum_kernel;
     std::unique_ptr<Kernel> _blit_kernel;
     std::unique_ptr<Texture> _distance_texture;
-    std::unique_ptr<Texture> _accum_texture;
+    std::unique_ptr<Texture> _accum_a_texture;
+    std::unique_ptr<Texture> _accum_b_texture;
     std::unique_ptr<BoxBlur> _blur;
 
 public:
     // Note: "color" and "output" can be referencing the same texture.
-    NonLocalMeansFilter(Device &device, int filter_radius, int patch_radius, float kc, Texture &color, Texture &variance, Texture &output)
+    NonLocalMeansFilter(Device &device, int filter_radius, int patch_radius, float kc,
+                        Texture &color, Texture &variance, Texture &color_a, Texture &color_b,
+                        Texture &output_a, Texture &output_b)
         : _device{&device},
           _width{static_cast<int>(color.width())},
           _height{static_cast<int>(color.height())},
           _filter_radius{filter_radius},
           _distance_texture{device.allocate_texture<float>(color.width(), color.height())},
-          _accum_texture{device.allocate_texture<luisa::float4>(color.width(), color.height())} {
+          _accum_a_texture{device.allocate_texture<luisa::float4>(color.width(), color.height())},
+          _accum_b_texture{device.allocate_texture<luisa::float4>(color.width(), color.height())} {
         
         using namespace luisa;
         using namespace luisa::compute;
@@ -74,43 +78,59 @@ public:
         });
         
         _clear_accum_kernel = device.compile_kernel([&] {
-            Arg<WriteOnlyTex2D> accum_texture{*_accum_texture};
+            Arg<WriteOnlyTex2D> accum_a_texture{*_accum_a_texture};
+            Arg<WriteOnlyTex2D> accum_b_texture{*_accum_b_texture};
             auto p = thread_xy();
             If (p.x() < _width && p.y() < _height) {
-                write(accum_texture, p, dsl::make_float4(0.0f));
+                write(accum_a_texture, p, dsl::make_float4(0.0f));
+                write(accum_b_texture, p, dsl::make_float4(0.0f));
             };
         });
         
         _accum_kernel = device.compile_kernel([&] {
             
             Arg<ReadOnlyTex2D> blurred_distance_texture{*_distance_texture};
-            Arg<ReadOnlyTex2D> color_texture{output};
-            Arg<ReadWriteTex2D> accum_texture{*_accum_texture};
+            Arg<ReadOnlyTex2D> color_a_texture{color_a};
+            Arg<ReadOnlyTex2D> color_b_texture{color_b};
+            Arg<ReadWriteTex2D> accum_a_texture{*_accum_a_texture};
+            Arg<ReadWriteTex2D> accum_b_texture{*_accum_b_texture};
             
             // Pointer to offset, will be updated before each launches
             Arg<int2> d{&_current_offset};
             
-            auto p = make_int2(thread_xy());
-            auto q = p + d;
+            Auto p = make_int2(thread_xy());
+            Auto q = p + d;
             If (p.x() < _width && p.y() < _height && q.x() >= 0 && q.x() < _width && q.y() >= 0 && q.y() < _height) {
+                
                 auto support = static_cast<float>(2 * patch_radius - 1);
                 Auto weight = exp(-max(read(blurred_distance_texture, thread_xy()).r() * (1.0f / (support * support)), 0.0f));
-                Auto color_q = make_float3(read(color_texture, make_uint2(q)));
-                Auto accum = read(accum_texture, thread_xy());
-                write(accum_texture, thread_xy(), make_float4(color_q * weight + make_float3(accum), accum.w() + weight));
+                
+                auto accumulate = [&q, &weight](auto &&color_texture, auto &&accum_texture) {
+                    Auto color_q = make_float3(read(color_texture, make_uint2(q)));
+                    Auto accum = read(accum_texture, thread_xy());
+                    write(accum_texture, thread_xy(), make_float4(color_q * weight + make_float3(accum), accum.w() + weight));
+                };
+                accumulate(color_a_texture, accum_a_texture);
+                accumulate(color_b_texture, accum_b_texture);
             };
         });
         
         _blit_kernel = device.compile_kernel([&] {
             
-            Arg<ReadOnlyTex2D> accum_texture{*_accum_texture};
-            Arg<WriteOnlyTex2D> output_texture{output};
+            Arg<ReadOnlyTex2D> accum_a_texture{*_accum_a_texture};
+            Arg<ReadOnlyTex2D> accum_b_texture{*_accum_b_texture};
+            Arg<WriteOnlyTex2D> output_a_texture{output_a};
+            Arg<WriteOnlyTex2D> output_b_texture{output_b};
             
             auto p = thread_xy();
             If (p.x() < _width && p.y() < _height) {
-                Auto accum = read(accum_texture, p);
-                Auto filtered = select(accum.w() <= 0.0f, dsl::make_float3(0.0f), make_float3(accum) / accum.w());
-                write(output_texture, p, make_float4(filtered, 1.0f));
+                auto blit = [&p](auto &&accum_texture, auto &&output_texture) {
+                    Auto accum = read(accum_texture, p);
+                    Auto filtered = select(accum.w() <= 0.0f, dsl::make_float3(0.0f), make_float3(accum) / accum.w());
+                    write(output_texture, p, make_float4(filtered, 1.0f));
+                };
+                blit(accum_a_texture, output_a_texture);
+                blit(accum_b_texture, output_b_texture);
             };
         });
     }

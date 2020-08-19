@@ -13,42 +13,6 @@ using luisa::compute::Kernel;
 using luisa::compute::Texture;
 using luisa::compute::dsl::Function;
 
-namespace detail {
-
-inline void box_blur_x_or_y(int rx, int ry, Texture &input, Texture &output) noexcept {
-    
-    using namespace luisa;
-    using namespace luisa::compute;
-    using namespace luisa::compute::dsl;
-    
-    Arg<ReadOnlyTex2D> in{input};
-    Arg<WriteOnlyTex2D> out{output};
-    
-    auto width = static_cast<int>(input.width());
-    auto height = static_cast<int>(input.height());
-    
-    Auto tx = cast<int>(thread_xy().x());
-    Auto ty = cast<int>(thread_xy().y());
-    If(tx < width && ty < height) {
-        Float4 sum{0.0f};
-        for (auto dx = -rx; dx <= rx; dx++) {
-            auto x = tx + dx;
-            If(x >= 0 && x < width) {
-                sum += make_float4(make_float3(read(in, make_uint2(x, ty))), 1.0f);
-            };
-        }
-        for (auto dy = -ry; dy <= ry; dy++) {
-            auto y = ty + dy;
-            If(y >= 0 && y < height) {
-                sum += make_float4(make_float3(read(in, make_uint2(tx, y))), 1.0f);
-            };
-        }
-        write(out, thread_xy(), make_float4(make_float3(sum) / sum.a(), 1.0f));
-    };
-}
-
-}// namespace detail
-
 class BoxBlur {
 
 private:
@@ -64,8 +28,37 @@ public:
         : _width{static_cast<int>(input.width())},
           _height{static_cast<int>(input.height())},
           _temp{device.allocate_texture<luisa::float4>(input.width(), input.height())} {
-        _blur_x = device.compile_kernel([&] { detail::box_blur_x_or_y(rx, 0, input, *_temp); });
-        _blur_y = device.compile_kernel([&] { detail::box_blur_x_or_y(0, ry, *_temp, output); });
+        
+        auto box_blur_x_or_y = [](int rx, int ry, Texture &input, Texture &output) noexcept {
+            
+            using namespace luisa;
+            using namespace luisa::compute;
+            using namespace luisa::compute::dsl;
+            
+            Arg<ReadOnlyTex2D> in{input};
+            Arg<WriteOnlyTex2D> out{output};
+            
+            auto width = static_cast<int>(input.width());
+            auto height = static_cast<int>(input.height());
+            Auto p = make_int2(thread_xy());
+            If (p.x() < width && p.y() < height) {
+                Float3 sum{0.0f};
+                for (auto dy = -ry; dy <= ry; dy++) {
+                    for (auto dx = -rx; dx <= rx; dx++) {
+                        Auto x = p.x() + dx;
+                        Auto y = p.y() + dy;
+                        if (rx != 0) { x = select(x < 0, -x, select(x < width, x, 2 * width - 1 - x)); }
+                        if (ry != 0) { y = select(y < 0, -y, select(y < height, y, 2 * height - 1 - y)); }
+                        sum += make_float3(read(in, make_uint2(x, y)));
+                    }
+                }
+                auto support = (2 * rx + 1) * (2 * ry + 1);
+                write(out, thread_xy(), make_float4(sum * (1.0f / static_cast<float>(support)), 1.0f));
+            };
+        };
+        
+        _blur_x = device.compile_kernel([&] { box_blur_x_or_y(rx, 0, input, *_temp); });
+        _blur_y = device.compile_kernel([&] { box_blur_x_or_y(0, ry, *_temp, output); });
     }
     
     void operator()(Dispatcher &dispatch) noexcept {

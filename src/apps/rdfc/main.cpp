@@ -6,14 +6,29 @@
 
 #include "dual_buffer_variance.h"
 #include "nlm_filter.h"
+#include "gaussian_blur.h"
 
 using namespace luisa;
 using namespace luisa::compute;
+using namespace luisa::compute::dsl;
 
 int main(int argc, char *argv[]) {
     
     Context context{argc, argv};
     auto device = Device::create(&context, "metal");
+    
+    {  // playground
+        auto image = cv::imread("data/images/luisa.png", cv::IMREAD_COLOR);
+        cv::cvtColor(image, image, cv::COLOR_BGR2RGBA);
+        auto texture = device->allocate_texture<uchar4>(image.cols, image.rows);
+        device->launch(texture->copy_from(image.data));
+        GaussianBlur blur{*device, 2.0f, 25.0f, *texture, *texture};
+        device->launch(blur);
+        device->launch(texture->copy_to(image.data));
+        device->synchronize();
+        cv::cvtColor(image, image, cv::COLOR_RGBA2BGR);
+        cv::imwrite("data/images/luisa-gaussian-blur.png", image);
+    }
     
     auto feature_name = "albedo";
     
@@ -50,12 +65,23 @@ int main(int argc, char *argv[]) {
     });
     
     DualBufferVariance dual_variance{*device, 10, *variance_texture, *color_a_texture, *color_b_texture, *variance_texture};
-    NonLocalMeansFilter filter{*device, 5, 3, 1.0f, *color_texture, *variance_texture, *color_texture};
+    NonLocalMeansFilter filter{*device, 5, 3, 1.0f, *color_texture, *variance_texture, *color_a_texture, *color_b_texture, *color_a_texture, *color_b_texture};
+    
+    auto add_half_buffers = device->compile_kernel([&] {
+        Arg<ReadOnlyTex2D> color_a{*color_a_texture};
+        Arg<ReadOnlyTex2D> color_b{*color_b_texture};
+        Arg<WriteOnlyTex2D> color{*color_texture};
+        auto p = thread_xy();
+        If (p.x() < width && p.y() < height) {
+            write(color, p, make_float4(0.5f * make_float3(read(color_a, p) + read(color_b, p)), 1.0f));
+        };
+    });
     
     device->launch(dual_variance);
     filter.apply();
     device->launch([&](Dispatcher &dispatch) {
         dispatch(variance_texture->copy_to(variance_image.data));
+        dispatch(*add_half_buffers, make_uint2(width, height));
         dispatch(color_texture->copy_to(color_image.data));
     });
     
