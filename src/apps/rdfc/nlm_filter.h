@@ -48,10 +48,11 @@ public:
         
         _distance_kernel = device.compile_kernel([&] {
             
-            Arg<Tex2D<TextureAccess::READ>> variance_texture{variance};
-            Arg<Tex2D<TextureAccess::READ>> color_texture{color};
-            Arg<Tex2D<TextureAccess::WRITE>> diff_texture{*_distance_texture};
+            Arg<ReadOnlyTex2D> variance_texture{variance};
+            Arg<ReadOnlyTex2D> color_texture{color};
+            Arg<WriteOnlyTex2D> diff_texture{*_distance_texture};
             
+            // Note: offset changes from pass to pass, so we bind a pointer to it
             Arg<int2> d{&_current_offset};
             
             auto p = thread_xy();
@@ -72,7 +73,7 @@ public:
         });
         
         _clear_accum_kernel = device.compile_kernel([&] {
-            Arg<Tex2D<TextureAccess::WRITE>> accum_texture{*_accum_texture};
+            Arg<WriteOnlyTex2D> accum_texture{*_accum_texture};
             auto p = thread_xy();
             If (p.x() < _width && p.y() < _height) {
                 write(accum_texture, p, dsl::make_float4(0.0f));
@@ -81,9 +82,11 @@ public:
         
         _accum_kernel = device.compile_kernel([&] {
             
-            Arg<Tex2D<TextureAccess::READ>> blurred_distance_texture{*_distance_texture};
-            Arg<Tex2D<TextureAccess::READ>> color_texture{color};
-            Arg<Tex2D<TextureAccess::READ_WRITE>> accum_texture{*_accum_texture};
+            Arg<ReadOnlyTex2D> blurred_distance_texture{*_distance_texture};
+            Arg<ReadOnlyTex2D> color_texture{color};
+            Arg<ReadWriteTex2D> accum_texture{*_accum_texture};
+            
+            // Pointer to offset, will be updated before each launches
             Arg<int2> d{&_current_offset};
             
             auto p = make_int2(thread_xy());
@@ -99,8 +102,8 @@ public:
         
         _blit_kernel = device.compile_kernel([&] {
             
-            Arg<Tex2D<TextureAccess::READ>> accum_texture{*_accum_texture};
-            Arg<Tex2D<TextureAccess::WRITE>> color_texture{color};
+            Arg<ReadOnlyTex2D> accum_texture{*_accum_texture};
+            Arg<WriteOnlyTex2D> color_texture{color};
             
             auto p = thread_xy();
             If (p.x() < _width && p.y() < _height) {

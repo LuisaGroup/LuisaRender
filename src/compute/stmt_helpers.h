@@ -28,9 +28,11 @@ struct Arg : public Variable, Noncopyable {
     
     explicit Arg(Texture &tex) noexcept : Variable{Function::current().arg<T>(&tex)} {}
     
+    // For embedding immutable uniform data
     template<typename U, std::enable_if_t<std::negation_v<std::is_pointer<U>>, int> = 0>
     explicit Arg(U data) noexcept: Variable{Function::current().arg<T>(&data, sizeof(data))} {}
     
+    // For binding mutable uniform data
     explicit Arg(void *p) noexcept : Variable{Function::current().arg<T>(p)} {}
 };
 

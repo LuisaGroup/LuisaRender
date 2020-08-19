@@ -96,6 +96,11 @@ struct Tex2D {
     }
 };
 
+using ReadOnlyTex2D = Tex2D<TextureAccess::READ>;
+using WriteOnlyTex2D = Tex2D<TextureAccess::WRITE>;
+using ReadWriteTex2D = Tex2D<TextureAccess::READ_WRITE>;
+using SampledTex2D = Tex2D<TextureAccess::SAMPLE>;
+
 struct AutoType {
     
     [[nodiscard]] static TypeDesc *desc() noexcept {
