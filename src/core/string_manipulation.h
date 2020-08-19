@@ -11,8 +11,7 @@
 #include <array>
 #include <filesystem>
 
-#include <openssl/sha.h>
-#include <openssl/evp.h>
+#include "sha1.h"
 
 namespace luisa { inline namespace utility {
 
@@ -23,12 +22,8 @@ inline std::string serialize(Args &&...args) noexcept {
     return ss.str();
 }
 
-using DigestSHA1 = std::array<uint8_t, SHA_DIGEST_LENGTH>;
-
-inline auto sha1_digest(std::string_view s) noexcept {
-    DigestSHA1 digest{};
-    SHA1(reinterpret_cast<const uint8_t *>(s.data()), s.size(), digest.data());
-    return digest;
+inline auto sha1_digest(const std::string &s) noexcept {
+    return SHA1{s}.digest();
 }
 
 inline std::string pascal_to_snake_case(std::string_view s) noexcept {  // TODO: Robustness

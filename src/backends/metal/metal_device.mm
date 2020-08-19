@@ -37,7 +37,7 @@ public:
 private:
     id<MTLDevice> _handle;
     id<MTLCommandQueue> _command_queue;
-    std::map<DigestSHA1, MTLFunctionWrapper> _kernel_cache;
+    std::map<SHA1::Digest, MTLFunctionWrapper> _kernel_cache;
     std::vector<std::unique_ptr<MetalDispatcher>> _dispatchers;
     uint32_t _next_dispatcher{0u};
     

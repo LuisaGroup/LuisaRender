@@ -33,7 +33,7 @@ public:
         using namespace luisa::compute::dsl;
         
         auto find_radius = [](float sigma, int size) {
-            for (auto d = 0; d < size; d++) { if (exp(-static_cast<float>(d * d) / (2.0f * sigma * sigma)) < 0.05f) { return d; }}
+            for (auto d = 0; d < size; d++) { if (std::exp(-static_cast<float>(d * d) / (2.0f * sigma * sigma)) < 0.05f) { return d; }}
             return size;
         };
         
@@ -56,7 +56,7 @@ public:
                         Auto y = p.y() + dy;
                         if (rx != 0) { x = select(x < 0, -x, select(x < width, x, 2 * width - 1 - x)); }
                         if (ry != 0) { y = select(y < 0, -y, select(y < height, y, 2 * height - 1 - y)); }
-                        auto weight = exp(-static_cast<float>(dx * dx + dy * dy) / (2.0f * (sigma_x * sigma_x + sigma_y * sigma_y)));
+                        auto weight = std::exp(-static_cast<float>(dx * dx + dy * dy) / (2.0f * (sigma_x * sigma_x + sigma_y * sigma_y)));
                         sum += make_float4(weight * make_float3(read(in, make_uint2(x, y))), weight);
                     }
                 }
