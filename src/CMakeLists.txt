@@ -8,7 +8,7 @@ target_link_libraries(spdlog_config INTERFACE spdlog::spdlog spdlog::spdlog_head
 
 find_package(glm CONFIG REQUIRED)
 add_library(glm_config INTERFACE)
-target_link_libraries(glm_config INTERFACE glm)
+target_include_directories(glm_config INTERFACE ${GLM_INCLUDE_DIRS})
 target_compile_definitions(glm_config INTERFACE GLM_FORCE_AVX2 GLM_FORCE_CXX17)
 
 add_subdirectory(core)

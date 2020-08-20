@@ -60,7 +60,7 @@ void MetalTexture::copy_from(Dispatcher &dispatcher, const void *data) {
                 destinationLevel:0
                destinationOrigin:MTLOriginMake(0, 0, 0)];
     [blit_encoder endEncoding];
-    dispatcher.add_callback([this, cache] { _cache.recycle(cache); });
+    dispatcher.when_completed([this, cache] { _cache.recycle(cache); });
 }
 
 void MetalTexture::copy_to(Dispatcher &dispatcher, void *data) {
@@ -77,14 +77,14 @@ void MetalTexture::copy_to(Dispatcher &dispatcher, void *data) {
            destinationBytesPerRow:pitch_byte_size()
          destinationBytesPerImage:byte_size()];
     [blit_encoder endEncoding];
-    dispatcher.add_callback([this, cache, dst = data, size = byte_size()] {
+    dispatcher.when_completed([this, cache, dst = data, size = byte_size()] {
         std::memmove(dst, [cache contents], size);
         _cache.recycle(cache);
     });
 }
 
 void MetalTexture::clear_cache() {
-
+    _cache.clear();
 }
 
 }

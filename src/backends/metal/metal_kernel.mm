@@ -21,7 +21,7 @@ void MetalKernel::_dispatch(Dispatcher &dispatcher, uint3 threadgroups, uint3 th
         for (auto[index, size, src] : _argument_bindings) {
             std::memmove([_argument_encoder constantDataAtIndex:index], src, size);
         }
-        dispatcher.add_callback([this, argument_buffer] {
+        dispatcher.when_completed([this, argument_buffer] {
             std::lock_guard lock{_argument_buffer_mutex};
             _available_argument_buffers.emplace_back(argument_buffer);
         });

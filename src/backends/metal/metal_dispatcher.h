@@ -22,8 +22,8 @@ private:
     id<MTLCommandBuffer> _handle{nullptr};
 
 protected:
-    void _do_synchronize() override { [_handle waitUntilCompleted]; }
-    void _do_commit() override { [_handle commit]; }
+    void _wait() override { [_handle waitUntilCompleted]; }
+    void _schedule() override { [_handle commit]; }
 
 public:
     explicit MetalDispatcher() noexcept = default;

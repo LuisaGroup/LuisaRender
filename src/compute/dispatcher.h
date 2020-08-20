@@ -25,17 +25,17 @@ protected:
     std::vector<std::function<void()>> _callbacks;
     std::future<void> _future;
     
-    virtual void _do_synchronize() = 0;
-    virtual void _do_commit() = 0;
+    virtual void _wait() = 0;
+    virtual void _schedule() = 0;
     
-    void _commit();
-    void _synchronize();
+    virtual void _commit();
+    virtual void _synchronize();
 
 public:
     virtual ~Dispatcher() noexcept = default;
     
     template<typename Callback, std::enable_if_t<std::is_invocable_v<Callback>, int> = 0>
-    void add_callback(Callback &&f) noexcept { _callbacks.emplace_back(std::forward<Callback>(f)); }
+    void when_completed(Callback &&f) noexcept { _callbacks.emplace_back(std::forward<Callback>(f)); }
     
     template<typename F, std::enable_if_t<std::is_invocable_v<F, Dispatcher &>, int> = 0>
     void operator()(F &&f) { f(*this); }

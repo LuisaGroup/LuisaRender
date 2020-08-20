@@ -8,10 +8,10 @@
 namespace luisa::compute {
 
 void Dispatcher::_commit() {
-    _do_commit();
+    _schedule();
     _future = std::async(std::launch::async, [this] {
-        _do_synchronize();
-        for (auto &&cb : _callbacks) { cb(); }
+        _wait();
+        std::for_each(_callbacks.cbegin(), _callbacks.cend(), [](auto &&cb) { cb(); });
     });
 }
 

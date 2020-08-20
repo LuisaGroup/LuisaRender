@@ -27,7 +27,7 @@ int main(int argc, char *argv[]) {
         Arg<WriteOnlyTex2D> image{*texture};
         Arg<uint2> image_size{make_uint2(width, height)};
         Auto txy = thread_xy();
-        If(txy.x() < image_size.x() && txy.y() < image_size.y()) {
+        If (txy.x() < image_size.x() && txy.y() < image_size.y()) {
             Auto xy_f = make_float2(txy);
             Auto size_f = make_float2(image_size) - 1.0f;
             Auto color = make_float4(linear_to_srgb(make_float3(xy_f / size_f, 1.0f)), 1.0f);
