@@ -17,13 +17,12 @@ class Dispatcher;
 class Kernel : Noncopyable {
 
 protected:
-    virtual void _dispatch(Dispatcher &dispatcher, uint3 threadgroups, uint3 threadgroup_size) = 0;
+    virtual void _dispatch(Dispatcher &dispatcher, uint2 threadgroups, uint2 threadgroup_size) = 0;
     
 public:
     virtual ~Kernel() noexcept = default;
     virtual void dispatch(Dispatcher &dispatcher, uint threads, uint threadgroup_size);
     virtual void dispatch(Dispatcher &dispatcher, uint2 threads, uint2 threadgroup_size);
-    virtual void dispatch(Dispatcher &dispatcher, uint3 threads, uint3 threadgroup_size);
 };
 
 }

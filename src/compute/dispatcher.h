@@ -42,7 +42,6 @@ public:
     
     void operator()(Kernel &kernel, uint threads, uint tg_size = 128u);
     void operator()(Kernel &kernel, uint2 threads, uint2 tg_size = make_uint2(8u, 8u));
-    void operator()(Kernel &kernel, uint3 threads, uint3 tg_size);
 };
 
 }

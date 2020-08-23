@@ -43,22 +43,6 @@ struct Var : public Variable {
     Var(Literals &&...vs) noexcept : Variable{Function::current().var<T>(std::forward<Literals>(vs)...)} {}
 };
 
-using Bool = Var<bool>;
-using Float = Var<float>;
-using Int8 = Var<int8_t>;
-using UInt8 = Var<uint8_t>;
-using Int16 = Var<int16_t>;
-using UInt16 = Var<uint16_t>;
-using Int32 = Var<int32_t>;
-using UInt32 = Var<uint32_t>;
-using Int64 = Var<int64_t>;
-using UInt64 = Var<uint64_t>;
-using Auto = Var<AutoType>;
-
-using Float2 = Var<float2>;
-using Float3 = Var<float3>;
-using Float4 = Var<float4>;
-
 template<typename T>
 struct Let : public Variable {
     
@@ -163,10 +147,38 @@ public:
     }
 };
 
+using Bool = Var<bool>;
+using Float = Var<float>;
+using Int8 = Var<int8_t>;
+using UInt8 = Var<uint8_t>;
+using Int16 = Var<int16_t>;
+using UInt16 = Var<uint16_t>;
+using Int32 = Var<int32_t>;
+using UInt32 = Var<uint32_t>;
+using Int64 = Var<int64_t>;
+using UInt64 = Var<uint64_t>;
+using Auto = Var<AutoType>;
+
+using Float2 = Var<float2>;
+using Float3 = Var<float3>;
+using Float4 = Var<float4>;
+
 // For highlighting...
-#define arg arg
-#define var var
-#define let let
+#define Arg  Arg
+#define Var  Var
+#define Let  Let
+
+#define Bool   Bool
+#define Float  Float
+#define Int8   Int8
+#define UInt8  UInt8
+#define Int16  Int16
+#define UInt16 UInt16
+#define Int32  Int32
+#define UInt32 UInt32
+#define Int64  Int64
+#define UInt64 UInt64
+#define Auto   Auto
 
 #define If(...)     IfStmtBuilder{literal(__VA_ARGS__)} << [&]
 #define Else        >> [&]

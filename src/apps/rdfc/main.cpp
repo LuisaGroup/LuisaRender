@@ -17,21 +17,6 @@ int main(int argc, char *argv[]) {
     Context context{argc, argv};
     auto device = Device::create(&context, "metal");
     
-    auto buffer = device->allocate_buffer<float>(1024 * 1024 + 1);
-    
-    LUISA_INFO("Fucking kernel...");
-    auto kernel = device->compile_kernel([&] {
-        Arg<float *> a{buffer};
-        for (auto i = 0; i < 1000; i++) {
-            Auto b = a[i];
-            Auto c = a[i + 1] - 5.0f;
-            Auto d = log(exp(b + c)) + dot(make_float3(b), make_float3(c));
-            a[i + 1] = d;
-        }
-    });
-    LUISA_INFO("Kernel fucked.");
-    device->launch(*kernel, 1024 * 1024);
-    
     {  // playground
         auto image = cv::imread("data/images/luisa.png", cv::IMREAD_COLOR);
         cv::cvtColor(image, image, cv::COLOR_BGR2RGBA);

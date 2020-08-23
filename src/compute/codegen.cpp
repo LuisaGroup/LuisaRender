@@ -342,8 +342,6 @@ void CppCodegen::_emit_variable(Variable v) {
         _os << "$tid";
     } else if (v.is_thread_xy()) {
         _os << "$txy";
-    } else if (v.is_thread_xyz()) {
-        _os << "$txyz";
     } else {
         _os << "$unknown";
     }

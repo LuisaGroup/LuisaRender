@@ -13,16 +13,16 @@ inline Variable literal(Args &&...args) noexcept {
     return Function::current().literal(std::forward<Args>(args)...);
 }
 
-[[nodiscard]] inline Variable thread_id() noexcept { return Function::current().thread_id(); }
-[[nodiscard]] inline Variable thread_x() noexcept { return thread_id(); }
-[[nodiscard]] inline Variable thread_xy() noexcept { return Function::current().thread_xy(); }
-[[nodiscard]] inline Variable thread_xyz() noexcept { return Function::current().thread_xyz(); }
+inline Variable thread_id() noexcept { return Function::current().thread_id(); }
+inline Variable thread_xy() noexcept { return Function::current().thread_xy(); }
+inline Variable thread_x() noexcept { return thread_xy().x(); }
+inline Variable thread_y() noexcept { return thread_xy().y(); }
 
 #define literal    literal
 #define thread_id  thread_id
 #define thread_x   thread_x
+#define thread_y   thread_y
 #define thread_xy  thread_xy
-#define thread_xyz thread_xyz
 
 }
 

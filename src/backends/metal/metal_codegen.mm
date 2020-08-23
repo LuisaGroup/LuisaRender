@@ -19,9 +19,6 @@ void MetalCodegen::_emit_function_decl(const Function &f) {
         } else if (v.is_thread_xy()) {
             _os << ", ";
             _os << "uint2 $txy [[thread_position_in_grid]]";
-        } else if (v.is_thread_xyz()) {
-            _os << ", ";
-            _os << "uint3 $txyz [[thread_position_in_grid]]";
         }
     }
     _os << ") ";

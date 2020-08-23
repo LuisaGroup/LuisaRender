@@ -62,6 +62,13 @@ public:
 };
 
 MetalDevice::MetalDevice(Context *context) : Device{context} {
+//    auto devices = MTLCopyAllDevices();
+//    for (id<MTLDevice> device in devices) {
+//        if (device.isLowPower) {
+//            _handle = device;
+//            break;
+//        }
+//    }
     _handle = MTLCreateSystemDefaultDevice();
     _command_queue = [_handle newCommandQueue];
     _dispatchers.reserve(max_command_queue_size);

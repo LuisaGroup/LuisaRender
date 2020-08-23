@@ -58,7 +58,7 @@ private:
     [[nodiscard]] id<MTLBuffer> _get_argument_buffer();
     
 protected:
-    void _dispatch(compute::Dispatcher &dispatcher, uint3 threadgroups, uint3 threadgroup_size) override;
+    void _dispatch(compute::Dispatcher &dispatcher, uint2 threadgroups, uint2 threadgroup_size) override;
 
 public:
     MetalKernel(

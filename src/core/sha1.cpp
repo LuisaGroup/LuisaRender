@@ -7,11 +7,11 @@
 #include <iomanip>
 
 // From: https://stackoverflow.com/questions/58524805/is-there-a-way-to-create-a-stringstream-from-a-string-view-without-copying-data
-template<typename __char_type, class __traits_type>
-class view_streambuf final : public std::basic_streambuf<__char_type, __traits_type> {
+template<typename CharT, class TraitsT>
+class view_streambuf final : public std::basic_streambuf<CharT, TraitsT> {
 private:
-    typedef std::basic_streambuf<__char_type, __traits_type> super_type;
-    typedef view_streambuf<__char_type, __traits_type> self_type;
+    typedef std::basic_streambuf<CharT, TraitsT> super_type;
+    typedef view_streambuf<CharT, TraitsT> self_type;
 public:
     
     /**
@@ -27,44 +27,44 @@ public:
     
     typedef typename std::basic_string_view<char_type, traits_type> source_view;
     
-    view_streambuf(const source_view &src) noexcept:
+    explicit view_streambuf(const source_view &src) noexcept:
         super_type(),
         src_(src) {
-        char_type *buff = const_cast<char_type *>( src_.data());
+        auto buff = const_cast<char_type *>( src_.data());
         this->setg(buff, buff, buff + src_.length());
     }
     
-    virtual std::streamsize xsgetn(char_type *__s, std::streamsize __n) override {
-        if (0 == __n) {
+    std::streamsize xsgetn(char_type *s, std::streamsize n) override {
+        if (0 == n) {
             return 0;
         }
-        if ((this->gptr() + __n) >= this->egptr()) {
-            __n = this->egptr() - this->gptr();
-            if (0 == __n && !traits_type::not_eof(this->underflow())) {
+        if ((this->gptr() + n) >= this->egptr()) {
+            n = this->egptr() - this->gptr();
+            if (0 == n && !traits_type::not_eof(this->underflow())) {
                 return -1;
             }
         }
-        std::memmove(static_cast<void *>(__s), this->gptr(), __n);
-        this->gbump(static_cast<int>(__n));
-        return __n;
+        std::memmove(static_cast<void *>(s), this->gptr(), n);
+        this->gbump(static_cast<int>(n));
+        return n;
     }
     
-    virtual int_type pbackfail(int_type __c) override {
+    int_type pbackfail(int_type c) override {
         char_type *pos = this->gptr() - 1;
-        *pos = traits_type::to_char_type(__c);
+        *pos = traits_type::to_char_type(c);
         this->pbump(-1);
         return 1;
     }
     
-    virtual int_type underflow() override {
+    int_type underflow() override {
         return traits_type::eof();
     }
     
-    virtual std::streamsize showmanyc() override {
+    std::streamsize showmanyc() override {
         return static_cast<std::streamsize>( this->egptr() - this->gptr());
     }
     
-    virtual ~view_streambuf() override {}
+    ~view_streambuf() override = default;
     
 private:
     const source_view &src_;
@@ -72,6 +72,7 @@ private:
 
 template<typename _char_type>
 class view_istream final : public std::basic_istream<_char_type, std::char_traits<_char_type>> {
+public:
     view_istream(const view_istream &) = delete;
     view_istream &operator=(const view_istream &) = delete;
 private:
@@ -85,7 +86,7 @@ public:
     typedef typename super_type::traits_type traits_type;
     typedef typename streambuf_type::source_view source_view;
     
-    view_istream(const source_view &src) :
+    explicit view_istream(const source_view &src) :
         super_type(nullptr),
         sb_(nullptr) {
         sb_ = new streambuf_type(src);
@@ -101,7 +102,7 @@ public:
         return *this;
     }
     
-    virtual ~view_istream() override {
+    ~view_istream() override {
         delete sb_;
     }
 
@@ -109,9 +110,9 @@ private:
     streambuf_type *sb_;
 };
 
+// From: https://github.com/vog/sha1
 #include "sha1.h"
 
-// From: https://github.com/vog/sha1
 /*
     sha1.hpp - source code of
 
@@ -133,8 +134,8 @@ private:
         -- Zlatko Michailov <zlatko@michailov.org>
 */
 
-constexpr size_t BLOCK_INTS = 16;  /* number of 32bit integers per SHA1 block */
-constexpr size_t BLOCK_BYTES = BLOCK_INTS * 4;
+constexpr size_t block_ints = 16;  /* number of 32bit integers per SHA1 block */
+constexpr size_t block_bytes = block_ints * 4;
 
 void reset(uint32_t digest[], std::string &buffer, uint64_t &transforms) {
     /* SHA1 initialization constants */
@@ -150,41 +151,41 @@ void reset(uint32_t digest[], std::string &buffer, uint64_t &transforms) {
 }
 
 uint32_t rol(const uint32_t value, const size_t bits) {
-    return (value << bits) | (value >> (32 - bits));
+    return (value << bits) | (value >> (32u - bits));
 }
 
-uint32_t blk(const uint32_t block[BLOCK_INTS], const size_t i) {
-    return rol(block[(i + 13) & 15] ^ block[(i + 8) & 15] ^ block[(i + 2) & 15] ^ block[i], 1);
+uint32_t blk(const uint32_t block[block_ints], const size_t i) {
+    return rol(block[(i + 13u) & 15u] ^ block[(i + 8u) & 15u] ^ block[(i + 2u) & 15u] ^ block[i], 1u);
 }
 
 /*
  * (R0+R1), R2, R3, R4 are the different operations used in SHA1
  */
 
-void R0(const uint32_t block[BLOCK_INTS], const uint32_t v, uint32_t &w, const uint32_t x, const uint32_t y, uint32_t &z, const size_t i) {
+void R0(const uint32_t block[block_ints], const uint32_t v, uint32_t &w, const uint32_t x, const uint32_t y, uint32_t &z, const size_t i) {
     z += ((w & (x ^ y)) ^ y) + block[i] + 0x5a827999 + rol(v, 5);
     w = rol(w, 30);
 }
 
-void R1(uint32_t block[BLOCK_INTS], const uint32_t v, uint32_t &w, const uint32_t x, const uint32_t y, uint32_t &z, const size_t i) {
+void R1(uint32_t block[block_ints], const uint32_t v, uint32_t &w, const uint32_t x, const uint32_t y, uint32_t &z, const size_t i) {
     block[i] = blk(block, i);
     z += ((w & (x ^ y)) ^ y) + block[i] + 0x5a827999 + rol(v, 5);
     w = rol(w, 30);
 }
 
-void R2(uint32_t block[BLOCK_INTS], const uint32_t v, uint32_t &w, const uint32_t x, const uint32_t y, uint32_t &z, const size_t i) {
+void R2(uint32_t block[block_ints], const uint32_t v, uint32_t &w, const uint32_t x, const uint32_t y, uint32_t &z, const size_t i) {
     block[i] = blk(block, i);
     z += (w ^ x ^ y) + block[i] + 0x6ed9eba1 + rol(v, 5);
     w = rol(w, 30);
 }
 
-void R3(uint32_t block[BLOCK_INTS], const uint32_t v, uint32_t &w, const uint32_t x, const uint32_t y, uint32_t &z, const size_t i) {
+void R3(uint32_t block[block_ints], const uint32_t v, uint32_t &w, const uint32_t x, const uint32_t y, uint32_t &z, const size_t i) {
     block[i] = blk(block, i);
     z += (((w | x) & y) | (w & x)) + block[i] + 0x8f1bbcdc + rol(v, 5);
     w = rol(w, 30);
 }
 
-void R4(uint32_t block[BLOCK_INTS], const uint32_t v, uint32_t &w, const uint32_t x, const uint32_t y, uint32_t &z, const size_t i) {
+void R4(uint32_t block[block_ints], const uint32_t v, uint32_t &w, const uint32_t x, const uint32_t y, uint32_t &z, const size_t i) {
     block[i] = blk(block, i);
     z += (w ^ x ^ y) + block[i] + 0xca62c1d6 + rol(v, 5);
     w = rol(w, 30);
@@ -194,7 +195,7 @@ void R4(uint32_t block[BLOCK_INTS], const uint32_t v, uint32_t &w, const uint32_
  * Hash a single 512-bit block. This is the core of the algorithm.
  */
 
-void transform(uint32_t digest[], uint32_t block[BLOCK_INTS], uint64_t &transforms) {
+void transform(uint32_t digest[], uint32_t block[block_ints], uint64_t &transforms) {
     /* Copy digest[] to working vars */
     uint32_t a = digest[0];
     uint32_t b = digest[1];
@@ -295,9 +296,9 @@ void transform(uint32_t digest[], uint32_t block[BLOCK_INTS], uint64_t &transfor
     transforms++;
 }
 
-void buffer_to_block(const std::string &buffer, uint32_t block[BLOCK_INTS]) {
+void buffer_to_block(const std::string &buffer, uint32_t block[block_ints]) {
     /* Convert the std::string (byte buffer) to a uint32_t array (MSB) */
-    for (size_t i = 0; i < BLOCK_INTS; i++) {
+    for (size_t i = 0; i < block_ints; i++) {
         block[i] = (buffer[4 * i + 3] & 0xff)
                    | (buffer[4 * i + 2] & 0xff) << 8
                    | (buffer[4 * i + 1] & 0xff) << 16
@@ -309,11 +310,11 @@ SHA1::SHA1(std::string_view s) {
     reset(_digest.data(), _buffer, _transforms);
     view_istream<char> is{s};
     while (true) {
-        char sbuf[BLOCK_BYTES];
-        is.read(sbuf, BLOCK_BYTES - _buffer.size());
+        char sbuf[block_bytes];
+        is.read(sbuf, block_bytes - _buffer.size());
         _buffer.append(sbuf, (std::size_t)is.gcount());
-        if (_buffer.size() != BLOCK_BYTES) { return; }
-        uint32_t block[BLOCK_INTS];
+        if (_buffer.size() != block_bytes) { return; }
+        uint32_t block[block_ints];
         buffer_to_block(_buffer, block);
         transform(_digest.data(), block, _transforms);
         _buffer.clear();

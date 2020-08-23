@@ -19,6 +19,5 @@ void Dispatcher::_synchronize() { if (_future.valid()) { _future.wait(); }}
 
 void Dispatcher::operator()(Kernel &kernel, uint threads, uint tg_size) { kernel.dispatch(*this, threads, tg_size); }
 void Dispatcher::operator()(Kernel &kernel, uint2 threads, uint2 tg_size) { kernel.dispatch(*this, threads, tg_size); }
-void Dispatcher::operator()(Kernel &kernel, uint3 threads, uint3 tg_size) { kernel.dispatch(*this, threads, tg_size); }
 
 }

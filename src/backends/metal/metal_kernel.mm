@@ -9,7 +9,7 @@
 
 namespace luisa::metal {
 
-void MetalKernel::_dispatch(Dispatcher &dispatcher, uint3 threadgroups, uint3 threadgroup_size) {
+void MetalKernel::_dispatch(Dispatcher &dispatcher, uint2 threadgroups, uint2 threadgroup_size) {
     
     id<MTLBuffer> argument_buffer = nullptr;
     
@@ -39,8 +39,8 @@ void MetalKernel::_dispatch(Dispatcher &dispatcher, uint3 threadgroups, uint3 th
             }
         }, argument);
     }
-    [command_encoder dispatchThreadgroups:MTLSizeMake(threadgroups.x, threadgroups.y, threadgroups.z)
-                    threadsPerThreadgroup:MTLSizeMake(threadgroup_size.x, threadgroup_size.y, threadgroup_size.z)];
+    [command_encoder dispatchThreadgroups:MTLSizeMake(threadgroups.x, threadgroups.y, 1u)
+                    threadsPerThreadgroup:MTLSizeMake(threadgroup_size.x, threadgroup_size.y, 1u)];
     [command_encoder endEncoding];
 }
 

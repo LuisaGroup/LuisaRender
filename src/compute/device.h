@@ -65,7 +65,6 @@ public:
     
     void launch(Kernel &kernel, uint threads, uint tg_size = 128u) { _launch([&](Dispatcher &dispatch) { dispatch(kernel, threads, tg_size); }); }
     void launch(Kernel &kernel, uint2 threads, uint2 tg_size = make_uint2(8u, 8u)) { _launch([&](Dispatcher &dispatch) { dispatch(kernel, threads, tg_size); }); }
-    void launch(Kernel &kernel, uint3 threads, uint3 tg_size) { _launch([&](Dispatcher &dispatch) { dispatch(kernel, threads, tg_size); }); }
     
     virtual void synchronize() = 0;
     

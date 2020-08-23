@@ -13,9 +13,9 @@ public:
     using Digest = std::array<uint32_t, 5>;
 
 private:
-    Digest _digest;
+    Digest _digest{};
     std::string _buffer;
-    uint64_t _transforms;
+    uint64_t _transforms{};
     
 public:
     explicit SHA1(std::string_view s);
