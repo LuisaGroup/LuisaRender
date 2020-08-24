@@ -21,8 +21,18 @@ protected:
     
 public:
     virtual ~Kernel() noexcept = default;
-    virtual void dispatch(Dispatcher &dispatcher, uint threads, uint threadgroup_size);
-    virtual void dispatch(Dispatcher &dispatcher, uint2 threads, uint2 threadgroup_size);
+    
+    [[nodiscard]] auto parallelize(uint threads, uint threadgroup_size = 128u) {
+        return [this, threads, tg_size = threadgroup_size](Dispatcher &dispatch) {
+            _dispatch(dispatch, make_uint2((threads + tg_size - 1u) / tg_size, 1u), make_uint2(tg_size, 1u));
+        };
+    }
+    
+    [[nodiscard]] auto parallelize(uint2 threads, uint2 threadgroup_size = make_uint2(8u, 8u)) {
+        return [this, threads, tg_size = threadgroup_size](Dispatcher &dispatch) {
+            _dispatch(dispatch, (threads + tg_size - 1u) / tg_size, tg_size);
+        };
+    }
 };
 
 }

@@ -63,7 +63,7 @@ public:
     
     void operator()(Dispatcher &dispatch) noexcept {
         using namespace luisa;
-        dispatch(*_blur_x, make_uint2(_width, _height));
-        dispatch(*_blur_y, make_uint2(_width, _height));
+        dispatch(_blur_x->parallelize(make_uint2(_width, _height)));
+        dispatch(_blur_y->parallelize(make_uint2(_width, _height)));
     }
 };

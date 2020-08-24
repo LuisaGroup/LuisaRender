@@ -39,7 +39,7 @@ int main(int argc, char *argv[]) {
     image.create(cv::Size{width, height}, CV_8UC4);
     
     device->launch([&](Dispatcher &d) {
-        d(*kernel, make_uint2(width, height));
+        d(kernel->parallelize(make_uint2(width, height)));
         d(texture->copy_to(buffer));
         d(buffer.copy_to(image.data));
     });

@@ -87,9 +87,9 @@ public:
     
     void operator()(Dispatcher &dispatch) {
         using namespace luisa;
-        dispatch(*_dual_variance_kernel, make_uint2(_width, _height));
+        dispatch(_dual_variance_kernel->parallelize(make_uint2(_width, _height)));
         dispatch(*_blur_sample_variance);
         dispatch(*_blur_dual_variance);
-        dispatch(*_scale_kernel, make_uint2(_width, _height));
+        dispatch(_scale_kernel->parallelize(make_uint2(_width, _height)));
     }
 };

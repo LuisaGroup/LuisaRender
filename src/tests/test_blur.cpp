@@ -58,10 +58,10 @@ int main(int argc, char *argv[]) {
     auto blur_y = device->compile_kernel([&] { blur_x_or_y(*texture, *temp_texture, width, height, 0, ry); });
     
     device->launch([&](Dispatcher &dispatch) {
-        dispatch(*blur_x, make_uint2(width, height));
+        dispatch(blur_x->parallelize(make_uint2(width, height)));
         dispatch(temp_texture->copy_to(*texture));
         for (auto i = 0; i < 20; i++) {
-            dispatch(*blur_y, make_uint2(width, height));
+            dispatch(blur_y->parallelize(make_uint2(width, height)));
             dispatch(temp_texture->copy_to(*texture));
         }
         dispatch(temp_texture->copy_to(image.data));

@@ -81,7 +81,7 @@ int main(int argc, char *argv[]) {
     filter.apply();
     device->launch([&](Dispatcher &dispatch) {
         dispatch(variance_texture->copy_to(variance_image.data));
-        dispatch(*add_half_buffers, make_uint2(width, height));
+        dispatch(add_half_buffers->parallelize(make_uint2(width, height)));
         dispatch(color_texture->copy_to(color_image.data));
     });
     
