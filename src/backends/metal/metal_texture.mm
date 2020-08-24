@@ -45,7 +45,7 @@ void MetalTexture::_copy_to(Dispatcher &dispatcher, Texture *texture) {
     [blit_encoder endEncoding];
 }
 
-void MetalTexture::copy_from(Dispatcher &dispatcher, const void *data) {
+void MetalTexture::_copy_from(Dispatcher &dispatcher, const void *data) {
     auto cache = _cache.get();
     memmove([cache contents], data, byte_size());
     auto command_buffer = dynamic_cast<MetalDispatcher &>(dispatcher).handle();
@@ -63,7 +63,7 @@ void MetalTexture::copy_from(Dispatcher &dispatcher, const void *data) {
     dispatcher.when_completed([this, cache] { _cache.recycle(cache); });
 }
 
-void MetalTexture::copy_to(Dispatcher &dispatcher, void *data) {
+void MetalTexture::_copy_to(Dispatcher &dispatcher, void *data) {
     auto cache = _cache.get();
     auto command_buffer = dynamic_cast<MetalDispatcher &>(dispatcher).handle();
     auto blit_encoder = [command_buffer blitCommandEncoder];

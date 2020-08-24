@@ -50,6 +50,9 @@ private:
     Buffer *_buffer{nullptr};
     size_t _offset{0u};
     size_t _size{0u};
+    
+    void _copy_from(Dispatcher &dispatcher, const void *host_data) const { _buffer->upload(dispatcher, byte_offset(), byte_size(), host_data); }
+    void _copy_to(Dispatcher &dispatcher, void *host_buffer) const { _buffer->download(dispatcher, byte_offset(), byte_size(), host_buffer); }
 
 public:
     BufferView() noexcept = default;
@@ -67,10 +70,8 @@ public:
     [[nodiscard]] size_t byte_offset() const noexcept { return _offset * sizeof(T); }
     [[nodiscard]] size_t byte_size() const noexcept { return _size * sizeof(T); }
     
-    void copy_from(Dispatcher &dispatcher, const void *host_data) const { _buffer->upload(dispatcher, byte_offset(), byte_size(), host_data); }
-    void copy_to(Dispatcher &dispatcher, void *host_buffer) const { _buffer->download(dispatcher, byte_offset(), byte_size(), host_buffer); }
-    [[nodiscard]] auto copy_from(const void *data) const { return [this, data](Dispatcher &d) { copy_from(d, data); }; }
-    [[nodiscard]] auto copy_to(void *data) const { return [this, data](Dispatcher &d) { copy_to(d, data); }; }
+    [[nodiscard]] auto copy_from(const void *data) const { return [this, data](Dispatcher &d) { _copy_from(d, data); }; }
+    [[nodiscard]] auto copy_to(void *data) const { return [this, data](Dispatcher &d) { _copy_to(d, data); }; }
     
     void clear_cache() const noexcept { _buffer->clear_cache(); }
 };
