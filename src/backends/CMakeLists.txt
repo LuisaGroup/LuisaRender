@@ -10,7 +10,8 @@ function(luisa_render_add_backend name)
     set_target_properties(${name} PROPERTIES
                           PUBLIC_HEADER "${BACKEND_SOURCES}"
                           LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/backends/"
-                          RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/backends/")
+                          RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/backends/"
+                          WINDOWS_EXPORT_ALL_SYMBOLS ON)
     install(TARGETS ${name} DESTINATION "lib/backends" LIBRARY DESTINATION "lib/backends" PUBLIC_HEADER DESTINATION "include/backends/${name}")
 endfunction()
 

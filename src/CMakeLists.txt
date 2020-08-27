@@ -1,5 +1,6 @@
 add_library(luisaheaders INTERFACE)
 target_include_directories(luisaheaders INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_compile_features(luisaheaders INTERFACE c_std_11 cxx_std_17)
 add_library(luisa::headers ALIAS luisaheaders)
 
 find_package(spdlog CONFIG REQUIRED)
