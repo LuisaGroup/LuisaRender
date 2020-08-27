@@ -15,7 +15,7 @@ using namespace luisa::compute::dsl;
 int main(int argc, char *argv[]) {
     
     Context context{argc, argv};
-    auto device = Device::create(&context, "metal");
+    auto device = Device::create(&context, "cuda");
     
     {  // playground
         auto image = cv::imread("data/images/luisa.png", cv::IMREAD_COLOR);

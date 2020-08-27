@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.16...3.17)
-cmake_policy(VERSION 3.16)
+cmake_minimum_required(VERSION 3.17..3.18)
+cmake_policy(VERSION 3.17)
 
 project(LuisaRender LANGUAGES C CXX VERSION 0.2.0)
 
@@ -10,11 +10,22 @@ set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/bin/")
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
-if (${CMAKE_HOST_SYSTEM_NAME} MATCHES "Darwin")
+include(CheckLanguage)
+
+check_language(OBJCXX)
+if (CMAKE_OBJCXX_COMPILER AND ${CMAKE_HOST_SYSTEM_NAME} MATCHES "Darwin")
     set(LUISA_RENDER_ENABLE_METAL_DEFAULT ON)
 else ()
     set(LUISA_RENDER_ENABLE_METAL_DEFAULT OFF)
 endif ()
 option(LUISA_RENDER_ENABLE_METAL "Build with Apple Metal support" ${LUISA_RENDER_ENABLE_METAL_DEFAULT})
+
+check_language(CUDA)
+if (CMAKE_CUDA_COMPILER)
+    set(LUISA_RENDER_ENABLE_CUDA_DEFAULT ON)
+else ()
+    set(LUISA_RENDER_ENABLE_CUDA_DEFAULT OFF)
+endif ()
+option(LUISA_RENDER_ENABLE_CUDA "Build with NVIDIA CUDA support" ${LUISA_RENDER_ENABLE_CUDA_DEFAULT})
 
 add_subdirectory(src)
