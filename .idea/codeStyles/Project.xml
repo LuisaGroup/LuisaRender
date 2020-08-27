@@ -1,13 +1,45 @@
 <component name="ProjectCodeStyleConfiguration">
   <code_scheme name="Project" version="173">
+    <option name="AUTODETECT_INDENTS" value="false" />
+    <option name="RIGHT_MARGIN" value="180" />
     <CMakeCodeStyleSettings>
       <option name="FORCE_COMMANDS_CASE" value="1" />
     </CMakeCodeStyleSettings>
+    <DB2CodeStyleSettings version="2">
+      <option name="KEYWORD_CASE" value="0" />
+      <option name="TYPE_CASE" value="3" />
+      <option name="INSERT_EL_WRAP" value="2" />
+    </DB2CodeStyleSettings>
+    <DerbyCodeStyleSettings version="2">
+      <option name="KEYWORD_CASE" value="0" />
+      <option name="TYPE_CASE" value="3" />
+      <option name="INSERT_EL_WRAP" value="2" />
+    </DerbyCodeStyleSettings>
+    <H2CodeStyleSettings version="2">
+      <option name="KEYWORD_CASE" value="0" />
+      <option name="TYPE_CASE" value="3" />
+      <option name="INSERT_EL_WRAP" value="2" />
+    </H2CodeStyleSettings>
+    <HSQLCodeStyleSettings version="2">
+      <option name="KEYWORD_CASE" value="0" />
+      <option name="TYPE_CASE" value="3" />
+      <option name="INSERT_EL_WRAP" value="2" />
+    </HSQLCodeStyleSettings>
+    <MSSQLCodeStyleSettings version="2">
+      <option name="KEYWORD_CASE" value="0" />
+      <option name="TYPE_CASE" value="3" />
+      <option name="INSERT_EL_WRAP" value="2" />
+    </MSSQLCodeStyleSettings>
+    <MySQLCodeStyleSettings version="2">
+      <option name="KEYWORD_CASE" value="0" />
+      <option name="TYPE_CASE" value="3" />
+      <option name="INSERT_EL_WRAP" value="2" />
+    </MySQLCodeStyleSettings>
     <Objective-C>
       <option name="INDENT_NAMESPACE_MEMBERS" value="0" />
       <option name="KEEP_STRUCTURES_IN_ONE_LINE" value="true" />
-      <option name="KEEP_CASE_EXPRESSIONS_IN_ONE_LINE" value="true" />
       <option name="KEEP_NESTED_NAMESPACES_IN_ONE_LINE" value="true" />
+      <option name="METHOD_BRACE_PLACEMENT" value="2" />
       <option name="FUNCTION_NON_TOP_AFTER_RETURN_TYPE_WRAP" value="0" />
       <option name="FUNCTION_TOP_AFTER_RETURN_TYPE_WRAP" value="0" />
       <option name="FUNCTION_PARAMETERS_WRAP" value="5" />
@@ -17,25 +49,110 @@
       <option name="TEMPLATE_CALL_ARGUMENTS_WRAP" value="5" />
       <option name="TEMPLATE_CALL_ARGUMENTS_ALIGN_MULTILINE" value="true" />
       <option name="TEMPLATE_CALL_ARGUMENTS_ALIGN_MULTILINE_PARS" value="true" />
-      <option name="CLASS_CONSTRUCTOR_INIT_LIST_WRAP" value="5" />
-      <option name="CLASS_CONSTRUCTOR_INIT_LIST_NEW_LINE_BEFORE_COLON" value="1" />
+      <option name="CLASS_CONSTRUCTOR_INIT_LIST_WRAP" value="0" />
       <option name="SUPERCLASS_LIST_WRAP" value="0" />
       <option name="SPACE_WITHIN_TEMPLATE_DOUBLE_GT" value="false" />
-      <option name="ALIGN_INIT_LIST_IN_COLUMNS" value="false" />
-      <option name="SPACE_BEFORE_SUPERCLASS_COLON" value="false" />
       <option name="SPACE_BEFORE_PROTOCOLS_BRACKETS" value="false" />
       <option name="KEEP_BLANK_LINES_BEFORE_END" value="1" />
-      <option name="INSERT_VIRTUAL_WITH_OVERRIDE" value="true" />
       <option name="ADD_BRIEF_TAG" value="true" />
       <option name="TAG_PREFIX_OF_LINE_COMMENT" value="AT" />
+      <option name="ADD_GETTER_PREFIX" value="false" />
+      <option name="INTRODUCE_CONST_VARS" value="true" />
+      <option name="INTRODUCE_AUTO_VARS" value="true" />
+      <option name="NAMESPACES_NAMING_CONVENTION">
+        <value prefix="" style="LOWERCASE" suffix="" />
+      </option>
+      <option name="CLASSES_AND_STRUCTS_NAMING_CONVENTION">
+        <value prefix="" style="PASCAL_CASE" suffix="" />
+      </option>
+      <option name="ENUMS_NAMING_CONVENTION">
+        <value prefix="" style="PASCAL_CASE" suffix="" />
+      </option>
+      <option name="ENUMERATORS_NAMING_CONVENTION">
+        <value prefix="" style="SCREAMING_SNAKE_CASE" suffix="" />
+      </option>
+      <option name="TYPEDEFS_NAMING_CONVENTION">
+        <value prefix="" style="PASCAL_CASE" suffix="" />
+      </option>
+      <option name="UNIONS_NAMING_CONVENTION">
+        <value prefix="" style="PASCAL_CASE" suffix="" />
+      </option>
+      <option name="METHODS_NAMING_CONVENTION">
+        <value prefix="" style="SNAKE_CASE" suffix="" />
+      </option>
+      <option name="FIELDS_NAMING_CONVENTION">
+        <value prefix="" style="SNAKE_CASE" suffix="" />
+      </option>
+      <option name="GLOBAL_FUNCTIONS_NAMING_CONVENTION">
+        <value prefix="" style="SNAKE_CASE" suffix="" />
+      </option>
+      <option name="GLOBAL_VARIABLES_NAMING_CONVENTION">
+        <value prefix="" style="SNAKE_CASE" suffix="" />
+      </option>
+      <option name="PARAMETERS_NAMING_CONVENTION">
+        <value prefix="" style="SNAKE_CASE" suffix="" />
+      </option>
+      <option name="LOCAL_VARIABLES_NAMING_CONVENTION">
+        <value prefix="" style="SNAKE_CASE" suffix="" />
+      </option>
     </Objective-C>
     <Objective-C-extensions>
       <option name="TAG_PREFIX_OF_LINE_COMMENT" value="AT" />
+      <extensions>
+        <pair source="cpp" header="h" fileNamingConvention="SNAKE_CASE" />
+        <pair source="c" header="h" fileNamingConvention="SNAKE_CASE" />
+        <pair source="mm" header="h" fileNamingConvention="SNAKE_CASE" />
+      </extensions>
+      <rules>
+        <rule entity="NAMESPACE" visibility="ANY" specifier="ANY" prefix="" style="LOWERCASE" suffix="" />
+        <rule entity="MACRO" visibility="ANY" specifier="ANY" prefix="" style="SCREAMING_SNAKE_CASE" suffix="" />
+        <rule entity="CLASS" visibility="ANY" specifier="ANY" prefix="" style="PASCAL_CASE" suffix="" />
+        <rule entity="ENUM" visibility="ANY" specifier="ANY" prefix="" style="PASCAL_CASE" suffix="" />
+        <rule entity="ENUMERATOR" visibility="ANY" specifier="ANY" prefix="" style="SCREAMING_SNAKE_CASE" suffix="" />
+        <rule entity="TYPEDEF" visibility="ANY" specifier="ANY" prefix="" style="PASCAL_CASE" suffix="" />
+        <rule entity="UNION" visibility="ANY" specifier="ANY" prefix="" style="PASCAL_CASE" suffix="" />
+        <rule entity="CLASS_MEMBER_FUNCTION,STRUCT_MEMBER_FUNCTION" visibility="PUBLIC" specifier="ANY" prefix="" style="SNAKE_CASE" suffix="" />
+        <rule entity="CLASS_MEMBER_FUNCTION,STRUCT_MEMBER_FUNCTION" visibility="PROTECTED,PRIVATE" specifier="ANY" prefix="_" style="SNAKE_CASE" suffix="" />
+        <rule entity="GLOBAL_FUNCTION" visibility="ANY" specifier="ANY" prefix="" style="SNAKE_CASE" suffix="" />
+        <rule entity="GLOBAL_VARIABLE" visibility="ANY" specifier="ANY" prefix="" style="SNAKE_CASE" suffix="" />
+        <rule entity="PARAMETER" visibility="ANY" specifier="ANY" prefix="" style="SNAKE_CASE" suffix="" />
+        <rule entity="LOCAL_VARIABLE" visibility="ANY" specifier="ANY" prefix="" style="SNAKE_CASE" suffix="" />
+        <rule entity="CLASS_MEMBER_FIELD,STRUCT_MEMBER_FIELD" visibility="PUBLIC" specifier="ANY" prefix="" style="SNAKE_CASE" suffix="" />
+        <rule entity="CLASS_MEMBER_FIELD,STRUCT_MEMBER_FIELD" visibility="PROTECTED,PRIVATE" specifier="ANY" prefix="_" style="SNAKE_CASE" suffix="" />
+      </rules>
     </Objective-C-extensions>
+    <OracleCodeStyleSettings version="2">
+      <option name="KEYWORD_CASE" value="0" />
+      <option name="TYPE_CASE" value="3" />
+      <option name="INSERT_EL_WRAP" value="2" />
+    </OracleCodeStyleSettings>
+    <PostgresCodeStyleSettings version="2">
+      <option name="KEYWORD_CASE" value="0" />
+      <option name="TYPE_CASE" value="3" />
+      <option name="INSERT_EL_WRAP" value="2" />
+    </PostgresCodeStyleSettings>
     <Python>
       <option name="OPTIMIZE_IMPORTS_SORT_NAMES_IN_FROM_IMPORTS" value="true" />
       <option name="OPTIMIZE_IMPORTS_JOIN_FROM_IMPORTS_WITH_SAME_SOURCE" value="true" />
     </Python>
+    <SQLiteCodeStyleSettings version="2">
+      <option name="KEYWORD_CASE" value="0" />
+      <option name="TYPE_CASE" value="3" />
+      <option name="INSERT_EL_WRAP" value="2" />
+    </SQLiteCodeStyleSettings>
+    <SqlCodeStyleSettings version="2">
+      <option name="KEYWORD_CASE" value="0" />
+      <option name="TYPE_CASE" value="3" />
+      <option name="INSERT_EL_WRAP" value="2" />
+    </SqlCodeStyleSettings>
+    <SybaseCodeStyleSettings version="2">
+      <option name="KEYWORD_CASE" value="0" />
+      <option name="TYPE_CASE" value="3" />
+      <option name="INSERT_EL_WRAP" value="2" />
+    </SybaseCodeStyleSettings>
+    <clangFormatSettings>
+      <option name="ENABLED" value="true" />
+    </clangFormatSettings>
     <codeStyleSettings language="CMake">
       <option name="ALIGN_MULTILINE_PARAMETERS_IN_CALLS" value="true" />
       <indentOptions>
@@ -47,8 +164,37 @@
         <option name="KEEP_INDENTS_ON_EMPTY_LINES" value="true" />
       </indentOptions>
     </codeStyleSettings>
+    <codeStyleSettings language="DB2">
+      <option name="KEEP_LINE_BREAKS" value="false" />
+      <indentOptions>
+        <option name="KEEP_INDENTS_ON_EMPTY_LINES" value="true" />
+      </indentOptions>
+    </codeStyleSettings>
+    <codeStyleSettings language="Derby">
+      <option name="KEEP_LINE_BREAKS" value="false" />
+      <indentOptions>
+        <option name="KEEP_INDENTS_ON_EMPTY_LINES" value="true" />
+      </indentOptions>
+    </codeStyleSettings>
+    <codeStyleSettings language="H2">
+      <option name="KEEP_LINE_BREAKS" value="false" />
+      <indentOptions>
+        <option name="KEEP_INDENTS_ON_EMPTY_LINES" value="true" />
+      </indentOptions>
+    </codeStyleSettings>
+    <codeStyleSettings language="HSQLDB">
+      <option name="KEEP_LINE_BREAKS" value="false" />
+      <indentOptions>
+        <option name="KEEP_INDENTS_ON_EMPTY_LINES" value="true" />
+      </indentOptions>
+    </codeStyleSettings>
+    <codeStyleSettings language="MySQL">
+      <option name="KEEP_LINE_BREAKS" value="false" />
+      <indentOptions>
+        <option name="KEEP_INDENTS_ON_EMPTY_LINES" value="true" />
+      </indentOptions>
+    </codeStyleSettings>
     <codeStyleSettings language="ObjectiveC">
-      <option name="RIGHT_MARGIN" value="180" />
       <option name="KEEP_BLANK_LINES_IN_DECLARATIONS" value="1" />
       <option name="KEEP_BLANK_LINES_IN_CODE" value="1" />
       <option name="KEEP_BLANK_LINES_BEFORE_RBRACE" value="1" />
@@ -58,19 +204,59 @@
       <option name="BLANK_LINES_AROUND_METHOD" value="0" />
       <option name="BLANK_LINES_AROUND_METHOD_IN_INTERFACE" value="0" />
       <option name="ALIGN_MULTILINE_CHAINED_METHODS" value="true" />
-      <option name="ALIGN_MULTILINE_BINARY_OPERATION" value="false" />
       <option name="SPACE_AFTER_TYPE_CAST" value="false" />
       <option name="METHOD_CALL_CHAIN_WRAP" value="1" />
       <option name="BINARY_OPERATION_SIGN_ON_NEXT_LINE" value="true" />
       <option name="FOR_STATEMENT_WRAP" value="1" />
       <option name="ASSIGNMENT_WRAP" value="1" />
+      <option name="IF_BRACE_FORCE" value="3" />
+      <option name="DOWHILE_BRACE_FORCE" value="3" />
+      <option name="WHILE_BRACE_FORCE" value="3" />
+      <option name="FOR_BRACE_FORCE" value="3" />
       <option name="ENUM_CONSTANTS_WRAP" value="0" />
       <indentOptions>
         <option name="CONTINUATION_INDENT_SIZE" value="4" />
         <option name="LABEL_INDENT_ABSOLUTE" value="true" />
+        <option name="KEEP_INDENTS_ON_EMPTY_LINES" value="true" />
+      </indentOptions>
+    </codeStyleSettings>
+    <codeStyleSettings language="Oracle">
+      <option name="KEEP_LINE_BREAKS" value="false" />
+      <indentOptions>
+        <option name="KEEP_INDENTS_ON_EMPTY_LINES" value="true" />
+      </indentOptions>
+    </codeStyleSettings>
+    <codeStyleSettings language="PostgreSQL">
+      <option name="KEEP_LINE_BREAKS" value="false" />
+      <indentOptions>
+        <option name="KEEP_INDENTS_ON_EMPTY_LINES" value="true" />
       </indentOptions>
     </codeStyleSettings>
     <codeStyleSettings language="Python">
+      <indentOptions>
+        <option name="KEEP_INDENTS_ON_EMPTY_LINES" value="true" />
+      </indentOptions>
+    </codeStyleSettings>
+    <codeStyleSettings language="SQL">
+      <option name="KEEP_LINE_BREAKS" value="false" />
+      <indentOptions>
+        <option name="KEEP_INDENTS_ON_EMPTY_LINES" value="true" />
+      </indentOptions>
+    </codeStyleSettings>
+    <codeStyleSettings language="SQLite">
+      <option name="KEEP_LINE_BREAKS" value="false" />
+      <indentOptions>
+        <option name="KEEP_INDENTS_ON_EMPTY_LINES" value="true" />
+      </indentOptions>
+    </codeStyleSettings>
+    <codeStyleSettings language="Sybase">
+      <option name="KEEP_LINE_BREAKS" value="false" />
+      <indentOptions>
+        <option name="KEEP_INDENTS_ON_EMPTY_LINES" value="true" />
+      </indentOptions>
+    </codeStyleSettings>
+    <codeStyleSettings language="TSQL">
+      <option name="KEEP_LINE_BREAKS" value="false" />
       <indentOptions>
         <option name="KEEP_INDENTS_ON_EMPTY_LINES" value="true" />
       </indentOptions>

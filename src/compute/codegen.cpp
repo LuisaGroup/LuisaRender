@@ -308,7 +308,7 @@ void CppCodegen::visit(const ExprStmt &expr_stmt) {
 
 void CppCodegen::_emit_struct_decl(const TypeDesc *desc) {
     
-    _os << "struct alignas(" << desc->alignment << ") Struct$" << desc->uid << " {";
+    _os << "struct alignas(" << desc->alignment << ") Struct$" << desc->uid() << " {";
     if (!desc->member_names.empty()) { _os << "\n"; }
     
     // for each member
@@ -423,7 +423,7 @@ void CppCodegen::_emit_type(const TypeDesc *desc) {
             _emit_type(desc->element_type);
             _os << ", " << desc->element_count << ">";
             break;
-        case TypeCatalog::CONST:
+        case TypeCatalog::CONSTANT:
             _emit_type(desc->element_type);
             if (auto et = desc->element_type;
                 et != nullptr &&
@@ -460,7 +460,7 @@ void CppCodegen::_emit_type(const TypeDesc *desc) {
             _emit_type(desc->element_type);
             _os << ">";
         case TypeCatalog::STRUCTURE:
-            _os << "Struct$" << desc->uid;
+            _os << "Struct$" << desc->uid();
             break;
         default:
             _os << "[BAD]";
@@ -477,7 +477,7 @@ void CppCodegen::_emit_function_call(const std::string &name) {
 }
 
 void CppCodegen::_emit_struct_fwd_decl(const TypeDesc *desc) {
-    _os << "struct Struct$" << desc->uid << ";\n";
+    _os << "struct Struct$" << desc->uid() << ";\n";
 }
 
 void CppCodegen::_emit_argument_struct_decl(const Function &f) {

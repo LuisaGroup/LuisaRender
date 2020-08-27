@@ -48,7 +48,6 @@ template<typename T, detail::EnableIfLiteralOperand<T>>                       \
 
 LUISA_MAP(MAKE_VARIABLE_MEMBER_BINARY_OPERATOR_IMPL, +, -, *, /, %, <<, >>, &, |, ^, &&, ||, ==, !=, <,>, <=, >=, [])
 
-#undef MAKE_VARIABLE_BINARY_OPERATOR_IMPL
 #undef MAKE_VARIABLE_MEMBER_BINARY_OPERATOR_IMPL
 
 // built-in functions
