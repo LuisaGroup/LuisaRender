@@ -450,7 +450,7 @@ namespace luisa::compute::dsl {                                                 
 
 #define LUISA_STRUCT(S, ...)                            \
 LUISA_STRUCT_BEGIN(S)                                   \
-     LUISA_MAP_MACRO(LUISA_STRUCT_MEMBER, __VA_ARGS__)  \
+     LUISA_MAP(LUISA_STRUCT_MEMBER, __VA_ARGS__)  \
 LUISA_STRUCT_END()                                      \
 
 inline const TypeDesc *remove_const(const TypeDesc *type) noexcept {

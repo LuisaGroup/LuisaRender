@@ -19,7 +19,7 @@ Variable Variable::operator op(Variable rhs) const noexcept {                   
 #define MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD(op_and_tag) \
 MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD_IMPL op_and_tag
 
-LUISA_MAP_MACRO(
+LUISA_MAP(
     MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD,
     (+, ADD), (-, SUB), (*, MUL), (/, DIV), (%, MOD),
     (<<, SHL), (>>, SHR), (&, BIT_AND), (|, BIT_OR), (^, BIT_XOR),
@@ -38,7 +38,7 @@ void Variable::operator op(Variable rhs) const noexcept {                       
 #define MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD(op_and_tag) \
 MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD_IMPL op_and_tag
 
-LUISA_MAP_MACRO(MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD,
+LUISA_MAP(MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD,
                 (=, ASSIGN), (+=, ADD_ASSIGN), (-=, SUB_ASSIGN), (*=, MUL_ASSIGN), (/=, DIV_ASSIGN), (%=, MOD_ASSIGN),
                 (&=, BIT_AND_ASSIGN), (|=, BIT_OR_ASSIGN), (^=, BIT_XOR_ASSIGN),
                 (<<=, SHL_ASSIGN), (>>=, SHR_ASSIGN))

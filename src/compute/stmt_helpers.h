@@ -17,7 +17,7 @@ inline void Variable::operator op(T &&rhs) const noexcept{                    \
     this->operator op(literal(std::forward<T>(rhs)));                         \
 }                                                                             \
 
-LUISA_MAP_MACRO(MAKE_VARIABLE_ASSIGNMENT_OPERATOR_IMPL, =, +=, -=, *=, /=, %=, &=, |=, ^=, <<=, >>=)
+LUISA_MAP(MAKE_VARIABLE_ASSIGNMENT_OPERATOR_IMPL, =, +=, -=, *=, /=, %=, &=, |=, ^=, <<=, >>=)
 #undef MAKE_VARIABLE_ASSIGNMENT_OPERATOR_IMPL
 
 template<typename T>

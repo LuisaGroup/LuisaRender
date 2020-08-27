@@ -169,8 +169,8 @@ template<typename T, detail::EnableIfLiteralOperand<T> = 0> [[nodiscard]] Variab
 void operator op(Variable rhs) const noexcept;                                                                           \
 template<typename T, detail::EnableIfLiteralOperand<T> = 0> void operator op(T &&rhs) const noexcept;                    \
 
-    LUISA_MAP_MACRO(MAKE_BINARY_OPERATOR_DECL, +, -, *, /, %, <<, >>, &, |, ^, &&, ||, ==, !=, <,>, <=, >=, [])
-    LUISA_MAP_MACRO(MAKE_ASSIGNMENT_OPERATOR_DECL, =, +=, -=, *=, /=, %=, &=, |=, ^=, <<=, >>=)
+    LUISA_MAP(MAKE_BINARY_OPERATOR_DECL, +, -, *, /, %, <<, >>, &, |, ^, &&, ||, ==, !=, <,>, <=, >=, [])
+    LUISA_MAP(MAKE_ASSIGNMENT_OPERATOR_DECL, =, +=, -=, *=, /=, %=, &=, |=, ^=, <<=, >>=)
 
 #undef MAKE_BINARY_OPERATOR_DECL
 #undef MAKE_ASSIGNMENT_OPERATOR_DECL

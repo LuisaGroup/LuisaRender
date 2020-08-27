@@ -33,7 +33,7 @@ template<typename T, luisa::compute::dsl::detail::EnableIfLiteralOperand<T> = 0>
     return luisa::compute::dsl::literal(std::forward<T>(lhs)).operator op(rhs);               \
 }                                                                                             \
 
-LUISA_MAP_MACRO(MAKE_VARIABLE_BINARY_OPERATOR_IMPL, +, -, *, /, %, <<, >>, &, |, ^, &&, ||, ==, !=, <,>, <=, >=)
+LUISA_MAP(MAKE_VARIABLE_BINARY_OPERATOR_IMPL, +, -, *, /, %, <<, >>, &, |, ^, &&, ||, ==, !=, <,>, <=, >=)
 
 #undef MAKE_VARIABLE_BINARY_OPERATOR_IMPL
 
@@ -46,17 +46,17 @@ template<typename T, detail::EnableIfLiteralOperand<T>>                       \
     return this->operator op(literal(std::forward<T>(rhs)));                  \
 }                                                                             \
 
-LUISA_MAP_MACRO(MAKE_VARIABLE_MEMBER_BINARY_OPERATOR_IMPL, +, -, *, /, %, <<, >>, &, |, ^, &&, ||, ==, !=, <,>, <=, >=, [])
+LUISA_MAP(MAKE_VARIABLE_MEMBER_BINARY_OPERATOR_IMPL, +, -, *, /, %, <<, >>, &, |, ^, &&, ||, ==, !=, <,>, <=, >=, [])
 
 #undef MAKE_VARIABLE_BINARY_OPERATOR_IMPL
 #undef MAKE_VARIABLE_MEMBER_BINARY_OPERATOR_IMPL
 
 // built-in functions
 #define MAP_VARIABLE_NAME_TO_ARGUMENT_DEF(name) LiteralExpr::Value name
-#define MAP_VARIABLE_NAMES_TO_ARGUMENT_LIST(...) LUISA_MAP_MACRO_LIST(MAP_VARIABLE_NAME_TO_ARGUMENT_DEF, __VA_ARGS__)
+#define MAP_VARIABLE_NAMES_TO_ARGUMENT_LIST(...) LUISA_MAP_LIST(MAP_VARIABLE_NAME_TO_ARGUMENT_DEF, __VA_ARGS__)
 
 #define MAP_VARIABLE_NAME_TO_VARIABLE(name) literal(name)
-#define MAP_VARIABLE_NAMES_TO_VARIABLE_LIST(...) LUISA_MAP_MACRO_LIST(MAP_VARIABLE_NAME_TO_VARIABLE, __VA_ARGS__)
+#define MAP_VARIABLE_NAMES_TO_VARIABLE_LIST(...) LUISA_MAP_LIST(MAP_VARIABLE_NAME_TO_VARIABLE, __VA_ARGS__)
 
 #define MAKE_BUILTIN_FUNCTION_DEF(func, ...)                                                                            \
 [[nodiscard]] inline Variable func(MAP_VARIABLE_NAMES_TO_ARGUMENT_LIST(__VA_ARGS__)) {                                  \
