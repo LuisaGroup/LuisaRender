@@ -7,7 +7,9 @@
 #include <string>
 #include <string_view>
 
-class SHA1 {
+#include <core/dll.h>
+
+class LUISA_EXPORT SHA1 {
 
 public:
     using Digest = std::array<uint32_t, 5>;

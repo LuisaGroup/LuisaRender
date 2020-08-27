@@ -14,7 +14,7 @@
 
 namespace luisa::compute {
 
-class Device : Noncopyable {
+class LUISA_EXPORT Device : Noncopyable {
 
 protected:
     Context *_context{nullptr};
@@ -71,6 +71,6 @@ public:
 using DeviceCreator = Device *(Context *);
 
 #define LUISA_EXPORT_DEVICE_CREATOR(DeviceClass)  \
-    LUISA_DLL_EXPORT ::luisa::compute::Device *create(::luisa::Context *context) { return new DeviceClass{context}; }
+    extern "C" LUISA_EXPORT ::luisa::compute::Device *create(::luisa::Context *context) { return new DeviceClass{context}; }
     
 }

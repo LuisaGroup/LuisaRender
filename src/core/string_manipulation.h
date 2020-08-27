@@ -11,7 +11,7 @@
 #include <array>
 #include <filesystem>
 
-#include "sha1.h"
+#include <glm/gtx/string_cast.hpp>
 
 namespace luisa { inline namespace utility {
 
@@ -20,10 +20,6 @@ inline std::string serialize(Args &&...args) noexcept {
     std::ostringstream ss;
     static_cast<void>((ss << ... << std::forward<Args>(args)));
     return ss.str();
-}
-
-inline auto sha1_digest(std::string_view s) noexcept {
-    return SHA1{s}.digest();
 }
 
 inline std::string pascal_to_snake_case(std::string_view s) noexcept {  // TODO: Robustness

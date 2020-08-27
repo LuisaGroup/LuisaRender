@@ -9,6 +9,7 @@ target_link_libraries(spdlog_config INTERFACE spdlog::spdlog spdlog::spdlog_head
 
 add_subdirectory(ext/glm)
 add_library(glm_config INTERFACE)
+set(GLM_INCLUDE_DIR "${CMAKE_CURRENT_LIST_DIR}/ext/glm/glm")
 target_link_libraries(glm_config INTERFACE glm::glm)
 target_compile_definitions(glm_config INTERFACE GLM_FORCE_AVX2 GLM_FORCE_CXX17)
 
@@ -25,7 +26,6 @@ function(luisa_render_add_application name)
     add_executable(${name} ${APP_SOURCES})
     target_compile_features(${name} PRIVATE c_std_11 cxx_std_17)
     target_link_libraries(${name} PRIVATE luisarender)
-    install(TARGETS ${name} DESTINATION bin)
     set_target_properties(${name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/")
 endfunction()
 

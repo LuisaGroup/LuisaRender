@@ -12,6 +12,7 @@
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
 
 #import <compute/device.h>
+#import <core/sha1.h>
 
 #import "metal_buffer.h"
 #import "metal_texture.h"
@@ -86,7 +87,7 @@ std::unique_ptr<Kernel> MetalDevice::_compile_kernel(const compute::dsl::Functio
     codegen.emit(f);
     auto s = os.str();
     
-    auto digest = sha1_digest(s);
+    auto digest = SHA1{s}.digest();
     auto iter = _kernel_cache.find(digest);
     if (iter == _kernel_cache.cend()) {
         

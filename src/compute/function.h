@@ -7,11 +7,12 @@
 #include <memory>
 #include <set>
 
+#include <core/dll.h>
 #include <compute/statement.h>
 
 namespace luisa::compute::dsl {
 
-class Function {
+class LUISA_EXPORT Function {
     
     friend class Variable;
 
@@ -25,8 +26,6 @@ private:
     
     std::vector<VariableTag> _used_builtins;
     uint32_t _uid_counter{0u};
-    
-    inline static thread_local Function *_current{nullptr};
     
     [[nodiscard]] uint32_t _get_uid() noexcept { return _uid_counter++; }
     
@@ -50,14 +49,19 @@ private:
         add_statement(std::make_unique<DeclareStmt>(v, literal(std::forward<Literals>(vs)...), is_const));
         return v;
     }
+    
+    [[nodiscard]] static Function *&_current() noexcept {
+        static thread_local Function *current = nullptr;
+        return current;
+    }
 
 public:
-    explicit Function(std::string name) noexcept: _name{std::move(name)} { _current = this; }
-    ~Function() noexcept { _current = nullptr; }
+    explicit Function(std::string name) noexcept: _name{std::move(name)} { _current() = this; }
+    ~Function() noexcept = default;
     
     [[nodiscard]] static Function &current() noexcept {
-        assert(_current != nullptr);
-        return *_current;
+        assert(_current() != nullptr);
+        return *_current();
     }
     
     [[nodiscard]] const std::string &name() const noexcept { return _name; }

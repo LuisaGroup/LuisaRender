@@ -12,4 +12,4 @@ set_target_properties(luisacore PROPERTIES
                       WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 add_library(luisarender::core ALIAS luisacore)
-install(TARGETS luisacore DESTINATION "bin/" LIBRARY DESTINATION "bin/" PUBLIC_HEADER DESTINATION "include/core/")
+file(COPY "${CMAKE_CURRENT_LIST_DIR}" DESTINATION "${CMAKE_BINARY_DIR}/include/")

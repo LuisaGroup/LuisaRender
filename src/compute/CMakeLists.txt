@@ -11,4 +11,3 @@ set_target_properties(luisacompute PROPERTIES
                       WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 add_library(luisarender::compute ALIAS luisacompute)
-install(TARGETS luisacompute DESTINATION "bin/" LIBRARY DESTINATION "bin" PUBLIC_HEADER DESTINATION "include/compute")

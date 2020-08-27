@@ -46,7 +46,7 @@ enum struct VariableTag {
     THREAD_XY,// built-in thread coord
 };
 
-class Variable {
+class LUISA_EXPORT Variable {
 
 protected:
     const TypeDesc *_type{nullptr};

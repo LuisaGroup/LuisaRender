@@ -11,7 +11,7 @@
 
 #include <dlfcn.h>
 
-#define LUISA_DLL_EXPORT extern "C" [[gnu::visibility("default")]]
+#define LUISA_EXPORT [[gnu::visibility("default")]]
 #define LUISA_DLL_PREFIX "lib"
 #define LUISA_DLL_EXTENSION ".so"
 
@@ -46,7 +46,7 @@ inline auto load_dynamic_symbol(DynamicModuleHandle handle, const std::string &n
 
 #include <windowsx.h>
 
-#define LUISA_DLL_EXPORT extern "C" __declspec(dllexport)
+#define LUISA_EXPORT __declspec(dllexport)
 #define LUISA_DLL_PREFIX ""
 #define LUISA_DLL_EXTENSION ".dll"
 

@@ -4,9 +4,11 @@
 
 #pragma once
 
+#include <core/dll.h>
+
 namespace luisa { inline namespace utility {
 
-struct Noncopyable {
+struct LUISA_EXPORT Noncopyable {
     Noncopyable() = default;
     Noncopyable(const Noncopyable &) = delete;
     Noncopyable &operator=(const Noncopyable &) = delete;

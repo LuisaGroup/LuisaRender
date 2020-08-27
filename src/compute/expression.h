@@ -13,7 +13,7 @@ namespace luisa::compute::dsl {
 
 struct ExprVisitor;
 
-struct Expression {
+struct LUISA_EXPORT Expression {
     virtual ~Expression() noexcept = default;
     virtual void accept(ExprVisitor &) const = 0;
 };
@@ -26,7 +26,7 @@ class LiteralExpr;
 class CallExpr;
 class CastExpr;
 
-struct ExprVisitor {
+struct LUISA_EXPORT ExprVisitor {
     virtual void visit(const UnaryExpr &unary_expr) = 0;
     virtual void visit(const BinaryExpr &binary_expr) = 0;
     virtual void visit(const MemberExpr &member_expr) = 0;
@@ -48,7 +48,7 @@ enum struct UnaryOp {
     // Note: We deliberately support *NO* pre- and postfix inc/dec operators to avoid possible abuse
 };
 
-class UnaryExpr : public Expression {
+class LUISA_EXPORT UnaryExpr : public Expression {
 
 private:
     Variable _operand;
@@ -80,7 +80,7 @@ enum struct BinaryOp {
     BIT_AND_ASSIGN, BIT_OR_ASSIGN, BIT_XOR_ASSIGN, SHL_ASSIGN, SHR_ASSIGN
 };
 
-class BinaryExpr : public Expression {
+class LUISA_EXPORT BinaryExpr : public Expression {
 
 private:
     Variable _lhs;
@@ -97,7 +97,7 @@ public:
     MAKE_EXPRESSION_ACCEPT_VISITOR()
 };
 
-class MemberExpr : public Expression {
+class LUISA_EXPORT MemberExpr : public Expression {
 
 private:
     Variable _self;
@@ -110,7 +110,7 @@ public:
     MAKE_EXPRESSION_ACCEPT_VISITOR()
 };
 
-class LiteralExpr : public Expression {
+class LUISA_EXPORT LiteralExpr : public Expression {
 
 public:
     using Value = std::variant<Variable, bool, float, int8_t, uint8_t, int16_t, uint16_t, int32_t, uint32_t, int64_t, uint64_t>;
@@ -125,7 +125,7 @@ public:
     MAKE_EXPRESSION_ACCEPT_VISITOR()
 };
 
-class CallExpr : public Expression {
+class LUISA_EXPORT CallExpr : public Expression {
 
 private:
     std::string _name;
@@ -146,7 +146,7 @@ enum struct CastOp {
     BITWISE
 };
 
-class CastExpr : public Expression {
+class LUISA_EXPORT CastExpr : public Expression {
 
 private:
     Variable _source;

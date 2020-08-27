@@ -54,7 +54,7 @@ MAKE_PIXEL_FORMAT_OF_TYPE(float4, RGBA32F)
 template<typename T>
 constexpr auto pixel_format = detail::PixelFormatImpl<T>::format;
 
-class Texture {
+class LUISA_EXPORT Texture {
 
 protected:
     uint32_t _width;

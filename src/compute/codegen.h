@@ -5,6 +5,7 @@
 #pragma once
 
 #include <ostream>
+#include <core/dll.h>
 #include <compute/function.h>
 
 namespace luisa {
@@ -13,7 +14,7 @@ class Device;
 
 namespace luisa::compute::dsl {
 
-class Codegen : Noncopyable {
+class LUISA_EXPORT Codegen : Noncopyable {
 
 protected:
     std::ostream &_os;
@@ -25,7 +26,7 @@ public:
 };
 
 // Example codegen for C++
-class CppCodegen : public Codegen, public ExprVisitor, public StmtVisitor {
+class LUISA_EXPORT CppCodegen : public Codegen, public ExprVisitor, public StmtVisitor {
 
 protected:
     int32_t _indent{0};

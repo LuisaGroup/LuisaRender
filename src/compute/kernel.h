@@ -14,7 +14,7 @@ namespace luisa::compute {
 
 class Dispatcher;
 
-class Kernel : Noncopyable {
+class LUISA_EXPORT Kernel : Noncopyable {
 
 protected:
     virtual void _dispatch(Dispatcher &dispatcher, uint2 blocks, uint2 block_size) = 0;
