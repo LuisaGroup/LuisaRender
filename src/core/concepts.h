@@ -8,7 +8,7 @@
 
 namespace luisa { inline namespace utility {
 
-struct LUISA_EXPORT Noncopyable {
+struct Noncopyable {
     Noncopyable() = default;
     Noncopyable(const Noncopyable &) = delete;
     Noncopyable &operator=(const Noncopyable &) = delete;

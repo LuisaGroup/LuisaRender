@@ -9,7 +9,7 @@
 
 namespace luisa::metal {
 
-class LUISA_EXPORT MetalCodegen : public compute::dsl::CppCodegen {
+class MetalCodegen : public compute::dsl::CppCodegen {
 
 protected:
     void _emit_function_decl(const compute::dsl::Function &f) override;

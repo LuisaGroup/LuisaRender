@@ -14,7 +14,7 @@
 
 namespace luisa::compute {
 
-class LUISA_EXPORT Device : Noncopyable {
+class Device : Noncopyable {
 
 protected:
     Context *_context{nullptr};

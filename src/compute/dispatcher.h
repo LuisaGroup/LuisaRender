@@ -16,7 +16,7 @@ namespace luisa::compute {
 class Device;
 class Kernel;
 
-class LUISA_EXPORT Dispatcher : Noncopyable {
+class Dispatcher : Noncopyable {
 
 public:
     friend class Device;

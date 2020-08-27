@@ -12,7 +12,7 @@
 
 namespace luisa {
 
-class LUISA_EXPORT Context : Noncopyable {
+class Context : Noncopyable {
 
 private:
     std::filesystem::path _runtime_directory;

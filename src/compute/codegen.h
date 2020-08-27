@@ -14,7 +14,7 @@ class Device;
 
 namespace luisa::compute::dsl {
 
-class LUISA_EXPORT Codegen : Noncopyable {
+class Codegen : Noncopyable {
 
 protected:
     std::ostream &_os;
@@ -26,7 +26,7 @@ public:
 };
 
 // Example codegen for C++
-class LUISA_EXPORT CppCodegen : public Codegen, public ExprVisitor, public StmtVisitor {
+class CppCodegen : public Codegen, public ExprVisitor, public StmtVisitor {
 
 protected:
     int32_t _indent{0};

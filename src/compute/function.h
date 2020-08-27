@@ -5,6 +5,7 @@
 #pragma once
 
 #include <memory>
+#include <vector>
 #include <set>
 
 #include <core/dll.h>
@@ -12,7 +13,7 @@
 
 namespace luisa::compute::dsl {
 
-class LUISA_EXPORT Function {
+class Function {
     
     friend class Variable;
 
@@ -20,8 +21,8 @@ private:
     std::string _name;
     std::vector<Variable> _arguments;
     std::vector<Variable> _builtin_vars;
-    std::vector<std::unique_ptr<Expression>> _expressions;
-    std::vector<std::unique_ptr<Statement>> _statements;
+    std::vector<std::shared_ptr<Expression>> _expressions;
+    std::vector<std::shared_ptr<Statement>> _statements;
     std::vector<const TypeDesc *> _used_types;
     
     std::vector<VariableTag> _used_builtins;
@@ -49,20 +50,12 @@ private:
         add_statement(std::make_unique<DeclareStmt>(v, literal(std::forward<Literals>(vs)...), is_const));
         return v;
     }
-    
-    [[nodiscard]] static Function *&_current() noexcept {
-        static thread_local Function *current = nullptr;
-        return current;
-    }
 
 public:
-    explicit Function(std::string name) noexcept: _name{std::move(name)} { _current() = this; }
-    ~Function() noexcept = default;
+    explicit Function(std::string name) noexcept;
+    ~Function() noexcept;
     
-    [[nodiscard]] static Function &current() noexcept {
-        assert(_current() != nullptr);
-        return *_current();
-    }
+    [[nodiscard]] static Function &current() noexcept;
     
     [[nodiscard]] const std::string &name() const noexcept { return _name; }
     
@@ -141,7 +134,7 @@ public:
     
     [[nodiscard]] const std::vector<Variable> &arguments() const noexcept { return _arguments; }
     [[nodiscard]] const std::vector<Variable> &builtin_variables() const noexcept { return _builtin_vars; }
-    [[nodiscard]] const std::vector<std::unique_ptr<Statement>> &statements() const noexcept { return _statements; }
+    [[nodiscard]] const std::vector<std::shared_ptr<Statement>> &statements() const noexcept { return _statements; }
     [[nodiscard]] const auto &used_types() const noexcept { return _used_types; }
 };
 

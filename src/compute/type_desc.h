@@ -68,7 +68,7 @@ enum struct TypeCatalog : uint32_t {
     STRUCTURE
 };
 
-struct LUISA_EXPORT TypeDesc : Noncopyable {
+struct TypeDesc : Noncopyable {
 
     TypeCatalog type{TypeCatalog::UNKNOWN};
     uint32_t size{0u};

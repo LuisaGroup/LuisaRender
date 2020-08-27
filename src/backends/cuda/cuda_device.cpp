@@ -37,6 +37,7 @@ protected:
         LUISA_INFO("Hello!");
         std::ostringstream os;
         CudaCodegen codegen{os};
+        codegen.emit(function);
         LUISA_INFO("Generated source:\n", os.str());
         return std::unique_ptr<Kernel>();
     }

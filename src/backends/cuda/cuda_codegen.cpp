@@ -12,7 +12,11 @@ using namespace luisa::compute::dsl;
 void CudaCodegen::emit(const Function &f) {
     _os << "#define GLM_FORCE_CUDA\n"
            "#define GLM_FORCE_CXX17\n"
-           "#include <core/data_types.h>\n\n";
+           "\n"
+           "#include <core/mathematics.h>\n"
+           "\n"
+           "using namespace luisa;\n"
+           "using namespace luisa::math;\n";
     CppCodegen::emit(f);
 }
 

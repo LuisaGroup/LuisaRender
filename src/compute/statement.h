@@ -17,7 +17,7 @@ namespace luisa::compute::dsl {
 struct StmtVisitor;
 
 // Statement interface
-struct LUISA_EXPORT Statement {
+struct Statement {
     virtual ~Statement() noexcept = default;
     virtual void accept(StmtVisitor &visitor) const = 0;
 };
@@ -33,7 +33,7 @@ class SwitchStmt;
 class CaseStmt;
 
 // Statement visitor interface
-struct LUISA_EXPORT StmtVisitor {
+struct StmtVisitor {
     virtual void visit(const DeclareStmt &declare_stmt) = 0;
     virtual void visit(const KeywordStmt &stmt) = 0;
     virtual void visit(const IfStmt &if_stmt) = 0;
@@ -47,7 +47,7 @@ struct LUISA_EXPORT StmtVisitor {
 #define MAKE_STATEMENT_ACCEPT_VISITOR()                                     \
 void accept(StmtVisitor &visitor) const override { visitor.visit(*this); }  \
 
-class LUISA_EXPORT DeclareStmt : public Statement {
+class DeclareStmt : public Statement {
 
 private:
     Variable _var;
@@ -63,7 +63,7 @@ public:
     MAKE_STATEMENT_ACCEPT_VISITOR()
 };
 
-class LUISA_EXPORT IfStmt : public Statement {
+class IfStmt : public Statement {
 
 private:
     Variable _condition;
@@ -76,7 +76,7 @@ public:
     MAKE_STATEMENT_ACCEPT_VISITOR()
 };
 
-class LUISA_EXPORT SwitchStmt : public Statement {
+class SwitchStmt : public Statement {
 
 private:
     Variable _expr;
@@ -87,7 +87,7 @@ public:
     MAKE_STATEMENT_ACCEPT_VISITOR()
 };
 
-class LUISA_EXPORT CaseStmt : public Statement {
+class CaseStmt : public Statement {
 
 private:
     Variable _expr;
@@ -100,7 +100,7 @@ public:
     MAKE_STATEMENT_ACCEPT_VISITOR()
 };
 
-class LUISA_EXPORT WhileStmt : public Statement {
+class WhileStmt : public Statement {
 
 private:
     Variable _condition;
@@ -114,7 +114,7 @@ public:
     MAKE_STATEMENT_ACCEPT_VISITOR()
 };
 
-class LUISA_EXPORT ForStmt : public Statement {
+class ForStmt : public Statement {
 
 private:
     Variable _i;
@@ -130,7 +130,7 @@ public:
     MAKE_STATEMENT_ACCEPT_VISITOR()
 };
 
-class LUISA_EXPORT KeywordStmt : public Statement {
+class KeywordStmt : public Statement {
 
 private:
     std::string_view _keyword;
