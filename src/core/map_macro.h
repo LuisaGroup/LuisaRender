@@ -32,7 +32,6 @@
 #define LUISA_MAP_NEXT0(test, next, ...) next LUISA_MAP_OUT
 #define LUISA_MAP_NEXT1(test, next) LUISA_MAP_DEFER ( LUISA_MAP_NEXT0 ) ( test, next, 0)
 #define LUISA_MAP_NEXT(test, next)  LUISA_MAP_NEXT1(LUISA_MAP_GET_END test, next)
-#define LUISA_MAP_INC(X) LUISA_MAP_INC_ ## X
 
 #define LUISA_MAP0(f, x, peek, ...) f(x) LUISA_MAP_DEFER ( LUISA_MAP_NEXT(peek, LUISA_MAP1) ) ( f, peek, __VA_ARGS__ )
 #define LUISA_MAP1(f, x, peek, ...) f(x) LUISA_MAP_DEFER ( LUISA_MAP_NEXT(peek, LUISA_MAP0) ) ( f, peek, __VA_ARGS__ )
