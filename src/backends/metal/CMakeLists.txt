@@ -1,3 +1,5 @@
+message(STATUS "Building with Apple Metal support")
+
 enable_language(OBJC)
 enable_language(OBJCXX)
 file(GLOB SOURCE_FILES *.mm *.h)

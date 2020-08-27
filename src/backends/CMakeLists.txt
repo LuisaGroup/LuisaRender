@@ -19,4 +19,8 @@ if (LUISA_RENDER_ENABLE_METAL)
     add_subdirectory(metal)
 endif ()
 
+if (LUISA_RENDER_ENABLE_CUDA)
+    add_subdirectory(cuda)
+endif ()
+
 add_library(luisarender::backends ALIAS luisabackends)
