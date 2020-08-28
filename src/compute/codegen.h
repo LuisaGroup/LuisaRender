@@ -33,6 +33,7 @@ protected:
     
     virtual void _emit_indent();
     virtual void _emit_function_decl(const Function &f);
+    virtual void _emit_function_body(const Function &f);
     virtual void _emit_struct_decl(const TypeDesc *desc);
     virtual void _emit_struct_fwd_decl(const TypeDesc *desc);
     virtual void _emit_variable(Variable v);

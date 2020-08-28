@@ -13,6 +13,9 @@ set(GLM_INCLUDE_DIR "${CMAKE_CURRENT_LIST_DIR}/ext/glm/glm")
 target_link_libraries(glm_config INTERFACE glm::glm)
 target_compile_definitions(glm_config INTERFACE GLM_FORCE_AVX2 GLM_FORCE_CXX17)
 
+add_library(jitify_config INTERFACE)
+target_include_directories(jitify_config INTERFACE ext)
+
 add_subdirectory(core)
 add_subdirectory(compute)
 add_subdirectory(backends)

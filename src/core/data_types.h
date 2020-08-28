@@ -19,11 +19,6 @@ using uchar3 = glm::vec<3, uchar, glm::aligned_highp>;
 using uchar4 = glm::vec<4, uchar, glm::aligned_highp>;
 using packed_uchar3 = glm::vec<3, uchar, glm::packed_highp>;
 
-static_assert(sizeof(uchar2) == 2u);
-static_assert(sizeof(uchar3) == 4u);
-static_assert(sizeof(uchar4) == 4u);
-static_assert(sizeof(packed_uchar3) == 3u);
-
 using float2 = glm::aligned_highp_vec2;
 using float3 = glm::aligned_highp_vec3;
 using float4 = glm::aligned_highp_vec4;
@@ -41,6 +36,16 @@ using packed_uint3 = glm::packed_highp_uvec3;
 
 using float3x3 = glm::aligned_highp_mat3x3;
 using float4x4 = glm::aligned_highp_mat4x4;
+
+static_assert(sizeof(uchar2) == 2u);
+static_assert(sizeof(uchar3) == 4u);
+static_assert(sizeof(uchar4) == 4u);
+static_assert(sizeof(packed_uchar3) == 3u);
+
+static_assert(alignof(uchar2) == 2u);
+static_assert(alignof(uchar3) == 4u);
+static_assert(alignof(uchar4) == 4u);
+static_assert(alignof(packed_uchar3) == 1u);
 
 static_assert(sizeof(float) == 4ul);
 static_assert(sizeof(float2) == 8ul);

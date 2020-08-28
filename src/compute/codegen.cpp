@@ -27,7 +27,7 @@ void CppCodegen::emit(const Function &f) {
     // function body
     _os << "{\n";
     _indent++;
-    for (auto &&stmt : f.statements()) { stmt->accept(*this); }
+    _emit_function_body(f);
     _os << "}\n\n";
 }
 
@@ -308,7 +308,7 @@ void CppCodegen::visit(const ExprStmt &expr_stmt) {
 
 void CppCodegen::_emit_struct_decl(const TypeDesc *desc) {
     
-    _os << "struct alignas(" << desc->alignment << ") Struct$" << desc->uid() << " {";
+    _os << "struct alignas(" << desc->alignment << ") Struct_" << desc->uid() << " {";
     if (!desc->member_names.empty()) { _os << "\n"; }
     
     // for each member
@@ -339,11 +339,11 @@ void CppCodegen::_emit_variable(Variable v) {
     } else if (v.is_local()) {
         _os << "v" << v.uid();
     } else if (v.is_thread_id()) {
-        _os << "$tid";
+        _os << "tid";
     } else if (v.is_thread_xy()) {
-        _os << "$txy";
+        _os << "txy";
     } else {
-        _os << "$unknown";
+        _os << "unknown";
     }
 }
 
@@ -460,7 +460,7 @@ void CppCodegen::_emit_type(const TypeDesc *desc) {
             _emit_type(desc->element_type);
             _os << ">";
         case TypeCatalog::STRUCTURE:
-            _os << "Struct$" << desc->uid();
+            _os << "Struct_" << desc->uid();
             break;
         default:
             _os << "[BAD]";
@@ -477,7 +477,7 @@ void CppCodegen::_emit_function_call(const std::string &name) {
 }
 
 void CppCodegen::_emit_struct_fwd_decl(const TypeDesc *desc) {
-    _os << "struct Struct$" << desc->uid() << ";\n";
+    _os << "struct Struct_" << desc->uid() << ";\n";
 }
 
 void CppCodegen::_emit_argument_struct_decl(const Function &f) {
@@ -492,6 +492,10 @@ void CppCodegen::_emit_argument_struct_decl(const Function &f) {
 
 void CppCodegen::_emit_argument_member_decl(Variable v) {
     _emit_variable_decl(std::move(v));
+}
+
+void CppCodegen::_emit_function_body(const Function &f) {
+    for (auto &&stmt : f.statements()) { stmt->accept(*this); }
 }
 
 }

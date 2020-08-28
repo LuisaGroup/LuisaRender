@@ -1,3 +1,6 @@
 [submodule "src/ext/glm"]
 	path = src/ext/glm
 	url = https://github.com/g-truc/glm.git
+[submodule "src/ext/jitify"]
+	path = src/ext/jitify
+	url = https://github.com/NVIDIA/jitify.git

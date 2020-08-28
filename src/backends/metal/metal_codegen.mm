@@ -15,10 +15,10 @@ void MetalCodegen::_emit_function_decl(const Function &f) {
     for (auto &&v : f.builtin_variables()) {
         if (v.is_thread_id()) {
             _os << ", ";
-            _os << "uint $tid [[thread_position_in_grid]]";
+            _os << "uint tid [[thread_position_in_grid]]";
         } else if (v.is_thread_xy()) {
             _os << ", ";
-            _os << "uint2 $txy [[thread_position_in_grid]]";
+            _os << "uint2 txy [[thread_position_in_grid]]";
         }
     }
     _os << ") ";

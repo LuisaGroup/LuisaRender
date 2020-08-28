@@ -6,7 +6,7 @@ target_include_directories(cuda PRIVATE ${CUDA_INCLUDE_DIRS})
 
 find_package(CUDAToolkit REQUIRED)
 find_package(OptiX REQUIRED VERSION 7)
-target_link_libraries(cuda PRIVATE CUDA::nvrtc CUDA::cuda_driver CUDA::cudart_static)
+target_link_libraries(cuda PRIVATE jitify_config CUDA::nvrtc CUDA::cuda_driver CUDA::cudart_static)
 target_include_directories(cuda PRIVATE ${OptiX_INCLUDE})
 target_compile_definitions(cuda PRIVATE OPTIX_INCLUDE_DIR="${OptiX_INCLUDE}")
 

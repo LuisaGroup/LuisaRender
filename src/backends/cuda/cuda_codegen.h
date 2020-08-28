@@ -13,8 +13,9 @@ using luisa::compute::dsl::CppCodegen;
 
 class CudaCodegen : public CppCodegen {
 
-private:
-
+protected:
+    void _emit_function_body(const Function &f) override;
+    void _emit_function_decl(const Function &f) override;
 
 public:
     explicit CudaCodegen(std::ostream &os) noexcept : CppCodegen{os} {}

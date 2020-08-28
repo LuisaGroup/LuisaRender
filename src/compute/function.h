@@ -21,8 +21,8 @@ private:
     std::string _name;
     std::vector<Variable> _arguments;
     std::vector<Variable> _builtin_vars;
-    std::vector<std::shared_ptr<Expression>> _expressions;
-    std::vector<std::shared_ptr<Statement>> _statements;
+    std::vector<std::unique_ptr<Expression>> _expressions;
+    std::vector<std::unique_ptr<Statement>> _statements;
     std::vector<const TypeDesc *> _used_types;
     
     std::vector<VariableTag> _used_builtins;
@@ -134,7 +134,7 @@ public:
     
     [[nodiscard]] const std::vector<Variable> &arguments() const noexcept { return _arguments; }
     [[nodiscard]] const std::vector<Variable> &builtin_variables() const noexcept { return _builtin_vars; }
-    [[nodiscard]] const std::vector<std::shared_ptr<Statement>> &statements() const noexcept { return _statements; }
+    [[nodiscard]] const std::vector<std::unique_ptr<Statement>> &statements() const noexcept { return _statements; }
     [[nodiscard]] const auto &used_types() const noexcept { return _used_types; }
 };
 
