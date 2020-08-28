@@ -11,8 +11,6 @@
 #include <array>
 #include <filesystem>
 
-#include <glm/gtx/string_cast.hpp>
-
 namespace luisa { inline namespace utility {
 
 template<typename ...Args>
