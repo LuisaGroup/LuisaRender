@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <cmath>
 
-#include <core/data_types.h>
+#include "data_types.h"
 
 namespace luisa::math {
 
@@ -129,14 +129,9 @@ using std::max;
 using std::min;
 
 using std::abs;
-using std::clamp;
 
 constexpr float radians(float deg) noexcept { return deg * constants::pi / 180.0f; }
 constexpr float degrees(float rad) noexcept { return rad * constants::inv_pi * 180.0f; }
-
-constexpr auto lerp(float a, float b, float t) noexcept {
-    return (1.0f - t) * a + t * b;
-}
 
 #define MAKE_VECTOR_UNARY_FUNC(func)                                                \
     template<typename T, uint N>                                                    \
@@ -218,14 +213,19 @@ MAKE_VECTOR_BINARY_FUNC(max)
 
 #undef MAKE_VECTOR_BINARY_FUNC
 
-template<typename T, uint N>
-constexpr auto lerp(Vector<T, N, false> a, Vector<T, N, false> b, float t) noexcept {
+template<typename T, typename F>
+constexpr auto select(bool pred, T t, F f) noexcept {
+    return pred ? t : f;
+}
+
+template<typename A, typename B>
+constexpr auto lerp(A a, B b, float t) noexcept {
     return a + t * (b - a);
 }
 
-template<typename T, uint N, typename U>
-constexpr auto clamp(Vector<T, N, false> v, U lb, U ub) noexcept {
-    return min(max(v, lb), ub);
+template<typename X, typename A, typename B>
+constexpr auto clamp(X x, A a, B b) noexcept {
+    return min(max(x, a), b);
 }
 
 // Vector Functions

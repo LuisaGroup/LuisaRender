@@ -16,6 +16,8 @@ class CudaCodegen : public CppCodegen {
 protected:
     void _emit_function_body(const Function &f) override;
     void _emit_function_decl(const Function &f) override;
+    void _emit_type(const compute::dsl::TypeDesc *desc) override;
+    void _emit_function_call(const std::string &name) override;
 
 public:
     explicit CudaCodegen(std::ostream &os) noexcept : CppCodegen{os} {}

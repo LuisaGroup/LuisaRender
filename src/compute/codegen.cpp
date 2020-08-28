@@ -372,10 +372,10 @@ void CppCodegen::_emit_type(const TypeDesc *desc) {
             _os << "float";
             break;
         case TypeCatalog::INT8:
-            _os << "byte";
+            _os << "char";
             break;
         case TypeCatalog::UINT8:
-            _os << "ubyte";
+            _os << "uchar";
             break;
         case TypeCatalog::INT16:
             _os << "short";

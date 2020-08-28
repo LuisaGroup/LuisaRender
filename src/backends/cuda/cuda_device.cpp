@@ -12,6 +12,7 @@
 
 #include "check.h"
 #include "cuda_codegen.h"
+#include "cuda_jit_headers.h"
 
 namespace luisa::cuda {
 
@@ -52,12 +53,17 @@ protected:
             header_names.emplace_back(header_item.first.c_str());
             header_sources.emplace_back(header_item.second.c_str());
         }
+        
+        auto &&luisa_headers = get_jit_headers(_context);
+        for (auto &&header_item : luisa_headers) {
+            header_names.emplace_back(header_item.first);
+            header_sources.emplace_back(header_item.second.c_str());
+        }
 
         nvrtcProgram prog;
-        nvrtcCreateProgram(&prog, src.c_str(), serialize(function.name(), ".cu").c_str(), headers.size(), header_sources.data(), header_names.data());// includeNames
+        nvrtcCreateProgram(&prog, src.c_str(), serialize(function.name(), ".cu").c_str(), header_sources.size(), header_sources.data(), header_names.data());// includeNames
         
         auto arch_opt = serialize("--gpu-architecture=compute_", _compute_capability);
-        auto include_opt = serialize("--include-path=", _context->runtime_path("include").string());
         auto cuda_version_opt = serialize("-DCUDA_VERSION=", CUDART_VERSION);
         const char *opts[] = {
             arch_opt.c_str(),
@@ -67,8 +73,7 @@ protected:
             "-restrict",
             "-w",
             "-ewp",
-            cuda_version_opt.c_str(),
-            include_opt.c_str()};
+            cuda_version_opt.c_str()};
         nvrtcCompileProgram(prog, sizeof(opts) / sizeof(const char *), opts);// options
 
         size_t logSize;
@@ -84,6 +89,7 @@ protected:
         ptx.resize(ptxSize);
         nvrtcGetPTX(prog, ptx.data());
         
+        jitify::detail::ptx_remove_unused_globals(&ptx);
         LUISA_INFO("Generated PTX:\n", ptx);
         
         return std::unique_ptr<Kernel>();
