@@ -7,12 +7,6 @@ find_package(spdlog CONFIG REQUIRED)
 add_library(spdlog_config INTERFACE)
 target_link_libraries(spdlog_config INTERFACE spdlog::spdlog spdlog::spdlog_header_only)
 
-add_subdirectory(ext/glm)
-add_library(glm_config INTERFACE)
-set(GLM_INCLUDE_DIR "${CMAKE_CURRENT_LIST_DIR}/ext/glm/glm")
-target_link_libraries(glm_config INTERFACE glm::glm)
-target_compile_definitions(glm_config INTERFACE GLM_FORCE_AVX2 GLM_FORCE_CXX17)
-
 add_library(jitify_config INTERFACE)
 target_include_directories(jitify_config INTERFACE ext)
 

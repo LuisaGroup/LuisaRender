@@ -416,53 +416,53 @@ struct MakeTypeDescImpl<float4x4> {
 };
 
 template<typename T>
-struct MakeTypeDescImpl<glm::tvec2<T, glm::aligned_highp>> {
+struct MakeTypeDescImpl<Vector<T, 2, false>> {
 
     using Type = Vector2<T>;
 
     [[nodiscard]] TypeDesc *operator()() const noexcept {
         auto desc = Type::desc();
-        desc->size = static_cast<uint32_t>(sizeof(glm::tvec2<T, glm::aligned_highp>));
-        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<glm::tvec2<T, glm::aligned_highp>>);
+        desc->size = static_cast<uint32_t>(sizeof(Vector<T, 2, false>));
+        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<Vector<T, 2, false>>);
         return desc;
     }
 };
 
 template<typename T>
-struct MakeTypeDescImpl<glm::tvec3<T, glm::aligned_highp>> {
+struct MakeTypeDescImpl<Vector<T, 3, false>> {
 
     using Type = Vector3<T>;
 
     [[nodiscard]] TypeDesc *operator()() const noexcept {
         auto desc = Type::desc();
-        desc->size = static_cast<uint32_t>(sizeof(glm::tvec3<T, glm::aligned_highp>));
-        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<glm::tvec3<T, glm::aligned_highp>>);
+        desc->size = static_cast<uint32_t>(sizeof(Vector<T, 3, false>));
+        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<Vector<T, 3, false>>);
         return desc;
     }
 };
 
 template<typename T>
-struct MakeTypeDescImpl<glm::tvec4<T, glm::aligned_highp>> {
+struct MakeTypeDescImpl<Vector<T, 4, false>> {
 
     using Type = Vector4<T>;
 
     [[nodiscard]] TypeDesc *operator()() const noexcept {
         auto desc = Type::desc();
-        desc->size = static_cast<uint32_t>(sizeof(glm::tvec4<T, glm::aligned_highp>));
-        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<glm::tvec4<T, glm::aligned_highp>>);
+        desc->size = static_cast<uint32_t>(sizeof(Vector<T, 4, false>));
+        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<Vector<T, 4, false>>);
         return desc;
     }
 };
 
 template<typename T>
-struct MakeTypeDescImpl<glm::tvec3<T, glm::packed_highp>> {
+struct MakeTypeDescImpl<Vector<T, 3, true>> {
 
     using Type = Vector3_PACKED<T>;
 
     [[nodiscard]] TypeDesc *operator()() const noexcept {
         auto desc = Type::desc();
-        desc->size = static_cast<uint32_t>(sizeof(glm::tvec3<T, glm::packed_highp>));
-        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<glm::tvec3<T, glm::packed_highp>>);
+        desc->size = static_cast<uint32_t>(sizeof(Vector<T, 3, true>));
+        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<Vector<T, 3, true>>);
         return desc;
     }
 };
