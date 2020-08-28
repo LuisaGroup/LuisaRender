@@ -4,9 +4,8 @@
 
 #pragma once
 
-#include <cmath>
 #include <algorithm>
-#include <glm/glm.hpp>
+#include <cmath>
 
 #include <core/data_types.h>
 
@@ -14,17 +13,17 @@ namespace luisa::math {
 
 inline namespace constants {
 
-constexpr auto PI[[maybe_unused]] = 3.14159265358979323846264338327950288f;
-constexpr auto PI_OVER_TWO[[maybe_unused]] = 1.57079632679489661923132169163975144f;
-constexpr auto PI_OVER_FOUR[[maybe_unused]] = 0.785398163397448309615660845819875721f;
-constexpr auto INV_PI[[maybe_unused]] = 0.318309886183790671537767526745028724f;
-constexpr auto TWO_OVER_PI[[maybe_unused]] = 0.636619772367581343075535053490057448f;
-constexpr auto SQRT_TWO[[maybe_unused]] = 1.41421356237309504880168872420969808f;
-constexpr auto INV_SQRT_TWO[[maybe_unused]] = 0.707106781186547524400844362104849039f;
+constexpr auto pi = 3.14159265358979323846264338327950288f;
+constexpr auto pi_over_two = 1.57079632679489661923132169163975144f;
+constexpr auto pi_over_four = 0.785398163397448309615660845819875721f;
+constexpr auto inv_pi = 0.318309886183790671537767526745028724f;
+constexpr auto two_over_pi = 0.636619772367581343075535053490057448f;
+constexpr auto sqrt_two = 1.41421356237309504880168872420969808f;
+constexpr auto inv_sqrt_two = 0.707106781186547524400844362104849039f;
 
-constexpr auto PRIME_NUMBER_COUNT[[maybe_unused]] = 512u;
+constexpr auto prime_number_count = 512u;
 
-constexpr uint prime_numbers[[maybe_unused]][PRIME_NUMBER_COUNT] = {
+constexpr uint prime_numbers [[maybe_unused]][prime_number_count] = {
     2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83,
     89, 97, 101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 157, 163, 167, 173, 179,
     181, 191, 193, 197, 199, 211, 223, 227, 229, 233, 239, 241, 251, 257, 263, 269, 271, 277,
@@ -58,7 +57,7 @@ constexpr uint prime_numbers[[maybe_unused]][PRIME_NUMBER_COUNT] = {
     3457, 3461, 3463, 3467, 3469, 3491, 3499, 3511, 3517, 3527, 3529, 3533, 3539, 3541, 3547,
     3557, 3559, 3571, 3581, 3583, 3593, 3607, 3613, 3617, 3623, 3631, 3637, 3643, 3659, 3671};
 
-constexpr uint prime_number_prefix_sums[[maybe_unused]][PRIME_NUMBER_COUNT] = {
+constexpr uint prime_number_prefix_sums [[maybe_unused]][prime_number_count] = {
     0, 2, 5, 10, 17, 28, 41, 58, 77, 100, 129, 160, 197, 238, 281, 328, 381, 440, 501, 568,
     639, 712, 791, 874, 963, 1060, 1161, 1264, 1371, 1480, 1593, 1720, 1851, 1988, 2127, 2276,
     2427, 2584, 2747, 2914, 3087, 3266, 3447, 3638, 3831, 4028, 4227, 4438, 4661, 4888, 5117,
@@ -102,49 +101,165 @@ constexpr uint prime_number_prefix_sums[[maybe_unused]][PRIME_NUMBER_COUNT] = {
     758006, 761455, 764912, 768373, 771836, 775303, 778772, 782263, 785762, 789273, 792790,
     796317, 799846, 803379, 806918, 810459, 814006, 817563, 821122, 824693, 828274, 831857,
     835450, 839057, 842670, 846287, 849910, 853541, 857178, 860821, 864480};
-    
-}
+
+}// namespace constants
 
 // Scalar Functions
-using glm::cos;
-using glm::sin;
-using glm::tan;
-using glm::acos;
-using glm::asin;
-using glm::atan;
+using std::acos;
+using std::asin;
+using std::atan;
 using std::atan2;
+using std::cos;
+using std::sin;
+using std::tan;
 
-using glm::sqrt;
+using std::sqrt;
 
-using glm::ceil;
-using glm::floor;
-using glm::round;
+using std::ceil;
+using std::floor;
+using std::round;
 
-using glm::pow;
-using glm::exp;
-using glm::log;
-using glm::log2;
+using std::exp;
+using std::log;
 using std::log10;
+using std::log2;
+using std::pow;
 
-using glm::min;
-using glm::max;
+using std::max;
+using std::min;
 
-using glm::abs;
-using glm::clamp;
+using std::abs;
+using std::clamp;
 
-inline float radians(float deg) noexcept { return deg * constants::PI / 180.0f; }
-inline float degrees(float rad) noexcept { return rad * constants::INV_PI * 180.0f; }
+constexpr float radians(float deg) noexcept { return deg * constants::pi / 180.0f; }
+constexpr float degrees(float rad) noexcept { return rad * constants::inv_pi * 180.0f; }
 
-// Vector Functions
-using glm::normalize;
-using glm::length;
-using glm::dot;
-using glm::cross;
-using glm::distance;
-
-template<typename T>
-inline auto lerp(T a, T b, float t) noexcept {
+constexpr auto lerp(float a, float b, float t) noexcept {
     return (1.0f - t) * a + t * b;
 }
-    
+
+#define MAKE_VECTOR_UNARY_FUNC(func)                                                \
+    template<typename T, uint N>                                                    \
+    constexpr auto func(Vector<T, N, false> v) noexcept {                           \
+        static_assert(N == 2 || N == 3 || N == 4);                                  \
+        if constexpr (N == 2) {                                                     \
+            return Vector<T, 2, false>{func(v.x), func(v.y)};                       \
+        } else if constexpr (N == 3) {                                              \
+            return Vector<T, 3, false>(func(v.x), func(v.y), func(v.z));            \
+        } else {                                                                    \
+            return Vector<T, 4, false>(func(v.x), func(v.y), func(v.z), func(v.w)); \
+        }                                                                           \
+    }
+
+MAKE_VECTOR_UNARY_FUNC(acos)
+MAKE_VECTOR_UNARY_FUNC(asin)
+MAKE_VECTOR_UNARY_FUNC(atan)
+MAKE_VECTOR_UNARY_FUNC(cos)
+MAKE_VECTOR_UNARY_FUNC(sin)
+MAKE_VECTOR_UNARY_FUNC(tan)
+MAKE_VECTOR_UNARY_FUNC(sqrt)
+MAKE_VECTOR_UNARY_FUNC(ceil)
+MAKE_VECTOR_UNARY_FUNC(floor)
+MAKE_VECTOR_UNARY_FUNC(round)
+MAKE_VECTOR_UNARY_FUNC(exp)
+MAKE_VECTOR_UNARY_FUNC(log)
+MAKE_VECTOR_UNARY_FUNC(log10)
+MAKE_VECTOR_UNARY_FUNC(log2)
+MAKE_VECTOR_UNARY_FUNC(abs)
+MAKE_VECTOR_UNARY_FUNC(radians)
+MAKE_VECTOR_UNARY_FUNC(degrees)
+
+#undef MAKE_VECTOR_UNARY_FUNC
+
+#define MAKE_VECTOR_BINARY_FUNC(func)                                                                   \
+    template<typename T, typename U, uint N>                                                            \
+    constexpr auto func(Vector<T, N, false> v, Vector<U, N, false> u) noexcept {                        \
+        static_assert(N == 2 || N == 3 || N == 4);                                                      \
+        using R = decltype(func(v.x, u.x));                                                             \
+        if constexpr (N == 2) {                                                                         \
+            return Vector<R, 2, false>{func(v.x, u.x), func(v.y, u.y)};                                 \
+        } else if constexpr (N == 3) {                                                                  \
+            return Vector<R, 3, false>(func(v.x, u.x), func(v.y, u.y), func(v.z, u.z));                 \
+        } else {                                                                                        \
+            return Vector<R, 4, false>(func(v.x, u.x), func(v.y, u.y), func(v.z, u.z), func(v.w, u.w)); \
+        }                                                                                               \
+    }                                                                                                   \
+                                                                                                        \
+    template<typename T, typename U, uint N>                                                            \
+    constexpr auto func(T v, Vector<U, N, false> u) noexcept {                                          \
+        static_assert(N == 2 || N == 3 || N == 4);                                                      \
+        using R = decltype(func(v, u.x));                                                               \
+        if constexpr (N == 2) {                                                                         \
+            return Vector<R, 2, false>{func(v, u.x), func(v, u.y)};                                     \
+        } else if constexpr (N == 3) {                                                                  \
+            return Vector<R, 3, false>(func(v, u.x), func(v, u.y), func(v, u.z));                       \
+        } else {                                                                                        \
+            return Vector<R, 4, false>(func(v, u.x), func(v, u.y), func(v, u.z), func(v, u.w));         \
+        }                                                                                               \
+    }                                                                                                   \
+                                                                                                        \
+    template<typename T, typename U, uint N>                                                            \
+    constexpr auto func(Vector<T, N, false> v, U u) noexcept {                                          \
+        static_assert(N == 2 || N == 3 || N == 4);                                                      \
+        using R = decltype(func(v.x, u));                                                               \
+        if constexpr (N == 2) {                                                                         \
+            return Vector<R, 2, false>{func(v.x, u), func(v.y, u)};                                     \
+        } else if constexpr (N == 3) {                                                                  \
+            return Vector<R, 3, false>(func(v.x, u), func(v.y, u), func(v.z, u));                       \
+        } else {                                                                                        \
+            return Vector<R, 4, false>(func(v.x, u), func(v.y, u), func(v.z, u), func(v.w, u));         \
+        }                                                                                               \
+    }
+
+MAKE_VECTOR_BINARY_FUNC(atan2)
+MAKE_VECTOR_BINARY_FUNC(pow)
+MAKE_VECTOR_BINARY_FUNC(min)
+MAKE_VECTOR_BINARY_FUNC(max)
+
+#undef MAKE_VECTOR_BINARY_FUNC
+
+template<typename T, uint N>
+constexpr auto lerp(Vector<T, N, false> a, Vector<T, N, false> b, float t) noexcept {
+    return a + t * (b - a);
 }
+
+template<typename T, uint N, typename U>
+constexpr auto clamp(Vector<T, N, false> v, U lb, U ub) noexcept {
+    return min(max(v, lb), ub);
+}
+
+// Vector Functions
+template<uint N>
+constexpr auto dot(Vector<float, N, false> u, Vector<float, N, false> v) noexcept {
+    static_assert(N == 2 || N == 3 || N == 4);
+    if constexpr (N == 2) {
+        return u.x * v.x + u.y * v.y;
+    } else if constexpr (N == 3) {
+        return u.x * v.x + u.y * v.y + u.z * v.z;
+    } else {
+        return u.x * v.x + u.y * v.y + u.z * v.z + u.w * v.w;
+    }
+}
+
+template<uint N>
+constexpr auto length(Vector<float, N, false> u) noexcept {
+    return sqrt(dot(u, u));
+}
+
+template<uint N>
+constexpr auto normalize(Vector<float, N, false> u) noexcept {
+    return u * (1.0f / length(u));
+}
+
+template<uint N>
+constexpr auto distance(Vector<float, N, false> u, Vector<float, N, false> v) noexcept {
+    return length(u - v);
+}
+
+constexpr auto cross(float3 u, float3 v) noexcept {
+    return make_float3(u.y * v.z - v.y * u.z,
+                       u.z * v.x - v.z * u.x,
+                       u.x * v.y - v.x * u.y);
+}
+
+}// namespace luisa
