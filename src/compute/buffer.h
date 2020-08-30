@@ -7,6 +7,7 @@
 #include <iostream>
 #include <limits>
 #include <functional>
+#include <utility>
 
 #include <core/concepts.h>
 #include <compute/dispatcher.h>
@@ -16,7 +17,7 @@ namespace luisa::compute {
 template<typename T>
 class BufferView;
 
-class Buffer : Noncopyable {
+class Buffer : private Noncopyable, public std::enable_shared_from_this<Buffer> {
 
 public:
     static constexpr auto npos = std::numeric_limits<size_t>::max();
@@ -47,7 +48,7 @@ public:
     static constexpr auto npos = std::numeric_limits<size_t>::max();
 
 private:
-    Buffer *_buffer{nullptr};
+    std::shared_ptr<Buffer> _buffer;
     size_t _offset{0u};
     size_t _size{0u};
     
@@ -57,14 +58,14 @@ private:
 public:
     BufferView() noexcept = default;
     
-    explicit BufferView(Buffer *buffer, size_t offset = 0u, size_t size = npos) noexcept: _buffer{buffer}, _offset{offset}, _size{size} {
+    explicit BufferView(std::shared_ptr<Buffer> buffer, size_t offset = 0u, size_t size = npos) noexcept: _buffer{std::move(buffer)}, _offset{offset}, _size{size} {
         if (_size == npos) { _size = (_buffer->size() - byte_offset()) / sizeof(T); }
     }
     
     [[nodiscard]] BufferView subview(size_t offset, size_t size = npos) const noexcept { return {_buffer, _offset + offset, size}; }
     
     [[nodiscard]] bool empty() const noexcept { return _buffer == nullptr || _size == 0u; }
-    [[nodiscard]] Buffer *buffer() const noexcept { return _buffer; }
+    [[nodiscard]] Buffer *buffer() const noexcept { return _buffer.get(); }
     [[nodiscard]] size_t offset() const noexcept { return _offset; }
     [[nodiscard]] size_t size() const noexcept { return _size; }
     [[nodiscard]] size_t byte_offset() const noexcept { return _offset * sizeof(T); }
@@ -78,7 +79,7 @@ public:
 
 template<typename T>
 inline auto Buffer::view(size_t offset, size_t size) noexcept {
-    return BufferView<T>{this, offset, size};
+    return BufferView<T>{shared_from_this(), offset, size};
 }
 
 }

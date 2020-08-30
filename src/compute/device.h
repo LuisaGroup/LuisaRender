@@ -18,9 +18,8 @@ class Device : Noncopyable {
 
 protected:
     Context *_context{nullptr};
-    std::vector<std::unique_ptr<Buffer>> _buffers;
     
-    [[nodiscard]] virtual std::unique_ptr<Buffer> _allocate_buffer(size_t size, size_t max_host_caches) = 0;
+    [[nodiscard]] virtual std::shared_ptr<Buffer> _allocate_buffer(size_t size, size_t max_host_caches) = 0;
     [[nodiscard]] virtual std::unique_ptr<Texture> _allocate_texture(uint32_t width, uint32_t height, PixelFormat format, size_t max_caches) = 0;
     [[nodiscard]] virtual std::unique_ptr<Kernel> _compile_kernel(const dsl::Function &function) = 0;
     
@@ -46,7 +45,7 @@ public:
     
     template<typename T>
     [[nodiscard]] BufferView<T> allocate_buffer(size_t size, size_t max_host_cache_count = 8) {
-        return _buffers.emplace_back(_allocate_buffer(size * sizeof(T), max_host_cache_count))->view<T>();
+        return _allocate_buffer(size * sizeof(T), max_host_cache_count)->view<T>();
     }
     
     template<typename T>

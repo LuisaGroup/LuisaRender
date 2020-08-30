@@ -8,8 +8,8 @@
 #include <vector>
 #include <set>
 
-#include <core/dll.h>
 #include <compute/statement.h>
+#include <core/platform.h>
 
 namespace luisa::compute::dsl {
 

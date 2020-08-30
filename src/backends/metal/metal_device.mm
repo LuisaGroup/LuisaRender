@@ -52,7 +52,7 @@ private:
 
 protected:
     std::unique_ptr<Kernel> _compile_kernel(const compute::dsl::Function &f) override;
-    std::unique_ptr<Buffer> _allocate_buffer(size_t size, size_t max_host_caches) override;
+    std::shared_ptr<Buffer> _allocate_buffer(size_t size, size_t max_host_caches) override;
     std::unique_ptr<Texture> _allocate_texture(uint32_t width, uint32_t height, compute::PixelFormat format, size_t max_caches) override;
     void _launch(const std::function<void(Dispatcher &)> &dispatch) override;
 
@@ -194,9 +194,9 @@ void MetalDevice::synchronize() {
     for (auto i = 0u; i < max_command_queue_size; i++) { next_dispatcher().reset(); }
 }
 
-std::unique_ptr<Buffer> MetalDevice::_allocate_buffer(size_t size, size_t max_host_caches) {
+std::shared_ptr<Buffer> MetalDevice::_allocate_buffer(size_t size, size_t max_host_caches) {
     auto buffer = [_handle newBufferWithLength:size options:MTLResourceStorageModePrivate];
-    return std::make_unique<MetalBuffer>(buffer, size, max_host_caches);
+    return std::make_shared<MetalBuffer>(buffer, size, max_host_caches);
 }
 
 std::unique_ptr<Texture> MetalDevice::_allocate_texture(uint32_t width, uint32_t height, compute::PixelFormat format, size_t max_caches) {

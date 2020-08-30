@@ -4,9 +4,9 @@
 
 #pragma once
 
-#include <ostream>
-#include <core/dll.h>
 #include <compute/function.h>
+#include <core/platform.h>
+#include <ostream>
 
 namespace luisa {
 class Device;

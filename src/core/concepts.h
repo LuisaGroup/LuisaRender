@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <core/dll.h>
+#include <core/platform.h>
 
 namespace luisa { inline namespace utility {
 

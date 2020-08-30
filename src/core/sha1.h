@@ -7,7 +7,7 @@
 #include <string>
 #include <string_view>
 
-#include <core/dll.h>
+#include <core/platform.h>
 
 class SHA1 {
 
