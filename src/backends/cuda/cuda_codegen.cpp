@@ -37,25 +37,8 @@ void CudaCodegen::_emit_function_body(const Function &f) {
     CppCodegen::_emit_function_body(f);
 }
 
-void CudaCodegen::_emit_argument_struct_decl(const Function &f) {}
-
 void CudaCodegen::_emit_function_decl(const Function &f) {
-    _os << "extern \"C\" __global__ void " << f.name() << "(";
-    auto &&args = f.arguments();
-    for (auto i = 0u; i < args.size(); i++) {
-        auto &&arg = args[i];
-        _emit_argument_member_decl(arg);
-        if (i != args.size() - 1u) { _os << ", "; }
-    }
-    _os << ") ";
-}
-
-void CudaCodegen::_emit_variable(Variable v) {
-    if (v.is_argument()) {
-        _os << "v" << v.uid();
-    } else {
-        CppCodegen::_emit_variable(v);
-    }
+    _os << "extern \"C\" __global__ void " << f.name() << "(const Argument &arg) ";
 }
 
 void CudaCodegen::_emit_function_call(const std::string &name) {
@@ -64,7 +47,7 @@ void CudaCodegen::_emit_function_call(const std::string &name) {
 }
 
 void CudaCodegen::_emit_type(const TypeDesc *desc) {
-
+    
     switch (desc->type) {
         case TypeCatalog::VECTOR2:
             _os << "luisa::";
