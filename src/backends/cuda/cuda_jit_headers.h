@@ -15,7 +15,7 @@ inline const auto &get_jit_headers(Context *context) noexcept {
         {"vector_types.h", text_file_contents(context->runtime_path("include") / "core" / "vector_types.h")},
         {"matrix_types.h", text_file_contents(context->runtime_path("include") / "core" / "matrix_types.h")},
         {"data_types.h", text_file_contents(context->runtime_path("include") / "core" / "data_types.h")},
-        {"mathematics.h", text_file_contents(context->runtime_path("include") / "core" / "mathematics.h")}};
+        {"math_helpers.h", text_file_contents(context->runtime_path("include") / "core" / "math_helpers.h")}};
     return headers;
 }
 

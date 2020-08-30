@@ -16,7 +16,7 @@ void CudaCodegen::emit(const Function &f) {
            "\n"
            "#include <cmath>\n"
            "#include <cstdint>\n"
-           "#include <mathematics.h>\n"
+           "#include <math_helpers.h>\n"
            "\n"
            "using luisa::uchar;\n"
            "using luisa::ushort;\n"
