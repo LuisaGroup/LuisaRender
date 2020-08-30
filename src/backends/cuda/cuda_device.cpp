@@ -12,6 +12,7 @@
 
 #include "check.h"
 #include "cuda_codegen.h"
+#include "cuda_buffer.h"
 #include "cuda_jit_headers.h"
 
 namespace luisa::cuda {
@@ -29,8 +30,8 @@ private:
     uint _compute_capability{};
 
 protected:
-    std::unique_ptr<Buffer> _allocate_buffer(size_t size, size_t max_host_caches) override {
-        return std::unique_ptr<Buffer>();
+    std::shared_ptr<Buffer> _allocate_buffer(size_t size, size_t max_host_caches) override {
+        return std::make_shared<CudaBuffer>(0, size, max_host_caches);
     }
 
     std::unique_ptr<Texture> _allocate_texture(uint32_t width, uint32_t height, compute::PixelFormat format, size_t max_caches) override {
