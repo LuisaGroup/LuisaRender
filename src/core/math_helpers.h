@@ -218,14 +218,6 @@ constexpr auto select(bool pred, T t, F f) noexcept {
     return pred ? t : f;
 }
 
-template<typename T, uint N>
-constexpr auto select(Vector<bool, N, false> pred, Vector<T, N, false> t, Vector<T, N, false> f) noexcept {
-    static_assert(N == 2 || N == 3 || N == 4);
-    if constexpr (N == 2) { return Vector<T, N, false>{select(pred.x, t.x, f.x), select(pred.y, t.y, f.y)}; }
-    else if constexpr (N == 3) { return Vector<T, N, false>{select(pred.x, t.x, f.x), select(pred.y, t.y, f.y), select(pred.z, t.z, f.z)}; }
-    else { return Vector<T, N, false>{select(pred.x, t.x, f.x), select(pred.y, t.y, f.y), select(pred.z, t.z, f.z), select(pred.w, t.w, f.w)}; }
-}
-
 template<typename A, typename B>
 constexpr auto lerp(A a, B b, float t) noexcept {
     return a + t * (b - a);

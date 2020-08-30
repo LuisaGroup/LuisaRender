@@ -30,7 +30,7 @@ void MetalCodegen::emit(const Function &f) {
            "\n"
            "using namespace metal;\n"
            "\n"
-           "template<typename B, typename T, typename F> inline auto ite(B p, T t, F f) { return select(t, f, p); }\n"
+           "template<typename T, typename F> inline auto ite(bool p, T t, F f) { return p ? t : f; }\n"
            "\n"
            "template<access a>\n"
            "inline float4 read(texture2d<float, a> t, uint2 coord) { return t.read(coord); }\n"
