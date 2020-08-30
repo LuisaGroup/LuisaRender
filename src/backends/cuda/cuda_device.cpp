@@ -72,8 +72,9 @@ protected:
             "--use_fast_math",
             "-default-device",
             "-restrict",
-            "-w",
             "-ewp",
+            "-dw",
+            "-w",
             cuda_version_opt.c_str()};
         nvrtcCompileProgram(prog, sizeof(opts) / sizeof(const char *), opts);// options
 
