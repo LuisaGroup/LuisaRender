@@ -20,7 +20,7 @@ int main(int argc, char *argv[]) {
         LUISA_INFO(1);
         auto tid = thread_id();
         If(tid < 1024) {
-            a[tid] = cos(a[tid]);
+            a[tid] = cos(select(a[tid] < 0, -a[tid], a[tid]));
         };
     });
 }

@@ -41,7 +41,7 @@ struct VectorStorage<T, 4> {
     constexpr VectorStorage(T x, T y, T z, T w) noexcept : x{x}, y{y}, z{z}, w{w} {}
 };
 
-}// namespace detail
+}// namespace vec::detail
 
 template<typename T, uint32_t N, bool is_packed>
 struct alignas(vec::detail::vector_alignment<T, N, is_packed>) Vector : vec::detail::VectorStorage<T, N> {
@@ -108,203 +108,147 @@ MAKE_VECTOR_BINARY_OP(%)
 
 #undef MAKE_VECTOR_BINARY_OP
 
-using char2 = Vector<char, 2, false>;
-using char3 = Vector<char, 3, false>;
-using char4 = Vector<char, 4, false>;
-using packed_char3 = Vector<char, 3, true>;
+#define MAKE_VECTOR_RELATIONAL_OP(op)                                                                      \
+    template<typename T, uint N>                                                                           \
+    constexpr auto operator op(Vector<T, N, false> lhs, Vector<T, N, false> rhs) noexcept {                \
+        static_assert(N == 2 || N == 3 || N == 4);                                                         \
+        if constexpr (N == 2) {                                                                            \
+            return Vector<bool, 2, false>{lhs.x op rhs.x, lhs.y op rhs.y};                                 \
+        } else if constexpr (N == 3) {                                                                     \
+            return Vector<bool, 3, false>{lhs.x op rhs.x, lhs.y op rhs.y, lhs.z op rhs.z};                 \
+        } else {                                                                                           \
+            return Vector<bool, 4, false>{lhs.x op rhs.x, lhs.y op rhs.y, lhs.z op rhs.z, lhs.w op rhs.w}; \
+        }                                                                                                  \
+    }                                                                                                      \
+                                                                                                           \
+    template<typename T, uint N>                                                                           \
+    constexpr auto operator op(T lhs, Vector<T, N, false> rhs) noexcept {                                  \
+        static_assert(N == 2 || N == 3 || N == 4);                                                         \
+        if constexpr (N == 2) {                                                                            \
+            return Vector<bool, 2, false>{lhs op rhs.x, lhs op rhs.y};                                     \
+        } else if constexpr (N == 3) {                                                                     \
+            return Vector<bool, 3, false>{lhs op rhs.x, lhs op rhs.y, lhs op rhs.z};                       \
+        } else {                                                                                           \
+            return Vector<bool, 4, false>{lhs op rhs.x, lhs op rhs.y, lhs op rhs.z, lhs op rhs.w};         \
+        }                                                                                                  \
+    }                                                                                                      \
+                                                                                                           \
+    template<typename T, uint N>                                                                           \
+    constexpr auto operator op(Vector<T, N, false> lhs, T rhs) noexcept {                                  \
+        static_assert(N == 2 || N == 3 || N == 4);                                                         \
+        if constexpr (N == 2) {                                                                            \
+            return Vector<bool, 2, false>{lhs.x op rhs, lhs.y op rhs};                                     \
+        } else if constexpr (N == 3) {                                                                     \
+            return Vector<bool, 3, false>{lhs.x op rhs, lhs.y op rhs, lhs.z op rhs};                       \
+        } else {                                                                                           \
+            return Vector<bool, 4, false>{lhs.x op rhs, lhs.y op rhs, lhs.z op rhs, lhs.w op rhs};         \
+        }                                                                                                  \
+    }
 
-using uchar2 = Vector<uchar, 2, false>;
-using uchar3 = Vector<uchar, 3, false>;
-using uchar4 = Vector<uchar, 4, false>;
-using packed_uchar3 = Vector<uchar, 3, true>;
+MAKE_VECTOR_RELATIONAL_OP(==)
+MAKE_VECTOR_RELATIONAL_OP(!=)
+MAKE_VECTOR_RELATIONAL_OP(<)
+MAKE_VECTOR_RELATIONAL_OP(<=)
+MAKE_VECTOR_RELATIONAL_OP(>)
+MAKE_VECTOR_RELATIONAL_OP(>=)
 
-using short2 = Vector<short, 2, false>;
-using short3 = Vector<short, 3, false>;
-using short4 = Vector<short, 4, false>;
-using packed_short3 = Vector<short, 3, true>;
+#undef MAKE_VECTOR_RELATIONAL_OP
 
-using ushort2 = Vector<ushort, 2, false>;
-using ushort3 = Vector<ushort, 3, false>;
-using ushort4 = Vector<ushort, 4, false>;
-using packed_ushort3 = Vector<ushort, 3, true>;
+#define MAKE_VECTOR_MAKE_TYPE2(type)                                                  \
+    constexpr auto make_##type##2() noexcept { return type##2 {}; }                   \
+    constexpr auto make_##type##2(type s) noexcept { return type##2 {s}; }            \
+    constexpr auto make_##type##2(type x, type y) noexcept { return type##2 {x, y}; } \
+                                                                                      \
+    template<typename U, uint N, bool packed>                                         \
+    constexpr auto make_##type##2(Vector<U, N, packed> v) noexcept {                  \
+        static_assert(N == 2 || N == 3 || N == 4);                                    \
+        return type##2 {v.x, v.y};                                                    \
+    }
 
-using int2 = Vector<int, 2, false>;
-using int3 = Vector<int, 3, false>;
-using int4 = Vector<int, 4, false>;
-using packed_int3 = Vector<int, 3, true>;
+#define MAKE_VECTOR_MAKE_TYPE3(type)                                                                             \
+    constexpr auto make_##type##3() noexcept { return type##3 {}; }                                              \
+    constexpr auto make_##type##3(type s) noexcept { return type##3 {s}; }                                       \
+    constexpr auto make_##type##3(type x, type y, type z) noexcept { return type##3 {x, y, z}; }                 \
+    constexpr auto make_##type##3(type##2 v, type z) noexcept { return type##3 {v.x, v.y, z}; }                  \
+    constexpr auto make_##type##3(type x, type##2 v) noexcept { return type##3 {x, v.x, v.y}; }                  \
+                                                                                                                 \
+    constexpr auto make_packed_##type##3() noexcept { return packed_##type##3 {}; }                              \
+    constexpr auto make_packed_##type##3(type s) noexcept { return packed_##type##3 {s}; }                       \
+    constexpr auto make_packed_##type##3(type x, type y, type z) noexcept { return packed_##type##3 {x, y, z}; } \
+    constexpr auto make_packed_##type##3(type##2 v, type z) noexcept { return packed_##type##3 {v.x, v.y, z}; }  \
+    constexpr auto make_packed_##type##3(type x, type##2 v) noexcept { return packed_##type##3 {x, v.x, v.y}; }  \
+                                                                                                                 \
+    template<typename U, uint N, bool packed>                                                                    \
+    constexpr auto make_##type##3(Vector<U, N, packed> v) noexcept {                                             \
+        static_assert(N == 3 || N == 4);                                                                         \
+        return type##3 {v.x, v.y, v.z};                                                                          \
+    }                                                                                                            \
+                                                                                                                 \
+    template<typename U, uint N, bool packed>                                                                    \
+    constexpr auto make_packed_##type##3(Vector<U, N, packed> v) noexcept {                                      \
+        static_assert(N == 3 || N == 4);                                                                         \
+        return packed_##type##3 {v.x, v.y, v.z};                                                                 \
+    }
 
-using uint2 = Vector<uint, 2, false>;
-using uint3 = Vector<uint, 3, false>;
-using uint4 = Vector<uint, 4, false>;
-using packed_uint3 = Vector<uint, 3, true>;
+#define MAKE_VECTOR_MAKE_TYPE4(type)                                                                          \
+    constexpr auto make_##type##4() noexcept { return type##4 {}; }                                           \
+    constexpr auto make_##type##4(type s) noexcept { return type##4 {s}; }                                    \
+    constexpr auto make_##type##4(type x, type y, type z, type w) noexcept { return type##4 {x, y, z, w}; }   \
+    constexpr auto make_##type##4(type##2 v, type z, type w) noexcept { return type##4 {v.x, v.y, z, w}; }    \
+    constexpr auto make_##type##4(type x, type y, type##2 v) noexcept { return type##4 {x, y, v.x, v.y}; }    \
+    constexpr auto make_##type##4(type x, type##2 v, type w) noexcept { return type##4 {x, v.x, v.y, w}; }    \
+    constexpr auto make_##type##4(type##2 v, type##2 u) noexcept { return type##4 {v.x, v.y, u.x, u.y}; }     \
+    constexpr auto make_##type##4(type##3 v, type w) noexcept { return type##4 {v.x, v.y, v.z, w}; }          \
+    constexpr auto make_##type##4(type x, type##3 v) noexcept { return type##4 {x, v.x, v.y, v.z}; }          \
+    constexpr auto make_##type##4(packed_##type##3 v, type w) noexcept { return type##4 {v.x, v.y, v.z, w}; } \
+    constexpr auto make_##type##4(type x, packed_##type##3 v) noexcept { return type##4 {x, v.x, v.y, v.z}; } \
+    template<typename U>                                                                                      \
+    constexpr auto make_##type##4(Vector<U, 4, false> v) noexcept {                                           \
+        return type##4 {v.x, v.y, v.z, v.w};                                                                  \
+    }
 
-using float2 = Vector<float, 2, false>;
-using float3 = Vector<float, 3, false>;
-using float4 = Vector<float, 4, false>;
-using packed_float3 = Vector<float, 3, true>;
+#define MAKE_VECTOR_TYPE(type)                      \
+    using type##2 = Vector<type, 2, false>;         \
+    using type##3 = Vector<type, 3, false>;         \
+    using type##4 = Vector<type, 4, false>;         \
+    using packed_##type##3 = Vector<type, 3, true>; \
+    MAKE_VECTOR_MAKE_TYPE2(type)                    \
+    MAKE_VECTOR_MAKE_TYPE3(type)                    \
+    MAKE_VECTOR_MAKE_TYPE4(type)
 
-static_assert(sizeof(uchar2) == 2u);
-static_assert(sizeof(uchar3) == 4u);
-static_assert(sizeof(uchar4) == 4u);
-static_assert(sizeof(packed_uchar3) == 3u);
+MAKE_VECTOR_TYPE(bool)
+MAKE_VECTOR_TYPE(char)
+MAKE_VECTOR_TYPE(uchar)
+MAKE_VECTOR_TYPE(short)
+MAKE_VECTOR_TYPE(ushort)
+MAKE_VECTOR_TYPE(int)
+MAKE_VECTOR_TYPE(uint)
+MAKE_VECTOR_TYPE(float)
 
-static_assert(alignof(uchar2) == 2u);
-static_assert(alignof(uchar3) == 4u);
-static_assert(alignof(uchar4) == 4u);
-static_assert(alignof(packed_uchar3) == 1u);
+#undef MAKE_VECTOR_TYPE
+#undef MAKE_VECTOR_MAKE_TYPE2
+#undef MAKE_VECTOR_MAKE_TYPE3
+#undef MAKE_VECTOR_MAKE_TYPE4
 
-static_assert(sizeof(float) == 4ul);
-static_assert(sizeof(float2) == 8ul);
-static_assert(sizeof(float3) == 16ul);
-static_assert(sizeof(float4) == 16ul);
-static_assert(sizeof(packed_float3) == 12ul);
+// For boolN
+constexpr auto operator!(bool2 v) noexcept { return make_bool2(!v.x, !v.y); }
+constexpr auto operator!(bool3 v) noexcept { return make_bool3(!v.x, !v.y, !v.z); }
+constexpr auto operator!(bool4 v) noexcept { return make_bool4(!v.x, !v.y, !v.z, !v.w); }
+constexpr auto operator||(bool2 lhs, bool2 rhs) noexcept { return make_bool2(lhs.x || rhs.x, lhs.y || rhs.y); }
+constexpr auto operator||(bool3 lhs, bool3 rhs) noexcept { return make_bool3(lhs.x || rhs.x, lhs.y || rhs.y, lhs.z || rhs.z); }
+constexpr auto operator||(bool4 lhs, bool4 rhs) noexcept { return make_bool4(lhs.x || rhs.x, lhs.y || rhs.y, lhs.z || rhs.z, lhs.w || rhs.w); }
+constexpr auto operator&&(bool2 lhs, bool2 rhs) noexcept { return make_bool2(lhs.x && rhs.x, lhs.y && rhs.y); }
+constexpr auto operator&&(bool3 lhs, bool3 rhs) noexcept { return make_bool3(lhs.x && rhs.x, lhs.y && rhs.y, lhs.z && rhs.z); }
+constexpr auto operator&&(bool4 lhs, bool4 rhs) noexcept { return make_bool4(lhs.x && rhs.x, lhs.y && rhs.y, lhs.z && rhs.z, lhs.w && rhs.w); }
 
-static_assert(alignof(float) == 4ul);
-static_assert(alignof(float2) == 8ul);
-static_assert(alignof(float3) == 16ul);
-static_assert(alignof(float4) == 16ul);
-static_assert(alignof(packed_float3) == 4ul);
-
-static_assert(sizeof(int) == 4ul);
-static_assert(sizeof(int2) == 8ul);
-static_assert(sizeof(int3) == 16ul);
-static_assert(sizeof(int4) == 16ul);
-static_assert(sizeof(packed_int3) == 12ul);
-
-static_assert(alignof(int) == 4ul);
-static_assert(alignof(int2) == 8ul);
-static_assert(alignof(int3) == 16ul);
-static_assert(alignof(int4) == 16ul);
-static_assert(alignof(packed_int3) == 4ul);
-
-static_assert(sizeof(uint) == 4ul);
-static_assert(sizeof(uint2) == 8ul);
-static_assert(sizeof(uint3) == 16ul);
-static_assert(sizeof(uint4) == 16ul);
-static_assert(sizeof(packed_uint3) == 12ul);
-
-static_assert(alignof(uint) == 4ul);
-static_assert(alignof(uint2) == 8ul);
-static_assert(alignof(uint3) == 16ul);
-static_assert(alignof(uint4) == 16ul);
-static_assert(alignof(packed_uint3) == 4ul);
-
-constexpr float2 make_float2() noexcept { return float2{}; }
-constexpr float2 make_float2(float s) noexcept { return float2{s}; }
-constexpr float2 make_float2(float x, float y) noexcept { return float2{x, y}; }
-constexpr float2 make_float2(float3 v) noexcept { return float2{v.x, v.y}; }
-constexpr float2 make_float2(float4 v) noexcept { return float2{v.x, v.y}; }
-
-constexpr float3 make_float3() noexcept { return float3{}; }
-constexpr float3 make_float3(float s) noexcept { return float3{s}; }
-constexpr float3 make_float3(float x, float y, float z) noexcept { return float3{x, y, z}; }
-constexpr float3 make_float3(float2 v, float z) noexcept { return float3{v.x, v.y, z}; }
-constexpr float3 make_float3(float x, float2 v) noexcept { return float3{x, v.x, v.y}; }
-constexpr float3 make_float3(float4 v) noexcept { return float3{v.x, v.y, v.z}; }
-
-constexpr float4 make_float4() noexcept { return float4{}; }
-constexpr float4 make_float4(float s) noexcept { return float4{s}; }
-constexpr float4 make_float4(float x, float y, float z, float w) noexcept { return float4{x, y, z, w}; }
-constexpr float4 make_float4(float2 v, float z, float w) noexcept { return float4{v.x, v.y, z, w}; }
-constexpr float4 make_float4(float x, float y, float2 v) noexcept { return float4{x, y, v.x, v.y}; }
-constexpr float4 make_float4(float x, float2 v, float w) noexcept { return float4{x, v.x, v.y, w}; }
-constexpr float4 make_float4(float2 v, float2 u) noexcept { return float4{v.x, v.y, u.x, u.y}; }
-constexpr float4 make_float4(float3 v, float w) noexcept { return float4{v.x, v.y, v.z, w}; }
-constexpr float4 make_float4(float x, float3 v) noexcept { return float4{x, v.x, v.y, v.z}; }
-
-constexpr int2 make_int2() noexcept { return int2{}; }
-constexpr int2 make_int2(int s) noexcept { return int2{s}; }
-constexpr int2 make_int2(int x, int y) noexcept { return int2{x, y}; }
-constexpr int2 make_int2(int3 v) noexcept { return int2{v.x, v.y}; }
-constexpr int2 make_int2(int4 v) noexcept { return int2{v.x, v.y}; }
-
-constexpr int3 make_int3() noexcept { return int3{}; }
-constexpr int3 make_int3(int s) noexcept { return int3{s}; }
-constexpr int3 make_int3(int x, int y, int z) noexcept { return int3{x, y, z}; }
-constexpr int3 make_int3(int2 v, int z) noexcept { return int3{v.x, v.y, z}; }
-constexpr int3 make_int3(int x, int2 v) noexcept { return int3{x, v.x, v.y}; }
-constexpr int3 make_int3(int4 v) noexcept { return int3{v.x, v.y, v.z}; }
-
-constexpr int4 make_int4() noexcept { return int4{}; }
-constexpr int4 make_int4(int s) noexcept { return int4{s}; }
-constexpr int4 make_int4(int x, int y, int z, int w) noexcept { return int4{x, y, z, w}; }
-constexpr int4 make_int4(int2 v, int z, int w) noexcept { return int4{v.x, v.y, z, w}; }
-constexpr int4 make_int4(int x, int y, int2 v) noexcept { return int4{x, y, v.x, v.y}; }
-constexpr int4 make_int4(int x, int2 v, int w) noexcept { return int4{x, v.x, v.y, w}; }
-constexpr int4 make_int4(int2 v, int2 u) noexcept { return int4{v.x, v.y, u.x, u.y}; }
-constexpr int4 make_int4(int3 v, int w) noexcept { return int4{v.x, v.y, v.z, w}; }
-constexpr int4 make_int4(int x, int3 v) noexcept { return int4{x, v.x, v.y, v.z}; }
-
-constexpr uint2 make_uint2() noexcept { return uint2{}; }
-constexpr uint2 make_uint2(uint s) noexcept { return uint2{s}; }
-constexpr uint2 make_uint2(uint x, uint y) noexcept { return uint2{x, y}; }
-constexpr uint2 make_uint2(uint3 v) noexcept { return uint2{v.x, v.y}; }
-constexpr uint2 make_uint2(uint4 v) noexcept { return uint2{v.x, v.y}; }
-
-constexpr uint3 make_uint3() noexcept { return uint3{}; }
-constexpr uint3 make_uint3(uint s) noexcept { return uint3{s}; }
-constexpr uint3 make_uint3(uint x, uint y, uint z) noexcept { return uint3{x, y, z}; }
-constexpr uint3 make_uint3(uint2 v, uint z) noexcept { return uint3{v.x, v.y, z}; }
-constexpr uint3 make_uint3(uint x, uint2 v) noexcept { return uint3{x, v.x, v.y}; }
-constexpr uint3 make_uint3(uint4 v) noexcept { return uint3{v.x, v.y, v.z}; }
-
-constexpr uint4 make_uint4() noexcept { return uint4{}; }
-constexpr uint4 make_uint4(uint s) noexcept { return uint4{s}; }
-constexpr uint4 make_uint4(uint x, uint y, uint z, uint w) noexcept { return uint4{x, y, z, w}; }
-constexpr uint4 make_uint4(uint2 v, uint z, uint w) noexcept { return uint4{v.x, v.y, z, w}; }
-constexpr uint4 make_uint4(uint x, uint y, uint2 v) noexcept { return uint4{x, y, v.x, v.y}; }
-constexpr uint4 make_uint4(uint x, uint2 v, uint w) noexcept { return uint4{x, v.x, v.y, w}; }
-constexpr uint4 make_uint4(uint2 v, uint2 u) noexcept { return uint4{v.x, v.y, u.x, u.y}; }
-constexpr uint4 make_uint4(uint3 v, uint w) noexcept { return uint4{v.x, v.y, v.z, w}; }
-constexpr uint4 make_uint4(uint x, uint3 v) noexcept { return uint4{x, v.x, v.y, v.z}; }
-
-constexpr float2 make_float2(int2 v) noexcept { return float2{static_cast<float>(v.x), static_cast<float>(v.y)}; }
-constexpr float2 make_float2(uint2 v) noexcept { return float2{static_cast<float>(v.x), static_cast<float>(v.y)}; }
-constexpr float3 make_float3(int3 v) noexcept { return float3{static_cast<float>(v.x), static_cast<float>(v.y), static_cast<float>(v.z)}; }
-constexpr float3 make_float3(uint3 v) noexcept { return float3{static_cast<float>(v.x), static_cast<float>(v.y), static_cast<float>(v.z)}; }
-constexpr float4 make_float4(int4 v) noexcept { return float4{static_cast<float>(v.x), static_cast<float>(v.y), static_cast<float>(v.z), static_cast<float>(v.w)}; }
-constexpr float4 make_float4(uint4 v) noexcept { return float4{static_cast<float>(v.x), static_cast<float>(v.y), static_cast<float>(v.z), static_cast<float>(v.w)}; }
-constexpr float3 make_float3(packed_int3 v) noexcept { return float3{static_cast<float>(v.x), static_cast<float>(v.y), static_cast<float>(v.z)}; }
-constexpr float3 make_float3(packed_uint3 v) noexcept { return float3{static_cast<float>(v.x), static_cast<float>(v.y), static_cast<float>(v.z)}; }
-constexpr float3 make_float3(packed_float3 v) noexcept { return float3{v.x, v.y, v.z}; }
-
-constexpr int2 make_int2(float2 v) noexcept { return int2{static_cast<int>(v.x), static_cast<int>(v.y)}; }
-constexpr int2 make_int2(uint2 v) noexcept { return int2{static_cast<int>(v.x), static_cast<int>(v.y)}; }
-constexpr int3 make_int3(float3 v) noexcept { return int3{static_cast<int>(v.x), static_cast<int>(v.y), static_cast<int>(v.z)}; }
-constexpr int3 make_int3(uint3 v) noexcept { return int3{static_cast<int>(v.x), static_cast<int>(v.y), static_cast<int>(v.z)}; }
-constexpr int4 make_int4(float4 v) noexcept { return int4{static_cast<int>(v.x), static_cast<int>(v.y), static_cast<int>(v.z), static_cast<int>(v.w)}; }
-constexpr int4 make_int4(uint4 v) noexcept { return int4{static_cast<int>(v.x), static_cast<int>(v.y), static_cast<int>(v.z), static_cast<int>(v.w)}; }
-constexpr int3 make_int3(packed_int3 v) noexcept { return int3{v.x, v.y, v.z}; }
-constexpr int3 make_int3(packed_uint3 v) noexcept { return int3{static_cast<int>(v.x), static_cast<int>(v.y), static_cast<int>(v.z)}; }
-constexpr int3 make_int3(packed_float3 v) noexcept { return int3{static_cast<int>(v.x), static_cast<int>(v.y), static_cast<int>(v.z)}; }
-
-constexpr uint2 make_uint2(float2 v) noexcept { return uint2{static_cast<uint>(v.x), static_cast<uint>(v.y)}; }
-constexpr uint2 make_uint2(int2 v) noexcept { return uint2{static_cast<uint>(v.x), static_cast<uint>(v.y)}; }
-constexpr uint3 make_uint3(float3 v) noexcept { return uint3{static_cast<uint>(v.x), static_cast<uint>(v.y), static_cast<uint>(v.z)}; }
-constexpr uint3 make_uint3(int3 v) noexcept { return uint3{static_cast<uint>(v.x), static_cast<uint>(v.y), static_cast<uint>(v.z)}; }
-constexpr uint4 make_uint4(float4 v) noexcept { return uint4{static_cast<uint>(v.x), static_cast<uint>(v.y), static_cast<uint>(v.z), static_cast<uint>(v.w)}; }
-constexpr uint4 make_uint4(int4 v) noexcept { return uint4{static_cast<uint>(v.x), static_cast<uint>(v.y), static_cast<uint>(v.z), static_cast<uint>(v.w)}; }
-constexpr uint3 make_uint3(packed_int3 v) noexcept { return uint3{static_cast<uint>(v.x), static_cast<uint>(v.y), static_cast<uint>(v.z)}; }
-constexpr uint3 make_uint3(packed_uint3 v) noexcept { return uint3{v.x, v.y, v.z}; }
-constexpr uint3 make_uint3(packed_float3 v) noexcept { return uint3{static_cast<uint>(v.x), static_cast<uint>(v.y), static_cast<uint>(v.z)}; }
-
-constexpr packed_float3 make_packed_float3() noexcept { return packed_float3{}; }
-constexpr packed_float3 make_packed_float3(int3 v) noexcept { return packed_float3{static_cast<float>(v.x), static_cast<float>(v.y), static_cast<float>(v.z)}; }
-constexpr packed_float3 make_packed_float3(uint3 v) noexcept { return packed_float3{static_cast<float>(v.x), static_cast<float>(v.y), static_cast<float>(v.z)}; }
-constexpr packed_float3 make_packed_float3(float3 v) noexcept { return packed_float3{v.x, v.y, v.z}; }
-constexpr packed_float3 make_packed_float3(packed_int3 v) noexcept { return packed_float3{static_cast<float>(v.x), static_cast<float>(v.y), static_cast<float>(v.z)}; }
-constexpr packed_float3 make_packed_float3(packed_uint3 v) noexcept { return packed_float3{static_cast<float>(v.x), static_cast<float>(v.y), static_cast<float>(v.z)}; }
-
-constexpr packed_int3 make_packed_int3(int3 v) noexcept { return packed_int3{v.x, v.y, v.z}; }
-constexpr packed_int3 make_packed_int3(uint3 v) noexcept { return packed_int3{static_cast<int>(v.x), static_cast<int>(v.y), static_cast<int>(v.z)}; }
-constexpr packed_int3 make_packed_int3(float3 v) noexcept { return packed_int3{static_cast<int>(v.x), static_cast<int>(v.y), static_cast<int>(v.z)}; }
-constexpr packed_int3 make_packed_int3(packed_uint3 v) noexcept { return packed_int3{static_cast<int>(v.x), static_cast<int>(v.y), static_cast<int>(v.z)}; }
-constexpr packed_int3 make_packed_int3(packed_float3 v) noexcept { return packed_int3{static_cast<int>(v.x), static_cast<int>(v.y), static_cast<int>(v.z)}; }
-
-constexpr packed_uint3 make_packed_uint3(uint3 v) noexcept { return packed_uint3{v.x, v.y, v.z}; }
-constexpr packed_uint3 make_packed_uint3(int3 v) noexcept { return packed_uint3{static_cast<uint>(v.x), static_cast<uint>(v.y), static_cast<uint>(v.z)}; }
-constexpr packed_uint3 make_packed_uint3(float3 v) noexcept { return packed_uint3{static_cast<uint>(v.x), static_cast<uint>(v.y), static_cast<uint>(v.z)}; }
-constexpr packed_uint3 make_packed_uint3(packed_int3 v) noexcept { return packed_uint3{static_cast<uint>(v.x), static_cast<uint>(v.y), static_cast<uint>(v.z)}; }
-constexpr packed_uint3 make_packed_uint3(packed_float3 v) noexcept { return packed_uint3{static_cast<uint>(v.x), static_cast<uint>(v.y), static_cast<uint>(v.z)}; }
+constexpr bool any(bool2 v) noexcept { return v.x || v.y; }
+constexpr bool any(bool3 v) noexcept { return v.x || v.y || v.z; }
+constexpr bool any(bool4 v) noexcept { return v.x || v.y || v.z || v.w; }
+constexpr bool all(bool2 v) noexcept { return v.x && v.y; }
+constexpr bool all(bool3 v) noexcept { return v.x && v.y && v.z; }
+constexpr bool all(bool4 v) noexcept { return v.x && v.y && v.z && v.w; }
+constexpr bool none(bool2 v) noexcept { return !any(v); }
+constexpr bool none(bool3 v) noexcept { return !any(v); }
+constexpr bool none(bool4 v) noexcept { return !any(v); }
 
 }// namespace luisa

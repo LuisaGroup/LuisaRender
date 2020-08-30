@@ -11,11 +11,9 @@ using namespace luisa::compute::dsl;
 
 void CudaCodegen::emit(const Function &f) {
 
-    _os << "#define GLM_FORCE_CUDA\n"
-           "#define GLM_FORCE_CXX03\n"
-           "\n"
-           "#include <cmath>\n"
+    _os << "#include <cmath>\n"
            "#include <cstdint>\n"
+           "\n"
            "#include <math_helpers.h>\n"
            "\n"
            "using luisa::uchar;\n"
