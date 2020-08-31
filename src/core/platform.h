@@ -25,8 +25,13 @@ inline size_t memory_page_size() noexcept {
     return page_size;
 }
 
-using ::aligned_alloc;
-using ::aligned_free;
+inline void *aligned_alloc(size_t alignment, size_t size) noexcept {
+    return ::aligned_alloc(alignment, size);
+}
+
+inline void aligned_free(void *buffer) noexcept {
+    free(buffer);
+}
 
 using DynamicModuleHandle = void *;
 
