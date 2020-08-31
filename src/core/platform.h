@@ -4,11 +4,14 @@
 
 #pragma once
 
-#include "logging.h"
+#include <cstdlib>
 #include <filesystem>
+
+#include "logging.h"
 
 #if !defined(_WIN32) && (defined(__unix__) || defined(__unix) || (defined(__APPLE__) && defined(__MACH__)))
 
+#include <unistd.h>
 #include <dlfcn.h>
 
 #define LUISA_EXPORT [[gnu::visibility("default")]]
@@ -16,6 +19,17 @@
 #define LUISA_DLL_EXTENSION ".so"
 
 namespace luisa { inline namespace utility {
+
+inline size_t memory_page_size() noexcept {
+    static thread_local auto page_size = getpagesize();
+    return page_size;
+}
+
+inline std::pair<void *, size_t> page_aligned_memory_allocate(size_t size) {
+    auto page_size = memory_page_size();
+    auto rounded_size = (size + page_size - 1u) / page_size * page_size;
+    return std::make_pair(aligned_alloc(page_size, rounded_size), rounded_size);
+}
 
 using DynamicModuleHandle = void *;
 
