@@ -25,7 +25,7 @@ inline size_t memory_page_size() noexcept {
     return page_size;
 }
 
-inline std::pair<void *, size_t> page_aligned_memory_allocate(size_t size) {
+inline std::pair<void *, size_t> page_aligned_alloc(size_t size) {
     auto page_size = memory_page_size();
     auto rounded_size = (size + page_size - 1u) / page_size * page_size;
     return std::make_pair(aligned_alloc(page_size, rounded_size), rounded_size);
