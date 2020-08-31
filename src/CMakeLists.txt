@@ -3,9 +3,9 @@ target_include_directories(luisaheaders INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_features(luisaheaders INTERFACE c_std_11 cxx_std_17)
 add_library(luisa::headers ALIAS luisaheaders)
 
-find_package(spdlog CONFIG REQUIRED)
+add_subdirectory(ext/spdlog)
 add_library(spdlog_config INTERFACE)
-target_link_libraries(spdlog_config INTERFACE spdlog::spdlog spdlog::spdlog_header_only)
+target_link_libraries(spdlog_config INTERFACE spdlog::spdlog)
 
 add_library(jitify_config INTERFACE)
 target_include_directories(jitify_config INTERFACE ext)

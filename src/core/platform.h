@@ -11,8 +11,8 @@
 
 #if !defined(_WIN32) && (defined(__unix__) || defined(__unix) || (defined(__APPLE__) && defined(__MACH__)))
 
-#include <unistd.h>
 #include <dlfcn.h>
+#include <unistd.h>
 
 #define LUISA_EXPORT [[gnu::visibility("default")]]
 #define LUISA_DLL_PREFIX "lib"
@@ -86,7 +86,7 @@ inline std::string win32_last_error_message() {
 
     auto err_msg = serialize(buffer, " (code = 0x", std::hex, err_code, ").");
     LocalFree(buffer);
-    
+
     return err_msg;
 }
 
@@ -145,27 +145,41 @@ class PageAlignedMemory {
 
 public:
     inline static auto page_size = memory_page_size();
-    
+
 private:
     T *_memory;
     size_t _aligned_byte_size;
 
 public:
     explicit PageAlignedMemory(size_t size) noexcept {
-        _aligned_byte_size = (size * sizeof(T) + page_size - 1u) / page_size * page_size;
+        _aligned_byte_size = std::max((size * sizeof(T) + page_size - 1u) / page_size * page_size, page_size);
         _memory = reinterpret_cast<T *>(luisa::aligned_alloc(page_size, _aligned_byte_size));
     }
-    
+
+    PageAlignedMemory(PageAlignedMemory &&another) noexcept
+        : _memory{another._memory}, _aligned_byte_size{another._aligned_byte_size} {
+        another._memory = nullptr;
+        another._aligned_byte_size = 0ul;
+    }
+
+    PageAlignedMemory &operator=(PageAlignedMemory &&rhs) noexcept {
+        _memory = rhs._memory;
+        _aligned_byte_size = rhs._aligned_byte_size;
+        rhs._memory = nullptr;
+        rhs._aligned_byte_size = 0ul;
+        return *this;
+    }
+
     PageAlignedMemory(const PageAlignedMemory &) = delete;
-    PageAlignedMemory(PageAlignedMemory &&) noexcept = default;
     PageAlignedMemory &operator=(const PageAlignedMemory &) = delete;
-    PageAlignedMemory &operator=(PageAlignedMemory &&) noexcept = default;
-    
-    ~PageAlignedMemory() noexcept { luisa::aligned_free(_memory); }
-    
+
+    ~PageAlignedMemory() noexcept {
+        if (_memory != nullptr) { luisa::aligned_free(_memory); }
+    }
+
     [[nodiscard]] size_t aligned_byte_size() const noexcept { return _aligned_byte_size; }
     [[nodiscard]] T *data() noexcept { return _memory; }
     [[nodiscard]] const T *data() const noexcept { return _memory; }
 };
 
-}}
+}}// namespace luisa::utility
