@@ -25,12 +25,6 @@ inline size_t memory_page_size() noexcept {
     return page_size;
 }
 
-inline std::pair<void *, size_t> page_aligned_alloc(size_t size) {
-    auto page_size = memory_page_size();
-    auto rounded_size = (size + page_size - 1u) / page_size * page_size;
-    return std::make_pair(aligned_alloc(page_size, rounded_size), rounded_size);
-}
-
 using DynamicModuleHandle = void *;
 
 inline DynamicModuleHandle load_dynamic_module(const std::filesystem::path &path) {
@@ -116,3 +110,15 @@ inline auto load_dynamic_symbol(DynamicModuleHandle handle, const std::string &n
 #else
 #error Unsupported platform for DLL exporting and importing
 #endif
+
+namespace luisa {
+
+inline namespace utility {
+
+inline std::pair<void *, size_t> page_aligned_alloc(size_t size) {
+    auto page_size = memory_page_size();
+    auto rounded_size = (size + page_size - 1u) / page_size * page_size;
+    return std::make_pair(aligned_alloc(page_size, rounded_size), rounded_size);
+}
+
+}}
