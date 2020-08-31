@@ -151,8 +151,8 @@ private:
     size_t _aligned_byte_size;
 
 public:
-    explicit PageAlignedMemory(size_t size) noexcept {
-        _aligned_byte_size = std::max((size * sizeof(T) + page_size - 1u) / page_size * page_size, page_size);
+    explicit PageAlignedMemory(size_t n) noexcept {
+        _aligned_byte_size = std::max((n * sizeof(T) + page_size - 1u) / page_size * page_size, page_size);
         _memory = reinterpret_cast<T *>(luisa::aligned_alloc(page_size, _aligned_byte_size));
     }
 

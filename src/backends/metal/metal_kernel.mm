@@ -57,7 +57,7 @@ MetalKernel::MetalKernel(id<MTLComputePipelineState> handle,
 
 id<MTLBuffer> MetalKernel::_create_argument_buffer() {
     auto device = [_handle device];
-    auto buffer = [device newBufferWithLength:_argument_encoder.encodedLength options:MTLResourceOptionCPUCacheModeWriteCombined];
+    auto buffer = [device newBufferWithLength:_argument_encoder.encodedLength options:MTLResourceOptionCPUCacheModeWriteCombined | MTLResourceHazardTrackingModeUntracked];
     [_argument_encoder setArgumentBuffer:buffer offset:0];
     for (auto &&argument : _arguments) {
         std::visit([&](auto &&arg) noexcept {

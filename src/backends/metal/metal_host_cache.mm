@@ -28,10 +28,10 @@ id<MTLBuffer> MetalHostCache::get() noexcept {
         LUISA_INFO("Time spent on PageAlignedBuffer::ctor = ", (t0 - tt0) / 1ns, "ns");
         cache = [_device newBufferWithBytesNoCopy:memory.data()
                                            length:memory.aligned_byte_size()
-                                          options:MTLResourceStorageModeShared
+                                          options:MTLResourceStorageModeShared | MTLResourceHazardTrackingModeUntracked
                                       deallocator:nullptr];
         auto t1 = std::chrono::high_resolution_clock::now();
-        LUISA_INFO("Time spent on MTLDevice::newBufferWithBytes = ", (t1 - t0) / 1ns, "ns");
+        LUISA_INFO("Time spent on MTLDevice::newBufferWithBytesNoCopy = ", (t1 - t0) / 1ns, "ns");
         LUISA_INFO("Created host cache buffer #", _cache_count++, " with length ", _cache_size, " for device content synchronization.");
     }
     return cache;
