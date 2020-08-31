@@ -46,7 +46,7 @@ private:
         auto id = _next_dispatcher;
         _next_dispatcher = (_next_dispatcher + 1u) % max_command_queue_size;
         auto &&dispatcher = *_dispatchers[id];
-        dispatcher._synchronize();
+        dispatcher._wait();
         return dispatcher;
     }
 

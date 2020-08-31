@@ -22,13 +22,13 @@ protected:
 public:
     virtual ~Kernel() noexcept = default;
     
-    [[nodiscard]] auto parallelize(uint threads, uint block_size = 128u) {
+    [[nodiscard]] auto parallelize(uint threads, uint block_size = 256u) {
         return [this, threads, block_size](Dispatcher &dispatch) {
             _dispatch(dispatch, make_uint2((threads + block_size - 1u) / block_size, 1u), make_uint2(block_size, 1u));
         };
     }
     
-    [[nodiscard]] auto parallelize(uint2 threads, uint2 block_size = make_uint2(8u, 8u)) {
+    [[nodiscard]] auto parallelize(uint2 threads, uint2 block_size = make_uint2(16u, 16u)) {
         return [this, threads, block_size](Dispatcher &dispatch) {
             _dispatch(dispatch, (threads + block_size - 1u) / block_size, block_size);
         };

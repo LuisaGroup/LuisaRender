@@ -23,7 +23,10 @@ private:
 
 protected:
     void _wait() override { [_handle waitUntilCompleted]; }
-    void _schedule() override { [_handle commit]; }
+    void _commit() override {
+        [_handle addCompletedHandler:^(id<MTLCommandBuffer>) { for (auto &&callback : _callbacks) { callback(); } }];
+        [_handle commit];
+    }
 
 public:
     explicit MetalDispatcher() noexcept = default;

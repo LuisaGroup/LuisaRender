@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <type_traits>
 #include <vector>
 #include <thread>
 #include <future>
@@ -23,13 +24,9 @@ public:
 
 protected:
     std::vector<std::function<void()>> _callbacks;
-    std::future<void> _future;
     
+    virtual void _commit() = 0;
     virtual void _wait() = 0;
-    virtual void _schedule() = 0;
-    
-    virtual void _commit();
-    virtual void _synchronize();
 
 public:
     virtual ~Dispatcher() noexcept = default;
@@ -39,6 +36,12 @@ public:
     
     template<typename F, std::enable_if_t<std::is_invocable_v<F, Dispatcher &>, int> = 0>
     void operator()(F &&f) { f(*this); }
+
+    template<typename F, typename CB, std::enable_if_t<std::conjunction_v<std::is_invocable<F, Dispatcher &>, std::is_invocable<CB>>, int> = 0>
+    void operator()(F &&f, CB &&callback) {
+        f(*this);
+        when_completed(std::forward<CB>(callback));
+    }
 };
 
 }

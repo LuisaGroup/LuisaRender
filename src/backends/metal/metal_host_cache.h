@@ -17,7 +17,6 @@ class MetalHostCache : Noncopyable {
 
 private:
     id<MTLDevice> _device;
-    std::vector<PageAlignedMemory<std::byte>> _allocated_memory;
     std::vector<id<MTLBuffer>> _available_caches;
     std::mutex _cache_mutex;
     std::condition_variable _cache_cv;
