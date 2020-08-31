@@ -25,6 +25,9 @@ inline size_t memory_page_size() noexcept {
     return page_size;
 }
 
+using ::aligned_alloc;
+using ::aligned_free;
+
 using DynamicModuleHandle = void *;
 
 inline DynamicModuleHandle load_dynamic_module(const std::filesystem::path &path) {
@@ -84,6 +87,23 @@ inline std::string win32_last_error_message() {
 
 }// namespace detail
 
+inline size_t memory_page_size() noexcept {
+    static thread_local auto page_size = [] {
+        SYSTEM_INFO info;
+        GetSystemInfo(&info);
+        return info.dwPageSize;
+    }();
+    return page_size;
+}
+
+inline void *aligned_alloc(size_t alignment, size_t size) noexcept {
+    return _aligned_malloc(size, alignment);
+}
+
+inline void aligned_free(void *buffer) noexcept {
+    _aligned_free(buffer);
+}
+
 inline DynamicModuleHandle load_dynamic_module(const std::filesystem::path &path) {
     LUISA_EXCEPTION_IF_NOT(std::filesystem::exists(path), "Dynamic module not found: ", path);
     LUISA_INFO("Loading dynamic module: ", path);
@@ -115,10 +135,32 @@ namespace luisa {
 
 inline namespace utility {
 
-inline std::pair<void *, size_t> page_aligned_alloc(size_t size) {
-    auto page_size = memory_page_size();
-    auto rounded_size = (size + page_size - 1u) / page_size * page_size;
-    return std::make_pair(aligned_alloc(page_size, rounded_size), rounded_size);
-}
+template<typename T>
+class PageAlignedMemory {
+
+public:
+    inline static auto page_size = memory_page_size();
+    
+private:
+    T *_memory;
+    size_t _aligned_byte_size;
+
+public:
+    explicit PageAlignedMemory(size_t size) noexcept {
+        _aligned_byte_size = (size * sizeof(T) + page_size - 1u) / page_size * page_size;
+        _memory = reinterpret_cast<T *>(luisa::aligned_alloc(page_size, _aligned_byte_size));
+    }
+    
+    PageAlignedMemory(const PageAlignedMemory &) = delete;
+    PageAlignedMemory(PageAlignedMemory &&) noexcept = default;
+    PageAlignedMemory &operator=(const PageAlignedMemory &) = delete;
+    PageAlignedMemory &operator=(PageAlignedMemory &&) noexcept = default;
+    
+    ~PageAlignedMemory() noexcept { luisa::aligned_free(_memory); }
+    
+    [[nodiscard]] size_t aligned_byte_size() const noexcept { return _aligned_byte_size; }
+    [[nodiscard]] T *data() noexcept { return _memory; }
+    [[nodiscard]] const T *data() const noexcept { return _memory; }
+};
 
 }}

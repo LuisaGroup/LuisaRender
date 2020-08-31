@@ -38,7 +38,7 @@ void CudaCodegen::_emit_function_body(const Function &f) {
 }
 
 void CudaCodegen::_emit_function_decl(const Function &f) {
-    _os << "extern \"C\" __global__ void " << f.name() << "(const Argument &arg) ";
+    _os << "extern \"C\" __global__ void " << f.name() << "(Argument arg) ";
 }
 
 void CudaCodegen::_emit_function_call(const std::string &name) {
