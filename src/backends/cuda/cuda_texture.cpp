@@ -68,7 +68,19 @@ void CudaTexture::_copy_from(Dispatcher &dispatcher, const void *data) {
 
 void CudaTexture::_copy_to(Dispatcher &dispatcher, void *data) {
     auto stream = dynamic_cast<CudaDispatcher &>(dispatcher).handle();
-    CUDA_CHECK(cuMemcpyAtoHAsync(data, _array_handle, 0, byte_size(), stream));
+    CUDA_MEMCPY2D memcpy_desc{};
+    memcpy_desc.srcMemoryType = CU_MEMORYTYPE_ARRAY;
+    memcpy_desc.srcArray = _array_handle;
+    memcpy_desc.srcXInBytes = 0;
+    memcpy_desc.srcY = 0;
+    memcpy_desc.dstMemoryType = CU_MEMORYTYPE_HOST;
+    memcpy_desc.dstHost = data;
+    memcpy_desc.dstXInBytes = 0;
+    memcpy_desc.dstY = 0;
+    memcpy_desc.dstPitch = pitch_byte_size();
+    memcpy_desc.WidthInBytes = pitch_byte_size();
+    memcpy_desc.Height = height();
+    CUDA_CHECK(cuMemcpy2DAsync(&memcpy_desc, stream));
 }
 
 }// namespace luisa::cuda
