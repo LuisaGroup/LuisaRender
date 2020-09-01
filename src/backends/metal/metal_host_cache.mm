@@ -7,38 +7,33 @@
 
 namespace luisa::metal {
 
-MetalHostCache::MetalHostCache(id<MTLDevice> device, size_t size, size_t count) noexcept
-    : _device{device}, _cache_size{size}, _max_count{count} {
-    _available_caches.resize(count, nullptr);
-}
+MetalHostCache::MetalHostCache(id<MTLDevice> device, size_t size) noexcept
+    : _device{device}, _cache_size{size} {}
 
 id<MTLBuffer> MetalHostCache::obtain() noexcept {
-    std::unique_lock lock{_cache_mutex};
-    _cache_cv.wait(lock, [this] { return !_available_caches.empty(); });
-    id<MTLBuffer> cache = _available_caches.back();
-    _available_caches.pop_back();
-    lock.unlock();
-    if (cache == nullptr) {
-        using namespace std::chrono_literals;
+    std::lock_guard lock{_cache_mutex};
+    id<MTLBuffer> cache = nullptr;
+    if (_available_caches.empty()) {
         cache = [_device newBufferWithLength:_cache_size options:MTLResourceStorageModeShared | MTLResourceHazardTrackingModeUntracked];
-        LUISA_INFO("Created host cache buffer #", _cache_count++, " with length ", _cache_size, " for device content synchronization.");
+        LUISA_INFO("Created host cache buffer #", _allocated_caches.size(), " with length ", _cache_size, " for device content synchronization.");
+        _allocated_caches.emplace(cache);
+    } else {
+        cache = _available_caches.back();
+        _available_caches.pop_back();
     }
     return cache;
 }
 
 void MetalHostCache::recycle(id<MTLBuffer> cache) noexcept {
-    {
-        std::lock_guard lock{_cache_mutex};
-        _available_caches.emplace_back(cache);
-    }
-    _cache_cv.notify_one();
+    std::lock_guard lock{_cache_mutex};
+    LUISA_EXCEPTION_IF(_allocated_caches.find(cache) == _allocated_caches.cend(), "Recycled cache is not allocated by MetalHostCache.");
+    _available_caches.emplace_back(cache);
 }
 
 void MetalHostCache::clear() noexcept {
     std::unique_lock lock{_cache_mutex};
-    _cache_cv.wait(lock, [this] { return _available_caches.size() == _max_count; });
     _available_caches.clear();
-    _available_caches.resize(_max_count, nullptr);
+    _allocated_caches.clear();
 }
 
 }

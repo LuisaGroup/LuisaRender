@@ -27,8 +27,8 @@ protected:
     void _copy_to(Dispatcher &dispatcher, void *data) override;
 
 public:
-    MetalTexture(id<MTLTexture> handle, uint32_t width, uint32_t height, compute::PixelFormat format, size_t max_caches) noexcept
-        : Texture{width, height, format, max_caches}, _handle{handle}, _cache{[handle device], byte_size(), max_caches} {}
+    MetalTexture(id<MTLTexture> handle, uint32_t width, uint32_t height, compute::PixelFormat format) noexcept
+        : Texture{width, height, format}, _handle{handle}, _cache{[handle device], byte_size()} {}
     
     [[nodiscard]] id<MTLTexture> handle() const noexcept { return _handle; }
     void clear_cache() override;

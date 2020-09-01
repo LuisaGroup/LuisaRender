@@ -60,7 +60,6 @@ protected:
     uint32_t _width;
     uint32_t _height;
     PixelFormat _format;
-    size_t _max_caches;
     
     virtual void _copy_from(Dispatcher &dispatcher, Buffer *buffer, size_t offset) = 0;
     virtual void _copy_to(Dispatcher &dispatcher, Buffer *buffer, size_t offset) = 0;
@@ -69,8 +68,8 @@ protected:
     virtual void _copy_to(Dispatcher &dispatcher, void *data) = 0;
 
 public:
-    Texture(uint32_t width, uint32_t height, PixelFormat format, size_t max_caches) noexcept
-        : _width{width}, _height{height}, _format{format}, _max_caches{max_caches} {}
+    Texture(uint32_t width, uint32_t height, PixelFormat format) noexcept
+        : _width{width}, _height{height}, _format{format} {}
     virtual ~Texture() noexcept = default;
     [[nodiscard]] uint32_t width() const noexcept { return _width; }
     [[nodiscard]] uint32_t height() const noexcept { return _height; }

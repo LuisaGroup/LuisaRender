@@ -14,7 +14,7 @@ void *CudaHostCache::obtain() noexcept {
     void *cache = nullptr;
     if (_available_caches.empty()) {
         CUDA_CHECK(cuMemHostAlloc(&cache, _size, 0));
-        LUISA_INFO("Created host cache buffer #", _count++, " with length ", _size, " for device content synchronization.");
+        LUISA_INFO("Created host cache buffer #", _allocated_caches.size(), " with length ", _size, " for device content synchronization.");
         _allocated_caches.emplace(cache);
     } else {
         cache = _available_caches.back();
@@ -33,6 +33,7 @@ void CudaHostCache::recycle(void *cache) noexcept {
 }
 
 void CudaHostCache::clear() noexcept {
+    std::lock_guard lock{_mutex};
     for (auto p : _allocated_caches) { CUDA_CHECK(cuMemFreeHost(p)); }
     _allocated_caches.clear();
     _available_caches.clear();

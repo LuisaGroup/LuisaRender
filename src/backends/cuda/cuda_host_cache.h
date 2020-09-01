@@ -19,7 +19,6 @@ private:
     std::set<void *> _allocated_caches;
     std::vector<void *> _available_caches;
     std::mutex _mutex;
-    size_t _count{0u};
     size_t _size;
 
 public:
