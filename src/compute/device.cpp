@@ -6,9 +6,9 @@
 
 namespace luisa::compute {
 
-std::unique_ptr<Device> Device::create(Context *context, std::string_view name) {
+std::unique_ptr<Device> Device::create(Context *context, std::string_view name, uint32_t device_id) {
     auto create_device = context->load_dynamic_function<DeviceCreator>(context->runtime_path("bin") / "backends", name, "create");
-    return std::unique_ptr<Device>{create_device(context)};
+    return std::unique_ptr<Device>{create_device(context, device_id)};
 }
 
 }

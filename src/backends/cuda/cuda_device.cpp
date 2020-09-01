@@ -101,7 +101,7 @@ protected:
     }
 
 public:
-    explicit CudaDevice(Context *context);
+    explicit CudaDevice(Context *context, uint32_t device_id);
     ~CudaDevice() noexcept override = default;
 
     void synchronize() override;
@@ -110,7 +110,7 @@ public:
 void CudaDevice::synchronize() {
 }
 
-CudaDevice::CudaDevice(Context *context) : Device{context} {
+CudaDevice::CudaDevice(Context *context, uint32_t device_id) : Device{context} {
 
     static std::once_flag flag;
     std::call_once(flag, cuInit, 0);

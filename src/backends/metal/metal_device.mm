@@ -57,20 +57,19 @@ protected:
     void _launch(const std::function<void(Dispatcher &)> &dispatch) override;
 
 public:
-    explicit MetalDevice(Context *context);
+    explicit MetalDevice(Context *context, uint32_t device_id);
     ~MetalDevice() noexcept override = default;
     void synchronize() override;
 };
 
-MetalDevice::MetalDevice(Context *context) : Device{context} {
-//    auto devices = MTLCopyAllDevices();
-//    for (id<MTLDevice> device in devices) {
-//        if (device.isLowPower) {
-//            _handle = device;
-//            break;
-//        }
-//    }
-    _handle = MTLCreateSystemDefaultDevice();
+MetalDevice::MetalDevice(Context *context, uint32_t device_id) : Device{context} {
+    auto devices = MTLCopyAllDevices();
+    for (id<MTLDevice> device in devices) {
+        if (device.isLowPower) {
+            _handle = device;
+            break;
+        }
+    }
     _command_queue = [_handle newCommandQueue];
     _dispatchers.reserve(max_command_queue_size);
     for (auto i = 0u; i < max_command_queue_size; i++) {
