@@ -27,6 +27,7 @@ class CudaDevice : public Device {
 
 private:
     CUdevice _handle{};
+    CUcontext _ctx{};
     uint _compute_capability{};
 
 protected:
@@ -102,12 +103,13 @@ protected:
 
 public:
     explicit CudaDevice(Context *context, uint32_t device_id);
-    ~CudaDevice() noexcept override = default;
+    ~CudaDevice() noexcept override;
 
     void synchronize() override;
 };
 
 void CudaDevice::synchronize() {
+    cuCtxSynchronize();
 }
 
 CudaDevice::CudaDevice(Context *context, uint32_t device_id) : Device{context} {
@@ -117,25 +119,27 @@ CudaDevice::CudaDevice(Context *context, uint32_t device_id) : Device{context} {
 
     int count = 0;
     cuDeviceGetCount(&count);
-    for (auto i = 0; i < count; i++) {
-        cuDeviceGet(&_handle, i);
-        char buffer[1024];
-        cuDeviceGetName(buffer, 1024, _handle);
-        auto major = 0;
-        auto minor = 0;
-        cuDeviceGetAttribute(&major, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, _handle);
-        cuDeviceGetAttribute(&minor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, _handle);
-        cuDeviceGetAttribute(&minor, CUdevice_attribute::CU_DEVICE_ATTRIBUTE_MAX, _handle);
-        _compute_capability = static_cast<uint>(major * 10 + minor);
-        LUISA_INFO("CUDA Device #", i, "(sm", _compute_capability, "): ", buffer);
-    }
-
-    int major = 0;
-    int minor = 0;
+    LUISA_ERROR_IF_NOT(device_id < count, "Invalid CUDA device index ", device_id, ": max available index is ", count - 1, ".");
+    
+    cuDeviceGet(&_handle, device_id);
+    cuDevicePrimaryCtxRetain(&_ctx, _handle);
+    
+    char buffer[1024];
+    cuDeviceGetName(buffer, 1024, _handle);
+    auto major = 0;
+    auto minor = 0;
+    cuDeviceGetAttribute(&major, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, _handle);
+    cuDeviceGetAttribute(&minor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, _handle);
+    _compute_capability = static_cast<uint>(major * 10 + minor);
+    LUISA_INFO("Created CUDA device #", device_id, ", description: name = ", buffer, ", arch = sm_", _compute_capability, ".");
+    
     nvrtcVersion(&major, &minor);
-    LUISA_INFO("NVRTC Version: ", major, ".", minor);
-    auto path = std::filesystem::canonical(getenv("OptiX_INSTALL_DIR"));
-    LUISA_INFO("OptiX include directory: ", path);
+    LUISA_INFO("NVRTC version: ", major, ".", minor);
+}
+
+CudaDevice::~CudaDevice() noexcept {
+    cuCtxSynchronize();
+    cuDevicePrimaryCtxRelease(_handle);
 }
 
 }// namespace luisa::cuda
