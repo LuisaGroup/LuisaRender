@@ -2,8 +2,8 @@
 // Created by Mike on 8/30/2020.
 //
 
-#include "check.h"
 #include "cuda_buffer.h"
+#include "cuda_check.h"
 #include "cuda_dispatcher.h"
 
 namespace luisa::cuda {

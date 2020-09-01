@@ -24,7 +24,11 @@ private:
 
 public:
     CudaHostCache(size_t size, size_t max_count) noexcept;
-    ~CudaHostCache() noexcept { clear(); }
+    ~CudaHostCache() noexcept {
+        LUISA_INFO("CudaHostCache: ", 0);
+        clear();
+        LUISA_INFO("CudaHostCache: ", 1);
+    }
     
     [[nodiscard]] void *obtain() noexcept;
     void recycle(void *cache) noexcept;

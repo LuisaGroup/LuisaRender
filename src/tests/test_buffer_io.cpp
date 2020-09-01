@@ -10,9 +10,9 @@ using namespace luisa::compute::dsl;
 int main(int argc, char *argv[]) {
     
     Context context{argc, argv};
-    auto device = Device::create(&context, "metal");
+    auto device = Device::create(&context, "cuda");
     
-    constexpr auto buffer_size = 1280u * 720u;
+    constexpr auto buffer_size = 1024u;
     
     auto buffer_a = device->allocate_buffer<float>(buffer_size, 4);
     auto buffer_b = device->allocate_buffer<float>(buffer_size, 4);
@@ -42,11 +42,13 @@ int main(int argc, char *argv[]) {
         };
     });
     
+    auto launch_index = 0u;
+    
     for (auto i = 0; i < 20; i++) {
         device->launch([&](Dispatcher &dispatch) {
             scale = 3.0f;
             dispatch(buffer_a.copy_from(input_copy.data()));
-            dispatch(kernel->parallelize(buffer_size));
+            dispatch(kernel->parallelize(buffer_size), [&] { LUISA_INFO("Kernel #", launch_index++, " finished."); });
         });
     }
     
@@ -54,7 +56,7 @@ int main(int argc, char *argv[]) {
     device->launch([&](Dispatcher &d) {
         scale = 2.0f;
         d(buffer_a.copy_from(input.data()));
-        d(kernel->parallelize(buffer_size));
+        d(kernel->parallelize(buffer_size), [&] { LUISA_INFO("Kernel #", launch_index++, " finished."); });
         d(buffer_b.copy_to(output.data()));
     });
     
@@ -62,7 +64,7 @@ int main(int argc, char *argv[]) {
         device->launch([&](Dispatcher &d) {
             scale = 3.0f;
             d(buffer_a.copy_from(input_copy.data()));
-            d(kernel->parallelize(buffer_size));
+            d(kernel->parallelize(buffer_size), [&] { LUISA_INFO("Kernel #", launch_index++, " finished."); });
         });
     }
     
@@ -71,7 +73,7 @@ int main(int argc, char *argv[]) {
     LUISA_INFO("Done.");
     for (auto i = 0; i < buffer_size; i++) {
         if (output[i] != input[i] * 2.0f) {
-            LUISA_WARNING("Fuck!");
+            LUISA_WARNING("Fuck! Expected ", input[i] * 2.0f, ", got ", output[i]);
         }
     }
 }

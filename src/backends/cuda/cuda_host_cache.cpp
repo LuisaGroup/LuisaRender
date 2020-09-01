@@ -4,7 +4,7 @@
 
 #include <core/platform.h>
 
-#include "check.h"
+#include "cuda_check.h"
 #include "cuda_host_cache.h"
 
 namespace luisa::cuda {
@@ -15,7 +15,7 @@ void *CudaHostCache::obtain() noexcept {
     auto cache = _available_caches.back();
     lock.unlock();
     if (cache == nullptr) {
-        CUDA_CHECK(cuMemAllocHost(&cache, _size));
+        CUDA_CHECK(cuMemHostAlloc(&cache, _size, 0));
         LUISA_INFO("Created host cache buffer #", _count++, " with length ", _size, " for device content synchronization.");
     }
     return cache;

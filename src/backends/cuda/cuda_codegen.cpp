@@ -25,7 +25,6 @@ void CudaCodegen::emit(const Function &f) {
 }
 
 void CudaCodegen::_emit_function_body(const Function &f) {
-
     for (auto &&v : f.builtin_variables()) {
         _emit_indent();
         if (v.is_thread_id()) {
@@ -38,7 +37,7 @@ void CudaCodegen::_emit_function_body(const Function &f) {
 }
 
 void CudaCodegen::_emit_function_decl(const Function &f) {
-    _os << "extern \"C\" __global__ void " << f.name() << "(Argument arg) ";
+    _os << "extern \"C\" __global__ void " << f.name() << "(const Argument arg) ";
 }
 
 void CudaCodegen::_emit_function_call(const std::string &name) {

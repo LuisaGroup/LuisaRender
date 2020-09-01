@@ -4,8 +4,8 @@
 
 #pragma
 
-#include <compute/dispatcher.h>
 #include <cuda.h>
+#include <compute/dispatcher.h>
 
 namespace luisa::cuda {
 
@@ -14,46 +14,28 @@ using luisa::compute::Dispatcher;
 class CudaDispatcher : public Dispatcher {
 
 private:
-    CUstream _handle;
-    bool _finished{false};
-    std::mutex _mutex;
-    std::condition_variable _cv;
+    CUstream _handle{nullptr};
+    CUevent _event{nullptr};
 
-    void _wait() noexcept {
-        std::unique_lock lock{_mutex};
-        _cv.wait(lock, [this] { return _finished; });
-    }
-
-    void _notify() noexcept {
-        {
-            std::lock_guard lock{_mutex};
-            _finished = true;
-        }
-        _cv.notify_one();
-    }
+    void _wait() noexcept { CUDA_CHECK(cuEventSynchronize(_event)); }
 
 public:
-    explicit CudaDispatcher(CUstream handle) noexcept : _handle{handle} {}
-    ~CudaDispatcher() noexcept override { _wait(); }
-
-    void reset() noexcept {
-        _callbacks.clear();
-        _finished = false;
+    explicit CudaDispatcher(CUstream handle) noexcept : _handle{handle} {
+        CUDA_CHECK(cuEventCreate(&_event, CU_EVENT_DISABLE_TIMING));
     }
+
+    ~CudaDispatcher() noexcept override { CUDA_CHECK(cuEventDestroy(_event)); }
 
     [[nodiscard]] CUstream handle() const noexcept { return _handle; }
 
     void commit() noexcept override {
-        CUDA_CHECK(cuLaunchHostFunc(
-            _handle, [](void *self) {
-                auto dispatcher = reinterpret_cast<CudaDispatcher *>(self);
-                for (auto &&cb : dispatcher->_callbacks) { cb(); }
-                dispatcher->_notify();
-            },
-            this));
+        CUDA_CHECK(cuEventRecord(_event, _handle));
     }
 
-    void wait() override { _wait(); }
+    void wait() override {
+        _wait();
+        for (auto &&cb : _callbacks) { cb(); }
+    }
 };
 
 }// namespace luisa::cuda
