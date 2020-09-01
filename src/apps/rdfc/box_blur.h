@@ -49,7 +49,7 @@ public:
                         Auto y = p.y() + dy;
                         if (rx != 0) { x = select(x < 0, -x, select(x < width, x, 2 * width - 1 - x)); }
                         if (ry != 0) { y = select(y < 0, -y, select(y < height, y, 2 * height - 1 - y)); }
-                        sum += make_float3(read(in, make_uint2(x, y)));
+                        sum = sum + make_float3(read(in, make_uint2(x, y)));
                     }
                 }
                 auto support = (2 * rx + 1) * (2 * ry + 1);

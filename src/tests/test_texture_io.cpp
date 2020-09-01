@@ -40,9 +40,9 @@ int main(int argc, char *argv[]) {
     
     device->launch([&](Dispatcher &d) {
         d(kernel->parallelize(make_uint2(width, height)));
-//        d(texture->copy_to(buffer));
-        d(texture->copy_to(image.data));
-//        d(buffer.copy_to(image.data));
+        d(texture->copy_to(buffer));
+//        d(texture->copy_to(image.data));
+        d(buffer.copy_to(image.data));
     });
     device->synchronize();
     

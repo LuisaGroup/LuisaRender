@@ -9,7 +9,9 @@
 
 namespace luisa {
 
-namespace vec::detail {
+inline namespace vec {
+
+namespace detail {
 
 template<typename T, uint32_t N, bool is_packed>
 constexpr auto vector_alignment = is_packed ? sizeof(T) : (sizeof(T) * (N + (N & 1u)));
@@ -41,10 +43,12 @@ struct VectorStorage<T, 4> {
     constexpr VectorStorage(T x, T y, T z, T w) noexcept : x{x}, y{y}, z{z}, w{w} {}
 };
 
-}// namespace vec::detail
+}// namespace detail
 
 template<typename T, uint32_t N, bool is_packed>
 struct alignas(vec::detail::vector_alignment<T, N, is_packed>) Vector : vec::detail::VectorStorage<T, N> {
+
+    using Storage = vec::detail::VectorStorage<T, N>;
 
     constexpr Vector() noexcept : vec::detail::VectorStorage<T, N>{static_cast<T>(0)} {}
 
@@ -61,6 +65,51 @@ struct alignas(vec::detail::vector_alignment<T, N, is_packed>) Vector : vec::det
 
     template<typename Index>
     [[nodiscard]] T operator[](Index i) const noexcept { return reinterpret_cast<const T(&)[N]>(*this)[i]; }
+
+#define MAKE_ASSIGN_OP(op)                         \
+    template<typename U>                           \
+    Vector &operator op(U rhs) noexcept {          \
+        static_assert(N == 2 || N == 3 || N == 4); \
+        if constexpr (N == 2) {                    \
+            Storage::x op rhs.x;                   \
+            Storage::y op rhs.y;                   \
+        } else if constexpr (N == 3) {             \
+            Storage::x op rhs.x;                   \
+            Storage::y op rhs.y;                   \
+            Storage::z op rhs.z;                   \
+        } else {                                   \
+            Storage::x op rhs.x;                   \
+            Storage::y op rhs.y;                   \
+            Storage::z op rhs.z;                   \
+            Storage::w op rhs.w;                   \
+        }                                          \
+        return *this;                              \
+    }                                              \
+    Vector &operator op(T rhs) noexcept {          \
+        static_assert(N == 2 || N == 3 || N == 4); \
+        if constexpr (N == 2) {                    \
+            Storage::x op rhs;                     \
+            Storage::y op rhs;                     \
+        } else if constexpr (N == 3) {             \
+            Storage::x op rhs;                     \
+            Storage::y op rhs;                     \
+            Storage::z op rhs;                     \
+        } else {                                   \
+            Storage::x op rhs;                     \
+            Storage::y op rhs;                     \
+            Storage::z op rhs;                     \
+            Storage::w op rhs;                     \
+        }                                          \
+        return *this;                              \
+    }
+
+    MAKE_ASSIGN_OP(+=)
+    MAKE_ASSIGN_OP(-=)
+    MAKE_ASSIGN_OP(*=)
+    MAKE_ASSIGN_OP(/=)
+    MAKE_ASSIGN_OP(%=)
+
+#undef MAKE_ASSIGN_OP
 };
 
 #define MAKE_VECTOR_BINARY_OP(op)                                                                          \
@@ -251,4 +300,4 @@ constexpr bool none(bool2 v) noexcept { return !any(v); }
 constexpr bool none(bool3 v) noexcept { return !any(v); }
 constexpr bool none(bool4 v) noexcept { return !any(v); }
 
-}// namespace luisa
+}}// namespace luisa::vec

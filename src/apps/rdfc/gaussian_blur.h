@@ -57,7 +57,7 @@ public:
                         if (rx != 0) { x = select(x < 0, -x, select(x < width, x, 2 * width - 1 - x)); }
                         if (ry != 0) { y = select(y < 0, -y, select(y < height, y, 2 * height - 1 - y)); }
                         auto weight = std::exp(-static_cast<float>(dx * dx + dy * dy) / (2.0f * (sigma_x * sigma_x + sigma_y * sigma_y)));
-                        sum += make_float4(weight * make_float3(read(in, make_uint2(x, y))), weight);
+                        sum = sum + make_float4(weight * make_float3(read(in, make_uint2(x, y))), weight);
                     }
                 }
                 write(out, thread_xy(), make_float4(make_float3(sum) / sum.w(), 1.0f));

@@ -68,6 +68,8 @@ ArgumentEncoder::ArgumentEncoder(const std::vector<Variable> &arguments) : _alig
             reinterpret_cast<CUtexObject *>(bytes.data())[0] = texture;
             reinterpret_cast<CUsurfObject *>(bytes.data())[1] = surface;
             _immutable_arguments.emplace_back(std::move(bytes), align_offset(alignment));
+            LUISA_INFO("Texture offset: ", offset);
+            offset += size;
         } else if (arg.is_immutable_argument()) {
             auto alignment = arg.type()->alignment;
             _immutable_arguments.emplace_back(arg.immutable_data(), align_offset(alignment));

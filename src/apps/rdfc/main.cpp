@@ -15,7 +15,7 @@ using namespace luisa::compute::dsl;
 int main(int argc, char *argv[]) {
     
     Context context{argc, argv};
-    auto device = Device::create(&context, "metal");
+    auto device = Device::create(&context, "cuda");
     
     {  // playground
         auto image = cv::imread("data/images/luisa.png", cv::IMREAD_COLOR);
@@ -28,6 +28,7 @@ int main(int argc, char *argv[]) {
         device->synchronize();
         cv::cvtColor(image, image, cv::COLOR_RGBA2BGR);
         cv::imwrite("data/images/luisa-gaussian-blur.png", image);
+        exit(0);
     }
     
     auto feature_name = "albedo";
