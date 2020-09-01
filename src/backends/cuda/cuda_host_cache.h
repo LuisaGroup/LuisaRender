@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <set>
 #include <vector>
 #include <mutex>
 #include <condition_variable>
@@ -15,20 +16,15 @@ namespace luisa::cuda {
 class CudaHostCache {
 
 private:
+    std::set<void *> _allocated_caches;
     std::vector<void *> _available_caches;
     std::mutex _mutex;
-    std::condition_variable _cv;
     size_t _count{0u};
     size_t _size;
-    size_t _max_count;
 
 public:
-    CudaHostCache(size_t size, size_t max_count) noexcept;
-    ~CudaHostCache() noexcept {
-        LUISA_INFO("CudaHostCache: ", 0);
-        clear();
-        LUISA_INFO("CudaHostCache: ", 1);
-    }
+    explicit CudaHostCache(size_t size) noexcept;
+    ~CudaHostCache() noexcept { clear(); }
     
     [[nodiscard]] void *obtain() noexcept;
     void recycle(void *cache) noexcept;

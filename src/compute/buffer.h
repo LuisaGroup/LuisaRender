@@ -24,11 +24,10 @@ public:
 
 protected:
     size_t _size;
-    size_t _max_host_cache_count;
 
 public:
-    explicit Buffer(size_t size, size_t max_host_cache_count) noexcept
-        : _size{size}, _max_host_cache_count{max_host_cache_count} {}
+    explicit Buffer(size_t size) noexcept
+        : _size{size} {}
     virtual ~Buffer() noexcept = default;
     
     [[nodiscard]] size_t size() const noexcept { return _size; }

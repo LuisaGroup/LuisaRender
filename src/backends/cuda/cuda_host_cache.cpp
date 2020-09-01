@@ -10,38 +10,32 @@
 namespace luisa::cuda {
 
 void *CudaHostCache::obtain() noexcept {
-    std::unique_lock lock{_mutex};
-    _cv.wait(lock, [this] { return !_available_caches.empty(); });
-    auto cache = _available_caches.back();
-    lock.unlock();
-    if (cache == nullptr) {
+    std::lock_guard lock{_mutex};
+    void *cache = nullptr;
+    if (_available_caches.empty()) {
         CUDA_CHECK(cuMemHostAlloc(&cache, _size, 0));
         LUISA_INFO("Created host cache buffer #", _count++, " with length ", _size, " for device content synchronization.");
+        _allocated_caches.emplace(cache);
+    } else {
+        cache = _available_caches.back();
+        _available_caches.pop_back();
     }
     return cache;
 }
 
-CudaHostCache::CudaHostCache(size_t size, size_t max_count) noexcept
-    : _size{size}, _max_count{max_count} {
-    _available_caches.resize(max_count, nullptr);
-}
+CudaHostCache::CudaHostCache(size_t size) noexcept
+    : _size{size} {}
 
 void CudaHostCache::recycle(void *cache) noexcept {
-    {
-        std::lock_guard lock{_mutex};
-        _available_caches.emplace_back(cache);
-    }
-    _cv.notify_one();
+    std::lock_guard lock{_mutex};
+    LUISA_EXCEPTION_IF(_allocated_caches.find(cache) == _allocated_caches.end(), "Recycled cache is not allocated by CudaHostCache.");
+    _available_caches.emplace_back(cache);
 }
 
 void CudaHostCache::clear() noexcept {
-    std::unique_lock lock{_mutex};
-    _cv.wait(lock, [this] { return _available_caches.size() == _max_count; });
-    for (auto p : _available_caches) {
-        if (p != nullptr) { CUDA_CHECK(cuMemFreeHost(p)); }
-    }
+    for (auto p : _allocated_caches) { CUDA_CHECK(cuMemFreeHost(p)); }
+    _allocated_caches.clear();
     _available_caches.clear();
-    _available_caches.resize(_max_count, nullptr);
 }
 
 }// namespace luisa::cuda

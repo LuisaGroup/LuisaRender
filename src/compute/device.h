@@ -19,8 +19,8 @@ class Device : Noncopyable {
 protected:
     Context *_context{nullptr};
 
-    [[nodiscard]] virtual std::shared_ptr<Buffer> _allocate_buffer(size_t size, size_t max_host_caches) = 0;
-    [[nodiscard]] virtual std::unique_ptr<Texture> _allocate_texture(uint32_t width, uint32_t height, PixelFormat format, size_t max_caches) = 0;
+    [[nodiscard]] virtual std::shared_ptr<Buffer> _allocate_buffer(size_t size) = 0;
+    [[nodiscard]] virtual std::unique_ptr<Texture> _allocate_texture(uint32_t width, uint32_t height, PixelFormat format) = 0;
     [[nodiscard]] virtual std::unique_ptr<Kernel> _compile_kernel(const dsl::Function &function) = 0;
 
     virtual void _launch(const std::function<void(Dispatcher &)> &dispatch) = 0;
@@ -44,17 +44,17 @@ public:
     }
 
     template<typename T>
-    [[nodiscard]] BufferView<T> allocate_buffer(size_t size, size_t max_host_cache_count = 8) {
-        return _allocate_buffer(size * sizeof(T), max_host_cache_count)->view<T>();
+    [[nodiscard]] BufferView<T> allocate_buffer(size_t size) {
+        return _allocate_buffer(size * sizeof(T))->view<T>();
     }
 
     template<typename T>
-    [[nodiscard]] std::unique_ptr<Texture> allocate_texture(uint32_t width, uint32_t height, size_t max_caches = 2) {
-        return allocate_texture(width, height, pixel_format<T>, max_caches);
+    [[nodiscard]] std::unique_ptr<Texture> allocate_texture(uint32_t width, uint32_t height) {
+        return allocate_texture(width, height, pixel_format<T>);
     }
 
-    [[nodiscard]] std::unique_ptr<Texture> allocate_texture(uint32_t width, uint32_t height, PixelFormat format, size_t max_caches = 2) {
-        return _allocate_texture(width, height, format, max_caches);
+    [[nodiscard]] std::unique_ptr<Texture> allocate_texture(uint32_t width, uint32_t height, PixelFormat format) {
+        return _allocate_texture(width, height, format);
     }
 
     template<typename Work, std::enable_if_t<std::is_invocable_v<Work, Dispatcher &>, int> = 0>

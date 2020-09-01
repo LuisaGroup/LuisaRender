@@ -28,12 +28,13 @@ using luisa::compute::Texture;
 class CudaDevice : public Device {
 
 public:
-    static constexpr auto max_command_queue_size = 1u;
+    static constexpr auto max_command_queue_size = 16u;
 
 private:
     CUdevice _handle{};
     CUcontext _ctx{};
     CUstream _stream{};
+    CUevent _sync_event{};
     std::vector<CUmodule> _modules;
     std::map<SHA1::Digest, CUfunction> _kernel_cache;
     
@@ -41,15 +42,14 @@ private:
     std::condition_variable _dispatch_cv;
     std::queue<std::unique_ptr<CudaDispatcher>> _dispatch_queue;
     std::thread _dispatch_thread;
-    std::condition_variable _complete_cv;
     std::atomic<bool> _stop_signal{false};
 
     uint32_t _compute_capability{};
 
 protected:
-    std::shared_ptr<Buffer> _allocate_buffer(size_t size, size_t max_host_caches) override;
+    std::shared_ptr<Buffer> _allocate_buffer(size_t size) override;
 
-    std::unique_ptr<Texture> _allocate_texture(uint32_t width, uint32_t height, compute::PixelFormat format, size_t max_caches) override {
+    std::unique_ptr<Texture> _allocate_texture(uint32_t width, uint32_t height, compute::PixelFormat format) override {
         LUISA_EXCEPTION("Not implemented!");
     }
 
@@ -64,8 +64,8 @@ public:
 };
 
 void CudaDevice::synchronize() {
-    std::unique_lock lock{_dispatch_mutex};
-    _complete_cv.wait(lock, [this] { return _dispatch_queue.empty(); });
+    CUDA_CHECK(cuEventRecord(_sync_event, _stream));
+    CUDA_CHECK(cuEventSynchronize(_sync_event));
 }
 
 CudaDevice::CudaDevice(Context *context, uint32_t device_id) : Device{context} {
@@ -90,6 +90,7 @@ CudaDevice::CudaDevice(Context *context, uint32_t device_id) : Device{context} {
     LUISA_INFO("Created CUDA device #", device_id, ", description: name = ", buffer, ", arch = sm_", _compute_capability, ".");
 
     CUDA_CHECK(cuStreamCreate(&_stream, 0));
+    CUDA_CHECK(cuEventCreate(&_sync_event, CU_EVENT_BLOCKING_SYNC | CU_EVENT_DISABLE_TIMING));
     
     _dispatch_thread = std::thread{[this, device_id] {
         
@@ -105,8 +106,6 @@ CudaDevice::CudaDevice(Context *context, uint32_t device_id) : Device{context} {
                 auto dispatch = std::move(_dispatch_queue.front());
                 _dispatch_queue.pop();
                 dispatch->wait();
-                lock.unlock();
-                _complete_cv.notify_one();
             }
         }
         CUDA_CHECK(cuCtxDestroy(ctx));
@@ -116,11 +115,8 @@ CudaDevice::CudaDevice(Context *context, uint32_t device_id) : Device{context} {
 CudaDevice::~CudaDevice() noexcept {
     _stop_signal = true;
     _dispatch_thread.join();
-    LUISA_INFO(0);
     CUDA_CHECK(cuStreamDestroy(_stream));
-    LUISA_INFO(1);
     for (auto module : _modules) { CUDA_CHECK(cuModuleUnload(module)); }
-    LUISA_INFO(2);
     CUDA_CHECK(cuCtxDestroy(_ctx));
 }
 
@@ -205,10 +201,10 @@ std::unique_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) {
     return std::make_unique<CudaKernel>(iter->second, ArgumentEncoder{function.arguments()});
 }
 
-std::shared_ptr<Buffer> CudaDevice::_allocate_buffer(size_t size, size_t max_host_caches) {
+std::shared_ptr<Buffer> CudaDevice::_allocate_buffer(size_t size) {
     CUdeviceptr buffer;
     CUDA_CHECK(cuMemAlloc(&buffer, size));
-    return std::make_shared<CudaBuffer>(buffer, size, max_host_caches);
+    return std::make_shared<CudaBuffer>(buffer, size);
 }
 
 void CudaDevice::_launch(const std::function<void(Dispatcher &)> &dispatch) {

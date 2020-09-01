@@ -20,7 +20,7 @@ private:
     CudaHostCache _host_cache;
 
 public:
-    CudaBuffer(CUdeviceptr handle, size_t size, size_t host_caches) noexcept : Buffer{size, host_caches}, _handle{handle}, _host_cache{size, host_caches} {}
+    CudaBuffer(CUdeviceptr handle, size_t size) noexcept : Buffer{size}, _handle{handle}, _host_cache{size} {}
     ~CudaBuffer() noexcept override;
     void upload(compute::Dispatcher &dispatcher, size_t offset, size_t size, const void *host_data) override;
     void download(compute::Dispatcher &dispatcher, size_t offset, size_t size, void *host_buffer) override;

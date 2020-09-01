@@ -14,8 +14,8 @@ int main(int argc, char *argv[]) {
     
     constexpr auto buffer_size = 1024u;
     
-    auto buffer_a = device->allocate_buffer<float>(buffer_size, 4);
-    auto buffer_b = device->allocate_buffer<float>(buffer_size, 4);
+    auto buffer_a = device->allocate_buffer<float>(buffer_size);
+    auto buffer_b = device->allocate_buffer<float>(buffer_size);
     
     std::vector<float> input(buffer_size);
     std::mt19937 rng{std::random_device{}()};
@@ -76,4 +76,5 @@ int main(int argc, char *argv[]) {
             LUISA_WARNING("Fuck! Expected ", input[i] * 2.0f, ", got ", output[i]);
         }
     }
+    LUISA_INFO("Results checked.");
 }

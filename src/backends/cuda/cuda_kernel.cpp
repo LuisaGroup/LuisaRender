@@ -12,7 +12,7 @@ ArgumentBufferView ArgumentBufferPool::obtain() noexcept {
     std::lock_guard lock{_mutex};
     if (_allocated_buffers.empty()) {
         void *buffer = nullptr;
-        CUDA_CHECK(cuMemHostAlloc(&buffer, _buffer_size, CU_MEMHOSTALLOC_WRITECOMBINED));
+        CUDA_CHECK(cuMemHostAlloc(&buffer, _buffer_size, 0));
         _allocated_buffers.emplace_back(buffer);
         for (auto offset = 0u; offset + _unaligned_size <= _buffer_size; offset += _aligned_size) {
             _available_buffers.emplace_back(reinterpret_cast<std::byte *>(buffer) + offset, false);
