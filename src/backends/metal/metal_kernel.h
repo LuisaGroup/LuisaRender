@@ -4,16 +4,16 @@
 
 #pragma once
 
-#include "core/logging.h"
-#include "core/platform.h"
-#include <algorithm>
-#import <condition_variable>
+#import <algorithm>
 #import <memory>
-#include <mutex>
+#import <mutex>
 #import <type_traits>
 #import <variant>
 
 #import <Metal/Metal.h>
+
+#import <core/logging.h>
+#import <core/platform.h>
 #import <compute/kernel.h>
 
 namespace luisa::metal {
@@ -35,7 +35,7 @@ class ArgumentBufferPool {
 private:
     id<MTLDevice> _device;
     std::vector<ArgumentBufferView> _buffers;
-    size_t _size{};
+    size_t _unaligned_size{};
     size_t _aligned_size{};
     size_t _buffer_size{};
     std::mutex _mutex;
@@ -43,7 +43,7 @@ private:
 public:
     ArgumentBufferPool(id<MTLDevice> device, size_t length, size_t alignment) noexcept
         : _device{device},
-          _size{length},
+          _unaligned_size{length},
           _aligned_size{(length + alignment - 1u) / alignment * alignment} {
         _buffer_size = std::max(_aligned_size, memory_page_size());
     }
@@ -53,7 +53,7 @@ public:
         if (_buffers.empty()) {
             auto buffer = [_device newBufferWithLength:_buffer_size
                                                options:MTLResourceCPUCacheModeWriteCombined | MTLResourceHazardTrackingModeUntracked];
-            for (auto offset = 0u; offset + _size <= _buffer_size; offset += _aligned_size) {
+            for (auto offset = 0u; offset + _unaligned_size <= _buffer_size; offset += _aligned_size) {
                 _buffers.emplace_back(buffer, offset, false);
             }
         }

@@ -42,7 +42,7 @@ private:
     std::vector<std::unique_ptr<MetalDispatcher>> _dispatchers;
     uint32_t _next_dispatcher{0u};
     
-    [[nodiscard]] MetalDispatcher &next_dispatcher() noexcept {
+    [[nodiscard]] MetalDispatcher &_get_next_dispatcher() noexcept {
         auto id = _next_dispatcher;
         _next_dispatcher = (_next_dispatcher + 1u) % max_command_queue_size;
         auto &&dispatcher = *_dispatchers[id];
@@ -94,7 +94,6 @@ std::unique_ptr<Kernel> MetalDevice::_compile_kernel(const compute::dsl::Functio
             LUISA_WARNING("Compilation output:");
             NSLog(@"%@", error);
         }
-        LUISA_INFO("Compilation for kernel \"", f.name(), "\" succeeded.");
         
         // Create PSO
         auto function = [library newFunctionWithName:@(f.name().c_str())];
@@ -110,6 +109,7 @@ std::unique_ptr<Kernel> MetalDevice::_compile_kernel(const compute::dsl::Functio
             NSLog(@"%@", error);
             LUISA_EXCEPTION("Failed to create pipeline state object for kernel \"", f.name(), "\".");
         }
+        LUISA_INFO("Compilation for kernel \"", f.name(), "\" succeeded.");
         
         MTLAutoreleasedArgument reflection;
         auto argument_encoder = [function newArgumentEncoderWithBufferIndex:0 reflection:&reflection];
@@ -179,7 +179,7 @@ std::unique_ptr<Kernel> MetalDevice::_compile_kernel(const compute::dsl::Functio
 }
 
 void MetalDevice::_launch(const std::function<void(Dispatcher &)> &dispatch) {
-    auto &&dispatcher = next_dispatcher();
+    auto &&dispatcher = _get_next_dispatcher();
     auto command_buffer = [_command_queue commandBuffer];
     dispatcher.reset(command_buffer);
     dispatch(dispatcher);
@@ -187,7 +187,7 @@ void MetalDevice::_launch(const std::function<void(Dispatcher &)> &dispatch) {
 }
 
 void MetalDevice::synchronize() {
-    for (auto i = 0u; i < max_command_queue_size; i++) { next_dispatcher().reset(); }
+    for (auto i = 0u; i < max_command_queue_size; i++) { _get_next_dispatcher().reset(); }
 }
 
 std::shared_ptr<Buffer> MetalDevice::_allocate_buffer(size_t size, size_t max_host_caches) {
