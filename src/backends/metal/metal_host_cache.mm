@@ -12,7 +12,7 @@ MetalHostCache::MetalHostCache(id<MTLDevice> device, size_t size, size_t count) 
     _available_caches.resize(count, nullptr);
 }
 
-id<MTLBuffer> MetalHostCache::get() noexcept {
+id<MTLBuffer> MetalHostCache::obtain() noexcept {
     std::unique_lock lock{_cache_mutex};
     _cache_cv.wait(lock, [this] { return !_available_caches.empty(); });
     id<MTLBuffer> cache = _available_caches.back();
@@ -20,10 +20,7 @@ id<MTLBuffer> MetalHostCache::get() noexcept {
     lock.unlock();
     if (cache == nullptr) {
         using namespace std::chrono_literals;
-        auto t0 = std::chrono::high_resolution_clock::now();
         cache = [_device newBufferWithLength:_cache_size options:MTLResourceStorageModeShared | MTLResourceHazardTrackingModeUntracked];
-        auto t1 = std::chrono::high_resolution_clock::now();
-        LUISA_INFO("Time spent on MTLDevice::newBufferWithBytesNoCopy = ", (t1 - t0) / 1ns, "ns");
         LUISA_INFO("Created host cache buffer #", _cache_count++, " with length ", _cache_size, " for device content synchronization.");
     }
     return cache;

@@ -9,8 +9,8 @@
 namespace luisa::metal {
 
 void MetalBuffer::upload(compute::Dispatcher &dispatcher, size_t offset, size_t size, const void *host_data) {
-    auto cache = _cache.get();
-    memmove([cache contents], host_data, size);
+    auto cache = _cache.obtain();
+    std::memmove([cache contents], host_data, size);
     auto command_buffer = dynamic_cast<MetalDispatcher &>(dispatcher).handle();
     auto blit_encoder = [command_buffer blitCommandEncoder];
     [blit_encoder copyFromBuffer:cache sourceOffset:0 toBuffer:_handle destinationOffset:offset size:size];
@@ -19,7 +19,7 @@ void MetalBuffer::upload(compute::Dispatcher &dispatcher, size_t offset, size_t 
 }
 
 void MetalBuffer::download(compute::Dispatcher &dispatcher, size_t offset, size_t size, void *host_buffer) {
-    auto cache = _cache.get();
+    auto cache = _cache.obtain();
     auto command_buffer = dynamic_cast<MetalDispatcher &>(dispatcher).handle();
     auto blit_encoder = [command_buffer blitCommandEncoder];
     [blit_encoder copyFromBuffer:_handle sourceOffset:offset toBuffer:cache destinationOffset:0 size:size];

@@ -64,7 +64,7 @@ public:
 
 MetalDevice::MetalDevice(Context *context, uint32_t device_id) : Device{context} {
     auto devices = MTLCopyAllDevices();
-    LUISA_ERROR_IF_NOT(device_id < devices.count, "Invalid Metal device index ", device_id, ": max available index is ", devices.count, ".");
+    LUISA_ERROR_IF_NOT(device_id < devices.count, "Invalid Metal device index ", device_id, ": max available index is ", devices.count - 1, ".");
     _handle = devices[device_id];
     LUISA_INFO("Created Metal device #", device_id, ", description:\n", [_handle.description cStringUsingEncoding:NSUTF8StringEncoding]);
     _command_queue = [_handle newCommandQueue];

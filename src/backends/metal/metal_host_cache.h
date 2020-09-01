@@ -27,7 +27,7 @@ private:
 public:
     MetalHostCache(id<MTLDevice> device, size_t size, size_t count) noexcept;
     ~MetalHostCache() noexcept { clear(); }
-    [[nodiscard]] id<MTLBuffer> get() noexcept;
+    [[nodiscard]] id<MTLBuffer> obtain() noexcept;
     void recycle(id<MTLBuffer> cache) noexcept;
     void clear() noexcept;
 };

@@ -20,6 +20,7 @@ private:
 
 public:
     explicit MetalDispatcher() noexcept = default;
+    ~MetalDispatcher() noexcept { [_handle waitUntilCompleted]; }
     [[nodiscard]] id<MTLCommandBuffer> handle() const noexcept { return _handle; }
     void reset(id<MTLCommandBuffer> handle = nullptr) noexcept {
         _callbacks.clear();
