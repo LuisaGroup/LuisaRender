@@ -4,8 +4,10 @@
 
 #pragma
 
-#include <compute/dispatcher.h>
 #include <cuda.h>
+#include <compute/dispatcher.h>
+
+#include "cuda_check.h"
 
 namespace luisa::cuda {
 
@@ -23,7 +25,7 @@ private:
 
 public:
     explicit CudaDispatcher(CUstream handle) noexcept : _handle{handle} {
-        CUDA_CHECK(cuEventCreate(&_event, CU_EVENT_DISABLE_TIMING | CU_EVENT_BLOCKING_SYNC));
+        CUDA_CHECK(cuEventCreate(&_event, CU_EVENT_DISABLE_TIMING));
     }
 
     ~CudaDispatcher() noexcept override { CUDA_CHECK(cuEventDestroy(_event)); }

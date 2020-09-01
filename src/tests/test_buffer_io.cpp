@@ -12,7 +12,7 @@ int main(int argc, char *argv[]) {
     Context context{argc, argv};
     auto device = Device::create(&context, "cuda");
     
-    constexpr auto buffer_size = 1024u;
+    constexpr auto buffer_size = 1024u * 768u;
     
     auto buffer_a = device->allocate_buffer<float>(buffer_size);
     auto buffer_b = device->allocate_buffer<float>(buffer_size);

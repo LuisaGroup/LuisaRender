@@ -15,6 +15,7 @@ void CudaCodegen::emit(const Function &f) {
            "#include <cstdint>\n"
            "\n"
            "#include <math_helpers.h>\n"
+           "#include <texture_helpers.h>\n"
            "\n"
            "using luisa::uchar;\n"
            "using luisa::ushort;\n"
@@ -30,7 +31,7 @@ void CudaCodegen::_emit_function_body(const Function &f) {
         if (v.is_thread_id()) {
             _os << "auto tid = static_cast<uint>(blockIdx.x * blockDim.x + threadIdx.x);\n";
         } else if (v.is_thread_xy()) {
-            _os << "auto txy = make_uint2(blockIdx.x * blockDim.x + threadIdx.x, blockIdx.y * blockDim.y + threadIdx.y);\n";
+            _os << "auto txy = luisa::make_uint2(blockIdx.x * blockDim.x + threadIdx.x, blockIdx.y * blockDim.y + threadIdx.y);\n";
         }
     }
     CppCodegen::_emit_function_body(f);
@@ -41,8 +42,41 @@ void CudaCodegen::_emit_function_decl(const Function &f) {
 }
 
 void CudaCodegen::_emit_function_call(const std::string &name) {
-    _os << "luisa::math::";
+    _os << "luisa::";
     CppCodegen::_emit_function_call(name);
+}
+
+void CudaCodegen::_emit_argument_member_decl(Variable v) {
+    if (v.type()->type == TypeCatalog::TEXTURE) {
+        LUISA_ERROR_IF_NOT(v.is_texture_argument(), "Textures are only allowed to be arguments.");
+        auto format = v.texture()->format();
+        _emit_indent();
+        switch (format) {
+            case PixelFormat::R8U:
+                _os << "luisa::Tex2D<uint8_t> ";
+                break;
+            case PixelFormat::RG8U:
+                _os << "luisa::Tex2D<luisa::uchar2> ";
+                break;
+            case PixelFormat::RGBA8U:
+                _os << "luisa::Tex2D<luisa::uchar4> ";
+                break;
+            case PixelFormat::R32F:
+                _os << "luisa::Tex2D<float> ";
+                break;
+            case PixelFormat::RG32F:
+                _os << "luisa::Tex2D<luisa::float2> ";
+                break;
+            case PixelFormat::RGBA32F:
+                _os << "luisa::Tex2D<luisa::float4> ";
+                break;
+            default:
+                break;
+        }
+        _os << "v" << v.uid();
+    } else {
+        CppCodegen::_emit_argument_member_decl(v);
+    }
 }
 
 void CudaCodegen::_emit_type(const TypeDesc *desc) {

@@ -28,6 +28,4 @@ public:
     [[nodiscard]] CUdeviceptr handle() const noexcept { return _handle; }
 };
 
-
-
 }

@@ -17,13 +17,8 @@ void CudaBuffer::upload(compute::Dispatcher &dispatcher, size_t offset, size_t s
 }
 
 void CudaBuffer::download(compute::Dispatcher &dispatcher, size_t offset, size_t size, void *host_buffer) {
-    auto cache = _host_cache.obtain();
     auto stream = dynamic_cast<CudaDispatcher &>(dispatcher).handle();
-    CUDA_CHECK(cuMemcpyAsync(reinterpret_cast<CUdeviceptr>(cache), _handle + offset, size, stream));
-    dispatcher.when_completed([cache, this, dst = host_buffer, size] {
-        std::memmove(dst, cache, size);
-        _host_cache.recycle(cache);
-    });
+    CUDA_CHECK(cuMemcpyDtoHAsync(host_buffer, _handle + offset, size, stream));
 }
 
 CudaBuffer::~CudaBuffer() noexcept {

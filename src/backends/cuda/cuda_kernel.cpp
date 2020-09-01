@@ -4,6 +4,7 @@
 
 #include "cuda_kernel.h"
 #include "cuda_buffer.h"
+#include "cuda_texture.h"
 #include "cuda_dispatcher.h"
 
 namespace luisa::cuda {
@@ -59,7 +60,14 @@ ArgumentEncoder::ArgumentEncoder(const std::vector<Variable> &arguments) : _alig
             LUISA_INFO("Buffer offset: ", offset);
             offset += size;
         } else if (arg.is_texture_argument()) {
-            LUISA_EXCEPTION("Not implemented!");
+            auto alignment = 8u;
+            auto size = 16u;
+            auto texture = dynamic_cast<CudaTexture *>(arg.texture())->texture_handle();
+            auto surface = dynamic_cast<CudaTexture *>(arg.texture())->surface_handle();
+            std::vector<std::byte> bytes(size);
+            reinterpret_cast<CUtexObject *>(bytes.data())[0] = texture;
+            reinterpret_cast<CUsurfObject *>(bytes.data())[1] = surface;
+            _immutable_arguments.emplace_back(std::move(bytes), align_offset(alignment));
         } else if (arg.is_immutable_argument()) {
             auto alignment = arg.type()->alignment;
             _immutable_arguments.emplace_back(arg.immutable_data(), align_offset(alignment));
@@ -99,8 +107,7 @@ void CudaKernel::_dispatch(compute::Dispatcher &dispatcher, uint2 blocks, uint2 
     auto argument_buffer = _argument_buffer_pool.obtain();
     _encode(argument_buffer);
     auto stream = dynamic_cast<CudaDispatcher &>(dispatcher).handle();
-    void *arguments[]{argument_buffer.buffer};
-    CUDA_CHECK(cuLaunchKernel(_handle, blocks.x, blocks.y, 1u, block_size.x, block_size.y, 1u, 0u, stream, arguments, nullptr));
+    CUDA_CHECK(cuLaunchKernel(_handle, blocks.x, blocks.y, 1u, block_size.x, block_size.y, 1u, 0u, stream, &argument_buffer.buffer, nullptr));
 }
 
 }// namespace luisa::cuda

@@ -9,7 +9,9 @@
 
 #include "data_types.h"
 
-namespace luisa::math {
+namespace luisa {
+
+inline namespace math {
 
 inline namespace constants {
 
@@ -221,9 +223,13 @@ constexpr auto select(bool pred, T t, F f) noexcept {
 template<typename T, uint N>
 constexpr auto select(Vector<bool, N, false> pred, Vector<T, N, false> t, Vector<T, N, false> f) noexcept {
     static_assert(N == 2 || N == 3 || N == 4);
-    if constexpr (N == 2) { return Vector<T, N, false>{select(pred.x, t.x, f.x), select(pred.y, t.y, f.y)}; }
-    else if constexpr (N == 3) { return Vector<T, N, false>{select(pred.x, t.x, f.x), select(pred.y, t.y, f.y), select(pred.z, t.z, f.z)}; }
-    else { return Vector<T, N, false>{select(pred.x, t.x, f.x), select(pred.y, t.y, f.y), select(pred.z, t.z, f.z), select(pred.w, t.w, f.w)}; }
+    if constexpr (N == 2) {
+        return Vector<T, N, false>{select(pred.x, t.x, f.x), select(pred.y, t.y, f.y)};
+    } else if constexpr (N == 3) {
+        return Vector<T, N, false>{select(pred.x, t.x, f.x), select(pred.y, t.y, f.y), select(pred.z, t.z, f.z)};
+    } else {
+        return Vector<T, N, false>{select(pred.x, t.x, f.x), select(pred.y, t.y, f.y), select(pred.z, t.z, f.z), select(pred.w, t.w, f.w)};
+    }
 }
 
 template<typename A, typename B>
@@ -346,4 +352,4 @@ constexpr auto inverse(float4x4 m) noexcept {// from GLM
                          inv_3 * one_over_determinant);
 }
 
-}// namespace luisa::math
+}}// namespace luisa::math

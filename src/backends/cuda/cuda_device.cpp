@@ -11,7 +11,7 @@
 #include <core/sha1.h>
 
 #include "cuda_buffer.h"
-#include "cuda_check.h"
+#include "cuda_texture.h"
 #include "cuda_codegen.h"
 #include "cuda_dispatcher.h"
 #include "cuda_jit_headers.h"
@@ -48,11 +48,7 @@ private:
 
 protected:
     std::shared_ptr<Buffer> _allocate_buffer(size_t size) override;
-
-    std::unique_ptr<Texture> _allocate_texture(uint32_t width, uint32_t height, compute::PixelFormat format) override {
-        LUISA_EXCEPTION("Not implemented!");
-    }
-
+    std::unique_ptr<Texture> _allocate_texture(uint32_t width, uint32_t height, compute::PixelFormat format) override;
     std::unique_ptr<Kernel> _compile_kernel(const compute::dsl::Function &function) override;
 
     void _launch(const std::function<void(Dispatcher &)> &dispatch) override;
@@ -166,7 +162,7 @@ std::unique_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) {
             "-dw",
             "-w",
             cuda_version_opt.c_str()};
-        NVRTC_CHECK(nvrtcCompileProgram(prog, sizeof(opts) / sizeof(const char *), opts));// options
+        nvrtcCompileProgram(prog, sizeof(opts) / sizeof(const char *), opts);// options
         
         size_t log_size;
         NVRTC_CHECK(nvrtcGetProgramLogSize(prog, &log_size));
@@ -216,6 +212,90 @@ void CudaDevice::_launch(const std::function<void(Dispatcher &)> &dispatch) {
         _dispatch_queue.push(std::move(dispatcher));
     }
     _dispatch_cv.notify_one();
+}
+
+std::unique_ptr<Texture> CudaDevice::_allocate_texture(uint32_t width, uint32_t height, compute::PixelFormat format) {
+    
+    // Create array
+    CUDA_ARRAY_DESCRIPTOR array_desc{};
+    array_desc.Width = width;
+    array_desc.Height = height;
+    switch (format) {
+        case compute::PixelFormat::R8U:
+            array_desc.Format = CU_AD_FORMAT_UNSIGNED_INT8;
+            array_desc.NumChannels = 1;
+            break;
+        case compute::PixelFormat::RG8U:
+            array_desc.Format = CU_AD_FORMAT_UNSIGNED_INT8;
+            array_desc.NumChannels = 2;
+            break;
+        case compute::PixelFormat::RGBA8U:
+            array_desc.Format = CU_AD_FORMAT_UNSIGNED_INT8;
+            array_desc.NumChannels = 4;
+            break;
+        case compute::PixelFormat::R32F:
+            array_desc.Format = CU_AD_FORMAT_FLOAT;
+            array_desc.NumChannels = 1;
+            break;
+        case compute::PixelFormat::RG32F:
+            array_desc.Format = CU_AD_FORMAT_FLOAT;
+            array_desc.NumChannels = 2;
+            break;
+        case compute::PixelFormat::RGBA32F:
+            array_desc.Format = CU_AD_FORMAT_FLOAT;
+            array_desc.NumChannels = 4;
+            break;
+        default:
+            break;
+    }
+    CUarray array;
+    CUDA_CHECK(cuArrayCreate(&array, &array_desc));
+    
+    // Create texture & surface
+    CUDA_RESOURCE_DESC res_desc{};
+    res_desc.resType = CU_RESOURCE_TYPE_ARRAY;
+    res_desc.res.array.hArray = array;
+    res_desc.flags = 0;
+    
+    CUDA_TEXTURE_DESC tex_desc{};
+    tex_desc.addressMode[0] = CU_TR_ADDRESS_MODE_CLAMP;
+    tex_desc.addressMode[1] = CU_TR_ADDRESS_MODE_CLAMP;
+    tex_desc.addressMode[2] = CU_TR_ADDRESS_MODE_CLAMP;
+    tex_desc.filterMode =  CU_TR_FILTER_MODE_LINEAR;
+    tex_desc.flags = CU_TRSF_NORMALIZED_COORDINATES;
+    
+    CUDA_RESOURCE_VIEW_DESC res_view_desc{};
+    switch (format) {
+        case PixelFormat::R8U:
+            res_view_desc.format = CU_RES_VIEW_FORMAT_UINT_1X8;
+            break;
+        case PixelFormat::RG8U:
+            res_view_desc.format = CU_RES_VIEW_FORMAT_UINT_2X8;
+            break;
+        case PixelFormat::RGBA8U:
+            res_view_desc.format = CU_RES_VIEW_FORMAT_UINT_4X8;
+            break;
+        case PixelFormat::R32F:
+            res_view_desc.format = CU_RES_VIEW_FORMAT_FLOAT_1X32;
+            break;
+        case PixelFormat::RG32F:
+            res_view_desc.format = CU_RES_VIEW_FORMAT_FLOAT_2X32;
+            break;
+        case PixelFormat::RGBA32F:
+            res_view_desc.format = CU_RES_VIEW_FORMAT_FLOAT_4X32;
+            break;
+        default:
+            break;
+    }
+    res_view_desc.width = width;
+    res_view_desc.height = height;
+    
+    CUtexObject texture;
+    CUsurfObject surface;
+    CUDA_CHECK(cuTexObjectCreate(&texture, &res_desc, &tex_desc, &res_view_desc));
+    CUDA_CHECK(cuSurfObjectCreate(&surface, &res_desc));
+    
+    return std::make_unique<CudaTexture>(array, texture, surface, width, height, format);
 }
 
 }// namespace luisa::cuda

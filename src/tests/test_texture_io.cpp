@@ -10,7 +10,7 @@ using namespace luisa::compute::dsl;
 int main(int argc, char *argv[]) {
     
     Context context{argc, argv};
-    auto device = Device::create(&context, "metal");
+    auto device = Device::create(&context, "cuda");
     
     constexpr auto width = 1280u;
     constexpr auto height = 720u;
@@ -20,7 +20,7 @@ int main(int argc, char *argv[]) {
     
     auto linear_to_srgb = [&](Float3 linear) {
         auto gamma = [](auto u) { return select(u <= 0.0031308f, 12.92f * u, 1.055f * pow(u, 1.0f / 2.4f) - 0.055f); };
-        return make_float3(gamma(linear.r()), gamma(linear.g()), gamma(linear.b()));
+        return gamma(linear);
     };
     
     auto kernel = device->compile_kernel([&] {
@@ -40,11 +40,14 @@ int main(int argc, char *argv[]) {
     
     device->launch([&](Dispatcher &d) {
         d(kernel->parallelize(make_uint2(width, height)));
-        d(texture->copy_to(buffer));
-        d(buffer.copy_to(image.data));
+//        d(texture->copy_to(buffer));
+        d(texture->copy_to(image.data));
+//        d(buffer.copy_to(image.data));
     });
     device->synchronize();
     
     cv::cvtColor(image, image, cv::COLOR_RGBA2BGR);
+    cv::imshow("Result", image);
+    cv::waitKey();
     cv::imwrite("data/images/test.png", image);
 }
