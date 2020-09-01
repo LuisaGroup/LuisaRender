@@ -46,7 +46,7 @@ private:
         auto id = _next_dispatcher;
         _next_dispatcher = (_next_dispatcher + 1u) % max_command_queue_size;
         auto &&dispatcher = *_dispatchers[id];
-        dispatcher._wait();
+        dispatcher.wait();
         return dispatcher;
     }
 
@@ -187,7 +187,7 @@ void MetalDevice::_launch(const std::function<void(Dispatcher &)> &dispatch) {
     auto command_buffer = [_command_queue commandBuffer];
     dispatcher.reset(command_buffer);
     dispatch(dispatcher);
-    dispatcher._commit();
+    dispatcher.commit();
 }
 
 void MetalDevice::synchronize() {
