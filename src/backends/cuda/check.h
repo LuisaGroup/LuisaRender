@@ -6,20 +6,18 @@
 
 #include <core/logging.h>
 
-#define OPTIX_CHECK(call)                                                       \
-    [&] {                                                                       \
-        if (auto res = call; res != OPTIX_SUCCESS) {                            \
-            LUISA_ERROR("OptiX call [ ", #call, " ] ",                          \
-                        "failed with error: ", optixGetErrorString(res), ": ",  \
-                        __FILE__, ":", __LINE__);                               \
-        }                                                                       \
+#define NVRTC_CHECK(x)                                                                                                  \
+    [&] {                                                                                                               \
+        nvrtcResult result = x;                                                                                         \
+        LUISA_EXCEPTION_IF_NOT(result == NVRTC_SUCCESS, "MVRTC call [ " #x " ] failed: ", nvrtcGetErrorString(result)); \
     }()
 
-#define CUDA_CHECK(call)                                                       \
-    [&] {                                                                      \
-        if (auto res = call; res != 0) {                                       \
-            LUISA_ERROR("CUDA call [ ", #call, " ] ",                          \
-                        "failed with error: ", cudaGetErrorString(res), ": ",  \
-                        __FILE__, ":", __LINE__);                              \
-        }                                                                      \
+#define CUDA_CHECK(x)                                              \
+    [&] {                                                          \
+        CUresult result = x;                                       \
+        if (result != CUDA_SUCCESS) {                              \
+            const char *msg;                                       \
+            cuGetErrorName(result, &msg);                          \
+            LUISA_EXCEPTION("CUDA call [ " #x " ] failed: ", msg); \
+        }                                                          \
     }()

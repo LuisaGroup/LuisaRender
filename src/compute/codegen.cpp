@@ -481,7 +481,7 @@ void CppCodegen::_emit_struct_fwd_decl(const TypeDesc *desc) {
 }
 
 void CppCodegen::_emit_argument_struct_decl(const Function &f) {
-    _os << "struct Argument {\n";
+    _os << "struct alignas(16) Argument {\n";
     for (auto &&arg : f.arguments()) {
         _os << "    ";
         _emit_argument_member_decl(arg);

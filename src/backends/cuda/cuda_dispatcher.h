@@ -4,8 +4,8 @@
 
 #pragma
 
-#include <cuda.h>
 #include <compute/dispatcher.h>
+#include <cuda.h>
 
 namespace luisa::cuda {
 
@@ -18,12 +18,12 @@ private:
     bool _finished{false};
     std::mutex _mutex;
     std::condition_variable _cv;
-    
+
     void _wait() noexcept {
         std::unique_lock lock{_mutex};
         _cv.wait(lock, [this] { return _finished; });
     }
-    
+
     void _notify() noexcept {
         {
             std::lock_guard lock{_mutex};
@@ -35,19 +35,22 @@ private:
 public:
     explicit CudaDispatcher(CUstream handle) noexcept : _handle{handle} {}
     ~CudaDispatcher() noexcept override { _wait(); }
-    
-    void reset() noexcept { _finished = false; }
+
+    void reset() noexcept {
+        _callbacks.clear();
+        _finished = false;
+    }
 
     [[nodiscard]] CUstream handle() const noexcept { return _handle; }
-    
+
     void commit() noexcept override {
-        cuLaunchHostFunc(
+        CUDA_CHECK(cuLaunchHostFunc(
             _handle, [](void *self) {
                 auto dispatcher = reinterpret_cast<CudaDispatcher *>(self);
                 for (auto &&cb : dispatcher->_callbacks) { cb(); }
                 dispatcher->_notify();
             },
-            this);
+            this));
     }
 
     void wait() override { _wait(); }

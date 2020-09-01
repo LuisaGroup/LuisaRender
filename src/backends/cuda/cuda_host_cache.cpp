@@ -3,6 +3,8 @@
 //
 
 #include <core/platform.h>
+
+#include "check.h"
 #include "cuda_host_cache.h"
 
 namespace luisa::cuda {
@@ -13,7 +15,7 @@ void *CudaHostCache::obtain() noexcept {
     auto cache = _available_caches.back();
     lock.unlock();
     if (cache == nullptr) {
-        cuMemAllocHost(&cache, _size);
+        CUDA_CHECK(cuMemAllocHost(&cache, _size));
         LUISA_INFO("Created host cache buffer #", _count++, " with length ", _size, " for device content synchronization.");
     }
     return cache;
@@ -36,7 +38,7 @@ void CudaHostCache::clear() noexcept {
     std::unique_lock lock{_mutex};
     _cv.wait(lock, [this] { return _available_caches.size() == _max_count; });
     for (auto p : _available_caches) {
-        if (p != nullptr) { cuMemFreeHost(p); }
+        if (p != nullptr) { CUDA_CHECK(cuMemFreeHost(p)); }
     }
     _available_caches.clear();
     _available_caches.resize(_max_count, nullptr);
