@@ -2,8 +2,8 @@
 // Created by Mike Smith on 2020/8/17.
 //
 
-#import <core/logging.h>
 #import "metal_host_cache.h"
+#import <core/logging.h>
 
 namespace luisa::metal {
 
@@ -19,7 +19,11 @@ id<MTLBuffer> MetalHostCache::get() noexcept {
     _available_caches.pop_back();
     lock.unlock();
     if (cache == nullptr) {
-        cache = [_device newBufferWithLength:_cache_size options:MTLResourceStorageModeShared];
+        using namespace std::chrono_literals;
+        auto t0 = std::chrono::high_resolution_clock::now();
+        cache = [_device newBufferWithLength:_cache_size options:MTLResourceStorageModeShared | MTLResourceHazardTrackingModeUntracked];
+        auto t1 = std::chrono::high_resolution_clock::now();
+        LUISA_INFO("Time spent on MTLDevice::newBufferWithBytesNoCopy = ", (t1 - t0) / 1ns, "ns");
         LUISA_INFO("Created host cache buffer #", _cache_count++, " with length ", _cache_size, " for device content synchronization.");
     }
     return cache;

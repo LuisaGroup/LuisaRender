@@ -11,8 +11,8 @@
 
 #if !defined(_WIN32) && (defined(__unix__) || defined(__unix) || (defined(__APPLE__) && defined(__MACH__)))
 
-#include <unistd.h>
 #include <dlfcn.h>
+#include <unistd.h>
 
 #define LUISA_EXPORT [[gnu::visibility("default")]]
 #define LUISA_DLL_PREFIX "lib"
@@ -23,14 +23,6 @@ namespace luisa { inline namespace utility {
 inline size_t memory_page_size() noexcept {
     static thread_local auto page_size = getpagesize();
     return page_size;
-}
-
-inline void *aligned_alloc(size_t alignment, size_t size) noexcept {
-    return ::aligned_alloc(alignment, size);
-}
-
-inline void aligned_free(void *buffer) noexcept {
-    free(buffer);
 }
 
 using DynamicModuleHandle = void *;
@@ -86,7 +78,7 @@ inline std::string win32_last_error_message() {
 
     auto err_msg = serialize(buffer, " (code = 0x", std::hex, err_code, ").");
     LocalFree(buffer);
-    
+
     return err_msg;
 }
 
@@ -99,14 +91,6 @@ inline size_t memory_page_size() noexcept {
         return info.dwPageSize;
     }();
     return page_size;
-}
-
-inline void *aligned_alloc(size_t alignment, size_t size) noexcept {
-    return _aligned_malloc(size, alignment);
-}
-
-inline void aligned_free(void *buffer) noexcept {
-    _aligned_free(buffer);
 }
 
 inline DynamicModuleHandle load_dynamic_module(const std::filesystem::path &path) {
@@ -135,37 +119,3 @@ inline auto load_dynamic_symbol(DynamicModuleHandle handle, const std::string &n
 #else
 #error Unsupported platform for DLL exporting and importing
 #endif
-
-namespace luisa {
-
-inline namespace utility {
-
-template<typename T>
-class PageAlignedMemory {
-
-public:
-    inline static auto page_size = memory_page_size();
-    
-private:
-    T *_memory;
-    size_t _aligned_byte_size;
-
-public:
-    explicit PageAlignedMemory(size_t size) noexcept {
-        _aligned_byte_size = (size * sizeof(T) + page_size - 1u) / page_size * page_size;
-        _memory = reinterpret_cast<T *>(luisa::aligned_alloc(page_size, _aligned_byte_size));
-    }
-    
-    PageAlignedMemory(const PageAlignedMemory &) = delete;
-    PageAlignedMemory(PageAlignedMemory &&) noexcept = default;
-    PageAlignedMemory &operator=(const PageAlignedMemory &) = delete;
-    PageAlignedMemory &operator=(PageAlignedMemory &&) noexcept = default;
-    
-    ~PageAlignedMemory() noexcept { luisa::aligned_free(_memory); }
-    
-    [[nodiscard]] size_t aligned_byte_size() const noexcept { return _aligned_byte_size; }
-    [[nodiscard]] T *data() noexcept { return _memory; }
-    [[nodiscard]] const T *data() const noexcept { return _memory; }
-};
-
-}}

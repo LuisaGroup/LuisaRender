@@ -15,15 +15,8 @@ using compute::Dispatcher;
 
 class MetalDispatcher : public Dispatcher {
 
-public:
-    friend class MetalDevice;
-
 private:
     id<MTLCommandBuffer> _handle{nullptr};
-
-protected:
-    void _wait() override { [_handle waitUntilCompleted]; }
-    void _schedule() override { [_handle commit]; }
 
 public:
     explicit MetalDispatcher() noexcept = default;
@@ -31,6 +24,12 @@ public:
     void reset(id<MTLCommandBuffer> handle = nullptr) noexcept {
         _callbacks.clear();
         _handle = handle;
+    }
+    
+    void wait() override { [_handle waitUntilCompleted]; }
+    void commit() override {
+        [_handle addCompletedHandler:^(id<MTLCommandBuffer>) { for (auto &&callback : _callbacks) { callback(); } }];
+        [_handle commit];
     }
 };
 

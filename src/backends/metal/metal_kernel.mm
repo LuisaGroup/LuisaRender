@@ -4,33 +4,26 @@
 
 #import <core/logging.h>
 
-#import "metal_kernel.h"
 #import "metal_dispatcher.h"
+#import "metal_kernel.h"
 
 namespace luisa::metal {
 
 void MetalKernel::_dispatch(Dispatcher &dispatcher, uint2 threadgroups, uint2 threadgroup_size) {
-    
-    id<MTLBuffer> argument_buffer = nullptr;
-    
-    if (_argument_bindings.empty()) {
-        argument_buffer = _available_argument_buffers.front();
-    } else {
-        argument_buffer = _get_argument_buffer();
-        [_argument_encoder setArgumentBuffer:argument_buffer offset:0];
-        for (auto[index, size, src] : _argument_bindings) {
+
+    auto argument_buffer = _get_argument_buffer();
+    if (!_argument_bindings.empty()) {
+        [_argument_encoder setArgumentBuffer:argument_buffer.handle offset:argument_buffer.offset];
+        for (auto [index, size, src] : _argument_bindings) {
             std::memmove([_argument_encoder constantDataAtIndex:index], src, size);
         }
-        dispatcher.when_completed([this, argument_buffer] {
-            std::lock_guard lock{_argument_buffer_mutex};
-            _available_argument_buffers.emplace_back(argument_buffer);
-        });
+        dispatcher.when_completed([this, argument_buffer] { _argument_buffer_pool.recycle(argument_buffer); });
     }
-    
+
     auto command_buffer = dynamic_cast<MetalDispatcher &>(dispatcher).handle();
     auto command_encoder = [command_buffer computeCommandEncoderWithDispatchType:MTLDispatchTypeConcurrent];
     [command_encoder setComputePipelineState:_handle];
-    [command_encoder setBuffer:argument_buffer offset:0u atIndex:0u];
+    [command_encoder setBuffer:argument_buffer.handle offset:argument_buffer.offset atIndex:0u];
     for (auto argument : _arguments) {
         std::visit([&](auto &&arg) noexcept {
             using Type = std::decay_t<decltype(arg)>;
@@ -48,17 +41,29 @@ MetalKernel::MetalKernel(id<MTLComputePipelineState> handle,
                          std::vector<Uniform> uniforms,
                          std::vector<Argument> args,
                          id<MTLArgumentEncoder> arg_enc) noexcept
-    : _handle{handle}, _argument_bindings{std::move(uniforms)}, _arguments{std::move(args)}, _argument_encoder{arg_enc} {
-    
+    : _handle{handle},
+      _argument_bindings{std::move(uniforms)},
+      _arguments{std::move(args)},
+      _argument_encoder{arg_enc},
+      _argument_buffer_pool{[handle device], arg_enc.encodedLength, arg_enc.alignment} {}
+
+ArgumentBufferView MetalKernel::_get_argument_buffer() {
     if (_argument_bindings.empty()) {
-        _available_argument_buffers.emplace_back(_create_argument_buffer());
+        if (_constant_argument_buffer == nullptr) {
+            auto device = [_handle device];
+            _constant_argument_buffer = [device newBufferWithLength:_argument_encoder.encodedLength
+                                                            options:MTLCPUCacheModeWriteCombined | MTLHazardTrackingModeUntracked];
+            _initialize_argument_buffer(_constant_argument_buffer, 0u);
+        }
+        return {_constant_argument_buffer, 0u, true};
     }
+    auto buffer = _argument_buffer_pool.obtain();
+    if (!buffer.initialized) { _initialize_argument_buffer(buffer.handle, buffer.offset); }
+    return {buffer.handle, buffer.offset, true};
 }
 
-id<MTLBuffer> MetalKernel::_create_argument_buffer() {
-    auto device = [_handle device];
-    auto buffer = [device newBufferWithLength:_argument_encoder.encodedLength options:MTLResourceOptionCPUCacheModeWriteCombined];
-    [_argument_encoder setArgumentBuffer:buffer offset:0];
+void MetalKernel::_initialize_argument_buffer(id<MTLBuffer> buffer, size_t offset) {
+    [_argument_encoder setArgumentBuffer:buffer offset:offset];
     for (auto &&argument : _arguments) {
         std::visit([&](auto &&arg) noexcept {
             using Type = std::decay_t<decltype(arg)>;
@@ -71,18 +76,6 @@ id<MTLBuffer> MetalKernel::_create_argument_buffer() {
             }
         }, argument);
     }
-    LUISA_INFO("Created argument buffer #", _argument_buffer_count++, " with length ", _argument_encoder.encodedLength, " for kernel launch.");
-    return buffer;
-}
-
-id<MTLBuffer> MetalKernel::_get_argument_buffer() {
-    std::lock_guard lock{_argument_buffer_mutex};
-    if (_available_argument_buffers.empty()) {
-        return _create_argument_buffer();
-    }
-    auto buffer = _available_argument_buffers.back();
-    _available_argument_buffers.pop_back();
-    return buffer;
 }
 
 }

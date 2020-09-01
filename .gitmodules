@@ -1,3 +1,6 @@
 [submodule "src/ext/jitify"]
 	path = src/ext/jitify
 	url = https://github.com/NVIDIA/jitify.git
+[submodule "src/ext/spdlog"]
+	path = src/ext/spdlog
+	url = https://github.com/gabime/spdlog.git
