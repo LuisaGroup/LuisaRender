@@ -9,7 +9,7 @@
 
 namespace luisa {
 
-inline namespace vec {
+inline namespace vector {
 
 namespace detail {
 
@@ -46,19 +46,19 @@ struct VectorStorage<T, 4> {
 }// namespace detail
 
 template<typename T, uint32_t N, bool is_packed>
-struct alignas(vec::detail::vector_alignment<T, N, is_packed>) Vector : vec::detail::VectorStorage<T, N> {
+struct alignas(detail::vector_alignment<T, N, is_packed>) Vector : detail::VectorStorage<T, N> {
 
-    using Storage = vec::detail::VectorStorage<T, N>;
+    using Storage = detail::VectorStorage<T, N>;
 
-    constexpr Vector() noexcept : vec::detail::VectorStorage<T, N>{static_cast<T>(0)} {}
+    constexpr Vector() noexcept : detail::VectorStorage<T, N>{static_cast<T>(0)} {}
 
     template<typename U>
-    explicit constexpr Vector(U u) noexcept : vec::detail::VectorStorage<T, N>{static_cast<T>(u)} {}
+    explicit constexpr Vector(U u) noexcept : detail::VectorStorage<T, N>{static_cast<T>(u)} {}
 
     template<
         typename... U,
         std::enable_if_t<sizeof...(U) == N, int> = 0>
-    explicit constexpr Vector(U... u) noexcept : vec::detail::VectorStorage<T, N>{static_cast<T>(u)...} {}
+    explicit constexpr Vector(U... u) noexcept : detail::VectorStorage<T, N>{static_cast<T>(u)...} {}
 
     template<typename Index>
     [[nodiscard]] T &operator[](Index i) noexcept { return reinterpret_cast<T(&)[N]>(*this)[i]; }

@@ -8,6 +8,8 @@
 
 namespace luisa {
 
+inline namespace matrix {
+
 struct float3x3 {
 
     float3 cols[3];
@@ -120,6 +122,8 @@ constexpr float4 operator*(float4x4 m, float4 v) noexcept {
 
 constexpr float4x4 operator*(float4x4 lhs, float4x4 rhs) noexcept {
     return make_float4x4(lhs * rhs[0], lhs * rhs[1], lhs * rhs[2], lhs * rhs[3]);
+}
+
 }
 
 }// namespace luisa
