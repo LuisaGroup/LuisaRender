@@ -59,7 +59,13 @@ public:
 
     template<typename Work, std::enable_if_t<std::is_invocable_v<Work, Dispatcher &>, int> = 0>
     void launch(Work &&work) {
-        _launch([&work, this](Dispatcher &dispatch) { work(dispatch); });
+        _launch([&work, this](Dispatcher &dispatch) { dispatch(work); });
+    }
+    
+    template<typename Work, typename Callback, std::enable_if_t<std::conjunction_v<
+        std::is_invocable<Work, Dispatcher &>, std::is_invocable<Callback>>, int> = 0>
+    void launch(Work &&work, Callback &&cb) {
+        _launch([&work, this, &cb](Dispatcher &dispatch) { dispatch(work, cb); });
     }
 
     virtual void synchronize() = 0;
