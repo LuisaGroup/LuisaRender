@@ -51,7 +51,7 @@ public:
         
         _blur = std::make_unique<BoxBlur>(device, patch_radius, patch_radius, *_distance_texture, *_distance_texture);
         
-        _distance_kernel = device.compile_kernel([&] {
+        _distance_kernel = device.compile_kernel("nlm_distance", [&] {
             
             Arg<ReadOnlyTex2D> variance_texture{variance};
             Arg<ReadOnlyTex2D> color_texture{color};
@@ -77,7 +77,7 @@ public:
             };
         });
         
-        _clear_accum_kernel = device.compile_kernel([&] {
+        _clear_accum_kernel = device.compile_kernel("nlm_clear_accum", [&] {
             Arg<WriteOnlyTex2D> accum_a_texture{*_accum_a_texture};
             Arg<WriteOnlyTex2D> accum_b_texture{*_accum_b_texture};
             auto p = thread_xy();
@@ -87,7 +87,7 @@ public:
             };
         });
         
-        _accum_kernel = device.compile_kernel([&] {
+        _accum_kernel = device.compile_kernel("nlm_accum", [&] {
             
             Arg<ReadOnlyTex2D> blurred_distance_texture{*_distance_texture};
             Arg<ReadOnlyTex2D> color_a_texture{color_a};
@@ -115,7 +115,7 @@ public:
             };
         });
         
-        _blit_kernel = device.compile_kernel([&] {
+        _blit_kernel = device.compile_kernel("nlm_blit", [&] {
             
             Arg<ReadOnlyTex2D> accum_a_texture{*_accum_a_texture};
             Arg<ReadOnlyTex2D> accum_b_texture{*_accum_b_texture};

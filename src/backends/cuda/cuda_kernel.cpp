@@ -11,7 +11,7 @@ namespace luisa::cuda {
 
 ArgumentBufferView ArgumentBufferPool::obtain() noexcept {
     std::lock_guard lock{_mutex};
-    if (_allocated_buffers.empty()) {
+    if (_available_buffers.empty()) {
         void *buffer = nullptr;
         CUDA_CHECK(cuMemHostAlloc(&buffer, _buffer_size, 0));
         _allocated_buffers.emplace_back(buffer);

@@ -169,42 +169,39 @@ MAKE_VECTOR_UNARY_FUNC(degrees)
 #undef MAKE_VECTOR_UNARY_FUNC
 
 #define MAKE_VECTOR_BINARY_FUNC(func)                                                                   \
-    template<typename T, typename U, uint N>                                                            \
-    constexpr auto func(Vector<T, N, false> v, Vector<U, N, false> u) noexcept {                        \
+    template<typename T, uint N>                                                                        \
+    constexpr auto func(Vector<T, N, false> v, Vector<T, N, false> u) noexcept {                        \
         static_assert(N == 2 || N == 3 || N == 4);                                                      \
-        using R = decltype(func(v.x, u.x));                                                             \
         if constexpr (N == 2) {                                                                         \
-            return Vector<R, 2, false>{func(v.x, u.x), func(v.y, u.y)};                                 \
+            return Vector<T, 2, false>{func(v.x, u.x), func(v.y, u.y)};                                 \
         } else if constexpr (N == 3) {                                                                  \
-            return Vector<R, 3, false>(func(v.x, u.x), func(v.y, u.y), func(v.z, u.z));                 \
+            return Vector<T, 3, false>(func(v.x, u.x), func(v.y, u.y), func(v.z, u.z));                 \
         } else {                                                                                        \
-            return Vector<R, 4, false>(func(v.x, u.x), func(v.y, u.y), func(v.z, u.z), func(v.w, u.w)); \
+            return Vector<T, 4, false>(func(v.x, u.x), func(v.y, u.y), func(v.z, u.z), func(v.w, u.w)); \
         }                                                                                               \
     }                                                                                                   \
                                                                                                         \
-    template<typename T, typename U, uint N>                                                            \
-    constexpr auto func(T v, Vector<U, N, false> u) noexcept {                                          \
+    template<typename T, uint N>                                                                        \
+    constexpr auto func(T v, Vector<T, N, false> u) noexcept {                                          \
         static_assert(N == 2 || N == 3 || N == 4);                                                      \
-        using R = decltype(func(v, u.x));                                                               \
         if constexpr (N == 2) {                                                                         \
-            return Vector<R, 2, false>{func(v, u.x), func(v, u.y)};                                     \
+            return Vector<T, 2, false>{func(v, u.x), func(v, u.y)};                                     \
         } else if constexpr (N == 3) {                                                                  \
-            return Vector<R, 3, false>(func(v, u.x), func(v, u.y), func(v, u.z));                       \
+            return Vector<T, 3, false>(func(v, u.x), func(v, u.y), func(v, u.z));                       \
         } else {                                                                                        \
-            return Vector<R, 4, false>(func(v, u.x), func(v, u.y), func(v, u.z), func(v, u.w));         \
+            return Vector<T, 4, false>(func(v, u.x), func(v, u.y), func(v, u.z), func(v, u.w));         \
         }                                                                                               \
     }                                                                                                   \
                                                                                                         \
-    template<typename T, typename U, uint N>                                                            \
-    constexpr auto func(Vector<T, N, false> v, U u) noexcept {                                          \
+    template<typename T, uint N>                                                                        \
+    constexpr auto func(Vector<T, N, false> v, T u) noexcept {                                          \
         static_assert(N == 2 || N == 3 || N == 4);                                                      \
-        using R = decltype(func(v.x, u));                                                               \
         if constexpr (N == 2) {                                                                         \
-            return Vector<R, 2, false>{func(v.x, u), func(v.y, u)};                                     \
+            return Vector<T, 2, false>{func(v.x, u), func(v.y, u)};                                     \
         } else if constexpr (N == 3) {                                                                  \
-            return Vector<R, 3, false>(func(v.x, u), func(v.y, u), func(v.z, u));                       \
+            return Vector<T, 3, false>(func(v.x, u), func(v.y, u), func(v.z, u));                       \
         } else {                                                                                        \
-            return Vector<R, 4, false>(func(v.x, u), func(v.y, u), func(v.z, u), func(v.w, u));         \
+            return Vector<T, 4, false>(func(v.x, u), func(v.y, u), func(v.z, u), func(v.w, u));         \
         }                                                                                               \
     }
 

@@ -57,15 +57,15 @@ public:
                         if (rx != 0) { x = select(x < 0, -x, select(x < width, x, 2 * width - 1 - x)); }
                         if (ry != 0) { y = select(y < 0, -y, select(y < height, y, 2 * height - 1 - y)); }
                         auto weight = std::exp(-static_cast<float>(dx * dx + dy * dy) / (2.0f * (sigma_x * sigma_x + sigma_y * sigma_y)));
-                        sum = sum + make_float4(weight * make_float3(read(in, make_uint2(x, y))), weight);
+                        sum += make_float4(weight * make_float3(read(in, make_uint2(x, y))), weight);
                     }
                 }
                 write(out, thread_xy(), make_float4(make_float3(sum) / sum.w(), 1.0f));
             };
         };
         
-        _blur_x_kernel = device.compile_kernel([&] { blur_x_or_y(rx, 0, sigma_x, 0.0f, input, *_temp); });
-        _blur_y_kernel = device.compile_kernel([&] { blur_x_or_y(0, ry, 0.0f, sigma_y, *_temp, output); });
+        _blur_x_kernel = device.compile_kernel("gaussian_blur_x", [&] { blur_x_or_y(rx, 0, sigma_x, 0.0f, input, *_temp); });
+        _blur_y_kernel = device.compile_kernel("gaussian_blur_y", [&] { blur_x_or_y(0, ry, 0.0f, sigma_y, *_temp, output); });
     }
     
     void operator()(Dispatcher &dispatch) noexcept {

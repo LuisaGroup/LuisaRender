@@ -39,7 +39,7 @@ public:
         using namespace luisa::compute;
         using namespace luisa::compute::dsl;
         
-        _dual_variance_kernel = device.compile_kernel([&] {
+        _dual_variance_kernel = device.compile_kernel("dual_var", [&] {
             
             Arg<ReadOnlyTex2D> color_a_texture{color_a};
             Arg<ReadOnlyTex2D> color_b_texture{color_b};
@@ -58,7 +58,7 @@ public:
         _blur_dual_variance = std::make_unique<BoxBlur>(device, blur_radius, blur_radius, *_blurred_dual_variance, *_blurred_dual_variance);
         _blur_sample_variance = std::make_unique<BoxBlur>(device, blur_radius, blur_radius, var_sample, *_blurred_sample_variance);
         
-        _scale_kernel = device.compile_kernel([&] {
+        _scale_kernel = device.compile_kernel("dual_var_scale", [&] {
             
             Arg<ReadOnlyTex2D> blurred_dual_var_texture{*_blurred_dual_variance};
             Arg<ReadOnlyTex2D> blurred_sample_var_texture{*_blurred_sample_variance};

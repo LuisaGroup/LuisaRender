@@ -21,13 +21,13 @@ void blur_x_or_y(Texture &input, Texture &output, int width, int height, int rx,
         for (auto dx = -rx; dx <= rx; dx++) {
             auto x = tx + dx;
             If (x >= 0 && x < width) {
-                sum = sum + read(in, make_uint2(x, ty));
+                sum += read(in, make_uint2(x, ty));
             };
         }
         for (auto dy = -ry; dy <= ry; dy++) {
             auto y = ty + dy;
             If (y >= 0 && y < height) {
-                sum = sum + read(in, make_uint2(tx, y));
+                sum += read(in, make_uint2(tx, y));
             };
         }
         write(out, thread_xy(), make_float4(make_float3(sum) / sum.a(), 1.0f));
