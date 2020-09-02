@@ -11,7 +11,7 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
-#include "string_manipulation.h"
+#include "string_util.h"
 
 namespace luisa::logging {
 

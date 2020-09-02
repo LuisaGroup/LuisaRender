@@ -4,5 +4,5 @@
 
 #pragma once
 
-#include <compute/expr_helpers.h>
-#include <compute/stmt_helpers.h>
+#include <compute/expr_util.h>
+#include <compute/stmt_util.h>

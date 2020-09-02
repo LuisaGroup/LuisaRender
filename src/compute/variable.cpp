@@ -3,9 +3,9 @@
 //
 
 #include <compute/expression.h>
-#include <compute/statement.h>
 #include <compute/function.h>
-#include <compute/stmt_helpers.h>
+#include <compute/statement.h>
+#include <compute/stmt_util.h>
 
 #include "variable.h"
 

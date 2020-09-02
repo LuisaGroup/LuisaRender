@@ -13,7 +13,7 @@ constexpr auto texture_jit_header =
     "#pragma once\n"
     "\n"
     "#include <type_traits>\n"
-    "#include <math_helpers.h>\n"
+    "#include <math_util.h>\n"
     "\n"
     "namespace luisa {\n"
     "\n"
@@ -95,8 +95,8 @@ inline const auto &get_jit_headers(Context *context) noexcept {
         {"vector_types.h", text_file_contents(context->runtime_path("include") / "core" / "vector_types.h")},
         {"matrix_types.h", text_file_contents(context->runtime_path("include") / "core" / "matrix_types.h")},
         {"data_types.h", text_file_contents(context->runtime_path("include") / "core" / "data_types.h")},
-        {"math_helpers.h", text_file_contents(context->runtime_path("include") / "core" / "math_helpers.h")},
-        {"texture_helpers.h", texture_jit_header}};
+        {"math_util.h", text_file_contents(context->runtime_path("include") / "core" / "math_helpers.h")},
+        {"texture_util.h", texture_jit_header}};
     return headers;
 }
 
