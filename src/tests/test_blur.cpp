@@ -37,7 +37,7 @@ void blur_x_or_y(Texture &input, Texture &output, int width, int height, int rx,
 int main(int argc, char *argv[]) {
     
     Context context{argc, argv};
-    auto device = Device::create(&context, "cuda");
+    auto device = Device::create(&context);
     
     auto image = cv::imread("data/images/luisa.png", cv::IMREAD_COLOR);
     if (image.type() == CV_8UC3) { cv::cvtColor(image, image, cv::COLOR_BGR2BGRA); }

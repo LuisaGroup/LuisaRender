@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
     try {
 
         Context context{argc, argv};
-        auto device = Device::create(&context, "cuda");
+        auto device = Device::create(&context);
 
         {// playground
             auto image = cv::imread("data/images/luisa.png", cv::IMREAD_COLOR);

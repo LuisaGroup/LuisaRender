@@ -14,34 +14,60 @@
 
 namespace luisa {
 
+using cxxopts::value;
+
 class Context : Noncopyable {
 
+public:
+    struct DeviceSelection {
+        std::string backend;
+        uint index;
+        DeviceSelection(std::string_view backend, uint index) noexcept : backend{backend}, index{index} {}
+    };
+
 private:
-    std::filesystem::path _runtime_directory;
-    std::filesystem::path _working_directory;
-    mutable std::map<std::filesystem::path, DynamicModuleHandle, std::less<>> _loaded_modules;
-    
+    int _argc;
+    const char **_argv;
+    std::filesystem::path _rundir;
+    std::filesystem::path _workdir;
+    std::optional<std::vector<DeviceSelection>> _devices;
+    cxxopts::Options _cli_options;
+    std::optional<cxxopts::ParseResult> _parsed_cli_options;
+    std::map<std::filesystem::path, DynamicModuleHandle, std::less<>> _loaded_modules;
+
+    [[nodiscard]] const cxxopts::ParseResult &_parse_result() noexcept;
+    [[nodiscard]] const std::filesystem::path &_runtime_dir() noexcept;
+    [[nodiscard]] const std::filesystem::path &_working_dir() noexcept;
+
     static bool _create_folder_if_necessary(const std::filesystem::path &path) noexcept;
 
 public:
-    Context(int argc, const char *const argv[]);
-    Context(const std::filesystem::path &runtime_dir, const std::filesystem::path &working_dir);
+    Context(int argc, char *argv[]);
     ~Context() noexcept;
-    bool create_working_folder(const std::filesystem::path &name) const noexcept;
-    bool create_cache_folder(const std::filesystem::path &name) const noexcept;
-    [[nodiscard]] std::filesystem::path include_path(const std::filesystem::path &name = {}) const noexcept;
-    [[nodiscard]] std::filesystem::path working_path(const std::filesystem::path &name = {}) const noexcept;
-    [[nodiscard]] std::filesystem::path runtime_path(const std::filesystem::path &name = {}) const noexcept;
-    [[nodiscard]] std::filesystem::path cache_path(const std::filesystem::path &name = {}) const noexcept;
-    
+    bool create_working_folder(const std::filesystem::path &name) noexcept;
+    bool create_cache_folder(const std::filesystem::path &name) noexcept;
+    [[nodiscard]] std::filesystem::path include_path(const std::filesystem::path &name = {}) noexcept;
+    [[nodiscard]] std::filesystem::path working_path(const std::filesystem::path &name = {}) noexcept;
+    [[nodiscard]] std::filesystem::path runtime_path(const std::filesystem::path &name = {}) noexcept;
+    [[nodiscard]] std::filesystem::path cache_path(const std::filesystem::path &name = {}) noexcept;
+
     template<typename F>
-    [[nodiscard]] auto load_dynamic_function(const std::filesystem::path &path, std::string_view module, std::string_view function) const {
+    [[nodiscard]] auto load_dynamic_function(const std::filesystem::path &path, std::string_view module, std::string_view function) {
         LUISA_EXCEPTION_IF(module.empty(), "Empty name given for dynamic module");
         auto module_path = std::filesystem::canonical(path / serialize(LUISA_DLL_PREFIX, module, LUISA_DLL_EXTENSION));
         auto iter = _loaded_modules.find(module_path);
         if (iter == _loaded_modules.cend()) { iter = _loaded_modules.emplace(module_path, load_dynamic_module(module_path)).first; }
         return load_dynamic_symbol<F>(iter->second, std::string{function});
     }
+    
+    void add_cli_option(std::string opt_name, std::string desc, std::shared_ptr<cxxopts::Value> value) {
+        _cli_options.add_options()(std::move(opt_name), std::move(desc), std::move(value));
+    }
+
+    template<typename T>
+    [[nodiscard]] T cli_option(const std::string &opt_name) { return _parse_result()[opt_name].as<T>(); }
+    
+    const std::vector<DeviceSelection> &devices() noexcept;
 };
 
-}
+}// namespace luisa

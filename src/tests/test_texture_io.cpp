@@ -10,7 +10,7 @@ using namespace luisa::compute::dsl;
 int main(int argc, char *argv[]) {
     
     Context context{argc, argv};
-    auto device = Device::create(&context, "cuda");
+    auto device = Device::create(&context);
     
     constexpr auto width = 1280u;
     constexpr auto height = 720u;

@@ -64,7 +64,7 @@ public:
 
     virtual void synchronize() = 0;
 
-    static std::unique_ptr<Device> create(Context *context, std::string_view name, uint32_t device_id = 0);
+    [[nodiscard]] static std::unique_ptr<Device> create(Context *context, uint32_t selection_id = 0u);
 };
 
 using DeviceCreator = Device *(Context *, uint32_t);
