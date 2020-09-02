@@ -10,6 +10,13 @@ target_link_libraries(spdlog_config INTERFACE spdlog::spdlog)
 add_library(jitify_config INTERFACE)
 target_include_directories(jitify_config INTERFACE ext)
 
+set(CXXOPTS_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(CXXOPTS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(CXXOPTS_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+add_subdirectory(ext/cxxopts)
+add_library(cxxopts_config INTERFACE)
+target_link_libraries(cxxopts_config INTERFACE cxxopts::cxxopts)
+
 add_subdirectory(core)
 add_subdirectory(compute)
 add_subdirectory(backends)

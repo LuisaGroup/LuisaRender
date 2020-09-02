@@ -4,3 +4,6 @@
 [submodule "src/ext/spdlog"]
 	path = src/ext/spdlog
 	url = https://github.com/gabime/spdlog.git
+[submodule "src/ext/cxxopts"]
+	path = src/ext/cxxopts
+	url = https://github.com/jarro2783/cxxopts.git

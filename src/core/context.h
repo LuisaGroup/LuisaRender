@@ -7,6 +7,8 @@
 #include <filesystem>
 #include <map>
 
+#include <cxxopts.hpp>
+
 #include <core/concepts.h>
 #include <core/platform.h>
 

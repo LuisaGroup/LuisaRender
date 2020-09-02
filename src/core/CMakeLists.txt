@@ -5,7 +5,7 @@ add_library(luisacore SHARED ${HEADER_FILES} ${SOURCE_FILES})
 target_compile_features(luisacore PUBLIC c_std_11 cxx_std_17)
 target_compile_definitions(luisacore PUBLIC NOMINMAX)
 
-target_link_libraries(luisacore PUBLIC spdlog_config luisaheaders)
+target_link_libraries(luisacore PUBLIC spdlog_config cxxopts_config luisaheaders)
 set_target_properties(luisacore PROPERTIES
                       PUBLIC_HEADER "${HEADER_FILES}"
                       LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/"
