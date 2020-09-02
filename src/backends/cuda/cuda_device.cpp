@@ -128,70 +128,91 @@ std::unique_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) {
     auto iter = _kernel_cache.find(digest);
     
     if (iter == _kernel_cache.end()) {
+    
+        std::ostringstream ss;
+        for (auto d : digest) { ss << std::setfill('0') << std::setw(8) << std::hex << std::uppercase << d; }
+        auto digest_str = ss.str();
+        auto cache_file_path = _context->cache_path(digest_str.append(".ptx"));
+        LUISA_INFO("No cache found for kernel \"", function.name(), "\" in memory, searching on disk: ", cache_file_path);
         
-        LUISA_INFO("No compilation cache found for kernel \"", function.name(), "\", compiling from source...");
-        
-        auto &&headers = jitify::detail::get_jitsafe_headers_map();
-        std::vector<const char *> header_names;
-        std::vector<const char *> header_sources;
-        header_names.reserve(headers.size());
-        header_sources.reserve(headers.size());
-        for (auto &&header_item : headers) {
-            header_names.emplace_back(header_item.first.c_str());
-            header_sources.emplace_back(header_item.second.c_str());
+        if (std::filesystem::exists(cache_file_path)) {
+            LUISA_INFO("Cache hit for kernel \"", function.name(), "\" on disk, compilation skipped.");
+            auto ptx = text_file_contents(cache_file_path);
+            CUmodule module;
+            CUfunction kernel;
+            CUDA_CHECK(cuModuleLoadData(&module, ptx.data()));
+            CUDA_CHECK(cuModuleGetFunction(&kernel, module, function.name().c_str()));
+            _modules.emplace_back(module);
+            iter = _kernel_cache.emplace(digest, kernel).first;
+        } else {
+            
+            LUISA_INFO("No cache found for kernel \"", function.name(), "\" on disk, compiling from source...");
+            auto &&headers = jitify::detail::get_jitsafe_headers_map();
+            std::vector<const char *> header_names;
+            std::vector<const char *> header_sources;
+            header_names.reserve(headers.size());
+            header_sources.reserve(headers.size());
+            for (auto &&header_item : headers) {
+                header_names.emplace_back(header_item.first.c_str());
+                header_sources.emplace_back(header_item.second.c_str());
+            }
+
+            auto &&luisa_headers = get_jit_headers(_context);
+            for (auto &&header_item : luisa_headers) {
+                header_names.emplace_back(header_item.first);
+                header_sources.emplace_back(header_item.second.c_str());
+            }
+
+            nvrtcProgram prog;
+            NVRTC_CHECK(nvrtcCreateProgram(&prog, src.c_str(), serialize(function.name(), ".cu").c_str(), header_sources.size(), header_sources.data(), header_names.data()));// includeNames
+
+            auto arch_opt = serialize("--gpu-architecture=compute_", _compute_capability);
+            auto cuda_version_opt = serialize("-DCUDA_VERSION=", CUDART_VERSION);
+            const char *opts[] = {
+                arch_opt.c_str(),
+                "--std=c++17",
+                "--use_fast_math",
+                "-default-device",
+                "-restrict",
+                "-ewp",
+                "-dw",
+                "-w",
+                cuda_version_opt.c_str()};
+            nvrtcCompileProgram(prog, sizeof(opts) / sizeof(const char *), opts);// options
+
+            size_t log_size;
+            NVRTC_CHECK(nvrtcGetProgramLogSize(prog, &log_size));
+            if (log_size > 1u) {
+                std::string log;
+                log.resize(log_size - 1u);
+                NVRTC_CHECK(nvrtcGetProgramLog(prog, log.data()));
+                LUISA_INFO("Compile log: ", log);
+            }
+
+            size_t ptx_size;
+            NVRTC_CHECK(nvrtcGetPTXSize(prog, &ptx_size));
+            std::string ptx;
+            ptx.resize(ptx_size - 1u);
+            NVRTC_CHECK(nvrtcGetPTX(prog, ptx.data()));
+            NVRTC_CHECK(nvrtcDestroyProgram(&prog));
+
+            jitify::detail::ptx_remove_unused_globals(&ptx);
+            //        LUISA_INFO("Generated PTX:\n", ptx);
+
+            CUmodule module;
+            CUfunction kernel;
+            CUDA_CHECK(cuModuleLoadData(&module, ptx.data()));
+            CUDA_CHECK(cuModuleGetFunction(&kernel, module, function.name().c_str()));
+            _modules.emplace_back(module);
+            
+            LUISA_INFO("Writing cache for compiled kernel \"", function.name(), "\" to disk: ", cache_file_path);
+            std::ofstream ptx_file{cache_file_path};
+            ptx_file << ptx;
+            
+            iter = _kernel_cache.emplace(digest, kernel).first;
         }
-        
-        auto &&luisa_headers = get_jit_headers(_context);
-        for (auto &&header_item : luisa_headers) {
-            header_names.emplace_back(header_item.first);
-            header_sources.emplace_back(header_item.second.c_str());
-        }
-        
-        nvrtcProgram prog;
-        NVRTC_CHECK(nvrtcCreateProgram(&prog, src.c_str(), serialize(function.name(), ".cu").c_str(), header_sources.size(), header_sources.data(), header_names.data()));// includeNames
-        
-        auto arch_opt = serialize("--gpu-architecture=compute_", _compute_capability);
-        auto cuda_version_opt = serialize("-DCUDA_VERSION=", CUDART_VERSION);
-        const char *opts[] = {
-            arch_opt.c_str(),
-            "--std=c++17",
-            "--use_fast_math",
-            "-default-device",
-            "-restrict",
-            "-ewp",
-            "-dw",
-            "-w",
-            cuda_version_opt.c_str()};
-        nvrtcCompileProgram(prog, sizeof(opts) / sizeof(const char *), opts);// options
-        
-        size_t log_size;
-        NVRTC_CHECK(nvrtcGetProgramLogSize(prog, &log_size));
-        if (log_size > 1u) {
-            std::string log;
-            log.resize(log_size - 1u);
-            NVRTC_CHECK(nvrtcGetProgramLog(prog, log.data()));
-            LUISA_INFO("Compile log: ", log);
-        }
-        
-        size_t ptx_size;
-        NVRTC_CHECK(nvrtcGetPTXSize(prog, &ptx_size));
-        std::string ptx;
-        ptx.resize(ptx_size - 1u);
-        NVRTC_CHECK(nvrtcGetPTX(prog, ptx.data()));
-        NVRTC_CHECK(nvrtcDestroyProgram(&prog));
-        
-        jitify::detail::ptx_remove_unused_globals(&ptx);
-//        LUISA_INFO("Generated PTX:\n", ptx);
-        
-        CUmodule module;
-        CUfunction kernel;
-        CUDA_CHECK(cuModuleLoadData(&module, ptx.data()));
-        CUDA_CHECK(cuModuleGetFunction(&kernel, module, function.name().c_str()));
-        _modules.emplace_back(module);
-        
-        iter = _kernel_cache.emplace(digest, kernel).first;
     } else {
-        LUISA_INFO("Cache hit for kernel \"", function.name(), "\", compilation skipped.");
+        LUISA_INFO("Cache hit for kernel \"", function.name(), "\" in memory, compilation skipped.");
     }
     
     return std::make_unique<CudaKernel>(iter->second, ArgumentEncoder{function.arguments()});

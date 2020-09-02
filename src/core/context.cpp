@@ -22,7 +22,7 @@ bool Context::create_cache_folder(const std::filesystem::path &name) noexcept { 
 std::filesystem::path Context::include_path(const std::filesystem::path &name) noexcept { return _runtime_dir() / "include" / name; }
 std::filesystem::path Context::working_path(const std::filesystem::path &name) noexcept { return _working_dir() / name; }
 std::filesystem::path Context::runtime_path(const std::filesystem::path &name) noexcept { return _runtime_dir() / name; }
-std::filesystem::path Context::cache_path(const std::filesystem::path &name) noexcept { return _runtime_dir() / "cache" / name; }
+std::filesystem::path Context::cache_path(const std::filesystem::path &name) noexcept { return _working_dir() / "cache" / name; }
 
 Context::~Context() noexcept {
     for (auto &&module_item : _loaded_modules) { destroy_dynamic_module(module_item.second); }
@@ -33,9 +33,10 @@ Context::Context(int argc, char *argv[])
       _argv{const_cast<const char **>(argv)},
       _cli_options{std::filesystem::path{argv[0]}.filename().string()} {
 
-    _cli_options.add_options()("d,devices", "Compute Devices", cxxopts::value<std::vector<std::string>>()->default_value(""))
-                    ("rundir", "Runtime Directory", cxxopts::value<std::filesystem::path>()->default_value(std::filesystem::canonical(argv[0]).parent_path().parent_path().string()))
-                    ("workdir", "Working Directory", cxxopts::value<std::filesystem::path>()->default_value(std::filesystem::canonical(std::filesystem::current_path()).string()));
+    _cli_options.add_options()("d,devices", "Select compute devices", cxxopts::value<std::vector<std::string>>()->default_value(""))
+                    ("rundir", "Specify runtime directory", cxxopts::value<std::filesystem::path>()->default_value(std::filesystem::canonical(argv[0]).parent_path().parent_path().string()))
+                    ("workdir", "Specify working directory", cxxopts::value<std::filesystem::path>()->default_value(std::filesystem::canonical(std::filesystem::current_path()).string()))
+                    ("C,clearcache", "Clear cached kernel compilation", cxxopts::value<bool>());
 }
 
 const cxxopts::ParseResult &Context::_parse_result() noexcept {
@@ -58,6 +59,10 @@ const std::filesystem::path &Context::_working_dir() noexcept {
         LUISA_EXCEPTION_IF(!std::filesystem::exists(_workdir) || !std::filesystem::is_directory(_workdir), "Invalid working directory: ", _workdir);
         LUISA_INFO("Working directory: ", _workdir);
         auto cache_directory = _workdir / "cache";
+        if (_parse_result()["clearcache"].as<bool>() && std::filesystem::exists(cache_directory)) {
+            LUISA_INFO("Removing cache directory: ", cache_directory);
+            std::filesystem::remove_all(cache_directory);
+        }
         LUISA_EXCEPTION_IF(!_create_folder_if_necessary(cache_directory), "Failed to create cache directory: ", cache_directory);
     }
     return _workdir;
