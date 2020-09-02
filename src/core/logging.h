@@ -7,64 +7,88 @@
 #include <exception>
 #include <iostream>
 
-#include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/spdlog.h>
 
 #include "string_manipulation.h"
 
-namespace luisa { inline namespace utility {
+namespace luisa::logging {
 
 spdlog::logger &logger() noexcept;
 
-template<typename ...Args>
-inline void LUISA_INFO(Args &&...args) noexcept {
+template<typename... Args>
+inline void info(Args &&... args) noexcept {
     logger().info(serialize(std::forward<Args>(args)...));
 }
 
-template<typename ...Args>
-inline void LUISA_WARNING(Args &&...args) noexcept {
+template<typename... Args>
+inline void warning(Args &&... args) noexcept {
     logger().warn(serialize(std::forward<Args>(args)...));
 }
 
-template<typename ...Args>
-inline void LUISA_WARNING_IF(bool predicate, Args &&...args) noexcept {
-    if (predicate) { LUISA_WARNING(std::forward<Args>(args)...); }
+template<typename... Args>
+inline void warning_if(bool predicate, Args &&... args) noexcept {
+    if (predicate) { warning(std::forward<Args>(args)...); }
 }
 
-template<typename ...Args>
-inline void LUISA_WARNING_IF_NOT(bool predicate, Args &&...args) noexcept {
-    LUISA_WARNING_IF(!predicate, std::forward<Args>(args)...);
+template<typename... Args>
+inline void warning_if_not(bool predicate, Args &&... args) noexcept {
+    warning_if(!predicate, std::forward<Args>(args)...);
 }
 
-template<typename ...Args>
-[[noreturn]] inline void LUISA_EXCEPTION(Args &&...args) {
+template<typename... Args>
+[[noreturn]] inline void exception(Args &&... args) {
     throw std::runtime_error{serialize(std::forward<Args>(args)...)};
 }
 
-template<typename ...Args>
-inline void LUISA_EXCEPTION_IF(bool predicate, Args &&...args) {
-    if (predicate) { LUISA_EXCEPTION(std::forward<Args>(args)...); }
+template<typename... Args>
+inline void exception_if(bool predicate, Args &&... args) {
+    if (predicate) { exception(std::forward<Args>(args)...); }
 }
 
-template<typename ...Args>
-inline void LUISA_EXCEPTION_IF_NOT(bool predicate, Args &&...args) {
-    LUISA_EXCEPTION_IF(!predicate, std::forward<Args>(args)...);
+template<typename... Args>
+inline void exception_if_not(bool predicate, Args &&... args) {
+    exception_if(!predicate, std::forward<Args>(args)...);
 }
 
-template<typename ...Args>
-[[noreturn]] inline void LUISA_ERROR(Args &&...args) {
+template<typename... Args>
+[[noreturn]] inline void error(Args &&... args) {
     logger().error(serialize(std::forward<Args>(args)...));
     exit(-1);
 }
 
-template<typename ...Args>
-inline void LUISA_ERROR_IF(bool predicate, Args &&...args) {
-    if (predicate) { LUISA_ERROR(std::forward<Args>(args)...); }
+template<typename... Args>
+inline void error_if(bool predicate, Args &&... args) {
+    if (predicate) { error(std::forward<Args>(args)...); }
 }
 
-template<typename ...Args>
-inline void LUISA_ERROR_IF_NOT(bool predicate, Args &&...args) {
-    LUISA_ERROR_IF(!predicate, std::forward<Args>(args)...);
+template<typename... Args>
+inline void error_if_not(bool predicate, Args &&... args) {
+    error_if(!predicate, std::forward<Args>(args)...);
 }
 
-}}
+}// namespace luisa::logging
+
+#define LUISA_INFO(...) \
+    ::luisa::logging::info(__VA_ARGS__)
+
+#define LUISA_WARNING(...) \
+    ::luisa::logging::warning(__VA_ARGS__, "\n    Source: ", __FILE__, ":", __LINE__)
+#define LUISA_WARNING_IF(...) \
+    ::luisa::logging::warning_if(__VA_ARGS__, "\n    Source: ", __FILE__, ":", __LINE__)
+#define LUISA_WARNING_IF_NOT(...) \
+    ::luisa::logging::warning_if_not(__VA_ARGS__, "\n    Source: ", __FILE__, ":", __LINE__)
+
+#define LUISA_EXCEPTION(...) \
+    ::luisa::logging::exception(__VA_ARGS__, "\n    Source: ", __FILE__, ":", __LINE__)
+#define LUISA_EXCEPTION_IF(...) \
+    ::luisa::logging::exception_if(__VA_ARGS__, "\n    Source: ", __FILE__, ":", __LINE__)
+#define LUISA_EXCEPTION_IF_NOT(...) \
+    ::luisa::logging::exception_if_not(__VA_ARGS__, "\n    Source: ", __FILE__, ":", __LINE__)
+
+#define LUISA_ERROR(...) \
+    ::luisa::logging::error(__VA_ARGS__, "\n    Source: ", __FILE__, ":", __LINE__)
+#define LUISA_ERROR_IF(...) \
+    ::luisa::logging::error_if(__VA_ARGS__, "\n    Source: ", __FILE__, ":", __LINE__)
+#define LUISA_ERROR_IF_NOT(...) \
+    ::luisa::logging::error_if_not(__VA_ARGS__, "\n    Source: ", __FILE__, ":", __LINE__)

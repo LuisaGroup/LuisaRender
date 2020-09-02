@@ -4,11 +4,11 @@
 
 #include "logging.h"
 
-namespace luisa { inline namespace utility {
+namespace luisa::logging {
 
 spdlog::logger &logger() noexcept {
     static auto l = spdlog::stdout_color_mt("console");
     return *l;
 }
 
-}}
+}
