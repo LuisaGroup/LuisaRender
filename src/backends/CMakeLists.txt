@@ -10,8 +10,7 @@ function(luisa_render_add_backend name)
     set_target_properties(${name} PROPERTIES
                           PUBLIC_HEADER "${BACKEND_SOURCES}"
                           LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/backends/"
-                          RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/backends/"
-                          WINDOWS_EXPORT_ALL_SYMBOLS ON)
+                          RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/backends/")
 endfunction()
 
 if (LUISA_RENDER_ENABLE_METAL)

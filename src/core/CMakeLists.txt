@@ -1,4 +1,4 @@
-file(GLOB HEADER_FILES *.h)
+file(GLOB HEADER_FILES RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" *.h)
 file(GLOB SOURCE_FILES *.cpp)
 
 add_library(luisacore SHARED ${HEADER_FILES} ${SOURCE_FILES})
@@ -13,4 +13,7 @@ set_target_properties(luisacore PROPERTIES
                       WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 add_library(luisarender::core ALIAS luisacore)
-file(COPY "${CMAKE_CURRENT_LIST_DIR}" DESTINATION "${CMAKE_BINARY_DIR}/include/")
+
+foreach (HEADER_FILE ${HEADER_FILES})
+    configure_file(${HEADER_FILE} "${CMAKE_BINARY_DIR}/include/${HEADER_FILE}" COPYONLY)
+endforeach ()
