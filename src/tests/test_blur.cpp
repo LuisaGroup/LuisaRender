@@ -21,13 +21,13 @@ void blur_x_or_y(Texture &input, Texture &output, int width, int height, int rx,
         for (auto dx = -rx; dx <= rx; dx++) {
             auto x = tx + dx;
             If (x >= 0 && x < width) {
-                sum += read(in, make_uint2(x, ty));
+                sum += make_float4(make_float3(read(in, make_uint2(x, ty))), 1.0f);
             };
         }
         for (auto dy = -ry; dy <= ry; dy++) {
             auto y = ty + dy;
             If (y >= 0 && y < height) {
-                sum += read(in, make_uint2(tx, y));
+                sum += make_float4(make_float3(read(in, make_uint2(tx, y))), 1.0f);
             };
         }
         write(out, thread_xy(), make_float4(make_float3(sum) / sum.a(), 1.0f));
@@ -37,7 +37,7 @@ void blur_x_or_y(Texture &input, Texture &output, int width, int height, int rx,
 int main(int argc, char *argv[]) {
     
     Context context{argc, argv};
-    auto device = Device::create(&context, "metal");
+    auto device = Device::create(&context, "cuda");
     
     auto image = cv::imread("data/images/luisa.png", cv::IMREAD_COLOR);
     if (image.type() == CV_8UC3) { cv::cvtColor(image, image, cv::COLOR_BGR2BGRA); }
@@ -57,6 +57,7 @@ int main(int argc, char *argv[]) {
     auto blur_x = device->compile_kernel([&] { blur_x_or_y(*texture, *temp_texture, width, height, rx, 0); });
     auto blur_y = device->compile_kernel([&] { blur_x_or_y(*texture, *temp_texture, width, height, 0, ry); });
     
+    LUISA_INFO("Processing...");
     device->launch([&](Dispatcher &dispatch) {
         dispatch(blur_x->parallelize(make_uint2(width, height)));
         dispatch(temp_texture->copy_to(*texture));
@@ -67,6 +68,7 @@ int main(int argc, char *argv[]) {
         dispatch(temp_texture->copy_to(image.data));
     });
     device->synchronize();
+    LUISA_INFO("Done.");
     
     cv::imshow("Result", image);
     cv::waitKey();
