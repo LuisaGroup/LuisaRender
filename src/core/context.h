@@ -18,9 +18,9 @@ class Context : Noncopyable {
 
 public:
     struct DeviceSelection {
-        std::string backend;
-        uint index;
-        DeviceSelection(std::string_view backend, uint index) noexcept : backend{backend}, index{index} {}
+        std::string backend_name;
+        uint32_t device_id;
+        DeviceSelection(std::string_view backend, uint32_t index) noexcept : backend_name{backend}, device_id{index} {}
     };
 
 private:

@@ -23,8 +23,8 @@ std::unique_ptr<Device> Device::create(Context *context, uint32_t selection_id) 
     }
     LUISA_ERROR_IF_NOT(selection_id < devices.size(), "Invalid device selection index: ", selection_id, ", max index is ", devices.size() - 1u, ".");
     auto &&selection = devices[selection_id];
-    auto create_device = context->load_dynamic_function<DeviceCreator>(context->runtime_path("bin") / "backends", selection.backend, "create");
-    return std::unique_ptr<Device>{create_device(context, selection.index)};
+    auto create_device = context->load_dynamic_function<DeviceCreator>(context->runtime_path("bin") / "backends", selection.backend_name, "create");
+    return std::unique_ptr<Device>{create_device(context, selection.device_id)};
 }
 
 }// namespace luisa::compute

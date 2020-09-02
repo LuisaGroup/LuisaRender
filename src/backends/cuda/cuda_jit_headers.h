@@ -57,7 +57,7 @@ constexpr auto texture_jit_header =
     "    return make_float4(0.0f);\n"
     "}\n"
     "\n"
-    "template<typename T>"
+    "template<typename T>\n"
     "inline void write(Tex2D<T> t, luisa::uint2 coord, luisa::float4 pixel) noexcept {\n"
     "    if constexpr (is_same_v<T, float>) {\n"
     "        surf2Dwrite<float>(pixel.x, t.surface, coord.x * 4u, coord.y);\n"

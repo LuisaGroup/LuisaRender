@@ -80,7 +80,7 @@ const std::vector<Context::DeviceSelection> &Context::devices() noexcept {
         }
         std::ostringstream ss;
         for (auto i = 0u; i < devices.size(); i++) {
-            ss << devices[i].backend << ":" << devices[i].index;
+            ss << devices[i].backend_name << ":" << devices[i].device_id;
             if (i != devices.size() - 1u) { ss << ", "; }
         }
         LUISA_INFO("Selected devices: ", ss.str());
