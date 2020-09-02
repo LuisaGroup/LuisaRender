@@ -66,41 +66,41 @@ struct alignas(detail::vector_alignment<T, N, is_packed>) Vector : detail::Vecto
     template<typename Index>
     [[nodiscard]] T operator[](Index i) const noexcept { return reinterpret_cast<const T(&)[N]>(*this)[i]; }
 
-#define MAKE_ASSIGN_OP(op)                         \
-    template<typename U>                           \
-    Vector &operator op(U rhs) noexcept {          \
-        static_assert(N == 2 || N == 3 || N == 4); \
-        if constexpr (N == 2) {                    \
-            Storage::x op rhs.x;                   \
-            Storage::y op rhs.y;                   \
-        } else if constexpr (N == 3) {             \
-            Storage::x op rhs.x;                   \
-            Storage::y op rhs.y;                   \
-            Storage::z op rhs.z;                   \
-        } else {                                   \
-            Storage::x op rhs.x;                   \
-            Storage::y op rhs.y;                   \
-            Storage::z op rhs.z;                   \
-            Storage::w op rhs.w;                   \
-        }                                          \
-        return *this;                              \
-    }                                              \
-    Vector &operator op(T rhs) noexcept {          \
-        static_assert(N == 2 || N == 3 || N == 4); \
-        if constexpr (N == 2) {                    \
-            Storage::x op rhs;                     \
-            Storage::y op rhs;                     \
-        } else if constexpr (N == 3) {             \
-            Storage::x op rhs;                     \
-            Storage::y op rhs;                     \
-            Storage::z op rhs;                     \
-        } else {                                   \
-            Storage::x op rhs;                     \
-            Storage::y op rhs;                     \
-            Storage::z op rhs;                     \
-            Storage::w op rhs;                     \
-        }                                          \
-        return *this;                              \
+#define MAKE_ASSIGN_OP(op)                                   \
+    template<bool packed>                                    \
+    Vector &operator op(Vector<T, N, packed> rhs) noexcept { \
+        static_assert(N == 2 || N == 3 || N == 4);           \
+        if constexpr (N == 2) {                              \
+            Storage::x op rhs.x;                             \
+            Storage::y op rhs.y;                             \
+        } else if constexpr (N == 3) {                       \
+            Storage::x op rhs.x;                             \
+            Storage::y op rhs.y;                             \
+            Storage::z op rhs.z;                             \
+        } else {                                             \
+            Storage::x op rhs.x;                             \
+            Storage::y op rhs.y;                             \
+            Storage::z op rhs.z;                             \
+            Storage::w op rhs.w;                             \
+        }                                                    \
+        return *this;                                        \
+    }                                                        \
+    Vector &operator op(T rhs) noexcept {                    \
+        static_assert(N == 2 || N == 3 || N == 4);           \
+        if constexpr (N == 2) {                              \
+            Storage::x op rhs;                               \
+            Storage::y op rhs;                               \
+        } else if constexpr (N == 3) {                       \
+            Storage::x op rhs;                               \
+            Storage::y op rhs;                               \
+            Storage::z op rhs;                               \
+        } else {                                             \
+            Storage::x op rhs;                               \
+            Storage::y op rhs;                               \
+            Storage::z op rhs;                               \
+            Storage::w op rhs;                               \
+        }                                                    \
+        return *this;                                        \
     }
 
     MAKE_ASSIGN_OP(+=)
@@ -300,4 +300,4 @@ constexpr bool none(bool2 v) noexcept { return !any(v); }
 constexpr bool none(bool3 v) noexcept { return !any(v); }
 constexpr bool none(bool4 v) noexcept { return !any(v); }
 
-}}// namespace luisa::vec
+}}// namespace luisa::vector
