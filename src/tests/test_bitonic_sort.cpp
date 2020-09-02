@@ -2,9 +2,9 @@
 // Created by Mike Smith on 2020/9/3.
 //
 
-#include <algorithm>
 #include <random>
 #include <vector>
+#include <algorithm>
 
 #include <compute/device.h>
 #include <compute/dsl.h>
@@ -27,10 +27,11 @@ int main(int argc, char *argv[]) {
 
     auto stride = 1u;
     auto step = 1u;
-
+    
     constexpr auto block_size = 1024u;
-
+    
     auto kernel = device->compile_kernel([&] {
+        
         Arg<float *> data{buffer};
         Arg<uint> cmp_stride_in{&stride};
         Arg<uint> cmp_step_in{&step};
@@ -57,22 +58,22 @@ int main(int argc, char *argv[]) {
         data[tid_y * block_size + lhs_index] = result.x();
         data[tid_y * block_size + rhs_index] = result.y();
     });
-
+    
     std::default_random_engine random{std::random_device{}()};
-
+    
     for (auto i = 0u; i < 20u; i++) {
         std::shuffle(host_buffer.begin(), host_buffer.end(), random);
         device->launch(buffer.copy_from(host_buffer.data()), [i] { LUISA_INFO("Copied #", i); });
+        device->launch([&](Dispatcher &dispatch) {
         for (stride = 2u; stride <= block_size; stride *= 2u) {
-            for (step = stride; step >= 2u; step /= 2u) {
-                device->launch(kernel->parallelize(make_uint2(block_size / 2u, buffer_size / block_size)));
+            for (step = stride; step >= 2; step /= 2) {
+                dispatch(kernel->parallelize(make_uint2(block_size / 2u, buffer_size / block_size)));
             }
-        }
-        device->launch([](Dispatcher &) {}, [i] { LUISA_INFO("Sorted #", i); });
+        } }, [i] { LUISA_INFO("Sorted #", i); });
     }
     device->launch(buffer.copy_to(host_buffer.data()));
     device->synchronize();
-
+    
     LUISA_INFO("Checking...");
     for (auto i = 0u; i < buffer_size; i += block_size) {
         LUISA_ERROR_IF_NOT(std::is_sorted(host_buffer.cbegin() + i, host_buffer.cbegin() + i + block_size), "Fuck!");
