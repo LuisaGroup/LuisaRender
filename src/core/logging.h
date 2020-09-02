@@ -6,6 +6,7 @@
 
 #include <exception>
 #include <iostream>
+#include <filesystem>
 
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
@@ -72,23 +73,25 @@ inline void error_if_not(bool predicate, Args &&... args) {
 #define LUISA_INFO(...) \
     ::luisa::logging::info(__VA_ARGS__)
 
+#define LUISA_SOURCE_LOCATION __FILE__ , ":", __LINE__
+
 #define LUISA_WARNING(...) \
-    ::luisa::logging::warning(__VA_ARGS__, "\n    Source: ", __FILE__, ":", __LINE__)
+    ::luisa::logging::warning(__VA_ARGS__, "\n    Source: ", LUISA_SOURCE_LOCATION)
 #define LUISA_WARNING_IF(...) \
-    ::luisa::logging::warning_if(__VA_ARGS__, "\n    Source: ", __FILE__, ":", __LINE__)
+    ::luisa::logging::warning_if(__VA_ARGS__, "\n    Source: ", LUISA_SOURCE_LOCATION)
 #define LUISA_WARNING_IF_NOT(...) \
-    ::luisa::logging::warning_if_not(__VA_ARGS__, "\n    Source: ", __FILE__, ":", __LINE__)
+    ::luisa::logging::warning_if_not(__VA_ARGS__, "\n    Source: ", LUISA_SOURCE_LOCATION)
 
 #define LUISA_EXCEPTION(...) \
-    ::luisa::logging::exception(__VA_ARGS__, "\n    Source: ", __FILE__, ":", __LINE__)
+    ::luisa::logging::exception(__VA_ARGS__, "\n    Source: ", LUISA_SOURCE_LOCATION)
 #define LUISA_EXCEPTION_IF(...) \
-    ::luisa::logging::exception_if(__VA_ARGS__, "\n    Source: ", __FILE__, ":", __LINE__)
+    ::luisa::logging::exception_if(__VA_ARGS__, "\n    Source: ", LUISA_SOURCE_LOCATION)
 #define LUISA_EXCEPTION_IF_NOT(...) \
-    ::luisa::logging::exception_if_not(__VA_ARGS__, "\n    Source: ", __FILE__, ":", __LINE__)
+    ::luisa::logging::exception_if_not(__VA_ARGS__, "\n    Source: ", LUISA_SOURCE_LOCATION)
 
 #define LUISA_ERROR(...) \
-    ::luisa::logging::error(__VA_ARGS__, "\n    Source: ", __FILE__, ":", __LINE__)
+    ::luisa::logging::error(__VA_ARGS__, "\n    Source: ", LUISA_SOURCE_LOCATION)
 #define LUISA_ERROR_IF(...) \
-    ::luisa::logging::error_if(__VA_ARGS__, "\n    Source: ", __FILE__, ":", __LINE__)
+    ::luisa::logging::error_if(__VA_ARGS__, "\n    Source: ", LUISA_SOURCE_LOCATION)
 #define LUISA_ERROR_IF_NOT(...) \
-    ::luisa::logging::error_if_not(__VA_ARGS__, "\n    Source: ", __FILE__, ":", __LINE__)
+    ::luisa::logging::error_if_not(__VA_ARGS__, "\n    Source: ", LUISA_SOURCE_LOCATION)
