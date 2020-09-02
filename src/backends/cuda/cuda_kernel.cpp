@@ -57,7 +57,6 @@ ArgumentEncoder::ArgumentEncoder(const std::vector<Variable> &arguments) : _alig
             std::vector<std::byte> bytes(size);
             reinterpret_cast<CUdeviceptr *>(bytes.data())[0] = device_ptr;
             _immutable_arguments.emplace_back(std::move(bytes), align_offset(alignment));
-            LUISA_INFO("Buffer offset: ", offset);
             offset += size;
         } else if (arg.is_texture_argument()) {
             auto alignment = 8u;
@@ -68,17 +67,14 @@ ArgumentEncoder::ArgumentEncoder(const std::vector<Variable> &arguments) : _alig
             reinterpret_cast<CUtexObject *>(bytes.data())[0] = texture;
             reinterpret_cast<CUsurfObject *>(bytes.data())[1] = surface;
             _immutable_arguments.emplace_back(std::move(bytes), align_offset(alignment));
-            LUISA_INFO("Texture offset: ", offset);
             offset += size;
         } else if (arg.is_immutable_argument()) {
             auto alignment = arg.type()->alignment;
             _immutable_arguments.emplace_back(arg.immutable_data(), align_offset(alignment));
-            LUISA_INFO("Immutable data alignment: ", alignment, ", offset: ", offset);
             offset += arg.immutable_data().size();
         } else if (arg.is_uniform_argument()) {
             auto alignment = arg.type()->alignment;
             _uniform_bindings.emplace_back(arg.uniform_data(), arg.type()->size, align_offset(alignment));
-            LUISA_INFO("Uniform data alignment: ", alignment, ", offset: ", offset);
             offset += arg.immutable_data().size();
         } else {
             LUISA_EXCEPTION("Unsupported argument type.");

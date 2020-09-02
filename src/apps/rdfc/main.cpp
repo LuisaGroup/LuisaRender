@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
         DualBufferVariance dual_variance{*device, 10, *variance_texture, *color_a_texture, *color_b_texture, *variance_texture};
         NonLocalMeansFilter filter{*device, 5, 3, 1.0f, *color_texture, *variance_texture, *color_a_texture, *color_b_texture, *color_a_texture, *color_b_texture};
 
-        auto add_half_buffers = device->compile_kernel([&] {
+        auto add_half_buffers = device->compile_kernel("add_half_buffers", [&] {
             Arg<ReadOnlyTex2D> color_a{*color_a_texture};
             Arg<ReadOnlyTex2D> color_b{*color_b_texture};
             Arg<WriteOnlyTex2D> color{*color_texture};
