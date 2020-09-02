@@ -7,3 +7,5 @@ target_link_libraries(test_texture_io PRIVATE ${OpenCV_LIBS})
 
 luisa_render_add_application(test_blur SOURCES test_blur.cpp)
 target_link_libraries(test_blur PRIVATE ${OpenCV_LIBS})
+
+luisa_render_add_application(test_bitonic_sort SOURCES test_bitonic_sort.cpp)
