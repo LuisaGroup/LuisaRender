@@ -95,7 +95,7 @@ inline const auto &get_jit_headers(Context *context) noexcept {
         {"vector_types.h", text_file_contents(context->runtime_path("include") / "core" / "vector_types.h")},
         {"matrix_types.h", text_file_contents(context->runtime_path("include") / "core" / "matrix_types.h")},
         {"data_types.h", text_file_contents(context->runtime_path("include") / "core" / "data_types.h")},
-        {"math_util.h", text_file_contents(context->runtime_path("include") / "core" / "math_helpers.h")},
+        {"math_util.h", text_file_contents(context->runtime_path("include") / "core" / "math_util.h")},
         {"texture_util.h", texture_jit_header}};
     return headers;
 }

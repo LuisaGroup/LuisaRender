@@ -33,7 +33,7 @@ public:
 private:
     CUdevice _handle{};
     CUcontext _ctx{};
-    CUstream _stream{};
+    CUstream _dispatch_stream{};
     CUevent _sync_event{};
     std::vector<CUmodule> _modules;
     std::map<SHA1::Digest, CUfunction> _kernel_cache;
@@ -51,7 +51,7 @@ protected:
     std::unique_ptr<Texture> _allocate_texture(uint32_t width, uint32_t height, compute::PixelFormat format) override;
     std::unique_ptr<Kernel> _compile_kernel(const compute::dsl::Function &function) override;
 
-    void _launch(const std::function<void(Dispatcher &)> &dispatch) override;
+    void _launch(const std::function<void(Dispatcher &)> &work) override;
 
 public:
     explicit CudaDevice(Context *context, uint32_t device_id);
@@ -60,7 +60,7 @@ public:
 };
 
 void CudaDevice::synchronize() {
-    CUDA_CHECK(cuEventRecord(_sync_event, _stream));
+    CUDA_CHECK(cuEventRecord(_sync_event, _dispatch_stream));
     CUDA_CHECK(cuEventSynchronize(_sync_event));
 }
 
@@ -74,7 +74,8 @@ CudaDevice::CudaDevice(Context *context, uint32_t device_id) : Device{context} {
     LUISA_ERROR_IF_NOT(device_id < count, "Invalid CUDA device index ", device_id, ": max available index is ", count - 1, ".");
 
     CUDA_CHECK(cuDeviceGet(&_handle, device_id));
-    CUDA_CHECK(cuCtxCreate(&_ctx, 0, _handle));
+    CUDA_CHECK(cuDevicePrimaryCtxRetain(&_ctx, _handle));
+    CUDA_CHECK(cuCtxSetCurrent(_ctx));
 
     char buffer[1024];
     CUDA_CHECK(cuDeviceGetName(buffer, 1024, _handle));
@@ -85,15 +86,14 @@ CudaDevice::CudaDevice(Context *context, uint32_t device_id) : Device{context} {
     _compute_capability = static_cast<uint>(major * 10 + minor);
     LUISA_INFO("Created CUDA device #", device_id, ", description: name = ", buffer, ", arch = sm_", _compute_capability, ".");
 
-    CUDA_CHECK(cuStreamCreate(&_stream, 0));
+    CUDA_CHECK(cuStreamCreate(&_dispatch_stream, 0));
     CUDA_CHECK(cuEventCreate(&_sync_event, CU_EVENT_BLOCKING_SYNC | CU_EVENT_DISABLE_TIMING));
     
-    _dispatch_thread = std::thread{[this, device_id] {
+    _dispatch_thread = std::thread{[this, device = _handle] {
         
-        CUdevice device;
         CUcontext ctx;
-        CUDA_CHECK(cuDeviceGet(&device, device_id));
-        CUDA_CHECK(cuCtxCreate(&ctx, 0, device));
+        CUDA_CHECK(cuDevicePrimaryCtxRetain(&ctx, device));
+        CUDA_CHECK(cuCtxSetCurrent(ctx));
         while (!_stop_signal.load()) {
             using namespace std::chrono_literals;
             std::unique_lock lock{_dispatch_mutex};
@@ -104,16 +104,17 @@ CudaDevice::CudaDevice(Context *context, uint32_t device_id) : Device{context} {
                 dispatch->wait();
             }
         }
-        CUDA_CHECK(cuCtxDestroy(ctx));
+        CUDA_CHECK(cuDevicePrimaryCtxRelease(device));
     }};
 }
 
 CudaDevice::~CudaDevice() noexcept {
     _stop_signal = true;
     _dispatch_thread.join();
-    CUDA_CHECK(cuStreamDestroy(_stream));
+    CUDA_CHECK(cuStreamDestroy(_dispatch_stream));
+    CUDA_CHECK(cuEventDestroy(_sync_event));
     for (auto module : _modules) { CUDA_CHECK(cuModuleUnload(module)); }
-    CUDA_CHECK(cuCtxDestroy(_ctx));
+    CUDA_CHECK(cuDevicePrimaryCtxRelease(_handle));
 }
 
 std::unique_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) {
@@ -224,9 +225,9 @@ std::shared_ptr<Buffer> CudaDevice::_allocate_buffer(size_t size) {
     return std::make_shared<CudaBuffer>(buffer, size);
 }
 
-void CudaDevice::_launch(const std::function<void(Dispatcher &)> &dispatch) {
-    auto dispatcher = std::make_unique<CudaDispatcher>(_stream);
-    dispatch(*dispatcher);
+void CudaDevice::_launch(const std::function<void(Dispatcher &)> &work) {
+    auto dispatcher = std::make_unique<CudaDispatcher>(_dispatch_stream);
+    (*dispatcher)(work);
     dispatcher->commit();
     {
         std::lock_guard lock{_dispatch_mutex};

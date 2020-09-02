@@ -15,5 +15,5 @@ set_target_properties(luisacore PROPERTIES
 add_library(luisarender::core ALIAS luisacore)
 
 foreach (HEADER_FILE ${HEADER_FILES})
-    configure_file(${HEADER_FILE} "${CMAKE_BINARY_DIR}/include/${HEADER_FILE}" COPYONLY)
+    configure_file(${HEADER_FILE} "${CMAKE_BINARY_DIR}/include/core/${HEADER_FILE}" COPYONLY)
 endforeach ()

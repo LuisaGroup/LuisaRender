@@ -4,8 +4,8 @@
 
 #pragma
 
-#include <cuda.h>
 #include <compute/dispatcher.h>
+#include <cuda.h>
 
 #include "cuda_check.h"
 
@@ -28,14 +28,18 @@ public:
         CUDA_CHECK(cuEventCreate(&_event, CU_EVENT_DISABLE_TIMING));
     }
 
-    ~CudaDispatcher() noexcept override { CUDA_CHECK(cuEventDestroy(_event)); }
+    ~CudaDispatcher() noexcept override {
+        CUDA_CHECK(cuEventDestroy(_event));
+    }
 
     [[nodiscard]] CUstream handle() const noexcept { return _handle; }
 
     void commit() noexcept override {
         CUDA_CHECK(cuLaunchHostFunc(
             _handle, [](void *self) {
-                for (auto &&cb : reinterpret_cast<CudaDispatcher *>(self)->_callbacks) { cb(); }
+                for (auto &&cb : reinterpret_cast<CudaDispatcher *>(self)->_callbacks) {
+                    cb();
+                }
             },
             this));
         CUDA_CHECK(cuEventRecord(_event, _handle));

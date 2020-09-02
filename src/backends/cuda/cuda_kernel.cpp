@@ -75,7 +75,7 @@ ArgumentEncoder::ArgumentEncoder(const std::vector<Variable> &arguments) : _alig
         } else if (arg.is_uniform_argument()) {
             auto alignment = arg.type()->alignment;
             _uniform_bindings.emplace_back(arg.uniform_data(), arg.type()->size, align_offset(alignment));
-            offset += arg.immutable_data().size();
+            offset += arg.type()->size;
         } else {
             LUISA_EXCEPTION("Unsupported argument type.");
         }

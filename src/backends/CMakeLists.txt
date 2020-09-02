@@ -21,4 +21,6 @@ if (LUISA_RENDER_ENABLE_CUDA)
     add_subdirectory(cuda)
 endif ()
 
+add_subdirectory(cpu)
+
 add_library(luisarender::backends ALIAS luisabackends)

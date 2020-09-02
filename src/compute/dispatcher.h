@@ -26,6 +26,10 @@ protected:
     std::vector<std::function<void()>> _callbacks;
 
 public:
+    Dispatcher() noexcept = default;
+    Dispatcher(Dispatcher &&) noexcept = default;
+    Dispatcher &operator=(Dispatcher &&) noexcept = default;
+    
     virtual ~Dispatcher() noexcept = default;
     
     virtual void commit() = 0;

@@ -2,5 +2,8 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/ext/cxxopts" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/ext/jitify" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/ext/spdlog" vcs="Git" />
   </component>
 </project>

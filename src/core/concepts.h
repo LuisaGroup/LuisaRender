@@ -12,6 +12,8 @@ struct Noncopyable {
     Noncopyable() = default;
     Noncopyable(const Noncopyable &) = delete;
     Noncopyable &operator=(const Noncopyable &) = delete;
+    Noncopyable(Noncopyable &&) noexcept = default;
+    Noncopyable &operator=(Noncopyable &&) noexcept = default;
 };
 
 }}

@@ -80,7 +80,7 @@ void CudaCodegen::_emit_argument_member_decl(Variable v) {
 }
 
 void CudaCodegen::_emit_type(const TypeDesc *desc) {
-    
+
     switch (desc->type) {
         case TypeCatalog::VECTOR2:
             _os << "luisa::";
