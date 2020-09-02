@@ -14,8 +14,6 @@
 
 namespace luisa {
 
-using cxxopts::value;
-
 class Context : Noncopyable {
 
 public:
@@ -59,14 +57,23 @@ public:
         if (iter == _loaded_modules.cend()) { iter = _loaded_modules.emplace(module_path, load_dynamic_module(module_path)).first; }
         return load_dynamic_symbol<F>(iter->second, std::string{function});
     }
-    
-    void add_cli_option(std::string opt_name, std::string desc, std::shared_ptr<cxxopts::Value> value) {
-        _cli_options.add_options()(std::move(opt_name), std::move(desc), std::move(value));
+
+    template<typename T>
+    void add_cli_option(const std::string &opt_name, const std::string &desc, const std::string &default_val = {}, const std::string &implicit_val = {}) {
+        if (!default_val.empty() && !implicit_val.empty()) {
+            _cli_options.add_options()(opt_name, desc, cxxopts::value<T>()->default_value(default_val)->implicit_value(implicit_val));
+        } else if (!default_val.empty()) {
+            _cli_options.add_options()(opt_name, desc, cxxopts::value<T>()->default_value(default_val));
+        } else if (!implicit_val.empty()) {
+            _cli_options.add_options()(opt_name, desc, cxxopts::value<T>()->implicit_value(implicit_val));
+        } else {
+            _cli_options.add_options()(opt_name, desc, cxxopts::value<T>());
+        }
     }
 
     template<typename T>
     [[nodiscard]] T cli_option(const std::string &opt_name) { return _parse_result()[opt_name].as<T>(); }
-    
+
     const std::vector<DeviceSelection> &devices() noexcept;
 };
 

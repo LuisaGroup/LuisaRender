@@ -33,9 +33,9 @@ Context::Context(int argc, char *argv[])
       _argv{const_cast<const char **>(argv)},
       _cli_options{std::filesystem::path{argv[0]}.filename().string()} {
 
-    _cli_options.add_options()("d,devices", "Compute Devices", value<std::vector<std::string>>()->default_value(""))
-                    ("rundir", "Runtime Directory", value<std::filesystem::path>()->default_value(std::filesystem::canonical(argv[0]).parent_path().parent_path().string()))
-                    ("workdir", "Working Directory", value<std::filesystem::path>()->default_value(std::filesystem::canonical(std::filesystem::current_path()).string()));
+    _cli_options.add_options()("d,devices", "Compute Devices", cxxopts::value<std::vector<std::string>>()->default_value(""))
+                    ("rundir", "Runtime Directory", cxxopts::value<std::filesystem::path>()->default_value(std::filesystem::canonical(argv[0]).parent_path().parent_path().string()))
+                    ("workdir", "Working Directory", cxxopts::value<std::filesystem::path>()->default_value(std::filesystem::canonical(std::filesystem::current_path()).string()));
 }
 
 const cxxopts::ParseResult &Context::_parse_result() noexcept {
