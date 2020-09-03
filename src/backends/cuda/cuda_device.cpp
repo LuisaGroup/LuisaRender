@@ -27,9 +27,6 @@ using luisa::compute::Texture;
 
 class CudaDevice : public Device {
 
-public:
-    static constexpr auto max_command_queue_size = 16u;
-
 private:
     CUdevice _handle{};
     CUcontext _ctx{};
