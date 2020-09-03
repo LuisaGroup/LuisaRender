@@ -42,11 +42,11 @@ private:
         return v;
     }
     
-    template<typename T, bool is_const, typename ...Literals>
+    template<typename T, bool is_const, bool is_threadgroup, typename ...Literals>
     [[nodiscard]] Variable _var_or_const(Literals &&...vs) noexcept {
         auto type = type_desc<T>;
         _used_types.emplace_back(type);
-        Variable v{type, _get_uid()};
+        Variable v{type, _get_uid(), is_threadgroup};
         add_statement(std::make_unique<DeclareStmt>(v, literal(std::forward<Literals>(vs)...), is_const));
         return v;
     }
@@ -108,10 +108,13 @@ public:
     [[nodiscard]] Variable thread_xy() noexcept { return _builtin_var<uint32_t>(VariableTag::THREAD_XY); }
     
     template<typename T, typename ...Literals>
-    [[nodiscard]] Variable var(Literals &&...vs) noexcept { return _var_or_const<T, false>(std::forward<Literals>(vs)...); }
+    [[nodiscard]] Variable var(Literals &&...vs) noexcept { return _var_or_const<T, false, false>(std::forward<Literals>(vs)...); }
     
     template<typename T, typename ...Literals>
-    [[nodiscard]] Variable constant(Literals &&...vs) noexcept { return _var_or_const<T, true>(std::forward<Literals>(vs)...); }
+    [[nodiscard]] Variable threadgroup_var(Literals &&...vs) noexcept { return _var_or_const<T, false, true>(std::forward<Literals>(vs)...); }
+    
+    template<typename T, typename ...Literals>
+    [[nodiscard]] Variable constant(Literals &&...vs) noexcept { return _var_or_const<T, true, false>(std::forward<Literals>(vs)...); }
     
     [[nodiscard]] Variable add_expression(std::unique_ptr<Expression> expr) noexcept {
         return Variable{_expressions.emplace_back(std::move(expr)).get()};

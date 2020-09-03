@@ -44,6 +44,13 @@ struct Var : public Variable {
 };
 
 template<typename T>
+struct Threadgroup : public Variable {
+    
+    template<typename... Literals>
+    Threadgroup(Literals &&... vs) noexcept : Variable{Function::current().threadgroup_var<T>(std::forward<Literals>(vs)...)} {}
+};
+
+template<typename T>
 struct Let : public Variable {
 
     template<typename... Literals>

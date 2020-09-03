@@ -35,8 +35,9 @@ enum struct VariableTag {
     UNIFORM,  // uniforms
     IMMUTABLE,// immutable data, i.e. constant uniforms
 
-    // for local variables
-    LOCAL,// local variables
+    // for variable declarations
+    LOCAL,      // local variables
+    THREADGROUP,// threadgroup variables
 
     // for expression nodes
     TEMPORARY,// temporary variables, i.e. expression nodes
@@ -67,8 +68,9 @@ public:
     Variable() noexcept = default;
 
     // Local variables
-    Variable(const TypeDesc *type, uint32_t uid) noexcept : _type{type}, _uid{uid}, _tag{VariableTag::LOCAL} {
-        LUISA_ERROR_IF(is_ptr_or_ref(_type), "Declaring local variable v", uid, " as a pointer or reference is not allowed.");
+    Variable(const TypeDesc *type, uint32_t uid, bool is_threadgroup = false) noexcept
+        : _type{type}, _uid{uid}, _tag{is_threadgroup ? VariableTag::THREADGROUP : VariableTag::LOCAL} {
+        LUISA_ERROR_IF(is_ptr_or_ref(_type), "Declaring variable v", uid, " as a pointer or reference is not allowed.");
     }
 
     // Buffer arguments
@@ -111,6 +113,7 @@ public:
     [[nodiscard]] bool is_valid() const noexcept { return _tag != VariableTag::INVALID; }
     [[nodiscard]] bool is_temporary() const noexcept { return _tag == VariableTag::TEMPORARY; }
     [[nodiscard]] bool is_local() const noexcept { return _tag == VariableTag::LOCAL; }
+    [[nodiscard]] bool is_threadgroup() const noexcept { return _tag == VariableTag::THREADGROUP; }
 
     [[nodiscard]] bool is_buffer_argument() const noexcept { return _tag == VariableTag::BUFFER; }
     [[nodiscard]] bool is_texture_argument() const noexcept { return _tag == VariableTag::TEXTURE; }
@@ -162,15 +165,17 @@ public:
     [[nodiscard]] Variable operator*() const noexcept;
     [[nodiscard]] Variable operator&() const noexcept;
 
-#define MAKE_BINARY_OPERATOR_DECL(op)                                                                                    \
-[[nodiscard]] Variable operator op(Variable rhs) const noexcept;                                                         \
-template<typename T, detail::EnableIfLiteralOperand<T> = 0> [[nodiscard]] Variable operator op(T &&rhs) const noexcept;  \
+#define MAKE_BINARY_OPERATOR_DECL(op)                                \
+    [[nodiscard]] Variable operator op(Variable rhs) const noexcept; \
+    template<typename T, detail::EnableIfLiteralOperand<T> = 0>      \
+    [[nodiscard]] Variable operator op(T &&rhs) const noexcept;
 
-#define MAKE_ASSIGNMENT_OPERATOR_DECL(op)                                                                                \
-void operator op(Variable rhs) const noexcept;                                                                           \
-template<typename T, detail::EnableIfLiteralOperand<T> = 0> void operator op(T &&rhs) const noexcept;                    \
+#define MAKE_ASSIGNMENT_OPERATOR_DECL(op)                       \
+    void operator op(Variable rhs) const noexcept;              \
+    template<typename T, detail::EnableIfLiteralOperand<T> = 0> \
+    void operator op(T &&rhs) const noexcept;
 
-    LUISA_MAP(MAKE_BINARY_OPERATOR_DECL, +, -, *, /, %, <<, >>, &, |, ^, &&, ||, ==, !=, <,>, <=, >=, [])
+    LUISA_MAP(MAKE_BINARY_OPERATOR_DECL, +, -, *, /, %, <<, >>, &, |, ^, &&, ||, ==, !=, <, >, <=, >=, [])
     LUISA_MAP(MAKE_ASSIGNMENT_OPERATOR_DECL, =, +=, -=, *=, /=, %=, &=, |=, ^=, <<=, >>=)
 
 #undef MAKE_BINARY_OPERATOR_DECL

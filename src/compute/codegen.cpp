@@ -324,6 +324,7 @@ void CppCodegen::_emit_struct_decl(const TypeDesc *desc) {
 }
 
 void CppCodegen::_emit_variable_decl(Variable v) {
+    if (v.is_threadgroup()) { _os << "threadgroup "; }
     _emit_type(v.type());
     if (v.type() != nullptr &&
         v.type()->type != TypeCatalog::POINTER &&
