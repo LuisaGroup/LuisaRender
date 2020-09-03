@@ -116,9 +116,9 @@ MAKE_BUILTIN_FUNCTION_DEF(read, texture, coord)
 MAKE_BUILTIN_VOID_FUNCTION_DEF(write, texture, coord, value)
 
 // threadgroup synchronization functions
-inline void barrier() {
+inline void threadgroup_barrier() {
     auto &&f = Function::current();
-    f.add_statement(std::make_unique<ExprStmt>(f.add_expression(std::make_unique<CallExpr>("barrier", std::vector<Variable>{}))));
+    f.add_statement(std::make_unique<ExprStmt>(f.add_expression(std::make_unique<CallExpr>("threadgroup_barrier", std::vector<Variable>{}))));
 }
 
 // atomic functions

@@ -175,6 +175,7 @@ MAKE_CONVENIENT_VARIABLE_TYPE(UInt, uint)
 #define Arg Arg
 #define Var Var
 #define Let Let
+#define Threadgroup Threadgroup
 
 #define Bool Bool
 #define Float Float

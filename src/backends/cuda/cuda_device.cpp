@@ -120,7 +120,7 @@ std::unique_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) {
     CudaCodegen codegen{os};
     codegen.emit(function);
     auto src = os.str();
-//    LUISA_INFO("Generated source:\n", src);
+    LUISA_INFO("Generated source:\n", src);
     
     auto digest = SHA1{src}.digest();
     auto iter = _kernel_cache.find(digest);

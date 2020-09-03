@@ -39,6 +39,7 @@ int main(int argc, char *argv[]) {
         Arg<uint> cmp_step_in{&step};
         
         Threadgroup<std::array<float, 256u>> tg_cache;
+        threadgroup_barrier();
 
         Auto cmp_step = cmp_step_in;
         Auto half_cmp_step = cmp_step / 2u;

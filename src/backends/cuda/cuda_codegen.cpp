@@ -42,8 +42,8 @@ void CudaCodegen::_emit_function_decl(const Function &f) {
 }
 
 void CudaCodegen::_emit_function_call(const std::string &name) {
-    if (name == "barrier") {
-        _os << "__sync_threads";
+    if (name == "threadgroup_barrier") {
+        _os << "__syncthreads";
     } else {
         _os << "luisa::";
         CppCodegen::_emit_function_call(name);
