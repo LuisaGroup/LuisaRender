@@ -315,10 +315,7 @@ void CppCodegen::_emit_struct_decl(const TypeDesc *desc) {
     for (auto i = 0u; i < desc->member_names.size(); i++) {
         _os << "    ";
         _emit_type(desc->member_types[i]);
-        if (auto mt = desc->member_types[i];
-            mt != nullptr &&
-            mt->type != TypeCatalog::REFERENCE && mt->type != TypeCatalog::POINTER) { _os << " "; }
-        _os << desc->member_names[i] << ";\n";
+        _os << " " << desc->member_names[i] << ";\n";
     }
     _os << "};\n\n";
 }
@@ -326,10 +323,7 @@ void CppCodegen::_emit_struct_decl(const TypeDesc *desc) {
 void CppCodegen::_emit_variable_decl(Variable v) {
     if (v.is_threadgroup()) { _os << "threadgroup "; }
     _emit_type(v.type());
-    if (v.type() != nullptr &&
-        v.type()->type != TypeCatalog::POINTER &&
-        v.type()->type != TypeCatalog::REFERENCE) { _os << " "; }
-    _os << "v" << v.uid();
+    _os << " v" << v.uid();
 }
 
 void CppCodegen::_emit_variable(Variable v) {
