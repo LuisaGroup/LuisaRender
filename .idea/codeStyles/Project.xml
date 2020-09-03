@@ -150,9 +150,6 @@
       <option name="TYPE_CASE" value="3" />
       <option name="INSERT_EL_WRAP" value="2" />
     </SybaseCodeStyleSettings>
-    <clangFormatSettings>
-      <option name="ENABLED" value="true" />
-    </clangFormatSettings>
     <codeStyleSettings language="CMake">
       <option name="ALIGN_MULTILINE_PARAMETERS_IN_CALLS" value="true" />
       <indentOptions>
