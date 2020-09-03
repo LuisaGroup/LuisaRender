@@ -240,9 +240,12 @@ void CppCodegen::visit(const DeclareStmt &declare_stmt) {
     _emit_indent();
     if (declare_stmt.is_constant()) { _os << "constexpr "; }
     _emit_variable_decl(declare_stmt.var());
-    _os << "{";
-    _emit_variable(declare_stmt.initialization());
-    _os << "};\n";
+    if (!declare_stmt.var().is_threadgroup()) {
+        _os << "{";
+        _emit_variable(declare_stmt.initialization());
+        _os << "}";
+    }
+    _os << ";\n";
 }
 
 void CppCodegen::visit(const KeywordStmt &stmt) {

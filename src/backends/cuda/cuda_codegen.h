@@ -19,6 +19,7 @@ protected:
     void _emit_type(const compute::dsl::TypeDesc *desc) override;
     void _emit_function_call(const std::string &name) override;
     void _emit_argument_member_decl(compute::dsl::Variable v) override;
+    void _emit_variable_decl(compute::dsl::Variable v) override;
 
 public:
     explicit CudaCodegen(std::ostream &os) noexcept : CppCodegen{os} {}

@@ -115,6 +115,12 @@ MAKE_BUILTIN_FUNCTION_DEF(make_float4x4, m00, m01, m02, m03, m10, m11, m12, m13,
 MAKE_BUILTIN_FUNCTION_DEF(read, texture, coord)
 MAKE_BUILTIN_VOID_FUNCTION_DEF(write, texture, coord, value)
 
+// threadgroup synchronization functions
+inline void barrier() {
+    auto &&f = Function::current();
+    f.add_statement(std::make_unique<ExprStmt>(f.add_expression(std::make_unique<CallExpr>("barrier", std::vector<Variable>{}))));
+}
+
 // atomic functions
 MAKE_BUILTIN_VOID_FUNCTION_DEF(atomic_store_explicit, object, desired)
 MAKE_BUILTIN_FUNCTION_DEF(atomic_load_explicit, object)

@@ -42,8 +42,12 @@ void CudaCodegen::_emit_function_decl(const Function &f) {
 }
 
 void CudaCodegen::_emit_function_call(const std::string &name) {
-    _os << "luisa::";
-    CppCodegen::_emit_function_call(name);
+    if (name == "barrier") {
+        _os << "__sync_threads";
+    } else {
+        _os << "luisa::";
+        CppCodegen::_emit_function_call(name);
+    }
 }
 
 void CudaCodegen::_emit_argument_member_decl(Variable v) {
@@ -112,6 +116,12 @@ void CudaCodegen::_emit_type(const TypeDesc *desc) {
             CppCodegen::_emit_type(desc);
             break;
     }
+}
+
+void CudaCodegen::_emit_variable_decl(Variable v) {
+    if (v.is_threadgroup()) { _os << "__shared__ "; }
+    _emit_type(v.type());
+    _os << " v" << v.uid();
 }
 
 }// namespace luisa::cuda

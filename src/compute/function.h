@@ -110,8 +110,8 @@ public:
     template<typename T, typename ...Literals>
     [[nodiscard]] Variable var(Literals &&...vs) noexcept { return _var_or_const<T, false, false>(std::forward<Literals>(vs)...); }
     
-    template<typename T, typename ...Literals>
-    [[nodiscard]] Variable threadgroup_var(Literals &&...vs) noexcept { return _var_or_const<T, false, true>(std::forward<Literals>(vs)...); }
+    template<typename T>
+    [[nodiscard]] Variable threadgroup_var() noexcept { return _var_or_const<T, false, true>(); }
     
     template<typename T, typename ...Literals>
     [[nodiscard]] Variable constant(Literals &&...vs) noexcept { return _var_or_const<T, true, false>(std::forward<Literals>(vs)...); }
