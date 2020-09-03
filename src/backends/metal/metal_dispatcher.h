@@ -15,8 +15,22 @@ using compute::Dispatcher;
 
 class MetalDispatcher : public Dispatcher {
 
+public:
+    static constexpr auto max_commands_in_single_dispatch = 8u;
+
 private:
     id<MTLCommandBuffer> _handle{nullptr};
+    uint _dispatch_count{0u};
+
+protected:
+    void _on_dispatch() override {
+        if (++_dispatch_count >= max_commands_in_single_dispatch) {
+            auto command_queue = [_handle commandQueue];
+            [_handle commit];
+            _handle = [command_queue commandBuffer];
+            _dispatch_count = 0u;
+        }
+    }
 
 public:
     explicit MetalDispatcher() noexcept = default;
@@ -25,6 +39,7 @@ public:
     void reset(id<MTLCommandBuffer> handle = nullptr) noexcept {
         _callbacks.clear();
         _handle = handle;
+        _dispatch_count = 0u;
     }
     
     void wait() override { [_handle waitUntilCompleted]; }

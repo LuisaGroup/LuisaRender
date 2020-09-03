@@ -24,6 +24,8 @@ public:
 
 protected:
     std::vector<std::function<void()>> _callbacks;
+    
+    virtual void _on_dispatch() {};
 
 public:
     Dispatcher() noexcept = default;
@@ -39,12 +41,16 @@ public:
     void when_completed(Callback &&f) noexcept { _callbacks.emplace_back(std::forward<Callback>(f)); }
     
     template<typename F, std::enable_if_t<std::is_invocable_v<F, Dispatcher &>, int> = 0>
-    void operator()(F &&f) { f(*this); }
+    void operator()(F &&f) {
+        f(*this);
+        _on_dispatch();
+    }
 
     template<typename F, typename CB, std::enable_if_t<std::conjunction_v<std::is_invocable<F, Dispatcher &>, std::is_invocable<CB>>, int> = 0>
     void operator()(F &&f, CB &&callback) {
         f(*this);
         when_completed(std::forward<CB>(callback));
+        _on_dispatch();
     }
 };
 
