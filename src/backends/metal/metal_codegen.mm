@@ -41,6 +41,8 @@ void MetalCodegen::emit(const Function &f) {
            "template<access a>\n"
            "inline void write(texture2d<float, a> t, uint2 coord, float4 v) { return t.write(v, coord); }\n"
            "\n"
+           "inline void threadgroup_barrier() { threadgroup_barrier(mem_flags::mem_threadgroup); }\n"
+           "\n"
            "inline auto inverse(float3x3 m) {  // from GLM\n"
            "    auto one_over_determinant = 1.0f / (m[0].x * (m[1].y * m[2].z - m[2].y * m[1].z) -\n"
            "                                        m[1].x * (m[0].y * m[2].z - m[2].y * m[0].z) +\n"
