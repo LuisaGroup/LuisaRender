@@ -16,6 +16,8 @@ using namespace luisa::compute::dsl;
 int main(int argc, char *argv[]) {
 
     Context context{argc, argv};
+    context.add_cli_option<uint>("b,blocksize", "Block size (results are sorted block-wise)", "1024");
+    
     auto device = Device::create(&context);
 
     constexpr auto buffer_size = 1024u * 1024u;
@@ -28,7 +30,7 @@ int main(int argc, char *argv[]) {
     auto stride = 1u;
     auto step = 1u;
     
-    constexpr auto block_size = 1024u;
+    auto block_size = context.cli_option<uint>("blocksize");
     
     auto kernel = device->compile_kernel([&] {
         
@@ -67,7 +69,7 @@ int main(int argc, char *argv[]) {
         device->launch([&](Dispatcher &dispatch) {
         for (stride = 2u; stride <= block_size; stride *= 2u) {
             for (step = stride; step >= 2; step /= 2) {
-                dispatch(kernel->parallelize(make_uint2(block_size / 2u, buffer_size / block_size)));
+                dispatch(kernel->parallelize(make_uint2(block_size / 2u, buffer_size / block_size), make_uint2(256u, 1u)));
             }
         } }, [i] { LUISA_INFO("Sorted #", i); });
     }
