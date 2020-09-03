@@ -19,7 +19,8 @@ int main(int argc, char *argv[]) {
     
     auto device = Device::create(&context);
     
-    constexpr auto buffer_size = 1024u * 1024u;
+    static constexpr auto buffer_size = 1024u * 1024u;
+    static constexpr auto block_size = 1024u;
     
     std::vector<float> host_buffer(buffer_size);
     for (auto i = 0u; i < buffer_size; i++) { host_buffer[i] = static_cast<float>(i); }
@@ -30,6 +31,7 @@ int main(int argc, char *argv[]) {
     auto step = 0u;
     
     auto kernel = device->compile_kernel([&] {
+        
         Arg<float *> data{buffer};
         Arg<uint> cmp_stride_in{&stride};
         Arg<uint> cmp_step_in{&step};
@@ -43,20 +45,10 @@ int main(int argc, char *argv[]) {
         Auto lhs = data[lhs_index];
         Auto rhs = data[rhs_index];
         
-        Auto cmp_stride = cmp_stride_in;
-        Auto reverse_ordered = lhs_index / cmp_stride % 2u;
-        
-        Auto smaller = min(lhs, rhs);
-        Auto greater = max(lhs, rhs);
-        Auto ascending_pair = make_uint2(smaller, greater);
-        Auto descending_pair = make_uint2(greater, smaller);
-        
-        Auto result = select(reverse_ordered == 1u, descending_pair, ascending_pair);
-        data[lhs_index] = result.x();
-        data[rhs_index] = result.y();
+        Auto predicate = cast<bool>(lhs_index & cmp_stride_in) ^ (lhs < rhs);
+        data[lhs_index] = select(predicate, lhs, rhs);
+        data[rhs_index] = select(predicate, rhs, lhs);
     });
-    
-    static constexpr auto block_size = 1024u;
     
     auto small_stride_kernel = device->compile_kernel([&] {
         
@@ -80,18 +72,10 @@ int main(int argc, char *argv[]) {
                 
                 Auto lhs = cache[lhs_index % block_size];
                 Auto rhs = cache[rhs_index % block_size];
-                
-                Auto reverse_ordered = lhs_index / cmp_stride % 2u;
-                
-                Auto smaller = min(lhs, rhs);
-                Auto greater = max(lhs, rhs);
-                Auto ascending_pair = make_uint2(smaller, greater);
-                Auto descending_pair = make_uint2(greater, smaller);
-                
-                Auto result = select(reverse_ordered == 1u, descending_pair, ascending_pair);
-                
-                cache[lhs_index % block_size] = result.x();
-                cache[rhs_index % block_size] = result.y();
+    
+                Auto predicate = cast<bool>(lhs_index & cmp_stride) ^ (lhs < rhs);
+                cache[lhs_index % block_size] = select(predicate, lhs, rhs);
+                cache[rhs_index % block_size] = select(predicate, rhs, lhs);
                 
                 threadgroup_barrier();
             }
@@ -126,17 +110,9 @@ int main(int argc, char *argv[]) {
             Auto lhs = cache[lhs_index % block_size];
             Auto rhs = cache[rhs_index % block_size];
             
-            Auto reverse_ordered = lhs_index / cmp_stride % 2u;
-            
-            Auto smaller = min(lhs, rhs);
-            Auto greater = max(lhs, rhs);
-            Auto ascending_pair = make_uint2(smaller, greater);
-            Auto descending_pair = make_uint2(greater, smaller);
-            
-            Auto result = select(reverse_ordered == 1u, descending_pair, ascending_pair);
-            
-            cache[lhs_index % block_size] = result.x();
-            cache[rhs_index % block_size] = result.y();
+            Auto predicate = cast<bool>(lhs_index & cmp_stride) ^ (lhs < rhs);
+            cache[lhs_index % block_size] = select(predicate, lhs, rhs);
+            cache[rhs_index % block_size] = select(predicate, rhs, lhs);
             
             threadgroup_barrier();
         }

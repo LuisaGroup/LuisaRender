@@ -20,6 +20,6 @@ private:
     uint64_t _transforms{};
     
 public:
-    explicit SHA1(std::string_view s);
+    explicit SHA1(const std::string &s);
     [[nodiscard]] auto digest() const noexcept { return _digest; }
 };

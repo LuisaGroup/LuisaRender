@@ -6,110 +6,6 @@
 #include <cstring>
 #include <iomanip>
 
-// From: https://stackoverflow.com/questions/58524805/is-there-a-way-to-create-a-stringstream-from-a-string-view-without-copying-data
-template<typename CharT, class TraitsT>
-class view_streambuf final : public std::basic_streambuf<CharT, TraitsT> {
-private:
-    typedef std::basic_streambuf<CharT, TraitsT> super_type;
-    typedef view_streambuf<CharT, TraitsT> self_type;
-public:
-    
-    /**
-    *  These are standard types.  They permit a standardized way of
-    *  referring to names of (or names dependent on) the template
-    *  parameters, which are specific to the implementation.
-    */
-    typedef typename super_type::char_type char_type;
-    typedef typename super_type::traits_type traits_type;
-    typedef typename traits_type::int_type int_type;
-    typedef typename traits_type::pos_type pos_type;
-    typedef typename traits_type::off_type off_type;
-    
-    typedef typename std::basic_string_view<char_type, traits_type> source_view;
-    
-    explicit view_streambuf(const source_view &src) noexcept:
-        super_type(),
-        src_(src) {
-        auto buff = const_cast<char_type *>( src_.data());
-        this->setg(buff, buff, buff + src_.length());
-    }
-    
-    std::streamsize xsgetn(char_type *s, std::streamsize n) override {
-        if (0 == n) {
-            return 0;
-        }
-        if ((this->gptr() + n) >= this->egptr()) {
-            n = this->egptr() - this->gptr();
-            if (0 == n && !traits_type::not_eof(this->underflow())) {
-                return -1;
-            }
-        }
-        std::memmove(static_cast<void *>(s), this->gptr(), n);
-        this->gbump(static_cast<int>(n));
-        return n;
-    }
-    
-    int_type pbackfail(int_type c) override {
-        char_type *pos = this->gptr() - 1;
-        *pos = traits_type::to_char_type(c);
-        this->pbump(-1);
-        return 1;
-    }
-    
-    int_type underflow() override {
-        return traits_type::eof();
-    }
-    
-    std::streamsize showmanyc() override {
-        return static_cast<std::streamsize>( this->egptr() - this->gptr());
-    }
-    
-    ~view_streambuf() override = default;
-    
-private:
-    const source_view &src_;
-};
-
-template<typename _char_type>
-class view_istream final : public std::basic_istream<_char_type, std::char_traits<_char_type>> {
-public:
-    view_istream(const view_istream &) = delete;
-    view_istream &operator=(const view_istream &) = delete;
-private:
-    typedef std::basic_istream<_char_type, std::char_traits<_char_type>> super_type;
-    typedef view_streambuf<_char_type, std::char_traits<_char_type>> streambuf_type;
-public:
-    typedef _char_type char_type;
-    typedef typename super_type::int_type int_type;
-    typedef typename super_type::pos_type pos_type;
-    typedef typename super_type::off_type off_type;
-    typedef typename super_type::traits_type traits_type;
-    typedef typename streambuf_type::source_view source_view;
-    
-    explicit view_istream(const source_view &src) :
-        super_type(nullptr),
-        sb_(nullptr) {
-        sb_ = new streambuf_type(src);
-        this->init(sb_);
-    }
-    
-    view_istream(view_istream &&other) noexcept:
-        super_type(std::forward<view_istream>(other)),
-        sb_(std::move(other.sb_)) {}
-    
-    view_istream &operator=(view_istream &&rhs) noexcept {
-        view_istream(std::forward<view_istream>(rhs)).swap(*this);
-        return *this;
-    }
-    
-    ~view_istream() override {
-        delete sb_;
-    }
-
-private:
-    streambuf_type *sb_;
-};
-
 // From: https://github.com/vog/sha1
 #include "sha1.h"
 
@@ -306,9 +202,9 @@ void buffer_to_block(const std::string &buffer, uint32_t block[block_ints]) {
     }
 }
 
-SHA1::SHA1(std::string_view s) {
+SHA1::SHA1(const std::string &s) {
     reset(_digest.data(), _buffer, _transforms);
-    view_istream<char> is{s};
+    std::istringstream is{s};
     while (true) {
         char sbuf[block_bytes];
         is.read(sbuf, block_bytes - _buffer.size());
