@@ -5,8 +5,8 @@
 #include <opencv2/opencv.hpp>
 
 #include "dual_buffer_variance.h"
-#include "nlm_filter.h"
 #include "gaussian_blur.h"
+#include "nlm_filter.h"
 
 using namespace luisa;
 using namespace luisa::compute;
@@ -64,6 +64,7 @@ int main(int argc, char *argv[]) {
             dispatch(color_a_texture->copy_from(color_a_image.data));
             dispatch(color_b_texture->copy_from(color_b_image.data));
             dispatch(variance_texture->copy_from(variance_image.data));
+            dispatch.when_completed([] { LUISA_INFO("Done copying textures to device."); });
         });
 
         DualBufferVariance dual_variance{*device, 10, *variance_texture, *color_a_texture, *color_b_texture, *variance_texture};
@@ -79,21 +80,21 @@ int main(int argc, char *argv[]) {
             };
         });
 
-        device->launch(dual_variance);
-        filter.apply();
         device->launch([&](Dispatcher &dispatch) {
+            dispatch(dual_variance);
+            dispatch(filter);
             dispatch(variance_texture->copy_to(variance_image.data));
             dispatch(add_half_buffers->parallelize(make_uint2(width, height)));
             dispatch(color_texture->copy_to(color_image.data));
+            LUISA_INFO("Done.");
         });
-
         device->synchronize();
-        LUISA_INFO("Done.");
 
         cv::cvtColor(variance_image, variance_image, cv::COLOR_RGBA2BGR);
         cv::cvtColor(color_image, color_image, cv::COLOR_RGBA2BGR);
         cv::imwrite(serialize("data/images/", feature_name, "-nlm.exr"), color_image);
         cv::imwrite(serialize("data/images/", feature_name, "Variance-dual.exr"), variance_image);
+        
     } catch (const std::exception &e) {
         LUISA_ERROR("Caught exception: ", e.what());
     }
