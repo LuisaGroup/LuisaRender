@@ -2,9 +2,9 @@
 // Created by Mike Smith on 2020/9/3.
 //
 
+#include <algorithm>
 #include <random>
 #include <vector>
-#include <algorithm>
 
 #include <compute/device.h>
 #include <compute/dsl.h>
@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
 
     Context context{argc, argv};
     context.add_cli_option<uint>("b,blocksize", "Block size (results are sorted block-wise)", "1024");
-    
+
     auto device = Device::create(&context);
 
     constexpr auto buffer_size = 1024u * 1024u;
@@ -29,17 +29,14 @@ int main(int argc, char *argv[]) {
 
     auto stride = 1u;
     auto step = 1u;
-    
+
     auto block_size = context.cli_option<uint>("blocksize");
-    
+
     auto kernel = device->compile_kernel([&] {
         
         Arg<float *> data{buffer};
         Arg<uint> cmp_stride_in{&stride};
         Arg<uint> cmp_step_in{&step};
-        
-        Threadgroup<std::array<float, 256u>> tg_cache;
-        threadgroup_barrier();
 
         Auto cmp_step = cmp_step_in;
         Auto half_cmp_step = cmp_step / 2u;
@@ -63,7 +60,6 @@ int main(int argc, char *argv[]) {
         data[tid_y * block_size + lhs_index] = result.x();
         data[tid_y * block_size + rhs_index] = result.y();
     });
-    
     std::default_random_engine random{std::random_device{}()};
     
     for (auto i = 0u; i < 20u; i++) {
@@ -78,7 +74,7 @@ int main(int argc, char *argv[]) {
     }
     device->launch(buffer.copy_to(host_buffer.data()));
     device->synchronize();
-    
+
     LUISA_INFO("Checking...");
     for (auto i = 0u; i < buffer_size; i += block_size) {
         LUISA_ERROR_IF_NOT(std::is_sorted(host_buffer.cbegin() + i, host_buffer.cbegin() + i + block_size), "Fuck!");

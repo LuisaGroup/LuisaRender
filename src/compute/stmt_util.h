@@ -202,7 +202,7 @@ MAKE_CONVENIENT_VARIABLE_TYPE(UInt, uint)
 #define Loop LoopWhenStmtBuilder{} << [&]
 #define When(...) >> literal(__VA_ARGS__)
 
-#define For(v, ...) ForStmtBuilder{__VA_ARGS__} << [&](Variable v)
+#define For(v, ...) ForStmtBuilder{__VA_ARGS__} << [&](const Variable &v)
 
 inline void break_() noexcept { Function::current().add_break(); }
 inline void continue_() noexcept { Function::current().add_continue(); }

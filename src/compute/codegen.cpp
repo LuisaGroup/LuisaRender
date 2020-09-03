@@ -334,7 +334,7 @@ void CppCodegen::_emit_variable(Variable v) {
         v.expression()->accept(*this);
     } else if (v.is_argument()) {
         _os << "arg.v" << v.uid();
-    } else if (v.is_local()) {
+    } else if (v.is_local() || v.is_threadgroup()) {
         _os << "v" << v.uid();
     } else if (v.is_thread_id()) {
         _os << "tid";
