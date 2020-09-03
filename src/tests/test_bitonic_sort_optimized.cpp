@@ -56,7 +56,7 @@ int main(int argc, char *argv[]) {
         data[rhs_index] = result.y();
     });
     
-    constexpr const auto block_size = 1024u;
+    static constexpr auto block_size = 1024u;
     
     auto small_stride_kernel = device->compile_kernel([&] {
         
