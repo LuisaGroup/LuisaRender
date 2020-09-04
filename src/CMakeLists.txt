@@ -23,7 +23,7 @@ add_subdirectory(render)
 add_subdirectory(backends)
 
 add_library(luisaall INTERFACE)
-target_link_libraries(luisaall INTERFACE luisacore luisacompute luisarender luisabackends)
+target_link_libraries(luisaall INTERFACE luisacore luisacompute luisabackends)
 add_library(luisa::all ALIAS luisaall)
 
 function(luisa_render_add_application name)

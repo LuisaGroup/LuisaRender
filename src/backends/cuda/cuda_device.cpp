@@ -9,6 +9,7 @@
 
 #include <compute/device.h>
 #include <core/sha1.h>
+#include <render/acceleration.h>
 
 #include "cuda_buffer.h"
 #include "cuda_texture.h"
@@ -19,11 +20,8 @@
 
 namespace luisa::cuda {
 
-using luisa::compute::Buffer;
-using luisa::compute::Device;
-using luisa::compute::Dispatcher;
-using luisa::compute::Kernel;
-using luisa::compute::Texture;
+using namespace luisa::compute;
+using namespace luisa::render;
 
 class CudaDevice : public Device {
 
@@ -54,6 +52,7 @@ public:
     explicit CudaDevice(Context *context, uint32_t device_id);
     ~CudaDevice() noexcept override;
     void synchronize() override;
+    std::unique_ptr<render::Acceleration> build_acceleration(const render::Geometry &geometry) override;
 };
 
 void CudaDevice::synchronize() {
@@ -214,6 +213,10 @@ std::unique_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) {
     }
     
     return std::make_unique<CudaKernel>(iter->second, ArgumentEncoder{function.arguments()});
+}
+
+std::unique_ptr<Acceleration> CudaDevice::build_acceleration(const Geometry &geometry) {
+    return nullptr;
 }
 
 std::shared_ptr<Buffer> CudaDevice::_allocate_buffer(size_t size) {

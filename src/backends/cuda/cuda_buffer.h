@@ -26,6 +26,7 @@ public:
     void download(compute::Dispatcher &dispatcher, size_t offset, size_t size, void *host_buffer) override;
     void clear_cache() noexcept override { _host_cache.clear(); }
     [[nodiscard]] CUdeviceptr handle() const noexcept { return _handle; }
+    void with_cache(compute::Dispatcher &dispatch, const std::function<void(void *)> &modify, size_t offset, size_t length) override;
 };
 
 }

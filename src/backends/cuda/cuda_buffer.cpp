@@ -26,4 +26,12 @@ CudaBuffer::~CudaBuffer() noexcept {
     _host_cache.clear();
 }
 
+void CudaBuffer::with_cache(Dispatcher &dispatch, const std::function<void(void *)> &modify, size_t offset, size_t length) {
+    auto cache = _host_cache.obtain();
+    modify(cache);
+    auto stream = dynamic_cast<CudaDispatcher &>(dispatch).handle();
+    CUDA_CHECK(cuMemcpyAsync(_handle + offset, reinterpret_cast<CUdeviceptr>(cache), length, stream));
+    dispatch.when_completed([cache, this] { _host_cache.recycle(cache); });
+}
+
 }
