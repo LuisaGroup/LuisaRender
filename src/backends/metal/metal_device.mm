@@ -11,8 +11,10 @@
 
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
 
-#import <compute/device.h>
 #import <core/sha1.h>
+#import <compute/device.h>
+#import <render/geometry.h>
+#import <render/acceleration.h>
 
 #import "metal_buffer.h"
 #import "metal_texture.h"
@@ -22,7 +24,8 @@
 
 namespace luisa::metal {
 
-using compute::Device;
+using namespace compute;
+using namespace render;
 
 class MetalDevice : public Device {
 
@@ -55,12 +58,17 @@ protected:
     std::shared_ptr<Buffer> _allocate_buffer(size_t size) override;
     std::unique_ptr<Texture> _allocate_texture(uint32_t width, uint32_t height, compute::PixelFormat format) override;
     void _launch(const std::function<void(Dispatcher &)> &dispatch) override;
+    std::unique_ptr<render::Acceleration> build_acceleration(const Geometry &geometry) override;
 
 public:
     explicit MetalDevice(Context *context, uint32_t device_id);
     ~MetalDevice() noexcept override = default;
     void synchronize() override;
 };
+
+std::unique_ptr<render::Acceleration> MetalDevice::build_acceleration(const Geometry &geometry) {
+    return nullptr;
+}
 
 MetalDevice::MetalDevice(Context *context, uint32_t device_id) : Device{context} {
     auto devices = MTLCopyAllDevices();
@@ -196,8 +204,6 @@ std::shared_ptr<Buffer> MetalDevice::_allocate_buffer(size_t size) {
 }
 
 std::unique_ptr<Texture> MetalDevice::_allocate_texture(uint32_t width, uint32_t height, compute::PixelFormat format) {
-    
-    using namespace compute;
     
     auto desc = [[MTLTextureDescriptor alloc] init];
     desc.textureType = MTLTextureType2D;

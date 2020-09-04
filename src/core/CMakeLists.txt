@@ -12,7 +12,7 @@ set_target_properties(luisacore PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/"
                       WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
-add_library(luisarender::core ALIAS luisacore)
+add_library(luisa::core ALIAS luisacore)
 
 foreach (HEADER_FILE ${HEADER_FILES})
     configure_file(${HEADER_FILE} "${CMAKE_BINARY_DIR}/include/core/${HEADER_FILE}" COPYONLY)

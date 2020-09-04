@@ -8,7 +8,7 @@
 #include <core/platform.h>
 #include <ostream>
 
-namespace luisa {
+namespace luisa::compute {
 class Device;
 }
 

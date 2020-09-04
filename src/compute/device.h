@@ -12,51 +12,58 @@
 #include <compute/texture.h>
 #include <core/context.h>
 
+namespace luisa::render {
+struct Acceleration;
+class Geometry;
+}
+
 namespace luisa::compute {
 
 class Device : Noncopyable {
 
 protected:
     Context *_context{nullptr};
-
+    
     [[nodiscard]] virtual std::shared_ptr<Buffer> _allocate_buffer(size_t size) = 0;
     [[nodiscard]] virtual std::unique_ptr<Texture> _allocate_texture(uint32_t width, uint32_t height, PixelFormat format) = 0;
     [[nodiscard]] virtual std::unique_ptr<Kernel> _compile_kernel(const dsl::Function &function) = 0;
-
+    
     virtual void _launch(const std::function<void(Dispatcher &)> &dispatch) = 0;
 
 public:
-    explicit Device(Context *context) noexcept : _context{context} {}
+    explicit Device(Context *context) noexcept: _context{context} {}
     virtual ~Device() noexcept = default;
-
+    
     [[nodiscard]] Context &context() const noexcept { return *_context; }
-
+    
     template<typename Def, std::enable_if_t<std::is_invocable_v<Def>, int> = 0>
     [[nodiscard]] std::unique_ptr<Kernel> compile_kernel(std::string name, Def &&def) {
         dsl::Function function{std::move(name)};
         def();
         return _compile_kernel(function);
     }
-
+    
     template<typename Def, std::enable_if_t<std::is_invocable_v<Def>, int> = 0>
     [[nodiscard]] std::unique_ptr<Kernel> compile_kernel(Def &&def) {
         return compile_kernel("foo", std::forward<Def>(def));
     }
-
+    
     template<typename T>
     [[nodiscard]] BufferView<T> allocate_buffer(size_t size) {
         return _allocate_buffer(size * sizeof(T))->view<T>();
     }
-
+    
     template<typename T>
     [[nodiscard]] std::unique_ptr<Texture> allocate_texture(uint32_t width, uint32_t height) {
         return allocate_texture(width, height, pixel_format<T>);
     }
-
+    
     [[nodiscard]] std::unique_ptr<Texture> allocate_texture(uint32_t width, uint32_t height, PixelFormat format) {
         return _allocate_texture(width, height, format);
     }
-
+    
+    [[nodiscard]] virtual std::unique_ptr<render::Acceleration> build_acceleration(const render::Geometry &geometry) = 0;
+    
     template<typename Work, std::enable_if_t<std::is_invocable_v<Work, Dispatcher &>, int> = 0>
     void launch(Work &&work) {
         _launch([&work, this](Dispatcher &dispatch) { dispatch(work); });
@@ -67,9 +74,9 @@ public:
     void launch(Work &&work, Callback &&cb) {
         _launch([&work, this, &cb](Dispatcher &dispatch) { dispatch(work, cb); });
     }
-
+    
     virtual void synchronize() = 0;
-
+    
     [[nodiscard]] static std::unique_ptr<Device> create(Context *context, uint32_t selection_id = 0u);
 };
 
@@ -79,5 +86,5 @@ using DeviceCreator = Device *(Context *, uint32_t);
     extern "C" LUISA_EXPORT ::luisa::compute::Device *create(::luisa::Context *context, uint32_t device_id) { \
         return new DeviceClass{context, device_id};                                                           \
     }
-
+    
 }// namespace luisa::compute

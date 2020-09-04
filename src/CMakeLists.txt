@@ -19,17 +19,18 @@ target_link_libraries(cxxopts_config INTERFACE cxxopts::cxxopts)
 
 add_subdirectory(core)
 add_subdirectory(compute)
+add_subdirectory(render)
 add_subdirectory(backends)
 
-add_library(luisarender INTERFACE)
-target_link_libraries(luisarender INTERFACE luisacore luisacompute luisabackends)
-add_library(luisarender::luisarender ALIAS luisarender)
+add_library(luisaall INTERFACE)
+target_link_libraries(luisaall INTERFACE luisacore luisacompute luisarender luisabackends)
+add_library(luisa::all ALIAS luisaall)
 
 function(luisa_render_add_application name)
     cmake_parse_arguments(APP "" "" "SOURCES" ${ARGN})
     add_executable(${name} ${APP_SOURCES})
     target_compile_features(${name} PRIVATE c_std_11 cxx_std_17)
-    target_link_libraries(${name} PRIVATE luisarender)
+    target_link_libraries(${name} PRIVATE luisaall)
     set_target_properties(${name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/")
 endfunction()
 

@@ -38,6 +38,8 @@ public:
     virtual void upload(Dispatcher &dispatcher, size_t offset, size_t size, const void *host_data) = 0;
     virtual void download(Dispatcher &dispatcher, size_t offset, size_t size, void *host_buffer) = 0;
     virtual void clear_cache() noexcept = 0;
+    
+    virtual void with_cache(compute::Dispatcher &dispatch, const std::function<void(void *)> &modify, size_t offset, size_t length) = 0;
 };
 
 template<typename T>
@@ -74,6 +76,15 @@ public:
     [[nodiscard]] auto copy_to(void *data) const { return [this, data](Dispatcher &d) { _copy_to(d, data); }; }
     
     void clear_cache() const noexcept { _buffer->clear_cache(); }
+    
+    template<typename Modify, std::enable_if_t<std::is_invocable_v<Modify, T *>, int> = 0>
+    auto modify(Modify &&modify) {
+        return [&modify, this](Dispatcher &dispatch) {
+            _buffer->with_cache(dispatch, [&modify](void *raw_data) {
+                modify(reinterpret_cast<T *>(raw_data));
+            }, byte_offset(), byte_size());
+        };
+    }
 };
 
 template<typename T>

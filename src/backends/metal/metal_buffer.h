@@ -25,6 +25,7 @@ public:
     void upload(compute::Dispatcher &dispatcher, size_t offset, size_t size, const void *host_data) override;
     void download(compute::Dispatcher &dispatcher, size_t offset, size_t size, void *host_buffer) override;
     void clear_cache() noexcept override { _cache.clear(); }
+    void with_cache(compute::Dispatcher &dispatch, const std::function<void(void *)> &modify, size_t offset, size_t length) override;
 };
 
 }

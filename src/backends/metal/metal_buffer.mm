@@ -30,4 +30,14 @@ void MetalBuffer::download(compute::Dispatcher &dispatcher, size_t offset, size_
     });
 }
 
+void MetalBuffer::with_cache(compute::Dispatcher &dispatch, const std::function<void(void *)> &modify, size_t offset, size_t length) {
+    auto cache = _cache.obtain();
+    modify(reinterpret_cast<std::byte *>([cache contents]) + offset);
+    auto command_buffer = dynamic_cast<MetalDispatcher &>(dispatch).handle();
+    auto blit_encoder = [command_buffer blitCommandEncoder];
+    [blit_encoder copyFromBuffer:cache sourceOffset:offset toBuffer:_handle destinationOffset:offset size:length];
+    [blit_encoder endEncoding];
+    dispatch.when_completed([this, cache] { _cache.recycle(cache); });
+}
+
 }

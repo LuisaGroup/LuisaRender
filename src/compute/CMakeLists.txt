@@ -10,4 +10,4 @@ set_target_properties(luisacompute PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/"
                       WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
-add_library(luisarender::compute ALIAS luisacompute)
+add_library(luisa::compute ALIAS luisacompute)
