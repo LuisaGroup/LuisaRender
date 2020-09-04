@@ -30,7 +30,7 @@ int main(int argc, char *argv[]) {
     auto stride = 0u;
     auto step = 0u;
     
-    auto kernel = device->compile_kernel([&] {
+    auto kernel = device->compile_kernel("basic", [&] {
         
         Arg<float *> data{buffer};
         Arg<uint> cmp_stride_in{&stride};
@@ -50,7 +50,7 @@ int main(int argc, char *argv[]) {
         data[rhs_index] = select(predicate, rhs, lhs);
     });
     
-    auto small_stride_kernel = device->compile_kernel([&] {
+    auto small_stride_kernel = device->compile_kernel("small_stride", [&] {
         
         Arg<float *> data{buffer};
         
@@ -84,7 +84,7 @@ int main(int argc, char *argv[]) {
         data[thread_id() * 2u + 1u] = cache[tgid * 2u + 1u];
     });
     
-    auto small_step_kernel = device->compile_kernel([&] {
+    auto small_step_kernel = device->compile_kernel("small_step", [&] {
         
         Arg<float *> data{buffer};
         Arg<uint> cmp_step_in{&step};

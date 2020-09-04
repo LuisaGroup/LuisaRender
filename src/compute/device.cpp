@@ -13,7 +13,7 @@ std::unique_ptr<Device> Device::create(Context *context, uint32_t selection_id) 
         for (auto backend : {"cuda", "metal"}) {
             try {
                 LUISA_INFO("Trying to create device \"", backend, ":", 0u, "\"...");
-                auto create_device = context->load_dynamic_function<DeviceCreator>(context->runtime_path("bin") / "backends", backend, "create");
+                auto create_device = context->load_dynamic_function<DeviceCreator>(context->runtime_path("bin") / "backends", serialize("luisabackend", backend), "create");
                 return std::unique_ptr<Device>{create_device(context, 0u)};
             } catch (const std::exception &e) {
                 LUISA_INFO("Failed to create device \"", backend, ":", 0u, "\".");
@@ -23,7 +23,7 @@ std::unique_ptr<Device> Device::create(Context *context, uint32_t selection_id) 
     }
     LUISA_ERROR_IF_NOT(selection_id < devices.size(), "Invalid device selection index: ", selection_id, ", max index is ", devices.size() - 1u, ".");
     auto &&selection = devices[selection_id];
-    auto create_device = context->load_dynamic_function<DeviceCreator>(context->runtime_path("bin") / "backends", selection.backend_name, "create");
+    auto create_device = context->load_dynamic_function<DeviceCreator>(context->runtime_path("bin") / "backends", "luisabackend" + selection.backend_name, "create");
     return std::unique_ptr<Device>{create_device(context, selection.device_id)};
 }
 
