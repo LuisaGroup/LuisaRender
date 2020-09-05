@@ -8,27 +8,23 @@
 #include <compute/buffer.h>
 
 #include "plugin.h"
+#include "illumination.h"
+#include "material_handle.h"
 
 namespace luisa::render {
 
-struct MaterialHandle {
-    int type_id;
-    uint data_block_offset;
-};
+class Material : public Plugin, public Illumination {
 
-struct MaterialDataBlock {
-    uint4 padding;
+public:
+    struct DataBlock {
+        uint4 padding;
+    };
+
+public:
+
+
 };
 
 }
 
-LUISA_STRUCT(luisa::render::MaterialHandle, type_id, data_block_offset)
-LUISA_STRUCT(luisa::render::MaterialDataBlock, padding)
-
-namespace luisa::render {
-
-class Material : public Plugin {
-
-};
-
-}
+LUISA_STRUCT(luisa::render::Material::DataBlock, padding)

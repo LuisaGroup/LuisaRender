@@ -11,6 +11,7 @@
 
 #include "shape.h"
 #include "material.h"
+#include "background.h"
 
 namespace luisa::render {
 
@@ -35,25 +36,25 @@ private:
     BufferView<Entity> _entities;
     BufferView<uint> _instances;
     BufferView<float4x4> _instance_transforms;
-    BufferView<MaterialDataBlock> _material_data;
+    BufferView<Material::DataBlock> _material_data;
     BufferView<MaterialHandle> _instance_materials;
     TransformTree _transform_tree;
-    
+    std::shared_ptr<Background> _background;
     std::unique_ptr<Acceleration> _acceleration;
     
     bool _is_static{false};
 
 private:
-    void _encode(const std::vector<std::shared_ptr<Shape>> &shapes,
-                 float3 *positions, float3 *normals, float2 *uvs,
-                 packed_uint3 *triangles,
-                 Entity *entities,
-                 std::vector<packed_uint3> &entity_ranges,  // (vertex offset, triangle offset, triangle count)
-                 std::vector<Material *> &instance_materials,
-                 uint *instances);
+    void _process(const std::vector<std::shared_ptr<Shape>> &shapes,
+                  float3 *positions, float3 *normals, float2 *uvs,
+                  packed_uint3 *triangles,
+                  Entity *entities,
+                  std::vector<packed_uint3> &entity_ranges,  // (vertex offset, triangle offset, triangle count)
+                  std::vector<Material *> &instance_materials,
+                  uint *instances);
 
 public:
-    Scene(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, float initial_time);
+    Scene(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, std::shared_ptr<Background> background, float initial_time);
     
     [[nodiscard]] auto update(float time) {
         return _instance_transforms.modify([time, this](float4x4 *matrices) {

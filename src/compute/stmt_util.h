@@ -57,7 +57,7 @@ struct Let : public Variable {
 
 // Used for arguments passed by value
 template<typename T>
-using ExprRef = Variable;
+using Expr = Variable;
 
 struct IfStmtBuilder {
 

@@ -25,7 +25,7 @@ int main(int argc, char *argv[]) {
     auto input_copy = input;
     std::shuffle(input_copy.begin(), input_copy.end(), rng);
     
-    auto scale_value = [&](Float k, ExprRef<float> x) -> Float {
+    auto scale_value = [&](Float k, Expr<float> x) -> Float {
         return k * x;
     };
     

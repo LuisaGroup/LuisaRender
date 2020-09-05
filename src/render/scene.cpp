@@ -6,7 +6,8 @@
 
 namespace luisa::render {
 
-Scene::Scene(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, float initial_time) {
+Scene::Scene(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, std::shared_ptr<Background> background, float initial_time)
+    : _background{std::move(background)} {
     
     // calculate memory usage...
     size_t vertex_count = 0u;
@@ -63,7 +64,7 @@ Scene::Scene(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, 
                 _triangles.modify([&](packed_uint3 *indices) {
                     _entities.modify([&](Entity *entities) {
                         _instances.modify([&](uint *instances) {
-                            _encode(shapes, positions, normals, uvs, indices, entities, meshes, materials, instances);
+                            _process(shapes, positions, normals, uvs, indices, entities, meshes, materials, instances);
                         });
                     });
                 });
@@ -80,22 +81,24 @@ Scene::Scene(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, 
     
     // apply initial transforms and build acceleration structure
     _is_static = _transform_tree.is_static();
-    device->launch(_instance_transforms.modify([&](float4x4 *matrices) { _transform_tree.update(matrices, initial_time); }));
+    device->launch(_instance_transforms.modify([&](float4x4 *matrices) {
+        _transform_tree.update(matrices, initial_time);
+    }), [&] { if (_is_static) { _instance_transforms.clear_cache(); }});
     _acceleration = device->build_acceleration(_positions, _triangles, meshes, _instances, _instance_transforms, _is_static);
     
     // now it's time to process materials
     
 }
 
-void Scene::_encode(const std::vector<std::shared_ptr<Shape>> &shapes,
-                    float3 *positions,
-                    float3 *normals,
-                    float2 *uvs,
-                    packed_uint3 *triangles,
-                    Entity *entities,
-                    std::vector<packed_uint3> &entity_ranges,
-                    std::vector<Material *> &instance_materials,
-                    uint *instances) {
+void Scene::_process(const std::vector<std::shared_ptr<Shape>> &shapes,
+                     float3 *positions,
+                     float3 *normals,
+                     float2 *uvs,
+                     packed_uint3 *triangles,
+                     Entity *entities,
+                     std::vector<packed_uint3> &entity_ranges,
+                     std::vector<Material *> &instance_materials,
+                     uint *instances) {
     
     size_t vertex_count = 0u;
     size_t triangle_count = 0u;
