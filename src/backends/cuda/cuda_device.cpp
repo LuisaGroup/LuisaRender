@@ -7,8 +7,8 @@
 
 #include <jitify/jitify.hpp>
 
-#include <compute/device.h>
 #include <core/sha1.h>
+#include <compute/device.h>
 #include <compute/acceleration.h>
 
 #include "cuda_buffer.h"
@@ -21,7 +21,6 @@
 namespace luisa::cuda {
 
 using namespace luisa::compute;
-using namespace luisa::render;
 
 class CudaDevice : public Device {
 
