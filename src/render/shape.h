@@ -25,7 +25,7 @@ public:
 
 protected:
     std::vector<Vertex> _vertices;
-    std::vector<uint3> _indices;
+    std::vector<packed_uint3> _indices;
     std::shared_ptr<Material> _material;
     std::shared_ptr<Transform> _transform;
     std::vector<std::shared_ptr<Shape>> _children;
@@ -35,12 +35,14 @@ private:
     void _exception_if_cleared() const { LUISA_EXCEPTION_IF(_cleared, "Invalid operation on cleared shape."); }
 
 public:
+    virtual ~Shape() noexcept = default;
+    
     [[nodiscard]] const std::vector<Vertex> &vertices() const {
         _exception_if_cleared();
         return _vertices;
     }
     
-    [[nodiscard]] const std::vector<uint3> &indices() const {
+    [[nodiscard]] const std::vector<packed_uint3> &indices() const {
         _exception_if_cleared();
         return _indices;
     }
@@ -56,6 +58,7 @@ public:
         _cleared = true;
     }
     
+    [[nodiscard]] bool is_entity() const noexcept { return _children.empty(); }
     [[nodiscard]] Transform *transform() const noexcept { return _transform.get(); }
     [[nodiscard]] Material *material() const noexcept { return _material.get(); }
 };

@@ -18,7 +18,7 @@ void MetalAcceleration::_refit(compute::Dispatcher &dispatch) {
 void MetalAcceleration::_intersect_any(compute::Dispatcher &dispatch,
                                        const BufferView<Ray> &ray_buffer,
                                        const BufferView<AnyHit> &hit_buffer,
-                                       const BufferView<uint> &count_buffer) {
+                                       const BufferView<uint> &count_buffer) const {
     
     [_any_intersector encodeIntersectionToCommandBuffer:dynamic_cast<MetalDispatcher &>(dispatch).handle()
                                        intersectionType:MPSIntersectionTypeAny
@@ -34,7 +34,7 @@ void MetalAcceleration::_intersect_any(compute::Dispatcher &dispatch,
 void MetalAcceleration::_intersect_closest(compute::Dispatcher &dispatch,
                                            const BufferView<Ray> &ray_buffer,
                                            const BufferView<ClosestHit> &hit_buffer,
-                                           const BufferView<uint> &count_buffer) {
+                                           const BufferView<uint> &count_buffer) const {
     
     [_any_intersector encodeIntersectionToCommandBuffer:dynamic_cast<MetalDispatcher &>(dispatch).handle()
                                        intersectionType:MPSIntersectionTypeNearest

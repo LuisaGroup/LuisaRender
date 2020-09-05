@@ -55,15 +55,7 @@ constexpr auto plugin_base_class_name() noexcept { return detail::plguin_base_cl
 
 using compute::Device;
 
-class Plugin : Noncopyable {
-
-protected:
-    Device *_device;
-
-public:
-    explicit Plugin(Device *device) noexcept: _device{device} {}
-    virtual ~Plugin() noexcept = default;
-    [[nodiscard]] Device &device() { return *_device; }
+struct Plugin : Noncopyable {
     
     template<typename T>
     [[nodiscard]] static std::unique_ptr<T> create(
@@ -73,9 +65,9 @@ public:
         
         auto base_name = pascal_to_snake_case(plugin_base_class_name<T>());
         auto derived_name = pascal_to_snake_case(derived_name_pascal_case);
-        auto plugin_dir = device->context().runtime_path("lib") / "plugins" / base_name.append("s");
+        auto plugin_dir = device->context().runtime_path("bin") / "plugins";
         using PluginCreator = T *(Device *, const ParameterSet &);
-        auto creator = device->context().load_dynamic_function<PluginCreator>(plugin_dir, derived_name, "create");
+        auto creator = device->context().load_dynamic_function<PluginCreator>(plugin_dir, serialize("luisa", base_name, derived_name), "create");
         return std::unique_ptr<T>{creator(device, params)};
     }
 };

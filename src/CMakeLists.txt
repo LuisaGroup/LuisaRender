@@ -19,11 +19,11 @@ target_link_libraries(cxxopts_config INTERFACE cxxopts::cxxopts)
 
 add_subdirectory(core)
 add_subdirectory(compute)
-add_subdirectory(render)
 add_subdirectory(backends)
+add_subdirectory(render)
 
 add_library(luisaall INTERFACE)
-target_link_libraries(luisaall INTERFACE luisacore luisacompute luisabackends)
+target_link_libraries(luisaall INTERFACE luisacore luisacompute luisabackends luisarender)
 add_library(luisa::all ALIAS luisaall)
 
 function(luisa_render_add_application name)
