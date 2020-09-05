@@ -56,7 +56,7 @@ protected:
 
     // For kernel argument bindings
     BufferView<std::byte> _buffer;
-    Texture *_texture{nullptr};
+    std::shared_ptr<Texture> _texture{nullptr};
     void *_data_ref{nullptr};
     std::vector<std::byte> _immutable_data;
 
@@ -81,7 +81,7 @@ public:
     }
 
     // Texture arguments
-    Variable(const TypeDesc *type, uint32_t uid, Texture *texture) noexcept : _type{type}, _uid{uid}, _texture{texture}, _tag{VariableTag::TEXTURE} {
+    Variable(const TypeDesc *type, uint32_t uid, std::shared_ptr<Texture> texture) noexcept : _type{type}, _uid{uid}, _texture{std::move(texture)}, _tag{VariableTag::TEXTURE} {
         LUISA_ERROR_IF_NOT(_type->type == TypeCatalog::TEXTURE, "Argument v", uid, " bound to a texture is not declared as a texture.");
     }
 
@@ -136,7 +136,7 @@ public:
     [[nodiscard]] BufferView<std::byte> buffer() const noexcept { return _buffer; }
 
     // for textures
-    [[nodiscard]] Texture *texture() const noexcept { return _texture; }
+    [[nodiscard]] Texture *texture() const noexcept { return _texture.get(); }
 
     // for uniforms
     [[nodiscard]] void *uniform_data() const noexcept { return _data_ref; }

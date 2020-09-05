@@ -52,9 +52,9 @@ private:
     }
 
 protected:
-    std::unique_ptr<Kernel> _compile_kernel(const compute::dsl::Function &f) override;
+    std::shared_ptr<Kernel> _compile_kernel(const compute::dsl::Function &f) override;
     std::shared_ptr<Buffer> _allocate_buffer(size_t size) override;
-    std::unique_ptr<Texture> _allocate_texture(uint32_t width, uint32_t height, compute::PixelFormat format) override;
+    std::shared_ptr<Texture> _allocate_texture(uint32_t width, uint32_t height, compute::PixelFormat format) override;
     void _launch(const std::function<void(Dispatcher &)> &dispatch) override;
 
 public:
@@ -83,7 +83,7 @@ MetalDevice::MetalDevice(Context *context, uint32_t device_id) : Device{context}
     }
 }
 
-std::unique_ptr<Kernel> MetalDevice::_compile_kernel(const compute::dsl::Function &f) {
+std::shared_ptr<Kernel> MetalDevice::_compile_kernel(const compute::dsl::Function &f) {
     
     LUISA_INFO("Generating source for kernel \"", f.name(), "\"...");
     
@@ -184,7 +184,7 @@ std::unique_ptr<Kernel> MetalDevice::_compile_kernel(const compute::dsl::Functio
         }
     }
     
-    return std::make_unique<MetalKernel>(pso, std::move(uniforms), std::move(arguments), arg_enc);
+    return std::make_shared<MetalKernel>(pso, std::move(uniforms), std::move(arguments), arg_enc);
 }
 
 void MetalDevice::_launch(const std::function<void(Dispatcher &)> &dispatch) {
@@ -204,7 +204,7 @@ std::shared_ptr<Buffer> MetalDevice::_allocate_buffer(size_t size) {
     return std::make_shared<MetalBuffer>(buffer, size);
 }
 
-std::unique_ptr<Texture> MetalDevice::_allocate_texture(uint32_t width, uint32_t height, compute::PixelFormat format) {
+std::shared_ptr<Texture> MetalDevice::_allocate_texture(uint32_t width, uint32_t height, compute::PixelFormat format) {
     
     auto desc = [[MTLTextureDescriptor alloc] init];
     desc.textureType = MTLTextureType2D;
@@ -233,7 +233,7 @@ std::unique_ptr<Texture> MetalDevice::_allocate_texture(uint32_t width, uint32_t
             break;
     }
     auto texture = [_handle newTextureWithDescriptor:desc];
-    return std::make_unique<MetalTexture>(texture, width, height, format);
+    return std::make_shared<MetalTexture>(texture, width, height, format);
 }
 
 std::unique_ptr<Acceleration> MetalDevice::build_acceleration(

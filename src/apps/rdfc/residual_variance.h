@@ -20,8 +20,8 @@ class ResidualVariance {
 private:
     int _width;
     int _height;
-    std::unique_ptr<Texture> _temp;
-    std::unique_ptr<Kernel> _diff_kernel;
+    std::shared_ptr<Texture> _temp;
+    std::shared_ptr<Kernel> _diff_kernel;
 
 public:
     ResidualVariance(Device &device, float sigma, Texture &color_a, Texture &color_b, Texture &output);

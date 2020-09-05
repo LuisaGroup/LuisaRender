@@ -13,12 +13,25 @@
 
 namespace luisa::render {
 
-class Material : public Plugin, public Illumination {
+using compute::dsl::Var;
+using compute::dsl::Expr;
 
-public:
-    struct DataBlock {
-        uint4 padding;
-    };
+struct MaterialSampleExpr {
+    Var<SampledSpectrum> f;
+    Var<float3> wi;
+    Var<float> pdf;
+    Var<bool> is_specular;
+    Var<bool> is_trans;
+};
+
+struct MaterialEvaluationExpr {
+    Var<SampledSpectrum> f;
+    Var<SampledSpectrum> L;
+    Var<float> pdf_bsdf;
+    Var<float> pdf_light;
+};
+
+class Material : public Plugin, public Illumination {
 
 public:
 
@@ -26,5 +39,3 @@ public:
 };
 
 }
-
-LUISA_STRUCT(luisa::render::Material::DataBlock, padding)

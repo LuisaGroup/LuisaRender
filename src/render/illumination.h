@@ -12,27 +12,11 @@
 
 #include "spectrum.h"
 #include "interaction.h"
+#include "data_block.h"
 
 namespace luisa::render {
 
-struct LightSample {
-    SampledSpectrum  L;
-    packed_float3 wi;
-    float pdf;
-};
-
-struct LightEvaluation {
-    SampledSpectrum L;
-    float pdf;
-};
-
-}
-
-LUISA_STRUCT(luisa::render::LightSample, L, wi, pdf)
-LUISA_STRUCT(luisa::render::LightEvaluation, L, pdf)
-
-namespace luisa::render {
-
+using compute::dsl::Var;
 using compute::dsl::Expr;
 
 using compute::Dispatcher;
@@ -42,24 +26,31 @@ class Shape;
 
 struct LightSampleBuffers {
     BufferView<SampledSpectrum> L;
-    BufferView<float4> wi_and_pdf;
+    BufferView<float> pdf;
 };
 
-class Illumination {
+struct LightSampleExpr {
+    Var<SampledSpectrum> L;
+    Var<float3> p;
+    Var<packed_float3> w;
+    Var<float> pdf;
+};
 
-public:
+struct Illumination {
+    
     struct Description {
         std::vector<float> cdf;
+        std::vector<float> pdf;
         float power;
     };
-
-private:
-    virtual Expr<LightSample> _sample(Expr<Interaction> pi, Expr<SampledWavelength> lambda, Expr<float2> u) = 0;
-    virtual Expr<LightEvaluation> _evaluate(Expr<float3> p, Expr<float3> n, Expr<float2> uv, Expr<float3> w, Expr<SampledWavelength> lambda) = 0;
-
-public:
+    
     [[nodiscard]] virtual Description description(const Shape *shape) = 0;
-    // TODO: sample and eval interfaces
+    
+    [[nodiscard]] virtual LightSampleExpr sample(
+        Expr<const DataBlock *> data,
+        Expr<Interaction> p,
+        Expr<SampledWavelength> lambda,
+        Expr<float2> u) = 0;
 };
 
 }

@@ -13,6 +13,8 @@ namespace luisa::render {
 using compute::Device;
 using compute::BufferView;
 
+using AnyInteraction = compute::AnyHit;
+
 struct Interaction {
     float3 pi;
     float3 wo;
@@ -24,8 +26,9 @@ struct Interaction {
 
 struct InteractionBuffers {
     
+    BufferView<bool> valid;
     BufferView<float3> pi;
-    BufferView<float3> wo;
+    BufferView<float3> ray_origin_to_hit;
     BufferView<float3> ng;
     BufferView<float3> ns;
     BufferView<float2> uv;
@@ -33,7 +36,7 @@ struct InteractionBuffers {
     
     InteractionBuffers(Device *device, size_t size) noexcept
         : pi{device->allocate_buffer<float3>(size)},
-          wo{device->allocate_buffer<float3>(size)},
+          ray_origin_to_hit{device->allocate_buffer<float3>(size)},
           ng{device->allocate_buffer<float3>(size)},
           ns{device->allocate_buffer<float3>(size)},
           uv{device->allocate_buffer<float2>(size)},

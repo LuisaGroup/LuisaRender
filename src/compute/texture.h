@@ -54,7 +54,7 @@ MAKE_PIXEL_FORMAT_OF_TYPE(float4, RGBA32F)
 template<typename T>
 constexpr auto pixel_format = detail::PixelFormatImpl<T>::format;
 
-class Texture {
+class Texture : public std::enable_shared_from_this<Texture> {
 
 protected:
     uint32_t _width;

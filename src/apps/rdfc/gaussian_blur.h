@@ -18,9 +18,9 @@ class GaussianBlur {
 private:
     int _width;
     int _height;
-    std::unique_ptr<Texture> _temp;
-    std::unique_ptr<Kernel> _blur_x_kernel;
-    std::unique_ptr<Kernel> _blur_y_kernel;
+    std::shared_ptr<Texture> _temp;
+    std::shared_ptr<Kernel> _blur_x_kernel;
+    std::shared_ptr<Kernel> _blur_y_kernel;
 
 public:
     GaussianBlur(Device &device, float sigma_x, float sigma_y, Texture &input, Texture &output)

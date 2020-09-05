@@ -67,10 +67,10 @@ public:
     }
     
     template<typename T>
-    [[nodiscard]] Variable arg(Texture *tex) noexcept {
+    [[nodiscard]] Variable arg(std::shared_ptr<Texture> tex) noexcept {
         auto type = type_desc<T>;
         _used_types.emplace_back(type);
-        return _arguments.emplace_back(type, _get_uid(), tex);
+        return _arguments.emplace_back(type, _get_uid(), std::move(tex));
     }
     
     template<typename T>

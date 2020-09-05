@@ -26,7 +26,9 @@ struct Arg : public Variable, Noncopyable {
     template<typename U>
     explicit Arg(const BufferView<U> &bv) noexcept : Variable{Function::current().arg<T>(std::move(bv))} {}
 
-    explicit Arg(Texture &tex) noexcept : Variable{Function::current().arg<T>(&tex)} {}
+    explicit Arg(std::shared_ptr<Texture> tex) noexcept : Variable{Function::current().arg<T>(std::move(tex))} {}
+    explicit Arg(Texture *tex) noexcept : Variable{Function::current().arg<T>(tex->shared_from_this())} {}
+    explicit Arg(Texture &tex) noexcept : Variable{Function::current().arg<T>(tex.shared_from_this())} {}
 
     // For embedding immutable uniform data
     template<typename U, std::enable_if_t<std::negation_v<std::is_pointer<U>>, int> = 0>
@@ -175,6 +177,7 @@ MAKE_CONVENIENT_VARIABLE_TYPE(UInt, uint)
 #define Arg Arg
 #define Var Var
 #define Let Let
+#define Expr Expr
 #define Threadgroup Threadgroup
 
 #define Bool Bool

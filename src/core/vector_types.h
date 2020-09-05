@@ -113,7 +113,7 @@ struct alignas(detail::vector_alignment<T, N, is_packed>) Vector : detail::Vecto
 };
 
 #define MAKE_VECTOR_BINARY_OP(op)                                                                          \
-    template<typename T, uint32_t N>                                                                       \
+    template<typename T, uint32_t N, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>                   \
     constexpr Vector<T, N, false> operator op(Vector<T, N, false> lhs, Vector<T, N, false> rhs) noexcept { \
         static_assert(N == 2 || N == 3 || N == 4);                                                         \
         if constexpr (N == 2) {                                                                            \
@@ -125,7 +125,7 @@ struct alignas(detail::vector_alignment<T, N, is_packed>) Vector : detail::Vecto
         }                                                                                                  \
     }                                                                                                      \
                                                                                                            \
-    template<typename T, uint32_t N>                                                                       \
+    template<typename T, uint32_t N, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>                   \
     constexpr Vector<T, N, false> operator op(T lhs, Vector<T, N, false> rhs) noexcept {                   \
         static_assert(N == 2 || N == 3 || N == 4);                                                         \
         if constexpr (N == 2) {                                                                            \
@@ -137,7 +137,7 @@ struct alignas(detail::vector_alignment<T, N, is_packed>) Vector : detail::Vecto
         }                                                                                                  \
     }                                                                                                      \
                                                                                                            \
-    template<typename T, uint32_t N>                                                                       \
+    template<typename T, uint32_t N, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>                   \
     constexpr Vector<T, N, false> operator op(Vector<T, N, false> lhs, T rhs) noexcept {                   \
         static_assert(N == 2 || N == 3 || N == 4);                                                         \
         if constexpr (N == 2) {                                                                            \

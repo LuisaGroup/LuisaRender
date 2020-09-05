@@ -20,10 +20,10 @@ class DualBufferVariance {
 private:
     int _width;
     int _height;
-    std::unique_ptr<Kernel> _dual_variance_kernel;
-    std::unique_ptr<Kernel> _scale_kernel;
-    std::unique_ptr<Texture> _blurred_sample_variance;
-    std::unique_ptr<Texture> _blurred_dual_variance;
+    std::shared_ptr<Kernel> _dual_variance_kernel;
+    std::shared_ptr<Kernel> _scale_kernel;
+    std::shared_ptr<Texture> _blurred_sample_variance;
+    std::shared_ptr<Texture> _blurred_dual_variance;
     std::unique_ptr<BoxBlur> _blur_sample_variance;
     std::unique_ptr<BoxBlur> _blur_dual_variance;
 

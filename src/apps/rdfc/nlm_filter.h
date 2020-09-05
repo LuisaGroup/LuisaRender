@@ -22,13 +22,13 @@ private:
     int _height;
     int _filter_radius{0};
     luisa::int2 _current_offset{0};
-    std::unique_ptr<Kernel> _distance_kernel;
-    std::unique_ptr<Kernel> _clear_accum_kernel;
-    std::unique_ptr<Kernel> _accum_kernel;
-    std::unique_ptr<Kernel> _blit_kernel;
-    std::unique_ptr<Texture> _distance_texture;
-    std::unique_ptr<Texture> _accum_a_texture;
-    std::unique_ptr<Texture> _accum_b_texture;
+    std::shared_ptr<Kernel> _distance_kernel;
+    std::shared_ptr<Kernel> _clear_accum_kernel;
+    std::shared_ptr<Kernel> _accum_kernel;
+    std::shared_ptr<Kernel> _blit_kernel;
+    std::shared_ptr<Texture> _distance_texture;
+    std::shared_ptr<Texture> _accum_a_texture;
+    std::shared_ptr<Texture> _accum_b_texture;
     std::unique_ptr<BoxBlur> _blur;
 
 public:

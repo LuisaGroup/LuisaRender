@@ -42,8 +42,8 @@ private:
 
 protected:
     std::shared_ptr<Buffer> _allocate_buffer(size_t size) override;
-    std::unique_ptr<Texture> _allocate_texture(uint32_t width, uint32_t height, compute::PixelFormat format) override;
-    std::unique_ptr<Kernel> _compile_kernel(const compute::dsl::Function &function) override;
+    std::shared_ptr<Texture> _allocate_texture(uint32_t width, uint32_t height, compute::PixelFormat format) override;
+    std::shared_ptr<Kernel> _compile_kernel(const compute::dsl::Function &function) override;
 
     void _launch(const std::function<void(Dispatcher &)> &work) override;
 
@@ -118,7 +118,7 @@ CudaDevice::~CudaDevice() noexcept {
     CUDA_CHECK(cuDevicePrimaryCtxRelease(_handle));
 }
 
-std::unique_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) {
+std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) {
     
     std::ostringstream os;
     CudaCodegen codegen{os};
@@ -217,7 +217,7 @@ std::unique_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) {
         LUISA_INFO("Cache hit for kernel \"", function.name(), "\" in memory, compilation skipped.");
     }
     
-    return std::make_unique<CudaKernel>(iter->second, ArgumentEncoder{function.arguments()});
+    return std::make_shared<CudaKernel>(iter->second, ArgumentEncoder{function.arguments()});
 }
 
 std::shared_ptr<Buffer> CudaDevice::_allocate_buffer(size_t size) {
@@ -237,7 +237,7 @@ void CudaDevice::_launch(const std::function<void(Dispatcher &)> &work) {
     _dispatch_cv.notify_one();
 }
 
-std::unique_ptr<Texture> CudaDevice::_allocate_texture(uint32_t width, uint32_t height, compute::PixelFormat format) {
+std::shared_ptr<Texture> CudaDevice::_allocate_texture(uint32_t width, uint32_t height, compute::PixelFormat format) {
     
     // Create array
     CUDA_ARRAY_DESCRIPTOR array_desc{};
@@ -318,7 +318,7 @@ std::unique_ptr<Texture> CudaDevice::_allocate_texture(uint32_t width, uint32_t 
     CUDA_CHECK(cuTexObjectCreate(&texture, &res_desc, &tex_desc, &res_view_desc));
     CUDA_CHECK(cuSurfObjectCreate(&surface, &res_desc));
     
-    return std::make_unique<CudaTexture>(array, texture, surface, width, height, format);
+    return std::make_shared<CudaTexture>(array, texture, surface, width, height, format);
 }
 
 std::unique_ptr<Acceleration> CudaDevice::build_acceleration(

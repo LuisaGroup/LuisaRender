@@ -18,9 +18,9 @@ class BoxBlur {
 private:
     int _width;
     int _height;
-    std::unique_ptr<Kernel> _blur_x;
-    std::unique_ptr<Kernel> _blur_y;
-    std::unique_ptr<Texture> _temp;
+    std::shared_ptr<Kernel> _blur_x;
+    std::shared_ptr<Kernel> _blur_y;
+    std::shared_ptr<Texture> _temp;
 
 public:
     // Note: "input" and "output" may alias

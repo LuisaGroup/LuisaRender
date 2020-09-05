@@ -21,8 +21,8 @@ protected:
     Context *_context{nullptr};
     
     [[nodiscard]] virtual std::shared_ptr<Buffer> _allocate_buffer(size_t size) = 0;
-    [[nodiscard]] virtual std::unique_ptr<Texture> _allocate_texture(uint32_t width, uint32_t height, PixelFormat format) = 0;
-    [[nodiscard]] virtual std::unique_ptr<Kernel> _compile_kernel(const dsl::Function &function) = 0;
+    [[nodiscard]] virtual std::shared_ptr<Texture> _allocate_texture(uint32_t width, uint32_t height, PixelFormat format) = 0;
+    [[nodiscard]] virtual std::shared_ptr<Kernel> _compile_kernel(const dsl::Function &function) = 0;
     
     virtual void _launch(const std::function<void(Dispatcher &)> &dispatch) = 0;
 
@@ -33,14 +33,14 @@ public:
     [[nodiscard]] Context &context() const noexcept { return *_context; }
     
     template<typename Def, std::enable_if_t<std::is_invocable_v<Def>, int> = 0>
-    [[nodiscard]] std::unique_ptr<Kernel> compile_kernel(std::string name, Def &&def) {
+    [[nodiscard]] std::shared_ptr<Kernel> compile_kernel(std::string name, Def &&def) {
         dsl::Function function{std::move(name)};
         def();
         return _compile_kernel(function);
     }
     
     template<typename Def, std::enable_if_t<std::is_invocable_v<Def>, int> = 0>
-    [[nodiscard]] std::unique_ptr<Kernel> compile_kernel(Def &&def) {
+    [[nodiscard]] std::shared_ptr<Kernel> compile_kernel(Def &&def) {
         return compile_kernel("foo", std::forward<Def>(def));
     }
     
@@ -50,11 +50,11 @@ public:
     }
     
     template<typename T>
-    [[nodiscard]] std::unique_ptr<Texture> allocate_texture(uint32_t width, uint32_t height) {
+    [[nodiscard]] std::shared_ptr<Texture> allocate_texture(uint32_t width, uint32_t height) {
         return allocate_texture(width, height, pixel_format<T>);
     }
     
-    [[nodiscard]] std::unique_ptr<Texture> allocate_texture(uint32_t width, uint32_t height, PixelFormat format) {
+    [[nodiscard]] std::shared_ptr<Texture> allocate_texture(uint32_t width, uint32_t height, PixelFormat format) {
         return _allocate_texture(width, height, format);
     }
     

@@ -106,6 +106,18 @@ constexpr uint prime_number_prefix_sums [[maybe_unused]][prime_number_count] = {
 
 }// namespace constants
 
+// bit manipulation function
+constexpr auto next_pow_of_two(uint v) noexcept {
+    v--;
+    v |= v >> 1u;
+    v |= v >> 2u;
+    v |= v >> 4u;
+    v |= v >> 8u;
+    v |= v >> 16u;
+    v++;
+    return v;
+}
+
 // Scalar Functions
 using std::acos;
 using std::asin;
