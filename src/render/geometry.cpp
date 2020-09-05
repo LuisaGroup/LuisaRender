@@ -73,7 +73,8 @@ Geometry::Geometry(Device *device, const std::vector<std::shared_ptr<Shape>> &sh
         _instance_transforms.clear_cache();
     });
     
-    _acceleration = device->build_acceleration(_positions, _triangles, meshes, _instances, _instance_transforms);
+    _is_static = _transform_tree.is_static();
+    _acceleration = device->build_acceleration(_positions, _triangles, meshes, _instances, _instance_transforms, _is_static);
 }
 
 void Geometry::_encode(const std::vector<std::shared_ptr<Shape>> &shapes,
@@ -90,6 +91,7 @@ void Geometry::_encode(const std::vector<std::shared_ptr<Shape>> &shapes,
     auto entity_offset = 0u;
     
     // TODO
+    
 }
 
 }

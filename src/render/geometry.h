@@ -44,6 +44,11 @@ public:
             for (auto &&child : _children) { update(buffer, time, m); }
         }
     }
+    
+    [[nodiscard]] bool is_static() const noexcept {
+        return (_transform == nullptr || _transform->is_static()) &&
+               std::all_of(_children.cbegin(), _children.cend(), [](auto &&child) { return child->is_static(); });
+    }
 };
 
 class Geometry {
@@ -60,11 +65,12 @@ private:
     BufferView<float2> _tex_coords;
     BufferView<packed_uint3> _triangles;
     BufferView<Entity> _entities;  // (index offset, vertex offset)
-    BufferView<uint> _instances;  // indices into entities
+    BufferView<uint> _instances;   // indices into entities
     BufferView<float4x4> _instance_transforms;
     TransformTree _transform_tree;
     std::unordered_map<Shape *, uint> _shape_to_instance_id;
     
+    bool _is_static{false};
     std::unique_ptr<Acceleration> _acceleration;
 
 private:
@@ -83,6 +89,8 @@ public:
             _transform_tree.update(matrices, time);
         });
     }
+    
+    [[nodiscard]] bool is_static() const noexcept { return _is_static; }
 };
 
 }

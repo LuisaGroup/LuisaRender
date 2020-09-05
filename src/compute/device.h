@@ -63,7 +63,8 @@ public:
         const BufferView<packed_uint3> &indices,
         const std::vector<packed_uint3> &meshes,  // (vertex offset, triangle offset, triangle count)
         const BufferView<uint> &instances,
-        const BufferView<float4x4> &transforms) = 0;
+        const BufferView<float4x4> &transforms,
+        bool is_static) = 0;
     
     template<typename Work, std::enable_if_t<std::is_invocable_v<Work, Dispatcher &>, int> = 0>
     void launch(Work &&work) {

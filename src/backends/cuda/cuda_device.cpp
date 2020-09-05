@@ -51,11 +51,13 @@ public:
     explicit CudaDevice(Context *context, uint32_t device_id);
     ~CudaDevice() noexcept override;
     void synchronize() override;
-    std::unique_ptr<Acceleration> build_acceleration(const BufferView<float3> &positions,
-                                                     const BufferView<packed_uint3> &indices,
-                                                     const std::vector<packed_uint3> &meshes,
-                                                     const BufferView<uint> &instances,
-                                                     const BufferView<float4x4> &transforms) override;
+    std::unique_ptr<Acceleration> build_acceleration(
+        const BufferView<float3> &positions,
+        const BufferView<packed_uint3> &indices,
+        const std::vector<packed_uint3> &meshes,
+        const BufferView<uint> &instances,
+        const BufferView<float4x4> &transforms,
+        bool is_static) override;
 };
 
 void CudaDevice::synchronize() {
@@ -319,11 +321,14 @@ std::unique_ptr<Texture> CudaDevice::_allocate_texture(uint32_t width, uint32_t 
     return std::make_unique<CudaTexture>(array, texture, surface, width, height, format);
 }
 
-std::unique_ptr<Acceleration> CudaDevice::build_acceleration(const BufferView<float3> &positions,
-                                                             const BufferView<packed_uint3> &indices,
-                                                             const std::vector<packed_uint3> &meshes,
-                                                             const BufferView<uint> &instances,
-                                                             const BufferView<float4x4> &transforms) {
+std::unique_ptr<Acceleration> CudaDevice::build_acceleration(
+    const BufferView<float3> &positions,
+    const BufferView<packed_uint3> &indices,
+    const std::vector<packed_uint3> &meshes,
+    const BufferView<uint> &instances,
+    const BufferView<float4x4> &transforms,
+    bool is_static) {
+    
     // TODO
     LUISA_ERROR("Not implemented!");
 }

@@ -67,7 +67,8 @@ public:
         const BufferView<packed_uint3> &indices,
         const std::vector<packed_uint3> &meshes,
         const BufferView<uint> &instances,
-        const BufferView<float4x4> &transforms) override;
+        const BufferView<float4x4> &transforms,
+        bool is_static) override;
 };
 
 MetalDevice::MetalDevice(Context *context, uint32_t device_id) : Device{context} {
@@ -240,7 +241,8 @@ std::unique_ptr<Acceleration> MetalDevice::build_acceleration(
     const BufferView<packed_uint3> &indices,
     const std::vector<packed_uint3> &meshes,
     const BufferView<uint> &instances,
-    const BufferView<float4x4> &transforms) {
+    const BufferView<float4x4> &transforms,
+    bool is_static) {
     
     auto acceleration_group = [[MPSAccelerationStructureGroup alloc] initWithDevice:_handle];
     auto instance_acceleration = [[MPSInstanceAccelerationStructure alloc] initWithGroup:acceleration_group];
@@ -268,7 +270,7 @@ std::unique_ptr<Acceleration> MetalDevice::build_acceleration(
     instance_acceleration.transformBuffer = dynamic_cast<MetalBuffer *>(transforms.buffer())->handle();
     instance_acceleration.transformBufferOffset = transforms.byte_offset();
     instance_acceleration.transformType = MPSTransformTypeFloat4x4;
-    instance_acceleration.usage = MPSAccelerationStructureUsageRefit;
+    instance_acceleration.usage = is_static ? MPSAccelerationStructureUsageNone : MPSAccelerationStructureUsageRefit;
     [instance_acceleration rebuild];
     
     auto closest_intersector = [[MPSRayIntersector alloc] initWithDevice:_handle];
