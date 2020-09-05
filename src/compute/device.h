@@ -10,12 +10,8 @@
 #include <compute/function.h>
 #include <compute/kernel.h>
 #include <compute/texture.h>
+#include <compute/acceleration.h>
 #include <core/context.h>
-
-namespace luisa::render {
-struct Acceleration;
-class Geometry;
-}
 
 namespace luisa::compute {
 
@@ -62,7 +58,12 @@ public:
         return _allocate_texture(width, height, format);
     }
     
-    [[nodiscard]] virtual std::unique_ptr<render::Acceleration> build_acceleration(const render::Geometry &geometry) = 0;
+    [[nodiscard]] virtual std::unique_ptr<Acceleration> build_acceleration(
+        const BufferView<float3> &positions,
+        const BufferView<packed_uint3> &indices,
+        const std::vector<packed_uint3> &meshes,  // (vertex offset, triangle offset, triangle count)
+        const BufferView<uint> &instances,
+        const BufferView<float4x4> &transforms) = 0;
     
     template<typename Work, std::enable_if_t<std::is_invocable_v<Work, Dispatcher &>, int> = 0>
     void launch(Work &&work) {

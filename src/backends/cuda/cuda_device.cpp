@@ -9,7 +9,7 @@
 
 #include <compute/device.h>
 #include <core/sha1.h>
-#include <render/acceleration.h>
+#include <compute/acceleration.h>
 
 #include "cuda_buffer.h"
 #include "cuda_texture.h"

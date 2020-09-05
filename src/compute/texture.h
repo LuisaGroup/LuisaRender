@@ -80,13 +80,13 @@ public:
     [[nodiscard]] auto copy_to(void *data) { return [this, data](Dispatcher &d) { _copy_to(d, data); }; }
     
     template<typename T>
-    [[nodiscard]] auto copy_from(BufferView<T> buffer) {
+    [[nodiscard]] auto copy_from(const BufferView<T> &buffer) {
         LUISA_WARNING_IF_NOT(pixel_format<T> == _format, "Texture pixel format and buffer type mismatch.");
         return [this, buffer](Dispatcher &d) { _copy_from(d, buffer.buffer(), buffer.byte_offset()); };
     }
     
     template<typename T>
-    [[nodiscard]] auto copy_to(BufferView<T> buffer) {
+    [[nodiscard]] auto copy_to(const BufferView<T> &buffer) {
         LUISA_WARNING_IF_NOT(pixel_format<T> == _format, "Texture pixel format and buffer type mismatch.");
         return [this, buffer](Dispatcher &d) { _copy_to(d, buffer.buffer(), buffer.byte_offset()); };
     }

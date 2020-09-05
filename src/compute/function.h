@@ -60,7 +60,7 @@ public:
     [[nodiscard]] const std::string &name() const noexcept { return _name; }
     
     template<typename T, typename U>
-    [[nodiscard]] Variable arg(BufferView<U> bv) noexcept {
+    [[nodiscard]] Variable arg(const BufferView<U> &bv) noexcept {
         auto type = type_desc<T>;
         _used_types.emplace_back(type);
         return _arguments.emplace_back(type, _get_uid(), bv.buffer(), bv.byte_offset(), bv.byte_size());

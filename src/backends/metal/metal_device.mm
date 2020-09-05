@@ -3,8 +3,6 @@
 //
 
 #import <cstdlib>
-#import <string>
-#import <fstream>
 #import <queue>
 #import <cstring>
 #import <map>
@@ -12,20 +10,20 @@
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
 
 #import <core/sha1.h>
+
 #import <compute/device.h>
-#import <render/geometry.h>
-#import <render/acceleration.h>
+#import <compute/acceleration.h>
 
 #import "metal_buffer.h"
 #import "metal_texture.h"
 #import "metal_kernel.h"
 #import "metal_codegen.h"
 #import "metal_dispatcher.h"
+#import "metal_acceleration.h"
 
 namespace luisa::metal {
 
 using namespace compute;
-using namespace render;
 
 class MetalDevice : public Device {
 
@@ -58,17 +56,19 @@ protected:
     std::shared_ptr<Buffer> _allocate_buffer(size_t size) override;
     std::unique_ptr<Texture> _allocate_texture(uint32_t width, uint32_t height, compute::PixelFormat format) override;
     void _launch(const std::function<void(Dispatcher &)> &dispatch) override;
-    std::unique_ptr<render::Acceleration> build_acceleration(const Geometry &geometry) override;
 
 public:
     explicit MetalDevice(Context *context, uint32_t device_id);
     ~MetalDevice() noexcept override = default;
     void synchronize() override;
+    
+    std::unique_ptr<Acceleration> build_acceleration(
+        const BufferView<float3> &positions,
+        const BufferView<packed_uint3> &indices,
+        const std::vector<packed_uint3> &meshes,
+        const BufferView<uint> &instances,
+        const BufferView<float4x4> &transforms) override;
 };
-
-std::unique_ptr<render::Acceleration> MetalDevice::build_acceleration(const Geometry &geometry) {
-    return nullptr;
-}
 
 MetalDevice::MetalDevice(Context *context, uint32_t device_id) : Device{context} {
     auto devices = MTLCopyAllDevices();
@@ -233,6 +233,61 @@ std::unique_ptr<Texture> MetalDevice::_allocate_texture(uint32_t width, uint32_t
     }
     auto texture = [_handle newTextureWithDescriptor:desc];
     return std::make_unique<MetalTexture>(texture, width, height, format);
+}
+
+std::unique_ptr<Acceleration> MetalDevice::build_acceleration(
+    const BufferView<float3> &positions,
+    const BufferView<packed_uint3> &indices,
+    const std::vector<packed_uint3> &meshes,
+    const BufferView<uint> &instances,
+    const BufferView<float4x4> &transforms) {
+    
+    auto acceleration_group = [[MPSAccelerationStructureGroup alloc] initWithDevice:_handle];
+    auto instance_acceleration = [[MPSInstanceAccelerationStructure alloc] initWithGroup:acceleration_group];
+    
+    auto acceleration_structures = [NSMutableArray array];
+    instance_acceleration.accelerationStructures = acceleration_structures;
+    
+    // create individual triangle acceleration structures
+    for (auto [vertex_offset, triangle_offset, triangle_count] : meshes) {
+        auto triangle_acceleration = [[MPSTriangleAccelerationStructure alloc] initWithGroup:acceleration_group];
+        triangle_acceleration.vertexBuffer = dynamic_cast<MetalBuffer *>(positions.buffer())->handle();
+        triangle_acceleration.vertexBufferOffset = positions.byte_offset() + vertex_offset * sizeof(float3);
+        triangle_acceleration.vertexStride = sizeof(float3);
+        triangle_acceleration.indexBuffer = dynamic_cast<MetalBuffer *>(indices.buffer())->handle();
+        triangle_acceleration.indexBufferOffset = indices.byte_offset() + triangle_offset * sizeof(packed_uint3);
+        triangle_acceleration.indexType = MPSDataTypeUInt32;
+        triangle_acceleration.triangleCount = triangle_count;
+        [triangle_acceleration rebuild];
+        [acceleration_structures addObject:triangle_acceleration];
+    }
+    
+    instance_acceleration.instanceBuffer = dynamic_cast<MetalBuffer *>(instances.buffer())->handle();
+    instance_acceleration.instanceBufferOffset = instances.byte_offset();
+    instance_acceleration.instanceCount = instances.size();
+    instance_acceleration.transformBuffer = dynamic_cast<MetalBuffer *>(transforms.buffer())->handle();
+    instance_acceleration.transformBufferOffset = transforms.byte_offset();
+    instance_acceleration.transformType = MPSTransformTypeFloat4x4;
+    instance_acceleration.usage = MPSAccelerationStructureUsageRefit;
+    [instance_acceleration rebuild];
+    
+    auto closest_intersector = [[MPSRayIntersector alloc] initWithDevice:_handle];
+    closest_intersector.rayDataType = MPSRayDataTypeOriginMinDistanceDirectionMaxDistance;
+    closest_intersector.rayStride = sizeof(Ray);
+    closest_intersector.intersectionDataType = MPSIntersectionDataTypeDistancePrimitiveIndexInstanceIndexCoordinates;
+    closest_intersector.intersectionStride = sizeof(ClosestHit);
+    closest_intersector.boundingBoxIntersectionTestType = MPSBoundingBoxIntersectionTestTypeAxisAligned;
+    closest_intersector.triangleIntersectionTestType = MPSTriangleIntersectionTestTypeWatertight;
+    
+    auto any_intersector = [[MPSRayIntersector alloc] initWithDevice:_handle];
+    any_intersector.rayDataType = MPSRayDataTypeOriginMinDistanceDirectionMaxDistance;
+    any_intersector.rayStride = sizeof(Ray);
+    any_intersector.intersectionDataType = MPSIntersectionDataTypeDistance;
+    any_intersector.intersectionStride = sizeof(AnyHit);
+    any_intersector.boundingBoxIntersectionTestType = MPSBoundingBoxIntersectionTestTypeAxisAligned;
+    any_intersector.triangleIntersectionTestType = MPSTriangleIntersectionTestTypeWatertight;
+    
+    return std::make_unique<MetalAcceleration>(instance_acceleration, closest_intersector, any_intersector);
 }
 
 }

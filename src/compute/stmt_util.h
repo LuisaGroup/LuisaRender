@@ -24,7 +24,7 @@ template<typename T>
 struct Arg : public Variable, Noncopyable {
 
     template<typename U>
-    explicit Arg(BufferView<U> bv) noexcept : Variable{Function::current().arg<T>(bv)} {}
+    explicit Arg(const BufferView<U> &bv) noexcept : Variable{Function::current().arg<T>(std::move(bv))} {}
 
     explicit Arg(Texture &tex) noexcept : Variable{Function::current().arg<T>(&tex)} {}
 
