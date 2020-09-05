@@ -209,23 +209,23 @@ void Scene::intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_buf
         Auto ray_count = *p_ray_count;
         If (tid < ray_count) {
             
-            Auto hit = hits[tid];
-            If (hit.$(distance) <= 0.0f) {
+            Var<ClosestHit> hit = hits[tid];
+            If (hit.distance() <= 0.0f) {
                 its_valid[tid] = false;
                 Return;
             };
             
             its_valid[tid] = true;
             
-            Auto instance_id = hit.$(instance_id);
+            Auto instance_id = hit.instance_id();
             its_material[tid] = materials[instance_id];
             
-            Auto entity = instance_entities[instance_id];
-            Auto triangle_id = entity.$(triangle_offset) + hit.$(triangle_id);
-            Auto indices = triangles[triangle_id] + entity.$(vertex_offset);
+            Var<Entity> entity = instance_entities[instance_id];
+            Auto triangle_id = entity.triangle_offset() + hit.triangle_id();
+            Auto indices = triangles[triangle_id] + entity.vertex_offset();
             
-            Auto bary_u = hit.$(bary_u);
-            Auto bary_v = hit.$(bary_v);
+            Auto bary_u = hit.bary_u();
+            Auto bary_v = hit.bary_v();
             Auto bary_w = literal(1.0f) - (bary_u + bary_v);
             
             Auto p0 = positions[indices.x()];

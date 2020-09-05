@@ -472,36 +472,6 @@ struct MakeTypeDescImpl<Vector<T, 3, true>> {
 template<typename T>
 inline const TypeDesc *type_desc = detail::MakeTypeDescImpl<T>{}();
 
-#define LUISA_STRUCT_BEGIN(S)                                                                    \
-namespace luisa::compute::dsl {                                                                  \
-    template<>                                                                                   \
-    struct Structure<S> {                                                                        \
-        [[nodiscard]] static TypeDesc *desc() noexcept {                                         \
-            using This = S;                                                                      \
-            static TypeDesc td;                                                                  \
-            static int depth = 0;                                                                \
-            if (depth++ == 0) {                                                                  \
-                td.type = TypeCatalog::STRUCTURE;                                                \
-                td.member_names.clear();                                                         \
-                td.member_types.clear();                                                         \
-
-#define LUISA_STRUCT_MEMBER(member)                                                              \
-                td.member_names.emplace_back(#member);                                           \
-                td.member_types.emplace_back(type_desc<decltype(std::declval<This>().member)>);  \
-
-#define LUISA_STRUCT_END()                                                                       \
-            }                                                                                    \
-            depth--;                                                                             \
-            return &td;                                                                          \
-        }                                                                                        \
-    };                                                                                           \
-}                                                                                                \
-
-#define LUISA_STRUCT(S, ...)                            \
-LUISA_STRUCT_BEGIN(S)                                   \
-     LUISA_MAP(LUISA_STRUCT_MEMBER, __VA_ARGS__)        \
-LUISA_STRUCT_END()                                      \
-
 inline const TypeDesc *remove_const(const TypeDesc *type) noexcept {
     if (type == nullptr) { return nullptr; }
     if (type->type == TypeCatalog::CONSTANT) { return remove_const(type->element_type); }
