@@ -4,7 +4,7 @@
 
 #pragma once
 
-// From: https://github.com/Erlkoenig90/LUISA_MAP-macro
+// From: https://github.com/Erlkoenig90/map-macro
 #define LUISA_MAP_EVAL0(...) __VA_ARGS__
 #define LUISA_MAP_EVAL1(...) LUISA_MAP_EVAL0(LUISA_MAP_EVAL0(LUISA_MAP_EVAL0(__VA_ARGS__)))
 #define LUISA_MAP_EVAL2(...) LUISA_MAP_EVAL1(LUISA_MAP_EVAL1(LUISA_MAP_EVAL1(__VA_ARGS__)))
