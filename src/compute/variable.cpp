@@ -11,48 +11,77 @@
 
 namespace luisa::compute::dsl {
 
-#define MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD_IMPL(op, op_tag)                                             \
-Variable Variable::operator op(Variable rhs) const noexcept {                                               \
-    return Function::current().add_expression(std::make_unique<BinaryExpr>(BinaryOp::op_tag, *this, rhs));  \
-}                                                                                                           \
+const Variable *Variable::make_local_variable(const TypeDesc *type) noexcept {
+    return nullptr;
+}
 
-#define MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD(op_and_tag) \
-MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD_IMPL op_and_tag
+const Variable *Variable::make_threadgroup_variable(const TypeDesc *type) noexcept {
+    return nullptr;
+}
 
-LUISA_MAP(
-    MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD,
-    (+, ADD), (-, SUB), (*, MUL), (/, DIV), (%, MOD),
-    (<<, SHL), (>>, SHR), (&, BIT_AND), (|, BIT_OR), (^, BIT_XOR),
-    (&&, AND), (||, OR),
-    (==, EQUAL), (!=, NOT_EQUAL), (<, LESS), (>, GREATER), (<=, LESS_EQUAL), (>=, GREATER_EQUAL),
-    ([], ACCESS))
+const Variable *Variable::make_uniform_argument(const TypeDesc *type, const void *data_ref) noexcept {
+    for (auto &&v : Function::current().arguments()) {
+        if (v->is_uniform_argument() && v->uniform_data() == data_ref) { return v.get(); }
+    }
+    auto v = std::make_unique<Variable>();
+    v->_type = type;
+    v->_tag = VariableTag::UNIFORM;
+    v->_uniform_data = data_ref;
+    return Function::current().add_argument(std::move(v));
+}
 
-#undef MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD
-#undef MAKE_VARIABLE_BINARY_OPERATOR_OVERLOAD_IMPL
+const Variable *Variable::make_immutable_argument(const TypeDesc *type, const std::vector<std::byte> &data) noexcept {
+    for (auto &&v : Function::current().arguments()) {
+        if (v->is_immutable_argument() &&
+            v->immutable_data().size() == data.size() &&
+            std::memcmp(v->immutable_data().data(), data.data(), data.size()) == 0) { return v.get(); }
+    }
+    auto v = std::make_unique<Variable>();
+    v->_type = type;
+    v->_tag = VariableTag::IMMUTABLE;
+    v->_immutable_data = data;
+    return Function::current().add_argument(std::move(v));
+}
 
-#define MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD_IMPL(op, op_tag)                                             \
-void Variable::operator op(Variable rhs) const noexcept {                                                   \
-    void_(Function::current().add_expression(std::make_unique<BinaryExpr>(BinaryOp::op_tag, *this, rhs)));  \
-}                                                                                                           \
+const Variable *Variable::make_temporary(const TypeDesc *type, std::unique_ptr<Expression> expression) noexcept {
+    auto v = std::make_unique<Variable>();
+    v->_type = type;
+    v->_tag = VariableTag::TEMPORARY;
+    v->_expression = std::move(expression);
+    return Function::current().add_variable(std::move(v));
+}
 
-#define MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD(op_and_tag) \
-MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD_IMPL op_and_tag
+const Variable *Variable::make_builtin(VariableTag tag) noexcept {
+    assert(tag == VariableTag::THREAD_ID || tag == VariableTag::THREAD_XY);
+    for (auto &&v : Function::current().builtins()) {
+        if (v->tag() == tag) { return v.get(); }
+    }
+    auto v = std::make_unique<Variable>();
+    v->_tag = tag;
+    if (tag == VariableTag::THREAD_ID) { v->_type = type_desc<uint>; }
+    else if (tag == VariableTag::THREAD_XY) { v->_type = type_desc<uint2>; }
+    return Function::current().add_builtin(std::move(v));
+}
 
-LUISA_MAP(MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD,
-                (=, ASSIGN), (+=, ADD_ASSIGN), (-=, SUB_ASSIGN), (*=, MUL_ASSIGN), (/=, DIV_ASSIGN), (%=, MOD_ASSIGN),
-                (&=, BIT_AND_ASSIGN), (|=, BIT_OR_ASSIGN), (^=, BIT_XOR_ASSIGN),
-                (<<=, SHL_ASSIGN), (>>=, SHR_ASSIGN))
+const Variable *Variable::make_buffer_argument(const TypeDesc *type, const std::shared_ptr<Buffer> &buffer) noexcept {
+    for (auto &&v : Function::current().arguments()) {
+        if (v->is_buffer_argument() && v->buffer() == buffer.get()) { return v.get(); }
+    }
+    auto v = std::make_unique<Variable>();
+    v->_type = type;
+    v->_tag = VariableTag::BUFFER;
+    v->_buffer = buffer;
+    return Function::current().add_argument(std::move(v));
+}
 
-#undef MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD
-#undef MAKE_VARIABLE_ASSIGN_OPERATOR_OVERLOAD_IMPL
+const Variable *Variable::make_texture_argument(const std::shared_ptr<Texture> &texture) noexcept {
+    for (auto &&v : Function::current().arguments()) {
+        if (v->is_texture_argument() && v->texture() == texture.get()) { return v.get(); }
+    }
+    auto v = std::make_unique<Variable>();
+    v->_tag = VariableTag::TEXTURE;
+    v->_texture = texture;
+    return Function::current().add_argument(std::move(v));
+}
 
-Variable Variable::member(std::string m) const noexcept { return Function::current().add_expression(std::make_unique<MemberExpr>(*this, std::move(m))); }
-
-Variable Variable::operator+() const noexcept { return Function::current().add_expression(std::make_unique<UnaryExpr>(UnaryOp::PLUS, *this)); }
-Variable Variable::operator-() const noexcept { return Function::current().add_expression(std::make_unique<UnaryExpr>(UnaryOp::MINUS, *this)); }
-Variable Variable::operator~() const noexcept { return Function::current().add_expression(std::make_unique<UnaryExpr>(UnaryOp::BIT_NOT, *this)); }
-Variable Variable::operator!() const noexcept { return Function::current().add_expression(std::make_unique<UnaryExpr>(UnaryOp::NOT, *this)); }
-Variable Variable::operator*() const noexcept { return Function::current().add_expression(std::make_unique<UnaryExpr>(UnaryOp::DEREFERENCE, *this)); }
-Variable Variable::operator&() const noexcept { return Function::current().add_expression(std::make_unique<UnaryExpr>(UnaryOp::ADDRESS_OF, *this)); }
-    
 }

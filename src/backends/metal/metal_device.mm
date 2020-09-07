@@ -9,7 +9,7 @@
 
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
 
-#import <core/sha1.h>
+#import <core/hash.h>
 
 #import <compute/device.h>
 #import <compute/acceleration.h>

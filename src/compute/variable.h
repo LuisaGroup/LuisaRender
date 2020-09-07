@@ -13,21 +13,19 @@
 namespace luisa::compute::dsl {
 
 class Expression;
-class Function;
 
-namespace detail {
+enum struct ResourceUsage : uint32_t {
+    NONE,
+    READ_ONLY,
+    WRITE_ONLY,
+    READ_WRITE,
+    SAMPLE,  // For textures only
+};
 
-template<typename T>
-using EnableIfLiteralOperand = std::enable_if_t<
-    std::is_convertible_v<T, std::variant<
-        bool, float, int8_t, uint8_t, int16_t, uint16_t, int32_t, uint32_t, int64_t, uint64_t>>,
-    int>;
-    
-}
-
+// new version of dsl
 enum struct VariableTag {
     
-    INVALID,// invalid
+    EMPTY,// should not appear
     
     // for arguments
     BUFFER,   // device buffers
@@ -49,68 +47,42 @@ enum struct VariableTag {
 
 class Variable {
 
-protected:
+public:
+    static constexpr auto resource_read_bit = 1u;
+    static constexpr auto resource_write_bit = 2u;
+    static constexpr auto resource_sample_bit = 4u;
+
+private:
     const TypeDesc *_type{nullptr};
     uint32_t _uid{0u};
-    VariableTag _tag{VariableTag::INVALID};
+    VariableTag _tag{VariableTag::EMPTY};
     
     // For kernel argument bindings
-    BufferView<std::byte> _buffer;
+    std::shared_ptr<Buffer> _buffer{nullptr};
     std::shared_ptr<Texture> _texture{nullptr};
-    void *_data_ref{nullptr};
     std::vector<std::byte> _immutable_data;
+    const void *_uniform_data{nullptr};
+    
+    // argument usage
+    uint32_t _usage{0u};
     
     // For temporary variables in expressions
-    Expression *_expression{nullptr};
+    std::unique_ptr<Expression> _expression{nullptr};
 
 public:
-    // Empty (i.e. invalid) variables, do not use unless necessary
-    Variable() noexcept = default;
+    [[nodiscard]] static const Variable *make_builtin(VariableTag tag) noexcept;
+    [[nodiscard]] static const Variable *make_local_variable(const TypeDesc *type) noexcept;
+    [[nodiscard]] static const Variable *make_threadgroup_variable(const TypeDesc *type) noexcept;
+    [[nodiscard]] static const Variable *make_buffer_argument(const TypeDesc *type, const std::shared_ptr<Buffer> &buffer) noexcept;
+    [[nodiscard]] static const Variable *make_texture_argument(const std::shared_ptr<Texture> &texture) noexcept;
+    [[nodiscard]] static const Variable *make_uniform_argument(const TypeDesc *type, const void *data_ref) noexcept;
+    [[nodiscard]] static const Variable *make_immutable_argument(const TypeDesc *type, const std::vector<std::byte> &data) noexcept;
+    [[nodiscard]] static const Variable *make_temporary(const TypeDesc *type, std::unique_ptr<Expression> expression) noexcept;
     
-    // Local variables
-    Variable(const TypeDesc *type, uint32_t uid, bool is_threadgroup = false) noexcept
-        : _type{type}, _uid{uid}, _tag{is_threadgroup ? VariableTag::THREADGROUP : VariableTag::LOCAL} {
-        LUISA_ERROR_IF(is_ptr_or_ref(_type), "Declaring variable v", uid, " as a pointer or reference is not allowed.");
-    }
+    [[nodiscard]] const TypeDesc *type() const noexcept { return _type; }
+    [[nodiscard]] uint uid() const noexcept { return _uid; }
+    [[nodiscard]] VariableTag tag() const noexcept { return _tag; }
     
-    // Buffer arguments
-    Variable(const TypeDesc *type, uint32_t uid, Buffer *buffer, size_t offset, size_t size) noexcept
-        : _type{type}, _uid{uid}, _buffer{buffer->view<std::byte>(offset, size)}, _tag{VariableTag::BUFFER} {
-        
-        LUISA_ERROR_IF_NOT(is_ptr_or_ref(_type), "Argument v", uid, " bound to a buffer is not declared as a pointer or reference.");
-    }
-    
-    // Texture arguments
-    Variable(const TypeDesc *type, uint32_t uid, std::shared_ptr<Texture> texture) noexcept: _type{type}, _uid{uid}, _texture{std::move(texture)}, _tag{VariableTag::TEXTURE} {
-        LUISA_ERROR_IF_NOT(_type->type == TypeCatalog::TEXTURE, "Argument v", uid, " bound to a texture is not declared as a texture.");
-    }
-    
-    // Immutable uniforms
-    Variable(const TypeDesc *type, uint32_t uid, const void *data, size_t size) noexcept: _type{type}, _uid{uid}, _tag{VariableTag::IMMUTABLE} {
-        LUISA_ERROR_IF(is_ptr_or_ref(_type) || _type->type == TypeCatalog::TEXTURE, "Argument v", uid, " bound to constant data is not declared as is.");
-        _immutable_data.resize(size);
-        std::memmove(_immutable_data.data(), data, size);
-    }
-    
-    // Uniforms
-    Variable(const TypeDesc *type, uint32_t uid, void *data_ref) noexcept: _type{type}, _uid{uid}, _data_ref{data_ref}, _tag{VariableTag::UNIFORM} {
-        LUISA_ERROR_IF(is_ptr_or_ref(_type) || _type->type == TypeCatalog::TEXTURE, "Argument v", uid, " bound to constant data is not declared as is.");
-    }
-    
-    // Built-in variables
-    Variable(const TypeDesc *type, VariableTag tag) noexcept
-        : _type{type}, _tag{tag} {}
-    
-    // For temporary variables, i.e. expression nodes
-    explicit Variable(Expression *expr) noexcept
-        : _expression{expr}, _tag{VariableTag::TEMPORARY} {}
-    
-    Variable(Variable &&) = default;
-    Variable(const Variable &) = default;
-    
-    [[nodiscard]] auto tag() const noexcept { return _tag; }
-    
-    [[nodiscard]] bool is_valid() const noexcept { return _tag != VariableTag::INVALID; }
     [[nodiscard]] bool is_temporary() const noexcept { return _tag == VariableTag::TEMPORARY; }
     [[nodiscard]] bool is_local() const noexcept { return _tag == VariableTag::LOCAL; }
     [[nodiscard]] bool is_threadgroup() const noexcept { return _tag == VariableTag::THREADGROUP; }
@@ -126,62 +98,34 @@ public:
     
     [[nodiscard]] bool is_thread_id() const noexcept { return _tag == VariableTag::THREAD_ID; }
     [[nodiscard]] bool is_thread_xy() const noexcept { return _tag == VariableTag::THREAD_XY; }
-    [[nodiscard]] bool is_builtin() const noexcept { return is_thread_id(); }
+    [[nodiscard]] bool is_builtin() const noexcept { return is_thread_id() || is_thread_xy(); }
     
-    [[nodiscard]] Expression *expression() const noexcept { return _expression; }
-    [[nodiscard]] const TypeDesc *type() const noexcept { return _type; }
-    [[nodiscard]] uint32_t uid() const noexcept { return _uid; }
+    [[nodiscard]] Expression *expression() const noexcept { return _expression.get(); }
     
-    // for buffers
-    [[nodiscard]] BufferView<std::byte> buffer() const noexcept { return _buffer; }
-    
-    // for textures
     [[nodiscard]] Texture *texture() const noexcept { return _texture.get(); }
-    
-    // for uniforms
-    [[nodiscard]] void *uniform_data() const noexcept { return _data_ref; }
-    
-    // for immutable data
+    [[nodiscard]] Buffer *buffer() const noexcept { return _buffer.get(); }
     [[nodiscard]] const std::vector<std::byte> &immutable_data() const noexcept { return _immutable_data; }
+    [[nodiscard]] const void *uniform_data() const noexcept { return _uniform_data; }
     
-    // Member access operators
-    [[nodiscard]] Variable member(std::string m) const noexcept;
-    [[nodiscard]] Variable operator[](std::string m) const noexcept { return member(std::move(m)); }
+    void mark_read() noexcept { _usage |= resource_read_bit; }
+    void mark_write() noexcept { _usage |= resource_write_bit; }
+    void mark_sample() noexcept { _usage |= resource_sample_bit; }
     
-    // Convenient methods for accessing vector members
-    [[nodiscard]] Variable x() const noexcept { return member("x"); }
-    [[nodiscard]] Variable y() const noexcept { return member("y"); }
-    [[nodiscard]] Variable z() const noexcept { return member("z"); }
-    [[nodiscard]] Variable w() const noexcept { return member("w"); }
-    [[nodiscard]] Variable r() const noexcept { return member("x"); }
-    [[nodiscard]] Variable g() const noexcept { return member("y"); }
-    [[nodiscard]] Variable b() const noexcept { return member("z"); }
-    [[nodiscard]] Variable a() const noexcept { return member("w"); }
-    
-    [[nodiscard]] Variable operator+() const noexcept;
-    [[nodiscard]] Variable operator-() const noexcept;
-    [[nodiscard]] Variable operator~() const noexcept;
-    [[nodiscard]] Variable operator!() const noexcept;
-    [[nodiscard]] Variable operator*() const noexcept;
-    [[nodiscard]] Variable operator&() const noexcept;
-
-#define MAKE_BINARY_OPERATOR_DECL(op)                                \
-    [[nodiscard]] Variable operator op(Variable rhs) const noexcept; \
-    template<typename T, detail::EnableIfLiteralOperand<T> = 0>      \
-    [[nodiscard]] Variable operator op(T &&rhs) const noexcept;
-
-#define MAKE_ASSIGNMENT_OPERATOR_DECL(op)                       \
-    void operator op(Variable rhs) const noexcept;              \
-    template<typename T, detail::EnableIfLiteralOperand<T> = 0> \
-    void operator op(T &&rhs) const noexcept;
-    
-    LUISA_MAP(MAKE_BINARY_OPERATOR_DECL, +, -, *, /, %, <<, >>, &, |, ^, &&, ||, ==, !=, <,>, <=, >=, [])
-    LUISA_MAP(MAKE_ASSIGNMENT_OPERATOR_DECL, =, +=, -=, *=, /=, %=, &=, |=, ^=, <<=, >>=)
-
-#undef MAKE_BINARY_OPERATOR_DECL
-#undef MAKE_ASSIGNMENT_OPERATOR_DECL
+    [[nodiscard]] ResourceUsage usage() const noexcept {
+        
+        bool read = _usage & resource_read_bit;
+        bool write = _usage & resource_write_bit;
+        bool sample = _usage & resource_sample_bit;
+        
+        assert(!(sample && read) && !(sample && write));
+        assert(!sample || is_texture_argument());
+        
+        if (read && write) { return ResourceUsage::READ_WRITE; }
+        if (read) { return ResourceUsage::READ_ONLY; }
+        if (write) { return ResourceUsage::WRITE_ONLY; }
+        if (sample) { return ResourceUsage::SAMPLE; }
+        return ResourceUsage::NONE;
+    }
 };
-
-#define $(m) member(#m)
 
 }// namespace luisa::compute::dsl

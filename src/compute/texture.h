@@ -109,4 +109,16 @@ public:
     [[nodiscard]] uint32_t pixel_count() const noexcept { return _width * _height; }
 };
 
+class TextureView {
+
+private:
+    std::shared_ptr<Texture> _texture;
+
+public:
+    [[nodiscard]] Texture *texture() const noexcept { return _texture.get(); }
+    
+    // TODO: Support referencing part of texture...
+    
+};
+
 }

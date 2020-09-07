@@ -107,7 +107,7 @@ constexpr uint prime_number_prefix_sums [[maybe_unused]][prime_number_count] = {
 }// namespace constants
 
 // bit manipulation function
-constexpr auto next_pow_of_two(uint v) noexcept {
+[[nodiscard]] constexpr auto next_pow_of_two(uint v) noexcept {
     v--;
     v |= v >> 1u;
     v |= v >> 2u;
@@ -144,12 +144,12 @@ using std::min;
 
 using std::abs;
 
-constexpr float radians(float deg) noexcept { return deg * constants::pi / 180.0f; }
-constexpr float degrees(float rad) noexcept { return rad * constants::inv_pi * 180.0f; }
+[[nodiscard]] constexpr float radians(float deg) noexcept { return deg * constants::pi / 180.0f; }
+[[nodiscard]] constexpr float degrees(float rad) noexcept { return rad * constants::inv_pi * 180.0f; }
 
 #define MAKE_VECTOR_UNARY_FUNC(func)                                                \
     template<typename T, uint N>                                                    \
-    constexpr auto func(Vector<T, N, false> v) noexcept {                           \
+    [[nodiscard]] constexpr auto func(Vector<T, N, false> v) noexcept {             \
         static_assert(N == 2 || N == 3 || N == 4);                                  \
         if constexpr (N == 2) {                                                     \
             return Vector<T, 2, false>{func(v.x), func(v.y)};                       \
@@ -182,7 +182,7 @@ MAKE_VECTOR_UNARY_FUNC(degrees)
 
 #define MAKE_VECTOR_BINARY_FUNC(func)                                                                   \
     template<typename T, uint N>                                                                        \
-    constexpr auto func(Vector<T, N, false> v, Vector<T, N, false> u) noexcept {                        \
+    [[nodiscard]] constexpr auto func(Vector<T, N, false> v, Vector<T, N, false> u) noexcept {          \
         static_assert(N == 2 || N == 3 || N == 4);                                                      \
         if constexpr (N == 2) {                                                                         \
             return Vector<T, 2, false>{func(v.x, u.x), func(v.y, u.y)};                                 \
@@ -194,7 +194,7 @@ MAKE_VECTOR_UNARY_FUNC(degrees)
     }                                                                                                   \
                                                                                                         \
     template<typename T, uint N>                                                                        \
-    constexpr auto func(T v, Vector<T, N, false> u) noexcept {                                          \
+    [[nodiscard]] constexpr auto func(T v, Vector<T, N, false> u) noexcept {                            \
         static_assert(N == 2 || N == 3 || N == 4);                                                      \
         if constexpr (N == 2) {                                                                         \
             return Vector<T, 2, false>{func(v, u.x), func(v, u.y)};                                     \
@@ -206,7 +206,7 @@ MAKE_VECTOR_UNARY_FUNC(degrees)
     }                                                                                                   \
                                                                                                         \
     template<typename T, uint N>                                                                        \
-    constexpr auto func(Vector<T, N, false> v, T u) noexcept {                                          \
+    [[nodiscard]] constexpr auto func(Vector<T, N, false> v, T u) noexcept {                            \
         static_assert(N == 2 || N == 3 || N == 4);                                                      \
         if constexpr (N == 2) {                                                                         \
             return Vector<T, 2, false>{func(v.x, u), func(v.y, u)};                                     \
@@ -225,12 +225,12 @@ MAKE_VECTOR_BINARY_FUNC(max)
 #undef MAKE_VECTOR_BINARY_FUNC
 
 template<typename T, typename F>
-constexpr auto select(bool pred, T t, F f) noexcept {
+[[nodiscard]] constexpr auto select(bool pred, T t, F f) noexcept {
     return pred ? t : f;
 }
 
 template<typename T, uint N>
-constexpr auto select(Vector<bool, N, false> pred, Vector<T, N, false> t, Vector<T, N, false> f) noexcept {
+[[nodiscard]] constexpr auto select(Vector<bool, N, false> pred, Vector<T, N, false> t, Vector<T, N, false> f) noexcept {
     static_assert(N == 2 || N == 3 || N == 4);
     if constexpr (N == 2) {
         return Vector<T, N, false>{select(pred.x, t.x, f.x), select(pred.y, t.y, f.y)};
@@ -242,18 +242,18 @@ constexpr auto select(Vector<bool, N, false> pred, Vector<T, N, false> t, Vector
 }
 
 template<typename A, typename B>
-constexpr auto lerp(A a, B b, float t) noexcept {
+[[nodiscard]] constexpr auto lerp(A a, B b, float t) noexcept {
     return a + t * (b - a);
 }
 
 template<typename X, typename A, typename B>
-constexpr auto clamp(X x, A a, B b) noexcept {
+[[nodiscard]] constexpr auto clamp(X x, A a, B b) noexcept {
     return min(max(x, a), b);
 }
 
 // Vector Functions
 template<uint N>
-constexpr auto dot(Vector<float, N, false> u, Vector<float, N, false> v) noexcept {
+[[nodiscard]] constexpr auto dot(Vector<float, N, false> u, Vector<float, N, false> v) noexcept {
     static_assert(N == 2 || N == 3 || N == 4);
     if constexpr (N == 2) {
         return u.x * v.x + u.y * v.y;
@@ -265,41 +265,41 @@ constexpr auto dot(Vector<float, N, false> u, Vector<float, N, false> v) noexcep
 }
 
 template<uint N>
-constexpr auto length(Vector<float, N, false> u) noexcept {
+[[nodiscard]] constexpr auto length(Vector<float, N, false> u) noexcept {
     return sqrt(dot(u, u));
 }
 
 template<uint N>
-constexpr auto normalize(Vector<float, N, false> u) noexcept {
+[[nodiscard]] constexpr auto normalize(Vector<float, N, false> u) noexcept {
     return u * (1.0f / length(u));
 }
 
 template<uint N>
-constexpr auto distance(Vector<float, N, false> u, Vector<float, N, false> v) noexcept {
+[[nodiscard]] constexpr auto distance(Vector<float, N, false> u, Vector<float, N, false> v) noexcept {
     return length(u - v);
 }
 
-constexpr auto cross(float3 u, float3 v) noexcept {
+[[nodiscard]] constexpr auto cross(float3 u, float3 v) noexcept {
     return make_float3(u.y * v.z - v.y * u.z,
                        u.z * v.x - v.z * u.x,
                        u.x * v.y - v.x * u.y);
 }
 
 // Matrix Functions
-constexpr auto transpose(float3x3 m) noexcept {
+[[nodiscard]] constexpr auto transpose(float3x3 m) noexcept {
     return make_float3x3(m[0].x, m[1].x, m[2].x,
                          m[0].y, m[1].y, m[2].y,
                          m[0].z, m[1].z, m[2].z);
 }
 
-constexpr auto transpose(float4x4 m) noexcept {
+[[nodiscard]] constexpr auto transpose(float4x4 m) noexcept {
     return make_float4x4(m[0].x, m[1].x, m[2].x, m[3].x,
                          m[0].y, m[1].y, m[2].y, m[3].y,
                          m[0].z, m[1].z, m[2].z, m[3].z,
                          m[0].w, m[1].w, m[2].w, m[3].w);
 }
 
-constexpr auto inverse(float3x3 m) noexcept {// from GLM
+[[nodiscard]] constexpr auto inverse(float3x3 m) noexcept {// from GLM
     auto one_over_determinant = 1.0f / (m[0].x * (m[1].y * m[2].z - m[2].y * m[1].z) - m[1].x * (m[0].y * m[2].z - m[2].y * m[0].z) + m[2].x * (m[0].y * m[1].z - m[1].y * m[0].z));
     return make_float3x3(
         (m[1].y * m[2].z - m[2].y * m[1].z) * one_over_determinant,
@@ -313,7 +313,7 @@ constexpr auto inverse(float3x3 m) noexcept {// from GLM
         (m[0].x * m[1].y - m[1].x * m[0].y) * one_over_determinant);
 }
 
-constexpr auto inverse(float4x4 m) noexcept {// from GLM
+[[nodiscard]] constexpr auto inverse(float4x4 m) noexcept {// from GLM
     auto coef00 = m[2].z * m[3].w - m[3].z * m[2].w;
     auto coef02 = m[1].z * m[3].w - m[3].z * m[1].w;
     auto coef03 = m[1].z * m[2].w - m[2].z * m[1].w;

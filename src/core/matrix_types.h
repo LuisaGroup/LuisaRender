@@ -61,34 +61,34 @@ struct float4x4 {
     [[nodiscard]] constexpr float4 operator[](Index i) const noexcept { return cols[i]; }
 };
 
-constexpr auto make_float3x3(float val = 1.0f) noexcept {
+[[nodiscard]] constexpr auto make_float3x3(float val = 1.0f) noexcept {
     return float3x3{val};
 }
 
-constexpr auto make_float3x3(float3 c0, float3 c1, float3 c2) noexcept {
+[[nodiscard]] constexpr auto make_float3x3(float3 c0, float3 c1, float3 c2) noexcept {
     return float3x3{c0, c1, c2};
 }
 
-constexpr auto make_float3x3(
+[[nodiscard]] constexpr auto make_float3x3(
     float m00, float m01, float m02,
     float m10, float m11, float m12,
     float m20, float m21, float m22) noexcept {
     return float3x3{m00, m01, m02, m10, m11, m12, m20, m21, m22};
 }
 
-constexpr auto make_float3x3(const float4x4 m) noexcept {
+[[nodiscard]] constexpr auto make_float3x3(const float4x4 m) noexcept {
     return make_float3x3(make_float3(m[0]), make_float3(m[1]), make_float3(m[2]));
 }
 
-constexpr auto make_float4x4(float val = 1.0f) noexcept {
+[[nodiscard]] constexpr auto make_float4x4(float val = 1.0f) noexcept {
     return float4x4{val};
 }
 
-constexpr auto make_float4x4(float4 c0, float4 c1, float4 c2, float4 c3) noexcept {
+[[nodiscard]] constexpr auto make_float4x4(float4 c0, float4 c1, float4 c2, float4 c3) noexcept {
     return float4x4{c0, c1, c2, c3};
 }
 
-constexpr auto make_float4x4(
+[[nodiscard]] constexpr auto make_float4x4(
     float m00, float m01, float m02, float m03,
     float m10, float m11, float m12, float m13,
     float m20, float m21, float m22, float m23,
@@ -100,7 +100,7 @@ constexpr auto make_float4x4(
                     m30, m31, m32, m33};
 }
 
-constexpr auto make_float4x4(const float3x3 m) noexcept {
+[[nodiscard]] constexpr auto make_float4x4(const float3x3 m) noexcept {
     return make_float4x4(
         make_float4(m[0], 0.0f),
         make_float4(m[1], 0.0f),
@@ -108,19 +108,19 @@ constexpr auto make_float4x4(const float3x3 m) noexcept {
         make_float4(0.0f, 0.0f, 0.0f, 1.0f));
 }
 
-constexpr float3 operator*(const float3x3 m, float3 v) noexcept {
+[[nodiscard]] constexpr float3 operator*(const float3x3 m, float3 v) noexcept {
     return v.x * m[0] + v.y * m[1] + v.z * m[2];
 }
 
-constexpr float3x3 operator*(const float3x3 lhs, const float3x3 rhs) noexcept {
+[[nodiscard]] constexpr float3x3 operator*(const float3x3 lhs, const float3x3 rhs) noexcept {
     return make_float3x3(lhs * rhs[0], lhs * rhs[1], lhs * rhs[2]);
 }
 
-constexpr float4 operator*(const float4x4 m, float4 v) noexcept {
+[[nodiscard]] constexpr float4 operator*(const float4x4 m, float4 v) noexcept {
     return v.x * m[0] + v.y * m[1] + v.z * m[2] + v.w * m[3];
 }
 
-constexpr float4x4 operator*(const float4x4 lhs, const float4x4 rhs) noexcept {
+[[nodiscard]] constexpr float4x4 operator*(const float4x4 lhs, const float4x4 rhs) noexcept {
     return make_float4x4(lhs * rhs[0], lhs * rhs[1], lhs * rhs[2], lhs * rhs[3]);
 }
 

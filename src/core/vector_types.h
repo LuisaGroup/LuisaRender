@@ -66,41 +66,41 @@ struct alignas(detail::vector_alignment<T, N, is_packed>) Vector : detail::Vecto
     template<typename Index>
     [[nodiscard]] T operator[](Index i) const noexcept { return reinterpret_cast<const T(&)[N]>(*this)[i]; }
 
-#define MAKE_ASSIGN_OP(op)                                   \
-    template<bool packed>                                    \
-    Vector &operator op(Vector<T, N, packed> rhs) noexcept { \
-        static_assert(N == 2 || N == 3 || N == 4);           \
-        if constexpr (N == 2) {                              \
-            Storage::x op rhs.x;                             \
-            Storage::y op rhs.y;                             \
-        } else if constexpr (N == 3) {                       \
-            Storage::x op rhs.x;                             \
-            Storage::y op rhs.y;                             \
-            Storage::z op rhs.z;                             \
-        } else {                                             \
-            Storage::x op rhs.x;                             \
-            Storage::y op rhs.y;                             \
-            Storage::z op rhs.z;                             \
-            Storage::w op rhs.w;                             \
-        }                                                    \
-        return *this;                                        \
-    }                                                        \
-    Vector &operator op(T rhs) noexcept {                    \
-        static_assert(N == 2 || N == 3 || N == 4);           \
-        if constexpr (N == 2) {                              \
-            Storage::x op rhs;                               \
-            Storage::y op rhs;                               \
-        } else if constexpr (N == 3) {                       \
-            Storage::x op rhs;                               \
-            Storage::y op rhs;                               \
-            Storage::z op rhs;                               \
-        } else {                                             \
-            Storage::x op rhs;                               \
-            Storage::y op rhs;                               \
-            Storage::z op rhs;                               \
-            Storage::w op rhs;                               \
-        }                                                    \
-        return *this;                                        \
+#define MAKE_ASSIGN_OP(op)                                                 \
+    template<bool packed>                                                  \
+    [[nodiscard]] Vector &operator op(Vector<T, N, packed> rhs) noexcept { \
+        static_assert(N == 2 || N == 3 || N == 4);                         \
+        if constexpr (N == 2) {                                            \
+            Storage::x op rhs.x;                                           \
+            Storage::y op rhs.y;                                           \
+        } else if constexpr (N == 3) {                                     \
+            Storage::x op rhs.x;                                           \
+            Storage::y op rhs.y;                                           \
+            Storage::z op rhs.z;                                           \
+        } else {                                                           \
+            Storage::x op rhs.x;                                           \
+            Storage::y op rhs.y;                                           \
+            Storage::z op rhs.z;                                           \
+            Storage::w op rhs.w;                                           \
+        }                                                                  \
+        return *this;                                                      \
+    }                                                                      \
+    [[nodiscard]] Vector &operator op(T rhs) noexcept {                    \
+        static_assert(N == 2 || N == 3 || N == 4);                         \
+        if constexpr (N == 2) {                                            \
+            Storage::x op rhs;                                             \
+            Storage::y op rhs;                                             \
+        } else if constexpr (N == 3) {                                     \
+            Storage::x op rhs;                                             \
+            Storage::y op rhs;                                             \
+            Storage::z op rhs;                                             \
+        } else {                                                           \
+            Storage::x op rhs;                                             \
+            Storage::y op rhs;                                             \
+            Storage::z op rhs;                                             \
+            Storage::w op rhs;                                             \
+        }                                                                  \
+        return *this;                                                      \
     }
 
     MAKE_ASSIGN_OP(+=)
@@ -112,41 +112,41 @@ struct alignas(detail::vector_alignment<T, N, is_packed>) Vector : detail::Vecto
 #undef MAKE_ASSIGN_OP
 };
 
-#define MAKE_VECTOR_BINARY_OP(op)                                                                          \
-    template<typename T, uint32_t N, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>                   \
-    constexpr Vector<T, N, false> operator op(Vector<T, N, false> lhs, Vector<T, N, false> rhs) noexcept { \
-        static_assert(N == 2 || N == 3 || N == 4);                                                         \
-        if constexpr (N == 2) {                                                                            \
-            return Vector<T, 2, false>{lhs.x op rhs.x, lhs.y op rhs.y};                                    \
-        } else if constexpr (N == 3) {                                                                     \
-            return Vector<T, 3, false>{lhs.x op rhs.x, lhs.y op rhs.y, lhs.z op rhs.z};                    \
-        } else {                                                                                           \
-            return Vector<T, 4, false>{lhs.x op rhs.x, lhs.y op rhs.y, lhs.z op rhs.z, lhs.w op rhs.w};    \
-        }                                                                                                  \
-    }                                                                                                      \
-                                                                                                           \
-    template<typename T, uint32_t N, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>                   \
-    constexpr Vector<T, N, false> operator op(T lhs, Vector<T, N, false> rhs) noexcept {                   \
-        static_assert(N == 2 || N == 3 || N == 4);                                                         \
-        if constexpr (N == 2) {                                                                            \
-            return Vector<T, 2, false>{lhs op rhs.x, lhs op rhs.y};                                        \
-        } else if constexpr (N == 3) {                                                                     \
-            return Vector<T, 3, false>{lhs op rhs.x, lhs op rhs.y, lhs op rhs.z};                          \
-        } else {                                                                                           \
-            return Vector<T, 4, false>{lhs op rhs.x, lhs op rhs.y, lhs op rhs.z, lhs op rhs.w};            \
-        }                                                                                                  \
-    }                                                                                                      \
-                                                                                                           \
-    template<typename T, uint32_t N, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>                   \
-    constexpr Vector<T, N, false> operator op(Vector<T, N, false> lhs, T rhs) noexcept {                   \
-        static_assert(N == 2 || N == 3 || N == 4);                                                         \
-        if constexpr (N == 2) {                                                                            \
-            return Vector<T, 2, false>{lhs.x op rhs, lhs.y op rhs};                                        \
-        } else if constexpr (N == 3) {                                                                     \
-            return Vector<T, 3, false>{lhs.x op rhs, lhs.y op rhs, lhs.z op rhs};                          \
-        } else {                                                                                           \
-            return Vector<T, 4, false>{lhs.x op rhs, lhs.y op rhs, lhs.z op rhs, lhs.w op rhs};            \
-        }                                                                                                  \
+#define MAKE_VECTOR_BINARY_OP(op)                                                                                        \
+    template<typename T, uint32_t N, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>                                 \
+    [[nodiscard]] constexpr Vector<T, N, false> operator op(Vector<T, N, false> lhs, Vector<T, N, false> rhs) noexcept { \
+        static_assert(N == 2 || N == 3 || N == 4);                                                                       \
+        if constexpr (N == 2) {                                                                                          \
+            return Vector<T, 2, false>{lhs.x op rhs.x, lhs.y op rhs.y};                                                  \
+        } else if constexpr (N == 3) {                                                                                   \
+            return Vector<T, 3, false>{lhs.x op rhs.x, lhs.y op rhs.y, lhs.z op rhs.z};                                  \
+        } else {                                                                                                         \
+            return Vector<T, 4, false>{lhs.x op rhs.x, lhs.y op rhs.y, lhs.z op rhs.z, lhs.w op rhs.w};                  \
+        }                                                                                                                \
+    }                                                                                                                    \
+                                                                                                                         \
+    template<typename T, uint32_t N, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>                                 \
+    [[nodiscard]] constexpr Vector<T, N, false> operator op(T lhs, Vector<T, N, false> rhs) noexcept {                   \
+        static_assert(N == 2 || N == 3 || N == 4);                                                                       \
+        if constexpr (N == 2) {                                                                                          \
+            return Vector<T, 2, false>{lhs op rhs.x, lhs op rhs.y};                                                      \
+        } else if constexpr (N == 3) {                                                                                   \
+            return Vector<T, 3, false>{lhs op rhs.x, lhs op rhs.y, lhs op rhs.z};                                        \
+        } else {                                                                                                         \
+            return Vector<T, 4, false>{lhs op rhs.x, lhs op rhs.y, lhs op rhs.z, lhs op rhs.w};                          \
+        }                                                                                                                \
+    }                                                                                                                    \
+                                                                                                                         \
+    template<typename T, uint32_t N, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>                                 \
+    [[nodiscard]] constexpr Vector<T, N, false> operator op(Vector<T, N, false> lhs, T rhs) noexcept {                   \
+        static_assert(N == 2 || N == 3 || N == 4);                                                                       \
+        if constexpr (N == 2) {                                                                                          \
+            return Vector<T, 2, false>{lhs.x op rhs, lhs.y op rhs};                                                      \
+        } else if constexpr (N == 3) {                                                                                   \
+            return Vector<T, 3, false>{lhs.x op rhs, lhs.y op rhs, lhs.z op rhs};                                        \
+        } else {                                                                                                         \
+            return Vector<T, 4, false>{lhs.x op rhs, lhs.y op rhs, lhs.z op rhs, lhs.w op rhs};                          \
+        }                                                                                                                \
     }
 
 MAKE_VECTOR_BINARY_OP(+)
@@ -157,41 +157,41 @@ MAKE_VECTOR_BINARY_OP(%)
 
 #undef MAKE_VECTOR_BINARY_OP
 
-#define MAKE_VECTOR_RELATIONAL_OP(op)                                                                      \
-    template<typename T, uint N>                                                                           \
-    constexpr auto operator op(Vector<T, N, false> lhs, Vector<T, N, false> rhs) noexcept {                \
-        static_assert(N == 2 || N == 3 || N == 4);                                                         \
-        if constexpr (N == 2) {                                                                            \
-            return Vector<bool, 2, false>{lhs.x op rhs.x, lhs.y op rhs.y};                                 \
-        } else if constexpr (N == 3) {                                                                     \
-            return Vector<bool, 3, false>{lhs.x op rhs.x, lhs.y op rhs.y, lhs.z op rhs.z};                 \
-        } else {                                                                                           \
-            return Vector<bool, 4, false>{lhs.x op rhs.x, lhs.y op rhs.y, lhs.z op rhs.z, lhs.w op rhs.w}; \
-        }                                                                                                  \
-    }                                                                                                      \
-                                                                                                           \
-    template<typename T, uint N>                                                                           \
-    constexpr auto operator op(T lhs, Vector<T, N, false> rhs) noexcept {                                  \
-        static_assert(N == 2 || N == 3 || N == 4);                                                         \
-        if constexpr (N == 2) {                                                                            \
-            return Vector<bool, 2, false>{lhs op rhs.x, lhs op rhs.y};                                     \
-        } else if constexpr (N == 3) {                                                                     \
-            return Vector<bool, 3, false>{lhs op rhs.x, lhs op rhs.y, lhs op rhs.z};                       \
-        } else {                                                                                           \
-            return Vector<bool, 4, false>{lhs op rhs.x, lhs op rhs.y, lhs op rhs.z, lhs op rhs.w};         \
-        }                                                                                                  \
-    }                                                                                                      \
-                                                                                                           \
-    template<typename T, uint N>                                                                           \
-    constexpr auto operator op(Vector<T, N, false> lhs, T rhs) noexcept {                                  \
-        static_assert(N == 2 || N == 3 || N == 4);                                                         \
-        if constexpr (N == 2) {                                                                            \
-            return Vector<bool, 2, false>{lhs.x op rhs, lhs.y op rhs};                                     \
-        } else if constexpr (N == 3) {                                                                     \
-            return Vector<bool, 3, false>{lhs.x op rhs, lhs.y op rhs, lhs.z op rhs};                       \
-        } else {                                                                                           \
-            return Vector<bool, 4, false>{lhs.x op rhs, lhs.y op rhs, lhs.z op rhs, lhs.w op rhs};         \
-        }                                                                                                  \
+#define MAKE_VECTOR_RELATIONAL_OP(op)                                                                                    \
+    template<typename T, uint N>                                                                                         \
+    [[nodiscard]] constexpr auto operator op(Vector<T, N, false> lhs, Vector<T, N, false> rhs) noexcept {                \
+        static_assert(N == 2 || N == 3 || N == 4);                                                                       \
+        if constexpr (N == 2) {                                                                                          \
+            return Vector<bool, 2, false>{lhs.x op rhs.x, lhs.y op rhs.y};                                               \
+        } else if constexpr (N == 3) {                                                                                   \
+            return Vector<bool, 3, false>{lhs.x op rhs.x, lhs.y op rhs.y, lhs.z op rhs.z};                               \
+        } else {                                                                                                         \
+            return Vector<bool, 4, false>{lhs.x op rhs.x, lhs.y op rhs.y, lhs.z op rhs.z, lhs.w op rhs.w};               \
+        }                                                                                                                \
+    }                                                                                                                    \
+                                                                                                                         \
+    template<typename T, uint N>                                                                                         \
+    [[nodiscard]] constexpr auto operator op(T lhs, Vector<T, N, false> rhs) noexcept {                                  \
+        static_assert(N == 2 || N == 3 || N == 4);                                                                       \
+        if constexpr (N == 2) {                                                                                          \
+            return Vector<bool, 2, false>{lhs op rhs.x, lhs op rhs.y};                                                   \
+        } else if constexpr (N == 3) {                                                                                   \
+            return Vector<bool, 3, false>{lhs op rhs.x, lhs op rhs.y, lhs op rhs.z};                                     \
+        } else {                                                                                                         \
+            return Vector<bool, 4, false>{lhs op rhs.x, lhs op rhs.y, lhs op rhs.z, lhs op rhs.w};                       \
+        }                                                                                                                \
+    }                                                                                                                    \
+                                                                                                                         \
+    template<typename T, uint N>                                                                                         \
+    [[nodiscard]] constexpr auto operator op(Vector<T, N, false> lhs, T rhs) noexcept {                                  \
+        static_assert(N == 2 || N == 3 || N == 4);                                                                       \
+        if constexpr (N == 2) {                                                                                          \
+            return Vector<bool, 2, false>{lhs.x op rhs, lhs.y op rhs};                                                   \
+        } else if constexpr (N == 3) {                                                                                   \
+            return Vector<bool, 3, false>{lhs.x op rhs, lhs.y op rhs, lhs.z op rhs};                                     \
+        } else {                                                                                                         \
+            return Vector<bool, 4, false>{lhs.x op rhs, lhs.y op rhs, lhs.z op rhs, lhs.w op rhs};                       \
+        }                                                                                                                \
     }
 
 MAKE_VECTOR_RELATIONAL_OP(==)
@@ -203,58 +203,56 @@ MAKE_VECTOR_RELATIONAL_OP(>=)
 
 #undef MAKE_VECTOR_RELATIONAL_OP
 
-#define MAKE_VECTOR_MAKE_TYPE2(type)                                                  \
-    constexpr auto make_##type##2() noexcept { return type##2 {}; }                   \
-    constexpr auto make_##type##2(type s) noexcept { return type##2 {s}; }            \
-    constexpr auto make_##type##2(type x, type y) noexcept { return type##2 {x, y}; } \
-                                                                                      \
-    template<typename U, uint N, bool packed>                                         \
-    constexpr auto make_##type##2(Vector<U, N, packed> v) noexcept {                  \
-        static_assert(N == 2 || N == 3 || N == 4);                                    \
-        return type##2 {v.x, v.y};                                                    \
+#define MAKE_VECTOR_MAKE_TYPE2(type)                                                                \
+    [[nodiscard]] constexpr auto make_##type##2() noexcept { return type##2 {}; }                   \
+    [[nodiscard]] constexpr auto make_##type##2(type s) noexcept { return type##2 {s}; }            \
+    [[nodiscard]] constexpr auto make_##type##2(type x, type y) noexcept { return type##2 {x, y}; } \
+                                                                                                    \
+    template<typename U, uint N, bool packed>                                                       \
+    [[nodiscard]] constexpr auto make_##type##2(Vector<U, N, packed> v) noexcept {                  \
+        static_assert(N == 2 || N == 3 || N == 4);                                                  \
+        return type##2 {v.x, v.y};                                                                  \
     }
 
-#define MAKE_VECTOR_MAKE_TYPE3(type)                                                                             \
-    constexpr auto make_##type##3() noexcept { return type##3 {}; }                                              \
-    constexpr auto make_##type##3(type s) noexcept { return type##3 {s}; }                                       \
-    constexpr auto make_##type##3(type x, type y, type z) noexcept { return type##3 {x, y, z}; }                 \
-    constexpr auto make_##type##3(type##2 v, type z) noexcept { return type##3 {v.x, v.y, z}; }                  \
-    constexpr auto make_##type##3(type x, type##2 v) noexcept { return type##3 {x, v.x, v.y}; }                  \
-                                                                                                                 \
-    constexpr auto make_packed_##type##3() noexcept { return packed_##type##3 {}; }                              \
-    constexpr auto make_packed_##type##3(type s) noexcept { return packed_##type##3 {s}; }                       \
-    constexpr auto make_packed_##type##3(type x, type y, type z) noexcept { return packed_##type##3 {x, y, z}; } \
-    constexpr auto make_packed_##type##3(type##2 v, type z) noexcept { return packed_##type##3 {v.x, v.y, z}; }  \
-    constexpr auto make_packed_##type##3(type x, type##2 v) noexcept { return packed_##type##3 {x, v.x, v.y}; }  \
-                                                                                                                 \
-    template<typename U, uint N, bool packed>                                                                    \
-    constexpr auto make_##type##3(Vector<U, N, packed> v) noexcept {                                             \
-        static_assert(N == 3 || N == 4);                                                                         \
-        return type##3 {v.x, v.y, v.z};                                                                          \
-    }                                                                                                            \
-                                                                                                                 \
-    template<typename U, uint N, bool packed>                                                                    \
-    constexpr auto make_packed_##type##3(Vector<U, N, packed> v) noexcept {                                      \
-        static_assert(N == 3 || N == 4);                                                                         \
-        return packed_##type##3 {v.x, v.y, v.z};                                                                 \
+#define MAKE_VECTOR_MAKE_TYPE3(type)                                                                                           \
+    [[nodiscard]] constexpr auto make_##type##3() noexcept { return type##3 {}; }                                              \
+    [[nodiscard]] constexpr auto make_##type##3(type s) noexcept { return type##3 {s}; }                                       \
+    [[nodiscard]] constexpr auto make_##type##3(type x, type y, type z) noexcept { return type##3 {x, y, z}; }                 \
+    [[nodiscard]] constexpr auto make_##type##3(type##2 v, type z) noexcept { return type##3 {v.x, v.y, z}; }                  \
+    [[nodiscard]] constexpr auto make_##type##3(type x, type##2 v) noexcept { return type##3 {x, v.x, v.y}; }                  \
+                                                                                                                               \
+    [[nodiscard]] constexpr auto make_packed_##type##3() noexcept { return packed_##type##3 {}; }                              \
+    [[nodiscard]] constexpr auto make_packed_##type##3(type s) noexcept { return packed_##type##3 {s}; }                       \
+    [[nodiscard]] constexpr auto make_packed_##type##3(type x, type y, type z) noexcept { return packed_##type##3 {x, y, z}; } \
+    [[nodiscard]] constexpr auto make_packed_##type##3(type##2 v, type z) noexcept { return packed_##type##3 {v.x, v.y, z}; }  \
+    [[nodiscard]] constexpr auto make_packed_##type##3(type x, type##2 v) noexcept { return packed_##type##3 {x, v.x, v.y}; }  \
+                                                                                                                               \
+    template<typename U, uint N, bool packed>                                                                                  \
+    [[nodiscard]] constexpr auto make_##type##3(Vector<U, N, packed> v) noexcept {                                             \
+        static_assert(N == 3 || N == 4);                                                                                       \
+        return type##3 {v.x, v.y, v.z};                                                                                        \
+    }                                                                                                                          \
+                                                                                                                               \
+    template<typename U, uint N, bool packed>                                                                                  \
+    [[nodiscard]] constexpr auto make_packed_##type##3(Vector<U, N, packed> v) noexcept {                                      \
+        static_assert(N == 3 || N == 4);                                                                                       \
+        return packed_##type##3 {v.x, v.y, v.z};                                                                               \
     }
 
-#define MAKE_VECTOR_MAKE_TYPE4(type)                                                                          \
-    constexpr auto make_##type##4() noexcept { return type##4 {}; }                                           \
-    constexpr auto make_##type##4(type s) noexcept { return type##4 {s}; }                                    \
-    constexpr auto make_##type##4(type x, type y, type z, type w) noexcept { return type##4 {x, y, z, w}; }   \
-    constexpr auto make_##type##4(type##2 v, type z, type w) noexcept { return type##4 {v.x, v.y, z, w}; }    \
-    constexpr auto make_##type##4(type x, type y, type##2 v) noexcept { return type##4 {x, y, v.x, v.y}; }    \
-    constexpr auto make_##type##4(type x, type##2 v, type w) noexcept { return type##4 {x, v.x, v.y, w}; }    \
-    constexpr auto make_##type##4(type##2 v, type##2 u) noexcept { return type##4 {v.x, v.y, u.x, u.y}; }     \
-    constexpr auto make_##type##4(type##3 v, type w) noexcept { return type##4 {v.x, v.y, v.z, w}; }          \
-    constexpr auto make_##type##4(type x, type##3 v) noexcept { return type##4 {x, v.x, v.y, v.z}; }          \
-    constexpr auto make_##type##4(packed_##type##3 v, type w) noexcept { return type##4 {v.x, v.y, v.z, w}; } \
-    constexpr auto make_##type##4(type x, packed_##type##3 v) noexcept { return type##4 {x, v.x, v.y, v.z}; } \
-    template<typename U>                                                                                      \
-    constexpr auto make_##type##4(Vector<U, 4, false> v) noexcept {                                           \
-        return type##4 {v.x, v.y, v.z, v.w};                                                                  \
-    }
+#define MAKE_VECTOR_MAKE_TYPE4(type)                                                                                        \
+    [[nodiscard]] constexpr auto make_##type##4() noexcept { return type##4 {}; }                                           \
+    [[nodiscard]] constexpr auto make_##type##4(type s) noexcept { return type##4 {s}; }                                    \
+    [[nodiscard]] constexpr auto make_##type##4(type x, type y, type z, type w) noexcept { return type##4 {x, y, z, w}; }   \
+    [[nodiscard]] constexpr auto make_##type##4(type##2 v, type z, type w) noexcept { return type##4 {v.x, v.y, z, w}; }    \
+    [[nodiscard]] constexpr auto make_##type##4(type x, type y, type##2 v) noexcept { return type##4 {x, y, v.x, v.y}; }    \
+    [[nodiscard]] constexpr auto make_##type##4(type x, type##2 v, type w) noexcept { return type##4 {x, v.x, v.y, w}; }    \
+    [[nodiscard]] constexpr auto make_##type##4(type##2 v, type##2 u) noexcept { return type##4 {v.x, v.y, u.x, u.y}; }     \
+    [[nodiscard]] constexpr auto make_##type##4(type##3 v, type w) noexcept { return type##4 {v.x, v.y, v.z, w}; }          \
+    [[nodiscard]] constexpr auto make_##type##4(type x, type##3 v) noexcept { return type##4 {x, v.x, v.y, v.z}; }          \
+    [[nodiscard]] constexpr auto make_##type##4(packed_##type##3 v, type w) noexcept { return type##4 {v.x, v.y, v.z, w}; } \
+    [[nodiscard]] constexpr auto make_##type##4(type x, packed_##type##3 v) noexcept { return type##4 {x, v.x, v.y, v.z}; } \
+    template<typename U>                                                                                                    \
+    [[nodiscard]] constexpr auto make_##type##4(Vector<U, 4, false> v) noexcept { return type##4 {v.x, v.y, v.z, v.w}; }
 
 #define MAKE_VECTOR_TYPE(type)                      \
     using type##2 = Vector<type, 2, false>;         \
@@ -280,24 +278,24 @@ MAKE_VECTOR_TYPE(float)
 #undef MAKE_VECTOR_MAKE_TYPE4
 
 // For boolN
-constexpr auto operator!(bool2 v) noexcept { return make_bool2(!v.x, !v.y); }
-constexpr auto operator!(bool3 v) noexcept { return make_bool3(!v.x, !v.y, !v.z); }
-constexpr auto operator!(bool4 v) noexcept { return make_bool4(!v.x, !v.y, !v.z, !v.w); }
-constexpr auto operator||(bool2 lhs, bool2 rhs) noexcept { return make_bool2(lhs.x || rhs.x, lhs.y || rhs.y); }
-constexpr auto operator||(bool3 lhs, bool3 rhs) noexcept { return make_bool3(lhs.x || rhs.x, lhs.y || rhs.y, lhs.z || rhs.z); }
-constexpr auto operator||(bool4 lhs, bool4 rhs) noexcept { return make_bool4(lhs.x || rhs.x, lhs.y || rhs.y, lhs.z || rhs.z, lhs.w || rhs.w); }
-constexpr auto operator&&(bool2 lhs, bool2 rhs) noexcept { return make_bool2(lhs.x && rhs.x, lhs.y && rhs.y); }
-constexpr auto operator&&(bool3 lhs, bool3 rhs) noexcept { return make_bool3(lhs.x && rhs.x, lhs.y && rhs.y, lhs.z && rhs.z); }
-constexpr auto operator&&(bool4 lhs, bool4 rhs) noexcept { return make_bool4(lhs.x && rhs.x, lhs.y && rhs.y, lhs.z && rhs.z, lhs.w && rhs.w); }
+[[nodiscard]] constexpr auto operator!(bool2 v) noexcept { return make_bool2(!v.x, !v.y); }
+[[nodiscard]] constexpr auto operator!(bool3 v) noexcept { return make_bool3(!v.x, !v.y, !v.z); }
+[[nodiscard]] constexpr auto operator!(bool4 v) noexcept { return make_bool4(!v.x, !v.y, !v.z, !v.w); }
+[[nodiscard]] constexpr auto operator||(bool2 lhs, bool2 rhs) noexcept { return make_bool2(lhs.x || rhs.x, lhs.y || rhs.y); }
+[[nodiscard]] constexpr auto operator||(bool3 lhs, bool3 rhs) noexcept { return make_bool3(lhs.x || rhs.x, lhs.y || rhs.y, lhs.z || rhs.z); }
+[[nodiscard]] constexpr auto operator||(bool4 lhs, bool4 rhs) noexcept { return make_bool4(lhs.x || rhs.x, lhs.y || rhs.y, lhs.z || rhs.z, lhs.w || rhs.w); }
+[[nodiscard]] constexpr auto operator&&(bool2 lhs, bool2 rhs) noexcept { return make_bool2(lhs.x && rhs.x, lhs.y && rhs.y); }
+[[nodiscard]] constexpr auto operator&&(bool3 lhs, bool3 rhs) noexcept { return make_bool3(lhs.x && rhs.x, lhs.y && rhs.y, lhs.z && rhs.z); }
+[[nodiscard]] constexpr auto operator&&(bool4 lhs, bool4 rhs) noexcept { return make_bool4(lhs.x && rhs.x, lhs.y && rhs.y, lhs.z && rhs.z, lhs.w && rhs.w); }
 
-constexpr bool any(bool2 v) noexcept { return v.x || v.y; }
-constexpr bool any(bool3 v) noexcept { return v.x || v.y || v.z; }
-constexpr bool any(bool4 v) noexcept { return v.x || v.y || v.z || v.w; }
-constexpr bool all(bool2 v) noexcept { return v.x && v.y; }
-constexpr bool all(bool3 v) noexcept { return v.x && v.y && v.z; }
-constexpr bool all(bool4 v) noexcept { return v.x && v.y && v.z && v.w; }
-constexpr bool none(bool2 v) noexcept { return !any(v); }
-constexpr bool none(bool3 v) noexcept { return !any(v); }
-constexpr bool none(bool4 v) noexcept { return !any(v); }
+[[nodiscard]] constexpr bool any(bool2 v) noexcept { return v.x || v.y; }
+[[nodiscard]] constexpr bool any(bool3 v) noexcept { return v.x || v.y || v.z; }
+[[nodiscard]] constexpr bool any(bool4 v) noexcept { return v.x || v.y || v.z || v.w; }
+[[nodiscard]] constexpr bool all(bool2 v) noexcept { return v.x && v.y; }
+[[nodiscard]] constexpr bool all(bool3 v) noexcept { return v.x && v.y && v.z; }
+[[nodiscard]] constexpr bool all(bool4 v) noexcept { return v.x && v.y && v.z && v.w; }
+[[nodiscard]] constexpr bool none(bool2 v) noexcept { return !any(v); }
+[[nodiscard]] constexpr bool none(bool3 v) noexcept { return !any(v); }
+[[nodiscard]] constexpr bool none(bool4 v) noexcept { return !any(v); }
 
 }}// namespace luisa::vector

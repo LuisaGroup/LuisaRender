@@ -7,7 +7,7 @@
 
 #include <jitify/jitify.hpp>
 
-#include <core/sha1.h>
+#include <core/hash.h>
 #include <compute/device.h>
 #include <compute/acceleration.h>
 

@@ -7,138 +7,53 @@
 #include <memory>
 #include <vector>
 #include <set>
+#include <map>
 
-#include <compute/statement.h>
 #include <core/platform.h>
 
 namespace luisa::compute::dsl {
 
+class Variable;
+struct Statement;
+class ScopeStmt;
+
 class Function {
-    
-    friend class Variable;
 
 private:
     std::string _name;
-    std::vector<Variable> _arguments;
-    std::vector<Variable> _builtin_vars;
-    std::vector<std::unique_ptr<Expression>> _expressions;
-    std::vector<std::unique_ptr<Statement>> _statements;
-    std::vector<const TypeDesc *> _used_types;
+    std::vector<std::unique_ptr<Variable>> _builtins;
+    std::vector<std::unique_ptr<Variable>> _variables;
+    std::vector<std::unique_ptr<Variable>> _arguments;
     
-    std::vector<VariableTag> _used_builtins;
-    uint32_t _uid_counter{0u};
-    
-    [[nodiscard]] uint32_t _get_uid() noexcept { return _uid_counter++; }
-    
-    template<typename T>
-    [[nodiscard]] Variable _builtin_var(VariableTag tag) noexcept {
-        auto type = type_desc<T>;
-        _used_types.emplace_back(type);
-        Variable v{type, tag};
-        if (std::find(_used_builtins.cbegin(), _used_builtins.cend(), tag) == _used_builtins.cend()) {
-            _used_builtins.emplace_back(tag);
-            _builtin_vars.emplace_back(v);
-        }
-        return v;
-    }
-    
-    template<typename T, bool is_const, bool is_threadgroup, typename ...Literals>
-    [[nodiscard]] Variable _var_or_const(Literals &&...vs) noexcept {
-        auto type = type_desc<T>;
-        _used_types.emplace_back(type);
-        Variable v{type, _get_uid(), is_threadgroup};
-        add_statement(std::make_unique<DeclareStmt>(v, literal(std::forward<Literals>(vs)...), is_const));
-        return v;
-    }
+    std::unique_ptr<ScopeStmt> _body;
+    std::stack<ScopeStmt *> _scope_stack;
 
 public:
     explicit Function(std::string name) noexcept;
     ~Function() noexcept;
     
     [[nodiscard]] static Function &current() noexcept;
-    
     [[nodiscard]] const std::string &name() const noexcept { return _name; }
     
-    template<typename T, typename U>
-    [[nodiscard]] Variable arg(const BufferView<U> &bv) noexcept {
-        auto type = type_desc<T>;
-        _used_types.emplace_back(type);
-        return _arguments.emplace_back(type, _get_uid(), bv.buffer(), bv.byte_offset(), bv.byte_size());
+    template<typename F, std::enable_if_t<std::is_invocable_v<F>, int> = 0>
+    void with_scope(ScopeStmt *scope, F &&f) {
+        _scope_stack.push(scope);
+        f();
+        _scope_stack.pop();
     }
     
-    template<typename T>
-    [[nodiscard]] Variable arg(std::shared_ptr<Texture> tex) noexcept {
-        auto type = type_desc<T>;
-        _used_types.emplace_back(type);
-        return _arguments.emplace_back(type, _get_uid(), std::move(tex));
-    }
+    void add_statement(std::unique_ptr<Statement> stmt) noexcept;
     
-    template<typename T>
-    [[nodiscard]] Variable arg(void *data) noexcept {
-        auto type = type_desc<T>;
-        _used_types.emplace_back(type);
-        return _arguments.emplace_back(type, _get_uid(), data);
-    }
+    [[nodiscard]] const std::vector<std::unique_ptr<Variable>> &builtins() const noexcept { return _builtins; }
+    [[nodiscard]] const std::vector<std::unique_ptr<Variable>> &variables() const noexcept { return _variables; }
+    [[nodiscard]] const std::vector<std::unique_ptr<Variable>> &arguments() const noexcept { return _arguments; }
     
-    template<typename T>
-    [[nodiscard]] Variable arg(const void *data, size_t size) noexcept {
-        auto type = type_desc<T>;
-        _used_types.emplace_back(type);
-        return _arguments.emplace_back(type, _get_uid(), data, size);
-    }
+    [[nodiscard]] const std::vector<std::unique_ptr<Statement>> &statements() const noexcept;
     
-    template<typename ...Literals,
-        std::enable_if_t<std::conjunction_v<std::is_convertible<Literals, LiteralExpr::Value>...>, int> = 0>
-    [[nodiscard]] Variable literal(Literals &&...vs) noexcept {
-        std::vector<LiteralExpr::Value> values{std::forward<Literals>(vs)...};
-        return add_expression(std::make_unique<LiteralExpr>(std::move(values)));
-    }
-    
-    template<typename Container,
-        std::enable_if_t<
-            std::conjunction_v<
-                std::is_convertible<decltype(*std::cbegin(std::declval<Container>())), LiteralExpr::Value>,
-                std::is_convertible<decltype(*std::cend(std::declval<Container>())), LiteralExpr::Value>>, int> = 0>
-    [[nodiscard]] Variable literal(Container &&container) noexcept {
-        std::vector<LiteralExpr::Value> values{std::begin(container), std::end(container)};
-        return add_expression(std::make_unique<LiteralExpr>(std::move(values)));
-    }
-    
-    [[nodiscard]] Variable thread_id() noexcept { return _builtin_var<uint32_t>(VariableTag::THREAD_ID); }
-    [[nodiscard]] Variable thread_xy() noexcept { return _builtin_var<uint32_t>(VariableTag::THREAD_XY); }
-    
-    template<typename T, typename ...Literals>
-    [[nodiscard]] Variable var(Literals &&...vs) noexcept { return _var_or_const<T, false, false>(std::forward<Literals>(vs)...); }
-    
-    template<typename T>
-    [[nodiscard]] Variable threadgroup_var() noexcept { return _var_or_const<T, false, true>(); }
-    
-    template<typename T, typename ...Literals>
-    [[nodiscard]] Variable constant(Literals &&...vs) noexcept { return _var_or_const<T, true, false>(std::forward<Literals>(vs)...); }
-    
-    [[nodiscard]] Variable add_expression(std::unique_ptr<Expression> expr) noexcept {
-        return Variable{_expressions.emplace_back(std::move(expr)).get()};
-    }
-    
-    void add_statement(std::unique_ptr<Statement> stmt) noexcept {
-        _statements.emplace_back(std::move(stmt));
-    }
-    
-    template<typename Block, std::enable_if_t<std::is_invocable_v<Block>, int> = 0>
-    void block(Block &&def_block) noexcept {
-        add_statement(std::make_unique<KeywordStmt>("{"));
-        def_block();
-        add_statement(std::make_unique<KeywordStmt>("}"));
-    }
-    
-    void add_break() noexcept { add_statement(std::make_unique<KeywordStmt>("break;")); }
-    void add_continue() noexcept { add_statement(std::make_unique<KeywordStmt>("continue;")); }
-    void add_return() noexcept { add_statement(std::make_unique<KeywordStmt>("return;")); }
-    
-    [[nodiscard]] const std::vector<Variable> &arguments() const noexcept { return _arguments; }
-    [[nodiscard]] const std::vector<Variable> &builtin_variables() const noexcept { return _builtin_vars; }
-    [[nodiscard]] const std::vector<std::unique_ptr<Statement>> &statements() const noexcept { return _statements; }
-    [[nodiscard]] const auto &used_types() const noexcept { return _used_types; }
+    // new api
+    [[nodiscard]] const Variable *add_builtin(std::unique_ptr<Variable> v) noexcept { return _builtins.emplace_back(std::move(v)).get(); }
+    [[nodiscard]] const Variable *add_variable(std::unique_ptr<Variable> v) noexcept { return _variables.emplace_back(std::move(v)).get(); }
+    [[nodiscard]] const Variable *add_argument(std::unique_ptr<Variable> v) noexcept { return _arguments.emplace_back(std::move(v)).get(); }
 };
 
 }

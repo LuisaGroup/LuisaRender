@@ -7,7 +7,9 @@
 #include <iomanip>
 
 // From: https://github.com/vog/sha1
-#include "sha1.h"
+#include "hash.h"
+
+namespace luisa { inline namespace utility {
 
 /*
     sha1.hpp - source code of
@@ -204,7 +206,7 @@ void buffer_to_block(const std::string &buffer, uint32_t block[block_ints]) {
 
 SHA1::SHA1(const std::string &s) {
     reset(_digest.data(), _buffer, _transforms);
-    std::istringstream is{s};
+    std::istringstream is{s, std::istringstream::binary};
     while (true) {
         char sbuf[block_bytes];
         is.read(sbuf, block_bytes - _buffer.size());
@@ -216,3 +218,5 @@ SHA1::SHA1(const std::string &s) {
         _buffer.clear();
     }
 }
+
+}}
