@@ -42,8 +42,6 @@ enum struct UnaryOp {
     PLUS, MINUS,  // +x, -x
     NOT,          // !x
     BIT_NOT,      // ~x
-    ADDRESS_OF,   // &x
-    DEREFERENCE   // *x
     
     // Note: We deliberately support *NO* pre- and postfix inc/dec operators to avoid possible abuse
 };
@@ -73,11 +71,6 @@ enum struct BinaryOp {
     
     // operator[]
     ACCESS,
-    
-    // assignment
-    ASSIGN,
-    ADD_ASSIGN, SUB_ASSIGN, MUL_ASSIGN, DIV_ASSIGN, MOD_ASSIGN,
-    BIT_AND_ASSIGN, BIT_OR_ASSIGN, BIT_XOR_ASSIGN, SHL_ASSIGN, SHR_ASSIGN
 };
 
 class BinaryExpr : public Expression {
@@ -113,7 +106,7 @@ public:
 class ValueExpr : public Expression {
 
 public:
-    using Value = std::variant<const Variable *, bool, float, int8_t, uint8_t, int16_t, uint16_t, int32_t, uint32_t>;
+    using Value = std::variant<bool, float, int8_t, uint8_t, int16_t, uint16_t, int32_t, uint32_t>;
 
 private:
     Value _value;

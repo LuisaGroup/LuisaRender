@@ -8,50 +8,11 @@
 
 namespace luisa::compute::dsl {
 
-template<typename ...Args>
-inline Variable literal(Args &&...args) noexcept {
-    return Function::current().literal(std::forward<Args>(args)...);
-}
-
-inline Variable thread_id() noexcept { return Function::current().thread_id(); }
-inline Variable thread_xy() noexcept { return Function::current().thread_xy(); }
-inline Variable thread_x() noexcept { return thread_xy().x(); }
-inline Variable thread_y() noexcept { return thread_xy().y(); }
-
-#define literal    literal
-#define thread_id  thread_id
-#define thread_x   thread_x
-#define thread_y   thread_y
-#define thread_xy  thread_xy
-
-}
-
-// binary operators for Variable in global namespace
-#define MAKE_VARIABLE_BINARY_OPERATOR_IMPL(op)                                                \
-template<typename T, luisa::compute::dsl::detail::EnableIfLiteralOperand<T> = 0>              \
-[[nodiscard]] inline auto operator op(T &&lhs, luisa::compute::dsl::Variable rhs) noexcept {  \
-    return luisa::compute::dsl::literal(std::forward<T>(lhs)).operator op(rhs);               \
-}                                                                                             \
-
-LUISA_MAP(MAKE_VARIABLE_BINARY_OPERATOR_IMPL, +, -, *, /, %, <<, >>, &, |, ^, &&, ||, ==, !=, <,>, <=, >=)
-
-#undef MAKE_VARIABLE_BINARY_OPERATOR_IMPL
-
-namespace luisa::compute::dsl {
-
-// binary operators for Variable
-#define MAKE_VARIABLE_MEMBER_BINARY_OPERATOR_IMPL(op)                         \
-template<typename T, detail::EnableIfLiteralOperand<T>>                       \
-[[nodiscard]] inline Variable Variable::operator op(T &&rhs) const noexcept{  \
-    return this->operator op(literal(std::forward<T>(rhs)));                  \
-}                                                                             \
-
-LUISA_MAP(MAKE_VARIABLE_MEMBER_BINARY_OPERATOR_IMPL, +, -, *, /, %, <<, >>, &, |, ^, &&, ||, ==, !=, <,>, <=, >=, [])
-
-#undef MAKE_VARIABLE_MEMBER_BINARY_OPERATOR_IMPL
-
 // built-in functions
-#define MAP_VARIABLE_NAME_TO_ARGUMENT_DEF(name) LiteralExpr::Value name
+#define MAP_VARIABLE_NAME_TO_ARGUMENT_TYPE(name) typename name##Type
+#define MAP_VARIABLE_NAMES_TO_ARGUMENT_TYPE_LIST(...) template<LUISA_MAP_LIST(MAP_VARIABLE_NAME_TO_ARGUMENT_TYPE, __VA_ARGS__)>
+
+#define MAP_VARIABLE_NAME_TO_ARGUMENT_DEF(name) Expr<name##Type> name
 #define MAP_VARIABLE_NAMES_TO_ARGUMENT_LIST(...) LUISA_MAP_LIST(MAP_VARIABLE_NAME_TO_ARGUMENT_DEF, __VA_ARGS__)
 
 #define MAP_VARIABLE_NAME_TO_VARIABLE(name) literal(name)

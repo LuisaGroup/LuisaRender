@@ -26,15 +26,11 @@
 #include <core/logging.h>
 #include <core/map_macro.h>
 
-#include <compute/texture.h>
-
 namespace luisa::compute::dsl {
 
 enum struct TypeCatalog : uint32_t {
 
     UNKNOWN,
-
-    AUTO,// deduced type
 
     BOOL,
 
@@ -45,8 +41,6 @@ enum struct TypeCatalog : uint32_t {
     UINT16,
     INT32,
     UINT32,
-    INT64,
-    UINT64,
 
     VECTOR2,
     VECTOR3,
@@ -57,30 +51,22 @@ enum struct TypeCatalog : uint32_t {
     MATRIX4,
 
     ARRAY,
-    CONSTANT,
-    POINTER,
-    REFERENCE,
-
-    TEXTURE,
 
     ATOMIC,
-
     STRUCTURE
 };
 
 struct TypeDesc : Noncopyable {
 
+    // scalars
     TypeCatalog type{TypeCatalog::UNKNOWN};
     uint32_t size{0u};
 
-    // for const, array, pointer and reference
+    // for arrays, vectors and matrices
     const TypeDesc *element_type{nullptr};
     uint32_t element_count{0u};
-
-    // for textures
-    TextureAccess access{TextureAccess::READ_WRITE};
-
-    // for structure
+    
+    // for structures
     std::vector<std::string> member_names;
     std::vector<const TypeDesc *> member_types;
     uint32_t alignment{0u};
@@ -91,35 +77,6 @@ struct TypeDesc : Noncopyable {
 private:
     uint32_t _uid{_uid_counter++};
     inline static uint32_t _uid_counter{1u};
-};
-
-template<TextureAccess access>
-struct Tex2D {
-    [[nodiscard]] static TypeDesc *desc() noexcept {
-        static TypeDesc d;
-        static std::once_flag flag;
-        std::call_once(flag, [] {d.type = TypeCatalog::TEXTURE; d.access = access; });
-        return &d;
-    }
-};
-
-using ReadOnlyTex2D = Tex2D<TextureAccess::READ>;
-using WriteOnlyTex2D = Tex2D<TextureAccess::WRITE>;
-using ReadWriteTex2D = Tex2D<TextureAccess::READ_WRITE>;
-using SampledTex2D = Tex2D<TextureAccess::SAMPLE>;
-
-struct AutoType {
-
-    [[nodiscard]] static TypeDesc *desc() noexcept {
-        static TypeDesc d;
-        static std::once_flag flag;
-        std::call_once(flag, [] { d.type = TypeCatalog::AUTO; });
-        return &d;
-    }
-
-    // For initialization type checking in Function::var<Auto>
-    template<typename... Args>
-    explicit AutoType(Args &&...) {}
 };
 
 template<typename T>
@@ -146,26 +103,9 @@ struct Scalar {
                 td.type = TypeCatalog::INT32;
             } else if constexpr (std::is_same_v<uint32_t, T>) {
                 td.type = TypeCatalog::UINT32;
-            } else if constexpr (std::is_same_v<int64_t, T>) {
-                td.type = TypeCatalog::INT64;
-            } else if constexpr (std::is_same_v<uint64_t, T>) {
-                td.type = TypeCatalog::UINT64;
             }
         });
         return &td;
-    }
-};
-
-template<typename T>
-struct Constant {
-    [[nodiscard]] static TypeDesc *desc() noexcept {
-        static TypeDesc d;
-        static std::once_flag flag;
-        std::call_once(flag, [] {
-            d.type = TypeCatalog::CONSTANT;
-            d.element_type = T::desc();
-        });
-        return &d;
     }
 };
 
@@ -237,32 +177,6 @@ struct Array {
 };
 
 template<typename T>
-struct Pointer {
-    [[nodiscard]] static TypeDesc *desc() noexcept {
-        static TypeDesc d;
-        static std::once_flag flag;
-        std::call_once(flag, [] {
-            d.type = TypeCatalog::POINTER;
-            d.element_type = T::desc();
-        });
-        return &d;
-    }
-};
-
-template<typename T>
-struct Reference {
-    [[nodiscard]] static TypeDesc *desc() noexcept {
-        static TypeDesc d;
-        std::once_flag flag;
-        std::call_once(flag, [] {
-            d.type = TypeCatalog::REFERENCE;
-            d.element_type = T::desc();
-        });
-        return &d;
-    }
-};
-
-template<typename T>
 struct Structure {
 
     template<typename>
@@ -296,55 +210,6 @@ public:
     }
 };
 
-template<>
-struct MakeTypeDescImpl<AutoType> {
-
-    using Type = AutoType;
-
-    [[nodiscard]] TypeDesc *operator()() const noexcept {
-        return Type::desc();
-    }
-};
-
-template<typename T>
-struct MakeTypeDescImpl<T *> {
-
-    using Type = Pointer<typename MakeTypeDescImpl<T>::Type>;
-
-    [[nodiscard]] TypeDesc *operator()() const noexcept {
-        auto desc = Type::desc();
-        desc->size = static_cast<uint32_t>(sizeof(T *));
-        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<T *>);
-        return desc;
-    }
-};
-
-template<typename T>
-struct MakeTypeDescImpl<const T> {
-
-    using Type = Constant<typename MakeTypeDescImpl<T>::Type>;
-
-    [[nodiscard]] TypeDesc *operator()() const noexcept {
-        auto desc = Type::desc();
-        desc->size = static_cast<uint32_t>(sizeof(const T));
-        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<const T>);
-        return desc;
-    }
-};
-
-template<TextureAccess access>
-struct MakeTypeDescImpl<Tex2D<access>> {
-
-    using Type = Tex2D<access>;
-
-    [[nodiscard]] TypeDesc *operator()() const noexcept {
-        auto desc = Type::desc();
-        desc->size = 32u;
-        desc->alignment = 32u;
-        return desc;
-    }
-};
-
 template<typename T>
 struct MakeTypeDescImpl<std::atomic<T>> {
 
@@ -356,19 +221,6 @@ struct MakeTypeDescImpl<std::atomic<T>> {
         auto desc = Type::desc();
         desc->size = static_cast<uint32_t>(sizeof(std::atomic<T>));
         desc->alignment = static_cast<uint32_t>(std::alignment_of_v<std::atomic<T>>);
-        return desc;
-    }
-};
-
-template<typename T>
-struct MakeTypeDescImpl<T &> {
-
-    using Type = Reference<typename MakeTypeDescImpl<T>::Type>;
-
-    [[nodiscard]] TypeDesc *operator()() const noexcept {
-        auto desc = Type::desc();
-        desc->size = static_cast<uint32_t>(sizeof(T &));
-        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<T &>);
         return desc;
     }
 };
@@ -472,94 +324,6 @@ struct MakeTypeDescImpl<Vector<T, 3, true>> {
 template<typename T>
 inline const TypeDesc *type_desc = detail::MakeTypeDescImpl<T>{}();
 
-inline const TypeDesc *remove_const(const TypeDesc *type) noexcept {
-    if (type == nullptr) { return nullptr; }
-    if (type->type == TypeCatalog::CONSTANT) { return remove_const(type->element_type); }
-    return type;
-}
-
-inline bool is_ptr_or_ref(const TypeDesc *type) noexcept {
-    auto t = remove_const(type);
-    return t != nullptr && (t->type == TypeCatalog::POINTER || t->type == TypeCatalog::REFERENCE);
-}
-
-inline bool is_const_ptr_or_ref(const TypeDesc *type) noexcept {
-    auto t = remove_const(type);
-    return is_ptr_or_ref(t) && t->element_type != nullptr && t->element_type->type == TypeCatalog::CONSTANT;
-}
-
-template<typename Container,
-         std::enable_if_t<
-             std::conjunction_v<
-                 std::is_convertible<decltype(*std::cbegin(std::declval<Container>())), const TypeDesc *>,
-                 std::is_convertible<decltype(*std::cend(std::declval<Container>())), const TypeDesc *>>,
-             int> = 0>
-[[nodiscard]] inline std::vector<const TypeDesc *> toposort_structs(Container &&container) {
-
-    // Gather all used structs
-    std::queue<const TypeDesc *> types_to_process;
-    for (auto iter = std::cbegin(container); iter != std::cend(container); iter++) {
-        types_to_process.emplace(*iter);
-    }
-
-    std::set<const TypeDesc *> processed;
-
-    std::vector<const TypeDesc *> structs;
-    std::unordered_map<const TypeDesc *, int> struct_ids;
-    while (!types_to_process.empty()) {
-        auto type = types_to_process.front();
-        types_to_process.pop();
-        if (type != nullptr && processed.find(type) == processed.end()) {
-            processed.emplace(type);
-            if (type->type == TypeCatalog::STRUCTURE) {
-                struct_ids.emplace(type, static_cast<int32_t>(structs.size()));
-                structs.emplace_back(type);
-                for (auto m : type->member_types) { types_to_process.emplace(m); }
-            } else if (type->element_type != nullptr) {
-                types_to_process.emplace(type->element_type);
-            }
-        }
-    }
-
-    // Build DAG
-    processed.clear();
-    std::vector<std::set<int>> refs(struct_ids.size());
-    std::vector<int> in_degrees(struct_ids.size(), 0);
-    std::function<void(const TypeDesc *, int)> find_refs{[&](const TypeDesc *t, int referrer) {
-        if (t == nullptr || processed.find(t) != processed.end()) { return; }
-        processed.emplace(t);
-        if (t->type == TypeCatalog::STRUCTURE) {
-            auto id = struct_ids[t];
-            if (referrer >= 0 && refs[id].find(referrer) == refs[id].end()) {
-                refs[id].emplace(referrer);
-                in_degrees[referrer]++;
-            }
-            for (auto m : t->member_types) { find_refs(m, id); }
-        } else if (t->type == TypeCatalog::ARRAY || t->type == TypeCatalog::CONSTANT) {
-            find_refs(t->element_type, referrer);
-        }
-    }};
-    for (auto s : structs) { find_refs(s, -1); }
-
-    // Sort
-    std::queue<int> zero_degree_nodes;
-    for (auto i = 0; i < static_cast<int>(in_degrees.size()); i++) {
-        if (in_degrees[i] == 0) { zero_degree_nodes.emplace(i); }
-    }
-
-    std::vector<const TypeDesc *> sorted;
-    while (!zero_degree_nodes.empty()) {
-        auto id = zero_degree_nodes.front();
-        zero_degree_nodes.pop();
-        sorted.emplace_back(structs[id]);
-        for (auto to : refs[id]) {
-            if (--in_degrees[to] == 0) { zero_degree_nodes.emplace(to); }
-        }
-    }
-
-    return sorted;
-}
-
-}// namespace luisa::compute::dsl
+};// namespace luisa::compute::dsl
 
 #endif

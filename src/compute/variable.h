@@ -5,13 +5,12 @@
 #pragma once
 
 #include <variant>
-
-#include <compute/buffer.h>
-#include <compute/texture.h>
 #include <compute/type_desc.h>
 
 namespace luisa::compute::dsl {
 
+class Buffer;
+class Texture;
 class Expression;
 
 enum struct ResourceUsage : uint32_t {
@@ -64,7 +63,7 @@ private:
     const void *_uniform_data{nullptr};
     
     // argument usage
-    uint32_t _usage{0u};
+    mutable uint32_t _usage{0u};
     
     // For temporary variables in expressions
     std::unique_ptr<Expression> _expression{nullptr};
@@ -107,9 +106,9 @@ public:
     [[nodiscard]] const std::vector<std::byte> &immutable_data() const noexcept { return _immutable_data; }
     [[nodiscard]] const void *uniform_data() const noexcept { return _uniform_data; }
     
-    void mark_read() noexcept { _usage |= resource_read_bit; }
-    void mark_write() noexcept { _usage |= resource_write_bit; }
-    void mark_sample() noexcept { _usage |= resource_sample_bit; }
+    void mark_read() const noexcept { _usage |= resource_read_bit; }
+    void mark_write() const noexcept { _usage |= resource_write_bit; }
+    void mark_sample() const noexcept { _usage |= resource_sample_bit; }
     
     [[nodiscard]] ResourceUsage usage() const noexcept {
         

@@ -22,47 +22,47 @@ struct VectorStorage {};
 template<typename T>
 struct VectorStorage<T, 2> {
     T x, y;
-    constexpr VectorStorage() noexcept : x{}, y{} {}
-    explicit constexpr VectorStorage(T s) noexcept : x{s}, y{s} {}
-    constexpr VectorStorage(T x, T y) noexcept : x{x}, y{y} {}
+    constexpr VectorStorage() noexcept: x{}, y{} {}
+    explicit constexpr VectorStorage(T s) noexcept: x{s}, y{s} {}
+    constexpr VectorStorage(T x, T y) noexcept: x{x}, y{y} {}
 };
 
 template<typename T>
 struct VectorStorage<T, 3> {
     T x, y, z;
-    constexpr VectorStorage() noexcept : x{}, y{}, z{} {}
-    explicit constexpr VectorStorage(T s) noexcept : x{s}, y{s}, z{s} {}
-    constexpr VectorStorage(T x, T y, T z) noexcept : x{x}, y{y}, z{z} {}
+    constexpr VectorStorage() noexcept: x{}, y{}, z{} {}
+    explicit constexpr VectorStorage(T s) noexcept: x{s}, y{s}, z{s} {}
+    constexpr VectorStorage(T x, T y, T z) noexcept: x{x}, y{y}, z{z} {}
 };
 
 template<typename T>
 struct VectorStorage<T, 4> {
     T x, y, z, w;
-    constexpr VectorStorage() noexcept : x{}, y{}, z{}, w{} {}
-    explicit constexpr VectorStorage(T s) noexcept : x{s}, y{s}, z{s}, w{s} {}
-    constexpr VectorStorage(T x, T y, T z, T w) noexcept : x{x}, y{y}, z{z}, w{w} {}
+    constexpr VectorStorage() noexcept: x{}, y{}, z{}, w{} {}
+    explicit constexpr VectorStorage(T s) noexcept: x{s}, y{s}, z{s}, w{s} {}
+    constexpr VectorStorage(T x, T y, T z, T w) noexcept: x{x}, y{y}, z{z}, w{w} {}
 };
 
 }// namespace detail
 
 template<typename T, uint32_t N, bool is_packed>
 struct alignas(detail::vector_alignment<T, N, is_packed>) Vector : detail::VectorStorage<T, N> {
-
+    
     using Storage = detail::VectorStorage<T, N>;
-
-    constexpr Vector() noexcept : detail::VectorStorage<T, N>{static_cast<T>(0)} {}
-
+    
+    constexpr Vector() noexcept: detail::VectorStorage<T, N>{static_cast<T>(0)} {}
+    
     template<typename U>
     explicit constexpr Vector(U u) noexcept : detail::VectorStorage<T, N>{static_cast<T>(u)} {}
-
+    
     template<
         typename... U,
         std::enable_if_t<sizeof...(U) == N, int> = 0>
     explicit constexpr Vector(U... u) noexcept : detail::VectorStorage<T, N>{static_cast<T>(u)...} {}
-
+    
     template<typename Index>
     [[nodiscard]] T &operator[](Index i) noexcept { return reinterpret_cast<T(&)[N]>(*this)[i]; }
-
+    
     template<typename Index>
     [[nodiscard]] T operator[](Index i) const noexcept { return reinterpret_cast<const T(&)[N]>(*this)[i]; }
 
@@ -102,7 +102,7 @@ struct alignas(detail::vector_alignment<T, N, is_packed>) Vector : detail::Vecto
         }                                                                  \
         return *this;                                                      \
     }
-
+    
     MAKE_ASSIGN_OP(+=)
     MAKE_ASSIGN_OP(-=)
     MAKE_ASSIGN_OP(*=)
@@ -298,4 +298,32 @@ MAKE_VECTOR_TYPE(float)
 [[nodiscard]] constexpr bool none(bool3 v) noexcept { return !any(v); }
 [[nodiscard]] constexpr bool none(bool4 v) noexcept { return !any(v); }
 
-}}// namespace luisa::vector
+namespace detail {
+
+template<typename T>
+struct IsVector2Impl : std::false_type {};
+
+template<typename T, bool packed>
+struct IsVector2Impl<Vector<T, 2, packed>> : std::true_type {};
+
+template<typename T>
+struct IsVector3Impl : std::false_type {};
+
+template<typename T, bool packed>
+struct IsVector3Impl<Vector<T, 3, packed>> : std::true_type {};
+
+template<typename T>
+struct IsVector4Impl : std::false_type {};
+
+template<typename T, bool packed>
+struct IsVector4Impl<Vector<T, 3, packed>> : std::true_type {};
+
+}
+
+template<typename T> constexpr auto is_vector_2 = detail::IsVector2Impl<T>::value;
+template<typename T> constexpr auto is_vector_3 = detail::IsVector3Impl<T>::value;
+template<typename T> constexpr auto is_vector_4 = detail::IsVector4Impl<T>::value;
+template<typename T> constexpr auto is_vector = std::disjunction_v<detail::IsVector2Impl<T>, detail::IsVector3Impl<T>, detail::IsVector4Impl<T>>;
+
+}
+}// namespace luisa::vector

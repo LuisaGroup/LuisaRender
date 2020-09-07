@@ -27,12 +27,15 @@ private:
     
     std::unique_ptr<ScopeStmt> _body;
     std::stack<ScopeStmt *> _scope_stack;
+    
+    uint32_t _uid_counter{0u};
 
 public:
     explicit Function(std::string name) noexcept;
     ~Function() noexcept;
     
     [[nodiscard]] static Function &current() noexcept;
+    [[nodiscard]] uint32_t next_uid() noexcept { return ++_uid_counter; }
     [[nodiscard]] const std::string &name() const noexcept { return _name; }
     
     template<typename F, std::enable_if_t<std::is_invocable_v<F>, int> = 0>

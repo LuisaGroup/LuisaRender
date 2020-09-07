@@ -39,6 +39,7 @@ class ExprStmt;
 class SwitchStmt;
 class SwitchCaseStmt;
 class SwitchDefaultStmt;
+class AssignStmt;
 
 // Statement visitor interface
 struct StmtVisitor {
@@ -55,6 +56,7 @@ struct StmtVisitor {
     virtual void visit(const SwitchStmt *switch_stmt) = 0;
     virtual void visit(const SwitchCaseStmt *case_stmt) = 0;
     virtual void visit(const SwitchDefaultStmt *default_stmt) = 0;
+    virtual void visit(const AssignStmt *assign_stmt) = 0;
 };
 
 #define MAKE_STATEMENT_ACCEPT_VISITOR()                                    \
@@ -92,16 +94,36 @@ class DeclareStmt : public Statement {
 
 private:
     const Variable *_var;
-    const Expression *_init_expr;
-    bool _is_constexpr;
+    std::vector<const Variable *> _initializer_list;
 
 public:
-    DeclareStmt(const Variable *var, const Expression *init, bool is_constexpr) noexcept
-        : _var{var}, _init_expr{init}, _is_constexpr{is_constexpr} {}
+    DeclareStmt(const Variable *var, std::vector<const Variable *> init) noexcept
+        : _var{var}, _initializer_list{std::move(init)} {}
     [[nodiscard]] const Variable *var() const noexcept { return _var; }
-    [[nodiscard]] const Expression *init_expr() const noexcept { return _init_expr; }
-    [[nodiscard]] bool is_constexpr() const noexcept { return _is_constexpr; }
+    [[nodiscard]] const std::vector<const Variable *> &init_expr() const noexcept { return _initializer_list; }
     MAKE_STATEMENT_ACCEPT_VISITOR()
+};
+
+enum struct AssignOp {
+    ASSIGN,
+    ADD_ASSIGN, SUB_ASSIGN, MUL_ASSIGN, DIV_ASSIGN, MOD_ASSIGN,
+    BIT_AND_ASSIGN, BIT_OR_ASSIGN, BIT_XOR_ASSIGN, SHL_ASSIGN, SHR_ASSIGN
+};
+
+class AssignStmt {
+
+private:
+    const Variable *_lhs;
+    const Variable *_rhs;
+    AssignOp _op;
+
+public:
+    AssignStmt(AssignOp op, const Variable *lhs, const Variable *rhs) noexcept
+        : _lhs{lhs}, _rhs{rhs}, _op{op} {}
+    
+    [[nodiscard]] const Variable *lhs() const noexcept { return _lhs; }
+    [[nodiscard]] const Variable *rhs() const noexcept { return _rhs; }
+    [[nodiscard]] AssignOp op() const noexcept { return _op; }
 };
 
 class IfStmt : public Statement {
