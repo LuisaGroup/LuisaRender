@@ -123,14 +123,14 @@ class CallExpr : public Expression {
 
 private:
     std::string _name;
-    std::vector<const Expression *> _arguments;
+    std::vector<const Variable *> _arguments;
 
 public:
-    CallExpr(std::string name, std::vector<const Expression *> args) noexcept
+    CallExpr(std::string name, std::vector<const Variable *> args) noexcept
         : _name{std::move(name)}, _arguments{std::move(args)} {}
     
     [[nodiscard]] const std::string &name() const noexcept { return _name; }
-    [[nodiscard]] const std::vector<const Expression *> &arguments() const noexcept { return _arguments; }
+    [[nodiscard]] const std::vector<const Variable *> &arguments() const noexcept { return _arguments; }
     MAKE_EXPRESSION_ACCEPT_VISITOR()
 };
 

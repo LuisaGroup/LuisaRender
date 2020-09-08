@@ -245,45 +245,17 @@ Expr(const Var<T> &) -> Expr<T>;
 template<typename T, std::enable_if_t<!is_var<T>, int> = 0>
 Expr(T &&) -> Expr<T>;
 
-namespace detail {
 
-template<typename Remain, typename Process = std::tuple<>>
-struct ExtractArgsImpl {};
-
-template<typename ...Transformed>
-struct ExtractArgsImpl<std::tuple<>, std::tuple<Transformed...>> {
-    using Type = std::tuple<Transformed...>;
+template<typename Tx, typename Ty>
+inline auto min(Tx x, Ty y) noexcept {
+    Expr expr_x{x};
+    Expr expr_y{y};
+    using TTx = std::decay_t<typename decltype(expr_x)::Type>;
+    using TTy = std::decay_t<typename decltype(expr_x)::Type>;
+    using R = std::decay_t<decltype(math::min(std::declval<TTx>(), std::declval<TTy>()))>;
+    auto v = Variable::make_temporary(type_desc<R>, std::make_unique<CallExpr("min", {expr_x.variable(), expr_y.variable()})>);
+    return Var<R>{v};
 };
-
-template<typename First, typename ...Other, typename ...Transformed>
-struct ExtractArgsImpl<std::tuple<First, Other...>, std::tuple<Transformed...>> {
-    using Type = typename ExtractArgsImpl<std::tuple<Other...>, std::tuple<Transformed..., typename First::Type>>::Type;
-};
-
-template<typename ExprPack>
-using ExprPackToArgPack = typename ExtractArgsImpl<ExprPack>::Type;
-
-template<typename F, typename ArgPack>
-struct InvokeResultImpl {};
-
-template<typename F, typename ...Args>
-struct InvokeResultImpl<F, std::tuple<Args...>> {
-    using Type = std::invoke_result_t<F, Args...>;
-};
-
-template<typename F, typename ExprPack>
-using InvokeResult = typename InvokeResultImpl<F, ExprPackToArgPack<ExprPack>>::Type;
-
-}
-
-template<typename ...Args, std::enable_if_t<std::negation_v<std::disjunction<std::bool_constant<std::is_scalar_v<Args> || is_vector<Args>>...>>, int> = 0>
-inline auto fuck(Args &&...args) noexcept {
-    
-    constexpr auto fucking = [](auto &&v) noexcept { return static_cast<std::decay_t<decltype(Expr{v})> *>(nullptr); };
-    using R = decay_t<>;
-    std::tuple arg_pack{Expr{std::forward<Args>(args)...}};
-    using R = detail::InvokeResult<luisa::math::min, decltype(arg_pack)>;
-}
 
 }
 
