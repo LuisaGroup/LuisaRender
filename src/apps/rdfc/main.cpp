@@ -4,96 +4,96 @@
 
 #include <opencv2/opencv.hpp>
 
-#include "dual_buffer_variance.h"
-#include "gaussian_blur.h"
-#include "nlm_filter.h"
+#include "feature_prefilter.h"
 
 using namespace luisa;
 using namespace luisa::compute;
 using namespace luisa::compute::dsl;
 
+[[nodiscard]] cv::Mat load_image(const std::string &path) {
+    LUISA_INFO("Loading image: \"", path, "\"...");
+    auto image = cv::imread(path, cv::IMREAD_UNCHANGED);
+    cv::cvtColor(image, image, image.channels() == 1 ? cv::COLOR_GRAY2RGBA : cv::COLOR_BGR2RGBA);
+    const auto size = image.rows * image.cols * image.channels();
+    for (auto i = 0; i < size; i++) {
+        auto &&v = reinterpret_cast<float *>(image.data)[i];
+        if (std::isnan(v)) { v = 0.0f; }
+        if (std::isinf(v)) { v = 1e6f; }
+    }
+    return image;
+}
+
 int main(int argc, char *argv[]) {
-
+    
     try {
-
+        
         Context context{argc, argv};
         auto device = Device::create(&context);
-
-        {// playground
-            auto image = cv::imread("data/images/luisa.png", cv::IMREAD_COLOR);
-            cv::cvtColor(image, image, cv::COLOR_BGR2RGBA);
-            auto texture = device->allocate_texture<uchar4>(image.cols, image.rows);
-            device->launch(texture->copy_from(image.data));
-            GaussianBlur blur{*device, 2.0f, 25.0f, *texture, *texture};
-            device->launch(blur);
-            device->launch(texture->copy_to(image.data));
-            device->synchronize();
-            cv::cvtColor(image, image, cv::COLOR_RGBA2BGR);
-            cv::imwrite("data/images/luisa-gaussian-blur.png", image);
-        }
-
-        auto feature_name = "albedo";
-
-        auto load_image = [](const std::string &path) {
-            LUISA_INFO("Loading image: \"", path, "\"...");
-            auto image = cv::imread(path, cv::IMREAD_UNCHANGED);
-            cv::cvtColor(image, image, image.channels() == 1 ? cv::COLOR_GRAY2RGBA : cv::COLOR_BGR2RGBA);
-            const auto size = image.rows * image.cols * image.channels();
-            for (auto i = 0; i < size; i++) {
-                auto &&v = reinterpret_cast<float *>(image.data)[i];
-                if (std::isnan(v)) { v = 0.0f; }
-                if (std::isinf(v)) { v = 1e6f; }
+    
+        std::unique_ptr<FeaturePrefilter> filter;
+        std::shared_ptr<Texture> feature;
+        std::shared_ptr<Texture> feature_var;
+        std::shared_ptr<Texture> feature_a;
+        std::shared_ptr<Texture> feature_b;
+        std::map<std::string, std::shared_ptr<Texture>> features;
+        
+        auto width = 0;
+        auto height = 0;
+    
+        for (auto feature_name : {"albedo", "normal", "depth", "visibility"}) {
+        
+            auto feature_image = load_image(context.working_path(serialize(feature_name, ".exr")));
+            auto feature_a_image = load_image(context.working_path(serialize(feature_name, "A.exr")));
+            auto feature_b_image = load_image(context.working_path(serialize(feature_name, "B.exr")));
+            auto feature_var_image = load_image(context.working_path(serialize(feature_name, "Variance.exr")));
+        
+            if (filter == nullptr) {  // not initialized
+                width = feature_image.cols;
+                height = feature_image.rows;
+                feature = device->allocate_texture<float4>(width, height);
+                feature_var = device->allocate_texture<float4>(width, height);
+                feature_a = device->allocate_texture<float4>(width, height);
+                feature_b = device->allocate_texture<float4>(width, height);
+                filter = std::make_unique<FeaturePrefilter>(
+                    *device, *feature, *feature_var, *feature_a, *feature_b,
+                    *feature, *feature_var, *feature_a, *feature_b);
             }
-            return image;
-        };
-
-        auto color_image = load_image(serialize("data/images/", feature_name, ".exr"));
-        auto color_a_image = load_image(serialize("data/images/", feature_name, "A.exr"));
-        auto color_b_image = load_image(serialize("data/images/", feature_name, "B.exr"));
-        auto variance_image = load_image(serialize("data/images/", feature_name, "Variance.exr"));
-
-        auto width = static_cast<uint32_t>(color_image.cols);
-        auto height = static_cast<uint32_t>(color_image.rows);
-        auto color_texture = device->allocate_texture<float4>(width, height);
-        auto color_a_texture = device->allocate_texture<float4>(width, height);
-        auto color_b_texture = device->allocate_texture<float4>(width, height);
-        auto variance_texture = device->allocate_texture<float4>(width, height);
-
-        device->launch([&](Dispatcher &dispatch) {
-            dispatch(color_texture->copy_from(color_image.data));
-            dispatch(color_a_texture->copy_from(color_a_image.data));
-            dispatch(color_b_texture->copy_from(color_b_image.data));
-            dispatch(variance_texture->copy_from(variance_image.data));
-            dispatch.when_completed([] { LUISA_INFO("Done copying textures to device."); });
-        });
-
-        DualBufferVariance dual_variance{*device, 10, *variance_texture, *color_a_texture, *color_b_texture, *variance_texture};
-        NonLocalMeansFilter filter{*device, 5, 3, 1.0f, *color_texture, *variance_texture, *color_a_texture, *color_b_texture, *color_a_texture, *color_b_texture};
-
-        auto add_half_buffers = device->compile_kernel("add_half_buffers", [&] {
-            Arg<ReadOnlyTex2D> color_a{*color_a_texture};
-            Arg<ReadOnlyTex2D> color_b{*color_b_texture};
-            Arg<WriteOnlyTex2D> color{*color_texture};
-            auto p = thread_xy();
-            If(p.x() < width && p.y() < height) {
-                write(color, p, make_float4(0.5f * make_float3(read(color_a, p) + read(color_b, p)), 1.0f));
-            };
-        });
-
-        device->launch([&](Dispatcher &dispatch) {
-            dispatch(dual_variance);
-            dispatch(filter);
-            dispatch(variance_texture->copy_to(variance_image.data));
-            dispatch(add_half_buffers->parallelize(make_uint2(width, height)));
-            dispatch(color_texture->copy_to(color_image.data));
-            LUISA_INFO("Done.");
-        });
+        
+            auto &&feature_out = *features.emplace(feature_name, device->allocate_texture<float4>(width, height)).first->second;
+            auto &&feature_var_out = *features.emplace(serialize(feature_name, "_var"), device->allocate_texture<float4>(width, height)).first->second;
+        
+            device->launch([&](Dispatcher &dispatch) {
+                dispatch(feature->copy_from(feature_image.data));
+                dispatch(feature_var->copy_from(feature_var_image.data));
+                dispatch(feature_a->copy_from(feature_a_image.data));
+                dispatch(feature_b->copy_from(feature_b_image.data));
+                dispatch(*filter);
+                dispatch(feature->copy_to(feature_out));
+                dispatch(feature_var->copy_to(feature_var_out));
+            }, [&] {
+                LUISA_INFO("Done filtering feature \"", feature_name, "\".");
+            });
+        }
+        
+        std::map<std::string, cv::Mat> feature_images;
+        for (auto feature_name : {"albedo", "normal", "depth", "visibility"}) {
+            auto &&feature_image = feature_images.emplace(feature_name, cv::Mat{}).first->second;
+            auto &&feature_var_image = feature_images.emplace(serialize(feature_name, "_var"), cv::Mat{}).first->second;
+            feature_image.create(height, width, CV_32FC4);
+            feature_var_image.create(height, width, CV_32FC4);
+            device->launch([&](Dispatcher &dispatch) {
+                dispatch(features[feature_name]->copy_to(feature_image.data));
+                dispatch(features[serialize(feature_name, "_var")]->copy_to(feature_var_image.data));
+            }, [feature_name, &context, &feature_images] {
+                auto &&feature_image = feature_images[feature_name];
+                auto &&feature_var_image = feature_images[serialize(feature_name, "_var")];
+                cv::cvtColor(feature_image, feature_image, cv::COLOR_RGBA2BGR);
+                cv::cvtColor(feature_var_image, feature_var_image, cv::COLOR_RGBA2BGR);
+                cv::imwrite((context.working_path("rdfc") / serialize(feature_name, ".exr")).string(), feature_image);
+                cv::imwrite((context.working_path("rdfc") / serialize(feature_name, "-variance.exr")).string(), feature_var_image);
+            });
+        }
         device->synchronize();
-
-        cv::cvtColor(variance_image, variance_image, cv::COLOR_RGBA2BGR);
-        cv::cvtColor(color_image, color_image, cv::COLOR_RGBA2BGR);
-        cv::imwrite(serialize("data/images/", feature_name, "-nlm.exr"), color_image);
-        cv::imwrite(serialize("data/images/", feature_name, "Variance-dual.exr"), variance_image);
         
     } catch (const std::exception &e) {
         LUISA_ERROR("Caught exception: ", e.what());
