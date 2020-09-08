@@ -5,6 +5,7 @@
 #include <opencv2/opencv.hpp>
 
 #include "feature_prefilter.h"
+#include "gradient_magnitude.h"
 
 using namespace luisa;
 using namespace luisa::compute;
@@ -23,13 +24,25 @@ using namespace luisa::compute::dsl;
     return image;
 }
 
+void standardize(cv::Mat &feature_image, cv::Mat &feature_var_image, cv::Mat &feature_a_image, cv::Mat &feature_b_image) {
+    cv::Scalar mean;
+    cv::Scalar stddev;
+    cv::meanStdDev(feature_image, mean, stddev);
+    LUISA_INFO("Image mean = (", mean[0], ", ", mean[1], ", ", mean[2], "), stddev = (", stddev[0], ", ", stddev[1], ", ", stddev[2], ")");
+    feature_image = (feature_image - mean) / stddev;
+    feature_image = (feature_image - mean) / stddev;
+    feature_a_image = (feature_a_image - mean) / stddev;
+    feature_b_image = (feature_b_image - mean) / stddev;
+    feature_var_image /= stddev * stddev;
+}
+
 int main(int argc, char *argv[]) {
     
     try {
         
         Context context{argc, argv};
         auto device = Device::create(&context);
-    
+        
         std::unique_ptr<FeaturePrefilter> filter;
         std::shared_ptr<Texture> feature;
         std::shared_ptr<Texture> feature_var;
@@ -39,14 +52,15 @@ int main(int argc, char *argv[]) {
         
         auto width = 0;
         auto height = 0;
-    
-        for (auto feature_name : {"albedo", "normal", "depth", "visibility"}) {
         
+        for (auto feature_name : {"albedo", "normal", "depth", "visibility"}) {
+            
             auto feature_image = load_image(context.working_path(serialize(feature_name, ".exr")));
+            auto feature_var_image = load_image(context.working_path(serialize(feature_name, "Variance.exr")));
             auto feature_a_image = load_image(context.working_path(serialize(feature_name, "A.exr")));
             auto feature_b_image = load_image(context.working_path(serialize(feature_name, "B.exr")));
-            auto feature_var_image = load_image(context.working_path(serialize(feature_name, "Variance.exr")));
-        
+            standardize(feature_image, feature_var_image, feature_a_image, feature_b_image);
+            
             if (filter == nullptr) {  // not initialized
                 width = feature_image.cols;
                 height = feature_image.rows;
@@ -58,10 +72,10 @@ int main(int argc, char *argv[]) {
                     *device, *feature, *feature_var, *feature_a, *feature_b,
                     *feature, *feature_var, *feature_a, *feature_b);
             }
-        
+            
             auto &&feature_out = *features.emplace(feature_name, device->allocate_texture<float4>(width, height)).first->second;
             auto &&feature_var_out = *features.emplace(serialize(feature_name, "_var"), device->allocate_texture<float4>(width, height)).first->second;
-        
+            
             device->launch([&](Dispatcher &dispatch) {
                 dispatch(feature->copy_from(feature_image.data));
                 dispatch(feature_var->copy_from(feature_var_image.data));
