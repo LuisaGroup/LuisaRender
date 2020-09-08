@@ -33,6 +33,7 @@ inline void func(MAP_VARIABLE_NAMES_TO_ARGUMENT_LIST(__VA_ARGS__)) {            
 }                                                                                                                       \
 
 MAKE_BUILTIN_FUNCTION_DEF(select, cond, tv, fv)
+MAKE_BUILTIN_FUNCTION_DEF(sqrt, x)
 MAKE_BUILTIN_FUNCTION_DEF(sin, x)
 MAKE_BUILTIN_FUNCTION_DEF(cos, x)
 MAKE_BUILTIN_FUNCTION_DEF(tan, x)
