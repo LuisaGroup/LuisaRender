@@ -130,7 +130,7 @@ public:
     template<typename UV>
     [[nodiscard]] auto read(UV &&uv) const noexcept {
         using namespace luisa::compute::dsl;
-        Expr uv_expr{uv};
+        Expr uv_expr{std::forward<UV>(uv)};
         auto tex = Variable::make_texture_argument(_texture);
         Function::current().mark_texture_read(_texture.get());
         return Expr<float4>{Variable::make_temporary(nullptr, std::make_unique<TextureExpr>(TextureOp::READ, tex, uv_expr.variable()))};
@@ -139,7 +139,7 @@ public:
     template<typename UV>
     [[nodiscard]] auto sample(UV &&uv) const noexcept {
         using namespace luisa::compute::dsl;
-        Expr uv_expr{uv};
+        Expr uv_expr{std::forward<UV>(uv)};
         auto tex = Variable::make_texture_argument(_texture);
         Function::current().mark_texture_sample(_texture.get());
         return Expr<float4>{Variable::make_temporary(nullptr, std::make_unique<TextureExpr>(TextureOp::SAMPLE, tex, uv_expr.variable()))};
@@ -148,8 +148,8 @@ public:
     template<typename UV, typename Value>
     [[nodiscard]] auto write(UV &&uv, Value &&value) const noexcept {
         using namespace luisa::compute::dsl;
-        Expr uv_expr{uv};
-        Expr value_expr{value};
+        Expr uv_expr{std::forward<UV>(uv)};
+        Expr value_expr{std::forward<Value>(value)};
         auto tex = Variable::make_texture_argument(_texture);
         Function::current().mark_texture_write(_texture.get());
         return Expr<float4>{Variable::make_temporary(nullptr, std::make_unique<TextureExpr>(TextureOp::SAMPLE, tex, uv_expr.variable(), value_expr.variable()))};

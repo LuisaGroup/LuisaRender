@@ -14,17 +14,20 @@ using namespace luisa::compute::dsl;
 
 template<typename Def, std::enable_if_t<std::is_invocable_v<Def>, int> = 0>
 void fake_compile_kernel(std::string name, Def &&def) {
+    LUISA_INFO("Compiling kernel: ", name);
     Function f{std::move(name)};
     def();
     CppCodegen codegen{std::cout};
     codegen.emit(f);
+    LUISA_INFO("Done.");
 }
 
 int main() {
     BufferView<Ray> empty_buffer;
     fake_compile_kernel("fuck", [&] {
-        Var ray_index = 5;
-        Var ii{ray_index};
-        Var origin{empty_buffer[ray_index].origin()};
+        Var ray_index = 5 + thread_id();
+        Var direction = normalize(make_float3(empty_buffer[ray_index].direction()));
+        Threadgroup<float3> fuck{64};
+        fuck[thread_id() % 64u] = direction;
     });
 }

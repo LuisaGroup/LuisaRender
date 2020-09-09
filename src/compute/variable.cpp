@@ -18,12 +18,13 @@ const Variable *Variable::make_local_variable(const TypeDesc *type) noexcept {
     return Function::current().add_variable(std::move(v));
 }
 
-const Variable *Variable::make_threadgroup_variable(const TypeDesc *type) noexcept {
+const Variable *Variable::make_threadgroup_variable(const TypeDesc *type, uint n) noexcept {
     auto v = std::make_unique<Variable>();
     v->_type = type;
     v->_tag = VariableTag::THREADGROUP;
     v->_uid = Function::current().next_uid();
-    return Function::current().add_variable(std::move(v));
+    v->_threadgroup_memory_size = n;
+    return Function::current().add_threadgroup_variable(std::move(v));
 }
 
 const Variable *Variable::make_uniform_argument(const TypeDesc *type, const void *data_ref) noexcept {

@@ -78,4 +78,9 @@ uint32_t Function::texture_usage(const Texture *texture) const noexcept {
     return iter->second;
 }
 
+const Variable *Function::add_threadgroup_variable(std::unique_ptr<Variable> v) noexcept {
+    _use_structure_type(v->type());
+    return _threadgroup_variables.emplace_back(std::move(v)).get();
+}
+
 }

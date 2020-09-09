@@ -140,19 +140,19 @@ struct Matrix4 {
     }
 };
 
-#define MAKE_VECTOR_TYPE_DESC(n, postfix)                \
-    template<typename T>                                 \
-    struct Vector##n##postfix {                          \
-        static_assert(std::is_arithmetic_v<T>);          \
-        [[nodiscard]] static TypeDesc *desc() noexcept { \
-            static TypeDesc d;                           \
-            static std::once_flag flag;                  \
-            std::call_once(flag, [] {                    \
-                d.type = TypeCatalog::VECTOR##n;         \
-                d.element_type = Scalar<T>::desc();      \
-            });                                          \
-            return &d;                                   \
-        }                                                \
+#define MAKE_VECTOR_TYPE_DESC(n, postfix)                  \
+    template<typename T>                                   \
+    struct Vector##n##postfix {                            \
+        static_assert(std::is_arithmetic_v<T>);            \
+        [[nodiscard]] static TypeDesc *desc() noexcept {   \
+            static TypeDesc d;                             \
+            static std::once_flag flag;                    \
+            std::call_once(flag, [] {                      \
+                d.type = TypeCatalog::VECTOR##n##postfix;  \
+                d.element_type = Scalar<T>::desc();        \
+            });                                            \
+            return &d;                                     \
+        }                                                  \
     };
 
 MAKE_VECTOR_TYPE_DESC(2, )
@@ -205,7 +205,7 @@ public:
     [[nodiscard]] TypeDesc *operator()() const noexcept {
         auto desc = Type::desc();
         desc->size = static_cast<uint32_t>(sizeof(T));
-        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<T>);
+        desc->alignment = static_cast<uint32_t>(alignof(T));
         return desc;
     }
 };

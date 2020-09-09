@@ -57,12 +57,6 @@ void CppCodegen::_emit_struct_decl(const TypeDesc *desc) {
     _os << "};\n\n";
 }
 
-void CppCodegen::_emit_variable_decl(Variable v) {
-    if (v.is_threadgroup()) { _os << "threadgroup "; }
-    _emit_type(v.type());
-    _os << " v" << v.uid();
-}
-
 void CppCodegen::_emit_variable(const Variable *v) {
     if (v->is_temporary()) {
         v->expression()->accept(*this);
@@ -131,7 +125,7 @@ void CppCodegen::_emit_type(const TypeDesc *desc) {
         case TypeCatalog::VECTOR3_PACKED:
             _os << "packed_";
             _emit_type(desc->element_type);
-            _os << 2;
+            _os << 3;
             break;
         case TypeCatalog::MATRIX3:
             _os << "float3x3";
@@ -193,13 +187,18 @@ void CppCodegen::_emit_function_decl(const Function &f) {
     _os << ") ";
 }
 
-void CppCodegen::_emit_function_call(const std::string &name) {
-    _os << name;
-}
-
 void CppCodegen::_emit_function_body(const Function &f) {
-    _indent = 0;
-    visit(f.body());
+    _os << "{\n";
+    for (auto &&v : f.threadgroup_variables()) {
+        _os << "    threadgroup array<";
+        _emit_type(v->type());
+        _os << ", " << v->threadgroup_element_count() << "> v" << v->uid() << ";\n";
+    }
+    _indent = 1;
+    for (auto &&stmt : f.body()->statements()) {
+        stmt->accept(*this);
+    }
+    _os << "}\n\n";
 }
 
 void CppCodegen::visit(const UnaryExpr *unary_expr) {
@@ -412,9 +411,14 @@ void CppCodegen::visit(const IfStmt *if_stmt) {
     _emit_variable(if_stmt->condition());
     _os << ") ";
     visit(if_stmt->true_branch());
-    if (if_stmt->false_branch() != nullptr) {
+    if (auto fb = if_stmt->false_branch(); fb != nullptr) {
         _os << " else ";
-        visit(if_stmt->false_branch());
+        auto &&stmts = fb->statements();
+        if (stmts.size() == 1u && dynamic_cast<const IfStmt *>(stmts.front().get())) {
+            stmts.front()->accept(*this);
+        } else {
+            visit(if_stmt->false_branch());
+        }
     }
     _os << "\n";
 }

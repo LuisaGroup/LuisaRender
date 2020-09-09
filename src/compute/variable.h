@@ -45,6 +45,7 @@ private:
     const TypeDesc *_type{nullptr};
     uint32_t _uid{0u};
     VariableTag _tag{VariableTag::EMPTY};
+    uint32_t _threadgroup_memory_size{};
     
     // For kernel argument bindings
     std::shared_ptr<Buffer> _buffer{nullptr};
@@ -58,7 +59,7 @@ private:
 public:
     [[nodiscard]] static const Variable *make_builtin(VariableTag tag) noexcept;
     [[nodiscard]] static const Variable *make_local_variable(const TypeDesc *type) noexcept;
-    [[nodiscard]] static const Variable *make_threadgroup_variable(const TypeDesc *type) noexcept;
+    [[nodiscard]] static const Variable *make_threadgroup_variable(const TypeDesc *type, uint size) noexcept;
     [[nodiscard]] static const Variable *make_buffer_argument(const TypeDesc *type, const std::shared_ptr<Buffer> &buffer) noexcept;
     [[nodiscard]] static const Variable *make_texture_argument(const std::shared_ptr<Texture> &texture) noexcept;
     [[nodiscard]] static const Variable *make_uniform_argument(const TypeDesc *type, const void *data_ref) noexcept;
@@ -72,6 +73,7 @@ public:
     [[nodiscard]] bool is_temporary() const noexcept { return _tag == VariableTag::TEMPORARY; }
     [[nodiscard]] bool is_local() const noexcept { return _tag == VariableTag::LOCAL; }
     [[nodiscard]] bool is_threadgroup() const noexcept { return _tag == VariableTag::THREADGROUP; }
+    [[nodiscard]] uint32_t threadgroup_element_count() const noexcept { return _threadgroup_memory_size; }
     
     [[nodiscard]] bool is_buffer_argument() const noexcept { return _tag == VariableTag::BUFFER; }
     [[nodiscard]] bool is_texture_argument() const noexcept { return _tag == VariableTag::TEXTURE; }

@@ -93,10 +93,10 @@ public:
         using namespace luisa::compute::dsl;
         auto v = Variable::make_buffer_argument(type_desc<T>, _buffer);
         if (_offset == 0u) {
-            auto i = Expr{index};
+            auto i = Expr{std::forward<Index>(index)};
             return Expr<T>{Variable::make_temporary(type_desc<T>, std::make_unique<BinaryExpr>(BinaryOp::ACCESS, v, i.variable()))};
         } else {
-            auto i = Expr{index} + static_cast<uint32_t>(_offset);
+            auto i = Expr{std::forward<Index>(index)} + static_cast<uint32_t>(_offset);
             return Expr<T>{Variable::make_temporary(type_desc<T>, std::make_unique<BinaryExpr>(BinaryOp::ACCESS, v, i.variable()))};
         }
     }

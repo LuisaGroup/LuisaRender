@@ -210,6 +210,22 @@ Var(const Expr<T> &) -> Var<T>;
 template<typename T>
 Var(Expr<T> &&) -> Var<T>;
 
+template<typename T>
+class Threadgroup {
+
+private:
+    const Variable *_variable;
+    
+public:
+    explicit Threadgroup(uint n) noexcept : _variable{Variable::make_threadgroup_variable(type_desc<T>, n)} {}
+    
+    template<typename Index>
+    [[nodiscard]] auto operator[](Index &&index) const noexcept {
+        Expr i{std::forward<Index>(index)};
+        return Expr<T>{Variable::make_temporary(type_desc<T>, std::make_unique<BinaryExpr>(BinaryOp::ACCESS, _variable, i.variable()))};
+    }
+};
+
 #define MAKE_UNARY_OP(op, op_tag)                                                                                       \
     template<typename T, std::enable_if_t<is_expr<T>, int> = 0>                                                         \
     auto operator op(T var) noexcept {                                                                                  \
