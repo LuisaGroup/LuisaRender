@@ -58,7 +58,6 @@ const Variable *Variable::make_temporary(const TypeDesc *type, std::unique_ptr<E
     v->_type = type;
     v->_tag = VariableTag::TEMPORARY;
     v->_expression = std::move(expression);
-    v->_uid = Function::current().next_uid();
     return Function::current().add_variable(std::move(v));
 }
 

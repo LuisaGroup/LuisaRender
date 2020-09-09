@@ -34,6 +34,7 @@ class CppCodegen : public Codegen, public ExprVisitor, public StmtVisitor {
 
 protected:
     int32_t _indent{0};
+    bool _after_else{false};
     
     virtual void _emit_indent();
     virtual void _emit_function_decl(const Function &f);

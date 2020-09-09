@@ -196,9 +196,10 @@ void CppCodegen::_emit_function_body(const Function &f) {
     }
     _indent = 1;
     for (auto &&stmt : f.body()->statements()) {
+        _after_else = false;
         stmt->accept(*this);
     }
-    _os << "}\n\n";
+    _os << "}\n";
 }
 
 void CppCodegen::visit(const UnaryExpr *unary_expr) {
@@ -381,11 +382,14 @@ void CppCodegen::visit(const ReturnStmt *stmt) {
 
 void CppCodegen::visit(const ScopeStmt *scope_stmt) {
     if (scope_stmt->statements().empty()) {
-        _os << "{}\n";
+        _os << "{}";
     } else {
         _os << "{\n";
         _indent++;
-        for (auto &&stmt : scope_stmt->statements()) { stmt->accept(*this); }
+        for (auto &&stmt : scope_stmt->statements()) {
+            _after_else = false;
+            stmt->accept(*this);
+        }
         _indent--;
         _emit_indent();
         _os << "}";
@@ -406,21 +410,24 @@ void CppCodegen::visit(const DeclareStmt *declare_stmt) {
 }
 
 void CppCodegen::visit(const IfStmt *if_stmt) {
-    _emit_indent();
+    if (!_after_else) { _emit_indent(); }
     _os << "if (";
     _emit_variable(if_stmt->condition());
     _os << ") ";
     visit(if_stmt->true_branch());
-    if (auto fb = if_stmt->false_branch(); fb != nullptr) {
+    if (auto fb = if_stmt->false_branch(); fb != nullptr && !fb->statements().empty()) {
         _os << " else ";
         auto &&stmts = fb->statements();
         if (stmts.size() == 1u && dynamic_cast<const IfStmt *>(stmts.front().get())) {
+            _after_else = true;
             stmts.front()->accept(*this);
         } else {
             visit(if_stmt->false_branch());
+            _os << "\n";
         }
+    } else {
+        _os << "\n";
     }
-    _os << "\n";
 }
 
 void CppCodegen::visit(const WhileStmt *while_stmt) {

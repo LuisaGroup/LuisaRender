@@ -25,9 +25,27 @@ void fake_compile_kernel(std::string name, Def &&def) {
 int main() {
     BufferView<Ray> empty_buffer;
     fake_compile_kernel("fuck", [&] {
-        Var ray_index = 5 + thread_id();
-        Var direction = normalize(make_float3(empty_buffer[ray_index].direction()));
-        Threadgroup<float3> fuck{64};
-        fuck[thread_id() % 64u] = direction;
+        If (thread_id() < 1024) {
+            Var ray_index = 5 + thread_id();
+            Var direction = normalize(make_float3(empty_buffer[ray_index].direction()));
+            Threadgroup<float3> fuck{64};
+            fuck[thread_id() % 64u] = direction;
+            Do {
+                Var i = 5;
+            } When(ray_index < 10);
+        } Elif (true) {
+            Var a = 0;
+        } Elif (false) {
+        
+        };
+        
+        Switch (thread_id()) {
+            Case (0) {
+            
+            };
+            Default {
+            
+            };
+        };
     });
 }

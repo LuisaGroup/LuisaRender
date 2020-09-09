@@ -215,9 +215,9 @@ class Threadgroup {
 
 private:
     const Variable *_variable;
-    
+
 public:
-    explicit Threadgroup(uint n) noexcept : _variable{Variable::make_threadgroup_variable(type_desc<T>, n)} {}
+    explicit Threadgroup(uint n) noexcept: _variable{Variable::make_threadgroup_variable(type_desc<T>, n)} {}
     
     template<typename Index>
     [[nodiscard]] auto operator[](Index &&index) const noexcept {
@@ -282,7 +282,7 @@ template<typename T, std::enable_if_t<std::negation_v<std::is_pointer<T>>, int> 
 inline auto immutable(T data) noexcept {
     std::vector<std::byte> bytes(sizeof(T));
     std::memmove(bytes.data(), &data, bytes.size());
-    return Expr<T>{Variable::make_uniform_argument(type_desc<T>, std::move(bytes))};
+    return Expr<T>{Variable::make_immutable_argument(type_desc<T>, std::move(bytes))};
 }
 
 #define MAP_ARGUMENT_TO_TEMPLATE_ARGUMENT(arg) typename T##arg
@@ -494,3 +494,137 @@ LUISA_STRUCT_BEGIN(S)                                   \
      LUISA_MAP(LUISA_STRUCT_MEMBER, __VA_ARGS__)        \
 LUISA_STRUCT_END()                                      \
 LUISA_STRUCT_SPECIALIZE_EXPR(S, __VA_ARGS__)
+
+#ifndef LUISA_DISABLE_DSL_SYNTAX_SUGERS
+
+namespace luisa::compute::dsl {
+
+class IfStmtBuilder {
+
+private:
+    const Variable *_cond{nullptr};
+    std::function<void()> _true;
+    std::function<void()> _false;
+
+public:
+    template<typename Cond>
+    explicit IfStmtBuilder(Cond &&cond) noexcept {
+        Expr cond_expr{std::forward<Cond>(cond)};
+        _cond = cond_expr.variable();
+    }
+    
+    ~IfStmtBuilder() noexcept {
+        if (_false) {
+            Function::current().add_statement(std::make_unique<IfStmt>(_cond, std::move(_true), std::move(_false)));
+        } else {
+            Function::current().add_statement(std::make_unique<IfStmt>(_cond, std::move(_true)));
+        }
+    }
+    
+    IfStmtBuilder &operator<<(std::function<void()> t) noexcept {
+        _true = std::move(t);
+        return *this;
+    }
+    
+    void operator>>(std::function<void()> f) noexcept { _false = std::move(f); }
+    
+    [[nodiscard]] IfStmtBuilder &operator<<(IfStmtBuilder *elif) noexcept {
+        _false = [elif] { delete elif; };
+        return *elif;
+    }
+};
+
+#define If(...) IfStmtBuilder{__VA_ARGS__} << [&]()
+#define Else >> [&]()
+#define Elif(...) << (new IfStmtBuilder{__VA_ARGS__}) << [&]()
+
+class WhileStmtBuilder {
+
+private:
+    const Variable *_cond{nullptr};
+    std::function<void()> _body;
+
+public:
+    template<typename Cond>
+    explicit WhileStmtBuilder(Cond &&cond) noexcept {
+        Expr cond_expr{std::forward<Cond>(cond)};
+        _cond = cond_expr.variable();
+    }
+    
+    ~WhileStmtBuilder() noexcept { Function::current().add_statement(std::make_unique<WhileStmt>(_cond, std::move(_body))); }
+    
+    void operator<<(std::function<void()> body) noexcept { _body = std::move(body); }
+};
+
+#define While(...) WhileStmtBuilder{__VA_ARGS__} << [&]()
+
+class DoWhileStmtBuilder {
+
+private:
+    const Variable *_cond{nullptr};
+    std::function<void()> _body;
+
+public:
+    ~DoWhileStmtBuilder() noexcept { Function::current().add_statement(std::make_unique<DoWhileStmt>(std::move(_body), _cond)); }
+    
+    DoWhileStmtBuilder &operator<<(std::function<void()> body) noexcept {
+        _body = std::move(body);
+        return *this;
+    }
+    
+    void operator<<(const Variable *cond) noexcept { _cond = cond; }
+};
+
+#define Do DoWhileStmtBuilder{} << [&]()
+#define When(...) << ::luisa::compute::dsl::detail::extract_variable(__VA_ARGS__)
+
+class SwitchStmtBuilder {
+
+private:
+    const Variable *_expr{nullptr};
+    
+public:
+    template<typename T>
+    SwitchStmtBuilder(T &&expr) noexcept {
+        Expr e{expr};
+        _expr = e.variable();
+    }
+    
+    template<typename F>
+    void operator<<(F &&f) noexcept {
+        Function::current().add_statement(std::make_unique<SwitchStmt>(_expr, std::forward<F>(f)));
+    }
+};
+
+class SwitchCaseStmtBuilder {
+
+private:
+    const Variable *_expr{nullptr};
+
+public:
+    template<typename T>
+    SwitchCaseStmtBuilder(T &&expr) noexcept {
+        Expr e{expr};
+        _expr = e.variable();
+    }
+    
+    template<typename F>
+    void operator<<(F &&f) noexcept {
+        Function::current().add_statement(std::make_unique<SwitchCaseStmt>(_expr, std::forward<F>(f)));
+    }
+};
+
+struct SwitchDefaultStmtBuilder {
+    template<typename F>
+    void operator<<(F &&f) noexcept {
+        Function::current().add_statement(std::make_unique<SwitchDefaultStmt>(std::forward<F>(f)));
+    }
+};
+
+#define Switch(...) SwitchStmtBuilder{__VA_ARGS__} << [&]()
+#define Case(...) SwitchCaseStmtBuilder{__VA_ARGS__} << [&]()
+#define Default SwitchDefaultStmtBuilder{} << [&]()
+
+}
+
+#endif
