@@ -19,11 +19,17 @@ class ScopeStmt;
 
 class Function {
 
+public:
+    static constexpr auto texture_read_bit = 1u;
+    static constexpr auto texture_write_bit = 2u;
+    static constexpr auto texture_sample_bit = 4u;
+
 private:
     std::string _name;
     std::vector<std::unique_ptr<Variable>> _builtins;
     std::vector<std::unique_ptr<Variable>> _variables;
     std::vector<std::unique_ptr<Variable>> _arguments;
+    std::map<const Texture *, uint32_t> _texture_usages;
     
     std::unique_ptr<ScopeStmt> _body;
     std::stack<ScopeStmt *> _scope_stack;
@@ -57,6 +63,27 @@ public:
     [[nodiscard]] const Variable *add_builtin(std::unique_ptr<Variable> v) noexcept { return _builtins.emplace_back(std::move(v)).get(); }
     [[nodiscard]] const Variable *add_variable(std::unique_ptr<Variable> v) noexcept { return _variables.emplace_back(std::move(v)).get(); }
     [[nodiscard]] const Variable *add_argument(std::unique_ptr<Variable> v) noexcept { return _arguments.emplace_back(std::move(v)).get(); }
+    
+    void mark_texture_read(const Texture *texture) noexcept {
+        if (auto iter = _texture_usages.find(texture); iter == _texture_usages.cend()) { _texture_usages.emplace(texture, texture_read_bit); }
+        else { iter->second |= texture_read_bit; }
+    }
+    
+    void mark_texture_write(const Texture *texture) noexcept {
+        if (auto iter = _texture_usages.find(texture); iter == _texture_usages.cend()) { _texture_usages.emplace(texture, texture_write_bit); }
+        else { iter->second |= texture_write_bit; }
+    }
+    
+    void mark_texture_sample(const Texture *texture) noexcept {
+        if (auto iter = _texture_usages.find(texture); iter == _texture_usages.cend()) { _texture_usages.emplace(texture, texture_sample_bit); }
+        else { iter->second |= texture_sample_bit; }
+    }
+    
+    [[nodiscard]] uint32_t texture_usage(const Texture *texture) const noexcept {
+        auto iter = _texture_usages.find(texture);
+        if (iter == _texture_usages.cend()) { return 0u; }
+        return iter->second;
+    }
 };
 
 }

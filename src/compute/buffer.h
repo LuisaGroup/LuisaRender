@@ -11,6 +11,7 @@
 
 #include <core/concepts.h>
 #include <compute/dispatcher.h>
+#include <compute/dsl.h>
 
 namespace luisa::compute {
 
@@ -78,13 +79,23 @@ public:
     void clear_cache() const noexcept { _buffer->clear_cache(); }
     
     template<typename Modify, std::enable_if_t<std::is_invocable_v<Modify, T *>, int> = 0>
-    auto modify(Modify &&modify) {
+    [[nodiscard]] auto modify(Modify &&modify) {
         return [&modify, this](Dispatcher &dispatch) {
             _buffer->with_cache(dispatch, [&modify](void *raw_data) {
                 modify(reinterpret_cast<T *>(raw_data));
             }, byte_offset(), byte_size());
         };
     }
+    
+    // For dsl
+    template<typename Index>
+    [[nodiscard]] auto operator[](Index &&index) const noexcept {
+        using namespace luisa::compute::dsl;
+        auto v = Variable::make_buffer_argument(type_desc<T>, _buffer);
+        auto i = Expr{index} + _offset;
+        return Expr<T>{Variable::make_temporary(std::make_unique<BinaryExpr>(BinaryOp::ACCESS, v, i.variable()))};
+    }
+    
 };
 
 template<typename T>

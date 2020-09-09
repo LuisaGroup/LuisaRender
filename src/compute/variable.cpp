@@ -5,7 +5,6 @@
 #include <compute/expression.h>
 #include <compute/function.h>
 #include <compute/statement.h>
-#include <compute/stmt_util.h>
 
 #include "variable.h"
 
@@ -53,9 +52,8 @@ const Variable *Variable::make_immutable_argument(const TypeDesc *type, const st
     return Function::current().add_argument(std::move(v));
 }
 
-const Variable *Variable::make_temporary(const TypeDesc *type, std::unique_ptr<Expression> expression) noexcept {
+const Variable *Variable::make_temporary(std::unique_ptr<Expression> expression) noexcept {
     auto v = std::make_unique<Variable>();
-    v->_type = type;
     v->_tag = VariableTag::TEMPORARY;
     v->_expression = std::move(expression);
     v->_uid = Function::current().next_uid();

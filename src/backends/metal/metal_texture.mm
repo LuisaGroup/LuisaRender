@@ -8,7 +8,7 @@
 
 namespace luisa::metal {
 
-void MetalTexture::_copy_from(Dispatcher &dispatcher, Buffer *buffer, size_t offset) {
+void MetalTexture::copy_from(Dispatcher &dispatcher, Buffer *buffer, size_t offset) {
     auto command_buffer = dynamic_cast<MetalDispatcher &>(dispatcher).handle();
     auto blit_encoder = [command_buffer blitCommandEncoder];
     [blit_encoder copyFromBuffer:dynamic_cast<MetalBuffer *>(buffer)->handle()
@@ -23,7 +23,7 @@ void MetalTexture::_copy_from(Dispatcher &dispatcher, Buffer *buffer, size_t off
     [blit_encoder endEncoding];
 }
 
-void MetalTexture::_copy_to(Dispatcher &dispatcher, Buffer *buffer, size_t offset) {
+void MetalTexture::copy_to(Dispatcher &dispatcher, Buffer *buffer, size_t offset) {
     auto command_buffer = dynamic_cast<MetalDispatcher &>(dispatcher).handle();
     auto blit_encoder = [command_buffer blitCommandEncoder];
     [blit_encoder copyFromTexture:_handle
@@ -38,14 +38,14 @@ void MetalTexture::_copy_to(Dispatcher &dispatcher, Buffer *buffer, size_t offse
     [blit_encoder endEncoding];
 }
 
-void MetalTexture::_copy_to(Dispatcher &dispatcher, Texture *texture) {
+void MetalTexture::copy_to(Dispatcher &dispatcher, Texture *texture) {
     auto command_buffer = dynamic_cast<MetalDispatcher &>(dispatcher).handle();
     auto blit_encoder = [command_buffer blitCommandEncoder];
     [blit_encoder copyFromTexture:_handle toTexture:dynamic_cast<MetalTexture *>(texture)->handle()];
     [blit_encoder endEncoding];
 }
 
-void MetalTexture::_copy_from(Dispatcher &dispatcher, const void *data) {
+void MetalTexture::copy_from(Dispatcher &dispatcher, const void *data) {
     auto cache = _cache.obtain();
     memmove([cache contents], data, byte_size());
     auto command_buffer = dynamic_cast<MetalDispatcher &>(dispatcher).handle();
@@ -63,7 +63,7 @@ void MetalTexture::_copy_from(Dispatcher &dispatcher, const void *data) {
     dispatcher.when_completed([this, cache] { _cache.recycle(cache); });
 }
 
-void MetalTexture::_copy_to(Dispatcher &dispatcher, void *data) {
+void MetalTexture::copy_to(Dispatcher &dispatcher, void *data) {
     auto cache = _cache.obtain();
     auto command_buffer = dynamic_cast<MetalDispatcher &>(dispatcher).handle();
     auto blit_encoder = [command_buffer blitCommandEncoder];

@@ -110,7 +110,7 @@ enum struct AssignOp {
     BIT_AND_ASSIGN, BIT_OR_ASSIGN, BIT_XOR_ASSIGN, SHL_ASSIGN, SHR_ASSIGN
 };
 
-class AssignStmt {
+class AssignStmt : public Statement {
 
 private:
     const Variable *_lhs;
@@ -124,6 +124,8 @@ public:
     [[nodiscard]] const Variable *lhs() const noexcept { return _lhs; }
     [[nodiscard]] const Variable *rhs() const noexcept { return _rhs; }
     [[nodiscard]] AssignOp op() const noexcept { return _op; }
+    
+    MAKE_STATEMENT_ACCEPT_VISITOR()
 };
 
 class IfStmt : public Statement {
@@ -236,11 +238,11 @@ public:
 class ExprStmt : public Statement {
 
 private:
-    const Expression *_expr;
+    std::unique_ptr<Expression> _expr;
 
 public:
-    explicit ExprStmt(const Expression *expr) noexcept: _expr{expr} {}
-    [[nodiscard]] const Expression *expr() const noexcept { return _expr; }
+    explicit ExprStmt(std::unique_ptr<Expression> expr) noexcept: _expr{std::move(expr)} {}
+    [[nodiscard]] const Expression *expr() const noexcept { return _expr.get(); }
     MAKE_STATEMENT_ACCEPT_VISITOR()
 };
 

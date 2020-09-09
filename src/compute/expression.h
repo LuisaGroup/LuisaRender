@@ -25,6 +25,7 @@ class MemberExpr;
 class ValueExpr;
 class CallExpr;
 class CastExpr;
+class TextureExpr;
 
 struct ExprVisitor {
     virtual void visit(const UnaryExpr *unary_expr) = 0;
@@ -33,6 +34,7 @@ struct ExprVisitor {
     virtual void visit(const ValueExpr *literal_expr) = 0;
     virtual void visit(const CallExpr *func_expr) = 0;
     virtual void visit(const CastExpr *cast_expr) = 0;
+    virtual void visit(const TextureExpr *tex_expr) = 0;
 };
 
 #define MAKE_EXPRESSION_ACCEPT_VISITOR()                                   \
@@ -153,6 +155,30 @@ public:
     [[nodiscard]] CastOp op() const noexcept { return _op; }
     [[nodiscard]] const Expression *source() const noexcept { return _source; }
     [[nodiscard]] const TypeDesc *dest_type() const noexcept { return _dest_type; }
+    MAKE_EXPRESSION_ACCEPT_VISITOR()
+};
+
+enum struct TextureOp : uint32_t {
+    READ, WRITE, SAMPLE
+};
+
+class TextureExpr : public Expression {
+
+private:
+    const Variable *_texture;
+    const Variable *_coord;
+    const Variable *_value;
+    TextureOp _op;
+
+public:
+    TextureExpr(TextureOp op, const Variable *tex, const Variable *uv, const Variable *value = nullptr) noexcept
+        : _texture{tex}, _coord{uv}, _value{value}, _op{op} {}
+    
+    [[nodiscard]] TextureOp op() const noexcept { return _op; }
+    [[nodiscard]] const Variable *texture() const noexcept { return _texture; }
+    [[nodiscard]] const Variable *coord() const noexcept { return _coord; }
+    [[nodiscard]] const Variable *value() const noexcept { return _value; }
+    
     MAKE_EXPRESSION_ACCEPT_VISITOR()
 };
 

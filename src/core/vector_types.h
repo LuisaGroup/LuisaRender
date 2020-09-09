@@ -52,13 +52,30 @@ struct alignas(detail::vector_alignment<T, N, is_packed>) Vector : detail::Vecto
     
     constexpr Vector() noexcept: detail::VectorStorage<T, N>{static_cast<T>(0)} {}
     
-    template<typename U>
+    template<typename U, std::enable_if_t<std::is_arithmetic_v<std::decay_t<U>>, int> = 0>
     explicit constexpr Vector(U u) noexcept : detail::VectorStorage<T, N>{static_cast<T>(u)} {}
     
-    template<
-        typename... U,
-        std::enable_if_t<sizeof...(U) == N, int> = 0>
-    explicit constexpr Vector(U... u) noexcept : detail::VectorStorage<T, N>{static_cast<T>(u)...} {}
+    template<typename X, typename Y, std::enable_if_t<
+        std::is_arithmetic_v<std::decay_t<X>> &&
+        std::is_arithmetic_v<std::decay_t<Y>> &&
+        (N == 2), int> = 0>
+    explicit constexpr Vector(X x, Y y) noexcept : detail::VectorStorage<T, N>{static_cast<T>(x), static_cast<T>(y)} {}
+    
+    template<typename X, typename Y, typename Z, std::enable_if_t<
+        std::is_arithmetic_v<std::decay_t<X>> &&
+        std::is_arithmetic_v<std::decay_t<Y>> &&
+        std::is_arithmetic_v<std::decay_t<Z>> &&
+        (N == 3), int> = 0>
+    explicit constexpr Vector(X x, Y y, Z z) noexcept : detail::VectorStorage<T, N>{static_cast<T>(x), static_cast<T>(y), static_cast<T>(z)} {}
+    
+    template<typename X, typename Y, typename Z, typename W, std::enable_if_t<
+        std::is_arithmetic_v<std::decay_t<X>> &&
+        std::is_arithmetic_v<std::decay_t<Y>> &&
+        std::is_arithmetic_v<std::decay_t<Z>> &&
+        std::is_arithmetic_v<std::decay_t<W>> &&
+        (N == 4), int> = 0>
+    explicit constexpr Vector(X x, Y y, Z z, W w) noexcept
+        : detail::VectorStorage<T, N>{static_cast<T>(x), static_cast<T>(y), static_cast<T>(z), static_cast<W>(w)} {}
     
     template<typename Index>
     [[nodiscard]] T &operator[](Index i) noexcept { return reinterpret_cast<T(&)[N]>(*this)[i]; }

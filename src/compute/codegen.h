@@ -4,9 +4,13 @@
 
 #pragma once
 
+#include <ostream>
+
 #include <compute/function.h>
 #include <core/platform.h>
-#include <ostream>
+#include <core/concepts.h>
+#include "expression.h"
+#include "statement.h"
 
 namespace luisa::compute {
 class Device;

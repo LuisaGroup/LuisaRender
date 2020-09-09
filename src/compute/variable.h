@@ -7,19 +7,14 @@
 #include <variant>
 #include <compute/type_desc.h>
 
-namespace luisa::compute::dsl {
-
+namespace luisa::compute {
 class Buffer;
 class Texture;
-class Expression;
+}
 
-enum struct ResourceUsage : uint32_t {
-    NONE,
-    READ_ONLY,
-    WRITE_ONLY,
-    READ_WRITE,
-    SAMPLE,  // For textures only
-};
+namespace luisa::compute::dsl {
+
+class Expression;
 
 // new version of dsl
 enum struct VariableTag {
@@ -46,11 +41,6 @@ enum struct VariableTag {
 
 class Variable {
 
-public:
-    static constexpr auto resource_read_bit = 1u;
-    static constexpr auto resource_write_bit = 2u;
-    static constexpr auto resource_sample_bit = 4u;
-
 private:
     const TypeDesc *_type{nullptr};
     uint32_t _uid{0u};
@@ -61,9 +51,6 @@ private:
     std::shared_ptr<Texture> _texture{nullptr};
     std::vector<std::byte> _immutable_data;
     const void *_uniform_data{nullptr};
-    
-    // argument usage
-    mutable uint32_t _usage{0u};
     
     // For temporary variables in expressions
     std::unique_ptr<Expression> _expression{nullptr};
@@ -76,7 +63,7 @@ public:
     [[nodiscard]] static const Variable *make_texture_argument(const std::shared_ptr<Texture> &texture) noexcept;
     [[nodiscard]] static const Variable *make_uniform_argument(const TypeDesc *type, const void *data_ref) noexcept;
     [[nodiscard]] static const Variable *make_immutable_argument(const TypeDesc *type, const std::vector<std::byte> &data) noexcept;
-    [[nodiscard]] static const Variable *make_temporary(const TypeDesc *type, std::unique_ptr<Expression> expression) noexcept;
+    [[nodiscard]] static const Variable *make_temporary(std::unique_ptr<Expression> expression) noexcept;
     
     [[nodiscard]] const TypeDesc *type() const noexcept { return _type; }
     [[nodiscard]] uint uid() const noexcept { return _uid; }
@@ -106,25 +93,7 @@ public:
     [[nodiscard]] const std::vector<std::byte> &immutable_data() const noexcept { return _immutable_data; }
     [[nodiscard]] const void *uniform_data() const noexcept { return _uniform_data; }
     
-    void mark_read() const noexcept { _usage |= resource_read_bit; }
-    void mark_write() const noexcept { _usage |= resource_write_bit; }
-    void mark_sample() const noexcept { _usage |= resource_sample_bit; }
-    
-    [[nodiscard]] ResourceUsage usage() const noexcept {
-        
-        bool read = _usage & resource_read_bit;
-        bool write = _usage & resource_write_bit;
-        bool sample = _usage & resource_sample_bit;
-        
-        assert(!(sample && read) && !(sample && write));
-        assert(!sample || is_texture_argument());
-        
-        if (read && write) { return ResourceUsage::READ_WRITE; }
-        if (read) { return ResourceUsage::READ_ONLY; }
-        if (write) { return ResourceUsage::WRITE_ONLY; }
-        if (sample) { return ResourceUsage::SAMPLE; }
-        return ResourceUsage::NONE;
-    }
+    [[nodiscard]]
 };
 
 }// namespace luisa::compute::dsl
