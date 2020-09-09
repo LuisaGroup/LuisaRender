@@ -176,7 +176,7 @@ template<typename T>
 struct Var : public Expr<T> {
     
     template<typename ...Args>
-    explicit Var(Args &&...args) noexcept : Expr<T>{Variable::make_local_variable(type_desc<T>)} {
+    Var(Args &&...args) noexcept : Expr<T>{Variable::make_local_variable(type_desc<T>)} {
         std::vector<const Variable *> init{detail::extract_variable(std::forward<Args>(args))...};
         Function::current().add_statement(std::make_unique<DeclareStmt>(this->_variable, std::move(init)));
     }
@@ -456,10 +456,10 @@ namespace luisa::compute::dsl {                                                 
     };                                                                                           \
 }                                                                                                \
 
-#define LUISA_STRUCT_MAP_MEMBER_NAME_TO_EXPR(name)                                                            \
-    [[nodiscard]] auto name() const noexcept {                                                                \
-        using R = std::decay_t<decltype(std::declval<Type>().name)>;                                          \
-        return Variable::make_temporary(type_desc<R>, std::make_unique<MemberExpr>(this->_variable, #name));  \
+#define LUISA_STRUCT_MAP_MEMBER_NAME_TO_EXPR(name)                                                                     \
+    [[nodiscard]] auto name() const noexcept {                                                                         \
+        using R = std::decay_t<decltype(std::declval<Type>().name)>;                                                   \
+        return Expr<R>{Variable::make_temporary(type_desc<R>, std::make_unique<MemberExpr>(this->_variable, #name))};  \
     }
 
 #define LUISA_STRUCT_SPECIALIZE_EXPR(S, ...)                            \

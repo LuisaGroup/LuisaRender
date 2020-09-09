@@ -186,7 +186,7 @@ void CppCodegen::_emit_function_decl(const Function &f) {
         } else if (arg->is_immutable_argument() || arg->is_uniform_argument()) {
             _os << "constant ";
             _emit_type(arg->type());
-            _os << " &" << arg->uid();
+            _os << " &v" << arg->uid();
             if (i != args.size() - 1u) { _os << ", "; }
         }
     }
