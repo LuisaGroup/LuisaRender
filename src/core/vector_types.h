@@ -74,7 +74,7 @@ struct alignas(detail::vector_alignment<T, N, is_packed>) Vector : detail::Vecto
         std::is_arithmetic_v<std::decay_t<Z>> &&
         std::is_arithmetic_v<std::decay_t<W>> &&
         (N == 4), int> = 0>
-    explicit constexpr Vector(X x, Y y, Z z, W w) noexcept
+    explicit constexpr Vector(const X x, const Y y, const Z z, const W w) noexcept
         : detail::VectorStorage<T, N>{static_cast<T>(x), static_cast<T>(y), static_cast<T>(z), static_cast<W>(w)} {}
     
     template<typename Index>

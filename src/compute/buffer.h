@@ -93,7 +93,7 @@ public:
         using namespace luisa::compute::dsl;
         auto v = Variable::make_buffer_argument(type_desc<T>, _buffer);
         auto i = Expr{index} + _offset;
-        return Expr<T>{Variable::make_temporary(std::make_unique<BinaryExpr>(BinaryOp::ACCESS, v, i.variable()))};
+        return Expr<T>{Variable::make_temporary(type_desc<T>, std::make_unique<BinaryExpr>(BinaryOp::ACCESS, v, i.variable()))};
     }
     
 };

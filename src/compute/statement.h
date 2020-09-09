@@ -131,16 +131,31 @@ public:
 class IfStmt : public Statement {
 
 private:
-    const Expression *_condition;
-    std::unique_ptr<ScopeStmt> _body;
+    const Variable *_condition;
+    std::unique_ptr<ScopeStmt> _true_branch;
+    std::unique_ptr<ScopeStmt> _false_branch;
 
 public:
-    template<typename Body, std::enable_if_t<std::is_invocable_v<Body>, int> = 0>
-    IfStmt(const Expression *cond, Body &&body) : _condition{cond}, _body{std::make_unique<ScopeStmt>()} {
-        Function::current().with_scope(_body.get(), std::forward<Body>(body));
+    template<typename True, std::enable_if_t<std::is_invocable_v<True>, int> = 0>
+    IfStmt(const Variable *cond, True &&true_branch) noexcept
+        : _condition{cond},
+          _true_branch{std::make_unique<ScopeStmt>()},
+          _false_branch{std::make_unique<ScopeStmt>()} {
+        Function::current().with_scope(_true_branch.get(), std::forward<True>(true_branch));
     }
-    [[nodiscard]] const Expression *condition() const noexcept { return _condition; }
-    [[nodiscard]] const ScopeStmt *body() const noexcept { return _body.get(); }
+    
+    template<typename True, typename False, std::enable_if_t<std::conjunction_v<std::is_invocable<True>, std::is_invocable<False>>, int> = 0>
+    IfStmt(const Variable *cond, True &&true_branch, False &&false_branch) noexcept
+        : _condition{cond},
+          _true_branch{std::make_unique<ScopeStmt>()},
+          _false_branch{std::make_unique<ScopeStmt>()} {
+        Function::current().with_scope(_true_branch.get(), std::forward<True>(true_branch));
+        Function::current().with_scope(_false_branch.get(), std::forward<False>(false_branch));
+    }
+    
+    [[nodiscard]] const Variable *condition() const noexcept { return _condition; }
+    [[nodiscard]] const ScopeStmt *true_branch() const noexcept { return _true_branch.get(); }
+    [[nodiscard]] const ScopeStmt *false_branch() const noexcept { return _false_branch.get(); }
     
     MAKE_STATEMENT_ACCEPT_VISITOR()
 };
@@ -148,19 +163,19 @@ public:
 class SwitchCaseStmt : public Statement {
 
 private:
-    const Expression *_expr;
+    const Variable *_expr;
     std::unique_ptr<ScopeStmt> _body;
 
 public:
     template<typename Body, std::enable_if_t<std::is_invocable_v<Body>, int> = 0>
-    SwitchCaseStmt(const Expression *expr, Body &&body) : _expr{expr}, _body{std::make_unique<ScopeStmt>()} {
+    SwitchCaseStmt(const Variable *expr, Body &&body) : _expr{expr}, _body{std::make_unique<ScopeStmt>()} {
         Function::current().with_scope(_body.get(), [&body] {
             body();
             Function::current().add_statement(std::make_unique<BreakStmt>());
         });
     }
     
-    [[nodiscard]] const Expression *expr() const noexcept { return _expr; }
+    [[nodiscard]] const Variable *expr() const noexcept { return _expr; }
     [[nodiscard]] const ScopeStmt *body() const noexcept { return _body.get(); }
     
     MAKE_STATEMENT_ACCEPT_VISITOR()
@@ -188,15 +203,15 @@ public:
 class SwitchStmt : public Statement {
 
 private:
-    const Expression *_expr;
+    const Variable *_expr;
     std::unique_ptr<ScopeStmt> _body;
 
 public:
     template<typename Body, std::enable_if_t<std::is_invocable_v<Body>, int> = 0>
-    SwitchStmt(const Expression *expr, Body &&body) noexcept: _expr{expr}, _body{std::make_unique<ScopeStmt>()} {
+    SwitchStmt(const Variable *expr, Body &&body) noexcept: _expr{expr}, _body{std::make_unique<ScopeStmt>()} {
         Function::current().with_scope(_body.get(), std::forward<Body>(body));
     }
-    [[nodiscard]] const Expression *expr() const noexcept { return _expr; }
+    [[nodiscard]] const Variable *expr() const noexcept { return _expr; }
     [[nodiscard]] const ScopeStmt *body() const noexcept { return _body.get(); }
     MAKE_STATEMENT_ACCEPT_VISITOR()
 };
@@ -204,15 +219,15 @@ public:
 class WhileStmt : public Statement {
 
 private:
-    const Expression *_condition;
+    const Variable *_condition;
     std::unique_ptr<ScopeStmt> _body;
 
 public:
     template<typename Body, std::enable_if_t<std::is_invocable_v<Body>, int> = 0>
-    WhileStmt(const Expression *cond, Body &&body) : _condition{cond}, _body{std::make_unique<ScopeStmt>()} {
+    WhileStmt(const Variable *cond, Body &&body) : _condition{cond}, _body{std::make_unique<ScopeStmt>()} {
         Function::current().with_scope(_body.get(), std::forward<Body>(body));
     }
-    [[nodiscard]] const Expression *condition() const noexcept { return _condition; }
+    [[nodiscard]] const Variable *condition() const noexcept { return _condition; }
     [[nodiscard]] const ScopeStmt *body() const noexcept { return _body.get(); }
     
     MAKE_STATEMENT_ACCEPT_VISITOR()
@@ -221,15 +236,15 @@ public:
 class DoWhileStmt : public Statement {
 
 private:
-    const Expression *_condition;
+    const Variable *_condition;
     std::unique_ptr<ScopeStmt> _body;
 
 public:
     template<typename Body, std::enable_if_t<std::is_invocable_v<Body>, int> = 0>
-    DoWhileStmt(Body &&body, const Expression *cond) : _condition{cond}, _body{std::make_unique<ScopeStmt>()} {
+    DoWhileStmt(Body &&body, const Variable *cond) : _condition{cond}, _body{std::make_unique<ScopeStmt>()} {
         Function::current().with_scope(_body.get(), std::forward<Body>(body));
     }
-    [[nodiscard]] const Expression *condition() const noexcept { return _condition; }
+    [[nodiscard]] const Variable *condition() const noexcept { return _condition; }
     [[nodiscard]] const ScopeStmt *body() const noexcept { return _body.get(); }
     
     MAKE_STATEMENT_ACCEPT_VISITOR()

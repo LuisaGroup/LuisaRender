@@ -63,7 +63,7 @@ public:
     [[nodiscard]] static const Variable *make_texture_argument(const std::shared_ptr<Texture> &texture) noexcept;
     [[nodiscard]] static const Variable *make_uniform_argument(const TypeDesc *type, const void *data_ref) noexcept;
     [[nodiscard]] static const Variable *make_immutable_argument(const TypeDesc *type, const std::vector<std::byte> &data) noexcept;
-    [[nodiscard]] static const Variable *make_temporary(std::unique_ptr<Expression> expression) noexcept;
+    [[nodiscard]] static const Variable *make_temporary(const TypeDesc *type, std::unique_ptr<Expression> expression) noexcept;
     
     [[nodiscard]] const TypeDesc *type() const noexcept { return _type; }
     [[nodiscard]] uint uid() const noexcept { return _uid; }
@@ -93,7 +93,6 @@ public:
     [[nodiscard]] const std::vector<std::byte> &immutable_data() const noexcept { return _immutable_data; }
     [[nodiscard]] const void *uniform_data() const noexcept { return _uniform_data; }
     
-    [[nodiscard]]
 };
 
 }// namespace luisa::compute::dsl

@@ -145,15 +145,15 @@ enum struct CastOp {
 class CastExpr : public Expression {
 
 private:
-    const Expression *_source;
+    const Variable *_source;
     CastOp _op;
     const TypeDesc *_dest_type;
 
 public:
-    CastExpr(CastOp op, const Expression *src, const TypeDesc *dest) noexcept
+    CastExpr(CastOp op, const Variable *src, const TypeDesc *dest) noexcept
         : _op{op}, _source{src}, _dest_type{dest} {}
     [[nodiscard]] CastOp op() const noexcept { return _op; }
-    [[nodiscard]] const Expression *source() const noexcept { return _source; }
+    [[nodiscard]] const Variable *source() const noexcept { return _source; }
     [[nodiscard]] const TypeDesc *dest_type() const noexcept { return _dest_type; }
     MAKE_EXPRESSION_ACCEPT_VISITOR()
 };

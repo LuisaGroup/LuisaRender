@@ -71,7 +71,7 @@ public:
     virtual void copy_from(Dispatcher &dispatcher, const void *data) = 0;
     virtual void copy_to(Dispatcher &dispatcher, void *data) = 0;
     
-    [[nodiscard]] TextureView view() const noexcept;
+    [[nodiscard]] TextureView view() noexcept;
 };
 
 class TextureView {
@@ -132,7 +132,7 @@ public:
         Expr uv_expr{uv};
         auto tex = Variable::make_texture_argument(_texture);
         Function::current().mark_texture_read(_texture.get());
-        return Expr<float4>{Variable::make_temporary(std::make_unique<TextureExpr>(TextureOp::READ, tex, uv_expr.variable()))};
+        return Expr<float4>{Variable::make_temporary(nullptr, std::make_unique<TextureExpr>(TextureOp::READ, tex, uv_expr.variable()))};
     }
     
     template<typename UV>
@@ -141,7 +141,7 @@ public:
         Expr uv_expr{uv};
         auto tex = Variable::make_texture_argument(_texture);
         Function::current().mark_texture_sample(_texture.get());
-        return Expr<float4>{Variable::make_temporary(std::make_unique<TextureExpr>(TextureOp::SAMPLE, tex, uv_expr.variable()))};
+        return Expr<float4>{Variable::make_temporary(nullptr, std::make_unique<TextureExpr>(TextureOp::SAMPLE, tex, uv_expr.variable()))};
     }
     
     template<typename UV, typename Value>
@@ -151,11 +151,11 @@ public:
         Expr value_expr{value};
         auto tex = Variable::make_texture_argument(_texture);
         Function::current().mark_texture_write(_texture.get());
-        return Expr<float4>{Variable::make_temporary(std::make_unique<TextureExpr>(TextureOp::SAMPLE, tex, uv_expr.variable(), value_expr.variable()))};
+        return Expr<float4>{Variable::make_temporary(nullptr, std::make_unique<TextureExpr>(TextureOp::SAMPLE, tex, uv_expr.variable(), value_expr.variable()))};
     }
 };
 
-TextureView Texture::view() const noexcept {
+TextureView Texture::view() noexcept {
     return TextureView{shared_from_this()};
 }
 

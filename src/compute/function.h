@@ -11,8 +11,13 @@
 
 #include <core/platform.h>
 
+namespace luisa::compute {
+class Texture;
+}
+
 namespace luisa::compute::dsl {
 
+struct TypeDesc;
 class Variable;
 struct Statement;
 class ScopeStmt;
@@ -30,11 +35,14 @@ private:
     std::vector<std::unique_ptr<Variable>> _variables;
     std::vector<std::unique_ptr<Variable>> _arguments;
     std::map<const Texture *, uint32_t> _texture_usages;
+    std::set<const TypeDesc *> _used_struct_types;
     
     std::unique_ptr<ScopeStmt> _body;
     std::stack<ScopeStmt *> _scope_stack;
     
     uint32_t _uid_counter{0u};
+    
+    void _use_structure_type(const TypeDesc *type) noexcept;
 
 public:
     explicit Function(std::string name) noexcept;
@@ -53,37 +61,22 @@ public:
     
     void add_statement(std::unique_ptr<Statement> stmt) noexcept;
     
+    [[nodiscard]] const std::set<const TypeDesc *> &used_structures() const noexcept { return _used_struct_types; }
     [[nodiscard]] const std::vector<std::unique_ptr<Variable>> &builtins() const noexcept { return _builtins; }
     [[nodiscard]] const std::vector<std::unique_ptr<Variable>> &variables() const noexcept { return _variables; }
     [[nodiscard]] const std::vector<std::unique_ptr<Variable>> &arguments() const noexcept { return _arguments; }
     
-    [[nodiscard]] const std::vector<std::unique_ptr<Statement>> &statements() const noexcept;
+    [[nodiscard]] const ScopeStmt *body() const noexcept { return _body.get(); }
     
     // new api
-    [[nodiscard]] const Variable *add_builtin(std::unique_ptr<Variable> v) noexcept { return _builtins.emplace_back(std::move(v)).get(); }
-    [[nodiscard]] const Variable *add_variable(std::unique_ptr<Variable> v) noexcept { return _variables.emplace_back(std::move(v)).get(); }
-    [[nodiscard]] const Variable *add_argument(std::unique_ptr<Variable> v) noexcept { return _arguments.emplace_back(std::move(v)).get(); }
+    [[nodiscard]] const Variable *add_builtin(std::unique_ptr<Variable> v) noexcept;
+    [[nodiscard]] const Variable *add_variable(std::unique_ptr<Variable> v) noexcept;
+    [[nodiscard]] const Variable *add_argument(std::unique_ptr<Variable> v) noexcept;
     
-    void mark_texture_read(const Texture *texture) noexcept {
-        if (auto iter = _texture_usages.find(texture); iter == _texture_usages.cend()) { _texture_usages.emplace(texture, texture_read_bit); }
-        else { iter->second |= texture_read_bit; }
-    }
-    
-    void mark_texture_write(const Texture *texture) noexcept {
-        if (auto iter = _texture_usages.find(texture); iter == _texture_usages.cend()) { _texture_usages.emplace(texture, texture_write_bit); }
-        else { iter->second |= texture_write_bit; }
-    }
-    
-    void mark_texture_sample(const Texture *texture) noexcept {
-        if (auto iter = _texture_usages.find(texture); iter == _texture_usages.cend()) { _texture_usages.emplace(texture, texture_sample_bit); }
-        else { iter->second |= texture_sample_bit; }
-    }
-    
-    [[nodiscard]] uint32_t texture_usage(const Texture *texture) const noexcept {
-        auto iter = _texture_usages.find(texture);
-        if (iter == _texture_usages.cend()) { return 0u; }
-        return iter->second;
-    }
+    void mark_texture_read(const Texture *texture) noexcept;
+    void mark_texture_write(const Texture *texture) noexcept;
+    void mark_texture_sample(const Texture *texture) noexcept;
+    [[nodiscard]] uint32_t texture_usage(const Texture *texture) const noexcept;
 };
 
 }

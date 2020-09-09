@@ -48,7 +48,7 @@ public:
 
 #define MAKE_ASSIGN_OP_SCALAR(T, op, op_tag)                                              \
     void operator op(T x) const noexcept {                                                \
-        auto v = Variable::make_temporary(std::make_unique<ValueExpr>(x));                \
+        auto v = Variable::make_temporary(type_desc<T>, std::make_unique<ValueExpr>(x));  \
         Function::current().add_statement(                                                \
             std::make_unique<AssignStmt>(AssignOp::op_tag, _variable, v));                \
     }
@@ -98,7 +98,7 @@ struct Expr : public ExprBase {
     
     explicit Expr(const Variable *v) noexcept: ExprBase{v} {}
     
-    Expr(T v) noexcept: ExprBase{Variable::make_temporary(std::make_unique<ValueExpr>(v))} {}
+    Expr(T v) noexcept: ExprBase{Variable::make_temporary(type_desc<T>, std::make_unique<ValueExpr>(v))} {}
     
     Expr(ExprBase &&expr) noexcept: ExprBase{expr.variable()} {}
     Expr(const ExprBase &expr) noexcept: ExprBase{expr.variable()} {}
@@ -106,28 +106,28 @@ struct Expr : public ExprBase {
     [[nodiscard]] auto x() const noexcept {
         if constexpr (is_vector<T>) {
             using MemberType = std::decay_t<decltype(std::declval<T>().x)>;
-            return Expr<MemberType>(Variable::make_temporary(std::make_unique<MemberExpr>(_variable, "x")));
+            return Expr<MemberType>(Variable::make_temporary(type_desc<MemberType>, std::make_unique<MemberExpr>(_variable, "x")));
         } else { LUISA_ERROR("This variable has no component x."); }
     }
     
     [[nodiscard]] auto y() const noexcept {
         if constexpr (is_vector<T>) {
             using MemberType = std::decay_t<decltype(std::declval<T>().y)>;
-            return Expr<MemberType>{Variable::make_temporary(std::make_unique<MemberExpr>(_variable, "y"))};
+            return Expr<MemberType>{Variable::make_temporary(type_desc<MemberType>, std::make_unique<MemberExpr>(_variable, "y"))};
         } else { LUISA_ERROR("This variable has no component y."); }
     }
     
     [[nodiscard]] auto z() const noexcept {
         if constexpr (is_vector_3<T> || is_vector_4<T>) {
             using MemberType = std::decay_t<decltype(std::declval<T>().z)>;
-            return Expr<MemberType>{Variable::make_temporary(std::make_unique<MemberExpr>(_variable, "z"))};
+            return Expr<MemberType>{Variable::make_temporary(type_desc<MemberType>, std::make_unique<MemberExpr>(_variable, "z"))};
         } else { LUISA_ERROR("This variable has no component z."); }
     }
     
     [[nodiscard]] auto w() const noexcept {
         if constexpr (is_vector_4<T>) {
             using MemberType = std::decay_t<decltype(std::declval<T>().w)>;
-            return Expr<MemberType>{Variable::make_temporary(std::make_unique<MemberExpr>(_variable, "w"))};
+            return Expr<MemberType>{Variable::make_temporary(type_desc<MemberType>, std::make_unique<MemberExpr>(_variable, "w"))};
         } else { LUISA_ERROR("This variable has no component w."); }
     }
     
@@ -139,7 +139,7 @@ struct Expr : public ExprBase {
     [[nodiscard]] auto operator[](const ExprBase &index) const noexcept {
         if constexpr (is_array<std::decay_t<T>>) {
             using ElementType = std::decay_t<decltype(std::declval<T>()[0])>;
-            return Expr<ElementType>{Variable::make_temporary(std::make_unique<BinaryExpr>(BinaryOp::ACCESS, _variable, index.variable()))};
+            return Expr<ElementType>{Variable::make_temporary(type_desc<ElementType>, std::make_unique<BinaryExpr>(BinaryOp::ACCESS, _variable, index.variable()))};
         } else { LUISA_ERROR("operator[] is not available on non-array types."); }
     }
 };
@@ -212,7 +212,7 @@ Var(Expr<T> &&) -> Var<T>;
     template<typename T, std::enable_if_t<is_expr<T>, int> = 0>                                                         \
     auto operator op(T var) noexcept {                                                                                  \
         using R = std::decay_t<decltype(op std::declval<typename T::Type>())>;                                          \
-        auto v = Variable::make_temporary(std::make_unique<UnaryExpr>(UnaryOp::op_tag, var.variable()));  \
+        auto v = Variable::make_temporary(type_desc<R>, std::make_unique<UnaryExpr>(UnaryOp::op_tag, var.variable()));  \
         return Expr<R>{v};                                                                                              \
     }
 MAKE_UNARY_OP(+, PLUS)
@@ -221,17 +221,17 @@ MAKE_UNARY_OP(!, NOT)
 MAKE_UNARY_OP(~, BIT_NOT)
 #undef MAKE_UNARY_OP
 
-#define MAKE_BINARY_OP(op, op_tag)                                                                                                    \
-    template<typename Lhs, typename Rhs, std::enable_if_t<std::disjunction_v<IsExpr<Lhs>, IsExpr<Rhs>>, int> = 0>                     \
-    inline auto operator op(Lhs &&lhs, Rhs &&rhs) noexcept {                                                                          \
-        Expr lhs_expr{lhs};                                                                                                           \
-        Expr rhs_expr{rhs};                                                                                                           \
-        using LhsT = typename decltype(lhs_expr)::Type;                                                                               \
-        using RhsT = typename decltype(rhs_expr)::Type;                                                                               \
-        using R = std::decay_t<decltype(std::declval<LhsT>() op std::declval<RhsT>())>;                                               \
-        auto v = Variable::make_temporary(std::make_unique<BinaryExpr>(BinaryOp::op_tag, lhs_expr.variable(), rhs_expr.variable()));  \
-        return Var<R>{v};                                                                                                             \
-    }                                                                                                                                 \
+#define MAKE_BINARY_OP(op, op_tag)                                                                                                                  \
+    template<typename Lhs, typename Rhs, std::enable_if_t<std::disjunction_v<IsExpr<Lhs>, IsExpr<Rhs>>, int> = 0>                                   \
+    inline auto operator op(Lhs &&lhs, Rhs &&rhs) noexcept {                                                                                        \
+        Expr lhs_expr{lhs};                                                                                                                         \
+        Expr rhs_expr{rhs};                                                                                                                         \
+        using LhsT = typename decltype(lhs_expr)::Type;                                                                                             \
+        using RhsT = typename decltype(rhs_expr)::Type;                                                                                             \
+        using R = std::decay_t<decltype(std::declval<LhsT>() op std::declval<RhsT>())>;                                                             \
+        auto v = Variable::make_temporary(type_desc<R>, std::make_unique<BinaryExpr>(BinaryOp::op_tag, lhs_expr.variable(), rhs_expr.variable()));  \
+        return Var<R>{v};                                                                                                                           \
+    }                                                                                                                                               \
 
 MAKE_BINARY_OP(+, ADD)
 MAKE_BINARY_OP(-, SUB)
@@ -282,7 +282,7 @@ inline auto func(LUISA_MAP_LIST(MAP_ARGUMENT_TO_ARGUMENT, __VA_ARGS__)) noexcept
     LUISA_MAP(MAP_ARGUMENT_TO_EXPR, __VA_ARGS__)                                                                  \
     LUISA_MAP(MAP_ARGUMENT_TO_TRUE_TYPE, __VA_ARGS__)                                                             \
     using R = std::decay_t<decltype(true_func(LUISA_MAP_LIST(MAP_ARGUMENT_TO_TRUE_TYPE_DECLVAL, __VA_ARGS__)))>;  \
-    return Expr<R>{Variable::make_temporary(std::make_unique<CallExpr>(                                           \
+    return Expr<R>{Variable::make_temporary(type_desc<R>, std::make_unique<CallExpr>(                             \
         #func, std::vector<const Variable *>{LUISA_MAP_LIST(MAP_ARGUMENT_TO_VARIABLE, __VA_ARGS__)}))};           \
 }
 
@@ -415,17 +415,17 @@ MAKE_BUILTIN_VOID_FUNCTION_VOID_DEF(threadgroup_barrier)
 
 template<typename T>
 [[nodiscard]] inline auto cast(const ExprBase &v) {
-    return Expr<T>{Variable::make_temporary(std::make_unique<CastExpr>(CastOp::STATIC, v.variable()))};
+    return Expr<T>{Variable::make_temporary(type_desc<T>, std::make_unique<CastExpr>(CastOp::STATIC, v.variable(), type_desc<T>))};
 }
 
 template<typename T>
 [[nodiscard]] inline auto reinterpret(const ExprBase &v) {
-    return Expr<T>{Variable::make_temporary(std::make_unique<CastExpr>(CastOp::REINTERPRET, v.variable()))};
+    return Expr<T>{Variable::make_temporary(type_desc<T>, std::make_unique<CastExpr>(CastOp::REINTERPRET, v.variable(), type_desc<T>))};
 }
 
 template<typename T>
 [[nodiscard]] inline auto bitcast(const ExprBase &v) {
-    return Expr<T>{Variable::make_temporary(std::make_unique<CastExpr>(CastOp::BITWISE, v.variable()))};
+    return Expr<T>{Variable::make_temporary(type_desc<T>, std::make_unique<CastExpr>(CastOp::BITWISE, v.variable(), type_desc<T>))};
 }
 
 }
@@ -454,20 +454,22 @@ namespace luisa::compute::dsl {                                                 
     };                                                                                           \
 }                                                                                                \
 
-#define LUISA_STRUCT_MAP_MEMBER_NAME_TO_EXPR(name)                                               \
-    [[nodiscard]] auto name() const noexcept {                                                   \
-        using R = std::decay_t<decltype(std::declval<Type>().name)>;                             \
-        return Variable::make_temporary(std::make_unique<MemberExpr>(this->_variable, #name));   \
+#define LUISA_STRUCT_MAP_MEMBER_NAME_TO_EXPR(name)                                                            \
+    [[nodiscard]] auto name() const noexcept {                                                                \
+        using R = std::decay_t<decltype(std::declval<Type>().name)>;                                          \
+        return Variable::make_temporary(type_desc<R>, std::make_unique<MemberExpr>(this->_variable, #name));  \
     }
 
 #define LUISA_STRUCT_SPECIALIZE_EXPR(S, ...)                            \
+namespace luisa::compute::dsl {                                         \
 template<> struct Expr<S> : public ExprBase {                           \
     using Type = S;                                                     \
     explicit Expr(const Variable *v) noexcept : ExprBase{v} {}          \
     Expr(ExprBase &&expr) noexcept : ExprBase{expr.variable()} {}       \
     Expr(const ExprBase &expr) noexcept : ExprBase{expr.variable()} {}  \
     LUISA_MAP(LUISA_STRUCT_MAP_MEMBER_NAME_TO_EXPR, __VA_ARGS__)        \
-};
+};                                                                      \
+}
 
 #define LUISA_STRUCT(S, ...)                            \
 LUISA_STRUCT_BEGIN(S)                                   \

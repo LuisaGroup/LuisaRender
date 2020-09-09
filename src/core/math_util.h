@@ -103,7 +103,7 @@ constexpr uint prime_number_prefix_sums [[maybe_unused]][prime_number_count] = {
     758006, 761455, 764912, 768373, 771836, 775303, 778772, 782263, 785762, 789273, 792790,
     796317, 799846, 803379, 806918, 810459, 814006, 817563, 821122, 824693, 828274, 831857,
     835450, 839057, 842670, 846287, 849910, 853541, 857178, 860821, 864480};
-
+    
 }// namespace constants
 
 // bit manipulation function
@@ -233,11 +233,11 @@ template<typename T, uint N>
 [[nodiscard]] constexpr auto select(Vector<bool, N, false> pred, Vector<T, N, false> t, Vector<T, N, false> f) noexcept {
     static_assert(N == 2 || N == 3 || N == 4);
     if constexpr (N == 2) {
-        return Vector<T, N, false>{select(pred.x, t.x, f.x), select(pred.y, t.y, f.y)};
+        return Vector < T, N, false > {select(pred.x, t.x, f.x), select(pred.y, t.y, f.y)};
     } else if constexpr (N == 3) {
-        return Vector<T, N, false>{select(pred.x, t.x, f.x), select(pred.y, t.y, f.y), select(pred.z, t.z, f.z)};
+        return Vector < T, N, false > {select(pred.x, t.x, f.x), select(pred.y, t.y, f.y), select(pred.z, t.z, f.z)};
     } else {
-        return Vector<T, N, false>{select(pred.x, t.x, f.x), select(pred.y, t.y, f.y), select(pred.z, t.z, f.z), select(pred.w, t.w, f.w)};
+        return Vector < T, N, false > {select(pred.x, t.x, f.x), select(pred.y, t.y, f.y), select(pred.z, t.z, f.z), select(pred.w, t.w, f.w)};
     }
 }
 
@@ -300,7 +300,8 @@ template<uint N>
 }
 
 [[nodiscard]] constexpr auto inverse(float3x3 m) noexcept {// from GLM
-    auto one_over_determinant = 1.0f / (m[0].x * (m[1].y * m[2].z - m[2].y * m[1].z) - m[1].x * (m[0].y * m[2].z - m[2].y * m[0].z) + m[2].x * (m[0].y * m[1].z - m[1].y * m[0].z));
+    const auto one_over_determinant = 1.0f /
+                                      (m[0].x * (m[1].y * m[2].z - m[2].y * m[1].z) - m[1].x * (m[0].y * m[2].z - m[2].y * m[0].z) + m[2].x * (m[0].y * m[1].z - m[1].y * m[0].z));
     return make_float3x3(
         (m[1].y * m[2].z - m[2].y * m[1].z) * one_over_determinant,
         (m[2].y * m[0].z - m[0].y * m[2].z) * one_over_determinant,
@@ -314,51 +315,52 @@ template<uint N>
 }
 
 [[nodiscard]] constexpr auto inverse(float4x4 m) noexcept {// from GLM
-    auto coef00 = m[2].z * m[3].w - m[3].z * m[2].w;
-    auto coef02 = m[1].z * m[3].w - m[3].z * m[1].w;
-    auto coef03 = m[1].z * m[2].w - m[2].z * m[1].w;
-    auto coef04 = m[2].y * m[3].w - m[3].y * m[2].w;
-    auto coef06 = m[1].y * m[3].w - m[3].y * m[1].w;
-    auto coef07 = m[1].y * m[2].w - m[2].y * m[1].w;
-    auto coef08 = m[2].y * m[3].z - m[3].y * m[2].z;
-    auto coef10 = m[1].y * m[3].z - m[3].y * m[1].z;
-    auto coef11 = m[1].y * m[2].z - m[2].y * m[1].z;
-    auto coef12 = m[2].x * m[3].w - m[3].x * m[2].w;
-    auto coef14 = m[1].x * m[3].w - m[3].x * m[1].w;
-    auto coef15 = m[1].x * m[2].w - m[2].x * m[1].w;
-    auto coef16 = m[2].x * m[3].z - m[3].x * m[2].z;
-    auto coef18 = m[1].x * m[3].z - m[3].x * m[1].z;
-    auto coef19 = m[1].x * m[2].z - m[2].x * m[1].z;
-    auto coef20 = m[2].x * m[3].y - m[3].x * m[2].y;
-    auto coef22 = m[1].x * m[3].y - m[3].x * m[1].y;
-    auto coef23 = m[1].x * m[2].y - m[2].x * m[1].y;
-    auto fac0 = float4(coef00, coef00, coef02, coef03);
-    auto fac1 = float4(coef04, coef04, coef06, coef07);
-    auto fac2 = float4(coef08, coef08, coef10, coef11);
-    auto fac3 = float4(coef12, coef12, coef14, coef15);
-    auto fac4 = float4(coef16, coef16, coef18, coef19);
-    auto fac5 = float4(coef20, coef20, coef22, coef23);
-    auto Vec0 = float4(m[1].x, m[0].x, m[0].x, m[0].x);
-    auto Vec1 = float4(m[1].y, m[0].y, m[0].y, m[0].y);
-    auto Vec2 = float4(m[1].z, m[0].z, m[0].z, m[0].z);
-    auto Vec3 = float4(m[1].w, m[0].w, m[0].w, m[0].w);
-    auto inv0 = Vec1 * fac0 - Vec2 * fac1 + Vec3 * fac2;
-    auto inv1 = Vec0 * fac0 - Vec2 * fac3 + Vec3 * fac4;
-    auto inv2 = Vec0 * fac1 - Vec1 * fac3 + Vec3 * fac5;
-    auto inv3 = Vec0 * fac2 - Vec1 * fac4 + Vec2 * fac5;
-    auto sign_a = float4(+1, -1, +1, -1);
-    auto sign_b = float4(-1, +1, -1, +1);
-    auto inv_0 = inv0 * sign_a;
-    auto inv_1 = inv1 * sign_b;
-    auto inv_2 = inv2 * sign_a;
-    auto inv_3 = inv3 * sign_b;
-    auto dot0 = m[0] * float4(inv_0.x, inv_1.x, inv_2.x, inv_3.x);
-    auto dot1 = dot0.x + dot0.y + dot0.z + dot0.w;
-    auto one_over_determinant = 1.0f / dot1;
+    const auto coef00 = m[2].z * m[3].w - m[3].z * m[2].w;
+    const auto coef02 = m[1].z * m[3].w - m[3].z * m[1].w;
+    const auto coef03 = m[1].z * m[2].w - m[2].z * m[1].w;
+    const auto coef04 = m[2].y * m[3].w - m[3].y * m[2].w;
+    const auto coef06 = m[1].y * m[3].w - m[3].y * m[1].w;
+    const auto coef07 = m[1].y * m[2].w - m[2].y * m[1].w;
+    const auto coef08 = m[2].y * m[3].z - m[3].y * m[2].z;
+    const auto coef10 = m[1].y * m[3].z - m[3].y * m[1].z;
+    const auto coef11 = m[1].y * m[2].z - m[2].y * m[1].z;
+    const auto coef12 = m[2].x * m[3].w - m[3].x * m[2].w;
+    const auto coef14 = m[1].x * m[3].w - m[3].x * m[1].w;
+    const auto coef15 = m[1].x * m[2].w - m[2].x * m[1].w;
+    const auto coef16 = m[2].x * m[3].z - m[3].x * m[2].z;
+    const auto coef18 = m[1].x * m[3].z - m[3].x * m[1].z;
+    const auto coef19 = m[1].x * m[2].z - m[2].x * m[1].z;
+    const auto coef20 = m[2].x * m[3].y - m[3].x * m[2].y;
+    const auto coef22 = m[1].x * m[3].y - m[3].x * m[1].y;
+    const auto coef23 = m[1].x * m[2].y - m[2].x * m[1].y;
+    const auto fac0 = make_float4(coef00, coef00, coef02, coef03);
+    const auto fac1 = make_float4(coef04, coef04, coef06, coef07);
+    const auto fac2 = make_float4(coef08, coef08, coef10, coef11);
+    const auto fac3 = make_float4(coef12, coef12, coef14, coef15);
+    const auto fac4 = make_float4(coef16, coef16, coef18, coef19);
+    const auto fac5 = make_float4(coef20, coef20, coef22, coef23);
+    const auto Vec0 = make_float4(m[1].x, m[0].x, m[0].x, m[0].x);
+    const auto Vec1 = make_float4(m[1].y, m[0].y, m[0].y, m[0].y);
+    const auto Vec2 = make_float4(m[1].z, m[0].z, m[0].z, m[0].z);
+    const auto Vec3 = make_float4(m[1].w, m[0].w, m[0].w, m[0].w);
+    const auto inv0 = Vec1 * fac0 - Vec2 * fac1 + Vec3 * fac2;
+    const auto inv1 = Vec0 * fac0 - Vec2 * fac3 + Vec3 * fac4;
+    const auto inv2 = Vec0 * fac1 - Vec1 * fac3 + Vec3 * fac5;
+    const auto inv3 = Vec0 * fac2 - Vec1 * fac4 + Vec2 * fac5;
+    const auto sign_a = make_float4(+1, -1, +1, -1);
+    const auto sign_b = make_float4(-1, +1, -1, +1);
+    const auto inv_0 = inv0 * sign_a;
+    const auto inv_1 = inv1 * sign_b;
+    const auto inv_2 = inv2 * sign_a;
+    const auto inv_3 = inv3 * sign_b;
+    const auto dot0 = m[0] * make_float4(inv_0.x, inv_1.x, inv_2.x, inv_3.x);
+    const auto dot1 = dot0.x + dot0.y + dot0.z + dot0.w;
+    const auto one_over_determinant = 1.0f / dot1;
     return make_float4x4(inv_0 * one_over_determinant,
                          inv_1 * one_over_determinant,
                          inv_2 * one_over_determinant,
                          inv_3 * one_over_determinant);
 }
 
-}}// namespace luisa::math
+}
+}// namespace luisa::math

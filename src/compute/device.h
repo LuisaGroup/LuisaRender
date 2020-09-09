@@ -50,12 +50,12 @@ public:
     }
     
     template<typename T>
-    [[nodiscard]] std::shared_ptr<Texture> allocate_texture(uint32_t width, uint32_t height) {
-        return allocate_texture(width, height, pixel_format<T>);
+    [[nodiscard]] TextureView allocate_texture(uint32_t width, uint32_t height) {
+        return allocate_texture(width, height, pixel_format<T>)->view();
     }
     
-    [[nodiscard]] std::shared_ptr<Texture> allocate_texture(uint32_t width, uint32_t height, PixelFormat format) {
-        return _allocate_texture(width, height, format);
+    [[nodiscard]] TextureView allocate_texture(uint32_t width, uint32_t height, PixelFormat format) {
+        return _allocate_texture(width, height, format)->view();
     }
     
     [[nodiscard]] virtual std::unique_ptr<Acceleration> build_acceleration(

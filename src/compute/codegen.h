@@ -39,35 +39,36 @@ protected:
     virtual void _emit_function_decl(const Function &f);
     virtual void _emit_function_body(const Function &f);
     virtual void _emit_struct_decl(const TypeDesc *desc);
-    virtual void _emit_struct_fwd_decl(const TypeDesc *desc);
-    virtual void _emit_variable(Variable v);
+    virtual void _emit_variable(const Variable *v);
     virtual void _emit_variable_decl(Variable v);
-    virtual void _emit_argument_member_decl(Variable v);
     virtual void _emit_type(const TypeDesc *desc);
     virtual void _emit_function_call(const std::string &name);
-    virtual void _emit_argument_struct_decl(const compute::dsl::Function &f);
 
 public:
     explicit CppCodegen(std::ostream &os) noexcept : Codegen{os} {}
     void emit(const Function &f) override;
-    
-    // expression visitors
-    void visit(const UnaryExpr &unary_expr) override;
-    void visit(const BinaryExpr &binary_expr) override;
-    void visit(const MemberExpr &member_expr) override;
-    void visit(const LiteralExpr &v) override;
-    void visit(const CallExpr &call_expr) override;
-    void visit(const CastExpr &cast_expr) override;
-    
-    // statement visitors
-    void visit(const DeclareStmt &declare_stmt) override;
-    void visit(const KeywordStmt &stmt) override;
-    void visit(const IfStmt &if_stmt) override;
-    void visit(const WhileStmt &while_stmt) override;
-    void visit(const ForStmt &loop_stmt) override;
-    void visit(const ExprStmt &expr_stmt) override;
-    void visit(const SwitchStmt &switch_stmt) override;
-    void visit(const CaseStmt &case_stmt) override;
+    ~CppCodegen() noexcept override = default;
+    void visit(const UnaryExpr *unary_expr) override;
+    void visit(const BinaryExpr *binary_expr) override;
+    void visit(const MemberExpr *member_expr) override;
+    void visit(const ValueExpr *literal_expr) override;
+    void visit(const CallExpr *func_expr) override;
+    void visit(const CastExpr *cast_expr) override;
+    void visit(const TextureExpr *tex_expr) override;
+    void visit(const EmptyStmt *stmt) override;
+    void visit(const BreakStmt *stmt) override;
+    void visit(const ContinueStmt *stmt) override;
+    void visit(const ReturnStmt *stmt) override;
+    void visit(const ScopeStmt *scope_stmt) override;
+    void visit(const DeclareStmt *declare_stmt) override;
+    void visit(const IfStmt *if_stmt) override;
+    void visit(const WhileStmt *while_stmt) override;
+    void visit(const DoWhileStmt *do_while_stmt) override;
+    void visit(const ExprStmt *expr_stmt) override;
+    void visit(const SwitchStmt *switch_stmt) override;
+    void visit(const SwitchCaseStmt *case_stmt) override;
+    void visit(const SwitchDefaultStmt *default_stmt) override;
+    void visit(const AssignStmt *assign_stmt) override;
 };
 
 }
