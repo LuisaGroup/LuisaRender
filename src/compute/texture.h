@@ -71,7 +71,7 @@ public:
     virtual void copy_from(Dispatcher &dispatcher, const void *data) = 0;
     virtual void copy_to(Dispatcher &dispatcher, void *data) = 0;
     
-    [[nodiscard]] TextureView view() noexcept;
+    [[nodiscard]] inline TextureView view() noexcept;
 };
 
 class TextureView {

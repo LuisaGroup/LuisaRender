@@ -129,6 +129,27 @@ struct alignas(detail::vector_alignment<T, N, is_packed>) Vector : detail::Vecto
 #undef MAKE_ASSIGN_OP
 };
 
+#define MAKE_VECTOR_UNARY_OP(op)                                                                                         \
+    template<typename T, uint N>                                                                                         \
+    [[nodiscard]] constexpr Vector<std::decay_t<decltype(op std::declval<T>())>, N, false>                               \
+    operator op(Vector<T, N, false> v) noexcept {                                                                        \
+        static_assert(N == 2 || N == 3 || N == 4);                                                                       \
+        if constexpr (N == 2) {                                                                                          \
+            return {op v.x, op v.y};                                                                                     \
+        } else if constexpr (N == 3) {                                                                                   \
+            return {op v.x, op v.y, op v.z};                                                                             \
+        } else {                                                                                                         \
+            return {op v.x, op v.y, op v.z, op v.w};                                                                     \
+        }                                                                                                                \
+    }
+
+MAKE_VECTOR_UNARY_OP(-)
+MAKE_VECTOR_UNARY_OP(+)
+MAKE_VECTOR_UNARY_OP(!)
+MAKE_VECTOR_UNARY_OP(~)
+
+#undef MAKE_VECTOR_UNARY_OP
+
 #define MAKE_VECTOR_BINARY_OP(op)                                                                                        \
     template<typename T, uint32_t N, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>                                 \
     [[nodiscard]] constexpr Vector<T, N, false> operator op(Vector<T, N, false> lhs, Vector<T, N, false> rhs) noexcept { \

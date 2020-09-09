@@ -60,6 +60,10 @@ public:
         _scope_stack.pop();
     }
     
+    void add_return();
+    void add_break();
+    void add_continue();
+    
     void add_statement(std::unique_ptr<Statement> stmt) noexcept;
     
     [[nodiscard]] const std::set<const TypeDesc *> &used_structures() const noexcept { return _used_struct_types; }

@@ -226,12 +226,13 @@ public:
     }
 };
 
-#define MAKE_UNARY_OP(op, op_tag)                                                                                       \
-    template<typename T, std::enable_if_t<is_expr<T>, int> = 0>                                                         \
-    auto operator op(T var) noexcept {                                                                                  \
-        using R = std::decay_t<decltype(op std::declval<typename T::Type>())>;                                          \
-        auto v = Variable::make_temporary(type_desc<R>, std::make_unique<UnaryExpr>(UnaryOp::op_tag, var.variable()));  \
-        return Expr<R>{v};                                                                                              \
+#define MAKE_UNARY_OP(op, op_tag)                                                                                            \
+    template<typename T, std::enable_if_t<is_expr<T>, int> = 0>                                                              \
+    auto operator op(T &&var) noexcept {                                                                                     \
+        Expr var_expr{std::forward<T>(var)};                                                                                 \
+        using R = std::decay_t<decltype(op std::declval<typename std::decay_t<decltype(var_expr)>::Type>())>;                \
+        auto v = Variable::make_temporary(type_desc<R>, std::make_unique<UnaryExpr>(UnaryOp::op_tag, var_expr.variable()));  \
+        return Expr<R>{v};                                                                                                   \
     }
 MAKE_UNARY_OP(+, PLUS)
 MAKE_UNARY_OP(-, MINUS)
@@ -242,8 +243,8 @@ MAKE_UNARY_OP(~, BIT_NOT)
 #define MAKE_BINARY_OP(op, op_tag)                                                                                                                  \
     template<typename Lhs, typename Rhs, std::enable_if_t<std::disjunction_v<IsExpr<Lhs>, IsExpr<Rhs>>, int> = 0>                                   \
     inline auto operator op(Lhs &&lhs, Rhs &&rhs) noexcept {                                                                                        \
-        Expr lhs_expr{lhs};                                                                                                                         \
-        Expr rhs_expr{rhs};                                                                                                                         \
+        Expr lhs_expr{std::forward<Lhs>(lhs)};                                                                                                      \
+        Expr rhs_expr{std::forward<Rhs>(rhs)};                                                                                                      \
         using LhsT = typename decltype(lhs_expr)::Type;                                                                                             \
         using RhsT = typename decltype(rhs_expr)::Type;                                                                                             \
         using R = std::decay_t<decltype(std::declval<LhsT>() op std::declval<RhsT>())>;                                                             \
@@ -624,6 +625,10 @@ struct SwitchDefaultStmtBuilder {
 #define Switch(...) SwitchStmtBuilder{__VA_ARGS__} << [&]()
 #define Case(...) SwitchCaseStmtBuilder{__VA_ARGS__} << [&]()
 #define Default SwitchDefaultStmtBuilder{} << [&]()
+
+#define Return Function::current().add_return()
+#define Break Function::current().add_break()
+#define Continue Function::current().add_continue()
 
 }
 

@@ -62,19 +62,21 @@ Scene::Scene(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, 
     std::vector<Material *> materials;
     meshes.reserve(entity_count);
     materials.reserve(entity_count);
-    device->launch(_positions.modify([&](float3 *positions) {
-        _normals.modify([&](float3 *normals) {
-            _tex_coords.modify([&](float2 *uvs) {
-                _triangles.modify([&](packed_uint3 *indices) {
-                    _instance_entities.modify([&](Entity *entities) {
-                        _instances.modify([&](uint *instances) {
-                            _process(shapes, positions, normals, uvs, indices, entities, meshes, materials, instances);
-                        });
-                    });
-                });
-            });
-        });
-    }), [&] {
+    device->launch([&](Dispatcher &dispatch) {
+        dispatch(_positions.modify([&](float3 *positions) {
+            dispatch(_normals.modify([&](float3 *normals) {
+                dispatch(_tex_coords.modify([&](float2 *uvs) {
+                    dispatch(_triangles.modify([&](packed_uint3 *indices) {
+                        dispatch(_instance_entities.modify([&](Entity *entities) {
+                            dispatch(_instances.modify([&](uint *instances) {
+                                _process(shapes, positions, normals, uvs, indices, entities, meshes, materials, instances);
+                            }));
+                        }));
+                    }));
+                }));
+            }));
+        }));
+    }, [&] {
         _positions.clear_cache();
         _normals.clear_cache();
         _tex_coords.clear_cache();
@@ -184,66 +186,48 @@ void Scene::intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_buf
     
     auto kernel = _device->compile_kernel("retrieve_interactions", [&] {
         
-        Arg<const ClosestHit *> hits{_closest_hit_buffer};
-        Arg<const Ray *> rays{ray_buffer};
-        Arg<const uint *> p_ray_count{ray_count_buffer};
-        
-        Arg<bool *> its_valid{its_buffers.valid};
-        Arg<float3 *> its_pi{its_buffers.pi};
-        Arg<float3 *> its_wo{its_buffers.ray_origin_to_hit};
-        Arg<float3 *> its_ng{its_buffers.ng};
-        Arg<float3 *> its_ns{its_buffers.ns};
-        Arg<float2 *> its_uv{its_buffers.uv};
-        Arg<MaterialHandle *> its_material{its_buffers.material};
-        
-        Arg<const float3 *> positions{_positions};
-        Arg<const float3 *> normals{_normals};
-        Arg<const float2 *> tex_coords{_tex_coords};
-        Arg<const packed_uint3 *> triangles{_triangles};
-        Arg<const uint *> instances{_instances};
-        Arg<const float4x4 *> transforms{_instance_transforms};
-        Arg<const Entity *> instance_entities{_instance_entities};
-        Arg<const MaterialHandle *> materials{_instance_materials};
-        
         auto tid = thread_id();
-        Auto ray_count = *p_ray_count;
+        Var ray_count = ray_count_buffer[0];
+        
         If (tid < ray_count) {
             
-            Var<ClosestHit> hit = hits[tid];
+            Var<ClosestHit> hit = _closest_hit_buffer[tid];
             If (hit.distance() <= 0.0f) {
-                its_valid[tid] = false;
+                its_buffers.valid[tid] = false;
                 Return;
             };
             
-            its_valid[tid] = true;
+            its_buffers.valid[tid] = true;
             
-            Auto instance_id = hit.instance_id();
-            its_material[tid] = materials[instance_id];
+            Var instance_id = hit.instance_id();
+            its_buffers.material[tid] = _instance_materials[instance_id];
             
-            Var<Entity> entity = instance_entities[instance_id];
-            Auto triangle_id = entity.triangle_offset() + hit.triangle_id();
-            Auto indices = triangles[triangle_id] + entity.vertex_offset();
+            Var entity = _instance_entities[instance_id];
+            Var triangle_id = entity.triangle_offset() + hit.triangle_id();
+            Var indices = make_uint3(_triangles[triangle_id]) + entity.vertex_offset();
             
-            Auto bary_u = hit.bary_u();
-            Auto bary_v = hit.bary_v();
-            Auto bary_w = literal(1.0f) - (bary_u + bary_v);
+            Var bary_u = hit.bary_u();
+            Var bary_v = hit.bary_v();
+            Var bary_w = 1.0f - (bary_u + bary_v);
             
-            Auto p0 = positions[indices.x()];
-            Auto p1 = positions[indices.y()];
-            Auto p2 = positions[indices.z()];
+            Var p0 = _positions[indices.x()];
+            Var p1 = _positions[indices.y()];
+            Var p2 = _positions[indices.z()];
             
-            Auto m = transforms[instance_id];
-            Auto nm = transpose(inverse(make_float3x3(m)));
-    
-            Auto p = m * (bary_u * p0 + bary_v * p1 + bary_w * p2);
-            its_pi[tid] = p;
-            its_wo[tid] = p - rays[tid].$(origin);
+            Var m = _instance_transforms[instance_id];
+            Var nm = transpose(inverse(make_float3x3(m)));
             
-            Auto ng = normalize(nm * cross(p1 - p0, p2 - p0));
-            Auto ns = normalize(bary_u * normals[indices.x()] + bary_u * normals[indices.y()] + bary_w * normals[indices.z()]);
-            its_ns[tid] = ns;
-            its_ng[tid] = select(dot(ns, ng) < 0.0f, -ng, ng);
-            its_uv[tid] = bary_u * tex_coords[indices.x()] + bary_v * tex_coords[indices.y()] + bary_w * tex_coords[indices.z()];
+            Var p = make_float3(m * make_float4(bary_u * p0 + bary_v * p1 + bary_w * p2, 1.0f));
+            its_buffers.pi[tid] = p;
+            
+            // NOTE: DO NOT NORMALIZE!
+            its_buffers.ray_origin_to_hit[tid] = p - make_float3(ray_buffer[tid].origin());
+            
+            Var ng = normalize(nm * cross(p1 - p0, p2 - p0));
+            Var ns = normalize(bary_u * _normals[indices.x()] + bary_u * _normals[indices.y()] + bary_w * _normals[indices.z()]);
+            its_buffers.ns[tid] = ns;
+            its_buffers.ng[tid] = select(dot(ns, ng) < 0.0f, -ng, ng);
+            its_buffers.uv[tid] = bary_u * _tex_coords[indices.x()] + bary_v * _tex_coords[indices.y()] + bary_w * _tex_coords[indices.z()];
         };
     });
     

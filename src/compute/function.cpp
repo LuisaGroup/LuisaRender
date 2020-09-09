@@ -83,4 +83,8 @@ const Variable *Function::add_threadgroup_variable(std::unique_ptr<Variable> v) 
     return _threadgroup_variables.emplace_back(std::move(v)).get();
 }
 
+void Function::add_return() { add_statement(std::make_unique<ReturnStmt>()); }
+void Function::add_break() { add_statement(std::make_unique<BreakStmt>()); }
+void Function::add_continue() { add_statement(std::make_unique<ContinueStmt>()); }
+
 }

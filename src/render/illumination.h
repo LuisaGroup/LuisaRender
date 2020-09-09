@@ -47,7 +47,7 @@ struct Illumination {
     [[nodiscard]] virtual Description description(const Shape *shape) = 0;
     
     [[nodiscard]] virtual LightSampleExpr sample(
-        Expr<const DataBlock *> data,
+        Expr<DataBlock> data,
         Expr<Interaction> p,
         Expr<SampledWavelength> lambda,
         Expr<float2> u) = 0;
