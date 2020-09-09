@@ -180,9 +180,9 @@ template<typename T>
 struct Structure {
 
     template<typename>
-    static constexpr auto ALWAYS_FALSE = false;
+    static constexpr bool always_false = false;
 
-    static_assert(ALWAYS_FALSE<T>, "Unregistered structure");
+    static_assert(always_false<T>, "Unregistered structure");
 };
 
 namespace detail {
@@ -322,7 +322,7 @@ struct MakeTypeDescImpl<Vector<T, 3, true>> {
 }// namespace detail
 
 template<typename T>
-inline const TypeDesc *type_desc = detail::MakeTypeDescImpl<T>{}();
+inline const TypeDesc *type_desc = detail::MakeTypeDescImpl<std::decay_t<T>>{}();
 
 };// namespace luisa::compute::dsl
 

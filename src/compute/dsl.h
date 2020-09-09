@@ -96,6 +96,8 @@ constexpr auto is_array = IsArray<T>::value;
 template<typename T>
 struct Expr : public ExprBase {
     
+    using Type = T;
+    
     explicit Expr(const Variable *v) noexcept: ExprBase{v} {}
     
     Expr(T v) noexcept: ExprBase{Variable::make_temporary(type_desc<T>, std::make_unique<ValueExpr>(v))} {}
@@ -175,7 +177,7 @@ struct Var : public Expr<T> {
     
     template<typename ...Args>
     explicit Var(Args &&...args) noexcept : Expr<T>{Variable::make_local_variable(type_desc<T>)} {
-        std::vector<const Variable *> init{extract_variable(std::forward<Args>(args))...};
+        std::vector<const Variable *> init{detail::extract_variable(std::forward<Args>(args))...};
         Function::current().add_statement(std::make_unique<DeclareStmt>(this->_variable, std::move(init)));
     }
     
@@ -230,7 +232,7 @@ MAKE_UNARY_OP(~, BIT_NOT)
         using RhsT = typename decltype(rhs_expr)::Type;                                                                                             \
         using R = std::decay_t<decltype(std::declval<LhsT>() op std::declval<RhsT>())>;                                                             \
         auto v = Variable::make_temporary(type_desc<R>, std::make_unique<BinaryExpr>(BinaryOp::op_tag, lhs_expr.variable(), rhs_expr.variable()));  \
-        return Var<R>{v};                                                                                                                           \
+        return Expr<R>{v};                                                                                                                          \
     }                                                                                                                                               \
 
 MAKE_BINARY_OP(+, ADD)

@@ -77,9 +77,10 @@ public:
 class TextureView {
 
 private:
-    std::shared_ptr<Texture> _texture;
+    std::shared_ptr<Texture> _texture{nullptr};
 
 public:
+    TextureView() noexcept = default;
     explicit TextureView(std::shared_ptr<Texture> texture) noexcept : _texture{std::move(texture)} {}
     [[nodiscard]] Texture *texture() const noexcept { return _texture.get(); }
     

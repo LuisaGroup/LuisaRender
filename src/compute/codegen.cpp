@@ -158,11 +158,10 @@ void CppCodegen::_emit_type(const TypeDesc *desc) {
 }
 
 void CppCodegen::_emit_function_decl(const Function &f) {
-    _os << "void " << f.name() << "(\n";
+    _os << "void " << f.name() << "(";
     auto &&args = f.arguments();
     for (auto i = 0u; i < args.size(); i++) {
         auto arg = args[i].get();
-        _os << "    ";
         if (arg->is_texture_argument()) {
             auto usage = f.texture_usage(arg->texture());
             bool read = usage & Function::texture_read_bit;
@@ -178,20 +177,20 @@ void CppCodegen::_emit_function_decl(const Function &f) {
             } else if (sample) {
                 _os << "texture2d<float, access::sample> v" << arg->uid();
             } else { continue; }
-            if (i != args.size() - 1u) { _os << ",\n"; }
+            if (i != args.size() - 1u) { _os << ", "; }
         } else if (arg->is_buffer_argument()) {
             _os << "device ";
             _emit_type(arg->type());
             _os << " *v" << arg->uid();
-            if (i != args.size() - 1u) { _os << ",\n"; }
+            if (i != args.size() - 1u) { _os << ", "; }
         } else if (arg->is_immutable_argument() || arg->is_uniform_argument()) {
             _os << "constant ";
             _emit_type(arg->type());
             _os << " &" << arg->uid();
-            if (i != args.size() - 1u) { _os << ",\n"; }
+            if (i != args.size() - 1u) { _os << ", "; }
         }
     }
-    _os << ")";
+    _os << ") ";
 }
 
 void CppCodegen::_emit_function_call(const std::string &name) {

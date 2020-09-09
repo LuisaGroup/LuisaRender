@@ -10,3 +10,6 @@ target_link_libraries(test_blur PRIVATE ${OpenCV_LIBS})
 
 luisa_render_add_application(test_bitonic_sort SOURCES test_bitonic_sort.cpp)
 luisa_render_add_application(test_bitonic_sort_optimized SOURCES test_bitonic_sort_optimized.cpp)
+
+add_executable(test_strong_type_dsl test_strong_type_dsl.cpp)
+target_link_libraries(test_strong_type_dsl PRIVATE luisa-compute)

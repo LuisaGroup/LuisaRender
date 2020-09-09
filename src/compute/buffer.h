@@ -92,7 +92,7 @@ public:
     [[nodiscard]] auto operator[](Index &&index) const noexcept {
         using namespace luisa::compute::dsl;
         auto v = Variable::make_buffer_argument(type_desc<T>, _buffer);
-        auto i = Expr{index} + _offset;
+        auto i = Expr{index} + static_cast<uint32_t>(_offset);
         return Expr<T>{Variable::make_temporary(type_desc<T>, std::make_unique<BinaryExpr>(BinaryOp::ACCESS, v, i.variable()))};
     }
     
