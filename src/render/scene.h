@@ -7,12 +7,12 @@
 #include <compute/device.h>
 #include <compute/dispatcher.h>
 #include <compute/buffer.h>
+#include <compute/pipeline.h>
 #include <compute/acceleration.h>
 
 #include "shape.h"
 #include "material.h"
 #include "background.h"
-#include "pipeline.h"
 #include "frame_data.h"
 
 namespace luisa::render {
@@ -21,6 +21,7 @@ using compute::Device;
 using compute::BufferView;
 using compute::Dispatcher;
 using compute::Acceleration;
+using compute::Pipeline;
 
 using compute::Ray;
 using compute::AnyHit;

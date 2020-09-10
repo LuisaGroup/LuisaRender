@@ -92,7 +92,6 @@ CudaDevice::CudaDevice(Context *context, uint32_t device_id) : Device{context} {
     CUDA_CHECK(cuEventCreate(&_sync_event, CU_EVENT_BLOCKING_SYNC | CU_EVENT_DISABLE_TIMING));
     
     _dispatch_thread = std::thread{[this, device = _handle] {
-        
         CUcontext ctx;
         CUDA_CHECK(cuDevicePrimaryCtxRetain(&ctx, device));
         CUDA_CHECK(cuCtxSetCurrent(ctx));

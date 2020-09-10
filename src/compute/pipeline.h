@@ -6,9 +6,7 @@
 
 #include <compute/device.h>
 
-namespace luisa::render {
-
-using compute::Dispatcher;
+namespace luisa::compute {
 
 class Pipeline {
 
@@ -29,9 +27,7 @@ public:
     }
     
     void operator()(Dispatcher &dispatch) const {
-        for (auto &&stage : _stages) {
-            dispatch(stage);
-        }
+        for (auto &&stage : _stages) { dispatch(stage); }
     }
     
 };
