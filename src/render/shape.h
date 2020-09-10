@@ -5,7 +5,6 @@
 #pragma once
 
 #include <vector>
-#include <span>
 
 #include <core/data_types.h>
 

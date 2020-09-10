@@ -8,6 +8,7 @@
 #include <vector>
 #include <set>
 #include <map>
+#include <stack>
 
 #include <core/platform.h>
 

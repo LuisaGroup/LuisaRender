@@ -84,7 +84,7 @@ private:
     std::vector<std::unique_ptr<Statement>> _statements;
 
 public:
-    void add_statement(std::unique_ptr<Statement> stmt) noexcept { _statements.emplace_back(std::move(stmt)).get(); }
+    void add_statement(std::unique_ptr<Statement> stmt) noexcept { _statements.emplace_back(std::move(stmt)); }
     [[nodiscard]] const std::vector<std::unique_ptr<Statement>> &statements() const noexcept { return _statements; }
     
     MAKE_STATEMENT_ACCEPT_VISITOR()
