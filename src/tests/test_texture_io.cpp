@@ -18,15 +18,14 @@ int main(int argc, char *argv[]) {
     auto texture = device->allocate_texture<uchar4>(width, height);
     auto buffer = device->allocate_buffer<uchar4>(width * height);
     
-    auto linear_to_srgb = [&](Expr<float3> linear) -> Expr<float3> {
-        auto gamma = [](auto u) { return select(u <= 0.0031308f, 12.92f * u, 1.055f * pow(u, 1.0f / 2.4f) - 0.055f); };
-        return gamma(linear);
+    auto linear_to_srgb = [](Expr<float3> u) -> Expr<float3> {
+        return select(u <= 0.0031308f, 12.92f * u, 1.055f * pow(u, 1.0f / 2.4f) - 0.055f);
     };
     
     auto kernel = device->compile_kernel([&] {
         auto image_size = immutable(make_uint2(width, height));
         auto txy = thread_xy();
-        If (txy.x() < image_size.x() && txy.y() < image_size.y()) {
+        If (all(txy < image_size)) {
             Var xy_f = make_float2(txy);
             Var size_f = make_float2(image_size) - 1.0f;
             Var color = make_float4(linear_to_srgb(make_float3(xy_f / size_f, 1.0f)), 1.0f);
@@ -37,10 +36,10 @@ int main(int argc, char *argv[]) {
     cv::Mat image;
     image.create(cv::Size{width, height}, CV_8UC4);
     
-    device->launch([&](Dispatcher &d) {
-        d(kernel->parallelize(make_uint2(width, height)));
-        d(texture.copy_to(buffer));
-        d(buffer.copy_to(image.data));
+    device->launch([&](Dispatcher &dispatch) {
+        dispatch(kernel->parallelize(make_uint2(width, height)));
+        dispatch(texture.copy_to(buffer));
+        dispatch(buffer.copy_to(image.data));
     });
     device->synchronize();
     
