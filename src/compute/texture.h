@@ -160,6 +160,8 @@ public:
         Function::current().mark_texture_write(_texture.get());
         Function::current().add_statement(std::make_unique<ExprStmt>(std::make_unique<TextureExpr>(TextureOp::WRITE, tex, uv_expr.variable(), value_expr.variable())));
     }
+    
+    [[nodiscard]] bool empty() const noexcept { return _texture == nullptr; }
 };
 
 TextureView Texture::view() noexcept {
