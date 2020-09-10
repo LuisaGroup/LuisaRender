@@ -11,18 +11,21 @@ using namespace luisa::compute::dsl;
 void MetalCodegen::_emit_function_decl(const Function &f) {
     
     auto &&args = f.arguments();
-    auto has_uniforms = false;
+    auto has_uniforms = std::any_of(args.cbegin(), args.cend(), [](auto &&v) noexcept {
+        return v->is_immutable_argument() || v->is_uniform_argument();
+    });
     
-    _os << "struct Uniforms {\n";
-    for (auto &&arg : args) {
-        if (arg->is_immutable_argument() || arg->is_uniform_argument()) {
-            _os << "    ";
-            _emit_type(arg->type());
-            _os << " v" << arg->uid() << ";\n";
-            has_uniforms = true;
+    if (has_uniforms) {
+        _os << "struct Uniforms {\n";
+        for (auto &&arg : args) {
+            if (arg->is_immutable_argument() || arg->is_uniform_argument()) {
+                _os << "    ";
+                _emit_type(arg->type());
+                _os << " v" << arg->uid() << ";\n";
+            }
         }
+        _os << "};\n\n";
     }
-    _os << "};\n\n";
     
     // kernel head
     _os << "kernel void " << f.name() << "(";
