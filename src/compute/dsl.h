@@ -496,7 +496,8 @@ LUISA_STRUCT_BEGIN(S)                                   \
 LUISA_STRUCT_END()                                      \
 LUISA_STRUCT_SPECIALIZE_EXPR(S, __VA_ARGS__)
 
-#ifndef LUISA_DISABLE_DSL_SYNTAX_SUGERS
+// Let's define some syntax sugars...
+#ifndef LUISA_DISABLE_DSL_SYNTAX_SUGARS
 
 namespace luisa::compute::dsl {
 

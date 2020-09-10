@@ -190,44 +190,44 @@ void Scene::intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_buf
         Var ray_count = ray_count_buffer[0];
         
         If (tid < ray_count) {
-            
+    
             Var<ClosestHit> hit = _closest_hit_buffer[tid];
             If (hit.distance() <= 0.0f) {
                 its_buffers.valid[tid] = false;
-                Return;
+            } Else {
+        
+                its_buffers.valid[tid] = true;
+        
+                Var instance_id = hit.instance_id();
+                its_buffers.material[tid] = _instance_materials[instance_id];
+        
+                Var entity = _instance_entities[instance_id];
+                Var triangle_id = entity.triangle_offset() + hit.triangle_id();
+                Var indices = make_uint3(_triangles[triangle_id]) + entity.vertex_offset();
+        
+                Var bary_u = hit.bary_u();
+                Var bary_v = hit.bary_v();
+                Var bary_w = 1.0f - (bary_u + bary_v);
+        
+                Var p0 = _positions[indices.x()];
+                Var p1 = _positions[indices.y()];
+                Var p2 = _positions[indices.z()];
+        
+                Var m = _instance_transforms[instance_id];
+                Var nm = transpose(inverse(make_float3x3(m)));
+        
+                Var p = make_float3(m * make_float4(bary_u * p0 + bary_v * p1 + bary_w * p2, 1.0f));
+                its_buffers.pi[tid] = p;
+        
+                // NOTE: DO NOT NORMALIZE!
+                its_buffers.ray_origin_to_hit[tid] = p - make_float3(ray_buffer[tid].origin());
+        
+                Var ng = normalize(nm * cross(p1 - p0, p2 - p0));
+                Var ns = normalize(bary_u * _normals[indices.x()] + bary_u * _normals[indices.y()] + bary_w * _normals[indices.z()]);
+                its_buffers.ns[tid] = ns;
+                its_buffers.ng[tid] = select(dot(ns, ng) < 0.0f, -ng, ng);
+                its_buffers.uv[tid] = bary_u * _tex_coords[indices.x()] + bary_v * _tex_coords[indices.y()] + bary_w * _tex_coords[indices.z()];
             };
-            
-            its_buffers.valid[tid] = true;
-            
-            Var instance_id = hit.instance_id();
-            its_buffers.material[tid] = _instance_materials[instance_id];
-            
-            Var entity = _instance_entities[instance_id];
-            Var triangle_id = entity.triangle_offset() + hit.triangle_id();
-            Var indices = make_uint3(_triangles[triangle_id]) + entity.vertex_offset();
-            
-            Var bary_u = hit.bary_u();
-            Var bary_v = hit.bary_v();
-            Var bary_w = 1.0f - (bary_u + bary_v);
-            
-            Var p0 = _positions[indices.x()];
-            Var p1 = _positions[indices.y()];
-            Var p2 = _positions[indices.z()];
-            
-            Var m = _instance_transforms[instance_id];
-            Var nm = transpose(inverse(make_float3x3(m)));
-            
-            Var p = make_float3(m * make_float4(bary_u * p0 + bary_v * p1 + bary_w * p2, 1.0f));
-            its_buffers.pi[tid] = p;
-            
-            // NOTE: DO NOT NORMALIZE!
-            its_buffers.ray_origin_to_hit[tid] = p - make_float3(ray_buffer[tid].origin());
-            
-            Var ng = normalize(nm * cross(p1 - p0, p2 - p0));
-            Var ns = normalize(bary_u * _normals[indices.x()] + bary_u * _normals[indices.y()] + bary_w * _normals[indices.z()]);
-            its_buffers.ns[tid] = ns;
-            its_buffers.ng[tid] = select(dot(ns, ng) < 0.0f, -ng, ng);
-            its_buffers.uv[tid] = bary_u * _tex_coords[indices.x()] + bary_v * _tex_coords[indices.y()] + bary_w * _tex_coords[indices.z()];
         };
     });
     
