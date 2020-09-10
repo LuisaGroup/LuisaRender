@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
     auto device = Device::create(&context);
 
     constexpr auto buffer_size = 1024u * 1024u;
-
+    
     std::vector<float> host_buffer(buffer_size);
     for (auto i = 0u; i < buffer_size; i++) { host_buffer[i] = static_cast<float>(i); }
 
@@ -34,31 +34,30 @@ int main(int argc, char *argv[]) {
 
     auto kernel = device->compile_kernel([&] {
         
-        Arg<float *> data{buffer};
-        Arg<uint> cmp_stride_in{&stride};
-        Arg<uint> cmp_step_in{&step};
+        auto cmp_stride_in = uniform(&stride);
+        auto cmp_step_in = uniform(&step);
 
-        Auto cmp_step = cmp_step_in;
-        Auto half_cmp_step = cmp_step / 2u;
-        Auto tid_x = thread_x();
-        Auto lhs_index = tid_x / half_cmp_step * cmp_step + tid_x % half_cmp_step;
-        Auto rhs_index = lhs_index + half_cmp_step;
+        Var cmp_step = cmp_step_in;
+        Var half_cmp_step = cmp_step / 2u;
+        Var tid_x = thread_xy().x();
+        Var lhs_index = tid_x / half_cmp_step * cmp_step + tid_x % half_cmp_step;
+        Var rhs_index = lhs_index + half_cmp_step;
 
-        Auto tid_y = thread_y();
-        Auto lhs = data[tid_y * block_size + lhs_index];
-        Auto rhs = data[tid_y * block_size + rhs_index];
+        Var tid_y = thread_xy().y();
+        Var lhs = buffer[tid_y * block_size + lhs_index];
+        Var rhs = buffer[tid_y * block_size + rhs_index];
 
-        Auto cmp_stride = cmp_stride_in;
-        Auto reverse_ordered = lhs_index / cmp_stride % 2u;
+        Var cmp_stride = cmp_stride_in;
+        Var reverse_ordered = lhs_index / cmp_stride % 2u;
 
-        Auto smaller = min(lhs, rhs);
-        Auto greater = max(lhs, rhs);
-        Auto ascending_pair = make_uint2(smaller, greater);
-        Auto descending_pair = make_uint2(greater, smaller);
+        Var smaller = min(lhs, rhs);
+        Var greater = max(lhs, rhs);
+        Var ascending_pair = make_uint2(smaller, greater);
+        Var descending_pair = make_uint2(greater, smaller);
 
-        Auto result = select(reverse_ordered == 1u, descending_pair, ascending_pair);
-        data[tid_y * block_size + lhs_index] = result.x();
-        data[tid_y * block_size + rhs_index] = result.y();
+        Var result = select(reverse_ordered == 1u, descending_pair, ascending_pair);
+        buffer[tid_y * block_size + lhs_index] = result.x();
+        buffer[tid_y * block_size + rhs_index] = result.y();
     });
     std::default_random_engine random{std::random_device{}()};
     

@@ -6,76 +6,50 @@
 
 #import "metal_dispatcher.h"
 #import "metal_kernel.h"
+#import "metal_buffer.h"
+#import "metal_texture.h"
 
 namespace luisa::metal {
 
 void MetalKernel::_dispatch(Dispatcher &dispatcher, uint2 threadgroups, uint2 threadgroup_size) {
-
-    auto argument_buffer = _get_argument_buffer();
-    if (!_argument_bindings.empty()) {
-        [_argument_encoder setArgumentBuffer:argument_buffer.handle offset:argument_buffer.offset];
-        for (auto [index, size, src] : _argument_bindings) {
-            std::memmove([_argument_encoder constantDataAtIndex:index], src, size);
-        }
-        dispatcher.when_completed([this, argument_buffer] { _argument_buffer_pool.recycle(argument_buffer); });
-    }
-
+    
     auto command_buffer = dynamic_cast<MetalDispatcher &>(dispatcher).handle();
     auto command_encoder = [command_buffer computeCommandEncoderWithDispatchType:MTLDispatchTypeConcurrent];
     [command_encoder setComputePipelineState:_handle];
-    [command_encoder setBuffer:argument_buffer.handle offset:argument_buffer.offset atIndex:0u];
-    for (auto argument : _arguments) {
-        std::visit([&](auto &&arg) noexcept {
-            using Type = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<Type, BufferArgument> || std::is_same_v<Type, TextureArgument>) {
-                [command_encoder useResource:arg.handle usage:arg.usage];
+    
+    // encode arguments
+    uint buffer_id = 0;
+    uint texture_id = 0;
+    for (auto &&r : _resources) {
+        if (r.buffer != nullptr) {  // buffer
+            auto mtl_buffer = dynamic_cast<MetalBuffer *>(r.buffer.get())->handle();
+            [command_encoder setBuffer:mtl_buffer offset:0u atIndex:buffer_id];
+            buffer_id++;
+        } else if (r.texture != nullptr) {  // texture
+            auto mtl_texture = dynamic_cast<MetalTexture *>(r.texture.get())->handle();
+            [command_encoder setTexture:mtl_texture atIndex:texture_id];
+            texture_id++;
+        } else {
+            LUISA_ERROR("Invalid argument.");
+        }
+    }
+    if (!_uniforms.empty()) {
+        std::vector<std::byte> bytes(_uniforms.back().offset + std::max(_uniforms.back().immutable.size(), _uniforms.back().binding_size));
+        for (auto &&u : _uniforms) {
+            if (u.binding != nullptr) {
+                std::memmove(bytes.data() + u.offset, u.binding, u.binding_size);
+            } else {
+                std::memmove(bytes.data() + u.offset, u.immutable.data(), u.immutable.size());
             }
-        }, argument);
+        }
+        [command_encoder setBytes:bytes.data() length:bytes.size() atIndex:buffer_id];
     }
     [command_encoder dispatchThreadgroups:MTLSizeMake(threadgroups.x, threadgroups.y, 1u)
                     threadsPerThreadgroup:MTLSizeMake(threadgroup_size.x, threadgroup_size.y, 1u)];
     [command_encoder endEncoding];
 }
 
-MetalKernel::MetalKernel(id<MTLComputePipelineState> handle,
-                         std::vector<Uniform> uniforms,
-                         std::vector<Argument> args,
-                         id<MTLArgumentEncoder> arg_enc) noexcept
-    : _handle{handle},
-      _argument_bindings{std::move(uniforms)},
-      _arguments{std::move(args)},
-      _argument_encoder{arg_enc},
-      _argument_buffer_pool{[handle device], arg_enc.encodedLength, arg_enc.alignment} {}
-
-ArgumentBufferView MetalKernel::_get_argument_buffer() {
-    if (_argument_bindings.empty()) {
-        if (_constant_argument_buffer == nullptr) {
-            auto device = [_handle device];
-            _constant_argument_buffer = [device newBufferWithLength:_argument_encoder.encodedLength
-                                                            options:MTLCPUCacheModeWriteCombined | MTLHazardTrackingModeUntracked];
-            _initialize_argument_buffer(_constant_argument_buffer, 0u);
-        }
-        return {_constant_argument_buffer, 0u, true};
-    }
-    auto buffer = _argument_buffer_pool.obtain();
-    if (!buffer.initialized) { _initialize_argument_buffer(buffer.handle, buffer.offset); }
-    return {buffer.handle, buffer.offset, true};
-}
-
-void MetalKernel::_initialize_argument_buffer(id<MTLBuffer> buffer, size_t offset) {
-    [_argument_encoder setArgumentBuffer:buffer offset:offset];
-    for (auto &&argument : _arguments) {
-        std::visit([&](auto &&arg) noexcept {
-            using Type = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<Type, ImmutableArgument>) {
-                std::memmove([_argument_encoder constantDataAtIndex:arg.index], arg.data.data(), arg.data.size());
-            } else if constexpr (std::is_same_v<Type, BufferArgument>) {
-                [_argument_encoder setBuffer:arg.handle offset:arg.offset atIndex:arg.index];
-            } else if constexpr (std::is_same_v<Type, TextureArgument>) {
-                [_argument_encoder setTexture:arg.handle atIndex:arg.index];
-            }
-        }, argument);
-    }
-}
+MetalKernel::MetalKernel(id<MTLComputePipelineState> handle, std::vector<Resource> res, std::vector<Uniform> uniforms) noexcept
+    : _handle{handle}, _resources{std::move(res)}, _uniforms{uniforms} {}
 
 }

@@ -10,18 +10,66 @@ using namespace luisa::compute::dsl;
 
 void MetalCodegen::_emit_function_decl(const Function &f) {
     
+    auto &&args = f.arguments();
+    auto has_uniforms = false;
+    
+    _os << "struct Uniforms {\n";
+    for (auto &&arg : args) {
+        if (arg->is_immutable_argument() || arg->is_uniform_argument()) {
+            _os << "    ";
+            _emit_type(arg->type());
+            _os << " v" << arg->uid() << ";\n";
+            has_uniforms = true;
+        }
+    }
+    _os << "};\n\n";
+    
     // kernel head
-    _os << "kernel void " << f.name() << "(device const Argument &arg [[buffer(0)]]";
-    for (auto &&v : f.builtin_variables()) {
-        if (v.is_thread_id()) {
+    _os << "kernel void " << f.name() << "(";
+    for (auto i = 0u; i < args.size(); i++) {
+        auto arg = args[i].get();
+        if (arg->is_texture_argument()) {
+            auto usage = f.texture_usage(arg->texture());
+            auto read = static_cast<bool>(usage & Function::texture_read_bit);
+            auto write = static_cast<bool>(usage & Function::texture_write_bit);
+            auto sample = static_cast<bool>(usage & Function::texture_sample_bit);
+            assert(!(sample && (read || write)));
+            if (read && write) {
+                _os << "texture2d<float, access::read_write> v" << arg->uid();
+            } else if (read) {
+                _os << "texture2d<float, access::read> v" << arg->uid();
+            } else if (write) {
+                _os << "texture2d<float, access::write> v" << arg->uid();
+            } else if (sample) {
+                _os << "texture2d<float, access::sample> v" << arg->uid();
+            } else { continue; }
+            if (i != args.size() - 1u) { _os << ", "; }
+        } else if (arg->is_buffer_argument()) {
+            _os << "device ";
+            _emit_type(arg->type());
+            _os << " *v" << arg->uid();
+            if (i != args.size() - 1u) { _os << ", "; }
+        }
+    }
+    if (has_uniforms) { _os << ", constant Uniforms &uniforms"; }
+    for (auto &&v : f.builtins()) {
+        if (v->is_thread_id()) {
             _os << ", ";
             _os << "uint tid [[thread_position_in_grid]]";
-        } else if (v.is_thread_xy()) {
+        } else if (v->is_thread_xy()) {
             _os << ", ";
             _os << "uint2 txy [[thread_position_in_grid]]";
         }
     }
     _os << ") ";
+}
+
+void MetalCodegen::_emit_variable(const Variable *v) {
+    if (v->is_uniform_argument() || v->is_immutable_argument()) {
+        _os << "uniforms.v" << v->uid();
+    } else {
+        CppCodegen::_emit_variable(v);
+    }
 }
 
 void MetalCodegen::emit(const Function &f) {
@@ -105,7 +153,6 @@ void MetalCodegen::emit(const Function &f) {
 }
 
 void MetalCodegen::_emit_type(const TypeDesc *desc) {
-    if (is_ptr_or_ref(desc)) { _os << "device "; }
     if (desc->type == TypeCatalog::ATOMIC) {
         _os << "_atomic<";
         _emit_type(desc->element_type);
@@ -115,7 +162,7 @@ void MetalCodegen::_emit_type(const TypeDesc *desc) {
     }
 }
 
-void MetalCodegen::_emit_function_call(const std::string &name) {
+void MetalCodegen::_emit_builtin_function_name(const std::string &name) {
     if (name.find("make_") == 0u) {
         _os << std::string_view{name.c_str()}.substr(5);
     } else if (name == "lerp") {

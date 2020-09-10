@@ -42,11 +42,13 @@ protected:
     virtual void _emit_struct_decl(const TypeDesc *desc);
     virtual void _emit_variable(const Variable *v);
     virtual void _emit_type(const TypeDesc *desc);
+    virtual void _emit_builtin_function_name(const std::string &func);
 
 public:
     explicit CppCodegen(std::ostream &os) noexcept : Codegen{os} {}
-    void emit(const Function &f) override;
     ~CppCodegen() noexcept override = default;
+    
+    void emit(const Function &f) override;
     void visit(const UnaryExpr *unary_expr) override;
     void visit(const BinaryExpr *binary_expr) override;
     void visit(const MemberExpr *member_expr) override;

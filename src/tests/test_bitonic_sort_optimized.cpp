@@ -32,92 +32,88 @@ int main(int argc, char *argv[]) {
     
     auto kernel = device->compile_kernel("basic", [&] {
         
-        Arg<float *> data{buffer};
-        Arg<uint> cmp_stride_in{&stride};
-        Arg<uint> cmp_step_in{&step};
+        auto cmp_stride_in = uniform(&stride);
+        auto cmp_step_in = uniform(&step);
         
-        Auto cmp_step = cmp_step_in;
-        Auto half_cmp_step = cmp_step / 2u;
-        Auto tid = thread_id();
-        Auto lhs_index = tid / half_cmp_step * cmp_step + tid % half_cmp_step;
-        Auto rhs_index = lhs_index + half_cmp_step;
+        Var cmp_step = cmp_step_in;
+        Var half_cmp_step = cmp_step / 2u;
+        Var tid = thread_id();
+        Var lhs_index = tid / half_cmp_step * cmp_step + tid % half_cmp_step;
+        Var rhs_index = lhs_index + half_cmp_step;
         
-        Auto lhs = data[lhs_index];
-        Auto rhs = data[rhs_index];
+        Var lhs = buffer[lhs_index];
+        Var rhs = buffer[rhs_index];
         
-        Auto predicate = cast<bool>(lhs_index & cmp_stride_in) ^ (lhs < rhs);
-        data[lhs_index] = select(predicate, lhs, rhs);
-        data[rhs_index] = select(predicate, rhs, lhs);
+        Var predicate = cast<bool>(lhs_index & cmp_stride_in) ^ (lhs < rhs);
+        buffer[lhs_index] = select(predicate, lhs, rhs);
+        buffer[rhs_index] = select(predicate, rhs, lhs);
     });
     
     auto small_stride_kernel = device->compile_kernel("small_stride", [&] {
         
-        Arg<float *> data{buffer};
+        Threadgroup<float> cache{block_size};
         
-        Threadgroup<std::array<float, block_size>> cache;
         constexpr auto half_block_size = block_size / 2u;
-        Auto tgid = thread_id() % half_block_size;
-        cache[tgid * 2u] = data[thread_id() * 2u];
-        cache[tgid * 2u + 1u] = data[thread_id() * 2u + 1u];
+        Var tgid = thread_id() % half_block_size;
+        cache[tgid * 2u] = buffer[thread_id() * 2u];
+        cache[tgid * 2u + 1u] = buffer[thread_id() * 2u + 1u];
         threadgroup_barrier();
         
-        Auto tid = thread_id();
+        auto tid = thread_id();
         for (auto cmp_stride = 2u; cmp_stride <= block_size; cmp_stride *= 2u) {
             for (auto cmp_step = cmp_stride; cmp_step >= 2u; cmp_step /= 2u) {
                 
                 auto half_cmp_step = cmp_step / 2u;
                 
-                Auto lhs_index = tid / half_cmp_step * cmp_step + tid % half_cmp_step;
-                Auto rhs_index = lhs_index + half_cmp_step;
+                Var lhs_index = tid / half_cmp_step * cmp_step + tid % half_cmp_step;
+                Var rhs_index = lhs_index + half_cmp_step;
                 
-                Auto lhs = cache[lhs_index % block_size];
-                Auto rhs = cache[rhs_index % block_size];
+                Var lhs = cache[lhs_index % block_size];
+                Var rhs = cache[rhs_index % block_size];
     
-                Auto predicate = cast<bool>(lhs_index & cmp_stride) ^ (lhs < rhs);
+                Var predicate = cast<bool>(lhs_index & cmp_stride) ^ (lhs < rhs);
                 cache[lhs_index % block_size] = select(predicate, lhs, rhs);
                 cache[rhs_index % block_size] = select(predicate, rhs, lhs);
                 
                 threadgroup_barrier();
             }
         }
-        data[thread_id() * 2u] = cache[tgid * 2u];
-        data[thread_id() * 2u + 1u] = cache[tgid * 2u + 1u];
+        buffer[thread_id() * 2u] = cache[tgid * 2u];
+        buffer[thread_id() * 2u + 1u] = cache[tgid * 2u + 1u];
     });
     
     auto small_step_kernel = device->compile_kernel("small_step", [&] {
         
-        Arg<float *> data{buffer};
-        Arg<uint> cmp_step_in{&step};
-        Arg<uint> cmp_stride_in{&stride};
+        auto cmp_stride_in = uniform(&stride);
         
-        Threadgroup<std::array<float, block_size>> cache;
+        Threadgroup<float> cache{block_size};
         constexpr auto half_block_size = block_size / 2u;
-        Auto tgid = thread_id() % half_block_size;
-        cache[tgid * 2u] = data[thread_id() * 2u];
-        cache[tgid * 2u + 1u] = data[thread_id() * 2u + 1u];
+        Var tgid = thread_id() % half_block_size;
+        cache[tgid * 2u] = buffer[thread_id() * 2u];
+        cache[tgid * 2u + 1u] = buffer[thread_id() * 2u + 1u];
         threadgroup_barrier();
         
-        Auto tid = thread_id();
-        Auto cmp_stride = cmp_stride_in;
+        auto tid = thread_id();
+        auto cmp_stride = cmp_stride_in;
         
         for (auto cmp_step = block_size; cmp_step >= 2u; cmp_step /= 2) {
             
             auto half_cmp_step = cmp_step / 2u;
             
-            Auto lhs_index = tid / half_cmp_step * cmp_step + tid % half_cmp_step;
-            Auto rhs_index = lhs_index + half_cmp_step;
+            Var lhs_index = tid / half_cmp_step * cmp_step + tid % half_cmp_step;
+            Var rhs_index = lhs_index + half_cmp_step;
             
-            Auto lhs = cache[lhs_index % block_size];
-            Auto rhs = cache[rhs_index % block_size];
+            Var lhs = cache[lhs_index % block_size];
+            Var rhs = cache[rhs_index % block_size];
             
-            Auto predicate = cast<bool>(lhs_index & cmp_stride) ^ (lhs < rhs);
+            Var predicate = cast<bool>(lhs_index & cmp_stride) ^ (lhs < rhs);
             cache[lhs_index % block_size] = select(predicate, lhs, rhs);
             cache[rhs_index % block_size] = select(predicate, rhs, lhs);
             
             threadgroup_barrier();
         }
-        data[thread_id() * 2u] = cache[tgid * 2u];
-        data[thread_id() * 2u + 1u] = cache[tgid * 2u + 1u];
+        buffer[thread_id() * 2u] = cache[tgid * 2u];
+        buffer[thread_id() * 2u + 1u] = cache[tgid * 2u + 1u];
     });
     
     std::default_random_engine random{std::random_device{}()};

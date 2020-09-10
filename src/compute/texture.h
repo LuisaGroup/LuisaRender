@@ -72,6 +72,25 @@ public:
     virtual void copy_to(Dispatcher &dispatcher, void *data) = 0;
     
     [[nodiscard]] inline TextureView view() noexcept;
+    
+    [[nodiscard]] uint32_t channels() const noexcept {
+        if (_format == PixelFormat::R8U || _format == PixelFormat::R32F) { return 1u; }
+        if (_format == PixelFormat::RG8U || _format == PixelFormat::RG32F) { return 2u; }
+        return 4u;
+    }
+    
+    [[nodiscard]] uint32_t pixel_byte_size() const noexcept {
+        if (_format == PixelFormat::R8U ||
+            _format == PixelFormat::RG8U ||
+            _format == PixelFormat::RGBA8U) {
+            return channels();
+        }
+        return sizeof(float) * channels();
+    }
+    
+    [[nodiscard]] uint32_t pitch_byte_size() const noexcept { return pixel_byte_size() * width(); }
+    [[nodiscard]] uint32_t byte_size() const noexcept { return pitch_byte_size() * height(); }
+    [[nodiscard]] uint32_t pixel_count() const noexcept { return width() * height(); }
 };
 
 class TextureView {
@@ -81,7 +100,7 @@ private:
 
 public:
     TextureView() noexcept = default;
-    explicit TextureView(std::shared_ptr<Texture> texture) noexcept : _texture{std::move(texture)} {}
+    explicit TextureView(std::shared_ptr<Texture> texture) noexcept: _texture{std::move(texture)} {}
     [[nodiscard]] Texture *texture() const noexcept { return _texture.get(); }
     
     [[nodiscard]] auto copy_from(const void *data) { return [this, data](Dispatcher &d) { _texture->copy_from(d, data); }; }
@@ -90,13 +109,13 @@ public:
     template<typename T>
     [[nodiscard]] auto copy_from(const BufferView<T> &buffer) {
         LUISA_WARNING_IF_NOT(pixel_format<T> == _texture->format(), "Texture pixel format and buffer type mismatch.");
-        return [this, buffer](Dispatcher &d) { _copy_from(d, buffer.buffer(), buffer.byte_offset()); };
+        return [this, buffer](Dispatcher &d) { _texture->copy_from(d, buffer.buffer(), buffer.byte_offset()); };
     }
     
     template<typename T>
     [[nodiscard]] auto copy_to(const BufferView<T> &buffer) {
         LUISA_WARNING_IF_NOT(pixel_format<T> == _texture->format(), "Texture pixel format and buffer type mismatch.");
-        return [this, buffer](Dispatcher &d) { _copy_to(d, buffer.buffer(), buffer.byte_offset()); };
+        return [this, buffer](Dispatcher &d) { _texture->copy_to(d, buffer.buffer(), buffer.byte_offset()); };
     }
     
     [[nodiscard]] auto copy_to(const TextureView &tv) { return [this, &tv](Dispatcher &d) { _texture->copy_to(d, tv.texture()); }; }
@@ -107,24 +126,11 @@ public:
     
     void clear_cache() { _texture->clear_cache(); }
     
-    [[nodiscard]] uint32_t channels() const noexcept {
-        if (_texture->format() == PixelFormat::R8U || _texture->format() == PixelFormat::R32F) { return 1u; }
-        if (_texture->format() == PixelFormat::RG8U || _texture->format() == PixelFormat::RG32F) { return 2u; }
-        return 4u;
-    }
-    
-    [[nodiscard]] uint32_t pixel_byte_size() const noexcept {
-        if (_texture->format() == PixelFormat::R8U ||
-            _texture->format() == PixelFormat::RG8U ||
-            _texture->format() == PixelFormat::RGBA8U) {
-            return channels();
-        }
-        return sizeof(float) * channels();
-    }
-    
-    [[nodiscard]] uint32_t pitch_byte_size() const noexcept { return pixel_byte_size() * width(); }
-    [[nodiscard]] uint32_t byte_size() const noexcept { return pitch_byte_size() * height(); }
-    [[nodiscard]] uint32_t pixel_count() const noexcept { return width() * height(); }
+    [[nodiscard]] uint32_t channels() const noexcept { return _texture->channels(); }
+    [[nodiscard]] uint32_t pixel_byte_size() const noexcept { return _texture->pixel_byte_size(); }
+    [[nodiscard]] uint32_t pitch_byte_size() const noexcept { return _texture->pitch_byte_size(); }
+    [[nodiscard]] uint32_t byte_size() const noexcept { return _texture->byte_size(); }
+    [[nodiscard]] uint32_t pixel_count() const noexcept { return _texture->pixel_count(); }
     
     // For DSL
     template<typename UV>
@@ -146,13 +152,13 @@ public:
     }
     
     template<typename UV, typename Value>
-    [[nodiscard]] auto write(UV &&uv, Value &&value) const noexcept {
+    void write(UV &&uv, Value &&value) const noexcept {
         using namespace luisa::compute::dsl;
         Expr uv_expr{std::forward<UV>(uv)};
         Expr value_expr{std::forward<Value>(value)};
         auto tex = Variable::make_texture_argument(_texture);
         Function::current().mark_texture_write(_texture.get());
-        return Expr<float4>{Variable::make_temporary(nullptr, std::make_unique<TextureExpr>(TextureOp::SAMPLE, tex, uv_expr.variable(), value_expr.variable()))};
+        Function::current().add_statement(std::make_unique<ExprStmt>(std::make_unique<TextureExpr>(TextureOp::WRITE, tex, uv_expr.variable(), value_expr.variable())));
     }
 };
 

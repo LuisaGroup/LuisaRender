@@ -158,9 +158,9 @@ void CppCodegen::_emit_function_decl(const Function &f) {
         auto arg = args[i].get();
         if (arg->is_texture_argument()) {
             auto usage = f.texture_usage(arg->texture());
-            bool read = usage & Function::texture_read_bit;
-            bool write = usage & Function::texture_write_bit;
-            bool sample = usage & Function::texture_sample_bit;
+            auto read = static_cast<bool>(usage & Function::texture_read_bit);
+            auto write = static_cast<bool>(usage & Function::texture_write_bit);
+            auto sample = static_cast<bool>(usage & Function::texture_sample_bit);
             assert(!(sample && (read || write)));
             if (read && write) {
                 _os << "texture2d<float, access::read_write> v" << arg->uid();
@@ -173,12 +173,10 @@ void CppCodegen::_emit_function_decl(const Function &f) {
             } else { continue; }
             if (i != args.size() - 1u) { _os << ", "; }
         } else if (arg->is_buffer_argument()) {
-            _os << "device ";
             _emit_type(arg->type());
             _os << " *v" << arg->uid();
             if (i != args.size() - 1u) { _os << ", "; }
         } else if (arg->is_immutable_argument() || arg->is_uniform_argument()) {
-            _os << "constant ";
             _emit_type(arg->type());
             _os << " &v" << arg->uid();
             if (i != args.size() - 1u) { _os << ", "; }
@@ -301,7 +299,8 @@ void CppCodegen::visit(const MemberExpr *member_expr) {
 }
 
 void CppCodegen::visit(const CallExpr *func_expr) {
-    _os << func_expr->name() << "(";
+    _emit_builtin_function_name(func_expr->name());
+    _os << "(";
     auto &&args = func_expr->arguments();
     for (auto i = 0u; i < args.size(); i++) {
         auto arg = args[i];
@@ -356,6 +355,7 @@ void CppCodegen::visit(const TextureExpr *tex_expr) {
             _os << ")";
             break;
         case TextureOp::SAMPLE:
+            LUISA_ERROR("Not implemented!");
             break;
     }
 }
@@ -519,6 +519,10 @@ void CppCodegen::visit(const AssignStmt *assign_stmt) {
     }
     _emit_variable(assign_stmt->rhs());
     _os << ";\n";
+}
+
+void CppCodegen::_emit_builtin_function_name(const std::string &func) {
+    _os << func;
 }
 
 }

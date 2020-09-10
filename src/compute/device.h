@@ -51,7 +51,7 @@ public:
     
     template<typename T>
     [[nodiscard]] TextureView allocate_texture(uint32_t width, uint32_t height) {
-        return allocate_texture(width, height, pixel_format<T>)->view();
+        return _allocate_texture(width, height, pixel_format<T>)->view();
     }
     
     [[nodiscard]] TextureView allocate_texture(uint32_t width, uint32_t height, PixelFormat format) {

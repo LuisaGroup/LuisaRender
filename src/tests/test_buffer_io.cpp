@@ -12,7 +12,7 @@ int main(int argc, char *argv[]) {
     Context context{argc, argv};
     auto device = Device::create(&context);
     
-    constexpr auto buffer_size = 1024u * 768u;
+    constexpr auto buffer_size = 1024u;
     
     auto buffer_a = device->allocate_buffer<float>(buffer_size);
     auto buffer_b = device->allocate_buffer<float>(buffer_size);
@@ -25,20 +25,15 @@ int main(int argc, char *argv[]) {
     auto input_copy = input;
     std::shuffle(input_copy.begin(), input_copy.end(), rng);
     
-    auto scale_value = [&](Float k, Expr<float> x) -> Float {
+    auto scale_value = [&](Expr<float> k, Expr<float> x) -> Expr<float> {
         return k * x;
     };
     
     auto scale = 1.0f;
     auto kernel = device->compile_kernel("simple_test", [&] {
-        
-        Arg<const float *> a{buffer_a};
-        Arg<float *> b{buffer_b};
-        Arg<float> k{&scale};
-        
-        Auto tid = thread_id();
-        If(tid < buffer_size) {
-            b[tid] = scale_value(k, a[tid]);
+        auto tid = thread_id();
+        If (tid < buffer_size) {
+            buffer_b[tid] = scale_value(uniform(&scale), buffer_a[tid]);
         };
     });
     
