@@ -92,7 +92,7 @@ void CudaCodegen::_emit_function_decl(const Function &f) {
             } else if (arg->is_buffer_argument()) {
                 _os << "    ";
                 _emit_type(arg->type());
-                _os << " *v" << arg->uid() << ";\n";
+                _os << " * __restrict__ v" << arg->uid() << ";\n";
             }
         }
         _os << "};\n\n"
