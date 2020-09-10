@@ -34,9 +34,9 @@ Context::Context(int argc, char *argv[])
       _cli_options{std::filesystem::path{argv[0]}.filename().string()} {
 
     _cli_options.add_options()("d,devices", "Select compute devices", cxxopts::value<std::vector<std::string>>()->default_value(""))
-                    ("rundir", "Specify runtime directory", cxxopts::value<std::filesystem::path>()->default_value(std::filesystem::canonical(argv[0]).parent_path().parent_path().string()))
-                    ("workdir", "Specify working directory", cxxopts::value<std::filesystem::path>()->default_value(std::filesystem::canonical(std::filesystem::current_path()).string()))
-                    ("C,clearcache", "Clear cached kernel compilation", cxxopts::value<bool>());
+                    ("runtime-dir", "Specify runtime directory", cxxopts::value<std::filesystem::path>()->default_value(std::filesystem::canonical(argv[0]).parent_path().parent_path().string()))
+                    ("working-dir", "Specify working directory", cxxopts::value<std::filesystem::path>()->default_value(std::filesystem::canonical(std::filesystem::current_path()).string()))
+                    ("clear-cache", "Clear cached kernel compilation", cxxopts::value<bool>());
 }
 
 const cxxopts::ParseResult &Context::_parse_result() noexcept {
@@ -46,7 +46,7 @@ const cxxopts::ParseResult &Context::_parse_result() noexcept {
 
 const std::filesystem::path &Context::_runtime_dir() noexcept {
     if (_rundir.empty()) {
-        _rundir = std::filesystem::canonical(_parse_result()["rundir"].as<std::filesystem::path>());
+        _rundir = std::filesystem::canonical(_parse_result()["runtime-dir"].as<std::filesystem::path>());
         LUISA_EXCEPTION_IF(!std::filesystem::exists(_rundir) || !std::filesystem::is_directory(_rundir), "Invalid runtime directory: ", _rundir);
         LUISA_INFO("Runtime directory: ", _rundir);
     }
@@ -55,11 +55,11 @@ const std::filesystem::path &Context::_runtime_dir() noexcept {
 
 const std::filesystem::path &Context::_working_dir() noexcept {
     if (_workdir.empty()) {
-        _workdir = std::filesystem::canonical(_parse_result()["workdir"].as<std::filesystem::path>());
+        _workdir = std::filesystem::canonical(_parse_result()["working-dir"].as<std::filesystem::path>());
         LUISA_EXCEPTION_IF(!std::filesystem::exists(_workdir) || !std::filesystem::is_directory(_workdir), "Invalid working directory: ", _workdir);
         LUISA_INFO("Working directory: ", _workdir);
         auto cache_directory = _workdir / "cache";
-        if (_parse_result()["clearcache"].as<bool>() && std::filesystem::exists(cache_directory)) {
+        if (_parse_result()["clear-cache"].as<bool>() && std::filesystem::exists(cache_directory)) {
             LUISA_INFO("Removing cache directory: ", cache_directory);
             std::filesystem::remove_all(cache_directory);
         }

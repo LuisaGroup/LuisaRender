@@ -183,8 +183,9 @@ void CppCodegen::visit(const LiteralExpr &literal_expr) {
             using T = std::decay_t<decltype(v)>;
             if constexpr (std::is_same_v<T, Variable>) { _emit_variable(v); }
             else if constexpr (std::is_same_v<T, bool>) { _os << v; }
-            else if constexpr (std::is_same_v<T, float>) { _os << v << "f"; }
-            else if constexpr (std::is_same_v<T, int8_t>) { _os << "static_cast<int8_t>(" << v << ")"; }
+            else if constexpr (std::is_same_v<T, float>) {
+                if (std::isinf(v)) { _os << "static_cast<float>(INFINITY)"; } else { _os << v << "f"; }
+            } else if constexpr (std::is_same_v<T, int8_t>) { _os << "static_cast<int8_t>(" << v << ")"; }
             else if constexpr (std::is_same_v<T, uint8_t>) { _os << "static_cast<uint8_t>(" << v << ")"; }
             else if constexpr (std::is_same_v<T, int16_t>) { _os << "static_cast<int16_t>(" << v << ")"; }
             else if constexpr (std::is_same_v<T, uint16_t>) { _os << "static_cast<uint16_t>(" << v << ")"; }
