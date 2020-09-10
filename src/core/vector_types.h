@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "scalar_types.h"
 #include <type_traits>
+#include "scalar_types.h"
 
 namespace luisa {
 
@@ -147,44 +147,43 @@ MAKE_VECTOR_UNARY_OP(-)
 MAKE_VECTOR_UNARY_OP(+)
 MAKE_VECTOR_UNARY_OP(!)
 MAKE_VECTOR_UNARY_OP(~)
-
 #undef MAKE_VECTOR_UNARY_OP
 
-#define MAKE_VECTOR_BINARY_OP(op)                                                                                        \
-    template<typename T, uint32_t N, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>                                 \
-    [[nodiscard]] constexpr Vector<T, N, false> operator op(Vector<T, N, false> lhs, Vector<T, N, false> rhs) noexcept { \
-        static_assert(N == 2 || N == 3 || N == 4);                                                                       \
-        if constexpr (N == 2) {                                                                                          \
-            return Vector<T, 2, false>{lhs.x op rhs.x, lhs.y op rhs.y};                                                  \
-        } else if constexpr (N == 3) {                                                                                   \
-            return Vector<T, 3, false>{lhs.x op rhs.x, lhs.y op rhs.y, lhs.z op rhs.z};                                  \
-        } else {                                                                                                         \
-            return Vector<T, 4, false>{lhs.x op rhs.x, lhs.y op rhs.y, lhs.z op rhs.z, lhs.w op rhs.w};                  \
-        }                                                                                                                \
-    }                                                                                                                    \
-                                                                                                                         \
-    template<typename T, uint32_t N, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>                                 \
-    [[nodiscard]] constexpr Vector<T, N, false> operator op(T lhs, Vector<T, N, false> rhs) noexcept {                   \
-        static_assert(N == 2 || N == 3 || N == 4);                                                                       \
-        if constexpr (N == 2) {                                                                                          \
-            return Vector<T, 2, false>{lhs op rhs.x, lhs op rhs.y};                                                      \
-        } else if constexpr (N == 3) {                                                                                   \
-            return Vector<T, 3, false>{lhs op rhs.x, lhs op rhs.y, lhs op rhs.z};                                        \
-        } else {                                                                                                         \
-            return Vector<T, 4, false>{lhs op rhs.x, lhs op rhs.y, lhs op rhs.z, lhs op rhs.w};                          \
-        }                                                                                                                \
-    }                                                                                                                    \
-                                                                                                                         \
-    template<typename T, uint32_t N, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>                                 \
-    [[nodiscard]] constexpr Vector<T, N, false> operator op(Vector<T, N, false> lhs, T rhs) noexcept {                   \
-        static_assert(N == 2 || N == 3 || N == 4);                                                                       \
-        if constexpr (N == 2) {                                                                                          \
-            return Vector<T, 2, false>{lhs.x op rhs, lhs.y op rhs};                                                      \
-        } else if constexpr (N == 3) {                                                                                   \
-            return Vector<T, 3, false>{lhs.x op rhs, lhs.y op rhs, lhs.z op rhs};                                        \
-        } else {                                                                                                         \
-            return Vector<T, 4, false>{lhs.x op rhs, lhs.y op rhs, lhs.z op rhs, lhs.w op rhs};                          \
-        }                                                                                                                \
+#define MAKE_VECTOR_BINARY_OP(op)                                                                          \
+    template<typename T, uint32_t N, std::enable_if_t<scalar::is_scalar<T>, int> = 0>                      \
+    constexpr Vector<T, N, false> operator op(Vector<T, N, false> lhs, Vector<T, N, false> rhs) noexcept { \
+        static_assert(N == 2 || N == 3 || N == 4);                                                         \
+        if constexpr (N == 2) {                                                                            \
+            return Vector<T, 2, false>{lhs.x op rhs.x, lhs.y op rhs.y};                                    \
+        } else if constexpr (N == 3) {                                                                     \
+            return Vector<T, 3, false>{lhs.x op rhs.x, lhs.y op rhs.y, lhs.z op rhs.z};                    \
+        } else {                                                                                           \
+            return Vector<T, 4, false>{lhs.x op rhs.x, lhs.y op rhs.y, lhs.z op rhs.z, lhs.w op rhs.w};    \
+        }                                                                                                  \
+    }                                                                                                      \
+                                                                                                           \
+    template<typename T, uint32_t N, std::enable_if_t<scalar::is_scalar<T>, int> = 0>                      \
+    constexpr Vector<T, N, false> operator op(T lhs, Vector<T, N, false> rhs) noexcept {                   \
+        static_assert(N == 2 || N == 3 || N == 4);                                                         \
+        if constexpr (N == 2) {                                                                            \
+            return Vector<T, 2, false>{lhs op rhs.x, lhs op rhs.y};                                        \
+        } else if constexpr (N == 3) {                                                                     \
+            return Vector<T, 3, false>{lhs op rhs.x, lhs op rhs.y, lhs op rhs.z};                          \
+        } else {                                                                                           \
+            return Vector<T, 4, false>{lhs op rhs.x, lhs op rhs.y, lhs op rhs.z, lhs op rhs.w};            \
+        }                                                                                                  \
+    }                                                                                                      \
+                                                                                                           \
+    template<typename T, uint32_t N, std::enable_if_t<scalar::is_scalar<T>, int> = 0>                      \
+    constexpr Vector<T, N, false> operator op(Vector<T, N, false> lhs, T rhs) noexcept {                   \
+        static_assert(N == 2 || N == 3 || N == 4);                                                         \
+        if constexpr (N == 2) {                                                                            \
+            return Vector<T, 2, false>{lhs.x op rhs, lhs.y op rhs};                                        \
+        } else if constexpr (N == 3) {                                                                     \
+            return Vector<T, 3, false>{lhs.x op rhs, lhs.y op rhs, lhs.z op rhs};                          \
+        } else {                                                                                           \
+            return Vector<T, 4, false>{lhs.x op rhs, lhs.y op rhs, lhs.z op rhs, lhs.w op rhs};            \
+        }                                                                                                  \
     }
 
 MAKE_VECTOR_BINARY_OP(+)

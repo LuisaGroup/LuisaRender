@@ -12,9 +12,9 @@ using namespace luisa;
 using namespace luisa::compute;
 using namespace luisa::compute::dsl;
 
-[[nodiscard]] cv::Mat load_image(const std::string &path) {
-    LUISA_INFO("Loading image: \"", path, "\"...");
-    auto image = cv::imread(path, cv::IMREAD_UNCHANGED);
+[[nodiscard]] cv::Mat load_image(const std::filesystem::path &path) {
+    LUISA_INFO("Loading image: ", path, "...");
+    auto image = cv::imread(path.string(), cv::IMREAD_UNCHANGED);
     cv::cvtColor(image, image, image.channels() == 1 ? cv::COLOR_GRAY2RGBA : cv::COLOR_BGR2RGBA);
     const auto size = image.rows * image.cols * image.channels();
     for (auto i = 0; i < size; i++) {
@@ -51,6 +51,7 @@ int main(int argc, char *argv[]) {
         auto height = color_image.rows;
         auto color = device->allocate_texture<float4>(width, height);
         auto color_var = device->allocate_texture<float4>(width, height);
+        
         device->launch([&](Dispatcher &dispatch) {
             dispatch(color->copy_from(color_image.data));
             dispatch(color_var->copy_from(color_var_image.data));
