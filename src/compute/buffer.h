@@ -73,17 +73,16 @@ public:
     [[nodiscard]] size_t byte_offset() const noexcept { return _offset * sizeof(T); }
     [[nodiscard]] size_t byte_size() const noexcept { return _size * sizeof(T); }
     
-    [[nodiscard]] auto copy_from(const void *data) const { return [this, data](Dispatcher &d) { _copy_from(d, data); }; }
-    [[nodiscard]] auto copy_to(void *data) const { return [this, data](Dispatcher &d) { _copy_to(d, data); }; }
+    [[nodiscard]] auto copy_from(const void *data) const { return [self = *this, data](Dispatcher &d) { self._copy_from(d, data); }; }
+    [[nodiscard]] auto copy_to(void *data) const { return [self = *this, data](Dispatcher &d) { self._copy_to(d, data); }; }
     
     void clear_cache() const noexcept { _buffer->clear_cache(); }
     
-    template<typename Modify, std::enable_if_t<std::is_invocable_v<Modify, T *>, int> = 0>
-    [[nodiscard]] auto modify(Modify &&modify) {
-        return [&modify, this](Dispatcher &dispatch) {
-            _buffer->with_cache(dispatch, [&modify](void *raw_data) {
+    [[nodiscard]] auto modify(std::function<void(T *)> modify) {
+        return [modify = std::move(modify), self = *this](Dispatcher &dispatch) {
+            self._buffer->with_cache(dispatch, [&modify](void *raw_data) {
                 modify(reinterpret_cast<T *>(raw_data));
-            }, byte_offset(), byte_size());
+            }, self.byte_offset(), self.byte_size());
         };
     }
     

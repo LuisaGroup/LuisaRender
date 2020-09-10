@@ -71,7 +71,7 @@ public:
     virtual void copy_from(Dispatcher &dispatcher, const void *data) = 0;
     virtual void copy_to(Dispatcher &dispatcher, void *data) = 0;
     
-    [[nodiscard]] inline TextureView view() noexcept;
+    [[nodiscard]] TextureView view() noexcept;
     
     [[nodiscard]] uint32_t channels() const noexcept {
         if (_format == PixelFormat::R8U || _format == PixelFormat::R32F) { return 1u; }
@@ -103,22 +103,30 @@ public:
     explicit TextureView(std::shared_ptr<Texture> texture) noexcept: _texture{std::move(texture)} {}
     [[nodiscard]] Texture *texture() const noexcept { return _texture.get(); }
     
-    [[nodiscard]] auto copy_from(const void *data) { return [this, data](Dispatcher &d) { _texture->copy_from(d, data); }; }
-    [[nodiscard]] auto copy_to(void *data) { return [this, data](Dispatcher &d) { _texture->copy_to(d, data); }; }
+    [[nodiscard]] auto copy_from(const void *data) { return [texture = _texture, data](Dispatcher &d) { texture->copy_from(d, data); }; }
+    [[nodiscard]] auto copy_to(void *data) { return [texture = _texture, data](Dispatcher &d) { texture->copy_to(d, data); }; }
     
     template<typename T>
-    [[nodiscard]] auto copy_from(const BufferView<T> &buffer) {
+    [[nodiscard]] auto copy_from(const BufferView<T> &bv) {
         LUISA_WARNING_IF_NOT(pixel_format<T> == _texture->format(), "Texture pixel format and buffer type mismatch.");
-        return [this, buffer](Dispatcher &d) { _texture->copy_from(d, buffer.buffer(), buffer.byte_offset()); };
+        return [texture = _texture, buffer = bv.buffer()->shared_from_this(), offset = bv.byte_offset()](Dispatcher &d) {
+            texture->copy_from(d, buffer.get(), offset);
+        };
     }
     
     template<typename T>
-    [[nodiscard]] auto copy_to(const BufferView<T> &buffer) {
+    [[nodiscard]] auto copy_to(const BufferView<T> &bv) {
         LUISA_WARNING_IF_NOT(pixel_format<T> == _texture->format(), "Texture pixel format and buffer type mismatch.");
-        return [this, buffer](Dispatcher &d) { _texture->copy_to(d, buffer.buffer(), buffer.byte_offset()); };
+        return [texture = _texture, buffer = bv.buffer()->shared_from_this(), offset = bv.byte_offset()](Dispatcher &d) {
+            texture->copy_to(d, buffer.get(), offset);
+        };
     }
     
-    [[nodiscard]] auto copy_to(const TextureView &tv) { return [this, &tv](Dispatcher &d) { _texture->copy_to(d, tv.texture()); }; }
+    [[nodiscard]] auto copy_to(const TextureView &tv) {
+        return [texture = _texture, other = tv.texture()->shared_from_this()](Dispatcher &d) {
+            texture->copy_to(d, other.get());
+        };
+    }
     
     [[nodiscard]] uint32_t width() const noexcept { return _texture->width(); }
     [[nodiscard]] uint32_t height() const noexcept { return _texture->height(); }
@@ -164,7 +172,7 @@ public:
     [[nodiscard]] bool empty() const noexcept { return _texture == nullptr; }
 };
 
-TextureView Texture::view() noexcept {
+[[nodiscard]] inline TextureView Texture::view() noexcept {
     return TextureView{shared_from_this()};
 }
 

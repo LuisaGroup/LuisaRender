@@ -22,13 +22,13 @@ public:
     virtual ~Acceleration() noexcept = default;
     [[nodiscard]] auto refit() { return [this](Dispatcher &dispatch) { _refit(dispatch); }; }
     [[nodiscard]] auto intersect_any(const BufferView<Ray> &ray_buffer, const BufferView<AnyHit> &hit_buffer, const BufferView<uint> &ray_count_buffer) const {
-        return [this, &rays = ray_buffer, &hits = hit_buffer, &ray_count = ray_count_buffer](Dispatcher &dispatch) {
-            _intersect_any(dispatch, rays, hits, ray_count);
+        return [this, ray_buffer, hit_buffer, ray_count_buffer](Dispatcher &dispatch) {
+            _intersect_any(dispatch, ray_buffer, hit_buffer, ray_count_buffer);
         };
     }
     [[nodiscard]] auto intersect_closest(const BufferView<Ray> &ray_buffer, const BufferView<ClosestHit> &hit_buffer, const BufferView<uint> &ray_count_buffer) const {
-        return [this, &rays = ray_buffer, &hits = hit_buffer, &ray_count = ray_count_buffer](Dispatcher &dispatch) {
-            _intersect_closest(dispatch, rays, hits, ray_count);
+        return [this, ray_buffer, hit_buffer, ray_count_buffer](Dispatcher &dispatch) {
+            _intersect_closest(dispatch, ray_buffer, hit_buffer, ray_count_buffer);
         };
     }
 };

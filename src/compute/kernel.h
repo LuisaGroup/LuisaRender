@@ -14,7 +14,7 @@ namespace luisa::compute {
 
 class Dispatcher;
 
-class Kernel : Noncopyable {
+class Kernel : public Noncopyable, public std::enable_shared_from_this<Kernel> {
 
 public:
     struct Resource {
@@ -40,14 +40,14 @@ public:
     virtual ~Kernel() noexcept = default;
     
     [[nodiscard]] auto parallelize(uint threads, uint block_size = 256u) {
-        return [this, threads, block_size](Dispatcher &dispatch) {
-            _dispatch(dispatch, make_uint2((threads + block_size - 1u) / block_size, 1u), make_uint2(block_size, 1u));
+        return [self = shared_from_this(), threads, block_size](Dispatcher &dispatch) {
+            self->_dispatch(dispatch, make_uint2((threads + block_size - 1u) / block_size, 1u), make_uint2(block_size, 1u));
         };
     }
     
     [[nodiscard]] auto parallelize(uint2 threads, uint2 block_size = make_uint2(16u, 16u)) {
-        return [this, threads, block_size](Dispatcher &dispatch) {
-            _dispatch(dispatch, (threads + block_size - 1u) / block_size, block_size);
+        return [self = shared_from_this(), threads, block_size](Dispatcher &dispatch) {
+            self->_dispatch(dispatch, (threads + block_size - 1u) / block_size, block_size);
         };
     }
 };

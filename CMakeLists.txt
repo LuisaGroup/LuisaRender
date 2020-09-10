@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.17..3.18)
 cmake_policy(VERSION 3.17)
 
-project(LuisaRender LANGUAGES C CXX VERSION 0.2.0)
+project(LuisaRender LANGUAGES C CXX VERSION 0.3.0)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/")
 set(CMAKE_INSTALL_PREFIX "${CMAKE_SOURCE_DIR}/install/")

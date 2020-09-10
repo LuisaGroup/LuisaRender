@@ -34,15 +34,17 @@ void MetalKernel::_dispatch(Dispatcher &dispatcher, uint2 threadgroups, uint2 th
         }
     }
     if (!_uniforms.empty()) {
-        std::vector<std::byte> bytes(_uniforms.back().offset + std::max(_uniforms.back().immutable.size(), _uniforms.back().binding_size));
+        if (_uniform_buffer.empty()) {
+            _uniform_buffer.resize(_uniforms.back().offset + std::max(_uniforms.back().immutable.size(), _uniforms.back().binding_size));
+        }
         for (auto &&u : _uniforms) {
             if (u.binding != nullptr) {
-                std::memmove(bytes.data() + u.offset, u.binding, u.binding_size);
+                std::memmove(_uniform_buffer.data() + u.offset, u.binding, u.binding_size);
             } else {
-                std::memmove(bytes.data() + u.offset, u.immutable.data(), u.immutable.size());
+                std::memmove(_uniform_buffer.data() + u.offset, u.immutable.data(), u.immutable.size());
             }
         }
-        [command_encoder setBytes:bytes.data() length:bytes.size() atIndex:buffer_id];
+        [command_encoder setBytes:_uniform_buffer.data() length:_uniform_buffer.size() atIndex:buffer_id];
     }
     [command_encoder dispatchThreadgroups:MTLSizeMake(threadgroups.x, threadgroups.y, 1u)
                     threadsPerThreadgroup:MTLSizeMake(threadgroup_size.x, threadgroup_size.y, 1u)];

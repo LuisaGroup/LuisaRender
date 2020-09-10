@@ -28,6 +28,7 @@ class MetalKernel : public Kernel {
 
 private:
     id<MTLComputePipelineState> _handle;
+    std::vector<std::byte> _uniform_buffer;
 
 protected:
     void _dispatch(compute::Dispatcher &dispatcher, uint2 threadgroups, uint2 threadgroup_size) override;

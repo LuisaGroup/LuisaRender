@@ -31,11 +31,6 @@ inline auto atomic_compare_exchange_weak(std::atomic<T> &obj, T exp, T d) noexce
 }
 
 template<typename T>
-inline auto atomic_compare_exchange_strong(std::atomic<T> &obj, T exp, T d) noexcept {
-    return std::atomic_compare_exchange_strong_explicit(&obj, exp, d, std::memory_order_relaxed);
-}
-
-template<typename T>
 inline auto atomic_fetch_add(std::atomic<T> &obj, T v) noexcept {
     return std::atomic_fetch_add_explicit(&obj, v, std::memory_order_relaxed);
 }

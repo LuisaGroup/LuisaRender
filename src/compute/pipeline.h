@@ -22,7 +22,7 @@ public:
     
     template<typename Stage, std::enable_if_t<std::is_invocable_v<Stage>, int> = 0>
     Pipeline &operator<<(Stage &&stage) noexcept {
-        _stages.emplace_back([stage = std::forward<Stage>(stage)](Dispatcher &) { stage(); });
+        _stages.emplace_back([stage = std::function{std::forward<Stage>(stage)}](Dispatcher &) { stage(); });
         return *this;
     }
     
