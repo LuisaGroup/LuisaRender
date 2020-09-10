@@ -22,14 +22,14 @@ private:
     int _height;
     std::shared_ptr<Kernel> _dual_variance_kernel;
     std::shared_ptr<Kernel> _scale_kernel;
-    std::shared_ptr<Texture> _blurred_sample_variance;
-    std::shared_ptr<Texture> _blurred_dual_variance;
+    TextureView _blurred_sample_variance;
+    TextureView _blurred_dual_variance;
     std::unique_ptr<BoxBlur> _blur_sample_variance;
     std::unique_ptr<BoxBlur> _blur_dual_variance;
 
 public:
     // Note: "var_sample" and "output" may alias
-    DualBufferVariance(Device &device, int blur_radius, Texture &var_sample, Texture &color_a, Texture &color_b, Texture &output)
+    DualBufferVariance(Device &device, int blur_radius, TextureView var_sample, TextureView color_a, TextureView color_b, TextureView output)
         : _width{static_cast<int>(var_sample.width())},
           _height{static_cast<int>(var_sample.height())},
           _blurred_sample_variance{device.allocate_texture<luisa::float4>(var_sample.width(), var_sample.height())},
@@ -40,47 +40,26 @@ public:
         using namespace luisa::compute::dsl;
         
         _dual_variance_kernel = device.compile_kernel("dual_var", [&] {
-            
-            Arg<ReadOnlyTex2D> color_a_texture{color_a};
-            Arg<ReadOnlyTex2D> color_b_texture{color_b};
-            Arg<WriteOnlyTex2D> dual_var_texture{*_blurred_dual_variance};
-            
             auto p = thread_xy();
             If (p.x() < _width && p.y() < _height) {
-                Auto va = read(color_a_texture, p);
-                Auto vb = read(color_b_texture, p);
-                Auto diff = va - vb;
-                Auto dual_var = 0.25f * diff * diff;
-                write(dual_var_texture, p, dual_var);
+                Var va = color_a.read(p);
+                Var vb = color_b.read(p);
+                Var diff = va - vb;
+                Var dual_var = 0.25f * diff * diff;
+                _blurred_dual_variance.write(p, dual_var);
             };
         });
         
-        _blur_dual_variance = std::make_unique<BoxBlur>(device, blur_radius, blur_radius, *_blurred_dual_variance, *_blurred_dual_variance);
-        _blur_sample_variance = std::make_unique<BoxBlur>(device, blur_radius, blur_radius, var_sample, *_blurred_sample_variance);
+        _blur_dual_variance = std::make_unique<BoxBlur>(device, blur_radius, blur_radius, _blurred_dual_variance, _blurred_dual_variance);
+        _blur_sample_variance = std::make_unique<BoxBlur>(device, blur_radius, blur_radius, var_sample, _blurred_sample_variance);
         
         _scale_kernel = device.compile_kernel("dual_var_scale", [&] {
-            
-            Arg<ReadOnlyTex2D> blurred_dual_var_texture{*_blurred_dual_variance};
-            Arg<ReadOnlyTex2D> blurred_sample_var_texture{*_blurred_sample_variance};
-            
             auto p = thread_xy();
-            auto match_pixel = [&](auto &&in_texture, auto &&out_texture) {
-                Auto sv = max(read(blurred_sample_var_texture, p), 1e-6f);
-                Auto dv = read(blurred_dual_var_texture, p);
-                Auto v = read(in_texture, p);
-                write(out_texture, p, min(v * dv / sv, 1e3f));
-            };
-            
             If (p.x() < _width && p.y() < _height) {
-                // Special case handling when "var_sample" and "output" alias...
-                if (&var_sample == &output) {  // alias
-                    Arg<ReadWriteTex2D> t{var_sample};
-                    match_pixel(t, t);
-                } else {
-                    Arg<ReadOnlyTex2D> in{var_sample};
-                    Arg<WriteOnlyTex2D> out{var_sample};
-                    match_pixel(in, out);
-                }
+                Var sv = max(_blurred_sample_variance.read(p), 1e-6f);
+                Var dv = _blurred_dual_variance.read(p);
+                Var v = var_sample.read(p);
+                output.write(p, min(v * dv / sv, 1e3f));
             };
         });
     }

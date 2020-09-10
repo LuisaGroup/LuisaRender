@@ -210,18 +210,24 @@ struct Var : public Expr<T> {
         std::vector<const Variable *> init{detail::extract_variable(std::forward<Args>(args))...};
         Function::current().add_statement(std::make_unique<DeclareStmt>(this->_variable, std::move(init)));
     }
+
+#define MAKE_ASSIGN_OP(op)  \
+    template<typename U>    \
+    void operator op(U &&rhs) noexcept { ExprBase::operator op(Expr{std::forward<U>(rhs)}); }
     
-    using ExprBase::operator=;
-    using ExprBase::operator+=;
-    using ExprBase::operator-=;
-    using ExprBase::operator*=;
-    using ExprBase::operator/=;
-    using ExprBase::operator%=;
-    using ExprBase::operator<<=;
-    using ExprBase::operator>>=;
-    using ExprBase::operator|=;
-    using ExprBase::operator&=;
-    using ExprBase::operator^=;
+    MAKE_ASSIGN_OP(=);
+    MAKE_ASSIGN_OP(+=);
+    MAKE_ASSIGN_OP(-=);
+    MAKE_ASSIGN_OP(*=);
+    MAKE_ASSIGN_OP(/=);
+    MAKE_ASSIGN_OP(%=);
+    MAKE_ASSIGN_OP(<<=);
+    MAKE_ASSIGN_OP(>>=);
+    MAKE_ASSIGN_OP(|=);
+    MAKE_ASSIGN_OP(&=);
+    MAKE_ASSIGN_OP(^=);
+#undef MAKE_ASSIGN_OP
+
 };
 
 // Deduction guides

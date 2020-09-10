@@ -20,8 +20,8 @@ private:
 
 public:
     FeaturePrefilter(Device &device,
-                     Texture &feature, Texture &variance, Texture &feature_a, Texture &feature_b,
-                     Texture &out_feature, Texture &out_var, Texture &out_a, Texture &out_b) noexcept
+                     TextureView feature, TextureView variance, TextureView feature_a, TextureView feature_b,
+                     TextureView out_feature, TextureView out_var, TextureView out_a, TextureView out_b) noexcept
         : _width{static_cast<int>(feature.width())}, _height{static_cast<int>(feature.height())} {
         
         using namespace luisa::compute;
@@ -30,17 +30,13 @@ public:
         _dual_variance_stage = std::make_unique<DualBufferVariance>(device, 10, variance, feature_a, feature_b, out_var);
         _nlm_filter = std::make_unique<NonLocalMeansFilter>(device, 5, 3, 1.0f, feature, variance, feature_a, feature_b, out_a, out_b);
         _add_half_buffers_kernel = device.compile_kernel("feature_prefilter_add_half_buffers", [&] {
-            Arg<ReadOnlyTex2D> feature_a_flt{out_a};
-            Arg<ReadOnlyTex2D> feature_b_flt{out_b};
-            Arg<WriteOnlyTex2D> feature_flt{out_feature};
-            Arg<WriteOnlyTex2D> residual_var{out_var};
             auto p = thread_xy();
             If (p.x() < _width && p.y() < _height) {
-                Auto fa = make_float3(read(feature_a_flt, p));
-                Auto fb = make_float3(read(feature_b_flt, p));
-                Auto diff = fa - fb;
-                write(feature_flt, p, make_float4(0.5f * (fa + fb), 1.0f));
-                write(residual_var, p, make_float4(0.25f * diff * diff, 1.0f));
+                Var fa = make_float3(out_a.read(p));
+                Var fb = make_float3(out_b.read(p));
+                Var diff = fa - fb;
+                out_feature.write(p, make_float4(0.5f * (fa + fb), 1.0f));
+                out_var.write(p, make_float4(0.25f * diff * diff, 1.0f));
             };
         });
         _gaussian_filter = std::make_unique<GaussianBlur>(device, 0.5f, 0.5f, out_var, out_var);

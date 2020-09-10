@@ -28,6 +28,9 @@ int main() {
         
         threadgroup_barrier();
         
+        Var x = 0;
+        x = select(x < 0, x, -x);
+        
         If (thread_id() < 1024) {
             Var ray_index = 5 + thread_id();
             Var direction = normalize(make_float3(empty_buffer[ray_index].direction()));

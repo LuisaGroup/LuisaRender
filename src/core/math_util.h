@@ -229,7 +229,7 @@ template<typename T, typename F>
     return pred ? t : f;
 }
 
-template<typename T, uint N>
+template<typename T, uint N, std::enable_if_t<scalar::is_scalar<T>, int> = 0>
 [[nodiscard]] constexpr auto select(Vector<bool, N, false> pred, Vector<T, N, false> t, Vector<T, N, false> f) noexcept {
     static_assert(N == 2 || N == 3 || N == 4);
     if constexpr (N == 2) {

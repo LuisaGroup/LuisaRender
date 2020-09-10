@@ -66,7 +66,7 @@ public:
     
     void operator()(Dispatcher &dispatch) noexcept {
         dispatch(_gradient_kernel->parallelize(luisa::make_uint2(_width, _height)));
-        if (_result != nullptr) { dispatch(_result->copy_to(*_output)); }
+        if (_result != nullptr) { dispatch(_result->copy_to(_output)); }
     }
     
 };
