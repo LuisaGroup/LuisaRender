@@ -19,19 +19,6 @@ int main(int argc, char *argv[]) {
         Context context{argc, argv};
         auto device = Device::create(&context);
 
-        {// playground
-            auto image = cv::imread("data/images/luisa.png", cv::IMREAD_COLOR);
-            cv::cvtColor(image, image, cv::COLOR_BGR2RGBA);
-            auto texture = device->allocate_texture<uchar4>(image.cols, image.rows);
-            device->launch(texture->copy_from(image.data));
-            GaussianBlur blur{*device, 2.0f, 25.0f, *texture, *texture};
-            device->launch(blur);
-            device->launch(texture->copy_to(image.data));
-            device->synchronize();
-            cv::cvtColor(image, image, cv::COLOR_RGBA2BGR);
-            cv::imwrite("data/images/luisa-gaussian-blur.png", image);
-        }
-
         auto feature_name = "albedo";
 
         auto load_image = [](const std::string &path) {
