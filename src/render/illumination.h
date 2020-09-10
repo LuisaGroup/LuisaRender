@@ -30,10 +30,10 @@ struct LightSampleBuffers {
 };
 
 struct LightSampleExpr {
-    Var<SampledSpectrum> L;
-    Var<float3> p;
-    Var<packed_float3> w;
-    Var<float> pdf;
+    Expr<SampledSpectrum> L;
+    Expr<float3> p;
+    Expr<packed_float3> w;
+    Expr<float> pdf;
 };
 
 struct Illumination {
