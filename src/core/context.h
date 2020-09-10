@@ -29,11 +29,11 @@ private:
     std::filesystem::path _rundir;
     std::filesystem::path _workdir;
     std::optional<std::vector<DeviceSelection>> _devices;
-    cxxopts::Options _cli_options;
-    std::optional<cxxopts::ParseResult> _parsed_cli_options;
+    mutable cxxopts::Options _cli_options;
+    mutable std::optional<cxxopts::ParseResult> _parsed_cli_options;
     std::map<std::filesystem::path, DynamicModuleHandle, std::less<>> _loaded_modules;
 
-    [[nodiscard]] const cxxopts::ParseResult &_parse_result() noexcept;
+    [[nodiscard]] const cxxopts::ParseResult &_parse_result() const noexcept;
     [[nodiscard]] const std::filesystem::path &_runtime_dir() noexcept;
     [[nodiscard]] const std::filesystem::path &_working_dir() noexcept;
 
@@ -72,9 +72,10 @@ public:
     }
 
     template<typename T>
-    [[nodiscard]] T cli_option(const std::string &opt_name) { return _parse_result()[opt_name].as<T>(); }
+    [[nodiscard]] T cli_option(const std::string &opt_name) const { return _parse_result()[opt_name].as<T>(); }
 
-    const std::vector<DeviceSelection> &devices() noexcept;
+    [[nodiscard]] const std::vector<DeviceSelection> &devices() noexcept;
+    [[nodiscard]] bool should_print_generated_source() const noexcept { return cli_option<bool>("print-source"); }
 };
 
 }// namespace luisa

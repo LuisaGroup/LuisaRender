@@ -85,7 +85,8 @@ std::shared_ptr<Kernel> MetalDevice::_compile_kernel(const compute::dsl::Functio
     MetalCodegen codegen{os};
     codegen.emit(f);
     auto s = os.str();
-    LUISA_INFO("Generated source:\n", s);
+    
+    if (_context->should_print_generated_source()) { LUISA_INFO("Generated source:\n", s); }
     
     auto digest = SHA1{s}.digest();
     auto iter = _kernel_cache.find(digest);
@@ -220,7 +221,7 @@ std::unique_ptr<Acceleration> MetalDevice::build_acceleration(
     instance_acceleration.accelerationStructures = acceleration_structures;
     
     // create individual triangle acceleration structures
-    for (auto [vertex_offset, triangle_offset, triangle_count] : meshes) {
+    for (auto[vertex_offset, triangle_offset, triangle_count] : meshes) {
         auto triangle_acceleration = [[MPSTriangleAccelerationStructure alloc] initWithGroup:acceleration_group];
         triangle_acceleration.vertexBuffer = dynamic_cast<MetalBuffer *>(positions.buffer())->handle();
         triangle_acceleration.vertexBufferOffset = positions.byte_offset() + vertex_offset * sizeof(float3);

@@ -36,11 +36,12 @@ Context::Context(int argc, char *argv[])
     _cli_options.add_options()("d,devices", "Select compute devices", cxxopts::value<std::vector<std::string>>()->default_value(""))
                     ("runtime-dir", "Specify runtime directory", cxxopts::value<std::filesystem::path>()->default_value(std::filesystem::canonical(argv[0]).parent_path().parent_path().string()))
                     ("working-dir", "Specify working directory", cxxopts::value<std::filesystem::path>()->default_value(std::filesystem::canonical(std::filesystem::current_path()).string()))
-                    ("clear-cache", "Clear cached kernel compilation", cxxopts::value<bool>());
+                    ("clear-cache", "Clear cached kernel compilation", cxxopts::value<bool>())
+                    ("print-source", "Print generated source code", cxxopts::value<bool>());
 }
 
-const cxxopts::ParseResult &Context::_parse_result() noexcept {
-    if (!_parsed_cli_options.has_value()) { _parsed_cli_options.emplace(_cli_options.parse(_argc, _argv)); }
+const cxxopts::ParseResult &Context::_parse_result() const noexcept {
+    if (!_parsed_cli_options.has_value()) { _parsed_cli_options.emplace(_cli_options.parse(const_cast<int &>(_argc), const_cast<const char **&>(_argv))); }
     return *_parsed_cli_options;
 }
 
