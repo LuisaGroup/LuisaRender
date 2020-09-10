@@ -166,7 +166,7 @@ std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) {
             }
 
             nvrtcProgram prog;
-            NVRTC_CHECK(nvrtcCreateProgram(&prog, src.c_str(), serialize(function.name(), ".cu").c_str(), header_sources.size(), header_sources.data(), header_names.data()));// includeNames
+            NVRTC_CHECK(nvrtcCreateProgram(&prog, src.c_str(), serialize(function.name(), ".cu").c_str(), header_sources.size(), header_sources.data(), header_names.data()));
 
             auto arch_opt = serialize("--gpu-architecture=compute_", _compute_capability);
             auto cuda_version_opt = serialize("-DCUDA_VERSION=", CUDART_VERSION);
