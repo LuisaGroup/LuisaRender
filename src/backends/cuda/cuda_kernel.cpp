@@ -11,14 +11,8 @@ namespace luisa::cuda {
 
 void CudaKernel::_dispatch(compute::Dispatcher &dispatcher, uint2 blocks, uint2 block_size) {
     
-    if (!_uniforms.empty()) {
-        for (auto &&u : _uniforms) {
-            if (u.binding != nullptr) {
-                std::memmove(_arguments.data() + u.offset, u.binding, u.binding_size);
-            } else {
-                std::memmove(_arguments.data() + u.offset, u.immutable.data(), u.immutable.size());
-            }
-        }
+    for (auto &&u : _uniforms) {
+        if (u.binding != nullptr) { std::memmove(_arguments.data() + u.offset, u.binding, u.binding_size); }
     }
     auto stream = dynamic_cast<CudaDispatcher &>(dispatcher).handle();
     void *args = _arguments.data();
@@ -48,6 +42,9 @@ CudaKernel::CudaKernel(CUfunction handle, std::vector<Kernel::Resource> resource
             std::memmove(_arguments.data() + res_offset + 8u, &cuda_surface, 8u);
             res_offset += 16u;
         }
+    }
+    for (auto &&u : _uniforms) {
+        if (u.binding == nullptr) { std::memmove(_arguments.data() + u.offset, u.immutable.data(), u.immutable.size()); }
     }
 }
     

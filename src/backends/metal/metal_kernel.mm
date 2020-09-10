@@ -36,13 +36,12 @@ void MetalKernel::_dispatch(Dispatcher &dispatcher, uint2 threadgroups, uint2 th
     if (!_uniforms.empty()) {
         if (_uniform_buffer.empty()) {
             _uniform_buffer.resize(_uniforms.back().offset + std::max(_uniforms.back().immutable.size(), _uniforms.back().binding_size));
+            for (auto &&u : _uniforms) {
+                if (u.binding == nullptr) { std::memmove(_uniform_buffer.data() + u.offset, u.immutable.data(), u.immutable.size()); }
+            }
         }
         for (auto &&u : _uniforms) {
-            if (u.binding != nullptr) {
-                std::memmove(_uniform_buffer.data() + u.offset, u.binding, u.binding_size);
-            } else {
-                std::memmove(_uniform_buffer.data() + u.offset, u.immutable.data(), u.immutable.size());
-            }
+            if (u.binding != nullptr) { std::memmove(_uniform_buffer.data() + u.offset, u.binding, u.binding_size); }
         }
         [command_encoder setBytes:_uniform_buffer.data() length:_uniform_buffer.size() atIndex:buffer_id];
     }

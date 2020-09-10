@@ -619,7 +619,7 @@ private:
     
 public:
     template<typename T>
-    SwitchStmtBuilder(T &&expr) noexcept {
+    explicit SwitchStmtBuilder(T &&expr) noexcept {
         Expr e{expr};
         _expr = e.variable();
     }
@@ -637,7 +637,7 @@ private:
 
 public:
     template<typename T>
-    SwitchCaseStmtBuilder(T &&expr) noexcept {
+    explicit SwitchCaseStmtBuilder(T &&expr) noexcept {
         Expr e{expr};
         _expr = e.variable();
     }
