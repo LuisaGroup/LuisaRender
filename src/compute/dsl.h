@@ -323,7 +323,6 @@ inline auto immutable(T data) noexcept {
 }
 
 #define MAP_ARGUMENT_TO_TEMPLATE_ARGUMENT(arg) typename T##arg
-#define MAP_ARGUMENT_TO_IS_EXPR(arg) IsExpr<T##arg>
 #define MAP_ARGUMENT_TO_ARGUMENT(arg) T##arg &&arg
 #define MAP_ARGUMENT_TO_EXPR(arg) Expr expr_##arg{arg};
 #define MAP_ARGUMENT_TO_TRUE_TYPE(arg) using TT##arg = std::decay_t<typename decltype(expr_##arg)::Type>;
