@@ -49,7 +49,7 @@ void MetalKernel::_dispatch(Dispatcher &dispatcher, uint2 threadgroups, uint2 th
     [command_encoder endEncoding];
 }
 
-MetalKernel::MetalKernel(id<MTLComputePipelineState> handle, std::vector<Resource> res, std::vector<Uniform> uniforms) noexcept
-    : _handle{handle}, _resources{std::move(res)}, _uniforms{uniforms} {}
+MetalKernel::MetalKernel(id<MTLComputePipelineState> handle, std::vector<Kernel::Resource> res, std::vector<Kernel::Uniform> uniforms) noexcept
+    : Kernel{std::move(res), std::move(uniforms)}, _handle{handle} {}
 
 }

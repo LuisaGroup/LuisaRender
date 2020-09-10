@@ -127,17 +127,17 @@ std::shared_ptr<Kernel> MetalDevice::_compile_kernel(const compute::dsl::Functio
     size_t uniform_offset = 0u;
     for (auto &&arg : f.arguments()) {
         if (arg->is_buffer_argument()) {
-            MetalKernel::Resource r;
+            Kernel::Resource r;
             r.buffer = arg->buffer()->shared_from_this();
             resources.emplace_back(std::move(r));
         } else if (arg->is_texture_argument()) {
-            MetalKernel::Resource r;
+            Kernel::Resource r;
             r.texture = arg->texture()->shared_from_this();
             resources.emplace_back(std::move(r));
         } else if (arg->is_uniform_argument()) {
             auto alignment = arg->type()->alignment;
             uniform_offset = (uniform_offset + alignment - 1u) / alignment * alignment;
-            MetalKernel::Uniform uniform;
+            Kernel::Uniform uniform;
             uniform.offset = uniform_offset;
             uniform.binding = arg->uniform_data();
             uniform.binding_size = arg->type()->size;
@@ -146,7 +146,7 @@ std::shared_ptr<Kernel> MetalDevice::_compile_kernel(const compute::dsl::Functio
         } else if (arg->is_immutable_argument()) {
             auto alignment = arg->type()->alignment;
             uniform_offset = (uniform_offset + alignment - 1u) / alignment * alignment;
-            MetalKernel::Uniform uniform;
+            Kernel::Uniform uniform;
             uniform.immutable = arg->immutable_data();
             uniform.offset = uniform_offset;
             uniforms.emplace_back(std::move(uniform));

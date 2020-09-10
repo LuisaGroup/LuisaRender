@@ -16,10 +16,27 @@ class Dispatcher;
 
 class Kernel : Noncopyable {
 
+public:
+    struct Resource {
+        std::shared_ptr<Buffer> buffer{nullptr};
+        std::shared_ptr<Texture> texture{nullptr};
+    };
+    
+    struct Uniform {
+        std::vector<std::byte> immutable;
+        const void *binding{nullptr};
+        size_t binding_size{};
+        size_t offset{0u};
+    };
+
 protected:
+    std::vector<Resource> _resources;
+    std::vector<Uniform> _uniforms;
     virtual void _dispatch(Dispatcher &dispatcher, uint2 blocks, uint2 block_size) = 0;
     
 public:
+    Kernel(std::vector<Resource> resources, std::vector<Uniform> uniforms) noexcept
+        : _resources{std::move(resources)}, _uniforms{std::move(uniforms)} {}
     virtual ~Kernel() noexcept = default;
     
     [[nodiscard]] auto parallelize(uint threads, uint block_size = 256u) {

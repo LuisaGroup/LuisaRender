@@ -26,29 +26,14 @@ using compute::Texture;
 
 class MetalKernel : public Kernel {
 
-public:
-    struct Resource {
-        std::shared_ptr<Buffer> buffer{nullptr};
-        std::shared_ptr<Texture> texture{nullptr};
-    };
-    
-    struct Uniform {
-        std::vector<std::byte> immutable;
-        const void *binding{nullptr};
-        size_t binding_size{};
-        size_t offset{0u};
-    };
-
 private:
     id<MTLComputePipelineState> _handle;
-    std::vector<Resource> _resources;
-    std::vector<Uniform> _uniforms;
 
 protected:
     void _dispatch(compute::Dispatcher &dispatcher, uint2 threadgroups, uint2 threadgroup_size) override;
 
 public:
-    MetalKernel(id<MTLComputePipelineState> handle, std::vector<Resource> res, std::vector<Uniform> uniforms) noexcept;
+    MetalKernel(id<MTLComputePipelineState> handle, std::vector<Kernel::Resource> res, std::vector<Kernel::Uniform> uniforms) noexcept;
     [[nodiscard]] id<MTLComputePipelineState> handle() const noexcept { return _handle; }
 };
 
