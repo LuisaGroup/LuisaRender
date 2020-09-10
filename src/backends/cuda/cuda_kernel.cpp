@@ -9,103 +9,46 @@
 
 namespace luisa::cuda {
 
-ArgumentBufferView ArgumentBufferPool::obtain() noexcept {
-    std::lock_guard lock{_mutex};
-    if (_available_buffers.empty()) {
-        void *buffer = nullptr;
-        CUDA_CHECK(cuMemHostAlloc(&buffer, _buffer_size, 0));
-        _allocated_buffers.emplace_back(buffer);
-        for (auto offset = 0u; offset + _unaligned_size <= _buffer_size; offset += _aligned_size) {
-            _available_buffers.emplace_back(reinterpret_cast<std::byte *>(buffer) + offset, false);
-        }
-    }
-    auto arg_buffer = _available_buffers.back();
-    _available_buffers.pop_back();
-    return arg_buffer;
-}
-
-void ArgumentBufferPool::recycle(ArgumentBufferView buffer) noexcept {
-    std::lock_guard lock{_mutex};
-    _available_buffers.emplace_back(buffer);
-}
-
-ArgumentBufferPool::~ArgumentBufferPool() noexcept {
-    for (auto p : _allocated_buffers) {
-        CUDA_CHECK(cuMemFreeHost(p));
-    }
-}
-
-void ArgumentBufferPool::create(size_t length, size_t alignment) noexcept {
-    _unaligned_size = length;
-    _aligned_size = (length + alignment - 1u) / alignment * alignment;
-    _buffer_size = std::max(_aligned_size, memory_page_size());
-}
-
-ArgumentEncoder::ArgumentEncoder(const std::vector<Variable> &arguments) : _alignment{16u} {
-
-    auto offset = 0u;
-    auto align_offset = [&offset](size_t alignment) noexcept {
-        return offset = (offset + alignment - 1u) / alignment * alignment;
-    };
-
-    for (auto &&arg : arguments) {
-        if (arg.is_buffer_argument()) {
-            auto buffer_view = arg.buffer();
-            auto device_ptr = dynamic_cast<CudaBuffer *>(buffer_view.buffer())->handle() + buffer_view.byte_offset();
-            auto size = 8u;
-            auto alignment = 8u;
-            std::vector<std::byte> bytes(size);
-            reinterpret_cast<CUdeviceptr *>(bytes.data())[0] = device_ptr;
-            _immutable_arguments.emplace_back(std::move(bytes), align_offset(alignment));
-            offset += size;
-        } else if (arg.is_texture_argument()) {
-            auto alignment = 8u;
-            auto size = 16u;
-            auto texture = dynamic_cast<CudaTexture *>(arg.texture())->texture_handle();
-            auto surface = dynamic_cast<CudaTexture *>(arg.texture())->surface_handle();
-            std::vector<std::byte> bytes(size);
-            reinterpret_cast<CUtexObject *>(bytes.data())[0] = texture;
-            reinterpret_cast<CUsurfObject *>(bytes.data())[1] = surface;
-            _immutable_arguments.emplace_back(std::move(bytes), align_offset(alignment));
-            offset += size;
-        } else if (arg.is_immutable_argument()) {
-            auto alignment = arg.type()->alignment;
-            _immutable_arguments.emplace_back(arg.immutable_data(), align_offset(alignment));
-            offset += arg.immutable_data().size();
-        } else if (arg.is_uniform_argument()) {
-            auto alignment = arg.type()->alignment;
-            _uniform_bindings.emplace_back(arg.uniform_data(), arg.type()->size, align_offset(alignment));
-            offset += arg.type()->size;
-        } else {
-            LUISA_EXCEPTION("Unsupported argument type.");
-        }
-    }
-    _encoded_length = align_offset(_alignment);
-}
-
-void ArgumentEncoder::encode(ArgumentBufferView &buffer) noexcept {
-    auto buffer_base = reinterpret_cast<std::byte *>(buffer.buffer);
-    if (!buffer.initialized) {
-        for (auto &&immutable : _immutable_arguments) {
-            std::memmove(buffer_base + immutable.argument_offset, immutable.data.data(), immutable.data.size());
-        }
-        buffer.initialized = true;
-    }
-    for (auto &&uniform : _uniform_bindings) {
-        std::memmove(buffer_base + uniform.argument_offset, uniform.data, uniform.data_size);
-    }
-}
-
-CudaKernel::CudaKernel(CUfunction handle, ArgumentEncoder arg_enc) noexcept
-    : _handle{handle}, _encode{std::move(arg_enc)} {
-    _argument_buffer_pool.create(_encode.encoded_length(), _encode.alignment());
-}
-
 void CudaKernel::_dispatch(compute::Dispatcher &dispatcher, uint2 blocks, uint2 block_size) {
-    auto argument_buffer = _argument_buffer_pool.obtain();
-    _encode(argument_buffer);
+    
+    if (!_uniforms.empty()) {
+        for (auto &&u : _uniforms) {
+            if (u.binding != nullptr) {
+                std::memmove(_arguments.data() + u.offset, u.binding, u.binding_size);
+            } else {
+                std::memmove(_arguments.data() + u.offset, u.immutable.data(), u.immutable.size());
+            }
+        }
+    }
     auto stream = dynamic_cast<CudaDispatcher &>(dispatcher).handle();
-    CUDA_CHECK(cuLaunchKernel(_handle, blocks.x, blocks.y, 1u, block_size.x, block_size.y, 1u, 0u, stream, &argument_buffer.buffer, nullptr));
+    void *args = _arguments.data();
+    CUDA_CHECK(cuLaunchKernel(_handle, blocks.x, blocks.y, 1u, block_size.x, block_size.y, 1u, 0u, stream, &args, nullptr));
 }
 
+CudaKernel::CudaKernel(CUfunction handle, std::vector<Kernel::Resource> resources, std::vector<Kernel::Uniform> uniforms) noexcept
+    : Kernel{std::move(resources), std::move(uniforms)}, _handle{handle} {
+    
+    size_t res_offset = 0u;
+    if (!_uniforms.empty()) {
+        res_offset = _uniforms.back().offset + std::max(_uniforms.back().binding_size, _uniforms.back().immutable.size());
+    }
+    res_offset = (res_offset + 7u) / 8u * 8u;
+    auto size = res_offset;
+    for (auto &&res : _resources) { size += res.buffer != nullptr ? 8u : 16u; }
+    _arguments.resize(size);
+    for (auto &&res : _resources) {
+        if (res.buffer != nullptr) {
+            auto cuda_buffer = dynamic_cast<CudaBuffer *>(res.buffer.get())->handle();
+            std::memmove(_arguments.data() + res_offset, &cuda_buffer, 8u);
+            res_offset += 8u;
+        } else {
+            auto cuda_texture = dynamic_cast<CudaTexture *>(res.texture.get())->texture_handle();
+            auto cuda_surface = dynamic_cast<CudaTexture *>(res.texture.get())->surface_handle();
+            std::memmove(_arguments.data() + res_offset, &cuda_texture, 8u);
+            std::memmove(_arguments.data() + res_offset + 8u, &cuda_surface, 8u);
+            res_offset += 16u;
+        }
+    }
+}
+    
 }// namespace luisa::cuda

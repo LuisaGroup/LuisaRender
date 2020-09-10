@@ -9,6 +9,7 @@
 
 #include <core/hash.h>
 #include <compute/device.h>
+#include <compute/kernel.h>
 #include <compute/acceleration.h>
 
 #include "cuda_buffer.h"
@@ -124,7 +125,7 @@ std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) {
     CudaCodegen codegen{os};
     codegen.emit(function);
     auto src = os.str();
-//    LUISA_INFO("Generated source:\n", src);
+    LUISA_INFO("Generated source:\n", src);
     
     auto digest = SHA1{src}.digest();
     auto iter = _kernel_cache.find(digest);
@@ -217,7 +218,38 @@ std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) {
         LUISA_INFO("Cache hit for kernel \"", function.name(), "\" in memory, compilation skipped.");
     }
     
-    return std::make_shared<CudaKernel>(iter->second, ArgumentEncoder{function.arguments()});
+    std::vector<Kernel::Resource> resources;
+    std::vector<Kernel::Uniform> uniforms;
+    size_t uniform_offset = 0u;
+    for (auto &&arg : function.arguments()) {
+        if (arg->is_buffer_argument()) {
+            Kernel::Resource r;
+            r.buffer = arg->buffer()->shared_from_this();
+            resources.emplace_back(std::move(r));
+        } else if (arg->is_texture_argument()) {
+            Kernel::Resource r;
+            r.texture = arg->texture()->shared_from_this();
+            resources.emplace_back(std::move(r));
+        } else if (arg->is_uniform_argument()) {
+            auto alignment = arg->type()->alignment;
+            uniform_offset = (uniform_offset + alignment - 1u) / alignment * alignment;
+            Kernel::Uniform uniform;
+            uniform.offset = uniform_offset;
+            uniform.binding = arg->uniform_data();
+            uniform.binding_size = arg->type()->size;
+            uniforms.emplace_back(std::move(uniform));
+            uniform_offset += arg->type()->size;
+        } else if (arg->is_immutable_argument()) {
+            auto alignment = arg->type()->alignment;
+            uniform_offset = (uniform_offset + alignment - 1u) / alignment * alignment;
+            Kernel::Uniform uniform;
+            uniform.immutable = arg->immutable_data();
+            uniform.offset = uniform_offset;
+            uniforms.emplace_back(std::move(uniform));
+            uniform_offset += arg->type()->size;
+        }
+    }
+    return std::make_shared<CudaKernel>(iter->second, std::move(resources), std::move(uniforms));
 }
 
 std::shared_ptr<Buffer> CudaDevice::_allocate_buffer(size_t size) {

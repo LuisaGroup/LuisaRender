@@ -8,7 +8,7 @@
 
 namespace luisa::cuda {
 
-void CudaTexture::_copy_from(Dispatcher &dispatcher, Buffer *buffer, size_t offset) {
+void CudaTexture::copy_from(Dispatcher &dispatcher, Buffer *buffer, size_t offset) {
     auto stream = dynamic_cast<CudaDispatcher &>(dispatcher).handle();
     CUDA_MEMCPY2D memcpy_desc{};
     memcpy_desc.srcMemoryType = CU_MEMORYTYPE_DEVICE;
@@ -25,7 +25,7 @@ void CudaTexture::_copy_from(Dispatcher &dispatcher, Buffer *buffer, size_t offs
     CUDA_CHECK(cuMemcpy2DAsync(&memcpy_desc, stream));
 }
 
-void CudaTexture::_copy_to(Dispatcher &dispatcher, Buffer *buffer, size_t offset) {
+void CudaTexture::copy_to(Dispatcher &dispatcher, Buffer *buffer, size_t offset) {
     auto stream = dynamic_cast<CudaDispatcher &>(dispatcher).handle();
     CUDA_MEMCPY2D memcpy_desc{};
     memcpy_desc.srcMemoryType = CU_MEMORYTYPE_ARRAY;
@@ -42,7 +42,7 @@ void CudaTexture::_copy_to(Dispatcher &dispatcher, Buffer *buffer, size_t offset
     CUDA_CHECK(cuMemcpy2DAsync(&memcpy_desc, stream));
 }
 
-void CudaTexture::_copy_to(Dispatcher &dispatcher, Texture *texture) {
+void CudaTexture::copy_to(Dispatcher &dispatcher, Texture *texture) {
     auto stream = dynamic_cast<CudaDispatcher &>(dispatcher).handle();
     CUDA_MEMCPY2D memcpy_desc{};
     memcpy_desc.srcMemoryType = CU_MEMORYTYPE_ARRAY;
@@ -58,7 +58,7 @@ void CudaTexture::_copy_to(Dispatcher &dispatcher, Texture *texture) {
     CUDA_CHECK(cuMemcpy2DAsync(&memcpy_desc, stream));
 }
 
-void CudaTexture::_copy_from(Dispatcher &dispatcher, const void *data) {
+void CudaTexture::copy_from(Dispatcher &dispatcher, const void *data) {
     auto stream = dynamic_cast<CudaDispatcher &>(dispatcher).handle();
     auto cache = _cache.obtain();
     std::memmove(cache, data, byte_size());
@@ -79,7 +79,7 @@ void CudaTexture::_copy_from(Dispatcher &dispatcher, const void *data) {
     dispatcher.when_completed([this, cache] { _cache.recycle(cache); });
 }
 
-void CudaTexture::_copy_to(Dispatcher &dispatcher, void *data) {
+void CudaTexture::copy_to(Dispatcher &dispatcher, void *data) {
     auto stream = dynamic_cast<CudaDispatcher &>(dispatcher).handle();
     CUDA_MEMCPY2D memcpy_desc{};
     memcpy_desc.srcMemoryType = CU_MEMORYTYPE_ARRAY;

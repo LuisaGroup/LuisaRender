@@ -18,7 +18,7 @@ constexpr auto texture_jit_header =
     "namespace luisa {\n"
     "\n"
     "template<typename T>\n"
-    "struct Tex2D {\n"
+    "struct alignas(8) Tex2D {\n"
     "    cudaTextureObject_t texture;\n"
     "    cudaSurfaceObject_t surface;\n"
     "};\n"

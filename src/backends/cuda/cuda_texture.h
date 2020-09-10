@@ -25,13 +25,6 @@ private:
     CUsurfObject _surface_handle;
     CudaHostCache _cache;
 
-protected:
-    void _copy_from(Dispatcher &dispatcher, Buffer *buffer, size_t offset) override;
-    void _copy_to(Dispatcher &dispatcher, Buffer *buffer, size_t offset) override;
-    void _copy_to(Dispatcher &dispatcher, Texture *texture) override;
-    void _copy_from(Dispatcher &dispatcher, const void *data) override;
-    void _copy_to(Dispatcher &dispatcher, void *data) override;
-
 public:
     CudaTexture(CUarray array_handle, CUtexObject tex_handle, CUsurfObject surf_handle, uint32_t width, uint32_t height, PixelFormat format) noexcept
         : Texture{width, height, format},
@@ -50,6 +43,12 @@ public:
     [[nodiscard]] CUtexObject texture_handle() const noexcept { return _texture_handle; }
     [[nodiscard]] CUsurfObject surface_handle() const noexcept { return _surface_handle; }
     void clear_cache() override { _cache.clear(); }
+    
+    void copy_from(Dispatcher &dispatcher, Buffer *buffer, size_t offset) override;
+    void copy_to(Dispatcher &dispatcher, Buffer *buffer, size_t offset) override;
+    void copy_to(Dispatcher &dispatcher, Texture *texture) override;
+    void copy_from(Dispatcher &dispatcher, const void *data) override;
+    void copy_to(Dispatcher &dispatcher, void *data) override;
 };
 
 }
