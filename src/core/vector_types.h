@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "scalar_types.h"
 #include <type_traits>
+#include "scalar_types.h"
 
 namespace luisa {
 
