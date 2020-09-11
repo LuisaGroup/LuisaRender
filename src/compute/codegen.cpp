@@ -32,7 +32,7 @@ void CppCodegen::visit(const ValueExpr *literal_expr) {
         if constexpr (std::is_same_v<T, Variable>) { _emit_variable(v); }
         else if constexpr (std::is_same_v<T, bool>) { _os << v; }
         else if constexpr (std::is_same_v<T, float>) {
-            if (std::isinf(v)) { _os << "static_cast<float>(INFINITY)"; } else { _os << v << "f"; }
+            if (std::isinf(v)) { _os << "static_cast<float>(1.0f / +0.0f)"; } else { _os << v << "f"; }  // TODO: Better handling of inf/nan
         } else if constexpr (std::is_same_v<T, int8_t>) { _os << "static_cast<int8_t>(" << v << ")"; }
         else if constexpr (std::is_same_v<T, uint8_t>) { _os << "static_cast<uint8_t>(" << v << ")"; }
         else if constexpr (std::is_same_v<T, int16_t>) { _os << "static_cast<int16_t>(" << v << ")"; }
