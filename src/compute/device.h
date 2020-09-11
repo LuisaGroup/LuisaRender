@@ -11,6 +11,7 @@
 #include <compute/kernel.h>
 #include <compute/texture.h>
 #include <compute/acceleration.h>
+#include <compute/primitive.h>
 #include <core/context.h>
 
 namespace luisa::compute {
@@ -60,8 +61,8 @@ public:
     
     [[nodiscard]] virtual std::unique_ptr<Acceleration> build_acceleration(
         const BufferView<float3> &positions,
-        const BufferView<packed_uint3> &indices,
-        const std::vector<packed_uint3> &meshes,  // (vertex offset, triangle offset, triangle count)
+        const BufferView<TriangleHandle> &indices,
+        const std::vector<EntityRange> &meshes,
         const BufferView<uint> &instances,
         const BufferView<float4x4> &transforms,
         bool is_static) = 0;

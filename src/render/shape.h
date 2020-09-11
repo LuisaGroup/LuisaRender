@@ -13,18 +13,15 @@
 
 namespace luisa::render {
 
-class Shape {
+using compute::Vertex;
+using compute::TriangleHandle;
+using compute::EntityHandle;
 
-public:
-    struct Vertex {
-        packed_float3 position;
-        packed_float3 normal;
-        float2 uv;
-    };
+class Shape {
 
 protected:
     std::vector<Vertex> _vertices;
-    std::vector<packed_uint3> _indices;
+    std::vector<TriangleHandle> _indices;
     std::shared_ptr<Material> _material;
     std::shared_ptr<Transform> _transform;
     std::vector<std::shared_ptr<Shape>> _children;
@@ -41,7 +38,7 @@ public:
         return _vertices;
     }
     
-    [[nodiscard]] const std::vector<packed_uint3> &indices() const {
+    [[nodiscard]] const std::vector<TriangleHandle> &indices() const {
         _exception_if_cleared();
         return _indices;
     }

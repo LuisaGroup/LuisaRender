@@ -32,7 +32,7 @@ struct LightSampleBuffers {
 struct LightSampleExpr {
     Expr<SampledSpectrum> L;
     Expr<float3> p;
-    Expr<packed_float3> w;
+    Expr<float3> w;
     Expr<float> pdf;
 };
 

@@ -6,8 +6,8 @@
 
 #include <compute/dispatcher.h>
 #include <compute/buffer.h>
-
-#include "ray.h"
+#include <compute/ray.h>
+#include <compute/hit.h>
 
 namespace luisa::compute {
 

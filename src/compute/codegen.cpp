@@ -122,11 +122,6 @@ void CppCodegen::_emit_type(const TypeDesc *desc) {
             _emit_type(desc->element_type);
             _os << 4;
             break;
-        case TypeCatalog::VECTOR3_PACKED:
-            _os << "packed_";
-            _emit_type(desc->element_type);
-            _os << 3;
-            break;
         case TypeCatalog::MATRIX3:
             _os << "float3x3";
             break;

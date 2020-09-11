@@ -147,17 +147,17 @@ using std::abs;
 [[nodiscard]] constexpr float radians(float deg) noexcept { return deg * constants::pi / 180.0f; }
 [[nodiscard]] constexpr float degrees(float rad) noexcept { return rad * constants::inv_pi * 180.0f; }
 
-#define MAKE_VECTOR_UNARY_FUNC(func)                                                \
-    template<typename T, uint N>                                                    \
-    [[nodiscard]] constexpr auto func(Vector<T, N, false> v) noexcept {             \
-        static_assert(N == 2 || N == 3 || N == 4);                                  \
-        if constexpr (N == 2) {                                                     \
-            return Vector<T, 2, false>{func(v.x), func(v.y)};                       \
-        } else if constexpr (N == 3) {                                              \
-            return Vector<T, 3, false>(func(v.x), func(v.y), func(v.z));            \
-        } else {                                                                    \
-            return Vector<T, 4, false>(func(v.x), func(v.y), func(v.z), func(v.w)); \
-        }                                                                           \
+#define MAKE_VECTOR_UNARY_FUNC(func)                                          \
+    template<typename T, uint N>                                              \
+    [[nodiscard]] constexpr auto func(Vector<T, N> v) noexcept {              \
+        static_assert(N == 2 || N == 3 || N == 4);                            \
+        if constexpr (N == 2) {                                               \
+            return Vector<T, 2>{func(v.x), func(v.y)};                        \
+        } else if constexpr (N == 3) {                                        \
+            return Vector<T, 3>(func(v.x), func(v.y), func(v.z));             \
+        } else {                                                              \
+            return Vector<T, 4>(func(v.x), func(v.y), func(v.z), func(v.w));  \
+        }                                                                     \
     }
 
 MAKE_VECTOR_UNARY_FUNC(acos)
@@ -180,41 +180,39 @@ MAKE_VECTOR_UNARY_FUNC(degrees)
 
 #undef MAKE_VECTOR_UNARY_FUNC
 
-#define MAKE_VECTOR_BINARY_FUNC(func)                                                                   \
-    template<typename T, uint N>                                                                        \
-    [[nodiscard]] constexpr auto func(Vector<T, N, false> v, Vector<T, N, false> u) noexcept {          \
-        static_assert(N == 2 || N == 3 || N == 4);                                                      \
-        if constexpr (N == 2) {                                                                         \
-            return Vector<T, 2, false>{func(v.x, u.x), func(v.y, u.y)};                                 \
-        } else if constexpr (N == 3) {                                                                  \
-            return Vector<T, 3, false>(func(v.x, u.x), func(v.y, u.y), func(v.z, u.z));                 \
-        } else {                                                                                        \
-            return Vector<T, 4, false>(func(v.x, u.x), func(v.y, u.y), func(v.z, u.z), func(v.w, u.w)); \
-        }                                                                                               \
-    }                                                                                                   \
-                                                                                                        \
-    template<typename T, uint N>                                                                        \
-    [[nodiscard]] constexpr auto func(T v, Vector<T, N, false> u) noexcept {                            \
-        static_assert(N == 2 || N == 3 || N == 4);                                                      \
-        if constexpr (N == 2) {                                                                         \
-            return Vector<T, 2, false>{func(v, u.x), func(v, u.y)};                                     \
-        } else if constexpr (N == 3) {                                                                  \
-            return Vector<T, 3, false>(func(v, u.x), func(v, u.y), func(v, u.z));                       \
-        } else {                                                                                        \
-            return Vector<T, 4, false>(func(v, u.x), func(v, u.y), func(v, u.z), func(v, u.w));         \
-        }                                                                                               \
-    }                                                                                                   \
-                                                                                                        \
-    template<typename T, uint N>                                                                        \
-    [[nodiscard]] constexpr auto func(Vector<T, N, false> v, T u) noexcept {                            \
-        static_assert(N == 2 || N == 3 || N == 4);                                                      \
-        if constexpr (N == 2) {                                                                         \
-            return Vector<T, 2, false>{func(v.x, u), func(v.y, u)};                                     \
-        } else if constexpr (N == 3) {                                                                  \
-            return Vector<T, 3, false>(func(v.x, u), func(v.y, u), func(v.z, u));                       \
-        } else {                                                                                        \
-            return Vector<T, 4, false>(func(v.x, u), func(v.y, u), func(v.z, u), func(v.w, u));         \
-        }                                                                                               \
+#define MAKE_VECTOR_BINARY_FUNC(func)                                                             \
+    template<typename T, uint N>                                                                  \
+    [[nodiscard]] constexpr auto func(Vector<T, N> v, Vector<T, N> u) noexcept {                  \
+        static_assert(N == 2 || N == 3 || N == 4);                                                \
+        if constexpr (N == 2) {                                                                   \
+            return Vector<T, 2>{func(v.x, u.x), func(v.y, u.y)};                                  \
+        } else if constexpr (N == 3) {                                                            \
+            return Vector<T, 3>(func(v.x, u.x), func(v.y, u.y), func(v.z, u.z));                  \
+        } else {                                                                                  \
+            return Vector<T, 4>(func(v.x, u.x), func(v.y, u.y), func(v.z, u.z), func(v.w, u.w));  \
+        }                                                                                         \
+    }                                                                                             \
+    template<typename T, uint N>                                                                  \
+    [[nodiscard]] constexpr auto func(T v, Vector<T, N> u) noexcept {                             \
+        static_assert(N == 2 || N == 3 || N == 4);                                                \
+        if constexpr (N == 2) {                                                                   \
+            return Vector<T, 2>{func(v, u.x), func(v, u.y)};                                      \
+        } else if constexpr (N == 3) {                                                            \
+            return Vector<T, 3>(func(v, u.x), func(v, u.y), func(v, u.z));                        \
+        } else {                                                                                  \
+            return Vector<T, 4>(func(v, u.x), func(v, u.y), func(v, u.z), func(v, u.w));          \
+        }                                                                                         \
+    }                                                                                             \
+    template<typename T, uint N>                                                                  \
+    [[nodiscard]] constexpr auto func(Vector<T, N> v, T u) noexcept {                             \
+        static_assert(N == 2 || N == 3 || N == 4);                                                \
+        if constexpr (N == 2) {                                                                   \
+            return Vector<T, 2>{func(v.x, u), func(v.y, u)};                                      \
+        } else if constexpr (N == 3) {                                                            \
+            return Vector<T, 3>(func(v.x, u), func(v.y, u), func(v.z, u));                        \
+        } else {                                                                                  \
+            return Vector<T, 4>(func(v.x, u), func(v.y, u), func(v.z, u), func(v.w, u));          \
+        }                                                                                         \
     }
 
 MAKE_VECTOR_BINARY_FUNC(atan2)
@@ -230,14 +228,14 @@ template<typename T, typename F>
 }
 
 template<typename T, uint N, std::enable_if_t<scalar::is_scalar<T>, int> = 0>
-[[nodiscard]] constexpr auto select(Vector<bool, N, false> pred, Vector<T, N, false> t, Vector<T, N, false> f) noexcept {
+[[nodiscard]] constexpr auto select(Vector<bool, N> pred, Vector<T, N> t, Vector<T, N> f) noexcept {
     static_assert(N == 2 || N == 3 || N == 4);
     if constexpr (N == 2) {
-        return Vector < T, N, false > {select(pred.x, t.x, f.x), select(pred.y, t.y, f.y)};
+        return Vector< T, N>{select(pred.x, t.x, f.x), select(pred.y, t.y, f.y)};
     } else if constexpr (N == 3) {
-        return Vector < T, N, false > {select(pred.x, t.x, f.x), select(pred.y, t.y, f.y), select(pred.z, t.z, f.z)};
+        return Vector< T, N>{select(pred.x, t.x, f.x), select(pred.y, t.y, f.y), select(pred.z, t.z, f.z)};
     } else {
-        return Vector < T, N, false > {select(pred.x, t.x, f.x), select(pred.y, t.y, f.y), select(pred.z, t.z, f.z), select(pred.w, t.w, f.w)};
+        return Vector<T, N>{select(pred.x, t.x, f.x), select(pred.y, t.y, f.y), select(pred.z, t.z, f.z), select(pred.w, t.w, f.w)};
     }
 }
 
@@ -253,7 +251,7 @@ template<typename X, typename A, typename B>
 
 // Vector Functions
 template<uint N>
-[[nodiscard]] constexpr auto dot(Vector<float, N, false> u, Vector<float, N, false> v) noexcept {
+[[nodiscard]] constexpr auto dot(Vector<float, N> u, Vector<float, N> v) noexcept {
     static_assert(N == 2 || N == 3 || N == 4);
     if constexpr (N == 2) {
         return u.x * v.x + u.y * v.y;
@@ -265,17 +263,17 @@ template<uint N>
 }
 
 template<uint N>
-[[nodiscard]] constexpr auto length(Vector<float, N, false> u) noexcept {
+[[nodiscard]] constexpr auto length(Vector<float, N> u) noexcept {
     return sqrt(dot(u, u));
 }
 
 template<uint N>
-[[nodiscard]] constexpr auto normalize(Vector<float, N, false> u) noexcept {
+[[nodiscard]] constexpr auto normalize(Vector<float, N> u) noexcept {
     return u * (1.0f / length(u));
 }
 
 template<uint N>
-[[nodiscard]] constexpr auto distance(Vector<float, N, false> u, Vector<float, N, false> v) noexcept {
+[[nodiscard]] constexpr auto distance(Vector<float, N> u, Vector<float, N> v) noexcept {
     return length(u - v);
 }
 

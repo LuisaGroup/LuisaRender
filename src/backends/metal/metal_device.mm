@@ -58,8 +58,8 @@ public:
     
     std::unique_ptr<Acceleration> build_acceleration(
         const BufferView<float3> &positions,
-        const BufferView<packed_uint3> &indices,
-        const std::vector<packed_uint3> &meshes,
+        const BufferView<TriangleHandle> &indices,
+        const std::vector<EntityRange> &meshes,
         const BufferView<uint> &instances,
         const BufferView<float4x4> &transforms,
         bool is_static) override;
@@ -208,8 +208,8 @@ std::shared_ptr<Texture> MetalDevice::_allocate_texture(uint32_t width, uint32_t
 
 std::unique_ptr<Acceleration> MetalDevice::build_acceleration(
     const BufferView<float3> &positions,
-    const BufferView<packed_uint3> &indices,
-    const std::vector<packed_uint3> &meshes,
+    const BufferView<TriangleHandle> &indices,
+    const std::vector<EntityRange> &meshes,
     const BufferView<uint> &instances,
     const BufferView<float4x4> &transforms,
     bool is_static) {
@@ -221,15 +221,15 @@ std::unique_ptr<Acceleration> MetalDevice::build_acceleration(
     instance_acceleration.accelerationStructures = acceleration_structures;
     
     // create individual triangle acceleration structures
-    for (auto[vertex_offset, triangle_offset, triangle_count] : meshes) {
+    for (auto m : meshes) {
         auto triangle_acceleration = [[MPSTriangleAccelerationStructure alloc] initWithGroup:acceleration_group];
         triangle_acceleration.vertexBuffer = dynamic_cast<MetalBuffer *>(positions.buffer())->handle();
-        triangle_acceleration.vertexBufferOffset = positions.byte_offset() + vertex_offset * sizeof(float3);
+        triangle_acceleration.vertexBufferOffset = positions.byte_offset() + m.vertex_offset * sizeof(float3);
         triangle_acceleration.vertexStride = sizeof(float3);
         triangle_acceleration.indexBuffer = dynamic_cast<MetalBuffer *>(indices.buffer())->handle();
-        triangle_acceleration.indexBufferOffset = indices.byte_offset() + triangle_offset * sizeof(packed_uint3);
+        triangle_acceleration.indexBufferOffset = indices.byte_offset() + m.triangle_offset * sizeof(TriangleHandle);
         triangle_acceleration.indexType = MPSDataTypeUInt32;
-        triangle_acceleration.triangleCount = triangle_count;
+        triangle_acceleration.triangleCount = m.triangle_count;
         [triangle_acceleration rebuild];
         [acceleration_structures addObject:triangle_acceleration];
     }

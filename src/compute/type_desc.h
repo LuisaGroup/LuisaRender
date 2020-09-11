@@ -45,7 +45,6 @@ enum struct TypeCatalog : uint32_t {
     VECTOR2,
     VECTOR3,
     VECTOR4,
-    VECTOR3_PACKED,
 
     MATRIX3,
     MATRIX4,
@@ -158,7 +157,6 @@ struct Matrix4 {
 MAKE_VECTOR_TYPE_DESC(2, )
 MAKE_VECTOR_TYPE_DESC(3, )
 MAKE_VECTOR_TYPE_DESC(4, )
-MAKE_VECTOR_TYPE_DESC(3, _PACKED)
 
 #undef MAKE_VECTOR_TYPE_DESC
 
@@ -268,53 +266,40 @@ struct MakeTypeDescImpl<float4x4> {
 };
 
 template<typename T>
-struct MakeTypeDescImpl<Vector<T, 2, false>> {
+struct MakeTypeDescImpl<Vector<T, 2>> {
 
     using Type = Vector2<T>;
 
     [[nodiscard]] TypeDesc *operator()() const noexcept {
         auto desc = Type::desc();
-        desc->size = static_cast<uint32_t>(sizeof(Vector<T, 2, false>));
-        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<Vector<T, 2, false>>);
+        desc->size = static_cast<uint32_t>(sizeof(Vector<T, 2>));
+        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<Vector<T, 2>>);
         return desc;
     }
 };
 
 template<typename T>
-struct MakeTypeDescImpl<Vector<T, 3, false>> {
+struct MakeTypeDescImpl<Vector<T, 3>> {
 
     using Type = Vector3<T>;
 
     [[nodiscard]] TypeDesc *operator()() const noexcept {
         auto desc = Type::desc();
-        desc->size = static_cast<uint32_t>(sizeof(Vector<T, 3, false>));
-        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<Vector<T, 3, false>>);
+        desc->size = static_cast<uint32_t>(sizeof(Vector<T, 3>));
+        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<Vector<T, 3>>);
         return desc;
     }
 };
 
 template<typename T>
-struct MakeTypeDescImpl<Vector<T, 4, false>> {
+struct MakeTypeDescImpl<Vector<T, 4>> {
 
     using Type = Vector4<T>;
 
     [[nodiscard]] TypeDesc *operator()() const noexcept {
         auto desc = Type::desc();
-        desc->size = static_cast<uint32_t>(sizeof(Vector<T, 4, false>));
-        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<Vector<T, 4, false>>);
-        return desc;
-    }
-};
-
-template<typename T>
-struct MakeTypeDescImpl<Vector<T, 3, true>> {
-
-    using Type = Vector3_PACKED<T>;
-
-    [[nodiscard]] TypeDesc *operator()() const noexcept {
-        auto desc = Type::desc();
-        desc->size = static_cast<uint32_t>(sizeof(Vector<T, 3, true>));
-        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<Vector<T, 3, true>>);
+        desc->size = static_cast<uint32_t>(sizeof(Vector<T, 4>));
+        desc->alignment = static_cast<uint32_t>(std::alignment_of_v<Vector<T, 4>>);
         return desc;
     }
 };

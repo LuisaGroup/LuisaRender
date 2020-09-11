@@ -125,9 +125,9 @@ struct Expr<T[N]> : public ExprBase {
     }
 };
 
-template<typename T, bool packed>
-struct Expr<Vector<T, 2, packed>> : public ExprBase {
-    using Type = Vector<T, 2, packed>;
+template<typename T>
+struct Expr<Vector<T, 2>> : public ExprBase {
+    using Type = Vector<T, 2>;
     explicit Expr(const Variable *v) noexcept: ExprBase{v} {}
     Expr(ExprBase &&expr) noexcept: ExprBase{expr.variable()} {}
     Expr(const ExprBase &expr) noexcept: ExprBase{expr.variable()} {}
@@ -140,9 +140,9 @@ struct Expr<Vector<T, 2, packed>> : public ExprBase {
     [[nodiscard]] auto g() const noexcept { return y(); }
 };
 
-template<typename T, bool packed>
-struct Expr<Vector<T, 3, packed>> : public ExprBase {
-    using Type = Vector<T, 3, packed>;
+template<typename T>
+struct Expr<Vector<T, 3>> : public ExprBase {
+    using Type = Vector<T, 3>;
     explicit Expr(const Variable *v) noexcept: ExprBase{v} {}
     Expr(ExprBase &&expr) noexcept: ExprBase{expr.variable()} {}
     Expr(const ExprBase &expr) noexcept: ExprBase{expr.variable()} {}
@@ -157,9 +157,9 @@ struct Expr<Vector<T, 3, packed>> : public ExprBase {
     [[nodiscard]] auto b() const noexcept { return z(); }
 };
 
-template<typename T, bool packed>
-struct Expr<Vector<T, 4, packed>> : public ExprBase {
-    using Type = Vector<T, 4, packed>;
+template<typename T>
+struct Expr<Vector<T, 4>> : public ExprBase {
+    using Type = Vector<T, 4>;
     explicit Expr(const Variable *v) noexcept: ExprBase{v} {}
     Expr(ExprBase &&expr) noexcept: ExprBase{expr.variable()} {}
     Expr(const ExprBase &expr) noexcept: ExprBase{expr.variable()} {}
@@ -415,15 +415,10 @@ MAKE_BUILTIN_FUNCTION_DEF(make_##T##4, vector::make_##T##4, x, y)             \
 MAKE_BUILTIN_FUNCTION_DEF(make_##T##4, vector::make_##T##4, x, y, z)          \
 MAKE_BUILTIN_FUNCTION_DEF(make_##T##4, vector::make_##T##4, x, y, z, w)       \
 
-// make_packed_vec3
-#define MAKE_BUILTIN_FUNCTION_DEF_MAKE_PACKED_VEC3(T)                         \
-MAKE_BUILTIN_FUNCTION_DEF(make_packed_##T##3, vector::make_packed_##T##3, v)  \
-
 #define MAKE_BUILTIN_FUNCTION_DEF_MAKE_VEC(T)                                 \
 MAKE_BUILTIN_FUNCTION_DEF_MAKE_VEC2(T)                                        \
 MAKE_BUILTIN_FUNCTION_DEF_MAKE_VEC3(T)                                        \
 MAKE_BUILTIN_FUNCTION_DEF_MAKE_VEC4(T)                                        \
-MAKE_BUILTIN_FUNCTION_DEF_MAKE_PACKED_VEC3(T)                                 \
 
 MAKE_BUILTIN_FUNCTION_DEF_MAKE_VEC(bool)
 MAKE_BUILTIN_FUNCTION_DEF_MAKE_VEC(float)

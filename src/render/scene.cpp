@@ -52,13 +52,13 @@ Scene::Scene(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, 
     _positions = device->allocate_buffer<float3>(vertex_count);
     _normals = device->allocate_buffer<float3>(vertex_count);
     _tex_coords = device->allocate_buffer<float2>(vertex_count);
-    _triangles = device->allocate_buffer<packed_uint3>(triangle_count);
-    _instance_entities = device->allocate_buffer<Entity>(instance_count);
+    _triangles = device->allocate_buffer<TriangleHandle>(triangle_count);
+    _instance_entities = device->allocate_buffer<EntityHandle>(instance_count);
     _instances = device->allocate_buffer<uint>(instance_count);
     _instance_transforms = device->allocate_buffer<float4x4>(instance_count);
     
     // encode shapes
-    std::vector<packed_uint3> meshes;
+    std::vector<EntityRange> meshes;
     std::vector<Material *> materials;
     meshes.reserve(entity_count);
     materials.reserve(entity_count);
@@ -66,8 +66,8 @@ Scene::Scene(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, 
         dispatch(_positions.modify([&](float3 *positions) {
             dispatch(_normals.modify([&](float3 *normals) {
                 dispatch(_tex_coords.modify([&](float2 *uvs) {
-                    dispatch(_triangles.modify([&](packed_uint3 *indices) {
-                        dispatch(_instance_entities.modify([&](Entity *entities) {
+                    dispatch(_triangles.modify([&](TriangleHandle *indices) {
+                        dispatch(_instance_entities.modify([&](EntityHandle *entities) {
                             dispatch(_instances.modify([&](uint *instances) {
                                 _process(shapes, positions, normals, uvs, indices, entities, meshes, materials, instances);
                             }));
@@ -100,9 +100,9 @@ void Scene::_process(const std::vector<std::shared_ptr<Shape>> &shapes,
                      float3 *positions,
                      float3 *normals,
                      float2 *uvs,
-                     packed_uint3 *triangles,
-                     Entity *entities,
-                     std::vector<packed_uint3> &entity_ranges,
+                     TriangleHandle *triangles,
+                     EntityHandle *entities,
+                     std::vector<EntityRange> &entity_ranges,
                      std::vector<Material *> &instance_materials,
                      uint *instances) {
     
@@ -149,14 +149,14 @@ void Scene::_process(const std::vector<std::shared_ptr<Shape>> &shapes,
                 shape->clear();
                 
                 auto entity_id = static_cast<uint>(entity_ranges.size());
-                entity_ranges.emplace_back(vertex_offset, triangle_offset, indices.size());
+                entity_ranges.emplace_back(EntityRange{static_cast<uint>(vertex_offset), static_cast<uint>(triangle_offset), static_cast<uint>(indices.size())});
                 entities[entity_id] = {static_cast<uint>(vertex_offset), static_cast<uint>(triangle_offset)};
                 
                 iter = entity_to_id.emplace(shape, entity_id).first;
             }
             auto entity_id = iter->second;
             instances[instance_id] = entity_id;
-            entities[instance_id] = {entity_ranges[entity_id].x, entity_ranges[entity_id].y};
+            entities[instance_id] = {entity_ranges[entity_id].vertex_offset, entity_ranges[entity_id].triangle_offset};
             instance_materials.emplace_back(material);
         } else {  // inner node, visit children
             for (auto &&child : shape->children()) {
@@ -203,15 +203,17 @@ void Scene::intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_buf
                 
                 Var entity = _instance_entities[instance_id];
                 Var triangle_id = entity.triangle_offset() + hit.triangle_id();
-                Var indices = make_uint3(_triangles[triangle_id]) + entity.vertex_offset();
+                Var i = _triangles[triangle_id].i() + entity.vertex_offset();
+                Var j = _triangles[triangle_id].j() + entity.vertex_offset();
+                Var k = _triangles[triangle_id].k() + entity.vertex_offset();
                 
                 Var bary_u = hit.bary_u();
                 Var bary_v = hit.bary_v();
                 Var bary_w = 1.0f - (bary_u + bary_v);
                 
-                Var p0 = _positions[indices.x()];
-                Var p1 = _positions[indices.y()];
-                Var p2 = _positions[indices.z()];
+                Var p0 = _positions[i];
+                Var p1 = _positions[j];
+                Var p2 = _positions[k];
                 
                 Var m = _instance_transforms[instance_id];
                 Var nm = transpose(inverse(make_float3x3(m)));
@@ -220,13 +222,13 @@ void Scene::intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_buf
                 its_buffers.pi[tid] = p;
                 
                 // NOTE: DO NOT NORMALIZE!
-                its_buffers.ray_origin_to_hit[tid] = p - make_float3(ray_buffer[tid].origin());
+                its_buffers.ray_origin_to_hit[tid] = p - make_float3(ray_buffer[tid].origin_x(), ray_buffer[tid].origin_y(), ray_buffer[tid].origin_z());
                 
                 Var ng = normalize(nm * cross(p1 - p0, p2 - p0));
-                Var ns = normalize(bary_u * _normals[indices.x()] + bary_u * _normals[indices.y()] + bary_w * _normals[indices.z()]);
+                Var ns = normalize(bary_u * _normals[i] + bary_u * _normals[j] + bary_w * _normals[k]);
                 its_buffers.ns[tid] = ns;
                 its_buffers.ng[tid] = select(dot(ns, ng) < 0.0f, -ng, ng);
-                its_buffers.uv[tid] = bary_u * _tex_coords[indices.x()] + bary_v * _tex_coords[indices.y()] + bary_w * _tex_coords[indices.z()];
+                its_buffers.uv[tid] = bary_u * _tex_coords[i] + bary_v * _tex_coords[j] + bary_w * _tex_coords[k];
             };
         };
     });

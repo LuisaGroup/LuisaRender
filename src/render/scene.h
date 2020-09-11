@@ -26,14 +26,9 @@ using compute::Pipeline;
 using compute::Ray;
 using compute::AnyHit;
 using compute::ClosestHit;
+using compute::EntityRange;
 
 class Scene {
-
-public:
-    struct Entity {
-        uint vertex_offset;
-        uint triangle_offset;
-    };
 
 private:
     Device *_device;
@@ -41,8 +36,8 @@ private:
     BufferView<float3> _positions;
     BufferView<float3> _normals;
     BufferView<float2> _tex_coords;
-    BufferView<packed_uint3> _triangles;
-    BufferView<Entity> _instance_entities;
+    BufferView<TriangleHandle> _triangles;
+    BufferView<EntityHandle> _instance_entities;
     BufferView<uint> _instances;
     BufferView<float4x4> _instance_transforms;
     BufferView<DataBlock> _material_data;
@@ -59,9 +54,9 @@ private:
 private:
     void _process(const std::vector<std::shared_ptr<Shape>> &shapes,
                   float3 *positions, float3 *normals, float2 *uvs,
-                  packed_uint3 *triangles,
-                  Entity *entities,
-                  std::vector<packed_uint3> &entity_ranges,  // (vertex offset, triangle offset, triangle count)
+                  TriangleHandle *triangles,
+                  EntityHandle *entities,
+                  std::vector<EntityRange> &entity_ranges,  // (vertex offset, triangle offset, triangle count)
                   std::vector<Material *> &instance_materials,
                   uint *instances);
 
@@ -75,4 +70,4 @@ public:
 
 }
 
-LUISA_STRUCT(luisa::render::Scene::Entity, vertex_offset, triangle_offset)
+

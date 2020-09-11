@@ -1,7 +1,7 @@
 file(GLOB HEADER_FILES *.h)
 file(GLOB SOURCE_FILES *.cpp)
 
-add_library(luisa-compute SHARED ${HEADER_FILES} ${SOURCE_FILES})
+add_library(luisa-compute SHARED ${HEADER_FILES} ${SOURCE_FILES} hit.h primitive.h)
 target_link_libraries(luisa-compute PUBLIC luisa-core)
 
 set_target_properties(luisa-compute PROPERTIES
