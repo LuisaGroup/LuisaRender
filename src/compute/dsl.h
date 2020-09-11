@@ -208,7 +208,7 @@ struct Var : public Expr<T> {
     template<typename ...Args>
     Var(Args &&...args) noexcept : Expr<T>{Variable::make_local_variable(type_desc<T>)} {
         std::vector<const Variable *> init{detail::extract_variable(std::forward<Args>(args))...};
-        Function::current().add_statement(std::make_unique<DeclareStmt>(this->_variable, std::move(init)));
+        Function::current().add_statement(std::make_unique<DeclareStmt>(Expr<T>::_variable, std::move(init)));
     }
 
 #define MAKE_ASSIGN_OP(op)  \
@@ -568,9 +568,9 @@ public:
     }
 };
 
-#define If(...) IfStmtBuilder{__VA_ARGS__} << [&]()
+#define If(...) ::luisa::compute::dsl::IfStmtBuilder{__VA_ARGS__} << [&]()
 #define Else >> [&]()
-#define Elif(...) << (new IfStmtBuilder{__VA_ARGS__}) << [&]()
+#define Elif(...) << (new ::luisa::compute::dsl::IfStmtBuilder{__VA_ARGS__}) << [&]()
 
 class WhileStmtBuilder {
 
@@ -590,7 +590,7 @@ public:
     void operator<<(std::function<void()> body) noexcept { _body = std::move(body); }
 };
 
-#define While(...) WhileStmtBuilder{__VA_ARGS__} << [&]()
+#define While(...) ::luisa::compute::dsl::WhileStmtBuilder{__VA_ARGS__} << [&]()
 
 class DoWhileStmtBuilder {
 
@@ -609,7 +609,7 @@ public:
     void operator<<(const Variable *cond) noexcept { _cond = cond; }
 };
 
-#define Do DoWhileStmtBuilder{} << [&]()
+#define Do ::luisa::compute::dsl::DoWhileStmtBuilder{} << [&]()
 #define When(...) << ::luisa::compute::dsl::detail::extract_variable(__VA_ARGS__)
 
 class SwitchStmtBuilder {
@@ -655,13 +655,13 @@ struct SwitchDefaultStmtBuilder {
     }
 };
 
-#define Switch(...) SwitchStmtBuilder{__VA_ARGS__} << [&]()
-#define Case(...) SwitchCaseStmtBuilder{__VA_ARGS__} << [&]()
-#define Default SwitchDefaultStmtBuilder{} << [&]()
+#define Switch(...) ::luisa::compute::dsl::SwitchStmtBuilder{__VA_ARGS__} << [&]()
+#define Case(...) ::luisa::compute::dsl::SwitchCaseStmtBuilder{__VA_ARGS__} << [&]()
+#define Default ::luisa::compute::dsl::SwitchDefaultStmtBuilder{} << [&]()
 
-#define Return Function::current().add_return()
-#define Break Function::current().add_break()
-#define Continue Function::current().add_continue()
+#define Return ::luisa::compute::dsl::Function::current().add_return()
+#define Break ::luisa::compute::dsl::Function::current().add_break()
+#define Continue ::luisa::compute::dsl::Function::current().add_continue()
 
 }
 

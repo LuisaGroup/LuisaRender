@@ -12,6 +12,7 @@ using luisa::compute::Dispatcher;
 using luisa::compute::Kernel;
 using luisa::compute::TextureView;
 using luisa::compute::dsl::Function;
+using luisa::compute::dsl::Var;
 
 class BoxBlur {
 
@@ -28,22 +29,22 @@ public:
         : _width{static_cast<int>(input.width())},
           _height{static_cast<int>(input.height())},
           _temp{device.allocate_texture<luisa::float4>(input.width(), input.height())} {
+    
+        using namespace luisa;
+        using namespace luisa::compute;
+        using namespace luisa::compute::dsl;
         
         auto box_blur_x_or_y = [](int rx, int ry, TextureView in, TextureView out) noexcept {
-            
-            using namespace luisa;
-            using namespace luisa::compute;
-            using namespace luisa::compute::dsl;
             
             auto width = static_cast<int>(in.width());
             auto height = static_cast<int>(in.height());
             Var p = make_int2(thread_xy());
-            If (p.x() < width && p.y() < height) {
+            If (all(p < dsl::make_int2(width, height))) {
                 Var sum = dsl::make_float3(0.0f);
                 for (auto dy = -ry; dy <= ry; dy++) {
                     for (auto dx = -rx; dx <= rx; dx++) {
-                        Var x = p.x() + dx;
-                        Var y = p.y() + dy;
+                        Var<int> x = p.x() + Expr{dx};
+                        Var<int> y = p.y() + Expr{dy};
                         if (rx != 0) { x = Expr{select(x < 0, -x, select(x < width, x, 2 * width - 1 - x))}; }
                         if (ry != 0) { y = Expr{select(y < 0, -y, select(y < height, y, 2 * height - 1 - y))}; }
                         sum += make_float3(in.read(make_uint2(x, y)));
