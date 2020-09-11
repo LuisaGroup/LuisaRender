@@ -59,6 +59,8 @@ public:
         return _allocate_texture(width, height, format)->view();
     }
     
+    [[nodiscard]] TextureView load_texture(const std::filesystem::path &file_name);
+    
     [[nodiscard]] virtual std::unique_ptr<Acceleration> build_acceleration(
         const BufferView<float3> &positions,
         const BufferView<TriangleHandle> &indices,

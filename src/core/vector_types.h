@@ -52,13 +52,13 @@ struct alignas(detail::vector_alignment<T, N>) Vector : detail::VectorStorage<T,
     
     constexpr Vector() noexcept : detail::VectorStorage<T, N>{static_cast<T>(0)} {}
     
-    template<typename U>
-    explicit constexpr Vector(U u) noexcept : detail::VectorStorage<T, N>{static_cast<T>(u)} {}
+    template<typename U, std::enable_if_t<std::is_same_v<std::decay_t<U>, T>, int> = 0>
+    explicit constexpr Vector(U u) noexcept : detail::VectorStorage<T, N>{u} {}
     
     template<
         typename... U,
-        std::enable_if_t<sizeof...(U) == N, int> = 0>
-    explicit constexpr Vector(U... u) noexcept : detail::VectorStorage<T, N>{static_cast<T>(u)...} {}
+        std::enable_if_t<sizeof...(U) == N && std::conjunction_v<std::is_same<std::decay_t<U>, T>...>, int> = 0>
+    explicit constexpr Vector(U... u) noexcept : detail::VectorStorage<T, N>{u...} {}
     
     template<typename Index>
     [[nodiscard]] T &operator[](Index i) noexcept { return reinterpret_cast<T(&)[N]>(*this)[i]; }
@@ -218,20 +218,20 @@ MAKE_VECTOR_RELATIONAL_OP(>=)
 
 #undef MAKE_VECTOR_RELATIONAL_OP
 
-#define MAKE_VECTOR_MAKE_TYPE2(type)                                                   \
-    constexpr auto make_##type##2() noexcept { return type##2 {}; }                    \
-    constexpr auto make_##type##2(type s) noexcept { return type##2 {s}; }             \
-    constexpr auto make_##type##2(type x, type y) noexcept { return type##2 {x, y}; }  \
-                                                                                       \
-    template<typename U, uint N>                                                       \
-    constexpr auto make_##type##2(Vector<U, N> v) noexcept {                           \
-        static_assert(N == 2 || N == 3 || N == 4);                                     \
-        return type##2 {v.x, v.y};                                                     \
+#define MAKE_VECTOR_MAKE_TYPE2(type)                                                  \
+    constexpr auto make_##type##2() noexcept { return type##2{}; }                    \
+    constexpr auto make_##type##2(type s) noexcept { return type##2{s}; }             \
+    constexpr auto make_##type##2(type x, type y) noexcept { return type##2{x, y}; }  \
+                                                                                      \
+    template<typename U, uint N>                                                      \
+    constexpr auto make_##type##2(Vector<U, N> v) noexcept {                          \
+        static_assert(N == 2 || N == 3 || N == 4);                                    \
+        return type##2{static_cast<type>(v.x), static_cast<type>(v.y)};               \
     }
 
 #define MAKE_VECTOR_MAKE_TYPE3(type)                                                              \
-    constexpr auto make_##type##3() noexcept { return type##3 {}; }                               \
-    constexpr auto make_##type##3(type s) noexcept { return type##3 {s}; }                        \
+    constexpr auto make_##type##3() noexcept { return type##3{}; }                                \
+    constexpr auto make_##type##3(type s) noexcept { return type##3{s}; }                         \
     constexpr auto make_##type##3(type x, type y, type z) noexcept { return type##3 {x, y, z}; }  \
     constexpr auto make_##type##3(type##2 v, type z) noexcept { return type##3 {v.x, v.y, z}; }   \
     constexpr auto make_##type##3(type x, type##2 v) noexcept { return type##3 {x, v.x, v.y}; }   \
@@ -239,22 +239,26 @@ MAKE_VECTOR_RELATIONAL_OP(>=)
     template<typename U, uint N>                                                                  \
     constexpr auto make_##type##3(Vector<U, N> v) noexcept {                                      \
         static_assert(N == 3 || N == 4);                                                          \
-        return type##3 {v.x, v.y, v.z};                                                           \
+        return type##3 {static_cast<type>(v.x), static_cast<type>(v.y), static_cast<type>(v.z)};  \
     }                                                                                             \
 
-#define MAKE_VECTOR_MAKE_TYPE4(type)                                                                          \
-    constexpr auto make_##type##4() noexcept { return type##4 {}; }                                           \
-    constexpr auto make_##type##4(type s) noexcept { return type##4 {s}; }                                    \
-    constexpr auto make_##type##4(type x, type y, type z, type w) noexcept { return type##4 {x, y, z, w}; }   \
-    constexpr auto make_##type##4(type##2 v, type z, type w) noexcept { return type##4 {v.x, v.y, z, w}; }    \
-    constexpr auto make_##type##4(type x, type y, type##2 v) noexcept { return type##4 {x, y, v.x, v.y}; }    \
-    constexpr auto make_##type##4(type x, type##2 v, type w) noexcept { return type##4 {x, v.x, v.y, w}; }    \
-    constexpr auto make_##type##4(type##2 v, type##2 u) noexcept { return type##4 {v.x, v.y, u.x, u.y}; }     \
-    constexpr auto make_##type##4(type##3 v, type w) noexcept { return type##4 {v.x, v.y, v.z, w}; }          \
-    constexpr auto make_##type##4(type x, type##3 v) noexcept { return type##4 {x, v.x, v.y, v.z}; }          \
-    template<typename U>                                                                                      \
-    constexpr auto make_##type##4(Vector<U, 4> v) noexcept {                                                  \
-        return type##4 {v.x, v.y, v.z, v.w};                                                                  \
+#define MAKE_VECTOR_MAKE_TYPE4(type)                                                                         \
+    constexpr auto make_##type##4() noexcept { return type##4 {}; }                                          \
+    constexpr auto make_##type##4(type s) noexcept { return type##4 {s}; }                                   \
+    constexpr auto make_##type##4(type x, type y, type z, type w) noexcept { return type##4 {x, y, z, w}; }  \
+    constexpr auto make_##type##4(type##2 v, type z, type w) noexcept { return type##4 {v.x, v.y, z, w}; }   \
+    constexpr auto make_##type##4(type x, type y, type##2 v) noexcept { return type##4 {x, y, v.x, v.y}; }   \
+    constexpr auto make_##type##4(type x, type##2 v, type w) noexcept { return type##4 {x, v.x, v.y, w}; }   \
+    constexpr auto make_##type##4(type##2 v, type##2 u) noexcept { return type##4 {v.x, v.y, u.x, u.y}; }    \
+    constexpr auto make_##type##4(type##3 v, type w) noexcept { return type##4 {v.x, v.y, v.z, w}; }         \
+    constexpr auto make_##type##4(type x, type##3 v) noexcept { return type##4 {x, v.x, v.y, v.z}; }         \
+    template<typename U>                                                                                     \
+    constexpr auto make_##type##4(Vector<U, 4> v) noexcept {                                                 \
+        return type##4 {                                                                                     \
+            static_cast<type>(v.x),                                                                          \
+            static_cast<type>(v.y),                                                                          \
+            static_cast<type>(v.z),                                                                          \
+            static_cast<type>(v.w)};                                                                         \
     }
 
 #define MAKE_VECTOR_TYPE(type)        \

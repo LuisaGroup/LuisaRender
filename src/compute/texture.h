@@ -71,6 +71,8 @@ public:
     virtual void copy_from(Dispatcher &dispatcher, const void *data) = 0;
     virtual void copy_to(Dispatcher &dispatcher, void *data) = 0;
     
+    void save(Dispatcher &dispatch, const std::filesystem::path &path) const;
+    
     [[nodiscard]] TextureView view() noexcept;
     
     [[nodiscard]] uint32_t channels() const noexcept {
@@ -157,6 +159,10 @@ public:
         auto tex = Variable::make_texture_argument(_texture);
         Function::current().mark_texture_sample(_texture.get());
         return Expr<float4>{Variable::make_temporary(nullptr, std::make_unique<TextureExpr>(TextureOp::SAMPLE, tex, uv_expr.variable()))};
+    }
+    
+    [[nodiscard]] auto save(std::filesystem::path path) const {
+        return [texture = _texture, path = std::move(path)](Dispatcher &d) { texture->save(d, path); };
     }
     
     template<typename UV, typename Value>

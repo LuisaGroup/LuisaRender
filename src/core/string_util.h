@@ -46,6 +46,11 @@ inline std::string text_file_contents(const std::filesystem::path &file_path) {
     return {std::istreambuf_iterator<char>{file}, std::istreambuf_iterator<char>{}};
 }
 
+inline std::string to_lower(std::string s) noexcept {
+    for (auto &&c : s) { c = static_cast<char>(std::tolower(c)); }
+    return s;
+}
+
 }}
 
 #ifdef __OBJC__
