@@ -33,6 +33,7 @@ public:
 private:
     id<MTLDevice> _handle;
     id<MTLCommandQueue> _command_queue;
+    std::mutex _kernel_cache_mutex;
     std::map<SHA1::Digest, id<MTLComputePipelineState>> _kernel_cache;
     std::vector<std::unique_ptr<MetalDispatcher>> _dispatchers;
     uint32_t _next_dispatcher{0u};
@@ -89,9 +90,14 @@ std::shared_ptr<Kernel> MetalDevice::_compile_kernel(const compute::dsl::Functio
     if (_context->should_print_generated_source()) { LUISA_INFO("Generated source:\n", s); }
     
     auto digest = SHA1{s}.digest();
-    auto iter = _kernel_cache.find(digest);
-    if (iter == _kernel_cache.cend()) {
-        
+    id<MTLComputePipelineState> pso = nullptr;
+    
+    {
+        std::lock_guard lock{_kernel_cache_mutex};
+        if (auto iter = _kernel_cache.find(digest); iter != _kernel_cache.cend()) { pso = iter->second; }
+    }
+    
+    if (pso == nullptr) {
         LUISA_INFO("No compilation cache found for kernel \"", f.name(), "\", compiling from source...");
         NSError *error = nullptr;
         auto library = [_handle newLibraryWithSource:@(s.c_str()) options:nullptr error:&error];
@@ -108,23 +114,23 @@ std::shared_ptr<Kernel> MetalDevice::_compile_kernel(const compute::dsl::Functio
         desc.label = @(f.name().c_str());
         
         error = nullptr;
-        auto pso = [_handle newComputePipelineStateWithDescriptor:desc options:MTLPipelineOptionNone reflection:nullptr error:&error];
+        pso = [_handle newComputePipelineStateWithDescriptor:desc options:MTLPipelineOptionNone reflection:nullptr error:&error];
         if (error != nullptr) {
             LUISA_WARNING("Error occurred while creating pipeline state object, reason:");
             NSLog(@"%@", error);
             LUISA_EXCEPTION("Failed to create pipeline state object for kernel \"", f.name(), "\".");
         }
         LUISA_INFO("Compilation for kernel \"", f.name(), "\" succeeded.");
-        iter = _kernel_cache.emplace(digest, pso).first;
+        {
+            std::lock_guard lock{_kernel_cache_mutex};
+            _kernel_cache.emplace(digest, pso);
+        }
     } else {
         LUISA_INFO("Cache hit for kernel \"", f.name(), "\", compilation skipped.");
     }
     
-    auto pso = iter->second;
-    
     std::vector<MetalKernel::Uniform> uniforms;
     std::vector<MetalKernel::Resource> resources;
-    
     size_t uniform_offset = 0u;
     for (auto &&arg : f.arguments()) {
         if (arg->is_buffer_argument()) {

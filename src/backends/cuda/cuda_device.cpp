@@ -118,7 +118,7 @@ CudaDevice::~CudaDevice() noexcept {
     CUDA_CHECK(cuDevicePrimaryCtxRelease(_handle));
 }
 
-std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) {
+std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) {  // TODO: Make it thread-safe
     
     std::ostringstream os;
     CudaCodegen codegen{os};
