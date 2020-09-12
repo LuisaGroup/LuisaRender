@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
         device->launch([&](Dispatcher &dispatch) {
             scale = 3.0f;
             dispatch(buffer_a.copy_from(input_copy.data()));
-            dispatch(kernel->parallelize(buffer_size), [&] { LUISA_INFO("Kernel #", launch_index++, " finished."); });
+            dispatch(kernel.parallelize(buffer_size), [&] { LUISA_INFO("Kernel #", launch_index++, " finished."); });
         });
     }
     
@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
     device->launch([&](Dispatcher &d) {
         scale = 2.0f;
         d(buffer_a.copy_from(input.data()));
-        d(kernel->parallelize(buffer_size), [&] { LUISA_INFO("Kernel #", launch_index++, " finished."); });
+        d(kernel.parallelize(buffer_size), [&] { LUISA_INFO("Kernel #", launch_index++, " finished."); });
         d(buffer_b.copy_to(output.data()));
     });
     
@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
         device->launch([&](Dispatcher &d) {
             scale = 3.0f;
             d(buffer_a.copy_from(input_copy.data()));
-            d(kernel->parallelize(buffer_size), [&] { LUISA_INFO("Kernel #", launch_index++, " finished."); });
+            d(kernel.parallelize(buffer_size), [&] { LUISA_INFO("Kernel #", launch_index++, " finished."); });
         });
     }
     

@@ -34,14 +34,14 @@ public:
     [[nodiscard]] Context &context() const noexcept { return *_context; }
     
     template<typename Def, std::enable_if_t<std::is_invocable_v<Def>, int> = 0>
-    [[nodiscard]] std::shared_ptr<Kernel> compile_kernel(std::string name, Def &&def) {
-        dsl::Function function{std::move(name)};
+    [[nodiscard]] KernelView compile_kernel(std::string name, Def &&def) {
+        auto function = std::make_shared<dsl::Function>(std::move(name));
         def();
-        return _compile_kernel(function);
+        return KernelView{std::async(std::launch::async, [function = std::move(function), this] { return _compile_kernel(*function); })};
     }
     
     template<typename Def, std::enable_if_t<std::is_invocable_v<Def>, int> = 0>
-    [[nodiscard]] std::shared_ptr<Kernel> compile_kernel(Def &&def) {
+    [[nodiscard]] KernelView compile_kernel(Def &&def) {
         return compile_kernel("foo", std::forward<Def>(def));
     }
     

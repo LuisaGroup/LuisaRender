@@ -58,6 +58,7 @@ const std::filesystem::path &Context::_working_dir() noexcept {
     if (_workdir.empty()) {
         _workdir = std::filesystem::canonical(_parse_result()["working-dir"].as<std::filesystem::path>());
         LUISA_EXCEPTION_IF(!std::filesystem::exists(_workdir) || !std::filesystem::is_directory(_workdir), "Invalid working directory: ", _workdir);
+        std::filesystem::current_path(_workdir);
         LUISA_INFO("Working directory: ", _workdir);
         auto cache_directory = _workdir / "cache";
         if (_parse_result()["clear-cache"].as<bool>() && std::filesystem::exists(cache_directory)) {

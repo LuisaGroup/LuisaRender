@@ -20,7 +20,7 @@ private:
     int _height;
     TextureView _output;
     TextureView _result;
-    std::shared_ptr<Kernel> _gradient_kernel;
+    KernelView _gradient_kernel;
 
 public:
     GradientMagnitude(Device &device, TextureView texture, TextureView output)
@@ -66,7 +66,7 @@ public:
     }
     
     void operator()(Dispatcher &dispatch) noexcept {
-        dispatch(_gradient_kernel->parallelize(luisa::make_uint2(_width, _height)));
+        dispatch(_gradient_kernel.parallelize(luisa::make_uint2(_width, _height)));
         if (!_result.empty() && !_output.empty()) { dispatch(_result.copy_to(_output)); }
     }
 };

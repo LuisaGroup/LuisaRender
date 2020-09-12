@@ -234,7 +234,7 @@ void Scene::intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_buf
     });
     
     pipeline << _acceleration->intersect_closest(ray_buffer, _closest_hit_buffer, ray_count_buffer)
-             << kernel->parallelize(ray_buffer.size());
+             << kernel.parallelize(ray_buffer.size());
 }
 
 }

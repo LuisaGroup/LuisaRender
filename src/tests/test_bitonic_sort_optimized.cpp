@@ -122,12 +122,12 @@ int main(int argc, char *argv[]) {
         std::shuffle(host_buffer.begin(), host_buffer.end(), random);
         device->launch(buffer.copy_from(host_buffer.data()), [i] { LUISA_INFO("Copied #", i); });
         device->launch([&](Dispatcher &dispatch) {
-            dispatch(small_stride_kernel->parallelize(buffer_size / 2u, block_size / 2u));
+            dispatch(small_stride_kernel.parallelize(buffer_size / 2u, block_size / 2u));
             for (stride = block_size * 2u; stride <= buffer_size; stride *= 2u) {
                 for (step = stride; step >= block_size * 2u; step /= 2) {
-                    dispatch(kernel->parallelize(buffer_size / 2u, block_size / 2u));
+                    dispatch(kernel.parallelize(buffer_size / 2u, block_size / 2u));
                 }
-                dispatch(small_step_kernel->parallelize(buffer_size / 2u, block_size / 2u));
+                dispatch(small_step_kernel.parallelize(buffer_size / 2u, block_size / 2u));
             }
         }, [i] { LUISA_INFO("Sorted #", i); });
     }

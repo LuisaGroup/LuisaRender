@@ -6,6 +6,7 @@
 
 #include <vector>
 #include <tuple>
+#include <future>
 
 #include <core/data_types.h>
 #include <compute/buffer.h>
@@ -14,7 +15,7 @@ namespace luisa::compute {
 
 class Dispatcher;
 
-class Kernel : public Noncopyable, public std::enable_shared_from_this<Kernel> {
+class Kernel : public Noncopyable {
 
 public:
     struct Resource {
@@ -28,6 +29,8 @@ public:
         size_t binding_size{};
         size_t offset{0u};
     };
+    
+    friend class KernelView;
 
 protected:
     std::vector<Resource> _resources;
@@ -38,15 +41,24 @@ public:
     Kernel(std::vector<Resource> resources, std::vector<Uniform> uniforms) noexcept
         : _resources{std::move(resources)}, _uniforms{std::move(uniforms)} {}
     virtual ~Kernel() noexcept = default;
+};
+
+class KernelView {
+
+private:
+    std::shared_future<std::shared_ptr<Kernel>> _kernel;
+
+public:
+    KernelView(std::shared_future<std::shared_ptr<Kernel>> kernel) noexcept : _kernel{std::move(kernel)} {}
     
     [[nodiscard]] auto parallelize(uint threads, uint block_size = 256u) {
-        return [self = shared_from_this(), threads, block_size](Dispatcher &dispatch) {
+        return [self = _kernel.get(), threads, block_size](Dispatcher &dispatch) {
             self->_dispatch(dispatch, make_uint2((threads + block_size - 1u) / block_size, 1u), make_uint2(block_size, 1u));
         };
     }
     
     [[nodiscard]] auto parallelize(uint2 threads, uint2 block_size = make_uint2(16u, 16u)) {
-        return [self = shared_from_this(), threads, block_size](Dispatcher &dispatch) {
+        return [self = _kernel.get(), threads, block_size](Dispatcher &dispatch) {
             self->_dispatch(dispatch, (threads + block_size - 1u) / block_size, block_size);
         };
     }

@@ -19,8 +19,8 @@ private:
     int _width;
     int _height;
     TextureView _temp;
-    std::shared_ptr<Kernel> _blur_x_kernel;
-    std::shared_ptr<Kernel> _blur_y_kernel;
+    KernelView _blur_x_kernel;
+    KernelView _blur_y_kernel;
 
 public:
     GaussianBlur(Device &device, float sigma_x, float sigma_y, TextureView input, TextureView output)
@@ -67,8 +67,8 @@ public:
     
     void operator()(Dispatcher &dispatch) noexcept {
         using namespace luisa;
-        dispatch(_blur_x_kernel->parallelize(make_uint2(_width, _height)));
-        dispatch(_blur_y_kernel->parallelize(make_uint2(_width, _height)));
+        dispatch(_blur_x_kernel.parallelize(make_uint2(_width, _height)));
+        dispatch(_blur_y_kernel.parallelize(make_uint2(_width, _height)));
     }
     
 };

@@ -69,14 +69,14 @@ TextureView Device::load_texture(const std::filesystem::path &file_name) {
         
         EXRImage exr_image;
         InitEXRImage(&exr_image);
+        auto exr_image_guard = guard_resource(&exr_image, [](EXRImage &img) mutable { FreeEXRImage(&img); });
         if (auto ret = LoadEXRImageFromFile(&exr_image, &exr_header, path_str.c_str(), &err); ret != 0) {
             LUISA_EXCEPTION("Failed to load ", file_name, ": ", err);
         }
         
         if (exr_image.num_channels == 1) {
             auto texture = allocate_texture<float>(exr_image.width, exr_image.height);
-            launch(texture.copy_from(exr_image.images[0]), [exr_image, file_name]() mutable {
-                FreeEXRImage(&exr_image);
+            launch(texture.copy_from(exr_image.images[0]), [file_name]() mutable {
                 LUISA_INFO("Loaded ", file_name, " as float texture.");
             });
             return texture;
@@ -88,10 +88,7 @@ TextureView Device::load_texture(const std::filesystem::path &file_name) {
                     reinterpret_cast<float *>(exr_image.images[0])[i],
                     reinterpret_cast<float *>(exr_image.images[1])[i]);
             }
-            FreeEXRImage(&exr_image);
-            launch(texture.copy_from(pixels.data()), [pixels = std::move(pixels), file_name] {
-                LUISA_INFO("Loaded ", file_name, " as float2 texture.");
-            });
+            launch(texture.copy_from(pixels.data()), [file_name] { LUISA_INFO("Loaded ", file_name, " as float2 texture."); });
             return texture;
         } else if (exr_image.num_channels == 3) {
             auto texture = allocate_texture<float4>(exr_image.width, exr_image.height);
@@ -103,10 +100,7 @@ TextureView Device::load_texture(const std::filesystem::path &file_name) {
                     reinterpret_cast<float *>(exr_image.images[2])[i],
                     1.0f);
             }
-            FreeEXRImage(&exr_image);
-            launch(texture.copy_from(pixels.data()), [pixels = std::move(pixels), file_name] {
-                LUISA_INFO("Loaded ", file_name, " as float4 texture.");
-            });
+            launch(texture.copy_from(pixels.data()), [file_name] { LUISA_INFO("Loaded ", file_name, " as float4 texture."); });
             return texture;
         } else {
             auto texture = allocate_texture<float4>(exr_image.width, exr_image.height);
@@ -118,10 +112,7 @@ TextureView Device::load_texture(const std::filesystem::path &file_name) {
                     reinterpret_cast<float *>(exr_image.images[2])[i],
                     reinterpret_cast<float *>(exr_image.images[3])[i]);
             }
-            FreeEXRImage(&exr_image);
-            launch(texture.copy_from(pixels.data()), [pixels = std::move(pixels), file_name] {
-                LUISA_INFO("Loaded ", file_name, " as float4 texture.");
-            });
+            launch(texture.copy_from(pixels.data()), [file_name] { LUISA_INFO("Loaded ", file_name, " as float4 texture."); });
             return texture;
         }
     } else if (stbi_is_hdr(path_str.c_str())) {
@@ -129,12 +120,10 @@ TextureView Device::load_texture(const std::filesystem::path &file_name) {
         auto height = 0;
         auto channels = 0;
         auto pixels = stbi_loadf(path_str.c_str(), &width, &height, &channels, 4);
+        auto pixels_guard = guard_resource(&pixels, [](float *p) mutable { stbi_image_free(p); });
         LUISA_ERROR_IF(pixels == nullptr, "Failed to load ", file_name);
         auto texture = allocate_texture<float4>(width, height);
-        launch(texture.copy_from(pixels), [pixels, file_name] {
-            LUISA_INFO("Loaded ", file_name, " as float4 texture.");
-            stbi_image_free(pixels);
-        });
+        launch(texture.copy_from(pixels), [file_name] { LUISA_INFO("Loaded ", file_name, " as float4 texture."); });
         return texture;
     }
     
@@ -144,27 +133,19 @@ TextureView Device::load_texture(const std::filesystem::path &file_name) {
     auto channels = 0;
     LUISA_ERROR_IF(stbi_info(path_str.c_str(), &width, &height, &channels) == 0, "Failed to load ", file_name, ": ", stbi_failure_reason());
     auto pixels = stbi_load(path_str.c_str(), &width, &height, &channels, channels == 3 ? 4 : 0);
+    auto pixels_guard = guard_resource(&pixels, [](uchar *p) mutable { stbi_image_free(p); });
     if (channels == 1) {
         auto texture = allocate_texture<uchar>(width, height);
-        launch(texture.copy_from(pixels), [pixels, file_name] {
-            LUISA_INFO("Loaded ", file_name, " as uchar texture.");
-            stbi_image_free(pixels);
-        });
+        launch(texture.copy_from(pixels), [file_name] { LUISA_INFO("Loaded ", file_name, " as uchar texture."); });
         return texture;
     } else if (channels == 2) {
         auto texture = allocate_texture<uchar2>(width, height);
-        launch(texture.copy_from(pixels), [pixels, file_name] {
-            LUISA_INFO("Loaded ", file_name, " as uchar2 texture.");
-            stbi_image_free(pixels);
-        });
+        launch(texture.copy_from(pixels), [file_name] { LUISA_INFO("Loaded ", file_name, " as uchar2 texture."); });
         return texture;
     }
     
     auto texture = allocate_texture<uchar4>(width, height);
-    launch(texture.copy_from(pixels), [pixels, file_name] {
-        LUISA_INFO("Loaded ", file_name, " as uchar4 texture.");
-        stbi_image_free(pixels);
-    });
+    launch(texture.copy_from(pixels), [file_name] { LUISA_INFO("Loaded ", file_name, " as uchar4 texture."); });
     return texture;
 }
 

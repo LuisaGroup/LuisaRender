@@ -71,7 +71,7 @@ public:
     virtual void copy_from(Dispatcher &dispatcher, const void *data) = 0;
     virtual void copy_to(Dispatcher &dispatcher, void *data) = 0;
     
-    void save(Dispatcher &dispatch, const std::filesystem::path &path) const;
+    void save(Dispatcher &dispatch, const std::filesystem::path &path);
     
     [[nodiscard]] TextureView view() noexcept;
     
@@ -79,6 +79,10 @@ public:
         if (_format == PixelFormat::R8U || _format == PixelFormat::R32F) { return 1u; }
         if (_format == PixelFormat::RG8U || _format == PixelFormat::RG32F) { return 2u; }
         return 4u;
+    }
+    
+    [[nodiscard]] bool is_hdr() const noexcept {
+        return _format == PixelFormat::R32F || _format == PixelFormat::RG32F || _format == PixelFormat::RGBA32F;
     }
     
     [[nodiscard]] uint32_t pixel_byte_size() const noexcept {
@@ -161,7 +165,7 @@ public:
         return Expr<float4>{Variable::make_temporary(nullptr, std::make_unique<TextureExpr>(TextureOp::SAMPLE, tex, uv_expr.variable()))};
     }
     
-    [[nodiscard]] auto save(std::filesystem::path path) const {
+    [[nodiscard]] auto save(std::filesystem::path path) {
         return [texture = _texture, path = std::move(path)](Dispatcher &d) { texture->save(d, path); };
     }
     
@@ -176,6 +180,7 @@ public:
     }
     
     [[nodiscard]] bool empty() const noexcept { return _texture == nullptr; }
+    [[nodiscard]] bool is_hdr() const noexcept { return _texture->is_hdr(); }
 };
 
 [[nodiscard]] inline TextureView Texture::view() noexcept {

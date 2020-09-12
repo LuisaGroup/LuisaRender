@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
         device->launch([&](Dispatcher &dispatch) {
         for (stride = 2u; stride <= block_size; stride *= 2u) {
             for (step = stride; step >= 2; step /= 2) {
-                dispatch(kernel->parallelize(make_uint2(block_size / 2u, buffer_size / block_size), make_uint2(256u, 1u)));
+                dispatch(kernel.parallelize(make_uint2(block_size / 2u, buffer_size / block_size), make_uint2(256u, 1u)));
             }
         } }, [i] { LUISA_INFO("Sorted #", i); });
     }

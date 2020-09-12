@@ -19,8 +19,8 @@ class BoxBlur {
 private:
     int _width;
     int _height;
-    std::shared_ptr<Kernel> _blur_x;
-    std::shared_ptr<Kernel> _blur_y;
+    KernelView _blur_x;
+    KernelView _blur_y;
     TextureView _temp;
 
 public:
@@ -61,7 +61,7 @@ public:
     
     void operator()(Dispatcher &dispatch) noexcept {
         using namespace luisa;
-        dispatch(_blur_x->parallelize(make_uint2(_width, _height)));
-        dispatch(_blur_y->parallelize(make_uint2(_width, _height)));
+        dispatch(_blur_x.parallelize(make_uint2(_width, _height)));
+        dispatch(_blur_y.parallelize(make_uint2(_width, _height)));
     }
 };

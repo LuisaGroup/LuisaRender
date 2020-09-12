@@ -20,8 +20,8 @@ class DualBufferVariance {
 private:
     int _width;
     int _height;
-    std::shared_ptr<Kernel> _dual_variance_kernel;
-    std::shared_ptr<Kernel> _scale_kernel;
+    KernelView _dual_variance_kernel;
+    KernelView _scale_kernel;
     TextureView _blurred_sample_variance;
     TextureView _blurred_dual_variance;
     std::unique_ptr<BoxBlur> _blur_sample_variance;
@@ -66,9 +66,9 @@ public:
     
     void operator()(Dispatcher &dispatch) {
         using namespace luisa;
-        dispatch(_dual_variance_kernel->parallelize(make_uint2(_width, _height)));
+        dispatch(_dual_variance_kernel.parallelize(make_uint2(_width, _height)));
         dispatch(*_blur_sample_variance);
         dispatch(*_blur_dual_variance);
-        dispatch(_scale_kernel->parallelize(make_uint2(_width, _height)));
+        dispatch(_scale_kernel.parallelize(make_uint2(_width, _height)));
     }
 };

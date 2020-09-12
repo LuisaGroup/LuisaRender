@@ -16,7 +16,7 @@ private:
     std::unique_ptr<DualBufferVariance> _dual_variance_stage;
     std::unique_ptr<NonLocalMeansFilter> _nlm_filter;
     std::unique_ptr<GaussianBlur> _gaussian_filter;
-    std::shared_ptr<Kernel> _add_half_buffers_kernel;
+    KernelView _add_half_buffers_kernel;
 
 public:
     FeaturePrefilter(Device &device,
@@ -45,7 +45,7 @@ public:
     void operator()(Dispatcher &dispatch) {
         dispatch(*_dual_variance_stage);
         dispatch(*_nlm_filter);
-        dispatch(_add_half_buffers_kernel->parallelize(luisa::make_uint2(_width, _height)));
+        dispatch(_add_half_buffers_kernel.parallelize(luisa::make_uint2(_width, _height)));
         dispatch(*_gaussian_filter);
     }
 };

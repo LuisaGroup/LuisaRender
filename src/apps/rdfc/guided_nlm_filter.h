@@ -22,17 +22,17 @@ private:
     int _height;
     int _filter_radius{0};
     luisa::int2 _current_offset{0};
-    std::shared_ptr<Kernel> _distance_kernel;
-    std::shared_ptr<Kernel> _clear_accum_kernel;
-    std::shared_ptr<Kernel> _accum_kernel;
-    std::shared_ptr<Kernel> _blit_kernel;
+    KernelView _distance_kernel;
+    KernelView _clear_accum_kernel;
+    KernelView _accum_kernel;
+    KernelView _blit_kernel;
     TextureView _distance_texture;
     TextureView _accum_texture;
     TextureView _delta_distance_texture;
     TextureView _delta_accum_texture;
     TextureView _delta_blur_temp_texture;
-    std::shared_ptr<Kernel> _delta_blur_x;
-    std::shared_ptr<Kernel> _delta_blur_y;
+    KernelView _delta_blur_x;
+    KernelView _delta_blur_y;
     std::unique_ptr<BoxBlur> _blur;
 
 public:
@@ -138,15 +138,15 @@ public:
     
     void operator()(Dispatcher &dispatch) noexcept {
         using namespace luisa;
-        dispatch(_clear_accum_kernel->parallelize(make_uint2(_width, _height)));
+        dispatch(_clear_accum_kernel.parallelize(make_uint2(_width, _height)));
         for (auto dy = -_filter_radius; dy <= _filter_radius; dy++) {
             for (auto dx = -_filter_radius; dx <= _filter_radius; dx++) {
                 _current_offset = make_int2(dx, dy);
-                dispatch(_distance_kernel->parallelize(make_uint2(_width, _height)));
+                dispatch(_distance_kernel.parallelize(make_uint2(_width, _height)));
                 dispatch(*_blur);
-                dispatch(_accum_kernel->parallelize(make_uint2(_width, _height)));
+                dispatch(_accum_kernel.parallelize(make_uint2(_width, _height)));
             }
         }
-        dispatch(_blit_kernel->parallelize(make_uint2(_width, _height)));
+        dispatch(_blit_kernel.parallelize(make_uint2(_width, _height)));
     }
 };
