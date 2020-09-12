@@ -35,8 +35,8 @@ int main(int argc, char *argv[]) {
     Context context{argc, argv};
     auto device = Device::create(&context);
     
-    auto texture = device->load_texture("data/images/luisa.png");
-    auto temp_texture = device->allocate_texture<uchar4>(texture.width(), texture.height());
+    auto texture = device->load_texture("data/images/albedo.exr");
+    auto temp_texture = device->allocate_texture<float4>(texture.width(), texture.height());
     
     constexpr auto rx = 5;
     constexpr auto ry = 10;
@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
             dispatch(blur_y.parallelize(make_uint2(texture.width(), texture.height())));
             dispatch(temp_texture.copy_to(texture));
         }
-        dispatch(temp_texture.save("data/images/luisa-blur.png"));
+        dispatch(temp_texture.save("data/images/luisa-blur.exr"));
     });
     device->synchronize();
     LUISA_INFO("Done.");

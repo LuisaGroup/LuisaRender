@@ -85,8 +85,8 @@ TextureView Device::load_texture(const std::filesystem::path &file_name) {
             std::vector<float2> pixels(exr_image.width * exr_image.height);
             for (auto i = 0u; i < exr_image.width * exr_image.height; i++) {
                 pixels[i] = make_float2(
-                    reinterpret_cast<float *>(exr_image.images[0])[i],
-                    reinterpret_cast<float *>(exr_image.images[1])[i]);
+                    reinterpret_cast<float *>(exr_image.images[1])[i],
+                    reinterpret_cast<float *>(exr_image.images[0])[i]);
             }
             launch(texture.copy_from(pixels.data()), [file_name] { LUISA_INFO("Loaded ", file_name, " as float2 texture."); });
             return texture;
@@ -95,9 +95,9 @@ TextureView Device::load_texture(const std::filesystem::path &file_name) {
             std::vector<float4> pixels(exr_image.width * exr_image.height);
             for (auto i = 0u; i < exr_image.width * exr_image.height; i++) {
                 pixels[i] = make_float4(
-                    reinterpret_cast<float *>(exr_image.images[0])[i],
-                    reinterpret_cast<float *>(exr_image.images[1])[i],
                     reinterpret_cast<float *>(exr_image.images[2])[i],
+                    reinterpret_cast<float *>(exr_image.images[1])[i],
+                    reinterpret_cast<float *>(exr_image.images[0])[i],
                     1.0f);
             }
             launch(texture.copy_from(pixels.data()), [file_name] { LUISA_INFO("Loaded ", file_name, " as float4 texture."); });
@@ -107,10 +107,10 @@ TextureView Device::load_texture(const std::filesystem::path &file_name) {
             std::vector<float4> pixels(exr_image.width * exr_image.height);
             for (auto i = 0u; i < exr_image.width * exr_image.height; i++) {
                 pixels[i] = make_float4(
-                    reinterpret_cast<float *>(exr_image.images[0])[i],
-                    reinterpret_cast<float *>(exr_image.images[1])[i],
+                    reinterpret_cast<float *>(exr_image.images[3])[i],
                     reinterpret_cast<float *>(exr_image.images[2])[i],
-                    reinterpret_cast<float *>(exr_image.images[3])[i]);
+                    reinterpret_cast<float *>(exr_image.images[1])[i],
+                    reinterpret_cast<float *>(exr_image.images[0])[i]);
             }
             launch(texture.copy_from(pixels.data()), [file_name] { LUISA_INFO("Loaded ", file_name, " as float4 texture."); });
             return texture;
