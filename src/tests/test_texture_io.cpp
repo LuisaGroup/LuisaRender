@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
     
     device->launch([&](Dispatcher &dispatch) {
         dispatch(kernel.parallelize(make_uint2(width, height)));
-        dispatch(ldr_texture.save(context.working_path("test.jpg")));
+        dispatch(ldr_texture.save(context.working_path("test.tga")));
         dispatch(hdr_texture.save(context.working_path("test.exr")));
     });
     device->synchronize();

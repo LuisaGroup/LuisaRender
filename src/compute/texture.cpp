@@ -96,7 +96,7 @@ void Texture::save(Dispatcher &dispatch, const std::filesystem::path &path) {
             LUISA_INFO("Done saving texture: ", path);
         });
     } else {
-        LUISA_ERROR_IF_NOT(extension == ".bmp" || extension == ".png" || extension == ".jpg" || extension == ".jpeg",
+        LUISA_ERROR_IF_NOT(extension == ".bmp" || extension == ".png" || extension == ".tga" || extension == ".jpg" || extension == ".jpeg",
                            "Failed to save texture with unsupported file extension: ", path);
         auto pixels = std::make_shared<std::vector<uchar>>(pixel_count() * channels());
         copy_to(dispatch, pixels->data());
@@ -106,6 +106,8 @@ void Texture::save(Dispatcher &dispatch, const std::filesystem::path &path) {
                 stbi_write_bmp(path_str.c_str(), w, h, c, pixels->data());
             } else if (extension == ".png") {
                 stbi_write_png(path_str.c_str(), w, h, c, pixels->data(), 0);
+            } else if (extension == ".tga") {
+                stbi_write_tga(path_str.c_str(), w, h, c, pixels->data());
             } else {
                 LUISA_WARNING_IF(c == 2, "Saving RG8U textures to JPEG images may lead to unexpected results.");
                 stbi_write_jpg(path_str.c_str(), w, h, c, pixels->data(), 100);

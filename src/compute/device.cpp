@@ -29,7 +29,7 @@ std::unique_ptr<Device> Device::create(Context *context, uint32_t selection_id) 
     return std::unique_ptr<Device>{create_device(context, selection.device_id)};
 }
 
-TextureView Device::load_texture(const std::filesystem::path &file_name) {
+TextureView Device::load_texture(const std::filesystem::path &file_name, bool gray_to_rgba) {
     
     auto path_str = std::filesystem::canonical(file_name).string();
     auto extension = to_lower(file_name.extension().string());
@@ -75,6 +75,19 @@ TextureView Device::load_texture(const std::filesystem::path &file_name) {
         }
         
         if (exr_image.num_channels == 1) {
+            if (gray_to_rgba) {
+                auto texture = allocate_texture<float4>(exr_image.width, exr_image.height);
+                std::vector<float4> pixels(exr_image.width * exr_image.height);
+                for (auto i = 0u; i < exr_image.width * exr_image.height; i++) {
+                    pixels[i] = make_float4(
+                        reinterpret_cast<float *>(exr_image.images[0])[i],
+                        reinterpret_cast<float *>(exr_image.images[0])[i],
+                        reinterpret_cast<float *>(exr_image.images[0])[i],
+                        1.0f);
+                }
+                launch(texture.copy_from(pixels.data()), [file_name] { LUISA_INFO("Loaded ", file_name, " as RGBA32F texture."); });
+                return texture;
+            }
             auto texture = allocate_texture<float>(exr_image.width, exr_image.height);
             launch(texture.copy_from(exr_image.images[0]), [file_name]() mutable {
                 LUISA_INFO("Loaded ", file_name, " as float texture.");
@@ -88,7 +101,7 @@ TextureView Device::load_texture(const std::filesystem::path &file_name) {
                     reinterpret_cast<float *>(exr_image.images[1])[i],
                     reinterpret_cast<float *>(exr_image.images[0])[i]);
             }
-            launch(texture.copy_from(pixels.data()), [file_name] { LUISA_INFO("Loaded ", file_name, " as float2 texture."); });
+            launch(texture.copy_from(pixels.data()), [file_name] { LUISA_INFO("Loaded ", file_name, " as RG32F texture."); });
             return texture;
         } else if (exr_image.num_channels == 3) {
             auto texture = allocate_texture<float4>(exr_image.width, exr_image.height);
@@ -100,7 +113,7 @@ TextureView Device::load_texture(const std::filesystem::path &file_name) {
                     reinterpret_cast<float *>(exr_image.images[0])[i],
                     1.0f);
             }
-            launch(texture.copy_from(pixels.data()), [file_name] { LUISA_INFO("Loaded ", file_name, " as float4 texture."); });
+            launch(texture.copy_from(pixels.data()), [file_name] { LUISA_INFO("Loaded ", file_name, " as RGBA32F texture."); });
             return texture;
         } else {
             auto texture = allocate_texture<float4>(exr_image.width, exr_image.height);
@@ -112,7 +125,7 @@ TextureView Device::load_texture(const std::filesystem::path &file_name) {
                     reinterpret_cast<float *>(exr_image.images[1])[i],
                     reinterpret_cast<float *>(exr_image.images[0])[i]);
             }
-            launch(texture.copy_from(pixels.data()), [file_name] { LUISA_INFO("Loaded ", file_name, " as float4 texture."); });
+            launch(texture.copy_from(pixels.data()), [file_name] { LUISA_INFO("Loaded ", file_name, " as RGBA32F texture."); });
             return texture;
         }
     } else if (stbi_is_hdr(path_str.c_str())) {
@@ -123,7 +136,7 @@ TextureView Device::load_texture(const std::filesystem::path &file_name) {
         auto pixels_guard = guard_resource(&pixels, [](float *p) mutable { stbi_image_free(p); });
         LUISA_ERROR_IF(pixels == nullptr, "Failed to load ", file_name);
         auto texture = allocate_texture<float4>(width, height);
-        launch(texture.copy_from(pixels), [file_name] { LUISA_INFO("Loaded ", file_name, " as float4 texture."); });
+        launch(texture.copy_from(pixels), [file_name] { LUISA_INFO("Loaded ", file_name, " as RGBA32F texture."); });
         return texture;
     }
     
@@ -132,20 +145,20 @@ TextureView Device::load_texture(const std::filesystem::path &file_name) {
     auto height = 0;
     auto channels = 0;
     LUISA_ERROR_IF(stbi_info(path_str.c_str(), &width, &height, &channels) == 0, "Failed to load ", file_name, ": ", stbi_failure_reason());
-    auto pixels = stbi_load(path_str.c_str(), &width, &height, &channels, channels == 3 ? 4 : 0);
+    auto pixels = stbi_load(path_str.c_str(), &width, &height, &channels, channels == 3 || gray_to_rgba ? 4 : 0);
     auto pixels_guard = guard_resource(&pixels, [](uchar *p) mutable { stbi_image_free(p); });
     if (channels == 1) {
-        auto texture = allocate_texture<uchar>(width, height);
-        launch(texture.copy_from(pixels), [file_name] { LUISA_INFO("Loaded ", file_name, " as uchar texture."); });
+        auto texture = gray_to_rgba ? allocate_texture<uchar4>(width, height) : allocate_texture<uchar>(width, height);
+        launch(texture.copy_from(pixels), [file_name, gray_to_rgba] { LUISA_INFO("Loaded ", file_name, gray_to_rgba ? " as RGBA8U texture." : " as R8U texture."); });
         return texture;
     } else if (channels == 2) {
         auto texture = allocate_texture<uchar2>(width, height);
-        launch(texture.copy_from(pixels), [file_name] { LUISA_INFO("Loaded ", file_name, " as uchar2 texture."); });
+        launch(texture.copy_from(pixels), [file_name] { LUISA_INFO("Loaded ", file_name, " as RG8U texture."); });
         return texture;
     }
     
     auto texture = allocate_texture<uchar4>(width, height);
-    launch(texture.copy_from(pixels), [file_name] { LUISA_INFO("Loaded ", file_name, " as uchar4 texture."); });
+    launch(texture.copy_from(pixels), [file_name] { LUISA_INFO("Loaded ", file_name, " as RGBA8U texture."); });
     return texture;
 }
 

@@ -59,7 +59,7 @@ public:
         return _allocate_texture(width, height, format)->view();
     }
     
-    [[nodiscard]] TextureView load_texture(const std::filesystem::path &file_name);
+    [[nodiscard]] TextureView load_texture(const std::filesystem::path &file_name, bool gray_to_rgba = false);
     
     [[nodiscard]] virtual std::unique_ptr<Acceleration> build_acceleration(
         const BufferView<float3> &positions,
