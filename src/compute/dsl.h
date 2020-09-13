@@ -264,7 +264,7 @@ public:
 
 #define MAKE_UNARY_OP(op, op_tag)                                                                                            \
     template<typename T, std::enable_if_t<is_expr<T>, int> = 0>                                                              \
-    auto operator op(T &&var) noexcept {                                                                                     \
+    inline auto operator op(T &&var) noexcept {                                                                              \
         Expr var_expr{std::forward<T>(var)};                                                                                 \
         using R = std::decay_t<decltype(op std::declval<typename std::decay_t<decltype(var_expr)>::Type>())>;                \
         auto v = Variable::make_temporary(type_desc<R>, std::make_unique<UnaryExpr>(UnaryOp::op_tag, var_expr.variable()));  \

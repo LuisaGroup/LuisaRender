@@ -11,14 +11,9 @@
 #include <array>
 #include <filesystem>
 
-namespace luisa { inline namespace utility {
+#include "data_types.h"
 
-template<typename ...Args>
-inline std::string serialize(Args &&...args) noexcept {
-    std::ostringstream ss;
-    static_cast<void>((ss << ... << std::forward<Args>(args)));
-    return ss.str();
-}
+namespace luisa { inline namespace utility {
 
 inline std::string pascal_to_snake_case(std::string_view s) noexcept {  // TODO: Robustness
     std::string result;
@@ -49,6 +44,33 @@ inline std::string text_file_contents(const std::filesystem::path &file_path) {
 inline std::string to_lower(std::string s) noexcept {
     for (auto &&c : s) { c = static_cast<char>(std::tolower(c)); }
     return s;
+}
+
+template<typename OS, typename T, uint N, std::enable_if_t<std::is_base_of_v<std::ostream, std::decay_t<OS>>, int> = 0>
+inline auto &operator<<(OS &os, Vector<T, N> v) noexcept {
+    auto flags = os.flags();
+    os << std::boolalpha << "(";
+    for (auto i = 0u; i < N - 1u; i++) { os << v[i] << ", "; }
+    os << v[N - 1] << ")";
+    os.flags(flags);
+    return os;
+}
+
+template<typename OS, std::enable_if_t<std::is_base_of_v<std::ostream, std::decay_t<OS>>, int> = 0>
+inline auto &operator<<(OS &os, float3x3 m) noexcept {
+    return os << "(" << m[0] << ", " << m[1] << ", " << m[2] << ")";
+}
+
+template<typename OS, std::enable_if_t<std::is_base_of_v<std::ostream, std::decay_t<OS>>, int> = 0>
+inline auto &operator<<(OS &os, float4x4 m) noexcept {
+    return os << "(" << m[0] << ", " << m[1] << ", " << m[2] << ", " << m[3] << ")";
+}
+
+template<typename ...Args>
+inline std::string serialize(Args &&...args) noexcept {
+    std::ostringstream ss;
+    static_cast<void>((ss << ... << std::forward<Args>(args)));
+    return ss.str();
 }
 
 }}

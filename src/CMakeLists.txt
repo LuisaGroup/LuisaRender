@@ -34,16 +34,20 @@ add_subdirectory(render)
 add_library(luisa-plugins INTERFACE)
 function(luisa_render_add_plugin name)
     cmake_parse_arguments(PLUGIN "" "CATEGORY" "SOURCES" ${ARGN})
-    add_library(${name} MODULE ${PLUGIN_SOURCES})
-    target_compile_features(${name} PRIVATE c_std_11 cxx_std_17)
-    target_link_libraries(${name} PRIVATE luisarender-render)
-    add_dependencies(luisa-plugins ${name})
-    list(FILTER PLUGIN_SOURCES INCLUDE REGEX ".*\\.h")
-    set_target_properties(${name} PROPERTIES PUBLIC_HEADER "${PLUGIN_SOURCES}")
+    add_library(luisa-${PLUGIN_CATEGORY}-${name} MODULE ${PLUGIN_SOURCES})
+    target_link_libraries(luisa-${PLUGIN_CATEGORY}-${name} PRIVATE luisa-render)
+    add_dependencies(luisa-plugins luisa-${PLUGIN_CATEGORY}-${name})
+    set_target_properties(luisa-${PLUGIN_CATEGORY}-${name} PROPERTIES
+                          LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/plugins/"
+                          RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/plugins/")
 endfunction()
 
+add_subdirectory(shapes)
+
+add_library(luisa::plugins ALIAS luisa-plugins)
+
 add_library(luisa-all INTERFACE)
-target_link_libraries(luisa-all INTERFACE luisa-core luisa-compute luisa-backends luisa-render)
+target_link_libraries(luisa-all INTERFACE luisa-core luisa-compute luisa-backends luisa-render luisa-plugins)
 add_library(luisa::all ALIAS luisa-all)
 
 function(luisa_render_add_application name)
