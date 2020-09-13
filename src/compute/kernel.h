@@ -49,7 +49,8 @@ private:
     std::shared_future<std::shared_ptr<Kernel>> _kernel;
 
 public:
-    KernelView(std::shared_future<std::shared_ptr<Kernel>> kernel) noexcept : _kernel{std::move(kernel)} {}
+    KernelView() noexcept = default;
+    explicit KernelView(std::shared_future<std::shared_ptr<Kernel>> kernel) noexcept : _kernel{std::move(kernel)} {}
     
     [[nodiscard]] auto parallelize(uint threads, uint block_size = 256u) {
         return [self = _kernel.get(), threads, block_size](Dispatcher &dispatch) {
@@ -62,6 +63,8 @@ public:
             self->_dispatch(dispatch, (threads + block_size - 1u) / block_size, block_size);
         };
     }
+    
+    [[nodiscard]] bool empty() const noexcept { return !_kernel.valid(); }
 };
 
 }

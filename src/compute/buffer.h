@@ -73,7 +73,7 @@ public:
     [[nodiscard]] size_t byte_offset() const noexcept { return _offset * sizeof(T); }
     [[nodiscard]] size_t byte_size() const noexcept { return _size * sizeof(T); }
     
-    [[nodiscard]] auto copy_from(const void *data) const { return [self = *this, data](Dispatcher &d) { self._copy_from(d, data); }; }
+    [[nodiscard]] auto copy_from(const void *data) { return [self = *this, data](Dispatcher &d) { self._copy_from(d, data); }; }
     [[nodiscard]] auto copy_to(void *data) const { return [self = *this, data](Dispatcher &d) { self._copy_to(d, data); }; }
     
     void clear_cache() const noexcept { _buffer->clear_cache(); }

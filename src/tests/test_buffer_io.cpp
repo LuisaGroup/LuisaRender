@@ -32,6 +32,7 @@ int main(int argc, char *argv[]) {
     auto scale = 1.0f;
     auto kernel = device->compile_kernel("simple_test", [&] {
         auto tid = thread_id();
+        Var<std::array<float, 8>> a{1, 2, 3, 4, 5, 6, 7, 8};
         If (tid < buffer_size) {
             buffer_b[tid] = scale_value(uniform(&scale), buffer_a[tid]);
         };

@@ -110,7 +110,7 @@ public:
     [[nodiscard]] Texture *texture() const noexcept { return _texture.get(); }
     
     [[nodiscard]] auto copy_from(const void *data) { return [texture = _texture, data](Dispatcher &d) { texture->copy_from(d, data); }; }
-    [[nodiscard]] auto copy_to(void *data) { return [texture = _texture, data](Dispatcher &d) { texture->copy_to(d, data); }; }
+    [[nodiscard]] auto copy_to(void *data) const { return [texture = _texture, data](Dispatcher &d) { texture->copy_to(d, data); }; }
     
     template<typename T>
     [[nodiscard]] auto copy_from(const BufferView<T> &bv) {
@@ -121,14 +121,14 @@ public:
     }
     
     template<typename T>
-    [[nodiscard]] auto copy_to(const BufferView<T> &bv) {
+    [[nodiscard]] auto copy_to(BufferView<T> &bv) const {
         LUISA_WARNING_IF_NOT(pixel_format<T> == _texture->format(), "Texture pixel format and buffer type mismatch.");
         return [texture = _texture, buffer = bv.buffer()->shared_from_this(), offset = bv.byte_offset()](Dispatcher &d) {
             texture->copy_to(d, buffer.get(), offset);
         };
     }
     
-    [[nodiscard]] auto copy_to(const TextureView &tv) {
+    [[nodiscard]] auto copy_to(TextureView &tv) const {
         return [texture = _texture, other = tv.texture()->shared_from_this()](Dispatcher &d) {
             texture->copy_to(d, other.get());
         };
@@ -165,12 +165,12 @@ public:
         return Expr<float4>{Variable::make_temporary(nullptr, std::make_unique<TextureExpr>(TextureOp::SAMPLE, tex, uv_expr.variable()))};
     }
     
-    [[nodiscard]] auto save(std::filesystem::path path) {
+    [[nodiscard]] auto save(std::filesystem::path path) const {
         return [texture = _texture, path = std::move(path)](Dispatcher &d) { texture->save(d, path); };
     }
     
     template<typename UV, typename Value>
-    void write(UV &&uv, Value &&value) const noexcept {
+    void write(UV &&uv, Value &&value) noexcept {
         using namespace luisa::compute::dsl;
         Expr uv_expr{std::forward<UV>(uv)};
         Expr value_expr{std::forward<Value>(value)};

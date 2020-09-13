@@ -11,100 +11,23 @@ using namespace compute;
 using namespace compute::dsl;
 
 Scene::Scene(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, std::shared_ptr<Background> background, float initial_time, size_t max_ray_count)
-    : _device{device}, _background{std::move(background)}, _time{initial_time}, _closest_hit_buffer{device->allocate_buffer<ClosestHit>(max_ray_count)} {
-    
-    // calculate memory usage...
-    size_t vertex_count = 0u;
-    size_t triangle_count = 0u;
-    size_t entity_count = 0u;
-    size_t instance_count = 0u;
-    
-    std::queue<Shape *> queue;
-    for (auto &&shape: shapes) { queue.emplace(shape.get()); }
-    
-    std::unordered_set<Shape *> visited_entities;
-    while (!queue.empty()) {
-        auto shape = queue.front();
-        queue.pop();
-        if (shape->is_entity()) {  // leaf node, containing one instance of entity
-            instance_count++;
-            if (visited_entities.count(shape) == 0u) {  // unvisited entity
-                entity_count++;
-                vertex_count += shape->vertices().size();
-                triangle_count += shape->indices().size();
-                visited_entities.emplace(shape);
-            }
-        } else {  // inner node, visit children
-            for (auto &&child : shape->children()) {
-                queue.emplace(child.get());
-            }
-        }
-    }
-    LUISA_ERROR_IF_NOT(entity_count == visited_entities.size(), "Something went wrong...");
-    
-    LUISA_INFO("Creating geometry with ",
-               instance_count, " instances, ",
-               entity_count, " entities, ",
-               triangle_count, " unique triangles and ",
-               vertex_count, " unique vertices.");
-    
-    // allocate buffers
-    _positions = device->allocate_buffer<float3>(vertex_count);
-    _normals = device->allocate_buffer<float3>(vertex_count);
-    _tex_coords = device->allocate_buffer<float2>(vertex_count);
-    _triangles = device->allocate_buffer<TriangleHandle>(triangle_count);
-    _instance_entities = device->allocate_buffer<EntityHandle>(instance_count);
-    _instances = device->allocate_buffer<uint>(instance_count);
-    _instance_transforms = device->allocate_buffer<float4x4>(instance_count);
-    
-    // encode shapes
-    std::vector<EntityRange> meshes;
-    std::vector<Material *> materials;
-    meshes.reserve(entity_count);
-    materials.reserve(entity_count);
-    device->launch([&](Dispatcher &dispatch) {
-        dispatch(_positions.modify([&](float3 *positions) {
-            dispatch(_normals.modify([&](float3 *normals) {
-                dispatch(_tex_coords.modify([&](float2 *uvs) {
-                    dispatch(_triangles.modify([&](TriangleHandle *indices) {
-                        dispatch(_instance_entities.modify([&](EntityHandle *entities) {
-                            dispatch(_instances.modify([&](uint *instances) {
-                                _process(shapes, positions, normals, uvs, indices, entities, meshes, materials, instances);
-                            }));
-                        }));
-                    }));
-                }));
-            }));
-        }));
-    }, [&] {
-        _positions.clear_cache();
-        _normals.clear_cache();
-        _tex_coords.clear_cache();
-        _triangles.clear_cache();
-        _instance_entities.clear_cache();
-        _instances.clear_cache();
-    });
-    
-    // apply initial transforms and build acceleration structure
-    _is_static = _transform_tree.is_static();
-    device->launch(_instance_transforms.modify([&](float4x4 *matrices) {
-        _transform_tree.update(matrices, initial_time);
-    }), [&] { if (_is_static) { _instance_transforms.clear_cache(); }});
-    _acceleration = device->build_acceleration(_positions, _triangles, meshes, _instances, _instance_transforms, _is_static);
+    : _device{device},
+      _background{std::move(background)},
+      _time{initial_time},
+      _closest_hit_buffer{device->allocate_buffer<ClosestHit>(max_ray_count)} {
     
     // now it's time to process materials
-    
 }
 
-void Scene::_process(const std::vector<std::shared_ptr<Shape>> &shapes,
-                     float3 *positions,
-                     float3 *normals,
-                     float2 *uvs,
-                     TriangleHandle *triangles,
-                     EntityHandle *entities,
-                     std::vector<EntityRange> &entity_ranges,
-                     std::vector<Material *> &instance_materials,
-                     uint *instances) {
+void Scene::_encode_geometry_buffers(const std::vector<std::shared_ptr<Shape>> &shapes,
+                                     float3 *positions,
+                                     float3 *normals,
+                                     float2 *uvs,
+                                     TriangleHandle *triangles,
+                                     EntityHandle *entities,
+                                     std::vector<EntityRange> &entity_ranges,
+                                     std::vector<Material *> &instance_materials,
+                                     uint *instances) {
     
     size_t vertex_count = 0u;
     size_t triangle_count = 0u;
@@ -142,9 +65,9 @@ void Scene::_process(const std::vector<std::shared_ptr<Shape>> &shapes,
                 vertex_count += vertices.size();
                 
                 // copy indices
-                auto indices = shape->indices();
+                auto indices = shape->triangles();
                 std::copy(indices.cbegin(), indices.cend(), triangles + triangle_offset);
-                triangle_count += shape->indices().size();
+                triangle_count += shape->triangles().size();
                 
                 shape->clear();
                 
@@ -166,28 +89,27 @@ void Scene::_process(const std::vector<std::shared_ptr<Shape>> &shapes,
     }
 }
 
-void Scene::update_geometry(Pipeline &pipeline, const float &time) {
-    if (!_is_static) {
-        // add update stage if the scene is not static
-        pipeline << [&time, this](Dispatcher &dispatch) {
-            if (_time != time) {
-                dispatch(_instance_transforms.modify([this](float4x4 *matrices) { _transform_tree.update(matrices, _time); }));
-                dispatch(_acceleration->refit());
-            }
-        };
+void Scene::_update_geometry(Dispatcher &dispatch, float time) {
+    if (!_is_static && _time != time) {  // add update stage only if the scene is dynamic and time changed
+        dispatch(_instance_transforms.modify([this](float4x4 *matrices) { _transform_tree.update(matrices, _time); }));
+        dispatch(_acceleration->refit());
     }
 }
 
-void Scene::intersect_any(Pipeline &pipeline, const BufferView<Ray> &rays, const BufferView<uint> &ray_count, const BufferView<AnyInteraction> &its) {
-    pipeline << _acceleration->intersect_any(rays, its, ray_count);
+void Scene::_intersect_any(Dispatcher &dispatch, const BufferView<Ray> &rays, const BufferView<uint> &ray_count, const BufferView<AnyInteraction> &its) {
+    _acceleration->intersect_any(rays, its, ray_count);
 }
 
-void Scene::intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_buffer, const BufferView<uint> &ray_count_buffer, const InteractionBuffers &its_buffers) {
+void Scene::_intersect_closest(Dispatcher &dispatch, const BufferView<Ray> &ray_buffer, const BufferView<uint> &ray_count_buffer, const InteractionBuffers &its_buffers) {
+
+}
+
+void Scene::_compile_retrieve_intersections_kernel() {
     
-    auto kernel = _device->compile_kernel("retrieve_interactions", [&] {
+    _retrieve_intersections_kernel = _device->compile_kernel("retrieve_interactions", [&] {
         
         auto tid = thread_id();
-        Var ray_count = ray_count_buffer[0];
+        Var ray_count = _ray_count_buffer[0];
         
         If (tid < ray_count) {
             
@@ -232,6 +154,93 @@ void Scene::intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_buf
             };
         };
     });
+}
+
+void Scene::_process_geometry(const std::vector<std::shared_ptr<Shape>> &shapes) {
+    
+    // calculate memory usage...
+    size_t vertex_count = 0u;
+    size_t triangle_count = 0u;
+    size_t entity_count = 0u;
+    size_t instance_count = 0u;
+    
+    std::queue<Shape *> queue;
+    for (auto &&shape: shapes) { queue.emplace(shape.get()); }
+    
+    std::unordered_set<Shape *> visited_entities;
+    while (!queue.empty()) {
+        auto shape = queue.front();
+        queue.pop();
+        if (shape->is_entity()) {  // leaf node, containing one instance of entity
+            instance_count++;
+            if (visited_entities.count(shape) == 0u) {  // unvisited entity
+                entity_count++;
+                vertex_count += shape->vertices().size();
+                triangle_count += shape->triangles().size();
+                visited_entities.emplace(shape);
+            }
+        } else {  // inner node, visit children
+            for (auto &&child : shape->children()) {
+                queue.emplace(child.get());
+            }
+        }
+    }
+    LUISA_ERROR_IF_NOT(entity_count == visited_entities.size(), "Something went wrong...");
+    
+    LUISA_INFO("Creating geometry with ",
+               instance_count, " instances, ",
+               entity_count, " entities, ",
+               triangle_count, " unique triangles and ",
+               vertex_count, " unique vertices.");
+    
+    // allocate buffers
+    _positions = _device->allocate_buffer<float3>(vertex_count);
+    _normals = _device->allocate_buffer<float3>(vertex_count);
+    _tex_coords = _device->allocate_buffer<float2>(vertex_count);
+    _triangles = _device->allocate_buffer<TriangleHandle>(triangle_count);
+    _instance_entities = _device->allocate_buffer<EntityHandle>(instance_count);
+    _instances = _device->allocate_buffer<uint>(instance_count);
+    _instance_transforms = _device->allocate_buffer<float4x4>(instance_count);
+    
+    // encode shapes
+    std::vector<EntityRange> meshes;
+    std::vector<Material *> materials;
+    meshes.reserve(entity_count);
+    materials.reserve(entity_count);
+    _device->launch([&](Dispatcher &dispatch) {
+        dispatch(_positions.modify([&](float3 *positions) {
+            dispatch(_normals.modify([&](float3 *normals) {
+                dispatch(_tex_coords.modify([&](float2 *uvs) {
+                    dispatch(_triangles.modify([&](TriangleHandle *indices) {
+                        dispatch(_instance_entities.modify([&](EntityHandle *entities) {
+                            dispatch(_instances.modify([&](uint *instances) {
+                                _encode_geometry_buffers(shapes, positions, normals, uvs, indices, entities, meshes, materials, instances);
+                            }));
+                        }));
+                    }));
+                }));
+            }));
+        }));
+    }, [&] {
+        _positions.clear_cache();
+        _normals.clear_cache();
+        _tex_coords.clear_cache();
+        _triangles.clear_cache();
+        _instance_entities.clear_cache();
+        _instances.clear_cache();
+    });
+    
+    // apply initial transforms and build acceleration structure
+    _is_static = _transform_tree.is_static();
+    _device->launch(_instance_transforms.modify([&](float4x4 *matrices) {
+        _transform_tree.update(matrices, _time);
+    }), [&] { if (_is_static) { _instance_transforms.clear_cache(); }});
+    _acceleration = _device->build_acceleration(_positions, _triangles, meshes, _instances, _instance_transforms, _is_static);
+}
+
+void Scene::intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_buffer, const BufferView<uint> &ray_count_buffer, const InteractionBuffers &its_buffers) {
+    
+    auto kernel =
     
     pipeline << _acceleration->intersect_closest(ray_buffer, _closest_hit_buffer, ray_count_buffer)
              << kernel.parallelize(ray_buffer.size());

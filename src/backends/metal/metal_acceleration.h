@@ -28,13 +28,11 @@ private:
     void _intersect_any(
         compute::Dispatcher &dispatch,
         const BufferView<Ray> &ray_buffer,
-        const BufferView<AnyHit> &hit_buffer,
-        const BufferView<uint> &count_buffer) const override;
+        const BufferView<AnyHit> &hit_buffer) const override;
     
     void _intersect_closest(compute::Dispatcher &dispatch,
                             const BufferView<Ray> &ray_buffer,
-                            const BufferView<ClosestHit> &hit_buffer,
-                            const BufferView<uint> &count_buffer) const override;
+                            const BufferView<ClosestHit> &hit_buffer) const override;
 
 public:
     MetalAcceleration(MPSInstanceAccelerationStructure *as, MPSRayIntersector *closest_its, MPSRayIntersector *any_its) noexcept

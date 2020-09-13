@@ -55,7 +55,16 @@ constexpr auto plugin_base_class_name() noexcept { return detail::plguin_base_cl
 
 using compute::Device;
 
-struct Plugin : Noncopyable {
+class Plugin : Noncopyable {
+
+private:
+    Device *_device{nullptr};
+
+public:
+    Plugin(Device *device, const ParameterSet &) noexcept : _device{device} {}
+    virtual ~Plugin() noexcept = default;
+    
+    [[nodiscard]] Device *device() const noexcept { return _device; }
     
     template<typename T>
     [[nodiscard]] static std::unique_ptr<T> create(
