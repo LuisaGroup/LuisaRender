@@ -11,8 +11,8 @@
 #include "box_blur.h"
 
 using luisa::compute::Device;
-using luisa::compute::Kernel;
-using luisa::compute::Texture;
+using luisa::compute::KernelView;
+using luisa::compute::TextureView;
 using luisa::compute::dsl::Function;
 
 class NonLocalMeansFilter {

@@ -9,7 +9,7 @@
 
 using luisa::compute::Device;
 using luisa::compute::Dispatcher;
-using luisa::compute::Kernel;
+using luisa::compute::KernelView;
 using luisa::compute::Texture;
 using luisa::compute::dsl::Function;
 
