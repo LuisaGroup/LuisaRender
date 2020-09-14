@@ -7,9 +7,9 @@
 #include <vector>
 
 #include <core/data_types.h>
-
-#include "material.h"
-#include "transform.h"
+#include <render/parser.h>
+#include <render/material.h>
+#include <render/transform.h>
 
 namespace luisa::render {
 

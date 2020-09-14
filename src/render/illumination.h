@@ -10,7 +10,6 @@
 #include <compute/dispatcher.h>
 #include <compute/buffer.h>
 
-#include "spectrum.h"
 #include "interaction.h"
 #include "data_block.h"
 
@@ -25,12 +24,12 @@ using compute::BufferView;
 class Shape;
 
 struct LightSampleBuffers {
-    BufferView<SampledSpectrum> L;
+    BufferView<float3> L;
     BufferView<float> pdf;
 };
 
 struct LightSampleExpr {
-    Expr<SampledSpectrum> L;
+    Expr<float3> L;
     Expr<float3> p;
     Expr<float3> w;
     Expr<float> pdf;
@@ -49,7 +48,6 @@ struct Illumination {
     [[nodiscard]] virtual LightSampleExpr sample(
         Expr<DataBlock> data,
         Expr<Interaction> p,
-        Expr<SampledWavelength> lambda,
         Expr<float2> u) = 0;
 };
 

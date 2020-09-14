@@ -17,6 +17,7 @@ Scene::Scene(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, 
       _closest_hit_buffer{device->allocate_buffer<ClosestHit>(max_ray_count)} {
     
     // now it's time to process materials
+    // not now...
 }
 
 void Scene::_encode_geometry_buffers(const std::vector<std::shared_ptr<Shape>> &shapes,
@@ -89,29 +90,30 @@ void Scene::_encode_geometry_buffers(const std::vector<std::shared_ptr<Shape>> &
     }
 }
 
-void Scene::_update_geometry(Dispatcher &dispatch, float time) {
+void Scene::_update_geometry(Pipeline &pipeline, float time) {
     if (!_is_static && _time != time) {  // add update stage only if the scene is dynamic and time changed
-        dispatch(_instance_transforms.modify([this](float4x4 *matrices) { _transform_tree.update(matrices, _time); }));
-        dispatch(_acceleration->refit());
+        _time = time;
+        pipeline << [this, time](Dispatcher &dispatch) {
+            dispatch(_instance_transforms.modify([this, time](float4x4 *matrices) { _transform_tree.update(matrices, time); }));
+            dispatch(_acceleration->refit());
+        };
     }
 }
 
-void Scene::_intersect_any(Dispatcher &dispatch, const BufferView<Ray> &rays, const BufferView<uint> &ray_count, const BufferView<AnyInteraction> &its) {
-    _acceleration->intersect_any(rays, its, ray_count);
+void Scene::_intersect_any(Pipeline &pipeline, const BufferView<Ray> &rays, const BufferView<AnyInteraction> &its) {
+    pipeline << _acceleration->intersect_any(rays, its);
 }
 
-void Scene::_intersect_closest(Dispatcher &dispatch, const BufferView<Ray> &ray_buffer, const BufferView<uint> &ray_count_buffer, const InteractionBuffers &its_buffers) {
-
-}
-
-void Scene::_compile_retrieve_intersections_kernel() {
+void Scene::_intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_buffer, const InteractionBuffers &its_buffers) {
     
-    _retrieve_intersections_kernel = _device->compile_kernel("retrieve_interactions", [&] {
+    pipeline << _acceleration->intersect_closest(ray_buffer, _closest_hit_buffer);
+    
+    constexpr auto threadgroup_size = 256u;
+    auto ray_count = static_cast<uint32_t>(ray_buffer.size());
+    auto kernel = _device->compile_kernel("retrieve_interactions", [&] {
         
         auto tid = thread_id();
-        Var ray_count = _ray_count_buffer[0];
-        
-        If (tid < ray_count) {
+        If (ray_count % threadgroup_size == 0u || tid < ray_count) {
             
             Var<ClosestHit> hit = _closest_hit_buffer[tid];
             If (hit.distance() <= 0.0f) {
@@ -154,6 +156,8 @@ void Scene::_compile_retrieve_intersections_kernel() {
             };
         };
     });
+    
+    pipeline << kernel.parallelize(ray_count, threadgroup_size);
 }
 
 void Scene::_process_geometry(const std::vector<std::shared_ptr<Shape>> &shapes) {
@@ -236,14 +240,6 @@ void Scene::_process_geometry(const std::vector<std::shared_ptr<Shape>> &shapes)
         _transform_tree.update(matrices, _time);
     }), [&] { if (_is_static) { _instance_transforms.clear_cache(); }});
     _acceleration = _device->build_acceleration(_positions, _triangles, meshes, _instances, _instance_transforms, _is_static);
-}
-
-void Scene::intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_buffer, const BufferView<uint> &ray_count_buffer, const InteractionBuffers &its_buffers) {
-    
-    auto kernel =
-    
-    pipeline << _acceleration->intersect_closest(ray_buffer, _closest_hit_buffer, ray_count_buffer)
-             << kernel.parallelize(ray_buffer.size());
 }
 
 }

@@ -17,7 +17,7 @@ using compute::dsl::Var;
 using compute::dsl::Expr;
 
 struct MaterialSampleExpr {
-    Var<SampledSpectrum> f;
+    Var<float3> f;
     Var<float3> wi;
     Var<float> pdf;
     Var<bool> is_specular;
@@ -25,8 +25,8 @@ struct MaterialSampleExpr {
 };
 
 struct MaterialEvaluationExpr {
-    Var<SampledSpectrum> f;
-    Var<SampledSpectrum> L;
+    Var<float3> f;
+    Var<float3> L;
     Var<float> pdf_bsdf;
     Var<float> pdf_light;
 };

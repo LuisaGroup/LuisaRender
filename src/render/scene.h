@@ -20,7 +20,7 @@ namespace luisa::render {
 using compute::Device;
 using compute::BufferView;
 using compute::KernelView;
-using compute::Dispatcher;
+using compute::Pipeline;
 using compute::Acceleration;
 
 using compute::Ray;
@@ -50,15 +50,13 @@ private:
     BufferView<AnyHit> _any_hit_buffer;
     BufferView<ClosestHit> _closest_hit_buffer;
     
-    KernelView _retrieve_intersections_kernel;
-    
     bool _is_static{false};
     float _time{};
 
 private:
-    void _update_geometry(Dispatcher &dispatch, float time);
-    void _intersect_any(Dispatcher &dispatch, const BufferView<Ray> &rays, const BufferView<uint> &ray_count, const BufferView<AnyInteraction> &its);
-    void _intersect_closest(Dispatcher &dispatch, const BufferView<Ray> &ray_buffer, const BufferView<uint> &ray_count_buffer, const InteractionBuffers &its_buffers);
+    void _update_geometry(Pipeline &pipeline, float time);
+    void _intersect_any(Pipeline &pipeline, const BufferView<Ray> &rays, const BufferView<AnyInteraction> &its);
+    void _intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_buffer, const InteractionBuffers &its_buffers);
     
     void _encode_geometry_buffers(const std::vector<std::shared_ptr<Shape>> &shapes,
                                   float3 *positions, float3 *normals, float2 *uvs,
@@ -69,7 +67,6 @@ private:
                                   uint *instances);
     
     void _process_geometry(const std::vector<std::shared_ptr<Shape>> &shapes);
-    void _compile_retrieve_intersections_kernel();
 
 public:
     Scene(Device *device,

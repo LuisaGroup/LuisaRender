@@ -39,7 +39,6 @@ LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Film)
 LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Camera)
 LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Shape)
 LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Transform)
-LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Light)
 LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Material)
 LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Integrator)
 LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Task)
@@ -55,7 +54,7 @@ constexpr auto plugin_base_class_name() noexcept { return detail::plguin_base_cl
 
 using compute::Device;
 
-class Plugin : Noncopyable {
+class Plugin : public Noncopyable {
 
 private:
     Device *_device{nullptr};

@@ -81,14 +81,18 @@ public:
 #undef MAKE_ASSIGN_OP_SCALAR
 };
 
+namespace detail {
+
 template<typename T>
-struct IsArray : std::false_type {};
+struct IsArrayImpl : std::false_type {};
 
 template<typename T, size_t N>
-struct IsArray<T[N]> : std::true_type {};
+struct IsArrayImpl<std::array<T, N>> : std::true_type {};
 
-template<typename T, size_t N>
-struct IsArray<std::array<T, N>> : std::true_type {};
+}
+
+template<typename T>
+using IsArray = detail::IsArrayImpl<std::remove_cv_t<T>>;
 
 template<typename T>
 constexpr auto is_array = IsArray<T>::value;
@@ -109,17 +113,6 @@ struct Expr<std::array<T, N>> : public ExprBase {
     Expr(ExprBase &&expr) noexcept: ExprBase{expr.variable()} {}
     Expr(const ExprBase &expr) noexcept: ExprBase{expr.variable()} {}
     
-    [[nodiscard]] auto operator[](const ExprBase &index) const noexcept {
-        return Expr<T>{Variable::make_temporary(type_desc<T>, std::make_unique<BinaryExpr>(BinaryOp::ACCESS, _variable, index.variable()))};
-    }
-};
-
-template<typename T, size_t N>
-struct Expr<T[N]> : public ExprBase {
-    using Type = std::array<T, N>;
-    explicit Expr(const Variable *v) noexcept: ExprBase{v} {}
-    Expr(ExprBase &&expr) noexcept: ExprBase{expr.variable()} {}
-    Expr(const ExprBase &expr) noexcept: ExprBase{expr.variable()} {}
     [[nodiscard]] auto operator[](const ExprBase &index) const noexcept {
         return Expr<T>{Variable::make_temporary(type_desc<T>, std::make_unique<BinaryExpr>(BinaryOp::ACCESS, _variable, index.variable()))};
     }
@@ -177,20 +170,20 @@ struct Expr<Vector<T, 4>> : public ExprBase {
 };
 
 // Deduction guides
-template<typename T, std::enable_if_t<!is_expr<T>, int> = 0>
-Expr(T &&) -> Expr<T>;
+template<typename T, std::enable_if_t<!is_expr<std::decay_t<T>> && !is_array<std::remove_cv_t<T>>, int> = 0>
+Expr(T &&) -> Expr<std::remove_cv_t<T>>;
 
 template<typename T>
-Expr(const Var<T> &) -> Expr<T>;
+Expr(const Var<T> &) -> Expr<std::decay_t<T>>;
 
 template<typename T>
-Expr(Var<T> &&) -> Expr<T>;
+Expr(Var<T> &&) -> Expr<std::decay_t<T>>;
 
 template<typename T>
-Expr(const Expr<T> &) -> Expr<T>;
+Expr(const Expr<T> &) -> Expr<std::decay_t<T>>;
 
 template<typename T>
-Expr(Expr<T> &&) -> Expr<T>;
+Expr(Expr<T> &&) -> Expr<std::decay_t<T>>;
 
 namespace detail {
 
@@ -203,12 +196,28 @@ inline const Variable *extract_variable(T &&v) noexcept {
 }
 
 template<typename T>
-struct Var : public Expr<T> {
+struct Var : public Expr<std::decay_t<T>> {
     
-    template<typename ...Args>
-    Var(Args &&...args) noexcept : Expr<T>{Variable::make_local_variable(type_desc<T>)} {
+    using ExprType = Expr<std::decay_t<T>>;
+    
+    template<typename ...Args, std::enable_if_t<std::negation_v<std::disjunction<IsArray<std::decay_t<Args>>...>>, int> = 0>
+    Var(Args &&...args) noexcept : ExprType{Variable::make_local_variable(type_desc<T>)} {
         std::vector<const Variable *> init{detail::extract_variable(std::forward<Args>(args))...};
-        Function::current().add_statement(std::make_unique<DeclareStmt>(Expr<T>::_variable, std::move(init)));
+        Function::current().add_statement(std::make_unique<DeclareStmt>(ExprType::_variable, std::move(init)));
+    }
+    
+    template<typename U, size_t N>
+    Var(const std::array<U, N> &args) noexcept : ExprType{Variable::make_local_variable(type_desc<T>)} {
+        std::vector<const Variable *> init;
+        for (auto &&elem : args) { init.emplace_back(detail::extract_variable(elem)); }
+        Function::current().add_statement(std::make_unique<DeclareStmt>(ExprType::_variable, std::move(init)));
+    }
+    
+    template<typename U>
+    Var(const std::vector<U> &args) noexcept : ExprType{Variable::make_local_variable(type_desc<T>)} {
+        std::vector<const Variable *> init;
+        for (auto &&elem : args) { init.emplace_back(detail::extract_variable(elem)); }
+        Function::current().add_statement(std::make_unique<DeclareStmt>(ExprType::_variable, std::move(init)));
     }
 
 #define MAKE_ASSIGN_OP(op)  \
@@ -231,20 +240,26 @@ struct Var : public Expr<T> {
 };
 
 // Deduction guides
-template<typename T, std::enable_if_t<!is_expr<T>, int> = 0>
-Var(T &&) -> Var<T>;
+template<typename T, std::enable_if_t<!is_expr<std::decay_t<T>> && !is_array<std::remove_cv_t<T>>, int> = 0>
+Var(T &&) -> Var<std::decay_t<T>>;
 
 template<typename T>
-Var(const Var<T> &) -> Var<T>;
+Var(const Var<T> &) -> Var<std::decay_t<T>>;
 
 template<typename T>
-Var(Var<T> &&) -> Var<T>;
+Var(Var<T> &&) -> Var<std::decay_t<T>>;
 
 template<typename T>
-Var(const Expr<T> &) -> Var<T>;
+Var(const Expr<T> &) -> Var<std::decay_t<T>>;
 
 template<typename T>
-Var(Expr<T> &&) -> Var<T>;
+Var(Expr<T> &&) -> Var<std::decay_t<T>>;
+
+template<typename T, size_t N>
+Var(const std::array<T, N> &) -> Var<std::array<T, N>>;
+
+template<typename T, size_t N>
+Var(std::array<T, N> &&) -> Var<std::array<T, N>>;
 
 template<typename T>
 class Threadgroup {

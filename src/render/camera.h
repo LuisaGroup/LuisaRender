@@ -4,15 +4,17 @@
 
 #pragma once
 
+#include <compute/pipeline.h>
 #include <render/plugin.h>
 #include <render/parser.h>
 #include <render/film.h>
 #include <render/filter.h>
 #include <render/transform.h>
+#include <render/sampler.h>
 
 namespace luisa::render {
 
-using compute::Dispatcher;
+using compute::Pipeline;
 using compute::BufferView;
 using compute::TextureView;
 using compute::Ray;
@@ -28,17 +30,17 @@ private:
     BufferView<float2> _pixel_position_buffer;
     BufferView<Ray> _camera_ray_buffer;
     BufferView<float3> _throughput_buffer;
-
-protected:
-    float _time{0.0f};
-    float4x4 _camera_to_world{1.0f};
+    BufferView<float> _filter_weight_buffer;
 
 private:
-    virtual void _generate_rays(Dispatcher &dispatch,
+    virtual void _generate_rays(Pipeline &pipeline,
+                                float time,
                                 Sampler &sampler,
-                                BufferView<float2> &pixel_positions,
+                                const BufferView<float2> &pixel_positions,
                                 BufferView<Ray> &rays,
                                 BufferView<float3> &throughputs) = 0;
+    
+    void _generate_pixel_positions_without_filter(Pipeline &pipeline, Sampler &sampler, BufferView<float2> &pixel_position_buffer, BufferView<float> &filter_weight_buffer);
 
 public:
     Camera(Device *d, const ParameterSet &params)
@@ -62,10 +64,13 @@ public:
     [[nodiscard]] BufferView<float3> &throughput_buffer() noexcept { return _throughput_buffer; }
     
     [[nodiscard]] auto generate_rays(float time, Sampler &sampler) {
-        _time = time;
-        _camera_to_world = _transform == nullptr ? make_float4x4(1.0f) : _transform->matrix(time);
-        return [this, &sampler](Dispatcher &dispatch) {
-            return _generate_rays(dispatch, sampler, _pixel_position_buffer, _camera_ray_buffer, _throughput_buffer);
+        return [this, time, &sampler](Pipeline &pipeline) {
+            if (_transform == nullptr) {
+                _generate_pixel_positions_without_filter(pipeline, sampler, _pixel_position_buffer, _filter_weight_buffer);
+            } else {
+                pipeline << _filter->importance_sample_pixel_positions(sampler, _pixel_position_buffer, _filter_weight_buffer);
+            }
+            _generate_rays(pipeline, time, sampler, _pixel_position_buffer, _camera_ray_buffer, _throughput_buffer);
         };
     }
 };
