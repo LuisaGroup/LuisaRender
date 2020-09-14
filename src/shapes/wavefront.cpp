@@ -7,11 +7,7 @@
 
 #include <render/shape.h>
 
-using namespace luisa;
-using namespace luisa::compute;
-using namespace luisa::render;
-
-namespace luisa::shape {
+namespace luisa::render::shape {
 
 class WavefrontObj : public Shape {
 

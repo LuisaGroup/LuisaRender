@@ -1,0 +1,5 @@
+luisa_render_add_plugin(box CATEGORY filter SOURCES box.cpp)
+luisa_render_add_plugin(gaussian CATEGORY filter SOURCES gaussian.cpp)
+luisa_render_add_plugin(lanczos_sinc CATEGORY filter SOURCES lanczos_sinc.cpp)
+luisa_render_add_plugin(mitchell_netravali CATEGORY filter SOURCES mitchell_netravali.cpp)
+luisa_render_add_plugin(triangle CATEGORY filter SOURCES triangle.cpp)

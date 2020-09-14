@@ -34,7 +34,7 @@ private:
 
 private:
     virtual void _generate_rays(Pipeline &pipeline,
-                                float time,
+                                float4x4 camera_to_world,
                                 Sampler &sampler,
                                 const BufferView<float2> &pixel_positions,
                                 BufferView<Ray> &rays,
@@ -65,12 +65,13 @@ public:
     
     [[nodiscard]] auto generate_rays(float time, Sampler &sampler) {
         return [this, time, &sampler](Pipeline &pipeline) {
-            if (_transform == nullptr) {
+            if (_filter == nullptr) {
                 _generate_pixel_positions_without_filter(pipeline, sampler, _pixel_position_buffer, _filter_weight_buffer);
             } else {
                 pipeline << _filter->importance_sample_pixel_positions(sampler, _pixel_position_buffer, _filter_weight_buffer);
             }
-            _generate_rays(pipeline, time, sampler, _pixel_position_buffer, _camera_ray_buffer, _throughput_buffer);
+            auto camera_to_world = _transform == nullptr ? make_float4x4(1.0f) : _transform->matrix(time);
+            _generate_rays(pipeline, camera_to_world, sampler, _pixel_position_buffer, _camera_ray_buffer, _throughput_buffer);
         };
     }
 };

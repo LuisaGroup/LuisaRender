@@ -108,7 +108,12 @@ public:
 class ValueExpr : public Expression {
 
 public:
-    using Value = std::variant<bool, float, int8_t, uint8_t, int16_t, uint16_t, int32_t, uint32_t>;
+    using Value = std::variant<
+        bool, float, int8_t, uint8_t, int16_t, uint16_t, int32_t, uint32_t,
+        bool2, float2, char2, uchar2, short2, ushort2, int2, uint2,
+        bool3, float3, char3, uchar3, short3, ushort3, int3, uint3,
+        bool4, float4, char4, uchar4, short4, ushort4, int4, uint4,
+        float3x3, float4x4>;
 
 private:
     Value _value;

@@ -121,6 +121,7 @@ struct Expr<std::array<T, N>> : public ExprBase {
 template<typename T>
 struct Expr<Vector<T, 2>> : public ExprBase {
     using Type = Vector<T, 2>;
+    Expr(Type v) noexcept: ExprBase{Variable::make_temporary(type_desc<Type>, std::make_unique<ValueExpr>(v))} {}
     explicit Expr(const Variable *v) noexcept: ExprBase{v} {}
     Expr(ExprBase &&expr) noexcept: ExprBase{expr.variable()} {}
     Expr(const ExprBase &expr) noexcept: ExprBase{expr.variable()} {}
@@ -136,6 +137,7 @@ struct Expr<Vector<T, 2>> : public ExprBase {
 template<typename T>
 struct Expr<Vector<T, 3>> : public ExprBase {
     using Type = Vector<T, 3>;
+    Expr(Type v) noexcept: ExprBase{Variable::make_temporary(type_desc<Type>, std::make_unique<ValueExpr>(v))} {}
     explicit Expr(const Variable *v) noexcept: ExprBase{v} {}
     Expr(ExprBase &&expr) noexcept: ExprBase{expr.variable()} {}
     Expr(const ExprBase &expr) noexcept: ExprBase{expr.variable()} {}
@@ -153,6 +155,7 @@ struct Expr<Vector<T, 3>> : public ExprBase {
 template<typename T>
 struct Expr<Vector<T, 4>> : public ExprBase {
     using Type = Vector<T, 4>;
+    Expr(Type v) noexcept: ExprBase{Variable::make_temporary(type_desc<Type>, std::make_unique<ValueExpr>(v))} {}
     explicit Expr(const Variable *v) noexcept: ExprBase{v} {}
     Expr(ExprBase &&expr) noexcept: ExprBase{expr.variable()} {}
     Expr(const ExprBase &expr) noexcept: ExprBase{expr.variable()} {}

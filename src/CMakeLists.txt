@@ -42,7 +42,11 @@ function(luisa_render_add_plugin name)
                           RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/plugins/")
 endfunction()
 
+add_subdirectory(cameras)
+add_subdirectory(films)
+add_subdirectory(filters)
 add_subdirectory(shapes)
+add_subdirectory(transforms)
 
 add_library(luisa::plugins ALIAS luisa-plugins)
 

@@ -19,10 +19,11 @@ class Film : public Plugin {
 private:
     uint2 _resolution;
 
-protected:
+private:
     virtual void _clear(Pipeline &pipeline) = 0;
     virtual void _accumulate_frame(Pipeline &pipeline, const BufferView<float3> &radiance_buffer, const BufferView<float> &weight_buffer) = 0;
     virtual void _postprocess(Pipeline &pipeline) = 0;
+    virtual void _save(Pipeline &pipeline, const std::filesystem::path &path) = 0;
 
 public:
     Film(Device *device, const ParameterSet &params)
@@ -43,6 +44,10 @@ public:
     
     [[nodiscard]] auto postprocess() {
         return [this](Pipeline &pipeline) { _postprocess(pipeline); };
+    }
+    
+    [[nodiscard]] auto save(std::filesystem::path path) {
+        return [this, path = std::move(path)](Pipeline &pipeline) { _save(pipeline, path); };
     }
 };
 

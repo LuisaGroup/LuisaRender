@@ -16,6 +16,8 @@ Scene::Scene(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, 
       _time{initial_time},
       _closest_hit_buffer{device->allocate_buffer<ClosestHit>(max_ray_count)} {
     
+    _process_geometry(shapes);
+    
     // now it's time to process materials
     // not now...
 }

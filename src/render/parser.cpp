@@ -191,10 +191,15 @@ std::unique_ptr<ParameterSet> Parser::_parse_parameter_set() {
                 value_list.emplace_back(_peek_and_pop());
             }
         } else {  // values
-            value_list.emplace_back(_peek_and_pop());
-            while (_peek() != "}") {
-                _match_and_pop(",");
-                value_list.emplace_back(_peek_and_pop());
+            auto token = _peek_and_pop();
+            if (std::isdigit(token.front()) || token.front() == '"' || token.front() == '\'') {
+                value_list.emplace_back(token);
+                while (_peek() != "}") {
+                    _match_and_pop(",");
+                    value_list.emplace_back(_peek_and_pop());
+                }
+            } else {  // TODO: parse inline nodes...
+                LUISA_EXCEPTION("Not implemented");
             }
         }
     }

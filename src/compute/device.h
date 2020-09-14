@@ -86,10 +86,10 @@ public:
 };
 
 using DeviceCreator = Device *(Context *, uint32_t);
+    
+}// namespace luisa::compute
 
 #define LUISA_EXPORT_DEVICE_CREATOR(DeviceClass)                                                              \
     extern "C" LUISA_EXPORT ::luisa::compute::Device *create(::luisa::Context *context, uint32_t device_id) { \
         return new DeviceClass{context, device_id};                                                           \
     }
-    
-}// namespace luisa::compute

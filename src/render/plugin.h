@@ -12,6 +12,7 @@
 #include <memory>
 #include <iostream>
 
+#include <core/platform.h>
 #include <core/concepts.h>
 #include <core/logging.h>
 #include <core/data_types.h>
@@ -83,7 +84,8 @@ public:
 }
 
 #define LUISA_EXPORT_PLUGIN_CREATOR(PluginClass)                                                                                          \
-    LUISA_DLL_EXPORT ::luisa::render::Plugin *create(::luisa::compute::Device *device, const ::luisa::render::ParameterSet &params) {     \
+    extern "C" LUISA_EXPORT ::luisa::render::Plugin *create(::luisa::compute::Device *device,                                             \
+                                                            const ::luisa::render::ParameterSet &params) {                                \
         LUISA_INFO("Creating instance of class ", #PluginClass, ", category: ", ::luisa::render::plugin_base_class_name<PluginClass>());  \
         return new PluginClass{device, params};                                                                                           \
     }
