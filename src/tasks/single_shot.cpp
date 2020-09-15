@@ -29,7 +29,8 @@ public:
 
 private:
     void _compile(Pipeline &pipeline) override {
-        pipeline << _sampler->reset(_camera->film()->resolution());
+        pipeline << _sampler->reset(_camera->film()->resolution())
+                 << _camera->film()->clear();
         for (auto i = 0u; i < _sampler->spp(); i++) {
             pipeline << _camera->generate_rays(0.0f, *_sampler)
                      << _integrator->render_frame(*_scene, *_sampler, _camera->ray_buffer(), _camera->throughput_buffer())

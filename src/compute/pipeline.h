@@ -38,9 +38,13 @@ public:
     }
     
     void run() {
-        _device->launch([this](Dispatcher &dispatch) {
-            for (auto &&stage : _stages) { stage(dispatch); }
-        });
+        for (auto i = 0u; i < _stages.size(); i += 16u) {
+            _device->launch([this, i](Dispatcher &dispatch) {
+                for (auto j = 0u; j < 16u && i + j < _stages.size(); j++) {
+                    dispatch(_stages[i + j]);
+                }
+            });
+        }
     }
     
 };

@@ -36,8 +36,8 @@ std::pair<Expr<float2>, Expr<float>> SeparableFilter::importance_sample_pixel_po
         _table_generated = true;
     }
     
-    Var weight = _weight_table;
-    Var cdf = _cdf_table;
+    auto weight = immutable(_weight_table);
+    auto cdf = immutable(_cdf_table);
     auto sample_1d = [&](Expr<float> u) {
         
         Var p = 0u;
@@ -67,7 +67,7 @@ std::pair<Expr<float2>, Expr<float>> SeparableFilter::importance_sample_pixel_po
             select(index_w_upper >= weight_table_size_float, 0.0f, weight[cast<uint>(index_w_upper)]),
             index_w - index_w_lower);
         
-        return std::make_pair(offset * 2.0f - 1.0f, select(w >= 0.0f, 1.0f, 0.0f));
+        return std::make_pair(offset * 2.0f - 1.0f, select(w >= 0.0f, 1.0f, -1.0f));
     };
     
     auto[dx, wx] = sample_1d(u.x());

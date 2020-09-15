@@ -1,7 +1,7 @@
 Integrator integrator : Normal {}
 
 Shape bunny : WavefrontObj {
-  path { "data/meshes/bunny/bunny.obj" }
+  path { "data/meshes/cow/cow.obj" }
 }
 
 Film film : RGB {
@@ -10,14 +10,17 @@ Film film : RGB {
 
 Camera camera : Pinhole {
   film { @film }
-  position { 0, 0.75, 7 }
-  target { 0, 0.75, 0 }
+  position { 0, 0.05, 0.5 }
+  target { 0, 0.05, 0 }
+  filter : MitchellNetravali {
+    radius { 10.0 }
+  }
 }
 
 task : SingleShot {
   integrator { @integrator }
   sampler : Independent {
-    spp { 4096 }
+    spp { 1024 }
   }
   camera { @camera }
   shapes { @bunny }

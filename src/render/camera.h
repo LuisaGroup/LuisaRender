@@ -44,7 +44,7 @@ public:
         : Plugin{d, params},
           _film{params["film"].parse_or_null<Film>()},
           _filter{params["filter"].parse_or_null<Filter>()},
-          _transform{params["filter"].parse_or_null<Transform>()} {
+          _transform{params["transform"].parse_or_null<Transform>()} {
         
         auto pixel_count = _film->resolution().x * _film->resolution().y;
         _pixel_position_buffer = device()->allocate_buffer<float2>(pixel_count);
