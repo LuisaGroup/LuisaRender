@@ -30,6 +30,7 @@ private:
     CUcontext _ctx{};
     CUstream _dispatch_stream{};
     CUevent _sync_event{};
+    std::mutex _kernel_cache_mutex;
     std::vector<CUmodule> _modules;
     std::map<SHA1::Digest, CUfunction> _kernel_cache;
     
@@ -127,9 +128,17 @@ std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) { 
     if (_context->should_print_generated_source()) { LUISA_INFO("Generated source:\n", src); }
     
     auto digest = SHA1{src}.digest();
-    auto iter = _kernel_cache.find(digest);
     
-    if (iter == _kernel_cache.end()) {
+    CUfunction kernel = nullptr;
+    
+    {
+        std::lock_guard lock{_kernel_cache_mutex};
+        if (auto iter = _kernel_cache.find(digest); iter != _kernel_cache.cend()) {
+            kernel = iter->second;
+        }
+    }
+    
+    if (kernel == nullptr) {
     
         std::ostringstream ss;
         for (auto d : digest) { ss << std::setfill('0') << std::setw(8) << std::hex << std::uppercase << d; }
@@ -140,12 +149,20 @@ std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) { 
         if (std::filesystem::exists(cache_file_path)) {
             LUISA_INFO("Cache hit for kernel \"", function.name(), "\" on disk, compilation skipped.");
             auto ptx = text_file_contents(cache_file_path);
+            
+            // retain context
+            CUcontext ctx;
+            cuDevicePrimaryCtxRetain(&ctx, _handle);
+            cuCtxSetCurrent(ctx);
             CUmodule module;
-            CUfunction kernel;
             CUDA_CHECK(cuModuleLoadData(&module, ptx.data()));
             CUDA_CHECK(cuModuleGetFunction(&kernel, module, function.name().c_str()));
+            // release context
+            cuDevicePrimaryCtxRelease(_handle);
+            
+            std::lock_guard lock{_kernel_cache_mutex};
             _modules.emplace_back(module);
-            iter = _kernel_cache.emplace(digest, kernel).first;
+            _kernel_cache.emplace(digest, kernel);
         } else {
             
             LUISA_INFO("No cache found for kernel \"", function.name(), "\" on disk, compiling from source...");
@@ -200,18 +217,28 @@ std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) { 
 
             jitify::detail::ptx_remove_unused_globals(&ptx);
             //        LUISA_INFO("Generated PTX:\n", ptx);
-
+            
+            // retain context
+            CUcontext ctx;
+            cuDevicePrimaryCtxRetain(&ctx, _handle);
+            cuCtxSetCurrent(ctx);
+            
             CUmodule module;
-            CUfunction kernel;
             CUDA_CHECK(cuModuleLoadData(&module, ptx.data()));
             CUDA_CHECK(cuModuleGetFunction(&kernel, module, function.name().c_str()));
+    
+            // release context
+            cuDevicePrimaryCtxRelease(_handle);
+            
+            std::lock_guard lock{_kernel_cache_mutex};
+            if (!std::filesystem::exists(cache_file_path)) {
+                LUISA_INFO("Writing cache for compiled kernel \"", function.name(), "\" to disk: ", cache_file_path);
+                std::ofstream ptx_file{cache_file_path};
+                ptx_file << ptx;
+            }
+    
             _modules.emplace_back(module);
-            
-            LUISA_INFO("Writing cache for compiled kernel \"", function.name(), "\" to disk: ", cache_file_path);
-            std::ofstream ptx_file{cache_file_path};
-            ptx_file << ptx;
-            
-            iter = _kernel_cache.emplace(digest, kernel).first;
+            _kernel_cache.emplace(digest, kernel);
         }
     } else {
         LUISA_INFO("Cache hit for kernel \"", function.name(), "\" in memory, compilation skipped.");
@@ -248,7 +275,9 @@ std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) { 
             uniform_offset += arg->type()->size;
         }
     }
-    return std::make_shared<CudaKernel>(iter->second, std::move(resources), std::move(uniforms));
+    
+    
+    return std::make_shared<CudaKernel>(kernel, std::move(resources), std::move(uniforms));
 }
 
 std::shared_ptr<Buffer> CudaDevice::_allocate_buffer(size_t size) {

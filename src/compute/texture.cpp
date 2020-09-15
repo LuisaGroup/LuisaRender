@@ -17,7 +17,7 @@ namespace luisa::compute {
 void Texture::save(Dispatcher &dispatch, const std::filesystem::path &path) {
     
     auto path_str = std::filesystem::absolute(path).string();
-    auto extension = to_lower(path.extension());
+    auto extension = to_lower(path.extension().string());
     
     if (extension == ".exr") {
         LUISA_ERROR_IF_NOT(is_hdr(), "Only HDR textures are allowed to be saved as OpenEXR files.");
