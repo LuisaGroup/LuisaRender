@@ -1,1 +1,2 @@
-add_subdirectory(rdfc)
+add_subdirectory(RDFC)
+add_subdirectory(LuisaRender)

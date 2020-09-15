@@ -35,8 +35,12 @@ public:
     
     template<typename Def, std::enable_if_t<std::is_invocable_v<Def>, int> = 0>
     [[nodiscard]] KernelView compile_kernel(std::string name, Def &&def) {
+        auto t0 = std::chrono::high_resolution_clock::now();
         auto function = std::make_shared<dsl::Function>(std::move(name));
         def();
+        auto t1 = std::chrono::high_resolution_clock::now();
+        using namespace std::chrono_literals;
+        LUISA_INFO("Construction time for kernel \"", function->name(), "\": ", (t1 - t0) / 1ns * 1e-6, "ms");
         return KernelView{std::async(std::launch::async, [function = std::move(function), this] { return _compile_kernel(*function); })};
     }
     

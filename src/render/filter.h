@@ -8,6 +8,7 @@
 #include <render/plugin.h>
 #include <render/parser.h>
 #include <render/sampler.h>
+#include <compute/dsl.h>
 
 namespace luisa::render {
 
@@ -20,13 +21,6 @@ class Filter : public Plugin {
 private:
     float _radius;
 
-private:
-    virtual void _importance_sample_pixel_positions(
-        Pipeline &pipeline,
-        Sampler &sampler,
-        BufferView<float2> &position_buffer,
-        BufferView<float> &weight_buffer) = 0;
-
 public:
     Filter(Device *device, const ParameterSet &params)
         : Plugin{device, params},
@@ -34,11 +28,8 @@ public:
     
     [[nodiscard]] float radius() const noexcept { return _radius; }
     
-    [[nodiscard]] auto importance_sample_pixel_positions(Sampler &sampler, BufferView<float2> &position_buffer, BufferView<float> &weight_buffer) {
-        return [this, &sampler, &position_buffer, &weight_buffer](Pipeline &pipeline) {
-            _importance_sample_pixel_positions(pipeline, sampler, position_buffer, weight_buffer);
-        };
-    }
+    // (position, weight)
+    [[nodiscard]] virtual std::pair<Expr<float2>, Expr<float>> importance_sample_pixel_position(Expr<uint2> p, Expr<float2> u) = 0;
 };
 
 class SeparableFilter : public Filter {
@@ -47,13 +38,20 @@ public:
     static constexpr auto lookup_table_size = 64u;
 
 private:
+    std::array<float, lookup_table_size> _weight_table{};
+    std::array<float, lookup_table_size> _cdf_table{};
+    float _scale{};
+    bool _table_generated{false};
+    
     // Filter 1D weight function, offset is in range [-radius, radius)
     [[nodiscard]] virtual float _weight_1d(float offset) const noexcept = 0;
-    void _importance_sample_pixel_positions(Pipeline &pipeline, Sampler &sampler, BufferView<float2> &position_buffer, BufferView<float> &weight_buffer) override;
 
 public:
     SeparableFilter(Device *device, const ParameterSet &params)
         : Filter{device, params} {}
+        
+    // (position, weight)
+    std::pair<Expr<float2>, Expr<float>> importance_sample_pixel_position(Expr<uint2> p, Expr<float2> u) override;
 };
 
 }

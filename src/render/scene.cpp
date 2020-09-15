@@ -10,16 +10,11 @@ namespace luisa::render {
 using namespace compute;
 using namespace compute::dsl;
 
-Scene::Scene(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, std::shared_ptr<Background> background, float initial_time, size_t max_ray_count)
+Scene::Scene(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, std::shared_ptr<Background> background, float initial_time)
     : _device{device},
-      _background{std::move(background)},
-      _time{initial_time},
-      _closest_hit_buffer{device->allocate_buffer<ClosestHit>(max_ray_count)} {
+      _background{std::move(background)} {
     
-    _process_geometry(shapes);
-    
-    // now it's time to process materials
-    // not now...
+    _process_geometry(shapes, initial_time);
 }
 
 void Scene::_encode_geometry_buffers(const std::vector<std::shared_ptr<Shape>> &shapes,
@@ -93,8 +88,7 @@ void Scene::_encode_geometry_buffers(const std::vector<std::shared_ptr<Shape>> &
 }
 
 void Scene::_update_geometry(Pipeline &pipeline, float time) {
-    if (!_is_static && _time != time) {  // add update stage only if the scene is dynamic and time changed
-        _time = time;
+    if (!_is_static) {  // add update stage only if the scene is dynamic and time changed
         pipeline << [this, time](Dispatcher &dispatch) {
             dispatch(_instance_transforms.modify([this, time](float4x4 *matrices) { _transform_tree.update(matrices, time); }));
             dispatch(_acceleration->refit());
@@ -102,11 +96,21 @@ void Scene::_update_geometry(Pipeline &pipeline, float time) {
     }
 }
 
-void Scene::_intersect_any(Pipeline &pipeline, const BufferView<Ray> &rays, const BufferView<AnyInteraction> &its) {
-    pipeline << _acceleration->intersect_any(rays, its);
+void Scene::_intersect_any(Pipeline &pipeline, const BufferView<Ray> &rays) {
+    pipeline << [this, ray_count = rays.size()] {
+        if (_any_hit_buffer.size() < ray_count) { _any_hit_buffer = _device->allocate_buffer<AnyInteraction>(ray_count); }
+    };
+    pipeline << _acceleration->intersect_any(rays, _any_hit_buffer);
 }
 
-void Scene::_intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_buffer, const InteractionBuffers &its_buffers) {
+void Scene::_intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_buffer) {
+    
+    pipeline << [this, ray_count = ray_buffer.size()] {
+        if (_closest_hit_buffer.size() < ray_count) {
+            _closest_hit_buffer = _device->allocate_buffer<ClosestHit>(ray_count);
+            _interaction_buffers.create(_device, ray_count);
+        }
+    };
     
     pipeline << _acceleration->intersect_closest(ray_buffer, _closest_hit_buffer);
     
@@ -119,13 +123,13 @@ void Scene::_intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_bu
             
             Var<ClosestHit> hit = _closest_hit_buffer[tid];
             If (hit.distance() <= 0.0f) {
-                its_buffers.valid[tid] = false;
+                _interaction_buffers.valid[tid] = false;
             } Else {
                 
-                its_buffers.valid[tid] = true;
+                _interaction_buffers.valid[tid] = true;
                 
                 Var instance_id = hit.instance_id();
-                its_buffers.material[tid] = _instance_materials[instance_id];
+                _interaction_buffers.material[tid] = _instance_materials[instance_id];
                 
                 Var entity = _instance_entities[instance_id];
                 Var triangle_id = entity.triangle_offset() + hit.triangle_id();
@@ -145,16 +149,16 @@ void Scene::_intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_bu
                 Var nm = transpose(inverse(make_float3x3(m)));
                 
                 Var p = make_float3(m * make_float4(bary_u * p0 + bary_v * p1 + bary_w * p2, 1.0f));
-                its_buffers.pi[tid] = p;
+                _interaction_buffers.pi[tid] = p;
                 
                 // NOTE: DO NOT NORMALIZE!
-                its_buffers.ray_origin_to_hit[tid] = p - make_float3(ray_buffer[tid].origin_x(), ray_buffer[tid].origin_y(), ray_buffer[tid].origin_z());
+                _interaction_buffers.ray_origin_to_hit[tid] = p - make_float3(ray_buffer[tid].origin_x(), ray_buffer[tid].origin_y(), ray_buffer[tid].origin_z());
                 
                 Var ng = normalize(nm * cross(p1 - p0, p2 - p0));
                 Var ns = normalize(bary_u * _normals[i] + bary_u * _normals[j] + bary_w * _normals[k]);
-                its_buffers.ns[tid] = ns;
-                its_buffers.ng[tid] = select(dot(ns, ng) < 0.0f, -ng, ng);
-                its_buffers.uv[tid] = bary_u * _tex_coords[i] + bary_v * _tex_coords[j] + bary_w * _tex_coords[k];
+                _interaction_buffers.ns[tid] = ns;
+                _interaction_buffers.ng[tid] = select(dot(ns, ng) < 0.0f, -ng, ng);
+                _interaction_buffers.uv[tid] = bary_u * _tex_coords[i] + bary_v * _tex_coords[j] + bary_w * _tex_coords[k];
             };
         };
     });
@@ -162,7 +166,7 @@ void Scene::_intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_bu
     pipeline << kernel.parallelize(ray_count, threadgroup_size);
 }
 
-void Scene::_process_geometry(const std::vector<std::shared_ptr<Shape>> &shapes) {
+void Scene::_process_geometry(const std::vector<std::shared_ptr<Shape>> &shapes, float initial_time) {
     
     // calculate memory usage...
     size_t vertex_count = 0u;
@@ -239,9 +243,13 @@ void Scene::_process_geometry(const std::vector<std::shared_ptr<Shape>> &shapes)
     // apply initial transforms and build acceleration structure
     _is_static = _transform_tree.is_static();
     _device->launch(_instance_transforms.modify([&](float4x4 *matrices) {
-        _transform_tree.update(matrices, _time);
+        _transform_tree.update(matrices, initial_time);
     }), [&] { if (_is_static) { _instance_transforms.clear_cache(); }});
     _acceleration = _device->build_acceleration(_positions, _triangles, meshes, _instances, _instance_transforms, _is_static);
+    
+    // now it's time to process materials
+    // not now...
+    _instance_materials = _device->allocate_buffer<MaterialHandle>(entity_count);
 }
 
 }

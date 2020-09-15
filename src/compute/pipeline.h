@@ -4,17 +4,21 @@
 
 #pragma once
 
+#include <compute/device.h>
 #include <compute/kernel.h>
 #include <compute/dispatcher.h>
 
 namespace luisa::compute {
 
-class Pipeline {
+class Pipeline : public Noncopyable {
 
 private:
+    Device *_device;
     std::vector<std::function<void(Dispatcher &)>> _stages;
 
 public:
+    explicit Pipeline(Device *device) : _device{device} {}
+    
     template<typename Func, std::enable_if_t<std::is_invocable_v<Func, Dispatcher &>, int> = 0>
     Pipeline &operator<<(Func &&func) {
         _stages.emplace_back(std::forward<Func>(func));
@@ -33,10 +37,10 @@ public:
         return *this;
     }
     
-    [[nodiscard]] auto run() {
-        return [this](Dispatcher &dispatch) {
-            for (auto &&stage : _stages) { dispatch(stage); }
-        };
+    void run() {
+        _device->launch([this](Dispatcher &dispatch) {
+            for (auto &&stage : _stages) { stage(dispatch); }
+        });
     }
     
 };

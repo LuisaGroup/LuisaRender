@@ -8,7 +8,7 @@
 
 namespace luisa::compute {
 
-struct Ray {
+struct alignas(16) Ray {
     float origin_x;
     float origin_y;
     float origin_z;

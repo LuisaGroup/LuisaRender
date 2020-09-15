@@ -33,7 +33,7 @@ int main() {
         
         If (thread_id() < 1024) {
             Var ray_index = 5 + thread_id();
-            Var direction = normalize(make_float3(empty_buffer[ray_index].direction()));
+            Var direction = normalize(make_float3(empty_buffer[ray_index].direction_x()));
             Threadgroup<float3> fuck{64};
             fuck[thread_id() % 64u] = direction;
             Do {

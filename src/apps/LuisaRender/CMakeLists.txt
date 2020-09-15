@@ -1,0 +1,1 @@
+luisa_render_add_application(LuisaRender SOURCES main.cpp)

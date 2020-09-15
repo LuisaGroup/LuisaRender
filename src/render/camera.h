@@ -31,16 +31,12 @@ private:
     BufferView<Ray> _camera_ray_buffer;
     BufferView<float3> _throughput_buffer;
     BufferView<float> _filter_weight_buffer;
+    
+    float4x4 _camera_to_world;
+    KernelView _generate_rays_kernel;
 
 private:
-    virtual void _generate_rays(Pipeline &pipeline,
-                                float4x4 camera_to_world,
-                                Sampler &sampler,
-                                const BufferView<float2> &pixel_positions,
-                                BufferView<Ray> &rays,
-                                BufferView<float3> &throughputs) = 0;
-    
-    void _generate_pixel_positions_without_filter(Pipeline &pipeline, Sampler &sampler, BufferView<float2> &pixel_position_buffer, BufferView<float> &filter_weight_buffer);
+    [[nodiscard]] virtual std::pair<Expr<Ray>, Expr<float3>> _generate_rays(Expr<float4x4> camera_to_world, Expr<float2> u_lens, Expr<float2> pixel_positions) = 0;
 
 public:
     Camera(Device *d, const ParameterSet &params)
@@ -63,17 +59,7 @@ public:
     [[nodiscard]] BufferView<Ray> &ray_buffer() noexcept { return _camera_ray_buffer; }
     [[nodiscard]] BufferView<float3> &throughput_buffer() noexcept { return _throughput_buffer; }
     
-    [[nodiscard]] auto generate_rays(float time, Sampler &sampler) {
-        return [this, time, &sampler](Pipeline &pipeline) {
-            if (_filter == nullptr) {
-                _generate_pixel_positions_without_filter(pipeline, sampler, _pixel_position_buffer, _filter_weight_buffer);
-            } else {
-                pipeline << _filter->importance_sample_pixel_positions(sampler, _pixel_position_buffer, _filter_weight_buffer);
-            }
-            auto camera_to_world = _transform == nullptr ? make_float4x4(1.0f) : _transform->matrix(time);
-            _generate_rays(pipeline, camera_to_world, sampler, _pixel_position_buffer, _camera_ray_buffer, _throughput_buffer);
-        };
-    }
+    [[nodiscard]] std::function<void(Pipeline &pipeline)> generate_rays(float time, Sampler &sampler);
 };
 
 }

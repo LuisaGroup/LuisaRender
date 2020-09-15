@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <compute/dsl.h>
 #include <compute/pipeline.h>
 #include <render/parser.h>
 #include <render/plugin.h>
@@ -13,21 +14,17 @@ namespace luisa::render {
 using compute::TextureView;
 using compute::BufferView;
 using compute::Pipeline;
+using compute::dsl::Expr;
 
 class Sampler : public Plugin {
 
 private:
     uint _spp;
     uint _current_frame_index{0u};
-    uint _current_sample_index{0u};
-    TextureView _samples;
 
 private:
-    virtual void _generate_samples(Pipeline &pipeline, TextureView &samples, uint num_dims) = 0;
     virtual void _prepare_for_next_frame(Pipeline &pipeline) = 0;
     virtual void _reset(Pipeline &pipeline, uint2 resolution) = 0;
-    
-    [[nodiscard]] virtual uint _max_sample_dimensions() = 0;
 
 public:
     Sampler(Device *device, const ParameterSet &params)
@@ -36,26 +33,15 @@ public:
     
     [[nodiscard]] uint spp() const noexcept { return _spp; }
     [[nodiscard]] uint current_frame_index() const noexcept { return _current_frame_index; }
-    [[nodiscard]] uint current_sample_index() const noexcept { return _current_sample_index; }
     
-    [[nodiscard]] const TextureView &sample_texture() const noexcept { return _samples; }
-    
-    [[nodiscard]] auto generate_samples(uint num_dims) {
-        return [this, num_dims](Pipeline &pipeline) {
-            pipeline << [this, num_dims] {
-                LUISA_EXCEPTION_IF_NOT(num_dims <= 4u, "Cannot generate samples beyond 4D, requested: ", num_dims);
-                LUISA_EXCEPTION_IF_NOT(_max_sample_dimensions() == 0u || _current_sample_index + num_dims <= _max_sample_dimensions(),
-                                       "Current sample dimension exceeds max sample dimension: ", _max_sample_dimensions());
-            };
-            _generate_samples(pipeline, _samples, num_dims);
-            pipeline << [this, num_dims] { _current_sample_index += num_dims; };
-        };
-    }
+    [[nodiscard]] virtual Expr<float> generate_1d_sample(Expr<uint> pixel_index) = 0;
+    [[nodiscard]] virtual Expr<float2> generate_2d_sample(Expr<uint> pixel_index) = 0;
+    [[nodiscard]] virtual Expr<float3> generate_3d_sample(Expr<uint> pixel_index) = 0;
+    [[nodiscard]] virtual Expr<float4> generate_4d_sample(Expr<uint> pixel_index) = 0;
     
     [[nodiscard]] auto prepare_for_next_frame() {
         return [this](Pipeline &pipeline) {
             pipeline << [this] {
-                _current_sample_index = 0u;
                 _current_frame_index++;
                 LUISA_WARNING_IF_NOT(_current_frame_index <= _spp, "Current frame index ", _current_frame_index, " exceeds samples per pixel: ", _spp);
             };
@@ -66,11 +52,7 @@ public:
     [[nodiscard]] auto reset(uint2 resolution) {
         return [this, resolution](Pipeline &pipeline) {
             pipeline << [this, resolution] {
-                if (_samples.empty() || _samples.width() != resolution.x || _samples.height() != resolution.y) {
-                    _samples = device()->allocate_texture<float4>(resolution.x, resolution.y);
-                }
                 _current_frame_index = 0u;
-                _current_sample_index = 0u;
             };
             _reset(pipeline, resolution);
         };

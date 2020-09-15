@@ -28,20 +28,20 @@ struct InteractionBuffers {
     
     BufferView<bool> valid;
     BufferView<float3> pi;
-    BufferView<float3> ray_origin_to_hit;
+    BufferView<float3> ray_origin_to_hit;  // Note: these vectors should not be normalized
     BufferView<float3> ng;
     BufferView<float3> ns;
     BufferView<float2> uv;
     BufferView<MaterialHandle> material;
     
-    InteractionBuffers(Device *device, size_t size) noexcept
-        : pi{device->allocate_buffer<float3>(size)},
-          ray_origin_to_hit{device->allocate_buffer<float3>(size)},
-          ng{device->allocate_buffer<float3>(size)},
-          ns{device->allocate_buffer<float3>(size)},
-          uv{device->allocate_buffer<float2>(size)},
-          material{device->allocate_buffer<MaterialHandle>(size)} {}
-    
+    void create(Device *device, size_t size) noexcept {
+        pi = device->allocate_buffer<float3>(size);
+        ray_origin_to_hit = device->allocate_buffer<float3>(size);
+        ng = device->allocate_buffer<float3>(size);
+        ns = device->allocate_buffer<float3>(size);
+        uv = device->allocate_buffer<float2>(size);
+        material = device->allocate_buffer<MaterialHandle>(size);
+    }
 };
 
 }

@@ -17,50 +17,28 @@ private:
     float3 _front{};
     float3 _up{};
     float3 _left{};
-    float4x4 _camera_to_world{};
     float2 _sensor_size{};
     float _near_plane;
 
 private:
-    void _generate_rays(Pipeline &pipeline,
-                        float4x4 camera_to_world,
-                        Sampler &sampler [[maybe_unused]],
-                        const BufferView<float2> &pixel_positions,
-                        BufferView<Ray> &rays,
-                        BufferView<float3> &throughputs) override {
+    std::pair<Expr<Ray>, Expr<float3>> _generate_rays(Expr<float4x4> camera_to_world, Expr<float2> u [[maybe_unused]], Expr<float2> pixel) override {
         
-        auto resolution = film()->resolution();
-        auto pixel_count = resolution.x * resolution.y;
-        constexpr auto threadgroup_size = 256u;
+        Var p_film = (0.5f - pixel / dsl::make_float2(film()->resolution())) * dsl::make_float2(_sensor_size) * 0.5f;
+        Var o_world = make_float3(camera_to_world * dsl::make_float4(_position, 1.0f));
+        Var p_film_world = make_float3(camera_to_world * make_float4(p_film.x() * _left + p_film.y() * _up + _near_plane * _front + _position, 1.0f));
+        Var d = normalize(p_film_world - o_world);
+    
+        Var<Ray> ray;
+        ray.origin_x() = o_world.x();
+        ray.origin_y() = o_world.y();
+        ray.origin_z() = o_world.z();
+        ray.min_distance() = 1e-3f;
+        ray.direction_x() = d.x();
+        ray.direction_y() = d.y();
+        ray.direction_z() = d.z();
+        ray.max_distance() = 1e3f;
         
-        pipeline << [this, camera_to_world] { _camera_to_world = camera_to_world; };
-        
-        auto kernel = device()->compile_kernel("pinhole_camara_generate_rays", [&] {
-            auto tid = thread_id();
-            If (pixel_count % threadgroup_size == 0u || tid < pixel_count) {
-                Var pixel = pixel_positions[tid];
-                Var p_film = (dsl::make_float2(0.5f) - pixel / dsl::make_float2(resolution)) * dsl::make_float2(_sensor_size) * 0.5f;
-                Var o_world = make_float3(uniform(&_camera_to_world) * dsl::make_float4(_position, 1.0f));
-                Var p_film_world = make_float3(uniform(&_camera_to_world) *
-                                               make_float4(p_film.x() * _left + p_film.y() * _up + _near_plane * _front + _position, 1.0f));
-                Var d = normalize(p_film_world - o_world);
-                
-                Var<Ray> ray;
-                ray.origin_x() = o_world.x();
-                ray.origin_y() = o_world.y();
-                ray.origin_z() = o_world.z();
-                ray.min_distance() = 1e-3f;
-                ray.direction_x() = d.x();
-                ray.direction_y() = d.y();
-                ray.direction_z() = d.z();
-                ray.max_distance() = 1e3f;
-                
-                rays[tid] = ray;
-                throughputs[tid] = dsl::make_float3(1.0f);
-            };
-        });
-        
-        pipeline << kernel.parallelize(pixel_count, threadgroup_size);
+        return std::make_pair(Expr{ray}, Expr{make_float3(1.0f)});
     }
 
 public:

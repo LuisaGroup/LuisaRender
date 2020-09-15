@@ -31,6 +31,7 @@ private:
     std::optional<std::vector<DeviceSelection>> _devices;
     mutable cxxopts::Options _cli_options;
     mutable std::optional<cxxopts::ParseResult> _parsed_cli_options;
+    mutable std::optional<std::string> _positional_option;
     std::map<std::filesystem::path, DynamicModuleHandle, std::less<>> _loaded_modules;
 
     [[nodiscard]] const cxxopts::ParseResult &_parse_result() const noexcept;
@@ -73,6 +74,8 @@ public:
 
     template<typename T>
     [[nodiscard]] T cli_option(const std::string &opt_name) const { return _parse_result()[opt_name].as<T>(); }
+    
+    [[nodiscard]] std::string cli_positional_option() const { return _parse_result()["positional"].as<std::string>(); }
 
     [[nodiscard]] const std::vector<DeviceSelection> &devices() noexcept;
     [[nodiscard]] bool should_print_generated_source() const noexcept { return cli_option<bool>("print-source"); }
