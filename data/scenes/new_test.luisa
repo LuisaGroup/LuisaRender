@@ -1,0 +1,24 @@
+Integrator integrator : Normal {}
+
+Shape bunny : WavefrontObj {
+  path { "data/meshes/bunny/bunny.obj" }
+}
+
+Film film : RGB {
+  resolution { 1200, 800 }
+}
+
+Camera camera : Pinhole {
+  film { @film }
+  position { 0, 0, 5 }
+  target { 0, 0, 0 }
+}
+
+task : SingleShot {
+  integrator { @integrator }
+  sampler : Independent {
+    spp { 1024 }
+  }
+  camera { @camera }
+  shapes { @bunny }
+}

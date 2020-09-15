@@ -51,9 +51,7 @@ public:
     
     [[nodiscard]] auto reset(uint2 resolution) {
         return [this, resolution](Pipeline &pipeline) {
-            pipeline << [this, resolution] {
-                _current_frame_index = 0u;
-            };
+            pipeline << [this] { _current_frame_index = 0u; };
             _reset(pipeline, resolution);
         };
     }
