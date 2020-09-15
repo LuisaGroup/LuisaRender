@@ -14,8 +14,5 @@ int main(int argc, char *argv[]) {
     auto device = Device::create(&context);
     
     Parser parser{device.get()};
-    auto task = parser.parse(context.cli_positional_option());
-    
-    task->compile();
-    task->execute();
+    parser.parse(context.cli_positional_option())->execute();
 }

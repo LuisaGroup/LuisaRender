@@ -30,12 +30,13 @@ private:
     BufferView<float2> _pixel_position_buffer;
     BufferView<Ray> _camera_ray_buffer;
     BufferView<float3> _throughput_buffer;
-    BufferView<float> _filter_weight_buffer;
+    BufferView<float> _pixel_weight_buffer;
     
     float4x4 _camera_to_world;
     KernelView _generate_rays_kernel;
 
 private:
+    [[nodiscard]] virtual bool _requires_lens_samples() const noexcept = 0;
     [[nodiscard]] virtual std::pair<Expr<Ray>, Expr<float3>> _generate_rays(Expr<float4x4> camera_to_world, Expr<float2> u_lens, Expr<float2> pixel_positions) = 0;
 
 public:
@@ -56,6 +57,7 @@ public:
     [[nodiscard]] Transform *transform() const noexcept { return _transform.get(); }
     
     [[nodiscard]] const BufferView<float2> &pixel_position_buffer() const noexcept { return _pixel_position_buffer; }
+    [[nodiscard]] const BufferView<float> &pixel_weight_buffer() const noexcept { return _pixel_weight_buffer; }
     [[nodiscard]] BufferView<Ray> &ray_buffer() noexcept { return _camera_ray_buffer; }
     [[nodiscard]] BufferView<float3> &throughput_buffer() noexcept { return _throughput_buffer; }
     

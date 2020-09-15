@@ -51,6 +51,8 @@ private:
     BufferView<ClosestHit> _closest_hit_buffer;
     InteractionBuffers _interaction_buffers;
     
+    KernelView _evaluate_interactions_kernel;
+    
     bool _is_static{false};
 
 private:

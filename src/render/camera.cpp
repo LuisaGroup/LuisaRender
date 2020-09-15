@@ -19,16 +19,18 @@ std::function<void(Pipeline &pipeline)> Camera::generate_rays(float time, Sample
         _generate_rays_kernel = device()->compile_kernel("camera_generate_rays", [&] {
             auto tid = thread_id();
             If (pixel_count % threadgroup_size == 0u || tid < pixel_count) {
-                Var u = sampler.generate_4d_sample(tid);
+                Var u = _requires_lens_samples() ?
+                        sampler.generate_4d_sample(tid) :
+                        make_float4(sampler.generate_2d_sample(tid), 0.0f, 0.0f);
                 Var p = make_uint2(tid % _film->resolution().x, tid / _film->resolution().x);
                 auto[px, px_w] = _filter == nullptr ?
                                  std::make_pair(make_float2(p) + make_float2(u), Expr{1.0f}) :
                                  _filter->importance_sample_pixel_position(p, make_float2(u));
                 Var pixel_position = px;
                 _pixel_position_buffer[tid] = pixel_position;
-                _filter_weight_buffer[tid] = px_w;
+                _pixel_weight_buffer[tid] = px_w;
                 
-                auto [ray, throughput] = _generate_rays(uniform(&_camera_to_world), make_float2(u.z(), u.w()), pixel_position);
+                auto[ray, throughput] = _generate_rays(uniform(&_camera_to_world), make_float2(u.z(), u.w()), pixel_position);
                 _camera_ray_buffer[tid] = ray;
                 _throughput_buffer[tid] = throughput;
             };

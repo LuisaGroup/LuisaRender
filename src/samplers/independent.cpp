@@ -17,7 +17,7 @@ private:
     uint _num_dims{};
 
 private:
-    [[nodiscard]] Expr<float> _rnd(Expr<uint> prev) noexcept {
+    [[nodiscard]] static Expr<float> _rnd(Expr<uint> prev) noexcept {
         constexpr auto lcg_a = 1664525u;
         constexpr auto lcg_c = 1013904223u;
         prev = (lcg_a * prev + lcg_c);
@@ -93,3 +93,5 @@ public:
 };
 
 }
+
+LUISA_EXPORT_PLUGIN_CREATOR(luisa::render::sampler::IndependentSampler)

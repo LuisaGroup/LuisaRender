@@ -25,8 +25,10 @@ public:
         : Plugin{device, params},
           _pipeline{device} {}
     
-    void compile() { _compile(_pipeline); }
-    void execute() { _pipeline.run(); }
+    void execute() {
+        _compile(_pipeline);
+        _pipeline.run();
+    }
 };
 
 }

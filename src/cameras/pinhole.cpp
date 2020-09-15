@@ -21,7 +21,9 @@ private:
     float _near_plane;
 
 private:
-    std::pair<Expr<Ray>, Expr<float3>> _generate_rays(Expr<float4x4> camera_to_world, Expr<float2> u [[maybe_unused]], Expr<float2> pixel) override {
+    [[nodiscard]] bool _requires_lens_samples() const noexcept override { return false; }
+    
+    [[nodiscard]] std::pair<Expr<Ray>, Expr<float3>> _generate_rays(Expr<float4x4> camera_to_world, Expr<float2> u [[maybe_unused]], Expr<float2> pixel) override {
         
         Var p_film = (0.5f - pixel / dsl::make_float2(film()->resolution())) * dsl::make_float2(_sensor_size) * 0.5f;
         Var o_world = make_float3(camera_to_world * dsl::make_float4(_position, 1.0f));
