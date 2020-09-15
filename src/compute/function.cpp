@@ -8,20 +8,14 @@
 
 namespace luisa::compute::dsl {
 
-static thread_local Function *_current = nullptr;
+static thread_local std::stack<Function *> _current;
 
 Function &Function::current() noexcept {
-    assert(_current != nullptr);
-    return *_current;
-}
-
-Function::~Function() noexcept {
-    _current = nullptr;
+    assert(!_current.empty());
+    return *_current.top();
 }
 
 Function::Function(std::string name) noexcept : _name{std::move(name)} {
-    assert(_current == nullptr);
-    _current = this;
     _body = std::make_unique<ScopeStmt>();
     _scope_stack.push(_body.get());
 }
@@ -86,5 +80,14 @@ const Variable *Function::add_threadgroup_variable(std::unique_ptr<Variable> v) 
 void Function::add_return() { add_statement(std::make_unique<ReturnStmt>()); }
 void Function::add_break() { add_statement(std::make_unique<BreakStmt>()); }
 void Function::add_continue() { add_statement(std::make_unique<ContinueStmt>()); }
+
+void Function::push(Function *f) noexcept {
+    _current.push(f);
+}
+
+void Function::pop(Function *f) noexcept {
+    assert(!_current.empty() && _current.top() == f);
+    _current.pop();
+}
 
 }

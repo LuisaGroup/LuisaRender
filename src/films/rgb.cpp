@@ -47,7 +47,6 @@ private:
         auto kernel = device()->compile_kernel("rgb_film_postprocess", [&] {
             auto txy = thread_xy();
             If (all(resolution() % threadgroup_size == make_uint2(0u)) || all(txy < resolution())) {
-                Var index = txy.y() * resolution().x + txy.x();
                 Var accum = _framebuffer.read(txy);
                 _framebuffer.write(txy, make_float4(
                     select(accum.w() == 0.0f,

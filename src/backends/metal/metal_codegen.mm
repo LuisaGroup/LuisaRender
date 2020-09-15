@@ -151,7 +151,12 @@ void MetalCodegen::emit(const Function &f) {
            "    auto one_over_determinant = 1.0f / dot1;\n"
            "    return inv * one_over_determinant;\n"
            "}\n"
-           "\n";
+           "\n"
+           "inline float3x3 make_float3x3(float4x4 m) {\n"
+           "    return float3x3(float3(m[0].x, m[0].y, m[0].z),\n"
+           "                    float3(m[1].x, m[1].y, m[1].z),\n"
+           "                    float3(m[2].x, m[2].y, m[2].z));\n"
+           "}\n";
     CppCodegen::emit(f);
 }
 
@@ -166,7 +171,7 @@ void MetalCodegen::_emit_type(const TypeDesc *desc) {
 }
 
 void MetalCodegen::_emit_builtin_function_name(const std::string &name) {
-    if (name.find("make_") == 0u) {
+    if (name != "make_float3x3" && name.find("make_") == 0u) {
         _os << std::string_view{name.c_str()}.substr(5);
     } else if (name == "lerp") {
         _os << "mix";

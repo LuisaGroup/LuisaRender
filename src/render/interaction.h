@@ -35,6 +35,7 @@ struct InteractionBuffers {
     BufferView<MaterialHandle> material;
     
     void create(Device *device, size_t size) noexcept {
+        valid = device->allocate_buffer<bool>(size);
         pi = device->allocate_buffer<float3>(size);
         ray_origin_to_hit = device->allocate_buffer<float3>(size);
         ng = device->allocate_buffer<float3>(size);

@@ -48,9 +48,12 @@ private:
 
 public:
     explicit Function(std::string name) noexcept;
-    ~Function() noexcept;
+    ~Function() noexcept = default;
     
     [[nodiscard]] static Function &current() noexcept;
+    static void push(Function *f) noexcept;
+    static void pop(Function *f) noexcept;
+    
     [[nodiscard]] uint32_t next_uid() noexcept { return ++_uid_counter; }
     [[nodiscard]] const std::string &name() const noexcept { return _name; }
     

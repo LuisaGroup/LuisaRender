@@ -16,6 +16,12 @@ std::function<void(Pipeline &pipeline)> Camera::generate_rays(float time, Sample
     auto pixel_count = _film->resolution().x * _film->resolution().y;
     
     if (_generate_rays_kernel.empty()) {
+    
+        _pixel_position_buffer = device()->allocate_buffer<float2>(pixel_count);
+        _camera_ray_buffer = device()->allocate_buffer<Ray>(pixel_count);
+        _throughput_buffer = device()->allocate_buffer<float3>(pixel_count);
+        _pixel_weight_buffer = device()->allocate_buffer<float>(pixel_count);
+        
         _generate_rays_kernel = device()->compile_kernel("camera_generate_rays", [&] {
             auto tid = thread_id();
             If (pixel_count % threadgroup_size == 0u || tid < pixel_count) {
@@ -24,8 +30,8 @@ std::function<void(Pipeline &pipeline)> Camera::generate_rays(float time, Sample
                         make_float4(sampler.generate_2d_sample(tid), 0.0f, 0.0f);
                 Var p = make_uint2(tid % _film->resolution().x, tid / _film->resolution().x);
                 auto[px, px_w] = _filter == nullptr ?
-                                 std::make_pair(make_float2(p) + make_float2(u), Expr{1.0f}) :
-                                 _filter->importance_sample_pixel_position(p, make_float2(u));
+                                 std::make_pair(make_float2(p) + make_float2(u.x(), u.y()), Expr{1.0f}) :
+                                 _filter->importance_sample_pixel_position(p, make_float2(u.x(), u.y()));
                 Var pixel_position = px;
                 _pixel_position_buffer[tid] = pixel_position;
                 _pixel_weight_buffer[tid] = px_w;

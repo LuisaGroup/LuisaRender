@@ -24,38 +24,36 @@ private:
         std::string err;
         
         auto input_file = path.string();
-        bool success = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, input_file.c_str());
+        bool success = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, input_file.c_str(), nullptr, true);
         
         LUISA_WARNING_IF_NOT(warn.empty(), warn);
         LUISA_EXCEPTION_IF_NOT(err.empty(), err);
         LUISA_EXCEPTION_IF_NOT(success, "Error occurred while loading Wavefront OBJ file: ", path);
         
         _vertices.resize(attrib.vertices.size() / 3u);
-        for (auto s = 0u; s < shapes.size(); s++) {
-            // Loop over faces(polygon)
-            auto index_offset = 0u;
-            for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
-                
-                auto fv = shapes[s].mesh.num_face_vertices[f];
-                LUISA_EXCEPTION_IF_NOT(fv == 3, "Only triangle primitives are supported.");
-                
-                // Loop over vertices in the face.
-                for (size_t v = 0; v < fv; v++) {
-                    // access to vertex
-                    tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
-                    tinyobj::real_t vx = attrib.vertices[3 * idx.vertex_index + 0];
-                    tinyobj::real_t vy = attrib.vertices[3 * idx.vertex_index + 1];
-                    tinyobj::real_t vz = attrib.vertices[3 * idx.vertex_index + 2];
-                    tinyobj::real_t nx = attrib.normals[3 * idx.normal_index + 0];
-                    tinyobj::real_t ny = attrib.normals[3 * idx.normal_index + 1];
-                    tinyobj::real_t nz = attrib.normals[3 * idx.normal_index + 2];
-                    tinyobj::real_t tx = attrib.texcoords[2 * idx.texcoord_index + 0];
-                    tinyobj::real_t ty = attrib.texcoords[2 * idx.texcoord_index + 1];
+        for (auto i = 0u; i < _vertices.size(); i++) {
+            _vertices[i].position = make_float3(attrib.vertices[i * 3u], attrib.vertices[i * 3u + 1u], attrib.vertices[i * 3u + 2u]);
+        }
+        
+        for (auto &&shape : shapes) {
+            for (auto i = 0u; i < shape.mesh.indices.size(); i += 3u) {
+                uint triangle[3];
+                for (auto j = 0u; j < 3u; j++) {
+                    auto idx = shape.mesh.indices[i + j];
+                    triangle[j] = idx.vertex_index;
+                    _vertices[idx.vertex_index].normal = make_float3(
+                        attrib.normals[3u * idx.normal_index],
+                        attrib.normals[3u * idx.normal_index + 1u],
+                        attrib.normals[3u * idx.normal_index + 2u]);
+                    if (idx.texcoord_index < 0) {
+                        _vertices[idx.vertex_index].uv = make_float2(0.0f);
+                    } else {
+                        _vertices[idx.vertex_index].uv = make_float2(
+                            attrib.texcoords[2u * idx.texcoord_index],
+                            attrib.texcoords[2u * idx.texcoord_index + 1u]);
+                    }
                 }
-                index_offset += fv;
-                
-                // per-face material
-                shapes[s].mesh.material_ids[f];
+                _triangles.emplace_back(TriangleHandle{triangle[0], triangle[1], triangle[2]});
             }
         }
     }

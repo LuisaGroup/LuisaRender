@@ -28,9 +28,13 @@ private:
     void _prepare_for_next_frame(Pipeline &pipeline) override { /* Nothing to do */ }
     
     void _reset(Pipeline &pipeline, uint2 resolution) override {
+        
         constexpr auto threadgroup_size = make_uint2(16u, 16u);
-        if (auto pixel_count = resolution.x * resolution.y; _state_buffer.size() != pixel_count) {
-            _reset_kernel = device()->compile_kernel("independent_sample_reset", [&] {
+        auto pixel_count = resolution.x * resolution.y;
+        
+        if (_state_buffer.empty()) {
+            _state_buffer = device()->allocate_buffer<uint>(pixel_count);
+            _reset_kernel = device()->compile_kernel("independent_sampler_reset", [&] {
                 auto tea = [](Expr<uint2> val) -> Expr<uint> {
                     Var v0 = val.x();
                     Var v1 = val.y();

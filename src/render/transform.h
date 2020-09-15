@@ -51,7 +51,7 @@ public:
             buffer[_instance_id] = m;
         } else {
             for (auto &&child : _children) {
-                update(buffer, time, m);
+                child->update(buffer, time, m);
             }
         }
     }
