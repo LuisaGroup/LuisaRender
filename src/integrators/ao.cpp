@@ -35,7 +35,7 @@ private:
                 
                          Var onb = make_onb(normal);
                          Var u = sampler.generate_2d_sample(tid);
-                         Var direction_local = uniform_sample_hemisphere(u);
+                         Var direction_local = cosine_sample_hemisphere(u);
                          Var direction = normalize(transform_to_world(onb, direction_local));
                 
                          Var<Ray> shadow_ray;

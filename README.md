@@ -6,37 +6,37 @@ High-Performance Renderer on GPU.
 ### Architecture
 | Feature                                                  | Progress  |
 |----------------------------------------------------------|-----------|
-| Plugin System                                            | Completed |
-| Embedded DSL for Runtime Kernel Generation & Compilation | Completed |
-| Scene Description Language                               | Completed |
+| Plugin System                                            | Done      |
+| Embedded DSL for Runtime Kernel Generation & Compilation | Done      |
+| Scene Description Language                               | Done      |
 | Wavefront Path Tracing                                   | Planned   |
 
 ### Backends
 | Feature                    | Progress    |
 |----------------------------|-------------|
-| Apple Metal                | Refactoring |
-| NVIDIA OptiX & OptiX-Prime | Planned     |
+| Apple Metal                | Done        |
+| NVIDIA OptiX & OptiX-Prime | Partial     |
 | Intel Embree               |             |
 | ...                        |             |
 
 ### Cameras
 | Feature                                   | Progress    |
 |-------------------------------------------|-------------|
-| Pinhole Cameras                           | Refactoring |
+| Pinhole Cameras                           | Done        |
 | Thin-Lens Cameras                         | Refactoring |
 | Realistic Cameras                         |             |
 | Fish-Eye Cameras                          |             |
 | ...                                       |             |
-| Camera Transform, Animation & Motion-Blur | Refactoring |
+| Camera Transform, Animation & Motion-Blur | Partial     |
 | Shutter Curves                            |             |
 
 ### Geometry
 | Feature                                     | Progress    |
 |---------------------------------------------|-------------|
-| Triangle Meshes                             | Refactoring |
-| Catmull-Clark Subdivision (with ASSIMP)     | Refactoring |
-| Instancing                                  | Refactoring |
-| Static and Dynamic Transforms & Motion-Blur | Refactoring |
+| Triangle Meshes (Wavefront OBJ Format)      | Partial     |
+| Catmull-Clark Subdivision                   |             |
+| Instancing                                  | Partial     |
+| Static and Dynamic Transforms & Motion-Blur | Partial     |
 | Curves                                      |             |
 | Out-of-Core Ray Tracing                     |             |
 
@@ -65,24 +65,25 @@ High-Performance Renderer on GPU.
 ### Samplers
 | Feature             | Progress    |
 |---------------------|-------------|
-| Independent Sampler | Refactoring |
+| Independent Sampler | Done        |
 | Halton Sampler      | Planned     |
 | ...                 |             |
 
 ### Reconstruction Filters
 | Feature                      | Progress    |
 |------------------------------|-------------|
-| Filter Importance Sampling   | Refactoring |
-| Mitchell-Netravali Filter    | Refactoring |
-| Box Filter                   | Refactoring |
-| Triangle Filter              | Refactoring |
-| Gaussian Filter              | Refactoring |
-| Lanczos Windowed Sinc Filter | Refactoring |
+| Filter Importance Sampling   | Done        |
+| Mitchell-Netravali Filter    | Done        |
+| Box Filter                   | Done        |
+| Triangle Filter              | Done        |
+| Gaussian Filter              | Done        |
+| Lanczos Windowed Sinc Filter | Done        |
 
 ### Integrators
 | Feature           | Progress    |
 |-------------------|-------------|
-| Normal Visualizer | Refactoring |
+| Normal Visualizer | Done        |
+| Ambient Occlusion | Done        |
 | Path Tracing      | Planned     |
 | SPPM              |             |
 | PSSMLT            |             |
@@ -99,7 +100,7 @@ High-Performance Renderer on GPU.
 ### Renders
 | Feature               | Progress    |
 |-----------------------|-------------|
-| Single-Shot Rendering | Refactoring |
+| Single-Shot Rendering | Partial     |
 | Animation Rendering   |             |
 | Interactive Rendering |             |
 | Remote Rendering      |             |

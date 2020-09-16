@@ -52,5 +52,12 @@ inline Expr<float3> uniform_sample_hemisphere(Expr<float2> u) {
     return make_float3(r * cos(phi), r * sin(phi), u.x());
 }
 
+inline Expr<float3> cosine_sample_hemisphere(Expr<float2> u)
+{
+    Var r = sqrt(u.x());
+    Var phi = static_cast<float>(2.0f * M_PI) * u.y();
+    return make_float3(r * cos(phi), r * sin(phi), sqrt(1.0f - u.x()));
+}
+
 }
 }
