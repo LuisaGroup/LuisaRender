@@ -13,12 +13,15 @@ Camera camera : Pinhole {
   position { 0, 0.99, 9 }
   target { 0, 0.99, 0 }
   fov { 27.8 }
+  filter : MitchellNetravali {
+    radius { 10.0 }
+  }
 }
 
 task : SingleShot {
   integrator { @integrator }
   sampler : Independent {
-    spp { 8192 }
+    spp { 1024 }
   }
   camera { @camera }
   shapes { @cbox }

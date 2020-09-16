@@ -38,14 +38,16 @@ std::pair<Expr<float2>, Expr<float>> SeparableFilter::importance_sample_pixel_po
     
     auto weight = immutable(_weight_table);
     auto cdf = immutable(_cdf_table);
-    auto sample_1d = [&](Expr<float> u) {
+    
+    auto sample_1d = [&](Expr<float> u_in) {
         
+        Var u = u_in;
         Var p = 0u;
         Var count = static_cast<int>(lookup_table_size);
         While (count > 0) {
             Var step = count / 2;
             Var mid = p + step;
-            If (weight[mid] < u) {
+            If (cdf[mid] < u) {
                 p = mid + 1;
                 count -= step + 1;
             } Else {
