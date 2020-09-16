@@ -13,7 +13,6 @@ class IndependentSampler : public Sampler {
 
 private:
     BufferView<uint> _state_buffer;
-    KernelView _reset_kernel;
     uint _num_dims{};
 
 private:
@@ -32,28 +31,28 @@ private:
         constexpr auto threadgroup_size = make_uint2(16u, 16u);
         auto pixel_count = resolution.x * resolution.y;
         
-        if (_state_buffer.empty()) {
+        if (_state_buffer.size() < pixel_count) {
             _state_buffer = device()->allocate_buffer<uint>(pixel_count);
-            _reset_kernel = device()->compile_kernel("independent_sampler_reset", [&] {
-                auto tea = [](Expr<uint2> val) -> Expr<uint> {
-                    Var v0 = val.x();
-                    Var v1 = val.y();
-                    Var s0 = 0;
-                    for (auto n = 0u; n < 5u; n++) {
-                        s0 += 0x9e3779b9u;
-                        v0 += ((v1 << 4u) + 0xa341316cu) ^ (v1 + s0) ^ ((v1 >> 5u) + 0xc8013ea4u);
-                        v1 += ((v0 << 4u) + 0xad90777du) ^ (v0 + s0) ^ ((v0 >> 5u) + 0x7e95761eu);
-                    }
-                    return v0;
-                };
-                auto txy = thread_xy();
-                If (all(resolution % threadgroup_size == make_uint2(0u)) || all(txy < resolution)) {
-                    auto index = txy.y() * resolution.x + txy.x();
-                    _state_buffer[index] = tea(txy);
-                };
-            });
         }
-        pipeline << _reset_kernel.parallelize(resolution, threadgroup_size);
+        
+        pipeline << device()->compile_kernel("independent_sampler_reset", [&] {
+            auto tea = [](Expr<uint2> val) -> Expr<uint> {
+                Var v0 = val.x();
+                Var v1 = val.y();
+                Var s0 = 0;
+                for (auto n = 0u; n < 5u; n++) {
+                    s0 += 0x9e3779b9u;
+                    v0 += ((v1 << 4u) + 0xa341316cu) ^ (v1 + s0) ^ ((v1 >> 5u) + 0xc8013ea4u);
+                    v1 += ((v0 << 4u) + 0xad90777du) ^ (v0 + s0) ^ ((v0 >> 5u) + 0x7e95761eu);
+                }
+                return v0;
+            };
+            auto txy = thread_xy();
+            If (all(resolution % threadgroup_size == make_uint2(0u)) || all(txy < resolution)) {
+                auto index = txy.y() * resolution.x + txy.x();
+                _state_buffer[index] = tea(txy);
+            };
+        }).parallelize(resolution, threadgroup_size);
     }
 
 public:

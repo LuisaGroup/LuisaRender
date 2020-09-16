@@ -18,18 +18,17 @@ private:
 private:
     void _clear(Pipeline &pipeline) override {
         constexpr auto threadgroup_size = make_uint2(16u, 16u);
-        auto kernel = device()->compile_kernel("rgb_film_clear", [&] {
+        pipeline << device()->compile_kernel("rgb_film_clear", [&] {
             auto txy = thread_xy();
             If (all(resolution() % threadgroup_size == make_uint2(0u)) || all(txy < resolution())) {
                 _framebuffer.write(txy, dsl::make_float4(0.0f));
             };
-        });
-        pipeline << kernel.parallelize(resolution(), threadgroup_size);
+        }).parallelize(resolution(), threadgroup_size);
     }
     
     void _accumulate_frame(Pipeline &pipeline, const BufferView<float3> &radiance_buffer, const BufferView<float> &weight_buffer) override {
         constexpr auto threadgroup_size = make_uint2(16u, 16u);
-        auto kernel = device()->compile_kernel("rgb_film_accumulate", [&] {
+        pipeline << device()->compile_kernel("rgb_film_accumulate", [&] {
             auto txy = thread_xy();
             If (all(resolution() % threadgroup_size == make_uint2(0u)) || all(txy < resolution())) {
                 Var index = txy.y() * resolution().x + txy.x();
@@ -38,13 +37,12 @@ private:
                 Var accum = _framebuffer.read(txy);
                 _framebuffer.write(txy, accum + make_float4(radiance * weight, weight));
             };
-        });
-        pipeline << kernel.parallelize(resolution(), threadgroup_size);
+        }).parallelize(resolution(), threadgroup_size);
     }
     
     void _postprocess(Pipeline &pipeline) override {
         constexpr auto threadgroup_size = make_uint2(16u, 16u);
-        auto kernel = device()->compile_kernel("rgb_film_postprocess", [&] {
+        pipeline << device()->compile_kernel("rgb_film_postprocess", [&] {
             auto txy = thread_xy();
             If (all(resolution() % threadgroup_size == make_uint2(0u)) || all(txy < resolution())) {
                 Var accum = _framebuffer.read(txy);
@@ -54,8 +52,7 @@ private:
                            make_float3(accum) / accum.w()),
                     1.0f));
             };
-        });
-        pipeline << kernel.parallelize(resolution(), threadgroup_size);
+        }).parallelize(resolution(), threadgroup_size);
     }
     
     void _save(Pipeline &pipeline, const std::filesystem::path &path) override {

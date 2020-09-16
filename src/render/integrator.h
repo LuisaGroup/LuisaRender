@@ -31,7 +31,7 @@ public:
     [[nodiscard]] const BufferView<float3> &radiance_buffer() const noexcept { return _radiance_buffer; }
     
     [[nodiscard]] auto render_frame(Scene &scene, Sampler &sampler, BufferView<Ray> &ray_buffer, BufferView<float3> &throughput_buffer) {
-        if (_radiance_buffer.empty()) {
+        if (_radiance_buffer.size() < ray_buffer.size()) {
             _radiance_buffer = device()->allocate_buffer<float3>(ray_buffer.size());
         }
         return [this, &scene, &sampler, &ray_buffer, &throughput_buffer](Pipeline &pipeline) {

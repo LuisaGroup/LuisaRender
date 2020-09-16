@@ -80,23 +80,15 @@ MetalDevice::MetalDevice(Context *context, uint32_t device_id) : Device{context}
 
 std::shared_ptr<Kernel> MetalDevice::_compile_kernel(const compute::dsl::Function &f) {
     
-    LUISA_INFO("Generating source for kernel \"", f.name(), "\"...");
-    
     std::ostringstream os;
-    auto t0 = std::chrono::high_resolution_clock::now();
     MetalCodegen codegen{os};
     codegen.emit(f);
     auto s = os.str();
-    auto t1 = std::chrono::high_resolution_clock::now();
-    using namespace std::chrono_literals;
-    LUISA_INFO("Codegen time for kernel \"", f.name(), "\": ", (t1 - t0) / 1ns * 1e-6, "ms");
     
     if (_context->should_print_generated_source()) { LUISA_INFO("Generated source:\n", s); }
     
 //    auto digest = SHA1{s}.digest();
     auto digest = murmur_hash_64a(s.data(), static_cast<uint32_t>(s.size()), 0);
-    auto t2 = std::chrono::high_resolution_clock::now();
-    LUISA_INFO("SHA1 calculation time for kernel \"", f.name(), "\": ", (t2 - t1) / 1ns * 1e-6, "ms");
     
     id<MTLComputePipelineState> pso = nullptr;
     
@@ -106,8 +98,6 @@ std::shared_ptr<Kernel> MetalDevice::_compile_kernel(const compute::dsl::Functio
     }
     
     if (pso == nullptr) {
-        
-        auto t3 = std::chrono::high_resolution_clock::now();
         
         LUISA_INFO("No compilation cache found for kernel \"", f.name(), "\", compiling from source...");
         NSError *error = nullptr;
@@ -131,17 +121,12 @@ std::shared_ptr<Kernel> MetalDevice::_compile_kernel(const compute::dsl::Functio
             NSLog(@"%@", error);
             LUISA_EXCEPTION("Failed to create pipeline state object for kernel \"", f.name(), "\".");
         }
-        LUISA_INFO("Compilation for kernel \"", f.name(), "\" succeeded.");
+        
         {
             std::lock_guard lock{_kernel_cache_mutex};
             _kernel_cache.emplace(digest, pso);
         }
         
-        auto t4 = std::chrono::high_resolution_clock::now();
-        LUISA_INFO("Compilation time for kernel \"", f.name(), "\": ", (t4 - t3) / 1ns * 1e-6, "ms");
-        
-    } else {
-        LUISA_INFO("Cache hit for kernel \"", f.name(), "\", compilation skipped.");
     }
     
     std::vector<MetalKernel::Uniform> uniforms;

@@ -89,6 +89,7 @@ public:
     // For dsl
     template<typename Index>
     [[nodiscard]] auto operator[](Index &&index) const noexcept {
+        LUISA_EXCEPTION_IF(empty(), "Indexing into empty buffer.");
         using namespace luisa::compute::dsl;
         auto v = Variable::make_buffer_argument(type_desc<T>, _buffer);
         if (_offset == 0u) {

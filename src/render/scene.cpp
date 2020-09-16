@@ -109,59 +109,56 @@ void Scene::_intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_bu
     auto ray_count = static_cast<uint>(ray_buffer.size());
     constexpr auto threadgroup_size = 256u;
     
-    if (_closest_hit_buffer.empty()) {
-        
+    if (_closest_hit_buffer.size() < ray_buffer.size()) {
         _closest_hit_buffer = _device->allocate_buffer<ClosestHit>(ray_count);
         _interaction_buffers.create(_device, ray_count);
-        
-        _evaluate_interactions_kernel = _device->compile_kernel("scene_evaluate_interactions", [&] {
-            auto tid = thread_id();
-            If (ray_count % threadgroup_size == 0u || tid < ray_count) {
-                Var<ClosestHit> hit = _closest_hit_buffer[tid];
-                If (hit.distance() <= 0.0f) {
-                    _interaction_buffers.valid[tid] = false;
-                } Else {
-                    
-                    _interaction_buffers.valid[tid] = true;
-                    
-                    Var instance_id = hit.instance_id();
-                    _interaction_buffers.material[tid] = _instance_materials[instance_id];
-                    
-                    Var entity = _instance_entities[instance_id];
-                    Var triangle_id = entity.triangle_offset() + hit.triangle_id();
-                    Var i = _triangles[triangle_id].i() + entity.vertex_offset();
-                    Var j = _triangles[triangle_id].j() + entity.vertex_offset();
-                    Var k = _triangles[triangle_id].k() + entity.vertex_offset();
-                    
-                    Var bary_u = hit.bary().x();
-                    Var bary_v = hit.bary().y();
-                    Var bary_w = 1.0f - (bary_u + bary_v);
-                    
-                    Var p0 = _positions[i];
-                    Var p1 = _positions[j];
-                    Var p2 = _positions[k];
-                    
-                    Var m = _instance_transforms[instance_id];
-                    Var nm = transpose(inverse(make_float3x3(m)));
-                    
-                    Var p = make_float3(m * make_float4(bary_u * p0 + bary_v * p1 + bary_w * p2, 1.0f));
-                    _interaction_buffers.pi[tid] = p;
-                    
-                    // NOTE: DO NOT NORMALIZE!
-                    _interaction_buffers.ray_origin_to_hit[tid] = p - make_float3(ray_buffer[tid].origin_x(), ray_buffer[tid].origin_y(), ray_buffer[tid].origin_z());
-                    
-                    Var ng = normalize(nm * cross(p1 - p0, p2 - p0));
-                    Var ns = normalize(bary_u * _normals[i] + bary_v * _normals[j] + bary_w * _normals[k]);
-                    _interaction_buffers.ns[tid] = ns;
-                    _interaction_buffers.ng[tid] = ng;
-                    _interaction_buffers.uv[tid] = bary_u * _tex_coords[i] + bary_v * _tex_coords[j] + bary_w * _tex_coords[k];
-                };
-            };
-        });
     }
     
     pipeline << _acceleration->intersect_closest(ray_buffer, _closest_hit_buffer)
-             << _evaluate_interactions_kernel.parallelize(ray_count, threadgroup_size);
+             << _device->compile_kernel("scene_evaluate_interactions", [&] {
+                 auto tid = thread_id();
+                 If (ray_count % threadgroup_size == 0u || tid < ray_count) {
+                     Var<ClosestHit> hit = _closest_hit_buffer[tid];
+                     If (hit.distance() <= 0.0f) {
+                         _interaction_buffers.valid[tid] = false;
+                     } Else {
+                
+                         _interaction_buffers.valid[tid] = true;
+                
+                         Var instance_id = hit.instance_id();
+                         _interaction_buffers.material[tid] = _instance_materials[instance_id];
+                
+                         Var entity = _instance_entities[instance_id];
+                         Var triangle_id = entity.triangle_offset() + hit.triangle_id();
+                         Var i = _triangles[triangle_id].i() + entity.vertex_offset();
+                         Var j = _triangles[triangle_id].j() + entity.vertex_offset();
+                         Var k = _triangles[triangle_id].k() + entity.vertex_offset();
+                
+                         Var bary_u = hit.bary().x();
+                         Var bary_v = hit.bary().y();
+                         Var bary_w = 1.0f - (bary_u + bary_v);
+                
+                         Var p0 = _positions[i];
+                         Var p1 = _positions[j];
+                         Var p2 = _positions[k];
+                
+                         Var m = _instance_transforms[instance_id];
+                         Var nm = transpose(inverse(make_float3x3(m)));
+                
+                         Var p = make_float3(m * make_float4(bary_u * p0 + bary_v * p1 + bary_w * p2, 1.0f));
+                         _interaction_buffers.pi[tid] = p;
+                
+                         // NOTE: DO NOT NORMALIZE!
+                         _interaction_buffers.ray_origin_to_hit[tid] = p - make_float3(ray_buffer[tid].origin_x(), ray_buffer[tid].origin_y(), ray_buffer[tid].origin_z());
+                
+                         Var ng = normalize(nm * cross(p1 - p0, p2 - p0));
+                         Var ns = normalize(bary_u * _normals[i] + bary_v * _normals[j] + bary_w * _normals[k]);
+                         _interaction_buffers.ns[tid] = ns;
+                         _interaction_buffers.ng[tid] = ng;
+                         _interaction_buffers.uv[tid] = bary_u * _tex_coords[i] + bary_v * _tex_coords[j] + bary_w * _tex_coords[k];
+                     };
+                 };
+             }).parallelize(ray_count, threadgroup_size);
 }
 
 void Scene::_process_geometry(const std::vector<std::shared_ptr<Shape>> &shapes, float initial_time) {

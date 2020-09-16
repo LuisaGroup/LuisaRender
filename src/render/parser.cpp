@@ -309,7 +309,6 @@ ParameterSet::ParameterSet(Parser *parser, std::string_view derived_type_name, s
 }
 
 const ParameterSet &ParameterSet::operator[](std::string_view parameter_name) const {
-    LUISA_INFO("Processing parameter: \"", parameter_name, "\"");
     return _child(parameter_name);
 }
 

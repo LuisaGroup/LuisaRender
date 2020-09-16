@@ -33,7 +33,6 @@ private:
     BufferView<float> _pixel_weight_buffer;
     
     float4x4 _camera_to_world;
-    KernelView _generate_rays_kernel;
 
 private:
     [[nodiscard]] virtual bool _requires_lens_samples() const noexcept = 0;
@@ -44,13 +43,7 @@ public:
         : Plugin{d, params},
           _film{params["film"].parse_or_null<Film>()},
           _filter{params["filter"].parse_or_null<Filter>()},
-          _transform{params["transform"].parse_or_null<Transform>()} {
-        
-        auto pixel_count = _film->resolution().x * _film->resolution().y;
-        _pixel_position_buffer = device()->allocate_buffer<float2>(pixel_count);
-        _camera_ray_buffer = device()->allocate_buffer<Ray>(pixel_count);
-        _throughput_buffer = device()->allocate_buffer<float3>(pixel_count);
-    }
+          _transform{params["transform"].parse_or_null<Transform>()} {}
     
     [[nodiscard]] Film *film() const noexcept { return _film.get(); }
     [[nodiscard]] Filter *filter() const noexcept { return _filter.get(); }

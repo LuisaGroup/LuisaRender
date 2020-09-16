@@ -15,7 +15,6 @@ id<MTLBuffer> MetalHostCache::obtain() noexcept {
     id<MTLBuffer> cache = nullptr;
     if (_available_caches.empty()) {
         cache = [_device newBufferWithLength:_cache_size options:MTLResourceStorageModeShared | MTLResourceHazardTrackingModeUntracked];
-        LUISA_INFO("Created host cache buffer #", _allocated_caches.size(), " with length ", _cache_size, " for device content synchronization.");
         _allocated_caches.emplace(cache);
     } else {
         cache = _available_caches.back();
