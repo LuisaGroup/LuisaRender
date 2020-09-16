@@ -29,9 +29,8 @@ private:
                      auto tid = thread_id();
                      If (pixel_count % threadgroup_size == 0u || tid < pixel_count) {
                          Var valid = scene.interaction_buffers().valid[tid];
-                         Var normal = scene.interaction_buffers().ns[tid];
-                         Var geo_normal = scene.interaction_buffers().ng[tid];
-                         Var position = offset_ray_origin(scene.interaction_buffers().pi[tid], geo_normal);
+                         Var normal = face_forward(scene.interaction_buffers().ng[tid], -scene.interaction_buffers().ray_origin_to_hit[tid]);
+                         Var position = offset_ray_origin(scene.interaction_buffers().pi[tid], normal);
                 
                          Var onb = make_onb(normal);
                          Var u = sampler.generate_2d_sample(tid);
@@ -42,7 +41,7 @@ private:
                          shadow_ray.origin_x() = position.x();
                          shadow_ray.origin_y() = position.y();
                          shadow_ray.origin_z() = position.z();
-                         shadow_ray.min_distance() = 1e-3f;
+                         shadow_ray.min_distance() = 0.0f;
                          shadow_ray.direction_x() = direction.x();
                          shadow_ray.direction_y() = direction.y();
                          shadow_ray.direction_z() = direction.z();

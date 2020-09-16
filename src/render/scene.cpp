@@ -99,7 +99,7 @@ void Scene::_update_geometry(Pipeline &pipeline, float time) {
 void Scene::_intersect_any(Pipeline &pipeline, const BufferView<Ray> &rays) {
     auto ray_count = rays.size();
     if (_any_hit_buffer.empty()) {
-        _any_hit_buffer = _device->allocate_buffer<AnyInteraction>(ray_count);
+        _any_hit_buffer = _device->allocate_buffer<AnyHit>(ray_count);
     }
     pipeline << _acceleration->intersect_any(rays, _any_hit_buffer);
 }

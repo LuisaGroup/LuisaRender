@@ -13,22 +13,16 @@ namespace luisa::render {
 using compute::Device;
 using compute::BufferView;
 
-using AnyInteraction = compute::AnyHit;
-
-struct Interaction {
-    float3 pi;
-    float3 wo;
-    float3 ng;
-    float3 ns;
-    float2 uv;
-    MaterialHandle material;
-};
-
 struct InteractionBuffers {
     
     BufferView<bool> valid;
     BufferView<float3> pi;
-    BufferView<float3> ray_origin_to_hit;  // Note: these vectors should not be normalized
+    
+    // Note:
+    // these vectors should not be normalized,
+    // since their lengths indicate distances.
+    BufferView<float3> ray_origin_to_hit;
+    
     BufferView<float3> ng;
     BufferView<float3> ns;
     BufferView<float2> uv;
@@ -46,5 +40,3 @@ struct InteractionBuffers {
 };
 
 }
-
-LUISA_STRUCT(luisa::render::Interaction, pi, wo, ng, ns, uv, material)
