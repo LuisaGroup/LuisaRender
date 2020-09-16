@@ -72,8 +72,8 @@ std::pair<Expr<float2>, Expr<float>> SeparableFilter::importance_sample_pixel_po
         return std::make_pair(offset * 2.0f - 1.0f, select(w >= 0.0f, 1.0f, -1.0f));
     };
     
-    auto[dx, wx] = sample_1d(u.x());
-    auto[dy, wy] = sample_1d(u.y());
+    auto[dx, wx] = sample_1d(u.x);
+    auto[dy, wy] = sample_1d(u.y);
     auto pixel_position = make_float2(p) + 0.5f + make_float2(dx, dy) * radius();
     auto pixel_weight = wx * wy * _scale;
     return std::make_pair(pixel_position, pixel_weight);

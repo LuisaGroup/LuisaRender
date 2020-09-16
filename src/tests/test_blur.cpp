@@ -10,8 +10,8 @@ void blur_x_or_y(TextureView input, TextureView output, int width, int height, i
     
     LUISA_ERROR_IF_NOT(rx * ry == 0, "At least one of rx and ry should be zero (got rx = ", rx, ", ry = ", ry, ").");
     
-    Var tx = cast<int>(thread_xy().x());
-    Var ty = cast<int>(thread_xy().y());
+    Var tx = cast<int>(thread_xy().x);
+    Var ty = cast<int>(thread_xy().y);
     If (tx < width && ty < height) {
         Var<float4> sum;
         for (auto dx = -rx; dx <= rx; dx++) {
@@ -26,7 +26,7 @@ void blur_x_or_y(TextureView input, TextureView output, int width, int height, i
                 sum += make_float4(make_float3(input.read(make_uint2(tx, y))), 1.0f);
             };
         }
-        output.write(thread_xy(), make_float4(make_float3(sum) / sum.w(), 1.0f));
+        output.write(thread_xy(), make_float4(make_float3(sum) / sum.w, 1.0f));
     };
 }
 

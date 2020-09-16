@@ -37,8 +37,8 @@ private:
         
         pipeline << device()->compile_kernel("independent_sampler_reset", [&] {
             auto tea = [](Expr<uint2> val) -> Expr<uint> {
-                Var v0 = val.x();
-                Var v1 = val.y();
+                Var v0 = val.x;
+                Var v1 = val.y;
                 Var s0 = 0u;
                 for (auto n = 0u; n < 5u; n++) {
                     s0 += 0x9e3779b9u;
@@ -49,7 +49,7 @@ private:
             };
             auto txy = thread_xy();
             If (all(resolution % threadgroup_size == make_uint2(0u)) || all(txy < resolution)) {
-                auto index = txy.y() * resolution.x + txy.x();
+                auto index = txy.y * resolution.x + txy.x;
                 _state_buffer[index] = tea(txy);
             };
         }).parallelize(resolution, threadgroup_size);

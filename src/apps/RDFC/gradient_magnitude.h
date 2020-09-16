@@ -38,16 +38,16 @@ public:
         _gradient_kernel = device.compile_kernel("gradient_magnitude", [&] {
             
             Var p = make_int2(thread_xy());
-            If (p.x() < _width && p.y() < _height) {
+            If (p.x < _width && p.y < _height) {
                 
-                Var c00 = make_float3(texture.read(make_uint2(abs(p.x() - 1), abs(p.y() - 1))));
-                Var c01 = make_float3(texture.read(make_uint2(p.x(), abs(p.y() - 1))));
-                Var c02 = make_float3(texture.read(make_uint2(select(p.x() == _width - 1, _width - 2, p.x() + 1), abs(p.y() - 1))));
-                Var c10 = make_float3(texture.read(make_uint2(abs(p.x() - 1), p.y())));
-                Var c12 = make_float3(texture.read(make_uint2(select(p.x() == _width - 1, _width - 2, p.x() + 1), p.y())));
-                Var c20 = make_float3(texture.read(make_uint2(abs(p.x() - 1), select(p.y() == _height - 1, _height - 2, p.y() + 1))));
-                Var c21 = make_float3(texture.read(make_uint2(p.x(), select(p.y() == _height - 1, _height - 2, p.y() + 1))));
-                Var c22 = make_float3(texture.read(make_uint2(select(p.x() == _width - 1, _width - 2, p.x() + 1), select(p.y() == _height - 1, _height - 2, p.y() + 1))));
+                Var c00 = make_float3(texture.read(make_uint2(abs(p.x - 1), abs(p.y - 1))));
+                Var c01 = make_float3(texture.read(make_uint2(p.x, abs(p.y - 1))));
+                Var c02 = make_float3(texture.read(make_uint2(select(p.x == _width - 1, _width - 2, p.x + 1), abs(p.y - 1))));
+                Var c10 = make_float3(texture.read(make_uint2(abs(p.x - 1), p.y)));
+                Var c12 = make_float3(texture.read(make_uint2(select(p.x == _width - 1, _width - 2, p.x + 1), p.y)));
+                Var c20 = make_float3(texture.read(make_uint2(abs(p.x - 1), select(p.y == _height - 1, _height - 2, p.y + 1))));
+                Var c21 = make_float3(texture.read(make_uint2(p.x, select(p.y == _height - 1, _height - 2, p.y + 1))));
+                Var c22 = make_float3(texture.read(make_uint2(select(p.x == _width - 1, _width - 2, p.x + 1), select(p.y == _height - 1, _height - 2, p.y + 1))));
                 
                 constexpr auto k0 = 47.0f / 256.0f;
                 constexpr auto k1 = 162.0f / 256.0f;

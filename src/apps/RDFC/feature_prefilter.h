@@ -31,7 +31,7 @@ public:
         _nlm_filter = std::make_unique<NonLocalMeansFilter>(device, 5, 3, 1.0f, feature, variance, feature_a, feature_b, out_a, out_b);
         _add_half_buffers_kernel = device.compile_kernel("feature_prefilter_add_half_buffers", [&] {
             auto p = thread_xy();
-            If (p.x() < _width && p.y() < _height) {
+            If (p.x < _width && p.y < _height) {
                 Var fa = make_float3(out_a.read(p));
                 Var fb = make_float3(out_b.read(p));
                 Var diff = fa - fb;

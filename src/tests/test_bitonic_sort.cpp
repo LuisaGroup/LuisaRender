@@ -39,11 +39,11 @@ int main(int argc, char *argv[]) {
 
         Var cmp_step = cmp_step_in;
         Var half_cmp_step = cmp_step / 2u;
-        Var tid_x = thread_xy().x();
+        Var tid_x = thread_xy().x;
         Var lhs_index = tid_x / half_cmp_step * cmp_step + tid_x % half_cmp_step;
         Var rhs_index = lhs_index + half_cmp_step;
 
-        Var tid_y = thread_xy().y();
+        Var tid_y = thread_xy().y;
         Var lhs = buffer[tid_y * block_size + lhs_index];
         Var rhs = buffer[tid_y * block_size + rhs_index];
 
@@ -56,8 +56,8 @@ int main(int argc, char *argv[]) {
         Var descending_pair = make_uint2(greater, smaller);
 
         Var result = select(reverse_ordered == 1u, descending_pair, ascending_pair);
-        buffer[tid_y * block_size + lhs_index] = result.x();
-        buffer[tid_y * block_size + rhs_index] = result.y();
+        buffer[tid_y * block_size + lhs_index] = result.x;
+        buffer[tid_y * block_size + rhs_index] = result.y;
     });
     std::default_random_engine random{std::random_device{}()};
     

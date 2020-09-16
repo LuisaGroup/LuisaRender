@@ -41,7 +41,7 @@ public:
         
         _dual_variance_kernel = device.compile_kernel("dual_var", [&] {
             auto p = thread_xy();
-            If (p.x() < _width && p.y() < _height) {
+            If (p.x < _width && p.y < _height) {
                 Var va = color_a.read(p);
                 Var vb = color_b.read(p);
                 Var diff = va - vb;
@@ -55,7 +55,7 @@ public:
         
         _scale_kernel = device.compile_kernel("dual_var_scale", [&] {
             auto p = thread_xy();
-            If (p.x() < _width && p.y() < _height) {
+            If (p.x < _width && p.y < _height) {
                 Var sv = max(_blurred_sample_variance.read(p), 1e-6f);
                 Var dv = _blurred_dual_variance.read(p);
                 Var v = var_sample.read(p);

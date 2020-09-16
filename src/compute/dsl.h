@@ -128,10 +128,10 @@ struct Expr<Vector<T, 2>> : public ExprBase {
     [[nodiscard]] auto operator[](const ExprBase &index) const noexcept {
         return Expr<T>{Variable::make_temporary(type_desc<T>, std::make_unique<BinaryExpr>(BinaryOp::ACCESS, _variable, index.variable()))};
     }
-    [[nodiscard]] auto x() const noexcept { return Expr<T>{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "x"))}; }
-    [[nodiscard]] auto y() const noexcept { return Expr<T>{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "y"))}; }
-    [[nodiscard]] auto r() const noexcept { return x(); }
-    [[nodiscard]] auto g() const noexcept { return y(); }
+    Expr<T> x{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "x"))};
+    Expr<T> y{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "y"))};
+    Expr<T> r{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "x"))};
+    Expr<T> g{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "y"))};
 };
 
 template<typename T>
@@ -144,12 +144,12 @@ struct Expr<Vector<T, 3>> : public ExprBase {
     [[nodiscard]] auto operator[](const ExprBase &index) const noexcept {
         return Expr<T>{Variable::make_temporary(type_desc<T>, std::make_unique<BinaryExpr>(BinaryOp::ACCESS, _variable, index.variable()))};
     }
-    [[nodiscard]] auto x() const noexcept { return Expr<T>{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "x"))}; }
-    [[nodiscard]] auto y() const noexcept { return Expr<T>{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "y"))}; }
-    [[nodiscard]] auto z() const noexcept { return Expr<T>{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "z"))}; }
-    [[nodiscard]] auto r() const noexcept { return x(); }
-    [[nodiscard]] auto g() const noexcept { return y(); }
-    [[nodiscard]] auto b() const noexcept { return z(); }
+    Expr<T> x{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "x"))};
+    Expr<T> y{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "y"))};
+    Expr<T> z{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "z"))};
+    Expr<T> r{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "x"))};
+    Expr<T> g{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "y"))};
+    Expr<T> b{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "z"))};
 };
 
 template<typename T>
@@ -162,14 +162,14 @@ struct Expr<Vector<T, 4>> : public ExprBase {
     [[nodiscard]] auto operator[](const ExprBase &index) const noexcept {
         return Expr<T>{Variable::make_temporary(type_desc<T>, std::make_unique<BinaryExpr>(BinaryOp::ACCESS, _variable, index.variable()))};
     }
-    [[nodiscard]] auto x() const noexcept { return Expr<T>{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "x"))}; }
-    [[nodiscard]] auto y() const noexcept { return Expr<T>{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "y"))}; }
-    [[nodiscard]] auto z() const noexcept { return Expr<T>{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "z"))}; }
-    [[nodiscard]] auto w() const noexcept { return Expr<T>{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "w"))}; }
-    [[nodiscard]] auto r() const noexcept { return x(); }
-    [[nodiscard]] auto g() const noexcept { return y(); }
-    [[nodiscard]] auto b() const noexcept { return z(); }
-    [[nodiscard]] auto a() const noexcept { return w(); }
+    Expr<T> x{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "x"))};
+    Expr<T> y{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "y"))};
+    Expr<T> z{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "z"))};
+    Expr<T> w{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "w"))};
+    Expr<T> r{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "x"))};
+    Expr<T> g{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "y"))};
+    Expr<T> b{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "z"))};
+    Expr<T> a{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "w"))};
 };
 
 // Deduction guides
@@ -518,11 +518,10 @@ namespace luisa::compute::dsl {                                                 
     };                                                                                           \
 }                                                                                                \
 
-#define LUISA_STRUCT_MAP_MEMBER_NAME_TO_EXPR(name)                                                                     \
-    [[nodiscard]] auto name() const noexcept {                                                                         \
-        using R = std::decay_t<decltype(std::declval<Type>().name)>;                                                   \
-        return Expr<R>{Variable::make_temporary(type_desc<R>, std::make_unique<MemberExpr>(this->_variable, #name))};  \
-    }
+#define LUISA_STRUCT_MAP_MEMBER_NAME_TO_EXPR(name)                                              \
+    Expr<std::decay_t<decltype(std::declval<Type>().name)>> name{                               \
+        Variable::make_temporary(type_desc<std::decay_t<decltype(std::declval<Type>().name)>>,  \
+                                 std::make_unique<MemberExpr>(ExprBase::_variable, #name))};    \
 
 #define LUISA_STRUCT_SPECIALIZE_EXPR(S, ...)                            \
 namespace luisa::compute::dsl {                                         \

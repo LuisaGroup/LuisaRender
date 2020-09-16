@@ -43,8 +43,8 @@ public:
                 Var sum = dsl::make_float3(0.0f);
                 for (auto dy = -ry; dy <= ry; dy++) {
                     for (auto dx = -rx; dx <= rx; dx++) {
-                        Var<int> x = p.x() + Expr{dx};
-                        Var<int> y = p.y() + Expr{dy};
+                        Var<int> x = p.x + Expr{dx};
+                        Var<int> y = p.y + Expr{dy};
                         if (rx != 0) { x = Expr{select(x < 0, -x, select(x < width, x, 2 * width - 1 - x))}; }
                         if (ry != 0) { y = Expr{select(y < 0, -y, select(y < height, y, 2 * height - 1 - y))}; }
                         sum += make_float3(in.read(make_uint2(x, y)));

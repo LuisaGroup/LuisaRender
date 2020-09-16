@@ -38,14 +38,14 @@ private:
                          Var direction = normalize(transform_to_world(onb, direction_local));
                 
                          Var<Ray> shadow_ray;
-                         shadow_ray.origin_x() = position.x();
-                         shadow_ray.origin_y() = position.y();
-                         shadow_ray.origin_z() = position.z();
-                         shadow_ray.min_distance() = 0.0f;
-                         shadow_ray.direction_x() = direction.x();
-                         shadow_ray.direction_y() = direction.y();
-                         shadow_ray.direction_z() = direction.z();
-                         shadow_ray.max_distance() = select(valid, 1e3f, -1.0f);
+                         shadow_ray.origin_x = position.x;
+                         shadow_ray.origin_y = position.y;
+                         shadow_ray.origin_z = position.z;
+                         shadow_ray.min_distance = 0.0f;
+                         shadow_ray.direction_x = direction.x;
+                         shadow_ray.direction_y = direction.y;
+                         shadow_ray.direction_z = direction.z;
+                         shadow_ray.max_distance = select(valid, 1e3f, -1.0f);
                          ray_buffer[tid] = shadow_ray;
                      };
                  }).parallelize(pixel_count, threadgroup_size)
@@ -53,7 +53,7 @@ private:
                  << device()->compile_kernel("ao_evaluate_shadows", [&] {
                      auto tid = thread_id();
                      If (pixel_count % threadgroup_size == 0u || tid < pixel_count) {
-                         Var its_distance = scene.any_hit_buffer()[tid].distance();
+                         Var its_distance = scene.any_hit_buffer()[tid].distance;
                          Var valid = scene.interaction_buffers().valid[tid];
                          Var throughput = throughput_buffer[tid];
                          radiance_buffer[tid] = throughput * select(valid && its_distance <= 0.0f, 1.0f, 0.0f);

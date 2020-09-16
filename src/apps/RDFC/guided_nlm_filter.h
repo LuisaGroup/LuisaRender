@@ -62,18 +62,18 @@ public:
             // Note: offset changes from pass to pass, so we bind a pointer to it
             auto d = uniform(&_current_offset);
             auto p = thread_xy();
-            If (p.x() < _width && p.y() < _height) {
+            If (p.x < _width && p.y < _height) {
                 Var target = make_int2(p) + d;
                 Var q = make_uint2(
-                    select(target.x() < 0, -target.x(), select(target.x() < _width, target.x(), 2 * _width - 1 - target.x())),
-                    select(target.y() < 0, -target.y(), select(target.y() < _height, target.y(), 2 * _height - 1 - target.y())));
+                    select(target.x < 0, -target.x, select(target.x < _width, target.x, 2 * _width - 1 - target.x)),
+                    select(target.y < 0, -target.y, select(target.y < _height, target.y, 2 * _height - 1 - target.y)));
                 Var var_p = make_float3(var_color.read(p));
                 Var var_q = make_float3(var_color.read(q));
                 Var var_pq = min(var_p, var_q);
                 Var diff = make_float3(color.read(p) - color.read(q));
                 constexpr auto epsilon = 1e-4f;
                 Var distance = (diff * diff - (var_p + var_pq)) / (epsilon + k_color * k_color * (var_p + var_q));
-                Var sum_distance = (distance.r() + distance.g() + distance.b()) * (1.0f / 3.0f);
+                Var sum_distance = (distance.r + distance.g + distance.b) * (1.0f / 3.0f);
                 _distance_texture.write(q, make_float4(make_float3(sum_distance), 1.0f));
             };
         });
@@ -82,7 +82,7 @@ public:
         
         _clear_accum_kernel = device.compile_kernel("guided_nlm_clear_accum", [&] {
             auto p = thread_xy();
-            If(p.x() < _width && p.y() < _height) {
+            If(p.x < _width && p.y < _height) {
                 _accum_texture.write(p, dsl::make_float4(0.0f));
             };
         });
@@ -93,7 +93,7 @@ public:
             auto d = uniform(&_current_offset);
             Var p = make_int2(thread_xy());
             Var q = p + d;
-            If (p.x() < _width && p.y() < _height && q.x() >= 0 && q.x() < _width && q.y() >= 0 && q.y() < _height) {
+            If (p.x < _width && p.y < _height && q.x >= 0 && q.x < _width && q.y >= 0 && q.y < _height) {
                 
                 auto distance_from_feature = [&](TextureView feature, TextureView var_feature, TextureView grad_feature, float k_feature) {
                     Var f_p = make_float3(feature.read(thread_xy()));
@@ -104,7 +104,7 @@ public:
                     Var var_pq = min(var_p, var_q);
                     Var grad_p = make_float3(grad_feature.read(thread_xy()));
                     Var d = ((diff_pq * diff_pq) - (var_p + var_pq)) / (k_feature * k_feature * max(tau, max(var_p, grad_p * grad_p)));
-                    return max(max(d.x(), d.y()), d.z());
+                    return max(max(d.x, d.y), d.z);
                 };
                 
                 Var distance_albedo = distance_from_feature(albedo, var_albedo, grad_albedo, k_albedo);
@@ -116,21 +116,21 @@ public:
                 Var w = exp(-distance_feature);
                 
                 if (!std::isinf(k_color)) {
-                    Var distance_color = max(_distance_texture.read(thread_xy()).r(), 0.0f);
+                    Var distance_color = max(_distance_texture.read(thread_xy()).r, 0.0f);
                     w *= exp(-distance_color);
                 }
                 
                 Var color_q = make_float3(color.read(make_uint2(q)));
                 Var accum = _accum_texture.read(thread_xy());
-                _accum_texture.write(thread_xy(), make_float4(color_q * w + make_float3(accum), accum.w() + w));
+                _accum_texture.write(thread_xy(), make_float4(color_q * w + make_float3(accum), accum.w + w));
             };
         });
         
         _blit_kernel = device.compile_kernel("guided_nlm_blit", [&] {
             auto p = thread_xy();
-            If(p.x() < _width && p.y() < _height) {
+            If(p.x < _width && p.y < _height) {
                 Var accum = _accum_texture.read(p);
-                Var filtered = select(accum.w() <= 0.0f, dsl::make_float3(0.0f), make_float3(accum) / accum.w());
+                Var filtered = select(accum.w <= 0.0f, dsl::make_float3(0.0f), make_float3(accum) / accum.w);
                 output.write(p, make_float4(filtered, 1.0f));
             };
         });

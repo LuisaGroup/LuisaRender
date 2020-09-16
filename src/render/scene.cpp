@@ -119,23 +119,23 @@ void Scene::_intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_bu
                  auto tid = thread_id();
                  If (ray_count % threadgroup_size == 0u || tid < ray_count) {
                      Var<ClosestHit> hit = _closest_hit_buffer[tid];
-                     If (hit.distance() <= 0.0f) {
+                     If (hit.distance <= 0.0f) {
                          _interaction_buffers.valid[tid] = false;
                      } Else {
                 
                          _interaction_buffers.valid[tid] = true;
                 
-                         Var instance_id = hit.instance_id();
+                         Var instance_id = hit.instance_id;
                          _interaction_buffers.material[tid] = _instance_materials[instance_id];
                 
                          Var entity = _instance_entities[instance_id];
-                         Var triangle_id = entity.triangle_offset() + hit.triangle_id();
-                         Var i = _triangles[triangle_id].i() + entity.vertex_offset();
-                         Var j = _triangles[triangle_id].j() + entity.vertex_offset();
-                         Var k = _triangles[triangle_id].k() + entity.vertex_offset();
+                         Var triangle_id = entity.triangle_offset + hit.triangle_id;
+                         Var i = _triangles[triangle_id].i + entity.vertex_offset;
+                         Var j = _triangles[triangle_id].j + entity.vertex_offset;
+                         Var k = _triangles[triangle_id].k + entity.vertex_offset;
                 
-                         Var bary_u = hit.bary().x();
-                         Var bary_v = hit.bary().y();
+                         Var bary_u = hit.bary.x;
+                         Var bary_v = hit.bary.y;
                          Var bary_w = 1.0f - (bary_u + bary_v);
                 
                          Var p0 = _positions[i];
@@ -149,7 +149,7 @@ void Scene::_intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_bu
                          _interaction_buffers.pi[tid] = p;
                 
                          // NOTE: DO NOT NORMALIZE!
-                         _interaction_buffers.ray_origin_to_hit[tid] = p - make_float3(ray_buffer[tid].origin_x(), ray_buffer[tid].origin_y(), ray_buffer[tid].origin_z());
+                         _interaction_buffers.ray_origin_to_hit[tid] = p - make_float3(ray_buffer[tid].origin_x, ray_buffer[tid].origin_y, ray_buffer[tid].origin_z);
                 
                          Var ng = normalize(nm * cross(p1 - p0, p2 - p0));
                          Var ns = normalize(bary_u * _normals[i] + bary_v * _normals[j] + bary_w * _normals[k]);

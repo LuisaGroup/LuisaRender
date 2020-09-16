@@ -45,19 +45,19 @@ public:
         
         auto blur_x_or_y = [width, height](int rx, int ry, float sigma_x, float sigma_y, TextureView input, TextureView output) noexcept {
             Var p = make_int2(thread_xy());
-            If (p.x() < width && p.y() < height) {
+            If (p.x < width && p.y < height) {
                 Var sum = dsl::make_float4(0.0f);
                 for (auto dy = -ry; dy <= ry; dy++) {
                     for (auto dx = -rx; dx <= rx; dx++) {
-                        Var x = p.x() + dx;
-                        Var y = p.y() + dy;
+                        Var x = p.x + dx;
+                        Var y = p.y + dy;
                         if (rx != 0) { x = select(x < 0, -x, select(x < width, x, 2 * width - 1 - x)); }
                         if (ry != 0) { y = select(y < 0, -y, select(y < height, y, 2 * height - 1 - y)); }
                         auto weight = std::exp(-static_cast<float>(dx * dx + dy * dy) / (2.0f * (sigma_x * sigma_x + sigma_y * sigma_y)));
                         sum += make_float4(weight * make_float3(input.read(make_uint2(x, y))), weight);
                     }
                 }
-                output.write(thread_xy(), make_float4(make_float3(sum) / sum.w(), 1.0f));
+                output.write(thread_xy(), make_float4(make_float3(sum) / sum.w, 1.0f));
             };
         };
         

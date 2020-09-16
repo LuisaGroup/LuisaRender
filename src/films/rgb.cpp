@@ -31,7 +31,7 @@ private:
         pipeline << device()->compile_kernel("rgb_film_accumulate", [&] {
             auto txy = thread_xy();
             If (all(resolution() % threadgroup_size == make_uint2(0u)) || all(txy < resolution())) {
-                Var index = txy.y() * resolution().x + txy.x();
+                Var index = txy.y * resolution().x + txy.x;
                 Var radiance = radiance_buffer[index];
                 Var weight = weight_buffer[index];
                 Var accum = _framebuffer.read(txy);
@@ -47,9 +47,9 @@ private:
             If (all(resolution() % threadgroup_size == make_uint2(0u)) || all(txy < resolution())) {
                 Var accum = _framebuffer.read(txy);
                 _framebuffer.write(txy, make_float4(
-                    select(accum.w() == 0.0f,
+                    select(accum.w == 0.0f,
                            dsl::make_float3(0.0f),
-                           make_float3(accum) / accum.w()),
+                           make_float3(accum) / accum.w),
                     1.0f));
             };
         }).parallelize(resolution(), threadgroup_size);
