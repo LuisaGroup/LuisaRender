@@ -133,8 +133,8 @@ void Scene::_intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_bu
                     Var j = _triangles[triangle_id].j() + entity.vertex_offset();
                     Var k = _triangles[triangle_id].k() + entity.vertex_offset();
                     
-                    Var bary_u = hit.bary_u();
-                    Var bary_v = hit.bary_v();
+                    Var bary_u = hit.bary().x();
+                    Var bary_v = hit.bary().y();
                     Var bary_w = 1.0f - (bary_u + bary_v);
                     
                     Var p0 = _positions[i];
@@ -151,9 +151,9 @@ void Scene::_intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_bu
                     _interaction_buffers.ray_origin_to_hit[tid] = p - make_float3(ray_buffer[tid].origin_x(), ray_buffer[tid].origin_y(), ray_buffer[tid].origin_z());
                     
                     Var ng = normalize(nm * cross(p1 - p0, p2 - p0));
-                    Var ns = normalize(bary_u * _normals[i] + bary_u * _normals[j] + bary_w * _normals[k]);
+                    Var ns = normalize(bary_u * _normals[i] + bary_v * _normals[j] + bary_w * _normals[k]);
                     _interaction_buffers.ns[tid] = ns;
-                    _interaction_buffers.ng[tid] = select(dot(ns, ng) < 0.0f, -ng, ng);
+                    _interaction_buffers.ng[tid] = ng;
                     _interaction_buffers.uv[tid] = bary_u * _tex_coords[i] + bary_v * _tex_coords[j] + bary_w * _tex_coords[k];
                 };
             };

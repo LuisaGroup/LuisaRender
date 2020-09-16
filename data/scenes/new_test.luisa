@@ -12,9 +12,6 @@ Camera camera : Pinhole {
   film { @film }
   position { 0, 0.05, 0.5 }
   target { 0, 0.05, 0 }
-  filter : MitchellNetravali {
-    radius { 10.0 }
-  }
 }
 
 task : SingleShot {

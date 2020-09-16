@@ -8,13 +8,14 @@
 #include <vector>
 #include <memory>
 
-#include "plugin.h"
+#include <compute/dsl.h>
+#include <render/plugin.h>
 
 namespace luisa::render {
 
 struct Transform : public Plugin {
     
-    Transform(Device *device, const ParameterSet &params) noexcept : Plugin{device, params} {}
+    Transform(Device *device, const ParameterSet &params) noexcept: Plugin{device, params} {}
     
     [[nodiscard]] virtual bool is_static() const noexcept = 0;
     [[nodiscard]] virtual float4x4 matrix(float time) const noexcept = 0;

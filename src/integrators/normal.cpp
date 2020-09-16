@@ -29,7 +29,8 @@ private:
                 If (pixel_count % threadgroup_size == 0u || tid < pixel_count) {
                     Var valid = scene.interaction_buffers().valid[tid];
                     Var normal = scene.interaction_buffers().ns[tid];
-                    radiance_buffer[tid] = select(valid, normal * 0.5f + 0.5f, make_float3(0.5f));
+                    Var throughput = throughput_buffer[tid];
+                    radiance_buffer[tid] = select(valid, throughput * normal * 0.5f + 0.5f, make_float3(0.5f));
                 };
             });
         }

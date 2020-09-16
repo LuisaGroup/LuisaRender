@@ -231,9 +231,9 @@ template<typename T, uint N, std::enable_if_t<scalar::is_scalar<T>, int> = 0>
 [[nodiscard]] constexpr auto select(Vector<bool, N> pred, Vector<T, N> t, Vector<T, N> f) noexcept {
     static_assert(N == 2 || N == 3 || N == 4);
     if constexpr (N == 2) {
-        return Vector< T, N>{select(pred.x, t.x, f.x), select(pred.y, t.y, f.y)};
+        return Vector<T, N>{select(pred.x, t.x, f.x), select(pred.y, t.y, f.y)};
     } else if constexpr (N == 3) {
-        return Vector< T, N>{select(pred.x, t.x, f.x), select(pred.y, t.y, f.y), select(pred.z, t.z, f.z)};
+        return Vector<T, N>{select(pred.x, t.x, f.x), select(pred.y, t.y, f.y), select(pred.z, t.z, f.z)};
     } else {
         return Vector<T, N>{select(pred.x, t.x, f.x), select(pred.y, t.y, f.y), select(pred.z, t.z, f.z), select(pred.w, t.w, f.w)};
     }
@@ -358,6 +358,37 @@ template<uint N>
                          inv_1 * one_over_determinant,
                          inv_2 * one_over_determinant,
                          inv_3 * one_over_determinant);
+}
+
+// transforms
+constexpr float4x4 translation(const float3 v) noexcept {
+    return make_float4x4(
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        v.x, v.y, v.z, 1.0f);
+}
+
+inline float4x4 rotation(const float3 axis, float angle) noexcept {
+    
+    auto c = cos(angle);
+    auto s = sin(angle);
+    auto a = normalize(axis);
+    auto t = (1.0f - c) * a;
+    
+    return make_float4x4(
+        c + t.x * a.x, t.x * a.y + s * a.z, t.x * a.z - s * a.y, 0.0f,
+        t.y * a.x - s * a.z, c + t.y * a.y, t.y * a.z + s * a.x, 0.0f,
+        t.z * a.x + s * a.y, t.z * a.y - s * a.x, c + t.z * a.z, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f);
+}
+
+constexpr float4x4 scaling(const float3 s) noexcept {
+    return make_float4x4(
+        s.x, 0.0f, 0.0f, 0.0f,
+        0.0f, s.y, 0.0f, 0.0f,
+        0.0f, 0.0f, s.z, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f);
 }
 
 }

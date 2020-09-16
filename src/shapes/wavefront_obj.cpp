@@ -38,16 +38,22 @@ private:
         for (auto &&shape : shapes) {
             for (auto i = 0u; i < shape.mesh.indices.size(); i += 3u) {
                 uint triangle[3];
+                auto p0 = _vertices[shape.mesh.indices[i].vertex_index].position;
+                auto p1 = _vertices[shape.mesh.indices[i + 1u].vertex_index].position;
+                auto p2 = _vertices[shape.mesh.indices[i + 2u].vertex_index].position;
+                auto ng = normalize(cross(p1 - p0, p2 - p0));
                 for (auto j = 0u; j < 3u; j++) {
                     auto idx = shape.mesh.indices[i + j];
                     triangle[j] = idx.vertex_index;
-                    _vertices[idx.vertex_index].normal = make_float3(
-                        attrib.normals[3u * idx.normal_index],
-                        attrib.normals[3u * idx.normal_index + 1u],
-                        attrib.normals[3u * idx.normal_index + 2u]);
-                    if (idx.texcoord_index < 0) {
-                        _vertices[idx.vertex_index].uv = make_float2(0.0f);
+                    if (idx.normal_index < 0) {
+                        _vertices[idx.vertex_index].normal = ng;
                     } else {
+                        _vertices[idx.vertex_index].normal = make_float3(
+                            attrib.normals[3u * idx.normal_index],
+                            attrib.normals[3u * idx.normal_index + 1u],
+                            attrib.normals[3u * idx.normal_index + 2u]);
+                    }
+                    if (idx.texcoord_index >= 0) {
                         _vertices[idx.vertex_index].uv = make_float2(
                             attrib.texcoords[2u * idx.texcoord_index],
                             attrib.texcoords[2u * idx.texcoord_index + 1u]);

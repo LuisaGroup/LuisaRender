@@ -26,8 +26,8 @@ public:
           _pipeline{device} {}
     
     void execute() {
-        _compile(_pipeline);
         auto t0 = std::chrono::high_resolution_clock::now();
+        _compile(_pipeline);
         _pipeline.run();
         device()->synchronize();
         auto t1 = std::chrono::high_resolution_clock::now();
