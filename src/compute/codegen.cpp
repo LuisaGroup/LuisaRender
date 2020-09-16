@@ -588,7 +588,7 @@ void CppCodegen::visit(const CastExpr *cast_expr) {
             _os << ")";
             break;
         case CastOp::BITWISE:
-            _os << "as<";
+            _os << "as_type<";
             _emit_type(cast_expr->dest_type());
             _os << ">(";
             _emit_variable(cast_expr->source());

@@ -35,7 +35,8 @@ private:
                 If (pixel_count % threadgroup_size == 0u || tid < pixel_count) {
                     Var valid = scene.interaction_buffers().valid[tid];
                     Var normal = scene.interaction_buffers().ns[tid];
-                    Var position = scene.interaction_buffers().pi[tid];
+                    Var geo_normal = scene.interaction_buffers().ng[tid];
+                    Var position = offset_ray_origin(scene.interaction_buffers().pi[tid], geo_normal);
                     
                     Var onb = make_onb(normal);
                     Var u = sampler.generate_2d_sample(tid);
