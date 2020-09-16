@@ -39,7 +39,7 @@ private:
             auto tea = [](Expr<uint2> val) -> Expr<uint> {
                 Var v0 = val.x();
                 Var v1 = val.y();
-                Var s0 = 0;
+                Var s0 = 0u;
                 for (auto n = 0u; n < 5u; n++) {
                     s0 += 0x9e3779b9u;
                     v0 += ((v1 << 4u) + 0xa341316cu) ^ (v1 + s0) ^ ((v1 >> 5u) + 0xc8013ea4u);
