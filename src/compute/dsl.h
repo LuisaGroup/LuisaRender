@@ -604,9 +604,10 @@ public:
         Function::current().add_statement(std::make_unique<WhileStmt>(always_true.variable(), std::move(_body)));
     }
     
-    void operator<<(std::function<void()> body) noexcept {
-        _body = [this, body = move(body)] {
-            If (!_cond()) { Break; };
+    template<typename Body, std::enable_if_t<std::is_invocable_v<Body>, int> = 0>
+    void operator<<(Body &&body) noexcept {
+        _body = [this, &body] {
+            If (!_cond()) { Break; };  // Work-around for local Var decls in cond
             body();
         };
     }
