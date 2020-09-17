@@ -34,7 +34,6 @@ class ScopeStmt;
 class DeclareStmt;
 class IfStmt;
 class WhileStmt;
-class DoWhileStmt;
 class ExprStmt;
 class SwitchStmt;
 class SwitchCaseStmt;
@@ -51,7 +50,6 @@ struct StmtVisitor {
     virtual void visit(const DeclareStmt *declare_stmt) = 0;
     virtual void visit(const IfStmt *if_stmt) = 0;
     virtual void visit(const WhileStmt *while_stmt) = 0;
-    virtual void visit(const DoWhileStmt *do_while_stmt) = 0;
     virtual void visit(const ExprStmt *expr_stmt) = 0;
     virtual void visit(const SwitchStmt *switch_stmt) = 0;
     virtual void visit(const SwitchCaseStmt *case_stmt) = 0;
@@ -225,23 +223,6 @@ private:
 public:
     template<typename Body, std::enable_if_t<std::is_invocable_v<Body>, int> = 0>
     WhileStmt(const Variable *cond, Body &&body) : _condition{cond}, _body{std::make_unique<ScopeStmt>()} {
-        Function::current().with_scope(_body.get(), std::forward<Body>(body));
-    }
-    [[nodiscard]] const Variable *condition() const noexcept { return _condition; }
-    [[nodiscard]] const ScopeStmt *body() const noexcept { return _body.get(); }
-    
-    MAKE_STATEMENT_ACCEPT_VISITOR()
-};
-
-class DoWhileStmt : public Statement {
-
-private:
-    const Variable *_condition;
-    std::unique_ptr<ScopeStmt> _body;
-
-public:
-    template<typename Body, std::enable_if_t<std::is_invocable_v<Body>, int> = 0>
-    DoWhileStmt(Body &&body, const Variable *cond) : _condition{cond}, _body{std::make_unique<ScopeStmt>()} {
         Function::current().with_scope(_body.get(), std::forward<Body>(body));
     }
     [[nodiscard]] const Variable *condition() const noexcept { return _condition; }

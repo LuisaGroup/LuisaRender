@@ -12,6 +12,9 @@ namespace luisa::compute {
 
 class Pipeline : public Noncopyable {
 
+public:
+    static constexpr auto max_stages_in_queue = 256u;
+
 private:
     Device *_device;
     std::queue<std::function<void(Dispatcher &)>> _stages;
@@ -22,12 +25,14 @@ public:
     template<typename Func, std::enable_if_t<std::is_invocable_v<Func, Dispatcher &>, int> = 0>
     Pipeline &operator<<(Func &&func) {
         _stages.emplace(std::forward<Func>(func));
+        if (_stages.size() >= max_stages_in_queue) { run(); }
         return *this;
     }
     
     template<typename Func, std::enable_if_t<std::is_invocable_v<Func>, int> = 0>
     Pipeline &operator<<(Func &&func) {
         _stages.emplace([f = std::forward<Func>(func)](Dispatcher &) { f(); });
+        if (_stages.size() >= max_stages_in_queue) { run(); }
         return *this;
     }
     

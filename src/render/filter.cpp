@@ -47,12 +47,9 @@ std::pair<Expr<float2>, Expr<float>> SeparableFilter::importance_sample_pixel_po
         While (count > 0) {
             Var step = count / 2;
             Var mid = p + step;
-            If (cdf[mid] < u) {
-                p = mid + 1;
-                count -= step + 1;
-            } Else {
-                count = step;
-            };
+            Var pred = cdf[mid] < u;
+            p = select(pred, mid + 1, p);
+            count = select(pred, count - (step + 1), step);
         };
         
         Var lb = dsl::clamp(p, 0u, lookup_table_size - 1u);

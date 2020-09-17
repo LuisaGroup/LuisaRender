@@ -22,7 +22,7 @@ Camera camera : Pinhole {
 task : SingleShot {
   integrator { @integrator }
   sampler : Independent {
-    spp { 65536 }
+    spp { 1024 }
   }
   camera { @camera }
   shapes { @cbox }

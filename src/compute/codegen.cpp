@@ -700,15 +700,6 @@ void CppCodegen::visit(const WhileStmt *while_stmt) {
     _os << "\n";
 }
 
-void CppCodegen::visit(const DoWhileStmt *do_while_stmt) {
-    _emit_indent();
-    _os << "do ";
-    visit(do_while_stmt->body());
-    _os << " while (";
-    _emit_variable(do_while_stmt->condition());
-    _os << ");\n";
-}
-
 void CppCodegen::visit(const ExprStmt *expr_stmt) {
     _emit_indent();
     expr_stmt->expr()->accept(*this);

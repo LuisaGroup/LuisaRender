@@ -543,6 +543,10 @@ LUISA_STRUCT_SPECIALIZE_EXPR(S, __VA_ARGS__)
 // Let's define some syntax sugars...
 #ifndef LUISA_DISABLE_DSL_SYNTAX_SUGARS
 
+#define Return ::luisa::compute::dsl::Function::current().add_return()
+#define Break ::luisa::compute::dsl::Function::current().add_break()
+#define Continue ::luisa::compute::dsl::Function::current().add_continue()
+
 namespace luisa::compute::dsl {
 
 class IfStmtBuilder {
@@ -587,42 +591,28 @@ public:
 class WhileStmtBuilder {
 
 private:
-    const Variable *_cond{nullptr};
+    std::function<Expr<bool>()> _cond;
     std::function<void()> _body;
 
 public:
     template<typename Cond>
-    explicit WhileStmtBuilder(Cond &&cond) noexcept {
-        Expr cond_expr{std::forward<Cond>(cond)};
-        _cond = cond_expr.variable();
+    explicit WhileStmtBuilder(Cond &&cond) noexcept
+        : _cond{std::forward<Cond>(cond)} {}
+    
+    ~WhileStmtBuilder() noexcept {
+        Expr always_true{true};
+        Function::current().add_statement(std::make_unique<WhileStmt>(always_true.variable(), std::move(_body)));
     }
     
-    ~WhileStmtBuilder() noexcept { Function::current().add_statement(std::make_unique<WhileStmt>(_cond, std::move(_body))); }
-    
-    void operator<<(std::function<void()> body) noexcept { _body = std::move(body); }
-};
-
-#define While(...) ::luisa::compute::dsl::WhileStmtBuilder{__VA_ARGS__} << [&]()
-
-class DoWhileStmtBuilder {
-
-private:
-    const Variable *_cond{nullptr};
-    std::function<void()> _body;
-
-public:
-    ~DoWhileStmtBuilder() noexcept { Function::current().add_statement(std::make_unique<DoWhileStmt>(std::move(_body), _cond)); }
-    
-    DoWhileStmtBuilder &operator<<(std::function<void()> body) noexcept {
-        _body = std::move(body);
-        return *this;
+    void operator<<(std::function<void()> body) noexcept {
+        _body = [this, body = move(body)] {
+            If (!_cond()) { Break; };
+            body();
+        };
     }
-    
-    void operator<<(const Variable *cond) noexcept { _cond = cond; }
 };
 
-#define Do ::luisa::compute::dsl::DoWhileStmtBuilder{} << [&]()
-#define When(...) << ::luisa::compute::dsl::detail::extract_variable(__VA_ARGS__)
+#define While(...) ::luisa::compute::dsl::WhileStmtBuilder{[&]{ return __VA_ARGS__; }} << [&]()
 
 class SwitchStmtBuilder {
 
@@ -670,10 +660,6 @@ struct SwitchDefaultStmtBuilder {
 #define Switch(...) ::luisa::compute::dsl::SwitchStmtBuilder{__VA_ARGS__} << [&]()
 #define Case(...) ::luisa::compute::dsl::SwitchCaseStmtBuilder{__VA_ARGS__} << [&]()
 #define Default ::luisa::compute::dsl::SwitchDefaultStmtBuilder{} << [&]()
-
-#define Return ::luisa::compute::dsl::Function::current().add_return()
-#define Break ::luisa::compute::dsl::Function::current().add_break()
-#define Continue ::luisa::compute::dsl::Function::current().add_continue()
 
 }
 
