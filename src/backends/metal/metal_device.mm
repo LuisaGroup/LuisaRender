@@ -34,7 +34,7 @@ private:
     id<MTLDevice> _handle;
     id<MTLCommandQueue> _command_queue;
     std::mutex _kernel_cache_mutex;
-    std::unordered_map<uint64_t, id<MTLComputePipelineState>> _kernel_cache;
+    std::map<SHA1::Digest, id<MTLComputePipelineState>> _kernel_cache;
     std::vector<std::unique_ptr<MetalDispatcher>> _dispatchers;
     uint32_t _next_dispatcher{0u};
     
@@ -60,7 +60,7 @@ public:
     std::unique_ptr<Acceleration> build_acceleration(
         const BufferView<float3> &positions,
         const BufferView<TriangleHandle> &indices,
-        const std::vector<EntityRange> &meshes,
+        const std::vector<MeshHandle> &meshes,
         const BufferView<uint> &instances,
         const BufferView<float4x4> &transforms,
         bool is_static) override;
@@ -87,8 +87,7 @@ std::shared_ptr<Kernel> MetalDevice::_compile_kernel(const compute::dsl::Functio
     
     if (_context->should_print_generated_source()) { LUISA_INFO("Generated source:\n", s); }
     
-//    auto digest = SHA1{s}.digest();
-    auto digest = murmur_hash_64a(s.data(), static_cast<uint32_t>(s.size()), 0);
+    auto digest = SHA1{s}.digest();
     
     id<MTLComputePipelineState> pso = nullptr;
     
@@ -215,7 +214,7 @@ std::shared_ptr<Texture> MetalDevice::_allocate_texture(uint32_t width, uint32_t
 std::unique_ptr<Acceleration> MetalDevice::build_acceleration(
     const BufferView<float3> &positions,
     const BufferView<TriangleHandle> &indices,
-    const std::vector<EntityRange> &meshes,
+    const std::vector<MeshHandle> &meshes,
     const BufferView<uint> &instances,
     const BufferView<float4x4> &transforms,
     bool is_static) {

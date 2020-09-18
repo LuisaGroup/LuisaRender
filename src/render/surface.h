@@ -8,16 +8,23 @@
 
 namespace luisa::render {
 
-struct DataBlock {
+struct alignas(16) DataBlock {
     float4 padding;
+};
+
+struct SurfaceShaderHandle {
+    uint type;
+    uint block_offset;
 };
 
 }
 
 LUISA_STRUCT(luisa::render::DataBlock, padding)
+LUISA_STRUCT(luisa::render::SurfaceShaderHandle, type, block_offset)
 
 namespace luisa::render {
 
+using compute::dsl::Var;
 using compute::dsl::Expr;
 
 struct SurfaceEvaluation {
@@ -51,6 +58,8 @@ protected:
     }
 
 public:
+    virtual ~SurfaceShader() noexcept = default;
+    
     [[nodiscard]] SurfaceEvaluation evaluate(Expr<float2> uv, Expr<float3> wo, Expr<float3> wi, Expr<float2> u2, Expr<DataBlock> data_ref) const {
         return _evaluate(uv, wo, wi, u2, data_ref);
     }

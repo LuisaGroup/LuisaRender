@@ -14,7 +14,9 @@ Scene::Scene(Device *device, const std::vector<std::shared_ptr<Shape>> &shapes, 
     : _device{device},
       _background{std::move(background)} {
     
-    _process_geometry(shapes, initial_time);
+    std::vector<Material *> instance_materials;
+    _process_geometry(shapes, initial_time, instance_materials);
+    _process_materials(instance_materials);
 }
 
 void Scene::_encode_geometry_buffers(const std::vector<std::shared_ptr<Shape>> &shapes,
@@ -22,8 +24,10 @@ void Scene::_encode_geometry_buffers(const std::vector<std::shared_ptr<Shape>> &
                                      float3 *normals,
                                      float2 *uvs,
                                      TriangleHandle *triangles,
+                                     float *triangle_cdf_tables,
                                      EntityHandle *entities,
-                                     std::vector<EntityRange> &entity_ranges,
+                                     float *entity_areas,
+                                     std::vector<MeshHandle> &entity_ranges,
                                      std::vector<Material *> &instance_materials,
                                      uint *instances) {
     
@@ -65,13 +69,28 @@ void Scene::_encode_geometry_buffers(const std::vector<std::shared_ptr<Shape>> &
                 // copy indices
                 auto indices = shape->triangles();
                 std::copy(indices.cbegin(), indices.cend(), triangles + triangle_offset);
+                
+                // compute cdf table
+                auto sum_area = 0.0f;
+                for (auto i = 0u; i < shape->triangles().size(); i++) {
+                    auto triangle = shape->triangles()[i];
+                    auto p0 = shape->vertices()[triangle.i].position;
+                    auto p1 = shape->vertices()[triangle.j].position;
+                    auto p2 = shape->vertices()[triangle.k].position;
+                    triangle_cdf_tables[triangle_offset + i] = (sum_area += 0.5f * length(cross(p1 - p0, p2 - p0)));
+                }
+                auto inv_sum_area = 1.0f / sum_area;
+                for (auto i = 0u; i < shape->triangles().size(); i++) {
+                    triangle_cdf_tables[triangle_offset + i] *= inv_sum_area;
+                }
                 triangle_count += shape->triangles().size();
                 
                 shape->clear();
                 
                 auto entity_id = static_cast<uint>(entity_ranges.size());
-                entity_ranges.emplace_back(EntityRange{static_cast<uint>(vertex_offset), static_cast<uint>(triangle_offset), static_cast<uint>(indices.size())});
+                entity_ranges.emplace_back(MeshHandle{static_cast<uint>(vertex_offset), static_cast<uint>(triangle_offset), static_cast<uint>(indices.size())});
                 entities[entity_id] = {static_cast<uint>(vertex_offset), static_cast<uint>(triangle_offset)};
+                entity_areas[entity_id] = sum_area;
                 
                 iter = entity_to_id.emplace(shape, entity_id).first;
             }
@@ -128,7 +147,7 @@ void Scene::_intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_bu
                          Var instance_id = hit.instance_id;
                          _interaction_buffers.material[tid] = _instance_materials[instance_id];
                 
-                         Var entity = _instance_entities[instance_id];
+                         Var entity = _entities[_instance_to_entity_id[instance_id]];
                          Var triangle_id = entity.triangle_offset + hit.triangle_id;
                          Var i = _triangles[triangle_id].i + entity.vertex_offset;
                          Var j = _triangles[triangle_id].j + entity.vertex_offset;
@@ -161,7 +180,7 @@ void Scene::_intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_bu
              }).parallelize(ray_count, threadgroup_size);
 }
 
-void Scene::_process_geometry(const std::vector<std::shared_ptr<Shape>> &shapes, float initial_time) {
+void Scene::_process_geometry(const std::vector<std::shared_ptr<Shape>> &shapes, float initial_time, std::vector<Material *> &instance_materials) {
     
     // calculate memory usage...
     size_t vertex_count = 0u;
@@ -203,23 +222,30 @@ void Scene::_process_geometry(const std::vector<std::shared_ptr<Shape>> &shapes,
     _normals = _device->allocate_buffer<float3>(vertex_count);
     _tex_coords = _device->allocate_buffer<float2>(vertex_count);
     _triangles = _device->allocate_buffer<TriangleHandle>(triangle_count);
-    _instance_entities = _device->allocate_buffer<EntityHandle>(instance_count);
-    _instances = _device->allocate_buffer<uint>(instance_count);
+    _triangle_cdf_tables = _device->allocate_buffer<float>(triangle_count);
+    _entities = _device->allocate_buffer<EntityHandle>(entity_count);
+    _entity_areas = _device->allocate_buffer<float>(entity_count);
+    _instance_to_entity_id = _device->allocate_buffer<uint>(instance_count);
     _instance_transforms = _device->allocate_buffer<float4x4>(instance_count);
     
     // encode shapes
-    std::vector<EntityRange> meshes;
-    std::vector<Material *> materials;
+    std::vector<MeshHandle> meshes;
     meshes.reserve(entity_count);
-    materials.reserve(entity_count);
+    instance_materials.reserve(instance_count);
     _device->launch([&](Dispatcher &dispatch) {
+        // clang-format off
         dispatch(_positions.modify([&](float3 *positions) {
             dispatch(_normals.modify([&](float3 *normals) {
                 dispatch(_tex_coords.modify([&](float2 *uvs) {
                     dispatch(_triangles.modify([&](TriangleHandle *indices) {
-                        dispatch(_instance_entities.modify([&](EntityHandle *entities) {
-                            dispatch(_instances.modify([&](uint *instances) {
-                                _encode_geometry_buffers(shapes, positions, normals, uvs, indices, entities, meshes, materials, instances);
+                        dispatch(_triangle_cdf_tables.modify([&](float *cdf_tables) {
+                            dispatch(_entities.modify([&](EntityHandle *entities) {
+                                dispatch(_entity_areas.modify([&](float *areas) {
+                                    dispatch(_instance_to_entity_id.modify([&](uint *instance_to_entity_id) {
+                                        _encode_geometry_buffers(shapes, positions, normals, uvs, indices,
+                                                                 cdf_tables, entities, areas, meshes, instance_materials, instance_to_entity_id);
+                                    }));
+                                }));
                             }));
                         }));
                     }));
@@ -231,20 +257,28 @@ void Scene::_process_geometry(const std::vector<std::shared_ptr<Shape>> &shapes,
         _normals.clear_cache();
         _tex_coords.clear_cache();
         _triangles.clear_cache();
-        _instance_entities.clear_cache();
-        _instances.clear_cache();
+        _triangle_cdf_tables.clear_cache();
+        _entities.clear_cache();
+        _entity_areas.clear_cache();
+        _instance_to_entity_id.clear_cache();
     });
     
     // apply initial transforms and build acceleration structure
     _is_static = _transform_tree.is_static();
     _device->launch(_instance_transforms.modify([&](float4x4 *matrices) {
         _transform_tree.update(matrices, initial_time);
-    }), [&] { if (_is_static) { _instance_transforms.clear_cache(); }});
-    _acceleration = _device->build_acceleration(_positions, _triangles, meshes, _instances, _instance_transforms, _is_static);
+    }), [&] {
+        if (_is_static) { _instance_transforms.clear_cache(); }
+    });
+    _acceleration = _device->build_acceleration(_positions, _triangles, meshes, _instance_to_entity_id, _instance_transforms, _is_static);
+}
+
+void Scene::_process_materials(const std::vector<Material *> &instance_materials) {
     
     // now it's time to process materials
     // not now...
-    _instance_materials = _device->allocate_buffer<MaterialHandle>(entity_count);
+    _instance_materials = _device->allocate_buffer<MaterialHandle>(instance_materials.size());
+    
 }
 
 }

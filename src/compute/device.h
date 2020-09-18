@@ -66,7 +66,7 @@ public:
     [[nodiscard]] virtual std::unique_ptr<Acceleration> build_acceleration(
         const BufferView<float3> &positions,
         const BufferView<TriangleHandle> &indices,
-        const std::vector<EntityRange> &meshes,
+        const std::vector<MeshHandle> &meshes,
         const BufferView<uint> &instances,
         const BufferView<float4x4> &transforms,
         bool is_static) = 0;

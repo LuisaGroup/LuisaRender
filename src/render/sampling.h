@@ -69,6 +69,21 @@ inline Expr<float3> cosine_sample_hemisphere(Expr<float2> u)
     return make_float3(r * cos(phi), r * sin(phi), sqrt(1.0f - u.x));
 }
 
+template<typename Table, typename = decltype(std::declval<Table &>()[Expr{0u}])>
+inline Expr<uint> sample_discrete(Table &&cdf, Expr<uint> left, Expr<uint> right, Expr<float> u_in) noexcept {
+    Var u = u_in;
+    Var p = left;
+    Var count = right - left;
+    While (count > 0u) {
+        Var step = count / 2u;
+        Var mid = p + step;
+        Var pred = cdf[mid] < u;
+        p = select(pred, mid + 1u, p);
+        count = select(pred, count - (step + 1u), step);
+    };
+    return compute::dsl::clamp(p, left, right - 1u);
+}
+
 }
 
 }

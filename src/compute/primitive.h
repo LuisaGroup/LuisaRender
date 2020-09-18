@@ -25,7 +25,7 @@ struct EntityHandle {
     uint triangle_offset;
 };
 
-struct EntityRange : public EntityHandle {
+struct MeshHandle : public EntityHandle {
     uint triangle_count;
 };
 
@@ -34,4 +34,4 @@ struct EntityRange : public EntityHandle {
 LUISA_STRUCT(luisa::compute::Vertex, position, normal, uv)
 LUISA_STRUCT(luisa::compute::TriangleHandle, i, j, k)
 LUISA_STRUCT(luisa::compute::EntityHandle, vertex_offset, triangle_offset)
-LUISA_STRUCT(luisa::compute::EntityRange, vertex_offset, triangle_offset, triangle_count)
+LUISA_STRUCT(luisa::compute::MeshHandle, vertex_offset, triangle_offset, triangle_count)

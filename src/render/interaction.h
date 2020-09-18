@@ -6,7 +6,7 @@
 
 #include <compute/buffer.h>
 #include <compute/device.h>
-#include "material_handle.h"
+#include <render/material.h>
 
 namespace luisa::render {
 

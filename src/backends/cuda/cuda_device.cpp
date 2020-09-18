@@ -56,7 +56,7 @@ public:
     std::unique_ptr<Acceleration> build_acceleration(
         const BufferView<float3> &positions,
         const BufferView<TriangleHandle> &indices,
-        const std::vector<EntityRange> &meshes,
+        const std::vector<MeshHandle> &meshes,
         const BufferView<uint> &instances,
         const BufferView<float4x4> &transforms,
         bool is_static) override;
@@ -384,7 +384,7 @@ std::shared_ptr<Texture> CudaDevice::_allocate_texture(uint32_t width, uint32_t 
 std::unique_ptr<Acceleration> CudaDevice::build_acceleration(
     const BufferView<float3> &positions,
     const BufferView<TriangleHandle> &indices,
-    const std::vector<EntityRange> &meshes,
+    const std::vector<MeshHandle> &meshes,
     const BufferView<uint> &instances,
     const BufferView<float4x4> &transforms,
     bool is_static) {

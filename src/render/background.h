@@ -5,11 +5,10 @@
 #pragma once
 
 #include "plugin.h"
-#include "illumination.h"
 
 namespace luisa::render {
 
-class Background : public Plugin, public Illumination {
+class Background : public Plugin {
 
 };
 

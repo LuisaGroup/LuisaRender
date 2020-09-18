@@ -3,6 +3,8 @@
 //
 
 #include <compute/dsl.h>
+#include <render/sampling.h>
+
 #include "filter.h"
 
 namespace luisa::render {
@@ -39,20 +41,9 @@ std::pair<Expr<float2>, Expr<float>> SeparableFilter::importance_sample_pixel_po
     auto weight = immutable(_weight_table);
     auto cdf = immutable(_cdf_table);
     
-    auto sample_1d = [&](Expr<float> u_in) {
+    auto sample_1d = [&](Expr<float> u) {
         
-        Var u = u_in;
-        Var p = 0u;
-        Var count = static_cast<int>(lookup_table_size);
-        While (count > 0) {
-            Var step = count / 2;
-            Var mid = p + step;
-            Var pred = cdf[mid] < u;
-            p = select(pred, mid + 1, p);
-            count = select(pred, count - (step + 1), step);
-        };
-        
-        Var lb = dsl::clamp(p, 0u, lookup_table_size - 1u);
+        Var lb = sample_discrete(cdf, 0u, lookup_table_size - 1u, u);
         Var cdf_lower = cdf[lb];
         Var cdf_upper = select(lb == lookup_table_size - 1u, 1.0f, cdf[lb + 1u]);
         Var offset = dsl::clamp((cast<float>(lb) + (u - cdf_lower) / (cdf_upper - cdf_lower)) * inv_table_size, 0.0f, 1.0f);
