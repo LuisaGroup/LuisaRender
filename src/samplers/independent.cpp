@@ -36,7 +36,8 @@ private:
         }
         
         pipeline << device()->compile_kernel("independent_sampler_reset", [&] {
-            auto tea = [](Expr<uint2> val) -> Expr<uint> {
+            auto tea = [](Expr<uint2> val_in) -> Expr<uint> {
+                Var val = val_in;
                 Var v0 = val.x;
                 Var v1 = val.y;
                 Var s0 = 0u;

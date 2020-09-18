@@ -52,6 +52,10 @@ inline Expr<float3> face_forward(Expr<float3> d_in, Expr<float3> ref_in) noexcep
     return select(dot(d, ref) < 0.0f, -d, d);
 }
 
+inline Expr<float> sign(Expr<float> x) noexcept {
+    return select(x > 0.0f, 1.0f, -1.0f);
+}
+
 inline Expr<float3> uniform_sample_hemisphere(Expr<float2> u) {
     Var r = sqrt(1.0f - u.x * u.x);
     Var phi = 2.0f * constants::pi * u.y;
@@ -66,4 +70,5 @@ inline Expr<float3> cosine_sample_hemisphere(Expr<float2> u)
 }
 
 }
+
 }

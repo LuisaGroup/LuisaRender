@@ -149,7 +149,7 @@ void Scene::_intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_bu
                          _interaction_buffers.pi[tid] = p;
                 
                          // NOTE: DO NOT NORMALIZE!
-                         _interaction_buffers.ray_origin_to_hit[tid] = p - make_float3(ray_buffer[tid].origin_x, ray_buffer[tid].origin_y, ray_buffer[tid].origin_z);
+                         _interaction_buffers.hit_to_ray_origin[tid] = make_float3(ray_buffer[tid].origin_x, ray_buffer[tid].origin_y, ray_buffer[tid].origin_z) - p;
                 
                          Var ng = normalize(nm * cross(p1 - p0, p2 - p0));
                          Var ns = normalize(bary_u * _normals[i] + bary_v * _normals[j] + bary_w * _normals[k]);

@@ -19,9 +19,9 @@ struct InteractionBuffers {
     BufferView<float3> pi;
     
     // Note:
-    // these vectors should not be normalized,
-    // since their lengths indicate distances.
-    BufferView<float3> ray_origin_to_hit;
+    //  These vectors should not be normalized,
+    //  since their lengths indicate distances.
+    BufferView<float3> hit_to_ray_origin;
     
     BufferView<float3> ng;
     BufferView<float3> ns;
@@ -31,7 +31,7 @@ struct InteractionBuffers {
     void create(Device *device, size_t size) noexcept {
         valid = device->allocate_buffer<bool>(size);
         pi = device->allocate_buffer<float3>(size);
-        ray_origin_to_hit = device->allocate_buffer<float3>(size);
+        hit_to_ray_origin = device->allocate_buffer<float3>(size);
         ng = device->allocate_buffer<float3>(size);
         ns = device->allocate_buffer<float3>(size);
         uv = device->allocate_buffer<float2>(size);

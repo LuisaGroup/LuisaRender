@@ -29,7 +29,7 @@ private:
                      auto tid = thread_id();
                      If (pixel_count % threadgroup_size == 0u || tid < pixel_count) {
                          Var valid = scene.interaction_buffers().valid[tid];
-                         Var normal = face_forward(scene.interaction_buffers().ng[tid], -scene.interaction_buffers().ray_origin_to_hit[tid]);
+                         Var normal = face_forward(scene.interaction_buffers().ng[tid], -scene.interaction_buffers().hit_to_ray_origin[tid]);
                          Var position = offset_ray_origin(scene.interaction_buffers().pi[tid], normal);
                 
                          Var onb = make_onb(normal);
