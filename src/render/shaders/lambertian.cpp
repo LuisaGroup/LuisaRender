@@ -35,10 +35,8 @@ private:
 public:
     Lambertian(float3 albedo, bool double_sided) noexcept : _data{albedo.x, albedo.y, albedo.z, double_sided} {}
     
-    [[nodiscard]] static SurfaceEvaluation evaluate(Expr<float2> uv, Expr<float3> wo, Expr<float3> wi, Expr<float2> u2, Expr<Data> data_ref) {
+    [[nodiscard]] static SurfaceEvaluation evaluate(Expr<float2> uv, Expr<float3> wo, Expr<float3> wi, Expr<float2> u2, Expr<Data> data) {
         Var is_refl = wi.z * wo.z > 0.0f;
-        
-        Var data = data_ref;
         Var albedo = make_float3(data.r, data.g, data.b);
         Var pdf = select(is_refl, abs(wi.z), 0.0f);
         Var sampled_wi = sign(wi.z) * cosine_sample_hemisphere(u2);

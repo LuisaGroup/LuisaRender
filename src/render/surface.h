@@ -70,14 +70,16 @@ template<typename Impl>
 class Surface : public SurfaceShader {
     
     [[nodiscard]] SurfaceEvaluation _evaluate(Expr<float2> uv, Expr<float3> wo, Expr<float3> wi, Expr<float2> u2, Expr<DataBlock> data_ref) const final {
-        return Impl::evaluate(uv, wo, wi, u2, compute::dsl::reinterpret<typename Impl::Data>(data_ref));
+        Var data = compute::dsl::reinterpret<typename Impl::Data>(data_ref);
+        return Impl::evaluate(uv, wo, wi, u2, data);
     }
     
     [[nodiscard]] Expr<float3> _emission(Expr<float2> uv, Expr<float3> wo, Expr<DataBlock> data_ref) const final {
         if constexpr (Impl::is_emissive) {
             LUISA_EXCEPTION("Invalid emission evaluation on non-emissive surface shader.");
         } else {
-            return Impl::emission(uv, wo, compute::dsl::reinterpret<typename Impl::Data>(data_ref));
+            Var data = compute::dsl::reinterpret<typename Impl::Data>(data_ref);
+            return Impl::emission(uv, wo, data);
         }
     }
     
