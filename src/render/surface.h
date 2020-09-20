@@ -84,17 +84,19 @@ class Surface : public SurfaceShader {
     }
     
     [[nodiscard]] Expr<float3> _emission(Expr<float2> uv, Expr<float3> wo, Expr<DataBlock> data_ref) const final {
-        if constexpr (Impl::is_emissive) {
-            LUISA_EXCEPTION("Invalid emission evaluation on non-emissive surface shader.");
-        } else {
-            Var data = compute::dsl::reinterpret<typename Impl::Data>(data_ref);
-            return _emission(uv, wo, data);
-        }
+        // Not using if constexpr, to make MSVC happy...
+        return _emission_impl(static_cast<const Impl *>(this), uv, wo, data_ref);
     }
     
-    template<typename I>
-    [[nodiscard]] static Expr<float3> _emission(Expr<float2> uv, Expr<float3> wo, Expr<typename I::Data> data) {
+    template<typename I, std::enable_if_t<I::is_emissive, int> = 0>
+    [[nodiscard]] static Expr<float3> _emission_impl(const I *, Expr<float2> uv, Expr<float3> wo, Expr<DataBlock> data_ref) {
+        Var data = compute::dsl::reinterpret<typename I::Data>(data_ref);
         return I::emission(uv, wo, data);
+    }
+    
+    template<typename I, std::enable_if_t<!I::is_emissive, int> = 0>
+    [[noreturn]] static Expr<float3> _emission_impl(const I *, Expr<float2> uv, Expr<float3> wo, Expr<DataBlock> data_ref) {
+        LUISA_EXCEPTION("Invalid emission evaluation on non-emissive surface shader.");
     }
     
     [[nodiscard]] uint _required_data_block_count() const noexcept final {
