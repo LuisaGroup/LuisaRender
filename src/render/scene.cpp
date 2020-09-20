@@ -25,7 +25,6 @@ void Scene::_encode_geometry_buffers(const std::vector<std::shared_ptr<Shape>> &
                                      float2 *uvs,
                                      TriangleHandle *triangles,
                                      float *triangle_cdf_tables,
-                                     float *triangle_areas,
                                      EntityHandle *entities,
                                      std::vector<MeshHandle> &entity_ranges,
                                      std::vector<Material *> &instance_materials,
@@ -79,7 +78,6 @@ void Scene::_encode_geometry_buffers(const std::vector<std::shared_ptr<Shape>> &
                     auto p2 = shape->vertices()[triangle.k].position;
                     auto area = 0.5f * length(cross(p1 - p0, p2 - p0));
                     triangle_cdf_tables[triangle_offset + i] = (sum_area += area);
-                    triangle_areas[triangle_offset + i] = area;
                 }
                 auto inv_sum_area = 1.0f / sum_area;
                 for (auto i = 0u; i < shape->triangles().size(); i++) {
@@ -116,22 +114,17 @@ void Scene::_update_geometry(Pipeline &pipeline, float time) {
     }
 }
 
-void Scene::_intersect_any(Pipeline &pipeline, const BufferView<Ray> &rays) {
-    auto ray_count = rays.size();
-    if (_any_hit_buffer.empty()) {
-        _any_hit_buffer = _device->allocate_buffer<AnyHit>(ray_count);
-    }
-    pipeline << _acceleration->intersect_any(rays, _any_hit_buffer);
+void Scene::_intersect_any(Pipeline &pipeline, const BufferView<Ray> &rays, BufferView<AnyHit> &hits) {
+    pipeline << _acceleration->intersect_any(rays, hits);
 }
 
-void Scene::_intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_buffer) {
+void Scene::_intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_buffer, InteractionBuffers &buffers) {
     
     auto ray_count = static_cast<uint>(ray_buffer.size());
     constexpr auto threadgroup_size = 256u;
     
     if (_closest_hit_buffer.size() < ray_buffer.size()) {
         _closest_hit_buffer = _device->allocate_buffer<ClosestHit>(ray_count);
-        _interaction_buffers.create(_device, ray_count);
     }
     
     pipeline << _acceleration->intersect_closest(ray_buffer, _closest_hit_buffer)
@@ -140,13 +133,13 @@ void Scene::_intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_bu
                  If (ray_count % threadgroup_size == 0u || tid < ray_count) {
                      Var<ClosestHit> hit = _closest_hit_buffer[tid];
                      If (hit.distance <= 0.0f) {
-                         _interaction_buffers.valid[tid] = false;
+                         if (buffers.has_miss()) { buffers.miss()[tid] = true; }
                      } Else {
                 
-                         _interaction_buffers.valid[tid] = true;
+                         if (buffers.has_miss()) { buffers.miss()[tid] = false; }
                 
                          Var instance_id = hit.instance_id;
-                         _interaction_buffers.material[tid] = _instance_materials[instance_id];
+                         if (buffers.has_material()) { buffers.material()[tid] = _instance_materials[instance_id]; }
                 
                          Var entity = _entities[_instance_to_entity_id[instance_id]];
                          Var triangle_id = entity.triangle_offset + hit.triangle_id;
@@ -166,16 +159,27 @@ void Scene::_intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_bu
                          Var nm = transpose(inverse(make_float3x3(m)));
                 
                          Var p = make_float3(m * make_float4(bary_u * p0 + bary_v * p1 + bary_w * p2, 1.0f));
-                         _interaction_buffers.pi[tid] = p;
+                         if (buffers.has_pi()) { buffers.pi()[tid] = p; }
                 
                          // NOTE: DO NOT NORMALIZE!
-                         _interaction_buffers.hit_to_ray_origin[tid] = make_float3(ray_buffer[tid].origin_x, ray_buffer[tid].origin_y, ray_buffer[tid].origin_z) - p;
+                         Var hit_to_ray_origin = make_float3(ray_buffer[tid].origin_x, ray_buffer[tid].origin_y, ray_buffer[tid].origin_z) - p;
+                         if (buffers.has_hit_to_ray_origin()) {
+                             buffers.hit_to_ray_origin()[tid] = hit_to_ray_origin;
+                         }
                 
-                         Var ng = normalize(nm * cross(p1 - p0, p2 - p0));
-                         Var ns = normalize(bary_u * _normals[i] + bary_v * _normals[j] + bary_w * _normals[k]);
-                         _interaction_buffers.ns[tid] = ns;
-                         _interaction_buffers.ng[tid] = ng;
-                         _interaction_buffers.uv[tid] = bary_u * _tex_coords[i] + bary_v * _tex_coords[j] + bary_w * _tex_coords[k];
+                         Var c = cross(p1 - p0, p2 - p0);
+                         Var ng = normalize(c);
+                         if (buffers.has_ns()) { buffers.ns()[tid] = normalize(nm * (bary_u * _normals[i] + bary_v * _normals[j] + bary_w * _normals[k])); }
+                         if (buffers.has_ng()) { buffers.ng()[tid] = ng; }
+                         if (buffers.has_uv()) { buffers.uv()[tid] = bary_u * _tex_coords[i] + bary_v * _tex_coords[j] + bary_w * _tex_coords[k]; }
+                         if (buffers.has_pdf()) {
+                             Var area = 0.5f * length(c);
+                             Var cdf_low = select(hit.triangle_id == 0u, 0.0f, _triangle_cdf_tables[triangle_id - 1u]);
+                             Var cdf_high = _triangle_cdf_tables[triangle_id];
+                             Var wo = normalize(hit_to_ray_origin);
+                             Var pdf = (cdf_high - cdf_low) * hit.distance * hit.distance / (area * abs(dot(wo, ng)));
+                             buffers.pdf()[tid] = pdf;
+                         }
                      };
                  };
              }).parallelize(ray_count, threadgroup_size);
@@ -225,7 +229,6 @@ void Scene::_process_geometry(const std::vector<std::shared_ptr<Shape>> &shapes,
     _triangles = _device->allocate_buffer<TriangleHandle>(triangle_count);
     _triangle_cdf_tables = _device->allocate_buffer<float>(triangle_count);
     _entities = _device->allocate_buffer<EntityHandle>(entity_count);
-    _triangle_areas = _device->allocate_buffer<float>(triangle_count);
     _instance_to_entity_id = _device->allocate_buffer<uint>(instance_count);
     _instance_transforms = _device->allocate_buffer<float4x4>(instance_count);
     
@@ -240,13 +243,12 @@ void Scene::_process_geometry(const std::vector<std::shared_ptr<Shape>> &shapes,
         dispatch(_tex_coords.modify([&](float2 *uvs) {
         dispatch(_triangles.modify([&](TriangleHandle *indices) {
         dispatch(_triangle_cdf_tables.modify([&](float *cdf_tables) {
-        dispatch(_triangle_areas.modify([&](float *areas) {
         dispatch(_entities.modify([&](EntityHandle *entities) {
         dispatch(_instance_to_entity_id.modify([&](uint *instance_to_entity_id) {
             _encode_geometry_buffers(
-                shapes, positions, normals, uvs, indices, cdf_tables, areas,
+                shapes, positions, normals, uvs, indices, cdf_tables,
                 entities, meshes, instance_materials, instance_to_entity_id);
-        })); })); })); })); })); })); })); }));
+        })); })); })); })); })); })); }));
         // clang-format on
     }, [&] {
         _positions.clear_cache();
@@ -255,7 +257,6 @@ void Scene::_process_geometry(const std::vector<std::shared_ptr<Shape>> &shapes,
         _triangles.clear_cache();
         _triangle_cdf_tables.clear_cache();
         _entities.clear_cache();
-        _triangle_areas.clear_cache();
         _instance_to_entity_id.clear_cache();
     });
     

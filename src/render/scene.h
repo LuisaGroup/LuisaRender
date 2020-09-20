@@ -38,7 +38,6 @@ private:
     BufferView<float3> _normals;
     BufferView<float2> _tex_coords;
     BufferView<TriangleHandle> _triangles;
-    BufferView<float> _triangle_areas;
     BufferView<float> _triangle_cdf_tables;
     BufferView<EntityHandle> _entities;
     BufferView<uint> _instance_to_entity_id;
@@ -63,9 +62,7 @@ private:
     std::shared_ptr<Background> _background;
     
     std::unique_ptr<Acceleration> _acceleration;
-    BufferView<AnyHit> _any_hit_buffer;
     BufferView<ClosestHit> _closest_hit_buffer;
-    InteractionBuffers _interaction_buffers;
     
     BufferView<float> _emitter_cdf_tables;
     
@@ -74,8 +71,8 @@ private:
 
 private:
     void _update_geometry(Pipeline &pipeline, float time);
-    void _intersect_any(Pipeline &pipeline, const BufferView<Ray> &rays);
-    void _intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_buffer);
+    void _intersect_any(Pipeline &pipeline, const BufferView<Ray> &rays, BufferView<AnyHit> &hits);
+    void _intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_buffer, InteractionBuffers &buffers);
     void _uniform_sample_one_light(Pipeline &pipeline, Sampler &sampler);
     
     void _encode_geometry_buffers(const std::vector<std::shared_ptr<Shape>> &shapes,
@@ -84,7 +81,6 @@ private:
                                   float2 *uvs,
                                   TriangleHandle *triangles,
                                   float *triangle_cdf_tables,
-                                  float *triangle_areas,
                                   EntityHandle *entities,
                                   std::vector<MeshHandle> &entity_ranges,
                                   std::vector<Material *> &instance_materials,
@@ -99,19 +95,16 @@ public:
           std::shared_ptr<Background> background,
           float initial_time);
     
-    [[nodiscard]] const BufferView<AnyHit> &any_hit_buffer() const noexcept { return _any_hit_buffer; }
-    [[nodiscard]] const InteractionBuffers &interaction_buffers() const noexcept { return _interaction_buffers; }
-    
     [[nodiscard]] auto update_geometry(float time) {
         return [this, time](Pipeline &pipeline) { _update_geometry(pipeline, time); };
     }
     
-    [[nodiscard]] auto intersect_any(const BufferView<Ray> &rays) {
-        return [this, &rays](Pipeline &pipeline) { _intersect_any(pipeline, rays); };
+    [[nodiscard]] auto intersect_any(const BufferView<Ray> &rays, BufferView<AnyHit> &hits) {
+        return [this, &rays, &hits](Pipeline &pipeline) { _intersect_any(pipeline, rays, hits); };
     }
     
-    [[nodiscard]] auto intersect_closest(const BufferView<Ray> &rays) {
-        return [this, &rays](Pipeline &pipeline) { _intersect_closest(pipeline, rays); };
+    [[nodiscard]] auto intersect_closest(const BufferView<Ray> &rays, InteractionBuffers &buffers) {
+        return [this, &rays, &buffers](Pipeline &pipeline) { _intersect_closest(pipeline, rays, buffers); };
     }
 };
 
