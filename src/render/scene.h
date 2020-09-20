@@ -38,9 +38,9 @@ private:
     BufferView<float3> _normals;
     BufferView<float2> _tex_coords;
     BufferView<TriangleHandle> _triangles;
+    BufferView<float> _triangle_areas;
     BufferView<float> _triangle_cdf_tables;
     BufferView<EntityHandle> _entities;
-    BufferView<float> _entity_areas;
     BufferView<uint> _instance_to_entity_id;
     BufferView<float4x4> _instance_transforms;
     
@@ -50,6 +50,7 @@ private:
     BufferView<MaterialHandle> _instance_materials;
     BufferView<float> _instance_area;
     BufferView<float> _shader_weights;
+    
     BufferView<float> _shader_cdf_tables;
     BufferView<uint> _shader_types;
     BufferView<uint> _shader_block_offsets;
@@ -78,12 +79,14 @@ private:
     void _uniform_sample_one_light(Pipeline &pipeline, Sampler &sampler);
     
     void _encode_geometry_buffers(const std::vector<std::shared_ptr<Shape>> &shapes,
-                                  float3 *positions, float3 *normals, float2 *uvs,
+                                  float3 *positions,
+                                  float3 *normals,
+                                  float2 *uvs,
                                   TriangleHandle *triangles,
                                   float *triangle_cdf_tables,
+                                  float *triangle_areas,
                                   EntityHandle *entities,
-                                  float *areas,
-                                  std::vector<MeshHandle> &entity_ranges,  // (vertex offset, triangle offset, triangle count)
+                                  std::vector<MeshHandle> &entity_ranges,
                                   std::vector<Material *> &instance_materials,
                                   uint *instances);
     

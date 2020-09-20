@@ -25,8 +25,8 @@ void Scene::_encode_geometry_buffers(const std::vector<std::shared_ptr<Shape>> &
                                      float2 *uvs,
                                      TriangleHandle *triangles,
                                      float *triangle_cdf_tables,
+                                     float *triangle_areas,
                                      EntityHandle *entities,
-                                     float *entity_areas,
                                      std::vector<MeshHandle> &entity_ranges,
                                      std::vector<Material *> &instance_materials,
                                      uint *instances) {
@@ -77,7 +77,9 @@ void Scene::_encode_geometry_buffers(const std::vector<std::shared_ptr<Shape>> &
                     auto p0 = shape->vertices()[triangle.i].position;
                     auto p1 = shape->vertices()[triangle.j].position;
                     auto p2 = shape->vertices()[triangle.k].position;
-                    triangle_cdf_tables[triangle_offset + i] = (sum_area += 0.5f * length(cross(p1 - p0, p2 - p0)));
+                    auto area = 0.5f * length(cross(p1 - p0, p2 - p0));
+                    triangle_cdf_tables[triangle_offset + i] = (sum_area += area);
+                    triangle_areas[triangle_offset + i] = area;
                 }
                 auto inv_sum_area = 1.0f / sum_area;
                 for (auto i = 0u; i < shape->triangles().size(); i++) {
@@ -90,7 +92,6 @@ void Scene::_encode_geometry_buffers(const std::vector<std::shared_ptr<Shape>> &
                 auto entity_id = static_cast<uint>(entity_ranges.size());
                 entity_ranges.emplace_back(MeshHandle{static_cast<uint>(vertex_offset), static_cast<uint>(triangle_offset), static_cast<uint>(indices.size())});
                 entities[entity_id] = {static_cast<uint>(vertex_offset), static_cast<uint>(triangle_offset)};
-                entity_areas[entity_id] = sum_area;
                 
                 iter = entity_to_id.emplace(shape, entity_id).first;
             }
@@ -224,7 +225,7 @@ void Scene::_process_geometry(const std::vector<std::shared_ptr<Shape>> &shapes,
     _triangles = _device->allocate_buffer<TriangleHandle>(triangle_count);
     _triangle_cdf_tables = _device->allocate_buffer<float>(triangle_count);
     _entities = _device->allocate_buffer<EntityHandle>(entity_count);
-    _entity_areas = _device->allocate_buffer<float>(entity_count);
+    _triangle_areas = _device->allocate_buffer<float>(triangle_count);
     _instance_to_entity_id = _device->allocate_buffer<uint>(instance_count);
     _instance_transforms = _device->allocate_buffer<float4x4>(instance_count);
     
@@ -235,23 +236,18 @@ void Scene::_process_geometry(const std::vector<std::shared_ptr<Shape>> &shapes,
     _device->launch([&](Dispatcher &dispatch) {
         // clang-format off
         dispatch(_positions.modify([&](float3 *positions) {
-            dispatch(_normals.modify([&](float3 *normals) {
-                dispatch(_tex_coords.modify([&](float2 *uvs) {
-                    dispatch(_triangles.modify([&](TriangleHandle *indices) {
-                        dispatch(_triangle_cdf_tables.modify([&](float *cdf_tables) {
-                            dispatch(_entities.modify([&](EntityHandle *entities) {
-                                dispatch(_entity_areas.modify([&](float *areas) {
-                                    dispatch(_instance_to_entity_id.modify([&](uint *instance_to_entity_id) {
-                                        _encode_geometry_buffers(shapes, positions, normals, uvs, indices,
-                                                                 cdf_tables, entities, areas, meshes, instance_materials, instance_to_entity_id);
-                                    }));
-                                }));
-                            }));
-                        }));
-                    }));
-                }));
-            }));
-        }));
+        dispatch(_normals.modify([&](float3 *normals) {
+        dispatch(_tex_coords.modify([&](float2 *uvs) {
+        dispatch(_triangles.modify([&](TriangleHandle *indices) {
+        dispatch(_triangle_cdf_tables.modify([&](float *cdf_tables) {
+        dispatch(_triangle_areas.modify([&](float *areas) {
+        dispatch(_entities.modify([&](EntityHandle *entities) {
+        dispatch(_instance_to_entity_id.modify([&](uint *instance_to_entity_id) {
+            _encode_geometry_buffers(
+                shapes, positions, normals, uvs, indices, cdf_tables, areas,
+                entities, meshes, instance_materials, instance_to_entity_id);
+        })); })); })); })); })); })); })); }));
+        // clang-format on
     }, [&] {
         _positions.clear_cache();
         _normals.clear_cache();
@@ -259,7 +255,7 @@ void Scene::_process_geometry(const std::vector<std::shared_ptr<Shape>> &shapes,
         _triangles.clear_cache();
         _triangle_cdf_tables.clear_cache();
         _entities.clear_cache();
-        _entity_areas.clear_cache();
+        _triangle_areas.clear_cache();
         _instance_to_entity_id.clear_cache();
     });
     
