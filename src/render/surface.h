@@ -88,8 +88,13 @@ class Surface : public SurfaceShader {
             LUISA_EXCEPTION("Invalid emission evaluation on non-emissive surface shader.");
         } else {
             Var data = compute::dsl::reinterpret<typename Impl::Data>(data_ref);
-            return Impl::emission(uv, wo, data);
+            return _emission(uv, wo, data);
         }
+    }
+    
+    template<typename I>
+    [[nodiscard]] static Expr<float3> _emission(Expr<float2> uv, Expr<float3> wo, Expr<typename I::Data> data) {
+        return I::emission(uv, wo, data);
     }
     
     [[nodiscard]] uint _required_data_block_count() const noexcept final {
