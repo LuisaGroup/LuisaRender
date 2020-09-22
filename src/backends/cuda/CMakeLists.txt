@@ -11,4 +11,4 @@ target_link_libraries(luisa-backend-cuda PRIVATE jitify_config CUDA::nvrtc CUDA:
 if (OptiX_FOUND)
     target_include_directories(luisa-backend-cuda PRIVATE ${OptiX_INCLUDE})
     target_compile_definitions(luisa-backend-cuda PRIVATE LUISA_OPTIX_AVAILABLE)
-endif()
+endif ()
