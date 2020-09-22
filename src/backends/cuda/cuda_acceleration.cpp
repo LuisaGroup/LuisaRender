@@ -18,6 +18,8 @@
             res == OPTIX_SUCCESS,                                              \
             "OptiX call [ ", #call, " ] failed: ", optixGetErrorString(res));  \
     }()
+    
+#include <compute/dsl_syntax.h>
 
 namespace luisa::cuda {
 
@@ -26,11 +28,11 @@ using namespace compute::dsl;
 
 CudaAcceleration::CudaAcceleration(
     CudaDevice *device,
-    const BufferView<float3> &positions,
+    const BufferView<luisa::float3> &positions,
     const BufferView<TriangleHandle> &indices,
     const std::vector<MeshHandle> &meshes,
     const BufferView<uint> &instances,
-    const BufferView<float4x4> &transforms,
+    const BufferView<luisa::float4x4> &transforms,
     bool is_static) {
     
     OPTIX_CHECK(optixInit());
@@ -39,6 +41,8 @@ CudaAcceleration::CudaAcceleration(
     OPTIX_CHECK(optixDeviceContextCreate(device->context(), &options, &_optix_ctx));
     
     auto compacted_size_buffer = device->allocate_buffer<uint2>(1u);
+    
+    // create geometry acceleration structures
     for (auto mesh : meshes) {
         
         OptixAccelBuildOptions accel_options{};
@@ -69,10 +73,8 @@ CudaAcceleration::CudaAcceleration(
         
         // Allocate device memory for the scratch space buffer as well
         // as the GAS itself
-        CUdeviceptr d_temp_buffer_gas;
-        CUdeviceptr d_gas_output_buffer;
-        CUDA_CHECK(cuMemAlloc(&d_temp_buffer_gas, gas_buffer_sizes.tempSizeInBytes));
-        CUDA_CHECK(cuMemAlloc(&d_gas_output_buffer, gas_buffer_sizes.outputSizeInBytes));
+        auto gas_temp_buffer = device->allocate_buffer<uchar>(gas_buffer_sizes.tempSizeInBytes);
+        auto gas_output_buffer = device->allocate_buffer<uchar>(gas_buffer_sizes.outputSizeInBytes);
         
         OptixTraversableHandle gas_handle = 0u;
         
@@ -84,28 +86,60 @@ CudaAcceleration::CudaAcceleration(
         device->launch([&](Dispatcher &dispatch) {
             auto stream = dynamic_cast<CudaDispatcher &>(dispatch).handle();
             OPTIX_CHECK(optixAccelBuild(_optix_ctx, stream, &accel_options, &triangle_input, 1,
-                                        d_temp_buffer_gas, gas_buffer_sizes.tempSizeInBytes,
-                                        d_gas_output_buffer, gas_buffer_sizes.outputSizeInBytes,
+                                        dynamic_cast<CudaBuffer *>(gas_temp_buffer.buffer())->handle() + gas_temp_buffer.byte_offset(), gas_buffer_sizes.tempSizeInBytes,
+                                        dynamic_cast<CudaBuffer *>(gas_output_buffer.buffer())->handle() + gas_output_buffer.byte_offset(), gas_buffer_sizes.outputSizeInBytes,
                                         &gas_handle, &emit_desc, 1));
             dispatch(compacted_size_buffer.copy_to(&compacted_size));
         });
         device->synchronize();
         
-        CUdeviceptr gas_buffer;
-        CUDA_CHECK(cuMemAlloc(&gas_buffer, compacted_size));
+        auto gas_buffer = device->allocate_buffer<uchar>(compacted_size);
         device->launch([&](Dispatcher &dispatch) {
             auto stream = dynamic_cast<CudaDispatcher &>(dispatch).handle();
-            OPTIX_CHECK(optixAccelCompact(_optix_ctx, stream, gas_handle, gas_buffer, compacted_size, &gas_handle));
-            CUDA_CHECK(cuMemFree(d_temp_buffer_gas));
-            CUDA_CHECK(cuMemFree(d_gas_output_buffer));
+            OPTIX_CHECK(optixAccelCompact(_optix_ctx, stream, gas_handle,
+                                          dynamic_cast<CudaBuffer *>(gas_buffer.buffer())->handle() + gas_buffer.byte_offset(),
+                                          compacted_size, &gas_handle));
         });
         device->synchronize();
         
         _gas_handles.emplace_back(gas_handle);
-        _gas_buffers.emplace_back(gas_buffer);
+        _gas_buffers.emplace_back(std::move(gas_buffer));
     }
     
+    _gas_handle_buffer = device->allocate_buffer<Traversable>(_gas_handles.size());
+    _instance_buffer = device->allocate_buffer<Instance>(instances.size());
     
+    auto instance_count = static_cast<uint>(instances.size());
+    auto initialize_instance_buffer_kernel = device->compile_kernel("init_instance_buffer", [&] {
+        auto tid = thread_id();
+        If (tid < instance_count) {
+            Var transform = transpose(transforms[tid]);
+            auto instance = _instance_buffer[tid];
+            instance.transform[0u] = transform[0u];
+            instance.transform[1u] = transform[1u];
+            instance.transform[2u] = transform[2u];
+            instance.instance_id = tid;
+            instance.sbt_offset = 0u;
+            instance.mask = 0xffffffffu;
+            instance.flags = static_cast<uint>(OPTIX_INSTANCE_FLAG_DISABLE_TRIANGLE_FACE_CULLING);
+            instance.traversable = _gas_handle_buffer[tid];
+        };
+    });
+    
+    device->launch([&](Dispatcher &dispatch) {
+        dispatch(_gas_handle_buffer.copy_from(_gas_handles.data()));
+        dispatch(initialize_instance_buffer_kernel.parallelize(instance_count));
+    });
+    
+    
+    // create instance acceleration structure
+    OptixAccelBuildOptions build_options{};
+    build_options.buildFlags = OPTIX_BUILD_FLAG_ALLOW_COMPACTION | OPTIX_BUILD_FLAG_PREFER_FAST_TRACE;
+    if (!is_static) { build_options.buildFlags |= OPTIX_BUILD_FLAG_ALLOW_UPDATE; }
+    build_options.operation = OPTIX_BUILD_OPERATION_BUILD;
+    
+    OptixBuildInput build_input{};
+    build_input.type = OPTIX_BUILD_INPUT_TYPE_INSTANCES;
 }
 
 void CudaAcceleration::_refit(Dispatcher &dispatch) {

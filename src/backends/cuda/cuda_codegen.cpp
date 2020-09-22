@@ -23,7 +23,15 @@ void CudaCodegen::emit(const Function &f) {
            "using luisa::ushort;\n"
            "using luisa::uint;\n"
            "\n"
-           "template<typename T, uint N> using array = T[N];\n"
+           "template<typename T, uint N>\n"
+           "class array {\n"
+           "private:\n"
+           "    T _m[N];\n"
+           "public:\n"
+           "    template<typename ...Args> array(Args &&...args) noexcept : _m{args...} {}\n"
+           "    [[nodiscard]] T &operator[](uint index) noexcept { return _m[index]; }\n"
+           "    [[nodiscard]] T operator[](uint index) const noexcept { return _m[index]; }\n"
+           "};\n"
            "\n"
            "template<typename T, typename U>\n"
            "T as_type(U u) noexcept { return *reinterpret_cast<T *>(&u); }\n\n";
@@ -100,7 +108,7 @@ void CudaCodegen::_emit_function_decl(const Function &f) {
             }
         }
         _os << "};\n\n"
-            << "extern \"C\" __global__ void " << f.name() << "(const Argument arg) ";
+            << "extern \"C\" __global__ void " << f.name() << "(Argument arg) ";
     } else {
         _os << "extern \"C\" __global__ void " << f.name() << "() ";
     }
