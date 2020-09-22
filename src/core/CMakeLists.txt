@@ -8,12 +8,14 @@ target_compile_definitions(luisa-core PUBLIC NOMINMAX)
 target_link_libraries(luisa-core PUBLIC spdlog_config cxxopts_config luisa-headers)
 set_target_properties(luisa-core PROPERTIES
                       PUBLIC_HEADER "${HEADER_FILES}"
-                      LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/"
-                      RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/"
+                      LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>/bin/"
+                      RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>/bin/"
                       WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
-add_library(luisa::core ALIAS luisa-core)
+add_custom_command(TARGET luisa-core PRE_BUILD COMMAND ${CMAKE_COMMAND} -E make_directory
+                   "${CMAKE_BINARY_DIR}/$<CONFIG>/include/core/")
+add_custom_command(TARGET luisa-core PRE_BUILD COMMAND ${CMAKE_COMMAND} -E copy
+                   ${HEADER_FILES} "${CMAKE_BINARY_DIR}/$<CONFIG>/include/core/"
+                   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
-foreach (HEADER_FILE ${HEADER_FILES})
-    configure_file(${HEADER_FILE} "${CMAKE_BINARY_DIR}/include/core/${HEADER_FILE}" COPYONLY)
-endforeach ()
+add_library(luisa::core ALIAS luisa-core)

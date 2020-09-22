@@ -82,7 +82,7 @@ private:
                                   TriangleHandle *triangles,
                                   float *triangle_cdf_tables,
                                   EntityHandle *entities,
-                                  std::vector<MeshHandle> &entity_ranges,
+                                  std::vector<MeshHandle> &meshes,
                                   std::vector<Material *> &instance_materials,
                                   uint *instances);
     

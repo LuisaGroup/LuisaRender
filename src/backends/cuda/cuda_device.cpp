@@ -3,6 +3,7 @@
 //
 
 #include "cuda_device.h"
+#include "cuda_acceleration.h"
 
 namespace luisa::cuda {
 
@@ -334,7 +335,7 @@ std::unique_ptr<Acceleration> CudaDevice::build_acceleration(
     bool is_static) {
 
 #ifdef LUISA_OPTIX_AVAILABLE
-    return nullptr;
+    return std::make_unique<CudaAcceleration>(this, positions, indices, meshes, instances, transforms, is_static);
 #else
     LUISA_EXCEPTION("OptiX not available!");
 #endif

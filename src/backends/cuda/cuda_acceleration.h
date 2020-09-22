@@ -7,7 +7,6 @@
 #ifdef LUISA_OPTIX_AVAILABLE
 
 #include <optix.h>
-#include <optix_stubs.h>
 
 #include <compute/ray.h>
 #include <compute/hit.h>
@@ -27,9 +26,6 @@ using compute::ClosestHit;
 class CudaDevice;
 
 class CudaAcceleration : public Acceleration {
-
-private:
-    CudaDevice *_device;
 
 private:
     void _refit(compute::Dispatcher &dispatch) override;

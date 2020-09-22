@@ -9,16 +9,16 @@
 #define NVRTC_CHECK(x)                                                                                \
     [&] {                                                                                             \
         nvrtcResult result = x;                                                                       \
-        LUISA_ERROR_IF_NOT(                                                                           \
+        LUISA_EXCEPTION_IF_NOT(                                                                       \
             result == NVRTC_SUCCESS, "MVRTC call [ " #x " ] failed: ", nvrtcGetErrorString(result));  \
     }()
 
-#define CUDA_CHECK(x)                                           \
-    [&] {                                                       \
-        CUresult result = x;                                    \
-        if (result != CUDA_SUCCESS) {                           \
-            const char *msg;                                    \
-            cuGetErrorName(result, &msg);                       \
-            LUISA_ERROR("CUDA call [ " #x " ] failed: ", msg);  \
-        }                                                       \
+#define CUDA_CHECK(x)                                               \
+    [&] {                                                           \
+        CUresult result = x;                                        \
+        if (result != CUDA_SUCCESS) {                               \
+            const char *msg;                                        \
+            cuGetErrorName(result, &msg);                           \
+            LUISA_EXCEPTION("CUDA call [ " #x " ] failed: ", msg);  \
+        }                                                           \
     }()

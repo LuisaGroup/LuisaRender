@@ -55,6 +55,7 @@ public:
     explicit CudaDevice(Context *context, uint32_t device_id);
     ~CudaDevice() noexcept override;
     void synchronize() override;
+    
     std::unique_ptr<Acceleration> build_acceleration(
         const BufferView<float3> &positions,
         const BufferView<TriangleHandle> &indices,
@@ -62,6 +63,9 @@ public:
         const BufferView<uint> &instances,
         const BufferView<float4x4> &transforms,
         bool is_static) override;
+    
+    [[nodiscard]] CUdevice handle() const noexcept { return _handle; }
+    [[nodiscard]] CUcontext context() const noexcept { return _ctx; }
 };
 
 }

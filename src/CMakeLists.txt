@@ -38,8 +38,8 @@ function(luisa_render_add_plugin name)
     target_link_libraries(luisa-${PLUGIN_CATEGORY}-${name} PRIVATE luisa-render)
     add_dependencies(luisa-plugins luisa-${PLUGIN_CATEGORY}-${name})
     set_target_properties(luisa-${PLUGIN_CATEGORY}-${name} PROPERTIES
-                          LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/plugins/"
-                          RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/plugins/")
+                          LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>/bin/plugins/"
+                          RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>/bin/plugins/")
 endfunction()
 
 add_subdirectory(cameras)
@@ -62,7 +62,7 @@ function(luisa_render_add_application name)
     add_executable(${name} ${APP_SOURCES})
     target_compile_features(${name} PRIVATE c_std_11 cxx_std_17)
     target_link_libraries(${name} PRIVATE luisa-all)
-    set_target_properties(${name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/")
+    set_target_properties(${name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>/bin/")
 endfunction()
 
 add_subdirectory(tests)

@@ -26,7 +26,7 @@ void Scene::_encode_geometry_buffers(const std::vector<std::shared_ptr<Shape>> &
                                      TriangleHandle *triangles,
                                      float *triangle_cdf_tables,
                                      EntityHandle *entities,
-                                     std::vector<MeshHandle> &entity_ranges,
+                                     std::vector<MeshHandle> &meshes,
                                      std::vector<Material *> &instance_materials,
                                      uint *instances) {
     
@@ -87,15 +87,15 @@ void Scene::_encode_geometry_buffers(const std::vector<std::shared_ptr<Shape>> &
                 
                 shape->clear();
                 
-                auto entity_id = static_cast<uint>(entity_ranges.size());
-                entity_ranges.emplace_back(MeshHandle{static_cast<uint>(vertex_offset), static_cast<uint>(triangle_offset), static_cast<uint>(indices.size())});
+                auto entity_id = static_cast<uint>(meshes.size());
+                meshes.emplace_back(MeshHandle{static_cast<uint>(vertex_offset), static_cast<uint>(triangle_offset), static_cast<uint>(shape->vertices().size()), static_cast<uint>(indices.size())});
                 entities[entity_id] = {static_cast<uint>(vertex_offset), static_cast<uint>(triangle_offset)};
                 
                 iter = entity_to_id.emplace(shape, entity_id).first;
             }
             auto entity_id = iter->second;
             instances[instance_id] = entity_id;
-            entities[instance_id] = {entity_ranges[entity_id].vertex_offset, entity_ranges[entity_id].triangle_offset};
+            entities[instance_id] = {meshes[entity_id].vertex_offset, meshes[entity_id].triangle_offset};
             instance_materials.emplace_back(material);
         } else {  // inner node, visit children
             for (auto &&child : shape->children()) {
