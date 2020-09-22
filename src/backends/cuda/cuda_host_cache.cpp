@@ -34,7 +34,9 @@ void CudaHostCache::recycle(void *cache) noexcept {
 
 void CudaHostCache::clear() noexcept {
     std::lock_guard lock{_mutex};
-    for (auto p : _allocated_caches) { CUDA_CHECK(cuMemFreeHost(p)); }
+    for (auto p : _allocated_caches) {
+        CUDA_CHECK(cuMemFreeHost(p));
+    }
     _allocated_caches.clear();
     _available_caches.clear();
 }

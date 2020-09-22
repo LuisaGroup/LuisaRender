@@ -12,7 +12,7 @@ void CudaBuffer::upload(compute::Dispatcher &dispatcher, size_t offset, size_t s
     auto cache = _host_cache.obtain();
     std::memmove(cache, host_data, size);
     auto stream = dynamic_cast<CudaDispatcher &>(dispatcher).handle();
-    CUDA_CHECK(cuMemcpyAsync(_handle + offset, reinterpret_cast<CUdeviceptr>(cache), size, stream));
+    CUDA_CHECK(cuMemcpyHtoDAsync(_handle + offset, cache, size, stream));
     dispatcher.when_completed([cache, this] { _host_cache.recycle(cache); });
 }
 

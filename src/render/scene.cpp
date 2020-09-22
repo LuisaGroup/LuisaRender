@@ -250,25 +250,25 @@ void Scene::_process_geometry(const std::vector<std::shared_ptr<Shape>> &shapes,
                 entities, meshes, instance_materials, instance_to_entity_id);
         })); })); })); })); })); })); }));
         // clang-format on
-    }, [&] {
-        _positions.clear_cache();
-        _normals.clear_cache();
-        _tex_coords.clear_cache();
-        _triangles.clear_cache();
-        _triangle_cdf_tables.clear_cache();
-        _entities.clear_cache();
-        _instance_to_entity_id.clear_cache();
     });
-    _device->synchronize();
-    LUISA_INFO("Done encoding geometry buffers.");
     
     // apply initial transforms and build acceleration structure
     _is_static = _transform_tree.is_static();
     _device->launch(_instance_transforms.modify([&](float4x4 *matrices) {
         _transform_tree.update(matrices, initial_time);
-    }), [&] {
-        if (_is_static) { _instance_transforms.clear_cache(); }
-    });
+    }));
+    
+    _device->synchronize();
+    LUISA_INFO("Done encoding geometry buffers.");
+    
+    _positions.clear_cache();
+    _normals.clear_cache();
+    _tex_coords.clear_cache();
+    _triangles.clear_cache();
+    _triangle_cdf_tables.clear_cache();
+    _entities.clear_cache();
+    _instance_to_entity_id.clear_cache();
+    if (_is_static) { _instance_transforms.clear_cache(); }
     
     LUISA_INFO("Creating acceleration structure.");
     _acceleration = _device->build_acceleration(_positions, _triangles, meshes, _instance_to_entity_id, _instance_transforms, _is_static);

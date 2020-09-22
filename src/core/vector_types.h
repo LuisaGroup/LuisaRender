@@ -301,4 +301,56 @@ constexpr bool none(bool2 v) noexcept { return !any(v); }
 constexpr bool none(bool3 v) noexcept { return !any(v); }
 constexpr bool none(bool4 v) noexcept { return !any(v); }
 
+namespace detail {
+
+template<typename T>
+struct IsVector2Impl : std::false_type {};
+
+template<typename T>
+struct IsVector2Impl<Vector<T, 2>> : std::true_type {};
+
+template<typename T>
+struct IsVector3Impl : std::false_type {};
+
+template<typename T>
+struct IsVector3Impl<Vector<T, 3>> : std::true_type {};
+
+template<typename T>
+struct IsVector4Impl : std::false_type {};
+
+template<typename T>
+struct IsVector4Impl<Vector<T, 4>> : std::true_type {};
+
+template<typename T>
+struct IsVectorImpl : std::false_type {};
+
+template<typename T, uint N>
+struct IsVectorImpl<Vector<T, N>> : std::true_type {};
+
+}
+
+template<typename T>
+using IsVector2 = detail::IsVector2Impl<T>;
+
+template<typename T>
+using IsVector3 = detail::IsVector3Impl<T>;
+
+template<typename T>
+using IsVector4 = detail::IsVector4Impl<T>;
+
+template<typename T>
+using IsVector = detail::IsVectorImpl<T>;
+
+template<typename T>
+constexpr auto is_vector2 = IsVector2<T>::value;
+
+template<typename T>
+constexpr auto is_vector3 = IsVector3<T>::value;
+
+template<typename T>
+constexpr auto is_vector4 = IsVector4<T>::value;
+
+template<typename T>
+constexpr auto is_vector = IsVector<T>::value;
+
 }}// namespace luisa::vector

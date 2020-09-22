@@ -46,129 +46,18 @@ void CppCodegen::visit(const ValueExpr *literal_expr) {
         using T = std::decay_t<decltype(v)>;
         
         // scalar
-        if constexpr (is_scalar<T>) { emit(v); }
-            
-            // type2
-        else if constexpr (std::is_same_v<T, bool2>) {
-            _os << "bool2(";
+        if constexpr (is_scalar<T>) {
+            emit(v);
+        } else if constexpr (is_vector2<T>) {
+            _emit_type(type_desc<T>);
+            _os << "(";
             emit(v.x);
             _os << ", ";
             emit(v.y);
             _os << ")";
-        } else if constexpr (std::is_same_v<T, float2>) {
-            _os << "float2(";
-            emit(v.x);
-            _os << ", ";
-            emit(v.y);
-            _os << ")";
-        } else if constexpr (std::is_same_v<T, char2>) {
-            _os << "char2(";
-            emit(v.x);
-            _os << ", ";
-            emit(v.y);
-            _os << ")";
-        } else if constexpr (std::is_same_v<T, uchar2>) {
-            _os << "uchar2(";
-            emit(v.x);
-            _os << ", ";
-            emit(v.y);
-            _os << ")";
-        } else if constexpr (std::is_same_v<T, short2>) {
-            _os << "short2(";
-            emit(v.x);
-            _os << ", ";
-            emit(v.y);
-            _os << ")";
-        } else if constexpr (std::is_same_v<T, ushort2>) {
-            _os << "ushort2(";
-            emit(v.x);
-            _os << ", ";
-            emit(v.y);
-            _os << ")";
-        } else if constexpr (std::is_same_v<T, int2>) {
-            _os << "int2(";
-            emit(v.x);
-            _os << ", ";
-            emit(v.y);
-            _os << ")";
-        } else if constexpr (std::is_same_v<T, uint2>) {
-            _os << "uint2(";
-            emit(v.x);
-            _os << ", ";
-            emit(v.y);
-            _os << ")";
-        }
-            
-            // type3
-        else if constexpr (std::is_same_v<T, bool3>) {
-            _os << "bool3(";
-            emit(v.x);
-            _os << ", ";
-            emit(v.y);
-            _os << ", ";
-            emit(v.z);
-            _os << ")";
-        } else if constexpr (std::is_same_v<T, float3>) {
-            _os << "float3(";
-            emit(v.x);
-            _os << ", ";
-            emit(v.y);
-            _os << ", ";
-            emit(v.z);
-            _os << ")";
-        } else if constexpr (std::is_same_v<T, char3>) {
-            _os << "char3(";
-            emit(v.x);
-            _os << ", ";
-            emit(v.y);
-            _os << ", ";
-            emit(v.z);
-            _os << ")";
-        } else if constexpr (std::is_same_v<T, uchar3>) {
-            _os << "uchar3(";
-            emit(v.x);
-            _os << ", ";
-            emit(v.y);
-            _os << ", ";
-            emit(v.z);
-            _os << ")";
-        } else if constexpr (std::is_same_v<T, short3>) {
-            _os << "short3(";
-            emit(v.x);
-            _os << ", ";
-            emit(v.y);
-            _os << ", ";
-            emit(v.z);
-            _os << ")";
-        } else if constexpr (std::is_same_v<T, ushort3>) {
-            _os << "ushort3(";
-            emit(v.x);
-            _os << ", ";
-            emit(v.y);
-            _os << ", ";
-            emit(v.z);
-            _os << ")";
-        } else if constexpr (std::is_same_v<T, int3>) {
-            _os << "int3(";
-            emit(v.x);
-            _os << ", ";
-            emit(v.y);
-            _os << ", ";
-            emit(v.z);
-            _os << ")";
-        } else if constexpr (std::is_same_v<T, uint3>) {
-            _os << "uint3(";
-            emit(v.x);
-            _os << ", ";
-            emit(v.y);
-            _os << ", ";
-            emit(v.z);
-            _os << ")";
-        }
-            
-            // type4
-        else if constexpr (std::is_same_v<T, bool4>) {
-            _os << "bool4(";
+        } else if constexpr (is_vector4<T>) {
+            _emit_type(type_desc<T>);
+            _os << "(";
             emit(v.x);
             _os << ", ";
             emit(v.y);
@@ -177,81 +66,9 @@ void CppCodegen::visit(const ValueExpr *literal_expr) {
             _os << ", ";
             emit(v.w);
             _os << ")";
-        } else if constexpr (std::is_same_v<T, float4>) {
-            _os << "float4(";
-            emit(v.x);
-            _os << ", ";
-            emit(v.y);
-            _os << ", ";
-            emit(v.z);
-            _os << ", ";
-            emit(v.w);
-            _os << ")";
-        } else if constexpr (std::is_same_v<T, char4>) {
-            _os << "char4(";
-            emit(v.x);
-            _os << ", ";
-            emit(v.y);
-            _os << ", ";
-            emit(v.z);
-            _os << ", ";
-            emit(v.w);
-            _os << ")";
-        } else if constexpr (std::is_same_v<T, uchar4>) {
-            _os << "uchar4(";
-            emit(v.x);
-            _os << ", ";
-            emit(v.y);
-            _os << ", ";
-            emit(v.z);
-            _os << ", ";
-            emit(v.w);
-            _os << ")";
-        } else if constexpr (std::is_same_v<T, short4>) {
-            _os << "short4(";
-            emit(v.x);
-            _os << ", ";
-            emit(v.y);
-            _os << ", ";
-            emit(v.z);
-            _os << ", ";
-            emit(v.w);
-            _os << ")";
-        } else if constexpr (std::is_same_v<T, ushort4>) {
-            _os << "ushort4(";
-            emit(v.x);
-            _os << ", ";
-            emit(v.y);
-            _os << ", ";
-            emit(v.z);
-            _os << ", ";
-            emit(v.w);
-            _os << ")";
-        } else if constexpr (std::is_same_v<T, int4>) {
-            _os << "int4(";
-            emit(v.x);
-            _os << ", ";
-            emit(v.y);
-            _os << ", ";
-            emit(v.z);
-            _os << ", ";
-            emit(v.w);
-            _os << ")";
-        } else if constexpr (std::is_same_v<T, uint4>) {
-            _os << "uint4(";
-            emit(v.x);
-            _os << ", ";
-            emit(v.y);
-            _os << ", ";
-            emit(v.z);
-            _os << ", ";
-            emit(v.w);
-            _os << ")";
-        }
-        
-        // matrices
-        else if constexpr (std::is_same_v<T, float3x3>) {
-            _os << "float3x3(";
+        } else if constexpr (std::is_same_v<T, float3x3>) {
+            _emit_type(type_desc<T>);
+            _os << "(";
             emit(v[0].x);
             _os << ", ";
             emit(v[0].y);
@@ -271,7 +88,8 @@ void CppCodegen::visit(const ValueExpr *literal_expr) {
             emit(v[2].z);
             _os << ")";
         } else if constexpr (std::is_same_v<T, float4x4>) {
-            _os << "float4x4(";
+            _emit_type(type_desc<T>);
+            _os << "(";
             emit(v[0].x);
             _os << ", ";
             emit(v[0].y);

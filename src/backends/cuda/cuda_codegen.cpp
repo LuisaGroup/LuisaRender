@@ -23,7 +23,7 @@ void CudaCodegen::emit(const Function &f) {
            "using luisa::ushort;\n"
            "using luisa::uint;\n"
            "\n"
-           "template<typename T, uint N> using array = T[N];\n";
+           "template<typename T, uint N> using array = T[N];\n\n";
     CppCodegen::emit(f);
 }
 

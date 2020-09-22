@@ -70,7 +70,7 @@ std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) { 
     CudaCodegen codegen{os};
     codegen.emit(function);
     auto src = os.str();
-    if (_context->should_print_generated_source()) { LUISA_INFO("Generated source:\n", src); }
+    if (_context->should_print_generated_source()) { LUISA_INFO("Generated source for kernel \"", function.name(), "\":\n", src); }
     
     auto digest = SHA1{src}.digest();
     
