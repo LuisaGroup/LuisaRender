@@ -2,6 +2,7 @@
 // Created by Mike Smith on 2020/9/15.
 //
 
+#include <compute/dsl_syntax.h>
 #include <render/sampler.h>
 
 namespace luisa::render::sampler {

@@ -2,7 +2,7 @@
 // Created by Mike Smith on 2020/9/4.
 //
 
-#include <compute/dsl.h>
+#include <compute/dsl_syntax.h>
 #include "scene.h"
 
 namespace luisa::render {

@@ -5,7 +5,7 @@
 #pragma once
 
 #include <compute/device.h>
-#include <compute/dsl.h>
+#include <compute/dsl_syntax.h>
 #include <compute/kernel.h>
 
 #include "box_blur.h"

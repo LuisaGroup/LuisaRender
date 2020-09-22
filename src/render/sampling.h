@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <compute/dsl.h>
+#include <compute/dsl_syntax.h>
 
 namespace luisa::render {
 

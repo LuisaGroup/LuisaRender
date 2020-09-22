@@ -7,7 +7,7 @@
 #include <vector>
 
 #include <compute/device.h>
-#include <compute/dsl.h>
+#include <compute/dsl_syntax.h>
 
 using namespace luisa;
 using namespace luisa::compute;
