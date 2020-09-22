@@ -113,7 +113,7 @@ public:
                 Var distance_vis = distance_from_feature(visibility, var_vis, grad_vis, k_vis);
                 
                 Var distance_feature = max(max(max(distance_albedo, distance_normal), max(distance_depth, distance_vis)), 0.0f);
-                Var w = exp(-distance_feature);
+                Var w = exp(-distance_feature - (d.x * d.x + d.y * d.y) * 0.075f);
                 
                 if (!std::isinf(k_color)) {
                     Var distance_color = max(_distance_texture.read(thread_xy()).r, 0.0f);

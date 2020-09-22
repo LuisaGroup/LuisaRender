@@ -98,7 +98,7 @@ int main(int argc, char *argv[]) {
         }
         
         auto guided_nlm = std::make_unique<GuidedNonLocalMeansFilter>(
-            *device, 5, 3, color, color_var, static_cast<float>(INFINITY), 1e-3f,
+            *device, 5, 3, color, color_var, 0.45f, 1e-3f,
             features["albedo"], features["albedo_var"], features["albedo_grad"], 0.6f,
             features["normal"], features["normal_var"], features["normal_grad"], 0.6f,
             features["depth"], features["depth_var"], features["depth_grad"], 0.6f,

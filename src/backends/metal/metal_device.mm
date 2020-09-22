@@ -101,9 +101,8 @@ std::shared_ptr<Kernel> MetalDevice::_compile_kernel(const compute::dsl::Functio
         LUISA_INFO("No compilation cache found for kernel \"", f.name(), "\", compiling from source...");
         NSError *error = nullptr;
         auto library = [_handle newLibraryWithSource:@(s.c_str()) options:nullptr error:&error];
-        if (error != nullptr) {
-            LUISA_WARNING("Compilation output:");
-            NSLog(@"%@", error);
+        if (error != nullptr && error.code != MTLLibraryErrorCompileWarning) {
+            LUISA_EXCEPTION("Compilation failed, reason:\n", [error.description cStringUsingEncoding:NSUTF8StringEncoding]);
         }
         
         // Create PSO

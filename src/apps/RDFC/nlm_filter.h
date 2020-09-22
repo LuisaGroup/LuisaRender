@@ -87,7 +87,7 @@ public:
             Var p = make_int2(thread_xy());
             Var q = p + d;
             If (p.x < _width && p.y < _height && q.x >= 0 && q.x < _width && q.y >= 0 && q.y < _height) {
-                Var weight = exp(-max(_distance_texture.read(thread_xy()).r, 0.0f));
+                Var weight = exp(-max(_distance_texture.read(thread_xy()).r, 0.0f) - (d.x * d.x + d.y * d.y) * 0.125f);
                 auto accumulate = [&](auto &&color_texture, auto &&accum_texture) {
                     Var color_q = make_float3(color_texture.read(make_uint2(q)));
                     Var accum = accum_texture.read(thread_xy());
