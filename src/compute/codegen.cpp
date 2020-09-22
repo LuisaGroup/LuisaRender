@@ -55,6 +55,15 @@ void CppCodegen::visit(const ValueExpr *literal_expr) {
             _os << ", ";
             emit(v.y);
             _os << ")";
+        } else if constexpr (is_vector3<T>) {
+            _emit_type(type_desc<T>);
+            _os << "(";
+            emit(v.x);
+            _os << ", ";
+            emit(v.y);
+            _os << ", ";
+            emit(v.z);
+            _os << ")";
         } else if constexpr (is_vector4<T>) {
             _emit_type(type_desc<T>);
             _os << "(";
@@ -122,6 +131,8 @@ void CppCodegen::visit(const ValueExpr *literal_expr) {
             _os << ", ";
             emit(v[3].w);
             _os << ")";
+        } else {
+            LUISA_EXCEPTION("Unknown value type.");
         }
     }, value);
     _os.flags(flags);

@@ -30,6 +30,9 @@ public:
     [[nodiscard]] auto translation() const noexcept { return _t; }
     [[nodiscard]] auto rotation() const noexcept { return _r; }
     [[nodiscard]] auto scaling() const noexcept { return _s; }
+    [[nodiscard]] bool is_static() const noexcept override { return true; }
 };
 
 }
+
+LUISA_EXPORT_PLUGIN_CREATOR(luisa::render::transform::TRSTransform)
