@@ -259,6 +259,8 @@ void Scene::_process_geometry(const std::vector<std::shared_ptr<Shape>> &shapes,
         _entities.clear_cache();
         _instance_to_entity_id.clear_cache();
     });
+    _device->synchronize();
+    LUISA_INFO("Done encoding geometry buffers.");
     
     // apply initial transforms and build acceleration structure
     _is_static = _transform_tree.is_static();
@@ -267,6 +269,8 @@ void Scene::_process_geometry(const std::vector<std::shared_ptr<Shape>> &shapes,
     }), [&] {
         if (_is_static) { _instance_transforms.clear_cache(); }
     });
+    
+    LUISA_INFO("Creating acceleration structure.");
     _acceleration = _device->build_acceleration(_positions, _triangles, meshes, _instance_to_entity_id, _instance_transforms, _is_static);
 }
 

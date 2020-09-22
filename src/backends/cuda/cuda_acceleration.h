@@ -28,6 +28,11 @@ class CudaDevice;
 class CudaAcceleration : public Acceleration {
 
 private:
+    OptixDeviceContext _optix_ctx{nullptr};
+    std::vector<OptixTraversableHandle> _gas_handles;
+    std::vector<CUdeviceptr> _gas_buffers;
+
+private:
     void _refit(compute::Dispatcher &dispatch) override;
     void _intersect_any(compute::Dispatcher &dispatch, const BufferView<Ray> &ray_buffer, const BufferView<AnyHit> &hit_buffer) const override;
     void _intersect_closest(compute::Dispatcher &dispatch, const BufferView<Ray> &ray_buffer, const BufferView<ClosestHit> &hit_buffer) const override;
