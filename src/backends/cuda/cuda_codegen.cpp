@@ -108,7 +108,7 @@ void CudaCodegen::_emit_function_decl(const Function &f) {
             }
         }
         _os << "};\n\n"
-            << "extern \"C\" __global__ void " << f.name() << "(Argument arg) ";
+            << "extern \"C\" __global__ void " << f.name() << "(const Argument arg) ";
     } else {
         _os << "extern \"C\" __global__ void " << f.name() << "() ";
     }

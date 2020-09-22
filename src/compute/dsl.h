@@ -39,6 +39,8 @@ protected:
 public:
     explicit ExprBase(const Variable *variable) noexcept: _variable{variable} {}
     [[nodiscard]] const Variable *variable() const noexcept { return _variable; }
+    
+    void assign(const ExprBase &another) const noexcept { Function::current().add_statement(std::make_unique<AssignStmt>(AssignOp::ASSIGN, _variable, another._variable)); }
 
 #define MAKE_ASSIGN_OP_EXPR(op, op_tag)                                                 \
     void operator op(const ExprBase &rhs) const noexcept {                              \
@@ -46,25 +48,9 @@ public:
             std::make_unique<AssignStmt>(AssignOp::op_tag, _variable, rhs._variable));  \
     }
 
-#define MAKE_ASSIGN_OP_SCALAR(T, op, op_tag)                                              \
-    void operator op(T x) const noexcept {                                                \
-        auto v = Variable::make_temporary(type_desc<T>, std::make_unique<ValueExpr>(x));  \
-        Function::current().add_statement(                                                \
-            std::make_unique<AssignStmt>(AssignOp::op_tag, _variable, v));                \
-    }
-
 #define MAKE_ASSIGN_OP(op, op_tag)               \
     MAKE_ASSIGN_OP_EXPR(op, op_tag)              \
-    MAKE_ASSIGN_OP_SCALAR(bool, op, op_tag)      \
-    MAKE_ASSIGN_OP_SCALAR(float, op, op_tag)     \
-    MAKE_ASSIGN_OP_SCALAR(int8_t, op, op_tag)    \
-    MAKE_ASSIGN_OP_SCALAR(uint8_t, op, op_tag)   \
-    MAKE_ASSIGN_OP_SCALAR(int16_t, op, op_tag)   \
-    MAKE_ASSIGN_OP_SCALAR(uint16_t, op, op_tag)  \
-    MAKE_ASSIGN_OP_SCALAR(int32_t, op, op_tag)   \
-    MAKE_ASSIGN_OP_SCALAR(uint32_t, op, op_tag)
     
-    MAKE_ASSIGN_OP(=, ASSIGN)
     MAKE_ASSIGN_OP(+=, ADD_ASSIGN)
     MAKE_ASSIGN_OP(-=, SUB_ASSIGN)
     MAKE_ASSIGN_OP(*=, MUL_ASSIGN)
@@ -78,7 +64,6 @@ public:
 
 #undef MAKE_ASSIGN_OP
 #undef MAKE_ASSIGN_OP_EXPR
-#undef MAKE_ASSIGN_OP_SCALAR
 };
 
 namespace detail {
@@ -99,12 +84,13 @@ constexpr auto is_array = IsArray<T>::value;
 
 template<typename T>
 struct Expr : public ExprBase {
-    
     using Type = T;
     explicit Expr(const Variable *v) noexcept: ExprBase{v} {}
     Expr(T v) noexcept: ExprBase{Variable::make_temporary(type_desc<T>, std::make_unique<ValueExpr>(v))} {}
     Expr(ExprBase &&expr) noexcept: ExprBase{expr.variable()} {}
     Expr(const ExprBase &expr) noexcept: ExprBase{expr.variable()} {}
+    
+    void operator=(const Expr<T> &e) const noexcept { assign(e); }
 };
 
 template<typename T, size_t N>
@@ -119,6 +105,8 @@ struct Expr<std::array<T, N>> : public ExprBase {
     
     template<typename U>
     [[nodiscard]] Expr<T> operator[](U &&index) const noexcept;
+    
+    void operator=(const ExprType &e) const noexcept { assign(e); }
 };
 
 template<typename T>
@@ -139,6 +127,8 @@ struct Expr<Vector<T, 2>> : public ExprBase {
     Expr<T> y{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "y"))};
     Expr<T> r{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "x"))};
     Expr<T> g{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "y"))};
+    
+    void operator=(const ExprType &e) const noexcept { assign(e); }
 };
 
 template<typename T>
@@ -161,6 +151,8 @@ struct Expr<Vector<T, 3>> : public ExprBase {
     Expr<T> r{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "x"))};
     Expr<T> g{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "y"))};
     Expr<T> b{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "z"))};
+    
+    void operator=(const ExprType &e) const noexcept { assign(e); }
 };
 
 template<typename T>
@@ -185,12 +177,15 @@ struct Expr<Vector<T, 4>> : public ExprBase {
     Expr<T> g{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "y"))};
     Expr<T> b{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "z"))};
     Expr<T> a{Variable::make_temporary(type_desc<T>, std::make_unique<MemberExpr>(_variable, "w"))};
+    
+    void operator=(const ExprType &e) const noexcept { assign(e); }
 };
 
 template<>
 struct Expr<float3x3> : public ExprBase {
     
     using Type = float3x3;
+    using ExprType = Expr<Type>;
     
     Expr(Type v) noexcept: ExprBase{Variable::make_temporary(type_desc<Type>, std::make_unique<ValueExpr>(v))} {}
     explicit Expr(const Variable *v) noexcept: ExprBase{v} {}
@@ -199,12 +194,15 @@ struct Expr<float3x3> : public ExprBase {
     
     template<typename U>
     [[nodiscard]] Expr<float3> operator[](U &&index) const noexcept;
+    
+    void operator=(const ExprType &e) const noexcept { assign(e); }
 };
 
 template<>
 struct Expr<float4x4> : public ExprBase {
     
     using Type = float4x4;
+    using ExprType = Expr<Type>;
     
     Expr(Type v) noexcept: ExprBase{Variable::make_temporary(type_desc<Type>, std::make_unique<ValueExpr>(v))} {}
     explicit Expr(const Variable *v) noexcept: ExprBase{v} {}
@@ -213,6 +211,8 @@ struct Expr<float4x4> : public ExprBase {
     
     template<typename U>
     [[nodiscard]] Expr<float4> operator[](U &&index) const noexcept;
+    
+    void operator=(const ExprType &e) const noexcept { assign(e); }
 };
 
 // Deduction guides
@@ -315,7 +315,7 @@ struct Var : public Expr<std::decay_t<T>> {
 
 #define MAKE_ASSIGN_OP(op)  \
     template<typename U>    \
-    void operator op(U &&rhs) noexcept { ExprBase::operator op(Expr{std::forward<U>(rhs)}); }
+    void operator op(U &&rhs) noexcept { ExprType::operator op(Expr{std::forward<U>(rhs)}); }
     
     MAKE_ASSIGN_OP(=);
     MAKE_ASSIGN_OP(+=);
@@ -619,9 +619,11 @@ namespace luisa::compute::dsl {                                                 
 namespace luisa::compute::dsl {                                         \
 template<> struct Expr<S> : public ExprBase {                           \
     using Type = S;                                                     \
+    using ExprType = Expr<Type>;                                        \
     explicit Expr(const Variable *v) noexcept : ExprBase{v} {}          \
     Expr(ExprBase &&expr) noexcept : ExprBase{expr.variable()} {}       \
     Expr(const ExprBase &expr) noexcept : ExprBase{expr.variable()} {}  \
+    void operator=(const ExprType &e) const noexcept { assign(e); }     \
     LUISA_MAP(LUISA_STRUCT_MAP_MEMBER_NAME_TO_EXPR, __VA_ARGS__)        \
 };                                                                      \
 }

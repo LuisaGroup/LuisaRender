@@ -114,7 +114,7 @@ CudaAcceleration::CudaAcceleration(
         auto tid = thread_id();
         If (tid < instance_count) {
             Var transform = transpose(transforms[tid]);
-            auto instance = _instance_buffer[tid];
+            Var<Instance> instance;
             instance.transform[0u] = transform[0u];
             instance.transform[1u] = transform[1u];
             instance.transform[2u] = transform[2u];
@@ -123,6 +123,7 @@ CudaAcceleration::CudaAcceleration(
             instance.mask = 0xffffffffu;
             instance.flags = static_cast<uint>(OPTIX_INSTANCE_FLAG_DISABLE_TRIANGLE_FACE_CULLING);
             instance.traversable = _gas_handle_buffer[tid];
+            _instance_buffer[tid] = instance;
         };
     });
     
