@@ -38,7 +38,7 @@ private:
                      << _sampler->prepare_for_next_frame();
         }
         pipeline << _camera->film()->postprocess()
-                 << _camera->film()->save("result.exr");
+                 << _camera->film()->save(device()->context().input_path("result.exr"));
     }
 };
 

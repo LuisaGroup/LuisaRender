@@ -26,8 +26,9 @@ public:
 private:
     int _argc;
     const char **_argv;
-    std::filesystem::path _rundir;
-    std::filesystem::path _workdir;
+    std::filesystem::path _run_dir;
+    std::filesystem::path _work_dir;
+    std::filesystem::path _in_dir;
     std::optional<std::vector<DeviceSelection>> _devices;
     mutable cxxopts::Options _cli_options;
     mutable std::optional<cxxopts::ParseResult> _parsed_cli_options;
@@ -37,6 +38,7 @@ private:
     [[nodiscard]] const cxxopts::ParseResult &_parse_result() const noexcept;
     [[nodiscard]] const std::filesystem::path &_runtime_dir() noexcept;
     [[nodiscard]] const std::filesystem::path &_working_dir() noexcept;
+    [[nodiscard]] const std::filesystem::path &_input_dir() noexcept;
 
     static bool _create_folder_if_necessary(const std::filesystem::path &path) noexcept;
 
@@ -48,6 +50,7 @@ public:
     [[nodiscard]] std::filesystem::path include_path(const std::filesystem::path &name = {}) noexcept;
     [[nodiscard]] std::filesystem::path working_path(const std::filesystem::path &name = {}) noexcept;
     [[nodiscard]] std::filesystem::path runtime_path(const std::filesystem::path &name = {}) noexcept;
+    [[nodiscard]] std::filesystem::path input_path(const std::filesystem::path &name = {}) noexcept;
     [[nodiscard]] std::filesystem::path cache_path(const std::filesystem::path &name = {}) noexcept;
 
     template<typename F>
@@ -77,7 +80,7 @@ public:
     
     [[nodiscard]] std::string cli_positional_option() const { return _parse_result()["positional"].as<std::string>(); }
 
-    [[nodiscard]] const std::vector<DeviceSelection> &devices() noexcept;
+    [[nodiscard]] const std::vector<DeviceSelection> &device_selections() noexcept;
     [[nodiscard]] bool should_print_generated_source() const noexcept { return cli_option<bool>("print-source"); }
 };
 

@@ -91,11 +91,11 @@ constexpr auto texture_jit_header =
 
 inline const auto &get_jit_headers(Context *context) noexcept {
     static std::map<const char *, std::string> headers{
-        {"scalar_types.h", text_file_contents(context->runtime_path("include") / "core" / "scalar_types.h")},
-        {"vector_types.h", text_file_contents(context->runtime_path("include") / "core" / "vector_types.h")},
-        {"matrix_types.h", text_file_contents(context->runtime_path("include") / "core" / "matrix_types.h")},
-        {"data_types.h", text_file_contents(context->runtime_path("include") / "core" / "data_types.h")},
-        {"math_util.h", text_file_contents(context->runtime_path("include") / "core" / "math_util.h")},
+        {"scalar_types.h", text_file_contents(context->include_path("core") / "scalar_types.h")},
+        {"vector_types.h", text_file_contents(context->include_path("core") / "vector_types.h")},
+        {"matrix_types.h", text_file_contents(context->include_path("core") / "matrix_types.h")},
+        {"data_types.h", text_file_contents(context->include_path("core") / "data_types.h")},
+        {"math_util.h", text_file_contents(context->include_path("core") / "math_util.h")},
         {"texture_util.h", texture_jit_header}};
     return headers;
 }

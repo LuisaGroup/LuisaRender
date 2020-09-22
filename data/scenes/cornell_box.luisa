@@ -1,7 +1,7 @@
 Integrator integrator : AO {}
 
 Shape cbox : WavefrontObj {
-  path { "data/meshes/cornell/CornellBox-Original.obj" }
+  path { "../meshes/cornell/CornellBox-Original.obj" }
 }
 
 Film film : RGB {
