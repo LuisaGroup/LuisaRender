@@ -9,7 +9,7 @@ namespace luisa::compute::dsl {
 void CppCodegen::emit(const Function &f) {
     
     // used structs
-    std::vector<const TypeDesc *> used_structures{f.used_structures().cbegin(), f.used_structures().cend()};
+    auto used_structures = f.used_structures();
     std::sort(used_structures.begin(), used_structures.end(), [](const TypeDesc *lhs, const TypeDesc *rhs) noexcept {
         return lhs->uid() < rhs->uid();
     });
@@ -140,7 +140,7 @@ void CppCodegen::visit(const ValueExpr *literal_expr) {
 
 void CppCodegen::_emit_struct_decl(const TypeDesc *desc) {
     
-    _os << "struct alignas(" << desc->alignment << ") Struct_" << desc->uid() << " {";
+    _os << "struct alignas(" << desc->alignment << ") Struct_" << desc->identifier << " {";
     if (!desc->member_names.empty()) { _os << "\n"; }
     
     // for each member
@@ -233,7 +233,7 @@ void CppCodegen::_emit_type(const TypeDesc *desc) {
             _emit_type(desc->element_type);
             _os << ">";
         case TypeCatalog::STRUCTURE:
-            _os << "Struct_" << desc->uid();
+            _os << "Struct_" << desc->identifier;
             break;
         default:
             _os << "[BAD]";

@@ -504,6 +504,8 @@ namespace luisa::compute::dsl {                                                 
             static std::once_flag flag;                                                          \
             std::call_once(flag, []{                                                             \
                 td.type = TypeCatalog::STRUCTURE;                                                \
+                td.identifier = #S;                                                              \
+                for (auto &&c : td.identifier) { if (c == ':') { c = '_'; } }                    \
                 td.member_names.clear();                                                         \
                 td.member_types.clear();                                                         \
 

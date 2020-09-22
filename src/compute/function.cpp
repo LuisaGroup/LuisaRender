@@ -15,7 +15,7 @@ Function &Function::current() noexcept {
     return *_current.top();
 }
 
-Function::Function(std::string name) noexcept : _name{std::move(name)} {
+Function::Function(std::string name) noexcept: _name{std::move(name)} {
     _body = std::make_unique<ScopeStmt>();
     _scope_stack.push(_body.get());
 }
@@ -30,8 +30,11 @@ void Function::_use_structure_type(const TypeDesc *type) noexcept {
     if (type == nullptr || type->type == TypeCatalog::UNKNOWN) { return; }
     if (type->type == TypeCatalog::ARRAY) {
         _use_structure_type(type->element_type);
-    } else if (type->type == TypeCatalog::STRUCTURE && _used_struct_types.find(type) == _used_struct_types.cend()) {
-        _used_struct_types.emplace(type);
+    } else if (type->type == TypeCatalog::STRUCTURE &&
+               std::none_of(_used_struct_types.cbegin(), _used_struct_types.cend(), [type](const TypeDesc *td) noexcept {
+                   return td == type || td->uid() == type->uid() || td->identifier == type->identifier;
+               })) {
+        _used_struct_types.emplace_back(type);
         for (auto member_type : type->member_types) { _use_structure_type(member_type); }
     }
 }

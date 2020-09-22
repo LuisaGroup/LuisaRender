@@ -24,7 +24,7 @@ struct VectorStorage<T, 2> {
     T x, y;
     constexpr VectorStorage() noexcept : x{}, y{} {}
     explicit constexpr VectorStorage(T s) noexcept : x{s}, y{s} {}
-    explicit constexpr VectorStorage(T x, T y) noexcept : x{x}, y{y} {}
+    constexpr VectorStorage(T x, T y) noexcept : x{x}, y{y} {}
 };
 
 template<typename T>
@@ -32,7 +32,7 @@ struct VectorStorage<T, 3> {
     T x, y, z;
     constexpr VectorStorage() noexcept : x{}, y{}, z{} {}
     explicit constexpr VectorStorage(T s) noexcept : x{s}, y{s}, z{s} {}
-    explicit constexpr VectorStorage(T x, T y, T z) noexcept : x{x}, y{y}, z{z} {}
+    constexpr VectorStorage(T x, T y, T z) noexcept : x{x}, y{y}, z{z} {}
 };
 
 template<typename T>
@@ -40,7 +40,7 @@ struct VectorStorage<T, 4> {
     T x, y, z, w;
     constexpr VectorStorage() noexcept : x{}, y{}, z{}, w{} {}
     explicit constexpr VectorStorage(T s) noexcept : x{s}, y{s}, z{s}, w{s} {}
-    explicit constexpr VectorStorage(T x, T y, T z, T w) noexcept : x{x}, y{y}, z{z}, w{w} {}
+    constexpr VectorStorage(T x, T y, T z, T w) noexcept : x{x}, y{y}, z{z}, w{w} {}
 };
 
 }// namespace detail
@@ -54,8 +54,8 @@ struct alignas(detail::vector_alignment<T, N>) Vector : detail::VectorStorage<T,
     
     explicit constexpr Vector(T u) noexcept : detail::VectorStorage<T, N>{u} {}
     
-    template<typename... U>
-    explicit constexpr Vector(U... u) noexcept : detail::VectorStorage<T, N>{u...} {}
+    template<typename... U, typename std::enable_if<sizeof...(U) == N, int>::type = 0>
+    constexpr Vector(U... u) noexcept : detail::VectorStorage<T, N>{u...} {}
     
     template<typename Index>
     [[nodiscard]] T &operator[](Index i) noexcept { return reinterpret_cast<T(&)[N]>(*this)[i]; }
