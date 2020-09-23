@@ -48,13 +48,13 @@ private:
     bool _is_static;
     optix::prime::Context _optix_context;
     std::vector<optix::prime::Model> _optix_geometry_models;
-    BufferView<uchar> _optix_instance_buffer;
+    std::vector<RTPmodel> _optix_geometry_instances;
     optix::prime::Model _optix_instance_model;
     optix::prime::Query _optix_anyhit_query;
     optix::prime::Query _optix_closesthit_query;
     mutable BufferView<CudaClosestHit> _optix_closesthit_buffer;
     BufferView<luisa::float4x4> _input_transform_buffer;
-    BufferView<luisa::float4x4> _optix_transform_buffer;
+    BufferView<std::array<float4, 3>> _optix_transform_buffer;
     KernelView _update_transforms_kernel;
 
 private:
