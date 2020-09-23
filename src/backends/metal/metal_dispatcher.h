@@ -25,9 +25,9 @@ private:
 protected:
     void _on_dispatch() override {
         if (++_dispatch_count >= max_commands_in_single_dispatch) {
-            auto command_queue = [_handle commandQueue];
+            [_handle enqueue];
             [_handle commit];
-            _handle = [command_queue commandBuffer];
+            _handle = [[_handle commandQueue] commandBufferWithUnretainedReferences];
             _dispatch_count = 0u;
         }
     }
@@ -37,14 +37,19 @@ public:
     ~MetalDispatcher() noexcept override { [_handle waitUntilCompleted]; }
     [[nodiscard]] id<MTLCommandBuffer> handle() const noexcept { return _handle; }
     void reset(id<MTLCommandBuffer> handle = nullptr) noexcept {
-        _callbacks.clear();
+        _callbacks = {};
         _handle = handle;
         _dispatch_count = 0u;
     }
     
     void wait() override { [_handle waitUntilCompleted]; }
     void commit() override {
-        [_handle addCompletedHandler:^(id<MTLCommandBuffer>) { for (auto &&callback : _callbacks) { callback(); } }];
+        [_handle addCompletedHandler:^(__weak id<MTLCommandBuffer>) {
+            for (auto &&callback : _callbacks) {
+                callback();
+            }
+        }];
+        [_handle enqueue];
         [_handle commit];
     }
 };

@@ -13,8 +13,8 @@ namespace luisa::metal {
 
 void MetalKernel::_dispatch(Dispatcher &dispatcher, uint2 threadgroups, uint2 threadgroup_size) {
     
-    auto command_buffer = dynamic_cast<MetalDispatcher &>(dispatcher).handle();
-    auto command_encoder = [command_buffer computeCommandEncoderWithDispatchType:MTLDispatchTypeConcurrent];
+    id<MTLCommandBuffer> command_buffer = dynamic_cast<MetalDispatcher &>(dispatcher).handle();
+    id<MTLComputeCommandEncoder> command_encoder = [command_buffer computeCommandEncoderWithDispatchType:MTLDispatchTypeConcurrent];
     [command_encoder setComputePipelineState:_handle];
     
     // encode arguments
@@ -22,11 +22,11 @@ void MetalKernel::_dispatch(Dispatcher &dispatcher, uint2 threadgroups, uint2 th
     uint texture_id = 0;
     for (auto &&r : _resources) {
         if (r.buffer != nullptr) {  // buffer
-            auto mtl_buffer = dynamic_cast<MetalBuffer *>(r.buffer.get())->handle();
+            id<MTLBuffer> mtl_buffer = dynamic_cast<MetalBuffer *>(r.buffer.get())->handle();
             [command_encoder setBuffer:mtl_buffer offset:0u atIndex:buffer_id];
             buffer_id++;
         } else if (r.texture != nullptr) {  // texture
-            auto mtl_texture = dynamic_cast<MetalTexture *>(r.texture.get())->handle();
+            id<MTLTexture> mtl_texture = dynamic_cast<MetalTexture *>(r.texture.get())->handle();
             [command_encoder setTexture:mtl_texture atIndex:texture_id];
             texture_id++;
         } else {

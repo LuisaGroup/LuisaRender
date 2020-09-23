@@ -27,7 +27,7 @@ using namespace compute;
 class MetalDevice : public Device {
 
 public:
-    static constexpr auto max_command_queue_size = 8u;
+    static constexpr auto max_command_queue_size = 16u;
 
 private:
     id<MTLDevice> _handle;
@@ -70,7 +70,7 @@ MetalDevice::MetalDevice(Context *context, uint32_t device_id) : Device{context,
     LUISA_ERROR_IF_NOT(device_id < devices.count, "Invalid Metal device index ", device_id, ": max available index is ", devices.count - 1, ".");
     _handle = devices[device_id];
     LUISA_INFO("Created Metal device #", device_id, ", description:\n", [_handle.description cStringUsingEncoding:NSUTF8StringEncoding]);
-    _command_queue = [_handle newCommandQueue];
+    _command_queue = [_handle newCommandQueueWithMaxCommandBufferCount:max_command_queue_size];
     _dispatchers.reserve(max_command_queue_size);
     for (auto i = 0u; i < max_command_queue_size; i++) {
         _dispatchers.emplace_back(std::make_unique<MetalDispatcher>());
@@ -162,7 +162,7 @@ std::shared_ptr<Kernel> MetalDevice::_compile_kernel(const compute::dsl::Functio
 
 void MetalDevice::_launch(const std::function<void(Dispatcher &)> &dispatch) {
     auto &&dispatcher = _get_next_dispatcher();
-    auto command_buffer = [_command_queue commandBuffer];
+    auto command_buffer = [_command_queue commandBufferWithUnretainedReferences];
     dispatcher.reset(command_buffer);
     dispatch(dispatcher);
     dispatcher.commit();
