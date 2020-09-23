@@ -14,7 +14,6 @@ void *CudaHostCache::obtain() noexcept {
     void *cache = nullptr;
     if (_available_caches.empty()) {
         CUDA_CHECK(cuMemHostAlloc(&cache, _size, 0));
-        LUISA_INFO("Created host cache buffer #", _allocated_caches.size(), " with length ", _size, " for device content synchronization.");
         _allocated_caches.emplace(cache);
     } else {
         cache = _available_caches.back();

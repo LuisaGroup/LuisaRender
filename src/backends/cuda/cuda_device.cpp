@@ -132,7 +132,7 @@ std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) { 
 
             auto arch_opt = serialize("--gpu-architecture=compute_", _compute_capability);
             auto cuda_version_opt = serialize("-DCUDA_VERSION=", CUDART_VERSION);
-            const char *opts[] = {
+            std::vector<const char *> opts{
                 arch_opt.c_str(),
                 "--std=c++17",
                 "--use_fast_math",
@@ -142,7 +142,14 @@ std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) { 
                 "-dw",
                 "-w",
                 cuda_version_opt.c_str()};
-            nvrtcCompileProgram(prog, sizeof(opts) / sizeof(const char *), opts);// options
+
+#ifdef LUISA_OPTIX_AVAILABLE
+            auto optix_include_opt = serialize("-I\"", LUISA_OPTIX_INCLUDE_DIR, "\"");
+            LUISA_INFO("OptiX include option: ", optix_include_opt);
+            opts.emplace_back(optix_include_opt.c_str());
+#endif
+            
+            nvrtcCompileProgram(prog, opts.size(), opts.data());// options
 
             size_t log_size;
             NVRTC_CHECK(nvrtcGetProgramLogSize(prog, &log_size));
@@ -185,8 +192,6 @@ std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) { 
             _modules.emplace_back(module);
             _kernel_cache.emplace(digest, kernel);
         }
-    } else {
-        LUISA_INFO("Cache hit for kernel \"", function.name(), "\" in memory, compilation skipped.");
     }
     
     std::vector<Kernel::Resource> resources;

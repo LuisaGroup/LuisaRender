@@ -10,6 +10,7 @@
 #include <compute/hit.h>
 #include <compute/primitive.h>
 #include <compute/acceleration.h>
+#include <compute/kernel.h>
 
 #include <optix.h>
 
@@ -29,6 +30,8 @@ struct alignas(16) Instance {
     luisa::uint2 pad;
 };
 
+static_assert(sizeof(Instance) == 80);
+
 }
 
 LUISA_STRUCT(luisa::cuda::Traversable, handle)
@@ -38,6 +41,7 @@ namespace luisa::cuda {
 
 using compute::Acceleration;
 using compute::BufferView;
+using compute::KernelView;
 using compute::TriangleHandle;
 using compute::MeshHandle;
 using compute::Ray;
@@ -49,10 +53,14 @@ class CudaDevice;
 class CudaAcceleration : public Acceleration {
 
 private:
+    CudaDevice *_device;
     OptixDeviceContext _optix_ctx{nullptr};
     OptixTraversableHandle _ias_handle{0u};
     BufferView<uchar> _ias_buffer;
     BufferView<Instance> _instance_buffer;
+    BufferView<float4x4> _instance_transform_buffer;
+    BufferView<uchar> _instance_update_buffer;
+    KernelView _instance_update_kernel;
     BufferView<Traversable> _gas_handle_buffer;
     std::vector<OptixTraversableHandle> _gas_handles;
     std::vector<BufferView<uchar>> _gas_buffers;

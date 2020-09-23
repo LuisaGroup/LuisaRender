@@ -15,7 +15,6 @@ void CudaCodegen::emit(const Function &f) {
     
     _os << "#include <cmath>\n"
            "#include <cstdint>\n"
-           "\n"
            "#include <math_util.h>\n"
            "#include <texture_util.h>\n"
            "\n"
