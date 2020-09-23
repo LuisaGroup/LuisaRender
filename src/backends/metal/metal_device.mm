@@ -252,16 +252,16 @@ std::unique_ptr<Acceleration> MetalDevice::build_acceleration(
     closest_intersector.rayStride = sizeof(Ray);
     closest_intersector.intersectionDataType = MPSIntersectionDataTypeDistancePrimitiveIndexInstanceIndexCoordinates;
     closest_intersector.intersectionStride = sizeof(ClosestHit);
-    closest_intersector.boundingBoxIntersectionTestType = MPSBoundingBoxIntersectionTestTypeAxisAligned;
-    closest_intersector.triangleIntersectionTestType = MPSTriangleIntersectionTestTypeWatertight;
+    closest_intersector.boundingBoxIntersectionTestType = MPSBoundingBoxIntersectionTestTypeDefault;
+    closest_intersector.triangleIntersectionTestType = MPSTriangleIntersectionTestTypeDefault;
     
     auto any_intersector = [[MPSRayIntersector alloc] initWithDevice:_handle];
     any_intersector.rayDataType = MPSRayDataTypeOriginMinDistanceDirectionMaxDistance;
     any_intersector.rayStride = sizeof(Ray);
     any_intersector.intersectionDataType = MPSIntersectionDataTypeDistance;
     any_intersector.intersectionStride = sizeof(AnyHit);
-    any_intersector.boundingBoxIntersectionTestType = MPSBoundingBoxIntersectionTestTypeAxisAligned;
-    any_intersector.triangleIntersectionTestType = MPSTriangleIntersectionTestTypeWatertight;
+    any_intersector.boundingBoxIntersectionTestType = MPSBoundingBoxIntersectionTestTypeDefault;
+    any_intersector.triangleIntersectionTestType = MPSTriangleIntersectionTestTypeDefault;
     
     return std::make_unique<MetalAcceleration>(instance_acceleration, closest_intersector, any_intersector);
 }
