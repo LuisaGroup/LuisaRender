@@ -19,6 +19,7 @@ namespace luisa::compute {
 class Device : Noncopyable {
 
 protected:
+    uint _index{0u};
     Context *_context{nullptr};
     
     [[nodiscard]] virtual std::shared_ptr<Buffer> _allocate_buffer(size_t size) = 0;
@@ -28,9 +29,10 @@ protected:
     virtual void _launch(const std::function<void(Dispatcher &)> &dispatch) = 0;
 
 public:
-    explicit Device(Context *context) noexcept: _context{context} {}
+    explicit Device(Context *context, uint index) noexcept: _context{context}, _index{index} {}
     virtual ~Device() noexcept = default;
     
+    [[nodiscard]] uint index() const noexcept { return _index; }
     [[nodiscard]] Context &context() const noexcept { return *_context; }
     
     template<typename Def, std::enable_if_t<std::is_invocable_v<Def>, int> = 0>

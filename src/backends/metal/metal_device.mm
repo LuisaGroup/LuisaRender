@@ -66,7 +66,7 @@ public:
         bool is_static) override;
 };
 
-MetalDevice::MetalDevice(Context *context, uint32_t device_id) : Device{context} {
+MetalDevice::MetalDevice(Context *context, uint32_t device_id) : Device{context, device_id} {
     auto devices = MTLCopyAllDevices();
     LUISA_ERROR_IF_NOT(device_id < devices.count, "Invalid Metal device index ", device_id, ": max available index is ", devices.count - 1, ".");
     _handle = devices[device_id];

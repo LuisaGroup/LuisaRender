@@ -1,8 +1,0 @@
-//
-// Created by Mike on 9/23/2020.
-//
-
-#ifndef LUISARENDER_OPTIX_ADAPTER_H
-#define LUISARENDER_OPTIX_ADAPTER_H
-
-#endif //LUISARENDER_OPTIX_ADAPTER_H

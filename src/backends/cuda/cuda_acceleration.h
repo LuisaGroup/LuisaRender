@@ -12,30 +12,21 @@
 #include <compute/acceleration.h>
 #include <compute/kernel.h>
 
-#include <optix.h>
+#include <optix_prime/optix_primepp.h>
 
 namespace luisa::cuda {
 
-struct alignas(8) Traversable {
-    luisa::uint2 handle;
-};
-
-struct alignas(16) Instance {
-    std::array<luisa::float4, 3> transform;
+struct CudaClosestHit {
+    float distance;
+    uint triangle_id;
     uint instance_id;
-    uint sbt_offset;
-    uint mask;
-    uint flags;
-    Traversable traversable;
-    luisa::uint2 pad;
+    float u;
+    float v;
 };
-
-static_assert(sizeof(Instance) == 80);
 
 }
 
-LUISA_STRUCT(luisa::cuda::Traversable, handle)
-LUISA_STRUCT(luisa::cuda::Instance, transform, instance_id, sbt_offset, mask, flags, traversable, pad)
+LUISA_STRUCT(luisa::cuda::CudaClosestHit, distance, triangle_id, instance_id, u, v)
 
 namespace luisa::cuda {
 
@@ -54,16 +45,17 @@ class CudaAcceleration : public Acceleration {
 
 private:
     CudaDevice *_device;
-    OptixDeviceContext _optix_ctx{nullptr};
-    OptixTraversableHandle _ias_handle{0u};
-    BufferView<uchar> _ias_buffer;
-    BufferView<Instance> _instance_buffer;
-    BufferView<float4x4> _instance_transform_buffer;
-    BufferView<uchar> _instance_update_buffer;
-    KernelView _instance_update_kernel;
-    BufferView<Traversable> _gas_handle_buffer;
-    std::vector<OptixTraversableHandle> _gas_handles;
-    std::vector<BufferView<uchar>> _gas_buffers;
+    bool _is_static;
+    optix::prime::Context _optix_context;
+    std::vector<optix::prime::Model> _optix_geometry_models;
+    BufferView<uchar> _optix_instance_buffer;
+    optix::prime::Model _optix_instance_model;
+    optix::prime::Query _optix_anyhit_query;
+    optix::prime::Query _optix_closesthit_query;
+    mutable BufferView<CudaClosestHit> _optix_closesthit_buffer;
+    BufferView<luisa::float4x4> _input_transform_buffer;
+    BufferView<luisa::float4x4> _optix_transform_buffer;
+    KernelView _update_transforms_kernel;
 
 private:
     void _refit(compute::Dispatcher &dispatch) override;

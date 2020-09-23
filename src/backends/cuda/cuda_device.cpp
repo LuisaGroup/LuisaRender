@@ -12,7 +12,7 @@ void CudaDevice::synchronize() {
     CUDA_CHECK(cuEventSynchronize(_sync_event));
 }
 
-CudaDevice::CudaDevice(Context *context, uint32_t device_id) : Device{context} {
+CudaDevice::CudaDevice(Context *context, uint32_t device_id) : Device{context, device_id} {
 
     static std::once_flag flag;
     std::call_once(flag, cuInit, 0);
@@ -142,12 +142,6 @@ std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) { 
                 "-dw",
                 "-w",
                 cuda_version_opt.c_str()};
-
-#ifdef LUISA_OPTIX_AVAILABLE
-            auto optix_include_opt = serialize("-I\"", LUISA_OPTIX_INCLUDE_DIR, "\"");
-            LUISA_INFO("OptiX include option: ", optix_include_opt);
-            opts.emplace_back(optix_include_opt.c_str());
-#endif
             
             nvrtcCompileProgram(prog, opts.size(), opts.data());// options
 

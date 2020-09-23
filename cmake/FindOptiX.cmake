@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2018 NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,32 +29,20 @@
 # Locate the OptiX distribution.  Search relative to the SDK first, then look in the system.
 
 # Our initial guess will be within the SDK.
+set(OptiX_INSTALL_DIR "" CACHE PATH "Path to OptiX installed location.")
 
-if (WIN32)
-    #		set(OptiX_INSTALL_DIR "C:/ProgramData/NVIDIA Corporation/OptiX SDK 5.1.0" CACHE PATH "Path to OptiX installed location.")
-    find_path(searched_OptiX_INSTALL_DIR
-              NAME include/optix.h
-              PATHS
-              "C:/ProgramData/NVIDIA Corporation/OptiX SDK 7.1.0"
-              "C:/ProgramData/NVIDIA Corporation/OptiX SDK 7.0.0"
-              "C:/ProgramData/NVIDIA Corporation/OptiX SDK 6.5.0"
-              "C:/ProgramData/NVIDIA Corporation/OptiX SDK 6.0.0"
-              "C:/ProgramData/NVIDIA Corporation/OptiX SDK 5.1.1"
-              "C:/ProgramData/NVIDIA Corporation/OptiX SDK 5.1.0"
-              "C:/ProgramData/NVIDIA Corporation/OptiX SDK 5.0.1"
-              "C:/ProgramData/NVIDIA Corporation/OptiX SDK 5.0.0"
-              "C:/ProgramData/NVIDIA Corporation/OptiX SDK *"
-              )
-    mark_as_advanced(searched_OptiX_INSTALL_DIR)
-    set(OptiX_INSTALL_DIR ${searched_OptiX_INSTALL_DIR} CACHE PATH "Path to OptiX installed location.")
-else ()
-    set(OptiX_INSTALL_DIR $ENV{OptiX_INSTALL_DIR} CACHE PATH "Path to OptiX installed location.")
+# The distribution contains only 64 bit libraries.  Error when we have been mis-configured.
+if (NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+    if (WIN32)
+        message(SEND_ERROR "Make sure when selecting the generator, you select one with Win64 or x64.")
+    endif ()
+    message(FATAL_ERROR "OptiX only supports builds configured for 64 bits.")
 endif ()
-# The distribution contains both 32 and 64 bit libraries.  Adjust the library
+
 # search path based on the bit-ness of the build.  (i.e. 64: bin64, lib64; 32:
 # bin, lib).  Note that on Mac, the OptiX library is a universal binary, so we
 # only need to look in lib and not lib64 for 64 bit builds.
-if (CMAKE_SIZEOF_VOID_P EQUAL 8 AND NOT APPLE)
+if (NOT APPLE)
     set(bit_dest "64")
 else ()
     set(bit_dest "")
@@ -81,9 +69,9 @@ macro(optix_find_api_library name version)
     endif ()
 endmacro()
 
-#OPTIX_find_api_library(optix 7.0.0)
-#OPTIX_find_api_library(optixu 7.0.0)
-#OPTIX_find_api_library(optix_prime 7.0.0)
+optix_find_api_library(optix 6.5.0)
+optix_find_api_library(optixu 6.5.0)
+optix_find_api_library(optix_prime 6.5.0)
 
 # Include
 find_path(OptiX_INCLUDE
@@ -96,9 +84,12 @@ find_path(OptiX_INCLUDE
           )
 
 # Check to make sure we found what we were looking for
-function(optix_report_error error_message required)
+function(optix_report_error error_message required component)
+    if (DEFINED OptiX_FIND_REQUIRED_${component} AND NOT OptiX_FIND_REQUIRED_${component})
+        set(required FALSE)
+    endif ()
     if (OptiX_FIND_REQUIRED AND required)
-        message(FATAL_ERROR "${error_message}")
+        message(FATAL_ERROR "${error_message}  Please locate before proceeding.")
     else ()
         if (NOT OptiX_FIND_QUIETLY)
             message(STATUS "${error_message}")
@@ -106,17 +97,15 @@ function(optix_report_error error_message required)
     endif ()
 endfunction()
 
-#if(NOT optix_LIBRARY)
-#  OptiX_report_error("optix library not found.  Please locate before proceeding." TRUE)
-#endif()
-if (NOT OptiX_INCLUDE)
-    optix_report_error("OptiX headers (optix.h and friends) not found.  Please locate before proceeding." TRUE)
+if (NOT optix_LIBRARY)
+    optix_report_error("optix library not found." TRUE libraries)
+elseif (NOT OptiX_INCLUDE)
+    optix_report_error("OptiX headers (optix.h and friends) not found." TRUE headers)
+elseif (NOT optix_prime_LIBRARY)
+    optix_report_error("optix Prime library not found." TRUE libraries)
 else ()
     set(OptiX_FOUND TRUE)
 endif ()
-#if(NOT optix_prime_LIBRARY)
-#  OptiX_report_error("optix Prime library not found.  Please locate before proceeding." FALSE)
-#endif()
 
 # Macro for setting up dummy targets
 function(optix_add_imported_library name lib_location dll_lib dependent_libs)
@@ -124,6 +113,7 @@ function(optix_add_imported_library name lib_location dll_lib dependent_libs)
     
     # Create imported target
     add_library(${name} SHARED IMPORTED)
+    target_include_directories(${name} INTERFACE ${OptiX_INCLUDE})
     
     # Import target "optix" for configuration "Debug"
     if (WIN32)
@@ -155,9 +145,9 @@ function(optix_add_imported_library name lib_location dll_lib dependent_libs)
 endfunction()
 
 # Sets up a dummy target
-#OptiX_add_imported_library(optix "${optix_LIBRARY}" "${optix_DLL}" "${OPENGL_LIBRARIES}")
-#OptiX_add_imported_library(optixu   "${optixu_LIBRARY}"   "${optixu_DLL}"   "")
-#OptiX_add_imported_library(optix_prime "${optix_prime_LIBRARY}"  "${optix_prime_DLL}"  "")
+optix_add_imported_library(optix "${optix_LIBRARY}" "${optix_DLL}" "${OPENGL_LIBRARIES}")
+optix_add_imported_library(optixu "${optixu_LIBRARY}" "${optixu_DLL}" "")
+optix_add_imported_library(optix_prime "${optix_prime_LIBRARY}" "${optix_prime_DLL}" "")
 
 macro(optix_check_same_path libA libB)
     if (_optix_path_to_${libA})
@@ -166,7 +156,7 @@ macro(optix_check_same_path libA libB)
             # to the ${libB}.
             get_filename_component(_optix_name_of_${libA} "${${libA}_LIBRARY}" NAME)
             if (EXISTS "${_optix_path_to_${libB}}/${_optix_name_of_${libA}}")
-                message(WARNING " ${libA} library found next to ${libB} library that is not being used.  Due to the way we are using rpath, the copy of ${libA} next to ${libB} will be used during loading instead of the one you intended.  Consider putting the libraries in the same directory or moving ${_optix_path_to_${libB}}/${_optix_name_of_${libA}} out of the way.")
+                message(WARNING " ${libA} library found next to ${libB} library that is not being used. Due to the way we are using rpath, the copy of ${libA} next to ${libB} will be used during loading instead of the one you intended.  Consider putting the libraries in the same directory or moving ${_optix_path_to_${libB}}/${_optix_name_of_${libA}} out of the way.")
             endif ()
         endif ()
         set(_${libA}_rpath "-Wl,-rpath,${_optix_path_to_${libA}}")
