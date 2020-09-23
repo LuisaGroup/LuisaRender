@@ -99,7 +99,7 @@ void CudaAcceleration::_intersect_any(Dispatcher &dispatch, const BufferView<Ray
     
     auto stream = dynamic_cast<CudaDispatcher &>(dispatch).handle();
     _optix_anyhit_query->setCudaStream(stream);
-    _optix_anyhit_query->execute(RTP_QUERY_HINT_ASYNC | RTP_QUERY_HINT_WATERTIGHT);
+    _optix_anyhit_query->execute(RTP_QUERY_HINT_ASYNC);
 }
 
 void CudaAcceleration::_intersect_closest(Dispatcher &dispatch, const BufferView<Ray> &ray_buffer, const BufferView<ClosestHit> &hit_buffer) const {
@@ -115,7 +115,7 @@ void CudaAcceleration::_intersect_closest(Dispatcher &dispatch, const BufferView
     
     auto stream = dynamic_cast<CudaDispatcher &>(dispatch).handle();
     _optix_closesthit_query->setCudaStream(stream);
-    _optix_closesthit_query->execute(RTP_QUERY_HINT_ASYNC | RTP_QUERY_HINT_WATERTIGHT);
+    _optix_closesthit_query->execute(RTP_QUERY_HINT_ASYNC);
     
     auto ray_count = static_cast<uint>(ray_buffer.size());
     auto kernel = _device->compile_kernel("cuda_accel_adapt_closest_hits", [&] {
