@@ -4,7 +4,6 @@
 
 #import <cstdlib>
 #import <queue>
-#import <cstring>
 #import <map>
 
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
