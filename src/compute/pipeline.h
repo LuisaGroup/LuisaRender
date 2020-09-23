@@ -13,7 +13,7 @@ namespace luisa::compute {
 class Pipeline : public Noncopyable {
 
 public:
-    static constexpr auto max_stages_in_queue = 256u;
+    static constexpr auto max_stages_in_queue = 64u;
 
 private:
     Device *_device;
