@@ -66,6 +66,7 @@ struct TypeDesc : Noncopyable {
     uint32_t element_count{0u};
     
     // for structures
+    std::string identifier;
     std::vector<std::string> member_names;
     std::vector<const TypeDesc *> member_types;
     uint32_t alignment{0u};

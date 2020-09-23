@@ -7,8 +7,8 @@ function(luisa_render_add_backend name)
     target_link_libraries(luisa-backend-${name} PRIVATE luisa-compute)
     add_dependencies(luisa-backends luisa-backend-${name})
     set_target_properties(luisa-backend-${name} PROPERTIES
-                          LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/backends/"
-                          RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/backends/")
+                          LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>/bin/backends/"
+                          RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>/bin/backends/")
 endfunction()
 
 if (LUISA_RENDER_ENABLE_METAL)

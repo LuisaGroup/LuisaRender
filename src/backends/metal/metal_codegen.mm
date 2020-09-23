@@ -156,7 +156,7 @@ void MetalCodegen::emit(const Function &f) {
            "    return float3x3(float3(m[0].x, m[0].y, m[0].z),\n"
            "                    float3(m[1].x, m[1].y, m[1].z),\n"
            "                    float3(m[2].x, m[2].y, m[2].z));\n"
-           "}\n";
+           "}\n\n";
     CppCodegen::emit(f);
 }
 

@@ -2,72 +2,17 @@
 // Created by Mike on 8/27/2020.
 //
 
-#include <cuda.h>
-#include <nvrtc.h>
-
-#include <jitify/jitify.hpp>
-
-#include <core/hash.h>
-#include <compute/device.h>
-#include <compute/kernel.h>
-#include <compute/acceleration.h>
-
-#include "cuda_buffer.h"
-#include "cuda_texture.h"
-#include "cuda_codegen.h"
-#include "cuda_dispatcher.h"
-#include "cuda_jit_headers.h"
-#include "cuda_kernel.h"
+#include "cuda_device.h"
+#include "cuda_acceleration.h"
 
 namespace luisa::cuda {
-
-using namespace luisa::compute;
-
-class CudaDevice : public Device {
-
-private:
-    CUdevice _handle{};
-    CUcontext _ctx{};
-    CUstream _dispatch_stream{};
-    CUevent _sync_event{};
-    std::mutex _kernel_cache_mutex;
-    std::vector<CUmodule> _modules;
-    std::map<SHA1::Digest, CUfunction> _kernel_cache;
-    
-    std::mutex _dispatch_mutex;
-    std::condition_variable _dispatch_cv;
-    std::queue<std::unique_ptr<CudaDispatcher>> _dispatch_queue;
-    std::thread _dispatch_thread;
-    std::atomic<bool> _stop_signal{false};
-
-    uint32_t _compute_capability{};
-
-protected:
-    std::shared_ptr<Buffer> _allocate_buffer(size_t size) override;
-    std::shared_ptr<Texture> _allocate_texture(uint32_t width, uint32_t height, compute::PixelFormat format) override;
-    std::shared_ptr<Kernel> _compile_kernel(const compute::dsl::Function &function) override;
-
-    void _launch(const std::function<void(Dispatcher &)> &work) override;
-
-public:
-    explicit CudaDevice(Context *context, uint32_t device_id);
-    ~CudaDevice() noexcept override;
-    void synchronize() override;
-    std::unique_ptr<Acceleration> build_acceleration(
-        const BufferView<float3> &positions,
-        const BufferView<TriangleHandle> &indices,
-        const std::vector<MeshHandle> &meshes,
-        const BufferView<uint> &instances,
-        const BufferView<float4x4> &transforms,
-        bool is_static) override;
-};
 
 void CudaDevice::synchronize() {
     CUDA_CHECK(cuEventRecord(_sync_event, _dispatch_stream));
     CUDA_CHECK(cuEventSynchronize(_sync_event));
 }
 
-CudaDevice::CudaDevice(Context *context, uint32_t device_id) : Device{context} {
+CudaDevice::CudaDevice(Context *context, uint32_t device_id) : Device{context, device_id} {
 
     static std::once_flag flag;
     std::call_once(flag, cuInit, 0);
@@ -125,7 +70,7 @@ std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) { 
     CudaCodegen codegen{os};
     codegen.emit(function);
     auto src = os.str();
-    if (_context->should_print_generated_source()) { LUISA_INFO("Generated source:\n", src); }
+    if (_context->should_print_generated_source()) { LUISA_INFO("Generated source for kernel \"", function.name(), "\":\n", src); }
     
     auto digest = SHA1{src}.digest();
     
@@ -187,7 +132,7 @@ std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) { 
 
             auto arch_opt = serialize("--gpu-architecture=compute_", _compute_capability);
             auto cuda_version_opt = serialize("-DCUDA_VERSION=", CUDART_VERSION);
-            const char *opts[] = {
+            std::vector<const char *> opts{
                 arch_opt.c_str(),
                 "--std=c++17",
                 "--use_fast_math",
@@ -197,7 +142,8 @@ std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) { 
                 "-dw",
                 "-w",
                 cuda_version_opt.c_str()};
-            nvrtcCompileProgram(prog, sizeof(opts) / sizeof(const char *), opts);// options
+            
+            nvrtcCompileProgram(prog, opts.size(), opts.data());// options
 
             size_t log_size;
             NVRTC_CHECK(nvrtcGetProgramLogSize(prog, &log_size));
@@ -240,8 +186,6 @@ std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) { 
             _modules.emplace_back(module);
             _kernel_cache.emplace(digest, kernel);
         }
-    } else {
-        LUISA_INFO("Cache hit for kernel \"", function.name(), "\" in memory, compilation skipped.");
     }
     
     std::vector<Kernel::Resource> resources;
@@ -388,9 +332,12 @@ std::unique_ptr<Acceleration> CudaDevice::build_acceleration(
     const BufferView<uint> &instances,
     const BufferView<float4x4> &transforms,
     bool is_static) {
-    
-    // TODO
-    LUISA_ERROR("Not implemented!");
+
+#ifdef LUISA_OPTIX_AVAILABLE
+    return std::make_unique<CudaAcceleration>(this, positions, indices, meshes, instances, transforms, is_static);
+#else
+    LUISA_EXCEPTION("OptiX not available!");
+#endif
 }
 
 }// namespace luisa::cuda

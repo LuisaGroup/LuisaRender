@@ -24,7 +24,7 @@ struct VectorStorage<T, 2> {
     T x, y;
     constexpr VectorStorage() noexcept : x{}, y{} {}
     explicit constexpr VectorStorage(T s) noexcept : x{s}, y{s} {}
-    explicit constexpr VectorStorage(T x, T y) noexcept : x{x}, y{y} {}
+    constexpr VectorStorage(T x, T y) noexcept : x{x}, y{y} {}
 };
 
 template<typename T>
@@ -32,7 +32,7 @@ struct VectorStorage<T, 3> {
     T x, y, z;
     constexpr VectorStorage() noexcept : x{}, y{}, z{} {}
     explicit constexpr VectorStorage(T s) noexcept : x{s}, y{s}, z{s} {}
-    explicit constexpr VectorStorage(T x, T y, T z) noexcept : x{x}, y{y}, z{z} {}
+    constexpr VectorStorage(T x, T y, T z) noexcept : x{x}, y{y}, z{z} {}
 };
 
 template<typename T>
@@ -40,7 +40,7 @@ struct VectorStorage<T, 4> {
     T x, y, z, w;
     constexpr VectorStorage() noexcept : x{}, y{}, z{}, w{} {}
     explicit constexpr VectorStorage(T s) noexcept : x{s}, y{s}, z{s}, w{s} {}
-    explicit constexpr VectorStorage(T x, T y, T z, T w) noexcept : x{x}, y{y}, z{z}, w{w} {}
+    constexpr VectorStorage(T x, T y, T z, T w) noexcept : x{x}, y{y}, z{z}, w{w} {}
 };
 
 }// namespace detail
@@ -54,8 +54,8 @@ struct alignas(detail::vector_alignment<T, N>) Vector : detail::VectorStorage<T,
     
     explicit constexpr Vector(T u) noexcept : detail::VectorStorage<T, N>{u} {}
     
-    template<typename... U>
-    explicit constexpr Vector(U... u) noexcept : detail::VectorStorage<T, N>{u...} {}
+    template<typename... U, typename std::enable_if<sizeof...(U) == N, int>::type = 0>
+    constexpr Vector(U... u) noexcept : detail::VectorStorage<T, N>{u...} {}
     
     template<typename Index>
     [[nodiscard]] T &operator[](Index i) noexcept { return reinterpret_cast<T(&)[N]>(*this)[i]; }
@@ -300,5 +300,57 @@ constexpr bool all(bool4 v) noexcept { return v.x && v.y && v.z && v.w; }
 constexpr bool none(bool2 v) noexcept { return !any(v); }
 constexpr bool none(bool3 v) noexcept { return !any(v); }
 constexpr bool none(bool4 v) noexcept { return !any(v); }
+
+namespace detail {
+
+template<typename T>
+struct IsVector2Impl : std::false_type {};
+
+template<typename T>
+struct IsVector2Impl<Vector<T, 2>> : std::true_type {};
+
+template<typename T>
+struct IsVector3Impl : std::false_type {};
+
+template<typename T>
+struct IsVector3Impl<Vector<T, 3>> : std::true_type {};
+
+template<typename T>
+struct IsVector4Impl : std::false_type {};
+
+template<typename T>
+struct IsVector4Impl<Vector<T, 4>> : std::true_type {};
+
+template<typename T>
+struct IsVectorImpl : std::false_type {};
+
+template<typename T, uint N>
+struct IsVectorImpl<Vector<T, N>> : std::true_type {};
+
+}
+
+template<typename T>
+using IsVector2 = detail::IsVector2Impl<T>;
+
+template<typename T>
+using IsVector3 = detail::IsVector3Impl<T>;
+
+template<typename T>
+using IsVector4 = detail::IsVector4Impl<T>;
+
+template<typename T>
+using IsVector = detail::IsVectorImpl<T>;
+
+template<typename T>
+constexpr auto is_vector2 = IsVector2<T>::value;
+
+template<typename T>
+constexpr auto is_vector3 = IsVector3<T>::value;
+
+template<typename T>
+constexpr auto is_vector4 = IsVector4<T>::value;
+
+template<typename T>
+constexpr auto is_vector = IsVector<T>::value;
 
 }}// namespace luisa::vector

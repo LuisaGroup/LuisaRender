@@ -9,7 +9,7 @@
 namespace luisa::compute {
 
 std::unique_ptr<Device> Device::create(Context *context, uint32_t selection_id) {
-    auto &&devices = context->devices();
+    auto &&devices = context->device_selections();
     if (devices.empty()) {// enumerate available devices
         LUISA_WARNING("Compute device is not specified, enumerating automatically...");
         for (auto backend : {"cuda", "metal"}) {

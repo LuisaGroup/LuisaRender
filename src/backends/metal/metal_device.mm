@@ -4,7 +4,6 @@
 
 #import <cstdlib>
 #import <queue>
-#import <cstring>
 #import <map>
 
 #import <MetalPerformanceShaders/MetalPerformanceShaders.h>
@@ -66,7 +65,7 @@ public:
         bool is_static) override;
 };
 
-MetalDevice::MetalDevice(Context *context, uint32_t device_id) : Device{context} {
+MetalDevice::MetalDevice(Context *context, uint32_t device_id) : Device{context, device_id} {
     auto devices = MTLCopyAllDevices();
     LUISA_ERROR_IF_NOT(device_id < devices.count, "Invalid Metal device index ", device_id, ": max available index is ", devices.count - 1, ".");
     _handle = devices[device_id];
@@ -101,9 +100,8 @@ std::shared_ptr<Kernel> MetalDevice::_compile_kernel(const compute::dsl::Functio
         LUISA_INFO("No compilation cache found for kernel \"", f.name(), "\", compiling from source...");
         NSError *error = nullptr;
         auto library = [_handle newLibraryWithSource:@(s.c_str()) options:nullptr error:&error];
-        if (error != nullptr) {
-            LUISA_WARNING("Compilation output:");
-            NSLog(@"%@", error);
+        if (error != nullptr && error.code != MTLLibraryErrorCompileWarning) {
+            LUISA_EXCEPTION("Compilation failed, reason:\n", [error.description cStringUsingEncoding:NSUTF8StringEncoding]);
         }
         
         // Create PSO
@@ -253,16 +251,16 @@ std::unique_ptr<Acceleration> MetalDevice::build_acceleration(
     closest_intersector.rayStride = sizeof(Ray);
     closest_intersector.intersectionDataType = MPSIntersectionDataTypeDistancePrimitiveIndexInstanceIndexCoordinates;
     closest_intersector.intersectionStride = sizeof(ClosestHit);
-    closest_intersector.boundingBoxIntersectionTestType = MPSBoundingBoxIntersectionTestTypeAxisAligned;
-    closest_intersector.triangleIntersectionTestType = MPSTriangleIntersectionTestTypeWatertight;
+    closest_intersector.boundingBoxIntersectionTestType = MPSBoundingBoxIntersectionTestTypeDefault;
+    closest_intersector.triangleIntersectionTestType = MPSTriangleIntersectionTestTypeDefault;
     
     auto any_intersector = [[MPSRayIntersector alloc] initWithDevice:_handle];
     any_intersector.rayDataType = MPSRayDataTypeOriginMinDistanceDirectionMaxDistance;
     any_intersector.rayStride = sizeof(Ray);
     any_intersector.intersectionDataType = MPSIntersectionDataTypeDistance;
     any_intersector.intersectionStride = sizeof(AnyHit);
-    any_intersector.boundingBoxIntersectionTestType = MPSBoundingBoxIntersectionTestTypeAxisAligned;
-    any_intersector.triangleIntersectionTestType = MPSTriangleIntersectionTestTypeWatertight;
+    any_intersector.boundingBoxIntersectionTestType = MPSBoundingBoxIntersectionTestTypeDefault;
+    any_intersector.triangleIntersectionTestType = MPSTriangleIntersectionTestTypeDefault;
     
     return std::make_unique<MetalAcceleration>(instance_acceleration, closest_intersector, any_intersector);
 }

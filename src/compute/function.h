@@ -37,7 +37,7 @@ private:
     std::vector<std::unique_ptr<Variable>> _threadgroup_variables;
     std::vector<std::unique_ptr<Variable>> _arguments;
     std::map<const Texture *, uint32_t> _texture_usages;
-    std::set<const TypeDesc *> _used_struct_types;
+    std::vector<const TypeDesc *> _used_struct_types;
     
     std::unique_ptr<ScopeStmt> _body;
     std::stack<ScopeStmt *> _scope_stack;
@@ -70,7 +70,7 @@ public:
     
     void add_statement(std::unique_ptr<Statement> stmt) noexcept;
     
-    [[nodiscard]] const std::set<const TypeDesc *> &used_structures() const noexcept { return _used_struct_types; }
+    [[nodiscard]] const std::vector<const TypeDesc *> &used_structures() const noexcept { return _used_struct_types; }
     [[nodiscard]] const std::vector<std::unique_ptr<Variable>> &builtins() const noexcept { return _builtins; }
     [[nodiscard]] const std::vector<std::unique_ptr<Variable>> &variables() const noexcept { return _variables; }
     [[nodiscard]] const std::vector<std::unique_ptr<Variable>> &threadgroup_variables() const noexcept { return _threadgroup_variables; }

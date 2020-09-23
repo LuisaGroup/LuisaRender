@@ -68,7 +68,7 @@ public:
     WavefrontObj(Device *d, const ParameterSet &params)
         : Shape{d, params} {
         
-        auto path = std::filesystem::canonical(device()->context().working_path(params["path"].parse_string()));
+        auto path = std::filesystem::canonical(device()->context().input_path(params["path"].parse_string()));
         _load(path);
     }
 };

@@ -1,7 +1,7 @@
 Integrator integrator : AO {}
 
 Shape bunny : WavefrontObj {
-  path { "data/meshes/cow/cow.obj" }
+  path { "../meshes/cow/cow.obj" }
 }
 
 Film film : RGB {
