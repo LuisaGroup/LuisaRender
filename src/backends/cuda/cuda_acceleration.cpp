@@ -117,10 +117,11 @@ void CudaAcceleration::_intersect_closest(Dispatcher &dispatch, const BufferView
     _optix_closesthit_query->setCudaStream(stream);
     _optix_closesthit_query->execute(RTP_QUERY_HINT_ASYNC);
     
+    constexpr auto tg_size = 1024u;
     auto ray_count = static_cast<uint>(ray_buffer.size());
     auto kernel = _device->compile_kernel("cuda_accel_adapt_closest_hits", [&] {
         auto tid = thread_id();
-        If (tid < ray_count) {
+        If (ray_count % tg_size == 0u || tid < ray_count) {
             Var hit = _optix_closesthit_buffer[tid];
             hit_buffer[tid].distance = hit.distance;
             hit_buffer[tid].triangle_id = hit.triangle_id;
@@ -128,7 +129,7 @@ void CudaAcceleration::_intersect_closest(Dispatcher &dispatch, const BufferView
             hit_buffer[tid].bary = make_float2(hit.u, hit.v);
         };
     });
-    dispatch(kernel.parallelize(ray_count));
+    dispatch(kernel.parallelize(ray_count, tg_size));
 }
 
 }

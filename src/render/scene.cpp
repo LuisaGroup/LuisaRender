@@ -121,7 +121,7 @@ void Scene::_intersect_any(Pipeline &pipeline, const BufferView<Ray> &rays, Buff
 void Scene::_intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_buffer, InteractionBuffers &buffers) {
     
     auto ray_count = static_cast<uint>(ray_buffer.size());
-    constexpr auto threadgroup_size = 256u;
+    constexpr auto threadgroup_size = 1024u;
     
     if (_closest_hit_buffer.size() < ray_buffer.size()) {
         _closest_hit_buffer = _device->allocate_buffer<ClosestHit>(ray_count);
