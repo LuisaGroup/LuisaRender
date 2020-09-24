@@ -123,6 +123,7 @@ function(optix_add_imported_library name lib_location dll_lib dependent_libs)
                               IMPORTED_LOCATION "${dll_lib}"
                               IMPORTED_LINK_INTERFACE_LIBRARIES "${dependent_libs}"
                               )
+        
     elseif (UNIX)
         set_target_properties(${name} PROPERTIES
                               #IMPORTED_LINK_INTERFACE_LIBRARIES "glu32;opengl32"
