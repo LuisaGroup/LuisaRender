@@ -2,6 +2,9 @@ Integrator integrator : AO {}
 
 Shape bunny : WavefrontObj {
   path { "../meshes/cow/cow.obj" }
+  transform : TRS {
+    translation { -0.1, 0.0, 0.0 }
+  }
 }
 
 Film film : RGB {
@@ -17,7 +20,7 @@ Camera camera : Pinhole {
 task : SingleShot {
   integrator { @integrator }
   sampler : Independent {
-    spp { 8192 }
+    spp { 1024 }
   }
   camera { @camera }
   shapes { @bunny }
