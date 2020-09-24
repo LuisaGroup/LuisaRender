@@ -86,9 +86,10 @@ void Scene::_encode_geometry_buffers(const std::vector<std::shared_ptr<Shape>> &
                 triangle_count += shape->triangles().size();
                 
                 auto entity_id = static_cast<uint>(meshes.size());
-                meshes.emplace_back(MeshHandle{static_cast<uint>(vertex_offset), static_cast<uint>(triangle_offset), static_cast<uint>(shape->vertices().size()), static_cast<uint>(indices.size())});
+                meshes.emplace_back(MeshHandle{static_cast<uint>(vertex_offset), static_cast<uint>(triangle_offset),
+                                               static_cast<uint>(shape->vertices().size()), static_cast<uint>(indices.size())});
                 entities[entity_id] = {static_cast<uint>(vertex_offset), static_cast<uint>(triangle_offset)};
-    
+                
                 shape->clear();
                 
                 iter = entity_to_id.emplace(shape, entity_id).first;
