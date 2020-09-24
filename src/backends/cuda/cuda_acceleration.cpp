@@ -26,6 +26,8 @@ CudaAcceleration::CudaAcceleration(
     _optix_context = optix::prime::Context::create(RTP_CONTEXT_TYPE_CUDA);
     _optix_context->setCudaDeviceNumbers({device->index()});
     
+    _device->synchronize();
+    
     for (auto mesh : meshes) {
         auto model = _optix_context->createModel();
         model->setTriangles(
@@ -66,6 +68,7 @@ CudaAcceleration::CudaAcceleration(
         };
     });
     _device->launch(_update_transforms_kernel.parallelize(instance_count));
+    _device->synchronize();
     
     _optix_instance_model->setInstances(
         instance_count, RTP_BUFFER_TYPE_HOST,
@@ -88,7 +91,9 @@ void CudaAcceleration::_refit(Dispatcher &dispatch) {
             _optix_geometry_instances.data(),
             RTP_BUFFER_FORMAT_TRANSFORM_FLOAT4x3, RTP_BUFFER_TYPE_CUDA_LINEAR,
             reinterpret_cast<const void *>(dynamic_cast<CudaBuffer *>(_optix_transform_buffer.buffer())->handle() + _optix_transform_buffer.byte_offset()));
+        _device->synchronize();
         _optix_instance_model->update(RTP_MODEL_HINT_ASYNC);
+        _optix_instance_model->finish();
     }
 }
 

@@ -12,6 +12,7 @@ Shape cow_ref : WavefrontObj {
   path { "../meshes/cow/cow.obj" }
   transform : TRS {
     scaling { 0.7 }
+    rotation { 0, 1, 0, -10 }
   }
 }
 

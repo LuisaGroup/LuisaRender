@@ -160,15 +160,12 @@ void Scene::_intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_bu
                 
                          Var m = _instance_transforms[instance_id];
                          Var nm = transpose(inverse(make_float3x3(m)));
-                
-                         Var p = make_float3(m * make_float4(bary_u * p0 + bary_v * p1 + bary_w * p2, 1.0f));
-                         if (buffers.has_pi()) { buffers.pi()[tid] = p; }
-                
-                         // NOTE: DO NOT NORMALIZE!
-                         Var hit_to_ray_origin = make_float3(ray_buffer[tid].origin_x, ray_buffer[tid].origin_y, ray_buffer[tid].origin_z) - p;
-                         if (buffers.has_hit_to_ray_origin()) {
-                             buffers.hit_to_ray_origin()[tid] = hit_to_ray_origin;
-                         }
+                         
+                         if (buffers.has_pi()) { buffers.pi()[tid] = make_float3(m * make_float4(bary_u * p0 + bary_v * p1 + bary_w * p2, 1.0f)); }
+                         if (buffers.has_distance()) { buffers.distance()[tid] = hit.distance; }
+                         
+                         Var wo = make_float3(-ray_buffer[tid].direction_x, -ray_buffer[tid].direction_y, -ray_buffer[tid].direction_z);
+                         if (buffers.has_wo()) { buffers.wo()[tid] = wo; }
                 
                          Var c = cross(p1 - p0, p2 - p0);
                          Var ng = normalize(c);
@@ -179,7 +176,6 @@ void Scene::_intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_bu
                              Var area = 0.5f * length(c);
                              Var cdf_low = select(hit.triangle_id == 0u, 0.0f, _triangle_cdf_tables[triangle_id - 1u]);
                              Var cdf_high = _triangle_cdf_tables[triangle_id];
-                             Var wo = normalize(hit_to_ray_origin);
                              Var pdf = (cdf_high - cdf_low) * hit.distance * hit.distance / (area * abs(dot(wo, ng)));
                              buffers.pdf()[tid] = pdf;
                          }

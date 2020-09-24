@@ -48,7 +48,10 @@ public:
                 return 1u;
             };
             auto film_resolution = _camera->film()->resolution();
-            _shutter_samples = std::clamp(_sampler->spp(), 1u, power_two_le(std::max(film_resolution.x, film_resolution.y) / 4u));
+            _shutter_samples = std::clamp(
+                _sampler->spp(),
+                1u,
+                std::max(power_two_le(std::max(film_resolution.x, film_resolution.y) / 4u), _sampler->spp() / 16u));
             LUISA_WARNING("Shutter samples not specified, using heuristic value: ", _shutter_samples);
         }
         

@@ -33,7 +33,6 @@ private:
             _interaction_buffers.create(device(), pixel_count,
                                         InteractionBuffers::COMPONENT_MISS |
                                         InteractionBuffers::COMPONENT_NG |
-                                        InteractionBuffers::COMPONENT_HIT_TO_RAY_ORIGIN |
                                         InteractionBuffers::COMPONENT_PI);
         }
         
@@ -41,9 +40,9 @@ private:
                  << device()->compile_kernel("ao_generate_shadow_rays", [&] {
                      auto tid = thread_id();
                      If (pixel_count % threadgroup_size == 0u || tid < pixel_count) {
-                
+    
+                         Var normal = _interaction_buffers.ng()[tid];
                          Var miss = _interaction_buffers.miss()[tid];
-                         Var normal = face_forward(_interaction_buffers.ng()[tid], _interaction_buffers.hit_to_ray_origin()[tid]);
                          Var position = offset_ray_origin(_interaction_buffers.pi()[tid], normal);
                 
                          Var onb = make_onb(normal);
