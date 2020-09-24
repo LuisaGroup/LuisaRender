@@ -44,7 +44,7 @@ public:
     
     void wait() override { [_handle waitUntilCompleted]; }
     void commit() override {
-        [_handle addCompletedHandler:^(__weak id<MTLCommandBuffer>) {
+        [_handle addCompletedHandler:^(id<MTLCommandBuffer>) {
             for (auto &&callback : _callbacks) {
                 callback();
             }
