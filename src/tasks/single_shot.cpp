@@ -52,7 +52,7 @@ public:
             LUISA_WARNING("Shutter samples not specified, using heuristic value: ", _shutter_samples);
         }
         
-        _scene = std::make_shared<Scene>(device(), params["shapes"].parse_reference_list<Shape>(), nullptr, _shutter_open);
+        _scene = std::make_shared<Scene>(device(), params["shapes"].parse_reference_list<Shape>(), nullptr, (_shutter_open + _shutter_close) * 0.5f);
         if (_scene->is_static() && _camera->is_static() && (_shutter_samples != 1u || _shutter_open != _shutter_close)) {
             LUISA_WARNING("Motion blur effects disabled since this scene is static.");
             _shutter_samples = 1u;
@@ -71,13 +71,13 @@ private:
         }
         std::vector<uint> time_sample_counts(_shutter_samples, 0u);
         for (auto i = 0u; i < _sampler->spp(); i++) {
-            time_sample_counts[std::uniform_int_distribution{0u, _shutter_samples - 1u}(random_engine)]++;
+            auto dist = std::uniform_int_distribution{0u, _shutter_samples - 1u};
+            time_sample_counts[dist(random_engine)] += 1u;
         }
         
+        LUISA_INFO("Rendering started");
         pipeline << _sampler->reset(_camera->film()->resolution())
                  << _camera->film()->clear();
-        
-        LUISA_INFO("Rendering started");
         for (auto i = 0u; i < _shutter_samples; i++) {
             auto time = time_sample_buckets[i];
             pipeline << _scene->update_geometry(time);
