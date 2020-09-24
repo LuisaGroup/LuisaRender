@@ -37,8 +37,9 @@ private:
                      << _camera->film()->accumulate_frame(_integrator->radiance_buffer(), _camera->pixel_weight_buffer())
                      << _sampler->prepare_for_next_frame();
         }
+        auto output_name = std::filesystem::canonical(device()->context().cli_positional_option()).filename().replace_extension("exr");
         pipeline << _camera->film()->postprocess()
-                 << _camera->film()->save(device()->context().input_path("result.exr"));
+                 << _camera->film()->save(device()->context().input_path(output_name));
     }
 };
 
