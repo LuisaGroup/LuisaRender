@@ -55,6 +55,7 @@ public:
     [[nodiscard]] BufferView<float3> &throughput_buffer() noexcept { return _throughput_buffer; }
     
     [[nodiscard]] std::function<void(Pipeline &pipeline)> generate_rays(float time, Sampler &sampler);
+    [[nodiscard]] bool is_static() const noexcept { return _transform == nullptr || _transform->is_static(); }
 };
 
 }

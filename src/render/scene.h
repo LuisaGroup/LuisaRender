@@ -106,6 +106,8 @@ public:
     [[nodiscard]] auto intersect_closest(const BufferView<Ray> &rays, InteractionBuffers &buffers) {
         return [this, &rays, &buffers](Pipeline &pipeline) { _intersect_closest(pipeline, rays, buffers); };
     }
+    
+    [[nodiscard]] bool is_static() const noexcept { return _is_static; }
 };
 
 }
