@@ -16,7 +16,7 @@ Shape cow_ref : WavefrontObj {
   }
 }
 
-Shape cow : InstanceGroup {
+Shape cow : Group {
   children { @cow_ref }
   transform : LinearTRSAnimation {
     time_points { 0.0, 1.0 }
@@ -24,15 +24,15 @@ Shape cow : InstanceGroup {
   }
 }
 
-Shape cows : InstanceGroup {
+Shape cows : Group {
   children { @cow_ref }
   transform : TRS {
     translation { 0.05, -0.02, 0.0 }
   }
 }
 
-Shape another_cow : InstanceGroup {
-  children { @cow }
+Shape another_cow : Instance {
+  reference { @cow }
   transform : TRS {
     scaling { 1.2 }
     translation { -0.01, 0.03, 0.0 }
