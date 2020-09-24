@@ -48,8 +48,6 @@ private:
 
 public:
     explicit Function(std::string name) noexcept;
-    ~Function() noexcept = default;
-    
     [[nodiscard]] static Function &current() noexcept;
     static void push(Function *f) noexcept;
     static void pop(Function *f) noexcept;
