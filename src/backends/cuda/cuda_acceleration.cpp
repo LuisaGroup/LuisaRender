@@ -23,8 +23,6 @@ CudaAcceleration::CudaAcceleration(
     const BufferView<luisa::float4x4> &transforms,
     bool is_static) : _device{device}, _is_static{is_static}, _input_transform_buffer{transforms} {
     
-    _device->synchronize();
-    
     _optix_context = optix::prime::Context::create(RTP_CONTEXT_TYPE_CUDA);
     _optix_context->setCudaDeviceNumbers({device->index()});
     
@@ -68,7 +66,6 @@ CudaAcceleration::CudaAcceleration(
         };
     });
     _device->launch(_update_transforms_kernel.parallelize(instance_count));
-    _device->synchronize();
     
     _optix_instance_model->setInstances(
         instance_count, RTP_BUFFER_TYPE_HOST,
@@ -86,6 +83,11 @@ void CudaAcceleration::_refit(Dispatcher &dispatch) {
     else {
         auto instance_count = static_cast<uint>(_optix_transform_buffer.size());
         dispatch(_update_transforms_kernel.parallelize(instance_count));
+        _optix_instance_model->setInstances(
+            instance_count, RTP_BUFFER_TYPE_HOST,
+            _optix_geometry_instances.data(),
+            RTP_BUFFER_FORMAT_TRANSFORM_FLOAT4x3, RTP_BUFFER_TYPE_CUDA_LINEAR,
+            reinterpret_cast<const void *>(dynamic_cast<CudaBuffer *>(_optix_transform_buffer.buffer())->handle() + _optix_transform_buffer.byte_offset()));
         _optix_instance_model->update(RTP_MODEL_HINT_ASYNC);
     }
 }
