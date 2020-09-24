@@ -13,7 +13,7 @@ if (OptiX_FOUND)
     target_link_libraries(luisa-backend-cuda PRIVATE optix_prime)
     target_compile_definitions(luisa-backend-cuda PRIVATE LUISA_OPTIX_AVAILABLE=1)
     if (optix_prime_DLL)
-        add_custom_command(TARGET luisa-backend-cuda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy
+        add_custom_command(TARGET luisa-backend-cuda POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
                            "${optix_prime_DLL}" "${CMAKE_BINARY_DIR}/$<CONFIG>/bin/")
     endif ()
 endif ()
