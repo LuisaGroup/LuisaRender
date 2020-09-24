@@ -1,4 +1,4 @@
-find_package(OpenCV REQUIRED)
+find_package(OpenCV)
 if (OpenCV_FOUND)
     file(GLOB SOURCE_FILES *.cpp *.h)
     luisa_render_add_application(RDFC SOURCES ${SOURCE_FILES})
