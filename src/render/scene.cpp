@@ -35,7 +35,7 @@ void Scene::_encode_geometry_buffers(const std::vector<std::shared_ptr<Shape>> &
     size_t instance_count = 0u;
     
     std::queue<std::tuple<Shape *, TransformTree *, Material *>> queue;
-    for (auto &&shape: shapes) { queue.emplace(shape.get(), &_transform_tree, nullptr); }
+    for (auto &&shape: shapes) { queue.emplace(shape.get(), _transform_tree.add_inner_node(shape->transform()), nullptr); }
     
     std::unordered_map<Shape *, uint> entity_to_id;
     while (!queue.empty()) {
@@ -109,7 +109,9 @@ void Scene::_encode_geometry_buffers(const std::vector<std::shared_ptr<Shape>> &
 void Scene::_update_geometry(Pipeline &pipeline, float time) {
     if (!_is_static) {  // add update stage only if the scene is dynamic and time changed
         pipeline << [this, time](Dispatcher &dispatch) {
-            dispatch(_instance_transforms.modify([this, time](float4x4 *matrices) { _transform_tree.update(matrices, time); }));
+            dispatch(_instance_transforms.modify([this, time](float4x4 *matrices) {
+                _transform_tree.update(matrices, time);
+            }));
             dispatch(_acceleration->refit());
         };
     }

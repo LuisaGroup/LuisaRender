@@ -155,7 +155,7 @@ public:
     template<typename T>
     [[nodiscard]] std::shared_ptr<T> global_node(std::string_view node_name) const {
         if (auto iter = _global_nodes.find(node_name); iter != _global_nodes.end()) {
-            return std::dynamic_pointer_cast<T>(iter->second);
+            return std::static_pointer_cast<T>(iter->second);
         }
         LUISA_EXCEPTION("Undefined node: ", node_name);
     }

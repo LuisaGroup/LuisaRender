@@ -41,6 +41,8 @@ protected:
     std::vector<Lobe> _lobes;
 
 public:
+    Material(Device *device, const ParameterSet &params) : Plugin{device, params} {}
+    
     [[nodiscard]] uint required_data_block_count() const noexcept {
         return std::accumulate(_lobes.cbegin(), _lobes.cend(), 0u, [](uint sum, const auto &lobe) noexcept {
             return sum + lobe.shader->required_data_block_count();
