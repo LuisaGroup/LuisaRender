@@ -78,7 +78,6 @@ private:
             time_sample_counts[dist(random_engine)] += 1u;
         }
         
-        LUISA_INFO("Rendering started");
         pipeline << _sampler->reset(_camera->film()->resolution())
                  << _camera->film()->clear();
         for (auto i = 0u; i < _shutter_samples; i++) {

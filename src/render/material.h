@@ -61,7 +61,7 @@ public:
         });
     }
     
-    [[nodiscard]] float sum_emissive_weight() const noexcept {
+    [[nodiscard]] float sum_emission_weight() const noexcept {
         return std::accumulate(_lobes.cbegin(), _lobes.cend(), 0.0f, [](float sum, const auto &lobe) noexcept {
             return sum + (lobe.shader->is_emissive() ? lobe.weight : 0.0f);
         });
@@ -83,7 +83,7 @@ public:
         return blocks;
     }
     
-    DataBlock *encode_emissive_data(DataBlock *blocks) {
+    DataBlock *encode_emission_data(DataBlock *blocks) {
         for (auto &&lobe : _lobes) {
             if (lobe.shader->is_emissive()) {
                 lobe.shader->encode_data(blocks);

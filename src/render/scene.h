@@ -13,7 +13,6 @@
 #include "shape.h"
 #include "material.h"
 #include "background.h"
-#include "frame_data.h"
 #include "interaction.h"
 
 namespace luisa::render {
@@ -47,9 +46,8 @@ private:
     
     // materials
     BufferView<MaterialHandle> _instance_materials;
-    BufferView<float> _instance_area;
-    BufferView<float> _shader_weights;
     
+    BufferView<float> _shader_weights;
     BufferView<float> _shader_cdf_tables;
     BufferView<uint> _shader_types;
     BufferView<uint> _shader_block_offsets;
@@ -63,9 +61,6 @@ private:
     
     std::unique_ptr<Acceleration> _acceleration;
     BufferView<ClosestHit> _closest_hit_buffer;
-    
-    BufferView<float> _emitter_cdf_tables;
-    
     
     bool _is_static{false};
 

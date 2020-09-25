@@ -26,9 +26,10 @@ public:
           _pipeline{device} {}
     
     void execute() {
-        LUISA_INFO("Compiling & running rendering pipeline...");
-        auto t0 = std::chrono::high_resolution_clock::now();
+        LUISA_INFO("Compiling pipeline...");
         _compile(_pipeline);
+        auto t0 = std::chrono::high_resolution_clock::now();
+        LUISA_INFO("Running pipeline...");
         _pipeline.run();
         device()->synchronize();
         auto t1 = std::chrono::high_resolution_clock::now();

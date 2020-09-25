@@ -7,6 +7,7 @@
 namespace luisa::cpu {
 
 class CpuDevice {
+
 };
 
 }
