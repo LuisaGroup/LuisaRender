@@ -12,12 +12,12 @@ High-Performance Renderer on GPU.
 | Wavefront Path Tracing                                   | Planned   |
 
 ### Backends
-| Feature                    | Progress    |
-|----------------------------|-------------|
-| Apple Metal                | Done        |
-| NVIDIA OptiX & OptiX-Prime | Partial     |
-| Intel Embree               |             |
-| ...                        |             |
+| Feature                    | Progress                                            |
+|----------------------------|-----------------------------------------------------|
+| Apple Metal                | Done                                                |
+| NVIDIA CUDA                | Done (with OptiX Prime for Acceleration Structures) |
+| CPU                        | Planned (with OpenCL)                               |
+| ...                        |                                                     |
 
 ### Cameras
 | Feature                                   | Progress    |
@@ -27,25 +27,23 @@ High-Performance Renderer on GPU.
 | Realistic Cameras                         |             |
 | Fish-Eye Cameras                          |             |
 | ...                                       |             |
-| Camera Transform, Animation & Motion-Blur | Partial     |
+| Camera Transform, Animation & Motion-Blur | Done        |
 | Shutter Curves                            |             |
 
 ### Geometry
 | Feature                                     | Progress    |
 |---------------------------------------------|-------------|
-| Triangle Meshes (Wavefront OBJ Format)      | Partial     |
+| Triangle Meshes (Wavefront OBJ Format)      | Done        |
 | Catmull-Clark Subdivision                   |             |
-| Instancing                                  | Partial     |
-| Static and Dynamic Transforms & Motion-Blur | Partial     |
+| Instancing                                  | Done        |
+| Static and Dynamic Transforms & Motion-Blur | Done        |
 | Curves                                      |             |
 | Out-of-Core Ray Tracing                     |             |
 
 ### Illumination
 | Feature                                       | Progress    |
 |-----------------------------------------------|-------------|
-| Point Lights                                  | Refactoring |
 | Diffuse Area Lights                           | Refactoring |
-| Realistic Lights                              |             |
 | HDRI Environment Maps                         |             |
 | Procedural Skylights                          |             |
 | ...                                           |             |
