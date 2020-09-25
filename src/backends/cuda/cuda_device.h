@@ -34,7 +34,7 @@ private:
     CUevent _sync_event{};
     std::mutex _kernel_cache_mutex;
     std::vector<CUmodule> _modules;
-    std::map<SHA1::Digest, CUfunction> _kernel_cache;
+    std::unordered_map<uint64_t, CUfunction> _kernel_cache;
     
     std::mutex _dispatch_mutex;
     std::condition_variable _dispatch_cv;
@@ -65,7 +65,6 @@ public:
         bool is_static) override;
     
     [[nodiscard]] CUdevice handle() const noexcept { return _handle; }
-    [[nodiscard]] CUcontext context() const noexcept { return _ctx; }
 };
 
 }

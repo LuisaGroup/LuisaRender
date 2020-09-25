@@ -31,6 +31,7 @@ LUISA_STRUCT(luisa::cuda::CudaClosestHit, distance, triangle_id, instance_id, u,
 namespace luisa::cuda {
 
 using compute::Acceleration;
+using compute::Buffer;
 using compute::BufferView;
 using compute::KernelView;
 using compute::TriangleHandle;
@@ -56,6 +57,12 @@ private:
     BufferView<luisa::float4x4> _input_transform_buffer;
     BufferView<std::array<float4, 3>> _optix_transform_buffer;
     KernelView _update_transforms_kernel;
+    mutable KernelView _adapt_interactions_kernel;
+    mutable size_t _prev_ray_buffer_offset{0u};
+    mutable size_t _prev_hit_buffer_offset{0u};
+    mutable Buffer *_prev_ray_buffer{nullptr};
+    mutable Buffer *_prev_hit_buffer{nullptr};
+    mutable Buffer *_prev_internal_hit_buffer{nullptr};
 
 private:
     void _refit(compute::Dispatcher &dispatch) override;

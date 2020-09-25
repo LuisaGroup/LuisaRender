@@ -115,6 +115,31 @@ void CudaAcceleration::_intersect_closest(Dispatcher &dispatch, const BufferView
         _optix_closesthit_buffer = _device->allocate_buffer<CudaClosestHit>(ray_buffer.size());
     }
     
+    constexpr auto tg_size = 1024u;
+    auto ray_count = static_cast<uint>(ray_buffer.size());
+    
+    if (_prev_ray_buffer != ray_buffer.buffer() || _prev_ray_buffer_offset != ray_buffer.byte_offset() ||
+        _prev_hit_buffer != hit_buffer.buffer() || _prev_hit_buffer_offset != hit_buffer.byte_offset() ||
+        _prev_internal_hit_buffer != _optix_closesthit_buffer.buffer()) {
+    
+        _adapt_interactions_kernel = _device->compile_kernel("cuda_accel_adapt_closest_hits", [&] {
+            auto tid = thread_id();
+            If (ray_count % tg_size == 0u || tid < ray_count) {
+                Var hit = _optix_closesthit_buffer[tid];
+                hit_buffer[tid].distance = hit.distance;
+                hit_buffer[tid].triangle_id = hit.triangle_id;
+                hit_buffer[tid].instance_id = hit.instance_id;
+                hit_buffer[tid].bary = make_float2(hit.u, hit.v);
+            };
+        });
+        
+        _prev_ray_buffer_offset = ray_buffer.byte_offset();
+        _prev_hit_buffer_offset = hit_buffer.byte_offset();
+        _prev_ray_buffer = ray_buffer.buffer();
+        _prev_hit_buffer = hit_buffer.buffer();
+        _prev_internal_hit_buffer = _optix_closesthit_buffer.buffer();
+    }
+    
     auto rays_ptr = reinterpret_cast<void *>(dynamic_cast<CudaBuffer *>(ray_buffer.buffer())->handle() + ray_buffer.byte_offset());
     auto hits_ptr = reinterpret_cast<void *>(dynamic_cast<CudaBuffer *>(_optix_closesthit_buffer.buffer())->handle() + _optix_closesthit_buffer.byte_offset());
     _optix_closesthit_query->setRays(ray_buffer.size(), RTP_BUFFER_FORMAT_RAY_ORIGIN_TMIN_DIRECTION_TMAX, RTP_BUFFER_TYPE_CUDA_LINEAR, rays_ptr);
@@ -124,19 +149,7 @@ void CudaAcceleration::_intersect_closest(Dispatcher &dispatch, const BufferView
     _optix_closesthit_query->setCudaStream(stream);
     _optix_closesthit_query->execute(RTP_QUERY_HINT_ASYNC);
     
-    constexpr auto tg_size = 1024u;
-    auto ray_count = static_cast<uint>(ray_buffer.size());
-    auto kernel = _device->compile_kernel("cuda_accel_adapt_closest_hits", [&] {
-        auto tid = thread_id();
-        If (ray_count % tg_size == 0u || tid < ray_count) {
-            Var hit = _optix_closesthit_buffer[tid];
-            hit_buffer[tid].distance = hit.distance;
-            hit_buffer[tid].triangle_id = hit.triangle_id;
-            hit_buffer[tid].instance_id = hit.instance_id;
-            hit_buffer[tid].bary = make_float2(hit.u, hit.v);
-        };
-    });
-    dispatch(kernel.parallelize(ray_count, tg_size));
+    dispatch(_adapt_interactions_kernel.parallelize(ray_count, tg_size));
 }
 
 }

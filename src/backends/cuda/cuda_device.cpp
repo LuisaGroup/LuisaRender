@@ -44,7 +44,7 @@ CudaDevice::CudaDevice(Context *context, uint32_t device_id) : Device{context, d
         while (!_stop_signal.load()) {
             using namespace std::chrono_literals;
             std::unique_lock lock{_dispatch_mutex};
-            _dispatch_cv.wait_for(lock, 5ms, [this] { return !_dispatch_queue.empty(); });
+            _dispatch_cv.wait_for(lock, 1ms, [this] { return !_dispatch_queue.empty(); });
             if (!_dispatch_queue.empty()) {
                 auto dispatch = std::move(_dispatch_queue.front());
                 _dispatch_queue.pop();
@@ -64,7 +64,7 @@ CudaDevice::~CudaDevice() noexcept {
     CUDA_CHECK(cuDevicePrimaryCtxRelease(_handle));
 }
 
-std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) {  // TODO: Make it thread-safe
+std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) {
     
     std::ostringstream os;
     CudaCodegen codegen{os};
@@ -72,7 +72,7 @@ std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) { 
     auto src = os.str();
     if (_context->should_print_generated_source()) { LUISA_INFO("Generated source for kernel \"", function.name(), "\":\n", src); }
     
-    auto digest = SHA1{src}.digest();
+    auto digest = murmur_hash_64a(src.c_str(), src.size(), 19980810u);
     
     CUfunction kernel = nullptr;
     
@@ -86,7 +86,7 @@ std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) { 
     if (kernel == nullptr) {
     
         std::ostringstream ss;
-        for (auto d : digest) { ss << std::setfill('0') << std::setw(8) << std::hex << std::uppercase << d; }
+        ss << std::setfill('0') << std::setw(16u) << std::hex << std::uppercase << digest;
         auto digest_str = ss.str();
         auto cache_file_path = _context->cache_path(digest_str.append(".ptx"));
         LUISA_INFO("No cache found for kernel \"", function.name(), "\" in memory, searching on disk: ", cache_file_path);
@@ -162,7 +162,6 @@ std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) { 
             NVRTC_CHECK(nvrtcDestroyProgram(&prog));
 
             jitify::detail::ptx_remove_unused_globals(&ptx);
-            //        LUISA_INFO("Generated PTX:\n", ptx);
             
             // retain context
             CUcontext ctx;
@@ -219,8 +218,6 @@ std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) { 
             uniform_offset += arg->type()->size;
         }
     }
-    
-    
     return std::make_shared<CudaKernel>(kernel, std::move(resources), std::move(uniforms));
 }
 
