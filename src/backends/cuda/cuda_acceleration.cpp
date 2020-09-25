@@ -36,7 +36,8 @@ CudaAcceleration::CudaAcceleration(
             mesh.vertex_count, RTP_BUFFER_TYPE_CUDA_LINEAR,
             reinterpret_cast<const void *>(dynamic_cast<CudaBuffer *>(positions.buffer())->handle() + positions.byte_offset() + mesh.vertex_offset * sizeof(luisa::float3)),
             sizeof(luisa::float3));
-        model->setBuilderParameter(RTP_BUILDER_PARAM_USE_CALLER_TRIANGLES, 1);
+        // Simple heuristic to determine whether or not we should bake vertices into acceleration structure...
+        model->setBuilderParameter(RTP_BUILDER_PARAM_USE_CALLER_TRIANGLES, mesh.vertex_count < 1024u * 1024u ? 0u : 1u);
         model->update(RTP_MODEL_HINT_ASYNC);
         _optix_geometry_models.emplace_back(model);
     }
@@ -70,6 +71,7 @@ CudaAcceleration::CudaAcceleration(
     _device->launch(_update_transforms_kernel.parallelize(instance_count));
     _device->synchronize();
     
+    _optix_instance_model->setBuilderParameter(RTP_BUILDER_PARAM_USE_CALLER_TRIANGLES, 0u);
     _optix_instance_model->setInstances(
         instance_count, RTP_BUFFER_TYPE_HOST,
         _optix_geometry_instances.data(),
@@ -86,6 +88,7 @@ void CudaAcceleration::_refit(Dispatcher &dispatch) {
     else {
         auto instance_count = static_cast<uint>(_optix_transform_buffer.size());
         dispatch(_update_transforms_kernel.parallelize(instance_count));
+        _optix_instance_model->setBuilderParameter(RTP_BUILDER_PARAM_USE_CALLER_TRIANGLES, 0u);
         _optix_instance_model->setInstances(
             instance_count, RTP_BUFFER_TYPE_HOST,
             _optix_geometry_instances.data(),

@@ -89,10 +89,8 @@ std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) {
         ss << std::setfill('0') << std::setw(16u) << std::hex << std::uppercase << digest;
         auto digest_str = ss.str();
         auto cache_file_path = _context->cache_path(digest_str.append(".ptx"));
-        LUISA_INFO("No cache found for kernel \"", function.name(), "\" in memory, searching on disk: ", cache_file_path);
         
         if (std::filesystem::exists(cache_file_path)) {
-            LUISA_INFO("Cache hit for kernel \"", function.name(), "\" on disk, compilation skipped.");
             auto ptx = text_file_contents(cache_file_path);
             
             // retain context
@@ -110,7 +108,6 @@ std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) {
             _kernel_cache.emplace(digest, kernel);
         } else {
             
-            LUISA_INFO("No cache found for kernel \"", function.name(), "\" on disk, compiling from source...");
             auto &&headers = jitify::detail::get_jitsafe_headers_map();
             std::vector<const char *> header_names;
             std::vector<const char *> header_sources;
@@ -177,7 +174,6 @@ std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) {
             
             std::lock_guard lock{_kernel_cache_mutex};
             if (!std::filesystem::exists(cache_file_path)) {
-                LUISA_INFO("Writing cache for compiled kernel \"", function.name(), "\" to disk: ", cache_file_path);
                 std::ofstream ptx_file{cache_file_path};
                 ptx_file << ptx;
             }
