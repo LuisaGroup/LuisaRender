@@ -9,7 +9,7 @@ High-Performance Renderer on GPU.
 | Plugin System                                            | Done      |
 | Embedded DSL for Runtime Kernel Generation & Compilation | Done      |
 | Scene Description Language                               | Done      |
-| Wavefront Path Tracing                                   | Planned   |
+| Wavefront Path Tracing                                   | Working   |
 
 ### Backends
 | Feature                    | Progress                                            |
@@ -47,14 +47,14 @@ High-Performance Renderer on GPU.
 | HDRI Environment Maps                         |             |
 | Procedural Skylights                          |             |
 | ...                                           |             |
-| Uniform-Distribution Light Selection Strategy | Refactoring |
+| Uniform-Distribution Light Selection Strategy | Working     |
 | Power-Distribution Light Selection Strategy   |             |
 
 ### Appearance
 | Feature                      | Progress |
 |------------------------------|----------|
-| BSDFs                        | Planned  |
-| Materials                    | Planned  |
+| BSDFs                        | Working  |
+| Materials                    | Working  |
 | Spectral Rendering           |          |
 | Textures & Filters           |          |
 | Shading Language Integration |          |
@@ -82,7 +82,7 @@ High-Performance Renderer on GPU.
 |-------------------|-------------|
 | Normal Visualizer | Done        |
 | Ambient Occlusion | Done        |
-| Path Tracing      | Planned     |
+| Path Tracing      | Working     |
 | SPPM              |             |
 | PSSMLT            |             |
 | ...               |             |
@@ -98,7 +98,7 @@ High-Performance Renderer on GPU.
 ### Renders
 | Feature               | Progress    |
 |-----------------------|-------------|
-| Single-Shot Rendering | Partial     |
+| Single-Shot Rendering | Done        |
 | Animation Rendering   |             |
 | Interactive Rendering |             |
 | Remote Rendering      |             |
