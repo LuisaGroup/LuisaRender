@@ -13,10 +13,10 @@ Camera camera : Pinhole {
   position { 0, 0.99, 9 }
   target { 0, 0.99, 0 }
   fov { 27.8 }
-  filter : Gaussian {
-    radius { 2.0 }
-    alpha { 1.0 }
-  }
+  // filter : Gaussian {
+  //   radius { 2.0 }
+  //   alpha { 1.0 }
+  // }
 }
 
 task : SingleShot {

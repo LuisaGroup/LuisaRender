@@ -22,7 +22,7 @@ bool Context::create_cache_folder(const std::filesystem::path &name) noexcept { 
 std::filesystem::path Context::include_path(const std::filesystem::path &name) noexcept { return _runtime_dir() / "include" / name; }
 std::filesystem::path Context::working_path(const std::filesystem::path &name) noexcept { return _working_dir() / name; }
 std::filesystem::path Context::runtime_path(const std::filesystem::path &name) noexcept { return _runtime_dir() / name; }
-std::filesystem::path Context::cache_path(const std::filesystem::path &name) noexcept { return _working_dir() / "cache" / name; }
+std::filesystem::path Context::cache_path(const std::filesystem::path &name) noexcept { return _runtime_dir() / "cache" / name; }
 std::filesystem::path Context::input_path(const std::filesystem::path &name) noexcept { return _input_dir() / name; }
 
 Context::~Context() noexcept {
@@ -60,6 +60,12 @@ const std::filesystem::path &Context::_runtime_dir() noexcept {
         _run_dir = std::filesystem::canonical(_parse_result()["runtime-dir"].as<std::filesystem::path>());
         LUISA_EXCEPTION_IF(!std::filesystem::exists(_run_dir) || !std::filesystem::is_directory(_run_dir), "Invalid runtime directory: ", _run_dir);
         LUISA_INFO("Runtime directory: ", _run_dir);
+        auto cache_directory = _run_dir / "cache";
+        if (_parse_result()["clear-cache"].as<bool>() && std::filesystem::exists(cache_directory)) {
+            LUISA_INFO("Removing cache directory: ", cache_directory);
+            std::filesystem::remove_all(cache_directory);
+        }
+        LUISA_EXCEPTION_IF(!_create_folder_if_necessary(cache_directory), "Failed to create cache directory: ", cache_directory);
     }
     return _run_dir;
 }
@@ -70,12 +76,6 @@ const std::filesystem::path &Context::_working_dir() noexcept {
         LUISA_EXCEPTION_IF(!std::filesystem::exists(_work_dir) || !std::filesystem::is_directory(_work_dir), "Invalid working directory: ", _work_dir);
         std::filesystem::current_path(_work_dir);
         LUISA_INFO("Working directory: ", _work_dir);
-        auto cache_directory = _work_dir / "cache";
-        if (_parse_result()["clear-cache"].as<bool>() && std::filesystem::exists(cache_directory)) {
-            LUISA_INFO("Removing cache directory: ", cache_directory);
-            std::filesystem::remove_all(cache_directory);
-        }
-        LUISA_EXCEPTION_IF(!_create_folder_if_necessary(cache_directory), "Failed to create cache directory: ", cache_directory);
     }
     return _work_dir;
 }
