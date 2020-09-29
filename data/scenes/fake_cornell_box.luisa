@@ -1,0 +1,111 @@
+Shape cube : WavefrontObj {
+  path { "../meshes/cube/cube.obj" }
+}
+
+Shape wall : Instance {
+  reference { @cube }
+  transform : TRS {
+    scaling { 10 }
+  }
+}
+
+Material red : Lambert {
+  albedo { 1, 0, 0 }
+}
+
+Material green : Lambert {
+  albedo { 0, 1, 0 }
+}
+
+Material white : Lambert {
+  albedo { 1, 1, 1 }
+}
+
+Shape back : Instance {
+  reference { @wall }
+  transform : TRS {
+    translation { 0, 0, -10 }
+  }
+  material { @white }
+}
+
+Shape left : Instance {
+  reference { @wall }
+  transform : TRS {
+    translation { -10, 0, 0 }
+  }
+  material { @red }
+}
+
+Shape right : Instance {
+  reference { @wall }
+  transform : TRS {
+    translation { 10, 0, 0 }
+  }
+  material { @green }
+}
+
+Shape top : Instance {
+  reference { @wall }
+  transform : TRS {
+    translation { 0, 10, 0 }
+  }
+  material { @white }
+}
+
+Shape bottom : Instance {
+  reference { @wall }
+  transform : TRS {
+    translation { 0, -10, 0 }
+  }
+  material { @white }
+}
+
+Shape light : Instance {
+  reference { @cube }
+  transform : TRS {
+    scaling { 2.5 }
+    translation { 0, 6.2, 0 }
+  }
+  material : Lambert {
+    emission { 10, 10, 10 }
+  }
+}
+
+Shape tall : Instance {
+  reference { @cube }
+  transform : TRS {
+    scaling { 3, 6, 3 }
+    rotation { 0, 1, 0, 17.5 }
+    translation { -1.75, -2, -1 }
+  }
+  material { @white }
+}
+
+Shape short : Instance {
+  reference { @cube }
+  transform : TRS {
+    scaling { 3, 3, 3 }
+    rotation { 0, 1, 0, -17.5 }
+    translation { 1.75, -3.5, 1.5 }
+  }
+  material { @white }
+}
+
+Camera camera : Pinhole {
+  film : RGB {
+    resolution { 1024, 1024 }
+  }
+  position { 0, 0, 28 }
+  target { 0, 0, 0 }
+  fov { 45 }
+}
+
+task : SingleShot {
+  integrator : AO {}
+  sampler : Independent {
+    spp { 128 }
+  }
+  camera { @camera }
+  shapes { @back, @left, @right, @top, @bottom, @light, @tall, @short }
+}

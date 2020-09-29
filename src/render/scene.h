@@ -71,7 +71,6 @@ private:
     void _update_geometry(Pipeline &pipeline, float time);
     void _intersect_any(Pipeline &pipeline, const BufferView<Ray> &rays, BufferView<AnyHit> &hits);
     void _intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_buffer, InteractionBuffers &buffers);
-    void _uniform_sample_one_light(Pipeline &pipeline, Sampler &sampler);
     
     void _encode_geometry_buffers(const std::vector<std::shared_ptr<Shape>> &shapes,
                                   float3 *positions,
@@ -106,6 +105,8 @@ public:
     }
     
     [[nodiscard]] bool is_static() const noexcept { return _is_static; }
+    
+    
 };
 
 }

@@ -8,7 +8,7 @@
 using namespace luisa::compute;
 using namespace luisa::compute::dsl;
 
-namespace luisa::render::shading {
+namespace luisa::render::shader {
 
 struct alignas(16) LambertData {
     float r;
@@ -19,9 +19,9 @@ struct alignas(16) LambertData {
 
 }
 
-LUISA_STRUCT(luisa::render::shading::LambertData, r, g, b, double_sided)
+LUISA_STRUCT(luisa::render::shader::LambertData, r, g, b, double_sided)
 
-namespace luisa::render::shading {
+namespace luisa::render::shader {
 
 class LambertReflection : public Surface<LambertReflection> {
 

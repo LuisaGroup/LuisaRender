@@ -3,6 +3,7 @@
 //
 
 #include <compute/dsl_syntax.h>
+#include <render/sampling.h>
 #include "scene.h"
 
 namespace luisa::render {
@@ -154,14 +155,14 @@ void Scene::_intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_bu
                          Var bary_v = hit.bary.y;
                          Var bary_w = 1.0f - (bary_u + bary_v);
                 
-                         Var p0 = _positions[i];
-                         Var p1 = _positions[j];
-                         Var p2 = _positions[k];
-                
                          Var m = _instance_transforms[instance_id];
                          Var nm = transpose(inverse(make_float3x3(m)));
                 
-                         if (buffers.has_pi()) { buffers.pi()[tid] = make_float3(m * make_float4(bary_u * p0 + bary_v * p1 + bary_w * p2, 1.0f)); }
+                         Var p0 = make_float3(m * make_float4(_positions[i], 1.0f));
+                         Var p1 = make_float3(m * make_float4(_positions[j], 1.0f));
+                         Var p2 = make_float3(m * make_float4(_positions[k], 1.0f));
+                
+                         if (buffers.has_pi()) { buffers.pi()[tid] = bary_u * p0 + bary_v * p1 + bary_w * p2; }
                          if (buffers.has_distance()) { buffers.distance()[tid] = hit.distance; }
                 
                          Var wo = make_float3(-ray_buffer[tid].direction_x, -ray_buffer[tid].direction_y, -ray_buffer[tid].direction_z);
@@ -169,7 +170,8 @@ void Scene::_intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_bu
                 
                          Var c = cross(p1 - p0, p2 - p0);
                          Var ng = normalize(c);
-                         if (buffers.has_ns()) { buffers.ns()[tid] = normalize(nm * (bary_u * _normals[i] + bary_v * _normals[j] + bary_w * _normals[k])); }
+//                         if (buffers.has_ns()) { buffers.ns()[tid] = normalize(nm * (bary_u * _normals[i] + bary_v * _normals[j] + bary_w * _normals[k])); }
+                         if (buffers.has_ns()) { buffers.ns()[tid] = ng; }  // FIXME: Error in Ns
                          if (buffers.has_ng()) { buffers.ng()[tid] = ng; }
                          if (buffers.has_uv()) { buffers.uv()[tid] = bary_u * _tex_coords[i] + bary_v * _tex_coords[j] + bary_w * _tex_coords[k]; }
                          if (buffers.has_pdf()) {
