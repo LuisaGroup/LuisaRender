@@ -31,13 +31,6 @@ using compute::MeshHandle;
 class Scene {
 
 public:
-    struct ShaderSelection {
-        Expr<uint> type;
-        Expr<uint> index;
-        Expr<float> prob;
-        Expr<float> weight;
-    };
-    
     struct LightSelection {
         Expr<uint> index;
         Expr<float> prob;
@@ -81,7 +74,6 @@ private:
     std::shared_ptr<Background> _background;
     
     std::unique_ptr<Acceleration> _acceleration;
-    BufferView<ClosestHit> _closest_hit_buffer;
     
     std::map<uint, SurfaceShader *> _surface_evaluate_functions;
     std::map<uint, SurfaceShader *> _surface_emission_functions;
@@ -90,9 +82,6 @@ private:
 
 private:
     void _update_geometry(Pipeline &pipeline, float time);
-    void _intersect_any(Pipeline &pipeline, const BufferView<Ray> &rays, BufferView<AnyHit> &hits);
-    void _intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_buffer, InteractionBuffers &buffers);
-    
     void _encode_geometry_buffers(const std::vector<std::shared_ptr<Shape>> &shapes,
                                   float3 *positions,
                                   float3 *normals,
@@ -118,11 +107,11 @@ public:
     }
     
     [[nodiscard]] auto intersect_any(const BufferView<Ray> &rays, BufferView<AnyHit> &hits) {
-        return [this, &rays, &hits](Pipeline &pipeline) { _intersect_any(pipeline, rays, hits); };
+        return _acceleration->intersect_any(rays, hits);
     }
     
-    [[nodiscard]] auto intersect_closest(const BufferView<Ray> &rays, InteractionBuffers &buffers) {
-        return [this, &rays, &buffers](Pipeline &pipeline) { _intersect_closest(pipeline, rays, buffers); };
+    [[nodiscard]] auto intersect_closest(const BufferView<Ray> &rays, BufferView<ClosestHit> &hits) {
+        return _acceleration->intersect_closest(rays, hits);
     }
     
     [[nodiscard]] bool is_static() const noexcept { return _is_static; }
@@ -130,6 +119,7 @@ public:
     
     [[nodiscard]] LightSelection uniform_select_light(Expr<float> u_light, Expr<float> u_shader) const;
     [[nodiscard]] LightSample uniform_sample_light(const LightSelection &selection, Expr<float3> p, Expr<float2> u_shape) const;
+    [[nodiscard]] Interaction evaluate_interaction(Expr<Ray> ray, Expr<ClosestHit> hit, uint flags, Expr<float> u_shader = 0.0f) const;
 };
 
 }

@@ -118,78 +118,6 @@ void Scene::_update_geometry(Pipeline &pipeline, float time) {
     }
 }
 
-void Scene::_intersect_any(Pipeline &pipeline, const BufferView<Ray> &rays, BufferView<AnyHit> &hits) {
-    pipeline << _acceleration->intersect_any(rays, hits);
-}
-
-void Scene::_intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_buffer, InteractionBuffers &buffers) {
-    
-    auto ray_count = static_cast<uint>(ray_buffer.size());
-    constexpr auto threadgroup_size = 1024u;
-    
-    if (_closest_hit_buffer.size() < ray_buffer.size()) {
-        _closest_hit_buffer = _device->allocate_buffer<ClosestHit>(ray_count);
-    }
-    
-    pipeline << _acceleration->intersect_closest(ray_buffer, _closest_hit_buffer)
-             << _device->compile_kernel("scene_evaluate_interactions", [&] {
-                 auto tid = thread_id();
-                 If (ray_count % threadgroup_size == 0u || tid < ray_count) {
-                     Var<ClosestHit> hit = _closest_hit_buffer[tid];
-                     If (hit.distance <= 0.0f) {
-                         if (buffers.has_miss()) { buffers.miss()[tid] = true; }
-                     } Else {
-                
-                         if (buffers.has_miss()) { buffers.miss()[tid] = false; }
-                
-                         Var instance_id = hit.instance_id;
-                         if (buffers.has_material()) { buffers.material()[tid] = _instance_materials[instance_id]; }
-                
-                         Var entity = _entities[_instance_to_entity_id[instance_id]];
-                         Var triangle_id = entity.triangle_offset + hit.triangle_id;
-                         Var i = _triangles[triangle_id].i + entity.vertex_offset;
-                         Var j = _triangles[triangle_id].j + entity.vertex_offset;
-                         Var k = _triangles[triangle_id].k + entity.vertex_offset;
-                
-                         Var bary_u = hit.bary.x;
-                         Var bary_v = hit.bary.y;
-                         Var bary_w = 1.0f - (bary_u + bary_v);
-                
-                         Var m = _instance_transforms[instance_id];
-                         Var nm = transpose(inverse(make_float3x3(m)));
-                
-                         Var p0 = make_float3(m * make_float4(_positions[i], 1.0f));
-                         Var p1 = make_float3(m * make_float4(_positions[j], 1.0f));
-                         Var p2 = make_float3(m * make_float4(_positions[k], 1.0f));
-                
-                         if (buffers.has_pi()) { buffers.pi()[tid] = bary_u * p0 + bary_v * p1 + bary_w * p2; }
-                         if (buffers.has_distance()) { buffers.distance()[tid] = hit.distance; }
-                
-                         Var wo = make_float3(-ray_buffer[tid].direction_x, -ray_buffer[tid].direction_y, -ray_buffer[tid].direction_z);
-                         if (buffers.has_wo()) { buffers.wo()[tid] = wo; }
-                
-                         Var c = cross(p1 - p0, p2 - p0);
-                         Var ng = normalize(c);
-//                         if (buffers.has_ns()) { buffers.ns()[tid] = normalize(nm * (bary_u * _normals[i] + bary_v * _normals[j] + bary_w * _normals[k])); }
-                         // FIXME: Error in Ns, temporally using Ng instead...
-                         if (buffers.has_ns()) { buffers.ns()[tid] = ng; }
-                         if (buffers.has_ng()) { buffers.ng()[tid] = ng; }
-                         if (buffers.has_uv()) { buffers.uv()[tid] = bary_u * _tex_coords[i] + bary_v * _tex_coords[j] + bary_w * _tex_coords[k]; }
-                         if (buffers.has_pdf()) {
-                             Var area = 0.5f * length(c);
-                             Var cdf_low = select(hit.triangle_id == 0u, 0.0f, _triangle_cdf_tables[triangle_id - 1u]);
-                             Var cdf_high = _triangle_cdf_tables[triangle_id];
-                             Var pdf = (cdf_high - cdf_low) * hit.distance * hit.distance / (area * abs(dot(wo, ng)));
-                             buffers.pdf()[tid] = pdf;
-                         }
-                
-                         // TODO: Process material...
-                         
-                     };
-                 };
-             }).parallelize(ray_count, threadgroup_size);
-}
-
 void Scene::_process_geometry(const std::vector<std::shared_ptr<Shape>> &shapes, float initial_time, std::vector<Material *> &instance_materials) {
     
     // calculate memory usage...
@@ -462,6 +390,67 @@ Scene::LightSelection Scene::uniform_select_light(Expr<float> u_light, Expr<floa
     Var shader_weight = _shader_weights[shader_index];
     Var shader_type = _shader_types[shader_index];
     return LightSelection{light_index, 1.0f / light_count(), shader_type, shader_index, shader_pdf, shader_weight};
+}
+
+Interaction Scene::evaluate_interaction(Expr<Ray> ray, Expr<ClosestHit> hit, uint flags, Expr<float> u_shader) const {
+    
+    Interaction interaction;
+    
+    If (hit.distance <= 0.0f) {
+        if (flags & Interaction::COMPONENT_MISS) { interaction.miss = true; }
+    } Else {
+        
+        if (flags & Interaction::COMPONENT_MISS) { interaction.miss = false; }
+        
+        Var instance_id = hit.instance_id;
+        Var entity = _entities[_instance_to_entity_id[instance_id]];
+        Var triangle_id = entity.triangle_offset + hit.triangle_id;
+        Var i = _triangles[triangle_id].i + entity.vertex_offset;
+        Var j = _triangles[triangle_id].j + entity.vertex_offset;
+        Var k = _triangles[triangle_id].k + entity.vertex_offset;
+        
+        Var bary_u = hit.bary.x;
+        Var bary_v = hit.bary.y;
+        Var bary_w = 1.0f - (bary_u + bary_v);
+        
+        Var m = _instance_transforms[instance_id];
+        Var nm = transpose(inverse(make_float3x3(m)));
+        
+        Var p0 = make_float3(m * make_float4(_positions[i], 1.0f));
+        Var p1 = make_float3(m * make_float4(_positions[j], 1.0f));
+        Var p2 = make_float3(m * make_float4(_positions[k], 1.0f));
+        
+        if (flags & Interaction::COMPONENT_PI) { interaction.pi = bary_u * p0 + bary_v * p1 + bary_w * p2; }
+        if (flags & Interaction::COMPONENT_DISTANCE) { interaction.distance = hit.distance; }
+        
+        Var wo = make_float3(-ray.direction_x, -ray.direction_y, -ray.direction_z);
+        if (flags & Interaction::COMPONENT_WO) { interaction.wo = wo; }
+        
+        Var c = cross(p1 - p0, p2 - p0);
+        Var ng = normalize(c);
+        // if (flags & Interaction::COMPONENT_NS) { interaction.ns = normalize(nm * (bary_u * _normals[i] + bary_v * _normals[j] + bary_w * _normals[k])); }
+        // FIXME: Error in Ns, temporally using Ng instead...
+        if (flags & Interaction::COMPONENT_NS) { interaction.ns = ng; }
+        if (flags & Interaction::COMPONENT_NG) { interaction.ng = ng; }
+        if (flags & Interaction::COMPONENT_UV) { interaction.uv = bary_u * _tex_coords[i] + bary_v * _tex_coords[j] + bary_w * _tex_coords[k]; }
+        if (flags & Interaction::COMPONENT_PDF) {
+            Var area = 0.5f * length(c);
+            Var cdf_low = select(hit.triangle_id == 0u, 0.0f, _triangle_cdf_tables[triangle_id - 1u]);
+            Var cdf_high = _triangle_cdf_tables[triangle_id];
+            Var pdf = (cdf_high - cdf_low) * hit.distance * hit.distance / (area * abs(dot(wo, ng)));
+            interaction.pdf = pdf;
+        }
+        
+        if (flags & Interaction::COMPONENT_SHADER) {
+            Var material = _instance_materials[hit.instance_id];
+            Var shader_index = sample_discrete(_shader_cdf_tables, material.shader_offset, material.shader_offset + material.shader_count, u_shader);
+            Var shader_type = _shader_types[shader_index];
+            Var shader_pdf = _shader_cdf_tables[shader_index] - select(shader_index == material.shader_offset, 0.0f, _shader_cdf_tables[shader_index - 1u]);
+            Var shader_weight = _shader_weights[shader_index];
+            interaction.shader.emplace(ShaderSelection{shader_type, shader_index, shader_pdf, shader_weight});
+        }
+    };
+    return interaction;
 }
 
 }

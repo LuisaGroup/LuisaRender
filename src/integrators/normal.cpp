@@ -14,7 +14,7 @@ using namespace compute::dsl;
 class NormalVisualizer : public Integrator {
 
 private:
-    InteractionBuffers _interaction_buffers;
+    BufferView<ClosestHit> _hit_buffer;
 
 private:
     void _render_frame(Pipeline &pipeline, Scene &scene, Sampler &sampler,
@@ -23,16 +23,13 @@ private:
         auto pixel_count = static_cast<uint>(ray_buffer.size());
         static constexpr auto threadgroup_size = 256u;
         
-        if (_interaction_buffers.size() < pixel_count) {
-            _interaction_buffers.create(device(), pixel_count, InteractionBuffers::COMPONENT_NS | InteractionBuffers::COMPONENT_MISS);
-        }
-        
-        pipeline << scene.intersect_closest(ray_buffer, _interaction_buffers)
+        pipeline << scene.intersect_closest(ray_buffer, _hit_buffer)
                  << device()->compile_kernel("normal_visualizer_colorize_normal", [&] {
                      auto tid = thread_id();
                      If (pixel_count % threadgroup_size == 0u || tid < pixel_count) {
-                         Var miss = _interaction_buffers.miss()[tid];
-                         Var normal = _interaction_buffers.ns()[tid];
+                         auto interaction = scene.evaluate_interaction(ray_buffer[tid], _hit_buffer[tid], Interaction::COMPONENT_NS | Interaction::COMPONENT_MISS);
+                         Var miss = *interaction.miss;
+                         Var normal = *interaction.ns;
                          Var throughput = throughput_buffer[tid];
                          radiance_buffer[tid] = select(miss, make_float3(0.5f), throughput * normal * 0.5f + 0.5f);
                      };
