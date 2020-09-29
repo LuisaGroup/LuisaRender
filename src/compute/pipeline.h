@@ -22,6 +22,8 @@ private:
 public:
     explicit Pipeline(Device *device) : _device{device} {}
     
+    [[nodiscard]] Device *device() const noexcept { return _device; }
+    
     template<typename Func, std::enable_if_t<std::is_invocable_v<Func, Dispatcher &>, int> = 0>
     Pipeline &operator<<(Func &&func) {
         _stages.emplace(std::forward<Func>(func));
@@ -50,7 +52,13 @@ public:
             }
         });
     }
-    
 };
+
+[[nodiscard]] constexpr auto synchronize() noexcept {
+    return [](Pipeline &pipeline) {
+        pipeline.run();
+        pipeline.device()->synchronize();
+    };
+}
 
 }

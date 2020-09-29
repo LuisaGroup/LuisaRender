@@ -62,6 +62,9 @@ private:
     std::unique_ptr<Acceleration> _acceleration;
     BufferView<ClosestHit> _closest_hit_buffer;
     
+    std::map<uint, SurfaceShader *> _surface_evaluate_functions;
+    std::map<uint, SurfaceShader *> _surface_emission_functions;
+    
     bool _is_static{false};
 
 private:
@@ -82,7 +85,7 @@ private:
                                   uint *instances);
     
     void _process_geometry(const std::vector<std::shared_ptr<Shape>> &instance_to_entity_id, float initial_time, std::vector<Material *> &instance_materials);
-    void _process_materials(const std::vector<Material *> &instance_materials);
+    void _process_materials(const std::vector<Material *> &shader_block_offsets);
 
 public:
     Scene(Device *device,

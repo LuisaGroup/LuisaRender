@@ -160,10 +160,10 @@ void Scene::_intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_bu
                 
                          Var m = _instance_transforms[instance_id];
                          Var nm = transpose(inverse(make_float3x3(m)));
-                         
+                
                          if (buffers.has_pi()) { buffers.pi()[tid] = make_float3(m * make_float4(bary_u * p0 + bary_v * p1 + bary_w * p2, 1.0f)); }
                          if (buffers.has_distance()) { buffers.distance()[tid] = hit.distance; }
-                         
+                
                          Var wo = make_float3(-ray_buffer[tid].direction_x, -ray_buffer[tid].direction_y, -ray_buffer[tid].direction_z);
                          if (buffers.has_wo()) { buffers.wo()[tid] = wo; }
                 
@@ -275,10 +275,99 @@ void Scene::_process_geometry(const std::vector<std::shared_ptr<Shape>> &shapes,
 
 void Scene::_process_materials(const std::vector<Material *> &instance_materials) {
     
+    LUISA_EXCEPTION_IF(std::any_of(instance_materials.cbegin(), instance_materials.cend(), [](auto material) noexcept {
+        return material == nullptr;
+    }), "Found instance assigned with null material.");
+    
     // now it's time to process materials
     // not now...
-    _instance_materials = _device->allocate_buffer<MaterialHandle>(instance_materials.size());
+    auto shader_count = 0u;
+    auto data_block_count = 0u;
+    auto emissive_shader_count = 0u;
+    auto emission_data_block_count = 0u;
+    auto emitter_count = 0u;
     
+    // encode materials...
+    _instance_materials = _device->allocate_buffer<MaterialHandle>(instance_materials.size());
+    _device->launch(_instance_materials.modify([&](MaterialHandle *handles) {
+        for (auto i = 0u; i < instance_materials.size(); i++) {
+            auto &&material = instance_materials[i];
+            handles[i] = {shader_count, material->lobe_count()};
+            shader_count += material->lobe_count();
+            data_block_count += material->required_data_block_count();
+            if (material->is_emissive()) {
+                emitter_count++;
+                emissive_shader_count += material->emissive_lobe_count();
+                emission_data_block_count += material->required_emission_data_block_count();
+            }
+        }
+    }));
+    
+    auto total_shader_count = shader_count + emissive_shader_count;
+    auto total_data_block_count = data_block_count + emission_data_block_count;
+    _shader_weights = _device->allocate_buffer<float>(total_shader_count);
+    _shader_cdf_tables = _device->allocate_buffer<float>(total_shader_count);
+    _shader_types = _device->allocate_buffer<uint>(total_shader_count);
+    _shader_block_offsets = _device->allocate_buffer<uint>(total_shader_count);
+    _shader_blocks = _device->allocate_buffer<DataBlock>(total_data_block_count);
+    
+    _emitter_to_instance_id = _device->allocate_buffer<uint>(emitter_count);
+    _emitter_materials = _device->allocate_buffer<MaterialHandle>(emitter_count);
+    _device->launch([&](Dispatcher &dispatch) {
+        // clang-format off
+        dispatch(_emitter_to_instance_id.modify([&](uint *emitter_to_instance_id) {
+        dispatch(_emitter_materials.modify([&](MaterialHandle *emitter_materials) {
+        dispatch(_shader_types.modify([&](uint *shader_types) {
+        dispatch(_shader_weights.modify([&](float *shader_weights) {
+        dispatch(_shader_cdf_tables.modify([&](float *shader_cdf) {
+        dispatch(_shader_block_offsets.modify([&](uint *shader_block_offsets) {
+        dispatch(_shader_blocks.modify([&](DataBlock *blocks) {
+            auto emitter_offset = 0u;
+            auto shader_offset = 0u;
+            auto emissive_shader_offset = shader_count;
+            auto data_block_offset = 0u;
+            auto emission_data_block_offset = data_block_count;
+            for (auto i = 0u; i < instance_materials.size(); i++) {
+                
+                auto &&material = instance_materials[i];
+                auto sum = 0.0f;
+                auto sum_weight = material->sum_weight();
+                for (auto &&lobe : material->lobes()) {
+                    shader_types[shader_offset] = lobe.shader->type_uid();
+                    shader_weights[shader_offset] = lobe.weight;
+                    shader_cdf[shader_offset] = (sum += lobe.weight) / sum_weight;
+                    shader_block_offsets[shader_offset] = data_block_offset;
+                    lobe.shader->encode_data(blocks + data_block_offset);
+                    shader_offset++;
+                    data_block_offset += lobe.shader->required_data_block_count();
+                    _surface_evaluate_functions.try_emplace(lobe.shader->type_uid(), lobe.shader.get());
+                }
+                
+                if (material->is_emissive()) {
+                    
+                    emitter_to_instance_id[emitter_offset] = i;
+                    emitter_materials[emitter_offset] = {emissive_shader_offset, material->emissive_lobe_count()};
+                    emitter_offset++;
+                    
+                    sum = 0.0f;
+                    sum_weight = material->sum_emission_weight();
+                    for (auto &&lobe : material->lobes()) {
+                        if (lobe.shader->is_emissive()) {
+                            shader_types[emissive_shader_offset] = lobe.shader->type_uid();
+                            shader_weights[emissive_shader_offset] = lobe.weight;
+                            shader_cdf[emissive_shader_offset] = (sum += lobe.weight) / sum_weight;
+                            shader_block_offsets[emissive_shader_offset] = emission_data_block_offset;
+                            lobe.shader->encode_data(blocks + emission_data_block_offset);
+                            emissive_shader_offset++;
+                            emission_data_block_offset += lobe.shader->required_data_block_count();
+                            _surface_emission_functions.try_emplace(lobe.shader->type_uid(), lobe.shader.get());
+                        }
+                    }
+                }
+            }
+        })); })); })); })); })); })); }));
+        // clang-format on
+    });
 }
 
 }

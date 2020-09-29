@@ -29,8 +29,7 @@ public:
         LUISA_INFO("Compiling & running pipeline...");
         auto t0 = std::chrono::high_resolution_clock::now();
         _compile(_pipeline);
-        _pipeline.run();
-        device()->synchronize();
+        _pipeline << compute::synchronize();
         auto t1 = std::chrono::high_resolution_clock::now();
         using namespace std::chrono_literals;
         LUISA_INFO("Rendering time: ", (t1 - t0) / 1ns * 1e-9, "s");

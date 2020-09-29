@@ -27,8 +27,9 @@ namespace luisa::render {
 using compute::dsl::Var;
 using compute::dsl::Expr;
 
-struct SurfaceEvaluation {
+struct Scattering {
     Expr<float3> emission;
+    Expr<float> pdf_emission;
     Expr<float3> bsdf;
     Expr<float> pdf_bsdf;
     Expr<float3> sampled_wi;
@@ -36,17 +37,24 @@ struct SurfaceEvaluation {
     Expr<float> sampled_pdf_bsdf;
 };
 
+struct Emission {
+    Expr<float3> emission;
+    Expr<float> emission_pdf;
+};
+
 class SurfaceShader {
 
 private:
-    [[nodiscard]] virtual SurfaceEvaluation _evaluate(Expr<float2> uv, Expr<float3> wo, Expr<float3> wi, Expr<float2> u2, Expr<DataBlock> data_ref) const = 0;
-    
-    [[nodiscard]] virtual Expr<float3> _emission(Expr<float2> uv, Expr<float3> wo, Expr<DataBlock> data_ref) const {
+    // Note: wo and wi are all in local coordinates, therefore no normal provided
+    [[nodiscard]] virtual Scattering _evaluate(Expr<float2> uv, Expr<float3> wo, Expr<float3> wi, Expr<float2> u2, Expr<DataBlock> data_ref) const = 0;
+    [[nodiscard]] virtual Emission _emission(Expr<float2> uv, Expr<float3> wo, Expr<DataBlock> data_ref) const {
         LUISA_EXCEPTION("Invalid sampling operation on non-emissive surface.");
     }
     
     [[nodiscard]] virtual uint _required_data_block_count() const noexcept = 0;
+    
     [[nodiscard]] virtual bool _is_emissive() const noexcept = 0;
+    
     [[nodiscard]] virtual uint _type_uid() const noexcept = 0;
     
     virtual void _encode_data(DataBlock *blocks) const = 0;
@@ -60,11 +68,11 @@ protected:
 public:
     virtual ~SurfaceShader() noexcept = default;
     
-    [[nodiscard]] SurfaceEvaluation evaluate(Expr<float2> uv, Expr<float3> wo, Expr<float3> wi, Expr<float2> u2, Expr<DataBlock> data_ref) const {
+    [[nodiscard]] Scattering evaluate(Expr<float2> uv, Expr<float3> wo, Expr<float3> wi, Expr<float2> u2, Expr<DataBlock> data_ref) const {
         return _evaluate(uv, wo, wi, u2, data_ref);
     }
     
-    [[nodiscard]] Expr<float3> emission(Expr<float2> uv, Expr<float3> wo, Expr<DataBlock> data_ref) const {
+    [[nodiscard]] Emission emission(Expr<float2> uv, Expr<float3> wo, Expr<DataBlock> data_ref) const {
         return _emission(uv, wo, data_ref);
     }
     
@@ -78,24 +86,24 @@ public:
 template<typename Impl>
 class Surface : public SurfaceShader {
     
-    [[nodiscard]] SurfaceEvaluation _evaluate(Expr<float2> uv, Expr<float3> wo, Expr<float3> wi, Expr<float2> u2, Expr<DataBlock> data_ref) const final {
+    [[nodiscard]] Scattering _evaluate(Expr<float2> uv, Expr<float3> wo, Expr<float3> wi, Expr<float2> u2, Expr<DataBlock> data_ref) const final {
         Var data = compute::dsl::reinterpret<typename Impl::Data>(data_ref);
         return Impl::evaluate(uv, wo, wi, u2, data);
     }
     
-    [[nodiscard]] Expr<float3> _emission(Expr<float2> uv, Expr<float3> wo, Expr<DataBlock> data_ref) const final {
-        // Not using if constexpr, to make MSVC happy...
+    [[nodiscard]] Emission _emission(Expr<float2> uv, Expr<float3> wo, Expr<DataBlock> data_ref) const final {
+        // Not using static-if's, to make MSVC happy...
         return _emission_impl(static_cast<const Impl *>(this), uv, wo, data_ref);
     }
     
     template<typename I, std::enable_if_t<I::is_emissive, int> = 0>
-    [[nodiscard]] static Expr<float3> _emission_impl(const I *, Expr<float2> uv, Expr<float3> wo, Expr<DataBlock> data_ref) {
+    [[nodiscard]] static Emission _emission_impl(const I *, Expr<float2> uv, Expr<float3> wo, Expr<DataBlock> data_ref) {
         Var data = compute::dsl::reinterpret<typename I::Data>(data_ref);
         return I::emission(uv, wo, data);
     }
     
     template<typename I, std::enable_if_t<!I::is_emissive, int> = 0>
-    [[noreturn]] static Expr<float3> _emission_impl(const I *, Expr<float2> uv, Expr<float3> wo, Expr<DataBlock> data_ref) {
+    [[noreturn]] static Emission _emission_impl(const I *, Expr<float2> uv, Expr<float3> wo, Expr<DataBlock> data_ref) {
         LUISA_EXCEPTION("Invalid emission evaluation on non-emissive surface shader.");
     }
     
@@ -115,6 +123,7 @@ class Surface : public SurfaceShader {
     void _encode_data(DataBlock *blocks) const final {
         *reinterpret_cast<typename Impl::Data *>(blocks) = static_cast<const Impl *>(this)->data();
     }
+    
 };
 
 }

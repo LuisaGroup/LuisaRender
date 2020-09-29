@@ -2,6 +2,10 @@ Integrator integrator : AO {}
 
 Shape cbox : WavefrontObj {
   path { "../meshes/cornell/CornellBox-Original.obj" }
+  material : Lambert {
+    albedo { 1.0, 1.0, 1.0 }
+    double_sided { false }
+  }
 }
 
 Film film : RGB {
