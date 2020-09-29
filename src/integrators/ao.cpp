@@ -44,9 +44,9 @@ private:
                              ray_buffer[tid], _closest_hit_buffer[tid],
                              Interaction::COMPONENT_MISS | Interaction::COMPONENT_NG | Interaction::COMPONENT_PI);
                 
-                         Var normal = *interaction.ng;
-                         Var miss = *interaction.miss;
-                         Var position = offset_ray_origin(*interaction.pi, normal);
+                         Var normal = interaction.ng;
+                         Var miss = interaction.miss;
+                         Var position = offset_ray_origin(interaction.pi, normal);
                          
                          _miss_buffer[tid] = miss;
                 

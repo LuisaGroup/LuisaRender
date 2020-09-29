@@ -39,15 +39,15 @@ struct Interaction {
         COMPONENT_ALL = 0xffffffffu
     };
     
-    std::optional<Expr<bool>> miss;
-    std::optional<Expr<float3>> pi;
-    std::optional<Expr<float3>> wo;
-    std::optional<Expr<float>> distance;
-    std::optional<Expr<float3>> ng;
-    std::optional<Expr<float3>> ns;
-    std::optional<Expr<float2>> uv;
-    std::optional<Expr<float>> pdf;
-    std::optional<ShaderSelection> shader;
+    Expr<bool> miss;
+    Expr<float3> pi;
+    Expr<float3> wo;
+    Expr<float> distance;
+    Expr<float3> ng;
+    Expr<float3> ns;
+    Expr<float2> uv;
+    Expr<float> pdf;
+    ShaderSelection shader;
 };
 
 class InteractionBuffers {
@@ -114,15 +114,15 @@ public:
     void emplace(Index &&index, const Interaction &interaction) {
         using namespace luisa::compute;
         using namespace luisa::compute::dsl;
-        if (has_miss() && interaction.miss.has_value()) { miss[std::forward<Index>(index)] = *interaction.miss; }
-        if (has_pi() && interaction.pi.has_value()) { pi[std::forward<Index>(index)] = *interaction.pi; }
-        if (has_wo() && interaction.wo.has_value()) { wo[std::forward<Index>(index)] = *interaction.wo; }
-        if (has_distance() && interaction.distance.has_value()) { distance[std::forward<Index>(index)] = *interaction.distance; }
-        if (has_ng() && interaction.ng.has_value()) { ng[std::forward<Index>(index)] = *interaction.ng; }
-        if (has_ns() && interaction.ns.has_value()) { ns[std::forward<Index>(index)] = *interaction.ns; }
-        if (has_uv() && interaction.uv.has_value()) { uv[std::forward<Index>(index)] = *interaction.uv; }
-        if (has_pdf() && interaction.pdf.has_value()) { pdf[std::forward<Index>(index)] = *interaction.pdf; }
-        if (has_shader() && interaction.shader.has_value()) { shader[std::forward<Index>(index)] = *interaction.shader; }
+        if (has_miss()) { miss[std::forward<Index>(index)] = interaction.miss; }
+        if (has_pi()) { pi[std::forward<Index>(index)] = interaction.pi; }
+        if (has_wo()) { wo[std::forward<Index>(index)] = interaction.wo; }
+        if (has_distance()) { distance[std::forward<Index>(index)] = interaction.distance; }
+        if (has_ng()) { ng[std::forward<Index>(index)] = interaction.ng; }
+        if (has_ns()) { ns[std::forward<Index>(index)] = interaction.ns; }
+        if (has_uv()) { uv[std::forward<Index>(index)] = interaction.uv; }
+        if (has_pdf()) { pdf[std::forward<Index>(index)] = interaction.pdf; }
+        if (has_shader()) { shader[std::forward<Index>(index)] = interaction.shader; }
     }
 };
 

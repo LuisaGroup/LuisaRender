@@ -394,13 +394,24 @@ Scene::LightSelection Scene::uniform_select_light(Expr<float> u_light, Expr<floa
 
 Interaction Scene::evaluate_interaction(Expr<Ray> ray, Expr<ClosestHit> hit, uint flags, Expr<float> u_shader) const {
     
-    Interaction interaction;
+    Var<bool> intr_miss;
+    Var<float3> intr_pi;
+    Var<float3> intr_wo;
+    Var<float> intr_distance;
+    Var<float3> intr_ng;
+    Var<float3> intr_ns;
+    Var<float2> intr_uv;
+    Var<float> intr_pdf;
+    Var<uint> intr_shader_type;
+    Var<uint> intr_shader_index;
+    Var<float> intr_shader_prob;
+    Var<float> intr_shader_weight;
     
     If (hit.distance <= 0.0f) {
-        if (flags & Interaction::COMPONENT_MISS) { interaction.miss = true; }
+        if (flags & Interaction::COMPONENT_MISS) { intr_miss = true; }
     } Else {
         
-        if (flags & Interaction::COMPONENT_MISS) { interaction.miss = false; }
+        if (flags & Interaction::COMPONENT_MISS) { intr_miss = false; }
         
         Var instance_id = hit.instance_id;
         Var entity = _entities[_instance_to_entity_id[instance_id]];
@@ -420,37 +431,38 @@ Interaction Scene::evaluate_interaction(Expr<Ray> ray, Expr<ClosestHit> hit, uin
         Var p1 = make_float3(m * make_float4(_positions[j], 1.0f));
         Var p2 = make_float3(m * make_float4(_positions[k], 1.0f));
         
-        if (flags & Interaction::COMPONENT_PI) { interaction.pi = bary_u * p0 + bary_v * p1 + bary_w * p2; }
-        if (flags & Interaction::COMPONENT_DISTANCE) { interaction.distance = hit.distance; }
+        if (flags & Interaction::COMPONENT_PI) { intr_pi = bary_u * p0 + bary_v * p1 + bary_w * p2; }
+        if (flags & Interaction::COMPONENT_DISTANCE) { intr_distance = hit.distance; }
         
         Var wo = make_float3(-ray.direction_x, -ray.direction_y, -ray.direction_z);
-        if (flags & Interaction::COMPONENT_WO) { interaction.wo = wo; }
+        if (flags & Interaction::COMPONENT_WO) { intr_wo = wo; }
         
         Var c = cross(p1 - p0, p2 - p0);
         Var ng = normalize(c);
         // if (flags & Interaction::COMPONENT_NS) { interaction.ns = normalize(nm * (bary_u * _normals[i] + bary_v * _normals[j] + bary_w * _normals[k])); }
         // FIXME: Error in Ns, temporally using Ng instead...
-        if (flags & Interaction::COMPONENT_NS) { interaction.ns = ng; }
-        if (flags & Interaction::COMPONENT_NG) { interaction.ng = ng; }
-        if (flags & Interaction::COMPONENT_UV) { interaction.uv = bary_u * _tex_coords[i] + bary_v * _tex_coords[j] + bary_w * _tex_coords[k]; }
+        if (flags & Interaction::COMPONENT_NS) { intr_ns = ng; }
+        if (flags & Interaction::COMPONENT_NG) { intr_ng = ng; }
+        if (flags & Interaction::COMPONENT_UV) { intr_uv = bary_u * _tex_coords[i] + bary_v * _tex_coords[j] + bary_w * _tex_coords[k]; }
         if (flags & Interaction::COMPONENT_PDF) {
             Var area = 0.5f * length(c);
             Var cdf_low = select(hit.triangle_id == 0u, 0.0f, _triangle_cdf_tables[triangle_id - 1u]);
             Var cdf_high = _triangle_cdf_tables[triangle_id];
-            Var pdf = (cdf_high - cdf_low) * hit.distance * hit.distance / (area * abs(dot(wo, ng)));
-            interaction.pdf = pdf;
+            intr_pdf = (cdf_high - cdf_low) * hit.distance * hit.distance / (area * abs(dot(wo, ng)));
         }
         
         if (flags & Interaction::COMPONENT_SHADER) {
             Var material = _instance_materials[hit.instance_id];
-            Var shader_index = sample_discrete(_shader_cdf_tables, material.shader_offset, material.shader_offset + material.shader_count, u_shader);
-            Var shader_type = _shader_types[shader_index];
-            Var shader_pdf = _shader_cdf_tables[shader_index] - select(shader_index == material.shader_offset, 0.0f, _shader_cdf_tables[shader_index - 1u]);
-            Var shader_weight = _shader_weights[shader_index];
-            interaction.shader.emplace(ShaderSelection{shader_type, shader_index, shader_pdf, shader_weight});
+            intr_shader_index = sample_discrete(_shader_cdf_tables, material.shader_offset, material.shader_offset + material.shader_count, u_shader);
+            intr_shader_type = _shader_types[intr_shader_index];
+            intr_shader_prob = _shader_cdf_tables[intr_shader_index] - select(intr_shader_index == material.shader_offset, 0.0f, _shader_cdf_tables[intr_shader_index - 1u]);
+            intr_shader_weight = _shader_weights[intr_shader_index];
         }
     };
-    return interaction;
+    
+    return Interaction{
+        intr_miss, intr_pi, intr_wo, intr_distance, intr_ng, intr_ns, intr_uv, intr_pdf,
+        intr_shader_type, intr_shader_index, intr_shader_prob, intr_shader_weight};
 }
 
 }

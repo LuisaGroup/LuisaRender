@@ -28,8 +28,8 @@ private:
                      auto tid = thread_id();
                      If (pixel_count % threadgroup_size == 0u || tid < pixel_count) {
                          auto interaction = scene.evaluate_interaction(ray_buffer[tid], _hit_buffer[tid], Interaction::COMPONENT_NS | Interaction::COMPONENT_MISS);
-                         Var miss = *interaction.miss;
-                         Var normal = *interaction.ns;
+                         Var miss = interaction.miss;
+                         Var normal = interaction.ns;
                          Var throughput = throughput_buffer[tid];
                          radiance_buffer[tid] = select(miss, make_float3(0.5f), throughput * normal * 0.5f + 0.5f);
                      };
