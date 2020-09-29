@@ -1,4 +1,4 @@
-Integrator integrator : AO {}
+Integrator integrator : Normal {}
 
 Shape cbox : WavefrontObj {
   path { "../meshes/cornell/CornellBox-Original.obj" }

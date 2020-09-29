@@ -23,6 +23,10 @@ private:
         auto pixel_count = static_cast<uint>(ray_buffer.size());
         static constexpr auto threadgroup_size = 256u;
         
+        if (_hit_buffer.size() < pixel_count) {
+            _hit_buffer = device()->allocate_buffer<ClosestHit>(pixel_count);
+        }
+        
         pipeline << scene.intersect_closest(ray_buffer, _hit_buffer)
                  << device()->compile_kernel("normal_visualizer_colorize_normal", [&] {
                      auto tid = thread_id();
