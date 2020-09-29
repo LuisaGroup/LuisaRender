@@ -12,6 +12,7 @@ namespace luisa::render {
 
 using compute::Device;
 using compute::BufferView;
+using compute::Expr;
 
 class InteractionBuffers {
 
@@ -26,9 +27,17 @@ public:
         COMPONENT_DISTANCE = 1u << 6u,
         COMPONENT_MATERIAL = 1u << 7u,
         COMPONENT_PDF = 1u << 8u,
+        COMPONENT_SHADER = 1u << 9u,
         
         COMPONENT_NONE = 0u,
         COMPONENT_ALL = 0xffffffffu
+    };
+    
+    struct ShaderBuffers {
+        BufferView<uint> type;
+        BufferView<uint> index;
+        BufferView<float> prob;
+        BufferView<float> weight;
     };
     
 private:
@@ -47,6 +56,8 @@ private:
     BufferView<MaterialHandle> _material;
     
     BufferView<float> _pdf;
+    
+    ShaderBuffers _shader;
 
 public:
     void create(Device *device, size_t size, uint32_t components = COMPONENT_ALL) noexcept {
@@ -61,6 +72,13 @@ public:
         _uv = has_uv() ? device->allocate_buffer<float2>(size) : BufferView<float2>{};
         _material = has_material() ? device->allocate_buffer<MaterialHandle>(size) : BufferView<MaterialHandle>{};
         _pdf = has_pdf() ? device->allocate_buffer<float>(size) : BufferView<float>{};
+        
+        if (has_shader()) {
+            _shader.type = device->allocate_buffer<uint>(size);
+            _shader.index = device->allocate_buffer<uint>(size);
+            _shader.prob = device->allocate_buffer<float>(size);
+            _shader.weight = device->allocate_buffer<float>(size);
+        }
     }
     
     [[nodiscard]] bool has_miss() const noexcept { return _components & COMPONENT_MISS; }
@@ -72,6 +90,7 @@ public:
     [[nodiscard]] bool has_uv() const noexcept { return _components & COMPONENT_UV; }
     [[nodiscard]] bool has_material() const noexcept { return _components & COMPONENT_MATERIAL; }
     [[nodiscard]] bool has_pdf() const noexcept { return _components & COMPONENT_PDF; }
+    [[nodiscard]] bool has_shader() const noexcept { return _components & COMPONENT_SHADER; }
     
     [[nodiscard]] auto &miss() noexcept { return _miss; }
     [[nodiscard]] auto &pi() noexcept { return _pi; }
@@ -82,6 +101,7 @@ public:
     [[nodiscard]] auto &uv() noexcept { return _uv; }
     [[nodiscard]] auto &material() noexcept { return _material; }
     [[nodiscard]] auto &pdf() noexcept { return _pdf; }
+    [[nodiscard]] auto &shader() noexcept { return _shader; }
     
     [[nodiscard]] const auto &miss() const noexcept { return _miss; }
     [[nodiscard]] const auto &pi() const noexcept { return _pi; }
@@ -92,6 +112,7 @@ public:
     [[nodiscard]] const auto &uv() const noexcept { return _uv; }
     [[nodiscard]] const auto &material() const noexcept { return _material; }
     [[nodiscard]] const auto &pdf() const noexcept { return _pdf; }
+    [[nodiscard]] const auto &shader() const noexcept { return _shader; }
     
     [[nodiscard]] bool empty() const noexcept { return _size == 0u || _components == COMPONENT_NONE; }
     [[nodiscard]] size_t size() const noexcept { return _size; }

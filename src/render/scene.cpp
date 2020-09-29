@@ -171,7 +171,8 @@ void Scene::_intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_bu
                          Var c = cross(p1 - p0, p2 - p0);
                          Var ng = normalize(c);
 //                         if (buffers.has_ns()) { buffers.ns()[tid] = normalize(nm * (bary_u * _normals[i] + bary_v * _normals[j] + bary_w * _normals[k])); }
-                         if (buffers.has_ns()) { buffers.ns()[tid] = ng; }  // FIXME: Error in Ns
+                         // FIXME: Error in Ns, temporally using Ng instead...
+                         if (buffers.has_ns()) { buffers.ns()[tid] = ng; }
                          if (buffers.has_ng()) { buffers.ng()[tid] = ng; }
                          if (buffers.has_uv()) { buffers.uv()[tid] = bary_u * _tex_coords[i] + bary_v * _tex_coords[j] + bary_w * _tex_coords[k]; }
                          if (buffers.has_pdf()) {
@@ -181,6 +182,9 @@ void Scene::_intersect_closest(Pipeline &pipeline, const BufferView<Ray> &ray_bu
                              Var pdf = (cdf_high - cdf_low) * hit.distance * hit.distance / (area * abs(dot(wo, ng)));
                              buffers.pdf()[tid] = pdf;
                          }
+                
+                         // TODO: Process material...
+                         
                      };
                  };
              }).parallelize(ray_count, threadgroup_size);
@@ -398,15 +402,12 @@ void Scene::_process_materials(const std::vector<Material *> &instance_materials
     });
 }
 
-Scene::LightSample Scene::uniform_sample_one_light(Expr<float3> p, Expr<float> u_light, Expr<float2> u_shape, Expr<float> u_lobe) {
+Scene::LightSample Scene::uniform_sample_light(const LightSelection &selection, Expr<float3> p, Expr<float2> u_shape) const {
     
     using namespace luisa::compute;
     using namespace luisa::compute::dsl;
     
-    auto n_light = light_count();
-    LUISA_ERROR_IF(n_light == 0u, "Cannot sample lights in a scene without lights.");
-    
-    Var light_index = dsl::clamp(cast<uint>(u_light * n_light), 0u, n_light - 1u);
+    Var light_index = selection.index;
     Var light_instance_id = _emitter_to_instance_id[light_index];
     Var light_entity_id = _instance_to_entity_id[light_instance_id];
     Var light_entity = _entities[light_entity_id];
@@ -434,21 +435,33 @@ Scene::LightSample Scene::uniform_sample_one_light(Expr<float3> p, Expr<float> u
     Var pdf = d * d * pdf_area / cos_theta;
     Var onb = make_onb(ng);
     Var w = transform_to_local(onb, -wi);
-    Var light_material = _emitter_materials[light_index];
-    Var shader_index = sample_discrete(_shader_cdf_tables, light_material.shader_offset, light_material.shader_offset + light_material.shader_count, u_lobe);
-    Var shader_pdf = _shader_cdf_tables[shader_index] - select(shader_index == light_material.shader_offset, 0.0f, _shader_cdf_tables[shader_index - 1u]);
-    Var shader_weight = _shader_weights[shader_index];
     Var L = make_float3(0.0f);
-    Switch (_shader_types[shader_index]) {
+    Switch (selection.shader.type) {
         for (auto f : _surface_emission_functions) {
             Case (f.first) {
-                auto [eval_L, eval_pdf] = f.second->emission(uv, w, _shader_blocks[_shader_block_offsets[shader_index]]);
+                auto[eval_L, eval_pdf] = f.second->emission(uv, w, _shader_blocks[_shader_block_offsets[selection.shader.index]]);
                 pdf *= eval_pdf;
-                L = eval_L * shader_weight / shader_pdf;
+                L = eval_L * selection.shader.weight / selection.shader.prob;
             };
         }
     };
-    return LightSample{1.0f / n_light, wi, L, pdf};
+    return LightSample{wi, L, pdf};
+}
+
+Scene::LightSelection Scene::uniform_select_light(Expr<float> u_light, Expr<float> u_shader) const {
+    
+    using namespace luisa::compute;
+    using namespace luisa::compute::dsl;
+    
+    LUISA_ERROR_IF(light_count() == 0u, "Cannot sample lights in a scene without lights.");
+    
+    Var light_index = dsl::clamp(cast<uint>(u_light * light_count()), 0u, light_count() - 1u);
+    Var light_material = _emitter_materials[light_index];
+    Var shader_index = sample_discrete(_shader_cdf_tables, light_material.shader_offset, light_material.shader_offset + light_material.shader_count, u_shader);
+    Var shader_pdf = _shader_cdf_tables[shader_index] - select(shader_index == light_material.shader_offset, 0.0f, _shader_cdf_tables[shader_index - 1u]);
+    Var shader_weight = _shader_weights[shader_index];
+    Var shader_type = _shader_types[shader_index];
+    return LightSelection{light_index, 1.0f / light_count(), shader_type, shader_index, shader_pdf, shader_weight};
 }
 
 }

@@ -31,8 +31,20 @@ using compute::MeshHandle;
 class Scene {
 
 public:
+    struct ShaderSelection {
+        Expr<uint> type;
+        Expr<uint> index;
+        Expr<float> prob;
+        Expr<float> weight;
+    };
+    
+    struct LightSelection {
+        Expr<uint> index;
+        Expr<float> prob;
+        ShaderSelection shader;
+    };
+    
     struct LightSample {
-        Expr<float> selection_prob;
         Expr<float3> wi;
         Expr<float3> Li;
         Expr<float> pdf;
@@ -116,7 +128,8 @@ public:
     [[nodiscard]] bool is_static() const noexcept { return _is_static; }
     [[nodiscard]] uint light_count() const noexcept { return _emitter_to_instance_id.size(); }
     
-    [[nodiscard]] LightSample uniform_sample_one_light(Expr<float3> p, Expr<float> u_light, Expr<float2> u_shape, Expr<float> u_lobe);
+    [[nodiscard]] LightSelection uniform_select_light(Expr<float> u_light, Expr<float> u_shader) const;
+    [[nodiscard]] LightSample uniform_sample_light(const LightSelection &selection, Expr<float3> p, Expr<float2> u_shape) const;
 };
 
 }
