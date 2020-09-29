@@ -14,12 +14,13 @@ namespace luisa::render {
 using compute::Device;
 using compute::BufferView;
 using compute::Expr;
+using compute::Var;
 
 struct ShaderSelection {
-    Expr<uint> type;
-    Expr<uint> index;
-    Expr<float> prob;
-    Expr<float> weight;
+    Var<uint> type;
+    Var<uint> index;
+    Var<float> prob;
+    Var<float> weight;
 };
 
 struct Interaction {
@@ -39,14 +40,14 @@ struct Interaction {
         COMPONENT_ALL = 0xffffffffu
     };
     
-    Expr<bool> miss;
-    Expr<float3> pi;
-    Expr<float3> wo;
-    Expr<float> distance;
-    Expr<float3> ng;
-    Expr<float3> ns;
-    Expr<float2> uv;
-    Expr<float> pdf;
+    Var<bool> miss;
+    Var<float3> pi;
+    Var<float3> wo;
+    Var<float> distance;
+    Var<float3> ng;
+    Var<float3> ns;
+    Var<float2> uv;
+    Var<float> pdf;
     ShaderSelection shader;
 };
 

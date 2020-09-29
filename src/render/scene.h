@@ -32,15 +32,15 @@ class Scene {
 
 public:
     struct LightSelection {
-        Expr<uint> index;
-        Expr<float> prob;
+        Var<uint> index;
+        Var<float> prob;
         ShaderSelection shader;
     };
     
     struct LightSample {
-        Expr<float3> wi;
-        Expr<float3> Li;
-        Expr<float> pdf;
+        Var<float3> wi;
+        Var<float3> Li;
+        Var<float> pdf;
     };
 
 private:
