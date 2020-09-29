@@ -230,6 +230,7 @@ void Scene::_process_geometry(const std::vector<std::shared_ptr<Shape>> &shapes,
     _triangles = _device->allocate_buffer<TriangleHandle>(triangle_count);
     _triangle_cdf_tables = _device->allocate_buffer<float>(triangle_count);
     _entities = _device->allocate_buffer<EntityHandle>(entity_count);
+    _entity_triangle_counts = _device->allocate_buffer<uint>(entity_count);
     _instance_to_entity_id = _device->allocate_buffer<uint>(instance_count);
     _instance_transforms = _device->allocate_buffer<float4x4>(instance_count);
     
@@ -252,6 +253,12 @@ void Scene::_process_geometry(const std::vector<std::shared_ptr<Shape>> &shapes,
         })); })); })); })); })); })); }));
         // clang-format on
     });
+    
+    _device->launch(_entity_triangle_counts.modify([&](uint *counts) {
+        for (auto i = 0u; i < meshes.size(); i++) {
+            counts[i] = meshes[i].triangle_count;
+        }
+    }));
     
     // apply initial transforms and build acceleration structure
     _is_static = _transform_tree.is_static();
@@ -389,6 +396,59 @@ void Scene::_process_materials(const std::vector<Material *> &instance_materials
         })); })); })); })); }));
         // clang-format on
     });
+}
+
+Scene::LightSample Scene::uniform_sample_one_light(Expr<float3> p, Expr<float> u_light, Expr<float2> u_shape, Expr<float> u_lobe) {
+    
+    using namespace luisa::compute;
+    using namespace luisa::compute::dsl;
+    
+    auto n_light = light_count();
+    LUISA_ERROR_IF(n_light == 0u, "Cannot sample lights in a scene without lights.");
+    
+    Var light_index = dsl::clamp(cast<uint>(u_light * n_light), 0u, n_light - 1u);
+    Var light_instance_id = _emitter_to_instance_id[light_index];
+    Var light_entity_id = _instance_to_entity_id[light_instance_id];
+    Var light_entity = _entities[light_entity_id];
+    Var light_triangle_count = _entity_triangle_counts[light_entity_id];
+    Var triangle_index = sample_discrete(_triangle_cdf_tables, light_entity.triangle_offset, light_entity.triangle_offset + light_triangle_count, u_shape.x);
+    u_shape.x = u_shape.x * light_triangle_count - triangle_index;
+    Var bary = uniform_sample_triangle(u_shape);
+    Var m = _instance_transforms[light_instance_id];
+    Var triangle = _triangles[triangle_index];
+    Expr uv0 = _tex_coords[triangle.i + light_entity.vertex_offset];
+    Expr uv1 = _tex_coords[triangle.j + light_entity.vertex_offset];
+    Expr uv2 = _tex_coords[triangle.k + light_entity.vertex_offset];
+    Expr uv = bary.x * uv0 + bary.y * uv1 + (1.0f - bary.x - bary.y) * uv2;
+    Var p0 = make_float3(m * make_float4(_positions[triangle.i + light_entity.vertex_offset], 1.0f));
+    Var p1 = make_float3(m * make_float4(_positions[triangle.j + light_entity.vertex_offset], 1.0f));
+    Var p2 = make_float3(m * make_float4(_positions[triangle.k + light_entity.vertex_offset], 1.0f));
+    Var p_light = bary.x * p0 + bary.y * p1 + (1.0f - bary.x - bary.y) * p2;
+    Var c = cross(p1 - p0, p2 - p0);
+    Var area = 0.5f * length(c);
+    Var ng = normalize(c);
+    Var pdf_area = (_triangle_cdf_tables[triangle_index] - select(triangle_index == light_entity.triangle_offset, 0.0f, _triangle_cdf_tables[triangle_index - 1u])) / area;
+    Var d = length(p_light - p);
+    Var wi = normalize(p_light - p);
+    Var cos_theta = abs(dot(wi, ng));
+    Var pdf = d * d * pdf_area / cos_theta;
+    Var onb = make_onb(ng);
+    Var w = transform_to_local(onb, -wi);
+    Var light_material = _emitter_materials[light_index];
+    Var shader_index = sample_discrete(_shader_cdf_tables, light_material.shader_offset, light_material.shader_offset + light_material.shader_count, u_lobe);
+    Var shader_pdf = _shader_cdf_tables[shader_index] - select(shader_index == light_material.shader_offset, 0.0f, _shader_cdf_tables[shader_index - 1u]);
+    Var shader_weight = _shader_weights[shader_index];
+    Var L = make_float3(0.0f);
+    Switch (_shader_types[shader_index]) {
+        for (auto f : _surface_emission_functions) {
+            Case (f.first) {
+                auto [eval_L, eval_pdf] = f.second->emission(uv, w, _shader_blocks[_shader_block_offsets[shader_index]]);
+                pdf *= eval_pdf;
+                L = eval_L * shader_weight / shader_pdf;
+            };
+        }
+    };
+    return LightSample{1.0f / n_light, wi, L, pdf};
 }
 
 }

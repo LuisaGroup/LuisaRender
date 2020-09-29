@@ -30,6 +30,14 @@ using compute::MeshHandle;
 
 class Scene {
 
+public:
+    struct LightSample {
+        Expr<float> selection_prob;
+        Expr<float3> wi;
+        Expr<float3> Li;
+        Expr<float> pdf;
+    };
+
 private:
     Device *_device;
     
@@ -39,6 +47,7 @@ private:
     BufferView<TriangleHandle> _triangles;
     BufferView<float> _triangle_cdf_tables;
     BufferView<EntityHandle> _entities;
+    BufferView<uint> _entity_triangle_counts;
     BufferView<uint> _instance_to_entity_id;
     BufferView<float4x4> _instance_transforms;
     
@@ -105,8 +114,9 @@ public:
     }
     
     [[nodiscard]] bool is_static() const noexcept { return _is_static; }
+    [[nodiscard]] uint light_count() const noexcept { return _emitter_to_instance_id.size(); }
     
-    
+    [[nodiscard]] LightSample uniform_sample_one_light(Expr<float3> p, Expr<float> u_light, Expr<float2> u_shape, Expr<float> u_lobe);
 };
 
 }

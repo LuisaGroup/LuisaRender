@@ -68,6 +68,11 @@ inline Expr<float3> cosine_sample_hemisphere(Expr<float2> u) {
     return make_float3(r * cos(phi), r * sin(phi), sqrt(1.0f - u.x));
 }
 
+inline Expr<float2> uniform_sample_triangle(Expr<float2> u) {
+    Var sx = sqrt(u.x);
+    return make_float2(1.0f - sx, u.y * sx);
+}
+
 template<typename Table, typename = decltype(std::declval<Table &>()[Expr{0u}])>
 inline Expr<uint> sample_discrete(Table &&cdf, Expr<uint> left, Expr<uint> right, Expr<float> u_in) noexcept {
     Var u = u_in;

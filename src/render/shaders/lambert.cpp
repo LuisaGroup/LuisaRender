@@ -33,20 +33,29 @@ private:
     Data _data;
 
 public:
-    LambertReflection(float3 albedo, bool double_sided) noexcept : _data{albedo.x, albedo.y, albedo.z, double_sided} {}
+    LambertReflection(float3 albedo, bool double_sided) noexcept: _data{albedo.x, albedo.y, albedo.z, double_sided} {}
     
-    [[nodiscard]] static Scattering evaluate(Expr<float2> uv [[maybe_unused]], Expr<float3> wo, Expr<float3> wi, Expr<float2> u2, Expr<Data> data) {
+    [[nodiscard]] static Scattering evaluate(Expr<float2> uv [[maybe_unused]], Expr<float3> wo, Expr<float3> wi, Expr<float2> u2, Expr<Data> data, uint comp) {
+        
         Var is_refl = wi.z * wo.z > 0.0f;
         Var is_front = wo.z > 0.0f;
         Var albedo = make_float3(data.r, data.g, data.b);
         Var double_sided = data.double_sided;
         Var valid = double_sided || is_front;
-        Var f = select(is_refl && valid, albedo * inv_pi, make_float3(0.0f));
-        Var pdf = select(is_refl && valid, abs(wi.z) * inv_pi, 0.0f);
-        Var sampled_wi = sign(wi.z) * cosine_sample_hemisphere(u2);
-        Var sampled_f = select(valid, albedo * inv_pi, make_float3(0.0f));
-        Var sampled_pdf = select(valid, abs(sampled_wi.z) * inv_pi, 0.0f);
-        return Scattering{make_float3(0.0f), 0.0f, f, pdf, sampled_wi, sampled_f, sampled_pdf};
+        
+        Scattering scattering;
+        if (comp & EVAL_BSDF) {
+            Var f = select(is_refl && valid, albedo * inv_pi, make_float3(0.0f));
+            Var pdf = select(is_refl && valid, abs(wi.z) * inv_pi, 0.0f);
+            scattering.evaluation.emplace(f, pdf);
+        }
+        if (comp & EVAL_BSDF_SAMPLING) {
+            Var sampled_wi = sign(wi.z) * cosine_sample_hemisphere(u2);
+            Var sampled_f = select(valid, albedo * inv_pi, make_float3(0.0f));
+            Var sampled_pdf = select(valid, abs(sampled_wi.z) * inv_pi, 0.0f);
+            scattering.sample.emplace(sampled_wi, sampled_f, sampled_pdf);
+        }
+        return scattering;
     }
     
     [[nodiscard]] const Data &data() const noexcept { return _data; }
@@ -62,19 +71,26 @@ private:
     Data _data;
 
 public:
-    LambertEmission(float3 e, bool double_sided) noexcept : _data{e.x, e.y, e.z, double_sided} {}
+    LambertEmission(float3 e, bool double_sided) noexcept: _data{e.x, e.y, e.z, double_sided} {}
     
-    [[nodiscard]] static Scattering evaluate(Expr<float2> uv [[maybe_unused]], Expr<float3> wo, Expr<float3> wi [[maybe_unused]], Expr<float2> u2 [[maybe_unused]], Expr<Data> data) {
-        Var is_front = wo.z > 0.0f;
-        Var double_sided = data.double_sided;
-        Var valid = double_sided || is_front;
-        Var emission = select(valid, make_float3(data.r, data.g, data.b), make_float3(0.0f));
-        Var pdf = select(valid, 1.0f, 0.0f);
-        return Scattering{emission, pdf, make_float3(0.0f), 0.0f, make_float3(0.0f), make_float3(0.0f), 0.0f};
+    [[nodiscard]] static Scattering evaluate(
+        Expr<float2> uv [[maybe_unused]], Expr<float3> wo, Expr<float3> wi [[maybe_unused]],
+        Expr<float2> u2 [[maybe_unused]], Expr<Data> data, uint comp) {
+        
+        Scattering scattering;
+        if (comp & EVAL_EMISSION) {
+            Var is_front = wo.z > 0.0f;
+            Var double_sided = data.double_sided;
+            Var valid = double_sided || is_front;
+            Var emission = select(valid, make_float3(data.r, data.g, data.b), make_float3(0.0f));
+            Var pdf = select(valid, 1.0f, 0.0f);
+            scattering.emission.emplace(emission, pdf);
+        }
+        return scattering;
     }
     
-    [[nodiscard]] static Emission emission(Expr<float2> uv [[maybe_unused]], Expr<float3> wo, Expr<Data> data) {
-        Var is_front = wo.z > 0.0f;
+    [[nodiscard]] static Emission emission(Expr<float2> uv [[maybe_unused]], Expr<float3> w, Expr<Data> data) {
+        Var is_front = w.z > 0.0f;
         Var double_sided = data.double_sided;
         Var valid = double_sided || is_front;
         Var emission = select(valid, make_float3(data.r, data.g, data.b), make_float3(0.0f));

@@ -4,50 +4,56 @@
 
 #pragma once
 
-#include <compute/dsl.h>
-
-namespace luisa::render {
-
-struct alignas(16) DataBlock {
-    float4 padding;
-};
-
-struct SurfaceShaderHandle {
-    uint type;
-    uint block_offset;
-};
-
-}
-
-LUISA_STRUCT(luisa::render::DataBlock, padding)
-LUISA_STRUCT(luisa::render::SurfaceShaderHandle, type, block_offset)
+#include <optional>
+#include <render/data_block.h>
 
 namespace luisa::render {
 
 using compute::dsl::Var;
 using compute::dsl::Expr;
 
-struct Scattering {
-    Expr<float3> emission;
-    Expr<float> pdf_emission;
-    Expr<float3> bsdf;
-    Expr<float> pdf_bsdf;
-    Expr<float3> sampled_wi;
-    Expr<float3> sampled_bsdf;
-    Expr<float> sampled_pdf_bsdf;
-};
-
-struct Emission {
-    Expr<float3> emission;
-    Expr<float> emission_pdf;
-};
-
 class SurfaceShader {
+
+public:
+    enum EvaluateComponent : uint {
+        EVAL_EMISSION = 1u,
+        EVAL_BSDF = 1u << 1u,
+        EVAL_BSDF_SAMPLING = 1u << 2u,
+        EVAL_ALL = 0xffffffffu
+    };
+    
+    struct Emission {
+        Expr<float3> L;
+        Expr<float> pdf;
+        template<typename TL, typename Tpdf>
+        Emission(TL &&L, Tpdf &&pdf) noexcept : L{std::forward<TL>(L)}, pdf{std::forward<Tpdf>(pdf)} {}
+    };
+    
+    struct BSDFEvaluation {
+        Expr<float3> f;
+        Expr<float> pdf;
+        template<typename Tf, typename Tpdf>
+        BSDFEvaluation(Tf &&f, Tpdf &&pdf) noexcept : f{std::forward<Tf>(f)}, pdf{std::forward<Tpdf>(pdf)} {}
+    };
+    
+    struct BSDFSample {
+        Expr<float3> wi;
+        Expr<float3> f;
+        Expr<float> pdf;
+        template<typename Twi, typename Tf, typename Tpdf>
+        BSDFSample(Twi &&wi, Tf &&f, Tpdf &&pdf) noexcept : wi{std::forward<Twi>(wi)}, f{std::forward<Tf>(f)}, pdf{std::forward<Tpdf>(pdf)} {}
+    };
+    
+    struct Scattering {
+        std::optional<Emission> emission;
+        std::optional<BSDFEvaluation> evaluation;
+        std::optional<BSDFSample> sample;
+    };
 
 private:
     // Note: wo and wi are all in local coordinates, therefore no normal provided
-    [[nodiscard]] virtual Scattering _evaluate(Expr<float2> uv, Expr<float3> wo, Expr<float3> wi, Expr<float2> u2, Expr<DataBlock> data_ref) const = 0;
-    [[nodiscard]] virtual Emission _emission(Expr<float2> uv, Expr<float3> wo, Expr<DataBlock> data_ref) const {
+    [[nodiscard]] virtual Scattering _evaluate(Expr<float2> uv, Expr<float3> wo, Expr<float3> wi, Expr<float2> u2, Expr<DataBlock> data_ref, uint comp) const = 0;
+    [[nodiscard]] virtual Emission _emission(Expr<float2> uv, Expr<float3> w, Expr<DataBlock> data_ref) const {
         LUISA_EXCEPTION("Invalid sampling operation on non-emissive surface.");
     }
     
@@ -68,8 +74,8 @@ protected:
 public:
     virtual ~SurfaceShader() noexcept = default;
     
-    [[nodiscard]] Scattering evaluate(Expr<float2> uv, Expr<float3> wo, Expr<float3> wi, Expr<float2> u2, Expr<DataBlock> data_ref) const {
-        return _evaluate(uv, wo, wi, u2, data_ref);
+    [[nodiscard]] Scattering evaluate(Expr<float2> uv, Expr<float3> wo, Expr<float3> wi, Expr<float2> u2, Expr<DataBlock> data_ref, uint comp = EVAL_ALL) const {
+        return _evaluate(uv, wo, wi, u2, data_ref, comp);
     }
     
     [[nodiscard]] Emission emission(Expr<float2> uv, Expr<float3> wo, Expr<DataBlock> data_ref) const {
@@ -86,9 +92,9 @@ public:
 template<typename Impl>
 class Surface : public SurfaceShader {
     
-    [[nodiscard]] Scattering _evaluate(Expr<float2> uv, Expr<float3> wo, Expr<float3> wi, Expr<float2> u2, Expr<DataBlock> data_ref) const final {
+    [[nodiscard]] Scattering _evaluate(Expr<float2> uv, Expr<float3> wo, Expr<float3> wi, Expr<float2> u2, Expr<DataBlock> data_ref, uint comp) const final {
         Var data = compute::dsl::reinterpret<typename Impl::Data>(data_ref);
-        return Impl::evaluate(uv, wo, wi, u2, data);
+        return Impl::evaluate(uv, wo, wi, u2, data, comp);
     }
     
     [[nodiscard]] Emission _emission(Expr<float2> uv, Expr<float3> wo, Expr<DataBlock> data_ref) const final {
@@ -103,7 +109,7 @@ class Surface : public SurfaceShader {
     }
     
     template<typename I, std::enable_if_t<!I::is_emissive, int> = 0>
-    [[noreturn]] static Emission _emission_impl(const I *, Expr<float2> uv, Expr<float3> wo, Expr<DataBlock> data_ref) {
+    [[noreturn]] static Emission _emission_impl(const I *, Expr<float2>, Expr<float3>, Expr<DataBlock>) {
         LUISA_EXCEPTION("Invalid emission evaluation on non-emissive surface shader.");
     }
     
