@@ -17,6 +17,25 @@
 
 namespace luisa::render {
 
+struct LightSelection {
+    uint index;
+    float prob;
+    ShaderSelection shader;
+};
+
+struct LightSample {
+    float3 wi;
+    float3 Li;
+    float pdf;
+};
+
+}
+
+LUISA_STRUCT(luisa::render::LightSelection, index, prob, shader)
+LUISA_STRUCT(luisa::render::LightSample, wi, Li, pdf)
+
+namespace luisa::render {
+
 using compute::Device;
 using compute::BufferView;
 using compute::KernelView;
@@ -29,21 +48,6 @@ using compute::ClosestHit;
 using compute::MeshHandle;
 
 class Scene {
-
-public:
-    struct LightSelection {
-        Var<uint> index;
-        Var<float> prob;
-        ShaderSelection shader;
-    };
-    
-    struct LightSample {
-        Var<float3> wi;
-        Var<float3> Li;
-        Var<float> pdf;
-    };
-    
-    using Scattering = SurfaceShader::Scattering;
 
 private:
     Device *_device;
@@ -119,10 +123,10 @@ public:
     [[nodiscard]] bool is_static() const noexcept { return _is_static; }
     [[nodiscard]] uint light_count() const noexcept { return _emitter_to_instance_id.size(); }
     
-    [[nodiscard]] LightSelection uniform_select_light(Expr<float> u_light, Expr<float> u_shader) const;
-    [[nodiscard]] LightSample uniform_sample_light(const LightSelection &selection, Expr<float3> p, Expr<float2> u_shape) const;
-    [[nodiscard]] Interaction evaluate_interaction(Expr<Ray> ray, Expr<ClosestHit> hit, Expr<float> u_shader, uint flags) const;
-    [[nodiscard]] Scattering evaluate_scattering(const Interaction &intr, Expr<float3> wi, Expr<float2> u, uint flags = SurfaceShader::EVAL_ALL);
+    [[nodiscard]] Expr<LightSelection> uniform_select_light(Expr<float> u_light, Expr<float> u_shader) const;
+    [[nodiscard]] Expr<LightSample> uniform_sample_light(Expr<LightSelection> selection, Expr<float3> p, Expr<float2> u_shape) const;
+    [[nodiscard]] Expr<Interaction> evaluate_interaction(Expr<Ray> ray, Expr<ClosestHit> hit, Expr<float> u_shader, uint flags) const;
+    [[nodiscard]] Expr<Scattering> evaluate_scattering(Expr<Interaction> intr, Expr<float3> wi, Expr<float2> u, uint flags = SurfaceShader::EVAL_ALL);
 };
 
 }

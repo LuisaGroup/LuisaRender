@@ -330,7 +330,7 @@ void Scene::_process_materials(const std::vector<Material *> &instance_materials
     });
 }
 
-Scene::LightSample Scene::uniform_sample_light(const LightSelection &selection, Expr<float3> p, Expr<float2> u_shape) const {
+Expr<LightSample> Scene::uniform_sample_light(Expr<LightSelection> selection, Expr<float3> p, Expr<float2> u_shape) const {
     
     using namespace luisa::compute;
     using namespace luisa::compute::dsl;
@@ -360,39 +360,43 @@ Scene::LightSample Scene::uniform_sample_light(const LightSelection &selection, 
     Var d = length(p_light - p);
     Var wi = normalize(p_light - p);
     Var cos_theta = abs(dot(wi, ng));
-    Var pdf = d * d * pdf_area / cos_theta;
-    Var L = make_float3(0.0f);
+    
+    Var<LightSample> sample;
+    sample.pdf = d * d * pdf_area / cos_theta;
     Switch (selection.shader.type) {
         for (auto f : _surface_emission_functions) {
             Case (f.first) {
-                auto[eval_L, eval_pdf] = f.second->emission(uv, ng, -wi, _shader_blocks[_shader_block_offsets[selection.shader.index]]);
-                pdf *= eval_pdf;
-                L = eval_L * selection.shader.weight / selection.shader.prob;
+                auto e = f.second->emission(uv, ng, -wi, _shader_blocks[_shader_block_offsets[selection.shader.index]]);
+                sample.pdf *= e.pdf;
+                sample.Li = e.L * selection.shader.weight / selection.shader.prob;
             };
         }
     };
-    return LightSample{wi, L, pdf};
+    return sample;
 }
 
-Scene::LightSelection Scene::uniform_select_light(Expr<float> u_light, Expr<float> u_shader) const {
+Expr<LightSelection> Scene::uniform_select_light(Expr<float> u_light, Expr<float> u_shader) const {
     
     using namespace luisa::compute;
     using namespace luisa::compute::dsl;
     
     LUISA_ERROR_IF(light_count() == 0u, "Cannot sample lights in a scene without lights.");
     
-    Var light_index = dsl::clamp(cast<uint>(u_light * light_count()), 0u, light_count() - 1u);
-    Var light_material = _emitter_materials[light_index];
-    Var shader_index = sample_discrete(_shader_cdf_tables, light_material.shader_offset, light_material.shader_offset + light_material.shader_count, u_shader);
-    Var shader_pdf = _shader_cdf_tables[shader_index] - select(shader_index == light_material.shader_offset, 0.0f, _shader_cdf_tables[shader_index - 1u]);
-    Var shader_weight = _shader_weights[shader_index];
-    Var shader_type = _shader_types[shader_index];
-    return LightSelection{light_index, 1.0f / light_count(), shader_type, shader_index, shader_pdf, shader_weight};
+    Var<LightSelection> selection;
+    selection.index = dsl::clamp(cast<uint>(u_light * light_count()), 0u, light_count() - 1u);
+    selection.prob = 1.0f / light_count();
+    Var light_material = _emitter_materials[selection.index];
+    selection.shader.index = sample_discrete(_shader_cdf_tables, light_material.shader_offset, light_material.shader_offset + light_material.shader_count, u_shader);
+    selection.shader.prob = _shader_cdf_tables[selection.shader.index] -
+        select(selection.shader.index == light_material.shader_offset, 0.0f, _shader_cdf_tables[selection.shader.index - 1u]);
+    selection.shader.weight = _shader_weights[selection.shader.index];
+    selection.shader.type = _shader_types[selection.shader.index];
+    return selection;
 }
 
-Interaction Scene::evaluate_interaction(Expr<Ray> ray, Expr<ClosestHit> hit, Expr<float> u_shader, uint flags) const {
+Expr<Interaction> Scene::evaluate_interaction(Expr<Ray> ray, Expr<ClosestHit> hit, Expr<float> u_shader, uint flags) const {
     
-    Interaction intr;
+    Var<Interaction> intr;
     
     If (hit.distance <= 0.0f) {
         if (flags & Interaction::COMPONENT_MISS) { intr.miss = true; }
@@ -450,10 +454,8 @@ Interaction Scene::evaluate_interaction(Expr<Ray> ray, Expr<ClosestHit> hit, Exp
     return intr;
 }
 
-Scene::Scattering Scene::evaluate_scattering(const Interaction &intr, Expr<float3> wi, Expr<float2> u, uint flags) {
-    
-    Scattering scattering;
-    
+Expr<Scattering> Scene::evaluate_scattering(Expr<Interaction> intr, Expr<float3> wi, Expr<float2> u, uint flags) {
+    Var<Scattering> scattering;
     If (!intr.miss) {
         Switch (intr.shader.type) {
             for (auto f : _surface_evaluate_functions) {

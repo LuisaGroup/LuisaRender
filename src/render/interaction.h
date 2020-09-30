@@ -8,19 +8,15 @@
 
 #include <compute/buffer.h>
 #include <compute/device.h>
+#include <compute/dsl.h>
 
 namespace luisa::render {
 
-using compute::Device;
-using compute::BufferView;
-using compute::Expr;
-using compute::Var;
-
 struct ShaderSelection {
-    Var<uint> type;
-    Var<uint> index;
-    Var<float> prob;
-    Var<float> weight;
+    uint type;
+    uint index;
+    float prob;
+    float weight;
 };
 
 struct Interaction {
@@ -40,16 +36,28 @@ struct Interaction {
         COMPONENT_ALL = 0xffffffffu
     };
     
-    Var<bool> miss;
-    Var<float3> pi;
-    Var<float3> wo;
-    Var<float> distance;
-    Var<float3> ng;
-    Var<float3> ns;
-    Var<float2> uv;
-    Var<float> pdf;
+    bool miss;
+    float3 pi;
+    float3 wo;
+    float distance;
+    float3 ng;
+    float3 ns;
+    float2 uv;
+    float pdf;
     ShaderSelection shader;
 };
+
+}
+
+LUISA_STRUCT(luisa::render::ShaderSelection, type, index, prob, weight)
+LUISA_STRUCT(luisa::render::Interaction, miss, pi, wo, distance, ng, ns, uv, pdf, shader)
+
+namespace luisa::render {
+
+using compute::Device;
+using compute::BufferView;
+using compute::Expr;
+using compute::Var;
 
 class InteractionBuffers {
 
@@ -112,7 +120,7 @@ public:
     [[nodiscard]] size_t size() const noexcept { return _size; }
     
     template<typename Index>
-    void emplace(Index &&index, const Interaction &interaction) {
+    void emplace(Index &&index, Expr<Interaction> interaction) {
         using namespace luisa::compute;
         using namespace luisa::compute::dsl;
         if (has_miss()) { miss[std::forward<Index>(index)] = interaction.miss; }
