@@ -16,10 +16,16 @@ struct Onb {
     float3 normal;
 };
 
+struct DiscreteSample {
+    uint index;
+    float pdf;
+};
+
 }
 }
 
 LUISA_STRUCT(luisa::render::sampling::Onb, tangent, binormal, normal)
+LUISA_STRUCT(luisa::render::sampling::DiscreteSample, index, pdf)
 
 namespace luisa::render {
 
@@ -72,7 +78,8 @@ inline Expr<float2> uniform_sample_triangle(Var<float2> u) {
 }
 
 template<typename Table, typename = decltype(std::declval<Table &>()[Expr{0u}])>
-inline Expr<uint> sample_discrete(Table &&cdf, Var<uint> first, Var<uint> last, Var<float> u) noexcept {
+inline Expr<DiscreteSample> sample_discrete(Table &&cdf, Var<uint> first, Var<uint> last, Var<float> u) noexcept {
+    Var first_copy = first;
     Var count = last - first;
     While (count > 0u) {
         Var step = count / 2;
@@ -81,7 +88,14 @@ inline Expr<uint> sample_discrete(Table &&cdf, Var<uint> first, Var<uint> last, 
         first = select(pred, it + 1u, first);
         count = select(pred, count - (step + 1u), step);
     };
-    return min(first, last - 1u);
+    Var<DiscreteSample> sample;
+    sample.index = min(first, last - 1u);
+    If (sample.index == first_copy) {
+        sample.pdf = cdf[sample.index];
+    } Else {
+        sample.pdf = cdf[sample.index] - cdf[sample.index - 1u];
+    };
+    return sample;
 }
 
 }

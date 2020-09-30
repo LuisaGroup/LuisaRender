@@ -42,22 +42,17 @@ Expr<FilterSample> SeparableFilter::_importance_sample_pixel_position(Expr<uint2
     auto cdf = immutable(_cdf_table);
     
     auto sample_1d = [&](Expr<float> u) {
-        
-        Var lb = sample_discrete(cdf, 0u, lookup_table_size - 1u, u);
-        Var cdf_lower = cdf[lb];
-        Var cdf_upper = select(lb == lookup_table_size - 1u, 1.0f, cdf[lb + 1u]);
-        Var offset = dsl::clamp((cast<float>(lb) + (u - cdf_lower) / (cdf_upper - cdf_lower)) * inv_table_size, 0.0f, 1.0f);
-        
-        constexpr auto weight_table_size_float = static_cast<float>(lookup_table_size);
-        Var index_w = offset * weight_table_size_float;
-        Var index_w_lower = floor(index_w);
-        Var index_w_upper = ceil(index_w);
-        Var w = lerp(
-            cdf[cast<uint>(index_w_lower)],
-            select(index_w_upper >= weight_table_size_float, 0.0f, weight[cast<uint>(index_w_upper)]),
-            index_w - index_w_lower);
-        
-        return std::make_pair(offset * 2.0f - 1.0f, select(w >= 0.0f, 1.0f, -1.0f));
+        auto sample = sample_discrete(cdf, 0u, lookup_table_size - 1u, u);
+        Var lb = sample.index;
+        Var cdf_upper = cdf[lb];
+        Var cdf_lower = select(lb == 0u, 0.0f, cdf[max(lb, 1u) - 1u]);
+        Var offset = dsl::clamp((lb + (u - cdf_lower) / (cdf_upper - cdf_lower)) * inv_table_size, 0.0f, 1.0f);
+        Var index_w = offset * lookup_table_size;
+        Var index_w_lower = dsl::clamp(cast<uint>(floor(index_w)), 0u, lookup_table_size - 1u);
+        Var index_w_upper = dsl::clamp(cast<uint>(ceil(index_w)), 0u, lookup_table_size - 1u);
+        Var p = offset * 2.0f - 1.0f;
+        Var w = lerp(weight[index_w_lower], weight[index_w_upper], index_w - index_w_lower);
+        return std::make_pair(p, select(w >= 0.0f, 1.0f, -1.0f));
     };
     
     auto[dx, wx] = sample_1d(u.x);

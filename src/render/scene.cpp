@@ -80,9 +80,8 @@ void Scene::_encode_geometry_buffers(const std::vector<std::shared_ptr<Shape>> &
                     auto area = 0.5f * length(cross(p1 - p0, p2 - p0));
                     triangle_cdf_tables[triangle_offset + i] = (sum_area += area);
                 }
-                auto inv_sum_area = 1.0f / sum_area;
                 for (auto i = 0u; i < shape->triangles().size(); i++) {
-                    triangle_cdf_tables[triangle_offset + i] *= inv_sum_area;
+                    triangle_cdf_tables[triangle_offset + i] /= sum_area;
                 }
                 triangle_count += shape->triangles().size();
                 
@@ -92,12 +91,10 @@ void Scene::_encode_geometry_buffers(const std::vector<std::shared_ptr<Shape>> &
                 entities[entity_id] = {static_cast<uint>(vertex_offset), static_cast<uint>(triangle_offset)};
                 
                 shape->clear();
-                
                 iter = entity_to_id.emplace(shape, entity_id).first;
             }
             auto entity_id = iter->second;
             instances[instance_id] = entity_id;
-            entities[instance_id] = {meshes[entity_id].vertex_offset, meshes[entity_id].triangle_offset};
             instance_materials.emplace_back(material);
         } else {  // inner node, visit children
             for (auto &&child : shape->children()) {
@@ -340,11 +337,11 @@ Expr<LightSample> Scene::uniform_sample_light(Expr<LightSelection> selection, Va
     Var light_entity_id = _instance_to_entity_id[light_instance_id];
     Var light_entity = _entities[light_entity_id];
     Var light_triangle_count = _entity_triangle_counts[light_entity_id];
-    Var triangle_index = sample_discrete(_triangle_cdf_tables, light_entity.triangle_offset, light_entity.triangle_offset + light_triangle_count, u_shape.x);
-    u_shape.x = u_shape.x * light_triangle_count - triangle_index;
+    auto discrete_sample = sample_discrete(_triangle_cdf_tables, light_entity.triangle_offset, light_entity.triangle_offset + light_triangle_count, u_shape.x);
+    u_shape.x = u_shape.x * light_triangle_count - discrete_sample.index;
     Var bary = uniform_sample_triangle(u_shape);
     Var m = _instance_transforms[light_instance_id];
-    Var triangle = _triangles[triangle_index];
+    Var triangle = _triangles[discrete_sample.index];
     Expr uv0 = _tex_coords[triangle.i + light_entity.vertex_offset];
     Expr uv1 = _tex_coords[triangle.j + light_entity.vertex_offset];
     Expr uv2 = _tex_coords[triangle.k + light_entity.vertex_offset];
@@ -356,7 +353,7 @@ Expr<LightSample> Scene::uniform_sample_light(Expr<LightSelection> selection, Va
     Var c = cross(p1 - p0, p2 - p0);
     Var area = 0.5f * length(c);
     Var ng = normalize(c);
-    Var pdf_area = (_triangle_cdf_tables[triangle_index] - select(triangle_index == light_entity.triangle_offset, 0.0f, _triangle_cdf_tables[triangle_index - 1u])) / area;
+    Var pdf_area = discrete_sample.pdf / area;
     Var wi = normalize(p_light - p);
     Var cos_theta = abs(dot(wi, ng));
     Var d = length(p_light - p);
@@ -387,9 +384,9 @@ Expr<LightSelection> Scene::uniform_select_light(Var<float> u_light, Var<float> 
     selection.index = dsl::clamp(cast<uint>(u_light * light_count()), 0u, light_count() - 1u);
     selection.prob = 1.0f / light_count();
     Var light_material = _emitter_materials[selection.index];
-    selection.shader.index = sample_discrete(_shader_cdf_tables, light_material.shader_offset, light_material.shader_offset + light_material.shader_count, u_shader);
-    selection.shader.prob = _shader_cdf_tables[selection.shader.index] -
-        select(selection.shader.index == light_material.shader_offset, 0.0f, _shader_cdf_tables[selection.shader.index - 1u]);
+    auto sample = sample_discrete(_shader_cdf_tables, light_material.shader_offset, light_material.shader_offset + light_material.shader_count, u_shader);
+    selection.shader.index = sample.index;
+    selection.shader.prob = sample.pdf;
     selection.shader.weight = _shader_weights[selection.shader.index];
     selection.shader.type = _shader_types[selection.shader.index];
     return selection;
@@ -445,9 +442,10 @@ Expr<Interaction> Scene::evaluate_interaction(Expr<Ray> ray, Expr<ClosestHit> hi
         
         if (flags & Interaction::COMPONENT_SHADER) {
             Var material = _instance_materials[hit.instance_id];
-            intr.shader.index = sample_discrete(_shader_cdf_tables, material.shader_offset, material.shader_offset + material.shader_count, u_shader);
+            auto sample = sample_discrete(_shader_cdf_tables, material.shader_offset, material.shader_offset + material.shader_count, u_shader);
+            intr.shader.index = sample.index;
+            intr.shader.prob = sample.pdf;
             intr.shader.type = _shader_types[intr.shader.index];
-            intr.shader.prob = _shader_cdf_tables[intr.shader.index] - select(intr.shader.index == material.shader_offset, 0.0f, _shader_cdf_tables[intr.shader.index - 1u]);
             intr.shader.weight = _shader_weights[intr.shader.index];
         }
     };

@@ -21,7 +21,7 @@ struct ShaderSelection {
 
 struct Interaction {
     
-    enum Component {
+    enum Component : uint {
         COMPONENT_MISS = 1u << 0u,
         COMPONENT_PI = 1u << 1u,
         COMPONENT_WO = 1u << 2u,
