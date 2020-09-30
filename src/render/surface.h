@@ -11,7 +11,6 @@ namespace luisa::render {
 
 struct Emission {
     float3 L;
-    float pdf;
 };
 
 struct BSDFEvaluation {
@@ -33,7 +32,7 @@ struct Scattering {
 
 }
 
-LUISA_STRUCT(luisa::render::Emission, L, pdf)
+LUISA_STRUCT(luisa::render::Emission, L)
 LUISA_STRUCT(luisa::render::BSDFEvaluation, f, pdf)
 LUISA_STRUCT(luisa::render::BSDFSample, wi, f, pdf)
 LUISA_STRUCT(luisa::render::Scattering, emission, evaluation, sample)

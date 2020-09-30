@@ -10,15 +10,15 @@ Shape wall : Instance {
 }
 
 Material red : Lambert {
-  albedo { 1, 0, 0 }
+  albedo { 0.63, 0.065, 0.05 }
 }
 
 Material green : Lambert {
-  albedo { 0, 1, 0 }
+  albedo { 0.14, 0.45, 0.091 }
 }
 
 Material white : Lambert {
-  albedo { 1, 1, 1 }
+  albedo { 0.725, 0.71, 0.68 }
 }
 
 Shape back : Instance {
@@ -61,14 +61,19 @@ Shape bottom : Instance {
   material { @white }
 }
 
+Shape quad : WavefrontObj {
+  path { "../meshes/plane/plane.obj" }
+}
+
 Shape light : Instance {
-  reference { @cube }
+  reference { @quad }
   transform : TRS {
-    scaling { 2.5 }
-    translation { 0, 6.2, 0 }
+    scaling { 1.25, 1.25, 1.25 }
+    rotation { 1, 0, 0, -90 }
+    translation { 0, 4.95, 0 }
   }
   material : Lambert {
-    emission { 10, 10, 10 }
+    emission { 8.5, 6, 2 }
   }
 }
 
@@ -102,7 +107,7 @@ Camera camera : Pinhole {
 }
 
 task : SingleShot {
-  integrator : AO {}
+  integrator : Direct {}
   sampler : Independent {
     spp { 1024 }
   }

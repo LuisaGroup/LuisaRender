@@ -27,12 +27,13 @@ struct LightSample {
     float3 wi;
     float3 Li;
     float pdf;
+    float distance;
 };
 
 }
 
 LUISA_STRUCT(luisa::render::LightSelection, index, prob, shader)
-LUISA_STRUCT(luisa::render::LightSample, wi, Li, pdf)
+LUISA_STRUCT(luisa::render::LightSample, wi, Li, pdf, distance)
 
 namespace luisa::render {
 

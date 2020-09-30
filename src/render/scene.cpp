@@ -330,7 +330,7 @@ void Scene::_process_materials(const std::vector<Material *> &instance_materials
     });
 }
 
-Expr<LightSample> Scene::uniform_sample_light(Expr<LightSelection> selection, Expr<float3> p, Expr<float2> u_shape) const {
+Expr<LightSample> Scene::uniform_sample_light(Expr<LightSelection> selection, Expr<float3> p, Expr<float2> u_shape_in) const {
     
     using namespace luisa::compute;
     using namespace luisa::compute::dsl;
@@ -340,6 +340,7 @@ Expr<LightSample> Scene::uniform_sample_light(Expr<LightSelection> selection, Ex
     Var light_entity_id = _instance_to_entity_id[light_instance_id];
     Var light_entity = _entities[light_entity_id];
     Var light_triangle_count = _entity_triangle_counts[light_entity_id];
+    Var u_shape = u_shape_in;
     Var triangle_index = sample_discrete(_triangle_cdf_tables, light_entity.triangle_offset, light_entity.triangle_offset + light_triangle_count, u_shape.x);
     u_shape.x = u_shape.x * light_triangle_count - triangle_index;
     Var bary = uniform_sample_triangle(u_shape);
@@ -357,17 +358,18 @@ Expr<LightSample> Scene::uniform_sample_light(Expr<LightSelection> selection, Ex
     Var area = 0.5f * length(c);
     Var ng = normalize(c);
     Var pdf_area = (_triangle_cdf_tables[triangle_index] - select(triangle_index == light_entity.triangle_offset, 0.0f, _triangle_cdf_tables[triangle_index - 1u])) / area;
-    Var d = length(p_light - p);
     Var wi = normalize(p_light - p);
     Var cos_theta = abs(dot(wi, ng));
+    Var d = length(p_light - p);
     
     Var<LightSample> sample;
-    sample.pdf = d * d * pdf_area / cos_theta;
+    sample.pdf = d * d * pdf_area / max(abs(cos_theta), 1e-4f);
+    sample.distance = d;
+    sample.wi = wi;
     Switch (selection.shader.type) {
         for (auto f : _surface_emission_functions) {
             Case (f.first) {
                 auto e = f.second->emission(uv, ng, -wi, _shader_blocks[_shader_block_offsets[selection.shader.index]]);
-                sample.pdf *= e.pdf;
                 sample.Li = e.L * selection.shader.weight / selection.shader.prob;
             };
         }
@@ -394,7 +396,7 @@ Expr<LightSelection> Scene::uniform_select_light(Expr<float> u_light, Expr<float
     return selection;
 }
 
-Expr<Interaction> Scene::evaluate_interaction(Expr<Ray> ray, Expr<ClosestHit> hit, Expr<float> u_shader, uint flags) const {
+Expr<Interaction> Scene::evaluate_interaction(Expr<Ray> ray, Expr<ClosestHit> hit, Expr<float> u_shader_in, uint flags) const {
     
     Var<Interaction> intr;
     
@@ -444,6 +446,7 @@ Expr<Interaction> Scene::evaluate_interaction(Expr<Ray> ray, Expr<ClosestHit> hi
         
         if (flags & Interaction::COMPONENT_SHADER) {
             Var material = _instance_materials[hit.instance_id];
+            Var u_shader = u_shader_in;
             intr.shader.index = sample_discrete(_shader_cdf_tables, material.shader_offset, material.shader_offset + material.shader_count, u_shader);
             intr.shader.type = _shader_types[intr.shader.index];
             intr.shader.prob = _shader_cdf_tables[intr.shader.index] - select(intr.shader.index == material.shader_offset, 0.0f, _shader_cdf_tables[intr.shader.index - 1u]);
@@ -454,7 +457,8 @@ Expr<Interaction> Scene::evaluate_interaction(Expr<Ray> ray, Expr<ClosestHit> hi
     return intr;
 }
 
-Expr<Scattering> Scene::evaluate_scattering(Expr<Interaction> intr, Expr<float3> wi, Expr<float2> u, uint flags) {
+Expr<Scattering> Scene::evaluate_scattering(Expr<Interaction> intr, Expr<float3> wi, Expr<float2> u_in, uint flags) {
+    Var u = u_in;
     Var<Scattering> scattering;
     If (!intr.miss) {
         Switch (intr.shader.type) {

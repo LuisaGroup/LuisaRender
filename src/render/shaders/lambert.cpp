@@ -95,7 +95,6 @@ public:
             Var emission = select(valid, make_float3(data.r, data.g, data.b), make_float3(0.0f));
             Var pdf = select(valid, 1.0f, 0.0f);
             scattering.emission.L = emission;
-            scattering.emission.pdf = pdf;
         }
         return scattering;
     }
@@ -106,7 +105,6 @@ public:
         Var valid = double_sided || is_front;
         Var<Emission> emission;
         emission.L = select(valid, make_float3(data.r, data.g, data.b), make_float3(0.0f));
-        emission.pdf = select(valid, 1.0f, 0.0f);
         return emission;
     }
     
