@@ -47,13 +47,16 @@ public:
         if (comp & EVAL_BSDF) {
             Var f = select(is_refl && valid, albedo * inv_pi, make_float3(0.0f));
             Var pdf = select(is_refl && valid, abs(wi.z) * inv_pi, 0.0f);
-            scattering.evaluation.emplace(f, pdf);
+            scattering.evaluation.f = f;
+            scattering.evaluation.pdf = pdf;
         }
         if (comp & EVAL_BSDF_SAMPLING) {
             Var sampled_wi = sign(wi.z) * cosine_sample_hemisphere(u2);
             Var sampled_f = select(valid, albedo * inv_pi, make_float3(0.0f));
             Var sampled_pdf = select(valid, abs(sampled_wi.z) * inv_pi, 0.0f);
-            scattering.sample.emplace(sampled_wi, sampled_f, sampled_pdf);
+            scattering.sample.wi = sampled_wi;
+            scattering.sample.f = sampled_f;
+            scattering.sample.pdf = sampled_pdf;
         }
         return scattering;
     }
@@ -84,7 +87,8 @@ public:
             Var valid = double_sided || is_front;
             Var emission = select(valid, make_float3(data.r, data.g, data.b), make_float3(0.0f));
             Var pdf = select(valid, 1.0f, 0.0f);
-            scattering.emission.emplace(emission, pdf);
+            scattering.emission.L = emission;
+            scattering.emission.pdf = pdf;
         }
         return scattering;
     }

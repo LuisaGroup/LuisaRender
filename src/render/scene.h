@@ -42,6 +42,8 @@ public:
         Var<float3> Li;
         Var<float> pdf;
     };
+    
+    using Scattering = SurfaceShader::Scattering;
 
 private:
     Device *_device;
@@ -120,6 +122,7 @@ public:
     [[nodiscard]] LightSelection uniform_select_light(Expr<float> u_light, Expr<float> u_shader) const;
     [[nodiscard]] LightSample uniform_sample_light(const LightSelection &selection, Expr<float3> p, Expr<float2> u_shape) const;
     [[nodiscard]] Interaction evaluate_interaction(Expr<Ray> ray, Expr<ClosestHit> hit, uint flags, Expr<float> u_shader = 0.0f) const;
+    [[nodiscard]] Scattering evaluate_scattering(const Interaction &intr, Expr<float3> wi, uint flags, Expr<float2> u = make_float2(0.0f));
 };
 
 }

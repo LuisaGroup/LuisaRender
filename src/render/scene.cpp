@@ -452,4 +452,23 @@ Interaction Scene::evaluate_interaction(Expr<Ray> ray, Expr<ClosestHit> hit, uin
     return intr;
 }
 
+Scene::Scattering Scene::evaluate_scattering(const Interaction &intr, Expr<float3> wi, uint flags, Expr<float2> u) {
+    
+    Scattering scattering;
+    
+    If (!intr.miss) {
+        Var onb = make_onb(intr.ns);
+        Var local_wo = transform_to_local(onb, intr.wo);
+        Var local_wi = transform_to_local(onb, wi);
+        Switch (intr.shader.type) {
+            for (auto f : _surface_evaluate_functions) {
+                Case (f.first) {
+                    scattering = f.second->evaluate(intr.uv, local_wo, local_wi, u, _shader_blocks[_shader_block_offsets[intr.shader.index]], flags);
+                };
+            }
+        };
+    };
+    return scattering;
+}
+
 }

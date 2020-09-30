@@ -25,29 +25,23 @@ public:
     struct Emission {
         Var<float3> L;
         Var<float> pdf;
-        template<typename TL, typename Tpdf>
-        Emission(TL &&L, Tpdf &&pdf) noexcept : L{std::forward<TL>(L)}, pdf{std::forward<Tpdf>(pdf)} {}
     };
     
     struct BSDFEvaluation {
         Var<float3> f;
         Var<float> pdf;
-        template<typename Tf, typename Tpdf>
-        BSDFEvaluation(Tf &&f, Tpdf &&pdf) noexcept : f{std::forward<Tf>(f)}, pdf{std::forward<Tpdf>(pdf)} {}
     };
     
     struct BSDFSample {
         Var<float3> wi;
         Var<float3> f;
         Var<float> pdf;
-        template<typename Twi, typename Tf, typename Tpdf>
-        BSDFSample(Twi &&wi, Tf &&f, Tpdf &&pdf) noexcept : wi{std::forward<Twi>(wi)}, f{std::forward<Tf>(f)}, pdf{std::forward<Tpdf>(pdf)} {}
     };
     
     struct Scattering {
-        std::optional<Emission> emission;
-        std::optional<BSDFEvaluation> evaluation;
-        std::optional<BSDFSample> sample;
+        Emission emission;
+        BSDFEvaluation evaluation;
+        BSDFSample sample;
     };
 
 private:
