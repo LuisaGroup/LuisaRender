@@ -12,14 +12,29 @@
 
 namespace luisa::render {
 
+struct FilterSample {
+    float2 p;
+    float weight;
+};
+
+}
+
+LUISA_STRUCT(luisa::render::FilterSample, p, weight)
+
+namespace luisa::render {
+
 using compute::Device;
 using compute::Pipeline;
 using compute::KernelView;
+using compute::dsl::Var;
+using compute::dsl::Expr;
 
 class Filter : public Plugin {
 
 private:
     float _radius;
+    
+    [[nodiscard]] virtual Expr<FilterSample> _importance_sample_pixel_position(Expr<uint2> p, Expr<float2> u) = 0;
 
 public:
     Filter(Device *device, const ParameterSet &params)
@@ -29,7 +44,9 @@ public:
     [[nodiscard]] float radius() const noexcept { return _radius; }
     
     // (position, weight)
-    [[nodiscard]] virtual std::pair<Expr<float2>, Expr<float>> importance_sample_pixel_position(Expr<uint2> p, Expr<float2> u) = 0;
+    [[nodiscard]] Expr<FilterSample> importance_sample_pixel_position(Var<uint2> p, Var<float2> u) {
+        return _importance_sample_pixel_position(p, u);
+    }
 };
 
 class SeparableFilter : public Filter {
@@ -45,13 +62,13 @@ private:
     
     // Filter 1D weight function, offset is in range [-radius, radius)
     [[nodiscard]] virtual float _weight_1d(float offset) const noexcept = 0;
+    
+    // (position, weight)
+    [[nodiscard]] Expr<FilterSample> _importance_sample_pixel_position(Expr<uint2> p, Expr<float2> u) override;
 
 public:
     SeparableFilter(Device *device, const ParameterSet &params)
         : Filter{device, params} {}
-        
-    // (position, weight)
-    std::pair<Expr<float2>, Expr<float>> importance_sample_pixel_position(Expr<uint2> p, Expr<float2> u) override;
 };
 
 }

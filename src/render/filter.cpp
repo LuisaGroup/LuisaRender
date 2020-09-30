@@ -12,7 +12,7 @@ namespace luisa::render {
 using namespace luisa::compute;
 using namespace luisa::compute::dsl;
 
-std::pair<Expr<float2>, Expr<float>> SeparableFilter::importance_sample_pixel_position(Expr<uint2> p, Expr<float2> u) {
+Expr<FilterSample> SeparableFilter::_importance_sample_pixel_position(Expr<uint2> p, Expr<float2> u) {
     
     constexpr auto inv_table_size = 1.0f / lookup_table_size;
     
@@ -62,9 +62,10 @@ std::pair<Expr<float2>, Expr<float>> SeparableFilter::importance_sample_pixel_po
     
     auto[dx, wx] = sample_1d(u.x);
     auto[dy, wy] = sample_1d(u.y);
-    auto pixel_position = make_float2(p) + 0.5f + make_float2(dx, dy) * radius();
-    auto pixel_weight = wx * wy * _scale;
-    return std::make_pair(pixel_position, pixel_weight);
+    Var<FilterSample> sample;
+    sample.p = make_float2(p) + 0.5f + make_float2(dx, dy) * radius();
+    sample.weight = wx * wy * _scale;
+    return sample;
 }
 
 }

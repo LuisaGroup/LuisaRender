@@ -75,11 +75,11 @@ protected:
 public:
     virtual ~SurfaceShader() noexcept = default;
     
-    [[nodiscard]] Expr<Scattering> evaluate(Expr<float2> uv, Expr<float3> n, Expr<float3> wo, Expr<float3> wi, Expr<float2> u2, Expr<DataBlock> data_ref, uint comp = EVAL_ALL) const {
+    [[nodiscard]] Expr<Scattering> evaluate(Var<float2> uv, Var<float3> n, Var<float3> wo, Var<float3> wi, Var<float2> u2, Expr<DataBlock> data_ref, uint comp = EVAL_ALL) const {
         return _evaluate(uv, n, wo, wi, u2, data_ref, comp);
     }
     
-    [[nodiscard]] Expr<Emission> emission(Expr<float2> uv, Expr<float3> n, Expr<float3> wo, Expr<DataBlock> data_ref) const {
+    [[nodiscard]] Expr<Emission> emission(Var<float2> uv, Var<float3> n, Var<float3> wo, Expr<DataBlock> data_ref) const {
         return _emission(uv, n, wo, data_ref);
     }
     

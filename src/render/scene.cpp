@@ -330,7 +330,7 @@ void Scene::_process_materials(const std::vector<Material *> &instance_materials
     });
 }
 
-Expr<LightSample> Scene::uniform_sample_light(Expr<LightSelection> selection, Expr<float3> p, Expr<float2> u_shape_in) const {
+Expr<LightSample> Scene::uniform_sample_light(Expr<LightSelection> selection, Var<float3> p, Var<float2> u_shape) const {
     
     using namespace luisa::compute;
     using namespace luisa::compute::dsl;
@@ -340,7 +340,6 @@ Expr<LightSample> Scene::uniform_sample_light(Expr<LightSelection> selection, Ex
     Var light_entity_id = _instance_to_entity_id[light_instance_id];
     Var light_entity = _entities[light_entity_id];
     Var light_triangle_count = _entity_triangle_counts[light_entity_id];
-    Var u_shape = u_shape_in;
     Var triangle_index = sample_discrete(_triangle_cdf_tables, light_entity.triangle_offset, light_entity.triangle_offset + light_triangle_count, u_shape.x);
     u_shape.x = u_shape.x * light_triangle_count - triangle_index;
     Var bary = uniform_sample_triangle(u_shape);
@@ -377,7 +376,7 @@ Expr<LightSample> Scene::uniform_sample_light(Expr<LightSelection> selection, Ex
     return sample;
 }
 
-Expr<LightSelection> Scene::uniform_select_light(Expr<float> u_light, Expr<float> u_shader) const {
+Expr<LightSelection> Scene::uniform_select_light(Var<float> u_light, Var<float> u_shader) const {
     
     using namespace luisa::compute;
     using namespace luisa::compute::dsl;
@@ -396,7 +395,7 @@ Expr<LightSelection> Scene::uniform_select_light(Expr<float> u_light, Expr<float
     return selection;
 }
 
-Expr<Interaction> Scene::evaluate_interaction(Expr<Ray> ray, Expr<ClosestHit> hit, Expr<float> u_shader_in, uint flags) const {
+Expr<Interaction> Scene::evaluate_interaction(Expr<Ray> ray, Expr<ClosestHit> hit, Var<float> u_shader, uint flags) const {
     
     Var<Interaction> intr;
     
@@ -446,7 +445,6 @@ Expr<Interaction> Scene::evaluate_interaction(Expr<Ray> ray, Expr<ClosestHit> hi
         
         if (flags & Interaction::COMPONENT_SHADER) {
             Var material = _instance_materials[hit.instance_id];
-            Var u_shader = u_shader_in;
             intr.shader.index = sample_discrete(_shader_cdf_tables, material.shader_offset, material.shader_offset + material.shader_count, u_shader);
             intr.shader.type = _shader_types[intr.shader.index];
             intr.shader.prob = _shader_cdf_tables[intr.shader.index] - select(intr.shader.index == material.shader_offset, 0.0f, _shader_cdf_tables[intr.shader.index - 1u]);
@@ -457,8 +455,7 @@ Expr<Interaction> Scene::evaluate_interaction(Expr<Ray> ray, Expr<ClosestHit> hi
     return intr;
 }
 
-Expr<Scattering> Scene::evaluate_scattering(Expr<Interaction> intr, Expr<float3> wi, Expr<float2> u_in, uint flags) {
-    Var u = u_in;
+Expr<Scattering> Scene::evaluate_scattering(Expr<Interaction> intr, Var<float3> wi, Var<float2> u, uint flags) {
     Var<Scattering> scattering;
     If (!intr.miss) {
         Switch (intr.shader.type) {

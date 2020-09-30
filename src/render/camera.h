@@ -14,11 +14,24 @@
 
 namespace luisa::render {
 
+using compute::Ray;
+
+struct RaySample {
+    Ray ray;
+    float3 throughput;
+};
+
+}
+
+LUISA_STRUCT(luisa::render::RaySample, ray, throughput)
+
+namespace luisa::render {
+
 using compute::Pipeline;
 using compute::BufferView;
 using compute::TextureView;
-using compute::Ray;
 using compute::dsl::Expr;
+using compute::dsl::Var;
 
 class Camera : public Plugin {
 
@@ -36,7 +49,7 @@ private:
 
 private:
     [[nodiscard]] virtual bool _requires_lens_samples() const noexcept = 0;
-    [[nodiscard]] virtual std::pair<Expr<Ray>, Expr<float3>> _generate_rays(Expr<float4x4> camera_to_world, Expr<float2> u_lens, Expr<float2> pixel_positions) = 0;
+    [[nodiscard]] virtual Expr<RaySample> _generate_rays(Var<float4x4> camera_to_world, Var<float2> u_lens, Var<float2> pixel_positions) = 0;
 
 public:
     Camera(Device *d, const ParameterSet &params)

@@ -124,10 +124,10 @@ public:
     [[nodiscard]] bool is_static() const noexcept { return _is_static; }
     [[nodiscard]] uint light_count() const noexcept { return _emitter_to_instance_id.size(); }
     
-    [[nodiscard]] Expr<LightSelection> uniform_select_light(Expr<float> u_light, Expr<float> u_shader) const;
-    [[nodiscard]] Expr<LightSample> uniform_sample_light(Expr<LightSelection> selection, Expr<float3> p, Expr<float2> u_shape) const;
-    [[nodiscard]] Expr<Interaction> evaluate_interaction(Expr<Ray> ray, Expr<ClosestHit> hit, Expr<float> u_shader, uint flags) const;
-    [[nodiscard]] Expr<Scattering> evaluate_scattering(Expr<Interaction> intr, Expr<float3> wi, Expr<float2> u, uint flags = SurfaceShader::EVAL_ALL);
+    [[nodiscard]] Expr<LightSelection> uniform_select_light(Var<float> u_light, Var<float> u_shader) const;
+    [[nodiscard]] Expr<LightSample> uniform_sample_light(Expr<LightSelection> selection, Var<float3> p, Var<float2> u_shape) const;
+    [[nodiscard]] Expr<Interaction> evaluate_interaction(Expr<Ray> ray, Expr<ClosestHit> hit, Var<float> u_shader, uint flags) const;
+    [[nodiscard]] Expr<Scattering> evaluate_scattering(Expr<Interaction> intr, Var<float3> wi, Var<float2> u, uint flags = SurfaceShader::EVAL_ALL);
 };
 
 }
