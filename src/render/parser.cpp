@@ -2,8 +2,7 @@
 // Created by Mike Smith on 2020/2/3.
 //
 
-#include "parser.h"
-
+#include <render/background.h>
 #include <render/filter.h>
 #include <render/film.h>
 #include <render/camera.h>
@@ -13,6 +12,8 @@
 #include <render/transform.h>
 #include <render/task.h>
 #include <render/sampler.h>
+
+#include "parser.h"
 
 namespace luisa::render {
 
@@ -118,6 +119,7 @@ std::shared_ptr<Task> Parser::_parse_top_level() {
         continue;                                                                                                                                               \
     }
     
+        LUISA_PARSER_PARSE_GLOBAL_NODE(Background)
         LUISA_PARSER_PARSE_GLOBAL_NODE(Filter)
         LUISA_PARSER_PARSE_GLOBAL_NODE(Film)
         LUISA_PARSER_PARSE_GLOBAL_NODE(Camera)

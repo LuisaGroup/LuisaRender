@@ -35,6 +35,7 @@ class ParameterSet;
         }                                                                                 \
     }
 
+LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Background)
 LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Filter)
 LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Film)
 LUISA_MAKE_PLUGIN_BASE_CLASS_MATCHER_AND_NAME(Camera)

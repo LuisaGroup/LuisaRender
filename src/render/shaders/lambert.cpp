@@ -3,6 +3,8 @@
 //
 
 #include <render/sampling.h>
+#include <render/shading.h>
+
 #include "lambert.h"
 
 using namespace luisa::compute;

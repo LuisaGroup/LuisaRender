@@ -2,9 +2,9 @@
 // Created by Mike Smith on 2020/9/16.
 //
 
-#include <compute/dsl_syntax.h>
 #include <render/integrator.h>
 #include <render/sampling.h>
+#include <render/shading.h>
 
 namespace luisa::render::integrator {
 
