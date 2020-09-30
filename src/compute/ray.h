@@ -48,10 +48,7 @@ inline Expr<float3> offset_ray_origin(Expr<float3> p_in, Expr<float3> n_in) noex
         as_float(as_int(p.y) + select(p.y < 0, -of_i.y, of_i.y)),
         as_float(as_int(p.z) + select(p.z < 0, -of_i.z, of_i.z)));
     
-    return make_float3(
-        select(abs(p.x) < origin, p.x + float_scale * n.x, p_i.x),
-        select(abs(p.y) < origin, p.y + float_scale * n.y, p_i.y),
-        select(abs(p.z) < origin, p.z + float_scale * n.z, p_i.z));
+    return select(abs(p) < origin, p + float_scale * n, p_i);
 }
 
 }
