@@ -67,6 +67,18 @@ void MetalCodegen::_emit_function_decl(const Function &f) {
     _os << ") ";
 }
 
+void MetalCodegen::visit(const CastExpr *cast_expr) {
+    if (cast_expr->op() == CastOp::REINTERPRET) {
+        _os << "*reinterpret_cast<device ";
+        _emit_type(cast_expr->dest_type());
+        _os << " *>(&";
+        _emit_variable(cast_expr->source());
+        _os << ")";
+    } else {
+        CppCodegen::visit(cast_expr);
+    }
+}
+
 void MetalCodegen::_emit_variable(const Variable *v) {
     if (v->is_uniform_argument() || v->is_immutable_argument()) {
         _os << "uniforms.v" << v->uid();

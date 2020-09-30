@@ -412,9 +412,9 @@ void CppCodegen::visit(const CastExpr *cast_expr) {
             _os << ")";
             break;
         case CastOp::REINTERPRET:
-            _os << "reinterpret_cast<device ";
+            _os << "*reinterpret_cast<";
             _emit_type(cast_expr->dest_type());
-            _os << " &>(";
+            _os << " *>(&";
             _emit_variable(cast_expr->source());
             _os << ")";
             break;

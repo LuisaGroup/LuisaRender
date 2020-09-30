@@ -50,8 +50,8 @@ private:
                          Var u = sampler.generate_2d_sample(tid);
                          auto scattering = scene.evaluate_scattering(interaction, make_float3(0.0f), u, SurfaceShader::EVAL_BSDF_SAMPLING);
                          throughput_buffer[tid] *= select(interaction.miss || scattering.sample.pdf == 0.0f,
-                                                          0.0f,
-                                                          inv_pi * abs(dot(scattering.sample.wi, interaction.ns)) / max(scattering.sample.pdf, 1e-3f));
+                                                          make_float3(0.0f),
+                                                          scattering.sample.f * abs(dot(scattering.sample.wi, interaction.ns)) / max(scattering.sample.pdf, 1e-3f));
                 
                          Var position = offset_ray_origin(interaction.pi, interaction.ng);
                          Var<Ray> shadow_ray;

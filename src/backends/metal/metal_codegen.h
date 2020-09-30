@@ -20,6 +20,7 @@ protected:
 public:
     explicit MetalCodegen(std::ostream &os) noexcept : compute::dsl::CppCodegen{os} {}
     void emit(const compute::dsl::Function &f) override;
+    void visit(const compute::dsl::CastExpr *cast_expr) override;
 };
 
 }
