@@ -16,7 +16,6 @@ class AmbientOcclusion : public Integrator {
 private:
     BufferView<AnyHit> _any_hit_buffer;
     BufferView<ClosestHit> _closest_hit_buffer;
-    BufferView<bool> _miss_buffer;
 
 private:
     void _render_frame(Pipeline &pipeline,
@@ -32,38 +31,38 @@ private:
         if (_any_hit_buffer.size() < pixel_count) {
             _any_hit_buffer = device()->allocate_buffer<AnyHit>(pixel_count);
             _closest_hit_buffer = device()->allocate_buffer<ClosestHit>(pixel_count);
-            _miss_buffer = device()->allocate_buffer<bool>(pixel_count);
         }
         
         pipeline << scene.intersect_closest(ray_buffer, _closest_hit_buffer)
-                 << device()->compile_kernel("ao_generate_shadow_rays", [&] {
+                 << device()->compile_kernel("ao_compute_scattering", [&] {
                      auto tid = thread_id();
                      If (pixel_count % threadgroup_size == 0u || tid < pixel_count) {
                 
                          auto interaction = scene.evaluate_interaction(
-                             ray_buffer[tid], _closest_hit_buffer[tid],
-                             Interaction::COMPONENT_MISS | Interaction::COMPONENT_NG | Interaction::COMPONENT_PI);
+                             ray_buffer[tid], _closest_hit_buffer[tid], 0.0f,
+                             Interaction::COMPONENT_MISS |
+                             Interaction::COMPONENT_NG |
+                             Interaction::COMPONENT_NS |
+                             Interaction::COMPONENT_PI |
+                             Interaction::COMPONENT_SHADER |
+                             Interaction::COMPONENT_WO);
                 
-                         Var normal = interaction.ng;
-                         Var miss = interaction.miss;
-                         Var position = offset_ray_origin(interaction.pi, normal);
-                         
-                         _miss_buffer[tid] = miss;
-                
-                         Var onb = make_onb(normal);
                          Var u = sampler.generate_2d_sample(tid);
-                         Var direction_local = cosine_sample_hemisphere(u);
-                         Var direction = normalize(transform_to_world(onb, direction_local));
+                         auto scattering = scene.evaluate_scattering(interaction, make_float3(0.0f), u, SurfaceShader::EVAL_BSDF_SAMPLING);
+                         throughput_buffer[tid] *= select(interaction.miss || scattering.sample.pdf == 0.0f,
+                                                          make_float3(0.0f),
+                                                          make_float3(1.0f));
                 
+                         Var position = offset_ray_origin(interaction.pi, interaction.ng);
                          Var<Ray> shadow_ray;
                          shadow_ray.origin_x = position.x;
                          shadow_ray.origin_y = position.y;
                          shadow_ray.origin_z = position.z;
                          shadow_ray.min_distance = 0.0f;
-                         shadow_ray.direction_x = direction.x;
-                         shadow_ray.direction_y = direction.y;
-                         shadow_ray.direction_z = direction.z;
-                         shadow_ray.max_distance = select(miss, -1.0f, 1e3f);
+                         shadow_ray.direction_x = scattering.sample.wi.x;
+                         shadow_ray.direction_y = scattering.sample.wi.y;
+                         shadow_ray.direction_z = scattering.sample.wi.z;
+                         shadow_ray.max_distance = select(interaction.miss, -1.0f, 1e3f);
                          ray_buffer[tid] = shadow_ray;
                      };
                  }).parallelize(pixel_count, threadgroup_size)
@@ -72,9 +71,8 @@ private:
                      auto tid = thread_id();
                      If (pixel_count % threadgroup_size == 0u || tid < pixel_count) {
                          Var its_distance = _any_hit_buffer[tid].distance;
-                         Var miss = _miss_buffer[tid];
                          Var throughput = throughput_buffer[tid];
-                         radiance_buffer[tid] = throughput * select(!miss && its_distance <= 0.0f, 1.0f, 0.0f);
+                         radiance_buffer[tid] = throughput * select(its_distance <= 0.0f, 1.0f, 0.0f);
                      };
                  }).parallelize(pixel_count, threadgroup_size);
     }

@@ -104,7 +104,7 @@ Camera camera : Pinhole {
 task : SingleShot {
   integrator : AO {}
   sampler : Independent {
-    spp { 1024 }
+    spp { 1 }
   }
   camera { @camera }
   shapes { @back, @left, @right, @top, @bottom, @light, @tall, @short }

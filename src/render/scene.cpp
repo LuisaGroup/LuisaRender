@@ -361,13 +361,11 @@ Scene::LightSample Scene::uniform_sample_light(const LightSelection &selection, 
     Var wi = normalize(p_light - p);
     Var cos_theta = abs(dot(wi, ng));
     Var pdf = d * d * pdf_area / cos_theta;
-    Var onb = make_onb(ng);
-    Var w = transform_to_local(onb, -wi);
     Var L = make_float3(0.0f);
     Switch (selection.shader.type) {
         for (auto f : _surface_emission_functions) {
             Case (f.first) {
-                auto[eval_L, eval_pdf] = f.second->emission(uv, w, _shader_blocks[_shader_block_offsets[selection.shader.index]]);
+                auto[eval_L, eval_pdf] = f.second->emission(uv, ng, -wi, _shader_blocks[_shader_block_offsets[selection.shader.index]]);
                 pdf *= eval_pdf;
                 L = eval_L * selection.shader.weight / selection.shader.prob;
             };
@@ -392,7 +390,7 @@ Scene::LightSelection Scene::uniform_select_light(Expr<float> u_light, Expr<floa
     return LightSelection{light_index, 1.0f / light_count(), shader_type, shader_index, shader_pdf, shader_weight};
 }
 
-Interaction Scene::evaluate_interaction(Expr<Ray> ray, Expr<ClosestHit> hit, uint flags, Expr<float> u_shader) const {
+Interaction Scene::evaluate_interaction(Expr<Ray> ray, Expr<ClosestHit> hit, Expr<float> u_shader, uint flags) const {
     
     Interaction intr;
     
@@ -452,18 +450,15 @@ Interaction Scene::evaluate_interaction(Expr<Ray> ray, Expr<ClosestHit> hit, uin
     return intr;
 }
 
-Scene::Scattering Scene::evaluate_scattering(const Interaction &intr, Expr<float3> wi, uint flags, Expr<float2> u) {
+Scene::Scattering Scene::evaluate_scattering(const Interaction &intr, Expr<float3> wi, Expr<float2> u, uint flags) {
     
     Scattering scattering;
     
     If (!intr.miss) {
-        Var onb = make_onb(intr.ns);
-        Var local_wo = transform_to_local(onb, intr.wo);
-        Var local_wi = transform_to_local(onb, wi);
         Switch (intr.shader.type) {
             for (auto f : _surface_evaluate_functions) {
                 Case (f.first) {
-                    scattering = f.second->evaluate(intr.uv, local_wo, local_wi, u, _shader_blocks[_shader_block_offsets[intr.shader.index]], flags);
+                    scattering = f.second->evaluate(intr.uv, intr.ns, intr.wo, wi, u, _shader_blocks[_shader_block_offsets[intr.shader.index]], flags);
                 };
             }
         };

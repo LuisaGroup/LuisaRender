@@ -45,9 +45,8 @@ public:
     };
 
 private:
-    // Note: wo and wi are all in local coordinates, therefore no normal provided
-    [[nodiscard]] virtual Scattering _evaluate(Expr<float2> uv, Expr<float3> wo, Expr<float3> wi, Expr<float2> u2, Expr<DataBlock> data_ref, uint comp) const = 0;
-    [[nodiscard]] virtual Emission _emission(Expr<float2> uv, Expr<float3> w, Expr<DataBlock> data_ref) const {
+    [[nodiscard]] virtual Scattering _evaluate(Expr<float2> uv, Expr<float3> n, Expr<float3> wo, Expr<float3> wi, Expr<float2> u2, Expr<DataBlock> data_ref, uint comp) const = 0;
+    [[nodiscard]] virtual Emission _emission(Expr<float2> uv, Expr<float3> n, Expr<float3> w, Expr<DataBlock> data_ref) const {
         LUISA_EXCEPTION("Invalid sampling operation on non-emissive surface.");
     }
     
@@ -68,12 +67,12 @@ protected:
 public:
     virtual ~SurfaceShader() noexcept = default;
     
-    [[nodiscard]] Scattering evaluate(Expr<float2> uv, Expr<float3> wo, Expr<float3> wi, Expr<float2> u2, Expr<DataBlock> data_ref, uint comp = EVAL_ALL) const {
-        return _evaluate(uv, wo, wi, u2, data_ref, comp);
+    [[nodiscard]] Scattering evaluate(Expr<float2> uv, Expr<float3> n, Expr<float3> wo, Expr<float3> wi, Expr<float2> u2, Expr<DataBlock> data_ref, uint comp = EVAL_ALL) const {
+        return _evaluate(uv, n, wo, wi, u2, data_ref, comp);
     }
     
-    [[nodiscard]] Emission emission(Expr<float2> uv, Expr<float3> wo, Expr<DataBlock> data_ref) const {
-        return _emission(uv, wo, data_ref);
+    [[nodiscard]] Emission emission(Expr<float2> uv, Expr<float3> n, Expr<float3> wo, Expr<DataBlock> data_ref) const {
+        return _emission(uv, n, wo, data_ref);
     }
     
     [[nodiscard]] uint required_data_block_count() const noexcept { return _required_data_block_count(); }
@@ -86,24 +85,24 @@ public:
 template<typename Impl>
 class Surface : public SurfaceShader {
     
-    [[nodiscard]] Scattering _evaluate(Expr<float2> uv, Expr<float3> wo, Expr<float3> wi, Expr<float2> u2, Expr<DataBlock> data_ref, uint comp) const final {
+    [[nodiscard]] Scattering _evaluate(Expr<float2> uv, Expr<float3> n, Expr<float3> wo, Expr<float3> wi, Expr<float2> u2, Expr<DataBlock> data_ref, uint comp) const final {
         Var data = compute::dsl::reinterpret<typename Impl::Data>(data_ref);
-        return Impl::evaluate(uv, wo, wi, u2, data, comp);
+        return Impl::evaluate(uv, n, wo, wi, u2, data, comp);
     }
     
-    [[nodiscard]] Emission _emission(Expr<float2> uv, Expr<float3> wo, Expr<DataBlock> data_ref) const final {
+    [[nodiscard]] Emission _emission(Expr<float2> uv, Expr<float3> n, Expr<float3> wo, Expr<DataBlock> data_ref) const final {
         // Not using static-if's, to make MSVC happy...
-        return _emission_impl(static_cast<const Impl *>(this), uv, wo, data_ref);
+        return _emission_impl(static_cast<const Impl *>(this), uv, n, wo, data_ref);
     }
     
     template<typename I, std::enable_if_t<I::is_emissive, int> = 0>
-    [[nodiscard]] static Emission _emission_impl(const I *, Expr<float2> uv, Expr<float3> wo, Expr<DataBlock> data_ref) {
+    [[nodiscard]] static Emission _emission_impl(const I *, Expr<float2> uv, Expr<float3> n, Expr<float3> wo, Expr<DataBlock> data_ref) {
         Var data = compute::dsl::reinterpret<typename I::Data>(data_ref);
-        return I::emission(uv, wo, data);
+        return I::emission(uv, n, wo, data);
     }
     
     template<typename I, std::enable_if_t<!I::is_emissive, int> = 0>
-    [[noreturn]] static Emission _emission_impl(const I *, Expr<float2>, Expr<float3>, Expr<DataBlock>) {
+    [[noreturn]] static Emission _emission_impl(const I *, Expr<float2>, Expr<float3>, Expr<float3>, Expr<DataBlock>) {
         LUISA_EXCEPTION("Invalid emission evaluation on non-emissive surface shader.");
     }
     
