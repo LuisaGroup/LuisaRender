@@ -27,7 +27,7 @@ private:
                        BufferView<float3> &radiance_buffer) override {
         
         auto pixel_count = static_cast<uint>(ray_buffer.size());
-        static constexpr auto threadgroup_size = 256u;
+        static constexpr auto threadgroup_size = 1024u;
         
         if (_any_hit_buffer.size() < pixel_count) {
             _any_hit_buffer = device()->allocate_buffer<AnyHit>(pixel_count);
