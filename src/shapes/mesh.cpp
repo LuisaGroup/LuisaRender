@@ -37,7 +37,6 @@ private:
                                              aiProcess_GenUVCoords |
                                              aiProcess_TransformUVCoords |
                                              aiProcess_OptimizeMeshes |
-                                             aiProcess_OptimizeGraph |
                                              aiProcess_FlipUVs);
         
         LUISA_EXCEPTION_IF(ai_scene == nullptr || (ai_scene->mFlags & static_cast<uint>(AI_SCENE_FLAGS_INCOMPLETE)) || ai_scene->mRootNode == nullptr,

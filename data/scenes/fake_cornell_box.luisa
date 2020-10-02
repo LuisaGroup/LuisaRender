@@ -65,8 +65,8 @@ Shape quad : Mesh {
   path { "../meshes/plane/plane.obj" }
 }
 
-Shape light : Instance {
-  reference { @quad }
+Shape light : Mesh {
+  path { "../meshes/plane/plane.obj" }
   transform : TRS {
     scaling { 1.25, 1.25, 1.25 }
     rotation { 1, 0, 0, -90 }
