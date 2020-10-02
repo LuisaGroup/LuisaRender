@@ -1,4 +1,4 @@
-Shape cube : WavefrontObj {
+Shape cube : Mesh {
   path { "../meshes/cube/cube.obj" }
 }
 
@@ -61,7 +61,7 @@ Shape bottom : Instance {
   material { @white }
 }
 
-Shape quad : WavefrontObj {
+Shape quad : Mesh {
   path { "../meshes/plane/plane.obj" }
 }
 

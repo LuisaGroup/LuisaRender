@@ -13,7 +13,6 @@ using namespace luisa::compute::dsl;
 std::function<void(Pipeline &pipeline)> Camera::generate_rays(float time, Sampler &sampler) {
     
     static constexpr auto threadgroup_size = 1024u;
-    
     auto pixel_count = _film->resolution().x * _film->resolution().y;
     
     if (_pixel_position_buffer.size() < pixel_count) {

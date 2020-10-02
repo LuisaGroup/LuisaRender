@@ -1,6 +1,6 @@
 Integrator integrator : Normal {}
 
-Shape cbox : WavefrontObj {
+Shape cbox : Mesh {
   path { "../meshes/cornell/CornellBox-Original.obj" }
   material : Lambert {
     albedo { 1.0, 1.0, 1.0 }

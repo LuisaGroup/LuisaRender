@@ -342,13 +342,16 @@ Expr<LightSample> Scene::uniform_sample_light(Expr<LightSelection> selection, Va
     Var bary = uniform_sample_triangle(u_shape);
     Var m = _instance_transforms[light_instance_id];
     Var triangle = _triangles[discrete_sample.index];
-    Expr uv0 = _tex_coords[triangle.i + light_entity.vertex_offset];
-    Expr uv1 = _tex_coords[triangle.j + light_entity.vertex_offset];
-    Expr uv2 = _tex_coords[triangle.k + light_entity.vertex_offset];
+    Var i = triangle.i + light_entity.vertex_offset;
+    Var j = triangle.j + light_entity.vertex_offset;
+    Var k = triangle.k + light_entity.vertex_offset;
+    Expr uv0 = _tex_coords[i];
+    Expr uv1 = _tex_coords[j];
+    Expr uv2 = _tex_coords[k];
     Expr uv = bary.x * uv0 + bary.y * uv1 + (1.0f - bary.x - bary.y) * uv2;
-    Var p0 = make_float3(m * make_float4(_positions[triangle.i + light_entity.vertex_offset], 1.0f));
-    Var p1 = make_float3(m * make_float4(_positions[triangle.j + light_entity.vertex_offset], 1.0f));
-    Var p2 = make_float3(m * make_float4(_positions[triangle.k + light_entity.vertex_offset], 1.0f));
+    Var p0 = make_float3(m * make_float4(_positions[i], 1.0f));
+    Var p1 = make_float3(m * make_float4(_positions[j], 1.0f));
+    Var p2 = make_float3(m * make_float4(_positions[k], 1.0f));
     Var p_light = bary.x * p0 + bary.y * p1 + (1.0f - bary.x - bary.y) * p2;
     Var c = cross(p1 - p0, p2 - p0);
     Var area = 0.5f * length(c);
@@ -428,9 +431,7 @@ Expr<Interaction> Scene::evaluate_interaction(Expr<Ray> ray, Expr<ClosestHit> hi
         
         Var c = cross(p1 - p0, p2 - p0);
         Var ng = normalize(c);
-        // if (flags & Interaction::COMPONENT_NS) { interaction.ns = normalize(nm * (bary_u * _normals[i] + bary_v * _normals[j] + bary_w * _normals[k])); }
-        // FIXME: Error in Ns, temporally using Ng instead...
-        if (flags & Interaction::COMPONENT_NS) { intr.ns = ng; }
+        if (flags & Interaction::COMPONENT_NS) { intr.ns = normalize(nm * (bary_u * _normals[i] + bary_v * _normals[j] + bary_w * _normals[k])); }
         if (flags & Interaction::COMPONENT_NG) { intr.ng = ng; }
         if (flags & Interaction::COMPONENT_UV) { intr.uv = bary_u * _tex_coords[i] + bary_v * _tex_coords[j] + bary_w * _tex_coords[k]; }
         if (flags & Interaction::COMPONENT_PDF) {

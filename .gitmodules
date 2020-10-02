@@ -7,12 +7,12 @@
 [submodule "src/ext/cxxopts"]
 	path = src/ext/cxxopts
 	url = https://github.com/jarro2783/cxxopts.git
-[submodule "src/ext/tinyobjloader"]
-	path = src/ext/tinyobjloader
-	url = https://github.com/tinyobjloader/tinyobjloader.git
 [submodule "src/ext/tinyexr"]
 	path = src/ext/tinyexr
 	url = https://github.com/syoyo/tinyexr.git
 [submodule "src/ext/stb"]
 	path = src/ext/stb
 	url = https://github.com/nothings/stb.git
+[submodule "src/ext/assimp"]
+	path = src/ext/assimp
+	url = https://github.com/assimp/assimp.git
