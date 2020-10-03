@@ -1,5 +1,5 @@
 # [Choice] Debian / Ubuntu version: debian-10, debian-9
-ARG VARIANT=buster
+ARG VARIANT=focal
 FROM mcr.microsoft.com/vscode/devcontainers/base:${VARIANT}
 
 # Install needed packages. Use a separate RUN statement to add your own dependencies.
