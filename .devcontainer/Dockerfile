@@ -1,9 +1,12 @@
-# See here for image contents: https://github.com/microsoft/vscode-dev-containers/tree/v0.145.0/containers/cpp/.devcontainer/base.Dockerfile
-
 # [Choice] Debian / Ubuntu version: debian-10, debian-9
-ARG VARIANT="focal"
-FROM mcr.microsoft.com/vscode/devcontainers/cpp:0-${VARIANT}
+ARG VARIANT=buster
+FROM mcr.microsoft.com/vscode/devcontainers/base:${VARIANT}
 
-# [Optional] Uncomment this section to install additional packages.
+# Install needed packages. Use a separate RUN statement to add your own dependencies.
+RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
+    && apt-get -y install build-essential cmake cppcheck valgrind clang lldb llvm \
+    && apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
+
+# [Optional] Uncomment this section to install additional OS packages.
 # RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
 #     && apt-get -y install --no-install-recommends <your-package-list-here>
