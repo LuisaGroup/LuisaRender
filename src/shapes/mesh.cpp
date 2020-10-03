@@ -50,6 +50,8 @@ private:
             std::copy(ai_scene->mMeshes, ai_scene->mMeshes + ai_scene->mNumMeshes, ai_meshes.begin());
         }
         
+        
+        
         for (auto ai_mesh : ai_meshes) {
             auto vertex_offset = static_cast<uint>(vertices.size());
             for (auto i = 0u; i < ai_mesh->mNumVertices; i++) {

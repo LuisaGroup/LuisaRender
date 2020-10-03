@@ -61,10 +61,6 @@ Shape bottom : Instance {
   material { @white }
 }
 
-Shape quad : Mesh {
-  path { "../meshes/plane/plane.obj" }
-}
-
 Shape light : Mesh {
   path { "../meshes/plane/plane.obj" }
   transform : TRS {

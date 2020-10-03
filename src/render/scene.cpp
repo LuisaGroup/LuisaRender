@@ -36,9 +36,7 @@ void Scene::_encode_geometry_buffers(const std::vector<std::shared_ptr<Shape>> &
     size_t instance_count = 0u;
     
     std::queue<std::tuple<Shape *, TransformTree *, Material *>> queue;
-    for (auto &&shape: shapes) {
-        queue.emplace(shape.get(), &_transform_tree, nullptr);
-    }
+    for (auto &&shape: shapes) { queue.emplace(shape.get(), &_transform_tree, nullptr); }
     
     std::unordered_map<Shape *, uint> entity_to_id;
     while (!queue.empty()) {
