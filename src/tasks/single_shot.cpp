@@ -55,11 +55,14 @@ public:
             LUISA_WARNING("Shutter samples not specified, using heuristic value: ", _shutter_samples);
         }
         
+        auto shapes = params["shapes"].parse_reference_list<Shape>();
         _scene = std::make_shared<Scene>(
             device(),
-            params["shapes"].parse_reference_list<Shape>(),
+            shapes,
             params["background"].parse_or_null<Background>(),
             (_shutter_open + _shutter_close) * 0.5f);
+        
+        for (auto &&shape : shapes) { shape->clear_vertex_data(); }
         
         if (_scene->is_static() && _camera->is_static() && (_shutter_samples != 1u || _shutter_open != _shutter_close)) {
             LUISA_WARNING("Motion blur effects disabled since this scene is static.");

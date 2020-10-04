@@ -33,9 +33,9 @@ class Material : public Plugin {
 
 public:
     struct Lobe {
-        std::unique_ptr<SurfaceShader> shader;
+        std::shared_ptr<SurfaceShader> shader;
         float weight;
-        Lobe(std::unique_ptr<SurfaceShader> shader, float weight) noexcept
+        Lobe(std::shared_ptr<SurfaceShader> shader, float weight) noexcept
             : shader{std::move(shader)}, weight{weight} {}
     };
 

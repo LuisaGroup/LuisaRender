@@ -48,12 +48,12 @@ public:
     
     [[nodiscard]] const std::vector<std::shared_ptr<Shape>> &children() const noexcept { return _children; }
     
-    void clear() noexcept {  // to save some memory...
+    void clear_vertex_data() noexcept {  // to save some memory...
         _vertices.clear();
         _triangles.clear();
         _vertices.shrink_to_fit();
         _triangles.shrink_to_fit();
-        for (auto &&child : _children) { child->clear(); }
+        for (auto &&child : _children) { child->clear_vertex_data(); }
         _cleared = true;
     }
     

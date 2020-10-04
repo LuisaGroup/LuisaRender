@@ -90,7 +90,7 @@ void Scene::_encode_geometry_buffers(const std::vector<std::shared_ptr<Shape>> &
                                                static_cast<uint>(shape->vertices().size()), static_cast<uint>(indices.size())});
                 entities[entity_id] = {static_cast<uint>(vertex_offset), static_cast<uint>(triangle_offset)};
                 
-                shape->clear();
+                // shape->clear();  // Will clear in Task...
                 iter = entity_to_id.emplace(shape, entity_id).first;
             }
             auto entity_id = iter->second;
@@ -464,6 +464,10 @@ Expr<Scattering> Scene::evaluate_scattering(Expr<Interaction> intr, Var<float3> 
                 };
             }
         };
+        Var scale = intr.shader.weight / intr.shader.prob;
+        if (flags & SurfaceShader::EVAL_EMISSION) { scattering.emission.L *= scale; }
+        if (flags & SurfaceShader::EVAL_BSDF) { scattering.evaluation.f *= scale; }
+        if (flags & SurfaceShader::EVAL_BSDF_SAMPLING) { scattering.sample.f *= scale; }
     };
     return scattering;
 }

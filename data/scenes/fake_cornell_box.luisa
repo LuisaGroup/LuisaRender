@@ -80,7 +80,10 @@ Shape tall : Instance {
     rotation { 0, 1, 0, 17.5 }
     translation { -1.75, -2, -1 }
   }
-  material { @white }
+  material : Mix {
+    components { @white, @red }
+    weights { 0.5, 0.5 }
+  }
 }
 
 Shape short : Instance {

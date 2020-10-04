@@ -16,3 +16,6 @@
 [submodule "src/ext/assimp"]
 	path = src/ext/assimp
 	url = https://github.com/assimp/assimp.git
+[submodule "src/ext/OpenCL-CLHPP"]
+	path = src/ext/OpenCL-CLHPP
+	url = https://github.com/KhronosGroup/OpenCL-CLHPP.git

@@ -19,6 +19,8 @@ if (LUISA_RENDER_ENABLE_CUDA)
     add_subdirectory(cuda)
 endif ()
 
-add_subdirectory(cpu)
+if (LUISA_RENDER_ENABLE_OPENCL)
+    add_subdirectory(opencl)
+endif ()
 
 add_library(luisa::backends ALIAS luisa-backends)

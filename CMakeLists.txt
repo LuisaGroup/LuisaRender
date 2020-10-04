@@ -29,4 +29,6 @@ else ()
 endif ()
 option(LUISA_RENDER_ENABLE_CUDA "Build with NVIDIA CUDA support" ${LUISA_RENDER_ENABLE_CUDA_DEFAULT})
 
+option(LUISA_RENDER_ENABLE_OPENCL "Build with OpenCL support" ON)
+
 add_subdirectory(src)
