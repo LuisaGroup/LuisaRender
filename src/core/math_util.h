@@ -284,13 +284,13 @@ template<uint N>
 }
 
 // Matrix Functions
-[[nodiscard]] constexpr auto transpose(float3x3 m) noexcept {
+[[nodiscard]] constexpr auto transpose(const float3x3 m) noexcept {
     return make_float3x3(m[0].x, m[1].x, m[2].x,
                          m[0].y, m[1].y, m[2].y,
                          m[0].z, m[1].z, m[2].z);
 }
 
-[[nodiscard]] constexpr auto transpose(float4x4 m) noexcept {
+[[nodiscard]] constexpr auto transpose(const float4x4 m) noexcept {
     return make_float4x4(m[0].x, m[1].x, m[2].x, m[3].x,
                          m[0].y, m[1].y, m[2].y, m[3].y,
                          m[0].z, m[1].z, m[2].z, m[3].z,

@@ -17,7 +17,7 @@ struct float3x3 {
     explicit constexpr float3x3(float s = 1.0f) noexcept
         : cols{make_float3(s, 0.0f, 0.0f), make_float3(0.0f, s, 0.0f), make_float3(0.0f, 0.0f, s)} {}
 
-    constexpr float3x3(float3 c0, float3 c1, float3 c2) noexcept
+    constexpr float3x3(const float3 c0, const float3 c1, const float3 c2) noexcept
         : cols{c0, c1, c2} {}
 
     constexpr float3x3(float m00, float m01, float m02,
@@ -42,7 +42,7 @@ struct float4x4 {
                make_float4(0.0f, 0.0f, s, 0.0f),
                make_float4(0.0f, 0.0f, 0.0f, s)} {}
 
-    constexpr float4x4(float4 c0, float4 c1, float4 c2, float4 c3) noexcept
+    constexpr float4x4(const float4 c0, const float4 c1, const float4 c2, const float4 c3) noexcept
         : cols{c0, c1, c2, c3} {}
 
     constexpr float4x4(float m00, float m01, float m02, float m03,
@@ -65,7 +65,7 @@ struct float4x4 {
     return float3x3{val};
 }
 
-[[nodiscard]] constexpr auto make_float3x3(float3 c0, float3 c1, float3 c2) noexcept {
+[[nodiscard]] constexpr auto make_float3x3(const float3 c0, const float3 c1, const float3 c2) noexcept {
     return float3x3{c0, c1, c2};
 }
 

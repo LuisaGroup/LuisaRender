@@ -61,7 +61,7 @@ struct alignas(detail::vector_alignment<T, N>) Vector : detail::VectorStorage<T,
     [[nodiscard]] T &operator[](Index i) noexcept { return reinterpret_cast<T(&)[N]>(*this)[i]; }
     
     template<typename Index>
-    [[nodiscard]] T operator[](Index i) const noexcept { return reinterpret_cast<const T(&)[N]>(*this)[i]; }
+    [[nodiscard]] constexpr T operator[](Index i) const noexcept { return reinterpret_cast<const T(&)[N]>(*this)[i]; }
 
 #define MAKE_ASSIGN_OP(op)                           \
     Vector &operator op(Vector<T, N> rhs) noexcept { \
