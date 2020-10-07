@@ -90,6 +90,19 @@ public:
     void encode_data(DataBlock *blocks) { _encode_data(blocks); }
 };
 
+namespace detail {
+
+template<typename T, typename = void>
+struct IsEmissiveImpl : std::false_type {};
+
+template<typename T>
+struct IsEmissiveImpl<T, std::void_t<decltype(T::emission)>> : std::true_type {};
+
+}
+
+template<typename T>
+constexpr auto is_emissive_v = detail::IsEmissiveImpl<T>::value;
+
 template<typename Impl>
 class Surface : public SurfaceShader {
     
@@ -103,13 +116,13 @@ class Surface : public SurfaceShader {
         return _emission_impl(static_cast<const Impl *>(this), uv, n, wo, data_ref);
     }
     
-    template<typename I, std::enable_if_t<I::is_emissive, int> = 0>
+    template<typename I, std::enable_if_t<is_emissive_v<I>, int> = 0>
     [[nodiscard]] static Expr<Emission> _emission_impl(const I *, Expr<float2> uv, Expr<float3> n, Expr<float3> wo, Expr<DataBlock> data_ref) {
         Var data = compute::dsl::reinterpret<typename I::Data>(data_ref);
         return I::emission(uv, n, wo, data);
     }
     
-    template<typename I, std::enable_if_t<!I::is_emissive, int> = 0>
+    template<typename I, std::enable_if_t<!is_emissive_v<I>, int> = 0>
     [[noreturn]] static Expr<Emission> _emission_impl(const I *, Expr<float2>, Expr<float3>, Expr<float3>, Expr<DataBlock>) {
         LUISA_EXCEPTION("Invalid emission evaluation on non-emissive surface shader.");
     }
@@ -119,7 +132,7 @@ class Surface : public SurfaceShader {
     }
     
     [[nodiscard]] bool _is_emissive() const noexcept final {
-        return Impl::is_emissive;
+        return is_emissive_v<Impl>;
     }
     
     [[nodiscard]] uint _type_uid() const noexcept final {

@@ -29,7 +29,6 @@ class LambertReflection : public Surface<LambertReflection> {
 
 public:
     using Data = LambertData;
-    static constexpr auto is_emissive = false;
 
 private:
     Data _data;
@@ -77,7 +76,6 @@ class LambertEmission : public Surface<LambertEmission> {
 
 public:
     using Data = LambertData;
-    static constexpr auto is_emissive = true;
 
 private:
     Data _data;

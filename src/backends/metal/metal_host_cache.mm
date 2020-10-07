@@ -30,7 +30,7 @@ void MetalHostCache::recycle(id<MTLBuffer> cache) noexcept {
 }
 
 void MetalHostCache::clear() noexcept {
-    std::unique_lock lock{_cache_mutex};
+    std::lock_guard lock{_cache_mutex};
     _available_caches.clear();
     _allocated_caches.clear();
 }

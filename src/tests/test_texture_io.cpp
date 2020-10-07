@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
     
     auto ldr_texture = device->allocate_texture<uchar4>(width, height);
     
-    auto kernel = device->compile_kernel([&] {
+    auto kernel = device->compile_kernel("simple_test", [&] {
         auto txy = thread_xy();
         auto image_size = make_uint2(width, height);
         If (all(txy < image_size)) {

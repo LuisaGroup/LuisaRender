@@ -43,7 +43,6 @@ public:
     
     [[nodiscard]] float radius() const noexcept { return _radius; }
     
-    // (position, weight)
     [[nodiscard]] Expr<FilterSample> importance_sample_pixel_position(Var<uint2> p, Var<float2> u) {
         return _importance_sample_pixel_position(p, u);
     }
