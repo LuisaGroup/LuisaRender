@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include <optional>
 #include <render/data_block.h>
 
 namespace luisa::render {

@@ -8,7 +8,11 @@ Transform a2 : TRS {
   translation { 0.1, 0.0, 0.0 }
 }
 
-Shape cow_ref : WavefrontObj {
+Material material : Lambert {
+  albedo { 1.0, 1.0, 1.0 }
+}
+
+Shape cow_ref : Mesh {
   path { "../meshes/cow/cow.obj" }
   transform : TRS {
     scaling { 0.7 }
@@ -39,6 +43,11 @@ Shape another_cow : Instance {
   }
 }
 
+Shape all : Group {
+  children { @cow, @cows, @another_cow }
+  material { @material }
+}
+
 Film film : RGB {
   resolution { 1200, 800 }
 }
@@ -56,5 +65,5 @@ task : SingleShot {
   }
   shutter_span { 0.45, 0.55 }
   camera { @camera }
-  shapes { @cow, @cows, @another_cow }
+  shapes { @all }
 }
