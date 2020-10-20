@@ -3,85 +3,80 @@
 //
 
 #include <thread>
-#include <compute/dsl_syntax.h>
+#include <vector>
+#include <chrono>
+#include <iostream>
+#include <fstream>
+#include <array>
+#include <sstream>
 
-namespace detail {
+static constexpr auto digit_count = 12u;
 
-template<uint32_t N>
-struct FactorialImpl {
-    static constexpr auto value = N * FactorialImpl<N - 1u>::value;
-};
-
-template<>
-struct FactorialImpl<0u> {
-    static constexpr auto value = 1u;
-};
-
+constexpr auto factorial(uint32_t n) noexcept {
+    auto x = 1u;
+    for (auto i = 1u; i <= n; i++) { x *= i; }
+    return x;
 }
 
-template<uint32_t N>
-constexpr auto factorial = detail::FactorialImpl<N>::value;
-
-using namespace luisa;
-using namespace luisa::compute;
-using namespace luisa::compute::dsl;
+struct alignas((digit_count + 7u) / 8u * 8u) Permutation {
+    std::array<uint8_t, digit_count> data{};
+    constexpr Permutation() noexcept {
+        for (auto i = 0u; i < digit_count; i++) {
+            data[i] = i + 1u;
+        }
+    }
+};
 
 int main() {
     
-    static constexpr std::array<uint32_t, 12u> factorial_table{
-        factorial<0>,
-        factorial<1>,
-        factorial<2>,
-        factorial<3>,
-        factorial<4>,
-        factorial<5>,
-        factorial<6>,
-        factorial<7>,
-        factorial<8>,
-        factorial<9>,
-        factorial<10>,
-        factorial<11>};
+    std::array<uint32_t, digit_count> factorial_table{};
+    for (auto i = 0u; i < digit_count; i++) { factorial_table[i] = factorial(i); }
     
-    using Permutation = std::array<uint8_t, 12>;
-    static constexpr auto count = factorial<12u>;
+    auto count = factorial(digit_count);
     
-    std::vector<Permutation> perms;
-    perms.resize(count);
-
-//    auto thread_count = std::thread::hardware_concurrency();
-    auto thread_count = 8u;
-    std::vector<std::thread> workers(thread_count);
+    std::vector<Permutation> perms(count);
     
-    std::cout << "Using my algorithm..." << std::endl;
+    auto worker_count = std::thread::hardware_concurrency();
+    std::vector<std::thread> workers;
+    workers.reserve(worker_count);
     
+    std::cout << "Using our algorithm..." << std::endl;
     auto t0 = std::chrono::high_resolution_clock::now();
-    for (auto tid = 0u; tid < thread_count; tid++) {
+    for (auto tid = 0u; tid < worker_count; tid++) {
         
-        workers[tid] = std::thread{[tid, thread_count, &perms, t0] {
+        workers.emplace_back([tid, worker_count, &perms, t0, count, factorial_table] {
             
-            constexpr auto block_size = 128u;
-            for (auto ii = tid * block_size; ii < count; ii += thread_count * block_size) {
-                for (auto i = ii; i < std::min(ii + block_size, count); i++) {
-                    
-                    auto &&p = perms[i];
-                    uint32_t used = 0u;
-                    auto index = i;
+            constexpr auto block_size = 1024u;
+            for (auto i = tid * block_size; i < count; i += worker_count * block_size) {
+                
+                Permutation p;
+                uint32_t used = 0u;
+                auto index = i;
 
 #pragma unroll
-                    for (auto j = 11; j >= 0; j--) {
-                        auto factorial_j = factorial_table[j];
-                        auto right_smaller_count = index / factorial_j;
-                        index %= factorial_j;
-                        auto empty_count = 0u;
+                for (auto j = 0u; j < digit_count; j++) {
+                    auto factorial_j = factorial_table[digit_count - 1u - j];
+                    auto right_smaller_count = index / factorial_j;
+                    index %= factorial_j;
+                    auto empty_count = 0u;
+
 #pragma unroll
-                        for (auto slot = 0u; slot < 12u; slot++) {
-                            auto mask = 1u << slot;
-                            if ((used & mask) == 0u && empty_count++ == right_smaller_count) {
-                                p[11 - j] = slot + 1u;
-                                used |= mask;
-                                break;
-                            }
+                    for (auto slot = 0u; slot < digit_count; slot++) {
+                        auto mask = 1u << slot;
+                        if ((used & mask) == 0u && empty_count++ == right_smaller_count) {
+                            p.data[j] = slot + 1u;
+                            used |= mask;
+                            break;
                         }
+                    }
+                }
+                
+                for (auto j = 0; j < block_size; j++) {
+                    if (auto jj = i + j; jj < count) {
+                        perms[jj] = p;
+                        std::next_permutation(p.data.begin(), p.data.end());
+                    } else {
+                        break;
                     }
                 }
             }
@@ -89,32 +84,31 @@ int main() {
             auto t1 = std::chrono::high_resolution_clock::now();
             
             using namespace std::chrono_literals;
-            std::cout << serialize("Thread #", tid, ": ", (t1 - t0) / 1ns * 1e-9, "s\n");
-        }};
+            std::ostringstream os;
+            os << "Thread #" << tid << ": " << (t1 - t0) / 1ns * 1e-9 << "s\n";
+            std::cout << os.str();
+        });
     }
     for (auto &&worker : workers) { worker.join(); }
-    auto t1 = std::chrono::high_resolution_clock::now();
-    
     using namespace std::chrono_literals;
+    
+    auto t1 = std::chrono::high_resolution_clock::now();
     std::cout << (t1 - t0) / 1ns * 1e-9 << "s" << std::endl;
     
-    for (auto i = 0u; i < 10u; i++) {
-        for (auto x : perms[i]) {
-            std::cout << static_cast<uint32_t>(x) << " ";
-        }
-        std::cout << "\n";
+    std::cout << "Checking... ";
+    Permutation p;
+    for (auto i = 0u; i < count; i++) {
+        if (perms[i].data != p.data) { exit(-1); }
+        std::next_permutation(p.data.begin(), p.data.end());
     }
-    
-    std::ofstream file{"test.bin", std::ios::binary};
-    file.write(reinterpret_cast<const char *>(perms.data()), perms.size() * sizeof(Permutation));
+    std::cout << "Pass!" << std::endl;
     
     std::cout << "Using std::next_permutation..." << std::endl;
-    Permutation p{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
-    for (auto i = 0u; i < 10u; i++) {
-        for (auto x : p) {
-            std::cout << static_cast<uint32_t>(x) << " ";
-        }
-        std::cout << "\n";
-        std::next_permutation(p.begin(), p.end());
+    t0 = std::chrono::high_resolution_clock::now();
+    for (auto i = 0u; i < count; i++) {
+        perms[i] = p;
+        std::next_permutation(p.data.begin(), p.data.end());
     }
+    t1 = std::chrono::high_resolution_clock::now();
+    std::cout << (t1 - t0) / 1ns * 1e-9 << "s" << std::endl;
 }

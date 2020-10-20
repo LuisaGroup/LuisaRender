@@ -65,6 +65,7 @@ public:
     }
     
     [[nodiscard]] bool empty() const noexcept { return !_kernel.valid(); }
+    void wait_for_compilation() noexcept { _kernel.wait(); }
 };
 
 }
