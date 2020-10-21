@@ -30,13 +30,13 @@ int main(int argc, char *argv[]) {
     using Permutation = std::array<uchar, digit_count>;
     
     constexpr auto count = factorial(digit_count);
-    std::vector<Permutation> perms(count);
+    std::vector<Permutation> perms;
+    perms.resize(count);
     
     auto device = Device::create(&context);
     
     constexpr auto part_size = (1u << 24u);
     constexpr auto thread_count = 1u << 20u;
-    constexpr auto block_size = (part_size + thread_count - 1u) / thread_count;
     constexpr auto perm_buffer_size = digit_count * part_size;  // process at most 2^28 = 256M elements at once
     auto perm_buffer = device->allocate_buffer<Permutation>(perm_buffer_size);
     
@@ -46,27 +46,25 @@ int main(int argc, char *argv[]) {
         Var start = uniform(&u_start);
         Var<Permutation> p;
         
-        for (auto i = 0; i < part_size; i += thread_count) {
+        for (auto i = 0u; i < part_size; i += thread_count) {
             
             Var used = 0u;
-            Var index = start + i;
+            Var index = start + i + thread_id();
             for (auto j = 0u; j < digit_count; j++) {
                 auto factorial_j = factorial_table[digit_count - 1u - j];
                 Var right_smaller_count = index / factorial_j;
                 index %= factorial_j;
-                Var empty_count = 0u;
                 Var slot = 0u;
                 While (slot < digit_count) {
                     auto mask = 1u << slot;
-                    If ((used & mask) == 0u && empty_count + 1 == right_smaller_count) {
+                    If ((used & mask) == 0u && slot + 1 == right_smaller_count) {
                         p[j] = slot + 1u;
                         used |= mask;
                         Break;
                     };
-                    empty_count += 1u;
                     slot += 1u;
                 };
-                perm_buffer[i] = p;
+                perm_buffer[i + thread_id()] = p;
             }
         }
     });
@@ -77,8 +75,16 @@ int main(int argc, char *argv[]) {
     Pipeline pipeline{device.get()};
     for (auto start = 0u; start < count; start += part_size) {
         u_start = start;
-        pipeline << kernel.parallelize(thread_count)
-                 << perm_buffer.copy_to(perms.data() + start);
+        pipeline << kernel.parallelize(thread_count, 1024u)
+                 << perm_buffer.subview(0u, std::min(part_size, count - start)).copy_to(perms.data() + start)
+                 << [start] { LUISA_INFO("Part: [", start, ", ", start + part_size, ")"); };
     }
     pipeline << synchronize();
+    
+    for (auto i = 0u; i < 10u; i++) {
+        for (auto x : perms[i]) {
+            std::cout << static_cast<uint>(x) << " ";
+        }
+        std::cout << "\n";
+    }
 }

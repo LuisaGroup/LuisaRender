@@ -64,7 +64,7 @@ public:
         if (_size == npos) { _size = (_buffer->size() - byte_offset()) / sizeof(T); }
     }
     
-    [[nodiscard]] BufferView subview(size_t offset, size_t size = npos) const noexcept { return {_buffer, _offset + offset, size}; }
+    [[nodiscard]] BufferView subview(size_t offset, size_t size = npos) const noexcept { return BufferView{_buffer, _offset + offset, size}; }
     
     [[nodiscard]] bool empty() const noexcept { return _buffer == nullptr || _size == 0u; }
     [[nodiscard]] Buffer *buffer() const noexcept { return _buffer.get(); }
