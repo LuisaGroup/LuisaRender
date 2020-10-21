@@ -51,7 +51,7 @@ constexpr auto factorial(uint32_t n) noexcept {
     return x;
 }
 
-int main() {
+int main(int argc, char *argv[]) {
     
     std::array<uint32_t, digit_count> factorial_table{};
     for (auto i = 0u; i < digit_count; i++) { factorial_table[i] = factorial(i); }
@@ -60,7 +60,9 @@ int main() {
     
     std::vector<Permutation<digit_count>> perms(count);
     
-    auto worker_count = std::thread::hardware_concurrency();
+    std::istringstream is{argv[1]};
+    auto worker_count = 8u;
+    is >> worker_count;
     std::vector<std::thread> workers;
     workers.reserve(worker_count);
     
