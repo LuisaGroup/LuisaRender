@@ -3,11 +3,14 @@
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/src/ext/OpenCL-CLHPP" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/ext/OpenCL-CLHPP/external/CMock" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/ext/OpenCL-CLHPP/external/Unity" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/src/ext/assimp" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/src/ext/cxxopts" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/src/ext/jitify" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/src/ext/spdlog" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/src/ext/stb" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/src/ext/tinyexr" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/ext/tinyexr/deps/ZFP" vcs="Git" />
   </component>
 </project>

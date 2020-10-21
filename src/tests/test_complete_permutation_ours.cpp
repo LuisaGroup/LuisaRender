@@ -8,22 +8,23 @@
 #include <iostream>
 #include <array>
 #include <sstream>
+#include <algorithm>
 
 static constexpr auto digit_count = 12u;
 
 template<int len>
 struct Permutation {
     
-    std::vector<uint8_t> data;
+    std::array<uint8_t, len> data;
     
     Permutation() {
-        data.resize(len);
         for (int i = 0; i < len; i++) {
             data[i] = i + 1;
         }
     }
     
     void get_next_permutation_dic_ord() {
+#pragma unroll
         for (int i = len - 1; i >= 1; i--)//从后往前遍历
         {
             if (data[i] > data[i - 1])//一旦遇到下降的地方

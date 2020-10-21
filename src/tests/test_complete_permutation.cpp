@@ -2,6 +2,7 @@
 // Created by Mike Smith on 2020/10/19.
 //
 
+#include <algorithm>
 #include <thread>
 #include <vector>
 #include <chrono>
