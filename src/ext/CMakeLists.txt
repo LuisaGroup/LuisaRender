@@ -1,7 +1,7 @@
 set(SPDLOG_BUILD_SHARED ON CACHE BOOL "" FORCE)
 add_subdirectory(spdlog)
 add_library(spdlog_config INTERFACE)
-target_link_libraries(spdlog_config INTERFACE spdlog::spdlog)
+target_link_libraries(spdlog_config INTERFACE spdlog::spdlog_header_only)
 
 add_library(jitify_config INTERFACE)
 target_include_directories(jitify_config INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})

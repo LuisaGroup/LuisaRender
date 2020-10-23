@@ -12,10 +12,10 @@ set_target_properties(luisa-core PROPERTIES
                       RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>/bin/"
                       WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
-add_custom_command(TARGET luisa-core PRE_BUILD COMMAND ${CMAKE_COMMAND} -E make_directory
+add_custom_command(TARGET luisa-core POST_BUILD COMMAND ${CMAKE_COMMAND} -E make_directory
                    "${CMAKE_BINARY_DIR}/$<CONFIG>/include/core/")
-add_custom_command(TARGET luisa-core PRE_BUILD COMMAND ${CMAKE_COMMAND} -E copy
+add_custom_command(TARGET luisa-core POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy
                    ${HEADER_FILES} "${CMAKE_BINARY_DIR}/$<CONFIG>/include/core/"
-                   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+                   WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 
 add_library(luisa::core ALIAS luisa-core)
