@@ -2,7 +2,7 @@ file(GLOB HEADER_FILES *.h)
 file(GLOB SOURCE_FILES *.cpp)
 
 add_library(luisa-compute SHARED ${HEADER_FILES} ${SOURCE_FILES})
-target_link_libraries(luisa-compute PUBLIC luisa-core tinyexr_config stb_config)
+target_link_libraries(luisa-compute PUBLIC mimalloc_config luisa-core tinyexr_config stb_config)
 
 set_target_properties(luisa-compute PROPERTIES
                       PUBLIC_HEADER "${HEADER_FILES}"

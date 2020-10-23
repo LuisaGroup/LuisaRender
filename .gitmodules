@@ -19,3 +19,6 @@
 [submodule "src/ext/OpenCL-CLHPP"]
 	path = src/ext/OpenCL-CLHPP
 	url = https://github.com/KhronosGroup/OpenCL-CLHPP.git
+[submodule "src/ext/mimalloc"]
+	path = src/ext/mimalloc
+	url = https://github.com/microsoft/mimalloc.git

@@ -14,7 +14,7 @@ add_library(luisa-plugins INTERFACE)
 function(luisa_render_add_plugin name)
     cmake_parse_arguments(PLUGIN "" "CATEGORY" "SOURCES" ${ARGN})
     add_library(luisa-${PLUGIN_CATEGORY}-${name} MODULE ${PLUGIN_SOURCES})
-    target_link_libraries(luisa-${PLUGIN_CATEGORY}-${name} PRIVATE luisa-render)
+    target_link_libraries(luisa-${PLUGIN_CATEGORY}-${name} PRIVATE mimalloc_config luisa-render)
     add_dependencies(luisa-plugins luisa-${PLUGIN_CATEGORY}-${name})
     set_target_properties(luisa-${PLUGIN_CATEGORY}-${name} PROPERTIES
                           LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>/bin/plugins/"
@@ -41,7 +41,7 @@ function(luisa_render_add_application name)
     cmake_parse_arguments(APP "" "" "SOURCES" ${ARGN})
     add_executable(${name} ${APP_SOURCES})
     target_compile_features(${name} PRIVATE c_std_11 cxx_std_17)
-    target_link_libraries(${name} PRIVATE luisa-all)
+    target_link_libraries(${name} PRIVATE mimalloc_config luisa-all)
     set_target_properties(${name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>/bin/")
 endfunction()
 
