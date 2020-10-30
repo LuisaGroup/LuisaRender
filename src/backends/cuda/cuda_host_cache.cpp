@@ -10,7 +10,7 @@
 namespace luisa::cuda {
 
 void *CudaHostCache::obtain() noexcept {
-    std::lock_guard lock{_mutex};
+    std::scoped_lock lock{_mutex};
     void *cache = nullptr;
     if (_available_caches.empty()) {
         CUDA_CHECK(cuMemHostAlloc(&cache, _size, 0));
@@ -26,13 +26,13 @@ CudaHostCache::CudaHostCache(size_t size) noexcept
     : _size{size} {}
 
 void CudaHostCache::recycle(void *cache) noexcept {
-    std::lock_guard lock{_mutex};
+    std::scoped_lock lock{_mutex};
     LUISA_EXCEPTION_IF(_allocated_caches.find(cache) == _allocated_caches.end(), "Recycled cache is not allocated by CudaHostCache.");
     _available_caches.emplace_back(cache);
 }
 
 void CudaHostCache::clear() noexcept {
-    std::lock_guard lock{_mutex};
+    std::scoped_lock lock{_mutex};
     for (auto p : _allocated_caches) {
         CUDA_CHECK(cuMemFreeHost(p));
     }

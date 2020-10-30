@@ -77,7 +77,7 @@ std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) {
     CUfunction kernel = nullptr;
     
     {
-        std::lock_guard lock{_kernel_cache_mutex};
+        std::scoped_lock lock{_kernel_cache_mutex};
         if (auto iter = _kernel_cache.find(digest); iter != _kernel_cache.cend()) {
             kernel = iter->second;
         }
@@ -103,7 +103,7 @@ std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) {
             // release context
             cuDevicePrimaryCtxRelease(_handle);
             
-            std::lock_guard lock{_kernel_cache_mutex};
+            std::scoped_lock lock{_kernel_cache_mutex};
             _modules.emplace_back(module);
             _kernel_cache.emplace(digest, kernel);
         } else {
@@ -172,7 +172,7 @@ std::shared_ptr<Kernel> CudaDevice::_compile_kernel(const Function &function) {
             // release context
             cuDevicePrimaryCtxRelease(_handle);
             
-            std::lock_guard lock{_kernel_cache_mutex};
+            std::scoped_lock lock{_kernel_cache_mutex};
             if (!std::filesystem::exists(cache_file_path)) {
                 std::ofstream ptx_file{cache_file_path};
                 ptx_file << ptx;
@@ -228,7 +228,7 @@ void CudaDevice::_launch(const std::function<void(Dispatcher &)> &work) {
     (*dispatcher)(work);
     dispatcher->commit();
     {
-        std::lock_guard lock{_dispatch_mutex};
+        std::scoped_lock lock{_dispatch_mutex};
         _dispatch_queue.push(std::move(dispatcher));
     }
     _dispatch_cv.notify_one();

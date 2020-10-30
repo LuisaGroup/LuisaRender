@@ -91,7 +91,7 @@ std::shared_ptr<Kernel> MetalDevice::_compile_kernel(const compute::dsl::Functio
     id<MTLComputePipelineState> pso = nullptr;
     
     {
-        std::lock_guard lock{_kernel_cache_mutex};
+        std::scoped_lock lock{_kernel_cache_mutex};
         if (auto iter = _kernel_cache.find(digest); iter != _kernel_cache.cend()) { pso = iter->second; }
     }
     
@@ -118,7 +118,7 @@ std::shared_ptr<Kernel> MetalDevice::_compile_kernel(const compute::dsl::Functio
         }
         
         {
-            std::lock_guard lock{_kernel_cache_mutex};
+            std::scoped_lock lock{_kernel_cache_mutex};
             _kernel_cache.emplace(digest, pso);
         }
         
