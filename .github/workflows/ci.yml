@@ -24,4 +24,4 @@ jobs:
           cmake --build .
       - name: "Run Tests"
         run: |
-          build/bin/LuisaRender data/scenes/fake_cornell_box.luisa
+          ./build/bin/LuisaRender data/scenes/fake_cornell_box.luisa
