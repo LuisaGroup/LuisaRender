@@ -1,13 +1,13 @@
-set(MI_OSX_ZONE ON CACHE BOOL "" FORCE)
-set(MI_BUILD_STATIC OFF CACHE BOOL "" FORCE)
-set(MI_BUILD_OBJECT OFF CACHE BOOL "" FORCE)
-add_subdirectory(mimalloc)
-set_target_properties(mimalloc PROPERTIES
-                      LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>/bin/"
-                      RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>/bin/"
-                      WINDOWS_EXPORT_ALL_SYMBOLS ON)
+# set(MI_OSX_ZONE ON CACHE BOOL "" FORCE)
+# set(MI_BUILD_STATIC OFF CACHE BOOL "" FORCE)
+# set(MI_BUILD_OBJECT OFF CACHE BOOL "" FORCE)
+# add_subdirectory(mimalloc)
+# set_target_properties(mimalloc PROPERTIES
+#                       LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>/bin/"
+#                       RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>/bin/"
+#                       WINDOWS_EXPORT_ALL_SYMBOLS ON)
 add_library(mimalloc_config INTERFACE)
-target_link_libraries(mimalloc_config INTERFACE mimalloc)
+# target_link_libraries(mimalloc_config INTERFACE mimalloc)
 
 set(SPDLOG_BUILD_SHARED ON CACHE BOOL "" FORCE)
 add_subdirectory(spdlog)
