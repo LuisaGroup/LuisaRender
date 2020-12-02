@@ -2,6 +2,10 @@ name: CI
 
 on: [push, pull_request]
 
+defaults:
+  run:
+    working-directory: '.'
+
 jobs:
   build-macos:
     runs-on: macos-latest
