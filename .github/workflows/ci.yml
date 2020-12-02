@@ -18,3 +18,6 @@ jobs:
           rm -rf build && mkdir build && cd build
           cmake .. -G Ninja -D CMAKE_BUILD_TYPE=Release
           cmake --build .
+      - name: "Run Tests"
+        run: |
+          build/bin/LuisaRender data/scenes/fake_cornell_box.luisa
