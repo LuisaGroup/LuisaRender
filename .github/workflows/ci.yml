@@ -17,9 +17,8 @@ jobs:
       - name: "Install Dependencies"
         run: |
           brew install cmake ninja
-      - name: "Build and Run"
+      - name: "Configure and Build"
         run: |
           rm -rf build && mkdir build && cd build
           cmake .. -G Ninja -D CMAKE_BUILD_TYPE=Release
           cmake --build .
-          ./Release/bin/LuisaRender ../data/scenes/fake_cornell_box.luisa
