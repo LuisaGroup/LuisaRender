@@ -1,0 +1,20 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: "Pull Submodules"
+        run: |
+          git submodule update --init --recursive
+      - name: "Install Dependencies"
+        run: |
+          brew install cmake ninja openimageio fmt spdlog assimp
+      - name: "Configure and Build"
+        run: |
+          rm -rf build && mkdir build && cd build
+          cmake .. -G Ninja -D CMAKE_BUILD_TYPE=Release
+          cmake --build .
