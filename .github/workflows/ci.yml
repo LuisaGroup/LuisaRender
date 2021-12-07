@@ -1,0 +1,66 @@
+name: build
+
+on: [ push, pull_request ]
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - name: "Install Dependencies"
+        run: |
+          sudo apt-get purge --auto-remove cmake
+          wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | sudo tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null
+          sudo apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main'
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+          sudo apt-get update
+          sudo apt-get -y install cmake
+          sudo apt-get -y install gcc-11 g++-11 build-essential ninja-build git file libopencv-dev uuid-dev libglfw3-dev libxinerama-dev libxcursor-dev libxi-dev
+          sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+      #      - name: "Setup CUDA"
+      #        uses: Jimver/cuda-toolkit@v0.2.4
+      #        with:
+      #          cuda: "11.4.0"
+      #          linux-local-args: '["--toolkit"]'
+      - name: "Configure and Build"
+        run: |
+          cmake -S . -B build -G Ninja -D CMAKE_BUILD_TYPE=Release -D CMAKE_C_COMPILER=gcc-11 -D CMAKE_CXX_COMPILER=g++-11 -D LUISA_COMPUTE_ENABLE_LLVM=OFF -D LUISA_COMPUTE_ENABLE_ISPC=ON
+          cmake --build build
+
+  #  build-macos:
+  #    runs-on: macos-latest
+  #    steps:
+  #      - uses: actions/checkout@v2
+  #        with:
+  #          submodules: recursive
+  #      - name: "Install Dependencies"
+  #        run: |
+  #          brew install cmake ninja opencv llvm sccache
+  #      - name: "Configure and Build"
+  #        run: |
+  #          export PATH=$PATH:/usr/local/opt/llvm/bin
+  #          cmake -S . -B build -G Ninja -D CMAKE_BUILD_TYPE=Release -D CMAKE_C_COMPILER=/usr/local/opt/llvm/bin/clang -D CMAKE_CXX_COMPILER=/usr/local/opt/llvm/bin/clang++ -D LUISA_COMPUTE_ENABLE_LLVM=OFF
+  #          cmake --build build
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      #      - name: "Setup CUDA"
+      #        uses: Jimver/cuda-toolkit@v0.2.4
+      #        with:
+      #          cuda: "11.4.0"
+      - name: "Setup Ninja"
+        uses: ashutoshvarma/setup-ninja@master
+        with:
+          version: 1.10.2
+      - name: "Configure and Build"
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          cmake -S . -G Ninja -B build -D CMAKE_BUILD_TYPE=Release -D CMAKE_C_COMPILER:FILEPATH=cl.exe -D CMAKE_CXX_COMPILER:FILEPATH=cl.exe -D LUISA_COMPUTE_ENABLE_DX=OFF
+          cmake --build build
