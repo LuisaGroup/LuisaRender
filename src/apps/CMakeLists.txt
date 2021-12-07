@@ -4,4 +4,4 @@ function(luisa_render_add_application name)
     target_link_libraries(${name} PRIVATE luisa::render)
 endfunction()
 
-luisa_render_add_application(test_cli SOURCES cli.cpp)
+luisa_render_add_application(megakernel_path_tracing SOURCES megakernel_path_tracing.cpp)
