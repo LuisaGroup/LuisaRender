@@ -1,0 +1,3 @@
+[submodule "src/compute"]
+	path = src/compute
+	url = https://github.com/Mike-Leo-Smith/LuisaCompute.git
