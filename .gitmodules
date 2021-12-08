@@ -4,3 +4,6 @@
 [submodule "src/ext/cxxopts"]
 	path = src/ext/cxxopts
 	url = https://github.com/jarro2783/cxxopts.git
+[submodule "src/ext/assimp"]
+	path = src/ext/assimp
+	url = https://github.com/assimp/assimp.git

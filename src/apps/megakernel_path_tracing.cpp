@@ -3,9 +3,7 @@
 //
 
 #include <cxxopts.hpp>
-
-#include <runtime/device.h>
-#include <runtime/context.h>
+#include <luisa-compute.h>
 
 [[nodiscard]] auto parse_cli_options(int argc, const char *const *argv) noexcept {
     cxxopts::Options cli{"Mega-Kernel Path Tracing"};
@@ -39,7 +37,5 @@ int main(int argc, char *argv[]) {
     auto backend = options["backend"].as<std::string>();
     auto index = options["device"].as<uint32_t>();
 
-    auto device = context.create_device("cuda", {{backend, index}});
-
-
+    auto device = context.create_device(backend, {{"index", index}});
 }

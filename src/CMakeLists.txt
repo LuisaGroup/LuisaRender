@@ -24,12 +24,13 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
 endif ()
 
 add_subdirectory(compute)
+add_subdirectory(base)
 
 add_library(luisa-render INTERFACE)
 target_link_libraries(luisa-render INTERFACE
         luisa-render-ext
         luisa-render-include
-        luisa::compute)
+        luisa-render-base)
 add_library(luisa::render ALIAS luisa-render)
 
 add_subdirectory(apps)
