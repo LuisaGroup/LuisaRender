@@ -32,6 +32,9 @@ namespace detail {
         case Scene::Node::Tag::SAMPLER: return "sampler"sv;
         case Scene::Node::Tag::INTEGRATOR: return "integrator"sv;
     }
+    LUISA_ERROR_WITH_LOCATION(
+        "Known scene node tag: 0x{:x}.",
+        to_underlying(tag));
 }
 
 }// namespace detail

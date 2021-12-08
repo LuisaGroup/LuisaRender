@@ -25,8 +25,8 @@ private:
 
 public:
     Sampler() noexcept : Scene::Node{Scene::Node::Tag::SAMPLER} {}
-    auto &set_resolution(uint2 r) noexcept;
-    auto &set_sample_count(uint spp) noexcept;
+    Sampler &set_resolution(uint2 r) noexcept;
+    Sampler &set_sample_count(uint spp) noexcept;
     [[nodiscard]] auto resolution() const noexcept { return _resolution; }
     [[nodiscard]] auto sample_count() const noexcept { return _sample_count; }
     virtual void start(Expr<uint2> pixel, Expr<uint> sample_index) noexcept = 0;
