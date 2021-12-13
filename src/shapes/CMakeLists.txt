@@ -1,0 +1,1 @@
+add_library(luisa-render-shapes INTERFACE)

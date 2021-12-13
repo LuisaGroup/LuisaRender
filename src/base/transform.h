@@ -5,14 +5,14 @@
 #pragma once
 
 #include <core/basic_types.h>
-#include <base/scene.h>
+#include <base/scene_node.h>
 
 namespace luisa::render {
 
-class Transform : public Scene::Node {
+class Transform : public SceneNode {
 
 public:
-    Transform() noexcept : Scene::Node{Scene::Node::Tag::TRANSFORM} {}
+    Transform() noexcept : SceneNode{SceneNode::Tag::TRANSFORM} {}
     [[nodiscard]] virtual bool is_static() const noexcept = 0;
     [[nodiscard]] virtual float4x4 matrix(float time) const noexcept = 0;
 };

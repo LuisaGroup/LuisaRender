@@ -3,7 +3,7 @@ add_library(luisa-render-ext INTERFACE)
 add_subdirectory(cxxopts)
 target_link_libraries(luisa-render-ext INTERFACE cxxopts::cxxopts)
 
-find_package(assimp CONFIG REQUIRED)
+find_package(assimp CONFIG)
 if (NOT assimp_FOUND)
     set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
     set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)

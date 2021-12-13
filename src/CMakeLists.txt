@@ -25,12 +25,28 @@ endif ()
 
 add_subdirectory(compute)
 add_subdirectory(base)
+add_subdirectory(cameras)
+add_subdirectory(films)
+add_subdirectory(filters)
+add_subdirectory(integrators)
+add_subdirectory(materials)
+add_subdirectory(samplers)
+add_subdirectory(shapes)
+add_subdirectory(transforms)
 
 add_library(luisa-render INTERFACE)
 target_link_libraries(luisa-render INTERFACE
         luisa-render-ext
         luisa-render-include
-        luisa-render-base)
+        luisa-render-base
+        luisa-render-cameras
+        luisa-render-films
+        luisa-render-filters
+        luisa-render-integrators
+        luisa-render-materials
+        luisa-render-samplers
+        luisa-render-shapes
+        luisa-render-transforms)
 add_library(luisa::render ALIAS luisa-render)
 
 add_subdirectory(apps)
