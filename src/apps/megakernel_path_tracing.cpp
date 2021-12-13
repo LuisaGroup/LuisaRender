@@ -142,6 +142,7 @@ int main(int argc, char *argv[]) {
     auto root = scene.define_root();
     root->add_property("integrator", integrator);
     root->add_property("camera", camera);
+    scene.validate();
 
     std::ostringstream os;
     dump(os, scene);

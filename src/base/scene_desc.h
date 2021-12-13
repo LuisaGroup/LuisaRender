@@ -48,6 +48,7 @@ public:
     void declare(std::string_view identifier, SceneNode::Tag tag) noexcept;
     [[nodiscard]] SceneDescNode *define(std::string_view identifier, SceneNode::Tag tag, std::string_view impl_type) noexcept;
     [[nodiscard]] SceneDescNode *define_root() noexcept;
+    void validate() const noexcept;
 };
 
 }// namespace luisa::render

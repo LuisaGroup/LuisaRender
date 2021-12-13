@@ -92,4 +92,31 @@ SceneDescNode *SceneDesc::define_root() noexcept {
     return &_root;
 }
 
+namespace detail {
+
+static void validate(const SceneDescNode *node, size_t depth) noexcept {
+    if (depth > 32u) [[unlikely]] {
+        LUISA_ERROR_WITH_LOCATION(
+            "Scene description is too deep. "
+            "Recursions in definitions?");
+    }
+    if (!node->is_defined()) [[unlikely]] {
+        LUISA_ERROR_WITH_LOCATION(
+            "Node '{}' is referenced but not defined "
+            "in the scene description.",
+            node->identifier());
+    }
+    for (auto &&[prop, values] : node->properties()) {
+        if (auto nodes = std::get_if<SceneDescNode::node_list>(&values)) {
+            for (auto n : *nodes) { validate(n, depth + 1u); }
+        }
+    }
+}
+
+}
+
+void SceneDesc::validate() const noexcept {
+    detail::validate(&_root, 0u);
+}
+
 }// namespace luisa::render
