@@ -11,7 +11,7 @@ namespace luisa::render {
 namespace detail {
 
 [[nodiscard]] static auto &scene_plugin_registry() noexcept {
-    static luisa::unordered_map<luisa::string, luisa::unique_ptr<DynamicModule>> registry;
+    static luisa::unordered_map<luisa::string, luisa::unique_ptr<DynamicModule>, Hash64> registry;
     return registry;
 }
 
