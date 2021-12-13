@@ -7,35 +7,41 @@
 namespace luisa::render {
 
 const SceneDescNode *SceneDesc::node(std::string_view identifier) const noexcept {
-    auto iter = _global_nodes.find(identifier);
-    return iter != _global_nodes.cend() ? nullptr : iter->get();
+    if (auto iter = _global_nodes.find(identifier);
+        iter != _global_nodes.cend()) {
+        return iter->get();
+    }
+    LUISA_ERROR_WITH_LOCATION(
+        "Global node '{}' not found "
+        "in scene description.",
+        identifier);
 }
 
 void SceneDesc::declare(std::string_view identifier, SceneNode::Tag tag) noexcept {
     if (tag == SceneNode::Tag::INTERNAL) [[unlikely]] {
-        LUISA_WARNING_WITH_LOCATION(
-            "Ignoring forward declaration of "
+        LUISA_ERROR_WITH_LOCATION(
+            "Invalid forward declaration of "
             "internal node '{}'.",
             identifier);
-    } else if (identifier == root_node_identifier ||
-               tag == SceneNode::Tag::ROOT) [[unlikely]] {
-        LUISA_WARNING_WITH_LOCATION(
-            "Ignoring forward declaration of root node");
-    } else {
-        auto [iter, first_decl] = _global_nodes.emplace(
-            lazy_construct([identifier, tag] {
-                return luisa::make_unique<SceneDescNode>(
-                    identifier, tag, std::string_view{});
-            }));
-        if (auto node = iter->get();
-            !first_decl && node->tag() != tag) [[unlikely]] {
-            LUISA_ERROR_WITH_LOCATION(
-                "Forward-declaration of node '{}' has "
-                "a different tag '{}' from '{}' "
-                "in previous declarations.",
-                identifier, SceneNode::tag_description(tag),
-                SceneNode::tag_description(node->tag()));
-        }
+    }
+    if (identifier == root_node_identifier ||
+        tag == SceneNode::Tag::ROOT) [[unlikely]] {
+        LUISA_ERROR_WITH_LOCATION(
+            "Invalid forward declaration of root node");
+    }
+    auto [iter, first_decl] = _global_nodes.emplace(
+        lazy_construct([identifier, tag] {
+            return luisa::make_unique<SceneDescNode>(
+                identifier, tag, std::string_view{});
+        }));
+    if (auto node = iter->get();
+        !first_decl && node->tag() != tag) [[unlikely]] {
+        LUISA_ERROR_WITH_LOCATION(
+            "Forward-declaration of node '{}' has "
+            "a different tag '{}' from '{}' "
+            "in previous declarations.",
+            identifier, SceneNode::tag_description(tag),
+            SceneNode::tag_description(node->tag()));
     }
 }
 

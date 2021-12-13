@@ -41,6 +41,8 @@ public:
     explicit SceneDesc(std::filesystem::path base_folder) noexcept
         : _base_folder{std::move(base_folder)},
           _root{root_node_identifier, SceneNode::Tag::ROOT, {}} {}
+    [[nodiscard]] auto &base_directory() const noexcept { return _base_folder; }
+    [[nodiscard]] auto &nodes() const noexcept { return _global_nodes; }
     [[nodiscard]] const SceneDescNode *node(std::string_view identifier) const noexcept;
     [[nodiscard]] auto root() const noexcept { return &_root; }
     void declare(std::string_view identifier, SceneNode::Tag tag) noexcept;

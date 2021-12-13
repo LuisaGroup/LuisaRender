@@ -53,19 +53,19 @@ public:
 constexpr std::string_view SceneNode::tag_description(SceneNode::Tag tag) noexcept {
     using namespace std::string_view_literals;
     switch (tag) {
-        case SceneNode::Tag::ROOT: return "root"sv;
-        case SceneNode::Tag::INTERNAL: return "internal"sv;
-        case SceneNode::Tag::CAMERA: return "camera"sv;
-        case SceneNode::Tag::SHAPE: return "shape"sv;
-        case SceneNode::Tag::MATERIAL: return "material"sv;
-        case SceneNode::Tag::TRANSFORM: return "transform"sv;
-        case SceneNode::Tag::FILM: return "film"sv;
-        case SceneNode::Tag::FILTER: return "filter"sv;
-        case SceneNode::Tag::SAMPLER: return "sampler"sv;
-        case SceneNode::Tag::INTEGRATOR: return "integrator"sv;
+        case SceneNode::Tag::ROOT: return "__root__"sv;
+        case SceneNode::Tag::INTERNAL: return "__internal__"sv;
+        case SceneNode::Tag::CAMERA: return "Camera"sv;
+        case SceneNode::Tag::SHAPE: return "Shape"sv;
+        case SceneNode::Tag::MATERIAL: return "Material"sv;
+        case SceneNode::Tag::TRANSFORM: return "Transform"sv;
+        case SceneNode::Tag::FILM: return "Film"sv;
+        case SceneNode::Tag::FILTER: return "Filter"sv;
+        case SceneNode::Tag::SAMPLER: return "Sampler"sv;
+        case SceneNode::Tag::INTEGRATOR: return "Integrator"sv;
         default: break;
     }
-    return "invalid"sv;
+    return "__invalid__"sv;
 }
 
 }// namespace luisa::render

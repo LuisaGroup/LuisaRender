@@ -23,6 +23,7 @@ namespace detail {
 [[nodiscard]] static auto &scene_plugin_load(const std::filesystem::path &runtime_dir, SceneNode::Tag tag, std::string_view impl_type) noexcept {
     std::scoped_lock lock{detail::scene_plugin_registry_mutex()};
     luisa::string name{fmt::format("luisa-render-{}-{}", SceneNode::tag_description(tag), impl_type)};
+    for (auto &c : name) { c = static_cast<char>(std::tolower(c)); }
     auto &&registry = detail::scene_plugin_registry();
     if (auto iter = registry.find(name); iter != registry.end()) {
         return *iter->second;
