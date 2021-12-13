@@ -1,0 +1,33 @@
+#include "../parts.luisa"
+
+Filter filter;
+Sampler sampler;
+
+Camera camera : ThinLens {
+  transform : Identity {}
+  film : RGB {
+    resolution { 1280, 720 }
+  }
+  filter { @filter }
+}
+
+Filter filter : Gaussian {
+  radius { 1.5, 1.5 }
+}
+
+Integrator : Path {
+  sampler { @sampler }
+  max_depth { 10 }
+}
+
+Sampler sampler : Independent {
+  spp { 1024 }
+}
+
+Material white;
+Material red;
+Material green;
+
+Shape tall_box : TriangleMesh {
+  material { @white }
+}
