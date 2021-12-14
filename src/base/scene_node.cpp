@@ -3,12 +3,12 @@
 //
 
 #include <core/logging.h>
-#include <base/scene_desc_node.h>
+#include <base/scene_node_desc.h>
 #include <base/scene_node.h>
 
 namespace luisa::render {
 
-SceneNode::SceneNode(Scene *scene, const SceneDescNode *desc, SceneNode::Tag tag) noexcept
+SceneNode::SceneNode(Scene *scene, const SceneNodeDesc *desc, SceneNode::Tag tag) noexcept
     : _scene{scene}, _tag{tag} {
     if (!desc->is_defined()) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(

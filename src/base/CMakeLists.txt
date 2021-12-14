@@ -6,7 +6,7 @@ set(LUISA_RENDER_BASE_SOURCES
         filter.cpp filter.h
         scene_node.cpp scene_node.h
         scene_desc.cpp scene_desc.h
-        scene_desc_node.cpp scene_desc_node.h
+        scene_node_desc.cpp scene_node_desc.h
         shape.cpp shape.h
         material.cpp material.h
         film.cpp film.h

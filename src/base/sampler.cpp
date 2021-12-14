@@ -16,7 +16,7 @@ Sampler &Sampler::set_sample_count(uint spp) noexcept {
     return *this;
 }
 
-Sampler::Sampler(Scene *scene, const SceneDescNode *desc) noexcept
+Sampler::Sampler(Scene *scene, const SceneNodeDesc *desc) noexcept
     : SceneNode{scene, desc, SceneNode::Tag::SAMPLER} {}
 
 }

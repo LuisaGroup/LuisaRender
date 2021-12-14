@@ -18,7 +18,7 @@ using compute::Context;
 using compute::Stream;
 
 class SceneDesc;
-class SceneDescNode;
+class SceneNodeDesc;
 
 class Camera;
 class Film;
@@ -33,32 +33,29 @@ class Environment;
 class Scene {
 
 public:
-    using NodeCreater = SceneNode *(Scene *, const SceneDescNode *);
+    using NodeCreater = SceneNode *(Scene *, const SceneNodeDesc *);
     using NodeDeleter = void(SceneNode *);
     using NodeHandle = std::unique_ptr<SceneNode, NodeDeleter *>;
 
+    struct Config;
+    struct Data;
+
 private:
     const Context &_context;
-    luisa::vector<NodeHandle> _internal_nodes;
-    luisa::unordered_map<luisa::string, NodeHandle, Hash64> _nodes;
+    luisa::unique_ptr<Config> _config;
 
 private:
-    Integrator *_render_integrator;
-    luisa::vector<Camera *> _cameras;
-    luisa::vector<Shape *> _shapes;
-    luisa::vector<Environment *> _environments;
-
     friend class SceneNode;
-    [[nodiscard]] SceneNode *_node(SceneNode::Tag tag, const SceneDescNode *desc) noexcept;
-    [[nodiscard]] Camera *_camera(const SceneDescNode *desc) noexcept;
-    [[nodiscard]] Film *_film(const SceneDescNode *desc) noexcept;
-    [[nodiscard]] Filter *_filter(const SceneDescNode *desc) noexcept;
-    [[nodiscard]] Integrator *_integrator(const SceneDescNode *desc) noexcept;
-    [[nodiscard]] Material *_material(const SceneDescNode *desc) noexcept;
-    [[nodiscard]] Sampler *_sampler(const SceneDescNode *desc) noexcept;
-    [[nodiscard]] Shape *_shape(const SceneDescNode *desc) noexcept;
-    [[nodiscard]] Transform *_transform(const SceneDescNode *desc) noexcept;
-    [[nodiscard]] Environment *_environment(const SceneDescNode *desc) noexcept;
+    [[nodiscard]] SceneNode *_node(SceneNode::Tag tag, const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] Camera *_camera(const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] Film *_film(const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] Filter *_filter(const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] Integrator *_integrator(const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] Material *_material(const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] Sampler *_sampler(const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] Shape *_shape(const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] Transform *_transform(const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] Environment *_environment(const SceneNodeDesc *desc) noexcept;
 
 public:
     // for internal use only, call Scene::create instead
@@ -70,12 +67,12 @@ public:
     Scene &operator=(const Scene &scene) noexcept = delete;
 
 public:
-    // public interfaces
     [[nodiscard]] static luisa::unique_ptr<Scene> create(const Context &ctx, const SceneDesc *desc) noexcept;
-    [[nodiscard]] auto integrator() const noexcept { return const_cast<const Integrator *>(_render_integrator); }
-    [[nodiscard]] auto cameras() const noexcept { return std::span{_cameras}; }
-    [[nodiscard]] auto shapes() const noexcept { return std::span{_shapes}; }
-    [[nodiscard]] auto environments() const noexcept { return std::span{_environments}; }
+    [[nodiscard]] const Integrator *integrator() const noexcept;
+    [[nodiscard]] std::span<const Shape *const> shapes() const noexcept;
+    [[nodiscard]] std::span<const Camera *const> cameras() const noexcept;
+    [[nodiscard]] std::span<const Environment *const> environments() const noexcept;
+    // TODO: build & update
 };
 
 }

@@ -15,13 +15,13 @@ namespace luisa::render {
 
 class SceneDesc;
 
-class SceneDescNode {
+class SceneNodeDesc {
 
 public:
     using bool_type = bool;
     using number_type = double;
     using string_type = luisa::string;
-    using node_type = const SceneDescNode *;
+    using node_type = const SceneNodeDesc *;
 
     using bool_list = luisa::vector<bool_type>;
     using number_list = luisa::vector<number_type>;
@@ -53,16 +53,16 @@ private:
     SourceLocation _location;
     SceneNode::Tag _tag;
     luisa::string _impl_type;
-    luisa::vector<luisa::unique_ptr<SceneDescNode>> _internal_nodes;
+    luisa::vector<luisa::unique_ptr<SceneNodeDesc>> _internal_nodes;
     luisa::unordered_map<luisa::string, value_list, Hash64> _properties;
 
 public:
-    SceneDescNode(std::string_view identifier, SceneNode::Tag tag) noexcept
+    SceneNodeDesc(std::string_view identifier, SceneNode::Tag tag) noexcept
         : _identifier{identifier}, _tag{tag} {}
-    SceneDescNode(SceneDescNode &&) noexcept = delete;
-    SceneDescNode(const SceneDescNode &) noexcept = delete;
-    SceneDescNode &operator=(SceneDescNode &&) noexcept = delete;
-    SceneDescNode &operator=(const SceneDescNode &) noexcept = delete;
+    SceneNodeDesc(SceneNodeDesc &&) noexcept = delete;
+    SceneNodeDesc(const SceneNodeDesc &) noexcept = delete;
+    SceneNodeDesc &operator=(SceneNodeDesc &&) noexcept = delete;
+    SceneNodeDesc &operator=(const SceneNodeDesc &) noexcept = delete;
     [[nodiscard]] auto identifier() const noexcept { return std::string_view{_identifier}; }
     [[nodiscard]] auto tag() const noexcept { return _tag; }
     [[nodiscard]] auto impl_type() const noexcept { return std::string_view{_impl_type}; }
@@ -75,7 +75,7 @@ public:
     void add_property(std::string_view name, number_type value) noexcept { add_property(name, number_list{value}); }
     void add_property(std::string_view name, string_type value) noexcept { add_property(name, string_list{std::move(value)}); }
     void add_property(std::string_view name, node_type value) noexcept { add_property(name, node_list{value}); }
-    [[nodiscard]] SceneDescNode *define_internal(
+    [[nodiscard]] SceneNodeDesc *define_internal(
         std::string_view name, std::string_view impl_type, SourceLocation location = {}) noexcept;
     [[nodiscard]] auto is_root() const noexcept { return _tag == SceneNode::Tag::ROOT; }
     [[nodiscard]] auto is_internal() const noexcept { return _tag == SceneNode::Tag::INTERNAL; }
@@ -85,42 +85,42 @@ public:
     using int_list = luisa::vector<int>;
     using uint_list = luisa::vector<uint>;
     using float_list = luisa::vector<float>;
-    using node = const SceneDescNode *;
+    using node = const SceneNodeDesc *;
     using string = luisa::string;
     using path = std::filesystem::path;
     using path_list = luisa::vector<path>;
 
     // parameter getters
-#define LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(type)                           \
+#define LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(type)                           \
     [[nodiscard]] type property_##type(std::string_view name) const noexcept; \
     [[nodiscard]] type property_##type##_or_default(std::string_view name, type default_value) const noexcept;
-    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(int)
-    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(int2)
-    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(int3)
-    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(int4)
-    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(uint)
-    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(uint2)
-    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(uint3)
-    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(uint4)
-    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(bool)
-    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(bool2)
-    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(bool3)
-    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(bool4)
-    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(float)
-    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(float2)
-    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(float3)
-    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(float4)
-    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(string)
-    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(path)
-    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(node)
-    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(int_list)
-    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(uint_list)
-    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(bool_list)
-    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(float_list)
-    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(string_list)
-    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(path_list)
-    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(node_list)
-#undef LUISA_SCENE_DESC_NODE_PROPERTY_GETTER
+    LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(int)
+    LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(int2)
+    LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(int3)
+    LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(int4)
+    LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(uint)
+    LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(uint2)
+    LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(uint3)
+    LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(uint4)
+    LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(bool)
+    LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(bool2)
+    LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(bool3)
+    LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(bool4)
+    LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(float)
+    LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(float2)
+    LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(float3)
+    LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(float4)
+    LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(string)
+    LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(path)
+    LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(node)
+    LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(int_list)
+    LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(uint_list)
+    LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(bool_list)
+    LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(float_list)
+    LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(string_list)
+    LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(path_list)
+    LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(node_list)
+#undef LUISA_SCENE_NODE_DESC_PROPERTY_GETTER
 };
 
 }// namespace luisa::render

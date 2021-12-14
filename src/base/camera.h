@@ -34,7 +34,7 @@ private:
     Transform *_transform{nullptr};
 
 public:
-    Camera(Scene *scene, const SceneDescNode *desc) noexcept
+    Camera(Scene *scene, const SceneNodeDesc *desc) noexcept
         : SceneNode{scene, desc, SceneNode::Tag::CAMERA} {}
     Camera &set_film(Film *film) noexcept;
     Camera &set_filter(Filter *filter) noexcept;

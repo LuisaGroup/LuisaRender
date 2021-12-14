@@ -18,7 +18,7 @@ using compute::Device;
 using compute::CommandBuffer;
 
 class Scene;
-class SceneDescNode;
+class SceneNodeDesc;
 
 class SceneNode {
 
@@ -43,7 +43,7 @@ private:
     Tag _tag;
 
 public:
-    SceneNode(Scene *scene, const SceneDescNode *desc, Tag tag) noexcept;
+    SceneNode(Scene *scene, const SceneNodeDesc *desc, Tag tag) noexcept;
     virtual ~SceneNode() noexcept = default;
     [[nodiscard]] auto scene() noexcept { return _scene; }
     [[nodiscard]] auto scene() const noexcept { return const_cast<const Scene *>(_scene); }

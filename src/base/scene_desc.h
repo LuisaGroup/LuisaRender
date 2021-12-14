@@ -4,15 +4,15 @@
 
 #pragma once
 
-#include <base/scene_desc_node.h>
+#include <base/scene_node_desc.h>
 
 namespace luisa::render {
 
 class SceneDesc {
 
 private:
-    [[nodiscard]] static auto _node_identifier(const luisa::unique_ptr<SceneDescNode> &node) noexcept { return node->identifier(); }
-    [[nodiscard]] static auto _node_identifier(const SceneDescNode *node) noexcept { return node->identifier(); }
+    [[nodiscard]] static auto _node_identifier(const luisa::unique_ptr<SceneNodeDesc> &node) noexcept { return node->identifier(); }
+    [[nodiscard]] static auto _node_identifier(const SceneNodeDesc *node) noexcept { return node->identifier(); }
     [[nodiscard]] static auto _node_identifier(std::string_view s) noexcept { return s; }
 
 public:
@@ -33,21 +33,21 @@ public:
     static constexpr std::string_view root_node_identifier = "render";
 
 private:
-    luisa::unordered_set<luisa::unique_ptr<SceneDescNode>, NodeHash, NodeEqual> _global_nodes;
+    luisa::unordered_set<luisa::unique_ptr<SceneNodeDesc>, NodeHash, NodeEqual> _global_nodes;
     luisa::vector<luisa::unique_ptr<std::filesystem::path>> _source_paths;
     luisa::vector<const std::filesystem::path *> _source_path_stack;
-    SceneDescNode _root;
+    SceneNodeDesc _root;
 
 public:
     SceneDesc() noexcept: _root{root_node_identifier, SceneNode::Tag::ROOT} {}
     [[nodiscard]] auto &nodes() const noexcept { return _global_nodes; }
-    [[nodiscard]] const SceneDescNode *node(std::string_view identifier) const noexcept;
+    [[nodiscard]] const SceneNodeDesc *node(std::string_view identifier) const noexcept;
     [[nodiscard]] auto root() const noexcept { return &_root; }
     void declare(std::string_view identifier, SceneNode::Tag tag) noexcept;
-    [[nodiscard]] SceneDescNode *define(
+    [[nodiscard]] SceneNodeDesc *define(
         std::string_view identifier, SceneNode::Tag tag,
-        std::string_view impl_type, SceneDescNode::SourceLocation location = {}) noexcept;
-    [[nodiscard]] SceneDescNode *define_root(SceneDescNode::SourceLocation location = {}) noexcept;
+        std::string_view impl_type, SceneNodeDesc::SourceLocation location = {}) noexcept;
+    [[nodiscard]] SceneNodeDesc *define_root(SceneNodeDesc::SourceLocation location = {}) noexcept;
     void push_source_path(const std::filesystem::path &path) noexcept;
     void pop_source_path() noexcept;
     [[nodiscard]] const std::filesystem::path *current_source_path() const noexcept;

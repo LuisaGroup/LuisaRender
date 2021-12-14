@@ -37,7 +37,7 @@ using namespace luisa;
 using namespace luisa::compute;
 using namespace luisa::render;
 
-void dump(std::ostream &os, const SceneDescNode *node, size_t indent_level = 0) noexcept {
+void dump(std::ostream &os, const SceneNodeDesc *node, size_t indent_level = 0) noexcept {
     auto indent = [&os](auto n) noexcept {
         for (auto i = 0u; i < n; i++) { os << "  "; }
     };
@@ -49,7 +49,7 @@ void dump(std::ostream &os, const SceneDescNode *node, size_t indent_level = 0) 
         std::visit(
             [&](auto &&v) noexcept {
                 using T = std::remove_cvref_t<decltype(v)>;
-                if constexpr (std::is_same_v<T, SceneDescNode::string_list>) {
+                if constexpr (std::is_same_v<T, SceneNodeDesc::string_list>) {
                     os << "{";
                     if (!v.empty()) {
                         os << " \"" << v.front() << '"';
@@ -59,7 +59,7 @@ void dump(std::ostream &os, const SceneDescNode *node, size_t indent_level = 0) 
                         os << " ";
                     }
                     os << "}";
-                } else if constexpr (std::is_same_v<T, SceneDescNode::node_list>) {
+                } else if constexpr (std::is_same_v<T, SceneNodeDesc::node_list>) {
                     if (v.size() == 1u && v.front()->is_internal()) {
                         os << ": ";
                         dump(os, v.front(), indent_level + 1u);
@@ -159,8 +159,8 @@ int main(int argc, char *argv[]) {
     scene.declare("filter", SceneNode::Tag::FILTER);
     auto camera = scene.define("camera", SceneNode::Tag::CAMERA, "ThinLens");
     auto film = camera->define_internal("film", "RGB");
-    film->add_property("resolution", SceneDescNode::number_list{1.0, 1.0});
-    film->add_property("filter", SceneDescNode::node_list{scene.node("filter")});
+    film->add_property("resolution", SceneNodeDesc::number_list{1.0, 1.0});
+    film->add_property("filter", SceneNodeDesc::node_list{scene.node("filter")});
     auto filter = scene.define("filter", SceneNode::Tag::FILTER, "Gaussian");
     filter->add_property("radius", 1.5);
     auto integrator = scene.define("integrator", SceneNode::Tag::INTEGRATOR, "Path");

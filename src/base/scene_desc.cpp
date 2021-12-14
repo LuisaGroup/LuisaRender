@@ -7,7 +7,7 @@
 
 namespace luisa::render {
 
-const SceneDescNode *SceneDesc::node(std::string_view identifier) const noexcept {
+const SceneNodeDesc *SceneDesc::node(std::string_view identifier) const noexcept {
     if (auto iter = _global_nodes.find(identifier);
         iter != _global_nodes.cend()) {
         return iter->get();
@@ -32,7 +32,7 @@ void SceneDesc::declare(std::string_view identifier, SceneNode::Tag tag) noexcep
     }
     auto [iter, first_decl] = _global_nodes.emplace(
         lazy_construct([identifier, tag] {
-            return luisa::make_unique<SceneDescNode>(
+            return luisa::make_unique<SceneNodeDesc>(
                 identifier, tag);
         }));
     if (auto node = iter->get();
@@ -46,16 +46,16 @@ void SceneDesc::declare(std::string_view identifier, SceneNode::Tag tag) noexcep
     }
 }
 
-SceneDescNode *SceneDesc::define(
+SceneNodeDesc *SceneDesc::define(
     std::string_view identifier, SceneNode::Tag tag,
-    std::string_view impl_type, SceneDescNode::SourceLocation location) noexcept {
+    std::string_view impl_type, SceneNodeDesc::SourceLocation location) noexcept {
 
     if (identifier == root_node_identifier ||
         tag == SceneNode::Tag::ROOT) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
             "Defining root node as a normal "
             "global node is not allowed. "
-            "Please use SceneDescNode::define_root().");
+            "Please use SceneNodeDesc::define_root().");
     }
     if (tag == SceneNode::Tag::INTERNAL) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
@@ -64,7 +64,7 @@ SceneDescNode *SceneDesc::define(
     }
     auto [iter, first_decl] = _global_nodes.emplace(
         lazy_construct([identifier, tag] {
-            return luisa::make_unique<SceneDescNode>(
+            return luisa::make_unique<SceneNodeDesc>(
                 identifier, tag);
         }));
     auto node = iter->get();
@@ -87,7 +87,7 @@ SceneDescNode *SceneDesc::define(
     return node;
 }
 
-SceneDescNode *SceneDesc::define_root(SceneDescNode::SourceLocation location) noexcept {
+SceneNodeDesc *SceneDesc::define_root(SceneNodeDesc::SourceLocation location) noexcept {
     if (_root.is_defined()) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
             "Redefinition of root node "
@@ -100,7 +100,7 @@ SceneDescNode *SceneDesc::define_root(SceneDescNode::SourceLocation location) no
 
 //namespace detail {
 //
-//static void validate(const SceneDescNode *node, size_t depth) noexcept {
+//static void validate(const SceneNodeDesc *node, size_t depth) noexcept {
 //    if (depth > 32u) [[unlikely]] {
 //        LUISA_ERROR_WITH_LOCATION(
 //            "Scene description is too deep. "
@@ -113,7 +113,7 @@ SceneDescNode *SceneDesc::define_root(SceneDescNode::SourceLocation location) no
 //            node->identifier());
 //    }
 //    for (auto &&[prop, values] : node->properties()) {
-//        if (auto nodes = std::get_if<SceneDescNode::node_list>(&values)) {
+//        if (auto nodes = std::get_if<SceneNodeDesc::node_list>(&values)) {
 //            for (auto n : *nodes) { validate(n, depth + 1u); }
 //        }
 //    }
