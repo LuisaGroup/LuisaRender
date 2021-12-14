@@ -12,7 +12,8 @@ namespace luisa::render {
 class Transform : public SceneNode {
 
 public:
-    Transform() noexcept : SceneNode{SceneNode::Tag::TRANSFORM} {}
+    Transform(Scene *scene, const SceneDescNode *desc) noexcept
+        : SceneNode{scene, desc, SceneNode::Tag::TRANSFORM} {}
     [[nodiscard]] virtual bool is_static() const noexcept = 0;
     [[nodiscard]] virtual float4x4 matrix(float time) const noexcept = 0;
 };

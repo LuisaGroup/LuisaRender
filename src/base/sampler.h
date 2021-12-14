@@ -20,7 +20,7 @@ private:
     uint _sample_count{};
 
 public:
-    Sampler() noexcept : SceneNode{SceneNode::Tag::SAMPLER} {}
+    Sampler(Scene *scene, const SceneDescNode *desc) noexcept;
     Sampler &set_resolution(uint2 r) noexcept;
     Sampler &set_sample_count(uint spp) noexcept;
     [[nodiscard]] auto resolution() const noexcept { return _resolution; }

@@ -8,13 +8,16 @@
 #include <string_view>
 
 namespace luisa::compute {
+class Device;
 class CommandBuffer;
 }
 
 namespace luisa::render {
 
+using compute::Device;
 using compute::CommandBuffer;
 
+class Scene;
 class SceneDescNode;
 
 class SceneNode {
@@ -31,22 +34,21 @@ public:
         FILTER,
         SAMPLER,
         INTEGRATOR
+        // TODO: MEDIUM?
     };
 
 private:
+    Scene *_scene;
     Tag _tag;
 
 public:
-    explicit SceneNode(Tag tag) noexcept : _tag{tag} {}
+    SceneNode(Scene *scene, const SceneDescNode *desc, Tag tag) noexcept;
     virtual ~SceneNode() noexcept = default;
+    [[nodiscard]] auto scene() noexcept { return _scene; }
+    [[nodiscard]] auto scene() const noexcept { return const_cast<const Scene *>(_scene); }
     [[nodiscard]] auto tag() const noexcept { return _tag; }
     [[nodiscard]] virtual std::string_view impl_type() const noexcept = 0;
-    [[nodiscard]] virtual size_t child_count() const noexcept = 0;
-    [[nodiscard]] virtual SceneNode *child(size_t index) noexcept = 0;
-    [[nodiscard]] virtual const SceneNode *child(size_t index) const noexcept;
-    virtual void load(const SceneDescNode &desc) noexcept = 0;
-    virtual void dump(SceneDescNode &desc) const noexcept = 0;
-    virtual void build(CommandBuffer &command_buffer) noexcept = 0;
+    virtual void build(Device &device, CommandBuffer &command_buffer) noexcept = 0;
     [[nodiscard]] static constexpr std::string_view tag_description(Tag tag) noexcept;
 };
 

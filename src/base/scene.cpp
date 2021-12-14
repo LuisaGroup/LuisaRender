@@ -4,6 +4,8 @@
 
 #include <mutex>
 #include <fmt/format.h>
+
+#include <base/scene_desc_node.h>
 #include <base/scene.h>
 
 namespace luisa::render {
@@ -34,25 +36,28 @@ namespace detail {
 
 }// namespace detail
 
-SceneNode *Scene::add(SceneNode::Tag tag, std::string_view identifier, std::string_view impl_type) noexcept {
-    if (auto iter = _nodes.find(identifier); iter != _nodes.end()) {
-        LUISA_ERROR_WITH_LOCATION(
-            "Scene node `{}` (type = {}::{}) is already in the graph (type = {}::{}).",
-            identifier, SceneNode::tag_description(tag), impl_type,
-            SceneNode::tag_description(iter->second->tag()),
-            iter->second->impl_type());
-    }
-    auto &&plugin = detail::scene_plugin_load(_context->runtime_directory() / "plugins", tag, impl_type);
-    auto node = plugin.invoke<Node *(void)>("create");
-    auto deleter = plugin.function<void(Node *)>("destroy");
-    auto ptr = _nodes.emplace(identifier, std::unique_ptr<Node, void (*)(Node *)>{node, deleter}).first->second.get();
-    if (ptr->tag() != tag || ptr->impl_type() != impl_type) [[unlikely]] {
-        LUISA_ERROR_WITH_LOCATION(
-            "Scene node `{}` (type = {}::{}) is created with invalid type {}::{}.",
-            identifier, SceneNode::tag_description(tag), impl_type,
-            SceneNode::tag_description(ptr->tag()), ptr->impl_type());
-    }
-    return ptr;
+SceneNode *Scene::node(SceneNode::Tag tag, const SceneDescNode *desc) noexcept {
+//    if (desc->is_internal()) {
+//        return
+//    }
+//    if (auto iter = _nodes.find(identifier); iter != _nodes.end()) {
+//        LUISA_ERROR_WITH_LOCATION(
+//            "Scene node `{}` (type = {}::{}) is already in the graph (type = {}::{}).",
+//            identifier, SceneNode::tag_description(tag), impl_type,
+//            SceneNode::tag_description(iter->second->tag()),
+//            iter->second->impl_type());
+//    }
+//    auto &&plugin = detail::scene_plugin_load(_context->runtime_directory() / "plugins", tag, impl_type);
+//    auto node = plugin.invoke<Node *(Scene *)>("create", this);
+//    auto deleter = plugin.function<void(Node *)>("destroy");
+//    auto ptr = _nodes.emplace(identifier, std::unique_ptr<Node, void (*)(Node *)>{node, deleter}).first->second.get();
+//    if (ptr->tag() != tag || ptr->impl_type() != impl_type) [[unlikely]] {
+//        LUISA_ERROR_WITH_LOCATION(
+//            "Scene node `{}` (type = {}::{}) is created with invalid type {}::{}.",
+//            identifier, SceneNode::tag_description(tag), impl_type,
+//            SceneNode::tag_description(ptr->tag()), ptr->impl_type());
+//    }
+//    return ptr;
 }
 
 Scene::Scene(const Context &ctx) noexcept : _context{&ctx} {}

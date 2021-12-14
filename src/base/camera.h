@@ -10,10 +10,10 @@
 
 namespace luisa::render {
 
-using compute::Ray;
-using compute::Var;
 using compute::Expr;
 using compute::Float3;
+using compute::Ray;
+using compute::Var;
 
 class Sampler;
 class Film;
@@ -34,7 +34,8 @@ private:
     Transform *_transform{nullptr};
 
 public:
-    Camera() noexcept : SceneNode{SceneNode::Tag::CAMERA} {}
+    Camera(Scene *scene, const SceneDescNode *desc) noexcept
+        : SceneNode{scene, desc, SceneNode::Tag::CAMERA} {}
     Camera &set_film(Film *film) noexcept;
     Camera &set_filter(Filter *filter) noexcept;
     Camera &set_transform(Transform *transform) noexcept;
@@ -47,4 +48,4 @@ public:
     [[nodiscard]] virtual Sample generate_ray(Sampler &sampler, Expr<uint2> pixel, Expr<float> time) const noexcept = 0;
 };
 
-}
+}// namespace luisa::render

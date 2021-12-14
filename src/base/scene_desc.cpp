@@ -98,41 +98,41 @@ SceneDescNode *SceneDesc::define_root(SceneDescNode::SourceLocation location) no
     return &_root;
 }
 
-namespace detail {
-
-static void validate(const SceneDescNode *node, size_t depth) noexcept {
-    if (depth > 32u) [[unlikely]] {
-        LUISA_ERROR_WITH_LOCATION(
-            "Scene description is too deep. "
-            "Recursions in definitions?");
-    }
-    if (!node->is_defined()) [[unlikely]] {
-        LUISA_ERROR_WITH_LOCATION(
-            "Node '{}' is referenced but not defined "
-            "in the scene description.",
-            node->identifier());
-    }
-    for (auto &&[prop, values] : node->properties()) {
-        if (auto nodes = std::get_if<SceneDescNode::node_list>(&values)) {
-            for (auto n : *nodes) { validate(n, depth + 1u); }
-        }
-    }
-}
-
-}// namespace detail
-
-void SceneDesc::validate() const noexcept {
-    if (!_source_path_stack.empty()) [[unlikely]] {
-        std::ostringstream oss;
-        for (auto p : _source_path_stack) { oss << "\n"
-                                                << *p; }
-        LUISA_ERROR_WITH_LOCATION(
-            "Unbalanced path stack in scene description. "
-            "Remaining paths (from stack top to bottom): {}",
-            oss.str());
-    }
-    detail::validate(&_root, 0u);
-}
+//namespace detail {
+//
+//static void validate(const SceneDescNode *node, size_t depth) noexcept {
+//    if (depth > 32u) [[unlikely]] {
+//        LUISA_ERROR_WITH_LOCATION(
+//            "Scene description is too deep. "
+//            "Recursions in definitions?");
+//    }
+//    if (!node->is_defined()) [[unlikely]] {
+//        LUISA_ERROR_WITH_LOCATION(
+//            "Node '{}' is referenced but not defined "
+//            "in the scene description.",
+//            node->identifier());
+//    }
+//    for (auto &&[prop, values] : node->properties()) {
+//        if (auto nodes = std::get_if<SceneDescNode::node_list>(&values)) {
+//            for (auto n : *nodes) { validate(n, depth + 1u); }
+//        }
+//    }
+//}
+//
+//}// namespace detail
+//
+//void SceneDesc::validate() const noexcept {
+//    if (!_source_path_stack.empty()) [[unlikely]] {
+//        std::ostringstream oss;
+//        for (auto p : _source_path_stack) { oss << "\n"
+//                                                << *p; }
+//        LUISA_ERROR_WITH_LOCATION(
+//            "Unbalanced path stack in scene description. "
+//            "Remaining paths (from stack top to bottom): {}",
+//            oss.str());
+//    }
+//    detail::validate(&_root, 0u);
+//}
 
 void SceneDesc::push_source_path(const std::filesystem::path &path) noexcept {
     auto canonical_path = luisa::make_unique<std::filesystem::path>(

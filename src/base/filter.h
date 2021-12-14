@@ -11,7 +11,8 @@ namespace luisa::render {
 class Filter : public SceneNode {
 
 public:
-    Filter() noexcept : SceneNode{SceneNode::Tag::FILTER} {}
+    Filter(Scene *scene, const SceneDescNode *desc) noexcept
+        : SceneNode{scene, desc, SceneNode::Tag::FILTER} {}
 
 };
 

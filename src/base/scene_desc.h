@@ -57,7 +57,6 @@ public:
         std::invoke(std::forward<F>(f));
         pop_source_path();
     }
-    void validate() const noexcept;
 };
 
 }// namespace luisa::render
