@@ -33,7 +33,8 @@ public:
         FILM,
         FILTER,
         SAMPLER,
-        INTEGRATOR
+        INTEGRATOR,
+        ENVIRONMENT
         // TODO: MEDIUM?
     };
 
@@ -65,6 +66,7 @@ constexpr std::string_view SceneNode::tag_description(SceneNode::Tag tag) noexce
         case SceneNode::Tag::FILTER: return "Filter"sv;
         case SceneNode::Tag::SAMPLER: return "Sampler"sv;
         case SceneNode::Tag::INTEGRATOR: return "Integrator"sv;
+        case SceneNode::Tag::ENVIRONMENT: return "Environment"sv;
         default: break;
     }
     return "__invalid__"sv;

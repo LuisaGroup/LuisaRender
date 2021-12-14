@@ -4,7 +4,14 @@ set(LUISA_RENDER_BASE_SOURCES
         camera.cpp camera.h
         sampler.cpp sampler.h
         filter.cpp filter.h
-        scene_node.cpp scene_node.h scene_desc.cpp scene_desc.h scene_desc_node.cpp scene_desc_node.h shape.cpp shape.h material.cpp material.h film.cpp film.h integrator.cpp integrator.h)
+        scene_node.cpp scene_node.h
+        scene_desc.cpp scene_desc.h
+        scene_desc_node.cpp scene_desc_node.h
+        shape.cpp shape.h
+        material.cpp material.h
+        film.cpp film.h
+        integrator.cpp integrator.h
+        environment.cpp environment.h)
 
 add_library(luisa-render-base SHARED ${LUISA_RENDER_BASE_SOURCES})
 target_link_libraries(luisa-render-base PUBLIC
