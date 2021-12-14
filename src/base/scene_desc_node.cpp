@@ -30,53 +30,54 @@ SceneDescNode *SceneDescNode::define_internal(std::string_view name, std::string
 #define LUSIA_SCENE_DESC_NODE_PROPERTY_THROW(...) \
     throw std::runtime_error{fmt::format(__VA_ARGS__)};
 
-#define LUISA_SCENE_DESC_NODE_PROPERTY_GET_POINTER(type)                        \
-    auto iter = _properties.find(name);                                         \
-    if (iter == _properties.cend()) [[unlikely]] {                              \
-        LUSIA_SCENE_DESC_NODE_PROPERTY_THROW(                                   \
-            "Property '{}' is not defined in "                                  \
-            "scene description node '{}'.",                                     \
-            name, _identifier);                                                 \
-    }                                                                           \
-    auto ptr = [&] {                                                            \
-        if constexpr (std::is_same_v<type, int> ||                              \
-                      std::is_same_v<type, uint> ||                             \
-                      std::is_same_v<type, float>) {                            \
-            return std::get_if<number_list>(&iter->second);                     \
-        } else if constexpr (std::is_same_v<type, bool>) {                      \
-            return std::get_if<bool_list>(&iter->second);                       \
-        } else if constexpr (std::is_same_v<type, string> ||                    \
-                             std::is_same_v<type, path>) {                      \
-            return std::get_if<string_list>(&iter->second);                     \
-        } else {                                                                \
-            return std::get_if<node_list>(&iter->second);                       \
-        }                                                                       \
-    }();                                                                        \
-    if (ptr == nullptr) [[unlikely]] {                                          \
-        LUSIA_SCENE_DESC_NODE_PROPERTY_THROW(                                   \
-            "Property '{}' is not a " #type " list in "                         \
-            "scene description node '{}'.",                                     \
-            name, _identifier);                                                 \
-    }                                                                           \
-    auto size = ptr->size();                                                    \
-    auto convert = [&](size_t i) noexcept {                                     \
-        auto raw_value = (*ptr)[i];                                             \
-        if constexpr (std::is_same_v<type, int> ||                              \
-                      std::is_same_v<type, uint>) {                             \
-            auto value = static_cast<type>(raw_value);                          \
-            if (value != raw_value) [[unlikely]] {                              \
-                LUISA_WARNING_WITH_LOCATION(                                    \
-                    "Conversion from property '{}' (value = {}) to int "        \
-                    "in scene description node '{}' is empty loses precision.", \
-                    name, raw_value, _identifier);                              \
-            }                                                                   \
-            return value;                                                       \
-        } else if constexpr (std::is_same_v<type, float> ||                     \
-                             std::is_same_v<type, path>) {                      \
-            return static_cast<type>(raw_value);                                \
-        } else {                                                                \
-            return raw_value;                                                   \
-        }                                                                       \
+#define LUISA_SCENE_DESC_NODE_PROPERTY_GET_POINTER(type)     \
+    auto iter = _properties.find(name);                      \
+    if (iter == _properties.cend()) [[unlikely]] {           \
+        LUSIA_SCENE_DESC_NODE_PROPERTY_THROW(                \
+            "Property '{}' is not defined in "               \
+            "scene description node '{}'.",                  \
+            name, _identifier);                              \
+    }                                                        \
+    auto ptr = [&] {                                         \
+        if constexpr (std::is_same_v<type, int> ||           \
+                      std::is_same_v<type, uint> ||          \
+                      std::is_same_v<type, float>) {         \
+            return std::get_if<number_list>(&iter->second);  \
+        } else if constexpr (std::is_same_v<type, bool>) {   \
+            return std::get_if<bool_list>(&iter->second);    \
+        } else if constexpr (std::is_same_v<type, string> || \
+                             std::is_same_v<type, path>) {   \
+            return std::get_if<string_list>(&iter->second);  \
+        } else {                                             \
+            return std::get_if<node_list>(&iter->second);    \
+        }                                                    \
+    }();                                                     \
+    if (ptr == nullptr) [[unlikely]] {                       \
+        LUSIA_SCENE_DESC_NODE_PROPERTY_THROW(                \
+            "Property '{}' is not a " #type " list in "      \
+            "scene description node '{}'.",                  \
+            name, _identifier);                              \
+    }                                                        \
+    auto size = ptr->size();                                 \
+    auto convert = [&](size_t i) {                           \
+        auto raw_value = (*ptr)[i];                          \
+        if constexpr (std::is_same_v<type, int> ||           \
+                      std::is_same_v<type, uint>) {          \
+            auto value = static_cast<type>(raw_value);       \
+            if (value != raw_value) [[unlikely]] {           \
+                LUSIA_SCENE_DESC_NODE_PROPERTY_THROW(        \
+                    "Invalid conversion from property '{}' " \
+                    "(value = {}) to " #type                 \
+                    "in scene description node '{}'.",       \
+                    name, raw_value, _identifier);           \
+            }                                                \
+            return value;                                    \
+        } else if constexpr (std::is_same_v<type, float> ||  \
+                             std::is_same_v<type, path>) {   \
+            return static_cast<type>(raw_value);             \
+        } else {                                             \
+            return raw_value;                                \
+        }                                                    \
     };
 
 #define LUISA_SCENE_DESC_NODE_PROPERTY_IMPL_SCALAR_OR_VECTOR(type, count)   \
