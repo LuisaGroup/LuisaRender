@@ -124,13 +124,13 @@ int main(int argc, char *argv[]) {
 
     auto device = context.create_device(backend, {{"index", index}});
 
-    SceneDesc scene{context.cache_directory()};
+    SceneDesc scene;
     scene.declare("camera", SceneNode::Tag::CAMERA);
     scene.declare("integrator", SceneNode::Tag::INTEGRATOR);
     scene.declare("sampler", SceneNode::Tag::SAMPLER);
     scene.declare("filter", SceneNode::Tag::FILTER);
     auto camera = scene.define("camera", SceneNode::Tag::CAMERA, "ThinLens");
-    auto film = camera->add_internal("film", "RGB");
+    auto film = camera->define_internal("film", "RGB");
     film->add_property("resolution", SceneDescNode::number_list{1.0, 1.0});
     film->add_property("filter", SceneDescNode::node_list{scene.node("filter")});
     auto filter = scene.define("filter", SceneNode::Tag::FILTER, "Gaussian");

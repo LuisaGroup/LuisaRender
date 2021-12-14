@@ -2,6 +2,7 @@
 // Created by Mike on 2021/12/13.
 //
 
+#include <sstream>
 #include <base/scene_desc.h>
 
 namespace luisa::render {
@@ -32,7 +33,7 @@ void SceneDesc::declare(std::string_view identifier, SceneNode::Tag tag) noexcep
     auto [iter, first_decl] = _global_nodes.emplace(
         lazy_construct([identifier, tag] {
             return luisa::make_unique<SceneDescNode>(
-                identifier, tag, std::string_view{});
+                identifier, tag);
         }));
     if (auto node = iter->get();
         !first_decl && node->tag() != tag) [[unlikely]] {
@@ -45,7 +46,10 @@ void SceneDesc::declare(std::string_view identifier, SceneNode::Tag tag) noexcep
     }
 }
 
-SceneDescNode *SceneDesc::define(std::string_view identifier, SceneNode::Tag tag, std::string_view impl_type) noexcept {
+SceneDescNode *SceneDesc::define(
+    std::string_view identifier, SceneNode::Tag tag,
+    std::string_view impl_type, SceneDescNode::SourceLocation location) noexcept {
+
     if (identifier == root_node_identifier ||
         tag == SceneNode::Tag::ROOT) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
@@ -61,7 +65,7 @@ SceneDescNode *SceneDesc::define(std::string_view identifier, SceneNode::Tag tag
     auto [iter, first_decl] = _global_nodes.emplace(
         lazy_construct([identifier, tag] {
             return luisa::make_unique<SceneDescNode>(
-                identifier, tag, std::string_view{});
+                identifier, tag);
         }));
     auto node = iter->get();
     if (!first_decl) {
@@ -79,16 +83,18 @@ SceneDescNode *SceneDesc::define(std::string_view identifier, SceneNode::Tag tag
         }
     }
     node->set_impl_type(impl_type);
+    node->set_source_location(location);
     return node;
 }
 
-SceneDescNode *SceneDesc::define_root() noexcept {
+SceneDescNode *SceneDesc::define_root(SceneDescNode::SourceLocation location) noexcept {
     if (_root.is_defined()) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
             "Redefinition of root node "
             "in scene description.");
     }
     _root.set_impl_type(root_node_identifier);
+    _root.set_source_location(location);
     return &_root;
 }
 
@@ -113,10 +119,35 @@ static void validate(const SceneDescNode *node, size_t depth) noexcept {
     }
 }
 
-}
+}// namespace detail
 
 void SceneDesc::validate() const noexcept {
+    if (!_source_path_stack.empty()) [[unlikely]] {
+        std::ostringstream oss;
+        for (auto p : _source_path_stack) { oss << "\n"
+                                                << *p; }
+        LUISA_ERROR_WITH_LOCATION(
+            "Unbalanced path stack in scene description. "
+            "Remaining paths (from stack top to bottom): {}",
+            oss.str());
+    }
     detail::validate(&_root, 0u);
+}
+
+void SceneDesc::push_source_path(const std::filesystem::path &path) noexcept {
+    auto canonical_path = luisa::make_unique<std::filesystem::path>(
+        std::filesystem::canonical(path));
+    _source_path_stack.emplace_back(
+        _source_paths.emplace_back(std::move(canonical_path)).get());
+}
+
+void SceneDesc::pop_source_path() noexcept {
+    _source_path_stack.pop_back();
+}
+
+const std::filesystem::path *SceneDesc::current_source_path() const noexcept {
+    if (_source_path_stack.empty()) { return nullptr; }
+    return _source_path_stack.back();
 }
 
 }// namespace luisa::render

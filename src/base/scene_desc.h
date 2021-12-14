@@ -34,20 +34,29 @@ public:
 
 private:
     luisa::unordered_set<luisa::unique_ptr<SceneDescNode>, NodeHash, NodeEqual> _global_nodes;
-    std::filesystem::path _base_folder;
+    luisa::vector<luisa::unique_ptr<std::filesystem::path>> _source_paths;
+    luisa::vector<const std::filesystem::path *> _source_path_stack;
     SceneDescNode _root;
 
 public:
-    explicit SceneDesc(std::filesystem::path base_folder) noexcept
-        : _base_folder{std::move(base_folder)},
-          _root{root_node_identifier, SceneNode::Tag::ROOT, {}} {}
-    [[nodiscard]] auto &base_directory() const noexcept { return _base_folder; }
+    SceneDesc() noexcept: _root{root_node_identifier, SceneNode::Tag::ROOT} {}
     [[nodiscard]] auto &nodes() const noexcept { return _global_nodes; }
     [[nodiscard]] const SceneDescNode *node(std::string_view identifier) const noexcept;
     [[nodiscard]] auto root() const noexcept { return &_root; }
     void declare(std::string_view identifier, SceneNode::Tag tag) noexcept;
-    [[nodiscard]] SceneDescNode *define(std::string_view identifier, SceneNode::Tag tag, std::string_view impl_type) noexcept;
-    [[nodiscard]] SceneDescNode *define_root() noexcept;
+    [[nodiscard]] SceneDescNode *define(
+        std::string_view identifier, SceneNode::Tag tag,
+        std::string_view impl_type, SceneDescNode::SourceLocation location = {}) noexcept;
+    [[nodiscard]] SceneDescNode *define_root(SceneDescNode::SourceLocation location = {}) noexcept;
+    void push_source_path(const std::filesystem::path &path) noexcept;
+    void pop_source_path() noexcept;
+    [[nodiscard]] const std::filesystem::path *current_source_path() const noexcept;
+    template<typename F>
+    void with_source_path(const std::filesystem::path &path, F &&f) noexcept {
+        push_source_path(path);
+        std::invoke(std::forward<F>(f));
+        pop_source_path();
+    }
     void validate() const noexcept;
 };
 
