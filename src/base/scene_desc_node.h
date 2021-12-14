@@ -75,10 +75,52 @@ public:
     void add_property(std::string_view name, number_type value) noexcept { add_property(name, number_list{value}); }
     void add_property(std::string_view name, string_type value) noexcept { add_property(name, string_list{std::move(value)}); }
     void add_property(std::string_view name, node_type value) noexcept { add_property(name, node_list{value}); }
-    [[nodiscard]] SceneDescNode *define_internal(std::string_view name, std::string_view impl_type, SourceLocation location = {}) noexcept;
+    [[nodiscard]] SceneDescNode *define_internal(
+        std::string_view name, std::string_view impl_type, SourceLocation location = {}) noexcept;
     [[nodiscard]] auto is_root() const noexcept { return _tag == SceneNode::Tag::ROOT; }
     [[nodiscard]] auto is_internal() const noexcept { return _tag == SceneNode::Tag::INTERNAL; }
     [[nodiscard]] auto is_defined() const noexcept { return !_impl_type.empty(); }
+
+public:
+    using int_list = luisa::vector<int>;
+    using uint_list = luisa::vector<uint>;
+    using float_list = luisa::vector<float>;
+    using node = const SceneDescNode *;
+    using string = luisa::string;
+    using path = std::filesystem::path;
+    using path_list = luisa::vector<path>;
+
+    // parameter getters
+#define LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(type)                           \
+    [[nodiscard]] type property_##type(std::string_view name) const noexcept; \
+    [[nodiscard]] type property_##type##_or_default(std::string_view name, type default_value) const noexcept;
+    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(int)
+    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(int2)
+    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(int3)
+    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(int4)
+    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(uint)
+    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(uint2)
+    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(uint3)
+    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(uint4)
+    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(bool)
+    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(bool2)
+    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(bool3)
+    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(bool4)
+    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(float)
+    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(float2)
+    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(float3)
+    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(float4)
+    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(string)
+    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(path)
+    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(node)
+    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(int_list)
+    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(uint_list)
+    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(bool_list)
+    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(float_list)
+    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(string_list)
+    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(path_list)
+    LUISA_SCENE_DESC_NODE_PROPERTY_GETTER(node_list)
+#undef LUISA_SCENE_DESC_NODE_PROPERTY_GETTER
 };
 
 }// namespace luisa::render

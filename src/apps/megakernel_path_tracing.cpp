@@ -33,6 +33,8 @@
     return options;
 }
 
+using namespace luisa;
+using namespace luisa::compute;
 using namespace luisa::render;
 
 void dump(std::ostream &os, const SceneDescNode *node, size_t indent_level = 0) noexcept {
@@ -113,6 +115,32 @@ void dump(std::ostream &os, const SceneDesc &scene) noexcept {
     os << std::endl;
     os.flags(flags);
 }
+
+class Base {
+public:
+    virtual ~Base() noexcept = default;
+    [[nodiscard]] virtual Float foo(Int x, Float y) const noexcept = 0;
+};
+
+[[nodiscard]] Float use_base(const Base &base, Int x, Float y) noexcept {
+    return base.foo(x, y);
+}
+
+class DerivedA : public Base {
+public:
+    [[nodiscard]] Float foo(Int x, Float y) const noexcept override {
+        return cast<float>(x) + y;
+    }
+};
+
+class DerivedB : public Base {
+private:
+    Buffer<float> _buffer;
+public:
+    [[nodiscard]] Float foo(Int x, Float y) const noexcept override {
+        return _buffer[x] + y;
+    }
+};
 
 int main(int argc, char *argv[]) {
 
