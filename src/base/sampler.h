@@ -16,18 +16,17 @@ using compute::Float2;
 class Sampler : public SceneNode {
 
 public:
-    Sampler(Scene *scene, const SceneNodeDesc *desc) noexcept;
+    struct Instance : public SceneNode::Instance {
+        virtual void start(Expr<uint2> pixel, Expr<uint> sample_index) noexcept = 0;
+        virtual void save_state() noexcept = 0;
+        virtual void load_state(Expr<uint2> pixel) noexcept = 0;
+        [[nodiscard]] virtual Float generate_1d() noexcept = 0;
+        [[nodiscard]] virtual Float2 generate_2d() noexcept = 0;
+    };
 
-    // start the sample sequence at a given pixel
-    virtual void start(Expr<uint2> pixel, Expr<uint> sample_index) noexcept = 0;
-    // save the sampler's state to its internal buffer
-    virtual void save() noexcept = 0;
-    // resume the sample sequence, from the previously saved state (in the internal buffer)
-    virtual void resume(Expr<uint2> pixel) noexcept = 0;
-    // generate a 1D sample, the internal (on-stack) state will be updated
-    [[nodiscard]] virtual Float generate_1d() noexcept = 0;
-    // generate a 2D sample, the internal (on-stack) state will be updated
-    [[nodiscard]] virtual Float2 generate_2d() noexcept = 0;
+public:
+    Sampler(Scene *scene, const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(Stream &stream, uint2 resolution, uint spp) const noexcept = 0;
 };
 
-}
+}// namespace luisa::render

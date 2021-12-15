@@ -6,4 +6,9 @@
 
 namespace luisa::render {
 
+inline Pipeline::Pipeline(Device &device) noexcept
+    : _device{device} {}
+
+
+
 }

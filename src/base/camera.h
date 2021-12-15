@@ -7,6 +7,7 @@
 #include <dsl/syntax.h>
 #include <rtx/ray.h>
 #include <base/scene_node.h>
+#include <base/sampler.h>
 
 namespace luisa::render {
 
@@ -28,6 +29,12 @@ public:
         Float3 weight;
     };
 
+    struct Instance : public SceneNode::Instance {
+        // generate ray in camera space
+        [[nodiscard]] virtual Sample generate_ray(
+            Sampler::Instance &sampler, Expr<float2> pixel, Expr<float> time) const noexcept = 0;
+    };
+
 private:
     const Film *_film;
     const Filter *_filter;
@@ -38,10 +45,7 @@ public:
     [[nodiscard]] auto film() const noexcept { return _film; }
     [[nodiscard]] auto filter() const noexcept { return _filter; }
     [[nodiscard]] auto transform() const noexcept { return _transform; }
-
-    // generate a ray in the **camera** space; the renderer is responsible for the camera-to-world transform
-    // camera space: right-handed, x - right, y - up, z - out
-    [[nodiscard]] virtual Sample generate_ray(Sampler &sampler, Expr<uint2> pixel, Expr<float> time) const noexcept = 0;
+    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(Stream &stream, float initial_time) const noexcept = 0;
 };
 
 }// namespace luisa::render
