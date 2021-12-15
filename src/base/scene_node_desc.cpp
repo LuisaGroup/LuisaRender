@@ -121,11 +121,11 @@ SceneNodeDesc *SceneNodeDesc::define_internal(std::string_view name, std::string
     }                                                         \
     LUISA_SCENE_NODE_DESC_PROPERTY_HANDLE_DEFAULT(d, dv)
 
-#define LUISA_SCENE_NODE_DESC_PROPERTY_IMPL_SCALAR(type, d, dv)        \
-    try {                                                              \
-        LUISA_SCENE_NODE_DESC_PROPERTY_IMPL_SCALAR_OR_VECTOR(type, 1u) \
-        return convert(0u);                                            \
-    }                                                                  \
+#define LUISA_SCENE_NODE_DESC_PROPERTY_IMPL_SCALAR(type, d, dv)       \
+    try {                                                             \
+        LUISA_SCENE_NODE_DESC_PROPERTY_IMPL_SCALAR_OR_VECTOR(type, 1) \
+        return convert(0u);                                           \
+    }                                                                 \
     LUISA_SCENE_NODE_DESC_PROPERTY_HANDLE_DEFAULT(d, dv)
 
 #define LUISA_SCENE_NODE_DESC_PROPERTY_IMPL_VECTOR2(type, d, dv)      \
@@ -135,11 +135,12 @@ SceneNodeDesc *SceneNodeDesc::define_internal(std::string_view name, std::string
     }                                                                 \
     LUISA_SCENE_NODE_DESC_PROPERTY_HANDLE_DEFAULT(d, dv)
 
-#define LUISA_SCENE_NODE_DESC_PROPERTY_IMPL_VECTOR3(type, d, dv)       \
-    try {                                                              \
-        LUISA_SCENE_NODE_DESC_PROPERTY_IMPL_SCALAR_OR_VECTOR(type, 3)  \
-        return Vector<type, 3>{convert(0u), convert(1u), convert(2u)}; \
-    }                                                                  \
+#define LUISA_SCENE_NODE_DESC_PROPERTY_IMPL_VECTOR3(type, d, dv)      \
+    try {                                                             \
+        LUISA_SCENE_NODE_DESC_PROPERTY_IMPL_SCALAR_OR_VECTOR(type, 3) \
+        return Vector<type, 3>{                                       \
+            convert(0u), convert(1u), convert(2u)};                   \
+    }                                                                 \
     LUISA_SCENE_NODE_DESC_PROPERTY_HANDLE_DEFAULT(d, dv)
 
 #define LUISA_SCENE_NODE_DESC_PROPERTY_IMPL_VECTOR4(type, d, dv)      \
@@ -217,8 +218,8 @@ LUISA_SCENE_NODE_DESC_PROPERTY_GETTER_LIST_IMPL(path)
 LUISA_SCENE_NODE_DESC_PROPERTY_GETTER_LIST_IMPL(node)
 
 #undef LUSIA_SCENE_NODE_DESC_PROPERTY_THROW
-#undef LUISA_SCENE_NODE_DESC_PROPERTY_GET_POINTER
 #undef LUISA_SCENE_NODE_DESC_PROPERTY_IMPL_LIST
+#undef LUISA_SCENE_NODE_DESC_PROPERTY_GET_POINTER
 #undef LUISA_SCENE_NODE_DESC_PROPERTY_IMPL_SCALAR
 #undef LUISA_SCENE_NODE_DESC_PROPERTY_IMPL_VECTOR2
 #undef LUISA_SCENE_NODE_DESC_PROPERTY_IMPL_VECTOR3
