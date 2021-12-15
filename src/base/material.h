@@ -9,7 +9,8 @@
 namespace luisa::render {
 
 class Material : public SceneNode {
-
+public:
+    Material(Scene *scene, const SceneNodeDesc *desc) noexcept;
 };
 
 }

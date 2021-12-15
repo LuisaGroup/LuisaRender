@@ -8,8 +8,16 @@
 
 namespace luisa::render {
 
+class Sampler;
+
 class Integrator : public SceneNode {
 
+private:
+    Sampler *_sampler;
+
+public:
+    Integrator(Scene *scene, const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] auto sampler() const noexcept { return _sampler; }
 };
 
 }

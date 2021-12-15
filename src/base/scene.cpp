@@ -10,6 +10,7 @@
 #include <base/filter.h>
 #include <base/integrator.h>
 #include <base/material.h>
+#include <base/light.h>
 #include <base/sampler.h>
 #include <base/shape.h>
 #include <base/transform.h>
@@ -27,6 +28,8 @@ struct Scene::Config {
     luisa::vector<Camera *> cameras;
     luisa::vector<Shape *> shapes;
     luisa::vector<Environment *> environments;
+    uint2 resolution{};
+    uint spp{0u};
 };
 
 const Integrator *Scene::integrator() const noexcept { return _config->integrator; }
@@ -60,7 +63,8 @@ namespace detail {
 
 }// namespace detail
 
-SceneNode *Scene::_node(SceneNode::Tag tag, const SceneNodeDesc *desc) noexcept {
+SceneNode *Scene::load_node(SceneNode::Tag tag, const SceneNodeDesc *desc) noexcept {
+    if (desc == nullptr) { return nullptr; }
     if (!desc->is_defined()) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
             "Undefined scene description "
@@ -107,40 +111,44 @@ inline Scene::Scene(const Context &ctx) noexcept
     : _context{ctx},
       _config{luisa::make_unique<Scene::Config>()} {}
 
-Camera *Scene::_camera(const SceneNodeDesc *desc) noexcept {
-    return dynamic_cast<Camera *>(_node(SceneNode::Tag::CAMERA, desc));
+Camera *Scene::load_camera(const SceneNodeDesc *desc) noexcept {
+    return dynamic_cast<Camera *>(load_node(SceneNode::Tag::CAMERA, desc));
 }
 
-Film *Scene::_film(const SceneNodeDesc *desc) noexcept {
-    return dynamic_cast<Film *>(_node(SceneNode::Tag::FILM, desc));
+Film *Scene::load_film(const SceneNodeDesc *desc) noexcept {
+    return dynamic_cast<Film *>(load_node(SceneNode::Tag::FILM, desc));
 }
 
-Filter *Scene::_filter(const SceneNodeDesc *desc) noexcept {
-    return dynamic_cast<Filter *>(_node(SceneNode::Tag::FILTER, desc));
+Filter *Scene::load_filter(const SceneNodeDesc *desc) noexcept {
+    return dynamic_cast<Filter *>(load_node(SceneNode::Tag::FILTER, desc));
 }
 
-Integrator *Scene::_integrator(const SceneNodeDesc *desc) noexcept {
-    return dynamic_cast<Integrator *>(_node(SceneNode::Tag::INTEGRATOR, desc));
+Integrator *Scene::load_integrator(const SceneNodeDesc *desc) noexcept {
+    return dynamic_cast<Integrator *>(load_node(SceneNode::Tag::INTEGRATOR, desc));
 }
 
-Material *Scene::_material(const SceneNodeDesc *desc) noexcept {
-    return dynamic_cast<Material *>(_node(SceneNode::Tag::MATERIAL, desc));
+Material *Scene::load_material(const SceneNodeDesc *desc) noexcept {
+    return dynamic_cast<Material *>(load_node(SceneNode::Tag::MATERIAL, desc));
 }
 
-Sampler *Scene::_sampler(const SceneNodeDesc *desc) noexcept {
-    return dynamic_cast<Sampler *>(_node(SceneNode::Tag::SAMPLER, desc));
+Light *Scene::load_light(const SceneNodeDesc *desc) noexcept {
+    return dynamic_cast<Light *>(load_node(SceneNode::Tag::LIGHT, desc));
 }
 
-Shape *Scene::_shape(const SceneNodeDesc *desc) noexcept {
-    return dynamic_cast<Shape *>(_node(SceneNode::Tag::SHAPE, desc));
+Sampler *Scene::load_sampler(const SceneNodeDesc *desc) noexcept {
+    return dynamic_cast<Sampler *>(load_node(SceneNode::Tag::SAMPLER, desc));
 }
 
-Transform *Scene::_transform(const SceneNodeDesc *desc) noexcept {
-    return dynamic_cast<Transform *>(_node(SceneNode::Tag::TRANSFORM, desc));
+Shape *Scene::load_shape(const SceneNodeDesc *desc) noexcept {
+    return dynamic_cast<Shape *>(load_node(SceneNode::Tag::SHAPE, desc));
 }
 
-Environment *Scene::_environment(const SceneNodeDesc *desc) noexcept {
-    return dynamic_cast<Environment *>(_node(SceneNode::Tag::ENVIRONMENT, desc));
+Transform *Scene::load_transform(const SceneNodeDesc *desc) noexcept {
+    return dynamic_cast<Transform *>(load_node(SceneNode::Tag::TRANSFORM, desc));
+}
+
+Environment *Scene::load_environment(const SceneNodeDesc *desc) noexcept {
+    return dynamic_cast<Environment *>(load_node(SceneNode::Tag::ENVIRONMENT, desc));
 }
 
 luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc) noexcept {
@@ -150,7 +158,12 @@ luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc
             "in the scene description.");
     }
     auto scene = luisa::make_unique<Scene>(ctx);
-    scene->_config->integrator = scene->_integrator(desc->root()->property_node("integrator"));
+    scene->_config->resolution = desc->root()->property_uint2_or_default(
+        "resolution",
+        make_uint2(desc->root()->property_uint_or_default(
+            "resolution", 1024u)));
+    scene->_config->spp = desc->root()->property_uint_or_default("spp", 1024u);
+    scene->_config->integrator = scene->load_integrator(desc->root()->property_node("integrator"));
     auto cameras = desc->root()->property_node_list("cameras");
     auto shapes = desc->root()->property_node_list("shapes");
     auto environments = desc->root()->property_node_list("environments");
@@ -159,18 +172,21 @@ luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc
     scene->_config->environments.reserve(environments.size());
     for (auto c : cameras) {
         scene->_config->cameras.emplace_back(
-            scene->_camera(c));
+            scene->load_camera(c));
     }
     for (auto s : shapes) {
         scene->_config->shapes.emplace_back(
-            scene->_shape(s));
+            scene->load_shape(s));
     }
     for (auto e : environments) {
         scene->_config->environments.emplace_back(
-            scene->_environment(e));
+            scene->load_environment(e));
     }
     return scene;
 }
+
+uint2 Scene::resolution() const noexcept { return _config->resolution; }
+uint Scene::spp() const noexcept { return _config->spp; }
 
 Scene::~Scene() noexcept = default;
 

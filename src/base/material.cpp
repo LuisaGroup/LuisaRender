@@ -6,6 +6,7 @@
 
 namespace luisa::render {
 
+Material::Material(Scene *scene, const SceneNodeDesc *desc) noexcept
+    : SceneNode{scene, desc, SceneNode::Tag::MATERIAL} {}
 
-
-}
+}// namespace luisa::render

@@ -29,16 +29,12 @@ public:
     };
 
 private:
-    Film *_film{nullptr};
-    Filter *_filter{nullptr};
-    Transform *_transform{nullptr};
+    const Film *_film;
+    const Filter *_filter;
+    const Transform *_transform;
 
 public:
-    Camera(Scene *scene, const SceneNodeDesc *desc) noexcept
-        : SceneNode{scene, desc, SceneNode::Tag::CAMERA} {}
-    Camera &set_film(Film *film) noexcept;
-    Camera &set_filter(Filter *filter) noexcept;
-    Camera &set_transform(Transform *transform) noexcept;
+    Camera(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] auto film() const noexcept { return _film; }
     [[nodiscard]] auto filter() const noexcept { return _filter; }
     [[nodiscard]] auto transform() const noexcept { return _transform; }

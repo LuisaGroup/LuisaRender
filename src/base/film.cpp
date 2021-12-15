@@ -6,6 +6,7 @@
 
 namespace luisa::render {
 
+Film::Film(Scene *scene, const SceneNodeDesc *desc) noexcept
+    : SceneNode{scene, desc, SceneNode::Tag::FILM} {}
 
-
-}
+}// namespace luisa::render

@@ -2,23 +2,19 @@
 // Created by Mike on 2021/12/8.
 //
 
+#include <base/scene.h>
+#include <base/film.h>
+#include <base/filter.h>
+#include <base/transform.h>
+#include <base/scene_node_desc.h>
 #include <base/camera.h>
 
 namespace luisa::render {
 
-Camera &Camera::set_film(Film *film) noexcept {
-    _film = film;
-    return *this;
-}
+Camera::Camera(Scene *scene, const SceneNodeDesc *desc) noexcept
+    : SceneNode{scene, desc, SceneNode::Tag::CAMERA},
+      _film{scene->load_film(desc->property_node_or_default("film"))},
+      _filter{scene->load_filter(desc->property_node_or_default("filter"))},
+      _transform{scene->load_transform(desc->property_node_or_default("transform"))} {}
 
-Camera &Camera::set_filter(Filter *filter) noexcept {
-    _filter = filter;
-    return *this;
-}
-
-Camera &Camera::set_transform(Transform *transform) noexcept {
-    _transform = transform;
-    return *this;
-}
-
-}
+}// namespace luisa::render

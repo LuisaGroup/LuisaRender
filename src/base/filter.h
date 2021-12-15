@@ -10,10 +10,12 @@ namespace luisa::render {
 
 class Filter : public SceneNode {
 
-public:
-    Filter(Scene *scene, const SceneNodeDesc *desc) noexcept
-        : SceneNode{scene, desc, SceneNode::Tag::FILTER} {}
+private:
+    float2 _radius;
 
+public:
+    Filter(Scene *scene, const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] auto radius() const noexcept { return _radius; }
 };
 
 }

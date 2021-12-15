@@ -29,6 +29,7 @@ public:
         CAMERA,
         SHAPE,
         MATERIAL,
+        LIGHT,
         TRANSFORM,
         FILM,
         FILTER,
@@ -49,7 +50,6 @@ public:
     [[nodiscard]] auto scene() const noexcept { return const_cast<const Scene *>(_scene); }
     [[nodiscard]] auto tag() const noexcept { return _tag; }
     [[nodiscard]] virtual std::string_view impl_type() const noexcept = 0;
-    virtual void build(Device &device, CommandBuffer &command_buffer) noexcept = 0;
     [[nodiscard]] static constexpr std::string_view tag_description(Tag tag) noexcept;
 };
 
@@ -61,6 +61,7 @@ constexpr std::string_view SceneNode::tag_description(SceneNode::Tag tag) noexce
         case SceneNode::Tag::CAMERA: return "Camera"sv;
         case SceneNode::Tag::SHAPE: return "Shape"sv;
         case SceneNode::Tag::MATERIAL: return "Material"sv;
+        case SceneNode::Tag::LIGHT: return "Light"sv;
         case SceneNode::Tag::TRANSFORM: return "Transform"sv;
         case SceneNode::Tag::FILM: return "Film"sv;
         case SceneNode::Tag::FILTER: return "Filter"sv;

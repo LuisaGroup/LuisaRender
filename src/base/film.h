@@ -9,7 +9,8 @@
 namespace luisa::render {
 
 class Film : public SceneNode {
-
+public:
+    Film(Scene *scene, const SceneNodeDesc *desc) noexcept;
 };
 
 }

@@ -9,6 +9,7 @@
 
 #include <core/hash.h>
 #include <core/allocator.h>
+#include <core/basic_types.h>
 #include <base/scene_node.h>
 
 namespace luisa::render {
@@ -93,7 +94,7 @@ public:
     // parameter getters
 #define LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(type)                           \
     [[nodiscard]] type property_##type(std::string_view name) const noexcept; \
-    [[nodiscard]] type property_##type##_or_default(std::string_view name, type default_value) const noexcept;
+    [[nodiscard]] type property_##type##_or_default(std::string_view name, type default_value = {}) const noexcept;
     LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(int)
     LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(int2)
     LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(int3)

@@ -8,8 +8,16 @@
 
 namespace luisa::render {
 
+class Transform;
+
 class Environment : public SceneNode {
 
+private:
+    const Transform *_transform;
+
+public:
+    Environment(Scene *scene, const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] auto transform() const noexcept { return _transform; }
 };
 
-}
+}// namespace luisa::render

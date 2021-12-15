@@ -1,6 +1,6 @@
 set(LUISA_RENDER_BASE_SOURCES
         scene.cpp scene.h
-        transform.h
+        transform.cpp transform.h
         camera.cpp camera.h
         sampler.cpp sampler.h
         filter.cpp filter.h
@@ -11,7 +11,8 @@ set(LUISA_RENDER_BASE_SOURCES
         material.cpp material.h
         film.cpp film.h
         integrator.cpp integrator.h
-        environment.cpp environment.h)
+        environment.cpp environment.h
+        light.cpp light.h)
 
 add_library(luisa-render-base SHARED ${LUISA_RENDER_BASE_SOURCES})
 target_link_libraries(luisa-render-base PUBLIC

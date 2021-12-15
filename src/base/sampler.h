@@ -15,16 +15,8 @@ using compute::Float2;
 
 class Sampler : public SceneNode {
 
-private:
-    uint2 _resolution{};
-    uint _sample_count{};
-
 public:
     Sampler(Scene *scene, const SceneNodeDesc *desc) noexcept;
-    Sampler &set_resolution(uint2 r) noexcept;
-    Sampler &set_sample_count(uint spp) noexcept;
-    [[nodiscard]] auto resolution() const noexcept { return _resolution; }
-    [[nodiscard]] auto sample_count() const noexcept { return _sample_count; }
 
     // start the sample sequence at a given pixel
     virtual void start(Expr<uint2> pixel, Expr<uint> sample_index) noexcept = 0;
