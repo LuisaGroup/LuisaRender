@@ -9,16 +9,17 @@
 
 namespace luisa::compute {
 class Device;
-class CommandBuffer;
+class Stream;
 }
 
 namespace luisa::render {
 
 using compute::Device;
-using compute::CommandBuffer;
+using compute::Stream;
 
 class Scene;
 class SceneNodeDesc;
+class Pipeline;
 
 class SceneNode {
 
@@ -40,16 +41,16 @@ public:
     };
 
 private:
-    Scene *_scene;
+    const Scene *_scene;
     Tag _tag;
 
 public:
-    SceneNode(Scene *scene, const SceneNodeDesc *desc, Tag tag) noexcept;
+    SceneNode(const Scene *scene, const SceneNodeDesc *desc, Tag tag) noexcept;
     virtual ~SceneNode() noexcept = default;
-    [[nodiscard]] auto scene() noexcept { return _scene; }
-    [[nodiscard]] auto scene() const noexcept { return const_cast<const Scene *>(_scene); }
+    [[nodiscard]] auto scene() const noexcept { return _scene; }
     [[nodiscard]] auto tag() const noexcept { return _tag; }
     [[nodiscard]] virtual std::string_view impl_type() const noexcept = 0;
+    virtual void build(Stream &stream, Pipeline &pipeline) const noexcept = 0;
     [[nodiscard]] static constexpr std::string_view tag_description(Tag tag) noexcept;
 };
 

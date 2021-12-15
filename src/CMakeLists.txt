@@ -25,6 +25,7 @@ endif ()
 
 add_subdirectory(compute)
 add_subdirectory(base)
+add_subdirectory(pipeline)
 add_subdirectory(cameras)
 add_subdirectory(films)
 add_subdirectory(filters)
@@ -39,6 +40,7 @@ target_link_libraries(luisa-render INTERFACE
         luisa-render-ext
         luisa-render-include
         luisa-render-base
+        luisa-render-pipeline
         luisa-render-cameras
         luisa-render-films
         luisa-render-filters

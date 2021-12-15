@@ -25,6 +25,7 @@ public:
     [[nodiscard]] auto light() const noexcept { return _light; }
     [[nodiscard]] auto transform() const noexcept { return _transform; }
     [[nodiscard]] virtual bool is_static() const noexcept = 0;
+    [[nodiscard]] virtual bool is_rigid() const noexcept = 0;
 };
 
 }// namespace luisa::render

@@ -9,13 +9,13 @@
 #include <core/hash.h>
 #include <core/allocator.h>
 #include <core/dynamic_module.h>
+#include <core/basic_types.h>
 #include <runtime/context.h>
 #include <base/scene_node.h>
 
 namespace luisa::render {
 
 using compute::Context;
-using compute::Stream;
 
 class SceneDesc;
 class SceneNodeDesc;
@@ -71,9 +71,7 @@ public:
     [[nodiscard]] std::span<const Shape *const> shapes() const noexcept;
     [[nodiscard]] std::span<const Camera *const> cameras() const noexcept;
     [[nodiscard]] std::span<const Environment *const> environments() const noexcept;
-    [[nodiscard]] uint2 resolution() const noexcept;
     [[nodiscard]] uint spp() const noexcept;
-    // TODO: build & update
 };
 
 }
