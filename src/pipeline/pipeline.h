@@ -4,8 +4,7 @@
 
 #pragma once
 
-#include <optional>
-#include <luisa-compute.h>
+#include <pipeline/pipeline_data.h>
 
 namespace luisa::render {
 

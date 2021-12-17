@@ -1,5 +1,7 @@
 set(LUISA_RENDER_PIPELINE_SOURCES
-        pipeline.cpp pipeline.h)
+        pipeline.cpp pipeline.h
+        pipeline_data.cpp pipeline_data.h
+        instance.h)
 
 add_library(luisa-render-pipeline SHARED ${LUISA_RENDER_PIPELINE_SOURCES})
 target_link_libraries(luisa-render-pipeline PUBLIC luisa-render-base)
