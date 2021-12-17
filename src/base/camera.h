@@ -30,7 +30,7 @@ public:
     };
 
     struct Instance : public SceneNode::Instance {
-        // generate ray in camera space
+        // generate ray in camera space, should not consider filter and/or transform
         [[nodiscard]] virtual Sample generate_ray(
             Sampler::Instance &sampler, Expr<float2> pixel, Expr<float> time) const noexcept = 0;
     };
