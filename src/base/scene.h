@@ -46,14 +46,14 @@ private:
     luisa::unique_ptr<Config> _config;
 
 public:
-    // for internal use only, call Scene::create instead
+    // for internal use only, call Scene::create() instead
     explicit Scene(const Context &ctx) noexcept;
     ~Scene() noexcept;
     Scene(Scene &&scene) noexcept = delete;
     Scene(const Scene &scene) noexcept = delete;
     Scene &operator=(Scene &&scene) noexcept = delete;
     Scene &operator=(const Scene &scene) noexcept = delete;
-    [[nodiscard]] SceneNode *load_node(SceneNode::Tag tag, const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] SceneNode *load_node(SceneNodeTag tag, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] Camera *load_camera(const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] Film *load_film(const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] Filter *load_filter(const SceneNodeDesc *desc) noexcept;

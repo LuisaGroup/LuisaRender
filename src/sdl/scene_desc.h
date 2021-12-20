@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <base/scene_node_desc.h>
+#include <sdl/scene_node_desc.h>
 
 namespace luisa::render {
 
@@ -39,13 +39,13 @@ private:
     SceneNodeDesc _root;
 
 public:
-    SceneDesc() noexcept: _root{root_node_identifier, SceneNode::Tag::ROOT} {}
+    SceneDesc() noexcept: _root{root_node_identifier, SceneNodeTag::ROOT} {}
     [[nodiscard]] auto &nodes() const noexcept { return _global_nodes; }
     [[nodiscard]] const SceneNodeDesc *node(std::string_view identifier) const noexcept;
     [[nodiscard]] auto root() const noexcept { return &_root; }
-    void declare(std::string_view identifier, SceneNode::Tag tag) noexcept;
+    void declare(std::string_view identifier, SceneNodeTag tag) noexcept;
     [[nodiscard]] SceneNodeDesc *define(
-        std::string_view identifier, SceneNode::Tag tag,
+        std::string_view identifier, SceneNodeTag tag,
         std::string_view impl_type, SceneNodeDesc::SourceLocation location = {}) noexcept;
     [[nodiscard]] SceneNodeDesc *define_root(SceneNodeDesc::SourceLocation location = {}) noexcept;
     void push_source_path(const std::filesystem::path &path) noexcept;

@@ -3,28 +3,27 @@
 //
 
 #include <core/logging.h>
-#include <base/scene_node_desc.h>
 #include <base/scene_node.h>
 
 namespace luisa::render {
 
-SceneNode::SceneNode(const Scene *scene, const SceneNodeDesc *desc, SceneNode::Tag tag) noexcept
+SceneNode::SceneNode(const Scene *scene, const SceneNodeDesc *desc, SceneNodeTag tag) noexcept
     : _scene{scene}, _tag{tag} {
     if (!desc->is_defined()) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
             "Undefined scene description "
             "node '{}' (type = {}::{}).",
             desc->identifier(),
-            tag_description(desc->tag()),
+            scene_node_tag_description(desc->tag()),
             desc->impl_type());
     }
     if (!desc->is_internal() && desc->tag() != tag) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
             "Invalid tag {} of scene description "
             "node '{}' (expected {}).",
-            tag_description(desc->tag()),
+            scene_node_tag_description(desc->tag()),
             desc->identifier(),
-            tag_description(tag));
+            scene_node_tag_description(tag));
     }
 }
 

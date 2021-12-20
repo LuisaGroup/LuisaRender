@@ -3,7 +3,7 @@
 //
 
 #include <sstream>
-#include <base/scene_desc.h>
+#include <sdl/scene_desc.h>
 
 namespace luisa::render {
 
@@ -18,15 +18,15 @@ const SceneNodeDesc *SceneDesc::node(std::string_view identifier) const noexcept
         identifier);
 }
 
-void SceneDesc::declare(std::string_view identifier, SceneNode::Tag tag) noexcept {
-    if (tag == SceneNode::Tag::INTERNAL) [[unlikely]] {
+void SceneDesc::declare(std::string_view identifier, SceneNodeTag tag) noexcept {
+    if (tag == SceneNodeTag::INTERNAL) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
             "Invalid forward declaration of "
             "internal node '{}'.",
             identifier);
     }
     if (identifier == root_node_identifier ||
-        tag == SceneNode::Tag::ROOT) [[unlikely]] {
+        tag == SceneNodeTag::ROOT) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
             "Invalid forward declaration of root node");
     }
@@ -41,23 +41,23 @@ void SceneDesc::declare(std::string_view identifier, SceneNode::Tag tag) noexcep
             "Forward-declaration of node '{}' has "
             "a different tag '{}' from '{}' "
             "in previous declarations.",
-            identifier, SceneNode::tag_description(tag),
-            SceneNode::tag_description(node->tag()));
+            identifier, scene_node_tag_description(tag),
+            scene_node_tag_description(node->tag()));
     }
 }
 
 SceneNodeDesc *SceneDesc::define(
-    std::string_view identifier, SceneNode::Tag tag,
+    std::string_view identifier, SceneNodeTag tag,
     std::string_view impl_type, SceneNodeDesc::SourceLocation location) noexcept {
 
     if (identifier == root_node_identifier ||
-        tag == SceneNode::Tag::ROOT) [[unlikely]] {
+        tag == SceneNodeTag::ROOT) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
             "Defining root node as a normal "
             "global node is not allowed. "
             "Please use SceneNodeDesc::define_root().");
     }
-    if (tag == SceneNode::Tag::INTERNAL) [[unlikely]] {
+    if (tag == SceneNodeTag::INTERNAL) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
             "Defining internal node as a "
             "global node is not allowed.");
@@ -78,8 +78,8 @@ SceneNodeDesc *SceneDesc::define(
             LUISA_ERROR_WITH_LOCATION(
                 "Definition of node '{}' has a different tag '{}' "
                 "from '{}' in previous declarations.",
-                identifier, SceneNode::tag_description(tag),
-                SceneNode::tag_description(node->tag()));
+                identifier, scene_node_tag_description(tag),
+                scene_node_tag_description(node->tag()));
         }
     }
     node->set_impl_type(impl_type);

@@ -7,6 +7,6 @@
 namespace luisa::render {
 
 Sampler::Sampler(Scene *scene, const SceneNodeDesc *desc) noexcept
-    : SceneNode{scene, desc, SceneNode::Tag::SAMPLER} {}
+    : SceneNode{scene, desc, SceneNodeTag::SAMPLER} {}
 
 }// namespace luisa::render

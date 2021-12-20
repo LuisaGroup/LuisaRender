@@ -3,13 +3,13 @@
 //
 
 #include <core/logging.h>
-#include <base/scene_node_desc.h>
+#include <sdl/scene_node_desc.h>
 #include <base/filter.h>
 
 namespace luisa::render {
 
 Filter::Filter(Scene *scene, const SceneNodeDesc *desc) noexcept
-    : SceneNode{scene, desc, SceneNode::Tag::FILTER},
+    : SceneNode{scene, desc, SceneNodeTag::FILTER},
       _radius{desc->property_float2_or_default(
           "radius",
           make_float2(desc->property_float_or_default("radius", 1.0f)))} {

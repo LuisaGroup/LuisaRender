@@ -10,7 +10,7 @@
 #include <core/hash.h>
 #include <core/allocator.h>
 #include <core/basic_types.h>
-#include <base/scene_node.h>
+#include <sdl/scene_node_tag.h>
 
 namespace luisa::render {
 
@@ -52,13 +52,13 @@ public:
 private:
     luisa::string _identifier;
     SourceLocation _location;
-    SceneNode::Tag _tag;
+    SceneNodeTag _tag;
     luisa::string _impl_type;
     luisa::vector<luisa::unique_ptr<SceneNodeDesc>> _internal_nodes;
     luisa::unordered_map<luisa::string, value_list, Hash64> _properties;
 
 public:
-    SceneNodeDesc(std::string_view identifier, SceneNode::Tag tag) noexcept
+    SceneNodeDesc(std::string_view identifier, SceneNodeTag tag) noexcept
         : _identifier{identifier}, _tag{tag} {}
     SceneNodeDesc(SceneNodeDesc &&) noexcept = delete;
     SceneNodeDesc(const SceneNodeDesc &) noexcept = delete;
@@ -78,8 +78,8 @@ public:
     void add_property(std::string_view name, node_type value) noexcept { add_property(name, node_list{value}); }
     [[nodiscard]] SceneNodeDesc *define_internal(
         std::string_view name, std::string_view impl_type, SourceLocation location = {}) noexcept;
-    [[nodiscard]] auto is_root() const noexcept { return _tag == SceneNode::Tag::ROOT; }
-    [[nodiscard]] auto is_internal() const noexcept { return _tag == SceneNode::Tag::INTERNAL; }
+    [[nodiscard]] auto is_root() const noexcept { return _tag == SceneNodeTag::ROOT; }
+    [[nodiscard]] auto is_internal() const noexcept { return _tag == SceneNodeTag::INTERNAL; }
     [[nodiscard]] auto is_defined() const noexcept { return !_impl_type.empty(); }
 
 public:

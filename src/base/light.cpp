@@ -7,6 +7,6 @@
 namespace luisa::render {
 
 Light::Light(Scene *scene, const SceneNodeDesc *desc) noexcept
-    : SceneNode{scene, desc, SceneNode::Tag::LIGHT} {}
+    : SceneNode{scene, desc, SceneNodeTag::LIGHT} {}
 
 }// namespace luisa::render

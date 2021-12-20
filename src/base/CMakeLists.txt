@@ -5,19 +5,17 @@ set(LUISA_RENDER_BASE_SOURCES
         sampler.cpp sampler.h
         filter.cpp filter.h
         scene_node.cpp scene_node.h
-        scene_desc.cpp scene_desc.h
-        scene_node_desc.cpp scene_node_desc.h
         shape.cpp shape.h
         material.cpp material.h
         film.cpp film.h
         integrator.cpp integrator.h
         environment.cpp environment.h
-        light.cpp light.h)
+        light.cpp light.h
+        pipeline.cpp pipeline.h)
 
 add_library(luisa-render-base SHARED ${LUISA_RENDER_BASE_SOURCES})
 target_link_libraries(luisa-render-base PUBLIC
-        luisa-render-include
-        luisa-render-ext
+        luisa-render-sdl
         luisa::compute)
 set_target_properties(luisa-render-base PROPERTIES
         WINDOWS_EXPORT_ALL_SYMBOLS ON

@@ -15,8 +15,8 @@
 #include <base/shape.h>
 #include <base/transform.h>
 #include <base/environment.h>
-#include <base/scene_desc.h>
-#include <base/scene_node_desc.h>
+#include <sdl/scene_desc.h>
+#include <sdl/scene_node_desc.h>
 #include <base/scene.h>
 
 namespace luisa::render {
@@ -49,9 +49,9 @@ namespace detail {
     return mutex;
 }
 
-[[nodiscard]] static auto &scene_plugin_load(const std::filesystem::path &runtime_dir, SceneNode::Tag tag, std::string_view impl_type) noexcept {
+[[nodiscard]] static auto &scene_plugin_load(const std::filesystem::path &runtime_dir, SceneNodeTag tag, std::string_view impl_type) noexcept {
     std::scoped_lock lock{detail::scene_plugin_registry_mutex()};
-    luisa::string name{fmt::format("luisa-render-{}-{}", SceneNode::tag_description(tag), impl_type)};
+    luisa::string name{fmt::format("luisa-render-{}-{}", scene_node_tag_description(tag), impl_type)};
     for (auto &c : name) { c = static_cast<char>(std::tolower(c)); }
     auto &&registry = detail::scene_plugin_registry();
     if (auto iter = registry.find(name); iter != registry.end()) {
@@ -63,14 +63,14 @@ namespace detail {
 
 }// namespace detail
 
-SceneNode *Scene::load_node(SceneNode::Tag tag, const SceneNodeDesc *desc) noexcept {
+SceneNode *Scene::load_node(SceneNodeTag tag, const SceneNodeDesc *desc) noexcept {
     if (desc == nullptr) { return nullptr; }
     if (!desc->is_defined()) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
             "Undefined scene description "
             "node '{}' (type = {}::{}).",
             desc->identifier(),
-            SceneNode::tag_description(desc->tag()),
+            scene_node_tag_description(desc->tag()),
             desc->impl_type());
     }
     auto &&plugin = detail::scene_plugin_load(
@@ -86,9 +86,9 @@ SceneNode *Scene::load_node(SceneNode::Tag tag, const SceneNodeDesc *desc) noexc
         LUISA_ERROR_WITH_LOCATION(
             "Invalid tag {} of scene description "
             "node '{}' (expected {}).",
-            SceneNode::tag_description(desc->tag()),
+            scene_node_tag_description(desc->tag()),
             desc->identifier(),
-            SceneNode::tag_description(tag));
+            scene_node_tag_description(tag));
     }
     auto [iter, first_def] = _config->nodes.try_emplace(
         luisa::string{desc->identifier()},
@@ -100,8 +100,8 @@ SceneNode *Scene::load_node(SceneNode::Tag tag, const SceneNodeDesc *desc) noexc
     if (node->tag() != tag || node->impl_type() != desc->impl_type()) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
             "Scene node `{}` (type = {}::{}) is already in the graph (type = {}::{}).",
-            desc->identifier(), SceneNode::tag_description(tag),
-            desc->impl_type(), SceneNode::tag_description(node->tag()),
+            desc->identifier(), scene_node_tag_description(tag),
+            desc->impl_type(), scene_node_tag_description(node->tag()),
             node->impl_type());
     }
     return node;
@@ -112,43 +112,43 @@ inline Scene::Scene(const Context &ctx) noexcept
       _config{luisa::make_unique<Scene::Config>()} {}
 
 Camera *Scene::load_camera(const SceneNodeDesc *desc) noexcept {
-    return dynamic_cast<Camera *>(load_node(SceneNode::Tag::CAMERA, desc));
+    return dynamic_cast<Camera *>(load_node(SceneNodeTag::CAMERA, desc));
 }
 
 Film *Scene::load_film(const SceneNodeDesc *desc) noexcept {
-    return dynamic_cast<Film *>(load_node(SceneNode::Tag::FILM, desc));
+    return dynamic_cast<Film *>(load_node(SceneNodeTag::FILM, desc));
 }
 
 Filter *Scene::load_filter(const SceneNodeDesc *desc) noexcept {
-    return dynamic_cast<Filter *>(load_node(SceneNode::Tag::FILTER, desc));
+    return dynamic_cast<Filter *>(load_node(SceneNodeTag::FILTER, desc));
 }
 
 Integrator *Scene::load_integrator(const SceneNodeDesc *desc) noexcept {
-    return dynamic_cast<Integrator *>(load_node(SceneNode::Tag::INTEGRATOR, desc));
+    return dynamic_cast<Integrator *>(load_node(SceneNodeTag::INTEGRATOR, desc));
 }
 
 Material *Scene::load_material(const SceneNodeDesc *desc) noexcept {
-    return dynamic_cast<Material *>(load_node(SceneNode::Tag::MATERIAL, desc));
+    return dynamic_cast<Material *>(load_node(SceneNodeTag::MATERIAL, desc));
 }
 
 Light *Scene::load_light(const SceneNodeDesc *desc) noexcept {
-    return dynamic_cast<Light *>(load_node(SceneNode::Tag::LIGHT, desc));
+    return dynamic_cast<Light *>(load_node(SceneNodeTag::LIGHT, desc));
 }
 
 Sampler *Scene::load_sampler(const SceneNodeDesc *desc) noexcept {
-    return dynamic_cast<Sampler *>(load_node(SceneNode::Tag::SAMPLER, desc));
+    return dynamic_cast<Sampler *>(load_node(SceneNodeTag::SAMPLER, desc));
 }
 
 Shape *Scene::load_shape(const SceneNodeDesc *desc) noexcept {
-    return dynamic_cast<Shape *>(load_node(SceneNode::Tag::SHAPE, desc));
+    return dynamic_cast<Shape *>(load_node(SceneNodeTag::SHAPE, desc));
 }
 
 Transform *Scene::load_transform(const SceneNodeDesc *desc) noexcept {
-    return dynamic_cast<Transform *>(load_node(SceneNode::Tag::TRANSFORM, desc));
+    return dynamic_cast<Transform *>(load_node(SceneNodeTag::TRANSFORM, desc));
 }
 
 Environment *Scene::load_environment(const SceneNodeDesc *desc) noexcept {
-    return dynamic_cast<Environment *>(load_node(SceneNode::Tag::ENVIRONMENT, desc));
+    return dynamic_cast<Environment *>(load_node(SceneNodeTag::ENVIRONMENT, desc));
 }
 
 luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc) noexcept {

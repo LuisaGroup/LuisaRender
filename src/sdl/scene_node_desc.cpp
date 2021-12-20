@@ -3,7 +3,7 @@
 //
 
 #include <stdexcept>
-#include <base/scene_node_desc.h>
+#include <sdl/scene_node_desc.h>
 
 namespace luisa::render {
 
@@ -19,7 +19,7 @@ void SceneNodeDesc::add_property(std::string_view name, SceneNodeDesc::value_lis
 SceneNodeDesc *SceneNodeDesc::define_internal(std::string_view name, std::string_view impl_type, SourceLocation location) noexcept {
     auto unique_node = luisa::make_unique<SceneNodeDesc>(
         fmt::format("{}.$internal${}", _identifier, name),
-        SceneNode::Tag::INTERNAL);
+        SceneNodeTag::INTERNAL);
     auto node = _internal_nodes.emplace_back(std::move(unique_node)).get();
     node->set_impl_type(impl_type);
     node->set_source_location(location);

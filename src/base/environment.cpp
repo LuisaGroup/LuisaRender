@@ -4,13 +4,13 @@
 
 #include <base/scene.h>
 #include <base/transform.h>
-#include <base/scene_node_desc.h>
+#include <sdl/scene_node_desc.h>
 #include <base/environment.h>
 
 namespace luisa::render {
 
 Environment::Environment(Scene *scene, const SceneNodeDesc *desc) noexcept
-    : SceneNode{scene, desc, SceneNode::Tag::ENVIRONMENT},
+    : SceneNode{scene, desc, SceneNodeTag::ENVIRONMENT},
       _transform{scene->load_transform(desc->property_node_or_default("transform"))} {}
 
 }// namespace luisa::render

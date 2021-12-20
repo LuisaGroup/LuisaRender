@@ -7,7 +7,7 @@
 #include <cxxopts.hpp>
 #include <luisa-compute.h>
 
-#include <base/scene_desc.h>
+#include <sdl/scene_desc.h>
 
 [[nodiscard]] auto parse_cli_options(int argc, const char *const *argv) noexcept {
     cxxopts::Options cli{"Mega-Kernel Path Tracing"};
@@ -100,12 +100,12 @@ void dump(std::ostream &os, const SceneDesc &scene) noexcept {
     os << std::boolalpha;
     os << "// forward declarations\n";
     for (auto &&node : scene.nodes()) {
-        os << SceneNode::tag_description(node->tag()) << " "
+        os << scene_node_tag_description(node->tag()) << " "
            << node->identifier() << ";\n";
     }
     os << "\n// definitions\n";
     for (auto &&node : scene.nodes()) {
-        os << SceneNode::tag_description(node->tag()) << " "
+        os << scene_node_tag_description(node->tag()) << " "
            << node->identifier() << " : ";
         dump(os, node.get());
         os << "\n\n";
@@ -153,19 +153,19 @@ int main(int argc, char *argv[]) {
     auto device = context.create_device(backend, {{"index", index}});
 
     SceneDesc scene;
-    scene.declare("camera", SceneNode::Tag::CAMERA);
-    scene.declare("integrator", SceneNode::Tag::INTEGRATOR);
-    scene.declare("sampler", SceneNode::Tag::SAMPLER);
-    scene.declare("filter", SceneNode::Tag::FILTER);
-    auto camera = scene.define("camera", SceneNode::Tag::CAMERA, "ThinLens");
+    scene.declare("camera", SceneNodeTag::CAMERA);
+    scene.declare("integrator", SceneNodeTag::INTEGRATOR);
+    scene.declare("sampler", SceneNodeTag::SAMPLER);
+    scene.declare("filter", SceneNodeTag::FILTER);
+    auto camera = scene.define("camera", SceneNodeTag::CAMERA, "ThinLens");
     auto film = camera->define_internal("film", "RGB");
     film->add_property("resolution", SceneNodeDesc::number_list{1.0, 1.0});
     film->add_property("filter", SceneNodeDesc::node_list{scene.node("filter")});
-    auto filter = scene.define("filter", SceneNode::Tag::FILTER, "Gaussian");
+    auto filter = scene.define("filter", SceneNodeTag::FILTER, "Gaussian");
     filter->add_property("radius", 1.5);
-    auto integrator = scene.define("integrator", SceneNode::Tag::INTEGRATOR, "Path");
+    auto integrator = scene.define("integrator", SceneNodeTag::INTEGRATOR, "Path");
     integrator->add_property("sampler", scene.node("sampler"));
-    auto sampler = scene.define("sampler", SceneNode::Tag::SAMPLER, "Independent");
+    auto sampler = scene.define("sampler", SceneNodeTag::SAMPLER, "Independent");
     sampler->add_property("spp", 1024.0);
     auto root = scene.define_root();
     root->add_property("integrator", integrator);
