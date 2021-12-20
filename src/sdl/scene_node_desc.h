@@ -74,9 +74,9 @@ public:
     void add_property(std::string_view name, bool_type value) noexcept { add_property(name, bool_list{value}); }
     void add_property(std::string_view name, number_type value) noexcept { add_property(name, number_list{value}); }
     void add_property(std::string_view name, string_type value) noexcept { add_property(name, string_list{std::move(value)}); }
+    void add_property(std::string_view name, const char *value) noexcept { add_property(name, string_list{value}); }
     void add_property(std::string_view name, node_type value) noexcept { add_property(name, node_list{value}); }
-    [[nodiscard]] SceneNodeDesc *define_internal(
-        std::string_view name, std::string_view impl_type, SourceLocation location = {}) noexcept;
+    [[nodiscard]] SceneNodeDesc *define_internal(std::string_view impl_type, SourceLocation location = {}) noexcept;
     [[nodiscard]] auto is_root() const noexcept { return _tag == SceneNodeTag::ROOT; }
     [[nodiscard]] auto is_internal() const noexcept { return _tag == SceneNodeTag::INTERNAL; }
     [[nodiscard]] auto is_defined() const noexcept { return _tag != SceneNodeTag::DECLARATION && !_impl_type.empty(); }

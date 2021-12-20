@@ -42,6 +42,7 @@ public:
     SceneDesc() noexcept: _root{root_node_identifier, SceneNodeTag::ROOT} {}
     [[nodiscard]] auto &nodes() const noexcept { return _global_nodes; }
     [[nodiscard]] const SceneNodeDesc *node(std::string_view identifier) const noexcept;
+    [[nodiscard]] auto root() noexcept { return &_root; }
     [[nodiscard]] auto root() const noexcept { return &_root; }
     [[nodiscard]] const SceneNodeDesc *reference(std::string_view identifier) noexcept;
     [[nodiscard]] SceneNodeDesc *define(

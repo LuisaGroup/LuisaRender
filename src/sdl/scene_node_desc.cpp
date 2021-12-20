@@ -22,13 +22,12 @@ void SceneNodeDesc::define(SceneNodeTag tag, std::string_view t, SceneNodeDesc::
     _location = l;
 }
 
-SceneNodeDesc *SceneNodeDesc::define_internal(std::string_view name, std::string_view impl_type, SourceLocation location) noexcept {
+SceneNodeDesc *SceneNodeDesc::define_internal(std::string_view impl_type, SourceLocation location) noexcept {
     auto unique_node = luisa::make_unique<SceneNodeDesc>(
-        fmt::format("{}.$internal${}", _identifier, name),
+        fmt::format("{}.$internal{}", _identifier, _internal_nodes.size()),
         SceneNodeTag::INTERNAL);
     auto node = _internal_nodes.emplace_back(std::move(unique_node)).get();
     node->define(SceneNodeTag::INTERNAL, impl_type, location);
-    add_property(name, luisa::vector<node_type>{node});
     return node;
 }
 

@@ -60,18 +60,35 @@ void dump(std::ostream &os, const SceneNodeDesc *node, size_t indent_level = 0) 
                     }
                     os << "}";
                 } else if constexpr (std::is_same_v<T, SceneNodeDesc::node_list>) {
-                    if (v.size() == 1u && v.front()->is_internal()) {
-                        os << ": ";
-                        dump(os, v.front(), indent_level + 1u);
+                    if (v.size() == 1u) {
+                        if (v.front()->is_internal()) {
+                            os << ": ";
+                            dump(os, v.front(), indent_level + 1u);
+                        } else {
+                            os << "{ @" << v.front()->identifier() << " }";
+                        }
                     } else {
                         os << "{";
                         if (!v.empty()) {
-                            os << " @" << v.front()->identifier();
-                            for (auto i = 1u; i < v.size(); i++) {
-                                os << ", @" << v[i]->identifier();
+                            os << "\n";
+                            indent(indent_level + 2u);
+                            if (v.front()->is_internal()) {
+                                dump(os, v.front(), indent_level + 2u);
+                            } else {
+                                os << "@" << v.front()->identifier();
                             }
-                            os << " ";
+                            for (auto i = 1u; i < v.size(); i++) {
+                                os << ",\n";
+                                indent(indent_level + 2u);
+                                if (v[i]->is_internal()) {
+                                    dump(os, v[i], indent_level + 2u);
+                                } else {
+                                    os << "@" << v[i]->identifier();
+                                }
+                            }
+                            os << "\n";
                         }
+                        indent(indent_level + 1u);
                         os << "}";
                     }
                 } else {
@@ -149,7 +166,8 @@ int main(int argc, char *argv[]) {
 
     SceneDesc scene;
     auto camera = scene.define("camera", SceneNodeTag::CAMERA, "ThinLens");
-    auto film = camera->define_internal("film", "RGB");
+    auto film = camera->define_internal("RGB");
+    camera->add_property("film", film);
     film->add_property("resolution", SceneNodeDesc::number_list{1280, 720});
     film->add_property("filter", scene.reference("filter"));
     auto filter = scene.define("filter", SceneNodeTag::FILTER, "Gaussian");
@@ -162,9 +180,11 @@ int main(int argc, char *argv[]) {
     root->add_property("integrator", integrator);
     root->add_property("camera", camera);
     auto shape1 = scene.define("cornell", SceneNodeTag::SHAPE, "TriangleMesh");
-    auto light = shape1->define_internal("light", "Diffuse");
+    auto light = shape1->define_internal("Diffuse");
+    shape1->add_property("light", light);
     light->add_property("emission", SceneNodeDesc::number_list{10.0f, 10.0f, 10.0f});
-    auto shape2 = scene.define("box", SceneNodeTag::SHAPE, "TriangleMesh");
+    auto shape2 = scene.root()->define_internal("TriangleMesh");
+    shape2->add_property("path", "../box.obj");
     root->add_property("shapes", SceneNodeDesc::node_list{shape1, shape2});
 
     std::ostringstream os;
