@@ -68,9 +68,7 @@ public:
     [[nodiscard]] auto tag() const noexcept { return _tag; }
     [[nodiscard]] auto impl_type() const noexcept { return std::string_view{_impl_type}; }
     [[nodiscard]] auto source_location() const noexcept { return _location; }
-    void set_tag(SceneNodeTag tag) noexcept { _tag = tag; }
-    void set_impl_type(std::string_view t) noexcept { _impl_type = t; }
-    void set_source_location(SourceLocation l) noexcept { _location = l; }
+    void define(SceneNodeTag tag, std::string_view t, SourceLocation l) noexcept;
     [[nodiscard]] auto &properties() const noexcept { return _properties; }
     void add_property(std::string_view name, value_list values) noexcept;
     void add_property(std::string_view name, bool_type value) noexcept { add_property(name, bool_list{value}); }

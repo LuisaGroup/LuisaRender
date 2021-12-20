@@ -22,10 +22,6 @@ Sampler sampler : Independent {
   spp { 1024 }
 }
 
-Material white;
-Material red;
-Material green;
-
 Shape tall_box : TriangleMesh {
   material { @white }
 }

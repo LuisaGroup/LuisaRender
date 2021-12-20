@@ -23,11 +23,12 @@ const SceneNodeDesc *SceneDesc::reference(std::string_view identifier) noexcept 
         LUISA_ERROR_WITH_LOCATION(
             "Invalid reference to root node.");
     }
-    return _global_nodes.emplace(
+    auto [iter, _] = _global_nodes.emplace(
         lazy_construct([identifier] {
             return luisa::make_unique<SceneNodeDesc>(
                 identifier, SceneNodeTag::DECLARATION);
-        })).first->get();
+        }));
+    return iter->get();
 }
 
 SceneNodeDesc *SceneDesc::define(
@@ -47,30 +48,21 @@ SceneNodeDesc *SceneDesc::define(
             "Defining internal or declaration node "
             "as a global node is not allowed.");
     }
-    auto [iter, first_decl] = _global_nodes.emplace(
+    auto [iter, _] = _global_nodes.emplace(
         lazy_construct([identifier, tag] {
             return luisa::make_unique<SceneNodeDesc>(
                 identifier, tag);
         }));
     auto node = iter->get();
-    if (!first_decl) {
-        if (node->is_defined()) [[unlikely]] {
-            LUISA_ERROR_WITH_LOCATION(
-                "Redefinition of node '{}' in scene description.",
-                node->identifier());
-        }
-        if (node->tag() != SceneNodeTag::DECLARATION &&
-            node->tag() != tag) [[unlikely]] {
-            LUISA_ERROR_WITH_LOCATION(
-                "Definition of node '{}' has a different tag '{}' "
-                "from '{}' in previous declarations.",
-                identifier, scene_node_tag_description(tag),
-                scene_node_tag_description(node->tag()));
-        }
+    if (node->is_defined()) [[unlikely]] {
+        LUISA_ERROR_WITH_LOCATION(
+            "Redefinition of node '{}' ({}::{}) "
+            "in scene description.",
+            node->identifier(),
+            scene_node_tag_description(node->tag()),
+            node->impl_type());
     }
-    node->set_tag(tag);
-    node->set_impl_type(impl_type);
-    node->set_source_location(location);
+    node->define(tag, impl_type, location);
     return node;
 }
 
@@ -80,8 +72,7 @@ SceneNodeDesc *SceneDesc::define_root(SceneNodeDesc::SourceLocation location) no
             "Redefinition of root node "
             "in scene description.");
     }
-    _root.set_impl_type(root_node_identifier);
-    _root.set_source_location(location);
+    _root.define(SceneNodeTag::ROOT, root_node_identifier, location);
     return &_root;
 }
 
