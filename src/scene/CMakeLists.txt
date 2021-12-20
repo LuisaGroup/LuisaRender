@@ -1,4 +1,4 @@
-set(LUISA_RENDER_BASE_SOURCES
+set(LUISA_RENDER_SCENE_SOURCES
         scene.cpp scene.h
         transform.cpp transform.h
         camera.cpp camera.h
@@ -13,10 +13,10 @@ set(LUISA_RENDER_BASE_SOURCES
         light.cpp light.h
         pipeline.cpp pipeline.h)
 
-add_library(luisa-render-base SHARED ${LUISA_RENDER_BASE_SOURCES})
-target_link_libraries(luisa-render-base PUBLIC
+add_library(luisa-render-scene SHARED ${LUISA_RENDER_SCENE_SOURCES})
+target_link_libraries(luisa-render-scene PUBLIC
         luisa-render-sdl
         luisa::compute)
-set_target_properties(luisa-render-base PROPERTIES
+set_target_properties(luisa-render-scene PROPERTIES
         WINDOWS_EXPORT_ALL_SYMBOLS ON
         UNITY_BUILD ON)

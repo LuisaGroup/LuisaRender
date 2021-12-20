@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include <base/scene_node.h>
-#include <base/sampler.h>
+#include <scene/scene_node.h>
+#include <scene/sampler.h>
 
 namespace luisa::render {
 

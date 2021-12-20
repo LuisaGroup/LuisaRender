@@ -18,32 +18,16 @@ const SceneNodeDesc *SceneDesc::node(std::string_view identifier) const noexcept
         identifier);
 }
 
-void SceneDesc::declare(std::string_view identifier, SceneNodeTag tag) noexcept {
-    if (tag == SceneNodeTag::INTERNAL) [[unlikely]] {
+const SceneNodeDesc *SceneDesc::reference(std::string_view identifier) noexcept {
+    if (identifier == root_node_identifier) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
-            "Invalid forward declaration of "
-            "internal node '{}'.",
-            identifier);
+            "Invalid reference to root node.");
     }
-    if (identifier == root_node_identifier ||
-        tag == SceneNodeTag::ROOT) [[unlikely]] {
-        LUISA_ERROR_WITH_LOCATION(
-            "Invalid forward declaration of root node");
-    }
-    auto [iter, first_decl] = _global_nodes.emplace(
-        lazy_construct([identifier, tag] {
+    return _global_nodes.emplace(
+        lazy_construct([identifier] {
             return luisa::make_unique<SceneNodeDesc>(
-                identifier, tag);
-        }));
-    if (auto node = iter->get();
-        !first_decl && node->tag() != tag) [[unlikely]] {
-        LUISA_ERROR_WITH_LOCATION(
-            "Forward-declaration of node '{}' has "
-            "a different tag '{}' from '{}' "
-            "in previous declarations.",
-            identifier, scene_node_tag_description(tag),
-            scene_node_tag_description(node->tag()));
-    }
+                identifier, SceneNodeTag::DECLARATION);
+        })).first->get();
 }
 
 SceneNodeDesc *SceneDesc::define(
@@ -57,10 +41,11 @@ SceneNodeDesc *SceneDesc::define(
             "global node is not allowed. "
             "Please use SceneNodeDesc::define_root().");
     }
-    if (tag == SceneNodeTag::INTERNAL) [[unlikely]] {
+    if (tag == SceneNodeTag::INTERNAL ||
+        tag == SceneNodeTag::DECLARATION) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
-            "Defining internal node as a "
-            "global node is not allowed.");
+            "Defining internal or declaration node "
+            "as a global node is not allowed.");
     }
     auto [iter, first_decl] = _global_nodes.emplace(
         lazy_construct([identifier, tag] {
@@ -74,7 +59,8 @@ SceneNodeDesc *SceneDesc::define(
                 "Redefinition of node '{}' in scene description.",
                 node->identifier());
         }
-        if (node->tag() != tag) [[unlikely]] {
+        if (node->tag() != SceneNodeTag::DECLARATION &&
+            node->tag() != tag) [[unlikely]] {
             LUISA_ERROR_WITH_LOCATION(
                 "Definition of node '{}' has a different tag '{}' "
                 "from '{}' in previous declarations.",
@@ -82,6 +68,7 @@ SceneNodeDesc *SceneDesc::define(
                 scene_node_tag_description(node->tag()));
         }
     }
+    node->set_tag(tag);
     node->set_impl_type(impl_type);
     node->set_source_location(location);
     return node;
@@ -97,42 +84,6 @@ SceneNodeDesc *SceneDesc::define_root(SceneNodeDesc::SourceLocation location) no
     _root.set_source_location(location);
     return &_root;
 }
-
-//namespace detail {
-//
-//static void validate(const SceneNodeDesc *node, size_t depth) noexcept {
-//    if (depth > 32u) [[unlikely]] {
-//        LUISA_ERROR_WITH_LOCATION(
-//            "Scene description is too deep. "
-//            "Recursions in definitions?");
-//    }
-//    if (!node->is_defined()) [[unlikely]] {
-//        LUISA_ERROR_WITH_LOCATION(
-//            "Node '{}' is referenced but not defined "
-//            "in the scene description.",
-//            node->identifier());
-//    }
-//    for (auto &&[prop, values] : node->properties()) {
-//        if (auto nodes = std::get_if<SceneNodeDesc::node_list>(&values)) {
-//            for (auto n : *nodes) { validate(n, depth + 1u); }
-//        }
-//    }
-//}
-//
-//}// namespace detail
-//
-//void SceneDesc::validate() const noexcept {
-//    if (!_source_path_stack.empty()) [[unlikely]] {
-//        std::ostringstream oss;
-//        for (auto p : _source_path_stack) { oss << "\n"
-//                                                << *p; }
-//        LUISA_ERROR_WITH_LOCATION(
-//            "Unbalanced path stack in scene description. "
-//            "Remaining paths (from stack top to bottom): {}",
-//            oss.str());
-//    }
-//    detail::validate(&_root, 0u);
-//}
 
 void SceneDesc::push_source_path(const std::filesystem::path &path) noexcept {
     auto canonical_path = luisa::make_unique<std::filesystem::path>(

@@ -2,12 +2,12 @@
 // Created by Mike on 2021/12/14.
 //
 
-#include <base/material.h>
-#include <base/light.h>
-#include <base/transform.h>
-#include <base/scene.h>
+#include <scene/material.h>
+#include <scene/light.h>
+#include <scene/transform.h>
+#include <scene/scene.h>
 #include <sdl/scene_node_desc.h>
-#include <base/shape.h>
+#include <scene/shape.h>
 
 namespace luisa::render {
 

@@ -2,10 +2,10 @@
 // Created by Mike Smith on 2021/12/15.
 //
 
-#include <base/scene.h>
-#include <base/transform.h>
+#include <scene/scene.h>
+#include <scene/transform.h>
 #include <sdl/scene_node_desc.h>
-#include <base/environment.h>
+#include <scene/environment.h>
 
 namespace luisa::render {
 

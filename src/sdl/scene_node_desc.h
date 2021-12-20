@@ -68,6 +68,7 @@ public:
     [[nodiscard]] auto tag() const noexcept { return _tag; }
     [[nodiscard]] auto impl_type() const noexcept { return std::string_view{_impl_type}; }
     [[nodiscard]] auto source_location() const noexcept { return _location; }
+    void set_tag(SceneNodeTag tag) noexcept { _tag = tag; }
     void set_impl_type(std::string_view t) noexcept { _impl_type = t; }
     void set_source_location(SourceLocation l) noexcept { _location = l; }
     [[nodiscard]] auto &properties() const noexcept { return _properties; }
@@ -80,7 +81,7 @@ public:
         std::string_view name, std::string_view impl_type, SourceLocation location = {}) noexcept;
     [[nodiscard]] auto is_root() const noexcept { return _tag == SceneNodeTag::ROOT; }
     [[nodiscard]] auto is_internal() const noexcept { return _tag == SceneNodeTag::INTERNAL; }
-    [[nodiscard]] auto is_defined() const noexcept { return !_impl_type.empty(); }
+    [[nodiscard]] auto is_defined() const noexcept { return _tag != SceneNodeTag::DECLARATION && !_impl_type.empty(); }
 
 public:
     using int_list = luisa::vector<int>;

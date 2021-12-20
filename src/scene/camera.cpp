@@ -2,12 +2,12 @@
 // Created by Mike on 2021/12/8.
 //
 
-#include <base/scene.h>
-#include <base/film.h>
-#include <base/filter.h>
-#include <base/transform.h>
+#include <scene/scene.h>
+#include <scene/film.h>
+#include <scene/filter.h>
+#include <scene/transform.h>
 #include <sdl/scene_node_desc.h>
-#include <base/camera.h>
+#include <scene/camera.h>
 
 namespace luisa::render {
 

@@ -2,7 +2,7 @@
 // Created by Mike on 2021/12/15.
 //
 
-#include <base/light.h>
+#include <scene/light.h>
 
 namespace luisa::render {
 

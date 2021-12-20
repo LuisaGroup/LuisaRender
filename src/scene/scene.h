@@ -11,7 +11,7 @@
 #include <core/dynamic_module.h>
 #include <core/basic_types.h>
 #include <runtime/context.h>
-#include <base/scene_node.h>
+#include <scene/scene_node.h>
 
 namespace luisa::render {
 

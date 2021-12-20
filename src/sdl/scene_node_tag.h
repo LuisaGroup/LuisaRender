@@ -10,6 +10,7 @@ namespace luisa::render {
 enum struct SceneNodeTag : uint32_t {
     ROOT,
     INTERNAL,
+    DECLARATION,
     CAMERA,
     SHAPE,
     MATERIAL,
@@ -28,6 +29,7 @@ constexpr std::string_view scene_node_tag_description(SceneNodeTag tag) noexcept
     switch (tag) {
         case SceneNodeTag::ROOT: return "__root__"sv;
         case SceneNodeTag::INTERNAL: return "__internal__"sv;
+        case SceneNodeTag::DECLARATION: return "__declaration__"sv;
         case SceneNodeTag::CAMERA: return "Camera"sv;
         case SceneNodeTag::SHAPE: return "Shape"sv;
         case SceneNodeTag::MATERIAL: return "Material"sv;

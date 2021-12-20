@@ -2,7 +2,7 @@
 // Created by Mike on 2021/12/8.
 //
 
-#include <base/sampler.h>
+#include <scene/sampler.h>
 
 namespace luisa::render {
 

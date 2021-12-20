@@ -5,19 +5,19 @@
 #include <mutex>
 #include <fmt/format.h>
 
-#include <base/camera.h>
-#include <base/film.h>
-#include <base/filter.h>
-#include <base/integrator.h>
-#include <base/material.h>
-#include <base/light.h>
-#include <base/sampler.h>
-#include <base/shape.h>
-#include <base/transform.h>
-#include <base/environment.h>
+#include <scene/camera.h>
+#include <scene/film.h>
+#include <scene/filter.h>
+#include <scene/integrator.h>
+#include <scene/material.h>
+#include <scene/light.h>
+#include <scene/sampler.h>
+#include <scene/shape.h>
+#include <scene/transform.h>
+#include <scene/environment.h>
 #include <sdl/scene_desc.h>
 #include <sdl/scene_node_desc.h>
-#include <base/scene.h>
+#include <scene/scene.h>
 
 namespace luisa::render {
 

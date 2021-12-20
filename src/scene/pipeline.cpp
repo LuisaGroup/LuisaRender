@@ -2,7 +2,7 @@
 // Created by Mike on 2021/12/15.
 //
 
-#include <base/pipeline.h>
+#include <scene/pipeline.h>
 
 namespace luisa::render {
 
