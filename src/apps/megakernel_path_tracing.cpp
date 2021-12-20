@@ -130,6 +130,7 @@ public:
 class DerivedB : public Base {
 private:
     Buffer<float> _buffer;
+
 public:
     [[nodiscard]] Float foo(Int x, Float y) const noexcept override {
         return _buffer[x] + y;
@@ -149,7 +150,7 @@ int main(int argc, char *argv[]) {
     SceneDesc scene;
     auto camera = scene.define("camera", SceneNodeTag::CAMERA, "ThinLens");
     auto film = camera->define_internal("film", "RGB");
-    film->add_property("resolution", SceneNodeDesc::number_list{1.0, 1.0});
+    film->add_property("resolution", SceneNodeDesc::number_list{1280, 720});
     film->add_property("filter", scene.reference("filter"));
     auto filter = scene.define("filter", SceneNodeTag::FILTER, "Gaussian");
     filter->add_property("radius", 1.5);
@@ -160,6 +161,11 @@ int main(int argc, char *argv[]) {
     auto root = scene.define_root();
     root->add_property("integrator", integrator);
     root->add_property("camera", camera);
+    auto shape1 = scene.define("cornell", SceneNodeTag::SHAPE, "TriangleMesh");
+    auto light = shape1->define_internal("light", "Diffuse");
+    light->add_property("emission", SceneNodeDesc::number_list{10.0f, 10.0f, 10.0f});
+    auto shape2 = scene.define("box", SceneNodeTag::SHAPE, "TriangleMesh");
+    root->add_property("shapes", SceneNodeDesc::node_list{shape1, shape2});
 
     std::ostringstream os;
     dump(os, scene);

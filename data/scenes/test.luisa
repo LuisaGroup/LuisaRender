@@ -1,7 +1,5 @@
-#include "../parts.luisa"
-
-Filter filter;
-Sampler sampler;
+import "../materials.luisa"
+import "../cameras.luisa"
 
 Camera camera : ThinLens {
   transform : Identity {}
