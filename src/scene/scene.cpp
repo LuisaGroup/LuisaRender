@@ -83,12 +83,13 @@ SceneNode *Scene::load_node(SceneNodeTag tag, const SceneNodeDesc *desc) noexcep
         return _config->internal_nodes.emplace_back(std::move(node)).get();
     }
     if (desc->tag() != tag) [[unlikely]] {
-        LUISA_ERROR_WITH_LOCATION(
+        LUISA_ERROR(
             "Invalid tag {} of scene description "
-            "node '{}' (expected {}).",
+            "node '{}' (expected {}). [{}]",
             scene_node_tag_description(desc->tag()),
             desc->identifier(),
-            scene_node_tag_description(tag));
+            scene_node_tag_description(tag),
+            desc->source_location().string());
     }
     auto [iter, first_def] = _config->nodes.try_emplace(
         luisa::string{desc->identifier()},
@@ -98,11 +99,12 @@ SceneNode *Scene::load_node(SceneNodeTag tag, const SceneNodeDesc *desc) noexcep
     auto node = iter->second.get();
     if (first_def) { return node; }
     if (node->tag() != tag || node->impl_type() != desc->impl_type()) [[unlikely]] {
-        LUISA_ERROR_WITH_LOCATION(
-            "Scene node `{}` (type = {}::{}) is already in the graph (type = {}::{}).",
+        LUISA_ERROR(
+            "Scene node `{}` (type = {}::{}) is already "
+            "in the graph (type = {}::{}). [{}]",
             desc->identifier(), scene_node_tag_description(tag),
             desc->impl_type(), scene_node_tag_description(node->tag()),
-            node->impl_type());
+            node->impl_type(), desc->source_location().string());
     }
     return node;
 }

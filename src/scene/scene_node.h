@@ -62,7 +62,6 @@ public:
     [[nodiscard]] auto scene() const noexcept { return _scene; }
     [[nodiscard]] auto tag() const noexcept { return _tag; }
     [[nodiscard]] virtual std::string_view impl_type() const noexcept = 0;
-    [[nodiscard]] static constexpr std::string_view tag_description(Tag tag) noexcept;
 };
 
 }// namespace luisa::render

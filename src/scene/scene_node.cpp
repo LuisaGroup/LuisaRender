@@ -18,12 +18,13 @@ SceneNode::SceneNode(const Scene *scene, const SceneNodeDesc *desc, SceneNodeTag
             desc->impl_type());
     }
     if (!desc->is_internal() && desc->tag() != tag) [[unlikely]] {
-        LUISA_ERROR_WITH_LOCATION(
+        LUISA_ERROR(
             "Invalid tag {} of scene description "
-            "node '{}' (expected {}).",
+            "node '{}' (expected {}). [{}]",
             scene_node_tag_description(desc->tag()),
             desc->identifier(),
-            scene_node_tag_description(tag));
+            scene_node_tag_description(tag),
+            desc->source_location().string());
     }
 }
 

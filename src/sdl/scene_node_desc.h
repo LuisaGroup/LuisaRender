@@ -5,6 +5,7 @@
 #pragma once
 
 #include <variant>
+#include <string>
 #include <filesystem>
 
 #include <core/hash.h>
@@ -49,6 +50,11 @@ public:
         [[nodiscard]] auto column() const noexcept { return _column; }
         void set_line(uint32_t line) noexcept { _line = line; }
         void set_column(uint32_t col) noexcept { _column = col; }
+        [[nodiscard]] auto string() const noexcept {
+            using namespace std::string_literals;
+            if (_file == nullptr) { return "unknown"s; }
+            return fmt::format("{}:{}:{}", _file->string(), _line + 1u, _column);
+        }
     };
 
 private:

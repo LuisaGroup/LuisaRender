@@ -17,21 +17,11 @@ inline SceneParser::SceneParser(SceneDesc &desc, const std::filesystem::path &pa
       _cursor{0u} {}
 
 inline void SceneParser::_report_error(std::string_view message) const noexcept {
-    LUISA_ERROR(
-        "{} [{}:{}:{}]",
-        message,
-        _location.file()->string(),
-        _location.line() + 1u,
-        _location.column());
+    LUISA_ERROR("{} [{}]", message, _location.string());
 }
 
 inline void SceneParser::_report_warning(std::string_view message) const noexcept {
-    LUISA_WARNING(
-        "{} [{}:{}:{}]",
-        message,
-        _location.file()->string(),
-        _location.line() + 1u,
-        _location.column());
+    LUISA_WARNING("{} [{}]", message, _location.string());
 }
 
 #define LUISA_SCENE_PARSER_ERROR(...) \

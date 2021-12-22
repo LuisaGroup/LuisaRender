@@ -38,16 +38,18 @@ SceneNodeDesc *SceneDesc::define(
 
     if (identifier == root_node_identifier ||
         tag == SceneNodeTag::ROOT) [[unlikely]] {
-        LUISA_ERROR_WITH_LOCATION(
+        LUISA_ERROR(
             "Defining root node as a normal "
             "global node is not allowed. "
-            "Please use SceneNodeDesc::define_root().");
+            "Please use SceneNodeDesc::define_root(). [{}]",
+            location.string());
     }
     if (tag == SceneNodeTag::INTERNAL ||
         tag == SceneNodeTag::DECLARATION) [[unlikely]] {
-        LUISA_ERROR_WITH_LOCATION(
+        LUISA_ERROR(
             "Defining internal or declaration node "
-            "as a global node is not allowed.");
+            "as a global node is not allowed. [{}]",
+            location.string());
     }
 
     std::scoped_lock lock{_mutex};
@@ -58,12 +60,13 @@ SceneNodeDesc *SceneDesc::define(
         }));
     auto node = iter->get();
     if (node->is_defined()) [[unlikely]] {
-        LUISA_ERROR_WITH_LOCATION(
+        LUISA_ERROR(
             "Redefinition of node '{}' ({}::{}) "
-            "in scene description.",
+            "in scene description. [{}]",
             node->identifier(),
             scene_node_tag_description(node->tag()),
-            node->impl_type());
+            node->impl_type(),
+            location.string());
     }
     node->define(tag, impl_type, location);
     return node;
@@ -72,9 +75,10 @@ SceneNodeDesc *SceneDesc::define(
 SceneNodeDesc *SceneDesc::define_root(SceneNodeDesc::SourceLocation location) noexcept {
     std::scoped_lock lock{_mutex};
     if (_root.is_defined()) [[unlikely]] {
-        LUISA_ERROR_WITH_LOCATION(
+        LUISA_ERROR(
             "Redefinition of root node "
-            "in scene description.");
+            "in scene description. [{}]",
+            location.string());
     }
     _root.define(SceneNodeTag::ROOT, root_node_identifier, location);
     return &_root;
