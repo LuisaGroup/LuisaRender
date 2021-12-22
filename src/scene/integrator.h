@@ -13,7 +13,7 @@ class Sampler;
 class Integrator : public SceneNode {
 
 private:
-    Sampler *_sampler;
+    const Sampler *_sampler;
 
 public:
     Integrator(Scene *scene, const SceneNodeDesc *desc) noexcept;

@@ -5,7 +5,10 @@ set(LUISA_RENDER_SDL_SOURCES
         scene_parser.cpp scene_parser.h)
 
 add_library(luisa-render-sdl SHARED ${LUISA_RENDER_SDL_SOURCES})
-target_link_libraries(luisa-render-sdl PUBLIC luisa::compute luisa-render-include)
+target_link_libraries(luisa-render-sdl PUBLIC
+        luisa::compute
+        luisa-render-include
+        luisa-render-ext)
 set_target_properties(luisa-render-sdl PROPERTIES
         WINDOWS_EXPORT_ALL_SYMBOLS ON
         UNITY_BUILD ON)

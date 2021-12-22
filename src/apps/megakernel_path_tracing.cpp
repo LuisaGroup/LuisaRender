@@ -8,11 +8,15 @@
 #include <luisa-compute.h>
 
 #include <sdl/scene_desc.h>
+#include <sdl/scene_parser.h>
 
 [[nodiscard]] auto parse_cli_options(int argc, const char *const *argv) noexcept {
     cxxopts::Options cli{"megakernel_path_tracing"};
     cli.add_option("", "b", "backend", "Compute backend name", cxxopts::value<std::string>(), "<backend>");
     cli.add_option("", "d", "device", "Compute device index", cxxopts::value<uint32_t>()->default_value("0"), "<index>");
+    cli.add_option("", "", "scene", "Path to scene description file", cxxopts::value<std::filesystem::path>(), "<file>");
+    cli.allow_unrecognised_options();
+    cli.parse_positional("scene");
     auto options = [&] {
         try {
             return cli.parse(argc, argv);
@@ -24,11 +28,13 @@
             exit(-1);
         }
     }();
-    if (options["backend"].count() == 0u) {
+    if (auto unknown = options.unmatched(); !unknown.empty()) {
+        luisa::string opts;
+        for (auto &&u : unknown) {
+            opts.append(" ").append(u);
+        }
         LUISA_WARNING_WITH_LOCATION(
-            "Compute backend not specified.");
-        std::cout << cli.help() << std::endl;
-        exit(-1);
+            "Unrecognized options: {}", opts);
     }
     return options;
 }
@@ -161,33 +167,12 @@ int main(int argc, char *argv[]) {
     auto options = parse_cli_options(argc, argv);
     auto backend = options["backend"].as<std::string>();
     auto index = options["device"].as<uint32_t>();
+    auto path = options["scene"].as<std::filesystem::path>();
 
     auto device = context.create_device(backend, {{"index", index}});
-
-    SceneDesc scene;
-    auto camera = scene.define("camera", SceneNodeTag::CAMERA, "ThinLens");
-    auto film = camera->define_internal("RGB");
-    camera->add_property("film", film);
-    film->add_property("resolution", SceneNodeDesc::number_list{1280, 720});
-    film->add_property("filter", scene.reference("filter"));
-    auto filter = scene.define("filter", SceneNodeTag::FILTER, "Gaussian");
-    filter->add_property("radius", 1.5);
-    auto integrator = scene.define("integrator", SceneNodeTag::INTEGRATOR, "Path");
-    integrator->add_property("sampler", scene.reference("sampler"));
-    auto sampler = scene.define("sampler", SceneNodeTag::SAMPLER, "Independent");
-    sampler->add_property("spp", 1024.0);
-    auto root = scene.define_root();
-    root->add_property("integrator", integrator);
-    root->add_property("camera", camera);
-    auto shape1 = scene.define("cornell", SceneNodeTag::SHAPE, "TriangleMesh");
-    auto light = shape1->define_internal("Diffuse");
-    shape1->add_property("light", light);
-    light->add_property("emission", SceneNodeDesc::number_list{10.0f, 10.0f, 10.0f});
-    auto shape2 = scene.root()->define_internal("TriangleMesh");
-    shape2->add_property("path", "../box.obj");
-    root->add_property("shapes", SceneNodeDesc::node_list{shape1, shape2});
+    auto scene = SceneParser::parse(path);
 
     std::ostringstream os;
-    dump(os, scene);
+    dump(os, *scene);
     LUISA_INFO("Scene dump:\n{}", os.str());
 }

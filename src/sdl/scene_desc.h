@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <core/spin_mutex.h>
 #include <sdl/scene_node_desc.h>
 
 namespace luisa::render {
@@ -34,9 +35,9 @@ public:
 
 private:
     luisa::unordered_set<luisa::unique_ptr<SceneNodeDesc>, NodeHash, NodeEqual> _global_nodes;
-    luisa::vector<luisa::unique_ptr<std::filesystem::path>> _source_paths;
-    luisa::vector<const std::filesystem::path *> _source_path_stack;
+    luisa::vector<luisa::unique_ptr<std::filesystem::path>> _paths;
     SceneNodeDesc _root;
+    spin_mutex _mutex;
 
 public:
     SceneDesc() noexcept: _root{root_node_identifier, SceneNodeTag::ROOT} {}
@@ -49,15 +50,7 @@ public:
         std::string_view identifier, SceneNodeTag tag,
         std::string_view impl_type, SceneNodeDesc::SourceLocation location = {}) noexcept;
     [[nodiscard]] SceneNodeDesc *define_root(SceneNodeDesc::SourceLocation location = {}) noexcept;
-    void push_source_path(const std::filesystem::path &path) noexcept;
-    void pop_source_path() noexcept;
-    [[nodiscard]] const std::filesystem::path *current_source_path() const noexcept;
-    template<typename F>
-    void with_source_path(const std::filesystem::path &path, F &&f) noexcept {
-        push_source_path(path);
-        std::invoke(std::forward<F>(f));
-        pop_source_path();
-    }
+    const std::filesystem::path *register_path(std::filesystem::path path) noexcept;
 };
 
 }// namespace luisa::render

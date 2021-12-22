@@ -1,6 +1,3 @@
-import "../materials.luisa"
-import "../cameras.luisa"
-
 Camera camera : ThinLens {
   transform : Identity {}
   film : RGB {
@@ -13,7 +10,7 @@ Filter filter : Gaussian {
   radius { 1.5, 1.5 }
 }
 
-Integrator : Path {
+Integrator integrator: Path {
   sampler { @sampler }
   max_depth { 10 }
 }
@@ -26,11 +23,17 @@ Shape tall_box : TriangleMesh {
   material { @white }
 }
 
+Material m : Metal {}
+Material white : Disney {}
+
 Shape short_box : TriangleMesh {
   material {
     Diffuse {
       color { 1.0 }
     },
+    @m,
     Specular {}
   }
 }
+
+import "main.luisa"

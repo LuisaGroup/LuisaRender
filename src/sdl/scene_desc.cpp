@@ -2,7 +2,7 @@
 // Created by Mike on 2021/12/13.
 //
 
-#include <sstream>
+#include <mutex>
 #include <sdl/scene_desc.h>
 
 namespace luisa::render {
@@ -23,6 +23,7 @@ const SceneNodeDesc *SceneDesc::reference(std::string_view identifier) noexcept 
         LUISA_ERROR_WITH_LOCATION(
             "Invalid reference to root node.");
     }
+    std::scoped_lock lock{_mutex};
     auto [iter, _] = _global_nodes.emplace(
         lazy_construct([identifier] {
             return luisa::make_unique<SceneNodeDesc>(
@@ -48,6 +49,8 @@ SceneNodeDesc *SceneDesc::define(
             "Defining internal or declaration node "
             "as a global node is not allowed.");
     }
+
+    std::scoped_lock lock{_mutex};
     auto [iter, _] = _global_nodes.emplace(
         lazy_construct([identifier, tag] {
             return luisa::make_unique<SceneNodeDesc>(
@@ -67,6 +70,7 @@ SceneNodeDesc *SceneDesc::define(
 }
 
 SceneNodeDesc *SceneDesc::define_root(SceneNodeDesc::SourceLocation location) noexcept {
+    std::scoped_lock lock{_mutex};
     if (_root.is_defined()) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
             "Redefinition of root node "
@@ -76,20 +80,10 @@ SceneNodeDesc *SceneDesc::define_root(SceneNodeDesc::SourceLocation location) no
     return &_root;
 }
 
-void SceneDesc::push_source_path(const std::filesystem::path &path) noexcept {
-    auto canonical_path = luisa::make_unique<std::filesystem::path>(
-        std::filesystem::canonical(path));
-    _source_path_stack.emplace_back(
-        _source_paths.emplace_back(std::move(canonical_path)).get());
-}
-
-void SceneDesc::pop_source_path() noexcept {
-    _source_path_stack.pop_back();
-}
-
-const std::filesystem::path *SceneDesc::current_source_path() const noexcept {
-    if (_source_path_stack.empty()) { return nullptr; }
-    return _source_path_stack.back();
+const std::filesystem::path *SceneDesc::register_path(std::filesystem::path path) noexcept {
+    auto p = luisa::make_unique<std::filesystem::path>(std::move(path));
+    std::scoped_lock lock{_mutex};
+    return _paths.emplace_back(std::move(p)).get();
 }
 
 }// namespace luisa::render

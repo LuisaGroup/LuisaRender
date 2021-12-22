@@ -39,7 +39,6 @@ public:
     using NodeHandle = std::unique_ptr<SceneNode, NodeDeleter *>;
 
     struct Config;
-    struct Data;
 
 private:
     const Context &_context;

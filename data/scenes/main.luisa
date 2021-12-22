@@ -1,0 +1,5 @@
+render {
+  cameras { @camera }
+  shapes { @tall_box, @short_box }
+  integrator { @integrator }
+}

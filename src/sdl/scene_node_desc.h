@@ -41,12 +41,14 @@ public:
 
     public:
         SourceLocation() noexcept : _file{nullptr}, _line{}, _column{} {}
-        SourceLocation(const std::filesystem::path *path, uint32_t line, uint32_t col) noexcept
+        explicit SourceLocation(const std::filesystem::path *path, uint32_t line = 0u, uint32_t col = 0u) noexcept
             : _file{path}, _line{line}, _column{col} {}
         [[nodiscard]] explicit operator bool() const noexcept { return _file != nullptr; }
         [[nodiscard]] auto file() const noexcept { return _file; }
         [[nodiscard]] auto line() const noexcept { return _line; }
         [[nodiscard]] auto column() const noexcept { return _column; }
+        void set_line(uint32_t line) noexcept { _line = line; }
+        void set_column(uint32_t col) noexcept { _column = col; }
     };
 
 private:
