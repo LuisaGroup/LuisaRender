@@ -15,8 +15,8 @@ set(LUISA_RENDER_SCENE_SOURCES
 
 add_library(luisa-render-scene SHARED ${LUISA_RENDER_SCENE_SOURCES})
 target_link_libraries(luisa-render-scene PUBLIC
-        luisa-render-sdl
-        luisa::compute)
+        luisa::compute
+        luisa-render-sdl)
 set_target_properties(luisa-render-scene PROPERTIES
         WINDOWS_EXPORT_ALL_SYMBOLS ON
         UNITY_BUILD ON)

@@ -7,3 +7,6 @@
 [submodule "src/ext/assimp"]
 	path = src/ext/assimp
 	url = https://github.com/assimp/assimp.git
+[submodule "src/ext/double-conversion"]
+	path = src/ext/double-conversion
+	url = https://github.com/google/double-conversion.git
