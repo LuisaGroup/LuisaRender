@@ -19,7 +19,6 @@ class SceneParser {
 private:
     SceneDesc &_desc;
     SceneNodeDesc::SourceLocation _location;
-    luisa::vector<std::future<void>> _import_parsing;
     luisa::string _source;
     size_t _cursor;
 

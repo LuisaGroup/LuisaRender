@@ -7,6 +7,7 @@
 #include <double-conversion/double-conversion.h>
 
 #include <core/logging.h>
+#include <core/thread_pool.h>
 #include <sdl/scene_parser.h>
 
 namespace luisa::render {
@@ -38,8 +39,6 @@ inline void SceneParser::_parse() noexcept {
     _parse_file();
     _source.clear();
     _source.shrink_to_fit();
-    _import_parsing.clear();
-    _import_parsing.shrink_to_fit();
 }
 
 inline void SceneParser::_parse_file() noexcept {
@@ -50,12 +49,10 @@ inline void SceneParser::_parse_file() noexcept {
             _skip_blanks();
             std::filesystem::path path{_read_string()};
             if (!path.is_absolute()) { path = _location.file()->parent_path() / path; }
-            // TODO: parallel parsing using thread pool
-            _import_parsing.emplace_back(std::async(
-                std::launch::async | std::launch::deferred,
+            ThreadPool::global().dispatch(
                 [path = std::move(path), &desc = _desc] {
                     SceneParser{desc, path}._parse();
-                }));
+                });
         } else if (token == SceneDesc::root_node_identifier) {// root node
             _parse_root_node(loc);
         } else [[likely]] {// scene node
@@ -353,6 +350,7 @@ inline SceneNodeDesc::string_list SceneParser::_parse_string_list_values() noexc
 luisa::unique_ptr<SceneDesc> SceneParser::parse(const path &entry_file) noexcept {
     auto desc = luisa::make_unique<SceneDesc>();
     SceneParser{*desc, entry_file}._parse();
+    ThreadPool::global().synchronize();
     return desc;
 }
 
