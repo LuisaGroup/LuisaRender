@@ -80,6 +80,7 @@ SceneNode *Scene::load_node(SceneNodeTag tag, const SceneNodeDesc *desc) noexcep
     auto destroy = plugin.function<NodeDeleter>("destroy");
     if (desc->is_internal()) {
         NodeHandle node{create(this, desc), destroy};
+        std::scoped_lock lock{_mutex};
         return _config->internal_nodes.emplace_back(std::move(node)).get();
     }
     if (desc->tag() != tag) [[unlikely]] {
@@ -91,12 +92,16 @@ SceneNode *Scene::load_node(SceneNodeTag tag, const SceneNodeDesc *desc) noexcep
             scene_node_tag_description(tag),
             desc->source_location().string());
     }
-    auto [iter, first_def] = _config->nodes.try_emplace(
-        luisa::string{desc->identifier()},
-        lazy_construct([desc, create, destroy, this] {
-            return NodeHandle{create(this, desc), destroy};
-        }));
-    auto node = iter->second.get();
+
+    auto [node, first_def] = [this, desc, create, destroy] {
+        std::scoped_lock lock{_mutex};
+        auto [iter, first] = _config->nodes.try_emplace(
+            luisa::string{desc->identifier()},
+            lazy_construct([desc, create, destroy, this] {
+                return NodeHandle{create(this, desc), destroy};
+            }));
+        return std::make_pair(iter->second.get(), first);
+    }();
     if (first_def) { return node; }
     if (node->tag() != tag || node->impl_type() != desc->impl_type()) [[unlikely]] {
         LUISA_ERROR(
@@ -168,6 +173,7 @@ luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc
     scene->_config->cameras.reserve(cameras.size());
     scene->_config->shapes.reserve(shapes.size());
     scene->_config->environments.reserve(environments.size());
+    // TODO: parallel loading
     for (auto c : cameras) {
         scene->_config->cameras.emplace_back(
             scene->load_camera(c));

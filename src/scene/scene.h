@@ -5,6 +5,7 @@
 #pragma once
 
 #include <span>
+#include <mutex>
 
 #include <core/hash.h>
 #include <core/allocator.h>
@@ -43,6 +44,7 @@ public:
 private:
     const Context &_context;
     luisa::unique_ptr<Config> _config;
+    std::recursive_mutex _mutex;
 
 public:
     // for internal use only, call Scene::create() instead

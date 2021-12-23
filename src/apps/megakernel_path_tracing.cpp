@@ -9,6 +9,7 @@
 
 #include <sdl/scene_desc.h>
 #include <sdl/scene_parser.h>
+#include <scene/scene.h>
 
 [[nodiscard]] auto parse_cli_options(int argc, const char *const *argv) noexcept {
     cxxopts::Options cli{"megakernel_path_tracing"};
@@ -170,9 +171,13 @@ int main(int argc, char *argv[]) {
     auto path = options["scene"].as<std::filesystem::path>();
 
     auto device = context.create_device(backend, {{"index", index}});
-    auto scene = SceneParser::parse(path);
+    Clock clock;
+    auto scene_desc = SceneParser::parse(path);
+    LUISA_INFO("Parse time: {} ms.", clock.toc());
 
     std::ostringstream os;
-    dump(os, *scene);
+    dump(os, *scene_desc);
     LUISA_INFO("Scene dump:\n{}", os.str());
+
+    auto scene = Scene::create(context, scene_desc.get());
 }

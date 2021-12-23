@@ -283,7 +283,7 @@ inline SceneNodeDesc::value_list SceneParser::_parse_value_list(SceneNodeDesc *n
     return value_list;
 }
 
-SceneNodeDesc::number_list SceneParser::_parse_number_list_values() noexcept {
+inline SceneNodeDesc::number_list SceneParser::_parse_number_list_values() noexcept {
     SceneNodeDesc::number_list list;
     list.emplace_back(_read_number());
     _skip_blanks();
@@ -296,7 +296,7 @@ SceneNodeDesc::number_list SceneParser::_parse_number_list_values() noexcept {
     return list;
 }
 
-SceneNodeDesc::bool_list SceneParser::_parse_bool_list_values() noexcept {
+inline SceneNodeDesc::bool_list SceneParser::_parse_bool_list_values() noexcept {
     SceneNodeDesc::bool_list list;
     list.emplace_back(_read_bool());
     _skip_blanks();
@@ -309,7 +309,7 @@ SceneNodeDesc::bool_list SceneParser::_parse_bool_list_values() noexcept {
     return list;
 }
 
-SceneNodeDesc::node_list SceneParser::_parse_node_list_values(SceneNodeDesc *node) noexcept {
+inline SceneNodeDesc::node_list SceneParser::_parse_node_list_values(SceneNodeDesc *node) noexcept {
 
     auto parse_ref_or_def = [node, this]() noexcept -> const auto * {
         if (_peek() == '@') {// reference
@@ -337,7 +337,7 @@ SceneNodeDesc::node_list SceneParser::_parse_node_list_values(SceneNodeDesc *nod
     return list;
 }
 
-SceneNodeDesc::string_list SceneParser::_parse_string_list_values() noexcept {
+inline SceneNodeDesc::string_list SceneParser::_parse_string_list_values() noexcept {
     SceneNodeDesc::string_list list;
     list.emplace_back(_read_string());
     _skip_blanks();

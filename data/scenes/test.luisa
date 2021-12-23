@@ -23,7 +23,7 @@ Shape tall_box : TriangleMesh {
   material { @white }
 }
 
-Material m : Metal {}
+Mat m : Metal {}
 Material white : Disney {}
 
 Shape short_box : TriangleMesh {
@@ -34,6 +34,10 @@ Shape short_box : TriangleMesh {
     @m,
     Specular {}
   }
+}
+
+Env env : HDR {
+  path { "hello.hdr" }
 }
 
 import "main.luisa"

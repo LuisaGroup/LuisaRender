@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <core/spin_mutex.h>
+#include <mutex>
 #include <sdl/scene_node_desc.h>
 
 namespace luisa::render {
@@ -37,13 +37,12 @@ private:
     luisa::unordered_set<luisa::unique_ptr<SceneNodeDesc>, NodeHash, NodeEqual> _global_nodes;
     luisa::vector<luisa::unique_ptr<std::filesystem::path>> _paths;
     SceneNodeDesc _root;
-    spin_mutex _mutex;
+    std::recursive_mutex _mutex;
 
 public:
     SceneDesc() noexcept: _root{root_node_identifier, SceneNodeTag::ROOT} {}
     [[nodiscard]] auto &nodes() const noexcept { return _global_nodes; }
     [[nodiscard]] const SceneNodeDesc *node(std::string_view identifier) const noexcept;
-    [[nodiscard]] auto root() noexcept { return &_root; }
     [[nodiscard]] auto root() const noexcept { return &_root; }
     [[nodiscard]] const SceneNodeDesc *reference(std::string_view identifier) noexcept;
     [[nodiscard]] SceneNodeDesc *define(
