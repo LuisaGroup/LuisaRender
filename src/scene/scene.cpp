@@ -33,9 +33,9 @@ struct Scene::Config {
 
 uint Scene::spp() const noexcept { return _config->spp; }
 const Integrator *Scene::integrator() const noexcept { return _config->integrator; }
-std::span<const Shape *const> Scene::shapes() const noexcept { return _config->shapes; }
-std::span<const Camera *const> Scene::cameras() const noexcept { return _config->cameras; }
-std::span<const Environment *const> Scene::environments() const noexcept { return _config->environments; }
+luisa::span<const Shape *const> Scene::shapes() const noexcept { return _config->shapes; }
+luisa::span<const Camera *const> Scene::cameras() const noexcept { return _config->cameras; }
+luisa::span<const Environment *const> Scene::environments() const noexcept { return _config->environments; }
 
 namespace detail {
 

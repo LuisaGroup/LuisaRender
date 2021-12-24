@@ -37,7 +37,7 @@ class Scene {
 public:
     using NodeCreater = SceneNode *(Scene *, const SceneNodeDesc *);
     using NodeDeleter = void(SceneNode *);
-    using NodeHandle = std::unique_ptr<SceneNode, NodeDeleter *>;
+    using NodeHandle = luisa::unique_ptr<SceneNode, NodeDeleter *>;
 
     struct Config;
 
@@ -69,9 +69,9 @@ public:
 public:
     [[nodiscard]] static luisa::unique_ptr<Scene> create(const Context &ctx, const SceneDesc *desc) noexcept;
     [[nodiscard]] const Integrator *integrator() const noexcept;
-    [[nodiscard]] std::span<const Shape *const> shapes() const noexcept;
-    [[nodiscard]] std::span<const Camera *const> cameras() const noexcept;
-    [[nodiscard]] std::span<const Environment *const> environments() const noexcept;
+    [[nodiscard]] luisa::span<const Shape *const> shapes() const noexcept;
+    [[nodiscard]] luisa::span<const Camera *const> cameras() const noexcept;
+    [[nodiscard]] luisa::span<const Environment *const> environments() const noexcept;
     [[nodiscard]] uint spp() const noexcept;
 };
 
