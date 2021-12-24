@@ -209,7 +209,8 @@ inline void SceneParser::_parse_root_node(SceneNodeDesc::SourceLocation l) noexc
 
 inline void SceneParser::_parse_global_node(SceneNodeDesc::SourceLocation l, std::string_view tag_desc) noexcept {
     using namespace std::string_view_literals;
-    static const luisa::unordered_map<std::string_view, SceneNodeTag> desc_to_tag{
+    static constexpr auto desc_to_tag_count = 15u;
+    static const luisa::fixed_map<std::string_view, SceneNodeTag, desc_to_tag_count> desc_to_tag{
         {"Camera"sv, SceneNodeTag::CAMERA},
         {"Cam"sv, SceneNodeTag::CAMERA},
         {"Shape"sv, SceneNodeTag::SHAPE},

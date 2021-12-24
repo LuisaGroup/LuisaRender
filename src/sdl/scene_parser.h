@@ -6,7 +6,7 @@
 #include <filesystem>
 #include <future>
 
-#include <core/allocator.h>
+#include <core/stl.h>
 #include <sdl/scene_node_desc.h>
 
 namespace luisa::render {

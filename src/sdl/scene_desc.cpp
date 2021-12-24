@@ -7,7 +7,7 @@
 namespace luisa::render {
 
 const SceneNodeDesc *SceneDesc::node(std::string_view identifier) const noexcept {
-    if (auto iter = _global_nodes.find(identifier);
+    if (auto iter = _global_nodes.find_as(identifier, NodeHash{}, NodeEqual{});
         iter != _global_nodes.cend()) {
         return iter->get();
     }

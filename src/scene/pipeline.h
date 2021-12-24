@@ -50,7 +50,7 @@ public:
 private:
     Device &_device;
     luisa::vector<ResourceHandle> _resources;
-    std::optional<BufferView<uint4>> _arena_buffer;
+    luisa::optional<BufferView<uint4>> _arena_buffer;
     BindlessArray _bindless_array;
     size_t _bindless_buffer_count{0u};
     size_t _bindless_tex2d_count{0u};

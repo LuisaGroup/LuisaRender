@@ -13,7 +13,7 @@
 
 [[nodiscard]] auto parse_cli_options(int argc, const char *const *argv) noexcept {
     cxxopts::Options cli{"megakernel_path_tracing"};
-    cli.add_option("", "b", "backend", "Compute backend name", cxxopts::value<std::string>(), "<backend>");
+    cli.add_option("", "b", "backend", "Compute backend name", cxxopts::value<luisa::string>(), "<backend>");
     cli.add_option("", "d", "device", "Compute device index", cxxopts::value<uint32_t>()->default_value("0"), "<index>");
     cli.add_option("", "", "scene", "Path to scene description file", cxxopts::value<std::filesystem::path>(), "<file>");
     cli.allow_unrecognised_options();
@@ -53,7 +53,7 @@ void dump(std::ostream &os, const SceneNodeDesc *node, size_t indent_level = 0) 
         os << "\n";
         indent(indent_level + 1u);
         os << prop << " ";
-        std::visit(
+        luisa::visit(
             [&](auto &&v) noexcept {
                 using T = std::remove_cvref_t<decltype(v)>;
                 if constexpr (std::is_same_v<T, SceneNodeDesc::string_list>) {
@@ -166,7 +166,7 @@ int main(int argc, char *argv[]) {
     luisa::compute::Context context{argv[0]};
 
     auto options = parse_cli_options(argc, argv);
-    auto backend = options["backend"].as<std::string>();
+    auto backend = options["backend"].as<luisa::string>();
     auto index = options["device"].as<uint32_t>();
     auto path = options["scene"].as<std::filesystem::path>();
 

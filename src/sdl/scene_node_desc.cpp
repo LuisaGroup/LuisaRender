@@ -8,7 +8,7 @@
 namespace luisa::render {
 
 void SceneNodeDesc::add_property(std::string_view name, SceneNodeDesc::value_list value) noexcept {
-    if (!_properties.emplace(name, std::move(value)).second) {
+    if (!_properties.emplace(luisa::string{name}, std::move(value)).second) {
         LUISA_ERROR(
             "Redefinition of property '{}' in "
             "scene description node '{}'. [{}]",
@@ -47,7 +47,8 @@ template<typename T>
 }// namespace detail
 
 #define LUISA_SCENE_NODE_DESC_PROPERTY_GET_POINTER(type)      \
-    auto iter = _properties.find(name);                       \
+    auto iter = _properties.find_as(                          \
+        name, Hash64{}, std::equal_to<>{});                   \
     if (iter == _properties.cend()) [[unlikely]] {            \
         LUSIA_SCENE_NODE_DESC_PROPERTY_THROW(                 \
             "Property '{}' is not defined in "                \
@@ -58,14 +59,14 @@ template<typename T>
         if constexpr (std::is_same_v<type, int> ||            \
                       std::is_same_v<type, uint> ||           \
                       std::is_same_v<type, float>) {          \
-            return std::get_if<number_list>(&iter->second);   \
+            return luisa::get_if<number_list>(&iter->second); \
         } else if constexpr (std::is_same_v<type, bool>) {    \
-            return std::get_if<bool_list>(&iter->second);     \
+            return luisa::get_if<bool_list>(&iter->second);   \
         } else if constexpr (std::is_same_v<type, string> ||  \
                              std::is_same_v<type, path>) {    \
-            return std::get_if<string_list>(&iter->second);   \
+            return luisa::get_if<string_list>(&iter->second); \
         } else {                                              \
-            return std::get_if<node_list>(&iter->second);     \
+            return luisa::get_if<node_list>(&iter->second);   \
         }                                                     \
     }();                                                      \
     if (ptr == nullptr) [[unlikely]] {                        \

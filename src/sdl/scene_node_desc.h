@@ -9,7 +9,7 @@
 #include <filesystem>
 
 #include <core/hash.h>
-#include <core/allocator.h>
+#include <core/stl.h>
 #include <core/basic_types.h>
 #include <sdl/scene_node_tag.h>
 
@@ -30,7 +30,7 @@ public:
     using string_list = luisa::vector<string_type>;
     using node_list = luisa::vector<node_type>;
 
-    using value_list = std::variant<
+    using value_list = luisa::variant<
         bool_list, number_list, string_list, node_list>;
 
     class SourceLocation {

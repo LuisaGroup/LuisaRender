@@ -8,7 +8,7 @@
 #include <mutex>
 
 #include <core/hash.h>
-#include <core/allocator.h>
+#include <core/stl.h>
 #include <core/dynamic_module.h>
 #include <core/basic_types.h>
 #include <runtime/context.h>
