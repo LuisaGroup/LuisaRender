@@ -7,6 +7,8 @@
 #include <optional>
 #include <luisa-compute.h>
 
+#include <scene/shape.h>
+
 namespace luisa::render {
 
 using compute::Accel;
@@ -21,11 +23,33 @@ using compute::PixelStorage;
 using compute::Resource;
 using compute::Volume;
 using compute::Callable;
+using compute::Triangle;
 
 class Scene;
 class Shape;
 
 class Pipeline {
+
+public:
+    template<typename T, size_t buffer_id_shift, size_t buffer_element_alignment>
+    class BufferArena {
+
+    public:
+        static constexpr auto buffer_capacity = (1u << buffer_id_shift) * buffer_element_alignment;
+
+    private:
+        Pipeline &_pipeline;
+        Buffer<T> *_buffer{nullptr};
+        uint _buffer_id{0u};
+        uint _buffer_offset{0u};
+
+    private:
+        void _create_buffer() noexcept;
+
+    public:
+        explicit BufferArena(Pipeline &pipeline) noexcept : _pipeline{pipeline} {}
+        [[nodiscard]] std::pair<BufferView<T>, uint/* buffer id and offset */> allocate(size_t n) noexcept;
+    };
 
 public:
     static constexpr size_t bindless_array_capacity = 500'000u;// limitation of Metal
@@ -36,27 +60,32 @@ public:
     static constexpr size_t arena_allocation_threshold = 4_mb;
     using ResourceHandle = luisa::unique_ptr<Resource>;
 
-    struct alignas(16) MeshData {
-        uint mesh_id;// index into Pipeline::_resources
-        uint position_buffer_id;
-        uint normal_buffer_id;
-        uint tangent_buffer_id;
-        uint uv_buffer_id;
-        uint triangle_buffer_id;
+    struct MeshData {
+        uint resource_id;
         uint triangle_count;
-        uint area_cdf_buffer_id;
+        uint position_buffer_id_and_offset;
+        uint attribute_buffer_id_and_offset;
+        uint triangle_buffer_id_and_offset;
+        uint area_cdf_buffer_id_and_offset;
     };
 
 private:
     Device &_device;
     luisa::vector<ResourceHandle> _resources;
-    luisa::optional<BufferView<uint4>> _arena_buffer;
     BindlessArray _bindless_array;
     size_t _bindless_buffer_count{0u};
     size_t _bindless_tex2d_count{0u};
     size_t _bindless_tex3d_count{0u};
     Accel _accel;
     luisa::unordered_map<const Shape *, MeshData> _meshes;
+    luisa::unordered_map<const Material *, uint/* buffer id and tag */> _materials;
+    luisa::unordered_map<const Light *, uint/* buffer id and tag */> _lights;
+    BufferArena<float3, Instance::position_buffer_id_shift, Instance::position_buffer_element_alignment> _position_buffer_arena;
+    BufferArena<VertexAttribute, Instance::attribute_buffer_id_shift, Instance::attribute_buffer_element_alignment> _attribute_buffer_arena;
+    BufferArena<Triangle, Instance::triangle_buffer_id_shift, Instance::triangle_buffer_element_alignment> _triangle_buffer_arena;
+    BufferArena<float, Instance::area_cdf_buffer_id_shift, Instance::area_cdf_buffer_element_alignment> _area_cdf_buffer_arena;
+    BufferArena<float4x4, Instance::transform_buffer_id_shift, 1u> _transform_buffer_arena;
+    BufferArena<Instance, Instance::instance_buffer_id_shift, 1u> _instance_buffer_arena;
 
 public:
     // for internal use only; use Pipeline::create() instead
@@ -65,7 +94,15 @@ public:
     Pipeline(const Pipeline &) noexcept = delete;
     Pipeline &operator=(Pipeline &&) noexcept = delete;
     Pipeline &operator=(const Pipeline &) noexcept = delete;
-    ~Pipeline() noexcept = default;
+    ~Pipeline() noexcept;
+
+private:
+    template<typename T>
+    [[nodiscard]] auto _emplace_back_bindless_buffer(BufferView<T> buffer) noexcept {
+        auto buffer_id = _bindless_buffer_count++;
+        _bindless_array.emplace(buffer_id, buffer);
+        return static_cast<uint>(buffer_id);
+    }
 
 public:
     template<typename T>
