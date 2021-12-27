@@ -17,31 +17,27 @@ inline SceneParser::SceneParser(SceneDesc &desc, const std::filesystem::path &pa
       _location{desc.register_path(std::filesystem::canonical(path))},
       _cursor{0u} {}
 
-inline void SceneParser::_report_error(std::string_view message) const noexcept {
-    LUISA_ERROR("{} [{}]", message, _location.string());
+template<typename... Args>
+inline void SceneParser::_report_error(std::string_view format, Args &&...args) const noexcept {
+    LUISA_ERROR("{} [{}]", fmt::format(format, std::forward<Args>(args)...), _location.string());
 }
 
-inline void SceneParser::_report_warning(std::string_view message) const noexcept {
-    LUISA_WARNING("{} [{}]", message, _location.string());
+template<typename... Args>
+inline void SceneParser::_report_warning(std::string_view format, Args &&...args) const noexcept {
+    LUISA_WARNING("{} [{}]", fmt::format(format, std::forward<Args>(args)...), _location.string());
 }
 
-#define LUISA_SCENE_PARSER_ERROR(...) \
-    _report_error(fmt::format(__VA_ARGS__))
-
-#define LUISA_SCENE_PARSER_WARNING(...) \
-    _report_warning(fmt::format(__VA_ARGS__))
-
-inline void SceneParser::_parse() noexcept {
+inline void SceneParser::_parse_file() noexcept {
     std::ifstream file{*_location.file()};
     _source = {
         std::istreambuf_iterator<char>{file},
         std::istreambuf_iterator<char>{}};
-    _parse_file();
+    _parse_source();
     _source.clear();
     _source.shrink_to_fit();
 }
 
-inline void SceneParser::_parse_file() noexcept {
+inline void SceneParser::_parse_source() noexcept {
     _skip_blanks();
     while (!_eof()) {
         auto loc = _location;
@@ -51,7 +47,7 @@ inline void SceneParser::_parse_file() noexcept {
             if (!path.is_absolute()) { path = _location.file()->parent_path() / path; }
             ThreadPool::global().dispatch(
                 [path = std::move(path), &desc = _desc] {
-                    SceneParser{desc, path}._parse();
+                    SceneParser{desc, path}._parse_file();
                 });
         } else if (token == SceneDesc::root_node_identifier) {// root node
             _parse_root_node(loc);
@@ -64,8 +60,9 @@ inline void SceneParser::_parse_file() noexcept {
 
 inline void SceneParser::_match(char c) noexcept {
     if (auto got = _get(); got != c) [[unlikely]] {
-        LUISA_SCENE_PARSER_ERROR(
-            "Invalid character '{}' (expected '{}').",
+        _report_error(
+            "Invalid character '{}' "
+            "(expected '{}').",
             got, c);
     }
 }
@@ -73,7 +70,7 @@ inline void SceneParser::_match(char c) noexcept {
 void SceneParser::_skip() noexcept { static_cast<void>(_get()); }
 
 inline char SceneParser::_peek() noexcept {
-    if (_eof()) [[unlikely]] { LUISA_SCENE_PARSER_ERROR("Premature EOF."); }
+    if (_eof()) [[unlikely]] { _report_error("Premature EOF."); }
     auto c = _source[_cursor];
     if (c == '\r') {
         if (_source[_cursor + 1u] == '\n') { _cursor++; }
@@ -83,7 +80,7 @@ inline char SceneParser::_peek() noexcept {
 }
 
 inline char SceneParser::_get() noexcept {
-    if (_eof()) [[unlikely]] { LUISA_SCENE_PARSER_ERROR("Premature EOF."); }
+    if (_eof()) [[unlikely]] { _report_error("Premature EOF."); }
     auto c = _source[_cursor++];
     if (c == '\r') {
         if (_source[_cursor] == '\n') { _cursor++; }
@@ -108,8 +105,7 @@ inline std::string_view SceneParser::_read_identifier() noexcept {
     auto offset = _cursor;
     if (auto c = _get();
         c != '_' && c != '$' && !isalpha(c)) [[unlikely]] {
-        LUISA_SCENE_PARSER_ERROR(
-            "Invalid character '{}' in identifier.", c);
+        _report_error("Invalid character '{}' in identifier.", c);
     }
     auto is_ident_body = [](auto c) noexcept {
         return isalnum(c) || c == '_' ||
@@ -137,7 +133,7 @@ inline double SceneParser::_read_number() noexcept {
         static_cast<int>(s.size()),
         &processed_count);
     if (processed_count == 0) [[unlikely]] {
-        LUISA_SCENE_PARSER_ERROR(
+        _report_error(
             "Invalid number string '{}...'.",
             s.substr(0, 4));
     }
@@ -159,12 +155,12 @@ inline bool SceneParser::_read_bool() noexcept {
 inline luisa::string SceneParser::_read_string() noexcept {
     auto quote = _get();
     if (quote != '"' && quote != '\'') [[unlikely]] {
-        LUISA_SCENE_PARSER_ERROR("Expected string but got {}.", quote);
+        _report_error("Expected string but got {}.", quote);
     }
     luisa::string s;
     for (auto c = _get(); c != quote; c = _get()) {
         if (!isprint(c)) [[unlikely]] {
-            LUISA_SCENE_PARSER_ERROR(
+            _report_error(
                 "Unexpected non-printable character 0x{:02x}.",
                 static_cast<int>(c));
         }
@@ -179,7 +175,7 @@ inline luisa::string SceneParser::_read_string() noexcept {
                     case '\\': return '\\';
                     case '\'': return '\'';
                     case '"': return '\"';
-                    default: LUISA_SCENE_PARSER_ERROR(
+                    default: _report_error(
                         "Invalid escaped character '{}'.", esc);
                 }
             }();
@@ -228,7 +224,7 @@ inline void SceneParser::_parse_global_node(SceneNodeDesc::SourceLocation l, std
         {"Env"sv, SceneNodeTag::ENVIRONMENT}};
     auto iter = desc_to_tag.find(tag_desc);
     if (iter == desc_to_tag.cend()) [[unlikely]] {
-        LUISA_SCENE_PARSER_ERROR(
+        _report_error(
             "Invalid scene node type '{}'.",
             tag_desc);
     }
@@ -270,7 +266,7 @@ inline SceneNodeDesc::value_list SceneParser::_parse_value_list(SceneNodeDesc *n
     _skip_blanks();
     auto value_list = [node, this]() noexcept -> SceneNodeDesc::value_list {
         auto c = _peek();
-        if (c == '}') [[unlikely]] { LUISA_SCENE_PARSER_ERROR("Empty value list."); }
+        if (c == '}') [[unlikely]] { _report_error("Empty value list."); }
         if (c == '@' || isupper(c)) { return _parse_node_list_values(node); }
         if (c == '"' || c == '\'') { return _parse_string_list_values(); }
         if (c == 't' || c == 'f') { return _parse_bool_list_values(); }
@@ -350,12 +346,9 @@ inline SceneNodeDesc::string_list SceneParser::_parse_string_list_values() noexc
 
 luisa::unique_ptr<SceneDesc> SceneParser::parse(const path &entry_file) noexcept {
     auto desc = luisa::make_unique<SceneDesc>();
-    SceneParser{*desc, entry_file}._parse();
+    SceneParser{*desc, entry_file}._parse_file();
     ThreadPool::global().synchronize();
     return desc;
 }
-
-#undef LUISA_SCENE_PARSER_ERROR
-#undef LUISA_SCENE_PARSER_WARNING
 
 }// namespace luisa::render

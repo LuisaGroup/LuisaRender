@@ -23,10 +23,15 @@ private:
     size_t _cursor;
 
 private:
-    [[noreturn]] void _report_error(std::string_view message) const noexcept;
-    void _report_warning(std::string_view message) const noexcept;
+    template<typename... Args>
+    [[noreturn]] void _report_error(std::string_view format, Args &&...args) const noexcept;
+    template<typename... Args>
+    void _report_warning(std::string_view format, Args &&...args) const noexcept;
+
+private:
     void _match(char c) noexcept;
     void _skip() noexcept;
+    void _skip_blanks() noexcept;
     [[nodiscard]] char _peek() noexcept;
     [[nodiscard]] char _get() noexcept;
     [[nodiscard]] bool _eof() const noexcept;
@@ -34,9 +39,8 @@ private:
     [[nodiscard]] double _read_number() noexcept;
     [[nodiscard]] bool _read_bool() noexcept;
     [[nodiscard]] luisa::string _read_string() noexcept;
-    void _skip_blanks() noexcept;
-    void _parse() noexcept;
     void _parse_file() noexcept;
+    void _parse_source() noexcept;
     void _parse_root_node(SceneNodeDesc::SourceLocation l) noexcept;
     void _parse_global_node(SceneNodeDesc::SourceLocation l, std::string_view tag_desc) noexcept;
     void _parse_node_body(SceneNodeDesc *node) noexcept;
