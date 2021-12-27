@@ -26,7 +26,7 @@ public:
 
 public:
     Sampler(Scene *scene, const SceneNodeDesc *desc) noexcept;
-    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(Stream &stream, uint2 resolution, uint spp) const noexcept = 0;
+    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(Stream &stream, Pipeline &pipeline, uint2 resolution, uint spp) const noexcept = 0;
 };
 
 }// namespace luisa::render

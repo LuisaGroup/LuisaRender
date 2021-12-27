@@ -21,8 +21,16 @@ public:
         Evaluation eval;
     };
 
+    class Instance {
+
+    public:
+        virtual ~Instance() noexcept = default;
+        [[nodiscard]] virtual uint /* bindless buffer id */ encode_data(Stream &stream, Pipeline &pipeline) const noexcept = 0;
+    };
+
 public:
     Material(Scene *scene, const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(Stream &stream, Pipeline &pipeline) const noexcept = 0;
 };
 
-}
+}// namespace luisa::render

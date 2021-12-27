@@ -16,19 +16,19 @@ namespace luisa::render {
 using compute::Accel;
 using compute::AccelBuildHint;
 using compute::BindlessArray;
+using compute::BindlessBuffer;
+using compute::BindlessTexture2D;
+using compute::BindlessTexture3D;
 using compute::Buffer;
 using compute::BufferView;
+using compute::Callable;
 using compute::Device;
 using compute::Image;
 using compute::Mesh;
 using compute::PixelStorage;
 using compute::Resource;
-using compute::Volume;
-using compute::Callable;
 using compute::Triangle;
-using compute::BindlessBuffer;
-using compute::BindlessTexture2D;
-using compute::BindlessTexture3D;
+using compute::Volume;
 
 class Scene;
 
@@ -49,7 +49,7 @@ public:
 
     public:
         explicit BufferArena(Pipeline &pipeline) noexcept : _pipeline{pipeline} {}
-        [[nodiscard]] std::pair<BufferView<T>, uint/* buffer id and offset */> allocate(size_t n) noexcept;
+        [[nodiscard]] std::pair<BufferView<T>, uint /* buffer id and offset */> allocate(size_t n) noexcept;
     };
 
 public:
@@ -62,7 +62,7 @@ public:
     using ResourceHandle = luisa::unique_ptr<Resource>;
 
     struct MeshData {
-        uint resource_id;
+        Mesh *resource;
         uint triangle_count;
         uint position_buffer_id_and_offset;
         uint attribute_buffer_id_and_offset;
@@ -70,38 +70,36 @@ public:
         uint area_cdf_buffer_id_and_offset;
     };
 
-    struct MaterialInterface {
-        uint tag;
-        luisa::function<Material::Sample(/* TODO */)> sample;
-        luisa::function<Material::Evaluation(/* TODO */)> evaluate;
-    };
-
-    struct LightInterface {
-        uint tag;
-        luisa::function<Light::Sample(/* TODO */)> sample;
-        luisa::function<Light::Evaluation(/* TODO */)> evaluate;
-    };
-
 private:
     Device &_device;
-    luisa::vector<ResourceHandle> _resources;
+    Accel _accel;
     BindlessArray _bindless_array;
     size_t _bindless_buffer_count{0u};
     size_t _bindless_tex2d_count{0u};
     size_t _bindless_tex3d_count{0u};
+    luisa::vector<ResourceHandle> _resources;
     luisa::unordered_map<const Shape *, MeshData> _meshes;
-    luisa::unordered_map<luisa::string/* impl type */, MaterialInterface> _material_interfaces;
-    luisa::unordered_map<luisa::string/* impl type */, LightInterface> _light_interfaces;
-    luisa::unordered_map<const Material *, uint/* buffer id and tag */> _materials;
-    luisa::unordered_map<const Light *, uint/* buffer id and tag */> _lights;
-    BufferArena<float3, Instance::position_buffer_id_shift, Instance::position_buffer_element_alignment> _position_buffer_arena;
-    BufferArena<VertexAttribute, Instance::attribute_buffer_id_shift, Instance::attribute_buffer_element_alignment> _attribute_buffer_arena;
-    BufferArena<Triangle, Instance::triangle_buffer_id_shift, Instance::triangle_buffer_element_alignment> _triangle_buffer_arena;
-    BufferArena<float, Instance::area_cdf_buffer_id_shift, Instance::area_cdf_buffer_element_alignment> _area_cdf_buffer_arena;
-    Accel _accel;
-    luisa::vector<Instance> _instances;
-    Buffer<Instance> _instance_buffer;
+    luisa::vector<luisa::unique_ptr<Material::Instance>> _material_instances;
+    luisa::vector<luisa::unique_ptr<Light::Instance>> _light_instances;
+    luisa::unordered_map<luisa::string /* impl type */, uint /* tag (index into material_instances) */, Hash64> _material_tags;
+    luisa::unordered_map<luisa::string /* impl type */, uint /* tag (index into _light_instances) */, Hash64> _light_tags;
+    luisa::unordered_map<const Material *, uint /* buffer id and tag */> _materials;
+    luisa::unordered_map<const Light *, uint /* buffer id and tag */> _lights;
+    BufferArena<float3, MeshInstance::position_buffer_id_shift, MeshInstance::position_buffer_element_alignment> _position_buffer_arena;
+    BufferArena<VertexAttribute, MeshInstance::attribute_buffer_id_shift, MeshInstance::attribute_buffer_element_alignment> _attribute_buffer_arena;
+    BufferArena<Triangle, MeshInstance::triangle_buffer_id_shift, MeshInstance::triangle_buffer_element_alignment> _triangle_buffer_arena;
+    BufferArena<float, MeshInstance::area_cdf_buffer_id_shift, MeshInstance::area_cdf_buffer_element_alignment> _area_cdf_buffer_arena;
+    luisa::vector<MeshInstance> _instances;
+    Buffer<MeshInstance> _instance_buffer;
     luisa::unique_ptr<TransformTree> _transform_tree;
+
+private:
+    void _build_geometry(Stream &stream, luisa::span<const Shape *const> shapes, float init_time, AccelBuildHint hint) noexcept;
+    void _process_shape(
+        Stream &stream, TransformTree::Builder &transform_builder, const Shape *shape,
+        const Material *overridden_material = nullptr, const Light *overridden_light = nullptr) noexcept;
+    [[nodiscard]] uint /* buffer_id_and_tag */ _process_material(Stream &stream, const Material *material) noexcept;
+    [[nodiscard]] uint /* buffer_id_and_tag */ _process_light(Stream &stream, const Shape *shape, const Light *light) noexcept;
 
 public:
     // for internal use only; use Pipeline::create() instead

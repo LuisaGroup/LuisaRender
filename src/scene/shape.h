@@ -28,7 +28,7 @@ struct alignas(16) VertexAttribute {
     };
 };
 
-struct alignas(16) Instance {
+struct alignas(16) MeshInstance {
 
     static constexpr auto instance_buffer_id_shift = 12u;
     static constexpr auto instance_buffer_offset_mask = (1u << instance_buffer_id_shift) - 1u;
@@ -60,15 +60,15 @@ struct alignas(16) Instance {
     uint triangle_buffer_size;
 
     // other info
-    uint transform_offset;
     uint area_cdf_buffer_id_and_offset;
     uint material_buffer_id_and_tag;// = (buffer_id << shift) | tag
     uint light_buffer_id_and_tag;   // = (buffer_id << shift) | tag
 };
 
-static_assert(sizeof(Instance) == 32);
+static_assert(sizeof(MeshInstance) == 32);
 
 using compute::Triangle;
+using compute::AccelBuildHint;
 
 class Light;
 class Material;
@@ -80,18 +80,20 @@ private:
     const Material *_material;
     const Light *_light;
     const Transform *_transform;
+    AccelBuildHint _build_hint{AccelBuildHint::FAST_TRACE};
 
 public:
     Shape(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] auto material() const noexcept { return _material; }
     [[nodiscard]] auto light() const noexcept { return _light; }
     [[nodiscard]] auto transform() const noexcept { return _transform; }
+    [[nodiscard]] auto build_hint() const noexcept { return _build_hint; }
     [[nodiscard]] virtual bool is_mesh() const noexcept = 0;
-    [[nodiscard]] virtual luisa::span<float3> position_buffer() const noexcept = 0;                 // empty if the shape is not a mesh
-    [[nodiscard]] virtual luisa::span<VertexAttribute> attribute_buffer() const noexcept = 0;       // empty if the shape is not a mesh or the mesh has no attributes
-    [[nodiscard]] virtual luisa::span<Triangle> triangle_buffer() const noexcept = 0;               // empty if the shape is not a mesh
-    [[nodiscard]] virtual luisa::span<const Shape *const> children(size_t index) const noexcept = 0;// empty if the shape is a mesh
-    [[nodiscard]] virtual bool is_rigid() const noexcept = 0;                                       // true if the shape will not deform
+    [[nodiscard]] virtual luisa::span<float3> positions() const noexcept = 0;           // empty if the shape is not a mesh
+    [[nodiscard]] virtual luisa::span<VertexAttribute> attributes() const noexcept = 0; // empty if the shape is not a mesh or the mesh has no attributes
+    [[nodiscard]] virtual luisa::span<Triangle> triangles() const noexcept = 0;         // empty if the shape is not a mesh
+    [[nodiscard]] virtual luisa::span<const Shape *const> children() const noexcept = 0;// empty if the shape is a mesh
+    [[nodiscard]] virtual bool is_rigid() const noexcept = 0;                           // true if the shape will not deform
 };
 
 }// namespace luisa::render
@@ -121,31 +123,32 @@ LUISA_STRUCT(
 };
 
 LUISA_STRUCT(
-    luisa::render::Instance,
+    luisa::render::MeshInstance,
 
     position_buffer_id_and_offset,
     attribute_buffer_id_and_offset,
     triangle_buffer_id_and_offset,
     triangle_buffer_size,
-    transform_offset,
     area_cdf_buffer_id_and_offset,
     material_buffer_id_and_tag,
     light_buffer_id_and_tag) {
 
-    [[nodiscard]] auto position_buffer_id() const noexcept { return position_buffer_id_and_offset >> luisa::render::Instance::position_buffer_id_shift; }
-    [[nodiscard]] auto position_buffer_offset() const noexcept { return (position_buffer_id_and_offset & luisa::render::Instance::position_buffer_offset_mask) * luisa::render::Instance::position_buffer_element_alignment; }
-    [[nodiscard]] auto attribute_buffer_id() const noexcept { return attribute_buffer_id_and_offset >> luisa::render::Instance::attribute_buffer_id_shift; }
-    [[nodiscard]] auto attribute_buffer_offset() const noexcept { return (attribute_buffer_id_and_offset & luisa::render::Instance::attribute_buffer_offset_mask) * luisa::render::Instance::attribute_buffer_element_alignment; }
-    [[nodiscard]] auto triangle_buffer_id() const noexcept { return triangle_buffer_id_and_offset >> luisa::render::Instance::triangle_buffer_id_shift; }
-    [[nodiscard]] auto triangle_buffer_offset() const noexcept { return (triangle_buffer_id_and_offset & luisa::render::Instance::triangle_buffer_offset_mask) * luisa::render::Instance::triangle_buffer_element_alignment; }
+    [[nodiscard]] auto position_buffer_id() const noexcept { return position_buffer_id_and_offset >> luisa::render::MeshInstance::position_buffer_id_shift; }
+    [[nodiscard]] auto position_buffer_offset() const noexcept { return (position_buffer_id_and_offset & luisa::render::MeshInstance::position_buffer_offset_mask) * luisa::render::MeshInstance::position_buffer_element_alignment; }
+    [[nodiscard]] auto has_attributes() const noexcept { return attribute_buffer_id_and_offset != ~0u; }
+    [[nodiscard]] auto attribute_buffer_id() const noexcept { return attribute_buffer_id_and_offset >> luisa::render::MeshInstance::attribute_buffer_id_shift; }
+    [[nodiscard]] auto attribute_buffer_offset() const noexcept { return (attribute_buffer_id_and_offset & luisa::render::MeshInstance::attribute_buffer_offset_mask) * luisa::render::MeshInstance::attribute_buffer_element_alignment; }
+    [[nodiscard]] auto triangle_buffer_id() const noexcept { return triangle_buffer_id_and_offset >> luisa::render::MeshInstance::triangle_buffer_id_shift; }
+    [[nodiscard]] auto triangle_buffer_offset() const noexcept { return (triangle_buffer_id_and_offset & luisa::render::MeshInstance::triangle_buffer_offset_mask) * luisa::render::MeshInstance::triangle_buffer_element_alignment; }
     [[nodiscard]] auto triangle_count() const noexcept { return triangle_buffer_size; }
-    [[nodiscard]] auto transform_id() const noexcept { return transform_offset; }
-    [[nodiscard]] auto area_cdf_buffer_id() const noexcept { return area_cdf_buffer_id_and_offset >> luisa::render::Instance::area_cdf_buffer_id_shift; }
-    [[nodiscard]] auto area_cdf_buffer_offset() const noexcept { return (area_cdf_buffer_id_and_offset & luisa::render::Instance::area_cdf_buffer_offset_mask) * luisa::render::Instance::area_cdf_buffer_element_alignment; }
-    [[nodiscard]] auto material_tag() const noexcept { return material_buffer_id_and_tag & luisa::render::Instance::material_tag_mask; }
-    [[nodiscard]] auto material_buffer_id() const noexcept { return material_buffer_id_and_tag >> luisa::render::Instance::material_buffer_id_shift; }
-    [[nodiscard]] auto light_tag() const noexcept { return light_buffer_id_and_tag & luisa::render::Instance::light_tag_mask; }
-    [[nodiscard]] auto light_buffer_id() const noexcept { return light_buffer_id_and_tag >> luisa::render::Instance::light_buffer_id_shift; }
+    [[nodiscard]] auto area_cdf_buffer_id() const noexcept { return area_cdf_buffer_id_and_offset >> luisa::render::MeshInstance::area_cdf_buffer_id_shift; }
+    [[nodiscard]] auto area_cdf_buffer_offset() const noexcept { return (area_cdf_buffer_id_and_offset & luisa::render::MeshInstance::area_cdf_buffer_offset_mask) * luisa::render::MeshInstance::area_cdf_buffer_element_alignment; }
+    [[nodiscard]] auto material_tag() const noexcept { return material_buffer_id_and_tag & luisa::render::MeshInstance::material_tag_mask; }
+    [[nodiscard]] auto material_buffer_id() const noexcept { return material_buffer_id_and_tag >> luisa::render::MeshInstance::material_buffer_id_shift; }
+    [[nodiscard]] auto has_material() const noexcept { return material_buffer_id_and_tag != ~0u; }
+    [[nodiscard]] auto light_tag() const noexcept { return light_buffer_id_and_tag & luisa::render::MeshInstance::light_tag_mask; }
+    [[nodiscard]] auto light_buffer_id() const noexcept { return light_buffer_id_and_tag >> luisa::render::MeshInstance::light_buffer_id_shift; }
+    [[nodiscard]] auto has_light() const noexcept { return light_buffer_id_and_tag != ~0u; }
 };
 
 // clang-format on

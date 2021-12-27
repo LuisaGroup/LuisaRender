@@ -44,10 +44,11 @@ private:
         [[nodiscard]] auto transform() const noexcept { return _transform; }
         [[nodiscard]] auto is_leaf() const noexcept { return _is_leaf; }
         [[nodiscard]] auto is_static() const noexcept { return _is_static; }
-        [[nodiscard]] Node *add_child(const Transform *transform, uint32_t transform_id, bool is_leaf, bool ancestors_static) noexcept;
+        Node *add_child(const Transform *transform, uint32_t transform_id, bool is_leaf, bool ancestors_static) noexcept;
         void update(Accel &accel, float4x4 matrix, float time) const noexcept;
     };
 
+public:
     class Builder {
 
     private:
@@ -58,8 +59,9 @@ private:
 
     public:
         explicit Builder(float initial_time = 0.0f) noexcept;
-        [[nodiscard]] float4x4 push(const Transform *t, uint index, bool is_leaf) noexcept;
+        void push(const Transform *t) noexcept;
         void pop() noexcept;
+        [[nodiscard]] float4x4 leaf(const Transform *t, uint index) noexcept;
         [[nodiscard]] luisa::unique_ptr<TransformTree> build() noexcept;
     };
 

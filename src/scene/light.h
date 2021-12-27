@@ -8,6 +8,12 @@
 
 namespace luisa::render {
 
+class Shape;
+
+struct LightInstance {
+
+};
+
 class Light : public SceneNode {
 
 public:
@@ -19,8 +25,14 @@ public:
 
     };
 
+    class Instance {
+
+    };
+
 public:
     Light(Scene *scene, const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] virtual float power(const Shape *shape) const noexcept = 0;
+    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(Stream &stream, Pipeline &pipeline) const noexcept = 0;
 };
 
 }

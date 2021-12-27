@@ -9,10 +9,9 @@ namespace luisa::render {
 Transform::Transform(Scene *scene, const SceneNodeDesc *desc) noexcept
     : SceneNode{scene, desc, SceneNodeTag::TRANSFORM} {}
 
-float4x4 TransformTree::Builder::push(const Transform *t, uint index, bool is_leaf) noexcept {
+void TransformTree::Builder::push(const Transform *t) noexcept {
     auto current = _node_stack.back();
-    _node_stack.emplace_back(
-        current->add_child(t, index, is_leaf, current->is_static()));
+    auto node = current->add_child(t, ~0u, false, current->is_static());
     if (t != nullptr && !t->is_identity()) {
         if (!t->is_static()) {
             for (auto iter = _node_stack.rbegin(); iter != _node_stack.rend() && (*iter)->is_static(); iter++) {
@@ -20,10 +19,9 @@ float4x4 TransformTree::Builder::push(const Transform *t, uint index, bool is_le
             }
         }
         _transform_stack.emplace_back(
-            _transform_stack.back() *
-            t->matrix(_initial_time));
+            _transform_stack.back() * t->matrix(_initial_time));
     }
-    return _transform_stack.back();
+    _node_stack.emplace_back(node);
 }
 
 inline TransformTree::Builder::Builder(float initial_time) noexcept
@@ -43,6 +41,21 @@ void TransformTree::Builder::pop() noexcept {
 
 luisa::unique_ptr<TransformTree> TransformTree::Builder::build() noexcept {
     return std::move(_tree);
+}
+
+float4x4 TransformTree::Builder::leaf(const Transform *t, uint index) noexcept {
+    auto current = _node_stack.back();
+    current->add_child(t, index, true, current->is_static());
+    auto matrix = _transform_stack.back();
+    if (t != nullptr && !t->is_identity()) {
+        if (!t->is_static()) {
+            for (auto iter = _node_stack.rbegin(); iter != _node_stack.rend() && (*iter)->is_static(); iter++) {
+                (*iter)->mark_dynamic();
+            }
+        }
+        matrix = matrix * t->matrix(_initial_time);
+    }
+    return matrix;
 }
 
 void TransformTree::update(Accel &accel, float time) const noexcept {
@@ -77,9 +90,7 @@ inline TransformTree::Node *TransformTree::Node::add_child(
 inline TransformTree::Node::Node(
     const Transform *transform, uint32_t transform_id,
     bool is_leaf, bool ancestors_static) noexcept
-    : _transform{transform},
-      _transform_id{transform_id},
-      _is_leaf{is_leaf},
-      _is_static{ancestors_static} {}
+    : _transform{transform}, _transform_id{transform_id}, _is_leaf{is_leaf},
+      _is_static{ancestors_static && (transform == nullptr || transform->is_static())} {}
 
 }// namespace luisa::render

@@ -22,7 +22,7 @@ private:
 public:
     Film(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] auto resolution() const noexcept { return _resolution; }
-    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(Stream &stream) const noexcept = 0;
+    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(Stream &stream, Pipeline &pipeline) const noexcept = 0;
 };
 
 }
