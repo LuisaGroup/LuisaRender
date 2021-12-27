@@ -8,6 +8,8 @@
 #include <luisa-compute.h>
 
 #include <scene/shape.h>
+#include <scene/light.h>
+#include <scene/material.h>
 
 namespace luisa::render {
 
@@ -26,7 +28,6 @@ using compute::Callable;
 using compute::Triangle;
 
 class Scene;
-class Shape;
 
 class Pipeline {
 
@@ -69,6 +70,18 @@ public:
         uint area_cdf_buffer_id_and_offset;
     };
 
+    struct MaterialInterface {
+        uint tag;
+        luisa::function<Material::Sample(/* TODO */)> sample;
+        luisa::function<Material::Evaluation(/* TODO */)> evaluate;
+    };
+
+    struct LightInterface {
+        uint tag;
+        luisa::function<Light::Sample(/* TODO */)> sample;
+        luisa::function<Light::Evaluation(/* TODO */)> evaluate;
+    };
+
 private:
     Device &_device;
     luisa::vector<ResourceHandle> _resources;
@@ -78,6 +91,8 @@ private:
     size_t _bindless_tex3d_count{0u};
     Accel _accel;
     luisa::unordered_map<const Shape *, MeshData> _meshes;
+    luisa::unordered_map<luisa::string/* impl type */, MaterialInterface> _material_interfaces;
+    luisa::unordered_map<luisa::string/* impl type */, LightInterface> _light_interfaces;
     luisa::unordered_map<const Material *, uint/* buffer id and tag */> _materials;
     luisa::unordered_map<const Light *, uint/* buffer id and tag */> _lights;
     BufferArena<float3, Instance::position_buffer_id_shift, Instance::position_buffer_element_alignment> _position_buffer_arena;
@@ -96,70 +111,44 @@ public:
     Pipeline &operator=(const Pipeline &) noexcept = delete;
     ~Pipeline() noexcept;
 
-private:
+public:
     template<typename T>
-    [[nodiscard]] auto _emplace_back_bindless_buffer(BufferView<T> buffer) noexcept {
+    [[nodiscard]] auto register_bindless(BufferView<T> buffer) noexcept {
         auto buffer_id = _bindless_buffer_count++;
         _bindless_array.emplace(buffer_id, buffer);
         return static_cast<uint>(buffer_id);
     }
 
-public:
     template<typename T>
-    [[nodiscard]] std::pair<BufferView<T>, uint/* id */> create_bindless_buffer(size_t size) noexcept {
-
+    [[nodiscard]] auto register_bindless(const Buffer<T> &buffer) noexcept {
+        return register_bindless(buffer.view());
     }
 
-    // low-level interfaces, for internal resources of scene nodes
-//    template<typename T>
-//    [[nodiscard]] Buffer<T> &create_buffer(size_t size) noexcept {
-//        auto buffer = luisa::make_unique<Buffer<T>>(_device.create_buffer<T>(size));
-//        auto p_buffer = buffer.get();
-//        _resources.emplace_back(std::move(buffer));
-//        return *p_buffer;
-//    }
-//
-//    template<typename T>
-//    [[nodiscard]] Image<T> &create_image(PixelStorage pixel, uint2 size, uint mip_levels = 1u) noexcept {
-//        auto image = luisa::make_unique<Image<T>>(_device.create_image<T>(pixel, size, mip_levels));
-//        auto p_image = image.get();
-//        _resources.emplace_back(std::move(image));
-//        return *p_image;
-//    }
-//
-//    template<typename T>
-//    [[nodiscard]] Volume<T> &create_volume(PixelStorage pixel, uint3 size, uint mip_levels = 1u) noexcept {
-//        auto volume = luisa::make_unique<Volume<T>>(_device.create_volume<T>(pixel, size, mip_levels));
-//        auto p_volume = volume.get();
-//        _resources.emplace_back(std::move(volume));
-//        return *p_volume;
-//    }
-//
-//    template<typename VBuffer, typename TBuffer>
-//    [[nodiscard]] Mesh &create_mesh(
-//        VBuffer &&vertices, TBuffer &&triangles,
-//        AccelBuildHint hint = AccelBuildHint::FAST_TRACE) noexcept {
-//        auto mesh = luisa::make_unique<Mesh>(_device.create_mesh(
-//            std::forward<VBuffer>(vertices),
-//            std::forward<TBuffer>(triangles)));
-//        auto p_mesh = mesh.get();
-//        _resources.emplace_back(std::move(mesh));
-//        return *p_mesh;
-//    }
-//
-//    [[nodiscard]] Accel &create_accel(AccelBuildHint hint = AccelBuildHint::FAST_TRACE) noexcept {
-//        auto accel = luisa::make_unique<Accel>(_device.create_accel(hint));
-//        auto p_accel = accel.get();
-//        _resources.emplace_back(std::move(accel));
-//        return *p_accel;
-//    }
-//
-//    [[nodiscard]] BindlessArray &create_bindless_array(size_t capacity = 65536u) noexcept {
-//        auto array = luisa::make_unique<BindlessArray>(_device.create_bindless_array(capacity));
-//        auto p_array = array.get();
-//        _resources.emplace_back(std::move(array));
-//        return *p_array;
-//    }
+    template<typename T>
+    [[nodiscard]] auto register_bindless(const Image<T> &image) noexcept {
+        auto tex2d_id = _bindless_tex2d_count++;
+        _bindless_array.emplace(tex2d_id, image);
+        return static_cast<uint>(tex2d_id);
+    }
+
+    template<typename T>
+    [[nodiscard]] auto register_bindless(const Volume<T> &volume) noexcept {
+        auto tex3d_id = _bindless_tex3d_count++;
+        _bindless_array.emplace(tex3d_id, volume);
+        return static_cast<uint>(tex3d_id);
+    }
+
+    template<typename T, typename... Args>
+        requires std::is_base_of_v<Resource, T>
+    [[nodiscard]] auto create(Args &&...args) noexcept -> T * {
+        auto resource = luisa::make_unique<T>(_device.create<T>(std::forward<Args>(args)...));
+        auto p = resource.get();
+        _resources.emplace_back(std::move(resource));
+        return p;
+    }
+
+    [[nodiscard]] auto &device() noexcept { return _device; }
+    [[nodiscard]] const auto &device() const noexcept { return _device; }
 };
 
 }// namespace luisa::render

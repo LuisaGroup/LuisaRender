@@ -9,6 +9,16 @@
 namespace luisa::render {
 
 class Light : public SceneNode {
+
+public:
+    struct Evaluation {
+
+    };
+
+    struct Sample {
+
+    };
+
 public:
     Light(Scene *scene, const SceneNodeDesc *desc) noexcept;
 };
