@@ -26,6 +26,9 @@ using compute::Resource;
 using compute::Volume;
 using compute::Callable;
 using compute::Triangle;
+using compute::BindlessBuffer;
+using compute::BindlessTexture2D;
+using compute::BindlessTexture3D;
 
 class Scene;
 
@@ -43,9 +46,6 @@ public:
         Buffer<T> *_buffer{nullptr};
         uint _buffer_id{0u};
         uint _buffer_offset{0u};
-
-    private:
-        void _create_buffer() noexcept;
 
     public:
         explicit BufferArena(Pipeline &pipeline) noexcept : _pipeline{pipeline} {}
@@ -89,7 +89,6 @@ private:
     size_t _bindless_buffer_count{0u};
     size_t _bindless_tex2d_count{0u};
     size_t _bindless_tex3d_count{0u};
-    Accel _accel;
     luisa::unordered_map<const Shape *, MeshData> _meshes;
     luisa::unordered_map<luisa::string/* impl type */, MaterialInterface> _material_interfaces;
     luisa::unordered_map<luisa::string/* impl type */, LightInterface> _light_interfaces;
@@ -99,8 +98,10 @@ private:
     BufferArena<VertexAttribute, Instance::attribute_buffer_id_shift, Instance::attribute_buffer_element_alignment> _attribute_buffer_arena;
     BufferArena<Triangle, Instance::triangle_buffer_id_shift, Instance::triangle_buffer_element_alignment> _triangle_buffer_arena;
     BufferArena<float, Instance::area_cdf_buffer_id_shift, Instance::area_cdf_buffer_element_alignment> _area_cdf_buffer_arena;
-    BufferArena<float4x4, Instance::transform_buffer_id_shift, 1u> _transform_buffer_arena;
-    BufferArena<Instance, Instance::instance_buffer_id_shift, 1u> _instance_buffer_arena;
+    Accel _accel;
+    luisa::vector<Instance> _instances;
+    Buffer<Instance> _instance_buffer;
+    luisa::unique_ptr<TransformTree> _transform_tree;
 
 public:
     // for internal use only; use Pipeline::create() instead
@@ -149,6 +150,11 @@ public:
 
     [[nodiscard]] auto &device() noexcept { return _device; }
     [[nodiscard]] const auto &device() const noexcept { return _device; }
+
+    template<typename T>
+    [[nodiscard]] auto bindless_buffer(Expr<uint> buffer_id) const noexcept { return _bindless_array.buffer<T>(buffer_id); }
+    [[nodiscard]] auto bindless_tex2d(Expr<uint> tex_id) const noexcept { return _bindless_array.tex2d(tex_id); }
+    [[nodiscard]] auto bindless_tex3d(Expr<uint> tex_id) const noexcept { return _bindless_array.tex3d(tex_id); }
 };
 
 }// namespace luisa::render

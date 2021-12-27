@@ -36,7 +36,6 @@ struct alignas(16) Instance {
     static constexpr auto position_buffer_id_shift = 13u;
     static constexpr auto attribute_buffer_id_shift = 13u;
     static constexpr auto triangle_buffer_id_shift = 13u;
-    static constexpr auto transform_buffer_id_shift = 13u;
     static constexpr auto area_cdf_buffer_id_shift = 13u;
 
     static constexpr auto position_buffer_element_alignment = 16u;
@@ -47,7 +46,6 @@ struct alignas(16) Instance {
     static constexpr auto position_buffer_offset_mask = (1u << position_buffer_id_shift) - 1u;
     static constexpr auto attribute_buffer_offset_mask = (1u << attribute_buffer_id_shift) - 1u;
     static constexpr auto triangle_buffer_offset_mask = (1u << triangle_buffer_id_shift) - 1u;
-    static constexpr auto transform_buffer_offset_mask = (1u << transform_buffer_id_shift) - 1u;
     static constexpr auto area_cdf_buffer_offset_mask = (1u << area_cdf_buffer_id_shift) - 1u;
 
     static constexpr auto material_buffer_id_shift = 12u;
@@ -61,16 +59,16 @@ struct alignas(16) Instance {
     uint triangle_buffer_id_and_offset;
     uint triangle_buffer_size;
 
-    // transform & sampling
-    uint transform_buffer_id_and_offset;// (buffer_id << shift) | offset
+    // other info
+    uint transform_offset;
     uint area_cdf_buffer_id_and_offset;
-
-    // appearance & illumination
     uint material_buffer_id_and_tag;// = (buffer_id << shift) | tag
     uint light_buffer_id_and_tag;   // = (buffer_id << shift) | tag
 };
 
 static_assert(sizeof(Instance) == 32);
+
+using compute::Triangle;
 
 class Light;
 class Material;
@@ -88,13 +86,12 @@ public:
     [[nodiscard]] auto material() const noexcept { return _material; }
     [[nodiscard]] auto light() const noexcept { return _light; }
     [[nodiscard]] auto transform() const noexcept { return _transform; }
-    [[nodiscard]] virtual luisa::span<float3> position_buffer() const noexcept = 0;
-    [[nodiscard]] virtual luisa::span<VertexAttribute> attribute_buffer() const noexcept = 0;
-    [[nodiscard]] virtual bool is_static() const noexcept = 0;
-    [[nodiscard]] virtual bool is_rigid() const noexcept = 0;
     [[nodiscard]] virtual bool is_mesh() const noexcept = 0;
-    [[nodiscard]] virtual size_t child_count() const noexcept = 0;
-    [[nodiscard]] virtual const Shape *child(size_t index) const noexcept = 0;
+    [[nodiscard]] virtual luisa::span<float3> position_buffer() const noexcept = 0;                 // empty if the shape is not a mesh
+    [[nodiscard]] virtual luisa::span<VertexAttribute> attribute_buffer() const noexcept = 0;       // empty if the shape is not a mesh or the mesh has no attributes
+    [[nodiscard]] virtual luisa::span<Triangle> triangle_buffer() const noexcept = 0;               // empty if the shape is not a mesh
+    [[nodiscard]] virtual luisa::span<const Shape *const> children(size_t index) const noexcept = 0;// empty if the shape is a mesh
+    [[nodiscard]] virtual bool is_rigid() const noexcept = 0;                                       // true if the shape will not deform
 };
 
 }// namespace luisa::render
@@ -130,8 +127,7 @@ LUISA_STRUCT(
     attribute_buffer_id_and_offset,
     triangle_buffer_id_and_offset,
     triangle_buffer_size,
-
-    transform_buffer_id_and_offset,
+    transform_offset,
     area_cdf_buffer_id_and_offset,
     material_buffer_id_and_tag,
     light_buffer_id_and_tag) {
@@ -143,8 +139,7 @@ LUISA_STRUCT(
     [[nodiscard]] auto triangle_buffer_id() const noexcept { return triangle_buffer_id_and_offset >> luisa::render::Instance::triangle_buffer_id_shift; }
     [[nodiscard]] auto triangle_buffer_offset() const noexcept { return (triangle_buffer_id_and_offset & luisa::render::Instance::triangle_buffer_offset_mask) * luisa::render::Instance::triangle_buffer_element_alignment; }
     [[nodiscard]] auto triangle_count() const noexcept { return triangle_buffer_size; }
-    [[nodiscard]] auto transform_buffer_id() const noexcept { return transform_buffer_id_and_offset >> luisa::render::Instance::transform_buffer_id_shift; }
-    [[nodiscard]] auto transform_buffer_offset() const noexcept { return transform_buffer_id_and_offset & luisa::render::Instance::transform_buffer_offset_mask; }
+    [[nodiscard]] auto transform_id() const noexcept { return transform_offset; }
     [[nodiscard]] auto area_cdf_buffer_id() const noexcept { return area_cdf_buffer_id_and_offset >> luisa::render::Instance::area_cdf_buffer_id_shift; }
     [[nodiscard]] auto area_cdf_buffer_offset() const noexcept { return (area_cdf_buffer_id_and_offset & luisa::render::Instance::area_cdf_buffer_offset_mask) * luisa::render::Instance::area_cdf_buffer_element_alignment; }
     [[nodiscard]] auto material_tag() const noexcept { return material_buffer_id_and_tag & luisa::render::Instance::material_tag_mask; }
