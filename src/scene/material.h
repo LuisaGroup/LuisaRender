@@ -11,6 +11,13 @@ namespace luisa::render {
 class Material : public SceneNode {
 
 public:
+    static constexpr auto property_flag_black = 1u;
+    static constexpr auto property_flag_two_sided = 2u;
+    static constexpr auto property_flag_reflective = 4u;
+    static constexpr auto property_flag_refractive = 8u;
+    static constexpr auto property_flag_volumetric = 16u;
+
+public:
     struct Evaluation {
         Float3 f;
         Float pdf;
@@ -21,16 +28,17 @@ public:
         Evaluation eval;
     };
 
-    class Instance {
+    class Interface {
 
     public:
-        virtual ~Instance() noexcept = default;
-        [[nodiscard]] virtual uint /* bindless buffer id */ encode_data(Stream &stream, Pipeline &pipeline) const noexcept = 0;
+        virtual ~Interface() noexcept = default;
     };
 
 public:
     Material(Scene *scene, const SceneNodeDesc *desc) noexcept;
-    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(Stream &stream, Pipeline &pipeline) const noexcept = 0;
+    [[nodiscard]] virtual luisa::unique_ptr<Interface> interface() const noexcept = 0;
+    [[nodiscard]] virtual uint property_flags() const noexcept = 0;
+    [[nodiscard]] virtual uint /* bindless buffer id and tag */ encode(Stream &stream, Pipeline &pipeline) const noexcept = 0;
 };
 
 }// namespace luisa::render

@@ -52,7 +52,7 @@ public:
     class Builder {
 
     private:
-        luisa::unique_ptr<TransformTree> _tree;
+        luisa::unique_ptr<TransformTree::Node> _root;
         luisa::vector<Node *> _node_stack;
         luisa::vector<float4x4> _transform_stack;
         float _initial_time;
@@ -62,17 +62,18 @@ public:
         void push(const Transform *t) noexcept;
         void pop() noexcept;
         [[nodiscard]] float4x4 leaf(const Transform *t, uint index) noexcept;
-        [[nodiscard]] luisa::unique_ptr<TransformTree> build() noexcept;
+        [[nodiscard]] TransformTree build() noexcept;
     };
 
 private:
     luisa::unique_ptr<Node> _root;
 
 private:
-    TransformTree() noexcept;
+    explicit TransformTree(luisa::unique_ptr<Node> root) noexcept
+        : _root{std::move(root)} {}
 
 public:
-    TransformTree(TransformTree &&) noexcept = default;
+    TransformTree() noexcept = default;
     [[nodiscard]] static Builder builder(float init_time = 0.0f) noexcept;
     void update(Accel &accel, float time) const noexcept;
     [[nodiscard]] auto is_static() const noexcept { return _root->is_static(); }

@@ -5,7 +5,8 @@
 #pragma once
 
 #include <rtx/mesh.h>
-#include <scene/scene_node.h>
+#include <scene/material.h>
+#include <scene/light.h>
 
 namespace luisa::render {
 
@@ -64,9 +65,10 @@ struct alignas(16) MeshInstance {
     uint triangle_buffer_size;
 
     // other info
-    uint area_cdf_buffer_id_and_offset;
+    uint material_and_light_property_flags;
     uint material_buffer_id_and_tag;// = (buffer_id << shift) | tag
     uint light_buffer_id_and_tag;   // = (buffer_id << shift) | tag
+    uint area_cdf_buffer_id_and_offset;
 };
 
 static_assert(sizeof(MeshInstance) == 32);
@@ -133,9 +135,10 @@ LUISA_STRUCT(
     attribute_buffer_id_and_offset,
     triangle_buffer_id_and_offset,
     triangle_buffer_size,
-    area_cdf_buffer_id_and_offset,
+    material_and_light_property_flags,
     material_buffer_id_and_tag,
-    light_buffer_id_and_tag) {
+    light_buffer_id_and_tag,
+    area_cdf_buffer_id_and_offset) {
 
     [[nodiscard]] auto position_buffer_id() const noexcept { return position_buffer_id_and_offset >> luisa::render::MeshInstance::position_buffer_id_shift; }
     [[nodiscard]] auto position_buffer_offset() const noexcept { return (position_buffer_id_and_offset & luisa::render::MeshInstance::position_buffer_offset_mask) * luisa::render::MeshInstance::position_buffer_element_alignment; }
@@ -149,10 +152,12 @@ LUISA_STRUCT(
     [[nodiscard]] auto area_cdf_buffer_offset() const noexcept { return (area_cdf_buffer_id_and_offset & luisa::render::MeshInstance::area_cdf_buffer_offset_mask) * luisa::render::MeshInstance::area_cdf_buffer_element_alignment; }
     [[nodiscard]] auto material_tag() const noexcept { return material_buffer_id_and_tag & luisa::render::MeshInstance::material_tag_mask; }
     [[nodiscard]] auto material_buffer_id() const noexcept { return material_buffer_id_and_tag >> luisa::render::MeshInstance::material_buffer_id_shift; }
-    [[nodiscard]] auto has_material() const noexcept { return material_buffer_id_and_tag != ~0u; }
     [[nodiscard]] auto light_tag() const noexcept { return light_buffer_id_and_tag & luisa::render::MeshInstance::light_tag_mask; }
     [[nodiscard]] auto light_buffer_id() const noexcept { return light_buffer_id_and_tag >> luisa::render::MeshInstance::light_buffer_id_shift; }
-    [[nodiscard]] auto has_light() const noexcept { return light_buffer_id_and_tag != ~0u; }
+    [[nodiscard]] auto material_flags() const noexcept { return material_and_light_property_flags & 0xffffu; }
+    [[nodiscard]] auto light_flags() const noexcept { return material_and_light_property_flags >> 16u; }
+    [[nodiscard]] auto black_material() const noexcept { return (material_flags() & luisa::render::Material::property_flag_black) != 0u; }
+    [[nodiscard]] auto black_light() const noexcept { return (material_flags() & luisa::render::Light::property_flag_black) != 0u; }
 };
 
 // clang-format on

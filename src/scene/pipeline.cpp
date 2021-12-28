@@ -114,8 +114,17 @@ void Pipeline::_process_shape(
         instance.triangle_buffer_id_and_offset = mesh.triangle_buffer_id_and_offset;
         instance.triangle_buffer_size = mesh.triangle_count;
         instance.area_cdf_buffer_id_and_offset = mesh.area_cdf_buffer_id_and_offset;
-        instance.material_buffer_id_and_tag = _process_material(stream, material);
-        instance.light_buffer_id_and_tag = _process_light(stream, shape, light);
+        auto [m, m_flags] = _process_material(stream, material);
+        auto [l, l_flags] = _process_light(stream, shape, light);
+        if (m_flags > 0xffff'ffffu || l_flags > 0xffff'ffffu) [[unlikely]] {
+            LUISA_ERROR_WITH_LOCATION(
+                "Invalid material and/or light "
+                "property flags: 0x{:08x} and 0x{:08x}.",
+                m_flags, l_flags);
+        }
+        instance.material_and_light_property_flags = (l_flags << 16u) | m_flags;
+        instance.material_buffer_id_and_tag = m;
+        instance.light_buffer_id_and_tag = l;
         // add instance
         auto object_to_world = transform_builder.leaf(shape->transform(), _accel.size());
         _accel.emplace_back(*mesh.resource, object_to_world, true);
@@ -127,36 +136,33 @@ void Pipeline::_process_shape(
     }
 }
 
-uint Pipeline::_process_material(Stream &stream, const Material *material) noexcept {
-    if (material == nullptr) { return ~0u; }
+std::pair<uint, uint> Pipeline::_process_material(Stream &stream, const Material *material) noexcept {
+    if (material == nullptr) { return {~0u, Material::property_flag_black}; }
     if (auto iter = _materials.find(material); iter != _materials.cend()) {
         return iter->second;
     }
-    auto [instance, tag] = [this, &stream, material] {
+    auto tag = [this, material] {
         luisa::string impl_type{material->impl_type()};
         if (auto iter = _material_tags.find(impl_type);
             iter != _material_tags.cend()) {
-            auto t = iter->second;
-            return std::make_pair(_material_instances[t].get(), t);
+            return iter->second;
         }
         static constexpr auto max_tag = (1u << MeshInstance::material_buffer_id_shift) - 1u;
-        auto t = static_cast<uint32_t>(_material_instances.size());
+        auto t = static_cast<uint32_t>(_material_interfaces.size());
         if (t > max_tag) [[unlikely]] { LUISA_ERROR_WITH_LOCATION("Too many materials."); }
-        auto m = material->build(stream, *this);
-        auto p = m.get();
-        _material_instances.emplace_back(std::move(m));
+        _material_interfaces.emplace_back(material->interface());
         _material_tags.emplace(std::move(impl_type), t);
-        return std::make_pair(p, t);
+        return t;
     }();
-    auto buffer_id = instance->encode_data(stream, *this);
+    auto buffer_id = material->encode(stream, *this);
     auto buffer_id_and_tag = (buffer_id << MeshInstance::material_buffer_id_shift) | tag;
-    _materials.emplace(material, buffer_id_and_tag);
-    return buffer_id_and_tag;
+    auto flags = material->property_flags();
+    return _materials.emplace(material, std::make_pair(buffer_id_and_tag, flags)).first->second;
 }
 
-uint Pipeline::_process_light(Stream &stream, const Shape *shape, const Light *light) noexcept {
-    if (light == nullptr) { return ~0u; }
-    return 0u;
+std::pair<uint, uint> Pipeline::_process_light(Stream &stream, const Shape *shape, const Light *light) noexcept {
+    if (light == nullptr) { return std::make_pair(~0u, Light::property_flag_black); }
+    return {};
 }
 
 Pipeline::~Pipeline() noexcept = default;

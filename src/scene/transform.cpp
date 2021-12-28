@@ -25,9 +25,9 @@ void TransformTree::Builder::push(const Transform *t) noexcept {
 }
 
 inline TransformTree::Builder::Builder(float initial_time) noexcept
-    : _tree{luisa::make_unique<TransformTree>(TransformTree{})},
+    : _root{luisa::make_unique<Node>(nullptr, ~0u, false, true)},
       _initial_time{initial_time} {
-    _node_stack.emplace_back(_tree->_root.get());
+    _node_stack.emplace_back(_root.get());
     _transform_stack.emplace_back(make_float4x4(1.0f));
 }
 
@@ -39,8 +39,8 @@ void TransformTree::Builder::pop() noexcept {
     _node_stack.pop_back();
 }
 
-luisa::unique_ptr<TransformTree> TransformTree::Builder::build() noexcept {
-    return std::move(_tree);
+TransformTree TransformTree::Builder::build() noexcept {
+    return TransformTree{std::move(_root)};
 }
 
 float4x4 TransformTree::Builder::leaf(const Transform *t, uint index) noexcept {
@@ -65,9 +65,6 @@ void TransformTree::update(Accel &accel, float time) const noexcept {
 TransformTree::Builder TransformTree::builder(float init_time) noexcept {
     return Builder{init_time};
 }
-
-inline TransformTree::TransformTree() noexcept
-    : _root{luisa::make_unique<Node>(nullptr, ~0u, false, true)} {}
 
 void TransformTree::Node::update(Accel &accel, float4x4 matrix, float time) const noexcept {
     if (is_static()) { return; }// static path in tree, prune
