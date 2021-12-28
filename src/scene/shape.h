@@ -10,6 +10,7 @@
 namespace luisa::render {
 
 struct alignas(16) VertexAttribute {
+
     uint compressed_normal;
     uint compressed_tangent;
     float compressed_uv[2];
@@ -24,7 +25,10 @@ struct alignas(16) VertexAttribute {
             auto u = make_uint2(clamp(round((p * 0.5f + 0.5f) * 65535.0f), 0.0f, 65535.0f));
             return u.x | (u.y << 16u);
         };
-        return VertexAttribute{oct_encode(normal), oct_encode(tangent), uv.x, uv.y};
+        return VertexAttribute{
+            .compressed_normal = oct_encode(normal),
+            .compressed_tangent = oct_encode(tangent),
+            .compressed_uv = {uv.x, uv.y}};
     };
 };
 
@@ -67,8 +71,8 @@ struct alignas(16) MeshInstance {
 
 static_assert(sizeof(MeshInstance) == 32);
 
-using compute::Triangle;
 using compute::AccelBuildHint;
+using compute::Triangle;
 
 class Light;
 class Material;
