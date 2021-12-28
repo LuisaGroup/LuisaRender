@@ -88,17 +88,18 @@ void Pipeline::_process_shape(
             auto sum_area = 0.0;
             luisa::vector<float> areas;
             areas.reserve(triangles.size() + 1u);
-            areas.emplace_back(0.0f);
             for (auto t : triangles) {
                 auto p0 = positions[t.i0];
                 auto p1 = positions[t.i1];
                 auto p2 = positions[t.i2];
                 auto v = cross(p1 - p0, p2 - p0);
                 auto a = std::sqrt(dot(v, v));
-                areas.emplace_back(static_cast<float>(sum_area += a));
+                areas.emplace_back(static_cast<float>(sum_area));
+                sum_area += a;
             }
             auto inv_sum_area = 1.0 / sum_area;
             for (auto &a : areas) { a = static_cast<float>(a * inv_sum_area); }
+            areas.emplace_back(1.0f);
             auto [area_cdf_buffer_view, area_cdf_buffer_id_and_offset] = _area_cdf_buffer_arena.allocate(areas.size());
             mesh.area_cdf_buffer_id_and_offset = area_cdf_buffer_id_and_offset;
             stream << area_cdf_buffer_view.copy_from(areas.data());
@@ -111,10 +112,10 @@ void Pipeline::_process_shape(
         instance.position_buffer_id_and_offset = mesh.position_buffer_id_and_offset;
         instance.attribute_buffer_id_and_offset = mesh.attribute_buffer_id_and_offset;
         instance.triangle_buffer_id_and_offset = mesh.triangle_buffer_id_and_offset;
+        instance.triangle_buffer_size = mesh.triangle_count;
         instance.area_cdf_buffer_id_and_offset = mesh.area_cdf_buffer_id_and_offset;
-        // process material and light
-        if (material != nullptr) { instance.material_buffer_id_and_tag = _process_material(stream, material); }
-        if (light != nullptr) { instance.light_buffer_id_and_tag = _process_light(stream, shape, light); }
+        instance.material_buffer_id_and_tag = _process_material(stream, material);
+        instance.light_buffer_id_and_tag = _process_light(stream, shape, light);
         // add instance
         auto object_to_world = transform_builder.leaf(shape->transform(), _accel.size());
         _accel.emplace_back(*mesh.resource, object_to_world, true);
@@ -127,6 +128,7 @@ void Pipeline::_process_shape(
 }
 
 uint Pipeline::_process_material(Stream &stream, const Material *material) noexcept {
+    if (material == nullptr) { return ~0u; }
     if (auto iter = _materials.find(material); iter != _materials.cend()) {
         return iter->second;
     }
@@ -153,7 +155,8 @@ uint Pipeline::_process_material(Stream &stream, const Material *material) noexc
 }
 
 uint Pipeline::_process_light(Stream &stream, const Shape *shape, const Light *light) noexcept {
-    return 0;
+    if (light == nullptr) { return ~0u; }
+    return 0u;
 }
 
 Pipeline::~Pipeline() noexcept = default;
