@@ -4,7 +4,7 @@
 
 #include <fstream>
 #include <streambuf>
-#include <double-conversion/double-conversion.h>
+#include <fast_float/fast_float.h>
 
 #include <core/logging.h>
 #include <core/thread_pool.h>
@@ -117,28 +117,16 @@ inline std::string_view SceneParser::_read_identifier() noexcept {
 }
 
 inline double SceneParser::_read_number() noexcept {
-    static thread_local double_conversion::StringToDoubleConverter converter{
-        double_conversion::StringToDoubleConverter::ALLOW_HEX |
-            double_conversion::StringToDoubleConverter::ALLOW_OCTALS |
-            double_conversion::StringToDoubleConverter::ALLOW_HEX_FLOATS |
-            double_conversion::StringToDoubleConverter::ALLOW_TRAILING_JUNK |
-            double_conversion::StringToDoubleConverter::ALLOW_TRAILING_SPACES |
-            double_conversion::StringToDoubleConverter::ALLOW_SPACES_AFTER_SIGN |
-            double_conversion::StringToDoubleConverter::ALLOW_CASE_INSENSIBILITY,
-        0.0, 0.0, nullptr, nullptr};
     auto s = std::string_view{_source}.substr(_cursor);
-    auto processed_count = 0;
-    auto value = converter.StringToDouble(
-        s.data(),
-        static_cast<int>(s.size()),
-        &processed_count);
-    if (processed_count == 0) [[unlikely]] {
-        _report_error(
-            "Invalid number string '{}...'.",
-            s.substr(0, 4));
+    auto value = 0.0;
+    if (auto result = fast_float::from_chars(s.data(), s.data() + s.size(), value);
+        result.ec != std::errc{}) [[unlikely]] {
+        _report_error("Invalid number string '{}...'.", s.substr(0, 4));
+    } else [[likely]] {
+        auto n = result.ptr - s.data();
+        _cursor += n;
+        _location.set_column(_location.column() + n);
     }
-    _cursor += processed_count;
-    _location.set_column(_location.column() + processed_count);
     return value;
 }
 

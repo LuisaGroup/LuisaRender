@@ -1,3 +1,18 @@
+import "test.luisa"
+
+Integrator integrator: Path {
+  sampler { @sampler }
+  max_depth { 10 }
+}
+
+Sampler sampler : Independent {
+  spp { 1024 }
+}
+
+Shape tall_box : TriangleMesh {
+  material { @white }
+}
+
 render {
   cameras { @camera }
   shapes { @tall_box, @short_box }

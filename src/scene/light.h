@@ -4,9 +4,12 @@
 
 #pragma once
 
+#include <runtime/bindless_array.h>
 #include <scene/scene_node.h>
 
 namespace luisa::render {
+
+using compute::BindlessArray;
 
 class Shape;
 
@@ -33,9 +36,14 @@ public:
 
     };
 
+    struct Context {
+
+    };
+
     class Interface {
 
     public:
+        [[nodiscard]] virtual luisa::unique_ptr<Context> decode(const BindlessArray &array, uint buffer_id) const noexcept;
         virtual ~Interface() noexcept = default;
     };
 
@@ -44,7 +52,7 @@ public:
     [[nodiscard]] virtual float power(const Shape *shape) const noexcept = 0;
     [[nodiscard]] virtual luisa::unique_ptr<Interface> interface() const noexcept = 0;
     [[nodiscard]] virtual uint property_flags() const noexcept = 0;
-    [[nodiscard]] virtual uint /* bindless buffer id and tag */ encode(Stream &stream, Pipeline &pipeline, const Shape *shape) const noexcept = 0;
+    [[nodiscard]] virtual uint /* bindless buffer id */ encode(Stream &stream, Pipeline &pipeline, const Shape *shape) const noexcept = 0;
 };
 
 }

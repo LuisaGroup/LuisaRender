@@ -10,19 +10,6 @@ Filter filter : Gaussian {
   radius { 1.5, 1.5 }
 }
 
-Integrator integrator: Path {
-  sampler { @sampler }
-  max_depth { 10 }
-}
-
-Sampler sampler : Independent {
-  spp { 1024 }
-}
-
-Shape tall_box : TriangleMesh {
-  material { @white }
-}
-
 Mat m : Metal {}
 Material white : Disney {}
 
@@ -39,5 +26,3 @@ Shape short_box : TriangleMesh {
 Env env : HDR {
   path { "hello.hdr" }
 }
-
-import "main.luisa"

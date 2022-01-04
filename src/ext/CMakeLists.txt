@@ -21,8 +21,5 @@ if (NOT assimp_FOUND)
 endif ()
 target_link_libraries(luisa-render-ext INTERFACE assimp::assimp)
 
-add_subdirectory(double-conversion)
-set_target_properties(double-conversion PROPERTIES
-        WINDOWS_EXPORT_ALL_SYMBOLS ON
-        UNITY_BUILD ON)
-target_link_libraries(luisa-render-ext INTERFACE double-conversion)
+add_subdirectory(fast_float)
+target_link_libraries(luisa-render-ext INTERFACE fast_float)

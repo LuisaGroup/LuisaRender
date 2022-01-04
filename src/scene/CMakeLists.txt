@@ -11,7 +11,8 @@ set(LUISA_RENDER_SCENE_SOURCES
         integrator.cpp integrator.h
         environment.cpp environment.h
         light.cpp light.h
-        pipeline.cpp pipeline.h)
+        pipeline.cpp pipeline.h
+        interaction.h)
 
 add_library(luisa-render-scene SHARED ${LUISA_RENDER_SCENE_SOURCES})
 target_link_libraries(luisa-render-scene PUBLIC
