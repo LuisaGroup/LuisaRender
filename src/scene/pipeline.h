@@ -35,7 +35,7 @@ class Scene;
 class Pipeline {
 
 public:
-    template<typename T, size_t buffer_id_shift, size_t buffer_element_alignment>
+    template<typename T, uint buffer_id_shift, uint buffer_element_alignment>
     class BufferArena {
 
     public:

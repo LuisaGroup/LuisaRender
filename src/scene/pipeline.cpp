@@ -6,7 +6,7 @@
 
 namespace luisa::render {
 
-template<typename T, size_t buffer_id_shift, size_t buffer_element_alignment>
+template<typename T, uint buffer_id_shift, uint buffer_element_alignment>
 std::pair<BufferView<T>, uint> Pipeline::BufferArena<T, buffer_id_shift, buffer_element_alignment>::allocate(size_t n) noexcept {
     if (n > buffer_capacity) {// too big, will not use the arena
         auto buffer = _pipeline.create<Buffer<T>>(n);
@@ -150,7 +150,7 @@ std::pair<uint, uint> Pipeline::_process_material(Stream &stream, const Material
         static constexpr auto max_tag = (1u << MeshInstance::material_buffer_id_shift) - 1u;
         auto t = static_cast<uint32_t>(_material_interfaces.size());
         if (t > max_tag) [[unlikely]] { LUISA_ERROR_WITH_LOCATION("Too many materials."); }
-        _material_interfaces.emplace_back(material->interface());
+        _material_interfaces.emplace_back(material->create_interface());
         _material_tags.emplace(std::move(impl_type), t);
         return t;
     }();
