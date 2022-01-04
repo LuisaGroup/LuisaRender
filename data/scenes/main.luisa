@@ -6,7 +6,7 @@ Integrator integrator: Path {
 }
 
 Sampler sampler : Independent {
-  spp { 1024 }
+  spp { +1024 }
 }
 
 Shape tall_box : TriangleMesh {

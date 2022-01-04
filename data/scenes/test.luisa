@@ -7,7 +7,7 @@ Camera camera : ThinLens {
 }
 
 Filter filter : Gaussian {
-  radius { 1.5, 1.5 }
+  radius { +1.5, +1.5 }
 }
 
 Mat m : Metal {}

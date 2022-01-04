@@ -117,6 +117,8 @@ inline std::string_view SceneParser::_read_identifier() noexcept {
 }
 
 inline double SceneParser::_read_number() noexcept {
+    if (_peek() == '+') [[unlikely]] { _skip(); }
+    // TODO: allow white spaces between +/- and the numbers?
     auto s = std::string_view{_source}.substr(_cursor);
     auto value = 0.0;
     if (auto result = fast_float::from_chars(s.data(), s.data() + s.size(), value);
