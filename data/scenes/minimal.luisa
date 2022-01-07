@@ -4,7 +4,7 @@ Camera camera : Pinhole {
 }
 
 Shape shape : TriangleMesh {
-  file { "../meshes/cbox.obj" }
+  file { "../meshes/bunny.obj" }
 }
 
 Integrator integrator : Normal {

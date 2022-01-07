@@ -3,8 +3,8 @@
 //
 
 #include <mutex>
-#include <fmt/format.h>
 
+#include <core/thread_pool.h>
 #include <scene/camera.h>
 #include <scene/film.h>
 #include <scene/filter.h>
@@ -173,7 +173,6 @@ luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc
     scene->_config->cameras.reserve(cameras.size());
     scene->_config->shapes.reserve(shapes.size());
     scene->_config->environments.reserve(environments.size());
-    // TODO: parallel loading
     for (auto c : cameras) {
         scene->_config->cameras.emplace_back(
             scene->load_camera(c));
@@ -186,6 +185,7 @@ luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc
         scene->_config->environments.emplace_back(
             scene->load_environment(e));
     }
+    ThreadPool::global().synchronize();
     return scene;
 }
 

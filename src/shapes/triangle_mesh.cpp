@@ -40,8 +40,7 @@ public:
                     aiProcess_RemoveComponent | aiProcess_ImproveCacheLocality |
                     aiProcess_OptimizeMeshes | aiProcess_OptimizeGraph |
                     aiProcess_GenNormals | aiProcess_GenUVCoords |
-                    aiProcess_CalcTangentSpace | aiProcess_FixInfacingNormals |
-                    aiProcess_Debone | aiProcess_PreTransformVertices);
+                    aiProcess_CalcTangentSpace | aiProcess_FixInfacingNormals);
             if (model == nullptr || (model->mFlags & AI_SCENE_FLAGS_INCOMPLETE) ||
                 model->mRootNode == nullptr || model->mRootNode->mNumMeshes == 0) [[unlikely]] {
                 LUISA_ERROR_WITH_LOCATION("Failed to load mesh '{}'", path_string);
@@ -60,7 +59,7 @@ public:
             }
             if (mesh->mTextureCoords[0] == nullptr ||
                 mesh->mNumUVComponents[0] != 2) [[unlikely]] {
-                LUISA_ERROR_WITH_LOCATION(
+                LUISA_WARNING_WITH_LOCATION(
                     "Invalid texture coordinates in mesh '{}': "
                     "address = {}, components = {}.",
                     path_string,
@@ -75,16 +74,25 @@ public:
             auto ai_tangents = mesh->mTangents;
             loader._positions.resize(vertex_count);
             loader._attributes.resize(vertex_count);
+            auto compute_tangent = [ai_tangents](auto i, float3 n) noexcept {
+                if (ai_tangents == nullptr) {
+                    auto b = abs(n.x) > abs(n.z) ?
+                                 make_float3(-n.y, n.x, 0.0f) :
+                                 make_float3(0.0f, -n.z, n.y);
+                    return normalize(cross(b, make_float3(n.x, n.y, n.z)));
+                }
+                return make_float3(ai_tangents[i].x, ai_tangents[i].y, ai_tangents[i].z);
+            };
+            auto compute_uv = [ai_tex_coords](auto i) noexcept {
+                if (ai_tex_coords == nullptr) { return make_float2(); }
+                return make_float2(ai_tex_coords[i].x, ai_tex_coords[i].y);
+            };
             for (auto i = 0; i < vertex_count; i++) {
-                auto p = ai_positions[i];
-                auto n = ai_normals[i];
-                auto t = ai_tangents[i];
-                auto uv = ai_tex_coords[i];
-                loader._positions[i] = make_float3(p.x, p.y, p.z);
-                loader._attributes[i] = VertexAttribute::encode(
-                    make_float3(n.x, n.y, n.z),
-                    make_float3(t.x, t.y, t.z),
-                    make_float2(uv.x, uv.y));
+                auto n = make_float3(ai_normals[i].x, ai_normals[i].y, ai_normals[i].z);
+                auto t = compute_tangent(i, n);
+                auto uv = compute_uv(i);
+                loader._attributes[i] = VertexAttribute::encode(n, t, uv);
+                loader._positions[i] = make_float3(ai_positions[i].x, ai_positions[i].y, ai_positions[i].z);
             }
             auto triangle_count = mesh->mNumFaces;
             auto ai_triangles = mesh->mFaces;
