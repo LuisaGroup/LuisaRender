@@ -21,4 +21,6 @@ if (NOT assimp_FOUND)
 endif ()
 target_link_libraries(luisa-render-ext INTERFACE assimp::assimp)
 
-target_include_directories(luisa-render-ext INTERFACE fast_float/include)
+add_library(fast_float INTERFACE)
+target_include_directories(fast_float INTERFACE fast_float/include)
+target_link_libraries(luisa-render-ext INTERFACE fast_float)
