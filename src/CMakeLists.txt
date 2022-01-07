@@ -26,6 +26,27 @@ endif ()
 add_subdirectory(compute)
 add_subdirectory(sdl)
 add_subdirectory(scene)
+
+function(luisa_render_add_plugin name)
+    cmake_parse_arguments(PLUGIN "" "CATEGORY" "SOURCES" ${ARGN})
+    set(lib_name luisa-render-${PLUGIN_CATEGORY}-${name})
+    add_library(${lib_name} MODULE ${PLUGIN_SOURCES})
+    target_link_libraries(${lib_name} PRIVATE luisa-render-scene)
+    add_dependencies(luisa-render-${PLUGIN_CATEGORY}s ${lib_name})
+    set_target_properties(${lib_name} PROPERTIES
+            LIBRARY_OUTPUT_DIRECTORY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/plugins"
+            RUNTIME_OUTPUT_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/plugins"
+            UNITY_BUILD ON
+            DEBUG_POSTFIX "")
+    foreach (CONFIG ${CMAKE_CONFIGURATION_TYPES})
+        string(TOUPPER ${CONFIG} CONFIG_UPPER)
+        set_target_properties(${lib_name} PROPERTIES
+                LIBRARY_OUTPUT_DIRECTORY_${CONFIG_UPPER} "${CMAKE_LIBRARY_OUTPUT_DIRECTORY_${CONFIG_UPPER}}/plugins"
+                RUNTIME_OUTPUT_DIRECTORY_${CONFIG_UPPER} "${CMAKE_RUNTIME_OUTPUT_DIRECTORY_${CONFIG_UPPER}}/plugins"
+                UNITY_BUILD ON)
+    endforeach ()
+endfunction()
+
 add_subdirectory(cameras)
 add_subdirectory(films)
 add_subdirectory(filters)

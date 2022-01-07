@@ -157,7 +157,7 @@ private:
 
 public:
     [[nodiscard]] Float foo(Int x, Float y) const noexcept override {
-        return _buffer[x] + y;
+        return _buffer.read(x) + y;
     }
 };
 

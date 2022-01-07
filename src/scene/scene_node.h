@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <string_view>
 
+#include <core/basic_types.h>
 #include <dsl/syntax.h>
 #include <sdl/scene_node_desc.h>
 
@@ -65,3 +66,14 @@ public:
 };
 
 }// namespace luisa::render
+
+#define LUISA_SCENE_NODE_MAKE_PLUGIN_API(cls)                      \
+    LUISA_EXPORT_API luisa::render::SceneNode *create(             \
+        luisa::render::Scene *scene,                               \
+        const luisa::render::SceneNodeDesc *desc) LUISA_NOEXCEPT { \
+        return luisa::new_with_allocator<cls>(scene, desc);        \
+    }                                                              \
+    LUISA_EXPORT_API void destroy(                                 \
+        luisa::render::SceneNode *node) LUISA_NOEXCEPT {           \
+        luisa::delete_with_allocator(node);                        \
+    }

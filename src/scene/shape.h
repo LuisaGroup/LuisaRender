@@ -112,7 +112,7 @@ LUISA_STRUCT(
     compressed_tangent,
     compressed_uv) {
 
-    [[nodiscard]] static auto oct_decode(luisa::compute::Expr<uint> u) noexcept {
+    [[nodiscard]] static auto oct_decode(luisa::compute::Expr<luisa::uint> u) noexcept {
         using namespace luisa::compute;
         auto p = make_float2(
             cast<float>((u & 0xffffu) * (1.0f / 65535.0f)),
