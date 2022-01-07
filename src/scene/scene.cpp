@@ -72,7 +72,7 @@ SceneNode *Scene::load_node(SceneNodeTag tag, const SceneNodeDesc *desc) noexcep
             desc->impl_type());
     }
     auto &&plugin = detail::scene_plugin_load(
-        _context.runtime_directory() / "plugins",
+        _context.runtime_directory(),
         tag, desc->impl_type());
     auto create = plugin.function<NodeCreater>("create");
     auto destroy = plugin.function<NodeDeleter>("destroy");

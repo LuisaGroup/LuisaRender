@@ -3,6 +3,10 @@ add_library(luisa-render-ext INTERFACE)
 add_subdirectory(cxxopts)
 target_link_libraries(luisa-render-ext INTERFACE cxxopts::cxxopts)
 
+add_library(fast_float INTERFACE)
+target_include_directories(fast_float INTERFACE fast_float/include)
+target_link_libraries(luisa-render-ext INTERFACE fast_float)
+
 find_package(assimp CONFIG)
 if (NOT assimp_FOUND)
     set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
@@ -20,7 +24,3 @@ if (NOT assimp_FOUND)
     set_target_properties(assimp PROPERTIES UNITY_BUILD OFF)
 endif ()
 target_link_libraries(luisa-render-ext INTERFACE assimp::assimp)
-
-add_library(fast_float INTERFACE)
-target_include_directories(fast_float INTERFACE fast_float/include)
-target_link_libraries(luisa-render-ext INTERFACE fast_float)
