@@ -142,7 +142,6 @@ LUISA_STRUCT(
 
     [[nodiscard]] auto position_buffer_id() const noexcept { return position_buffer_id_and_offset >> luisa::render::MeshInstance::position_buffer_id_shift; }
     [[nodiscard]] auto position_buffer_offset() const noexcept { return (position_buffer_id_and_offset & luisa::render::MeshInstance::position_buffer_offset_mask) * luisa::render::MeshInstance::position_buffer_element_alignment; }
-    [[nodiscard]] auto has_attributes() const noexcept { return attribute_buffer_id_and_offset != ~0u; }
     [[nodiscard]] auto attribute_buffer_id() const noexcept { return attribute_buffer_id_and_offset >> luisa::render::MeshInstance::attribute_buffer_id_shift; }
     [[nodiscard]] auto attribute_buffer_offset() const noexcept { return (attribute_buffer_id_and_offset & luisa::render::MeshInstance::attribute_buffer_offset_mask) * luisa::render::MeshInstance::attribute_buffer_element_alignment; }
     [[nodiscard]] auto triangle_buffer_id() const noexcept { return triangle_buffer_id_and_offset >> luisa::render::MeshInstance::triangle_buffer_id_shift; }

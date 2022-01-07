@@ -62,7 +62,7 @@ void Pipeline::_process_shape(
             if (positions.empty() || triangles.empty()) [[unlikely]] {
                 LUISA_ERROR_WITH_LOCATION("Found mesh without vertices.");
             }
-            if (!attributes.empty() && positions.size() != attributes.size()) [[unlikely]] {
+            if (positions.size() != attributes.size()) [[unlikely]] {
                 LUISA_ERROR_WITH_LOCATION(
                     "Sizes of positions ({}) and "
                     "attributes ({}) mismatch.",
@@ -78,12 +78,8 @@ void Pipeline::_process_shape(
             mesh.position_buffer_id_and_offset = position_buffer_id_and_offset;
             mesh.triangle_buffer_id_and_offset = triangle_buffer_id_and_offset;
             mesh.triangle_count = triangles.size();
-            if (attributes.empty()) {
-                mesh.attribute_buffer_id_and_offset = ~0u;// indicates invalid attribute buffer
-            } else {
-                auto [_, attribute_buffer_id_and_offset] = _attribute_buffer_arena.allocate(attributes.size());
-                mesh.attribute_buffer_id_and_offset = attribute_buffer_id_and_offset;
-            }
+            auto [_, attribute_buffer_id_and_offset] = _attribute_buffer_arena.allocate(attributes.size());
+            mesh.attribute_buffer_id_and_offset = attribute_buffer_id_and_offset;
             // compute area cdf
             auto sum_area = 0.0;
             luisa::vector<float> areas;
