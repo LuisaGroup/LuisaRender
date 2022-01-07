@@ -72,7 +72,6 @@ public:
     [[nodiscard]] luisa::span<const Shape *const> shapes() const noexcept;
     [[nodiscard]] luisa::span<const Camera *const> cameras() const noexcept;
     [[nodiscard]] luisa::span<const Environment *const> environments() const noexcept;
-    [[nodiscard]] uint spp() const noexcept;
 };
 
 }

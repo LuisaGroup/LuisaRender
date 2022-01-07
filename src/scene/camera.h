@@ -29,7 +29,15 @@ public:
         Float3 weight;
     };
 
-    struct Instance : public SceneNode::Instance {
+    class Instance : public SceneNode::Instance {
+
+    private:
+        const Camera *_camera;
+
+    public:
+        explicit Instance(const Camera *camera) noexcept : _camera{camera} {}
+        [[nodiscard]] auto camera() const noexcept { return _camera; }
+
         // generate ray in camera space, should not consider _filter and/or _transform
         [[nodiscard]] virtual Sample generate_ray(
             Sampler::Instance &sampler, Expr<float2> pixel, Expr<float> time) const noexcept = 0;
@@ -39,13 +47,15 @@ private:
     const Film *_film;
     const Filter *_filter;
     const Transform *_transform;
+    float2 _time_span;
 
 public:
     Camera(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] auto film() const noexcept { return _film; }
     [[nodiscard]] auto filter() const noexcept { return _filter; }
     [[nodiscard]] auto transform() const noexcept { return _transform; }
-    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(Stream &stream, Pipeline &pipeline, float initial_time) const noexcept = 0;
+    [[nodiscard]] auto time_span() const noexcept { return _time_span; }
+    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(Stream &stream, Pipeline &pipeline) const noexcept = 0;
 };
 
 }// namespace luisa::render

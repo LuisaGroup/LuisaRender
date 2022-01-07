@@ -10,6 +10,7 @@
 #include <sdl/scene_desc.h>
 #include <sdl/scene_parser.h>
 #include <scene/scene.h>
+#include <scene/pipeline.h>
 
 [[nodiscard]] auto parse_cli_options(int argc, const char *const *argv) noexcept {
     cxxopts::Options cli{"megakernel_path_tracing"};
@@ -185,4 +186,7 @@ int main(int argc, char *argv[]) {
     LUISA_INFO("Scene dump:\n{}", os.str());
 
     auto scene = Scene::create(context, scene_desc.get());
+
+    auto stream = device.create_stream();
+    auto pipeline = Pipeline::create(device, stream, *scene);
 }

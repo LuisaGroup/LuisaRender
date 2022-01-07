@@ -6,6 +6,10 @@
 
 namespace luisa::render {
 
+class ColorFilmInstance : public Film::Instance {
+
+};
+
 class ColorFilm final : public Film {
 
 public:

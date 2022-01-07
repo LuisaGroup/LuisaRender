@@ -28,10 +28,8 @@ struct Scene::Config {
     luisa::vector<Camera *> cameras;
     luisa::vector<Shape *> shapes;
     luisa::vector<Environment *> environments;
-    uint spp{0u};
 };
 
-uint Scene::spp() const noexcept { return _config->spp; }
 const Integrator *Scene::integrator() const noexcept { return _config->integrator; }
 luisa::span<const Shape *const> Scene::shapes() const noexcept { return _config->shapes; }
 luisa::span<const Camera *const> Scene::cameras() const noexcept { return _config->cameras; }
@@ -165,7 +163,6 @@ luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc
             "in the scene description.");
     }
     auto scene = luisa::make_unique<Scene>(ctx);
-    scene->_config->spp = desc->root()->property_uint_or_default("spp", 1024u);
     scene->_config->integrator = scene->load_integrator(desc->root()->property_node("integrator"));
     auto cameras = desc->root()->property_node_list("cameras");
     auto shapes = desc->root()->property_node_list("shapes");

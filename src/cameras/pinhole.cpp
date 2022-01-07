@@ -16,11 +16,16 @@ class PinholeCameraInstance;
 class PinholeCameraInstance final : public Camera::Instance {
 
 private:
-    const PinholeCamera *_camera;
+    float3 _position;
+    float3 _front;
+    float3 _up;
+    float3 _right;
+    float _fov;
 
 public:
-    explicit PinholeCameraInstance(const PinholeCamera *camera) noexcept
-        : _camera{camera} {}
+    explicit PinholeCameraInstance(
+        const PinholeCamera *camera, float3 position,
+        float3 front, float3 up, float3 right, float fov) noexcept;
 
     [[nodiscard]] Camera::Sample generate_ray(
         Sampler::Instance &sampler,
@@ -49,8 +54,10 @@ public:
         _fov = radians(_fov);
     }
 
-    [[nodiscard]] luisa::unique_ptr<Camera::Instance> build(
-        Stream &stream, Pipeline &pipeline, float initial_time) const noexcept override { return luisa::make_unique<PinholeCameraInstance>(this); }
+    [[nodiscard]] luisa::unique_ptr<Camera::Instance> build(Stream &stream, Pipeline &pipeline) const noexcept override {
+        return luisa::make_unique<PinholeCameraInstance>(
+            this, _position, _front, _up, _right, _fov);
+    }
 
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "pinhole"; }
     [[nodiscard]] auto position() const noexcept { return _position; }
@@ -60,12 +67,18 @@ public:
     [[nodiscard]] auto fov() const noexcept { return _fov; }
 };
 
+PinholeCameraInstance::PinholeCameraInstance(
+    const PinholeCamera *camera, float3 position,
+    float3 front, float3 up, float3 right, float fov) noexcept
+    : Camera::Instance{camera}, _position{position},
+      _front{front}, _up{up}, _right{right}, _fov{fov} {}
+
 Camera::Sample PinholeCameraInstance::generate_ray(
     Sampler::Instance & /* sampler */, Expr<float2> pixel, Expr<float> /* time */) const noexcept {
-    auto resolution = make_float2(_camera->film()->resolution());
-    auto p = (pixel * 2.0f - resolution) * (std::tan(_camera->fov() * 0.5f) / resolution.y);
-    auto direction = p.x * _camera->right() - p.y * _camera->up() + _camera->front();
-    return Camera::Sample{make_ray(_camera->position(), direction), make_float3(1.0f)};
+    auto resolution = make_float2(camera()->film()->resolution());
+    auto p = (pixel * 2.0f - resolution) * (std::tan(_fov * 0.5f) / resolution.y);
+    auto direction = p.x * _right - p.y * _up + _front;
+    return Camera::Sample{make_ray(_position, direction), make_float3(1.0f)};
 }
 
 }// namespace luisa::render

@@ -54,6 +54,10 @@ void Pipeline::_process_shape(
     auto light = overridden_light == nullptr ? shape->light() : overridden_light;
 
     if (shape->is_mesh()) {
+        if (shape->deformable()) [[unlikely]] {
+            LUISA_ERROR_WITH_LOCATION(
+                "Deformable meshes are not yet supported.");
+        }
         auto iter = _meshes.find(shape);
         if (iter == _meshes.end()) {
             auto positions = shape->positions();
@@ -159,6 +163,35 @@ std::pair<uint, uint> Pipeline::_process_material(Stream &stream, const Material
 std::pair<uint, uint> Pipeline::_process_light(Stream &stream, const Shape *shape, const Light *light) noexcept {
     if (light == nullptr) { return std::make_pair(~0u, Light::property_flag_black); }
     return {};
+}
+
+luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, const Scene &scene) noexcept {
+    auto pipeline = luisa::make_unique<Pipeline>(device);
+    pipeline->_cameras.reserve(scene.cameras().size());
+    pipeline->_films.reserve(scene.cameras().size());
+    pipeline->_filters.reserve(scene.cameras().size());
+    auto mean_time = 0.0;
+    for (auto camera : scene.cameras()) {
+        pipeline->_cameras.emplace_back(camera->build(stream, *pipeline));
+        pipeline->_films.emplace_back(camera->film()->build(stream, *pipeline));
+        pipeline->_filters.emplace_back(camera->filter()->build(stream, *pipeline));
+        mean_time += (camera->time_span().x + camera->time_span().y) * 0.5f;
+    }
+    mean_time *= 1.0 / static_cast<double>(scene.cameras().size());
+    pipeline->_build_geometry(stream, scene.shapes(), static_cast<float>(mean_time), AccelBuildHint::FAST_TRACE);
+    pipeline->_integrator = scene.integrator()->build(stream, *pipeline);
+    pipeline->_sampler = scene.integrator()->sampler()->build(stream, *pipeline);
+    return pipeline;
+}
+
+void Pipeline::update(Stream &stream, float time) noexcept {
+    // TODO: support deformable meshes
+    _transform_tree.update(_accel, time);
+    stream << _accel.update();
+}
+
+void Pipeline::render(Stream &stream) noexcept {
+    _integrator->render(stream, *this);
 }
 
 Pipeline::~Pipeline() noexcept = default;

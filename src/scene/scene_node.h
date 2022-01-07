@@ -40,9 +40,9 @@ public:
 
     protected:
         Instance() noexcept = default;
-        ~Instance() noexcept = default;
 
     public:
+        virtual ~Instance() noexcept = default;
         Instance(Instance &&) noexcept = delete;
         Instance(const Instance &) noexcept = delete;
         Instance &operator=(Instance &&) noexcept = delete;

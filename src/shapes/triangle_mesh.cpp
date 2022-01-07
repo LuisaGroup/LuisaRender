@@ -119,7 +119,7 @@ public:
         : Shape{scene, desc}, _loader{TriangleMeshLoader::load(desc->property_path("file"))} {}
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "trianglemesh"; }
     [[nodiscard]] luisa::span<const Shape *const> children() const noexcept override { return {}; }
-    [[nodiscard]] bool is_rigid() const noexcept override { return true; }
+    [[nodiscard]] bool deformable() const noexcept override { return false; }
     [[nodiscard]] bool is_mesh() const noexcept override { return true; }
     [[nodiscard]] luisa::span<const float3> positions() const noexcept override { return _loader.get().positions(); }
     [[nodiscard]] luisa::span<const VertexAttribute> attributes() const noexcept override { return _loader.get().attributes(); }

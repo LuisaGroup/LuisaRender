@@ -9,7 +9,12 @@
 
 #include <scene/shape.h>
 #include <scene/light.h>
+#include <scene/camera.h>
+#include <scene/film.h>
+#include <scene/filter.h>
 #include <scene/material.h>
+#include <scene/transform.h>
+#include <scene/integrator.h>
 
 namespace luisa::render {
 
@@ -92,6 +97,11 @@ private:
     BufferArena<float, MeshInstance::area_cdf_buffer_id_shift, MeshInstance::area_cdf_buffer_element_alignment> _area_cdf_buffer_arena;
     luisa::vector<MeshInstance> _instances;
     Buffer<MeshInstance> _instance_buffer;
+    luisa::vector<luisa::unique_ptr<Camera::Instance>> _cameras;
+    luisa::vector<luisa::unique_ptr<Filter::Instance>> _filters;
+    luisa::vector<luisa::unique_ptr<Film::Instance>> _films;
+    luisa::unique_ptr<Integrator::Instance> _integrator;
+    luisa::unique_ptr<Sampler::Instance> _sampler;
 
 private:
     void _build_geometry(Stream &stream, luisa::span<const Shape *const> shapes, float init_time, AccelBuildHint hint) noexcept;
@@ -153,6 +163,23 @@ public:
     [[nodiscard]] auto bindless_buffer(Expr<uint> buffer_id) const noexcept { return _bindless_array.buffer<T>(buffer_id); }
     [[nodiscard]] auto bindless_tex2d(Expr<uint> tex_id) const noexcept { return _bindless_array.tex2d(tex_id); }
     [[nodiscard]] auto bindless_tex3d(Expr<uint> tex_id) const noexcept { return _bindless_array.tex3d(tex_id); }
+
+public:
+    [[nodiscard]] static luisa::unique_ptr<Pipeline> create(Device &device, Stream &stream, const Scene &scene) noexcept;
+    [[nodiscard]] auto &accel() const noexcept { return _accel; }
+    [[nodiscard]] auto &bindless_array() const noexcept { return _bindless_array; }
+    [[nodiscard]] auto &transform_tree() const noexcept { return _transform_tree; }
+    [[nodiscard]] auto instance_buffer() const noexcept { return _instance_buffer.view(); }
+    [[nodiscard]] auto cameras() const noexcept { return luisa::span{_cameras}; }
+    [[nodiscard]] auto filters() const noexcept { return luisa::span{_filters}; }
+    [[nodiscard]] auto films() noexcept { return luisa::span{_films}; }
+    [[nodiscard]] auto films() const noexcept { return luisa::span{_films}; }
+    [[nodiscard]] auto material_interfaces() const noexcept { return luisa::span{_material_interfaces}; }
+    [[nodiscard]] auto light_interfaces() const noexcept { return luisa::span{_light_interfaces}; }
+    [[nodiscard]] auto sampler() noexcept { return _sampler.get(); }
+    [[nodiscard]] auto sampler() const noexcept { return _sampler.get(); }
+    void update(Stream &stream, float time) noexcept;
+    void render(Stream &stream) noexcept;
 };
 
 }// namespace luisa::render

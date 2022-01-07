@@ -99,7 +99,7 @@ public:
     [[nodiscard]] virtual luisa::span<const VertexAttribute> attributes() const noexcept = 0; // empty if the shape is not a mesh or the mesh has no attributes
     [[nodiscard]] virtual luisa::span<const Triangle> triangles() const noexcept = 0;         // empty if the shape is not a mesh
     [[nodiscard]] virtual luisa::span<const Shape *const> children() const noexcept = 0;// empty if the shape is a mesh
-    [[nodiscard]] virtual bool is_rigid() const noexcept = 0;                           // true if the shape will not deform
+    [[nodiscard]] virtual bool deformable() const noexcept = 0;                           // true if the shape will not deform
 };
 
 }// namespace luisa::render

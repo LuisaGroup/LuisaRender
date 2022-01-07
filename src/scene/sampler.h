@@ -16,7 +16,17 @@ using compute::Float2;
 class Sampler : public SceneNode {
 
 public:
-    struct Instance : public SceneNode::Instance {
+    class Instance : public SceneNode::Instance {
+
+    private:
+        const Sampler *_sampler;
+
+    public:
+        explicit Instance(const Sampler *sampler) noexcept : _sampler{sampler} {}
+        [[nodiscard]] auto sampler() const noexcept { return _sampler; }
+
+        // interfaces
+        virtual void reset(Stream &stream, uint2 resolution, uint spp) noexcept = 0;
         virtual void start(Expr<uint2> pixel, Expr<uint> sample_index) noexcept = 0;
         virtual void save_state() noexcept = 0;
         virtual void load_state(Expr<uint2> pixel) noexcept = 0;
@@ -26,7 +36,7 @@ public:
 
 public:
     Sampler(Scene *scene, const SceneNodeDesc *desc) noexcept;
-    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(Stream &stream, Pipeline &pipeline, uint2 resolution, uint spp) const noexcept = 0;
+    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(Stream &stream, Pipeline &pipeline) const noexcept = 0;
 };
 
 }// namespace luisa::render
