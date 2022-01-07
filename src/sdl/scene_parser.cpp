@@ -45,7 +45,7 @@ inline void SceneParser::_parse_source() noexcept {
             _skip_blanks();
             std::filesystem::path path{_read_string()};
             if (!path.is_absolute()) { path = _location.file()->parent_path() / path; }
-            ThreadPool::global().dispatch(
+            ThreadPool::global().async(
                 [path = std::move(path), &desc = _desc] {
                     SceneParser{desc, path}._parse_file();
                 });

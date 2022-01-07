@@ -1,0 +1,18 @@
+Camera camera : Pinhole {
+  position { 0.0, 0.0, 0.0 }
+  film : Color {}
+}
+
+Shape shape : TriangleMesh {
+  file { "../meshes/cbox.obj" }
+}
+
+Integrator integrator : Normal {
+  sampler : Independent {}
+}
+
+render {
+  cameras { @camera }
+  shapes { @shape }
+  integrator { @integrator }
+}

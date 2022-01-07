@@ -95,9 +95,9 @@ public:
     [[nodiscard]] auto transform() const noexcept { return _transform; }
     [[nodiscard]] auto build_hint() const noexcept { return _build_hint; }
     [[nodiscard]] virtual bool is_mesh() const noexcept = 0;
-    [[nodiscard]] virtual luisa::span<float3> positions() const noexcept = 0;           // empty if the shape is not a mesh
-    [[nodiscard]] virtual luisa::span<VertexAttribute> attributes() const noexcept = 0; // empty if the shape is not a mesh or the mesh has no attributes
-    [[nodiscard]] virtual luisa::span<Triangle> triangles() const noexcept = 0;         // empty if the shape is not a mesh
+    [[nodiscard]] virtual luisa::span<const float3> positions() const noexcept = 0;           // empty if the shape is not a mesh
+    [[nodiscard]] virtual luisa::span<const VertexAttribute> attributes() const noexcept = 0; // empty if the shape is not a mesh or the mesh has no attributes
+    [[nodiscard]] virtual luisa::span<const Triangle> triangles() const noexcept = 0;         // empty if the shape is not a mesh
     [[nodiscard]] virtual luisa::span<const Shape *const> children() const noexcept = 0;// empty if the shape is a mesh
     [[nodiscard]] virtual bool is_rigid() const noexcept = 0;                           // true if the shape will not deform
 };

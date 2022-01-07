@@ -29,7 +29,12 @@
             exit(-1);
         }
     }();
-    if (auto unknown = options.unmatched(); !unknown.empty()) {
+    if (options["scene"].count() == 0u) [[unlikely]] {
+        LUISA_WARNING_WITH_LOCATION("Scene file not specified.");
+        std::cout << cli.help() << std::endl;
+        exit(-1);
+    }
+    if (auto unknown = options.unmatched(); !unknown.empty()) [[unlikely]] {
         luisa::string opts;
         for (auto &&u : unknown) {
             opts.append(" ").append(u);

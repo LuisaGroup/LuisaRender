@@ -67,7 +67,7 @@ public:
 
 }// namespace luisa::render
 
-#define LUISA_SCENE_NODE_MAKE_PLUGIN_API(cls)                      \
+#define LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(cls)                   \
     LUISA_EXPORT_API luisa::render::SceneNode *create(             \
         luisa::render::Scene *scene,                               \
         const luisa::render::SceneNodeDesc *desc) LUISA_NOEXCEPT { \

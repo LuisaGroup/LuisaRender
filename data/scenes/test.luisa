@@ -1,4 +1,4 @@
-Camera camera : ThinLens {
+Camera camera : Pinhole {
   transform : Identity {}
   film : RGB {
     resolution { 1280, 720 }

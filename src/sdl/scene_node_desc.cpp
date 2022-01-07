@@ -37,12 +37,13 @@ SceneNodeDesc *SceneNodeDesc::define_internal(std::string_view impl_type, Source
 namespace detail {
 template<typename T>
 [[nodiscard]] inline auto handle_path(SceneNodeDesc::SourceLocation l, T &&raw_value) noexcept {
-    if constexpr (std::is_same_v<std::remove_cvref_t<T>, SceneNodeDesc::path>) {
+    if constexpr (std::is_same_v<std::remove_cvref_t<T>, SceneNodeDesc::string>) {
         SceneNodeDesc::path p{std::forward<T>(raw_value)};
         if (!l || p.is_absolute()) { return p; }
-        return l.file()->parent_path() / p;
+        return std::filesystem::canonical(l.file()->parent_path() / p);
+    } else {
+        return std::forward<T>(raw_value);
     }
-    return std::forward<T>(raw_value);
 }
 }// namespace detail
 

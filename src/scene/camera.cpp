@@ -13,7 +13,7 @@ namespace luisa::render {
 
 Camera::Camera(Scene *scene, const SceneNodeDesc *desc) noexcept
     : SceneNode{scene, desc, SceneNodeTag::CAMERA},
-      _film{scene->load_film(desc->property_node_or_default("film"))},
+      _film{scene->load_film(desc->property_node("film"))},
       _filter{scene->load_filter(desc->property_node_or_default("filter"))},
       _transform{scene->load_transform(desc->property_node_or_default("transform"))} {}
 

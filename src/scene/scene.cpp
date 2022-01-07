@@ -169,7 +169,7 @@ luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc
     scene->_config->integrator = scene->load_integrator(desc->root()->property_node("integrator"));
     auto cameras = desc->root()->property_node_list("cameras");
     auto shapes = desc->root()->property_node_list("shapes");
-    auto environments = desc->root()->property_node_list("environments");
+    auto environments = desc->root()->property_node_list_or_default("environments");
     scene->_config->cameras.reserve(cameras.size());
     scene->_config->shapes.reserve(shapes.size());
     scene->_config->environments.reserve(environments.size());

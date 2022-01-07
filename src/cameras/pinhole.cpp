@@ -8,6 +8,8 @@
 
 namespace luisa::render {
 
+using namespace luisa::compute;
+
 class PinholeCamera;
 class PinholeCameraInstance;
 
@@ -19,6 +21,7 @@ private:
 public:
     explicit PinholeCameraInstance(const PinholeCamera *camera) noexcept
         : _camera{camera} {}
+
     [[nodiscard]] Camera::Sample generate_ray(
         Sampler::Instance &sampler,
         Expr<float2> pixel, Expr<float> time) const noexcept override;
@@ -45,10 +48,9 @@ public:
         _up = normalize(cross(_right, _front));
         _fov = radians(_fov);
     }
+
     [[nodiscard]] luisa::unique_ptr<Camera::Instance> build(
-        Stream &stream, Pipeline &pipeline, float initial_time) const noexcept override {
-        return luisa::make_unique<PinholeCameraInstance>(this);
-    }
+        Stream &stream, Pipeline &pipeline, float initial_time) const noexcept override { return luisa::make_unique<PinholeCameraInstance>(this); }
 
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "pinhole"; }
     [[nodiscard]] auto position() const noexcept { return _position; }
@@ -59,15 +61,13 @@ public:
 };
 
 Camera::Sample PinholeCameraInstance::generate_ray(
-    Sampler::Instance &sampler, Expr<float2> pixel, Expr<float> time [[maybe_unused]]) const noexcept {
-
-    auto resolution = _camera->film()->resolution();
-    auto u = sampler.generate_2d();
-
-    // TODO...
-    return Camera::Sample{};
+    Sampler::Instance & /* sampler */, Expr<float2> pixel, Expr<float> /* time */) const noexcept {
+    auto resolution = make_float2(_camera->film()->resolution());
+    auto p = (pixel * 2.0f - resolution) * (std::tan(_camera->fov() * 0.5f) / resolution.y);
+    auto direction = p.x * _camera->right() - p.y * _camera->up() + _camera->front();
+    return Camera::Sample{make_ray(_camera->position(), direction), make_float3(1.0f)};
 }
 
 }// namespace luisa::render
 
-LUISA_SCENE_NODE_MAKE_PLUGIN_API(luisa::render::PinholeCamera)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::PinholeCamera)
