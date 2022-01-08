@@ -54,7 +54,7 @@ public:
         _fov = radians(_fov);
     }
 
-    [[nodiscard]] luisa::unique_ptr<Camera::Instance> build(Stream &stream, Pipeline &pipeline) const noexcept override {
+    [[nodiscard]] luisa::unique_ptr<Camera::Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
         return luisa::make_unique<PinholeCameraInstance>(
             this, _position, _front, _up, _right, _fov);
     }

@@ -38,7 +38,7 @@ public:
     Material(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] virtual luisa::unique_ptr<Interface> create_interface() const noexcept = 0;
     [[nodiscard]] virtual uint property_flags() const noexcept = 0;
-    [[nodiscard]] virtual uint /* bindless buffer id */ encode(Stream &stream, Pipeline &pipeline) const noexcept = 0;
+    [[nodiscard]] virtual uint /* bindless buffer id */ encode(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
 };
 
 }// namespace luisa::render

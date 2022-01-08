@@ -14,12 +14,14 @@
 namespace luisa::compute {
 class Device;
 class Stream;
+class CommandBuffer;
 }// namespace luisa::compute
 
 namespace luisa::render {
 
 using compute::Device;
 using compute::Stream;
+using compute::CommandBuffer;
 
 using compute::Expr;
 using compute::Var;

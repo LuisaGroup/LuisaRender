@@ -55,7 +55,7 @@ public:
     [[nodiscard]] auto filter() const noexcept { return _filter; }
     [[nodiscard]] auto transform() const noexcept { return _transform; }
     [[nodiscard]] auto time_span() const noexcept { return _time_span; }
-    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(Stream &stream, Pipeline &pipeline) const noexcept = 0;
+    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
 };
 
 }// namespace luisa::render

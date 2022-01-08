@@ -34,20 +34,20 @@ inline Pipeline::Pipeline(Device &device) noexcept
       _triangle_buffer_arena{*this},
       _area_cdf_buffer_arena{*this} {}
 
-void Pipeline::_build_geometry(Stream &stream, luisa::span<const Shape *const> shapes, float init_time, AccelBuildHint hint) noexcept {
+void Pipeline::_build_geometry(CommandBuffer &command_buffer, luisa::span<const Shape *const> shapes, float init_time, AccelBuildHint hint) noexcept {
     _accel = _device.create_accel(hint);
     auto transform_builder = TransformTree::builder(init_time);
     for (auto shape : shapes) {
-        _process_shape(stream, transform_builder, shape);
+        _process_shape(command_buffer, transform_builder, shape);
     }
     _transform_tree = transform_builder.build();
     _instance_buffer = _device.create_buffer<MeshInstance>(_instances.size());
-    stream << _instance_buffer.copy_from(_instances.data())
-           << _accel.build();
+    command_buffer << _instance_buffer.copy_from(_instances.data())
+                   << _accel.build();
 }
 
 void Pipeline::_process_shape(
-    Stream &stream, TransformTree::Builder &transform_builder, const Shape *shape,
+    CommandBuffer &command_buffer, TransformTree::Builder &transform_builder, const Shape *shape,
     const Material *overridden_material, const Light *overridden_light) noexcept {
 
     auto material = overridden_material == nullptr ? shape->material() : overridden_material;
@@ -77,7 +77,7 @@ void Pipeline::_process_shape(
             auto [position_buffer_view, position_buffer_id_and_offset] = _position_buffer_arena.allocate(positions.size());
             auto [triangle_buffer_view, triangle_buffer_id_and_offset] = _triangle_buffer_arena.allocate(triangles.size());
             mesh.resource = create<Mesh>(position_buffer_view, triangle_buffer_view, shape->build_hint());
-            stream << mesh.resource->build();
+            command_buffer << mesh.resource->build();
             // assign mesh data
             mesh.position_buffer_id_and_offset = position_buffer_id_and_offset;
             mesh.triangle_buffer_id_and_offset = triangle_buffer_id_and_offset;
@@ -102,7 +102,7 @@ void Pipeline::_process_shape(
             areas.emplace_back(1.0f);
             auto [area_cdf_buffer_view, area_cdf_buffer_id_and_offset] = _area_cdf_buffer_arena.allocate(areas.size());
             mesh.area_cdf_buffer_id_and_offset = area_cdf_buffer_id_and_offset;
-            stream << area_cdf_buffer_view.copy_from(areas.data());
+            command_buffer << area_cdf_buffer_view.copy_from(areas.data());
             iter = _meshes.emplace(shape, mesh).first;
         }
         auto mesh = iter->second;
@@ -114,8 +114,8 @@ void Pipeline::_process_shape(
         instance.triangle_buffer_id_and_offset = mesh.triangle_buffer_id_and_offset;
         instance.triangle_buffer_size = mesh.triangle_count;
         instance.area_cdf_buffer_id_and_offset = mesh.area_cdf_buffer_id_and_offset;
-        auto [m, m_flags] = _process_material(stream, material);
-        auto [l, l_flags] = _process_light(stream, shape, light);
+        auto [m, m_flags] = _process_material(command_buffer, material);
+        auto [l, l_flags] = _process_light(command_buffer, shape, light);
         if (m_flags > 0xffff'ffffu || l_flags > 0xffff'ffffu) [[unlikely]] {
             LUISA_ERROR_WITH_LOCATION(
                 "Invalid material and/or light "
@@ -131,12 +131,12 @@ void Pipeline::_process_shape(
         _instances.emplace_back(instance);
     } else {
         if (shape->transform() != nullptr) { transform_builder.push(shape->transform()); }
-        for (auto child : shape->children()) { _process_shape(stream, transform_builder, child, material, light); }
+        for (auto child : shape->children()) { _process_shape(command_buffer, transform_builder, child, material, light); }
         if (shape->transform() != nullptr) { transform_builder.pop(); }
     }
 }
 
-std::pair<uint, uint> Pipeline::_process_material(Stream &stream, const Material *material) noexcept {
+std::pair<uint, uint> Pipeline::_process_material(CommandBuffer &command_buffer, const Material *material) noexcept {
     if (material == nullptr) { return {~0u, Material::property_flag_black}; }
     if (auto iter = _materials.find(material); iter != _materials.cend()) {
         return iter->second;
@@ -154,13 +154,14 @@ std::pair<uint, uint> Pipeline::_process_material(Stream &stream, const Material
         _material_tags.emplace(std::move(impl_type), t);
         return t;
     }();
-    auto buffer_id = material->encode(stream, *this);
+    auto buffer_id = material->encode(*this, command_buffer);
     auto buffer_id_and_tag = (buffer_id << MeshInstance::material_buffer_id_shift) | tag;
     auto flags = material->property_flags();
     return _materials.emplace(material, std::make_pair(buffer_id_and_tag, flags)).first->second;
 }
 
-std::pair<uint, uint> Pipeline::_process_light(Stream &stream, const Shape *shape, const Light *light) noexcept {
+std::pair<uint, uint> Pipeline::_process_light(CommandBuffer &command_buffer, const Shape *shape, const Light *light) noexcept {
+    // TODO...
     if (light == nullptr) { return std::make_pair(~0u, Light::property_flag_black); }
     return {};
 }
@@ -170,27 +171,30 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     pipeline->_cameras.reserve(scene.cameras().size());
     pipeline->_films.reserve(scene.cameras().size());
     pipeline->_filters.reserve(scene.cameras().size());
-    auto mean_time = 0.0;
-    for (auto camera : scene.cameras()) {
-        pipeline->_cameras.emplace_back(camera->build(stream, *pipeline));
-        pipeline->_films.emplace_back(camera->film()->build(stream, *pipeline));
-        pipeline->_filters.emplace_back(
-            camera->filter() == nullptr ?
-                nullptr :
-                camera->filter()->build(stream, *pipeline));
-        mean_time += (camera->time_span().x + camera->time_span().y) * 0.5f;
+    auto command_buffer = stream.command_buffer();
+    {
+        auto mean_time = 0.0;
+        for (auto camera : scene.cameras()) {
+            pipeline->_cameras.emplace_back(camera->build(*pipeline, command_buffer));
+            pipeline->_films.emplace_back(camera->film()->build(*pipeline, command_buffer));
+            auto filter = camera->filter();
+            pipeline->_filters.emplace_back(
+                filter == nullptr ? nullptr : filter->build(*pipeline, command_buffer));
+            mean_time += (camera->time_span().x + camera->time_span().y) * 0.5f;
+        }
+        mean_time *= 1.0 / static_cast<double>(scene.cameras().size());
+        pipeline->_build_geometry(command_buffer, scene.shapes(), static_cast<float>(mean_time), AccelBuildHint::FAST_TRACE);
+        pipeline->_integrator = scene.integrator()->build(*pipeline, command_buffer);
+        pipeline->_sampler = scene.integrator()->sampler()->build(*pipeline, command_buffer);
     }
-    mean_time *= 1.0 / static_cast<double>(scene.cameras().size());
-    pipeline->_build_geometry(stream, scene.shapes(), static_cast<float>(mean_time), AccelBuildHint::FAST_TRACE);
-    pipeline->_integrator = scene.integrator()->build(stream, *pipeline);
-    pipeline->_sampler = scene.integrator()->sampler()->build(stream, *pipeline);
+    command_buffer.commit();
     return pipeline;
 }
 
-void Pipeline::update(Stream &stream, float time) noexcept {
+void Pipeline::update_geometry(CommandBuffer &command_buffer, float time) noexcept {
     // TODO: support deformable meshes
     _transform_tree.update(_accel, time);
-    stream << _accel.update();
+    command_buffer << _accel.update();
 }
 
 void Pipeline::render(Stream &stream) noexcept {

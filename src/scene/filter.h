@@ -29,7 +29,7 @@ private:
 public:
     Filter(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] auto radius() const noexcept { return _radius; }
-    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(Stream &stream, Pipeline &pipeline) const noexcept = 0;
+    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
 };
 
 }

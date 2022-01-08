@@ -104,12 +104,12 @@ private:
     luisa::unique_ptr<Sampler::Instance> _sampler;
 
 private:
-    void _build_geometry(Stream &stream, luisa::span<const Shape *const> shapes, float init_time, AccelBuildHint hint) noexcept;
+    void _build_geometry(CommandBuffer &command_buffer, luisa::span<const Shape *const> shapes, float init_time, AccelBuildHint hint) noexcept;
     void _process_shape(
-        Stream &stream, TransformTree::Builder &transform_builder, const Shape *shape,
+        CommandBuffer &command_buffer, TransformTree::Builder &transform_builder, const Shape *shape,
         const Material *overridden_material = nullptr, const Light *overridden_light = nullptr) noexcept;
-    [[nodiscard]] std::pair<uint /* buffer id and tag */, uint /* property flags */> _process_material(Stream &stream, const Material *material) noexcept;
-    [[nodiscard]] std::pair<uint /* buffer id and tag */, uint /* property flags */> _process_light(Stream &stream, const Shape *shape, const Light *light) noexcept;
+    [[nodiscard]] std::pair<uint /* buffer id and tag */, uint /* property flags */> _process_material(CommandBuffer &command_buffer, const Material *material) noexcept;
+    [[nodiscard]] std::pair<uint /* buffer id and tag */, uint /* property flags */> _process_light(CommandBuffer &command_buffer, const Shape *shape, const Light *light) noexcept;
 
 public:
     // for internal use only; use Pipeline::create() instead
@@ -178,7 +178,7 @@ public:
     [[nodiscard]] auto light_interfaces() const noexcept { return luisa::span{_light_interfaces}; }
     [[nodiscard]] auto sampler() noexcept { return _sampler.get(); }
     [[nodiscard]] auto sampler() const noexcept { return _sampler.get(); }
-    void update(Stream &stream, float time) noexcept;
+    void update_geometry(CommandBuffer &command_buffer, float time) noexcept;
     void render(Stream &stream) noexcept;
 };
 

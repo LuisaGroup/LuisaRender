@@ -24,7 +24,7 @@ private:
 
 public:
     IndependentSamplerInstance(Device &device, const IndependentSampler *sampler, uint _seed) noexcept;
-    void reset(Stream &stream, uint2 resolution, uint spp) noexcept override;
+    void reset(CommandBuffer &command_buffer, uint2 resolution, uint spp) noexcept override;
     void start(Expr<uint2> pixel, Expr<uint> sample_index) noexcept override;
     void save_state() noexcept override;
     void load_state(Expr<uint2> pixel) noexcept override;
@@ -40,7 +40,7 @@ private:
 public:
     IndependentSampler(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Sampler{scene, desc}, _seed{desc->property_uint_or_default("seed", 19980810u)} {}
-    [[nodiscard]] luisa::unique_ptr<Instance> build(Stream &stream, Pipeline &pipeline) const noexcept override {
+    [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
         return luisa::make_unique<IndependentSamplerInstance>(pipeline.device(), this, _seed);
     }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "independent"; }
@@ -65,11 +65,11 @@ IndependentSamplerInstance::IndependentSamplerInstance(Device &device, const Ind
     _make_sampler_state = _device.compile(kernel);
 }
 
-void IndependentSamplerInstance::reset(Stream &stream, uint2 resolution, uint /* spp */) noexcept {
+void IndependentSamplerInstance::reset(CommandBuffer &command_buffer, uint2 resolution, uint /* spp */) noexcept {
     if (!_states || any(_states.size() < resolution)) {
         _states = _device.create_image<uint>(PixelStorage::INT1, resolution);
     }
-    stream << _make_sampler_state(_states, _seed).dispatch(resolution);
+    command_buffer << _make_sampler_state(_states, _seed).dispatch(resolution);
 }
 
 void IndependentSamplerInstance::start(Expr<uint2> pixel, Expr<uint> /* sample_index */) noexcept {
