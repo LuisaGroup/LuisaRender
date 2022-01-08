@@ -191,7 +191,7 @@ public:
     [[nodiscard]] std::pair<Var<MeshInstance>, Var<float4x4>> instance(const Var<Hit> &hit) const noexcept;
     [[nodiscard]] Var<Triangle> triangle(const Var<MeshInstance> &instance, const Var<Hit> &hit) const noexcept;
     [[nodiscard]] Var<float3> vertex_position(const Var<MeshInstance> &instance, const Var<Triangle> &triangle, const Var<Hit> &hit) const noexcept;
-    [[nodiscard]] std::tuple<Var<float3> /* normal */, Var<float3> /* tangent */, Var<float2> /* uv */> vertex_attribute(
+    [[nodiscard]] std::tuple<Var<float3> /* normal */, Var<float3> /* tangent */, Var<float2> /* uv */> vertex_attributes(
         const Var<MeshInstance> &instance, const Var<Triangle> &triangle, const Var<Hit> &hit) const noexcept;
 };
 

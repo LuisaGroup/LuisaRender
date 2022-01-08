@@ -232,7 +232,7 @@ Var<float3> Pipeline::vertex_position(const Var<MeshInstance> &instance, const V
     return hit->interpolate(p0, p1, p2);
 }
 
-std::tuple<Var<float3>, Var<float3>, Var<float2>> Pipeline::vertex_attribute(
+std::tuple<Var<float3>, Var<float3>, Var<float2>> Pipeline::vertex_attributes(
     const Var<MeshInstance> &instance, const Var<Triangle> &triangle, const Var<Hit> &hit) const noexcept {
     auto a0 = buffer<VertexAttribute>(instance->attribute_buffer_id()).read(instance->attribute_buffer_offset() + triangle.i0);
     auto a1 = buffer<VertexAttribute>(instance->attribute_buffer_id()).read(instance->attribute_buffer_offset() + triangle.i1);

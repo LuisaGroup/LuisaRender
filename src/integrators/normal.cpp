@@ -67,7 +67,7 @@ void NormalVisualizerInstance::_render_one_camera(
         auto pixel_id = dispatch_id().xy();
         sampler->start(pixel_id, frame_index);
         auto pixel = make_float2(pixel_id);
-        if (filter == nullptr) {// not specified, using default box sampler
+        if (filter == nullptr) {// not specified, using default box filter
             pixel += sampler->generate_2d();
         } else {
             // TODO: support filter sampling
@@ -82,21 +82,22 @@ void NormalVisualizerInstance::_render_one_camera(
             ray.direction = normalize(camera_to_world_normal * def<float3>(ray.direction));
         }
         auto hit = pipeline.accel().trace_closest(ray);
-        $if(hit->miss()) {
-            film->accumulate(pixel_id, make_float3());
-        }
-        $else {
+        auto radiance = def<float3>();
+        $if(!hit->miss()) {
             auto [instance, instance_transform] = pipeline.instance(hit);
             auto triangle = pipeline.triangle(instance, hit);
-            auto [normal, tangent, uv] = pipeline.vertex_attribute(instance, triangle, hit);
+            auto [normal, tangent, uv] = pipeline.vertex_attributes(instance, triangle, hit);
             auto m = transpose(inverse(make_float3x3(instance_transform)));
-            film->accumulate(pixel_id, make_float3(normalize(m * normal) * 0.5f + 0.5f));
+            radiance = normalize(m * normal) * 0.5f + 0.5f;
         };
+        film->accumulate(pixel_id, weight * radiance);
     };
     auto render = pipeline.device().compile(render_kernel);
+    stream << synchronize();
     Clock clock;
     auto time_start = camera->camera()->time_span().x;
     auto time_end = camera->camera()->time_span().x;
+    auto spp_per_commit = 16u;
     for (auto i = 0u; i < spp; i++) {
         auto t = static_cast<float>((static_cast<double>(i) + 0.5f) / static_cast<double>(spp));
         auto time = lerp(time_start, time_end, t);
@@ -104,9 +105,12 @@ void NormalVisualizerInstance::_render_one_camera(
         auto camera_transform = camera->camera()->transform();
         auto camera_to_world = camera_transform == nullptr ? make_float4x4() : camera_transform->matrix(t);
         auto camera_to_world_normal = transpose(inverse(make_float3x3(camera_to_world)));
-        command_buffer << render(i, camera_to_world, camera_to_world_normal, time).dispatch(resolution)
-                       << commit();
+        command_buffer << render(i, camera_to_world, camera_to_world_normal, time).dispatch(resolution);
+        if (spp % spp_per_commit == spp_per_commit - 1u) [[unlikely]] { command_buffer << commit(); }
     }
+    command_buffer << commit();
+    stream << synchronize();
+    LUISA_INFO("Rendering finished in {} ms.", clock.toc());
 }
 
 }// namespace luisa::render
