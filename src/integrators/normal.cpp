@@ -90,6 +90,7 @@ void NormalVisualizerInstance::_render_one_camera(
             auto [normal, tangent, uv] = pipeline.vertex_attributes(instance, triangle, hit);
             auto m = transpose(inverse(make_float3x3(instance_transform)));
             radiance = normalize(m * normal) * 0.5f + 0.5f;
+            radiance = make_float3(hit.bary, 1.0f);
         };
         film->accumulate(pixel_id, weight * radiance);
     };

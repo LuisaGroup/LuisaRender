@@ -7,13 +7,12 @@
 namespace luisa::render {
 
 template<typename T, uint buffer_id_shift, uint buffer_element_alignment>
-std::pair<BufferView<T>, uint> Pipeline::BufferArena<T, buffer_id_shift, buffer_element_alignment>::allocate(size_t n) noexcept {
+inline std::pair<BufferView<T>, uint> Pipeline::BufferArena<T, buffer_id_shift, buffer_element_alignment>::allocate(size_t n) noexcept {
     if (n > buffer_capacity) {// too big, will not use the arena
         auto buffer = _pipeline.create<Buffer<T>>(n);
         auto buffer_id = _pipeline.register_bindless(buffer->view());
         return std::make_pair(buffer->view(), buffer_id << buffer_id_shift);
     }
-    static constexpr auto a = buffer_element_alignment;
     if (_buffer == nullptr || _buffer_offset + n > buffer_capacity) {
         _buffer = _pipeline.create<Buffer<T>>(buffer_capacity);
         _buffer_id = _pipeline.register_bindless(_buffer->view());
@@ -22,6 +21,7 @@ std::pair<BufferView<T>, uint> Pipeline::BufferArena<T, buffer_id_shift, buffer_
     auto view = _buffer->view(_buffer_offset, n);
     auto id_and_offset = (_buffer_id << buffer_id_shift) |
                          (_buffer_offset / buffer_element_alignment);
+    static constexpr auto a = buffer_element_alignment;
     _buffer_offset = (_buffer_offset + n + a - 1u) / a * a;
     return std::make_pair(view, id_and_offset);
 }
