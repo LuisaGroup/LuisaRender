@@ -90,7 +90,7 @@ void NormalVisualizerInstance::_render_one_camera(
             auto triangle = pipeline.triangle(instance, hit);
             auto [normal, tangent, uv] = pipeline.vertex_attribute(instance, triangle, hit);
             auto m = transpose(inverse(make_float3x3(instance_transform)));
-            film->accumulate(pixel_id, make_float3(m * normal * 0.5f + 0.5f));
+            film->accumulate(pixel_id, make_float3(normalize(m * normal) * 0.5f + 0.5f));
         };
     };
     auto render = pipeline.device().compile(render_kernel);
