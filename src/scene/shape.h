@@ -37,32 +37,19 @@ struct alignas(16) MeshInstance {
 
     static constexpr auto instance_buffer_id_shift = 12u;
     static constexpr auto instance_buffer_offset_mask = (1u << instance_buffer_id_shift) - 1u;
-
-    static constexpr auto position_buffer_id_shift = 13u;
-    static constexpr auto attribute_buffer_id_shift = 13u;
-    static constexpr auto triangle_buffer_id_shift = 13u;
     static constexpr auto area_cdf_buffer_id_shift = 13u;
-
-    static constexpr auto position_buffer_element_alignment = 16u;
-    static constexpr auto attribute_buffer_element_alignment = 16u;
-    static constexpr auto triangle_buffer_element_alignment = 16u;
     static constexpr auto area_cdf_buffer_element_alignment = 16u;
-
-    static constexpr auto position_buffer_offset_mask = (1u << position_buffer_id_shift) - 1u;
-    static constexpr auto attribute_buffer_offset_mask = (1u << attribute_buffer_id_shift) - 1u;
-    static constexpr auto triangle_buffer_offset_mask = (1u << triangle_buffer_id_shift) - 1u;
     static constexpr auto area_cdf_buffer_offset_mask = (1u << area_cdf_buffer_id_shift) - 1u;
-
     static constexpr auto material_buffer_id_shift = 12u;
     static constexpr auto light_buffer_id_shift = 12u;
     static constexpr auto material_tag_mask = (1u << material_buffer_id_shift) - 1u;
     static constexpr auto light_tag_mask = (1u << light_buffer_id_shift) - 1u;
 
     // vertices & indices
-    uint position_buffer_id_and_offset;// (buffer_id << shift) | offset
-    uint attribute_buffer_id_and_offset;
-    uint triangle_buffer_id_and_offset;
-    uint triangle_buffer_size;
+    uint position_buffer_id;// (buffer_id << shift) | offset
+    uint attribute_buffer_id;
+    uint triangle_buffer_id;
+    uint triangle_count;
 
     // other info
     uint material_and_light_property_flags;
@@ -131,22 +118,14 @@ LUISA_STRUCT(
 LUISA_STRUCT(
     luisa::render::MeshInstance,
 
-    position_buffer_id_and_offset,
-    attribute_buffer_id_and_offset,
-    triangle_buffer_id_and_offset,
-    triangle_buffer_size,
+    position_buffer_id,
+    attribute_buffer_id,
+    triangle_buffer_id,
+    triangle_count,
     material_and_light_property_flags,
     material_buffer_id_and_tag,
     light_buffer_id_and_tag,
     area_cdf_buffer_id_and_offset) {
-
-    [[nodiscard]] auto position_buffer_id() const noexcept { return position_buffer_id_and_offset >> luisa::render::MeshInstance::position_buffer_id_shift; }
-    [[nodiscard]] auto position_buffer_offset() const noexcept { return (position_buffer_id_and_offset & luisa::render::MeshInstance::position_buffer_offset_mask) * luisa::render::MeshInstance::position_buffer_element_alignment; }
-    [[nodiscard]] auto attribute_buffer_id() const noexcept { return attribute_buffer_id_and_offset >> luisa::render::MeshInstance::attribute_buffer_id_shift; }
-    [[nodiscard]] auto attribute_buffer_offset() const noexcept { return (attribute_buffer_id_and_offset & luisa::render::MeshInstance::attribute_buffer_offset_mask) * luisa::render::MeshInstance::attribute_buffer_element_alignment; }
-    [[nodiscard]] auto triangle_buffer_id() const noexcept { return triangle_buffer_id_and_offset >> luisa::render::MeshInstance::triangle_buffer_id_shift; }
-    [[nodiscard]] auto triangle_buffer_offset() const noexcept { return (triangle_buffer_id_and_offset & luisa::render::MeshInstance::triangle_buffer_offset_mask) * luisa::render::MeshInstance::triangle_buffer_element_alignment; }
-    [[nodiscard]] auto triangle_count() const noexcept { return triangle_buffer_size; }
     [[nodiscard]] auto area_cdf_buffer_id() const noexcept { return area_cdf_buffer_id_and_offset >> luisa::render::MeshInstance::area_cdf_buffer_id_shift; }
     [[nodiscard]] auto area_cdf_buffer_offset() const noexcept { return (area_cdf_buffer_id_and_offset & luisa::render::MeshInstance::area_cdf_buffer_offset_mask) * luisa::render::MeshInstance::area_cdf_buffer_element_alignment; }
     [[nodiscard]] auto material_tag() const noexcept { return material_buffer_id_and_tag & luisa::render::MeshInstance::material_tag_mask; }

@@ -5,7 +5,7 @@ Film film : Color {
 Camera camera : Pinhole {
   position { -0.01, 0.995, 5.0 }
   fov { 27.8 }
-  spp { 1 }
+  spp { 1024 }
   film { @film }
 }
 
@@ -13,7 +13,7 @@ Camera camera2 : Pinhole {
   position { -0.01, 0.995, 5.0 }
   up { 1.0, 1.0, 0.0 }
   fov { 27.8 }
-  spp { 1 }
+  spp { 1024 }
   file { "camera2.exr" }
   film { @film }
 }
@@ -26,6 +26,6 @@ Integrator integrator : Normal {
 
 render {
   cameras { @camera, @camera2 }
-  shapes { @cbox-light, @cbox }
+  shapes { @cbox, @cbox-light }
   integrator { @integrator }
 }

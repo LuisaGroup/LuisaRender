@@ -6,24 +6,21 @@
 
 namespace luisa::render {
 
-template<typename T, uint buffer_id_shift, uint buffer_element_alignment>
-inline std::pair<BufferView<T>, uint> Pipeline::BufferArena<T, buffer_id_shift, buffer_element_alignment>::allocate(size_t n) noexcept {
-    if (n > buffer_capacity) {// too big, will not use the arena
+template<typename T, size_t capacity>
+inline std::pair<BufferView<T>, uint> Pipeline::BufferArena<T, capacity>::allocate(size_t n) noexcept {
+    if (n > capacity) {// too big, will not use the arena
         auto buffer = _pipeline.create<Buffer<T>>(n);
         auto buffer_id = _pipeline.register_bindless(buffer->view());
-        return std::make_pair(buffer->view(), buffer_id << buffer_id_shift);
+        return std::make_pair(buffer->view(), buffer_id);
     }
-    if (_buffer == nullptr || _buffer_offset + n > buffer_capacity) {
-        _buffer = _pipeline.create<Buffer<T>>(buffer_capacity);
+    if (_buffer == nullptr || _buffer_offset + n > capacity) {
+        _buffer = _pipeline.create<Buffer<T>>(capacity);
         _buffer_id = _pipeline.register_bindless(_buffer->view());
         _buffer_offset = 0u;
     }
     auto view = _buffer->view(_buffer_offset, n);
-    auto id_and_offset = (_buffer_id << buffer_id_shift) |
-                         (_buffer_offset / buffer_element_alignment);
-    static constexpr auto a = buffer_element_alignment;
-    _buffer_offset = (_buffer_offset + n + a - 1u) / a * a;
-    return std::make_pair(view, id_and_offset);
+    _buffer_offset += n;
+    return std::make_pair(view, _buffer_id);
 }
 
 inline Pipeline::Pipeline(Device &device) noexcept
@@ -31,7 +28,6 @@ inline Pipeline::Pipeline(Device &device) noexcept
       _bindless_array{device.create_bindless_array(bindless_array_capacity)},
       _position_buffer_arena{*this},
       _attribute_buffer_arena{*this},
-      _triangle_buffer_arena{*this},
       _area_cdf_buffer_arena{*this} {}
 
 void Pipeline::_build_geometry(CommandBuffer &command_buffer, luisa::span<const Shape *const> shapes, float init_time, AccelBuildHint hint) noexcept {
@@ -75,19 +71,28 @@ void Pipeline::_process_shape(
             }
             MeshData mesh{};
             // create mesh
-            auto [position_buffer_view, position_buffer_id_and_offset] = _position_buffer_arena.allocate(positions.size());
-            auto [triangle_buffer_view, triangle_buffer_id_and_offset] = _triangle_buffer_arena.allocate(triangles.size());
-            auto [attribute_buffer_view, attribute_buffer_id_and_offset] = _attribute_buffer_arena.allocate(attributes.size());
-            mesh.resource = create<Mesh>(position_buffer_view, triangle_buffer_view, shape->build_hint());
+            auto [position_buffer_view, position_buffer_id] = _position_buffer_arena.allocate(positions.size());
+            auto [attribute_buffer_view, attribute_buffer_id] = _attribute_buffer_arena.allocate(attributes.size());
+            if (position_buffer_view.offset() != attribute_buffer_view.offset()) [[unlikely]] {
+                LUISA_ERROR_WITH_LOCATION("Position and attribute buffer offsets mismatch.");
+            }
+            auto index_offset = static_cast<uint>(position_buffer_view.offset());
+            luisa::vector<Triangle> offset_triangles(triangles.size());
+            std::transform(triangles.cbegin(), triangles.cend(), offset_triangles.begin(), [index_offset](auto t) noexcept {
+                return Triangle{t.i0 + index_offset, t.i1 + index_offset, t.i2 + index_offset};
+            });
+            auto triangle_buffer = create<Buffer<Triangle>>(triangles.size());
+            auto triangle_buffer_id = register_bindless(triangle_buffer->view());
+            mesh.resource = create<Mesh>(position_buffer_view.original(), *triangle_buffer, shape->build_hint());
             command_buffer << position_buffer_view.copy_from(positions.data())
-                           << triangle_buffer_view.copy_from(triangles.data())
+                           << triangle_buffer->copy_from(offset_triangles.data())
                            << attribute_buffer_view.copy_from(attributes.data())
-                           << mesh.resource->build();
+                           << mesh.resource->build();// TODO: why?
             // assign mesh data
-            mesh.position_buffer_id_and_offset = position_buffer_id_and_offset;
-            mesh.triangle_buffer_id_and_offset = triangle_buffer_id_and_offset;
+            mesh.position_buffer_id = position_buffer_id;
+            mesh.triangle_buffer_id = triangle_buffer_id;
             mesh.triangle_count = triangles.size();
-            mesh.attribute_buffer_id_and_offset = attribute_buffer_id_and_offset;
+            mesh.attribute_buffer_id = attribute_buffer_id;
             // compute area cdf
             auto sum_area = 0.0;
             luisa::vector<float> areas;
@@ -104,19 +109,22 @@ void Pipeline::_process_shape(
             auto inv_sum_area = 1.0 / sum_area;
             for (auto &a : areas) { a = static_cast<float>(a * inv_sum_area); }
             areas.emplace_back(1.0f);
-            auto [area_cdf_buffer_view, area_cdf_buffer_id_and_offset] = _area_cdf_buffer_arena.allocate(areas.size());
-            mesh.area_cdf_buffer_id_and_offset = area_cdf_buffer_id_and_offset;
-            command_buffer << area_cdf_buffer_view.copy_from(areas.data());
+            auto [area_cdf_buffer_view, area_cdf_buffer_id] = _area_cdf_buffer_arena.allocate(areas.size());
+            mesh.area_cdf_buffer_id_and_offset = (area_cdf_buffer_id << MeshInstance::area_cdf_buffer_id_shift) |
+                                                 static_cast<uint>(area_cdf_buffer_view.offset() /
+                                                                   MeshInstance::area_cdf_buffer_element_alignment);
+            command_buffer << area_cdf_buffer_view.copy_from(areas.data())
+                           << luisa::compute::commit();
             iter = _meshes.emplace(shape, mesh).first;
         }
         auto mesh = iter->second;
 
         // create instance
         MeshInstance instance{};
-        instance.position_buffer_id_and_offset = mesh.position_buffer_id_and_offset;
-        instance.attribute_buffer_id_and_offset = mesh.attribute_buffer_id_and_offset;
-        instance.triangle_buffer_id_and_offset = mesh.triangle_buffer_id_and_offset;
-        instance.triangle_buffer_size = mesh.triangle_count;
+        instance.position_buffer_id = mesh.position_buffer_id;
+        instance.attribute_buffer_id = mesh.attribute_buffer_id;
+        instance.triangle_buffer_id = mesh.triangle_buffer_id;
+        instance.triangle_count = mesh.triangle_count;
         instance.area_cdf_buffer_id_and_offset = mesh.area_cdf_buffer_id_and_offset;
         auto [m, m_flags] = _process_material(command_buffer, material);
         auto [l, l_flags] = _process_light(command_buffer, shape, light);
@@ -222,21 +230,21 @@ std::pair<Var<MeshInstance>, Var<float4x4>> Pipeline::instance(const Var<Hit> &h
 }
 
 Var<Triangle> Pipeline::triangle(const Var<MeshInstance> &instance, const Var<Hit> &hit) const noexcept {
-    return buffer<Triangle>(instance->triangle_buffer_id()).read(instance->triangle_buffer_offset() + hit.prim);
+    return buffer<Triangle>(instance->triangle_buffer_id).read(hit.prim);
 }
 
 Var<float3> Pipeline::vertex_position(const Var<MeshInstance> &instance, const Var<Triangle> &triangle, const Var<Hit> &hit) const noexcept {
-    auto p0 = buffer<float3>(instance->position_buffer_id()).read(instance->position_buffer_offset() + triangle.i0);
-    auto p1 = buffer<float3>(instance->position_buffer_id()).read(instance->position_buffer_offset() + triangle.i1);
-    auto p2 = buffer<float3>(instance->position_buffer_id()).read(instance->position_buffer_offset() + triangle.i2);
+    auto p0 = buffer<float3>(instance->position_buffer_id).read(triangle.i0);
+    auto p1 = buffer<float3>(instance->position_buffer_id).read(triangle.i1);
+    auto p2 = buffer<float3>(instance->position_buffer_id).read(triangle.i2);
     return hit->interpolate(p0, p1, p2);
 }
 
 std::tuple<Var<float3>, Var<float3>, Var<float2>> Pipeline::vertex_attributes(
     const Var<MeshInstance> &instance, const Var<Triangle> &triangle, const Var<Hit> &hit) const noexcept {
-    auto a0 = buffer<VertexAttribute>(instance->attribute_buffer_id()).read(instance->attribute_buffer_offset() + triangle.i0);
-    auto a1 = buffer<VertexAttribute>(instance->attribute_buffer_id()).read(instance->attribute_buffer_offset() + triangle.i1);
-    auto a2 = buffer<VertexAttribute>(instance->attribute_buffer_id()).read(instance->attribute_buffer_offset() + triangle.i2);
+    auto a0 = buffer<VertexAttribute>(instance->attribute_buffer_id).read(triangle.i0);
+    auto a1 = buffer<VertexAttribute>(instance->attribute_buffer_id).read(triangle.i1);
+    auto a2 = buffer<VertexAttribute>(instance->attribute_buffer_id).read(triangle.i2);
     auto normal = normalize(hit->interpolate(a0->normal(), a1->normal(), a2->normal()));
     auto tangent = normalize(hit->interpolate(a0->tangent(), a1->tangent(), a2->tangent()));
     auto uv = hit->interpolate(a0->uv(), a1->uv(), a2->uv());

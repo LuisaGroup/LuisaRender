@@ -42,11 +42,8 @@ class Scene;
 class Pipeline {
 
 public:
-    template<typename T, uint buffer_id_shift, uint buffer_element_alignment>
+    template<typename T, size_t capacity>
     class BufferArena {
-
-    public:
-        static constexpr auto buffer_capacity = (1u << buffer_id_shift) * buffer_element_alignment;
 
     private:
         Pipeline &_pipeline;
@@ -56,7 +53,7 @@ public:
 
     public:
         explicit BufferArena(Pipeline &pipeline) noexcept : _pipeline{pipeline} {}
-        [[nodiscard]] std::pair<BufferView<T>, uint /* buffer id and offset */> allocate(size_t n) noexcept;
+        [[nodiscard]] std::pair<BufferView<T>, uint /* bindless buffer id */> allocate(size_t n) noexcept;
     };
 
 public:
@@ -71,9 +68,9 @@ public:
     struct MeshData {
         Mesh *resource;
         uint triangle_count;
-        uint position_buffer_id_and_offset;
-        uint attribute_buffer_id_and_offset;
-        uint triangle_buffer_id_and_offset;
+        uint position_buffer_id;
+        uint attribute_buffer_id;
+        uint triangle_buffer_id;
         uint area_cdf_buffer_id_and_offset;
     };
 
@@ -93,10 +90,9 @@ private:
     luisa::unordered_map<luisa::string /* impl type */, uint /* tag */, Hash64> _light_tags;
     luisa::unordered_map<const Material *, std::pair<uint /* buffer id and tag */, uint /* properties */>> _materials;
     luisa::unordered_map<const Light *, std::pair<uint /* buffer id and tag */, uint /* properties */>> _lights;
-    BufferArena<float3, MeshInstance::position_buffer_id_shift, MeshInstance::position_buffer_element_alignment> _position_buffer_arena;
-    BufferArena<VertexAttribute, MeshInstance::attribute_buffer_id_shift, MeshInstance::attribute_buffer_element_alignment> _attribute_buffer_arena;
-    BufferArena<Triangle, MeshInstance::triangle_buffer_id_shift, MeshInstance::triangle_buffer_element_alignment> _triangle_buffer_arena;
-    BufferArena<float, MeshInstance::area_cdf_buffer_id_shift, MeshInstance::area_cdf_buffer_element_alignment> _area_cdf_buffer_arena;
+    BufferArena<float3, 65536u> _position_buffer_arena;
+    BufferArena<VertexAttribute, 65536u> _attribute_buffer_arena;
+    BufferArena<float, 65536u> _area_cdf_buffer_arena;
     luisa::vector<MeshInstance> _instances;
     Buffer<MeshInstance> _instance_buffer;
     luisa::vector<luisa::unique_ptr<Camera::Instance>> _cameras;
