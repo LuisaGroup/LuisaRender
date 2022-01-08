@@ -23,7 +23,7 @@ public:
 
     public:
         explicit Instance(const Sampler *sampler) noexcept : _sampler{sampler} {}
-        [[nodiscard]] auto sampler() const noexcept { return _sampler; }
+        [[nodiscard]] auto node() const noexcept { return _sampler; }
 
         // interfaces
         virtual void reset(CommandBuffer &command_buffer, uint2 resolution, uint spp) noexcept = 0;

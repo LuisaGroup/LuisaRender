@@ -16,7 +16,14 @@ Camera::Camera(Scene *scene, const SceneNodeDesc *desc) noexcept
       _film{scene->load_film(desc->property_node("film"))},
       _filter{scene->load_filter(desc->property_node_or_default("filter"))},
       _transform{scene->load_transform(desc->property_node_or_default("transform"))},
-      _time_span{desc->property_float2_or_default("time_span", luisa::make_float2())} {
+      _time_span{desc->property_float2_or_default("time_span", luisa::make_float2())},
+      _spp{desc->property_uint_or_default("spp", 1024u)},
+      _file{desc->property_path_or_default(
+          "file", std::filesystem::canonical(
+                      desc->source_location() ?
+                          desc->source_location().file()->parent_path() :
+                          std::filesystem::current_path()) /
+                      "color.exr")} {
     if (_time_span.y < _time_span.x) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
             "Invalid time span: [{}, {}].",

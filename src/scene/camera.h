@@ -36,7 +36,7 @@ public:
 
     public:
         explicit Instance(const Camera *camera) noexcept : _camera{camera} {}
-        [[nodiscard]] auto camera() const noexcept { return _camera; }
+        [[nodiscard]] auto node() const noexcept { return _camera; }
 
         // generate ray in camera space, should not consider _filter and/or _transform
         [[nodiscard]] virtual Sample generate_ray(
@@ -48,6 +48,8 @@ private:
     const Filter *_filter;
     const Transform *_transform;
     float2 _time_span;
+    uint _spp;
+    std::filesystem::path _file;
 
 public:
     Camera(Scene *scene, const SceneNodeDesc *desc) noexcept;
@@ -55,6 +57,8 @@ public:
     [[nodiscard]] auto filter() const noexcept { return _filter; }
     [[nodiscard]] auto transform() const noexcept { return _transform; }
     [[nodiscard]] auto time_span() const noexcept { return _time_span; }
+    [[nodiscard]] auto spp() const noexcept { return _spp; }
+    [[nodiscard]] auto file() const noexcept { return _file; }
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
 };
 

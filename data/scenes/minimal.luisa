@@ -1,21 +1,31 @@
+Film film : Color {
+  resolution { 1024 }
+}
+
 Camera camera : Pinhole {
   position { -0.01, 0.995, 5.0 }
   fov { 27.8 }
-  film : Color {
-    spp { 1024 }
-  }
+  spp { 1 }
+  film { @film }
 }
 
-Shape shape : TriangleMesh {
-  file { "../meshes/cbox.obj" }
+Camera camera2 : Pinhole {
+  position { -0.01, 0.995, 5.0 }
+  up { 1.0, 1.0, 0.0 }
+  fov { 27.8 }
+  spp { 1 }
+  file { "camera2.exr" }
+  film { @film }
 }
+
+import "../meshes/cbox.luisa"
 
 Integrator integrator : Normal {
   sampler : Independent {}
 }
 
 render {
-  cameras { @camera }
-  shapes { @shape }
+  cameras { @camera, @camera2 }
+  shapes { @cbox-light, @cbox }
   integrator { @integrator }
 }

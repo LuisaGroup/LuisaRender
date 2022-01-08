@@ -43,7 +43,7 @@ public:
     class Interface {
 
     public:
-        [[nodiscard]] virtual luisa::unique_ptr<Context> decode(const BindlessArray &array, uint buffer_id) const noexcept;
+        [[nodiscard]] virtual luisa::unique_ptr<Context> decode(const BindlessArray &array, uint buffer_id) const noexcept = 0;
         virtual ~Interface() noexcept = default;
     };
 

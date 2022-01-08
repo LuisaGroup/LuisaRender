@@ -29,6 +29,7 @@ using compute::BufferView;
 using compute::Callable;
 using compute::Device;
 using compute::Hit;
+using compute::Ray;
 using compute::Image;
 using compute::Mesh;
 using compute::PixelStorage;
@@ -188,6 +189,8 @@ public:
     template<typename I>
     [[nodiscard]] auto tex3d(I &&i) const noexcept { return _bindless_array.tex3d(std::forward<I>(i)); }
 
+    [[nodiscard]] Var<Hit> trace_closest(const Var<Ray> &ray) const noexcept;
+    [[nodiscard]] Var<bool> trace_any(const Var<Ray> &ray) const noexcept;
     [[nodiscard]] std::pair<Var<MeshInstance>, Var<float4x4>> instance(const Var<Hit> &hit) const noexcept;
     [[nodiscard]] Var<Triangle> triangle(const Var<MeshInstance> &instance, const Var<Hit> &hit) const noexcept;
     [[nodiscard]] Var<float3> vertex_position(const Var<MeshInstance> &instance, const Var<Triangle> &triangle, const Var<Hit> &hit) const noexcept;

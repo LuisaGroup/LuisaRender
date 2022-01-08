@@ -1,0 +1,43 @@
+Shape cbox-ceiling : TriangleMesh {
+  file { "cbox-parts/ceiling.obj" }
+}
+
+Shape cbox-floor : TriangleMesh {
+  file { "cbox-parts/floor.obj" }
+}
+
+Shape cbox-left-wall : TriangleMesh {
+  file { "cbox-parts/left-wall.obj" }
+}
+
+Shape cbox-right-wall : TriangleMesh {
+  file { "cbox-parts/right-wall.obj" }
+}
+
+Shape cbox-back-wall : TriangleMesh {
+  file { "cbox-parts/back-wall.obj" }
+}
+
+Shape cbox-tall-box : TriangleMesh {
+  file { "cbox-parts/tall-box.obj" }
+}
+
+Shape cbox-short-box : TriangleMesh {
+  file { "cbox-parts/short-box.obj" }
+}
+
+Shape cbox-light : TriangleMesh {
+  file { "cbox-parts/light.obj" }
+}
+
+Shape cbox : Group {
+  shapes {
+    @cbox-floor,
+    @cbox-ceiling,
+    @cbox-left-wall,
+    @cbox-right-wall,
+    @cbox-back-wall,
+    @cbox-tall-box,
+    @cbox-short-box
+  }
+}

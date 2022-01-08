@@ -18,9 +18,15 @@ public:
         Float pdf;
     };
 
-    struct Instance : public SceneNode::Instance {
-        [[nodiscard]] virtual Sample sample_pixel(
-            Sampler::Instance &sampler) const noexcept = 0;
+    class Instance : public SceneNode::Instance {
+
+    private:
+        const Filter *_filter;
+
+    public:
+        explicit Instance(const Filter *filter) noexcept : _filter{filter} {}
+        [[nodiscard]] auto node() const noexcept { return _filter; }
+        [[nodiscard]] virtual Sample sample_pixel(Sampler::Instance &sampler) const noexcept = 0;
     };
 
 private:

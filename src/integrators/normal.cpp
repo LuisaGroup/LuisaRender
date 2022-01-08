@@ -39,7 +39,7 @@ void NormalVisualizerInstance::render(Stream &stream, Pipeline &pipeline) noexce
     for (auto i = 0u; i < pipeline.camera_count(); i++) {
         auto [camera, film, filter] = pipeline.camera(i);
         _render_one_camera(stream, pipeline, camera, filter, film);
-        film->save(stream);
+        film->save(stream, camera->node()->file());
     }
 }
 
@@ -49,11 +49,12 @@ void NormalVisualizerInstance::_render_one_camera(
     const Filter::Instance *filter,
     Film::Instance *film) noexcept {
 
-    auto spp = film->film()->spp();
-    auto resolution = film->film()->resolution();
+    auto spp = camera->node()->spp();
+    auto resolution = film->node()->resolution();
+    auto image_file = camera->node()->file();
     LUISA_INFO(
         "Rendering to '{}' of resolution {}x{} at {}spp.",
-        film->film()->file().string(),
+        image_file.string(),
         resolution.x, resolution.y, spp);
 
     auto sampler = pipeline.sampler();
@@ -77,11 +78,11 @@ void NormalVisualizerInstance::_render_one_camera(
         auto [ray, weight] = camera->generate_ray(*sampler, pixel, time);
         sampler->save_state();
 
-        if (camera->camera()->transform() != nullptr) {
+        if (camera->node()->transform() != nullptr) {
             ray.origin = make_float3(camera_to_world * make_float4(def<float3>(ray.origin), 1.0f));
             ray.direction = normalize(camera_to_world_normal * def<float3>(ray.direction));
         }
-        auto hit = pipeline.accel().trace_closest(ray);
+        auto hit = pipeline.trace_closest(ray);
         auto radiance = def<float3>();
         $if(!hit->miss()) {
             auto [instance, instance_transform] = pipeline.instance(hit);
@@ -95,14 +96,14 @@ void NormalVisualizerInstance::_render_one_camera(
     auto render = pipeline.device().compile(render_kernel);
     stream << synchronize();
     Clock clock;
-    auto time_start = camera->camera()->time_span().x;
-    auto time_end = camera->camera()->time_span().x;
+    auto time_start = camera->node()->time_span().x;
+    auto time_end = camera->node()->time_span().x;
     auto spp_per_commit = 16u;
     for (auto i = 0u; i < spp; i++) {
         auto t = static_cast<float>((static_cast<double>(i) + 0.5f) / static_cast<double>(spp));
         auto time = lerp(time_start, time_end, t);
         pipeline.update_geometry(command_buffer, time);
-        auto camera_transform = camera->camera()->transform();
+        auto camera_transform = camera->node()->transform();
         auto camera_to_world = camera_transform == nullptr ? make_float4x4() : camera_transform->matrix(t);
         auto camera_to_world_normal = transpose(inverse(make_float3x3(camera_to_world)));
         command_buffer << render(i, camera_to_world, camera_to_world_normal, time).dispatch(resolution);

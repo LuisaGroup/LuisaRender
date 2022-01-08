@@ -243,6 +243,9 @@ std::tuple<Var<float3>, Var<float3>, Var<float2>> Pipeline::vertex_attributes(
     return std::make_tuple(std::move(normal), std::move(tangent), std::move(uv));
 }
 
+Var<Hit> Pipeline::trace_closest(const Var<Ray> &ray) const noexcept { return _accel.trace_closest(ray); }
+Var<bool> Pipeline::trace_any(const Var<Ray> &ray) const noexcept { return _accel.trace_any(ray); }
+
 Pipeline::~Pipeline() noexcept = default;
 
 }// namespace luisa::render

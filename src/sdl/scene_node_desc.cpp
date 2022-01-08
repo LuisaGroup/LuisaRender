@@ -18,8 +18,11 @@ void SceneNodeDesc::add_property(std::string_view name, SceneNodeDesc::value_lis
 
 void SceneNodeDesc::define(SceneNodeTag tag, std::string_view t, SceneNodeDesc::SourceLocation l) noexcept {
     _tag = tag;
-    _impl_type = t;
     _location = l;
+    _impl_type = t;
+    for (auto &c : _impl_type) {
+        c = static_cast<char>(tolower(c));
+    }
 }
 
 SceneNodeDesc *SceneNodeDesc::define_internal(std::string_view impl_type, SourceLocation location) noexcept {
@@ -40,7 +43,7 @@ template<typename T>
     if constexpr (std::is_same_v<std::remove_cvref_t<T>, SceneNodeDesc::string>) {
         SceneNodeDesc::path p{std::forward<T>(raw_value)};
         if (!l || p.is_absolute()) { return p; }
-        return std::filesystem::canonical(l.file()->parent_path() / p);
+        return std::filesystem::canonical(l.file()->parent_path()) / p;
     } else {
         return std::forward<T>(raw_value);
     }
