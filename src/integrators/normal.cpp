@@ -86,14 +86,11 @@ void NormalVisualizerInstance::_render_one_camera(
             film->accumulate(pixel_id, make_float3());
         }
         $else {
-            auto instance = pipeline.instance_buffer().read(hit.inst);
-            auto triangle = pipeline.buffer<Triangle>(instance->triangle_buffer_id()).read(instance->triangle_buffer_offset() + hit.prim);
-            auto attribute_buffer = pipeline.buffer<VertexAttribute>(instance->attribute_buffer_id());
-            auto n0 = attribute_buffer.read(instance->attribute_buffer_offset() + triangle.i0)->normal();
-            auto n1 = attribute_buffer.read(instance->attribute_buffer_offset() + triangle.i1)->normal();
-            auto n2 = attribute_buffer.read(instance->attribute_buffer_offset() + triangle.i2)->normal();
-            auto n = normalize(hit->interpolate(n0, n1, n2));
-            film->accumulate(pixel_id, make_float3(n * 0.5f + 0.5f));
+            auto [instance, instance_transform] = pipeline.instance(hit);
+            auto triangle = pipeline.triangle(instance, hit);
+            auto [normal, tangent, uv] = pipeline.vertex_attribute(instance, triangle, hit);
+            auto m = transpose(inverse(make_float3x3(instance_transform)));
+            film->accumulate(pixel_id, make_float3(m * normal * 0.5f + 0.5f));
         };
     };
     auto render = pipeline.device().compile(render_kernel);

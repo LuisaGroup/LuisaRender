@@ -28,6 +28,7 @@ using compute::Buffer;
 using compute::BufferView;
 using compute::Callable;
 using compute::Device;
+using compute::Hit;
 using compute::Image;
 using compute::Mesh;
 using compute::PixelStorage;
@@ -186,6 +187,12 @@ public:
     [[nodiscard]] auto tex2d(I &&i) const noexcept { return _bindless_array.tex2d(std::forward<I>(i)); }
     template<typename I>
     [[nodiscard]] auto tex3d(I &&i) const noexcept { return _bindless_array.tex3d(std::forward<I>(i)); }
+
+    [[nodiscard]] std::pair<Var<MeshInstance>, Var<float4x4>> instance(const Var<Hit> &hit) const noexcept;
+    [[nodiscard]] Var<Triangle> triangle(const Var<MeshInstance> &instance, const Var<Hit> &hit) const noexcept;
+    [[nodiscard]] Var<float3> vertex_position(const Var<MeshInstance> &instance, const Var<Triangle> &triangle, const Var<Hit> &hit) const noexcept;
+    [[nodiscard]] std::tuple<Var<float3> /* normal */, Var<float3> /* tangent */, Var<float2> /* uv */> vertex_attribute(
+        const Var<MeshInstance> &instance, const Var<Triangle> &triangle, const Var<Hit> &hit) const noexcept;
 };
 
 }// namespace luisa::render

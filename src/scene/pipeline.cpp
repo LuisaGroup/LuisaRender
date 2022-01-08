@@ -215,6 +215,34 @@ std::tuple<const Camera::Instance *, const Film::Instance *, const Filter::Insta
     return std::make_tuple(_cameras[i].get(), _films[i].get(), _filters[i].get());
 }
 
+std::pair<Var<MeshInstance>, Var<float4x4>> Pipeline::instance(const Var<Hit> &hit) const noexcept {
+    auto instance = _instance_buffer.read(hit.inst);
+    auto transform = _accel.instance_to_world(hit.inst);
+    return std::make_pair(std::move(instance), std::move(transform));
+}
+
+Var<Triangle> Pipeline::triangle(const Var<MeshInstance> &instance, const Var<Hit> &hit) const noexcept {
+    return buffer<Triangle>(instance->triangle_buffer_id()).read(instance->triangle_buffer_offset() + hit.prim);
+}
+
+Var<float3> Pipeline::vertex_position(const Var<MeshInstance> &instance, const Var<Triangle> &triangle, const Var<Hit> &hit) const noexcept {
+    auto p0 = buffer<float3>(instance->position_buffer_id()).read(instance->position_buffer_offset() + triangle.i0);
+    auto p1 = buffer<float3>(instance->position_buffer_id()).read(instance->position_buffer_offset() + triangle.i1);
+    auto p2 = buffer<float3>(instance->position_buffer_id()).read(instance->position_buffer_offset() + triangle.i2);
+    return hit->interpolate(p0, p1, p2);
+}
+
+std::tuple<Var<float3>, Var<float3>, Var<float2>> Pipeline::vertex_attribute(
+    const Var<MeshInstance> &instance, const Var<Triangle> &triangle, const Var<Hit> &hit) const noexcept {
+    auto a0 = buffer<VertexAttribute>(instance->attribute_buffer_id()).read(instance->attribute_buffer_offset() + triangle.i0);
+    auto a1 = buffer<VertexAttribute>(instance->attribute_buffer_id()).read(instance->attribute_buffer_offset() + triangle.i1);
+    auto a2 = buffer<VertexAttribute>(instance->attribute_buffer_id()).read(instance->attribute_buffer_offset() + triangle.i2);
+    auto normal = normalize(hit->interpolate(a0->normal(), a1->normal(), a2->normal()));
+    auto tangent = normalize(hit->interpolate(a0->tangent(), a1->tangent(), a2->tangent()));
+    auto uv = hit->interpolate(a0->uv(), a1->uv(), a2->uv());
+    return std::make_tuple(std::move(normal), std::move(tangent), std::move(uv));
+}
+
 Pipeline::~Pipeline() noexcept = default;
 
 }// namespace luisa::render
