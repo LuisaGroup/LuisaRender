@@ -77,7 +77,7 @@ Camera::Sample PinholeCameraInstance::generate_ray(
     Sampler::Instance & /* sampler */, Expr<float2> pixel, Expr<float> /* time */) const noexcept {
     auto resolution = make_float2(camera()->film()->resolution());
     auto p = (pixel * 2.0f - resolution) * (std::tan(_fov * 0.5f) / resolution.y);
-    auto direction = p.x * _right - p.y * _up + _front;
+    auto direction = normalize(p.x * _right - p.y * _up + _front);
     return Camera::Sample{make_ray(_position, direction), make_float3(1.0f)};
 }
 

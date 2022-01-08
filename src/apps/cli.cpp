@@ -189,4 +189,6 @@ int main(int argc, char *argv[]) {
 
     auto stream = device.create_stream();
     auto pipeline = Pipeline::create(device, stream, *scene);
+    pipeline->render(stream);
+    stream.synchronize();
 }

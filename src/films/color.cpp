@@ -2,6 +2,8 @@
 // Created by Mike on 2022/1/7.
 //
 
+#include <opencv2/opencv.hpp>
+
 #include <luisa-compute.h>
 #include <scene/film.h>
 #include <scene/pipeline.h>
@@ -45,7 +47,24 @@ ColorFilmInstance::ColorFilmInstance(Device &device, const ColorFilm *film) noex
 }
 
 void ColorFilmInstance::save(Stream &stream) const noexcept {
-
+    auto resolution = film()->resolution();
+    cv::Mat image{
+        static_cast<int>(resolution.y),
+        static_cast<int>(resolution.x),
+        CV_32FC4, cv::Scalar::all(0)};
+    // TODO: support post-processing pipeline...
+    stream << _image.copy_to(image.data) << synchronize();
+    cv::cvtColor(image, image, cv::COLOR_RGBA2BGR);
+    auto file_path = film()->file();
+    auto file_ext = file_path.extension().string();
+    for (auto &c : file_ext) { c = static_cast<char>(tolower(c)); }
+    if (file_ext == ".exr") {// HDR
+        cv::imwrite(file_path.string(), image);
+    } else {// LDR
+        LUISA_ERROR_WITH_LOCATION(
+            "Film extension '{}' is not supported.",
+            file_ext);
+    }
 }
 
 void ColorFilmInstance::accumulate(Expr<uint2> pixel, Expr<float3> color) const noexcept {

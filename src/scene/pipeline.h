@@ -170,16 +170,22 @@ public:
     [[nodiscard]] auto &bindless_array() const noexcept { return _bindless_array; }
     [[nodiscard]] auto &transform_tree() const noexcept { return _transform_tree; }
     [[nodiscard]] auto instance_buffer() const noexcept { return _instance_buffer.view(); }
-    [[nodiscard]] auto cameras() const noexcept { return luisa::span{_cameras}; }
-    [[nodiscard]] auto filters() const noexcept { return luisa::span{_filters}; }
-    [[nodiscard]] auto films() noexcept { return luisa::span{_films}; }
-    [[nodiscard]] auto films() const noexcept { return luisa::span{_films}; }
+    [[nodiscard]] auto camera_count() const noexcept { return _cameras.size(); }
+    [[nodiscard]] std::tuple<Camera::Instance *, Film::Instance *, Filter::Instance *> camera(size_t i) noexcept;
+    [[nodiscard]] std::tuple<const Camera::Instance *, const Film::Instance *, const Filter::Instance *> camera(size_t i) const noexcept;
     [[nodiscard]] auto material_interfaces() const noexcept { return luisa::span{_material_interfaces}; }
     [[nodiscard]] auto light_interfaces() const noexcept { return luisa::span{_light_interfaces}; }
     [[nodiscard]] auto sampler() noexcept { return _sampler.get(); }
     [[nodiscard]] auto sampler() const noexcept { return _sampler.get(); }
     void update_geometry(CommandBuffer &command_buffer, float time) noexcept;
     void render(Stream &stream) noexcept;
+
+    template<typename T, typename I>
+    [[nodiscard]] auto buffer(I &&i) const noexcept { return _bindless_array.buffer<T>(std::forward<I>(i)); }
+    template<typename I>
+    [[nodiscard]] auto tex2d(I &&i) const noexcept { return _bindless_array.tex2d(std::forward<I>(i)); }
+    template<typename I>
+    [[nodiscard]] auto tex3d(I &&i) const noexcept { return _bindless_array.tex3d(std::forward<I>(i)); }
 };
 
 }// namespace luisa::render

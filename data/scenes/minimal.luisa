@@ -1,10 +1,13 @@
 Camera camera : Pinhole {
-  position { 0.0, 0.0, 0.0 }
-  film : Color {}
+  position { -0.01, 0.995, 5.0 }
+  fov { 27.8 }
+  film : Color {
+    spp { 1024 }
+  }
 }
 
 Shape shape : TriangleMesh {
-  file { "../meshes/bunny.obj" }
+  file { "../meshes/cbox.obj" }
 }
 
 Integrator integrator : Normal {

@@ -42,7 +42,8 @@ void Pipeline::_build_geometry(CommandBuffer &command_buffer, luisa::span<const 
     }
     _transform_tree = transform_builder.build();
     _instance_buffer = _device.create_buffer<MeshInstance>(_instances.size());
-    command_buffer << _instance_buffer.copy_from(_instances.data())
+    command_buffer << _bindless_array.update()
+                   << _instance_buffer.copy_from(_instances.data())
                    << _accel.build();
 }
 
@@ -76,13 +77,16 @@ void Pipeline::_process_shape(
             // create mesh
             auto [position_buffer_view, position_buffer_id_and_offset] = _position_buffer_arena.allocate(positions.size());
             auto [triangle_buffer_view, triangle_buffer_id_and_offset] = _triangle_buffer_arena.allocate(triangles.size());
+            auto [attribute_buffer_view, attribute_buffer_id_and_offset] = _attribute_buffer_arena.allocate(attributes.size());
             mesh.resource = create<Mesh>(position_buffer_view, triangle_buffer_view, shape->build_hint());
-            command_buffer << mesh.resource->build();
+            command_buffer << position_buffer_view.copy_from(positions.data())
+                           << triangle_buffer_view.copy_from(triangles.data())
+                           << attribute_buffer_view.copy_from(attributes.data())
+                           << mesh.resource->build();
             // assign mesh data
             mesh.position_buffer_id_and_offset = position_buffer_id_and_offset;
             mesh.triangle_buffer_id_and_offset = triangle_buffer_id_and_offset;
             mesh.triangle_count = triangles.size();
-            auto [_, attribute_buffer_id_and_offset] = _attribute_buffer_arena.allocate(attributes.size());
             mesh.attribute_buffer_id_and_offset = attribute_buffer_id_and_offset;
             // compute area cdf
             auto sum_area = 0.0;
@@ -193,12 +197,22 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
 
 void Pipeline::update_geometry(CommandBuffer &command_buffer, float time) noexcept {
     // TODO: support deformable meshes
-    _transform_tree.update(_accel, time);
-    command_buffer << _accel.update();
+    if (!_transform_tree.is_static()) {
+        _transform_tree.update(_accel, time);
+        command_buffer << _accel.update();
+    }
 }
 
 void Pipeline::render(Stream &stream) noexcept {
     _integrator->render(stream, *this);
+}
+
+std::tuple<Camera::Instance *, Film::Instance *, Filter::Instance *> Pipeline::camera(size_t i) noexcept {
+    return std::make_tuple(_cameras[i].get(), _films[i].get(), _filters[i].get());
+}
+
+std::tuple<const Camera::Instance *, const Film::Instance *, const Filter::Instance *> Pipeline::camera(size_t i) const noexcept {
+    return std::make_tuple(_cameras[i].get(), _films[i].get(), _filters[i].get());
 }
 
 Pipeline::~Pipeline() noexcept = default;
