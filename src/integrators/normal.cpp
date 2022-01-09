@@ -68,15 +68,17 @@ void NormalVisualizerInstance::_render_one_camera(
         auto pixel_id = dispatch_id().xy();
         sampler->start(pixel_id, frame_index);
         auto pixel = make_float2(pixel_id);
+        auto path_weight = def(make_float3(1.0f));
         if (filter == nullptr) {// not specified, using default box filter
             pixel += sampler->generate_2d();
         } else {
-            // TODO: support filter sampling
-            LUISA_ERROR_WITH_LOCATION(
-                "Filter sampling is not implemented.");
+            auto [offset, filter_weight] = filter->sample(*sampler);
+            pixel += offset;
+            path_weight *= filter_weight;
         }
-        auto [ray, weight] = camera->generate_ray(*sampler, pixel, time);
+        auto [ray, camera_weight] = camera->generate_ray(*sampler, pixel, time);
         sampler->save_state();
+        path_weight *= camera_weight;
 
         if (camera->node()->transform() != nullptr) {
             ray.origin = make_float3(camera_to_world * make_float4(def<float3>(ray.origin), 1.0f));
@@ -90,9 +92,8 @@ void NormalVisualizerInstance::_render_one_camera(
             auto [normal, tangent, uv] = pipeline.vertex_attributes(instance, triangle, hit);
             auto m = transpose(inverse(make_float3x3(instance_transform)));
             radiance = normalize(m * normal) * 0.5f + 0.5f;
-            radiance = make_float3(make_uint3(hit.inst));
         };
-        film->accumulate(pixel_id, weight * radiance);
+        film->accumulate(pixel_id, path_weight * radiance);
     };
     auto render = pipeline.device().compile(render_kernel);
     stream << synchronize();

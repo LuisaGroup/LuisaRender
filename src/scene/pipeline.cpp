@@ -87,7 +87,7 @@ void Pipeline::_process_shape(
             command_buffer << position_buffer_view.copy_from(positions.data())
                            << triangle_buffer->copy_from(offset_triangles.data())
                            << attribute_buffer_view.copy_from(attributes.data())
-                           << mesh.resource->build();// TODO: why?
+                           << mesh.resource->build();
             // assign mesh data
             mesh.position_buffer_id = position_buffer_id;
             mesh.triangle_buffer_id = triangle_buffer_id;
@@ -162,7 +162,7 @@ std::pair<uint, uint> Pipeline::_process_material(CommandBuffer &command_buffer,
         static constexpr auto max_tag = (1u << MeshInstance::material_buffer_id_shift) - 1u;
         auto t = static_cast<uint32_t>(_material_interfaces.size());
         if (t > max_tag) [[unlikely]] { LUISA_ERROR_WITH_LOCATION("Too many materials."); }
-        _material_interfaces.emplace_back(material->create_interface());
+        _material_interfaces.emplace_back(material->interface());
         _material_tags.emplace(std::move(impl_type), t);
         return t;
     }();

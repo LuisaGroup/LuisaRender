@@ -36,21 +36,23 @@ public:
 
     };
 
-    struct Context {
+    struct Instance {
 
     };
 
     class Interface {
 
     public:
-        [[nodiscard]] virtual luisa::unique_ptr<Context> decode(const BindlessArray &array, uint buffer_id) const noexcept = 0;
+        [[nodiscard]] virtual luisa::unique_ptr<Instance> decode(const BindlessArray &array, uint buffer_id) const noexcept = 0;
+        [[nodiscard]] virtual Sample sample(const Instance &light) const noexcept = 0;
+        [[nodiscard]] virtual Evaluation evaluate(const Instance &light) const noexcept = 0;
         virtual ~Interface() noexcept = default;
     };
 
 public:
     Light(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] virtual float power(const Shape *shape) const noexcept = 0;
-    [[nodiscard]] virtual luisa::unique_ptr<Interface> create_interface() const noexcept = 0;
+    [[nodiscard]] virtual luisa::unique_ptr<Interface> interface() const noexcept = 0;
     [[nodiscard]] virtual uint property_flags() const noexcept = 0;
     [[nodiscard]] virtual uint /* bindless buffer id */ encode(Pipeline &pipeline, CommandBuffer &command_buffer, const Shape *shape) const noexcept = 0;
 };

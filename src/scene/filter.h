@@ -15,7 +15,6 @@ public:
     struct Sample {
         Float2 offset;
         Float weight;
-        Float pdf;
     };
 
     class Instance : public SceneNode::Instance {
@@ -26,7 +25,7 @@ public:
     public:
         explicit Instance(const Filter *filter) noexcept : _filter{filter} {}
         [[nodiscard]] auto node() const noexcept { return _filter; }
-        [[nodiscard]] virtual Sample sample_pixel(Sampler::Instance &sampler) const noexcept = 0;
+        [[nodiscard]] virtual Sample sample(Sampler::Instance &sampler) const noexcept = 0;
     };
 
 private:
