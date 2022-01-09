@@ -6,6 +6,10 @@
 
 #include <scene/scene_node.h>
 
+#ifdef interface
+#undef interface
+#endif
+
 namespace luisa::render {
 
 class Material : public SceneNode {

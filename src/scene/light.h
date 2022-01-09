@@ -7,6 +7,10 @@
 #include <runtime/bindless_array.h>
 #include <scene/scene_node.h>
 
+#ifdef interface
+#undef interface
+#endif
+
 namespace luisa::render {
 
 using compute::BindlessArray;
