@@ -25,7 +25,7 @@ private:
 public:
     LambertMaterial(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Material{scene, desc}, _params{} {
-        auto color = desc->property_float3_or_default("color", make_float3(1.0f));
+        auto color = clamp(desc->property_float3_or_default("color", make_float3(1.0f)), 0.0f, 1.0f);
         auto two_sided = desc->property_bool_or_default("two_sided", false);
         _params.color[0] = color.x;
         _params.color[1] = color.y;
@@ -42,7 +42,7 @@ public:
         return flags;
     }
     [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
-        auto buffer = pipeline.create<Buffer<LambertParams>>(sizeof(LambertParams));
+        auto buffer = pipeline.create<Buffer<LambertParams>>(sizeof(LambertParams));// TODO: optimize small buffers
         command_buffer << buffer->copy_from(&_params)
                        << commit();// lifetime!
         return pipeline.register_bindless(*buffer);

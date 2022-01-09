@@ -24,8 +24,13 @@ Integrator integrator : Normal {
   sampler : Independent {}
 }
 
+Integrator pt : MegaPath {
+  depth { 5 }
+  sampler : Independent {}
+}
+
 render {
   cameras { @camera, @camera2 }
   shapes { @cbox, @cbox-light }
-  integrator { @integrator }
+  integrator { @pt }
 }

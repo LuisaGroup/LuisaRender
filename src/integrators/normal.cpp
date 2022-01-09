@@ -12,7 +12,7 @@ class NormalVisualizer;
 class NormalVisualizerInstance final : public Integrator::Instance {
 
 private:
-    void _render_one_camera(
+    static void _render_one_camera(
         Stream &stream, Pipeline &pipeline,
         const Camera::Instance *camera, const Filter::Instance *filter,
         Film::Instance *film) noexcept;
