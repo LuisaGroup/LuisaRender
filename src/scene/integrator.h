@@ -13,13 +13,14 @@ class Sampler;
 class Integrator : public SceneNode {
 
 public:
-    class Instance : public SceneNode::Instance {
+    class Instance {
 
     private:
         const Integrator *_integrator;
 
     public:
         explicit Instance(const Integrator *integrator) noexcept : _integrator{integrator} {}
+        virtual ~Instance() noexcept = default;
         [[nodiscard]] auto node() const noexcept { return _integrator; }
         virtual void render(Stream &stream, Pipeline &pipeline) noexcept = 0;
     };

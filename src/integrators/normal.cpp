@@ -84,16 +84,12 @@ void NormalVisualizerInstance::_render_one_camera(
             ray.origin = make_float3(camera_to_world * make_float4(def<float3>(ray.origin), 1.0f));
             ray.direction = normalize(camera_to_world_normal * def<float3>(ray.direction));
         }
-        auto hit = pipeline.trace_closest(ray);
-        auto radiance = def<float3>();
-        $if(!hit->miss()) {
-            auto [instance, instance_transform] = pipeline.instance(hit);
-            auto triangle = pipeline.triangle(instance, hit);
-            auto [normal, tangent, uv] = pipeline.vertex_attributes(instance, triangle, hit);
-            auto m = transpose(inverse(make_float3x3(instance_transform)));
-            radiance = normalize(m * normal) * 0.5f + 0.5f;
-        };
-        film->accumulate(pixel_id, path_weight * radiance);
+        auto interaction = pipeline.intersect(ray);
+        auto color = ite(
+            interaction.valid(),
+            interaction.shading().n() * 0.5f + 0.5f,
+            make_float3());
+        film->accumulate(pixel_id, path_weight * color);
     };
     auto render = pipeline.device().compile(render_kernel);
     stream << synchronize();

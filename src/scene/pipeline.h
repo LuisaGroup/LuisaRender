@@ -15,6 +15,7 @@
 #include <scene/material.h>
 #include <scene/transform.h>
 #include <scene/integrator.h>
+#include <scene/interaction.h>
 
 namespace luisa::render {
 
@@ -93,8 +94,8 @@ private:
     BufferArena<float3, 65536u> _position_buffer_arena;
     BufferArena<VertexAttribute, 65536u> _attribute_buffer_arena;
     BufferArena<float, 65536u> _area_cdf_buffer_arena;
-    luisa::vector<MeshInstance> _instances;
-    Buffer<MeshInstance> _instance_buffer;
+    luisa::vector<InstancedShape> _instances;
+    Buffer<InstancedShape> _instance_buffer;
     luisa::vector<luisa::unique_ptr<Camera::Instance>> _cameras;
     luisa::vector<luisa::unique_ptr<Filter::Instance>> _filters;
     luisa::vector<luisa::unique_ptr<Film::Instance>> _films;
@@ -187,11 +188,15 @@ public:
 
     [[nodiscard]] Var<Hit> trace_closest(const Var<Ray> &ray) const noexcept;
     [[nodiscard]] Var<bool> trace_any(const Var<Ray> &ray) const noexcept;
-    [[nodiscard]] std::pair<Var<MeshInstance>, Var<float4x4>> instance(const Var<Hit> &hit) const noexcept;
-    [[nodiscard]] Var<Triangle> triangle(const Var<MeshInstance> &instance, const Var<Hit> &hit) const noexcept;
-    [[nodiscard]] Var<float3> vertex_position(const Var<MeshInstance> &instance, const Var<Triangle> &triangle, const Var<Hit> &hit) const noexcept;
-    [[nodiscard]] std::tuple<Var<float3> /* normal */, Var<float3> /* tangent */, Var<float2> /* uv */> vertex_attributes(
-        const Var<MeshInstance> &instance, const Var<Triangle> &triangle, const Var<Hit> &hit) const noexcept;
+    [[nodiscard]] Interaction interaction(const Var<Ray> &ray, const Var<Hit> &hit) const noexcept;
+    [[nodiscard]] std::pair<Var<InstancedShape>, Var<float4x4>> instance(const Var<Hit> &hit) const noexcept;
+    [[nodiscard]] Var<Triangle> triangle(const Var<InstancedShape> &instance, const Var<Hit> &hit) const noexcept;
+    [[nodiscard]] std::pair<Var<float3>/* position */, Var<float3>/* ng */>
+        vertex(const Var<InstancedShape> &instance, const Var<float4x4> &shape_to_world, const Var<float3x3> &shape_to_world_normal, const Var<Triangle> &triangle, const Var<Hit> &hit) const noexcept;
+    [[nodiscard]] std::tuple<Var<float3> /* ns */, Var<float3> /* tangent */, Var<float2> /* uv */>
+        vertex_attributes(const Var<InstancedShape> &instance, const Var<float3x3> &shape_to_world_normal, const Var<Triangle> &triangle, const Var<Hit> &hit) const noexcept;
+    [[nodiscard]] auto intersect(const Var<Ray> &ray) const noexcept { return interaction(ray, trace_closest(ray)); }
+    [[nodiscard]] auto intersect_any(const Var<Ray> &ray) const noexcept { return trace_any(ray); }
 };
 
 }// namespace luisa::render

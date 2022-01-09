@@ -17,13 +17,14 @@ public:
         Float weight;
     };
 
-    class Instance : public SceneNode::Instance {
+    class Instance {
 
     private:
         const Filter *_filter;
 
     public:
         explicit Instance(const Filter *filter) noexcept : _filter{filter} {}
+        virtual ~Instance() noexcept = default;
         [[nodiscard]] auto node() const noexcept { return _filter; }
         [[nodiscard]] virtual Sample sample(Sampler::Instance &sampler) const noexcept = 0;
     };

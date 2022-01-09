@@ -38,19 +38,6 @@ class SceneNode {
 public:
     using Tag = SceneNodeTag;
 
-    class Instance {
-
-    protected:
-        Instance() noexcept = default;
-
-    public:
-        virtual ~Instance() noexcept = default;
-        Instance(Instance &&) noexcept = delete;
-        Instance(const Instance &) noexcept = delete;
-        Instance &operator=(Instance &&) noexcept = delete;
-        Instance &operator=(const Instance &) noexcept = delete;
-    };
-
 private:
     const Scene *_scene;
     Tag _tag;

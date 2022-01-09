@@ -16,13 +16,14 @@ using compute::Float2;
 class Sampler : public SceneNode {
 
 public:
-    class Instance : public SceneNode::Instance {
+    class Instance {
 
     private:
         const Sampler *_sampler;
 
     public:
         explicit Instance(const Sampler *sampler) noexcept : _sampler{sampler} {}
+        virtual ~Instance() noexcept = default;
         [[nodiscard]] auto node() const noexcept { return _sampler; }
 
         // interfaces

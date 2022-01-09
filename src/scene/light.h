@@ -17,13 +17,6 @@ using compute::BindlessArray;
 
 class Shape;
 
-struct LightInstance {
-    uint instance_id;
-    uint light_buffer_id_and_tag;
-    uint position_buffer_id_and_offset;
-    uint attribute_buffer_id_and_offset;
-};
-
 class Light : public SceneNode {
 
 public:
@@ -47,7 +40,7 @@ public:
     class Interface {
 
     public:
-        [[nodiscard]] virtual luisa::unique_ptr<Instance> decode(const BindlessArray &array, uint buffer_id) const noexcept = 0;
+        [[nodiscard]] virtual luisa::unique_ptr<Instance> decode(const BindlessArray &array, Expr<uint> buffer_id) const noexcept = 0;
         [[nodiscard]] virtual Sample sample(const Instance &light) const noexcept = 0;
         [[nodiscard]] virtual Evaluation evaluate(const Instance &light) const noexcept = 0;
         virtual ~Interface() noexcept = default;

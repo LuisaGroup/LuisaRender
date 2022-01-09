@@ -33,7 +33,7 @@ struct alignas(16) VertexAttribute {
     };
 };
 
-struct alignas(16) MeshInstance {
+struct alignas(16) InstancedShape {
 
     static constexpr auto instance_buffer_id_shift = 12u;
     static constexpr auto instance_buffer_offset_mask = (1u << instance_buffer_id_shift) - 1u;
@@ -58,7 +58,7 @@ struct alignas(16) MeshInstance {
     uint area_cdf_buffer_id_and_offset;
 };
 
-static_assert(sizeof(MeshInstance) == 32);
+static_assert(sizeof(InstancedShape) == 32);
 
 using compute::AccelBuildHint;
 using compute::Triangle;
@@ -116,7 +116,7 @@ LUISA_STRUCT(
 };
 
 LUISA_STRUCT(
-    luisa::render::MeshInstance,
+    luisa::render::InstancedShape,
 
     position_buffer_id,
     attribute_buffer_id,
@@ -126,12 +126,12 @@ LUISA_STRUCT(
     material_buffer_id_and_tag,
     light_buffer_id_and_tag,
     area_cdf_buffer_id_and_offset) {
-    [[nodiscard]] auto area_cdf_buffer_id() const noexcept { return area_cdf_buffer_id_and_offset >> luisa::render::MeshInstance::area_cdf_buffer_id_shift; }
-    [[nodiscard]] auto area_cdf_buffer_offset() const noexcept { return (area_cdf_buffer_id_and_offset & luisa::render::MeshInstance::area_cdf_buffer_offset_mask) * luisa::render::MeshInstance::area_cdf_buffer_element_alignment; }
-    [[nodiscard]] auto material_tag() const noexcept { return material_buffer_id_and_tag & luisa::render::MeshInstance::material_tag_mask; }
-    [[nodiscard]] auto material_buffer_id() const noexcept { return material_buffer_id_and_tag >> luisa::render::MeshInstance::material_buffer_id_shift; }
-    [[nodiscard]] auto light_tag() const noexcept { return light_buffer_id_and_tag & luisa::render::MeshInstance::light_tag_mask; }
-    [[nodiscard]] auto light_buffer_id() const noexcept { return light_buffer_id_and_tag >> luisa::render::MeshInstance::light_buffer_id_shift; }
+    [[nodiscard]] auto area_cdf_buffer_id() const noexcept { return area_cdf_buffer_id_and_offset >> luisa::render::InstancedShape::area_cdf_buffer_id_shift; }
+    [[nodiscard]] auto area_cdf_buffer_offset() const noexcept { return (area_cdf_buffer_id_and_offset & luisa::render::InstancedShape::area_cdf_buffer_offset_mask) * luisa::render::InstancedShape::area_cdf_buffer_element_alignment; }
+    [[nodiscard]] auto material_tag() const noexcept { return material_buffer_id_and_tag & luisa::render::InstancedShape::material_tag_mask; }
+    [[nodiscard]] auto material_buffer_id() const noexcept { return material_buffer_id_and_tag >> luisa::render::InstancedShape::material_buffer_id_shift; }
+    [[nodiscard]] auto light_tag() const noexcept { return light_buffer_id_and_tag & luisa::render::InstancedShape::light_tag_mask; }
+    [[nodiscard]] auto light_buffer_id() const noexcept { return light_buffer_id_and_tag >> luisa::render::InstancedShape::light_buffer_id_shift; }
     [[nodiscard]] auto material_flags() const noexcept { return material_and_light_property_flags & 0xffffu; }
     [[nodiscard]] auto light_flags() const noexcept { return material_and_light_property_flags >> 16u; }
     [[nodiscard]] auto black_material() const noexcept { return (material_flags() & luisa::render::Material::property_flag_black) != 0u; }

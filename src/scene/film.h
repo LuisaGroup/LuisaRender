@@ -12,13 +12,14 @@ namespace luisa::render {
 class Film : public SceneNode {
 
 public:
-    class Instance : public SceneNode::Instance {
+    class Instance {
 
     private:
         const Film *_film;
 
     public:
         explicit Instance(const Film *film) noexcept : _film{film} {}
+        virtual ~Instance() noexcept = default;
         [[nodiscard]] auto node() const noexcept { return _film; }
         virtual void accumulate(Expr<uint2> pixel, Expr<float3> color) const noexcept = 0;
         virtual void clear(CommandBuffer &command_buffer) noexcept = 0;

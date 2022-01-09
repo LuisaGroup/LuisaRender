@@ -12,6 +12,8 @@
 
 namespace luisa::render {
 
+using compute::BindlessArray;
+
 class Material : public SceneNode {
 
 public:
@@ -32,10 +34,15 @@ public:
         Evaluation eval;
     };
 
-    class Interface {
+    class Instance {
+        virtual ~Instance() noexcept = default;
+    };
 
-    public:
+    struct Interface {
         virtual ~Interface() noexcept = default;
+        [[nodiscard]] virtual luisa::unique_ptr<Instance> decode(const BindlessArray &array, Expr<uint> buffer_id) const noexcept = 0;
+        [[nodiscard]] virtual Evaluation evaluate(const Instance &material) const noexcept = 0;
+        [[nodiscard]] virtual Sample sample(const Instance &material) const noexcept = 0;
     };
 
 public:

@@ -29,13 +29,14 @@ public:
         Float3 weight;
     };
 
-    class Instance : public SceneNode::Instance {
+    class Instance {
 
     private:
         const Camera *_camera;
 
     public:
         explicit Instance(const Camera *camera) noexcept : _camera{camera} {}
+        virtual ~Instance() noexcept = default;
         [[nodiscard]] auto node() const noexcept { return _camera; }
 
         // generate ray in camera space, should not consider _filter and/or _transform
