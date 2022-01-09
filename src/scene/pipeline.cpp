@@ -31,6 +31,8 @@ inline Pipeline::Pipeline(Device &device) noexcept
       _attribute_buffer_arena{*this},
       _area_cdf_buffer_arena{*this} {}
 
+Pipeline::~Pipeline() noexcept = default;
+
 void Pipeline::_build_geometry(CommandBuffer &command_buffer, luisa::span<const Shape *const> shapes, float init_time, AccelBuildHint hint) noexcept {
     _accel = _device.create_accel(hint);
     auto transform_builder = TransformTree::builder(init_time);
@@ -115,7 +117,7 @@ void Pipeline::_process_shape(
                                                  static_cast<uint>(area_cdf_buffer_view.offset() /
                                                                    InstancedShape::area_cdf_buffer_element_alignment);
             command_buffer << area_cdf_buffer_view.copy_from(areas.data())
-                           << luisa::compute::commit();
+                           << luisa::compute::commit();// must commit here, be careful about lifetime!
             iter = _meshes.emplace(shape, mesh).first;
         }
         auto mesh = iter->second;
@@ -163,7 +165,7 @@ std::pair<uint, uint> Pipeline::_process_material(CommandBuffer &command_buffer,
         static constexpr auto max_tag = (1u << InstancedShape::material_buffer_id_shift) - 1u;
         auto t = static_cast<uint32_t>(_material_interfaces.size());
         if (t > max_tag) [[unlikely]] { LUISA_ERROR_WITH_LOCATION("Too many materials."); }
-        _material_interfaces.emplace_back(material->interface());
+        _material_interfaces.emplace_back(material);
         _material_tags.emplace(std::move(impl_type), t);
         return t;
     }();
@@ -257,7 +259,7 @@ std::tuple<Var<float3>, Var<float3>, Var<float2>> Pipeline::vertex_attributes(
 Var<Hit> Pipeline::trace_closest(const Var<Ray> &ray) const noexcept { return _accel.trace_closest(ray); }
 Var<bool> Pipeline::trace_any(const Var<Ray> &ray) const noexcept { return _accel.trace_any(ray); }
 
-Interaction Pipeline::interaction(const Var<Ray> &ray, const Var<Hit> &hit) const noexcept {
+luisa::unique_ptr<Interaction> Pipeline::interaction(const Var<Ray> &ray, const Var<Hit> &hit) const noexcept {
     using namespace luisa::compute;
     Interaction it;
     $if (!hit->miss()) {
@@ -265,12 +267,30 @@ Interaction Pipeline::interaction(const Var<Ray> &ray, const Var<Hit> &hit) cons
         auto shape_to_world_normal = transpose(inverse(make_float3x3(shape_to_world)));
         auto tri = triangle(shape, hit);
         auto [p, ng] = vertex(shape, shape_to_world, shape_to_world_normal, tri, hit);
-        auto [ns, tangent, uv] = vertex_attributes(shape, shape_to_world_normal, tri, hit);
-        it = Interaction{shape, shape_to_world, p, -def<float3>(ray.direction), ng, uv, ns, tangent};
+        auto [ns, t, uv] = vertex_attributes(shape, shape_to_world_normal, tri, hit);
+        auto wo = -def<float3>(ray.direction);
+        it = Interaction{std::move(shape), p, wo, ng, uv, ns, t};
     };
-    return it;
+    return luisa::make_unique<Interaction>(std::move(it));
 }
 
-Pipeline::~Pipeline() noexcept = default;
+luisa::unique_ptr<Material::Closure> Pipeline::decode_material(uint tag, const Interaction &it) const noexcept {
+    if (tag > _material_interfaces.size()) [[unlikely]] {
+        LUISA_ERROR_WITH_LOCATION(
+            "Invalid material tag: {}.", tag);
+    }
+    return _material_interfaces[tag]->decode(*this, it);
+}
+
+void Pipeline::decode_material(const Interaction &it, const luisa::function<void(const Material::Closure &)> &func) const noexcept {
+    $switch(it.shape()->material_tag()) {
+        for (auto tag = 0u; tag < _material_tags.size(); tag++) {
+            $case(tag) {
+                auto closure = decode_material(tag, it);
+                func(*closure);
+            };
+        }
+    };
+}
 
 }// namespace luisa::render

@@ -30,10 +30,10 @@ using compute::BufferView;
 using compute::Callable;
 using compute::Device;
 using compute::Hit;
-using compute::Ray;
 using compute::Image;
 using compute::Mesh;
 using compute::PixelStorage;
+using compute::Ray;
 using compute::Resource;
 using compute::Triangle;
 using compute::Volume;
@@ -85,8 +85,8 @@ private:
     size_t _bindless_tex3d_count{0u};
     luisa::vector<ResourceHandle> _resources;
     luisa::unordered_map<const Shape *, MeshData> _meshes;
-    luisa::vector<luisa::unique_ptr<Material::Interface>> _material_interfaces;
-    luisa::vector<luisa::unique_ptr<Light::Interface>> _light_interfaces;
+    luisa::vector<const Material *> _material_interfaces;
+    luisa::vector<const Light *> _light_interfaces;
     luisa::unordered_map<luisa::string /* impl type */, uint /* tag */, Hash64> _material_tags;
     luisa::unordered_map<luisa::string /* impl type */, uint /* tag */, Hash64> _light_tags;
     luisa::unordered_map<const Material *, std::pair<uint /* buffer id and tag */, uint /* properties */>> _materials;
@@ -188,15 +188,17 @@ public:
 
     [[nodiscard]] Var<Hit> trace_closest(const Var<Ray> &ray) const noexcept;
     [[nodiscard]] Var<bool> trace_any(const Var<Ray> &ray) const noexcept;
-    [[nodiscard]] Interaction interaction(const Var<Ray> &ray, const Var<Hit> &hit) const noexcept;
+    [[nodiscard]] luisa::unique_ptr<Interaction> interaction(const Var<Ray> &ray, const Var<Hit> &hit) const noexcept;
     [[nodiscard]] std::pair<Var<InstancedShape>, Var<float4x4>> instance(const Var<Hit> &hit) const noexcept;
     [[nodiscard]] Var<Triangle> triangle(const Var<InstancedShape> &instance, const Var<Hit> &hit) const noexcept;
-    [[nodiscard]] std::pair<Var<float3>/* position */, Var<float3>/* ng */>
-        vertex(const Var<InstancedShape> &instance, const Var<float4x4> &shape_to_world, const Var<float3x3> &shape_to_world_normal, const Var<Triangle> &triangle, const Var<Hit> &hit) const noexcept;
+    [[nodiscard]] std::pair<Var<float3> /* position */, Var<float3> /* ng */>
+    vertex(const Var<InstancedShape> &instance, const Var<float4x4> &shape_to_world, const Var<float3x3> &shape_to_world_normal, const Var<Triangle> &triangle, const Var<Hit> &hit) const noexcept;
     [[nodiscard]] std::tuple<Var<float3> /* ns */, Var<float3> /* tangent */, Var<float2> /* uv */>
-        vertex_attributes(const Var<InstancedShape> &instance, const Var<float3x3> &shape_to_world_normal, const Var<Triangle> &triangle, const Var<Hit> &hit) const noexcept;
+    vertex_attributes(const Var<InstancedShape> &instance, const Var<float3x3> &shape_to_world_normal, const Var<Triangle> &triangle, const Var<Hit> &hit) const noexcept;
     [[nodiscard]] auto intersect(const Var<Ray> &ray) const noexcept { return interaction(ray, trace_closest(ray)); }
     [[nodiscard]] auto intersect_any(const Var<Ray> &ray) const noexcept { return trace_any(ray); }
+    [[nodiscard]] luisa::unique_ptr<Material::Closure> decode_material(uint tag, const Interaction &it) const noexcept;
+    void decode_material(const Interaction &it, const luisa::function<void(const Material::Closure &)> &func) const noexcept;
 };
 
 }// namespace luisa::render

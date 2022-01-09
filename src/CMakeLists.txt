@@ -26,12 +26,13 @@ endif ()
 add_subdirectory(compute)
 add_subdirectory(sdl)
 add_subdirectory(scene)
+add_subdirectory(util)
 
 function(luisa_render_add_plugin name)
     cmake_parse_arguments(PLUGIN "" "CATEGORY" "SOURCES" ${ARGN})
     set(lib_name luisa-render-${PLUGIN_CATEGORY}-${name})
     add_library(${lib_name} MODULE ${PLUGIN_SOURCES})
-    target_link_libraries(${lib_name} PRIVATE luisa-render-scene)
+    target_link_libraries(${lib_name} PRIVATE luisa-render-scene luisa-render-util)
     add_dependencies(luisa-render-${PLUGIN_CATEGORY}s ${lib_name})
     set_target_properties(${lib_name} PROPERTIES
             LIBRARY_OUTPUT_DIRECTORY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/"
@@ -62,6 +63,7 @@ target_link_libraries(luisa-render INTERFACE
         luisa-render-include
         luisa-render-sdl
         luisa-render-scene
+        luisa-render-util
         luisa-render-cameras
         luisa-render-films
         luisa-render-filters

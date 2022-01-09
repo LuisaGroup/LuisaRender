@@ -14,7 +14,7 @@ using namespace luisa::compute;
 
 class ColorFilm;
 
-class ColorFilmInstance : public Film::Instance {
+class ColorFilmInstance final : public Film::Instance {
 
 private:
     Image<float> _image;

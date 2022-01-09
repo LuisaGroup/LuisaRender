@@ -9,7 +9,7 @@ namespace luisa::render {
 
 class NormalVisualizer;
 
-class NormalVisualizerInstance : public Integrator::Instance {
+class NormalVisualizerInstance final : public Integrator::Instance {
 
 private:
     void _render_one_camera(
@@ -86,8 +86,8 @@ void NormalVisualizerInstance::_render_one_camera(
         }
         auto interaction = pipeline.intersect(ray);
         auto color = ite(
-            interaction.valid(),
-            interaction.shading().n() * 0.5f + 0.5f,
+            interaction->valid(),
+            interaction->shading().n() * 0.5f + 0.5f,
             make_float3());
         film->accumulate(pixel_id, path_weight * color);
     };

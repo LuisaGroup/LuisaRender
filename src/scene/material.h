@@ -5,14 +5,14 @@
 #pragma once
 
 #include <scene/scene_node.h>
-
-#ifdef interface
-#undef interface
-#endif
+#include <scene/sampler.h>
 
 namespace luisa::render {
 
 using compute::BindlessArray;
+
+class Sampler;
+class Interaction;
 
 class Material : public SceneNode {
 
@@ -34,22 +34,17 @@ public:
         Evaluation eval;
     };
 
-    class Instance {
-        virtual ~Instance() noexcept = default;
-    };
-
-    struct Interface {
-        virtual ~Interface() noexcept = default;
-        [[nodiscard]] virtual luisa::unique_ptr<Instance> decode(const BindlessArray &array, Expr<uint> buffer_id) const noexcept = 0;
-        [[nodiscard]] virtual Evaluation evaluate(const Instance &material) const noexcept = 0;
-        [[nodiscard]] virtual Sample sample(const Instance &material) const noexcept = 0;
+    struct Closure {
+        virtual ~Closure() noexcept = default;
+        [[nodiscard]] virtual Evaluation evaluate(Expr<float3> wi) const noexcept = 0;
+        [[nodiscard]] virtual Sample sample(Sampler::Instance &sampler) const noexcept = 0;
     };
 
 public:
     Material(Scene *scene, const SceneNodeDesc *desc) noexcept;
-    [[nodiscard]] virtual luisa::unique_ptr<Interface> interface() const noexcept = 0;
     [[nodiscard]] virtual uint property_flags() const noexcept = 0;
     [[nodiscard]] virtual uint /* bindless buffer id */ encode(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
+    [[nodiscard]] virtual luisa::unique_ptr<Closure> decode(const Pipeline &pipeline, const Interaction &it) const noexcept = 0;
 };
 
 }// namespace luisa::render

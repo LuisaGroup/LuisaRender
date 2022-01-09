@@ -12,7 +12,7 @@ using namespace luisa::compute;
 
 class IndependentSampler;
 
-class IndependentSamplerInstance : public Sampler::Instance {
+class IndependentSamplerInstance final : public Sampler::Instance {
 
 private:
     Device &_device;

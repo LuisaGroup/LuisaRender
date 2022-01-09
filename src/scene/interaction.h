@@ -70,27 +70,24 @@ private:
     Bool _valid;
     Frame _shading;
     Var<InstancedShape> _shape;
-    Float4x4 _shape_to_world;
 
 public:
     Interaction() noexcept : _valid{false} {}
-    Interaction(Var<InstancedShape> shape, Expr<float4x4> shape_to_world, Expr<float3> p, Expr<float3> wo, Expr<float3> ng) noexcept
+    Interaction(Var<InstancedShape> shape, Expr<float3> p, Expr<float3> wo, Expr<float3> ng) noexcept
         : _p{p}, _wo{wo}, _ng{ng}, _valid{true},
           _shading{Frame::make(ng)},
-          _shape{std::move(shape)},
-          _shape_to_world{shape_to_world} {}
-    Interaction(Var<InstancedShape> shape, Expr<float4x4> shape_to_world, Expr<float3> p, Expr<float3> wo, Expr<float3> ng, Expr<float2> uv, Expr<float3> ns, Expr<float3> tangent) noexcept
+          _shape{std::move(shape)} {}
+    Interaction(Var<InstancedShape> shape, Expr<float3> p, Expr<float3> wo, Expr<float3> ng, Expr<float2> uv, Expr<float3> ns, Expr<float3> tangent) noexcept
         : _p{p}, _wo{wo}, _ng{ng}, _uv{uv},  _valid{true},
           _shading{Frame::make(ns, tangent)},
-          _shape{std::move(shape)},
-          _shape_to_world{shape_to_world} {}
+          _shape{std::move(shape)} {}
     [[nodiscard]] auto p() const noexcept { return _p; }
     [[nodiscard]] auto ng() const noexcept { return _ng; }
+    [[nodiscard]] auto wo() const noexcept { return _wo; }
     [[nodiscard]] auto uv() const noexcept { return _uv; }
     [[nodiscard]] auto valid() const noexcept { return _valid; }
     [[nodiscard]] const auto &shading() const noexcept { return _shading; }
     [[nodiscard]] const auto &shape() const noexcept { return _shape; }
-    [[nodiscard]] const auto &shape_to_world() const noexcept { return _shape_to_world; }
     [[nodiscard]] auto spawn_ray(Expr<float3> wi) const noexcept {
         return luisa::compute::make_ray_robust(_p, _ng, wi);
     }

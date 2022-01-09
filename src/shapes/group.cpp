@@ -8,7 +8,7 @@
 
 namespace luisa::render {
 
-class ShapeGroup : public Shape {
+class ShapeGroup final : public Shape {
 
 private:
     luisa::vector<const Shape *> _children;
