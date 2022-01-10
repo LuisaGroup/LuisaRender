@@ -6,15 +6,22 @@
 
 #include <scene/scene_node.h>
 #include <scene/sampler.h>
-#include <scene/light.h>
 
 namespace luisa::render {
 
 class Interaction;
 
+using compute::UInt;
+using compute::Float;
+
 class LightSampler : public SceneNode {
 
 public:
+    struct Selection {
+        UInt inst;
+        Float pdf;
+    };
+
     class Instance {
 
     private:
@@ -23,9 +30,10 @@ public:
     public:
         explicit Instance(const LightSampler *light_dist) noexcept : _sampler{light_dist} {}
         virtual ~Instance() noexcept = default;
+        virtual void update(Stream &stream) noexcept = 0;
         [[nodiscard]] auto node() const noexcept { return _sampler; }
-        [[nodiscard]] virtual Light::Evaluation evaluate(const Interaction &it) const noexcept = 0;
-        [[nodiscard]] virtual Light::Sample sample(Sampler::Instance &sampler, const Interaction &it) const noexcept = 0;
+        [[nodiscard]] virtual Float pdf(const Interaction &it) const noexcept = 0;
+        [[nodiscard]] virtual Selection sample(Sampler::Instance &sampler, const Interaction &it) const noexcept = 0;
     };
 
 public:

@@ -47,7 +47,7 @@ Shape cbox-short-box : TriangleMesh {
 
 Shape cbox-light : TriangleMesh {
   file { "cbox-parts/light.obj" }
-  material { @cbox-white }// TODO
+  light : Diffuse {}
 }
 
 Shape cbox : Group {

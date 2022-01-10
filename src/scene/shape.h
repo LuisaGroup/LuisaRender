@@ -5,10 +5,12 @@
 #pragma once
 
 #include <rtx/mesh.h>
-#include <scene/material.h>
-#include <scene/light.h>
+#include <scene/scene_node.h>
 
 namespace luisa::render {
+
+class Light;
+class Material;
 
 struct alignas(16) VertexAttribute {
 
@@ -171,9 +173,9 @@ LUISA_STRUCT(
     [[nodiscard]] auto material_flags() const noexcept { return (properties >> luisa::render::InstancedShape::material_property_shift) & luisa::render::InstancedShape::material_property_mask; }
     [[nodiscard]] auto light_flags() const noexcept { return (properties >> luisa::render::InstancedShape::light_property_shift) & luisa::render::InstancedShape::light_property_mask; }
     [[nodiscard]] auto shape_flags() const noexcept { return (properties >> luisa::render::InstancedShape::shape_property_shift) & luisa::render::InstancedShape::shape_property_mask; }
-    [[nodiscard]] auto has_material() const noexcept { return (material_flags() & luisa::render::Material::property_flag_black) == 0u; }
-    [[nodiscard]] auto has_light() const noexcept { return (material_flags() & luisa::render::Light::property_flag_black) == 0u; }
-    [[nodiscard]] auto two_sided() const noexcept { return (shape_flags() & luisa::render::Shape::property_flag_two_sided) != 0u; }
+    [[nodiscard]] auto test_material_flag(uint flag) const noexcept { return (material_flags() & flag) != 0u; }
+    [[nodiscard]] auto test_light_flag(uint flag) const noexcept { return (light_flags() & flag) != 0u; }
+    [[nodiscard]] auto test_shape_flag(uint flag) const noexcept { return (shape_flags() & flag) != 0u; }
 };
 
 // clang-format on

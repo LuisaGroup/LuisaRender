@@ -23,7 +23,7 @@ public:
         explicit Instance(const Integrator *integrator) noexcept : _integrator{integrator} {}
         virtual ~Instance() noexcept = default;
         [[nodiscard]] auto node() const noexcept { return _integrator; }
-        virtual void render(Stream &stream, Pipeline &pipeline) noexcept = 0;
+        virtual void render(Stream &stream) noexcept = 0;
     };
 
 private:

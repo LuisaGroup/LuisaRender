@@ -72,8 +72,8 @@ private:
     luisa::vector<const Light *> _light_interfaces;
     luisa::unordered_map<luisa::string /* impl type */, uint /* tag */, Hash64> _material_tags;
     luisa::unordered_map<luisa::string /* impl type */, uint /* tag */, Hash64> _light_tags;
-    luisa::unordered_map<const Material *, std::tuple<const Shape *, uint /* buffer id and tag */, uint /* properties */>> _materials;
-    luisa::unordered_map<const Light *, std::tuple<const Shape *, uint /* buffer id and tag */, uint /* properties */>> _lights;
+    luisa::unordered_map<const Material *, std::tuple<uint /* instance_id */, const Shape *, uint /* buffer id and tag */, uint /* properties */>> _materials;
+    luisa::unordered_map<const Light *, std::tuple<uint /* instance_id */, const Shape *, uint /* buffer id and tag */, uint /* properties */>> _lights;
     luisa::vector<InstancedShape> _instances;
     Buffer<InstancedShape> _instance_buffer;
     luisa::vector<luisa::unique_ptr<Camera::Instance>> _cameras;
@@ -89,8 +89,8 @@ private:
         CommandBuffer &command_buffer, TransformTree::Builder &transform_builder, const Shape *shape,
         luisa::optional<bool> overridden_two_sided = luisa::nullopt,
         const Material *overridden_material = nullptr, const Light *overridden_light = nullptr) noexcept;
-    [[nodiscard]] std::pair<uint /* buffer id and tag */, uint /* property flags */> _process_material(CommandBuffer &command_buffer, const Shape *shape, const Material *material) noexcept;
-    [[nodiscard]] std::pair<uint /* buffer id and tag */, uint /* property flags */> _process_light(CommandBuffer &command_buffer, const Shape *shape, const Light *light) noexcept;
+    [[nodiscard]] std::pair<uint /* buffer id and tag */, uint /* property flags */> _process_material(CommandBuffer &command_buffer, uint instance_id, const Shape *shape, const Material *material) noexcept;
+    [[nodiscard]] std::pair<uint /* buffer id and tag */, uint /* property flags */> _process_light(CommandBuffer &command_buffer, uint instance_id, const Shape *shape, const Light *light) noexcept;
 
 public:
     // for internal use only; use Pipeline::create() instead
@@ -139,7 +139,8 @@ public:
 
     template<typename T>
     [[nodiscard]] std::pair<BufferView<T>, uint /* bindless id */> arena_buffer(size_t n) noexcept {
-        auto view = _general_buffer_arena->allocate<T>(n);
+        auto view = _general_buffer_arena->allocate<T>(
+            std::max(n, static_cast<size_t>(1u)));
         auto buffer_id = register_bindless(view);
         return std::make_pair(view, buffer_id);
     }
@@ -181,8 +182,8 @@ public:
     [[nodiscard]] Var<Hit> trace_closest(const Var<Ray> &ray) const noexcept;
     [[nodiscard]] Var<bool> trace_any(const Var<Ray> &ray) const noexcept;
     [[nodiscard]] luisa::unique_ptr<Interaction> interaction(const Var<Ray> &ray, const Var<Hit> &hit) const noexcept;
-    [[nodiscard]] std::pair<Var<InstancedShape>, Var<float4x4>> instance(const Var<Hit> &hit) const noexcept;
-    [[nodiscard]] Var<Triangle> triangle(const Var<InstancedShape> &instance, const Var<Hit> &hit) const noexcept;
+    [[nodiscard]] std::pair<Var<InstancedShape>, Var<float4x4>> instance(Expr<uint> index) const noexcept;
+    [[nodiscard]] Var<Triangle> triangle(const Var<InstancedShape> &instance, Expr<uint> index) const noexcept;
     [[nodiscard]] std::pair<Var<float3> /* position */, Var<float3> /* ng */>
     vertex(const Var<InstancedShape> &instance, const Var<float4x4> &shape_to_world, const Var<float3x3> &shape_to_world_normal, const Var<Triangle> &triangle, const Var<Hit> &hit) const noexcept;
     [[nodiscard]] std::tuple<Var<float3> /* ns */, Var<float3> /* tangent */, Var<float2> /* uv */>
@@ -191,6 +192,8 @@ public:
     [[nodiscard]] auto intersect_any(const Var<Ray> &ray) const noexcept { return trace_any(ray); }
     [[nodiscard]] luisa::unique_ptr<Material::Closure> decode_material(uint tag, const Interaction &it) const noexcept;
     void decode_material(const Interaction &it, const luisa::function<void(const Material::Closure &)> &func) const noexcept;
+    [[nodiscard]] const Light *decode_light(uint tag) const noexcept;
+    void decode_light(Expr<uint> tag, const luisa::function<void(const Light *)> &func) const noexcept;
 };
 
 }// namespace luisa::render

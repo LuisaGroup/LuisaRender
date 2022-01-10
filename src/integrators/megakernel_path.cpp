@@ -16,7 +16,7 @@ private:
 public:
     MegakernelPathTracing(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Integrator{scene, desc},
-          _max_depth{std::max(desc->property_uint_or_default("depth", 5u), 1u)} {}
+          _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)} {}
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] string_view impl_type() const noexcept override { return "megapath"; }
     [[nodiscard]] unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
@@ -25,6 +25,7 @@ public:
 class MegakernelPathTracingInstance final : public Integrator::Instance {
 
 private:
+    Pipeline &_pipeline;
     uint _max_depth;
 
 private:
@@ -35,19 +36,19 @@ private:
         Film::Instance *film, uint max_depth) noexcept;
 
 public:
-    explicit MegakernelPathTracingInstance(const MegakernelPathTracing *node) noexcept
-        : Integrator::Instance{node}, _max_depth{node->max_depth()} {}
-    void render(Stream &stream, Pipeline &pipeline) noexcept override {
-        for (auto i = 0u; i < pipeline.camera_count(); i++) {
-            auto [camera, film, filter] = pipeline.camera(i);
-            _render_one_camera(stream, pipeline, camera, filter, film, _max_depth);
+    explicit MegakernelPathTracingInstance(const MegakernelPathTracing *node, Pipeline &pipeline) noexcept
+        : Integrator::Instance{node}, _pipeline{pipeline}, _max_depth{node->max_depth()} {}
+    void render(Stream &stream) noexcept override {
+        for (auto i = 0u; i < _pipeline.camera_count(); i++) {
+            auto [camera, film, filter] = _pipeline.camera(i);
+            _render_one_camera(stream, _pipeline, camera, filter, film, _max_depth);
             film->save(stream, camera->node()->file());
         }
     }
 };
 
-unique_ptr<Integrator::Instance> MegakernelPathTracing::build(Pipeline &, CommandBuffer &) const noexcept {
-    return luisa::make_unique<MegakernelPathTracingInstance>(this);
+unique_ptr<Integrator::Instance> MegakernelPathTracing::build(Pipeline &pipeline, CommandBuffer &) const noexcept {
+    return luisa::make_unique<MegakernelPathTracingInstance>(this, pipeline);
 }
 
 void MegakernelPathTracingInstance::_render_one_camera(
@@ -61,6 +62,13 @@ void MegakernelPathTracingInstance::_render_one_camera(
         image_file.string(),
         resolution.x, resolution.y, spp);
 
+    auto light_sampler = pipeline.light_sampler();
+    if (light_sampler == nullptr) [[unlikely]] {
+        LUISA_ERROR_WITH_LOCATION(
+            "Path tracing cannot render "
+            "scenes without lights.");
+    }
+
     auto sampler = pipeline.sampler();
     auto command_buffer = stream.command_buffer();
     film->clear(command_buffer);
@@ -68,8 +76,11 @@ void MegakernelPathTracingInstance::_render_one_camera(
     command_buffer.commit();
 
     using namespace luisa::compute;
-    Kernel2D render_kernel = [&](UInt frame_index, Float4x4 camera_to_world, Float3x3 camera_to_world_normal, Float time) noexcept {
+    Callable balanced_heuristic = [](Float pdf_a, Float pdf_b) noexcept {
+        return pdf_a / max(pdf_a + pdf_b, 1e-4f);
+    };
 
+    Kernel2D render_kernel = [&](UInt frame_index, Float4x4 camera_to_world, Float3x3 camera_to_world_normal, Float time) noexcept {
         set_block_size(8u, 8u, 1u);
 
         auto pixel_id = dispatch_id().xy();
@@ -87,34 +98,61 @@ void MegakernelPathTracingInstance::_render_one_camera(
 
         auto ray = camera_ray;
         auto radiance = def(make_float3(0.0f));
-        auto interaction = pipeline.intersect(ray);
-        $if(interaction->valid()) {
-            auto has_light = (interaction->shape()->light_flags() & Light::property_flag_black) == 0u;
-            auto has_material = (interaction->shape()->material_flags() & Material::property_flag_black) == 0u;
-            $if(has_material) {
-
-                // sample light
-                constexpr auto light_position = make_float3(-0.24f, 1.98f, 0.16f);
-                constexpr auto light_u = make_float3(-0.24f, 1.98f, -0.22f) - light_position;
-                constexpr auto light_v = make_float3(0.23f, 1.98f, 0.16f) - light_position;
-                constexpr auto light_emission = make_float3(17.0f, 12.0f, 4.0f);
-                auto light_area = length(cross(light_u, light_v));
-                auto light_normal = normalize(cross(light_u, light_v));
-                auto u_light = sampler->generate_2d();
-                auto p_light = light_position + u_light.x * light_u + u_light.y * light_v;
-                auto shadow_ray = interaction->spawn_ray_to(p_light);
-                auto wi = def<float3>(shadow_ray.direction);
-                auto light_front_face = dot(wi, light_normal) < 0.0f;
-                auto occluded = pipeline.intersect_any(shadow_ray);
-                $if(light_front_face & !occluded) {
-                    pipeline.decode_material(*interaction, [&](const Material::Closure &material) {
-                        auto [f, pdf] = material.evaluate(wi);
-                        radiance = throughput * ite(pdf > 1e-4f, f, 0.0f) *
-                                   abs(dot(interaction->shading().n(), wi)) *
-                                   light_emission * light_area;
-                    });
-                };
+        auto pdf_bsdf = def(0.0f);
+        $for(depth, max_depth) {
+            auto interaction = pipeline.intersect(ray);
+            $if(!interaction->valid()) { $break; };
+            // evaluate Le
+            $if(!interaction->shape()->test_light_flag(Light::property_flag_black)) {
+                pipeline.decode_light(interaction->shape()->light_tag(), [&](const Light *light) noexcept {
+                    auto eval = light->evaluate(*interaction, def<float3>(ray.origin));
+                    $if(eval.pdf > 1e-4f) {
+                        auto pdf_light = eval.pdf * light_sampler->pdf(*interaction);
+                        auto mis_weight = ite(depth == 0u, 1.0f, balanced_heuristic(pdf_bsdf, pdf_light));
+                        radiance += throughput * eval.Le * mis_weight;
+                    };
+                });
             };
+
+            $if(interaction->shape()->test_material_flag(Material::property_flag_black)) { $break; };
+
+            // sample light
+            Light::Sample light_sample;
+            auto light_selection = light_sampler->sample(*sampler, *interaction);
+            auto light_instance_and_transform = pipeline.instance(light_selection.inst);
+            pipeline.decode_light(light_instance_and_transform.first->light_tag(), [&](const Light *light) noexcept {
+                auto &&[light_instance, light_to_world] = light_instance_and_transform;
+                light_sample = light->sample(*sampler, interaction->p(), light_instance, light_to_world);
+            });
+            auto shadow_ray = interaction->spawn_ray_to(light_sample.p);
+            auto occluded = pipeline.intersect_any(shadow_ray);
+            pipeline.decode_material(*interaction, [&](const Material::Closure &material) {
+                // evaluate direct lighting
+                $if(light_sample.eval.pdf > 1e-4f & !occluded) {
+                    auto light_pdf = light_sample.eval.pdf * light_selection.pdf;
+                    auto wi = def<float3>(shadow_ray.direction);
+                    auto [f, pdf] = material.evaluate(wi);
+                    auto mis_weight = balanced_heuristic(light_sample.eval.pdf, pdf);
+                    radiance += throughput * mis_weight * ite(pdf > 1e-4f, f, 0.0f) *
+                                abs(dot(interaction->shading().n(), wi)) *
+                                light_sample.eval.Le / (light_sample.eval.pdf * light_selection.pdf);
+                };
+                // sample material
+                auto [wi, eval] = material.sample(*sampler);
+                ray = interaction->spawn_ray(wi);
+                pdf_bsdf = eval.pdf;
+                throughput *= ite(
+                    eval.pdf > 1e-4f,
+                    eval.f * abs(dot(interaction->shading().n(), wi)) / eval.pdf,
+                    make_float3());
+            });
+            // rr
+            $if(all(throughput <= 0.0f)) { $break; };
+            auto l = dot(make_float3(0.212671f, 0.715160f, 0.072169f), throughput);
+            auto q = max(l, 0.05f);
+            auto r = sampler->generate_1d();
+            $if(r >= q) { $break; };
+            throughput *= 1.0f / q;
         };
         film->accumulate(pixel_id, radiance);
         sampler->save_state();

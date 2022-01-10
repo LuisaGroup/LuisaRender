@@ -12,14 +12,17 @@ class NormalVisualizer;
 class NormalVisualizerInstance final : public Integrator::Instance {
 
 private:
+    Pipeline &_pipeline;
+
+private:
     static void _render_one_camera(
         Stream &stream, Pipeline &pipeline,
         const Camera::Instance *camera, const Filter::Instance *filter,
         Film::Instance *film) noexcept;
 
 public:
-    explicit NormalVisualizerInstance(const NormalVisualizer *integrator) noexcept;
-    void render(Stream &stream, Pipeline &pipeline) noexcept override;
+    explicit NormalVisualizerInstance(const NormalVisualizer *integrator, Pipeline &pipeline) noexcept;
+    void render(Stream &stream) noexcept override;
 };
 
 class NormalVisualizer final : public Integrator {
@@ -27,18 +30,19 @@ class NormalVisualizer final : public Integrator {
 public:
     NormalVisualizer(Scene *scene, const SceneNodeDesc *desc) noexcept : Integrator{scene, desc} {}
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "normal"; }
-    [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
-        return luisa::make_unique<NormalVisualizerInstance>(this);
+    [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &) const noexcept override {
+        return luisa::make_unique<NormalVisualizerInstance>(this, pipeline);
     }
 };
 
-NormalVisualizerInstance::NormalVisualizerInstance(const NormalVisualizer *integrator) noexcept
-    : Integrator::Instance{integrator} {}
+NormalVisualizerInstance::NormalVisualizerInstance(
+    const NormalVisualizer *integrator, Pipeline &pipeline) noexcept
+    : Integrator::Instance{integrator}, _pipeline{pipeline} {}
 
-void NormalVisualizerInstance::render(Stream &stream, Pipeline &pipeline) noexcept {
-    for (auto i = 0u; i < pipeline.camera_count(); i++) {
-        auto [camera, film, filter] = pipeline.camera(i);
-        _render_one_camera(stream, pipeline, camera, filter, film);
+void NormalVisualizerInstance::render(Stream &stream) noexcept {
+    for (auto i = 0u; i < _pipeline.camera_count(); i++) {
+        auto [camera, film, filter] = _pipeline.camera(i);
+        _render_one_camera(stream, _pipeline, camera, filter, film);
         film->save(stream, camera->node()->file());
     }
 }

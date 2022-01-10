@@ -44,7 +44,8 @@ public:
     Material(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] virtual uint property_flags() const noexcept = 0;
     [[nodiscard]] virtual uint /* bindless buffer id */ encode(
-        Pipeline &pipeline, CommandBuffer &command_buffer, const Shape *shape) const noexcept = 0;
+        Pipeline &pipeline, CommandBuffer &command_buffer,
+        uint instance_id, const Shape *shape) const noexcept = 0;
     [[nodiscard]] virtual luisa::unique_ptr<Closure> decode(const Pipeline &pipeline, const Interaction &it) const noexcept = 0;
 };
 

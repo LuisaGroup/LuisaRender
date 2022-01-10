@@ -50,7 +50,7 @@ public:
         }
         return flags;
     }
-    [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer, const Shape *) const noexcept override {
+    [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint, const Shape *) const noexcept override {
         auto [buffer_view, buffer_id] = pipeline.arena_buffer<LambertParams>(sizeof(LambertParams));
         command_buffer << buffer_view.copy_from(&_params);
         return buffer_id;

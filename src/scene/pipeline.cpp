@@ -86,8 +86,12 @@ void Pipeline::_process_shape(
         }
         auto mesh = iter->second;
         auto two_sided = overridden_two_sided.value_or(mesh.two_sided);
-        auto [m, m_flags] = _process_material(command_buffer, shape, material);
-        auto [l, l_flags] = _process_light(command_buffer, shape, light);
+        auto instance_id = static_cast<uint>(_accel.size());
+        auto object_to_world = transform_builder.leaf(shape->transform(), instance_id);
+        _accel.emplace_back(*mesh.resource, object_to_world, true);
+
+        auto [m, m_flags] = _process_material(command_buffer, instance_id, shape, material);
+        auto [l, l_flags] = _process_light(command_buffer, instance_id, shape, light);
 
         // create instance
         InstancedShape instance{};
@@ -96,9 +100,6 @@ void Pipeline::_process_shape(
             two_sided ? Shape::property_flag_two_sided : 0u, m_flags, l_flags);
         instance.material_buffer_id_and_tag = m;
         instance.light_buffer_id_and_tag = l;
-        // add instance
-        auto object_to_world = transform_builder.leaf(shape->transform(), _accel.size());
-        _accel.emplace_back(*mesh.resource, object_to_world, true);
         _instances.emplace_back(instance);
     } else {
         if (shape->transform() != nullptr) { transform_builder.push(shape->transform()); }
@@ -107,10 +108,10 @@ void Pipeline::_process_shape(
     }
 }
 
-std::pair<uint, uint> Pipeline::_process_material(CommandBuffer &command_buffer, const Shape *shape, const Material *material) noexcept {
+std::pair<uint, uint> Pipeline::_process_material(CommandBuffer &command_buffer, uint instance_id, const Shape *shape, const Material *material) noexcept {
     if (material == nullptr) { return {~0u, Material::property_flag_black}; }
     if (auto iter = _materials.find(material); iter != _materials.cend()) {
-        auto [_, buffer_id_and_tag, flags] = iter->second;
+        auto [i, s, buffer_id_and_tag, flags] = iter->second;
         return std::make_pair(buffer_id_and_tag, flags);
     }
     auto tag = [this, material] {
@@ -126,16 +127,16 @@ std::pair<uint, uint> Pipeline::_process_material(CommandBuffer &command_buffer,
         return t;
     }();
     auto buffer_id_and_tag = InstancedShape::encode_material_buffer_id_and_tag(
-        material->encode(*this, command_buffer, shape), tag);
+        material->encode(*this, command_buffer, instance_id, shape), tag);
     auto flags = material->property_flags();
-    _materials.emplace(material, std::make_tuple(shape, buffer_id_and_tag, flags));
+    _materials.emplace(material, std::make_tuple(instance_id, shape, buffer_id_and_tag, flags));
     return std::make_pair(buffer_id_and_tag, flags);
 }
 
-std::pair<uint, uint> Pipeline::_process_light(CommandBuffer &command_buffer, const Shape *shape, const Light *light) noexcept {
+std::pair<uint, uint> Pipeline::_process_light(CommandBuffer &command_buffer, uint instance_id, const Shape *shape, const Light *light) noexcept {
     if (light == nullptr) { return std::make_pair(~0u, Light::property_flag_black); }
     if (auto iter = _lights.find(light); iter != _lights.cend()) {
-        auto [_, buffer_id_and_tag, flags] = iter->second;
+        auto [i, s, buffer_id_and_tag, flags] = iter->second;
         return std::make_pair(buffer_id_and_tag, flags);
     }
     auto tag = [this, light] {
@@ -151,9 +152,9 @@ std::pair<uint, uint> Pipeline::_process_light(CommandBuffer &command_buffer, co
         return t;
     }();
     auto buffer_id_and_tag = InstancedShape::encode_light_buffer_id_and_tag(
-        light->encode(*this, command_buffer, shape), tag);
+        light->encode(*this, command_buffer, instance_id, shape), tag);
     auto flags = light->property_flags();
-    _lights.emplace(light, std::make_tuple(shape, buffer_id_and_tag, flags));
+    _lights.emplace(light, std::make_tuple(instance_id, shape, buffer_id_and_tag, flags));
     return std::make_pair(buffer_id_and_tag, flags);
 }
 
@@ -175,7 +176,11 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
         pipeline->_build_geometry(command_buffer, scene.shapes(), static_cast<float>(mean_time), AccelBuildHint::FAST_TRACE);
         pipeline->_integrator = scene.integrator()->build(*pipeline, command_buffer);
         pipeline->_sampler = scene.integrator()->sampler()->build(*pipeline, command_buffer);
-        pipeline->_light_sampler = scene.integrator()->light_sampler()->build(*pipeline, command_buffer);
+        if (pipeline->_lights.empty()) [[unlikely]] {
+            LUISA_WARNING_WITH_LOCATION("No lights found in the scene.");
+        } else {
+            pipeline->_light_sampler = scene.integrator()->light_sampler()->build(*pipeline, command_buffer);
+        }
     }
     command_buffer.commit();
     return pipeline;
@@ -190,7 +195,7 @@ void Pipeline::update_geometry(CommandBuffer &command_buffer, float time) noexce
 }
 
 void Pipeline::render(Stream &stream) noexcept {
-    _integrator->render(stream, *this);
+    _integrator->render(stream);
 }
 
 std::tuple<Camera::Instance *, Film::Instance *, Filter::Instance *> Pipeline::camera(size_t i) noexcept {
@@ -201,14 +206,14 @@ std::tuple<const Camera::Instance *, const Film::Instance *, const Filter::Insta
     return std::make_tuple(_cameras[i].get(), _films[i].get(), _filters[i].get());
 }
 
-std::pair<Var<InstancedShape>, Var<float4x4>> Pipeline::instance(const Var<Hit> &hit) const noexcept {
-    auto instance = _instance_buffer.read(hit.inst);
-    auto transform = _accel.instance_to_world(hit.inst);
+std::pair<Var<InstancedShape>, Var<float4x4>> Pipeline::instance(Expr<uint> i) const noexcept {
+    auto instance = _instance_buffer.read(i);
+    auto transform = _accel.instance_to_world(i);
     return std::make_pair(std::move(instance), std::move(transform));
 }
 
-Var<Triangle> Pipeline::triangle(const Var<InstancedShape> &instance, const Var<Hit> &hit) const noexcept {
-    return buffer<Triangle>(instance->triangle_buffer_id()).read(hit.prim);
+Var<Triangle> Pipeline::triangle(const Var<InstancedShape> &instance, Expr<uint> i) const noexcept {
+    return buffer<Triangle>(instance->triangle_buffer_id()).read(i);
 }
 
 std::pair<Var<float3>, Var<float3>> Pipeline::vertex(const Var<InstancedShape> &instance, const Var<float4x4> &shape_to_world, const Var<float3x3> &shape_to_world_normal, const Var<Triangle> &triangle, const Var<Hit> &hit) const noexcept {
@@ -238,13 +243,13 @@ luisa::unique_ptr<Interaction> Pipeline::interaction(const Var<Ray> &ray, const 
     using namespace luisa::compute;
     Interaction it;
     $if(!hit->miss()) {
-        auto [shape, shape_to_world] = instance(hit);
+        auto [shape, shape_to_world] = instance(hit.inst);
         auto shape_to_world_normal = transpose(inverse(make_float3x3(shape_to_world)));
-        auto tri = triangle(shape, hit);
+        auto tri = triangle(shape, hit.prim);
         auto [p, ng] = vertex(shape, shape_to_world, shape_to_world_normal, tri, hit);
         auto [ns, t, uv] = vertex_attributes(shape, shape_to_world_normal, tri, hit);
         auto wo = -def<float3>(ray.direction);
-        auto two_sided = shape->two_sided();
+        auto two_sided = shape->test_shape_flag(Shape::property_flag_two_sided);
         it = Interaction{
             std::move(shape), p, wo,
             ite(two_sided & (dot(ng, wo) < 0.0f), -ng, ng), uv,
@@ -255,19 +260,30 @@ luisa::unique_ptr<Interaction> Pipeline::interaction(const Var<Ray> &ray, const 
 
 luisa::unique_ptr<Material::Closure> Pipeline::decode_material(uint tag, const Interaction &it) const noexcept {
     if (tag > _material_interfaces.size()) [[unlikely]] {
-        LUISA_ERROR_WITH_LOCATION(
-            "Invalid material tag: {}.", tag);
+        LUISA_ERROR_WITH_LOCATION("Invalid material tag: {}.", tag);
     }
     return _material_interfaces[tag]->decode(*this, it);
 }
 
 void Pipeline::decode_material(const Interaction &it, const luisa::function<void(const Material::Closure &)> &func) const noexcept {
     $switch(it.shape()->material_tag()) {
-        for (auto tag = 0u; tag < _material_tags.size(); tag++) {
-            $case(tag) {
-                auto closure = decode_material(tag, it);
-                func(*closure);
-            };
+        for (auto tag = 0u; tag < _material_interfaces.size(); tag++) {
+            $case(tag) { func(*decode_material(tag, it)); };
+        }
+    };
+}
+
+const Light *Pipeline::decode_light(uint tag) const noexcept {
+    if (tag > _light_interfaces.size()) [[unlikely]] {
+        LUISA_ERROR_WITH_LOCATION("Invalid light tag: {}.", tag);
+    }
+    return _light_interfaces[tag];
+}
+
+void Pipeline::decode_light(Expr<uint> tag, const function<void(const Light *)> &func) const noexcept {
+    $switch(tag) {
+        for (auto i = 0u; i < _light_interfaces.size(); i++) {
+            $case(i) { func(decode_light(i)); };
         }
     };
 }

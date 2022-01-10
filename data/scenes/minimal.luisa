@@ -61,6 +61,6 @@ Shape group : Group {
 
 render {
   cameras { @camera, @camera2 }
-  shapes { @cbox, @cbox-light, @bunny, @group }
+  shapes { @cbox, @cbox-light } //, @bunny, @group }
   integrator { @pt }
 }
