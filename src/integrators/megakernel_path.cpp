@@ -163,7 +163,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
     Clock clock;
     auto time_start = camera->node()->time_span().x;
     auto time_end = camera->node()->time_span().x;
-    auto spp_per_commit = 16u;
+    auto spp_per_commit = 64u;
     for (auto i = 0u; i < spp; i++) {
         auto t = static_cast<float>((static_cast<double>(i) + 0.5f) / static_cast<double>(spp));
         auto time = lerp(time_start, time_end, t);
