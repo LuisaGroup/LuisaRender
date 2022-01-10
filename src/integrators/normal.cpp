@@ -69,21 +69,14 @@ void NormalVisualizerInstance::_render_one_camera(
         sampler->start(pixel_id, frame_index);
         auto pixel = make_float2(pixel_id);
         auto path_weight = def(make_float3(1.0f));
-        if (filter == nullptr) {// not specified, using default box filter
-            pixel += sampler->generate_2d();
-        } else {
-            auto [offset, filter_weight] = filter->sample(*sampler);
-            pixel += offset;
-            path_weight *= filter_weight;
-        }
+        auto [filter_offset, filter_weight] = filter->sample(*sampler);
+        pixel += filter_offset;
+        path_weight *= filter_weight;
         auto [ray, camera_weight] = camera->generate_ray(*sampler, pixel, time);
         sampler->save_state();
         path_weight *= camera_weight;
-
-        if (camera->node()->transform() != nullptr) {
-            ray.origin = make_float3(camera_to_world * make_float4(def<float3>(ray.origin), 1.0f));
-            ray.direction = normalize(camera_to_world_normal * def<float3>(ray.direction));
-        }
+        ray.origin = make_float3(camera_to_world * make_float4(def<float3>(ray.origin), 1.0f));
+        ray.direction = normalize(camera_to_world_normal * def<float3>(ray.direction));
         auto interaction = pipeline.intersect(ray);
         auto color = ite(
             interaction->valid(),
@@ -101,8 +94,7 @@ void NormalVisualizerInstance::_render_one_camera(
         auto t = static_cast<float>((static_cast<double>(i) + 0.5f) / static_cast<double>(spp));
         auto time = lerp(time_start, time_end, t);
         pipeline.update_geometry(command_buffer, time);
-        auto camera_transform = camera->node()->transform();
-        auto camera_to_world = camera_transform == nullptr ? make_float4x4() : camera_transform->matrix(t);
+        auto camera_to_world = camera->node()->transform()->matrix(t);
         auto camera_to_world_normal = transpose(inverse(make_float3x3(camera_to_world)));
         command_buffer << render(i, camera_to_world, camera_to_world_normal, time).dispatch(resolution);
         if (spp % spp_per_commit == spp_per_commit - 1u) [[unlikely]] { command_buffer << commit(); }

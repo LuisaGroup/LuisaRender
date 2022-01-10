@@ -1,33 +1,53 @@
+Material cbox-white : Lambert {
+  color { 0.725, 0.71, 0.68 }
+}
+
+Material cbox-red : Lambert {
+  color { 0.63, 0.065, 0.05 }
+}
+
+Material cbox-green : Lambert {
+  color { 0.14, 0.45, 0.091 }
+}
+
 Shape cbox-ceiling : TriangleMesh {
   file { "cbox-parts/ceiling.obj" }
+  material { @cbox-white }
 }
 
 Shape cbox-floor : TriangleMesh {
   file { "cbox-parts/floor.obj" }
+  material { @cbox-white }
 }
 
 Shape cbox-left-wall : TriangleMesh {
   file { "cbox-parts/left-wall.obj" }
+  material { @cbox-red }
 }
 
 Shape cbox-right-wall : TriangleMesh {
   file { "cbox-parts/right-wall.obj" }
+  material { @cbox-green }
 }
 
 Shape cbox-back-wall : TriangleMesh {
   file { "cbox-parts/back-wall.obj" }
+  material { @cbox-white }
 }
 
 Shape cbox-tall-box : TriangleMesh {
   file { "cbox-parts/tall-box.obj" }
+  material { @cbox-white }
 }
 
 Shape cbox-short-box : TriangleMesh {
   file { "cbox-parts/short-box.obj" }
+  material { @cbox-white }
 }
 
 Shape cbox-light : TriangleMesh {
   file { "cbox-parts/light.obj" }
+  material { @cbox-white }// TODO
 }
 
 Shape cbox : Group {

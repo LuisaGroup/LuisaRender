@@ -49,8 +49,7 @@ public:
 IndependentSamplerInstance::IndependentSamplerInstance(Device &device, const IndependentSampler *sampler, uint seed) noexcept
     : Sampler::Instance{sampler}, _device{device}, _seed{seed} {
     Kernel2D kernel = [](ImageUInt states, UInt seed) noexcept {
-        auto tea = [](UInt v0, UInt v1) noexcept {
-            auto s0 = def(0u);
+        auto tea = [](UInt s0, UInt v0, UInt v1) noexcept {
             for (auto n = 0u; n < 4u; n++) {
                 s0 += 0x9e3779b9u;
                 v0 += ((v1 << 4) + 0xa341316cu) ^ (v1 + s0) ^ ((v1 >> 5u) + 0xc8013ea4u);
@@ -59,7 +58,7 @@ IndependentSamplerInstance::IndependentSamplerInstance(Device &device, const Ind
             return v0;
         };
         auto p = dispatch_id().xy();
-        auto state = tea(p.x, p.y);
+        auto state = tea(seed, p.x, p.y);
         states.write(p, make_uint4(state));
     };
     _make_sampler_state = _device.compile(kernel);

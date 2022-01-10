@@ -91,9 +91,9 @@ public:
     [[nodiscard]] auto spawn_ray(Expr<float3> wi) const noexcept {
         return luisa::compute::make_ray_robust(_p, _ng, wi);
     }
-    [[nodiscard]] auto spawn_shadow_ray(Expr<float3> wi, Expr<float3> p_light) const noexcept {
-        return luisa::compute::make_ray_robust(
-            _p, _ng, wi, distance(_p, p_light) - 1e-3f /* TODO: adaptive epsilon? */);
+    [[nodiscard]] auto spawn_ray_to(Expr<float3> p_light, Expr<float> eps = 1e-3f) const noexcept {
+        auto l = p_light - _p;
+        return luisa::compute::make_ray_robust(_p, _ng, normalize(l), length(l) - eps);
     }
 };
 

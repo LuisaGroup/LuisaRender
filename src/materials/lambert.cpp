@@ -70,8 +70,9 @@ public:
         : _interaction{it},
           _f{std::move(color) * inv_pi},
           _two_sided{std::move(two_sided)},
-          _cos_wo{dot(it.wo(), it.shading().n())},
-          _front_face{_cos_wo > 0.0f} {}
+          _cos_wo{dot(it.wo(), it.shading().n())} {
+        _front_face = _cos_wo > 0.0f;
+    }
 
 private:
     [[nodiscard]] Material::Evaluation evaluate(Expr<float3> wi) const noexcept override {
@@ -86,10 +87,10 @@ private:
     }
 
     [[nodiscard]] Material::Sample sample(Sampler::Instance &sampler) const noexcept override {
-        auto wi = sample_cosine_hemisphere(sampler.generate_2d());
-        auto pdf = ite(_front_face | _two_sided, cosine_hemisphere_pdf(wi.z), 0.0f);
-        wi.z *= sign(_cos_wo);
-        return {.wi = _interaction.shading().local_to_world(wi),
+        auto wi_local = sample_cosine_hemisphere(sampler.generate_2d());
+        auto pdf = ite(_front_face | _two_sided, cosine_hemisphere_pdf(wi_local.z), 0.0f);
+        wi_local.z *= sign(_cos_wo);
+        return {.wi = _interaction.shading().local_to_world(wi_local),
                 .eval = {.f = _f, .pdf = pdf}};
     }
 };

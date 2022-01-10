@@ -20,13 +20,12 @@ Camera camera2 : Pinhole {
 
 import "../meshes/cbox.luisa"
 
-Integrator integrator : Normal {
+Integrator normal : Normal {
   sampler : Independent {}
 }
 
 Integrator pt : MegaPath {
   depth { 5 }
-  sampler : Independent {}
 }
 
 render {

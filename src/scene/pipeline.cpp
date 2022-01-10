@@ -192,9 +192,7 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
         for (auto camera : scene.cameras()) {
             pipeline->_cameras.emplace_back(camera->build(*pipeline, command_buffer));
             pipeline->_films.emplace_back(camera->film()->build(*pipeline, command_buffer));
-            auto filter = camera->filter();
-            pipeline->_filters.emplace_back(
-                filter == nullptr ? nullptr : filter->build(*pipeline, command_buffer));
+            pipeline->_filters.emplace_back(camera->filter()->build(*pipeline, command_buffer));
             mean_time += (camera->time_span().x + camera->time_span().y) * 0.5f;
         }
         mean_time *= 1.0 / static_cast<double>(scene.cameras().size());

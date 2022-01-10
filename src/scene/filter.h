@@ -14,7 +14,7 @@ class Filter : public SceneNode {
 public:
     struct Sample {
         Float2 offset;
-        Float weight;
+        Float3 weight;
     };
 
     class Instance {
