@@ -28,8 +28,39 @@ Integrator pt : MegaPath {
   depth { 5 }
 }
 
+Shape bunny : TriangleMesh {
+  file { "../meshes/bunny.obj" }
+  transform : SRT {
+    scale { 0.01 }
+    translate { 0.35, 0.825, 0.4 }
+    rotate { 0, 1, 0, 20 }
+  }
+  material : Lambert {
+    color { 1.0 }
+  }
+}
+
+Shape group : Group {
+  shapes {
+    @cbox-tall-box,
+    @cbox-short-box,
+    Instance {
+      shape { @bunny }
+      material { @cbox-red }
+      transform : SRT {
+        rotate { 0, 1, 0, 30 }
+        translate { -0.2, 0, 0.2 }
+      }
+    }
+  }
+  transform : SRT {
+    scale { 0.4 }
+    translate { -0.45, 0, 0.5 }
+  }
+}
+
 render {
   cameras { @camera, @camera2 }
-  shapes { @cbox, @cbox-light }
+  shapes { @cbox, @cbox-light, @bunny, @group }
   integrator { @pt }
 }

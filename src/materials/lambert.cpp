@@ -25,7 +25,10 @@ private:
 public:
     LambertMaterial(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Material{scene, desc}, _params{} {
-        auto color = clamp(desc->property_float3_or_default("color", make_float3(1.0f)), 0.0f, 1.0f);
+        auto color = clamp(
+            desc->property_float3_or_default(
+                "color", make_float3(desc->property_float_or_default("color", 1.0f))),
+            0.0f, 1.0f);
         auto two_sided = desc->property_bool_or_default("two_sided", false);
         _params.color[0] = color.x;
         _params.color[1] = color.y;
