@@ -78,6 +78,7 @@ public:
     [[nodiscard]] auto source_location() const noexcept { return _location; }
     void define(SceneNodeTag tag, std::string_view t, SourceLocation l) noexcept;
     [[nodiscard]] auto &properties() const noexcept { return _properties; }
+    [[nodiscard]] bool has_property(luisa::string_view prop) const noexcept;
     void add_property(std::string_view name, value_list values) noexcept;
     void add_property(std::string_view name, bool_type value) noexcept { add_property(name, bool_list{value}); }
     void add_property(std::string_view name, number_type value) noexcept { add_property(name, number_list{value}); }

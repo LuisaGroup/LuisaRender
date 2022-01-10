@@ -11,6 +11,7 @@ namespace luisa::render {
 
 using compute::BindlessArray;
 
+class Shape;
 class Sampler;
 class Interaction;
 
@@ -18,10 +19,9 @@ class Material : public SceneNode {
 
 public:
     static constexpr auto property_flag_black = 1u;
-    static constexpr auto property_flag_two_sided = 2u;
-    static constexpr auto property_flag_reflective = 4u;
-    static constexpr auto property_flag_refractive = 8u;
-    static constexpr auto property_flag_volumetric = 16u;
+    static constexpr auto property_flag_reflective = 2u;
+    static constexpr auto property_flag_refractive = 4u;
+    // TODO: more flags
 
 public:
     struct Evaluation {
@@ -43,7 +43,8 @@ public:
 public:
     Material(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] virtual uint property_flags() const noexcept = 0;
-    [[nodiscard]] virtual uint /* bindless buffer id */ encode(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
+    [[nodiscard]] virtual uint /* bindless buffer id */ encode(
+        Pipeline &pipeline, CommandBuffer &command_buffer, const Shape *shape) const noexcept = 0;
     [[nodiscard]] virtual luisa::unique_ptr<Closure> decode(const Pipeline &pipeline, const Interaction &it) const noexcept = 0;
 };
 

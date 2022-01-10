@@ -37,28 +37,61 @@ struct alignas(16) InstancedShape {
 
     static constexpr auto instance_buffer_id_shift = 12u;
     static constexpr auto instance_buffer_offset_mask = (1u << instance_buffer_id_shift) - 1u;
-    static constexpr auto area_cdf_buffer_id_shift = 13u;
-    static constexpr auto area_cdf_buffer_element_alignment = 16u;
-    static constexpr auto area_cdf_buffer_offset_mask = (1u << area_cdf_buffer_id_shift) - 1u;
-    static constexpr auto material_buffer_id_shift = 12u;
-    static constexpr auto light_buffer_id_shift = 12u;
+
+    static constexpr auto material_property_bits = 14u;
+    static constexpr auto light_property_bits = 14u;
+    static constexpr auto shape_property_bits = 4u;
+    static constexpr auto material_property_mask = (1u << material_property_bits) - 1u;
+    static constexpr auto light_property_mask = (1u << light_property_bits) - 1u;
+    static constexpr auto shape_property_mask = (1u << shape_property_bits) - 1u;
+    static constexpr auto shape_property_shift = 0u;
+    static constexpr auto light_property_shift = shape_property_shift + shape_property_bits;
+    static constexpr auto material_property_shift = light_property_shift + light_property_bits;
+
+    static constexpr auto material_buffer_id_shift = 10u;
+    static constexpr auto light_buffer_id_shift = 10u;
     static constexpr auto material_tag_mask = (1u << material_buffer_id_shift) - 1u;
     static constexpr auto light_tag_mask = (1u << light_buffer_id_shift) - 1u;
 
-    // vertices & indices
-    uint position_buffer_id;// (buffer_id << shift) | offset
-    uint attribute_buffer_id;
-    uint triangle_buffer_id;
-    uint triangle_count;
+    static constexpr auto position_buffer_id_offset = 0u;
+    static constexpr auto attribute_buffer_id_offset = 1u;
+    static constexpr auto triangle_buffer_id_offset = 2u;
 
-    // other info
-    uint material_and_light_property_flags;
-    uint material_buffer_id_and_tag;// = (buffer_id << shift) | tag
-    uint light_buffer_id_and_tag;   // = (buffer_id << shift) | tag
-    uint area_cdf_buffer_id_and_offset;
+    uint buffer_id_base;
+    uint properties;
+    uint material_buffer_id_and_tag;
+    uint light_buffer_id_and_tag;
+
+    [[nodiscard]] static auto encode_property_flags(uint shape_flags, uint material_flags, uint light_flags) noexcept {
+        if (shape_flags > shape_property_mask ||
+            material_flags > material_property_mask ||
+            light_flags > light_property_mask) [[unlikely]] {
+            LUISA_ERROR_WITH_LOCATION(
+                "Invalid property flags: "
+                "shape = {:x}, material = {:x}, light = {:x}.",
+                shape_flags, material_flags, light_flags);
+        }
+        return (shape_flags << shape_property_shift) |
+               (material_flags << material_property_shift) |
+               (light_flags << light_property_shift);
+    }
+
+    [[nodiscard]] static auto encode_material_buffer_id_and_tag(uint buffer_id, uint tag) noexcept {
+        if (tag > material_tag_mask) [[unlikely]] {
+            LUISA_ERROR_WITH_LOCATION("Invalid material tag: {}.", tag);
+        }
+        return (buffer_id << material_buffer_id_shift) | tag;
+    }
+
+    [[nodiscard]] static auto encode_light_buffer_id_and_tag(uint buffer_id, uint tag) noexcept {
+        if (tag > light_tag_mask) [[unlikely]] {
+            LUISA_ERROR_WITH_LOCATION("Invalid light tag: {}.", tag);
+        }
+        return (buffer_id << light_buffer_id_shift) | tag;
+    }
 };
 
-static_assert(sizeof(InstancedShape) == 32);
+static_assert(sizeof(InstancedShape) == 16u);
 
 using compute::AccelBuildHint;
 using compute::Triangle;
@@ -69,10 +102,14 @@ class Transform;
 
 class Shape : public SceneNode {
 
+public:
+    static constexpr auto property_flag_two_sided = 1u;
+
 private:
     const Material *_material;
     const Light *_light;
     const Transform *_transform;
+    luisa::optional<bool> _two_sided;
     AccelBuildHint _build_hint{AccelBuildHint::FAST_TRACE};
 
 public:
@@ -81,12 +118,13 @@ public:
     [[nodiscard]] auto light() const noexcept { return _light; }
     [[nodiscard]] auto transform() const noexcept { return _transform; }
     [[nodiscard]] auto build_hint() const noexcept { return _build_hint; }
+    [[nodiscard]] auto two_sided() const noexcept { return _two_sided; }
     [[nodiscard]] virtual bool is_mesh() const noexcept = 0;
-    [[nodiscard]] virtual luisa::span<const float3> positions() const noexcept = 0;           // empty if the shape is not a mesh
-    [[nodiscard]] virtual luisa::span<const VertexAttribute> attributes() const noexcept = 0; // empty if the shape is not a mesh or the mesh has no attributes
-    [[nodiscard]] virtual luisa::span<const Triangle> triangles() const noexcept = 0;         // empty if the shape is not a mesh
-    [[nodiscard]] virtual luisa::span<const Shape *const> children() const noexcept = 0;// empty if the shape is a mesh
-    [[nodiscard]] virtual bool deformable() const noexcept = 0;                           // true if the shape will not deform
+    [[nodiscard]] virtual luisa::span<const float3> positions() const noexcept = 0;          // empty if the shape is not a mesh
+    [[nodiscard]] virtual luisa::span<const VertexAttribute> attributes() const noexcept = 0;// empty if the shape is not a mesh or the mesh has no attributes
+    [[nodiscard]] virtual luisa::span<const Triangle> triangles() const noexcept = 0;        // empty if the shape is not a mesh
+    [[nodiscard]] virtual luisa::span<const Shape *const> children() const noexcept = 0;     // empty if the shape is a mesh
+    [[nodiscard]] virtual bool deformable() const noexcept = 0;                              // true if the shape will not deform
 };
 
 }// namespace luisa::render
@@ -118,24 +156,24 @@ LUISA_STRUCT(
 LUISA_STRUCT(
     luisa::render::InstancedShape,
 
-    position_buffer_id,
-    attribute_buffer_id,
-    triangle_buffer_id,
-    triangle_count,
-    material_and_light_property_flags,
+    buffer_id_base,
+    properties,
     material_buffer_id_and_tag,
-    light_buffer_id_and_tag,
-    area_cdf_buffer_id_and_offset) {
-    [[nodiscard]] auto area_cdf_buffer_id() const noexcept { return area_cdf_buffer_id_and_offset >> luisa::render::InstancedShape::area_cdf_buffer_id_shift; }
-    [[nodiscard]] auto area_cdf_buffer_offset() const noexcept { return (area_cdf_buffer_id_and_offset & luisa::render::InstancedShape::area_cdf_buffer_offset_mask) * luisa::render::InstancedShape::area_cdf_buffer_element_alignment; }
+    light_buffer_id_and_tag) {
+
+    [[nodiscard]] auto position_buffer_id() const noexcept { return buffer_id_base + luisa::render::InstancedShape::position_buffer_id_offset; }
+    [[nodiscard]] auto attribute_buffer_id() const noexcept { return buffer_id_base + luisa::render::InstancedShape::attribute_buffer_id_offset; }
+    [[nodiscard]] auto triangle_buffer_id() const noexcept { return buffer_id_base + luisa::render::InstancedShape::triangle_buffer_id_offset; }
     [[nodiscard]] auto material_tag() const noexcept { return material_buffer_id_and_tag & luisa::render::InstancedShape::material_tag_mask; }
     [[nodiscard]] auto material_buffer_id() const noexcept { return material_buffer_id_and_tag >> luisa::render::InstancedShape::material_buffer_id_shift; }
     [[nodiscard]] auto light_tag() const noexcept { return light_buffer_id_and_tag & luisa::render::InstancedShape::light_tag_mask; }
     [[nodiscard]] auto light_buffer_id() const noexcept { return light_buffer_id_and_tag >> luisa::render::InstancedShape::light_buffer_id_shift; }
-    [[nodiscard]] auto material_flags() const noexcept { return material_and_light_property_flags & 0xffffu; }
-    [[nodiscard]] auto light_flags() const noexcept { return material_and_light_property_flags >> 16u; }
-    [[nodiscard]] auto black_material() const noexcept { return (material_flags() & luisa::render::Material::property_flag_black) != 0u; }
-    [[nodiscard]] auto black_light() const noexcept { return (material_flags() & luisa::render::Light::property_flag_black) != 0u; }
+    [[nodiscard]] auto material_flags() const noexcept { return (properties >> luisa::render::InstancedShape::material_property_shift) & luisa::render::InstancedShape::material_property_mask; }
+    [[nodiscard]] auto light_flags() const noexcept { return (properties >> luisa::render::InstancedShape::light_property_shift) & luisa::render::InstancedShape::light_property_mask; }
+    [[nodiscard]] auto shape_flags() const noexcept { return (properties >> luisa::render::InstancedShape::shape_property_shift) & luisa::render::InstancedShape::shape_property_mask; }
+    [[nodiscard]] auto has_material() const noexcept { return (material_flags() & luisa::render::Material::property_flag_black) == 0u; }
+    [[nodiscard]] auto has_light() const noexcept { return (material_flags() & luisa::render::Light::property_flag_black) == 0u; }
+    [[nodiscard]] auto two_sided() const noexcept { return (shape_flags() & luisa::render::Shape::property_flag_two_sided) != 0u; }
 };
 
 // clang-format on

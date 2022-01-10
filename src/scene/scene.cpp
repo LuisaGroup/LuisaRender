@@ -15,7 +15,7 @@
 #include <scene/shape.h>
 #include <scene/transform.h>
 #include <scene/environment.h>
-#include <scene/light_distribution.h>
+#include <scene/light_sampler.h>
 #include <sdl/scene_desc.h>
 #include <sdl/scene_node_desc.h>
 #include <scene/scene.h>
@@ -157,8 +157,8 @@ Environment *Scene::load_environment(const SceneNodeDesc *desc) noexcept {
     return dynamic_cast<Environment *>(load_node(SceneNodeTag::ENVIRONMENT, desc));
 }
 
-LightDistribution *Scene::load_light_distribution(const SceneNodeDesc *desc) noexcept {
-    return dynamic_cast<LightDistribution *>(load_node(SceneNodeTag::LIGHT_DISTRIBUTION, desc));
+LightSampler *Scene::load_light_distribution(const SceneNodeDesc *desc) noexcept {
+    return dynamic_cast<LightSampler *>(load_node(SceneNodeTag::LIGHT_SAMPLER, desc));
 }
 
 luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc) noexcept {

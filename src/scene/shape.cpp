@@ -16,7 +16,9 @@ Shape::Shape(Scene *scene, const SceneNodeDesc *desc) noexcept
       _material{scene->load_material(desc->property_node_or_default("material"))},
       _light{scene->load_light(desc->property_node_or_default("light"))},
       _transform{scene->load_transform(desc->property_node_or_default("transform"))} {
-
+    if (desc->has_property("two_sided")) {
+        _two_sided = desc->property_bool("two_sided");
+    }
     auto hint = desc->property_string_or_default("build_hint", "");
     if (hint == "fast_update") {
         _build_hint = AccelBuildHint::FAST_UPDATE;

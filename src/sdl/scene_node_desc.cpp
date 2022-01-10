@@ -34,6 +34,10 @@ SceneNodeDesc *SceneNodeDesc::define_internal(std::string_view impl_type, Source
     return node;
 }
 
+bool SceneNodeDesc::has_property(luisa::string_view prop) const noexcept {
+    return _properties.find_as(prop, Hash64{}, std::equal_to<>{}) != _properties.cend();
+}
+
 #define LUSIA_SCENE_NODE_DESC_PROPERTY_THROW(...) \
     throw std::runtime_error{fmt::format(__VA_ARGS__)};
 

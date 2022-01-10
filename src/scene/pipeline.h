@@ -16,6 +16,7 @@
 #include <scene/transform.h>
 #include <scene/integrator.h>
 #include <scene/interaction.h>
+#include <scene/light_sampler.h>
 
 namespace luisa::render {
 
@@ -26,6 +27,7 @@ using compute::BindlessBuffer;
 using compute::BindlessTexture2D;
 using compute::BindlessTexture3D;
 using compute::Buffer;
+using compute::BufferArena;
 using compute::BufferView;
 using compute::Callable;
 using compute::Device;
@@ -43,36 +45,14 @@ class Scene;
 class Pipeline {
 
 public:
-    template<typename T, size_t capacity>
-    class BufferArena {
-
-    private:
-        Pipeline &_pipeline;
-        Buffer<T> *_buffer{nullptr};
-        uint _buffer_id{0u};
-        uint _buffer_offset{0u};
-
-    public:
-        explicit BufferArena(Pipeline &pipeline) noexcept : _pipeline{pipeline} {}
-        [[nodiscard]] std::pair<BufferView<T>, uint /* bindless buffer id */> allocate(size_t n) noexcept;
-    };
-
-public:
     static constexpr size_t bindless_array_capacity = 500'000u;// limitation of Metal
-    using arena_buffer_block_type = uint4;
-    static constexpr size_t arena_buffer_block_size = sizeof(arena_buffer_block_type);
-    static constexpr size_t arena_buffer_block_count = 4u * 1024u * 1024u;
-    static constexpr size_t arena_buffer_size = arena_buffer_block_size * arena_buffer_block_count;// == 64MB
-    static constexpr size_t arena_allocation_threshold = 4_mb;
+    static constexpr auto vertex_buffer_arena_size_elements = 1024u * 1024u;
     using ResourceHandle = luisa::unique_ptr<Resource>;
 
     struct MeshData {
         Mesh *resource;
-        uint triangle_count;
-        uint position_buffer_id;
-        uint attribute_buffer_id;
-        uint triangle_buffer_id;
-        uint area_cdf_buffer_id_and_offset;
+        uint buffer_id_base;
+        bool two_sided;
     };
 
 private:
@@ -80,6 +60,9 @@ private:
     Accel _accel;
     TransformTree _transform_tree;
     BindlessArray _bindless_array;
+    luisa::unique_ptr<BufferArena> _position_buffer_arena;
+    luisa::unique_ptr<BufferArena> _attribute_buffer_arena;
+    luisa::unique_ptr<BufferArena> _general_buffer_arena;
     size_t _bindless_buffer_count{0u};
     size_t _bindless_tex2d_count{0u};
     size_t _bindless_tex3d_count{0u};
@@ -89,25 +72,24 @@ private:
     luisa::vector<const Light *> _light_interfaces;
     luisa::unordered_map<luisa::string /* impl type */, uint /* tag */, Hash64> _material_tags;
     luisa::unordered_map<luisa::string /* impl type */, uint /* tag */, Hash64> _light_tags;
-    luisa::unordered_map<const Material *, std::pair<uint /* buffer id and tag */, uint /* properties */>> _materials;
-    luisa::unordered_map<const Light *, std::pair<uint /* buffer id and tag */, uint /* properties */>> _lights;
-    BufferArena<float3, 65536u> _position_buffer_arena;
-    BufferArena<VertexAttribute, 65536u> _attribute_buffer_arena;
-    BufferArena<float, 65536u> _area_cdf_buffer_arena;
+    luisa::unordered_map<const Material *, std::tuple<const Shape *, uint /* buffer id and tag */, uint /* properties */>> _materials;
+    luisa::unordered_map<const Light *, std::tuple<const Shape *, uint /* buffer id and tag */, uint /* properties */>> _lights;
     luisa::vector<InstancedShape> _instances;
     Buffer<InstancedShape> _instance_buffer;
     luisa::vector<luisa::unique_ptr<Camera::Instance>> _cameras;
     luisa::vector<luisa::unique_ptr<Filter::Instance>> _filters;
     luisa::vector<luisa::unique_ptr<Film::Instance>> _films;
     luisa::unique_ptr<Integrator::Instance> _integrator;
+    luisa::unique_ptr<LightSampler::Instance> _light_sampler;
     luisa::unique_ptr<Sampler::Instance> _sampler;
 
 private:
     void _build_geometry(CommandBuffer &command_buffer, luisa::span<const Shape *const> shapes, float init_time, AccelBuildHint hint) noexcept;
     void _process_shape(
         CommandBuffer &command_buffer, TransformTree::Builder &transform_builder, const Shape *shape,
+        luisa::optional<bool> overridden_two_sided = luisa::nullopt,
         const Material *overridden_material = nullptr, const Light *overridden_light = nullptr) noexcept;
-    [[nodiscard]] std::pair<uint /* buffer id and tag */, uint /* property flags */> _process_material(CommandBuffer &command_buffer, const Material *material) noexcept;
+    [[nodiscard]] std::pair<uint /* buffer id and tag */, uint /* property flags */> _process_material(CommandBuffer &command_buffer, const Shape *shape, const Material *material) noexcept;
     [[nodiscard]] std::pair<uint /* buffer id and tag */, uint /* property flags */> _process_light(CommandBuffer &command_buffer, const Shape *shape, const Light *light) noexcept;
 
 public:
@@ -155,6 +137,13 @@ public:
         return p;
     }
 
+    template<typename T>
+    [[nodiscard]] std::pair<BufferView<T>, uint /* bindless id */> arena_buffer(size_t n) noexcept {
+        auto view = _general_buffer_arena->allocate<T>(n);
+        auto buffer_id = register_bindless(view);
+        return std::make_pair(view, buffer_id);
+    }
+
     [[nodiscard]] auto &device() noexcept { return _device; }
     [[nodiscard]] const auto &device() const noexcept { return _device; }
 
@@ -174,8 +163,11 @@ public:
     [[nodiscard]] std::tuple<const Camera::Instance *, const Film::Instance *, const Filter::Instance *> camera(size_t i) const noexcept;
     [[nodiscard]] auto material_interfaces() const noexcept { return luisa::span{_material_interfaces}; }
     [[nodiscard]] auto light_interfaces() const noexcept { return luisa::span{_light_interfaces}; }
+    [[nodiscard]] auto &lights() const noexcept { return _lights; }
+    [[nodiscard]] auto &materials() const noexcept { return _materials; }
     [[nodiscard]] auto sampler() noexcept { return _sampler.get(); }
     [[nodiscard]] auto sampler() const noexcept { return _sampler.get(); }
+    [[nodiscard]] auto light_sampler() const noexcept { return _light_sampler.get(); }
     void update_geometry(CommandBuffer &command_buffer, float time) noexcept;
     void render(Stream &stream) noexcept;
 

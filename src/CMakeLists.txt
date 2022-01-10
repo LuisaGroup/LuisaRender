@@ -56,7 +56,7 @@ add_subdirectory(materials)
 add_subdirectory(samplers)
 add_subdirectory(shapes)
 add_subdirectory(transforms)
-add_subdirectory(lightdists)
+add_subdirectory(lightsamplers)
 
 add_library(luisa-render INTERFACE)
 target_link_libraries(luisa-render INTERFACE
@@ -73,7 +73,7 @@ target_link_libraries(luisa-render INTERFACE
         luisa-render-samplers
         luisa-render-shapes
         luisa-render-transforms
-        luisa-render-lightdists)
+        luisa-render-lightsamplers)
 add_library(luisa::render ALIAS luisa-render)
 
 add_subdirectory(apps)
