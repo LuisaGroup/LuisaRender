@@ -25,7 +25,7 @@ Integrator normal : Normal {
 }
 
 Integrator pt : MegaPath {
-  depth { 5 }
+  depth { 10 }
 }
 
 Shape bunny : TriangleMesh {
