@@ -224,7 +224,7 @@ Var<Triangle> Pipeline::triangle(const Var<InstancedShape> &instance, Expr<uint>
     return buffer<Triangle>(instance->triangle_buffer_id()).read(i);
 }
 
-std::tuple<Var<float3>, Var<float3>, Var<float>> Pipeline::surface_point(
+std::tuple<Var<float3>, Var<float3>, Var<float>> Pipeline::surface_point_geometry(
     const Var<InstancedShape> &instance, const Var<float4x4> &shape_to_world,
     const Var<Triangle> &triangle, const Var<float3> &uvw) const noexcept {
 
@@ -268,7 +268,7 @@ luisa::unique_ptr<Interaction> Pipeline::interaction(const Var<Ray> &ray, const 
         auto [shape, shape_to_world] = instance(hit.inst);
         auto shape_to_world_normal = transpose(inverse(make_float3x3(shape_to_world)));
         auto tri = triangle(shape, hit.prim);
-        auto [p, ng, area] = surface_point(
+        auto [p, ng, area] = surface_point_geometry(
             shape, shape_to_world, tri,
             make_float3(1.0f - hit.bary.x - hit.bary.y, hit.bary));
         auto [ns, t, uv] = surface_point_attributes(

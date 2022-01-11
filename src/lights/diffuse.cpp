@@ -66,7 +66,7 @@ public:
         auto triangle = pipeline.triangle(light_inst, triangle_id);
         auto light_to_world_normal = transpose(inverse(light_to_world));
         auto uvw = sample_uniform_triangle(sampler.generate_2d());
-        auto [p, ng, area] = pipeline.surface_point(light_inst, light_to_world, triangle, uvw);
+        auto [p, ng, area] = pipeline.surface_point_geometry(light_inst, light_to_world, triangle, uvw);
         auto [ns, tangent, uv] = pipeline.surface_point_attributes(light_inst, light_to_world_normal, triangle, uvw);
         Interaction it{light_inst_id, light_inst, triangle_id, area, p, normalize(it_from.p() - p), ng, uv, ns, tangent};
         auto p_from = it_from.p();

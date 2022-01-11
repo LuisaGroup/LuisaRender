@@ -201,7 +201,7 @@ public:
     [[nodiscard]] std::pair<Var<InstancedShape>, Var<float4x4>> instance(Expr<uint> index) const noexcept;
     [[nodiscard]] Var<Triangle> triangle(const Var<InstancedShape> &instance, Expr<uint> index) const noexcept;
     [[nodiscard]] std::tuple<Var<float3> /* position */, Var<float3> /* ng */, Var<float>/* area */>
-    surface_point(const Var<InstancedShape> &instance, const Var<float4x4> &shape_to_world,
+    surface_point_geometry(const Var<InstancedShape> &instance, const Var<float4x4> &shape_to_world,
            const Var<Triangle> &triangle, const Var<float3> &uvw) const noexcept;
     [[nodiscard]] std::tuple<Var<float3> /* ns */, Var<float3> /* tangent */, Var<float2> /* uv */>
     surface_point_attributes(const Var<InstancedShape> &instance, const Var<float3x3> &shape_to_world_normal,

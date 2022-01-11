@@ -145,7 +145,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
             });
             // rr
             $if(all(throughput <= 0.0f)) { $break; };
-            $if(depth >= 3u) {
+            $if(depth >= 1u) {
                 auto l = dot(make_float3(0.212671f, 0.715160f, 0.072169f), throughput);
                 auto q = max(l, 0.05f);
                 auto r = sampler->generate_1d();

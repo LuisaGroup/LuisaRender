@@ -19,6 +19,7 @@ target_link_libraries(luisa-render-ext INTERFACE tinyexr)
 
 find_package(assimp CONFIG)
 if (NOT assimp_FOUND)
+    set(ASSIMP_BUILD_ZLIB ON CACHE BOOL "" FORCE)
     set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
     set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
     set(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)
