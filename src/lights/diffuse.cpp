@@ -30,7 +30,9 @@ public:
     DiffuseLight(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Light{scene, desc},
           _emission{desc->property_float3_or_default(
-              "emission", make_float3(desc->property_float("emission")))} {}
+              "emission", make_float3(desc->property_float("emission")))} {
+        _emission *= desc->property_float_or_default("scale", 1.0f);
+    }
 
     [[nodiscard]] float power(const Shape *shape) const noexcept override { return /* TODO */ 0.0f; }
     [[nodiscard]] uint property_flags() const noexcept override { return 0u; }

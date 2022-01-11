@@ -1,12 +1,14 @@
 Film film : Color {
   resolution { 1024 }
+  exposure { 1 }
 }
 
 Camera camera : Pinhole {
   position { -0.01, 0.995, 5.0 }
   fov { 27.8 }
-  spp { 1024 }
+  spp { 128 }
   film { @film }
+  file { "test.exr" }
 }
 
 Camera camera2 : Pinhole {
@@ -38,6 +40,21 @@ Shape bunny : TriangleMesh {
   material { @cbox-white }
 }
 
+Shape light : TriangleMesh {
+  file { "../meshes/light.obj" }
+  two_sided { true }
+  light : Diffuse {
+    emission { 1.5, 1.1, 0.6 }
+    scale { 1.75 }
+  }
+  transform : SRT {
+    scale { 0.2 }
+    translate { 0.2, 0.1, 0.9 }
+    rotate { 0, 1, 0, -20 }
+  }
+  material { @cbox-green }
+}
+
 Shape group : Group {
   shapes {
     @cbox-tall-box,
@@ -46,6 +63,7 @@ Shape group : Group {
       shape { @bunny }
       light : Diffuse {
         emission { 0.4, 1.6, 3.2 }
+        scale { 1.5 }
       }
       transform : SRT {
         rotate { 0, 1, 0, 30 }
@@ -61,6 +79,7 @@ Shape group : Group {
 
 render {
   cameras { @camera }
-  shapes { @cbox, @cbox-light, @bunny, @group }
+  shapes { @cbox, @cbox-light,
+   @bunny, @group, @light }
   integrator { @pt }
 }

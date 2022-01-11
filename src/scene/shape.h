@@ -180,7 +180,7 @@ LUISA_STRUCT(
     [[nodiscard]] auto test_material_flag(luisa::uint flag) const noexcept { return (material_flags() & flag) != 0u; }
     [[nodiscard]] auto test_light_flag(luisa::uint flag) const noexcept { return (light_flags() & flag) != 0u; }
     [[nodiscard]] auto test_shape_flag(luisa::uint flag) const noexcept { return (shape_flags() & flag) != 0u; }
-    [[nodiscard]] auto two_sided() const noexcept { return false & test_shape_flag(luisa::render::Shape::property_flag_two_sided); }
+    [[nodiscard]] auto two_sided() const noexcept { return test_shape_flag(luisa::render::Shape::property_flag_two_sided); }
 };
 
 // clang-format on
