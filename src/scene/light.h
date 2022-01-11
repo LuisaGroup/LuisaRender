@@ -45,7 +45,7 @@ public:
         const Pipeline &pipeline, const Interaction &it, Expr<float3> p_from) const noexcept = 0;
     [[nodiscard]] virtual Sample sample(
         const Pipeline &pipeline, Sampler::Instance &sampler,
-        const Interaction &it_from, Expr<uint> light_inst_id) const noexcept = 0;
+        Expr<uint> light_inst_id, const Interaction &it_from) const noexcept = 0;
 };
 
 }

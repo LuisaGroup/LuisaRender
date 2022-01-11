@@ -77,7 +77,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
 
     using namespace luisa::compute;
     Callable balanced_heuristic = [](Float pdf_a, Float pdf_b) noexcept {
-        return pdf_a / max(pdf_a + pdf_b, 1e-4f);
+        return ite(pdf_a > 0.0f, pdf_a / (pdf_a + pdf_b), 0.0f);
     };
 
     Kernel2D render_kernel = [&](UInt frame_index, Float4x4 camera_to_world, Float3x3 camera_to_world_normal, Float time) noexcept {
@@ -106,7 +106,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
             $if(!interaction->shape()->test_light_flag(Light::property_flag_black)) {
                 pipeline.decode_light(interaction->shape()->light_tag(), [&](const Light *light) noexcept {
                     auto eval = light->evaluate(pipeline, *interaction, ray->origin());
-                    $if(eval.pdf > 1e-4f) {
+                    $if(eval.pdf > 0.0f) {
                         auto pdf_light = eval.pdf * light_sampler->pdf(*interaction);
                         auto mis_weight = ite(depth == 0u, 1.0f, balanced_heuristic(pdf_bsdf, pdf_light));
                         radiance += throughput * eval.Le * mis_weight;
@@ -120,17 +120,17 @@ void MegakernelPathTracingInstance::_render_one_camera(
             Light::Sample light_sample;
             auto light_selection = light_sampler->sample(*sampler, *interaction);
             pipeline.decode_light(light_selection.light_tag, [&](const Light *light) noexcept {
-                light_sample = light->sample(pipeline, *sampler, *interaction, light_selection.instance_id);
+                light_sample = light->sample(pipeline, *sampler, light_selection.instance_id, *interaction);
             });
             auto occluded = pipeline.intersect_any(light_sample.shadow_ray);
             pipeline.decode_material(*interaction, [&](const Material::Closure &material) {
                 // evaluate direct lighting
-                $if(light_sample.eval.pdf > 1e-4f & !occluded) {
+                $if(light_sample.eval.pdf > 0.0f & !occluded) {
                     auto light_pdf = light_sample.eval.pdf * light_selection.pdf;
-                    auto wi = def<float3>(light_sample.shadow_ray->direction());
+                    auto wi = light_sample.shadow_ray->direction();
                     auto [f, pdf] = material.evaluate(wi);
                     auto mis_weight = balanced_heuristic(light_pdf, pdf);
-                    radiance += throughput * mis_weight * ite(pdf > 1e-4f, f, 0.0f) *
+                    radiance += throughput * mis_weight * ite(pdf > 0.0f, f, 0.0f) *
                                 abs(dot(interaction->shading().n(), wi)) *
                                 light_sample.eval.Le / light_pdf;
                 };
@@ -139,7 +139,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
                 ray = interaction->spawn_ray(wi);
                 pdf_bsdf = eval.pdf;
                 throughput *= ite(
-                    eval.pdf > 1e-4f,
+                    eval.pdf > 0.0f,
                     eval.f * abs(dot(interaction->shading().n(), wi)) / eval.pdf,
                     make_float3());
             });

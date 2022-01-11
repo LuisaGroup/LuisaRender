@@ -48,14 +48,15 @@ public:
     [[nodiscard]] Evaluation evaluate(const Pipeline &pipeline, const Interaction &it, Expr<float3> p_from) const noexcept override {
         using namespace luisa::compute;
         auto params = pipeline.buffer<DiffuseLightParams>(it.shape()->light_buffer_id()).read(0u);
-        auto pdf_area = pipeline.buffer<float>(it.shape()->pdf_buffer_id()).read(it.triangle_id()) * (1.0f / it.triangle_area());
+        auto pdf_triangle = pipeline.buffer<float>(it.shape()->pdf_buffer_id()).read(it.triangle_id());
+        auto pdf_area = cast<float>(params.triangle_count) * (pdf_triangle / it.triangle_area());
         auto cos_wo = dot(it.wo(), it.shading().n());
         auto front_face = cos_wo > 0.0f;
-        auto Le = make_float3(17.0f, 12.0f, 4.0f) * 2.0f;
+        auto emission = def<float3>(params.emission);
         auto pdf = distance_squared(it.p(), p_from) * pdf_area * (1.0f / cos_wo);
-        return {.Le = Le, .pdf = ite(front_face, pdf, 0.0f)};
+        return {.Le = emission, .pdf = ite(front_face, pdf, 0.0f)};
     }
-    [[nodiscard]] Sample sample(const Pipeline &pipeline, Sampler::Instance &sampler, const Interaction &it_from, Expr<uint> light_inst_id) const noexcept override {
+    [[nodiscard]] Sample sample(const Pipeline &pipeline, Sampler::Instance &sampler, Expr<uint> light_inst_id, const Interaction &it_from) const noexcept override {
         auto [light_inst, light_to_world] = pipeline.instance(light_inst_id);
         auto alias_table_buffer_id = light_inst->alias_table_buffer_id();
         auto params = pipeline.buffer<DiffuseLightParams>(light_inst->light_buffer_id()).read(0u);
@@ -68,8 +69,9 @@ public:
         auto [p, ng, area] = pipeline.surface_point(light_inst, light_to_world, triangle, uvw);
         auto [ns, tangent, uv] = pipeline.surface_point_attributes(light_inst, light_to_world_normal, triangle, uvw);
         Interaction it{light_inst_id, light_inst, triangle_id, area, p, normalize(it_from.p() - p), ng, uv, ns, tangent};
-        auto eval = evaluate(pipeline, it, it_from.p());
-        return {.eval = eval, .p_light = p, .shadow_ray = it_from.spawn_ray_to(p)};
+        auto p_from = it_from.p();
+        auto eval = evaluate(pipeline, it, p_from);
+        return {.eval = std::move(eval), .p_light = p, .shadow_ray = it_from.spawn_ray_to(p)};
     }
 };
 
