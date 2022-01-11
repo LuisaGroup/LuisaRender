@@ -18,7 +18,8 @@ class LightSampler : public SceneNode {
 
 public:
     struct Selection {
-        UInt inst;
+        UInt instance_id;
+        UInt light_tag;
         Float pdf;
     };
 

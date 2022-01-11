@@ -26,4 +26,58 @@ Float cosine_hemisphere_pdf(Expr<float> cos_theta) noexcept {
     return cos_theta * inv_pi;
 }
 
+std::pair<luisa::vector<AliasEntry>, luisa::vector<float>>
+create_alias_table(luisa::span<float> values) noexcept {
+
+    auto sum = std::reduce(values.cbegin(), values.cend(), 0.0);
+    auto inv_sum = 1.0 / sum;
+    luisa::vector<float> pdf(values.size());
+    std::transform(
+        values.cbegin(), values.cend(), pdf.begin(),
+        [inv_sum](auto v) noexcept {
+            return static_cast<float>(v * inv_sum);
+        });
+
+    auto ratio = static_cast<double>(values.size()) / sum;
+    static thread_local luisa::vector<uint> over;
+    static thread_local luisa::vector<uint> under;
+    over.clear();
+    under.clear();
+    over.reserve(next_pow2(values.size()));
+    under.reserve(next_pow2(values.size()));
+
+    luisa::vector<AliasEntry> table(values.size());
+    for (auto i = 0u; i < values.size(); i++) {
+        auto p = static_cast<float>(values[i] * ratio);
+        table[i] = {p, i};
+        (p > 1.0f ? over : under).emplace_back(i);
+    }
+
+    while (!over.empty() && !under.empty()) {
+        auto o = over.back();
+        auto u = under.back();
+        over.pop_back();
+        under.pop_back();
+        table[o].prob -= 1.0f - table[u].prob;
+        table[u].alias = o;
+        if (table[o].prob > 1.0f) {
+            over.push_back(o);
+        } else if (table[o].prob < 1.0f) {
+            under.push_back(o);
+        }
+    }
+    for (auto i : over) { table[i] = {1.0f, i}; }
+    for (auto i : under) { table[i] = {1.0f, i}; }
+
+    return std::make_pair(std::move(table), std::move(pdf));
+}
+
+Float3 sample_uniform_triangle(Expr<float2> u) noexcept {
+    auto uv = ite(
+        u.x < u.y,
+        make_float2(0.5f * u.x, -0.5f * u.x + u.y),
+        make_float2(-0.5f * u.y + u.x, 0.5f * u.y));
+    return make_float3(uv, 1.0f - uv.x - uv.y);
+}
+
 }// namespace luisa::render

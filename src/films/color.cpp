@@ -62,7 +62,7 @@ void ColorFilmInstance::save(Stream &stream, const std::filesystem::path &path) 
         const char *err = nullptr;
         auto ret = SaveEXR(
             rgb.data(), static_cast<int>(resolution.x), static_cast<int>(resolution.y),
-            3, true /* write as fp16 */, path.string().c_str(), &err);
+            3, false, path.string().c_str(), &err);
         if (ret != TINYEXR_SUCCESS) [[unlikely]] {
             LUISA_ERROR_WITH_LOCATION(
                 "Failure when writing image '{}'. "

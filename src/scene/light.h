@@ -11,6 +11,7 @@
 
 namespace luisa::render {
 
+using compute::Ray;
 using compute::BindlessArray;
 
 class Shape;
@@ -29,7 +30,8 @@ public:
 
     struct Sample {
         Evaluation eval;
-        Float3 p;
+        Float3 p_light;
+        Var<Ray> shadow_ray;
     };
 
 public:
@@ -40,11 +42,10 @@ public:
         Pipeline &pipeline, CommandBuffer &command_buffer,
         uint instance_id, const Shape *shape) const noexcept = 0;
     [[nodiscard]] virtual Evaluation evaluate(
-        const Interaction &it, Expr<float3> p_from) const noexcept = 0;
+        const Pipeline &pipeline, const Interaction &it, Expr<float3> p_from) const noexcept = 0;
     [[nodiscard]] virtual Sample sample(
-        Sampler::Instance &sampler, Expr<float3> p_from,
-        Expr<InstancedShape> light_inst,
-        Expr<float4x4> light_inst_to_world) const noexcept = 0;
+        const Pipeline &pipeline, Sampler::Instance &sampler,
+        const Interaction &it_from, Expr<uint> light_inst_id) const noexcept = 0;
 };
 
 }

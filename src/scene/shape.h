@@ -50,14 +50,16 @@ struct alignas(16) InstancedShape {
     static constexpr auto light_property_shift = shape_property_shift + shape_property_bits;
     static constexpr auto material_property_shift = light_property_shift + light_property_bits;
 
-    static constexpr auto material_buffer_id_shift = 10u;
-    static constexpr auto light_buffer_id_shift = 10u;
+    static constexpr auto material_buffer_id_shift = 8u;
+    static constexpr auto light_buffer_id_shift = 8u;
     static constexpr auto material_tag_mask = (1u << material_buffer_id_shift) - 1u;
     static constexpr auto light_tag_mask = (1u << light_buffer_id_shift) - 1u;
 
     static constexpr auto position_buffer_id_offset = 0u;
     static constexpr auto attribute_buffer_id_offset = 1u;
     static constexpr auto triangle_buffer_id_offset = 2u;
+    static constexpr auto alias_table_buffer_id_offset = 3u;
+    static constexpr auto pdf_buffer_id_offset = 4u;
 
     uint buffer_id_base;
     uint properties;
@@ -79,14 +81,14 @@ struct alignas(16) InstancedShape {
     }
 
     [[nodiscard]] static auto encode_material_buffer_id_and_tag(uint buffer_id, uint tag) noexcept {
-        if (tag > material_tag_mask) [[unlikely]] {
+        if (tag != ~0u && tag > material_tag_mask) [[unlikely]] {
             LUISA_ERROR_WITH_LOCATION("Invalid material tag: {}.", tag);
         }
         return (buffer_id << material_buffer_id_shift) | tag;
     }
 
     [[nodiscard]] static auto encode_light_buffer_id_and_tag(uint buffer_id, uint tag) noexcept {
-        if (tag > light_tag_mask) [[unlikely]] {
+        if (tag != ~0u && tag > light_tag_mask) [[unlikely]] {
             LUISA_ERROR_WITH_LOCATION("Invalid light tag: {}.", tag);
         }
         return (buffer_id << light_buffer_id_shift) | tag;
@@ -166,6 +168,8 @@ LUISA_STRUCT(
     [[nodiscard]] auto position_buffer_id() const noexcept { return buffer_id_base + luisa::render::InstancedShape::position_buffer_id_offset; }
     [[nodiscard]] auto attribute_buffer_id() const noexcept { return buffer_id_base + luisa::render::InstancedShape::attribute_buffer_id_offset; }
     [[nodiscard]] auto triangle_buffer_id() const noexcept { return buffer_id_base + luisa::render::InstancedShape::triangle_buffer_id_offset; }
+    [[nodiscard]] auto alias_table_buffer_id() const noexcept { return buffer_id_base + luisa::render::InstancedShape::alias_table_buffer_id_offset; }
+    [[nodiscard]] auto pdf_buffer_id() const noexcept { return buffer_id_base + luisa::render::InstancedShape::pdf_buffer_id_offset; }
     [[nodiscard]] auto material_tag() const noexcept { return material_buffer_id_and_tag & luisa::render::InstancedShape::material_tag_mask; }
     [[nodiscard]] auto material_buffer_id() const noexcept { return material_buffer_id_and_tag >> luisa::render::InstancedShape::material_buffer_id_shift; }
     [[nodiscard]] auto light_tag() const noexcept { return light_buffer_id_and_tag & luisa::render::InstancedShape::light_tag_mask; }
@@ -176,6 +180,7 @@ LUISA_STRUCT(
     [[nodiscard]] auto test_material_flag(luisa::uint flag) const noexcept { return (material_flags() & flag) != 0u; }
     [[nodiscard]] auto test_light_flag(luisa::uint flag) const noexcept { return (light_flags() & flag) != 0u; }
     [[nodiscard]] auto test_shape_flag(luisa::uint flag) const noexcept { return (shape_flags() & flag) != 0u; }
+    [[nodiscard]] auto two_sided() const noexcept { return false & test_shape_flag(luisa::render::Shape::property_flag_two_sided); }
 };
 
 // clang-format on

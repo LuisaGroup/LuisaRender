@@ -63,29 +63,35 @@ public:
 class Interaction {
 
 private:
+    Var<InstancedShape> _shape;
     Float3 _p;
     Float3 _wo;
     Float3 _ng;
     Float2 _uv;
-    Bool _valid;
     Frame _shading;
-    Var<InstancedShape> _shape;
+    UInt _inst_id;
+    UInt _prim_id;
+    Float _prim_area;
 
 public:
-    Interaction() noexcept : _valid{false} {}
-    Interaction(Var<InstancedShape> shape, Expr<float3> p, Expr<float3> wo, Expr<float3> ng) noexcept
-        : _p{p}, _wo{wo}, _ng{ng}, _valid{true},
-          _shading{Frame::make(ng)},
-          _shape{std::move(shape)} {}
-    Interaction(Var<InstancedShape> shape, Expr<float3> p, Expr<float3> wo, Expr<float3> ng, Expr<float2> uv, Expr<float3> ns, Expr<float3> tangent) noexcept
-        : _p{p}, _wo{wo}, _ng{ng}, _uv{uv},  _valid{true},
-          _shading{Frame::make(ns, tangent)},
-          _shape{std::move(shape)} {}
+    Interaction() noexcept : _inst_id{~0u} {}
+    Interaction(Expr<uint> inst_id, Var<InstancedShape> shape, Expr<uint> prim_id, Expr<float> prim_area, Expr<float3> p, Expr<float3> wo, Expr<float3> ng) noexcept
+        :_shape{std::move(shape)}, _p{p}, _wo{wo},
+          _ng{ite(_shape->two_sided() & (dot(ng, wo) < 0.0f), -ng, ng)},
+          _inst_id{inst_id}, _prim_id{prim_id}, _prim_area{prim_area} { _shading = Frame::make(_ng); }
+    Interaction(Expr<uint> inst_id, Var<InstancedShape> shape, Expr<uint> prim_id, Expr<float> prim_area, Expr<float3> p, Expr<float3> wo, Expr<float3> ng, Expr<float2> uv, Expr<float3> ns, Expr<float3> tangent) noexcept
+        : _shape{std::move(shape)}, _p{p}, _wo{wo},
+          _ng{ite(_shape->two_sided() & (dot(ng, wo) < 0.0f), -ng, ng)}, _uv{uv},
+          _shading{Frame::make(ite(_shape->two_sided() & (dot(ns, wo) < 0.0f), -ns, ns), tangent)},
+          _inst_id{inst_id}, _prim_id{prim_id}, _prim_area{prim_area} {}
     [[nodiscard]] auto p() const noexcept { return _p; }
     [[nodiscard]] auto ng() const noexcept { return _ng; }
     [[nodiscard]] auto wo() const noexcept { return _wo; }
     [[nodiscard]] auto uv() const noexcept { return _uv; }
-    [[nodiscard]] auto valid() const noexcept { return _valid; }
+    [[nodiscard]] auto instance_id() const noexcept { return _inst_id; }
+    [[nodiscard]] auto triangle_id() const noexcept { return _prim_id; }
+    [[nodiscard]] auto triangle_area() const noexcept { return _prim_area; }
+    [[nodiscard]] auto valid() const noexcept { return _inst_id != ~0u; }
     [[nodiscard]] const auto &shading() const noexcept { return _shading; }
     [[nodiscard]] const auto &shape() const noexcept { return _shape; }
     [[nodiscard]] auto spawn_ray(Expr<float3> wi) const noexcept {

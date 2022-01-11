@@ -105,7 +105,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
             // evaluate Le
             $if(!interaction->shape()->test_light_flag(Light::property_flag_black)) {
                 pipeline.decode_light(interaction->shape()->light_tag(), [&](const Light *light) noexcept {
-                    auto eval = light->evaluate(*interaction, ray->origin());
+                    auto eval = light->evaluate(pipeline, *interaction, ray->origin());
                     $if(eval.pdf > 1e-4f) {
                         auto pdf_light = eval.pdf * light_sampler->pdf(*interaction);
                         auto mis_weight = ite(depth == 0u, 1.0f, balanced_heuristic(pdf_bsdf, pdf_light));
@@ -119,23 +119,20 @@ void MegakernelPathTracingInstance::_render_one_camera(
             // sample light
             Light::Sample light_sample;
             auto light_selection = light_sampler->sample(*sampler, *interaction);
-            auto light_instance_and_transform = pipeline.instance(light_selection.inst);
-            pipeline.decode_light(light_instance_and_transform.first->light_tag(), [&](const Light *light) noexcept {
-                auto &&[light_instance, light_to_world] = light_instance_and_transform;
-                light_sample = light->sample(*sampler, interaction->p(), light_instance, light_to_world);
+            pipeline.decode_light(light_selection.light_tag, [&](const Light *light) noexcept {
+                light_sample = light->sample(pipeline, *sampler, *interaction, light_selection.instance_id);
             });
-            auto shadow_ray = interaction->spawn_ray_to(light_sample.p);
-            auto occluded = pipeline.intersect_any(shadow_ray);
+            auto occluded = pipeline.intersect_any(light_sample.shadow_ray);
             pipeline.decode_material(*interaction, [&](const Material::Closure &material) {
                 // evaluate direct lighting
                 $if(light_sample.eval.pdf > 1e-4f & !occluded) {
                     auto light_pdf = light_sample.eval.pdf * light_selection.pdf;
-                    auto wi = def<float3>(shadow_ray->direction());
+                    auto wi = def<float3>(light_sample.shadow_ray->direction());
                     auto [f, pdf] = material.evaluate(wi);
-                    auto mis_weight = balanced_heuristic(light_sample.eval.pdf, pdf);
+                    auto mis_weight = balanced_heuristic(light_pdf, pdf);
                     radiance += throughput * mis_weight * ite(pdf > 1e-4f, f, 0.0f) *
                                 abs(dot(interaction->shading().n(), wi)) *
-                                light_sample.eval.Le / (light_sample.eval.pdf * light_selection.pdf);
+                                light_sample.eval.Le / light_pdf;
                 };
                 // sample material
                 auto [wi, eval] = material.sample(*sampler);

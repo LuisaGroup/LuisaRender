@@ -47,7 +47,9 @@ Shape cbox-short-box : TriangleMesh {
 
 Shape cbox-light : TriangleMesh {
   file { "cbox-parts/light.obj" }
-  light : Diffuse {}
+  light : Diffuse {
+    emission { 17.0, 12.0, 4.0 }
+  }
 }
 
 Shape cbox : Group {

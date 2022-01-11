@@ -3,6 +3,7 @@
 //
 
 #include <luisa-compute.h>
+#include <util/sampling.h>
 #include <scene/pipeline.h>
 
 namespace luisa::render {
@@ -76,10 +77,27 @@ void Pipeline::_process_shape(
                            << triangle_buffer->copy_from(offset_triangles.data())
                            << mesh.resource->build()
                            << luisa::compute::commit();
+            // compute alias table
+            luisa::vector<float> triangle_areas(triangles.size());
+            std::transform(triangles.cbegin(), triangles.cend(), triangle_areas.begin(), [positions](auto t) noexcept {
+                auto p0 = positions[t.i0];
+                auto p1 = positions[t.i1];
+                auto p2 = positions[t.i2];
+                return std::abs(length(cross(p1 - p0, p2 - p0)));
+            });
+            auto [alias_table, pdf] = create_alias_table(triangle_areas);
+            auto alias_table_buffer_view = _general_buffer_arena->allocate<AliasEntry>(alias_table.size());
+            auto pdf_buffer_view = _general_buffer_arena->allocate<float>(pdf.size());
+            command_buffer << alias_table_buffer_view.copy_from(alias_table.data())
+                           << pdf_buffer_view.copy_from(pdf.data())
+                           << luisa::compute::commit();
+
             // assign mesh data
             auto position_buffer_id = register_bindless(position_buffer_view.original());
             auto attribute_buffer_id = register_bindless(attribute_buffer_view.original());
             auto triangle_buffer_id = register_bindless(triangle_buffer->view());
+            auto alias_buffer_id = register_bindless(alias_table_buffer_view);
+            auto pdf_buffer_id = register_bindless(pdf_buffer_view);
             mesh.buffer_id_base = position_buffer_id;
             mesh.two_sided = shape->two_sided().value_or(false);
             iter = _meshes.emplace(shape, mesh).first;
@@ -90,16 +108,16 @@ void Pipeline::_process_shape(
         auto object_to_world = transform_builder.leaf(shape->transform(), instance_id);
         _accel.emplace_back(*mesh.resource, object_to_world, true);
 
-        auto [m, m_flags] = _process_material(command_buffer, instance_id, shape, material);
-        auto [l, l_flags] = _process_light(command_buffer, instance_id, shape, light);
+        auto m = _process_material(command_buffer, instance_id, shape, material);
+        auto l = _process_light(command_buffer, instance_id, shape, light);
 
         // create instance
         InstancedShape instance{};
         instance.buffer_id_base = mesh.buffer_id_base;
         instance.properties = InstancedShape::encode_property_flags(
-            two_sided ? Shape::property_flag_two_sided : 0u, m_flags, l_flags);
-        instance.material_buffer_id_and_tag = m;
-        instance.light_buffer_id_and_tag = l;
+            two_sided ? Shape::property_flag_two_sided : 0u, m.flags, l.flags);
+        instance.material_buffer_id_and_tag = InstancedShape::encode_material_buffer_id_and_tag(m.buffer_id, m.tag);
+        instance.light_buffer_id_and_tag = InstancedShape::encode_light_buffer_id_and_tag(l.buffer_id, l.tag);
         _instances.emplace_back(instance);
     } else {
         if (shape->transform() != nullptr) { transform_builder.push(shape->transform()); }
@@ -108,12 +126,9 @@ void Pipeline::_process_shape(
     }
 }
 
-std::pair<uint, uint> Pipeline::_process_material(CommandBuffer &command_buffer, uint instance_id, const Shape *shape, const Material *material) noexcept {
-    if (material == nullptr) { return {~0u, Material::property_flag_black}; }
-    if (auto iter = _materials.find(material); iter != _materials.cend()) {
-        auto [i, s, buffer_id_and_tag, flags] = iter->second;
-        return std::make_pair(buffer_id_and_tag, flags);
-    }
+Pipeline::MaterialData Pipeline::_process_material(CommandBuffer &command_buffer, uint instance_id, const Shape *shape, const Material *material) noexcept {
+    if (material == nullptr) { return {shape, instance_id, ~0u, ~0u, Material::property_flag_black}; }
+    if (auto iter = _materials.find(material); iter != _materials.cend()) { return iter->second; }
     auto tag = [this, material] {
         luisa::string impl_type{material->impl_type()};
         if (auto iter = _material_tags.find(impl_type);
@@ -126,19 +141,14 @@ std::pair<uint, uint> Pipeline::_process_material(CommandBuffer &command_buffer,
         _material_tags.emplace(std::move(impl_type), t);
         return t;
     }();
-    auto buffer_id_and_tag = InstancedShape::encode_material_buffer_id_and_tag(
-        material->encode(*this, command_buffer, instance_id, shape), tag);
+    auto buffer_id = material->encode(*this, command_buffer, instance_id, shape);
     auto flags = material->property_flags();
-    _materials.emplace(material, std::make_tuple(instance_id, shape, buffer_id_and_tag, flags));
-    return std::make_pair(buffer_id_and_tag, flags);
+    return _materials.emplace(material, MaterialData{shape, instance_id, buffer_id, tag, flags}).first->second;
 }
 
-std::pair<uint, uint> Pipeline::_process_light(CommandBuffer &command_buffer, uint instance_id, const Shape *shape, const Light *light) noexcept {
-    if (light == nullptr) { return std::make_pair(~0u, Light::property_flag_black); }
-    if (auto iter = _lights.find(light); iter != _lights.cend()) {
-        auto [i, s, buffer_id_and_tag, flags] = iter->second;
-        return std::make_pair(buffer_id_and_tag, flags);
-    }
+Pipeline::LightData Pipeline::_process_light(CommandBuffer &command_buffer, uint instance_id, const Shape *shape, const Light *light) noexcept {
+    if (light == nullptr) { return {shape, instance_id, ~0u, ~0u, Light::property_flag_black}; }
+    if (auto iter = _lights.find(light); iter != _lights.cend()) { return iter->second; }
     auto tag = [this, light] {
         luisa::string impl_type{light->impl_type()};
         if (auto iter = _light_tags.find(impl_type);
@@ -151,11 +161,9 @@ std::pair<uint, uint> Pipeline::_process_light(CommandBuffer &command_buffer, ui
         _light_tags.emplace(std::move(impl_type), t);
         return t;
     }();
-    auto buffer_id_and_tag = InstancedShape::encode_light_buffer_id_and_tag(
-        light->encode(*this, command_buffer, instance_id, shape), tag);
+    auto buffer_id = light->encode(*this, command_buffer, instance_id, shape);
     auto flags = light->property_flags();
-    _lights.emplace(light, std::make_tuple(instance_id, shape, buffer_id_and_tag, flags));
-    return std::make_pair(buffer_id_and_tag, flags);
+    return _lights.emplace(light, LightData{shape, instance_id, buffer_id, tag, flags}).first->second;
 }
 
 luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, const Scene &scene) noexcept {
@@ -216,23 +224,37 @@ Var<Triangle> Pipeline::triangle(const Var<InstancedShape> &instance, Expr<uint>
     return buffer<Triangle>(instance->triangle_buffer_id()).read(i);
 }
 
-std::pair<Var<float3>, Var<float3>> Pipeline::vertex(const Var<InstancedShape> &instance, const Var<float4x4> &shape_to_world, const Var<float3x3> &shape_to_world_normal, const Var<Triangle> &triangle, const Var<Hit> &hit) const noexcept {
-    auto p0 = buffer<float3>(instance->position_buffer_id()).read(triangle.i0);
-    auto p1 = buffer<float3>(instance->position_buffer_id()).read(triangle.i1);
-    auto p2 = buffer<float3>(instance->position_buffer_id()).read(triangle.i2);
-    auto p = make_float3(shape_to_world * make_float4(hit->interpolate(p0, p1, p2), 1.0f));
-    auto ng = normalize(shape_to_world_normal * cross(p1 - p0, p2 - p0));
-    return std::make_pair(std::move(p), std::move(ng));
+std::tuple<Var<float3>, Var<float3>, Var<float>> Pipeline::surface_point(
+    const Var<InstancedShape> &instance, const Var<float4x4> &shape_to_world,
+    const Var<Triangle> &triangle, const Var<float3> &uvw) const noexcept {
+
+    auto world = [&m = shape_to_world](auto &&p) noexcept {
+        return make_float3(m * make_float4(std::forward<decltype(p)>(p), 1.0f));
+    };
+    auto p_buffer = instance->position_buffer_id();
+    auto p0 = buffer<float3>(p_buffer).read(triangle.i0);
+    auto p1 = buffer<float3>(p_buffer).read(triangle.i1);
+    auto p2 = buffer<float3>(p_buffer).read(triangle.i2);
+    auto p = uvw.x * world(p0) + uvw.y * world(p1) + uvw.z * world(p2);
+    auto c = cross(p1 - p0, p2 - p0);
+    auto area = 0.5f * length(c);
+    auto ng = normalize(c);
+    return std::make_tuple(std::move(p), std::move(ng), std::move(area));
 }
 
-std::tuple<Var<float3>, Var<float3>, Var<float2>> Pipeline::vertex_attributes(
-    const Var<InstancedShape> &instance, const Var<float3x3> &shape_to_world_normal, const Var<Triangle> &triangle, const Var<Hit> &hit) const noexcept {
+std::tuple<Var<float3>, Var<float3>, Var<float2>> Pipeline::surface_point_attributes(
+    const Var<InstancedShape> &instance, const Var<float3x3> &shape_to_world_normal, const Var<Triangle> &triangle, const Var<float3> &uvw) const noexcept {
     auto a0 = buffer<VertexAttribute>(instance->attribute_buffer_id()).read(triangle.i0);
     auto a1 = buffer<VertexAttribute>(instance->attribute_buffer_id()).read(triangle.i1);
     auto a2 = buffer<VertexAttribute>(instance->attribute_buffer_id()).read(triangle.i2);
-    auto normal = normalize(shape_to_world_normal * hit->interpolate(a0->normal(), a1->normal(), a2->normal()));
-    auto tangent = normalize(shape_to_world_normal * hit->interpolate(a0->tangent(), a1->tangent(), a2->tangent()));
-    auto uv = hit->interpolate(a0->uv(), a1->uv(), a2->uv());
+    auto interpolate = [&](auto &&a, auto &&b, auto &&c) noexcept {
+        return uvw.x * std::forward<decltype(a)>(a) +
+               uvw.y * std::forward<decltype(b)>(b) +
+               uvw.z * std::forward<decltype(c)>(c);
+    };
+    auto normal = normalize(shape_to_world_normal * interpolate(a0->normal(), a1->normal(), a2->normal()));
+    auto tangent = normalize(shape_to_world_normal * interpolate(a0->tangent(), a1->tangent(), a2->tangent()));
+    auto uv = interpolate(a0->uv(), a1->uv(), a2->uv());
     return std::make_tuple(std::move(normal), std::move(tangent), std::move(uv));
 }
 
@@ -246,14 +268,16 @@ luisa::unique_ptr<Interaction> Pipeline::interaction(const Var<Ray> &ray, const 
         auto [shape, shape_to_world] = instance(hit.inst);
         auto shape_to_world_normal = transpose(inverse(make_float3x3(shape_to_world)));
         auto tri = triangle(shape, hit.prim);
-        auto [p, ng] = vertex(shape, shape_to_world, shape_to_world_normal, tri, hit);
-        auto [ns, t, uv] = vertex_attributes(shape, shape_to_world_normal, tri, hit);
+        auto [p, ng, area] = surface_point(
+            shape, shape_to_world, tri,
+            make_float3(1.0f - hit.bary.x - hit.bary.y, hit.bary));
+        auto [ns, t, uv] = surface_point_attributes(
+            shape, shape_to_world_normal, tri,
+            make_float3(1.0f - hit.bary.x - hit.bary.y, hit.bary));
         auto wo = -ray->direction();
-        auto two_sided = shape->test_shape_flag(Shape::property_flag_two_sided);
         it = Interaction{
-            std::move(shape), p, wo,
-            ite(two_sided & (dot(ng, wo) < 0.0f), -ng, ng), uv,
-            ite(two_sided & (dot(ns, wo) < 0.0f), -ns, ns), t};
+            hit.inst, std::move(shape), hit.prim,
+            area, p, wo, ng, uv, ns, t};
     };
     return luisa::make_unique<Interaction>(std::move(it));
 }

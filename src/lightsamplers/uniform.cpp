@@ -20,19 +20,22 @@ class UniformLightSamplerInstance final : public LightSampler::Instance {
 
 private:
     const Pipeline &_pipeline;
-    uint _light_to_instance_buffer_id{};
+    uint _light_buffer_id{};
 
 public:
     UniformLightSamplerInstance(const LightSampler *sampler, Pipeline &pipeline, CommandBuffer &command_buffer) noexcept
         : LightSampler::Instance{sampler},
           _pipeline{pipeline} {
         auto [view, buffer_id] = pipeline.arena_buffer<uint>(pipeline.lights().size());
-        _light_to_instance_buffer_id = buffer_id;
+        _light_buffer_id = buffer_id;
         luisa::vector<uint> light_to_instance_id(pipeline.lights().size());
         std::transform(
             pipeline.lights().cbegin(), pipeline.lights().cend(),
             light_to_instance_id.begin(),
-            [](auto light) noexcept { return std::get<0>(light.second); });
+            [](auto light) noexcept {
+                return InstancedShape::encode_light_buffer_id_and_tag(
+                    light.second.instance_id, light.second.tag);
+            });
         command_buffer << view.copy_from(light_to_instance_id.data())
                        << compute::commit();// lifetime
     }
@@ -45,8 +48,10 @@ public:
         auto u = sampler.generate_1d();
         auto n = static_cast<uint>(_pipeline.lights().size());
         auto i = clamp(cast<uint>(u * static_cast<float>(n)), 0u, n - 1u);
-        auto instance_id = _pipeline.buffer<uint>(_light_to_instance_buffer_id).read(i);
-        return {.inst = instance_id, .pdf = pdf(it)};
+        auto instance_id_and_light_tag = _pipeline.buffer<uint>(_light_buffer_id).read(i);
+        auto instance_id = instance_id_and_light_tag >> InstancedShape::light_buffer_id_shift;
+        auto light_tag = instance_id_and_light_tag & InstancedShape::light_tag_mask;
+        return {instance_id, light_tag, pdf(it)};
     }
 };
 

@@ -55,6 +55,22 @@ public:
         bool two_sided;
     };
 
+    struct LightData {
+        const Shape *shape;
+        uint instance_id;
+        uint buffer_id;
+        uint tag;
+        uint flags;
+    };
+
+    struct MaterialData {
+        const Shape *shape;
+        uint instance_id;
+        uint buffer_id;
+        uint tag;
+        uint flags;
+    };
+
 private:
     Device &_device;
     Accel _accel;
@@ -72,8 +88,8 @@ private:
     luisa::vector<const Light *> _light_interfaces;
     luisa::unordered_map<luisa::string /* impl type */, uint /* tag */, Hash64> _material_tags;
     luisa::unordered_map<luisa::string /* impl type */, uint /* tag */, Hash64> _light_tags;
-    luisa::unordered_map<const Material *, std::tuple<uint /* instance_id */, const Shape *, uint /* buffer id and tag */, uint /* properties */>> _materials;
-    luisa::unordered_map<const Light *, std::tuple<uint /* instance_id */, const Shape *, uint /* buffer id and tag */, uint /* properties */>> _lights;
+    luisa::unordered_map<const Material *, MaterialData> _materials;
+    luisa::unordered_map<const Light *, LightData> _lights;
     luisa::vector<InstancedShape> _instances;
     Buffer<InstancedShape> _instance_buffer;
     luisa::vector<luisa::unique_ptr<Camera::Instance>> _cameras;
@@ -89,8 +105,8 @@ private:
         CommandBuffer &command_buffer, TransformTree::Builder &transform_builder, const Shape *shape,
         luisa::optional<bool> overridden_two_sided = luisa::nullopt,
         const Material *overridden_material = nullptr, const Light *overridden_light = nullptr) noexcept;
-    [[nodiscard]] std::pair<uint /* buffer id and tag */, uint /* property flags */> _process_material(CommandBuffer &command_buffer, uint instance_id, const Shape *shape, const Material *material) noexcept;
-    [[nodiscard]] std::pair<uint /* buffer id and tag */, uint /* property flags */> _process_light(CommandBuffer &command_buffer, uint instance_id, const Shape *shape, const Light *light) noexcept;
+    [[nodiscard]] MaterialData _process_material(CommandBuffer &command_buffer, uint instance_id, const Shape *shape, const Material *material) noexcept;
+    [[nodiscard]] LightData _process_light(CommandBuffer &command_buffer, uint instance_id, const Shape *shape, const Light *light) noexcept;
 
 public:
     // for internal use only; use Pipeline::create() instead
@@ -184,10 +200,12 @@ public:
     [[nodiscard]] luisa::unique_ptr<Interaction> interaction(const Var<Ray> &ray, const Var<Hit> &hit) const noexcept;
     [[nodiscard]] std::pair<Var<InstancedShape>, Var<float4x4>> instance(Expr<uint> index) const noexcept;
     [[nodiscard]] Var<Triangle> triangle(const Var<InstancedShape> &instance, Expr<uint> index) const noexcept;
-    [[nodiscard]] std::pair<Var<float3> /* position */, Var<float3> /* ng */>
-    vertex(const Var<InstancedShape> &instance, const Var<float4x4> &shape_to_world, const Var<float3x3> &shape_to_world_normal, const Var<Triangle> &triangle, const Var<Hit> &hit) const noexcept;
+    [[nodiscard]] std::tuple<Var<float3> /* position */, Var<float3> /* ng */, Var<float>/* area */>
+    surface_point(const Var<InstancedShape> &instance, const Var<float4x4> &shape_to_world,
+           const Var<Triangle> &triangle, const Var<float3> &uvw) const noexcept;
     [[nodiscard]] std::tuple<Var<float3> /* ns */, Var<float3> /* tangent */, Var<float2> /* uv */>
-    vertex_attributes(const Var<InstancedShape> &instance, const Var<float3x3> &shape_to_world_normal, const Var<Triangle> &triangle, const Var<Hit> &hit) const noexcept;
+    surface_point_attributes(const Var<InstancedShape> &instance, const Var<float3x3> &shape_to_world_normal,
+                      const Var<Triangle> &triangle, const Var<float3> &uvw) const noexcept;
     [[nodiscard]] auto intersect(const Var<Ray> &ray) const noexcept { return interaction(ray, trace_closest(ray)); }
     [[nodiscard]] auto intersect_any(const Var<Ray> &ray) const noexcept { return trace_any(ray); }
     [[nodiscard]] luisa::unique_ptr<Material::Closure> decode_material(uint tag, const Interaction &it) const noexcept;
