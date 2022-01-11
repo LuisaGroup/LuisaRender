@@ -2,11 +2,16 @@
 // Created by Mike on 2022/1/7.
 //
 
+#if defined(LUISA_USE_OPENCV)
 #include <opencv2/opencv.hpp>
+#endif
 
 #include <luisa-compute.h>
 #include <scene/film.h>
 #include <scene/pipeline.h>
+
+#define TINYEXR_IMPLEMENTATION
+#include "tinyexr.h"
 
 namespace luisa::render {
 
@@ -48,6 +53,9 @@ ColorFilmInstance::ColorFilmInstance(Device &device, const ColorFilm *film) noex
 
 void ColorFilmInstance::save(Stream &stream, const std::filesystem::path &path) const noexcept {
     auto resolution = node()->resolution();
+    auto file_ext = path.extension().string();
+    for (auto &c : file_ext) { c = static_cast<char>(tolower(c)); }
+#if defined(LUISA_USE_OPENCV)
     cv::Mat image{
         static_cast<int>(resolution.y),
         static_cast<int>(resolution.x),
@@ -55,8 +63,6 @@ void ColorFilmInstance::save(Stream &stream, const std::filesystem::path &path) 
     // TODO: support post-processing pipeline...
     stream << _image.copy_to(image.data) << synchronize();
     cv::cvtColor(image, image, cv::COLOR_RGBA2BGR);
-    auto file_ext = path.extension().string();
-    for (auto &c : file_ext) { c = static_cast<char>(tolower(c)); }
     if (file_ext == ".exr") {// HDR
         cv::imwrite(path.string(), image);
     } else {// LDR
@@ -64,6 +70,29 @@ void ColorFilmInstance::save(Stream &stream, const std::filesystem::path &path) 
             "Film extension '{}' is not supported.",
             file_ext);
     }
+#else
+    std::vector<float> data, rgb;
+    data.resize(resolution.y * resolution.x * 4);
+    rgb.resize(resolution.y * resolution.x * 3);
+    stream << _image.copy_to(data.data()) << synchronize();
+    for (int i = 0; i < resolution.x * resolution.y; i++) {
+        for (int c = 0; c < 3; c++)
+            rgb[i * 3 + c] = data[i * 4 + c];
+    }
+    if (file_ext == ".exr") {
+        const char* err = nullptr;
+        int ret = SaveEXR(rgb.data(),
+                          resolution.x, resolution.y, 3, 1 /* write as fp16 */, path.string().c_str(), &err);
+        if (ret != TINYEXR_SUCCESS) {
+            LUISA_ERROR_WITH_LOCATION(
+                "Failure when writing image '{}': OpenEXR error: {}", file_ext, err);
+        }
+    } else {
+        LUISA_ERROR_WITH_LOCATION(
+            "Film extension '{}' is not supported.",
+            file_ext);
+    }
+#endif
 }
 
 void ColorFilmInstance::accumulate(Expr<uint2> pixel, Expr<float3> color) const noexcept {

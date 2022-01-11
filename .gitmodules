@@ -10,3 +10,6 @@
 [submodule "src/ext/fast_float"]
 	path = src/ext/fast_float
 	url = https://github.com/fastfloat/fast_float.git
+[submodule "src/ext/tinyexr"]
+	path = src/ext/tinyexr
+	url = https://github.com/syoyo/tinyexr.git
