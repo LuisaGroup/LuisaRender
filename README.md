@@ -4,8 +4,9 @@ High-Performance renderer for stream architectures based on [LuisaCompute](https
 # Demo
 Cornell Box with Bunnies.
 - Multiple-Level Instancing
+- Mega-Kernel Path Tracing
+- Samples per Pixel: 1024
 - Resolution: 1024x1024
 - Max Depth: 10
-- Integrator: Mega-Kernel Path Tracing
 
 ![CornellBoxBunny](data/scenes/color.png)
