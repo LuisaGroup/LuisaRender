@@ -145,11 +145,13 @@ void MegakernelPathTracingInstance::_render_one_camera(
             });
             // rr
             $if(all(throughput <= 0.0f)) { $break; };
-            auto l = dot(make_float3(0.212671f, 0.715160f, 0.072169f), throughput);
-            auto q = max(l, 0.05f);
-            auto r = sampler->generate_1d();
-            $if(r >= q) { $break; };
-            throughput *= 1.0f / q;
+            $if(depth >= 3u) {
+                auto l = dot(make_float3(0.212671f, 0.715160f, 0.072169f), throughput);
+                auto q = max(l, 0.05f);
+                auto r = sampler->generate_1d();
+                $if(r >= q) { $break; };
+                throughput *= 1.0f / q;
+            };
         };
         film->accumulate(pixel_id, radiance);
         sampler->save_state();
