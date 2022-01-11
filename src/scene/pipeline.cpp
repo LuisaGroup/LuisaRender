@@ -248,7 +248,7 @@ luisa::unique_ptr<Interaction> Pipeline::interaction(const Var<Ray> &ray, const 
         auto tri = triangle(shape, hit.prim);
         auto [p, ng] = vertex(shape, shape_to_world, shape_to_world_normal, tri, hit);
         auto [ns, t, uv] = vertex_attributes(shape, shape_to_world_normal, tri, hit);
-        auto wo = -def<float3>(ray.direction);
+        auto wo = -ray->direction();
         auto two_sided = shape->test_shape_flag(Shape::property_flag_two_sided);
         it = Interaction{
             std::move(shape), p, wo,

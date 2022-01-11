@@ -92,8 +92,8 @@ void MegakernelPathTracingInstance::_render_one_camera(
         throughput *= filter_weight;
 
         auto [camera_ray, camera_weight] = camera->generate_ray(*sampler, pixel, time);
-        camera_ray.origin = make_float3(camera_to_world * make_float4(def<float3>(camera_ray.origin), 1.0f));
-        camera_ray.direction = normalize(camera_to_world_normal * def<float3>(camera_ray.direction));
+        camera_ray->set_origin(make_float3(camera_to_world * make_float4(camera_ray->origin(), 1.0f)));
+        camera_ray->set_direction(normalize(camera_to_world_normal * camera_ray->direction()));
         throughput *= camera_weight;
 
         auto ray = camera_ray;
@@ -105,7 +105,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
             // evaluate Le
             $if(!interaction->shape()->test_light_flag(Light::property_flag_black)) {
                 pipeline.decode_light(interaction->shape()->light_tag(), [&](const Light *light) noexcept {
-                    auto eval = light->evaluate(*interaction, def<float3>(ray.origin));
+                    auto eval = light->evaluate(*interaction, ray->origin());
                     $if(eval.pdf > 1e-4f) {
                         auto pdf_light = eval.pdf * light_sampler->pdf(*interaction);
                         auto mis_weight = ite(depth == 0u, 1.0f, balanced_heuristic(pdf_bsdf, pdf_light));
@@ -130,7 +130,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
                 // evaluate direct lighting
                 $if(light_sample.eval.pdf > 1e-4f & !occluded) {
                     auto light_pdf = light_sample.eval.pdf * light_selection.pdf;
-                    auto wi = def<float3>(shadow_ray.direction);
+                    auto wi = def<float3>(shadow_ray->direction());
                     auto [f, pdf] = material.evaluate(wi);
                     auto mis_weight = balanced_heuristic(light_sample.eval.pdf, pdf);
                     radiance += throughput * mis_weight * ite(pdf > 1e-4f, f, 0.0f) *

@@ -79,8 +79,8 @@ void NormalVisualizerInstance::_render_one_camera(
         auto [ray, camera_weight] = camera->generate_ray(*sampler, pixel, time);
         sampler->save_state();
         path_weight *= camera_weight;
-        ray.origin = make_float3(camera_to_world * make_float4(def<float3>(ray.origin), 1.0f));
-        ray.direction = normalize(camera_to_world_normal * def<float3>(ray.direction));
+        ray->set_origin(make_float3(camera_to_world * make_float4(ray->origin(), 1.0f)));
+        ray->set_direction(normalize(camera_to_world_normal * ray->direction()));
         auto interaction = pipeline.intersect(ray);
         auto color = ite(
             interaction->valid(),
