@@ -9,6 +9,8 @@ target_link_libraries(luisa-render-ext INTERFACE fast_float)
 
 add_library(miniz SHARED tinyexr/deps/miniz/miniz.c)
 target_include_directories(miniz PUBLIC tinyexr/deps/miniz)
+set_target_properties(miniz PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+
 add_library(tinyexr SHARED tinyexr/tinyexr.cc)
 target_include_directories(tinyexr PUBLIC tinyexr)
 target_link_libraries(tinyexr PUBLIC miniz)
