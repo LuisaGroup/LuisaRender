@@ -56,24 +56,31 @@ private:
     const Pipeline &_pipeline;
     const Interaction &_it;
 
-public:
-    DiffuseLightClosure(const Pipeline &pipeline, const Interaction &it) noexcept
-        : _pipeline{pipeline}, _it{it} {}
-    [[nodiscard]] Light::Evaluation evaluate(Expr<float3> p_from) const noexcept override {
-        using namespace luisa::compute;
-        auto params = _pipeline.buffer<DiffuseLightParams>(_it.shape()->light_buffer_id()).read(0u);
+private:
+    [[nodiscard]] auto _evaluate(Expr<float3> p_from, const Var<DiffuseLightParams> &params) const noexcept {
         auto pdf_triangle = _pipeline.buffer<float>(_it.shape()->pdf_buffer_id()).read(_it.triangle_id());
         auto pdf_area = cast<float>(params.triangle_count) * (pdf_triangle / _it.triangle_area());
         auto cos_wo = dot(_it.wo(), _it.shading().n());
         auto front_face = cos_wo > 0.0f;
         auto emission = def<float3>(params.emission);
         auto pdf = distance_squared(_it.p(), p_from) * pdf_area * (1.0f / cos_wo);
-        return {.Le = emission, .pdf = ite(front_face, pdf, 0.0f)};
+        return Light::Evaluation{.Le = emission, .pdf = ite(front_face, pdf, 0.0f)};
     }
+
+public:
+    DiffuseLightClosure(const Pipeline &pipeline, const Interaction &it) noexcept
+        : _pipeline{pipeline}, _it{it} {}
+
+    [[nodiscard]] Light::Evaluation evaluate(Expr<float3> p_from) const noexcept override {
+        using namespace luisa::compute;
+        auto params = _pipeline.buffer<DiffuseLightParams>(_it.shape()->light_buffer_id()).read(0u);
+        return _evaluate(p_from, params);
+    }
+
     [[nodiscard]] Light::Sample sample(Sampler::Instance &sampler, Expr<uint> light_inst_id) const noexcept override {
         auto [light_inst, light_to_world] = _pipeline.instance(light_inst_id);
-        auto alias_table_buffer_id = light_inst->alias_table_buffer_id();
         auto params = _pipeline.buffer<DiffuseLightParams>(light_inst->light_buffer_id()).read(0u);
+        auto alias_table_buffer_id = light_inst->alias_table_buffer_id();
         auto triangle_id = sample_alias_table(
             _pipeline.buffer<AliasEntry>(alias_table_buffer_id),
             params.triangle_count, sampler.generate_1d());
@@ -84,7 +91,7 @@ public:
         auto [ns, tangent, uv] = _pipeline.surface_point_attributes(light_inst, light_to_world_normal, triangle, uvw);
         Interaction it{light_inst_id, light_inst, triangle_id, area, p, normalize(_it.p() - p), ng, uv, ns, tangent};
         DiffuseLightClosure closure{_pipeline, it};
-        return {.eval = closure.evaluate(_it.p()), .p_light = p, .shadow_ray = _it.spawn_ray_to(p)};
+        return {.eval = closure._evaluate(_it.p(), params), .p_light = p, .shadow_ray = _it.spawn_ray_to(p)};
     }
 };
 
