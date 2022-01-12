@@ -6,6 +6,7 @@
 
 #include <scene/scene_node.h>
 #include <scene/sampler.h>
+#include <scene/light.h>
 
 namespace luisa::render {
 
@@ -26,15 +27,20 @@ public:
     class Instance {
 
     private:
+        Pipeline &_pipeline;
         const LightSampler *_sampler;
 
     public:
-        explicit Instance(const LightSampler *light_dist) noexcept : _sampler{light_dist} {}
+        explicit Instance(Pipeline &pipeline, const LightSampler *light_dist) noexcept
+            : _pipeline{pipeline}, _sampler{light_dist} {}
         virtual ~Instance() noexcept = default;
         virtual void update(Stream &stream) noexcept = 0;
         [[nodiscard]] auto node() const noexcept { return _sampler; }
-        [[nodiscard]] virtual Float pdf(const Interaction &it) const noexcept = 0;
-        [[nodiscard]] virtual Selection sample(Sampler::Instance &sampler, const Interaction &it) const noexcept = 0;
+        [[nodiscard]] const auto &pipeline() const noexcept { return _pipeline; }
+        [[nodiscard]] virtual Float pdf_selection(const Interaction &it) const noexcept = 0;
+        [[nodiscard]] virtual Selection select(Sampler::Instance &sampler, const Interaction &it) const noexcept = 0;
+        [[nodiscard]] virtual Light::Evaluation evaluate(const Interaction &it, Expr<float3> p_from) const noexcept;
+        [[nodiscard]] virtual Light::Sample sample(Sampler::Instance &sampler, const Interaction &it) const noexcept;
     };
 
 public:

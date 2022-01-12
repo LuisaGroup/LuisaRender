@@ -19,13 +19,11 @@ public:
 class UniformLightSamplerInstance final : public LightSampler::Instance {
 
 private:
-    const Pipeline &_pipeline;
     uint _light_buffer_id{};
 
 public:
     UniformLightSamplerInstance(const LightSampler *sampler, Pipeline &pipeline, CommandBuffer &command_buffer) noexcept
-        : LightSampler::Instance{sampler},
-          _pipeline{pipeline} {
+        : LightSampler::Instance{pipeline, sampler} {
         auto [view, buffer_id] = pipeline.arena_buffer<uint>(pipeline.lights().size());
         _light_buffer_id = buffer_id;
         luisa::vector<uint> light_to_instance_id(pipeline.lights().size());
@@ -40,18 +38,18 @@ public:
                        << compute::commit();// lifetime
     }
     void update(Stream &) noexcept override {}
-    [[nodiscard]] Float pdf(const Interaction &it) const noexcept override {
-        return static_cast<float>(1.0 / static_cast<double>(_pipeline.lights().size()));
+    [[nodiscard]] Float pdf_selection(const Interaction &it) const noexcept override {
+        return static_cast<float>(1.0 / static_cast<double>(pipeline().lights().size()));
     }
-    [[nodiscard]] LightSampler::Selection sample(Sampler::Instance &sampler, const Interaction &it) const noexcept override {
+    [[nodiscard]] LightSampler::Selection select(Sampler::Instance &sampler, const Interaction &it) const noexcept override {
         using namespace luisa::compute;
         auto u = sampler.generate_1d();
-        auto n = static_cast<uint>(_pipeline.lights().size());
+        auto n = static_cast<uint>(pipeline().lights().size());
         auto i = clamp(cast<uint>(u * static_cast<float>(n)), 0u, n - 1u);
-        auto instance_id_and_light_tag = _pipeline.buffer<uint>(_light_buffer_id).read(i);
+        auto instance_id_and_light_tag = pipeline().buffer<uint>(_light_buffer_id).read(i);
         auto instance_id = instance_id_and_light_tag >> InstancedShape::light_buffer_id_shift;
         auto light_tag = instance_id_and_light_tag & InstancedShape::light_tag_mask;
-        return {instance_id, light_tag, pdf(it)};
+        return {instance_id, light_tag, pdf_selection(it)};
     }
 };
 
