@@ -47,37 +47,33 @@ public:
         command_buffer << buffer_view.copy_from(&params) << luisa::compute::commit();
         return buffer_id;
     }
-    [[nodiscard]] luisa::unique_ptr<Closure> decode(const Pipeline &pipeline, const Interaction &it) const noexcept override;
+    [[nodiscard]] luisa::unique_ptr<Closure> decode(const Pipeline &pipeline) const noexcept override;
 };
 
 class DiffuseLightClosure final : public Light::Closure {
 
 private:
     const Pipeline &_pipeline;
-    const Interaction &_it;
 
 private:
-    [[nodiscard]] auto _evaluate(Expr<float3> p_from, const Var<DiffuseLightParams> &params) const noexcept {
+    [[nodiscard]] auto _evaluate(const Interaction &it_light, Expr<float3> p_from, const Var<DiffuseLightParams> &params) const noexcept {
         using namespace luisa::compute;
-        auto pdf_triangle = _pipeline.buffer<float>(_it.shape()->pdf_buffer_id()).read(_it.triangle_id());
-        auto pdf_area = cast<float>(params.triangle_count) * (pdf_triangle / _it.triangle_area());
-        auto cos_wo = dot(_it.wo(), _it.shading().n());
+        auto pdf_triangle = _pipeline.buffer<float>(it_light.shape()->pdf_buffer_id()).read(it_light.triangle_id());
+        auto pdf_area = cast<float>(params.triangle_count) * (pdf_triangle / it_light.triangle_area());
+        auto cos_wo = dot(it_light.wo(), it_light.shading().n());
         auto front_face = cos_wo > 0.0f;
         auto emission = def<float3>(params.emission);
-        auto pdf = distance_squared(_it.p(), p_from) * pdf_area * (1.0f / cos_wo);
+        auto pdf = distance_squared(it_light.p(), p_from) * pdf_area * (1.0f / cos_wo);
         return Light::Evaluation{.L = emission, .pdf = ite(front_face, pdf, 0.0f)};
     }
 
 public:
-    DiffuseLightClosure(const Pipeline &pipeline, const Interaction &it) noexcept
-        : _pipeline{pipeline}, _it{it} {}
-
-    [[nodiscard]] Light::Evaluation evaluate(Expr<float3> p_from) const noexcept override {
-        auto params = _pipeline.buffer<DiffuseLightParams>(_it.shape()->light_buffer_id()).read(0u);
-        return _evaluate(p_from, params);
+    explicit DiffuseLightClosure(const Pipeline &pipeline) noexcept : _pipeline{pipeline} {}
+    [[nodiscard]] Light::Evaluation evaluate(const Interaction &it, Expr<float3> p_from) const noexcept override {
+        auto params = _pipeline.buffer<DiffuseLightParams>(it.shape()->light_buffer_id()).read(0u);
+        return _evaluate(it, p_from, params);
     }
-
-    [[nodiscard]] Light::Sample sample(Sampler::Instance &sampler, Expr<uint> light_inst_id) const noexcept override {
+    [[nodiscard]] Light::Sample sample(Sampler::Instance &sampler, Expr<uint> light_inst_id, const Interaction &it_from) const noexcept override {
         using namespace luisa::compute;
         auto [light_inst, light_to_world] = _pipeline.instance(light_inst_id);
         auto params = _pipeline.buffer<DiffuseLightParams>(light_inst->light_buffer_id()).read(0u);
@@ -90,14 +86,14 @@ public:
         auto uvw = sample_uniform_triangle(sampler.generate_2d());
         auto [p, ng, area] = _pipeline.surface_point_geometry(light_inst, light_to_world, triangle, uvw);
         auto [ns, tangent, uv] = _pipeline.surface_point_attributes(light_inst, light_to_world_normal, triangle, uvw);
-        Interaction it{light_inst_id, light_inst, triangle_id, area, p, normalize(_it.p() - p), ng, uv, ns, tangent};
-        DiffuseLightClosure closure{_pipeline, it};
-        return {.eval = closure._evaluate(_it.p(), params), .p_light = p, .shadow_ray = _it.spawn_ray_to(p)};
+        Interaction it_light{light_inst, triangle_id, area, p, normalize(it_from.p() - p), ng, uv, ns, tangent};
+        DiffuseLightClosure closure{_pipeline};
+        return {.eval = closure._evaluate(it_light, it_from.p(), params), .p_light = p};
     }
 };
 
-luisa::unique_ptr<Light::Closure> DiffuseLight::decode(const Pipeline &pipeline, const Interaction &it) const noexcept {
-    return luisa::make_unique<DiffuseLightClosure>(pipeline, it);
+luisa::unique_ptr<Light::Closure> DiffuseLight::decode(const Pipeline &pipeline) const noexcept {
+    return luisa::make_unique<DiffuseLightClosure>(pipeline);
 }
 
 }// namespace luisa::render

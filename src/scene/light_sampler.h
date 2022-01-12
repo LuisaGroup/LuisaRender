@@ -40,7 +40,7 @@ public:
         [[nodiscard]] virtual Float pdf_selection(const Interaction &it) const noexcept = 0;
         [[nodiscard]] virtual Selection select(Sampler::Instance &sampler, const Interaction &it) const noexcept = 0;
         [[nodiscard]] virtual Light::Evaluation evaluate(const Interaction &it, Expr<float3> p_from) const noexcept;
-        [[nodiscard]] virtual Light::Sample sample(Sampler::Instance &sampler, const Interaction &it) const noexcept;
+        [[nodiscard]] virtual Light::Sample sample(Sampler::Instance &sampler, const Interaction &it_from) const noexcept;
     };
 
 public:

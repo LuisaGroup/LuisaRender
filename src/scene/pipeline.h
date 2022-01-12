@@ -209,8 +209,8 @@ public:
     [[nodiscard]] auto intersect_any(const Var<Ray> &ray) const noexcept { return trace_any(ray); }
     [[nodiscard]] luisa::unique_ptr<Material::Closure> decode_material(uint tag, const Interaction &it) const noexcept;
     void decode_material(Expr<uint> tag, const Interaction &it, const luisa::function<void(const Material::Closure &)> &func) const noexcept;
-    [[nodiscard]] luisa::unique_ptr<Light::Closure> decode_light(uint tag, const Interaction &it) const noexcept;
-    void decode_light(Expr<uint> tag, const Interaction &it, const luisa::function<void(const Light::Closure &)> &func) const noexcept;
+    [[nodiscard]] luisa::unique_ptr<Light::Closure> decode_light(uint tag) const noexcept;
+    void decode_light(Expr<uint> tag, const luisa::function<void(const Light::Closure &)> &func) const noexcept;
 };
 
 }// namespace luisa::render

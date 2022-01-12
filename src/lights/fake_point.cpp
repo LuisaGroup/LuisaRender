@@ -53,37 +53,35 @@ public:
         command_buffer << buffer_view.copy_from(&_params);
         return buffer_id;
     }
-    [[nodiscard]] luisa::unique_ptr<Closure> decode(const Pipeline &pipeline, const Interaction &it) const noexcept override;
+    [[nodiscard]] luisa::unique_ptr<Closure> decode(const Pipeline &pipeline) const noexcept override;
 };
 
 class FakePointLightClosure final : public Light::Closure {
 
 private:
     const Pipeline &_pipeline;
-    const Interaction &_it;
 
 public:
-    FakePointLightClosure(const Pipeline &ppl, const Interaction &it) noexcept
-        : _pipeline{ppl}, _it{it} {}
-    [[nodiscard]] Light::Evaluation evaluate(Expr<float3> p_from) const noexcept override { return {}; /* should never be called */ }
-    [[nodiscard]] Light::Sample sample(Sampler::Instance &sampler, Expr<uint> light_inst_id) const noexcept override {
+    explicit FakePointLightClosure(const Pipeline &ppl) noexcept: _pipeline{ppl} {}
+    [[nodiscard]] Light::Evaluation evaluate(const Interaction &, Expr<float3>) const noexcept override { return {}; /* should never be called */ }
+    [[nodiscard]] Light::Sample sample(Sampler::Instance &sampler, Expr<uint> light_inst_id, const Interaction &it_from) const noexcept override {
         using namespace luisa::compute;
         auto [inst, inst_to_world] = _pipeline.instance(light_inst_id);
         auto params = _pipeline.buffer<FakePointLightParams>(inst->light_buffer_id()).read(0u);
         auto emission = def<float3>(params.emission);
         auto center = make_float3(inst_to_world * make_float4(make_float3(0.0f), 1.0f));
         auto offset = sample_uniform_sphere(sampler.generate_2d());
+        auto p_light = params.radius * offset + center;
         Light::Sample s;
         s.eval.L = emission * 1e6f;
-        s.eval.pdf = 1e6f;
-        s.p_light = params.radius * offset + center;
-        s.shadow_ray = _it.spawn_ray_to(s.p_light);
+        s.eval.pdf = 1e6f * distance_squared(p_light, it_from.p());
+        s.p_light = p_light;
         return s;
     }
 };
 
-luisa::unique_ptr<Light::Closure> FakePointLight::decode(const Pipeline &pipeline, const Interaction &it) const noexcept {
-    return luisa::make_unique<FakePointLightClosure>(pipeline, it);
+luisa::unique_ptr<Light::Closure> FakePointLight::decode(const Pipeline &pipeline) const noexcept {
+    return luisa::make_unique<FakePointLightClosure>(pipeline);
 }
 
 }// namespace luisa::render

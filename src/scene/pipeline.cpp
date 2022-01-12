@@ -286,9 +286,7 @@ luisa::unique_ptr<Interaction> Pipeline::interaction(const Var<Ray> &ray, const 
             shape, shape_to_world_normal, tri,
             make_float3(1.0f - hit.bary.x - hit.bary.y, hit.bary));
         auto wo = -ray->direction();
-        it = Interaction{
-            hit.inst, std::move(shape), hit.prim,
-            area, p, wo, ng, uv, ns, t};
+        it = Interaction{std::move(shape), hit.prim, area, p, wo, ng, uv, ns, t};
     };
     return luisa::make_unique<Interaction>(std::move(it));
 }
@@ -308,17 +306,17 @@ void Pipeline::decode_material(Expr<uint> tag, const Interaction &it, const luis
     };
 }
 
-luisa::unique_ptr<Light::Closure> Pipeline::decode_light(uint tag, const Interaction &it) const noexcept {
+luisa::unique_ptr<Light::Closure> Pipeline::decode_light(uint tag) const noexcept {
     if (tag > _light_interfaces.size()) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION("Invalid light tag: {}.", tag);
     }
-    return _light_interfaces[tag]->decode(*this, it);
+    return _light_interfaces[tag]->decode(*this);
 }
 
-void Pipeline::decode_light(Expr<uint> tag, const Interaction &it, const function<void(const Light::Closure &)> &func) const noexcept {
+void Pipeline::decode_light(Expr<uint> tag, const function<void(const Light::Closure &)> &func) const noexcept {
     $switch(tag) {
         for (auto i = 0u; i < _light_interfaces.size(); i++) {
-            $case(i) { func(*decode_light(i, it)); };
+            $case(i) { func(*decode_light(i)); };
         }
     };
 }

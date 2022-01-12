@@ -1,12 +1,12 @@
 Film film : Color {
   resolution { 1024 }
-  exposure { 1 }
+  exposure { 0 }
 }
 
 Camera camera : Pinhole {
   position { -0.01, 0.995, 5.0 }
   fov { 27.8 }
-  spp { 4096 }
+  spp { 1024 }
   film { @film }
   file { "test.exr" }
 }
@@ -35,7 +35,7 @@ Shape virtual : Virtual {
     translate { 0, 2, 2 }
   }
   light : FakePoint {
-    emission { 0.2 }
+    emission { 4 }
     radius { 0.2 }
   }
 }
@@ -69,6 +69,17 @@ Shape light : TriangleMesh {
   }
 }
 
+Shape point : Virtual {
+  transform : SRT {
+    translate { 0.2, 0.1, 0.9 }
+  }
+  light : FakePoint {
+    emission { 1.5, 1.1, 0.6 }
+    scale { 0.25 }
+    radius { 0.01 }
+  }
+}
+
 Shape group : Group {
   shapes {
     @cbox-short-box,
@@ -97,6 +108,6 @@ Shape group : Group {
 
 render {
   cameras { @camera }
-  shapes { @cbox, @cbox-light, @bunny, @group, @light, @virtual }
+  shapes { @cbox, @cbox-light, @bunny, @group, @light, @point }
   integrator { @pt }
 }

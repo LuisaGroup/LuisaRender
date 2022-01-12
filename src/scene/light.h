@@ -29,13 +29,12 @@ public:
     struct Sample {
         Evaluation eval;
         Float3 p_light;
-        Var<Ray> shadow_ray;
     };
 
     struct Closure {
         virtual ~Closure() noexcept = default;
-        [[nodiscard]] virtual Evaluation evaluate(Expr<float3> p_from) const noexcept = 0;
-        [[nodiscard]] virtual Sample sample(Sampler::Instance &sampler, Expr<uint> light_inst_id) const noexcept = 0;
+        [[nodiscard]] virtual Evaluation evaluate(const Interaction &it_light, Expr<float3> p_from) const noexcept = 0;
+        [[nodiscard]] virtual Sample sample(Sampler::Instance &sampler, Expr<uint> light_inst_id, const Interaction &it_from) const noexcept = 0;
     };
 
 public:
@@ -45,7 +44,7 @@ public:
     [[nodiscard]] virtual uint /* bindless buffer id */ encode(
         Pipeline &pipeline, CommandBuffer &command_buffer,
         uint instance_id, const Shape *shape) const noexcept = 0;
-    [[nodiscard]] virtual luisa::unique_ptr<Closure> decode(const Pipeline &pipeline, const Interaction &it) const noexcept = 0;
+    [[nodiscard]] virtual luisa::unique_ptr<Closure> decode(const Pipeline &pipeline) const noexcept = 0;
 };
 
 }// namespace luisa::render

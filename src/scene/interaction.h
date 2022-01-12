@@ -69,29 +69,28 @@ private:
     Float3 _ng;
     Float2 _uv;
     Frame _shading;
-    UInt _inst_id;
     UInt _prim_id;
     Float _prim_area;
 
 public:
-    Interaction() noexcept : _inst_id{~0u} {}
-    Interaction(Expr<uint> inst_id, Var<InstancedShape> shape, Expr<uint> prim_id, Expr<float> prim_area,
+    Interaction() noexcept : _prim_id{~0u} {}
+    Interaction(Var<InstancedShape> shape, Expr<uint> prim_id, Expr<float> prim_area,
                 Expr<float3> p, Expr<float3> wo, Expr<float3> ng) noexcept
-        : _shape{std::move(shape)}, _p{p}, _wo{wo}, _ng{ng}, _shading{Frame::make(_ng)},
-          _inst_id{inst_id}, _prim_id{prim_id}, _prim_area{prim_area} {}
-    Interaction(Expr<uint> inst_id, Var<InstancedShape> shape, Expr<uint> prim_id, Expr<float> prim_area,
+        : _shape{std::move(shape)}, _p{p}, _wo{wo},
+          _ng{ng}, _shading{Frame::make(_ng)},
+          _prim_id{prim_id}, _prim_area{prim_area} {}
+    Interaction(Var<InstancedShape> shape, Expr<uint> prim_id, Expr<float> prim_area,
                 Expr<float3> p, Expr<float3> wo, Expr<float3> ng, Expr<float2> uv, Expr<float3> ns, Expr<float3> tangent) noexcept
         : _shape{std::move(shape)}, _p{p}, _wo{wo}, _ng{ng}, _uv{uv},
           _shading{Frame::make(ite(_shape->two_sided() & (dot(ns, wo) < 0.0f), -ns, ns), tangent)},
-          _inst_id{inst_id}, _prim_id{prim_id}, _prim_area{prim_area} {}
+          _prim_id{prim_id}, _prim_area{prim_area} {}
     [[nodiscard]] auto p() const noexcept { return _p; }
     [[nodiscard]] auto ng() const noexcept { return _ng; }
     [[nodiscard]] auto wo() const noexcept { return _wo; }
     [[nodiscard]] auto uv() const noexcept { return _uv; }
-    [[nodiscard]] auto instance_id() const noexcept { return _inst_id; }
     [[nodiscard]] auto triangle_id() const noexcept { return _prim_id; }
     [[nodiscard]] auto triangle_area() const noexcept { return _prim_area; }
-    [[nodiscard]] auto valid() const noexcept { return _inst_id != ~0u; }
+    [[nodiscard]] auto valid() const noexcept { return _prim_id != ~0u; }
     [[nodiscard]] const auto &shading() const noexcept { return _shading; }
     [[nodiscard]] const auto &shape() const noexcept { return _shape; }
     [[nodiscard]] auto spawn_ray(Expr<float3> wi) const noexcept {

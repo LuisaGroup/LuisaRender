@@ -115,11 +115,12 @@ void MegakernelPathTracingInstance::_render_one_camera(
             // evaluate material
             $if(!it->shape()->has_material()) { $break; };
             auto light_sample = light_sampler->sample(*sampler, *it);
-            auto occluded = pipeline.intersect_any(light_sample.shadow_ray);
+            auto shadow_ray = it->spawn_ray_to(light_sample.p_light);
+            auto occluded = pipeline.intersect_any(shadow_ray);
             pipeline.decode_material(it->shape()->material_tag(), *it, [&](const Material::Closure &material) {
                 // sample direct lighting
                 $if(light_sample.eval.pdf > 0.0f & !occluded) {
-                    auto wi = light_sample.shadow_ray->direction();
+                    auto wi = shadow_ray->direction();
                     auto [f, pdf] = material.evaluate(wi);
                     auto mis_weight = balanced_heuristic(light_sample.eval.pdf, pdf);
                     Li += beta * mis_weight * ite(pdf > 0.0f, f, 0.0f) *
