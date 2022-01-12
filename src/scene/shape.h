@@ -40,15 +40,8 @@ struct alignas(16) InstancedShape {
     static constexpr auto instance_buffer_id_shift = 12u;
     static constexpr auto instance_buffer_offset_mask = (1u << instance_buffer_id_shift) - 1u;
 
-    static constexpr auto material_property_bits = 14u;
-    static constexpr auto light_property_bits = 14u;
-    static constexpr auto shape_property_bits = 4u;
-    static constexpr auto material_property_mask = (1u << material_property_bits) - 1u;
-    static constexpr auto light_property_mask = (1u << light_property_bits) - 1u;
-    static constexpr auto shape_property_mask = (1u << shape_property_bits) - 1u;
-    static constexpr auto shape_property_shift = 0u;
-    static constexpr auto light_property_shift = shape_property_shift + shape_property_bits;
-    static constexpr auto material_property_shift = light_property_shift + light_property_bits;
+    static constexpr auto property_flag_bits = 8u;
+    static constexpr auto property_flag_mask = (1u << property_flag_bits) - 1u;
 
     static constexpr auto material_buffer_id_shift = 8u;
     static constexpr auto light_buffer_id_shift = 8u;
@@ -65,20 +58,6 @@ struct alignas(16) InstancedShape {
     uint properties;
     uint material_buffer_id_and_tag;
     uint light_buffer_id_and_tag;
-
-    [[nodiscard]] static auto encode_property_flags(uint shape_flags, uint material_flags, uint light_flags) noexcept {
-        if (shape_flags > shape_property_mask ||
-            material_flags > material_property_mask ||
-            light_flags > light_property_mask) [[unlikely]] {
-            LUISA_ERROR_WITH_LOCATION(
-                "Invalid property flags: "
-                "shape = {:x}, material = {:x}, light = {:x}.",
-                shape_flags, material_flags, light_flags);
-        }
-        return (shape_flags << shape_property_shift) |
-               (material_flags << material_property_shift) |
-               (light_flags << light_property_shift);
-    }
 
     [[nodiscard]] static auto encode_material_buffer_id_and_tag(uint buffer_id, uint tag) noexcept {
         if (tag != ~0u && tag > material_tag_mask) [[unlikely]] {
@@ -107,7 +86,9 @@ class Transform;
 class Shape : public SceneNode {
 
 public:
-    static constexpr auto property_flag_two_sided = 1u;
+    static constexpr auto property_flag_two_sided = 1u << 0u;
+    static constexpr auto property_flag_has_material = 1u << 1u;
+    static constexpr auto property_flag_has_light = 1u << 2u;
 
 private:
     const Material *_material;
@@ -174,13 +155,11 @@ LUISA_STRUCT(
     [[nodiscard]] auto material_buffer_id() const noexcept { return material_buffer_id_and_tag >> luisa::render::InstancedShape::material_buffer_id_shift; }
     [[nodiscard]] auto light_tag() const noexcept { return light_buffer_id_and_tag & luisa::render::InstancedShape::light_tag_mask; }
     [[nodiscard]] auto light_buffer_id() const noexcept { return light_buffer_id_and_tag >> luisa::render::InstancedShape::light_buffer_id_shift; }
-    [[nodiscard]] auto material_flags() const noexcept { return (properties >> luisa::render::InstancedShape::material_property_shift) & luisa::render::InstancedShape::material_property_mask; }
-    [[nodiscard]] auto light_flags() const noexcept { return (properties >> luisa::render::InstancedShape::light_property_shift) & luisa::render::InstancedShape::light_property_mask; }
-    [[nodiscard]] auto shape_flags() const noexcept { return (properties >> luisa::render::InstancedShape::shape_property_shift) & luisa::render::InstancedShape::shape_property_mask; }
-    [[nodiscard]] auto test_material_flag(luisa::uint flag) const noexcept { return (material_flags() & flag) != 0u; }
-    [[nodiscard]] auto test_light_flag(luisa::uint flag) const noexcept { return (light_flags() & flag) != 0u; }
-    [[nodiscard]] auto test_shape_flag(luisa::uint flag) const noexcept { return (shape_flags() & flag) != 0u; }
-    [[nodiscard]] auto two_sided() const noexcept { return test_shape_flag(luisa::render::Shape::property_flag_two_sided); }
+    [[nodiscard]] auto property_flags() const noexcept { return properties & luisa::render::InstancedShape::property_flag_mask; }
+    [[nodiscard]] auto test_property_flag(luisa::uint flag) const noexcept { return (property_flags() & flag) != 0u; }
+    [[nodiscard]] auto two_sided() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_two_sided); }
+    [[nodiscard]] auto has_light() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_light); }
+    [[nodiscard]] auto has_material() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_material); }
 };
 
 // clang-format on

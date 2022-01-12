@@ -41,14 +41,10 @@ public:
         }
     }
     [[nodiscard]] string_view impl_type() const noexcept override { return "lambert"; }
-    [[nodiscard]] uint property_flags() const noexcept override {
-        auto flags = property_flag_reflective;
-        if (_params.color[0] == 0.0f &&
-            _params.color[1] == 0.0f &&
-            _params.color[1] == 0.0f) {
-            flags |= property_flag_black;
-        }
-        return flags;
+    [[nodiscard]] bool is_black() const noexcept override {
+        return _params.color[0] == 0.0f &&
+               _params.color[1] == 0.0f &&
+               _params.color[1] == 0.0f;
     }
     [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint, const Shape *) const noexcept override {
         auto [buffer_view, buffer_id] = pipeline.arena_buffer<LambertParams>(sizeof(LambertParams));

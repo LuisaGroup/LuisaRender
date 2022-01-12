@@ -60,7 +60,6 @@ public:
         uint instance_id;
         uint buffer_id;
         uint tag;
-        uint flags;
     };
 
     struct MaterialData {
@@ -68,7 +67,6 @@ public:
         uint instance_id;
         uint buffer_id;
         uint tag;
-        uint flags;
     };
 
 private:
@@ -209,9 +207,9 @@ public:
     [[nodiscard]] auto intersect(const Var<Ray> &ray) const noexcept { return interaction(ray, trace_closest(ray)); }
     [[nodiscard]] auto intersect_any(const Var<Ray> &ray) const noexcept { return trace_any(ray); }
     [[nodiscard]] luisa::unique_ptr<Material::Closure> decode_material(uint tag, const Interaction &it) const noexcept;
-    void decode_material(const Interaction &it, const luisa::function<void(const Material::Closure &)> &func) const noexcept;
-    [[nodiscard]] const Light *decode_light(uint tag) const noexcept;
-    void decode_light(Expr<uint> tag, const luisa::function<void(const Light *)> &func) const noexcept;
+    void decode_material(Expr<uint> tag, const Interaction &it, const luisa::function<void(const Material::Closure &)> &func) const noexcept;
+    [[nodiscard]] luisa::unique_ptr<Light::Closure> decode_light(uint tag, const Interaction &it) const noexcept;
+    void decode_light(Expr<uint> tag, const Interaction &it, const luisa::function<void(const Light::Closure &)> &func) const noexcept;
 };
 
 }// namespace luisa::render

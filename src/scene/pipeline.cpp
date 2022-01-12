@@ -108,16 +108,20 @@ void Pipeline::_process_shape(
         auto object_to_world = transform_builder.leaf(shape->transform(), instance_id);
         _accel.emplace_back(*mesh.resource, object_to_world, true);
 
-        auto m = _process_material(command_buffer, instance_id, shape, material);
-        auto l = _process_light(command_buffer, instance_id, shape, light);
-
         // create instance
         InstancedShape instance{};
         instance.buffer_id_base = mesh.buffer_id_base;
-        instance.properties = InstancedShape::encode_property_flags(
-            two_sided ? Shape::property_flag_two_sided : 0u, m.flags, l.flags);
-        instance.material_buffer_id_and_tag = InstancedShape::encode_material_buffer_id_and_tag(m.buffer_id, m.tag);
-        instance.light_buffer_id_and_tag = InstancedShape::encode_light_buffer_id_and_tag(l.buffer_id, l.tag);
+        if (two_sided) { instance.properties |= Shape::property_flag_two_sided; }
+        if (material != nullptr && !material->is_black()) {
+            auto m = _process_material(command_buffer, instance_id, shape, material);
+            instance.properties |= Shape::property_flag_has_material;
+            instance.material_buffer_id_and_tag = InstancedShape::encode_material_buffer_id_and_tag(m.buffer_id, m.tag);
+        }
+        if (light != nullptr && !light->is_black()) {
+            auto l = _process_light(command_buffer, instance_id, shape, light);
+            instance.properties |= Shape::property_flag_has_light;
+            instance.light_buffer_id_and_tag = InstancedShape::encode_light_buffer_id_and_tag(l.buffer_id, l.tag);
+        }
         _instances.emplace_back(instance);
     } else {
         if (shape->transform() != nullptr) { transform_builder.push(shape->transform()); }
@@ -127,7 +131,6 @@ void Pipeline::_process_shape(
 }
 
 Pipeline::MaterialData Pipeline::_process_material(CommandBuffer &command_buffer, uint instance_id, const Shape *shape, const Material *material) noexcept {
-    if (material == nullptr) { return {shape, instance_id, ~0u, ~0u, Material::property_flag_black}; }
     if (auto iter = _materials.find(material); iter != _materials.cend()) { return iter->second; }
     auto tag = [this, material] {
         luisa::string impl_type{material->impl_type()};
@@ -142,12 +145,10 @@ Pipeline::MaterialData Pipeline::_process_material(CommandBuffer &command_buffer
         return t;
     }();
     auto buffer_id = material->encode(*this, command_buffer, instance_id, shape);
-    auto flags = material->property_flags();
-    return _materials.emplace(material, MaterialData{shape, instance_id, buffer_id, tag, flags}).first->second;
+    return _materials.emplace(material, MaterialData{shape, instance_id, buffer_id, tag}).first->second;
 }
 
 Pipeline::LightData Pipeline::_process_light(CommandBuffer &command_buffer, uint instance_id, const Shape *shape, const Light *light) noexcept {
-    if (light == nullptr) { return {shape, instance_id, ~0u, ~0u, Light::property_flag_black}; }
     if (auto iter = _lights.find(light); iter != _lights.cend()) { return iter->second; }
     auto tag = [this, light] {
         luisa::string impl_type{light->impl_type()};
@@ -162,8 +163,7 @@ Pipeline::LightData Pipeline::_process_light(CommandBuffer &command_buffer, uint
         return t;
     }();
     auto buffer_id = light->encode(*this, command_buffer, instance_id, shape);
-    auto flags = light->property_flags();
-    return _lights.emplace(light, LightData{shape, instance_id, buffer_id, tag, flags}).first->second;
+    return _lights.emplace(light, LightData{shape, instance_id, buffer_id, tag}).first->second;
 }
 
 luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, const Scene &scene) noexcept {
@@ -289,25 +289,25 @@ luisa::unique_ptr<Material::Closure> Pipeline::decode_material(uint tag, const I
     return _material_interfaces[tag]->decode(*this, it);
 }
 
-void Pipeline::decode_material(const Interaction &it, const luisa::function<void(const Material::Closure &)> &func) const noexcept {
-    $switch(it.shape()->material_tag()) {
-        for (auto tag = 0u; tag < _material_interfaces.size(); tag++) {
-            $case(tag) { func(*decode_material(tag, it)); };
+void Pipeline::decode_material(Expr<uint> tag, const Interaction &it, const luisa::function<void(const Material::Closure &)> &func) const noexcept {
+    $switch(tag) {
+        for (auto i = 0u; i < _material_interfaces.size(); i++) {
+            $case(i) { func(*decode_material(i, it)); };
         }
     };
 }
 
-const Light *Pipeline::decode_light(uint tag) const noexcept {
+luisa::unique_ptr<Light::Closure> Pipeline::decode_light(uint tag, const Interaction &it) const noexcept {
     if (tag > _light_interfaces.size()) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION("Invalid light tag: {}.", tag);
     }
-    return _light_interfaces[tag];
+    return _light_interfaces[tag]->decode(*this, it);
 }
 
-void Pipeline::decode_light(Expr<uint> tag, const function<void(const Light *)> &func) const noexcept {
+void Pipeline::decode_light(Expr<uint> tag, const Interaction &it, const function<void(const Light::Closure &)> &func) const noexcept {
     $switch(tag) {
         for (auto i = 0u; i < _light_interfaces.size(); i++) {
-            $case(i) { func(decode_light(i)); };
+            $case(i) { func(*decode_light(i, it)); };
         }
     };
 }

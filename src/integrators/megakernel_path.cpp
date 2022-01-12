@@ -103,9 +103,9 @@ void MegakernelPathTracingInstance::_render_one_camera(
             auto interaction = pipeline.intersect(ray);
             $if(!interaction->valid()) { $break; };
             // evaluate Le
-            $if(!interaction->shape()->test_light_flag(Light::property_flag_black)) {
-                pipeline.decode_light(interaction->shape()->light_tag(), [&](const Light *light) noexcept {
-                    auto eval = light->evaluate(pipeline, *interaction, ray->origin());
+            $if(interaction->shape()->has_light()) {
+                pipeline.decode_light(interaction->shape()->light_tag(), *interaction, [&](const Light::Closure &light) noexcept {
+                    auto eval = light.evaluate(ray->origin());
                     $if(eval.pdf > 0.0f) {
                         auto pdf_light = eval.pdf * light_sampler->pdf(*interaction);
                         auto mis_weight = ite(depth == 0u, 1.0f, balanced_heuristic(pdf_bsdf, pdf_light));
@@ -114,16 +114,16 @@ void MegakernelPathTracingInstance::_render_one_camera(
                 });
             };
 
-            $if(interaction->shape()->test_material_flag(Material::property_flag_black)) { $break; };
+            $if(!interaction->shape()->has_material()) { $break; };
 
             // sample light
             Light::Sample light_sample;
             auto light_selection = light_sampler->sample(*sampler, *interaction);
-            pipeline.decode_light(light_selection.light_tag, [&](const Light *light) noexcept {
-                light_sample = light->sample(pipeline, *sampler, light_selection.instance_id, *interaction);
+            pipeline.decode_light(light_selection.light_tag, *interaction, [&](const Light::Closure &light) noexcept {
+                light_sample = light.sample(*sampler, light_selection.instance_id);
             });
             auto occluded = pipeline.intersect_any(light_sample.shadow_ray);
-            pipeline.decode_material(*interaction, [&](const Material::Closure &material) {
+            pipeline.decode_material(interaction->shape()->material_tag(), *interaction, [&](const Material::Closure &material) {
                 // evaluate direct lighting
                 $if(light_sample.eval.pdf > 0.0f & !occluded) {
                     auto light_pdf = light_sample.eval.pdf * light_selection.pdf;

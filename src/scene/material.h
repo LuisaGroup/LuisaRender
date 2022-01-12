@@ -18,12 +18,6 @@ class Interaction;
 class Material : public SceneNode {
 
 public:
-    static constexpr auto property_flag_black = 1u;
-    static constexpr auto property_flag_reflective = 2u;
-    static constexpr auto property_flag_refractive = 4u;
-    // TODO: more flags
-
-public:
     struct Evaluation {
         Float3 f;
         Float pdf;
@@ -42,7 +36,7 @@ public:
 
 public:
     Material(Scene *scene, const SceneNodeDesc *desc) noexcept;
-    [[nodiscard]] virtual uint property_flags() const noexcept = 0;
+    [[nodiscard]] virtual bool is_black() const noexcept = 0;
     [[nodiscard]] virtual uint /* bindless buffer id */ encode(
         Pipeline &pipeline, CommandBuffer &command_buffer,
         uint instance_id, const Shape *shape) const noexcept = 0;
