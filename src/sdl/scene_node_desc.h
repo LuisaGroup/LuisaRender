@@ -99,18 +99,18 @@ public:
     using path_list = luisa::vector<path>;
 
     // parameter getters
-#define LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(type)                           \
-    [[nodiscard]] type property_##type(                                       \
-        std::string_view name) const noexcept;                                \
-    [[nodiscard]] type property_##type##_or_default(                          \
-        std::string_view name,                                                \
-        const luisa::function<type(const SceneNodeDesc *)> &) const noexcept; \
-    [[nodiscard]] type property_##type##_or_default(                          \
-        std::string_view name,                                                \
-        type default_value = {}) const noexcept {                             \
-        return property_##type##_or_default(name, [&](auto) noexcept {        \
-            return default_value;                                             \
-        });                                                                   \
+#define LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(type)                                 \
+    [[nodiscard]] type property_##type(                                             \
+        std::string_view name) const noexcept;                                      \
+    [[nodiscard]] type property_##type##_or_default(                                \
+        std::string_view name,                                                      \
+        const luisa::function<type(const SceneNodeDesc *)> &) const noexcept;       \
+    [[nodiscard]] type property_##type##_or_default(                                \
+        std::string_view name,                                                      \
+        const type &default_value = {}) const noexcept {                            \
+        return property_##type##_or_default(name, [&default_value](auto) noexcept { \
+            return default_value;                                                   \
+        });                                                                         \
     }
     LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(int)
     LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(int2)
