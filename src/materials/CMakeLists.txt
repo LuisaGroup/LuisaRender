@@ -1,3 +1,4 @@
 add_library(luisa-render-materials INTERFACE)
 luisa_render_add_plugin(black CATEGORY material SOURCES black.cpp)
 luisa_render_add_plugin(lambert CATEGORY material SOURCES lambert.cpp)
+luisa_render_add_plugin(fakemirror CATEGORY material SOURCES fake_mirror.cpp)

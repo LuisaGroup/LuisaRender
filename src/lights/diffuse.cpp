@@ -58,6 +58,7 @@ private:
 
 private:
     [[nodiscard]] auto _evaluate(Expr<float3> p_from, const Var<DiffuseLightParams> &params) const noexcept {
+        using namespace luisa::compute;
         auto pdf_triangle = _pipeline.buffer<float>(_it.shape()->pdf_buffer_id()).read(_it.triangle_id());
         auto pdf_area = cast<float>(params.triangle_count) * (pdf_triangle / _it.triangle_area());
         auto cos_wo = dot(_it.wo(), _it.shading().n());
@@ -72,12 +73,12 @@ public:
         : _pipeline{pipeline}, _it{it} {}
 
     [[nodiscard]] Light::Evaluation evaluate(Expr<float3> p_from) const noexcept override {
-        using namespace luisa::compute;
         auto params = _pipeline.buffer<DiffuseLightParams>(_it.shape()->light_buffer_id()).read(0u);
         return _evaluate(p_from, params);
     }
 
     [[nodiscard]] Light::Sample sample(Sampler::Instance &sampler, Expr<uint> light_inst_id) const noexcept override {
+        using namespace luisa::compute;
         auto [light_inst, light_to_world] = _pipeline.instance(light_inst_id);
         auto params = _pipeline.buffer<DiffuseLightParams>(light_inst->light_buffer_id()).read(0u);
         auto alias_table_buffer_id = light_inst->alias_table_buffer_id();
