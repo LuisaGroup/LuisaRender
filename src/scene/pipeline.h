@@ -53,6 +53,7 @@ public:
         Mesh *resource;
         uint buffer_id_base;
         bool two_sided;
+        bool is_virtual;
     };
 
     struct LightData {

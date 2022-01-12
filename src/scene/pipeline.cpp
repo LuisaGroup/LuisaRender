@@ -106,21 +106,32 @@ void Pipeline::_process_shape(
         auto two_sided = overridden_two_sided.value_or(mesh.two_sided);
         auto instance_id = static_cast<uint>(_accel.size());
         auto object_to_world = transform_builder.leaf(shape->transform(), instance_id);
-        _accel.emplace_back(*mesh.resource, object_to_world, true);
+        _accel.emplace_back(*mesh.resource, object_to_world, !shape->is_virtual());
 
         // create instance
         InstancedShape instance{};
         instance.buffer_id_base = mesh.buffer_id_base;
         if (two_sided) { instance.properties |= Shape::property_flag_two_sided; }
         if (material != nullptr && !material->is_black()) {
-            auto m = _process_material(command_buffer, instance_id, shape, material);
-            instance.properties |= Shape::property_flag_has_material;
-            instance.material_buffer_id_and_tag = InstancedShape::encode_material_buffer_id_and_tag(m.buffer_id, m.tag);
+            if (shape->is_virtual()) {
+                LUISA_WARNING_WITH_LOCATION(
+                    "Materials will be ignored on virtual shapes.");
+            } else {
+                auto m = _process_material(command_buffer, instance_id, shape, material);
+                instance.properties |= Shape::property_flag_has_material;
+                instance.material_buffer_id_and_tag = InstancedShape::encode_material_buffer_id_and_tag(m.buffer_id, m.tag);
+            }
         }
         if (light != nullptr && !light->is_black()) {
-            auto l = _process_light(command_buffer, instance_id, shape, light);
-            instance.properties |= Shape::property_flag_has_light;
-            instance.light_buffer_id_and_tag = InstancedShape::encode_light_buffer_id_and_tag(l.buffer_id, l.tag);
+            if (shape->is_virtual() != light->is_virtual()) {
+                LUISA_WARNING_WITH_LOCATION(
+                    "Non-virtual lights will be ignored on "
+                    "virtual shapes and vise versa.");
+            } else {
+                auto l = _process_light(command_buffer, instance_id, shape, light);
+                instance.properties |= Shape::property_flag_has_light;
+                instance.light_buffer_id_and_tag = InstancedShape::encode_light_buffer_id_and_tag(l.buffer_id, l.tag);
+            }
         }
         _instances.emplace_back(instance);
     } else {

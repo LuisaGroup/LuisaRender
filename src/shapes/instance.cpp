@@ -18,6 +18,7 @@ public:
         : Shape{scene, desc}, _shape{scene->load_shape(desc->property_node("shape"))} {}
     [[nodiscard]] string_view impl_type() const noexcept override { return "instance"; }
     [[nodiscard]] bool is_mesh() const noexcept override { return false; }
+    [[nodiscard]] bool is_virtual() const noexcept override { return false; }
     [[nodiscard]] span<const float3> positions() const noexcept override { return {}; }
     [[nodiscard]] span<const VertexAttribute> attributes() const noexcept override { return {}; }
     [[nodiscard]] span<const Triangle> triangles() const noexcept override { return {}; }

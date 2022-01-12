@@ -12,8 +12,8 @@
 
 namespace luisa::render {
 
-using compute::Ray;
 using compute::BindlessArray;
+using compute::Ray;
 
 class Shape;
 class Interaction;
@@ -22,7 +22,7 @@ class Light : public SceneNode {
 
 public:
     struct Evaluation {
-        Float3 Le;
+        Float3 L;
         Float pdf;
     };
 
@@ -40,12 +40,12 @@ public:
 
 public:
     Light(Scene *scene, const SceneNodeDesc *desc) noexcept;
-    [[nodiscard]] virtual float power(const Shape *shape) const noexcept = 0;
     [[nodiscard]] virtual bool is_black() const noexcept = 0;
+    [[nodiscard]] virtual bool is_virtual() const noexcept = 0;
     [[nodiscard]] virtual uint /* bindless buffer id */ encode(
         Pipeline &pipeline, CommandBuffer &command_buffer,
         uint instance_id, const Shape *shape) const noexcept = 0;
     [[nodiscard]] virtual luisa::unique_ptr<Closure> decode(const Pipeline &pipeline, const Interaction &it) const noexcept = 0;
 };
 
-}
+}// namespace luisa::render

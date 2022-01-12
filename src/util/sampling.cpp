@@ -80,4 +80,11 @@ Float3 sample_uniform_triangle(Expr<float2> u) noexcept {
     return make_float3(uv, 1.0f - uv.x - uv.y);
 }
 
+Float3 sample_uniform_sphere(Expr<float2> u) noexcept {
+    auto z = 1.0f - 2.0f * u.x;
+    auto r = sqrt(max(1.0f - z * z, 0.0f));
+    auto phi = 2.0f * pi * u.y;
+    return make_float3(r * cos(phi), r * sin(phi), z);
+}
+
 }// namespace luisa::render

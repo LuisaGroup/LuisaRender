@@ -109,7 +109,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
             $if(it->shape()->has_light()) {
                 auto eval = light_sampler->evaluate(*it, ray->origin());
                 auto mis_weight = ite(depth == 0u, 1.0f, balanced_heuristic(pdf_bsdf, eval.pdf));
-                Li += ite(eval.pdf > 0.0f, beta * eval.Le * mis_weight, make_float3(0.0f));
+                Li += ite(eval.pdf > 0.0f, beta * eval.L * mis_weight, make_float3(0.0f));
             };
 
             // evaluate material
@@ -124,7 +124,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
                     auto mis_weight = balanced_heuristic(light_sample.eval.pdf, pdf);
                     Li += beta * mis_weight * ite(pdf > 0.0f, f, 0.0f) *
                           abs(dot(it->shading().n(), wi)) *
-                          light_sample.eval.Le / light_sample.eval.pdf;
+                          light_sample.eval.L / light_sample.eval.pdf;
                 };
                 // sample material
                 auto [wi, eval] = material.sample(*sampler);

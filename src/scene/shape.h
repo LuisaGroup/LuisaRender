@@ -105,6 +105,7 @@ public:
     [[nodiscard]] auto build_hint() const noexcept { return _build_hint; }
     [[nodiscard]] auto two_sided() const noexcept { return _two_sided; }
     [[nodiscard]] virtual bool is_mesh() const noexcept = 0;
+    [[nodiscard]] virtual bool is_virtual() const noexcept = 0;
     [[nodiscard]] virtual luisa::span<const float3> positions() const noexcept = 0;          // empty if the shape is not a mesh
     [[nodiscard]] virtual luisa::span<const VertexAttribute> attributes() const noexcept = 0;// empty if the shape is not a mesh or the mesh has no attributes
     [[nodiscard]] virtual luisa::span<const Triangle> triangles() const noexcept = 0;        // empty if the shape is not a mesh

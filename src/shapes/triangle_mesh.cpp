@@ -121,6 +121,7 @@ public:
     [[nodiscard]] luisa::span<const Shape *const> children() const noexcept override { return {}; }
     [[nodiscard]] bool deformable() const noexcept override { return false; }
     [[nodiscard]] bool is_mesh() const noexcept override { return true; }
+    [[nodiscard]] bool is_virtual() const noexcept override { return false; }
     [[nodiscard]] luisa::span<const float3> positions() const noexcept override { return _loader.get().positions(); }
     [[nodiscard]] luisa::span<const VertexAttribute> attributes() const noexcept override { return _loader.get().attributes(); }
     [[nodiscard]] luisa::span<const Triangle> triangles() const noexcept override { return _loader.get().triangles(); }

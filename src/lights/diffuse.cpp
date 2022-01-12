@@ -33,9 +33,8 @@ public:
               "emission", make_float3(desc->property_float("emission")))} {
         _emission = max(_emission * desc->property_float_or_default("scale", 1.0f), 0.0f);
     }
-
-    [[nodiscard]] float power(const Shape *shape) const noexcept override { return /* TODO */ 0.0f; }
     [[nodiscard]] bool is_black() const noexcept override { return all(_emission == 0.0f); }
+    [[nodiscard]] bool is_virtual() const noexcept override { return false; }
     [[nodiscard]] string_view impl_type() const noexcept override { return "diffuse"; }
     [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint instance_id, const Shape *shape) const noexcept override {
         DiffuseLightParams params{};
@@ -65,7 +64,7 @@ private:
         auto front_face = cos_wo > 0.0f;
         auto emission = def<float3>(params.emission);
         auto pdf = distance_squared(_it.p(), p_from) * pdf_area * (1.0f / cos_wo);
-        return Light::Evaluation{.Le = emission, .pdf = ite(front_face, pdf, 0.0f)};
+        return Light::Evaluation{.L = emission, .pdf = ite(front_face, pdf, 0.0f)};
     }
 
 public:

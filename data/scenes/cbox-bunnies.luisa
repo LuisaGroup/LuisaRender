@@ -6,7 +6,7 @@ Film film : Color {
 Camera camera : Pinhole {
   position { -0.01, 0.995, 5.0 }
   fov { 27.8 }
-  spp { 1024 }
+  spp { 4096 }
   film { @film }
   file { "test.exr" }
 }
@@ -28,6 +28,16 @@ Integrator normal : Normal {
 
 Integrator pt : MegaPath {
   depth { 10 }
+}
+
+Shape virtual : Virtual {
+  transform : SRT {
+    translate { 0, 2, 2 }
+  }
+  light : FakePoint {
+    emission { 0.2 }
+    radius { 0.2 }
+  }
 }
 
 Shape bunny : TriangleMesh {
@@ -87,6 +97,6 @@ Shape group : Group {
 
 render {
   cameras { @camera }
-  shapes { @cbox, @cbox-light, @bunny, @group, @light }
+  shapes { @cbox, @cbox-light, @bunny, @group, @light, @virtual }
   integrator { @pt }
 }
