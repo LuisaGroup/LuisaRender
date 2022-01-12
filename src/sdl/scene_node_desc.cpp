@@ -39,7 +39,7 @@ bool SceneNodeDesc::has_property(luisa::string_view prop) const noexcept {
 }
 
 #define LUSIA_SCENE_NODE_DESC_PROPERTY_THROW(...) \
-    throw std::runtime_error{fmt::format(__VA_ARGS__)};
+    throw std::runtime_error { fmt::format(__VA_ARGS__) }
 
 namespace detail {
 template<typename T>
@@ -130,7 +130,7 @@ template<typename T>
 #define LUISA_SCENE_NODE_DESC_PROPERTY_HANDLE_DEFAULT(d, dv)      \
     catch (const std::runtime_error &e) {                         \
         if constexpr (d) {                                        \
-            return dv;                                            \
+            return dv(this);                                      \
         } else {                                                  \
             LUISA_ERROR("{} [{}]", e.what(), _location.string()); \
         }                                                         \
@@ -178,32 +178,36 @@ template<typename T>
     }                                                                 \
     LUISA_SCENE_NODE_DESC_PROPERTY_HANDLE_DEFAULT(d, dv)
 
-#define LUISA_SCENE_NODE_DESC_PROPERTY_GETTER_LIST_IMPL(type)                   \
-    [[nodiscard]] type##_list SceneNodeDesc::property_##type##_list(            \
-        std::string_view name) const noexcept {                                 \
-        LUISA_SCENE_NODE_DESC_PROPERTY_IMPL_LIST(type, false, type##_list{})    \
-    }                                                                           \
-    [[nodiscard]] type##_list SceneNodeDesc::property_##type##_list_or_default( \
-        std::string_view name, type##_list default_value) const noexcept {      \
-        LUISA_SCENE_NODE_DESC_PROPERTY_IMPL_LIST(type, true, default_value)     \
+#define LUISA_SCENE_NODE_DESC_PROPERTY_GETTER_LIST_IMPL(type)                                      \
+    [[nodiscard]] type##_list SceneNodeDesc::property_##type##_list(                               \
+        std::string_view name) const noexcept {                                                    \
+        LUISA_SCENE_NODE_DESC_PROPERTY_IMPL_LIST(type, false, [](auto) { return type##_list{}; })  \
+    }                                                                                              \
+    [[nodiscard]] type##_list SceneNodeDesc::property_##type##_list_or_default(                    \
+        std::string_view name,                                                                     \
+        const luisa::function<type##_list(const SceneNodeDesc *)> &default_value) const noexcept { \
+        LUISA_SCENE_NODE_DESC_PROPERTY_IMPL_LIST(type, true, default_value)                        \
     }
 
 #define LUISA_SCENE_NODE_DESC_PROPERTY_GETTER_SCALAR_IMPL(type)                               \
     [[nodiscard]] type SceneNodeDesc::property_##type(std::string_view name) const noexcept { \
-        LUISA_SCENE_NODE_DESC_PROPERTY_IMPL_SCALAR(type, false, type{})                       \
+        LUISA_SCENE_NODE_DESC_PROPERTY_IMPL_SCALAR(type, false, [](auto) { return type{}; })  \
     }                                                                                         \
     [[nodiscard]] type SceneNodeDesc::property_##type##_or_default(                           \
-        std::string_view name, type default_value) const noexcept {                           \
+        std::string_view name,                                                                \
+        const luisa::function<type(const SceneNodeDesc *)> &default_value) const noexcept {   \
         LUISA_SCENE_NODE_DESC_PROPERTY_IMPL_SCALAR(type, true, default_value)                 \
     }
 
-#define LUISA_SCENE_NODE_DESC_PROPERTY_GETTER_VECTOR_IMPL(type, N)                                  \
-    [[nodiscard]] type##N SceneNodeDesc::property_##type##N(std::string_view name) const noexcept { \
-        LUISA_SCENE_NODE_DESC_PROPERTY_IMPL_VECTOR##N(type, false, type##N{})                       \
-    }                                                                                               \
-    [[nodiscard]] type##N SceneNodeDesc::property_##type##N##_or_default(                           \
-        std::string_view name, type##N default_value) const noexcept {                              \
-        LUISA_SCENE_NODE_DESC_PROPERTY_IMPL_VECTOR##N(type, true, default_value)                    \
+#define LUISA_SCENE_NODE_DESC_PROPERTY_GETTER_VECTOR_IMPL(type, N)                                 \
+    [[nodiscard]] type##N SceneNodeDesc::property_##type##N(                                       \
+        std::string_view name) const noexcept {                                                    \
+        LUISA_SCENE_NODE_DESC_PROPERTY_IMPL_VECTOR##N(type, false, [](auto) { return type##N{}; }) \
+    }                                                                                              \
+    [[nodiscard]] type##N SceneNodeDesc::property_##type##N##_or_default(                          \
+        std::string_view name,                                                                     \
+        const luisa::function<type##N(const SceneNodeDesc *)> &default_value) const noexcept {     \
+        LUISA_SCENE_NODE_DESC_PROPERTY_IMPL_VECTOR##N(type, true, default_value)                   \
     }
 
 using node = SceneNodeDesc::node;

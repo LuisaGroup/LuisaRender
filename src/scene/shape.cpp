@@ -13,9 +13,12 @@ namespace luisa::render {
 
 Shape::Shape(Scene *scene, const SceneNodeDesc *desc) noexcept
     : SceneNode{scene, desc, SceneNodeTag::SHAPE},
-      _material{scene == nullptr ? nullptr : scene->load_material(desc->property_node_or_default("material"))},
-      _light{scene == nullptr ? nullptr : scene->load_light(desc->property_node_or_default("light"))},
-      _transform{scene == nullptr ? nullptr : scene->load_transform(desc->property_node_or_default("transform"))} {
+      _material{nullptr}, _light{nullptr}, _transform{nullptr} {
+
+    if (auto light = desc->property_node_or_default("light")) { _light = scene->load_light(light); }
+    if (auto material = desc->property_node_or_default("material")) { _material = scene->load_material(material); }
+    if (auto transform = desc->property_node_or_default("transform")) { _transform = scene->load_transform(transform);}
+
     if (desc->has_property("two_sided")) {
         _two_sided = desc->property_bool("two_sided");
     }

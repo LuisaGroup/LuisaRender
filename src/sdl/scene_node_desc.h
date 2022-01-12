@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include <variant>
 #include <string>
 #include <filesystem>
 
@@ -101,8 +100,18 @@ public:
 
     // parameter getters
 #define LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(type)                           \
-    [[nodiscard]] type property_##type(std::string_view name) const noexcept; \
-    [[nodiscard]] type property_##type##_or_default(std::string_view name, type default_value = {}) const noexcept;
+    [[nodiscard]] type property_##type(                                       \
+        std::string_view name) const noexcept;                                \
+    [[nodiscard]] type property_##type##_or_default(                          \
+        std::string_view name,                                                \
+        const luisa::function<type(const SceneNodeDesc *)> &) const noexcept; \
+    [[nodiscard]] type property_##type##_or_default(                          \
+        std::string_view name,                                                \
+        type default_value = {}) const noexcept {                             \
+        return property_##type##_or_default(name, [&](auto) noexcept {        \
+            return default_value;                                             \
+        });                                                                   \
+    }
     LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(int)
     LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(int2)
     LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(int3)

@@ -27,12 +27,13 @@ private:
 
 public:
     FakePointLight(Scene *scene, const SceneNodeDesc *desc) noexcept : Light{scene, desc} {
-        auto emission = desc->property_float3_or_default(
-                            "emission", make_float3(desc->property_float("emission"))) *
-                        desc->property_float_or_default("scale", 1.0f);
-        _params.emission[0] = std::max(emission.x, 0.0f);
-        _params.emission[1] = std::max(emission.y, 0.0f);
-        _params.emission[2] = std::max(emission.z, 0.0f);
+        auto emission = desc->property_float3_or_default("emission", [](auto desc) noexcept {
+            return make_float3(desc->property_float("emission"));
+        });
+        auto scale = desc->property_float_or_default("scale", 1.0f);
+        _params.emission[0] = std::max(emission.x * scale, 0.0f);
+        _params.emission[1] = std::max(emission.y * scale, 0.0f);
+        _params.emission[2] = std::max(emission.z * scale, 0.0f);
         _params.radius = desc->property_float_or_default("radius", 0.0f);
     }
     [[nodiscard]] bool is_black() const noexcept override {

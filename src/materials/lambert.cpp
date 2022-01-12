@@ -26,10 +26,11 @@ public:
     LambertMaterial(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Material{scene, desc}, _params{} {
         auto color = clamp(
-            desc->property_float3_or_default(
-                "color", make_float3(desc->property_float_or_default("color", 1.0f))),
+            desc->property_float3_or_default("color", [](auto desc) noexcept {
+                return make_float3(desc->property_float_or_default("color", 1.0f));
+            }),
             0.0f, 1.0f);
-        auto color_texture = desc->property_path_or_default("color", {});
+        auto color_texture = desc->property_path_or_default("color", "");
         _params.color[0] = color.x;
         _params.color[1] = color.y;
         _params.color[2] = color.z;
