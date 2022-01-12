@@ -86,74 +86,72 @@ void MegakernelPathTracingInstance::_render_one_camera(
         auto pixel_id = dispatch_id().xy();
         sampler->start(pixel_id, frame_index);
         auto pixel = make_float2(pixel_id);
-        auto throughput = def(make_float3(1.0f));
+        auto beta = def(make_float3(1.0f));
         auto [filter_offset, filter_weight] = filter->sample(*sampler);
         pixel += filter_offset;
-        throughput *= filter_weight;
+        beta *= filter_weight;
 
         auto [camera_ray, camera_weight] = camera->generate_ray(*sampler, pixel, time);
         camera_ray->set_origin(make_float3(camera_to_world * make_float4(camera_ray->origin(), 1.0f)));
         camera_ray->set_direction(normalize(camera_to_world_normal * camera_ray->direction()));
-        throughput *= camera_weight;
+        beta *= camera_weight;
 
         auto ray = camera_ray;
-        auto radiance = def(make_float3(0.0f));
+        auto Li = def(make_float3(0.0f));
         auto pdf_bsdf = def(0.0f);
         $for(depth, max_depth) {
-            auto interaction = pipeline.intersect(ray);
-            $if(!interaction->valid()) { $break; };
+            auto it = pipeline.intersect(ray);
+            $if(!it->valid()) { $break; };
             // evaluate Le
-            $if(interaction->shape()->has_light()) {
-                pipeline.decode_light(interaction->shape()->light_tag(), *interaction, [&](const Light::Closure &light) noexcept {
+            $if(it->shape()->has_light()) {
+                pipeline.decode_light(it->shape()->light_tag(), *it, [&](const Light::Closure &light) noexcept {
                     auto eval = light.evaluate(ray->origin());
                     $if(eval.pdf > 0.0f) {
-                        auto pdf_light = eval.pdf * light_sampler->pdf(*interaction);
+                        auto pdf_light = eval.pdf * light_sampler->pdf(*it);
                         auto mis_weight = ite(depth == 0u, 1.0f, balanced_heuristic(pdf_bsdf, pdf_light));
-                        radiance += throughput * eval.Le * mis_weight;
+                        Li += beta * eval.Le * mis_weight;
                     };
                 });
             };
 
-            $if(!interaction->shape()->has_material()) { $break; };
+            $if(!it->shape()->has_material()) { $break; };
 
             // sample light
             Light::Sample light_sample;
-            auto light_selection = light_sampler->sample(*sampler, *interaction);
-            pipeline.decode_light(light_selection.light_tag, *interaction, [&](const Light::Closure &light) noexcept {
+            auto light_selection = light_sampler->sample(*sampler, *it);
+            pipeline.decode_light(light_selection.light_tag, *it, [&](const Light::Closure &light) noexcept {
                 light_sample = light.sample(*sampler, light_selection.instance_id);
             });
             auto occluded = pipeline.intersect_any(light_sample.shadow_ray);
-            pipeline.decode_material(interaction->shape()->material_tag(), *interaction, [&](const Material::Closure &material) {
+            pipeline.decode_material(it->shape()->material_tag(), *it, [&](const Material::Closure &material) {
                 // evaluate direct lighting
                 $if(light_sample.eval.pdf > 0.0f & !occluded) {
                     auto light_pdf = light_sample.eval.pdf * light_selection.pdf;
                     auto wi = light_sample.shadow_ray->direction();
                     auto [f, pdf] = material.evaluate(wi);
                     auto mis_weight = balanced_heuristic(light_pdf, pdf);
-                    radiance += throughput * mis_weight * ite(pdf > 0.0f, f, 0.0f) *
-                                abs(dot(interaction->shading().n(), wi)) *
+                    Li += beta * mis_weight * ite(pdf > 0.0f, f, 0.0f) *
+                                abs(dot(it->shading().n(), wi)) *
                                 light_sample.eval.Le / light_pdf;
                 };
                 // sample material
                 auto [wi, eval] = material.sample(*sampler);
-                ray = interaction->spawn_ray(wi);
+                ray = it->spawn_ray(wi);
                 pdf_bsdf = eval.pdf;
-                throughput *= ite(
+                beta *= ite(
                     eval.pdf > 0.0f,
-                    eval.f * abs(dot(interaction->shading().n(), wi)) / eval.pdf,
+                    eval.f * abs(dot(it->shading().n(), wi)) / eval.pdf,
                     make_float3());
             });
             // rr
-            $if(all(throughput <= 0.0f)) { $break; };
-            $if(depth >= 1u) {
-                auto l = dot(make_float3(0.212671f, 0.715160f, 0.072169f), throughput);
-                auto q = max(l, 0.05f);
-                auto r = sampler->generate_1d();
-                $if(r >= q) { $break; };
-                throughput *= 1.0f / q;
+            $if(all(beta <= 0.0f)) { $break; };
+            auto lum = dot(make_float3(0.212671f, 0.715160f, 0.072169f), beta);
+            $if(depth >= 1u | lum < 0.95f) {
+                $if(sampler->generate_1d() >= lum) { $break; };
+                beta *= 1.0f / lum;
             };
         };
-        film->accumulate(pixel_id, radiance);
+        film->accumulate(pixel_id, Li);
         sampler->save_state();
     };
 
