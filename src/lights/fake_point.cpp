@@ -70,11 +70,13 @@ public:
         auto params = _pipeline.buffer<FakePointLightParams>(inst->light_buffer_id()).read(0u);
         auto emission = def<float3>(params.emission);
         auto center = make_float3(inst_to_world * make_float4(make_float3(0.0f), 1.0f));
-        auto offset = sample_uniform_sphere(sampler.generate_2d());
-        auto p_light = params.radius * offset + center;
+        auto frame = Frame::make(normalize(it_from.p() - center));
+        auto offset = sample_uniform_disk_concentric(sampler.generate_2d());
+        auto p_light = params.radius * frame.local_to_world(make_float3(offset, 0.0f)) + center;
         Light::Sample s;
-        s.eval.L = emission * 1e6f;
-        s.eval.pdf = 1e6f * distance_squared(p_light, it_from.p());
+        static constexpr auto delta_pdf = 1e8f;
+        s.eval.L = emission * delta_pdf;
+        s.eval.pdf = distance_squared(p_light, it_from.p()) * delta_pdf;
         s.p_light = p_light;
         return s;
     }

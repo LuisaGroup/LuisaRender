@@ -1,5 +1,6 @@
 add_library(luisa-render-util SHARED
-        sampling.cpp sampling.h)
+        sampling.cpp sampling.h
+        frame.cpp frame.h)
 target_link_libraries(luisa-render-util PUBLIC
         luisa::compute luisa-render-include)
 set_target_properties(luisa-render-util PROPERTIES

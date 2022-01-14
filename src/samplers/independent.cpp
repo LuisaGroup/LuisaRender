@@ -16,11 +16,12 @@ class IndependentSamplerInstance final : public Sampler::Instance {
 
 private:
     Device &_device;
-    Image<uint> _states;
+    uint2 _resolution;
+    Buffer<uint> _states;
     luisa::optional<Var<uint>> _state;
-    luisa::optional<Var<uint2>> _pixel;
+    luisa::optional<Var<uint>> _pixel_id;
     uint _seed;
-    Shader2D<Image<uint>, uint> _make_sampler_state;
+    Shader1D<Buffer<uint>, uint, uint> _make_sampler_state;
 
 public:
     IndependentSamplerInstance(Device &device, const IndependentSampler *sampler, uint _seed) noexcept;
@@ -48,7 +49,7 @@ public:
 
 IndependentSamplerInstance::IndependentSamplerInstance(Device &device, const IndependentSampler *sampler, uint seed) noexcept
     : Sampler::Instance{sampler}, _device{device}, _seed{seed} {
-    Kernel2D kernel = [](ImageUInt states, UInt seed) noexcept {
+    Kernel1D kernel = [](BufferUInt states, UInt seed, UInt width) noexcept {
         auto tea = [](UInt s0, UInt v0, UInt v1) noexcept {
             for (auto n = 0u; n < 4u; n++) {
                 s0 += 0x9e3779b9u;
@@ -57,18 +58,21 @@ IndependentSamplerInstance::IndependentSamplerInstance(Device &device, const Ind
             }
             return v0;
         };
-        auto p = dispatch_id().xy();
-        auto state = tea(seed, p.x, p.y);
-        states.write(p, make_uint4(state));
+        auto x = dispatch_x() % width;
+        auto y = dispatch_x() / width;
+        auto state = tea(seed, x, y);
+        states.write(dispatch_x(), state);
     };
     _make_sampler_state = _device.compile(kernel);
 }
 
 void IndependentSamplerInstance::reset(CommandBuffer &command_buffer, uint2 resolution, uint /* spp */) noexcept {
-    if (!_states || any(_states.size() < resolution)) {
-        _states = _device.create_image<uint>(PixelStorage::INT1, resolution);
+    _resolution = resolution;
+    auto pixel_count = _resolution.x * _resolution.y;
+    if (!_states || pixel_count > _states.size()) {
+        _states = _device.create_buffer<uint>(next_pow2(pixel_count));
     }
-    command_buffer << _make_sampler_state(_states, _seed).dispatch(resolution);
+    command_buffer << _make_sampler_state(_states, _seed, _resolution.x).dispatch(pixel_count);
 }
 
 void IndependentSamplerInstance::start(Expr<uint2> pixel, Expr<uint> /* sample_index */) noexcept {
@@ -76,14 +80,14 @@ void IndependentSamplerInstance::start(Expr<uint2> pixel, Expr<uint> /* sample_i
 }
 
 void IndependentSamplerInstance::save_state() noexcept {
-    _states.write(*_pixel, make_uint4(*_state));
+    _states.write(*_pixel_id, *_state);
 }
 
 void IndependentSamplerInstance::load_state(Expr<uint2> pixel) noexcept {
-    _pixel = luisa::nullopt;
-    _pixel = def(pixel);
+    _pixel_id = luisa::nullopt;
+    _pixel_id = pixel.y * _resolution.x + pixel.x;;
     _state = luisa::nullopt;
-    _state = _states.read(pixel).x;
+    _state = _states.read(pixel.y * _resolution.x + pixel.x);
 }
 
 Float IndependentSamplerInstance::generate_1d() noexcept {

@@ -47,10 +47,10 @@ public:
     [[nodiscard]] Material::Sample sample(Sampler::Instance &sampler) const noexcept override {
         auto cos_wo = dot(_it.wo(), _it.shading().n());
         auto wi = 2.0f * cos_wo * _it.shading().n() - _it.wo();
-        static constexpr auto large_number = 1e6f;
+        static constexpr auto delta_pdf = 1e8f;
         Material::Evaluation eval{
-            .f = make_float3(large_number) * _color / cos_wo,
-            .pdf = ite(cos_wo > 0.0f, large_number, 0.0f)};
+            .f = delta_pdf * _color / cos_wo,
+            .pdf = ite(cos_wo > 0.0f, delta_pdf, 0.0f)};
         return {.wi = std::move(wi), .eval = std::move(eval)};
     }
 };
