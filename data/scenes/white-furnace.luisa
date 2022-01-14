@@ -6,7 +6,7 @@ Film film : Color {
 Camera camera : Pinhole {
   position { 0, 0, 5 }
   fov { 27.8 }
-  spp { 128 }
+  spp { 4096 }
   film { @film }
   file { "white-furnace-test.exr" }
 }
@@ -16,7 +16,7 @@ Integrator normal : Normal {
 }
 
 Integrator pt : MegaPath {
-  depth { 10 }
+  depth { 2 }
 }
 
 Shape teapot : TriangleMesh {
@@ -31,9 +31,16 @@ Shape teapot : TriangleMesh {
   }
 }
 
+Shape sphere : TriangleMesh {
+  file { "../meshes/sphere.obj" }
+  material : Lambert {
+    color { 1 }
+  }
+}
+
 render {
   cameras { @camera }
-  shapes { @teapot }
+  shapes { @sphere }
   integrator { @pt }
   environment : Constant {
     emission { 1 }
