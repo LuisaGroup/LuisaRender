@@ -108,10 +108,10 @@ Shape group : Group {
 
 render {
   cameras { @camera }
-  shapes { @cbox, // @cbox-light,
+  shapes { @cbox, @cbox-light,
    @bunny, @group, @light, @point }
   integrator { @pt }
-  environment : Constant {
-    emission { 2 }
-  }
+  // environment : Constant {
+  //   emission { 2 }
+  // }
 }
