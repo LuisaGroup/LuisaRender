@@ -1,0 +1,61 @@
+Film film : Color {
+  resolution { 1024 }
+  exposure { 0 }
+}
+
+Camera camera : Pinhole {
+  position { 0, 0, 5 }
+  fov { 60 }
+  spp { 1024 }
+  film { @film }
+  file { "environment-mapping.exr" }
+}
+
+Integrator normal : Normal {
+  sampler : Independent {}
+}
+
+Integrator pt : MegaPath {
+  depth { 10 }
+}
+
+Shape teapot : Group {
+  shapes {
+    TriangleMesh {
+      file { "../meshes/utah-teapot-lid.obj" }
+      material : FakeMirror {
+        color { 1 }
+      }
+    },
+    TriangleMesh {
+      file { "../meshes/utah-teapot.obj" }
+      material : FakeMirror {
+        color { 1.0, 0.71, 0.29 }
+      }
+    }
+  }
+  transform : SRT {
+    scale { 0.4 }
+    translate { 0, -0.5, 0 }
+    rotate { 1, 2, 1, 90 }
+  }
+}
+
+Shape sphere : TriangleMesh {
+  file { "../meshes/sphere.obj" }
+  material : FakeMirror {
+    color { 1 }
+  }
+}
+
+render {
+  cameras { @camera }
+  shapes { @teapot }
+  integrator { @pt }
+  environment : HDRI {
+    file { "../envmaps/photo_studio_01_1k.hdr" }
+    transform : SRT {
+      rotate { 0, 1, 0, 45 }
+    }
+  }
+}

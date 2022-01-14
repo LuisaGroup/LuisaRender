@@ -21,6 +21,7 @@ using luisa::compute::Var;
 [[nodiscard]] Float cosine_hemisphere_pdf(Expr<float> cos_theta) noexcept;
 [[nodiscard]] Float3 sample_uniform_sphere(Expr<float2> u) noexcept;
 [[nodiscard]] constexpr float uniform_sphere_pdf() noexcept { return inv_pi * 0.25f; }
+[[nodiscard]] Float2 invert_uniform_sphere_sample(Expr<float3> w) noexcept;
 
 struct AliasEntry {
     float prob;

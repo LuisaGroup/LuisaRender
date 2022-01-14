@@ -40,6 +40,7 @@ using compute::Ray;
 using compute::Resource;
 using compute::Triangle;
 using compute::Volume;
+using TextureSampler = compute::Sampler;
 
 class Scene;
 
@@ -133,16 +134,16 @@ public:
     }
 
     template<typename T>
-    [[nodiscard]] auto register_bindless(const Image<T> &image) noexcept {
+    [[nodiscard]] auto register_bindless(const Image<T> &image, TextureSampler sampler) noexcept {
         auto tex2d_id = _bindless_tex2d_count++;
-        _bindless_array.emplace(tex2d_id, image);
+        _bindless_array.emplace(tex2d_id, image, sampler);
         return static_cast<uint>(tex2d_id);
     }
 
     template<typename T>
-    [[nodiscard]] auto register_bindless(const Volume<T> &volume) noexcept {
+    [[nodiscard]] auto register_bindless(const Volume<T> &volume, TextureSampler sampler) noexcept {
         auto tex3d_id = _bindless_tex3d_count++;
-        _bindless_array.emplace(tex3d_id, volume);
+        _bindless_array.emplace(tex3d_id, volume, sampler);
         return static_cast<uint>(tex3d_id);
     }
 

@@ -30,20 +30,22 @@ public:
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
-struct ConstantEnvironmentInstance final : public Environment::Instance {
+class ConstantEnvironmentInstance final : public Environment::Instance {
+
+private:
+    float3 _emission;
+
+public:
+    ConstantEnvironmentInstance(Pipeline &ppl, const ConstantEnvironment *env) noexcept
+        : Environment::Instance{ppl, env}, _emission{env->emission()} {}
     [[nodiscard]] auto evaluate() const noexcept {
-        return Light::Evaluation{
-            .L = static_cast<const ConstantEnvironment *>(node())->emission(),
-            .pdf = uniform_sphere_pdf()};
+        return Light::Evaluation{.L = _emission, .pdf = uniform_sphere_pdf()};
     }
     [[nodiscard]] Light::Evaluation evaluate(Expr<float3>, Expr<float3x3>, Expr<float>) const noexcept override { return evaluate(); }
     [[nodiscard]] Light::Sample sample(Sampler::Instance &sampler, const Interaction &it_from, Expr<float3x3> env_to_world, Expr<float>) const noexcept override {
         auto wi = sample_uniform_sphere(sampler.generate_2d());
-        return {.eval = evaluate(),
-                .shadow_ray = it_from.spawn_ray(env_to_world * wi)};
+        return {.eval = evaluate(), .shadow_ray = it_from.spawn_ray(env_to_world * wi)};
     }
-    ConstantEnvironmentInstance(Pipeline &ppl, const Environment *env) noexcept
-        : Environment::Instance{ppl, env} {}
 };
 
 luisa::unique_ptr<Environment::Instance> ConstantEnvironment::build(Pipeline &pipeline, CommandBuffer &) const noexcept {

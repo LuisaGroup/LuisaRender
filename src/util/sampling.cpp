@@ -87,4 +87,10 @@ Float3 sample_uniform_sphere(Expr<float2> u) noexcept {
     return make_float3(r * cos(phi), r * sin(phi), z);
 }
 
+Float2 invert_uniform_sphere_sample(Expr<float3> w) noexcept {
+    auto phi = atan2(w.y, w.x);
+    phi = ite(phi < 0.0f, phi + pi * 2.0f, phi);
+    return make_float2(0.5f * (1.0f - w.z), phi * (0.5f * inv_pi));
+}
+
 }// namespace luisa::render

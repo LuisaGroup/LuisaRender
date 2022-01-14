@@ -20,7 +20,7 @@ public:
         auto rotation = desc->property_float4_or_default("rotate", make_float4(0.0f, 0.0f, 1.0f, 0.0f));
         auto translation = desc->property_float3_or_default("translate", make_float3());
         _matrix = luisa::translation(translation) *
-                  luisa::rotation(rotation.xyz(), radians(rotation.w)) *
+                  luisa::rotation(normalize(rotation.xyz()), radians(rotation.w)) *
                   luisa::scaling(scaling);
     }
     [[nodiscard]] string_view impl_type() const noexcept override { return "srt"; }
