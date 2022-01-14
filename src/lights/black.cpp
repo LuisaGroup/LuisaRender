@@ -12,7 +12,7 @@ struct BlackLight final : public Light {
     [[nodiscard]] bool is_virtual() const noexcept override { return true; }
     [[nodiscard]] string_view impl_type() const noexcept override { return "black"; }
     [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint instance_id, const Shape *shape) const noexcept override { return ~0u; }
-    [[nodiscard]] luisa::unique_ptr<Closure> decode(const Pipeline &pipeline) const noexcept override { return nullptr; }
+    [[nodiscard]] luisa::unique_ptr<Closure> decode(const Pipeline &) const noexcept override { return nullptr; }
 };
 
 }

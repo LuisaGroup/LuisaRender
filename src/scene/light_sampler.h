@@ -21,26 +21,30 @@ public:
     struct Selection {
         UInt instance_id;
         UInt light_tag;
-        Float pdf;
+        Float pmf;
+        [[nodiscard]] auto is_environment() const noexcept {
+            return instance_id == ~0u;
+        }
     };
 
     class Instance {
 
     private:
-        Pipeline &_pipeline;
+        const Pipeline &_pipeline;
         const LightSampler *_sampler;
 
     public:
         explicit Instance(Pipeline &pipeline, const LightSampler *light_dist) noexcept
             : _pipeline{pipeline}, _sampler{light_dist} {}
         virtual ~Instance() noexcept = default;
-        virtual void update(Stream &stream) noexcept = 0;
+        [[nodiscard]] uint light_count() const noexcept;
         [[nodiscard]] auto node() const noexcept { return _sampler; }
         [[nodiscard]] const auto &pipeline() const noexcept { return _pipeline; }
-        [[nodiscard]] virtual Float pdf_selection(const Interaction &it) const noexcept = 0;
+        virtual void update(CommandBuffer &command_buffer, float time) noexcept = 0;
+        [[nodiscard]] virtual Float pmf(const Interaction &it) const noexcept = 0;
         [[nodiscard]] virtual Selection select(Sampler::Instance &sampler, const Interaction &it) const noexcept = 0;
-        [[nodiscard]] virtual Light::Evaluation evaluate(const Interaction &it, Expr<float3> p_from) const noexcept;
-        [[nodiscard]] virtual Light::Sample sample(Sampler::Instance &sampler, const Interaction &it_from) const noexcept;
+        [[nodiscard]] virtual Light::Evaluation evaluate(const Interaction &it, Expr<float3> p_from, Expr<float> time) const noexcept;
+        [[nodiscard]] virtual Light::Sample sample(Sampler::Instance &sampler, const Interaction &it_from, Expr<float> time) const noexcept;
     };
 
 public:

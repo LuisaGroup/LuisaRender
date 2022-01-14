@@ -11,7 +11,7 @@ namespace luisa::render {
 
 [[nodiscard]] static auto default_light_sampler_node_desc() noexcept {
     static auto desc = [] {
-        static SceneNodeDesc d{"__default_light_sampler__", SceneNodeTag::LIGHT_SAMPLER};
+        static SceneNodeDesc d{"__integrator_default_light_sampler__", SceneNodeTag::LIGHT_SAMPLER};
         d.define(SceneNodeTag::LIGHT_SAMPLER, "Uniform", {});
         return &d;
     }();
@@ -20,7 +20,7 @@ namespace luisa::render {
 
 [[nodiscard]] static auto default_sampler_node_desc() noexcept {
     static auto desc = [] {
-        static SceneNodeDesc d{"__default_sampler__", SceneNodeTag::SAMPLER};
+        static SceneNodeDesc d{"__integrator_default_sampler__", SceneNodeTag::SAMPLER};
         d.define(SceneNodeTag::SAMPLER, "Independent", {});
         return &d;
     }();
@@ -31,7 +31,7 @@ Integrator::Integrator(Scene *scene, const SceneNodeDesc *desc) noexcept
     : SceneNode{scene, desc, SceneNodeTag::INTEGRATOR},
       _sampler{scene->load_sampler(desc->property_node_or_default(
           "sampler", default_sampler_node_desc()))},
-      _light_sampler{scene->load_light_distribution(desc->property_node_or_default(
+      _light_sampler{scene->load_light_sampler(desc->property_node_or_default(
           "light_sampler", default_light_sampler_node_desc()))} {}
 
 }// namespace luisa::render

@@ -32,6 +32,7 @@ private:
 
 public:
     Interaction() noexcept : _prim_id{~0u} {}
+    explicit Interaction(Expr<float3> wo) noexcept : _wo{wo}, _prim_id{~0u} {}
     Interaction(Var<InstancedShape> shape, Expr<uint> prim_id, Expr<float> prim_area,
                 Expr<float3> p, Expr<float3> wo, Expr<float3> ng) noexcept
         : _shape{std::move(shape)}, _p{p}, _wo{wo},

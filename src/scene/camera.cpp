@@ -13,7 +13,7 @@ namespace luisa::render {
 
 [[nodiscard]] static auto default_filter_node_desc() noexcept {
     static auto desc = [] {
-        static SceneNodeDesc d{"__default_filter__", SceneNodeTag::FILTER};
+        static SceneNodeDesc d{"__camera_default_filter__", SceneNodeTag::FILTER};
         d.define(SceneNodeTag::FILTER, "Box", {});
         return &d;
     }();
@@ -22,7 +22,7 @@ namespace luisa::render {
 
 [[nodiscard]] static auto default_transform_node_desc() noexcept {
     static auto desc = [] {
-        static SceneNodeDesc d{"__default_transform__", SceneNodeTag::TRANSFORM};
+        static SceneNodeDesc d{"__camera_default_transform__", SceneNodeTag::TRANSFORM};
         d.define(SceneNodeTag::TRANSFORM, "Identity", {});
         return &d;
     }();

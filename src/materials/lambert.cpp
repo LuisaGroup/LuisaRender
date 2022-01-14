@@ -70,14 +70,14 @@ private:
     Bool _front_face;
 
 public:
-    LambertClosure(const Interaction &it, Float3 color) noexcept
+    LambertClosure(const Interaction &it, Expr<float3> color) noexcept
         : _interaction{it},
           _f{std::move(color) * inv_pi},
           _cos_wo{dot(it.wo(), it.shading().n())},
           _front_face{_cos_wo > 0.0f} {}
 
 private:
-    [[nodiscard]] Material::Evaluation evaluate(Expr<float3> wi) const noexcept override {
+    [[nodiscard]] Material::Evaluation evaluate(Expr<float3> wi, Expr<float> time) const noexcept override {
         auto n = _interaction.shading().n();
         auto wo = _interaction.wo();
         auto cos_wi = dot(n, wi);
@@ -86,7 +86,7 @@ private:
         return {.f = _f, .pdf = std::move(pdf)};
     }
 
-    [[nodiscard]] Material::Sample sample(Sampler::Instance &sampler) const noexcept override {
+    [[nodiscard]] Material::Sample sample(Sampler::Instance &sampler, Expr<float> time) const noexcept override {
         auto wi_local = sample_cosine_hemisphere(sampler.generate_2d());
         auto pdf = ite(_front_face, cosine_hemisphere_pdf(wi_local.z), 0.0f);
         wi_local.z *= sign(_cos_wo);

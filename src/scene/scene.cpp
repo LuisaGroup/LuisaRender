@@ -26,15 +26,15 @@ struct Scene::Config {
     luisa::vector<NodeHandle> internal_nodes;
     luisa::unordered_map<luisa::string, NodeHandle, Hash64> nodes;
     Integrator *integrator{nullptr};
+    Environment *environment{nullptr};
     luisa::vector<Camera *> cameras;
     luisa::vector<Shape *> shapes;
-    luisa::vector<Environment *> environments;
 };
 
 const Integrator *Scene::integrator() const noexcept { return _config->integrator; }
+const Environment *Scene::environment() const noexcept { return _config->environment; }
 luisa::span<const Shape *const> Scene::shapes() const noexcept { return _config->shapes; }
 luisa::span<const Camera *const> Scene::cameras() const noexcept { return _config->cameras; }
-luisa::span<const Environment *const> Scene::environments() const noexcept { return _config->environments; }
 
 namespace detail {
 
@@ -153,12 +153,12 @@ Transform *Scene::load_transform(const SceneNodeDesc *desc) noexcept {
     return dynamic_cast<Transform *>(load_node(SceneNodeTag::TRANSFORM, desc));
 }
 
-Environment *Scene::load_environment(const SceneNodeDesc *desc) noexcept {
-    return dynamic_cast<Environment *>(load_node(SceneNodeTag::ENVIRONMENT, desc));
+LightSampler *Scene::load_light_sampler(const SceneNodeDesc *desc) noexcept {
+    return dynamic_cast<LightSampler *>(load_node(SceneNodeTag::LIGHT_SAMPLER, desc));
 }
 
-LightSampler *Scene::load_light_distribution(const SceneNodeDesc *desc) noexcept {
-    return dynamic_cast<LightSampler *>(load_node(SceneNodeTag::LIGHT_SAMPLER, desc));
+Environment *Scene::load_environment(const SceneNodeDesc *desc) noexcept {
+    return dynamic_cast<Environment *>(load_node(SceneNodeTag::ENVIRONMENT, desc));
 }
 
 luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc) noexcept {
@@ -169,12 +169,12 @@ luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc
     }
     auto scene = luisa::make_unique<Scene>(ctx);
     scene->_config->integrator = scene->load_integrator(desc->root()->property_node("integrator"));
+    scene->_config->environment = scene->load_environment(desc->root()->property_node_or_default("environment"));
     auto cameras = desc->root()->property_node_list("cameras");
     auto shapes = desc->root()->property_node_list("shapes");
     auto environments = desc->root()->property_node_list_or_default("environments");
     scene->_config->cameras.reserve(cameras.size());
     scene->_config->shapes.reserve(shapes.size());
-    scene->_config->environments.reserve(environments.size());
     for (auto c : cameras) {
         scene->_config->cameras.emplace_back(
             scene->load_camera(c));
@@ -182,10 +182,6 @@ luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc
     for (auto s : shapes) {
         scene->_config->shapes.emplace_back(
             scene->load_shape(s));
-    }
-    for (auto e : environments) {
-        scene->_config->environments.emplace_back(
-            scene->load_environment(e));
     }
     ThreadPool::global().synchronize();
     return scene;

@@ -11,7 +11,7 @@ namespace luisa::render {
 class UniformLightSampler final : public LightSampler {
 
 public:
-    unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
+    luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
     UniformLightSampler(Scene *scene, const SceneNodeDesc *desc) noexcept : LightSampler{scene, desc} {}
     [[nodiscard]] string_view impl_type() const noexcept override { return "uniform"; }
 };
@@ -37,8 +37,8 @@ public:
         command_buffer << view.copy_from(light_to_instance_id.data())
                        << compute::commit();// lifetime
     }
-    void update(Stream &) noexcept override {}
-    [[nodiscard]] Float pdf_selection(const Interaction &it) const noexcept override {
+    void update(CommandBuffer &, float) noexcept override {}
+    [[nodiscard]] Float pmf(const Interaction &it) const noexcept override {
         return static_cast<float>(1.0 / static_cast<double>(pipeline().lights().size()));
     }
     [[nodiscard]] LightSampler::Selection select(Sampler::Instance &sampler, const Interaction &it) const noexcept override {
@@ -49,7 +49,7 @@ public:
         auto instance_id_and_light_tag = pipeline().buffer<uint>(_light_buffer_id).read(i);
         auto instance_id = instance_id_and_light_tag >> InstancedShape::light_buffer_id_shift;
         auto light_tag = instance_id_and_light_tag & InstancedShape::light_tag_mask;
-        return {instance_id, light_tag, pdf_selection(it)};
+        return {instance_id, light_tag, pmf(it)};
     }
 };
 

@@ -7,8 +7,8 @@ Cornell Box with Bunnies.
 - Mega-Kernel Path Tracing
 - Lambert & (Fake) Mirror Materials
 - Diffuse Area Lights
-- Samples per Pixel: 65536
+- Samples per Pixel: 1,048,576
 - Resolution: 1024x1024
 - Max Depth: 10
 
-![CornellBoxBunny](data/scenes/test-65536spp.png)
+![CornellBoxBunny](data/scenes/test-1048576spp.png)

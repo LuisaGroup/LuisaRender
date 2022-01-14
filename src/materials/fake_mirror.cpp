@@ -41,10 +41,10 @@ private:
 public:
     FakeMirrorClosure(const Interaction &it, Expr<float3> color) noexcept
         : _it{it}, _color{color} {}
-    [[nodiscard]] Material::Evaluation evaluate(Expr<float3> wi) const noexcept override {
+    [[nodiscard]] Material::Evaluation evaluate(Expr<float3> wi, Expr<float> time) const noexcept override {
         return {.f = make_float3(0.0f), .pdf = 0.0f};
     }
-    [[nodiscard]] Material::Sample sample(Sampler::Instance &sampler) const noexcept override {
+    [[nodiscard]] Material::Sample sample(Sampler::Instance &sampler, Expr<float> time) const noexcept override {
         auto cos_wo = dot(_it.wo(), _it.shading().n());
         auto wi = 2.0f * cos_wo * _it.shading().n() - _it.wo();
         static constexpr auto delta_pdf = 1e8f;

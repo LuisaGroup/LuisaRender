@@ -17,6 +17,7 @@
 #include <scene/integrator.h>
 #include <scene/interaction.h>
 #include <scene/light_sampler.h>
+#include <scene/environment.h>
 
 namespace luisa::render {
 
@@ -97,6 +98,8 @@ private:
     luisa::unique_ptr<Integrator::Instance> _integrator;
     luisa::unique_ptr<LightSampler::Instance> _light_sampler;
     luisa::unique_ptr<Sampler::Instance> _sampler;
+    luisa::unique_ptr<Environment::Instance> _environment;
+    float _mean_time{0.0f};
 
 private:
     void _build_geometry(CommandBuffer &command_buffer, luisa::span<const Shape *const> shapes, float init_time, AccelBuildHint hint) noexcept;
@@ -183,7 +186,9 @@ public:
     [[nodiscard]] auto &materials() const noexcept { return _materials; }
     [[nodiscard]] auto sampler() noexcept { return _sampler.get(); }
     [[nodiscard]] auto sampler() const noexcept { return _sampler.get(); }
+    [[nodiscard]] auto environment() const noexcept { return _environment.get(); }
     [[nodiscard]] auto light_sampler() const noexcept { return _light_sampler.get(); }
+    [[nodiscard]] auto mean_time() const noexcept { return _mean_time; }
     void update_geometry(CommandBuffer &command_buffer, float time) noexcept;
     void render(Stream &stream) noexcept;
 

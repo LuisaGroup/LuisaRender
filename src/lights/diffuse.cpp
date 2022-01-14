@@ -69,11 +69,11 @@ private:
 
 public:
     explicit DiffuseLightClosure(const Pipeline &pipeline) noexcept : _pipeline{pipeline} {}
-    [[nodiscard]] Light::Evaluation evaluate(const Interaction &it, Expr<float3> p_from) const noexcept override {
+    [[nodiscard]] Light::Evaluation evaluate(const Interaction &it, Expr<float3> p_from, Expr<float> time) const noexcept override {
         auto params = _pipeline.buffer<DiffuseLightParams>(it.shape()->light_buffer_id()).read(0u);
         return _evaluate(it, p_from, params);
     }
-    [[nodiscard]] Light::Sample sample(Sampler::Instance &sampler, Expr<uint> light_inst_id, const Interaction &it_from) const noexcept override {
+    [[nodiscard]] Light::Sample sample(Sampler::Instance &sampler, Expr<uint> light_inst_id, const Interaction &it_from, Expr<float> time) const noexcept override {
         using namespace luisa::compute;
         auto [light_inst, light_to_world] = _pipeline.instance(light_inst_id);
         auto params = _pipeline.buffer<DiffuseLightParams>(light_inst->light_buffer_id()).read(0u);
@@ -88,7 +88,8 @@ public:
         auto [ns, tangent, uv] = _pipeline.surface_point_attributes(light_inst, light_to_world_normal, triangle, uvw);
         Interaction it_light{light_inst, triangle_id, area, p, normalize(it_from.p() - p), ng, uv, ns, tangent};
         DiffuseLightClosure closure{_pipeline};
-        return {.eval = closure._evaluate(it_light, it_from.p(), params), .p_light = p};
+        return {.eval = closure._evaluate(it_light, it_from.p(), params),
+                .shadow_ray = it_from.spawn_ray_to(p)};
     }
 };
 

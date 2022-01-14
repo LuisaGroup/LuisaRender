@@ -30,8 +30,8 @@ public:
 
     struct Closure {
         virtual ~Closure() noexcept = default;
-        [[nodiscard]] virtual Evaluation evaluate(Expr<float3> wi) const noexcept = 0;
-        [[nodiscard]] virtual Sample sample(Sampler::Instance &sampler) const noexcept = 0;
+        [[nodiscard]] virtual Evaluation evaluate(Expr<float3> wi, Expr<float> time) const noexcept = 0;
+        [[nodiscard]] virtual Sample sample(Sampler::Instance &sampler, Expr<float> time) const noexcept = 0;
     };
 
 public:

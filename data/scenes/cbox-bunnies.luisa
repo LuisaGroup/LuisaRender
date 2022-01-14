@@ -6,7 +6,7 @@ Film film : Color {
 Camera camera : Pinhole {
   position { -0.01, 0.995, 5.0 }
   fov { 27.8 }
-  spp { 1024 }
+  spp { 128 }
   film { @film }
   file { "test.exr" }
 }
@@ -108,6 +108,10 @@ Shape group : Group {
 
 render {
   cameras { @camera }
-  shapes { @cbox, @cbox-light, @bunny, @group, @light, @point }
+  shapes { @cbox, // @cbox-light,
+   @bunny, @group, @light, @point }
   integrator { @pt }
+  environment : Constant {
+    emission { 2 }
+  }
 }

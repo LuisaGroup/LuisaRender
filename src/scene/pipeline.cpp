@@ -192,11 +192,18 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
             mean_time += (camera->time_span().x + camera->time_span().y) * 0.5f;
         }
         mean_time *= 1.0 / static_cast<double>(scene.cameras().size());
-        pipeline->_build_geometry(command_buffer, scene.shapes(), static_cast<float>(mean_time), AccelBuildHint::FAST_TRACE);
+        pipeline->_mean_time = static_cast<float>(mean_time);
+        pipeline->_build_geometry(command_buffer, scene.shapes(), pipeline->_mean_time, AccelBuildHint::FAST_TRACE);
         pipeline->_integrator = scene.integrator()->build(*pipeline, command_buffer);
         pipeline->_sampler = scene.integrator()->sampler()->build(*pipeline, command_buffer);
+        if (auto env = scene.environment(); env != nullptr && !env->is_black()) {
+            pipeline->_environment = env->build(*pipeline, command_buffer);
+        }
         if (pipeline->_lights.empty()) [[unlikely]] {
-            LUISA_WARNING_WITH_LOCATION("No lights found in the scene.");
+            if (pipeline->_environment == nullptr) {
+                LUISA_WARNING_WITH_LOCATION(
+                    "No lights or environment found in the scene.");
+            }
         } else {
             pipeline->_light_sampler = scene.integrator()->light_sampler()->build(*pipeline, command_buffer);
         }
@@ -275,7 +282,9 @@ Var<bool> Pipeline::trace_any(const Var<Ray> &ray) const noexcept { return _acce
 luisa::unique_ptr<Interaction> Pipeline::interaction(const Var<Ray> &ray, const Var<Hit> &hit) const noexcept {
     using namespace luisa::compute;
     Interaction it;
-    $if(!hit->miss()) {
+    $if(hit->miss()) {
+        it = Interaction{-ray->direction()};
+    } $else {
         auto [shape, shape_to_world] = instance(hit.inst);
         auto shape_to_world_normal = transpose(inverse(make_float3x3(shape_to_world)));
         auto tri = triangle(shape, hit.prim);

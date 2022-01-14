@@ -30,8 +30,8 @@ class Light;
 class Sampler;
 class Shape;
 class Transform;
-class Environment;
 class LightSampler;
+class Environment;
 
 class Scene {
 
@@ -65,15 +65,15 @@ public:
     [[nodiscard]] Sampler *load_sampler(const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] Shape *load_shape(const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] Transform *load_transform(const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] LightSampler *load_light_sampler(const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] Environment *load_environment(const SceneNodeDesc *desc) noexcept;
-    [[nodiscard]] LightSampler *load_light_distribution(const SceneNodeDesc *desc) noexcept;
 
 public:
     [[nodiscard]] static luisa::unique_ptr<Scene> create(const Context &ctx, const SceneDesc *desc) noexcept;
     [[nodiscard]] const Integrator *integrator() const noexcept;
+    [[nodiscard]] const Environment *environment() const noexcept;
     [[nodiscard]] luisa::span<const Shape *const> shapes() const noexcept;
     [[nodiscard]] luisa::span<const Camera *const> cameras() const noexcept;
-    [[nodiscard]] luisa::span<const Environment *const> environments() const noexcept;
 };
 
 }

@@ -63,8 +63,8 @@ private:
 
 public:
     explicit FakePointLightClosure(const Pipeline &ppl) noexcept: _pipeline{ppl} {}
-    [[nodiscard]] Light::Evaluation evaluate(const Interaction &, Expr<float3>) const noexcept override { return {}; /* should never be called */ }
-    [[nodiscard]] Light::Sample sample(Sampler::Instance &sampler, Expr<uint> light_inst_id, const Interaction &it_from) const noexcept override {
+    [[nodiscard]] Light::Evaluation evaluate(const Interaction &, Expr<float3>, Expr<float>) const noexcept override { return {}; /* should never be called */ }
+    [[nodiscard]] Light::Sample sample(Sampler::Instance &sampler, Expr<uint> light_inst_id, const Interaction &it_from, Expr<float> time) const noexcept override {
         using namespace luisa::compute;
         auto [inst, inst_to_world] = _pipeline.instance(light_inst_id);
         auto params = _pipeline.buffer<FakePointLightParams>(inst->light_buffer_id()).read(0u);
@@ -77,7 +77,7 @@ public:
         static constexpr auto delta_pdf = 1e8f;
         s.eval.L = emission * delta_pdf;
         s.eval.pdf = distance_squared(p_light, it_from.p()) * delta_pdf;
-        s.p_light = p_light;
+        s.shadow_ray = it_from.spawn_ray_to(p_light);
         return s;
     }
 };
