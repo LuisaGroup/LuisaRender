@@ -27,8 +27,8 @@ public:
         [[nodiscard]] auto node() const noexcept { return _env; }
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
         [[nodiscard]] auto selection_prob() const noexcept { return _select_prob; }
-        [[nodiscard]] virtual Light::Evaluation evaluate(Expr<float3> wi, Expr<float> time) const noexcept = 0;
-        [[nodiscard]] virtual Light::Sample sample(Sampler::Instance &sampler, const Interaction &it_from, Expr<float> time) const noexcept = 0;
+        [[nodiscard]] virtual Light::Evaluation evaluate(Expr<float3> wi, Expr<float3x3> env_to_world, Expr<float> time) const noexcept = 0;
+        [[nodiscard]] virtual Light::Sample sample(Sampler::Instance &sampler, const Interaction &it_from, Expr<float3x3> env_to_world, Expr<float> time) const noexcept = 0;
     };
 
 private:

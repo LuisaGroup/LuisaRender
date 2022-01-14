@@ -1,0 +1,44 @@
+Film film : Color {
+  resolution { 1024 }
+  exposure { 0 }
+}
+
+Camera camera : Pinhole {
+  position { 0, 0, 5 }
+  fov { 27.8 }
+  spp { 128 }
+  film { @film }
+  file { "white-furnace-test.exr" }
+}
+
+Integrator normal : Normal {
+  sampler : Independent {}
+}
+
+Integrator pt : MegaPath {
+  depth { 10 }
+}
+
+Shape teapot : TriangleMesh {
+  file { "../meshes/utah-teapot.obj" }
+  material : Lambert {
+    color { 1 }
+  }
+  transform : SRT {
+    scale { 0.25 }
+    translate { 0, -0.5, 0 }
+    rotate { 0, 1, 0, 90 }
+  }
+}
+
+render {
+  cameras { @camera }
+  shapes { @teapot }
+  integrator { @pt }
+  environment : Constant {
+    emission { 1 }
+    transform : SRT {
+      rotate { 0, 1, 0, 45 }
+    }
+  }
+}

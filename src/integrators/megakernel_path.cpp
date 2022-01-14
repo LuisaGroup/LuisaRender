@@ -63,12 +63,6 @@ void MegakernelPathTracingInstance::_render_one_camera(
         resolution.x, resolution.y, spp);
 
     auto light_sampler = pipeline.light_sampler();
-    if (light_sampler == nullptr) [[unlikely]] {
-        LUISA_ERROR_WITH_LOCATION(
-            "Path tracing cannot render "
-            "scenes without lights.");
-    }
-
     auto sampler = pipeline.sampler();
     auto env = pipeline.environment();
 
@@ -82,8 +76,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
         return ite(pdf_a > 0.0f, pdf_a / (pdf_a + pdf_b), 0.0f);
     };
 
-    Kernel2D render_kernel = [&](UInt frame_index, Float4x4 camera_to_world, Float3x3 camera_to_world_normal,
-                                 Float3x3 env_to_world, Float3x3 world_to_env, Float time) noexcept {
+    Kernel2D render_kernel = [&](UInt frame_index, Float4x4 camera_to_world, Float3x3 camera_to_world_normal, Float3x3 env_to_world, Float time) noexcept {
         set_block_size(8u, 8u, 1u);
 
         auto pixel_id = dispatch_id().xy();
@@ -115,26 +108,27 @@ void MegakernelPathTracingInstance::_render_one_camera(
 
             // trace
             auto it = pipeline.intersect(ray);
+
+            // miss
             $if(!it->valid()) {
                 if (env_prob > 0.0f) {
-                    auto w = ray->direction();
-                    if (env != nullptr && !env->node()->transform()->is_identity()) {
-                        w = world_to_env * w;
-                    }
-                    auto eval = env->evaluate(w, time);
+                    auto eval = env->evaluate(
+                        ray->direction(), env_to_world, time);
                     eval.pdf *= env_prob;
                     add_light_contrib(eval);
                 }
                 $break;
             };
 
-            // evaluate Le
-            $if(it->shape()->has_light()) {
-                auto eval = light_sampler->evaluate(
-                    *it, ray->origin(), time);
-                eval.pdf *= 1.0f - env_prob;
-                add_light_contrib(eval);
-            };
+            // hit light
+            if (light_sampler != nullptr) {
+                $if(it->shape()->has_light()) {
+                    auto eval = light_sampler->evaluate(
+                        *it, ray->origin(), time);
+                    eval.pdf *= 1.0f - env_prob;
+                    add_light_contrib(eval);
+                };
+            }
 
             // sample one light
             $if(!it->shape()->has_material()) { $break; };
@@ -142,18 +136,16 @@ void MegakernelPathTracingInstance::_render_one_camera(
             if (env_prob > 0.0f) {
                 auto u = sampler->generate_1d();
                 $if(u < env_prob) {
-                    light_sample = env->sample(*sampler, *it, time);
+                    light_sample = env->sample(*sampler, *it, env_to_world, time);
                     light_sample.eval.pdf *= env_prob;
-                    if (env != nullptr && !env->node()->transform()->is_identity()) {
-                        light_sample.shadow_ray->set_direction(
-                            env_to_world * light_sample.shadow_ray->direction());
-                    }
                 }
                 $else {
-                    light_sample = light_sampler->sample(*sampler, *it, time);
-                    light_sample.eval.pdf *= 1.0f - env_prob;
+                    if (light_sampler != nullptr) {
+                        light_sample = light_sampler->sample(*sampler, *it, time);
+                        light_sample.eval.pdf *= 1.0f - env_prob;
+                    }
                 };
-            } else {
+            } else if (light_sampler != nullptr) {
                 light_sample = light_sampler->sample(*sampler, *it, time);
                 light_sample.eval.pdf *= 1.0f - env_prob;
             }
@@ -207,12 +199,10 @@ void MegakernelPathTracingInstance::_render_one_camera(
         pipeline.update_geometry(command_buffer, time);
         auto camera_to_world = camera->node()->transform()->matrix(t);
         auto camera_to_world_normal = transpose(inverse(make_float3x3(camera_to_world)));
-        auto env_to_world = env == nullptr ?
+        auto env_to_world = env == nullptr || env->node()->transform()->is_identity() ?
                                 make_float3x3(1.0f) :
                                 transpose(inverse(make_float3x3(env->node()->transform()->matrix(time))));
-        auto world_to_env = inverse(env_to_world);
-        command_buffer << render(i, camera_to_world, camera_to_world_normal, env_to_world, world_to_env, time)
-                              .dispatch(resolution);
+        command_buffer << render(i, camera_to_world, camera_to_world_normal, env_to_world, time).dispatch(resolution);
         if (spp % spp_per_commit == spp_per_commit - 1u) [[unlikely]] {
             command_buffer << commit();
         }

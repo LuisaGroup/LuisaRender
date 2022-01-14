@@ -17,11 +17,11 @@ Frame::Frame() noexcept
       _n{0.0f, 0.0f, 1.0f} {}
 
 Frame Frame::make(Expr<float3> normal) noexcept {
-    auto bitangent = normalize(ite(
+    auto tangent = normalize(ite(
         abs(normal.x) > abs(normal.z),
-        make_float3(-normal.y, normal.x, 0.0f),
-        make_float3(0.0f, -normal.z, normal.y)));
-    auto tangent = normalize(cross(bitangent, normal));
+        make_float3(normal.z, 0.0f, -normal.x),
+        make_float3(0.0f, normal.z, -normal.y)));
+    auto bitangent = normalize(cross(normal, tangent));
     return Frame{std::move(tangent), std::move(bitangent), normal};
 }
 
@@ -40,5 +40,4 @@ Float3 Frame::world_to_local(Expr<float3> d) const noexcept {
     return make_float3(dot(d, _u), dot(d, _v), dot(d, _n));
 }
 
-}
-
+}// namespace luisa::render

@@ -250,10 +250,10 @@ std::tuple<Var<float3>, Var<float3>, Var<float>> Pipeline::surface_point_geometr
         return make_float3(m * make_float4(std::forward<decltype(p)>(p), 1.0f));
     };
     auto p_buffer = instance->position_buffer_id();
-    auto p0 = buffer<float3>(p_buffer).read(triangle.i0);
-    auto p1 = buffer<float3>(p_buffer).read(triangle.i1);
-    auto p2 = buffer<float3>(p_buffer).read(triangle.i2);
-    auto p = uvw.x * world(p0) + uvw.y * world(p1) + uvw.z * world(p2);
+    auto p0 = world(buffer<float3>(p_buffer).read(triangle.i0));
+    auto p1 = world(buffer<float3>(p_buffer).read(triangle.i1));
+    auto p2 = world(buffer<float3>(p_buffer).read(triangle.i2));
+    auto p = uvw.x * p0 + uvw.y * p1 + uvw.z * p2;
     auto c = cross(p1 - p0, p2 - p0);
     auto area = 0.5f * length(c);
     auto ng = normalize(c);
