@@ -10,7 +10,7 @@ Camera camera : Pinhole {
   film { @film }
   file { "environment-mapping.exr" }
   time_span { 0, 0 }
-  filter : Gaussian {
+  filter : Mitchell {
     radius { 1 }
   }
 }

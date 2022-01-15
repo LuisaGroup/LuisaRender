@@ -1,3 +1,6 @@
 add_library(luisa-render-filters INTERFACE)
 luisa_render_add_plugin(box CATEGORY filter SOURCES box.cpp)
 luisa_render_add_plugin(gaussian CATEGORY filter SOURCES gaussian.cpp)
+luisa_render_add_plugin(mitchell CATEGORY filter SOURCES mitchell.cpp)
+luisa_render_add_plugin(triangle CATEGORY filter SOURCES triangle.cpp)
+luisa_render_add_plugin(lanczossinc CATEGORY filter SOURCES lanczos_sinc.cpp)
