@@ -155,7 +155,8 @@ LoadedImage<float> load_hdr_image(const std::filesystem::path &path, uint expect
         FreeEXRImage(&exr_image);
         FreeEXRHeader(&exr_header);
         return {pixels, make_uint2(width, height), expected_channels,
-                [](auto p) noexcept { luisa::deallocate(p); }};
+                static_cast<typename LoadedImage<float>::deleter_type>(
+                    [](auto p) noexcept { luisa::deallocate(p); })};
     }
     if (ext == ".hdr") {
         int w, h, nc;
@@ -166,7 +167,8 @@ LoadedImage<float> load_hdr_image(const std::filesystem::path &path, uint expect
                 filename);
         }
         return {pixels, make_uint2(w, h), static_cast<uint>(nc),
-                [](auto p) noexcept { stbi_image_free(p); }};
+                static_cast<typename LoadedImage<float>::deleter_type>(
+                    [](auto p) noexcept { stbi_image_free(p); })};
     }
     LUISA_ERROR_WITH_LOCATION(
         "Invalid HDR image '{}'.",
@@ -191,7 +193,8 @@ LoadedImage<uint8_t> load_ldr_image(const std::filesystem::path &path, uint expe
             filename);
     }
     return {pixels, make_uint2(w, h), static_cast<uint>(nc),
-            [](auto p) noexcept { stbi_image_free(p); }};
+            static_cast<typename LoadedImage<uint8_t>::deleter_type>(
+                [](auto p) noexcept { stbi_image_free(p); })};
 }
 
 }// namespace luisa::render

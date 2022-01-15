@@ -81,7 +81,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
 
         auto pixel_id = dispatch_id().xy();
         sampler->start(pixel_id, frame_index);
-        auto pixel = make_float2(pixel_id);
+        auto pixel = make_float2(pixel_id) + 0.5f;
         auto beta = def(make_float3(1.0f));
         auto [filter_offset, filter_weight] = filter->sample(*sampler);
         pixel += filter_offset;

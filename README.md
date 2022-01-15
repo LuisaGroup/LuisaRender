@@ -10,7 +10,7 @@ High-Performance renderer for stream architectures based on [LuisaCompute](https
    - Samples per Pixel: 1,048,576
    - Resolution: 1024x1024
    - Max Depth: 10
-   - 
+
 ![CornellBoxBunny](data/scenes/test-1048576spp.png)
 
 - Rotating Teapot with Environment Mapping.

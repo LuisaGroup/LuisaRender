@@ -6,10 +6,13 @@ Film film : Color {
 Camera camera : Pinhole {
   position { 0, 0, 5 }
   fov { 60 }
-  spp { 16384 }
+  spp { 1024 }
   film { @film }
   file { "environment-mapping.exr" }
-  time_span { 0, 0.1 }
+  time_span { 0, 0 }
+  filter : Gaussian {
+    radius { 1 }
+  }
 }
 
 Integrator normal : Normal {

@@ -27,7 +27,7 @@ Float cosine_hemisphere_pdf(Expr<float> cos_theta) noexcept {
 }
 
 std::pair<luisa::vector<AliasEntry>, luisa::vector<float>>
-create_alias_table(luisa::span<float> values) noexcept {
+create_alias_table(luisa::span<const float> values) noexcept {
 
     auto sum = std::reduce(values.cbegin(), values.cend(), 0.0);
     auto inv_sum = 1.0 / sum;

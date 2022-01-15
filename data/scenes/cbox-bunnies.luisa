@@ -9,6 +9,9 @@ Camera camera : Pinhole {
   spp { 1024 }
   film { @film }
   file { "test.exr" }
+  filter : Gaussian {
+    radius { 1 }
+  }
 }
 
 Camera camera2 : Pinhole {

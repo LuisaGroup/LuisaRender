@@ -78,7 +78,7 @@ public:
         auto [light_inst, light_to_world] = _pipeline.instance(light_inst_id);
         auto params = _pipeline.buffer<DiffuseLightParams>(light_inst->light_buffer_id()).read(0u);
         auto alias_table_buffer_id = light_inst->alias_table_buffer_id();
-        auto triangle_id = sample_alias_table(
+        auto [triangle_id, _] = sample_alias_table(
             _pipeline.buffer<AliasEntry>(alias_table_buffer_id),
             params.triangle_count, sampler.generate_1d());
         auto triangle = _pipeline.triangle(light_inst, triangle_id);

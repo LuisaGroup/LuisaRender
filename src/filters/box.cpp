@@ -7,27 +7,11 @@
 
 namespace luisa::render {
 
-class BoxFilter final : public Filter {
-
-public:
+struct BoxFilter final : public Filter {
     BoxFilter(Scene *scene, const SceneNodeDesc *desc) noexcept : Filter{scene, desc} {}
-    [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "box"; }
+    [[nodiscard]] float evaluate(float x) const noexcept override { return 1.0f; }
 };
-
-class BoxFilterInstance final : public Filter::Instance {
-
-public:
-    explicit BoxFilterInstance(const BoxFilter *filter) noexcept : Filter::Instance{filter} {}
-    Filter::Sample sample(Sampler::Instance &sampler) const noexcept override {
-        auto u = sampler.generate_2d();
-        return {.offset = u * node()->radius(), .weight = make_float3(1.0f)};
-    }
-};
-
-luisa::unique_ptr<Filter::Instance> BoxFilter::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
-    return luisa::make_unique<BoxFilterInstance>(this);
-}
 
 }// namespace luisa::render
 
