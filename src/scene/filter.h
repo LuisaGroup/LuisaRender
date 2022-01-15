@@ -14,7 +14,7 @@ namespace luisa::render {
 class Filter : public SceneNode {
 
 public:
-    static constexpr auto look_up_table_size = 63u;
+    static constexpr auto look_up_table_size = 64u;
 
 public:
     struct Sample {

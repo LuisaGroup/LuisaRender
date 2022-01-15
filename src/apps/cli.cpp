@@ -5,7 +5,6 @@
 #include <span>
 
 #include <cxxopts.hpp>
-#include <luisa-compute.h>
 
 #include <sdl/scene_desc.h>
 #include <sdl/scene_parser.h>
@@ -50,123 +49,6 @@ using namespace luisa;
 using namespace luisa::compute;
 using namespace luisa::render;
 
-void dump(std::ostream &os, const SceneNodeDesc *node, size_t indent_level = 0) noexcept {
-    auto indent = [&os](auto n) noexcept {
-        for (auto i = 0u; i < n; i++) { os << "  "; }
-    };
-    os << node->impl_type() << " {";
-    for (auto &&[prop, values] : node->properties()) {
-        os << "\n";
-        indent(indent_level + 1u);
-        os << prop << " ";
-        luisa::visit(
-            [&](auto &&v) noexcept {
-                using T = std::remove_cvref_t<decltype(v)>;
-                if constexpr (std::is_same_v<T, SceneNodeDesc::string_list>) {
-                    os << "{";
-                    if (!v.empty()) {
-                        os << " \"" << v.front() << '"';
-                        for (auto i = 1u; i < v.size(); i++) {
-                            os << ", \"" << v[i] << '"';
-                        }
-                        os << " ";
-                    }
-                    os << "}";
-                } else if constexpr (std::is_same_v<T, SceneNodeDesc::node_list>) {
-                    if (v.size() == 1u) {
-                        if (v.front()->is_internal()) {
-                            os << ": ";
-                            dump(os, v.front(), indent_level + 1u);
-                        } else {
-                            os << "{ @" << v.front()->identifier() << " }";
-                        }
-                    } else {
-                        os << "{";
-                        if (!v.empty()) {
-                            os << "\n";
-                            indent(indent_level + 2u);
-                            if (v.front()->is_internal()) {
-                                dump(os, v.front(), indent_level + 2u);
-                            } else {
-                                os << "@" << v.front()->identifier();
-                            }
-                            for (auto i = 1u; i < v.size(); i++) {
-                                os << ",\n";
-                                indent(indent_level + 2u);
-                                if (v[i]->is_internal()) {
-                                    dump(os, v[i], indent_level + 2u);
-                                } else {
-                                    os << "@" << v[i]->identifier();
-                                }
-                            }
-                            os << "\n";
-                        }
-                        indent(indent_level + 1u);
-                        os << "}";
-                    }
-                } else {
-                    os << "{";
-                    if (!v.empty()) {
-                        os << " " << v.front();
-                        for (auto i = 1u; i < v.size(); i++) {
-                            os << ", " << v[i];
-                        }
-                        os << " ";
-                    }
-                    os << "}";
-                }
-            },
-            values);
-    }
-    if (!node->properties().empty()) {
-        os << "\n";
-        indent(indent_level);
-    }
-    os << "}";
-}
-
-void dump(std::ostream &os, const SceneDesc &scene) noexcept {
-    auto flags = os.flags();
-    os << std::boolalpha;
-    for (auto &&node : scene.nodes()) {
-        os << scene_node_tag_description(node->tag()) << " "
-           << node->identifier() << " : ";
-        dump(os, node.get());
-        os << "\n\n";
-    }
-    os << "// entry\n";
-    dump(os, scene.root());
-    os << std::endl;
-    os.flags(flags);
-}
-
-class Base {
-public:
-    virtual ~Base() noexcept = default;
-    [[nodiscard]] virtual Float foo(Int x, Float y) const noexcept = 0;
-};
-
-[[nodiscard]] Float use_base(const Base &base, Int x, Float y) noexcept {
-    return base.foo(x, y);
-}
-
-class DerivedA : public Base {
-public:
-    [[nodiscard]] Float foo(Int x, Float y) const noexcept override {
-        return cast<float>(x) + y;
-    }
-};
-
-class DerivedB : public Base {
-private:
-    Buffer<float> _buffer;
-
-public:
-    [[nodiscard]] Float foo(Int x, Float y) const noexcept override {
-        return _buffer.read(x) + y;
-    }
-};
-
 int main(int argc, char *argv[]) {
 
     log_level_info();
@@ -180,14 +62,12 @@ int main(int argc, char *argv[]) {
     auto device = context.create_device(backend, {{"index", index}});
     Clock clock;
     auto scene_desc = SceneParser::parse(path);
-    LUISA_INFO("Parse time: {} ms.", clock.toc());
-
-    std::ostringstream os;
-    dump(os, *scene_desc);
-    LUISA_INFO("Scene dump:\n{}", os.str());
+    LUISA_INFO(
+        "Parsed scene description "
+        "file '{}' in {} ms.",
+        path.string(), clock.toc());
 
     auto scene = Scene::create(context, scene_desc.get());
-
     auto stream = device.create_stream();
     auto pipeline = Pipeline::create(device, stream, *scene);
     pipeline->render(stream);

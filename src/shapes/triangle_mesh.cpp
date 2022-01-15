@@ -25,8 +25,8 @@ public:
 
     [[nodiscard]] static auto load(std::filesystem::path path) noexcept {
         return ThreadPool::global().async([path = std::move(path)] {
+            Clock clock;
             auto path_string = path.string();
-            LUISA_INFO("Loading mesh from '{}'.", path_string);
             Assimp::Importer importer;
             importer.SetPropertyInteger(
                 AI_CONFIG_PP_RVC_FLAGS,
@@ -104,6 +104,9 @@ public:
                     auto t = face.mIndices;
                     return Triangle{t[0], t[1], t[2]};
                 });
+            LUISA_INFO(
+                "Loaded triangle mesh '{}' in {} ms.",
+                path_string, clock.toc());
             return loader;
         });
     }
