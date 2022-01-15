@@ -37,7 +37,7 @@ private:
 
 public:
     explicit MegakernelPathTracingInstance(const MegakernelPathTracing *node, Pipeline &pipeline) noexcept
-        : Integrator::Instance{node}, _pipeline{pipeline}, _max_depth{node->max_depth()} {}
+        : Integrator::Instance{pipeline, node}, _pipeline{pipeline}, _max_depth{node->max_depth()} {}
     void render(Stream &stream) noexcept override {
         for (auto i = 0u; i < _pipeline.camera_count(); i++) {
             auto [camera, film, filter] = _pipeline.camera(i);

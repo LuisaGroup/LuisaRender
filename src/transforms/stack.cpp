@@ -13,6 +13,7 @@ private:
     luisa::vector<const Transform *> _transforms;
     mutable float4x4 _matrix_cache;
     mutable float _time_cache;
+    mutable spin_mutex _mutex;
     bool _is_static;
     bool _is_identity;
 
@@ -37,7 +38,8 @@ public:
     [[nodiscard]] bool is_static() const noexcept override { return _is_static; }
     [[nodiscard]] bool is_identity() const noexcept override { return _is_identity; }
     [[nodiscard]] float4x4 matrix(float time) const noexcept override {
-        if (is_static()) { return _matrix_cache; }
+        std::scoped_lock lock{_mutex};
+        if (_is_static) { return _matrix_cache; }
         if (time != _time_cache) {
             _time_cache = time;
             _matrix_cache = make_float4x4(1.0f);

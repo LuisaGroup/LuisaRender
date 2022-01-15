@@ -16,6 +16,7 @@ private:
     mutable float4x4 _matrix_cache;
     mutable float _time_cache;
     mutable uint _upper_index_cache{~0u};
+    mutable spin_mutex _mutex;
     mutable DecomposedTransform _t0_cache{};
     mutable DecomposedTransform _t1_cache{};
 
@@ -70,6 +71,7 @@ public:
     [[nodiscard]] bool is_static() const noexcept override { return false; }
     [[nodiscard]] bool is_identity() const noexcept override { return false; }
     [[nodiscard]] float4x4 matrix(float time) const noexcept override {
+        std::scoped_lock lock{_mutex};
         if (time != _time_cache) {
             if (time <= _time_points.front()) {
                 _time_cache = _time_points.front();

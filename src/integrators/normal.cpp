@@ -37,7 +37,7 @@ public:
 
 NormalVisualizerInstance::NormalVisualizerInstance(
     const NormalVisualizer *integrator, Pipeline &pipeline) noexcept
-    : Integrator::Instance{integrator}, _pipeline{pipeline} {}
+    : Integrator::Instance{pipeline, integrator}, _pipeline{pipeline} {}
 
 void NormalVisualizerInstance::render(Stream &stream) noexcept {
     for (auto i = 0u; i < _pipeline.camera_count(); i++) {
