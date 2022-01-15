@@ -16,19 +16,25 @@ namespace luisa::render {
 template<typename T>
 class LoadedImage {
 
+public:
+    using deleter_type = void(*)(T *);
+
 private:
-    T *_pixels;
+    T *_pixels{nullptr};
     uint2 _resolution;
-    uint _channels;
-    void(*_deleter)(T *);
+    uint _channels{0u};
+    deleter_type _deleter{nullptr};
 
 private:
     void _destroy() noexcept {
-        if (_pixels != nullptr) { _deleter(_pixels); }
+        if (_pixels != nullptr) {
+            _deleter(_pixels);
+        }
     }
 
 public:
-    LoadedImage(T *pixels, uint2 resolution, uint num_channels, void (*deleter)(T *)) noexcept
+    LoadedImage() noexcept = default;
+    LoadedImage(T *pixels, uint2 resolution, uint num_channels, deleter_type deleter) noexcept
         : _pixels{pixels}, _resolution{resolution}, _channels{num_channels}, _deleter{deleter} {}
     ~LoadedImage() noexcept { _destroy(); }
     LoadedImage(LoadedImage &&another) noexcept
@@ -45,6 +51,7 @@ public:
             _deleter = rhs._deleter;
             rhs._pixels = nullptr;
         }
+        return *this;
     }
     LoadedImage(const LoadedImage &) noexcept = delete;
     LoadedImage &operator=(const LoadedImage &) noexcept = delete;

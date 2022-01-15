@@ -216,7 +216,8 @@ void Pipeline::update_geometry(CommandBuffer &command_buffer, float time) noexce
     // TODO: support deformable meshes
     if (!_transform_tree.is_static()) {
         _transform_tree.update(_accel, time);
-        command_buffer << _accel.update() << luisa::compute::commit();
+        command_buffer << _accel.update()
+                       << luisa::compute::commit();
     }
 }
 
