@@ -26,6 +26,12 @@ public:
     [[nodiscard]] string_view impl_type() const noexcept override { return "srt"; }
     [[nodiscard]] bool is_static() const noexcept override { return true; }
     [[nodiscard]] float4x4 matrix(float) const noexcept override { return _matrix; }
+    [[nodiscard]] bool is_identity() const noexcept override {
+        return all(_matrix[0] == make_float4(1.0f, 0.0f, 0.0f, 0.0f)) &&
+               all(_matrix[1] == make_float4(0.0f, 1.0f, 0.0f, 0.0f)) &&
+               all(_matrix[2] == make_float4(0.0f, 0.0f, 1.0f, 0.0f)) &&
+               all(_matrix[3] == make_float4(0.0f, 0.0f, 0.0f, 1.0f));
+    }
 };
 
 }// namespace luisa::render

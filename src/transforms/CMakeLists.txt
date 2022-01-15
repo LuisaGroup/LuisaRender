@@ -1,3 +1,6 @@
 add_library(luisa-render-transforms INTERFACE)
 luisa_render_add_plugin(identity CATEGORY transform SOURCES identity.cpp)
+luisa_render_add_plugin(matrix CATEGORY transform SOURCES matrix.cpp)
 luisa_render_add_plugin(srt CATEGORY transform SOURCES srt.cpp)
+luisa_render_add_plugin(stack CATEGORY transform SOURCES stack.cpp)
+luisa_render_add_plugin(lerp CATEGORY transform SOURCES lerp.cpp)

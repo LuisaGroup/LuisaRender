@@ -216,7 +216,7 @@ void Pipeline::update_geometry(CommandBuffer &command_buffer, float time) noexce
     // TODO: support deformable meshes
     if (!_transform_tree.is_static()) {
         _transform_tree.update(_accel, time);
-        command_buffer << _accel.update();
+        command_buffer << _accel.update() << luisa::compute::commit();
     }
 }
 
@@ -284,7 +284,8 @@ luisa::unique_ptr<Interaction> Pipeline::interaction(const Var<Ray> &ray, const 
     Interaction it;
     $if(hit->miss()) {
         it = Interaction{-ray->direction()};
-    } $else {
+    }
+    $else {
         auto [shape, shape_to_world] = instance(hit.inst);
         auto shape_to_world_normal = transpose(inverse(make_float3x3(shape_to_world)));
         auto tri = triangle(shape, hit.prim);

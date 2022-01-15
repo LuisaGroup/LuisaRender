@@ -6,9 +6,10 @@ Film film : Color {
 Camera camera : Pinhole {
   position { 0, 0, 5 }
   fov { 60 }
-  spp { 1024 }
+  spp { 4096 }
   film { @film }
   file { "environment-mapping.exr" }
+  time_span { 0, 0.1 }
 }
 
 Integrator normal : Normal {
@@ -34,10 +35,20 @@ Shape teapot : Group {
       }
     }
   }
-  transform : SRT {
-    scale { 0.4 }
-    translate { 0, -0.5, 0 }
-    rotate { 1, 2, 1, 90 }
+  transform : Lerp {
+    transforms {
+      SRT {
+        scale { 0.4 }
+        translate { 0, -1, 0 }
+        rotate { 1, 2, 1, 90 }
+      },
+      SRT {
+        scale { 0.4 }
+        translate { 0, -1, 0 }
+        rotate { 1, 2, 1, 100 }
+      }
+    }
+    time_points { 0, 0.1 }
   }
 }
 

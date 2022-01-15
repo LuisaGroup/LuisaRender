@@ -47,10 +47,10 @@ private:
     float _scale;
 
 private:
-    [[nodiscard]] auto _evaluate(Expr<float3> wi_local, Expr<float> time) const noexcept {
+    [[nodiscard]] auto _evaluate(Expr<float3> wi_local) const noexcept {
         auto theta = acos(wi_local.y);
         auto phi = atan2(wi_local.x, wi_local.z);
-        auto u = -0.5f * inv_pi * (phi + time);
+        auto u = -0.5f * inv_pi * phi;
         auto v = theta * inv_pi;
         auto L = pipeline().tex2d(_image_id).sample(make_float2(u, v));
         return Light::Evaluation{.L = make_float3(L) * _scale, .pdf = uniform_sphere_pdf()};
@@ -64,12 +64,12 @@ public:
         command_buffer << device_image->copy_from(image.pixels());
         _image_id = pipeline.register_bindless(*device_image, TextureSampler::bilinear_repeat());
     }
-    [[nodiscard]] Light::Evaluation evaluate(Expr<float3> wi, Expr<float3x3> env_to_world, Expr<float> time) const noexcept override {
-        return _evaluate(transpose(env_to_world) * wi, time);
+    [[nodiscard]] Light::Evaluation evaluate(Expr<float3> wi, Expr<float3x3> env_to_world, Expr<float>) const noexcept override {
+        return _evaluate(transpose(env_to_world) * wi);
     }
-    [[nodiscard]] Light::Sample sample(Sampler::Instance &sampler, const Interaction &it_from, Expr<float3x3> env_to_world, Expr<float> time) const noexcept override {
+    [[nodiscard]] Light::Sample sample(Sampler::Instance &sampler, const Interaction &it_from, Expr<float3x3> env_to_world, Expr<float>) const noexcept override {
         auto wi = sample_uniform_sphere(sampler.generate_2d());
-        return {.eval = _evaluate(wi, time), .shadow_ray = it_from.spawn_ray(env_to_world * wi)};
+        return {.eval = _evaluate(wi), .shadow_ray = it_from.spawn_ray(env_to_world * wi)};
     }
 };
 
