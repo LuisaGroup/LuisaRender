@@ -6,7 +6,7 @@ Film film : Color {
 Camera camera : Pinhole {
   position { 0, 0, 5 }
   fov { 60 }
-  spp { 4096 }
+  spp { 16384 }
   film { @film }
   file { "environment-mapping.exr" }
   time_span { 0, 0.1 }
