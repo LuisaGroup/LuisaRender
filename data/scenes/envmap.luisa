@@ -9,8 +9,8 @@ Camera camera : Pinhole {
   spp { 1024 }
   film { @film }
   file { "environment-mapping.exr" }
-  time_span { 0, 0 }
-  filter : Mitchell {
+  shutter_span { 0, 0.1 }
+  filter : Gaussian {
     radius { 1 }
   }
 }
@@ -23,15 +23,15 @@ Integrator pt : MegaPath {
   depth { 10 }
 }
 
-Shape teapot : Group {
+Object teapot : Group {
   shapes {
-    TriangleMesh {
+    Mesh {
       file { "../meshes/utah-teapot-lid.obj" }
       material : FakeMirror {
         color { 1 }
       }
     },
-    TriangleMesh {
+    Mesh {
       file { "../meshes/utah-teapot.obj" }
       material : FakeMirror {
         color { 1.0, 0.71, 0.29 }
@@ -55,7 +55,7 @@ Shape teapot : Group {
   }
 }
 
-Shape sphere : TriangleMesh {
+Object sphere : Mesh {
   file { "../meshes/sphere.obj" }
   material : FakeMirror {
     color { 1 }

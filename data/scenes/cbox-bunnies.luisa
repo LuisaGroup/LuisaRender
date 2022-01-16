@@ -6,12 +6,13 @@ Film film : Color {
 Camera camera : Pinhole {
   position { -0.01, 0.995, 5.0 }
   fov { 27.8 }
-  spp { 1024 }
+  spp { 65536 }
   film { @film }
   file { "test.exr" }
   filter : Gaussian {
     radius { 1 }
   }
+  shutter_span { 0, 0.1 }
 }
 
 Camera camera2 : Pinhole {
@@ -43,7 +44,7 @@ Shape virtual : Virtual {
   }
 }
 
-Shape bunny : TriangleMesh {
+Shape bunny : Mesh {
   file { "../meshes/bunny.obj" }
   transform : SRT {
     scale { 0.01 }
@@ -55,17 +56,27 @@ Shape bunny : TriangleMesh {
   }
 }
 
-Shape light : TriangleMesh {
+Shape light : Mesh {
   file { "../meshes/light.obj" }
   two_sided { true }
   light : Diffuse {
     emission { 1.5, 1.1, 0.6 }
     scale { 1.75 }
   }
-  transform : SRT {
-    scale { 0.2 }
-    translate { 0.2, 0.1, 0.9 }
-    rotate { 0, 1, 0, -20 }
+  transform : Lerp {
+    transforms {
+      SRT {
+        scale { 0.2 }
+        translate { 0.2, 0.1, 0.9 }
+        rotate { 0, 1, 0, -20 }
+      },
+      SRT {
+        scale { 0.2 }
+        translate { 0.2, 0.1, 0.9 }
+        rotate { 0, 1, 0, 60 }
+      }
+    }
+    time_points { 0, 0.1 }
   }
   material : FakeMirror {
     color { 0.28, 0.9, 0.182 }
@@ -81,6 +92,10 @@ Shape point : Virtual {
     scale { 0.25 }
     radius { 0.01 }
   }
+}
+
+Shape light_box : Group {
+  shapes { @light, @point }// TODO: bug if { @point, @light }, seems related to transforms
 }
 
 Shape group : Group {
@@ -111,7 +126,7 @@ Shape group : Group {
 
 render {
   cameras { @camera }
-  shapes { @cbox, @cbox-light, @bunny, @group, @light, @point }
+  shapes { @cbox, @cbox-light, @bunny, @group, @light_box }
   integrator { @pt }
   // environment : Constant {
   //   emission { 0.1 }

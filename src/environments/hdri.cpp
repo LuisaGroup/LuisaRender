@@ -28,6 +28,7 @@ public:
             LUISA_INFO(
                 "Loaded HDRI image '{}' in {} ms.",
                 file_path.string(), clock.toc());
+            // TODO: compute sampling distribution...
             return image;
         });
     }
@@ -64,6 +65,7 @@ public:
         command_buffer << device_image->copy_from(image.pixels());
         _image_id = pipeline.register_bindless(*device_image, TextureSampler::bilinear_repeat());
     }
+    // TODO: importance sampling
     [[nodiscard]] Light::Evaluation evaluate(Expr<float3> wi, Expr<float3x3> env_to_world, Expr<float>) const noexcept override {
         return _evaluate(transpose(env_to_world) * wi);
     }

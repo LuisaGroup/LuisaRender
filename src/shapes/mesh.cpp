@@ -11,7 +11,7 @@
 
 namespace luisa::render {
 
-class TriangleMeshLoader {
+class MeshLoader {
 
 private:
     luisa::vector<float3> _positions;
@@ -66,7 +66,7 @@ public:
                     fmt::ptr(mesh->mTextureCoords[0]),
                     mesh->mNumUVComponents[0]);
             }
-            TriangleMeshLoader loader;
+            MeshLoader loader;
             auto vertex_count = mesh->mNumVertices;
             auto ai_positions = mesh->mVertices;
             auto ai_normals = mesh->mNormals;
@@ -112,15 +112,15 @@ public:
     }
 };
 
-class TriangleMesh final : public Shape {
+class Mesh final : public Shape {
 
 private:
-    std::shared_future<TriangleMeshLoader> _loader;
+    std::shared_future<MeshLoader> _loader;
 
 public:
-    TriangleMesh(Scene *scene, const SceneNodeDesc *desc) noexcept
-        : Shape{scene, desc}, _loader{TriangleMeshLoader::load(desc->property_path("file"))} {}
-    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "trianglemesh"; }
+    Mesh(Scene *scene, const SceneNodeDesc *desc) noexcept
+        : Shape{scene, desc}, _loader{MeshLoader::load(desc->property_path("file"))} {}
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "mesh"; }
     [[nodiscard]] luisa::span<const Shape *const> children() const noexcept override { return {}; }
     [[nodiscard]] bool deformable() const noexcept override { return false; }
     [[nodiscard]] bool is_mesh() const noexcept override { return true; }
@@ -132,4 +132,4 @@ public:
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::TriangleMesh)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::Mesh)

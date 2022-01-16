@@ -19,7 +19,7 @@ Integrator pt : MegaPath {
   depth { 2 }
 }
 
-Shape teapot : TriangleMesh {
+Shape teapot : Mesh {
   file { "../meshes/utah-teapot.obj" }
   material : Lambert {
     color { 1 }
@@ -31,7 +31,7 @@ Shape teapot : TriangleMesh {
   }
 }
 
-Shape sphere : TriangleMesh {
+Shape sphere : Mesh {
   file { "../meshes/sphere.obj" }
   material : Lambert {
     color { 1 }

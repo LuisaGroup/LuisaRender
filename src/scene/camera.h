@@ -44,23 +44,38 @@ public:
             Sampler::Instance &sampler, Expr<float2> pixel, Expr<float> time) const noexcept = 0;
     };
 
+    struct ShutterPoint {
+        float time;
+        float weight;
+    };
+
+    struct ShutterSample {
+        ShutterPoint point;
+        uint spp;
+    };
+
 private:
     const Film *_film;
     const Filter *_filter;
     const Transform *_transform;
-    float2 _time_span;
+    float2 _shutter_span;
+    uint _shutter_samples;
     uint _spp;
     std::filesystem::path _file;
+    luisa::vector<ShutterPoint> _shutter_points;
 
 public:
     Camera(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] auto film() const noexcept { return _film; }
     [[nodiscard]] auto filter() const noexcept { return _filter; }
     [[nodiscard]] auto transform() const noexcept { return _transform; }
-    [[nodiscard]] auto time_span() const noexcept { return _time_span; }
+    [[nodiscard]] auto shutter_span() const noexcept { return _shutter_span; }
+    [[nodiscard]] auto shutter_weight(float time) const noexcept -> float;
+    [[nodiscard]] auto shutter_samples() const noexcept -> luisa::vector<ShutterSample>;
     [[nodiscard]] auto spp() const noexcept { return _spp; }
     [[nodiscard]] auto file() const noexcept { return _file; }
-    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
+    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
 };
 
 }// namespace luisa::render

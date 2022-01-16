@@ -91,8 +91,8 @@ void NormalVisualizerInstance::_render_one_camera(
     auto render = pipeline.device().compile(render_kernel);
     stream << synchronize();
     Clock clock;
-    auto time_start = camera->node()->time_span().x;
-    auto time_end = camera->node()->time_span().y;
+    auto time_start = camera->node()->shutter_span().x;
+    auto time_end = camera->node()->shutter_span().y;
     auto spp_per_commit = 16u;
     for (auto i = 0u; i < spp; i++) {
         auto t = static_cast<float>((static_cast<double>(i) + 0.5f) / static_cast<double>(spp));

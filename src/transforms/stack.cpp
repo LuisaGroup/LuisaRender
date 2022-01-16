@@ -20,8 +20,7 @@ private:
 public:
     TransformStack(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Transform{scene, desc},
-          _matrix_cache{make_float4x4(1.0f)},
-          _time_cache{0.0f},
+          _matrix_cache{make_float4x4(1.0f)}, _time_cache{0.0f},
           _is_static{true}, _is_identity{true} {
         auto children = desc->property_node_list_or_default("transforms");
         luisa::vector<const Transform *> transforms(children.size());

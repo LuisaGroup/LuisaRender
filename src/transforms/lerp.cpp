@@ -61,7 +61,6 @@ public:
         _time_points.reserve(indices.size());
         _transforms.reserve(indices.size());
         for (auto index : indices) {
-            LUISA_INFO("Index: {}, Time: {}", index, times[index]);
             _time_points.emplace_back(times[index]);
             _transforms.emplace_back(
                 scene->load_transform(nodes[index]));
