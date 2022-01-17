@@ -6,7 +6,7 @@ Film film : Color {
 Camera camera : Pinhole {
   position { -0.01, 0.995, 5.0 }
   fov { 27.8 }
-  spp { 65536 }
+  spp { 128 }
   film { @film }
   file { "test.exr" }
   filter : Gaussian {
@@ -63,21 +63,21 @@ Shape light : Mesh {
     emission { 1.5, 1.1, 0.6 }
     scale { 1.75 }
   }
-  transform : Lerp {
-    transforms {
-      SRT {
-        scale { 0.2 }
-        translate { 0.2, 0.1, 0.9 }
-        rotate { 0, 1, 0, -20 }
-      },
+  transform : //Lerp {
+    //transforms {
+    //  SRT {
+    //    scale { 0.2 }
+    //    translate { 0.2, 0.1, 0.9 }
+    //    rotate { 0, 1, 0, -20 }
+    //  },
       SRT {
         scale { 0.2 }
         translate { 0.2, 0.1, 0.9 }
         rotate { 0, 1, 0, 60 }
       }
-    }
-    time_points { 0, 0.1 }
-  }
+  //  }
+  //  time_points { 0, 0.1 }
+  //}
   material : FakeMirror {
     color { 0.28, 0.9, 0.182 }
   }
@@ -95,7 +95,7 @@ Shape point : Virtual {
 }
 
 Shape light_box : Group {
-  shapes { @light, @point }// TODO: bug if { @point, @light }, seems related to transforms
+  shapes { @point, @light }// TODO: bug if { @point, @light }, seems related to transforms
 }
 
 Shape group : Group {
@@ -126,7 +126,7 @@ Shape group : Group {
 
 render {
   cameras { @camera }
-  shapes { @cbox, @cbox-light, @bunny, @group, @light_box }
+  shapes { @cbox, @cbox-light, @light_box, @bunny, @group }
   integrator { @pt }
   // environment : Constant {
   //   emission { 0.1 }

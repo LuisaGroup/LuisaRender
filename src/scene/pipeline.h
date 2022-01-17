@@ -92,6 +92,7 @@ private:
     luisa::unordered_map<const Material *, MaterialData> _materials;
     luisa::unordered_map<const Light *, LightData> _lights;
     luisa::vector<InstancedShape> _instances;
+    luisa::vector<InstancedTransform> _dynamic_transforms;
     Buffer<InstancedShape> _instance_buffer;
     luisa::vector<luisa::unique_ptr<Camera::Instance>> _cameras;
     luisa::vector<luisa::unique_ptr<Filter::Instance>> _filters;
@@ -105,7 +106,7 @@ private:
 private:
     void _build_geometry(CommandBuffer &command_buffer, luisa::span<const Shape *const> shapes, float init_time, AccelBuildHint hint) noexcept;
     void _process_shape(
-        CommandBuffer &command_buffer, TransformTree::Builder &transform_builder, const Shape *shape,
+        CommandBuffer &command_buffer, const Shape *shape,
         luisa::optional<bool> overridden_two_sided = luisa::nullopt,
         const Material *overridden_material = nullptr, const Light *overridden_light = nullptr) noexcept;
     [[nodiscard]] MaterialData _process_material(CommandBuffer &command_buffer, uint instance_id, const Shape *shape, const Material *material) noexcept;

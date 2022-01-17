@@ -20,63 +20,48 @@ public:
     [[nodiscard]] virtual float4x4 matrix(float time) const noexcept = 0;
 };
 
-using compute::Accel;
-
 class TransformTree {
 
-private:
+public:
     class Node {
 
     private:
+        const Node *_parent;
         const Transform *_transform;
-        luisa::slist<Node> _children;
-        uint32_t _transform_id;
-        bool _is_leaf;
-        bool _is_static;
 
     public:
-        Node(const Transform *transform, uint32_t transform_id, bool is_leaf, bool ancestors_static) noexcept;
-        Node(Node &&) noexcept = delete;
-        Node(const Node &) noexcept = delete;
-        Node &operator=(Node &&) noexcept = delete;
-        Node &operator=(const Node &) noexcept = delete;
-        void mark_dynamic() noexcept { _is_static = false; }
+        Node(const Node *parent, const Transform *t) noexcept;
         [[nodiscard]] auto transform() const noexcept { return _transform; }
-        [[nodiscard]] auto is_leaf() const noexcept { return _is_leaf; }
-        [[nodiscard]] auto is_static() const noexcept { return _is_static; }
-        Node *add_child(const Transform *transform, uint32_t transform_id, bool is_leaf, bool ancestors_static) noexcept;
-        void update(Accel &accel, float4x4 matrix, float time) const noexcept;
-    };
-
-public:
-    class Builder {
-
-    private:
-        luisa::unique_ptr<TransformTree::Node> _root;
-        luisa::vector<Node *> _node_stack;
-        luisa::vector<float4x4> _transform_stack;
-        float _initial_time;
-
-    public:
-        explicit Builder(float initial_time = 0.0f) noexcept;
-        void push(const Transform *t) noexcept;
-        void pop() noexcept;
-        [[nodiscard]] float4x4 leaf(const Transform *t, uint index) noexcept;
-        [[nodiscard]] TransformTree build() noexcept;
+        [[nodiscard]] float4x4 matrix(float time) const noexcept;
     };
 
 private:
-    luisa::unique_ptr<Node> _root;
-
-private:
-    explicit TransformTree(luisa::unique_ptr<Node> root) noexcept
-        : _root{std::move(root)} {}
+    luisa::vector<luisa::unique_ptr<Node>> _nodes;
+    luisa::vector<const Node *> _node_stack;
+    luisa::vector<bool> _static_stack;
 
 public:
-    TransformTree() noexcept = default;
-    [[nodiscard]] static Builder builder(float init_time = 0.0f) noexcept;
-    void update(Accel &accel, float time) const noexcept;
-    [[nodiscard]] auto is_static() const noexcept { return _root->is_static(); }
+    TransformTree() noexcept;
+    [[nodiscard]] auto size() const noexcept { return _nodes.size(); }
+    [[nodiscard]] auto empty() const noexcept { return _nodes.empty(); }
+    void push(const Transform *t) noexcept;
+    void pop(const Transform *t) noexcept;
+    [[nodiscard]] std::pair<const Node *, bool /* is_static */> leaf(const Transform *t) noexcept;
+};
+
+class InstancedTransform {
+
+private:
+    const TransformTree::Node *_node;
+    size_t _instance_id;
+
+public:
+    InstancedTransform(const TransformTree::Node *node, size_t inst) noexcept
+        : _node{node}, _instance_id{inst} {}
+    [[nodiscard]] auto instance_id() const noexcept { return _instance_id; }
+    [[nodiscard]] auto matrix(float time) const noexcept {
+        return _node == nullptr ? make_float4x4(1.0f) : _node->matrix(time);
+    }
 };
 
 }// namespace luisa::render

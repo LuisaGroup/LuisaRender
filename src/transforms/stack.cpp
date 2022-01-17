@@ -37,8 +37,15 @@ public:
     [[nodiscard]] bool is_static() const noexcept override { return _is_static; }
     [[nodiscard]] bool is_identity() const noexcept override { return _is_identity; }
     [[nodiscard]] float4x4 matrix(float time) const noexcept override {
-        std::scoped_lock lock{_mutex};
         if (_is_static) { return _matrix_cache; }
+        if (_transforms.size() < 4u) {
+            auto m = make_float4x4(1.0f);
+            for (auto t : _transforms) {
+                m = t->matrix(time) * m;
+            }
+            return m;
+        }
+        std::scoped_lock lock{_mutex};
         if (time != _time_cache) {
             _time_cache = time;
             _matrix_cache = make_float4x4(1.0f);

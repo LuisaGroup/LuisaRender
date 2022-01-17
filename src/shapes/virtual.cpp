@@ -26,18 +26,22 @@ public:
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "fakepoint"; }
     [[nodiscard]] bool is_mesh() const noexcept override { return true; }
     [[nodiscard]] luisa::span<const float3> positions() const noexcept override {
-        static const auto p = make_float3(0.0f);
-        return {&p, 1u};
+        static const std::array p{
+            make_float3(0.0f, 0.0f, 0.0f),
+            make_float3(1e-4f, 0.0f, 0.0f),
+            make_float3(0.0f, 1e-4f, 0.0f)};
+        return p;
     }
     [[nodiscard]] luisa::span<const VertexAttribute> attributes() const noexcept override {
-        static const auto a = VertexAttribute::encode(
+        static const auto attr = VertexAttribute::encode(
             make_float3(0.0f, 0.0f, 1.0f),
             make_float3(1.0f, 0.0f, 0.0f),
             make_float2(0.0f));
-        return {&a, 1u};
+        static const std::array a{attr, attr, attr};
+        return a;
     }
     [[nodiscard]] luisa::span<const Triangle> triangles() const noexcept override {
-        static const Triangle t{0u, 0u, 0u};
+        static const Triangle t{0u, 1u, 2u};
         return {&t, 1u};
     }
     [[nodiscard]] luisa::span<const Shape *const> children() const noexcept override { return {}; }
@@ -45,7 +49,7 @@ public:
     [[nodiscard]] bool is_virtual() const noexcept override { return true; }
 
 public:
-    [[nodiscard]] static auto instance() noexcept {
+    [[nodiscard]] static auto instance() noexcept -> const Shape * {
         static FakePoint p;
         return &p;
     }
@@ -65,7 +69,7 @@ public:
     [[nodiscard]] luisa::span<const VertexAttribute> attributes() const noexcept override { return {}; }
     [[nodiscard]] luisa::span<const Triangle> triangles() const noexcept override { return {}; }
     [[nodiscard]] luisa::span<const Shape *const> children() const noexcept override {
-        static const std::array<const Shape *, 1u> shapes{detail::FakePoint::instance()};
+        static const std::array shapes{detail::FakePoint::instance()};
         return shapes;
     }
 };

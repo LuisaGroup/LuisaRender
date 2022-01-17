@@ -21,11 +21,7 @@ Pipeline::~Pipeline() noexcept = default;
 
 void Pipeline::_build_geometry(CommandBuffer &command_buffer, luisa::span<const Shape *const> shapes, float init_time, AccelBuildHint hint) noexcept {
     _accel = _device.create_accel(hint);
-    auto transform_builder = TransformTree::builder(init_time);
-    for (auto shape : shapes) {
-        _process_shape(command_buffer, transform_builder, shape);
-    }
-    _transform_tree = transform_builder.build();
+    for (auto shape : shapes) { _process_shape(command_buffer, shape); }
     _instance_buffer = _device.create_buffer<InstancedShape>(_instances.size());
     command_buffer << _bindless_array.update()
                    << _instance_buffer.copy_from(_instances.data())
@@ -33,8 +29,10 @@ void Pipeline::_build_geometry(CommandBuffer &command_buffer, luisa::span<const 
 }
 
 void Pipeline::_process_shape(
-    CommandBuffer &command_buffer, TransformTree::Builder &transform_builder, const Shape *shape,
-    luisa::optional<bool> overridden_two_sided, const Material *overridden_material, const Light *overridden_light) noexcept {
+    CommandBuffer &command_buffer, const Shape *shape,
+    luisa::optional<bool> overridden_two_sided,
+    const Material *overridden_material,
+    const Light *overridden_light) noexcept {
 
     auto material = overridden_material == nullptr ? shape->material() : overridden_material;
     auto light = overridden_light == nullptr ? shape->light() : overridden_light;
@@ -105,8 +103,10 @@ void Pipeline::_process_shape(
         auto mesh = iter->second;
         auto two_sided = overridden_two_sided.value_or(mesh.two_sided);
         auto instance_id = static_cast<uint>(_accel.size());
-        auto object_to_world = transform_builder.leaf(shape->transform(), instance_id);
-        _accel.emplace_back(*mesh.resource, object_to_world, !shape->is_virtual());
+        auto [t_node, is_static] = _transform_tree.leaf(shape->transform());
+        InstancedTransform inst_xform{t_node, instance_id};
+        _accel.emplace_back(*mesh.resource, inst_xform.matrix(_mean_time), !shape->is_virtual());
+        if (!is_static) { _dynamic_transforms.emplace_back(inst_xform); }
 
         // create instance
         InstancedShape instance{};
@@ -135,9 +135,13 @@ void Pipeline::_process_shape(
         }
         _instances.emplace_back(instance);
     } else {
-        if (shape->transform() != nullptr) { transform_builder.push(shape->transform()); }
-        for (auto child : shape->children()) { _process_shape(command_buffer, transform_builder, child, shape->two_sided(), material, light); }
-        if (shape->transform() != nullptr) { transform_builder.pop(); }
+//        if (!shape->is_virtual()) {
+            _transform_tree.push(shape->transform());
+            for (auto child : shape->children()) {
+                _process_shape(command_buffer, child, shape->two_sided(), material, light);
+            }
+            _transform_tree.pop(shape->transform());
+//        }
     }
 }
 
@@ -214,8 +218,11 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
 
 void Pipeline::update_geometry(CommandBuffer &command_buffer, float time) noexcept {
     // TODO: support deformable meshes
-    if (!_transform_tree.is_static()) {
-        _transform_tree.update(_accel, time);
+    if (!_dynamic_transforms.empty()) {
+        for (auto t : _dynamic_transforms) {
+            _accel.set_transform(
+                t.instance_id(), t.matrix(time));
+        }
         command_buffer << _accel.update()
                        << luisa::compute::commit();
     }
