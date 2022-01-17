@@ -1,0 +1,27 @@
+Film film : Color {
+  resolution { 1024 }
+  exposure { 0 }
+}
+
+Camera camera : Pinhole {
+  position { -0.01, 0.995, 5.0 }
+  fov { 27.8 }
+  spp { 1024 }
+  film { @film }
+  file { "cbox.exr" }
+  filter : Gaussian {
+    radius { 1 }
+  }
+}
+
+import "../meshes/cbox.luisa"
+
+Integrator pt : MegaPath {
+  depth { 10 }
+}
+
+render {
+  cameras { @camera }
+  shapes { @cbox, @cbox-light }
+  integrator { @pt }
+}

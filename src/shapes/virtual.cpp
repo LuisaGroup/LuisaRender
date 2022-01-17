@@ -28,8 +28,8 @@ public:
     [[nodiscard]] luisa::span<const float3> positions() const noexcept override {
         static const std::array p{
             make_float3(0.0f, 0.0f, 0.0f),
-            make_float3(1e-4f, 0.0f, 0.0f),
-            make_float3(0.0f, 1e-4f, 0.0f)};
+            make_float3(1.0f, 0.0f, 0.0f),
+            make_float3(0.0f, 1.0f, 0.0f)};
         return p;
     }
     [[nodiscard]] luisa::span<const VertexAttribute> attributes() const noexcept override {

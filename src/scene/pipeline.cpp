@@ -105,8 +105,14 @@ void Pipeline::_process_shape(
         auto instance_id = static_cast<uint>(_accel.size());
         auto [t_node, is_static] = _transform_tree.leaf(shape->transform());
         InstancedTransform inst_xform{t_node, instance_id};
-        _accel.emplace_back(*mesh.resource, inst_xform.matrix(_mean_time), !shape->is_virtual());
         if (!is_static) { _dynamic_transforms.emplace_back(inst_xform); }
+        auto object_to_world = inst_xform.matrix(_mean_time);
+        if (shape->is_virtual()) {
+            auto scaling = make_float4x4(make_float3x3(0.0f));
+            _accel.emplace_back(*mesh.resource, object_to_world * scaling, false);
+        } else {
+            _accel.emplace_back(*mesh.resource, object_to_world, true);
+        }
 
         // create instance
         InstancedShape instance{};
@@ -219,9 +225,22 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
 void Pipeline::update_geometry(CommandBuffer &command_buffer, float time) noexcept {
     // TODO: support deformable meshes
     if (!_dynamic_transforms.empty()) {
-        for (auto t : _dynamic_transforms) {
-            _accel.set_transform(
-                t.instance_id(), t.matrix(time));
+        if (_dynamic_transforms.size() < 128u) {
+            for (auto t : _dynamic_transforms) {
+                _accel.set_transform(
+                    t.instance_id(),
+                    t.matrix(time));
+            }
+        } else {
+            ThreadPool::global().parallel(
+                _dynamic_transforms.size(),
+                [this, time](auto i) noexcept {
+                    auto t = _dynamic_transforms[i];
+                    _accel.set_transform(
+                        t.instance_id(),
+                        t.matrix(time));
+                });
+            ThreadPool::global().synchronize();
         }
         command_buffer << _accel.update()
                        << luisa::compute::commit();
