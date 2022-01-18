@@ -26,9 +26,10 @@ public:
     LambertMaterial(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Material{scene, desc}, _params{} {
         auto color = clamp(
-            desc->property_float3_or_default("color", [](auto desc) noexcept {
-                return make_float3(desc->property_float_or_default("color", 1.0f));
-            }),
+            desc->property_float3_or_default(
+                "color", lazy_construct([desc] {
+                    return make_float3(desc->property_float_or_default("color", 1.0f));
+                })),
             0.0f, 1.0f);
         auto color_texture = desc->property_path_or_default("color", "");
         _params.color[0] = color.x;
@@ -98,9 +99,9 @@ private:
 luisa::unique_ptr<Material::Closure> LambertMaterial::decode(const Pipeline &pipeline, const Interaction &it) const noexcept {
     auto params = pipeline.buffer<LambertParams>(it.shape()->material_buffer_id()).read(0u);
     auto color = def<float3>(params.color);
-//    $if(params.color_texture_id != ~0u) {
-//        color = pipeline.tex2d(params.color_texture_id).sample(it.uv());
-//    };
+    //    $if(params.color_texture_id != ~0u) {
+    //        color = pipeline.tex2d(params.color_texture_id).sample(it.uv());
+    //    };
     return luisa::make_unique<LambertClosure>(it, std::move(color));
 }
 

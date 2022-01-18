@@ -18,9 +18,9 @@ public:
     ConstantEnvironment(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Environment{scene, desc} {
         auto emission = desc->property_float3_or_default(
-            "emission", [](auto desc) noexcept {
+            "emission", lazy_construct([desc] {
                 return make_float3(desc->property_float_or_default("emission", 1.0f));
-            });
+            }));
         auto scale = desc->property_float_or_default("scale", 1.0f);
         _emission = max(emission * scale, 0.0f);
     }

@@ -14,9 +14,9 @@ private:
 public:
     ScaleRotateTranslate(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Transform{scene, desc} {
-        auto scaling = desc->property_float3_or_default("scale", [](auto desc) noexcept {
+        auto scaling = desc->property_float3_or_default("scale", lazy_construct([desc]{
             return make_float3(desc->property_float_or_default("scale", 1.0f));
-        });
+        }));
         auto rotation = desc->property_float4_or_default("rotate", make_float4(0.0f, 0.0f, 1.0f, 0.0f));
         auto translation = desc->property_float3_or_default("translate", make_float3());
         _matrix = luisa::translation(translation) *

@@ -29,9 +29,10 @@ private:
 public:
     DiffuseLight(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Light{scene, desc},
-          _emission{desc->property_float3_or_default("emission", [](auto desc) noexcept {
-              return make_float3(desc->property_float("emission"));
-          })} {
+          _emission{desc->property_float3_or_default(
+              "emission", lazy_construct([desc] {
+                  return make_float3(desc->property_float("emission"));
+              }))} {
         _emission = max(_emission * desc->property_float_or_default("scale", 1.0f), 0.0f);
     }
     [[nodiscard]] bool is_black() const noexcept override { return all(_emission == 0.0f); }

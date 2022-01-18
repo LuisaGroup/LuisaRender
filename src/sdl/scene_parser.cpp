@@ -193,7 +193,7 @@ inline void SceneParser::_parse_root_node(SceneNodeDesc::SourceLocation l) noexc
 
 inline void SceneParser::_parse_global_node(SceneNodeDesc::SourceLocation l, std::string_view tag_desc) noexcept {
     using namespace std::string_view_literals;
-    static constexpr auto desc_to_tag_count = 18u;
+    static constexpr auto desc_to_tag_count = 19u;
     static const luisa::fixed_map<std::string_view, SceneNodeTag, desc_to_tag_count> desc_to_tag{
         {"Camera"sv, SceneNodeTag::CAMERA},
         {"Cam"sv, SceneNodeTag::CAMERA},
@@ -212,7 +212,8 @@ inline void SceneParser::_parse_global_node(SceneNodeDesc::SourceLocation l, std
         {"Integrator"sv, SceneNodeTag::INTEGRATOR},
         {"LightSampler"sv, SceneNodeTag::LIGHT_SAMPLER},
         {"Environment"sv, SceneNodeTag::ENVIRONMENT},
-        {"Env"sv, SceneNodeTag::ENVIRONMENT}};
+        {"Env"sv, SceneNodeTag::ENVIRONMENT},
+        {"Generic"sv, SceneNodeTag::DECLARATION}};
     auto iter = desc_to_tag.find(tag_desc);
     if (iter == desc_to_tag.cend()) [[unlikely]] {
         _report_error(
@@ -223,10 +224,17 @@ inline void SceneParser::_parse_global_node(SceneNodeDesc::SourceLocation l, std
     _skip_blanks();
     auto name = _read_identifier();
     _skip_blanks();
-    _match(':');
-    _skip_blanks();
-    auto impl_type = _read_identifier();
-    _parse_node_body(_desc.define(name, tag, impl_type, l));
+    const SceneNodeDesc *base = nullptr;
+    luisa::string_view impl_type;
+    if (_peek() == ':') {
+        _match(':');
+        _skip_blanks();
+        impl_type = _read_identifier();
+        _skip_blanks();
+        if (_peek() == '(') { base = _parse_base_node(); }
+        _skip_blanks();
+    }
+    _parse_node_body(_desc.define(name, tag, impl_type, l, base));
 }
 
 void SceneParser::_parse_node_body(SceneNodeDesc *node) noexcept {
@@ -241,7 +249,9 @@ void SceneParser::_parse_node_body(SceneNodeDesc *node) noexcept {
             _skip_blanks();
             auto loc = _location;
             auto impl_type = _read_identifier();
-            auto internal_node = node->define_internal(impl_type, loc);
+            const SceneNodeDesc *base = nullptr;
+            if (_peek() == '(') { base = _parse_base_node(); }
+            auto internal_node = node->define_internal(impl_type, loc, base);
             _parse_node_body(internal_node);
             node->add_property(prop, internal_node);
         } else {
@@ -305,7 +315,9 @@ inline SceneNodeDesc::node_list SceneParser::_parse_node_list_values(SceneNodeDe
         // inline definition
         auto loc = _location;
         auto impl_type = _read_identifier();
-        auto internal_node = node->define_internal(impl_type, loc);
+        const SceneNodeDesc *base = nullptr;
+        if (_peek() == '(') { base = _parse_base_node(); }
+        auto internal_node = node->define_internal(impl_type, loc, base);
         _parse_node_body(internal_node);
         return internal_node;
     };
@@ -335,11 +347,22 @@ inline SceneNodeDesc::string_list SceneParser::_parse_string_list_values() noexc
     return list;
 }
 
-luisa::unique_ptr<SceneDesc> SceneParser::parse(const path &entry_file) noexcept {
+luisa::unique_ptr<SceneDesc> SceneParser::parse(const std::filesystem::path &entry_file) noexcept {
     auto desc = luisa::make_unique<SceneDesc>();
     SceneParser{*desc, entry_file}._parse_file();
     ThreadPool::global().synchronize();
     return desc;
+}
+
+const SceneNodeDesc *SceneParser::_parse_base_node() noexcept {
+    _match('(');
+    _skip_blanks();
+    _match('@');
+    _skip_blanks();
+    auto base = _desc.reference(_read_identifier());
+    _skip_blanks();
+    _match(')');
+    return base;
 }
 
 }// namespace luisa::render

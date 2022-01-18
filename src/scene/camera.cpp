@@ -39,10 +39,10 @@ Camera::Camera(Scene *scene, const SceneNodeDesc *desc) noexcept
       _transform{scene->load_transform(desc->property_node_or_default(
           "transform", default_transform_node_desc()))},
       _shutter_span{desc->property_float2_or_default(
-          "shutter_span", [](auto desc) noexcept {
+          "shutter_span", lazy_construct([desc] {
               return make_float2(desc->property_float_or_default(
                   "shutter_span", 0.0f));
-          })},
+          }))},
       _shutter_samples{desc->property_uint_or_default("shutter_samples", 0u)},// 0 means default
       _spp{desc->property_uint_or_default("spp", 1024u)} {
 

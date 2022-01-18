@@ -17,9 +17,10 @@ private:
 public:
     FakeMirrorMaterial(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Material{scene, desc} {
-        _color = desc->property_float3_or_default("color", [](auto desc) noexcept {
-            return make_float3(desc->property_float_or_default("color", 1.0f));
-        });
+        _color = desc->property_float3_or_default(
+            "color", lazy_construct([desc] {
+                return make_float3(desc->property_float_or_default("color", 1.0f));
+            }));
         _color = clamp(_color, 0.0f, 1.0f);
     }
     [[nodiscard]] bool is_black() const noexcept override { return false; }

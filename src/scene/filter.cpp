@@ -11,9 +11,9 @@ namespace luisa::render {
 Filter::Filter(Scene *scene, const SceneNodeDesc *desc) noexcept
     : SceneNode{scene, desc, SceneNodeTag::FILTER},
       _radius{desc->property_float2_or_default(
-          "radius", [](auto desc) {
+          "radius", lazy_construct([desc] {
               return make_float2(desc->property_float_or_default("radius", 0.5f));
-          })} {
+          }))} {
     if (any(_radius <= 0.0f)) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
             "Invalid filter radius: ({}, {}).",

@@ -27,9 +27,10 @@ private:
 
 public:
     FakePointLight(Scene *scene, const SceneNodeDesc *desc) noexcept : Light{scene, desc} {
-        auto emission = desc->property_float3_or_default("emission", [](auto desc) noexcept {
-            return make_float3(desc->property_float("emission"));
-        });
+        auto emission = desc->property_float3_or_default(
+            "emission", lazy_construct([desc] {
+                return make_float3(desc->property_float("emission"));
+            }));
         auto scale = desc->property_float_or_default("scale", 1.0f);
         _params.emission[0] = std::max(emission.x * scale, 0.0f);
         _params.emission[1] = std::max(emission.y * scale, 0.0f);
@@ -62,7 +63,7 @@ private:
     const Pipeline &_pipeline;
 
 public:
-    explicit FakePointLightClosure(const Pipeline &ppl) noexcept: _pipeline{ppl} {}
+    explicit FakePointLightClosure(const Pipeline &ppl) noexcept : _pipeline{ppl} {}
     [[nodiscard]] Light::Evaluation evaluate(const Interaction &, Expr<float3>, Expr<float>) const noexcept override { return {}; /* should never be called */ }
     [[nodiscard]] Light::Sample sample(Sampler::Instance &sampler, Expr<uint> light_inst_id, const Interaction &it_from, Expr<float> time) const noexcept override {
         using namespace luisa::compute;

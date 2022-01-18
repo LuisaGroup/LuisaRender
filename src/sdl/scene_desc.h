@@ -46,8 +46,8 @@ public:
     [[nodiscard]] auto root() const noexcept { return &_root; }
     [[nodiscard]] const SceneNodeDesc *reference(std::string_view identifier) noexcept;
     [[nodiscard]] SceneNodeDesc *define(
-        std::string_view identifier, SceneNodeTag tag,
-        std::string_view impl_type, SceneNodeDesc::SourceLocation location = {}) noexcept;
+        std::string_view identifier, SceneNodeTag tag, std::string_view impl_type,
+        SceneNodeDesc::SourceLocation location = {}, const SceneNodeDesc *base = nullptr) noexcept;
     [[nodiscard]] SceneNodeDesc *define_root(SceneNodeDesc::SourceLocation location = {}) noexcept;
     const std::filesystem::path *register_path(std::filesystem::path path) noexcept;
 };

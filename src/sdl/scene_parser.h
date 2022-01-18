@@ -49,6 +49,7 @@ private:
     [[nodiscard]] SceneNodeDesc::bool_list _parse_bool_list_values() noexcept;
     [[nodiscard]] SceneNodeDesc::node_list _parse_node_list_values(SceneNodeDesc *node) noexcept;
     [[nodiscard]] SceneNodeDesc::string_list _parse_string_list_values() noexcept;
+    [[nodiscard]] const SceneNodeDesc *_parse_base_node() noexcept;
 
     SceneParser(SceneDesc &desc, const std::filesystem::path &path) noexcept;
 

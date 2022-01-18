@@ -32,8 +32,8 @@ const SceneNodeDesc *SceneDesc::reference(std::string_view identifier) noexcept 
 }
 
 SceneNodeDesc *SceneDesc::define(
-    std::string_view identifier, SceneNodeTag tag,
-    std::string_view impl_type, SceneNodeDesc::SourceLocation location) noexcept {
+    std::string_view identifier, SceneNodeTag tag, std::string_view impl_type,
+    SceneNodeDesc::SourceLocation location, const SceneNodeDesc *base) noexcept {
 
     if (identifier == root_node_identifier ||
         tag == SceneNodeTag::ROOT) [[unlikely]] {
@@ -67,7 +67,7 @@ SceneNodeDesc *SceneDesc::define(
             node->impl_type(),
             location.string());
     }
-    node->define(tag, impl_type, location);
+    node->define(tag, impl_type, location, base);
     return node;
 }
 

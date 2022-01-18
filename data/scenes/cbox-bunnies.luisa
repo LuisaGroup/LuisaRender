@@ -3,25 +3,25 @@ Film film : Color {
   exposure { 0 }
 }
 
-Camera camera : Pinhole {
-  position { -0.01, 0.995, 5.0 }
-  fov { 27.8 }
-  spp { 1024 }
+Camera camera_base {
   film { @film }
-  file { "test.exr" }
   filter : Gaussian {
     radius { 1 }
   }
+  fov { 27.8 }
+  spp { 1024 }
+}
+
+Camera camera : Pinhole(@camera_base) {
+  position { -0.01, 0.995, 5.0 }
+  file { "test.exr" }
   shutter_span { 0, 0.1 }
 }
 
-Camera camera2 : Pinhole {
+Camera camera2 : Pinhole(@camera) {
   position { -0.01, 0.995, 5.0 }
   up { 1.0, 1.0, 0.0 }
-  fov { 27.8 }
-  spp { 1024 }
   file { "camera2.exr" }
-  film { @film }
 }
 
 import "../meshes/cbox.luisa"
@@ -125,7 +125,7 @@ Shape group : Group {
 }
 
 render {
-  cameras { @camera }
+  cameras { @camera2 }
   shapes { @cbox, @cbox-light, @light_box, @bunny, @group }
   integrator { @pt }
   // environment : Constant {

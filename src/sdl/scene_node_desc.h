@@ -9,12 +9,75 @@
 
 #include <core/hash.h>
 #include <core/stl.h>
+#include <core/logging.h>
 #include <core/basic_types.h>
 #include <sdl/scene_node_tag.h>
 
 namespace luisa::render {
 
 class SceneDesc;
+class SceneNodeDesc;
+
+namespace detail {
+
+template<typename T>
+struct scene_node_raw_property : public scene_node_raw_property<std::remove_cvref<T>> {};
+
+template<>
+struct scene_node_raw_property<bool> {
+    using type = bool;
+    static constexpr luisa::string_view value = "bool";
+};
+
+template<>
+struct scene_node_raw_property<float> {
+    using type = double;
+    static constexpr luisa::string_view value = "number";
+};
+
+template<>
+struct scene_node_raw_property<int> {
+    using type = double;
+    static constexpr luisa::string_view value = "number";
+};
+
+template<>
+struct scene_node_raw_property<uint> {
+    using type = double;
+    static constexpr luisa::string_view value = "number";
+};
+
+template<>
+struct scene_node_raw_property<luisa::string> {
+    using type = luisa::string;
+    static constexpr luisa::string_view value = "string";
+};
+
+template<>
+struct scene_node_raw_property<std::filesystem::path> {
+    using type = luisa::string;
+    static constexpr luisa::string_view value = "path";
+};
+
+template<>
+struct scene_node_raw_property<const SceneNodeDesc *> {
+    using type = const SceneNodeDesc *;
+    static constexpr luisa::string_view value = "node";
+};
+
+template<typename T>
+using scene_node_raw_property_t = typename scene_node_raw_property<T>::type;
+
+template<typename T>
+constexpr auto scene_node_raw_property_v = scene_node_raw_property<T>::value;
+
+template<typename T>
+constexpr auto is_property_list_v = false;
+
+template<typename T>
+constexpr auto is_property_list_v<luisa::vector<T>> = true;
+
+}// namespace detail
 
 class SceneNodeDesc {
 
@@ -23,7 +86,6 @@ public:
     using number_type = double;
     using string_type = luisa::string;
     using node_type = const SceneNodeDesc *;
-
     using bool_list = luisa::vector<bool_type>;
     using number_list = luisa::vector<number_type>;
     using string_list = luisa::vector<string_type>;
@@ -58,33 +120,60 @@ public:
 
 private:
     luisa::string _identifier;
-    SourceLocation _location;
-    SceneNodeTag _tag;
     luisa::string _impl_type;
+    SourceLocation _location;
+    const SceneNodeDesc *_base{nullptr};
+    SceneNodeTag _tag;
     luisa::vector<luisa::unique_ptr<SceneNodeDesc>> _internal_nodes;
     luisa::unordered_map<luisa::string, value_list, Hash64> _properties;
 
 public:
-    SceneNodeDesc(std::string_view identifier, SceneNodeTag tag) noexcept
+    template<typename T>
+    [[nodiscard]] luisa::optional<luisa::span<const detail::scene_node_raw_property_t<T>>>
+    _property_raw_values(luisa::string_view name) const noexcept;
+    template<typename T>
+    [[nodiscard]] luisa::optional<T> _property_scalar(luisa::string_view name) const noexcept;
+    template<typename T, size_t N>
+    [[nodiscard]] luisa::optional<luisa::Vector<T, N>> _property_vector(luisa::string_view name) const noexcept;
+    template<typename T>
+    [[nodiscard]] luisa::optional<luisa::vector<T>> _property_list(luisa::string_view name) const noexcept;
+
+    template<typename Dest, typename Src>
+    [[nodiscard]] inline auto _property_convert(std::string_view name, Src &&src) const noexcept;
+
+    template<typename T>
+    [[nodiscard]] auto _property_generic(luisa::string_view name) const noexcept {
+        if constexpr (is_vector_v<T>) {
+            return _property_vector<vector_element_t<T>, vector_dimension_v<T>>(name);
+        } else if constexpr (detail::is_property_list_v<T>) {
+            return _property_list<typename T::value_type>(name);
+        } else {
+            return _property_scalar<T>(name);
+        }
+    }
+
+public:
+    SceneNodeDesc(luisa::string_view identifier, SceneNodeTag tag) noexcept
         : _identifier{identifier}, _tag{tag} {}
     SceneNodeDesc(SceneNodeDesc &&) noexcept = delete;
     SceneNodeDesc(const SceneNodeDesc &) noexcept = delete;
     SceneNodeDesc &operator=(SceneNodeDesc &&) noexcept = delete;
     SceneNodeDesc &operator=(const SceneNodeDesc &) noexcept = delete;
-    [[nodiscard]] auto identifier() const noexcept { return std::string_view{_identifier}; }
+    [[nodiscard]] auto identifier() const noexcept { return luisa::string_view{_identifier}; }
     [[nodiscard]] auto tag() const noexcept { return _tag; }
-    [[nodiscard]] auto impl_type() const noexcept { return std::string_view{_impl_type}; }
+    [[nodiscard]] auto impl_type() const noexcept { return luisa::string_view{_impl_type}; }
     [[nodiscard]] auto source_location() const noexcept { return _location; }
-    void define(SceneNodeTag tag, std::string_view t, SourceLocation l) noexcept;
+    void define(SceneNodeTag tag, luisa::string_view t, SourceLocation l, const SceneNodeDesc *base = nullptr) noexcept;
     [[nodiscard]] auto &properties() const noexcept { return _properties; }
     [[nodiscard]] bool has_property(luisa::string_view prop) const noexcept;
-    void add_property(std::string_view name, value_list values) noexcept;
-    void add_property(std::string_view name, bool_type value) noexcept { add_property(name, bool_list{value}); }
-    void add_property(std::string_view name, number_type value) noexcept { add_property(name, number_list{value}); }
-    void add_property(std::string_view name, string_type value) noexcept { add_property(name, string_list{std::move(value)}); }
-    void add_property(std::string_view name, const char *value) noexcept { add_property(name, string_list{value}); }
-    void add_property(std::string_view name, node_type value) noexcept { add_property(name, node_list{value}); }
-    [[nodiscard]] SceneNodeDesc *define_internal(std::string_view impl_type, SourceLocation location = {}) noexcept;
+    void add_property(luisa::string_view name, value_list values) noexcept;
+    void add_property(luisa::string_view name, bool_type value) noexcept { add_property(name, bool_list{value}); }
+    void add_property(luisa::string_view name, number_type value) noexcept { add_property(name, number_list{value}); }
+    void add_property(luisa::string_view name, string_type value) noexcept { add_property(name, string_list{std::move(value)}); }
+    void add_property(luisa::string_view name, const char *value) noexcept { add_property(name, string_list{value}); }
+    void add_property(luisa::string_view name, node_type value) noexcept { add_property(name, node_list{value}); }
+    [[nodiscard]] SceneNodeDesc *define_internal(
+        luisa::string_view impl_type, SourceLocation location = {}, const SceneNodeDesc *base = nullptr) noexcept;
     [[nodiscard]] auto is_root() const noexcept { return _tag == SceneNodeTag::ROOT; }
     [[nodiscard]] auto is_internal() const noexcept { return _tag == SceneNodeTag::INTERNAL; }
     [[nodiscard]] auto is_defined() const noexcept { return _tag != SceneNodeTag::DECLARATION && !_impl_type.empty(); }
@@ -99,18 +188,22 @@ public:
     using path_list = luisa::vector<path>;
 
     // parameter getters
-#define LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(type)                                 \
-    [[nodiscard]] type property_##type(                                             \
-        std::string_view name) const noexcept;                                      \
-    [[nodiscard]] type property_##type##_or_default(                                \
-        std::string_view name,                                                      \
-        const luisa::function<type(const SceneNodeDesc *)> &) const noexcept;       \
-    [[nodiscard]] type property_##type##_or_default(                                \
-        std::string_view name,                                                      \
-        const type &default_value = {}) const noexcept {                            \
-        return property_##type##_or_default(name, [&default_value](auto) noexcept { \
-            return default_value;                                                   \
-        });                                                                         \
+#define LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(type)                        \
+    [[nodiscard]] type property_##type(                                    \
+        std::string_view name) const noexcept {                            \
+        if (auto p = _property_generic<type>(name)) [[likely]] {           \
+            return *p;                                                     \
+        }                                                                  \
+        LUISA_ERROR(                                                       \
+            "No valid values given for property '{}' in "                  \
+            "scene description node '{}'. [{}]",                           \
+            name, _identifier, source_location().string());                \
+    }                                                                      \
+    template<typename DV = type>                                           \
+    [[nodiscard]] type property_##type##_or_default(                       \
+        std::string_view name, DV &&default_value = DV{}) const noexcept { \
+        return _property_generic<type>(name).value_or(                     \
+            std::forward<DV>(default_value));                              \
     }
     LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(int)
     LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(int2)
@@ -140,5 +233,122 @@ public:
     LUISA_SCENE_NODE_DESC_PROPERTY_GETTER(node_list)
 #undef LUISA_SCENE_NODE_DESC_PROPERTY_GETTER
 };
+
+template<typename Dest, typename Src>
+auto SceneNodeDesc::_property_convert(std::string_view name, Src &&src) const noexcept {
+    auto l = source_location();
+    if constexpr (std::is_same_v<std::remove_cvref_t<Dest>, SceneNodeDesc::path>) {
+        SceneNodeDesc::path p{std::forward<Src>(src)};
+        if (!l || p.is_absolute()) { return p; }
+        return std::filesystem::canonical(l.file()->parent_path()) / p;
+    } else if constexpr (std::is_same_v<Dest, int> ||
+                         std::is_same_v<Dest, uint>) {
+        auto value = static_cast<Dest>(src);
+        if (value != src) [[unlikely]] {
+            LUISA_ERROR_WITH_LOCATION(
+                "Invalid conversion from property '{}' (value = {}) "
+                "to integer in scene description node '{}'.",
+                name, src, _identifier);
+        }
+        return value;
+    } else if constexpr (std::is_same_v<Dest, float>) {
+        return static_cast<Dest>(src);
+    } else {
+        return static_cast<Dest>(std::forward<Src>(src));
+    }
+}
+
+template<typename T>
+inline luisa::optional<luisa::span<const detail::scene_node_raw_property_t<T>>>
+SceneNodeDesc::_property_raw_values(luisa::string_view name) const noexcept {
+    auto iter = _properties.find_as(name, Hash64{}, std::equal_to<>{});
+    if (iter == _properties.cend()) {
+        return _base == nullptr ?
+                   luisa::nullopt :
+                   _base->_property_raw_values<T>(name);
+    }
+    using raw_type = detail::scene_node_raw_property_t<T>;
+    auto ptr = luisa::get_if<luisa::vector<raw_type>>(&iter->second);
+    if (ptr == nullptr) [[unlikely]] {
+        LUISA_WARNING(
+            "Property '{}' is defined but is not a {} list "
+            "in scene description node '{}'. [{}]",
+            name, detail::scene_node_raw_property_v<T>,
+            _identifier, source_location().string());
+        return luisa::nullopt;
+    }
+    return luisa::span{*ptr};
+}
+
+template<typename T>
+inline optional<T> SceneNodeDesc::_property_scalar(luisa::string_view name) const noexcept {
+    if (auto raw_values_opt = _property_raw_values<T>(name);
+        raw_values_opt && !raw_values_opt->empty()) [[likely]] {
+        auto raw_values = *raw_values_opt;
+        if (raw_values.size() > 1u) [[unlikely]] {
+            LUISA_WARNING(
+                "Found {} values given for property '{}' in "
+                "scene description node '{}', but only 1 is required. "
+                "Additional values will be discarded. [{}]",
+                raw_values.size(), name, _identifier, source_location().string());
+        }
+        return _property_convert<T>(name, raw_values.front());
+    }
+    return luisa::nullopt;
+}
+
+template<typename T, size_t N>
+inline optional<luisa::Vector<T, N>> SceneNodeDesc::_property_vector(luisa::string_view name) const noexcept {
+    if (auto raw_values_opt = _property_raw_values<T>(name);
+        raw_values_opt && !raw_values_opt->empty()) [[likely]] {
+        auto raw_values = *raw_values_opt;
+        if (raw_values.size() < N) [[unlikely]] {
+            LUISA_WARNING(
+                "Found {} but required {} values for property "
+                "'{}' in scene description node '{}'. [{}]",
+                raw_values.size(), N, name, _identifier,
+                source_location().string());
+            return luisa::nullopt;
+        }
+        if (raw_values.size() > N) [[unlikely]] {
+            LUISA_WARNING(
+                "Found {} but required {} values for property '{}' in scene "
+                "description node '{}'. Additional values will be discarded. [{}]",
+                raw_values.size(), N, name, _identifier, source_location().string());
+        }
+        if constexpr (N == 2u) {
+            return luisa::Vector<T, N>{
+                _property_convert<T>(name, raw_values[0]),
+                _property_convert<T>(name, raw_values[1])};
+        } else if constexpr (N == 3u) {
+            return luisa::Vector<T, N>{
+                _property_convert<T>(name, raw_values[0]),
+                _property_convert<T>(name, raw_values[1]),
+                _property_convert<T>(name, raw_values[2])};
+        } else {
+            return luisa::Vector<T, N>{
+                _property_convert<T>(name, raw_values[0]),
+                _property_convert<T>(name, raw_values[1]),
+                _property_convert<T>(name, raw_values[2]),
+                _property_convert<T>(name, raw_values[3])};
+        }
+    }
+    return luisa::nullopt;
+}
+
+template<typename T>
+inline luisa::optional<luisa::vector<T>> SceneNodeDesc::_property_list(luisa::string_view name) const noexcept {
+    if (auto raw_values_opt = _property_raw_values<T>(name)) [[likely]] {
+        auto raw_values = *raw_values_opt;
+        luisa::vector<T> values;
+        values.reserve(raw_values.size());
+        for (auto &&rv : raw_values) {
+            values.emplace_back(static_cast<T>(
+                _property_convert<T>(name, rv)));
+        }
+        return values;
+    }
+    return luisa::nullopt;
+}
 
 }// namespace luisa::render
