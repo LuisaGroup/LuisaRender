@@ -68,11 +68,11 @@ void NormalVisualizerInstance::_render_one_camera(
     command_buffer.commit();
 
     using namespace luisa::compute;
-    Kernel2D render_kernel = [&](UInt frame_index, Float4x4 camera_to_world, Float3x3 camera_to_world_normal, Float time) noexcept {
+    Kernel2D render_kernel = [&](UInt frame_index, Float4x4 camera_to_world, Float3x3 camera_to_world_normal, Float time, Float shutter_weight) noexcept {
         auto pixel_id = dispatch_id().xy();
         sampler->start(pixel_id, frame_index);
         auto pixel = make_float2(pixel_id);
-        auto path_weight = def(make_float3(1.0f));
+        auto path_weight = def(make_float3(shutter_weight));
         auto [filter_offset, filter_weight] = filter->sample(*sampler);
         pixel += filter_offset;
         path_weight *= filter_weight;
@@ -89,19 +89,23 @@ void NormalVisualizerInstance::_render_one_camera(
         film->accumulate(pixel_id, path_weight * color);
     };
     auto render = pipeline.device().compile(render_kernel);
+    auto shutter_samples = camera->node()->shutter_samples();
     stream << synchronize();
     Clock clock;
-    auto time_start = camera->node()->shutter_span().x;
-    auto time_end = camera->node()->shutter_span().y;
-    auto spp_per_commit = 16u;
-    for (auto i = 0u; i < spp; i++) {
-        auto t = static_cast<float>((static_cast<double>(i) + 0.5f) / static_cast<double>(spp));
-        auto time = lerp(time_start, time_end, t);
-        pipeline.update_geometry(command_buffer, time);
-        auto camera_to_world = camera->node()->transform()->matrix(t);
-        auto camera_to_world_normal = transpose(inverse(make_float3x3(camera_to_world)));
-        command_buffer << render(i, camera_to_world, camera_to_world_normal, time).dispatch(resolution);
-        if (spp % spp_per_commit == spp_per_commit - 1u) [[unlikely]] { command_buffer << commit(); }
+    auto dispatch_count = 0u;
+    auto dispatches_per_commit = 64u;
+    for (auto s : shutter_samples) {
+        for (auto i = 0u; i < s.spp; i++) {
+            if (pipeline.update_geometry(command_buffer, s.point.time)) { dispatch_count = 0u; }
+            auto camera_to_world = camera->node()->transform()->matrix(s.point.time);
+            auto camera_to_world_normal = transpose(inverse(make_float3x3(camera_to_world)));
+            command_buffer << render(i, camera_to_world, camera_to_world_normal,
+                                     s.point.time, s.point.weight).dispatch(resolution);
+            if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
+                command_buffer << commit();
+                dispatch_count = 0u;
+            }
+        }
     }
     command_buffer << commit();
     stream << synchronize();

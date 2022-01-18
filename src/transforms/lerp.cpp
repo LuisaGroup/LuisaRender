@@ -54,7 +54,7 @@ public:
             LUISA_WARNING(
                 "Duplicate time points (count = {}) in "
                 "LerpTransform will be removed. [{}]",
-                indices.end() - iter,
+                std::distance(iter, indices.end()),
                 desc->source_location().string());
             indices.erase(iter, indices.end());
         }

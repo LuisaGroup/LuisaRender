@@ -191,7 +191,7 @@ public:
     [[nodiscard]] auto environment() const noexcept { return _environment.get(); }
     [[nodiscard]] auto light_sampler() const noexcept { return _light_sampler.get(); }
     [[nodiscard]] auto mean_time() const noexcept { return _mean_time; }
-    void update_geometry(CommandBuffer &command_buffer, float time) noexcept;
+    bool update_geometry(CommandBuffer &command_buffer, float time) noexcept;
     void render(Stream &stream) noexcept;
 
     template<typename T, typename I>

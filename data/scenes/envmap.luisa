@@ -6,10 +6,13 @@ Film film : Color {
 Camera camera : Pinhole {
   position { 0, 0, 5 }
   fov { 60 }
-  spp { 1024 }
+  spp { 16384 }
   film { @film }
-  file { "environment-mapping.exr" }
-  shutter_span { 0, 0.1 }
+  file { "envmap-curve-normal.exr" }
+  shutter_span { 0, 1 }
+  shutter_samples { 1024 }
+  shutter_weights { 0, 0.2, 0.5, 3.5, 0.5, 0.2, 0 }
+  shutter_time_points { 0, 0.15, 0.25, 0.5, 0.75, 0.85, 1 }
   filter : Gaussian {
     radius { 1 }
   }
@@ -51,7 +54,7 @@ Object teapot : Group {
         rotate { 1, 2, 1, 100 }
       }
     }
-    time_points { 0, 0.1 }
+    time_points { 0, 1 }
   }
 }
 

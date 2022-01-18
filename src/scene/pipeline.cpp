@@ -141,13 +141,13 @@ void Pipeline::_process_shape(
         }
         _instances.emplace_back(instance);
     } else {
-//        if (!shape->is_virtual()) {
-            _transform_tree.push(shape->transform());
-            for (auto child : shape->children()) {
-                _process_shape(command_buffer, child, shape->two_sided(), material, light);
-            }
-            _transform_tree.pop(shape->transform());
-//        }
+        //        if (!shape->is_virtual()) {
+        _transform_tree.push(shape->transform());
+        for (auto child : shape->children()) {
+            _process_shape(command_buffer, child, shape->two_sided(), material, light);
+        }
+        _transform_tree.pop(shape->transform());
+        //        }
     }
 }
 
@@ -222,29 +222,29 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     return pipeline;
 }
 
-void Pipeline::update_geometry(CommandBuffer &command_buffer, float time) noexcept {
+bool Pipeline::update_geometry(CommandBuffer &command_buffer, float time) noexcept {
     // TODO: support deformable meshes
-    if (!_dynamic_transforms.empty()) {
-        if (_dynamic_transforms.size() < 128u) {
-            for (auto t : _dynamic_transforms) {
+    if (_dynamic_transforms.empty()) { return false; }
+    if (_dynamic_transforms.size() < 128u) {
+        for (auto t : _dynamic_transforms) {
+            _accel.set_transform(
+                t.instance_id(),
+                t.matrix(time));
+        }
+    } else {
+        ThreadPool::global().parallel(
+            _dynamic_transforms.size(),
+            [this, time](auto i) noexcept {
+                auto t = _dynamic_transforms[i];
                 _accel.set_transform(
                     t.instance_id(),
                     t.matrix(time));
-            }
-        } else {
-            ThreadPool::global().parallel(
-                _dynamic_transforms.size(),
-                [this, time](auto i) noexcept {
-                    auto t = _dynamic_transforms[i];
-                    _accel.set_transform(
-                        t.instance_id(),
-                        t.matrix(time));
-                });
-            ThreadPool::global().synchronize();
-        }
-        command_buffer << _accel.update()
-                       << luisa::compute::commit();
+            });
+        ThreadPool::global().synchronize();
     }
+    command_buffer << _accel.update()
+                   << luisa::compute::commit();
+    return true;
 }
 
 void Pipeline::render(Stream &stream) noexcept {
