@@ -1,5 +1,5 @@
 Film film : Color {
-  resolution { 1024 }
+  resolution { 1280, 720 }
   exposure { 0 }
 }
 
@@ -10,7 +10,7 @@ Camera camera : Pinhole {
   film { @film }
   file { "envmap-curve-normal.exr" }
   shutter_span { 0, 1 }
-  shutter_samples { 1024 }
+  shutter_samples { 128 }
   shutter_weights { 0, 0.2, 0.5, 3.5, 0.5, 0.2, 0 }
   shutter_time_points { 0, 0.15, 0.25, 0.5, 0.75, 0.85, 1 }
   filter : Gaussian {

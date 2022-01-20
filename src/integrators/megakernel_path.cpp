@@ -12,12 +12,18 @@ class MegakernelPathTracing final : public Integrator {
 
 private:
     uint _max_depth;
+    uint _rr_depth;
+    float _rr_threshold;
 
 public:
     MegakernelPathTracing(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Integrator{scene, desc},
-          _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)} {}
+          _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)},
+          _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 2u), 1u)},
+          _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)} {}
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
+    [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
+    [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
     [[nodiscard]] string_view impl_type() const noexcept override { return "megapath"; }
     [[nodiscard]] unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
@@ -26,22 +32,25 @@ class MegakernelPathTracingInstance final : public Integrator::Instance {
 
 private:
     Pipeline &_pipeline;
-    uint _max_depth;
 
 private:
     static void _render_one_camera(
         Stream &stream, Pipeline &pipeline,
         const Camera::Instance *camera,
         const Filter::Instance *filter,
-        Film::Instance *film, uint max_depth) noexcept;
+        Film::Instance *film, uint max_depth,
+        uint rr_depth, float rr_threshold) noexcept;
 
 public:
     explicit MegakernelPathTracingInstance(const MegakernelPathTracing *node, Pipeline &pipeline) noexcept
-        : Integrator::Instance{pipeline, node}, _pipeline{pipeline}, _max_depth{node->max_depth()} {}
+        : Integrator::Instance{pipeline, node}, _pipeline{pipeline} {}
     void render(Stream &stream) noexcept override {
+        auto pt = static_cast<const MegakernelPathTracing *>(node());
         for (auto i = 0u; i < _pipeline.camera_count(); i++) {
             auto [camera, film, filter] = _pipeline.camera(i);
-            _render_one_camera(stream, _pipeline, camera, filter, film, _max_depth);
+            _render_one_camera(
+                stream, _pipeline, camera, filter, film,
+                pt->max_depth(), pt->rr_depth(), pt->rr_threshold());
             film->save(stream, camera->node()->file());
         }
     }
@@ -53,7 +62,9 @@ unique_ptr<Integrator::Instance> MegakernelPathTracing::build(Pipeline &pipeline
 
 void MegakernelPathTracingInstance::_render_one_camera(
     Stream &stream, Pipeline &pipeline, const Camera::Instance *camera,
-    const Filter::Instance *filter, Film::Instance *film, uint max_depth) noexcept {
+    const Filter::Instance *filter, Film::Instance *film, uint max_depth,
+    uint rr_depth, float rr_threshold) noexcept {
+
     auto spp = camera->node()->spp();
     auto resolution = film->node()->resolution();
     auto image_file = camera->node()->file();
@@ -177,10 +188,10 @@ void MegakernelPathTracingInstance::_render_one_camera(
 
             // rr
             $if(all(beta <= 0.0f)) { $break; };
-            auto lum = dot(make_float3(0.212671f, 0.715160f, 0.072169f), beta);
-            $if(depth >= 1u | lum < 0.95f) {
-                $if(sampler->generate_1d() >= lum) { $break; };
-                beta *= 1.0f / lum;
+            auto q = saturate(max(beta.x, max(beta.y, beta.z)));
+            $if(depth >= rr_depth - 1u) {
+                $if(sampler->generate_1d() >= q) { $break; };
+                beta *= 1.0f / q;
             };
         };
         film->accumulate(pixel_id, Li);
@@ -203,7 +214,8 @@ void MegakernelPathTracingInstance::_render_one_camera(
                                     transpose(inverse(make_float3x3(
                                         env->node()->transform()->matrix(s.point.time))));
             command_buffer << render(i, camera_to_world, camera_to_world_normal,
-                                     env_to_world, s.point.time, s.point.weight).dispatch(resolution);
+                                     env_to_world, s.point.time, s.point.weight)
+                                  .dispatch(resolution);
             if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
                 command_buffer << commit();
                 dispatch_count = 0u;

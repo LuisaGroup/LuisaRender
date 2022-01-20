@@ -125,7 +125,7 @@ Shape group : Group {
 }
 
 render {
-  cameras { @camera2 }
+  cameras { @camera }
   shapes { @cbox, @cbox-light, @light_box, @bunny, @group }
   integrator { @pt }
   // environment : Constant {
