@@ -141,13 +141,11 @@ void Pipeline::_process_shape(
         }
         _instances.emplace_back(instance);
     } else {
-        //        if (!shape->is_virtual()) {
         _transform_tree.push(shape->transform());
         for (auto child : shape->children()) {
             _process_shape(command_buffer, child, shape->two_sided(), material, light);
         }
         _transform_tree.pop(shape->transform());
-        //        }
     }
 }
 

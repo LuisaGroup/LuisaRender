@@ -71,7 +71,7 @@ void NormalVisualizerInstance::_render_one_camera(
     Kernel2D render_kernel = [&](UInt frame_index, Float4x4 camera_to_world, Float3x3 camera_to_world_normal, Float time, Float shutter_weight) noexcept {
         auto pixel_id = dispatch_id().xy();
         sampler->start(pixel_id, frame_index);
-        auto pixel = make_float2(pixel_id);
+        auto pixel = make_float2(pixel_id) + 0.5f;
         auto path_weight = def(make_float3(shutter_weight));
         auto [filter_offset, filter_weight] = filter->sample(*sampler);
         pixel += filter_offset;
