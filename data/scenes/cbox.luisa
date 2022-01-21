@@ -6,7 +6,7 @@ Film film : Color {
 Camera camera : Pinhole {
   position { -0.01, 0.995, 5.0 }
   fov { 27.8 }
-  spp { 4096 }
+  spp { 1 }
   film { @film }
   file { "cbox.exr" }
   filter : Gaussian {
