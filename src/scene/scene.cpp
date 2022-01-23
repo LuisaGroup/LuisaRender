@@ -94,15 +94,20 @@ SceneNode *Scene::load_node(SceneNodeTag tag, const SceneNodeDesc *desc) noexcep
 
     auto [node, first_def] = [this, desc, create, destroy] {
         std::scoped_lock lock{_mutex};
-        auto [iter, first] = _config->nodes.try_emplace(
+        auto [iter, success] = _config->nodes.try_emplace(
             luisa::string{desc->identifier()},
-            lazy_construct([desc, create, destroy, this] {
-                return NodeHandle{create(this, desc), destroy};
-            }));
-        return std::make_pair(iter->second.get(), first);
+            NodeHandle{nullptr, nullptr});
+        if (success) [[likely]] {
+            LUISA_INFO(
+                "Constructing scene graph node '{}' (desc = {}).",
+                desc->identifier(), fmt::ptr(desc));
+            iter->second = NodeHandle{create(this, desc), destroy};
+        }
+        return std::make_pair(iter->second.get(), success);
     }();
     if (first_def) { return node; }
-    if (node->tag() != tag || node->impl_type() != desc->impl_type()) [[unlikely]] {
+    if (node->tag() != tag ||
+        node->impl_type() != desc->impl_type()) [[unlikely]] {
         LUISA_ERROR(
             "Scene node `{}` (type = {}::{}) is already "
             "in the graph (type = {}::{}). [{}]",

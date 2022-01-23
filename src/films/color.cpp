@@ -82,9 +82,10 @@ void ColorFilmInstance::save(Stream &stream, const std::filesystem::path &path) 
 }
 
 void ColorFilmInstance::accumulate(Expr<uint2> pixel, Expr<float3> color) const noexcept {
+    auto fixed_color = ite(any(isnan(color)), 0.0f, color);
     auto old = _image.read(pixel);
     auto t = old.w + 1.0f;
-    _image.write(pixel, make_float4(lerp(old.xyz(), color, 1.0f / t), t));
+    _image.write(pixel, make_float4(lerp(old.xyz(), fixed_color, 1.0f / t), t));
 }
 
 void ColorFilmInstance::clear(CommandBuffer &command_buffer) noexcept {

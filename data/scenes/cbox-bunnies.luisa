@@ -9,7 +9,7 @@ Camera camera_base {
     radius { 1 }
   }
   fov { 27.8 }
-  spp { 1024 }
+  spp { 128 }
 }
 
 Camera camera : Pinhole(@camera_base) {
@@ -46,10 +46,19 @@ Shape virtual : Virtual {
 
 Shape bunny : Mesh {
   file { "../meshes/bunny.obj" }
-  transform : SRT {
-    scale { 0.01 }
-    translate { 0.35, 0.825, 0.4 }
-    rotate { 0, 1, 0, 20 }
+  // file { "/Users/mike/Downloads/lucy.ply" }
+  transform : Stack {
+    transforms {
+      // SRT {
+      //   scale { 0.03 }
+      //   rotate { 1, 0, 0, -90 }
+      // },
+      SRT {
+        scale { 0.01 }
+        translate { 0.35, 0.825, 0.4 }
+        rotate { 0, 1, 0, 20 }
+      }
+    }
   }
   material : FakeMirror {
     color { 1.0, 0.71, 0.29 }

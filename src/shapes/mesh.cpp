@@ -24,7 +24,18 @@ public:
     [[nodiscard]] auto triangles() const noexcept { return luisa::span{_triangles}; }
 
     [[nodiscard]] static auto load(std::filesystem::path path) noexcept {
-        return ThreadPool::global().async([path = std::move(path)] {
+
+        static luisa::unordered_map<uint64_t, std::shared_future<MeshLoader>> cache;
+        static std::mutex mutex;
+        auto hash = luisa::hash64(std::filesystem::canonical(path).string());
+
+        std::scoped_lock lock{mutex};
+        if (auto iter = cache.find(hash); iter != cache.end()) {
+            return iter->second;
+        }
+
+        LUISA_INFO("Loading mesh '{}'...", path.string());
+        auto future = ThreadPool::global().async([path = std::move(path)] {
             Clock clock;
             auto path_string = path.string();
             Assimp::Importer importer;
@@ -109,6 +120,8 @@ public:
                 path_string, clock.toc());
             return loader;
         });
+        cache.emplace(hash, future);
+        return future;
     }
 };
 
