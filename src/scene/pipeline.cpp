@@ -44,59 +44,68 @@ void Pipeline::_process_shape(
         }
         auto iter = _meshes.find(shape);
         if (iter == _meshes.end()) {
-            auto positions = shape->positions();
-            auto attributes = shape->attributes();
-            auto triangles = shape->triangles();
-            if (positions.empty() || triangles.empty()) [[unlikely]] {
-                LUISA_ERROR_WITH_LOCATION("Found mesh without vertices.");
-            }
-            if (positions.size() != attributes.size()) [[unlikely]] {
-                LUISA_ERROR_WITH_LOCATION(
-                    "Sizes of positions ({}) and "
-                    "attributes ({}) mismatch.",
-                    positions.size(), attributes.size());
-            }
-            MeshData mesh{};
-            // create mesh
-            auto position_buffer_view = _position_buffer_arena->allocate<float3>(positions.size());
-            auto attribute_buffer_view = _attribute_buffer_arena->allocate<VertexAttribute>(attributes.size());
-            if (position_buffer_view.offset() != attribute_buffer_view.offset()) [[unlikely]] {
-                LUISA_ERROR_WITH_LOCATION("Position and attribute buffer offsets mismatch.");
-            }
-            auto index_offset = static_cast<uint>(position_buffer_view.offset());
-            luisa::vector<Triangle> offset_triangles(triangles.size());
-            std::transform(triangles.cbegin(), triangles.cend(), offset_triangles.begin(), [index_offset](auto t) noexcept {
-                return Triangle{t.i0 + index_offset, t.i1 + index_offset, t.i2 + index_offset};
-            });
-            auto triangle_buffer = create<Buffer<Triangle>>(triangles.size());
-            mesh.resource = create<Mesh>(position_buffer_view.original(), *triangle_buffer, shape->build_hint());
-            command_buffer << position_buffer_view.copy_from(positions.data())
-                           << attribute_buffer_view.copy_from(attributes.data())
-                           << triangle_buffer->copy_from(offset_triangles.data())
-                           << mesh.resource->build()
-                           << luisa::compute::commit();
-            // compute alias table
-            luisa::vector<float> triangle_areas(triangles.size());
-            std::transform(triangles.cbegin(), triangles.cend(), triangle_areas.begin(), [positions](auto t) noexcept {
-                auto p0 = positions[t.i0];
-                auto p1 = positions[t.i1];
-                auto p2 = positions[t.i2];
-                return std::abs(length(cross(p1 - p0, p2 - p0)));
-            });
-            auto [alias_table, pdf] = create_alias_table(triangle_areas);
-            auto alias_table_buffer_view = _general_buffer_arena->allocate<AliasEntry>(alias_table.size());
-            auto pdf_buffer_view = _general_buffer_arena->allocate<float>(pdf.size());
-            command_buffer << alias_table_buffer_view.copy_from(alias_table.data())
-                           << pdf_buffer_view.copy_from(pdf.data())
-                           << luisa::compute::commit();
+            auto mesh_geom = [&] {
+                auto positions = shape->positions();
+                auto attributes = shape->attributes();
+                auto triangles = shape->triangles();
+                if (positions.empty() || triangles.empty()) [[unlikely]] {
+                    LUISA_ERROR_WITH_LOCATION("Found mesh without vertices.");
+                }
+                if (positions.size() != attributes.size()) [[unlikely]] {
+                    LUISA_ERROR_WITH_LOCATION(
+                        "Sizes of positions ({}) and "
+                        "attributes ({}) mismatch.",
+                        positions.size(), attributes.size());
+                }
+                auto hash = luisa::detail::xxh3_hash64(positions.data(), positions.size_bytes(), Hash64::default_seed);
+                hash = luisa::detail::xxh3_hash64(attributes.data(), attributes.size_bytes(), hash);
+                hash = luisa::detail::xxh3_hash64(triangles.data(), triangles.size_bytes(), hash);
+                auto [iter, non_existent] = _mesh_cache.try_emplace(hash, MeshGeometry{});
+                if (!non_existent) { return iter->second; }
 
+                // create mesh
+                auto position_buffer_view = _position_buffer_arena->allocate<float3>(positions.size());
+                auto attribute_buffer_view = _attribute_buffer_arena->allocate<VertexAttribute>(attributes.size());
+                if (position_buffer_view.offset() != attribute_buffer_view.offset()) [[unlikely]] {
+                    LUISA_ERROR_WITH_LOCATION("Position and attribute buffer offsets mismatch.");
+                }
+                auto index_offset = static_cast<uint>(position_buffer_view.offset());
+                luisa::vector<Triangle> offset_triangles(triangles.size());
+                std::transform(triangles.cbegin(), triangles.cend(), offset_triangles.begin(), [index_offset](auto t) noexcept {
+                    return Triangle{t.i0 + index_offset, t.i1 + index_offset, t.i2 + index_offset};
+                });
+                auto triangle_buffer = create<Buffer<Triangle>>(triangles.size());
+                auto mesh = create<Mesh>(position_buffer_view.original(), *triangle_buffer, shape->build_hint());
+                command_buffer << position_buffer_view.copy_from(positions.data())
+                               << attribute_buffer_view.copy_from(attributes.data())
+                               << triangle_buffer->copy_from(offset_triangles.data())
+                               << mesh->build()
+                               << luisa::compute::commit();
+                // compute alias table
+                luisa::vector<float> triangle_areas(triangles.size());
+                std::transform(triangles.cbegin(), triangles.cend(), triangle_areas.begin(), [positions](auto t) noexcept {
+                    auto p0 = positions[t.i0];
+                    auto p1 = positions[t.i1];
+                    auto p2 = positions[t.i2];
+                    return std::abs(length(cross(p1 - p0, p2 - p0)));
+                });
+                auto [alias_table, pdf] = create_alias_table(triangle_areas);
+                auto alias_table_buffer_view = _general_buffer_arena->allocate<AliasEntry>(alias_table.size());
+                auto pdf_buffer_view = _general_buffer_arena->allocate<float>(pdf.size());
+                command_buffer << alias_table_buffer_view.copy_from(alias_table.data())
+                               << pdf_buffer_view.copy_from(pdf.data())
+                               << luisa::compute::commit();
+                auto position_buffer_id = register_bindless(position_buffer_view.original());
+                auto attribute_buffer_id = register_bindless(attribute_buffer_view.original());
+                auto triangle_buffer_id = register_bindless(triangle_buffer->view());
+                auto alias_buffer_id = register_bindless(alias_table_buffer_view);
+                auto pdf_buffer_id = register_bindless(pdf_buffer_view);
+                return iter->second = {mesh, position_buffer_id};
+            }();
             // assign mesh data
-            auto position_buffer_id = register_bindless(position_buffer_view.original());
-            auto attribute_buffer_id = register_bindless(attribute_buffer_view.original());
-            auto triangle_buffer_id = register_bindless(triangle_buffer->view());
-            auto alias_buffer_id = register_bindless(alias_table_buffer_view);
-            auto pdf_buffer_id = register_bindless(pdf_buffer_view);
-            mesh.buffer_id_base = position_buffer_id;
+            MeshData mesh{};
+            mesh.resource = mesh_geom.resource;
+            mesh.buffer_id_base = mesh_geom.buffer_id_base;
             mesh.two_sided = shape->two_sided().value_or(false);
             iter = _meshes.emplace(shape, mesh).first;
         }

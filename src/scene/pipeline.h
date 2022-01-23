@@ -51,6 +51,11 @@ public:
     static constexpr auto vertex_buffer_arena_size_elements = 1024u * 1024u;
     using ResourceHandle = luisa::unique_ptr<Resource>;
 
+    struct MeshGeometry {
+        Mesh *resource;
+        uint buffer_id_base;
+    };
+
     struct MeshData {
         Mesh *resource;
         uint buffer_id_base;
@@ -84,6 +89,7 @@ private:
     size_t _bindless_tex2d_count{0u};
     size_t _bindless_tex3d_count{0u};
     luisa::vector<ResourceHandle> _resources;
+    luisa::unordered_map<uint64_t, MeshGeometry> _mesh_cache;
     luisa::unordered_map<const Shape *, MeshData> _meshes;
     luisa::vector<const Material *> _material_interfaces;
     luisa::vector<const Light *> _light_interfaces;

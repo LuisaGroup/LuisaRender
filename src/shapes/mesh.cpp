@@ -30,12 +30,11 @@ public:
         auto hash = luisa::hash64(std::filesystem::canonical(path).string());
 
         std::scoped_lock lock{mutex};
-        if (auto iter = cache.find(hash); iter != cache.end()) {
-            return iter->second;
-        }
+        auto [iter, non_existent] = cache.try_emplace(hash);
+        if (!non_existent) { return iter->second; }
 
         LUISA_INFO("Loading mesh '{}'...", path.string());
-        auto future = ThreadPool::global().async([path = std::move(path)] {
+        return iter->second = ThreadPool::global().async([path = std::move(path)] {
             Clock clock;
             auto path_string = path.string();
             Assimp::Importer importer;
@@ -120,8 +119,6 @@ public:
                 path_string, clock.toc());
             return loader;
         });
-        cache.emplace(hash, future);
-        return future;
     }
 };
 

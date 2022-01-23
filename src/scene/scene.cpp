@@ -98,7 +98,7 @@ SceneNode *Scene::load_node(SceneNodeTag tag, const SceneNodeDesc *desc) noexcep
             luisa::string{desc->identifier()},
             NodeHandle{nullptr, nullptr});
         if (success) [[likely]] {
-            LUISA_INFO(
+            LUISA_VERBOSE_WITH_LOCATION(
                 "Constructing scene graph node '{}' (desc = {}).",
                 desc->identifier(), fmt::ptr(desc));
             iter->second = NodeHandle{create(this, desc), destroy};
