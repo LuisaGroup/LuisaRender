@@ -34,7 +34,7 @@ public:
     }
     [[nodiscard]] auto &image() const noexcept { return _image.get(); }
     [[nodiscard]] auto scale() const noexcept { return _scale; }
-    [[nodiscard]] bool is_black() const noexcept override { return false; }
+    [[nodiscard]] bool is_black() const noexcept override { return _scale == 0.0f; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "hdri"; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
@@ -45,33 +45,38 @@ class HDRIEnvironmentInstance final : public Environment::Instance {
 
 private:
     uint _image_id{};
-    float _scale;
 
 private:
-    [[nodiscard]] auto _evaluate(Expr<float3> wi_local) const noexcept {
+    [[nodiscard]] auto _evaluate(Expr<float3> wi_local, const SampledWavelengths &swl) const noexcept {
         auto theta = acos(wi_local.y);
         auto phi = atan2(wi_local.x, wi_local.z);
         auto u = -0.5f * inv_pi * phi;
         auto v = theta * inv_pi;
-        auto L = pipeline().tex2d(_image_id).sample(make_float2(u, v));
-        return Light::Evaluation{.L = make_float3(L) * _scale, .pdf = uniform_sphere_pdf()};
+        auto emission = pipeline().tex2d(_image_id).sample(make_float2(u, v)).xyz();
+        auto env = static_cast<const HDRIEnvironment *>(node());
+        auto spec = pipeline().srgb_illuminant_spectrum(emission * env->scale());
+        return Light::Evaluation{.L = spec.sample(swl), .pdf = uniform_sphere_pdf()};
     }
 
 public:
     HDRIEnvironmentInstance(Pipeline &pipeline, CommandBuffer &command_buffer, const HDRIEnvironment *env) noexcept
-        : Environment::Instance{pipeline, env}, _scale{env->scale()} {
+        : Environment::Instance{pipeline, env} {
         auto &&image = env->image();
         auto device_image = pipeline.create<Image<float>>(PixelStorage::FLOAT4, image.resolution());
         command_buffer << device_image->copy_from(image.pixels());
         _image_id = pipeline.register_bindless(*device_image, TextureSampler::bilinear_repeat());
     }
     // TODO: importance sampling
-    [[nodiscard]] Light::Evaluation evaluate(Expr<float3> wi, Expr<float3x3> env_to_world, Expr<float>) const noexcept override {
-        return _evaluate(transpose(env_to_world) * wi);
+    [[nodiscard]] Light::Evaluation evaluate(
+        Expr<float3> wi, Expr<float3x3> env_to_world,
+        const SampledWavelengths &swl, Expr<float>) const noexcept override {
+        return _evaluate(transpose(env_to_world) * wi, swl);
     }
-    [[nodiscard]] Light::Sample sample(Sampler::Instance &sampler, const Interaction &it_from, Expr<float3x3> env_to_world, Expr<float>) const noexcept override {
+    [[nodiscard]] Light::Sample sample(
+        Sampler::Instance &sampler, const Interaction &it_from, Expr<float3x3> env_to_world,
+        const SampledWavelengths &swl, Expr<float>) const noexcept override {
         auto wi = sample_uniform_sphere(sampler.generate_2d());
-        return {.eval = _evaluate(wi), .shadow_ray = it_from.spawn_ray(env_to_world * wi)};
+        return {.eval = _evaluate(wi, swl), .shadow_ray = it_from.spawn_ray(env_to_world * wi)};
     }
 };
 

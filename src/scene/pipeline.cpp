@@ -201,6 +201,17 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     pipeline->_filters.reserve(scene.cameras().size());
     auto command_buffer = stream.command_buffer();
     {
+        auto rgb2spec_t0 = pipeline->create<Volume<float>>(PixelStorage::FLOAT4, make_uint3(64u, 64u, 64u));
+        auto rgb2spec_t1 = pipeline->create<Volume<float>>(PixelStorage::FLOAT4, make_uint3(64u, 64u, 64u));
+        auto rgb2spec_t2 = pipeline->create<Volume<float>>(PixelStorage::FLOAT4, make_uint3(64u, 64u, 64u));
+        RGB2SpectrumTable::srgb().encode(
+            command_buffer,
+            rgb2spec_t0->view(0u),
+            rgb2spec_t1->view(0u),
+            rgb2spec_t2->view(0u));
+        pipeline->_rgb2spec_index = pipeline->register_bindless(*rgb2spec_t0, TextureSampler::bilinear_zero());
+        static_cast<void>(pipeline->register_bindless(*rgb2spec_t1, TextureSampler::bilinear_zero()));
+        static_cast<void>(pipeline->register_bindless(*rgb2spec_t2, TextureSampler::bilinear_zero()));
         auto mean_time = 0.0;
         for (auto camera : scene.cameras()) {
             pipeline->_cameras.emplace_back(camera->build(*pipeline, command_buffer));
@@ -335,34 +346,58 @@ luisa::unique_ptr<Interaction> Pipeline::interaction(const Var<Ray> &ray, const 
     return luisa::make_unique<Interaction>(std::move(it));
 }
 
-luisa::unique_ptr<Material::Closure> Pipeline::decode_material(uint tag, const Interaction &it) const noexcept {
+luisa::unique_ptr<Material::Closure> Pipeline::decode_material(
+    uint tag, const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     if (tag > _material_interfaces.size()) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION("Invalid material tag: {}.", tag);
     }
-    return _material_interfaces[tag]->decode(*this, it);
+    return _material_interfaces[tag]->decode(*this, it, swl, time);
 }
 
-void Pipeline::decode_material(Expr<uint> tag, const Interaction &it, const luisa::function<void(const Material::Closure &)> &func) const noexcept {
+void Pipeline::decode_material(
+    Expr<uint> tag, const Interaction &it, const SampledWavelengths &swl, Expr<float> time,
+    const luisa::function<void(const Material::Closure &)> &func) const noexcept {
     $switch(tag) {
         for (auto i = 0u; i < _material_interfaces.size(); i++) {
-            $case(i) { func(*decode_material(i, it)); };
+            $case(i) { func(*decode_material(i, it, swl, time)); };
         }
     };
 }
 
-luisa::unique_ptr<Light::Closure> Pipeline::decode_light(uint tag) const noexcept {
+luisa::unique_ptr<Light::Closure> Pipeline::decode_light(
+    uint tag, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     if (tag > _light_interfaces.size()) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION("Invalid light tag: {}.", tag);
     }
-    return _light_interfaces[tag]->decode(*this);
+    return _light_interfaces[tag]->decode(*this, swl, time);
 }
 
-void Pipeline::decode_light(Expr<uint> tag, const function<void(const Light::Closure &)> &func) const noexcept {
+void Pipeline::decode_light(
+    Expr<uint> tag, const SampledWavelengths &swl, Expr<float> time,
+    const function<void(const Light::Closure &)> &func) const noexcept {
     $switch(tag) {
         for (auto i = 0u; i < _light_interfaces.size(); i++) {
-            $case(i) { func(*decode_light(i)); };
+            $case(i) { func(*decode_light(i, swl, time)); };
         }
     };
+}
+
+RGBAlbedoSpectrum Pipeline::srgb_albedo_spectrum(Expr<float3> rgb) const noexcept {
+    auto rsp = RGB2SpectrumTable::srgb().decode_albedo(
+        Expr{_bindless_array}, _rgb2spec_index, rgb);
+    return RGBAlbedoSpectrum{std::move(rsp)};
+}
+
+RGBUnboundSpectrum Pipeline::srgb_unbound_spectrum(Expr<float3> rgb) const noexcept {
+    auto [rsp, scale] = RGB2SpectrumTable::srgb().decode_unbound(
+        Expr{_bindless_array}, _rgb2spec_index, rgb);
+    return {std::move(rsp), std::move(scale)};
+}
+
+RGBIlluminantSpectrum Pipeline::srgb_illuminant_spectrum(Expr<float3> rgb) const noexcept {
+    auto [rsp, scale] = RGB2SpectrumTable::srgb().decode_unbound(
+        Expr{_bindless_array}, _rgb2spec_index, rgb);
+    return {std::move(rsp), std::move(scale), DenselySampledSpectrum::cie_illum_d6500()};
 }
 
 }// namespace luisa::render

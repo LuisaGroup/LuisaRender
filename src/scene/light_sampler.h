@@ -41,10 +41,18 @@ public:
         [[nodiscard]] auto node() const noexcept { return _sampler; }
         [[nodiscard]] const auto &pipeline() const noexcept { return _pipeline; }
         virtual void update(CommandBuffer &command_buffer, float time) noexcept = 0;
-        [[nodiscard]] virtual Float pmf(const Interaction &it) const noexcept = 0;
-        [[nodiscard]] virtual Selection select(Sampler::Instance &sampler, const Interaction &it) const noexcept = 0;
-        [[nodiscard]] virtual Light::Evaluation evaluate(const Interaction &it, Expr<float3> p_from, Expr<float> time) const noexcept;
-        [[nodiscard]] virtual Light::Sample sample(Sampler::Instance &sampler, const Interaction &it_from, Expr<float> time) const noexcept;
+        [[nodiscard]] virtual Float pmf(
+            const Interaction &it,
+            const SampledWavelengths &swl) const noexcept = 0;
+        [[nodiscard]] virtual Selection select(
+            Sampler::Instance &sampler, const Interaction &it,
+            const SampledWavelengths &swl) const noexcept = 0;
+        [[nodiscard]] virtual Light::Evaluation evaluate(
+            const Interaction &it, Expr<float3> p_from,
+            const SampledWavelengths &swl, Expr<float> time) const noexcept;
+        [[nodiscard]] virtual Light::Sample sample(
+            Sampler::Instance &sampler, const Interaction &it_from,
+            const SampledWavelengths &swl, Expr<float> time) const noexcept;
     };
 
 public:

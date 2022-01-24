@@ -26,7 +26,7 @@ class Camera : public SceneNode {
 public:
     struct Sample {
         Var<Ray> ray;
-        Float3 weight;
+        Float weight;
     };
 
     class Instance {

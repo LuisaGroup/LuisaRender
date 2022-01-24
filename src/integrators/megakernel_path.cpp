@@ -93,11 +93,12 @@ void MegakernelPathTracingInstance::_render_one_camera(
         auto pixel_id = dispatch_id().xy();
         sampler->start(pixel_id, frame_index);
         auto pixel = make_float2(pixel_id) + 0.5f;
-        auto beta = def(make_float3(shutter_weight));
+        auto beta = def(make_float4(shutter_weight));
         auto [filter_offset, filter_weight] = filter->sample(*sampler);
         pixel += filter_offset;
         beta *= filter_weight;
 
+        auto swl = SampledWavelengths::sample_visible(sampler->generate_1d());
         auto [camera_ray, camera_weight] = camera->generate_ray(*sampler, pixel, time);
         if (!camera->node()->transform()->is_identity()) {
             camera_ray->set_origin(make_float3(camera_to_world * make_float4(camera_ray->origin(), 1.0f)));
@@ -106,13 +107,13 @@ void MegakernelPathTracingInstance::_render_one_camera(
         beta *= camera_weight;
 
         auto ray = camera_ray;
-        auto Li = def(make_float3(0.0f));
+        auto Li = def(make_float4(0.0f));
         auto pdf_bsdf = def(0.0f);
         $for(depth, max_depth) {
 
             auto add_light_contrib = [&](const Light::Evaluation &eval) noexcept {
                 auto mis_weight = ite(depth == 0u, 1.0f, balanced_heuristic(pdf_bsdf, eval.pdf));
-                Li += ite(eval.pdf > 0.0f, beta * eval.L * mis_weight, make_float3(0.0f));
+                Li += ite(eval.pdf > 0.0f, beta * eval.L * mis_weight, make_float4(0.0f));
             };
 
             auto env_prob = env == nullptr ? 0.0f : env->selection_prob();
@@ -123,8 +124,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
             // miss
             $if(!it->valid()) {
                 if (env_prob > 0.0f) {
-                    auto eval = env->evaluate(
-                        ray->direction(), env_to_world, time);
+                    auto eval = env->evaluate(ray->direction(), env_to_world, swl, time);
                     eval.pdf *= env_prob;
                     add_light_contrib(eval);
                 }
@@ -134,8 +134,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
             // hit light
             if (light_sampler != nullptr) {
                 $if(it->shape()->has_light()) {
-                    auto eval = light_sampler->evaluate(
-                        *it, ray->origin(), time);
+                    auto eval = light_sampler->evaluate(*it, ray->origin(), swl, time);
                     eval.pdf *= 1.0f - env_prob;
                     add_light_contrib(eval);
                 };
@@ -147,17 +146,17 @@ void MegakernelPathTracingInstance::_render_one_camera(
             if (env_prob > 0.0f) {
                 auto u = sampler->generate_1d();
                 $if(u < env_prob) {
-                    light_sample = env->sample(*sampler, *it, env_to_world, time);
+                    light_sample = env->sample(*sampler, *it, env_to_world, swl, time);
                     light_sample.eval.pdf *= env_prob;
                 }
                 $else {
                     if (light_sampler != nullptr) {
-                        light_sample = light_sampler->sample(*sampler, *it, time);
+                        light_sample = light_sampler->sample(*sampler, *it, swl, time);
                         light_sample.eval.pdf *= 1.0f - env_prob;
                     }
                 };
             } else if (light_sampler != nullptr) {
-                light_sample = light_sampler->sample(*sampler, *it, time);
+                light_sample = light_sampler->sample(*sampler, *it, swl, time);
                 light_sample.eval.pdf *= 1.0f - env_prob;
             }
 
@@ -165,11 +164,11 @@ void MegakernelPathTracingInstance::_render_one_camera(
             auto occluded = pipeline.intersect_any(light_sample.shadow_ray);
 
             // evaluate material
-            pipeline.decode_material(it->shape()->material_tag(), *it, [&](const Material::Closure &material) {
+            pipeline.decode_material(it->shape()->material_tag(), *it, swl, time, [&](const Material::Closure &material) {
                 // direct lighting
                 $if(light_sample.eval.pdf > 0.0f & !occluded) {
                     auto wi = light_sample.shadow_ray->direction();
-                    auto [f, pdf] = material.evaluate(wi, time);
+                    auto [f, pdf] = material.evaluate(wi);
                     auto mis_weight = balanced_heuristic(light_sample.eval.pdf, pdf);
                     Li += beta * mis_weight * ite(pdf > 0.0f, f, 0.0f) *
                           abs(dot(it->shading().n(), wi)) *
@@ -177,24 +176,24 @@ void MegakernelPathTracingInstance::_render_one_camera(
                 };
 
                 // sample material
-                auto [wi, eval] = material.sample(*sampler, time);
+                auto [wi, eval] = material.sample(*sampler);
                 ray = it->spawn_ray(wi);
                 pdf_bsdf = eval.pdf;
                 beta *= ite(
                     eval.pdf > 0.0f,
                     eval.f * abs(dot(it->shading().n(), wi)) / eval.pdf,
-                    make_float3(0.0f));
+                    make_float4(0.0f));
             });
 
             // rr
             $if(all(beta <= 0.0f)) { $break; };
-            auto q = saturate(max(beta.x, max(beta.y, beta.z)));
+            auto q = swl.cie_y(beta);
             $if(depth >= rr_depth - 1u) {
                 $if(sampler->generate_1d() >= q) { $break; };
                 beta *= 1.0f / q;
             };
         };
-        film->accumulate(pixel_id, Li);
+        film->accumulate(pixel_id, swl.srgb(Li));
         sampler->save_state();
     };
     auto render = pipeline.device().compile(render_kernel);

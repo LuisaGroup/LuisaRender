@@ -30,6 +30,7 @@ private:
     Float _c0;
     Float _c1;
     Float _c2;
+    luisa::optional<Float> _maximum;
 
 private:
     [[nodiscard]] static Float _s(Expr<float> x) noexcept;
@@ -63,10 +64,11 @@ public:
     constexpr RGB2SpectrumTable(RGB2SpectrumTable &&) noexcept = default;
     constexpr RGB2SpectrumTable(const RGB2SpectrumTable &) noexcept = default;
     [[nodiscard]] static RGB2SpectrumTable srgb() noexcept;
-    [[nodiscard]] float3 coefficients(float3 rgb) const noexcept;
+    [[nodiscard]] float3 decode_albedo(float3 rgb) const noexcept;
+    [[nodiscard]] std::pair<float3, float> decode_unbound(float3 rgb) const noexcept;
+    [[nodiscard]] RGBSigmoidPolynomial decode_albedo(Expr<BindlessArray> array, Expr<uint> base_index, Expr<float3> rgb) const noexcept;
+    [[nodiscard]] std::pair<RGBSigmoidPolynomial, Float> decode_unbound(Expr<BindlessArray> array, Expr<uint> base_index, Expr<float3> rgb) const noexcept;
     void encode(CommandBuffer &command_buffer, VolumeView<float> t0, VolumeView<float> t1, VolumeView<float> t2) const noexcept;
-    [[nodiscard]] RGBSigmoidPolynomial decode(Expr<BindlessArray> array, Expr<uint> base_index, Expr<float3> rgb) const noexcept;
-    [[nodiscard]] RGBSigmoidPolynomial decode(const BindlessArray &array, Expr<uint> base_index, Expr<float3> rgb) const noexcept;
 };
 
 class SampledWavelengths {
@@ -132,13 +134,33 @@ public:
     }
 };
 
-class RGBUnboundedSpectrum {
+class RGBUnboundSpectrum {
 
 private:
-    RGBAlbedoSpectrum _albedo;
+    RGBSigmoidPolynomial _rsp;
     Float _scale;
 
 public:
+    RGBUnboundSpectrum(RGBSigmoidPolynomial rsp, Expr<float> scale) noexcept
+        : _rsp{std::move(rsp)}, _scale{scale} {}
+    [[nodiscard]] auto sample(const SampledWavelengths &swl) const noexcept {
+        return _rsp(swl.lambda()) * _scale;
+    }
+};
+
+class RGBIlluminantSpectrum {
+
+private:
+    RGBSigmoidPolynomial _rsp;
+    Float _scale;
+    const DenselySampledSpectrum &_illuminant;
+
+public:
+    RGBIlluminantSpectrum(RGBSigmoidPolynomial rsp, Expr<float> scale, const DenselySampledSpectrum &illum) noexcept
+        : _rsp{std::move(rsp)}, _scale{scale}, _illuminant{illum} {}
+    [[nodiscard]] auto sample(const SampledWavelengths &swl) const noexcept {
+        return _rsp(swl.lambda()) * _scale * _illuminant.sample(swl);
+    }
 };
 
 }// namespace luisa::render

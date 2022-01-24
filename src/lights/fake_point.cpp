@@ -10,13 +10,16 @@
 namespace luisa::render {
 
 struct alignas(16) FakePointLightParams {
-    float emission[3];
+    float3 rsp;
+    float scale;
     float radius;
 };
 
 }// namespace luisa::render
 
-LUISA_STRUCT(luisa::render::FakePointLightParams, emission, radius){};
+LUISA_STRUCT(
+    luisa::render::FakePointLightParams,
+    rsp, scale, radius){};
 
 namespace luisa::render {
 
@@ -32,16 +35,11 @@ public:
                 return make_float3(desc->property_float("emission"));
             }));
         auto scale = desc->property_float_or_default("scale", 1.0f);
-        _params.emission[0] = std::max(emission.x * scale, 0.0f);
-        _params.emission[1] = std::max(emission.y * scale, 0.0f);
-        _params.emission[2] = std::max(emission.z * scale, 0.0f);
+        std::tie(_params.rsp, _params.scale) = RGB2SpectrumTable::srgb().decode_unbound(
+            max(emission * scale, 0.0f));
         _params.radius = desc->property_float_or_default("radius", 0.0f);
     }
-    [[nodiscard]] bool is_black() const noexcept override {
-        return _params.emission[0] == 0.0f &&
-               _params.emission[1] == 0.0f &&
-               _params.emission[2] == 0.0f;
-    }
+    [[nodiscard]] bool is_black() const noexcept override { return _params.scale == 0.0f; }
     [[nodiscard]] bool is_virtual() const noexcept override { return true; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "fakepoint"; }
     [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint, const Shape *shape) const noexcept override {
@@ -54,37 +52,42 @@ public:
         command_buffer << buffer_view.copy_from(&_params);
         return buffer_id;
     }
-    [[nodiscard]] luisa::unique_ptr<Closure> decode(const Pipeline &pipeline) const noexcept override;
+    [[nodiscard]] luisa::unique_ptr<Closure> decode(const Pipeline &pipeline, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
 };
 
 class FakePointLightClosure final : public Light::Closure {
 
 private:
     const Pipeline &_pipeline;
+    const SampledWavelengths &_swl;
 
 public:
-    explicit FakePointLightClosure(const Pipeline &ppl) noexcept : _pipeline{ppl} {}
-    [[nodiscard]] Light::Evaluation evaluate(const Interaction &, Expr<float3>, Expr<float>) const noexcept override { return {}; /* should never be called */ }
-    [[nodiscard]] Light::Sample sample(Sampler::Instance &sampler, Expr<uint> light_inst_id, const Interaction &it_from, Expr<float> time) const noexcept override {
+    explicit FakePointLightClosure(const Pipeline &ppl, const SampledWavelengths &swl) noexcept
+        : _pipeline{ppl}, _swl{swl} {}
+    [[nodiscard]] Light::Evaluation evaluate(const Interaction &, Expr<float3>) const noexcept override { return {}; /* should never be called */ }
+    [[nodiscard]] Light::Sample sample(Sampler::Instance &sampler, Expr<uint> light_inst_id, const Interaction &it_from) const noexcept override {
         using namespace luisa::compute;
         auto [inst, inst_to_world] = _pipeline.instance(light_inst_id);
         auto params = _pipeline.buffer<FakePointLightParams>(inst->light_buffer_id()).read(0u);
-        auto emission = def<float3>(params.emission);
+        RGBIlluminantSpectrum spec{
+            RGBSigmoidPolynomial{params.rsp}, params.scale,
+            DenselySampledSpectrum::cie_illum_d6500()};
+        auto L = spec.sample(_swl);
         auto center = make_float3(inst_to_world * make_float4(make_float3(0.0f), 1.0f));
         auto frame = Frame::make(normalize(it_from.p() - center));
         auto offset = sample_uniform_disk_concentric(sampler.generate_2d());
         auto p_light = params.radius * frame.local_to_world(make_float3(offset, 0.0f)) + center;
         Light::Sample s;
         static constexpr auto delta_pdf = 1e8f;
-        s.eval.L = emission * delta_pdf;
+        s.eval.L = L * delta_pdf;
         s.eval.pdf = distance_squared(p_light, it_from.p()) * delta_pdf;
         s.shadow_ray = it_from.spawn_ray_to(p_light);
         return s;
     }
 };
 
-luisa::unique_ptr<Light::Closure> FakePointLight::decode(const Pipeline &pipeline) const noexcept {
-    return luisa::make_unique<FakePointLightClosure>(pipeline);
+luisa::unique_ptr<Light::Closure> FakePointLight::decode(const Pipeline &pipeline, const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    return luisa::make_unique<FakePointLightClosure>(pipeline, swl);
 }
 
 }// namespace luisa::render

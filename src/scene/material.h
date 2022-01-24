@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <util/spectrum.h>
 #include <scene/scene_node.h>
 #include <scene/sampler.h>
 
@@ -19,7 +20,7 @@ class Material : public SceneNode {
 
 public:
     struct Evaluation {
-        Float3 f;
+        Float4 f;
         Float pdf;
     };
 
@@ -30,8 +31,8 @@ public:
 
     struct Closure {
         virtual ~Closure() noexcept = default;
-        [[nodiscard]] virtual Evaluation evaluate(Expr<float3> wi, Expr<float> time) const noexcept = 0;
-        [[nodiscard]] virtual Sample sample(Sampler::Instance &sampler, Expr<float> time) const noexcept = 0;
+        [[nodiscard]] virtual Evaluation evaluate(Expr<float3> wi) const noexcept = 0;
+        [[nodiscard]] virtual Sample sample(Sampler::Instance &sampler) const noexcept = 0;
     };
 
 public:
@@ -40,7 +41,9 @@ public:
     [[nodiscard]] virtual uint /* bindless buffer id */ encode(
         Pipeline &pipeline, CommandBuffer &command_buffer,
         uint instance_id, const Shape *shape) const noexcept = 0;
-    [[nodiscard]] virtual luisa::unique_ptr<Closure> decode(const Pipeline &pipeline, const Interaction &it) const noexcept = 0;
+    [[nodiscard]] virtual luisa::unique_ptr<Closure> decode(
+        const Pipeline &pipeline, const Interaction &it,
+        const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
 };
 
 }// namespace luisa::render

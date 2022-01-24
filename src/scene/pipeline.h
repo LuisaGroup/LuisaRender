@@ -5,8 +5,9 @@
 #pragma once
 
 #include <optional>
-#include <luisa-compute.h>
 
+#include <luisa-compute.h>
+#include <util/spectrum.h>
 #include <scene/shape.h>
 #include <scene/light.h>
 #include <scene/camera.h>
@@ -35,11 +36,11 @@ using compute::Device;
 using compute::Hit;
 using compute::Image;
 using compute::Mesh;
-using compute::PixelStorage;
 using compute::Ray;
 using compute::Resource;
 using compute::Triangle;
 using compute::Volume;
+using compute::PixelStorage;
 using TextureSampler = compute::Sampler;
 
 class Scene;
@@ -107,6 +108,7 @@ private:
     luisa::unique_ptr<LightSampler::Instance> _light_sampler;
     luisa::unique_ptr<Sampler::Instance> _sampler;
     luisa::unique_ptr<Environment::Instance> _environment;
+    uint _rgb2spec_index{0u};
     float _mean_time{0.0f};
 
 private:
@@ -220,10 +222,19 @@ public:
                       const Var<Triangle> &triangle, const Var<float3> &uvw) const noexcept;
     [[nodiscard]] auto intersect(const Var<Ray> &ray) const noexcept { return interaction(ray, trace_closest(ray)); }
     [[nodiscard]] auto intersect_any(const Var<Ray> &ray) const noexcept { return trace_any(ray); }
-    [[nodiscard]] luisa::unique_ptr<Material::Closure> decode_material(uint tag, const Interaction &it) const noexcept;
-    void decode_material(Expr<uint> tag, const Interaction &it, const luisa::function<void(const Material::Closure &)> &func) const noexcept;
-    [[nodiscard]] luisa::unique_ptr<Light::Closure> decode_light(uint tag) const noexcept;
-    void decode_light(Expr<uint> tag, const luisa::function<void(const Light::Closure &)> &func) const noexcept;
+    [[nodiscard]] luisa::unique_ptr<Material::Closure> decode_material(
+        uint tag, const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept;
+    void decode_material(
+        Expr<uint> tag, const Interaction &it, const SampledWavelengths &swl, Expr<float> time,
+        const luisa::function<void(const Material::Closure &)> &func) const noexcept;
+    [[nodiscard]] luisa::unique_ptr<Light::Closure> decode_light(
+        uint tag, const SampledWavelengths &swl, Expr<float> time) const noexcept;
+    void decode_light(
+        Expr<uint> tag, const SampledWavelengths &swl, Expr<float> time,
+        const luisa::function<void(const Light::Closure &)> &func) const noexcept;
+    [[nodiscard]] RGBAlbedoSpectrum srgb_albedo_spectrum(Expr<float3> rgb) const noexcept;
+    [[nodiscard]] RGBUnboundSpectrum srgb_unbound_spectrum(Expr<float3> rgb) const noexcept;
+    [[nodiscard]] RGBIlluminantSpectrum srgb_illuminant_spectrum(Expr<float3> rgb) const noexcept;
 };
 
 }// namespace luisa::render

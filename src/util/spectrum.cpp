@@ -190,7 +190,7 @@ RGB2SpectrumTable RGB2SpectrumTable::srgb() noexcept {
 }
 
 // from PBRT-v4: https://github.com/mmp/pbrt-v4/blob/master/src/pbrt/util/color.cpp
-float3 RGB2SpectrumTable::coefficients(float3 rgb_in) const noexcept {
+float3 RGB2SpectrumTable::decode_albedo(float3 rgb_in) const noexcept {
     auto rgb = clamp(rgb_in, 0.0f, 1.0f);
     if (rgb[0] == rgb[1] && rgb[1] == rgb[2]) {
         return make_float3(
@@ -238,7 +238,7 @@ void RGB2SpectrumTable::encode(CommandBuffer &command_buffer, VolumeView<float> 
                    << luisa::compute::commit();
 }
 
-RGBSigmoidPolynomial RGB2SpectrumTable::decode(Expr<BindlessArray> array, Expr<uint> base_index, Expr<float3> rgb_in) const noexcept {
+RGBSigmoidPolynomial RGB2SpectrumTable::decode_albedo(Expr<BindlessArray> array, Expr<uint> base_index, Expr<float3> rgb_in) const noexcept {
     using namespace luisa::compute;
     auto rgb = clamp(rgb_in, 0.0f, 1.0f);
     auto c = def<float3>();
@@ -282,10 +282,22 @@ RGBSigmoidPolynomial RGB2SpectrumTable::decode(Expr<BindlessArray> array, Expr<u
     return RGBSigmoidPolynomial{c};
 }
 
-RGBSigmoidPolynomial RGB2SpectrumTable::decode(
-    const luisa::compute::BindlessArray &array, luisa::compute::Expr<uint> base_index,
-    luisa::compute::Expr<luisa::Vector<float, 3>> rgb) const noexcept {
-    return decode(Expr{array}, base_index, rgb);
+std::pair<float3, float> RGB2SpectrumTable::decode_unbound(float3 rgb) const noexcept {
+    auto m = std::max({rgb.x, rgb.y, rgb.z});
+    auto scale = 2.0f * m;
+    auto c = decode_albedo(scale == 0.0f ? make_float3(0.0f) : rgb / scale);
+    return std::make_pair(c, scale);
+}
+
+std::pair<RGBSigmoidPolynomial, Float> RGB2SpectrumTable::decode_unbound(
+    Expr<BindlessArray> array, Expr<uint> base_index, Expr<float3> rgb) const noexcept {
+    using namespace luisa::compute;
+    auto m = max(max(rgb.x, rgb.y), rgb.z);
+    auto scale = 2.0f * m;
+    auto c = decode_albedo(
+        array, base_index,
+        ite(scale == 0.0f, 0.0f, rgb / scale));
+    return std::make_pair(std::move(c), std::move(scale));
 }
 
 }// namespace luisa::render

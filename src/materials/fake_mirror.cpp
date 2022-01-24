@@ -12,53 +12,60 @@ namespace luisa::render {
 class FakeMirrorMaterial final : public Material {
 
 private:
-    float3 _color;
+    std::array<float, 3> _rsp;
+    bool _is_black;
 
 public:
     FakeMirrorMaterial(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Material{scene, desc} {
-        _color = desc->property_float3_or_default(
+        auto color = clamp(desc->property_float3_or_default(
             "color", lazy_construct([desc] {
                 return make_float3(desc->property_float_or_default("color", 1.0f));
-            }));
-        _color = clamp(_color, 0.0f, 1.0f);
+            })), 0.0f, 1.0f);
+        auto rsp = RGB2SpectrumTable::srgb().decode_albedo(color);
+        _rsp = {rsp.x, rsp.y, rsp.z};
+        _is_black = all(color == 0.0f);
     }
-    [[nodiscard]] bool is_black() const noexcept override { return false; }
+    [[nodiscard]] bool is_black() const noexcept override { return _is_black; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "fakemirror"; }
     [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint instance_id, const Shape *shape) const noexcept override {
         auto [buffer_view, buffer_id] = pipeline.arena_buffer<float3>(1u);
-        command_buffer << buffer_view.copy_from(&_color);
+        command_buffer << buffer_view.copy_from(&_rsp);
         return buffer_id;
     }
-    [[nodiscard]] luisa::unique_ptr<Closure> decode(const Pipeline &pipeline, const Interaction &it) const noexcept override;
+    [[nodiscard]] luisa::unique_ptr<Closure> decode(
+        const Pipeline &pipeline, const Interaction &it,
+        const SampledWavelengths &swl, Expr<float> time) const noexcept override;
 };
 
 class FakeMirrorClosure final : public Material::Closure {
 
 private:
     const Interaction &_it;
-    Float3 _color;
+    Float4 _sampled_spec;
 
 public:
-    FakeMirrorClosure(const Interaction &it, Expr<float3> color) noexcept
-        : _it{it}, _color{color} {}
-    [[nodiscard]] Material::Evaluation evaluate(Expr<float3> wi, Expr<float> time) const noexcept override {
-        return {.f = make_float3(0.0f), .pdf = 0.0f};
+    FakeMirrorClosure(const Interaction &it, Expr<float3> rsp, const SampledWavelengths &swl) noexcept
+        : _it{it}, _sampled_spec{RGBAlbedoSpectrum{RGBSigmoidPolynomial{rsp}}.sample(swl)} {}
+    [[nodiscard]] Material::Evaluation evaluate(Expr<float3> wi) const noexcept override {
+        return {.f = make_float4(0.0f), .pdf = 0.0f};
     }
-    [[nodiscard]] Material::Sample sample(Sampler::Instance &sampler, Expr<float> time) const noexcept override {
+    [[nodiscard]] Material::Sample sample(Sampler::Instance &sampler) const noexcept override {
         auto cos_wo = dot(_it.wo(), _it.shading().n());
         auto wi = 2.0f * cos_wo * _it.shading().n() - _it.wo();
         static constexpr auto delta_pdf = 1e8f;
         Material::Evaluation eval{
-            .f = delta_pdf * _color / cos_wo,
+            .f = delta_pdf * _sampled_spec / cos_wo,
             .pdf = ite(cos_wo > 0.0f, delta_pdf, 0.0f)};
         return {.wi = std::move(wi), .eval = std::move(eval)};
     }
 };
 
-unique_ptr<Material::Closure> FakeMirrorMaterial::decode(const Pipeline &pipeline, const Interaction &it) const noexcept {
-    auto color = pipeline.buffer<float3>(it.shape()->material_buffer_id()).read(0u);
-    return luisa::make_unique<FakeMirrorClosure>(it, color);
+unique_ptr<Material::Closure> FakeMirrorMaterial::decode(
+    const Pipeline &pipeline, const Interaction &it,
+    const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    auto rsp = pipeline.buffer<float3>(it.shape()->material_buffer_id()).read(0u);
+    return luisa::make_unique<FakeMirrorClosure>(it, rsp, swl);
 }
 
 }// namespace luisa::render

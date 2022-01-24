@@ -12,40 +12,39 @@ namespace luisa::render {
 
 using namespace luisa::compute;
 
-class ColorFilm;
+class ColorFilm final : public Film {
+
+private:
+    float _scale{0.0f};
+
+public:
+    ColorFilm(Scene *scene, const SceneNodeDesc *desc) noexcept
+        : Film{scene, desc} {
+        auto exposure = desc->property_float_or_default("exposure", 0.0f);
+        _scale = std::pow(2.0f, exposure);
+    }
+    [[nodiscard]] auto scale() const noexcept { return _scale; }
+    [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "color"; }
+};
 
 class ColorFilmInstance final : public Film::Instance {
 
 private:
     Image<float> _image;
     Shader2D<Image<float>> _clear_image;
-    float _scale;
 
 public:
-    ColorFilmInstance(Device &device, const ColorFilm *film, float scale) noexcept;
-    void accumulate(Expr<uint2> pixel, Expr<float3> color) const noexcept override;
+    ColorFilmInstance(Device &device, Pipeline &pipeline, const ColorFilm *film) noexcept;
+    void accumulate(Expr<uint2> pixel, Expr<float3> rgb) const noexcept override;
     void save(Stream &stream, const std::filesystem::path &path) const noexcept override;
     void clear(CommandBuffer &command_buffer) noexcept override;
 };
 
-class ColorFilm final : public Film {
-
-private:
-    float _exposure;
-
-public:
-    ColorFilm(Scene *scene, const SceneNodeDesc *desc) noexcept
-        : Film{scene, desc}, _exposure{desc->property_float_or_default("exposure", 0.0f)} {}
-    [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
-        return luisa::make_unique<ColorFilmInstance>(pipeline.device(), this, std::pow(2.0f, _exposure));
-    }
-    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "color"; }
-};
-
-ColorFilmInstance::ColorFilmInstance(Device &device, const ColorFilm *film, float scale) noexcept
-    : Film::Instance{film},
-      _image{device.create_image<float>(PixelStorage::FLOAT4, film->resolution())},
-      _scale{scale} {
+ColorFilmInstance::ColorFilmInstance(Device &device, Pipeline &pipeline, const ColorFilm *film) noexcept
+    : Film::Instance{pipeline, film},
+      _image{device.create_image<float>(
+          PixelStorage::FLOAT4, film->resolution())} {
     Kernel2D clear_image = [](ImageFloat image) noexcept {
         image.write(dispatch_id().xy(), make_float4(0.0f));
     };
@@ -59,9 +58,10 @@ void ColorFilmInstance::save(Stream &stream, const std::filesystem::path &path) 
     std::vector<float> rgb;
     rgb.resize(resolution.y * resolution.x * 4);
     stream << _image.copy_to(rgb.data()) << synchronize();
+    auto scale = static_cast<const ColorFilm *>(node())->scale();
     for (auto i = 0; i < resolution.x * resolution.y; i++) {
         for (auto c = 0; c < 3; c++) {
-            rgb[i * 3 + c] = _scale * rgb[i * 4 + c];
+            rgb[i * 3 + c] = scale * rgb[i * 4 + c];
         }
     }
     if (file_ext == ".exr") {
@@ -72,7 +72,8 @@ void ColorFilmInstance::save(Stream &stream, const std::filesystem::path &path) 
         if (ret != TINYEXR_SUCCESS) [[unlikely]] {
             LUISA_ERROR_WITH_LOCATION(
                 "Failure when writing image '{}'. "
-                "OpenEXR error: {}", path.string(), err);
+                "OpenEXR error: {}",
+                path.string(), err);
         }
     } else {
         LUISA_ERROR_WITH_LOCATION(
@@ -81,15 +82,19 @@ void ColorFilmInstance::save(Stream &stream, const std::filesystem::path &path) 
     }
 }
 
-void ColorFilmInstance::accumulate(Expr<uint2> pixel, Expr<float3> color) const noexcept {
-    auto fixed_color = ite(any(isnan(color)), 0.0f, color);
+void ColorFilmInstance::accumulate(Expr<uint2> pixel, Expr<float3> rgb_in) const noexcept {
+    auto rgb = ite(any(isnan(rgb_in)), 0.0f, rgb_in);
     auto old = _image.read(pixel);
     auto t = old.w + 1.0f;
-    _image.write(pixel, make_float4(lerp(old.xyz(), fixed_color, 1.0f / t), t));
+    _image.write(pixel, make_float4(lerp(old.xyz(), rgb, 1.0f / t), t));
 }
 
 void ColorFilmInstance::clear(CommandBuffer &command_buffer) noexcept {
     command_buffer << _clear_image(_image).dispatch(node()->resolution());
+}
+
+luisa::unique_ptr<Film::Instance> ColorFilm::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
+    return luisa::make_unique<ColorFilmInstance>(pipeline.device(), pipeline, this);
 }
 
 }// namespace luisa::render
