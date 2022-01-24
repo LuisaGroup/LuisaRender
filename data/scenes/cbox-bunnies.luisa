@@ -9,12 +9,12 @@ Camera camera_base {
     radius { 1 }
   }
   fov { 27.8 }
-  spp { 128 }
+  spp { 4096 }
 }
 
 Camera camera : Pinhole(@camera_base) {
   position { -0.01, 0.995, 5.0 }
-  file { "test.exr" }
+  file { "cbox-bunnies.exr" }
   shutter_span { 0, 0.1 }
 }
 

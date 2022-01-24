@@ -57,12 +57,12 @@ private:
         auto phi = atan2(wi_local.x, wi_local.z);
         auto u = -0.5f * inv_pi * phi;
         auto v = theta * inv_pi;
+        auto s = static_cast<const HDRIEnvironment *>(node())->scale();
         auto rsp = pipeline().tex2d(_image_id).sample(make_float2(u, v));
         RGBIlluminantSpectrum spec{
-            RGBSigmoidPolynomial{rsp.xyz()}, rsp.w,
+            RGBSigmoidPolynomial{rsp.xyz()}, rsp.w * s,
             DenselySampledSpectrum::cie_illum_d6500()};
-        auto env = static_cast<const HDRIEnvironment *>(node());
-        auto L = spec.sample(swl) * env->scale();
+        auto L = spec.sample(swl);
         return Light::Evaluation{.L = L, .pdf = uniform_sphere_pdf()};
     }
 
