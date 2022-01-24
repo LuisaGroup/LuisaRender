@@ -29,6 +29,11 @@ public:
                 "Loaded HDRI image '{}' in {} ms.",
                 file_path.string(), clock.toc());
             // TODO: compute sampling distribution...
+            for (auto i = 0u; i < image.resolution().x * image.resolution().y; i++) {
+                auto &p = reinterpret_cast<float4 *>(image.pixels())[i];
+                auto [rsp, scale] = RGB2SpectrumTable::srgb().decode_unbound(p.xyz());
+                p = make_float4(rsp, scale);
+            }
             return image;
         });
     }
@@ -52,10 +57,13 @@ private:
         auto phi = atan2(wi_local.x, wi_local.z);
         auto u = -0.5f * inv_pi * phi;
         auto v = theta * inv_pi;
-        auto emission = pipeline().tex2d(_image_id).sample(make_float2(u, v)).xyz();
+        auto rsp = pipeline().tex2d(_image_id).sample(make_float2(u, v));
+        RGBIlluminantSpectrum spec{
+            RGBSigmoidPolynomial{rsp.xyz()}, rsp.w,
+            DenselySampledSpectrum::cie_illum_d6500()};
         auto env = static_cast<const HDRIEnvironment *>(node());
-        auto spec = pipeline().srgb_illuminant_spectrum(emission * env->scale());
-        return Light::Evaluation{.L = spec.sample(swl), .pdf = uniform_sphere_pdf()};
+        auto L = spec.sample(swl) * env->scale();
+        return Light::Evaluation{.L = L, .pdf = uniform_sphere_pdf()};
     }
 
 public:

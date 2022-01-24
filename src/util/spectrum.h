@@ -51,10 +51,10 @@ class RGB2SpectrumTable {
 
 public:
     static constexpr auto resolution = 64u;
+    using scale_table_type = const float[resolution];
+    using coefficient_table_type = const float[3][resolution][resolution][resolution][4];
 
 private:
-    using scale_table_type = const float[resolution];
-    using coefficient_table_type = const float[3][resolution][resolution][resolution][3];
     const scale_table_type &_z_nodes;
     const coefficient_table_type &_coefficients;
 

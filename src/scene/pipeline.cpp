@@ -201,9 +201,9 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     pipeline->_filters.reserve(scene.cameras().size());
     auto command_buffer = stream.command_buffer();
     {
-        auto rgb2spec_t0 = pipeline->create<Volume<float>>(PixelStorage::FLOAT4, make_uint3(64u, 64u, 64u));
-        auto rgb2spec_t1 = pipeline->create<Volume<float>>(PixelStorage::FLOAT4, make_uint3(64u, 64u, 64u));
-        auto rgb2spec_t2 = pipeline->create<Volume<float>>(PixelStorage::FLOAT4, make_uint3(64u, 64u, 64u));
+        auto rgb2spec_t0 = pipeline->create<Volume<float>>(PixelStorage::FLOAT4, make_uint3(RGB2SpectrumTable::resolution));
+        auto rgb2spec_t1 = pipeline->create<Volume<float>>(PixelStorage::FLOAT4, make_uint3(RGB2SpectrumTable::resolution));
+        auto rgb2spec_t2 = pipeline->create<Volume<float>>(PixelStorage::FLOAT4, make_uint3(RGB2SpectrumTable::resolution));
         RGB2SpectrumTable::srgb().encode(
             command_buffer,
             rgb2spec_t0->view(0u),

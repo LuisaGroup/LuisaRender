@@ -181,9 +181,8 @@ Float3 SampledWavelengths::srgb(Expr<float4> values) const noexcept {
     return cie_xyz_to_linear_srgb(cie_xyz(values));
 }
 
-extern "C" const float sRGBToSpectrumTable_Scale[RGB2SpectrumTable::resolution];
-extern "C" const float sRGBToSpectrumTable_Data
-    [3][RGB2SpectrumTable::resolution][RGB2SpectrumTable::resolution][RGB2SpectrumTable::resolution][3];
+extern "C" RGB2SpectrumTable::scale_table_type sRGBToSpectrumTable_Scale;
+extern "C" RGB2SpectrumTable::coefficient_table_type sRGBToSpectrumTable_Data;
 
 RGB2SpectrumTable RGB2SpectrumTable::srgb() noexcept {
     return {sRGBToSpectrumTable_Scale, sRGBToSpectrumTable_Data};
@@ -217,7 +216,7 @@ float3 RGB2SpectrumTable::decode_albedo(float3 rgb_in) const noexcept {
 
     // Trilinearly interpolate sigmoid polynomial coefficients _c_
     auto c = make_float3();
-    for (auto i = 0u; i < 3u; ++i) {
+    for (auto i = 0u; i < 3u; i++) {
         // Define _co_ lambda for looking up sigmoid polynomial coefficients
         auto co = [=, this](int dx, int dy, int dz) noexcept {
             return _coefficients[maxc][zi + dz][yi + dy][xi + dx][i];
@@ -226,7 +225,7 @@ float3 RGB2SpectrumTable::decode_albedo(float3 rgb_in) const noexcept {
                          lerp(co(0, 1, 0), co(1, 1, 0), dx), dy),
                     lerp(lerp(co(0, 0, 1), co(1, 0, 1), dx),
                          lerp(co(0, 1, 1), co(1, 1, 1), dx), dy),
-                    z);
+                    dz);
     }
     return c;
 }
@@ -274,7 +273,7 @@ RGBSigmoidPolynomial RGB2SpectrumTable::decode_albedo(Expr<BindlessArray> array,
         auto dz = (z - z_nodes[zi]) / (z_nodes[zi + 1u] - z_nodes[zi]);
 
         // Trilinearly interpolate sigmoid polynomial coefficients _c_
-        auto coord = make_float3(x, y, cast<float>(zi) + dz);
+        auto coord = make_float3(cast<float>(zi) + dz, y, x);
         c = array.tex3d(base_index + maxc)
                 .sample(coord * (1.0f / resolution))
                 .xyz();
