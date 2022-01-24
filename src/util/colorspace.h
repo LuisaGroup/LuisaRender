@@ -13,13 +13,7 @@ using luisa::compute::Expr;
 using luisa::compute::Float3;
 using luisa::compute::Float4;
 
-class SampledWavelengths;
-
-[[nodiscard]] Float4 sample_cie_x(const SampledWavelengths &lambda) noexcept;
-[[nodiscard]] Float4 sample_cie_y(const SampledWavelengths &lambda) noexcept;
-[[nodiscard]] Float4 sample_cie_z(const SampledWavelengths &lambda) noexcept;
-
 // TODO: other colorspaces than sRGB
-[[nodiscard]] Float3 cie_xyz_to_rgb(Expr<float3> xyz) noexcept;
+[[nodiscard]] Float3 cie_xyz_to_linear_srgb(Expr<float3> xyz) noexcept;
 
 }

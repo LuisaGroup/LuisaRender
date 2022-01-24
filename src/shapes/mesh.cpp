@@ -32,8 +32,6 @@ public:
         std::scoped_lock lock{mutex};
         auto [iter, non_existent] = cache.try_emplace(hash);
         if (!non_existent) { return iter->second; }
-
-        LUISA_INFO("Loading mesh '{}'...", path.string());
         return iter->second = ThreadPool::global().async([path = std::move(path)] {
             Clock clock;
             auto path_string = path.string();

@@ -3,7 +3,11 @@ add_library(luisa-render-util SHARED
         frame.cpp frame.h
         imageio.cpp imageio.h
         xform.cpp xform.h
-        spectrum.cpp spectrum.h colorspace.cpp colorspace.h)
+        spectrum.cpp spectrum.h
+        spectrum_cie_xyz.inl.h
+        spectrum_cie_illum_d65.inl.h
+        colorspace.cpp colorspace.h
+        srgb2spec.cpp)
 target_link_libraries(luisa-render-util PUBLIC
         luisa::compute
         luisa-render-include

@@ -7,17 +7,22 @@
 #include <core/basic_types.h>
 #include <core/stl.h>
 #include <dsl/syntax.h>
-#include "colorspace.h"
+#include <runtime/command_buffer.h>
+#include <util/colorspace.h>
 
 namespace luisa::render {
 
 constexpr auto visible_wavelength_min = 360.0f;
 constexpr auto visible_wavelength_max = 830.0f;
 
-using compute::Expr;
+using compute::BindlessArray;
 using compute::Bool;
+using compute::CommandBuffer;
+using compute::Constant;
+using compute::Expr;
 using compute::Float;
 using compute::Float4;
+using compute::VolumeView;
 
 class RGBSigmoidPolynomial {
 
@@ -28,19 +33,40 @@ private:
 
 private:
     [[nodiscard]] static Float _s(Expr<float> x) noexcept;
+    [[nodiscard]] static Float4 _s(Expr<float4> x) noexcept;
 
 public:
     RGBSigmoidPolynomial() noexcept = default;
     RGBSigmoidPolynomial(Expr<float> c0, Expr<float> c1, Expr<float> c2) noexcept
         : _c0{c0}, _c1{c1}, _c2{c2} {}
+    explicit RGBSigmoidPolynomial(Expr<float3> c) noexcept
+        : RGBSigmoidPolynomial{c.x, c.y, c.z} {}
     [[nodiscard]] Float operator()(Expr<float> lambda) const noexcept;
+    [[nodiscard]] Float4 operator()(Expr<float4> lambda) const noexcept;
     [[nodiscard]] Float maximum() const noexcept;
 };
 
-class Spectrum {
+class RGB2SpectrumTable {
 
 public:
-    virtual ~Spectrum() noexcept = default;
+    static constexpr auto resolution = 64u;
+
+private:
+    using scale_table_type = const float[resolution];
+    using coefficient_table_type = const float[3][resolution][resolution][resolution][3];
+    const scale_table_type &_z_nodes;
+    const coefficient_table_type &_coefficients;
+
+public:
+    constexpr RGB2SpectrumTable(const scale_table_type &z_nodes, const coefficient_table_type &coefficients) noexcept
+        : _z_nodes{z_nodes}, _coefficients{coefficients} {}
+    constexpr RGB2SpectrumTable(RGB2SpectrumTable &&) noexcept = default;
+    constexpr RGB2SpectrumTable(const RGB2SpectrumTable &) noexcept = default;
+    [[nodiscard]] static RGB2SpectrumTable srgb() noexcept;
+    [[nodiscard]] float3 coefficients(float3 rgb) const noexcept;
+    void encode(CommandBuffer &command_buffer, VolumeView<float> t0, VolumeView<float> t1, VolumeView<float> t2) const noexcept;
+    [[nodiscard]] RGBSigmoidPolynomial decode(Expr<BindlessArray> array, Expr<uint> base_index, Expr<float3> rgb) const noexcept;
+    [[nodiscard]] RGBSigmoidPolynomial decode(const BindlessArray &array, Expr<uint> base_index, Expr<float3> rgb) const noexcept;
 };
 
 class SampledWavelengths {
@@ -67,10 +93,52 @@ public:
     [[nodiscard]] static SampledWavelengths sample_visible(Expr<float> u) noexcept;
     [[nodiscard]] auto lambda() const noexcept { return _lambda; }
     [[nodiscard]] auto pdf() const noexcept { return _pdf; }
+    [[nodiscard]] Float cie_y(Expr<float4> values) const noexcept;
+    [[nodiscard]] Float3 cie_xyz(Expr<float4> values) const noexcept;
+    [[nodiscard]] Float3 srgb(Expr<float4> values) const noexcept;
 };
 
-[[nodiscard]] Float sampled_spectrum_to_y(const SampledWavelengths &lambda, Expr<float4> values) noexcept;
-[[nodiscard]] Float3 sampled_spectrum_to_xyz(const SampledWavelengths &lambda, Expr<float4> values) noexcept;
-[[nodiscard]] Float3 sampled_spectrum_to_rgb(const SampledWavelengths &lambda, Expr<float4> values) noexcept;
+class DenselySampledSpectrum {
 
-}
+public:
+    static constexpr auto sample_count =
+        static_cast<uint>(visible_wavelength_max - visible_wavelength_min) + 1u;
+
+private:
+    Constant<float> _values;
+
+private:
+    explicit DenselySampledSpectrum(luisa::span<const float, sample_count> values) noexcept
+        : _values{values} {}
+
+public:
+    [[nodiscard]] static const DenselySampledSpectrum &cie_x() noexcept;
+    [[nodiscard]] static const DenselySampledSpectrum &cie_y() noexcept;
+    [[nodiscard]] static const DenselySampledSpectrum &cie_z() noexcept;
+    [[nodiscard]] static const DenselySampledSpectrum &cie_illum_d6500() noexcept;
+    [[nodiscard]] Float4 sample(const SampledWavelengths &swl) const noexcept;
+};
+
+class RGBAlbedoSpectrum {
+
+private:
+    RGBSigmoidPolynomial _rsp;
+
+public:
+    explicit RGBAlbedoSpectrum(RGBSigmoidPolynomial rsp) noexcept
+        : _rsp{std::move(rsp)} {}
+    [[nodiscard]] auto sample(const SampledWavelengths &swl) const noexcept {
+        return _rsp(swl.lambda());
+    }
+};
+
+class RGBUnboundedSpectrum {
+
+private:
+    RGBAlbedoSpectrum _albedo;
+    Float _scale;
+
+public:
+};
+
+}// namespace luisa::render
