@@ -25,4 +25,3 @@ render {
   shapes { @cbox, @cbox-light }
   integrator { @pt }
 }
-
