@@ -8,7 +8,7 @@ Camera camera : Pinhole {
   fov { 60 }
   spp { 16384 }
   film { @film }
-  file { "envmap-curve.exr" }
+  file { "envmap-curve-spectral.exr" }
   shutter_span { 0, 1 }
   shutter_samples { 128 }
   shutter_weights { 0, 0.2, 0.5, 3.5, 0.5, 0.2, 0 }

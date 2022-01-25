@@ -187,8 +187,8 @@ void MegakernelPathTracingInstance::_render_one_camera(
 
             // rr
             $if(all(beta <= 0.0f)) { $break; };
-            auto q = swl.cie_y(beta);
             $if(depth >= rr_depth - 1u) {
+                auto q = min(swl.cie_y(beta), rr_threshold);
                 $if(sampler->generate_1d() >= q) { $break; };
                 beta *= 1.0f / q;
             };

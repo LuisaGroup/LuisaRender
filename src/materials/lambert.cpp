@@ -72,9 +72,9 @@ private:
     Bool _front_face;
 
 public:
-    LambertClosure(const Interaction &it, Expr<float3> color_rsp, const SampledWavelengths &swl) noexcept
+    LambertClosure(const Interaction &it, Expr<float4> albedo) noexcept
         : _interaction{it},
-          _f{RGBAlbedoSpectrum{RGBSigmoidPolynomial{color_rsp}}.sample(swl) * inv_pi},
+          _f{albedo * inv_pi},
           _cos_wo{dot(it.wo(), it.shading().n())},
           _front_face{_cos_wo > 0.0f} {}
 
@@ -101,11 +101,14 @@ luisa::unique_ptr<Material::Closure> LambertMaterial::decode(
     const Pipeline &pipeline, const Interaction &it,
     const SampledWavelengths &swl, Expr<float>) const noexcept {
     auto params = pipeline.buffer<LambertParams>(it.shape()->material_buffer_id()).read(0u);
-    auto color_rsp = def<float3>(params.color_rsp);
-    //    $if(params.color_texture_id != ~0u) {
-    //        color = pipeline.tex2d(params.color_texture_id).sample(it.uv());
-    //    };
-    return luisa::make_unique<LambertClosure>(it, std::move(color_rsp), swl);
+    RGBAlbedoSpectrum spec{RGBSigmoidPolynomial{def<float3>(params.color_rsp)}};
+    auto albedo = spec.sample(swl);
+    $if(params.color_texture_id != ~0u) {
+        auto color = pipeline.tex2d(params.color_texture_id).sample(it.uv());
+        auto spec = pipeline.srgb_albedo_spectrum(color.xyz());
+        albedo = spec.sample(swl);
+    };
+    return luisa::make_unique<LambertClosure>(it, std::move(albedo));
 }
 
 }// namespace luisa::render

@@ -348,7 +348,7 @@ luisa::unique_ptr<Interaction> Pipeline::interaction(const Var<Ray> &ray, const 
 
 luisa::unique_ptr<Material::Closure> Pipeline::decode_material(
     uint tag, const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    if (tag > _material_interfaces.size()) [[unlikely]] {
+    if (tag >= _material_interfaces.size()) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION("Invalid material tag: {}.", tag);
     }
     return _material_interfaces[tag]->decode(*this, it, swl, time);
@@ -357,16 +357,20 @@ luisa::unique_ptr<Material::Closure> Pipeline::decode_material(
 void Pipeline::decode_material(
     Expr<uint> tag, const Interaction &it, const SampledWavelengths &swl, Expr<float> time,
     const luisa::function<void(const Material::Closure &)> &func) const noexcept {
-    $switch(tag) {
-        for (auto i = 0u; i < _material_interfaces.size(); i++) {
-            $case(i) { func(*decode_material(i, it, swl, time)); };
-        }
-    };
+    if (auto n = _material_interfaces.size(); n == 1u) {
+        func(*decode_material(0u, it, swl, time));
+    } else {
+        $switch(tag) {
+            for (auto i = 0u; i < n; i++) {
+                $case(i) { func(*decode_material(i, it, swl, time)); };
+            }
+        };
+    }
 }
 
 luisa::unique_ptr<Light::Closure> Pipeline::decode_light(
     uint tag, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    if (tag > _light_interfaces.size()) [[unlikely]] {
+    if (tag >= _light_interfaces.size()) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION("Invalid light tag: {}.", tag);
     }
     return _light_interfaces[tag]->decode(*this, swl, time);
@@ -375,11 +379,15 @@ luisa::unique_ptr<Light::Closure> Pipeline::decode_light(
 void Pipeline::decode_light(
     Expr<uint> tag, const SampledWavelengths &swl, Expr<float> time,
     const function<void(const Light::Closure &)> &func) const noexcept {
-    $switch(tag) {
-        for (auto i = 0u; i < _light_interfaces.size(); i++) {
-            $case(i) { func(*decode_light(i, swl, time)); };
-        }
-    };
+    if (auto n = _light_interfaces.size(); n == 1u) {
+        func(*decode_light(0u, swl, time));
+    } else {
+        $switch(tag) {
+            for (auto i = 0u; i < n; i++) {
+                $case(i) { func(*decode_light(i, swl, time)); };
+            }
+        };
+    }
 }
 
 RGBAlbedoSpectrum Pipeline::srgb_albedo_spectrum(Expr<float3> rgb) const noexcept {
