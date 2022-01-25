@@ -13,7 +13,8 @@ set(LUISA_RENDER_SCENE_SOURCES
         light.cpp light.h
         pipeline.cpp pipeline.h
         interaction.h
-        light_sampler.cpp light_sampler.h)
+        light_sampler.cpp light_sampler.h
+        texture.cpp texture.h)
 
 add_library(luisa-render-scene SHARED ${LUISA_RENDER_SCENE_SOURCES})
 target_link_libraries(luisa-render-scene PUBLIC
