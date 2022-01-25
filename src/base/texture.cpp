@@ -3,6 +3,7 @@
 //
 
 #include <base/texture.h>
+#include <base/pipeline.h>
 
 namespace luisa::render {
 
@@ -52,7 +53,7 @@ TextureHandle render::TextureHandle::encode_rsp_scale_texture(uint tex_id) noexc
 }
 
 TextureHandle TextureHandle::encode_custom(uint custom_tag, float3 custom_float3, uint custom_id) noexcept {
-    if (custom_tag >= (1u << texture_id_offset_shift)) [[unlikely]] {
+    if (custom_tag < tag_custom_begin || custom_tag > tag_mask) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
             "Invalid custom tag for texture handle: {}.",
             custom_tag);
@@ -69,5 +70,21 @@ TextureHandle TextureHandle::encode_custom(uint custom_tag, float3 custom_float3
 
 Texture::Texture(Scene *scene, const SceneNodeDesc *desc) noexcept
     : SceneNode{scene, desc, SceneNodeTag::TEXTURE} {}
+
+uint Texture::handle_tag() const noexcept {
+    static std::mutex mutex;
+    static luisa::unordered_map<luisa::string, uint, Hash64> impl_to_tag;
+    std::scoped_lock lock{mutex};
+    auto [iter, _] = impl_to_tag.try_emplace(
+        luisa::string{impl_type()},
+        static_cast<uint>(impl_to_tag.size() + TextureHandle::tag_custom_begin));
+    return iter->second;
+}
+
+TextureHandle Texture::encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint instance_id, const Shape *shape) const noexcept {
+    auto handle = _encode(pipeline, command_buffer, instance_id, shape);
+    pipeline.register_texture(this);
+    return handle;
+}
 
 }// namespace luisa::render

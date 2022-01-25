@@ -364,6 +364,7 @@ void Pipeline::decode_material(
             for (auto i = 0u; i < n; i++) {
                 $case(i) { func(*decode_material(i, it, swl, time)); };
             }
+            $default { luisa::compute::unreachable(); };
         };
     }
 }
@@ -386,6 +387,7 @@ void Pipeline::decode_light(
             for (auto i = 0u; i < n; i++) {
                 $case(i) { func(*decode_light(i, swl, time)); };
             }
+            $default { luisa::compute::unreachable(); };
         };
     }
 }
@@ -406,6 +408,39 @@ RGBIlluminantSpectrum Pipeline::srgb_illuminant_spectrum(Expr<float3> rgb) const
     auto [rsp, scale] = RGB2SpectrumTable::srgb().decode_unbound(
         Expr{_bindless_array}, _rgb2spec_index, rgb);
     return {std::move(rsp), std::move(scale), DenselySampledSpectrum::cie_illum_d6500()};
+}
+
+Float4 Pipeline::evaluate_texture(
+    const Var<TextureHandle> &handle, const Interaction &it,
+    const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    // short path: only one texture type
+    if (std::count_if(
+            _texture_interfaces.cbegin(), _texture_interfaces.cend(),
+            [](auto p) noexcept { return p != nullptr; }) == 1u) {
+        for (auto t : _texture_interfaces) {
+            if (t != nullptr) {
+                return t->evaluate(*this, it, handle, swl, time);
+            }
+        }
+    }
+    // dynamic dispatch
+    using namespace luisa::compute;
+    auto value = def(make_float4());
+    $switch(handle->tag()) {
+        for (auto i = 0u; i < _texture_interfaces.size(); i++) {
+            if (auto t = _texture_interfaces[i]; t != nullptr) {
+                $case(i) {
+                    value = t->evaluate(*this, it, handle, swl, time);
+                };
+            }
+        }
+        $default { unreachable(); };
+    };
+    return value;
+}
+
+void Pipeline::register_texture(const Texture *texture) noexcept {
+    _texture_interfaces[texture->handle_tag()] = texture;
 }
 
 }// namespace luisa::render

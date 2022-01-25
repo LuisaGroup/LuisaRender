@@ -11,18 +11,20 @@ namespace luisa::render {
 
 struct TextureHandle {
 
-    static constexpr auto tag_rsp_constant = 0u;      // Constant: RGB polynomial sigmoid
-    static constexpr auto tag_rsp_scale_constant = 1u;// Constant: RGB polynomial sigmoid + scale
-    static constexpr auto tag_srgb_texture = 2u;      // Texture: sRGB encoding
-    static constexpr auto tag_gamma_texture = 3u;     // Texture: gamma encoding
-    static constexpr auto tag_linear_texture = 4u;    // Texture: linear encoding
-    static constexpr auto tag_rsp_texture = 5u;       // Texture: RGB polynomial sigmoid
-    static constexpr auto tag_rsp_scale_texture = 6u; // Texture: RGB polynomial sigmoid + scale
-
     static constexpr auto texture_id_offset_shift = 6u;
-    static constexpr auto encoding_tag_mask = (1 << texture_id_offset_shift) - 1u;
+    static constexpr auto tag_mask = (1 << texture_id_offset_shift) - 1u;
     static constexpr auto fixed_point_scale_max = 4096.0f;
     static constexpr auto fixed_point_scale_multiplier = 16384.0f;
+
+    static constexpr auto tag_rsp_constant = 0u;      // [Built-in] Constant: RGB polynomial sigmoid
+    static constexpr auto tag_rsp_scale_constant = 1u;// [Built-in] Constant: RGB polynomial sigmoid + scale
+    static constexpr auto tag_srgb_texture = 2u;      // [Built-in] Texture: sRGB encoding
+    static constexpr auto tag_gamma_texture = 3u;     // [Built-in] Texture: gamma encoding
+    static constexpr auto tag_linear_texture = 4u;    // [Built-in] Texture: linear encoding
+    static constexpr auto tag_rsp_texture = 5u;       // [Built-in] Texture: RGB polynomial sigmoid
+    static constexpr auto tag_rsp_scale_texture = 6u; // [Built-in] Texture: RGB polynomial sigmoid + scale
+    static constexpr auto tag_custom_begin = 7u;      // [Custom]
+    static constexpr auto tag_max_count = 1u << texture_id_offset_shift;
 
     float compressed_rsp[3];
     uint texture_or_scale;
@@ -45,7 +47,7 @@ LUISA_STRUCT(luisa::render::TextureHandle, compressed_rsp, texture_or_scale) {
         return luisa::compute::def<luisa::float3>(compressed_rsp);
     }
     [[nodiscard]] auto tag() const noexcept {
-        return texture_or_scale & luisa::render::TextureHandle::encoding_tag_mask;
+        return texture_or_scale & luisa::render::TextureHandle::tag_mask;
     }
     [[nodiscard]] auto scale() const noexcept {
         using luisa::compute::cast;
@@ -64,11 +66,29 @@ LUISA_STRUCT(luisa::render::TextureHandle, compressed_rsp, texture_or_scale) {
 
 namespace luisa::render {
 
+class Shape;
+class Interaction;
+class SampledWavelengths;
+using compute::Float4;
+
 class Texture : public SceneNode {
+
+private:
+    [[nodiscard]] virtual TextureHandle _encode(
+        Pipeline &pipeline, CommandBuffer &command_buffer,
+        uint instance_id, const Shape *shape) const noexcept = 0;
 
 public:
     Texture(Scene *scene, const SceneNodeDesc *desc) noexcept;
-
+    [[nodiscard]] virtual bool is_custom() const noexcept = 0;
+    [[nodiscard]] virtual uint handle_tag() const noexcept;
+    [[nodiscard]] TextureHandle encode(
+        Pipeline &pipeline, CommandBuffer &command_buffer,
+        uint instance_id, const Shape *shape) const noexcept;
+    [[nodiscard]] virtual Float4 evaluate(
+        const Pipeline &pipeline, const Interaction &it,
+        const Var<TextureHandle> &handle,
+        const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
 };
 
-}
+}// namespace luisa::render

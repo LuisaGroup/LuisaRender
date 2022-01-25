@@ -19,6 +19,7 @@
 #include <base/interaction.h>
 #include <base/light_sampler.h>
 #include <base/environment.h>
+#include <base/texture.h>
 
 namespace luisa::render {
 
@@ -98,6 +99,7 @@ private:
     luisa::unordered_map<luisa::string /* impl type */, uint /* tag */, Hash64> _light_tags;
     luisa::unordered_map<const Material *, MaterialData> _materials;
     luisa::unordered_map<const Light *, LightData> _lights;
+    std::array<const Texture *, TextureHandle::tag_max_count> _texture_interfaces{};
     luisa::vector<InstancedShape> _instances;
     luisa::vector<InstancedTransform> _dynamic_transforms;
     Buffer<InstancedShape> _instance_buffer;
@@ -156,6 +158,8 @@ public:
         return static_cast<uint>(tex3d_id);
     }
 
+    void register_texture(const Texture *texture) noexcept;
+
     template<typename T, typename... Args>
         requires std::is_base_of_v<Resource, T>
     [[nodiscard]] auto create(Args &&...args) noexcept -> T * {
@@ -199,6 +203,7 @@ public:
     [[nodiscard]] auto environment() const noexcept { return _environment.get(); }
     [[nodiscard]] auto light_sampler() const noexcept { return _light_sampler.get(); }
     [[nodiscard]] auto mean_time() const noexcept { return _mean_time; }
+
     bool update_geometry(CommandBuffer &command_buffer, float time) noexcept;
     void render(Stream &stream) noexcept;
 
@@ -222,16 +227,23 @@ public:
                       const Var<Triangle> &triangle, const Var<float3> &uvw) const noexcept;
     [[nodiscard]] auto intersect(const Var<Ray> &ray) const noexcept { return interaction(ray, trace_closest(ray)); }
     [[nodiscard]] auto intersect_any(const Var<Ray> &ray) const noexcept { return trace_any(ray); }
+
+    [[nodiscard]] Float4 evaluate_texture(
+        const Var<TextureHandle> &handle, const Interaction &it,
+        const SampledWavelengths &swl, Expr<float> time) const noexcept;
+
     [[nodiscard]] luisa::unique_ptr<Material::Closure> decode_material(
         uint tag, const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept;
     void decode_material(
         Expr<uint> tag, const Interaction &it, const SampledWavelengths &swl, Expr<float> time,
         const luisa::function<void(const Material::Closure &)> &func) const noexcept;
+
     [[nodiscard]] luisa::unique_ptr<Light::Closure> decode_light(
         uint tag, const SampledWavelengths &swl, Expr<float> time) const noexcept;
     void decode_light(
         Expr<uint> tag, const SampledWavelengths &swl, Expr<float> time,
         const luisa::function<void(const Light::Closure &)> &func) const noexcept;
+
     [[nodiscard]] RGBAlbedoSpectrum srgb_albedo_spectrum(Expr<float3> rgb) const noexcept;
     [[nodiscard]] RGBUnboundSpectrum srgb_unbound_spectrum(Expr<float3> rgb) const noexcept;
     [[nodiscard]] RGBIlluminantSpectrum srgb_illuminant_spectrum(Expr<float3> rgb) const noexcept;

@@ -68,6 +68,7 @@ public:
     [[nodiscard]] Transform *load_transform(const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] LightSampler *load_light_sampler(const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] Environment *load_environment(const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] Texture *load_texture(const SceneNodeDesc *desc) noexcept;
 
 public:
     [[nodiscard]] static luisa::unique_ptr<Scene> create(const Context &ctx, const SceneDesc *desc) noexcept;

@@ -5,6 +5,8 @@
 #include <mutex>
 
 #include <core/thread_pool.h>
+#include <sdl/scene_desc.h>
+#include <sdl/scene_node_desc.h>
 #include <base/camera.h>
 #include <base/film.h>
 #include <base/filter.h>
@@ -16,8 +18,7 @@
 #include <base/transform.h>
 #include <base/environment.h>
 #include <base/light_sampler.h>
-#include <sdl/scene_desc.h>
-#include <sdl/scene_node_desc.h>
+#include <base/texture.h>
 #include <base/scene.h>
 
 namespace luisa::render {
@@ -164,6 +165,10 @@ LightSampler *Scene::load_light_sampler(const SceneNodeDesc *desc) noexcept {
 
 Environment *Scene::load_environment(const SceneNodeDesc *desc) noexcept {
     return dynamic_cast<Environment *>(load_node(SceneNodeTag::ENVIRONMENT, desc));
+}
+
+Texture *Scene::load_texture(const SceneNodeDesc *desc) noexcept {
+    return dynamic_cast<Texture *>(load_node(SceneNodeTag::TEXTURE, desc));
 }
 
 luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc) noexcept {
