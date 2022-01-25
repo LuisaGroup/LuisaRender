@@ -55,12 +55,13 @@ private:
     [[nodiscard]] auto _evaluate(Expr<float3> wi_local, const SampledWavelengths &swl) const noexcept {
         auto theta = acos(wi_local.y);
         auto phi = atan2(wi_local.x, wi_local.z);
-        auto u = -0.5f * inv_pi * phi;
-        auto v = theta * inv_pi;
-        auto s = static_cast<const HDRIEnvironment *>(node())->scale();
+        auto env = static_cast<const HDRIEnvironment *>(node());
+        auto resolution = make_float2(env->image().resolution());
+        auto u = -0.5f * inv_pi * phi - 0.5f / resolution.x;
+        auto v = theta * inv_pi + 0.5f / resolution.y;
         auto rsp = pipeline().tex2d(_image_id).sample(make_float2(u, v));
         RGBIlluminantSpectrum spec{
-            RGBSigmoidPolynomial{rsp.xyz()}, rsp.w * s,
+            RGBSigmoidPolynomial{rsp.xyz()}, rsp.w * env->scale(),
             DenselySampledSpectrum::cie_illum_d6500()};
         auto L = spec.sample(swl);
         return Light::Evaluation{.L = L, .pdf = uniform_sphere_pdf()};

@@ -189,11 +189,10 @@ RGB2SpectrumTable RGB2SpectrumTable::srgb() noexcept {
 }
 
 void RGB2SpectrumTable::encode(CommandBuffer &command_buffer, VolumeView<float> t0, VolumeView<float> t1, VolumeView<float> t2) const noexcept {
-    // FIXME: might be some error in texture uploading...
-    //    command_buffer << t0.copy_from(_coefficients[0])
-    //                   << t1.copy_from(_coefficients[1])
-    //                   << t2.copy_from(_coefficients[2])
-    //                   << luisa::compute::commit();
+    command_buffer << t0.copy_from(_coefficients[0])
+                   << t1.copy_from(_coefficients[1])
+                   << t2.copy_from(_coefficients[2])
+                   << luisa::compute::commit();
 }
 
 // from PBRT-v4: https://github.com/mmp/pbrt-v4/blob/master/src/pbrt/util/color.cpp
@@ -275,7 +274,7 @@ RGBSigmoidPolynomial RGB2SpectrumTable::decode_albedo(Expr<BindlessArray> array,
         auto dz = (z - z_nodes[zi]) / (z_nodes[zi + 1u] - z_nodes[zi]);
 
         // Trilinearly interpolate sigmoid polynomial coefficients _c_
-        auto coord = make_float3(cast<float>(zi) + dz, y, x) + 0.5f;
+        auto coord = make_float3(x, y, cast<float>(zi) + dz) + 0.5f;
         c = array.tex3d(base_index + maxc)
                 .sample(coord * (1.0f / resolution))
                 .xyz();
