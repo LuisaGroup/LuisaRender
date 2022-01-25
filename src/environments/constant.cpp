@@ -4,8 +4,8 @@
 
 #include <luisa-compute.h>
 #include <util/sampling.h>
-#include <scene/interaction.h>
-#include <scene/environment.h>
+#include <base/interaction.h>
+#include <base/environment.h>
 
 namespace luisa::render {
 

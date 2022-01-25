@@ -21,7 +21,8 @@ enum struct SceneNodeTag : uint32_t {
     SAMPLER,
     INTEGRATOR,
     LIGHT_SAMPLER,
-    ENVIRONMENT
+    ENVIRONMENT,
+    TEXTURE
     // TODO: MEDIUM?
 };
 
@@ -42,6 +43,7 @@ constexpr std::string_view scene_node_tag_description(SceneNodeTag tag) noexcept
         case SceneNodeTag::INTEGRATOR: return "Integrator"sv;
         case SceneNodeTag::LIGHT_SAMPLER: return "LightSampler"sv;
         case SceneNodeTag::ENVIRONMENT: return "Environment"sv;
+        case SceneNodeTag::TEXTURE: return "Texture"sv;
         default: break;
     }
     return "__invalid__"sv;

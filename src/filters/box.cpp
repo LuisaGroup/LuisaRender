@@ -3,7 +3,7 @@
 //
 
 #include <luisa-compute.h>
-#include <scene/filter.h>
+#include <base/filter.h>
 
 namespace luisa::render {
 

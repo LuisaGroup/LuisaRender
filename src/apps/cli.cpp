@@ -8,8 +8,8 @@
 
 #include <sdl/scene_desc.h>
 #include <sdl/scene_parser.h>
-#include <scene/scene.h>
-#include <scene/pipeline.h>
+#include <base/scene.h>
+#include <base/pipeline.h>
 
 [[nodiscard]] auto parse_cli_options(int argc, const char *const *argv) noexcept {
     cxxopts::Options cli{"megakernel_path_tracing"};

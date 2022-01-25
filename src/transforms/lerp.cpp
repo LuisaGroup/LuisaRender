@@ -3,8 +3,8 @@
 //
 
 #include <util/xform.h>
-#include <scene/transform.h>
-#include <scene/scene.h>
+#include <base/transform.h>
+#include <base/scene.h>
 
 namespace luisa::render {
 

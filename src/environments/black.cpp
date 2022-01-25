@@ -2,7 +2,7 @@
 // Created by Mike Smith on 2022/1/14.
 //
 
-#include <scene/environment.h>
+#include <base/environment.h>
 
 namespace luisa::render {
 

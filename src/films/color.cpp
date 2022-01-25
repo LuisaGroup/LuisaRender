@@ -5,8 +5,8 @@
 #include <tinyexr.h>
 
 #include <luisa-compute.h>
-#include <scene/film.h>
-#include <scene/pipeline.h>
+#include <base/film.h>
+#include <base/pipeline.h>
 
 namespace luisa::render {
 

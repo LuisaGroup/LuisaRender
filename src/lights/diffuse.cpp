@@ -3,10 +3,10 @@
 //
 
 #include <luisa-compute.h>
-#include <scene/light.h>
-#include <scene/interaction.h>
+#include <base/light.h>
+#include <base/interaction.h>
 #include <util/sampling.h>
-#include <scene/pipeline.h>
+#include <base/pipeline.h>
 
 namespace luisa::render {
 

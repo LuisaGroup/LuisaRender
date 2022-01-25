@@ -7,7 +7,7 @@
 #include <assimp/scene.h>
 
 #include <core/thread_pool.h>
-#include <scene/shape.h>
+#include <base/shape.h>
 
 namespace luisa::render {
 

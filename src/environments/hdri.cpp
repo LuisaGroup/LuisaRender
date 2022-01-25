@@ -5,9 +5,9 @@
 #include <luisa-compute.h>
 #include <util/sampling.h>
 #include <util/imageio.h>
-#include <scene/interaction.h>
-#include <scene/environment.h>
-#include <scene/pipeline.h>
+#include <base/interaction.h>
+#include <base/environment.h>
+#include <base/pipeline.h>
 
 namespace luisa::render {
 

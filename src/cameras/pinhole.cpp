@@ -3,8 +3,8 @@
 //
 
 #include <rtx/ray.h>
-#include <scene/camera.h>
-#include <scene/film.h>
+#include <base/camera.h>
+#include <base/film.h>
 
 namespace luisa::render {
 

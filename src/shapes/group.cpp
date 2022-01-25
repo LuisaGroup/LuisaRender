@@ -3,8 +3,8 @@
 //
 
 #include <luisa-compute.h>
-#include <scene/shape.h>
-#include <scene/scene.h>
+#include <base/shape.h>
+#include <base/scene.h>
 
 namespace luisa::render {
 

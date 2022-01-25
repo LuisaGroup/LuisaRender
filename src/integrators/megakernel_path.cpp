@@ -3,8 +3,8 @@
 //
 
 #include <luisa-compute.h>
-#include <scene/pipeline.h>
-#include <scene/integrator.h>
+#include <base/pipeline.h>
+#include <base/integrator.h>
 
 namespace luisa::render {
 

@@ -3,9 +3,9 @@
 //
 
 #include <luisa-compute.h>
-#include <scene/material.h>
-#include <scene/interaction.h>
-#include <scene/pipeline.h>
+#include <base/material.h>
+#include <base/interaction.h>
+#include <base/pipeline.h>
 
 namespace luisa::render {
 struct FakeMirrorParams {

@@ -3,8 +3,8 @@
 //
 
 #include <luisa-compute.h>
-#include <scene/light_sampler.h>
-#include <scene/pipeline.h>
+#include <base/light_sampler.h>
+#include <base/pipeline.h>
 
 namespace luisa::render {
 

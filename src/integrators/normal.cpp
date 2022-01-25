@@ -2,8 +2,8 @@
 // Created by Mike on 2022/1/7.
 //
 
-#include <scene/pipeline.h>
-#include <scene/integrator.h>
+#include <base/pipeline.h>
+#include <base/integrator.h>
 
 namespace luisa::render {
 
