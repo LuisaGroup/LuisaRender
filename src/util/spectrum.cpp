@@ -188,6 +188,14 @@ RGB2SpectrumTable RGB2SpectrumTable::srgb() noexcept {
     return {sRGBToSpectrumTable_Scale, sRGBToSpectrumTable_Data};
 }
 
+void RGB2SpectrumTable::encode(CommandBuffer &command_buffer, VolumeView<float> t0, VolumeView<float> t1, VolumeView<float> t2) const noexcept {
+    // FIXME: might be some error in texture uploading...
+    //    command_buffer << t0.copy_from(_coefficients[0])
+    //                   << t1.copy_from(_coefficients[1])
+    //                   << t2.copy_from(_coefficients[2])
+    //                   << luisa::compute::commit();
+}
+
 // from PBRT-v4: https://github.com/mmp/pbrt-v4/blob/master/src/pbrt/util/color.cpp
 float3 RGB2SpectrumTable::decode_albedo(float3 rgb_in) const noexcept {
     auto rgb = clamp(rgb_in, 0.0f, 1.0f);
@@ -230,13 +238,7 @@ float3 RGB2SpectrumTable::decode_albedo(float3 rgb_in) const noexcept {
     return c;
 }
 
-void RGB2SpectrumTable::encode(CommandBuffer &command_buffer, VolumeView<float> t0, VolumeView<float> t1, VolumeView<float> t2) const noexcept {
-    command_buffer << t0.copy_from(_coefficients[0])
-                   << t1.copy_from(_coefficients[1])
-                   << t2.copy_from(_coefficients[2])
-                   << luisa::compute::commit();
-}
-
+// FIXME: producing monochrome images...
 RGBSigmoidPolynomial RGB2SpectrumTable::decode_albedo(Expr<BindlessArray> array, Expr<uint> base_index, Expr<float3> rgb_in) const noexcept {
     using namespace luisa::compute;
     auto rgb = clamp(rgb_in, 0.0f, 1.0f);
@@ -273,7 +275,7 @@ RGBSigmoidPolynomial RGB2SpectrumTable::decode_albedo(Expr<BindlessArray> array,
         auto dz = (z - z_nodes[zi]) / (z_nodes[zi + 1u] - z_nodes[zi]);
 
         // Trilinearly interpolate sigmoid polynomial coefficients _c_
-        auto coord = make_float3(cast<float>(zi) + dz, y, x);
+        auto coord = make_float3(cast<float>(zi) + dz, y, x) + 0.5f;
         c = array.tex3d(base_index + maxc)
                 .sample(coord * (1.0f / resolution))
                 .xyz();

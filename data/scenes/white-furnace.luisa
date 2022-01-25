@@ -16,7 +16,7 @@ Integrator normal : Normal {
 }
 
 Integrator pt : MegaPath {
-  depth { 2 }
+  depth { 16 }
 }
 
 Shape teapot : Mesh {
@@ -40,7 +40,7 @@ Shape sphere : Mesh {
 
 render {
   cameras { @camera }
-  shapes { @sphere }
+  shapes { @teapot }
   integrator { @pt }
   environment : Constant {
     emission { 1 }

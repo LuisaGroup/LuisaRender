@@ -10,8 +10,7 @@ Camera camera : Pinhole {
   film { @film }
   file { "cbox.exr" }
   filter : Gaussian {
-    radius { 5 }
-    sigma { 2 }
+    radius { 1 }
   }
 }
 

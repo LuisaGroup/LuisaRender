@@ -6,12 +6,11 @@
 
 namespace luisa::render {
 
-// from Wikipedia: https://en.wikipedia.org/wiki/SRGB#The_sRGB_transfer_function_.28.22gamma.22.29
 Float3 cie_xyz_to_linear_srgb(Expr<float3> xyz) noexcept {
-    auto m = make_float3x3(
-        +3.2406255f, -0.9689307f, +0.0557101f,
-        -1.5372080f, +1.8757561f, -0.2040211f,
-        -0.4986286f, +0.0415175f, +1.0569959f);
+    constexpr auto m = make_float3x3(
+        +3.240479f, -0.969256f, +0.055648f,
+        -1.537150f, +1.875991f, -0.204043f,
+        -0.498535f, +0.041556f, +1.057311f);
     return m * xyz;
 }
 
