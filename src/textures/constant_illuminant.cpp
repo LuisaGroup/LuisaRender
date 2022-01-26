@@ -33,7 +33,6 @@ public:
         std::tie(_rsp, _scale) = RGB2SpectrumTable::srgb().decode_unbound(
             max(color, 0.0f) * max(scale, 0.0f));
     }
-    [[nodiscard]] bool is_black() const noexcept override { return _scale == 0.0f; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "constillum"; }
     [[nodiscard]] Float4 evaluate(
         const Pipeline &, const Interaction &, const Var<TextureHandle> &handle,
@@ -46,6 +45,7 @@ public:
     [[nodiscard]] bool is_color() const noexcept override { return false; }
     [[nodiscard]] bool is_general() const noexcept override { return false; }
     [[nodiscard]] bool is_illuminant() const noexcept override { return true; }
+    [[nodiscard]] bool is_black() const noexcept override { return _scale == 0.0f; }
 };
 
 }// namespace luisa::render

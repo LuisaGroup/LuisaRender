@@ -240,32 +240,36 @@ float3 RGB2SpectrumTable::decode_albedo(float3 rgb_in) const noexcept {
 // FIXME: producing monochrome images...
 RGBSigmoidPolynomial RGB2SpectrumTable::decode_albedo(Expr<BindlessArray> array, Expr<uint> base_index, Expr<float3> rgb_in) const noexcept {
     using namespace luisa::compute;
-    auto rgb = clamp(rgb_in, 0.0f, 1.0f);
-    auto c = make_float3(
-        0.0f, 0.0f, (rgb[0] - 0.5f) / sqrt(rgb[0] * (1.0f - rgb[0])));
-    $if(rgb[0] != rgb[1] | rgb[1] != rgb[2]) {
-        // Find maximum component and compute remapped component values
-        auto maxc = ite(
-            rgb[0] > rgb[1],
-            ite(rgb[0] > rgb[2], 0u, 2u),
-            ite(rgb[1] > rgb[2], 1u, 2u));
-        auto z = rgb[maxc];
-        auto x = rgb[(maxc + 1u) % 3u] * (resolution - 1u) / z;
-        auto y = rgb[(maxc + 2u) % 3u] * (resolution - 1u) / z;
+    static Callable decode = [](BindlessVar array, UInt base_index, Float3 rgb_in) noexcept {
+        auto rgb = clamp(rgb_in, 0.0f, 1.0f);
+        auto c = make_float3(
+            0.0f, 0.0f, (rgb[0] - 0.5f) / sqrt(rgb[0] * (1.0f - rgb[0])));
+        $if(rgb[0] != rgb[1] | rgb[1] != rgb[2]) {
+            // Find maximum component and compute remapped component values
+            auto maxc = ite(
+                rgb[0] > rgb[1],
+                ite(rgb[0] > rgb[2], 0u, 2u),
+                ite(rgb[1] > rgb[2], 1u, 2u));
+            auto z = rgb[maxc];
+            auto x = rgb[(maxc + 1u) % 3u] / z;
+            auto y = rgb[(maxc + 2u) % 3u] / z;
 
-        // Compute integer indices and offsets for coefficient interpolation
-        auto inverse_smooth_step = [](auto x) noexcept {
-            return 0.5f - sin(asin(1.0f - 2.0f * x) * (1.0f / 3.0f));
+            // Compute integer indices and offsets for coefficient interpolation
+            auto inverse_smooth_step = [](auto x) noexcept {
+                return 0.5f - sin(asin(1.0f - 2.0f * x) * (1.0f / 3.0f));
+            };
+            auto zz = inverse_smooth_step(inverse_smooth_step(z));
+
+            // Trilinearly interpolate sigmoid polynomial coefficients _c_
+            auto coord = fma(
+                make_float3(x, y, zz),
+                (resolution - 1.0f) / resolution,
+                0.5f / resolution);
+            c = array.tex3d(base_index + maxc).sample(coord).xyz();
         };
-        auto zz = inverse_smooth_step(inverse_smooth_step(z));
-
-        // Trilinearly interpolate sigmoid polynomial coefficients _c_
-        auto coord = make_float3(x, y, zz * (resolution - 1.0f)) + 0.5f;
-        c = array.tex3d(base_index + maxc)
-                     .sample(coord * (1.0f / resolution))
-                     .xyz();
+        return c;
     };
-    return RGBSigmoidPolynomial{c};
+    return RGBSigmoidPolynomial{decode(array, base_index, rgb_in)};
 }
 
 std::pair<float3, float> RGB2SpectrumTable::decode_unbound(float3 rgb) const noexcept {
