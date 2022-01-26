@@ -1,17 +1,17 @@
 Material cbox-white : Lambert {
-  color : Constant {
+  color : Const {
     color { 0.725, 0.71, 0.68 }
   }
 }
 
 Material cbox-red : Lambert {
-  color : Constant {
+  color : Const {
     color { 0.63, 0.065, 0.05 }
   }
 }
 
 Material cbox-green : Lambert {
-  color : Constant {
+  color : Const {
     color { 0.14, 0.45, 0.091 }
   }
 }
@@ -36,9 +36,15 @@ Shape cbox-right-wall : Mesh {
   material { @cbox-green }
 }
 
+Material cbox-brick : Lambert {
+  color : sRGB {
+    file { "../textures/brickwall.jpg" }
+  }
+}
+
 Shape cbox-back-wall : Mesh {
   file { "cbox-parts/back-wall.obj" }
-  material { @cbox-white }
+  material { @cbox-brick }
 }
 
 Shape cbox-tall-box : Mesh {
@@ -54,8 +60,9 @@ Shape cbox-short-box : Mesh {
 Shape cbox-light : Mesh {
   file { "cbox-parts/light.obj" }
   light : Diffuse {
-    emission : ConstantIlluminant {
-      emission { 51.0, 36.0, 12.0 }
+    emission : ConstIllum {
+      emission { 0.510, 0.360, 0.120 }
+      scale { 100 }
     }
   }
 }

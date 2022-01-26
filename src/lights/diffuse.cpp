@@ -29,7 +29,7 @@ namespace luisa::render {
         static SceneNodeDesc d{
             "__diffuse_light_default_color_texture",
             SceneNodeTag::TEXTURE};
-        d.define(SceneNodeTag::TEXTURE, "constantilluminant", {});
+        d.define(SceneNodeTag::TEXTURE, "constillum", {});
         return &d;
     }();
     return desc;
@@ -46,8 +46,15 @@ public:
         : Light{scene, desc},
           _emission{scene->load_texture(desc->property_node_or_default(
               "emission", default_emission_texture_desc()))},
-         _scale{std::max(desc->property_float_or_default("scale", 1.0f), 0.0f)} {}
-    [[nodiscard]] bool is_black() const noexcept override { return _scale == 0.0f; }
+         _scale{std::max(desc->property_float_or_default("scale", 1.0f), 0.0f)} {
+        if (!_emission->is_illuminant()) [[unlikely]] {
+            LUISA_ERROR(
+                "Non-illuminant textures are not "
+                "allowed in Diffuse lights. [{}]",
+                desc->source_location().string());
+        }
+    }
+    [[nodiscard]] bool is_black() const noexcept override { return _scale == 0.0f || _emission->is_black(); }
     [[nodiscard]] bool is_virtual() const noexcept override { return false; }
     [[nodiscard]] string_view impl_type() const noexcept override { return "diffuse"; }
     [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint instance_id, const Shape *shape) const noexcept override {

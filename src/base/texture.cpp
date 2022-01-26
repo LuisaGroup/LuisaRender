@@ -7,67 +7,6 @@
 
 namespace luisa::render {
 
-TextureHandle render::TextureHandle::encode_rsp_constant(float3 rsp) noexcept {
-    return TextureHandle{
-        .compressed_rsp = {rsp.x, rsp.y, rsp.z},
-        .texture_or_scale = tag_rsp_constant};
-}
-
-TextureHandle render::TextureHandle::encode_rsp_scale_constant(float3 rsp, float scale) noexcept {
-    auto fp_scale = static_cast<uint>(std::round(
-        std::clamp(scale, 0.0f, fixed_point_scale_max) *
-        fixed_point_scale_multiplier));
-    return TextureHandle{
-        .compressed_rsp = {rsp.x, rsp.y, rsp.z},
-        .texture_or_scale = tag_rsp_scale_constant | (fp_scale << texture_id_offset_shift)};
-}
-
-[[nodiscard]] static inline auto texture_handle_encode_texture(uint tag, uint tex_id) noexcept {
-    if (tex_id > (~0u >> TextureHandle::texture_id_offset_shift)) [[unlikely]] {
-        LUISA_ERROR_WITH_LOCATION(
-            "Invalid texture id for texture handle: {}.",
-            tex_id);
-    }
-    constexpr auto shift = TextureHandle::texture_id_offset_shift;
-    return TextureHandle{.compressed_rsp = {}, .texture_or_scale = tag | (tex_id << shift)};
-}
-
-TextureHandle render::TextureHandle::encode_srgb_texture(uint tex_id) noexcept {
-    return texture_handle_encode_texture(tag_srgb_texture, tex_id);
-}
-
-TextureHandle render::TextureHandle::encode_gamma_texture(uint tex_id) noexcept {
-    return texture_handle_encode_texture(tag_gamma_texture, tex_id);
-}
-
-TextureHandle render::TextureHandle::encode_linear_texture(uint tex_id) noexcept {
-    return texture_handle_encode_texture(tag_linear_texture, tex_id);
-}
-
-TextureHandle render::TextureHandle::encode_rsp_texture(uint tex_id) noexcept {
-    return texture_handle_encode_texture(tag_rsp_texture, tex_id);
-}
-
-TextureHandle render::TextureHandle::encode_rsp_scale_texture(uint tex_id) noexcept {
-    return texture_handle_encode_texture(tag_rsp_scale_texture, tex_id);
-}
-
-TextureHandle TextureHandle::encode_custom(uint custom_tag, float3 custom_float3, uint custom_id) noexcept {
-    if (custom_tag < tag_custom_begin || custom_tag > tag_mask) [[unlikely]] {
-        LUISA_ERROR_WITH_LOCATION(
-            "Invalid custom tag for texture handle: {}.",
-            custom_tag);
-    }
-    if (custom_id > (~0u >> texture_id_offset_shift)) [[unlikely]] {
-        LUISA_ERROR_WITH_LOCATION(
-            "Invalid custom id for texture handle: {}.",
-            custom_id);
-    }
-    return TextureHandle{
-        .compressed_rsp = {custom_float3.x, custom_float3.y, custom_float3.z},
-        .texture_or_scale = custom_tag | (custom_id << texture_id_offset_shift)};
-}
-
 Texture::Texture(Scene *scene, const SceneNodeDesc *desc) noexcept
     : SceneNode{scene, desc, SceneNodeTag::TEXTURE} {}
 
@@ -77,8 +16,65 @@ uint Texture::handle_tag() const noexcept {
     std::scoped_lock lock{mutex};
     auto [iter, _] = impl_to_tag.try_emplace(
         luisa::string{impl_type()},
-        static_cast<uint>(impl_to_tag.size() + TextureHandle::tag_custom_begin));
+        static_cast<uint>(impl_to_tag.size()));
     return iter->second;
+}
+
+TextureHandle TextureHandle::encode_constant(uint tag, float3 v, float alpha) noexcept {
+    if (tag > tag_mask) [[unlikely]] {
+        LUISA_ERROR_WITH_LOCATION(
+            "Invalid tag for texture handle: {}.", tag);
+    }
+    if (alpha < 0.0f || alpha > fixed_point_alpha_max) [[unlikely]] {
+        LUISA_WARNING_WITH_LOCATION(
+            "Invalid alpha for texture handle: {}. "
+            "Clamping to [0, {}].",
+            alpha, fixed_point_alpha_max);
+    }
+    auto fp_alpha = static_cast<uint>(std::round(
+                        std::clamp(alpha, 0.0f, fixed_point_alpha_max) *
+                        fixed_point_alpha_scale))
+                    << texture_id_offset_shift;
+    return {.id_and_tag = tag | fp_alpha, .compressed_v = {v.x, v.y, v.z}};
+}
+
+TextureHandle TextureHandle::encode_texture(uint tag, uint tex_id, float3 v) noexcept {
+    if (tag > tag_mask) [[unlikely]] {
+        LUISA_ERROR_WITH_LOCATION(
+            "Invalid tag for texture handle: {}.", tag);
+    }
+    if (tex_id > (~0u >> texture_id_offset_shift)) [[unlikely]] {
+        LUISA_ERROR_WITH_LOCATION(
+            "Invalid id for texture handle: {}.", tex_id);
+    }
+    return {.id_and_tag = tag | tex_id, .compressed_v = {v.x, v.y, v.z}};
+}
+
+ImageTexture::ImageTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
+    : Texture{scene, desc} {
+    auto address = desc->property_string_or_default("address_mode", "repeat");
+    auto filter = desc->property_string_or_default("filter_mode", "bilinear");
+    auto address_mode = [&address, desc] {
+        for (auto &c : address) { c = static_cast<char>(tolower(c)); }
+        if (address == "zero") { return TextureSampler::Address::ZERO; }
+        if (address == "edge") { return TextureSampler::Address::EDGE; }
+        if (address == "mirror") { return TextureSampler::Address::MIRROR; }
+        if (address == "repeat") { return TextureSampler::Address::REPEAT; }
+        LUISA_ERROR(
+            "Invalid texture address mode '{}'. [{}]",
+            address, desc->source_location().string());
+    }();
+    auto filter_mode = [&filter, desc] {
+        for (auto &c : filter) { c = static_cast<char>(tolower(c)); }
+        if (filter == "point") { return TextureSampler::Filter::POINT; }
+        if (filter == "bilinear") { return TextureSampler::Filter::BILINEAR; }
+        if (filter == "trilinear") { return TextureSampler::Filter::TRILINEAR; }
+        if (filter == "anisotropic" || filter == "aniso") { return TextureSampler::Filter::ANISOTROPIC; }
+        LUISA_ERROR(
+            "Invalid texture filter mode '{}'. [{}]",
+            filter, desc->source_location().string());
+    }();
+    _sampler = {filter_mode, address_mode};
 }
 
 }// namespace luisa::render

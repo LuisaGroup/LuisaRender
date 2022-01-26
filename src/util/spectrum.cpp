@@ -254,27 +254,16 @@ RGBSigmoidPolynomial RGB2SpectrumTable::decode_albedo(Expr<BindlessArray> array,
         auto y = rgb[(maxc + 2u) % 3u] * (resolution - 1u) / z;
 
         // Compute integer indices and offsets for coefficient interpolation
-        Constant<float> z_nodes{_z_nodes};
-        auto find_z_interval = [&z_nodes](auto z) noexcept {
-            auto size = def(resolution - 2u);
-            auto first = def(1u);
-            $while(size != 0u) {
-                auto half = size >> 1u;
-                auto middle = first + half;
-                auto pred = z_nodes[middle] < z;
-                first = ite(pred, middle + 1u, first);
-                size = ite(pred, size - (half + 1u), half);
-            };
-            return min(first - 1u, resolution - 2u);
+        auto inverse_smooth_step = [](auto x) noexcept {
+            return 0.5f - sin(asin(1.0f - 2.0f * x) * (1.0f / 3.0f));
         };
-        auto zi = find_z_interval(z);
-        auto dz = (z - z_nodes[zi]) / (z_nodes[zi + 1u] - z_nodes[zi]);
+        auto zz = inverse_smooth_step(inverse_smooth_step(z));
 
         // Trilinearly interpolate sigmoid polynomial coefficients _c_
-        auto coord = make_float3(x, y, cast<float>(zi) + dz) + 0.5f;
+        auto coord = make_float3(x, y, zz * (resolution - 1.0f)) + 0.5f;
         c = array.tex3d(base_index + maxc)
-                .sample(coord * (1.0f / resolution))
-                .xyz();
+                     .sample(coord * (1.0f / resolution))
+                     .xyz();
     };
     return RGBSigmoidPolynomial{c};
 }

@@ -14,7 +14,7 @@ namespace luisa::render {
         static SceneNodeDesc d{
             "__fake_mirror_material_default_color_texture",
             SceneNodeTag::TEXTURE};
-        d.define(SceneNodeTag::TEXTURE, "constant", {});
+        d.define(SceneNodeTag::TEXTURE, "const", {});
         return &d;
     }();
     return desc;
@@ -29,7 +29,14 @@ public:
     FakeMirrorMaterial(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Material{scene, desc},
           _color{scene->load_texture(desc->property_node_or_default(
-              "color", default_color_texture_desc()))} {}
+              "color", default_color_texture_desc()))} {
+        if (!_color->is_color()) [[unlikely]] {
+            LUISA_ERROR(
+                "Non-color textures are not "
+                "allowed in FakeMirror materials. [{}]",
+                desc->source_location().string());
+        }
+    }
     [[nodiscard]] bool is_black() const noexcept override { return _color->is_black(); }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "fakemirror"; }
     [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint instance_id, const Shape *shape) const noexcept override {

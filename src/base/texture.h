@@ -6,6 +6,7 @@
 
 #include <dsl/syntax.h>
 #include <util/spectrum.h>
+#include <util/imageio.h>
 #include <base/scene_node.h>
 
 namespace luisa::render {
@@ -14,56 +15,35 @@ struct alignas(16) TextureHandle {
 
     static constexpr auto texture_id_offset_shift = 6u;
     static constexpr auto tag_mask = (1 << texture_id_offset_shift) - 1u;
-    static constexpr auto fixed_point_scale_max = 4096.0f;
-    static constexpr auto fixed_point_scale_multiplier = 16384.0f;
-
-    static constexpr auto tag_rsp_constant = 0u;      // [Built-in] Constant: RGB polynomial sigmoid
-    static constexpr auto tag_rsp_scale_constant = 1u;// [Built-in] Constant: RGB polynomial sigmoid + scale
-    static constexpr auto tag_srgb_texture = 2u;      // [Built-in] Texture: sRGB encoding
-    static constexpr auto tag_gamma_texture = 3u;     // [Built-in] Texture: gamma encoding
-    static constexpr auto tag_linear_texture = 4u;    // [Built-in] Texture: linear encoding
-    static constexpr auto tag_rsp_texture = 5u;       // [Built-in] Texture: RGB polynomial sigmoid
-    static constexpr auto tag_rsp_scale_texture = 6u; // [Built-in] Texture: RGB polynomial sigmoid + scale
-    static constexpr auto tag_custom_begin = 7u;      // [Custom]
+    static constexpr auto fixed_point_alpha_max = 4096.0f - 1.0f;
+    static constexpr auto fixed_point_alpha_scale = 16384.0f;
     static constexpr auto tag_max_count = 1u << texture_id_offset_shift;
 
-    float compressed_rsp[3];
-    uint texture_or_scale;
+    uint id_and_tag;
+    float compressed_v[3];
 
-    [[nodiscard]] static TextureHandle encode_rsp_constant(float3 rsp) noexcept;
-    [[nodiscard]] static TextureHandle encode_rsp_scale_constant(float3 rsp, float scale) noexcept;
-    [[nodiscard]] static TextureHandle encode_srgb_texture(uint tex_id) noexcept;
-    [[nodiscard]] static TextureHandle encode_gamma_texture(uint tex_id) noexcept;
-    [[nodiscard]] static TextureHandle encode_linear_texture(uint tex_id) noexcept;
-    [[nodiscard]] static TextureHandle encode_rsp_texture(uint tex_id) noexcept;
-    [[nodiscard]] static TextureHandle encode_rsp_scale_texture(uint tex_id) noexcept;
-    [[nodiscard]] static TextureHandle encode_custom(uint custom_tag, float3 custom_float3, uint custom_id) noexcept;
+    [[nodiscard]] static TextureHandle encode_constant(uint tag, float3 v, float alpha = 1.0f) noexcept;
+    [[nodiscard]] static TextureHandle encode_texture(uint tag, uint tex_id, float3 v = make_float3(1.0f)) noexcept;
 };
 
 }// namespace luisa::render
 
 // clang-format off
-LUISA_STRUCT(luisa::render::TextureHandle, compressed_rsp, texture_or_scale) {
-    [[nodiscard]] auto rsp() const noexcept {
-        return luisa::render::RGBSigmoidPolynomial{
-            luisa::compute::def<luisa::float3>(compressed_rsp)};
-    }
+LUISA_STRUCT(luisa::render::TextureHandle, id_and_tag, compressed_v) {
     [[nodiscard]] auto tag() const noexcept {
-        return texture_or_scale & luisa::render::TextureHandle::tag_mask;
+        return id_and_tag & luisa::render::TextureHandle::tag_mask;
     }
-    [[nodiscard]] auto scale() const noexcept {
+    [[nodiscard]] auto v() const noexcept {
+        return luisa::compute::def<luisa::float3>(compressed_v);
+    }
+    [[nodiscard]] auto alpha() const noexcept {
         using luisa::compute::cast;
         using luisa::render::TextureHandle;
-        return cast<float>(texture_or_scale >> TextureHandle::texture_id_offset_shift) *
-            (1.0f / TextureHandle::fixed_point_scale_multiplier);
+        return cast<float>(id_and_tag >> TextureHandle::texture_id_offset_shift) *
+            (1.0f / TextureHandle::fixed_point_alpha_scale);
     }
     [[nodiscard]] auto texture_id() const noexcept {
-        return texture_or_scale >> luisa::render::TextureHandle::texture_id_offset_shift;
-    }
-    [[nodiscard]] auto custom_tag() const noexcept { return tag(); }
-    [[nodiscard]] auto custom_id() const noexcept { return texture_id(); }
-    [[nodiscard]] auto custom_float3() const noexcept {
-        return luisa::compute::def<luisa::float3>(compressed_rsp);
+        return id_and_tag >> luisa::render::TextureHandle::texture_id_offset_shift;
     }
 };
 // clang-format on
@@ -84,12 +64,29 @@ private:
 
 public:
     Texture(Scene *scene, const SceneNodeDesc *desc) noexcept;
-    [[nodiscard]] virtual uint handle_tag() const noexcept;
+    [[nodiscard]] uint handle_tag() const noexcept;
     [[nodiscard]] virtual bool is_black() const noexcept = 0;
+    [[nodiscard]] virtual bool is_color() const noexcept = 0;     // automatically converts to the albedo spectrum
+    [[nodiscard]] virtual bool is_general() const noexcept = 0;   // returns the value as-is (no conversion spectrum)
+    [[nodiscard]] virtual bool is_illuminant() const noexcept = 0;// automatically converts to the illuminant spectrum
     [[nodiscard]] virtual Float4 evaluate(
         const Pipeline &pipeline, const Interaction &it,
         const Var<TextureHandle> &handle,
         const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
+};
+
+using compute::PixelStorage;
+using TextureSampler = compute::Sampler;
+
+class ImageTexture : public Texture {
+
+private:
+    TextureSampler _sampler;
+
+public:
+    ImageTexture(Scene *scene, const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] auto sampler() const noexcept { return _sampler; }
+    [[nodiscard]] bool is_black() const noexcept override { return false; }
 };
 
 }// namespace luisa::render

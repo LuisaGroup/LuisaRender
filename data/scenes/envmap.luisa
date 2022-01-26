@@ -35,7 +35,7 @@ Object teapot : Group {
     Mesh {
       file { "../meshes/utah-teapot.obj" }
       material : FakeMirror {
-        color : Constant {
+        color : Const {
           color { 1.0, 0.71, 0.29 }
         }
       }

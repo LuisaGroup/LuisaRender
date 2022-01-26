@@ -1,3 +1,5 @@
 add_library(luisa-render-textures INTERFACE)
-luisa_render_add_plugin(constant CATEGORY texture SOURCES constant.cpp)
-luisa_render_add_plugin(constantilluminant CATEGORY texture SOURCES constant_illuminant.cpp)
+luisa_render_add_plugin(const CATEGORY texture SOURCES constant.cpp)
+luisa_render_add_plugin(constillum CATEGORY texture SOURCES constant_illuminant.cpp)
+luisa_render_add_plugin(srgb CATEGORY texture SOURCES srgb.cpp)
+luisa_render_add_plugin(srgbillum CATEGORY texture SOURCES srgb_illuminant.cpp)

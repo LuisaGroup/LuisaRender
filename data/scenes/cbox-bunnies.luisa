@@ -52,7 +52,7 @@ Shape bunny : Mesh {
     rotate { 0, 1, 0, 20 }
   }
   material : FakeMirror {
-    color : Constant {
+    color : Const {
       color { 1.0, 0.71, 0.29 }
     }
   }
@@ -62,7 +62,7 @@ Shape light : Mesh {
   file { "../meshes/light.obj" }
   two_sided { true }
   light : Diffuse {
-    emission : ConstantIlluminant {
+    emission : ConstIllum {
       emission { 1.5, 1.1, 0.6 }
     }
     scale { 1.75 }
@@ -83,7 +83,7 @@ Shape light : Mesh {
     time_points { 0, 0.1 }
   }
   material : FakeMirror {
-    color : Constant {
+    color : Const {
       color { 0.28, 0.9, 0.182 }
     }
   }
@@ -114,7 +114,7 @@ Shape group : Group {
     Instance {
       shape { @bunny }
       light : Diffuse {
-        emission : ConstantIlluminant {
+        emission : ConstIllum {
           emission { 0.4, 1.6, 3.2 }
         }
         scale { 1.5 }
