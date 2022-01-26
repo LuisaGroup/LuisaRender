@@ -68,7 +68,9 @@ render {
   shapes { @teapot }
   integrator { @pt }
   environment : HDRI {
-    file { "../envmaps/photo_studio_01_1k.hdr" }
+    emission : HDRIllum {
+      file { "../envmaps/photo_studio_01_1k.hdr" }
+    }
     transform : SRT {
       rotate { 0, 1, 0, 45 }
     }

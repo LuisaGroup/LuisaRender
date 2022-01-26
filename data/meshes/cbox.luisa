@@ -37,14 +37,17 @@ Shape cbox-right-wall : Mesh {
 }
 
 Material cbox-brick : Lambert {
-  color : sRGB {
-    file { "../textures/brickwall.jpg" }
+  color : Gamma {
+    file { "/Users/mike/Downloads/_DSC7097.jpg" }
+    // file { "../textures/brickwall.jpg" }
+    uv_scale { 0.6666666666666666666, 1 }
+    uv_offset { 0.1, 0 }
   }
 }
 
 Shape cbox-back-wall : Mesh {
   file { "cbox-parts/back-wall.obj" }
-  material { @cbox-brick }
+  material { @cbox-white }
 }
 
 Shape cbox-tall-box : Mesh {

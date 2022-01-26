@@ -195,6 +195,12 @@ void RGB2SpectrumTable::encode(CommandBuffer &command_buffer, VolumeView<float> 
                    << luisa::compute::commit();
 }
 
+namespace detail {
+[[nodiscard]] inline auto inverse_smooth_step(auto x) noexcept {
+    return 0.5f - sin(asin(1.0f - 2.0f * x) * (1.0f / 3.0f));
+}
+}// namespace detail
+
 // from PBRT-v4: https://github.com/mmp/pbrt-v4/blob/master/src/pbrt/util/color.cpp
 float3 RGB2SpectrumTable::decode_albedo(float3 rgb_in) const noexcept {
     auto rgb = clamp(rgb_in, 0.0f, 1.0f);
@@ -211,15 +217,17 @@ float3 RGB2SpectrumTable::decode_albedo(float3 rgb_in) const noexcept {
     auto x = rgb[(maxc + 1u) % 3u] * (resolution - 1u) / z;
     auto y = rgb[(maxc + 2u) % 3u] * (resolution - 1u) / z;
 
+    auto zz = detail::inverse_smooth_step(
+                  detail::inverse_smooth_step(z)) *
+              (resolution - 1u);
+
     // Compute integer indices and offsets for coefficient interpolation
     auto xi = std::min(static_cast<uint>(x), resolution - 2u);
     auto yi = std::min(static_cast<uint>(y), resolution - 2u);
-    auto zi = std::min(
-        static_cast<uint>(std::lower_bound(_z_nodes, _z_nodes + resolution, z) - _z_nodes),
-        resolution - 2u);
+    auto zi = std::min(static_cast<uint>(zz), resolution - 2u);
     auto dx = x - static_cast<float>(xi);
     auto dy = y - static_cast<float>(yi);
-    auto dz = (z - _z_nodes[zi]) / (_z_nodes[zi + 1u] - _z_nodes[zi]);
+    auto dz = zz - static_cast<float>(zi);
 
     // Trilinearly interpolate sigmoid polynomial coefficients _c_
     auto c = make_float3();
@@ -253,12 +261,8 @@ RGBSigmoidPolynomial RGB2SpectrumTable::decode_albedo(Expr<BindlessArray> array,
             auto z = rgb[maxc];
             auto x = rgb[(maxc + 1u) % 3u] / z;
             auto y = rgb[(maxc + 2u) % 3u] / z;
-
-            // Compute integer indices and offsets for coefficient interpolation
-            auto inverse_smooth_step = [](auto x) noexcept {
-                return 0.5f - sin(asin(1.0f - 2.0f * x) * (1.0f / 3.0f));
-            };
-            auto zz = inverse_smooth_step(inverse_smooth_step(z));
+            auto zz = detail::inverse_smooth_step(
+                detail::inverse_smooth_step(z));
 
             // Trilinearly interpolate sigmoid polynomial coefficients _c_
             auto coord = fma(

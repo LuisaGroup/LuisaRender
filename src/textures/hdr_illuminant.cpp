@@ -2,6 +2,7 @@
 // Created by Mike Smith on 2022/1/26.
 //
 
+#include <core/clock.h>
 #include <core/thread_pool.h>
 #include <util/imageio.h>
 #include <base/texture.h>
@@ -11,37 +12,32 @@ namespace luisa::render {
 
 using namespace luisa::compute;
 
-class SRGBIlluminantTexture final : public ImageTexture {
+class HDRIlluminantTexture final : public ImageTexture {
 
 private:
-    std::shared_future<LoadedImage<uint8_t>> _image;
+    std::shared_future<LoadedImage<float>> _image;
     float3 _scale;
 
 private:
     [[nodiscard]] std::pair<uint, float3> _encode(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
         auto &&image = _image.get();
-        auto device_image = pipeline.create<Image<float>>(PixelStorage::BYTE4, image.resolution());
+        auto device_image = pipeline.create<Image<float>>(PixelStorage::FLOAT4, image.resolution());
         auto bindless_id = pipeline.register_bindless(*device_image, sampler());
         command_buffer << device_image->copy_from(image.pixels());
-        return std::make_pair(bindless_id, _scale);
+        return std::make_pair(bindless_id, make_float3());
     }
     [[nodiscard]] Float4 _evaluate(
         const Pipeline &pipeline, const Var<TextureHandle> &handle,
         Expr<float2> uv, const SampledWavelengths &swl) const noexcept override {
-        auto color_srgb = pipeline.tex2d(handle->texture_id()).sample(uv).xyz();
-        auto srgb2linear = [](Expr<float3> x) noexcept {
-            return ite(
-                x <= 0.04045f,
-                x * (1.0f / 12.92f),
-                pow((x + 0.055f) * (1.0f / 1.055f), 2.4f));
-        };
-        auto color = srgb2linear(color_srgb);
-        auto spec = pipeline.srgb_illuminant_spectrum(color * handle->v());
+        auto rsp_scale = pipeline.tex2d(handle->texture_id()).sample(uv);
+        RGBIlluminantSpectrum spec{
+            RGBSigmoidPolynomial{rsp_scale.xyz()}, rsp_scale.w,
+            DenselySampledSpectrum::cie_illum_d6500()};
         return spec.sample(swl);
     }
 
 public:
-    SRGBIlluminantTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
+    HDRIlluminantTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
         : ImageTexture{scene, desc},
           _scale{clamp(
               desc->property_float3_or_default(
@@ -51,11 +47,21 @@ public:
                   })),
               0.0f, 1.0f)} {
         auto path = desc->property_path("file");
-        _image = ThreadPool::global().async([path = std::move(path)] {
-            return load_ldr_image(path, 4u);
+        _image = ThreadPool::global().async([path = std::move(path), s = _scale] {
+            Clock clock;
+            auto image = load_hdr_image(path, 4u);
+            LUISA_INFO(
+                "Loaded HDRI image '{}' in {} ms.",
+                path.string(), clock.toc());
+            for (auto i = 0u; i < image.resolution().x * image.resolution().y; i++) {
+                auto &p = reinterpret_cast<float4 *>(image.pixels())[i];
+                auto [rsp, scale] = RGB2SpectrumTable::srgb().decode_unbound(p.xyz() * s);
+                p = make_float4(rsp, scale);
+            }
+            return image;
         });
     }
-    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "srgbillum"; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "hdrillum"; }
     [[nodiscard]] bool is_color() const noexcept override { return false; }
     [[nodiscard]] bool is_general() const noexcept override { return false; }
     [[nodiscard]] bool is_illuminant() const noexcept override { return true; }
@@ -64,4 +70,4 @@ public:
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::SRGBIlluminantTexture)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::HDRIlluminantTexture)

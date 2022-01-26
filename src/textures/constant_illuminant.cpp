@@ -14,7 +14,16 @@ private:
 
 private:
     [[nodiscard]] TextureHandle encode(Pipeline &, CommandBuffer &) const noexcept override {
-        return TextureHandle::encode_constant(handle_tag(), _rsp, _scale);
+        return TextureHandle::encode_constant(
+            handle_tag(), {}, 0.0f,
+            make_float4(_rsp, _scale));
+    }
+    [[nodiscard]] static auto _evaluate(const Var<TextureHandle> &handle, const SampledWavelengths &swl) noexcept {
+        auto rsp_scale = handle->extra();
+        RGBIlluminantSpectrum spec{
+            RGBSigmoidPolynomial{rsp_scale.xyz()}, rsp_scale.w,
+            DenselySampledSpectrum::cie_illum_d6500()};
+        return spec.sample(swl);
     }
 
 public:
@@ -37,10 +46,12 @@ public:
     [[nodiscard]] Float4 evaluate(
         const Pipeline &, const Interaction &, const Var<TextureHandle> &handle,
         const SampledWavelengths &swl, Expr<float>) const noexcept override {
-        RGBIlluminantSpectrum spec{
-            RGBSigmoidPolynomial{handle->v()}, handle->alpha(),
-            DenselySampledSpectrum::cie_illum_d6500()};
-        return spec.sample(swl);
+        return _evaluate(handle, swl);
+    }
+    [[nodiscard]] Float4 evaluate(
+        const Pipeline &pipeline, const Var<TextureHandle> &handle, Expr<float3> wi,
+        const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        return _evaluate(handle, swl);
     }
     [[nodiscard]] bool is_color() const noexcept override { return false; }
     [[nodiscard]] bool is_general() const noexcept override { return false; }

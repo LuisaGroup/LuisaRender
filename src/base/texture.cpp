@@ -20,7 +20,7 @@ uint Texture::handle_tag() const noexcept {
     return iter->second;
 }
 
-TextureHandle TextureHandle::encode_constant(uint tag, float3 v, float alpha) noexcept {
+TextureHandle TextureHandle::encode_constant(uint tag, float3 v, float alpha, float4 e) noexcept {
     if (tag > tag_mask) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
             "Invalid tag for texture handle: {}.", tag);
@@ -35,10 +35,11 @@ TextureHandle TextureHandle::encode_constant(uint tag, float3 v, float alpha) no
                         std::clamp(alpha, 0.0f, fixed_point_alpha_max) *
                         fixed_point_alpha_scale))
                     << texture_id_offset_shift;
-    return {.id_and_tag = tag | fp_alpha, .compressed_v = {v.x, v.y, v.z}};
+    return {.id_and_tag = tag | fp_alpha,
+            .compressed_v = {v.x, v.y, v.z, e.x, e.y, e.z, e.w}};
 }
 
-TextureHandle TextureHandle::encode_texture(uint tag, uint tex_id, float3 v) noexcept {
+TextureHandle TextureHandle::encode_texture(uint tag, uint tex_id, float3 v, float4 e) noexcept {
     if (tag > tag_mask) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
             "Invalid tag for texture handle: {}.", tag);
@@ -47,7 +48,8 @@ TextureHandle TextureHandle::encode_texture(uint tag, uint tex_id, float3 v) noe
         LUISA_ERROR_WITH_LOCATION(
             "Invalid id for texture handle: {}.", tex_id);
     }
-    return {.id_and_tag = tag | tex_id, .compressed_v = {v.x, v.y, v.z}};
+    return {.id_and_tag = tag | tex_id,
+            .compressed_v = {v.x, v.y, v.z, e.x, e.y, e.z, e.w}};
 }
 
 ImageTexture::ImageTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
@@ -75,6 +77,42 @@ ImageTexture::ImageTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
             filter, desc->source_location().string());
     }();
     _sampler = {filter_mode, address_mode};
+    _uv_scale = desc->property_float2_or_default(
+        "uv_scale", lazy_construct([desc]{
+            return make_float2(desc->property_float_or_default(
+                "uv_scale", 1.0f));
+        }));
+    _uv_offset = desc->property_float2_or_default(
+        "uv_offset", lazy_construct([desc]{
+            return make_float2(desc->property_float_or_default(
+                "uv_offset", 0.0f));
+        }));
+}
+
+Float4 ImageTexture::evaluate(
+    const Pipeline &pipeline, const Interaction &it,
+    const Var<TextureHandle> &handle,
+    const SampledWavelengths &swl, Expr<float>) const noexcept {
+    auto uv = it.uv() * handle->extra().xy() + handle->extra().zw();
+    return _evaluate(pipeline, handle, uv, swl);
+}
+
+Float4 ImageTexture::evaluate(
+    const Pipeline &pipeline, const Var<TextureHandle> &handle,
+    Expr<float3> wi_local, const SampledWavelengths &swl, Expr<float>) const noexcept {
+    auto theta = acos(wi_local.y);
+    auto phi = atan2(wi_local.x, wi_local.z);
+    auto resolution = pipeline.tex2d(handle->texture_id()).size();
+    auto u = -0.5f * inv_pi * phi - 0.5f / resolution.x;
+    auto v = theta * inv_pi + 0.5f / resolution.y;
+    auto uv = make_float2(u, v) * handle->extra().xy() + handle->extra().zw();
+    return _evaluate(pipeline, handle, uv, swl);
+}
+
+TextureHandle ImageTexture::encode(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
+    auto [tex_id, v] = _encode(pipeline, command_buffer);
+    return TextureHandle::encode_texture(
+        handle_tag(), tex_id, v, make_float4(_uv_scale, _uv_offset));
 }
 
 }// namespace luisa::render

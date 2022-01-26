@@ -18,6 +18,10 @@ private:
             handle_tag(), make_float3(_rsp[0], _rsp[1], _rsp[2]));
     }
 
+    [[nodiscard]] static auto _evaluate(const Var<TextureHandle> &handle, const SampledWavelengths &swl) noexcept {
+        return RGBAlbedoSpectrum{RGBSigmoidPolynomial{handle->v()}}.sample(swl);
+    }
+
 public:
     ConstantColorTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Texture{scene, desc} {
@@ -36,7 +40,12 @@ public:
     [[nodiscard]] Float4 evaluate(
         const Pipeline &, const Interaction &, const Var<TextureHandle> &handle,
         const SampledWavelengths &swl, Expr<float>) const noexcept override {
-        return RGBAlbedoSpectrum{RGBSigmoidPolynomial{handle->v()}}.sample(swl);
+        return _evaluate(handle, swl);
+    }
+    [[nodiscard]] Float4 evaluate(
+        const Pipeline &pipeline, const Var<TextureHandle> &handle, Expr<float3> wi,
+        const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        return _evaluate(handle, swl);
     }
     [[nodiscard]] bool is_color() const noexcept override { return true; }
     [[nodiscard]] bool is_general() const noexcept override { return false; }

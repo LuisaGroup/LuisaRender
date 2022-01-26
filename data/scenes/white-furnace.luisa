@@ -38,8 +38,10 @@ render {
   cameras { @camera }
   shapes { @teapot }
   integrator { @pt }
-  environment : Constant {
-    emission { 1 }
+  environment : HDRI {
+    emission : ConstIllum {
+      emission { 1 }
+    }
     transform : SRT {
       rotate { 0, 1, 0, 45 }
     }

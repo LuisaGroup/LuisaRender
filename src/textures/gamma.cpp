@@ -11,10 +11,11 @@ namespace luisa::render {
 
 using namespace luisa::compute;
 
-class SRGBTexture final : public ImageTexture {
+class GammaTexture final : public ImageTexture {
 
 private:
     std::shared_future<LoadedImage<uint8_t>> _image;
+    float3 _gamma;
 
 private:
     [[nodiscard]] std::pair<uint, float3> _encode(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
@@ -22,32 +23,32 @@ private:
         auto device_image = pipeline.create<Image<float>>(PixelStorage::BYTE4, image.resolution());
         auto bindless_id = pipeline.register_bindless(*device_image, sampler());
         command_buffer << device_image->copy_from(image.pixels());
-        return std::make_pair(bindless_id, make_float3());
+        return std::make_pair(bindless_id, _gamma);
     }
     [[nodiscard]] Float4 _evaluate(
         const Pipeline &pipeline, const Var<TextureHandle> &handle,
         Expr<float2> uv, const SampledWavelengths &swl) const noexcept override {
-        auto color_srgb = pipeline.tex2d(handle->texture_id()).sample(uv).xyz();
-        auto srgb2linear = [](Expr<float3> x) noexcept {
-            return ite(
-                x <= 0.04045f,
-                x * (1.0f / 12.92f),
-                pow((x + 0.055f) * (1.0f / 1.055f), 2.4f));
-        };
-        auto color = srgb2linear(color_srgb);
+        auto color_gamma = pipeline.tex2d(handle->texture_id()).sample(uv).xyz();
+        auto color = pow(color_gamma, handle->v());
         auto spec = pipeline.srgb_albedo_spectrum(color);
         return spec.sample(swl);
     }
 
 public:
-    SRGBTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
-        : ImageTexture{scene, desc} {
+    GammaTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
+        : ImageTexture{scene, desc},
+          _gamma{desc->property_float3_or_default(
+              "gamma", lazy_construct([desc] {
+                  return make_float3(desc->property_float_or_default(
+                      "gamma", 2.2f));
+              }))} {
         auto path = desc->property_path("file");
         _image = ThreadPool::global().async([path = std::move(path)] {
             return load_ldr_image(path, 4u);
         });
+        _gamma = clamp(_gamma, 1e-4f, 16.0f);
     }
-    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "srgb"; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "gamma"; }
     [[nodiscard]] bool is_color() const noexcept override { return true; }
     [[nodiscard]] bool is_general() const noexcept override { return false; }
     [[nodiscard]] bool is_illuminant() const noexcept override { return false; }
@@ -55,4 +56,4 @@ public:
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::SRGBTexture)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::GammaTexture)
