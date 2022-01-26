@@ -2,54 +2,40 @@
 // Created by Mike Smith on 2022/1/12.
 //
 
-#include <luisa-compute.h>
 #include <base/material.h>
 #include <base/interaction.h>
 #include <base/pipeline.h>
+#include <base/scene.h>
 
 namespace luisa::render {
-struct FakeMirrorParams {
-    float rsp[3];
-    uint tex_id;
-};
-}// namespace luisa::render
 
-// clang-format off
-LUISA_STRUCT(luisa::render::FakeMirrorParams, rsp, tex_id) {
-    [[nodiscard]] auto has_texture() const noexcept {
-        return tex_id != ~0u;
-    }
-};
-// clang-format on
-
-namespace luisa::render {
+[[nodiscard]] static auto default_color_texture_desc() noexcept {
+    static auto desc = [] {
+        static SceneNodeDesc d{
+            "__fake_mirror_material_default_color_texture",
+            SceneNodeTag::TEXTURE};
+        d.define(SceneNodeTag::TEXTURE, "constant", {});
+        return &d;
+    }();
+    return desc;
+}
 
 class FakeMirrorMaterial final : public Material {
 
 private:
-    FakeMirrorParams _params{};
-    bool _is_black{};
+    const Texture *_color;
 
 public:
     FakeMirrorMaterial(Scene *scene, const SceneNodeDesc *desc) noexcept
-        : Material{scene, desc} {
-        auto color = clamp(
-            desc->property_float3_or_default(
-                "color", lazy_construct([desc] {
-                    return make_float3(desc->property_float_or_default("color", 1.0f));
-                })),
-            0.0f, 1.0f);
-        auto rsp = RGB2SpectrumTable::srgb().decode_albedo(color);
-        _params.rsp[0] = rsp.x;
-        _params.rsp[1] = rsp.y;
-        _params.rsp[2] = rsp.z;
-        _is_black = all(color == 0.0f);
-    }
-    [[nodiscard]] bool is_black() const noexcept override { return _is_black; }
+        : Material{scene, desc},
+          _color{scene->load_texture(desc->property_node_or_default(
+              "color", default_color_texture_desc()))} {}
+    [[nodiscard]] bool is_black() const noexcept override { return _color->is_black(); }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "fakemirror"; }
     [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint instance_id, const Shape *shape) const noexcept override {
-        auto [buffer_view, buffer_id] = pipeline.arena_buffer<FakeMirrorParams>(1u);
-        command_buffer << buffer_view.copy_from(&_params);
+        auto [buffer_view, buffer_id] = pipeline.arena_buffer<TextureHandle>(1u);
+        auto texture_handle = pipeline.encode_texture(_color, command_buffer);
+        command_buffer << buffer_view.copy_from(texture_handle);
         return buffer_id;
     }
     [[nodiscard]] luisa::unique_ptr<Closure> decode(
@@ -83,13 +69,8 @@ public:
 unique_ptr<Material::Closure> FakeMirrorMaterial::decode(
     const Pipeline &pipeline, const Interaction &it,
     const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    auto params = pipeline.buffer<FakeMirrorParams>(it.shape()->material_buffer_id()).read(0u);
-    using namespace luisa::compute;
-    RGBSigmoidPolynomial rsp{def<float3>(params.rsp)};
-    auto R = RGBAlbedoSpectrum{rsp}.sample(swl);
-    $if (params->has_texture()) {
-
-    };
+    auto texture = pipeline.buffer<TextureHandle>(it.shape()->material_buffer_id()).read(0u);
+    auto R = pipeline.evaluate_texture(texture, it, swl, time);
     return luisa::make_unique<FakeMirrorClosure>(it, R);
 }
 

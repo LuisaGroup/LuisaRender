@@ -5,11 +5,12 @@
 #pragma once
 
 #include <dsl/syntax.h>
+#include <util/spectrum.h>
 #include <base/scene_node.h>
 
 namespace luisa::render {
 
-struct TextureHandle {
+struct alignas(16) TextureHandle {
 
     static constexpr auto texture_id_offset_shift = 6u;
     static constexpr auto tag_mask = (1 << texture_id_offset_shift) - 1u;
@@ -44,7 +45,8 @@ struct TextureHandle {
 // clang-format off
 LUISA_STRUCT(luisa::render::TextureHandle, compressed_rsp, texture_or_scale) {
     [[nodiscard]] auto rsp() const noexcept {
-        return luisa::compute::def<luisa::float3>(compressed_rsp);
+        return luisa::render::RGBSigmoidPolynomial{
+            luisa::compute::def<luisa::float3>(compressed_rsp)};
     }
     [[nodiscard]] auto tag() const noexcept {
         return texture_or_scale & luisa::render::TextureHandle::tag_mask;
@@ -59,14 +61,16 @@ LUISA_STRUCT(luisa::render::TextureHandle, compressed_rsp, texture_or_scale) {
         return texture_or_scale >> luisa::render::TextureHandle::texture_id_offset_shift;
     }
     [[nodiscard]] auto custom_tag() const noexcept { return tag(); }
-    [[nodiscard]] auto custom_float3() const noexcept { return rsp(); }
     [[nodiscard]] auto custom_id() const noexcept { return texture_id(); }
+    [[nodiscard]] auto custom_float3() const noexcept {
+        return luisa::compute::def<luisa::float3>(compressed_rsp);
+    }
 };
 // clang-format on
 
 namespace luisa::render {
 
-class Shape;
+class Pipeline;
 class Interaction;
 class SampledWavelengths;
 using compute::Float4;
@@ -74,17 +78,14 @@ using compute::Float4;
 class Texture : public SceneNode {
 
 private:
-    [[nodiscard]] virtual TextureHandle _encode(
-        Pipeline &pipeline, CommandBuffer &command_buffer,
-        uint instance_id, const Shape *shape) const noexcept = 0;
+    friend class Pipeline;
+    [[nodiscard]] virtual TextureHandle encode(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
 
 public:
     Texture(Scene *scene, const SceneNodeDesc *desc) noexcept;
-    [[nodiscard]] virtual bool is_custom() const noexcept = 0;
     [[nodiscard]] virtual uint handle_tag() const noexcept;
-    [[nodiscard]] TextureHandle encode(
-        Pipeline &pipeline, CommandBuffer &command_buffer,
-        uint instance_id, const Shape *shape) const noexcept;
+    [[nodiscard]] virtual bool is_black() const noexcept = 0;
     [[nodiscard]] virtual Float4 evaluate(
         const Pipeline &pipeline, const Interaction &it,
         const Var<TextureHandle> &handle,

@@ -46,22 +46,15 @@ Shape virtual : Virtual {
 
 Shape bunny : Mesh {
   file { "../meshes/bunny.obj" }
-  // file { "/Users/mike/Downloads/lucy.ply" }
-  transform : Stack {
-    transforms {
-      // SRT {
-      //   scale { 0.03 }
-      //   rotate { 1, 0, 0, -90 }
-      // },
-      SRT {
-        scale { 0.01 }
-        translate { 0.35, 0.825, 0.4 }
-        rotate { 0, 1, 0, 20 }
-      }
-    }
+  transform : SRT {
+    scale { 0.01 }
+    translate { 0.35, 0.825, 0.4 }
+    rotate { 0, 1, 0, 20 }
   }
   material : FakeMirror {
-    color { 1.0, 0.71, 0.29 }
+    color : Constant {
+      color { 1.0, 0.71, 0.29 }
+    }
   }
 }
 
@@ -69,7 +62,9 @@ Shape light : Mesh {
   file { "../meshes/light.obj" }
   two_sided { true }
   light : Diffuse {
-    emission { 1.5, 1.1, 0.6 }
+    emission : ConstantIlluminant {
+      emission { 1.5, 1.1, 0.6 }
+    }
     scale { 1.75 }
   }
   transform : Lerp {
@@ -88,7 +83,9 @@ Shape light : Mesh {
     time_points { 0, 0.1 }
   }
   material : FakeMirror {
-    color { 0.28, 0.9, 0.182 }
+    color : Constant {
+      color { 0.28, 0.9, 0.182 }
+    }
   }
 }
 
@@ -117,7 +114,9 @@ Shape group : Group {
     Instance {
       shape { @bunny }
       light : Diffuse {
-        emission { 0.4, 1.6, 3.2 }
+        emission : ConstantIlluminant {
+          emission { 0.4, 1.6, 3.2 }
+        }
         scale { 1.5 }
       }
       material { @cbox-red }
@@ -137,7 +136,4 @@ render {
   cameras { @camera }
   shapes { @cbox, @cbox-light, @light_box, @bunny, @group }
   integrator { @pt }
-  // environment : Constant {
-  //   emission { 0.1 }
-  // }
 }

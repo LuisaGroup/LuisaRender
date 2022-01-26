@@ -81,10 +81,4 @@ uint Texture::handle_tag() const noexcept {
     return iter->second;
 }
 
-TextureHandle Texture::encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint instance_id, const Shape *shape) const noexcept {
-    auto handle = _encode(pipeline, command_buffer, instance_id, shape);
-    pipeline.register_texture(this);
-    return handle;
-}
-
 }// namespace luisa::render

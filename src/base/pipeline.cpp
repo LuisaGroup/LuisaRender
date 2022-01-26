@@ -19,7 +19,10 @@ inline Pipeline::Pipeline(Device &device) noexcept
 
 Pipeline::~Pipeline() noexcept = default;
 
-void Pipeline::_build_geometry(CommandBuffer &command_buffer, luisa::span<const Shape *const> shapes, float init_time, AccelBuildHint hint) noexcept {
+void Pipeline::_build_geometry(
+    CommandBuffer &command_buffer, luisa::span<const Shape *const> shapes,
+    float init_time, AccelBuildHint hint) noexcept {
+
     _accel = _device.create_accel(hint);
     for (auto shape : shapes) { _process_shape(command_buffer, shape); }
     _instance_buffer = _device.create_buffer<InstancedShape>(_instances.size());
@@ -60,8 +63,8 @@ void Pipeline::_process_shape(
                 auto hash = luisa::detail::xxh3_hash64(positions.data(), positions.size_bytes(), Hash64::default_seed);
                 hash = luisa::detail::xxh3_hash64(attributes.data(), attributes.size_bytes(), hash);
                 hash = luisa::detail::xxh3_hash64(triangles.data(), triangles.size_bytes(), hash);
-                auto [iter, non_existent] = _mesh_cache.try_emplace(hash, MeshGeometry{});
-                if (!non_existent) { return iter->second; }
+                auto [cache_iter, non_existent] = _mesh_cache.try_emplace(hash, MeshGeometry{});
+                if (!non_existent) { return cache_iter->second; }
 
                 // create mesh
                 auto position_buffer_view = _position_buffer_arena->allocate<float3>(positions.size());
@@ -100,7 +103,7 @@ void Pipeline::_process_shape(
                 auto triangle_buffer_id = register_bindless(triangle_buffer->view());
                 auto alias_buffer_id = register_bindless(alias_table_buffer_view);
                 auto pdf_buffer_id = register_bindless(pdf_buffer_view);
-                return iter->second = {mesh, position_buffer_id};
+                return cache_iter->second = {mesh, position_buffer_id};
             }();
             // assign mesh data
             MeshData mesh{};
@@ -439,8 +442,14 @@ Float4 Pipeline::evaluate_texture(
     return value;
 }
 
-void Pipeline::register_texture(const Texture *texture) noexcept {
-    _texture_interfaces[texture->handle_tag()] = texture;
+const TextureHandle *Pipeline::encode_texture(const Texture *texture, CommandBuffer &command_buffer) noexcept {
+    auto [iter, first_def] = _texture_handles.try_emplace(texture, nullptr);
+    if (first_def) {
+        iter->second = luisa::make_unique<TextureHandle>(
+            texture->encode(*this, command_buffer));
+        _texture_interfaces[texture->handle_tag()] = texture;
+    }
+    return iter->second.get();
 }
 
 }// namespace luisa::render

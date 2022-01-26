@@ -1,13 +1,19 @@
 Material cbox-white : Lambert {
-  color { 0.725, 0.71, 0.68 }
+  color : Constant {
+    color { 0.725, 0.71, 0.68 }
+  }
 }
 
 Material cbox-red : Lambert {
-  color { 0.63, 0.065, 0.05 }
+  color : Constant {
+    color { 0.63, 0.065, 0.05 }
+  }
 }
 
 Material cbox-green : Lambert {
-  color { 0.14, 0.45, 0.091 }
+  color : Constant {
+    color { 0.14, 0.45, 0.091 }
+  }
 }
 
 Shape cbox-ceiling : Mesh {
@@ -48,7 +54,9 @@ Shape cbox-short-box : Mesh {
 Shape cbox-light : Mesh {
   file { "cbox-parts/light.obj" }
   light : Diffuse {
-    emission { 51.0, 36.0, 12.0 }
+    emission : ConstantIlluminant {
+      emission { 51.0, 36.0, 12.0 }
+    }
   }
 }
 

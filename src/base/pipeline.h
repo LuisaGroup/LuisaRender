@@ -100,6 +100,7 @@ private:
     luisa::unordered_map<const Material *, MaterialData> _materials;
     luisa::unordered_map<const Light *, LightData> _lights;
     std::array<const Texture *, TextureHandle::tag_max_count> _texture_interfaces{};
+    luisa::unordered_map<const Texture *, luisa::unique_ptr<TextureHandle>> _texture_handles;
     luisa::vector<InstancedShape> _instances;
     luisa::vector<InstancedTransform> _dynamic_transforms;
     Buffer<InstancedShape> _instance_buffer;
@@ -158,7 +159,7 @@ public:
         return static_cast<uint>(tex3d_id);
     }
 
-    void register_texture(const Texture *texture) noexcept;
+    const TextureHandle *encode_texture(const Texture *texture, CommandBuffer &command_buffer) noexcept;
 
     template<typename T, typename... Args>
         requires std::is_base_of_v<Resource, T>

@@ -2,66 +2,49 @@
 // Created by Mike Smith on 2022/1/9.
 //
 
-#include <luisa-compute.h>
+#include <util/sampling.h>
 #include <base/material.h>
 #include <base/interaction.h>
 #include <base/pipeline.h>
-#include <util/sampling.h>
+#include <base/scene.h>
 
 namespace luisa::render {
 
-using namespace luisa::compute;
+[[nodiscard]] static auto default_color_texture_desc() noexcept {
+    static auto desc = [] {
+        static SceneNodeDesc d{
+            "__lambert_material_default_color_texture",
+            SceneNodeTag::TEXTURE};
+        d.define(SceneNodeTag::TEXTURE, "constant", {});
+        return &d;
+    }();
+    return desc;
+}
 
-struct LambertParams {
-    float color_rsp[3];
-    uint color_texture_id;
-};
+using namespace luisa::compute;
 
 class LambertMaterial final : public Material {
 
 private:
-    LambertParams _params{};
-    bool _is_black{};
+    const Texture *_color;
 
 public:
     LambertMaterial(Scene *scene, const SceneNodeDesc *desc) noexcept
-        : Material{scene, desc}, _params{} {
-        auto color = clamp(
-            desc->property_float3_or_default(
-                "color", lazy_construct([desc] {
-                    return make_float3(desc->property_float_or_default("color", 1.0f));
-                })),
-            0.0f, 1.0f);
-        auto color_texture = desc->property_path_or_default("color", "");
-        auto rsp = RGB2SpectrumTable::srgb().decode_albedo(color);
-        _params.color_rsp[0] = rsp.x;
-        _params.color_rsp[1] = rsp.y;
-        _params.color_rsp[2] = rsp.z;
-        if (color_texture.empty()) {
-            _params.color_texture_id = ~0u;
-            _is_black = all(color == 0.0f);
-        } else {
-            // TODO: load texture
-            LUISA_INFO("Loading color texture for lambert material: '{}'.", color_texture.string());
-        }
-    }
+        : Material{scene, desc},
+          _color{scene->load_texture(desc->property_node_or_default(
+              "color", default_color_texture_desc()))} {}
     [[nodiscard]] string_view impl_type() const noexcept override { return "lambert"; }
-    [[nodiscard]] bool is_black() const noexcept override { return _is_black; }
+    [[nodiscard]] bool is_black() const noexcept override { return _color->is_black(); }
     [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint, const Shape *) const noexcept override {
-        auto [buffer_view, buffer_id] = pipeline.arena_buffer<LambertParams>(sizeof(LambertParams));
-        command_buffer << buffer_view.copy_from(&_params);
+        auto [buffer_view, buffer_id] = pipeline.arena_buffer<TextureHandle>(1u);
+        auto texture = pipeline.encode_texture(_color, command_buffer);
+        command_buffer << buffer_view.copy_from(texture);
         return buffer_id;
     }
     [[nodiscard]] luisa::unique_ptr<Closure> decode(
         const Pipeline &pipeline, const Interaction &it,
         const SampledWavelengths &swl, Expr<float> time) const noexcept override;
 };
-
-}// namespace luisa::render
-
-LUISA_STRUCT(luisa::render::LambertParams, color_rsp, color_texture_id){};
-
-namespace luisa::render {
 
 class LambertClosure final : public Material::Closure {
 
@@ -99,16 +82,10 @@ private:
 
 luisa::unique_ptr<Material::Closure> LambertMaterial::decode(
     const Pipeline &pipeline, const Interaction &it,
-    const SampledWavelengths &swl, Expr<float>) const noexcept {
-    auto params = pipeline.buffer<LambertParams>(it.shape()->material_buffer_id()).read(0u);
-    RGBAlbedoSpectrum spec{RGBSigmoidPolynomial{def<float3>(params.color_rsp)}};
-    auto albedo = spec.sample(swl);
-    $if(params.color_texture_id != ~0u) {
-        auto color = pipeline.tex2d(params.color_texture_id).sample(it.uv());
-        auto spec = pipeline.srgb_albedo_spectrum(color.xyz());
-        albedo = spec.sample(swl);
-    };
-    return luisa::make_unique<LambertClosure>(it, std::move(albedo));
+    const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    auto texture = pipeline.buffer<TextureHandle>(it.shape()->material_buffer_id()).read(0u);
+    auto R = pipeline.evaluate_texture(texture, it, swl, time);
+    return luisa::make_unique<LambertClosure>(it, std::move(R));
 }
 
 }// namespace luisa::render

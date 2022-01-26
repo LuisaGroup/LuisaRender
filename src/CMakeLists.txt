@@ -24,6 +24,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
 endif ()
 
 add_subdirectory(compute)
+
 add_subdirectory(sdl)
 add_subdirectory(util)
 add_subdirectory(base)
@@ -48,34 +49,35 @@ function(luisa_render_add_plugin name)
     endforeach ()
 endfunction()
 
-add_subdirectory(cameras)
 add_subdirectory(films)
-add_subdirectory(filters)
-add_subdirectory(integrators)
-add_subdirectory(materials)
-add_subdirectory(samplers)
 add_subdirectory(shapes)
 add_subdirectory(lights)
+add_subdirectory(cameras)
+add_subdirectory(filters)
+add_subdirectory(textures)
+add_subdirectory(samplers)
+add_subdirectory(materials)
 add_subdirectory(transforms)
+add_subdirectory(integrators)
 add_subdirectory(environments)
 add_subdirectory(lightsamplers)
 
 add_library(luisa-render INTERFACE)
 target_link_libraries(luisa-render INTERFACE
         luisa-render-ext
-        luisa-render-include
         luisa-render-sdl
         luisa-render-base
         luisa-render-util
-        luisa-render-cameras
         luisa-render-films
-        luisa-render-filters
-        luisa-render-integrators
-        luisa-render-materials
-        luisa-render-samplers
         luisa-render-shapes
         luisa-render-lights
+        luisa-render-filters
+        luisa-render-cameras
+        luisa-render-textures
+        luisa-render-samplers
+        luisa-render-materials
         luisa-render-transforms
+        luisa-render-integrators
         luisa-render-environments
         luisa-render-lightsamplers)
 add_library(luisa::render ALIAS luisa-render)

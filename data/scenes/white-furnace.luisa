@@ -21,9 +21,7 @@ Integrator pt : MegaPath {
 
 Shape teapot : Mesh {
   file { "../meshes/utah-teapot.obj" }
-  material : Lambert {
-    color { 1 }
-  }
+  material : Lambert {}
   transform : SRT {
     scale { 0.25 }
     translate { 0, -0.5, 0 }
@@ -33,9 +31,7 @@ Shape teapot : Mesh {
 
 Shape sphere : Mesh {
   file { "../meshes/sphere.obj" }
-  material : Lambert {
-    color { 1 }
-  }
+  material : Lambert {}
 }
 
 render {

@@ -30,14 +30,14 @@ Object teapot : Group {
   shapes {
     Mesh {
       file { "../meshes/utah-teapot-lid.obj" }
-      material : FakeMirror {
-        color { 1 }
-      }
+      material : FakeMirror {}
     },
     Mesh {
       file { "../meshes/utah-teapot.obj" }
       material : FakeMirror {
-        color { 1.0, 0.71, 0.29 }
+        color : Constant {
+          color { 1.0, 0.71, 0.29 }
+        }
       }
     }
   }
@@ -60,9 +60,7 @@ Object teapot : Group {
 
 Object sphere : Mesh {
   file { "../meshes/sphere.obj" }
-  material : FakeMirror {
-    color { 1 }
-  }
+  material : FakeMirror {}
 }
 
 render {
