@@ -15,7 +15,7 @@ namespace luisa::render {
 [[nodiscard]] static auto default_emission_texture_desc() noexcept {
     static auto desc = [] {
         static SceneNodeDesc d{
-            "__hdri_environment_default_emission_texture",
+            "__environment_mapping_default_emission_texture",
             SceneNodeTag::TEXTURE};
         d.define(SceneNodeTag::TEXTURE, "constillum", {});
         return &d;
@@ -38,7 +38,7 @@ public:
         if (!_emission->is_illuminant()) [[unlikely]] {
             LUISA_ERROR(
                 "Non-illuminant textures are not "
-                "allowed in HDRI environments. [{}]",
+                "allowed in environment mapping. [{}]",
                 desc->source_location().string());
         }
     }
@@ -64,7 +64,12 @@ private:
         for (auto i = 0u; i < std::size(_texture.compressed_v); i++) {
             handle.compressed_v[i] = _texture.compressed_v[i];
         }
-        auto L = env->emission()->evaluate(pipeline(), handle, wi_local, swl, time);
+        auto theta = acos(wi_local.y);
+        auto phi = atan2(wi_local.x, wi_local.z);
+        auto u = -0.5f * inv_pi * phi;
+        auto v = theta * inv_pi;
+        Interaction it{-wi_local, make_float2(u, v)};
+        auto L = env->emission()->evaluate(pipeline(), it, handle, swl, time);
         return Light::Evaluation{.L = L * env->scale(), .pdf = uniform_sphere_pdf()};
     }
 

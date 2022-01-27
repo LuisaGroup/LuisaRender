@@ -86,9 +86,6 @@ public:
         const Pipeline &pipeline, const Interaction &it,
         const Var<TextureHandle> &handle,
         const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
-    [[nodiscard]] virtual Float4 evaluate(
-        const Pipeline &pipeline, const Var<TextureHandle> &handle,
-        Expr<float3> wi, const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
 };
 
 using compute::PixelStorage;
@@ -118,9 +115,6 @@ public:
     [[nodiscard]] Float4 evaluate(
         const Pipeline &pipeline, const Interaction &it, const Var<TextureHandle> &handle,
         const SampledWavelengths &swl, Expr<float> time) const noexcept override;
-    [[nodiscard]] Float4 evaluate(
-        const Pipeline &pipeline, const Var<TextureHandle> &handle,
-        Expr<float3> wi_local, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
 };
 
 }// namespace luisa::render

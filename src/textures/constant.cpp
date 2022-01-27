@@ -42,11 +42,6 @@ public:
         const SampledWavelengths &swl, Expr<float>) const noexcept override {
         return _evaluate(handle, swl);
     }
-    [[nodiscard]] Float4 evaluate(
-        const Pipeline &pipeline, const Var<TextureHandle> &handle, Expr<float3> wi,
-        const SampledWavelengths &swl, Expr<float> time) const noexcept override {
-        return _evaluate(handle, swl);
-    }
     [[nodiscard]] bool is_color() const noexcept override { return true; }
     [[nodiscard]] bool is_general() const noexcept override { return false; }
     [[nodiscard]] bool is_illuminant() const noexcept override { return false; }
