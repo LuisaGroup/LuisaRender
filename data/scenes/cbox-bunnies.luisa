@@ -9,7 +9,7 @@ Camera camera_base {
     radius { 1 }
   }
   fov { 27.8 }
-  spp { 1024 }
+  spp { 128 }
 }
 
 Camera camera : Pinhole(@camera_base) {
@@ -47,8 +47,8 @@ Shape virtual : Virtual {
 Shape bunny : Mesh {
   file { "../meshes/bunny.obj" }
   transform : SRT {
-    scale { 0.01 }
-    translate { 0.35, 0.825, 0.4 }
+    scale { 0.5 }
+    translate { 0.4, 0.5, 0.4 }
     rotate { 0, 1, 0, 20 }
   }
   material : FakeMirror {
@@ -61,12 +61,12 @@ Shape bunny : Mesh {
 Shape light : Mesh {
   file { "../meshes/light.obj" }
   two_sided { true }
-  light : Diffuse {
-    emission : ConstIllum {
-      emission { 1.5, 1.1, 0.6 }
-    }
-    scale { 1.75 }
-  }
+  // light : Diffuse {
+  //   emission : ConstIllum {
+  //     emission { 1.5, 1.1, 0.6 }
+  //   }
+  //   scale { 1.75 }
+  // }
   transform : Lerp {
     transforms {
       SRT {
@@ -122,7 +122,7 @@ Shape group : Group {
       material { @cbox-red }
       transform : SRT {
         rotate { 0, 1, 0, 30 }
-        translate { -0.2, 0, 0.2 }
+        translate { -0.1, 0, 0.2 }
       }
     }
   }

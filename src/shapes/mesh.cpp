@@ -51,7 +51,9 @@ public:
                     aiProcess_CalcTangentSpace | aiProcess_FixInfacingNormals);
             if (model == nullptr || (model->mFlags & AI_SCENE_FLAGS_INCOMPLETE) ||
                 model->mRootNode == nullptr || model->mRootNode->mNumMeshes == 0) [[unlikely]] {
-                LUISA_ERROR_WITH_LOCATION("Failed to load mesh '{}'", path_string);
+                LUISA_ERROR_WITH_LOCATION(
+                    "Failed to load mesh '{}': {}.",
+                    path_string, importer.GetErrorString());
             }
             auto mesh = model->mMeshes[0];
             if (auto uv_count = std::count_if(
