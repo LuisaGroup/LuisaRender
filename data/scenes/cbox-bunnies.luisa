@@ -56,6 +56,14 @@ Shape bunny : Mesh {
       color { 1.0, 0.71, 0.29 }
     }
   }
+  // material : Lambert {
+  //   color : Gamma {
+  //     // color { 1.0, 0.71, 0.29 }
+  //     file { "../textures/brickwall.jpg" }
+  //     gamma { 1.2 }
+  //     uv_scale { 0.5 }
+  //   }
+  // }
 }
 
 Shape light : Mesh {

@@ -5,6 +5,7 @@
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
+#include <assimp/mesh.h>
 
 #include <core/thread_pool.h>
 #include <base/shape.h>
@@ -42,13 +43,21 @@ public:
                     aiComponent_CAMERAS | aiComponent_COLORS |
                     aiComponent_LIGHTS | aiComponent_MATERIALS |
                     aiComponent_TEXTURES);
+            importer.SetPropertyInteger(
+                AI_CONFIG_PP_SBP_REMOVE,
+                aiPrimitiveType_LINE | aiPrimitiveType_POINT);
+            importer.SetPropertyBool(
+                AI_CONFIG_PP_FD_CHECKAREA, false);
             auto model = importer.ReadFile(
                 path_string.c_str(),
                 aiProcess_Triangulate | aiProcess_JoinIdenticalVertices |
                     aiProcess_RemoveComponent | aiProcess_ImproveCacheLocality |
                     aiProcess_OptimizeMeshes | aiProcess_OptimizeGraph |
                     aiProcess_GenNormals | aiProcess_GenUVCoords |
-                    aiProcess_CalcTangentSpace | aiProcess_FixInfacingNormals);
+                    aiProcess_CalcTangentSpace | aiProcess_FixInfacingNormals |
+                    aiProcess_PreTransformVertices | aiProcess_RemoveRedundantMaterials |
+                    aiProcess_FindInvalidData | aiProcess_TransformUVCoords |
+                    aiProcess_SortByPType | aiProcess_FindDegenerates);
             if (model == nullptr || (model->mFlags & AI_SCENE_FLAGS_INCOMPLETE) ||
                 model->mRootNode == nullptr || model->mRootNode->mNumMeshes == 0) [[unlikely]] {
                 LUISA_ERROR_WITH_LOCATION(

@@ -1,6 +1,6 @@
 Film film : Color {
   resolution { 1024 }
-  exposure { 0 }
+  exposure { -1.5 }
 }
 
 Camera camera : Pinhole {
@@ -10,7 +10,7 @@ Camera camera : Pinhole {
   film { @film }
   file { "cbox-image-light.exr" }
   filter : Gaussian {
-    radius { 1 }
+    radius { 0.5 }
   }
 }
 
@@ -20,17 +20,20 @@ Integrator pt : MegaPath {
   depth { 10 }
 }
 
-Shape image-light : Instance {
-  shape { @cbox-back-wall }
+Shape image-light : Mesh {
+  file { "../meshes/quad.obj" }
+  two_sided { false }
   transform : SRT {
-    scale { 0.75, 0.5, 1 }
-    translate { 0, 0.75, 0.01 }
+    scale { 1.5, 1, 1 }
+    translate { 0, 1.2, -0.97 }
   }
   light : Diffuse {
     emission : GammaIllum {
-      file { "/Users/mike/Downloads/WechatIMG16.jpeg" }
-      scale { 15 }
-      gamma { 3 }
+      file { "/Users/mike/Downloads/_DSC9322.jpg" } // "/Users/mike/Downloads/WechatIMG16.jpeg" }
+      uv_offset { 0, 0 }
+      uv_scale { 1, 1 }
+      scale { 5 }
+      gamma { 3.5 }
     }
   }
   material : Black {}
@@ -45,6 +48,7 @@ render {
     @cbox-floor,
     @cbox-back-wall,
     @cbox-short-box,
+    // @cbox-tall-box,
     @image-light
   }
   integrator { @pt }

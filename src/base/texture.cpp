@@ -54,8 +54,8 @@ TextureHandle TextureHandle::encode_texture(uint tag, uint tex_id, float3 v, flo
 
 ImageTexture::ImageTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
     : Texture{scene, desc} {
-    auto address = desc->property_string_or_default("address_mode", "repeat");
-    auto filter = desc->property_string_or_default("filter_mode", "bilinear");
+    auto address = desc->property_string_or_default("address", "repeat");
+    auto filter = desc->property_string_or_default("filter", "bilinear");
     auto address_mode = [&address, desc] {
         for (auto &c : address) { c = static_cast<char>(tolower(c)); }
         if (address == "zero") { return TextureSampler::Address::ZERO; }
