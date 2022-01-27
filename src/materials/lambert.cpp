@@ -44,7 +44,7 @@ public:
     [[nodiscard]] bool is_black() const noexcept override { return _color->is_black(); }
     [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint, const Shape *) const noexcept override {
         auto [buffer_view, buffer_id] = pipeline.arena_buffer<TextureHandle>(1u);
-        auto texture = pipeline.encode_texture(_color, command_buffer);
+        auto texture = pipeline.encode_texture(command_buffer, _color);
         command_buffer << buffer_view.copy_from(texture);
         return buffer_id;
     }

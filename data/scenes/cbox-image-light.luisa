@@ -1,0 +1,51 @@
+Film film : Color {
+  resolution { 1024 }
+  exposure { 0 }
+}
+
+Camera camera : Pinhole {
+  position { -0.01, 0.995, 5.0 }
+  fov { 27.8 }
+  spp { 1024 }
+  film { @film }
+  file { "cbox-image-light.exr" }
+  filter : Gaussian {
+    radius { 1 }
+  }
+}
+
+import "../meshes/cbox.luisa"
+
+Integrator pt : MegaPath {
+  depth { 10 }
+}
+
+Shape image-light : Instance {
+  shape { @cbox-back-wall }
+  transform : SRT {
+    scale { 0.75, 0.5, 1 }
+    translate { 0, 0.75, 0.01 }
+  }
+  light : Diffuse {
+    emission : GammaIllum {
+      file { "/Users/mike/Downloads/WechatIMG16.jpeg" }
+      scale { 15 }
+      gamma { 3 }
+    }
+  }
+  material : Black {}
+}
+
+render {
+  cameras { @camera }
+  shapes {
+    @cbox-left-wall,
+    @cbox-right-wall,
+    @cbox-ceiling,
+    @cbox-floor,
+    @cbox-back-wall,
+    @cbox-short-box,
+    @image-light
+  }
+  integrator { @pt }
+}

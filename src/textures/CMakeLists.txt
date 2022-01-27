@@ -4,4 +4,5 @@ luisa_render_add_plugin(constillum CATEGORY texture SOURCES constant_illuminant.
 luisa_render_add_plugin(srgb CATEGORY texture SOURCES srgb.cpp)
 luisa_render_add_plugin(gamma CATEGORY texture SOURCES gamma.cpp)
 luisa_render_add_plugin(srgbillum CATEGORY texture SOURCES srgb_illuminant.cpp)
+luisa_render_add_plugin(gammaillum CATEGORY texture SOURCES gamma_illuminant.cpp)
 luisa_render_add_plugin(hdrillum CATEGORY texture SOURCES hdr_illuminant.cpp)

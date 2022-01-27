@@ -38,7 +38,7 @@ render {
   cameras { @camera }
   shapes { @teapot }
   integrator { @pt }
-  environment : HDRI {
+  environment : Map {
     emission : ConstIllum {
       emission { 1 }
     }

@@ -23,14 +23,14 @@ namespace luisa::render {
     return desc;
 }
 
-class HDRIEnvironment final : public Environment {
+class EnvironmentMapping final : public Environment {
 
 private:
     const Texture *_emission;
     float _scale;
 
 public:
-    HDRIEnvironment(Scene *scene, const SceneNodeDesc *desc) noexcept
+    EnvironmentMapping(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Environment{scene, desc},
           _emission{scene->load_texture(desc->property_node_or_default(
               "emission", default_emission_texture_desc()))},
@@ -45,20 +45,20 @@ public:
     [[nodiscard]] auto scale() const noexcept { return _scale; }
     [[nodiscard]] auto emission() const noexcept { return _emission; }
     [[nodiscard]] bool is_black() const noexcept override { return _scale == 0.0f || _emission->is_black(); }
-    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "hdri"; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "map"; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
 using namespace luisa::compute;
 
-class HDRIEnvironmentInstance final : public Environment::Instance {
+class EnvironmentMappingInstance final : public Environment::Instance {
 
 private:
     TextureHandle _texture;
 
 private:
     [[nodiscard]] auto _evaluate(Expr<float3> wi_local, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-        auto env = static_cast<const HDRIEnvironment *>(node());
+        auto env = static_cast<const EnvironmentMapping *>(node());
         auto handle = def<TextureHandle>();
         handle.id_and_tag = _texture.id_and_tag;
         for (auto i = 0u; i < std::size(_texture.compressed_v); i++) {
@@ -69,9 +69,9 @@ private:
     }
 
 public:
-    HDRIEnvironmentInstance(Pipeline &pipeline, CommandBuffer &command_buffer, const HDRIEnvironment *env) noexcept
+    EnvironmentMappingInstance(Pipeline &pipeline, CommandBuffer &command_buffer, const EnvironmentMapping *env) noexcept
         : Environment::Instance{pipeline, env},
-          _texture{*pipeline.encode_texture(env->emission(), command_buffer)} {}
+          _texture{*pipeline.encode_texture(command_buffer, env->emission())} {}
     // TODO: importance sampling
     [[nodiscard]] Light::Evaluation evaluate(
         Expr<float3> wi, Expr<float3x3> env_to_world,
@@ -88,10 +88,10 @@ public:
     }
 };
 
-unique_ptr<Environment::Instance> HDRIEnvironment::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
-    return luisa::make_unique<HDRIEnvironmentInstance>(pipeline, command_buffer, this);
+unique_ptr<Environment::Instance> EnvironmentMapping::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
+    return luisa::make_unique<EnvironmentMappingInstance>(pipeline, command_buffer, this);
 }
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::HDRIEnvironment)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::EnvironmentMapping)

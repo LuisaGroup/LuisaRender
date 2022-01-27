@@ -19,11 +19,8 @@ private:
 
 private:
     [[nodiscard]] std::pair<uint, float3> _encode(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
-        auto &&image = _image.get();
-        auto device_image = pipeline.create<Image<float>>(PixelStorage::BYTE4, image.resolution());
-        auto bindless_id = pipeline.register_bindless(*device_image, sampler());
-        command_buffer << device_image->copy_from(image.pixels());
-        return std::make_pair(bindless_id, _scale);
+        auto texture_id = pipeline.image_texture(command_buffer, _image.get(), sampler());
+        return std::make_pair(texture_id, _scale);
     }
     [[nodiscard]] Float4 _evaluate(
         const Pipeline &pipeline, const Var<TextureHandle> &handle,
@@ -43,13 +40,13 @@ private:
 public:
     SRGBIlluminantTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
         : ImageTexture{scene, desc},
-          _scale{clamp(
+          _scale{max(
               desc->property_float3_or_default(
                   "scale", lazy_construct([desc] {
                       return make_float3(desc->property_float_or_default(
                           "scale", 1.0f));
                   })),
-              0.0f, 1.0f)} {
+              0.0f)} {
         auto path = desc->property_path("file");
         _image = ThreadPool::global().async([path = std::move(path)] {
             return load_ldr_image(path, 4u);

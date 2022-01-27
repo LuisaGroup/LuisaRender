@@ -442,7 +442,7 @@ Float4 Pipeline::evaluate_texture(
     return value;
 }
 
-const TextureHandle *Pipeline::encode_texture(const Texture *texture, CommandBuffer &command_buffer) noexcept {
+const TextureHandle *Pipeline::encode_texture(CommandBuffer &command_buffer, const Texture *texture) noexcept {
     auto [iter, first_def] = _texture_handles.try_emplace(texture, nullptr);
     if (first_def) {
         iter->second = luisa::make_unique<TextureHandle>(

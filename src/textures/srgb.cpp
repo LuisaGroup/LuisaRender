@@ -18,11 +18,8 @@ private:
 
 private:
     [[nodiscard]] std::pair<uint, float3> _encode(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
-        auto &&image = _image.get();
-        auto device_image = pipeline.create<Image<float>>(PixelStorage::BYTE4, image.resolution());
-        auto bindless_id = pipeline.register_bindless(*device_image, sampler());
-        command_buffer << device_image->copy_from(image.pixels());
-        return std::make_pair(bindless_id, make_float3());
+        auto texture_id = pipeline.image_texture(command_buffer, _image.get(), sampler());
+        return std::make_pair(texture_id, make_float3());
     }
     [[nodiscard]] Float4 _evaluate(
         const Pipeline &pipeline, const Var<TextureHandle> &handle,

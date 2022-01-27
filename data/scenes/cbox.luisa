@@ -22,6 +22,6 @@ Integrator pt : MegaPath {
 
 render {
   cameras { @camera }
-  shapes { @cbox, @cbox-light }
+  shapes { @cbox }
   integrator { @pt }
 }

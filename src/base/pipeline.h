@@ -37,11 +37,11 @@ using compute::Device;
 using compute::Hit;
 using compute::Image;
 using compute::Mesh;
+using compute::PixelStorage;
 using compute::Ray;
 using compute::Resource;
 using compute::Triangle;
 using compute::Volume;
-using compute::PixelStorage;
 using TextureSampler = compute::Sampler;
 
 class Scene;
@@ -159,7 +159,37 @@ public:
         return static_cast<uint>(tex3d_id);
     }
 
-    const TextureHandle *encode_texture(const Texture *texture, CommandBuffer &command_buffer) noexcept;
+    const TextureHandle *encode_texture(CommandBuffer &command_buffer, const Texture *texture) noexcept;
+
+    template<typename T>
+    [[nodiscard]] auto image_texture(CommandBuffer &command_buffer, const LoadedImage<T> &image, TextureSampler sampler) noexcept {
+        auto storage = [&image] {
+            if constexpr (std::is_same_v<T, uint8_t>) {
+                switch (auto nc = image.num_channels()) {
+                    case 1u: return PixelStorage::BYTE1;
+                    case 2u: return PixelStorage::BYTE2;
+                    case 4u: return PixelStorage::BYTE4;
+                    default: LUISA_ERROR_WITH_LOCATION(
+                        "Invalid LDR image channels: {}.", nc);
+                }
+            } else if constexpr (std::is_same_v<T, float>) {
+                switch (auto nc = image.num_channels()) {
+                    case 1u: return PixelStorage::FLOAT1;
+                    case 2u: return PixelStorage::FLOAT2;
+                    case 4u: return PixelStorage::FLOAT4;
+                    default: LUISA_ERROR_WITH_LOCATION(
+                        "Invalid HDR image channels: {}.", nc);
+                }
+            } else {
+                static_assert(always_false_v<T>);
+            }
+        }();
+        auto device_image = this->create<Image<float>>(storage, image.resolution());
+        auto texture_id = this->register_bindless(*device_image, sampler);
+        command_buffer << device_image->copy_from(image.pixels())
+                       << compute::commit();
+        return texture_id;
+    }
 
     template<typename T, typename... Args>
         requires std::is_base_of_v<Resource, T>
@@ -220,12 +250,12 @@ public:
     [[nodiscard]] luisa::unique_ptr<Interaction> interaction(const Var<Ray> &ray, const Var<Hit> &hit) const noexcept;
     [[nodiscard]] std::pair<Var<InstancedShape>, Var<float4x4>> instance(Expr<uint> index) const noexcept;
     [[nodiscard]] Var<Triangle> triangle(const Var<InstancedShape> &instance, Expr<uint> index) const noexcept;
-    [[nodiscard]] std::tuple<Var<float3> /* position */, Var<float3> /* ng */, Var<float>/* area */>
+    [[nodiscard]] std::tuple<Var<float3> /* position */, Var<float3> /* ng */, Var<float> /* area */>
     surface_point_geometry(const Var<InstancedShape> &instance, const Var<float4x4> &shape_to_world,
-           const Var<Triangle> &triangle, const Var<float3> &uvw) const noexcept;
+                           const Var<Triangle> &triangle, const Var<float3> &uvw) const noexcept;
     [[nodiscard]] std::tuple<Var<float3> /* ns */, Var<float3> /* tangent */, Var<float2> /* uv */>
     surface_point_attributes(const Var<InstancedShape> &instance, const Var<float3x3> &shape_to_world_normal,
-                      const Var<Triangle> &triangle, const Var<float3> &uvw) const noexcept;
+                             const Var<Triangle> &triangle, const Var<float3> &uvw) const noexcept;
     [[nodiscard]] auto intersect(const Var<Ray> &ray) const noexcept { return interaction(ray, trace_closest(ray)); }
     [[nodiscard]] auto intersect_any(const Var<Ray> &ray) const noexcept { return trace_any(ray); }
 

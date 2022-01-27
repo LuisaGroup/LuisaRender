@@ -134,6 +134,6 @@ Shape group : Group {
 
 render {
   cameras { @camera }
-  shapes { @cbox, @cbox-light, @light_box, @bunny, @group }
+  shapes { @cbox, @light_box, @bunny, @group }
   integrator { @pt }
 }

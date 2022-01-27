@@ -166,7 +166,7 @@ LoadedImage<float> load_hdr_image(const std::filesystem::path &path, uint expect
                 "Failed to load HDR image '{}'.",
                 filename);
         }
-        return {pixels, make_uint2(w, h), static_cast<uint>(nc),
+        return {pixels, make_uint2(w, h), expected_channels,
                 static_cast<typename LoadedImage<float>::deleter_type>(
                     [](float *p) noexcept { stbi_image_free(p); })};
     }
@@ -192,7 +192,7 @@ LoadedImage<uint8_t> load_ldr_image(const std::filesystem::path &path, uint expe
             "Failed to load LDR image '{}'.",
             filename);
     }
-    return {pixels, make_uint2(w, h), static_cast<uint>(nc),
+    return {pixels, make_uint2(w, h), expected_channels,
             static_cast<typename LoadedImage<uint8_t>::deleter_type>(
                 [](uint8_t *p) noexcept { stbi_image_free(p); })};
 }

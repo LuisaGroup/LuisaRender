@@ -41,7 +41,7 @@ public:
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "fakemirror"; }
     [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint instance_id, const Shape *shape) const noexcept override {
         auto [buffer_view, buffer_id] = pipeline.arena_buffer<TextureHandle>(1u);
-        auto texture_handle = pipeline.encode_texture(_color, command_buffer);
+        auto texture_handle = pipeline.encode_texture(command_buffer, _color);
         command_buffer << buffer_view.copy_from(texture_handle);
         return buffer_id;
     }

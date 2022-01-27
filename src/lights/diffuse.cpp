@@ -58,7 +58,7 @@ public:
     [[nodiscard]] bool is_virtual() const noexcept override { return false; }
     [[nodiscard]] string_view impl_type() const noexcept override { return "diffuse"; }
     [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint instance_id, const Shape *shape) const noexcept override {
-        auto texture = pipeline.encode_texture(_emission, command_buffer);
+        auto texture = pipeline.encode_texture(command_buffer, _emission);
         DiffuseLightParams params{
             .emission = *texture, .scale = _scale,
             .triangle_count = static_cast<uint>(shape->triangles().size())};
