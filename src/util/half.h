@@ -8,6 +8,9 @@
 
 namespace luisa::render {
 
+constexpr auto half_max = 65504.0f;
+constexpr auto half_min = -65504.0f;
+
 namespace detail {
 
 [[nodiscard]] inline auto float_bits_to_half(auto x) noexcept {
@@ -31,7 +34,7 @@ using compute::as;
 
 // assumes IEEE-754
 [[nodiscard]] inline uint float_to_half(float f) noexcept {
-    auto x = luisa::bit_cast<uint>(f);
+    auto x = luisa::bit_cast<uint>(clamp(f, half_min, half_max));
     return detail::float_bits_to_half(x);
 }
 
@@ -41,7 +44,7 @@ using compute::as;
 }
 
 [[nodiscard]] inline UInt float_to_half(Expr<float> f) noexcept {
-    auto x = as<uint>(f);
+    auto x = as<uint>(clamp(f, half_min, half_max));
     return detail::float_bits_to_half(x);
 }
 

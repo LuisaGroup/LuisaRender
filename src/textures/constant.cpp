@@ -6,7 +6,7 @@
 
 namespace luisa::render {
 
-class ConstantColorTexture final : public Texture {
+class ConstantColor final : public Texture {
 
 private:
     std::array<float, 3> _rsp{};
@@ -23,7 +23,7 @@ private:
     }
 
 public:
-    ConstantColorTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
+    ConstantColor(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Texture{scene, desc} {
         auto color = desc->property_float3_or_default(
             "color", lazy_construct([desc] {
@@ -49,4 +49,4 @@ public:
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::ConstantColorTexture)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::ConstantColor)

@@ -32,8 +32,11 @@ private:
     }
     LoadedImage(void *pixels, storage_type storage, uint2 resolution, deleter_type deleter) noexcept
         : _pixels{pixels}, _resolution{resolution}, _storage{storage}, _deleter{deleter} {}
-    [[nodiscard]] static LoadedImage _load_float(const std::filesystem::path &path, storage_type storage) noexcept;
     [[nodiscard]] static LoadedImage _load_byte(const std::filesystem::path &path, storage_type storage) noexcept;
+    [[nodiscard]] static LoadedImage _load_half(const std::filesystem::path &path, storage_type storage) noexcept;
+    [[nodiscard]] static LoadedImage _load_short(const std::filesystem::path &path, storage_type storage) noexcept;
+    [[nodiscard]] static LoadedImage _load_float(const std::filesystem::path &path, storage_type storage) noexcept;
+    [[nodiscard]] static LoadedImage _load_int(const std::filesystem::path &path, storage_type storage) noexcept;
 
 public:
     ~LoadedImage() noexcept { _destroy(); }
@@ -61,7 +64,6 @@ public:
     [[nodiscard]] auto channels() const noexcept { return compute::pixel_storage_channel_count(_storage); }
     [[nodiscard]] auto pixel_size_bytes() const noexcept { return compute::pixel_storage_size(_storage); }
     [[nodiscard]] auto size_bytes() const noexcept { return _resolution.x * _resolution.y * pixel_size_bytes(); }
-
     [[nodiscard]] static LoadedImage load(const std::filesystem::path &path, storage_type storage) noexcept;
 };
 

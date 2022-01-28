@@ -70,6 +70,7 @@ render {
   environment : Map {
     emission : HDRIllum {
       file { "../envmaps/photo_studio_01_1k.hdr" }
+      half { true }
       // file { "/Users/mike/Downloads/dreifaltigkeitsberg_8k.exr" }
     }
     transform : SRT {

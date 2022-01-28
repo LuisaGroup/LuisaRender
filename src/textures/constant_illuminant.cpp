@@ -6,7 +6,7 @@
 
 namespace luisa::render {
 
-class ConstantIlluminantTexture final : public Texture {
+class ConstantIlluminant final : public Texture {
 
 private:
     float3 _rsp;
@@ -27,7 +27,7 @@ private:
     }
 
 public:
-    ConstantIlluminantTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
+    ConstantIlluminant(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Texture{scene, desc} {
         auto color = desc->property_float3_or_default(
             "emission", lazy_construct([desc] {
@@ -56,4 +56,4 @@ public:
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::ConstantIlluminantTexture)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::ConstantIlluminant)
