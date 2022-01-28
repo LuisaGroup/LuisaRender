@@ -18,10 +18,6 @@ private:
             handle_tag(), make_float3(_rsp[0], _rsp[1], _rsp[2]));
     }
 
-    [[nodiscard]] static auto _evaluate(const Var<TextureHandle> &handle, const SampledWavelengths &swl) noexcept {
-        return RGBAlbedoSpectrum{RGBSigmoidPolynomial{handle->v()}}.sample(swl);
-    }
-
 public:
     ConstantColor(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Texture{scene, desc} {
@@ -36,11 +32,11 @@ public:
         _is_black = all(color == 0.0f);
     }
     [[nodiscard]] bool is_black() const noexcept override { return _is_black; }
-    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "const"; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "constcolor"; }
     [[nodiscard]] Float4 evaluate(
         const Pipeline &, const Interaction &, const Var<TextureHandle> &handle,
         const SampledWavelengths &swl, Expr<float>) const noexcept override {
-        return _evaluate(handle, swl);
+        return RGBAlbedoSpectrum{RGBSigmoidPolynomial{handle->v()}}.sample(swl);
     }
     [[nodiscard]] bool is_color() const noexcept override { return true; }
     [[nodiscard]] bool is_value() const noexcept override { return false; }

@@ -18,13 +18,6 @@ private:
             handle_tag(), {}, 0.0f,
             make_float4(_rsp, _scale));
     }
-    [[nodiscard]] static auto _evaluate(const Var<TextureHandle> &handle, const SampledWavelengths &swl) noexcept {
-        auto rsp_scale = handle->extra();
-        RGBIlluminantSpectrum spec{
-            RGBSigmoidPolynomial{rsp_scale.xyz()}, rsp_scale.w,
-            DenselySampledSpectrum::cie_illum_d6500()};
-        return spec.sample(swl);
-    }
 
 public:
     ConstantIlluminant(Scene *scene, const SceneNodeDesc *desc) noexcept
@@ -46,7 +39,11 @@ public:
     [[nodiscard]] Float4 evaluate(
         const Pipeline &, const Interaction &, const Var<TextureHandle> &handle,
         const SampledWavelengths &swl, Expr<float>) const noexcept override {
-        return _evaluate(handle, swl);
+        auto rsp_scale = handle->extra();
+        RGBIlluminantSpectrum spec{
+            RGBSigmoidPolynomial{rsp_scale.xyz()}, rsp_scale.w,
+            DenselySampledSpectrum::cie_illum_d6500()};
+        return spec.sample(swl);
     }
     [[nodiscard]] bool is_color() const noexcept override { return false; }
     [[nodiscard]] bool is_value() const noexcept override { return false; }
