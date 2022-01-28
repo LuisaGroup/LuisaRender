@@ -212,9 +212,9 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
             rgb2spec_t0->view(0u),
             rgb2spec_t1->view(0u),
             rgb2spec_t2->view(0u));
-        pipeline->_rgb2spec_index = pipeline->register_bindless(*rgb2spec_t0, TextureSampler::bilinear_zero());
-        static_cast<void>(pipeline->register_bindless(*rgb2spec_t1, TextureSampler::bilinear_zero()));
-        static_cast<void>(pipeline->register_bindless(*rgb2spec_t2, TextureSampler::bilinear_zero()));
+        pipeline->_rgb2spec_index = pipeline->register_bindless(*rgb2spec_t0, TextureSampler::linear_point_zero());
+        static_cast<void>(pipeline->register_bindless(*rgb2spec_t1, TextureSampler::linear_point_zero()));
+        static_cast<void>(pipeline->register_bindless(*rgb2spec_t2, TextureSampler::linear_point_zero()));
         auto mean_time = 0.0;
         for (auto camera : scene.cameras()) {
             pipeline->_cameras.emplace_back(camera->build(*pipeline, command_buffer));
@@ -450,6 +450,14 @@ const TextureHandle *Pipeline::encode_texture(CommandBuffer &command_buffer, con
         _texture_interfaces[texture->handle_tag()] = texture;
     }
     return iter->second.get();
+}
+
+uint Pipeline::image_texture(CommandBuffer &command_buffer, const LoadedImage &image, TextureSampler sampler) noexcept {
+    auto device_image = this->create<Image<float>>(image.pixel_storage(), image.size());
+    auto texture_id = this->register_bindless(*device_image, sampler);
+    command_buffer << device_image->copy_from(image.pixels())
+                   << compute::commit();
+    return texture_id;
 }
 
 }// namespace luisa::render

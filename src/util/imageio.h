@@ -7,23 +7,22 @@
 #include <filesystem>
 
 #include <core/stl.h>
-#include <core/basic_types.h>
+#include <runtime/pixel.h>
 
 namespace luisa::render {
 
 // TODO: texture cache
-
-template<typename T>
 class LoadedImage {
 
 public:
-    using deleter_type = void(*)(T *);
+    using storage_type = compute::PixelStorage;
+    using deleter_type = void(*)(void *);
 
 private:
-    T *_pixels{nullptr};
+    void *_pixels;
     uint2 _resolution;
-    uint _channels{0u};
-    deleter_type _deleter{nullptr};
+    storage_type _storage;
+    luisa::function<void(void *)> _deleter;
 
 private:
     void _destroy() noexcept {
@@ -31,23 +30,24 @@ private:
             _deleter(_pixels);
         }
     }
+    LoadedImage(void *pixels, storage_type storage, uint2 resolution, deleter_type deleter) noexcept
+        : _pixels{pixels}, _resolution{resolution}, _storage{storage}, _deleter{deleter} {}
+    [[nodiscard]] static LoadedImage _load_float(const std::filesystem::path &path, storage_type storage) noexcept;
+    [[nodiscard]] static LoadedImage _load_byte(const std::filesystem::path &path, storage_type storage) noexcept;
 
 public:
-    LoadedImage() noexcept = default;
-    LoadedImage(T *pixels, uint2 resolution, uint num_channels, deleter_type deleter) noexcept
-        : _pixels{pixels}, _resolution{resolution}, _channels{num_channels}, _deleter{deleter} {}
     ~LoadedImage() noexcept { _destroy(); }
     LoadedImage(LoadedImage &&another) noexcept
         : _pixels{another._pixels},
           _resolution{another._resolution},
-          _channels{another._channels},
+          _storage{another._storage},
           _deleter{another._deleter} { another._pixels = nullptr; }
     LoadedImage &operator=(LoadedImage &&rhs) noexcept {
         if (&rhs != this) [[likely]] {
             _destroy();
             _pixels = rhs._pixels;
             _resolution = rhs._resolution;
-            _channels = rhs._channels;
+            _storage = rhs._storage;
             _deleter = rhs._deleter;
             rhs._pixels = nullptr;
         }
@@ -55,12 +55,14 @@ public:
     }
     LoadedImage(const LoadedImage &) noexcept = delete;
     LoadedImage &operator=(const LoadedImage &) noexcept = delete;
+    [[nodiscard]] auto size() const noexcept { return _resolution; }
     [[nodiscard]] auto pixels() const noexcept { return _pixels; }
-    [[nodiscard]] auto resolution() const noexcept { return _resolution; }
-    [[nodiscard]] auto num_channels() const noexcept { return _channels; }
-};
+    [[nodiscard]] auto pixel_storage() const noexcept { return _storage; }
+    [[nodiscard]] auto channels() const noexcept { return compute::pixel_storage_channel_count(_storage); }
+    [[nodiscard]] auto pixel_size_bytes() const noexcept { return compute::pixel_storage_size(_storage); }
+    [[nodiscard]] auto size_bytes() const noexcept { return _resolution.x * _resolution.y * pixel_size_bytes(); }
 
-[[nodiscard]] LoadedImage<float> load_hdr_image(const std::filesystem::path &path, uint expected_channels = 0u) noexcept;
-[[nodiscard]] LoadedImage<uint8_t> load_ldr_image(const std::filesystem::path &path, uint expected_channels = 0u) noexcept;
+    [[nodiscard]] static LoadedImage load(const std::filesystem::path &path, storage_type storage) noexcept;
+};
 
 }

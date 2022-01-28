@@ -49,7 +49,7 @@ public:
         return _evaluate(handle, swl);
     }
     [[nodiscard]] bool is_color() const noexcept override { return false; }
-    [[nodiscard]] bool is_general() const noexcept override { return false; }
+    [[nodiscard]] bool is_value() const noexcept override { return false; }
     [[nodiscard]] bool is_illuminant() const noexcept override { return true; }
     [[nodiscard]] bool is_black() const noexcept override { return _scale == 0.0f; }
 };

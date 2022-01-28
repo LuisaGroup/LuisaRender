@@ -11,6 +11,8 @@
 #include <base/scene.h>
 #include <base/pipeline.h>
 
+#include <util/ies.h>
+
 [[nodiscard]] auto parse_cli_options(int argc, const char *const *argv) noexcept {
     cxxopts::Options cli{"megakernel_path_tracing"};
     cli.add_option("", "b", "backend", "Compute backend name", cxxopts::value<luisa::string>(), "<backend>");
@@ -58,6 +60,28 @@ int main(int argc, char *argv[]) {
     auto backend = options["backend"].as<luisa::string>();
     auto index = options["device"].as<uint32_t>();
     auto path = options["scene"].as<std::filesystem::path>();
+
+    auto ies_profile = IESProfile::parse("/Users/mike/Downloads/002bb0e37aa7e5f1d7851fb1db032628.ies");
+    LUISA_INFO(
+        "Loaded IES profile with "
+        "{} vertical angle(s) and "
+        "{} horizontal angle(s):",
+        ies_profile.vertical_angles().size(),
+        ies_profile.horizontal_angles().size());
+    std::cout << "Vertical Angles:";
+    for (auto v : ies_profile.vertical_angles()) {
+        std::cout << " " << v;
+    }
+    std::cout << "\n";
+    auto candela_offset = 0u;
+    for (auto h : ies_profile.horizontal_angles()) {
+        std::cout << "@" << h << ":";
+        for (auto i = 0u; i < ies_profile.vertical_angles().size(); i++) {
+            std::cout << " " << ies_profile.candela_values()[candela_offset + i];
+        }
+        std::cout << "\n";
+        candela_offset += ies_profile.vertical_angles().size();
+    }
 
     auto device = context.create_device(backend, {{"index", index}});
     Clock clock;

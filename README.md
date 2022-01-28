@@ -18,6 +18,7 @@ on [LuisaCompute](https://github.com/Mike-Leo-Smith/LuisaCompute).
 
 - Rotating Teapot with Environment Mapping.
     - Mega-Kernel Path Tracing
+    - Motion Blur
     - (Fake) Mirror Materials
     - HDRI Environment Mapping
     - Spectral Rendering
@@ -26,7 +27,7 @@ on [LuisaCompute](https://github.com/Mike-Leo-Smith/LuisaCompute).
 
 ![EnvironmentMapping](data/scenes/environment-mapping.png)
 
-- Luisa in the Cornell Box.
+- Luisa Illuminating the Render.
     - Mega-Kernel Path Tracing
     - Textured Diffuse Area Light
     - Lambert Materials

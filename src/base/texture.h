@@ -80,7 +80,7 @@ public:
     [[nodiscard]] uint handle_tag() const noexcept;
     [[nodiscard]] virtual bool is_black() const noexcept = 0;
     [[nodiscard]] virtual bool is_color() const noexcept = 0;     // automatically converts to the albedo spectrum
-    [[nodiscard]] virtual bool is_general() const noexcept = 0;   // returns the value as-is (no conversion spectrum)
+    [[nodiscard]] virtual bool is_value() const noexcept = 0;   // returns the value as-is (no conversion spectrum)
     [[nodiscard]] virtual bool is_illuminant() const noexcept = 0;// automatically converts to the illuminant spectrum
     [[nodiscard]] virtual Float4 evaluate(
         const Pipeline &pipeline, const Interaction &it,

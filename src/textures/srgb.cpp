@@ -14,7 +14,7 @@ using namespace luisa::compute;
 class SRGBTexture final : public ImageTexture {
 
 private:
-    std::shared_future<LoadedImage<uint8_t>> _image;
+    std::shared_future<LoadedImage> _image;
 
 private:
     [[nodiscard]] std::pair<uint, float3> _encode(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
@@ -41,12 +41,12 @@ public:
         : ImageTexture{scene, desc} {
         auto path = desc->property_path("file");
         _image = ThreadPool::global().async([path = std::move(path)] {
-            return load_ldr_image(path, 4u);
+            return LoadedImage::load(path, PixelStorage::BYTE4);
         });
     }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "srgb"; }
     [[nodiscard]] bool is_color() const noexcept override { return true; }
-    [[nodiscard]] bool is_general() const noexcept override { return false; }
+    [[nodiscard]] bool is_value() const noexcept override { return false; }
     [[nodiscard]] bool is_illuminant() const noexcept override { return false; }
 };
 

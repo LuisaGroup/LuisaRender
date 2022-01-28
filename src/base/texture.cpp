@@ -69,8 +69,8 @@ ImageTexture::ImageTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
     auto filter_mode = [&filter, desc] {
         for (auto &c : filter) { c = static_cast<char>(tolower(c)); }
         if (filter == "point") { return TextureSampler::Filter::POINT; }
-        if (filter == "bilinear") { return TextureSampler::Filter::BILINEAR; }
-        if (filter == "trilinear") { return TextureSampler::Filter::TRILINEAR; }
+        if (filter == "bilinear") { return TextureSampler::Filter::LINEAR_POINT; }
+        if (filter == "trilinear") { return TextureSampler::Filter::LINEAR_LINEAR; }
         if (filter == "anisotropic" || filter == "aniso") { return TextureSampler::Filter::ANISOTROPIC; }
         LUISA_ERROR(
             "Invalid texture filter mode '{}'. [{}]",

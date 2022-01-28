@@ -8,7 +8,7 @@ add_library(luisa-render-util SHARED
         spectrum_cie_illum_d65.inl.h
         colorspace.cpp colorspace.h
         srgb2spec.cpp
-        half.h)
+        half.h ies.cpp ies.h)
 target_link_libraries(luisa-render-util PUBLIC
         luisa::compute
         luisa-render-include

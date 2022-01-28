@@ -15,7 +15,7 @@ using namespace luisa::compute;
 class HDRIlluminantTexture final : public ImageTexture {
 
 private:
-    std::shared_future<LoadedImage<float>> _image;
+    std::shared_future<LoadedImage> _image;
     float3 _scale;
 
 private:
@@ -45,12 +45,8 @@ public:
               0.0f)} {
         auto path = desc->property_path("file");
         _image = ThreadPool::global().async([path = std::move(path), s = _scale] {
-            Clock clock;
-            auto image = load_hdr_image(path, 4u);
-            LUISA_INFO(
-                "Loaded HDRI image '{}' in {} ms.",
-                path.string(), clock.toc());
-            for (auto i = 0u; i < image.resolution().x * image.resolution().y; i++) {
+            auto image = LoadedImage::load(path, PixelStorage::FLOAT4);
+            for (auto i = 0u; i < image.size().x * image.size().y; i++) {
                 auto &p = reinterpret_cast<float4 *>(image.pixels())[i];
                 auto [rsp, scale] = RGB2SpectrumTable::srgb().decode_unbound(p.xyz() * s);
                 p = make_float4(rsp, scale);
@@ -60,7 +56,7 @@ public:
     }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "hdrillum"; }
     [[nodiscard]] bool is_color() const noexcept override { return false; }
-    [[nodiscard]] bool is_general() const noexcept override { return false; }
+    [[nodiscard]] bool is_value() const noexcept override { return false; }
     [[nodiscard]] bool is_illuminant() const noexcept override { return true; }
     [[nodiscard]] bool is_black() const noexcept override { return all(_scale == 0.0f); }
 };

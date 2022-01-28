@@ -12,16 +12,16 @@
 
 namespace luisa::render {
 
-LoadedImage<float> load_hdr_image(const std::filesystem::path &path, uint expected_channels) noexcept {
+inline LoadedImage LoadedImage::_load_float(const std::filesystem::path &path, storage_type storage) noexcept {
     auto filename = path.string();
-    if (expected_channels != 1u &&
-        expected_channels != 3u &&
-        expected_channels != 4u) [[unlikely]] {
+    if (storage != storage_type::FLOAT1 &&
+        storage != storage_type::FLOAT2 &&
+        storage != storage_type::FLOAT4) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
-            "Invalid expected channel count {} "
-            "for HDR image '{}'.",
-            expected_channels, filename);
+            "Invalid pixel storage {:02x} for FLOAT image '{}'.",
+            luisa::to_underlying(storage), filename);
     }
+    auto expected_channels = compute::pixel_storage_channel_count(storage);
     auto ext = path.extension();
     if (ext == ".exr") {
         EXRVersion exr_version;
@@ -86,13 +86,13 @@ LoadedImage<float> load_hdr_image(const std::filesystem::path &path, uint expect
             std::memcpy(
                 pixels, exr_image.images[0],
                 float_count * sizeof(float));
-        } else if (expected_channels == 3u) {
+        } else if (expected_channels == 2u) {
             using namespace std::string_view_literals;
-            std::array<uint, 3u> swizzle{};
+            std::array<uint, 2u> swizzle{};
             if (num_channels == 1u) {
-                swizzle = {0u, 0u, 0u};
+                swizzle = {0u, 0u};
             } else {
-                std::array desc{"R"sv, "G"sv, "B"sv};
+                std::array desc{"R"sv, "G"sv};
                 std::transform(
                     desc.cbegin(), desc.cend(), swizzle.begin(),
                     [&](auto channel) noexcept {
@@ -154,9 +154,10 @@ LoadedImage<float> load_hdr_image(const std::filesystem::path &path, uint expect
         }
         FreeEXRImage(&exr_image);
         FreeEXRHeader(&exr_header);
-        return {pixels, make_uint2(width, height), expected_channels,
-                static_cast<typename LoadedImage<float>::deleter_type>(
-                    [](float *p) noexcept { luisa::deallocate(p); })};
+        return {pixels, storage, make_uint2(width, height),
+                [](void *p) noexcept {
+                    luisa::deallocate(static_cast<float *>(p));
+                }};
     }
     if (ext == ".hdr") {
         int w, h, nc;
@@ -166,35 +167,62 @@ LoadedImage<float> load_hdr_image(const std::filesystem::path &path, uint expect
                 "Failed to load HDR image '{}'.",
                 filename);
         }
-        return {pixels, make_uint2(w, h), expected_channels,
-                static_cast<typename LoadedImage<float>::deleter_type>(
-                    [](float *p) noexcept { stbi_image_free(p); })};
+        return {pixels, storage, make_uint2(w, h),
+                [](void *p) noexcept { stbi_image_free(p); }};
     }
     LUISA_ERROR_WITH_LOCATION(
-        "Invalid HDR image '{}'.",
+        "Invalid FLOAT image '{}'.",
         filename);
 }
 
-LoadedImage<uint8_t> load_ldr_image(const std::filesystem::path &path, uint expected_channels) noexcept {
+inline LoadedImage LoadedImage::_load_byte(const std::filesystem::path &path, storage_type storage) noexcept {
     auto filename = path.string();
-    if (expected_channels != 1u &&
-        expected_channels != 3u &&
-        expected_channels != 4u) [[unlikely]] {
+    if (storage != storage_type::BYTE1 &&
+        storage != storage_type::BYTE2 &&
+        storage != storage_type::BYTE4) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
-            "Invalid expected channel count {} "
-            "for HDR image '{}'.",
-            expected_channels, filename);
+            "Invalid pixel storage 0x{:02x} for BYTE image '{}'.",
+            luisa::to_underlying(storage), filename);
     }
     int w, h, nc;
+    auto expected_channels = compute::pixel_storage_channel_count(storage);
     auto pixels = stbi_load(filename.c_str(), &w, &h, &nc, static_cast<int>(expected_channels));
     if (pixels == nullptr) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
-            "Failed to load LDR image '{}'.",
+            "Failed to load BYTE image '{}'.",
             filename);
     }
-    return {pixels, make_uint2(w, h), expected_channels,
-            static_cast<typename LoadedImage<uint8_t>::deleter_type>(
-                [](uint8_t *p) noexcept { stbi_image_free(p); })};
+    return {pixels, storage, make_uint2(w, h),
+            [](void *p) noexcept { stbi_image_free(p); }};
+}
+
+LoadedImage LoadedImage::load(const std::filesystem::path &path, LoadedImage::storage_type storage) noexcept {
+    switch (storage) {
+        case compute::PixelStorage::BYTE1:
+        case compute::PixelStorage::BYTE2:
+        case compute::PixelStorage::BYTE4:
+            return _load_byte(path, storage);
+        case compute::PixelStorage::SHORT1:
+        case compute::PixelStorage::SHORT2:
+        case compute::PixelStorage::SHORT4:
+            LUISA_ERROR_WITH_LOCATION("Not implemented.");
+        case compute::PixelStorage::INT1:
+        case compute::PixelStorage::INT2:
+        case compute::PixelStorage::INT4:
+            LUISA_ERROR_WITH_LOCATION("Not implemented.");
+        case compute::PixelStorage::HALF1:
+        case compute::PixelStorage::HALF2:
+        case compute::PixelStorage::HALF4:
+            LUISA_ERROR_WITH_LOCATION("Not implemented.");
+        case compute::PixelStorage::FLOAT1:
+        case compute::PixelStorage::FLOAT2:
+        case compute::PixelStorage::FLOAT4:
+            return _load_float(path, storage);
+        default: break;
+    }
+    LUISA_ERROR_WITH_LOCATION(
+        "Invalid pixel storage: {:02x}.",
+        luisa::to_underlying(storage));
 }
 
 }// namespace luisa::render

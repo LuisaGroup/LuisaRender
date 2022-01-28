@@ -159,37 +159,8 @@ public:
         return static_cast<uint>(tex3d_id);
     }
 
-    const TextureHandle *encode_texture(CommandBuffer &command_buffer, const Texture *texture) noexcept;
-
-    template<typename T>
-    [[nodiscard]] auto image_texture(CommandBuffer &command_buffer, const LoadedImage<T> &image, TextureSampler sampler) noexcept {
-        auto storage = [&image] {
-            if constexpr (std::is_same_v<T, uint8_t>) {
-                switch (auto nc = image.num_channels()) {
-                    case 1u: return PixelStorage::BYTE1;
-                    case 2u: return PixelStorage::BYTE2;
-                    case 4u: return PixelStorage::BYTE4;
-                    default: LUISA_ERROR_WITH_LOCATION(
-                        "Invalid LDR image channels: {}.", nc);
-                }
-            } else if constexpr (std::is_same_v<T, float>) {
-                switch (auto nc = image.num_channels()) {
-                    case 1u: return PixelStorage::FLOAT1;
-                    case 2u: return PixelStorage::FLOAT2;
-                    case 4u: return PixelStorage::FLOAT4;
-                    default: LUISA_ERROR_WITH_LOCATION(
-                        "Invalid HDR image channels: {}.", nc);
-                }
-            } else {
-                static_assert(always_false_v<T>);
-            }
-        }();
-        auto device_image = this->create<Image<float>>(storage, image.resolution());
-        auto texture_id = this->register_bindless(*device_image, sampler);
-        command_buffer << device_image->copy_from(image.pixels())
-                       << compute::commit();
-        return texture_id;
-    }
+    [[nodiscard]] const TextureHandle *encode_texture(CommandBuffer &command_buffer, const Texture *texture) noexcept;
+    [[nodiscard]] uint image_texture(CommandBuffer &command_buffer, const LoadedImage &image, TextureSampler sampler) noexcept;
 
     template<typename T, typename... Args>
         requires std::is_base_of_v<Resource, T>
