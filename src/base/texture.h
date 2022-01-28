@@ -7,6 +7,7 @@
 #include <dsl/syntax.h>
 #include <util/spectrum.h>
 #include <util/imageio.h>
+#include <util/half.h>
 #include <base/scene_node.h>
 
 namespace luisa::render {
@@ -15,8 +16,6 @@ struct alignas(16) TextureHandle {
 
     static constexpr auto texture_id_offset_shift = 6u;
     static constexpr auto tag_mask = (1 << texture_id_offset_shift) - 1u;
-    static constexpr auto fixed_point_alpha_max = 4096.0f - 1.0f;
-    static constexpr auto fixed_point_alpha_scale = 16384.0f;
     static constexpr auto tag_max_count = 1u << texture_id_offset_shift;
 
     uint id_and_tag;
@@ -52,8 +51,8 @@ LUISA_STRUCT(luisa::render::TextureHandle, id_and_tag, compressed_v) {
     [[nodiscard]] auto alpha() const noexcept {
         using luisa::compute::cast;
         using luisa::render::TextureHandle;
-        return cast<float>(id_and_tag >> TextureHandle::texture_id_offset_shift) *
-            (1.0f / TextureHandle::fixed_point_alpha_scale);
+        return luisa::render::half_to_float(
+            id_and_tag >> TextureHandle::texture_id_offset_shift);
     }
     [[nodiscard]] auto texture_id() const noexcept {
         return id_and_tag >> luisa::render::TextureHandle::texture_id_offset_shift;
@@ -80,7 +79,7 @@ public:
     [[nodiscard]] uint handle_tag() const noexcept;
     [[nodiscard]] virtual bool is_black() const noexcept = 0;
     [[nodiscard]] virtual bool is_color() const noexcept = 0;     // automatically converts to the albedo spectrum
-    [[nodiscard]] virtual bool is_value() const noexcept = 0;   // returns the value as-is (no conversion spectrum)
+    [[nodiscard]] virtual bool is_generic() const noexcept = 0;   // returns the value as-is (no conversion spectrum)
     [[nodiscard]] virtual bool is_illuminant() const noexcept = 0;// automatically converts to the illuminant spectrum
     [[nodiscard]] virtual Float4 evaluate(
         const Pipeline &pipeline, const Interaction &it,

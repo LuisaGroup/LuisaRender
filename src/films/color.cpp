@@ -15,15 +15,24 @@ using namespace luisa::compute;
 class ColorFilm final : public Film {
 
 private:
-    float _scale{0.0f};
+    std::array<float, 3> _scale{};
+    bool _fp16{};
 
 public:
     ColorFilm(Scene *scene, const SceneNodeDesc *desc) noexcept
-        : Film{scene, desc} {
-        auto exposure = desc->property_float_or_default("exposure", 0.0f);
-        _scale = std::pow(2.0f, exposure);
+        : Film{scene, desc},
+          _fp16{desc->property_bool_or_default("fp16", false)} {
+        auto exposure = desc->property_float3_or_default(
+            "exposure", lazy_construct([desc] {
+                return make_float3(desc->property_float_or_default(
+                    "exposure", 0.0f));
+            }));
+        _scale[0] = std::pow(2.0f, exposure.x);
+        _scale[1] = std::pow(2.0f, exposure.y);
+        _scale[2] = std::pow(2.0f, exposure.z);
     }
     [[nodiscard]] auto scale() const noexcept { return _scale; }
+    [[nodiscard]] auto fp16() const noexcept { return _fp16; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "color"; }
 };
@@ -56,19 +65,20 @@ void ColorFilmInstance::save(Stream &stream, const std::filesystem::path &path) 
     auto file_ext = path.extension().string();
     for (auto &c : file_ext) { c = static_cast<char>(tolower(c)); }
     std::vector<float> rgb;
-    rgb.resize(resolution.y * resolution.x * 4);
+    rgb.resize(resolution.x * resolution.y * 4);
     stream << _image.copy_to(rgb.data()) << synchronize();
-    auto scale = static_cast<const ColorFilm *>(node())->scale();
+    auto film = static_cast<const ColorFilm *>(node());
+    auto scale = film->scale();
     for (auto i = 0; i < resolution.x * resolution.y; i++) {
         for (auto c = 0; c < 3; c++) {
-            rgb[i * 3 + c] = scale * rgb[i * 4 + c];
+            rgb[i * 3 + c] = scale[c] * rgb[i * 4 + c];
         }
     }
     if (file_ext == ".exr") {
         const char *err = nullptr;
         auto ret = SaveEXR(
             rgb.data(), static_cast<int>(resolution.x), static_cast<int>(resolution.y),
-            3, false, path.string().c_str(), &err);
+            3, film->fp16(), path.string().c_str(), &err);
         if (ret != TINYEXR_SUCCESS) [[unlikely]] {
             LUISA_ERROR_WITH_LOCATION(
                 "Failure when writing image '{}'. "

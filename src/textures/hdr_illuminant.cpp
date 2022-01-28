@@ -71,7 +71,7 @@ public:
     }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "hdrillum"; }
     [[nodiscard]] bool is_color() const noexcept override { return false; }
-    [[nodiscard]] bool is_value() const noexcept override { return false; }
+    [[nodiscard]] bool is_generic() const noexcept override { return false; }
     [[nodiscard]] bool is_illuminant() const noexcept override { return true; }
     [[nodiscard]] bool is_black() const noexcept override { return _is_black; }
 };

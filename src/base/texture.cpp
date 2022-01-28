@@ -25,16 +25,7 @@ TextureHandle TextureHandle::encode_constant(uint tag, float3 v, float alpha, fl
         LUISA_ERROR_WITH_LOCATION(
             "Invalid tag for texture handle: {}.", tag);
     }
-    if (alpha < 0.0f || alpha > fixed_point_alpha_max) [[unlikely]] {
-        LUISA_WARNING_WITH_LOCATION(
-            "Invalid alpha for texture handle: {}. "
-            "Clamping to [0, {}].",
-            alpha, fixed_point_alpha_max);
-    }
-    auto fp_alpha = static_cast<uint>(std::round(
-                        std::clamp(alpha, 0.0f, fixed_point_alpha_max) *
-                        fixed_point_alpha_scale));
-    return {.id_and_tag = tag | (fp_alpha << texture_id_offset_shift),
+    return {.id_and_tag = tag | (float_to_half(alpha) << texture_id_offset_shift),
             .compressed_v = {v.x, v.y, v.z, e.x, e.y, e.z, e.w}};
 }
 

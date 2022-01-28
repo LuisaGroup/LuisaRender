@@ -13,7 +13,7 @@ namespace luisa::render {
 
 using namespace luisa::compute;
 
-class LinearTexture final : public ImageTexture {
+class ColorTexture final : public ImageTexture {
 
 private:
     std::shared_future<LoadedImage> _img;
@@ -30,10 +30,20 @@ private:
     }
 
 public:
-    LinearTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
+    ColorTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
         : ImageTexture{scene, desc} {
         auto path = desc->property_path("file");
-        auto half = desc->property_bool_or_default("half", false);
+        auto half = desc->property_bool_or_default("fp16", true);
+        auto encoding = desc->property_string_or_default(
+            "encoding", lazy_construct([desc, &path]() noexcept -> luisa::string {
+                auto ext = path.extension().string();
+                for (auto &c : ext) { c = static_cast<char>(tolower(c)); }
+                if (ext == ".exr" || ext == ".hdr") { return "linear"; }
+                return "sRGB";
+            }));
+        for (auto &c : encoding) { c = static_cast<char>(tolower(c)); }
+        auto gamma = 1.0f;
+        if (encoding == "gamma") { gamma = desc->property_float_or_default("gamma", 2.2f); }
         _img = ThreadPool::global().async([path = std::move(path), half] {
             if (half) {
                 auto image = LoadedImage::load(path, PixelStorage::HALF4);
@@ -58,7 +68,7 @@ public:
             return image;
         });
     }
-    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "linear"; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "color"; }
     [[nodiscard]] bool is_black() const noexcept override { return false; }
     [[nodiscard]] bool is_color() const noexcept override { return true; }
     [[nodiscard]] bool is_generic() const noexcept override { return false; }
@@ -67,4 +77,4 @@ public:
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::LinearTexture)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::ColorTexture)

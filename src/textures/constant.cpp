@@ -32,14 +32,14 @@ public:
         _is_black = all(color == 0.0f);
     }
     [[nodiscard]] bool is_black() const noexcept override { return _is_black; }
-    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "constcolor"; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "const"; }
     [[nodiscard]] Float4 evaluate(
         const Pipeline &, const Interaction &, const Var<TextureHandle> &handle,
         const SampledWavelengths &swl, Expr<float>) const noexcept override {
         return RGBAlbedoSpectrum{RGBSigmoidPolynomial{handle->v()}}.sample(swl);
     }
     [[nodiscard]] bool is_color() const noexcept override { return true; }
-    [[nodiscard]] bool is_value() const noexcept override { return false; }
+    [[nodiscard]] bool is_generic() const noexcept override { return false; }
     [[nodiscard]] bool is_illuminant() const noexcept override { return false; }
 };
 
