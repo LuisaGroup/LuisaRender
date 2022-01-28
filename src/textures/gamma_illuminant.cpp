@@ -15,6 +15,7 @@ using namespace luisa::compute;
 class GammaIlluminantTexture final : public ImageTexture {
 
 public:
+    static constexpr auto gamma_min = 1e-3f;
     static constexpr auto gamma_max = 15.0f;
     static constexpr auto gamma_scale = 1024.0f;
 
@@ -67,12 +68,13 @@ public:
         _img = ThreadPool::global().async([path = std::move(path)] {
             return LoadedImage::load(path, PixelStorage::BYTE4);
         });
-        _gamma = clamp(_gamma, 0.0f, gamma_max);
-        _scale = clamp(_scale, 0.0f, 1024.0f);
+        _gamma = clamp(_gamma, gamma_min, gamma_max);
+        _scale = clamp(_scale, 1.0f / 1024.0f, 1024.0f);
     }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "gammaillum"; }
     [[nodiscard]] bool is_color() const noexcept override { return false; }
     [[nodiscard]] bool is_value() const noexcept override { return false; }
+    [[nodiscard]] bool is_black() const noexcept override { return all(_scale == 0.0f); }
     [[nodiscard]] bool is_illuminant() const noexcept override { return true; }
 };
 

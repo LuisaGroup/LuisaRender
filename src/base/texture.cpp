@@ -100,7 +100,6 @@ TextureHandle ImageTexture::encode(Pipeline &pipeline, CommandBuffer &command_bu
     auto &&image = _image();
     auto device_image = pipeline.create<Image<float>>(image.pixel_storage(), image.size());
     auto tex_id = pipeline.register_bindless(*device_image, _sampler);
-    LUISA_INFO("TextureID: {}.", tex_id);
     command_buffer << device_image->copy_from(image.pixels())
                    << compute::commit();
     return TextureHandle::encode_texture(

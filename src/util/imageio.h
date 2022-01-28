@@ -16,22 +16,19 @@ class LoadedImage {
 
 public:
     using storage_type = compute::PixelStorage;
-    using deleter_type = void(*)(void *);
 
 private:
-    void *_pixels;
+    void *_pixels{nullptr};
     uint2 _resolution;
-    storage_type _storage;
+    storage_type _storage{};
     luisa::function<void(void *)> _deleter;
 
 private:
     void _destroy() noexcept {
-        if (_pixels != nullptr) {
-            _deleter(_pixels);
-        }
+        if (*this) { _deleter(_pixels); }
     }
-    LoadedImage(void *pixels, storage_type storage, uint2 resolution, deleter_type deleter) noexcept
-        : _pixels{pixels}, _resolution{resolution}, _storage{storage}, _deleter{deleter} {}
+    LoadedImage(void *pixels, storage_type storage, uint2 resolution, luisa::function<void(void *)> deleter) noexcept
+        : _pixels{pixels}, _resolution{resolution}, _storage{storage}, _deleter{std::move(deleter)} {}
     [[nodiscard]] static LoadedImage _load_byte(const std::filesystem::path &path, storage_type storage) noexcept;
     [[nodiscard]] static LoadedImage _load_half(const std::filesystem::path &path, storage_type storage) noexcept;
     [[nodiscard]] static LoadedImage _load_short(const std::filesystem::path &path, storage_type storage) noexcept;
@@ -39,6 +36,7 @@ private:
     [[nodiscard]] static LoadedImage _load_int(const std::filesystem::path &path, storage_type storage) noexcept;
 
 public:
+    LoadedImage() noexcept = default;
     ~LoadedImage() noexcept { _destroy(); }
     LoadedImage(LoadedImage &&another) noexcept
         : _pixels{another._pixels},
@@ -64,7 +62,8 @@ public:
     [[nodiscard]] auto channels() const noexcept { return compute::pixel_storage_channel_count(_storage); }
     [[nodiscard]] auto pixel_size_bytes() const noexcept { return compute::pixel_storage_size(_storage); }
     [[nodiscard]] auto size_bytes() const noexcept { return _resolution.x * _resolution.y * pixel_size_bytes(); }
+    [[nodiscard]] explicit operator bool() const noexcept { return _pixels != nullptr; }
     [[nodiscard]] static LoadedImage load(const std::filesystem::path &path, storage_type storage) noexcept;
 };
 
-}
+}// namespace luisa::render

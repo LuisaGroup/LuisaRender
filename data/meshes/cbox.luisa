@@ -39,6 +39,8 @@ Shape cbox-right-wall : Mesh {
 Material cbox-brick : Lambert {
   color : Linear {
     file { "../textures/brickwall.jpg" }
+    half { true }
+    gamma { 0.5 }
   }
 }
 

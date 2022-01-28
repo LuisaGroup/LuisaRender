@@ -171,8 +171,8 @@ inline LoadedImage LoadedImage::_load_float(const std::filesystem::path &path, s
     auto pixels = stbi_loadf(filename.c_str(), &w, &h, &nc, static_cast<int>(expected_channels));
     if (pixels == nullptr) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
-            "Failed to load FLOAT image '{}'.",
-            filename);
+            "Failed to load FLOAT image '{}': {}.",
+            filename, stbi_failure_reason());
     }
     return {pixels, storage, make_uint2(w, h),
             [](void *p) noexcept { stbi_image_free(p); }};
@@ -199,8 +199,8 @@ LoadedImage LoadedImage::_load_half(const std::filesystem::path &path, LoadedIma
     auto pixels = stbi_loadf(filename.c_str(), &w, &h, &nc, static_cast<int>(expected_channels));
     if (pixels == nullptr) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
-            "Failed to load HALF image '{}'.",
-            filename);
+            "Failed to load HALF image '{}': {}.",
+            filename, stbi_failure_reason());
     }
     auto half_pixels = luisa::allocate<uint16_t>(w * h * expected_channels);
     for (auto i = 0u; i < w * h * expected_channels; i++) {
@@ -226,8 +226,8 @@ inline LoadedImage LoadedImage::_load_byte(const std::filesystem::path &path, st
     auto pixels = stbi_load(filename.c_str(), &w, &h, &nc, static_cast<int>(expected_channels));
     if (pixels == nullptr) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
-            "Failed to load BYTE image '{}'.",
-            filename);
+            "Failed to load BYTE image '{}': {}.",
+            filename, stbi_failure_reason());
     }
     return {pixels, storage, make_uint2(w, h),
             [](void *p) noexcept { stbi_image_free(p); }};
@@ -247,8 +247,8 @@ LoadedImage LoadedImage::_load_short(const std::filesystem::path &path, LoadedIm
     auto pixels = stbi_load_16(filename.c_str(), &w, &h, &nc, static_cast<int>(expected_channels));
     if (pixels == nullptr) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
-            "Failed to load SHORT image '{}'.",
-            filename);
+            "Failed to load SHORT image '{}': {}.",
+            filename, stbi_failure_reason());
     }
     return {pixels, storage, make_uint2(w, h),
             [](void *p) noexcept { stbi_image_free(p); }};
@@ -276,6 +276,8 @@ LoadedImage LoadedImage::_load_int(const std::filesystem::path &path, LoadedImag
 }
 
 LoadedImage LoadedImage::load(const std::filesystem::path &path, LoadedImage::storage_type storage) noexcept {
+    static std::once_flag flag;
+    std::call_once(flag, []{ stbi_ldr_to_hdr_gamma(1.0f); });
     switch (storage) {
         case compute::PixelStorage::BYTE1:
         case compute::PixelStorage::BYTE2:

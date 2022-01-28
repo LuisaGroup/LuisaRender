@@ -41,10 +41,11 @@ public:
         _img = ThreadPool::global().async([path = std::move(path)] {
             return LoadedImage::load(path, PixelStorage::BYTE4);
         });
-        _gamma = clamp(_gamma, 1e-4f, 16.0f);
+        _gamma = clamp(_gamma, 1e-3f, 16.0f);
     }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "gamma"; }
     [[nodiscard]] bool is_color() const noexcept override { return true; }
+    [[nodiscard]] bool is_black() const noexcept override { return false; }
     [[nodiscard]] bool is_value() const noexcept override { return false; }
     [[nodiscard]] bool is_illuminant() const noexcept override { return false; }
 };

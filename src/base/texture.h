@@ -111,7 +111,6 @@ public:
     [[nodiscard]] auto sampler() const noexcept { return _sampler; }
     [[nodiscard]] auto uv_scale() const noexcept { return _uv_scale; }
     [[nodiscard]] auto uv_offset() const noexcept { return _uv_offset; }
-    [[nodiscard]] bool is_black() const noexcept override { return false; }
     [[nodiscard]] Float4 evaluate(
         const Pipeline &pipeline, const Interaction &it, const Var<TextureHandle> &handle,
         const SampledWavelengths &swl, Expr<float> time) const noexcept override;

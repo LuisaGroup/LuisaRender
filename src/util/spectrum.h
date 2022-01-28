@@ -153,13 +153,17 @@ class RGBIlluminantSpectrum {
 private:
     RGBSigmoidPolynomial _rsp;
     Float _scale;
-    const DenselySampledSpectrum &_illuminant;
+    const DenselySampledSpectrum *_illuminant;
 
 public:
+    RGBIlluminantSpectrum(RGBIlluminantSpectrum &&) noexcept = default;
+    RGBIlluminantSpectrum(const RGBIlluminantSpectrum &) noexcept = default;
+    RGBIlluminantSpectrum &operator=(RGBIlluminantSpectrum &&) noexcept = default;
+    RGBIlluminantSpectrum &operator=(const RGBIlluminantSpectrum &) noexcept = default;
     RGBIlluminantSpectrum(RGBSigmoidPolynomial rsp, Expr<float> scale, const DenselySampledSpectrum &illum) noexcept
-        : _rsp{std::move(rsp)}, _scale{scale}, _illuminant{illum} {}
+        : _rsp{std::move(rsp)}, _scale{scale}, _illuminant{&illum} {}
     [[nodiscard]] auto sample(const SampledWavelengths &swl) const noexcept {
-        return _rsp(swl.lambda()) * _scale * _illuminant.sample(swl);
+        return _rsp(swl.lambda()) * _scale * _illuminant->sample(swl);
     }
 };
 

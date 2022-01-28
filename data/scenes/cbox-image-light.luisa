@@ -34,11 +34,14 @@ Shape image-light : Mesh {
     //   half { true }
     // }
     emission : GammaIllum {
-      file { "/Users/mike/Downloads/_DSC9322.jpg" } // "/Users/mike/Downloads/WechatIMG16.jpeg" }
+      file {
+        // "/Users/mike/Downloads/_DSC9322.jpg" }
+        "/Users/mike/Downloads/WechatIMG16.jpeg" }
       uv_offset { 0, 0 }
       uv_scale { 1, 1 }
-      scale { 5 }
+      scale { 15 }
       gamma { 3.5 }
+      half { true }
     }
   }
   material : Black {}
