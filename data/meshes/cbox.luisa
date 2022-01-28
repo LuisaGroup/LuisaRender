@@ -46,7 +46,7 @@ Material cbox-brick : Lambert {
 
 Shape cbox-back-wall : Mesh {
   file { "cbox-parts/back-wall.obj" }
-  material { @cbox-brick }
+  material { @cbox-white }
 }
 
 Shape cbox-tall-box : Mesh {

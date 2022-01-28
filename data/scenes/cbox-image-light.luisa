@@ -33,14 +33,14 @@ Shape image-light : Mesh {
     //   scale { 3 }
     //   half { true }
     // }
-    emission : GammaIllum {
+    emission : HDRIllum {
       file {
         // "/Users/mike/Downloads/_DSC9322.jpg" }
         "/Users/mike/Downloads/WechatIMG16.jpeg" }
       uv_offset { 0, 0 }
       uv_scale { 1, 1 }
       scale { 15 }
-      gamma { 3.5 }
+      gamma { 1 }
       half { true }
     }
   }
@@ -54,7 +54,10 @@ render {
     @cbox-right-wall,
     @cbox-ceiling,
     @cbox-floor,
-    @cbox-back-wall,
+    Instance {
+      shape { @cbox-back-wall }
+      material { @cbox-brick }
+    },
     @cbox-short-box,
     // @cbox-tall-box,
     @image-light
