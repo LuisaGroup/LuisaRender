@@ -102,8 +102,8 @@ private:
     [[nodiscard]] virtual Float4 _evaluate(
         const Pipeline &pipeline, const Var<TextureHandle> &handle,
         Expr<float2> uv, const SampledWavelengths &swl) const noexcept = 0;
-    [[nodiscard]] virtual std::pair<uint/* texture_id */, float3/* handle.v*/>
-        _encode(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
+    [[nodiscard]] virtual const LoadedImage &_image() const noexcept = 0;
+    [[nodiscard]] virtual float3 _v() const noexcept = 0;
     TextureHandle encode(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 
 public:

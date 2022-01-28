@@ -19,20 +19,23 @@ public:
     static constexpr auto gamma_scale = 1024.0f;
 
 private:
-    std::shared_future<LoadedImage> _image;
+    std::shared_future<LoadedImage> _img;
     float3 _gamma;
     float3 _scale;
 
 private:
-    [[nodiscard]] std::pair<uint, float3> _encode(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
-        auto texture_id = pipeline.image_texture(command_buffer, _image.get(), sampler());
-        auto fixed_point_gamma = [](auto f) noexcept { return static_cast<uint>(std::round(f * gamma_scale)); };
-        auto encoded_v = make_uint3(
+    [[nodiscard]] float3 _v() const noexcept override {
+        auto fixed_point_gamma = [](auto f) noexcept {
+            return static_cast<uint>(
+                std::round(f * gamma_scale));
+        };
+        auto v = make_uint3(
             (fixed_point_gamma(_gamma.x) << 16u) | float_to_half(_scale.x),
             (fixed_point_gamma(_gamma.y) << 16u) | float_to_half(_scale.y),
             (fixed_point_gamma(_gamma.z) << 16u) | float_to_half(_scale.z));
-        return std::make_pair(texture_id, luisa::bit_cast<float3>(encoded_v));
+        return luisa::bit_cast<float3>(v);
     }
+    [[nodiscard]] const LoadedImage &_image() const noexcept override { return _img.get(); }
     [[nodiscard]] Float4 _evaluate(
         const Pipeline &pipeline, const Var<TextureHandle> &handle,
         Expr<float2> uv, const SampledWavelengths &swl) const noexcept override {
@@ -61,7 +64,7 @@ public:
                       "scale", 1.0f));
               }))} {
         auto path = desc->property_path("file");
-        _image = ThreadPool::global().async([path = std::move(path)] {
+        _img = ThreadPool::global().async([path = std::move(path)] {
             return LoadedImage::load(path, PixelStorage::BYTE4);
         });
         _gamma = clamp(_gamma, 0.0f, gamma_max);

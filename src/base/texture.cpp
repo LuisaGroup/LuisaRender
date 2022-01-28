@@ -33,9 +33,8 @@ TextureHandle TextureHandle::encode_constant(uint tag, float3 v, float alpha, fl
     }
     auto fp_alpha = static_cast<uint>(std::round(
                         std::clamp(alpha, 0.0f, fixed_point_alpha_max) *
-                        fixed_point_alpha_scale))
-                    << texture_id_offset_shift;
-    return {.id_and_tag = tag | fp_alpha,
+                        fixed_point_alpha_scale));
+    return {.id_and_tag = tag | (fp_alpha << texture_id_offset_shift),
             .compressed_v = {v.x, v.y, v.z, e.x, e.y, e.z, e.w}};
 }
 
@@ -48,7 +47,7 @@ TextureHandle TextureHandle::encode_texture(uint tag, uint tex_id, float3 v, flo
         LUISA_ERROR_WITH_LOCATION(
             "Invalid id for texture handle: {}.", tex_id);
     }
-    return {.id_and_tag = tag | tex_id,
+    return {.id_and_tag = tag | (tex_id << texture_id_offset_shift),
             .compressed_v = {v.x, v.y, v.z, e.x, e.y, e.z, e.w}};
 }
 
@@ -78,12 +77,12 @@ ImageTexture::ImageTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
     }();
     _sampler = {filter_mode, address_mode};
     _uv_scale = desc->property_float2_or_default(
-        "uv_scale", lazy_construct([desc]{
+        "uv_scale", lazy_construct([desc] {
             return make_float2(desc->property_float_or_default(
                 "uv_scale", 1.0f));
         }));
     _uv_offset = desc->property_float2_or_default(
-        "uv_offset", lazy_construct([desc]{
+        "uv_offset", lazy_construct([desc] {
             return make_float2(desc->property_float_or_default(
                 "uv_offset", 0.0f));
         }));
@@ -98,9 +97,15 @@ Float4 ImageTexture::evaluate(
 }
 
 TextureHandle ImageTexture::encode(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
-    auto [tex_id, v] = _encode(pipeline, command_buffer);
+    auto &&image = _image();
+    auto device_image = pipeline.create<Image<float>>(image.pixel_storage(), image.size());
+    auto tex_id = pipeline.register_bindless(*device_image, _sampler);
+    LUISA_INFO("TextureID: {}.", tex_id);
+    command_buffer << device_image->copy_from(image.pixels())
+                   << compute::commit();
     return TextureHandle::encode_texture(
-        handle_tag(), tex_id, v, make_float4(_uv_scale, _uv_offset));
+        handle_tag(), tex_id, _v(),
+        make_float4(_uv_scale, _uv_offset));
 }
 
 }// namespace luisa::render

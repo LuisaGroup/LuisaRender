@@ -16,13 +16,11 @@ using namespace luisa::compute;
 class LinearTexture final : public ImageTexture {
 
 private:
-    std::shared_future<LoadedImage> _image;
+    std::shared_future<LoadedImage> _img;
 
 private:
-    [[nodiscard]] std::pair<uint, float3> _encode(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
-        auto texture_id = pipeline.image_texture(command_buffer, _image.get(), sampler());
-        return std::make_pair(texture_id, make_float3());
-    }
+    [[nodiscard]] float3 _v() const noexcept override { return make_float3(); }
+    [[nodiscard]] const LoadedImage &_image() const noexcept override { return _img.get(); }
     [[nodiscard]] Float4 _evaluate(
         const Pipeline &pipeline, const Var<TextureHandle> &handle,
         Expr<float2> uv, const SampledWavelengths &swl) const noexcept override {
@@ -36,7 +34,7 @@ public:
         : ImageTexture{scene, desc} {
         auto path = desc->property_path("file");
         auto half = desc->property_bool_or_default("half", false);
-        _image = ThreadPool::global().async([path = std::move(path), half] {
+        _img = ThreadPool::global().async([path = std::move(path), half] {
             return LoadedImage::load(path, half ? PixelStorage::HALF4 : PixelStorage::FLOAT4);
         });
     }
