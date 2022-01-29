@@ -14,7 +14,7 @@ namespace luisa::render {
         static SceneNodeDesc d{
             "__fake_mirror_material_default_color_texture",
             SceneNodeTag::TEXTURE};
-        d.define(SceneNodeTag::TEXTURE, "const", {});
+        d.define(SceneNodeTag::TEXTURE, "constcolor", {});
         return &d;
     }();
     return desc;

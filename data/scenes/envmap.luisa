@@ -35,7 +35,7 @@ Object teapot : Group {
     Mesh {
       file { "../meshes/utah-teapot.obj" }
       material : FakeMirror {
-        color : Const {
+        color : ConstColor {
           color { 1.0, 0.71, 0.29 }
         }
       }
@@ -68,9 +68,9 @@ render {
   shapes { @teapot }
   integrator { @pt }
   environment : Map {
-    emission : HDRIllum {
+    emission : Illum {
       file { "../envmaps/photo_studio_01_1k.hdr" }
-      half { true }
+      fp16 { true }
       // file { "/Users/mike/Downloads/dreifaltigkeitsberg_8k.exr" }
     }
     transform : SRT {
