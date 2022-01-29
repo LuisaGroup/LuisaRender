@@ -103,8 +103,8 @@ public:
         });
     }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "color"; }
-    [[nodiscard]] bool is_black() const noexcept override { return false; }
     [[nodiscard]] Category category() const noexcept override { return Category::COLOR; }
+    [[nodiscard]] bool is_black() const noexcept override { return _is_black; }
 };
 
 }// namespace luisa::render
