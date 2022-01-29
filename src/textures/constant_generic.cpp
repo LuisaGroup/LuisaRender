@@ -27,9 +27,7 @@ public:
                 v.size(), desc->source_location().string());
             v.resize(4u);
         }
-        for (auto i = 0u; i < v.size(); i++) {
-            _v[i] = v[i];
-        }
+        for (auto i = 0u; i < v.size(); i++) { _v[i] = v[i]; }
     }
     [[nodiscard]] bool is_black() const noexcept override { return all(_v == 0.0f); }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "constgeneric"; }
