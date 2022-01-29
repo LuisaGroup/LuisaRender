@@ -13,8 +13,7 @@
 
 namespace luisa::render {
 
-template<typename T>
-[[nodiscard]] inline std::pair<void *, uint2> load_exr(const char *filename, uint expected_channels) noexcept {
+[[nodiscard]] inline auto parse_exr_header(const char *filename) noexcept {
     EXRVersion exr_version;
     if (ParseEXRVersionFromFile(&exr_version, filename) != TINYEXR_SUCCESS) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
@@ -39,6 +38,11 @@ template<typename T>
             "Failed to parse OpenEXR image '{}': {}.",
             filename, error);
     }
+    return exr_header;
+}
+
+template<typename T>
+[[nodiscard]] inline std::pair<void *, uint2> parse_exr_image(const char *filename, EXRHeader &exr_header, uint expected_channels) noexcept {
     for (int i = 0; i < exr_header.num_channels; i++) {
         if constexpr (std::is_same_v<T, float>) {
             exr_header.requested_pixel_types[i] = TINYEXR_PIXELTYPE_FLOAT;
@@ -50,7 +54,7 @@ template<typename T>
             static_assert(always_false_v<T>);
         }
     }
-    err = nullptr;
+    const char *err = nullptr;
     EXRImage exr_image;
     InitEXRImage(&exr_image);
     if (LoadEXRImageFromFile(
@@ -150,6 +154,12 @@ template<typename T>
     return std::make_pair(pixels, make_uint2(width, height));
 }
 
+template<typename T>
+[[nodiscard]] inline auto load_exr(const char *filename, uint expected_channels) noexcept {
+    auto exr_header = parse_exr_header(filename);
+    return parse_exr_image<T>(filename, exr_header, expected_channels);
+}
+
 inline LoadedImage LoadedImage::_load_float(const std::filesystem::path &path, storage_type storage) noexcept {
     auto filename = path.string();
     if (storage != storage_type::FLOAT1 &&
@@ -164,8 +174,11 @@ inline LoadedImage LoadedImage::_load_float(const std::filesystem::path &path, s
     for (auto &c : ext) { c = static_cast<char>(tolower(c)); }
     if (ext == ".exr") {
         auto [pixels, size] = load_exr<float>(filename.c_str(), expected_channels);
-        return {pixels, storage, size,
-                [](void *p) noexcept { luisa::deallocate(static_cast<float *>(p)); }};
+        return {
+            pixels, storage, size,
+            [](void *p) noexcept {
+                luisa::deallocate(static_cast<float *>(p));
+            }};
     }
     int w, h, nc;
     auto pixels = stbi_loadf(filename.c_str(), &w, &h, &nc, static_cast<int>(expected_channels));
@@ -174,8 +187,7 @@ inline LoadedImage LoadedImage::_load_float(const std::filesystem::path &path, s
             "Failed to load FLOAT image '{}': {}.",
             filename, stbi_failure_reason());
     }
-    return {pixels, storage, make_uint2(w, h),
-            [](void *p) noexcept { stbi_image_free(p); }};
+    return {pixels, storage, make_uint2(w, h), stbi_image_free};
 }
 
 LoadedImage LoadedImage::_load_half(const std::filesystem::path &path, LoadedImage::storage_type storage) noexcept {
@@ -192,8 +204,11 @@ LoadedImage LoadedImage::_load_half(const std::filesystem::path &path, LoadedIma
     for (auto &c : ext) { c = static_cast<char>(tolower(c)); }
     if (ext == ".exr") {
         auto [pixels, size] = load_exr<uint16_t>(filename.c_str(), expected_channels);
-        return {pixels, storage, size,
-                [](void *p) noexcept { luisa::deallocate(static_cast<short *>(p)); }};
+        return {
+            pixels, storage, size,
+            [](void *p) noexcept {
+                luisa::deallocate(static_cast<short *>(p));
+            }};
     }
     int w, h, nc;
     auto pixels = stbi_loadf(filename.c_str(), &w, &h, &nc, static_cast<int>(expected_channels));
@@ -208,8 +223,11 @@ LoadedImage LoadedImage::_load_half(const std::filesystem::path &path, LoadedIma
             reinterpret_cast<const float *>(pixels)[i]);
     }
     stbi_image_free(pixels);
-    return {half_pixels, storage, make_uint2(w, h),
-            [](void *p) noexcept { luisa::deallocate(static_cast<uint16_t *>(p)); }};
+    return {
+        half_pixels, storage, make_uint2(w, h),
+        [](void *p) noexcept {
+            luisa::deallocate(static_cast<uint16_t *>(p));
+        }};
 }
 
 inline LoadedImage LoadedImage::_load_byte(const std::filesystem::path &path, storage_type storage) noexcept {
@@ -229,8 +247,7 @@ inline LoadedImage LoadedImage::_load_byte(const std::filesystem::path &path, st
             "Failed to load BYTE image '{}': {}.",
             filename, stbi_failure_reason());
     }
-    return {pixels, storage, make_uint2(w, h),
-            [](void *p) noexcept { stbi_image_free(p); }};
+    return {pixels, storage, make_uint2(w, h), stbi_image_free};
 }
 
 LoadedImage LoadedImage::_load_short(const std::filesystem::path &path, LoadedImage::storage_type storage) noexcept {
@@ -250,8 +267,7 @@ LoadedImage LoadedImage::_load_short(const std::filesystem::path &path, LoadedIm
             "Failed to load SHORT image '{}': {}.",
             filename, stbi_failure_reason());
     }
-    return {pixels, storage, make_uint2(w, h),
-            [](void *p) noexcept { stbi_image_free(p); }};
+    return {pixels, storage, make_uint2(w, h), stbi_image_free};
 }
 
 LoadedImage LoadedImage::_load_int(const std::filesystem::path &path, LoadedImage::storage_type storage) noexcept {
@@ -271,13 +287,16 @@ LoadedImage LoadedImage::_load_int(const std::filesystem::path &path, LoadedImag
             "Invalid INT image: '{}'.", filename);
     }
     auto [pixels, size] = load_exr<uint>(filename.c_str(), expected_channels);
-    return {pixels, storage, size,
-            [](void *p) noexcept { luisa::deallocate(static_cast<uint32_t *>(p)); }};
+    return {
+        pixels, storage, size,
+        [](void *p) noexcept {
+            luisa::deallocate(static_cast<uint32_t *>(p));
+        }};
 }
 
 LoadedImage LoadedImage::load(const std::filesystem::path &path, LoadedImage::storage_type storage) noexcept {
     static std::once_flag flag;
-    std::call_once(flag, []{ stbi_ldr_to_hdr_gamma(1.0f); });
+    std::call_once(flag, [] { stbi_ldr_to_hdr_gamma(1.0f); });
     switch (storage) {
         case compute::PixelStorage::BYTE1:
         case compute::PixelStorage::BYTE2:
@@ -304,6 +323,127 @@ LoadedImage LoadedImage::load(const std::filesystem::path &path, LoadedImage::st
     LUISA_ERROR_WITH_LOCATION(
         "Invalid pixel storage: {:02x}.",
         luisa::to_underlying(storage));
+}
+
+LoadedImage LoadedImage::load(const std::filesystem::path &path) noexcept {
+    auto ext = path.extension().string();
+    auto path_string = path.string();
+    for (auto &c : ext) { c = static_cast<char>(tolower(c)); }
+    if (ext == ".exr") {
+        auto exr_header = parse_exr_header(path_string.c_str());
+        auto t = exr_header.pixel_types[0];
+        auto load_image = [&exr_header, t, p = path_string.c_str()]() noexcept {
+            if (t == TINYEXR_PIXELTYPE_UINT) {
+                auto expected_channels = 4u;
+                auto storage = storage_type::INT4;
+                if (exr_header.num_channels == 1u) {
+                    expected_channels = 1u;
+                    storage = storage_type::INT1;
+                } else if (exr_header.num_channels == 2u) {
+                    expected_channels = 2u;
+                    storage = storage_type::INT2;
+                }
+                auto [pixels, size] = parse_exr_image<uint>(
+                    p, exr_header, expected_channels);
+                return std::make_tuple(
+                    pixels, size, storage,
+                    luisa::function<void(void *)>{[](void *p) noexcept {
+                        luisa::deallocate(static_cast<uint *>(p));
+                    }});
+            }
+            if (t == TINYEXR_PIXELTYPE_HALF) {
+                auto expected_channels = 4u;
+                auto storage = storage_type::HALF4;
+                if (exr_header.num_channels == 1u) {
+                    expected_channels = 1u;
+                    storage = storage_type::HALF1;
+                } else if (exr_header.num_channels == 2u) {
+                    expected_channels = 2u;
+                    storage = storage_type::HALF2;
+                }
+                auto [pixels, size] = parse_exr_image<uint16_t>(
+                    p, exr_header, expected_channels);
+                return std::make_tuple(
+                    pixels, size, storage,
+                    luisa::function<void(void *)>{[](void *p) noexcept {
+                        luisa::deallocate(static_cast<uint16_t *>(p));
+                    }});
+            }
+            auto expected_channels = 4u;
+            auto storage = storage_type::FLOAT4;
+            if (exr_header.num_channels == 1u) {
+                expected_channels = 1u;
+                storage = storage_type::FLOAT1;
+            } else if (exr_header.num_channels == 2u) {
+                expected_channels = 2u;
+                storage = storage_type::FLOAT2;
+            }
+            auto [pixels, size] = parse_exr_image<float>(
+                p, exr_header, expected_channels);
+            return std::make_tuple(
+                pixels, size, storage,
+                luisa::function<void(void *)>{[](void *p) noexcept {
+                    luisa::deallocate(static_cast<float *>(p));
+                }});
+        };
+        auto [pixels, size, storage, deleter] = load_image();
+        return {pixels, storage, size, std::move(deleter)};
+    }
+    if (ext == ".hdr") {
+        return load(path, storage_type::HALF4);
+    }
+    auto p = path_string.c_str();
+    auto file = fopen(p, "r");
+    if (file == nullptr) {
+        LUISA_ERROR_WITH_LOCATION(
+            "Failed to open image '{}'.",
+            path_string);
+    }
+    auto width = 0, height = 0, channels = 0;
+    if (!stbi_info_from_file(file, &width, &height, &channels)) [[unlikely]] {
+        fclose(file);
+        LUISA_ERROR_WITH_LOCATION(
+            "Failed to parse info from image '{}': {}.",
+            path_string, stbi_failure_reason());
+    }
+    if (stbi_is_16_bit_from_file(file)) {
+        auto expected_channels = 4;
+        auto storage = storage_type::SHORT4;
+        if (channels == 1) {
+            expected_channels = 1;
+            storage = storage_type::SHORT1;
+        } else if (channels == 2) {
+            expected_channels = 2;
+            storage = storage_type::SHORT2;
+        }
+        auto pixels = stbi_load_from_file_16(
+            file, &width, &height, &channels, expected_channels);
+        fclose(file);
+        if (pixels == nullptr) [[unlikely]] {
+            LUISA_ERROR_WITH_LOCATION(
+                "Failed to load image '{}': {}.",
+                path_string, stbi_failure_reason());
+        }
+        return {pixels, storage, make_uint2(width, height), stbi_image_free};
+    }
+    auto expected_channels = 4;
+    auto storage = storage_type::BYTE4;
+    if (channels == 1) {
+        expected_channels = 1;
+        storage = storage_type::BYTE1;
+    } else if (channels == 2) {
+        expected_channels = 2;
+        storage = storage_type::BYTE2;
+    }
+    auto pixels = stbi_load_from_file(
+        file, &width, &height, &channels, expected_channels);
+    fclose(file);
+    if (pixels == nullptr) [[unlikely]] {
+        LUISA_ERROR_WITH_LOCATION(
+            "Failed to load image '{}': {}.",
+            path_string, stbi_failure_reason());
+    }
+    return {pixels, storage, make_uint2(width, height), stbi_image_free};
 }
 
 }// namespace luisa::render
