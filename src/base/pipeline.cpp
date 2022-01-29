@@ -438,6 +438,7 @@ Float4 Pipeline::evaluate_texture(
     };
     // short path: only one texture type
     if (_texture_interfaces.size() == 1u) {
+        LUISA_INFO("TextureEvaluation: short-path.");
         return process(_texture_interfaces.front()->evaluate(
             *this, it, handle, time));
     }
@@ -445,6 +446,9 @@ Float4 Pipeline::evaluate_texture(
     auto value = def<float4>();
     $switch(handle->tag()) {
         for (auto i = 0u; i < _texture_interfaces.size(); i++) {
+            LUISA_INFO(
+                "TextureEvaluate #{}: {}.",
+                i, _texture_interfaces[i]->impl_type());
             $case(i) {
                 value = process(_texture_interfaces[i]->evaluate(
                     *this, it, handle, time));
