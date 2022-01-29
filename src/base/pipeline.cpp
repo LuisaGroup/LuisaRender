@@ -7,6 +7,10 @@
 #include <base/pipeline.h>
 #include <base/scene.h>
 
+#ifdef interface
+#undef interface// Windows is really bad...
+#endif
+
 namespace luisa::render {
 
 inline Pipeline::Pipeline(Device &device) noexcept
