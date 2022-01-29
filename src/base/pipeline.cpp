@@ -437,24 +437,30 @@ Float4 Pipeline::evaluate_texture(
         return value;
     };
     // short path: only one texture type
-    if (_texture_interfaces.size() == 1u) {
-        LUISA_INFO("TextureEvaluation: short-path.");
-        return process(_texture_interfaces.front()->evaluate(
+    auto interfaces = texture_interfaces(category);
+    if (interfaces.size() == 1u) {
+        return process(interfaces.front()->evaluate(
             *this, it, handle, time));
     }
     // dynamic dispatch
     auto value = def<float4>();
+    if (interfaces.empty()) [[unlikely]] { return value; }
     $switch(handle->tag()) {
-        for (auto i = 0u; i < _texture_interfaces.size(); i++) {
-            LUISA_INFO(
-                "TextureEvaluate #{}: {}.",
-                i, _texture_interfaces[i]->impl_type());
+        for (auto i = 0u; i < interfaces.size(); i++) {
             $case(i) {
-                value = process(_texture_interfaces[i]->evaluate(
+                value = process(interfaces[i]->evaluate(
                     *this, it, handle, time));
             };
         }
-        $default { unreachable(); };
+        if (interfaces.size() == 2u) {
+            $default {
+                // actually unreachable, but
+                // will be faster with this case...
+                value = process(value);
+            };
+        } else {
+            $default { unreachable(); };
+        }
     };
     return value;
 }
@@ -462,16 +468,18 @@ Float4 Pipeline::evaluate_texture(
 const TextureHandle *Pipeline::encode_texture(CommandBuffer &command_buffer, const Texture *texture) noexcept {
     auto [iter, first_def] = _texture_handles.try_emplace(texture, nullptr);
     if (first_def) {
-        auto handle_tag = [this, texture] {
+        auto handle_tag = [texture, &interfaces = texture_interfaces(texture->category())] {
             if (auto it = std::find_if(
-                    _texture_interfaces.begin(), _texture_interfaces.end(),
-                    [texture](auto i) noexcept { return i->impl_type() == texture->impl_type(); });
-                it != _texture_interfaces.end()) {
+                    interfaces.begin(), interfaces.end(),
+                    [texture](auto i) noexcept {
+                        return i->impl_type() == texture->impl_type();
+                    });
+                it != interfaces.end()) {
                 return static_cast<uint>(std::distance(
-                    _texture_interfaces.begin(), it));
+                    interfaces.begin(), it));
             }
-            auto tag = static_cast<uint>(_texture_interfaces.size());
-            _texture_interfaces.emplace_back(texture);
+            auto tag = static_cast<uint>(interfaces.size());
+            interfaces.emplace_back(texture);
             return tag;
         }();
         iter->second = luisa::make_unique<TextureHandle>(
@@ -506,7 +514,7 @@ Float4 Pipeline::evaluate_texture(
     Texture::Category category, TextureHandle handle, const Interaction &it,
     const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto tag = handle.id_and_tag & TextureHandle::tag_mask;
-    auto interface = _texture_interfaces.at(tag);
+    auto interface = texture_interfaces(category)[tag];
     Var<TextureHandle> dsl_handle;
     dsl_handle.id_and_tag = handle.id_and_tag;
     dsl_handle.compressed_v[0] = handle.compressed_v[0];
@@ -548,6 +556,34 @@ Float4 Pipeline::evaluate_generic_texture(
     return evaluate_texture(
         Texture::Category::GENERIC,
         handle, it, {}, time);
+}
+
+luisa::vector<const Texture *> &Pipeline::texture_interfaces(Texture::Category category) noexcept {
+    switch (category) {
+        case Texture::Category::GENERIC:
+            return _generic_texture_interfaces;
+        case Texture::Category::COLOR:
+            return _color_texture_interfaces;
+        case Texture::Category::ILLUMINANT:
+            return _illuminant_texture_interfaces;
+    }
+    LUISA_ERROR_WITH_LOCATION(
+        "Invalid texture category {:02x}.",
+        luisa::to_underlying(category));
+}
+
+luisa::span<const Texture *const> Pipeline::texture_interfaces(Texture::Category category) const noexcept {
+    switch (category) {
+        case Texture::Category::GENERIC:
+            return _generic_texture_interfaces;
+        case Texture::Category::COLOR:
+            return _color_texture_interfaces;
+        case Texture::Category::ILLUMINANT:
+            return _illuminant_texture_interfaces;
+    }
+    LUISA_ERROR_WITH_LOCATION(
+        "Invalid texture category {:02x}.",
+        luisa::to_underlying(category));
 }
 
 }// namespace luisa::render

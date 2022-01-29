@@ -99,7 +99,9 @@ private:
     luisa::unordered_map<luisa::string /* impl type */, uint /* tag */, Hash64> _light_tags;
     luisa::unordered_map<const Material *, MaterialData> _materials;
     luisa::unordered_map<const Light *, LightData> _lights;
-    luisa::vector<const Texture *> _texture_interfaces{};
+    luisa::vector<const Texture *> _color_texture_interfaces;
+    luisa::vector<const Texture *> _illuminant_texture_interfaces;
+    luisa::vector<const Texture *> _generic_texture_interfaces;
     luisa::unordered_map<const Texture *, luisa::unique_ptr<TextureHandle>> _texture_handles;
     luisa::vector<InstancedShape> _instances;
     luisa::vector<InstancedTransform> _dynamic_transforms;
@@ -197,6 +199,8 @@ public:
     [[nodiscard]] std::tuple<const Camera::Instance *, const Film::Instance *, const Filter::Instance *> camera(size_t i) const noexcept;
     [[nodiscard]] auto material_interfaces() const noexcept { return luisa::span{_material_interfaces}; }
     [[nodiscard]] auto light_interfaces() const noexcept { return luisa::span{_light_interfaces}; }
+    [[nodiscard]] luisa::vector<const Texture *> &texture_interfaces(Texture::Category category) noexcept;
+    [[nodiscard]] luisa::span<const Texture *const> texture_interfaces(Texture::Category category) const noexcept;
     [[nodiscard]] auto &lights() const noexcept { return _lights; }
     [[nodiscard]] auto &materials() const noexcept { return _materials; }
     [[nodiscard]] auto sampler() noexcept { return _sampler.get(); }
