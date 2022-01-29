@@ -74,10 +74,11 @@ ImageTexture::ImageTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
 Float4 ImageTexture::evaluate(
     const Pipeline &pipeline, const Interaction &it,
     const Var<TextureHandle> &handle, Expr<float>) const noexcept {
-    auto uv_scale = as<uint>(handle->v().x);
-    auto u_scale = half_to_float(uv_scale & 0xffffu);
-    auto v_scale = half_to_float(uv_scale >> 16u);
-    auto uv_offset = handle->v().yz();
+    auto uv_scale = as<uint>(handle.compressed_v[0]);
+    auto v_scale = half_to_float(uv_scale & 0xffffu);
+    auto u_scale = half_to_float(uv_scale >> 16u);
+    auto uv_offset = make_float2(
+        handle.compressed_v[1], handle.compressed_v[2]);
     auto uv = it.uv() * make_float2(u_scale, v_scale) + uv_offset;
     return pipeline.tex2d(handle->texture_id()).sample(uv);// TODO: LOD
 }
@@ -94,8 +95,8 @@ TextureHandle ImageTexture::_encode(
     auto u_scale = float_to_half(_uv_scale.x);
     auto v_scale = float_to_half(_uv_scale.y);
     auto compressed = make_float3(
-        luisa::bit_cast<float>(u_scale | (v_scale << 16u)),
-                _uv_offset);
+        luisa::bit_cast<float>(v_scale | (u_scale << 16u)),
+        _uv_offset);
     return TextureHandle::encode_texture(
         handle_tag, tex_id, compressed);
 }

@@ -34,8 +34,9 @@ Shape image-light : Mesh {
         // "/Users/mike/Downloads/WechatIMG16.jpeg" }
       uv_offset { 0, 0 }
       scale { 15 }
-      encoding { "sRGB" }
-      address { "mirror" }
+      encoding { "gamma" }
+      address { "edge" }
+      gamma { 3.5 }
     }
   }
   material : Black {}

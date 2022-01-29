@@ -419,31 +419,35 @@ Float4 Pipeline::evaluate_texture(
     const Var<TextureHandle> &handle, const Interaction &it,
     const SampledWavelengths &swl, Expr<float> time) const noexcept {
     using namespace luisa::compute;
-    auto value = def(make_float4());
-    if (_texture_interfaces.size() == 1u) {// short path: only one texture type
-        value = _texture_interfaces.front()->evaluate(
-            *this, it, handle, time);
-    } else {// dynamic dispatch
-        $switch(handle->tag()) {
-            for (auto i = 0u; i < _texture_interfaces.size(); i++) {
-                $case(i) {
-                    value = _texture_interfaces[i]->evaluate(
-                        *this, it, handle, time);
-                };
-            }
-            $default { unreachable(); };
-        };
+    auto process = [category, &swl](auto value) noexcept {
+        if (category == Texture::Category::COLOR) {
+            auto spec = RGBAlbedoSpectrum{RGBSigmoidPolynomial{value.xyz()}};
+            return spec.sample(swl);
+        }
+        if (category == Texture::Category::ILLUMINANT) {
+            auto spec = RGBIlluminantSpectrum{
+                RGBSigmoidPolynomial{value.xyz()}, value.w,
+                DenselySampledSpectrum::cie_illum_d65()};
+            return spec.sample(swl);
+        }
+        return value;
+    };
+    // short path: only one texture type
+    if (_texture_interfaces.size() == 1u) {
+        return process(_texture_interfaces.front()->evaluate(
+            *this, it, handle, time));
     }
-    if (category == Texture::Category::COLOR) {
-        auto spec = RGBAlbedoSpectrum{RGBSigmoidPolynomial{value.xyz()}};
-        return spec.sample(swl);
-    }
-    if (category == Texture::Category::ILLUMINANT) {
-        auto spec = RGBIlluminantSpectrum{
-            RGBSigmoidPolynomial{value.xyz()}, value.w,
-            DenselySampledSpectrum::cie_illum_d65()};
-        return spec.sample(swl);
-    }
+    // dynamic dispatch
+    auto value = def<float4>();
+    $switch(handle->tag()) {
+        for (auto i = 0u; i < _texture_interfaces.size(); i++) {
+            $case(i) {
+                value = process(_texture_interfaces[i]->evaluate(
+                    *this, it, handle, time));
+            };
+        }
+        $default { unreachable(); };
+    };
     return value;
 }
 

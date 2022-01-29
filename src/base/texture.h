@@ -14,7 +14,7 @@ namespace luisa::render {
 
 struct alignas(16) TextureHandle {
 
-    static constexpr auto texture_id_offset_shift = 6u;
+    static constexpr auto texture_id_offset_shift = 8u;
     static constexpr auto tag_mask = (1 << texture_id_offset_shift) - 1u;
     static constexpr auto tag_max_count = 1u << texture_id_offset_shift;
 
