@@ -33,7 +33,7 @@ public:
         : Material{scene, desc},
           _color{scene->load_texture(desc->property_node_or_default(
               "color", default_color_texture_desc()))} {
-        if (!_color->is_color()) [[unlikely]] {
+        if (_color->category() != Texture::Category::COLOR) [[unlikely]] {
             LUISA_ERROR(
                 "Non-color textures are not "
                 "allowed in Lambert materials. [{}]",
@@ -91,7 +91,7 @@ luisa::unique_ptr<Material::Closure> LambertMaterial::decode(
     const Pipeline &pipeline, const Interaction &it,
     const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto texture = pipeline.buffer<TextureHandle>(it.shape()->material_buffer_id()).read(0u);
-    auto R = pipeline.evaluate_texture(texture, it, swl, time);
+    auto R = pipeline.evaluate_color_texture(texture, it, swl, time);
     return luisa::make_unique<LambertClosure>(it, std::move(R));
 }
 

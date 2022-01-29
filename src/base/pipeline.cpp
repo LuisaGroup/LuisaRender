@@ -5,6 +5,7 @@
 #include <luisa-compute.h>
 #include <util/sampling.h>
 #include <base/pipeline.h>
+#include <base/scene.h>
 
 namespace luisa::render {
 
@@ -410,54 +411,170 @@ RGBUnboundSpectrum Pipeline::srgb_unbound_spectrum(Expr<float3> rgb) const noexc
 RGBIlluminantSpectrum Pipeline::srgb_illuminant_spectrum(Expr<float3> rgb) const noexcept {
     auto [rsp, scale] = RGB2SpectrumTable::srgb().decode_unbound(
         Expr{_bindless_array}, _rgb2spec_index, rgb);
-    return {std::move(rsp), std::move(scale), DenselySampledSpectrum::cie_illum_d6500()};
+    return {std::move(rsp), std::move(scale), DenselySampledSpectrum::cie_illum_d65()};
 }
 
 Float4 Pipeline::evaluate_texture(
+    Texture::Category category,
     const Var<TextureHandle> &handle, const Interaction &it,
     const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    // short path: only one texture type
-    if (std::count_if(
-            _texture_interfaces.cbegin(), _texture_interfaces.cend(),
-            [](auto p) noexcept { return p != nullptr; }) == 1u) {
-        for (auto t : _texture_interfaces) {
-            if (t != nullptr) {
-                return t->evaluate(*this, it, handle, swl, time);
-            }
+    auto &&interfaces = [this, category] {
+        switch (category) {
+            case Texture::Category::GENERIC:
+                return _generic_texture_interfaces;
+            case Texture::Category::COLOR:
+                return _color_texture_interfaces;
+            case Texture::Category::ILLUMINANT:
+                return _illuminant_texture_interfaces;
+            default: break;
         }
-    }
-    // dynamic dispatch
+        LUISA_ERROR_WITH_LOCATION(
+            "Invalid texture category: {:02x}.",
+            luisa::to_underlying(category));
+    }();
     using namespace luisa::compute;
     auto value = def(make_float4());
-    $switch(handle->tag()) {
-        for (auto i = 0u; i < _texture_interfaces.size(); i++) {
-            if (auto t = _texture_interfaces[i]; t != nullptr) {
+    if (interfaces.size() == 1u) {// short path: only one texture type
+        value = interfaces.front()->evaluate(
+            *this, it, handle, time);
+    } else {// dynamic dispatch
+        $switch(handle->tag()) {
+            for (auto i = 0u; i < interfaces.size(); i++) {
                 $case(i) {
-                    value = t->evaluate(*this, it, handle, swl, time);
+                    value = interfaces[i]->evaluate(
+                        *this, it, handle, time);
                 };
             }
-        }
-        $default { unreachable(); };
-    };
+            $default { unreachable(); };
+        };
+    }
+    if (category == Texture::Category::COLOR) {
+        auto spec = RGBAlbedoSpectrum{RGBSigmoidPolynomial{value.xyz()}};
+        return spec.sample(swl);
+    }
+    if (category == Texture::Category::ILLUMINANT) {
+        auto spec = RGBIlluminantSpectrum{
+            RGBSigmoidPolynomial{value.xyz()}, value.w,
+            DenselySampledSpectrum::cie_illum_d65()};
+        return spec.sample(swl);
+    }
     return value;
 }
 
 const TextureHandle *Pipeline::encode_texture(CommandBuffer &command_buffer, const Texture *texture) noexcept {
     auto [iter, first_def] = _texture_handles.try_emplace(texture, nullptr);
     if (first_def) {
+        auto interfaces = [this, category = texture->category()] {
+            switch (category) {
+                case Texture::Category::GENERIC:
+                    return &_generic_texture_interfaces;
+                case Texture::Category::COLOR:
+                    return &_color_texture_interfaces;
+                case Texture::Category::ILLUMINANT:
+                    return &_illuminant_texture_interfaces;
+                default: break;
+            }
+            LUISA_ERROR_WITH_LOCATION(
+                "Invalid texture category: {:02x}.",
+                luisa::to_underlying(category));
+        }();
+        auto handle_tag = [interfaces, texture] {
+            if (auto it = std::find_if(
+                    interfaces->begin(), interfaces->end(),
+                    [texture](auto i) noexcept { return i->impl_type() == texture->impl_type(); });
+                it != interfaces->end()) {
+                return static_cast<uint>(std::distance(interfaces->begin(), it));
+            }
+            auto tag = static_cast<uint>(interfaces->size());
+            interfaces->emplace_back(texture);
+            return tag;
+        }();
         iter->second = luisa::make_unique<TextureHandle>(
-            texture->encode(*this, command_buffer));
-        _texture_interfaces[texture->handle_tag()] = texture;
+            texture->_encode(*this, command_buffer, handle_tag));
     }
     return iter->second.get();
 }
+Float4 Pipeline::evaluate_color_texture(
+    const Var<TextureHandle> &handle, const Interaction &it,
+    const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    return evaluate_texture(
+        Texture::Category::COLOR,
+        handle, it, swl, time);
+}
 
-uint Pipeline::image_texture(CommandBuffer &command_buffer, const LoadedImage &image, TextureSampler sampler) noexcept {
-    auto device_image = this->create<Image<float>>(image.pixel_storage(), image.size());
-    auto texture_id = this->register_bindless(*device_image, sampler);
-    command_buffer << device_image->copy_from(image.pixels())
-                   << compute::commit();
-    return texture_id;
+Float4 Pipeline::evaluate_illuminant_texture(
+    const Var<TextureHandle> &handle, const Interaction &it,
+    const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    return evaluate_texture(
+        Texture::Category::ILLUMINANT,
+        handle, it, swl, time);
+}
+
+Float4 Pipeline::evaluate_generic_texture(
+    const Var<TextureHandle> &handle, const Interaction &it, Expr<float> time) const noexcept {
+    return evaluate_texture(
+        Texture::Category::GENERIC,
+        handle, it, {}, time);
+}
+
+Float4 Pipeline::evaluate_texture(
+    Texture::Category category, TextureHandle handle, const Interaction &it,
+    const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    auto interface = [this, category, tag = handle.id_and_tag & TextureHandle::tag_mask] {
+        switch (category) {
+            case Texture::Category::GENERIC:
+                return _generic_texture_interfaces.at(tag);
+            case Texture::Category::COLOR:
+                return _color_texture_interfaces.at(tag);
+            case Texture::Category::ILLUMINANT:
+                return _illuminant_texture_interfaces.at(tag);
+            default: break;
+        }
+        LUISA_ERROR_WITH_LOCATION(
+            "Invalid texture category: {:02x}.",
+            luisa::to_underlying(category));
+    }();
+    Var<TextureHandle> dsl_handle;
+    dsl_handle.id_and_tag = handle.id_and_tag;
+    dsl_handle.compressed_v[0] = handle.compressed_v[0];
+    dsl_handle.compressed_v[1] = handle.compressed_v[1];
+    dsl_handle.compressed_v[2] = handle.compressed_v[2];
+    auto value = interface->evaluate(
+        *this, it, dsl_handle, time);
+    if (category == Texture::Category::COLOR) {
+        auto spec = RGBAlbedoSpectrum{RGBSigmoidPolynomial{value.xyz()}};
+        return spec.sample(swl);
+    }
+    if (category == Texture::Category::ILLUMINANT) {
+        auto spec = RGBIlluminantSpectrum{
+            RGBSigmoidPolynomial{value.xyz()}, value.w,
+            DenselySampledSpectrum::cie_illum_d65()};
+        return spec.sample(swl);
+    }
+    return value;
+}
+
+Float4 Pipeline::evaluate_color_texture(
+    TextureHandle handle, const Interaction &it,
+    const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    return evaluate_texture(
+        Texture::Category::COLOR,
+        handle, it, swl, time);
+}
+
+Float4 Pipeline::evaluate_illuminant_texture(
+    TextureHandle handle, const Interaction &it,
+    const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    return evaluate_texture(
+        Texture::Category::ILLUMINANT,
+        handle, it, swl, time);
+}
+
+Float4 Pipeline::evaluate_generic_texture(
+    TextureHandle handle, const Interaction &it, Expr<float> time) const noexcept {
+    return evaluate_texture(
+        Texture::Category::GENERIC,
+        handle, it, {}, time);
 }
 
 }// namespace luisa::render

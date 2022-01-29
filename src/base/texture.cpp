@@ -10,26 +10,16 @@ namespace luisa::render {
 Texture::Texture(Scene *scene, const SceneNodeDesc *desc) noexcept
     : SceneNode{scene, desc, SceneNodeTag::TEXTURE} {}
 
-uint Texture::handle_tag() const noexcept {
-    static std::mutex mutex;
-    static luisa::unordered_map<luisa::string, uint, Hash64> impl_to_tag;
-    std::scoped_lock lock{mutex};
-    auto [iter, _] = impl_to_tag.try_emplace(
-        luisa::string{impl_type()},
-        static_cast<uint>(impl_to_tag.size()));
-    return iter->second;
-}
-
-TextureHandle TextureHandle::encode_constant(uint tag, float3 v, float alpha, float4 e) noexcept {
+TextureHandle TextureHandle::encode_constant(uint tag, float3 v, float alpha) noexcept {
     if (tag > tag_mask) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
             "Invalid tag for texture handle: {}.", tag);
     }
     return {.id_and_tag = tag | (float_to_half(alpha) << texture_id_offset_shift),
-            .compressed_v = {v.x, v.y, v.z, e.x, e.y, e.z, e.w}};
+            .compressed_v = {v.x, v.y, v.z}};
 }
 
-TextureHandle TextureHandle::encode_texture(uint tag, uint tex_id, float3 v, float4 e) noexcept {
+TextureHandle TextureHandle::encode_texture(uint tag, uint tex_id, float3 v) noexcept {
     if (tag > tag_mask) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
             "Invalid tag for texture handle: {}.", tag);
@@ -39,13 +29,15 @@ TextureHandle TextureHandle::encode_texture(uint tag, uint tex_id, float3 v, flo
             "Invalid id for texture handle: {}.", tex_id);
     }
     return {.id_and_tag = tag | (tex_id << texture_id_offset_shift),
-            .compressed_v = {v.x, v.y, v.z, e.x, e.y, e.z, e.w}};
+            .compressed_v = {v.x, v.y, v.z}};
 }
 
 ImageTexture::ImageTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
     : Texture{scene, desc} {
-    auto address = desc->property_string_or_default("address", "repeat");
     auto filter = desc->property_string_or_default("filter", "bilinear");
+    auto address = desc->property_string_or_default("address", "repeat");
+    for (auto &c : filter) { c = static_cast<char>(tolower(c)); }
+    for (auto &c : address) { c = static_cast<char>(tolower(c)); }
     auto address_mode = [&address, desc] {
         for (auto &c : address) { c = static_cast<char>(tolower(c)); }
         if (address == "zero") { return TextureSampler::Address::ZERO; }
@@ -81,21 +73,31 @@ ImageTexture::ImageTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
 
 Float4 ImageTexture::evaluate(
     const Pipeline &pipeline, const Interaction &it,
-    const Var<TextureHandle> &handle,
-    const SampledWavelengths &swl, Expr<float>) const noexcept {
-    auto uv = it.uv() * handle->extra().xy() + handle->extra().zw();
-    return _evaluate(pipeline, handle, uv, swl);
+    const Var<TextureHandle> &handle, Expr<float>) const noexcept {
+    auto uv_scale = as<uint>(handle->v().x);
+    auto u_scale = half_to_float(uv_scale & 0xffffu);
+    auto v_scale = half_to_float(uv_scale >> 16u);
+    auto uv_offset = handle->v().yz();
+    auto uv = it.uv() * make_float2(u_scale, v_scale) + uv_offset;
+    return pipeline.tex2d(handle->texture_id()).sample(uv);// TODO: LOD
 }
 
-TextureHandle ImageTexture::encode(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
+TextureHandle ImageTexture::_encode(
+    Pipeline &pipeline, CommandBuffer &command_buffer,
+    uint handle_tag) const noexcept {
+
     auto &&image = _image();
     auto device_image = pipeline.create<Image<float>>(image.pixel_storage(), image.size());
     auto tex_id = pipeline.register_bindless(*device_image, _sampler);
     command_buffer << device_image->copy_from(image.pixels())
                    << compute::commit();
+    auto u_scale = float_to_half(_uv_scale.x);
+    auto v_scale = float_to_half(_uv_scale.y);
+    auto compressed = make_float3(
+        luisa::bit_cast<float>(u_scale | (v_scale << 16u)),
+                _uv_offset);
     return TextureHandle::encode_texture(
-        handle_tag(), tex_id, _v(),
-        make_float4(_uv_scale, _uv_offset));
+        handle_tag, tex_id, compressed);
 }
 
 }// namespace luisa::render

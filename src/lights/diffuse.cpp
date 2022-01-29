@@ -47,7 +47,7 @@ public:
           _emission{scene->load_texture(desc->property_node_or_default(
               "emission", default_emission_texture_desc()))},
          _scale{std::max(desc->property_float_or_default("scale", 1.0f), 0.0f)} {
-        if (!_emission->is_illuminant()) [[unlikely]] {
+        if (_emission->category() != Texture::Category::ILLUMINANT) [[unlikely]] {
             LUISA_ERROR(
                 "Non-illuminant textures are not "
                 "allowed in Diffuse lights. [{}]",
@@ -85,7 +85,7 @@ private:
         auto pdf_area = cast<float>(params.triangle_count) * (pdf_triangle / it_light.triangle_area());
         auto cos_wo = dot(it_light.wo(), it_light.shading().n());
         auto front_face = cos_wo > 0.0f;
-        auto L = _pipeline.evaluate_texture(params.emission, it_light, _swl, _time);
+        auto L = _pipeline.evaluate_illuminant_texture(params.emission, it_light, _swl, _time);
         auto pdf = distance_squared(it_light.p(), p_from) * pdf_area * (1.0f / cos_wo);
         return Light::Evaluation{.L = L * params.scale, .pdf = ite(front_face, pdf, 0.0f)};
     }

@@ -1,17 +1,17 @@
 Material cbox-white : Lambert {
-  color : Const {
+  color : ConstColor {
     color { 0.725, 0.71, 0.68 }
   }
 }
 
 Material cbox-red : Lambert {
-  color : Const {
+  color : ConstColor {
     color { 0.63, 0.065, 0.05 }
   }
 }
 
 Material cbox-green : Lambert {
-  color : Const {
+  color : ConstColor {
     color { 0.14, 0.45, 0.091 }
   }
 }
@@ -37,10 +37,10 @@ Shape cbox-right-wall : Mesh {
 }
 
 Material cbox-brick : Lambert {
-  color : Linear {
+  color : Color {
     file { "../textures/brickwall.jpg" }
-    half { true }
     gamma { 0.5 }
+    encoding { "gamma" }
   }
 }
 

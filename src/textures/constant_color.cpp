@@ -13,9 +13,9 @@ private:
     bool _is_black{false};
 
 private:
-    [[nodiscard]] TextureHandle encode(Pipeline &, CommandBuffer &) const noexcept override {
+    [[nodiscard]] TextureHandle _encode(Pipeline &, CommandBuffer &, uint handle_tag) const noexcept override {
         return TextureHandle::encode_constant(
-            handle_tag(), make_float3(_rsp[0], _rsp[1], _rsp[2]));
+            handle_tag, make_float3(_rsp[0], _rsp[1], _rsp[2]));
     }
 
 public:
@@ -32,15 +32,13 @@ public:
         _is_black = all(color == 0.0f);
     }
     [[nodiscard]] bool is_black() const noexcept override { return _is_black; }
-    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "const"; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "constcolor"; }
     [[nodiscard]] Float4 evaluate(
-        const Pipeline &, const Interaction &, const Var<TextureHandle> &handle,
-        const SampledWavelengths &swl, Expr<float>) const noexcept override {
-        return RGBAlbedoSpectrum{RGBSigmoidPolynomial{handle->v()}}.sample(swl);
+        const Pipeline &, const Interaction &,
+        const Var<TextureHandle> &handle, Expr<float>) const noexcept override {
+        return compute::make_float4(handle->v(), handle->alpha());
     }
-    [[nodiscard]] bool is_color() const noexcept override { return true; }
-    [[nodiscard]] bool is_generic() const noexcept override { return false; }
-    [[nodiscard]] bool is_illuminant() const noexcept override { return false; }
+    [[nodiscard]] Category category() const noexcept override { return Category::COLOR; }
 };
 
 }// namespace luisa::render

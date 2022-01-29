@@ -122,7 +122,7 @@ const DenselySampledSpectrum &DenselySampledSpectrum::cie_z() noexcept {
     return s;
 }
 
-const DenselySampledSpectrum &DenselySampledSpectrum::cie_illum_d6500() noexcept {
+const DenselySampledSpectrum &DenselySampledSpectrum::cie_illum_d65() noexcept {
     static DenselySampledSpectrum s{cie_illum_d6500_samples};
     return s;
 }

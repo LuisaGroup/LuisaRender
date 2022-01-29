@@ -13,10 +13,8 @@ private:
     float _scale{};
 
 private:
-    [[nodiscard]] TextureHandle encode(Pipeline &, CommandBuffer &) const noexcept override {
-        return TextureHandle::encode_constant(
-            handle_tag(), {}, 0.0f,
-            make_float4(_rsp, _scale));
+    [[nodiscard]] TextureHandle _encode(Pipeline &, CommandBuffer &, uint handle_tag) const noexcept override {
+        return TextureHandle::encode_constant(handle_tag, _rsp, _scale);
     }
 
 public:
@@ -37,18 +35,14 @@ public:
     }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "constillum"; }
     [[nodiscard]] Float4 evaluate(
-        const Pipeline &, const Interaction &, const Var<TextureHandle> &handle,
-        const SampledWavelengths &swl, Expr<float>) const noexcept override {
-        auto rsp_scale = handle->extra();
-        RGBIlluminantSpectrum spec{
-            RGBSigmoidPolynomial{rsp_scale.xyz()}, rsp_scale.w,
-            DenselySampledSpectrum::cie_illum_d6500()};
-        return spec.sample(swl);
+        const Pipeline &, const Interaction &,
+        const Var<TextureHandle> &handle, Expr<float>) const noexcept override {
+        auto rsp = handle->v();
+        auto scale = handle->alpha();
+        return compute::make_float4(rsp, scale);
     }
-    [[nodiscard]] bool is_color() const noexcept override { return false; }
-    [[nodiscard]] bool is_generic() const noexcept override { return false; }
-    [[nodiscard]] bool is_illuminant() const noexcept override { return true; }
     [[nodiscard]] bool is_black() const noexcept override { return _scale == 0.0f; }
+    [[nodiscard]] Category category() const noexcept override { return Category::ILLUMINANT; }
 };
 
 }// namespace luisa::render

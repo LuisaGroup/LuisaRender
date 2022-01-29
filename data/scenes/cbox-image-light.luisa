@@ -28,20 +28,14 @@ Shape image-light : Mesh {
     translate { 0, 1.2, -0.97 }
   }
   light : Diffuse {
-    // emission : HDRIllum {
-    //   file { "../envmaps/photo_studio_01_1k.hdr" }
-    //   scale { 3 }
-    //   half { true }
-    // }
-    emission : HDRIllum {
+    emission : Illum {
       file {
-        // "/Users/mike/Downloads/_DSC9322.jpg" }
-        "/Users/mike/Downloads/WechatIMG16.jpeg" }
+        "/Users/mike/Downloads/_DSC9322.jpg" }
+        // "/Users/mike/Downloads/WechatIMG16.jpeg" }
       uv_offset { 0, 0 }
-      uv_scale { 1, 1 }
       scale { 15 }
-      gamma { 1 }
-      half { true }
+      encoding { "sRGB" }
+      address { "mirror" }
     }
   }
   material : Black {}

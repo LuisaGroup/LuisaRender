@@ -99,7 +99,9 @@ private:
     luisa::unordered_map<luisa::string /* impl type */, uint /* tag */, Hash64> _light_tags;
     luisa::unordered_map<const Material *, MaterialData> _materials;
     luisa::unordered_map<const Light *, LightData> _lights;
-    std::array<const Texture *, TextureHandle::tag_max_count> _texture_interfaces{};
+    luisa::vector<const Texture *> _color_texture_interfaces{};
+    luisa::vector<const Texture *> _illuminant_texture_interfaces{};
+    luisa::vector<const Texture *> _generic_texture_interfaces{};
     luisa::unordered_map<const Texture *, luisa::unique_ptr<TextureHandle>> _texture_handles;
     luisa::vector<InstancedShape> _instances;
     luisa::vector<InstancedTransform> _dynamic_transforms;
@@ -160,7 +162,6 @@ public:
     }
 
     [[nodiscard]] const TextureHandle *encode_texture(CommandBuffer &command_buffer, const Texture *texture) noexcept;
-    [[nodiscard]] uint image_texture(CommandBuffer &command_buffer, const LoadedImage &image, TextureSampler sampler) noexcept;
 
     template<typename T, typename... Args>
         requires std::is_base_of_v<Resource, T>
@@ -231,8 +232,30 @@ public:
     [[nodiscard]] auto intersect_any(const Var<Ray> &ray) const noexcept { return trace_any(ray); }
 
     [[nodiscard]] Float4 evaluate_texture(
+        Texture::Category category, TextureHandle handle, const Interaction &it,
+        const SampledWavelengths &swl, Expr<float> time) const noexcept;
+    [[nodiscard]] Float4 evaluate_color_texture(
+        TextureHandle handle, const Interaction &it,
+        const SampledWavelengths &swl, Expr<float> time) const noexcept;
+    [[nodiscard]] Float4 evaluate_illuminant_texture(
+        TextureHandle handle, const Interaction &it,
+        const SampledWavelengths &swl, Expr<float> time) const noexcept;
+    [[nodiscard]] Float4 evaluate_generic_texture(
+        TextureHandle handle, const Interaction &it,
+        Expr<float> time) const noexcept;
+
+    [[nodiscard]] Float4 evaluate_texture(
+        Texture::Category category, const Var<TextureHandle> &handle, const Interaction &it,
+        const SampledWavelengths &swl, Expr<float> time) const noexcept;
+    [[nodiscard]] Float4 evaluate_color_texture(
         const Var<TextureHandle> &handle, const Interaction &it,
         const SampledWavelengths &swl, Expr<float> time) const noexcept;
+    [[nodiscard]] Float4 evaluate_illuminant_texture(
+        const Var<TextureHandle> &handle, const Interaction &it,
+        const SampledWavelengths &swl, Expr<float> time) const noexcept;
+    [[nodiscard]] Float4 evaluate_generic_texture(
+        const Var<TextureHandle> &handle, const Interaction &it,
+        Expr<float> time) const noexcept;
 
     [[nodiscard]] luisa::unique_ptr<Material::Closure> decode_material(
         uint tag, const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept;

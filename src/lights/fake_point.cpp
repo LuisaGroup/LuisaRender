@@ -71,7 +71,7 @@ public:
         auto params = _pipeline.buffer<FakePointLightParams>(inst->light_buffer_id()).read(0u);
         RGBIlluminantSpectrum spec{
             RGBSigmoidPolynomial{params.rsp}, params.scale,
-            DenselySampledSpectrum::cie_illum_d6500()};
+            DenselySampledSpectrum::cie_illum_d65()};
         auto L = spec.sample(_swl);
         auto center = make_float3(inst_to_world * make_float4(make_float3(0.0f), 1.0f));
         auto frame = Frame::make(normalize(it_from.p() - center));

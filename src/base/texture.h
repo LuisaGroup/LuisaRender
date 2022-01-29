@@ -19,15 +19,12 @@ struct alignas(16) TextureHandle {
     static constexpr auto tag_max_count = 1u << texture_id_offset_shift;
 
     uint id_and_tag;
-    float compressed_v[7];
+    float compressed_v[3];
 
     [[nodiscard]] static TextureHandle encode_constant(
-        uint tag, float3 v, float alpha = 1.0f,
-        float4 e = make_float4()) noexcept;
+        uint tag, float3 v, float alpha = 1.0f) noexcept;
     [[nodiscard]] static TextureHandle encode_texture(
-        uint tag, uint tex_id,
-        float3 v = make_float3(1.0f),
-        float4 extra = make_float4(0.0f)) noexcept;
+        uint tag, uint tex_id, float3 v = make_float3(1.0f)) noexcept;
 };
 
 }// namespace luisa::render
@@ -42,11 +39,6 @@ LUISA_STRUCT(luisa::render::TextureHandle, id_and_tag, compressed_v) {
             compressed_v[0],
             compressed_v[1],
             compressed_v[2]);
-    }
-    [[nodiscard]] auto extra() const noexcept {
-        return luisa::compute::make_float4(
-            compressed_v[3], compressed_v[4],
-            compressed_v[5], compressed_v[6]);
     }
     [[nodiscard]] auto alpha() const noexcept {
         using luisa::compute::cast;
@@ -69,22 +61,26 @@ using compute::Float4;
 
 class Texture : public SceneNode {
 
+public:
+    enum struct Category {
+        GENERIC,  // automatically converts to the albedo spectrum
+        COLOR,    // returns the value as-is (no conversion spectrum)
+        ILLUMINANT// automatically converts to the illuminant spectrum
+    };
+
 private:
     friend class Pipeline;
-    [[nodiscard]] virtual TextureHandle encode(
-        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
+    [[nodiscard]] virtual TextureHandle _encode(
+        Pipeline &pipeline, CommandBuffer &command_buffer,
+        uint handle_tag) const noexcept = 0;
 
 public:
     Texture(Scene *scene, const SceneNodeDesc *desc) noexcept;
-    [[nodiscard]] uint handle_tag() const noexcept;
     [[nodiscard]] virtual bool is_black() const noexcept = 0;
-    [[nodiscard]] virtual bool is_color() const noexcept = 0;     // automatically converts to the albedo spectrum
-    [[nodiscard]] virtual bool is_generic() const noexcept = 0;   // returns the value as-is (no conversion spectrum)
-    [[nodiscard]] virtual bool is_illuminant() const noexcept = 0;// automatically converts to the illuminant spectrum
+    [[nodiscard]] virtual Category category() const noexcept = 0;
     [[nodiscard]] virtual Float4 evaluate(
         const Pipeline &pipeline, const Interaction &it,
-        const Var<TextureHandle> &handle,
-        const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
+        const Var<TextureHandle> &handle, Expr<float> time) const noexcept = 0;
 };
 
 using compute::PixelStorage;
@@ -98,12 +94,9 @@ private:
     float2 _uv_offset;
 
 private:
-    [[nodiscard]] virtual Float4 _evaluate(
-        const Pipeline &pipeline, const Var<TextureHandle> &handle,
-        Expr<float2> uv, const SampledWavelengths &swl) const noexcept = 0;
     [[nodiscard]] virtual const LoadedImage &_image() const noexcept = 0;
-    [[nodiscard]] virtual float3 _v() const noexcept = 0;
-    TextureHandle encode(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
+    [[nodiscard]] TextureHandle _encode(
+        Pipeline &pipeline, CommandBuffer &command_buffer, uint handle_tag) const noexcept override;
 
 public:
     ImageTexture(Scene *scene, const SceneNodeDesc *desc) noexcept;
@@ -111,8 +104,8 @@ public:
     [[nodiscard]] auto uv_scale() const noexcept { return _uv_scale; }
     [[nodiscard]] auto uv_offset() const noexcept { return _uv_offset; }
     [[nodiscard]] Float4 evaluate(
-        const Pipeline &pipeline, const Interaction &it, const Var<TextureHandle> &handle,
-        const SampledWavelengths &swl, Expr<float> time) const noexcept override;
+        const Pipeline &pipeline, const Interaction &it,
+        const Var<TextureHandle> &handle, Expr<float> time) const noexcept override;
 };
 
 }// namespace luisa::render

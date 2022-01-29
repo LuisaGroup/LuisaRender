@@ -35,7 +35,7 @@ public:
           _emission{scene->load_texture(desc->property_node_or_default(
               "emission", default_emission_texture_desc()))},
           _scale{std::max(desc->property_float_or_default("scale", 1.0f), 0.0f)} {
-        if (!_emission->is_illuminant()) [[unlikely]] {
+        if (_emission->category() != Texture::Category::ILLUMINANT) [[unlikely]] {
             LUISA_ERROR(
                 "Non-illuminant textures are not "
                 "allowed in environment mapping. [{}]",
@@ -59,17 +59,12 @@ private:
 private:
     [[nodiscard]] auto _evaluate(Expr<float3> wi_local, const SampledWavelengths &swl, Expr<float> time) const noexcept {
         auto env = static_cast<const EnvironmentMapping *>(node());
-        auto handle = def<TextureHandle>();
-        handle.id_and_tag = _texture.id_and_tag;
-        for (auto i = 0u; i < std::size(_texture.compressed_v); i++) {
-            handle.compressed_v[i] = _texture.compressed_v[i];
-        }
         auto theta = acos(wi_local.y);
         auto phi = atan2(wi_local.x, wi_local.z);
         auto u = -0.5f * inv_pi * phi;
         auto v = theta * inv_pi;
         Interaction it{-wi_local, make_float2(u, v)};
-        auto L = env->emission()->evaluate(pipeline(), it, handle, swl, time);
+        auto L = pipeline().evaluate_illuminant_texture(_texture, it, swl, time);
         return Light::Evaluation{.L = L * env->scale(), .pdf = uniform_sphere_pdf()};
     }
 

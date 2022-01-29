@@ -13,7 +13,7 @@ namespace luisa::render {
 
 using namespace luisa::compute;
 
-class ColorTexture final : public ImageTexture {
+class IlluminantTexture final : public ImageTexture {
 
 private:
     std::shared_future<LoadedImage> _img;
@@ -23,7 +23,7 @@ private:
     [[nodiscard]] const LoadedImage &_image() const noexcept override { return _img.get(); }
 
 public:
-    ColorTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
+    IlluminantTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
         : ImageTexture{scene, desc} {
         auto path = desc->property_path("file");
         auto half = desc->property_bool_or_default("fp16", true);
@@ -35,30 +35,23 @@ public:
                 return "sRGB";
             }));
         for (auto &c : encoding) { c = static_cast<char>(tolower(c)); }
-        auto gamma = make_float3(1.0f);
-        if (encoding == "gamma") {
-            gamma = desc->property_float3_or_default(
-                "gamma", lazy_construct([desc] {
-                    return make_float3(desc->property_float_or_default(
-                        "gamma", 2.2f));
-                }));
-        }
-        gamma = clamp(gamma, 1e-3f, 16.0f);
-        auto tint = desc->property_float3_or_default(
-            "tint", lazy_construct([desc] {
+        auto gamma = 1.0f;
+        if (encoding == "gamma") { gamma = desc->property_float_or_default("gamma", 2.2f); }
+        auto scale = desc->property_float3_or_default(
+            "scale", lazy_construct([desc] {
                 return make_float3(desc->property_float_or_default(
-                    "tint", 1.0f));
+                    "scale", 1.0f));
             }));
-        tint = max(tint, 0.0f);
-        _is_black = all(tint == 0.0f);
+        scale = clamp(scale, 0.0f, 1024.0f);
+        _is_black = all(scale == 0.0f);
         _img = ThreadPool::global().async([path = std::move(path), half, encoding = std::move(encoding),
-                                           gamma, tint, sloc = desc->source_location()] {
+                                           gamma, sloc = desc->source_location(), scale] {
             auto image = LoadedImage::load(path, half ? PixelStorage::HALF4 : PixelStorage::FLOAT4);
             if (encoding == "rsp") { return image; }
-            auto process = [&]() -> luisa::function<float3(float3)> {
-                auto rgb2spec = [tint](auto p) noexcept {
-                    auto rsp = RGB2SpectrumTable::srgb().decode_albedo(p * tint);
-                    return make_float3(rsp.x, rsp.y, rsp.z);
+            auto process = [&]() -> luisa::function<float4(float3)> {
+                auto rgb2spec = [scale](auto p) noexcept {
+                    auto rsp_scale = RGB2SpectrumTable::srgb().decode_unbound(p * scale);
+                    return make_float4(rsp_scale.first, rsp_scale.second);
                 };
                 if (encoding == "linear") { return rgb2spec; }
                 if (encoding == "srgb") {
@@ -72,9 +65,9 @@ public:
                     };
                 }
                 if (encoding == "gamma") {
-                    return [rgb2spec, g = gamma](auto p) noexcept {
-                        return rgb2spec(make_float3(
-                            pow(p.x, g.x), pow(p.y, g.y), pow(p.z, g.z)));
+                    return [rgb2spec, gamma](auto p) noexcept {
+                        auto g = [gamma](auto x) noexcept { return std::pow(x, gamma); };
+                        return rgb2spec(make_float3(g(p.x), g(p.y), g(p.z)));
                     };
                 }
                 LUISA_ERROR(
@@ -90,23 +83,22 @@ public:
                     pixels[i][0] = float_to_half(rsp.x);
                     pixels[i][1] = float_to_half(rsp.y);
                     pixels[i][2] = float_to_half(rsp.z);
+                    pixels[i][3] = float_to_half(rsp.w);
                 }
             } else {
                 auto pixels = reinterpret_cast<float4 *>(image.pixels());
                 for (auto i = 0u; i < image.size().x * image.size().y; i++) {
-                    auto p = pixels[i];
-                    auto rsp = process(p.xyz());
-                    pixels[i] = make_float4(rsp, p.w);
+                    pixels[i] = process(pixels[i].xyz());
                 }
             }
             return image;
         });
     }
-    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "color"; }
-    [[nodiscard]] bool is_black() const noexcept override { return false; }
-    [[nodiscard]] Category category() const noexcept override { return Category::COLOR; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "illum"; }
+    [[nodiscard]] bool is_black() const noexcept override { return _is_black; }
+    [[nodiscard]] Category category() const noexcept override { return Category::ILLUMINANT; }
 };
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::ColorTexture)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::IlluminantTexture)

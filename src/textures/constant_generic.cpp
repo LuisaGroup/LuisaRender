@@ -12,8 +12,8 @@ private:
     float4 _v;
 
 private:
-    [[nodiscard]] TextureHandle encode(Pipeline &, CommandBuffer &) const noexcept override {
-        return TextureHandle::encode_constant(handle_tag(), make_float3(), 0.0f, _v);
+    [[nodiscard]] TextureHandle _encode(Pipeline &, CommandBuffer &, uint handle_tag) const noexcept override {
+        return TextureHandle::encode_constant(handle_tag, _v.xyz(), _v.w);
     }
 
 public:
@@ -32,15 +32,13 @@ public:
         }
     }
     [[nodiscard]] bool is_black() const noexcept override { return all(_v == 0.0f); }
-    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "constvalue"; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "constgeneric"; }
     [[nodiscard]] Float4 evaluate(
-        const Pipeline &, const Interaction &, const Var<TextureHandle> &handle,
-        const SampledWavelengths &swl, Expr<float>) const noexcept override {
-        return handle->extra();
+        const Pipeline &, const Interaction &,
+        const Var<TextureHandle> &handle, Expr<float>) const noexcept override {
+        return compute::make_float4(handle->v(), handle->alpha());
     }
-    [[nodiscard]] bool is_color() const noexcept override { return true; }
-    [[nodiscard]] bool is_generic() const noexcept override { return false; }
-    [[nodiscard]] bool is_illuminant() const noexcept override { return false; }
+    [[nodiscard]] Category category() const noexcept override { return Category::GENERIC; }
 };
 
 }// namespace luisa::render

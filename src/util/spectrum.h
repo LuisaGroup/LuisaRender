@@ -117,7 +117,7 @@ public:
     [[nodiscard]] static const DenselySampledSpectrum &cie_x() noexcept;
     [[nodiscard]] static const DenselySampledSpectrum &cie_y() noexcept;
     [[nodiscard]] static const DenselySampledSpectrum &cie_z() noexcept;
-    [[nodiscard]] static const DenselySampledSpectrum &cie_illum_d6500() noexcept;
+    [[nodiscard]] static const DenselySampledSpectrum &cie_illum_d65() noexcept;
     [[nodiscard]] Float4 sample(const SampledWavelengths &swl) const noexcept;
 };
 
