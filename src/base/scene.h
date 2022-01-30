@@ -25,7 +25,7 @@ class Camera;
 class Film;
 class Filter;
 class Integrator;
-class Material;
+class Surface;
 class Light;
 class Sampler;
 class Shape;
@@ -61,7 +61,7 @@ public:
     [[nodiscard]] Film *load_film(const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] Filter *load_filter(const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] Integrator *load_integrator(const SceneNodeDesc *desc) noexcept;
-    [[nodiscard]] Material *load_material(const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] Surface *load_surface(const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] Light *load_light(const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] Sampler *load_sampler(const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] Shape *load_shape(const SceneNodeDesc *desc) noexcept;

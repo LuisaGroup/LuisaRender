@@ -11,7 +11,7 @@
 #include <base/film.h>
 #include <base/filter.h>
 #include <base/integrator.h>
-#include <base/material.h>
+#include <base/surface.h>
 #include <base/light.h>
 #include <base/sampler.h>
 #include <base/shape.h>
@@ -139,8 +139,8 @@ Integrator *Scene::load_integrator(const SceneNodeDesc *desc) noexcept {
     return dynamic_cast<Integrator *>(load_node(SceneNodeTag::INTEGRATOR, desc));
 }
 
-Material *Scene::load_material(const SceneNodeDesc *desc) noexcept {
-    return dynamic_cast<Material *>(load_node(SceneNodeTag::MATERIAL, desc));
+Surface *Scene::load_surface(const SceneNodeDesc *desc) noexcept {
+    return dynamic_cast<Surface *>(load_node(SceneNodeTag::SURFACE, desc));
 }
 
 Light *Scene::load_light(const SceneNodeDesc *desc) noexcept {

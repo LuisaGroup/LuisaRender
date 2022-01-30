@@ -1,16 +1,16 @@
-Material cbox-white : Lambert {
+Surface cbox-white : Lambert {
   color : ConstColor {
     color { 0.725, 0.71, 0.68 }
   }
 }
 
-Material cbox-red : Lambert {
+Surface cbox-red : Lambert {
   color : ConstColor {
     color { 0.63, 0.065, 0.05 }
   }
 }
 
-Material cbox-green : Lambert {
+Surface cbox-green : Lambert {
   color : ConstColor {
     color { 0.14, 0.45, 0.091 }
   }
@@ -18,25 +18,25 @@ Material cbox-green : Lambert {
 
 Shape cbox-ceiling : Mesh {
   file { "cbox-parts/ceiling.obj" }
-  material { @cbox-white }
+  surface { @cbox-white }
 }
 
 Shape cbox-floor : Mesh {
   file { "cbox-parts/floor.obj" }
-  material { @cbox-white }
+  surface { @cbox-white }
 }
 
 Shape cbox-left-wall : Mesh {
   file { "cbox-parts/left-wall.obj" }
-  material { @cbox-red }
+  surface { @cbox-red }
 }
 
 Shape cbox-right-wall : Mesh {
   file { "cbox-parts/right-wall.obj" }
-  material { @cbox-green }
+  surface { @cbox-green }
 }
 
-Material cbox-brick : Lambert {
+Surface cbox-brick : Lambert {
   color : Color {
     file { "../textures/brickwall.jpg" }
     gamma { 1 }
@@ -46,17 +46,17 @@ Material cbox-brick : Lambert {
 
 Shape cbox-back-wall : Mesh {
   file { "cbox-parts/back-wall.obj" }
-  material { @cbox-white }
+  surface { @cbox-white }
 }
 
 Shape cbox-tall-box : Mesh {
   file { "cbox-parts/tall-box.obj" }
-  material { @cbox-white }
+  surface { @cbox-white }
 }
 
 Shape cbox-short-box : Mesh {
   file { "cbox-parts/short-box.obj" }
-  material { @cbox-white }
+  surface { @cbox-white }
 }
 
 Shape cbox-light : Mesh {

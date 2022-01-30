@@ -39,10 +39,10 @@ void Pipeline::_build_geometry(
 void Pipeline::_process_shape(
     CommandBuffer &command_buffer, const Shape *shape,
     luisa::optional<bool> overridden_two_sided,
-    const Material *overridden_material,
+    const Surface *overridden_surface,
     const Light *overridden_light) noexcept {
 
-    auto material = overridden_material == nullptr ? shape->material() : overridden_material;
+    auto material = overridden_surface == nullptr ? shape->surface() : overridden_surface;
     auto light = overridden_light == nullptr ? shape->light() : overridden_light;
 
     if (shape->is_mesh()) {
@@ -140,7 +140,7 @@ void Pipeline::_process_shape(
                 LUISA_WARNING_WITH_LOCATION(
                     "Materials will be ignored on virtual shapes.");
             } else {
-                auto m = _process_material(command_buffer, instance_id, shape, material);
+                auto m = _process_surface(command_buffer, instance_id, shape, material);
                 instance.properties |= Shape::property_flag_has_material;
                 instance.material_buffer_id_and_tag = InstancedShape::encode_material_buffer_id_and_tag(m.buffer_id, m.tag);
             }
@@ -166,22 +166,22 @@ void Pipeline::_process_shape(
     }
 }
 
-Pipeline::MaterialData Pipeline::_process_material(CommandBuffer &command_buffer, uint instance_id, const Shape *shape, const Material *material) noexcept {
-    if (auto iter = _materials.find(material); iter != _materials.cend()) { return iter->second; }
+Pipeline::MaterialData Pipeline::_process_surface(CommandBuffer &command_buffer, uint instance_id, const Shape *shape, const Surface *material) noexcept {
+    if (auto iter = _surfaces.find(material); iter != _surfaces.cend()) { return iter->second; }
     auto tag = [this, material] {
         luisa::string impl_type{material->impl_type()};
         if (auto iter = _material_tags.find(impl_type);
             iter != _material_tags.cend()) { return iter->second; }
-        auto t = static_cast<uint32_t>(_material_interfaces.size());
+        auto t = static_cast<uint32_t>(_surface_interfaces.size());
         if (t > InstancedShape::material_tag_mask) [[unlikely]] {
             LUISA_ERROR_WITH_LOCATION("Too many material tags.");
         }
-        _material_interfaces.emplace_back(material);
+        _surface_interfaces.emplace_back(material);
         _material_tags.emplace(std::move(impl_type), t);
         return t;
     }();
     auto buffer_id = material->encode(*this, command_buffer, instance_id, shape);
-    return _materials.emplace(material, MaterialData{shape, instance_id, buffer_id, tag}).first->second;
+    return _surfaces.emplace(material, MaterialData{shape, instance_id, buffer_id, tag}).first->second;
 }
 
 Pipeline::LightData Pipeline::_process_light(CommandBuffer &command_buffer, uint instance_id, const Shape *shape, const Light *light) noexcept {
@@ -354,18 +354,18 @@ luisa::unique_ptr<Interaction> Pipeline::interaction(const Var<Ray> &ray, const 
     return luisa::make_unique<Interaction>(std::move(it));
 }
 
-luisa::unique_ptr<Material::Closure> Pipeline::decode_material(
+luisa::unique_ptr<Surface::Closure> Pipeline::decode_material(
     uint tag, const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    if (tag >= _material_interfaces.size()) [[unlikely]] {
+    if (tag >= _surface_interfaces.size()) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION("Invalid material tag: {}.", tag);
     }
-    return _material_interfaces[tag]->decode(*this, it, swl, time);
+    return _surface_interfaces[tag]->decode(*this, it, swl, time);
 }
 
 void Pipeline::decode_material(
     Expr<uint> tag, const Interaction &it, const SampledWavelengths &swl, Expr<float> time,
-    const luisa::function<void(const Material::Closure &)> &func) const noexcept {
-    if (auto n = _material_interfaces.size(); n == 1u) {
+    const luisa::function<void(const Surface::Closure &)> &func) const noexcept {
+    if (auto n = _surface_interfaces.size(); n == 1u) {
         func(*decode_material(0u, it, swl, time));
     } else {
         $switch(tag) {

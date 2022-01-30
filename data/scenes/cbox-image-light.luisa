@@ -8,7 +8,7 @@ Camera camera : Pinhole {
   fov { 27.8 }
   spp { 1024 }
   film { @film }
-  file { "cbox-image-light.exr" }
+  file { "../renders/cbox-image-light.exr" }
   filter : Mitchell {
     radius { 1 }
   }
@@ -40,7 +40,7 @@ Shape image-light : Mesh {
       gamma { 3 }
     }
   }
-  material : Black {}
+  surface : Null {}
 }
 
 render {
@@ -52,7 +52,7 @@ render {
     @cbox-floor,
     Instance {
       shape { @cbox-back-wall }
-      material { @cbox-brick }
+      surface { @cbox-brick }
     },
     @cbox-short-box,
     // @cbox-tall-box,

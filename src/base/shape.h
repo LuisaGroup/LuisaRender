@@ -10,7 +10,7 @@
 namespace luisa::render {
 
 class Light;
-class Material;
+class Surface;
 
 struct alignas(16) VertexAttribute {
 
@@ -80,7 +80,7 @@ using compute::AccelBuildHint;
 using compute::Triangle;
 
 class Light;
-class Material;
+class Surface;
 class Transform;
 
 class Shape : public SceneNode {
@@ -91,7 +91,7 @@ public:
     static constexpr auto property_flag_has_light = 1u << 2u;
 
 private:
-    const Material *_material;
+    const Surface *_surface;
     const Light *_light;
     const Transform *_transform;
     luisa::optional<bool> _two_sided;
@@ -99,7 +99,7 @@ private:
 
 public:
     Shape(Scene *scene, const SceneNodeDesc *desc) noexcept;
-    [[nodiscard]] auto material() const noexcept { return _material; }
+    [[nodiscard]] auto surface() const noexcept { return _surface; }
     [[nodiscard]] auto light() const noexcept { return _light; }
     [[nodiscard]] auto transform() const noexcept { return _transform; }
     [[nodiscard]] auto build_hint() const noexcept { return _build_hint; }

@@ -13,7 +13,7 @@ enum struct SceneNodeTag : uint32_t {
     DECLARATION,
     CAMERA,
     SHAPE,
-    MATERIAL,
+    SURFACE,
     LIGHT,
     TRANSFORM,
     FILM,
@@ -34,7 +34,7 @@ constexpr std::string_view scene_node_tag_description(SceneNodeTag tag) noexcept
         case SceneNodeTag::DECLARATION: return "__declaration__"sv;
         case SceneNodeTag::CAMERA: return "Camera"sv;
         case SceneNodeTag::SHAPE: return "Shape"sv;
-        case SceneNodeTag::MATERIAL: return "Material"sv;
+        case SceneNodeTag::SURFACE: return "Surface"sv;
         case SceneNodeTag::LIGHT: return "Light"sv;
         case SceneNodeTag::TRANSFORM: return "Transform"sv;
         case SceneNodeTag::FILM: return "Film"sv;
@@ -49,4 +49,4 @@ constexpr std::string_view scene_node_tag_description(SceneNodeTag tag) noexcept
     return "__invalid__"sv;
 }
 
-}
+}// namespace luisa::render

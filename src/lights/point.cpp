@@ -9,7 +9,7 @@
 
 namespace luisa::render {
 
-struct alignas(16) FakePointLightParams {
+struct alignas(16) PointLightParams {
     float3 rsp;
     float scale;
     float radius;
@@ -18,18 +18,18 @@ struct alignas(16) FakePointLightParams {
 }// namespace luisa::render
 
 LUISA_STRUCT(
-    luisa::render::FakePointLightParams,
+    luisa::render::PointLightParams,
     rsp, scale, radius){};
 
 namespace luisa::render {
 
-class FakePointLight final : public Light {
+class PointLight final : public Light {
 
 private:
-    FakePointLightParams _params{};
+    PointLightParams _params{};
 
 public:
-    FakePointLight(Scene *scene, const SceneNodeDesc *desc) noexcept : Light{scene, desc} {
+    PointLight(Scene *scene, const SceneNodeDesc *desc) noexcept : Light{scene, desc} {
         auto emission = desc->property_float3_or_default(
             "emission", lazy_construct([desc] {
                 return make_float3(desc->property_float("emission"));
@@ -41,34 +41,34 @@ public:
     }
     [[nodiscard]] bool is_black() const noexcept override { return _params.scale == 0.0f; }
     [[nodiscard]] bool is_virtual() const noexcept override { return true; }
-    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "fakepoint"; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "point"; }
     [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint, const Shape *shape) const noexcept override {
         if (!shape->is_virtual()) [[unlikely]] {
             LUISA_ERROR_WITH_LOCATION(
                 "Virtual lights should not be "
                 "applied to non-virtual shapes.");
         }
-        auto [buffer_view, buffer_id] = pipeline.arena_buffer<FakePointLightParams>(1u);
+        auto [buffer_view, buffer_id] = pipeline.arena_buffer<PointLightParams>(1u);
         command_buffer << buffer_view.copy_from(&_params);
         return buffer_id;
     }
     [[nodiscard]] luisa::unique_ptr<Closure> decode(const Pipeline &pipeline, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
 };
 
-class FakePointLightClosure final : public Light::Closure {
+class PointLightClosure final : public Light::Closure {
 
 private:
     const Pipeline &_pipeline;
     const SampledWavelengths &_swl;
 
 public:
-    explicit FakePointLightClosure(const Pipeline &ppl, const SampledWavelengths &swl) noexcept
+    explicit PointLightClosure(const Pipeline &ppl, const SampledWavelengths &swl) noexcept
         : _pipeline{ppl}, _swl{swl} {}
     [[nodiscard]] Light::Evaluation evaluate(const Interaction &, Expr<float3>) const noexcept override { return {}; /* should never be called */ }
     [[nodiscard]] Light::Sample sample(Sampler::Instance &sampler, Expr<uint> light_inst_id, const Interaction &it_from) const noexcept override {
         using namespace luisa::compute;
         auto [inst, inst_to_world] = _pipeline.instance(light_inst_id);
-        auto params = _pipeline.buffer<FakePointLightParams>(inst->light_buffer_id()).read(0u);
+        auto params = _pipeline.buffer<PointLightParams>(inst->light_buffer_id()).read(0u);
         RGBIlluminantSpectrum spec{
             RGBSigmoidPolynomial{params.rsp}, params.scale,
             DenselySampledSpectrum::cie_illum_d65()};
@@ -86,10 +86,10 @@ public:
     }
 };
 
-luisa::unique_ptr<Light::Closure> FakePointLight::decode(const Pipeline &pipeline, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    return luisa::make_unique<FakePointLightClosure>(pipeline, swl);
+luisa::unique_ptr<Light::Closure> PointLight::decode(const Pipeline &pipeline, const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    return luisa::make_unique<PointLightClosure>(pipeline, swl);
 }
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::FakePointLight)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::PointLight)

@@ -8,7 +8,7 @@ Camera camera : Pinhole {
   fov { 27.8 }
   spp { 1024 }
   film { @film }
-  file { "cbox.exr" }
+  file { "../renders/cbox.exr" }
   filter : Gaussian {
     radius { 1 }
   }

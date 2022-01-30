@@ -3,7 +3,7 @@
 //
 
 #include <util/sampling.h>
-#include <base/material.h>
+#include <base/surface.h>
 #include <base/interaction.h>
 #include <base/pipeline.h>
 #include <base/scene.h>
@@ -13,7 +13,7 @@ namespace luisa::render {
 [[nodiscard]] static auto default_color_texture_desc() noexcept {
     static auto desc = [] {
         static SceneNodeDesc d{
-            "__lambert_material_default_color_texture",
+            "__lambert_surface_default_color_texture",
             SceneNodeTag::TEXTURE};
         d.define(SceneNodeTag::TEXTURE, "constcolor", {});
         return &d;
@@ -23,20 +23,20 @@ namespace luisa::render {
 
 using namespace luisa::compute;
 
-class LambertMaterial final : public Material {
+class LambertSurface final : public Surface {
 
 private:
     const Texture *_color;
 
 public:
-    LambertMaterial(Scene *scene, const SceneNodeDesc *desc) noexcept
-        : Material{scene, desc},
+    LambertSurface(Scene *scene, const SceneNodeDesc *desc) noexcept
+        : Surface{scene, desc},
           _color{scene->load_texture(desc->property_node_or_default(
               "color", default_color_texture_desc()))} {
         if (_color->category() != Texture::Category::COLOR) [[unlikely]] {
             LUISA_ERROR(
                 "Non-color textures are not "
-                "allowed in Lambert materials. [{}]",
+                "allowed in LambertSurface. [{}]",
                 desc->source_location().string());
         }
     }
@@ -53,7 +53,7 @@ public:
         const SampledWavelengths &swl, Expr<float> time) const noexcept override;
 };
 
-class LambertClosure final : public Material::Closure {
+class LambertClosure final : public Surface::Closure {
 
 private:
     const Interaction &_interaction;
@@ -69,7 +69,7 @@ public:
           _front_face{_cos_wo > 0.0f} {}
 
 private:
-    [[nodiscard]] Material::Evaluation evaluate(Expr<float3> wi) const noexcept override {
+    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
         auto n = _interaction.shading().n();
         auto wo = _interaction.wo();
         auto cos_wi = dot(n, wi);
@@ -78,7 +78,7 @@ private:
         return {.f = _f, .pdf = std::move(pdf)};
     }
 
-    [[nodiscard]] Material::Sample sample(Sampler::Instance &sampler) const noexcept override {
+    [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
         auto wi_local = sample_cosine_hemisphere(sampler.generate_2d());
         auto pdf = ite(_front_face, cosine_hemisphere_pdf(wi_local.z), 0.0f);
         wi_local.z *= sign(_cos_wo);
@@ -87,7 +87,7 @@ private:
     }
 };
 
-luisa::unique_ptr<Material::Closure> LambertMaterial::decode(
+luisa::unique_ptr<Surface::Closure> LambertSurface::decode(
     const Pipeline &pipeline, const Interaction &it,
     const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto texture = pipeline.buffer<TextureHandle>(it.shape()->material_buffer_id()).read(0u);
@@ -97,4 +97,4 @@ luisa::unique_ptr<Material::Closure> LambertMaterial::decode(
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::LambertMaterial)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::LambertSurface)

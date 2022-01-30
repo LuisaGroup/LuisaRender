@@ -6,7 +6,7 @@ set(LUISA_RENDER_BASE_SOURCES
         filter.cpp filter.h
         scene_node.cpp scene_node.h
         shape.cpp shape.h
-        material.cpp material.h
+        surface.cpp surface.h
         film.cpp film.h
         integrator.cpp integrator.h
         environment.cpp environment.h

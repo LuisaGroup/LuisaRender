@@ -16,7 +16,7 @@ class Shape;
 class Sampler;
 class Interaction;
 
-class Material : public SceneNode {
+class Surface : public SceneNode {
 
 public:
     struct Evaluation {
@@ -36,7 +36,7 @@ public:
     };
 
 public:
-    Material(Scene *scene, const SceneNodeDesc *desc) noexcept;
+    Surface(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] virtual bool is_black() const noexcept = 0;
     [[nodiscard]] virtual uint /* bindless buffer id */ encode(
         Pipeline &pipeline, CommandBuffer &command_buffer,

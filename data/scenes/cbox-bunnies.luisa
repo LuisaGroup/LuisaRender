@@ -14,14 +14,8 @@ Camera camera_base {
 
 Camera camera : Pinhole(@camera_base) {
   position { -0.01, 0.995, 5.0 }
-  file { "cbox-bunnies.exr" }
+  file { "../renders/cbox-bunnies.exr" }
   shutter_span { 0, 0.1 }
-}
-
-Camera camera2 : Pinhole(@camera) {
-  position { -0.01, 0.995, 5.0 }
-  up { 1.0, 1.0, 0.0 }
-  file { "camera2.exr" }
 }
 
 import "../meshes/cbox.luisa"
@@ -38,7 +32,7 @@ Shape virtual : Virtual {
   transform : SRT {
     translate { 0, 2, 2 }
   }
-  light : FakePoint {
+  light : Point {
     emission { 4 }
     radius { 0.2 }
   }
@@ -51,7 +45,7 @@ Shape bunny : Mesh {
     translate { 0.4, 0.5, 0.4 }
     rotate { 0, 1, 0, 20 }
   }
-  material : FakeMirror {
+  surface : Mirror {
     color : ConstColor {
       color { 1.0, 0.71, 0.29 }
     }
@@ -76,7 +70,7 @@ Shape light : Mesh {
     }
     time_points { 0, 0.1 }
   }
-  material : FakeMirror {
+  surface : Mirror {
     color : ConstColor {
       color { 0.28, 0.9, 0.182 }
     }
@@ -87,7 +81,7 @@ Shape point : Virtual {
   transform : SRT {
     translate { 0.2, 0.1, 0.9 }
   }
-  light : FakePoint {
+  light : Point {
     emission { 1.5, 1.1, 0.6 }
     scale { 0.25 }
     radius { 0.01 }
@@ -103,7 +97,7 @@ Shape group : Group {
     @cbox-short-box,
     Instance {
       shape { @cbox-tall-box }
-      material : FakeMirror {}
+      surface : Mirror {}
     },
     Instance {
       shape { @bunny }
@@ -113,7 +107,7 @@ Shape group : Group {
         }
         scale { 1.5 }
       }
-      material { @cbox-red }
+      surface { @cbox-red }
       transform : SRT {
         rotate { 0, 1, 0, 30 }
         translate { -0.1, 0, 0.2 }

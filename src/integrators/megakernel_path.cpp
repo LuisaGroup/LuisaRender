@@ -164,7 +164,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
             auto occluded = pipeline.intersect_any(light_sample.shadow_ray);
 
             // evaluate material
-            pipeline.decode_material(it->shape()->material_tag(), *it, swl, time, [&](const Material::Closure &material) {
+            pipeline.decode_material(it->shape()->material_tag(), *it, swl, time, [&](const Surface::Closure &material) {
                 // direct lighting
                 $if(light_sample.eval.pdf > 0.0f & !occluded) {
                     auto wi = light_sample.shadow_ray->direction();

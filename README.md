@@ -14,7 +14,7 @@ on [LuisaCompute](https://github.com/Mike-Leo-Smith/LuisaCompute).
     - Resolution: 1024x1024
     - Max Depth: 10
 
-![CornellBoxBunny](data/scenes/test-1048576spp.png)
+![CornellBoxBunny](data/renders/cbox-bunnies.png)
 
 - Rotating Teapot with Environment Mapping.
     - Mega-Kernel Path Tracing
@@ -25,7 +25,7 @@ on [LuisaCompute](https://github.com/Mike-Leo-Smith/LuisaCompute).
     - Resolution: 1024x1024
     - Max Depth: 10
 
-![EnvironmentMapping](data/scenes/environment-mapping.png)
+![EnvironmentMapping](data/renders/envmap.png)
 
 - Luisa Illuminating the Render.
     - Mega-Kernel Path Tracing
@@ -35,4 +35,4 @@ on [LuisaCompute](https://github.com/Mike-Leo-Smith/LuisaCompute).
     - Resolution: 1024x1024
     - Max Depth: 10
 
-![CornellBoxLuisa](data/scenes/demo-cbox-luisa.png)
+![CornellBoxLuisa](data/renders/cbox-image-light.png)
