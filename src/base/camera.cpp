@@ -13,31 +13,13 @@
 
 namespace luisa::render {
 
-[[nodiscard]] static auto default_filter_node_desc() noexcept {
-    static auto desc = [] {
-        static SceneNodeDesc d{"__camera_default_filter__", SceneNodeTag::FILTER};
-        d.define(SceneNodeTag::FILTER, "Box", {});
-        return &d;
-    }();
-    return desc;
-}
-
-[[nodiscard]] static auto default_transform_node_desc() noexcept {
-    static auto desc = [] {
-        static SceneNodeDesc d{"__camera_default_transform__", SceneNodeTag::TRANSFORM};
-        d.define(SceneNodeTag::TRANSFORM, "Identity", {});
-        return &d;
-    }();
-    return desc;
-}
-
 Camera::Camera(Scene *scene, const SceneNodeDesc *desc) noexcept
     : SceneNode{scene, desc, SceneNodeTag::CAMERA},
       _film{scene->load_film(desc->property_node("film"))},
       _filter{scene->load_filter(desc->property_node_or_default(
-          "filter", default_filter_node_desc()))},
+          "filter", SceneNodeDesc::shared_default_filter("Box")))},
       _transform{scene->load_transform(desc->property_node_or_default(
-          "transform", default_transform_node_desc()))},
+          "transform", SceneNodeDesc::shared_default_transform("Identity")))},
       _shutter_span{desc->property_float2_or_default(
           "shutter_span", lazy_construct([desc] {
               return make_float2(desc->property_float_or_default(

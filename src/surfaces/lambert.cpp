@@ -10,17 +10,6 @@
 
 namespace luisa::render {
 
-[[nodiscard]] static auto default_color_texture_desc() noexcept {
-    static auto desc = [] {
-        static SceneNodeDesc d{
-            "__lambert_surface_default_color_texture",
-            SceneNodeTag::TEXTURE};
-        d.define(SceneNodeTag::TEXTURE, "constcolor", {});
-        return &d;
-    }();
-    return desc;
-}
-
 using namespace luisa::compute;
 
 class LambertSurface final : public Surface {
@@ -32,7 +21,7 @@ public:
     LambertSurface(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Surface{scene, desc},
           _color{scene->load_texture(desc->property_node_or_default(
-              "color", default_color_texture_desc()))} {
+              "color", SceneNodeDesc::shared_default_texture("ConstColor")))} {
         if (_color->category() != Texture::Category::COLOR) [[unlikely]] {
             LUISA_ERROR(
                 "Non-color textures are not "
@@ -40,7 +29,7 @@ public:
                 desc->source_location().string());
         }
     }
-    [[nodiscard]] string_view impl_type() const noexcept override { return "lambert"; }
+    [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] bool is_black() const noexcept override { return _color->is_black(); }
     [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint, const Shape *) const noexcept override {
         auto [buffer_view, buffer_id] = pipeline.arena_buffer<TextureHandle>(1u);

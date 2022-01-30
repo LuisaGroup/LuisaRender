@@ -39,7 +39,7 @@ public:
                 desc->source_location().string());
         }
     }
-    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "matrix"; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] float4x4 matrix(float) const noexcept override { return _matrix; }
     [[nodiscard]] bool is_static() const noexcept override { return true; }
     [[nodiscard]] bool is_identity() const noexcept override {

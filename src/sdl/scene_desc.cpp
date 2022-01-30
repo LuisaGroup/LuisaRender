@@ -26,7 +26,8 @@ const SceneNodeDesc *SceneDesc::reference(std::string_view identifier) noexcept 
     auto [iter, _] = _global_nodes.emplace(
         lazy_construct([identifier] {
             return luisa::make_unique<SceneNodeDesc>(
-                identifier, SceneNodeTag::DECLARATION);
+                luisa::string{identifier},
+                SceneNodeTag::DECLARATION);
         }));
     return iter->get();
 }
@@ -55,7 +56,7 @@ SceneNodeDesc *SceneDesc::define(
     auto [iter, _] = _global_nodes.emplace(
         lazy_construct([identifier, tag] {
             return luisa::make_unique<SceneNodeDesc>(
-                identifier, tag);
+                luisa::string{identifier}, tag);
         }));
     auto node = iter->get();
     if (node->is_defined()) [[unlikely]] {

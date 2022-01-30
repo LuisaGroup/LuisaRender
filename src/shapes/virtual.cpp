@@ -23,7 +23,7 @@ private:
 
 public:
     FakePoint() noexcept : Shape{nullptr, _default_desc()} {}
-    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "fakepoint"; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] bool is_mesh() const noexcept override { return true; }
     [[nodiscard]] luisa::span<const float3> positions() const noexcept override {
         static const std::array p{
@@ -61,7 +61,7 @@ class VirtualShape final : public Shape {
 
 public:
     VirtualShape(Scene *scene, const SceneNodeDesc *desc) noexcept : Shape{scene, desc} {}
-    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "virtual"; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] bool is_mesh() const noexcept override { return false; }
     [[nodiscard]] bool is_virtual() const noexcept override { return true; }
     [[nodiscard]] bool deformable() const noexcept override { return false; }

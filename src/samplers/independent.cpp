@@ -44,7 +44,7 @@ public:
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
         return luisa::make_unique<IndependentSamplerInstance>(pipeline.device(), this, _seed);
     }
-    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "independent"; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
 };
 
 IndependentSamplerInstance::IndependentSamplerInstance(Device &device, const IndependentSampler *sampler, uint seed) noexcept

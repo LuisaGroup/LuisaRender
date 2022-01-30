@@ -2,7 +2,6 @@
 // Created by Mike Smith on 2022/1/15.
 //
 
-#include <luisa-compute.h>
 #include <util/sampling.h>
 #include <util/imageio.h>
 #include <base/interaction.h>
@@ -11,17 +10,6 @@
 #include <base/scene.h>
 
 namespace luisa::render {
-
-[[nodiscard]] static auto default_emission_texture_desc() noexcept {
-    static auto desc = [] {
-        static SceneNodeDesc d{
-            "__environment_mapping_default_emission_texture",
-            SceneNodeTag::TEXTURE};
-        d.define(SceneNodeTag::TEXTURE, "constillum", {});
-        return &d;
-    }();
-    return desc;
-}
 
 class EnvironmentMapping final : public Environment {
 
@@ -33,7 +21,7 @@ public:
     EnvironmentMapping(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Environment{scene, desc},
           _emission{scene->load_texture(desc->property_node_or_default(
-              "emission", default_emission_texture_desc()))},
+              "emission", SceneNodeDesc::shared_default_texture("ConstIllum")))},
           _scale{std::max(desc->property_float_or_default("scale", 1.0f), 0.0f)} {
         if (_emission->category() != Texture::Category::ILLUMINANT) [[unlikely]] {
             LUISA_ERROR(
@@ -45,7 +33,7 @@ public:
     [[nodiscard]] auto scale() const noexcept { return _scale; }
     [[nodiscard]] auto emission() const noexcept { return _emission; }
     [[nodiscard]] bool is_black() const noexcept override { return _scale == 0.0f || _emission->is_black(); }
-    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "map"; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 

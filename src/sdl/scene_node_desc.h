@@ -153,8 +153,8 @@ public:
     }
 
 public:
-    SceneNodeDesc(luisa::string_view identifier, SceneNodeTag tag) noexcept
-        : _identifier{identifier}, _tag{tag} {}
+    SceneNodeDesc(luisa::string identifier, SceneNodeTag tag) noexcept
+        : _identifier{std::move(identifier)}, _tag{tag} {}
     SceneNodeDesc(SceneNodeDesc &&) noexcept = delete;
     SceneNodeDesc(const SceneNodeDesc &) noexcept = delete;
     SceneNodeDesc &operator=(SceneNodeDesc &&) noexcept = delete;
@@ -177,6 +177,24 @@ public:
     [[nodiscard]] auto is_root() const noexcept { return _tag == SceneNodeTag::ROOT; }
     [[nodiscard]] auto is_internal() const noexcept { return _tag == SceneNodeTag::INTERNAL; }
     [[nodiscard]] auto is_defined() const noexcept { return _tag != SceneNodeTag::DECLARATION && !_impl_type.empty(); }
+    [[nodiscard]] static const SceneNodeDesc *shared_default(SceneNodeTag tag, luisa::string impl) noexcept;
+#define LUISA_SCENE_NODE_DESC_SHARED_DEFAULT(category, tag)                            \
+    [[nodiscard]] static auto shared_default_##category(luisa::string impl) noexcept { \
+        return shared_default(SceneNodeTag::tag, std::move(impl));                     \
+    }
+    LUISA_SCENE_NODE_DESC_SHARED_DEFAULT(camera, CAMERA)
+    LUISA_SCENE_NODE_DESC_SHARED_DEFAULT(shape, SHAPE)
+    LUISA_SCENE_NODE_DESC_SHARED_DEFAULT(surface, SURFACE)
+    LUISA_SCENE_NODE_DESC_SHARED_DEFAULT(light, LIGHT)
+    LUISA_SCENE_NODE_DESC_SHARED_DEFAULT(transform, TRANSFORM)
+    LUISA_SCENE_NODE_DESC_SHARED_DEFAULT(film, FILM)
+    LUISA_SCENE_NODE_DESC_SHARED_DEFAULT(filter, FILTER)
+    LUISA_SCENE_NODE_DESC_SHARED_DEFAULT(sampler, SAMPLER)
+    LUISA_SCENE_NODE_DESC_SHARED_DEFAULT(integrator, INTEGRATOR)
+    LUISA_SCENE_NODE_DESC_SHARED_DEFAULT(light_sampler, LIGHT_SAMPLER)
+    LUISA_SCENE_NODE_DESC_SHARED_DEFAULT(environment, ENVIRONMENT)
+    LUISA_SCENE_NODE_DESC_SHARED_DEFAULT(texture, TEXTURE)
+#undef LUISA_SCENE_NODE_DESC_SHARED_DEFAULT
 
 public:
     using int_list = luisa::vector<int>;

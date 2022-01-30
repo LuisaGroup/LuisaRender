@@ -9,7 +9,7 @@ namespace luisa::render {
 
 struct BoxFilter final : public Filter {
     BoxFilter(Scene *scene, const SceneNodeDesc *desc) noexcept : Filter{scene, desc} {}
-    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "box"; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] float evaluate(float x) const noexcept override { return 1.0f; }
 };
 

@@ -23,7 +23,7 @@ public:
                   luisa::rotation(normalize(rotation.xyz()), radians(rotation.w)) *
                   luisa::scaling(scaling);
     }
-    [[nodiscard]] string_view impl_type() const noexcept override { return "srt"; }
+    [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] bool is_static() const noexcept override { return true; }
     [[nodiscard]] float4x4 matrix(float) const noexcept override { return _matrix; }
     [[nodiscard]] bool is_identity() const noexcept override {

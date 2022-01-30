@@ -60,7 +60,7 @@ public:
             this, _position, _front, _up, _right, _fov);
     }
 
-    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "pinhole"; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] auto position() const noexcept { return _position; }
     [[nodiscard]] auto front() const noexcept { return _front; }
     [[nodiscard]] auto right() const noexcept { return _right; }

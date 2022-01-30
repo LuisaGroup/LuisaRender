@@ -13,7 +13,7 @@ class UniformLightSampler final : public LightSampler {
 public:
     luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
     UniformLightSampler(Scene *scene, const SceneNodeDesc *desc) noexcept : LightSampler{scene, desc} {}
-    [[nodiscard]] string_view impl_type() const noexcept override { return "uniform"; }
+    [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
 };
 
 class UniformLightSamplerInstance final : public LightSampler::Instance {

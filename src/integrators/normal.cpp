@@ -29,7 +29,7 @@ class NormalVisualizer final : public Integrator {
 
 public:
     NormalVisualizer(Scene *scene, const SceneNodeDesc *desc) noexcept : Integrator{scene, desc} {}
-    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "normal"; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &) const noexcept override {
         return luisa::make_unique<NormalVisualizerInstance>(this, pipeline);
     }

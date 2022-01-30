@@ -31,7 +31,7 @@ void SceneNodeDesc::define(SceneNodeTag tag, luisa::string_view t, SceneNodeDesc
 SceneNodeDesc *SceneNodeDesc::define_internal(
     luisa::string_view impl_type, SourceLocation location, const SceneNodeDesc *base) noexcept {
     auto unique_node = luisa::make_unique<SceneNodeDesc>(
-        fmt::format("{}.$internal{}", _identifier, _internal_nodes.size()),
+        luisa::format("{}.$internal{}", _identifier, _internal_nodes.size()),
         SceneNodeTag::INTERNAL);
     auto node = _internal_nodes.emplace_back(std::move(unique_node)).get();
     node->define(SceneNodeTag::INTERNAL, impl_type, location, base);
@@ -41,6 +41,26 @@ SceneNodeDesc *SceneNodeDesc::define_internal(
 bool SceneNodeDesc::has_property(luisa::string_view prop) const noexcept {
     return _properties.find_as(prop, Hash64{}, std::equal_to<>{}) != _properties.cend() ||
            (_base != nullptr && _base->has_property(prop));
+}
+
+const SceneNodeDesc *SceneNodeDesc::shared_default(SceneNodeTag tag, luisa::string impl) noexcept {
+    static luisa::unordered_map<uint64_t, luisa::unique_ptr<SceneNodeDesc>> descriptions;
+    static std::mutex mutex;
+    static thread_local const auto seed = hash64("__scene_node_tag_and_impl_type_hash");
+    for (auto &c : impl) { c = static_cast<char>(tolower(c)); }
+    auto hash = hash64(impl, hash64(to_underlying(tag), seed));
+    std::scoped_lock lock{mutex};
+    auto [iter, not_defined] = descriptions.try_emplace(hash, nullptr);
+    if (not_defined) {
+        auto identifier = luisa::format(
+            "__shared_default_{}_{}",
+            scene_node_tag_description(tag), impl);
+        for (auto &c : identifier) { c = static_cast<char>(tolower(c)); }
+        iter->second = luisa::make_unique<SceneNodeDesc>(
+            std::move(identifier), tag);
+        iter->second->define(tag, impl, {});
+    }
+    return iter->second.get();
 }
 
 }// namespace luisa::render

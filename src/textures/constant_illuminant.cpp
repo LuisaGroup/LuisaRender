@@ -36,7 +36,7 @@ public:
             max(color, 0.0f) * max(scale, 0.0f));
         _rsp_scale = make_float4(rsp_scale.first, rsp_scale.second);
     }
-    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "constillum"; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] Float4 evaluate(
         const Pipeline &pipeline, const Interaction &,
         const Var<TextureHandle> &handle, Expr<float>) const noexcept override {

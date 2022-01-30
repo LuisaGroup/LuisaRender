@@ -33,7 +33,7 @@ public:
         for (auto i = 0u; i < v.size(); i++) { _v[i] = v[i]; }
     }
     [[nodiscard]] bool is_black() const noexcept override { return all(_v == 0.0f); }
-    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "constgeneric"; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] Float4 evaluate(
         const Pipeline &pipeline, const Interaction &,
         const Var<TextureHandle> &handle, Expr<float>) const noexcept override {

@@ -33,7 +33,7 @@ public:
         }
         if (!_is_static) { _transforms = std::move(transforms); }
     }
-    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "stack"; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] bool is_static() const noexcept override { return _is_static; }
     [[nodiscard]] bool is_identity() const noexcept override { return _is_identity; }
     [[nodiscard]] float4x4 matrix(float time) const noexcept override {

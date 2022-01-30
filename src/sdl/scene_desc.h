@@ -31,7 +31,7 @@ public:
             return _node_identifier(std::forward<Lhs>(lhs)) == _node_identifier(std::forward<Rhs>(rhs));
         }
     };
-    static constexpr std::string_view root_node_identifier = "render";
+    static constexpr luisa::string_view root_node_identifier = "render";
 
 private:
     luisa::unordered_set<luisa::unique_ptr<SceneNodeDesc>, NodeHash, NodeEqual> _global_nodes;
@@ -40,7 +40,7 @@ private:
     std::recursive_mutex _mutex;
 
 public:
-    SceneDesc() noexcept: _root{root_node_identifier, SceneNodeTag::ROOT} {}
+    SceneDesc() noexcept: _root{luisa::string{root_node_identifier}, SceneNodeTag::ROOT} {}
     [[nodiscard]] auto &nodes() const noexcept { return _global_nodes; }
     [[nodiscard]] const SceneNodeDesc *node(std::string_view identifier) const noexcept;
     [[nodiscard]] auto root() const noexcept { return &_root; }

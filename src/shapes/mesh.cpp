@@ -139,7 +139,7 @@ private:
 public:
     Mesh(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Shape{scene, desc}, _loader{MeshLoader::load(desc->property_path("file"))} {}
-    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "mesh"; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::span<const Shape *const> children() const noexcept override { return {}; }
     [[nodiscard]] bool deformable() const noexcept override { return false; }
     [[nodiscard]] bool is_mesh() const noexcept override { return true; }

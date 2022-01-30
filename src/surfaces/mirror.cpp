@@ -9,17 +9,6 @@
 
 namespace luisa::render {
 
-[[nodiscard]] static auto default_color_texture_desc() noexcept {
-    static auto desc = [] {
-        static SceneNodeDesc d{
-            "__fake_mirror_surface_default_color_texture",
-            SceneNodeTag::TEXTURE};
-        d.define(SceneNodeTag::TEXTURE, "constcolor", {});
-        return &d;
-    }();
-    return desc;
-}
-
 class MirrorSurface final : public Surface {
 
 private:
@@ -29,7 +18,7 @@ public:
     MirrorSurface(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Surface{scene, desc},
           _color{scene->load_texture(desc->property_node_or_default(
-              "color", default_color_texture_desc()))} {
+              "color", SceneNodeDesc::shared_default_texture("ConstColor")))} {
         if (_color->category() != Texture::Category::COLOR) [[unlikely]] {
             LUISA_ERROR(
                 "Non-color textures are not "
@@ -38,7 +27,7 @@ public:
         }
     }
     [[nodiscard]] bool is_black() const noexcept override { return _color->is_black(); }
-    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "mirror"; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint instance_id, const Shape *shape) const noexcept override {
         auto [buffer_view, buffer_id] = pipeline.arena_buffer<TextureHandle>(1u);
         auto texture_handle = pipeline.encode_texture(command_buffer, _color);

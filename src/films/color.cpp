@@ -34,7 +34,7 @@ public:
     [[nodiscard]] auto scale() const noexcept { return _scale; }
     [[nodiscard]] auto fp16() const noexcept { return _fp16; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
-    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "color"; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
 };
 
 class ColorFilmInstance final : public Film::Instance {
