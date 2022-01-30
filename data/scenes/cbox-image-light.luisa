@@ -1,6 +1,6 @@
 Film film : Color {
   resolution { 1024 }
-  exposure { -1.5 }
+  exposure { -3.5 }
 }
 
 Camera camera : Pinhole {
@@ -30,12 +30,14 @@ Shape image-light : Mesh {
   light : Diffuse {
     emission : Illum {
       file {
-        // "/Users/mike/Downloads/_DSC9322.jpg" }
-        "/Users/mike/Downloads/WechatIMG16.jpeg" }
+        "/Users/mike/Downloads/_DSC9322.jpg" }
+        // "/Users/mike/Downloads/WechatIMG16.jpeg" }
       uv_offset { 0, 0 }
+      uv_scale { 1 }
       scale { 15 }
-      encoding { "sRGB" }
-      address { "edge" }
+      encoding { "gamma" }
+      address { "mirror" }
+      gamma { 3 }
     }
   }
   material : Black {}

@@ -3,6 +3,7 @@
 //
 
 #include <base/texture.h>
+#include <base/pipeline.h>
 
 namespace luisa::render {
 
@@ -12,8 +13,10 @@ private:
     float4 _v;
 
 private:
-    [[nodiscard]] TextureHandle _encode(Pipeline &, CommandBuffer &, uint handle_tag) const noexcept override {
-        return TextureHandle::encode_constant(handle_tag, _v.xyz(), _v.w);
+    [[nodiscard]] TextureHandle _encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint handle_tag) const noexcept override {
+        auto [buffer, buffer_id] = pipeline.arena_buffer<float4>(1u);
+        command_buffer << buffer.copy_from(&_v);
+        return TextureHandle::encode_texture(handle_tag, buffer_id);
     }
 
 public:
@@ -32,9 +35,9 @@ public:
     [[nodiscard]] bool is_black() const noexcept override { return all(_v == 0.0f); }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return "constgeneric"; }
     [[nodiscard]] Float4 evaluate(
-        const Pipeline &, const Interaction &,
+        const Pipeline &pipeline, const Interaction &,
         const Var<TextureHandle> &handle, Expr<float>) const noexcept override {
-        return compute::make_float4(handle->v(), handle->alpha());
+        return pipeline.buffer<float4>(handle->texture_id()).read(0u);
     }
     [[nodiscard]] Category category() const noexcept override { return Category::GENERIC; }
 };

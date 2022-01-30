@@ -26,7 +26,7 @@ public:
     ColorTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
         : ImageTexture{scene, desc} {
         auto path = desc->property_path("file");
-        auto half = desc->property_bool_or_default("fp16", true);
+        auto fp32 = desc->property_bool_or_default("fp32", false);
         auto encoding = desc->property_string_or_default(
             "encoding", lazy_construct([&path]() noexcept -> luisa::string {
                 auto ext = path.extension().string();
@@ -51,7 +51,7 @@ public:
             }));
         tint = max(tint, 0.0f);
         _is_black = all(tint == 0.0f);
-        _img = ThreadPool::global().async([path = std::move(path), half, encoding = std::move(encoding),
+        _img = ThreadPool::global().async([path = std::move(path), half = !fp32, encoding = std::move(encoding),
                                            gamma, tint, sloc = desc->source_location()] {
             auto image = LoadedImage::load(path, half ? PixelStorage::HALF4 : PixelStorage::FLOAT4);
             if (encoding == "rsp") { return image; }
