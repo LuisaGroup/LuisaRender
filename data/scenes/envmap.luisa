@@ -6,10 +6,10 @@ Film film : Color {
 Camera camera : Pinhole {
   position { 0, 0, 5 }
   fov { 60 }
-  spp { 16384 }
+  spp { 1024 }
   film { @film }
   file { "../renders/envmap.exr" }
-  shutter_span { 0, 1 }
+  shutter_span { 0, 0 }
   shutter_samples { 128 }
   shutter_weights { 0, 0.2, 0.5, 3.5, 0.5, 0.2, 0 }
   shutter_time_points { 0, 0.15, 0.25, 0.5, 0.75, 0.85, 1 }
@@ -30,13 +30,35 @@ Shape teapot : Group {
   shapes {
     Mesh {
       file { "../meshes/utah-teapot-lid.obj" }
-      surface : Mirror {}
+      // surface : Mirror {}
+      surface : Disney {
+        roughness : ConstGeneric {
+          v { 0.5 }
+        }
+        metallic : ConstGeneric {
+          v { 1 }
+        }
+        base_color : ConstColor {
+          color { 1 }
+        }
+      }
     },
     Mesh {
       file { "../meshes/utah-teapot.obj" }
-      surface : Mirror {
-        color : ConstColor {
+      // surface : Mirror {
+      //   color : ConstColor {
+      //     color { 1.0, 0.71, 0.29 }
+      //   }
+      // }
+      surface : Disney {
+        base_color : ConstColor {
           color { 1.0, 0.71, 0.29 }
+        }
+        roughness : ConstGeneric {
+          v { 0 }
+        }
+        specular_trans : ConstGeneric {
+          v { 1 }
         }
       }
     }

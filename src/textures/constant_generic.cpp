@@ -31,6 +31,7 @@ public:
             v.resize(4u);
         }
         for (auto i = 0u; i < v.size(); i++) { _v[i] = v[i]; }
+        LUISA_INFO("Generic v: [{}, {}, {}, {}].", _v.x, _v.y, _v.z, _v.w);
     }
     [[nodiscard]] bool is_black() const noexcept override { return all(_v == 0.0f); }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
