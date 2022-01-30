@@ -141,7 +141,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
             }
 
             // sample one light
-            $if(!it->shape()->has_material()) { $break; };
+            $if(!it->shape()->has_surface()) { $break; };
             Light::Sample light_sample;
             if (env_prob > 0.0f) {
                 auto u = sampler->generate_1d();
@@ -164,7 +164,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
             auto occluded = pipeline.intersect_any(light_sample.shadow_ray);
 
             // evaluate material
-            pipeline.decode_material(it->shape()->material_tag(), *it, swl, time, [&](const Surface::Closure &material) {
+            pipeline.decode_material(it->shape()->surface_tag(), *it, swl, time, [&](const Surface::Closure &material) {
                 // direct lighting
                 $if(light_sample.eval.pdf > 0.0f & !occluded) {
                     auto wi = light_sample.shadow_ray->direction();

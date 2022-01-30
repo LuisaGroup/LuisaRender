@@ -9,7 +9,7 @@ Camera camera_base {
     radius { 1 }
   }
   fov { 27.8 }
-  spp { 128 }
+  spp { 16384 }
 }
 
 Camera camera : Pinhole(@camera_base) {

@@ -95,7 +95,7 @@ private:
     luisa::unordered_map<const Shape *, MeshData> _meshes;
     luisa::vector<const Surface *> _surface_interfaces;
     luisa::vector<const Light *> _light_interfaces;
-    luisa::unordered_map<luisa::string /* impl type */, uint /* tag */, Hash64> _material_tags;
+    luisa::unordered_map<luisa::string /* impl type */, uint /* tag */, Hash64> _surface_tags;
     luisa::unordered_map<luisa::string /* impl type */, uint /* tag */, Hash64> _light_tags;
     luisa::unordered_map<const Surface *, MaterialData> _surfaces;
     luisa::unordered_map<const Light *, LightData> _lights;

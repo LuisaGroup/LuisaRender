@@ -141,8 +141,8 @@ void Pipeline::_process_shape(
                     "Materials will be ignored on virtual shapes.");
             } else {
                 auto m = _process_surface(command_buffer, instance_id, shape, material);
-                instance.properties |= Shape::property_flag_has_material;
-                instance.material_buffer_id_and_tag = InstancedShape::encode_material_buffer_id_and_tag(m.buffer_id, m.tag);
+                instance.properties |= Shape::property_flag_has_surface;
+                instance.surface_buffer_id_and_tag = InstancedShape::encode_surface_buffer_id_and_tag(m.buffer_id, m.tag);
             }
         }
         if (light != nullptr && !light->is_black()) {
@@ -170,14 +170,14 @@ Pipeline::MaterialData Pipeline::_process_surface(CommandBuffer &command_buffer,
     if (auto iter = _surfaces.find(material); iter != _surfaces.cend()) { return iter->second; }
     auto tag = [this, material] {
         luisa::string impl_type{material->impl_type()};
-        if (auto iter = _material_tags.find(impl_type);
-            iter != _material_tags.cend()) { return iter->second; }
+        if (auto iter = _surface_tags.find(impl_type);
+            iter != _surface_tags.cend()) { return iter->second; }
         auto t = static_cast<uint32_t>(_surface_interfaces.size());
-        if (t > InstancedShape::material_tag_mask) [[unlikely]] {
+        if (t > InstancedShape::surface_tag_mask) [[unlikely]] {
             LUISA_ERROR_WITH_LOCATION("Too many material tags.");
         }
         _surface_interfaces.emplace_back(material);
-        _material_tags.emplace(std::move(impl_type), t);
+        _surface_tags.emplace(std::move(impl_type), t);
         return t;
     }();
     auto buffer_id = material->encode(*this, command_buffer, instance_id, shape);

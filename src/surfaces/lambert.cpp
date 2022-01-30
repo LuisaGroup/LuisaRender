@@ -90,7 +90,7 @@ private:
 luisa::unique_ptr<Surface::Closure> LambertSurface::decode(
     const Pipeline &pipeline, const Interaction &it,
     const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    auto texture = pipeline.buffer<TextureHandle>(it.shape()->material_buffer_id()).read(0u);
+    auto texture = pipeline.buffer<TextureHandle>(it.shape()->surface_buffer_id()).read(0u);
     auto R = pipeline.evaluate_color_texture(texture, it, swl, time);
     return luisa::make_unique<LambertClosure>(it, std::move(R));
 }

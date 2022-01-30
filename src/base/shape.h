@@ -43,9 +43,9 @@ struct alignas(16) InstancedShape {
     static constexpr auto property_flag_bits = 8u;
     static constexpr auto property_flag_mask = (1u << property_flag_bits) - 1u;
 
-    static constexpr auto material_buffer_id_shift = 8u;
+    static constexpr auto surface_buffer_id_shift = 8u;
     static constexpr auto light_buffer_id_shift = 8u;
-    static constexpr auto material_tag_mask = (1u << material_buffer_id_shift) - 1u;
+    static constexpr auto surface_tag_mask = (1u << surface_buffer_id_shift) - 1u;
     static constexpr auto light_tag_mask = (1u << light_buffer_id_shift) - 1u;
 
     static constexpr auto position_buffer_id_offset = 0u;
@@ -56,14 +56,14 @@ struct alignas(16) InstancedShape {
 
     uint buffer_id_base;
     uint properties;
-    uint material_buffer_id_and_tag;
+    uint surface_buffer_id_and_tag;
     uint light_buffer_id_and_tag;
 
-    [[nodiscard]] static auto encode_material_buffer_id_and_tag(uint buffer_id, uint tag) noexcept {
-        if (tag != ~0u && tag > material_tag_mask) [[unlikely]] {
+    [[nodiscard]] static auto encode_surface_buffer_id_and_tag(uint buffer_id, uint tag) noexcept {
+        if (tag != ~0u && tag > surface_tag_mask) [[unlikely]] {
             LUISA_ERROR_WITH_LOCATION("Invalid material tag: {}.", tag);
         }
-        return (buffer_id << material_buffer_id_shift) | tag;
+        return (buffer_id << surface_buffer_id_shift) | tag;
     }
 
     [[nodiscard]] static auto encode_light_buffer_id_and_tag(uint buffer_id, uint tag) noexcept {
@@ -87,7 +87,7 @@ class Shape : public SceneNode {
 
 public:
     static constexpr auto property_flag_two_sided = 1u << 0u;
-    static constexpr auto property_flag_has_material = 1u << 1u;
+    static constexpr auto property_flag_has_surface = 1u << 1u;
     static constexpr auto property_flag_has_light = 1u << 2u;
 
 private:
@@ -144,7 +144,7 @@ LUISA_STRUCT(
 
     buffer_id_base,
     properties,
-    material_buffer_id_and_tag,
+    surface_buffer_id_and_tag,
     light_buffer_id_and_tag) {
 
     [[nodiscard]] auto position_buffer_id() const noexcept { return buffer_id_base + luisa::render::InstancedShape::position_buffer_id_offset; }
@@ -152,15 +152,15 @@ LUISA_STRUCT(
     [[nodiscard]] auto triangle_buffer_id() const noexcept { return buffer_id_base + luisa::render::InstancedShape::triangle_buffer_id_offset; }
     [[nodiscard]] auto alias_table_buffer_id() const noexcept { return buffer_id_base + luisa::render::InstancedShape::alias_table_buffer_id_offset; }
     [[nodiscard]] auto pdf_buffer_id() const noexcept { return buffer_id_base + luisa::render::InstancedShape::pdf_buffer_id_offset; }
-    [[nodiscard]] auto material_tag() const noexcept { return material_buffer_id_and_tag & luisa::render::InstancedShape::material_tag_mask; }
-    [[nodiscard]] auto material_buffer_id() const noexcept { return material_buffer_id_and_tag >> luisa::render::InstancedShape::material_buffer_id_shift; }
+    [[nodiscard]] auto surface_tag() const noexcept { return surface_buffer_id_and_tag & luisa::render::InstancedShape::surface_tag_mask; }
+    [[nodiscard]] auto surface_buffer_id() const noexcept { return surface_buffer_id_and_tag >> luisa::render::InstancedShape::surface_buffer_id_shift; }
     [[nodiscard]] auto light_tag() const noexcept { return light_buffer_id_and_tag & luisa::render::InstancedShape::light_tag_mask; }
     [[nodiscard]] auto light_buffer_id() const noexcept { return light_buffer_id_and_tag >> luisa::render::InstancedShape::light_buffer_id_shift; }
     [[nodiscard]] auto property_flags() const noexcept { return properties & luisa::render::InstancedShape::property_flag_mask; }
     [[nodiscard]] auto test_property_flag(luisa::uint flag) const noexcept { return (property_flags() & flag) != 0u; }
     [[nodiscard]] auto two_sided() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_two_sided); }
     [[nodiscard]] auto has_light() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_light); }
-    [[nodiscard]] auto has_material() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_material); }
+    [[nodiscard]] auto has_surface() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_surface); }
 };
 
 // clang-format on
