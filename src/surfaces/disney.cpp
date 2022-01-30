@@ -83,8 +83,7 @@ public:
             *pipeline.encode_texture(command_buffer, _clearcoat),
             *pipeline.encode_texture(command_buffer, _clearcoat_gloss),
             *pipeline.encode_texture(command_buffer, _ior),
-            *pipeline.encode_texture(command_buffer, _specular_trans),
-        };
+            *pipeline.encode_texture(command_buffer, _specular_trans)};
         auto [buffer, buffer_id] = pipeline.arena_buffer<TextureHandle>(textures.size());
         command_buffer << buffer.copy_from(&textures) << compute::commit();
         return buffer_id;
@@ -97,8 +96,11 @@ public:
 class DisneySurfaceClosure final : public Surface::Closure {
 
 private:
-    const Interaction &_it;
-    const SampledWavelengths &_swl;
+    Float3 _n;
+    Float3 _vx;
+    Float3 _vy;
+    Float3 _wo;
+    SampledWavelengths _swl;
     Float4 _base_color;
     Float _metallic;
     Float _roughness;
@@ -118,9 +120,8 @@ public:
         Expr<float4> base_color, Expr<float> metallic, Expr<float> roughness, Expr<float> anisotropy,
         Expr<float> specular, Expr<float> specular_tint, Expr<float> sheen, Expr<float> sheen_tint,
         Expr<float> clearcoat, Expr<float> clearcoat_gloss, Expr<float> ior, Expr<float> specular_trans) noexcept
-        : _it{it}, _swl{swl},
-          _base_color{base_color}, _metallic{metallic},
-          _roughness{clamp(roughness, 1e-3f, 1.0f)}, _anisotropy{anisotropy},
+        : _n{it.shading().n()}, _vx{it.shading().u()}, _vy{it.shading().v()}, _wo{it.wo()}, _swl{swl},
+          _base_color{base_color}, _metallic{metallic}, _roughness{roughness}, _anisotropy{anisotropy},
           _specular{specular}, _specular_tint{specular_tint}, _sheen{sheen}, _sheen_tint{sheen_tint},
           _clearcoat{clearcoat}, _clearcoat_gloss{clearcoat_gloss},
           _ior{ite(ior == 0.0f, 1.5f, ior)}, _specular_trans{specular_trans} {}
@@ -140,10 +141,10 @@ public:
     LUISA_RENDER_DISNEY_PARAM_GETTER(ior)
     LUISA_RENDER_DISNEY_PARAM_GETTER(specular_trans)
 #undef LUISA_RENDER_DISNEY_PARAM_GETTER
-    [[nodiscard]] auto n() const noexcept { return _it.shading().n(); }
-    [[nodiscard]] auto vx() const noexcept { return _it.shading().u(); }
-    [[nodiscard]] auto vy() const noexcept { return _it.shading().v(); }
-    [[nodiscard]] auto wo() const noexcept { return _it.wo(); }
+    [[nodiscard]] const auto &n() const noexcept { return _n; }
+    [[nodiscard]] const auto &vx() const noexcept { return _vx; }
+    [[nodiscard]] const auto &vy() const noexcept { return _vy; }
+    [[nodiscard]] const auto &wo() const noexcept { return _wo; }
     [[nodiscard]] const auto &swl() const noexcept { return _swl; }
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override;
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override;
@@ -182,13 +183,14 @@ using namespace luisa::compute;
     return make_float3(sin_theta * cos(phi), sin_theta * sin(phi), cos_theta);
 }
 
-[[nodiscard]] inline auto schlick_weight(Float cos_theta) noexcept {
-    return pow(saturate(1.0f - cos_theta), 5.0f);
+[[nodiscard]] inline auto pow2(auto x) noexcept {
+    return x * x;
 }
 
-template<typename T>
-[[nodiscard]] inline auto pow2(T &&x) noexcept {
-    return pow(2.0f, std::forward<T>(x));
+[[nodiscard]] inline auto schlick_weight(Float cos_theta) noexcept {
+    auto c = saturate(1.0f - cos_theta);
+    auto cc = c * c;
+    return cc * cc * c;
 }
 
 [[nodiscard]] inline auto fresnel_dielectric(Float cos_theta_i, Float eta_i, Float eta_t) noexcept {
@@ -264,8 +266,9 @@ template<typename T>
     return normalize(w_h);
 }
 
-[[nodiscard]] inline auto lambertian_pdf(const Float3 &w_i, const Float3 &n) noexcept {
-    return max(inv_pi * dot(w_i, n), 0.0f);
+[[nodiscard]] inline auto lambertian_pdf(const Float3 &w_o, const Float3 &w_i, const Float3 &n) noexcept {
+    auto pdf = abs(inv_pi * dot(w_i, n));
+    return ite(same_hemisphere(w_o, w_i, n), pdf, 0.0f);
 }
 
 [[nodiscard]] inline auto gtr_1_pdf(const Float3 &w_o, const Float3 &w_i, const Float3 &n, Float alpha) noexcept {
@@ -373,8 +376,8 @@ template<typename T>
                  smith_shadowing_ggx(abs(dot(n, w_o)), alpha);
         auto i_dot_h = dot(w_i, w_h);
         auto o_dot_h = dot(w_o, w_h);
-        auto c = abs(o_dot_h) / abs(dot(w_o, n)) *
-                 abs(i_dot_h) / abs(dot(w_i, n)) *
+        auto c = abs(o_dot_h) / abs(o_dot_n) *
+                 abs(i_dot_h) / abs(i_dot_n) *
                  pow2(eta_o) / pow2(eta_o * o_dot_h + eta_i * i_dot_h);
         f = mat.base_color() * c * (1.f - f) * g * d;
     };
@@ -449,33 +452,29 @@ template<typename T>
 }
 
 [[nodiscard]] auto disney_surface_pdf(const DisneySurfaceClosure &mat, const Float3 &w_i) noexcept {
-    auto pdf = def(0.0f);
     auto alpha = max(0.001f, mat.roughness() * mat.roughness());
-    $if(same_hemisphere(mat.wo(), w_i, mat.n())) {
-        auto aspect = sqrt(1.f - mat.anisotropy() * 0.9f);
-        auto alpha_aniso = make_float2(
-            max(0.001f, alpha / aspect),
-            max(0.001f, alpha * aspect));
-        auto clearcoat_alpha = lerp(0.1f, 0.001f, mat.clearcoat_gloss());
-        auto diffuse = lambertian_pdf(w_i, mat.n());
-        auto clear_coat = gtr_1_pdf(mat.wo(), w_i, mat.n(), clearcoat_alpha);
-        auto microfacet = def(0.f);
-        auto microfacet_transmission = def(0.f);
-        $if(mat.anisotropy() == 0.f) {
-            microfacet = gtr_2_pdf(mat.wo(), w_i, mat.n(), alpha);
-        }
-        $else {
-            microfacet = gtr_2_aniso_pdf(
-                mat.wo(), w_i, mat.n(),
-                mat.vx(), mat.vy(), alpha_aniso);
-        };
-        pdf = (diffuse + microfacet + clear_coat) * (1.0f / 3.0f);
+    auto aspect = sqrt(1.f - mat.anisotropy() * 0.9f);
+    auto alpha_aniso = make_float2(
+        max(0.001f, alpha / aspect),
+        max(0.001f, alpha * aspect));
+    auto clearcoat_alpha = lerp(0.1f, 0.001f, mat.clearcoat_gloss());
+    auto pdf = lambertian_pdf(mat.wo(), w_i, mat.n()) +
+               gtr_1_pdf(mat.wo(), w_i, mat.n(), clearcoat_alpha);
+    $if(mat.anisotropy() == 0.f) {
+        pdf += gtr_2_pdf(mat.wo(), w_i, mat.n(), alpha);
     }
-    $elif(mat.specular_trans() > 0.f) {
-        pdf = gtr_2_transmission_pdf(
+    $else {
+        pdf += gtr_2_aniso_pdf(
+            mat.wo(), w_i, mat.n(),
+            mat.vx(), mat.vy(), alpha_aniso);
+    };
+    auto inv_n = def(1.0f / 3.0f);
+    $if(mat.specular_trans() > 0.f) {
+        inv_n = 1.0f / 4.0f;
+        pdf += gtr_2_transmission_pdf(
             mat.wo(), w_i, mat.n(), alpha, mat.ior());
     };
-    return pdf;
+    return pdf * inv_n;
 }
 
 [[nodiscard]] inline auto reflect(const Float3 &i, const Float3 &n) noexcept {
@@ -552,7 +551,7 @@ Surface::Evaluation DisneySurfaceClosure::evaluate(Expr<float3> wi) const noexce
 Surface::Sample DisneySurfaceClosure::sample(Sampler::Instance &sampler) const noexcept {
     auto u = sampler.generate_2d();
     auto [wi, f, pdf] = detail::disney_surface_sample(*this, u);
-    return {.wi = std::move(wi), .eval = {.f = std::move(f), .pdf = std::move(pdf)}};
+    return {.wi = wi, .eval = {.f = f, .pdf = pdf}};
 }
 
 }// namespace luisa::render

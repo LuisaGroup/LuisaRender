@@ -84,7 +84,8 @@ __device__ Float fresnel_dielectric(Float cos_theta_i, Float eta_i, Float eta_t)
         return 1.f;
     }
     return 0.5f * pow2(g - cos_theta_i) / pow2(g + cos_theta_i)
-           * (1.f + pow2(cos_theta_i * (g + cos_theta_i) - 1.f) / pow2(cos_theta_i * (g - cos_theta_i) + 1.f));
+           * (1.f + pow2(cos_theta_i * (g + cos_theta_i) - 1.f) /
+                        pow2(cos_theta_i * (g - cos_theta_i) + 1.f));
 }
 
 // D_GTR1: Generalized Trowbridge-Reitz with gamma=1

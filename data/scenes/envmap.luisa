@@ -39,7 +39,7 @@ Shape teapot : Group {
           v { 1 }
         }
         base_color : ConstColor {
-          color { 1 }
+          color { 1, 1, 1 }
         }
       }
     },
@@ -55,10 +55,16 @@ Shape teapot : Group {
           color { 1.0, 0.71, 0.29 }
         }
         roughness : ConstGeneric {
+          v { 0.3 }
+        }
+        metallic : ConstGeneric {
+          v { 0 }
+        }
+        specular : ConstGeneric {
           v { 0 }
         }
         specular_trans : ConstGeneric {
-          v { 1 }
+          v { 0 }
         }
       }
     }
