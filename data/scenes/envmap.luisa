@@ -6,7 +6,7 @@ Film film : Color {
 Camera camera : Pinhole {
   position { 0, 0, 5 }
   fov { 60 }
-  spp { 1024 }
+  spp { 4096 }
   film { @film }
   file { "../renders/envmap.exr" }
   shutter_span { 0, 0 }
@@ -28,21 +28,21 @@ Integrator pt : MegaPath {
 
 Shape teapot : Group {
   shapes {
-    Mesh {
-      file { "../meshes/utah-teapot-lid.obj" }
-      // surface : Mirror {}
-      surface : Disney {
-        roughness : ConstGeneric {
-          v { 0.5 }
-        }
-        metallic : ConstGeneric {
-          v { 1 }
-        }
-        base_color : ConstColor {
-          color { 1, 1, 1 }
-        }
-      }
-    },
+    // Mesh {
+    //   file { "../meshes/utah-teapot-lid.obj" }
+    //   // surface : Mirror {}
+    //   surface : Disney {
+    //     roughness : ConstGeneric {
+    //       v { 0.5 }
+    //     }
+    //     metallic : ConstGeneric {
+    //       v { 1 }
+    //     }
+    //     base_color : ConstColor {
+    //       color { 1, 1, 1 }
+    //     }
+    //   }
+    // },
     Mesh {
       file { "../meshes/utah-teapot.obj" }
       // surface : Mirror {
@@ -55,7 +55,7 @@ Shape teapot : Group {
           color { 1.0, 0.71, 0.29 }
         }
         roughness : ConstGeneric {
-          v { 0.3 }
+          v { 0.1 }
         }
         metallic : ConstGeneric {
           v { 0 }
@@ -64,6 +64,12 @@ Shape teapot : Group {
           v { 0 }
         }
         specular_trans : ConstGeneric {
+          v { 1 }
+        }
+        clearcoat : ConstGeneric {
+          v { 0 }
+        }
+        clearcoat_gloss : ConstGeneric {
           v { 0 }
         }
       }

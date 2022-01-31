@@ -13,18 +13,19 @@ namespace luisa::render {
 class DisneySurface final : public Surface {
 
 private:
-    const Texture *_base_color{};
+    const Texture *_color{};
     const Texture *_metallic{};
+    const Texture *_eta{};
     const Texture *_roughness{};
-    const Texture *_anisotropy{};
-    const Texture *_specular{};
     const Texture *_specular_tint{};
+    const Texture *_anisotropic{};
     const Texture *_sheen{};
     const Texture *_sheen_tint{};
     const Texture *_clearcoat{};
     const Texture *_clearcoat_gloss{};
-    const Texture *_ior{};
     const Texture *_specular_trans{};
+    const Texture *_flatness{};
+    const Texture *_diffuse_trans{};
 
 public:
     DisneySurface(Scene *scene, const SceneNodeDesc *desc) noexcept
@@ -52,18 +53,19 @@ public:
         };
 #define LUISA_RENDER_DISNEY_PARAM_LOAD(name, category) \
     load_texture(_##name, #name, Texture::Category::category);
-        LUISA_RENDER_DISNEY_PARAM_LOAD(base_color, COLOR)
+        LUISA_RENDER_DISNEY_PARAM_LOAD(color, COLOR)
         LUISA_RENDER_DISNEY_PARAM_LOAD(metallic, GENERIC)
+        LUISA_RENDER_DISNEY_PARAM_LOAD(eta, GENERIC)
         LUISA_RENDER_DISNEY_PARAM_LOAD(roughness, GENERIC)
-        LUISA_RENDER_DISNEY_PARAM_LOAD(anisotropy, GENERIC)
-        LUISA_RENDER_DISNEY_PARAM_LOAD(specular, GENERIC)
         LUISA_RENDER_DISNEY_PARAM_LOAD(specular_tint, GENERIC)
+        LUISA_RENDER_DISNEY_PARAM_LOAD(anisotropic, GENERIC)
         LUISA_RENDER_DISNEY_PARAM_LOAD(sheen, GENERIC)
         LUISA_RENDER_DISNEY_PARAM_LOAD(sheen_tint, GENERIC)
         LUISA_RENDER_DISNEY_PARAM_LOAD(clearcoat, GENERIC)
         LUISA_RENDER_DISNEY_PARAM_LOAD(clearcoat_gloss, GENERIC)
-        LUISA_RENDER_DISNEY_PARAM_LOAD(ior, GENERIC)
         LUISA_RENDER_DISNEY_PARAM_LOAD(specular_trans, GENERIC)
+        LUISA_RENDER_DISNEY_PARAM_LOAD(flatness, GENERIC)
+        LUISA_RENDER_DISNEY_PARAM_LOAD(diffuse_trans, GENERIC)
 #undef LUISA_RENDER_DISNEY_PARAM_LOAD
     }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
@@ -72,18 +74,19 @@ public:
         Pipeline &pipeline, CommandBuffer &command_buffer,
         uint instance_id, const Shape *shape) const noexcept override {
         std::array textures{
-            *pipeline.encode_texture(command_buffer, _base_color),
+            *pipeline.encode_texture(command_buffer, _color),
             *pipeline.encode_texture(command_buffer, _metallic),
+            *pipeline.encode_texture(command_buffer, _eta),
             *pipeline.encode_texture(command_buffer, _roughness),
-            *pipeline.encode_texture(command_buffer, _anisotropy),
-            *pipeline.encode_texture(command_buffer, _specular),
             *pipeline.encode_texture(command_buffer, _specular_tint),
+            *pipeline.encode_texture(command_buffer, _anisotropic),
             *pipeline.encode_texture(command_buffer, _sheen),
             *pipeline.encode_texture(command_buffer, _sheen_tint),
             *pipeline.encode_texture(command_buffer, _clearcoat),
             *pipeline.encode_texture(command_buffer, _clearcoat_gloss),
-            *pipeline.encode_texture(command_buffer, _ior),
-            *pipeline.encode_texture(command_buffer, _specular_trans)};
+            *pipeline.encode_texture(command_buffer, _specular_trans),
+            *pipeline.encode_texture(command_buffer, _flatness),
+            *pipeline.encode_texture(command_buffer, _diffuse_trans)};
         auto [buffer, buffer_id] = pipeline.arena_buffer<TextureHandle>(textures.size());
         command_buffer << buffer.copy_from(&textures) << compute::commit();
         return buffer_id;
@@ -93,59 +96,451 @@ public:
         const SampledWavelengths &swl, Expr<float> time) const noexcept override;
 };
 
+namespace disney_impl {
+
+using namespace compute;
+
+[[nodiscard]] inline Float sqr(Float x) noexcept { return x * x; }
+[[nodiscard]] inline auto Lerp(const auto &t, const auto &v1, const auto &v2) noexcept { return lerp(v1, v2, t); }
+[[nodiscard]] inline Float AbsDot(Float3 u, Float3 v) noexcept { return abs(dot(u, v)); }
+[[nodiscard]] inline Float CosTheta(Float3 w) { return w.z; }
+[[nodiscard]] inline Float Cos2Theta(Float3 w) { return w.z * w.z; }
+[[nodiscard]] inline Float AbsCosTheta(Float3 w) { return abs(w.z); }
+[[nodiscard]] inline Float Sin2Theta(Float3 w) { return max(0.0f, 1.0f - Cos2Theta(w)); }
+[[nodiscard]] inline Float SinTheta(Float3 w) { return sqrt(Sin2Theta(w)); }
+[[nodiscard]] inline Float TanTheta(Float3 w) { return SinTheta(w) / CosTheta(w); }
+[[nodiscard]] inline Float Tan2Theta(Float3 w) { return Sin2Theta(w) / Cos2Theta(w); }
+[[nodiscard]] inline Float CosPhi(Float3 w) {
+    auto sinTheta = SinTheta(w);
+    return ite(sinTheta == 0.0f, 1.0f, clamp(w.x / sinTheta, -1.0f, 1.0f));
+}
+[[nodiscard]] inline Float SinPhi(Float3 w) {
+    auto sinTheta = SinTheta(w);
+    return ite(sinTheta == 0.0f, 0.0f, clamp(w.y / sinTheta, -1.0f, 1.0f));
+}
+[[nodiscard]] inline Float Cos2Phi(Float3 w) { return CosPhi(w) * CosPhi(w); }
+[[nodiscard]] inline Float Sin2Phi(Float3 w) { return SinPhi(w) * SinPhi(w); }
+[[nodiscard]] inline Bool SameHemisphere(Float3 w, Float3 wp) noexcept { return w.z * wp.z > 0.0f; }
+[[nodiscard]] inline Float3 Faceforward(Float3 v, Float3 v2) noexcept { return sign(dot(v, v2)) * v; }
+
+[[nodiscard]] inline Float3 SphericalDirection(Float sinTheta, Float cosTheta, Float phi) noexcept {
+    return make_float3(sinTheta * cos(phi), sinTheta * sin(phi), cosTheta);
+}
+
+[[nodiscard]] inline Float3 Reflect(Float3 wo, Float3 n) noexcept {
+    return -wo + 2.0f * dot(wo, n) * n;
+}
+
+[[nodiscard]] inline Bool Refract(Float3 wi, Float3 n, Float eta, Float3 *wt) noexcept {
+    // Compute $\cos \theta_\roman{t}$ using Snell's law
+    auto cosThetaI = dot(n, wi);
+    auto sin2ThetaI = max(0.0f, 1.0f - cosThetaI * cosThetaI);
+    auto sin2ThetaT = eta * eta * sin2ThetaI;
+
+    // Handle total internal reflection for transmission
+    auto is_refract = sin2ThetaT < 1.0f;
+    $if(is_refract) {
+        auto cosThetaT = sqrt(1.0f - sin2ThetaT);
+        *wt = eta * -wi + (eta * cosThetaI - cosThetaT) * n;
+    };
+    return is_refract;
+}
+
+[[nodiscard]] inline Float SchlickWeight(Float cosTheta) noexcept {// (1 - cos)^5
+    auto m = clamp(1.0f - cosTheta, 0.0f, 1.0f);
+    return (m * m) * (m * m) * m;
+}
+
+[[nodiscard]] inline Float FrSchlick(const auto &R0, Float cosTheta) noexcept {
+    return Lerp(SchlickWeight(cosTheta), R0, 1.0f);
+}
+
+[[nodiscard]] inline Float FresnelMoment1(Float eta) noexcept {
+    auto eta2 = eta * eta;
+    auto eta3 = eta2 * eta;
+    auto eta4 = eta3 * eta;
+    auto eta5 = eta4 * eta;
+    return ite(
+        eta < 1.0f,
+        0.45966f - 1.73965f * eta + 3.37668f * eta2 - 3.904945f * eta3 +
+            2.49277f * eta4 - 0.68441f * eta5,
+        -4.61686f + 11.1136f * eta - 10.4646f * eta2 + 5.11455f * eta3 -
+            1.27198f * eta4 + 0.12746f * eta5);
+}
+
+[[nodiscard]] inline Float FrDielectric(Float cosThetaI, Float etaI_in, Float etaT_in) noexcept {
+    cosThetaI = clamp(cosThetaI, -1.0f, 1.0f);
+    // Potentially swap indices of refraction
+    auto entering = cosThetaI > 0.f;
+    auto etaI = ite(entering, etaI_in, etaT_in);
+    auto etaT = ite(entering, etaT_in, etaI_in);
+    cosThetaI = abs(cosThetaI);
+
+    // Compute _cosThetaT_ using Snell's law
+    auto sinThetaI = sqrt(1.0f - cosThetaI * cosThetaI);
+    auto sinThetaT = etaI / etaT * sinThetaI;
+
+    // Handle total internal reflection
+    auto fr = def(1.0f);
+    $if(sinThetaT < 1.0f) {
+        auto cosThetaT = sqrt(max(0.0f, 1.0f - sinThetaT * sinThetaT));
+        auto Rparl = ((etaT * cosThetaI) - (etaI * cosThetaT)) /
+                     ((etaT * cosThetaI) + (etaI * cosThetaT));
+        auto Rperp = ((etaI * cosThetaI) - (etaT * cosThetaT)) /
+                     ((etaI * cosThetaI) + (etaT * cosThetaT));
+        fr = (Rparl * Rparl + Rperp * Rperp) * 0.5f;
+    };
+    return fr;
+}
+
+// For a dielectric, R(0) = (eta - 1)^2 / (eta + 1)^2, assuming we're
+// coming from air..
+[[nodiscard]] inline Float SchlickR0FromEta(Float eta) noexcept { return sqr(eta - 1.0f) / sqr(eta + 1.0f); }
+
+[[nodiscard]] inline Float GTR1(Float cosTheta, Float alpha) noexcept {
+    auto alpha2 = alpha * alpha;
+    return (alpha2 - 1.0f) / (pi * log(alpha2) * (1.0f + (alpha2 - 1.0f) * cosTheta * cosTheta));
+}
+
+// Smith masking/shadowing term.
+[[nodiscard]] inline Float smithG_GGX(Float cosTheta, Float alpha) noexcept {
+    auto alpha2 = alpha * alpha;
+    auto cosTheta2 = cosTheta * cosTheta;
+    return 1.0f / (cosTheta + sqrt(alpha2 + cosTheta2 - alpha2 * cosTheta2));
+}
+
+struct Lobe {
+    virtual ~Lobe() noexcept = default;
+    [[nodiscard]] virtual Float4 f(Float3 wo, Float3 wi) const noexcept = 0;
+    [[nodiscard]] virtual Float pdf(Float3 wo, Float3 wi) const noexcept {
+        return ite(SameHemisphere(wo, wi), AbsCosTheta(wi) * inv_pi, 0.0f);
+    }
+    [[nodiscard]] virtual Float4 sample(Float3 wo, Float3 *wi, Float2 u, Float *pdf) const noexcept {
+        auto w = sample_cosine_hemisphere(u);
+        *wi = w;
+        *pdf = w.z * inv_pi;
+        return f(wo, w);
+    }
+};
+
+class Diffuse final : public Lobe {
+
+private:
+    Float4 R;
+
+public:
+    explicit Diffuse(Float4 R = {}) noexcept : R{R} {}
+    [[nodiscard]] Float4 f(Float3 wo, Float3 wi) const noexcept override {
+        auto Fo = SchlickWeight(AbsCosTheta(wo));
+        auto Fi = SchlickWeight(AbsCosTheta(wi));
+
+        // Diffuse fresnel - go from 1 at normal incidence to .5 at grazing.
+        // Burley 2015, eq (4).
+        return R * inv_pi * (1.0f - Fo * 0.5f) * (1.0f - Fi * 0.5f);
+    }
+};
+
+class FakeSS final : public Lobe {
+
+private:
+    Float4 R;
+    Float roughness;
+
+public:
+    explicit FakeSS(Float4 R = {}, Float roughness = {}) noexcept : R{R}, roughness{roughness} {}
+    [[nodiscard]] Float4 f(Float3 wo, Float3 wi) const noexcept override {
+        auto wh = wi + wo;
+        auto F = def<float4>();
+        $if(any(wh != 0.0f)) {
+            wh = normalize(wh);
+            auto cosThetaD = dot(wi, wh);
+            // Fss90 used to "flatten" retro-reflection based on roughness
+            auto Fss90 = cosThetaD * cosThetaD * roughness;
+            auto Fo = SchlickWeight(AbsCosTheta(wo));
+            auto Fi = SchlickWeight(AbsCosTheta(wi));
+            auto Fss = Lerp(Fo, 1.0f, Fss90) * Lerp(Fi, 1.0f, Fss90);
+            // 1.25 scale is used to (roughly) preserve albedo
+            auto ss = 1.25f * (Fss * (1.0f / (AbsCosTheta(wo) + AbsCosTheta(wi)) - 0.5f) + 0.5f);
+            F = R * inv_pi * ss;
+        };
+        return F;
+    }
+};
+
+class Retro final : public Lobe {
+
+private:
+    Float4 R;
+    Float roughness;
+
+public:
+    explicit Retro(Float4 R = {}, Float roughness = {}) noexcept : R{R}, roughness{roughness} {}
+    [[nodiscard]] Float4 f(Float3 wo, Float3 wi) const noexcept override {
+        auto wh = wi + wo;
+        auto F = def<float4>();
+        $if(any(wh != 0.0f)) {
+            wh = normalize(wh);
+            auto cosThetaD = dot(wi, wh);
+
+            Float Fo = SchlickWeight(AbsCosTheta(wo)),
+                  Fi = SchlickWeight(AbsCosTheta(wi));
+            Float Rr = 2 * roughness * cosThetaD * cosThetaD;
+
+            // Burley 2015, eq (4).
+            F = R * inv_pi * Rr * (Fo + Fi + Fo * Fi * (Rr - 1.0f));
+        };
+        return F;
+    }
+};
+
+class Sheen final : public Lobe {
+
+private:
+    Float4 R;
+
+public:
+    [[nodiscard]] explicit Sheen(Float4 R = {}) noexcept : R{R} {}
+    [[nodiscard]] Float4 f(Float3 wo, Float3 wi) const noexcept override {
+        auto wh = wi + wo;
+        auto F = def<float4>();
+        $if(any(wh != 0.0f)) {
+            wh = normalize(wh);
+            auto cosThetaD = dot(wi, wh);
+            F = R * SchlickWeight(cosThetaD);
+        };
+        return F;
+    }
+};
+
+class Clearcoat final : public Lobe {
+
+private:
+    Float weight;
+    Float gloss;
+
+public:
+    explicit Clearcoat(Float weight = {}, Float gloss = {}) noexcept
+        : weight{weight}, gloss{gloss} {}
+    [[nodiscard]] Float4 f(Float3 wo, Float3 wi) const noexcept override {
+        auto wh = wi + wo;
+        auto F = def<float4>();
+        $if(any(wh != 0.0f)) {
+            wh = normalize(wh);
+
+            // Clearcoat has ior = 1.5 hardcoded -> F0 = 0.04. It then uses the
+            // GTR1 distribution, which has even fatter tails than Trowbridge-Reitz
+            // (which is GTR2).
+            auto Dr = GTR1(AbsCosTheta(wh), gloss);
+            auto Fr = FrSchlick(.04f, dot(wo, wh));
+            // The geometric term always based on alpha = 0.25.
+            auto Gr = smithG_GGX(AbsCosTheta(wo), .25f) *
+                      smithG_GGX(AbsCosTheta(wi), .25f);
+            F = make_float4(weight * Gr * Fr * Dr * .25f);
+        };
+        return F;
+    }
+    [[nodiscard]] Float pdf(Float3 wo, Float3 wi) const noexcept override {
+        auto wh = wi + wo;
+        auto p = def(0.0f);
+        $if(SameHemisphere(wo, wi) & any(wh != 0.0f)) {
+            wh = normalize(wh);
+            // The sampling routine samples wh exactly from the GTR1 distribution.
+            // Thus, the final value of the PDF is just the value of the
+            // distribution for wh converted to a measure with respect to the
+            // surface normal.
+            auto Dr = GTR1(AbsCosTheta(wh), gloss);
+            p = Dr * AbsCosTheta(wh) / (4.0f * dot(wo, wh));
+        };
+        return p;
+    }
+    [[nodiscard]] Float4 sample(Float3 wo, Float3 *wi, Float2 u, Float *p) const noexcept override {
+        // TODO: double check all this: there still seem to be some very
+        // occasional fireflies with clearcoat; presumably there is a bug
+        // somewhere.
+        *p = 0.0f;
+        auto F = def<float4>();
+        $if(wo.z != 0.0f) {
+            auto alpha2 = gloss * gloss;
+            auto cosTheta = sqrt(max(0.0f, (1.0f - pow(alpha2, 1.0f - u.x)) / (1.0f - alpha2)));
+            auto sinTheta = sqrt(max(0.0f, 1.0f - cosTheta * cosTheta));
+            auto phi = 2 * pi * u.y;
+            auto wh = SphericalDirection(sinTheta, cosTheta, phi);
+            wh = normalize(ite(SameHemisphere(wo, wh), wh, -wh));
+            auto w = Reflect(wo, wh);
+            $if(SameHemisphere(wo, w)) {
+                *wi = w;
+                *p = pdf(wo, w);
+                F = f(wo, w);
+            };
+        };
+        return F;
+    }
+};
+
+class Fresnel {
+
+private:
+    Float4 R0;
+    Float metallic;
+    Float eta;
+
+public:
+    [[nodiscard]] explicit Fresnel(Float4 R0 = {}, Float metallic = {}, Float eta = {}) noexcept
+        : R0{R0}, metallic{metallic}, eta{eta} {}
+    [[nodiscard]] Float4 evaluate(Float cosI) const noexcept {
+        return Lerp(metallic, make_float4(FrDielectric(cosI, 1.0f, eta)), FrSchlick(R0, cosI));
+    }
+};
+
+[[nodiscard]] inline Float2 TrowbridgeReitzSample11(Float cosTheta, Float U1, Float U2) noexcept {
+    // special case (normal incidence)
+    auto sample = def<float2>();
+    $if(cosTheta > 0.9999f) {
+        auto r = sqrt(U1 / (1.0f - U1));
+        auto phi = 2.0f * pi * U2;
+        auto slope_x = r * cos(phi);
+        auto slope_y = r * sin(phi);
+        sample = make_float2(slope_x, slope_y);
+    }
+    $else {
+        auto sinTheta = sqrt(max(0.0f, 1.0f - cosTheta * cosTheta));
+        auto tanTheta = sinTheta / cosTheta;
+        auto a = 1.0f / tanTheta;
+        auto G1 = 2.0f / (1.0f + sqrt(1.f + 1.f / (a * a)));
+        // sample slope_x
+        auto A = 2.0f * U1 / G1 - 1.0f;
+        auto tmp = min(1.f / (A * A - 1.f), 1e10f);
+        auto B = tanTheta;
+        auto D = sqrt(max(B * B * tmp * tmp - (A * A - B * B) * tmp, 0.0f));
+        auto slope_x_1 = B * tmp - D;
+        auto slope_x_2 = B * tmp + D;
+        auto slope_x = ite(
+            A<0.0f | slope_x_2> 1.f / tanTheta,
+            slope_x_1, slope_x_2);
+        // sample slope_y
+        auto S = ite(U2 > 0.5f, 1.0f, -1.0f);
+        U2 = ite(U2 > 0.5f, 2.f * (U2 - .5f), 2.f * (.5f - U2));
+        auto z = (U2 * (U2 * (U2 * 0.27385f - 0.73369f) + 0.46341f)) /
+                 (U2 * (U2 * (U2 * 0.093073f + 0.309420f) - 1.000000f) + 0.597999f);
+        auto slope_y = S * z * sqrt(1.f + slope_x * slope_x);
+        sample = make_float2(slope_x, slope_y);
+    };
+    return sample;
+}
+
+[[nodiscard]] inline Float3 TrowbridgeReitzSample(Float3 wi, Float alpha_x, Float alpha_y, Float U1, Float U2) {
+    // 1. stretch wi
+    auto wiStretched = normalize(make_float3(alpha_x * wi.x, alpha_y * wi.y, wi.z));
+    // 2. simulate P22_{wi}(x_slope, y_slope, 1, 1)
+    auto slope = TrowbridgeReitzSample11(CosTheta(wiStretched), U1, U2);
+    auto slope_x = slope.x;
+    auto slope_y = slope.y;
+    // 3. rotate
+    auto tmp = CosPhi(wiStretched) * slope_x - SinPhi(wiStretched) * slope_y;
+    slope_y = SinPhi(wiStretched) * slope_x + CosPhi(wiStretched) * slope_y;
+    slope_x = tmp;
+    // 4. unstretch
+    slope_x = alpha_x * slope_x;
+    slope_y = alpha_y * slope_y;
+    // 5. compute normal
+    return normalize(make_float3(-slope_x, -slope_y, 1.0f));
+}
+
+struct MicrofacetDistribution {
+    virtual ~MicrofacetDistribution() noexcept = default;
+    [[nodiscard]] virtual Float G(Float3 wo, Float3 wi) const noexcept = 0;
+    [[nodiscard]] virtual Float D(Float3 wh) const noexcept = 0;
+    [[nodiscard]] virtual Float pdf(Float3 wo, Float3 wh) const noexcept = 0;
+    [[nodiscard]] virtual Float3 sample_wh(Float3 wo, Float2 u) const noexcept = 0;
+};
+
+class TrowbridgeReitzDistribution : public MicrofacetDistribution {
+
+protected:
+    Float alphax, alphay;
+
+protected:
+    [[nodiscard]] Float G1(Float3 w) const noexcept {
+        return 1.0f / (1.0f + Lambda(w));
+    }
+
+private:
+    [[nodiscard]] Float Lambda(const Float3 &w) const noexcept {
+        auto L = def(0.0f);
+        auto absTanTheta = abs(TanTheta(w));
+        $if(!isinf(absTanTheta)) {
+            // Compute _alpha_ for direction _w_
+            auto alpha = sqrt(Cos2Phi(w) * alphax * alphax + Sin2Phi(w) * alphay * alphay);
+            auto alpha2Tan2Theta = (alpha * absTanTheta) * (alpha * absTanTheta);
+            return (-1.0f + sqrt(1.f + alpha2Tan2Theta)) * 0.5f;
+        };
+        return L;
+    }
+
+public:
+    [[nodiscard]] TrowbridgeReitzDistribution(Float alphax, Float alphay) noexcept
+        : alphax(alphax), alphay(alphay) {}
+
+    // TrowbridgeReitzDistribution Public Methods
+    [[nodiscard]] static inline Float RoughnessToAlpha(Float roughness) noexcept {
+        roughness = max(roughness, 1e-3f);
+        auto x = log(roughness);
+        return 1.62142f + 0.819955f * x + 0.1734f * x * x +
+               0.0171201f * x * x * x + 0.000640711f * x * x * x * x;
+    }
+
+    [[nodiscard]] Float G(Float3 wo, Float3 wi) const noexcept override {
+        return 1.0f / (1.0f + Lambda(wo) + Lambda(wi));
+    }
+
+    [[nodiscard]] Float pdf(Float3 wo, Float3 wh) const noexcept override {
+        return D(wh) * G1(wo) * abs(dot(wo, wh)) / AbsCosTheta(wo);
+    }
+
+    [[nodiscard]] Float D(Float3 wh) const noexcept override {
+        auto d = def(0.0f);
+        auto tan2Theta = Tan2Theta(wh);
+        $if(!isinf(tan2Theta)) {
+            auto cos4Theta = Cos2Theta(wh) * Cos2Theta(wh);
+            auto e = (Cos2Phi(wh) / (alphax * alphax) +
+                      Sin2Phi(wh) / (alphay * alphay)) *
+                     tan2Theta;
+            return 1.0f / (pi * alphax * alphay * cos4Theta * (1.0f + e) * (1.0f + e));
+        };
+        return d;
+    }
+
+    [[nodiscard]] Float3 sample_wh(Float3 wo, Float2 u) const noexcept override {
+        auto s = sign(wo.z);
+        auto wh = TrowbridgeReitzSample(s * wo, alphax, alphay, u.x, u.y);
+        return s * wh;
+    }
+};
+
+struct DisneyMicrofacetDistribution final : public TrowbridgeReitzDistribution {
+    [[nodiscard]] explicit DisneyMicrofacetDistribution(Float alphax = 0.0f, Float alphay = 0.0f) noexcept
+        : TrowbridgeReitzDistribution{alphax, alphay} {}
+    [[nodiscard]] Float G(Float3 wo, Float3 wi) const noexcept override {
+        // Disney uses the separable masking-shadowing model.
+        return G1(wo) * G1(wi);
+    }
+};
+
+
+
+}// namespace disney_impl
+
 class DisneySurfaceClosure final : public Surface::Closure {
 
 private:
-    Float3 _n;
-    Float3 _vx;
-    Float3 _vy;
-    Float3 _wo;
-    SampledWavelengths _swl;
-    Float4 _base_color;
-    Float _metallic;
-    Float _roughness;
-    Float _anisotropy;
-    Float _specular;
-    Float _specular_tint;
-    Float _sheen;
-    Float _sheen_tint;
-    Float _clearcoat;
-    Float _clearcoat_gloss;
-    Float _ior;
-    Float _specular_trans;
-
 public:
     DisneySurfaceClosure(
         const Interaction &it, const SampledWavelengths &swl,
-        Expr<float4> base_color, Expr<float> metallic, Expr<float> roughness, Expr<float> anisotropy,
-        Expr<float> specular, Expr<float> specular_tint, Expr<float> sheen, Expr<float> sheen_tint,
-        Expr<float> clearcoat, Expr<float> clearcoat_gloss, Expr<float> ior, Expr<float> specular_trans) noexcept
-        : _n{it.shading().n()}, _vx{it.shading().u()}, _vy{it.shading().v()}, _wo{it.wo()}, _swl{swl},
-          _base_color{base_color}, _metallic{metallic}, _roughness{roughness}, _anisotropy{anisotropy},
-          _specular{specular}, _specular_tint{specular_tint}, _sheen{sheen}, _sheen_tint{sheen_tint},
-          _clearcoat{clearcoat}, _clearcoat_gloss{clearcoat_gloss},
-          _ior{ite(ior == 0.0f, 1.5f, ior)}, _specular_trans{specular_trans} {}
-
-#define LUISA_RENDER_DISNEY_PARAM_GETTER(name) \
-    [[nodiscard]] const auto &name() const noexcept { return _##name; }
-    LUISA_RENDER_DISNEY_PARAM_GETTER(base_color)
-    LUISA_RENDER_DISNEY_PARAM_GETTER(metallic)
-    LUISA_RENDER_DISNEY_PARAM_GETTER(roughness)
-    LUISA_RENDER_DISNEY_PARAM_GETTER(anisotropy)
-    LUISA_RENDER_DISNEY_PARAM_GETTER(specular)
-    LUISA_RENDER_DISNEY_PARAM_GETTER(specular_tint)
-    LUISA_RENDER_DISNEY_PARAM_GETTER(sheen)
-    LUISA_RENDER_DISNEY_PARAM_GETTER(sheen_tint)
-    LUISA_RENDER_DISNEY_PARAM_GETTER(clearcoat)
-    LUISA_RENDER_DISNEY_PARAM_GETTER(clearcoat_gloss)
-    LUISA_RENDER_DISNEY_PARAM_GETTER(ior)
-    LUISA_RENDER_DISNEY_PARAM_GETTER(specular_trans)
-#undef LUISA_RENDER_DISNEY_PARAM_GETTER
-    [[nodiscard]] const auto &n() const noexcept { return _n; }
-    [[nodiscard]] const auto &vx() const noexcept { return _vx; }
-    [[nodiscard]] const auto &vy() const noexcept { return _vy; }
-    [[nodiscard]] const auto &wo() const noexcept { return _wo; }
-    [[nodiscard]] const auto &swl() const noexcept { return _swl; }
+        Expr<float4> color, Expr<float> metallic, Expr<float> eta, Expr<float> roughness,
+        Expr<float> specular_tint, Expr<float> anisotropic, Expr<float> sheen, Expr<float> sheen_tint,
+        Expr<float> clearcoat, Expr<float> clearcoat_gloss, Expr<float> specular_trans,
+        Expr<float> flatness, Expr<float> diffuse_trans) noexcept {
+    }
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override;
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override;
 };
@@ -156,402 +551,27 @@ luisa::unique_ptr<Surface::Closure> DisneySurface::decode(
     auto params = pipeline.buffer<TextureHandle>(it.shape()->surface_buffer_id());
     return luisa::make_unique<DisneySurfaceClosure>(
         it, swl,
-        pipeline.evaluate_color_texture(params.read(0), it, swl, time),
+        pipeline.evaluate_color_texture(params.read(0), it, swl, time) /* color */,
         pipeline.evaluate_generic_texture(params.read(1), it, time).x /* metallic */,
-        pipeline.evaluate_generic_texture(params.read(2), it, time).x /* roughness */,
-        pipeline.evaluate_generic_texture(params.read(3), it, time).x /* anisotropy */,
-        pipeline.evaluate_generic_texture(params.read(4), it, time).x /* specular */,
-        pipeline.evaluate_generic_texture(params.read(5), it, time).x /* specular_tint */,
+        pipeline.evaluate_generic_texture(params.read(2), it, time).x /* eta */,
+        pipeline.evaluate_generic_texture(params.read(3), it, time).x /* roughness */,
+        pipeline.evaluate_generic_texture(params.read(4), it, time).x /* specular_tint */,
+        pipeline.evaluate_generic_texture(params.read(5), it, time).x /* anisotropic */,
         pipeline.evaluate_generic_texture(params.read(6), it, time).x /* sheen */,
         pipeline.evaluate_generic_texture(params.read(7), it, time).x /* sheen_tint */,
         pipeline.evaluate_generic_texture(params.read(8), it, time).x /* clearcoat */,
         pipeline.evaluate_generic_texture(params.read(9), it, time).x /* clearcoat_gloss */,
-        pipeline.evaluate_generic_texture(params.read(10), it, time).x /* ior */,
-        pipeline.evaluate_generic_texture(params.read(11), it, time).x /* specular_trans */);
+        pipeline.evaluate_generic_texture(params.read(10), it, time).x /* specular_trans */,
+        pipeline.evaluate_generic_texture(params.read(11), it, time).x /* flatness */,
+        pipeline.evaluate_generic_texture(params.read(12), it, time).x /* diffuse_trans */);
 }
-
-// from: https://github.com/Twinklebear/ChameleonRT/blob/master/backends/optix/disney_bsdf.h
-namespace detail {
-
-using namespace luisa::compute;
-
-[[nodiscard]] inline auto same_hemisphere(const Float3 &w_o, const Float3 &w_i, const Float3 &n) noexcept {
-    return dot(w_o, n) * dot(w_i, n) > 0.f;
-}
-
-[[nodiscard]] inline auto spherical_dir(Float sin_theta, Float cos_theta, Float phi) noexcept {
-    return make_float3(sin_theta * cos(phi), sin_theta * sin(phi), cos_theta);
-}
-
-[[nodiscard]] inline auto pow2(auto x) noexcept {
-    return x * x;
-}
-
-[[nodiscard]] inline auto schlick_weight(Float cos_theta) noexcept {
-    auto c = saturate(1.0f - cos_theta);
-    auto cc = c * c;
-    return cc * cc * c;
-}
-
-[[nodiscard]] inline auto fresnel_dielectric(Float cos_theta_i, Float eta_i, Float eta_t) noexcept {
-    auto g = pow2(eta_t) / pow2(eta_i) - 1.f + pow2(cos_theta_i);
-    auto f = def(1.f);
-    $if(g >= 0.0f) {
-        f = 0.5f * pow2(g - cos_theta_i) / pow2(g + cos_theta_i) *
-            (1.f + pow2(cos_theta_i * (g + cos_theta_i) - 1.f) /
-                       pow2(cos_theta_i * (g - cos_theta_i) + 1.f));
-    };
-    return f;
-}
-
-[[nodiscard]] inline auto gtr_1(Float cos_theta_h, Float alpha) noexcept {
-    auto g = def(inv_pi);
-    $if(alpha < 1.0f) {
-        auto alpha_sqr = alpha * alpha;
-        g = inv_pi * (alpha_sqr - 1.f) /
-            (log(alpha_sqr) * (1.f + (alpha_sqr - 1.f) * cos_theta_h * cos_theta_h));
-    };
-    return g;
-}
-
-[[nodiscard]] inline auto gtr_2(Float cos_theta_h, Float alpha) noexcept {
-    auto alpha_sqr = alpha * alpha;
-    return inv_pi * alpha_sqr /
-           pow2(1.f + (alpha_sqr - 1.f) * cos_theta_h * cos_theta_h);
-}
-
-[[nodiscard]] inline auto gtr_2_aniso(Float h_dot_n, Float h_dot_x, Float h_dot_y, Float2 alpha) noexcept {
-    auto denom = pi * alpha.x * alpha.y *
-                 pow2(pow2(h_dot_x / alpha.x) + pow2(h_dot_y / alpha.y) + h_dot_n * h_dot_n);
-    return 1.0f / denom;
-}
-
-[[nodiscard]] inline auto smith_shadowing_ggx(Float n_dot_o, Float alpha_g) noexcept {
-    auto a = alpha_g * alpha_g;
-    auto b = n_dot_o * n_dot_o;
-    return 1.f / (n_dot_o + sqrt(a + b - a * b));
-}
-
-[[nodiscard]] inline auto smith_shadowing_ggx_aniso(Float n_dot_o, Float o_dot_x, Float o_dot_y, Float2 alpha) noexcept {
-    return 1.f / (n_dot_o + sqrt(pow2(o_dot_x * alpha.x) + pow2(o_dot_y * alpha.y) + pow2(n_dot_o)));
-}
-
-[[nodiscard]] inline auto sample_lambertian_dir(const Float3 &n, const Float3 &v_x, const Float3 &v_y, const Float2 &s) noexcept {
-    auto hemi_dir = normalize(sample_cosine_hemisphere(s));
-    return hemi_dir.x * v_x + hemi_dir.y * v_y + hemi_dir.z * n;
-}
-
-[[nodiscard]] inline auto sample_gtr_1_h(const Float3 &n, const Float3 &v_x, const Float3 &v_y, Float alpha, const Float2 &s) noexcept {
-    auto phi_h = 2.f * pi * s.x;
-    auto alpha_sqr = alpha * alpha;
-    auto cos_theta_h_sqr = (1.f - pow(alpha_sqr, 1.f - s.y)) / (1.f - alpha_sqr);
-    auto cos_theta_h = sqrt(cos_theta_h_sqr);
-    auto sin_theta_h = 1.f - cos_theta_h_sqr;
-    auto hemi_dir = normalize(spherical_dir(sin_theta_h, cos_theta_h, phi_h));
-    return hemi_dir.x * v_x + hemi_dir.y * v_y + hemi_dir.z * n;
-}
-
-[[nodiscard]] inline auto sample_gtr_2_h(const Float3 &n, const Float3 &v_x, const Float3 &v_y, Float alpha, const Float2 &s) noexcept {
-    auto phi_h = 2.f * pi * s.x;
-    auto cos_theta_h_sqr = (1.f - s.y) / (1.f + (alpha * alpha - 1.f) * s.y);
-    auto cos_theta_h = sqrt(cos_theta_h_sqr);
-    auto sin_theta_h = 1.f - cos_theta_h_sqr;
-    auto hemi_dir = normalize(spherical_dir(sin_theta_h, cos_theta_h, phi_h));
-    return hemi_dir.x * v_x + hemi_dir.y * v_y + hemi_dir.z * n;
-}
-
-[[nodiscard]] inline auto sample_gtr_2_aniso_h(const Float3 &n, const Float3 &v_x, const Float3 &v_y, const Float2 &alpha, const Float2 &s) noexcept {
-    auto x = 2.f * pi * s.x;
-    auto w_h = sqrt(s.y / (1.f - s.y)) * (alpha.x * cos(x) * v_x + alpha.y * sin(x) * v_y) + n;
-    return normalize(w_h);
-}
-
-[[nodiscard]] inline auto lambertian_pdf(const Float3 &w_o, const Float3 &w_i, const Float3 &n) noexcept {
-    auto pdf = abs(inv_pi * dot(w_i, n));
-    return ite(same_hemisphere(w_o, w_i, n), pdf, 0.0f);
-}
-
-[[nodiscard]] inline auto gtr_1_pdf(const Float3 &w_o, const Float3 &w_i, const Float3 &n, Float alpha) noexcept {
-    auto pdf = def(0.0f);
-    $if(same_hemisphere(w_o, w_i, n)) {
-        auto w_h = normalize(w_i + w_o);
-        auto cos_theta_h = dot(n, w_h);
-        auto d = gtr_1(cos_theta_h, alpha);
-        pdf = d * cos_theta_h / (4.f * dot(w_o, w_h));
-    };
-    return pdf;
-}
-
-[[nodiscard]] inline auto gtr_2_pdf(const Float3 &w_o, const Float3 &w_i, const Float3 &n, Float alpha) noexcept {
-    auto pdf = def(0.0f);
-    $if(same_hemisphere(w_o, w_i, n)) {
-        auto w_h = normalize(w_i + w_o);
-        auto cos_theta_h = dot(n, w_h);
-        auto d = gtr_2(cos_theta_h, alpha);
-        pdf = d * cos_theta_h / (4.f * dot(w_o, w_h));
-    };
-    return pdf;
-}
-
-[[nodiscard]] inline auto gtr_2_transmission_pdf(
-    const Float3 &w_o, const Float3 &w_i, const Float3 &n,
-    Float alpha, Float ior) noexcept {
-    auto pdf = def(0.0f);
-    $if(!same_hemisphere(w_o, w_i, n)) {
-        auto entering = dot(w_o, n) > 0.f;
-        auto eta_o = ite(entering, 1.f, ior);
-        auto eta_i = ite(entering, ior, 1.f);
-        auto w_h = normalize(w_o + w_i * eta_i / eta_o);
-        auto cos_theta_h = abs(dot(n, w_h));
-        auto i_dot_h = dot(w_i, w_h);
-        auto o_dot_h = dot(w_o, w_h);
-        auto d = gtr_2(cos_theta_h, alpha);
-        auto dwh_dwi = o_dot_h * pow2(eta_o) /
-                       pow2(eta_o * o_dot_h + eta_i * i_dot_h);
-        pdf = d * cos_theta_h * abs(dwh_dwi);
-    };
-    return pdf;
-}
-
-[[nodiscard]] inline auto gtr_2_aniso_pdf(
-    const Float3 &w_o, const Float3 &w_i, const Float3 &n,
-    const Float3 &v_x, const Float3 &v_y, const Float2 &alpha) noexcept {
-    auto pdf = def(0.0f);
-    $if(same_hemisphere(w_o, w_i, n)) {
-        auto w_h = normalize(w_i + w_o);
-        auto cos_theta_h = dot(n, w_h);
-        auto d = gtr_2_aniso(cos_theta_h, abs(dot(w_h, v_x)), abs(dot(w_h, v_y)), alpha);
-        pdf = d * cos_theta_h / (4.f * dot(w_o, w_h));
-    };
-    return pdf;
-}
-
-[[nodiscard]] inline auto disney_diffuse(
-    const DisneySurfaceClosure &mat, const Float3 &n,
-    const Float3 &w_o, const Float3 &w_i) noexcept {
-    Float3 w_h = normalize(w_i + w_o);
-    Float n_dot_o = abs(dot(w_o, n));
-    Float n_dot_i = abs(dot(w_i, n));
-    Float i_dot_h = dot(w_i, w_h);
-    Float fd90 = 0.5f + 2.f * mat.roughness() * i_dot_h * i_dot_h;
-    Float fi = schlick_weight(n_dot_i);
-    Float fo = schlick_weight(n_dot_o);
-    return mat.base_color() * inv_pi *
-           lerp(1.f, fd90, fi) * lerp(1.f, fd90, fo);
-}
-
-[[nodiscard]] inline auto disney_microfacet_isotropic(
-    const DisneySurfaceClosure &mat, const Float3 &n,
-    const Float3 &w_o, const Float3 &w_i) noexcept {
-    auto w_h = normalize(w_i + w_o);
-    auto lum = mat.swl().cie_y(mat.base_color());
-    auto tint = ite(lum > 0.f, mat.base_color() / lum, make_float4(1.f));
-    auto spec = lerp(
-        mat.specular() * 0.08f * lerp(1.0f, tint, mat.specular_tint()),
-        mat.base_color(),
-        mat.metallic());
-    auto alpha = max(0.001f, mat.roughness() * mat.roughness());
-    auto d = gtr_2(dot(n, w_h), alpha);
-    auto f = lerp(spec, 1.0f, schlick_weight(dot(w_i, w_h)));
-    auto g = smith_shadowing_ggx(dot(n, w_i), alpha) *
-             smith_shadowing_ggx(dot(n, w_o), alpha);
-    return d * f * g;
-}
-
-[[nodiscard]] inline auto disney_microfacet_transmission_isotropic(
-    const DisneySurfaceClosure &mat, const Float3 &n,
-    const Float3 &w_o, const Float3 &w_i) noexcept {
-    auto o_dot_n = dot(w_o, n);
-    auto i_dot_n = dot(w_i, n);
-    auto f = def(make_float4(0.0f));
-    $if(o_dot_n != 0.0f & i_dot_n != 0.0f) {
-        auto entering = o_dot_n > 0.f;
-        auto eta_o = ite(entering, 1.f, mat.ior());
-        auto eta_i = ite(entering, mat.ior(), 1.f);
-        auto w_h = normalize(w_o + w_i * eta_i / eta_o);
-        auto alpha = max(0.001f, mat.roughness() * mat.roughness());
-        auto d = gtr_2(abs(dot(n, w_h)), alpha);
-        auto f = fresnel_dielectric(abs(dot(w_i, n)), eta_o, eta_i);
-        auto g = smith_shadowing_ggx(abs(dot(n, w_i)), alpha) *
-                 smith_shadowing_ggx(abs(dot(n, w_o)), alpha);
-        auto i_dot_h = dot(w_i, w_h);
-        auto o_dot_h = dot(w_o, w_h);
-        auto c = abs(o_dot_h) / abs(o_dot_n) *
-                 abs(i_dot_h) / abs(i_dot_n) *
-                 pow2(eta_o) / pow2(eta_o * o_dot_h + eta_i * i_dot_h);
-        f = mat.base_color() * c * (1.f - f) * g * d;
-    };
-    return f;
-}
-
-[[nodiscard]] inline auto disney_microfacet_anisotropic(
-    const DisneySurfaceClosure &mat, const Float3 &n,
-    const Float3 &w_o, const Float3 &w_i, const Float3 &v_x, const Float3 &v_y) noexcept {
-    auto w_h = normalize(w_i + w_o);
-    auto lum = mat.swl().cie_y(mat.base_color());
-    auto tint = ite(lum > 0.f, mat.base_color() / lum, 1.0f);
-    auto spec = lerp(
-        mat.specular() * 0.08f * lerp(1.0f, tint, mat.specular_tint()),
-        mat.base_color(), mat.metallic());
-    auto aspect = sqrt(1.f - mat.anisotropy() * 0.9f);
-    auto a = mat.roughness() * mat.roughness();
-    auto alpha = make_float2(max(0.001f, a / aspect), max(0.001f, a * aspect));
-    auto d = gtr_2_aniso(dot(n, w_h), abs(dot(w_h, v_x)), abs(dot(w_h, v_y)), alpha);
-    auto f = lerp(spec, 1.0f, schlick_weight(dot(w_i, w_h)));
-    auto g = smith_shadowing_ggx_aniso(dot(n, w_i), abs(dot(w_i, v_x)), abs(dot(w_i, v_y)), alpha) *
-             smith_shadowing_ggx_aniso(dot(n, w_o), abs(dot(w_o, v_x)), abs(dot(w_o, v_y)), alpha);
-    return d * f * g;
-}
-
-[[nodiscard]] inline auto disney_clear_coat(
-    const DisneySurfaceClosure &mat, const Float3 &n,
-    const Float3 &w_o, const Float3 &w_i) noexcept {
-    auto w_h = normalize(w_i + w_o);
-    auto alpha = lerp(0.1f, 0.001f, mat.clearcoat_gloss());
-    auto d = gtr_1(dot(n, w_h), alpha);
-    auto f = lerp(0.04f, 1.f, schlick_weight(dot(w_i, n)));
-    auto g = smith_shadowing_ggx(dot(n, w_i), 0.25f) *
-             smith_shadowing_ggx(dot(n, w_o), 0.25f);
-    return 0.25f * mat.clearcoat() * d * f * g;
-}
-
-[[nodiscard]] inline auto disney_sheen(
-    const DisneySurfaceClosure &mat, const Float3 &n,
-    const Float3 &w_o, const Float3 &w_i) noexcept {
-    auto w_h = normalize(w_i + w_o);
-    auto lum = mat.swl().cie_y(mat.base_color());
-    auto tint = ite(lum > 0.f, mat.base_color() / lum, 1.0f);
-    auto sheen_color = lerp(1.0f, tint, mat.sheen_tint());
-    auto f = schlick_weight(dot(w_i, n));
-    return f * mat.sheen() * sheen_color;
-}
-
-[[nodiscard]] auto disney_surface_f(const DisneySurfaceClosure &mat, const Float3 &w_i) noexcept {
-    auto f = def(make_float4());
-    $if(same_hemisphere(mat.wo(), w_i, mat.n())) {
-        auto coat = disney_clear_coat(mat, mat.n(), mat.wo(), w_i);
-        auto sheen = disney_sheen(mat, mat.n(), mat.wo(), w_i);
-        auto diffuse = disney_diffuse(mat, mat.n(), mat.wo(), w_i);
-        auto gloss = def(make_float4());
-        $if(mat.anisotropy() == 0.f) {
-            gloss = disney_microfacet_isotropic(
-                mat, mat.n(), mat.wo(), w_i);
-        }
-        $else {
-            gloss = disney_microfacet_anisotropic(
-                mat, mat.n(), mat.wo(), w_i, mat.vx(), mat.vy());
-        };
-        f = (diffuse + sheen) * (1.f - mat.metallic()) * (1.f - mat.specular_trans()) + gloss + coat;
-    }
-    $elif(mat.specular_trans() > 0.f) {
-        auto spec_trans = disney_microfacet_transmission_isotropic(
-            mat, mat.n(), mat.wo(), w_i);
-        f = spec_trans * (1.f - mat.metallic()) * mat.specular_trans();
-    };
-    return f;
-}
-
-[[nodiscard]] auto disney_surface_pdf(const DisneySurfaceClosure &mat, const Float3 &w_i) noexcept {
-    auto alpha = max(0.001f, mat.roughness() * mat.roughness());
-    auto aspect = sqrt(1.f - mat.anisotropy() * 0.9f);
-    auto alpha_aniso = make_float2(
-        max(0.001f, alpha / aspect),
-        max(0.001f, alpha * aspect));
-    auto clearcoat_alpha = lerp(0.1f, 0.001f, mat.clearcoat_gloss());
-    auto pdf = lambertian_pdf(mat.wo(), w_i, mat.n()) +
-               gtr_1_pdf(mat.wo(), w_i, mat.n(), clearcoat_alpha);
-    $if(mat.anisotropy() == 0.f) {
-        pdf += gtr_2_pdf(mat.wo(), w_i, mat.n(), alpha);
-    }
-    $else {
-        pdf += gtr_2_aniso_pdf(
-            mat.wo(), w_i, mat.n(),
-            mat.vx(), mat.vy(), alpha_aniso);
-    };
-    auto inv_n = def(1.0f / 3.0f);
-    $if(mat.specular_trans() > 0.f) {
-        inv_n = 1.0f / 4.0f;
-        pdf += gtr_2_transmission_pdf(
-            mat.wo(), w_i, mat.n(), alpha, mat.ior());
-    };
-    return pdf * inv_n;
-}
-
-[[nodiscard]] inline auto reflect(const Float3 &i, const Float3 &n) noexcept {
-    return i - 2.0f * dot(n, i) * n;
-}
-
-[[nodiscard]] inline auto refract(const Float3 &i, const Float3 &n, Float eta) noexcept {
-    auto c = dot(n, i);
-    auto k = 1.0f - eta * eta * (1.0f - c * c);
-    return ite(k < 0.0f, 0.0f, eta * i - (eta * c + sqrt(k)) * n);
-}
-
-[[nodiscard]] std::tuple<Float3 /* wi */, Float4 /* f */, Float /* pdf */>
-disney_surface_sample(const DisneySurfaceClosure &mat, const Float2 &u_in) noexcept {
-    auto num_comp = ite(mat.specular_trans() == 0.f, 3.0f, 4.0f);
-    auto component = cast<uint>(min(u_in.x * num_comp, num_comp - 1.0f));
-    auto u = make_float2(u_in.x * num_comp - cast<float>(component), u_in.y);
-    auto n = mat.n();
-    auto wo = mat.wo();
-    auto vx = mat.vx();
-    auto vy = mat.vy();
-    auto wi = def(make_float3());
-    $switch(component) {
-        $case(0u) {
-            wi = sample_lambertian_dir(n, vx, vy, u);
-        };
-        $case(1u) {
-            auto wh = def(make_float3());
-            auto alpha = max(0.001f, mat.roughness() * mat.roughness());
-            $if(mat.anisotropy() == 0.f) {
-                wh = sample_gtr_2_h(n, vx, vy, alpha, u);
-            }
-            $else {
-                auto aspect = sqrt(1.f - mat.anisotropy() * 0.9f);
-                auto alpha_aniso = make_float2(
-                    max(0.001f, alpha / aspect),
-                    max(0.001f, alpha * aspect));
-                wh = sample_gtr_2_aniso_h(n, vx, vy, alpha_aniso, u);
-            };
-            wi = reflect(-wo, wh);
-            wi = ite(same_hemisphere(wo, wi, n), wi, make_float3(0.0f));
-        };
-        $case(2u) {
-            auto alpha = lerp(0.1f, 0.001f, mat.clearcoat_gloss());
-            auto wh = sample_gtr_1_h(n, vx, vy, alpha, u);
-            wi = reflect(-wo, wh);
-            wi = ite(same_hemisphere(wo, wi, n), wi, make_float3(0.0f));
-        };
-        $case(3u) {
-            auto alpha = max(0.001f, mat.roughness() * mat.roughness());
-            auto wh = sample_gtr_2_h(n, vx, vy, alpha, u);
-            wh = sign(dot(wo, wh)) * wh;
-            auto entering = dot(wo, n) > 0.f;
-            wi = refract(-wo, wh, ite(entering, 1.f / mat.ior(), mat.ior()));
-        };
-        $default { unreachable(); };
-    };
-    auto pdf = def(0.0f);
-    auto f = def(make_float4());
-    $if(!all(wi == 0.0f)) {
-        f = disney_surface_f(mat, wi);
-        pdf = disney_surface_pdf(mat, wi);
-    };
-    return std::make_tuple(wi, f, pdf);
-}
-
-}// namespace detail
 
 Surface::Evaluation DisneySurfaceClosure::evaluate(Expr<float3> wi) const noexcept {
-    return {.f = detail::disney_surface_f(*this, wi),
-            .pdf = detail::disney_surface_pdf(*this, wi)};
+    return {};
 }
 
 Surface::Sample DisneySurfaceClosure::sample(Sampler::Instance &sampler) const noexcept {
-    auto u = sampler.generate_2d();
-    auto [wi, f, pdf] = detail::disney_surface_sample(*this, u);
-    return {.wi = wi, .eval = {.f = f, .pdf = pdf}};
+    return {};
 }
 
 }// namespace luisa::render
