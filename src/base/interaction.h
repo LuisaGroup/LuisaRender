@@ -54,6 +54,7 @@ public:
     [[nodiscard]] auto valid() const noexcept { return _prim_id != ~0u; }
     [[nodiscard]] const auto &shading() const noexcept { return _shading; }
     [[nodiscard]] const auto &shape() const noexcept { return _shape; }
+    [[nodiscard]] auto wo_local() const noexcept { return _shading.world_to_local(_wo); }
     [[nodiscard]] auto spawn_ray(Expr<float3> wi) const noexcept {
         return luisa::compute::make_ray_robust(_p, _ng, wi);
     }

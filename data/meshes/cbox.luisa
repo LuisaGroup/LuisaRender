@@ -1,17 +1,17 @@
-Surface cbox-white : Lambert {
-  color : ConstColor {
+Surface cbox-white : Matte {
+  Kd : ConstColor {
     color { 0.725, 0.71, 0.68 }
   }
 }
 
-Surface cbox-red : Lambert {
-  color : ConstColor {
+Surface cbox-red : Matte {
+  Kd : ConstColor {
     color { 0.63, 0.065, 0.05 }
   }
 }
 
-Surface cbox-green : Lambert {
-  color : ConstColor {
+Surface cbox-green : Matte {
+  Kd : ConstColor {
     color { 0.14, 0.45, 0.091 }
   }
 }
@@ -36,11 +36,14 @@ Shape cbox-right-wall : Mesh {
   surface { @cbox-green }
 }
 
-Surface cbox-brick : Lambert {
-  color : Color {
+Surface cbox-brick : Matte {
+  Kd : Color {
     file { "../textures/brickwall.jpg" }
     gamma { 1 }
     encoding { "gamma" }
+  }
+  sigma : ConstGeneric {
+    v { 10 }
   }
 }
 
