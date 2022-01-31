@@ -143,4 +143,16 @@ public:
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept override;
 };
 
+class OrenNayar : public BxDF {
+
+private:
+    Float4 _r;
+    Float _a;
+    Float _b;
+
+public:
+    OrenNayar(Expr<float4> R, Expr<float> sigma) noexcept;
+    [[nodiscard]] Float4 evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
+};
+
 }// namespace luisa::render

@@ -327,13 +327,38 @@ Float MicrofacetTransmission::pdf(Expr<float3> wo, Expr<float3> wi) const noexce
     auto eta = ite(cos_theta(wo) > 0.f, _eta_b / _eta_a, _eta_a / _eta_b);
     auto wh = normalize(wo + wi * eta);
     auto p = def(0.f);
-    $if (!same_hemisphere(wo, wi) & dot(wo, wh) * dot(wi, wh) < 0.f) {
+    $if(!same_hemisphere(wo, wi) & dot(wo, wh) * dot(wi, wh) < 0.f) {
         // Compute change of variables _dwh\_dwi_ for microfacet transmission
         auto sqrtDenom = dot(wo, wh) + eta * dot(wi, wh);
         auto dwh_dwi = sqr(eta / sqrtDenom) * abs_dot(wi, wh);
         p = _distribution->pdf(wo, wh) * dwh_dwi;
     };
     return p;
+}
+
+OrenNayar::OrenNayar(Expr<float4> R, Expr<float> sigma) noexcept : _r{R} {
+    auto sigma2 = sqr(radians(sigma));
+    _a = 1.f - (sigma2 / (2.f * sigma2 + 0.66f));
+    _b = 0.45f * sigma2 / (sigma2 + 0.09f);
+}
+
+Float4 OrenNayar::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
+    auto sinThetaI = sin_theta(wi);
+    auto sinThetaO = sin_theta(wo);
+    // Compute cosine term of Oren-Nayar model
+    auto sinPhiI = sin_phi(wi);
+    auto cosPhiI = cos_phi(wi);
+    auto sinPhiO = sin_phi(wo);
+    auto cosPhiO = cos_phi(wo);
+    auto dCos = cosPhiI * cosPhiO + sinPhiI * sinPhiO;
+    auto maxCos = ite(sinThetaI > 1e-4f & sinThetaO > 1e-4f, max(0.f, dCos), 0.f);
+    // Compute sine and tangent terms of Oren-Nayar model
+    auto absCosThetaI = abs_cos_theta(wi);
+    auto absCosThetaO = abs_cos_theta(wo);
+    auto sinAlpha = ite(absCosThetaI > absCosThetaO, sinThetaO, sinThetaI);
+    auto tanBeta = ite(absCosThetaI > absCosThetaO,
+                       sinThetaI / absCosThetaI, sinThetaO / absCosThetaO);
+    return _r * inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta);
 }
 
 }// namespace luisa::render
