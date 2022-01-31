@@ -93,9 +93,9 @@ void ColorFilmInstance::save(Stream &stream, const std::filesystem::path &path) 
 }
 
 void ColorFilmInstance::accumulate(Expr<uint2> pixel, Expr<float3> rgb_in) const noexcept {
-    auto rgb = ite(any(isnan(rgb_in)), 0.0f, rgb_in);
     auto old = _image.read(pixel);
     auto t = old.w + 1.0f;
+    auto rgb = ite(isnan(rgb_in), old.xyz(), rgb_in);
     _image.write(pixel, make_float4(lerp(old.xyz(), rgb, 1.0f / t), t));
 }
 

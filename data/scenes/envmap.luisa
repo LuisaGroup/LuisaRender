@@ -6,7 +6,7 @@ Film film : Color {
 Camera camera : Pinhole {
   position { 0, 0, 5 }
   fov { 60 }
-  spp { 4096 }
+  spp { 16384 }
   film { @film }
   file { "../renders/envmap.exr" }
   shutter_span { 0, 0 }
@@ -50,27 +50,15 @@ Shape teapot : Group {
       //     color { 1.0, 0.71, 0.29 }
       //   }
       // }
-      surface : Disney {
-        base_color : ConstColor {
+      surface : Plastic {
+        Kd : ConstColor {
           color { 1.0, 0.71, 0.29 }
         }
+        Ks : ConstColor {
+          color { 1.0, 1.0, 1.0 }
+        }
         roughness : ConstGeneric {
-          v { 0.1 }
-        }
-        metallic : ConstGeneric {
-          v { 0 }
-        }
-        specular : ConstGeneric {
-          v { 0 }
-        }
-        specular_trans : ConstGeneric {
-          v { 1 }
-        }
-        clearcoat : ConstGeneric {
-          v { 0 }
-        }
-        clearcoat_gloss : ConstGeneric {
-          v { 0 }
+          v { 0.05 }
         }
       }
     }

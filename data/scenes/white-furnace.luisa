@@ -21,7 +21,18 @@ Integrator pt : MegaPath {
 
 Shape teapot : Mesh {
   file { "../meshes/utah-teapot.obj" }
-  surface : Lambert {}
+  // surface : Lambert {}
+    surface : Plastic {
+    Kd : ConstColor {
+      color { 1.0, 0.71, 0.29 }
+    }
+    Ks : ConstColor {
+      color { 1.0, 1.0, 1.0 }
+    }
+    roughness : ConstGeneric {
+      v { 0.3 }
+    }
+  }
   transform : SRT {
     scale { 0.25 }
     translate { 0, -0.5, 0 }

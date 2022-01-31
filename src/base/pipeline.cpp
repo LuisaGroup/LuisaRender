@@ -421,11 +421,13 @@ RGBIlluminantSpectrum Pipeline::srgb_illuminant_spectrum(Expr<float3> rgb) const
 Float4 Pipeline::evaluate_texture(
     Texture::Category category,
     const Var<TextureHandle> &handle, const Interaction &it,
-    const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    const SampledWavelengths &swl, Expr<float> time, Float *max_value) const noexcept {
     using namespace luisa::compute;
-    auto process = [category, &swl](auto value) noexcept {
+    auto process = [category, &swl, max_value](auto value) noexcept {
         if (category == Texture::Category::COLOR) {
-            auto spec = RGBAlbedoSpectrum{RGBSigmoidPolynomial{value.xyz()}};
+            auto rsp = RGBSigmoidPolynomial{value.xyz()};
+            auto spec = RGBAlbedoSpectrum{rsp};
+            if (max_value != nullptr) { *max_value = rsp.maximum(); }
             return spec.sample(swl);
         }
         if (category == Texture::Category::ILLUMINANT) {
@@ -489,10 +491,10 @@ const TextureHandle *Pipeline::encode_texture(CommandBuffer &command_buffer, con
 }
 Float4 Pipeline::evaluate_color_texture(
     const Var<TextureHandle> &handle, const Interaction &it,
-    const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    const SampledWavelengths &swl, Expr<float> time, Float *max_value) const noexcept {
     return evaluate_texture(
-        Texture::Category::COLOR,
-        handle, it, swl, time);
+        Texture::Category::COLOR, handle,
+        it, swl, time, max_value);
 }
 
 Float4 Pipeline::evaluate_illuminant_texture(
@@ -512,7 +514,7 @@ Float4 Pipeline::evaluate_generic_texture(
 
 Float4 Pipeline::evaluate_texture(
     Texture::Category category, TextureHandle handle, const Interaction &it,
-    const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    const SampledWavelengths &swl, Expr<float> time, Float *max_value) const noexcept {
     auto tag = handle.id_and_tag & TextureHandle::tag_mask;
     auto interface = texture_interfaces(category)[tag];
     Var<TextureHandle> dsl_handle;
@@ -523,7 +525,9 @@ Float4 Pipeline::evaluate_texture(
     auto value = interface->evaluate(
         *this, it, dsl_handle, time);
     if (category == Texture::Category::COLOR) {
-        auto spec = RGBAlbedoSpectrum{RGBSigmoidPolynomial{value.xyz()}};
+        auto rsp = RGBSigmoidPolynomial{value.xyz()};
+        auto spec = RGBAlbedoSpectrum{rsp};
+        if (max_value != nullptr) { *max_value = rsp.maximum(); }
         return spec.sample(swl);
     }
     if (category == Texture::Category::ILLUMINANT) {
@@ -537,10 +541,11 @@ Float4 Pipeline::evaluate_texture(
 
 Float4 Pipeline::evaluate_color_texture(
     TextureHandle handle, const Interaction &it,
-    const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    const SampledWavelengths &swl, Expr<float> time,
+    Float *max_value) const noexcept {
     return evaluate_texture(
-        Texture::Category::COLOR,
-        handle, it, swl, time);
+        Texture::Category::COLOR, handle,
+        it, swl, time, max_value);
 }
 
 Float4 Pipeline::evaluate_illuminant_texture(

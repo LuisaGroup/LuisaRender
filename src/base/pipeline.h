@@ -235,10 +235,11 @@ public:
 
     [[nodiscard]] Float4 evaluate_texture(
         Texture::Category category, TextureHandle handle, const Interaction &it,
-        const SampledWavelengths &swl, Expr<float> time) const noexcept;
+        const SampledWavelengths &swl, Expr<float> time, Float *max_value = nullptr) const noexcept;
     [[nodiscard]] Float4 evaluate_color_texture(
         TextureHandle handle, const Interaction &it,
-        const SampledWavelengths &swl, Expr<float> time) const noexcept;
+        const SampledWavelengths &swl, Expr<float> time,
+        Float *max_value = nullptr) const noexcept;
     [[nodiscard]] Float4 evaluate_illuminant_texture(
         TextureHandle handle, const Interaction &it,
         const SampledWavelengths &swl, Expr<float> time) const noexcept;
@@ -248,10 +249,11 @@ public:
 
     [[nodiscard]] Float4 evaluate_texture(
         Texture::Category category, const Var<TextureHandle> &handle, const Interaction &it,
-        const SampledWavelengths &swl, Expr<float> time) const noexcept;
+        const SampledWavelengths &swl, Expr<float> time, Float *max_value = nullptr) const noexcept;
     [[nodiscard]] Float4 evaluate_color_texture(
         const Var<TextureHandle> &handle, const Interaction &it,
-        const SampledWavelengths &swl, Expr<float> time) const noexcept;
+        const SampledWavelengths &swl, Expr<float> time,
+        Float *max_value = nullptr) const noexcept;
     [[nodiscard]] Float4 evaluate_illuminant_texture(
         const Var<TextureHandle> &handle, const Interaction &it,
         const SampledWavelengths &swl, Expr<float> time) const noexcept;
