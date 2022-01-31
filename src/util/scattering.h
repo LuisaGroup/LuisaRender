@@ -156,4 +156,23 @@ public:
     [[nodiscard]] Float4 evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
 };
 
+class FresnelBlend : public BxDF {
+
+private:
+    // FresnelBlend Private Data
+    Float4 _rd, _rs;
+    const MicrofacetDistribution *_distribution;
+
+private:
+    [[nodiscard]] Float Schlick(Expr<float> cosTheta) const noexcept;
+
+public:
+    FresnelBlend(Expr<float4> Rd, Expr<float4> Rs, const MicrofacetDistribution *distrib) noexcept
+        : _rd{Rd}, _rs{Rs}, _distribution{distrib} {}
+    [[nodiscard]] Float4 evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
+    [[nodiscard]] Float4 sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept override;
+    [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept override;
+};
+
+
 }// namespace luisa::render

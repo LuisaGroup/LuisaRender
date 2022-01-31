@@ -204,7 +204,7 @@ Float TrowbridgeReitzDistribution::Lambda(Expr<float3> w) const noexcept {
 }
 
 Float3 TrowbridgeReitzDistribution::sample_wh(Expr<float3> wo, Expr<float2> u) const noexcept {
-    auto s = sign(wo.z);
+    auto s = sign(cos_theta(wo));
     auto wh = TrowbridgeReitzSample(s * wo, _alpha, u);
     return s * wh;
 }
@@ -365,6 +365,68 @@ Float4 OrenNayar::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
     auto tanBeta = ite(absCosThetaI > absCosThetaO,
                        sinThetaI / absCosThetaI, sinThetaO / absCosThetaO);
     return _r * inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta);
+}
+
+Float FresnelBlend::Schlick(Expr<float> cosTheta) const noexcept {
+    auto pow5 = [](Float v) { return sqr(sqr(v)) * v; };
+    return _rs + pow5(1.f - cosTheta) * (1.f - _rs);
+}
+
+Float4 FresnelBlend::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
+    auto pow5 = [](Float v) noexcept { return sqr(sqr(v)) * v; };
+    auto absCosThetaI = abs_cos_theta(wi);
+    auto absCosThetaO = abs_cos_theta(wo);
+    auto diffuse = (28.f / (23.f * pi)) * _rd * (1.f - _rs) *
+                   (1.f - pow5(1.f - .5f * absCosThetaI)) *
+                   (1.f - pow5(1.f - .5f * absCosThetaO));
+    auto wh = wi + wo;
+    auto f = def<float4>();
+    $if(any(wh != 0.f)) {
+        wh = normalize(wh);
+        auto specular = _distribution->D(wh) /
+                        (4.f * abs_dot(wi, wh) * max(absCosThetaI, absCosThetaO)) *
+                        Schlick(dot(wi, wh));
+        f = diffuse + specular;
+    };
+    return f;
+}
+
+Float4 FresnelBlend::sample(Expr<float3> wo, Float3 *wi, Expr<float2> uOrig, Float *p) const noexcept {
+    using compute::sign;
+    auto u = def(uOrig);
+    *p = 0.f;
+    auto f = def<float4>();
+    $if(u.x < .5f) {
+        u.x = 2.f * u.x;
+        // Cosine-sample the hemisphere, flipping the direction if necessary
+        *wi = sample_cosine_hemisphere(u);
+        wi->z *= sign(cos_theta(wo));
+        compute::assume(same_hemisphere(wo, *wi));
+        *p = pdf(wo, *wi);
+        f = evaluate(wo, *wi);
+    }
+    $else {
+        u.x = 2.f * (u.x - .5f);
+        // Sample microfacet orientation $\wh$ and reflected direction $\wi$
+        auto wh = _distribution->sample_wh(wo, u);
+        *wi = reflect(wo, wh);
+        $if(same_hemisphere(wo, *wi)) {
+            *p = pdf(wo, *wi);
+            f = evaluate(wo, *wi);
+        };
+    };
+    return f;
+}
+
+Float FresnelBlend::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {
+    auto p = def(0.f);
+    $if(same_hemisphere(wo, wi)) {
+        auto wh = normalize(wo + wi);
+        auto pdf_wh = _distribution->pdf(wo, wh);
+        p = .5f * (abs_cos_theta(wi) * inv_pi +
+                   pdf_wh / (4.f * dot(wo, wh)));
+    };
+    return p;
 }
 
 }// namespace luisa::render
