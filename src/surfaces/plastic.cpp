@@ -21,6 +21,7 @@ public:
         TextureHandle Ks;
         TextureHandle roughness;
         bool remap_roughness;
+        bool isotropic;
     };
 
 private:
@@ -66,7 +67,8 @@ public:
             .Kd = *pipeline.encode_texture(command_buffer, _kd),
             .Ks = *pipeline.encode_texture(command_buffer, _ks),
             .roughness = *pipeline.encode_texture(command_buffer, _roughness),
-            .remap_roughness = _remap_roughness};
+            .remap_roughness = _remap_roughness,
+            .isotropic = _roughness->channels() == 1u};
         command_buffer << buffer_view.copy_from(&params)
                        << compute::commit();
         return buffer_id;
@@ -80,7 +82,7 @@ public:
 
 LUISA_STRUCT(
     luisa::render::PlasticSurface::Params,
-    Kd, Ks, roughness, remap_roughness){};
+    Kd, Ks, roughness, remap_roughness, isotropic){};
 
 namespace luisa::render {
 
@@ -94,8 +96,8 @@ private:
     MicrofacetReflection _microfacet;
 
 public:
-    PlasticClosure(const Interaction &it, Expr<float4> Kd, Expr<float4> Ks, Expr<float> alpha) noexcept
-        : _interaction{it}, _distribution{make_float2(alpha)}, _fresnel{1.5f, 1.0f},
+    PlasticClosure(const Interaction &it, Expr<float4> Kd, Expr<float4> Ks, Expr<float2> alpha) noexcept
+        : _interaction{it}, _distribution{alpha}, _fresnel{1.5f, 1.0f},
           _lambert{Kd}, _microfacet{Ks, &_distribution, &_fresnel} {}
 
 private:
@@ -123,7 +125,7 @@ private:
             f += _microfacet.evaluate(wo_local, wi_local);
             pdf = (pdf + _microfacet.pdf(wo_local, wi_local)) * .5f;
         }
-        $else{// Microfacet
+        $else {// Microfacet
             u.x = fma(-2.0f, u.x, 2.0f);
             f = _microfacet.sample(wo_local, &wi_local, u, &pdf);
             f += _lambert.evaluate(wo_local, wi_local);
@@ -142,7 +144,8 @@ luisa::unique_ptr<Surface::Closure> PlasticSurface::decode(
     auto Ks_max = def(0.0f);
     auto Kd = pipeline.evaluate_color_texture(params.Kd, it, swl, time, &Kd_max);
     auto Ks = pipeline.evaluate_color_texture(params.Ks, it, swl, time, &Ks_max);
-    auto roughness = saturate(pipeline.evaluate_generic_texture(params.roughness, it, time).x);
+    auto r = pipeline.evaluate_generic_texture(params.roughness, it, time);
+    auto roughness = ite(params.isotropic, r.xx(), r.xy());
     auto alpha = ite(
         params.remap_roughness,
         TrowbridgeReitzDistribution::roughness_to_alpha(roughness),

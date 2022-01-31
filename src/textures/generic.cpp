@@ -43,6 +43,7 @@ public:
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] Category category() const noexcept override { return Category::GENERIC; }
     [[nodiscard]] bool is_black() const noexcept override { return false; }
+    [[nodiscard]] uint channels() const noexcept override { return _img.get().channels(); }
 };
 
 }// namespace luisa::render

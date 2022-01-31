@@ -40,6 +40,7 @@ public:
     [[nodiscard]] Float Lambda(Expr<float3> w) const noexcept override;
     [[nodiscard]] Float3 sample_wh(Expr<float3> wo, Expr<float2> u) const noexcept override;
     [[nodiscard]] static Float roughness_to_alpha(Expr<float> roughness) noexcept;
+    [[nodiscard]] static Float2 roughness_to_alpha(Expr<float2> roughness) noexcept;
     [[nodiscard]] auto alpha() const noexcept { return _alpha; }
 };
 

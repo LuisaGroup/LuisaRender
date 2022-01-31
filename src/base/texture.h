@@ -81,6 +81,7 @@ public:
     [[nodiscard]] virtual Float4 evaluate(
         const Pipeline &pipeline, const Interaction &it,
         const Var<TextureHandle> &handle, Expr<float> time) const noexcept = 0;
+    [[nodiscard]] virtual uint channels() const noexcept { return 4u; }
 };
 
 using compute::PixelStorage;

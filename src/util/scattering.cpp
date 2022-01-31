@@ -107,6 +107,12 @@ Float TrowbridgeReitzDistribution::roughness_to_alpha(Expr<float> roughness) noe
            0.0171201f * x * x * x + 0.000640711f * x * x * x * x;
 }
 
+Float2 TrowbridgeReitzDistribution::roughness_to_alpha(Expr<float2> roughness) noexcept {
+    return compute::make_float2(
+        roughness_to_alpha(roughness.x),
+        roughness_to_alpha(roughness.y));
+}
+
 Float TrowbridgeReitzDistribution::D(Expr<float3> wh) const noexcept {
     using compute::isinf;
     auto tan2Theta = tan2_theta(wh);

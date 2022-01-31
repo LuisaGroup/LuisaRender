@@ -11,6 +11,7 @@ class ConstantValue final : public Texture {
 
 private:
     float4 _v;
+    uint _channels;
 
 private:
     [[nodiscard]] TextureHandle _encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint handle_tag) const noexcept override {
@@ -30,7 +31,8 @@ public:
                 v.size(), desc->source_location().string());
             v.resize(4u);
         }
-        for (auto i = 0u; i < v.size(); i++) { _v[i] = v[i]; }
+        _channels = v.size();
+        for (auto i = 0u; i < _channels; i++) { _v[i] = v[i]; }
         LUISA_INFO("Generic v: [{}, {}, {}, {}].", _v.x, _v.y, _v.z, _v.w);
     }
     [[nodiscard]] bool is_black() const noexcept override { return all(_v == 0.0f); }
@@ -41,6 +43,7 @@ public:
         return pipeline.buffer<float4>(handle->texture_id()).read(0u);
     }
     [[nodiscard]] Category category() const noexcept override { return Category::GENERIC; }
+    [[nodiscard]] uint channels() const noexcept override { return _channels; }
 };
 
 }// namespace luisa::render
