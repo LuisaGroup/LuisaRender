@@ -107,13 +107,13 @@ void MegakernelPathTracingInstance::_render_one_camera(
         beta *= camera_weight;
 
         auto ray = camera_ray;
-        auto Li = def(make_float4(0.0f));
+        auto Li = def(make_float3(0.0f));
         auto pdf_bsdf = def(0.0f);
         $for(depth, max_depth) {
 
             auto add_light_contrib = [&](const Light::Evaluation &eval) noexcept {
                 auto mis_weight = ite(depth == 0u, 1.0f, balanced_heuristic(pdf_bsdf, eval.pdf));
-                Li += ite(eval.pdf > 0.0f, beta * eval.L * mis_weight, make_float4(0.0f));
+                Li += swl.srgb(ite(eval.pdf > 0.0f, beta * eval.L * mis_weight, make_float4(0.0f)));
             };
 
             auto env_prob = env == nullptr ? 0.0f : env->selection_prob();
@@ -170,9 +170,10 @@ void MegakernelPathTracingInstance::_render_one_camera(
                     auto wi = light_sample.shadow_ray->direction();
                     auto [f, pdf] = material.evaluate(wi);
                     auto mis_weight = balanced_heuristic(light_sample.eval.pdf, pdf);
-                    Li += beta * mis_weight * ite(pdf > 0.0f, f, 0.0f) *
-                          abs(dot(it->shading().n(), wi)) *
-                          light_sample.eval.L / light_sample.eval.pdf;
+                    Li += swl.srgb(
+                        beta * mis_weight * ite(pdf > 0.0f, f, 0.0f) *
+                        abs(dot(it->shading().n(), wi)) *
+                        light_sample.eval.L / light_sample.eval.pdf);
                 };
 
                 // sample material
@@ -193,7 +194,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
                 beta *= 1.0f / q;
             };
         };
-        film->accumulate(pixel_id, swl.srgb(Li));
+        film->accumulate(pixel_id, Li);
         sampler->save_state();
     };
     auto render = pipeline.device().compile(render_kernel);

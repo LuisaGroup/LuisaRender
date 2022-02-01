@@ -44,7 +44,7 @@ public:
     [[nodiscard]] auto alpha() const noexcept { return _alpha; }
 };
 
-[[nodiscard]] Float fresnel_dielectric(Float cosThetaI, Float etaI, Float etaT) noexcept;
+[[nodiscard]] Float4 fresnel_dielectric(Float cosThetaI, Float4 etaI, Float4 etaT) noexcept;
 [[nodiscard]] Float4 fresnel_conductor(Float cosThetaI, Float4 etaI, Float4 etaT, Float4 k) noexcept;
 
 struct Fresnel {
@@ -66,10 +66,10 @@ public:
 class FresnelDielectric final : public Fresnel {
 
 private:
-    Float _eta_i, _eta_t;
+    Float4 _eta_i, _eta_t;
 
 public:
-    FresnelDielectric(Expr<float> etaI, Expr<float> etaT) noexcept
+    FresnelDielectric(Expr<float4> etaI, Expr<float4> etaT) noexcept
         : _eta_i{etaI}, _eta_t{etaT} {}
     [[nodiscard]] Float4 evaluate(Expr<float> cosThetaI) const noexcept override;
 };
@@ -129,16 +129,17 @@ private:
     // MicrofacetTransmission Private Data
     Float4 _t;
     const MicrofacetDistribution *_distribution;
-    Float _eta_a;
-    Float _eta_b;
+    Float4 _eta_a;
+    Float4 _eta_b;
     FresnelDielectric _fresnel;
 
 public:
     // MicrofacetTransmission Public Methods
     MicrofacetTransmission(
         Expr<float4> T, const MicrofacetDistribution *d,
-        Expr<float> etaA, Expr<float> etaB) noexcept
-        : _t{T}, _distribution{d}, _eta_a{etaA}, _eta_b{etaB}, _fresnel{etaA, etaB} {}
+        Expr<float4> etaA, Expr<float4> etaB) noexcept
+        : _t{T}, _distribution{d}, _eta_a{etaA},
+          _eta_b{etaB}, _fresnel{etaA, etaB} {}
     [[nodiscard]] Float4 evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
     [[nodiscard]] Float4 sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept override;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept override;
@@ -164,7 +165,7 @@ private:
     const MicrofacetDistribution *_distribution;
 
 private:
-    [[nodiscard]] Float Schlick(Expr<float> cosTheta) const noexcept;
+    [[nodiscard]] Float4 Schlick(Expr<float> cosTheta) const noexcept;
 
 public:
     FresnelBlend(Expr<float4> Rd, Expr<float4> Rs, const MicrofacetDistribution *distrib) noexcept
@@ -173,6 +174,5 @@ public:
     [[nodiscard]] Float4 sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept override;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept override;
 };
-
 
 }// namespace luisa::render

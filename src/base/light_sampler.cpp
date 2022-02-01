@@ -16,7 +16,7 @@ Light::Evaluation LightSampler::Instance::evaluate(
     _pipeline.decode_light(it.shape()->light_tag(), swl, time, [&](const Light::Closure &light) noexcept {
         eval = light.evaluate(it, p_from);
     });
-    eval.pdf *= pmf(it, swl);
+    eval.L *= 1.f / pmf(it, swl);
     return eval;
 }
 
@@ -28,7 +28,7 @@ Light::Sample LightSampler::Instance::sample(
     _pipeline.decode_light(selection.light_tag, swl, time, [&](const Light::Closure &light) noexcept {
         light_sample = light.sample(sampler, selection.instance_id, it_from);
     });
-    light_sample.eval.pdf *= selection.pmf;
+    light_sample.eval.L *= 1.f / selection.pmf;
     return light_sample;
 }
 

@@ -7,7 +7,7 @@
 
 namespace luisa::render {
 
-class ConstantValue final : public Texture {
+class ConstantGeneric final : public Texture {
 
 private:
     float4 _v;
@@ -21,7 +21,7 @@ private:
     }
 
 public:
-    ConstantValue(Scene *scene, const SceneNodeDesc *desc) noexcept
+    ConstantGeneric(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Texture{scene, desc} {
         auto v = desc->property_float_list_or_default("v");
         if (v.size() > 4u) [[unlikely]] {
@@ -31,9 +31,8 @@ public:
                 v.size(), desc->source_location().string());
             v.resize(4u);
         }
-        _channels = v.size();
-        for (auto i = 0u; i < _channels; i++) { _v[i] = v[i]; }
-        LUISA_INFO("Generic v: [{}, {}, {}, {}].", _v.x, _v.y, _v.z, _v.w);
+        _channels = std::max(v.size(), static_cast<size_t>(1u));
+        for (auto i = 0u; i < v.size(); i++) { _v[i] = v[i]; }
     }
     [[nodiscard]] bool is_black() const noexcept override { return all(_v == 0.0f); }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
@@ -48,4 +47,4 @@ public:
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::ConstantValue)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::ConstantGeneric)

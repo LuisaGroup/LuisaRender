@@ -102,7 +102,7 @@ private:
         auto wo_local = _interaction.wo_local();
         auto wi_local = _interaction.shading().world_to_local(wi);
         auto f = _blend.evaluate(wo_local, wi_local);
-        auto pdf = _blend.evaluate(wo_local, wi_local);
+        auto pdf = _blend.pdf(wo_local, wi_local);
         return {.f = f, .pdf = pdf};
     }
 

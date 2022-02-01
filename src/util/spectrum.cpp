@@ -90,7 +90,7 @@ SampledWavelengths SampledWavelengths::sample_visible(Expr<float> u) noexcept {
 
 Bool SampledWavelengths::secondary_terminated() const noexcept {
     using luisa::compute::all;
-    return all(_pdf == 0.0f);
+    return all(_pdf.yzw() == 0.0f);
 }
 
 void SampledWavelengths::terminate_secondary() noexcept {

@@ -94,7 +94,7 @@ public:
             _pipeline.buffer<AliasEntry>(alias_table_buffer_id),
             params.triangle_count, sampler.generate_1d());
         auto triangle = _pipeline.triangle(light_inst, triangle_id);
-        auto light_to_world_normal = transpose(inverse(light_to_world));
+        auto light_to_world_normal = transpose(inverse(make_float3x3(light_to_world)));
         auto uvw = sample_uniform_triangle(sampler.generate_2d());
         auto [p, ng, area] = _pipeline.surface_point_geometry(light_inst, light_to_world, triangle, uvw);
         auto [ns, tangent, uv] = _pipeline.surface_point_attributes(light_inst, light_to_world_normal, triangle, uvw);
@@ -105,7 +105,8 @@ public:
     }
 };
 
-luisa::unique_ptr<Light::Closure> DiffuseLight::decode(const Pipeline &pipeline, const SampledWavelengths &swl, Expr<float> time) const noexcept {
+luisa::unique_ptr<Light::Closure> DiffuseLight::decode(
+    const Pipeline &pipeline, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     return luisa::make_unique<DiffuseLightClosure>(pipeline, swl, time);
 }
 

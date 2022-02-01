@@ -32,7 +32,7 @@ Float3 reflect(Float3 wo, Float3 n) noexcept {
     return -wo + 2.0f * dot(wo, n) * n;
 }
 
-Float fresnel_dielectric(Float cosThetaI, Float etaI_in, Float etaT_in) noexcept {
+Float4 fresnel_dielectric(Float cosThetaI, Float4 etaI_in, Float4 etaT_in) noexcept {
     using namespace compute;
     cosThetaI = clamp(cosThetaI, -1.f, 1.f);
     // Potentially swap indices of refraction
@@ -43,18 +43,14 @@ Float fresnel_dielectric(Float cosThetaI, Float etaI_in, Float etaT_in) noexcept
     // Compute _cosThetaT_ using Snell's law
     auto sinThetaI = sqrt(max(0.f, 1.f - sqr(cosThetaI)));
     auto sinThetaT = etaI / etaT * sinThetaI;
-
+    auto cosThetaT = sqrt(max(0.f, 1.f - sqr(sinThetaT)));
+    auto Rparl = ((etaT * cosThetaI) - (etaI * cosThetaT)) /
+                 ((etaT * cosThetaI) + (etaI * cosThetaT));
+    auto Rperp = ((etaI * cosThetaI) - (etaT * cosThetaT)) /
+                 ((etaI * cosThetaI) + (etaT * cosThetaT));
+    auto fr = (Rparl * Rparl + Rperp * Rperp) * .5f;
     // Handle total internal reflection
-    auto fr = def(1.0f);
-    $if(sinThetaT < 1.f) {
-        auto cosThetaT = sqrt(max(0.f, 1.f - sqr(sinThetaT)));
-        auto Rparl = ((etaT * cosThetaI) - (etaI * cosThetaT)) /
-                     ((etaT * cosThetaI) + (etaI * cosThetaT));
-        auto Rperp = ((etaI * cosThetaI) - (etaT * cosThetaT)) /
-                     ((etaI * cosThetaI) + (etaT * cosThetaT));
-        fr = (Rparl * Rparl + Rperp * Rperp) * .5f;
-    };
-    return fr;
+    return ite(sinThetaT < 1.f, fr, 1.0f);
 }
 
 Float4 fresnel_conductor(Float cosThetaI, Float4 etai, Float4 etat, Float4 k) noexcept {
@@ -214,7 +210,7 @@ Float4 FresnelConductor::evaluate(Expr<float> cosThetaI) const noexcept {
 }
 
 Float4 FresnelDielectric::evaluate(Expr<float> cosThetaI) const noexcept {
-    return make_float4(fresnel_dielectric(cosThetaI, _eta_i, _eta_t));
+    return fresnel_dielectric(cosThetaI, _eta_i, _eta_t);
 }
 
 Float4 FresnelNoOp::evaluate(Expr<float>) const noexcept {
@@ -300,7 +296,7 @@ Float4 MicrofacetTransmission::evaluate(Expr<float3> wo, Expr<float3> wi) const 
     auto cosThetaO = cos_theta(wo);
     auto cosThetaI = cos_theta(wi);
     // Compute $\wh$ from $\wo$ and $\wi$ for microfacet transmission
-    auto eta = ite(cos_theta(wo) > 0.f, _eta_b / _eta_a, _eta_a / _eta_b);
+    auto eta = ite(cos_theta(wo) > 0.f, _eta_b / _eta_a, _eta_a / _eta_b)[0];// TODO
     auto wh = normalize(wo + wi * eta);
     wh *= compute::sign(cos_theta(wh));
     $if(!same_hemisphere(wo, wi) &
@@ -321,7 +317,7 @@ Float4 MicrofacetTransmission::sample(Expr<float3> wo, Float3 *wi, Expr<float2> 
     *p = 0.0f;
     auto f = def<float4>();
     auto wh = _distribution->sample_wh(wo, u);
-    auto eta = ite(cos_theta(wo) > 0.f, _eta_a / _eta_b, _eta_b / _eta_a);
+    auto eta = ite(cos_theta(wo) > 0.f, _eta_a / _eta_b, _eta_b / _eta_a)[0];// TODO
     $if(wo.z != 0 & dot(wo, wh) > 0.f & refract(wo, wh, eta, wi)) {
         *p = pdf(wo, *wi);
         f = evaluate(wo, *wi);
@@ -330,7 +326,7 @@ Float4 MicrofacetTransmission::sample(Expr<float3> wo, Float3 *wi, Expr<float2> 
 }
 
 Float MicrofacetTransmission::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {
-    auto eta = ite(cos_theta(wo) > 0.f, _eta_b / _eta_a, _eta_a / _eta_b);
+    auto eta = ite(cos_theta(wo) > 0.f, _eta_b / _eta_a, _eta_a / _eta_b)[0];// TODO
     auto wh = normalize(wo + wi * eta);
     auto p = def(0.f);
     $if(!same_hemisphere(wo, wi) & dot(wo, wh) * dot(wi, wh) < 0.f) {
@@ -367,7 +363,7 @@ Float4 OrenNayar::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
     return _r * inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta);
 }
 
-Float FresnelBlend::Schlick(Expr<float> cosTheta) const noexcept {
+Float4 FresnelBlend::Schlick(Expr<float> cosTheta) const noexcept {
     auto pow5 = [](Float v) { return sqr(sqr(v)) * v; };
     return _rs + pow5(1.f - cosTheta) * (1.f - _rs);
 }
