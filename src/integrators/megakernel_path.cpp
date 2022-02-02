@@ -97,8 +97,8 @@ void MegakernelPathTracingInstance::_render_one_camera(
         auto [filter_offset, filter_weight] = filter->sample(*sampler);
         pixel += filter_offset;
         beta *= filter_weight;
-
         auto swl = SampledWavelengths::sample_visible(sampler->generate_1d());
+        swl.terminate_secondary();
         auto [camera_ray, camera_weight] = camera->generate_ray(*sampler, pixel, time);
         if (!camera->node()->transform()->is_identity()) {
             camera_ray->set_origin(make_float3(camera_to_world * make_float4(camera_ray->origin(), 1.0f)));
@@ -172,7 +172,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
                     auto mis_weight = balanced_heuristic(light_sample.eval.pdf, pdf);
                     Li += swl.srgb(
                         beta * mis_weight * ite(pdf > 0.0f, f, 0.0f) *
-                        abs(dot(it->shading().n(), wi)) *
+                        abs_dot(it->shading().n(), wi) *
                         light_sample.eval.L / light_sample.eval.pdf);
                 };
 
@@ -182,7 +182,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
                 pdf_bsdf = eval.pdf;
                 beta *= ite(
                     eval.pdf > 0.0f,
-                    eval.f * abs(dot(it->shading().n(), wi)) / eval.pdf,
+                    eval.f * abs_dot(it->shading().n(), wi) / eval.pdf,
                     make_float4(0.0f));
             });
 

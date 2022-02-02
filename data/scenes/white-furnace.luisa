@@ -6,7 +6,7 @@ Film film : Color {
 Camera camera : Pinhole {
   position { 0, 0, 5 }
   fov { 27.8 }
-  spp { 4096 }
+  spp { 1024 }
   film { @film }
   file { "../renders/white-furnace-test.exr" }
 }
@@ -22,7 +22,7 @@ Integrator pt : MegaPath {
 Shape teapot : Mesh {
   file { "../meshes/utah-teapot.obj" }
   // surface : Lambert {}
-    surface : Plastic {
+    surface : Glass {
     Kd : ConstColor {
       color { 1.0, 0.71, 0.29 }
     }

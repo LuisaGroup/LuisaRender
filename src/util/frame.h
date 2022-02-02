@@ -44,13 +44,14 @@ using compute::max;
 using compute::sign;
 using compute::sin;
 using compute::sqrt;
+using compute::saturate;
 
 [[nodiscard]] inline auto sqr(auto x) noexcept { return x * x; }
 [[nodiscard]] inline Float abs_dot(Float3 u, Float3 v) noexcept { return abs(dot(u, v)); }
 [[nodiscard]] inline Float cos_theta(Float3 w) { return w.z; }
 [[nodiscard]] inline Float cos2_theta(Float3 w) { return sqr(w.z); }
 [[nodiscard]] inline Float abs_cos_theta(Float3 w) { return abs(w.z); }
-[[nodiscard]] inline Float sin2_theta(Float3 w) { return max(0.0f, 1.0f - cos2_theta(w)); }
+[[nodiscard]] inline Float sin2_theta(Float3 w) { return saturate(1.0f - cos2_theta(w)); }
 [[nodiscard]] inline Float sin_theta(Float3 w) { return sqrt(sin2_theta(w)); }
 [[nodiscard]] inline Float tan_theta(Float3 w) { return sin_theta(w) / cos_theta(w); }
 [[nodiscard]] inline Float tan2_theta(Float3 w) { return sin2_theta(w) / cos2_theta(w); }

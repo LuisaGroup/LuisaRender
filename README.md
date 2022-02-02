@@ -36,3 +36,12 @@ on [LuisaCompute](https://github.com/Mike-Leo-Smith/LuisaCompute).
     - Max Depth: 10
 
 ![CornellBoxLuisa](data/renders/cbox-image-light.png)
+
+- Glass Teapot
+    - Mega-Kernel Path Tracing
+    - Environment Mapping
+    - Roughness Glass Material
+    - Spectral Rendering
+    - Resolution: 1024x1024
+    - Max Depth: 16
+![EnvmapGlass](data/renders/envmap-glass.png)

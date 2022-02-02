@@ -16,15 +16,11 @@ Bool refract(Float3 wi, Float3 n, Float eta, Float3 *wt) noexcept {
     // Compute $\cos \theta_\roman{t}$ using Snell's law
     auto cosThetaI = dot(n, wi);
     auto sin2ThetaI = max(0.0f, 1.0f - sqr(cosThetaI));
-    auto sin2ThetaT = eta * eta * sin2ThetaI;
-
+    auto sin2ThetaT = sqr(eta) * sin2ThetaI;
+    auto cosThetaT = sqrt(saturate(1.f - sin2ThetaT));
+    *wt = -eta * wi + (eta * cosThetaI - cosThetaT) * n;
     // Handle total internal reflection for transmission
-    auto is_refract = sin2ThetaT < 1.0f;
-    *wt = ite(
-        is_refract,
-        -eta * wi + (eta * cosThetaI - sqrt(1.0f - sin2ThetaT)) * n,
-        0.0f);
-    return is_refract;
+    return sin2ThetaT < 1.f;
 }
 
 Float3 reflect(Float3 wo, Float3 n) noexcept {
@@ -32,9 +28,9 @@ Float3 reflect(Float3 wo, Float3 n) noexcept {
     return -wo + 2.0f * dot(wo, n) * n;
 }
 
-Float4 fresnel_dielectric(Float cosThetaI, Float4 etaI_in, Float4 etaT_in) noexcept {
+Float4 fresnel_dielectric(Float cosThetaI_in, Float4 etaI_in, Float4 etaT_in) noexcept {
     using namespace compute;
-    cosThetaI = clamp(cosThetaI, -1.f, 1.f);
+    auto cosThetaI = clamp(cosThetaI_in, -1.f, 1.f);
     // Potentially swap indices of refraction
     auto entering = cosThetaI > 0.f;
     auto etaI = ite(entering, etaI_in, etaT_in);
@@ -50,7 +46,7 @@ Float4 fresnel_dielectric(Float cosThetaI, Float4 etaI_in, Float4 etaT_in) noexc
                  ((etaI * cosThetaI) + (etaT * cosThetaT));
     auto fr = (Rparl * Rparl + Rperp * Rperp) * .5f;
     // Handle total internal reflection
-    return ite(sinThetaT < 1.f, fr, 1.0f);
+    return ite(sinThetaT < 1.f, fr, 1.f);
 }
 
 Float4 fresnel_conductor(Float cosThetaI, Float4 etai, Float4 etat, Float4 k) noexcept {
@@ -111,10 +107,10 @@ Float2 TrowbridgeReitzDistribution::roughness_to_alpha(Expr<float2> roughness) n
 
 Float TrowbridgeReitzDistribution::D(Expr<float3> wh) const noexcept {
     using compute::isinf;
-    auto tan2Theta = tan2_theta(wh);
-    auto cos4Theta = sqr(cos2_theta(wh));
     auto d = def(0.0f);
-    $if(!isinf(tan2Theta) & cos4Theta > 1e-16f) {
+    auto tan2Theta = tan2_theta(wh);
+    $if(!isinf(tan2Theta)) {
+        auto cos4Theta = sqr(cos2_theta(wh));
         auto e = tan2Theta * (sqr(cos_phi(wh) / _alpha.x) +
                               sqr(sin_phi(wh) / _alpha.y));
         d = 1.0f / (pi * _alpha.x * _alpha.y * cos4Theta * sqr(1.f + e));
@@ -124,13 +120,14 @@ Float TrowbridgeReitzDistribution::D(Expr<float3> wh) const noexcept {
 
 Float TrowbridgeReitzDistribution::Lambda(Expr<float3> w) const noexcept {
     using compute::isinf;
-    auto tan2Theta = tan2_theta(w);
     auto L = def(0.0f);
-    $if(!isinf(tan2Theta)) {
+    auto absTanTheta = abs(tan_theta(w));
+    $if(!isinf(absTanTheta)) {
         // Compute _alpha_ for direction _w_
-        auto alpha2 = sqr(cos_phi(w) * _alpha.x) +
-                      sqr(sin_phi(w) * _alpha.y);
-        L = (sqrt(1.f + alpha2 * tan2Theta) - 1.f) * .5f;
+        auto alpha2 = cos2_phi(w) * sqr(_alpha.x) +
+                      sin2_phi(w) * sqr(_alpha.y);
+        auto alpha2Tan2Theta = alpha2 * sqr(absTanTheta);
+        L = (-1.f + sqrt(1.f + alpha2Tan2Theta)) * .5f;
     };
     return L;
 }
@@ -143,24 +140,24 @@ Float TrowbridgeReitzDistribution::Lambda(Expr<float3> w) const noexcept {
     // special case (normal incidence)
     $if(cosTheta > .9999f) {
         auto r = sqrt(U.x / (1.f - U.x));
-        auto phi = 2.f * pi * U.y;
+        auto phi = (2.f * pi) * U.y;
         slope = r * make_float2(cos(phi), sin(phi));
     }
     $else {
-        auto sinTheta = sqrt(max(0.f, 1.f - cosTheta * cosTheta));
+        auto sinTheta = sqrt(saturate(1.f - sqr(cosTheta)));
         auto tanTheta = sinTheta / cosTheta;
         auto a = 1.f / tanTheta;
-        auto G1 = 2.f / (1.f + sqrt(1.f + 1.f / (a * a)));
+        auto G1 = 2.f / (1.f + sqrt(1.f + 1.f / sqr(a)));
 
         // sample slope_x
         auto A = 2.f * U.x / G1 - 1.f;
-        auto tmp = min(1.f / (A * A - 1.f), 1e10f);
+        auto tmp = min(1.f / (sqr(A) - 1.f), 1e10f);
         auto B = tanTheta;
-        auto D = sqrt(max(B * B * tmp * tmp - (A * A - B * B) * tmp, 0.f));
+        auto D = sqrt(max(sqr(B) * sqr(tmp) - (sqr(A) - sqr(B)) * tmp, 0.f));
         auto slope_x_1 = B * tmp - D;
         auto slope_x_2 = B * tmp + D;
         auto slope_x = ite(
-            A<0.f | slope_x_2> 1.f / tanTheta,
+            (A < 0.f) | (slope_x_2 > 1.f / tanTheta),
             slope_x_1, slope_x_2);
 
         // sample slope_y
@@ -168,7 +165,7 @@ Float TrowbridgeReitzDistribution::Lambda(Expr<float3> w) const noexcept {
         auto U2 = ite(U.y > .5f, 2.f * (U.y - .5f), 2.f * (.5f - U.y));
         auto z = (U2 * (U2 * (U2 * 0.27385f - 0.73369f) + 0.46341f)) /
                  (U2 * (U2 * (U2 * 0.093073f + 0.309420f) - 1.000000f) + 0.597999f);
-        auto slope_y = S * z * sqrt(1.f + slope_x * slope_x);
+        auto slope_y = S * z * sqrt(1.f + sqr(slope_x));
         slope = make_float2(slope_x, slope_y);
     };
     return slope;
@@ -185,7 +182,7 @@ Float TrowbridgeReitzDistribution::Lambda(Expr<float3> w) const noexcept {
         alpha.x * wi.x, alpha.y * wi.y, wi.z));
 
     // 2. simulate P22_{wi}(x_slope, y_slope, 1, 1)
-    auto slope = TrowbridgeReitzSample11(wiStretched.z, U);
+    auto slope = TrowbridgeReitzSample11(cos_theta(wiStretched), U);
 
     // 3. rotate
     slope = make_float2(
@@ -272,10 +269,9 @@ Float4 MicrofacetReflection::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u,
     auto wh = _distribution->sample_wh(wo, u);
     *wi = reflect(wo, wh);
     auto f = def<float4>();
-    $if(wo.z != 0.f & dot(wo, wh) > 0.f & same_hemisphere(wo, *wi)) {
+    $if(wo.z != 0.f & same_hemisphere(wo, wh) & same_hemisphere(wo, *wi)) {
         // Compute PDF of _wi_ for microfacet reflection
-        *p = _distribution->pdf(wo, wh) /
-             (4.f * dot(wo, wh));
+        *p = _distribution->pdf(wo, wh) / (4.f * dot(wo, wh));
         f = evaluate(wo, *wi);
     };
     return f;
@@ -296,9 +292,9 @@ Float4 MicrofacetTransmission::evaluate(Expr<float3> wo, Expr<float3> wi) const 
     auto cosThetaO = cos_theta(wo);
     auto cosThetaI = cos_theta(wi);
     // Compute $\wh$ from $\wo$ and $\wi$ for microfacet transmission
-    auto eta = ite(cos_theta(wo) > 0.f, _eta_b / _eta_a, _eta_a / _eta_b)[0];// TODO
+    auto eta = ite(cosThetaO > 0.f, _eta_b / _eta_a, _eta_a / _eta_b)[0];// TODO
     auto wh = normalize(wo + wi * eta);
-    wh *= compute::sign(cos_theta(wh));
+    wh = compute::sign(cos_theta(wh)) * wh;
     $if(!same_hemisphere(wo, wi) &
         cosThetaO != 0.f & cosThetaI != 0.f &
         dot(wo, wh) * dot(wi, wh) < 0.f) {
@@ -318,7 +314,8 @@ Float4 MicrofacetTransmission::sample(Expr<float3> wo, Float3 *wi, Expr<float2> 
     auto f = def<float4>();
     auto wh = _distribution->sample_wh(wo, u);
     auto eta = ite(cos_theta(wo) > 0.f, _eta_a / _eta_b, _eta_b / _eta_a)[0];// TODO
-    $if(wo.z != 0 & dot(wo, wh) > 0.f & refract(wo, wh, eta, wi)) {
+    auto refr = refract(wo, wh, eta, wi);
+    $if(wo.z != 0.f & dot(wo, wh) > 0.f & refr) {
         *p = pdf(wo, *wi);
         f = evaluate(wo, *wi);
     };
