@@ -46,3 +46,15 @@ on [LuisaCompute](https://github.com/Mike-Leo-Smith/LuisaCompute).
     - Max Depth: 16
 
 ![EnvmapGlass](data/renders/envmap-glass.png)
+
+- Plastic Teapot
+    - Mega-Kernel Path Tracing
+    - Environment Mapping
+    - Roughness Plastic Material
+    - Spectral Rendering
+    - Resolution: 1024x1024
+    - Max Depth: 16
+
+![EnvmapGlass](data/renders/envmap-plastic.png)
+
+
