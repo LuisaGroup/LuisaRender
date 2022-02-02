@@ -6,7 +6,7 @@ Film film : Color {
 Camera camera : Pinhole {
   position { 0, 0, 5 }
   fov { 60 }
-  spp { 65536 }
+  spp { 1024 }
   film { @film }
   file { "../renders/envmap.exr" }
   shutter_span { 0, 0 }
@@ -52,7 +52,7 @@ Shape teapot : Group {
       //   }
       // }
       two_sided { false }
-      surface : Plastic {
+      surface : Glass {
         Kr : ConstColor {
           // color { 1.0, 0.71, 0.29 }
         }
