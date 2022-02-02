@@ -6,9 +6,9 @@ Film film : Color {
 Camera camera : Pinhole {
   position { 0, 0, 5 }
   fov { 60 }
-  spp { 262144 }
+  spp { 16384 }
   film { @film }
-  file { "../renders/envmap.exr" }
+  file { "../renders/envmap-glass-BK7.exr" }
   shutter_span { 0, 0 }
   shutter_samples { 128 }
   shutter_weights { 0, 0.2, 0.5, 3.5, 0.5, 0.2, 0 }
@@ -57,15 +57,18 @@ Shape teapot : Group {
           // color { 1.0, 0.71, 0.29 }
         }
         Kt : ConstColor {
+          color { 0.2, 0.3, 0.9 }
           // color { 0.5, 0.5, 0.5 }
         }
         roughness : ConstGeneric {
           v { 0.05 }
         }
         remap_roughness { false }
-        eta : ConstGeneric {
-          v { 1.5, 1.52, 1.6 }
-        }
+        eta { 1.7 }
+        // eta { "Sapphire" }
+        // eta : ConstGeneric {
+        //   v { 1.5, 1.52, 1.6 }
+        // }
       }
     }
   }

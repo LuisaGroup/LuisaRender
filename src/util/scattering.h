@@ -19,6 +19,11 @@ using compute::Float4;
 [[nodiscard]] Bool refract(Float3 wi, Float3 n, Float eta, Float3 *wt) noexcept;
 [[nodiscard]] Float3 face_forward(Float3 v, Float3 n) noexcept;
 
+[[nodiscard]] Float3 spherical_direction(Float sinTheta, Float cosTheta, Float phi) noexcept;
+[[nodiscard]] Float3 spherical_direction(Float sinTheta, Float cosTheta, Float phi, Float3 x, Float3 y, Float3 z) noexcept;
+[[nodiscard]] Float spherical_theta(Float3 v) noexcept;
+[[nodiscard]] Float spherical_phi(Float3 v) noexcept;
+
 struct MicrofacetDistribution {
     virtual ~MicrofacetDistribution() noexcept = default;
     [[nodiscard]] Float G1(Expr<float3> w) const noexcept;
@@ -44,6 +49,7 @@ public:
     [[nodiscard]] auto alpha() const noexcept { return _alpha; }
 };
 
+[[nodiscard]] Float fresnel_dielectric(Float cosThetaI, Float etaI, Float etaT) noexcept;
 [[nodiscard]] Float4 fresnel_dielectric(Float cosThetaI, Float4 etaI, Float4 etaT) noexcept;
 [[nodiscard]] Float4 fresnel_conductor(Float cosThetaI, Float4 etaI, Float4 etaT, Float4 k) noexcept;
 
