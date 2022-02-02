@@ -40,7 +40,6 @@ public:
         }
     }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] bool is_black() const noexcept override { return _kd->is_black(); }
     [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint, const Shape *) const noexcept override {
         auto [buffer_view, buffer_id] = pipeline.arena_buffer<TextureHandle>(2u);
         std::array textures{
@@ -59,11 +58,13 @@ class MatteClosure final : public Surface::Closure {
 
 private:
     const Interaction &_interaction;
+    const SampledWavelengths &_swl;
     OrenNayar _oren_nayar;
 
 public:
-    MatteClosure(const Interaction &it, Expr<float4> albedo, Expr<float> sigma) noexcept
-        : _interaction{it}, _oren_nayar{albedo, sigma} {}
+    MatteClosure(const Interaction &it, const SampledWavelengths &swl,
+                 Expr<float4> albedo, Expr<float> sigma) noexcept
+        : _interaction{it}, _swl{swl}, _oren_nayar{albedo, sigma} {}
 
 private:
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
@@ -71,7 +72,7 @@ private:
         auto wi_local = _interaction.shading().world_to_local(wi);
         auto f = _oren_nayar.evaluate(wo_local, wi_local);
         auto pdf = _oren_nayar.pdf(wo_local, wi_local);
-        return {.f = f, .pdf = pdf};
+        return {.swl = _swl, .f = f, .pdf = pdf};
     }
 
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
@@ -81,7 +82,7 @@ private:
         auto pdf = def(0.f);
         auto f = _oren_nayar.sample(wo_local, &wi_local, u, &pdf);
         auto wi = _interaction.shading().local_to_world(wi_local);
-        return {.wi = wi, .eval = {.f = f, .pdf = pdf}};
+        return {.wi = wi, .eval = {.swl = _swl, .f = f, .pdf = pdf}};
     }
 };
 
@@ -91,7 +92,7 @@ luisa::unique_ptr<Surface::Closure> MatteSurface::decode(
     auto buffer = pipeline.buffer<TextureHandle>(it.shape()->surface_buffer_id());
     auto R = pipeline.evaluate_color_texture(buffer.read(0u), it, swl, time);
     auto sigma = pipeline.evaluate_generic_texture(buffer.read(1u), it, time).x;
-    return luisa::make_unique<MatteClosure>(it, R, clamp(sigma, 0.f, 90.f));
+    return luisa::make_unique<MatteClosure>(it, swl, R, clamp(sigma, 0.f, 90.f));
 }
 
 }// namespace luisa::render

@@ -30,7 +30,6 @@ public:
         }
     }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] bool is_black() const noexcept override { return _color->is_black(); }
     [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint, const Shape *) const noexcept override {
         auto [buffer_view, buffer_id] = pipeline.arena_buffer<TextureHandle>(1u);
         auto texture = pipeline.encode_texture(command_buffer, _color);
@@ -46,14 +45,14 @@ class LambertClosure final : public Surface::Closure {
 
 private:
     const Interaction &_interaction;
+    const SampledWavelengths &_swl;
     Float4 _f;
     Float _cos_wo;
     Bool _front_face;
 
 public:
-    LambertClosure(const Interaction &it, Expr<float4> albedo) noexcept
-        : _interaction{it},
-          _f{albedo * inv_pi},
+    LambertClosure(const Interaction &it, const SampledWavelengths &swl, Expr<float4> albedo) noexcept
+        : _interaction{it}, _swl{swl}, _f{albedo * inv_pi},
           _cos_wo{dot(it.wo(), it.shading().n())},
           _front_face{_cos_wo > 0.0f} {}
 
@@ -64,7 +63,7 @@ private:
         auto cos_wi = dot(n, wi);
         auto same_hemisphere = cos_wi * _cos_wo > 0.0f;
         auto pdf = ite(same_hemisphere & _front_face, cosine_hemisphere_pdf(abs(cos_wi)), 0.0f);
-        return {.f = _f, .pdf = std::move(pdf)};
+        return {.swl = _swl, .f = _f, .pdf = std::move(pdf)};
     }
 
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
@@ -72,7 +71,7 @@ private:
         auto pdf = ite(_front_face, cosine_hemisphere_pdf(wi_local.z), 0.0f);
         wi_local.z *= sign(_cos_wo);
         return {.wi = _interaction.shading().local_to_world(wi_local),
-                .eval = {.f = _f, .pdf = pdf}};
+                .eval = {.swl = _swl, .f = _f, .pdf = pdf}};
     }
 };
 
@@ -81,7 +80,7 @@ luisa::unique_ptr<Surface::Closure> LambertSurface::decode(
     const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto texture = pipeline.buffer<TextureHandle>(it.shape()->surface_buffer_id()).read(0u);
     auto R = pipeline.evaluate_color_texture(texture, it, swl, time);
-    return luisa::make_unique<LambertClosure>(it, std::move(R));
+    return luisa::make_unique<LambertClosure>(it, swl, std::move(R));
 }
 
 }// namespace luisa::render

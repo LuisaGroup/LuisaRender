@@ -60,7 +60,6 @@ public:
         }
     }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] bool is_black() const noexcept override { return false; }
     [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint, const Shape *) const noexcept override {
         auto [buffer_view, buffer_id] = pipeline.arena_buffer<Params>(1u);
         Params params{
@@ -90,12 +89,14 @@ class SubstrateClosure final : public Surface::Closure {
 
 private:
     const Interaction &_interaction;
+    const SampledWavelengths &_swl;
     TrowbridgeReitzDistribution _distribution;
     FresnelBlend _blend;
 
 public:
-    SubstrateClosure(const Interaction &it, Expr<float4> Kd, Expr<float4> Ks, Expr<float2> alpha) noexcept
-        : _interaction{it}, _distribution{alpha}, _blend{Kd, Ks, &_distribution} {}
+    SubstrateClosure(const Interaction &it, const SampledWavelengths &swl,
+                     Expr<float4> Kd, Expr<float4> Ks, Expr<float2> alpha) noexcept
+        : _interaction{it}, _swl{swl}, _distribution{alpha}, _blend{Kd, Ks, &_distribution} {}
 
 private:
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
@@ -103,7 +104,7 @@ private:
         auto wi_local = _interaction.shading().world_to_local(wi);
         auto f = _blend.evaluate(wo_local, wi_local);
         auto pdf = _blend.pdf(wo_local, wi_local);
-        return {.f = f, .pdf = pdf};
+        return {.swl = _swl, .f = f, .pdf = pdf};
     }
 
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
@@ -113,7 +114,7 @@ private:
         auto wi_local = def<float3>();
         auto f = _blend.sample(wo_local, &wi_local, u, &pdf);
         auto wi = _interaction.shading().local_to_world(wi_local);
-        return {.wi = wi, .eval = {.f = f, .pdf = pdf}};
+        return {.wi = wi, .eval = {.swl = _swl, .f = f, .pdf = pdf}};
     }
 };
 
@@ -129,7 +130,7 @@ luisa::unique_ptr<Surface::Closure> SubstrateSurface::decode(
         params.remap_roughness,
         TrowbridgeReitzDistribution::roughness_to_alpha(roughness),
         roughness);
-    return luisa::make_unique<SubstrateClosure>(it, Kd, Ks, alpha);
+    return luisa::make_unique<SubstrateClosure>(it, swl, Kd, Ks, alpha);
 }
 
 }// namespace luisa::render

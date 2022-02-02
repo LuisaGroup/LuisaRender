@@ -20,6 +20,7 @@ class Surface : public SceneNode {
 
 public:
     struct Evaluation {
+        SampledWavelengths swl;
         Float4 f;
         Float pdf;
     };
@@ -37,7 +38,7 @@ public:
 
 public:
     Surface(Scene *scene, const SceneNodeDesc *desc) noexcept;
-    [[nodiscard]] virtual bool is_black() const noexcept = 0;
+    [[nodiscard]] virtual bool is_null() const noexcept { return false; }
     [[nodiscard]] virtual uint /* bindless buffer id */ encode(
         Pipeline &pipeline, CommandBuffer &command_buffer,
         uint instance_id, const Shape *shape) const noexcept = 0;

@@ -77,7 +77,6 @@ public:
         }
     }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] bool is_black() const noexcept override { return false; }
     [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint, const Shape *) const noexcept override {
         auto [buffer_view, buffer_id] = pipeline.arena_buffer<Params>(1u);
         Params params{
@@ -110,20 +109,22 @@ class GlassClosure final : public Surface::Closure {
 
 private:
     const Interaction &_interaction;
+    const SampledWavelengths &_swl;
     TrowbridgeReitzDistribution _distribution;
     FresnelDielectric _fresnel;
     MicrofacetReflection _refl;
     MicrofacetTransmission _trans;
     Float _kr_ratio;
+    Bool _dispersion;
 
 public:
-    GlassClosure(const Interaction &it, Expr<float4> eta,
-                 Expr<float4> Kr, Expr<float4> Kt,
-                 Expr<float2> alpha, Expr<float> Kr_ratio) noexcept
-        : _interaction{it}, _distribution{alpha}, _fresnel{make_float4(1.0f), eta},
-          _refl{Kr, &_distribution, &_fresnel},
-          _trans{Kt, &_distribution, make_float4(1.f), eta},
-          _kr_ratio{Kr_ratio} {}
+    GlassClosure(
+        const Interaction &it, const SampledWavelengths &swl,
+        Expr<float4> eta, Expr<float4> Kr, Expr<float4> Kt,
+        Expr<float2> alpha, Expr<float> Kr_ratio) noexcept
+        : _interaction{it}, _swl{swl}, _distribution{alpha}, _fresnel{make_float4(1.0f), eta},
+          _refl{Kr, &_distribution, &_fresnel}, _trans{Kt, &_distribution, make_float4(1.f), eta},
+          _kr_ratio{Kr_ratio}, _dispersion{!(eta.x == eta.y & eta.y == eta.z & eta.z == eta.w)} {}
 
 private:
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
@@ -131,6 +132,7 @@ private:
         auto wi_local = _interaction.shading().world_to_local(wi);
         auto f = def<float4>();
         auto pdf = def(0.f);
+        auto swl = _swl;
         auto t = saturate(abs(_fresnel.evaluate(cos_theta(wo_local)).x) * _kr_ratio);
         $if(same_hemisphere(wo_local, wi_local)) {
             f = _refl.evaluate(wo_local, wi_local) / t;
@@ -139,8 +141,9 @@ private:
         $else {
             f = _trans.evaluate(wo_local, wi_local) / (1.f - t);
             pdf = _trans.pdf(wo_local, wi_local);
+            $if(_dispersion) { swl.terminate_secondary(); };
         };
-        return {.f = f, .pdf = pdf};
+        return {.swl = swl, .f = f, .pdf = pdf};
     }
 
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
@@ -151,16 +154,18 @@ private:
         auto wi_local = def(make_float3(0.0f, 0.0f, 1.0f));
         auto t = saturate(_fresnel.evaluate(cos_theta(wo_local)).x * _kr_ratio);
         auto lobe = cast<int>(u.x >= t);
+        auto swl = _swl;
         $if(lobe == 0u) {// Reflection
             u.x = u.x / t;
             f = _refl.sample(wo_local, &wi_local, u, &pdf) / t;
         }
-        $else {// Refraction
+        $else {// Transmission
             u.x = (u.x - t) / (1.f - t);
             f = _trans.sample(wo_local, &wi_local, u, &pdf) / (1.f - t);
+            $if(_dispersion) { swl.terminate_secondary(); };
         };
         auto wi = _interaction.shading().local_to_world(wi_local);
-        return {.wi = wi, .eval = {.f = f, .pdf = pdf}};
+        return {.wi = wi, .eval = {.swl = swl, .f = f, .pdf = pdf}};
     }
 };
 
@@ -192,7 +197,7 @@ luisa::unique_ptr<Surface::Closure> GlassSurface::decode(
         dot(c, make_float3(1.f, inv_ll.z, sqr(inv_ll.z))),
         dot(c, make_float3(1.f, inv_ll.w, sqr(inv_ll.w))));
     return luisa::make_unique<GlassClosure>(
-        it, eta, Kr, Kt, alpha, Kr_ratio);
+        it, swl, eta, Kr, Kt, alpha, Kr_ratio);
 }
 
 }// namespace luisa::render

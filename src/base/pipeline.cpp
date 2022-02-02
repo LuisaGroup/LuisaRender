@@ -135,7 +135,7 @@ void Pipeline::_process_shape(
         InstancedShape instance{};
         instance.buffer_id_base = mesh.buffer_id_base;
         if (two_sided) { instance.properties |= Shape::property_flag_two_sided; }
-        if (material != nullptr && !material->is_black()) {
+        if (material != nullptr && !material->is_null()) {
             if (shape->is_virtual()) {
                 LUISA_WARNING_WITH_LOCATION(
                     "Materials will be ignored on virtual shapes.");
@@ -145,7 +145,7 @@ void Pipeline::_process_shape(
                 instance.surface_buffer_id_and_tag = InstancedShape::encode_surface_buffer_id_and_tag(m.buffer_id, m.tag);
             }
         }
-        if (light != nullptr && !light->is_black()) {
+        if (light != nullptr && !light->is_null()) {
             if (shape->is_virtual() != light->is_virtual()) {
                 LUISA_WARNING_WITH_LOCATION(
                     "Non-virtual lights will be ignored on "

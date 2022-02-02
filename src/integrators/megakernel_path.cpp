@@ -98,7 +98,6 @@ void MegakernelPathTracingInstance::_render_one_camera(
         pixel += filter_offset;
         beta *= filter_weight;
         auto swl = SampledWavelengths::sample_visible(sampler->generate_1d());
-        swl.terminate_secondary();
         auto [camera_ray, camera_weight] = camera->generate_ray(*sampler, pixel, time);
         if (!camera->node()->transform()->is_identity()) {
             camera_ray->set_origin(make_float3(camera_to_world * make_float4(camera_ray->origin(), 1.0f)));
@@ -125,17 +124,17 @@ void MegakernelPathTracingInstance::_render_one_camera(
             $if(!it->valid()) {
                 if (env_prob > 0.0f) {
                     auto eval = env->evaluate(ray->direction(), env_to_world, swl, time);
-                    eval.pdf *= env_prob;
+                    eval.L /= env_prob;
                     add_light_contrib(eval);
                 }
                 $break;
             };
 
             // hit light
-            if (light_sampler != nullptr) {
+            if (light_sampler != nullptr && env_prob < 1.f) {
                 $if(it->shape()->has_light()) {
                     auto eval = light_sampler->evaluate(*it, ray->origin(), swl, time);
-                    eval.pdf *= 1.0f - env_prob;
+                    eval.L /= 1.0f - env_prob;
                     add_light_contrib(eval);
                 };
             }
@@ -168,9 +167,9 @@ void MegakernelPathTracingInstance::_render_one_camera(
                 // direct lighting
                 $if(light_sample.eval.pdf > 0.0f & !occluded) {
                     auto wi = light_sample.shadow_ray->direction();
-                    auto [f, pdf] = material.evaluate(wi);
+                    auto [new_swl, f, pdf] = material.evaluate(wi);
                     auto mis_weight = balanced_heuristic(light_sample.eval.pdf, pdf);
-                    Li += swl.srgb(
+                    Li += new_swl.srgb(
                         beta * mis_weight * ite(pdf > 0.0f, f, 0.0f) *
                         abs_dot(it->shading().n(), wi) *
                         light_sample.eval.L / light_sample.eval.pdf);
@@ -184,6 +183,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
                     eval.pdf > 0.0f,
                     eval.f * abs_dot(it->shading().n(), wi) / eval.pdf,
                     make_float4(0.0f));
+                swl = eval.swl;
             });
 
             // rr

@@ -77,7 +77,6 @@ public:
         }
     }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] bool is_black() const noexcept override { return false; }
     [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint, const Shape *) const noexcept override {
         auto [buffer_view, buffer_id] = pipeline.arena_buffer<Params>(1u);
         Params params{
@@ -110,6 +109,7 @@ class PlasticClosure final : public Surface::Closure {
 
 private:
     const Interaction &_interaction;
+    const SampledWavelengths &_swl;
     TrowbridgeReitzDistribution _distribution;
     FresnelDielectric _fresnel;
     LambertianReflection _lambert;
@@ -117,9 +117,10 @@ private:
     Float _kd_ratio;
 
 public:
-    PlasticClosure(const Interaction &it, Expr<float4> eta, Expr<float4> Kd, Expr<float4> Ks,
+    PlasticClosure(const Interaction &it, const SampledWavelengths &swl,
+                   Expr<float4> eta, Expr<float4> Kd, Expr<float4> Ks,
                    Expr<float2> alpha, Expr<float> Kd_ratio) noexcept
-        : _interaction{it}, _distribution{alpha}, _fresnel{eta, make_float4(1.0f)},
+        : _interaction{it}, _swl{swl}, _distribution{alpha}, _fresnel{eta, make_float4(1.0f)},
           _lambert{Kd}, _microfacet{Ks, &_distribution, &_fresnel}, _kd_ratio{Kd_ratio} {}
 
 private:
@@ -130,7 +131,7 @@ private:
         auto pdf_d = _lambert.pdf(wo_local, wi_local);
         auto f_s = _microfacet.evaluate(wo_local, wi_local);
         auto pdf_s = _microfacet.pdf(wo_local, wi_local);
-        return {.f = f_d + f_s, .pdf = lerp(pdf_s, pdf_d, _kd_ratio)};
+        return {.swl = _swl, .f = f_d + f_s, .pdf = lerp(pdf_s, pdf_d, _kd_ratio)};
     }
 
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
@@ -155,7 +156,7 @@ private:
             pdf = lerp(pdf, pdf_d, _kd_ratio);
         };
         auto wi = _interaction.shading().local_to_world(wi_local);
-        return {.wi = wi, .eval = {.f = f, .pdf = pdf}};
+        return {.wi = wi, .eval = {.swl = _swl, .f = f, .pdf = pdf}};
     }
 };
 
@@ -190,7 +191,7 @@ luisa::unique_ptr<Surface::Closure> PlasticSurface::decode(
         dot(c, make_float3(1.f, inv_ll.z, sqr(inv_ll.z))),
         dot(c, make_float3(1.f, inv_ll.w, sqr(inv_ll.w))));
     return luisa::make_unique<PlasticClosure>(
-        it, eta, scale * Kd, scale * Ks,
+        it, swl, eta, scale * Kd, scale * Ks,
         alpha, clamp(Kd_ratio, .1f, .9f));
 }
 

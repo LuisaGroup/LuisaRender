@@ -39,7 +39,7 @@ public:
             max(emission * scale, 0.0f));
         _params.radius = desc->property_float_or_default("radius", 0.0f);
     }
-    [[nodiscard]] bool is_black() const noexcept override { return _params.scale == 0.0f; }
+    [[nodiscard]] bool is_null() const noexcept override { return _params.scale == 0.0f; }
     [[nodiscard]] bool is_virtual() const noexcept override { return true; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint, const Shape *shape) const noexcept override {
