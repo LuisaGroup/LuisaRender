@@ -372,7 +372,7 @@ private:
 public:
     DisneySurfaceClosure(
         const Interaction &it, const SampledWavelengths &swl,
-        Expr<float4> color, Expr<float> metallic, Expr<float> eta_in, Expr<float> roughness,
+        Expr<float4> color, Expr<float> metallic_in, Expr<float> eta_in, Expr<float> roughness,
         Expr<float> specular_tint, Expr<float> anisotropic, Expr<float> sheen, Expr<float> sheen_tint,
         Expr<float> clearcoat, Expr<float> clearcoat_gloss, Expr<float> specular_trans_in,
         Expr<float> flatness, Expr<float> diffuse_trans, Expr<bool> thin) noexcept
@@ -380,6 +380,7 @@ public:
 
         constexpr auto black_threshold = 1e-6f;
         auto front_face = dot(_it.wo(), _it.shading().n()) > 0.f;
+        auto metallic = ite(front_face, metallic_in, 0.f);
         auto specular_trans = (1.f - metallic) * specular_trans_in;
         auto diffuse_weight = (1.f - metallic) * (1.f - specular_trans);
         auto dt = diffuse_trans * .5f;// 0: all diffuse is reflected -> 1, transmitted
@@ -455,6 +456,7 @@ public:
     [[nodiscard]] Surface::Evaluation evaluate_local(Float3 wo_local, Float3 wi_local) const noexcept {
         auto f = def(make_float4());
         auto pdf = def(0.f);
+        // TODO: performance test
         $if(same_hemisphere(wo_local, wi_local)) {// reflection
             f = _specular->evaluate(wo_local, wi_local) +
                 _diffuse->evaluate(wo_local, wi_local) +
@@ -492,6 +494,8 @@ public:
         return evaluate_local(wo_local, wi_local);
     }
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
+
+        // TODO: weighted sampling
 
         auto sel = sampler.generate_2d();
         auto index = sel.x * cast<float>(_lobe_count);

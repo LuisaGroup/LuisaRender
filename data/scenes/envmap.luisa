@@ -57,7 +57,7 @@ Shape teapot : Group {
           color { 1.0 }
         }
         roughness : ConstGeneric {
-          v { 0.5 }
+          v { 0.2 }
         }
         metallic : ConstGeneric {
           v { 0.5 }
