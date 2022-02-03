@@ -6,7 +6,7 @@ Film film : Color {
 Camera camera : Pinhole {
   position { 0, 0, 5 }
   fov { 60 }
-  spp { 1024 }
+  spp { 4096 }
   film { @film }
   file { "../renders/envmap-glass-BK7.exr" }
   shutter_span { 0, 0 }
@@ -60,10 +60,10 @@ Shape teapot : Group {
           v { 0.1 }
         }
         metallic : ConstGeneric {
-          v { 1 }
+          v { 0.5 }
         }
         specular_trans : ConstGeneric {
-          v { 0 }
+          v { 1 }
         }
         thin { false }
       }
