@@ -378,8 +378,8 @@ public:
         Expr<float> flatness, Expr<float> diffuse_trans, Expr<bool> thin) noexcept
         : _it{it}, _swl{swl}, _lobes{0u} {
 
+        constexpr auto black_threshold = 1e-6f;
         auto front_face = dot(_it.wo(), _it.shading().n()) > 0.f;
-        auto black_threshold = 1e-6f;
         auto specular_trans = (1.f - metallic) * specular_trans_in;
         auto diffuse_weight = (1.f - metallic) * (1.f - specular_trans);
         auto dt = diffuse_trans * .5f;// 0: all diffuse is reflected -> 1, transmitted
@@ -399,12 +399,12 @@ public:
         // retro-reflection
         auto Cretro = diffuse_weight * color;
         _retro = luisa::make_unique<DisneyRetro>(Cretro, roughness);
-        _lobes |= ite(front_face & any(Cretro > black_threshold), refl_retro, 0u);
+        _lobes |= ite((front_face | thin) & any(Cretro > black_threshold), refl_retro, 0u);
 
         // sheen
         auto Csheen = diffuse_weight * sheen * lerp(specular_tint, 1.f, Ctint);
         _sheen = luisa::make_unique<DisneySheen>(Csheen);
-        _lobes |= ite(front_face & any(Csheen > black_threshold), refl_sheen, 0u);
+        _lobes |= ite((front_face | thin) & any(Csheen > black_threshold), refl_sheen, 0u);
 
         // create the microfacet distribution for metallic and/or specular transmittance
         auto aspect = sqrt(1.f - anisotropic * .9f);
@@ -424,7 +424,7 @@ public:
         // clearcoat
         _clearcoat = luisa::make_unique<DisneyClearcoat>(
             clearcoat, lerp(.1f, .001f, clearcoat_gloss));
-        _lobes |= ite(front_face & clearcoat > black_threshold, refl_clearcoat, 0u);
+        _lobes |= ite((front_face | thin) & clearcoat > black_threshold, refl_clearcoat, 0u);
 
         // specular transmission
         auto T = specular_trans * sqrt(color);
