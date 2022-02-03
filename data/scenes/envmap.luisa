@@ -6,7 +6,7 @@ Film film : Color {
 Camera camera : Pinhole {
   position { 0, 0, 5 }
   fov { 60 }
-  spp { 16384 }
+  spp { 1024 }
   film { @film }
   file { "../renders/envmap-glass-BK7.exr" }
   shutter_span { 0, 0 }
@@ -52,24 +52,39 @@ Shape teapot : Group {
       //   }
       // }
       two_sided { false }
-      surface : Glass {
-        Kr : ConstColor {
-          // color { 1.0, 0.71, 0.29 }
-        }
-        Kt : ConstColor {
-          color { 0.2, 0.3, 0.9 }
-          // color { 0.5, 0.5, 0.5 }
+      surface : Disney {
+        color : ConstColor {
+          color { 1.0 }
         }
         roughness : ConstGeneric {
-          v { 0.05 }
+          v { 0.1 }
         }
-        remap_roughness { false }
-        eta { 1.7 }
-        // eta { "Sapphire" }
-        // eta : ConstGeneric {
-        //   v { 1.5, 1.52, 1.6 }
-        // }
+        metallic : ConstGeneric {
+          v { 1 }
+        }
+        specular_trans : ConstGeneric {
+          v { 0 }
+        }
+        thin { false }
       }
+      // surface : Glass {
+      //   Kr : ConstColor {
+      //     // color { 1.0, 0.71, 0.29 }
+      //   }
+      //   Kt : ConstColor {
+      //     color { 0.2, 0.3, 0.9 }
+      //     // color { 0.5, 0.5, 0.5 }
+      //   }
+      //   roughness : ConstGeneric {
+      //     v { 0.05 }
+      //   }
+      //   remap_roughness { false }
+      //   eta { 1.7 }
+      //   // eta { "Sapphire" }
+      //   // eta : ConstGeneric {
+      //   //   v { 1.5, 1.52, 1.6 }
+      //   // }
+      // }
     }
   }
   transform : Lerp {

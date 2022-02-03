@@ -13,9 +13,8 @@ namespace luisa::render {
 
 using namespace luisa::compute;
 
-
 inline auto builtin_ior_texture_desc(luisa::string name) noexcept {
-    static const auto nodes = []{
+    static const auto nodes = [] {
         auto make_desc = [](luisa::string name, float3 ior) noexcept {
             auto desc = luisa::make_shared<SceneNodeDesc>(
                 luisa::format("__glass_surface_builtin_ior_{}", name),
@@ -186,12 +185,12 @@ private:
         auto swl = _swl;
         auto t = saturate(abs(_fresnel.evaluate(cos_theta(wo_local)).x) * _kr_ratio);
         $if(same_hemisphere(wo_local, wi_local)) {
-            f = _refl.evaluate(wo_local, wi_local) / t;
-            pdf = _refl.pdf(wo_local, wi_local);
+            f = _refl.evaluate(wo_local, wi_local);
+            pdf = _refl.pdf(wo_local, wi_local) * t;
         }
         $else {
-            f = _trans.evaluate(wo_local, wi_local) / (1.f - t);
-            pdf = _trans.pdf(wo_local, wi_local);
+            f = _trans.evaluate(wo_local, wi_local);
+            pdf = _trans.pdf(wo_local, wi_local) * (1.f - t);
             $if(_dispersion) { swl.terminate_secondary(); };
         };
         return {.swl = swl, .f = f, .pdf = pdf};
@@ -208,11 +207,13 @@ private:
         auto swl = _swl;
         $if(lobe == 0u) {// Reflection
             u.x = u.x / t;
-            f = _refl.sample(wo_local, &wi_local, u, &pdf) / t;
+            f = _refl.sample(wo_local, &wi_local, u, &pdf);
+            pdf *= t;
         }
         $else {// Transmission
             u.x = (u.x - t) / (1.f - t);
-            f = _trans.sample(wo_local, &wi_local, u, &pdf) / (1.f - t);
+            f = _trans.sample(wo_local, &wi_local, u, &pdf);
+            pdf *= (1.f - t);
             $if(_dispersion) { swl.terminate_secondary(); };
         };
         auto wi = _interaction.shading().local_to_world(wi_local);
