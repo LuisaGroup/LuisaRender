@@ -65,6 +65,12 @@ Shape teapot : Group {
         specular_trans : ConstGeneric {
           v { 1 }
         }
+        clearcoat : ConstGeneric {
+          v { 1 }
+        }
+        clearcoat_gloss : ConstGeneric {
+          v { 1 }
+        }
         thin { false }
       }
       // surface : Glass {

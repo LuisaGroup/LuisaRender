@@ -452,7 +452,7 @@ public:
         _lobes |= ite(cc > black_threshold, refl_clearcoat, 0u);
 
         // clearcoat sampling weight
-        _sampling_weights[sampling_technique_clearcoat] = cc * F;
+        _sampling_weights[sampling_technique_clearcoat] = cc * FrSchlick(.04f, 1.f);
 
         // specular transmission
         auto T = specular_trans * sqrt(color);
@@ -491,7 +491,7 @@ public:
         for (auto i = 0u; i < max_sampling_techique_count; i++) {
             auto regularized_weight = ite(
                 (_lobes & sampling_techniques[i]) != 0u,
-                max(_sampling_weights[i], 1e-2f), 0.f);
+                sqrt(max(_sampling_weights[i], 1e-3f)), 0.f);
             _sampling_weights[i] = regularized_weight;
             sum_weights += regularized_weight;
         }
