@@ -117,14 +117,7 @@ Float MicrofacetDistribution::pdf(Expr<float3> wo, Expr<float3> wh) const noexce
 TrowbridgeReitzDistribution::TrowbridgeReitzDistribution(Expr<float2> alpha) noexcept
     : _alpha{compute::max(alpha, 1e-3f)} {}
 
-Float TrowbridgeReitzDistribution::roughness_to_alpha(Expr<float> roughness) noexcept {
-    using compute::log;
-    using compute::max;
-    auto x = log(max(roughness, 1e-3f));
-    return 1.62142f + 0.819955f * x + 0.1734f * x * x +
-           0.0171201f * x * x * x + 0.000640711f * x * x * x * x;
-}
-
+Float TrowbridgeReitzDistribution::roughness_to_alpha(Expr<float> roughness) noexcept { return sqr(roughness); }
 Float2 TrowbridgeReitzDistribution::roughness_to_alpha(Expr<float2> roughness) noexcept {
     return compute::make_float2(
         roughness_to_alpha(roughness.x),

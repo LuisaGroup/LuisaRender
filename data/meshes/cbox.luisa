@@ -71,6 +71,13 @@ Surface cbox-brick : Matte {
   }
 }
 
+Surface cbox-metal : Metal {
+  eta { "Au" }
+  roughness : ConstGeneric {
+    v { 0.2 }
+  }
+}
+
 Shape cbox-back-wall : Mesh {
   file { "cbox-parts/back-wall.obj" }
   surface { @cbox-white }
@@ -78,7 +85,7 @@ Shape cbox-back-wall : Mesh {
 
 Shape cbox-tall-box : Mesh {
   file { "cbox-parts/tall-box.obj" }
-  surface { @cbox-white }
+  surface { @cbox-metal }
 }
 
 Shape cbox-short-box : Mesh {

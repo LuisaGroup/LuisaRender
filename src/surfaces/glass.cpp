@@ -77,7 +77,7 @@ public:
               "Kt", SceneNodeDesc::shared_default_texture("ConstColor")))},
           _roughness{scene->load_texture(desc->property_node_or_default(
               "roughness", SceneNodeDesc::shared_default_texture("ConstGeneric")))},
-          _remap_roughness{desc->property_bool_or_default("remap_roughness", false)} {
+          _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {
         if (_kr->category() != Texture::Category::COLOR) [[unlikely]] {
             LUISA_ERROR(
                 "Non-color textures are not "
@@ -230,7 +230,7 @@ luisa::unique_ptr<Surface::Closure> GlassSurface::decode(
     auto r = pipeline.evaluate_generic_texture(params.roughness, it, time);
     auto e = pipeline.evaluate_generic_texture(params.eta, it, time);
     auto eta_basis = ite(params.dispersion, e.xyz(), ite(e.x == 0.f, 1.5f, e.x));
-    auto roughness = sqr(ite(params.isotropic, r.xx(), r.xy()));
+    auto roughness = ite(params.isotropic, r.xx(), r.xy());
     auto alpha = ite(
         params.remap_roughness,
         TrowbridgeReitzDistribution::roughness_to_alpha(roughness),
