@@ -344,12 +344,27 @@ public:
     static constexpr auto refl_fake_ss = 1u << 1u;
     static constexpr auto refl_retro = 1u << 2u;
     static constexpr auto refl_sheen = 1u << 3u;
+    static constexpr auto refl_diffuse_like =
+        refl_diffuse | refl_fake_ss |
+        refl_retro | refl_sheen;
     static constexpr auto refl_specular = 1u << 4u;
     static constexpr auto refl_clearcoat = 1u << 5u;
     static constexpr auto trans_specular = 1u << 6u;
     static constexpr auto trans_thin_specular = 1u << 7u;
     static constexpr auto trans_thin_diffuse = 1u << 8u;
-    static constexpr auto max_lobe_count = 9u;
+
+public:
+    static constexpr std::array sampling_techniques{
+        refl_diffuse_like, refl_specular, refl_clearcoat,
+        trans_specular, trans_thin_specular, trans_thin_diffuse};
+    static constexpr auto sampling_technique_diffuse = 0u;
+    static constexpr auto sampling_technique_specular = 1u;
+    static constexpr auto sampling_technique_clearcoat = 2u;
+    static constexpr auto sampling_technique_specular_trans = 3u;
+    static constexpr auto sampling_technique_thin_specular_trans = 4u;
+    static constexpr auto sampling_technique_thin_diffuse_trans = 5u;
+    static constexpr auto max_sampling_techique_count = 6u;
+    static_assert(max_sampling_techique_count == std::size(sampling_techniques));
 
 private:
     const Interaction &_it;
@@ -367,7 +382,7 @@ private:
     luisa::unique_ptr<MicrofacetTransmission> _thin_spec_trans;
     luisa::unique_ptr<LambertianTransmission> _diff_trans;
     UInt _lobes;
-    UInt _lobe_count;
+    Float _sampling_weights[max_sampling_techique_count];
 
 public:
     DisneySurfaceClosure(
@@ -379,7 +394,8 @@ public:
         : _it{it}, _swl{swl}, _lobes{0u} {
 
         constexpr auto black_threshold = 1e-6f;
-        auto front_face = dot(_it.wo(), _it.shading().n()) > 0.f;
+        auto cos_theta_o = dot(_it.wo(), _it.shading().n());
+        auto front_face = cos_theta_o > 0.f;
         auto metallic = ite(front_face, metallic_in, 0.f);
         auto specular_trans = (1.f - metallic) * specular_trans_in;
         auto diffuse_weight = (1.f - metallic) * (1.f - specular_trans);
@@ -398,14 +414,17 @@ public:
         _lobes |= ite(any(Css > black_threshold), refl_fake_ss, 0u);
 
         // retro-reflection
-        auto Cretro = diffuse_weight * color;
+        auto Cretro = ite(front_face | thin, diffuse_weight * color, 0.f);
         _retro = luisa::make_unique<DisneyRetro>(Cretro, roughness);
-        _lobes |= ite((front_face | thin) & any(Cretro > black_threshold), refl_retro, 0u);
+        _lobes |= ite(any(Cretro > black_threshold), refl_retro, 0u);
 
         // sheen
-        auto Csheen = diffuse_weight * sheen * lerp(specular_tint, 1.f, Ctint);
+        auto Csheen = ite(front_face | thin, diffuse_weight * sheen * lerp(specular_tint, 1.f, Ctint), 0.f);
         _sheen = luisa::make_unique<DisneySheen>(Csheen);
-        _lobes |= ite((front_face | thin) & any(Csheen > black_threshold), refl_sheen, 0u);
+        _lobes |= ite(any(Csheen > black_threshold), refl_sheen, 0u);
+
+        // diffuse sampling weight
+        _sampling_weights[sampling_technique_diffuse] = swl.cie_y(Cdiff + Css + Cretro + Csheen);
 
         // create the microfacet distribution for metallic and/or specular transmittance
         auto aspect = sqrt(1.f - anisotropic * .9f);
@@ -422,10 +441,18 @@ public:
             make_float4(1.f), _distrib.get(), _fresnel.get());
         _lobes |= refl_specular;// always consider the specular lobe
 
+        // specular reflection sampling weight
+        auto F = saturate(_fresnel->evaluate(cos_theta_o).x);
+        _sampling_weights[sampling_technique_specular] = swl.cie_y(Cspec0) * F;
+
         // clearcoat
-        _clearcoat = luisa::make_unique<DisneyClearcoat>(
-            clearcoat, lerp(.1f, .001f, clearcoat_gloss));
-        _lobes |= ite((front_face | thin) & clearcoat > black_threshold, refl_clearcoat, 0u);
+        auto cc = ite(front_face | thin, clearcoat, 0.f);
+        auto gloss = lerp(.1f, .001f, clearcoat_gloss);
+        _clearcoat = luisa::make_unique<DisneyClearcoat>(cc, gloss);
+        _lobes |= ite(cc > black_threshold, refl_clearcoat, 0u);
+
+        // clearcoat sampling weight
+        _sampling_weights[sampling_technique_clearcoat] = cc * F;
 
         // specular transmission
         auto T = specular_trans * sqrt(color);
@@ -433,6 +460,9 @@ public:
         _spec_trans = luisa::make_unique<MicrofacetTransmission>(
             Cst, _distrib.get(), make_float4(1.f), make_float4(eta));
         _lobes |= ite(any(Cst > black_threshold), trans_specular, 0u);
+
+        // specular transmission sampling weight
+        _sampling_weights[sampling_technique_specular_trans] = (1.f - F) * swl.cie_y(Cst);
 
         // thin specular transmission
         auto rscaled = (.65f * eta - .35f) * roughness;
@@ -445,13 +475,28 @@ public:
             Ctst, _thin_distrib.get(), make_float4(1.f), make_float4(eta));
         _lobes |= ite(any(Ctst > black_threshold), trans_thin_specular, 0u);
 
+        // thin specular transmission sampling weight
+        _sampling_weights[sampling_technique_thin_specular_trans] = (1.f - F) * swl.cie_y(Ctst);
+
         // thin diffuse transmission
         auto Cdt = ite(thin, dt * color, 0.f);
         _diff_trans = luisa::make_unique<LambertianTransmission>(dt * color);
         _lobes |= ite(any(Cdt > black_threshold), trans_thin_diffuse, 0u);
 
-        // lobe count
-        _lobe_count = popcount(_lobes);
+        // thin diffuse transmission sampling weight
+        _sampling_weights[sampling_technique_thin_diffuse_trans] = swl.cie_y(Cdt);
+
+        // normalize sampling weights
+        auto sum_weights = def(0.f);
+        for (auto i = 0u; i < max_sampling_techique_count; i++) {
+            auto regularized_weight = ite(
+                (_lobes & sampling_techniques[i]) != 0u,
+                max(_sampling_weights[i], 1e-2f), 0.f);
+            _sampling_weights[i] = regularized_weight;
+            sum_weights += regularized_weight;
+        }
+        auto inv_sum_weights = 1.f / sum_weights;
+        for (auto &s : _sampling_weights) { s *= inv_sum_weights; }
     }
     [[nodiscard]] Surface::Evaluation evaluate_local(Float3 wo_local, Float3 wi_local) const noexcept {
         auto f = def(make_float4());
@@ -462,31 +507,33 @@ public:
                 _diffuse->evaluate(wo_local, wi_local) +
                 _fake_ss->evaluate(wo_local, wi_local) +
                 _retro->evaluate(wo_local, wi_local) +
-                _sheen->evaluate(wo_local, wi_local) +
-                _clearcoat->evaluate(wo_local, wi_local);
-            pdf = _specular->pdf(wo_local, wi_local) +
-                  ite((_lobes & refl_diffuse) != 0u, _diffuse->pdf(wo_local, wi_local), 0.f) +
-                  ite((_lobes & refl_fake_ss) != 0u, _fake_ss->pdf(wo_local, wi_local), 0.f) +
-                  ite((_lobes & refl_retro) != 0u, _retro->pdf(wo_local, wi_local), 0.f) +
-                  ite((_lobes & refl_sheen) != 0u, _sheen->pdf(wo_local, wi_local), 0.f) +
-                  ite((_lobes & refl_clearcoat) != 0u, _clearcoat->pdf(wo_local, wi_local), 0.f);
+                _sheen->evaluate(wo_local, wi_local);
+            pdf = _sampling_weights[sampling_technique_specular] *
+                      _specular->pdf(wo_local, wi_local) +
+                  _sampling_weights[sampling_technique_diffuse] *
+                      _diffuse->pdf(wo_local, wi_local);
+            $if((_lobes & refl_clearcoat) != 0u) {
+                f += _clearcoat->evaluate(wo_local, wi_local);
+                pdf += _sampling_weights[sampling_technique_clearcoat] *
+                       _clearcoat->pdf(wo_local, wi_local);
+            };
         }
         $else {// transmission
-            f = _diff_trans->evaluate(wo_local, wi_local);
-            pdf = ite(
-                (_lobes & trans_thin_diffuse) != 0u,
-                _diff_trans->pdf(wo_local, wi_local), 0.f);
             $if((_lobes & trans_specular) != 0u) {
-                f += _spec_trans->evaluate(wo_local, wi_local);
-                pdf += _spec_trans->pdf(wo_local, wi_local);
-            };
-            $if((_lobes & trans_thin_specular) != 0u) {
-                f += _thin_spec_trans->evaluate(wo_local, wi_local);
-                pdf += _thin_spec_trans->pdf(wo_local, wi_local);
+                f = _spec_trans->evaluate(wo_local, wi_local);
+                pdf = _sampling_weights[sampling_technique_specular_trans] *
+                      _spec_trans->pdf(wo_local, wi_local);
+            }
+            $else {
+                f = _diff_trans->evaluate(wo_local, wi_local) +
+                    _thin_spec_trans->evaluate(wo_local, wi_local);
+                pdf = _sampling_weights[sampling_technique_thin_diffuse_trans] *
+                          _diff_trans->pdf(wo_local, wi_local) +
+                      _sampling_weights[sampling_technique_thin_specular_trans] *
+                          _thin_spec_trans->pdf(wo_local, wi_local);
             };
         };
-        auto inv_lobe_count = 1.f / cast<float>(_lobe_count);
-        return {.swl = _swl, .f = f, .pdf = pdf * inv_lobe_count};
+        return {.swl = _swl, .f = f, .pdf = pdf};
     }
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
         auto wo_local = _it.wo_local();
@@ -497,27 +544,29 @@ public:
 
         // TODO: weighted sampling
 
-        auto sel = sampler.generate_2d();
-        auto index = sel.x * cast<float>(_lobe_count);
-        auto u = make_float2(fract(index), sel.y);
-
-        auto count = def(0.f);
+        auto u = sampler.generate_2d();
         auto sampling_tech = def(0u);
-        for (auto i = 0u; i < max_lobe_count; i++) {
-            auto bit = 1u << i;
-            auto has_lobe = (_lobes & bit) != 0u;
-            sampling_tech = ite(has_lobe & (index >= count), i, sampling_tech);
-            count = ite(has_lobe, count + 1.f, count);
+        auto sum_weights = def(0.f);
+        auto ux_remapped = def(0.f);
+        auto lower_sum = def(0.f);
+        auto upper_sum = def(1.f);
+        for (auto i = 0u; i < max_sampling_techique_count; i++) {
+            auto sel = (_lobes & sampling_techniques[i]) != 0u & (u.x > sum_weights);
+            sampling_tech = ite(sel, i, sampling_tech);
+            lower_sum = ite(sel, sum_weights, lower_sum);
+            sum_weights += _sampling_weights[i];
+            upper_sum = ite(sel, sum_weights, upper_sum);
         }
+        u.x = saturate((u.x - lower_sum) / (upper_sum - lower_sum));
 
         // sample
         auto wo_local = _it.wo_local();
         auto wi_local = def(make_float3(0.f, 0.f, 1.f));
-        std::array<const BxDF *, max_lobe_count> lobes{
-            _diffuse.get(), _fake_ss.get(), _retro.get(), _sheen.get(), _specular.get(),
-            _clearcoat.get(), _spec_trans.get(), _thin_spec_trans.get(), _diff_trans.get()};
+        std::array<const BxDF *, max_sampling_techique_count> lobes{
+            _diffuse.get(), _specular.get(), _clearcoat.get(),
+            _spec_trans.get(), _thin_spec_trans.get(), _diff_trans.get()};
         $switch(sampling_tech) {
-            for (auto i = 0u; i < max_lobe_count; i++) {
+            for (auto i = 0u; i < max_sampling_techique_count; i++) {
                 $case(i) {
                     auto pdf = def<float>();
                     static_cast<void>(lobes[i]->sample(wo_local, &wi_local, u, &pdf));
