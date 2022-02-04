@@ -45,7 +45,7 @@ Shape teapot : Mesh {
 
 Shape sphere : Mesh {
   file { "../meshes/sphere.obj" }
-  surface : Lambert {}
+  surface : Matte {}
 }
 
 render {
