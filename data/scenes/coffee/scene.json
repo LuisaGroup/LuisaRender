@@ -1,0 +1,354 @@
+{
+    "media": [],
+    "bsdfs": [
+        {
+            "name": "Plastic_Orange",
+            "albedo": [
+                1.0,
+                0.37867626547813416,
+                0.013473397120833397
+            ],
+            "type": "plastic",
+            "ior": 1.5,
+            "thickness": 1.0,
+            "sigma_a": 0.0
+        },
+        {
+            "name": "Plastic_Black",
+            "albedo": 0.00631,
+            "type": "rough_plastic",
+            "ior": 1.5,
+            "thickness": 1.0,
+            "sigma_a": 0.0,
+            "distribution": "ggx",
+            "roughness": 0.1
+        },
+        {
+            "name": "Glass",
+            "albedo": 1.0,
+            "type": "dielectric",
+            "ior": 1.5,
+            "enable_refraction": true
+        },
+        {
+            "name": "Metal",
+            "albedo": 1.0,
+            "type": "mirror"
+        },
+        {
+            "name": "Floor",
+            "albedo": 0.578596,
+            "type": "plastic",
+            "ior": 1.5,
+            "thickness": 1.0,
+            "sigma_a": 0.0
+        }
+    ],
+    "primitives": [
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh013.wo3",
+            "bsdf": "Plastic_Black"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh008.wo3",
+            "bsdf": "Plastic_Black"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh010.wo3",
+            "bsdf": "Glass"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh009.wo3",
+            "bsdf": "Plastic_Orange"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh015.wo3",
+            "bsdf": "Metal"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh012.wo3",
+            "bsdf": "Plastic_Orange"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh016.wo3",
+            "bsdf": "Plastic_Orange"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh017.wo3",
+            "bsdf": "Plastic_Black"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh018.wo3",
+            "bsdf": "Plastic_Black"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh019.wo3",
+            "bsdf": "Plastic_Black"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh007.wo3",
+            "bsdf": "Plastic_Black"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh006.wo3",
+            "bsdf": "Plastic_Orange"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh005.wo3",
+            "bsdf": "Plastic_Black"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh003.wo3",
+            "bsdf": "Plastic_Black"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh002.wo3",
+            "bsdf": "Metal"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh001.wo3",
+            "bsdf": "Plastic_Orange"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh011.wo3",
+            "bsdf": "Plastic_Black"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh000.wo3",
+            "bsdf": "Plastic_Orange"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh014.wo3",
+            "bsdf": "Plastic_Black"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh004.wo3",
+            "bsdf": "Floor"
+        },
+        {
+            "transform": {
+                "position": [
+                    -0.2779231071472168,
+                    0.22527095675468445,
+                    0.16372351348400116
+                ],
+                "scale": [
+                    0.385150671005249,
+                    0.17287249863147736,
+                    0.44884392619132996
+                ],
+                "rotation": [
+                    -89.99999237060547,
+                    179.99998474121094,
+                    115.00001525878906
+                ]
+            },
+            "emission": 2.0,
+            "type": "quad",
+            "bsdf": {
+                "albedo": 1.0,
+                "type": "null"
+            }
+        },
+        {
+            "transform": {
+                "position": [
+                    0.3229469954967499,
+                    0.25175952911376953,
+                    0.04627799987792969
+                ],
+                "scale": [
+                    0.4488450288772583,
+                    0.16401799023151398,
+                    0.3654222786426544
+                ],
+                "rotation": [
+                    0.0,
+                    0.7131163477897644,
+                    90.0
+                ]
+            },
+            "emission": 2.0,
+            "type": "quad",
+            "bsdf": {
+                "albedo": 1.0,
+                "type": "null"
+            }
+        },
+        {
+            "transform": {
+                "position": [
+                    0.0,
+                    0.503849983215332,
+                    0.03724350035190582
+                ],
+                "scale": [
+                    0.4602559506893158,
+                    0.2118360549211502,
+                    0.46025699377059937
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    -179.99998474121094
+                ]
+            },
+            "emission": 2.0,
+            "type": "quad",
+            "bsdf": {
+                "albedo": 1.0,
+                "type": "null"
+            }
+        }
+    ],
+    "camera": {
+        "tonemap": "filmic",
+        "resolution": [
+            800,
+            1000
+        ],
+        "reconstruction_filter": "tent",
+        "transform": {
+            "position": [
+                -0.0029600381385535,
+                0.19830328226089478,
+                0.828150749206543
+            ],
+            "look_at": [
+                0.002896534511819482,
+                0.16660931706428528,
+                0.022717338055372238
+            ],
+            "up": [
+                0.0,
+                1.0,
+                0.0
+            ]
+        },
+        "type": "pinhole",
+        "fov": 25.0
+    },
+    "integrator": {
+        "min_bounces": 0,
+        "max_bounces": 16,
+        "enable_consistency_checks": false,
+        "enable_two_sided_shading": true,
+        "type": "path_tracer",
+        "enable_light_sampling": true,
+        "enable_volume_light_sampling": true
+    },
+    "renderer": {
+        "overwrite_output_files": true,
+        "adaptive_sampling": true,
+        "enable_resume_render": false,
+        "stratified_sampler": true,
+        "scene_bvh": true,
+        "spp": 64,
+        "spp_step": 16,
+        "checkpoint_interval": "0",
+        "timeout": "0",
+        "output_file": "coffee.png",
+        "resume_render_file": "TungstenRenderState.dat",
+        "hdr_output_file": "coffee.exr"
+    }
+}

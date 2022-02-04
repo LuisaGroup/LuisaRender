@@ -14,7 +14,7 @@ private:
 public:
     MatrixTransform(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Transform{scene, desc}, _matrix{make_float4x4(1.0f)} {
-        auto m = desc->property_float_list_or_default("transform");
+        auto m = desc->property_float_list_or_default("m");
         if (m.size() == 16u) {
             if (!all(make_float4(m[12], m[13], m[14], m[15]) ==
                      make_float4(0.0f, 0.0f, 0.0f, 1.0f))) {

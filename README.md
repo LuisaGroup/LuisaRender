@@ -5,7 +5,7 @@ on [LuisaCompute](https://github.com/Mike-Leo-Smith/LuisaCompute).
 
 # Demo
 
-- Cornell Box with Bunnies.
+- Cornell Box with Bunnies
     - Mega-Kernel Path Tracing
     - Multiple-Level Instancing
     - Lambert & (Fake) Mirror Materials
@@ -16,7 +16,7 @@ on [LuisaCompute](https://github.com/Mike-Leo-Smith/LuisaCompute).
 
 ![CornellBoxBunny](data/renders/cbox-bunnies.png)
 
-- Rotating Teapot with Environment Mapping.
+- Rotating Teapot with Environment Mapping
     - Mega-Kernel Path Tracing
     - Motion Blur
     - (Fake) Mirror Materials
@@ -27,7 +27,7 @@ on [LuisaCompute](https://github.com/Mike-Leo-Smith/LuisaCompute).
 
 ![EnvironmentMapping](data/renders/envmap.png)
 
-- Luisa Illuminating the Render.
+- Luisa Illuminating the Render
     - Mega-Kernel Path Tracing
     - Textured Diffuse Area Light
     - Lambert Materials
@@ -57,4 +57,12 @@ on [LuisaCompute](https://github.com/Mike-Leo-Smith/LuisaCompute).
 
 ![EnvmapGlass](data/renders/envmap-plastic.png)
 
+- Coffee (from [Rendering Resources](https://benedikt-bitterli.me/resources/))
+  - Mega-Kernel Path Tracing
+  - Diffuse Area Lights
+  - Plastic, Disney, Glass, and Mirror Materials
+  - Spectral Rendering
+  - Resolution: 800x1000
+  - Max Depth: 10
 
+![Coffee](data/scenes/coffee/color.png)
