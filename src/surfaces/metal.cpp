@@ -334,9 +334,9 @@ public:
                     "Invalid eta list size: {}. [{}]",
                     eta.size(), desc->source_location().string());
             }
-            luisa::vector<float> lambda(eta.size());
-            luisa::vector<float> n(eta.size());
-            luisa::vector<float> k(eta.size());
+            luisa::vector<float> lambda(eta.size() / 3u);
+            luisa::vector<float> n(eta.size() / 3u);
+            luisa::vector<float> k(eta.size() / 3u);
             for (auto i = 0u; i < eta.size() / 3u; i++) {
                 lambda[i] = eta[i * 3u + 0u];
                 n[i] = eta[i * 3u + 1u];
