@@ -7,16 +7,27 @@ def convert_roughness(r):
     return glm.sqrt(r)
 
 
+def convert_albedo(a):
+    if isinstance(a, str):
+        return f'''Color {{
+    file {{ "{a}" }}
+    uv_scale {{ 1, -1 }}
+  }}'''
+    else:
+        a = glm.vec3(a)
+        return f'''ConstColor {{
+    color {{ {a.x}, {a.y}, {a.z} }}
+  }}'''
+
+
 def convert_plastic_material(out_file, material: dict):
     name = material["name"]
     roughness = material.get("roughness", 1e-6)
     ior = material["ior"]
-    color = glm.vec3(material["albedo"])
+    color = material["albedo"]
     print(f'''
 Surface mat_{name} : Substrate {{
-  Kd : ConstColor {{
-    color {{ {color.x}, {color.y}, {color.z} }}
-  }}
+  Kd : {convert_albedo(color)}
   Ks : ConstColor {{
     color {{ 0.04 }}
   }}
@@ -31,7 +42,7 @@ Surface mat_{name} : Substrate {{
 
 def convert_glass_material(out_file, material: dict):
     name = material["name"]
-    color = glm.vec3(material["albedo"])
+    color = material["albedo"]
     roughness = material.get("roughness", 1e-6)
     ior = material["ior"]
     print(f'''
@@ -39,9 +50,7 @@ Surface mat_{name} : Glass {{
   Kr : ConstColor {{
     color {{ 1 }}
   }}
-  Kt : ConstColor {{
-    color {{ {color.x}, {color.y}, {color.z} }}
-  }}
+  Kt : {convert_albedo(color)}
   eta : ConstGeneric {{
     v {{ {ior} }}
   }}
@@ -53,12 +62,10 @@ Surface mat_{name} : Glass {{
 
 def convert_mirror_material(out_file, material: dict):
     name = material["name"]
-    color = glm.vec3(material["albedo"])
+    color = material["albedo"]
     print(f'''
 Surface mat_{name} : Mirror {{
-  color : ConstColor {{
-    color {{ {color.x}, {color.y}, {color.z} }}
-  }}
+  color : {convert_albedo(color)}
 }}''', file=out_file)
 
 
@@ -70,7 +77,7 @@ def convert_metal_material(out_file, material: dict):
         n = material["eta"]
         k = material["k"]
         eta = f"360, {n}, {k}, 830, {n}, {k}"
-    roughness = material["roughness"]
+    roughness = material.get("roughness", 1e-6)
     print(f'''
 Surface mat_{name} : Metal {{
   eta {{ {eta} }}
@@ -88,12 +95,10 @@ Surface mat_{name} : Null {{}}''', file=out_file)
 
 def convert_matte_material(out_file, material: dict):
     name = material["name"]
-    color = glm.vec3(material["albedo"])
+    color = material["albedo"]
     print(f'''
 Surface mat_{name} : Matte {{
-  Kd : ConstColor {{
-    color {{ {color.x}, {color.y}, {color.z} }}
-  }}
+  Kd : {convert_albedo(color)}
 }}''', file=out_file)
 
 
@@ -105,7 +110,7 @@ def convert_material(out_file, material: dict):
         convert_glass_material(out_file, material)
     elif impl == "mirror":
         convert_mirror_material(out_file, material)
-    elif impl == "rough_conductor":
+    elif impl == "conductor" or impl == "rough_conductor":
         convert_metal_material(out_file, material)
     elif impl == "lambert":
         convert_matte_material(out_file, material)

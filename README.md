@@ -65,7 +65,7 @@ on [LuisaCompute](https://github.com/Mike-Leo-Smith/LuisaCompute).
   - Resolution: 800x1000
   - Max Depth: 10
 
-![Coffee](data/scenes/coffee/color.png)
+![Coffee](data/scenes/coffee/color-denoised.png)
 
 - Spaceship (from [Rendering Resources](https://benedikt-bitterli.me/resources/))
   - Mega-Kernel Path Tracing
