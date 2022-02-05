@@ -1,6 +1,6 @@
 
 Surface mat_Backdrop : Matte {
-  color : ConstColor {
+  Kd : ConstColor {
     color { 0.10000000149011612, 0.10000000149011612, 0.10000000149011612 }
   }
 }
@@ -8,14 +8,14 @@ Surface mat_Backdrop : Matte {
 Surface mat_RoughAluminium : Metal {
   eta { "Al" }
   roughness : ConstGeneric {
-    v { 0.39810717055349726 }
+    v { 0.31622776601683794 }
   }
 }
 
 Surface mat_RoughSteel : Metal {
   eta { 360, 2.0, 0.0, 830, 2.0, 0.0 }
   roughness : ConstGeneric {
-    v { 0.39810717055349726 }
+    v { 0.31622776601683794 }
   }
 }
 
@@ -30,7 +30,7 @@ Surface mat_DarkPlastic : Substrate {
     v { 1.5 }
   }
   roughness : ConstGeneric {
-    v { 0.5253055608807534 }
+    v { 0.4472135954999579 }
   }
 }
 
@@ -45,7 +45,7 @@ Surface mat_PinkLeather : Substrate {
     v { 1.5 }
   }
   roughness : ConstGeneric {
-    v { 0.6931448431551464 }
+    v { 0.6324555320336759 }
   }
 }
 
@@ -60,7 +60,7 @@ Surface mat_Leather : Substrate {
     v { 1.5 }
   }
   roughness : ConstGeneric {
-    v { 0.6931448431551464 }
+    v { 0.6324555320336759 }
   }
 }
 
@@ -75,7 +75,7 @@ Surface mat_RedLeather : Substrate {
     v { 1.5 }
   }
   roughness : ConstGeneric {
-    v { 0.6931448431551464 }
+    v { 0.6324555320336759 }
   }
 }
 
@@ -90,7 +90,7 @@ Surface mat_BrightPinkLeather : Substrate {
     v { 1.5 }
   }
   roughness : ConstGeneric {
-    v { 0.6931448431551464 }
+    v { 0.6324555320336759 }
   }
 }
 
@@ -120,7 +120,7 @@ Surface mat_DarkRubber : Substrate {
     v { 1.5 }
   }
   roughness : ConstGeneric {
-    v { 0.6931448431551464 }
+    v { 0.6324555320336759 }
   }
 }
 
@@ -225,7 +225,7 @@ Shape shape_7 : Mesh {
   light : Diffuse {
     emission : ConstIllum {
       emission { 20.0, 3.0, 3.0 }
-      scale { 10 }
+      scale { 8 }
     }
   }
   transform : Matrix {
@@ -1321,7 +1321,7 @@ Shape shape_89 : Mesh {
 
 Env env : Map {
   emission : ConstIllum {
-    emission { 0.0003000000142492354, 0.0003000000142492354, 0.0003000000142492354 }
+    emission { 0.2 }
   }
 }
 
@@ -1450,6 +1450,6 @@ render {
     @shape_89,
     @shape_91
   }
-  environment : Null {}
+  environment { @env }
 }
 

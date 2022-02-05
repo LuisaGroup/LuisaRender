@@ -4,7 +4,7 @@ import glm
 
 
 def convert_roughness(r):
-    return glm.pow(r, 0.4)
+    return glm.sqrt(r)
 
 
 def convert_plastic_material(out_file, material: dict):
@@ -46,7 +46,7 @@ Surface mat_{name} : Glass {{
     v {{ {ior} }}
   }}
   roughness : ConstGeneric {{
-    v {{ {glm.sqrt(roughness)} }}
+    v {{ {convert_roughness(roughness)} }}
   }}
 }}''', file=out_file)
 
@@ -91,7 +91,7 @@ def convert_matte_material(out_file, material: dict):
     color = glm.vec3(material["albedo"])
     print(f'''
 Surface mat_{name} : Matte {{
-  color : ConstColor {{
+  Kd : ConstColor {{
     color {{ {color.x}, {color.y}, {color.z} }}
   }}
 }}''', file=out_file)
@@ -142,7 +142,7 @@ def convert_shape(out_file, index, shape: dict):
     M = convert_transform(S, R, T)
     impl = shape["type"]
     if impl == "infinite_sphere":
-        emission = glm.vec3(shape["emission"]) * 1e-3
+        emission = glm.vec3(shape["emission"])
         print(f'''
 Env env : Map {{
   emission : ConstIllum {{
@@ -226,7 +226,7 @@ Camera camera : Pinhole {{
 
 def write_render(out_file, shapes):
     shape_refs = ",\n    ".join(f'@shape_{i}' for i, s in enumerate(shapes) if s["type"] != "infinite_sphere")
-    env = "environment { @env }" if False and any(
+    env = "environment { @env }" if any(
         s["type"] == "infinite_sphere" for s in shapes) else "environment : Null {}"
     print(f'''
 render {{

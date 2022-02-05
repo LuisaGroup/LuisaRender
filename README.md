@@ -66,3 +66,13 @@ on [LuisaCompute](https://github.com/Mike-Leo-Smith/LuisaCompute).
   - Max Depth: 10
 
 ![Coffee](data/scenes/coffee/color.png)
+
+- Spaceship (from [Rendering Resources](https://benedikt-bitterli.me/resources/))
+  - Mega-Kernel Path Tracing
+  - Diffuse Area Lights
+  - Substrate, Metal, Matte, and Glass Materials
+  - Spectral Rendering
+  - Resolution: 1280x720
+  - Max Depth: 10
+
+![Spaceship](data/scenes/spaceship/color-denoised.png)

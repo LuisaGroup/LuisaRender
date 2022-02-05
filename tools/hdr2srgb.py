@@ -4,11 +4,11 @@ from sys import argv
 
 
 def rgb2srgb(image):
-    return np.uint16(np.round(np.clip(np.where(
+    return np.uint8(np.round(np.clip(np.where(
         image <= 0.00304,
         12.92 * image,
         1.055 * np.power(image, 1.0 / 2.4) - 0.055
-    ) * 65535, 0, 65535)))
+    ) * 255, 0, 255)))
 
 
 def imread(filename):
