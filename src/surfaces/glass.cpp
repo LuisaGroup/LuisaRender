@@ -183,7 +183,7 @@ private:
         auto f = def<float4>();
         auto pdf = def(0.f);
         auto swl = _swl;
-        auto t = saturate(abs(_fresnel.evaluate(cos_theta(wo_local)).x) * _kr_ratio);
+        auto t = clamp(_fresnel.evaluate(cos_theta(wo_local)).x, 0.2f, 0.8f) * _kr_ratio;
         $if(same_hemisphere(wo_local, wi_local)) {
             f = _refl.evaluate(wo_local, wi_local);
             pdf = _refl.pdf(wo_local, wi_local) * t;

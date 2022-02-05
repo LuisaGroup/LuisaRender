@@ -57,6 +57,20 @@ Surface mat_{name} : Mirror {{
 }}''', file=out_file)
 
 
+def convert_metal_material(out_file, material: dict):
+    name = material["name"]
+    color = vec3(material["albedo"])
+    eta = material["material"]
+    roughness = material["roughness"]
+    print(f'''
+Surface mat_{name} : Metal {{
+  eta {{ "{eta}" }}
+  roughness : ConstGeneric {{
+    v {{ {roughness} }}
+  }}
+}}''', file=out_file)
+
+
 def convert_material(out_file, material: dict):
     impl = material["type"]
     if impl == "plastic" or impl == "rough_plastic":
@@ -65,7 +79,10 @@ def convert_material(out_file, material: dict):
         convert_glass_material(out_file, material)
     elif impl == "mirror":
         convert_mirror_material(out_file, material)
+    elif impl == "rough_conductor":
+        convert_metal_material(out_file, material)
     else:
+        print(material)
         raise NotImplemented
 
 
@@ -122,7 +139,7 @@ def convert_shape(out_file, index, shape: dict):
         file = "models/square.obj"
     else:
         raise NotImplemented
-    emission = vec3(shape.get("emission", 0))
+    emission = vec3(shape.get("emission", vec3(shape.get("power", 0)) * 0.001))
     if emission.x == emission.y == emission.z == 0:
         light = ""
     else:

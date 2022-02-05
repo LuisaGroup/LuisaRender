@@ -242,6 +242,37 @@ static constexpr std::array Ti{
     make_float2(3.158307692f, 4.01f), make_float2(3.174461538f, 4.01f), make_float2(3.190615385f, 4.01f), make_float2(3.206769231f, 4.01f),
     make_float2(3.214507042f, 4.007183099f), make_float2(3.220140845f, 4.003661972f)};
 
+static constexpr std::array V{
+    make_float2(2.582857143f, 3.365714286f), make_float2(2.643571429f, 3.387142857f), make_float2(2.709230769f, 3.407692308f),
+    make_float2(2.782307692f, 3.426923077f), make_float2(2.855384615f, 3.446153846f), make_float2(2.92f, 3.4575f),
+    make_float2(2.9825f, 3.466875f), make_float2(3.045f, 3.47625f), make_float2(3.115f, 3.481875f), make_float2(3.19f, 3.485f),
+    make_float2(3.265f, 3.488125f), make_float2(3.333333333f, 3.49f), make_float2(3.391666667f, 3.49f), make_float2(3.45f, 3.49f),
+    make_float2(3.508333333f, 3.49f), make_float2(3.534f, 3.484f), make_float2(3.5515f, 3.4765f), make_float2(3.569f, 3.469f),
+    make_float2(3.5865f, 3.4615f), make_float2(3.634f, 3.444f), make_float2(3.689f, 3.424f), make_float2(3.744f, 3.404f),
+    make_float2(3.799f, 3.384f), make_float2(3.8276f, 3.3608f), make_float2(3.8496f, 3.3368f), make_float2(3.8716f, 3.3128f),
+    make_float2(3.8936f, 3.2888f), make_float2(3.9156f, 3.2648f), make_float2(3.9104f, 3.2472f), make_float2(3.8984f, 3.2312f),
+    make_float2(3.8864f, 3.2152f), make_float2(3.8744f, 3.1992f), make_float2(3.8624f, 3.1832f), make_float2(3.88f, 3.16f),
+    make_float2(3.905f, 3.135f), make_float2(3.93f, 3.11f), make_float2(3.955f, 3.085f), make_float2(3.98f, 3.06f),
+    make_float2(3.994848485f, 3.038787879f), make_float2(3.969090909f, 3.032727273f), make_float2(3.943333333f, 3.026666667f),
+    make_float2(3.917575758f, 3.020606061f), make_float2(3.891818182f, 3.014545455f), make_float2(3.866060606f, 3.008484848f),
+    make_float2(3.84030303f, 3.002424242f), make_float2(3.805142857f, 3.001714286f), make_float2(3.763714286f, 3.004571429f),
+    make_float2(3.722285714f, 3.007428571f), make_float2(3.680857143f, 3.010285714f), make_float2(3.639428571f, 3.013142857f),
+    make_float2(3.598f, 3.016f), make_float2(3.556571429f, 3.018857143f), make_float2(3.519285714f, 3.025f),
+    make_float2(3.484761905f, 3.033333333f), make_float2(3.450238095f, 3.041666667f), make_float2(3.415714286f, 3.05f),
+    make_float2(3.381190476f, 3.058333333f), make_float2(3.346666667f, 3.066666667f), make_float2(3.312142857f, 3.075f),
+    make_float2(3.277619048f, 3.083333333f), make_float2(3.248444444f, 3.091333333f), make_float2(3.240666667f, 3.098f),
+    make_float2(3.232888889f, 3.104666667f), make_float2(3.225111111f, 3.111333333f), make_float2(3.217333333f, 3.118f),
+    make_float2(3.209555556f, 3.124666667f), make_float2(3.201777778f, 3.131333333f), make_float2(3.194f, 3.138f),
+    make_float2(3.186222222f, 3.144666667f), make_float2(3.180384615f, 3.150961538f), make_float2(3.182307692f, 3.155769231f),
+    make_float2(3.184230769f, 3.160576923f), make_float2(3.186153846f, 3.165384615f), make_float2(3.188076923f, 3.170192308f),
+    make_float2(3.19f, 3.175f), make_float2(3.191923077f, 3.179807692f), make_float2(3.193846154f, 3.184615385f),
+    make_float2(3.195769231f, 3.189423077f), make_float2(3.197692308f, 3.194230769f), make_float2(3.199615385f, 3.199038462f),
+    make_float2(3.197538462f, 3.203076923f), make_float2(3.194461538f, 3.206923077f), make_float2(3.191384615f, 3.210769231f),
+    make_float2(3.188307692f, 3.214615385f), make_float2(3.185230769f, 3.218461538f), make_float2(3.182153846f, 3.222307692f),
+    make_float2(3.179076923f, 3.226153846f), make_float2(3.176f, 3.23f), make_float2(3.172923077f, 3.233846154f),
+    make_float2(3.169846154f, 3.237692308f), make_float2(3.166769231f, 3.241538462f), make_float2(3.163692308f, 3.245384615f),
+    make_float2(3.160615385f, 3.249230769f), make_float2(3.157746479f, 3.255070423f), make_float2(3.154929577f, 3.261408451f)};
+
 }// namespace ior
 
 using namespace luisa::compute;
@@ -289,6 +320,8 @@ public:
                 _eta = ior::Fe;
             } else if (eta_name == "ti" || eta_name == "titanium") {
                 _eta = ior::Ti;
+            } else if (eta_name == "v" || eta_name == "vanadium") {
+                _eta = ior::V;
             } else [[unlikely]] {
                 LUISA_ERROR(
                     "Unknown metal '{}'. [{}]", eta_name,
