@@ -18,11 +18,13 @@ private:
     luisa::vector<float3> _positions;
     luisa::vector<VertexAttribute> _attributes;
     luisa::vector<Triangle> _triangles;
+    bool _has_uv{};
 
 public:
     [[nodiscard]] auto positions() const noexcept { return luisa::span{_positions}; }
     [[nodiscard]] auto attributes() const noexcept { return luisa::span{_attributes}; }
     [[nodiscard]] auto triangles() const noexcept { return luisa::span{_triangles}; }
+    [[nodiscard]] auto has_uv() const noexcept { return _has_uv; }
 
     [[nodiscard]] static auto load(std::filesystem::path path) noexcept {
 
@@ -103,6 +105,7 @@ public:
                 }
                 return make_float3(ai_tangents[i].x, ai_tangents[i].y, ai_tangents[i].z);
             };
+            loader._has_uv = ai_tex_coords != nullptr;
             auto compute_uv = [ai_tex_coords](auto i) noexcept {
                 if (ai_tex_coords == nullptr) { return make_float2(); }
                 return make_float2(ai_tex_coords[i].x, ai_tex_coords[i].y);
@@ -136,10 +139,20 @@ class Mesh final : public Shape {
 
 private:
     std::shared_future<MeshLoader> _loader;
+    std::shared_future<LoadedImage> _alpha_image;
+    float _alpha{1.f};
 
 public:
     Mesh(Scene *scene, const SceneNodeDesc *desc) noexcept
-        : Shape{scene, desc}, _loader{MeshLoader::load(desc->property_path("file"))} {}
+        : Shape{scene, desc}, _loader{MeshLoader::load(desc->property_path("file"))} {
+        if (auto p = desc->property_path_or_default("alpha"); !p.empty()) {
+            _alpha_image = ThreadPool::global().async([p = std::move(p)] {
+                return LoadedImage::load(p, LoadedImage::storage_type::BYTE1);
+            });
+        } else {
+            _alpha = desc->property_float_or_default("alpha", 1.f);
+        }
+    }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::span<const Shape *const> children() const noexcept override { return {}; }
     [[nodiscard]] bool deformable() const noexcept override { return false; }
@@ -148,6 +161,12 @@ public:
     [[nodiscard]] luisa::span<const float3> positions() const noexcept override { return _loader.get().positions(); }
     [[nodiscard]] luisa::span<const VertexAttribute> attributes() const noexcept override { return _loader.get().attributes(); }
     [[nodiscard]] luisa::span<const Triangle> triangles() const noexcept override { return _loader.get().triangles(); }
+    [[nodiscard]] float alpha() const noexcept override { return _alpha; }
+    [[nodiscard]] const LoadedImage *alpha_image() const noexcept override {
+        return _alpha_image.valid() && _loader.get().has_uv() ?
+                   std::addressof(_alpha_image.get()) :
+                   nullptr;
+    }
 };
 
 }// namespace luisa::render

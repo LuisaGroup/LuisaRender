@@ -1,4 +1,4 @@
-Surface cbox-white : Matte {
+Surface cbox-white : Disney {
   color : ConstColor {
     color { 0.725, 0.71, 0.68 }
   }
@@ -10,7 +10,7 @@ Surface cbox-white : Matte {
   }
 }
 
-Surface cbox-red : Matte {
+Surface cbox-red : Disney {
   color : ConstColor {
     color { 0.63, 0.065, 0.05 }
   }
@@ -18,14 +18,11 @@ Surface cbox-red : Matte {
     color { 0.63, 0.065, 0.05 }
   }
   roughness : ConstGeneric {
-    v { .1 }
-  }
-  metallic : ConstGeneric {
     v { 1 }
   }
 }
 
-Surface cbox-green : Matte {
+Surface cbox-green : Disney {
   color : ConstColor {
     color { 0.14, 0.45, 0.091 }
   }
@@ -33,9 +30,6 @@ Surface cbox-green : Matte {
     color { 0.14, 0.45, 0.091 }
   }
   roughness : ConstGeneric {
-    v { .1 }
-  }
-  metallic : ConstGeneric {
     v { 1 }
   }
 }
@@ -85,7 +79,7 @@ Shape cbox-back-wall : Mesh {
 
 Shape cbox-tall-box : Mesh {
   file { "cbox-parts/tall-box.obj" }
-  surface { @cbox-metal }
+  surface { @cbox-white }
 }
 
 Shape cbox-short-box : Mesh {

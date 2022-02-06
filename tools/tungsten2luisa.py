@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from sys import argv
 import glm
 
@@ -7,7 +8,7 @@ def convert_roughness(r):
     return glm.sqrt(r)
 
 
-def convert_albedo(a):
+def convert_albedo_texture(a):
     if isinstance(a, str):
         return f'''Color {{
     file {{ "{a}" }}
@@ -20,6 +21,18 @@ def convert_albedo(a):
   }}'''
 
 
+def convert_emission_texture(a):
+    if isinstance(a, str):
+        return f'''Illum {{
+    file {{ "{a}" }}
+  }}'''
+    else:
+        a = glm.vec3(a)
+        return f'''ConstIllum {{
+    color {{ {a.x}, {a.y}, {a.z} }}
+  }}'''
+
+
 def convert_plastic_material(out_file, material: dict):
     name = material["name"]
     roughness = material.get("roughness", 1e-6)
@@ -27,7 +40,7 @@ def convert_plastic_material(out_file, material: dict):
     color = material["albedo"]
     print(f'''
 Surface mat_{name} : Substrate {{
-  Kd : {convert_albedo(color)}
+  Kd : {convert_albedo_texture(color)}
   Ks : ConstColor {{
     color {{ 0.04 }}
   }}
@@ -50,7 +63,7 @@ Surface mat_{name} : Glass {{
   Kr : ConstColor {{
     color {{ 1 }}
   }}
-  Kt : {convert_albedo(color)}
+  Kt : {convert_albedo_texture(color)}
   eta : ConstGeneric {{
     v {{ {ior} }}
   }}
@@ -65,7 +78,7 @@ def convert_mirror_material(out_file, material: dict):
     color = material["albedo"]
     print(f'''
 Surface mat_{name} : Mirror {{
-  color : {convert_albedo(color)}
+  color : {convert_albedo_texture(color)}
 }}''', file=out_file)
 
 
@@ -98,7 +111,7 @@ def convert_matte_material(out_file, material: dict):
     color = material["albedo"]
     print(f'''
 Surface mat_{name} : Matte {{
-  Kd : {convert_albedo(color)}
+  Kd : {convert_albedo_texture(color)}
 }}''', file=out_file)
 
 
@@ -112,8 +125,12 @@ def convert_material(out_file, material: dict):
         convert_mirror_material(out_file, material)
     elif impl == "conductor" or impl == "rough_conductor":
         convert_metal_material(out_file, material)
-    elif impl == "lambert":
+    elif impl == "lambert" or impl == "oren_nayar":
         convert_matte_material(out_file, material)
+    elif impl == "transparency":  # TODO
+        base_material = material["base"]
+        base_material["name"] = material["name"]
+        convert_material(out_file, base_material)
     elif impl == "null":
         convert_null_material(out_file, material)
     else:
@@ -139,7 +156,7 @@ def convert_transform(S, R, T):
     return glm.translate(T) * rotateYXZ(R) * glm.scale(S)
 
 
-def convert_shape(out_file, index, shape: dict):
+def convert_shape(out_file, index, shape: dict, materials: dict):
     transform = shape["transform"]
     T = glm.vec3(transform.get("position", 0))
     R = glm.radians(glm.vec3(transform.get("rotation", 0)))
@@ -147,19 +164,29 @@ def convert_shape(out_file, index, shape: dict):
     M = convert_transform(S, R, T)
     impl = shape["type"]
     if impl == "infinite_sphere":
-        emission = glm.vec3(shape["emission"])
+        emission = shape["emission"]
         print(f'''
 Env env : Map {{
-  emission : ConstIllum {{
-    emission {{ {emission.x}, {emission.y}, {emission.z} }}
+  emission : {convert_emission_texture(emission)}
+  transform : SRT {{
+    rotate {{ 0, 1, 0, -90 }}
   }}
-}}
-''', file=out_file)
+}}''', file=out_file)
     else:
+        alpha = ""
         if impl == "mesh":
             file = shape["file"]
             assert file.endswith(".wo3")
             file = f"{file[:-4]}.obj"
+            if "bsdf" in shape:
+                mat_name = shape["bsdf"]
+                for m in materials:
+                    if m["name"] == mat_name and m["type"] == "transparency":
+                        a = m["alpha"]
+                        a_ext = Path(a).suffix
+                        alpha = f'''
+  alpha {{ "{a.replace(a_ext, f"-alpha{a_ext}")}" }}'''
+                        break
         elif impl == "quad":
             file = "models/square.obj"
             M = M * rotateXYZ(glm.radians(glm.vec3(-90, 0, 0))) * glm.scale(glm.vec3(.5))
@@ -186,7 +213,7 @@ Env env : Map {{
         print(f'''
 Shape shape_{index} : Mesh {{
   file {{ "{file}" }}
-  surface {{ @mat_{material} }}{light}
+  surface {{ @mat_{material} }}{light}{alpha}
   transform : Matrix {{
     m {{
       {M0},
@@ -198,9 +225,9 @@ Shape shape_{index} : Mesh {{
 }}''', file=out_file)
 
 
-def convert_shapes(out_file, shapes):
+def convert_shapes(out_file, shapes, materials):
     for i, shape in enumerate(shapes):
-        convert_shape(out_file, i, shape)
+        convert_shape(out_file, i, shape, materials)
 
 
 def convert_camera(out_file, camera: dict, spp):
@@ -259,6 +286,6 @@ if __name__ == "__main__":
     print(camera)
     with open(f"{file_name[:-5]}.luisa", "w") as file:
         convert_materials(file, materials)
-        convert_shapes(file, shapes)
+        convert_shapes(file, shapes, materials)
         convert_camera(file, camera, spp)
         write_render(file, shapes)

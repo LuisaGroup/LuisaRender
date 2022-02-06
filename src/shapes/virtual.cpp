@@ -13,7 +13,7 @@ class FakePoint final : public Shape {
 
 private:
     [[nodiscard]] static auto _default_desc() noexcept {
-        static auto desc = []{
+        static auto desc = [] {
             static SceneNodeDesc d{"__fakepoint_default_desc", SceneNodeTag::SHAPE};
             d.define(SceneNodeTag::SHAPE, "fakepoint", {});
             return &d;
@@ -22,7 +22,7 @@ private:
     }
 
 public:
-    FakePoint() noexcept : Shape{nullptr, _default_desc()} {}
+    explicit FakePoint(Scene *scene) noexcept : Shape{scene, _default_desc()} {}
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] bool is_mesh() const noexcept override { return true; }
     [[nodiscard]] luisa::span<const float3> positions() const noexcept override {
@@ -47,20 +47,19 @@ public:
     [[nodiscard]] luisa::span<const Shape *const> children() const noexcept override { return {}; }
     [[nodiscard]] bool deformable() const noexcept override { return false; }
     [[nodiscard]] bool is_virtual() const noexcept override { return true; }
-
-public:
-    [[nodiscard]] static auto instance() noexcept -> const Shape * {
-        static FakePoint p;
-        return &p;
-    }
 };
 
-}
+}// namespace detail
 
 class VirtualShape final : public Shape {
 
+private:
+    detail::FakePoint _point;
+    std::array<const Shape *, 1u> _children;
+
 public:
-    VirtualShape(Scene *scene, const SceneNodeDesc *desc) noexcept : Shape{scene, desc} {}
+    VirtualShape(Scene *scene, const SceneNodeDesc *desc) noexcept
+        : Shape{scene, desc}, _point{scene}, _children{&_point} {}
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] bool is_mesh() const noexcept override { return false; }
     [[nodiscard]] bool is_virtual() const noexcept override { return true; }
@@ -68,10 +67,7 @@ public:
     [[nodiscard]] luisa::span<const float3> positions() const noexcept override { return {}; }
     [[nodiscard]] luisa::span<const VertexAttribute> attributes() const noexcept override { return {}; }
     [[nodiscard]] luisa::span<const Triangle> triangles() const noexcept override { return {}; }
-    [[nodiscard]] luisa::span<const Shape *const> children() const noexcept override {
-        static const std::array shapes{detail::FakePoint::instance()};
-        return shapes;
-    }
+    [[nodiscard]] luisa::span<const Shape *const> children() const noexcept override { return _children; }
 };
 
 }// namespace luisa::render

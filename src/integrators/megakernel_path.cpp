@@ -139,6 +139,15 @@ void MegakernelPathTracingInstance::_render_one_camera(
                 };
             }
 
+            // alpha
+            auto alpha = it->alpha();
+            auto u_alpha = sampler->generate_1d();
+            $if (u_alpha >= alpha) {
+                ray = it->spawn_ray(-it->wo());
+                pdf_bsdf = 1e16f;
+                $continue;
+            };
+
             // sample one light
             $if(!it->shape()->has_surface()) { $break; };
             Light::Sample light_sample;

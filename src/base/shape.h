@@ -5,6 +5,8 @@
 #pragma once
 
 #include <rtx/mesh.h>
+#include <util/half.h>
+#include <util/imageio.h>
 #include <base/scene_node.h>
 
 namespace luisa::render {
@@ -55,13 +57,20 @@ struct alignas(16) InstancedShape {
     static constexpr auto pdf_buffer_id_offset = 4u;
 
     uint buffer_id_base;
-    uint properties;
+    uint alpha_texture_id_and_properties;
     uint surface_buffer_id_and_tag;
     uint light_buffer_id_and_tag;
 
+    [[nodiscard]] static auto encode_alpha_texture_id_and_properties(uint tex_id, uint prop) noexcept {
+        if (prop > property_flag_mask) [[unlikely]] {
+            LUISA_ERROR_WITH_LOCATION("Invalid property flags: {:02x}.", prop);
+        }
+        return (tex_id << property_flag_bits) | prop;
+    }
+
     [[nodiscard]] static auto encode_surface_buffer_id_and_tag(uint buffer_id, uint tag) noexcept {
         if (tag != ~0u && tag > surface_tag_mask) [[unlikely]] {
-            LUISA_ERROR_WITH_LOCATION("Invalid material tag: {}.", tag);
+            LUISA_ERROR_WITH_LOCATION("Invalid surface tag: {}.", tag);
         }
         return (buffer_id << surface_buffer_id_shift) | tag;
     }
@@ -89,13 +98,14 @@ public:
     static constexpr auto property_flag_two_sided = 1u << 0u;
     static constexpr auto property_flag_has_surface = 1u << 1u;
     static constexpr auto property_flag_has_light = 1u << 2u;
+    static constexpr auto property_flag_constant_alpha = 1u << 3u;
 
 private:
     const Surface *_surface;
     const Light *_light;
     const Transform *_transform;
-    luisa::optional<bool> _two_sided;
     AccelBuildHint _build_hint{AccelBuildHint::FAST_TRACE};
+    luisa::optional<bool> _two_sided;
 
 public:
     Shape(Scene *scene, const SceneNodeDesc *desc) noexcept;
@@ -111,6 +121,8 @@ public:
     [[nodiscard]] virtual luisa::span<const Triangle> triangles() const noexcept = 0;        // empty if the shape is not a mesh
     [[nodiscard]] virtual luisa::span<const Shape *const> children() const noexcept = 0;     // empty if the shape is a mesh
     [[nodiscard]] virtual bool deformable() const noexcept = 0;                              // true if the shape will not deform
+    [[nodiscard]] virtual float alpha() const noexcept { return 1.f; }                       // constant alpha, only considered for meshes
+    [[nodiscard]] virtual const LoadedImage *alpha_image() const noexcept { return nullptr; }// textured alpha, only considered for meshes
 };
 
 }// namespace luisa::render
@@ -143,7 +155,7 @@ LUISA_STRUCT(
     luisa::render::InstancedShape,
 
     buffer_id_base,
-    properties,
+    alpha_texture_id_and_properties,
     surface_buffer_id_and_tag,
     light_buffer_id_and_tag) {
 
@@ -156,11 +168,14 @@ LUISA_STRUCT(
     [[nodiscard]] auto surface_buffer_id() const noexcept { return surface_buffer_id_and_tag >> luisa::render::InstancedShape::surface_buffer_id_shift; }
     [[nodiscard]] auto light_tag() const noexcept { return light_buffer_id_and_tag & luisa::render::InstancedShape::light_tag_mask; }
     [[nodiscard]] auto light_buffer_id() const noexcept { return light_buffer_id_and_tag >> luisa::render::InstancedShape::light_buffer_id_shift; }
-    [[nodiscard]] auto property_flags() const noexcept { return properties & luisa::render::InstancedShape::property_flag_mask; }
+    [[nodiscard]] auto property_flags() const noexcept { return alpha_texture_id_and_properties & luisa::render::InstancedShape::property_flag_mask; }
+    [[nodiscard]] auto alpha_texture_id() const noexcept { return alpha_texture_id_and_properties >> luisa::render::InstancedShape::property_flag_bits; }
+    [[nodiscard]] auto alpha() const noexcept { return luisa::render::half_to_float(alpha_texture_id() & 0xffffu); }
     [[nodiscard]] auto test_property_flag(luisa::uint flag) const noexcept { return (property_flags() & flag) != 0u; }
     [[nodiscard]] auto two_sided() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_two_sided); }
     [[nodiscard]] auto has_light() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_light); }
     [[nodiscard]] auto has_surface() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_surface); }
+    [[nodiscard]] auto has_alpha_texture() const noexcept { return !test_property_flag(luisa::render::Shape::property_flag_constant_alpha); }
 };
 
 // clang-format on

@@ -17,7 +17,7 @@ Camera camera : Pinhole {
 import "../meshes/cbox.luisa"
 
 Integrator pt : MegaPath {
-  depth { 10 }
+  depth { 5 }
 }
 
 render {

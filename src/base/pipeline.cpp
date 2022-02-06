@@ -110,11 +110,23 @@ void Pipeline::_process_shape(
                 auto pdf_buffer_id = register_bindless(pdf_buffer_view);
                 return cache_iter->second = {mesh, position_buffer_id};
             }();
+            // create alpha texture if any
+            auto texture_id = ~0u;
+            if (auto alpha = shape->alpha_image()) {
+                assert(alpha->pixel_storage() == PixelStorage::BYTE1);
+                auto image = create<Image<float>>(PixelStorage::BYTE1, alpha->size());
+                command_buffer << image->copy_from(alpha->pixels())
+                               << compute::commit();
+                texture_id = register_bindless(
+                    *image, TextureSampler::linear_point_zero());
+            }
             // assign mesh data
             MeshData mesh{};
             mesh.resource = mesh_geom.resource;
             mesh.buffer_id_base = mesh_geom.buffer_id_base;
             mesh.two_sided = shape->two_sided().value_or(false);
+            mesh.alpha_texture_id = texture_id;
+            mesh.alpha = shape->alpha();
             iter = _meshes.emplace(shape, mesh).first;
         }
         auto mesh = iter->second;
@@ -134,14 +146,15 @@ void Pipeline::_process_shape(
         // create instance
         InstancedShape instance{};
         instance.buffer_id_base = mesh.buffer_id_base;
-        if (two_sided) { instance.properties |= Shape::property_flag_two_sided; }
+        auto shape_properties = 0u;
+        if (two_sided) { shape_properties |= Shape::property_flag_two_sided; }
         if (material != nullptr && !material->is_null()) {
             if (shape->is_virtual()) {
                 LUISA_WARNING_WITH_LOCATION(
                     "Materials will be ignored on virtual shapes.");
             } else {
                 auto m = _process_surface(command_buffer, instance_id, shape, material);
-                instance.properties |= Shape::property_flag_has_surface;
+                shape_properties |= Shape::property_flag_has_surface;
                 instance.surface_buffer_id_and_tag = InstancedShape::encode_surface_buffer_id_and_tag(m.buffer_id, m.tag);
             }
         }
@@ -152,10 +165,19 @@ void Pipeline::_process_shape(
                     "virtual shapes and vise versa.");
             } else {
                 auto l = _process_light(command_buffer, instance_id, shape, light);
-                instance.properties |= Shape::property_flag_has_light;
+                shape_properties |= Shape::property_flag_has_light;
                 instance.light_buffer_id_and_tag = InstancedShape::encode_light_buffer_id_and_tag(l.buffer_id, l.tag);
             }
         }
+
+        auto alpha_texture = mesh.alpha_texture_id;
+        if (mesh.alpha_texture_id == ~0u) {
+            alpha_texture = float_to_half(mesh.alpha);
+            shape_properties |= Shape::property_flag_constant_alpha;
+        }
+        instance.alpha_texture_id_and_properties =
+            InstancedShape::encode_alpha_texture_id_and_properties(
+                alpha_texture, shape_properties);
         _instances.emplace_back(instance);
     } else {
         _transform_tree.push(shape->transform());
@@ -349,7 +371,15 @@ luisa::unique_ptr<Interaction> Pipeline::interaction(const Var<Ray> &ray, const 
             shape, shape_to_world_normal, tri,
             make_float3(1.0f - hit.bary.x - hit.bary.y, hit.bary));
         auto wo = -ray->direction();
-        it = Interaction{std::move(shape), hit.prim, area, p, wo, ng, uv, ns, t};
+        auto &shape_ref = shape;
+        auto &uv_ref = uv;
+        auto alpha = shape->alpha();
+        $if(shape->has_alpha_texture()) {
+            alpha = tex2d(shape_ref->alpha_texture_id()).sample(uv_ref).x;
+        };
+        it = Interaction{
+            std::move(shape), hit.prim, area,
+            p, wo, ng, uv, ns, t, alpha};
     };
     return luisa::make_unique<Interaction>(std::move(it));
 }
