@@ -1,4 +1,4 @@
-Surface cbox-white : Matte {
+Surface cbox-white : Disney {
   color : ConstColor {
     color { 0.725, 0.71, 0.68 }
   }
@@ -10,7 +10,7 @@ Surface cbox-white : Matte {
   }
 }
 
-Surface cbox-red : Matte {
+Surface cbox-red : Disney {
   color : ConstColor {
     color { 0.63, 0.065, 0.05 }
   }
@@ -22,7 +22,7 @@ Surface cbox-red : Matte {
   }
 }
 
-Surface cbox-green : Matte {
+Surface cbox-green : Disney {
   color : ConstColor {
     color { 0.14, 0.45, 0.091 }
   }

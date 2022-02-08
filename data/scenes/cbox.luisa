@@ -6,7 +6,7 @@ Film film : Color {
 Camera camera : Pinhole {
   position { -0.01, 0.995, 5.0 }
   fov { 27.8 }
-  spp { 1024 }
+  spp { 1 }
   film { @film }
   file { "../renders/cbox.exr" }
   filter : Gaussian {
@@ -19,6 +19,8 @@ import "../meshes/cbox.luisa"
 Integrator pt : MegaPath {
   depth { 5 }
 }
+
+Integrator normal : Normal {}
 
 render {
   cameras { @camera }

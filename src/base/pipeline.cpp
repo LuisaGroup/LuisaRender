@@ -31,9 +31,8 @@ void Pipeline::_build_geometry(
     _accel = _device.create_accel(hint);
     for (auto shape : shapes) { _process_shape(command_buffer, shape); }
     _instance_buffer = _device.create_buffer<InstancedShape>(_instances.size());
-    command_buffer << _bindless_array.update()
-                   << _instance_buffer.copy_from(_instances.data())
-                   << _accel.build();
+    command_buffer << _instance_buffer.copy_from(_instances.data())
+                   << _accel.build();// FIXME: adding commit() leads to wrong rendering, why?
 }
 
 void Pipeline::_process_shape(
@@ -88,7 +87,7 @@ void Pipeline::_process_shape(
                                << attribute_buffer_view.copy_from(attributes.data())
                                << triangle_buffer->copy_from(offset_triangles.data())
                                << mesh->build()
-                               << luisa::compute::commit();
+                               << compute::commit();
                 // compute alias table
                 luisa::vector<float> triangle_areas(triangles.size());
                 std::transform(triangles.cbegin(), triangles.cend(), triangle_areas.begin(), [positions](auto t) noexcept {
@@ -102,7 +101,7 @@ void Pipeline::_process_shape(
                 auto pdf_buffer_view = _general_buffer_arena->allocate<float>(pdf.size());
                 command_buffer << alias_table_buffer_view.copy_from(alias_table.data())
                                << pdf_buffer_view.copy_from(pdf.data())
-                               << luisa::compute::commit();
+                               << compute::commit();
                 auto position_buffer_id = register_bindless(position_buffer_view.original());
                 auto attribute_buffer_id = register_bindless(attribute_buffer_view.original());
                 auto triangle_buffer_id = register_bindless(triangle_buffer->view());
@@ -225,48 +224,48 @@ Pipeline::LightData Pipeline::_process_light(CommandBuffer &command_buffer, uint
 }
 
 luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, const Scene &scene) noexcept {
+    ThreadPool::global().synchronize();
     auto pipeline = luisa::make_unique<Pipeline>(device);
     pipeline->_cameras.reserve(scene.cameras().size());
     pipeline->_films.reserve(scene.cameras().size());
     pipeline->_filters.reserve(scene.cameras().size());
     auto command_buffer = stream.command_buffer();
-    {
-        auto rgb2spec_t0 = pipeline->create<Volume<float>>(PixelStorage::FLOAT4, make_uint3(RGB2SpectrumTable::resolution));
-        auto rgb2spec_t1 = pipeline->create<Volume<float>>(PixelStorage::FLOAT4, make_uint3(RGB2SpectrumTable::resolution));
-        auto rgb2spec_t2 = pipeline->create<Volume<float>>(PixelStorage::FLOAT4, make_uint3(RGB2SpectrumTable::resolution));
-        RGB2SpectrumTable::srgb().encode(
-            command_buffer,
-            rgb2spec_t0->view(0u),
-            rgb2spec_t1->view(0u),
-            rgb2spec_t2->view(0u));
-        pipeline->_rgb2spec_index = pipeline->register_bindless(*rgb2spec_t0, TextureSampler::linear_point_zero());
-        static_cast<void>(pipeline->register_bindless(*rgb2spec_t1, TextureSampler::linear_point_zero()));
-        static_cast<void>(pipeline->register_bindless(*rgb2spec_t2, TextureSampler::linear_point_zero()));
-        auto mean_time = 0.0;
-        for (auto camera : scene.cameras()) {
-            pipeline->_cameras.emplace_back(camera->build(*pipeline, command_buffer));
-            pipeline->_films.emplace_back(camera->film()->build(*pipeline, command_buffer));
-            pipeline->_filters.emplace_back(camera->filter()->build(*pipeline, command_buffer));
-            mean_time += (camera->shutter_span().x + camera->shutter_span().y) * 0.5f;
-        }
-        mean_time *= 1.0 / static_cast<double>(scene.cameras().size());
-        pipeline->_mean_time = static_cast<float>(mean_time);
-        pipeline->_build_geometry(command_buffer, scene.shapes(), pipeline->_mean_time, AccelBuildHint::FAST_TRACE);
-        pipeline->_integrator = scene.integrator()->build(*pipeline, command_buffer);
-        pipeline->_sampler = scene.integrator()->sampler()->build(*pipeline, command_buffer);
-        if (auto env = scene.environment(); env != nullptr && !env->is_black()) {
-            pipeline->_environment = env->build(*pipeline, command_buffer);
-        }
-        if (pipeline->_lights.empty()) [[unlikely]] {
-            if (pipeline->_environment == nullptr) {
-                LUISA_WARNING_WITH_LOCATION(
-                    "No lights or environment found in the scene.");
-            }
-        } else {
-            pipeline->_light_sampler = scene.integrator()->light_sampler()->build(*pipeline, command_buffer);
-        }
+    auto rgb2spec_t0 = pipeline->create<Volume<float>>(PixelStorage::FLOAT4, make_uint3(RGB2SpectrumTable::resolution));
+    auto rgb2spec_t1 = pipeline->create<Volume<float>>(PixelStorage::FLOAT4, make_uint3(RGB2SpectrumTable::resolution));
+    auto rgb2spec_t2 = pipeline->create<Volume<float>>(PixelStorage::FLOAT4, make_uint3(RGB2SpectrumTable::resolution));
+    RGB2SpectrumTable::srgb().encode(
+        command_buffer,
+        rgb2spec_t0->view(0u),
+        rgb2spec_t1->view(0u),
+        rgb2spec_t2->view(0u));
+    pipeline->_rgb2spec_index = pipeline->register_bindless(*rgb2spec_t0, TextureSampler::linear_point_zero());
+    static_cast<void>(pipeline->register_bindless(*rgb2spec_t1, TextureSampler::linear_point_zero()));
+    static_cast<void>(pipeline->register_bindless(*rgb2spec_t2, TextureSampler::linear_point_zero()));
+    auto mean_time = 0.0;
+    for (auto camera : scene.cameras()) {
+        pipeline->_cameras.emplace_back(camera->build(*pipeline, command_buffer));
+        pipeline->_films.emplace_back(camera->film()->build(*pipeline, command_buffer));
+        pipeline->_filters.emplace_back(camera->filter()->build(*pipeline, command_buffer));
+        mean_time += (camera->shutter_span().x + camera->shutter_span().y) * 0.5f;
     }
-    command_buffer.commit();
+    mean_time *= 1.0 / static_cast<double>(scene.cameras().size());
+    pipeline->_mean_time = static_cast<float>(mean_time);
+    pipeline->_build_geometry(command_buffer, scene.shapes(), pipeline->_mean_time, AccelBuildHint::FAST_TRACE);
+    pipeline->_integrator = scene.integrator()->build(*pipeline, command_buffer);
+    pipeline->_sampler = scene.integrator()->sampler()->build(*pipeline, command_buffer);
+    if (auto env = scene.environment(); env != nullptr && !env->is_black()) {
+        pipeline->_environment = env->build(*pipeline, command_buffer);
+    }
+    if (pipeline->_lights.empty()) [[unlikely]] {
+        if (pipeline->_environment == nullptr) {
+            LUISA_WARNING_WITH_LOCATION(
+                "No lights or environment found in the scene.");
+        }
+    } else {
+        pipeline->_light_sampler = scene.integrator()->light_sampler()->build(*pipeline, command_buffer);
+    }
+    command_buffer << pipeline->_bindless_array.update()
+                   << compute::commit();
     return pipeline;
 }
 

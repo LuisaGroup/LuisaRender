@@ -10319,7 +10319,7 @@ Camera camera : Pinhole {
 
 render {
   cameras { @camera }
-  integrator : MegaPath {
+  integrator : Normal {
     depth { 10 }
   }
   shapes {

@@ -28,15 +28,7 @@ public:
 
     [[nodiscard]] static auto load(std::filesystem::path path) noexcept {
 
-        static luisa::unordered_map<uint64_t, std::shared_future<MeshLoader>> cache;
-        static std::mutex mutex;
-        auto hash = luisa::hash64(std::filesystem::canonical(path).string());
-
-        std::scoped_lock lock{mutex};
-        auto [iter, non_existent] = cache.try_emplace(
-            hash, std::shared_future<MeshLoader>{});
-        if (!non_existent) { return iter->second; }
-        return iter->second = ThreadPool::global().async([path = std::move(path)] {
+        return ThreadPool::global().async([path = std::move(path)] {
             Clock clock;
             auto path_string = path.string();
             Assimp::Importer importer;
