@@ -5,6 +5,16 @@ on [LuisaCompute](https://github.com/Mike-Leo-Smith/LuisaCompute).
 
 # Demo
 
+- Living-Room Table
+    - Mega-Kernel Path Tracing
+    - Glass, Plastic, and Metal Materials
+    - Environment Mapping
+    - Spectral Rendering
+    - Depth of Filed
+    - Resolution: 1024x1024
+    - Max Depth: 10
+![LivingRoomTable](data/renders/living-room.png)
+
 - Cornell Box with Bunnies
     - Mega-Kernel Path Tracing
     - Multiple-Level Instancing
