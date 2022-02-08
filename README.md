@@ -5,7 +5,7 @@ on [LuisaCompute](https://github.com/Mike-Leo-Smith/LuisaCompute).
 
 # Demo
 
-- Living-Room Table
+- Living-Room Table (from [Rendering Resources](https://benedikt-bitterli.me/resources/))
     - Mega-Kernel Path Tracing
     - Glass, Plastic, and Metal Materials
     - Environment Mapping
@@ -13,7 +13,28 @@ on [LuisaCompute](https://github.com/Mike-Leo-Smith/LuisaCompute).
     - Depth of Filed
     - Resolution: 1024x1024
     - Max Depth: 10
+
 ![LivingRoomTable](data/renders/living-room.png)
+
+- Coffee (from [Rendering Resources](https://benedikt-bitterli.me/resources/))
+  - Mega-Kernel Path Tracing
+  - Diffuse Area Lights
+  - Plastic, Disney, Glass, and Mirror Materials
+  - Spectral Rendering
+  - Resolution: 800x1000
+  - Max Depth: 10
+
+![Coffee](data/scenes/coffee/color.png)
+
+- Spaceship (from [Rendering Resources](https://benedikt-bitterli.me/resources/))
+  - Mega-Kernel Path Tracing
+  - Diffuse Area Lights
+  - Substrate, Metal, Matte, and Glass Materials
+  - Spectral Rendering
+  - Resolution: 1280x720
+  - Max Depth: 10
+
+![Spaceship](data/scenes/spaceship/color-denoised.png)
 
 - Cornell Box with Bunnies
     - Mega-Kernel Path Tracing
@@ -66,23 +87,3 @@ on [LuisaCompute](https://github.com/Mike-Leo-Smith/LuisaCompute).
     - Max Depth: 16
 
 ![EnvmapGlass](data/renders/envmap-plastic.png)
-
-- Coffee (from [Rendering Resources](https://benedikt-bitterli.me/resources/))
-  - Mega-Kernel Path Tracing
-  - Diffuse Area Lights
-  - Plastic, Disney, Glass, and Mirror Materials
-  - Spectral Rendering
-  - Resolution: 800x1000
-  - Max Depth: 10
-
-![Coffee](data/scenes/coffee/color.png)
-
-- Spaceship (from [Rendering Resources](https://benedikt-bitterli.me/resources/))
-  - Mega-Kernel Path Tracing
-  - Diffuse Area Lights
-  - Substrate, Metal, Matte, and Glass Materials
-  - Spectral Rendering
-  - Resolution: 1280x720
-  - Max Depth: 10
-
-![Spaceship](data/scenes/spaceship/color-denoised.png)
