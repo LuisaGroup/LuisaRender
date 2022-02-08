@@ -14,9 +14,7 @@ private:
 
 private:
     [[nodiscard]] TextureHandle _encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint handle_tag) const noexcept override {
-        auto [buffer, buffer_id] = pipeline.arena_buffer<float4>(1u);
-        command_buffer << buffer.copy_from(&_rsp_scale);
-        return TextureHandle::encode_texture(handle_tag, buffer_id);
+        return TextureHandle::encode_constant(handle_tag, _rsp_scale.xyz(), _rsp_scale.w);
     }
 
 public:
@@ -40,7 +38,7 @@ public:
     [[nodiscard]] Float4 evaluate(
         const Pipeline &pipeline, const Interaction &,
         const Var<TextureHandle> &handle, Expr<float>) const noexcept override {
-        return pipeline.buffer<float4>(handle->texture_id()).read(0u);
+        return make_float4(handle->v(), handle->alpha());
     }
     [[nodiscard]] bool is_black() const noexcept override { return _rsp_scale.w == 0.0f; }
     [[nodiscard]] Category category() const noexcept override { return Category::ILLUMINANT; }

@@ -36,7 +36,7 @@ public:
     [[nodiscard]] Float4 evaluate(
         const Pipeline &, const Interaction &,
         const Var<TextureHandle> &handle, Expr<float>) const noexcept override {
-        return compute::make_float4(handle->v(), handle->alpha());
+        return compute::make_float4(handle->v(), 1.f);
     }
     [[nodiscard]] Category category() const noexcept override { return Category::COLOR; }
 };

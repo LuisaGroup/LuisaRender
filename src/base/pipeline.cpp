@@ -82,11 +82,12 @@ void Pipeline::_process_shape(
                     return Triangle{t.i0 + index_offset, t.i1 + index_offset, t.i2 + index_offset};
                 });
                 auto triangle_buffer = create<Buffer<Triangle>>(triangles.size());
-                auto mesh = create<Mesh>(position_buffer_view.original(), *triangle_buffer, shape->build_hint());
                 command_buffer << position_buffer_view.copy_from(positions.data())
                                << attribute_buffer_view.copy_from(attributes.data())
                                << triangle_buffer->copy_from(offset_triangles.data())
-                               << mesh->build()
+                               << compute::commit();
+                auto mesh = create<Mesh>(position_buffer_view.original(), *triangle_buffer, shape->build_hint());
+                command_buffer << mesh->build()
                                << compute::commit();
                 // compute alias table
                 luisa::vector<float> triangle_areas(triangles.size());
