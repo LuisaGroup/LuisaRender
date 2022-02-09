@@ -78,7 +78,7 @@ Shape teapot : Group {
           // color { 1.0, 0.71, 0.29 }
         }
         Kt : ConstColor {
-          color { 0.2, 0.3, 0.9 }
+          // color { 0.2, 0.3, 0.9 }
           // color { 0.5, 0.5, 0.5 }
         }
         roughness : ConstGeneric {
