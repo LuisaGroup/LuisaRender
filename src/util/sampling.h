@@ -60,6 +60,11 @@ template<typename ProbTable, typename AliasTable>
     return std::make_pair(index, uu);
 }
 
+[[nodiscard]] UInt xxhash32(Expr<uint> p) noexcept;
+[[nodiscard]] UInt xxhash32(Expr<uint2> p) noexcept;
+[[nodiscard]] UInt xxhash32(Expr<uint3> p) noexcept;
+[[nodiscard]] UInt xxhash32(Expr<uint4> p) noexcept;
+
 }// namespace luisa::render
 
 LUISA_STRUCT(luisa::render::AliasEntry, prob, alias){};

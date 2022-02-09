@@ -3,6 +3,8 @@
 //
 
 #include <luisa-compute.h>
+
+#include <util/sampling.h>
 #include <base/pipeline.h>
 #include <base/sampler.h>
 
@@ -19,7 +21,6 @@ private:
     Buffer<uint> _states;
     luisa::optional<Var<uint>> _state;
     luisa::optional<Var<uint>> _pixel_id;
-    Shader1D<Buffer<uint>, uint, uint> _make_sampler_state;
 
 public:
     IndependentSamplerInstance(const Pipeline &pipeline, const IndependentSampler *sampler) noexcept;
@@ -59,19 +60,11 @@ void IndependentSamplerInstance::reset(CommandBuffer &command_buffer, uint2 reso
 }
 
 void IndependentSamplerInstance::start(Expr<uint2> pixel, Expr<uint> index) noexcept {
-    auto tea = [](UInt s0, UInt v0, UInt v1) noexcept {
-        for (auto n = 0u; n < 4u; n++) {
-            s0 += 0x9e3779b9u;
-            v0 += ((v1 << 4) + 0xa341316cu) ^ (v1 + s0) ^ ((v1 >> 5u) + 0xc8013ea4u);
-            v1 += ((v0 << 4) + 0xad90777du) ^ (v0 + s0) ^ ((v0 >> 5u) + 0x7e95761eu);
-        }
-        return v0;
-    };
     auto seed = static_cast<const IndependentSampler *>(node())->seed();
     _pixel_id = luisa::nullopt;
     _pixel_id = pixel.y * _resolution.x + pixel.x;
     _state = luisa::nullopt;
-    _state = tea(seed, index, *_pixel_id);
+    _state = xxhash32(make_uint3(seed, index, *_pixel_id));
 }
 
 void IndependentSamplerInstance::save_state() noexcept {

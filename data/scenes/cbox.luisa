@@ -17,7 +17,7 @@ Camera camera : Pinhole {
 import "../meshes/cbox.luisa"
 
 Integrator pt : MegaPath {
-  sampler : ZSobol {}
+  sampler : Sobol {}
   depth { 5 }
 }
 
