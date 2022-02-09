@@ -18,11 +18,10 @@ Camera camera : Pinhole {
   }
 }
 
-Integrator normal : Normal {
-  sampler : Independent {}
-}
+Integrator normal : Normal {}
 
 Integrator pt : MegaPath {
+  sampler : ZSobol {}
   depth { 16 }
   rr_depth { 3 }
 }
