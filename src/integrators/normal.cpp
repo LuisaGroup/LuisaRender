@@ -77,7 +77,6 @@ void NormalVisualizerInstance::_render_one_camera(
         pixel += filter_offset;
         path_weight *= filter_weight;
         auto [ray, camera_weight] = camera->generate_ray(*sampler, pixel, time);
-        sampler->save_state();
         path_weight *= camera_weight;
         ray->set_origin(make_float3(camera_to_world * make_float4(ray->origin(), 1.0f)));
         ray->set_direction(normalize(camera_to_world_normal * ray->direction()));

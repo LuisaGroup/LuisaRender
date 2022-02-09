@@ -1,0 +1,56 @@
+//
+// Created by Mike Smith on 2022/2/9.
+//
+
+#pragma once
+
+#include <dsl/syntax.h>
+
+namespace luisa::render {
+
+using compute::make_uint2;
+using compute::UInt2;
+using compute::Expr;
+
+[[nodiscard]] constexpr auto u64_to_uint2(uint64_t x) noexcept {
+    return luisa::make_uint2(
+        static_cast<uint>(x >> 32u) /* hi */,
+        static_cast<uint>(x & ~0u) /* lo */);
+}
+
+[[nodiscard]] constexpr auto uint2_to_u64(uint2 v) noexcept {
+    return (static_cast<uint64_t>(v.x) << 32u) | v.y;
+}
+
+class U64 {
+
+private:
+    UInt2 _bits;
+
+public:
+    explicit U64(uint64_t u) noexcept: _bits{u64_to_uint2(u)} {}
+    explicit U64(Expr<uint2> u) noexcept : _bits{u} {}
+    explicit U64(Expr<uint> u) noexcept : _bits{make_uint2(0u, u)} {}
+    U64(Expr<uint> hi, Expr<uint> lo) noexcept : _bits{make_uint2(hi, lo)} {}
+    U64(U64 &&) noexcept = default;
+    U64(const U64 &) noexcept = default;
+    U64 &operator=(U64 &&) noexcept = default;
+    U64 &operator=(const U64 &) noexcept = default;
+    [[nodiscard]] auto hi() const noexcept { return _bits.x; }
+    [[nodiscard]] auto lo() const noexcept { return _bits.y; }
+    [[nodiscard]] auto bits() const noexcept { return _bits; }
+    [[nodiscard]] auto operator&(Expr<uint> rhs) const noexcept { return lo() & rhs; }
+    [[nodiscard]] auto operator&(const U64 &rhs) const noexcept { return U64{_bits & rhs._bits}; }
+    [[nodiscard]] auto operator|(Expr<uint> rhs) const noexcept { return U64{hi(), lo() | rhs}; }
+    [[nodiscard]] auto operator|(const U64 &rhs) const noexcept { return U64{_bits | rhs._bits}; }
+    [[nodiscard]] auto operator^(Expr<uint> rhs) const noexcept { return U64{hi(), lo() ^ rhs}; }
+    [[nodiscard]] auto operator^(const U64 &rhs) const noexcept { return U64{_bits ^ rhs._bits}; }
+    [[nodiscard]] auto operator>>(Expr<uint> rhs) const noexcept { return U64{hi() >> rhs, (hi() << (32u - rhs)) | (lo() >> rhs)}; }
+    [[nodiscard]] auto operator<<(Expr<uint> rhs) const noexcept { return U64{(hi() << rhs) | (lo() >> (32u - rhs)), lo() << rhs}; }
+    [[nodiscard]] auto operator==(const U64 &rhs) const noexcept { return all(_bits == rhs._bits); }
+    [[nodiscard]] auto operator==(Expr<uint> rhs) const noexcept { return hi() == 0u & lo() == rhs; }
+    [[nodiscard]] auto operator!=(const U64 &rhs) const noexcept { return !(*this == rhs); }
+    [[nodiscard]] auto operator!=(Expr<uint> rhs) const noexcept { return !(*this == rhs); }
+};
+
+}// namespace luisa::render

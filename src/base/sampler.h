@@ -19,11 +19,14 @@ public:
     class Instance {
 
     private:
+        const Pipeline &_pipeline;
         const Sampler *_sampler;
 
     public:
-        explicit Instance(const Sampler *sampler) noexcept : _sampler{sampler} {}
+        explicit Instance(const Pipeline &pipeline, const Sampler *sampler) noexcept
+            : _pipeline{pipeline}, _sampler{sampler} {}
         virtual ~Instance() noexcept = default;
+        [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
         [[nodiscard]] auto node() const noexcept { return _sampler; }
 
         // interfaces

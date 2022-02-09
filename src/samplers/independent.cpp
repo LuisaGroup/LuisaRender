@@ -15,16 +15,14 @@ class IndependentSampler;
 class IndependentSamplerInstance final : public Sampler::Instance {
 
 private:
-    Device &_device;
     uint2 _resolution;
     Buffer<uint> _states;
     luisa::optional<Var<uint>> _state;
     luisa::optional<Var<uint>> _pixel_id;
-    uint _seed;
     Shader1D<Buffer<uint>, uint, uint> _make_sampler_state;
 
 public:
-    IndependentSamplerInstance(Device &device, const IndependentSampler *sampler, uint _seed) noexcept;
+    IndependentSamplerInstance(const Pipeline &pipeline, const IndependentSampler *sampler) noexcept;
     void reset(CommandBuffer &command_buffer, uint2 resolution, uint spp) noexcept override;
     void start(Expr<uint2> pixel, Expr<uint> sample_index) noexcept override;
     void save_state() noexcept override;
@@ -42,41 +40,38 @@ public:
     IndependentSampler(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Sampler{scene, desc}, _seed{desc->property_uint_or_default("seed", 19980810u)} {}
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
-        return luisa::make_unique<IndependentSamplerInstance>(pipeline.device(), this, _seed);
+        return luisa::make_unique<IndependentSamplerInstance>(pipeline, this);
     }
+    [[nodiscard]] auto seed() const noexcept { return _seed; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
 };
 
-IndependentSamplerInstance::IndependentSamplerInstance(Device &device, const IndependentSampler *sampler, uint seed) noexcept
-    : Sampler::Instance{sampler}, _device{device}, _seed{seed} {
-    Kernel1D kernel = [](BufferUInt states, UInt seed, UInt width) noexcept {
-        auto tea = [](UInt s0, UInt v0, UInt v1) noexcept {
-            for (auto n = 0u; n < 4u; n++) {
-                s0 += 0x9e3779b9u;
-                v0 += ((v1 << 4) + 0xa341316cu) ^ (v1 + s0) ^ ((v1 >> 5u) + 0xc8013ea4u);
-                v1 += ((v0 << 4) + 0xad90777du) ^ (v0 + s0) ^ ((v0 >> 5u) + 0x7e95761eu);
-            }
-            return v0;
-        };
-        auto x = dispatch_x() % width;
-        auto y = dispatch_x() / width;
-        auto state = tea(seed, x, y);
-        states.write(dispatch_x(), state);
-    };
-    _make_sampler_state = _device.compile(kernel);
-}
+IndependentSamplerInstance::IndependentSamplerInstance(
+    const Pipeline &pipeline, const IndependentSampler *sampler) noexcept
+    : Sampler::Instance{pipeline, sampler} {}
 
 void IndependentSamplerInstance::reset(CommandBuffer &command_buffer, uint2 resolution, uint /* spp */) noexcept {
     _resolution = resolution;
     auto pixel_count = _resolution.x * _resolution.y;
     if (!_states || pixel_count > _states.size()) {
-        _states = _device.create_buffer<uint>(next_pow2(pixel_count));
+        _states = pipeline().device().create_buffer<uint>(next_pow2(pixel_count));
     }
-    command_buffer << _make_sampler_state(_states, _seed, _resolution.x).dispatch(pixel_count);
 }
 
-void IndependentSamplerInstance::start(Expr<uint2> pixel, Expr<uint> /* sample_index */) noexcept {
-    load_state(pixel);
+void IndependentSamplerInstance::start(Expr<uint2> pixel, Expr<uint> index) noexcept {
+    auto tea = [](UInt s0, UInt v0, UInt v1) noexcept {
+        for (auto n = 0u; n < 4u; n++) {
+            s0 += 0x9e3779b9u;
+            v0 += ((v1 << 4) + 0xa341316cu) ^ (v1 + s0) ^ ((v1 >> 5u) + 0xc8013ea4u);
+            v1 += ((v0 << 4) + 0xad90777du) ^ (v0 + s0) ^ ((v0 >> 5u) + 0x7e95761eu);
+        }
+        return v0;
+    };
+    auto seed = static_cast<const IndependentSampler *>(node())->seed();
+    _pixel_id = luisa::nullopt;
+    _pixel_id = pixel.y * _resolution.x + pixel.x;
+    _state = luisa::nullopt;
+    _state = tea(seed, index, *_pixel_id);
 }
 
 void IndependentSamplerInstance::save_state() noexcept {
@@ -85,7 +80,7 @@ void IndependentSamplerInstance::save_state() noexcept {
 
 void IndependentSamplerInstance::load_state(Expr<uint2> pixel) noexcept {
     _pixel_id = luisa::nullopt;
-    _pixel_id = pixel.y * _resolution.x + pixel.x;;
+    _pixel_id = pixel.y * _resolution.x + pixel.x;
     _state = luisa::nullopt;
     _state = _states.read(pixel.y * _resolution.x + pixel.x);
 }

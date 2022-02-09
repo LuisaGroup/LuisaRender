@@ -122,7 +122,7 @@ render {
   environment : Map {
     emission : Illum {
       file { "../envmaps/photo_studio_01_1k.hdr" }
-      // file { "/Users/mike/Downloads/car2/textures/envmap.exr" }
+      // file { "../envmaps/envmap.exr" }
       fp16 { true }
       // file { "/Users/mike/Downloads/dreifaltigkeitsberg_8k.exr" }
     }

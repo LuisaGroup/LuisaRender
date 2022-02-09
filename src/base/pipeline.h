@@ -182,8 +182,7 @@ public:
         return std::make_pair(view, buffer_id);
     }
 
-    [[nodiscard]] auto &device() noexcept { return _device; }
-    [[nodiscard]] const auto &device() const noexcept { return _device; }
+    [[nodiscard]] auto &device() const noexcept { return _device; }
 
     template<typename T>
     [[nodiscard]] auto bindless_buffer(Expr<uint> buffer_id) const noexcept { return _bindless_array.buffer<T>(buffer_id); }

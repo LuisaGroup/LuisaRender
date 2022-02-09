@@ -204,7 +204,6 @@ void MegakernelPathTracingInstance::_render_one_camera(
             };
         };
         film->accumulate(pixel_id, Li);
-        sampler->save_state();
     };
     auto render = pipeline.device().compile(render_kernel);
     auto shutter_samples = camera->node()->shutter_samples();

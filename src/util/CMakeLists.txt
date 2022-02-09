@@ -8,8 +8,13 @@ add_library(luisa-render-util SHARED
         spectrum_cie_illum_d65.inl.h
         colorspace.cpp colorspace.h
         srgb2spec.cpp
-        half.h ies.cpp ies.h
-        scattering.cpp scattering.h complex.h)
+        half.h
+        u64.h
+        ies.cpp ies.h
+        scattering.cpp scattering.h
+        bluenoise.cpp bluenoise.h
+        sobolmatrices.cpp sobolmatrices.h
+        complex.h)
 target_link_libraries(luisa-render-util PUBLIC
         luisa::compute
         luisa-render-include
