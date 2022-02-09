@@ -82,7 +82,7 @@ Shape teapot : Group {
           // color { 0.5, 0.5, 0.5 }
         }
         roughness : ConstGeneric {
-          v { 0.05 }
+          v { 0.001 }
         }
         remap_roughness { false }
         // eta { 1.7 }
