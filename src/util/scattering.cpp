@@ -294,10 +294,11 @@ Float4 MicrofacetTransmission::evaluate(Expr<float3> wo, Expr<float3> wi) const 
     auto wh = normalize(wo + wi * eta);
     wh = compute::sign(cos_theta(wh)) * wh;
     auto sqrtDenom = dot(wo, wh) + eta * dot(wi, wh);
+    auto factor = 1.f / eta;
     auto F = _fresnel.evaluate(dot(wo, wh));
     auto D = _distribution->D(wh);
     auto G = _distribution->G(wo, wi);
-    auto f = (1.f - F) * _t *
+    auto f = (1.f - F) * _t * sqr(factor) *
              abs(D * G * sqr(eta) * abs_dot(wi, wh) * abs_dot(wo, wh) /
                  (cosThetaI * cosThetaO * sqr(sqrtDenom)));
     auto valid = !same_hemisphere(wo, wi) &

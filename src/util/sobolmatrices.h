@@ -19,4 +19,4 @@ static constexpr auto VdCSobolMatrixInvSize = 26u;
 LUISA_EXPORT_API const uint64_t VdCSobolMatrices[VdCSobolMatrixSize][SobolMatrixSize];
 LUISA_EXPORT_API const uint64_t VdCSobolMatricesInv[VdCSobolMatrixInvSize][SobolMatrixSize];
 
-}  // namespace pbrt
+}// namespace luisa::render

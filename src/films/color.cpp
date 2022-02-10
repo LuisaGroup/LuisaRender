@@ -15,7 +15,7 @@ using namespace luisa::compute;
 class ColorFilm final : public Film {
 
 private:
-    std::array<float, 3> _scale{};
+    float3 _scale;
     bool _fp16{};
 
 public:
@@ -96,7 +96,7 @@ void ColorFilmInstance::accumulate(Expr<uint2> pixel, Expr<float3> rgb) const no
     auto valid = !any(isnan(rgb));
     auto old = _image.read(pixel);
     auto t = ite(valid, old.w + 1.0f, old.w);
-    auto threshold = 4096.0f;
+    auto threshold = 65536.0f;
     auto lum = dot(make_float3(0.212671f, 0.715160f, 0.072169f), rgb);
     auto c = rgb * (threshold / max(lum, threshold));
     auto color = ite(valid, lerp(old.xyz(), c, 1.0f / t), old.xyz());

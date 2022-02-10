@@ -6,7 +6,7 @@ Film film : Color {
 Camera camera : Pinhole {
   position { 0, 0, 5 }
   fov { 60 }
-  spp { 1024 }
+  spp { 4096 }
   film { @film }
   file { "../renders/envmap.exr" }
   shutter_span { 0, 0 }
@@ -21,8 +21,8 @@ Camera camera : Pinhole {
 Integrator normal : Normal {}
 
 Integrator pt : MegaPath {
-  sampler : PaddedSobol {}
-  depth { 16 }
+  sampler : Independent {}
+  depth { 32 }
   rr_depth { 3 }
 }
 
@@ -85,10 +85,10 @@ Shape teapot : Group {
         }
         remap_roughness { false }
         // eta { 1.7 }
-        // eta { "Sapphire" }
-        eta : ConstGeneric {
-          v { 1.5, 1.52, 1.6 }
-        }
+        eta { "Sapphire" }
+        // eta : ConstGeneric {
+        //   v { 1.5, 1.52, 1.6 }
+        // }
       }
     }
   }
