@@ -33,7 +33,7 @@ function(luisa_render_add_plugin name)
     cmake_parse_arguments(PLUGIN "" "CATEGORY" "SOURCES" ${ARGN})
     set(lib_name luisa-render-${PLUGIN_CATEGORY}-${name})
     add_library(${lib_name} MODULE ${PLUGIN_SOURCES})
-    target_link_libraries(${lib_name} PRIVATE luisa-render-base)
+    target_link_libraries(${lib_name} PRIVATE luisa-render-util luisa-render-base)
     target_compile_definitions(${lib_name} PRIVATE LUISA_RENDER_PLUGIN_NAME="${name}")
     add_dependencies(luisa-render-${PLUGIN_CATEGORY}s ${lib_name})
     set_target_properties(${lib_name} PROPERTIES

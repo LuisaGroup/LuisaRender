@@ -37,7 +37,7 @@
 namespace luisa::render {
 
 // clang-format off
-const uint32_t SobolMatrices32[NSobolDimensions * SobolMatrixSize] = {
+extern "C" const uint32_t SobolMatrices32[NSobolDimensions * SobolMatrixSize] = {
     0x80000000, 0x40000000, 0x20000000, 0x10000000, 0x08000000, 0x04000000,
     0x02000000, 0x01000000, 0x00800000, 0x00400000, 0x00200000, 0x00100000,
     0x00080000, 0x00040000, 0x00020000, 0x00010000, 0x00008000, 0x00004000,
@@ -8915,7 +8915,7 @@ const uint32_t SobolMatrices32[NSobolDimensions * SobolMatrixSize] = {
     0x6d8253b0, 0x59c0d35a, 0x34a32b93, 0x1397876e,
 };
 
-const uint64_t VdCSobolMatrices[VdCSobolMatrixSize][SobolMatrixSize] = {
+extern "C" const uint64_t VdCSobolMatrices[VdCSobolMatrixSize][SobolMatrixSize] = {
     {// m = 1
      0x1ULL, 0x1ULL, 0x1ULL, 0x1ULL, 0x1ULL, 0x1ULL, 0x1ULL, 0x1ULL, 0x1ULL,
      0x1ULL, 0x1ULL, 0x1ULL, 0x1ULL, 0x1ULL, 0x1ULL, 0x1ULL, 0x1ULL, 0x1ULL,
@@ -9041,7 +9041,7 @@ const uint64_t VdCSobolMatrices[VdCSobolMatrixSize][SobolMatrixSize] = {
     {// m = 25
      0x1400140ULL, 0x1e001e0ULL}};
 
-const uint64_t VdCSobolMatricesInv[VdCSobolMatrixInvSize][SobolMatrixSize] = {
+extern "C" const uint64_t VdCSobolMatricesInv[VdCSobolMatrixInvSize][SobolMatrixSize] = {
     {// m = 1
      0x2ULL, 0x3ULL},
     {// m = 2
