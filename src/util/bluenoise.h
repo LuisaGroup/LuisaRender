@@ -14,6 +14,6 @@ using compute::Volume;
 static constexpr auto BlueNoiseResolution = 128u;
 static constexpr auto NumBlueNoiseTextures = 48u;
 
-extern "C" const uint16_t BlueNoiseTextures[NumBlueNoiseTextures][BlueNoiseResolution][BlueNoiseResolution];
+LUISA_EXPORT_API const uint16_t BlueNoiseTextures[NumBlueNoiseTextures][BlueNoiseResolution][BlueNoiseResolution];
 
 }// namespace luisa::render
