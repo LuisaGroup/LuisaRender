@@ -1019,7 +1019,7 @@ Camera camera : Thinlens {
   look_at { 2.6, 0.68, -1.89 }
   aperture { 0.95 }
   focal_length { 50 }
-  spp { 16384 }
+  spp { 65536 }
   filter : Gaussian {
     radius { 1 }
   }
