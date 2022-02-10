@@ -3,6 +3,7 @@
 //
 
 #include <dsl/sugar.h>
+#include <util/u64.h>
 #include <util/sampling.h>
 #include <util/sobolmatrices.h>
 #include <base/sampler.h>
@@ -32,16 +33,20 @@ public:
     static constexpr auto max_dimension = 1024u;
 
 private:
-    uint _spp{};
+    uint _scale{};
     uint _width{};
-    luisa::optional<UInt> _dimension{};
-    luisa::optional<UInt> _pixel_index{};
-    luisa::optional<UInt> _sample_index{};
-    luisa::unique_ptr<Constant<uint>> _sobol_matrices;
-    Buffer<uint2> _state_buffer;
+    luisa::optional<UInt2> _pixel;
+    luisa::optional<UInt> _pixel_index;
+    luisa::optional<UInt> _seed;
+    luisa::optional<UInt> _dimension;
+    luisa::optional<U64> _sobol_index;
+    Buffer<uint> _sobol_matrices;
+    luisa::unique_ptr<Constant<uint2>> _vdc_sobol_matrices;
+    luisa::unique_ptr<Constant<uint2>> _vdc_sobol_matrices_inv;
+    Buffer<uint3> _state_buffer;
 
 private:
-    [[nodiscard]] static auto _fast_owen_scramble(UInt seed, UInt v) noexcept {
+    [[nodiscard]] static auto _fast_owen_scramble(Expr<uint> seed, UInt v) noexcept {
         v = reverse(v);
         v ^= v * 0x3d20adeau;
         v += seed;
@@ -51,26 +56,64 @@ private:
         return reverse(v);
     }
 
-    [[nodiscard]] auto _sobol_sample(UInt a, uint dimension, Expr<uint> hash) const noexcept {
+    [[nodiscard]] static auto _binary_permute_scramble(Expr<uint> seed, Expr<uint> v) noexcept {
+        return seed ^ v;
+    }
+
+    template<bool scramble>
+    [[nodiscard]] auto _sobol_sample(U64 a, Expr<uint> dimension, Expr<uint> hash) const noexcept {
         auto v = def(0u);
         auto i = def(dimension * SobolMatrixSize);
         $while(a != 0u) {
-            v = ite((a & 1u) != 0u, v ^ _sobol_matrices->read(i), v);
+            v = ite((a & 1u) != 0u, v ^ _sobol_matrices.read(i), v);
             a = a >> 1u;
-            i += 1u;
+            i = i + 1u;
         };
-        v = _fast_owen_scramble(hash, v);
+        if constexpr (scramble) { v = _fast_owen_scramble(hash, v); }
         return min(v * 0x1p-32f, one_minus_epsilon);
     }
+
+    [[nodiscard]] auto _sobol_interval_to_index(uint m, UInt frame, Expr<uint2> p) const noexcept {
+        if (m == 0u) { return U64{frame}; }
+        U64 delta;
+        auto c = def(0u);
+        $while(frame != 0u) {
+            auto vdc = _vdc_sobol_matrices->read(c);
+            auto delta_bits = ite((frame & 1u) != 0u, delta.bits() ^ vdc, delta.bits());
+            delta = U64{delta_bits};
+            frame = frame >> 1u;
+            c = c + 1u;
+        };
+        // flipped b
+        auto m2 = m << 1u;
+        auto index = U64{frame} << m2;
+        auto b = delta ^ ((U64{p.x} << m) | p.y);
+        auto d = def(0u);
+        $while(b != 0u) {
+            auto vdc_inv = _vdc_sobol_matrices_inv->read(d);
+            auto index_bits = ite((b & 1u) != 0u, index.bits() ^ vdc_inv, index.bits());
+            index = U64{index_bits};
+            b = b >> 1u;
+            d = d + 1u;
+        };
+        return index;
+    }
+
+    [[nodiscard]] static auto _log2_uint(uint x) noexcept {
+        auto n = 0u;
+        for (; (1u << n) < x; n++) {}
+        return n;
+    };
 
 public:
     explicit SobolSamplerInstance(
         const Pipeline &pipeline, CommandBuffer &command_buffer,
         const SobolSampler *s) noexcept
         : Sampler::Instance{pipeline, s} {
-        std::array<uint, SobolMatrixSize * 2u> sobol_matrices{};
-        std::memcpy(sobol_matrices.data(), SobolMatrices32, luisa::span{sobol_matrices}.size_bytes());
-        _sobol_matrices = luisa::make_unique<Constant<uint>>(sobol_matrices);
+        luisa::vector<uint4> vdc_sobol_matrices(SobolMatrixSize * VdCSobolMatrixSize);
+        _sobol_matrices = pipeline.device().create_buffer<uint>(SobolMatrixSize * NSobolDimensions);
+        command_buffer << _sobol_matrices.copy_from(SobolMatrices32)
+                       << commit();
     }
     void reset(CommandBuffer &command_buffer, uint2 resolution, uint spp) noexcept override {
         if (spp != next_pow2(spp)) {
@@ -78,40 +121,53 @@ public:
                 "Non power-of-two samples per pixel "
                 "is not optimal for Sobol' sampler.");
         }
-        _spp = spp;
         auto pixel_count = resolution.x * resolution.y;
         if (_state_buffer.size() < pixel_count) {
-            _state_buffer = pipeline().device().create_buffer<uint2>(
+            _state_buffer = pipeline().device().create_buffer<uint3>(
                 next_pow2(pixel_count));
         }
         _width = resolution.x;
+        _scale = next_pow2(std::max(resolution.x, resolution.y));
+        auto m = _log2_uint(_scale);
+        std::array<uint2, SobolMatrixSize> vdc_sobol_matrices;
+        std::array<uint2, SobolMatrixSize> vdc_sobol_matrices_inv;
+        for (auto i = 0u; i < SobolMatrixSize; i++) {
+            vdc_sobol_matrices[i] = u64_to_uint2(VdCSobolMatrices[m - 1u][i]);
+            vdc_sobol_matrices_inv[i] = u64_to_uint2(VdCSobolMatricesInv[m - 1u][i]);
+        }
+        _vdc_sobol_matrices = luisa::make_unique<Constant<uint2>>(vdc_sobol_matrices);
+        _vdc_sobol_matrices_inv = luisa::make_unique<Constant<uint2>>(vdc_sobol_matrices_inv);
     }
     void start(Expr<uint2> pixel, Expr<uint> sample_index) noexcept override {
+        _pixel.emplace(pixel);
         _dimension.emplace(0u);
+        _sobol_index.emplace(_sobol_interval_to_index(
+            _log2_uint(_scale), sample_index, pixel));
         _pixel_index.emplace(pixel.y * _width + pixel.x);
-        _sample_index.emplace(sample_index);
+        auto seed = static_cast<const SobolSampler *>(node())->seed();
+        _seed.emplace(xxhash32(make_uint2(seed, *_pixel_index)));
     }
     void save_state() noexcept override {
-        auto state = make_uint2(*_sample_index, *_dimension);
-        _state_buffer.write(*_pixel_index, state);
+        auto state = make_uint3(_sobol_index->bits(), *_dimension);
+        _state_buffer.write(_pixel->y * _width + _pixel->x, state);
     }
     void load_state(Expr<uint2> pixel) noexcept override {
+        _pixel.emplace(pixel);
         _pixel_index.emplace(pixel.y * _width + pixel.x);
+        auto seed = static_cast<const SobolSampler *>(node())->seed();
+        _seed.emplace(xxhash32(make_uint2(seed, *_pixel_index)));
         auto state = _state_buffer.read(*_pixel_index);
-        _sample_index.emplace(state.x);
-        _dimension.emplace(state.y);
+        _sobol_index.emplace(state.xy());
+        _dimension.emplace(state.z);
     }
     [[nodiscard]] Float generate_1d() noexcept override {
-        auto hash = xxhash32(make_uint3(*_pixel_index, *_sample_index, *_dimension));
-        auto u = _sobol_sample(*_sample_index, 0u, hash);
-        *_dimension += 1u;
+        auto u = _sobol_sample<true>(*_sobol_index, *_dimension, *_seed);
+        *_dimension = (*_dimension + 1u) % NSobolDimensions;
         return u;
     }
     [[nodiscard]] Float2 generate_2d() noexcept override {
-        auto hash = xxhash32(make_uint3(*_pixel_index, *_sample_index, *_dimension));
-        auto ux = _sobol_sample(*_sample_index, 0u, hash);
-        auto uy = _sobol_sample(*_sample_index, 1u, (hash << 16u) | (hash >> 16u));
-        *_dimension += 2u;
+        auto ux = generate_1d();
+        auto uy = generate_1d();
         return make_float2(ux, uy);
     }
 };

@@ -16,7 +16,7 @@ using compute::UInt2;
 [[nodiscard]] constexpr auto u64_to_uint2(uint64_t x) noexcept {
     return luisa::make_uint2(
         static_cast<uint>(x >> 32u) /* hi */,
-        static_cast<uint>(x & ~0u) /* lo */);
+        static_cast<uint>(x) /* lo */);
 }
 
 [[nodiscard]] constexpr auto uint2_to_u64(uint2 v) noexcept {

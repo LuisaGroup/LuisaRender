@@ -8915,7 +8915,7 @@ const uint32_t SobolMatrices32[NSobolDimensions * SobolMatrixSize] = {
     0x6d8253b0, 0x59c0d35a, 0x34a32b93, 0x1397876e,
 };
 
-const uint64_t VdCSobolMatrices[][SobolMatrixSize] = {
+const uint64_t VdCSobolMatrices[VdCSobolMatrixSize][SobolMatrixSize] = {
     {// m = 1
      0x1ULL, 0x1ULL, 0x1ULL, 0x1ULL, 0x1ULL, 0x1ULL, 0x1ULL, 0x1ULL, 0x1ULL,
      0x1ULL, 0x1ULL, 0x1ULL, 0x1ULL, 0x1ULL, 0x1ULL, 0x1ULL, 0x1ULL, 0x1ULL,
@@ -9041,7 +9041,7 @@ const uint64_t VdCSobolMatrices[][SobolMatrixSize] = {
     {// m = 25
      0x1400140ULL, 0x1e001e0ULL}};
 
-const uint64_t VdCSobolMatricesInv[][SobolMatrixSize] = {
+const uint64_t VdCSobolMatricesInv[VdCSobolMatrixInvSize][SobolMatrixSize] = {
     {// m = 1
      0x2ULL, 0x3ULL},
     {// m = 2

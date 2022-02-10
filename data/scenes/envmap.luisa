@@ -21,7 +21,7 @@ Camera camera : Pinhole {
 Integrator normal : Normal {}
 
 Integrator pt : MegaPath {
-  sampler : Sobol {}
+  sampler : PaddedSobol {}
   depth { 16 }
   rr_depth { 3 }
 }

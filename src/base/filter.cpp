@@ -55,7 +55,7 @@ Filter::Sample Filter::Instance::sample(Sampler::Instance &sampler) const noexce
     Constant pdfs = pdf_table();
     Constant alias_indices = alias_table_indices();
     Constant alias_probs = alias_table_probabilities();
-    auto u = sampler.generate_2d();
+    auto u = sampler.generate_pixel_2d();
     auto n = look_up_table_size - 1u;
     auto [iy, uy] = sample_alias_table(alias_probs, alias_indices, n, u.x);
     auto [ix, ux] = sample_alias_table(alias_probs, alias_indices, n, u.y);

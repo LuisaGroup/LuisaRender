@@ -36,6 +36,7 @@ public:
         virtual void load_state(Expr<uint2> pixel) noexcept = 0;
         [[nodiscard]] virtual Float generate_1d() noexcept = 0;
         [[nodiscard]] virtual Float2 generate_2d() noexcept = 0;
+        [[nodiscard]] virtual Float2 generate_pixel_2d() noexcept { return generate_2d(); }
     };
 
 public:
