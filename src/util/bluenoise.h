@@ -16,12 +16,4 @@ static constexpr auto NumBlueNoiseTextures = 48u;
 
 extern const uint16_t BlueNoiseTextures[NumBlueNoiseTextures][BlueNoiseResolution][BlueNoiseResolution];
 
-// Blue noise lookup functions
-inline auto BlueNoise(Expr<Volume<float>> textures, Expr<uint> textureIndex, Expr<uint2> p) noexcept {
-    auto t = textureIndex % NumBlueNoiseTextures;
-    auto x = p.x % BlueNoiseResolution;
-    auto y = p.y % BlueNoiseResolution;
-    return textures.read(make_uint3(y, x, t)).x;
-}
-
 }// namespace luisa::render

@@ -43,7 +43,7 @@ private:
     Buffer<uint> _sobol_matrices;
     luisa::unique_ptr<Constant<uint2>> _vdc_sobol_matrices;
     luisa::unique_ptr<Constant<uint2>> _vdc_sobol_matrices_inv;
-    Buffer<uint3> _state_buffer;
+    Buffer<uint4> _state_buffer;
 
 private:
     [[nodiscard]] static auto _fast_owen_scramble(Expr<uint> seed, UInt v) noexcept {
@@ -123,7 +123,7 @@ public:
         }
         auto pixel_count = resolution.x * resolution.y;
         if (_state_buffer.size() < pixel_count) {
-            _state_buffer = pipeline().device().create_buffer<uint3>(
+            _state_buffer = pipeline().device().create_buffer<uint4>(
                 next_pow2(pixel_count));
         }
         _width = resolution.x;
@@ -145,20 +145,19 @@ public:
             _log2_uint(_scale), sample_index, pixel));
         _pixel_index.emplace(pixel.y * _width + pixel.x);
         auto seed = static_cast<const SobolSampler *>(node())->seed();
-        _seed.emplace(xxhash32(make_uint2(seed, *_pixel_index)));
+        _seed.emplace(xxhash32(make_uint3(*_pixel_index, sample_index, seed)));
     }
     void save_state() noexcept override {
-        auto state = make_uint3(_sobol_index->bits(), *_dimension);
+        auto state = make_uint4(_sobol_index->bits(), *_dimension, *_seed);
         _state_buffer.write(_pixel->y * _width + _pixel->x, state);
     }
     void load_state(Expr<uint2> pixel) noexcept override {
         _pixel.emplace(pixel);
         _pixel_index.emplace(pixel.y * _width + pixel.x);
-        auto seed = static_cast<const SobolSampler *>(node())->seed();
-        _seed.emplace(xxhash32(make_uint2(seed, *_pixel_index)));
         auto state = _state_buffer.read(*_pixel_index);
         _sobol_index.emplace(state.xy());
         _dimension.emplace(state.z);
+        _seed.emplace(state.w);
     }
     [[nodiscard]] Float generate_1d() noexcept override {
         auto u = _sobol_sample<true>(*_sobol_index, *_dimension, *_seed);
