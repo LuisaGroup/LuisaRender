@@ -45,6 +45,7 @@ public:
     [[nodiscard]] Float operator()(Expr<float> lambda) const noexcept;
     [[nodiscard]] Float4 operator()(Expr<float4> lambda) const noexcept;
     [[nodiscard]] Float maximum() const noexcept;
+    [[nodiscard]] auto c() const noexcept { return make_float3(_c0, _c1, _c2); }
 };
 
 class RGB2SpectrumTable {
@@ -132,6 +133,7 @@ public:
     [[nodiscard]] auto sample(const SampledWavelengths &swl) const noexcept {
         return _rsp(swl.lambda());
     }
+    [[nodiscard]] auto rsp() const noexcept { return _rsp; }
 };
 
 class RGBUnboundSpectrum {
@@ -146,6 +148,8 @@ public:
     [[nodiscard]] auto sample(const SampledWavelengths &swl) const noexcept {
         return _rsp(swl.lambda()) * _scale;
     }
+    [[nodiscard]] auto rsp() const noexcept { return _rsp; }
+    [[nodiscard]] auto scale() const noexcept { return _scale; }
 };
 
 class RGBIlluminantSpectrum {
@@ -165,6 +169,8 @@ public:
     [[nodiscard]] auto sample(const SampledWavelengths &swl) const noexcept {
         return _rsp(swl.lambda()) * _scale * _illuminant->sample(swl);
     }
+    [[nodiscard]] auto rsp() const noexcept { return _rsp; }
+    [[nodiscard]] auto scale() const noexcept { return _scale; }
 };
 
 }// namespace luisa::render

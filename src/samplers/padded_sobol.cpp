@@ -3,7 +3,7 @@
 //
 
 #include <dsl/sugar.h>
-#include <util/sampling.h>
+#include <util/rng.h>
 #include <util/sobolmatrices.h>
 #include <base/sampler.h>
 #include <base/pipeline.h>

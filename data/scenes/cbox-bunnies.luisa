@@ -9,13 +9,13 @@ Camera camera_base {
     radius { 1 }
   }
   fov { 27.8 }
-  spp { 128 }
+  spp { 16384 }
 }
 
 Camera camera : Pinhole(@camera_base) {
   position { -0.01, 0.995, 5.0 }
-  file { "../renders/cbox-bunnies.exr" }
-  shutter_span { 0, 0.1 }
+  file { "../renders/cbox-bunnies-normal.exr" }
+  shutter_span { 0, 1 }
 }
 
 import "../meshes/cbox.luisa"
@@ -25,6 +25,7 @@ Integrator normal : Normal {
 }
 
 Integrator pt : MegaPath {
+  sampler : Independent {}
   depth { 10 }
 }
 
@@ -45,8 +46,8 @@ Shape bunny : Mesh {
     translate { 0.4, 0.5, 0.4 }
     rotate { 0, 1, 0, 20 }
   }
-  surface : Mirror {
-    color : ConstColor {
+  surface : Matte {
+    Kd : PrimHash {
       color { 1.0, 0.71, 0.29 }
     }
   }
@@ -60,18 +61,33 @@ Shape light : Mesh {
       SRT {
         scale { 0.2 }
         translate { 0.2, 0.1, 0.9 }
-        rotate { 0, 1, 0, -20 }
+        rotate { 0, 1, 0, 0 }
       },
       SRT {
         scale { 0.2 }
         translate { 0.2, 0.1, 0.9 }
-        rotate { 0, 1, 0, 60 }
+        rotate { 0, 1, 0, 90 }
+      },
+      SRT {
+        scale { 0.2 }
+        translate { 0.2, 0.1, 0.9 }
+        rotate { 0, 1, 0, 180 }
+      },
+      SRT {
+        scale { 0.2 }
+        translate { 0.2, 0.1, 0.9 }
+        rotate { 0, 1, 0, 270 }
+      },
+      SRT {
+        scale { 0.2 }
+        translate { 0.2, 0.1, 0.9 }
+        rotate { 0, 1, 0, 360 }
       }
     }
-    time_points { 0, 0.1 }
+    time_points { 0.0, 0.25, 0.5, 0.75, 1.0 }
   }
-  surface : Mirror {
-    color : ConstColor {
+  surface : Matte {
+    Kd : PrimHash {
       color { 0.28, 0.9, 0.182 }
     }
   }
@@ -94,19 +110,24 @@ Shape light_box : Group {
 
 Shape group : Group {
   shapes {
-    @cbox-short-box,
+    Instance {
+      shape { @cbox-short-box }
+      surface : Matte {
+        Kd : PrimHash {}
+      }
+    },
     Instance {
       shape { @cbox-tall-box }
       surface : Mirror {}
     },
     Instance {
       shape { @bunny }
-      light : Diffuse {
-        emission : ConstIllum {
-          emission { 0.4, 1.6, 3.2 }
-        }
-        scale { 1.5 }
-      }
+      // light : Diffuse {
+      //   emission : ConstIllum {
+      //     emission { 0.4, 1.6, 3.2 }
+      //   }
+      //   scale { 1.5 }
+      // }
       surface { @cbox-red }
       transform : SRT {
         rotate { 0, 1, 0, 30 }

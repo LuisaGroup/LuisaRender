@@ -378,8 +378,8 @@ luisa::unique_ptr<Interaction> Pipeline::interaction(const Var<Ray> &ray, const 
             alpha = tex2d(shape_ref->alpha_texture_id()).sample(uv_ref).x;
         };
         it = Interaction{
-            std::move(shape), hit.prim, area,
-            p, wo, ng, uv, ns, t, alpha};
+            std::move(shape), hit.inst, hit.prim,
+            area, p, wo, ng, uv, ns, t, alpha};
     };
     return luisa::make_unique<Interaction>(std::move(it));
 }

@@ -27,6 +27,12 @@ public:
     class Handle;
     class VertexAttribute;
 
+    enum struct Tag {
+        MESH,
+        INSTANCE,
+        VIRTUAL
+    };
+
 public:
     static constexpr auto property_flag_two_sided = 1u << 0u;
     static constexpr auto property_flag_has_surface = 1u << 1u;
@@ -37,6 +43,7 @@ private:
     const Surface *_surface;
     const Light *_light;
     const Transform *_transform;
+    bool _visible;
     luisa::optional<bool> _two_sided;
 
 public:

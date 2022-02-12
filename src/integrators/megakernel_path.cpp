@@ -93,7 +93,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
         auto pixel_id = dispatch_id().xy();
         sampler->start(pixel_id, frame_index);
         auto pixel = make_float2(pixel_id) + 0.5f;
-        auto beta = def(make_float4(shutter_weight));
+        auto beta = def(make_float4(1.f));
         auto [filter_offset, filter_weight] = filter->sample(*sampler);
         pixel += filter_offset;
         beta *= filter_weight;
@@ -142,7 +142,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
             // alpha
             auto alpha = it->alpha();
             auto u_alpha = sampler->generate_1d();
-            $if (u_alpha >= alpha) {
+            $if(u_alpha >= alpha) {
                 ray = it->spawn_ray(-it->wo());
                 pdf_bsdf = 1e16f;
                 $continue;
@@ -203,7 +203,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
                 beta *= 1.0f / q;
             };
         };
-        film->accumulate(pixel_id, Li);
+        film->accumulate(pixel_id, Li * shutter_weight);
     };
     auto render = pipeline.device().compile(render_kernel);
     auto shutter_samples = camera->node()->shutter_samples();
@@ -211,17 +211,18 @@ void MegakernelPathTracingInstance::_render_one_camera(
 
     Clock clock;
     auto dispatch_count = 0u;
-    auto dispatches_per_commit = 64u;
+    auto dispatches_per_commit = 8u;
+    auto sample_id = 0u;
     for (auto s : shutter_samples) {
+        if (pipeline.update_geometry(command_buffer, s.point.time)) { dispatch_count = 0u; }
+        auto camera_to_world = camera->node()->transform()->matrix(s.point.time);
+        auto camera_to_world_normal = transpose(inverse(make_float3x3(camera_to_world)));
+        auto env_to_world = env == nullptr || env->node()->transform()->is_identity() ?
+                                make_float3x3(1.0f) :
+                                transpose(inverse(make_float3x3(
+                                    env->node()->transform()->matrix(s.point.time))));
         for (auto i = 0u; i < s.spp; i++) {
-            if (pipeline.update_geometry(command_buffer, s.point.time)) { dispatch_count = 0u; }
-            auto camera_to_world = camera->node()->transform()->matrix(s.point.time);
-            auto camera_to_world_normal = transpose(inverse(make_float3x3(camera_to_world)));
-            auto env_to_world = env == nullptr || env->node()->transform()->is_identity() ?
-                                    make_float3x3(1.0f) :
-                                    transpose(inverse(make_float3x3(
-                                        env->node()->transform()->matrix(s.point.time))));
-            command_buffer << render(i, camera_to_world, camera_to_world_normal,
+            command_buffer << render(sample_id++, camera_to_world, camera_to_world_normal,
                                      env_to_world, s.point.time, s.point.weight)
                                   .dispatch(resolution);
             if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {

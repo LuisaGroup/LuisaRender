@@ -72,7 +72,7 @@ void NormalVisualizerInstance::_render_one_camera(
         auto pixel_id = dispatch_id().xy();
         sampler->start(pixel_id, frame_index);
         auto pixel = make_float2(pixel_id) + 0.5f;
-        auto path_weight = def(make_float3(shutter_weight));
+        auto path_weight = def(1.f);
         auto [filter_offset, filter_weight] = filter->sample(*sampler);
         pixel += filter_offset;
         path_weight *= filter_weight;
@@ -85,20 +85,21 @@ void NormalVisualizerInstance::_render_one_camera(
             interaction->valid(),
             interaction->shading().n() * 0.5f + 0.5f,
             make_float3());
-        film->accumulate(pixel_id, path_weight * color);
+        film->accumulate(pixel_id, shutter_weight * path_weight * color);
     };
     auto render = pipeline.device().compile(render_kernel);
     auto shutter_samples = camera->node()->shutter_samples();
     stream << synchronize();
     Clock clock;
+    auto sample_id = 0u;
     auto dispatch_count = 0u;
     auto dispatches_per_commit = 64u;
     for (auto s : shutter_samples) {
+        if (pipeline.update_geometry(command_buffer, s.point.time)) { dispatch_count = 0u; }
+        auto camera_to_world = camera->node()->transform()->matrix(s.point.time);
+        auto camera_to_world_normal = transpose(inverse(make_float3x3(camera_to_world)));
         for (auto i = 0u; i < s.spp; i++) {
-            if (pipeline.update_geometry(command_buffer, s.point.time)) { dispatch_count = 0u; }
-            auto camera_to_world = camera->node()->transform()->matrix(s.point.time);
-            auto camera_to_world_normal = transpose(inverse(make_float3x3(camera_to_world)));
-            command_buffer << render(i, camera_to_world, camera_to_world_normal,
+            command_buffer << render(sample_id++, camera_to_world, camera_to_world_normal,
                                      s.point.time, s.point.weight).dispatch(resolution);
             if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
                 command_buffer << commit();

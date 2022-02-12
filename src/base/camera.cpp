@@ -36,7 +36,7 @@ Camera::Camera(Scene *scene, const SceneNodeDesc *desc) noexcept
     }
     if (_shutter_span.x != _shutter_span.y) {
         if (_shutter_samples == 0u) {
-            _shutter_samples = std::max(_spp, 1024u);
+            _shutter_samples = std::min(_spp, 256u);
         } else if (_shutter_samples > _spp) {
             LUISA_WARNING(
                 "Too many shutter samples ({}), "

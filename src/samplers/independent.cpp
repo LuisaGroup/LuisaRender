@@ -4,7 +4,7 @@
 
 #include <luisa-compute.h>
 
-#include <util/sampling.h>
+#include <util/rng.h>
 #include <base/pipeline.h>
 #include <base/sampler.h>
 

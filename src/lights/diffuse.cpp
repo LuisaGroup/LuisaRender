@@ -35,7 +35,7 @@ public:
         : Light{scene, desc},
           _emission{scene->load_texture(desc->property_node_or_default(
               "emission", SceneNodeDesc::shared_default_texture("ConstIllum")))},
-         _scale{std::max(desc->property_float_or_default("scale", 1.0f), 0.0f)} {
+          _scale{std::max(desc->property_float_or_default("scale", 1.0f), 0.0f)} {
         if (_emission->category() != Texture::Category::ILLUMINANT) [[unlikely]] {
             LUISA_ERROR(
                 "Non-illuminant textures are not "
@@ -49,8 +49,7 @@ public:
     [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint instance_id, const Shape *shape) const noexcept override {
         auto texture = pipeline.encode_texture(command_buffer, _emission);
         DiffuseLightParams params{
-            .emission = *texture, .scale = _scale,
-            .triangle_count = static_cast<uint>(shape->triangles().size())};
+            .emission = *texture, .scale = _scale, .triangle_count = static_cast<uint>(shape->triangles().size())};
         auto [buffer_view, buffer_id] = pipeline.arena_buffer<DiffuseLightParams>(1u);
         command_buffer << buffer_view.copy_from(&params) << luisa::compute::commit();
         return buffer_id;
@@ -98,7 +97,9 @@ public:
         auto uvw = sample_uniform_triangle(sampler.generate_2d());
         auto [p, ng, area] = _pipeline.surface_point_geometry(light_inst, light_to_world, triangle, uvw);
         auto [ns, tangent, uv] = _pipeline.surface_point_attributes(light_inst, light_to_world_normal, triangle, uvw);
-        Interaction it_light{light_inst, triangle_id, area, p, normalize(it_from.p() - p), ng, uv, ns, tangent};
+        Interaction it_light{
+            light_inst, light_inst_id, triangle_id, area, p,
+            normalize(it_from.p() - p), ng, uv, ns, tangent};
         DiffuseLightClosure closure{_pipeline, _swl, _time};
         return {.eval = closure._evaluate(it_light, it_from.p(), params),
                 .shadow_ray = it_from.spawn_ray_to(p)};

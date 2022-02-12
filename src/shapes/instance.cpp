@@ -8,13 +8,13 @@
 
 namespace luisa::render {
 
-class ShapeGroup final : public Shape {
+class ShapeInstance final : public Shape {
 
 private:
     const Shape *_shape;
 
 public:
-    ShapeGroup(Scene *scene, const SceneNodeDesc *desc) noexcept
+    ShapeInstance(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Shape{scene, desc}, _shape{scene->load_shape(desc->property_node("shape"))} {}
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] bool is_mesh() const noexcept override { return false; }
@@ -28,4 +28,4 @@ public:
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::ShapeGroup)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::ShapeInstance)

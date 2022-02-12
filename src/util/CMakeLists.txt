@@ -10,6 +10,7 @@ add_library(luisa-render-util SHARED
         srgb2spec.cpp
         half.h
         u64.h
+        rng.cpp rng.h
         ies.cpp ies.h
         scattering.cpp scattering.h
         bluenoise.cpp bluenoise.h

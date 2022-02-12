@@ -5,3 +5,4 @@ luisa_render_add_plugin(constgeneric CATEGORY texture SOURCES constant_generic.c
 luisa_render_add_plugin(color CATEGORY texture SOURCES color.cpp)
 luisa_render_add_plugin(illum CATEGORY texture SOURCES illuminant.cpp)
 luisa_render_add_plugin(generic CATEGORY texture SOURCES generic.cpp)
+luisa_render_add_plugin(primhash CATEGORY texture SOURCES primitive_hash.cpp)
