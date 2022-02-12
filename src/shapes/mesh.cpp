@@ -16,7 +16,7 @@ class MeshLoader {
 
 private:
     luisa::vector<float3> _positions;
-    luisa::vector<VertexAttribute> _attributes;
+    luisa::vector<Shape::VertexAttribute> _attributes;
     luisa::vector<Triangle> _triangles;
     bool _has_uv{};
 
@@ -106,7 +106,7 @@ public:
                 auto n = make_float3(ai_normals[i].x, ai_normals[i].y, ai_normals[i].z);
                 auto t = compute_tangent(i, n);
                 auto uv = compute_uv(i);
-                loader._attributes[i] = VertexAttribute::encode(n, t, uv);
+                loader._attributes[i] = Shape::VertexAttribute::encode(n, t, uv);
                 loader._positions[i] = make_float3(ai_positions[i].x, ai_positions[i].y, ai_positions[i].z);
             }
             auto triangle_count = mesh->mNumFaces;
@@ -132,6 +132,7 @@ class Mesh final : public Shape {
 private:
     std::shared_future<MeshLoader> _loader;
     std::shared_future<LoadedImage> _alpha_image;
+    AccelBuildHint _build_hint{AccelBuildHint::FAST_TRACE};
     float _alpha{1.f};
 
 public:
@@ -144,6 +145,12 @@ public:
         } else {
             _alpha = desc->property_float_or_default("alpha", 1.f);
         }
+        auto hint = desc->property_string_or_default("build_hint", "");
+        if (hint == "fast_update") {
+            _build_hint = AccelBuildHint::FAST_UPDATE;
+        } else if (hint == "fast_rebuild") {
+            _build_hint = AccelBuildHint::FAST_REBUILD;
+        }
     }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::span<const Shape *const> children() const noexcept override { return {}; }
@@ -151,7 +158,7 @@ public:
     [[nodiscard]] bool is_mesh() const noexcept override { return true; }
     [[nodiscard]] bool is_virtual() const noexcept override { return false; }
     [[nodiscard]] luisa::span<const float3> positions() const noexcept override { return _loader.get().positions(); }
-    [[nodiscard]] luisa::span<const VertexAttribute> attributes() const noexcept override { return _loader.get().attributes(); }
+    [[nodiscard]] luisa::span<const Shape::VertexAttribute> attributes() const noexcept override { return _loader.get().attributes(); }
     [[nodiscard]] luisa::span<const Triangle> triangles() const noexcept override { return _loader.get().triangles(); }
     [[nodiscard]] float alpha() const noexcept override { return _alpha; }
     [[nodiscard]] const LoadedImage *alpha_image() const noexcept override {

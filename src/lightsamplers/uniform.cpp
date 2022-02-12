@@ -31,7 +31,7 @@ public:
             pipeline.lights().cbegin(), pipeline.lights().cend(),
             light_to_instance_id.begin(),
             [](auto light) noexcept {
-                return InstancedShape::encode_light_buffer_id_and_tag(
+                return Shape::Handle::encode_light_buffer_id_and_tag(
                     light.second.instance_id, light.second.tag);
             });
         command_buffer << view.copy_from(light_to_instance_id.data())
@@ -48,8 +48,8 @@ public:
         auto n = static_cast<uint>(pipeline().lights().size());
         auto i = clamp(cast<uint>(u * static_cast<float>(n)), 0u, n - 1u);
         auto instance_id_and_light_tag = pipeline().buffer<uint>(_light_buffer_id).read(i);
-        auto instance_id = instance_id_and_light_tag >> InstancedShape::light_buffer_id_shift;
-        auto light_tag = instance_id_and_light_tag & InstancedShape::light_tag_mask;
+        auto instance_id = instance_id_and_light_tag >> Shape::Handle::light_buffer_id_shift;
+        auto light_tag = instance_id_and_light_tag & Shape::Handle::light_tag_mask;
         return {instance_id, light_tag, pmf(it)};
     }
 };

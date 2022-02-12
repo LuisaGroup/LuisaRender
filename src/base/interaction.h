@@ -21,7 +21,7 @@ using luisa::compute::UInt;
 class Interaction {
 
 private:
-    Var<InstancedShape> _shape;
+    Var<Shape::Handle> _shape;
     Float3 _p;
     Float3 _wo;
     Float3 _ng;
@@ -37,11 +37,11 @@ public:
         : _wo{wo}, _prim_id{~0u}, _alpha{alpha} {}
     Interaction(Expr<float3> wo, Expr<float2> uv, Expr<float> alpha = 1.f) noexcept
         : _wo{wo}, _uv{uv}, _prim_id{~0u}, _alpha{alpha} {}
-    Interaction(Var<InstancedShape> shape, Expr<uint> prim_id, Expr<float> prim_area,
+    Interaction(Var<Shape::Handle> shape, Expr<uint> prim_id, Expr<float> prim_area,
                 Expr<float3> p, Expr<float3> wo, Expr<float3> ng, Expr<float> alpha = 1.f) noexcept
         : _shape{std::move(shape)}, _p{p}, _wo{wo}, _ng{ng}, _shading{Frame::make(_ng)},
           _prim_id{prim_id}, _prim_area{prim_area}, _alpha{alpha} {}
-    Interaction(Var<InstancedShape> shape, Expr<uint> prim_id, Expr<float> prim_area,
+    Interaction(Var<Shape::Handle> shape, Expr<uint> prim_id, Expr<float> prim_area,
                 Expr<float3> p, Expr<float3> wo, Expr<float3> ng, Expr<float2> uv,
                 Expr<float3> ns, Expr<float3> tangent, Expr<float> alpha = 1.f) noexcept
         : _shape{std::move(shape)}, _p{p}, _wo{wo}, _ng{ng}, _uv{uv},

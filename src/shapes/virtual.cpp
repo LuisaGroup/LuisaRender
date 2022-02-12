@@ -32,8 +32,8 @@ public:
             make_float3(0.0f, 1.0f, 0.0f)};
         return p;
     }
-    [[nodiscard]] luisa::span<const VertexAttribute> attributes() const noexcept override {
-        static const auto attr = VertexAttribute::encode(
+    [[nodiscard]] luisa::span<const Shape::VertexAttribute> attributes() const noexcept override {
+        static const auto attr = Shape::VertexAttribute::encode(
             make_float3(0.0f, 0.0f, 1.0f),
             make_float3(1.0f, 0.0f, 0.0f),
             make_float2(0.0f));
@@ -65,7 +65,7 @@ public:
     [[nodiscard]] bool is_virtual() const noexcept override { return true; }
     [[nodiscard]] bool deformable() const noexcept override { return false; }
     [[nodiscard]] luisa::span<const float3> positions() const noexcept override { return {}; }
-    [[nodiscard]] luisa::span<const VertexAttribute> attributes() const noexcept override { return {}; }
+    [[nodiscard]] luisa::span<const Shape::VertexAttribute> attributes() const noexcept override { return {}; }
     [[nodiscard]] luisa::span<const Triangle> triangles() const noexcept override { return {}; }
     [[nodiscard]] luisa::span<const Shape *const> children() const noexcept override { return _children; }
 };

@@ -105,9 +105,9 @@ private:
     luisa::vector<const Texture *> _illuminant_texture_interfaces;
     luisa::vector<const Texture *> _generic_texture_interfaces;
     luisa::unordered_map<const Texture *, luisa::unique_ptr<TextureHandle>> _texture_handles;
-    luisa::vector<InstancedShape> _instances;
+    luisa::vector<Shape::Handle> _instances;
     luisa::vector<InstancedTransform> _dynamic_transforms;
-    Buffer<InstancedShape> _instance_buffer;
+    Buffer<Shape::Handle> _instance_buffer;
     luisa::vector<luisa::unique_ptr<Camera::Instance>> _cameras;
     luisa::vector<luisa::unique_ptr<Filter::Instance>> _filters;
     luisa::vector<luisa::unique_ptr<Film::Instance>> _films;
@@ -223,13 +223,13 @@ public:
     [[nodiscard]] Var<Hit> trace_closest(const Var<Ray> &ray) const noexcept;
     [[nodiscard]] Var<bool> trace_any(const Var<Ray> &ray) const noexcept;
     [[nodiscard]] luisa::unique_ptr<Interaction> interaction(const Var<Ray> &ray, const Var<Hit> &hit) const noexcept;
-    [[nodiscard]] std::pair<Var<InstancedShape>, Var<float4x4>> instance(Expr<uint> index) const noexcept;
-    [[nodiscard]] Var<Triangle> triangle(const Var<InstancedShape> &instance, Expr<uint> index) const noexcept;
+    [[nodiscard]] std::pair<Var<Shape::Handle>, Var<float4x4>> instance(Expr<uint> index) const noexcept;
+    [[nodiscard]] Var<Triangle> triangle(const Var<Shape::Handle> &instance, Expr<uint> index) const noexcept;
     [[nodiscard]] std::tuple<Var<float3> /* position */, Var<float3> /* ng */, Var<float> /* area */>
-    surface_point_geometry(const Var<InstancedShape> &instance, const Var<float4x4> &shape_to_world,
+    surface_point_geometry(const Var<Shape::Handle> &instance, const Var<float4x4> &shape_to_world,
                            const Var<Triangle> &triangle, const Var<float3> &uvw) const noexcept;
     [[nodiscard]] std::tuple<Var<float3> /* ns */, Var<float3> /* tangent */, Var<float2> /* uv */>
-    surface_point_attributes(const Var<InstancedShape> &instance, const Var<float3x3> &shape_to_world_normal,
+    surface_point_attributes(const Var<Shape::Handle> &instance, const Var<float3x3> &shape_to_world_normal,
                              const Var<Triangle> &triangle, const Var<float3> &uvw) const noexcept;
     [[nodiscard]] auto intersect(const Var<Ray> &ray) const noexcept { return interaction(ray, trace_closest(ray)); }
     [[nodiscard]] auto intersect_any(const Var<Ray> &ray) const noexcept { return trace_any(ray); }

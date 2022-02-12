@@ -19,7 +19,7 @@ inline Pipeline::Pipeline(Device &device) noexcept
       _position_buffer_arena{luisa::make_unique<BufferArena>(
           device, vertex_buffer_arena_size_elements * sizeof(float3))},
       _attribute_buffer_arena{luisa::make_unique<BufferArena>(
-          device, vertex_buffer_arena_size_elements * sizeof(VertexAttribute))},
+          device, vertex_buffer_arena_size_elements * sizeof(Shape::VertexAttribute))},
       _general_buffer_arena{luisa::make_unique<BufferArena>(device, 16_mb)} {}
 
 Pipeline::~Pipeline() noexcept = default;
@@ -30,7 +30,7 @@ void Pipeline::_build_geometry(
 
     _accel = _device.create_accel(hint);
     for (auto shape : shapes) { _process_shape(command_buffer, shape); }
-    _instance_buffer = _device.create_buffer<InstancedShape>(_instances.size());
+    _instance_buffer = _device.create_buffer<Shape::Handle>(_instances.size());
     command_buffer << _instance_buffer.copy_from(_instances.data())
                    << _accel.build();// FIXME: adding commit() leads to wrong rendering, why?
 }
@@ -72,7 +72,7 @@ void Pipeline::_process_shape(
 
                 // create mesh
                 auto position_buffer_view = _position_buffer_arena->allocate<float3>(positions.size());
-                auto attribute_buffer_view = _attribute_buffer_arena->allocate<VertexAttribute>(attributes.size());
+                auto attribute_buffer_view = _attribute_buffer_arena->allocate<Shape::VertexAttribute>(attributes.size());
                 if (position_buffer_view.offset() != attribute_buffer_view.offset()) [[unlikely]] {
                     LUISA_ERROR_WITH_LOCATION("Position and attribute buffer offsets mismatch.");
                 }
@@ -144,7 +144,7 @@ void Pipeline::_process_shape(
         }
 
         // create instance
-        InstancedShape instance{};
+        Shape::Handle instance{};
         instance.buffer_id_base = mesh.buffer_id_base;
         auto shape_properties = 0u;
         if (two_sided) { shape_properties |= Shape::property_flag_two_sided; }
@@ -155,7 +155,7 @@ void Pipeline::_process_shape(
             } else {
                 auto m = _process_surface(command_buffer, instance_id, shape, material);
                 shape_properties |= Shape::property_flag_has_surface;
-                instance.surface_buffer_id_and_tag = InstancedShape::encode_surface_buffer_id_and_tag(m.buffer_id, m.tag);
+                instance.surface_buffer_id_and_tag = Shape::Handle::encode_surface_buffer_id_and_tag(m.buffer_id, m.tag);
             }
         }
         if (light != nullptr && !light->is_null()) {
@@ -166,7 +166,7 @@ void Pipeline::_process_shape(
             } else {
                 auto l = _process_light(command_buffer, instance_id, shape, light);
                 shape_properties |= Shape::property_flag_has_light;
-                instance.light_buffer_id_and_tag = InstancedShape::encode_light_buffer_id_and_tag(l.buffer_id, l.tag);
+                instance.light_buffer_id_and_tag = Shape::Handle::encode_light_buffer_id_and_tag(l.buffer_id, l.tag);
             }
         }
 
@@ -176,7 +176,7 @@ void Pipeline::_process_shape(
             shape_properties |= Shape::property_flag_constant_alpha;
         }
         instance.alpha_texture_id_and_properties =
-            InstancedShape::encode_alpha_texture_id_and_properties(
+            Shape::Handle::encode_alpha_texture_id_and_properties(
                 alpha_texture, shape_properties);
         _instances.emplace_back(instance);
     } else {
@@ -195,7 +195,7 @@ Pipeline::MaterialData Pipeline::_process_surface(CommandBuffer &command_buffer,
         if (auto iter = _surface_tags.find(impl_type);
             iter != _surface_tags.cend()) { return iter->second; }
         auto t = static_cast<uint32_t>(_surface_interfaces.size());
-        if (t > InstancedShape::surface_tag_mask) [[unlikely]] {
+        if (t > Shape::Handle::surface_tag_mask) [[unlikely]] {
             LUISA_ERROR_WITH_LOCATION("Too many material tags.");
         }
         _surface_interfaces.emplace_back(material);
@@ -213,7 +213,7 @@ Pipeline::LightData Pipeline::_process_light(CommandBuffer &command_buffer, uint
         if (auto iter = _light_tags.find(impl_type);
             iter != _light_tags.cend()) { return iter->second; }
         auto t = static_cast<uint32_t>(_light_interfaces.size());
-        if (t > InstancedShape::light_tag_mask) [[unlikely]] {
+        if (t > Shape::Handle::light_tag_mask) [[unlikely]] {
             LUISA_ERROR_WITH_LOCATION("Too many light tags.");
         }
         _light_interfaces.emplace_back(light);
@@ -307,18 +307,18 @@ std::tuple<const Camera::Instance *, const Film::Instance *, const Filter::Insta
     return std::make_tuple(_cameras[i].get(), _films[i].get(), _filters[i].get());
 }
 
-std::pair<Var<InstancedShape>, Var<float4x4>> Pipeline::instance(Expr<uint> i) const noexcept {
+std::pair<Var<Shape::Handle>, Var<float4x4>> Pipeline::instance(Expr<uint> i) const noexcept {
     auto instance = _instance_buffer.read(i);
     auto transform = _accel.instance_to_world(i);
     return std::make_pair(std::move(instance), std::move(transform));
 }
 
-Var<Triangle> Pipeline::triangle(const Var<InstancedShape> &instance, Expr<uint> i) const noexcept {
+Var<Triangle> Pipeline::triangle(const Var<Shape::Handle> &instance, Expr<uint> i) const noexcept {
     return buffer<Triangle>(instance->triangle_buffer_id()).read(i);
 }
 
 std::tuple<Var<float3>, Var<float3>, Var<float>> Pipeline::surface_point_geometry(
-    const Var<InstancedShape> &instance, const Var<float4x4> &shape_to_world,
+    const Var<Shape::Handle> &instance, const Var<float4x4> &shape_to_world,
     const Var<Triangle> &triangle, const Var<float3> &uvw) const noexcept {
 
     auto world = [&m = shape_to_world](auto &&p) noexcept {
@@ -336,10 +336,10 @@ std::tuple<Var<float3>, Var<float3>, Var<float>> Pipeline::surface_point_geometr
 }
 
 std::tuple<Var<float3>, Var<float3>, Var<float2>> Pipeline::surface_point_attributes(
-    const Var<InstancedShape> &instance, const Var<float3x3> &shape_to_world_normal, const Var<Triangle> &triangle, const Var<float3> &uvw) const noexcept {
-    auto a0 = buffer<VertexAttribute>(instance->attribute_buffer_id()).read(triangle.i0);
-    auto a1 = buffer<VertexAttribute>(instance->attribute_buffer_id()).read(triangle.i1);
-    auto a2 = buffer<VertexAttribute>(instance->attribute_buffer_id()).read(triangle.i2);
+    const Var<Shape::Handle> &instance, const Var<float3x3> &shape_to_world_normal, const Var<Triangle> &triangle, const Var<float3> &uvw) const noexcept {
+    auto a0 = buffer<Shape::VertexAttribute>(instance->attribute_buffer_id()).read(triangle.i0);
+    auto a1 = buffer<Shape::VertexAttribute>(instance->attribute_buffer_id()).read(triangle.i1);
+    auto a2 = buffer<Shape::VertexAttribute>(instance->attribute_buffer_id()).read(triangle.i2);
     auto interpolate = [&](auto &&a, auto &&b, auto &&c) noexcept {
         return uvw.x * std::forward<decltype(a)>(a) +
                uvw.y * std::forward<decltype(b)>(b) +
