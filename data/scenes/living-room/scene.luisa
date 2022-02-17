@@ -1014,26 +1014,24 @@ Env env : Map {
   }
 }
 
-Camera camera : Thinlens {
+Camera camera : Pinhole {
   position { 5.105184555053711, 0.7310651540756226, -2.3178906440734863 }
-  look_at { 2.6, 0.68, -1.89 }
-  aperture { 0.95 }
-  focal_length { 50 }
-  spp { 65536 }
+  front { -0.9617919325828552, 0.07440698146820068, 0.2634764611721039 }
+  up { 0.0, 1.0, 0.0 }
+  fov { 58.71550708558254 }
+  spp { 1024 }
   filter : Gaussian {
     radius { 1 }
   }
   film : Color {
     file { "color.exr" }
-    resolution { 1024, 1024 }
+    resolution { 1280, 720 }
   }
 }
 
 render {
   cameras { @camera }
-  integrator : MegaPath {
-    sampler : Independent {}
-  }
+  integrator : MegaPath {}
   shapes {
     @shape_0,
     @shape_1,

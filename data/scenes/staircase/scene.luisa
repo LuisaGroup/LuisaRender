@@ -10312,14 +10312,14 @@ Camera camera : Pinhole {
     radius { 1 }
   }
   film : Color {
-    file { "color.exr" }
     resolution { 720, 1280 }
   }
+  file { "color.exr" }
 }
 
 render {
   cameras { @camera }
-  integrator : Normal {
+  integrator : MegaPath {
     depth { 10 }
   }
   shapes {
