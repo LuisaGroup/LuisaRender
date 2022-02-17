@@ -250,9 +250,9 @@ Camera camera : Pinhole {{
     radius {{ 1 }}
   }}
   film : Color {{
-    file {{ "color.exr" }}
     resolution {{ {int(resolution.x)}, {int(resolution.y)} }}
   }}
+  file {{ "color.exr" }}
 }}''', file=out_file)
 
 

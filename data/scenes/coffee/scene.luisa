@@ -393,14 +393,14 @@ Camera camera : Pinhole {
   front { 0.0072655160911381245, -0.03931873291730881, -0.9992002844810486 }
   up { 0.0, 1.0, 0.0 }
   fov { 31.0 }
-  spp { 128 }
+  spp { 65536 }
   filter : Gaussian {
     radius { 1 }
   }
   film : Color {
-    file { "coffee.exr" }
     resolution { 800.0, 1000.0 }
   }
+  file { "coffee.exr" }
 }
 
 render {
