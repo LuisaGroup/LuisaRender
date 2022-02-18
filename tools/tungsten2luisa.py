@@ -191,6 +191,7 @@ Env env : Map {{
             file = "models/square.obj"
             M = M * rotateXYZ(glm.radians(glm.vec3(-90, 0, 0))) * glm.scale(glm.vec3(.5))
         else:
+            print(shape)
             raise NotImplementedError()
         material = shape["bsdf"]
         if not isinstance(material, str):
