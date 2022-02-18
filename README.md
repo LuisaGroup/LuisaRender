@@ -58,7 +58,7 @@ on [LuisaCompute](https://github.com/Mike-Leo-Smith/LuisaCompute).
 
 ![EnvironmentMapping](data/renders/envmap.png)
 
-- Luisa Illuminating the Render
+- Cornell Box with Textured Area Light
     - Mega-Kernel Path Tracing
     - Textured Diffuse Area Light
     - Lambert Materials
