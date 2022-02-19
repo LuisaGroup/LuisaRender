@@ -23,6 +23,8 @@ public:
         SampledWavelengths swl;
         Float4 f;
         Float pdf;
+        Float2 alpha;
+        Float4 eta;
     };
 
     struct Sample {

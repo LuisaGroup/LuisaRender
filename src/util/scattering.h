@@ -78,6 +78,8 @@ public:
     FresnelDielectric(Expr<float4> etaI, Expr<float4> etaT) noexcept
         : _eta_i{etaI}, _eta_t{etaT} {}
     [[nodiscard]] Float4 evaluate(Expr<float> cosThetaI) const noexcept override;
+    [[nodiscard]] auto eta_i() const noexcept { return _eta_i; }
+    [[nodiscard]] auto eta_t() const noexcept { return _eta_t; }
 };
 
 struct FresnelNoOp final : public Fresnel {

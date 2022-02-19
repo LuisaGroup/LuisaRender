@@ -314,17 +314,18 @@ class DisneyFresnel final : public Fresnel {
 private:
     Float4 R0;
     Float metallic;
-    Float eta;
+    Float e;
 
 public:
     DisneyFresnel(Float4 R0, Float metallic, Float eta) noexcept
-        : R0{std::move(R0)}, metallic{std::move(metallic)}, eta{std::move(eta)} {}
+        : R0{std::move(R0)}, metallic{std::move(metallic)}, e{std::move(eta)} {}
     [[nodiscard]] Float4 evaluate(Expr<float> cosI) const noexcept override {
         return lerp(
-            fresnel_dielectric(cosI, make_float4(1.f), make_float4(eta)),
+            fresnel_dielectric(cosI, make_float4(1.f), make_float4(e)),
             FrSchlick(R0, cosI),
             metallic);
     }
+    [[nodiscard]] auto eta() const noexcept { return e; }
 };
 
 struct DisneyMicrofacetDistribution final : public TrowbridgeReitzDistribution {
@@ -373,15 +374,16 @@ private:
     luisa::unique_ptr<DisneyFakeSS> _fake_ss;
     luisa::unique_ptr<DisneyRetro> _retro;
     luisa::unique_ptr<DisneySheen> _sheen;
-    luisa::unique_ptr<MicrofacetDistribution> _distrib;
-    luisa::unique_ptr<Fresnel> _fresnel;
+    luisa::unique_ptr<DisneyMicrofacetDistribution> _distrib;
+    luisa::unique_ptr<DisneyFresnel> _fresnel;
     luisa::unique_ptr<MicrofacetReflection> _specular;
     luisa::unique_ptr<DisneyClearcoat> _clearcoat;
     luisa::unique_ptr<MicrofacetTransmission> _spec_trans;
-    luisa::unique_ptr<MicrofacetDistribution> _thin_distrib;
+    luisa::unique_ptr<TrowbridgeReitzDistribution> _thin_distrib;
     luisa::unique_ptr<MicrofacetTransmission> _thin_spec_trans;
     luisa::unique_ptr<LambertianTransmission> _diff_trans;
     UInt _lobes;
+    Bool _thin;
     Float _sampling_weights[max_sampling_techique_count];
 
 public:
@@ -391,7 +393,7 @@ public:
         Expr<float> specular_tint, Expr<float> anisotropic, Expr<float> sheen, Expr<float> sheen_tint,
         Expr<float> clearcoat, Expr<float> clearcoat_gloss, Expr<float> specular_trans_in,
         Expr<float> flatness, Expr<float> diffuse_trans, Expr<bool> thin) noexcept
-        : _it{it}, _swl{swl}, _lobes{0u} {
+        : _it{it}, _swl{swl}, _lobes{0u}, _thin{thin} {
 
         constexpr auto black_threshold = 1e-6f;
         auto cos_theta_o = dot(_it.wo(), _it.shading().n());
@@ -533,7 +535,8 @@ public:
                           _thin_spec_trans->pdf(wo_local, wi_local);
             };
         };
-        return {.swl = _swl, .f = f, .pdf = pdf};
+        return {.swl = _swl, .f = f, .pdf = pdf, .alpha = _distrib->alpha(),
+                .eta = ite(_thin & wi_local.z < 0.f, make_float4(_fresnel->eta()), 1.f)};
     }
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
         auto wo_local = _it.wo_local();

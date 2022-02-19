@@ -131,7 +131,10 @@ private:
         auto pdf_d = _lambert.pdf(wo_local, wi_local);
         auto f_s = _microfacet.evaluate(wo_local, wi_local);
         auto pdf_s = _microfacet.pdf(wo_local, wi_local);
-        return {.swl = _swl, .f = f_d + f_s, .pdf = lerp(pdf_s, pdf_d, _kd_ratio)};
+        return {.swl = _swl, .f = f_d + f_s,
+                .pdf = lerp(pdf_s, pdf_d, _kd_ratio),
+                .alpha = _distribution.alpha(),
+                .eta = make_float4(1.f)};
     }
 
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
@@ -156,7 +159,9 @@ private:
             pdf = lerp(pdf, pdf_d, _kd_ratio);
         };
         auto wi = _interaction.shading().local_to_world(wi_local);
-        return {.wi = wi, .eval = {.swl = _swl, .f = f, .pdf = pdf}};
+        return {.wi = wi, .eval = {.swl = _swl, .f = f, .pdf = pdf,
+                                   .alpha = _distribution.alpha(),
+                                   .eta = make_float4(1.f)}};
     }
 };
 

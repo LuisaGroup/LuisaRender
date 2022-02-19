@@ -490,7 +490,9 @@ private:
         auto wi_local = _interaction.shading().world_to_local(wi);
         auto f = _lobe.evaluate(wo_local, wi_local);
         auto pdf = _lobe.pdf(wo_local, wi_local);
-        return {.swl = _swl, .f = f, .pdf = pdf};
+        return {.swl = _swl, .f = f, .pdf = pdf,
+                .alpha = _distrib.alpha(),
+                .eta = make_float4(1.f)};
     }
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
         auto wo_local = _interaction.wo_local();
@@ -499,7 +501,9 @@ private:
         auto wi_local = def(make_float3(0.f, 0.f, 1.f));
         auto f = _lobe.sample(wo_local, &wi_local, u, &pdf);
         auto wi = _interaction.shading().local_to_world(wi_local);
-        return {.wi = wi, .eval = {.swl = _swl, .f = f, .pdf = pdf}};
+        return {.wi = wi, .eval = {.swl = _swl, .f = f, .pdf = pdf,
+                                   .alpha = _distrib.alpha(),
+                                   .eta = make_float4(1.f)}};
     }
 };
 

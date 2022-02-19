@@ -104,7 +104,9 @@ private:
         auto wi_local = _interaction.shading().world_to_local(wi);
         auto f = _blend.evaluate(wo_local, wi_local);
         auto pdf = _blend.pdf(wo_local, wi_local);
-        return {.swl = _swl, .f = f, .pdf = pdf};
+        return {.swl = _swl, .f = f, .pdf = pdf,
+                .alpha = _distribution.alpha(),
+                .eta = make_float4(1.f)};
     }
 
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
@@ -114,7 +116,9 @@ private:
         auto wi_local = def<float3>();
         auto f = _blend.sample(wo_local, &wi_local, u, &pdf);
         auto wi = _interaction.shading().local_to_world(wi_local);
-        return {.wi = wi, .eval = {.swl = _swl, .f = f, .pdf = pdf}};
+        return {.wi = wi, .eval = {.swl = _swl, .f = f, .pdf = pdf,
+                                   .alpha = _distribution.alpha(),
+                                   .eta = make_float4(1.f)}};
     }
 };
 
