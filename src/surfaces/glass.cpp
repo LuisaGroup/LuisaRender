@@ -193,7 +193,8 @@ private:
             pdf = _trans.pdf(wo_local, wi_local) * (1.f - t);
             $if(_dispersion) { swl.terminate_secondary(); };
         };
-        return {.swl = swl, .f = f, .pdf = pdf};
+        return {.swl = swl, .f = f, .pdf = pdf, .alpha = _distribution.alpha(),
+                .eta = ite(wi_local.z > 0.f, _fresnel.eta_i(), _fresnel.eta_t())};
     }
 
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
@@ -217,7 +218,8 @@ private:
             $if(_dispersion) { swl.terminate_secondary(); };
         };
         auto wi = _interaction.shading().local_to_world(wi_local);
-        return {.wi = wi, .eval = {.swl = swl, .f = f, .pdf = pdf}};
+        auto eta = ite(wi_local.z > 0.f, _fresnel.eta_i(), _fresnel.eta_t());
+        return {.wi = wi, .eval = {.swl = swl, .f = f, .pdf = pdf, .alpha = _distribution.alpha(), .eta = eta}};
     }
 };
 

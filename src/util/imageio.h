@@ -67,4 +67,15 @@ public:
     [[nodiscard]] static LoadedImage load(const std::filesystem::path &path, storage_type storage) noexcept;
 };
 
+class TiledMipmap {
+
+private:
+    uint2 _size;
+    luisa::vector<std::byte> _data;
+
+public:
+
+
+};
+
 }// namespace luisa::render
