@@ -32,6 +32,7 @@
 // The tabulated direction numbers are available here:
 // http://web.maths.unsw.edu.au/~fkuo/sobol/new-joe-kuo-6.21201
 
+#define LUISA_RENDER_SOBOL_MATRICES_DEFINITION
 #include <util/sobolmatrices.h>
 
 namespace luisa::render {

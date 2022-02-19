@@ -4,16 +4,15 @@
 
 #pragma once
 
-#include <dsl/syntax.h>
+#include <core/platform.h>
 
 namespace luisa::render {
-
-using compute::Expr;
-using compute::Volume;
 
 static constexpr auto BlueNoiseResolution = 128u;
 static constexpr auto NumBlueNoiseTextures = 48u;
 
+#ifndef LUISA_RENDER_BLUE_NOISE_DEFINITION
 LUISA_IMPORT_API const uint16_t BlueNoiseTextures[NumBlueNoiseTextures][BlueNoiseResolution][BlueNoiseResolution];
+#endif
 
 }// namespace luisa::render

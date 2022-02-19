@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include <cstdint>
 #include <core/platform.h>
 
 namespace luisa::render {
@@ -12,11 +11,14 @@ namespace luisa::render {
 // Sobol Matrix Declarations
 static constexpr auto NSobolDimensions = 1024u;
 static constexpr auto SobolMatrixSize = 52u;
-LUISA_IMPORT_API const uint32_t SobolMatrices32[NSobolDimensions * SobolMatrixSize];
 
 static constexpr auto VdCSobolMatrixSize = 25u;
 static constexpr auto VdCSobolMatrixInvSize = 26u;
+
+#ifndef LUISA_RENDER_SOBOL_MATRICES_DEFINITION
+LUISA_IMPORT_API const uint32_t SobolMatrices32[NSobolDimensions * SobolMatrixSize];
 LUISA_IMPORT_API const uint64_t VdCSobolMatrices[VdCSobolMatrixSize][SobolMatrixSize];
 LUISA_IMPORT_API const uint64_t VdCSobolMatricesInv[VdCSobolMatrixInvSize][SobolMatrixSize];
+#endif
 
 }// namespace luisa::render
