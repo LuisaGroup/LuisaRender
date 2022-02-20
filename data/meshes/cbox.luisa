@@ -63,9 +63,9 @@ Surface cbox-brick : Matte {
   sigma : ConstGeneric {
     v { 10 }
   }
-  // normal : Generic {
-  //   file { "../textures/brickwall_normal.jpg" }
-  // }
+  normal : Generic {
+    file { "../textures/brickwall_normal.jpg" }
+  }
 }
 
 Surface cbox-metal : Metal {
