@@ -110,7 +110,6 @@ void MegakernelPathTracingInstance::_render_one_camera(
         auto ray = camera_ray;
         auto Li = def(make_float3(0.0f));
         auto pdf_bsdf = def(0.0f);
-        MediumTracker medium_tracker;
         $for(depth, max_depth) {
 
             auto add_light_contrib = [&](const Light::Evaluation &eval) noexcept {
@@ -175,7 +174,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
             auto occluded = pipeline.intersect_any(light_sample.shadow_ray);
 
             // evaluate material
-            auto eta = def(make_float4(1.f));
+            auto eta_scale = def(make_float4(1.f));
             auto cos_theta_o = it->wo_local().z;
             pipeline.decode_material(it->shape()->surface_tag(), *it, swl, time, [&](const Surface::Closure &material) {
 
@@ -195,7 +194,6 @@ void MegakernelPathTracingInstance::_render_one_camera(
                 // sample material
                 auto [wi, eval] = material.sample(*sampler);
                 auto cos_theta_i = dot(wi, it->shading().n());
-                auto cos_theta_o = dot(it->wo(), it->shading().n());
                 ray = it->spawn_ray(wi);
                 pdf_bsdf = eval.pdf;
                 beta *= ite(
