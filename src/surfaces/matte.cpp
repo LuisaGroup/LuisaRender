@@ -41,10 +41,11 @@ public:
     }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint, const Shape *) const noexcept override {
-        auto [buffer_view, buffer_id] = pipeline.arena_buffer<TextureHandle>(2u);
+        auto [buffer_view, buffer_id] = pipeline.arena_buffer<TextureHandle>(3u);
         std::array textures{
             *pipeline.encode_texture(command_buffer, _kd),
-            *pipeline.encode_texture(command_buffer, _sigma)};
+            *pipeline.encode_texture(command_buffer, _sigma),
+            *pipeline.encode_texture(command_buffer, normal_map())};
         command_buffer << buffer_view.copy_from(textures.data())
                        << compute::commit();
         return buffer_id;
@@ -57,19 +58,22 @@ public:
 class MatteClosure final : public Surface::Closure {
 
 private:
-    const Interaction &_interaction;
+    Float3 _wo_local;
+    Frame _shading;
     const SampledWavelengths &_swl;
     OrenNayar _oren_nayar;
 
 public:
     MatteClosure(const Interaction &it, const SampledWavelengths &swl,
-                 Expr<float4> albedo, Expr<float> sigma) noexcept
-        : _interaction{it}, _swl{swl}, _oren_nayar{albedo, sigma} {}
+                 Expr<float3> n_map, Expr<float4> albedo, Expr<float> sigma) noexcept
+        : _wo_local{it.wo_local()},
+          _shading{Surface::apply_normal_mapping(it.shading(), n_map)},
+          _swl{swl}, _oren_nayar{albedo, sigma} {}
 
 private:
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
-        auto wo_local = _interaction.wo_local();
-        auto wi_local = _interaction.shading().world_to_local(wi);
+        auto wo_local = _wo_local;
+        auto wi_local = _shading.world_to_local(wi);
         auto f = _oren_nayar.evaluate(wo_local, wi_local);
         auto pdf = _oren_nayar.pdf(wo_local, wi_local);
         return {.swl = _swl, .f = f, .pdf = pdf,
@@ -78,12 +82,12 @@ private:
     }
 
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
-        auto wo_local = _interaction.wo_local();
+        auto wo_local = _wo_local;
         auto wi_local = def(make_float3(0.0f, 0.0f, 1.0f));
         auto u = sampler.generate_2d();
         auto pdf = def(0.f);
         auto f = _oren_nayar.sample(wo_local, &wi_local, u, &pdf);
-        auto wi = _interaction.shading().local_to_world(wi_local);
+        auto wi = _shading.local_to_world(wi_local);
         return {.wi = wi,
                 .eval = {.swl = _swl, .f = f, .pdf = pdf,
                          .alpha = make_float2(1.f),
@@ -97,7 +101,9 @@ luisa::unique_ptr<Surface::Closure> MatteSurface::decode(
     auto buffer = pipeline.buffer<TextureHandle>(it.shape()->surface_buffer_id());
     auto R = pipeline.evaluate_color_texture(buffer.read(0u), it, swl, time);
     auto sigma = pipeline.evaluate_generic_texture(buffer.read(1u), it, time).x;
-    return luisa::make_unique<MatteClosure>(it, swl, R, clamp(sigma, 0.f, 90.f));
+    auto normal = pipeline.evaluate_generic_texture(buffer.read(2u), it, time).xyz();
+    return luisa::make_unique<MatteClosure>(
+        it, swl, normal, R, clamp(sigma, 0.f, 90.f));
 }
 
 }// namespace luisa::render
