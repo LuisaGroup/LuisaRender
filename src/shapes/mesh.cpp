@@ -52,7 +52,8 @@ public:
                     aiProcess_CalcTangentSpace | aiProcess_FixInfacingNormals |
                     aiProcess_PreTransformVertices | aiProcess_RemoveRedundantMaterials |
                     aiProcess_FindInvalidData | aiProcess_TransformUVCoords |
-                    aiProcess_SortByPType | aiProcess_FindDegenerates);
+                    aiProcess_SortByPType | aiProcess_FindDegenerates |
+                    aiProcess_FlipUVs);
             if (model == nullptr || (model->mFlags & AI_SCENE_FLAGS_INCOMPLETE) ||
                 model->mRootNode == nullptr || model->mRootNode->mNumMeshes == 0) [[unlikely]] {
                 LUISA_ERROR_WITH_LOCATION(
