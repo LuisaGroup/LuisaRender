@@ -236,6 +236,11 @@ Float BxDF::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {
 Float4 LambertianReflection::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
     return _r * inv_pi;
 }
+map<luisa::string, Float4> LambertianReflection::grad(Expr<float3> wo, Expr<float3> wi) const noexcept {
+    luisa::map<luisa::string, Float4> grad;
+    grad["R"] = make_float4(inv_pi);
+    return grad;
+}
 
 Float4 LambertianTransmission::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
     return _t * inv_pi;
@@ -250,6 +255,11 @@ Float4 LambertianTransmission::sample(Expr<float3> wo, Float3 *wi, Expr<float2> 
 
 Float LambertianTransmission::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {
     return compute::ite(same_hemisphere(wo, wi), 0.0f, abs_cos_theta(wi) * inv_pi);
+}
+map<luisa::string, Float4> LambertianTransmission::grad(Expr<float3> wo, Expr<float3> wi) const noexcept {
+    luisa::map<luisa::string, Float4> grad;
+    grad["T"] = make_float4(inv_pi);
+    return grad;
 }
 
 Float4 MicrofacetReflection::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
@@ -284,6 +294,10 @@ Float MicrofacetReflection::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept
     auto wh = normalize(wo + wi);
     auto p = _distribution->pdf(wo, wh) / (4.f * dot(wo, wh));
     return ite(same_hemisphere(wo, wi), p, 0.f);
+}
+map<luisa::string, Float4> MicrofacetReflection::grad(Expr<float3> wo, Expr<float3> wi) const noexcept {
+    // TODO
+    LUISA_ERROR_WITH_LOCATION("unimplemented");
 }
 
 Float4 MicrofacetTransmission::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
@@ -326,11 +340,16 @@ Float MicrofacetTransmission::pdf(Expr<float3> wo, Expr<float3> wi) const noexce
     auto valid = !same_hemisphere(wo, wi) & dot(wo, wh) * dot(wi, wh) < 0.f;
     return ite(valid, _distribution->pdf(wo, wh) * dwh_dwi, 0.f);
 }
+map<luisa::string, Float4> MicrofacetTransmission::grad(Expr<float3> wo, Expr<float3> wi) const noexcept {
+    // TODO
+    LUISA_ERROR_WITH_LOCATION("unimplemented");
+}
 
-OrenNayar::OrenNayar(Expr<float4> R, Expr<float> sigma) noexcept : _r{R} {
-    auto sigma2 = sqr(radians(sigma));
-    _a = 1.f - (sigma2 / (2.f * sigma2 + 0.66f));
-    _b = 0.45f * sigma2 / (sigma2 + 0.09f);
+OrenNayar::OrenNayar(Expr<float4> R, Expr<float> sigma) noexcept
+    : _r{R} {
+    _sigma2 = sqr(radians(sigma));
+    _a = 1.f - (_sigma2 / (2.f * _sigma2 + 0.66f));
+    _b = 0.45f * _sigma2 / (_sigma2 + 0.09f);
 }
 
 Float4 OrenNayar::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
@@ -350,6 +369,31 @@ Float4 OrenNayar::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
     auto tanBeta = ite(absCosThetaI > absCosThetaO,
                        sinThetaI / absCosThetaI, sinThetaO / absCosThetaO);
     return _r * inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta);
+}
+map<luisa::string, Float4> OrenNayar::grad(Expr<float3> wo, Expr<float3> wi) const noexcept {
+    auto sinThetaI = sin_theta(wi);
+    auto sinThetaO = sin_theta(wo);
+    // Compute cosine term of Oren-Nayar model
+    auto sinPhiI = sin_phi(wi);
+    auto cosPhiI = cos_phi(wi);
+    auto sinPhiO = sin_phi(wo);
+    auto cosPhiO = cos_phi(wo);
+    auto dCos = cosPhiI * cosPhiO + sinPhiI * sinPhiO;
+    auto maxCos = ite(sinThetaI > 1e-4f & sinThetaO > 1e-4f, max(0.f, dCos), 0.f);
+    // Compute sine and tangent terms of Oren-Nayar model
+    auto absCosThetaI = abs_cos_theta(wi);
+    auto absCosThetaO = abs_cos_theta(wo);
+    auto sinAlpha = ite(absCosThetaI > absCosThetaO, sinThetaO, sinThetaI);
+    auto tanBeta = ite(absCosThetaI > absCosThetaO,
+                       sinThetaI / absCosThetaI, sinThetaO / absCosThetaO);
+    luisa::map<luisa::string, Float4> grad;
+    auto df_dR = inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta);
+    auto df_dA = _r * inv_pi;
+    auto dA_dSigma2 = - 0.165f * sqr(_sigma2 + 0.33f);
+    auto df_dSigma2 = df_dA * dA_dSigma2;
+    grad["R"] = make_float4(df_dR);
+    grad["Sigma2"] = df_dSigma2;
+    return grad;
 }
 
 Float4 FresnelBlend::Schlick(Expr<float> cosTheta) const noexcept {
@@ -405,6 +449,10 @@ Float FresnelBlend::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {
     auto pdf_wh = _distribution->pdf(wo, wh);
     auto p = .5f * (abs_cos_theta(wi) * inv_pi + pdf_wh / (4.f * dot(wo, wh)));
     return ite(same_hemisphere(wo, wi), p, 0.f);
+}
+map<luisa::string, Float4> FresnelBlend::grad(Expr<float3> wo, Expr<float3> wi) const noexcept {
+    // TODO
+    LUISA_ERROR_WITH_LOCATION("unimplemented");
 }
 
 }// namespace luisa::render

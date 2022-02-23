@@ -5,6 +5,7 @@
 #pragma once
 
 #include <dsl/syntax.h>
+#include <core/stl.h>
 
 namespace luisa::render {
 
@@ -55,7 +56,7 @@ public:
 
 struct Fresnel {
     virtual ~Fresnel() noexcept = default;
-    virtual Float4 evaluate(Expr<float> cosI) const noexcept = 0;
+    [[nodiscard]] virtual Float4 evaluate(Expr<float> cosI) const noexcept = 0;
 };
 
 class FresnelConductor final : public Fresnel {
@@ -91,6 +92,7 @@ struct BxDF {
     [[nodiscard]] virtual Float4 evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept = 0;
     [[nodiscard]] virtual Float4 sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept;
     [[nodiscard]] virtual Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept;
+    [[nodiscard]] virtual luisa::map<luisa::string, Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept = 0;
 };
 
 class LambertianReflection : public BxDF {
@@ -101,6 +103,7 @@ private:
 public:
     explicit LambertianReflection(Expr<float4> R) noexcept : _r{R} {}
     [[nodiscard]] Float4 evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
+    [[nodiscard]] map<luisa::string, Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override;
 };
 
 class LambertianTransmission : public BxDF {
@@ -113,6 +116,7 @@ public:
     [[nodiscard]] Float4 evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
     [[nodiscard]] Float4 sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept override;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept override;
+    [[nodiscard]] map<luisa::string, Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override;
 };
 
 class MicrofacetReflection : public BxDF {
@@ -129,6 +133,7 @@ public:
     [[nodiscard]] Float4 evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
     [[nodiscard]] Float4 sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept override;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept override;
+    [[nodiscard]] map<luisa::string, Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override;
 };
 
 class MicrofacetTransmission : public BxDF {
@@ -151,18 +156,21 @@ public:
     [[nodiscard]] Float4 evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
     [[nodiscard]] Float4 sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept override;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept override;
+    [[nodiscard]] map<luisa::string, Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override;
 };
 
 class OrenNayar : public BxDF {
 
 private:
     Float4 _r;
+    Float _sigma2;
     Float _a;
     Float _b;
 
 public:
     OrenNayar(Expr<float4> R, Expr<float> sigma) noexcept;
     [[nodiscard]] Float4 evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
+    map<luisa::string, Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override;
 };
 
 class FresnelBlend : public BxDF {
@@ -181,6 +189,7 @@ public:
     [[nodiscard]] Float4 evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
     [[nodiscard]] Float4 sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept override;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept override;
+    [[nodiscard]] map<luisa::string, Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override;
 };
 
 }// namespace luisa::render

@@ -93,6 +93,19 @@ private:
                          .alpha = make_float2(1.f),
                          .eta = make_float4(1.f)}};
     }
+
+    void update() noexcept override {
+        // TODO
+        LUISA_ERROR_WITH_LOCATION("unimplemented");
+    }
+    void backward(Expr<float4> k, Float learning_rate, Expr<float3> wi) noexcept override {
+        auto wo_local = _wo_local;
+        auto wi_local = _shading.world_to_local(wi);
+        auto grad_map = _oren_nayar.grad(wo_local, wi_local);
+
+        // TODO
+        LUISA_ERROR_WITH_LOCATION("unimplemented");
+    }
 };
 
 luisa::unique_ptr<Surface::Closure> MatteSurface::decode(

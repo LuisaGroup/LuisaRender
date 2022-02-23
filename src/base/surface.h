@@ -41,7 +41,9 @@ public:
         virtual ~Closure() noexcept = default;
         [[nodiscard]] virtual Evaluation evaluate(Expr<float3> wi) const noexcept = 0;
         [[nodiscard]] virtual Sample sample(Sampler::Instance &sampler) const noexcept = 0;
-//        [[nodiscard]] virtual Evaluation back_prop(Expr<Float>) noexcept = 0;
+
+        virtual void update() noexcept = 0;
+        virtual void backward(Expr<float4> k, Float learning_rate, Expr<float3> wi) noexcept = 0;
     };
 
     [[nodiscard]] static Frame apply_normal_mapping(const Frame &f, Expr<float3> n_map) noexcept;

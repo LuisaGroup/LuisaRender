@@ -174,6 +174,14 @@ public:
         // Burley 2015, eq (4).
         return R * inv_pi * (1.f - Fo * .5f) * (1.f - Fi * .5f);
     }
+    map<luisa::string, Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+        auto Fo = SchlickWeight(abs_cos_theta(wo));
+        auto Fi = SchlickWeight(abs_cos_theta(wi));
+
+        luisa::map<luisa::string, Float4> grad;
+        grad["R"] = make_float4(inv_pi * (1.f - Fo * .5f) * (1.f - Fi * .5f));
+        return grad;
+    }
 };
 
 // "Fake" subsurface scattering lobe, based on the Hanrahan-Krueger BRDF
@@ -201,6 +209,10 @@ public:
         auto ss = 1.25f * (Fss * (1.f / (abs_cos_theta(wo) + abs_cos_theta(wi)) - .5f) + .5f);
         return ite(valid, R * inv_pi * ss, 0.f);
     }
+    map<luisa::string, Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+        // TODO
+        LUISA_ERROR_WITH_LOCATION("unimplemented");
+    }
 };
 
 class DisneyRetro final : public BxDF {
@@ -225,6 +237,10 @@ public:
         auto f = R * inv_pi * Rr * (Fo + Fi + Fo * Fi * (Rr - 1.f));
         return ite(valid, f, 0.f);
     }
+    map<luisa::string, Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+        // TODO
+        LUISA_ERROR_WITH_LOCATION("unimplemented");
+    }
 };
 
 class DisneySheen final : public BxDF {
@@ -240,6 +256,10 @@ public:
         wh = normalize(wh);
         auto cosThetaD = dot(wi, wh);
         return ite(valid, R * SchlickWeight(cosThetaD), 0.f);
+    }
+    map<luisa::string, Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+        // TODO
+        LUISA_ERROR_WITH_LOCATION("unimplemented");
     }
 };
 
@@ -304,6 +324,10 @@ public:
         // surface normal.
         auto Dr = GTR1(abs_cos_theta(wh), gloss);
         return ite(valid, Dr * abs_cos_theta(wh) / (4.f * dot(wo, wh)), 0.f);
+    }
+    map<luisa::string, Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+        // TODO
+        LUISA_ERROR_WITH_LOCATION("unimplemented");
     }
 };
 
@@ -580,6 +604,15 @@ public:
         auto eval = evaluate_local(wo_local, wi_local);
         auto wi = _it.shading().local_to_world(wi_local);
         return {.wi = std::move(wi), .eval = std::move(eval)};
+    }
+
+    void update() noexcept override {
+        // TODO
+        LUISA_ERROR_WITH_LOCATION("unimplemented");
+    }
+    void backward(Expr<float4> k, Float learning_rate, Expr<float3> wi) noexcept override {
+        // TODO
+        LUISA_ERROR_WITH_LOCATION("unimplemented");
     }
 };
 
