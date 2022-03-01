@@ -3,6 +3,8 @@
 //
 
 #include <luisa-compute.h>
+
+#include <util/medium_tracker.h>
 #include <base/pipeline.h>
 #include <base/integrator.h>
 
@@ -173,11 +175,15 @@ void MegakernelPathTracingInstance::_render_one_camera(
 
             // evaluate material
             auto eta_scale = def(make_float4(1.f));
+            auto cos_theta_o = it->wo_local().z;
             pipeline.decode_material(it->shape()->surface_tag(), *it, swl, time, [&](const Surface::Closure &material) {
+
                 // direct lighting
                 $if(light_sample.eval.pdf > 0.0f & !occluded) {
                     auto wi = light_sample.shadow_ray->direction();
                     auto eval = material.evaluate(wi);
+                    auto cos_theta_i = dot(it->shading().n(), wi);
+                    auto is_trans = cos_theta_i * cos_theta_o < 0.f;
                     auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
                     Li += eval.swl.srgb(
                         beta * mis_weight * ite(eval.pdf > 0.0f, eval.f, 0.0f) *
@@ -188,7 +194,6 @@ void MegakernelPathTracingInstance::_render_one_camera(
                 // sample material
                 auto [wi, eval] = material.sample(*sampler);
                 auto cos_theta_i = dot(wi, it->shading().n());
-                auto cos_theta_o = dot(it->wo(), it->shading().n());
                 ray = it->spawn_ray(wi);
                 pdf_bsdf = eval.pdf;
                 beta *= ite(

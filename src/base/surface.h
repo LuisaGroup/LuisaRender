@@ -6,14 +6,19 @@
 
 #include <util/spectrum.h>
 #include <base/scene_node.h>
+#include <base/texture.h>
 #include <base/sampler.h>
 
 namespace luisa::render {
 
+using compute::Var;
+using compute::Expr;
+using compute::Float3;
 using compute::BindlessArray;
 
 class Shape;
 class Sampler;
+class Frame;
 class Interaction;
 
 class Surface : public SceneNode {
@@ -38,8 +43,14 @@ public:
         [[nodiscard]] virtual Sample sample(Sampler::Instance &sampler) const noexcept = 0;
     };
 
+    [[nodiscard]] static Frame apply_normal_mapping(const Frame &f, Expr<float3> n_map) noexcept;
+
+private:
+    const Texture *_normal_map;
+
 public:
     Surface(Scene *scene, const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] auto normal_map() const noexcept { return _normal_map; }
     [[nodiscard]] virtual bool is_null() const noexcept { return false; }
     [[nodiscard]] virtual uint /* bindless buffer id */ encode(
         Pipeline &pipeline, CommandBuffer &command_buffer,

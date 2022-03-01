@@ -57,11 +57,14 @@ Shape cbox-right-wall : Mesh {
 Surface cbox-brick : Matte {
   Kd : Color {
     file { "../textures/brickwall.jpg" }
-    gamma { 1 }
+    gamma { 0.5 }
     encoding { "gamma" }
   }
   sigma : ConstGeneric {
     v { 10 }
+  }
+  normal : Generic {
+    file { "../textures/brickwall_normal.jpg" }
   }
 }
 
@@ -74,7 +77,7 @@ Surface cbox-metal : Metal {
 
 Shape cbox-back-wall : Mesh {
   file { "cbox-parts/back-wall.obj" }
-  surface { @cbox-white }
+  surface { @cbox-brick }
 }
 
 Shape cbox-tall-box : Mesh {

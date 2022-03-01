@@ -2,5 +2,5 @@ import cv2 as cv
 
 
 if __name__ == "__main__":
-    image = cv.imread("/Users/mike/Downloads/bathroom/textures/rug_mask.png", cv.IMREAD_UNCHANGED)
-    cv.imwrite("/Users/mike/Downloads/bathroom/textures/rug_mask-alpha.png", image[::-1, :, -1])
+    image = cv.imread(r"C:\Users\Mike\Desktop\LuisaRender\data\scenes\living-room\textures\leaf.png", cv.IMREAD_UNCHANGED)
+    cv.imwrite(r"C:\Users\Mike\Desktop\LuisaRender\data\scenes\living-room\textures\leaf-alpha.png", image[..., -1])

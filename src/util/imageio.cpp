@@ -393,7 +393,7 @@ LoadedImage LoadedImage::load(const std::filesystem::path &path) noexcept {
         return load(path, storage_type::HALF4);
     }
     auto p = path_string.c_str();
-    auto file = fopen(p, "r");
+    auto file = fopen(p, "rb");
     if (file == nullptr) {
         LUISA_ERROR_WITH_LOCATION(
             "Failed to open image '{}'.",
