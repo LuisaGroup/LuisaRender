@@ -8,7 +8,6 @@ Surface mat_Dirt : Matte {
 Surface mat_Floor : Substrate {
   Kd : Color {
     file { "textures/wood.jpg" }
-    uv_scale { 1, -1 }
   }
   Ks : ConstColor {
     color { 0.04 }
@@ -24,7 +23,6 @@ Surface mat_Floor : Substrate {
 Surface mat_TableWood : Substrate {
   Kd : Color {
     file { "textures/wood5.jpg" }
-    uv_scale { 1, -1 }
   }
   Ks : ConstColor {
     color { 0.04 }
@@ -92,7 +90,6 @@ Surface mat_MattePaint : Matte {
 Surface mat_Painting : Matte {
   Kd : Color {
     file { "textures/picture8.jpg" }
-    uv_scale { 1, -1 }
   }
 }
 
@@ -138,7 +135,6 @@ Surface mat_Transluscent : Matte {
 Surface mat_Leaves : Matte {
   Kd : Color {
     file { "textures/leaf.png" }
-    uv_scale { 1, -1 }
   }
 }
 
@@ -1019,21 +1015,19 @@ Camera camera : Pinhole {
   front { -0.9617919325828552, 0.07440698146820068, 0.2634764611721039 }
   up { 0.0, 1.0, 0.0 }
   fov { 58.71550708558254 }
-  spp { 1024 }
+  spp { 64 }
   filter : Gaussian {
     radius { 1 }
   }
   film : Color {
-    file { "color.exr" }
     resolution { 1280, 720 }
   }
+  file { "color.exr" }
 }
 
 render {
   cameras { @camera }
-  integrator : MegaPath {
-    depth { 12 }
-  }
+  integrator : MegaPath {}
   shapes {
     @shape_0,
     @shape_1,
