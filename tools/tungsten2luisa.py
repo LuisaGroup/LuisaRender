@@ -189,6 +189,9 @@ Env env : Map {{
         elif impl == "quad":
             file = "models/square.obj"
             M = M * rotateXYZ(glm.radians(glm.vec3(-90, 0, 0))) * glm.scale(glm.vec3(.5))
+        elif impl == "cube":
+            file = "models/cube.obj"
+            M = M * rotateXYZ(glm.radians(glm.vec3(-90, 0, 0))) * glm.scale(glm.vec3(.5))
         else:
             print(shape)
             raise NotImplementedError()

@@ -60,7 +60,7 @@ public:
 
     struct MeshData {
         Mesh *resource;
-        uint buffer_id_base;
+        uint geometry_buffer_id_base;
         uint alpha_texture_id;
         float alpha;
         bool two_sided;

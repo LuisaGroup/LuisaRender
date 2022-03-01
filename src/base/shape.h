@@ -106,7 +106,7 @@ struct alignas(16) Shape::Handle {
     static constexpr auto alias_table_buffer_id_offset = 3u;
     static constexpr auto pdf_buffer_id_offset = 4u;
 
-    uint buffer_id_base;
+    uint geometry_buffer_id_base;
     uint alpha_texture_id_and_properties;
     uint surface_buffer_id_and_tag;
     uint light_buffer_id_and_tag;
@@ -165,16 +165,16 @@ LUISA_STRUCT(
 LUISA_STRUCT(
     luisa::render::Shape::Handle,
 
-    buffer_id_base,
+    geometry_buffer_id_base,
     alpha_texture_id_and_properties,
     surface_buffer_id_and_tag,
     light_buffer_id_and_tag) {
 
-    [[nodiscard]] auto position_buffer_id() const noexcept { return buffer_id_base + luisa::render::Shape::Handle::position_buffer_id_offset; }
-    [[nodiscard]] auto attribute_buffer_id() const noexcept { return buffer_id_base + luisa::render::Shape::Handle::attribute_buffer_id_offset; }
-    [[nodiscard]] auto triangle_buffer_id() const noexcept { return buffer_id_base + luisa::render::Shape::Handle::triangle_buffer_id_offset; }
-    [[nodiscard]] auto alias_table_buffer_id() const noexcept { return buffer_id_base + luisa::render::Shape::Handle::alias_table_buffer_id_offset; }
-    [[nodiscard]] auto pdf_buffer_id() const noexcept { return buffer_id_base + luisa::render::Shape::Handle::pdf_buffer_id_offset; }
+    [[nodiscard]] auto position_buffer_id() const noexcept { return geometry_buffer_id_base + luisa::render::Shape::Handle::position_buffer_id_offset; }
+    [[nodiscard]] auto attribute_buffer_id() const noexcept { return geometry_buffer_id_base + luisa::render::Shape::Handle::attribute_buffer_id_offset; }
+    [[nodiscard]] auto triangle_buffer_id() const noexcept { return geometry_buffer_id_base + luisa::render::Shape::Handle::triangle_buffer_id_offset; }
+    [[nodiscard]] auto alias_table_buffer_id() const noexcept { return geometry_buffer_id_base + luisa::render::Shape::Handle::alias_table_buffer_id_offset; }
+    [[nodiscard]] auto pdf_buffer_id() const noexcept { return geometry_buffer_id_base + luisa::render::Shape::Handle::pdf_buffer_id_offset; }
     [[nodiscard]] auto surface_tag() const noexcept { return surface_buffer_id_and_tag & luisa::render::Shape::Handle::surface_tag_mask; }
     [[nodiscard]] auto surface_buffer_id() const noexcept { return surface_buffer_id_and_tag >> luisa::render::Shape::Handle::surface_buffer_id_shift; }
     [[nodiscard]] auto light_tag() const noexcept { return light_buffer_id_and_tag & luisa::render::Shape::Handle::light_tag_mask; }

@@ -6,7 +6,7 @@ Film film : Color {
 Camera camera : Pinhole {
   position { 0, 0, 5 }
   fov { 60 }
-  spp { 4096 }
+  spp { 16384 }
   film { @film }
   file { "../renders/envmap.exr" }
   shutter_span { 0, 0 }
@@ -114,9 +114,20 @@ Shape sphere : Mesh {
   surface : Mirror {}
 }
 
+import "../meshes/bingdwendwen.luisa"
+
+Shape scaled-bing : Instance {
+  shape { @bingdwendwen }
+  transform : SRT {
+    scale { 4 }
+    translate { 1, -2, 0 }
+    // rotate { 0, 1, 0, 180 }
+  }
+}
+
 render {
   cameras { @camera }
-  shapes { @teapot }
+  shapes { @scaled-bing }
   integrator { @pt }
   environment : Map {
     emission : Illum {

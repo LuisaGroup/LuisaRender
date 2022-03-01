@@ -123,7 +123,7 @@ void Pipeline::_process_shape(
             // assign mesh data
             MeshData mesh{};
             mesh.resource = mesh_geom.resource;
-            mesh.buffer_id_base = mesh_geom.buffer_id_base;
+            mesh.geometry_buffer_id_base = mesh_geom.buffer_id_base;
             mesh.two_sided = shape->two_sided().value_or(false);
             mesh.alpha_texture_id = texture_id;
             mesh.alpha = shape->alpha();
@@ -145,7 +145,7 @@ void Pipeline::_process_shape(
 
         // create instance
         Shape::Handle instance{};
-        instance.buffer_id_base = mesh.buffer_id_base;
+        instance.geometry_buffer_id_base = mesh.geometry_buffer_id_base;
         auto shape_properties = 0u;
         if (two_sided) { shape_properties |= Shape::property_flag_two_sided; }
         if (material != nullptr && !material->is_null()) {

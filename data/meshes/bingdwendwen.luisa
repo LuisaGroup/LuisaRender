@@ -1,0 +1,73 @@
+Surface bing-white : Substrate {
+  Kd : Color {
+    file { "bingdwendwen/body.jpg" }
+  }
+  Ks : ConstColor {
+    color { 0.04 }
+  }
+  roughness : ConstGeneric {
+    v { 0.3 }
+  }
+}
+
+Surface bing-black : Matte {
+  Kd : ConstColor {
+    color { 0.3 }
+  }
+}
+
+Surface bing-glass : Glass {
+  roughness : ConstGeneric {
+    v { 0.01 }
+  }
+  Kt : ConstColor {
+    color { 0.9, 0.95, 1.0 }
+  }
+}
+
+Surface bing-colorful : Substrate {
+  Kd : Color {
+    file { "bingdwendwen/ring.jpg" }
+  }
+  Ks : ConstColor {
+    color { 0.04 }
+  }
+  roughness : ConstGeneric {
+    v { 0.2 }
+  }
+}
+
+Shape bing-body : Mesh {
+  file { "bingdwendwen/oldtiger001.obj" }
+  surface { @bing-white }
+}
+
+Shape bing-coat : Mesh {
+  file { "bingdwendwen/oldtiger002.obj" }
+  surface { @bing-glass }
+}
+
+Shape bing-ring : Mesh {
+  file { "bingdwendwen/oldtiger009.obj" }
+  surface { @bing-colorful }
+}
+
+Shape bing-tail : Mesh {
+  file { "bingdwendwen/Sphere001.obj" }
+  surface { @bing-black }
+}
+
+Shape bing-tail-coat : Mesh {
+  file { "bingdwendwen/Sphere002.obj" }
+  surface { @bing-glass }
+}
+
+Shape bingdwendwen : Group {
+  shapes {
+    @bing-body,
+    @bing-ring,
+    @bing-coat,
+    @bing-tail,
+    @bing-tail-coat
+  }
+}
