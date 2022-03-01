@@ -42,7 +42,9 @@ public:
         return static_cast<float>(1.0 / static_cast<double>(pipeline().lights().size()));
     }
     [[nodiscard]] Float pmf(const Interaction &it, const SampledWavelengths &) const noexcept override { return pmf(it); }
-    [[nodiscard]] LightSampler::Selection select(Sampler::Instance &sampler, const Interaction &it, const SampledWavelengths &) const noexcept override {
+    [[nodiscard]] LightSampler::Selection select(
+        Sampler::Instance &sampler, const Interaction &it,
+        const SampledWavelengths &) const noexcept override {
         using namespace luisa::compute;
         auto u = sampler.generate_1d();
         auto n = static_cast<uint>(pipeline().lights().size());

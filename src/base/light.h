@@ -41,15 +41,30 @@ public:
             const Interaction &it_from) const noexcept = 0;
     };
 
+    class Instance {
+
+    private:
+        const Pipeline &_pipeline;
+        const Light *_light;
+
+    public:
+        Instance(const Pipeline &pipeline, const Light *light) noexcept
+            : _pipeline{pipeline}, _light{light} {}
+        virtual ~Instance() noexcept = default;
+        template<typename T = Light>
+            requires std::is_base_of_v<Light, T>
+        [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_light); }
+        [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
+        [[nodiscard]] virtual luisa::unique_ptr<Closure> closure(
+            const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
+    };
+
 public:
     Light(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] virtual bool is_null() const noexcept { return false; }
     [[nodiscard]] virtual bool is_virtual() const noexcept { return false; }
-    [[nodiscard]] virtual uint /* bindless buffer id */ encode(
-        Pipeline &pipeline, CommandBuffer &command_buffer,
-        uint instance_id, const Shape *shape) const noexcept = 0;
-    [[nodiscard]] virtual luisa::unique_ptr<Closure> decode(
-        const Pipeline &pipeline, const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
+    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
 };
 
 }// namespace luisa::render

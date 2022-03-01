@@ -67,20 +67,6 @@ public:
         bool is_virtual;
     };
 
-    struct LightData {
-        const Shape *shape;
-        uint instance_id;
-        uint buffer_id;
-        uint tag;
-    };
-
-    struct MaterialData {
-        const Shape *shape;
-        uint instance_id;
-        uint buffer_id;
-        uint tag;
-    };
-
 private:
     Device &_device;
     Accel _accel;
@@ -95,16 +81,11 @@ private:
     luisa::vector<ResourceHandle> _resources;
     luisa::unordered_map<uint64_t, MeshGeometry> _mesh_cache;
     luisa::unordered_map<const Shape *, MeshData> _meshes;
-    luisa::vector<const Surface *> _surface_interfaces;
-    luisa::vector<const Light *> _light_interfaces;
-    luisa::unordered_map<luisa::string /* impl type */, uint /* tag */, Hash64> _surface_tags;
-    luisa::unordered_map<luisa::string /* impl type */, uint /* tag */, Hash64> _light_tags;
-    luisa::unordered_map<const Surface *, MaterialData> _surfaces;
-    luisa::unordered_map<const Light *, LightData> _lights;
-    luisa::vector<const Texture *> _color_texture_interfaces;
-    luisa::vector<const Texture *> _illuminant_texture_interfaces;
-    luisa::vector<const Texture *> _generic_texture_interfaces;
-    luisa::unordered_map<const Texture *, luisa::unique_ptr<TextureHandle>> _texture_handles;
+    luisa::vector<const Surface::Instance *> _surfaces;
+    luisa::vector<const Light::Instance *> _lights;
+    luisa::unordered_map<const Surface *, uint> _surface_tags;
+    luisa::unordered_map<const Light *, uint> _light_tags;
+    luisa::unordered_map<const Texture *, const Texture::Instance *> _textures;
     luisa::vector<Shape::Handle> _instances;
     luisa::vector<InstancedTransform> _dynamic_transforms;
     Buffer<Shape::Handle> _instance_buffer;
@@ -124,8 +105,8 @@ private:
         CommandBuffer &command_buffer, const Shape *shape,
         luisa::optional<bool> overridden_two_sided = luisa::nullopt,
         const Surface *overridden_surface = nullptr, const Light *overridden_light = nullptr) noexcept;
-    [[nodiscard]] MaterialData _process_surface(CommandBuffer &command_buffer, uint instance_id, const Shape *shape, const Surface *material) noexcept;
-    [[nodiscard]] LightData _process_light(CommandBuffer &command_buffer, uint instance_id, const Shape *shape, const Light *light) noexcept;
+    [[nodiscard]] uint _process_surface(CommandBuffer &command_buffer, uint instance_id, const Shape *shape, const Surface *material) noexcept;
+    [[nodiscard]] uint _process_light(CommandBuffer &command_buffer, uint instance_id, const Shape *shape, const Light *light) noexcept;
 
 public:
     // for internal use only; use Pipeline::create() instead
@@ -198,12 +179,8 @@ public:
     [[nodiscard]] auto camera_count() const noexcept { return _cameras.size(); }
     [[nodiscard]] std::tuple<Camera::Instance *, Film::Instance *, Filter::Instance *> camera(size_t i) noexcept;
     [[nodiscard]] std::tuple<const Camera::Instance *, const Film::Instance *, const Filter::Instance *> camera(size_t i) const noexcept;
-    [[nodiscard]] auto surface_interfaces() const noexcept { return luisa::span{_surface_interfaces}; }
-    [[nodiscard]] auto light_interfaces() const noexcept { return luisa::span{_light_interfaces}; }
-    [[nodiscard]] luisa::vector<const Texture *> &texture_interfaces(Texture::Category category) noexcept;
-    [[nodiscard]] luisa::span<const Texture *const> texture_interfaces(Texture::Category category) const noexcept;
-    [[nodiscard]] auto &lights() const noexcept { return _lights; }
-    [[nodiscard]] auto &surfaces() const noexcept { return _surfaces; }
+    [[nodiscard]] auto surfaces() const noexcept { return luisa::span{_surfaces}; }
+    [[nodiscard]] auto lights() const noexcept { return luisa::span{_lights}; }
     [[nodiscard]] auto sampler() noexcept { return _sampler.get(); }
     [[nodiscard]] auto sampler() const noexcept { return _sampler.get(); }
     [[nodiscard]] auto environment() const noexcept { return _environment.get(); }
@@ -234,45 +211,8 @@ public:
     [[nodiscard]] auto intersect(const Var<Ray> &ray) const noexcept { return interaction(ray, trace_closest(ray)); }
     [[nodiscard]] auto intersect_any(const Var<Ray> &ray) const noexcept { return trace_any(ray); }
 
-    [[nodiscard]] Float4 evaluate_texture(
-        Texture::Category category, TextureHandle handle, const Interaction &it,
-        const SampledWavelengths &swl, Expr<float> time, Float *max_value = nullptr) const noexcept;
-    [[nodiscard]] Float4 evaluate_color_texture(
-        TextureHandle handle, const Interaction &it,
-        const SampledWavelengths &swl, Expr<float> time,
-        Float *max_value = nullptr) const noexcept;
-    [[nodiscard]] Float4 evaluate_illuminant_texture(
-        TextureHandle handle, const Interaction &it,
-        const SampledWavelengths &swl, Expr<float> time) const noexcept;
-    [[nodiscard]] Float4 evaluate_generic_texture(
-        TextureHandle handle, const Interaction &it,
-        Expr<float> time) const noexcept;
-
-    [[nodiscard]] Float4 evaluate_texture(
-        Texture::Category category, const Var<TextureHandle> &handle, const Interaction &it,
-        const SampledWavelengths &swl, Expr<float> time, Float *max_value = nullptr) const noexcept;
-    [[nodiscard]] Float4 evaluate_color_texture(
-        const Var<TextureHandle> &handle, const Interaction &it,
-        const SampledWavelengths &swl, Expr<float> time,
-        Float *max_value = nullptr) const noexcept;
-    [[nodiscard]] Float4 evaluate_illuminant_texture(
-        const Var<TextureHandle> &handle, const Interaction &it,
-        const SampledWavelengths &swl, Expr<float> time) const noexcept;
-    [[nodiscard]] Float4 evaluate_generic_texture(
-        const Var<TextureHandle> &handle, const Interaction &it,
-        Expr<float> time) const noexcept;
-
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> decode_material(
-        uint tag, const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept;
-    void decode_material(
-        Expr<uint> tag, const Interaction &it, const SampledWavelengths &swl, Expr<float> time,
-        const luisa::function<void(const Surface::Closure &)> &func) const noexcept;
-
-    [[nodiscard]] luisa::unique_ptr<Light::Closure> decode_light(
-        uint tag, const SampledWavelengths &swl, Expr<float> time) const noexcept;
-    void decode_light(
-        Expr<uint> tag, const SampledWavelengths &swl, Expr<float> time,
-        const luisa::function<void(const Light::Closure &)> &func) const noexcept;
+    void dynamic_dispatch_surface(Expr<uint> tag, const luisa::function<void(const Surface::Instance *)> &f) const noexcept;
+    void dynamic_dispatch_light(Expr<uint> tag, const luisa::function<void(const Light::Instance *)> &f) const noexcept;
 
     [[nodiscard]] RGBAlbedoSpectrum srgb_albedo_spectrum(Expr<float3> rgb) const noexcept;
     [[nodiscard]] RGBUnboundSpectrum srgb_unbound_spectrum(Expr<float3> rgb) const noexcept;

@@ -34,7 +34,10 @@ public:
     public:
         explicit Instance(const Filter *filter) noexcept;
         virtual ~Instance() noexcept = default;
-        [[nodiscard]] auto node() const noexcept { return _filter; }
+
+        template<typename T = Filter>
+            requires std::is_base_of_v<Filter, T>
+        [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_filter); }
         [[nodiscard]] auto look_up_table() const noexcept { return luisa::span{_lut}; }
         [[nodiscard]] auto pdf_table() const noexcept { return luisa::span{_pdf}; }
         [[nodiscard]] auto alias_table_indices() const noexcept { return luisa::span{_alias_indices}; }
@@ -52,4 +55,4 @@ public:
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept;
 };
 
-}
+}// namespace luisa::render

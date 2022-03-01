@@ -24,7 +24,7 @@ private:
 
 public:
     explicit PinholeCameraInstance(
-        const PinholeCamera *camera, float3 position,
+        const Pipeline &ppl, const PinholeCamera *camera, float3 position,
         float3 front, float3 up, float3 right, float fov) noexcept;
 
     [[nodiscard]] Camera::Sample generate_ray(
@@ -57,7 +57,7 @@ public:
     [[nodiscard]] luisa::unique_ptr<Camera::Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
         return luisa::make_unique<PinholeCameraInstance>(
-            this, _position, _front, _up, _right, _fov);
+            pipeline, this, _position, _front, _up, _right, _fov);
     }
 
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
@@ -69,9 +69,9 @@ public:
 };
 
 PinholeCameraInstance::PinholeCameraInstance(
-    const PinholeCamera *camera, float3 position,
+    const Pipeline &ppl, const PinholeCamera *camera, float3 position,
     float3 front, float3 up, float3 right, float fov) noexcept
-    : Camera::Instance{camera}, _position{position},
+    : Camera::Instance{ppl, camera}, _position{position},
       _front{front}, _up{up}, _right{right}, _fov{fov} {}
 
 Camera::Sample PinholeCameraInstance::generate_ray(

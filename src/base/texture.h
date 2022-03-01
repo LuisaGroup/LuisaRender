@@ -62,10 +62,21 @@ using compute::Float4;
 class Texture : public SceneNode {
 
 public:
-    enum struct Category {
-        GENERIC,  // automatically converts to the albedo spectrum
-        COLOR,    // returns the value as-is (no conversion spectrum)
-        ILLUMINANT// automatically converts to the illuminant spectrum
+    class Instance {
+
+    private:
+        const Pipeline &_pipeline;
+        const Texture *_texture;
+
+    public:
+        Instance(const Pipeline &pipeline, const Texture *texture) noexcept
+            : _pipeline{pipeline}, _texture{texture} {}
+        virtual ~Instance() noexcept = default;
+        template<typename T = Texture>
+            requires std::is_base_of_v<Texture, T>
+        [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_texture); }
+        [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
+        [[nodiscard]] virtual Float4 evaluate(const Interaction &it, Expr<float> time) const noexcept = 0;
     };
 
 private:
@@ -77,11 +88,9 @@ private:
 public:
     Texture(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] virtual bool is_black() const noexcept = 0;
-    [[nodiscard]] virtual Category category() const noexcept = 0;
-    [[nodiscard]] virtual Float4 evaluate(
-        const Pipeline &pipeline, const Interaction &it,
-        const Var<TextureHandle> &handle, Expr<float> time) const noexcept = 0;
     [[nodiscard]] virtual uint channels() const noexcept { return 4u; }
+    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
 };
 
 using compute::PixelStorage;
