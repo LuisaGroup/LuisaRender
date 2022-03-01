@@ -12,7 +12,6 @@ def convert_albedo_texture(a):
     if isinstance(a, str):
         return f'''Color {{
     file {{ "{a}" }}
-    uv_scale {{ 1, -1 }}
   }}'''
     else:
         a = glm.vec3(a)
