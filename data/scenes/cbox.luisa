@@ -1,5 +1,5 @@
 Film film : Color {
-  resolution { 1024 }
+  resolution { 1 }
   exposure { 0 }
 }
 
