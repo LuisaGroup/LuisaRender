@@ -125,7 +125,7 @@ public:
         // TODO
         LUISA_ERROR_WITH_LOCATION("unimplemented");
     }
-    void backward(Expr<float4> k, Float learning_rate, Expr<float3> wi) noexcept override {
+    void backward(Pipeline &pipeline, const SampledWavelengths &swl_fixed, Expr<float4> k, Float learning_rate, Expr<float3> wi) noexcept override {
         // TODO
         LUISA_ERROR_WITH_LOCATION("unimplemented");
     }

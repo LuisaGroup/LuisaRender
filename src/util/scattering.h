@@ -163,14 +163,14 @@ class OrenNayar : public BxDF {
 
 private:
     Float4 _r;
-    Float _sigma2;
+    Float _sigma;
     Float _a;
     Float _b;
 
 public:
     OrenNayar(Expr<float4> R, Expr<float> sigma) noexcept;
     [[nodiscard]] Float4 evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
-    map<luisa::string, Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override;
+    [[nodiscard]] map<luisa::string, Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override;
 };
 
 class FresnelBlend : public BxDF {

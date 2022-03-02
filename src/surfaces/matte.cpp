@@ -76,9 +76,7 @@ private:
         auto wi_local = _shading.world_to_local(wi);
         auto f = _oren_nayar.evaluate(wo_local, wi_local);
         auto pdf = _oren_nayar.pdf(wo_local, wi_local);
-        return {.swl = _swl, .f = f, .pdf = pdf,
-                .alpha = make_float2(1.f),
-                .eta = make_float4(1.f)};
+        return {.swl = _swl, .f = f, .pdf = pdf, .alpha = make_float2(1.f), .eta = make_float4(1.f)};
     }
 
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
@@ -89,19 +87,26 @@ private:
         auto f = _oren_nayar.sample(wo_local, &wi_local, u, &pdf);
         auto wi = _shading.local_to_world(wi_local);
         return {.wi = wi,
-                .eval = {.swl = _swl, .f = f, .pdf = pdf,
-                         .alpha = make_float2(1.f),
-                         .eta = make_float4(1.f)}};
+                .eval = {.swl = _swl, .f = f, .pdf = pdf, .alpha = make_float2(1.f), .eta = make_float4(1.f)}};
     }
 
     void update() noexcept override {
         // TODO
         LUISA_ERROR_WITH_LOCATION("unimplemented");
     }
-    void backward(Expr<float4> k, Float learning_rate, Expr<float3> wi) noexcept override {
+    void backward(Pipeline &pipeline, const SampledWavelengths &swl_fixed, Expr<float4> k, Float learning_rate, Expr<float3> wi) noexcept override {
         auto wo_local = _wo_local;
         auto wi_local = _shading.world_to_local(wi);
         auto grad_map = _oren_nayar.grad(wo_local, wi_local);
+
+        auto df_dKd = grad_map["R"];
+        auto df_dSigma = grad_map["Sigma"];
+
+        auto rgb_df_dKd = _swl.srgb(df_dKd);
+        auto rgb_df_dSigma = _swl.srgb(df_dSigma);
+
+        auto spectrum_df_dKd = pipeline.srgb_unbound_spectrum(rgb_df_dKd).sample(swl_fixed);
+        auto spectrum_df_dSigma = pipeline.srgb_unbound_spectrum(rgb_df_dSigma).sample(swl_fixed);
 
         // TODO
         LUISA_ERROR_WITH_LOCATION("unimplemented");

@@ -346,10 +346,10 @@ map<luisa::string, Float4> MicrofacetTransmission::grad(Expr<float3> wo, Expr<fl
 }
 
 OrenNayar::OrenNayar(Expr<float4> R, Expr<float> sigma) noexcept
-    : _r{R} {
-    _sigma2 = sqr(radians(sigma));
-    _a = 1.f - (_sigma2 / (2.f * _sigma2 + 0.66f));
-    _b = 0.45f * _sigma2 / (_sigma2 + 0.09f);
+    : _r{R}, _sigma{sigma} {
+    auto sigma2 = sqr(radians(sigma));
+    _a = 1.f - (sigma2 / (2.f * sigma2 + 0.66f));
+    _b = 0.45f * sigma2 / (sigma2 + 0.09f);
 }
 
 Float4 OrenNayar::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
@@ -389,10 +389,12 @@ map<luisa::string, Float4> OrenNayar::grad(Expr<float3> wo, Expr<float3> wi) con
     luisa::map<luisa::string, Float4> grad;
     auto df_dR = inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta);
     auto df_dA = _r * inv_pi;
-    auto dA_dSigma2 = - 0.165f * sqr(_sigma2 + 0.33f);
-    auto df_dSigma2 = df_dA * dA_dSigma2;
+    auto sigma2 = sqr(radians(_sigma));
+    auto dA_dSigma2 = - 0.165f * sqr(sigma2 + 0.33f);
+    auto dSigma2_dSigma = 2 * radians(_sigma) / 180.f;
+    auto df_dSigma = df_dA * dA_dSigma2 * dSigma2_dSigma;
     grad["R"] = make_float4(df_dR);
-    grad["Sigma2"] = df_dSigma2;
+    grad["Sigma"] = df_dSigma;
     return grad;
 }
 

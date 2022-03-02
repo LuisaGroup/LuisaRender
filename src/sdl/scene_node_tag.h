@@ -20,6 +20,7 @@ enum struct SceneNodeTag : uint32_t {
     FILTER,
     SAMPLER,
     INTEGRATOR,
+    GRAD_INTEGRATOR,
     LIGHT_SAMPLER,
     ENVIRONMENT,
     TEXTURE
