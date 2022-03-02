@@ -43,7 +43,7 @@ public:
         [[nodiscard]] virtual Sample sample(Sampler::Instance &sampler) const noexcept = 0;
 
         virtual void update() noexcept = 0;
-        virtual void backward(Pipeline &pipeline, const SampledWavelengths &swl_fixed, Expr<float4> k, Float learning_rate, Expr<float3> wi) noexcept = 0;
+        virtual void backward(Pipeline &pipeline, Expr<float3> k, Float learning_rate, Expr<float3> wi) noexcept = 0;
     };
 
     [[nodiscard]] static Frame apply_normal_mapping(const Frame &f, Expr<float3> n_map) noexcept;

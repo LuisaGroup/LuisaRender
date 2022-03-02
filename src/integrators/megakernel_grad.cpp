@@ -114,7 +114,7 @@ void MegakernelPathTracingGradInstance::_integrate_one_camera(
 
         auto ray = camera_ray;
         // TODO : the shape of Li (rgb/spectrum)
-        auto Li = def(make_float4(1.0f));
+        auto Li = def(make_float3(1.0f));
         auto pdf_bsdf = def(0.0f);
 
         // TODO : radiative
@@ -137,7 +137,7 @@ void MegakernelPathTracingGradInstance::_integrate_one_camera(
             // evaluate material
             auto eta_scale = def(make_float4(1.f));
             auto cos_theta_o = it->wo_local().z;
-            pipeline.decode_material(it->shape()->surface_tag(), *it, swl, time, [&](Surface::Closure &material) {
+            pipeline.decode_material(it->shape()->surface_tag(), *it, swl, time, [&](const Surface::Closure &material) {
 
                 // sample material
                 auto [wi, eval] = material.sample(*sampler);
@@ -146,7 +146,7 @@ void MegakernelPathTracingGradInstance::_integrate_one_camera(
                 pdf_bsdf = eval.pdf;
 
                 // radiative bp
-                material.backward(pipeline, swl_fixed, Li * beta, 1.0f, wi);
+                material.backward(pipeline, Li * beta, 1.0f, wi);
 
                 beta *= ite(
                     eval.pdf > 0.0f,

@@ -94,19 +94,16 @@ private:
         // TODO
         LUISA_ERROR_WITH_LOCATION("unimplemented");
     }
-    void backward(Pipeline &pipeline, const SampledWavelengths &swl_fixed, Expr<float4> k, Float learning_rate, Expr<float3> wi) noexcept override {
+    void backward(Pipeline &pipeline, Expr<float3> k, Float learning_rate, Expr<float3> wi) noexcept override {
         auto wo_local = _wo_local;
         auto wi_local = _shading.world_to_local(wi);
-        auto grad_map = _oren_nayar.grad(wo_local, wi_local);
+        auto grad = _oren_nayar.grad(wo_local, wi_local);
 
-        auto df_dKd = grad_map["R"];
-        auto df_dSigma = grad_map["Sigma"];
-
-        auto rgb_df_dKd = _swl.srgb(df_dKd);
-        auto rgb_df_dSigma = _swl.srgb(df_dSigma);
-
-        auto spectrum_df_dKd = pipeline.srgb_unbound_spectrum(rgb_df_dKd).sample(swl_fixed);
-        auto spectrum_df_dSigma = pipeline.srgb_unbound_spectrum(rgb_df_dSigma).sample(swl_fixed);
+        auto df_dKd_0 = _swl.srgb(grad[0]);
+        auto df_dKd_1 = _swl.srgb(grad[1]);
+        auto df_dKd_2 = _swl.srgb(grad[2]);
+        auto df_dKd_3 = _swl.srgb(grad[3]);
+        auto df_dSigma = _swl.srgb(grad[4]);
 
         // TODO
         LUISA_ERROR_WITH_LOCATION("unimplemented");

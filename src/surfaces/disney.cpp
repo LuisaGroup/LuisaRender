@@ -174,12 +174,21 @@ public:
         // Burley 2015, eq (4).
         return R * inv_pi * (1.f - Fo * .5f) * (1.f - Fi * .5f);
     }
-    [[nodiscard]] map<luisa::string, Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+    [[nodiscard]] luisa::vector<Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
         auto Fo = SchlickWeight(abs_cos_theta(wo));
         auto Fi = SchlickWeight(abs_cos_theta(wi));
 
-        luisa::map<luisa::string, Float4> grad;
-        grad["R"] = make_float4(inv_pi * (1.f - Fo * .5f) * (1.f - Fi * .5f));
+        luisa::vector<Float4> grad;
+        grad.reserve(4);
+        auto df_dR = inv_pi * (1.f - Fo * .5f) * (1.f - Fi * .5f);
+        auto df_dR_0 = make_float4(1.0f, 0.0f, 0.0f, 0.0f) * df_dR;
+        auto df_dR_1 = make_float4(0.0f, 1.0f, 0.0f, 0.0f) * df_dR;
+        auto df_dR_2 = make_float4(0.0f, 0.0f, 1.0f, 0.0f) * df_dR;
+        auto df_dR_3 = make_float4(0.0f, 0.0f, 0.0f, 1.0f) * df_dR;
+        grad.emplace_back(df_dR_0);
+        grad.emplace_back(df_dR_1);
+        grad.emplace_back(df_dR_2);
+        grad.emplace_back(df_dR_3);
         return grad;
     }
 };
@@ -209,7 +218,7 @@ public:
         auto ss = 1.25f * (Fss * (1.f / (abs_cos_theta(wo) + abs_cos_theta(wi)) - .5f) + .5f);
         return ite(valid, R * inv_pi * ss, 0.f);
     }
-    [[nodiscard]] map<luisa::string, Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+    [[nodiscard]] luisa::vector<Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
         // TODO
         LUISA_ERROR_WITH_LOCATION("unimplemented");
     }
@@ -237,7 +246,7 @@ public:
         auto f = R * inv_pi * Rr * (Fo + Fi + Fo * Fi * (Rr - 1.f));
         return ite(valid, f, 0.f);
     }
-    [[nodiscard]] map<luisa::string, Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+    [[nodiscard]] luisa::vector<Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
         // TODO
         LUISA_ERROR_WITH_LOCATION("unimplemented");
     }
@@ -257,7 +266,7 @@ public:
         auto cosThetaD = dot(wi, wh);
         return ite(valid, R * SchlickWeight(cosThetaD), 0.f);
     }
-    [[nodiscard]] map<luisa::string, Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+    [[nodiscard]] luisa::vector<Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
         // TODO
         LUISA_ERROR_WITH_LOCATION("unimplemented");
     }
@@ -325,7 +334,7 @@ public:
         auto Dr = GTR1(abs_cos_theta(wh), gloss);
         return ite(valid, Dr * abs_cos_theta(wh) / (4.f * dot(wo, wh)), 0.f);
     }
-    [[nodiscard]] map<luisa::string, Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+    [[nodiscard]] luisa::vector<Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
         // TODO
         LUISA_ERROR_WITH_LOCATION("unimplemented");
     }
@@ -610,7 +619,7 @@ public:
         // TODO
         LUISA_ERROR_WITH_LOCATION("unimplemented");
     }
-    void backward(Pipeline &pipeline, const SampledWavelengths &swl_fixed, Expr<float4> k, Float learning_rate, Expr<float3> wi) noexcept override {
+    void backward(Pipeline &pipeline, Expr<float3> k, Float learning_rate, Expr<float3> wi) noexcept override {
         // TODO
         LUISA_ERROR_WITH_LOCATION("unimplemented");
     }

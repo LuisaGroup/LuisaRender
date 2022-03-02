@@ -236,9 +236,17 @@ Float BxDF::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {
 Float4 LambertianReflection::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
     return _r * inv_pi;
 }
-map<luisa::string, Float4> LambertianReflection::grad(Expr<float3> wo, Expr<float3> wi) const noexcept {
-    luisa::map<luisa::string, Float4> grad;
-    grad["R"] = make_float4(inv_pi);
+luisa::vector<Float4> LambertianReflection::grad(Expr<float3> wo, Expr<float3> wi) const noexcept {
+    luisa::vector<Float4> grad;
+    grad.reserve(4);
+    auto df_dR_0 = make_float4(1.0f, 0.0f, 0.0f, 0.0f) * inv_pi;
+    auto df_dR_1 = make_float4(0.0f, 1.0f, 0.0f, 0.0f) * inv_pi;
+    auto df_dR_2 = make_float4(0.0f, 0.0f, 1.0f, 0.0f) * inv_pi;
+    auto df_dR_3 = make_float4(0.0f, 0.0f, 0.0f, 1.0f) * inv_pi;
+    grad.emplace_back(df_dR_0);
+    grad.emplace_back(df_dR_1);
+    grad.emplace_back(df_dR_2);
+    grad.emplace_back(df_dR_3);
     return grad;
 }
 
@@ -256,9 +264,17 @@ Float4 LambertianTransmission::sample(Expr<float3> wo, Float3 *wi, Expr<float2> 
 Float LambertianTransmission::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {
     return compute::ite(same_hemisphere(wo, wi), 0.0f, abs_cos_theta(wi) * inv_pi);
 }
-map<luisa::string, Float4> LambertianTransmission::grad(Expr<float3> wo, Expr<float3> wi) const noexcept {
-    luisa::map<luisa::string, Float4> grad;
-    grad["T"] = make_float4(inv_pi);
+luisa::vector<Float4> LambertianTransmission::grad(Expr<float3> wo, Expr<float3> wi) const noexcept {
+    luisa::vector<Float4> grad;
+    grad.reserve(4);
+    auto df_dT_0 = make_float4(1.0f, 0.0f, 0.0f, 0.0f) * inv_pi;
+    auto df_dT_1 = make_float4(0.0f, 1.0f, 0.0f, 0.0f) * inv_pi;
+    auto df_dT_2 = make_float4(0.0f, 0.0f, 1.0f, 0.0f) * inv_pi;
+    auto df_dT_3 = make_float4(0.0f, 0.0f, 0.0f, 1.0f) * inv_pi;
+    grad.emplace_back(df_dT_0);
+    grad.emplace_back(df_dT_1);
+    grad.emplace_back(df_dT_2);
+    grad.emplace_back(df_dT_3);
     return grad;
 }
 
@@ -295,7 +311,7 @@ Float MicrofacetReflection::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept
     auto p = _distribution->pdf(wo, wh) / (4.f * dot(wo, wh));
     return ite(same_hemisphere(wo, wi), p, 0.f);
 }
-map<luisa::string, Float4> MicrofacetReflection::grad(Expr<float3> wo, Expr<float3> wi) const noexcept {
+luisa::vector<Float4> MicrofacetReflection::grad(Expr<float3> wo, Expr<float3> wi) const noexcept {
     // TODO
     LUISA_ERROR_WITH_LOCATION("unimplemented");
 }
@@ -340,7 +356,7 @@ Float MicrofacetTransmission::pdf(Expr<float3> wo, Expr<float3> wi) const noexce
     auto valid = !same_hemisphere(wo, wi) & dot(wo, wh) * dot(wi, wh) < 0.f;
     return ite(valid, _distribution->pdf(wo, wh) * dwh_dwi, 0.f);
 }
-map<luisa::string, Float4> MicrofacetTransmission::grad(Expr<float3> wo, Expr<float3> wi) const noexcept {
+luisa::vector<Float4> MicrofacetTransmission::grad(Expr<float3> wo, Expr<float3> wi) const noexcept {
     // TODO
     LUISA_ERROR_WITH_LOCATION("unimplemented");
 }
@@ -370,7 +386,8 @@ Float4 OrenNayar::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
                        sinThetaI / absCosThetaI, sinThetaO / absCosThetaO);
     return _r * inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta);
 }
-map<luisa::string, Float4> OrenNayar::grad(Expr<float3> wo, Expr<float3> wi) const noexcept {
+
+luisa::vector<Float4> OrenNayar::grad(Expr<float3> wo, Expr<float3> wi) const noexcept {
     auto sinThetaI = sin_theta(wi);
     auto sinThetaO = sin_theta(wo);
     // Compute cosine term of Oren-Nayar model
@@ -386,15 +403,25 @@ map<luisa::string, Float4> OrenNayar::grad(Expr<float3> wo, Expr<float3> wi) con
     auto sinAlpha = ite(absCosThetaI > absCosThetaO, sinThetaO, sinThetaI);
     auto tanBeta = ite(absCosThetaI > absCosThetaO,
                        sinThetaI / absCosThetaI, sinThetaO / absCosThetaO);
-    luisa::map<luisa::string, Float4> grad;
+
     auto df_dR = inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta);
     auto df_dA = _r * inv_pi;
     auto sigma2 = sqr(radians(_sigma));
     auto dA_dSigma2 = - 0.165f * sqr(sigma2 + 0.33f);
     auto dSigma2_dSigma = 2 * radians(_sigma) / 180.f;
     auto df_dSigma = df_dA * dA_dSigma2 * dSigma2_dSigma;
-    grad["R"] = make_float4(df_dR);
-    grad["Sigma"] = df_dSigma;
+
+    luisa::vector<Float4> grad;
+    grad.reserve(5);
+    auto df_dR_0 = make_float4(1.0f, 0.0f, 0.0f, 0.0f) * df_dR;
+    auto df_dR_1 = make_float4(0.0f, 1.0f, 0.0f, 0.0f) * df_dR;
+    auto df_dR_2 = make_float4(0.0f, 0.0f, 1.0f, 0.0f) * df_dR;
+    auto df_dR_3 = make_float4(0.0f, 0.0f, 0.0f, 1.0f) * df_dR;
+    grad.emplace_back(df_dR_0);
+    grad.emplace_back(df_dR_1);
+    grad.emplace_back(df_dR_2);
+    grad.emplace_back(df_dR_3);
+    grad.emplace_back(df_dSigma);
     return grad;
 }
 
@@ -452,7 +479,7 @@ Float FresnelBlend::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {
     auto p = .5f * (abs_cos_theta(wi) * inv_pi + pdf_wh / (4.f * dot(wo, wh)));
     return ite(same_hemisphere(wo, wi), p, 0.f);
 }
-map<luisa::string, Float4> FresnelBlend::grad(Expr<float3> wo, Expr<float3> wi) const noexcept {
+luisa::vector<Float4> FresnelBlend::grad(Expr<float3> wo, Expr<float3> wi) const noexcept {
     // TODO
     LUISA_ERROR_WITH_LOCATION("unimplemented");
 }
