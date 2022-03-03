@@ -180,7 +180,7 @@ private:
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
         auto wo_local = _interaction.wo_local();
         auto wi_local = _interaction.shading().world_to_local(wi);
-        auto f = def<float4>();
+        auto f = def(make_float4());
         auto pdf = def(0.f);
         auto swl = _swl;
         auto t = clamp(_fresnel.evaluate(cos_theta(wo_local)).x, 0.2f, 0.8f) * _kr_ratio;
@@ -201,7 +201,7 @@ private:
         auto wo_local = _interaction.wo_local();
         auto u = sampler.generate_2d();
         auto pdf = def(0.f);
-        auto f = def<float4>();
+        auto f = def(make_float4());
         auto wi_local = def(make_float3(0.0f, 0.0f, 1.0f));
         auto t = saturate(_fresnel.evaluate(cos_theta(wo_local)).x * _kr_ratio);
         auto lobe = cast<int>(u.x >= t);
