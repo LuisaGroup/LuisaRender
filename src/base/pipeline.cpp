@@ -475,7 +475,7 @@ Float4 Pipeline::evaluate_texture(
             *this, it, handle, time));
     }
     // dynamic dispatch
-    auto value = def<float4>();
+    auto value = def(make_float4());
     if (interfaces.empty()) [[unlikely]] { return value; }
     $switch(handle->tag()) {
         for (auto i = 0u; i < interfaces.size(); i++) {

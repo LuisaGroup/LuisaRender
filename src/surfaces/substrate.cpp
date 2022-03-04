@@ -113,7 +113,7 @@ private:
         auto wo_local = _interaction.wo_local();
         auto u = sampler.generate_2d();
         auto pdf = def(0.f);
-        auto wi_local = def<float3>();
+        auto wi_local = def(make_float3());
         auto f = _blend.sample(wo_local, &wi_local, u, &pdf);
         auto wi = _interaction.shading().local_to_world(wi_local);
         return {.wi = wi, .eval = {.swl = _swl, .f = f, .pdf = pdf,

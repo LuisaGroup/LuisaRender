@@ -377,7 +377,7 @@ Float4 FresnelBlend::sample(Expr<float3> wo, Float3 *wi, Expr<float2> uOrig, Flo
     using compute::sign;
     auto u = def(uOrig);
     *p = 0.f;
-    auto f = def<float4>();
+    auto f = def(make_float4());
     $if(u.x < .5f) {
         u.x = 2.f * u.x;
         // Cosine-sample the hemisphere, flipping the direction if necessary
