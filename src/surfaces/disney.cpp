@@ -604,7 +604,7 @@ public:
         $switch(sampling_tech) {
             for (auto i = 0u; i < max_sampling_techique_count; i++) {
                 $case(i) {
-                    auto pdf = def<float>();
+                    auto pdf = def(0.f);
                     static_cast<void>(lobes[i]->sample(wo_local, &wi_local, u, &pdf));
                 };
             }

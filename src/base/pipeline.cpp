@@ -32,7 +32,7 @@ void Pipeline::_build_geometry(
     for (auto shape : shapes) { _process_shape(command_buffer, shape); }
     _instance_buffer = _device.create_buffer<Shape::Handle>(_instances.size());
     command_buffer << _instance_buffer.copy_from(_instances.data())
-                   << _accel.build();// FIXME: adding commit() leads to wrong rendering, why?
+                   << _accel.build();
 }
 
 void Pipeline::_process_shape(
