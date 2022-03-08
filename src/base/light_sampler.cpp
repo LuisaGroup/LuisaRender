@@ -13,8 +13,9 @@ Light::Evaluation LightSampler::Instance::evaluate(
     const Interaction &it, Expr<float3> p_from,
     const SampledWavelengths &swl, Expr<float> time) const noexcept {
     Light::Evaluation eval;
-    _pipeline.decode_light(it.shape()->light_tag(), swl, time, [&](const Light::Closure &light) noexcept {
-        eval = light.evaluate(it, p_from);
+    _pipeline.dynamic_dispatch_light(it.shape()->light_tag(), [&](auto light) noexcept {
+        auto closure = light->closure(swl, time);
+        eval = closure->evaluate(it, p_from);
     });
     eval.L *= 1.f / pmf(it, swl);
     return eval;
@@ -25,8 +26,9 @@ Light::Sample LightSampler::Instance::sample(
     const SampledWavelengths &swl, Expr<float> time) const noexcept {
     Light::Sample light_sample;
     auto selection = select(sampler, it_from, swl);
-    _pipeline.decode_light(selection.light_tag, swl, time, [&](const Light::Closure &light) noexcept {
-        light_sample = light.sample(sampler, selection.instance_id, it_from);
+    _pipeline.dynamic_dispatch_light(selection.light_tag, [&](auto light) noexcept {
+        auto closure = light->closure(swl, time);
+        light_sample = closure->sample(sampler, selection.instance_id, it_from);
     });
     light_sample.eval.L *= 1.f / selection.pmf;
     return light_sample;

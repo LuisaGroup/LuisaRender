@@ -28,6 +28,7 @@ public:
         template<typename T = Integrator>
             requires std::is_base_of_v<Integrator, T>
         [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_integrator); }
+        [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
         virtual void render(Stream &stream) noexcept = 0;
     };
 

@@ -42,7 +42,7 @@ public:
         template<typename T = LightSampler>
             requires std::is_base_of_v<LightSampler, T>
         [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_sampler); }
-        [[nodiscard]] const auto &pipeline() const noexcept { return _pipeline; }
+        [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
         virtual void update(CommandBuffer &command_buffer, float time) noexcept = 0;
         [[nodiscard]] virtual Float pmf(
             const Interaction &it,

@@ -37,8 +37,19 @@ public:
         Evaluation eval;
     };
 
-    struct Closure {
+    class Instance;
+
+    class Closure {
+
+    private:
+        const Instance *_instance;
+
+    public:
+        explicit Closure(const Instance *instance) noexcept : _instance{instance} {}
         virtual ~Closure() noexcept = default;
+        template<typename T = Instance>
+            requires std::is_base_of_v<Instance, T>
+        [[nodiscard]] auto instance() const noexcept { return static_cast<const T *>(_instance); }
         [[nodiscard]] virtual Evaluation evaluate(Expr<float3> wi) const noexcept = 0;
         [[nodiscard]] virtual Sample sample(Sampler::Instance &sampler) const noexcept = 0;
     };
@@ -65,12 +76,14 @@ public:
 
 private:
     const Texture *_normal_map;
+    const Texture *_alpha_map;
 
 public:
     Surface(Scene *scene, const SceneNodeDesc *desc) noexcept;
-    [[nodiscard]] auto normal_map() const noexcept { return _normal_map; }
+    [[nodiscard]] auto normal() const noexcept { return _normal_map; }
+    [[nodiscard]] auto alpha() const noexcept { return _alpha_map; }
     [[nodiscard]] virtual bool is_null() const noexcept { return false; }
-    [[nodiscard]] virtual uint /* material_id */ build(
+    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
 };
 

@@ -22,6 +22,11 @@ class Interaction;
 class Light : public SceneNode {
 
 public:
+    struct Handle {
+        uint instance_id;
+        uint light_tag;
+    };
+
     struct Evaluation {
         Float4 L;
         Float pdf;
@@ -68,3 +73,5 @@ public:
 };
 
 }// namespace luisa::render
+
+LUISA_STRUCT(luisa::render::Light::Handle, instance_id, light_tag){};

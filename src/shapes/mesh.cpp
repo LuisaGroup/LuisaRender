@@ -131,20 +131,11 @@ class Mesh final : public Shape {
 
 private:
     std::shared_future<MeshLoader> _loader;
-    std::shared_future<LoadedImage> _alpha_image;
     AccelBuildHint _build_hint{AccelBuildHint::FAST_TRACE};
-    float _alpha{1.f};
 
 public:
     Mesh(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Shape{scene, desc}, _loader{MeshLoader::load(desc->property_path("file"))} {
-        if (auto p = desc->property_path_or_default("alpha"); !p.empty()) {
-            _alpha_image = ThreadPool::global().async([p = std::move(p)] {
-                return LoadedImage::load(p, LoadedImage::storage_type::BYTE1);
-            });
-        } else {
-            _alpha = desc->property_float_or_default("alpha", 1.f);
-        }
         auto hint = desc->property_string_or_default("build_hint", "");
         if (hint == "fast_update") {
             _build_hint = AccelBuildHint::FAST_UPDATE;
@@ -156,16 +147,9 @@ public:
     [[nodiscard]] luisa::span<const Shape *const> children() const noexcept override { return {}; }
     [[nodiscard]] bool deformable() const noexcept override { return false; }
     [[nodiscard]] bool is_mesh() const noexcept override { return true; }
-    [[nodiscard]] bool is_virtual() const noexcept override { return false; }
     [[nodiscard]] luisa::span<const float3> positions() const noexcept override { return _loader.get().positions(); }
     [[nodiscard]] luisa::span<const Shape::VertexAttribute> attributes() const noexcept override { return _loader.get().attributes(); }
     [[nodiscard]] luisa::span<const Triangle> triangles() const noexcept override { return _loader.get().triangles(); }
-    [[nodiscard]] float alpha() const noexcept override { return _alpha; }
-    [[nodiscard]] const LoadedImage *alpha_image() const noexcept override {
-        return _alpha_image.valid() && _loader.get().has_uv() ?
-                   std::addressof(_alpha_image.get()) :
-                   nullptr;
-    }
 };
 
 }// namespace luisa::render

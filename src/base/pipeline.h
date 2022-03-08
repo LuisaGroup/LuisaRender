@@ -61,8 +61,6 @@ public:
     struct MeshData {
         Mesh *resource;
         uint geometry_buffer_id_base;
-        uint alpha_texture_id;
-        float alpha;
         bool two_sided;
         bool is_virtual;
     };
@@ -81,11 +79,12 @@ private:
     luisa::vector<ResourceHandle> _resources;
     luisa::unordered_map<uint64_t, MeshGeometry> _mesh_cache;
     luisa::unordered_map<const Shape *, MeshData> _meshes;
-    luisa::vector<const Surface::Instance *> _surfaces;
-    luisa::vector<const Light::Instance *> _lights;
+    luisa::vector<luisa::unique_ptr<Surface::Instance>> _surfaces;
+    luisa::vector<luisa::unique_ptr<Light::Instance>> _lights;
+    luisa::vector<Light::Handle> _instanced_lights;
     luisa::unordered_map<const Surface *, uint> _surface_tags;
     luisa::unordered_map<const Light *, uint> _light_tags;
-    luisa::unordered_map<const Texture *, const Texture::Instance *> _textures;
+    luisa::unordered_map<const Texture *, luisa::unique_ptr<Texture::Instance>> _textures;
     luisa::vector<Shape::Handle> _instances;
     luisa::vector<InstancedTransform> _dynamic_transforms;
     Buffer<Shape::Handle> _instance_buffer;
@@ -100,13 +99,16 @@ private:
     float _mean_time{0.0f};
 
 private:
-    void _build_geometry(CommandBuffer &command_buffer, luisa::span<const Shape *const> shapes, float init_time, AccelBuildHint hint) noexcept;
+    void _build_geometry(
+        CommandBuffer &command_buffer,
+        luisa::span<const Shape *const> shapes,
+        float init_time, AccelBuildHint hint) noexcept;
     void _process_shape(
         CommandBuffer &command_buffer, const Shape *shape,
         luisa::optional<bool> overridden_two_sided = luisa::nullopt,
         const Surface *overridden_surface = nullptr, const Light *overridden_light = nullptr) noexcept;
-    [[nodiscard]] uint _process_surface(CommandBuffer &command_buffer, uint instance_id, const Shape *shape, const Surface *material) noexcept;
-    [[nodiscard]] uint _process_light(CommandBuffer &command_buffer, uint instance_id, const Shape *shape, const Light *light) noexcept;
+    [[nodiscard]] uint _process_surface(CommandBuffer &command_buffer, const Surface *surface) noexcept;
+    [[nodiscard]] uint _process_light(CommandBuffer &command_buffer, const Light *light) noexcept;
 
 public:
     // for internal use only; use Pipeline::create() instead
@@ -144,8 +146,6 @@ public:
         return static_cast<uint>(tex3d_id);
     }
 
-    [[nodiscard]] const TextureHandle *encode_texture(CommandBuffer &command_buffer, const Texture *texture) noexcept;
-
     template<typename T, typename... Args>
         requires std::is_base_of_v<Resource, T>
     [[nodiscard]] auto create(Args &&...args) noexcept -> T * {
@@ -171,7 +171,8 @@ public:
     [[nodiscard]] auto bindless_tex3d(Expr<uint> tex_id) const noexcept { return _bindless_array.tex3d(tex_id); }
 
 public:
-    [[nodiscard]] static luisa::unique_ptr<Pipeline> create(Device &device, Stream &stream, const Scene &scene) noexcept;
+    [[nodiscard]] static luisa::unique_ptr<Pipeline> create(
+        Device &device, Stream &stream, const Scene &scene) noexcept;
     [[nodiscard]] auto &accel() const noexcept { return _accel; }
     [[nodiscard]] auto &bindless_array() const noexcept { return _bindless_array; }
     [[nodiscard]] auto &transform_tree() const noexcept { return _transform_tree; }
@@ -181,12 +182,14 @@ public:
     [[nodiscard]] std::tuple<const Camera::Instance *, const Film::Instance *, const Filter::Instance *> camera(size_t i) const noexcept;
     [[nodiscard]] auto surfaces() const noexcept { return luisa::span{_surfaces}; }
     [[nodiscard]] auto lights() const noexcept { return luisa::span{_lights}; }
+    [[nodiscard]] auto instanced_lights() const noexcept { return luisa::span{_instanced_lights}; }
     [[nodiscard]] auto sampler() noexcept { return _sampler.get(); }
     [[nodiscard]] auto sampler() const noexcept { return _sampler.get(); }
     [[nodiscard]] auto environment() const noexcept { return _environment.get(); }
     [[nodiscard]] auto light_sampler() const noexcept { return _light_sampler.get(); }
     [[nodiscard]] auto mean_time() const noexcept { return _mean_time; }
-
+    [[nodiscard]] const Texture::Instance *build_texture(
+        CommandBuffer &command_buffer, const Texture *texture) noexcept;
     bool update_geometry(CommandBuffer &command_buffer, float time) noexcept;
     void render(Stream &stream) noexcept;
 

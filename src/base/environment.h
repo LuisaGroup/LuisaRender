@@ -22,7 +22,7 @@ public:
         float _select_prob;
 
     public:
-        explicit Instance(Pipeline &pipeline, const Environment *env) noexcept;
+        explicit Instance(const Pipeline &pipeline, const Environment *env) noexcept;
         virtual ~Instance() noexcept = default;
 
         template<typename T = Environment>

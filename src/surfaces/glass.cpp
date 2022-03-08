@@ -49,24 +49,12 @@ inline auto builtin_ior_texture_desc(luisa::string name) noexcept {
 
 class GlassSurface final : public Surface {
 
-public:
-    struct Params {
-        TextureHandle Kr;
-        TextureHandle Kt;
-        TextureHandle roughness;
-        TextureHandle eta;
-        bool remap_roughness;
-        bool isotropic;
-        bool dispersion;
-    };
-
 private:
     const Texture *_kr;
     const Texture *_kt;
-    const Texture *_roughness;
-    const Texture *_eta;
+    const Texture *_roughness{nullptr};
+    const Texture *_eta{nullptr};
     bool _remap_roughness;
-    luisa::unique_ptr<SceneNodeDesc> _builtin_ior;
 
 public:
     GlassSurface(Scene *scene, const SceneNodeDesc *desc) noexcept
@@ -75,8 +63,7 @@ public:
               "Kr", SceneNodeDesc::shared_default_texture("ConstColor")))},
           _kt{scene->load_texture(desc->property_node_or_default(
               "Kt", SceneNodeDesc::shared_default_texture("ConstColor")))},
-          _roughness{scene->load_texture(desc->property_node_or_default(
-              "roughness", SceneNodeDesc::shared_default_texture("ConstGeneric")))},
+          _roughness{scene->load_texture(desc->property_node_or_default("roughness"))},
           _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {
         if (_kr->category() != Texture::Category::COLOR) [[unlikely]] {
             LUISA_ERROR(
@@ -90,7 +77,8 @@ public:
                 "allowed in GlassSurface::Kt. [{}]",
                 desc->source_location().string());
         }
-        if (_roughness->category() != Texture::Category::GENERIC) [[unlikely]] {
+        if (_roughness != nullptr &&
+            _roughness->category() != Texture::Category::GENERIC) [[unlikely]] {
             LUISA_ERROR(
                 "Non-generic textures are not "
                 "allowed in GlassSurface::roughness. [{}]",
@@ -99,55 +87,59 @@ public:
         if (auto eta_name = desc->property_string_or_default("eta"); !eta_name.empty()) {
             _eta = scene->load_texture(builtin_ior_texture_desc(eta_name));
             if (_eta == nullptr) [[unlikely]] {
-                LUISA_ERROR(
-                    "Unknown built-in glass '{}'. [{}]",
+                LUISA_WARNING_WITH_LOCATION(
+                    "Unknown built-in glass '{}'. "
+                    "Fallback to constant IOR = 1.5. [{}]",
                     eta_name, desc->source_location().string());
             }
         } else {
-            _eta = scene->load_texture(desc->property_node_or_default(
-                "eta", SceneNodeDesc::shared_default_texture("ConstGeneric")));
+            _eta = scene->load_texture(desc->property_node_or_default("eta"));
         }
-        if (_eta->category() != Texture::Category::GENERIC) [[unlikely]] {
-            LUISA_ERROR(
-                "Non-generic textures are not "
-                "allowed in GlassSurface::eta. [{}]",
-                desc->source_location().string());
-        }
-        if (_eta->channels() == 2u) [[unlikely]] {
-            LUISA_ERROR(
-                "Invalid channel count {} "
-                "for GlassSurface::eta.",
-                desc->source_location().string());
+        if (_eta != nullptr) {
+            if (_eta->category() != Texture::Category::GENERIC) [[unlikely]] {
+                LUISA_ERROR(
+                    "Non-generic textures are not "
+                    "allowed in GlassSurface::eta. [{}]",
+                    desc->source_location().string());
+            }
+            if (_eta->channels() == 2u) [[unlikely]] {
+                LUISA_ERROR(
+                    "Invalid channel count {} "
+                    "for GlassSurface::eta.",
+                    desc->source_location().string());
+            }
         }
     }
+    [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint, const Shape *) const noexcept override {
-        auto [buffer_view, buffer_id] = pipeline.arena_buffer<Params>(1u);
-        Params params{
-            .Kr = *pipeline.encode_texture(command_buffer, _kr),
-            .Kt = *pipeline.encode_texture(command_buffer, _kt),
-            .roughness = *pipeline.encode_texture(command_buffer, _roughness),
-            .eta = *pipeline.encode_texture(command_buffer, _eta),
-            .remap_roughness = _remap_roughness,
-            .isotropic = _roughness->channels() == 1u,
-            .dispersion = _eta->channels() != 1u};
-        command_buffer << buffer_view.copy_from(&params)
-                       << compute::commit();
-        return buffer_id;
-    }
-    [[nodiscard]] luisa::unique_ptr<Closure> decode(
-        const Pipeline &pipeline, const Interaction &it,
-        const SampledWavelengths &swl, Expr<float> time) const noexcept override;
+    [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
-}// namespace luisa::render
+class GlassInstance final : public Surface::Instance {
 
-LUISA_STRUCT(
-    luisa::render::GlassSurface::Params,
-    Kr, Kt, roughness, eta,
-    remap_roughness, isotropic, dispersion){};
+private:
+    const Texture::Instance *_kr;
+    const Texture::Instance *_kt;
+    const Texture::Instance *_roughness{nullptr};
+    const Texture::Instance *_eta{nullptr};
 
-namespace luisa::render {
+public:
+    GlassInstance(
+        const Pipeline &pipeline, const Surface *surface,
+        const Texture::Instance *Kr, const Texture::Instance *Kt,
+        const Texture::Instance *roughness, const Texture::Instance *eta) noexcept
+        : Surface::Instance{pipeline, surface}, _kr{Kr}, _kt{Kt}, _roughness{roughness}, _eta{eta} {}
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
+        const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
+};
+
+luisa::unique_ptr<Surface::Instance> GlassSurface::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
+    auto Kr = pipeline.build_texture(command_buffer, _kr);
+    auto Kt = pipeline.build_texture(command_buffer, _kt);
+    auto roughness = pipeline.build_texture(command_buffer, _roughness);
+    auto eta = pipeline.build_texture(command_buffer, _eta);
+    return luisa::make_unique<GlassInstance>(pipeline, this, Kr, Kt, roughness, eta);
+}
 
 class GlassClosure final : public Surface::Closure {
 
@@ -169,11 +161,14 @@ private:
 
 public:
     GlassClosure(
+        const Surface::Instance *instance,
         const Interaction &it, const SampledWavelengths &swl,
         Expr<float4> eta, Expr<float4> Kr, Expr<float4> Kt,
         Expr<float2> alpha, Expr<float> Kr_ratio) noexcept
-        : _interaction{it}, _swl{swl}, _distribution{alpha}, _fresnel{make_float4(1.0f), eta},
-          _refl{Kr, &_distribution, &_fresnel}, _trans{Kt, &_distribution, make_float4(1.f), eta},
+        : Surface::Closure{instance}, _interaction{it}, _swl{swl},
+          _distribution{alpha}, _fresnel{make_float4(1.0f), eta},
+          _refl{Kr, &_distribution, &_fresnel},
+          _trans{Kt, &_distribution, make_float4(1.f), eta},
           _kr_ratio{Kr_ratio}, _dispersion{has_dispersion(eta)} {}
 
 private:
@@ -193,8 +188,7 @@ private:
             pdf = _trans.pdf(wo_local, wi_local) * (1.f - t);
             $if(_dispersion) { swl.terminate_secondary(); };
         };
-        return {.swl = swl, .f = f, .pdf = pdf, .alpha = _distribution.alpha(),
-                .eta = ite(wi_local.z > 0.f, _fresnel.eta_i(), _fresnel.eta_t())};
+        return {.swl = swl, .f = f, .pdf = pdf, .alpha = _distribution.alpha(), .eta = ite(wi_local.z > 0.f, _fresnel.eta_i(), _fresnel.eta_t())};
     }
 
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
@@ -223,35 +217,41 @@ private:
     }
 };
 
-luisa::unique_ptr<Surface::Closure> GlassSurface::decode(
-    const Pipeline &pipeline, const Interaction &it,
-    const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    auto params = pipeline.buffer<Params>(it.shape()->surface_buffer_id()).read(0u);
-    auto Kr = pipeline.evaluate_color_texture(params.Kr, it, swl, time);
-    auto Kt = sqrt(pipeline.evaluate_color_texture(params.Kt, it, swl, time));
-    auto r = pipeline.evaluate_generic_texture(params.roughness, it, time);
-    auto e = pipeline.evaluate_generic_texture(params.eta, it, time);
-    auto eta_basis = ite(params.dispersion, e.xyz(), ite(e.x == 0.f, 1.5f, e.x));
-    auto roughness = ite(params.isotropic, r.xx(), r.xy());
-    auto alpha = ite(
-        params.remap_roughness,
-        TrowbridgeReitzDistribution::roughness_to_alpha(roughness),
-        roughness);
+luisa::unique_ptr<Surface::Closure> GlassInstance::closure(
+    const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    auto Kr = _kr->evaluate(it, swl, time);
+    auto Kt = _kt->evaluate(it, swl, time);
+    auto alpha = def(make_float2(.5f));
+    if (_roughness != nullptr) {
+        auto r = _roughness->evaluate(it, swl, time);
+        auto remap = node<GlassSurface>()->remap_roughness();
+        auto r2a = [](auto &&x) noexcept { return TrowbridgeReitzDistribution::roughness_to_alpha(x); };
+        alpha = _roughness->node()->channels() == 1u ?
+                    (remap ? make_float2(r2a(r.x)) : r.xx()) :
+                    (remap ? r2a(r.xy()) : r.xy());
+    }
+    auto eta = def(make_float4(1.5f));
+    if (_eta != nullptr) {
+        if (_eta->node()->channels() == 1u) {
+            eta = _eta->evaluate(it, swl, time).xxxx();
+        } else {
+            auto e = _eta->evaluate(it, swl, time).xyz();
+            auto inv_bb = sqr(1.f / make_float3(700.0f, 546.1f, 435.8f));
+            auto m = make_float3x3(make_float3(1.f), inv_bb, sqr(inv_bb));
+            auto c = inverse(m) * e;
+            auto inv_ll = sqr(1.f / swl.lambda());
+            eta = make_float4(
+                dot(c, make_float3(1.f, inv_ll.x, sqr(inv_ll.x))),
+                dot(c, make_float3(1.f, inv_ll.y, sqr(inv_ll.y))),
+                dot(c, make_float3(1.f, inv_ll.z, sqr(inv_ll.z))),
+                dot(c, make_float3(1.f, inv_ll.w, sqr(inv_ll.w))));
+        }
+    }
     auto Kr_lum = swl.cie_y(Kr);
     auto Kt_lum = swl.cie_y(Kt);
     auto Kr_ratio = ite(Kr_lum == 0.f, 0.f, Kr_lum / (Kr_lum + Kt_lum));
-    // interpolate eta using Cauchy's dispersion formula
-    auto inv_bb = sqr(1.f / make_float3(700.0f, 546.1f, 435.8f));
-    auto m = make_float3x3(make_float3(1.f), inv_bb, sqr(inv_bb));
-    auto c = inverse(m) * eta_basis;
-    auto inv_ll = sqr(1.f / swl.lambda());
-    auto eta = make_float4(
-        dot(c, make_float3(1.f, inv_ll.x, sqr(inv_ll.x))),
-        dot(c, make_float3(1.f, inv_ll.y, sqr(inv_ll.y))),
-        dot(c, make_float3(1.f, inv_ll.z, sqr(inv_ll.z))),
-        dot(c, make_float3(1.f, inv_ll.w, sqr(inv_ll.w))));
     return luisa::make_unique<GlassClosure>(
-        it, swl, eta, Kr, Kt, alpha, Kr_ratio);
+        this, it, swl, eta, Kr, Kt, alpha, Kr_ratio);
 }
 
 }// namespace luisa::render
