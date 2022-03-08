@@ -176,47 +176,49 @@ void MegakernelPathTracingInstance::_render_one_camera(
                     it->set_shading(Frame::make(normal, it->shading().u()));
                 }
                 // apply alpha map
+                auto alpha_skip = def(false);
                 if (auto alpha_map = surface->alpha()) {
                     auto alpha = alpha_map->evaluate(*it, swl, time).x;
                     auto u_alpha = sampler->generate_1d();
-                    $if(u_alpha >= alpha) {
-                        ray = it->spawn_ray(ray->direction());
-                        pdf_bsdf = 1e16f;
-                        $continue;
-                    };
+                    alpha_skip = alpha < u_alpha;
                 }
 
-                // create closure
-                auto closure = surface->closure(*it, swl, time);
+                $if (alpha_skip) {
+                    ray = it->spawn_ray(ray->direction());
+                    pdf_bsdf = 1e16f;
+                } $else {
+                    // create closure
+                    auto closure = surface->closure(*it, swl, time);
 
-                // direct lighting
-                $if(light_sample.eval.pdf > 0.0f & !occluded) {
-                    auto wi = light_sample.shadow_ray->direction();
-                    auto eval = closure->evaluate(wi);
-                    auto cos_theta_i = dot(it->shading().n(), wi);
-                    auto is_trans = cos_theta_i * cos_theta_o < 0.f;
-                    auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
-                    Li += eval.swl.srgb(
-                        beta * mis_weight * ite(eval.pdf > 0.0f, eval.f, 0.0f) *
-                        abs_dot(it->shading().n(), wi) *
-                        light_sample.eval.L / light_sample.eval.pdf);
+                    // direct lighting
+                    $if(light_sample.eval.pdf > 0.0f & !occluded) {
+                        auto wi = light_sample.shadow_ray->direction();
+                        auto eval = closure->evaluate(wi);
+                        auto cos_theta_i = dot(it->shading().n(), wi);
+                        auto is_trans = cos_theta_i * cos_theta_o < 0.f;
+                        auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
+                        Li += eval.swl.srgb(
+                            beta * mis_weight * ite(eval.pdf > 0.0f, eval.f, 0.0f) *
+                            abs_dot(it->shading().n(), wi) *
+                            light_sample.eval.L / light_sample.eval.pdf);
+                    };
+
+                    // sample material
+                    auto [wi, eval] = closure->sample(*sampler);
+                    auto cos_theta_i = dot(wi, it->shading().n());
+                    ray = it->spawn_ray(wi);
+                    pdf_bsdf = eval.pdf;
+                    beta *= ite(
+                        eval.pdf > 0.0f,
+                        eval.f * abs(cos_theta_i) / eval.pdf,
+                        make_float4(0.0f));
+                    swl = eval.swl;
+                    eta_scale = ite(
+                        cos_theta_i * cos_theta_o < 0.f &
+                            min(eval.alpha.x, eval.alpha.y) < .05f,
+                        ite(cos_theta_o > 0.f, sqr(eval.eta), sqrt(1.f / eval.eta)),
+                        1.f);
                 };
-
-                // sample material
-                auto [wi, eval] = closure->sample(*sampler);
-                auto cos_theta_i = dot(wi, it->shading().n());
-                ray = it->spawn_ray(wi);
-                pdf_bsdf = eval.pdf;
-                beta *= ite(
-                    eval.pdf > 0.0f,
-                    eval.f * abs(cos_theta_i) / eval.pdf,
-                    make_float4(0.0f));
-                swl = eval.swl;
-                eta_scale = ite(
-                    cos_theta_i * cos_theta_o < 0.f &
-                        min(eval.alpha.x, eval.alpha.y) < .05f,
-                    ite(cos_theta_o > 0.f, sqr(eval.eta), sqrt(1.f / eval.eta)),
-                    1.f);
             });
 
             // rr
