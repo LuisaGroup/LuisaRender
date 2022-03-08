@@ -393,7 +393,7 @@ Camera camera : Pinhole {
   front { 0.0072655160911381245, -0.03931873291730881, -0.9992002844810486 }
   up { 0.0, 1.0, 0.0 }
   fov { 31.0 }
-  spp { 1024 }
+  spp { 64 }
   filter : Gaussian {
     radius { 1 }
   }
