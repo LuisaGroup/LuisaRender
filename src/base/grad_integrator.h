@@ -25,7 +25,7 @@ public:
             : _pipeline{pipeline}, _grad_integrator{grad_integrator} {}
         virtual ~Instance() noexcept = default;
         [[nodiscard]] auto node() const noexcept { return _grad_integrator; }
-        virtual void integrate(Stream &stream) noexcept = 0;
+        virtual void backpropagation(Stream &stream, luisa::vector<Film::Instance *> targets) noexcept = 0;
     };
 
 private:

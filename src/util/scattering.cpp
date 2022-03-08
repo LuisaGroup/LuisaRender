@@ -134,6 +134,7 @@ Float TrowbridgeReitzDistribution::D(Expr<float3> wh) const noexcept {
     return ite(isinf(tan2Theta), 0.f, d);
 }
 
+
 Float TrowbridgeReitzDistribution::Lambda(Expr<float3> w) const noexcept {
     using compute::isinf;
     auto absTanTheta = abs(tan_theta(w));
@@ -312,6 +313,16 @@ Float MicrofacetReflection::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept
     return ite(same_hemisphere(wo, wi), p, 0.f);
 }
 luisa::vector<Float4> MicrofacetReflection::grad(Expr<float3> wo, Expr<float3> wi) const noexcept {
+    // TODO : we didn't deal with distribution and fresnel here
+
+    using compute::any;
+    using compute::normalize;
+    auto cosThetaO = abs_cos_theta(wo);
+    auto cosThetaI = abs_cos_theta(wi);
+    auto wh = wi + wo;
+    auto valid = cosThetaI != 0.f & cosThetaO != 0.f & any(wh != 0.f);
+    wh = normalize(wh);
+
     // TODO
     LUISA_ERROR_WITH_LOCATION("unimplemented");
 }
@@ -480,8 +491,45 @@ Float FresnelBlend::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {
     return ite(same_hemisphere(wo, wi), p, 0.f);
 }
 luisa::vector<Float4> FresnelBlend::grad(Expr<float3> wo, Expr<float3> wi) const noexcept {
-    // TODO
-    LUISA_ERROR_WITH_LOCATION("unimplemented");
+    // TODO : we didn't deal with distribution here
+
+    auto pow5 = [](Float v) noexcept { return sqr(sqr(v)) * v; };
+    auto absCosThetaI = abs_cos_theta(wi);
+    auto absCosThetaO = abs_cos_theta(wo);
+
+    auto wh = wi + wo;
+    auto valid = any(wh != 0.f);
+    wh = normalize(wh);
+    auto specular = _distribution->D(wh) /
+                    (4.f * abs_dot(wi, wh) * max(absCosThetaI, absCosThetaO)) *
+                    Schlick(dot(wi, wh));
+
+    luisa::vector<Float4> grad;
+    grad.reserve(8);
+    auto k_diffuse_Rd = (28.f / (23.f * pi)) * (1.f - _rs) *
+               (1.f - pow5(1.f - .5f * absCosThetaI)) *
+               (1.f - pow5(1.f - .5f * absCosThetaO));
+    auto k_diffuse_Rs = -(28.f / (23.f * pi)) * _rd *
+               (1.f - pow5(1.f - .5f * absCosThetaI)) *
+               (1.f - pow5(1.f - .5f * absCosThetaO));
+    auto k_specular_Rs = 1 - pow5(1.f - dot(wi, wh));
+    auto df_dRd_0 = make_float4(1.0f, 0.0f, 0.0f, 0.0f) * k_diffuse_Rd;
+    auto df_dRd_1 = make_float4(0.0f, 1.0f, 0.0f, 0.0f) * k_diffuse_Rd;
+    auto df_dRd_2 = make_float4(0.0f, 0.0f, 1.0f, 0.0f) * k_diffuse_Rd;
+    auto df_dRd_3 = make_float4(0.0f, 0.0f, 0.0f, 1.0f) * k_diffuse_Rd;
+    auto df_dRs_0 = make_float4(1.0f, 0.0f, 0.0f, 0.0f) * (k_diffuse_Rs + k_specular_Rs);
+    auto df_dRs_1 = make_float4(0.0f, 1.0f, 0.0f, 0.0f) * (k_diffuse_Rs + k_specular_Rs);
+    auto df_dRs_2 = make_float4(0.0f, 0.0f, 1.0f, 0.0f) * (k_diffuse_Rs + k_specular_Rs);
+    auto df_dRs_3 = make_float4(0.0f, 0.0f, 0.0f, 1.0f) * (k_diffuse_Rs + k_specular_Rs);
+    grad.emplace_back(df_dRd_0);
+    grad.emplace_back(df_dRd_1);
+    grad.emplace_back(df_dRd_2);
+    grad.emplace_back(df_dRd_3);
+    grad.emplace_back(df_dRs_0);
+    grad.emplace_back(df_dRs_1);
+    grad.emplace_back(df_dRs_2);
+    grad.emplace_back(df_dRs_3);
+    return grad;
 }
 
 }// namespace luisa::render

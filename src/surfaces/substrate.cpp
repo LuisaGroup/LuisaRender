@@ -126,6 +126,19 @@ private:
         LUISA_ERROR_WITH_LOCATION("unimplemented");
     }
     void backward(Pipeline &pipeline, Expr<float3> k, Float learning_rate, Expr<float3> wi) noexcept override {
+        auto wo_local = _interaction.wo_local();
+        auto wi_local = _interaction.shading().world_to_local(wi);
+        auto grad = _blend.grad(wo_local, wi_local);
+
+        auto df_dRd_0 = _swl.srgb(grad[0]);
+        auto df_dRd_1 = _swl.srgb(grad[1]);
+        auto df_dRd_2 = _swl.srgb(grad[2]);
+        auto df_dRd_3 = _swl.srgb(grad[3]);
+        auto df_dRs_0 = _swl.srgb(grad[4]);
+        auto df_dRs_1 = _swl.srgb(grad[5]);
+        auto df_dRs_2 = _swl.srgb(grad[6]);
+        auto df_dRs_3 = _swl.srgb(grad[7]);
+
         // TODO
         LUISA_ERROR_WITH_LOCATION("unimplemented");
     }

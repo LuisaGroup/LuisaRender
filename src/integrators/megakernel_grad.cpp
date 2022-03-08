@@ -47,17 +47,17 @@ private:
 public:
     explicit MegakernelPathTracingGradInstance(const MegakernelPathTracingGrad *node, Pipeline &pipeline) noexcept
         : GradIntegrator::Instance{pipeline, node}, _pipeline{pipeline} {}
-    void integrate(Stream &stream) noexcept override {
+    void backpropagation(Stream &stream, luisa::vector<Film::Instance *> targets) noexcept override {
         // TODO : create grad buffer
-        // TODO : compare ref with film to get loss
 
         auto pt = static_cast<const MegakernelPathTracingGrad *>(node());
         for (auto i = 0u; i < _pipeline.camera_count(); i++) {
-            auto [camera, film, filter] = _pipeline.camera(i);
+            auto [camera, rendered_film, filter] = _pipeline.camera(i);
+            // TODO : compare ref with film to get loss
+
             _integrate_one_camera(
-                stream, _pipeline, camera, filter, film,
+                stream, _pipeline, camera, filter, rendered_film,
                 pt->max_depth(), pt->rr_depth(), pt->rr_threshold());
-            film->save(stream, camera->node()->file());
         }
     }
 };
@@ -104,7 +104,6 @@ void MegakernelPathTracingGradInstance::_integrate_one_camera(
         pixel += filter_offset;
         beta *= filter_weight;
         auto swl = SampledWavelengths::sample_visible(sampler->generate_1d());
-        auto swl_fixed = swl;
         auto [camera_ray, camera_weight] = camera->generate_ray(*sampler, pixel, time);
         if (!camera->node()->transform()->is_identity()) {
             camera_ray->set_origin(make_float3(camera_to_world * make_float4(camera_ray->origin(), 1.0f)));
@@ -146,7 +145,8 @@ void MegakernelPathTracingGradInstance::_integrate_one_camera(
                 pdf_bsdf = eval.pdf;
 
                 // radiative bp
-                material.backward(pipeline, Li * beta, 1.0f, wi);
+                // TODO : how to change beta from 4 channels to 3 channels
+                material.backward(pipeline, Li * swl.srgb(beta), 1.0f, wi);
 
                 beta *= ite(
                     eval.pdf > 0.0f,
@@ -195,6 +195,9 @@ void MegakernelPathTracingGradInstance::_integrate_one_camera(
             }
         }
     }
+
+    // TODO : update grads
+
     command_buffer << commit();
     stream << synchronize();
     LUISA_INFO("Backward finished in {} ms.", clock.toc());
