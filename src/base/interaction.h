@@ -56,6 +56,7 @@ public:
     [[nodiscard]] auto triangle_area() const noexcept { return _prim_area; }
     [[nodiscard]] auto valid() const noexcept { return _inst_id != ~0u; }
     [[nodiscard]] const auto &shading() const noexcept { return _shading; }
+    void set_shading(Frame frame) noexcept { _shading = std::move(frame); }
     [[nodiscard]] const auto &shape() const noexcept { return _shape; }
     [[nodiscard]] auto wo_local() const noexcept { return _shading.world_to_local(_wo); }
     [[nodiscard]] auto spawn_ray(Expr<float3> wi) const noexcept {

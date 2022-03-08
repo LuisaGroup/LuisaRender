@@ -136,6 +136,9 @@ Surface mat_Leaves : Matte {
   Kd : Color {
     file { "textures/leaf.png" }
   }
+  alpha : Generic {
+    file { "textures/leaf-alpha.png" }
+  }
 }
 
 Surface mat_Branches : Matte {
@@ -285,7 +288,6 @@ Shape shape_9 : Mesh {
 Shape shape_10 : Mesh {
   file { "models/Mesh025.obj" }
   surface { @mat_Leaves }
-  alpha { "textures/leaf-alpha.png" }
   transform : Matrix {
     m {
       1.0, 0.0, 0.0, 0.0,
@@ -312,7 +314,6 @@ Shape shape_11 : Mesh {
 Shape shape_12 : Mesh {
   file { "models/Mesh032.obj" }
   surface { @mat_Leaves }
-  alpha { "textures/leaf-alpha.png" }
   transform : Matrix {
     m {
       1.0, 0.0, 0.0, 0.0,
@@ -807,7 +808,6 @@ Shape shape_49 : Mesh {
 Shape shape_50 : Mesh {
   file { "models/Mesh058.obj" }
   surface { @mat_Leaves }
-  alpha { "textures/leaf-alpha.png" }
   transform : Matrix {
     m {
       1.0, 0.0, 0.0, 0.0,
@@ -834,7 +834,6 @@ Shape shape_51 : Mesh {
 Shape shape_52 : Mesh {
   file { "models/Mesh007.obj" }
   surface { @mat_Leaves }
-  alpha { "textures/leaf-alpha.png" }
   transform : Matrix {
     m {
       1.0, 0.0, 0.0, 0.0,
@@ -1027,9 +1026,7 @@ Camera camera : Pinhole {
 
 render {
   cameras { @camera }
-  integrator : MegaPath {
-    depth { 12 }
-  }
+  integrator : MegaPath {}
   shapes {
     @shape_0,
     @shape_1,

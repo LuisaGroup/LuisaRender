@@ -76,7 +76,9 @@ public:
     [[nodiscard]] luisa::string_view impl_type() const noexcept override {
         return LUISA_RENDER_PLUGIN_NAME;
     }
-    [[nodiscard]] luisa::unique_ptr<Instance> build(
+
+private:
+    [[nodiscard]] luisa::unique_ptr<Instance> _build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
@@ -132,7 +134,8 @@ public:
         const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
 };
 
-luisa::unique_ptr<Surface::Instance> DisneySurface::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
+luisa::unique_ptr<Surface::Instance> DisneySurface::_build(
+    Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
     auto color = pipeline.build_texture(command_buffer, _color);
     auto metallic = pipeline.build_texture(command_buffer, _metallic);
     auto eta = pipeline.build_texture(command_buffer, _eta);

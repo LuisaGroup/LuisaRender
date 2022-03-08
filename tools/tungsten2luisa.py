@@ -32,7 +32,7 @@ def convert_emission_texture(a):
   }}'''
 
 
-def convert_plastic_material(out_file, material: dict):
+def convert_plastic_material(out_file, material: dict, alpha=""):
     name = material["name"]
     roughness = material.get("roughness", 1e-6)
     ior = material["ior"]
@@ -48,11 +48,11 @@ Surface mat_{name} : Substrate {{
   }}
   roughness : ConstGeneric {{
     v {{ {convert_roughness(roughness)} }}
-  }}
+  }}{alpha}
 }}''', file=out_file)
 
 
-def convert_glass_material(out_file, material: dict):
+def convert_glass_material(out_file, material: dict, alpha=""):
     name = material["name"]
     color = material["albedo"]
     roughness = material.get("roughness", 1e-6)
@@ -68,20 +68,20 @@ Surface mat_{name} : Glass {{
   }}
   roughness : ConstGeneric {{
     v {{ {convert_roughness(roughness)} }}
-  }}
+  }}{alpha}
 }}''', file=out_file)
 
 
-def convert_mirror_material(out_file, material: dict):
+def convert_mirror_material(out_file, material: dict, alpha=""):
     name = material["name"]
     color = material["albedo"]
     print(f'''
 Surface mat_{name} : Mirror {{
-  color : {convert_albedo_texture(color)}
+  color : {convert_albedo_texture(color)}{alpha}
 }}''', file=out_file)
 
 
-def convert_metal_material(out_file, material: dict):
+def convert_metal_material(out_file, material: dict, alpha=""):
     name = material["name"]
     if "material" in material:
         eta = f'"{material["material"]}"'
@@ -95,7 +95,7 @@ Surface mat_{name} : Metal {{
   eta {{ {eta} }}
   roughness : ConstGeneric {{
     v {{ {convert_roughness(roughness)} }}
-  }}
+  }}{alpha}
 }}''', file=out_file)
 
 
@@ -105,31 +105,37 @@ def convert_null_material(out_file, material: dict):
 Surface mat_{name} : Null {{}}''', file=out_file)
 
 
-def convert_matte_material(out_file, material: dict):
+def convert_matte_material(out_file, material: dict, alpha=""):
     name = material["name"]
     color = material["albedo"]
     print(f'''
 Surface mat_{name} : Matte {{
-  Kd : {convert_albedo_texture(color)}
+  Kd : {convert_albedo_texture(color)}{alpha}
 }}''', file=out_file)
 
 
-def convert_material(out_file, material: dict):
+def convert_material(out_file, material: dict, alpha=""):
     impl = material["type"]
     if impl == "plastic" or impl == "rough_plastic":
-        convert_plastic_material(out_file, material)
+        convert_plastic_material(out_file, material, alpha)
     elif impl == "dielectric" or impl == "rough_dielectric":
-        convert_glass_material(out_file, material)
+        convert_glass_material(out_file, material, alpha)
     elif impl == "mirror":
-        convert_mirror_material(out_file, material)
+        convert_mirror_material(out_file, material, alpha)
     elif impl == "conductor" or impl == "rough_conductor":
-        convert_metal_material(out_file, material)
+        convert_metal_material(out_file, material, alpha)
     elif impl == "lambert" or impl == "oren_nayar":
-        convert_matte_material(out_file, material)
+        convert_matte_material(out_file, material, alpha)
     elif impl == "transparency":  # TODO
+        a = material["alpha"]
+        a_ext = Path(a).suffix
+        aa = f'''
+  alpha : Generic {{
+    file {{ "{a.replace(a_ext, f"-alpha{a_ext}")}" }}
+  }}'''
         base_material = material["base"]
         base_material["name"] = material["name"]
-        convert_material(out_file, base_material)
+        convert_material(out_file, base_material, aa)
     elif impl == "null":
         convert_null_material(out_file, material)
     else:
@@ -177,15 +183,6 @@ Env env : Map {{
             file = shape["file"]
             assert file.endswith(".wo3")
             file = f"{file[:-4]}.obj"
-            if "bsdf" in shape:
-                mat_name = shape["bsdf"]
-                for m in materials:
-                    if m["name"] == mat_name and m["type"] == "transparency":
-                        a = m["alpha"]
-                        a_ext = Path(a).suffix
-                        alpha = f'''
-  alpha {{ "{a.replace(a_ext, f"-alpha{a_ext}")}" }}'''
-                        break
         elif impl == "quad":
             file = "models/square.obj"
             M = M * rotateXYZ(glm.radians(glm.vec3(-90, 0, 0))) * glm.scale(glm.vec3(.5))

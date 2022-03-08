@@ -60,6 +60,11 @@ public:
         const Pipeline &_pipeline;
         const Surface *_surface;
 
+    private:
+        friend class Surface;
+        const Texture::Instance *_alpha{nullptr};
+        const Texture::Instance *_normal{nullptr};
+
     public:
         Instance(const Pipeline &pipeline, const Surface *surface) noexcept
             : _pipeline{pipeline}, _surface{surface} {}
@@ -68,6 +73,8 @@ public:
             requires std::is_base_of_v<Surface, T>
         [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_surface); }
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
+        [[nodiscard]] auto alpha() const noexcept { return _alpha; }
+        [[nodiscard]] auto normal() const noexcept { return _normal; }
         [[nodiscard]] virtual luisa::unique_ptr<Closure> closure(
             const Interaction &it,
             const SampledWavelengths &swl,
@@ -75,16 +82,20 @@ public:
     };
 
 private:
-    const Texture *_normal_map;
-    const Texture *_alpha_map;
+    const Texture *_normal;
+    const Texture *_alpha;
+
+private:
+    [[nodiscard]] virtual luisa::unique_ptr<Instance> _build(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
 
 public:
     Surface(Scene *scene, const SceneNodeDesc *desc) noexcept;
-    [[nodiscard]] auto normal() const noexcept { return _normal_map; }
-    [[nodiscard]] auto alpha() const noexcept { return _alpha_map; }
+    [[nodiscard]] auto normal() const noexcept { return _normal; }
+    [[nodiscard]] auto alpha() const noexcept { return _alpha; }
     [[nodiscard]] virtual bool is_null() const noexcept { return false; }
-    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
-        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
+    [[nodiscard]] luisa::unique_ptr<Instance> build(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept;
 };
 
 }// namespace luisa::render

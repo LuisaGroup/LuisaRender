@@ -112,7 +112,10 @@ public:
     }
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
+
+private:
+    [[nodiscard]] luisa::unique_ptr<Instance> _build(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
 class GlassInstance final : public Surface::Instance {
@@ -133,7 +136,8 @@ public:
         const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
 };
 
-luisa::unique_ptr<Surface::Instance> GlassSurface::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
+luisa::unique_ptr<Surface::Instance> GlassSurface::_build(
+    Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
     auto Kr = pipeline.build_texture(command_buffer, _kr);
     auto Kt = pipeline.build_texture(command_buffer, _kt);
     auto roughness = pipeline.build_texture(command_buffer, _roughness);

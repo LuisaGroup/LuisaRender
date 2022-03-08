@@ -67,7 +67,9 @@ public:
     }
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] luisa::unique_ptr<Instance> build(
+
+private:
+    [[nodiscard]] luisa::unique_ptr<Instance> _build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
@@ -90,7 +92,7 @@ public:
         const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
 };
 
-luisa::unique_ptr<Surface::Instance> PlasticSurface::build(
+luisa::unique_ptr<Surface::Instance> PlasticSurface::_build(
     Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
     auto Kd = pipeline.build_texture(command_buffer, _kd);
     auto Ks = pipeline.build_texture(command_buffer, _ks);
