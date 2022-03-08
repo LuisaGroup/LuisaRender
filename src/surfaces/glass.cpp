@@ -221,7 +221,7 @@ luisa::unique_ptr<Surface::Closure> GlassInstance::closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto Kr = _kr->evaluate(it, swl, time);
     auto Kt = _kt->evaluate(it, swl, time);
-    auto alpha = def(make_float2(.5f));
+    auto alpha = def(make_float2(0.f));
     if (_roughness != nullptr) {
         auto r = _roughness->evaluate(it, swl, time);
         auto remap = node<GlassSurface>()->remap_roughness();

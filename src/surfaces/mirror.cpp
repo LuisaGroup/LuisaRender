@@ -30,7 +30,7 @@ public:
                 "allowed in MirrorSurface::color. [{}]",
                 desc->source_location().string());
         }
-        if (_roughness->category() != Texture::Category::GENERIC) [[unlikely]] {
+        if (_roughness != nullptr && _roughness->category() != Texture::Category::GENERIC) [[unlikely]] {
             LUISA_ERROR(
                 "Non-generic textures are not "
                 "allowed in MirrorSurface::roughness. [{}]",
@@ -125,7 +125,7 @@ public:
 
 luisa::unique_ptr<Surface::Closure> MirrorInstance::closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    auto alpha = def(make_float2(.5f));
+    auto alpha = def(make_float2(0.f));
     if (_roughness != nullptr) {
         auto r = _roughness->evaluate(it, swl, time);
         auto remap = node<MirrorSurface>()->remap_roughness();

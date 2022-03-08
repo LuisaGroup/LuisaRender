@@ -41,7 +41,12 @@ struct ConstantIlluminantInstance final : public Texture::Instance {
     ConstantIlluminantInstance(const Pipeline &p, const Texture *t) noexcept
         : Texture::Instance{p, t} {}
     [[nodiscard]] Float4 evaluate(const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
-        return node<ConstantIlluminant>()->rsp_scale();
+        auto rsp_scale = node<ConstantIlluminant>()->rsp_scale();
+        auto rsp = RGBSigmoidPolynomial{rsp_scale.xyz()};
+        auto spec = RGBIlluminantSpectrum{
+            rsp, rsp_scale.w,
+            DenselySampledSpectrum::cie_illum_d65()};
+        return spec.sample(swl);
     }
 };
 
