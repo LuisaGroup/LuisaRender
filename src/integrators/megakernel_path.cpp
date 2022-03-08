@@ -37,7 +37,7 @@ private:
 
 private:
     static void _render_one_camera(
-        Stream &stream, Pipeline &pipeline,
+        Stream &surface_instance, Pipeline &pipeline,
         const Camera::Instance *camera,
         const Filter::Instance *filter,
         Film::Instance *film, uint max_depth,
@@ -141,15 +141,6 @@ void MegakernelPathTracingInstance::_render_one_camera(
                 };
             }
 
-            // alpha
-            auto alpha = it->alpha();
-            auto u_alpha = sampler->generate_1d();
-            $if(u_alpha >= alpha) {
-                ray = it->spawn_ray(-it->wo());
-                pdf_bsdf = 1e16f;
-                $continue;
-            };
-
             // sample one light
             $if(!it->shape()->has_surface()) { $break; };
             Light::Sample light_sample;
@@ -176,12 +167,14 @@ void MegakernelPathTracingInstance::_render_one_camera(
             // evaluate material
             auto eta_scale = def(make_float4(1.f));
             auto cos_theta_o = it->wo_local().z;
-            pipeline.decode_material(it->shape()->surface_tag(), *it, swl, time, [&](const Surface::Closure &material) {
+            auto surface_tag = it->shape()->surface_tag();
+            pipeline.dynamic_dispatch_surface(surface_tag, [&](auto surface) {
+                auto closure = surface->closure(*it, swl, time);
 
                 // direct lighting
                 $if(light_sample.eval.pdf > 0.0f & !occluded) {
                     auto wi = light_sample.shadow_ray->direction();
-                    auto eval = material.evaluate(wi);
+                    auto eval = closure->evaluate(wi);
                     auto cos_theta_i = dot(it->shading().n(), wi);
                     auto is_trans = cos_theta_i * cos_theta_o < 0.f;
                     auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
@@ -192,7 +185,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
                 };
 
                 // sample material
-                auto [wi, eval] = material.sample(*sampler);
+                auto [wi, eval] = closure->sample(*sampler);
                 auto cos_theta_i = dot(wi, it->shading().n());
                 ray = it->spawn_ray(wi);
                 pdf_bsdf = eval.pdf;

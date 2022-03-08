@@ -32,7 +32,7 @@ void Pipeline::_build_geometry(
     for (auto shape : shapes) { _process_shape(command_buffer, shape); }
     _instance_buffer = _device.create_buffer<Shape::Handle>(_instances.size());
     command_buffer << _instance_buffer.copy_from(_instances.data())
-                   << _accel.build();// FIXME: adding commit() leads to wrong rendering, why?
+                   << _accel.build();
 }
 
 void Pipeline::_process_shape(
@@ -41,7 +41,7 @@ void Pipeline::_process_shape(
     const Surface *overridden_surface,
     const Light *overridden_light) noexcept {
 
-    auto material = overridden_surface == nullptr ? shape->surface() : overridden_surface;
+    auto surface = overridden_surface == nullptr ? shape->surface() : overridden_surface;
     auto light = overridden_light == nullptr ? shape->light() : overridden_light;
 
     if (shape->is_mesh()) {
@@ -110,23 +110,11 @@ void Pipeline::_process_shape(
                 auto pdf_buffer_id = register_bindless(pdf_buffer_view);
                 return cache_iter->second = {mesh, position_buffer_id};
             }();
-            // create alpha texture if any
-            auto texture_id = ~0u;
-            if (auto alpha = shape->alpha_image()) {
-                assert(alpha->pixel_storage() == PixelStorage::BYTE1);
-                auto image = create<Image<float>>(PixelStorage::BYTE1, alpha->size());
-                command_buffer << image->copy_from(alpha->pixels())
-                               << compute::commit();
-                texture_id = register_bindless(
-                    *image, TextureSampler::linear_point_zero());
-            }
             // assign mesh data
             MeshData mesh{};
             mesh.resource = mesh_geom.resource;
             mesh.geometry_buffer_id_base = mesh_geom.buffer_id_base;
             mesh.two_sided = shape->two_sided().value_or(false);
-            mesh.alpha_texture_id = texture_id;
-            mesh.alpha = shape->alpha();
             iter = _meshes.emplace(shape, mesh).first;
         }
         auto mesh = iter->second;
@@ -136,92 +124,55 @@ void Pipeline::_process_shape(
         InstancedTransform inst_xform{t_node, instance_id};
         if (!is_static) { _dynamic_transforms.emplace_back(inst_xform); }
         auto object_to_world = inst_xform.matrix(_mean_time);
-        if (shape->is_virtual()) {
-            auto scaling = make_float4x4(make_float3x3(0.0f));
-            _accel.emplace_back(*mesh.resource, object_to_world * scaling, false);
-        } else {
-            _accel.emplace_back(*mesh.resource, object_to_world, true);
-        }
+        _accel.emplace_back(*mesh.resource, object_to_world, true);
 
         // create instance
-        Shape::Handle instance{};
-        instance.geometry_buffer_id_base = mesh.geometry_buffer_id_base;
-        auto shape_properties = 0u;
-        if (two_sided) { shape_properties |= Shape::property_flag_two_sided; }
-        if (material != nullptr && !material->is_null()) {
-            if (shape->is_virtual()) {
-                LUISA_WARNING_WITH_LOCATION(
-                    "Materials will be ignored on virtual shapes.");
-            } else {
-                auto m = _process_surface(command_buffer, instance_id, shape, material);
-                shape_properties |= Shape::property_flag_has_surface;
-                instance.surface_buffer_id_and_tag = Shape::Handle::encode_surface_buffer_id_and_tag(m.buffer_id, m.tag);
-            }
+        auto properties = 0u;
+        auto surface_tag = 0u;
+        auto light_tag = 0u;
+        if (two_sided) { properties |= Shape::property_flag_two_sided; }
+        if (surface != nullptr && !surface->is_null()) {
+            surface_tag = _process_surface(command_buffer, surface);
+            properties |= Shape::property_flag_has_surface;
         }
         if (light != nullptr && !light->is_null()) {
-            if (shape->is_virtual() != light->is_virtual()) {
-                LUISA_WARNING_WITH_LOCATION(
-                    "Non-virtual lights will be ignored on "
-                    "virtual shapes and vise versa.");
-            } else {
-                auto l = _process_light(command_buffer, instance_id, shape, light);
-                shape_properties |= Shape::property_flag_has_light;
-                instance.light_buffer_id_and_tag = Shape::Handle::encode_light_buffer_id_and_tag(l.buffer_id, l.tag);
-            }
+            light_tag = _process_light(command_buffer, light);
+            properties |= Shape::property_flag_has_light;
         }
-
-        auto alpha_texture = mesh.alpha_texture_id;
-        if (mesh.alpha_texture_id == ~0u) {
-            alpha_texture = float_to_half(mesh.alpha);
-            shape_properties |= Shape::property_flag_constant_alpha;
+        _instances.emplace_back(Shape::Handle::encode(
+            mesh.geometry_buffer_id_base,
+            properties, surface_tag, light_tag,
+            mesh.resource->triangle_count()));
+        if (properties & Shape::property_flag_has_light) {
+            _instanced_lights.emplace_back(Light::Handle{
+                .instance_id = instance_id,
+                .light_tag = light_tag});
         }
-        instance.alpha_texture_id_and_properties =
-            Shape::Handle::encode_alpha_texture_id_and_properties(
-                alpha_texture, shape_properties);
-        _instances.emplace_back(instance);
     } else {
         _transform_tree.push(shape->transform());
         for (auto child : shape->children()) {
-            _process_shape(command_buffer, child, shape->two_sided(), material, light);
+            _process_shape(command_buffer, child, shape->two_sided(), surface, light);
         }
         _transform_tree.pop(shape->transform());
     }
 }
 
-Pipeline::MaterialData Pipeline::_process_surface(CommandBuffer &command_buffer, uint instance_id, const Shape *shape, const Surface *material) noexcept {
-    if (auto iter = _surfaces.find(material); iter != _surfaces.cend()) { return iter->second; }
-    auto tag = [this, material] {
-        luisa::string impl_type{material->impl_type()};
-        if (auto iter = _surface_tags.find(impl_type);
-            iter != _surface_tags.cend()) { return iter->second; }
-        auto t = static_cast<uint32_t>(_surface_interfaces.size());
-        if (t > Shape::Handle::surface_tag_mask) [[unlikely]] {
-            LUISA_ERROR_WITH_LOCATION("Too many material tags.");
-        }
-        _surface_interfaces.emplace_back(material);
-        _surface_tags.emplace(std::move(impl_type), t);
-        return t;
-    }();
-    auto buffer_id = material->encode(*this, command_buffer, instance_id, shape);
-    return _surfaces.emplace(material, MaterialData{shape, instance_id, buffer_id, tag}).first->second;
+uint Pipeline::_process_surface(CommandBuffer &command_buffer, const Surface *surface) noexcept {
+    auto [iter, not_existent] = _surface_tags.try_emplace(surface, 0u);
+    if (not_existent) {
+        iter->second = static_cast<uint>(_surfaces.size());
+        _surfaces.emplace_back(surface->build(*this, command_buffer));
+    }
+    return iter->second;
 }
 
-Pipeline::LightData Pipeline::_process_light(CommandBuffer &command_buffer, uint instance_id, const Shape *shape, const Light *light) noexcept {
-    if (auto iter = _lights.find(light); iter != _lights.cend()) { return iter->second; }
-    auto tag = [this, light] {
-        luisa::string impl_type{light->impl_type()};
-        if (auto iter = _light_tags.find(impl_type);
-            iter != _light_tags.cend()) { return iter->second; }
-        auto t = static_cast<uint32_t>(_light_interfaces.size());
-        if (t > Shape::Handle::light_tag_mask) [[unlikely]] {
-            LUISA_ERROR_WITH_LOCATION("Too many light tags.");
-        }
-        _light_interfaces.emplace_back(light);
-        _light_tags.emplace(std::move(impl_type), t);
-        return t;
-    }();
-    auto buffer_id = light->encode(*this, command_buffer, instance_id, shape);
-    return _lights.emplace(light, LightData{shape, instance_id, buffer_id, tag}).first->second;
+uint Pipeline::_process_light(CommandBuffer &command_buffer, const Light *light) noexcept {
+    auto [iter, not_existent] = _light_tags.try_emplace(light, 0u);
+    if (not_existent) {
+        iter->second = static_cast<uint>(_lights.size());
+        _lights.emplace_back(light->build(*this, command_buffer));
+    }
+    return iter->second;
 }
 
 luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, const Scene &scene) noexcept {
@@ -373,61 +324,11 @@ luisa::unique_ptr<Interaction> Pipeline::interaction(const Var<Ray> &ray, const 
         auto wo = -ray->direction();
         auto &shape_ref = shape;
         auto &uv_ref = uv;
-        auto alpha = shape->alpha();
-        $if(shape->has_alpha_texture()) {
-            alpha = tex2d(shape_ref->alpha_texture_id()).sample(uv_ref).x;
-        };
         it = Interaction{
             std::move(shape), hit.inst, hit.prim,
-            area, p, wo, ng, uv, ns, t, alpha};
+            area, p, wo, ng, uv, ns, t};
     };
     return luisa::make_unique<Interaction>(std::move(it));
-}
-
-luisa::unique_ptr<Surface::Closure> Pipeline::decode_material(
-    uint tag, const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    if (tag >= _surface_interfaces.size()) [[unlikely]] {
-        LUISA_ERROR_WITH_LOCATION("Invalid material tag: {}.", tag);
-    }
-    return _surface_interfaces[tag]->decode(*this, it, swl, time);
-}
-
-void Pipeline::decode_material(
-    Expr<uint> tag, const Interaction &it, const SampledWavelengths &swl, Expr<float> time,
-    const luisa::function<void(const Surface::Closure &)> &func) const noexcept {
-    if (auto n = _surface_interfaces.size(); n == 1u) {
-        func(*decode_material(0u, it, swl, time));
-    } else {
-        $switch(tag) {
-            for (auto i = 0u; i < n; i++) {
-                $case(i) { func(*decode_material(i, it, swl, time)); };
-            }
-            $default { luisa::compute::unreachable(); };
-        };
-    }
-}
-
-luisa::unique_ptr<Light::Closure> Pipeline::decode_light(
-    uint tag, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    if (tag >= _light_interfaces.size()) [[unlikely]] {
-        LUISA_ERROR_WITH_LOCATION("Invalid light tag: {}.", tag);
-    }
-    return _light_interfaces[tag]->decode(*this, swl, time);
-}
-
-void Pipeline::decode_light(
-    Expr<uint> tag, const SampledWavelengths &swl, Expr<float> time,
-    const function<void(const Light::Closure &)> &func) const noexcept {
-    if (auto n = _light_interfaces.size(); n == 1u) {
-        func(*decode_light(0u, swl, time));
-    } else {
-        $switch(tag) {
-            for (auto i = 0u; i < n; i++) {
-                $case(i) { func(*decode_light(i, swl, time)); };
-            }
-            $default { luisa::compute::unreachable(); };
-        };
-    }
 }
 
 RGBAlbedoSpectrum Pipeline::srgb_albedo_spectrum(Expr<float3> rgb) const noexcept {
@@ -448,177 +349,35 @@ RGBIlluminantSpectrum Pipeline::srgb_illuminant_spectrum(Expr<float3> rgb) const
     return {std::move(rsp), std::move(scale), DenselySampledSpectrum::cie_illum_d65()};
 }
 
-Float4 Pipeline::evaluate_texture(
-    Texture::Category category,
-    const Var<TextureHandle> &handle, const Interaction &it,
-    const SampledWavelengths &swl, Expr<float> time, Float *max_value) const noexcept {
-    using namespace luisa::compute;
-    auto process = [category, &swl, max_value](auto value) noexcept {
-        if (category == Texture::Category::COLOR) {
-            auto rsp = RGBSigmoidPolynomial{value.xyz()};
-            auto spec = RGBAlbedoSpectrum{rsp};
-            if (max_value != nullptr) { *max_value = rsp.maximum(); }
-            return spec.sample(swl);
-        }
-        if (category == Texture::Category::ILLUMINANT) {
-            auto spec = RGBIlluminantSpectrum{
-                RGBSigmoidPolynomial{value.xyz()}, value.w,
-                DenselySampledSpectrum::cie_illum_d65()};
-            return spec.sample(swl);
-        }
-        return value;
-    };
-    // short path: only one texture type
-    auto interfaces = texture_interfaces(category);
-    if (interfaces.size() == 1u) {
-        return process(interfaces.front()->evaluate(
-            *this, it, handle, time));
-    }
-    // dynamic dispatch
-    auto value = def(make_float4());
-    if (interfaces.empty()) [[unlikely]] { return value; }
-    $switch(handle->tag()) {
-        for (auto i = 0u; i < interfaces.size(); i++) {
-            $case(i) {
-                value = process(interfaces[i]->evaluate(
-                    *this, it, handle, time));
-            };
-        }
-        if (interfaces.size() == 2u) {
-            $default {
-                // actually unreachable, but
-                // will be faster with this case...
-                value = process(value);
-            };
-        } else {
-            $default { unreachable(); };
-        }
-    };
-    return value;
-}
-
-const TextureHandle *Pipeline::encode_texture(CommandBuffer &command_buffer, const Texture *texture) noexcept {
-    auto [iter, first_def] = _texture_handles.try_emplace(texture, nullptr);
-    if (first_def) {
-        auto handle_tag = [texture, &interfaces = texture_interfaces(texture->category())] {
-            if (auto it = std::find_if(
-                    interfaces.begin(), interfaces.end(),
-                    [texture](auto i) noexcept {
-                        return i->impl_type() == texture->impl_type();
-                    });
-                it != interfaces.end()) {
-                return static_cast<uint>(std::distance(
-                    interfaces.begin(), it));
-            }
-            auto tag = static_cast<uint>(interfaces.size());
-            interfaces.emplace_back(texture);
-            return tag;
-        }();
-        iter->second = luisa::make_unique<TextureHandle>(
-            texture->_encode(*this, command_buffer, handle_tag));
-    }
+const Texture::Instance *Pipeline::build_texture(CommandBuffer &command_buffer, const Texture *texture) noexcept {
+    if (texture == nullptr) { return nullptr; }
+    auto [iter, not_exists] = _textures.try_emplace(texture, nullptr);
+    if (not_exists) { iter->second = texture->build(*this, command_buffer); }
     return iter->second.get();
 }
-Float4 Pipeline::evaluate_color_texture(
-    const Var<TextureHandle> &handle, const Interaction &it,
-    const SampledWavelengths &swl, Expr<float> time, Float *max_value) const noexcept {
-    return evaluate_texture(
-        Texture::Category::COLOR, handle,
-        it, swl, time, max_value);
-}
 
-Float4 Pipeline::evaluate_illuminant_texture(
-    const Var<TextureHandle> &handle, const Interaction &it,
-    const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    return evaluate_texture(
-        Texture::Category::ILLUMINANT,
-        handle, it, swl, time);
-}
-
-Float4 Pipeline::evaluate_generic_texture(
-    const Var<TextureHandle> &handle, const Interaction &it, Expr<float> time) const noexcept {
-    return evaluate_texture(
-        Texture::Category::GENERIC,
-        handle, it, {}, time);
-}
-
-Float4 Pipeline::evaluate_texture(
-    Texture::Category category, TextureHandle handle, const Interaction &it,
-    const SampledWavelengths &swl, Expr<float> time, Float *max_value) const noexcept {
-    auto tag = handle.id_and_tag & TextureHandle::tag_mask;
-    auto interface = texture_interfaces(category)[tag];
-    Var<TextureHandle> dsl_handle;
-    dsl_handle.id_and_tag = handle.id_and_tag;
-    dsl_handle.compressed_v[0] = handle.compressed_v[0];
-    dsl_handle.compressed_v[1] = handle.compressed_v[1];
-    dsl_handle.compressed_v[2] = handle.compressed_v[2];
-    auto value = interface->evaluate(
-        *this, it, dsl_handle, time);
-    if (category == Texture::Category::COLOR) {
-        auto rsp = RGBSigmoidPolynomial{value.xyz()};
-        auto spec = RGBAlbedoSpectrum{rsp};
-        if (max_value != nullptr) { *max_value = rsp.maximum(); }
-        return spec.sample(swl);
+void Pipeline::dynamic_dispatch_surface(
+    Expr<uint> tag, const function<void(const Surface::Instance *)> &f) const noexcept {
+    if (!_surfaces.empty()) [[likely]] {
+        $switch(tag) {
+            for (auto i = 0u; i < _surfaces.size(); i++) {
+                $case(i) { f(_surfaces[i].get()); };
+            }
+            $default { compute::unreachable(); };
+        };
     }
-    if (category == Texture::Category::ILLUMINANT) {
-        auto spec = RGBIlluminantSpectrum{
-            RGBSigmoidPolynomial{value.xyz()}, value.w,
-            DenselySampledSpectrum::cie_illum_d65()};
-        return spec.sample(swl);
+}
+
+void Pipeline::dynamic_dispatch_light(
+    Expr<uint> tag, const function<void(const Light::Instance *)> &f) const noexcept {
+    if (!_lights.empty()) [[likely]] {
+        $switch(tag) {
+            for (auto i = 0u; i < _lights.size(); i++) {
+                $case(i) { f(_lights[i].get()); };
+            }
+            $default { compute::unreachable(); };
+        };
     }
-    return value;
-}
-
-Float4 Pipeline::evaluate_color_texture(
-    TextureHandle handle, const Interaction &it,
-    const SampledWavelengths &swl, Expr<float> time,
-    Float *max_value) const noexcept {
-    return evaluate_texture(
-        Texture::Category::COLOR, handle,
-        it, swl, time, max_value);
-}
-
-Float4 Pipeline::evaluate_illuminant_texture(
-    TextureHandle handle, const Interaction &it,
-    const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    return evaluate_texture(
-        Texture::Category::ILLUMINANT,
-        handle, it, swl, time);
-}
-
-Float4 Pipeline::evaluate_generic_texture(
-    TextureHandle handle, const Interaction &it, Expr<float> time) const noexcept {
-    return evaluate_texture(
-        Texture::Category::GENERIC,
-        handle, it, {}, time);
-}
-
-luisa::vector<const Texture *> &Pipeline::texture_interfaces(Texture::Category category) noexcept {
-    switch (category) {
-        case Texture::Category::GENERIC:
-            return _generic_texture_interfaces;
-        case Texture::Category::COLOR:
-            return _color_texture_interfaces;
-        case Texture::Category::ILLUMINANT:
-            return _illuminant_texture_interfaces;
-    }
-    LUISA_ERROR_WITH_LOCATION(
-        "Invalid texture category {:02x}.",
-        luisa::to_underlying(category));
-}
-
-luisa::span<const Texture *const> Pipeline::texture_interfaces(Texture::Category category) const noexcept {
-    switch (category) {
-        case Texture::Category::GENERIC:
-            return _generic_texture_interfaces;
-        case Texture::Category::COLOR:
-            return _color_texture_interfaces;
-        case Texture::Category::ILLUMINANT:
-            return _illuminant_texture_interfaces;
-    }
-    LUISA_ERROR_WITH_LOCATION(
-        "Invalid texture category {:02x}.",
-        luisa::to_underlying(category));
 }
 
 }// namespace luisa::render

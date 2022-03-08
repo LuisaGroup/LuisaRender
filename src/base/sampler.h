@@ -27,7 +27,12 @@ public:
             : _pipeline{pipeline}, _sampler{sampler} {}
         virtual ~Instance() noexcept = default;
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
-        [[nodiscard]] auto node() const noexcept { return _sampler; }
+
+        template<typename T = Sampler>
+            requires std::is_base_of_v<Sampler, T>
+        [[nodiscard]] auto node() const noexcept {
+            return static_cast<const T *>(_sampler);
+        }
 
         // interfaces
         virtual void reset(CommandBuffer &command_buffer, uint2 resolution, uint spp) noexcept = 0;
@@ -41,7 +46,8 @@ public:
 
 public:
     Sampler(Scene *scene, const SceneNodeDesc *desc) noexcept;
-    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
+    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
 };
 
 }// namespace luisa::render

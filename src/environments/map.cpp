@@ -42,24 +42,23 @@ using namespace luisa::compute;
 class EnvironmentMappingInstance final : public Environment::Instance {
 
 private:
-    TextureHandle _texture;
+    const Texture::Instance *_texture;
 
 private:
     [[nodiscard]] auto _evaluate(Expr<float3> wi_local, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-        auto env = static_cast<const EnvironmentMapping *>(node());
+        auto env = node<EnvironmentMapping>();
         auto theta = acos(wi_local.y);
         auto phi = atan2(wi_local.x, wi_local.z);
         auto u = -0.5f * inv_pi * phi;
         auto v = theta * inv_pi;
         Interaction it{-wi_local, make_float2(u, v)};
-        auto L = pipeline().evaluate_illuminant_texture(_texture, it, swl, time);
+        auto L = _texture->evaluate(it, swl, time);
         return Light::Evaluation{.L = L * env->scale(), .pdf = uniform_sphere_pdf()};
     }
 
 public:
-    EnvironmentMappingInstance(Pipeline &pipeline, CommandBuffer &command_buffer, const EnvironmentMapping *env) noexcept
-        : Environment::Instance{pipeline, env},
-          _texture{*pipeline.encode_texture(command_buffer, env->emission())} {}
+    EnvironmentMappingInstance(const Pipeline &pipeline, const Environment *env, const Texture::Instance *texture) noexcept
+        : Environment::Instance{pipeline, env}, _texture{texture} {}
     // TODO: importance sampling
     [[nodiscard]] Light::Evaluation evaluate(
         Expr<float3> wi, Expr<float3x3> env_to_world,
@@ -77,7 +76,8 @@ public:
 };
 
 unique_ptr<Environment::Instance> EnvironmentMapping::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
-    return luisa::make_unique<EnvironmentMappingInstance>(pipeline, command_buffer, this);
+    auto texture = pipeline.build_texture(command_buffer, _emission);
+    return luisa::make_unique<EnvironmentMappingInstance>(pipeline, this, texture);
 }
 
 }// namespace luisa::render

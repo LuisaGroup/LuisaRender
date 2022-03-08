@@ -12,8 +12,8 @@ namespace luisa::render {
 
 class Interaction;
 
-using compute::UInt;
 using compute::Float;
+using compute::UInt;
 
 class LightSampler : public SceneNode {
 
@@ -38,8 +38,11 @@ public:
             : _pipeline{pipeline}, _sampler{light_dist} {}
         virtual ~Instance() noexcept = default;
         [[nodiscard]] uint light_count() const noexcept;
-        [[nodiscard]] auto node() const noexcept { return _sampler; }
-        [[nodiscard]] const auto &pipeline() const noexcept { return _pipeline; }
+
+        template<typename T = LightSampler>
+            requires std::is_base_of_v<LightSampler, T>
+        [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_sampler); }
+        [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
         virtual void update(CommandBuffer &command_buffer, float time) noexcept = 0;
         [[nodiscard]] virtual Float pmf(
             const Interaction &it,

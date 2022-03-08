@@ -78,7 +78,6 @@ public:
     }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] bool is_mesh() const noexcept override { return true; }
-    [[nodiscard]] bool is_virtual() const noexcept override { return false; }
     [[nodiscard]] luisa::span<const float3> positions() const noexcept override { return _positions; }
     [[nodiscard]] luisa::span<const VertexAttribute> attributes() const noexcept override { return _attributes; }
     [[nodiscard]] luisa::span<const Triangle> triangles() const noexcept override { return _triangles; }

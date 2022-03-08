@@ -10,8 +10,9 @@ struct NullLight final : public Light {
     NullLight(Scene *scene, const SceneNodeDesc *desc) noexcept : Light{scene, desc} {}
     [[nodiscard]] bool is_null() const noexcept override { return true; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] uint encode(Pipeline &, CommandBuffer &, uint, const Shape *) const noexcept override { return ~0u; }
-    [[nodiscard]] luisa::unique_ptr<Closure> decode(const Pipeline &, const SampledWavelengths &, Expr<float>) const noexcept override { return nullptr; }
+    [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
+        return nullptr;
+    }
 };
 
 }// namespace luisa::render

@@ -2,10 +2,8 @@
 // Created by Mike Smith on 2022/1/28.
 //
 
-#include <core/clock.h>
 #include <core/thread_pool.h>
 #include <util/imageio.h>
-#include <util/half.h>
 #include <base/texture.h>
 #include <base/pipeline.h>
 
@@ -41,9 +39,9 @@ public:
         });
     }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] Category category() const noexcept override { return Category::GENERIC; }
     [[nodiscard]] bool is_black() const noexcept override { return false; }
     [[nodiscard]] uint channels() const noexcept override { return _img.get().channels(); }
+    [[nodiscard]] Category category() const noexcept override { return Category::GENERIC; }
 };
 
 }// namespace luisa::render

@@ -52,8 +52,9 @@ private:
     float _projected_pixel_size{};
 
 public:
-    explicit ThinlensCameraInstance(const ThinlensCamera *camera) noexcept
-        : Camera::Instance{camera} {
+    explicit ThinlensCameraInstance(
+        const Pipeline &ppl, const ThinlensCamera *camera) noexcept
+        : Camera::Instance{ppl, camera} {
         _position = camera->position();
         auto v = camera->look_at() - _position;
         auto f = camera->focal_length() * 1e-3;
@@ -92,7 +93,7 @@ public:
 
 luisa::unique_ptr<Camera::Instance> ThinlensCamera::build(
     Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
-    return luisa::make_unique<ThinlensCameraInstance>(this);
+    return luisa::make_unique<ThinlensCameraInstance>(pipeline, this);
 }
 
 }// namespace luisa::render

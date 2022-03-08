@@ -3,6 +3,7 @@
 //
 
 #include <base/texture.h>
+#include <base/interaction.h>
 
 namespace luisa::render {
 
@@ -11,12 +12,6 @@ class ConstantColor final : public Texture {
 private:
     std::array<float, 3> _rsp{};
     bool _is_black{false};
-
-private:
-    [[nodiscard]] TextureHandle _encode(Pipeline &, CommandBuffer &, uint handle_tag) const noexcept override {
-        return TextureHandle::encode_constant(
-            handle_tag, make_float3(_rsp[0], _rsp[1], _rsp[2]));
-    }
 
 public:
     ConstantColor(Scene *scene, const SceneNodeDesc *desc) noexcept
@@ -31,15 +26,26 @@ public:
         _rsp = {rsp.x, rsp.y, rsp.z};
         _is_black = all(color == 0.0f);
     }
+    [[nodiscard]] Category category() const noexcept override { return Category::COLOR; }
+    [[nodiscard]] auto rsp() const noexcept { return make_float3(_rsp[0], _rsp[1], _rsp[2]); }
     [[nodiscard]] bool is_black() const noexcept override { return _is_black; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] Float4 evaluate(
-        const Pipeline &, const Interaction &,
-        const Var<TextureHandle> &handle, Expr<float>) const noexcept override {
-        return compute::make_float4(handle->v(), 1.f);
-    }
-    [[nodiscard]] Category category() const noexcept override { return Category::COLOR; }
+    [[nodiscard]] uint channels() const noexcept override { return 3u; }
+    [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
+
+struct ConstantColorInstance final : public Texture::Instance {
+    ConstantColorInstance(const Pipeline &ppl, const Texture *texture) noexcept : Texture::Instance{ppl, texture} {}
+    [[nodiscard]] Float4 evaluate(const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        auto rsp = RGBSigmoidPolynomial{node<ConstantColor>()->rsp()};
+        return RGBAlbedoSpectrum{rsp}.sample(swl);
+    }
+};
+
+luisa::unique_ptr<Texture::Instance> ConstantColor::build(
+    Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
+    return luisa::make_unique<ConstantColorInstance>(pipeline, this);
+}
 
 }// namespace luisa::render
 
