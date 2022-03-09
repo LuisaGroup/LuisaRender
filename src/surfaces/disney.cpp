@@ -178,8 +178,8 @@ public:
         auto Fo = SchlickWeight(abs_cos_theta(wo));
         auto Fi = SchlickWeight(abs_cos_theta(wi));
 
-        auto f_r = inv_pi * (1.f - Fo * .5f) * (1.f - Fi * .5f);
-        return {make_float4(f_r)};
+        auto d_r = make_float4(inv_pi * (1.f - Fo * .5f) * (1.f - Fi * .5f));
+        return {d_r};
     }
 };
 

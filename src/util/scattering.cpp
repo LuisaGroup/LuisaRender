@@ -248,7 +248,7 @@ luisa::vector<Float4> FresnelDielectric::grad(Expr<float> cosThetaI_in) const no
     auto Rperpv = (etaI * cosThetaI) + (etaT * cosThetaT);
     auto Rperp = Rperpu / Rperpv;
 
-    // forward
+//    // forward
 //    auto fr_Rparl = Rparl;
 //    auto fr_Rperp = Rperp;
 //    auto Rparlu_etaI = -cosThetaT;
@@ -317,8 +317,8 @@ Float4 LambertianReflection::evaluate(Expr<float3> wo, Expr<float3> wi) const no
     return _r * inv_pi;
 }
 luisa::vector<Float4> LambertianReflection::grad(Expr<float3> wo, Expr<float3> wi) const noexcept {
-    auto f_r = inv_pi;
-    return {make_float4(f_r)};
+    auto d_r = make_float4(inv_pi);
+    return {d_r};
 }
 
 Float4 LambertianTransmission::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
@@ -336,8 +336,8 @@ Float LambertianTransmission::pdf(Expr<float3> wo, Expr<float3> wi) const noexce
     return compute::ite(same_hemisphere(wo, wi), 0.0f, abs_cos_theta(wi) * inv_pi);
 }
 luisa::vector<Float4> LambertianTransmission::grad(Expr<float3> wo, Expr<float3> wi) const noexcept {
-    auto f_t = inv_pi;
-    return {make_float4(f_t)};
+    auto d_t = make_float4(inv_pi);
+    return {d_t};
 }
 
 Float4 MicrofacetReflection::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
@@ -383,6 +383,26 @@ luisa::vector<Float4> MicrofacetReflection::grad(Expr<float3> wo, Expr<float3> w
     auto wh = wi + wo;
     auto valid = cosThetaI != 0.f & cosThetaO != 0.f & any(wh != 0.f);
     wh = normalize(wh);
+    auto cosThetaI_grad = dot(wi, face_forward(wh, make_float3(0.f, 0.f, 1.f)));
+    auto F = _fresnel->evaluate(cosThetaI_grad);
+    auto D = _distribution->D(wh);
+    auto G = _distribution->G(wo, wi);
+
+    // backward
+    auto grad_fresnel = _fresnel->grad(cosThetaI_grad);
+    auto d_f = ite(valid, 1.f, 0.f);
+    auto d_r = d_f * 0.25f * D * G * F / (cosThetaI * cosThetaO);
+    auto d_F = d_f * 0.25f * _r * D * G / (cosThetaI * cosThetaO);
+
+    // TODO : different type of Fresnel has different grads
+    luisa::vector<Float4> grad;
+    grad.reserve(1 + grad_fresnel.size());
+    grad.emplace_back(d_r);
+    for (const auto& v : grad_fresnel) {
+        grad.emplace_back(d_F * v);
+    }
+
+    return grad;
 
     // TODO
     LUISA_ERROR_WITH_LOCATION("unimplemented");
@@ -476,16 +496,31 @@ luisa::vector<Float4> OrenNayar::grad(Expr<float3> wo, Expr<float3> wi) const no
     auto tanBeta = ite(absCosThetaI > absCosThetaO,
                        sinThetaI / absCosThetaI, sinThetaO / absCosThetaO);
 
-        auto sigma2 = sqr(radians(_sigma));
-        auto sigma2_sigma = 2 * radians(_sigma) / 180.f;
-    auto f_r = inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta);
-    auto f_a = _r * inv_pi;
-    auto f_b = _r * inv_pi * maxCos * sinAlpha * tanBeta;
-    auto a_sigma2 = - 0.165f * sqr(sigma2 + 0.33f);
-    auto b_sigma2 = 0.0405f / sqr(sigma2 + 0.09f);
-    auto f_sigma = (f_a * a_sigma2 + f_b * b_sigma2) * sigma2_sigma;
+    auto sigma2 = sqr(radians(_sigma));
 
-    return {make_float4(f_r), f_sigma};
+//    // forward
+//    auto sigma2_sigma = 2 * radians(_sigma) / 180.f;
+//    auto a_sigma2 = -0.165f * sqr(sigma2 + 0.33f);
+//    auto b_sigma2 = 0.0405f / sqr(sigma2 + 0.09f);
+//
+//    auto f_r = make_float4(inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta));
+//    auto f_a = _r * inv_pi;
+//    auto f_b = _r * inv_pi * maxCos * sinAlpha * tanBeta;
+//    auto f_sigma = (f_a * a_sigma2 + f_b * b_sigma2) * sigma2_sigma;
+//
+//    return {f_r, f_sigma};
+
+    // backward
+    auto sigma2_sigma = 2 * radians(_sigma) / 180.f;
+    auto a_sigma2 = -0.165f * sqr(sigma2 + 0.33f);
+    auto b_sigma2 = 0.0405f / sqr(sigma2 + 0.09f);
+    auto d_r = make_float4(inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta));
+    auto d_a = _r * inv_pi;
+    auto d_b = _r * inv_pi * maxCos * sinAlpha * tanBeta;
+    auto d_sigma2 = d_a * a_sigma2 + d_b * b_sigma2;
+    auto d_sigma = d_sigma2 * sigma2_sigma;
+
+    return {d_r, d_sigma};
 }
 
 Float4 FresnelBlend::Schlick(Expr<float> cosTheta) const noexcept {
@@ -561,9 +596,9 @@ luisa::vector<Float4> FresnelBlend::grad(Expr<float3> wo, Expr<float3> wi) const
                (1.f - pow5(1.f - .5f * absCosThetaO));
     auto specular_rs = 1 - pow5(1.f - dot(wi, wh));
 
-    auto f_rd = diffuse_rd;
-    auto f_rs = diffuse_rs + specular_rs;
-    return {make_float4(f_rd), make_float4(f_rs)};
+    auto d_rd = make_float4(diffuse_rd);
+    auto d_rs = make_float4(diffuse_rs + specular_rs);
+    return {d_rd, d_rs};
 }
 
 }// namespace luisa::render
