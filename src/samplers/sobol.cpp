@@ -2,6 +2,8 @@
 // Created by Mike Smith on 2022/2/9.
 //
 
+#include <bit>
+
 #include <dsl/sugar.h>
 #include <util/u64.h>
 #include <util/rng.h>
@@ -97,12 +99,6 @@ private:
         return index;
     }
 
-    [[nodiscard]] static auto _log2_uint(uint x) noexcept {
-        auto n = 0u;
-        for (; (1u << n) < x; n++) {}
-        return n;
-    };
-
 public:
     explicit SobolSamplerInstance(
         const Pipeline &pipeline, CommandBuffer &command_buffer,
@@ -125,7 +121,7 @@ public:
         }
         _width = resolution.x;
         _scale = next_pow2(std::max(resolution.x, resolution.y));
-        auto m = _log2_uint(_scale);
+        auto m = std::bit_width(_scale);
         std::array<uint2, SobolMatrixSize> vdc_sobol_matrices;
         std::array<uint2, SobolMatrixSize> vdc_sobol_matrices_inv;
         for (auto i = 0u; i < SobolMatrixSize; i++) {
@@ -138,7 +134,7 @@ public:
     void start(Expr<uint2> pixel, Expr<uint> sample_index) noexcept override {
         _dimension.emplace(0u);
         _sobol_index.emplace(_sobol_interval_to_index(
-            _log2_uint(_scale), sample_index, pixel));
+            std::bit_width(_scale), sample_index, pixel));
         _seed.emplace(xxhash32(make_uint3(
             (pixel.x << 16u) | pixel.y, sample_index,
             node<SobolSampler>()->seed())));
