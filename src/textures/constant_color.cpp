@@ -56,7 +56,13 @@ public:
         return RGBAlbedoSpectrum{rsp}.sample(swl);
     }
     void backward(const Interaction &it, const SampledWavelengths &swl, Expr<float> time, Expr<float4> grad) const noexcept override {
-        // TODO...
+        if (_diff_param) {
+            auto g = make_float4(
+                dot(grad, sqr(swl.lambda())),
+                dot(grad, swl.lambda()),
+                dot(grad, make_float4(1.f)), 0.f);
+            pipeline().differentiation().accumulate(*_diff_param, g);
+        }
     }
 };
 

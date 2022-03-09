@@ -46,7 +46,7 @@ public:
     ConstantIlluminantInstance(
         const Pipeline &p, const Texture *t,
         luisa::optional<Differentiation::ConstantParameter> param) noexcept
-        : Texture::Instance{p, t}, _diff_param{param} {}
+        : Texture::Instance{p, t}, _diff_param{std::move(param)} {}
     [[nodiscard]] Float4 evaluate(const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         auto rsp_scale = [&] {
             return _diff_param ?
@@ -60,7 +60,16 @@ public:
         return spec.sample(swl);
     }
     void backward(const Interaction &it, const SampledWavelengths &swl, Expr<float> time, Expr<float4> grad) const noexcept override {
-        // TODO...
+        if (_diff_param) {
+            auto v = pipeline().differentiation().decode(*_diff_param);
+            auto spec = RGBSigmoidPolynomial{v.xyz()}(swl.lambda());
+            auto g = make_float4(
+                v.w * dot(grad, sqr(swl.lambda())),
+                v.w * dot(grad, swl.lambda()),
+                v.w * dot(grad, make_float4(1.f)),
+                dot(grad, spec));
+            pipeline().differentiation().accumulate(*_diff_param, g);
+        }
     }
 };
 

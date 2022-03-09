@@ -93,11 +93,24 @@ void ImageTexture::Instance::backward(
         auto uv = _compute_uv(it);
         switch (node()->category()) {
             case Category::COLOR: {
-                // TODO: compute dL/dRSP
+                auto g = make_float4(
+                    dot(grad, sqr(swl.lambda())),
+                    dot(grad, swl.lambda()),
+                    dot(grad, make_float4(1.f)), 0.f);
+                pipeline().differentiation().accumulate(
+                    *_diff_param, uv, g);
                 break;
             }
             case Category::ILLUMINANT: {
-                // TODO: compute dL/dRSP
+                auto v = pipeline().tex2d(_texture_id).sample(uv);
+                auto spec = RGBSigmoidPolynomial{v.xyz()}(swl.lambda());
+                auto g = make_float4(
+                    v.w * dot(grad, sqr(swl.lambda())),
+                    v.w * dot(grad, swl.lambda()),
+                    v.w * dot(grad, make_float4(1.f)),
+                    dot(grad, spec));
+                pipeline().differentiation().accumulate(
+                    *_diff_param, uv, g);
                 break;
             }
             case Category::GENERIC: {
