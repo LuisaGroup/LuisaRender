@@ -37,22 +37,41 @@ public:
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
-struct ConstantIlluminantInstance final : public Texture::Instance {
-    ConstantIlluminantInstance(const Pipeline &p, const Texture *t) noexcept
-        : Texture::Instance{p, t} {}
+class ConstantIlluminantInstance final : public Texture::Instance {
+
+private:
+    luisa::optional<Differentiation::ConstantParameter> _diff_param;
+
+public:
+    ConstantIlluminantInstance(
+        const Pipeline &p, const Texture *t,
+        luisa::optional<Differentiation::ConstantParameter> param) noexcept
+        : Texture::Instance{p, t}, _diff_param{param} {}
     [[nodiscard]] Float4 evaluate(const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
-        auto rsp_scale = node<ConstantIlluminant>()->rsp_scale();
+        auto rsp_scale = [&] {
+            return _diff_param ?
+                       pipeline().differentiation().decode(*_diff_param) :
+                       def(node<ConstantIlluminant>()->rsp_scale());
+        }();
         auto rsp = RGBSigmoidPolynomial{rsp_scale.xyz()};
         auto spec = RGBIlluminantSpectrum{
             rsp, rsp_scale.w,
             DenselySampledSpectrum::cie_illum_d65()};
         return spec.sample(swl);
     }
+    void backward(const Interaction &it, const SampledWavelengths &swl, Expr<float> time, Expr<float4> grad) const noexcept override {
+        // TODO...
+    }
 };
 
 luisa::unique_ptr<Texture::Instance> ConstantIlluminant::build(
     Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
-    return luisa::make_unique<ConstantIlluminantInstance>(pipeline, this);
+    luisa::optional<Differentiation::ConstantParameter> param;
+    if (requires_gradients()) {
+        param.emplace(pipeline.differentiation().parameter(_rsp_scale));
+    }
+    return luisa::make_unique<ConstantIlluminantInstance>(
+        pipeline, this, std::move(param));
 }
 
 }// namespace luisa::render

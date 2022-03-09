@@ -36,17 +36,32 @@ public:
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
-struct ConstantGenericInstance final : public Texture::Instance {
-    ConstantGenericInstance(const Pipeline &p, const Texture *t) noexcept
-        : Texture::Instance{p, t} {}
+class ConstantGenericInstance final : public Texture::Instance {
+
+private:
+    luisa::optional<Differentiation::ConstantParameter> _diff_param;
+
+public:
+    ConstantGenericInstance(
+        const Pipeline &p, const Texture *t,
+        luisa::optional<Differentiation::ConstantParameter> param) noexcept
+        : Texture::Instance{p, t}, _diff_param{std::move(param)} {}
     [[nodiscard]] Float4 evaluate(const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        if (_diff_param) { return pipeline().differentiation().decode(*_diff_param); }
         return node<ConstantGeneric>()->v();
+    }
+    void backward(const Interaction &, const SampledWavelengths &, Expr<float>, Expr<float4> grad) const noexcept override {
+        if (_diff_param) { pipeline().differentiation().accumulate(*_diff_param, grad); }
     }
 };
 
 luisa::unique_ptr<Texture::Instance> ConstantGeneric::build(
     Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
-    return luisa::make_unique<ConstantGenericInstance>(pipeline, this);
+    luisa::optional<Differentiation::ConstantParameter> param;
+    if (requires_gradients()) {
+        param.emplace(pipeline.differentiation().parameter(_v, _channels));
+    }
+    return luisa::make_unique<ConstantGenericInstance>(pipeline, this, std::move(param));
 }
 
 }// namespace luisa::render

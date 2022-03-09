@@ -4,6 +4,7 @@
 
 #include <base/texture.h>
 #include <base/interaction.h>
+#include <base/pipeline.h>
 
 namespace luisa::render {
 
@@ -34,17 +35,39 @@ public:
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
-struct ConstantColorInstance final : public Texture::Instance {
-    ConstantColorInstance(const Pipeline &ppl, const Texture *texture) noexcept : Texture::Instance{ppl, texture} {}
+class ConstantColorInstance final : public Texture::Instance {
+
+private:
+    luisa::optional<Differentiation::ConstantParameter> _diff_param;
+
+public:
+    ConstantColorInstance(
+        const Pipeline &ppl, const Texture *texture,
+        luisa::optional<Differentiation::ConstantParameter> param) noexcept
+        : Texture::Instance{ppl, texture}, _diff_param{std::move(param)} {}
     [[nodiscard]] Float4 evaluate(const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
-        auto rsp = RGBSigmoidPolynomial{node<ConstantColor>()->rsp()};
+        auto rsp = [&] {
+            if (_diff_param) {
+                auto v = pipeline().differentiation().decode(*_diff_param);
+                return RGBSigmoidPolynomial{v.xyz()};
+            }
+            return RGBSigmoidPolynomial{node<ConstantColor>()->rsp()};
+        }();
         return RGBAlbedoSpectrum{rsp}.sample(swl);
+    }
+    void backward(const Interaction &it, const SampledWavelengths &swl, Expr<float> time, Expr<float4> grad) const noexcept override {
+        // TODO...
     }
 };
 
 luisa::unique_ptr<Texture::Instance> ConstantColor::build(
     Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
-    return luisa::make_unique<ConstantColorInstance>(pipeline, this);
+    luisa::optional<Differentiation::ConstantParameter> param;
+    if (requires_gradients()) {
+        param.emplace(pipeline.differentiation().parameter(rsp()));
+    }
+    return luisa::make_unique<ConstantColorInstance>(
+        pipeline, this, std::move(param));
 }
 
 }// namespace luisa::render

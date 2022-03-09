@@ -178,6 +178,10 @@ uint Pipeline::_process_light(CommandBuffer &command_buffer, const Light *light)
 luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, const Scene &scene) noexcept {
     ThreadPool::global().synchronize();
     auto pipeline = luisa::make_unique<Pipeline>(device);
+    if (scene.integrator()->differentiable()) {
+        pipeline->_differentiation =
+            luisa::make_unique<Differentiation>(*pipeline);
+    }
     pipeline->_cameras.reserve(scene.cameras().size());
     pipeline->_films.reserve(scene.cameras().size());
     pipeline->_filters.reserve(scene.cameras().size());
@@ -216,8 +220,11 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     } else {
         pipeline->_light_sampler = scene.integrator()->light_sampler()->build(*pipeline, command_buffer);
     }
-    command_buffer << pipeline->_bindless_array.update()
-                   << compute::commit();
+    command_buffer << pipeline->_bindless_array.update();
+    if (auto &&diff = pipeline->_differentiation) {
+        diff->materialize(command_buffer);
+    }
+    command_buffer << compute::commit();
     return pipeline;
 }
 
@@ -378,6 +385,16 @@ void Pipeline::dynamic_dispatch_light(
             $default { compute::unreachable(); };
         };
     }
+}
+
+Differentiation &Pipeline::differentiation() noexcept {
+    LUISA_ASSERT(_differentiation, "Differentiation is not constructed.");
+    return *_differentiation;
+}
+
+const Differentiation &Pipeline::differentiation() const noexcept {
+    LUISA_ASSERT(_differentiation, "Differentiation is not constructed.");
+    return *_differentiation;
 }
 
 }// namespace luisa::render

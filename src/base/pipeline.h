@@ -20,6 +20,7 @@
 #include <base/light_sampler.h>
 #include <base/environment.h>
 #include <base/texture.h>
+#include <base/differentiation.h>
 
 namespace luisa::render {
 
@@ -97,6 +98,7 @@ private:
     luisa::unique_ptr<Environment::Instance> _environment;
     uint _rgb2spec_index{0u};
     float _mean_time{0.0f};
+    luisa::unique_ptr<Differentiation> _differentiation;
 
 private:
     void _build_geometry(
@@ -163,17 +165,18 @@ public:
         return std::make_pair(view, buffer_id);
     }
 
-    [[nodiscard]] auto &device() const noexcept { return _device; }
-
     template<typename T>
     [[nodiscard]] auto bindless_buffer(Expr<uint> buffer_id) const noexcept { return _bindless_array.buffer<T>(buffer_id); }
     [[nodiscard]] auto bindless_tex2d(Expr<uint> tex_id) const noexcept { return _bindless_array.tex2d(tex_id); }
     [[nodiscard]] auto bindless_tex3d(Expr<uint> tex_id) const noexcept { return _bindless_array.tex3d(tex_id); }
 
 public:
+    [[nodiscard]] auto &device() const noexcept { return _device; }
     [[nodiscard]] static luisa::unique_ptr<Pipeline> create(
         Device &device, Stream &stream, const Scene &scene) noexcept;
     [[nodiscard]] auto &accel() const noexcept { return _accel; }
+    [[nodiscard]] Differentiation &differentiation() noexcept;
+    [[nodiscard]] const Differentiation &differentiation() const noexcept;
     [[nodiscard]] auto &bindless_array() const noexcept { return _bindless_array; }
     [[nodiscard]] auto &transform_tree() const noexcept { return _transform_tree; }
     [[nodiscard]] auto instance_buffer() const noexcept { return _instance_buffer.view(); }
