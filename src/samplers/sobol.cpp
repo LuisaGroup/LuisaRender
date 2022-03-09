@@ -35,8 +35,6 @@ public:
 private:
     uint _scale{};
     uint _width{};
-    luisa::optional<UInt2> _pixel;
-    luisa::optional<UInt> _pixel_index;
     luisa::optional<UInt> _seed;
     luisa::optional<UInt> _dimension;
     luisa::optional<U64> _sobol_index;
@@ -115,16 +113,15 @@ public:
         command_buffer << _sobol_matrices.copy_from(SobolMatrices32)
                        << commit();
     }
-    void reset(CommandBuffer &command_buffer, uint2 resolution, uint spp) noexcept override {
+    void reset(CommandBuffer &command_buffer, uint2 resolution, uint state_count, uint spp) noexcept override {
         if (spp != next_pow2(spp)) {
             LUISA_WARNING_WITH_LOCATION(
                 "Non power-of-two samples per pixel "
                 "is not optimal for Sobol' sampler.");
         }
-        auto pixel_count = resolution.x * resolution.y;
-        if (_state_buffer.size() < pixel_count) {
+        if (_state_buffer.size() < state_count) {
             _state_buffer = pipeline().device().create_buffer<uint4>(
-                next_pow2(pixel_count));
+                next_pow2(state_count));
         }
         _width = resolution.x;
         _scale = next_pow2(std::max(resolution.x, resolution.y));
@@ -139,22 +136,19 @@ public:
         _vdc_sobol_matrices_inv = luisa::make_unique<Constant<uint2>>(vdc_sobol_matrices_inv);
     }
     void start(Expr<uint2> pixel, Expr<uint> sample_index) noexcept override {
-        _pixel.emplace(pixel);
         _dimension.emplace(0u);
         _sobol_index.emplace(_sobol_interval_to_index(
             _log2_uint(_scale), sample_index, pixel));
-        _pixel_index.emplace(pixel.y * _width + pixel.x);
-        auto seed = static_cast<const SobolSampler *>(node())->seed();
-        _seed.emplace(xxhash32(make_uint3(*_pixel_index, sample_index, seed)));
+        _seed.emplace(xxhash32(make_uint3(
+            (pixel.x << 16u) | pixel.y, sample_index,
+            node<SobolSampler>()->seed())));
     }
-    void save_state() noexcept override {
+    void save_state(Expr<uint> state_id) noexcept override {
         auto state = make_uint4(_sobol_index->bits(), *_dimension, *_seed);
-        _state_buffer.write(_pixel->y * _width + _pixel->x, state);
+        _state_buffer.write(state_id, state);
     }
-    void load_state(Expr<uint2> pixel) noexcept override {
-        _pixel.emplace(pixel);
-        _pixel_index.emplace(pixel.y * _width + pixel.x);
-        auto state = _state_buffer.read(*_pixel_index);
+    void load_state(Expr<uint> state_id) noexcept override {
+        auto state = _state_buffer.read(state_id);
         _sobol_index.emplace(state.xy());
         _dimension.emplace(state.z);
         _seed.emplace(state.w);

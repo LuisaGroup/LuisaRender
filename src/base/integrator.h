@@ -40,7 +40,7 @@ public:
     Integrator(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] auto sampler() const noexcept { return _sampler; }
     [[nodiscard]] auto light_sampler() const noexcept { return _light_sampler; }
-    [[nodiscard]] virtual bool differentiable() const noexcept { return false; }
+    [[nodiscard]] virtual bool differentiable() const noexcept = 0;
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
 };

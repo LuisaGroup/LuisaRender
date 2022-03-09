@@ -617,6 +617,9 @@ public:
         auto wi = _it.shading().local_to_world(wi_local);
         return {.wi = std::move(wi), .eval = std::move(eval)};
     }
+    void backward(Expr<float4> grad) const noexcept override {
+
+    }
 };
 
 luisa::unique_ptr<Surface::Closure> DisneySurfaceInstance::closure(

@@ -219,6 +219,9 @@ private:
         auto eta = ite(wi_local.z > 0.f, _fresnel.eta_i(), _fresnel.eta_t());
         return {.wi = wi, .eval = {.swl = swl, .f = f, .pdf = pdf, .alpha = _distribution.alpha(), .eta = eta}};
     }
+    void backward(Expr<float4> grad) const noexcept override {
+
+    }
 };
 
 luisa::unique_ptr<Surface::Closure> GlassInstance::closure(

@@ -26,6 +26,7 @@ public:
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
+    [[nodiscard]] bool differentiable() const noexcept override { return false; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
@@ -81,7 +82,8 @@ void MegakernelPathTracingInstance::_render_one_camera(
 
     auto command_buffer = stream.command_buffer();
     film->clear(command_buffer);
-    sampler->reset(command_buffer, resolution, spp);
+    auto pixel_count = resolution.x * resolution.y;
+    sampler->reset(command_buffer, resolution, pixel_count, spp);
     command_buffer.commit();
 
     using namespace luisa::compute;
@@ -89,7 +91,8 @@ void MegakernelPathTracingInstance::_render_one_camera(
         return ite(pdf_a > 0.0f, pdf_a / (pdf_a + pdf_b), 0.0f);
     };
 
-    Kernel2D render_kernel = [&](UInt frame_index, Float4x4 camera_to_world, Float3x3 camera_to_world_normal, Float3x3 env_to_world, Float time, Float shutter_weight) noexcept {
+    Kernel2D render_kernel = [&](UInt frame_index, Float4x4 camera_to_world, Float3x3 camera_to_world_normal,
+                                 Float3x3 env_to_world, Float time, Float shutter_weight) noexcept {
         set_block_size(8u, 8u, 1u);
 
         auto pixel_id = dispatch_id().xy();
@@ -183,10 +186,11 @@ void MegakernelPathTracingInstance::_render_one_camera(
                     alpha_skip = alpha < u_alpha;
                 }
 
-                $if (alpha_skip) {
+                $if(alpha_skip) {
                     ray = it->spawn_ray(ray->direction());
                     pdf_bsdf = 1e16f;
-                } $else {
+                }
+                $else {
                     // create closure
                     auto closure = surface->closure(*it, swl, time);
 

@@ -52,6 +52,7 @@ public:
         [[nodiscard]] auto instance() const noexcept { return static_cast<const T *>(_instance); }
         [[nodiscard]] virtual Evaluation evaluate(Expr<float3> wi) const noexcept = 0;
         [[nodiscard]] virtual Sample sample(Sampler::Instance &sampler) const noexcept = 0;
+        virtual void backward(Expr<float4> grad) const noexcept = 0;
     };
 
     class Instance {

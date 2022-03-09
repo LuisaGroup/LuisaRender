@@ -35,10 +35,10 @@ public:
         }
 
         // interfaces
-        virtual void reset(CommandBuffer &command_buffer, uint2 resolution, uint spp) noexcept = 0;
+        virtual void reset(CommandBuffer &command_buffer, uint2 resolution, uint state_count, uint spp) noexcept = 0;
         virtual void start(Expr<uint2> pixel, Expr<uint> sample_index) noexcept = 0;
-        virtual void save_state() noexcept = 0;
-        virtual void load_state(Expr<uint2> pixel) noexcept = 0;
+        virtual void save_state(Expr<uint> state_id) noexcept = 0;
+        virtual void load_state(Expr<uint> state_id) noexcept = 0;
         [[nodiscard]] virtual Float generate_1d() noexcept = 0;
         [[nodiscard]] virtual Float2 generate_2d() noexcept = 0;
         [[nodiscard]] virtual Float2 generate_pixel_2d() noexcept { return generate_2d(); }

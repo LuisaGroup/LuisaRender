@@ -127,6 +127,9 @@ private:
                          .alpha = _distribution.alpha(),
                          .eta = make_float4(1.f)}};
     }
+    void backward(Expr<float4> grad) const noexcept override {
+
+    }
 };
 
 luisa::unique_ptr<Surface::Closure> SubstrateInstance::closure(

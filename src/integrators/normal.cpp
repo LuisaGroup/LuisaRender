@@ -29,6 +29,7 @@ class NormalVisualizer final : public Integrator {
 
 public:
     NormalVisualizer(Scene *scene, const SceneNodeDesc *desc) noexcept : Integrator{scene, desc} {}
+    [[nodiscard]] bool differentiable() const noexcept override { return false; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &) const noexcept override {
         return luisa::make_unique<NormalVisualizerInstance>(this, pipeline);
@@ -63,8 +64,9 @@ void NormalVisualizerInstance::_render_one_camera(
 
     auto sampler = pipeline.sampler();
     auto command_buffer = stream.command_buffer();
+    auto pixel_count = resolution.x * resolution.y;
     film->clear(command_buffer);
-    sampler->reset(command_buffer, resolution, spp);
+    sampler->reset(command_buffer, resolution, pixel_count, spp);
     command_buffer.commit();
 
     using namespace luisa::compute;
@@ -100,7 +102,8 @@ void NormalVisualizerInstance::_render_one_camera(
         auto camera_to_world_normal = transpose(inverse(make_float3x3(camera_to_world)));
         for (auto i = 0u; i < s.spp; i++) {
             command_buffer << render(sample_id++, camera_to_world, camera_to_world_normal,
-                                     s.point.time, s.point.weight).dispatch(resolution);
+                                     s.point.time, s.point.weight)
+                                  .dispatch(resolution);
             if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
                 command_buffer << commit();
                 dispatch_count = 0u;
