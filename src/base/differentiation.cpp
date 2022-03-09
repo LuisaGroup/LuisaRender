@@ -117,7 +117,48 @@ void Differentiation::accumulate(const Differentiation::ConstantParameter &param
 
 void Differentiation::accumulate(const Differentiation::TexturedParameter &param, Expr<float2> p, Expr<float4> grad) const noexcept {
     LUISA_ASSERT(_grad_buffer, "Gradient buffer is not materialized.");
-    // TODO
+    using namespace compute;
+    auto map_uv = [s = param.sampler()](Expr<float2> uv) noexcept {
+        switch (s.address()) {
+            case TextureSampler::Address::EDGE:
+                return saturate(uv);
+            case TextureSampler::Address::REPEAT:
+                return fract(uv);
+            case TextureSampler::Address::MIRROR: {
+                auto t = floor(uv);
+                return ite(make_int2(t) % 2 == 0, uv - t, t - uv + 1.f);
+            }
+            case TextureSampler::Address::ZERO:
+                return def(uv);
+        }
+        LUISA_ERROR_WITH_LOCATION(
+            "Invalid texture address mode.");
+    };
+    auto write_grad = [&param, this](Expr<float2> uv, Expr<float4> grad) noexcept {
+        $if (all(uv >= 0.f && uv < 1.f)) {
+            auto size = param.image().size();
+            auto st = clamp(make_uint2(uv * make_float2(size)), 0u, size - 1u);
+            auto pixel_id = st.y * size.x + st.x;
+            auto nc = pixel_format_channel_count(param.image().format());
+            auto offset = param.gradient_buffer_offset() + pixel_id * nc;
+            for (auto i = 0u; i < nc; i++) {
+                atomic_float_add(*_grad_buffer, offset + i, grad[i]);
+            }
+        };
+    };
+    if (param.sampler().filter() == TextureSampler::Filter::POINT) {
+        write_grad(map_uv(p), grad);
+    } else {// bi-linear
+        auto t = fract(p + .5f);
+        std::array offsets_and_weights{
+            std::make_pair(make_float2(-.5f, -.5f), (1.f - t.x) * (1.f - t.y)),
+            std::make_pair(make_float2(-.5f, +.5f), (1.f - t.x) * t.y),
+            std::make_pair(make_float2(+.5f, -.5f), t.x * (1.f - t.y)),
+            std::make_pair(make_float2(+.5f, +.5f), t.x * t.y)};
+        for (auto &&[offset, weight] : offsets_and_weights) {
+            write_grad(map_uv(p + offset), weight * grad);
+        }
+    }
 }
 
 }// namespace luisa::render
