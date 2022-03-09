@@ -162,4 +162,9 @@ void Differentiation::accumulate(const Differentiation::TexturedParameter &param
     }
 }
 
+void Differentiation::step(CommandBuffer &command_buffer, float alpha) noexcept {
+    apply_gradients(command_buffer, alpha);
+    clear_gradients(command_buffer);
+}
+
 }// namespace luisa::render

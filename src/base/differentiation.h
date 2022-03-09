@@ -68,8 +68,6 @@ private:
     Shader1D<Buffer<uint>, Buffer<float4>, float> _apply_grad_const;
     Shader2D<Buffer<uint>, uint, Image<float>, uint, float> _apply_grad_tex;
 
-private:
-
 public:
     explicit Differentiation(Pipeline &pipeline) noexcept;
     [[nodiscard]] ConstantParameter parameter(float x) noexcept;
@@ -81,6 +79,8 @@ public:
     void materialize(CommandBuffer &command_buffer) noexcept;
     void clear_gradients(CommandBuffer &command_buffer) noexcept;
     void apply_gradients(CommandBuffer &command_buffer, float alpha) noexcept;
+    /// Apply then clear the gradients
+    void step(CommandBuffer &command_buffer, float alpha) noexcept;
 
 public:
     [[nodiscard]] Float4 decode(const ConstantParameter &param) const noexcept;
