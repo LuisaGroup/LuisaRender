@@ -10302,7 +10302,7 @@ Camera camera : Pinhole {
   filter : Gaussian {
     radius { 1 }
   }
-  film : Color {
+  film : AtomicColor {
     resolution { 720, 1280 }
   }
   file { "color.exr" }
@@ -10310,7 +10310,7 @@ Camera camera : Pinhole {
 
 render {
   cameras { @camera }
-  integrator : MegaPath {}
+  integrator : MegaWave {}
   shapes {
     @shape_0,
     @shape_1,
