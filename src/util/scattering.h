@@ -57,6 +57,7 @@ public:
 struct Fresnel {
     virtual ~Fresnel() noexcept = default;
     [[nodiscard]] virtual Float4 evaluate(Expr<float> cosI) const noexcept = 0;
+    [[nodiscard]] virtual luisa::vector<Float4> grad(Expr<float> cosThetaI) const noexcept = 0;
 };
 
 class FresnelConductor final : public Fresnel {
@@ -68,6 +69,7 @@ public:
     FresnelConductor(Expr<float4> etaI, Expr<float4> etaT, Expr<float4> k) noexcept
         : _eta_i{etaI}, _eta_t{etaT}, _k{k} {}
     [[nodiscard]] Float4 evaluate(Expr<float> cosThetaI) const noexcept override;
+    [[nodiscard]] luisa::vector<Float4> grad(Expr<float> cosThetaI) const noexcept override;
 };
 
 class FresnelDielectric final : public Fresnel {
@@ -81,10 +83,12 @@ public:
     [[nodiscard]] Float4 evaluate(Expr<float> cosThetaI) const noexcept override;
     [[nodiscard]] auto eta_i() const noexcept { return _eta_i; }
     [[nodiscard]] auto eta_t() const noexcept { return _eta_t; }
+    [[nodiscard]] luisa::vector<Float4> grad(Expr<float> cosThetaI) const noexcept override;
 };
 
 struct FresnelNoOp final : public Fresnel {
-    [[nodiscard]] Float4 evaluate(Expr<float>) const noexcept override;
+    [[nodiscard]] Float4 evaluate(Expr<float> cosThetaI) const noexcept override;
+    [[nodiscard]] luisa::vector<Float4> grad(Expr<float> cosThetaI) const noexcept override;
 };
 
 struct BxDF {

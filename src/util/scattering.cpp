@@ -215,12 +215,91 @@ Float4 FresnelConductor::evaluate(Expr<float> cosThetaI) const noexcept {
     return fresnel_conductor(abs(cosThetaI), _eta_i, _eta_t, _k);
 }
 
+luisa::vector<Float4> FresnelConductor::grad(Expr<float> cosThetaI) const noexcept {
+    LUISA_ERROR_WITH_LOCATION("FresnelConductor is not differentiable.");
+}
+
 Float4 FresnelDielectric::evaluate(Expr<float> cosThetaI) const noexcept {
     return fresnel_dielectric(cosThetaI, _eta_i, _eta_t);
 }
 
+luisa::vector<Float4> FresnelDielectric::grad(Expr<float> cosThetaI_in) const noexcept {
+    using namespace compute;
+
+    auto cosThetaI = clamp(cosThetaI_in, -1.f, 1.f);
+
+    // Potentially swap indices of refraction
+    auto entering = cosThetaI > 0.f;
+    auto etaI = ite(entering, _eta_i, _eta_t);
+    auto etaT = ite(entering, _eta_t, _eta_i);
+
+    cosThetaI = abs(cosThetaI);
+    auto sinThetaI = sqrt(max(0.f, 1.f - sqr(cosThetaI)));
+
+    // Compute _cosThetaT_ using Snell's law
+    auto sinThetaT = sinThetaI * etaI / etaT;
+    auto cos2ThetaT = 1.f - sqr(sinThetaT);
+    auto cosThetaT = sqrt(max(0.f, cos2ThetaT));
+
+    auto Rparlu = (etaT * cosThetaI) - (etaI * cosThetaT);
+    auto Rparlv = (etaT * cosThetaI) + (etaI * cosThetaT);
+    auto Rparl = Rparlu / Rparlv;
+    auto Rperpu = (etaI * cosThetaI) - (etaT * cosThetaT);
+    auto Rperpv = (etaI * cosThetaI) + (etaT * cosThetaT);
+    auto Rperp = Rperpu / Rperpv;
+
+    // forward
+//    auto fr_Rparl = Rparl;
+//    auto fr_Rperp = Rperp;
+//    auto Rparlu_etaI = -cosThetaT;
+//    auto Rparlv_etaI = cosThetaT;
+//    auto Rparlu_etaT = cosThetaI;
+//    auto Rparlv_etaT = cosThetaI;
+//    auto Rparl_etaI = (Rparlu_etaI * Rparlv - Rparlu * Rparlv_etaI) / sqr(Rparlv);
+//    auto Rparl_etaT = (Rparlu_etaT * Rparlv - Rparlu * Rparlv_etaT) / sqr(Rparlv);
+//    auto Rperpu_etaI = cosThetaI;
+//    auto Rperpv_etaI = cosThetaI;
+//    auto Rperpu_etaT = -cosThetaT;
+//    auto Rperpv_etaT = cosThetaT;
+//    auto Rperp_etaI = (Rperpu_etaI * Rperpv - Rperpv_etaI * Rperpu) / sqr(Rperpv);
+//    auto Rperp_etaT = (Rperpu_etaT * Rperpv - Rperpv_etaT * Rperpu) / sqr(Rperpv);
+//    auto fr_etaI = fr_Rparl * Rparl_etaI + fr_Rperp * Rperp_etaI;
+//    auto fr_etaT = fr_Rparl * Rparl_etaT + fr_Rperp * Rperp_etaT;
+//    auto not_tir = sinThetaT < 1.f;
+//    auto f_etaI = ite(not_tir, ite(entering, fr_etaI, fr_etaT), 0.f);
+//    auto f_etaT = ite(not_tir, ite(entering, fr_etaT, fr_etaI), 0.f);
+//    return {f_etaI, f_etaT};
+
+    // backward
+    auto d_fr = ite(sinThetaT < 1.f, 1.f, 0.f);
+    auto d_Rparl = d_fr * Rparl;
+    auto d_Rperp = d_fr * Rperp;
+    auto d_Rparlu = d_Rparl / Rparlv;
+    auto d_Rparlv = -d_Rparl * Rparlu / (Rparlv * Rparlv);
+    auto d_Rperpu = d_Rperp / Rperpv;
+    auto d_Rperpv = -d_Rperp * Rperpu / (Rperpv * Rperpv);
+    auto d_cosThetaT = (-d_Rparlu + d_Rparlu) * etaT + (-d_Rperpu + d_Rperpv) * etaI;
+    auto d_sinThetaT = ite(cos2ThetaT > 0.f, -d_cosThetaT * sinThetaT / sqrt(cos2ThetaT), 0.f);
+    auto d_etaT = -d_sinThetaT * sinThetaI * etaI / (etaT * etaT) +
+                  (d_Rparlu + d_Rparlv) * cosThetaI + (-d_Rperpu + d_Rperpv) * cosThetaT;
+    auto d_etaI = d_sinThetaT * sinThetaI / etaT +
+                  (-d_Rparlu + d_Rparlv) * cosThetaT + (d_Rperpu + d_Rperpv) * cosThetaI;
+    auto d_eta_i =
+        d_etaI * ite(entering, 1.f, 0.f) +
+        d_etaT * ite(entering, 0.f, 1.f);
+    auto d_eta_t =
+        d_etaI * ite(entering, 0.f, 1.f) +
+        d_etaT * ite(entering, 1.f, 0.f);
+
+    return {d_eta_i, d_eta_t};
+}
+
 Float4 FresnelNoOp::evaluate(Expr<float>) const noexcept {
     return make_float4(1.0f);
+}
+
+luisa::vector<Float4> FresnelNoOp::grad(Expr<float> cosThetaI) const noexcept {
+    return {};
 }
 
 Float4 BxDF::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *p) const noexcept {
@@ -238,17 +317,8 @@ Float4 LambertianReflection::evaluate(Expr<float3> wo, Expr<float3> wi) const no
     return _r * inv_pi;
 }
 luisa::vector<Float4> LambertianReflection::grad(Expr<float3> wo, Expr<float3> wi) const noexcept {
-    luisa::vector<Float4> grad;
-    grad.reserve(4);
-    auto df_dR_0 = make_float4(1.0f, 0.0f, 0.0f, 0.0f) * inv_pi;
-    auto df_dR_1 = make_float4(0.0f, 1.0f, 0.0f, 0.0f) * inv_pi;
-    auto df_dR_2 = make_float4(0.0f, 0.0f, 1.0f, 0.0f) * inv_pi;
-    auto df_dR_3 = make_float4(0.0f, 0.0f, 0.0f, 1.0f) * inv_pi;
-    grad.emplace_back(df_dR_0);
-    grad.emplace_back(df_dR_1);
-    grad.emplace_back(df_dR_2);
-    grad.emplace_back(df_dR_3);
-    return grad;
+    auto f_r = inv_pi;
+    return {make_float4(f_r)};
 }
 
 Float4 LambertianTransmission::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
@@ -266,17 +336,8 @@ Float LambertianTransmission::pdf(Expr<float3> wo, Expr<float3> wi) const noexce
     return compute::ite(same_hemisphere(wo, wi), 0.0f, abs_cos_theta(wi) * inv_pi);
 }
 luisa::vector<Float4> LambertianTransmission::grad(Expr<float3> wo, Expr<float3> wi) const noexcept {
-    luisa::vector<Float4> grad;
-    grad.reserve(4);
-    auto df_dT_0 = make_float4(1.0f, 0.0f, 0.0f, 0.0f) * inv_pi;
-    auto df_dT_1 = make_float4(0.0f, 1.0f, 0.0f, 0.0f) * inv_pi;
-    auto df_dT_2 = make_float4(0.0f, 0.0f, 1.0f, 0.0f) * inv_pi;
-    auto df_dT_3 = make_float4(0.0f, 0.0f, 0.0f, 1.0f) * inv_pi;
-    grad.emplace_back(df_dT_0);
-    grad.emplace_back(df_dT_1);
-    grad.emplace_back(df_dT_2);
-    grad.emplace_back(df_dT_3);
-    return grad;
+    auto f_t = inv_pi;
+    return {make_float4(f_t)};
 }
 
 Float4 MicrofacetReflection::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
@@ -415,25 +476,16 @@ luisa::vector<Float4> OrenNayar::grad(Expr<float3> wo, Expr<float3> wi) const no
     auto tanBeta = ite(absCosThetaI > absCosThetaO,
                        sinThetaI / absCosThetaI, sinThetaO / absCosThetaO);
 
-    auto df_dR = inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta);
-    auto df_dA = _r * inv_pi;
-    auto sigma2 = sqr(radians(_sigma));
-    auto dA_dSigma2 = - 0.165f * sqr(sigma2 + 0.33f);
-    auto dSigma2_dSigma = 2 * radians(_sigma) / 180.f;
-    auto df_dSigma = df_dA * dA_dSigma2 * dSigma2_dSigma;
+        auto sigma2 = sqr(radians(_sigma));
+        auto sigma2_sigma = 2 * radians(_sigma) / 180.f;
+    auto f_r = inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta);
+    auto f_a = _r * inv_pi;
+    auto f_b = _r * inv_pi * maxCos * sinAlpha * tanBeta;
+    auto a_sigma2 = - 0.165f * sqr(sigma2 + 0.33f);
+    auto b_sigma2 = 0.0405f / sqr(sigma2 + 0.09f);
+    auto f_sigma = (f_a * a_sigma2 + f_b * b_sigma2) * sigma2_sigma;
 
-    luisa::vector<Float4> grad;
-    grad.reserve(5);
-    auto df_dR_0 = make_float4(1.0f, 0.0f, 0.0f, 0.0f) * df_dR;
-    auto df_dR_1 = make_float4(0.0f, 1.0f, 0.0f, 0.0f) * df_dR;
-    auto df_dR_2 = make_float4(0.0f, 0.0f, 1.0f, 0.0f) * df_dR;
-    auto df_dR_3 = make_float4(0.0f, 0.0f, 0.0f, 1.0f) * df_dR;
-    grad.emplace_back(df_dR_0);
-    grad.emplace_back(df_dR_1);
-    grad.emplace_back(df_dR_2);
-    grad.emplace_back(df_dR_3);
-    grad.emplace_back(df_dSigma);
-    return grad;
+    return {make_float4(f_r), f_sigma};
 }
 
 Float4 FresnelBlend::Schlick(Expr<float> cosTheta) const noexcept {
@@ -500,36 +552,18 @@ luisa::vector<Float4> FresnelBlend::grad(Expr<float3> wo, Expr<float3> wi) const
     auto wh = wi + wo;
     auto valid = any(wh != 0.f);
     wh = normalize(wh);
-    auto specular = _distribution->D(wh) /
-                    (4.f * abs_dot(wi, wh) * max(absCosThetaI, absCosThetaO)) *
-                    Schlick(dot(wi, wh));
 
-    luisa::vector<Float4> grad;
-    grad.reserve(8);
-    auto k_diffuse_Rd = (28.f / (23.f * pi)) * (1.f - _rs) *
+    auto diffuse_rd = (28.f / (23.f * pi)) * (1.f - _rs) *
                (1.f - pow5(1.f - .5f * absCosThetaI)) *
                (1.f - pow5(1.f - .5f * absCosThetaO));
-    auto k_diffuse_Rs = -(28.f / (23.f * pi)) * _rd *
+    auto diffuse_rs = -(28.f / (23.f * pi)) * _rd *
                (1.f - pow5(1.f - .5f * absCosThetaI)) *
                (1.f - pow5(1.f - .5f * absCosThetaO));
-    auto k_specular_Rs = 1 - pow5(1.f - dot(wi, wh));
-    auto df_dRd_0 = make_float4(1.0f, 0.0f, 0.0f, 0.0f) * k_diffuse_Rd;
-    auto df_dRd_1 = make_float4(0.0f, 1.0f, 0.0f, 0.0f) * k_diffuse_Rd;
-    auto df_dRd_2 = make_float4(0.0f, 0.0f, 1.0f, 0.0f) * k_diffuse_Rd;
-    auto df_dRd_3 = make_float4(0.0f, 0.0f, 0.0f, 1.0f) * k_diffuse_Rd;
-    auto df_dRs_0 = make_float4(1.0f, 0.0f, 0.0f, 0.0f) * (k_diffuse_Rs + k_specular_Rs);
-    auto df_dRs_1 = make_float4(0.0f, 1.0f, 0.0f, 0.0f) * (k_diffuse_Rs + k_specular_Rs);
-    auto df_dRs_2 = make_float4(0.0f, 0.0f, 1.0f, 0.0f) * (k_diffuse_Rs + k_specular_Rs);
-    auto df_dRs_3 = make_float4(0.0f, 0.0f, 0.0f, 1.0f) * (k_diffuse_Rs + k_specular_Rs);
-    grad.emplace_back(df_dRd_0);
-    grad.emplace_back(df_dRd_1);
-    grad.emplace_back(df_dRd_2);
-    grad.emplace_back(df_dRd_3);
-    grad.emplace_back(df_dRs_0);
-    grad.emplace_back(df_dRs_1);
-    grad.emplace_back(df_dRs_2);
-    grad.emplace_back(df_dRs_3);
-    return grad;
+    auto specular_rs = 1 - pow5(1.f - dot(wi, wh));
+
+    auto f_rd = diffuse_rd;
+    auto f_rs = diffuse_rs + specular_rs;
+    return {make_float4(f_rd), make_float4(f_rs)};
 }
 
 }// namespace luisa::render

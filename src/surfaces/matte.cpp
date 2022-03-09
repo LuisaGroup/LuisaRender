@@ -99,12 +99,6 @@ private:
         auto wi_local = _shading.world_to_local(wi);
         auto grad = _oren_nayar.grad(wo_local, wi_local);
 
-        auto df_dKd_0 = _swl.srgb(grad[0]);
-        auto df_dKd_1 = _swl.srgb(grad[1]);
-        auto df_dKd_2 = _swl.srgb(grad[2]);
-        auto df_dKd_3 = _swl.srgb(grad[3]);
-        auto df_dSigma = _swl.srgb(grad[4]);
-
         // TODO
         LUISA_ERROR_WITH_LOCATION("unimplemented");
     }

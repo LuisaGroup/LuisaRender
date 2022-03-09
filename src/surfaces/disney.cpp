@@ -178,18 +178,8 @@ public:
         auto Fo = SchlickWeight(abs_cos_theta(wo));
         auto Fi = SchlickWeight(abs_cos_theta(wi));
 
-        luisa::vector<Float4> grad;
-        grad.reserve(4);
-        auto df_dR = inv_pi * (1.f - Fo * .5f) * (1.f - Fi * .5f);
-        auto df_dR_0 = make_float4(1.0f, 0.0f, 0.0f, 0.0f) * df_dR;
-        auto df_dR_1 = make_float4(0.0f, 1.0f, 0.0f, 0.0f) * df_dR;
-        auto df_dR_2 = make_float4(0.0f, 0.0f, 1.0f, 0.0f) * df_dR;
-        auto df_dR_3 = make_float4(0.0f, 0.0f, 0.0f, 1.0f) * df_dR;
-        grad.emplace_back(df_dR_0);
-        grad.emplace_back(df_dR_1);
-        grad.emplace_back(df_dR_2);
-        grad.emplace_back(df_dR_3);
-        return grad;
+        auto f_r = inv_pi * (1.f - Fo * .5f) * (1.f - Fi * .5f);
+        return {make_float4(f_r)};
     }
 };
 
