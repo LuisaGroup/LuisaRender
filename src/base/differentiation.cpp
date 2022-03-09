@@ -121,12 +121,13 @@ void Differentiation::accumulate(const Differentiation::TexturedParameter &param
     auto map_uv = [s = param.sampler()](Expr<float2> uv) noexcept {
         switch (s.address()) {
             case TextureSampler::Address::EDGE:
-                return saturate(uv);
+                return clamp(uv, 0.f, one_minus_epsilon);
             case TextureSampler::Address::REPEAT:
                 return fract(uv);
             case TextureSampler::Address::MIRROR: {
                 auto t = floor(uv);
-                return ite(make_int2(t) % 2 == 0, uv - t, t - uv + 1.f);
+                auto frac = uv - t;
+                return ite(make_int2(t) % 2 == 0, frac, 1.f - frac);
             }
             case TextureSampler::Address::ZERO:
                 return def(uv);
