@@ -468,8 +468,6 @@ luisa::unique_ptr<Surface::Instance> MetalSurface::_build(
 class MetalClosure final : public Surface::Closure {
 
 private:
-    const Interaction &_interaction;
-    const SampledWavelengths &_swl;
     FresnelConductor _fresnel;
     TrowbridgeReitzDistribution _distrib;
     MicrofacetReflection _lobe;
@@ -477,16 +475,16 @@ private:
 public:
     MetalClosure(
         const Surface::Instance *instance,
-        const Interaction &it, const SampledWavelengths &swl,
+        const Interaction &it, const SampledWavelengths &swl, Expr<float> time,
         Expr<float4> n, Expr<float4> k, Expr<float2> alpha) noexcept
-        : Surface::Closure{instance}, _interaction{it}, _swl{swl},
+        : Surface::Closure{instance, it, swl, time},
           _fresnel{make_float4(1.f), n, k}, _distrib{alpha},
           _lobe{make_float4(1.f), &_distrib, &_fresnel} {}
 
 private:
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
-        auto wo_local = _interaction.wo_local();
-        auto wi_local = _interaction.shading().world_to_local(wi);
+        auto wo_local = _it.wo_local();
+        auto wi_local = _it.shading().world_to_local(wi);
         auto f = _lobe.evaluate(wo_local, wi_local);
         auto pdf = _lobe.pdf(wo_local, wi_local);
         return {.swl = _swl,
@@ -496,12 +494,12 @@ private:
                 .eta = make_float4(1.f)};
     }
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
-        auto wo_local = _interaction.wo_local();
+        auto wo_local = _it.wo_local();
         auto u = sampler.generate_2d();
         auto pdf = def(0.f);
         auto wi_local = def(make_float3(0.f, 0.f, 1.f));
         auto f = _lobe.sample(wo_local, &wi_local, u, &pdf);
-        auto wi = _interaction.shading().local_to_world(wi_local);
+        auto wi = _it.shading().local_to_world(wi_local);
         return {.wi = wi,
                 .eval = {.swl = _swl,
                          .f = f,
@@ -510,7 +508,6 @@ private:
                          .eta = make_float4(1.f)}};
     }
     void backward(Expr<float3> wi, Expr<float4> grad) const noexcept override {
-
     }
 };
 
@@ -538,7 +535,7 @@ luisa::unique_ptr<Surface::Closure> MetalInstance::closure(const Interaction &it
     auto eta3 = sample_eta_k(lambda.w);
     auto n = make_float4(eta0.x, eta1.x, eta2.x, eta3.x);
     auto k = make_float4(eta0.y, eta1.y, eta2.y, eta3.y);
-    return luisa::make_unique<MetalClosure>(this, it, swl, n, k, alpha);
+    return luisa::make_unique<MetalClosure>(this, it, swl, time, n, k, alpha);
 }
 
 }// namespace luisa::render

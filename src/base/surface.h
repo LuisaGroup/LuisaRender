@@ -44,8 +44,16 @@ public:
     private:
         const Instance *_instance;
 
+    protected:
+        const Interaction &_it;
+        const SampledWavelengths &_swl;
+        Float _time;
+
     public:
-        explicit Closure(const Instance *instance) noexcept : _instance{instance} {}
+        explicit Closure(
+            const Instance *instance, const Interaction &it,
+            const SampledWavelengths &swl, Expr<float> time) noexcept
+            : _instance{instance}, _it{it}, _swl{swl}, _time{time} {}
         virtual ~Closure() noexcept = default;
         template<typename T = Instance>
             requires std::is_base_of_v<Instance, T>

@@ -58,6 +58,13 @@ public:
         : Surface::Instance{pipeline, surface}, _kd{Kd}, _sigma{sigma} {}
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
+
+    [[nodiscard]] auto Kd() const noexcept {
+        return _kd;
+    }
+    [[nodiscard]] auto Sigma() const noexcept {
+        return _sigma;
+    }
 };
 
 luisa::unique_ptr<Surface::Instance> MatteSurface::_build(
@@ -70,24 +77,20 @@ luisa::unique_ptr<Surface::Instance> MatteSurface::_build(
 class MatteClosure final : public Surface::Closure {
 
 private:
-    Float3 _wo_local;
-    Frame _shading;
-    const SampledWavelengths &_swl;
     OrenNayar _oren_nayar;
 
 public:
     MatteClosure(
         const Surface::Instance *instance,
         const Interaction &it, const SampledWavelengths &swl,
-        Expr<float4> albedo, Expr<float> sigma) noexcept
-        : Surface::Closure{instance},
-          _wo_local{it.wo_local()}, _shading{it.shading()},
-          _swl{swl}, _oren_nayar{albedo, sigma} {}
+        Expr<float> time, Expr<float4> albedo, Expr<float> sigma) noexcept
+        : Surface::Closure{instance, it, swl, time},
+          _oren_nayar{albedo, sigma} {}
 
 private:
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
-        auto wo_local = _wo_local;
-        auto wi_local = _shading.world_to_local(wi);
+        auto wo_local = _it.wo_local();
+        auto wi_local = _it.shading().world_to_local(wi);
         auto f = _oren_nayar.evaluate(wo_local, wi_local);
         auto pdf = _oren_nayar.pdf(wo_local, wi_local);
         return {.swl = _swl,
@@ -97,12 +100,12 @@ private:
                 .eta = make_float4(1.f)};
     }
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
-        auto wo_local = _wo_local;
+        auto wo_local = _it.wo_local();
         auto wi_local = def(make_float3(0.0f, 0.0f, 1.0f));
         auto u = sampler.generate_2d();
         auto pdf = def(0.f);
         auto f = _oren_nayar.sample(wo_local, &wi_local, u, &pdf);
-        auto wi = _shading.local_to_world(wi_local);
+        auto wi = _it.shading().local_to_world(wi_local);
         return {.wi = wi,
                 .eval = {.swl = _swl,
                          .f = f,
@@ -112,9 +115,12 @@ private:
     }
 
     void backward(Expr<float3> wi, Expr<float4> grad) const noexcept override {
-        auto wo_local = _wo_local;
-        auto wi_local = _shading.world_to_local(wi);
-//        auto g = _oren_nayar.grad(wo_local, wi_local);
+        auto wo_local = _it.wo_local();
+        auto wi_local = _it.shading().world_to_local(wi);
+        auto grad_params = _oren_nayar.grad(wo_local, wi_local);
+
+        instance<MatteInstance>()->Kd()->backward(_it, _swl, _time,
+                                                  grad_params[0] * grad);
 
         // TODO
         LUISA_ERROR_WITH_LOCATION("unimplemented");
@@ -125,7 +131,7 @@ luisa::unique_ptr<Surface::Closure> MatteInstance::closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto Kd = _kd->evaluate(it, swl, time);
     auto sigma = _sigma ? clamp(_sigma->evaluate(it, swl, time).x, 0.f, 90.f) : 0.f;
-    return luisa::make_unique<MatteClosure>(this, it, swl, Kd, sigma);
+    return luisa::make_unique<MatteClosure>(this, it, swl, time, Kd, sigma);
 }
 
 }// namespace luisa::render

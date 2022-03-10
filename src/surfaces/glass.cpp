@@ -148,8 +148,6 @@ luisa::unique_ptr<Surface::Instance> GlassSurface::_build(
 class GlassClosure final : public Surface::Closure {
 
 private:
-    const Interaction &_interaction;
-    const SampledWavelengths &_swl;
     TrowbridgeReitzDistribution _distribution;
     FresnelDielectric _fresnel;
     MicrofacetReflection _refl;
@@ -166,10 +164,10 @@ private:
 public:
     GlassClosure(
         const Surface::Instance *instance,
-        const Interaction &it, const SampledWavelengths &swl,
+        const Interaction &it, const SampledWavelengths &swl, Expr<float> time,
         Expr<float4> eta, Expr<float4> Kr, Expr<float4> Kt,
         Expr<float2> alpha, Expr<float> Kr_ratio) noexcept
-        : Surface::Closure{instance}, _interaction{it}, _swl{swl},
+        : Surface::Closure{instance, it, swl, time},
           _distribution{alpha}, _fresnel{make_float4(1.0f), eta},
           _refl{Kr, &_distribution, &_fresnel},
           _trans{Kt, &_distribution, make_float4(1.f), eta},
@@ -177,8 +175,8 @@ public:
 
 private:
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
-        auto wo_local = _interaction.wo_local();
-        auto wi_local = _interaction.shading().world_to_local(wi);
+        auto wo_local = _it.wo_local();
+        auto wi_local = _it.shading().world_to_local(wi);
         auto f = def(make_float4());
         auto pdf = def(0.f);
         auto swl = _swl;
@@ -196,7 +194,7 @@ private:
     }
 
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
-        auto wo_local = _interaction.wo_local();
+        auto wo_local = _it.wo_local();
         auto u = sampler.generate_2d();
         auto pdf = def(0.f);
         auto f = def(make_float4());
@@ -215,7 +213,7 @@ private:
             pdf *= (1.f - t);
             $if(_dispersion) { swl.terminate_secondary(); };
         };
-        auto wi = _interaction.shading().local_to_world(wi_local);
+        auto wi = _it.shading().local_to_world(wi_local);
         auto eta = ite(wi_local.z > 0.f, _fresnel.eta_i(), _fresnel.eta_t());
         return {.wi = wi, .eval = {.swl = swl, .f = f, .pdf = pdf, .alpha = _distribution.alpha(), .eta = eta}};
     }
@@ -260,7 +258,7 @@ luisa::unique_ptr<Surface::Closure> GlassInstance::closure(
     auto Kt_lum = swl.cie_y(Kt);
     auto Kr_ratio = ite(Kr_lum == 0.f, 0.f, Kr_lum / (Kr_lum + Kt_lum));
     return luisa::make_unique<GlassClosure>(
-        this, it, swl, eta, Kr, Kt, alpha, Kr_ratio);
+        this, it, swl, time, eta, Kr, Kt, alpha, Kr_ratio);
 }
 
 }// namespace luisa::render

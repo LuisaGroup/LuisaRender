@@ -90,8 +90,6 @@ public:
 class MirrorClosure final : public Surface::Closure {
 
 private:
-    const Interaction &_it;
-    const SampledWavelengths &_swl;
     SchlickFresnel _fresnel;
     TrowbridgeReitzDistribution _distribution;
     MicrofacetReflection _refl;
@@ -99,9 +97,9 @@ private:
 public:
     MirrorClosure(
         const Surface::Instance *instance,
-        const Interaction &it, const SampledWavelengths &swl,
+        const Interaction &it, const SampledWavelengths &swl, Expr<float> time,
         Expr<float4> refl, Expr<float2> alpha) noexcept
-        : Surface::Closure{instance}, _it{it}, _swl{swl},
+        : Surface::Closure{instance, it, swl, time},
           _fresnel{refl}, _distribution{alpha},
           _refl{refl, &_distribution, &_fresnel} {}
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
@@ -146,7 +144,7 @@ luisa::unique_ptr<Surface::Closure> MirrorInstance::closure(
                     (remap ? r2a(r.xy()) : r.xy());
     }
     auto color = _color->evaluate(it, swl, time);
-    return luisa::make_unique<MirrorClosure>(this, it, swl, color, alpha);
+    return luisa::make_unique<MirrorClosure>(this, it, swl, time, color, alpha);
 }
 
 }// namespace luisa::render

@@ -87,23 +87,21 @@ luisa::unique_ptr<Surface::Instance> SubstrateSurface::_build(
 class SubstrateClosure final : public Surface::Closure {
 
 private:
-    const Interaction &_interaction;
-    const SampledWavelengths &_swl;
     TrowbridgeReitzDistribution _distribution;
     FresnelBlend _blend;
 
 public:
     SubstrateClosure(
         const Surface::Instance *instance,
-        const Interaction &it, const SampledWavelengths &swl,
+        const Interaction &it, const SampledWavelengths &swl, Expr<float> time,
         Expr<float4> Kd, Expr<float4> Ks, Expr<float2> alpha) noexcept
-        : Surface::Closure{instance}, _interaction{it}, _swl{swl},
+        : Surface::Closure{instance, it, swl, time},
           _distribution{alpha}, _blend{Kd, Ks, &_distribution} {}
 
 private:
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
-        auto wo_local = _interaction.wo_local();
-        auto wi_local = _interaction.shading().world_to_local(wi);
+        auto wo_local = _it.wo_local();
+        auto wi_local = _it.shading().world_to_local(wi);
         auto f = _blend.evaluate(wo_local, wi_local);
         auto pdf = _blend.pdf(wo_local, wi_local);
         return {.swl = _swl,
@@ -114,12 +112,12 @@ private:
     }
 
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
-        auto wo_local = _interaction.wo_local();
+        auto wo_local = _it.wo_local();
         auto u = sampler.generate_2d();
         auto pdf = def(0.f);
         auto wi_local = def(make_float3());
         auto f = _blend.sample(wo_local, &wi_local, u, &pdf);
-        auto wi = _interaction.shading().local_to_world(wi_local);
+        auto wi = _it.shading().local_to_world(wi_local);
         return {.wi = wi,
                 .eval = {.swl = _swl,
                          .f = f,
@@ -128,9 +126,9 @@ private:
                          .eta = make_float4(1.f)}};
     }
     void backward(Expr<float3> wi, Expr<float4> grad) const noexcept override {
-        auto wo_local = _interaction.wo_local();
-        auto wi_local = _interaction.shading().world_to_local(wi);
-//        auto grad = _blend.grad(wo_local, wi_local);
+        auto wo_local = _it.wo_local();
+        auto wi_local = _it.shading().world_to_local(wi);
+        //        auto grad = _blend.grad(wo_local, wi_local);
 
         // TODO
         LUISA_ERROR_WITH_LOCATION("unimplemented");
@@ -151,7 +149,7 @@ luisa::unique_ptr<Surface::Closure> SubstrateInstance::closure(
                     (remap ? r2a(r.xy()) : r.xy());
     }
     return luisa::make_unique<SubstrateClosure>(
-        this, it, swl, Kd, Ks, alpha);
+        this, it, swl, time, Kd, Ks, alpha);
 }
 
 }// namespace luisa::render

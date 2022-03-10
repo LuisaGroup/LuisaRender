@@ -425,8 +425,6 @@ public:
     static_assert(max_sampling_techique_count == std::size(sampling_techniques));
 
 private:
-    const Interaction &_it;
-    const SampledWavelengths &_swl;
     luisa::unique_ptr<DisneyDiffuse> _diffuse;
     luisa::unique_ptr<DisneyFakeSS> _fake_ss;
     luisa::unique_ptr<DisneyRetro> _retro;
@@ -444,12 +442,13 @@ private:
 
 public:
     DisneySurfaceClosure(
-        const DisneySurfaceInstance *instance, const Interaction &it, const SampledWavelengths &swl,
+        const DisneySurfaceInstance *instance, const Interaction &it,
+        const SampledWavelengths &swl, Expr<float> time,
         Expr<float4> color, Expr<float> metallic_in, Expr<float> eta_in, Expr<float> roughness,
         Expr<float> specular_tint, Expr<float> anisotropic, Expr<float> sheen, Expr<float> sheen_tint,
         Expr<float> clearcoat, Expr<float> clearcoat_gloss, Expr<float> specular_trans_in,
         Expr<float> flatness, Expr<float> diffuse_trans) noexcept
-        : Surface::Closure{instance}, _it{it}, _swl{swl}, _lobes{0u} {
+        : Surface::Closure{instance, it, swl, time}, _lobes{0u} {
 
         // TODO: should not generate lobes than are not used.
 
@@ -667,7 +666,7 @@ luisa::unique_ptr<Surface::Closure> DisneySurfaceInstance::closure(
     auto flatness = _flatness ? _flatness->evaluate(it, swl, time).x : 0.f;
     auto diffuse_trans = _diffuse_trans ? _diffuse_trans->evaluate(it, swl, time).x : 0.f;
     return luisa::make_unique<DisneySurfaceClosure>(
-        this, it, swl,
+        this, it, swl, time,
         color, metallic, eta, roughness,
         specular_tint, anisotropic,
         sheen, sheen_tint,
