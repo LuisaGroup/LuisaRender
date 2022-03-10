@@ -403,9 +403,6 @@ luisa::vector<Float4> MicrofacetReflection::grad(Expr<float3> wo, Expr<float3> w
     }
 
     return grad;
-
-    // TODO
-    LUISA_ERROR_WITH_LOCATION("unimplemented");
 }
 
 Float4 MicrofacetTransmission::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
@@ -451,6 +448,38 @@ Float MicrofacetTransmission::pdf(Expr<float3> wo, Expr<float3> wi) const noexce
 luisa::vector<Float4> MicrofacetTransmission::grad(Expr<float3> wo, Expr<float3> wi) const noexcept {
     // TODO
     LUISA_ERROR_WITH_LOCATION("unimplemented");
+
+    auto cosThetaO = cos_theta(wo);
+    auto cosThetaI = cos_theta(wi);
+    // Compute $\wh$ from $\wo$ and $\wi$ for microfacet transmission
+    auto eta = ite(cosThetaO > 0.f, _eta_b / _eta_a, _eta_a / _eta_b)[0];// TODO
+    auto wh = normalize(wo + wi * eta);
+    wh = compute::sign(cos_theta(wh)) * wh;
+    auto sqrtDenom = dot(wo, wh) + eta * dot(wi, wh);
+    auto factor = 1.f / eta;
+    auto F = _fresnel.evaluate(dot(wo, wh));
+    auto D = _distribution->D(wh);
+    auto G = _distribution->G(wo, wi);
+    auto f = (1.f - F) * _t * sqr(factor) *
+             abs(D * G * sqr(eta) * abs_dot(wi, wh) * abs_dot(wo, wh) /
+                 (cosThetaI * cosThetaO * sqr(sqrtDenom)));
+    auto valid = !same_hemisphere(wo, wi) &
+                 cosThetaO != 0.f & cosThetaI != 0.f &
+                 dot(wo, wh) * dot(wi, wh) < 0.f;
+
+    // backward
+    auto k_0 = abs(D * G * sqr(eta) * dot(wi, wh) * dot(wo, wh) /
+                   (cosThetaI * cosThetaO * sqr(sqrtDenom)));
+    auto d_f = ite(valid, 1.f, 0.f);
+    auto d_t = d_f * (1.f - F) * sqr(factor) * k_0;
+    auto d_F = - d_f * _t * sqr(factor) * k_0;
+    auto d_factor = d_f * (1.f - F) * _t * k_0 * 2.f * factor;
+    auto d_sqrtDenom = d_f * (1.f - F) * _t * sqr(factor) * k_0 / sqrtDenom * (-2.f);
+    auto d_wh = d_f * (1.f - F) * _t * sqr(factor) * D * G * sqr(eta) *
+                abs(D * G * sqr(eta) *
+                    (wi * dot(wo, wh) + abs_dot(wi, wh) * wo) /
+                    (cosThetaI * cosThetaO * sqr(sqrtDenom)));
+    auto d_eta = - d_factor / sqr(eta); // TODO
 }
 
 OrenNayar::OrenNayar(Expr<float4> R, Expr<float> sigma) noexcept
