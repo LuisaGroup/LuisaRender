@@ -119,11 +119,9 @@ private:
         auto wi_local = _it.shading().world_to_local(wi);
         auto grad_params = _oren_nayar.grad(wo_local, wi_local);
 
-        instance<MatteInstance>()->Kd()->backward(_it, _swl, _time,
-                                                  grad_params[0] * grad);
-
-        // TODO
-        LUISA_ERROR_WITH_LOCATION("unimplemented");
+        auto _instance = instance<MatteInstance>();
+        _instance->Kd()->backward(_it, _swl, _time, grad_params[0] * grad);
+        _instance->Kd()->backward(_it, _swl, _time, grad_params[1] * grad);
     }
 };
 

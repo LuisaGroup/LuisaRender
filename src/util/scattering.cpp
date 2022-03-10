@@ -134,7 +134,6 @@ Float TrowbridgeReitzDistribution::D(Expr<float3> wh) const noexcept {
     return ite(isinf(tan2Theta), 0.f, d);
 }
 
-
 Float TrowbridgeReitzDistribution::Lambda(Expr<float3> w) const noexcept {
     using compute::isinf;
     auto absTanTheta = abs(tan_theta(w));
@@ -248,27 +247,27 @@ luisa::vector<Float4> FresnelDielectric::grad(Expr<float> cosThetaI_in) const no
     auto Rperpv = (etaI * cosThetaI) + (etaT * cosThetaT);
     auto Rperp = Rperpu / Rperpv;
 
-//    // forward
-//    auto fr_Rparl = Rparl;
-//    auto fr_Rperp = Rperp;
-//    auto Rparlu_etaI = -cosThetaT;
-//    auto Rparlv_etaI = cosThetaT;
-//    auto Rparlu_etaT = cosThetaI;
-//    auto Rparlv_etaT = cosThetaI;
-//    auto Rparl_etaI = (Rparlu_etaI * Rparlv - Rparlu * Rparlv_etaI) / sqr(Rparlv);
-//    auto Rparl_etaT = (Rparlu_etaT * Rparlv - Rparlu * Rparlv_etaT) / sqr(Rparlv);
-//    auto Rperpu_etaI = cosThetaI;
-//    auto Rperpv_etaI = cosThetaI;
-//    auto Rperpu_etaT = -cosThetaT;
-//    auto Rperpv_etaT = cosThetaT;
-//    auto Rperp_etaI = (Rperpu_etaI * Rperpv - Rperpv_etaI * Rperpu) / sqr(Rperpv);
-//    auto Rperp_etaT = (Rperpu_etaT * Rperpv - Rperpv_etaT * Rperpu) / sqr(Rperpv);
-//    auto fr_etaI = fr_Rparl * Rparl_etaI + fr_Rperp * Rperp_etaI;
-//    auto fr_etaT = fr_Rparl * Rparl_etaT + fr_Rperp * Rperp_etaT;
-//    auto not_tir = sinThetaT < 1.f;
-//    auto f_etaI = ite(not_tir, ite(entering, fr_etaI, fr_etaT), 0.f);
-//    auto f_etaT = ite(not_tir, ite(entering, fr_etaT, fr_etaI), 0.f);
-//    return {f_etaI, f_etaT};
+    //    // forward
+    //    auto fr_Rparl = Rparl;
+    //    auto fr_Rperp = Rperp;
+    //    auto Rparlu_etaI = -cosThetaT;
+    //    auto Rparlv_etaI = cosThetaT;
+    //    auto Rparlu_etaT = cosThetaI;
+    //    auto Rparlv_etaT = cosThetaI;
+    //    auto Rparl_etaI = (Rparlu_etaI * Rparlv - Rparlu * Rparlv_etaI) / sqr(Rparlv);
+    //    auto Rparl_etaT = (Rparlu_etaT * Rparlv - Rparlu * Rparlv_etaT) / sqr(Rparlv);
+    //    auto Rperpu_etaI = cosThetaI;
+    //    auto Rperpv_etaI = cosThetaI;
+    //    auto Rperpu_etaT = -cosThetaT;
+    //    auto Rperpv_etaT = cosThetaT;
+    //    auto Rperp_etaI = (Rperpu_etaI * Rperpv - Rperpv_etaI * Rperpu) / sqr(Rperpv);
+    //    auto Rperp_etaT = (Rperpu_etaT * Rperpv - Rperpv_etaT * Rperpu) / sqr(Rperpv);
+    //    auto fr_etaI = fr_Rparl * Rparl_etaI + fr_Rperp * Rperp_etaI;
+    //    auto fr_etaT = fr_Rparl * Rparl_etaT + fr_Rperp * Rperp_etaT;
+    //    auto not_tir = sinThetaT < 1.f;
+    //    auto f_etaI = ite(not_tir, ite(entering, fr_etaI, fr_etaT), 0.f);
+    //    auto f_etaT = ite(not_tir, ite(entering, fr_etaT, fr_etaI), 0.f);
+    //    return {f_etaI, f_etaT};
 
     // backward
     auto d_fr = ite(sinThetaT < 1.f, 1.f, 0.f);
@@ -398,7 +397,7 @@ luisa::vector<Float4> MicrofacetReflection::grad(Expr<float3> wo, Expr<float3> w
     luisa::vector<Float4> grad;
     grad.reserve(1 + grad_fresnel.size());
     grad.emplace_back(d_r);
-    for (const auto& v : grad_fresnel) {
+    for (const auto &v : grad_fresnel) {
         grad.emplace_back(d_F * v);
     }
 
@@ -472,14 +471,14 @@ luisa::vector<Float4> MicrofacetTransmission::grad(Expr<float3> wo, Expr<float3>
                    (cosThetaI * cosThetaO * sqr(sqrtDenom)));
     auto d_f = ite(valid, 1.f, 0.f);
     auto d_t = d_f * (1.f - F) * sqr(factor) * k_0;
-    auto d_F = - d_f * _t * sqr(factor) * k_0;
+    auto d_F = -d_f * _t * sqr(factor) * k_0;
     auto d_factor = d_f * (1.f - F) * _t * k_0 * 2.f * factor;
     auto d_sqrtDenom = d_f * (1.f - F) * _t * sqr(factor) * k_0 / sqrtDenom * (-2.f);
-//    auto d_wh = d_f * (1.f - F) * _t * sqr(factor) * D * G * sqr(eta) *
-//                abs(D * G * sqr(eta) *
-//                    (wi * dot(wo, wh) + abs_dot(wi, wh) * wo) /
-//                    (cosThetaI * cosThetaO * sqr(sqrtDenom)));
-    auto d_eta = - d_factor / sqr(eta); // TODO
+    //    auto d_wh = d_f * (1.f - F) * _t * sqr(factor) * D * G * sqr(eta) *
+    //                abs(D * G * sqr(eta) *
+    //                    (wi * dot(wo, wh) + abs_dot(wi, wh) * wo) /
+    //                    (cosThetaI * cosThetaO * sqr(sqrtDenom)));
+    auto d_eta = -d_factor / sqr(eta);// TODO
 }
 
 OrenNayar::OrenNayar(Expr<float4> R, Expr<float> sigma) noexcept
@@ -527,17 +526,17 @@ luisa::vector<Float4> OrenNayar::grad(Expr<float3> wo, Expr<float3> wi) const no
 
     auto sigma2 = sqr(radians(_sigma));
 
-//    // forward
-//    auto sigma2_sigma = 2 * radians(_sigma) / 180.f;
-//    auto a_sigma2 = -0.165f * sqr(sigma2 + 0.33f);
-//    auto b_sigma2 = 0.0405f / sqr(sigma2 + 0.09f);
-//
-//    auto f_r = make_float4(inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta));
-//    auto f_a = _r * inv_pi;
-//    auto f_b = _r * inv_pi * maxCos * sinAlpha * tanBeta;
-//    auto f_sigma = (f_a * a_sigma2 + f_b * b_sigma2) * sigma2_sigma;
-//
-//    return {f_r, f_sigma};
+    //    // forward
+    //    auto sigma2_sigma = 2 * radians(_sigma) / 180.f;
+    //    auto a_sigma2 = -0.165f * sqr(sigma2 + 0.33f);
+    //    auto b_sigma2 = 0.0405f / sqr(sigma2 + 0.09f);
+    //
+    //    auto f_r = make_float4(inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta));
+    //    auto f_a = _r * inv_pi;
+    //    auto f_b = _r * inv_pi * maxCos * sinAlpha * tanBeta;
+    //    auto f_sigma = (f_a * a_sigma2 + f_b * b_sigma2) * sigma2_sigma;
+    //
+    //    return {f_r, f_sigma};
 
     // backward
     auto sigma2_sigma = 2 * radians(_sigma) / 180.f;
@@ -618,11 +617,11 @@ luisa::vector<Float4> FresnelBlend::grad(Expr<float3> wo, Expr<float3> wi) const
     wh = normalize(wh);
 
     auto diffuse_rd = (28.f / (23.f * pi)) * (1.f - _rs) *
-               (1.f - pow5(1.f - .5f * absCosThetaI)) *
-               (1.f - pow5(1.f - .5f * absCosThetaO));
+                      (1.f - pow5(1.f - .5f * absCosThetaI)) *
+                      (1.f - pow5(1.f - .5f * absCosThetaO));
     auto diffuse_rs = -(28.f / (23.f * pi)) * _rd *
-               (1.f - pow5(1.f - .5f * absCosThetaI)) *
-               (1.f - pow5(1.f - .5f * absCosThetaO));
+                      (1.f - pow5(1.f - .5f * absCosThetaI)) *
+                      (1.f - pow5(1.f - .5f * absCosThetaO));
     auto specular_rs = 1 - pow5(1.f - dot(wi, wh));
 
     auto d_rd = make_float4(diffuse_rd);

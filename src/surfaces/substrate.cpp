@@ -128,7 +128,7 @@ private:
     void backward(Expr<float3> wi, Expr<float4> grad) const noexcept override {
         auto wo_local = _it.wo_local();
         auto wi_local = _it.shading().world_to_local(wi);
-        //        auto grad = _blend.grad(wo_local, wi_local);
+        auto grad_params = _blend.grad(wo_local, wi_local);
 
         // TODO
         LUISA_ERROR_WITH_LOCATION("unimplemented");
