@@ -1,4 +1,4 @@
-Surface cbox-white : Disney {
+Surface cbox-white : Matte {
   color : ConstColor {
     color { 0.725, 0.71, 0.68 }
   }
@@ -6,11 +6,11 @@ Surface cbox-white : Disney {
     color { 0.725, 0.71, 0.68 }
   }
   roughness : ConstGeneric {
-    v { .25 }
+    v { 1 }
   }
 }
 
-Surface cbox-red : Disney {
+Surface cbox-red : Matte {
   color : ConstColor {
     color { 0.63, 0.065, 0.05 }
   }
@@ -18,11 +18,11 @@ Surface cbox-red : Disney {
     color { 0.63, 0.065, 0.05 }
   }
   roughness : ConstGeneric {
-    v { .25 }
+    v { 1 }
   }
 }
 
-Surface cbox-green : Disney {
+Surface cbox-green : Matte {
   color : ConstColor {
     color { 0.14, 0.45, 0.091 }
   }
@@ -30,7 +30,7 @@ Surface cbox-green : Disney {
     color { 0.14, 0.45, 0.091 }
   }
   roughness : ConstGeneric {
-    v { .25 }
+    v { 1 }
   }
 }
 

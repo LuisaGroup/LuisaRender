@@ -25,6 +25,7 @@ public:
     class Instance {
 
     private:
+        const Pipeline &_pipeline;
         const Filter *_filter;
         std::array<float, look_up_table_size> _lut{};
         std::array<float, look_up_table_size - 1u> _pdf{};
@@ -32,9 +33,13 @@ public:
         std::array<uint, look_up_table_size - 1u> _alias_indices{};
 
     public:
-        explicit Instance(const Filter *filter) noexcept;
+        Instance(const Pipeline &pipeline, const Filter *filter) noexcept;
         virtual ~Instance() noexcept = default;
-        [[nodiscard]] auto node() const noexcept { return _filter; }
+
+        template<typename T = Filter>
+            requires std::is_base_of_v<Filter, T>
+        [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_filter); }
+        [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
         [[nodiscard]] auto look_up_table() const noexcept { return luisa::span{_lut}; }
         [[nodiscard]] auto pdf_table() const noexcept { return luisa::span{_pdf}; }
         [[nodiscard]] auto alias_table_indices() const noexcept { return luisa::span{_alias_indices}; }
@@ -52,4 +57,4 @@ public:
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept;
 };
 
-}
+}// namespace luisa::render

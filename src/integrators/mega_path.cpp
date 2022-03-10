@@ -26,6 +26,7 @@ public:
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
+    [[nodiscard]] bool differentiable() const noexcept override { return false; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
@@ -37,7 +38,7 @@ private:
 
 private:
     static void _render_one_camera(
-        Stream &stream, Pipeline &pipeline,
+        Stream &surface_instance, Pipeline &pipeline,
         const Camera::Instance *camera,
         const Filter::Instance *filter,
         Film::Instance *film, uint max_depth,
@@ -81,7 +82,8 @@ void MegakernelPathTracingInstance::_render_one_camera(
 
     auto command_buffer = stream.command_buffer();
     film->clear(command_buffer);
-    sampler->reset(command_buffer, resolution, spp);
+    auto pixel_count = resolution.x * resolution.y;
+    sampler->reset(command_buffer, resolution, pixel_count, spp);
     command_buffer.commit();
 
     using namespace luisa::compute;
@@ -89,7 +91,8 @@ void MegakernelPathTracingInstance::_render_one_camera(
         return ite(pdf_a > 0.0f, pdf_a / (pdf_a + pdf_b), 0.0f);
     };
 
-    Kernel2D render_kernel = [&](UInt frame_index, Float4x4 camera_to_world, Float3x3 camera_to_world_normal, Float3x3 env_to_world, Float time, Float shutter_weight) noexcept {
+    Kernel2D render_kernel = [&](UInt frame_index, Float4x4 camera_to_world, Float3x3 camera_to_world_normal,
+                                 Float3x3 env_to_world, Float time, Float shutter_weight) noexcept {
         set_block_size(8u, 8u, 1u);
 
         auto pixel_id = dispatch_id().xy();
@@ -141,15 +144,6 @@ void MegakernelPathTracingInstance::_render_one_camera(
                 };
             }
 
-            // alpha
-            auto alpha = it->alpha();
-            auto u_alpha = sampler->generate_1d();
-            $if(u_alpha >= alpha) {
-                ray = it->spawn_ray(-it->wo());
-                pdf_bsdf = 1e16f;
-                $continue;
-            };
-
             // sample one light
             $if(!it->shape()->has_surface()) { $break; };
             Light::Sample light_sample;
@@ -176,36 +170,59 @@ void MegakernelPathTracingInstance::_render_one_camera(
             // evaluate material
             auto eta_scale = def(make_float4(1.f));
             auto cos_theta_o = it->wo_local().z;
-            pipeline.decode_material(it->shape()->surface_tag(), *it, swl, time, [&](const Surface::Closure &material) {
+            auto surface_tag = it->shape()->surface_tag();
+            pipeline.dynamic_dispatch_surface(surface_tag, [&](auto surface) {
+                // apply normal map
+                if (auto normal_map = surface->normal()) {
+                    auto normal_local = 2.f * normal_map->evaluate(*it, swl, time).xyz() - 1.f;
+                    auto normal = it->shading().local_to_world(normal_local);
+                    it->set_shading(Frame::make(normal, it->shading().u()));
+                }
+                // apply alpha map
+                auto alpha_skip = def(false);
+                if (auto alpha_map = surface->alpha()) {
+                    auto alpha = alpha_map->evaluate(*it, swl, time).x;
+                    auto u_alpha = sampler->generate_1d();
+                    alpha_skip = alpha < u_alpha;
+                }
 
-                // direct lighting
-                $if(light_sample.eval.pdf > 0.0f & !occluded) {
-                    auto wi = light_sample.shadow_ray->direction();
-                    auto eval = material.evaluate(wi);
-                    auto cos_theta_i = dot(it->shading().n(), wi);
-                    auto is_trans = cos_theta_i * cos_theta_o < 0.f;
-                    auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
-                    Li += eval.swl.srgb(
-                        beta * mis_weight * ite(eval.pdf > 0.0f, eval.f, 0.0f) *
-                        abs_dot(it->shading().n(), wi) *
-                        light_sample.eval.L / light_sample.eval.pdf);
+                $if(alpha_skip) {
+                    ray = it->spawn_ray(ray->direction());
+                    pdf_bsdf = 1e16f;
+                }
+                $else {
+                    // create closure
+                    auto closure = surface->closure(*it, swl, time);
+
+                    // direct lighting
+                    $if(light_sample.eval.pdf > 0.0f & !occluded) {
+                        auto wi = light_sample.shadow_ray->direction();
+                        auto eval = closure->evaluate(wi);
+                        auto cos_theta_i = dot(it->shading().n(), wi);
+                        auto is_trans = cos_theta_i * cos_theta_o < 0.f;
+                        auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
+                        Li += eval.swl.srgb(
+                            beta * mis_weight * ite(eval.pdf > 0.0f, eval.f, 0.0f) *
+                            abs_dot(it->shading().n(), wi) *
+                            light_sample.eval.L / light_sample.eval.pdf);
+                    };
+
+                    // sample material
+                    auto [wi, eval] = closure->sample(*sampler);
+                    auto cos_theta_i = dot(wi, it->shading().n());
+                    ray = it->spawn_ray(wi);
+                    pdf_bsdf = eval.pdf;
+                    beta *= ite(
+                        eval.pdf > 0.0f,
+                        eval.f * abs(cos_theta_i) / eval.pdf,
+                        make_float4(0.0f));
+                    swl = eval.swl;
+                    eta_scale = ite(
+                        cos_theta_i * cos_theta_o < 0.f &
+                            min(eval.alpha.x, eval.alpha.y) < .05f,
+                        ite(cos_theta_o > 0.f, sqr(eval.eta), sqrt(1.f / eval.eta)),
+                        1.f);
                 };
-
-                // sample material
-                auto [wi, eval] = material.sample(*sampler);
-                auto cos_theta_i = dot(wi, it->shading().n());
-                ray = it->spawn_ray(wi);
-                pdf_bsdf = eval.pdf;
-                beta *= ite(
-                    eval.pdf > 0.0f,
-                    eval.f * abs(cos_theta_i) / eval.pdf,
-                    make_float4(0.0f));
-                swl = eval.swl;
-                eta_scale = ite(
-                    cos_theta_i * cos_theta_o < 0.f &
-                        min(eval.alpha.x, eval.alpha.y) < .05f,
-                    ite(cos_theta_o > 0.f, sqr(eval.eta), sqrt(1.f / eval.eta)),
-                    1.f);
             });
 
             // rr

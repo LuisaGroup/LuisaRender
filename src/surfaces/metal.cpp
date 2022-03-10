@@ -347,26 +347,17 @@ using namespace luisa::compute;
 
 class MetalSurface final : public Surface {
 
-public:
-    struct Params {
-        TextureHandle roughness;
-        uint eta_k_buffer_id;
-        bool remap_roughness;
-        bool isotropic;
-    };
-
 private:
     const Texture *_roughness;
+    luisa::unique_ptr<Constant<float2>> _eta;
     bool _remap_roughness;
-    std::array<float2, ior::lut_size> _eta;
 
 public:
     MetalSurface(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Surface{scene, desc},
-          _roughness{scene->load_texture(desc->property_node_or_default(
-              "roughness", SceneNodeDesc::shared_default_texture("ConstGeneric")))},
+          _roughness{scene->load_texture(desc->property_node_or_default("roughness"))},
           _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {
-        if (_roughness->category() != Texture::Category::GENERIC) [[unlikely]] {
+        if (_roughness != nullptr && _roughness->category() != Texture::Category::GENERIC) [[unlikely]] {
             LUISA_ERROR(
                 "Non-generic textures are not "
                 "allowed in MetalSurface::roughness. [{}]",
@@ -375,29 +366,32 @@ public:
         if (auto eta_name = desc->property_string_or_default("eta"); !eta_name.empty()) {
             for (auto &c : eta_name) { c = static_cast<char>(tolower(c)); }
             if (eta_name == "ag" || eta_name == "silver") {
-                _eta = ior::Ag;
+                _eta = luisa::make_unique<Constant<float2>>(ior::Ag);
             } else if (eta_name == "al" || eta_name == "aluminium") {
-                _eta = ior::Al;
+                _eta = luisa::make_unique<Constant<float2>>(ior::Al);
             } else if (eta_name == "au" || eta_name == "gold") {
-                _eta = ior::Au;
+                _eta = luisa::make_unique<Constant<float2>>(ior::Au);
             } else if (eta_name == "cu" || eta_name == "copper") {
-                _eta = ior::Cu;
+                _eta = luisa::make_unique<Constant<float2>>(ior::Cu);
             } else if (eta_name == "cuzn" || eta_name == "cu-zn" || eta_name == "brass") {
-                _eta = ior::CuZn;
+                _eta = luisa::make_unique<Constant<float2>>(ior::CuZn);
             } else if (eta_name == "fe" || eta_name == "iron") {
-                _eta = ior::Fe;
+                _eta = luisa::make_unique<Constant<float2>>(ior::Fe);
             } else if (eta_name == "ti" || eta_name == "titanium") {
-                _eta = ior::Ti;
+                _eta = luisa::make_unique<Constant<float2>>(ior::Ti);
             } else if (eta_name == "v" || eta_name == "vanadium") {
-                _eta = ior::V;
+                _eta = luisa::make_unique<Constant<float2>>(ior::V);
             } else if (eta_name == "vn") {
-                _eta = ior::VN;
+                _eta = luisa::make_unique<Constant<float2>>(ior::VN);
             } else if (eta_name == "li" || eta_name == "lithium") {
-                _eta = ior::Li;
+                _eta = luisa::make_unique<Constant<float2>>(ior::Li);
             } else [[unlikely]] {
-                LUISA_ERROR(
-                    "Unknown metal '{}'. [{}]", eta_name,
+                LUISA_WARNING_WITH_LOCATION(
+                    "Unknown metal '{}'. "
+                    "Fallback to Aluminium. [{}]",
+                    eta_name,
                     desc->source_location().string());
+                _eta = luisa::make_unique<Constant<float2>>(ior::Al);
             }
         } else {
             auto eta = desc->property_float_list("eta");
@@ -426,6 +420,7 @@ public:
                     lambda.front(), lambda.back(), desc->source_location().string());
             }
             // TODO: scan rather than binary search
+            luisa::vector<float2> lut(ior::lut_size);
             for (auto i = 0u; i < ior::lut_size; i++) {
                 auto wavelength = static_cast<float>(
                     i * ior::lut_step + ior::lut_min);
@@ -436,38 +431,39 @@ public:
                     static_cast<size_t>(1u), lambda.size() - 1u);
                 auto t = (wavelength - lambda[index - 1u]) /
                          (lambda[index] - lambda[index - 1u]);
-                _eta[i] = make_float2(
+                lut[i] = make_float2(
                     std::lerp(n[index - 1u], n[index], t),
                     std::lerp(k[index - 1u], k[index], t));
             }
+            _eta = luisa::make_unique<Constant<float2>>(lut);
         }
     }
+    [[nodiscard]] auto &eta() const noexcept { return *_eta; }
+    [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint, const Shape *) const noexcept override {
-        auto [buffer_view, buffer_id] = pipeline.arena_buffer<Params>(1u);
-        auto [lut_buffer_view, lut_buffer_id] = pipeline.arena_buffer<float2>(ior::lut_size);
-        Params params{
-            .roughness = *pipeline.encode_texture(command_buffer, _roughness),
-            .eta_k_buffer_id = lut_buffer_id,
-            .remap_roughness = _remap_roughness,
-            .isotropic = _roughness->channels() == 1u};
-        command_buffer << buffer_view.copy_from(&params)
-                       << lut_buffer_view.copy_from(_eta.data())
-                       << compute::commit();
-        return buffer_id;
-    }
-    [[nodiscard]] luisa::unique_ptr<Closure> decode(
-        const Pipeline &pipeline, const Interaction &it,
-        const SampledWavelengths &swl, Expr<float> time) const noexcept override;
+
+private:
+    [[nodiscard]] luisa::unique_ptr<Instance> _build(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
-}// namespace luisa::render
+class MetalInstance final : public Surface::Instance {
 
-LUISA_STRUCT(
-    luisa::render::MetalSurface::Params,
-    roughness, eta_k_buffer_id, remap_roughness, isotropic){};
+private:
+    const Texture::Instance *_roughness;
 
-namespace luisa::render {
+public:
+    MetalInstance(const Pipeline &pipeline, const Surface *surface, const Texture::Instance *roughness) noexcept
+        : Surface::Instance{pipeline, surface}, _roughness{roughness} {}
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
+        const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
+};
+
+luisa::unique_ptr<Surface::Instance> MetalSurface::_build(
+    Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
+    auto roughness = pipeline.build_texture(command_buffer, _roughness);
+    return luisa::make_unique<MetalInstance>(pipeline, this, roughness);
+}
 
 class MetalClosure final : public Surface::Closure {
 
@@ -479,10 +475,13 @@ private:
     MicrofacetReflection _lobe;
 
 public:
-    MetalClosure(const Interaction &it, const SampledWavelengths &swl,
-                 Expr<float4> n, Expr<float4> k, Expr<float2> alpha) noexcept
-        : _interaction{it}, _swl{swl}, _fresnel{make_float4(1.f), n, k},
-          _distrib{alpha}, _lobe{make_float4(1.f), &_distrib, &_fresnel} {}
+    MetalClosure(
+        const Surface::Instance *instance,
+        const Interaction &it, const SampledWavelengths &swl,
+        Expr<float4> n, Expr<float4> k, Expr<float2> alpha) noexcept
+        : Surface::Closure{instance}, _interaction{it}, _swl{swl},
+          _fresnel{make_float4(1.f), n, k}, _distrib{alpha},
+          _lobe{make_float4(1.f), &_distrib, &_fresnel} {}
 
 private:
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
@@ -490,7 +489,9 @@ private:
         auto wi_local = _interaction.shading().world_to_local(wi);
         auto f = _lobe.evaluate(wo_local, wi_local);
         auto pdf = _lobe.pdf(wo_local, wi_local);
-        return {.swl = _swl, .f = f, .pdf = pdf,
+        return {.swl = _swl,
+                .f = f,
+                .pdf = pdf,
                 .alpha = _distrib.alpha(),
                 .eta = make_float4(1.f)};
     }
@@ -501,38 +502,34 @@ private:
         auto wi_local = def(make_float3(0.f, 0.f, 1.f));
         auto f = _lobe.sample(wo_local, &wi_local, u, &pdf);
         auto wi = _interaction.shading().local_to_world(wi_local);
-        return {.wi = wi, .eval = {.swl = _swl, .f = f, .pdf = pdf,
-                                   .alpha = _distrib.alpha(),
-                                   .eta = make_float4(1.f)}};
+        return {.wi = wi,
+                .eval = {.swl = _swl,
+                         .f = f,
+                         .pdf = pdf,
+                         .alpha = _distrib.alpha(),
+                         .eta = make_float4(1.f)}};
     }
+    void backward(Expr<float3> wi, Expr<float4> grad) const noexcept override {
 
-    void update() noexcept override {
-        // TODO
-        LUISA_ERROR_WITH_LOCATION("unimplemented");
-    }
-    void backward(Pipeline &pipeline, Expr<float3> k, Float learning_rate, Expr<float3> wi) noexcept override {
-        // TODO
-        LUISA_ERROR_WITH_LOCATION("unimplemented");
     }
 };
 
-luisa::unique_ptr<Surface::Closure> MetalSurface::decode(
-    const Pipeline &pipeline, const Interaction &it,
-    const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    auto params = pipeline.buffer<Params>(it.shape()->surface_buffer_id()).read(0u);
-    auto r = pipeline.evaluate_generic_texture(params.roughness, it, time);
-    auto roughness = ite(params.isotropic, r.xx(), r.xy());
-    auto alpha = ite(
-        params.remap_roughness,
-        TrowbridgeReitzDistribution::roughness_to_alpha(roughness),
-        roughness);
-    auto lut_buffer = pipeline.buffer<float2>(params.eta_k_buffer_id);
-    auto sample_eta_k = [lut_buffer](auto lambda) noexcept {
+luisa::unique_ptr<Surface::Closure> MetalInstance::closure(const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    auto alpha = def(make_float2(.5f));
+    if (_roughness != nullptr) {
+        auto r = _roughness->evaluate(it, swl, time);
+        auto remap = node<MetalSurface>()->remap_roughness();
+        auto r2a = [](auto &&x) noexcept { return TrowbridgeReitzDistribution::roughness_to_alpha(x); };
+        alpha = _roughness->node()->channels() == 1u ?
+                    (remap ? make_float2(r2a(r.x)) : r.xx()) :
+                    (remap ? r2a(r.xy()) : r.xy());
+    }
+    auto sample_eta_k = [&lut = node<MetalSurface>()->eta()](auto lambda) noexcept {
         auto lo = (lambda - visible_wavelength_min) / 5.f;
         auto il = cast<uint>(lo);
         auto ih = min(il + 1u, ior::lut_size - 1u);
         auto t = fract(lo);
-        return lerp(lut_buffer.read(il), lut_buffer.read(ih), t);
+        return lerp(lut.read(il), lut.read(ih), t);
     };
     auto lambda = clamp(swl.lambda(), visible_wavelength_min, visible_wavelength_max);
     auto eta0 = sample_eta_k(lambda.x);
@@ -541,7 +538,7 @@ luisa::unique_ptr<Surface::Closure> MetalSurface::decode(
     auto eta3 = sample_eta_k(lambda.w);
     auto n = make_float4(eta0.x, eta1.x, eta2.x, eta3.x);
     auto k = make_float4(eta0.y, eta1.y, eta2.y, eta3.y);
-    return luisa::make_unique<MetalClosure>(it, swl, n, k, alpha);
+    return luisa::make_unique<MetalClosure>(this, it, swl, n, k, alpha);
 }
 
 }// namespace luisa::render

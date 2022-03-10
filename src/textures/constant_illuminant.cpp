@@ -12,11 +12,6 @@ class ConstantIlluminant final : public Texture {
 private:
     float4 _rsp_scale;
 
-private:
-    [[nodiscard]] TextureHandle _encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint handle_tag) const noexcept override {
-        return TextureHandle::encode_constant(handle_tag, _rsp_scale.xyz(), _rsp_scale.w);
-    }
-
 public:
     ConstantIlluminant(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Texture{scene, desc} {
@@ -34,15 +29,59 @@ public:
             max(color, 0.0f) * max(scale, 0.0f));
         _rsp_scale = make_float4(rsp_scale.first, rsp_scale.second);
     }
+    [[nodiscard]] auto rsp_scale() const noexcept { return _rsp_scale; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] Float4 evaluate(
-        const Pipeline &pipeline, const Interaction &,
-        const Var<TextureHandle> &handle, Expr<float>) const noexcept override {
-        return make_float4(handle->v(), handle->alpha());
-    }
     [[nodiscard]] bool is_black() const noexcept override { return _rsp_scale.w == 0.0f; }
+    [[nodiscard]] uint channels() const noexcept override { return 4u; }
     [[nodiscard]] Category category() const noexcept override { return Category::ILLUMINANT; }
+    [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
+
+class ConstantIlluminantInstance final : public Texture::Instance {
+
+private:
+    luisa::optional<Differentiation::ConstantParameter> _diff_param;
+
+public:
+    ConstantIlluminantInstance(
+        const Pipeline &p, const Texture *t,
+        luisa::optional<Differentiation::ConstantParameter> param) noexcept
+        : Texture::Instance{p, t}, _diff_param{std::move(param)} {}
+    [[nodiscard]] Float4 evaluate(const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        auto rsp_scale = [&] {
+            return _diff_param ?
+                       pipeline().differentiation().decode(*_diff_param) :
+                       def(node<ConstantIlluminant>()->rsp_scale());
+        }();
+        auto rsp = RGBSigmoidPolynomial{rsp_scale.xyz()};
+        auto spec = RGBIlluminantSpectrum{
+            rsp, rsp_scale.w,
+            DenselySampledSpectrum::cie_illum_d65()};
+        return spec.sample(swl);
+    }
+    void backward(const Interaction &it, const SampledWavelengths &swl, Expr<float> time, Expr<float4> grad) const noexcept override {
+        if (_diff_param) {
+            auto v = pipeline().differentiation().decode(*_diff_param);
+            auto spec = RGBSigmoidPolynomial{v.xyz()}(swl.lambda());
+            auto g = make_float4(
+                v.w * dot(grad, sqr(swl.lambda())),
+                v.w * dot(grad, swl.lambda()),
+                v.w * dot(grad, make_float4(1.f)),
+                dot(grad, spec));
+            pipeline().differentiation().accumulate(*_diff_param, g);
+        }
+    }
+};
+
+luisa::unique_ptr<Texture::Instance> ConstantIlluminant::build(
+    Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
+    luisa::optional<Differentiation::ConstantParameter> param;
+    if (requires_gradients()) {
+        param.emplace(pipeline.differentiation().parameter(_rsp_scale));
+    }
+    return luisa::make_unique<ConstantIlluminantInstance>(
+        pipeline, this, std::move(param));
+}
 
 }// namespace luisa::render
 

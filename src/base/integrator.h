@@ -24,7 +24,11 @@ public:
         explicit Instance(const Pipeline &pipeline, const Integrator *integrator) noexcept
             : _pipeline{pipeline}, _integrator{integrator} {}
         virtual ~Instance() noexcept = default;
-        [[nodiscard]] auto node() const noexcept { return _integrator; }
+
+        template<typename T = Integrator>
+            requires std::is_base_of_v<Integrator, T>
+        [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_integrator); }
+        [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
         virtual void render(Stream &stream) noexcept = 0;
     };
 
@@ -36,8 +40,9 @@ public:
     Integrator(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] auto sampler() const noexcept { return _sampler; }
     [[nodiscard]] auto light_sampler() const noexcept { return _light_sampler; }
+    [[nodiscard]] virtual bool differentiable() const noexcept = 0;
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
 };
 
-}
+}// namespace luisa::render

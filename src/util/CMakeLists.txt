@@ -15,7 +15,9 @@ add_library(luisa-render-util SHARED
         scattering.cpp scattering.h
         bluenoise.cpp bluenoise.h
         sobolmatrices.cpp sobolmatrices.h
-        complex.h medium_tracker.cpp medium_tracker.h)
+        complex.h
+        medium_tracker.cpp medium_tracker.h
+        atomic.h)
 target_link_libraries(luisa-render-util PUBLIC
         luisa::compute
         luisa-render-include

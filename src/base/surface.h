@@ -11,10 +11,10 @@
 
 namespace luisa::render {
 
-using compute::Var;
+using compute::BindlessArray;
 using compute::Expr;
 using compute::Float3;
-using compute::BindlessArray;
+using compute::Var;
 
 class Shape;
 class Sampler;
@@ -37,30 +37,66 @@ public:
         Evaluation eval;
     };
 
-    struct Closure {
+    class Instance;
+
+    class Closure {
+
+    private:
+        const Instance *_instance;
+
+    public:
+        explicit Closure(const Instance *instance) noexcept : _instance{instance} {}
         virtual ~Closure() noexcept = default;
+        template<typename T = Instance>
+            requires std::is_base_of_v<Instance, T>
+        [[nodiscard]] auto instance() const noexcept { return static_cast<const T *>(_instance); }
         [[nodiscard]] virtual Evaluation evaluate(Expr<float3> wi) const noexcept = 0;
         [[nodiscard]] virtual Sample sample(Sampler::Instance &sampler) const noexcept = 0;
-
-        virtual void update() noexcept = 0;
-        virtual void backward(Pipeline &pipeline, Expr<float3> k, Float learning_rate, Expr<float3> wi) noexcept = 0;
+        virtual void backward(Expr<float3> wi, Expr<float4> grad) const noexcept = 0;
     };
 
-    [[nodiscard]] static Frame apply_normal_mapping(const Frame &f, Expr<float3> n_map) noexcept;
+    class Instance {
+
+    private:
+        const Pipeline &_pipeline;
+        const Surface *_surface;
+
+    private:
+        friend class Surface;
+        const Texture::Instance *_alpha{nullptr};
+        const Texture::Instance *_normal{nullptr};
+
+    public:
+        Instance(const Pipeline &pipeline, const Surface *surface) noexcept
+            : _pipeline{pipeline}, _surface{surface} {}
+        virtual ~Instance() noexcept = default;
+        template<typename T = Surface>
+            requires std::is_base_of_v<Surface, T>
+        [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_surface); }
+        [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
+        [[nodiscard]] auto alpha() const noexcept { return _alpha; }
+        [[nodiscard]] auto normal() const noexcept { return _normal; }
+        [[nodiscard]] virtual luisa::unique_ptr<Closure> closure(
+            const Interaction &it,
+            const SampledWavelengths &swl,
+            Expr<float> time) const noexcept = 0;
+    };
 
 private:
-    const Texture *_normal_map;
+    const Texture *_normal;
+    const Texture *_alpha;
+
+private:
+    [[nodiscard]] virtual luisa::unique_ptr<Instance> _build(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
 
 public:
     Surface(Scene *scene, const SceneNodeDesc *desc) noexcept;
-    [[nodiscard]] auto normal_map() const noexcept { return _normal_map; }
+    [[nodiscard]] auto normal() const noexcept { return _normal; }
+    [[nodiscard]] auto alpha() const noexcept { return _alpha; }
     [[nodiscard]] virtual bool is_null() const noexcept { return false; }
-    [[nodiscard]] virtual uint /* bindless buffer id */ encode(
-        Pipeline &pipeline, CommandBuffer &command_buffer,
-        uint instance_id, const Shape *shape) const noexcept = 0;
-    [[nodiscard]] virtual luisa::unique_ptr<Closure> decode(
-        const Pipeline &pipeline, const Interaction &it,
-        const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
+    [[nodiscard]] luisa::unique_ptr<Instance> build(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept;
 };
 
 }// namespace luisa::render

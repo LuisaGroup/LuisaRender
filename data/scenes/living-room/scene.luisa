@@ -8,7 +8,6 @@ Surface mat_Dirt : Matte {
 Surface mat_Floor : Substrate {
   Kd : Color {
     file { "textures/wood.jpg" }
-    uv_scale { 1, -1 }
   }
   Ks : ConstColor {
     color { 0.04 }
@@ -24,7 +23,6 @@ Surface mat_Floor : Substrate {
 Surface mat_TableWood : Substrate {
   Kd : Color {
     file { "textures/wood5.jpg" }
-    uv_scale { 1, -1 }
   }
   Ks : ConstColor {
     color { 0.04 }
@@ -92,7 +90,6 @@ Surface mat_MattePaint : Matte {
 Surface mat_Painting : Matte {
   Kd : Color {
     file { "textures/picture8.jpg" }
-    uv_scale { 1, -1 }
   }
 }
 
@@ -138,7 +135,9 @@ Surface mat_Transluscent : Matte {
 Surface mat_Leaves : Matte {
   Kd : Color {
     file { "textures/leaf.png" }
-    uv_scale { 1, -1 }
+  }
+  alpha : Generic {
+    file { "textures/leaf-alpha.png" }
   }
 }
 
@@ -289,7 +288,6 @@ Shape shape_9 : Mesh {
 Shape shape_10 : Mesh {
   file { "models/Mesh025.obj" }
   surface { @mat_Leaves }
-  alpha { "textures/leaf-alpha.png" }
   transform : Matrix {
     m {
       1.0, 0.0, 0.0, 0.0,
@@ -316,7 +314,6 @@ Shape shape_11 : Mesh {
 Shape shape_12 : Mesh {
   file { "models/Mesh032.obj" }
   surface { @mat_Leaves }
-  alpha { "textures/leaf-alpha.png" }
   transform : Matrix {
     m {
       1.0, 0.0, 0.0, 0.0,
@@ -811,7 +808,6 @@ Shape shape_49 : Mesh {
 Shape shape_50 : Mesh {
   file { "models/Mesh058.obj" }
   surface { @mat_Leaves }
-  alpha { "textures/leaf-alpha.png" }
   transform : Matrix {
     m {
       1.0, 0.0, 0.0, 0.0,
@@ -838,7 +834,6 @@ Shape shape_51 : Mesh {
 Shape shape_52 : Mesh {
   file { "models/Mesh007.obj" }
   surface { @mat_Leaves }
-  alpha { "textures/leaf-alpha.png" }
   transform : Matrix {
     m {
       1.0, 0.0, 0.0, 0.0,
@@ -1024,16 +1019,14 @@ Camera camera : Pinhole {
     radius { 1 }
   }
   film : Color {
-    file { "color.exr" }
     resolution { 1280, 720 }
   }
+  file { "color.exr" }
 }
 
 render {
   cameras { @camera }
-  integrator : MegaPath {
-    depth { 12 }
-  }
+  integrator : MegaPath {}
   shapes {
     @shape_0,
     @shape_1,

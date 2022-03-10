@@ -1356,9 +1356,7 @@ Camera camera : Pinhole {
 
 render {
   cameras { @camera }
-  integrator : MegaPath {
-    sampler : Sobol {}
-  }
+  integrator : MegaPath {}
   shapes {
     @shape_0,
     @shape_1,

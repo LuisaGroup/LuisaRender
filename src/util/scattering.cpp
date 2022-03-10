@@ -475,10 +475,10 @@ luisa::vector<Float4> MicrofacetTransmission::grad(Expr<float3> wo, Expr<float3>
     auto d_F = - d_f * _t * sqr(factor) * k_0;
     auto d_factor = d_f * (1.f - F) * _t * k_0 * 2.f * factor;
     auto d_sqrtDenom = d_f * (1.f - F) * _t * sqr(factor) * k_0 / sqrtDenom * (-2.f);
-    auto d_wh = d_f * (1.f - F) * _t * sqr(factor) * D * G * sqr(eta) *
-                abs(D * G * sqr(eta) *
-                    (wi * dot(wo, wh) + abs_dot(wi, wh) * wo) /
-                    (cosThetaI * cosThetaO * sqr(sqrtDenom)));
+//    auto d_wh = d_f * (1.f - F) * _t * sqr(factor) * D * G * sqr(eta) *
+//                abs(D * G * sqr(eta) *
+//                    (wi * dot(wo, wh) + abs_dot(wi, wh) * wo) /
+//                    (cosThetaI * cosThetaO * sqr(sqrtDenom)));
     auto d_eta = - d_factor / sqr(eta); // TODO
 }
 
@@ -577,7 +577,7 @@ Float4 FresnelBlend::sample(Expr<float3> wo, Float3 *wi, Expr<float2> uOrig, Flo
     using compute::sign;
     auto u = def(uOrig);
     *p = 0.f;
-    auto f = def<float4>();
+    auto f = def(make_float4());
     $if(u.x < .5f) {
         u.x = 2.f * u.x;
         // Cosine-sample the hemisphere, flipping the direction if necessary

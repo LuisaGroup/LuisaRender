@@ -27,13 +27,18 @@ public:
             : _pipeline{pipeline}, _sampler{sampler} {}
         virtual ~Instance() noexcept = default;
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
-        [[nodiscard]] auto node() const noexcept { return _sampler; }
+
+        template<typename T = Sampler>
+            requires std::is_base_of_v<Sampler, T>
+        [[nodiscard]] auto node() const noexcept {
+            return static_cast<const T *>(_sampler);
+        }
 
         // interfaces
-        virtual void reset(CommandBuffer &command_buffer, uint2 resolution, uint spp) noexcept = 0;
+        virtual void reset(CommandBuffer &command_buffer, uint2 resolution, uint state_count, uint spp) noexcept = 0;
         virtual void start(Expr<uint2> pixel, Expr<uint> sample_index) noexcept = 0;
-        virtual void save_state() noexcept = 0;
-        virtual void load_state(Expr<uint2> pixel) noexcept = 0;
+        virtual void save_state(Expr<uint> state_id) noexcept = 0;
+        virtual void load_state(Expr<uint> state_id) noexcept = 0;
         [[nodiscard]] virtual Float generate_1d() noexcept = 0;
         [[nodiscard]] virtual Float2 generate_2d() noexcept = 0;
         [[nodiscard]] virtual Float2 generate_pixel_2d() noexcept { return generate_2d(); }
@@ -41,7 +46,8 @@ public:
 
 public:
     Sampler(Scene *scene, const SceneNodeDesc *desc) noexcept;
-    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
+    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
 };
 
 }// namespace luisa::render

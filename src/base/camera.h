@@ -32,12 +32,18 @@ public:
     class Instance {
 
     private:
+        const Pipeline &_pipeline;
         const Camera *_camera;
 
     public:
-        explicit Instance(const Camera *camera) noexcept : _camera{camera} {}
+        Instance(const Pipeline &pipeline, const Camera *camera) noexcept
+            : _pipeline{pipeline}, _camera{camera} {}
         virtual ~Instance() noexcept = default;
-        [[nodiscard]] auto node() const noexcept { return _camera; }
+
+        template<typename T = Camera>
+            requires std::is_base_of_v<Camera, T>
+        [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_camera); }
+        [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
 
         // generate ray in camera space, should not consider _filter and/or _transform
         [[nodiscard]] virtual Sample generate_ray(

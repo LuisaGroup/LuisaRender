@@ -4,33 +4,13 @@
 
 #include <base/texture.h>
 #include <base/pipeline.h>
+#include <util/atomic.h>
 
 namespace luisa::render {
 
 Texture::Texture(Scene *scene, const SceneNodeDesc *desc) noexcept
-    : SceneNode{scene, desc, SceneNodeTag::TEXTURE} {}
-
-TextureHandle TextureHandle::encode_constant(uint tag, float3 v, float alpha) noexcept {
-    if (tag > tag_mask) [[unlikely]] {
-        LUISA_ERROR_WITH_LOCATION(
-            "Invalid tag for texture handle: {}.", tag);
-    }
-    return {.id_and_tag = tag | (float_to_half(alpha) << texture_id_offset_shift),
-            .compressed_v = {v.x, v.y, v.z}};
-}
-
-TextureHandle TextureHandle::encode_texture(uint tag, uint tex_id, float3 v) noexcept {
-    if (tag > tag_mask) [[unlikely]] {
-        LUISA_ERROR_WITH_LOCATION(
-            "Invalid tag for texture handle: {}.", tag);
-    }
-    if (tex_id > (~0u >> texture_id_offset_shift)) [[unlikely]] {
-        LUISA_ERROR_WITH_LOCATION(
-            "Invalid id for texture handle: {}.", tex_id);
-    }
-    return {.id_and_tag = tag | (tex_id << texture_id_offset_shift),
-            .compressed_v = {v.x, v.y, v.z}};
-}
+    : SceneNode{scene, desc, SceneNodeTag::TEXTURE},
+      _requires_grad{desc->property_bool_or_default("requires_grad")} {}
 
 ImageTexture::ImageTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
     : Texture{scene, desc} {
@@ -71,34 +51,82 @@ ImageTexture::ImageTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
         }));
 }
 
-Float4 ImageTexture::evaluate(
-    const Pipeline &pipeline, const Interaction &it,
-    const Var<TextureHandle> &handle, Expr<float>) const noexcept {
-    auto uv_scale = as<uint>(handle.compressed_v[0]);
-    auto v_scale = half_to_float(uv_scale & 0xffffu);
-    auto u_scale = half_to_float(uv_scale >> 16u);
-    auto uv_offset = make_float2(
-        handle.compressed_v[1], handle.compressed_v[2]);
-    auto uv = it.uv() * make_float2(u_scale, v_scale) + uv_offset;
-    return pipeline.tex2d(handle->texture_id()).sample(uv);// TODO: LOD
-}
-
-TextureHandle ImageTexture::_encode(
-    Pipeline &pipeline, CommandBuffer &command_buffer,
-    uint handle_tag) const noexcept {
-
+luisa::unique_ptr<Texture::Instance> ImageTexture::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
     auto &&image = _image();
     auto device_image = pipeline.create<Image<float>>(image.pixel_storage(), image.size());
     auto tex_id = pipeline.register_bindless(*device_image, _sampler);
     command_buffer << device_image->copy_from(image.pixels())
                    << compute::commit();
-    auto u_scale = float_to_half(_uv_scale.x);
-    auto v_scale = float_to_half(_uv_scale.y);
-    auto compressed = make_float3(
-        luisa::bit_cast<float>(v_scale | (u_scale << 16u)),
-        _uv_offset);
-    return TextureHandle::encode_texture(
-        handle_tag, tex_id, compressed);
+    luisa::optional<Differentiation::TexturedParameter> param;
+    if (requires_gradients()) {
+        param.emplace(pipeline.differentiation().parameter(
+            *device_image, _sampler));
+    }
+    return luisa::make_unique<Instance>(
+        pipeline, this, tex_id, std::move(param));
+}
+
+Float4 ImageTexture::Instance::evaluate(const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    auto uv = _compute_uv(it);
+    auto v = pipeline().tex2d(_texture_id).sample(uv);// TODO: LOD
+    switch (node()->category()) {
+        case Category::COLOR: {
+            auto rsp = RGBSigmoidPolynomial{v.xyz()};
+            auto spec = RGBAlbedoSpectrum{rsp};
+            return spec.sample(swl);
+        }
+        case Category::ILLUMINANT: {
+            auto rsp = RGBSigmoidPolynomial{v.xyz()};
+            auto spec = RGBIlluminantSpectrum{
+                rsp, v.w, DenselySampledSpectrum::cie_illum_d65()};
+            return spec.sample(swl);
+        }
+        default: break;
+    }
+    return v;
+}
+
+void ImageTexture::Instance::backward(
+    const Interaction &it, const SampledWavelengths &swl,
+    Expr<float> time, Expr<float4> grad) const noexcept {
+    if (_diff_param) {
+        auto uv = _compute_uv(it);
+        switch (node()->category()) {
+            case Category::COLOR: {
+                auto g = make_float4(
+                    dot(grad, sqr(swl.lambda())),
+                    dot(grad, swl.lambda()),
+                    dot(grad, make_float4(1.f)), 0.f);
+                pipeline().differentiation().accumulate(
+                    *_diff_param, uv, g);
+                break;
+            }
+            case Category::ILLUMINANT: {
+                auto v = pipeline().tex2d(_texture_id).sample(uv);
+                auto spec = RGBSigmoidPolynomial{v.xyz()}(swl.lambda());
+                auto g = make_float4(
+                    v.w * dot(grad, sqr(swl.lambda())),
+                    v.w * dot(grad, swl.lambda()),
+                    v.w * dot(grad, make_float4(1.f)),
+                    dot(grad, spec));
+                pipeline().differentiation().accumulate(
+                    *_diff_param, uv, g);
+                break;
+            }
+            case Category::GENERIC: {
+                pipeline().differentiation().accumulate(
+                    *_diff_param, uv, grad);
+                break;
+            }
+        }
+    }
+}
+
+Float2 ImageTexture::Instance::_compute_uv(const Interaction &it) const noexcept {
+    auto texture = node<ImageTexture>();
+    auto uv_scale = texture->uv_scale();
+    auto uv_offset = texture->uv_offset();
+    return it.uv() * uv_scale + uv_offset;
 }
 
 }// namespace luisa::render

@@ -17,17 +17,15 @@ class IndependentSampler;
 class IndependentSamplerInstance final : public Sampler::Instance {
 
 private:
-    uint2 _resolution;
     Buffer<uint> _states;
     luisa::optional<Var<uint>> _state;
-    luisa::optional<Var<uint>> _pixel_id;
 
 public:
     IndependentSamplerInstance(const Pipeline &pipeline, const IndependentSampler *sampler) noexcept;
-    void reset(CommandBuffer &command_buffer, uint2 resolution, uint spp) noexcept override;
+    void reset(CommandBuffer &command_buffer, uint2 resolution, uint state_count, uint spp) noexcept override;
     void start(Expr<uint2> pixel, Expr<uint> sample_index) noexcept override;
-    void save_state() noexcept override;
-    void load_state(Expr<uint2> pixel) noexcept override;
+    void save_state(Expr<uint> state_id) noexcept override;
+    void load_state(Expr<uint> state_id) noexcept override;
     Float generate_1d() noexcept override;
     Float2 generate_2d() noexcept override;
 };
@@ -51,31 +49,26 @@ IndependentSamplerInstance::IndependentSamplerInstance(
     const Pipeline &pipeline, const IndependentSampler *sampler) noexcept
     : Sampler::Instance{pipeline, sampler} {}
 
-void IndependentSamplerInstance::reset(CommandBuffer &command_buffer, uint2 resolution, uint /* spp */) noexcept {
-    _resolution = resolution;
-    auto pixel_count = _resolution.x * _resolution.y;
-    if (!_states || pixel_count > _states.size()) {
-        _states = pipeline().device().create_buffer<uint>(next_pow2(pixel_count));
+void IndependentSamplerInstance::reset(
+    CommandBuffer &command_buffer, uint2, uint state_count, uint) noexcept {
+    if (!_states || state_count > _states.size()) {
+        _states = pipeline().device().create_buffer<uint>(
+            next_pow2(state_count));
     }
 }
 
 void IndependentSamplerInstance::start(Expr<uint2> pixel, Expr<uint> index) noexcept {
-    auto seed = static_cast<const IndependentSampler *>(node())->seed();
-    _pixel_id = luisa::nullopt;
-    _pixel_id = pixel.y * _resolution.x + pixel.x;
-    _state = luisa::nullopt;
-    _state = xxhash32(make_uint3(seed, index, *_pixel_id));
+    auto seed = node<IndependentSampler>()->seed();
+    _state.emplace(xxhash32(make_uint3(
+        seed, index, (pixel.x << 16u) | pixel.y)));
 }
 
-void IndependentSamplerInstance::save_state() noexcept {
-    _states.write(*_pixel_id, *_state);
+void IndependentSamplerInstance::save_state(Expr<uint> state_id) noexcept {
+    _states.write(state_id, *_state);
 }
 
-void IndependentSamplerInstance::load_state(Expr<uint2> pixel) noexcept {
-    _pixel_id = luisa::nullopt;
-    _pixel_id = pixel.y * _resolution.x + pixel.x;
-    _state = luisa::nullopt;
-    _state = _states.read(pixel.y * _resolution.x + pixel.x);
+void IndependentSamplerInstance::load_state(Expr<uint> state_id) noexcept {
+    _state.emplace(_states.read(state_id));
 }
 
 Float IndependentSamplerInstance::generate_1d() noexcept {

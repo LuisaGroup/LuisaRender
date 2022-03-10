@@ -12,14 +12,6 @@ namespace luisa::render {
 
 class MirrorSurface final : public Surface {
 
-public:
-    struct Params {
-        TextureHandle color;
-        TextureHandle roughness;
-        bool remap_roughness;
-        bool isotropic;
-    };
-
 private:
     const Texture *_color;
     const Texture *_roughness;
@@ -30,8 +22,7 @@ public:
         : Surface{scene, desc},
           _color{scene->load_texture(desc->property_node_or_default(
               "color", SceneNodeDesc::shared_default_texture("ConstColor")))},
-          _roughness{scene->load_texture(desc->property_node_or_default(
-              "roughness", SceneNodeDesc::shared_default_texture("ConstGeneric")))},
+          _roughness{scene->load_texture(desc->property_node_or_default("roughness"))},
           _remap_roughness{desc->property_bool_or_default("remap_roughness", false)} {
         if (_color->category() != Texture::Category::COLOR) [[unlikely]] {
             LUISA_ERROR(
@@ -39,36 +30,42 @@ public:
                 "allowed in MirrorSurface::color. [{}]",
                 desc->source_location().string());
         }
-        if (_roughness->category() != Texture::Category::GENERIC) [[unlikely]] {
+        if (_roughness != nullptr && _roughness->category() != Texture::Category::GENERIC) [[unlikely]] {
             LUISA_ERROR(
                 "Non-generic textures are not "
                 "allowed in MirrorSurface::roughness. [{}]",
                 desc->source_location().string());
         }
     }
+    [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] uint encode(Pipeline &pipeline, CommandBuffer &command_buffer, uint instance_id, const Shape *shape) const noexcept override {
-        Params params{
-            .color = *pipeline.encode_texture(command_buffer, _color),
-            .roughness = *pipeline.encode_texture(command_buffer, _roughness),
-            .remap_roughness = _remap_roughness,
-            .isotropic = _roughness->channels() == 1u};
-        auto [buffer_view, buffer_id] = pipeline.arena_buffer<Params>(1u);
-        command_buffer << buffer_view.copy_from(&params) << compute::commit();
-        return buffer_id;
-    }
-    [[nodiscard]] luisa::unique_ptr<Closure> decode(
-        const Pipeline &pipeline, const Interaction &it,
-        const SampledWavelengths &swl, Expr<float> time) const noexcept override;
+
+private:
+    [[nodiscard]] luisa::unique_ptr<Instance> _build(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
-}// namespace luisa::render
+class MirrorInstance final : public Surface::Instance {
 
-LUISA_STRUCT(
-    luisa::render::MirrorSurface::Params,
-    color, roughness, remap_roughness, isotropic){};
+private:
+    const Texture::Instance *_color;
+    const Texture::Instance *_roughness;
 
-namespace luisa::render {
+public:
+    MirrorInstance(
+        const Pipeline &pipeline, const Surface *surface,
+        const Texture::Instance *color, const Texture::Instance *roughness) noexcept
+        : Surface::Instance{pipeline, surface}, _color{color}, _roughness{roughness} {}
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
+        const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
+};
+
+luisa::unique_ptr<Surface::Instance> MirrorSurface::_build(
+    Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
+    auto color = pipeline.build_texture(command_buffer, _color);
+    auto roughness = pipeline.build_texture(command_buffer, _roughness);
+    return luisa::make_unique<MirrorInstance>(pipeline, this, color, roughness);
+}
 
 using namespace luisa::compute;
 
@@ -84,6 +81,10 @@ public:
         auto weight = sqr(sqr(m)) * m;
         return lerp(R0, 1.f, weight);
     }
+    [[nodiscard]] luisa::vector<Float4> grad(Expr<float> cosThetaI) const noexcept override {
+        // TODO
+        LUISA_ERROR_WITH_LOCATION("unimplemented");
+    }
 };
 
 class MirrorClosure final : public Surface::Closure {
@@ -97,16 +98,20 @@ private:
 
 public:
     MirrorClosure(
+        const Surface::Instance *instance,
         const Interaction &it, const SampledWavelengths &swl,
         Expr<float4> refl, Expr<float2> alpha) noexcept
-        : _it{it}, _swl{swl}, _fresnel{refl}, _distribution{alpha},
+        : Surface::Closure{instance}, _it{it}, _swl{swl},
+          _fresnel{refl}, _distribution{alpha},
           _refl{refl, &_distribution, &_fresnel} {}
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
         auto wo_local = _it.wo_local();
         auto wi_local = _it.shading().world_to_local(wi);
         auto f = _refl.evaluate(wo_local, wi_local);
         auto pdf = _refl.pdf(wo_local, wi_local);
-        return {.swl = _swl, .f = f, .pdf = pdf,
+        return {.swl = _swl,
+                .f = f,
+                .pdf = pdf,
                 .alpha = _distribution.alpha(),
                 .eta = make_float4(1.f)};
     }
@@ -116,33 +121,32 @@ public:
         auto u = sampler.generate_2d();
         auto f = _refl.sample(_it.wo_local(), &wi_local, u, &pdf);
         return {.wi = _it.shading().local_to_world(wi_local),
-                .eval = {.swl = _swl, .f = f, .pdf = pdf,
+                .eval = {.swl = _swl,
+                         .f = f,
+                         .pdf = pdf,
                          .alpha = _distribution.alpha(),
                          .eta = make_float4(1.f)}};
     }
 
-    void update() noexcept override {
-        // TODO
-        LUISA_ERROR_WITH_LOCATION("unimplemented");
-    }
-    void backward(Pipeline &pipeline, Expr<float3> k, Float learning_rate, Expr<float3> wi) noexcept override {
+    void backward(Expr<float3> wi, Expr<float4> grad) const noexcept override {
         // TODO
         LUISA_ERROR_WITH_LOCATION("unimplemented");
     }
 };
 
-unique_ptr<Surface::Closure> MirrorSurface::decode(
-    const Pipeline &pipeline, const Interaction &it,
-    const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    auto params = pipeline.buffer<MirrorSurface::Params>(it.shape()->surface_buffer_id()).read(0u);
-    auto R = pipeline.evaluate_color_texture(params.color, it, swl, time);
-    auto r = pipeline.evaluate_generic_texture(params.roughness, it, time);
-    auto roughness = ite(params.isotropic, r.xx(), r.xy());
-    auto alpha = ite(
-        params.remap_roughness,
-        TrowbridgeReitzDistribution::roughness_to_alpha(roughness),
-        roughness);
-    return luisa::make_unique<MirrorClosure>(it, swl, R, alpha);
+luisa::unique_ptr<Surface::Closure> MirrorInstance::closure(
+    const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    auto alpha = def(make_float2(0.f));
+    if (_roughness != nullptr) {
+        auto r = _roughness->evaluate(it, swl, time);
+        auto remap = node<MirrorSurface>()->remap_roughness();
+        auto r2a = [](auto &&x) noexcept { return TrowbridgeReitzDistribution::roughness_to_alpha(x); };
+        alpha = _roughness->node()->channels() == 1u ?
+                    (remap ? make_float2(r2a(r.x)) : r.xx()) :
+                    (remap ? r2a(r.xy()) : r.xy());
+    }
+    auto color = _color->evaluate(it, swl, time);
+    return luisa::make_unique<MirrorClosure>(this, it, swl, color, alpha);
 }
 
 }// namespace luisa::render

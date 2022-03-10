@@ -95,9 +95,9 @@ public:
             return image;
         });
     }
-    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] Category category() const noexcept override { return Category::ILLUMINANT; }
     [[nodiscard]] bool is_black() const noexcept override { return _is_black; }
+    [[nodiscard]] Category category() const noexcept override { return Category::ILLUMINANT; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
 };
 
 }// namespace luisa::render
