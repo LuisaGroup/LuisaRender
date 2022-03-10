@@ -6,7 +6,7 @@ Film film : Color {
 Camera camera : Pinhole {
   position { 0, 0, 5 }
   fov { 60 }
-  spp { 16384 }
+  spp { 65536 }
   film { @film }
   file { "../renders/envmap.exr" }
   shutter_span { 0, 0 }
@@ -81,14 +81,14 @@ Shape teapot : Group {
           // color { 0.5, 0.5, 0.5 }
         }
         roughness : ConstGeneric {
-          v { 0.001 }
+          v { 0.01 }
         }
-        remap_roughness { false }
+        remap_roughness { true }
         // eta { 1.7 }
-        eta { "Sapphire" }
-        // eta : ConstGeneric {
-        //   v { 1.5, 1.52, 1.6 }
-        // }
+        // eta { "Sapphire" }
+        eta : ConstGeneric {
+          v { 1.5, 1.52, 1.6 }
+        }
       }
     }
   }
@@ -127,7 +127,7 @@ Shape scaled-bing : Instance {
 
 render {
   cameras { @camera }
-  shapes { @scaled-bing }
+  shapes { @teapot }
   integrator { @pt }
   environment : Map {
     emission : Illum {

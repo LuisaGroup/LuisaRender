@@ -111,13 +111,13 @@ void MegakernelPathTracingInstance::_render_one_camera(
         beta *= camera_weight;
 
         auto ray = camera_ray;
-        auto Li = def(make_float3(0.0f));
+        auto Li = def(make_float4(0.0f));
         auto pdf_bsdf = def(0.0f);
         $for(depth, max_depth) {
 
             auto add_light_contrib = [&](const Light::Evaluation &eval) noexcept {
                 auto mis_weight = ite(depth == 0u, 1.0f, balanced_heuristic(pdf_bsdf, eval.pdf));
-                Li += swl.srgb(ite(eval.pdf > 0.0f, beta * eval.L * mis_weight, make_float4(0.0f)));
+                Li += ite(eval.pdf > 0.0f, beta * eval.L * mis_weight, make_float4(0.0f));
             };
 
             auto env_prob = env == nullptr ? 0.0f : env->selection_prob();
@@ -201,10 +201,9 @@ void MegakernelPathTracingInstance::_render_one_camera(
                         auto cos_theta_i = dot(it->shading().n(), wi);
                         auto is_trans = cos_theta_i * cos_theta_o < 0.f;
                         auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
-                        Li += eval.swl.srgb(
-                            beta * mis_weight * ite(eval.pdf > 0.0f, eval.f, 0.0f) *
-                            abs_dot(it->shading().n(), wi) *
-                            light_sample.eval.L / light_sample.eval.pdf);
+                        Li += beta * mis_weight * ite(eval.pdf > 0.0f, eval.f, 0.0f) *
+                              abs_dot(it->shading().n(), wi) *
+                              light_sample.eval.L / light_sample.eval.pdf;
                     };
 
                     // sample material
@@ -216,7 +215,6 @@ void MegakernelPathTracingInstance::_render_one_camera(
                         eval.pdf > 0.0f,
                         eval.f * abs(cos_theta_i) / eval.pdf,
                         make_float4(0.0f));
-                    swl = eval.swl;
                     eta_scale = ite(
                         cos_theta_i * cos_theta_o < 0.f &
                             min(eval.alpha.x, eval.alpha.y) < .05f,
@@ -233,7 +231,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
                 beta *= 1.0f / q;
             };
         };
-        film->accumulate(pixel_id, Li * shutter_weight);
+        film->accumulate(pixel_id, swl.srgb(Li * shutter_weight));
     };
     auto render = pipeline.device().compile(render_kernel);
     auto shutter_samples = camera->node()->shutter_samples();

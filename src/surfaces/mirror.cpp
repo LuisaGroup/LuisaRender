@@ -107,11 +107,7 @@ public:
         auto wi_local = _it.shading().world_to_local(wi);
         auto f = _refl.evaluate(wo_local, wi_local);
         auto pdf = _refl.pdf(wo_local, wi_local);
-        return {.swl = _swl,
-                .f = f,
-                .pdf = pdf,
-                .alpha = _distribution.alpha(),
-                .eta = make_float4(1.f)};
+        return {.f = f, .pdf = pdf, .alpha = _distribution.alpha(), .eta = make_float4(1.f)};
     }
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
         auto pdf = def(0.f);
@@ -119,11 +115,7 @@ public:
         auto u = sampler.generate_2d();
         auto f = _refl.sample(_it.wo_local(), &wi_local, u, &pdf);
         return {.wi = _it.shading().local_to_world(wi_local),
-                .eval = {.swl = _swl,
-                         .f = f,
-                         .pdf = pdf,
-                         .alpha = _distribution.alpha(),
-                         .eta = make_float4(1.f)}};
+                .eval = {.f = f, .pdf = pdf, .alpha = _distribution.alpha(), .eta = make_float4(1.f)}};
     }
 
     void backward(Expr<float3> wi, Expr<float4> grad) const noexcept override {

@@ -93,11 +93,7 @@ private:
         auto wi_local = _it.shading().world_to_local(wi);
         auto f = _oren_nayar.evaluate(wo_local, wi_local);
         auto pdf = _oren_nayar.pdf(wo_local, wi_local);
-        return {.swl = _swl,
-                .f = f,
-                .pdf = pdf,
-                .alpha = make_float2(1.f),
-                .eta = make_float4(1.f)};
+        return {.f = f, .pdf = pdf, .alpha = make_float2(1.f), .eta = make_float4(1.f)};
     }
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
         auto wo_local = _it.wo_local();
@@ -106,12 +102,7 @@ private:
         auto pdf = def(0.f);
         auto f = _oren_nayar.sample(wo_local, &wi_local, u, &pdf);
         auto wi = _it.shading().local_to_world(wi_local);
-        return {.wi = wi,
-                .eval = {.swl = _swl,
-                         .f = f,
-                         .pdf = pdf,
-                         .alpha = make_float2(1.f),
-                         .eta = make_float4(1.f)}};
+        return {.wi = wi, .eval = {.f = f, .pdf = pdf, .alpha = make_float2(1.f), .eta = make_float4(1.f)}};
     }
 
     void backward(Expr<float3> wi, Expr<float4> grad) const noexcept override {

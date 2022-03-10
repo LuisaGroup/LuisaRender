@@ -408,28 +408,35 @@ luisa::vector<Float4> MicrofacetReflection::grad(Expr<float3> wo, Expr<float3> w
 Float4 MicrofacetTransmission::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
     auto cosThetaO = cos_theta(wo);
     auto cosThetaI = cos_theta(wi);
+    auto refr = !same_hemisphere(wo, wi) & cosThetaO != 0.f & cosThetaI != 0.f;
+    auto eta = ite(cosThetaO > 0.f, _eta_b / _eta_a, _eta_a / _eta_b);
     // Compute $\wh$ from $\wo$ and $\wi$ for microfacet transmission
-    auto eta = ite(cosThetaO > 0.f, _eta_b / _eta_a, _eta_a / _eta_b)[0];// TODO
-    auto wh = normalize(wo + wi * eta);
-    wh = compute::sign(cos_theta(wh)) * wh;
-    auto sqrtDenom = dot(wo, wh) + eta * dot(wi, wh);
-    auto factor = 1.f / eta;
-    auto F = _fresnel.evaluate(dot(wo, wh));
-    auto D = _distribution->D(wh);
     auto G = _distribution->G(wo, wi);
-    auto f = (1.f - F) * _t * sqr(factor) *
-             abs(D * G * sqr(eta) * abs_dot(wi, wh) * abs_dot(wo, wh) /
-                 (cosThetaI * cosThetaO * sqr(sqrtDenom)));
-    auto valid = !same_hemisphere(wo, wi) &
-                 cosThetaO != 0.f & cosThetaI != 0.f &
-                 dot(wo, wh) * dot(wi, wh) < 0.f;
-    return ite(valid, f, 0.f);
+    auto ft = def(make_float4());
+    for (auto i = 0u; i < 4u; i++) {
+        auto wh = normalize(wo + wi * eta[i]);
+        wh = compute::sign(cos_theta(wh)) * wh;
+        auto sqrtDenom = dot(wo, wh) + eta[i] * dot(wi, wh);
+        auto factor = 1.f / eta[i];
+        auto F = _fresnel.evaluate(dot(wo, wh))[i];
+        auto D = _distribution->D(wh);
+        auto f = (1.f - F) * _t[i] * sqr(factor) *
+                 abs(D * G * sqr(eta[i]) * abs_dot(wi, wh) * abs_dot(wo, wh) /
+                     (cosThetaI * cosThetaO * sqr(sqrtDenom)));
+        auto valid = refr & dot(wo, wh) * dot(wi, wh) < 0.f;
+        ft[i] = ite(valid, f, 0.f);
+    }
+    return ft;
 }
 
-Float4 MicrofacetTransmission::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *p) const noexcept {
+Float4 MicrofacetTransmission::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u_in, Float *p) const noexcept {
+    using namespace compute;
     *p = 0.0f;
+    auto swl_i_float = u_in.x * 4.f;
+    auto swl_i = cast<int>(clamp(swl_i_float, 0.f, 3.f));
+    auto eta = ite(cos_theta(wo) > 0.f, _eta_a / _eta_b, _eta_b / _eta_a)[swl_i];// TODO
+    auto u = make_float2(fract(swl_i_float), u_in.y);
     auto wh = _distribution->sample_wh(wo, u);
-    auto eta = ite(cos_theta(wo) > 0.f, _eta_a / _eta_b, _eta_b / _eta_a)[0];// TODO
     auto refr = refract(wo, wh, eta, wi);
     auto valid = wo.z != 0.f & dot(wo, wh) > 0.f & refr;
     *p = ite(valid, pdf(wo, *wi), 0.f);
@@ -437,14 +444,19 @@ Float4 MicrofacetTransmission::sample(Expr<float3> wo, Float3 *wi, Expr<float2> 
 }
 
 Float MicrofacetTransmission::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {
-    auto eta = ite(cos_theta(wo) > 0.f, _eta_b / _eta_a, _eta_a / _eta_b)[0];// TODO
-    auto wh = normalize(wo + wi * eta);
-    // Compute change of variables _dwh\_dwi_ for microfacet transmission
-    auto sqrtDenom = dot(wo, wh) + eta * dot(wi, wh);
-    auto dwh_dwi = sqr(eta / sqrtDenom) * abs_dot(wi, wh);
-    auto valid = !same_hemisphere(wo, wi) & dot(wo, wh) * dot(wi, wh) < 0.f;
-    return ite(valid, _distribution->pdf(wo, wh) * dwh_dwi, 0.f);
+    auto pdf = def(0.f);
+    auto eta = ite(cos_theta(wo) > 0.f, _eta_b / _eta_a, _eta_a / _eta_b);
+    for (auto i = 0u; i < 4u; i++) {
+        auto wh = normalize(wo + wi * eta[i]);
+        // Compute change of variables _dwh\_dwi_ for microfacet transmission
+        auto sqrtDenom = dot(wo, wh) + eta[i] * dot(wi, wh);
+        auto dwh_dwi = sqr(eta[i] / sqrtDenom) * abs_dot(wi, wh);
+        auto valid = !same_hemisphere(wo, wi) & dot(wo, wh) * dot(wi, wh) < 0.f;
+        pdf += ite(valid, _distribution->pdf(wo, wh) * dwh_dwi, 0.f);
+    }
+    return pdf * .25f;
 }
+
 luisa::vector<Float4> MicrofacetTransmission::grad(Expr<float3> wo, Expr<float3> wi) const noexcept {
     // TODO
     LUISA_ERROR_WITH_LOCATION("unimplemented");

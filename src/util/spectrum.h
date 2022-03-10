@@ -87,8 +87,6 @@ public:
         : _lambda{lambda}, _pdf{pdf} {}
     [[nodiscard]] Bool operator==(const SampledWavelengths &rhs) const noexcept;
     [[nodiscard]] Bool operator!=(const SampledWavelengths &rhs) const noexcept;
-    [[nodiscard]] Bool secondary_terminated() const noexcept;
-    void terminate_secondary() noexcept;
     [[nodiscard]] static SampledWavelengths sample_uniform(
         Expr<float> u,
         Expr<float> lambda_min = visible_wavelength_min,

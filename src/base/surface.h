@@ -25,7 +25,6 @@ class Surface : public SceneNode {
 
 public:
     struct Evaluation {
-        SampledWavelengths swl;
         Float4 f;
         Float pdf;
         Float2 alpha;

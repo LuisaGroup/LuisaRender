@@ -37,8 +37,24 @@ public:
         Var<Ray> shadow_ray;
     };
 
-    struct Closure {
+    class Instance;
+
+    class Closure {
+
+    private:
+        const Instance *_instance;
+
+    protected:
+        const SampledWavelengths &_swl;
+        Float _time;
+
+    public:
+        Closure(const Instance *instance, const SampledWavelengths &swl, Expr<float> time) noexcept
+            : _instance{instance}, _swl{swl}, _time{time} {}
         virtual ~Closure() noexcept = default;
+        template<typename T = Instance>
+        requires std::is_base_of_v<Instance, T>
+        [[nodiscard]] auto instance() const noexcept { return static_cast<const T *>(_instance); }
         [[nodiscard]] virtual Evaluation evaluate(
             const Interaction &it_light, Expr<float3> p_from) const noexcept = 0;
         [[nodiscard]] virtual Sample sample(

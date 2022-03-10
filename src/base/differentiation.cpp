@@ -99,8 +99,7 @@ void Differentiation::apply_gradients(CommandBuffer &command_buffer, float alpha
         auto offset = p.gradient_buffer_offset();
         auto channels = compute::pixel_format_channel_count(image.format());
         command_buffer << _apply_grad_tex(*_grad_buffer, offset, image, channels, alpha)
-                              .dispatch(image.size())
-                       << compute::commit();
+                              .dispatch(image.size());
     }
 }
 
@@ -136,7 +135,7 @@ void Differentiation::accumulate(const Differentiation::TexturedParameter &param
             "Invalid texture address mode.");
     };
     auto write_grad = [&param, this](Expr<float2> uv, Expr<float4> grad) noexcept {
-        $if (all(uv >= 0.f && uv < 1.f)) {
+        $if(all(uv >= 0.f && uv < 1.f)) {
             auto size = param.image().size();
             auto st = clamp(make_uint2(uv * make_float2(size)), 0u, size - 1u);
             auto pixel_id = st.y * size.x + st.x;

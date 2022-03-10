@@ -188,9 +188,8 @@ private:
         $else {
             f = _trans.evaluate(wo_local, wi_local);
             pdf = _trans.pdf(wo_local, wi_local) * (1.f - t);
-            $if(_dispersion) { swl.terminate_secondary(); };
         };
-        return {.swl = swl, .f = f, .pdf = pdf, .alpha = _distribution.alpha(), .eta = ite(wi_local.z > 0.f, _fresnel.eta_i(), _fresnel.eta_t())};
+        return {.f = f, .pdf = pdf, .alpha = _distribution.alpha(), .eta = ite(wi_local.z > 0.f, _fresnel.eta_i(), _fresnel.eta_t())};
     }
 
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
@@ -211,11 +210,10 @@ private:
             u.x = (u.x - t) / (1.f - t);
             f = _trans.sample(wo_local, &wi_local, u, &pdf);
             pdf *= (1.f - t);
-            $if(_dispersion) { swl.terminate_secondary(); };
         };
         auto wi = _it.shading().local_to_world(wi_local);
         auto eta = ite(wi_local.z > 0.f, _fresnel.eta_i(), _fresnel.eta_t());
-        return {.wi = wi, .eval = {.swl = swl, .f = f, .pdf = pdf, .alpha = _distribution.alpha(), .eta = eta}};
+        return {.wi = wi, .eval = {.f = f, .pdf = pdf, .alpha = _distribution.alpha(), .eta = eta}};
     }
 
     void backward(Expr<float3> wi, Expr<float4> grad) const noexcept override {
