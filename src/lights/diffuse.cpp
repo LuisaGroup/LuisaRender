@@ -92,14 +92,12 @@ public:
         auto triangle = pipeline.triangle(light_inst, triangle_id);
         auto light_to_world_normal = transpose(inverse(make_float3x3(light_to_world)));
         auto uvw = sample_uniform_triangle(sampler.generate_2d());
-        auto [p, ng, area] = pipeline.surface_point_geometry(light_inst, light_to_world, triangle, uvw);
-        auto [ns, tangent, uv] = pipeline.surface_point_attributes(light_inst, light_to_world_normal, triangle, uvw);
-        Interaction it_light{
-            light_inst, light_inst_id, triangle_id, area, p,
-            normalize(it_from.p() - p), ng, uv, ns, tangent};
+        auto attrib = pipeline.shading_point(light_inst, triangle, uvw, light_to_world, light_to_world_normal);
+        auto wo = normalize(it_from.p() - attrib.p);
+        Interaction it_light{light_inst, light_inst_id, triangle_id, wo, attrib};
         DiffuseLightClosure closure{light, _swl, _time};
         return {.eval = closure.evaluate(it_light, it_from.p()),
-                .shadow_ray = it_from.spawn_ray_to(p)};
+                .shadow_ray = it_from.spawn_ray_to(attrib.p)};
     }
 };
 

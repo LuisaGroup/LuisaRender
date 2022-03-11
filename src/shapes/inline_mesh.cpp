@@ -9,8 +9,7 @@ namespace luisa::render {
 class InlineMesh final : public Shape {
 
 private:
-    luisa::vector<float3> _positions;
-    luisa::vector<VertexAttribute> _attributes;
+    luisa::vector<Vertex> _vertices;
     luisa::vector<Triangle> _triangles;
 
 public:
@@ -37,8 +36,7 @@ public:
 
         auto triangle_count = triangles.size() / 3u;
         auto vertex_count = positions.size() / 3u;
-        _positions.reserve(vertex_count);
-        _attributes.reserve(vertex_count);
+        _vertices.reserve(vertex_count);
         _triangles.reserve(triangle_count);
         for (auto i = 0u; i < triangle_count; i++) {
             auto t0 = triangles[i * 3u + 0u];
@@ -53,11 +51,11 @@ public:
             auto p0 = positions[i * 3u + 0u];
             auto p1 = positions[i * 3u + 1u];
             auto p2 = positions[i * 3u + 2u];
-            _positions.emplace_back(make_float3(p0, p1, p2));
+            auto p = make_float3(p0, p1, p2);
             auto n0 = normals[i * 3u + 0u];
             auto n1 = normals[i * 3u + 1u];
             auto n2 = normals[i * 3u + 2u];
-            auto normal = make_float3(n0, n1, n2);
+            auto n = make_float3(n0, n1, n2);
             auto uv = make_float2();
             if (!uvs.empty()) {
                 auto u = uvs[i * 2u + 0u];
@@ -71,15 +69,13 @@ public:
                 auto t2 = tangents[i * 3u + 2u];
                 tangent = make_float3(t0, t1, t2);
             }
-            _attributes.emplace_back(
-                VertexAttribute::encode(
-                    normal, tangent, uv));
+            _vertices.emplace_back(Vertex::encode(
+                p, n, tangent, uv));
         }
     }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] bool is_mesh() const noexcept override { return true; }
-    [[nodiscard]] luisa::span<const float3> positions() const noexcept override { return _positions; }
-    [[nodiscard]] luisa::span<const VertexAttribute> attributes() const noexcept override { return _attributes; }
+    [[nodiscard]] luisa::span<const Vertex> vertices() const noexcept override { return _vertices; }
     [[nodiscard]] luisa::span<const Triangle> triangles() const noexcept override { return _triangles; }
     [[nodiscard]] luisa::span<const Shape *const> children() const noexcept override { return {}; }
     [[nodiscard]] bool deformable() const noexcept override { return false; }
