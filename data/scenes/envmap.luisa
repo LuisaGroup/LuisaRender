@@ -6,7 +6,7 @@ Film film : Color {
 Camera camera : Pinhole {
   position { 0, 0, 5 }
   fov { 60 }
-  spp { 4096 }
+  spp { 128 }
   film { @film }
   file { "../renders/envmap-new.exr" }
   shutter_span { 0, 0 }
@@ -72,7 +72,7 @@ Shape teapot : Group {
       //   }
       //   thin { false }
       // }
-      surface : Glass {
+      surface : Metal {
         Kr : ConstColor {
           // color { 1.0, 0.71, 0.29 }
         }
@@ -81,7 +81,7 @@ Shape teapot : Group {
           // color { 0.5, 0.5, 0.5 }
         }
         roughness : ConstGeneric {
-          v { 0.01 }
+          v { 0.2 }
         }
         remap_roughness { true }
         // eta { 1.7 }
@@ -131,8 +131,8 @@ render {
   integrator { @pt }
   environment : Map {
     emission : Illum {
-      file { "../envmaps/photo_studio_01_1k.hdr" }
-      // file { "../envmaps/envmap.exr" }
+      // file { "../envmaps/photo_studio_01_1k.hdr" }
+      file { "../envmaps/envmap.exr" }
       fp16 { true }
       // file { "/Users/mike/Downloads/dreifaltigkeitsberg_8k.exr" }
     }

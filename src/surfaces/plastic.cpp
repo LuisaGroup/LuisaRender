@@ -199,8 +199,10 @@ luisa::unique_ptr<Surface::Closure> PlasticInstance::closure(
         }
     }
     auto Kd_ratio = ite(Kd_scale == 0.f, 0.f, Kd_scale / (Kd_scale + Ks_scale));
+    auto scale = 1.f / max(Kd_scale + Ks_scale, 1.f);
     return luisa::make_unique<PlasticClosure>(
-        this, it, swl, time, eta, Kd, Ks,
+        this, it, swl, time, eta,
+        Kd * scale, Ks * scale,
         alpha, clamp(Kd_ratio, .1f, .9f));
 }
 

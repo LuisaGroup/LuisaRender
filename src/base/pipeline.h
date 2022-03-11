@@ -176,6 +176,7 @@ public:
     [[nodiscard]] auto &accel() const noexcept { return _accel; }
     [[nodiscard]] Differentiation &differentiation() noexcept;
     [[nodiscard]] const Differentiation &differentiation() const noexcept;
+    [[nodiscard]] auto &bindless_array() noexcept { return _bindless_array; }
     [[nodiscard]] auto &bindless_array() const noexcept { return _bindless_array; }
     [[nodiscard]] auto &transform_tree() const noexcept { return _transform_tree; }
     [[nodiscard]] auto instance_buffer() const noexcept { return _instance_buffer.view(); }

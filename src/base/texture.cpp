@@ -87,7 +87,8 @@ Texture::Evaluation ImageTexture::Instance::evaluate(
             auto rsp = RGBSigmoidPolynomial{v.xyz()};
             auto spec = RGBIlluminantSpectrum{
                 rsp, v.w, DenselySampledSpectrum::cie_illum_d65()};
-            return {.value = spec.sample(swl), .scale = v.w};
+            return {.value = spec.sample(swl),
+                    .scale = v.w};
         }
         default: break;
     }
