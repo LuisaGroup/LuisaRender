@@ -2,6 +2,7 @@
 // Created by Mike Smith on 2022/1/15.
 //
 
+#include <numbers>
 #include <tinyexr.h>
 
 #include <util/sampling.h>
@@ -119,8 +120,7 @@ public:
                 alias_buffer, EnvironmentMapping::sample_map_size.x, u.x, offset);
             auto uv = make_float2(cast<float>(ix) + ux, cast<float>(iy) + uy) /
                       make_float2(EnvironmentMapping::sample_map_size);
-            auto p = pipeline().bindless_buffer<float>(*_pdf_buffer_id)
-                .read(iy * EnvironmentMapping::sample_map_size.x + ix);
+            auto p = pipeline().bindless_buffer<float>(*_pdf_buffer_id).read(iy * EnvironmentMapping::sample_map_size.x + ix);
             return std::make_pair(EnvironmentMapping::uv_to_direction(uv), p);
         }();
         return {.eval = {.L = _evaluate(wi_local, swl, time), .pdf = pdf},
@@ -165,7 +165,6 @@ unique_ptr<Environment::Instance> EnvironmentMapping::build(
             for (auto v : values) { sum += v; }
             row_averages[i] = static_cast<float>(sum * (1.0 / sample_map_size.x));
             auto [alias_table, pdf_table] = create_alias_table(values);
-            auto dst_offset = sample_map_size.y + i * sample_map_size.x;
             std::copy_n(
                 pdf_table.data(), sample_map_size.x,
                 pdfs.data() + i * sample_map_size.x);
@@ -178,7 +177,8 @@ unique_ptr<Environment::Instance> EnvironmentMapping::build(
         for (auto y = 0u; y < sample_map_size.y; y++) {
             auto offset = y * sample_map_size.x;
             auto pdf_y = pdf_table[y];
-            auto scale = static_cast<float>(.25 * M_1_PI * pdf_y * pixel_count);
+            auto scale = static_cast<float>(
+                .25 * std::numbers::inv_pi * pdf_y * pixel_count);
             for (auto x = 0u; x < sample_map_size.x; x++) {
                 pdfs[offset + x] *= scale;
             }
@@ -191,9 +191,6 @@ unique_ptr<Environment::Instance> EnvironmentMapping::build(
                        << pdf_buffer_view.copy_from(pdfs.data());
         alias_id.emplace(alias_buffer_id);
         pdf_id.emplace(pdf_buffer_id);
-        LUISA_INFO(
-            "Sum: {}.",
-            std::accumulate(pdfs.cbegin(), pdfs.cend(), 0.f));
     }
     return luisa::make_unique<EnvironmentMappingInstance>(
         pipeline, this, texture, std::move(alias_id), std::move(pdf_id));
