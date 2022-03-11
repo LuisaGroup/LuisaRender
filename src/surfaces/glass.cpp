@@ -189,7 +189,10 @@ private:
             f = _trans.evaluate(wo_local, wi_local);
             pdf = _trans.pdf(wo_local, wi_local) * (1.f - t);
         };
-        return {.f = f, .pdf = pdf, .alpha = _distribution.alpha(), .eta = ite(wi_local.z > 0.f, _fresnel.eta_i(), _fresnel.eta_t())};
+        return {.f = f,
+                .pdf = pdf,
+                .alpha = _distribution.alpha(),
+                .eta = ite(wi_local.z > 0.f, _fresnel.eta_i(), _fresnel.eta_t())};
     }
 
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
