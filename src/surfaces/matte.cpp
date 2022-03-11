@@ -102,13 +102,17 @@ private:
     }
 
     void backward(Expr<float3> wi, Expr<float4> grad) const noexcept override {
-        auto wo_local = _it.wo_local();
-        auto wi_local = _it.shading().world_to_local(wi);
-        auto grad_params = _oren_nayar.grad(wo_local, wi_local);
-
         auto _instance = instance<MatteInstance>();
-        _instance->Kd()->backward(_it, _swl, _time, grad_params[0] * grad);
-        _instance->Kd()->backward(_it, _swl, _time, grad_params[1] * grad);
+        auto requires_grad_kd = _instance->Kd()->node()->requires_gradients(),
+             requires_grad_sigma = _instance->Sigma()->node()->requires_gradients();
+        $if(requires_grad_kd || requires_grad_sigma) {
+            auto wo_local = _it.wo_local();
+            auto wi_local = _it.shading().world_to_local(wi);
+            auto grad_params = _oren_nayar.grad(wo_local, wi_local);
+
+            _instance->Kd()->backward(_it, _swl, _time, grad_params[0] * grad);
+            _instance->Sigma()->backward(_it, _swl, _time, grad_params[1] * grad);
+        };
     }
 };
 

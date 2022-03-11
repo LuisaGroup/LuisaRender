@@ -126,16 +126,17 @@ private:
                          .eta = make_float4(1.f)}};
     }
     void backward(Expr<float3> wi, Expr<float4> grad) const noexcept override {
-        auto wo_local = _it.wo_local();
-        auto wi_local = _it.shading().world_to_local(wi);
-        auto grad_params = _blend.grad(wo_local, wi_local);
-
         auto _instance = instance<SubstrateInstance>();
-        _instance->Kd()->backward(_it, _swl, _time, grad_params[0] * grad);
-        _instance->Kd()->backward(_it, _swl, _time, grad_params[1] * grad);
+        auto requires_grad_kd = _instance->Kd()->node()->requires_gradients(),
+             requires_grad_ks = _instance->Ks()->node()->requires_gradients();
+        $if(requires_grad_kd || requires_grad_ks) {
+            auto wo_local = _it.wo_local();
+            auto wi_local = _it.shading().world_to_local(wi);
+            auto grad_params = _blend.grad(wo_local, wi_local);
 
-        // TODO
-        LUISA_ERROR_WITH_LOCATION("unimplemented");
+            _instance->Kd()->backward(_it, _swl, _time, grad_params[0] * grad);
+            _instance->Ks()->backward(_it, _swl, _time, grad_params[1] * grad);
+        };
     }
 };
 

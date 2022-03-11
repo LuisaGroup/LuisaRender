@@ -42,7 +42,7 @@ private:
         const Filter::Instance *filter,
         uint max_depth,
         uint rr_depth, float rr_threshold,
-        compute::Float dLoss_dLi_func(
+        compute::Float4 dLoss_dLi_func(
             Expr<uint2> pixel,
             const Film::Instance *film_rendered,
             const Film::Instance *film_target),
@@ -53,7 +53,7 @@ public:
     explicit MegakernelGradRadiativeInstance(const MegakernelGradRadiative *node, Pipeline &pipeline) noexcept
         : GradIntegrator::Instance{pipeline, node}, _pipeline{pipeline} {}
     void backpropagation(Stream &stream, luisa::vector<Film::Instance *> film_target,
-                         compute::Float dLoss_dLi_func(
+                         compute::Float4 dLoss_dLi_func(
                              Expr<uint2> pixel,
                              const Film::Instance *film_rendered,
                              const Film::Instance *film_target)) noexcept override {
@@ -79,7 +79,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
     Stream &stream, Pipeline &pipeline, const Camera::Instance *camera,
     const Filter::Instance *filter, uint max_depth,
     uint rr_depth, float rr_threshold,
-    compute::Float dLoss_dLi_func(
+    compute::Float4 dLoss_dLi_func(
         Expr<uint2> pixel,
         const Film::Instance *film_rendered,
         const Film::Instance *film_target),
@@ -112,7 +112,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
         auto pixel_id = dispatch_id().xy();
         sampler->start(pixel_id, frame_index);
         auto pixel = make_float2(pixel_id) + 0.5f;
-        auto beta = def(make_float4(1.f));
+        auto beta = shutter_weight * dLoss_dLi_func(pixel_id, film_rendered, film_target);
         auto [filter_offset, filter_weight] = filter->sample(*sampler);
         pixel += filter_offset;
         beta *= filter_weight;
@@ -171,7 +171,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
 
                     // radiative bp
                     // TODO : how to change beta from 4 channels to 3 channels
-                    closure->backward(wi, shutter_weight * beta * Li);
+                    closure->backward(wi, beta * Li);
 
                     beta *= ite(
                         eval.pdf > 0.0f,
@@ -220,8 +220,6 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
             }
         }
     }
-
-    // TODO : update grads
 
     command_buffer << commit();
     stream << synchronize();

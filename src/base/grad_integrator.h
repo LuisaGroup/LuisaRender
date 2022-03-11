@@ -26,7 +26,7 @@ public:
         virtual ~Instance() noexcept = default;
         [[nodiscard]] auto node() const noexcept { return _grad_integrator; }
         virtual void backpropagation(Stream &stream, luisa::vector<Film::Instance *> film_target,
-                                     compute::Float dLoss_dLi_func(
+                                     compute::Float4 dLoss_dLi_func(
                                          Expr<uint2> pixel,
                                          const Film::Instance *film_rendered,
                                          const Film::Instance *film_target)) noexcept = 0;
