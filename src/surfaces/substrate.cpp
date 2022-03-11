@@ -73,6 +73,8 @@ public:
           _kd{Kd}, _ks{Ks}, _roughness{roughness} {}
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
+    [[nodiscard]] auto Kd() const noexcept { return _kd; }
+    [[nodiscard]] auto Ks() const noexcept { return _ks; }
 };
 
 luisa::unique_ptr<Surface::Instance> SubstrateSurface::_build(
@@ -129,6 +131,10 @@ private:
         auto wo_local = _it.wo_local();
         auto wi_local = _it.shading().world_to_local(wi);
         auto grad_params = _blend.grad(wo_local, wi_local);
+
+        auto _instance = instance<SubstrateInstance>();
+        _instance->Kd()->backward(_it, _swl, _time, grad_params[0] * grad);
+        _instance->Kd()->backward(_it, _swl, _time, grad_params[1] * grad);
 
         // TODO
         LUISA_ERROR_WITH_LOCATION("unimplemented");

@@ -25,7 +25,11 @@ public:
             : _pipeline{pipeline}, _grad_integrator{grad_integrator} {}
         virtual ~Instance() noexcept = default;
         [[nodiscard]] auto node() const noexcept { return _grad_integrator; }
-        virtual void backpropagation(Stream &stream, luisa::vector<Film::Instance *> targets) noexcept = 0;
+        virtual void backpropagation(Stream &stream, luisa::vector<Film::Instance *> film_target,
+                                     compute::Float dLoss_dLi_func(
+                                         Expr<uint2> pixel,
+                                         const Film::Instance *film_rendered,
+                                         const Film::Instance *film_target)) noexcept = 0;
     };
 
 private:
@@ -40,4 +44,4 @@ public:
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
 };
 
-}
+}// namespace luisa::render

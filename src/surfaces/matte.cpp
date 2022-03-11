@@ -59,12 +59,8 @@ public:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
 
-    [[nodiscard]] auto Kd() const noexcept {
-        return _kd;
-    }
-    [[nodiscard]] auto Sigma() const noexcept {
-        return _sigma;
-    }
+    [[nodiscard]] auto Kd() const noexcept { return _kd; }
+    [[nodiscard]] auto Sigma() const noexcept { return _sigma; }
 };
 
 luisa::unique_ptr<Surface::Instance> MatteSurface::_build(
