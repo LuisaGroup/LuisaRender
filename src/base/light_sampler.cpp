@@ -28,7 +28,7 @@ Light::Sample LightSampler::Instance::sample(
     auto selection = select(sampler, it_from, swl);
     _pipeline.dynamic_dispatch_light(selection.light_tag, [&](auto light) noexcept {
         auto closure = light->closure(swl, time);
-        light_sample = closure->sample(sampler, selection.instance_id, it_from);
+        light_sample = closure->sample(sampler, selection.instance_id, it_from.p());
     });
     light_sample.eval.L *= 1.f / selection.pmf;
     return light_sample;

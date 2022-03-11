@@ -72,13 +72,8 @@ public:
     void set_shading(Frame frame) noexcept { _shading = std::move(frame); }
     [[nodiscard]] const auto &shape() const noexcept { return _shape; }
     [[nodiscard]] auto wo_local() const noexcept { return _shading.world_to_local(_wo); }
-    [[nodiscard]] auto spawn_ray(Expr<float3> wi) const noexcept {
-        return luisa::compute::make_ray_robust(_p, _ng, wi);
-    }
-    [[nodiscard]] auto spawn_ray_to(Expr<float3> p_light, Expr<float> eps = 1e-3f) const noexcept {
-        using namespace luisa::compute;
-        auto l = p_light - _p;
-        return make_ray_robust(_p, _ng, normalize(l), length(l) - eps);
+    [[nodiscard]] auto spawn_ray(Expr<float3> wi, Expr<float> t_max = std::numeric_limits<float>::max()) const noexcept {
+        return luisa::compute::make_ray_robust(_p, _ng, wi, t_max);
     }
 };
 

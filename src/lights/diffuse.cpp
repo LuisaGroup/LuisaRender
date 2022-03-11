@@ -81,7 +81,7 @@ public:
         auto pdf = distance_squared(it_light.p(), p_from) * pdf_area * (1.0f / cos_wo);
         return Light::Evaluation{.L = L, .pdf = ite(front_face, pdf, 0.0f)};
     }
-    [[nodiscard]] Light::Sample sample(Sampler::Instance &sampler, Expr<uint> light_inst_id, const Interaction &it_from) const noexcept override {
+    [[nodiscard]] Light::Sample sample(Sampler::Instance &sampler, Expr<uint> light_inst_id, Expr<float3> p_from) const noexcept override {
         auto light = instance<DiffuseLightInstance>();
         auto &&pipeline = light->pipeline();
         auto [light_inst, light_to_world] = pipeline.instance(light_inst_id);
@@ -93,11 +93,12 @@ public:
         auto light_to_world_normal = transpose(inverse(make_float3x3(light_to_world)));
         auto uvw = sample_uniform_triangle(sampler.generate_2d());
         auto attrib = pipeline.shading_point(light_inst, triangle, uvw, light_to_world, light_to_world_normal);
-        auto wo = normalize(it_from.p() - attrib.p);
+        auto wo = normalize(p_from - attrib.p);
         Interaction it_light{light_inst, light_inst_id, triangle_id, wo, attrib};
         DiffuseLightClosure closure{light, _swl, _time};
-        return {.eval = closure.evaluate(it_light, it_from.p()),
-                .shadow_ray = it_from.spawn_ray_to(attrib.p)};
+        return {.eval = closure.evaluate(it_light, p_from),
+                .wi = normalize(attrib.p - p_from),
+                .distance = distance(attrib.p, p_from) * .9999f};
     }
 };
 

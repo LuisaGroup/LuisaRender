@@ -67,11 +67,12 @@ public:
         return _evaluate(world_to_env * wi, swl, time);
     }
     [[nodiscard]] Light::Sample sample(
-        Sampler::Instance &sampler, const Interaction &it_from, Expr<float3x3> env_to_world,
+        Sampler::Instance &sampler, Expr<float3> p_from, Expr<float3x3> env_to_world,
         const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         auto local_wi = sample_uniform_sphere(sampler.generate_2d());
         return {.eval = _evaluate(local_wi, swl, time),
-                .shadow_ray = it_from.spawn_ray(env_to_world * local_wi)};
+                .wi = normalize(env_to_world * local_wi),
+                .distance = std::numeric_limits<float>::max()};
     }
 };
 

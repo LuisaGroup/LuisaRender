@@ -150,7 +150,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
             if (env_prob > 0.0f) {
                 auto u = sampler->generate_1d();
                 $if(u < env_prob) {
-                    light_sample = env->sample(*sampler, *it, env_to_world, swl, time);
+                    light_sample = env->sample(*sampler, it->p(), env_to_world, swl, time);
                     light_sample.eval.pdf *= env_prob;
                 }
                 $else {
@@ -165,7 +165,8 @@ void MegakernelPathTracingInstance::_render_one_camera(
             }
 
             // trace shadow ray
-            auto occluded = pipeline.intersect_any(light_sample.shadow_ray);
+            auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
+            auto occluded = pipeline.intersect_any(shadow_ray);
 
             // evaluate material
             auto eta_scale = def(make_float4(1.f));
@@ -196,7 +197,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
 
                     // direct lighting
                     $if(light_sample.eval.pdf > 0.0f & !occluded) {
-                        auto wi = light_sample.shadow_ray->direction();
+                        auto wi = light_sample.wi;
                         auto eval = closure->evaluate(wi);
                         auto cos_theta_i = dot(it->shading().n(), wi);
                         auto is_trans = cos_theta_i * cos_theta_o < 0.f;
