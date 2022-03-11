@@ -63,28 +63,27 @@ using namespace luisa::compute;
 class DiffuseLightClosure final : public Light::Closure {
 
 private:
-    const DiffuseLightInstance *_light;
-    const SampledWavelengths &_swl;
     Float _time;
 
 public:
-    explicit DiffuseLightClosure(const DiffuseLightInstance *light, const SampledWavelengths &swl, Expr<float> time) noexcept
-        : _light{light}, _swl{swl}, _time{time} {}
-    [[nodiscard]] auto light() const noexcept { return _light; }
+    DiffuseLightClosure(const DiffuseLightInstance *light, const SampledWavelengths &swl, Expr<float> time) noexcept
+        : Light::Closure{light, swl, time} {}
     [[nodiscard]] Light::Evaluation evaluate(const Interaction &it_light, Expr<float3> p_from) const noexcept override {
         using namespace luisa::compute;
-        auto &&pipeline = _light->pipeline();
+        auto light = instance<DiffuseLightInstance>();
+        auto &&pipeline = light->pipeline();
         auto pdf_triangle = pipeline.buffer<float>(it_light.shape()->pdf_buffer_id()).read(it_light.triangle_id());
         auto pdf_area = cast<float>(it_light.shape()->triangle_count()) * (pdf_triangle / it_light.triangle_area());
         auto cos_wo = dot(it_light.wo(), it_light.shading().n());
         auto front_face = cos_wo > 0.0f;
-        auto L = _light->texture()->evaluate(it_light, _swl, _time) *
-                 _light->node<DiffuseLight>()->scale();
+        auto L = light->texture()->evaluate(it_light, _swl, _time) *
+                 light->node<DiffuseLight>()->scale();
         auto pdf = distance_squared(it_light.p(), p_from) * pdf_area * (1.0f / cos_wo);
         return Light::Evaluation{.L = L, .pdf = ite(front_face, pdf, 0.0f)};
     }
     [[nodiscard]] Light::Sample sample(Sampler::Instance &sampler, Expr<uint> light_inst_id, const Interaction &it_from) const noexcept override {
-        auto &&pipeline = _light->pipeline();
+        auto light = instance<DiffuseLightInstance>();
+        auto &&pipeline = light->pipeline();
         auto [light_inst, light_to_world] = pipeline.instance(light_inst_id);
         auto alias_table_buffer_id = light_inst->alias_table_buffer_id();
         auto [triangle_id, _] = sample_alias_table(
@@ -98,7 +97,7 @@ public:
         Interaction it_light{
             light_inst, light_inst_id, triangle_id, area, p,
             normalize(it_from.p() - p), ng, uv, ns, tangent};
-        DiffuseLightClosure closure{_light, _swl, _time};
+        DiffuseLightClosure closure{light, _swl, _time};
         return {.eval = closure.evaluate(it_light, it_from.p()),
                 .shadow_ray = it_from.spawn_ray_to(p)};
     }

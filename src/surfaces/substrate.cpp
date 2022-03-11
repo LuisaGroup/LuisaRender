@@ -106,8 +106,7 @@ private:
         auto wi_local = _it.shading().world_to_local(wi);
         auto f = _blend.evaluate(wo_local, wi_local);
         auto pdf = _blend.pdf(wo_local, wi_local);
-        return {.swl = _swl,
-                .f = f,
+        return {.f = f,
                 .pdf = pdf,
                 .alpha = _distribution.alpha(),
                 .eta = make_float4(1.f)};
@@ -121,8 +120,7 @@ private:
         auto f = _blend.sample(wo_local, &wi_local, u, &pdf);
         auto wi = _it.shading().local_to_world(wi_local);
         return {.wi = wi,
-                .eval = {.swl = _swl,
-                         .f = f,
+                .eval = {.f = f,
                          .pdf = pdf,
                          .alpha = _distribution.alpha(),
                          .eta = make_float4(1.f)}};

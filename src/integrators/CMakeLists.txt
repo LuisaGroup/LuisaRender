@@ -1,5 +1,4 @@
 add_library(luisa-render-integrators INTERFACE)
 luisa_render_add_plugin(normal CATEGORY integrator SOURCES normal.cpp)
-luisa_render_add_plugin(megapathgrad CATEGORY integrator SOURCES mega_grad_radiative.cpp)
+luisa_render_add_plugin(megapathgrad CATEGORY integrator SOURCES mega_path_grad.cpp)
 luisa_render_add_plugin(megapath CATEGORY integrator SOURCES mega_path.cpp)
-luisa_render_add_plugin(megawave CATEGORY integrator SOURCES mega_wave.cpp)

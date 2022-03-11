@@ -88,22 +88,6 @@ SampledWavelengths SampledWavelengths::sample_visible(Expr<float> u) noexcept {
     return {lambda, pdf};
 }
 
-Bool SampledWavelengths::secondary_terminated() const noexcept {
-    using luisa::compute::all;
-    return all(_pdf.yzw() == 0.0f);
-}
-
-void SampledWavelengths::terminate_secondary() noexcept {
-    using luisa::compute::ite;
-    using luisa::compute::make_float4;
-    _pdf = ite(
-        secondary_terminated(),
-        _pdf,
-        make_float4(
-            _pdf.x * (1.0f / sample_count),
-            0.0f, 0.0f, 0.0f));
-}
-
 #include <util/spectrum_cie_xyz.inl.h>
 #include <util/spectrum_cie_illum_d65.inl.h>
 

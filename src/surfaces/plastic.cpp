@@ -129,8 +129,7 @@ private:
         auto pdf_d = _lambert.pdf(wo_local, wi_local);
         auto f_s = _microfacet.evaluate(wo_local, wi_local);
         auto pdf_s = _microfacet.pdf(wo_local, wi_local);
-        return {.swl = _swl,
-                .f = f_d + f_s,
+        return {.f = f_d + f_s,
                 .pdf = lerp(pdf_s, pdf_d, _kd_ratio),
                 .alpha = _distribution.alpha(),
                 .eta = make_float4(1.f)};
@@ -159,8 +158,7 @@ private:
         };
         auto wi = _it.shading().local_to_world(wi_local);
         return {.wi = wi,
-                .eval = {.swl = _swl,
-                         .f = f,
+                .eval = {.f = f,
                          .pdf = pdf,
                          .alpha = _distribution.alpha(),
                          .eta = make_float4(1.f)}};

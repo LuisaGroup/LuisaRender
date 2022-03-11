@@ -594,8 +594,7 @@ public:
             };
         };
         auto thin = instance<DisneySurfaceInstance>()->thin();
-        return {.swl = _swl,
-                .f = f,
+        return {.f = f,
                 .pdf = pdf,
                 .alpha = _distrib->alpha(),
                 .eta = ite(thin & wi_local.z < 0.f, make_float4(_fresnel->eta()), 1.f)};

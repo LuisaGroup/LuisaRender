@@ -104,9 +104,6 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
     command_buffer.commit();
 
     using namespace luisa::compute;
-    Callable balanced_heuristic = [](Float pdf_a, Float pdf_b) noexcept {
-        return ite(pdf_a > 0.0f, pdf_a / (pdf_a + pdf_b), 0.0f);
-    };
 
     Kernel2D render_kernel = [&](UInt frame_index, Float4x4 camera_to_world, Float3x3 camera_to_world_normal,
                                  Float3x3 env_to_world, Float time, Float shutter_weight) noexcept {
@@ -120,7 +117,6 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
         pixel += filter_offset;
         beta *= filter_weight;
         auto swl = SampledWavelengths::sample_visible(sampler->generate_1d());
-        auto swl_fixed = swl;
         auto [camera_ray, camera_weight] = camera->generate_ray(*sampler, pixel, time);
         if (!camera->node()->transform()->is_identity()) {
             camera_ray->set_origin(make_float3(camera_to_world * make_float4(camera_ray->origin(), 1.0f)));
@@ -175,14 +171,12 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
 
                     // radiative bp
                     // TODO : how to change beta from 4 channels to 3 channels
-                    closure->backward(wi,
-                                      Li * pipeline.srgb_unbound_spectrum(swl.srgb(beta)).sample(swl_fixed));
+                    closure->backward(wi, shutter_weight * beta * Li);
 
                     beta *= ite(
                         eval.pdf > 0.0f,
                         eval.f * abs(cos_theta_i) / eval.pdf,
                         make_float4(0.0f));
-                    swl = eval.swl;
                     eta_scale = ite(
                         cos_theta_i * cos_theta_o < 0.f &
                             min(eval.alpha.x, eval.alpha.y) < .05f,
