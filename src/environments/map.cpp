@@ -49,8 +49,8 @@ public:
         auto theta = pi * uv.y;
         auto y = cos(theta);
         auto sin_theta = sin(theta);
-        auto x = cos(phi) * sin_theta;
-        auto z = sin(phi) * sin_theta;
+        auto x = sin(phi) * sin_theta;
+        auto z = cos(phi) * sin_theta;
         return normalize(make_float3(x, y, z));
     }
     [[nodiscard]] static auto direction_to_uv(Expr<float3> w) noexcept {
@@ -58,7 +58,7 @@ public:
         auto phi = atan2(w.x, w.z);
         auto u = 1.f - 0.5f * inv_pi * phi;
         auto v = theta * inv_pi;
-        return make_float2(u, v);
+        return fract(make_float2(u, v));
     }
 };
 
@@ -85,7 +85,6 @@ public:
         : Environment::Instance{pipeline, env}, _texture{texture},
           _alias_buffer_id{std::move(alias_buffer_id)},
           _pdf_buffer_id{std::move(pdf_buffer_id)} {}
-    // TODO: importance sampling
     [[nodiscard]] Light::Evaluation evaluate(
         Expr<float3> wi, Expr<float3x3> env_to_world,
         const SampledWavelengths &swl, Expr<float> time) const noexcept override {
@@ -100,11 +99,8 @@ public:
         auto ix = cast<uint>(clamp(uv.x * size.x, 0.f, size.x - 1.f));
         auto iy = cast<uint>(clamp(uv.y * size.y, 0.f, size.y - 1.f));
         auto pdf_buffer = pipeline().bindless_buffer<float>(*_pdf_buffer_id);
-        auto pdf_y = pdf_buffer.read(iy);
-        auto pdf_x = pdf_buffer.read(
-            ix + EnvironmentMapping::sample_map_size.y +
-            iy * EnvironmentMapping::sample_map_size.x);
-        return {.L = L, .pdf = pdf_y * pdf_x};
+        auto pdf = pdf_buffer.read(iy * EnvironmentMapping::sample_map_size.x + ix);
+        return {.L = L, .pdf = pdf * (.25f * inv_pi)};
     }
     [[nodiscard]] Light::Sample sample(
         Sampler::Instance &sampler, Expr<float3> p_from, Expr<float3x3> env_to_world,
@@ -123,12 +119,13 @@ public:
                           iy * EnvironmentMapping::sample_map_size.x;
             auto [ix, ux] = sample_alias_table(
                 alias_buffer, EnvironmentMapping::sample_map_size.x, u.x, offset);
-            auto pdf_buffer = pipeline().bindless_buffer<float>(*_pdf_buffer_id);
             auto uv = make_float2(cast<float>(ix) + ux, cast<float>(iy) + uy) /
                       make_float2(EnvironmentMapping::sample_map_size);
+            auto p = pipeline().bindless_buffer<float>(*_pdf_buffer_id)
+                .read(iy * EnvironmentMapping::sample_map_size.x + ix);
             return std::make_pair(
                 EnvironmentMapping::uv_to_direction(uv),
-                pdf_buffer.read(iy) * pdf_buffer.read(offset + ix));
+                p * (.25f * inv_pi));
         }();
         return {.eval = {.L = _evaluate(wi_local, swl, time), .pdf = pdf},
                 .wi = normalize(env_to_world * wi_local),
@@ -143,7 +140,7 @@ unique_ptr<Environment::Instance> EnvironmentMapping::build(
     luisa::optional<uint> pdf_id;
     if (!_emission->is_constant()) {
         auto &&device = pipeline.device();
-        auto pixel_count = sample_map_size.x * sample_map_size.y;
+        constexpr auto pixel_count = sample_map_size.x * sample_map_size.y;
         luisa::vector<float> scale_map(pixel_count);
         auto scale_map_device = device.create_buffer<float>(pixel_count);
         Kernel2D generate_weight_map_kernel = [&] {
@@ -155,7 +152,7 @@ unique_ptr<Environment::Instance> EnvironmentMapping::build(
             auto scale = texture->evaluate(it, {}, 0.f).scale;
             auto sin_theta = sin(uv.y * pi);
             auto pixel_id = coord.y * sample_map_size.x + coord.x;
-            scale_map_device.write(pixel_id, sin_theta * scale);
+            scale_map_device.write(pixel_id, max(sin_theta * scale, 1e-2f));
         };
         auto generate_weight_map = device.compile(generate_weight_map_kernel);
         command_buffer << pipeline.bindless_array().update()
@@ -163,22 +160,32 @@ unique_ptr<Environment::Instance> EnvironmentMapping::build(
                        << scale_map_device.copy_to(scale_map.data())
                        << synchronize();
         luisa::vector<float> row_averages(sample_map_size.y);
-        luisa::vector<float> pdfs(sample_map_size.y + pixel_count);
+        luisa::vector<float> pdfs(pixel_count);
         luisa::vector<AliasEntry> aliases(sample_map_size.y + pixel_count);
-        for (auto y = 0u; y < sample_map_size.y; y++) {
+        for (auto i = 0u; i < sample_map_size.y; i++) {
             auto sum = 0.;
             auto values = luisa::span{scale_map}.subspan(
-                y * sample_map_size.x, sample_map_size.x);
+                i * sample_map_size.x, sample_map_size.x);
             for (auto v : values) { sum += v; }
-            row_averages[y] = static_cast<float>(sum * (1.0 / sample_map_size.x));
+            row_averages[i] = static_cast<float>(sum * (1.0 / sample_map_size.x));
             auto [alias_table, pdf_table] = create_alias_table(values);
-            auto dst_offset = sample_map_size.y + y * sample_map_size.x;
-            std::copy_n(pdf_table.data(), sample_map_size.x, pdfs.data() + dst_offset);
-            std::copy_n(alias_table.data(), sample_map_size.x, aliases.data() + dst_offset);
+            auto dst_offset = sample_map_size.y + i * sample_map_size.x;
+            std::copy_n(
+                pdf_table.data(), sample_map_size.x,
+                pdfs.data() + i * sample_map_size.x);
+            std::copy_n(
+                alias_table.data(), sample_map_size.x,
+                aliases.data() + sample_map_size.y + i * sample_map_size.x);
         }
         auto [alias_table, pdf_table] = create_alias_table(row_averages);
-        std::copy_n(pdf_table.data(), sample_map_size.y, pdfs.data());
         std::copy_n(alias_table.data(), sample_map_size.y, aliases.data());
+        for (auto y = 0u; y < sample_map_size.y; y++) {
+            auto offset = y * sample_map_size.x;
+            auto scale = pdf_table[y] * static_cast<float>(pixel_count);
+            for (auto x = 0u; x < sample_map_size.x; x++) {
+                pdfs[offset + x] *= scale;
+            }
+        }
         auto [alias_buffer_view, alias_buffer_id] =
             pipeline.arena_buffer<AliasEntry>(aliases.size());
         auto [pdf_buffer_view, pdf_buffer_id] =
@@ -187,6 +194,9 @@ unique_ptr<Environment::Instance> EnvironmentMapping::build(
                        << pdf_buffer_view.copy_from(pdfs.data());
         alias_id.emplace(alias_buffer_id);
         pdf_id.emplace(pdf_buffer_id);
+        LUISA_INFO(
+            "Sum: {}.",
+            std::accumulate(pdfs.cbegin(), pdfs.cend(), 0.f));
     }
     return luisa::make_unique<EnvironmentMappingInstance>(
         pipeline, this, texture, std::move(alias_id), std::move(pdf_id));

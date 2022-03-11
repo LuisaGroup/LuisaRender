@@ -83,7 +83,7 @@ Shape teapot : Group {
         roughness : ConstGeneric {
           v { 0.2 }
         }
-        remap_roughness { true }
+        // remap_roughness { true }
         // eta { 1.7 }
         eta { "Sapphire" }
         // eta : ConstGeneric {
@@ -131,8 +131,8 @@ render {
   integrator { @pt }
   environment : Map {
     emission : Illum {
-      // file { "../envmaps/photo_studio_01_1k.hdr" }
-      file { "../envmaps/envmap.exr" }
+      file { "../envmaps/photo_studio_01_1k.hdr" }
+      // file { "../envmaps/envmap.exr" }
       fp16 { true }
       // file { "/Users/mike/Downloads/dreifaltigkeitsberg_8k.exr" }
     }

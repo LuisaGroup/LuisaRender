@@ -38,7 +38,7 @@ template<typename Table>
     using namespace luisa::compute;
     auto u = u_in * cast<float>(n);
     auto i = clamp(cast<uint>(u), 0u, n - 1u);
-    auto u_remapped = u - cast<float>(i);
+    auto u_remapped = fract(u);
     auto entry = table.read(i + offset);
     auto index = ite(u_remapped < entry.prob, i, entry.alias);
     auto uu = ite(
@@ -54,7 +54,7 @@ template<typename ProbTable, typename AliasTable>
     using namespace luisa::compute;
     auto u = u_in * cast<float>(n);
     auto i = clamp(cast<uint>(u), 0u, n - 1u);
-    auto u_remapped = u - cast<float>(i);
+    auto u_remapped = fract(u);
     auto prob = probs.read(i + offset);
     auto index = ite(u_remapped < prob, i, indices.read(i + offset));
     auto uu = ite(
