@@ -2,6 +2,9 @@
 // Created by Mike Smith on 2022/1/28.
 //
 
+#include <tinyexr.h>
+#include <stb/stb_image_resize.h>
+
 #include <core/clock.h>
 #include <core/thread_pool.h>
 #include <util/imageio.h>
@@ -80,16 +83,17 @@ public:
                 for (auto i = 0u; i < image.size().x * image.size().y; i++) {
                     auto [x, y, z, _] = pixels[i];
                     auto f = make_float3(half_to_float(x), half_to_float(y), half_to_float(z));
-                    auto rsp = process(f);
-                    pixels[i][0] = float_to_half(rsp.x);
-                    pixels[i][1] = float_to_half(rsp.y);
-                    pixels[i][2] = float_to_half(rsp.z);
-                    pixels[i][3] = float_to_half(rsp.w);
+                    auto rsp_scale = process(f);
+                    pixels[i][0] = float_to_half(rsp_scale.x);
+                    pixels[i][1] = float_to_half(rsp_scale.y);
+                    pixels[i][2] = float_to_half(rsp_scale.z);
+                    pixels[i][3] = float_to_half(rsp_scale.w);
                 }
             } else {
                 auto pixels = reinterpret_cast<float4 *>(image.pixels());
                 for (auto i = 0u; i < image.size().x * image.size().y; i++) {
-                    pixels[i] = process(pixels[i].xyz());
+                    auto rsp_scale = process(pixels[i].xyz());
+                    pixels[i] = rsp_scale;
                 }
             }
             return image;

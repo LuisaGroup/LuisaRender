@@ -7,6 +7,7 @@
 #include <luisa-compute.h>
 #include <base/film.h>
 #include <base/pipeline.h>
+#include <util/colorspace.h>
 
 namespace luisa::render {
 
@@ -97,7 +98,7 @@ void ColorFilmInstance::accumulate(Expr<uint2> pixel, Expr<float3> rgb) const no
     auto old = _image.read(pixel);
     auto t = ite(valid, old.w + 1.0f, old.w);
     auto threshold = 65536.0f;
-    auto lum = dot(make_float3(0.212671f, 0.715160f, 0.072169f), rgb);
+    auto lum = srgb_to_cie_y(rgb);
     auto c = rgb * (threshold / max(lum, threshold));
     auto color = ite(valid, lerp(old.xyz(), c, 1.0f / t), old.xyz());
     _image.write(pixel, make_float4(color, t));

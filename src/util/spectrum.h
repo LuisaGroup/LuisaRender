@@ -21,6 +21,7 @@ using compute::CommandBuffer;
 using compute::Constant;
 using compute::Expr;
 using compute::Float;
+using compute::Float3;
 using compute::Float4;
 using compute::VolumeView;
 

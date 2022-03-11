@@ -76,7 +76,7 @@ public:
         auto pdf_area = cast<float>(it_light.shape()->triangle_count()) * (pdf_triangle / it_light.triangle_area());
         auto cos_wo = dot(it_light.wo(), it_light.shading().n());
         auto front_face = cos_wo > 0.0f;
-        auto L = light->texture()->evaluate(it_light, _swl, _time) *
+        auto L = light->texture()->evaluate(it_light, _swl, _time).value *
                  light->node<DiffuseLight>()->scale();
         auto pdf = distance_squared(it_light.p(), p_from) * pdf_area * (1.0f / cos_wo);
         return Light::Evaluation{.L = L, .pdf = ite(front_face, pdf, 0.0f)};

@@ -52,7 +52,7 @@ private:
         auto u = -0.5f * inv_pi * phi;
         auto v = theta * inv_pi;
         Interaction it{-wi_local, make_float2(u, v)};
-        auto L = _texture->evaluate(it, swl, time);
+        auto [L, _] = _texture->evaluate(it, swl, time);
         return Light::Evaluation{.L = L * env->scale(), .pdf = uniform_sphere_pdf()};
     }
 

@@ -135,11 +135,11 @@ private:
 
 luisa::unique_ptr<Surface::Closure> SubstrateInstance::closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    auto Kd = _kd->evaluate(it, swl, time);
-    auto Ks = _ks->evaluate(it, swl, time);
+    auto Kd = _kd->evaluate(it, swl, time).value;
+    auto Ks = _ks->evaluate(it, swl, time).value;
     auto alpha = def(make_float2(.5f));
     if (_roughness != nullptr) {
-        auto r = _roughness->evaluate(it, swl, time);
+        auto r = _roughness->evaluate(it, swl, time).value;
         auto remap = node<SubstrateSurface>()->remap_roughness();
         auto r2a = [](auto &&x) noexcept { return TrowbridgeReitzDistribution::roughness_to_alpha(x); };
         alpha = _roughness->node()->channels() == 1u ?

@@ -34,6 +34,11 @@ public:
         GENERIC
     };
 
+    struct Evaluation {
+        Float4 value;
+        Float scale;
+    };
+
     class Instance {
 
     private:
@@ -48,7 +53,7 @@ public:
             requires std::is_base_of_v<Texture, T>
         [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_texture); }
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
-        [[nodiscard]] virtual Float4 evaluate(
+        [[nodiscard]] virtual Evaluation evaluate(
             const Interaction &it,
             const SampledWavelengths &swl,
             Expr<float> time) const noexcept = 0;
@@ -65,6 +70,7 @@ public:
     [[nodiscard]] auto requires_gradients() const noexcept { return _requires_grad; }
     void disable_gradients() noexcept { _requires_grad = false; }
     [[nodiscard]] virtual bool is_black() const noexcept = 0;
+    [[nodiscard]] virtual bool is_constant() const noexcept = 0;
     [[nodiscard]] virtual uint channels() const noexcept { return 4u; }
     [[nodiscard]] virtual Category category() const noexcept = 0;
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
@@ -74,6 +80,11 @@ public:
 class ImageTexture : public Texture {
 
 public:
+    enum struct Mapping {
+        UV,
+        SPHERICAL
+    };
+
     class Instance : public Texture::Instance {
 
     private:
@@ -88,7 +99,7 @@ public:
                  luisa::optional<Differentiation::TexturedParameter> param) noexcept
             : Texture::Instance{pipeline, texture},
               _texture_id{texture_id}, _diff_param{std::move(param)} {}
-        [[nodiscard]] Float4 evaluate(
+        [[nodiscard]] Evaluation evaluate(
             const Interaction &it, const SampledWavelengths &swl,
             Expr<float> time) const noexcept override;
         void backward(
@@ -97,6 +108,7 @@ public:
     };
 
 private:
+    Mapping _mapping;
     TextureSampler _sampler;
     float2 _uv_scale;
     float2 _uv_offset;
@@ -106,10 +118,12 @@ private:
 
 public:
     ImageTexture(Scene *scene, const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] auto mapping() const noexcept { return _mapping; }
     [[nodiscard]] auto sampler() const noexcept { return _sampler; }
     [[nodiscard]] auto uv_scale() const noexcept { return _uv_scale; }
     [[nodiscard]] auto uv_offset() const noexcept { return _uv_offset; }
     [[nodiscard]] bool is_black() const noexcept override { return false; }
+    [[nodiscard]] bool is_constant() const noexcept override { return false; }
     [[nodiscard]] uint channels() const noexcept override { return _image().channels(); }
     [[nodiscard]] luisa::unique_ptr<Texture::Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;

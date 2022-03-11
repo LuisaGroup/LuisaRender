@@ -61,7 +61,8 @@ public:
     [[nodiscard]] auto pixel_storage() const noexcept { return _storage; }
     [[nodiscard]] auto channels() const noexcept { return compute::pixel_storage_channel_count(_storage); }
     [[nodiscard]] auto pixel_size_bytes() const noexcept { return compute::pixel_storage_size(_storage); }
-    [[nodiscard]] auto size_bytes() const noexcept { return _resolution.x * _resolution.y * pixel_size_bytes(); }
+    [[nodiscard]] auto pixel_count() const noexcept { return _resolution.x * _resolution.y; }
+    [[nodiscard]] auto size_bytes() const noexcept { return pixel_count() * pixel_size_bytes(); }
     [[nodiscard]] explicit operator bool() const noexcept { return _pixels != nullptr; }
     [[nodiscard]] static LoadedImage load(const std::filesystem::path &path) noexcept;
     [[nodiscard]] static LoadedImage load(const std::filesystem::path &path, storage_type storage) noexcept;

@@ -227,11 +227,11 @@ private:
 
 luisa::unique_ptr<Surface::Closure> GlassInstance::closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    auto Kr = _kr->evaluate(it, swl, time);
-    auto Kt = _kt->evaluate(it, swl, time);
+    auto [Kr, Kr_scale] = _kr->evaluate(it, swl, time);
+    auto [Kt, Kt_scale] = _kt->evaluate(it, swl, time);
     auto alpha = def(make_float2(0.f));
     if (_roughness != nullptr) {
-        auto r = _roughness->evaluate(it, swl, time);
+        auto r = _roughness->evaluate(it, swl, time).value;
         auto remap = node<GlassSurface>()->remap_roughness();
         auto r2a = [](auto &&x) noexcept { return TrowbridgeReitzDistribution::roughness_to_alpha(x); };
         alpha = _roughness->node()->channels() == 1u ?
@@ -241,9 +241,9 @@ luisa::unique_ptr<Surface::Closure> GlassInstance::closure(
     auto eta = def(make_float4(1.5f));
     if (_eta != nullptr) {
         if (_eta->node()->channels() == 1u) {
-            eta = _eta->evaluate(it, swl, time).xxxx();
+            eta = _eta->evaluate(it, swl, time).value.xxxx();
         } else {
-            auto e = _eta->evaluate(it, swl, time).xyz();
+            auto e = _eta->evaluate(it, swl, time).value.xyz();
             auto inv_bb = sqr(1.f / make_float3(700.0f, 546.1f, 435.8f));
             auto m = make_float3x3(make_float3(1.f), inv_bb, sqr(inv_bb));
             auto c = inverse(m) * e;
@@ -255,9 +255,7 @@ luisa::unique_ptr<Surface::Closure> GlassInstance::closure(
                 dot(c, make_float3(1.f, inv_ll.w, sqr(inv_ll.w))));
         }
     }
-    auto Kr_lum = swl.cie_y(Kr);
-    auto Kt_lum = swl.cie_y(Kt);
-    auto Kr_ratio = ite(Kr_lum == 0.f, 0.f, Kr_lum / (Kr_lum + Kt_lum));
+    auto Kr_ratio = ite(Kr_scale == 0.f, 0.f, Kr_scale / (Kr_scale + Kt_scale));
     return luisa::make_unique<GlassClosure>(
         this, it, swl, time, eta, Kr, Kt, alpha, Kr_ratio);
 }

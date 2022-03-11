@@ -120,8 +120,8 @@ private:
 
 luisa::unique_ptr<Surface::Closure> MatteInstance::closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    auto Kd = _kd->evaluate(it, swl, time);
-    auto sigma = _sigma ? clamp(_sigma->evaluate(it, swl, time).x, 0.f, 90.f) : 0.f;
+    auto Kd = _kd->evaluate(it, swl, time).value;
+    auto sigma = _sigma ? clamp(_sigma->evaluate(it, swl, time).value.x, 0.f, 90.f) : 0.f;
     return luisa::make_unique<MatteClosure>(this, it, swl, time, Kd, sigma);
 }
 

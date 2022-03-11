@@ -8,6 +8,7 @@
 #include <base/film.h>
 #include <base/pipeline.h>
 #include <util/atomic.h>
+#include <util/colorspace.h>
 
 namespace luisa::render {
 
@@ -98,7 +99,7 @@ void AtomicColorFilmInstance::accumulate(Expr<uint2> pixel, Expr<float3> rgb) co
     $if (!any(isnan(rgb))) {
         auto pixel_id = pixel.y * node()->resolution().x + pixel.x;
         auto threshold = 16384.0f;
-        auto lum = dot(make_float3(0.212671f, 0.715160f, 0.072169f), rgb);
+        auto lum = srgb_to_cie_y(rgb);
         auto c = rgb * (threshold / max(lum, threshold));
         for (auto i = 0u; i < 3u; i++) {
             atomic_float_add(_image, pixel_id * 4u + i, c[i]);

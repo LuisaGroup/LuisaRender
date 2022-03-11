@@ -29,6 +29,7 @@ public:
     }
     [[nodiscard]] auto v() const noexcept { return _v; }
     [[nodiscard]] bool is_black() const noexcept override { return all(_v == 0.0f); }
+    [[nodiscard]] bool is_constant() const noexcept override { return true; }
     [[nodiscard]] Category category() const noexcept override { return Category::GENERIC; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] uint channels() const noexcept override { return _channels; }
@@ -46,9 +47,14 @@ public:
         const Pipeline &p, const Texture *t,
         luisa::optional<Differentiation::ConstantParameter> param) noexcept
         : Texture::Instance{p, t}, _diff_param{std::move(param)} {}
-    [[nodiscard]] Float4 evaluate(const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
-        if (_diff_param) { return pipeline().differentiation().decode(*_diff_param); }
-        return node<ConstantGeneric>()->v();
+    [[nodiscard]] Texture::Evaluation evaluate(const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        auto value = [&] {
+            if (_diff_param) {
+                return pipeline().differentiation().decode(*_diff_param);
+            }
+            return def(node<ConstantGeneric>()->v());
+        }();
+        return {.value = value, .scale = 1.f};
     }
     void backward(const Interaction &, const SampledWavelengths &, Expr<float>, Expr<float4> grad) const noexcept override {
         if (_diff_param) { pipeline().differentiation().accumulate(*_diff_param, grad); }

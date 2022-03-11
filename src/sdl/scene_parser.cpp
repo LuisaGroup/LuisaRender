@@ -193,7 +193,7 @@ inline void SceneParser::_parse_root_node(SceneNodeDesc::SourceLocation l) noexc
 
 inline void SceneParser::_parse_global_node(SceneNodeDesc::SourceLocation l, std::string_view tag_desc) noexcept {
     using namespace std::string_view_literals;
-    static constexpr auto desc_to_tag_count = 23u;
+    static constexpr auto desc_to_tag_count = 25u;
     static const luisa::fixed_map<std::string_view, SceneNodeTag, desc_to_tag_count> desc_to_tag{
         {"Camera"sv, SceneNodeTag::CAMERA},
         {"Cam"sv, SceneNodeTag::CAMERA},
@@ -217,6 +217,8 @@ inline void SceneParser::_parse_global_node(SceneNodeDesc::SourceLocation l, std
         {"Env"sv, SceneNodeTag::ENVIRONMENT},
         {"Texture"sv, SceneNodeTag::TEXTURE},
         {"Tex"sv, SceneNodeTag::TEXTURE},
+        {"TextureMapping"sv, SceneNodeTag::TEXTURE_MAPPING},
+        {"TexMapping"sv, SceneNodeTag::TEXTURE_MAPPING},
         {"Generic"sv, SceneNodeTag::DECLARATION}};
     auto iter = desc_to_tag.find(tag_desc);
     if (iter == desc_to_tag.cend()) [[unlikely]] {
