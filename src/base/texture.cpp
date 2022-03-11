@@ -10,7 +10,7 @@ namespace luisa::render {
 
 Texture::Texture(Scene *scene, const SceneNodeDesc *desc) noexcept
     : SceneNode{scene, desc, SceneNodeTag::TEXTURE},
-      _requires_grad{desc->property_bool_or_default("requires_grad")} {}
+      _requires_grad{desc->property_bool_or_default("requires_grad", false)} {}
 
 ImageTexture::ImageTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
     : Texture{scene, desc} {

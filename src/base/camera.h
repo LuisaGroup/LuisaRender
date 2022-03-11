@@ -13,6 +13,7 @@ namespace luisa::render {
 
 using compute::Expr;
 using compute::Float3;
+using compute::Image;
 using compute::Ray;
 using compute::Var;
 
@@ -69,6 +70,7 @@ private:
     uint _spp;
     std::filesystem::path _file;
     luisa::vector<ShutterPoint> _shutter_points;
+    std::filesystem::path _target_file;
 
 public:
     Camera(Scene *scene, const SceneNodeDesc *desc) noexcept;
@@ -80,6 +82,7 @@ public:
     [[nodiscard]] auto shutter_samples() const noexcept -> luisa::vector<ShutterSample>;
     [[nodiscard]] auto spp() const noexcept { return _spp; }
     [[nodiscard]] auto file() const noexcept { return _file; }
+    [[nodiscard]] auto target_file() const noexcept { return _target_file; }
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
 };

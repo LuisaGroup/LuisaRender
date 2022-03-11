@@ -15,7 +15,6 @@ set(LUISA_RENDER_BASE_SOURCES
         interaction.h
         light_sampler.cpp light_sampler.h
         texture.cpp texture.h
-        grad_integrator.h grad_integrator.cpp
         differentiation.cpp differentiation.h)
 
 add_library(luisa-render-base SHARED ${LUISA_RENDER_BASE_SOURCES})
