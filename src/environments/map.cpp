@@ -100,7 +100,7 @@ public:
         auto iy = cast<uint>(clamp(uv.y * size.y, 0.f, size.y - 1.f));
         auto pdf_buffer = pipeline().bindless_buffer<float>(*_pdf_buffer_id);
         auto pdf = pdf_buffer.read(iy * EnvironmentMapping::sample_map_size.x + ix);
-        return {.L = L, .pdf = pdf * (.25f * inv_pi)};
+        return {.L = L, .pdf = pdf};
     }
     [[nodiscard]] Light::Sample sample(
         Sampler::Instance &sampler, Expr<float3> p_from, Expr<float3x3> env_to_world,
@@ -108,9 +108,7 @@ public:
         auto [wi_local, pdf] = [&] {
             auto u = sampler.generate_2d();
             if (_texture->node()->is_constant()) {
-                return std::make_pair(
-                    sample_uniform_sphere(u),
-                    def(uniform_sphere_pdf()));
+                return std::make_pair(sample_uniform_sphere(u), def(uniform_sphere_pdf()));
             }
             auto alias_buffer = pipeline().bindless_buffer<AliasEntry>(*_alias_buffer_id);
             auto [iy, uy] = sample_alias_table(
@@ -123,9 +121,7 @@ public:
                       make_float2(EnvironmentMapping::sample_map_size);
             auto p = pipeline().bindless_buffer<float>(*_pdf_buffer_id)
                 .read(iy * EnvironmentMapping::sample_map_size.x + ix);
-            return std::make_pair(
-                EnvironmentMapping::uv_to_direction(uv),
-                p * (.25f * inv_pi));
+            return std::make_pair(EnvironmentMapping::uv_to_direction(uv), p);
         }();
         return {.eval = {.L = _evaluate(wi_local, swl, time), .pdf = pdf},
                 .wi = normalize(env_to_world * wi_local),
@@ -181,7 +177,8 @@ unique_ptr<Environment::Instance> EnvironmentMapping::build(
         std::copy_n(alias_table.data(), sample_map_size.y, aliases.data());
         for (auto y = 0u; y < sample_map_size.y; y++) {
             auto offset = y * sample_map_size.x;
-            auto scale = pdf_table[y] * static_cast<float>(pixel_count);
+            auto pdf_y = pdf_table[y];
+            auto scale = static_cast<float>(.25 * M_1_PI * pdf_y * pixel_count);
             for (auto x = 0u; x < sample_map_size.x; x++) {
                 pdfs[offset + x] *= scale;
             }
