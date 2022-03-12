@@ -204,7 +204,8 @@ public:
     [[nodiscard]] Var<Hit> trace_closest(const Var<Ray> &ray) const noexcept;
     [[nodiscard]] Var<bool> trace_any(const Var<Ray> &ray) const noexcept;
     [[nodiscard]] luisa::unique_ptr<Interaction> interaction(const Var<Ray> &ray, const Var<Hit> &hit) const noexcept;
-    [[nodiscard]] std::pair<Var<Shape::Handle>, Var<float4x4>> instance(Expr<uint> index) const noexcept;
+    [[nodiscard]] Var<Shape::Handle> instance(Expr<uint> index) const noexcept;
+    [[nodiscard]] Float4x4 instance_to_world(Expr<uint> index) const noexcept;
     [[nodiscard]] Var<Triangle> triangle(const Var<Shape::Handle> &instance, Expr<uint> index) const noexcept;
     [[nodiscard]] ShadingAttribute shading_point(
         const Var<Shape::Handle> &instance, const Var<Triangle> &triangle, const Var<float3> &uvw,

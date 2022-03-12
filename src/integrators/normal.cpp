@@ -14,9 +14,6 @@ class NormalVisualizer;
 class NormalVisualizerInstance final : public Integrator::Instance {
 
 private:
-    Pipeline &_pipeline;
-
-private:
     static void _render_one_camera(
         CommandBuffer &command_buffer,
         Pipeline &pipeline,
@@ -40,16 +37,16 @@ public:
 
 NormalVisualizerInstance::NormalVisualizerInstance(
     const NormalVisualizer *integrator, Pipeline &pipeline) noexcept
-    : Integrator::Instance{pipeline, integrator}, _pipeline{pipeline} {}
+    : Integrator::Instance{pipeline, integrator} {}
 
 void NormalVisualizerInstance::render(Stream &stream) noexcept {
     luisa::vector<float> pixels;
     auto command_buffer = stream.command_buffer();
-    for (auto i = 0u; i < _pipeline.camera_count(); i++) {
-        auto camera = _pipeline.camera(i);
+    for (auto i = 0u; i < pipeline().camera_count(); i++) {
+        auto camera = pipeline().camera(i);
         auto resolution = camera->film()->node()->resolution();
         auto pixel_count = resolution.x * resolution.y;
-        _render_one_camera(command_buffer, _pipeline, camera);
+        _render_one_camera(command_buffer, pipeline(), camera);
         pixels.resize(next_pow2(pixel_count) * 4u);
         camera->film()->download(command_buffer, reinterpret_cast<float4 *>(pixels.data()));
         command_buffer << compute::synchronize();

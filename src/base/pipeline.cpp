@@ -240,10 +240,12 @@ void Pipeline::render(Stream &stream) noexcept {
     _integrator->render(stream);
 }
 
-std::pair<Var<Shape::Handle>, Var<float4x4>> Pipeline::instance(Expr<uint> i) const noexcept {
-    auto instance = _instance_buffer.read(i);
-    auto transform = _accel.instance_to_world(i);
-    return std::make_pair(std::move(instance), std::move(transform));
+Var<Shape::Handle> Pipeline::instance(Expr<uint> i) const noexcept {
+    return _instance_buffer.read(i);
+}
+
+Float4x4 Pipeline::instance_to_world(Expr<uint> i) const noexcept {
+    return _accel.instance_to_world(i);
 }
 
 Var<Triangle> Pipeline::triangle(const Var<Shape::Handle> &instance, Expr<uint> i) const noexcept {
@@ -282,7 +284,8 @@ luisa::unique_ptr<Interaction> Pipeline::interaction(const Var<Ray> &ray, const 
         it = Interaction{-ray->direction()};
     }
     $else {
-        auto [shape, m] = instance(hit.inst);
+        auto shape = instance(hit.inst);
+        auto m = instance_to_world(hit.inst);
         auto n = transpose(inverse(make_float3x3(m)));
         auto tri = triangle(shape, hit.prim);
         auto uvw = make_float3(1.0f - hit.bary.x - hit.bary.y, hit.bary);

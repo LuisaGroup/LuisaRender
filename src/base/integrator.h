@@ -17,11 +17,11 @@ public:
     class Instance {
 
     private:
-        const Pipeline &_pipeline;
+        Pipeline &_pipeline;
         const Integrator *_integrator;
 
     public:
-        explicit Instance(const Pipeline &pipeline, const Integrator *integrator) noexcept
+        explicit Instance(Pipeline &pipeline, const Integrator *integrator) noexcept
             : _pipeline{pipeline}, _integrator{integrator} {}
         virtual ~Instance() noexcept = default;
 

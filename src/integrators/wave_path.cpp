@@ -34,33 +34,136 @@ public:
     [[nodiscard]] unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
+struct PathStateSOA {
+    Buffer<float4> swl_lambda;
+    Buffer<float4> swl_pdf;
+    Buffer<float4> beta;
+    Buffer<float4> Li;
+    Buffer<float> pdf_bsdf;
+    PathStateSOA(Device &device, size_t size) noexcept
+        : swl_lambda{device.create_buffer<float4>(size)},
+          swl_pdf{device.create_buffer<float4>(size)},
+          beta{device.create_buffer<float4>(size)},
+          Li{device.create_buffer<float4>(size)},
+          pdf_bsdf{device.create_buffer<float>(size)} {}
+    [[nodiscard]] auto swl(Expr<uint> i) const noexcept {
+        auto lambda = swl_lambda.read(i);
+        auto pdf = swl_pdf.read(i);
+        return SampledWavelengths{lambda, pdf};
+    }
+};
+
+struct RaySOA {
+    Buffer<float3> origin;
+    Buffer<float3> direction;
+    Buffer<float> t_max;
+    RaySOA(Device &device, size_t size) noexcept
+        : origin{device.create_buffer<float3>(size)},
+          direction{device.create_buffer<float3>(size)},
+          t_max{device.create_buffer<float>(size)} {}
+    [[nodiscard]] auto read(Expr<uint> i) const noexcept {
+        auto o = origin.read(i);
+        auto d = direction.read(i);
+        auto t = t_max.read(i);
+        return make_ray(o, d, 0.f, t);
+    }
+    void write(Expr<uint> i, const Var<Ray> &ray) const noexcept {
+        origin.write(i, ray->origin());
+        direction.write(i, ray->direction());
+        t_max.write(i, ray->t_max());
+    }
+};
+
+struct HitSOA {
+    Buffer<uint> inst;
+    Buffer<uint> prim;
+    Buffer<float2> bary;
+    HitSOA(Device &device, size_t size) noexcept
+        : inst{device.create_buffer<uint>(size)},
+          prim{device.create_buffer<uint>(size)},
+          bary{device.create_buffer<float2>(size)} {}
+    [[nodiscard]] auto read(Expr<uint> i) const noexcept {
+        auto inst_id = inst.read(i);
+        auto prim_id = prim.read(i);
+        auto uv = bary.read(i);
+        return def<Hit>(inst_id, prim_id, uv);
+    }
+    void write(Expr<uint> i, Expr<Hit> hit) const noexcept {
+        inst.write(i, hit.inst);
+        prim.write(i, hit.prim);
+        bary.write(i, hit.bary);
+    }
+};
+
+struct LightSampleSOA {
+    Buffer<float4> L;
+    Buffer<float> pdf;
+    Buffer<float3> wi;
+    LightSampleSOA(Device &device, size_t size) noexcept
+        : L{device.create_buffer<float4>(size)},
+          pdf{device.create_buffer<float>(size)},
+          wi{device.create_buffer<float3>(size)} {}
+};
+
+class RayQueue {
+
+public:
+    static constexpr auto counter_buffer_size = 1024u;
+
+private:
+    Buffer<uint> _index_buffer;
+    Buffer<uint> _counter_buffer;
+    uint _current_counter;
+    Shader1D<> _clear_counters;
+
+public:
+    RayQueue(Device &device, size_t size) noexcept
+        : _index_buffer{device.create_buffer<uint>(size)},
+          _counter_buffer{device.create_buffer<uint>(counter_buffer_size)},
+          _current_counter{0u} {
+        _clear_counters = device.compile<1>([this] {
+            _counter_buffer.write(dispatch_x(), 0u);
+        });
+    }
+    [[nodiscard]] BufferView<uint> prepare_counter_buffer(CommandBuffer &command_buffer) noexcept {
+        if (_current_counter == counter_buffer_size) {
+            _current_counter = 0u;
+            command_buffer << _clear_counters().dispatch(counter_buffer_size);
+        }
+        return _counter_buffer.view(_current_counter++, 1u);
+    }
+    [[nodiscard]] BufferView<uint> prepare_index_buffer(CommandBuffer &command_buffer) noexcept {
+        return _index_buffer;
+    }
+};
+
 class WavefrontPathTracingInstance final : public Integrator::Instance {
 
 private:
-    Pipeline &_pipeline;
-    luisa::vector<float4> _pixels;
-
-private:
-    static void _render_one_camera(
-        CommandBuffer &command_buffer, Pipeline &pipeline,
-        WavefrontPathTracingInstance *pt, Camera::Instance *camera) noexcept;
+    void _render_one_camera(CommandBuffer &path_indices, Camera::Instance *path_count) noexcept;
 
 public:
     explicit WavefrontPathTracingInstance(const WavefrontPathTracing *node, Pipeline &pipeline) noexcept
-        : Integrator::Instance{pipeline, node}, _pipeline{pipeline} {}
+        : Integrator::Instance{pipeline, node} {}
 
     void render(Stream &stream) noexcept override {
         auto pt = node<WavefrontPathTracing>();
         auto command_buffer = stream.command_buffer();
-        for (auto i = 0u; i < _pipeline.camera_count(); i++) {
-            auto camera = _pipeline.camera(i);
+        luisa::vector<float4> pixels;
+        for (auto i = 0u; i < pipeline().camera_count(); i++) {
+            auto camera = pipeline().camera(i);
             auto resolution = camera->film()->node()->resolution();
             auto pixel_count = resolution.x * resolution.y;
-            _pixels.resize(next_pow2(pixel_count) * 4u);
-            _render_one_camera(command_buffer, _pipeline, this, camera);
-            camera->film()->download(command_buffer, _pixels.data());
-            command_buffer << compute::synchronize();
+            pixels.resize(next_pow2(pixel_count) * 4u);
             auto film_path = camera->node()->file();
+            LUISA_INFO(
+                "Rendering to '{}' of resolution {}x{} at {}spp.",
+                film_path.string(),
+                resolution.x, resolution.y,
+                camera->node()->spp());
+            _render_one_camera(command_buffer, camera);
+            camera->film()->download(command_buffer, pixels.data());
+            command_buffer << compute::synchronize();
             if (film_path.extension() != ".exr") [[unlikely]] {
                 LUISA_WARNING_WITH_LOCATION(
                     "Unexpected film file extension. "
@@ -69,7 +172,7 @@ public:
             }
             auto size = make_int2(resolution);
             const char *err = nullptr;
-            SaveEXR(reinterpret_cast<const float *>(_pixels.data()),
+            SaveEXR(reinterpret_cast<const float *>(pixels.data()),
                     size.x, size.y, 4, false, film_path.string().c_str(), &err);
             if (err != nullptr) [[unlikely]] {
                 LUISA_ERROR_WITH_LOCATION(
@@ -85,82 +188,135 @@ unique_ptr<Integrator::Instance> WavefrontPathTracing::build(Pipeline &pipeline,
 }
 
 void WavefrontPathTracingInstance::_render_one_camera(
-    CommandBuffer &command_buffer, Pipeline &pipeline,
-    WavefrontPathTracingInstance *pt, Camera::Instance *camera) noexcept {
+    CommandBuffer &command_buffer, Camera::Instance *camera) noexcept {
+
+    auto &&device = camera->pipeline().device();
+
+    auto light_sampler = pipeline().light_sampler();
+    auto sampler = pipeline().sampler();
+    auto env = pipeline().environment();
+    auto env_prob = env == nullptr ? 0.0f : env->selection_prob();
 
     auto spp = camera->node()->spp();
     auto resolution = camera->film()->node()->resolution();
-    auto image_file = camera->node()->file();
-    LUISA_INFO(
-        "Rendering to '{}' of resolution {}x{} at {}spp.",
-        image_file.string(),
-        resolution.x, resolution.y, spp);
-
-    auto light_sampler = pipeline.light_sampler();
-    auto sampler = pipeline.sampler();
-    auto env = pipeline.environment();
-
-    camera->film()->clear(command_buffer);
     auto pixel_count = resolution.x * resolution.y;
+
+    PathStateSOA path_states{device, pixel_count};
+    LightSampleSOA light_samples{device, pixel_count};
+    RaySOA rays{device, pixel_count};
+    HitSOA hits{device, pixel_count};
+    camera->film()->clear(command_buffer);
     sampler->reset(command_buffer, resolution, pixel_count, spp);
     command_buffer.commit();
 
-    using namespace luisa::compute;
+    auto generate_rays_shader = device.compile<1>([&](BufferUInt path_indices, UInt sample_id, Float4x4 c2w, Float time) noexcept {
+        auto pixel_id = dispatch_x();
+        auto pixel_coord = make_uint2(pixel_id / resolution.x, pixel_id % resolution.x);
+        sampler->start(pixel_coord, sample_id);
+        auto camera_sample = camera->generate_ray(*sampler, pixel_coord, time, c2w);
+        auto swl = SampledWavelengths::sample_visible(sampler->generate_1d());
+        sampler->save_state(pixel_id);
+        rays.write(pixel_id, camera_sample.ray);
+        path_states.swl_lambda.write(pixel_id, swl.lambda());
+        path_states.swl_pdf.write(pixel_id, swl.pdf());
+        path_states.beta.write(pixel_id, make_float4(camera_sample.weight));
+        path_states.Li.write(pixel_id, make_float4());
+        path_states.pdf_bsdf.write(pixel_id, 1e16f);
+        path_indices.write(pixel_id, pixel_id);
+    });
+
+    auto intersect_shader = device.compile<1>([&](BufferUInt ray_count,
+                                                  BufferUInt surface_queue, BufferUInt surface_queue_size,
+                                                  BufferUInt light_queue, BufferUInt light_queue_size,
+                                                  BufferUInt escape_queue, BufferUInt escape_queue_size) noexcept {
+        auto ray_id = dispatch_x();
+        $if(ray_id < ray_count.read(0u)) {
+            auto ray = rays.read(ray_id);
+            auto hit = pipeline().trace_closest(ray);
+            hits.write(ray_id, hit);
+            $if(!hit->miss()) {
+                auto shape = pipeline().instance(hit.inst);
+                $if(shape->has_surface()) {
+                    auto queue_id = surface_queue_size.atomic(0u).fetch_add(1u);
+                    surface_queue.write(queue_id, ray_id);
+                };
+                $if(shape->has_light()) {
+                    auto queue_id = light_queue_size.atomic(0u).fetch_add(1u);
+                    light_queue.write(queue_id, ray_id);
+                };
+            }
+            $elif(env_prob > 0.f) {
+                auto queue_id = escape_queue_size.atomic(0u).fetch_add(1u);
+                escape_queue.write(queue_id, ray_id);
+            };
+        };
+    });
+
     Callable balanced_heuristic = [](Float pdf_a, Float pdf_b) noexcept {
         return ite(pdf_a > 0.0f, pdf_a / (pdf_a + pdf_b), 0.0f);
     };
 
-    Kernel2D render_kernel = [&](UInt frame_index, Float4x4 camera_to_world, Float3x3 env_to_world,
-                                 Float time, Float shutter_weight) noexcept {
-        set_block_size(8u, 8u, 1u);
-
-        auto pixel_id = dispatch_id().xy();
-        sampler->start(pixel_id, frame_index);
-        auto [camera_ray, camera_weight] = camera->generate_ray(
-            *sampler, pixel_id, time, camera_to_world);
-        auto beta = def(make_float4(camera_weight));
-        auto swl = SampledWavelengths::sample_visible(sampler->generate_1d());
-        auto ray = camera_ray;
-        auto Li = def(make_float4(0.0f));
-        auto pdf_bsdf = def(0.0f);
-        $for(depth, pt->node<WavefrontPathTracing>()->max_depth()) {
-
-            auto add_light_contrib = [&](const Light::Evaluation &eval) noexcept {
-                auto mis_weight = ite(depth == 0u, 1.0f, balanced_heuristic(pdf_bsdf, eval.pdf));
+    auto evaluate_miss_shader = device.compile<1>([&](BufferUInt path_indices,
+                                                      BufferUInt queue, BufferUInt queue_size,
+                                                      Float3x3 e2w, Float time) noexcept {
+        if (env_prob > 0.f) {
+            auto queue_id = dispatch_x();
+            $if(queue_id < queue_size.read(0u)) {
+                auto ray_id = queue.read(queue_id);
+                auto wi = rays.direction.read(ray_id);
+                auto path_id = path_indices.read(ray_id);
+                auto swl = path_states.swl(path_id);
+                auto pdf_bsdf = path_states.pdf_bsdf.read(path_id);
+                auto beta = path_states.beta.read(path_id);
+                auto Li = path_states.Li.read(path_id);
+                auto eval = env->evaluate(wi, e2w, swl, time);
+                eval.L *= 1.f / env->selection_prob();
+                auto mis_weight = balanced_heuristic(pdf_bsdf, eval.pdf);
                 Li += ite(eval.pdf > 0.0f, beta * eval.L * mis_weight, make_float4(0.0f));
+                path_states.Li.write(path_id, Li);
             };
+        }
+    });
 
-            auto env_prob = env == nullptr ? 0.0f : env->selection_prob();
+    auto evaluate_light_shader = device.compile<1>([&](BufferUInt path_indices,
+                                                       BufferUInt queue, BufferUInt queue_size,
+                                                       Float time) noexcept {
+        auto queue_id = dispatch_x();
+        $if(queue_id < queue_size.read(0u)) {
+            auto ray_id = queue.read(queue_id);
+            auto ray = rays.read(ray_id);
+            auto hit = hits.read(ray_id);
+            auto path_id = path_indices.read(ray_id);
+            auto swl = path_states.swl(path_id);
+            auto pdf_bsdf = path_states.pdf_bsdf.read(path_id);
+            auto beta = path_states.beta.read(path_id);
+            auto Li = path_states.Li.read(path_id);
+            auto it = pipeline().interaction(ray, hit);
+            auto eval = light_sampler->evaluate(*it, ray->origin(), swl, time);
+            eval.L *= 1.f / (1.f - env_prob);
+            auto mis_weight = balanced_heuristic(pdf_bsdf, eval.pdf);
+            Li += ite(eval.pdf > 0.0f, beta * eval.L * mis_weight, make_float4(0.0f));
+            path_states.Li.write(path_id, Li);
+        };
+    });
 
-            // trace
-            auto it = pipeline.intersect(ray);
-
-            // miss
-            $if(!it->valid()) {
-                if (env_prob > 0.0f) {
-                    auto eval = env->evaluate(ray->direction(), env_to_world, swl, time);
-                    eval.L /= env_prob;
-                    add_light_contrib(eval);
-                }
-                $break;
-            };
-
-            // hit light
-            if (light_sampler != nullptr && env_prob < 1.f) {
-                $if(it->shape()->has_light()) {
-                    auto eval = light_sampler->evaluate(*it, ray->origin(), swl, time);
-                    eval.L /= 1.0f - env_prob;
-                    add_light_contrib(eval);
-                };
-            }
-
-            // sample one light
-            $if(!it->shape()->has_surface()) { $break; };
+    auto sample_light_shader = device.compile<1>([&](BufferUInt path_indices,
+                                                     BufferUInt queue, BufferUInt queue_size,
+                                                     Float3x3 e2w, Float time) noexcept {
+        auto queue_id = dispatch_x();
+        $if(queue_id < queue_size.read(0u)) {
+            auto ray_id = queue.read(queue_id);
+            auto ray = rays.read(ray_id);
+            auto hit = hits.read(ray_id);
+            auto it = pipeline().interaction(ray, hit);
+            auto path_id = path_indices.read(ray_id);
+            auto swl = path_states.swl(path_id);
+            sampler->load_state(path_id);
             Light::Sample light_sample;
             if (env_prob > 0.0f) {
                 auto u = sampler->generate_1d();
                 $if(u < env_prob) {
-                    light_sample = env->sample(*sampler, it->p(), env_to_world, swl, time);
+                    light_sample = env->sample(*sampler, it->p(), e2w, swl, time);
                     light_sample.eval.pdf *= env_prob;
                 }
                 $else {
@@ -173,16 +329,34 @@ void WavefrontPathTracingInstance::_render_one_camera(
                 light_sample = light_sampler->sample(*sampler, *it, swl, time);
                 light_sample.eval.pdf *= 1.0f - env_prob;
             }
-
+            sampler->save_state(path_id);
             // trace shadow ray
             auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
-            auto occluded = pipeline.intersect_any(shadow_ray);
+            auto occluded = pipeline().intersect_any(shadow_ray);
+            light_samples.L.write(queue_id, ite(occluded, make_float4(0.f), light_sample.eval.L));
+            light_samples.pdf.write(queue_id, ite(occluded, 0.f, light_sample.eval.pdf));
+            light_samples.wi.write(queue_id, shadow_ray->direction());
+        };
+    });
 
-            // evaluate material
-            auto eta_scale = def(make_float4(1.f));
+    auto evaluate_surface_shader = device.compile<1>([&](BufferUInt path_indices, UInt trace_depth, BufferUInt queue, BufferUInt queue_size,
+                                                         BufferUInt out_queue, BufferUInt out_queue_size, Float time) noexcept {
+        auto queue_id = dispatch_x();
+        $if(queue_id < queue_size.read(0u)) {
+            auto ray_id = queue.read(queue_id);
+            auto ray = rays.read(ray_id);
+            auto hit = hits.read(ray_id);
+            auto it = pipeline().interaction(ray, hit);
+            auto path_id = path_indices.read(ray_id);
+            sampler->load_state(path_id);
+            auto Li = path_states.Li.read(path_id);
+            auto swl = path_states.swl(path_id);
+            auto beta = path_states.beta.read(path_id);
             auto cos_theta_o = it->wo_local().z;
             auto surface_tag = it->shape()->surface_tag();
-            pipeline.dynamic_dispatch_surface(surface_tag, [&](auto surface) {
+            auto pdf_bsdf = def(0.f);
+            auto eta_scale = def(make_float4(1.f));
+            pipeline().dynamic_dispatch_surface(surface_tag, [&](auto surface) {
                 // apply normal map
                 if (auto normal_map = surface->normal()) {
                     auto normal_local = 2.f * normal_map->evaluate(*it, swl, time).value.xyz() - 1.f;
@@ -206,15 +380,16 @@ void WavefrontPathTracingInstance::_render_one_camera(
                     auto closure = surface->closure(*it, swl, time);
 
                     // direct lighting
-                    $if(light_sample.eval.pdf > 0.0f & !occluded) {
-                        auto wi = light_sample.wi;
+                    auto pdf_light = light_samples.pdf.read(queue_id);
+                    $if(pdf_light > 0.0f) {
+                        auto Ld = light_samples.L.read(queue_id);
+                        auto wi = light_samples.wi.read(queue_id);
                         auto eval = closure->evaluate(wi);
                         auto cos_theta_i = dot(it->shading().n(), wi);
                         auto is_trans = cos_theta_i * cos_theta_o < 0.f;
-                        auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
+                        auto mis_weight = balanced_heuristic(pdf_light, eval.pdf);
                         Li += beta * mis_weight * ite(eval.pdf > 0.0f, eval.f, 0.0f) *
-                              abs_dot(it->shading().n(), wi) *
-                              light_sample.eval.L / light_sample.eval.pdf;
+                              abs_dot(it->shading().n(), wi) * Ld / pdf_light;
                     };
 
                     // sample material
@@ -233,44 +408,87 @@ void WavefrontPathTracingInstance::_render_one_camera(
                         1.f);
                 };
             });
-
-            // rr
-            $if(all(beta <= 0.0f)) { $break; };
-            auto q = max(swl.cie_y(beta * eta_scale), .05f);
-            auto rr_depth = pt->node<WavefrontPathTracing>()->rr_depth();
-            auto rr_threshold = pt->node<WavefrontPathTracing>()->rr_threshold();
-            $if(depth >= rr_depth & q < rr_threshold) {
-                $if(sampler->generate_1d() >= q) { $break; };
-                beta *= 1.0f / q;
+            $if(any(beta > 0.f)) {
+                auto q = max(swl.cie_y(beta * eta_scale), .05f);
+                auto rr_depth = node<WavefrontPathTracing>()->rr_depth();
+                auto rr_threshold = node<WavefrontPathTracing>()->rr_threshold();
+                $if(trace_depth >= rr_depth & q < rr_threshold) {
+                    $if(sampler->generate_1d() < q) {
+                        beta *= 1.f / q;
+                        auto out_queue_id = out_queue_size.atomic(0u).fetch_add(1u);
+                        out_queue.write(out_queue_id, path_id);
+                        rays.write(out_queue_id, ray);
+                    };
+                };
             };
+            sampler->save_state(path_id);
+            path_states.Li.write(path_id, Li);
+            path_states.beta.write(path_id, beta);
+            path_states.pdf_bsdf.write(path_id, pdf_bsdf);
         };
-        camera->film()->accumulate(pixel_id, swl.srgb(Li * shutter_weight));
-    };
-    auto render = pipeline.device().compile(render_kernel);
-    auto shutter_samples = camera->node()->shutter_samples();
-    command_buffer << synchronize();
+    });
 
+    auto accumulate_shader = device.compile<1>([&](Float shutter_weight) noexcept {
+        auto pixel_id = dispatch_x();
+        auto pixel_coord = make_uint2(pixel_id / resolution.x, pixel_id % resolution.x);
+        auto swl = path_states.swl(pixel_id);
+        auto Li = path_states.Li.read(pixel_id);
+        camera->film()->accumulate(pixel_coord, swl.srgb(Li * shutter_weight));
+    });
+
+    RayQueue path_queue{device, pixel_count};
+    RayQueue out_path_queue{device, pixel_count};
+    RayQueue surface_queue{device, pixel_count};
+    RayQueue light_queue{device, pixel_count};
+    RayQueue miss_queue{device, pixel_count};
+    auto pixel_count_buffer = device.create_buffer<uint>(1u);
+    auto shutter_samples = camera->node()->shutter_samples();
+    command_buffer << pixel_count_buffer.copy_from(&pixel_count)
+                   << synchronize();
     Clock clock;
-    auto dispatch_count = 0u;
-    auto dispatches_per_commit = 16u;
     auto sample_id = 0u;
     for (auto s : shutter_samples) {
-        if (pipeline.update_geometry(command_buffer, s.point.time)) {
-            dispatch_count = 0u;
-        }
-        auto camera_to_world = camera->node()->transform()->matrix(s.point.time);
+        auto time = s.point.time;
+        pipeline().update_geometry(command_buffer, time);
+        auto camera_to_world = camera->node()->transform()->matrix(time);
         auto env_to_world = env == nullptr || env->node()->transform()->is_identity() ?
                                 make_float3x3(1.0f) :
                                 transpose(inverse(make_float3x3(
-                                    env->node()->transform()->matrix(s.point.time))));
+                                    env->node()->transform()->matrix(time))));
         for (auto i = 0u; i < s.spp; i++) {
-            command_buffer << render(sample_id++, camera_to_world, env_to_world,
-                                     s.point.time, s.point.weight)
-                                  .dispatch(resolution);
-            if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
-                command_buffer << commit();
-                dispatch_count = 0u;
+            auto path_indices = path_queue.prepare_index_buffer(command_buffer);
+            auto path_count = pixel_count_buffer.view();
+            command_buffer << generate_rays_shader(path_indices, sample_id, camera_to_world, time).dispatch(pixel_count);
+            for (auto depth = 0u; depth < node<WavefrontPathTracing>()->max_depth(); depth++) {
+                auto surface_indices = surface_queue.prepare_index_buffer(command_buffer);
+                auto surface_count = surface_queue.prepare_counter_buffer(command_buffer);
+                auto light_indices = light_queue.prepare_index_buffer(command_buffer);
+                auto light_count = light_queue.prepare_counter_buffer(command_buffer);
+                auto miss_indices = miss_queue.prepare_index_buffer(command_buffer);
+                auto miss_count = miss_queue.prepare_counter_buffer(command_buffer);
+                auto out_path_indices = out_path_queue.prepare_index_buffer(command_buffer);
+                auto out_path_count = out_path_queue.prepare_counter_buffer(command_buffer);
+                command_buffer << intersect_shader(path_count, surface_indices, surface_count,
+                                                   light_indices, light_count, miss_indices, miss_count)
+                                      .dispatch(pixel_count);
+                if (env_prob > 0.f) {
+                    command_buffer << evaluate_miss_shader(path_indices, miss_indices, miss_count, env_to_world, time)
+                                          .dispatch(pixel_count);
+                }
+                command_buffer << evaluate_light_shader(path_indices, light_indices, light_count, time)
+                                      .dispatch(pixel_count)
+                               << sample_light_shader(path_indices, surface_indices, surface_count, env_to_world, time)
+                                      .dispatch(pixel_count)
+                               << evaluate_surface_shader(path_indices, depth, surface_indices, surface_count,
+                                                          out_path_indices, out_path_count, time)
+                                      .dispatch(pixel_count);
+                path_indices = out_path_indices;
+                path_count = out_path_count;
+                std::swap(path_queue, out_path_queue);
             }
+            command_buffer << accumulate_shader(s.point.weight).dispatch(pixel_count)
+                           << commit();
+            sample_id++;
         }
     }
     command_buffer << synchronize();

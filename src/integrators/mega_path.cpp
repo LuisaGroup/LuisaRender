@@ -40,7 +40,6 @@ public:
 class MegakernelPathTracingInstance final : public Integrator::Instance {
 
 private:
-    Pipeline &_pipeline;
     uint _last_spp{0u};
     Clock _clock;
     Framerate _framerate;
@@ -54,9 +53,9 @@ private:
 
 public:
     explicit MegakernelPathTracingInstance(const MegakernelPathTracing *node, Pipeline &pipeline) noexcept
-        : Integrator::Instance{pipeline, node}, _pipeline{pipeline} {
+        : Integrator::Instance{pipeline, node} {
         if (node->display_enabled()) {
-            auto first_film = _pipeline.camera(0u)->film()->node();
+            auto first_film = pipeline.camera(0u)->film()->node();
             _window.emplace("Display", first_film->resolution(), true);
         }
     }
@@ -132,15 +131,15 @@ public:
     void render(Stream &stream) noexcept override {
         auto pt = node<MegakernelPathTracing>();
         auto command_buffer = stream.command_buffer();
-        for (auto i = 0u; i < _pipeline.camera_count(); i++) {
-            auto camera = _pipeline.camera(i);
+        for (auto i = 0u; i < pipeline().camera_count(); i++) {
+            auto camera = pipeline().camera(i);
             auto resolution = camera->film()->node()->resolution();
             auto pixel_count = resolution.x * resolution.y;
             _last_spp = 0u;
             _clock.tic();
             _framerate.clear();
             _pixels.resize(next_pow2(pixel_count) * 4u);
-            _render_one_camera(command_buffer, _pipeline, this, camera);
+            _render_one_camera(command_buffer, pipeline(), this, camera);
             camera->film()->download(command_buffer, _pixels.data());
             command_buffer << compute::synchronize();
             auto film_path = camera->node()->file();

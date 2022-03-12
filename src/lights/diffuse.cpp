@@ -84,7 +84,8 @@ public:
     [[nodiscard]] Light::Sample sample(Sampler::Instance &sampler, Expr<uint> light_inst_id, Expr<float3> p_from) const noexcept override {
         auto light = instance<DiffuseLightInstance>();
         auto &&pipeline = light->pipeline();
-        auto [light_inst, light_to_world] = pipeline.instance(light_inst_id);
+        auto light_inst = pipeline.instance(light_inst_id);
+        auto light_to_world = pipeline.instance_to_world(light_inst_id);
         auto alias_table_buffer_id = light_inst->alias_table_buffer_id();
         auto [triangle_id, _] = sample_alias_table(
             pipeline.buffer<AliasEntry>(alias_table_buffer_id),
