@@ -6,7 +6,7 @@ Film film : Color {
 Camera camera : Pinhole {
   position { 0, 0, 5 }
   fov { 60 }
-  spp { 1024 }
+  spp { 16384 }
   film { @film }
   file { "../renders/envmap-new.exr" }
   shutter_span { 0, 0 }
@@ -24,6 +24,7 @@ Integrator pt : MegaPath {
   sampler : Independent {}
   depth { 32 }
   rr_depth { 5 }
+  display { true }
 }
 
 Shape teapot : Group {

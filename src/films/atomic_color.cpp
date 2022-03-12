@@ -2,8 +2,6 @@
 // Created by Mike on 2022/1/7.
 //
 
-#include <tinyexr.h>
-
 #include <luisa-compute.h>
 #include <base/film.h>
 #include <base/pipeline.h>
@@ -40,13 +38,15 @@ class AtomicColorFilmInstance final : public Film::Instance {
 
 private:
     Buffer<uint> _image;
+    Buffer<float4> _converted;
     Shader1D<Buffer<uint>> _clear_image;
+    Shader1D<Buffer<uint>, Buffer<float4>> _convert_image;
 
 public:
     AtomicColorFilmInstance(Device &device, Pipeline &pipeline, const AtomicColorFilm *film) noexcept;
     void accumulate(Expr<uint2> pixel, Expr<float3> rgb) const noexcept override;
-    void save(Stream &stream, const std::filesystem::path &path) const noexcept override;
     void clear(CommandBuffer &command_buffer) noexcept override;
+    void download(CommandBuffer &command_buffer, float4 *framebuffer) const noexcept override;
 };
 
 AtomicColorFilmInstance::AtomicColorFilmInstance(Device &device, Pipeline &pipeline, const AtomicColorFilm *film) noexcept
@@ -54,49 +54,33 @@ AtomicColorFilmInstance::AtomicColorFilmInstance(Device &device, Pipeline &pipel
     auto resolution = node()->resolution();
     auto pixel_count = resolution.x * resolution.y;
     _image = pipeline.device().create_buffer<uint>(pixel_count * 4u);
-    Kernel1D clear_image = [](BufferUInt image) noexcept {
+    _converted = pipeline.device().create_buffer<float4>(pixel_count);
+    _clear_image = device.compile<1>([](BufferUInt image) noexcept {
         image.write(dispatch_x() * 4u + 0u, 0u);
         image.write(dispatch_x() * 4u + 1u, 0u);
         image.write(dispatch_x() * 4u + 2u, 0u);
         image.write(dispatch_x() * 4u + 3u, 0u);
-    };
-    _clear_image = device.compile(clear_image);
+    });
+    _convert_image = device.compile<1>([this](BufferUInt accum, BufferFloat4 output) noexcept {
+        auto i = dispatch_x();
+        auto c0 = as<float>(accum.read(i * 4u + 0u));
+        auto c1 = as<float>(accum.read(i * 4u + 1u));
+        auto c2 = as<float>(accum.read(i * 4u + 2u));
+        auto n = cast<float>(max(accum.read(i * 4u + 3u), 1u));
+        auto scale = (1.f / n) * node<AtomicColorFilm>()->scale();
+        output.write(i, make_float4(scale * make_float3(c0, c1, c2), 1.f));
+    });
 }
 
-void AtomicColorFilmInstance::save(Stream &stream, const std::filesystem::path &path) const noexcept {
+void AtomicColorFilmInstance::download(CommandBuffer &command_buffer, float4 *framebuffer) const noexcept {
     auto resolution = node()->resolution();
-    auto file_ext = path.extension().string();
-    for (auto &c : file_ext) { c = static_cast<char>(tolower(c)); }
-    std::vector<float4> rgb(resolution.x * resolution.y);
-    stream << _image.copy_to(rgb.data()) << synchronize();
-    auto film = static_cast<const AtomicColorFilm *>(node());
-    auto scale = film->scale();
-    for (auto i = 0; i < resolution.x * resolution.y; i++) {
-        auto n = luisa::bit_cast<uint>(rgb[i].w);
-        auto v = 1.f / static_cast<float>(n) * scale * rgb[i].xyz();
-        rgb[i] = make_float4(v, 1.f);
-    }
-    if (file_ext == ".exr") {
-        const char *err = nullptr;
-        auto ret = SaveEXR(
-            reinterpret_cast<const float *>(rgb.data()),
-            static_cast<int>(resolution.x), static_cast<int>(resolution.y),
-            4, false, path.string().c_str(), &err);
-        if (ret != TINYEXR_SUCCESS) [[unlikely]] {
-            LUISA_ERROR_WITH_LOCATION(
-                "Failure when writing image '{}'. "
-                "OpenEXR error: {}",
-                path.string(), err);
-        }
-    } else {
-        LUISA_ERROR_WITH_LOCATION(
-            "Film extension '{}' is not supported.",
-            file_ext);
-    }
+    auto pixel_count = resolution.x * resolution.y;
+    command_buffer << _convert_image(_image, _converted).dispatch(pixel_count)
+                   << _converted.copy_to(framebuffer);
 }
 
 void AtomicColorFilmInstance::accumulate(Expr<uint2> pixel, Expr<float3> rgb) const noexcept {
-    $if (!any(isnan(rgb))) {
+    $if(!any(isnan(rgb))) {
         auto pixel_id = pixel.y * node()->resolution().x + pixel.x;
         auto threshold = 16384.0f;
         auto lum = srgb_to_cie_y(rgb);

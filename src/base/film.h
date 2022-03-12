@@ -29,7 +29,7 @@ public:
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
         virtual void accumulate(Expr<uint2> pixel, Expr<float3> rgb) const noexcept = 0;// TODO: spectrum
         virtual void clear(CommandBuffer &command_buffer) noexcept = 0;
-        virtual void save(Stream &stream, const std::filesystem::path &path) const noexcept = 0;
+        virtual void download(CommandBuffer &command_buffer, float4 *framebuffer) const noexcept = 0;
     };
 
 private:

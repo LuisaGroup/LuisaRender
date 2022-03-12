@@ -2,6 +2,7 @@
 // Created by Mike Smith on 2022/1/10.
 //
 
+#include <tinyexr.h>
 #include <luisa-compute.h>
 
 #include <util/medium_tracker.h>
@@ -10,23 +11,28 @@
 
 namespace luisa::render {
 
+using namespace compute;
+
 class MegakernelPathTracing final : public Integrator {
 
 private:
     uint _max_depth;
     uint _rr_depth;
     float _rr_threshold;
+    bool _display;
 
 public:
     MegakernelPathTracing(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Integrator{scene, desc},
           _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)},
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
-          _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)} {}
+          _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
+          _display{desc->property_bool_or_default("display")} {}
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
     [[nodiscard]] bool differentiable() const noexcept override { return false; }
+    [[nodiscard]] bool display_enabled() const noexcept { return _display; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
@@ -35,26 +41,92 @@ class MegakernelPathTracingInstance final : public Integrator::Instance {
 
 private:
     Pipeline &_pipeline;
+    uint _last_spp{0u};
+    Framerate _framerate;
+    luisa::vector<float4> _pixels;
+    luisa::optional<Window> _window;
+    luisa::optional<Shader1D<Buffer<float4>>> _tonemap;
 
 private:
     static void _render_one_camera(
-        Stream &surface_instance, Pipeline &pipeline,
-        const Camera::Instance *camera,
-        const Filter::Instance *filter,
-        Film::Instance *film, uint max_depth,
-        uint rr_depth, float rr_threshold) noexcept;
+        CommandBuffer &command_buffer, Pipeline &pipeline, MegakernelPathTracingInstance *pt,
+        const Camera::Instance *camera, const Filter::Instance *filter, Film::Instance *film) noexcept;
 
 public:
     explicit MegakernelPathTracingInstance(const MegakernelPathTracing *node, Pipeline &pipeline) noexcept
-        : Integrator::Instance{pipeline, node}, _pipeline{pipeline} {}
+        : Integrator::Instance{pipeline, node}, _pipeline{pipeline} {
+        if (node->display_enabled()) {
+            auto first_film = get<1>(_pipeline.camera(0u))->node();
+            _window.emplace("Display", first_film->resolution(), true);
+        }
+    }
+
+    void display(CommandBuffer &command_buffer, const Film::Instance *film, uint spp) noexcept {
+        if (_window) {
+            _framerate.record(spp - _last_spp);
+            _last_spp = spp;
+            _window->run_one_frame([&] {
+                auto resolution = film->node()->resolution();
+                auto pixel_count = resolution.x * resolution.y;
+                film->download(command_buffer, _pixels.data());
+                command_buffer << synchronize();
+                for (auto &p : luisa::span{_pixels}.subspan(0u, pixel_count)) {
+                    auto pow = [](auto v, auto a) noexcept {
+                        return make_float3(
+                            std::pow(v.x, a),
+                            std::pow(v.y, a),
+                            std::pow(v.z, a));
+                    };
+                    auto linear = p.xyz();
+                    auto srgb = select(
+                        1.055f * pow(linear, 1.0f / 2.4f) - 0.055f,
+                        12.92f * linear,
+                        linear <= 0.00304f);
+                    p = make_float4(srgb, 1.f);
+                }
+                ImGui::Begin("Console", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+                ImGui::Text("Frame: %u", spp);
+                ImGui::Text("FPS: %.2f", _framerate.report());
+                ImGui::End();
+                _window->set_background(_pixels.data(), resolution);
+            });
+        }
+    }
+
     void render(Stream &stream) noexcept override {
-        auto pt = static_cast<const MegakernelPathTracing *>(node());
+        auto pt = node<MegakernelPathTracing>();
+        auto command_buffer = stream.command_buffer();
         for (auto i = 0u; i < _pipeline.camera_count(); i++) {
             auto [camera, film, filter] = _pipeline.camera(i);
+            auto resolution = film->node()->resolution();
+            auto pixel_count = resolution.x * resolution.y;
+            _last_spp = 0u;
+            _framerate.clear();
+            _pixels.resize(next_pow2(pixel_count) * 4u);
             _render_one_camera(
-                stream, _pipeline, camera, filter, film,
-                pt->max_depth(), pt->rr_depth(), pt->rr_threshold());
-            film->save(stream, camera->node()->file());
+                command_buffer, _pipeline,
+                this, camera, filter, film);
+            film->download(command_buffer, _pixels.data());
+            command_buffer << compute::synchronize();
+            auto film_path = camera->node()->file();
+            if (film_path.extension() != ".exr") [[unlikely]] {
+                LUISA_WARNING_WITH_LOCATION(
+                    "Unexpected film file extension. "
+                    "Changing to '.exr'.");
+                film_path.replace_extension(".exr");
+            }
+            auto size = make_int2(resolution);
+            const char *err = nullptr;
+            SaveEXR(reinterpret_cast<const float *>(_pixels.data()),
+                    size.x, size.y, 4, false, film_path.string().c_str(), &err);
+            if (err != nullptr) [[unlikely]] {
+                LUISA_ERROR_WITH_LOCATION(
+                    "Failed to save film to '{}'.",
+                    film_path.string());
+            }
+        }
+        while (_window && !_window->should_close()) {
+            _window->run_one_frame([] {});
         }
     }
 };
@@ -64,9 +136,8 @@ unique_ptr<Integrator::Instance> MegakernelPathTracing::build(Pipeline &pipeline
 }
 
 void MegakernelPathTracingInstance::_render_one_camera(
-    Stream &stream, Pipeline &pipeline, const Camera::Instance *camera,
-    const Filter::Instance *filter, Film::Instance *film, uint max_depth,
-    uint rr_depth, float rr_threshold) noexcept {
+    CommandBuffer &command_buffer, Pipeline &pipeline, MegakernelPathTracingInstance *pt,
+    const Camera::Instance *camera, const Filter::Instance *filter, Film::Instance *film) noexcept {
 
     auto spp = camera->node()->spp();
     auto resolution = film->node()->resolution();
@@ -80,7 +151,6 @@ void MegakernelPathTracingInstance::_render_one_camera(
     auto sampler = pipeline.sampler();
     auto env = pipeline.environment();
 
-    auto command_buffer = stream.command_buffer();
     film->clear(command_buffer);
     auto pixel_count = resolution.x * resolution.y;
     sampler->reset(command_buffer, resolution, pixel_count, spp);
@@ -113,7 +183,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
         auto ray = camera_ray;
         auto Li = def(make_float4(0.0f));
         auto pdf_bsdf = def(0.0f);
-        $for(depth, max_depth) {
+        $for(depth, pt->node<MegakernelPathTracing>()->max_depth()) {
 
             auto add_light_contrib = [&](const Light::Evaluation &eval) noexcept {
                 auto mis_weight = ite(depth == 0u, 1.0f, balanced_heuristic(pdf_bsdf, eval.pdf));
@@ -227,6 +297,8 @@ void MegakernelPathTracingInstance::_render_one_camera(
             // rr
             $if(all(beta <= 0.0f)) { $break; };
             auto q = max(swl.cie_y(beta * eta_scale), .05f);
+            auto rr_depth = pt->node<MegakernelPathTracing>()->rr_depth();
+            auto rr_threshold = pt->node<MegakernelPathTracing>()->rr_threshold();
             $if(depth >= rr_depth & q < rr_threshold) {
                 $if(sampler->generate_1d() >= q) { $break; };
                 beta *= 1.0f / q;
@@ -236,14 +308,19 @@ void MegakernelPathTracingInstance::_render_one_camera(
     };
     auto render = pipeline.device().compile(render_kernel);
     auto shutter_samples = camera->node()->shutter_samples();
-    stream << synchronize();
+    command_buffer << synchronize();
+
+    auto display = pt->node<MegakernelPathTracing>()->display_enabled();
 
     Clock clock;
     auto dispatch_count = 0u;
-    auto dispatches_per_commit = 8u;
+    auto dispatches_per_commit = display ? 4u : 16u;
     auto sample_id = 0u;
     for (auto s : shutter_samples) {
-        if (pipeline.update_geometry(command_buffer, s.point.time)) { dispatch_count = 0u; }
+        if (pipeline.update_geometry(command_buffer, s.point.time)) {
+            dispatch_count = 0u;
+            if (display) { pt->display(command_buffer, film, sample_id); }
+        }
         auto camera_to_world = camera->node()->transform()->matrix(s.point.time);
         auto camera_to_world_normal = transpose(inverse(make_float3x3(camera_to_world)));
         auto env_to_world = env == nullptr || env->node()->transform()->is_identity() ?
@@ -257,11 +334,11 @@ void MegakernelPathTracingInstance::_render_one_camera(
             if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
                 command_buffer << commit();
                 dispatch_count = 0u;
+                if (display) { pt->display(command_buffer, film, sample_id); }
             }
         }
     }
-    command_buffer << commit();
-    stream << synchronize();
+    command_buffer << synchronize();
     LUISA_INFO("Rendering finished in {} ms.", clock.toc());
 }
 

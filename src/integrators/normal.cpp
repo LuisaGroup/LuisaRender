@@ -2,6 +2,8 @@
 // Created by Mike on 2022/1/7.
 //
 
+#include <tinyexr.h>
+
 #include <base/pipeline.h>
 #include <base/integrator.h>
 
@@ -16,7 +18,7 @@ private:
 
 private:
     static void _render_one_camera(
-        Stream &stream, Pipeline &pipeline,
+        CommandBuffer &command_buffer, Pipeline &pipeline,
         const Camera::Instance *camera, const Filter::Instance *filter,
         Film::Instance *film) noexcept;
 
@@ -41,18 +43,38 @@ NormalVisualizerInstance::NormalVisualizerInstance(
     : Integrator::Instance{pipeline, integrator}, _pipeline{pipeline} {}
 
 void NormalVisualizerInstance::render(Stream &stream) noexcept {
+    luisa::vector<float> pixels;
+    auto command_buffer = stream.command_buffer();
     for (auto i = 0u; i < _pipeline.camera_count(); i++) {
         auto [camera, film, filter] = _pipeline.camera(i);
-        _render_one_camera(stream, _pipeline, camera, filter, film);
-        film->save(stream, camera->node()->file());
+        auto resolution = film->node()->resolution();
+        auto pixel_count = resolution.x * resolution.y;
+        _render_one_camera(command_buffer, _pipeline, camera, filter, film);
+        pixels.resize(next_pow2(pixel_count) * 4u);
+        film->download(command_buffer, reinterpret_cast<float4 *>(pixels.data()));
+        command_buffer << compute::synchronize();
+        auto film_path = camera->node()->file();
+        if (film_path.extension() != ".exr") [[unlikely]] {
+            LUISA_WARNING_WITH_LOCATION(
+                "Unexpected film file extension. "
+                "Changing to '.exr'.");
+            film_path.replace_extension(".exr");
+        }
+        auto size = make_int2(resolution);
+        const char *err = nullptr;
+        SaveEXR(pixels.data(), size.x, size.y, 4, false,
+                film_path.string().c_str(), &err);
+        if (err != nullptr) [[unlikely]] {
+            LUISA_ERROR_WITH_LOCATION(
+                "Failed to save film to '{}'.",
+                film_path.string());
+        }
     }
 }
 
 void NormalVisualizerInstance::_render_one_camera(
-    Stream &stream, Pipeline &pipeline,
-    const Camera::Instance *camera,
-    const Filter::Instance *filter,
-    Film::Instance *film) noexcept {
+    CommandBuffer &command_buffer, Pipeline &pipeline,
+    const Camera::Instance *camera, const Filter::Instance *filter, Film::Instance *film) noexcept {
 
     auto spp = camera->node()->spp();
     auto resolution = film->node()->resolution();
@@ -63,14 +85,14 @@ void NormalVisualizerInstance::_render_one_camera(
         resolution.x, resolution.y, spp);
 
     auto sampler = pipeline.sampler();
-    auto command_buffer = stream.command_buffer();
     auto pixel_count = resolution.x * resolution.y;
     film->clear(command_buffer);
     sampler->reset(command_buffer, resolution, pixel_count, spp);
     command_buffer.commit();
 
     using namespace luisa::compute;
-    Kernel2D render_kernel = [&](UInt frame_index, Float4x4 camera_to_world, Float3x3 camera_to_world_normal, Float time, Float shutter_weight) noexcept {
+    auto render = pipeline.device().compile<2>([&](UInt frame_index, Float4x4 camera_to_world, Float3x3 camera_to_world_normal,
+                                                   Float time, Float shutter_weight) noexcept {
         auto pixel_id = dispatch_id().xy();
         sampler->start(pixel_id, frame_index);
         auto pixel = make_float2(pixel_id) + 0.5f;
@@ -88,10 +110,9 @@ void NormalVisualizerInstance::_render_one_camera(
             interaction->shading().n() * 0.5f + 0.5f,
             make_float3());
         film->accumulate(pixel_id, shutter_weight * path_weight * color);
-    };
-    auto render = pipeline.device().compile(render_kernel);
+    });
     auto shutter_samples = camera->node()->shutter_samples();
-    stream << synchronize();
+    command_buffer << synchronize();
     Clock clock;
     auto sample_id = 0u;
     auto dispatch_count = 0u;
@@ -110,8 +131,7 @@ void NormalVisualizerInstance::_render_one_camera(
             }
         }
     }
-    command_buffer << commit();
-    stream << synchronize();
+    command_buffer << synchronize();
     LUISA_INFO("Rendering finished in {} ms.", clock.toc());
 }
 
