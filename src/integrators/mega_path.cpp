@@ -46,7 +46,6 @@ private:
     Framerate _framerate;
     luisa::vector<float4> _pixels;
     luisa::optional<Window> _window;
-    luisa::optional<Shader1D<Buffer<float4>>> _tonemap;
 
 private:
     static void _render_one_camera(
@@ -64,6 +63,12 @@ public:
 
     void display(CommandBuffer &command_buffer, const Film::Instance *film, uint spp) noexcept {
         static auto exposure = 0.f;
+        static auto aces = true;
+        static auto a = 2.51f;
+        static auto b = 0.03f;
+        static auto c = 2.43f;
+        static auto d = 0.59f;
+        static auto e = 0.14f;
         if (_window) {
             if (_window->should_close()) {
                 _window.reset();
@@ -77,16 +82,19 @@ public:
                 film->download(command_buffer, _pixels.data());
                 command_buffer << synchronize();
                 auto scale = std::pow(2.f, exposure);
+                auto pow = [](auto v, auto a) noexcept {
+                    return make_float3(
+                        std::pow(v.x, a),
+                        std::pow(v.y, a),
+                        std::pow(v.z, a));
+                };
+                auto tonemap = [](auto x) noexcept {
+                    return x * (a * x + b) / (x * (c * x + d) + e);
+                };
                 for (auto &p : luisa::span{_pixels}.subspan(0u, pixel_count)) {
-                    auto pow = [](auto v, auto a) noexcept {
-                        return make_float3(
-                            std::pow(v.x, a),
-                            std::pow(v.y, a),
-                            std::pow(v.z, a));
-                    };
                     auto linear = scale * p.xyz();
                     auto srgb = select(
-                        1.055f * pow(linear, 1.0f / 2.4f) - 0.055f,
+                        1.055f * pow(tonemap(linear), 1.0f / 2.4f) - 0.055f,
                         12.92f * linear,
                         linear <= 0.00304f);
                     p = make_float4(srgb, 1.f);
@@ -95,6 +103,24 @@ public:
                 ImGui::Text("Frame: %u", spp);
                 ImGui::Text("Time: %.1fs", _clock.toc() * 1e-3);
                 ImGui::Text("FPS: %.2f", _framerate.report());
+                ImGui::Checkbox("ACES", &aces);
+                if (aces) {
+                    ImGui::SameLine();
+                    ImGui::Spacing();
+                    ImGui::SameLine();
+                    if (ImGui::Button("Reset")) {
+                        a = 2.51f;
+                        b = 0.03f;
+                        c = 2.43f;
+                        d = 0.59f;
+                        e = 0.14f;
+                    }
+                    ImGui::SliderFloat("A", &a, 0.f, 3.f, "%.2f");
+                    ImGui::SliderFloat("B", &b, 0.f, 3.f, "%.2f");
+                    ImGui::SliderFloat("C", &c, 0.f, 3.f, "%.2f");
+                    ImGui::SliderFloat("D", &d, 0.f, 3.f, "%.2f");
+                    ImGui::SliderFloat("E", &e, 0.f, 3.f, "%.2f");
+                }
                 ImGui::SliderFloat("Exposure", &exposure, -10.f, 10.f, "%.1f");
                 ImGui::End();
                 _window->set_background(_pixels.data(), resolution);

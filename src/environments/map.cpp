@@ -196,9 +196,6 @@ unique_ptr<Environment::Instance> EnvironmentMapping::build(
                        << commit();
         alias_id.emplace(alias_buffer_id);
         pdf_id.emplace(pdf_buffer_id);
-
-        auto size = make_int2(sample_map_size);
-        SaveEXR(pdfs.data(), size.x, size.y, 1, false, "pdf.exr", nullptr);
     }
     return luisa::make_unique<EnvironmentMappingInstance>(
         pipeline, this, texture, std::move(alias_id), std::move(pdf_id));
