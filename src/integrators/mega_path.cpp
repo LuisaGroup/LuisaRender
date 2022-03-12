@@ -42,6 +42,7 @@ class MegakernelPathTracingInstance final : public Integrator::Instance {
 private:
     Pipeline &_pipeline;
     uint _last_spp{0u};
+    Clock _clock;
     Framerate _framerate;
     luisa::vector<float4> _pixels;
     luisa::optional<Window> _window;
@@ -63,6 +64,10 @@ public:
 
     void display(CommandBuffer &command_buffer, const Film::Instance *film, uint spp) noexcept {
         if (_window) {
+            if (_window->should_close()) {
+                _window.reset();
+                return;
+            }
             _framerate.record(spp - _last_spp);
             _last_spp = spp;
             _window->run_one_frame([&] {
@@ -86,6 +91,7 @@ public:
                 }
                 ImGui::Begin("Console", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
                 ImGui::Text("Frame: %u", spp);
+                ImGui::Text("Time: %.1fs", _clock.toc() * 1e-3);
                 ImGui::Text("FPS: %.2f", _framerate.report());
                 ImGui::End();
                 _window->set_background(_pixels.data(), resolution);
@@ -101,6 +107,7 @@ public:
             auto resolution = film->node()->resolution();
             auto pixel_count = resolution.x * resolution.y;
             _last_spp = 0u;
+            _clock.tic();
             _framerate.clear();
             _pixels.resize(next_pow2(pixel_count) * 4u);
             _render_one_camera(
