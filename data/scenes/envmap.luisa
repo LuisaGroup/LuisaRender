@@ -133,8 +133,8 @@ render {
   integrator { @pt }
   environment : Map {
     emission : Illum {
-      file { "../envmaps/photo_studio_01_1k.hdr" }
-      // file { "../envmaps/envmap.exr" }
+      // file { "../envmaps/photo_studio_01_1k.hdr" }
+      file { "../envmaps/envmap.exr" }
       // file { "/Users/mike/Downloads/dreifaltigkeitsberg_8k.exr" }
     }
     transform : SRT {

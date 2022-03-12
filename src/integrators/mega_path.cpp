@@ -63,6 +63,7 @@ public:
     }
 
     void display(CommandBuffer &command_buffer, const Film::Instance *film, uint spp) noexcept {
+        static auto exposure = 0.f;
         if (_window) {
             if (_window->should_close()) {
                 _window.reset();
@@ -75,6 +76,7 @@ public:
                 auto pixel_count = resolution.x * resolution.y;
                 film->download(command_buffer, _pixels.data());
                 command_buffer << synchronize();
+                auto scale = std::pow(2.f, exposure);
                 for (auto &p : luisa::span{_pixels}.subspan(0u, pixel_count)) {
                     auto pow = [](auto v, auto a) noexcept {
                         return make_float3(
@@ -82,7 +84,7 @@ public:
                             std::pow(v.y, a),
                             std::pow(v.z, a));
                     };
-                    auto linear = p.xyz();
+                    auto linear = scale * p.xyz();
                     auto srgb = select(
                         1.055f * pow(linear, 1.0f / 2.4f) - 0.055f,
                         12.92f * linear,
@@ -93,6 +95,7 @@ public:
                 ImGui::Text("Frame: %u", spp);
                 ImGui::Text("Time: %.1fs", _clock.toc() * 1e-3);
                 ImGui::Text("FPS: %.2f", _framerate.report());
+                ImGui::SliderFloat("Exposure", &exposure, -10.f, 10.f, "%.1f");
                 ImGui::End();
                 _window->set_background(_pixels.data(), resolution);
             });
