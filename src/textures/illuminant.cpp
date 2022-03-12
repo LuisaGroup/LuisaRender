@@ -29,7 +29,7 @@ public:
     IlluminantTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
         : ImageTexture{scene, desc} {
         auto path = desc->property_path("file");
-        auto fp32 = desc->property_bool_or_default("fp32", false);
+        auto fp32 = desc->property_bool_or_default("fp32", true);
         auto encoding = desc->property_string_or_default(
             "encoding", lazy_construct([&path]() noexcept -> luisa::string {
                 auto ext = path.extension().string();

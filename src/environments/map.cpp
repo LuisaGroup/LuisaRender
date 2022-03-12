@@ -135,6 +135,7 @@ unique_ptr<Environment::Instance> EnvironmentMapping::build(
     luisa::optional<uint> alias_id;
     luisa::optional<uint> pdf_id;
     if (!_emission->is_constant()) {
+        command_buffer << pipeline.bindless_array().update() << commit();
         auto &&device = pipeline.device();
         constexpr auto pixel_count = sample_map_size.x * sample_map_size.y;
         luisa::vector<float> scale_map(pixel_count);
@@ -151,8 +152,7 @@ unique_ptr<Environment::Instance> EnvironmentMapping::build(
             scale_map_device.write(pixel_id, max(sin_theta * scale, 1e-2f));
         };
         auto generate_weight_map = device.compile(generate_weight_map_kernel);
-        command_buffer << pipeline.bindless_array().update()
-                       << generate_weight_map().dispatch(sample_map_size)
+        command_buffer << generate_weight_map().dispatch(sample_map_size)
                        << scale_map_device.copy_to(scale_map.data())
                        << synchronize();
         luisa::vector<float> row_averages(sample_map_size.y);
@@ -188,9 +188,13 @@ unique_ptr<Environment::Instance> EnvironmentMapping::build(
         auto [pdf_buffer_view, pdf_buffer_id] =
             pipeline.arena_buffer<float>(pdfs.size());
         command_buffer << alias_buffer_view.copy_from(aliases.data())
-                       << pdf_buffer_view.copy_from(pdfs.data());
+                       << pdf_buffer_view.copy_from(pdfs.data())
+                       << commit();
         alias_id.emplace(alias_buffer_id);
         pdf_id.emplace(pdf_buffer_id);
+
+        auto size = make_int2(sample_map_size);
+        SaveEXR(pdfs.data(), size.x, size.y, 1, false, "pdf.exr", nullptr);
     }
     return luisa::make_unique<EnvironmentMappingInstance>(
         pipeline, this, texture, std::move(alias_id), std::move(pdf_id));
