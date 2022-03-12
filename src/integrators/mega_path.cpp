@@ -63,7 +63,7 @@ public:
 
     void display(CommandBuffer &command_buffer, const Film::Instance *film, uint spp) noexcept {
         static auto exposure = 0.f;
-        static auto aces = true;
+        static auto aces = false;
         static auto a = 2.51f;
         static auto b = 0.03f;
         static auto c = 2.43f;
@@ -93,8 +93,9 @@ public:
                 };
                 for (auto &p : luisa::span{_pixels}.subspan(0u, pixel_count)) {
                     auto linear = scale * p.xyz();
+                    if (aces) { linear = tonemap(linear); }
                     auto srgb = select(
-                        1.055f * pow(tonemap(linear), 1.0f / 2.4f) - 0.055f,
+                        1.055f * pow(linear, 1.0f / 2.4f) - 0.055f,
                         12.92f * linear,
                         linear <= 0.00304f);
                     p = make_float4(srgb, 1.f);

@@ -18,7 +18,8 @@ import "../meshes/cbox.luisa"
 
 Integrator pt : MegaPath {
   sampler : Independent {}
-  depth { 5 }
+  depth { 10 }
+  // display { true }
 }
 
 Integrator normal : Normal {}

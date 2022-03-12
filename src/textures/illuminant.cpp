@@ -2,10 +2,8 @@
 // Created by Mike Smith on 2022/1/28.
 //
 
-#include <tinyexr.h>
 #include <stb/stb_image_resize.h>
 
-#include <core/clock.h>
 #include <core/thread_pool.h>
 #include <util/imageio.h>
 #include <util/half.h>
@@ -50,7 +48,7 @@ public:
         _img = ThreadPool::global().async([path = std::move(path), half = !fp32,
                                            encoding = std::move(encoding), gamma,
                                            sloc = desc->source_location(), scale] {
-            auto image = LoadedImage::load(path, half ? PixelStorage::HALF4 : PixelStorage::FLOAT4);
+            auto image = LoadedImage::load(path, PixelStorage::FLOAT4);
             if (encoding == "rsp") { return image; }
             auto process = [&]() -> luisa::function<float4(float3)> {
                 auto rgb2spec = [scale](auto p) noexcept {
@@ -79,18 +77,18 @@ public:
                     encoding, sloc.string());
             }();
             if (half) {
-                auto pixels = reinterpret_cast<std::array<uint16_t, 4u> *>(image.pixels());
+                auto pixels = static_cast<float4 *>(image.pixels());
+                auto out_pixels = static_cast<std::array<uint16_t, 4> *>(image.pixels());
                 for (auto i = 0u; i < image.size().x * image.size().y; i++) {
-                    auto [x, y, z, _] = pixels[i];
-                    auto f = make_float3(half_to_float(x), half_to_float(y), half_to_float(z));
-                    auto rsp_scale = process(f);
-                    pixels[i][0] = float_to_half(rsp_scale.x);
-                    pixels[i][1] = float_to_half(rsp_scale.y);
-                    pixels[i][2] = float_to_half(rsp_scale.z);
-                    pixels[i][3] = float_to_half(rsp_scale.w);
+                    auto rsp_scale = process(pixels[i].xyz());
+                    out_pixels[i][0] = float_to_half(rsp_scale.x);
+                    out_pixels[i][1] = float_to_half(rsp_scale.y);
+                    out_pixels[i][2] = float_to_half(rsp_scale.z);
+                    out_pixels[i][3] = float_to_half(rsp_scale.w);
                 }
+                image.set_pixel_storage(PixelStorage::HALF4);
             } else {
-                auto pixels = reinterpret_cast<float4 *>(image.pixels());
+                auto pixels = static_cast<float4 *>(image.pixels());
                 for (auto i = 0u; i < image.size().x * image.size().y; i++) {
                     auto rsp_scale = process(pixels[i].xyz());
                     pixels[i] = rsp_scale;

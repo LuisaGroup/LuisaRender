@@ -58,6 +58,7 @@ public:
     LoadedImage &operator=(const LoadedImage &) noexcept = delete;
     [[nodiscard]] auto size() const noexcept { return _resolution; }
     [[nodiscard]] auto pixels() const noexcept { return _pixels; }
+    void set_pixel_storage(storage_type s) noexcept { _storage = s; }
     [[nodiscard]] auto pixel_storage() const noexcept { return _storage; }
     [[nodiscard]] auto channels() const noexcept { return compute::pixel_storage_channel_count(_storage); }
     [[nodiscard]] auto pixel_size_bytes() const noexcept { return compute::pixel_storage_size(_storage); }
