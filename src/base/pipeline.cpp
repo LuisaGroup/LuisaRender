@@ -170,8 +170,6 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
             luisa::make_unique<Differentiation>(*pipeline);
     }
     pipeline->_cameras.reserve(scene.cameras().size());
-    pipeline->_films.reserve(scene.cameras().size());
-    pipeline->_filters.reserve(scene.cameras().size());
     auto command_buffer = stream.command_buffer();
     auto rgb2spec_t0 = pipeline->create<Volume<float>>(PixelStorage::FLOAT4, make_uint3(RGB2SpectrumTable::resolution));
     auto rgb2spec_t1 = pipeline->create<Volume<float>>(PixelStorage::FLOAT4, make_uint3(RGB2SpectrumTable::resolution));
@@ -187,8 +185,6 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     auto mean_time = 0.0;
     for (auto camera : scene.cameras()) {
         pipeline->_cameras.emplace_back(camera->build(*pipeline, command_buffer));
-        pipeline->_films.emplace_back(camera->film()->build(*pipeline, command_buffer));
-        pipeline->_filters.emplace_back(camera->filter()->build(*pipeline, command_buffer));
         mean_time += (camera->shutter_span().x + camera->shutter_span().y) * 0.5f;
     }
     mean_time *= 1.0 / static_cast<double>(scene.cameras().size());
@@ -242,14 +238,6 @@ bool Pipeline::update_geometry(CommandBuffer &command_buffer, float time) noexce
 
 void Pipeline::render(Stream &stream) noexcept {
     _integrator->render(stream);
-}
-
-std::tuple<Camera::Instance *, Film::Instance *, Filter::Instance *> Pipeline::camera(size_t i) noexcept {
-    return std::make_tuple(_cameras[i].get(), _films[i].get(), _filters[i].get());
-}
-
-std::tuple<const Camera::Instance *, const Film::Instance *, const Filter::Instance *> Pipeline::camera(size_t i) const noexcept {
-    return std::make_tuple(_cameras[i].get(), _films[i].get(), _filters[i].get());
 }
 
 std::pair<Var<Shape::Handle>, Var<float4x4>> Pipeline::instance(Expr<uint> i) const noexcept {

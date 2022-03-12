@@ -120,7 +120,8 @@ public:
                 alias_buffer, EnvironmentMapping::sample_map_size.x, u.x, offset);
             auto uv = make_float2(cast<float>(ix) + ux, cast<float>(iy) + uy) /
                       make_float2(EnvironmentMapping::sample_map_size);
-            auto p = pipeline().bindless_buffer<float>(*_pdf_buffer_id).read(iy * EnvironmentMapping::sample_map_size.x + ix);
+            auto index = iy * EnvironmentMapping::sample_map_size.x + ix;
+            auto p = pipeline().bindless_buffer<float>(*_pdf_buffer_id).read(index);
             return std::make_pair(EnvironmentMapping::uv_to_direction(uv), p);
         }();
         return {.eval = {.L = _evaluate(wi_local, swl, time), .pdf = pdf},

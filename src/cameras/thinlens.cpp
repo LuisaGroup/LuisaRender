@@ -53,8 +53,9 @@ private:
 
 public:
     explicit ThinlensCameraInstance(
-        const Pipeline &ppl, const ThinlensCamera *camera) noexcept
-        : Camera::Instance{ppl, camera} {
+        Pipeline &ppl, CommandBuffer &command_buffer,
+        const ThinlensCamera *camera) noexcept
+        : Camera::Instance{ppl, command_buffer, camera} {
         _position = camera->position();
         auto v = camera->look_at() - _position;
         auto f = camera->focal_length() * 1e-3;
@@ -80,7 +81,8 @@ public:
         }
     }
 
-    [[nodiscard]] Camera::Sample generate_ray(
+private:
+    [[nodiscard]] Camera::Sample _generate_ray(
         Sampler::Instance &sampler,
         Expr<float2> pixel, Expr<float> time) const noexcept override {
         auto coord_focal = (_pixel_offset - pixel) * _projected_pixel_size;
@@ -93,7 +95,8 @@ public:
 
 luisa::unique_ptr<Camera::Instance> ThinlensCamera::build(
     Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
-    return luisa::make_unique<ThinlensCameraInstance>(pipeline, this);
+    return luisa::make_unique<ThinlensCameraInstance>(
+        pipeline, command_buffer, this);
 }
 
 }// namespace luisa::render

@@ -181,4 +181,23 @@ auto Camera::shutter_samples() const noexcept -> vector<ShutterSample> {
     return buckets;
 }
 
+Camera::Instance::Instance(Pipeline &pipeline, CommandBuffer &command_buffer, const Camera *camera) noexcept
+    : _pipeline{pipeline}, _camera{camera},
+      _film{camera->film()->build(pipeline, command_buffer)},
+      _filter{camera->filter()->build(pipeline, command_buffer)} {}
+
+Camera::Sample Camera::Instance::generate_ray(
+    Sampler::Instance &sampler, Expr<uint2> pixel_coord,
+    Expr<float> time, Expr<float4x4> camera_to_world) const noexcept {
+    auto [filter_offset, filter_weight] = filter()->sample(sampler);
+    auto pixel = make_float2(pixel_coord) + 0.5f + filter_offset;
+    auto sample = _generate_ray(sampler, pixel, time);
+    sample.weight *= filter_weight;
+    sample.ray->set_origin(make_float3(
+        camera_to_world * make_float4(sample.ray->origin(), 1.0f)));
+    sample.ray->set_direction(normalize(
+        make_float3x3(camera_to_world) * sample.ray->direction()));
+    return sample;
+}
+
 }// namespace luisa::render

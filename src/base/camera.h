@@ -8,6 +8,8 @@
 #include <rtx/ray.h>
 #include <base/scene_node.h>
 #include <base/sampler.h>
+#include <base/film.h>
+#include <base/filter.h>
 
 namespace luisa::render {
 
@@ -17,8 +19,6 @@ using compute::Ray;
 using compute::Var;
 
 class Sampler;
-class Film;
-class Filter;
 class Transform;
 
 class Camera : public SceneNode {
@@ -34,20 +34,29 @@ public:
     private:
         const Pipeline &_pipeline;
         const Camera *_camera;
+        luisa::unique_ptr<Film::Instance> _film;
+        luisa::unique_ptr<Filter::Instance> _filter;
+
+    private:
+        // generate ray in camera space, should not consider _filter and/or _transform
+        [[nodiscard]] virtual Sample _generate_ray(
+            Sampler::Instance &sampler,
+            Expr<float2> pixel, Expr<float> time) const noexcept = 0;
 
     public:
-        Instance(const Pipeline &pipeline, const Camera *camera) noexcept
-            : _pipeline{pipeline}, _camera{camera} {}
+        Instance(Pipeline &pipeline, CommandBuffer &command_buffer, const Camera *camera) noexcept;
         virtual ~Instance() noexcept = default;
-
         template<typename T = Camera>
             requires std::is_base_of_v<Camera, T>
         [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_camera); }
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
-
-        // generate ray in camera space, should not consider _filter and/or _transform
-        [[nodiscard]] virtual Sample generate_ray(
-            Sampler::Instance &sampler, Expr<float2> pixel, Expr<float> time) const noexcept = 0;
+        [[nodiscard]] auto film() noexcept { return _film.get(); }
+        [[nodiscard]] auto filter() noexcept { return _filter.get(); }
+        [[nodiscard]] auto film() const noexcept { return _film.get(); }
+        [[nodiscard]] auto filter() const noexcept { return _filter.get(); }
+        [[nodiscard]] Sample generate_ray(
+            Sampler::Instance &sampler, Expr<uint2> pixel_coord,
+            Expr<float> time, Expr<float4x4> camera_to_world) const noexcept;
     };
 
     struct ShutterPoint {

@@ -89,8 +89,6 @@ private:
     luisa::vector<InstancedTransform> _dynamic_transforms;
     Buffer<Shape::Handle> _instance_buffer;
     luisa::vector<luisa::unique_ptr<Camera::Instance>> _cameras;
-    luisa::vector<luisa::unique_ptr<Filter::Instance>> _filters;
-    luisa::vector<luisa::unique_ptr<Film::Instance>> _films;
     luisa::unique_ptr<Integrator::Instance> _integrator;
     luisa::unique_ptr<LightSampler::Instance> _light_sampler;
     luisa::unique_ptr<Sampler::Instance> _sampler;
@@ -181,8 +179,8 @@ public:
     [[nodiscard]] auto &transform_tree() const noexcept { return _transform_tree; }
     [[nodiscard]] auto instance_buffer() const noexcept { return _instance_buffer.view(); }
     [[nodiscard]] auto camera_count() const noexcept { return _cameras.size(); }
-    [[nodiscard]] std::tuple<Camera::Instance *, Film::Instance *, Filter::Instance *> camera(size_t i) noexcept;
-    [[nodiscard]] std::tuple<const Camera::Instance *, const Film::Instance *, const Filter::Instance *> camera(size_t i) const noexcept;
+    [[nodiscard]] auto camera(size_t i) noexcept { return _cameras[i].get(); }
+    [[nodiscard]] auto camera(size_t i) const noexcept { return _cameras[i].get(); }
     [[nodiscard]] auto surfaces() const noexcept { return luisa::span{_surfaces}; }
     [[nodiscard]] auto lights() const noexcept { return luisa::span{_lights}; }
     [[nodiscard]] auto instanced_lights() const noexcept { return luisa::span{_instanced_lights}; }
