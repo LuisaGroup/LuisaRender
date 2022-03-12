@@ -155,6 +155,10 @@ unique_ptr<Environment::Instance> EnvironmentMapping::build(
         command_buffer << generate_weight_map().dispatch(sample_map_size)
                        << scale_map_device.copy_to(scale_map.data())
                        << synchronize();
+        auto sum_scale = 0.;
+        for (auto s : scale_map) { sum_scale += s; }
+        auto average_scale = static_cast<float>(sum_scale / pixel_count);
+        for (auto &&s : scale_map) { s = std::max(s - average_scale, 1e-2f); }
         luisa::vector<float> row_averages(sample_map_size.y);
         luisa::vector<float> pdfs(pixel_count);
         luisa::vector<AliasEntry> aliases(sample_map_size.y + pixel_count);
@@ -192,6 +196,9 @@ unique_ptr<Environment::Instance> EnvironmentMapping::build(
                        << commit();
         alias_id.emplace(alias_buffer_id);
         pdf_id.emplace(pdf_buffer_id);
+
+        auto size = make_int2(sample_map_size);
+        SaveEXR(pdfs.data(), size.x, size.y, 1, false, "pdf.exr", nullptr);
     }
     return luisa::make_unique<EnvironmentMappingInstance>(
         pipeline, this, texture, std::move(alias_id), std::move(pdf_id));

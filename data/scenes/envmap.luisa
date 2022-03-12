@@ -6,7 +6,7 @@ Film film : Color {
 Camera camera : Pinhole {
   position { 0, 0, 5 }
   fov { 60 }
-  spp { 4096 }
+  spp { 1024 }
   film { @film }
   file { "../renders/envmap-new.exr" }
   shutter_span { 0, 0 }
@@ -85,8 +85,8 @@ Shape teapot : Group {
         }
         // remap_roughness { true }
         // eta { 1.7 }
-        // eta { "Sapphire" }
-        eta { "Ti" }
+        eta { "Sapphire" }
+        // eta { "Ti" }
         // eta : ConstGeneric {
         //   v { 1.5, 1.52, 1.6 }
         // }
@@ -132,9 +132,8 @@ render {
   integrator { @pt }
   environment : Map {
     emission : Illum {
-      // file { "../envmaps/photo_studio_01_1k.hdr" }
-      file { "../envmaps/envmap.exr" }
-      // fp32 { true }
+      file { "../envmaps/photo_studio_01_1k.hdr" }
+      // file { "../envmaps/envmap.exr" }
       // file { "/Users/mike/Downloads/dreifaltigkeitsberg_8k.exr" }
     }
     transform : SRT {
