@@ -16,8 +16,6 @@ namespace luisa::render {
 inline Pipeline::Pipeline(Device &device) noexcept
     : _device{device},
       _bindless_array{device.create_bindless_array(bindless_array_capacity)},
-      _vertex_buffer_arena{luisa::make_unique<BufferArena>(
-          device, vertex_buffer_arena_size_elements * sizeof(Shape::Vertex))},
       _general_buffer_arena{luisa::make_unique<BufferArena>(device, 16_mb)} {}
 
 Pipeline::~Pipeline() noexcept = default;
@@ -61,18 +59,12 @@ void Pipeline::_process_shape(
                 if (!non_existent) { return cache_iter->second; }
 
                 // create mesh
-                auto vertex_buffer_view = _vertex_buffer_arena->allocate<Shape::Vertex>(vertices.size());
-                auto index_offset = static_cast<uint>(vertex_buffer_view.offset());
-                luisa::vector<Triangle> offset_triangles(triangles.size());
-                std::transform(triangles.cbegin(), triangles.cend(), offset_triangles.begin(), [index_offset](auto t) noexcept {
-                    return Triangle{t.i0 + index_offset, t.i1 + index_offset, t.i2 + index_offset};
-                });
+                auto vertex_buffer = create<Buffer<Shape::Vertex>>(vertices.size());
                 auto triangle_buffer = create<Buffer<Triangle>>(triangles.size());
-                command_buffer << vertex_buffer_view.copy_from(vertices.data())
-                               << triangle_buffer->copy_from(offset_triangles.data())
-                               << compute::commit();
-                auto mesh = create<Mesh>(vertex_buffer_view.original(), *triangle_buffer, shape->build_hint());
-                command_buffer << mesh->build()
+                auto mesh = create<Mesh>(*vertex_buffer, *triangle_buffer, shape->build_hint());
+                command_buffer << vertex_buffer->copy_from(vertices.data())
+                               << triangle_buffer->copy_from(triangles.data())
+                               << mesh->build()
                                << compute::commit();
                 // compute alias table
                 luisa::vector<float> triangle_areas(triangles.size());
@@ -88,7 +80,7 @@ void Pipeline::_process_shape(
                 command_buffer << alias_table_buffer_view.copy_from(alias_table.data())
                                << pdf_buffer_view.copy_from(pdf.data())
                                << compute::commit();
-                auto vertex_buffer_id = register_bindless(vertex_buffer_view.original());
+                auto vertex_buffer_id = register_bindless(vertex_buffer->view());
                 auto triangle_buffer_id = register_bindless(triangle_buffer->view());
                 auto alias_buffer_id = register_bindless(alias_table_buffer_view);
                 auto pdf_buffer_id = register_bindless(pdf_buffer_view);
@@ -207,7 +199,7 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     if (auto &&diff = pipeline->_differentiation) {
         diff->materialize(command_buffer);
     }
-    command_buffer << compute::commit();
+    command_buffer << compute::synchronize();
     return pipeline;
 }
 

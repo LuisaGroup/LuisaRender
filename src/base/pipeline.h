@@ -71,7 +71,6 @@ private:
     Accel _accel;
     TransformTree _transform_tree;
     BindlessArray _bindless_array;
-    luisa::unique_ptr<BufferArena> _vertex_buffer_arena;
     luisa::unique_ptr<BufferArena> _general_buffer_arena;
     size_t _bindless_buffer_count{0u};
     size_t _bindless_tex2d_count{0u};
