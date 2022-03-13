@@ -61,14 +61,14 @@ void Pipeline::_process_shape(
                 if (!non_existent) { return cache_iter->second; }
 
                 // create mesh
-                auto vertex_buffer_view = _vertex_buffer_arena->allocate<Shape::Vertex>((vertices.size() + 15u) / 16u * 16u);
+                auto vertex_buffer_view = _vertex_buffer_arena->allocate<Shape::Vertex>(vertices.size());
                 auto index_offset = static_cast<uint>(vertex_buffer_view.offset());
                 luisa::vector<Triangle> offset_triangles(triangles.size());
                 std::transform(triangles.cbegin(), triangles.cend(), offset_triangles.begin(), [index_offset](auto t) noexcept {
                     return Triangle{t.i0 + index_offset, t.i1 + index_offset, t.i2 + index_offset};
                 });
                 auto triangle_buffer = create<Buffer<Triangle>>(triangles.size());
-                command_buffer << vertex_buffer_view.subview(0u, vertices.size()).copy_from(vertices.data())
+                command_buffer << vertex_buffer_view.copy_from(vertices.data())
                                << triangle_buffer->copy_from(offset_triangles.data())
                                << compute::commit();
                 auto mesh = create<Mesh>(vertex_buffer_view.original(), *triangle_buffer, shape->build_hint());
