@@ -6,7 +6,7 @@ Film film : Color {
 Camera camera : Pinhole {
   position { 0, 0, 5 }
   fov { 60 }
-  spp { 65536 }
+  spp { 1024 }
   film { @film }
   file { "../renders/envmap-new.exr" }
   shutter_span { 0, 0 }
@@ -20,9 +20,9 @@ Camera camera : Pinhole {
 
 Integrator normal : Normal {}
 
-Integrator pt : MegaPath {
+Integrator pt : WavePath {
   sampler : Independent {}
-  depth { 32 }
+  depth { 16 }
   rr_depth { 5 }
   display { true }
 }
