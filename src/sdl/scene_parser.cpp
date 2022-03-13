@@ -28,19 +28,26 @@ inline void SceneParser::_report_warning(std::string_view format, Args &&...args
 }
 
 inline void SceneParser::_parse_file() noexcept {
-    auto file_path = _location.file()->string();
-    auto file = fopen(file_path.c_str(), "r");
-    if (file == nullptr) {
-        LUISA_ERROR_WITH_LOCATION(
-            "Failed to open file '{}'.",
-            file_path);
-    }
-    fseek(file, 0, SEEK_END);
-    auto length = ftell(file);
-    fseek(file, 0, SEEK_SET);
-    _source.resize(length);
-    fread(_source.data(), 1, length, file);
-    fclose(file);
+    //    auto file_path = _location.file()->string();
+    //    auto file = fopen(file_path.c_str(), "r");
+    //    if (file == nullptr) {
+    //        LUISA_ERROR_WITH_LOCATION(
+    //            "Failed to open file '{}'.",
+    //            file_path);
+    //    }
+    //    fseek(file, 0, SEEK_END);
+    //    auto length = ftell(file);
+    //    fseek(file, 0, SEEK_SET);
+    //    _source.resize(length);
+    //    fread(_source.data(), 1, length, file);
+    //    fclose(file);
+    //    _parse_source();
+    //    _source.clear();
+    //    _source.shrink_to_fit();
+    std::ifstream file{*_location.file()};
+    _source = {
+        std::istreambuf_iterator<char>{file},
+        std::istreambuf_iterator<char>{}};
     _parse_source();
     _source.clear();
     _source.shrink_to_fit();
