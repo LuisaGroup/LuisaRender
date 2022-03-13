@@ -1027,7 +1027,7 @@ Camera camera : Pinhole {
 render {
   cameras { @camera }
   integrator : WavePath {
-    display { true }
+    // display { true }
     depth { 12 }
   }
   shapes {
