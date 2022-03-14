@@ -26,7 +26,8 @@ Camera::Camera(Scene *scene, const SceneNodeDesc *desc) noexcept
                   "shutter_span", 0.0f));
           }))},
       _shutter_samples{desc->property_uint_or_default("shutter_samples", 0u)},// 0 means default
-      _spp{desc->property_uint_or_default("spp", 1024u)} {
+      _spp{desc->property_uint_or_default("spp", 1024u)},
+      _target{scene->load_texture(desc->property_node_or_default("target"))} {
 
     if (_shutter_span.y < _shutter_span.x) [[unlikely]] {
         LUISA_ERROR(
@@ -124,9 +125,6 @@ Camera::Camera(Scene *scene, const SceneNodeDesc *desc) noexcept
         !std::filesystem::exists(folder)) {
         std::filesystem::create_directories(folder);
     }
-
-    // target image path for differentiable rendering
-    _target_file = desc->property_path_or_default("target_image_path", "@@@no###");
 }
 
 auto Camera::shutter_weight(float time) const noexcept -> float {

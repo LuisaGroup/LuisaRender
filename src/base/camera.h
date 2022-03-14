@@ -70,7 +70,7 @@ private:
     uint _spp;
     std::filesystem::path _file;
     luisa::vector<ShutterPoint> _shutter_points;
-    std::filesystem::path _target_file;
+    const Texture *_target;
 
 public:
     Camera(Scene *scene, const SceneNodeDesc *desc) noexcept;
@@ -82,7 +82,7 @@ public:
     [[nodiscard]] auto shutter_samples() const noexcept -> luisa::vector<ShutterSample>;
     [[nodiscard]] auto spp() const noexcept { return _spp; }
     [[nodiscard]] auto file() const noexcept { return _file; }
-    [[nodiscard]] auto target_file() const noexcept { return _target_file; }
+    [[nodiscard]] auto target() const noexcept { return _target; }
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
 };

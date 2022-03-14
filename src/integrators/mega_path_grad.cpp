@@ -58,7 +58,7 @@ class MegakernelGradRadiativeInstance final : public Integrator::Instance {
 private:
     Pipeline &_pipeline;
     MegakernelGradRadiative::Loss _loss_function;
-    luisa::vector<Image<float>> _rendered_image, _target_image;
+    luisa::vector<Image<float>> _rendered_image, _target_image, _target_image_rgb;
 
 private:
     static void _render_one_camera(
@@ -83,29 +83,32 @@ private:
         const Film::Instance *film_target) noexcept;
 
 public:
-    explicit MegakernelGradRadiativeInstance(const MegakernelGradRadiative *node, Pipeline &pipeline) noexcept
+    explicit MegakernelGradRadiativeInstance(
+        const MegakernelGradRadiative *node,
+        Pipeline &pipeline, CommandBuffer &command_buffer) noexcept
         : Integrator::Instance{pipeline, node},
           _pipeline{pipeline}, _loss_function{node->loss()} {
         // allocate space for rendered/target images
-        _rendered_image.reserve(pipeline.camera_count());
-        _target_image.reserve(pipeline.camera_count());
-        for (auto i = 0u; i < pipeline.camera_count(); ++i) {
+        _rendered_image.reserve(_pipeline.camera_count());
+        _target_image.reserve(_pipeline.camera_count());
+        for (auto i = 0u; i < _pipeline.camera_count(); ++i) {
             auto [camera, film, filter] = _pipeline.camera(i);
             auto resolution = film->node()->resolution();
-            _rendered_image.emplace_back(pipeline.device().create_image<float>(
+            _rendered_image.emplace_back(_pipeline.device().create_image<float>(
                 PixelStorage::FLOAT4, resolution));
-            _target_image.emplace_back(pipeline.device().create_image<float>(
+            _target_image.emplace_back(_pipeline.device().create_image<float>(
+                PixelStorage::FLOAT4, resolution));
+            _target_image_rgb.emplace_back(_pipeline.device().create_image<float>(
                 PixelStorage::FLOAT4, resolution));
         }
+        load_target_image(command_buffer.stream());
     }
-    void render(Stream &stream) noexcept override {
+    void load_target_image(Stream &stream) noexcept {
         // load target images
         std::vector<float> rgb;
-
-        auto pt = node<MegakernelGradRadiative>();
-        for (auto i = 0u; i < _pipeline.camera_count(); i++) {
-            auto [camera, film_rendered, filter] = _pipeline.camera(i);
-            auto resolution = film_rendered->node()->resolution();
+        for (auto i = 0u; i < _pipeline.camera_count(); ++i) {
+            auto [camera, film, filter] = _pipeline.camera(i);
+            auto resolution = film->node()->resolution();
             rgb.resize(resolution.x * resolution.y * 4);
             auto path = camera->node()->target_file();
             auto file_ext = path.extension().string();
@@ -125,9 +128,14 @@ public:
                     "Film extension '{}' is not supported.",
                     file_ext);
             }
-            stream << _target_image.back().copy_from(rgb.data()) << synchronize();
+            stream << _target_image_rgb[i].copy_from(rgb.data()) << synchronize();
+        }
+    }
+    void render(Stream &stream) noexcept override {
 
-            // TODO : compare ref with film to get loss
+        auto pt = node<MegakernelGradRadiative>();
+        for (auto i = 0u; i < _pipeline.camera_count(); i++) {
+            auto [camera, film_rendered, filter] = _pipeline.camera(i);
             _integrate_one_camera(
                 stream, _pipeline, camera, filter,
                 pt->max_depth(), pt->rr_depth(), pt->rr_threshold(),
@@ -137,7 +145,7 @@ public:
 };
 
 unique_ptr<Integrator::Instance> MegakernelGradRadiative::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
-    return luisa::make_unique<MegakernelGradRadiativeInstance>(this, pipeline);
+    return luisa::make_unique<MegakernelGradRadiativeInstance>(this, pipeline, command_buffer);
 }
 
 void MegakernelGradRadiativeInstance::_integrate_one_camera(
