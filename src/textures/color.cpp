@@ -90,13 +90,13 @@ public:
                     pixels[i][0] = float_to_half(rsp.x);
                     pixels[i][1] = float_to_half(rsp.y);
                     pixels[i][2] = float_to_half(rsp.z);
+                    pixels[i][3] = float_to_half(srgb_to_cie_y(f));
                 }
             } else {
                 auto pixels = reinterpret_cast<float4 *>(image.pixels());
                 for (auto i = 0u; i < image.size().x * image.size().y; i++) {
-                    auto p = pixels[i];
-                    auto rsp = process(p.xyz());
-                    pixels[i] = make_float4(rsp, p.w);
+                    auto p = pixels[i].xyz();
+                    pixels[i] = make_float4(process(p), srgb_to_cie_y(p));
                 }
             }
             return image;

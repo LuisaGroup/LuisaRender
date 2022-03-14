@@ -15,14 +15,12 @@ namespace luisa::render {
 class MeshLoader {
 
 private:
-    luisa::vector<float3> _positions;
-    luisa::vector<Shape::VertexAttribute> _attributes;
+    luisa::vector<Shape::Vertex> _vertices;
     luisa::vector<Triangle> _triangles;
     bool _has_uv{};
 
 public:
-    [[nodiscard]] auto positions() const noexcept { return luisa::span{_positions}; }
-    [[nodiscard]] auto attributes() const noexcept { return luisa::span{_attributes}; }
+    [[nodiscard]] auto vertices() const noexcept { return luisa::span{_vertices}; }
     [[nodiscard]] auto triangles() const noexcept { return luisa::span{_triangles}; }
     [[nodiscard]] auto has_uv() const noexcept { return _has_uv; }
 
@@ -86,8 +84,7 @@ public:
             auto ai_normals = mesh->mNormals;
             auto ai_tex_coords = mesh->mTextureCoords[0];
             auto ai_tangents = mesh->mTangents;
-            loader._positions.resize(vertex_count);
-            loader._attributes.resize(vertex_count);
+            loader._vertices.resize(vertex_count);
             auto compute_tangent = [ai_tangents](auto i, float3 n) noexcept {
                 if (ai_tangents == nullptr) {
                     auto b = abs(n.x) > abs(n.z) ?
@@ -103,11 +100,11 @@ public:
                 return make_float2(ai_tex_coords[i].x, ai_tex_coords[i].y);
             };
             for (auto i = 0; i < vertex_count; i++) {
+                auto p = make_float3(ai_positions[i].x, ai_positions[i].y, ai_positions[i].z);
                 auto n = make_float3(ai_normals[i].x, ai_normals[i].y, ai_normals[i].z);
                 auto t = compute_tangent(i, n);
                 auto uv = compute_uv(i);
-                loader._attributes[i] = Shape::VertexAttribute::encode(n, t, uv);
-                loader._positions[i] = make_float3(ai_positions[i].x, ai_positions[i].y, ai_positions[i].z);
+                loader._vertices[i] = Shape::Vertex::encode(p, n, t, uv);
             }
             auto triangle_count = mesh->mNumFaces;
             auto ai_triangles = mesh->mFaces;
@@ -147,8 +144,7 @@ public:
     [[nodiscard]] luisa::span<const Shape *const> children() const noexcept override { return {}; }
     [[nodiscard]] bool deformable() const noexcept override { return false; }
     [[nodiscard]] bool is_mesh() const noexcept override { return true; }
-    [[nodiscard]] luisa::span<const float3> positions() const noexcept override { return _loader.get().positions(); }
-    [[nodiscard]] luisa::span<const Shape::VertexAttribute> attributes() const noexcept override { return _loader.get().attributes(); }
+    [[nodiscard]] luisa::span<const Vertex> vertices() const noexcept override { return _loader.get().vertices(); }
     [[nodiscard]] luisa::span<const Triangle> triangles() const noexcept override { return _loader.get().triangles(); }
 };
 

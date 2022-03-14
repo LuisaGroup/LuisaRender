@@ -444,13 +444,14 @@ public:
     DisneySurfaceClosure(
         const DisneySurfaceInstance *instance, const Interaction &it,
         const SampledWavelengths &swl, Expr<float> time,
-        Expr<float4> color, Expr<float> metallic_in, Expr<float> eta_in, Expr<float> roughness,
+        Expr<float4> color, Expr<float> color_lum, Expr<float> metallic_in, Expr<float> eta_in, Expr<float> roughness,
         Expr<float> specular_tint, Expr<float> anisotropic, Expr<float> sheen, Expr<float> sheen_tint,
         Expr<float> clearcoat, Expr<float> clearcoat_gloss, Expr<float> specular_trans_in,
         Expr<float> flatness, Expr<float> diffuse_trans) noexcept
         : Surface::Closure{instance, it, swl, time}, _lobes{0u} {
 
         // TODO: should not generate lobes than are not used.
+        // TODO: compute scales based on color_lum
 
         constexpr auto black_threshold = 1e-6f;
         auto cos_theta_o = dot(_it.wo(), _it.shading().n());
@@ -459,8 +460,7 @@ public:
         auto specular_trans = (1.f - metallic) * specular_trans_in;
         auto diffuse_weight = (1.f - metallic) * (1.f - specular_trans);
         auto dt = diffuse_trans * .5f;// 0: all diffuse is reflected -> 1, transmitted
-        auto lum = swl.cie_y(color);
-        auto Ctint = ite(lum > 0.f, color / lum, 1.f);// normalize lum. to isolate hue+sat
+        auto Ctint = ite(color_lum > 0.f, color / color_lum, 1.f);// normalize lum. to isolate hue+sat
         auto eta = ite(eta_in < black_threshold, 1.5f, eta_in);
         auto thin = instance->thin();
 
@@ -651,21 +651,22 @@ public:
 luisa::unique_ptr<Surface::Closure> DisneySurfaceInstance::closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto color = _color->evaluate(it, swl, time);
-    auto metallic = _metallic ? _metallic->evaluate(it, swl, time).x : 0.f;
-    auto eta = _eta ? _eta->evaluate(it, swl, time).x : 1.5f;
-    auto roughness = _roughness ? _roughness->evaluate(it, swl, time).x : 1.f;
-    auto specular_tint = _specular_tint ? _specular_tint->evaluate(it, swl, time).x : 1.f;
-    auto anisotropic = _anisotropic ? _anisotropic->evaluate(it, swl, time).x : 0.f;
-    auto sheen = _sheen ? _sheen->evaluate(it, swl, time).x : 0.f;
-    auto sheen_tint = _sheen_tint ? _sheen_tint->evaluate(it, swl, time).x : 0.f;
-    auto clearcoat = _clearcoat ? _clearcoat->evaluate(it, swl, time).x : 0.f;
-    auto clearcoat_gloss = _clearcoat_gloss ? _clearcoat_gloss->evaluate(it, swl, time).x : 0.f;
-    auto specular_trans = _specular_trans ? _specular_trans->evaluate(it, swl, time).x : 0.f;
-    auto flatness = _flatness ? _flatness->evaluate(it, swl, time).x : 0.f;
-    auto diffuse_trans = _diffuse_trans ? _diffuse_trans->evaluate(it, swl, time).x : 0.f;
+    auto metallic = _metallic ? _metallic->evaluate(it, swl, time).value.x : 0.f;
+    auto eta = _eta ? _eta->evaluate(it, swl, time).value.x : 1.5f;
+    auto roughness = _roughness ? _roughness->evaluate(it, swl, time).value.x : 1.f;
+    auto specular_tint = _specular_tint ? _specular_tint->evaluate(it, swl, time).value.x : 1.f;
+    auto anisotropic = _anisotropic ? _anisotropic->evaluate(it, swl, time).value.x : 0.f;
+    auto sheen = _sheen ? _sheen->evaluate(it, swl, time).value.x : 0.f;
+    auto sheen_tint = _sheen_tint ? _sheen_tint->evaluate(it, swl, time).value.x : 0.f;
+    auto clearcoat = _clearcoat ? _clearcoat->evaluate(it, swl, time).value.x : 0.f;
+    auto clearcoat_gloss = _clearcoat_gloss ? _clearcoat_gloss->evaluate(it, swl, time).value.x : 0.f;
+    auto specular_trans = _specular_trans ? _specular_trans->evaluate(it, swl, time).value.x : 0.f;
+    auto flatness = _flatness ? _flatness->evaluate(it, swl, time).value.x : 0.f;
+    auto diffuse_trans = _diffuse_trans ? _diffuse_trans->evaluate(it, swl, time).value.x : 0.f;
     return luisa::make_unique<DisneySurfaceClosure>(
         this, it, swl, time,
-        color, metallic, eta, roughness,
+        color.value, color.scale,
+        metallic, eta, roughness,
         specular_tint, anisotropic,
         sheen, sheen_tint,
         clearcoat, clearcoat_gloss,

@@ -13,7 +13,14 @@ Texture::Texture(Scene *scene, const SceneNodeDesc *desc) noexcept
       _requires_grad{desc->property_bool_or_default("requires_grad", false)} {}
 
 ImageTexture::ImageTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
-    : Texture{scene, desc} {
+    : Texture{scene, desc},
+      _mapping{[desc] {
+          auto m = desc->property_string_or_default("mapping", "uv");
+          for (auto &c : m) { c = static_cast<char>(std::tolower(c)); }
+          if (m == "uv") { return Mapping::UV; }
+          if (m == "spherical") { return Mapping::SPHERICAL; }
+          LUISA_ERROR_WITH_LOCATION("Invalid texture mapping: {}.", m);
+      }()} {
     auto filter = desc->property_string_or_default("filter", "bilinear");
     auto address = desc->property_string_or_default("address", "repeat");
     for (auto &c : filter) { c = static_cast<char>(tolower(c)); }
@@ -66,24 +73,26 @@ luisa::unique_ptr<Texture::Instance> ImageTexture::build(Pipeline &pipeline, Com
         pipeline, this, tex_id, std::move(param));
 }
 
-Float4 ImageTexture::Instance::evaluate(const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
+Texture::Evaluation ImageTexture::Instance::evaluate(
+    const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto uv = _compute_uv(it);
     auto v = pipeline().tex2d(_texture_id).sample(uv);// TODO: LOD
     switch (node()->category()) {
         case Category::COLOR: {
             auto rsp = RGBSigmoidPolynomial{v.xyz()};
             auto spec = RGBAlbedoSpectrum{rsp};
-            return spec.sample(swl);
+            return {.value = spec.sample(swl), .scale = v.w};
         }
         case Category::ILLUMINANT: {
             auto rsp = RGBSigmoidPolynomial{v.xyz()};
             auto spec = RGBIlluminantSpectrum{
                 rsp, v.w, DenselySampledSpectrum::cie_illum_d65()};
-            return spec.sample(swl);
+            return {.value = spec.sample(swl),
+                    .scale = v.w};
         }
         default: break;
     }
-    return v;
+    return {.value = v, .scale = 1.f};
 }
 
 void ImageTexture::Instance::backward(

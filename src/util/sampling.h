@@ -33,12 +33,13 @@ struct AliasEntry {
 create_alias_table(luisa::span<const float> values) noexcept;
 
 template<typename Table>
-[[nodiscard]] auto sample_alias_table(const Table &table, Expr<uint> n, Expr<float> u_in) noexcept {
+[[nodiscard]] auto sample_alias_table(
+    const Table &table, Expr<uint> n, Expr<float> u_in, Expr<uint> offset = 0u) noexcept {
     using namespace luisa::compute;
     auto u = u_in * cast<float>(n);
     auto i = clamp(cast<uint>(u), 0u, n - 1u);
-    auto u_remapped = u - cast<float>(i);
-    auto entry = table.read(i);
+    auto u_remapped = fract(u);
+    auto entry = table.read(i + offset);
     auto index = ite(u_remapped < entry.prob, i, entry.alias);
     auto uu = ite(
         u_remapped < entry.prob, u_remapped / entry.prob,
@@ -47,13 +48,15 @@ template<typename Table>
 }
 
 template<typename ProbTable, typename AliasTable>
-[[nodiscard]] auto sample_alias_table(const ProbTable &probs, const AliasTable &indices, Expr<uint> n, Expr<float> u_in) noexcept {
+[[nodiscard]] auto sample_alias_table(
+    const ProbTable &probs, const AliasTable &indices,
+    Expr<uint> n, Expr<float> u_in, Expr<uint> offset = 0u) noexcept {
     using namespace luisa::compute;
     auto u = u_in * cast<float>(n);
     auto i = clamp(cast<uint>(u), 0u, n - 1u);
-    auto u_remapped = u - cast<float>(i);
-    auto prob = probs.read(i);
-    auto index = ite(u_remapped < prob, i, indices.read(i));
+    auto u_remapped = fract(u);
+    auto prob = probs.read(i + offset);
+    auto index = ite(u_remapped < prob, i, indices.read(i + offset));
     auto uu = ite(
         u_remapped < prob, u_remapped / prob,
         (u_remapped - prob) / (1.0f - prob));

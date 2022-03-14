@@ -19,6 +19,7 @@
 #include <base/environment.h>
 #include <base/light_sampler.h>
 #include <base/texture.h>
+#include <base/texture_mapping.h>
 #include <base/scene.h>
 
 namespace luisa::render {
@@ -169,6 +170,10 @@ Environment *Scene::load_environment(const SceneNodeDesc *desc) noexcept {
 
 Texture *Scene::load_texture(const SceneNodeDesc *desc) noexcept {
     return dynamic_cast<Texture *>(load_node(SceneNodeTag::TEXTURE, desc));
+}
+
+TextureMapping *Scene::load_texture_mapping(const SceneNodeDesc *desc) noexcept {
+    return dynamic_cast<TextureMapping *>(load_node(SceneNodeTag::TEXTURE_MAPPING, desc));
 }
 
 luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc) noexcept {

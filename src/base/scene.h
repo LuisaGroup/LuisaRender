@@ -33,6 +33,7 @@ class Transform;
 class LightSampler;
 class Environment;
 class Texture;
+class TextureMapping;
 
 class Scene {
 
@@ -69,6 +70,7 @@ public:
     [[nodiscard]] LightSampler *load_light_sampler(const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] Environment *load_environment(const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] Texture *load_texture(const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] TextureMapping *load_texture_mapping(const SceneNodeDesc *desc) noexcept;
 
 public:
     [[nodiscard]] static luisa::unique_ptr<Scene> create(const Context &ctx, const SceneDesc *desc) noexcept;

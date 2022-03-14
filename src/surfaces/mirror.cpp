@@ -128,14 +128,14 @@ luisa::unique_ptr<Surface::Closure> MirrorInstance::closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto alpha = def(make_float2(0.f));
     if (_roughness != nullptr) {
-        auto r = _roughness->evaluate(it, swl, time);
+        auto r = _roughness->evaluate(it, swl, time).value;
         auto remap = node<MirrorSurface>()->remap_roughness();
         auto r2a = [](auto &&x) noexcept { return TrowbridgeReitzDistribution::roughness_to_alpha(x); };
         alpha = _roughness->node()->channels() == 1u ?
                     (remap ? make_float2(r2a(r.x)) : r.xx()) :
                     (remap ? r2a(r.xy()) : r.xy());
     }
-    auto color = _color->evaluate(it, swl, time);
+    auto color = _color->evaluate(it, swl, time).value;
     return luisa::make_unique<MirrorClosure>(this, it, swl, time, color, alpha);
 }
 

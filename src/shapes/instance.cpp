@@ -18,8 +18,7 @@ public:
         : Shape{scene, desc}, _shape{scene->load_shape(desc->property_node("shape"))} {}
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] bool is_mesh() const noexcept override { return false; }
-    [[nodiscard]] span<const float3> positions() const noexcept override { return {}; }
-    [[nodiscard]] span<const Shape::VertexAttribute> attributes() const noexcept override { return {}; }
+    [[nodiscard]] span<const Vertex> vertices() const noexcept override { return {}; }
     [[nodiscard]] span<const Triangle> triangles() const noexcept override { return {}; }
     [[nodiscard]] span<const Shape *const> children() const noexcept override { return {&_shape, 1u}; }
     [[nodiscard]] bool deformable() const noexcept override { return false; }

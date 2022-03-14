@@ -32,6 +32,7 @@ public:
     [[nodiscard]] auto rsp_scale() const noexcept { return _rsp_scale; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] bool is_black() const noexcept override { return _rsp_scale.w == 0.0f; }
+    [[nodiscard]] bool is_constant() const noexcept override { return true; }
     [[nodiscard]] uint channels() const noexcept override { return 4u; }
     [[nodiscard]] Category category() const noexcept override { return Category::ILLUMINANT; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
@@ -47,7 +48,7 @@ public:
         const Pipeline &p, const Texture *t,
         luisa::optional<Differentiation::ConstantParameter> param) noexcept
         : Texture::Instance{p, t}, _diff_param{std::move(param)} {}
-    [[nodiscard]] Float4 evaluate(const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+    [[nodiscard]] Texture::Evaluation evaluate(const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         auto rsp_scale = [&] {
             return _diff_param ?
                        pipeline().differentiation().decode(*_diff_param) :
@@ -57,7 +58,7 @@ public:
         auto spec = RGBIlluminantSpectrum{
             rsp, rsp_scale.w,
             DenselySampledSpectrum::cie_illum_d65()};
-        return spec.sample(swl);
+        return {.value = spec.sample(swl), .scale = rsp_scale.w};
     }
     void backward(const Interaction &it, const SampledWavelengths &swl, Expr<float> time, Expr<float4> grad) const noexcept override {
         if (_diff_param) {

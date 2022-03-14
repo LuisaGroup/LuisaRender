@@ -34,7 +34,8 @@ public:
 
     struct Sample {
         Evaluation eval;
-        Var<Ray> shadow_ray;
+        Float3 wi;
+        Float distance;
     };
 
     class Instance;
@@ -59,7 +60,7 @@ public:
             const Interaction &it_light, Expr<float3> p_from) const noexcept = 0;
         [[nodiscard]] virtual Sample sample(
             Sampler::Instance &sampler, Expr<uint> light_inst_id,
-            const Interaction &it_from) const noexcept = 0;
+            Expr<float3> p_from) const noexcept = 0;
     };
 
     class Instance {

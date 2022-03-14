@@ -6,7 +6,7 @@ add_library(luisa-render-util SHARED
         spectrum.cpp spectrum.h
         spectrum_cie_xyz.inl.h
         spectrum_cie_illum_d65.inl.h
-        colorspace.cpp colorspace.h
+        colorspace.h
         srgb2spec.cpp
         half.h
         u64.h

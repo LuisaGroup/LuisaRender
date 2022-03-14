@@ -72,8 +72,6 @@ private:
     Accel _accel;
     TransformTree _transform_tree;
     BindlessArray _bindless_array;
-    luisa::unique_ptr<BufferArena> _position_buffer_arena;
-    luisa::unique_ptr<BufferArena> _attribute_buffer_arena;
     luisa::unique_ptr<BufferArena> _general_buffer_arena;
     size_t _bindless_buffer_count{0u};
     size_t _bindless_tex2d_count{0u};
@@ -91,8 +89,6 @@ private:
     luisa::vector<InstancedTransform> _dynamic_transforms;
     Buffer<Shape::Handle> _instance_buffer;
     luisa::vector<luisa::unique_ptr<Camera::Instance>> _cameras;
-    luisa::vector<luisa::unique_ptr<Filter::Instance>> _filters;
-    luisa::vector<luisa::unique_ptr<Film::Instance>> _films;
     luisa::unique_ptr<Integrator::Instance> _integrator;
     luisa::unique_ptr<LightSampler::Instance> _light_sampler;
     luisa::unique_ptr<Sampler::Instance> _sampler;
@@ -178,12 +174,13 @@ public:
     [[nodiscard]] auto &accel() const noexcept { return _accel; }
     [[nodiscard]] Differentiation &differentiation() noexcept;
     [[nodiscard]] const Differentiation &differentiation() const noexcept;
+    [[nodiscard]] auto &bindless_array() noexcept { return _bindless_array; }
     [[nodiscard]] auto &bindless_array() const noexcept { return _bindless_array; }
     [[nodiscard]] auto &transform_tree() const noexcept { return _transform_tree; }
     [[nodiscard]] auto instance_buffer() const noexcept { return _instance_buffer.view(); }
     [[nodiscard]] auto camera_count() const noexcept { return _cameras.size(); }
-    [[nodiscard]] std::tuple<Camera::Instance *, Film::Instance *, Filter::Instance *> camera(size_t i) noexcept;
-    [[nodiscard]] std::tuple<const Camera::Instance *, const Film::Instance *, const Filter::Instance *> camera(size_t i) const noexcept;
+    [[nodiscard]] auto camera(size_t i) noexcept { return _cameras[i].get(); }
+    [[nodiscard]] auto camera(size_t i) const noexcept { return _cameras[i].get(); }
     [[nodiscard]] auto surfaces() const noexcept { return luisa::span{_surfaces}; }
     [[nodiscard]] auto lights() const noexcept { return luisa::span{_lights}; }
     [[nodiscard]] auto instanced_lights() const noexcept { return luisa::span{_instanced_lights}; }
@@ -207,14 +204,12 @@ public:
     [[nodiscard]] Var<Hit> trace_closest(const Var<Ray> &ray) const noexcept;
     [[nodiscard]] Var<bool> trace_any(const Var<Ray> &ray) const noexcept;
     [[nodiscard]] luisa::unique_ptr<Interaction> interaction(const Var<Ray> &ray, const Var<Hit> &hit) const noexcept;
-    [[nodiscard]] std::pair<Var<Shape::Handle>, Var<float4x4>> instance(Expr<uint> index) const noexcept;
+    [[nodiscard]] Var<Shape::Handle> instance(Expr<uint> index) const noexcept;
+    [[nodiscard]] Float4x4 instance_to_world(Expr<uint> index) const noexcept;
     [[nodiscard]] Var<Triangle> triangle(const Var<Shape::Handle> &instance, Expr<uint> index) const noexcept;
-    [[nodiscard]] std::tuple<Var<float3> /* position */, Var<float3> /* ng */, Var<float> /* area */>
-    surface_point_geometry(const Var<Shape::Handle> &instance, const Var<float4x4> &shape_to_world,
-                           const Var<Triangle> &triangle, const Var<float3> &uvw) const noexcept;
-    [[nodiscard]] std::tuple<Var<float3> /* ns */, Var<float3> /* tangent */, Var<float2> /* uv */>
-    surface_point_attributes(const Var<Shape::Handle> &instance, const Var<float3x3> &shape_to_world_normal,
-                             const Var<Triangle> &triangle, const Var<float3> &uvw) const noexcept;
+    [[nodiscard]] ShadingAttribute shading_point(
+        const Var<Shape::Handle> &instance, const Var<Triangle> &triangle, const Var<float3> &uvw,
+        const Var<float4x4> &shape_to_world, const Var<float3x3> &shape_to_world_normal) const noexcept;
     [[nodiscard]] auto intersect(const Var<Ray> &ray) const noexcept { return interaction(ray, trace_closest(ray)); }
     [[nodiscard]] auto intersect_any(const Var<Ray> &ray) const noexcept { return trace_any(ray); }
 

@@ -430,16 +430,14 @@ Float4 MicrofacetTransmission::evaluate(Expr<float3> wo, Expr<float3> wi) const 
 
 Float4 MicrofacetTransmission::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u_in, Float *p) const noexcept {
     using namespace compute;
-    *p = 0.0f;
     auto swl_i_float = u_in.x * 4.f;
     auto swl_i = cast<int>(clamp(swl_i_float, 0.f, 3.f));
     auto eta = ite(cos_theta(wo) > 0.f, _eta_a / _eta_b, _eta_b / _eta_a)[swl_i];// TODO
     auto u = make_float2(fract(swl_i_float), u_in.y);
     auto wh = _distribution->sample_wh(wo, u);
     auto refr = refract(wo, wh, eta, wi);
-    auto valid = wo.z != 0.f & dot(wo, wh) > 0.f & refr;
-    *p = ite(valid, pdf(wo, *wi), 0.f);
-    return ite(valid, evaluate(wo, *wi), 0.f);
+    *p = pdf(wo, *wi);
+    return evaluate(wo, *wi);
 }
 
 Float MicrofacetTransmission::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {

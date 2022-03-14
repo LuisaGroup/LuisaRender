@@ -172,11 +172,11 @@ private:
 luisa::unique_ptr<Surface::Closure> PlasticInstance::closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     // TODO: ensure energy conservation
-    auto Kd = _kd->evaluate(it, swl, time);
-    auto Ks = _ks->evaluate(it, swl, time);
+    auto [Kd, Kd_scale] = _kd->evaluate(it, swl, time);
+    auto [Ks, Ks_scale] = _ks->evaluate(it, swl, time);
     auto alpha = def(make_float2(.5f));
     if (_roughness != nullptr) {
-        auto r = _roughness->evaluate(it, swl, time);
+        auto r = _roughness->evaluate(it, swl, time).value;
         auto remap = node<PlasticSurface>()->remap_roughness();
         auto r2a = [](auto &&x) noexcept { return TrowbridgeReitzDistribution::roughness_to_alpha(x); };
         alpha = _roughness->node()->channels() == 1u ?
@@ -186,9 +186,9 @@ luisa::unique_ptr<Surface::Closure> PlasticInstance::closure(
     auto eta = def(make_float4(1.5f));
     if (_eta != nullptr) {
         if (_eta->node()->channels() == 1u) {
-            eta = _eta->evaluate(it, swl, time).xxxx();
+            eta = _eta->evaluate(it, swl, time).value.xxxx();
         } else {
-            auto e = _eta->evaluate(it, swl, time).xyz();
+            auto e = _eta->evaluate(it, swl, time).value.xyz();
             auto inv_bb = sqr(1.f / make_float3(700.0f, 546.1f, 435.8f));
             auto m = make_float3x3(make_float3(1.f), inv_bb, sqr(inv_bb));
             auto c = inverse(m) * e;
@@ -200,11 +200,11 @@ luisa::unique_ptr<Surface::Closure> PlasticInstance::closure(
                 dot(c, make_float3(1.f, inv_ll.w, sqr(inv_ll.w))));
         }
     }
-    auto Kd_lum = swl.cie_y(Kd);
-    auto Ks_lum = swl.cie_y(Ks);
-    auto Kd_ratio = ite(Kd_lum == 0.f, 0.f, Kd_lum / (Kd_lum + Ks_lum));
+    auto Kd_ratio = ite(Kd_scale == 0.f, 0.f, Kd_scale / (Kd_scale + Ks_scale));
+    auto scale = 1.f / max(Kd_scale + Ks_scale, 1.f);
     return luisa::make_unique<PlasticClosure>(
-        this, it, swl, time, eta, Kd, Ks,
+        this, it, swl, time, eta,
+        Kd * scale, Ks * scale,
         alpha, clamp(Kd_ratio, .1f, .9f));
 }
 

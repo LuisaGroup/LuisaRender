@@ -76,15 +76,16 @@ public:
         auto pdf_area = cast<float>(it_light.shape()->triangle_count()) * (pdf_triangle / it_light.triangle_area());
         auto cos_wo = dot(it_light.wo(), it_light.shading().n());
         auto front_face = cos_wo > 0.0f;
-        auto L = light->texture()->evaluate(it_light, _swl, _time) *
+        auto L = light->texture()->evaluate(it_light, _swl, _time).value *
                  light->node<DiffuseLight>()->scale();
         auto pdf = distance_squared(it_light.p(), p_from) * pdf_area * (1.0f / cos_wo);
         return Light::Evaluation{.L = L, .pdf = ite(front_face, pdf, 0.0f)};
     }
-    [[nodiscard]] Light::Sample sample(Sampler::Instance &sampler, Expr<uint> light_inst_id, const Interaction &it_from) const noexcept override {
+    [[nodiscard]] Light::Sample sample(Sampler::Instance &sampler, Expr<uint> light_inst_id, Expr<float3> p_from) const noexcept override {
         auto light = instance<DiffuseLightInstance>();
         auto &&pipeline = light->pipeline();
-        auto [light_inst, light_to_world] = pipeline.instance(light_inst_id);
+        auto light_inst = pipeline.instance(light_inst_id);
+        auto light_to_world = pipeline.instance_to_world(light_inst_id);
         auto alias_table_buffer_id = light_inst->alias_table_buffer_id();
         auto [triangle_id, _] = sample_alias_table(
             pipeline.buffer<AliasEntry>(alias_table_buffer_id),
@@ -92,14 +93,13 @@ public:
         auto triangle = pipeline.triangle(light_inst, triangle_id);
         auto light_to_world_normal = transpose(inverse(make_float3x3(light_to_world)));
         auto uvw = sample_uniform_triangle(sampler.generate_2d());
-        auto [p, ng, area] = pipeline.surface_point_geometry(light_inst, light_to_world, triangle, uvw);
-        auto [ns, tangent, uv] = pipeline.surface_point_attributes(light_inst, light_to_world_normal, triangle, uvw);
-        Interaction it_light{
-            light_inst, light_inst_id, triangle_id, area, p,
-            normalize(it_from.p() - p), ng, uv, ns, tangent};
+        auto attrib = pipeline.shading_point(light_inst, triangle, uvw, light_to_world, light_to_world_normal);
+        auto wo = normalize(p_from - attrib.p);
+        Interaction it_light{light_inst, light_inst_id, triangle_id, wo, attrib};
         DiffuseLightClosure closure{light, _swl, _time};
-        return {.eval = closure.evaluate(it_light, it_from.p()),
-                .shadow_ray = it_from.spawn_ray_to(p)};
+        return {.eval = closure.evaluate(it_light, p_from),
+                .wi = normalize(attrib.p - p_from),
+                .distance = distance(attrib.p, p_from) * .9999f};
     }
 };
 

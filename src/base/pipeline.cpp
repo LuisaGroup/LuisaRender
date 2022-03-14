@@ -16,10 +16,6 @@ namespace luisa::render {
 inline Pipeline::Pipeline(Device &device) noexcept
     : _device{device},
       _bindless_array{device.create_bindless_array(bindless_array_capacity)},
-      _position_buffer_arena{luisa::make_unique<BufferArena>(
-          device, vertex_buffer_arena_size_elements * sizeof(float3))},
-      _attribute_buffer_arena{luisa::make_unique<BufferArena>(
-          device, vertex_buffer_arena_size_elements * sizeof(Shape::VertexAttribute))},
       _general_buffer_arena{luisa::make_unique<BufferArena>(device, 16_mb)} {}
 
 Pipeline::~Pipeline() noexcept = default;
@@ -52,49 +48,30 @@ void Pipeline::_process_shape(
         auto iter = _meshes.find(shape);
         if (iter == _meshes.end()) {
             auto mesh_geom = [&] {
-                auto positions = shape->positions();
-                auto attributes = shape->attributes();
+                auto vertices = shape->vertices();
                 auto triangles = shape->triangles();
-                if (positions.empty() || triangles.empty()) [[unlikely]] {
+                if (vertices.empty() || triangles.empty()) [[unlikely]] {
                     LUISA_ERROR_WITH_LOCATION("Found mesh without vertices.");
                 }
-                if (positions.size() != attributes.size()) [[unlikely]] {
-                    LUISA_ERROR_WITH_LOCATION(
-                        "Sizes of positions ({}) and "
-                        "attributes ({}) mismatch.",
-                        positions.size(), attributes.size());
-                }
-                auto hash = luisa::detail::xxh3_hash64(positions.data(), positions.size_bytes(), Hash64::default_seed);
-                hash = luisa::detail::xxh3_hash64(attributes.data(), attributes.size_bytes(), hash);
+                auto hash = luisa::detail::xxh3_hash64(vertices.data(), vertices.size_bytes(), Hash64::default_seed);
                 hash = luisa::detail::xxh3_hash64(triangles.data(), triangles.size_bytes(), hash);
                 auto [cache_iter, non_existent] = _mesh_cache.try_emplace(hash, MeshGeometry{});
                 if (!non_existent) { return cache_iter->second; }
 
                 // create mesh
-                auto position_buffer_view = _position_buffer_arena->allocate<float3>(positions.size());
-                auto attribute_buffer_view = _attribute_buffer_arena->allocate<Shape::VertexAttribute>(attributes.size());
-                if (position_buffer_view.offset() != attribute_buffer_view.offset()) [[unlikely]] {
-                    LUISA_ERROR_WITH_LOCATION("Position and attribute buffer offsets mismatch.");
-                }
-                auto index_offset = static_cast<uint>(position_buffer_view.offset());
-                luisa::vector<Triangle> offset_triangles(triangles.size());
-                std::transform(triangles.cbegin(), triangles.cend(), offset_triangles.begin(), [index_offset](auto t) noexcept {
-                    return Triangle{t.i0 + index_offset, t.i1 + index_offset, t.i2 + index_offset};
-                });
+                auto vertex_buffer = create<Buffer<Shape::Vertex>>(vertices.size());
                 auto triangle_buffer = create<Buffer<Triangle>>(triangles.size());
-                command_buffer << position_buffer_view.copy_from(positions.data())
-                               << attribute_buffer_view.copy_from(attributes.data())
-                               << triangle_buffer->copy_from(offset_triangles.data())
-                               << compute::commit();
-                auto mesh = create<Mesh>(position_buffer_view.original(), *triangle_buffer, shape->build_hint());
-                command_buffer << mesh->build()
+                auto mesh = create<Mesh>(*vertex_buffer, *triangle_buffer, shape->build_hint());
+                command_buffer << vertex_buffer->copy_from(vertices.data())
+                               << triangle_buffer->copy_from(triangles.data())
+                               << mesh->build()
                                << compute::commit();
                 // compute alias table
                 luisa::vector<float> triangle_areas(triangles.size());
-                std::transform(triangles.cbegin(), triangles.cend(), triangle_areas.begin(), [positions](auto t) noexcept {
-                    auto p0 = positions[t.i0];
-                    auto p1 = positions[t.i1];
-                    auto p2 = positions[t.i2];
+                std::transform(triangles.cbegin(), triangles.cend(), triangle_areas.begin(), [vertices](auto t) noexcept {
+                    auto p0 = vertices[t.i0].pos;
+                    auto p1 = vertices[t.i1].pos;
+                    auto p2 = vertices[t.i2].pos;
                     return std::abs(length(cross(p1 - p0, p2 - p0)));
                 });
                 auto [alias_table, pdf] = create_alias_table(triangle_areas);
@@ -103,12 +80,14 @@ void Pipeline::_process_shape(
                 command_buffer << alias_table_buffer_view.copy_from(alias_table.data())
                                << pdf_buffer_view.copy_from(pdf.data())
                                << compute::commit();
-                auto position_buffer_id = register_bindless(position_buffer_view.original());
-                auto attribute_buffer_id = register_bindless(attribute_buffer_view.original());
+                auto vertex_buffer_id = register_bindless(vertex_buffer->view());
                 auto triangle_buffer_id = register_bindless(triangle_buffer->view());
                 auto alias_buffer_id = register_bindless(alias_table_buffer_view);
                 auto pdf_buffer_id = register_bindless(pdf_buffer_view);
-                return cache_iter->second = {mesh, position_buffer_id};
+                LUISA_ASSERT(triangle_buffer_id - vertex_buffer_id == Shape::Handle::triangle_buffer_id_offset, "Invalid.");
+                LUISA_ASSERT(alias_buffer_id - vertex_buffer_id == Shape::Handle::alias_table_buffer_id_offset, "Invalid.");
+                LUISA_ASSERT(pdf_buffer_id - vertex_buffer_id == Shape::Handle::pdf_buffer_id_offset, "Invalid.");
+                return cache_iter->second = {mesh, vertex_buffer_id};
             }();
             // assign mesh data
             MeshData mesh{};
@@ -183,8 +162,6 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
             luisa::make_unique<Differentiation>(*pipeline);
     }
     pipeline->_cameras.reserve(scene.cameras().size());
-    pipeline->_films.reserve(scene.cameras().size());
-    pipeline->_filters.reserve(scene.cameras().size());
     auto command_buffer = stream.command_buffer();
     auto rgb2spec_t0 = pipeline->create<Volume<float>>(PixelStorage::FLOAT4, make_uint3(RGB2SpectrumTable::resolution));
     auto rgb2spec_t1 = pipeline->create<Volume<float>>(PixelStorage::FLOAT4, make_uint3(RGB2SpectrumTable::resolution));
@@ -200,8 +177,6 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     auto mean_time = 0.0;
     for (auto camera : scene.cameras()) {
         pipeline->_cameras.emplace_back(camera->build(*pipeline, command_buffer));
-        pipeline->_films.emplace_back(camera->film()->build(*pipeline, command_buffer));
-        pipeline->_filters.emplace_back(camera->filter()->build(*pipeline, command_buffer));
         mean_time += (camera->shutter_span().x + camera->shutter_span().y) * 0.5f;
     }
     mean_time *= 1.0 / static_cast<double>(scene.cameras().size());
@@ -224,7 +199,7 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     if (auto &&diff = pipeline->_differentiation) {
         diff->materialize(command_buffer);
     }
-    command_buffer << compute::commit();
+    command_buffer << compute::synchronize();
     return pipeline;
 }
 
@@ -257,56 +232,38 @@ void Pipeline::render(Stream &stream) noexcept {
     _integrator->render(stream);
 }
 
-std::tuple<Camera::Instance *, Film::Instance *, Filter::Instance *> Pipeline::camera(size_t i) noexcept {
-    return std::make_tuple(_cameras[i].get(), _films[i].get(), _filters[i].get());
+Var<Shape::Handle> Pipeline::instance(Expr<uint> i) const noexcept {
+    return _instance_buffer.read(i);
 }
 
-std::tuple<const Camera::Instance *, const Film::Instance *, const Filter::Instance *> Pipeline::camera(size_t i) const noexcept {
-    return std::make_tuple(_cameras[i].get(), _films[i].get(), _filters[i].get());
-}
-
-std::pair<Var<Shape::Handle>, Var<float4x4>> Pipeline::instance(Expr<uint> i) const noexcept {
-    auto instance = _instance_buffer.read(i);
-    auto transform = _accel.instance_to_world(i);
-    return std::make_pair(std::move(instance), std::move(transform));
+Float4x4 Pipeline::instance_to_world(Expr<uint> i) const noexcept {
+    return _accel.instance_to_world(i);
 }
 
 Var<Triangle> Pipeline::triangle(const Var<Shape::Handle> &instance, Expr<uint> i) const noexcept {
     return buffer<Triangle>(instance->triangle_buffer_id()).read(i);
 }
 
-std::tuple<Var<float3>, Var<float3>, Var<float>> Pipeline::surface_point_geometry(
-    const Var<Shape::Handle> &instance, const Var<float4x4> &shape_to_world,
-    const Var<Triangle> &triangle, const Var<float3> &uvw) const noexcept {
-
-    auto world = [&m = shape_to_world](auto &&p) noexcept {
-        return make_float3(m * make_float4(std::forward<decltype(p)>(p), 1.0f));
-    };
-    auto p_buffer = instance->position_buffer_id();
-    auto p0 = world(buffer<float3>(p_buffer).read(triangle.i0));
-    auto p1 = world(buffer<float3>(p_buffer).read(triangle.i1));
-    auto p2 = world(buffer<float3>(p_buffer).read(triangle.i2));
+ShadingAttribute Pipeline::shading_point(
+    const Var<Shape::Handle> &instance, const Var<Triangle> &triangle, const Var<float3> &uvw,
+    const Var<float4x4> &shape_to_world, const Var<float3x3> &shape_to_world_normal) const noexcept {
+    auto v_buffer = instance->vertex_buffer_id();
+    auto v0 = buffer<Shape::Vertex>(v_buffer).read(triangle.i0);
+    auto v1 = buffer<Shape::Vertex>(v_buffer).read(triangle.i1);
+    auto v2 = buffer<Shape::Vertex>(v_buffer).read(triangle.i2);
+    auto p0 = make_float3(shape_to_world * make_float4(v0->position(), 1.f));
+    auto p1 = make_float3(shape_to_world * make_float4(v1->position(), 1.f));
+    auto p2 = make_float3(shape_to_world * make_float4(v2->position(), 1.f));
     auto p = uvw.x * p0 + uvw.y * p1 + uvw.z * p2;
     auto c = cross(p1 - p0, p2 - p0);
     auto area = 0.5f * length(c);
     auto ng = normalize(c);
-    return std::make_tuple(std::move(p), std::move(ng), std::move(area));
-}
-
-std::tuple<Var<float3>, Var<float3>, Var<float2>> Pipeline::surface_point_attributes(
-    const Var<Shape::Handle> &instance, const Var<float3x3> &shape_to_world_normal, const Var<Triangle> &triangle, const Var<float3> &uvw) const noexcept {
-    auto a0 = buffer<Shape::VertexAttribute>(instance->attribute_buffer_id()).read(triangle.i0);
-    auto a1 = buffer<Shape::VertexAttribute>(instance->attribute_buffer_id()).read(triangle.i1);
-    auto a2 = buffer<Shape::VertexAttribute>(instance->attribute_buffer_id()).read(triangle.i2);
-    auto interpolate = [&](auto &&a, auto &&b, auto &&c) noexcept {
-        return uvw.x * std::forward<decltype(a)>(a) +
-               uvw.y * std::forward<decltype(b)>(b) +
-               uvw.z * std::forward<decltype(c)>(c);
-    };
-    auto normal = normalize(shape_to_world_normal * interpolate(a0->normal(), a1->normal(), a2->normal()));
-    auto tangent = normalize(shape_to_world_normal * interpolate(a0->tangent(), a1->tangent(), a2->tangent()));
-    auto uv = interpolate(a0->uv(), a1->uv(), a2->uv());
-    return std::make_tuple(std::move(normal), std::move(tangent), std::move(uv));
+    auto uv = uvw.x * v0->uv() + uvw.y * v1->uv() + uvw.z * v2->uv();
+    auto ns_local = uvw.x * v0->normal() + uvw.y * v1->normal() + uvw.z * v2->normal();
+    auto tangent_local = uvw.x * v0->tangent() + uvw.y * v1->tangent() + uvw.z * v2->tangent();
+    auto ns = normalize(shape_to_world_normal * ns_local);
+    auto tangent = normalize(shape_to_world_normal * tangent_local);
+    return {.p = p, .ng = ng, .ns = ns, .tangent = tangent, .uv = uv, .area = area};
 }
 
 Var<Hit> Pipeline::trace_closest(const Var<Ray> &ray) const noexcept { return _accel.trace_closest(ray); }
@@ -319,21 +276,14 @@ luisa::unique_ptr<Interaction> Pipeline::interaction(const Var<Ray> &ray, const 
         it = Interaction{-ray->direction()};
     }
     $else {
-        auto [shape, shape_to_world] = instance(hit.inst);
-        auto shape_to_world_normal = transpose(inverse(make_float3x3(shape_to_world)));
+        auto shape = instance(hit.inst);
+        auto m = instance_to_world(hit.inst);
+        auto n = transpose(inverse(make_float3x3(m)));
         auto tri = triangle(shape, hit.prim);
-        auto [p, ng, area] = surface_point_geometry(
-            shape, shape_to_world, tri,
-            make_float3(1.0f - hit.bary.x - hit.bary.y, hit.bary));
-        auto [ns, t, uv] = surface_point_attributes(
-            shape, shape_to_world_normal, tri,
-            make_float3(1.0f - hit.bary.x - hit.bary.y, hit.bary));
+        auto uvw = make_float3(1.0f - hit.bary.x - hit.bary.y, hit.bary);
+        auto attrib = shading_point(shape, tri, uvw, m, n);
         auto wo = -ray->direction();
-        auto &shape_ref = shape;
-        auto &uv_ref = uv;
-        it = Interaction{
-            std::move(shape), hit.inst, hit.prim,
-            area, p, wo, ng, uv, ns, t};
+        it = Interaction{std::move(shape), hit.inst, hit.prim, wo, attrib};
     };
     return luisa::make_unique<Interaction>(std::move(it));
 }

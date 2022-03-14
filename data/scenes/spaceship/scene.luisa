@@ -1344,7 +1344,7 @@ Camera camera : Pinhole {
   front { 0.13595250248908997, -0.05167683959007263, -0.9893665909767151 }
   up { 0.0, 1.0, 0.0 }
   fov { 35.98339777135762 }
-  spp { 1024 }
+  spp { 4096 }
   filter : Gaussian {
     radius { 1 }
   }
@@ -1356,7 +1356,9 @@ Camera camera : Pinhole {
 
 render {
   cameras { @camera }
-  integrator : MegaPath {}
+  integrator : MegaPath {
+    display { true }
+  }
   shapes {
     @shape_0,
     @shape_1,
