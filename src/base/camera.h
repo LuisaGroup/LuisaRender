@@ -10,6 +10,7 @@
 #include <base/sampler.h>
 #include <base/film.h>
 #include <base/filter.h>
+#include <base/texture.h>
 
 namespace luisa::render {
 
@@ -37,6 +38,7 @@ public:
         const Camera *_camera;
         luisa::unique_ptr<Film::Instance> _film;
         luisa::unique_ptr<Filter::Instance> _filter;
+        const Texture::Instance *_target;
 
     private:
         // generate ray in camera space, should not consider _filter and/or _transform
@@ -55,6 +57,7 @@ public:
         [[nodiscard]] auto filter() noexcept { return _filter.get(); }
         [[nodiscard]] auto film() const noexcept { return _film.get(); }
         [[nodiscard]] auto filter() const noexcept { return _filter.get(); }
+        [[nodiscard]] auto target() const noexcept { return _target; }
         [[nodiscard]] Sample generate_ray(
             Sampler::Instance &sampler, Expr<uint2> pixel_coord,
             Expr<float> time, Expr<float4x4> camera_to_world) const noexcept;

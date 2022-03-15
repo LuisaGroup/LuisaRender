@@ -16,7 +16,6 @@
 #include <base/surface.h>
 #include <base/transform.h>
 #include <base/integrator.h>
-#include <base/grad_integrator.h>
 #include <base/interaction.h>
 #include <base/light_sampler.h>
 #include <base/environment.h>
