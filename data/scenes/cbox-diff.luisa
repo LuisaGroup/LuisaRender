@@ -8,18 +8,18 @@ Camera camera : Pinhole {
   fov { 27.8 }
   spp { 1024 }
   film { @film }
-  file { "../renders/cbox.exr" }
+  file { "../renders/cbox-diff.exr" }
   filter : Gaussian {
     radius { 1 }
   }
+  target { "../renders/cbox.exr" }
 }
 
 import "../meshes/cbox.luisa"
 
-Integrator pt : MegaPath {
+Integrator pt : MegaPathGrad {
   sampler : Independent {}
   depth { 10 }
-  display { true }
 }
 
 Integrator normal : Normal {}
