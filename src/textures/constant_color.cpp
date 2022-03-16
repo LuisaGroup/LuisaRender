@@ -62,8 +62,9 @@ public:
             auto g = make_float4(
                 dot(grad, sqr(swl.lambda())),
                 dot(grad, swl.lambda()),
-                dot(grad, make_float4(1.f)), 0.f);
-            pipeline().differentiation().accumulate(*_diff_param, g);
+                dot(grad, make_float4(1.f)),
+                0.f);
+            pipeline().differentiation().accumulate(*_diff_param, grad);
         }
     }
 };

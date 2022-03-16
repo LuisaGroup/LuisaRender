@@ -93,7 +93,8 @@ public:
         }
 
         // back propagate
-        pipeline().differentiation().step(command_buffer, 1.0f);
+
+        pipeline().differentiation().step(command_buffer, 0.02f);
 
         // save results
         for (auto i = 0u; i < pipeline().camera_count(); i++) {
@@ -188,9 +189,8 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
         auto pdf_bsdf = def(0.0f);
 
         auto Li = def(make_float4(1.0f));
-        auto d_Li = def(make_float4(0.0f));
 
-        $for(depth, pt_exact->max_depth()) {
+        $for(depth, 1u) {
 
             // trace
             auto it = pipeline.intersect(ray);
@@ -229,7 +229,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
 
                     // radiative bp
                     // TODO : how to accumulate grads with different swl
-                    closure->backward(wi, beta * Li);
+                    closure->backward(wi, beta * Li / static_cast<float>(pixel_count));
 
                     beta *= ite(
                         eval.pdf > 0.0f,
