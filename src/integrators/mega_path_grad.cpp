@@ -76,6 +76,7 @@ public:
         auto pt = node<MegakernelGradRadiative>();
         auto command_buffer = stream.command_buffer();
         luisa::vector<float4> pixels;
+        pipeline().printer().reset(stream);
 
         // render
         for (auto i = 0u; i < pipeline().camera_count(); i++) {
@@ -124,6 +125,8 @@ public:
                     film_path.string());
             }
         }
+
+        std::cout << pipeline().printer().retrieve(stream);
     }
 };
 
@@ -158,7 +161,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
         sampler->start(pixel_id, frame_index);
         auto [camera_ray, camera_weight] = camera->generate_ray(*sampler, pixel_id, time, camera_to_world);
         auto swl = SampledWavelengths::sample_visible(sampler->generate_1d());
-        auto beta = make_float4(camera_weight * shutter_weight);
+        auto beta = make_float4(camera_weight * shutter_weight / float(pixel_count));
 
         auto it = Interaction{
             make_float3(1.0f),
@@ -229,7 +232,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
 
                     // radiative bp
                     // TODO : how to accumulate grads with different swl
-                    closure->backward(wi, beta * Li / static_cast<float>(pixel_count));
+                    closure->backward(wi, beta * Li);
 
                     beta *= ite(
                         eval.pdf > 0.0f,
@@ -281,6 +284,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
 
     command_buffer << commit();
     command_buffer << synchronize();
+
     LUISA_INFO("Backward propagation finished in {} ms.", clock.toc());
 }
 

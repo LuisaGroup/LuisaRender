@@ -99,7 +99,7 @@ void Differentiation::apply_gradients(CommandBuffer &command_buffer, float alpha
     luisa::vector<float4> debug_gradients(n);
     luisa::vector<float4> params_after(n);
     command_buffer << _const_param_buffer.subview(0u, n).copy_to(params_before.data())
-                   << _grad_buffer->subview(0u, n).copy_to(debug_gradients.data())
+                   << _grad_buffer->subview(0u, 4 * n).copy_to(debug_gradients.data())
                    << _apply_grad_const(*_grad_buffer, _const_param_buffer, alpha)
                           .dispatch(n)
                    << _const_param_buffer.subview(0u, n).copy_to(params_after.data())
@@ -109,10 +109,10 @@ void Differentiation::apply_gradients(CommandBuffer &command_buffer, float alpha
         auto g = debug_gradients[i];
         auto p1 = params_after[i];
         LUISA_INFO(
-            "Param #{}: "
-            "before = ({}, {}, {}, {}), "
-            "grad = ({}, {}, {}, {}), "
-            "after = ({}, {}, {}, {}).",
+            "Param #{}: \n"
+            "before = ({}, {}, {}, {}), \n"
+            "grad   = ({}, {}, {}, {}), \n"
+            "after  = ({}, {}, {}, {}).",
             i,
             p0.x, p0.y, p0.z, p0.w,
             g.x, g.y, g.z, g.w,

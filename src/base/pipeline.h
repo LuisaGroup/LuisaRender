@@ -22,6 +22,8 @@
 #include <base/texture.h>
 #include <base/differentiation.h>
 
+#include <compute/src/dsl/printer.h>
+
 namespace luisa::render {
 
 using compute::Accel;
@@ -39,6 +41,7 @@ using compute::Hit;
 using compute::Image;
 using compute::Mesh;
 using compute::PixelStorage;
+using compute::Printer;
 using compute::Ray;
 using compute::Resource;
 using compute::Triangle;
@@ -95,6 +98,8 @@ private:
     uint _rgb2spec_index{0u};
     float _mean_time{0.0f};
     luisa::unique_ptr<Differentiation> _differentiation;
+
+    Printer _printer;
 
 private:
     void _build_geometry(
@@ -192,6 +197,7 @@ public:
         CommandBuffer &command_buffer, const Texture *texture) noexcept;
     bool update_geometry(CommandBuffer &command_buffer, float time) noexcept;
     void render(Stream &stream) noexcept;
+    [[nodiscard]] auto &printer() noexcept { return _printer; }
 
     template<typename T, typename I>
     [[nodiscard]] auto buffer(I &&i) const noexcept { return _bindless_array.buffer<T>(std::forward<I>(i)); }
