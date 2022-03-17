@@ -53,48 +53,6 @@ struct PathStateSOA {
     }
 };
 
-struct RaySOA {
-    Buffer<float3> origin;
-    Buffer<float3> direction;
-    Buffer<float> t_max;
-    RaySOA(Device &device, size_t size) noexcept
-        : origin{device.create_buffer<float3>(size)},
-          direction{device.create_buffer<float3>(size)},
-          t_max{device.create_buffer<float>(size)} {}
-    [[nodiscard]] auto read(Expr<uint> i) const noexcept {
-        auto o = origin.read(i);
-        auto d = direction.read(i);
-        auto t = t_max.read(i);
-        return make_ray(o, d, 0.f, t);
-    }
-    void write(Expr<uint> i, const Var<Ray> &ray) const noexcept {
-        origin.write(i, ray->origin());
-        direction.write(i, ray->direction());
-        t_max.write(i, ray->t_max());
-    }
-};
-
-struct HitSOA {
-    Buffer<uint> inst;
-    Buffer<uint> prim;
-    Buffer<float2> bary;
-    HitSOA(Device &device, size_t size) noexcept
-        : inst{device.create_buffer<uint>(size)},
-          prim{device.create_buffer<uint>(size)},
-          bary{device.create_buffer<float2>(size)} {}
-    [[nodiscard]] auto read(Expr<uint> i) const noexcept {
-        auto inst_id = inst.read(i);
-        auto prim_id = prim.read(i);
-        auto uv = bary.read(i);
-        return def<Hit>(inst_id, prim_id, uv);
-    }
-    void write(Expr<uint> i, Expr<Hit> hit) const noexcept {
-        inst.write(i, hit.inst);
-        prim.write(i, hit.prim);
-        bary.write(i, hit.bary);
-    }
-};
-
 struct LightSampleSOA {
     Buffer<float4> L;
     Buffer<float> pdf;
@@ -140,7 +98,7 @@ public:
 class WavefrontPathTracingInstance final : public Integrator::Instance {
 
 private:
-    void _render_one_camera(CommandBuffer &path_indices, Camera::Instance *path_count) noexcept;
+    void _render_one_camera(CommandBuffer &command_buffer, Camera::Instance *camera) noexcept;
 
 public:
     explicit WavefrontPathTracingInstance(const WavefrontPathTracing *node, Pipeline &pipeline) noexcept
@@ -501,9 +459,11 @@ void WavefrontPathTracingInstance::_render_one_camera(
                     command_buffer << evaluate_miss_shader(path_indices, rays, miss_indices, miss_count, env_to_world, time)
                                           .dispatch(pixel_count);
                 }
-                command_buffer << evaluate_light_shader(path_indices, rays, hits, light_indices, light_count, time)
-                                      .dispatch(pixel_count)
-                               << sample_light_shader(path_indices, rays, hits, surface_indices, surface_count, env_to_world, time)
+                if (light_sampler != nullptr) {
+                    command_buffer << evaluate_light_shader(path_indices, rays, hits, light_indices, light_count, time)
+                                          .dispatch(pixel_count);
+                }
+                command_buffer << sample_light_shader(path_indices, rays, hits, surface_indices, surface_count, env_to_world, time)
                                       .dispatch(pixel_count)
                                << evaluate_surface_shader(path_indices, depth, surface_indices, surface_count,
                                                           rays, hits, out_rays, out_path_indices, out_path_count, time)
