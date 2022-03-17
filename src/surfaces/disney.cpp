@@ -204,12 +204,12 @@ public:
         // Burley 2015, eq (4).
         return R * inv_pi * (1.f - Fo * .5f) * (1.f - Fi * .5f);
     }
-    [[nodiscard]] luisa::vector<Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+    [[nodiscard]] luisa::map<luisa::string, Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
         auto Fo = SchlickWeight(abs_cos_theta(wo));
         auto Fi = SchlickWeight(abs_cos_theta(wi));
 
         auto d_r = make_float4(inv_pi * (1.f - Fo * .5f) * (1.f - Fi * .5f));
-        return {d_r};
+        return {{"d_r", d_r}};
     }
 };
 
@@ -238,7 +238,7 @@ public:
         auto ss = 1.25f * (Fss * (1.f / (abs_cos_theta(wo) + abs_cos_theta(wi)) - .5f) + .5f);
         return ite(valid, R * inv_pi * ss, 0.f);
     }
-    [[nodiscard]] luisa::vector<Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+    [[nodiscard]] luisa::map<luisa::string, Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
         // TODO
         LUISA_ERROR_WITH_LOCATION("unimplemented");
     }
@@ -266,7 +266,7 @@ public:
         auto f = R * inv_pi * Rr * (Fo + Fi + Fo * Fi * (Rr - 1.f));
         return ite(valid, f, 0.f);
     }
-    [[nodiscard]] luisa::vector<Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+    [[nodiscard]] luisa::map<luisa::string, Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
         // TODO
         LUISA_ERROR_WITH_LOCATION("unimplemented");
     }
@@ -286,7 +286,7 @@ public:
         auto cosThetaD = dot(wi, wh);
         return ite(valid, R * SchlickWeight(cosThetaD), 0.f);
     }
-    [[nodiscard]] luisa::vector<Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+    [[nodiscard]] luisa::map<luisa::string, Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
         // TODO
         LUISA_ERROR_WITH_LOCATION("unimplemented");
     }
@@ -354,7 +354,7 @@ public:
         auto Dr = GTR1(abs_cos_theta(wh), gloss);
         return ite(valid, Dr * abs_cos_theta(wh) / (4.f * dot(wo, wh)), 0.f);
     }
-    [[nodiscard]] luisa::vector<Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+    [[nodiscard]] luisa::map<luisa::string, Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
         // TODO
         LUISA_ERROR_WITH_LOCATION("unimplemented");
     }
@@ -379,9 +379,12 @@ public:
             metallic);
     }
     [[nodiscard]] auto eta() const noexcept { return e; }
-    [[nodiscard]] luisa::vector<Float4> grad(Expr<float> cosThetaI) const noexcept override {
+    [[nodiscard]] luisa::map<luisa::string, Float4> grad(Expr<float> cosThetaI) const noexcept override {
         // TODO
         LUISA_ERROR_WITH_LOCATION("unimplemented");
+    }
+    [[nodiscard]] bool differentiable() const noexcept override {
+        return true;
     }
 };
 
@@ -459,7 +462,7 @@ public:
         auto metallic = ite(front_face, metallic_in, 0.f);
         auto specular_trans = (1.f - metallic) * specular_trans_in;
         auto diffuse_weight = (1.f - metallic) * (1.f - specular_trans);
-        auto dt = diffuse_trans * .5f;// 0: all diffuse is reflected -> 1, transmitted
+        auto dt = diffuse_trans * .5f;                            // 0: all diffuse is reflected -> 1, transmitted
         auto Ctint = ite(color_lum > 0.f, color / color_lum, 1.f);// normalize lum. to isolate hue+sat
         auto eta = ite(eta_in < black_threshold, 1.5f, eta_in);
         auto thin = instance->thin();

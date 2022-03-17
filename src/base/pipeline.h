@@ -22,8 +22,6 @@
 #include <base/texture.h>
 #include <base/differentiation.h>
 
-#include <compute/src/dsl/printer.h>
-
 namespace luisa::render {
 
 using compute::Accel;

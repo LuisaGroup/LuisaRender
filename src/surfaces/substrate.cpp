@@ -134,8 +134,8 @@ private:
             auto wi_local = _it.shading().world_to_local(wi);
             auto grad_params = _blend.grad(wo_local, wi_local);
 
-            _instance->Kd()->backward(_it, _swl, _time, grad_params[0] * grad);
-            _instance->Ks()->backward(_it, _swl, _time, grad_params[1] * grad);
+            _instance->Kd()->backward(_it, _swl, _time, grad_params["d_rd"] * grad);
+            _instance->Ks()->backward(_it, _swl, _time, grad_params["d_rs"] * grad);
         };
     }
 };

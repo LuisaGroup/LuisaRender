@@ -81,9 +81,12 @@ public:
         auto weight = sqr(sqr(m)) * m;
         return lerp(R0, 1.f, weight);
     }
-    [[nodiscard]] luisa::vector<Float4> grad(Expr<float> cosThetaI) const noexcept override {
+    [[nodiscard]] luisa::map<luisa::string, Float4> grad(Expr<float> cosThetaI) const noexcept override {
         // TODO
         LUISA_ERROR_WITH_LOCATION("unimplemented");
+    }
+    [[nodiscard]] bool differentiable() const noexcept override {
+        return true;
     }
 };
 

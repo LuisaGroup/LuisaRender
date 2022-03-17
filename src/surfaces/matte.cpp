@@ -111,9 +111,9 @@ private:
             auto wi_local = _it.shading().world_to_local(wi);
             auto grad_params = _oren_nayar.grad(wo_local, wi_local);
 
-            _instance->Kd()->backward(_it, _swl, _time, grad_params[0] * grad);
+            _instance->Kd()->backward(_it, _swl, _time, grad_params["d_r"] * grad);
             if (auto sigma = _instance->Sigma()) {
-                sigma->backward(_it, _swl, _time, grad_params[1] * grad);
+                sigma->backward(_it, _swl, _time, grad_params["d_sigma"] * grad);
             }
         }
     }
