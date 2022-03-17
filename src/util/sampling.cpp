@@ -29,14 +29,23 @@ Float cosine_hemisphere_pdf(Expr<float> cos_theta) noexcept {
 std::pair<luisa::vector<AliasEntry>, luisa::vector<float>>
 create_alias_table(luisa::span<const float> values) noexcept {
 
-    auto sum = std::reduce(values.cbegin(), values.cend(), 0.0);
-    auto inv_sum = 1.0 / sum;
+    auto sum = 0.0;
+    for (auto v : values) { sum += std::abs(v); }
     luisa::vector<float> pdf(values.size());
-    std::transform(
-        values.cbegin(), values.cend(), pdf.begin(),
-        [inv_sum](auto v) noexcept {
-            return static_cast<float>(v * inv_sum);
-        });
+    if (sum == 0.) [[unlikely]] {
+        LUISA_WARNING_WITH_LOCATION(
+            "All-zero values in alias table construction. "
+            "Fallback to uniform sampling density.");
+        auto n = static_cast<double>(values.size());
+        std::fill(pdf.begin(), pdf.end(), 1.0 / n);
+    } else [[likely]] {
+        auto inv_sum = 1.0 / sum;
+        std::transform(
+            values.cbegin(), values.cend(), pdf.begin(),
+            [inv_sum](auto v) noexcept {
+                return static_cast<float>(std::abs(v) * inv_sum);
+            });
+    }
 
     auto ratio = static_cast<double>(values.size()) / sum;
     static thread_local luisa::vector<uint> over;

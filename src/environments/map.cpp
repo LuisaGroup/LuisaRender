@@ -150,7 +150,7 @@ unique_ptr<Environment::Instance> EnvironmentMapping::build(
             auto scale = texture->evaluate(it, {}, 0.f).scale;
             auto sin_theta = sin(uv.y * pi);
             auto pixel_id = coord.y * sample_map_size.x + coord.x;
-            scale_map_device.write(pixel_id, max(sin_theta * scale, 1e-2f));
+            scale_map_device.write(pixel_id, sin_theta * scale);
         };
         auto generate_weight_map = device.compile(generate_weight_map_kernel);
         command_buffer << generate_weight_map().dispatch(sample_map_size)
@@ -159,7 +159,7 @@ unique_ptr<Environment::Instance> EnvironmentMapping::build(
         auto sum_scale = 0.;
         for (auto s : scale_map) { sum_scale += s; }
         auto average_scale = static_cast<float>(sum_scale / pixel_count);
-        for (auto &&s : scale_map) { s = std::max(s - average_scale, 1e-2f); }
+        for (auto &&s : scale_map) { s = std::max(s - average_scale, 0.f); }
         luisa::vector<float> row_averages(sample_map_size.y);
         luisa::vector<float> pdfs(pixel_count);
         luisa::vector<AliasEntry> aliases(sample_map_size.y + pixel_count);

@@ -1021,7 +1021,7 @@ Camera camera : Pinhole {
   film : Color {
     resolution { 1280, 720 }
   }
-  file { "color.exr" }
+  file { "color-wavefront.exr" }
 }
 
 render {

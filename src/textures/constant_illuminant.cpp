@@ -63,13 +63,11 @@ public:
     void backward(const Interaction &it, const SampledWavelengths &swl, Expr<float> time, Expr<float4> grad) const noexcept override {
         if (_diff_param) {
             auto v = pipeline().differentiation().decode(*_diff_param);
-            auto spec = RGBSigmoidPolynomial{v.xyz()}(swl.lambda());
-            auto g = make_float4(
-                v.w * dot(grad, sqr(swl.lambda())),
-                v.w * dot(grad, swl.lambda()),
-                v.w * dot(grad, make_float4(1.f)),
-                dot(grad, spec));
-            pipeline().differentiation().accumulate(*_diff_param, g);
+            auto spec = RGBIlluminantSpectrum{
+                RGBSigmoidPolynomial{v.xyz()}, v.w,
+                DenselySampledSpectrum::cie_illum_d65()};
+            pipeline().differentiation().accumulate(
+                *_diff_param, spec.backward(grad));
         }
     }
 };

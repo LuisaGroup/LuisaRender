@@ -25,6 +25,16 @@ Float4 RGBSigmoidPolynomial::_s(Expr<float4> x) noexcept {
         0.5f + 0.5f * x * rsqrt(1.0f + x * x));
 }
 
+Float RGBSigmoidPolynomial::_grad_s(Expr<float> x) noexcept {
+    auto xx_plus_one = x * x + 1.f;
+    return .5f / (xx_plus_one * sqrt(xx_plus_one));
+}
+
+Float4 RGBSigmoidPolynomial::_grad_s(Expr<float4> x) noexcept {
+    auto xx_plus_one = x * x + 1.f;
+    return .5f / (xx_plus_one * sqrt(xx_plus_one));
+}
+
 Float RGBSigmoidPolynomial::operator()(Expr<float> lambda) const noexcept {
     using luisa::compute::fma;
     return _s(fma(lambda, fma(lambda, _c0, _c1), _c2));// c0 * x * x + c1 * x + c2
@@ -45,6 +55,18 @@ Float RGBSigmoidPolynomial::maximum() const noexcept {
         visible_wavelength_min,
         visible_wavelength_max));
     return max(edge, mid);
+}
+
+Float3 RGBSigmoidPolynomial::grad(Expr<float> lambda) const noexcept {
+    using namespace luisa::compute;
+    auto dPoly_dC0 = lambda * lambda;
+    auto dPoly_dC1 = lambda;
+    auto dPoly_dC2 = 1.f;
+    auto dS_dPoly = _grad_s(_s(lambda));
+    auto dS_dC0 = dS_dPoly * dPoly_dC0;
+    auto dS_dC1 = dS_dPoly * dPoly_dC1;
+    auto dS_dC2 = dS_dPoly * dPoly_dC2;
+    return make_float3(dS_dC0, dS_dC1, dS_dC2);
 }
 
 Bool SampledWavelengths::operator==(const SampledWavelengths &rhs) const noexcept {
@@ -183,6 +205,7 @@ namespace detail {
 [[nodiscard]] inline auto inverse_smooth_step(auto x) noexcept {
     return 0.5f - sin(asin(1.0f - 2.0f * x) * (1.0f / 3.0f));
 }
+
 }// namespace detail
 
 // from PBRT-v4: https://github.com/mmp/pbrt-v4/blob/master/src/pbrt/util/color.cpp
@@ -229,7 +252,6 @@ float3 RGB2SpectrumTable::decode_albedo(float3 rgb_in) const noexcept {
     return c;
 }
 
-// FIXME: producing monochrome images...
 RGBSigmoidPolynomial RGB2SpectrumTable::decode_albedo(Expr<BindlessArray> array, Expr<uint> base_index, Expr<float3> rgb_in) const noexcept {
     using namespace luisa::compute;
     static Callable decode = [](BindlessVar array, UInt base_index, Float3 rgb_in) noexcept {
@@ -276,6 +298,38 @@ std::pair<RGBSigmoidPolynomial, Float> RGB2SpectrumTable::decode_unbound(
         array, base_index,
         ite(scale == 0.0f, 0.0f, rgb / scale));
     return std::make_pair(std::move(c), std::move(scale));
+}
+
+Float3 RGBAlbedoSpectrum::backward(const SampledWavelengths &swl, Expr<float4> dSpec) const noexcept {
+    auto lambda = swl.lambda();
+    return dSpec[0] * _rsp.grad(lambda[0]) +
+           dSpec[1] * _rsp.grad(lambda[1]) +
+           dSpec[2] * _rsp.grad(lambda[2]) +
+           dSpec[3] * _rsp.grad(lambda[3]);
+}
+
+Float4 RGBUnboundSpectrum::backward(const SampledWavelengths &swl, Expr<float4> dSpec) const noexcept {
+    auto lambda = swl.lambda();
+    auto dScale = dot(dSpec, _rsp(lambda));
+    return make_float4(
+        _scale * (dSpec[0] * _rsp.grad(lambda[0]) +
+                  dSpec[1] * _rsp.grad(lambda[1]) +
+                  dSpec[2] * _rsp.grad(lambda[2]) +
+                  dSpec[3] * _rsp.grad(lambda[3])),
+        dScale);
+}
+
+Float4 RGBIlluminantSpectrum::backward(const SampledWavelengths &swl, Expr<float4> dSpec) const noexcept {
+    auto illum = _illuminant->sample(swl);
+    auto lambda = swl.lambda();
+    auto dIllum = dSpec * illum;
+    auto dScale = dot(dIllum, _rsp(lambda));
+    return make_float4(
+        _scale * (dIllum[0] * _rsp.grad(lambda[0]) +
+                  dIllum[1] * _rsp.grad(lambda[1]) +
+                  dIllum[2] * _rsp.grad(lambda[2]) +
+                  dIllum[3] * _rsp.grad(lambda[3])),
+        dScale);
 }
 
 }// namespace luisa::render

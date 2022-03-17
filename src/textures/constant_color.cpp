@@ -59,11 +59,11 @@ public:
     }
     void backward(const Interaction &it, const SampledWavelengths &swl, Expr<float> time, Expr<float4> grad) const noexcept override {
         if (_diff_param) {
-            auto g = make_float4(
-                dot(grad, sqr(swl.lambda())),
-                dot(grad, swl.lambda()),
-                dot(grad, make_float4(1.f)), 0.f);
-            pipeline().differentiation().accumulate(*_diff_param, g);
+            auto v = pipeline().differentiation().decode(*_diff_param);
+            auto spec = RGBAlbedoSpectrum{RGBSigmoidPolynomial{v.xyz()}};
+            pipeline().differentiation().accumulate(
+                *_diff_param,
+                make_float4(spec.backward(swl, grad), 0.f));
         }
     }
 };

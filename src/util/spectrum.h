@@ -36,6 +36,8 @@ private:
 private:
     [[nodiscard]] static Float _s(Expr<float> x) noexcept;
     [[nodiscard]] static Float4 _s(Expr<float4> x) noexcept;
+    [[nodiscard]] static Float _grad_s(Expr<float> x) noexcept;
+    [[nodiscard]] static Float4 _grad_s(Expr<float4> x) noexcept;
 
 public:
     RGBSigmoidPolynomial() noexcept = default;
@@ -47,6 +49,7 @@ public:
     [[nodiscard]] Float4 operator()(Expr<float4> lambda) const noexcept;
     [[nodiscard]] Float maximum() const noexcept;
     [[nodiscard]] auto c() const noexcept { return make_float3(_c0, _c1, _c2); }
+    [[nodiscard]] Float3 grad(Expr<float> lambda) const noexcept;
 };
 
 class RGB2SpectrumTable {
@@ -133,6 +136,7 @@ public:
         return _rsp(swl.lambda());
     }
     [[nodiscard]] auto rsp() const noexcept { return _rsp; }
+    [[nodiscard]] Float3 backward(const SampledWavelengths &swl, Expr<float4> dSpec) const noexcept;
 };
 
 class RGBUnboundSpectrum {
@@ -149,6 +153,7 @@ public:
     }
     [[nodiscard]] auto rsp() const noexcept { return _rsp; }
     [[nodiscard]] auto scale() const noexcept { return _scale; }
+    [[nodiscard]] Float4 backward(const SampledWavelengths &swl, Expr<float4> dSpec) const noexcept;
 };
 
 class RGBIlluminantSpectrum {
@@ -170,6 +175,7 @@ public:
     }
     [[nodiscard]] auto rsp() const noexcept { return _rsp; }
     [[nodiscard]] auto scale() const noexcept { return _scale; }
+    [[nodiscard]] Float4 backward(const SampledWavelengths &swl, Expr<float4> dSpec) const noexcept;
 };
 
 }// namespace luisa::render
