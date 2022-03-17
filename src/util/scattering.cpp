@@ -391,15 +391,15 @@ luisa::map<luisa::string, Float4> MicrofacetReflection::grad(Expr<float3> wo, Ex
     auto wh = wi + wo;
     auto valid = cosThetaI != 0.f & cosThetaO != 0.f & any(wh != 0.f);
     wh = normalize(wh);
-    auto cosThetaI_grad = dot(wi, face_forward(wh, make_float3(0.f, 0.f, 1.f)));
-    auto F = _fresnel->evaluate(cosThetaI_grad);
+    auto cosI = dot(wi, face_forward(wh, make_float3(0.f, 0.f, 1.f)));
+    auto F = _fresnel->evaluate(cosI);
     auto D = _distribution->D(wh);
     auto G = _distribution->G(wo, wi);
 
     // backward
     luisa::map<luisa::string, Float4> grad_fresnel;
     if (_fresnel->differentiable())
-        grad_fresnel = _fresnel->grad(cosThetaI_grad);
+        grad_fresnel = _fresnel->grad(cosI);
     auto d_f = ite(valid, 1.f, 0.f);
     auto d_r = d_f * 0.25f * D * G * F / (cosThetaI * cosThetaO);
     auto d_F = d_f * 0.25f * _r * D * G / (cosThetaI * cosThetaO);

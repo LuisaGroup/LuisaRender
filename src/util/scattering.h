@@ -58,7 +58,7 @@ struct Fresnel {
     virtual ~Fresnel() noexcept = default;
     [[nodiscard]] virtual bool differentiable() const noexcept = 0;
     [[nodiscard]] virtual Float4 evaluate(Expr<float> cosI) const noexcept = 0;
-    [[nodiscard]] virtual luisa::map<luisa::string, Float4> grad(Expr<float> cosThetaI) const noexcept = 0;
+    [[nodiscard]] virtual luisa::map<luisa::string, Float4> grad(Expr<float> cosI) const noexcept = 0;
 };
 
 class FresnelConductor final : public Fresnel {
@@ -70,7 +70,7 @@ public:
     FresnelConductor(Expr<float4> etaI, Expr<float4> etaT, Expr<float4> k) noexcept
         : _eta_i{etaI}, _eta_t{etaT}, _k{k} {}
     [[nodiscard]] Float4 evaluate(Expr<float> cosThetaI) const noexcept override;
-    [[nodiscard]] luisa::map<luisa::string, Float4> grad(Expr<float> cosThetaI) const noexcept override;
+    [[nodiscard]] luisa::map<luisa::string, Float4> grad(Expr<float> cosI) const noexcept override;
     [[nodiscard]] bool differentiable() const noexcept override;
 };
 
@@ -91,7 +91,7 @@ public:
 
 struct FresnelNoOp final : public Fresnel {
     [[nodiscard]] Float4 evaluate(Expr<float> cosThetaI) const noexcept override;
-    [[nodiscard]] luisa::map<luisa::string, Float4> grad(Expr<float> cosThetaI) const noexcept override;
+    [[nodiscard]] luisa::map<luisa::string, Float4> grad(Expr<float> cosI) const noexcept override;
     [[nodiscard]] bool differentiable() const noexcept override;
 };
 

@@ -379,7 +379,7 @@ public:
             metallic);
     }
     [[nodiscard]] auto eta() const noexcept { return e; }
-    [[nodiscard]] luisa::map<luisa::string, Float4> grad(Expr<float> cosThetaI) const noexcept override {
+    [[nodiscard]] luisa::map<luisa::string, Float4> grad(Expr<float> cosI) const noexcept override {
         // TODO
         LUISA_ERROR_WITH_LOCATION("unimplemented");
     }
