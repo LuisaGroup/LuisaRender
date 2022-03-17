@@ -59,8 +59,11 @@ Float RGBSigmoidPolynomial::maximum() const noexcept {
 
 Float3 RGBSigmoidPolynomial::grad(Expr<float> lambda) const noexcept {
     using namespace luisa::compute;
-    auto dPoly_dC0 = lambda * lambda;
-    auto dPoly_dC1 = lambda;
+    // FIXME: valid normalization?
+    auto x = (lambda - visible_wavelength_min) /
+             (visible_wavelength_max - visible_wavelength_min);
+    auto dPoly_dC0 = x * x;
+    auto dPoly_dC1 = x;
     auto dPoly_dC2 = 1.f;
     auto dS_dPoly = _grad_s(_s(lambda));
     auto dS_dC0 = dS_dPoly * dPoly_dC0;
