@@ -59,12 +59,8 @@ public:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
 
-    [[nodiscard]] auto Kd() const noexcept {
-        return _kd;
-    }
-    [[nodiscard]] auto Sigma() const noexcept {
-        return _sigma;
-    }
+    [[nodiscard]] auto Kd() const noexcept { return _kd; }
+    [[nodiscard]] auto Sigma() const noexcept { return _sigma; }
 };
 
 luisa::unique_ptr<Surface::Instance> MatteSurface::_build(
@@ -106,15 +102,20 @@ private:
     }
 
     void backward(Expr<float3> wi, Expr<float4> grad) const noexcept override {
-        auto wo_local = _it.wo_local();
-        auto wi_local = _it.shading().world_to_local(wi);
-        auto grad_params = _oren_nayar.grad(wo_local, wi_local);
+        auto _instance = instance<MatteInstance>();
+        auto requires_grad_kd = _instance->Kd()->node()->requires_gradients();
+        auto requires_grad_sigma = _instance->Sigma() != nullptr &&
+                                   _instance->Sigma()->node()->requires_gradients();
+        if (requires_grad_kd || requires_grad_sigma) {
+            auto wo_local = _it.wo_local();
+            auto wi_local = _it.shading().world_to_local(wi);
+            auto grad_params = _oren_nayar.grad(wo_local, wi_local);
 
-        instance<MatteInstance>()->Kd()->backward(_it, _swl, _time,
-                                                  grad_params[0] * grad);
-
-        // TODO
-        LUISA_ERROR_WITH_LOCATION("unimplemented");
+            _instance->Kd()->backward(_it, _swl, _time, grad_params[0] * grad);
+            if (auto sigma = _instance->Sigma()) {
+                sigma->backward(_it, _swl, _time, grad_params[1] * grad);
+            }
+        }
     }
 };
 

@@ -10,6 +10,7 @@
 #include <base/transform.h>
 #include <sdl/scene_node_desc.h>
 #include <base/camera.h>
+#include <base/pipeline.h>
 
 namespace luisa::render {
 
@@ -26,7 +27,8 @@ Camera::Camera(Scene *scene, const SceneNodeDesc *desc) noexcept
                   "shutter_span", 0.0f));
           }))},
       _shutter_samples{desc->property_uint_or_default("shutter_samples", 0u)},// 0 means default
-      _spp{desc->property_uint_or_default("spp", 1024u)} {
+      _spp{desc->property_uint_or_default("spp", 1024u)},
+      _target{scene->load_texture(desc->property_node_or_default("target"))} {
 
     if (_shutter_span.y < _shutter_span.x) [[unlikely]] {
         LUISA_ERROR(
@@ -184,7 +186,8 @@ auto Camera::shutter_samples() const noexcept -> vector<ShutterSample> {
 Camera::Instance::Instance(Pipeline &pipeline, CommandBuffer &command_buffer, const Camera *camera) noexcept
     : _pipeline{pipeline}, _camera{camera},
       _film{camera->film()->build(pipeline, command_buffer)},
-      _filter{camera->filter()->build(pipeline, command_buffer)} {}
+      _filter{camera->filter()->build(pipeline, command_buffer)},
+      _target{pipeline.build_texture(command_buffer, camera->target())} {}
 
 Camera::Sample Camera::Instance::generate_ray(
     Sampler::Instance &sampler, Expr<uint2> pixel_coord,

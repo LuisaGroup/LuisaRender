@@ -67,7 +67,7 @@ public:
                 RGBSigmoidPolynomial{v.xyz()}, v.w,
                 DenselySampledSpectrum::cie_illum_d65()};
             pipeline().differentiation().accumulate(
-                *_diff_param, spec.backward(grad));
+                *_diff_param, spec.backward(swl, grad));
         }
     }
 };

@@ -605,7 +605,6 @@ public:
         return evaluate_local(wo_local, wi_local);
     }
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
-
         // TODO: weighted sampling
 
         auto u = sampler.generate_2d();

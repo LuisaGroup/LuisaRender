@@ -14,6 +14,8 @@ Differentiation::Differentiation(Pipeline &pipeline) noexcept
       _const_param_buffer{*pipeline.create<Buffer<float4>>(constant_parameter_buffer_capacity)},
       _gradient_buffer_size{constant_parameter_buffer_capacity * 4u} {
 
+    _constant_params.reserve(constant_parameter_buffer_capacity);
+
     using namespace compute;
     Kernel1D clear_grad = [](BufferUInt gradients) noexcept {
         gradients.write(dispatch_x(), 0u);
@@ -80,8 +82,8 @@ Differentiation::TexturedParameter Differentiation::parameter(const Image<float>
 void Differentiation::materialize(CommandBuffer &command_buffer) noexcept {
     LUISA_ASSERT(!_grad_buffer, "Differentiation already materialized.");
     _grad_buffer.emplace(*_pipeline.create<Buffer<uint>>(_gradient_buffer_size));
-    auto n = _constant_params.size();
-    command_buffer << _const_param_buffer.subview(0u, n).copy_from(_constant_params.data());
+    auto n = static_cast<uint>(_constant_params.size());
+    command_buffer << _const_param_buffer.subview(0u, std::max(n, 1u)).copy_from(_constant_params.data());
     clear_gradients(command_buffer);
 }
 
@@ -92,8 +94,30 @@ void Differentiation::clear_gradients(CommandBuffer &command_buffer) noexcept {
 
 void Differentiation::apply_gradients(CommandBuffer &command_buffer, float alpha) noexcept {
     LUISA_ASSERT(_grad_buffer, "Gradient buffer is not materialized.");
-    command_buffer << _apply_grad_const(*_grad_buffer, _const_param_buffer, alpha)
-                          .dispatch(_constant_params.size());
+    auto n = std::max(static_cast<uint>(_constant_params.size()), 1u);
+    luisa::vector<float4> params_before(n);
+    luisa::vector<float4> debug_gradients(n);
+    luisa::vector<float4> params_after(n);
+    command_buffer << _const_param_buffer.subview(0u, n).copy_to(params_before.data())
+                   << _grad_buffer->subview(0u, 4 * n).copy_to(debug_gradients.data())
+                   << _apply_grad_const(*_grad_buffer, _const_param_buffer, alpha)
+                          .dispatch(n)
+                   << _const_param_buffer.subview(0u, n).copy_to(params_after.data())
+                   << compute::synchronize();
+    for (auto i = 0u; i < _constant_params.size(); i++) {
+        auto p0 = params_before[i];
+        auto g = debug_gradients[i];
+        auto p1 = params_after[i];
+        LUISA_INFO(
+            "Param #{}: \n"
+            "before = ({}, {}, {}, {}), \n"
+            "grad   = ({}, {}, {}, {}), \n"
+            "after  = ({}, {}, {}, {}).",
+            i,
+            p0.x, p0.y, p0.z, p0.w,
+            g.x, g.y, g.z, g.w,
+            p1.x, p1.y, p1.z, p1.w);
+    }
     for (auto &&p : _textured_params) {
         auto image = p.image().view();
         auto offset = p.gradient_buffer_offset();

@@ -164,6 +164,8 @@ private:
                          .eta = make_float4(1.f)}};
     }
     void backward(Expr<float3> wi, Expr<float4> grad) const noexcept override {
+        // TODO
+        LUISA_ERROR_WITH_LOCATION("unimplemented");
     }
 };
 

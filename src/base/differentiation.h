@@ -39,7 +39,7 @@ public:
         ConstantParameter(uint index, uint channels) noexcept
             : _index{index}, _channels{channels} {}
         [[nodiscard]] auto index() const noexcept { return _index; }
-        [[nodiscard]] auto channels() const noexcept { return _index; }
+        [[nodiscard]] auto channels() const noexcept { return _channels; }
     };
 
     class TexturedParameter {

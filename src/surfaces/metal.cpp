@@ -499,6 +499,7 @@ private:
         return {.wi = wi, .eval = {.f = f, .pdf = pdf, .alpha = _distrib.alpha(), .eta = make_float4(1.f)}};
     }
     void backward(Expr<float3> wi, Expr<float4> grad) const noexcept override {
+        LUISA_ERROR_WITH_LOCATION("metal material is not differentiable");
     }
 };
 

@@ -10,7 +10,7 @@ namespace luisa::render {
 
 Texture::Texture(Scene *scene, const SceneNodeDesc *desc) noexcept
     : SceneNode{scene, desc, SceneNodeTag::TEXTURE},
-      _requires_grad{desc->property_bool_or_default("requires_grad")} {}
+      _requires_grad{desc->property_bool_or_default("requires_grad", false)} {}
 
 ImageTexture::ImageTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
     : Texture{scene, desc},
@@ -115,7 +115,7 @@ void ImageTexture::Instance::backward(
                     RGBSigmoidPolynomial{v.xyz()}, v.w,
                     DenselySampledSpectrum::cie_illum_d65()};
                 pipeline().differentiation().accumulate(
-                    *_diff_param, uv, spec.backward(grad));
+                    *_diff_param, uv, spec.backward(swl, grad));
                 break;
             }
             case Category::GENERIC: {

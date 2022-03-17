@@ -37,7 +37,7 @@ Filter::Instance::Instance(const Pipeline &pipeline, const Filter *filter) noexc
         _lut[i + 1u] = filter->evaluate(x);
         auto f_mid = 0.5f * (_lut[i] + _lut[i + 1u]);
         integral += f_mid;
-        abs_f[i] = abs(f_mid);
+        abs_f[i] = std::abs(f_mid);
     }
     auto inv_integral = 1.0f / integral;
     for (auto &f : _lut) { f *= inv_integral; }
