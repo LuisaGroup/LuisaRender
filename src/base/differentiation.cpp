@@ -82,7 +82,7 @@ Differentiation::TexturedParameter Differentiation::parameter(const Image<float>
 void Differentiation::materialize(CommandBuffer &command_buffer) noexcept {
     LUISA_ASSERT(!_grad_buffer, "Differentiation already materialized.");
     _grad_buffer.emplace(*_pipeline.create<Buffer<uint>>(std::max(_gradient_buffer_size, 1u)));
-    if (auto n = _gradient_buffer_size) {
+    if (auto n = _constant_params.size()) {
         command_buffer << _const_param_buffer.subview(0u, n)
                               .copy_from(_constant_params.data());
         clear_gradients(command_buffer);

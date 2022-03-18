@@ -16,7 +16,7 @@ Camera camera : Pinhole {
 
 import "../meshes/cbox.luisa"
 
-Integrator pt : WavePath {
+Integrator pt : MegaPath {
   sampler : Independent {}
   depth { 10 }
   // display { true }

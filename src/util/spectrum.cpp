@@ -9,6 +9,9 @@
 
 namespace luisa::render {
 
+static constexpr auto rsp_coefficient_scales = make_float3(10000.f, 10.f, 0.01f);
+static constexpr auto inv_rsp_coefficient_scales = make_float3(1e-4f, 1e-1f, 1e2f);
+
 inline Float RGBSigmoidPolynomial::_s(Expr<float> x) noexcept {
     using namespace luisa::compute;
     return ite(
@@ -35,14 +38,16 @@ Float4 RGBSigmoidPolynomial::_grad_s(Expr<float4> x) noexcept {
     return .5f / (xx_plus_one * sqrt(xx_plus_one));
 }
 
-Float RGBSigmoidPolynomial::operator()(Expr<float> lambda) const noexcept {
+Float RGBSigmoidPolynomial::operator()(Expr<float> lambda_ns) const noexcept {
     using luisa::compute::fma;
-    return _s(fma(lambda, fma(lambda, _c0, _c1), _c2));// c0 * x * x + c1 * x + c2
+    auto lambda = lambda_ns * 1e-3f;
+    return _s(fma(lambda, fma(lambda, _c.x, _c.y), _c.z));// c0 * x * x + c1 * x + c2
 }
 
-Float4 RGBSigmoidPolynomial::operator()(Expr<float4> lambda) const noexcept {
+Float4 RGBSigmoidPolynomial::operator()(Expr<float4> lambda_ns) const noexcept {
     using luisa::compute::fma;
-    return _s(fma(lambda, fma(lambda, _c0, _c1), _c2));// c0 * x * x + c1 * x + c2
+    auto lambda = lambda_ns * 1e-3f;
+    return _s(fma(lambda, fma(lambda, _c.x, _c.y), _c.z));// c0 * x * x + c1 * x + c2
 }
 
 Float RGBSigmoidPolynomial::maximum() const noexcept {
@@ -51,26 +56,32 @@ Float RGBSigmoidPolynomial::maximum() const noexcept {
         (*this)(visible_wavelength_min),
         (*this)(visible_wavelength_max));
     auto mid = (*this)(clamp(
-        -_c1 / (2.0f * _c0),
+        -_c.y / (2.0f * _c.x),
         visible_wavelength_min,
         visible_wavelength_max));
     return max(edge, mid);
 }
 
-Float3 RGBSigmoidPolynomial::grad(Expr<float> lambda) const noexcept {
+Float3 RGBSigmoidPolynomial::grad(Expr<float> lambda_ns) const noexcept {
     using namespace luisa::compute;
-    // FIXME: valid normalization?
-    auto x = (lambda - visible_wavelength_min) /
-             (visible_wavelength_max - visible_wavelength_min);
-    auto dPoly_dC0 = x * x;
-    auto dPoly_dC1 = x;
+    auto lambda = lambda_ns * 1e-3f;
+    auto dPoly_dC0 = lambda * lambda;
+    auto dPoly_dC1 = lambda;
     auto dPoly_dC2 = 1.f;
-    auto dS_dPoly = _grad_s(_s(lambda));
+    auto poly = fma(lambda, fma(lambda, _c.x, _c.y), _c.z);
+    auto dS_dPoly = _grad_s(poly);
     auto dS_dC0 = dS_dPoly * dPoly_dC0;
     auto dS_dC1 = dS_dPoly * dPoly_dC1;
     auto dS_dC2 = dS_dPoly * dPoly_dC2;
-    return make_float3(dS_dC0, dS_dC1, dS_dC2);
+    return make_float3(dS_dC0, dS_dC1, dS_dC2) *
+        (rsp_coefficient_scales * make_float3(1e-6f, 1e-3f, 1.f));
 }
+
+RGBSigmoidPolynomial::RGBSigmoidPolynomial(Expr<float> c0, Expr<float> c1, Expr<float> c2) noexcept
+    : _c{make_float3(c0, c1, c2) * inv_rsp_coefficient_scales * make_float3(1e6f, 1e3f, 1.f)} {}
+
+RGBSigmoidPolynomial::RGBSigmoidPolynomial(Expr<float3> c) noexcept
+    : _c{c * inv_rsp_coefficient_scales * make_float3(1e6f, 1e3f, 1.f)} {}
 
 Bool SampledWavelengths::operator==(const SampledWavelengths &rhs) const noexcept {
     return all(_lambda == rhs._lambda) & all(_pdf == rhs._pdf);
@@ -190,11 +201,10 @@ Float3 SampledWavelengths::srgb(Expr<float4> values) const noexcept {
     return cie_xyz_to_linear_srgb(cie_xyz(values));
 }
 
-extern "C" RGB2SpectrumTable::scale_table_type sRGBToSpectrumTable_Scale;
-extern "C" RGB2SpectrumTable::coefficient_table_type sRGBToSpectrumTable_Data;
+extern RGB2SpectrumTable::coefficient_table_type sRGBToSpectrumTable_Data;
 
 RGB2SpectrumTable RGB2SpectrumTable::srgb() noexcept {
-    return {sRGBToSpectrumTable_Scale, sRGBToSpectrumTable_Data};
+    return RGB2SpectrumTable{sRGBToSpectrumTable_Data};
 }
 
 void RGB2SpectrumTable::encode(CommandBuffer &command_buffer, VolumeView<float> t0, VolumeView<float> t1, VolumeView<float> t2) const noexcept {
@@ -215,8 +225,8 @@ namespace detail {
 float3 RGB2SpectrumTable::decode_albedo(float3 rgb_in) const noexcept {
     auto rgb = clamp(rgb_in, 0.0f, 1.0f);
     if (rgb[0] == rgb[1] && rgb[1] == rgb[2]) {
-        return make_float3(
-            0.0f, 0.0f, (rgb[0] - 0.5f) / std::sqrt(rgb[0] * (1.0f - rgb[0])));
+        return rsp_coefficient_scales *
+               make_float3(0.0f, 0.0f, (rgb[0] - 0.5f) / std::sqrt(rgb[0] * (1.0f - rgb[0])));
     }
 
     // Find maximum component and compute remapped component values
@@ -259,8 +269,8 @@ RGBSigmoidPolynomial RGB2SpectrumTable::decode_albedo(Expr<BindlessArray> array,
     using namespace luisa::compute;
     static Callable decode = [](BindlessVar array, UInt base_index, Float3 rgb_in) noexcept {
         auto rgb = clamp(rgb_in, 0.0f, 1.0f);
-        auto c = make_float3(
-            0.0f, 0.0f, (rgb[0] - 0.5f) / sqrt(rgb[0] * (1.0f - rgb[0])));
+        auto c = rsp_coefficient_scales *
+                 make_float3(0.0f, 0.0f, (rgb[0] - 0.5f) / sqrt(rgb[0] * (1.0f - rgb[0])));
         $if(rgb[0] != rgb[1] | rgb[1] != rgb[2]) {
             // Find maximum component and compute remapped component values
             auto maxc = ite(

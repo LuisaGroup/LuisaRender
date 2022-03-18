@@ -28,10 +28,7 @@ using compute::VolumeView;
 class RGBSigmoidPolynomial {
 
 private:
-    Float _c0;
-    Float _c1;
-    Float _c2;
-    luisa::optional<Float> _maximum;
+    Float3 _c;
 
 private:
     [[nodiscard]] static Float _s(Expr<float> x) noexcept;
@@ -41,14 +38,11 @@ private:
 
 public:
     RGBSigmoidPolynomial() noexcept = default;
-    RGBSigmoidPolynomial(Expr<float> c0, Expr<float> c1, Expr<float> c2) noexcept
-        : _c0{c0}, _c1{c1}, _c2{c2} {}
-    explicit RGBSigmoidPolynomial(Expr<float3> c) noexcept
-        : RGBSigmoidPolynomial{c.x, c.y, c.z} {}
+    RGBSigmoidPolynomial(Expr<float> c0, Expr<float> c1, Expr<float> c2) noexcept;
+    explicit RGBSigmoidPolynomial(Expr<float3> c) noexcept;
     [[nodiscard]] Float operator()(Expr<float> lambda) const noexcept;
     [[nodiscard]] Float4 operator()(Expr<float4> lambda) const noexcept;
     [[nodiscard]] Float maximum() const noexcept;
-    [[nodiscard]] auto c() const noexcept { return make_float3(_c0, _c1, _c2); }
     [[nodiscard]] Float3 grad(Expr<float> lambda) const noexcept;
 };
 
@@ -56,16 +50,14 @@ class RGB2SpectrumTable {
 
 public:
     static constexpr auto resolution = 64u;
-    using scale_table_type = const float[resolution];
     using coefficient_table_type = const float[3][resolution][resolution][resolution][4];
 
 private:
-    const scale_table_type &_z_nodes;
     const coefficient_table_type &_coefficients;
 
 public:
-    constexpr RGB2SpectrumTable(const scale_table_type &z_nodes, const coefficient_table_type &coefficients) noexcept
-        : _z_nodes{z_nodes}, _coefficients{coefficients} {}
+    explicit constexpr RGB2SpectrumTable(const coefficient_table_type &coefficients) noexcept
+        : _coefficients{coefficients} {}
     constexpr RGB2SpectrumTable(RGB2SpectrumTable &&) noexcept = default;
     constexpr RGB2SpectrumTable(const RGB2SpectrumTable &) noexcept = default;
     [[nodiscard]] static RGB2SpectrumTable srgb() noexcept;

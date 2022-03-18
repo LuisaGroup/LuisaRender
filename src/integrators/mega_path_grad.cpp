@@ -95,7 +95,7 @@ public:
 
         // back propagate
 
-        pipeline().differentiation().step(command_buffer, 0.02f);
+        pipeline().differentiation().step(command_buffer, 10.f);
 
         // save results
         for (auto i = 0u; i < pipeline().camera_count(); i++) {
@@ -333,7 +333,7 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
         auto pt_exact = pt->node<MegakernelGradRadiative>();
 
         auto ray = camera_ray;
-        auto pdf_bsdf = def(0.0f);
+        auto pdf_bsdf = def(1e16f);
 
         auto Li = def(make_float4(0.0f));
 
