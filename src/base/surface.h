@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <util/spectrum.h>
+#include <util/spec.h>
 #include <base/scene_node.h>
 #include <base/texture.h>
 #include <base/sampler.h>

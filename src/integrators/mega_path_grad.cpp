@@ -35,23 +35,25 @@ public:
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)} {
         auto loss_str = desc->property_string_or_default("loss", "L2");
-        const static luisa::fixed_map<luisa::string, Loss, 2> loss_map{
-            {"L1", Loss::L1},
-            {"L2", Loss::L2},
-        };
-        auto iter = loss_map.find(loss_str);
-        if (iter != loss_map.end())
-            _loss_function = iter->second;
-        else
+        for (auto &c : loss_str) { c = static_cast<char>(toupper(c)); }
+        if (loss_str == "L1") {
+            _loss_function = Loss::L1;
+        } else if (loss_str == "L2") {
             _loss_function = Loss::L2;
+        } else {
+            LUISA_WARNING_WITH_LOCATION(
+                "unknown loss '{}'. "
+                "Fallback to L2 loss.",
+                loss_str);
+        }
     }
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
     [[nodiscard]] auto loss() const noexcept { return _loss_function; }
     [[nodiscard]] bool differentiable() const noexcept override { return true; }
-    [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
 class MegakernelGradRadiativeInstance final : public Integrator::Instance {

@@ -127,7 +127,6 @@ public:
     [[nodiscard]] auto sample(const SampledWavelengths &swl) const noexcept {
         return _rsp(swl.lambda());
     }
-    [[nodiscard]] auto rsp() const noexcept { return _rsp; }
     [[nodiscard]] Float3 backward(const SampledWavelengths &swl, Expr<float4> dSpec) const noexcept;
 };
 
@@ -143,7 +142,6 @@ public:
     [[nodiscard]] auto sample(const SampledWavelengths &swl) const noexcept {
         return _rsp(swl.lambda()) * _scale;
     }
-    [[nodiscard]] auto rsp() const noexcept { return _rsp; }
     [[nodiscard]] auto scale() const noexcept { return _scale; }
     [[nodiscard]] Float4 backward(const SampledWavelengths &swl, Expr<float4> dSpec) const noexcept;
 };
@@ -165,7 +163,6 @@ public:
     [[nodiscard]] auto sample(const SampledWavelengths &swl) const noexcept {
         return _rsp(swl.lambda()) * _scale * _illuminant->sample(swl);
     }
-    [[nodiscard]] auto rsp() const noexcept { return _rsp; }
     [[nodiscard]] auto scale() const noexcept { return _scale; }
     [[nodiscard]] Float4 backward(const SampledWavelengths &swl, Expr<float4> dSpec) const noexcept;
 };

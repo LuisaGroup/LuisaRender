@@ -6,7 +6,7 @@
 
 #include <rtx/ray.h>
 #include <runtime/bindless_array.h>
-#include <util/spectrum.h>
+#include <util/spec.h>
 #include <base/scene_node.h>
 #include <base/sampler.h>
 #include <base/shape.h>

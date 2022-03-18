@@ -5,7 +5,7 @@
 #include <dsl/syntax.h>
 #include <dsl/sugar.h>
 #include <util/colorspace.h>
-#include <util/spectrum.h>
+#include <util/spec.h>
 
 namespace luisa::render {
 
@@ -124,8 +124,8 @@ SampledWavelengths SampledWavelengths::sample_visible(Expr<float> u) noexcept {
     return {lambda, pdf};
 }
 
-#include <util/spectrum_cie_xyz.inl.h>
-#include <util/spectrum_cie_illum_d65.inl.h>
+#include <util/spec_cie_xyz.inl.h>
+#include <util/spec_cie_illum_d65.inl.h>
 
 const DenselySampledSpectrum &DenselySampledSpectrum::cie_x() noexcept {
     static DenselySampledSpectrum s{cie_x_samples};

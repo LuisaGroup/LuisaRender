@@ -5,7 +5,7 @@
 #pragma once
 
 #include <dsl/syntax.h>
-#include <util/spectrum.h>
+#include <util/spec.h>
 #include <util/imageio.h>
 #include <util/half.h>
 #include <base/scene_node.h>

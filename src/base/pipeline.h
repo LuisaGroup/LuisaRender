@@ -7,7 +7,7 @@
 #include <optional>
 
 #include <luisa-compute.h>
-#include <util/spectrum.h>
+#include <util/spec.h>
 #include <base/shape.h>
 #include <base/light.h>
 #include <base/camera.h>
