@@ -14,9 +14,6 @@ Environment::Environment(Scene *scene, const SceneNodeDesc *desc) noexcept
       _importance{std::max(desc->property_float_or_default("importance", 1.0f), 0.01f)} {}
 
 Environment::Instance::Instance(const Pipeline &pipeline, const Environment *env) noexcept
-    : _pipeline{pipeline}, _env{env},
-      _select_prob{env->importance() /
-                   (env->importance() +
-                    static_cast<float>(pipeline.lights().size()))} {}
+    : _pipeline{pipeline}, _env{env} {}
 
 }// namespace luisa::render

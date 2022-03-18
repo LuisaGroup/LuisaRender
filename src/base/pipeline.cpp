@@ -188,11 +188,9 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     if (auto env = scene.environment(); env != nullptr && !env->is_black()) {
         pipeline->_environment = env->build(*pipeline, command_buffer);
     }
-    if (pipeline->_lights.empty()) [[unlikely]] {
-        if (pipeline->_environment == nullptr) {
-            LUISA_WARNING_WITH_LOCATION(
-                "No lights or environment found in the scene.");
-        }
+    if (pipeline->_lights.empty() && pipeline->_environment == nullptr) [[unlikely]] {
+        LUISA_WARNING_WITH_LOCATION(
+            "No lights or environment found in the scene.");
     } else {
         pipeline->_light_sampler = scene.integrator()->light_sampler()->build(*pipeline, command_buffer);
     }
@@ -224,8 +222,9 @@ bool Pipeline::update_geometry(CommandBuffer &command_buffer, float time) noexce
             });
         ThreadPool::global().synchronize();
     }
-    command_buffer << _accel.update()
-                   << luisa::compute::commit();
+    command_buffer << _accel.update();
+    if (_light_sampler) { _light_sampler->update(command_buffer, time); }
+    command_buffer.commit();
     return true;
 }
 
