@@ -79,7 +79,8 @@ public:
         auto L = light->texture()->evaluate(it_light, _swl, _time).value *
                  light->node<DiffuseLight>()->scale();
         auto pdf = distance_squared(it_light.p(), p_from) * pdf_area * (1.0f / cos_wo);
-        return Light::Evaluation{.L = L, .pdf = ite(front_face, pdf, 0.0f)};
+        return {.L = ite(front_face, L, make_float4()),
+                .pdf = ite(front_face, pdf, 0.0f)};
     }
     [[nodiscard]] Light::Sample sample(Sampler::Instance &sampler, Expr<uint> light_inst_id, Expr<float3> p_from) const noexcept override {
         auto light = instance<DiffuseLightInstance>();
