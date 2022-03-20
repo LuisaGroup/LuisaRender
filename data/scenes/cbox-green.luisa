@@ -6,14 +6,11 @@ Film film : Color {
 Camera camera : Pinhole {
   position { -0.01, 0.995, 5.0 }
   fov { 27.8 }
-  spp { 4 }
+  spp { 1024 }
   film { @film }
-  file { "../renders/cbox-diff.exr" }
+  file { "../renders/cbox-green.exr" }
   filter : Gaussian {
     radius { 1 }
-  }
-  target : Illum {
-    file { "../renders/cbox.exr" }
   }
 }
 
@@ -23,20 +20,6 @@ Surface cbox-white : Matte {
   }
   Kd : ConstColor {
     color { 0.725, 0.71, 0.68 }
-  }
-  roughness : ConstGeneric {
-    v { 1 }
-  }
-}
-
-Surface cbox-red : Matte {
-  color : ConstColor {
-    color { 0.63, 0.065, 0.05 }
-  }
-  Kd : ConstColor {
-    // color { 0.63, 0.065, 0.05 }
-    color { 0.14, 0.45, 0.091 }
-    requires_grad { true }
   }
   roughness : ConstGeneric {
     v { 1 }
@@ -67,7 +50,7 @@ Shape cbox-floor : Mesh {
 
 Shape cbox-left-wall : Mesh {
   file { "../meshes/cbox-parts/left-wall.obj" }
-  surface { @cbox-red }
+  surface { @cbox-green }
 }
 
 Shape cbox-right-wall : Mesh {
@@ -133,7 +116,7 @@ Shape cbox : Group {
   }
 }
 
-Integrator pt : MegaPathGrad {
+Integrator pt : MegaPath {
   sampler : Independent {}
   depth { 10 }
 }

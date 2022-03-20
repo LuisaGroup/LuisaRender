@@ -78,24 +78,25 @@ public:
         luisa::vector<float4> pixels;
         pipeline().printer().reset(stream);
 
-        // render
-        for (auto i = 0u; i < pipeline().camera_count(); i++) {
-            auto camera = pipeline().camera(i);
-            auto resolution = camera->film()->node()->resolution();
-            auto pixel_count = resolution.x * resolution.y;
+        for (auto k = 0u; k < 10u; ++k) {
+            // render
+            for (auto i = 0u; i < pipeline().camera_count(); i++) {
+                auto camera = pipeline().camera(i);
+                auto resolution = camera->film()->node()->resolution();
+                auto pixel_count = resolution.x * resolution.y;
 
-            _render_one_camera(command_buffer, pipeline(), this, camera);
+                _render_one_camera(command_buffer, pipeline(), this, camera);
+            }
+
+            // accumulate grads
+            for (auto i = 0u; i < pipeline().camera_count(); i++) {
+                auto camera = pipeline().camera(i);
+                _integrate_one_camera(command_buffer, pipeline(), this, camera);
+            }
+
+            // back propagate
+            pipeline().differentiation().step(command_buffer, 0.001f);
         }
-
-        // accumulate grads
-        for (auto i = 0u; i < pipeline().camera_count(); i++) {
-            auto camera = pipeline().camera(i);
-            _integrate_one_camera(command_buffer, pipeline(), this, camera);
-        }
-
-        // back propagate
-
-        pipeline().differentiation().step(command_buffer, 0.02f);
 
         // save results
         for (auto i = 0u; i < pipeline().camera_count(); i++) {
@@ -171,7 +172,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
         switch (pt_exact->loss()) {
             case MegakernelGradRadiative::Loss::L1:
                 // L1 loss
-                beta *= ite(pipeline.srgb_unbound_spectrum(
+                beta *= ite(pipeline.srgb_illuminant_spectrum(
                                         camera->film()->read(pixel_id).average)
                                         .sample(swl) -
                                     camera->target()->evaluate(it, swl, time).value >=
@@ -181,7 +182,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
                 break;
             case MegakernelGradRadiative::Loss::L2:
                 // L2 loss
-                beta *= 2.0f * (pipeline.srgb_unbound_spectrum(
+                beta *= 2.0f * (pipeline.srgb_illuminant_spectrum(
                                             camera->film()->read(pixel_id).average)
                                     .sample(swl) -
                                 camera->target()->evaluate(it, swl, time).value);
