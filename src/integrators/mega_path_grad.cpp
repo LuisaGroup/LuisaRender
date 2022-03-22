@@ -51,7 +51,7 @@ public:
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
     [[nodiscard]] auto loss() const noexcept { return _loss_function; }
-    [[nodiscard]] bool differentiable() const noexcept override { return true; }
+    [[nodiscard]] bool is_differentiable() const noexcept override { return true; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
@@ -73,7 +73,7 @@ public:
     explicit MegakernelGradRadiativeInstance(
         const MegakernelGradRadiative *node,
         Pipeline &pipeline, CommandBuffer &command_buffer) noexcept
-        : Integrator::Instance{pipeline, node} {}
+        : Integrator::Instance{pipeline, command_buffer, node} {}
     void render(Stream &stream) noexcept override {
         auto pt = node<MegakernelGradRadiative>();
         auto command_buffer = stream.command_buffer();
@@ -145,7 +145,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
     auto resolution = camera->node()->film()->resolution();
     LUISA_INFO("Start backward propagation.");
 
-    auto sampler = pipeline.sampler();
+    auto sampler = pt->sampler();
     auto env = pipeline.environment();
 
     auto pixel_count = resolution.x * resolution.y;
@@ -300,7 +300,7 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
     auto image_file = camera->node()->file();
 
     camera->film()->clear(command_buffer);
-    auto light_sampler = pipeline.light_sampler();
+    auto light_sampler = pt->light_sampler();
     if (light_sampler == nullptr) [[unlikely]] {
         LUISA_WARNING_WITH_LOCATION(
             "No lights in scene. Rendering aborted.");
@@ -308,7 +308,7 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
     }
 
     auto pixel_count = resolution.x * resolution.y;
-    auto sampler = pipeline.sampler();
+    auto sampler = pt->sampler();
     sampler->reset(command_buffer, resolution, pixel_count, spp);
     command_buffer.commit();
 

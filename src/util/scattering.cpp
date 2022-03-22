@@ -215,7 +215,7 @@ Float4 FresnelConductor::evaluate(Expr<float> cosThetaI) const noexcept {
 }
 
 luisa::vector<Float4> FresnelConductor::grad(Expr<float> cosThetaI) const noexcept {
-    LUISA_ERROR_WITH_LOCATION("FresnelConductor is not differentiable.");
+    LUISA_ERROR_WITH_LOCATION("FresnelConductor is not is_differentiable.");
 }
 
 Float4 FresnelDielectric::evaluate(Expr<float> cosThetaI) const noexcept {

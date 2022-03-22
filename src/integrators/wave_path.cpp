@@ -29,7 +29,7 @@ public:
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
-    [[nodiscard]] bool differentiable() const noexcept override { return false; }
+    [[nodiscard]] bool is_differentiable() const noexcept override { return false; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
@@ -101,8 +101,8 @@ private:
     void _render_one_camera(CommandBuffer &command_buffer, Camera::Instance *camera) noexcept;
 
 public:
-    explicit WavefrontPathTracingInstance(const WavefrontPathTracing *node, Pipeline &pipeline) noexcept
-        : Integrator::Instance{pipeline, node} {}
+    WavefrontPathTracingInstance(const WavefrontPathTracing *node, Pipeline &pipeline, CommandBuffer &cb) noexcept
+        : Integrator::Instance{pipeline, cb, node} {}
 
     void render(Stream &stream) noexcept override {
         auto pt = node<WavefrontPathTracing>();
@@ -141,8 +141,8 @@ public:
     }
 };
 
-unique_ptr<Integrator::Instance> WavefrontPathTracing::build(Pipeline &pipeline, CommandBuffer &) const noexcept {
-    return luisa::make_unique<WavefrontPathTracingInstance>(this, pipeline);
+unique_ptr<Integrator::Instance> WavefrontPathTracing::build(Pipeline &pipeline, CommandBuffer &cb) const noexcept {
+    return luisa::make_unique<WavefrontPathTracingInstance>(this, pipeline, cb);
 }
 
 void WavefrontPathTracingInstance::_render_one_camera(
@@ -151,8 +151,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
     auto &&device = camera->pipeline().device();
 
     camera->film()->clear(command_buffer);
-    auto light_sampler = pipeline().light_sampler();
-    if (light_sampler == nullptr) [[unlikely]] {
+    if (!pipeline().has_lighting()) [[unlikely]] {
         LUISA_WARNING_WITH_LOCATION(
             "No lights in scene. Rendering aborted.");
         return;
@@ -164,8 +163,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
     PathStateSOA path_states{device, pixel_count};
     LightSampleSOA light_samples{device, pixel_count};
 
-    auto sampler = pipeline().sampler();
-    sampler->reset(command_buffer, resolution, pixel_count, spp);
+    sampler()->reset(command_buffer, resolution, pixel_count, spp);
     command_buffer.commit();
 
     using BufferRay = BufferVar<Ray>;
@@ -175,10 +173,10 @@ void WavefrontPathTracingInstance::_render_one_camera(
     auto generate_rays_shader = device.compile<1>([&](BufferUInt path_indices, BufferRay rays, UInt sample_id, Float4x4 c2w, Float time) noexcept {
         auto pixel_id = dispatch_x();
         auto pixel_coord = make_uint2(pixel_id % resolution.x, pixel_id / resolution.x);
-        sampler->start(pixel_coord, sample_id);
-        auto camera_sample = camera->generate_ray(*sampler, pixel_coord, time, c2w);
-        auto swl = SampledWavelengths::sample_visible(sampler->generate_1d());
-        sampler->save_state(pixel_id);
+        sampler()->start(pixel_coord, sample_id);
+        auto camera_sample = camera->generate_ray(*sampler(), pixel_coord, time, c2w);
+        auto swl = SampledWavelengths::sample_visible(sampler()->generate_1d());
+        sampler()->save_state(pixel_id);
         rays.write(pixel_id, camera_sample.ray);
         path_states.swl_lambda.write(pixel_id, swl.lambda());
         path_states.swl_pdf.write(pixel_id, swl.pdf());
@@ -236,7 +234,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                 auto pdf_bsdf = path_states.pdf_bsdf.read(path_id);
                 auto beta = path_states.beta.read(path_id);
                 auto Li = path_states.Li.read(path_id);
-                auto eval = light_sampler->evaluate_miss(wi, e2w, swl, time);
+                auto eval = light_sampler()->evaluate_miss(wi, e2w, swl, time);
                 auto mis_weight = balanced_heuristic(pdf_bsdf, eval.pdf);
                 Li += beta * eval.L * mis_weight;
                 path_states.Li.write(path_id, Li);
@@ -259,7 +257,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                 auto beta = path_states.beta.read(path_id);
                 auto Li = path_states.Li.read(path_id);
                 auto it = pipeline().interaction(ray, hit);
-                auto eval = light_sampler->evaluate_hit(*it, ray->origin(), swl, time);
+                auto eval = light_sampler()->evaluate_hit(*it, ray->origin(), swl, time);
                 auto mis_weight = balanced_heuristic(pdf_bsdf, eval.pdf);
                 Li += beta * eval.L * mis_weight;
                 path_states.Li.write(path_id, Li);
@@ -278,9 +276,9 @@ void WavefrontPathTracingInstance::_render_one_camera(
             auto it = pipeline().interaction(ray, hit);
             auto path_id = path_indices.read(ray_id);
             auto swl = path_states.swl(path_id);
-            sampler->load_state(path_id);
-            auto light_sample = light_sampler->sample(*sampler, *it, e2w, swl, time);
-            sampler->save_state(path_id);
+            sampler()->load_state(path_id);
+            auto light_sample = light_sampler()->sample(*sampler(), *it, e2w, swl, time);
+            sampler()->save_state(path_id);
             // trace shadow ray
             auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
             auto occluded = pipeline().intersect_any(shadow_ray);
@@ -301,7 +299,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
             auto hit = in_hits.read(ray_id);
             auto it = pipeline().interaction(ray, hit);
             auto path_id = path_indices.read(ray_id);
-            sampler->load_state(path_id);
+            sampler()->load_state(path_id);
             auto Li = path_states.Li.read(path_id);
             auto swl = path_states.swl(path_id);
             auto beta = path_states.beta.read(path_id);
@@ -320,7 +318,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                 auto alpha_skip = def(false);
                 if (auto alpha_map = surface->alpha()) {
                     auto alpha = alpha_map->evaluate(*it, swl, time).value.x;
-                    auto u_alpha = sampler->generate_1d();
+                    auto u_alpha = sampler()->generate_1d();
                     alpha_skip = alpha < u_alpha;
                 }
 
@@ -346,7 +344,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                     };
 
                     // sample material
-                    auto [wi, eval] = closure->sample(*sampler);
+                    auto [wi, eval] = closure->sample(*sampler());
                     auto cos_theta_i = dot(wi, it->shading().n());
                     ray = it->spawn_ray(wi);
                     pdf_bsdf = eval.pdf;
@@ -367,7 +365,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                 auto rr_threshold = node<WavefrontPathTracing>()->rr_threshold();
                 // rr
                 $if(trace_depth >= rr_depth & q < rr_threshold) {
-                    $if(sampler->generate_1d() < q) {
+                    $if(sampler()->generate_1d() < q) {
                         beta *= 1.f / q;
                         auto out_queue_id = out_queue_size.atomic(0u).fetch_add(1u);
                         out_queue.write(out_queue_id, path_id);
@@ -380,7 +378,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                     out_rays.write(out_queue_id, ray);
                 };
             };
-            sampler->save_state(path_id);
+            sampler()->save_state(path_id);
             path_states.Li.write(path_id, Li);
             path_states.beta.write(path_id, beta);
             path_states.pdf_bsdf.write(path_id, pdf_bsdf);

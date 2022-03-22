@@ -20,12 +20,6 @@ using compute::UInt;
 class LightSampler : public SceneNode {
 
 public:
-    struct Selection {
-        UInt instance_id;
-        UInt light_tag;
-        Float pmf;
-    };
-
     class Instance {
 
     private:
@@ -41,7 +35,6 @@ public:
             requires std::is_base_of_v<LightSampler, T>
         [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_sampler); }
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
-        virtual void update(CommandBuffer &command_buffer, float time) noexcept = 0;
         [[nodiscard]] virtual Light::Evaluation evaluate_hit(
             const Interaction &it, Expr<float3> p_from,
             const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;

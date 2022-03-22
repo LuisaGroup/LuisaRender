@@ -92,8 +92,6 @@ private:
     Buffer<Shape::Handle> _instance_buffer;
     luisa::vector<luisa::unique_ptr<Camera::Instance>> _cameras;
     luisa::unique_ptr<Integrator::Instance> _integrator;
-    luisa::unique_ptr<LightSampler::Instance> _light_sampler;
-    luisa::unique_ptr<Sampler::Instance> _sampler;
     luisa::unique_ptr<Environment::Instance> _environment;
     uint _rgb2spec_index{0u};
     float _mean_time{0.0f};
@@ -188,10 +186,8 @@ public:
     [[nodiscard]] auto surfaces() const noexcept { return luisa::span{_surfaces}; }
     [[nodiscard]] auto lights() const noexcept { return luisa::span{_lights}; }
     [[nodiscard]] auto instanced_lights() const noexcept { return luisa::span{_instanced_lights}; }
-    [[nodiscard]] auto sampler() noexcept { return _sampler.get(); }
-    [[nodiscard]] auto sampler() const noexcept { return _sampler.get(); }
     [[nodiscard]] auto environment() const noexcept { return _environment.get(); }
-    [[nodiscard]] auto light_sampler() const noexcept { return _light_sampler.get(); }
+    [[nodiscard]] auto has_lighting() const noexcept { return !_lights.empty() || _environment != nullptr; }
     [[nodiscard]] auto mean_time() const noexcept { return _mean_time; }
     [[nodiscard]] const Texture::Instance *build_texture(
         CommandBuffer &command_buffer, const Texture *texture) noexcept;

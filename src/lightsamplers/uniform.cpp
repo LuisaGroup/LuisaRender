@@ -37,7 +37,6 @@ public:
                         (n + env->node()->importance());
         }
     }
-    void update(CommandBuffer &, float) noexcept override {}
     [[nodiscard]] Light::Evaluation evaluate_hit(
         const Interaction &it, Expr<float3> p_from,
         const SampledWavelengths &swl, Expr<float> time) const noexcept override {

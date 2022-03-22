@@ -20,6 +20,7 @@
 #include <base/light_sampler.h>
 #include <base/texture.h>
 #include <base/texture_mapping.h>
+#include <base/spectrum.h>
 #include <base/scene.h>
 
 namespace luisa::render {
@@ -176,6 +177,10 @@ TextureMapping *Scene::load_texture_mapping(const SceneNodeDesc *desc) noexcept 
     return dynamic_cast<TextureMapping *>(load_node(SceneNodeTag::TEXTURE_MAPPING, desc));
 }
 
+Spectrum *Scene::load_spectrum(const SceneNodeDesc *desc) noexcept {
+    return dynamic_cast<Spectrum *>(load_node(SceneNodeTag::SPECTRUM, desc));
+}
+
 luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc) noexcept {
     if (!desc->root()->is_defined()) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
@@ -199,7 +204,7 @@ luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc
             scene->load_shape(s));
     }
     ThreadPool::global().synchronize();
-    if (!scene->_config->integrator->differentiable()) {
+    if (!scene->_config->integrator->is_differentiable()) {
         auto disabled = 0u;
         for (auto &&node : scene->_config->internal_nodes) {
             if (node->tag() == SceneNodeTag::TEXTURE) {
@@ -222,7 +227,7 @@ luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc
         if (disabled != 0u) {
             LUISA_WARNING_WITH_LOCATION(
                 "Disabled gradient computation in {} "
-                "texture{} for non-differentiable integrator.",
+                "texture{} for non-is_differentiable integrator.",
                 disabled, disabled > 1u ? "s" : "");
         }
     }

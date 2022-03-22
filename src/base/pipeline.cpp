@@ -158,7 +158,7 @@ uint Pipeline::_process_light(CommandBuffer &command_buffer, const Light *light)
 luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, const Scene &scene) noexcept {
     ThreadPool::global().synchronize();
     auto pipeline = luisa::make_unique<Pipeline>(device);
-    if (scene.integrator()->differentiable()) {
+    if (scene.integrator()->is_differentiable()) {
         pipeline->_differentiation =
             luisa::make_unique<Differentiation>(*pipeline);
     }
@@ -184,15 +184,12 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     pipeline->_mean_time = static_cast<float>(mean_time);
     pipeline->_build_geometry(command_buffer, scene.shapes(), pipeline->_mean_time, AccelBuildHint::FAST_TRACE);
     pipeline->_integrator = scene.integrator()->build(*pipeline, command_buffer);
-    pipeline->_sampler = scene.integrator()->sampler()->build(*pipeline, command_buffer);
     if (auto env = scene.environment(); env != nullptr && !env->is_black()) {
         pipeline->_environment = env->build(*pipeline, command_buffer);
     }
     if (pipeline->_lights.empty() && pipeline->_environment == nullptr) [[unlikely]] {
         LUISA_WARNING_WITH_LOCATION(
             "No lights or environment found in the scene.");
-    } else {
-        pipeline->_light_sampler = scene.integrator()->light_sampler()->build(*pipeline, command_buffer);
     }
     command_buffer << pipeline->_bindless_array.update();
     if (auto &&diff = pipeline->_differentiation) {
@@ -222,9 +219,7 @@ bool Pipeline::update_geometry(CommandBuffer &command_buffer, float time) noexce
             });
         ThreadPool::global().synchronize();
     }
-    command_buffer << _accel.update();
-    if (_light_sampler) { _light_sampler->update(command_buffer, time); }
-    command_buffer.commit();
+    command_buffer << _accel.update() << compute::commit();
     return true;
 }
 

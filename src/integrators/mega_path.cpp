@@ -31,7 +31,7 @@ public:
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
-    [[nodiscard]] bool differentiable() const noexcept override { return false; }
+    [[nodiscard]] bool is_differentiable() const noexcept override { return false; }
     [[nodiscard]] bool display_enabled() const noexcept { return _display; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
@@ -52,8 +52,8 @@ private:
         MegakernelPathTracingInstance *pt, Camera::Instance *camera) noexcept;
 
 public:
-    explicit MegakernelPathTracingInstance(const MegakernelPathTracing *node, Pipeline &pipeline) noexcept
-        : Integrator::Instance{pipeline, node} {
+    explicit MegakernelPathTracingInstance(const MegakernelPathTracing *node, Pipeline &pipeline, CommandBuffer &cmd_buffer) noexcept
+        : Integrator::Instance{pipeline, cmd_buffer, node} {
         if (node->display_enabled()) {
             auto first_film = pipeline.camera(0u)->film()->node();
             _window.emplace("Display", first_film->resolution(), true);
@@ -165,8 +165,8 @@ public:
     }
 };
 
-unique_ptr<Integrator::Instance> MegakernelPathTracing::build(Pipeline &pipeline, CommandBuffer &) const noexcept {
-    return luisa::make_unique<MegakernelPathTracingInstance>(this, pipeline);
+unique_ptr<Integrator::Instance> MegakernelPathTracing::build(Pipeline &pipeline, CommandBuffer &cmd_buffer) const noexcept {
+    return luisa::make_unique<MegakernelPathTracingInstance>(this, pipeline, cmd_buffer);
 }
 
 void MegakernelPathTracingInstance::_render_one_camera(
@@ -178,14 +178,14 @@ void MegakernelPathTracingInstance::_render_one_camera(
     auto image_file = camera->node()->file();
 
     camera->film()->clear(command_buffer);
-    auto light_sampler = pipeline.light_sampler();
-    auto sampler = pipeline.sampler();
-    if (light_sampler == nullptr) [[unlikely]] {
+    if (!pipeline.has_lighting()) [[unlikely]] {
         LUISA_WARNING_WITH_LOCATION(
             "No lights in scene. Rendering aborted.");
         return;
     }
 
+    auto light_sampler = pt->light_sampler();
+    auto sampler = pt->sampler();
     auto pixel_count = resolution.x * resolution.y;
     sampler->reset(command_buffer, resolution, pixel_count, spp);
     command_buffer.commit();

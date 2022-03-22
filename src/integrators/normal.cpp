@@ -14,13 +14,14 @@ class NormalVisualizer;
 class NormalVisualizerInstance final : public Integrator::Instance {
 
 private:
-    static void _render_one_camera(
+    void _render_one_camera(
         CommandBuffer &command_buffer,
-        Pipeline &pipeline,
         Camera::Instance *camera) noexcept;
 
 public:
-    explicit NormalVisualizerInstance(const NormalVisualizer *integrator, Pipeline &pipeline) noexcept;
+    explicit NormalVisualizerInstance(
+        const NormalVisualizer *integrator,
+        Pipeline &pipeline, CommandBuffer &cb) noexcept;
     void render(Stream &stream) noexcept override;
 };
 
@@ -28,16 +29,16 @@ class NormalVisualizer final : public Integrator {
 
 public:
     NormalVisualizer(Scene *scene, const SceneNodeDesc *desc) noexcept : Integrator{scene, desc} {}
-    [[nodiscard]] bool differentiable() const noexcept override { return false; }
+    [[nodiscard]] bool is_differentiable() const noexcept override { return false; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &) const noexcept override {
-        return luisa::make_unique<NormalVisualizerInstance>(this, pipeline);
+    [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &cb) const noexcept override {
+        return luisa::make_unique<NormalVisualizerInstance>(this, pipeline, cb);
     }
 };
 
 NormalVisualizerInstance::NormalVisualizerInstance(
-    const NormalVisualizer *integrator, Pipeline &pipeline) noexcept
-    : Integrator::Instance{pipeline, integrator} {}
+    const NormalVisualizer *integrator, Pipeline &pipeline, CommandBuffer &cb) noexcept
+    : Integrator::Instance{pipeline, cb, integrator} {}
 
 void NormalVisualizerInstance::render(Stream &stream) noexcept {
     luisa::vector<float> pixels;
@@ -46,7 +47,7 @@ void NormalVisualizerInstance::render(Stream &stream) noexcept {
         auto camera = pipeline().camera(i);
         auto resolution = camera->film()->node()->resolution();
         auto pixel_count = resolution.x * resolution.y;
-        _render_one_camera(command_buffer, pipeline(), camera);
+        _render_one_camera(command_buffer, camera);
         pixels.resize(next_pow2(pixel_count) * 4u);
         camera->film()->download(command_buffer, reinterpret_cast<float4 *>(pixels.data()));
         command_buffer << compute::synchronize();
@@ -70,7 +71,7 @@ void NormalVisualizerInstance::render(Stream &stream) noexcept {
 }
 
 void NormalVisualizerInstance::_render_one_camera(
-    CommandBuffer &command_buffer, Pipeline &pipeline, Camera::Instance *camera) noexcept {
+    CommandBuffer &command_buffer, Camera::Instance *camera) noexcept {
 
     auto spp = camera->node()->spp();
     auto resolution = camera->film()->node()->resolution();
@@ -80,20 +81,19 @@ void NormalVisualizerInstance::_render_one_camera(
         image_file.string(),
         resolution.x, resolution.y, spp);
 
-    auto sampler = pipeline.sampler();
     auto pixel_count = resolution.x * resolution.y;
     camera->film()->clear(command_buffer);
-    sampler->reset(command_buffer, resolution, pixel_count, spp);
+    sampler()->reset(command_buffer, resolution, pixel_count, spp);
     command_buffer.commit();
 
     using namespace luisa::compute;
-    auto render = pipeline.device().compile<2>([&](UInt frame_index, Float4x4 camera_to_world, Float time, Float shutter_weight) noexcept {
+    auto render = pipeline().device().compile<2>([&](UInt frame_index, Float4x4 camera_to_world, Float time, Float shutter_weight) noexcept {
         auto pixel_id = dispatch_id().xy();
-        sampler->start(pixel_id, frame_index);
+        sampler()->start(pixel_id, frame_index);
         auto [ray, camera_weight] = camera->generate_ray(
-            *sampler, pixel_id, time, camera_to_world);
+            *sampler(), pixel_id, time, camera_to_world);
         auto path_weight = camera_weight;
-        auto interaction = pipeline.intersect(ray);
+        auto interaction = pipeline().intersect(ray);
         auto color = ite(
             interaction->valid(),
             interaction->shading().n() * 0.5f + 0.5f,
@@ -107,7 +107,7 @@ void NormalVisualizerInstance::_render_one_camera(
     auto dispatch_count = 0u;
     auto dispatches_per_commit = 64u;
     for (auto s : shutter_samples) {
-        if (pipeline.update_geometry(command_buffer, s.point.time)) { dispatch_count = 0u; }
+        if (pipeline().update_geometry(command_buffer, s.point.time)) { dispatch_count = 0u; }
         auto camera_to_world = camera->node()->transform()->matrix(s.point.time);
         for (auto i = 0u; i < s.spp; i++) {
             command_buffer << render(sample_id++, camera_to_world, s.point.time, s.point.weight)
