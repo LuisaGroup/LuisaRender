@@ -243,7 +243,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
                     eta_scale = ite(
                         cos_theta_i * cos_theta_o < 0.f &
                             min(eval.alpha.x, eval.alpha.y) < .05f,
-                        ite(cos_theta_o > 0.f, sqr(eval.eta), sqrt(1.f / eval.eta)),
+                        ite(cos_theta_o > 0.f, sqr(eval.eta), sqr(1.f / eval.eta)),
                         1.0f);
                 };
             });
@@ -429,7 +429,7 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
                     eta_scale = ite(
                         cos_theta_i * cos_theta_o < 0.f &
                             min(eval.alpha.x, eval.alpha.y) < .05f,
-                        ite(cos_theta_o > 0.f, sqr(eval.eta), sqrt(1.f / eval.eta)),
+                        ite(cos_theta_o > 0.f, sqr(eval.eta), sqr(1.f / eval.eta)),
                         1.0f);
                 };
             });
