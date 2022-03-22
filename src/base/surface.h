@@ -8,6 +8,7 @@
 #include <base/scene_node.h>
 #include <base/texture.h>
 #include <base/sampler.h>
+#include <base/spectrum.h>
 
 namespace luisa::render {
 
@@ -25,10 +26,10 @@ class Surface : public SceneNode {
 
 public:
     struct Evaluation {
-        Float4 f;
+        SampledSpectrum f;
         Float pdf;
         Float2 alpha;
-        Float4 eta;
+        SampledSpectrum eta;
     };
 
     struct Sample {
@@ -59,7 +60,7 @@ public:
         [[nodiscard]] auto instance() const noexcept { return static_cast<const T *>(_instance); }
         [[nodiscard]] virtual Evaluation evaluate(Expr<float3> wi) const noexcept = 0;
         [[nodiscard]] virtual Sample sample(Sampler::Instance &sampler) const noexcept = 0;
-        virtual void backward(Expr<float3> wi, Expr<float4> grad) const noexcept = 0;
+        virtual void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept = 0;
     };
 
     class Instance {

@@ -5,6 +5,7 @@
 #pragma once
 
 #include <dsl/syntax.h>
+#include <base/spectrum.h>
 
 namespace luisa::render {
 
@@ -15,6 +16,7 @@ using compute::Float4;
 using compute::UInt;
 using compute::Var;
 
+// TODO: use spectrum
 struct MediumInfo {
     float4 eta;
 };

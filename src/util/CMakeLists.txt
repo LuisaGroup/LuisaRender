@@ -4,8 +4,6 @@ add_library(luisa-render-util SHARED
         imageio.cpp imageio.h
         xform.cpp xform.h
         spec.cpp spec.h
-        spec_cie_xyz.inl.h
-        spec_cie_illum_d65.inl.h
         colorspace.h
         srgb2spec.cpp
         half.h

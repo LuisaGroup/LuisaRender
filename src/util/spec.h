@@ -15,6 +15,7 @@ namespace luisa::render {
 constexpr auto visible_wavelength_min = 360.0f;
 constexpr auto visible_wavelength_max = 830.0f;
 
+using compute::ArrayVar;
 using compute::BindlessArray;
 using compute::Bool;
 using compute::CommandBuffer;
@@ -23,77 +24,8 @@ using compute::Expr;
 using compute::Float;
 using compute::Float3;
 using compute::Float4;
+using compute::Local;
 using compute::VolumeView;
-
-class RGBSigmoidPolynomial {
-
-private:
-    Float3 _c;
-
-private:
-    [[nodiscard]] static Float _s(Expr<float> x) noexcept;
-    [[nodiscard]] static Float4 _s(Expr<float4> x) noexcept;
-    [[nodiscard]] static Float _grad_s(Expr<float> x) noexcept;
-    [[nodiscard]] static Float4 _grad_s(Expr<float4> x) noexcept;
-
-public:
-    RGBSigmoidPolynomial() noexcept = default;
-    RGBSigmoidPolynomial(Expr<float> c0, Expr<float> c1, Expr<float> c2) noexcept;
-    explicit RGBSigmoidPolynomial(Expr<float3> c) noexcept;
-    [[nodiscard]] Float operator()(Expr<float> lambda) const noexcept;
-    [[nodiscard]] Float4 operator()(Expr<float4> lambda) const noexcept;
-    [[nodiscard]] Float maximum() const noexcept;
-    [[nodiscard]] Float3 grad(Expr<float> lambda) const noexcept;
-};
-
-class RGB2SpectrumTable {
-
-public:
-    static constexpr auto resolution = 64u;
-    using coefficient_table_type = const float[3][resolution][resolution][resolution][4];
-
-private:
-    const coefficient_table_type &_coefficients;
-
-public:
-    explicit constexpr RGB2SpectrumTable(const coefficient_table_type &coefficients) noexcept
-        : _coefficients{coefficients} {}
-    constexpr RGB2SpectrumTable(RGB2SpectrumTable &&) noexcept = default;
-    constexpr RGB2SpectrumTable(const RGB2SpectrumTable &) noexcept = default;
-    [[nodiscard]] static RGB2SpectrumTable srgb() noexcept;
-    [[nodiscard]] float3 decode_albedo(float3 rgb) const noexcept;
-    [[nodiscard]] std::pair<float3, float> decode_unbound(float3 rgb) const noexcept;
-    [[nodiscard]] RGBSigmoidPolynomial decode_albedo(Expr<BindlessArray> array, Expr<uint> base_index, Expr<float3> rgb) const noexcept;
-    [[nodiscard]] std::pair<RGBSigmoidPolynomial, Float> decode_unbound(Expr<BindlessArray> array, Expr<uint> base_index, Expr<float3> rgb) const noexcept;
-    void encode(CommandBuffer &command_buffer, VolumeView<float> t0, VolumeView<float> t1, VolumeView<float> t2) const noexcept;
-};
-
-class SampledWavelengths {
-
-public:
-    static constexpr auto sample_count = 4u;
-
-private:
-    Float4 _lambda;
-    Float4 _pdf;
-
-public:
-    SampledWavelengths() noexcept = default;
-    SampledWavelengths(Expr<float4> lambda, Expr<float4> pdf) noexcept
-        : _lambda{lambda}, _pdf{pdf} {}
-    [[nodiscard]] Bool operator==(const SampledWavelengths &rhs) const noexcept;
-    [[nodiscard]] Bool operator!=(const SampledWavelengths &rhs) const noexcept;
-    [[nodiscard]] static SampledWavelengths sample_uniform(
-        Expr<float> u,
-        Expr<float> lambda_min = visible_wavelength_min,
-        Expr<float> lambda_max = visible_wavelength_max) noexcept;
-    [[nodiscard]] static SampledWavelengths sample_visible(Expr<float> u) noexcept;
-    [[nodiscard]] auto lambda() const noexcept { return _lambda; }
-    [[nodiscard]] auto pdf() const noexcept { return _pdf; }
-    [[nodiscard]] Float cie_y(Expr<float4> values) const noexcept;
-    [[nodiscard]] Float3 cie_xyz(Expr<float4> values) const noexcept;
-    [[nodiscard]] Float3 srgb(Expr<float4> values) const noexcept;
-};
 
 class DenselySampledSpectrum {
 
@@ -113,58 +45,87 @@ public:
     [[nodiscard]] static const DenselySampledSpectrum &cie_y() noexcept;
     [[nodiscard]] static const DenselySampledSpectrum &cie_z() noexcept;
     [[nodiscard]] static const DenselySampledSpectrum &cie_illum_d65() noexcept;
-    [[nodiscard]] Float4 sample(const SampledWavelengths &swl) const noexcept;
+    [[nodiscard]] Float sample(Expr<float> lambda) const noexcept;
+    [[nodiscard]] static float cie_y_integral() noexcept;
 };
 
-class RGBAlbedoSpectrum {
+class SampledSpectrum {
 
 private:
-    RGBSigmoidPolynomial _rsp;
+    Local<float> _samples;
 
 public:
-    explicit RGBAlbedoSpectrum(RGBSigmoidPolynomial rsp) noexcept
-        : _rsp{std::move(rsp)} {}
-    [[nodiscard]] auto sample(const SampledWavelengths &swl) const noexcept {
-        return _rsp(swl.lambda());
+    explicit SampledSpectrum(size_t n, Expr<float> s = 0.f) noexcept : _samples{n} {
+        for (auto i = 0u; i < n; i++) { _samples[i] = s; }
     }
-    [[nodiscard]] Float3 backward(const SampledWavelengths &swl, Expr<float4> dSpec) const noexcept;
-};
-
-class RGBUnboundSpectrum {
-
-private:
-    RGBSigmoidPolynomial _rsp;
-    Float _scale;
-
-public:
-    RGBUnboundSpectrum(RGBSigmoidPolynomial rsp, Expr<float> scale) noexcept
-        : _rsp{std::move(rsp)}, _scale{scale} {}
-    [[nodiscard]] auto sample(const SampledWavelengths &swl) const noexcept {
-        return _rsp(swl.lambda()) * _scale;
+    [[nodiscard]] auto dimension() const noexcept { return _samples.size(); }
+    [[nodiscard]] auto &values() noexcept { return _samples; }
+    [[nodiscard]] auto &values() const noexcept { return _samples; }
+    [[nodiscard]] Float &at(Expr<uint> i) noexcept { return _samples[i]; }
+    [[nodiscard]] Float at(Expr<uint> i) const noexcept { return _samples[i]; }
+    [[nodiscard]] Float &operator[](Expr<uint> i) noexcept { return at(i); }
+    [[nodiscard]] Float operator[](Expr<uint> i) const noexcept { return at(i); }
+    template<typename F>
+    void for_each(F &&f) noexcept {
+        for (auto i = 0u; i < dimension(); i++) { f(i, (*this)[i]); }
     }
-    [[nodiscard]] auto scale() const noexcept { return _scale; }
-    [[nodiscard]] Float4 backward(const SampledWavelengths &swl, Expr<float4> dSpec) const noexcept;
-};
-
-class RGBIlluminantSpectrum {
-
-private:
-    RGBSigmoidPolynomial _rsp;
-    Float _scale;
-    const DenselySampledSpectrum *_illuminant;
-
-public:
-    RGBIlluminantSpectrum(RGBIlluminantSpectrum &&) noexcept = default;
-    RGBIlluminantSpectrum(const RGBIlluminantSpectrum &) noexcept = default;
-    RGBIlluminantSpectrum &operator=(RGBIlluminantSpectrum &&) noexcept = default;
-    RGBIlluminantSpectrum &operator=(const RGBIlluminantSpectrum &) noexcept = default;
-    RGBIlluminantSpectrum(RGBSigmoidPolynomial rsp, Expr<float> scale, const DenselySampledSpectrum &illum) noexcept
-        : _rsp{std::move(rsp)}, _scale{scale}, _illuminant{&illum} {}
-    [[nodiscard]] auto sample(const SampledWavelengths &swl) const noexcept {
-        return _rsp(swl.lambda()) * _scale * _illuminant->sample(swl);
+    template<typename F>
+    void for_each(F &&f) const noexcept {
+        for (auto i = 0u; i < dimension(); i++) { f(i, Expr{(*this)[i]}); }
     }
-    [[nodiscard]] auto scale() const noexcept { return _scale; }
-    [[nodiscard]] Float4 backward(const SampledWavelengths &swl, Expr<float4> dSpec) const noexcept;
+    template<typename F>
+    [[nodiscard]] auto map(F &&f) const noexcept {
+        SampledSpectrum s{_samples.size()};
+        for (auto i = 0u; i < dimension(); i++) { s[i] = f(i, Expr{(*this)[i]}); }
+        return s;
+    }
+    template<typename T, typename F>
+    [[nodiscard]] auto reduce(T &&initial, F &&f) const noexcept {
+        using compute::def;
+        auto r = def(std::forward<T>(initial));
+        for (auto i = 0u; i < dimension(); i++) { r = f(Expr{r}, i, Expr{(*this)[i]}); }
+        return r;
+    }
+    template<typename F>
+    [[nodiscard]] auto any(F &&f) const noexcept {
+        return reduce(false, [&f](auto r, auto, auto s) noexcept { return r | f(s); });
+    }
+    template<typename F>
+    [[nodiscard]] auto all(F &&f) const noexcept {
+        return reduce(true, [&f](auto r, auto, auto s) noexcept { return r & f(s); });
+    }
+    template<typename F>
+    [[nodiscard]] auto none(F &&f) const noexcept { return !any(std::forward<F>(f)); }
+
+    [[nodiscard]] auto operator+() const noexcept {
+        return map([](auto, auto s) noexcept { return s; });
+    }
+    [[nodiscard]] auto operator-() const noexcept {
+        return map([](auto, auto s) noexcept { return -s; });
+    }
+#define LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP(op)                            \
+    [[nodiscard]] auto operator op(Expr<float> rhs) const noexcept {                \
+        return map([rhs](auto, auto lhs) { return lhs op rhs; });                   \
+    }                                                                               \
+    [[nodiscard]] auto operator op(const SampledSpectrum &rhs) const noexcept {     \
+        return map([&rhs](auto i, auto lhs) { return lhs op rhs[i]; });             \
+    }                                                                               \
+    friend auto operator op(Expr<float> lhs, const SampledSpectrum &rhs) noexcept { \
+        return rhs.map([lhs](auto, auto r) noexcept { return lhs op r; });          \
+    }                                                                               \
+    SampledSpectrum &operator op##=(Expr<float> rhs) noexcept {                     \
+        for (auto i = 0u; i < dimension(); i++) { (*this)[i] op## = rhs; }          \
+        return *this;                                                               \
+    }                                                                               \
+    SampledSpectrum &operator op##=(const SampledSpectrum &rhs) noexcept {          \
+        for (auto i = 0u; i < dimension(); i++) { (*this)[i] op## = rhs[i]; }       \
+        return *this;                                                               \
+    }
+    LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP(+)
+    LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP(-)
+    LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP(*)
+    LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP(/)
+#undef LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP
 };
 
 }// namespace luisa::render

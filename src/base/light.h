@@ -10,6 +10,7 @@
 #include <base/scene_node.h>
 #include <base/sampler.h>
 #include <base/shape.h>
+#include <base/spectrum.h>
 
 namespace luisa::render {
 
@@ -28,7 +29,7 @@ public:
     };
 
     struct Evaluation {
-        Float4 L;
+        SampledSpectrum L;
         Float pdf;
     };
 
@@ -54,7 +55,7 @@ public:
             : _instance{instance}, _swl{swl}, _time{time} {}
         virtual ~Closure() noexcept = default;
         template<typename T = Instance>
-        requires std::is_base_of_v<Instance, T>
+            requires std::is_base_of_v<Instance, T>
         [[nodiscard]] auto instance() const noexcept { return static_cast<const T *>(_instance); }
         [[nodiscard]] virtual Evaluation evaluate(
             const Interaction &it_light, Expr<float3> p_from) const noexcept = 0;

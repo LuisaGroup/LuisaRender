@@ -164,17 +164,17 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     }
     pipeline->_cameras.reserve(scene.cameras().size());
     auto command_buffer = stream.command_buffer();
-    auto rgb2spec_t0 = pipeline->create<Volume<float>>(PixelStorage::FLOAT4, make_uint3(RGB2SpectrumTable::resolution));
-    auto rgb2spec_t1 = pipeline->create<Volume<float>>(PixelStorage::FLOAT4, make_uint3(RGB2SpectrumTable::resolution));
-    auto rgb2spec_t2 = pipeline->create<Volume<float>>(PixelStorage::FLOAT4, make_uint3(RGB2SpectrumTable::resolution));
-    RGB2SpectrumTable::srgb().encode(
-        command_buffer,
-        rgb2spec_t0->view(0u),
-        rgb2spec_t1->view(0u),
-        rgb2spec_t2->view(0u));
-    pipeline->_rgb2spec_index = pipeline->register_bindless(*rgb2spec_t0, TextureSampler::linear_point_zero());
-    static_cast<void>(pipeline->register_bindless(*rgb2spec_t1, TextureSampler::linear_point_zero()));
-    static_cast<void>(pipeline->register_bindless(*rgb2spec_t2, TextureSampler::linear_point_zero()));
+//    auto rgb2spec_t0 = pipeline->create<Volume<float>>(PixelStorage::FLOAT4, make_uint3(RGB2SpectrumTable::resolution));
+//    auto rgb2spec_t1 = pipeline->create<Volume<float>>(PixelStorage::FLOAT4, make_uint3(RGB2SpectrumTable::resolution));
+//    auto rgb2spec_t2 = pipeline->create<Volume<float>>(PixelStorage::FLOAT4, make_uint3(RGB2SpectrumTable::resolution));
+//    RGB2SpectrumTable::srgb().encode(
+//        command_buffer,
+//        rgb2spec_t0->view(0u),
+//        rgb2spec_t1->view(0u),
+//        rgb2spec_t2->view(0u));
+//    pipeline->_rgb2spec_index = pipeline->register_bindless(*rgb2spec_t0, TextureSampler::linear_point_zero());
+//    static_cast<void>(pipeline->register_bindless(*rgb2spec_t1, TextureSampler::linear_point_zero()));
+//    static_cast<void>(pipeline->register_bindless(*rgb2spec_t2, TextureSampler::linear_point_zero()));
     auto mean_time = 0.0;
     for (auto camera : scene.cameras()) {
         pipeline->_cameras.emplace_back(camera->build(*pipeline, command_buffer));
@@ -283,23 +283,23 @@ luisa::unique_ptr<Interaction> Pipeline::interaction(const Var<Ray> &ray, const 
     return luisa::make_unique<Interaction>(std::move(it));
 }
 
-RGBAlbedoSpectrum Pipeline::srgb_albedo_spectrum(Expr<float3> rgb) const noexcept {
-    auto rsp = RGB2SpectrumTable::srgb().decode_albedo(
-        Expr{_bindless_array}, _rgb2spec_index, rgb);
-    return RGBAlbedoSpectrum{std::move(rsp)};
-}
-
-RGBUnboundSpectrum Pipeline::srgb_unbound_spectrum(Expr<float3> rgb) const noexcept {
-    auto [rsp, scale] = RGB2SpectrumTable::srgb().decode_unbound(
-        Expr{_bindless_array}, _rgb2spec_index, rgb);
-    return {std::move(rsp), std::move(scale)};
-}
-
-RGBIlluminantSpectrum Pipeline::srgb_illuminant_spectrum(Expr<float3> rgb) const noexcept {
-    auto [rsp, scale] = RGB2SpectrumTable::srgb().decode_unbound(
-        Expr{_bindless_array}, _rgb2spec_index, rgb);
-    return {std::move(rsp), std::move(scale), DenselySampledSpectrum::cie_illum_d65()};
-}
+//RGBAlbedoSpectrum Pipeline::srgb_albedo_spectrum(Expr<float3> rgb) const noexcept {
+//    auto rsp = RGB2SpectrumTable::srgb().decode_albedo(
+//        Expr{_bindless_array}, _rgb2spec_index, rgb);
+//    return RGBAlbedoSpectrum{std::move(rsp)};
+//}
+//
+//RGBUnboundSpectrum Pipeline::srgb_unbound_spectrum(Expr<float3> rgb) const noexcept {
+//    auto [rsp, scale] = RGB2SpectrumTable::srgb().decode_unbound(
+//        Expr{_bindless_array}, _rgb2spec_index, rgb);
+//    return {std::move(rsp), std::move(scale)};
+//}
+//
+//RGBIlluminantSpectrum Pipeline::srgb_illuminant_spectrum(Expr<float3> rgb) const noexcept {
+//    auto [rsp, scale] = RGB2SpectrumTable::srgb().decode_unbound(
+//        Expr{_bindless_array}, _rgb2spec_index, rgb);
+//    return {std::move(rsp), std::move(scale), DenselySampledSpectrum::cie_illum_d65()};
+//}
 
 const Texture::Instance *Pipeline::build_texture(CommandBuffer &command_buffer, const Texture *texture) noexcept {
     if (texture == nullptr) { return nullptr; }

@@ -35,41 +35,22 @@ public:
     DisneySurface(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Surface{scene, desc},
           _thin{desc->property_bool_or_default("thin", false)} {
-        auto load_texture = [scene, desc](const Texture *&t, std::string_view name, Texture::Category category) noexcept {
-            if (category == Texture::Category::COLOR) {
-                t = scene->load_texture(desc->property_node_or_default(
-                    name, SceneNodeDesc::shared_default_texture("ConstColor")));
-                if (t->category() != category) [[unlikely]] {
-                    LUISA_ERROR(
-                        "Expected color texture for "
-                        "property '{}' in DisneySurface. [{}]",
-                        name, desc->source_location().string());
-                }
-            } else {
-                t = scene->load_texture(desc->property_node_or_default(name));
-                if (t != nullptr && t->category() != category) [[unlikely]] {
-                    LUISA_ERROR(
-                        "Expected generic texture for "
-                        "property '{}' in DisneySurface. [{}]",
-                        name, desc->source_location().string());
-                }
-            }
-        };
-#define LUISA_RENDER_DISNEY_PARAM_LOAD(name, category) \
-    load_texture(_##name, #name, Texture::Category::category);
-        LUISA_RENDER_DISNEY_PARAM_LOAD(color, COLOR)
-        LUISA_RENDER_DISNEY_PARAM_LOAD(metallic, GENERIC)
-        LUISA_RENDER_DISNEY_PARAM_LOAD(eta, GENERIC)
-        LUISA_RENDER_DISNEY_PARAM_LOAD(roughness, GENERIC)
-        LUISA_RENDER_DISNEY_PARAM_LOAD(specular_tint, GENERIC)
-        LUISA_RENDER_DISNEY_PARAM_LOAD(anisotropic, GENERIC)
-        LUISA_RENDER_DISNEY_PARAM_LOAD(sheen, GENERIC)
-        LUISA_RENDER_DISNEY_PARAM_LOAD(sheen_tint, GENERIC)
-        LUISA_RENDER_DISNEY_PARAM_LOAD(clearcoat, GENERIC)
-        LUISA_RENDER_DISNEY_PARAM_LOAD(clearcoat_gloss, GENERIC)
-        LUISA_RENDER_DISNEY_PARAM_LOAD(specular_trans, GENERIC)
-        LUISA_RENDER_DISNEY_PARAM_LOAD(flatness, GENERIC)
-        LUISA_RENDER_DISNEY_PARAM_LOAD(diffuse_trans, GENERIC)
+#define LUISA_RENDER_DISNEY_PARAM_LOAD(name)                      \
+    _##name = scene->load_texture(desc->property_node_or_default( \
+        #name, SceneNodeDesc::shared_default_texture("Constant")));
+        LUISA_RENDER_DISNEY_PARAM_LOAD(color)
+        LUISA_RENDER_DISNEY_PARAM_LOAD(metallic)
+        LUISA_RENDER_DISNEY_PARAM_LOAD(eta)
+        LUISA_RENDER_DISNEY_PARAM_LOAD(roughness)
+        LUISA_RENDER_DISNEY_PARAM_LOAD(specular_tint)
+        LUISA_RENDER_DISNEY_PARAM_LOAD(anisotropic)
+        LUISA_RENDER_DISNEY_PARAM_LOAD(sheen)
+        LUISA_RENDER_DISNEY_PARAM_LOAD(sheen_tint)
+        LUISA_RENDER_DISNEY_PARAM_LOAD(clearcoat)
+        LUISA_RENDER_DISNEY_PARAM_LOAD(clearcoat_gloss)
+        LUISA_RENDER_DISNEY_PARAM_LOAD(specular_trans)
+        LUISA_RENDER_DISNEY_PARAM_LOAD(flatness)
+        LUISA_RENDER_DISNEY_PARAM_LOAD(diffuse_trans)
 #undef LUISA_RENDER_DISNEY_PARAM_LOAD
     }
     [[nodiscard]] auto thin() const noexcept { return _thin; }
@@ -179,10 +160,6 @@ namespace {
     return lerp(R0, 1.f, SchlickWeight(cosTheta));
 }
 
-[[nodiscard]] inline Float4 FrSchlick(Expr<float4> R0, Expr<float> cosTheta) noexcept {
-    return lerp(R0, make_float4(1.f), SchlickWeight(cosTheta));
-}
-
 // For a dielectric, R(0) = (eta - 1)^2 / (eta + 1)^2, assuming we're
 // coming from air..
 [[nodiscard]] inline Float SchlickR0FromEta(Float eta) {
@@ -191,12 +168,17 @@ namespace {
 
 class DisneyDiffuse final : public BxDF {
 
+public:
+    struct Gradient {
+        SampledSpectrum dR;
+    };
+
 private:
-    Float4 R;
+    SampledSpectrum R;
 
 public:
-    explicit DisneyDiffuse(Float4 R) noexcept : R{std::move(R)} {}
-    [[nodiscard]] Float4 evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+    explicit DisneyDiffuse(SampledSpectrum R) noexcept : R{std::move(R)} {}
+    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override {
         auto Fo = SchlickWeight(abs_cos_theta(wo));
         auto Fi = SchlickWeight(abs_cos_theta(wi));
 
@@ -204,12 +186,10 @@ public:
         // Burley 2015, eq (4).
         return R * inv_pi * (1.f - Fo * .5f) * (1.f - Fi * .5f);
     }
-    [[nodiscard]] luisa::vector<Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
         auto Fo = SchlickWeight(abs_cos_theta(wo));
         auto Fi = SchlickWeight(abs_cos_theta(wi));
-
-        auto d_r = make_float4(inv_pi * (1.f - Fo * .5f) * (1.f - Fi * .5f));
-        return {d_r};
+        return {.dR = df * inv_pi * (1.f - Fo * .5f) * (1.f - Fi * .5f)};
     }
 };
 
@@ -217,14 +197,20 @@ public:
 // approximation of the BSSRDF.
 class DisneyFakeSS final : public BxDF {
 
+public:
+    struct Gradient {
+        SampledSpectrum dR;
+        Float dRoughness;
+    };
+
 private:
-    Float4 R;
+    SampledSpectrum R;
     Float roughness;
 
 public:
-    DisneyFakeSS(Float4 R, Float roughness) noexcept
+    DisneyFakeSS(SampledSpectrum R, Float roughness) noexcept
         : R{std::move(R)}, roughness{std::move(roughness)} {}
-    [[nodiscard]] Float4 evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override {
         auto wh = wi + wo;
         auto valid = any(wh != 0.f);
         wh = normalize(wh);
@@ -236,24 +222,30 @@ public:
         auto Fss = lerp(1.0f, Fss90, Fo) * lerp(1.0f, Fss90, Fi);
         // 1.25 scale is used to (roughly) preserve albedo
         auto ss = 1.25f * (Fss * (1.f / (abs_cos_theta(wo) + abs_cos_theta(wi)) - .5f) + .5f);
-        return ite(valid, R * inv_pi * ss, 0.f);
+        return R * ite(valid, inv_pi * ss, 0.f);
     }
-    [[nodiscard]] luisa::vector<Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
         // TODO
-        LUISA_ERROR_WITH_LOCATION("unimplemented");
+        LUISA_ERROR_WITH_LOCATION("Not implemented.");
     }
 };
 
 class DisneyRetro final : public BxDF {
 
+public:
+    struct Gradient {
+        SampledSpectrum dR;
+        Float dRoughness;
+    };
+
 private:
-    Float4 R;
+    SampledSpectrum R;
     Float roughness;
 
 public:
-    DisneyRetro(Float4 R, Float roughness) noexcept
+    DisneyRetro(SampledSpectrum R, Float roughness) noexcept
         : R{std::move(R)}, roughness{std::move(roughness)} {}
-    [[nodiscard]] Float4 evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override {
         auto wh = wi + wo;
         auto valid = any(wh != 0.f);
         wh = normalize(wh);
@@ -263,32 +255,37 @@ public:
         auto Rr = 2.f * roughness * cosThetaD * cosThetaD;
 
         // Burley 2015, eq (4).
-        auto f = R * inv_pi * Rr * (Fo + Fi + Fo * Fi * (Rr - 1.f));
-        return ite(valid, f, 0.f);
+        auto f = ite(valid, inv_pi * Rr * (Fo + Fi + Fo * Fi * (Rr - 1.f)), 0.f);
+        return R * f;
     }
-    [[nodiscard]] luisa::vector<Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
         // TODO
-        LUISA_ERROR_WITH_LOCATION("unimplemented");
+        LUISA_ERROR_WITH_LOCATION("Not implemented.");
     }
 };
 
 class DisneySheen final : public BxDF {
 
+public:
+    struct Gradient {
+        SampledSpectrum dR;
+    };
+
 private:
-    Float4 R;
+    SampledSpectrum R;
 
 public:
-    explicit DisneySheen(Float4 R) noexcept : R{std::move(R)} {}
-    [[nodiscard]] Float4 evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+    explicit DisneySheen(SampledSpectrum R) noexcept : R{std::move(R)} {}
+    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override {
         auto wh = wi + wo;
         auto valid = any(wh != 0.f);
         wh = normalize(wh);
         auto cosThetaD = dot(wi, wh);
-        return ite(valid, R * SchlickWeight(cosThetaD), 0.f);
+        return R * ite(valid, SchlickWeight(cosThetaD), 0.f);
     }
-    [[nodiscard]] luisa::vector<Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
         // TODO
-        LUISA_ERROR_WITH_LOCATION("unimplemented");
+        LUISA_ERROR_WITH_LOCATION("Not implemented.");
     }
 };
 
@@ -305,7 +302,13 @@ public:
     return 1.f / (cosTheta + sqrt(alpha2 + cosTheta2 - alpha2 * cosTheta2));
 }
 
-class DisneyClearcoat final : public BxDF {
+class DisneyClearcoat final {
+
+public:
+    struct Gradient {
+        Float dWeight;
+        Float dGloss;
+    };
 
 private:
     Float weight;
@@ -314,7 +317,7 @@ private:
 public:
     DisneyClearcoat(Float weight, Float gloss) noexcept
         : weight{std::move(weight)}, gloss{std::move(gloss)} {}
-    [[nodiscard]] Float4 evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+    [[nodiscard]] Float evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
         auto wh = wi + wo;
         auto valid = any(wh != 0.f);
         wh = normalize(wh);
@@ -326,9 +329,9 @@ public:
         // The geometric term always based on alpha = 0.25.
         auto Gr = smithG_GGX(abs_cos_theta(wo), .25f) *
                   smithG_GGX(abs_cos_theta(wi), .25f);
-        return ite(valid, weight * Gr * Fr * Dr * .25f, make_float4(0.f));
+        return ite(valid, weight * Gr * Fr * Dr * .25f, 0.f);
     }
-    [[nodiscard]] Float4 sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *p) const noexcept override {
+    [[nodiscard]] Float sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *p) const noexcept {
         // TODO: double check all this: there still seem to be some very
         // occasional fireflies with clearcoat; presumably there is a bug
         // somewhere.
@@ -343,7 +346,7 @@ public:
         *p = ite(valid, pdf(wo, *wi), 0.f);
         return ite(valid, evaluate(wo, *wi), 0.f);
     }
-    [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+    [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {
         auto wh = wi + wo;
         auto valid = same_hemisphere(wo, wi) & any(wh != 0.f);
         wh = normalize(wh);
@@ -354,9 +357,9 @@ public:
         auto Dr = GTR1(abs_cos_theta(wh), gloss);
         return ite(valid, Dr * abs_cos_theta(wh) / (4.f * dot(wo, wh)), 0.f);
     }
-    [[nodiscard]] luisa::vector<Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
         // TODO
-        LUISA_ERROR_WITH_LOCATION("unimplemented");
+        LUISA_ERROR_WITH_LOCATION("Not implemented.");
     }
 };
 
@@ -364,30 +367,37 @@ public:
 // a mixture between dielectric and the Schlick Fresnel approximation.
 class DisneyFresnel final : public Fresnel {
 
+public:
+    struct Gradient {
+        SampledSpectrum dR0;
+        Float dMetallic;
+        Float dEta;
+    };
+
 private:
-    Float4 R0;
+    SampledSpectrum R0;
     Float metallic;
     Float e;
 
 public:
-    DisneyFresnel(Float4 R0, Float metallic, Float eta) noexcept
+    DisneyFresnel(SampledSpectrum R0, Float metallic, Float eta) noexcept
         : R0{std::move(R0)}, metallic{std::move(metallic)}, e{std::move(eta)} {}
-    [[nodiscard]] Float4 evaluate(Expr<float> cosI) const noexcept override {
-        return lerp(
-            fresnel_dielectric(cosI, make_float4(1.f), make_float4(e)),
-            FrSchlick(R0, cosI),
-            metallic);
+    [[nodiscard]] SampledSpectrum evaluate(Expr<float> cosI) const noexcept override {
+        auto fr = fresnel_dielectric(cosI, 1.f, e);
+        return R0.map([&](auto, auto R) noexcept {
+            return lerp(fr, FrSchlick(R, cosI), metallic);
+        });
     }
     [[nodiscard]] auto eta() const noexcept { return e; }
-    [[nodiscard]] luisa::vector<Float4> grad(Expr<float> cosThetaI) const noexcept override {
+    [[nodiscard]] Gradient backward(Expr<float> cosThetaI, const SampledSpectrum &dFr) const noexcept {
         // TODO
-        LUISA_ERROR_WITH_LOCATION("unimplemented");
+        LUISA_ERROR_WITH_LOCATION("Not implemented.");
     }
 };
 
 struct DisneyMicrofacetDistribution final : public TrowbridgeReitzDistribution {
-    explicit DisneyMicrofacetDistribution(Float2 alpha) noexcept
-        : TrowbridgeReitzDistribution{std::move(alpha)} {}
+    explicit DisneyMicrofacetDistribution(Expr<float2> alpha) noexcept
+        : TrowbridgeReitzDistribution{alpha} {}
     [[nodiscard]] Float G(Expr<float3> wo, Expr<float3> wi) const noexcept override {
         return G1(wo) * G1(wi);
     }
@@ -459,7 +469,7 @@ public:
         auto metallic = ite(front_face, metallic_in, 0.f);
         auto specular_trans = (1.f - metallic) * specular_trans_in;
         auto diffuse_weight = (1.f - metallic) * (1.f - specular_trans);
-        auto dt = diffuse_trans * .5f;// 0: all diffuse is reflected -> 1, transmitted
+        auto dt = diffuse_trans * .5f;                            // 0: all diffuse is reflected -> 1, transmitted
         auto Ctint = ite(color_lum > 0.f, color / color_lum, 1.f);// normalize lum. to isolate hue+sat
         auto eta = ite(eta_in < black_threshold, 1.5f, eta_in);
         auto thin = instance->thin();

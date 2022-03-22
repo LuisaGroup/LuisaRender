@@ -208,18 +208,13 @@ void MegakernelPathTracingInstance::_render_one_camera(
         sampler->start(pixel_id, frame_index);
         auto [camera_ray, camera_weight] = camera->generate_ray(
             *sampler, pixel_id, time, camera_to_world);
-        auto beta = def(make_float4(camera_weight));
-        auto swl = SampledWavelengths::sample_visible(sampler->generate_1d());
+        auto swl = pt->spectrum()->sample(*sampler);
+        SampledSpectrum beta{swl.dimension(), camera_weight};
+        SampledSpectrum Li{swl.dimension()};
 
         auto ray = camera_ray;
-        auto Li = def(make_float4(0.0f));
         auto pdf_bsdf = def(1e16f);
         $for(depth, pt->node<MegakernelPathTracing>()->max_depth()) {
-
-            auto add_light_contrib = [&](const Light::Evaluation &eval) noexcept {
-                auto mis_weight = ite(depth == 0u, 1.0f, balanced_heuristic(pdf_bsdf, eval.pdf));
-                Li += ite(eval.pdf > 0.0f, beta * eval.L * mis_weight, make_float4(0.0f));
-            };
 
             // trace
             auto it = pipeline.intersect(ray);
@@ -254,20 +249,20 @@ void MegakernelPathTracingInstance::_render_one_camera(
             auto occluded = pipeline.intersect_any(shadow_ray);
 
             // evaluate material
-            auto eta_scale = def(make_float4(1.f));
+            SampledSpectrum eta_scale{swl.dimension(), 1.f};
             auto cos_theta_o = it->wo_local().z;
             auto surface_tag = it->shape()->surface_tag();
             pipeline.dynamic_dispatch_surface(surface_tag, [&](auto surface) {
                 // apply normal map
                 if (auto normal_map = surface->normal()) {
-                    auto normal_local = 2.f * normal_map->evaluate(*it, swl, time).value.xyz() - 1.f;
+                    auto normal_local = 2.f * normal_map->evaluate(*it, time).xyz() - 1.f;
                     auto normal = it->shading().local_to_world(normal_local);
                     it->set_shading(Frame::make(normal, it->shading().u()));
                 }
                 // apply alpha map
                 auto alpha_skip = def(false);
                 if (auto alpha_map = surface->alpha()) {
-                    auto alpha = alpha_map->evaluate(*it, swl, time).value.x;
+                    auto alpha = alpha_map->evaluate(*it, time).x;
                     auto u_alpha = sampler->generate_1d();
                     alpha_skip = alpha < u_alpha;
                 }
@@ -287,30 +282,33 @@ void MegakernelPathTracingInstance::_render_one_camera(
                         auto cos_theta_i = dot(it->shading().n(), wi);
                         auto is_trans = cos_theta_i * cos_theta_o < 0.f;
                         auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
-                        Li += beta * mis_weight * ite(eval.pdf > 0.0f, eval.f, 0.0f) *
-                              abs_dot(it->shading().n(), wi) *
+                        Li += beta * mis_weight * eval.f * abs_dot(it->shading().n(), wi) *
                               light_sample.eval.L / light_sample.eval.pdf;
                     };
 
                     // sample material
-                    auto [wi, eval] = closure->sample(*sampler);
-                    auto cos_theta_i = dot(wi, it->shading().n());
-                    ray = it->spawn_ray(wi);
-                    pdf_bsdf = eval.pdf;
-                    beta *= ite(
-                        eval.pdf > 0.0f,
-                        eval.f * abs(cos_theta_i) / eval.pdf,
-                        make_float4(0.0f));
-                    eta_scale = ite(
-                        cos_theta_i * cos_theta_o < 0.f &
-                            min(eval.alpha.x, eval.alpha.y) < .05f,
-                        ite(cos_theta_o > 0.f, sqr(eval.eta), sqrt(1.f / eval.eta)),
-                        1.f);
+                    auto sample = closure->sample(*sampler);
+                    auto cos_theta_i = dot(sample.wi, it->shading().n());
+                    ray = it->spawn_ray(sample.wi);
+                    pdf_bsdf = sample.eval.pdf;
+                    auto t = ite(sample.eval.pdf > 0.f, abs(cos_theta_i), 0.f);
+                    beta *= sample.eval.f * t;
+
+                    // specular transmission, consider eta scale
+                    $if(cos_theta_i * cos_theta_o < 0.f &
+                        min(sample.eval.alpha.x, sample.eval.alpha.y) < .05f) {
+                        for (auto i = 0u; i < swl.dimension(); i++) {
+                            eta_scale[i] = ite(
+                                cos_theta_o > 0.f,
+                                sqr(sample.eval.eta[i]),
+                                sqr(1.f / sample.eval.eta[i]));
+                        }
+                    };
                 };
             });
 
             // rr
-            $if(all(beta <= 0.0f)) { $break; };
+            $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
             auto q = max(swl.cie_y(beta * eta_scale), .05f);
             auto rr_depth = pt->node<MegakernelPathTracing>()->rr_depth();
             auto rr_threshold = pt->node<MegakernelPathTracing>()->rr_threshold();

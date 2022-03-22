@@ -40,11 +40,11 @@ public:
     [[nodiscard]] Light::Evaluation evaluate_hit(
         const Interaction &it, Expr<float3> p_from,
         const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        Light::Evaluation eval{.L = SampledSpectrum{swl.dimension()}, .pdf = 0.f};
         if (pipeline().lights().empty()) [[unlikely]] {// no lights
             LUISA_WARNING_WITH_LOCATION("No lights in scene.");
-            return {.L = make_float4(0.f), .pdf = 0.f};
+            return eval;
         }
-        Light::Evaluation eval;
         pipeline().dynamic_dispatch_light(it.shape()->light_tag(), [&](auto light) noexcept {
             auto closure = light->closure(swl, time);
             eval = closure->evaluate(it, p_from);
@@ -58,7 +58,7 @@ public:
         const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         if (_env_prob == 0.f) [[unlikely]] {// no environment
             LUISA_WARNING_WITH_LOCATION("No environment in scene");
-            return {.L = make_float4(0.f), .pdf = 0.f};
+            return {.L = SampledSpectrum{swl.dimension()}, .pdf = 0.f};
         }
         auto eval = pipeline().environment()->evaluate(wi, env_to_world, swl, time);
         eval.pdf *= _env_prob;
@@ -67,9 +67,12 @@ public:
     [[nodiscard]] Light::Sample sample(
         Sampler::Instance &sampler, const Interaction &it_from, Expr<float3x3> env_to_world,
         const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        Light::Sample sample{
+            .eval = {.L = SampledSpectrum{swl.dimension()}, .pdf = 0.f},
+            .wi = {0.f, 1.f, 0.f},
+            .distance = std::numeric_limits<float>::max()};
         if (_env_prob > 0.f) {// consider environment
             auto u = sampler.generate_1d();
-            Light::Sample sample;
             $if(u < _env_prob) {
                 sample = pipeline().environment()->sample(
                     sampler, it_from.p(), env_to_world, swl, time);
@@ -88,25 +91,20 @@ public:
                     sample.eval.pdf *= (1.f - _env_prob) / n;
                 }
             };
-            return sample;
-        }
-        if (!pipeline().lights().empty()) {
+        } else if (!pipeline().lights().empty()) {
             auto u = sampler.generate_1d();
             auto n = static_cast<float>(pipeline().lights().size());
             auto i = cast<uint>(clamp(u * n, 0.f, n - 1.f));
             auto handle = pipeline().buffer<Light::Handle>(_light_buffer_id).read(i);
-            Light::Sample sample;
             pipeline().dynamic_dispatch_light(handle.light_tag, [&](auto light) noexcept {
                 auto closure = light->closure(swl, time);
                 sample = closure->sample(sampler, handle.instance_id, it_from.p());
             });
             sample.eval.pdf *= 1.f / n;
-            return sample;
+        } else {
+            LUISA_WARNING_WITH_LOCATION("No light or environment to sample.");
         }
-        LUISA_WARNING_WITH_LOCATION("No light or environment to sample.");
-        return {.eval = {.L = make_float4(), .pdf = 0.f},
-                .wi = make_float3(0.f, 1.f, 0.f),
-                .distance = std::numeric_limits<float>::max()};
+        return sample;
     }
 };
 

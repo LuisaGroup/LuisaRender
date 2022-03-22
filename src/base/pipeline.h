@@ -187,6 +187,7 @@ public:
     [[nodiscard]] auto lights() const noexcept { return luisa::span{_lights}; }
     [[nodiscard]] auto instanced_lights() const noexcept { return luisa::span{_instanced_lights}; }
     [[nodiscard]] auto environment() const noexcept { return _environment.get(); }
+    [[nodiscard]] auto integrator() const noexcept { return _integrator.get(); }
     [[nodiscard]] auto has_lighting() const noexcept { return !_lights.empty() || _environment != nullptr; }
     [[nodiscard]] auto mean_time() const noexcept { return _mean_time; }
     [[nodiscard]] const Texture::Instance *build_texture(
@@ -213,13 +214,8 @@ public:
         const Var<float4x4> &shape_to_world, const Var<float3x3> &shape_to_world_normal) const noexcept;
     [[nodiscard]] auto intersect(const Var<Ray> &ray) const noexcept { return interaction(ray, trace_closest(ray)); }
     [[nodiscard]] auto intersect_any(const Var<Ray> &ray) const noexcept { return trace_any(ray); }
-
     void dynamic_dispatch_surface(Expr<uint> tag, const luisa::function<void(const Surface::Instance *)> &f) const noexcept;
     void dynamic_dispatch_light(Expr<uint> tag, const luisa::function<void(const Light::Instance *)> &f) const noexcept;
-
-    [[nodiscard]] RGBAlbedoSpectrum srgb_albedo_spectrum(Expr<float3> rgb) const noexcept;
-    [[nodiscard]] RGBUnboundSpectrum srgb_unbound_spectrum(Expr<float3> rgb) const noexcept;
-    [[nodiscard]] RGBIlluminantSpectrum srgb_illuminant_spectrum(Expr<float3> rgb) const noexcept;
 };
 
 }// namespace luisa::render

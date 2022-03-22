@@ -6,6 +6,7 @@
 
 #include <dsl/syntax.h>
 #include <core/stl.h>
+#include <util/spec.h>
 
 namespace luisa::render {
 
@@ -25,7 +26,18 @@ using compute::Float4;
 [[nodiscard]] Float spherical_theta(Float3 v) noexcept;
 [[nodiscard]] Float spherical_phi(Float3 v) noexcept;
 
-struct MicrofacetDistribution {
+class MicrofacetDistribution {
+
+public:
+    struct Gradient {
+        Float2 dAlpha;
+    };
+
+private:
+    Float2 _alpha;
+
+public:
+    explicit MicrofacetDistribution(Expr<float2> alpha) noexcept;
     virtual ~MicrofacetDistribution() noexcept = default;
     [[nodiscard]] Float G1(Expr<float3> w) const noexcept;
     [[nodiscard]] virtual Float G(Expr<float3> wo, Expr<float3> wi) const noexcept;
@@ -33,167 +45,192 @@ struct MicrofacetDistribution {
     [[nodiscard]] virtual Float Lambda(Expr<float3> w) const noexcept = 0;
     [[nodiscard]] virtual Float3 sample_wh(Expr<float3> wo, Expr<float2> u) const noexcept = 0;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wh) const noexcept;
+    [[nodiscard]] auto alpha() const noexcept { return _alpha; }
+    // TODO: backward
 };
 
-class TrowbridgeReitzDistribution : public MicrofacetDistribution {
-
-private:
-    Float2 _alpha;
-
-public:
+struct TrowbridgeReitzDistribution : public MicrofacetDistribution {
     explicit TrowbridgeReitzDistribution(Expr<float2> alpha) noexcept;
     [[nodiscard]] Float D(Expr<float3> wh) const noexcept override;
     [[nodiscard]] Float Lambda(Expr<float3> w) const noexcept override;
     [[nodiscard]] Float3 sample_wh(Expr<float3> wo, Expr<float2> u) const noexcept override;
     [[nodiscard]] static Float roughness_to_alpha(Expr<float> roughness) noexcept;
     [[nodiscard]] static Float2 roughness_to_alpha(Expr<float2> roughness) noexcept;
-    [[nodiscard]] auto alpha() const noexcept { return _alpha; }
 };
 
 [[nodiscard]] Float fresnel_dielectric(Float cosThetaI, Float etaI, Float etaT) noexcept;
-[[nodiscard]] Float4 fresnel_dielectric(Float cosThetaI, Float4 etaI, Float4 etaT) noexcept;
-[[nodiscard]] Float4 fresnel_conductor(Float cosThetaI, Float4 etaI, Float4 etaT, Float4 k) noexcept;
+[[nodiscard]] Float fresnel_conductor(Float cosThetaI, Float etaI, Float etaT, Float k) noexcept;
+[[nodiscard]] SampledSpectrum fresnel_dielectric(
+    Float cosThetaI, const SampledSpectrum &etaI, const SampledSpectrum &etaT) noexcept;
+[[nodiscard]] SampledSpectrum fresnel_conductor(
+    Float cosThetaI, const SampledSpectrum &etaI,
+    const SampledSpectrum &etaT, const SampledSpectrum &k) noexcept;
 
 struct Fresnel {
     virtual ~Fresnel() noexcept = default;
-    [[nodiscard]] virtual Float4 evaluate(Expr<float> cosI) const noexcept = 0;
-    [[nodiscard]] virtual luisa::vector<Float4> grad(Expr<float> cosThetaI) const noexcept = 0;
+    [[nodiscard]] virtual SampledSpectrum evaluate(Expr<float> cosI) const noexcept = 0;
 };
 
 class FresnelConductor final : public Fresnel {
 
 private:
-    Float4 _eta_i, _eta_t, _k;
+    SampledSpectrum _eta_i;
+    SampledSpectrum _eta_t;
+    SampledSpectrum _k;
 
 public:
-    FresnelConductor(Expr<float4> etaI, Expr<float4> etaT, Expr<float4> k) noexcept
-        : _eta_i{etaI}, _eta_t{etaT}, _k{k} {}
-    [[nodiscard]] Float4 evaluate(Expr<float> cosThetaI) const noexcept override;
-    [[nodiscard]] luisa::vector<Float4> grad(Expr<float> cosThetaI) const noexcept override;
+    FresnelConductor(SampledSpectrum etaI, SampledSpectrum etaT, SampledSpectrum k) noexcept
+        : _eta_i{std::move(etaI)}, _eta_t{std::move(etaT)}, _k{std::move(k)} {}
+    [[nodiscard]] SampledSpectrum evaluate(Expr<float> cosThetaI) const noexcept override;
 };
 
 class FresnelDielectric final : public Fresnel {
 
 private:
-    Float4 _eta_i, _eta_t;
+    SampledSpectrum _eta_i, _eta_t;
 
 public:
-    FresnelDielectric(Expr<float4> etaI, Expr<float4> etaT) noexcept
-        : _eta_i{etaI}, _eta_t{etaT} {}
-    [[nodiscard]] Float4 evaluate(Expr<float> cosThetaI) const noexcept override;
+    FresnelDielectric(SampledSpectrum etaI, SampledSpectrum etaT) noexcept
+        : _eta_i{std::move(etaI)}, _eta_t{std::move(etaT)} {}
+    [[nodiscard]] SampledSpectrum evaluate(Expr<float> cosThetaI) const noexcept override;
     [[nodiscard]] auto eta_i() const noexcept { return _eta_i; }
     [[nodiscard]] auto eta_t() const noexcept { return _eta_t; }
-    [[nodiscard]] luisa::vector<Float4> grad(Expr<float> cosThetaI) const noexcept override;
-};
-
-struct FresnelNoOp final : public Fresnel {
-    [[nodiscard]] Float4 evaluate(Expr<float> cosThetaI) const noexcept override;
-    [[nodiscard]] luisa::vector<Float4> grad(Expr<float> cosThetaI) const noexcept override;
 };
 
 struct BxDF {
     virtual ~BxDF() noexcept = default;
-    [[nodiscard]] virtual Float4 evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept = 0;
-    [[nodiscard]] virtual Float4 sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept;
+    [[nodiscard]] virtual SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept = 0;
+    [[nodiscard]] virtual SampledSpectrum sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept;
     [[nodiscard]] virtual Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept;
-    [[nodiscard]] virtual luisa::vector<Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept = 0;
 };
 
 class LambertianReflection : public BxDF {
 
+public:
+    struct Gradient {
+        SampledSpectrum dR;
+    };
+
 private:
-    Float4 _r;
+    SampledSpectrum _r;
 
 public:
-    explicit LambertianReflection(Expr<float4> R) noexcept : _r{R} {}
-    [[nodiscard]] Float4 evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
-    [[nodiscard]] luisa::vector<Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override;
+    explicit LambertianReflection(SampledSpectrum R) noexcept : _r{std::move(R)} {}
+    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
+    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept;
 };
 
 class LambertianTransmission : public BxDF {
 
+public:
+    struct Gradient {
+        SampledSpectrum dT;
+    };
+
 private:
-    Float4 _t;
+    SampledSpectrum _t;
 
 public:
-    explicit LambertianTransmission(Expr<float4> T) noexcept : _t{T} {}
-    [[nodiscard]] Float4 evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
-    [[nodiscard]] Float4 sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept override;
+    explicit LambertianTransmission(SampledSpectrum T) noexcept : _t{std::move(T)} {}
+    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
+    [[nodiscard]] SampledSpectrum sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept override;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept override;
-    [[nodiscard]] luisa::vector<Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override;
+    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept;
 };
 
 class MicrofacetReflection : public BxDF {
 
+public:
+    struct Gradient {
+        SampledSpectrum dR;
+        Float2 dAlpha;
+    };
+
 private:
     // MicrofacetReflection Private Data
-    Float4 _r;
+    SampledSpectrum _r;
     const MicrofacetDistribution *_distribution;
     const Fresnel *_fresnel;
 
 public:
-    MicrofacetReflection(Expr<float4> R, const MicrofacetDistribution *d, const Fresnel *f) noexcept
-        : _r{R}, _distribution{d}, _fresnel{f} {}
-    [[nodiscard]] Float4 evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
-    [[nodiscard]] Float4 sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept override;
+    MicrofacetReflection(SampledSpectrum R, const MicrofacetDistribution *d, const Fresnel *f) noexcept
+        : _r{std::move(R)}, _distribution{d}, _fresnel{f} {}
+    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
+    [[nodiscard]] SampledSpectrum sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept override;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept override;
-    [[nodiscard]] luisa::vector<Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override;
+    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept;
 };
 
 class MicrofacetTransmission : public BxDF {
 
+public:
+    struct Gradient {
+        SampledSpectrum dT;
+        Float2 dAlpha;
+    };
+
 private:
     // MicrofacetTransmission Private Data
-    Float4 _t;
+    SampledSpectrum _t;
     const MicrofacetDistribution *_distribution;
-    Float4 _eta_a;
-    Float4 _eta_b;
-    FresnelDielectric _fresnel;
+    SampledSpectrum _eta_a;
+    SampledSpectrum _eta_b;
 
 public:
     // MicrofacetTransmission Public Methods
-    MicrofacetTransmission(
-        Expr<float4> T, const MicrofacetDistribution *d,
-        Expr<float4> etaA, Expr<float4> etaB) noexcept
-        : _t{T}, _distribution{d}, _eta_a{etaA},
-          _eta_b{etaB}, _fresnel{etaA, etaB} {}
-    [[nodiscard]] Float4 evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
-    [[nodiscard]] Float4 sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept override;
+    MicrofacetTransmission(SampledSpectrum T, const MicrofacetDistribution *d,
+                           SampledSpectrum etaA, SampledSpectrum etaB) noexcept
+        : _t{std::move(T)}, _distribution{d}, _eta_a{std::move(etaA)}, _eta_b{std::move(etaB)} {}
+    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
+    [[nodiscard]] SampledSpectrum sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept override;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept override;
-    [[nodiscard]] luisa::vector<Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override;
+    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept;
 };
 
 class OrenNayar : public BxDF {
 
+public:
+    struct Gradient {
+        SampledSpectrum dR;
+        Float dSigma;
+    };
+
 private:
-    Float4 _r;
+    SampledSpectrum _r;
     Float _sigma;
     Float _a;
     Float _b;
 
 public:
-    OrenNayar(Expr<float4> R, Expr<float> sigma) noexcept;
-    [[nodiscard]] Float4 evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
-    [[nodiscard]] luisa::vector<Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override;
+    OrenNayar(SampledSpectrum R, Expr<float> sigma) noexcept;
+    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
+    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept;
 };
 
 class FresnelBlend : public BxDF {
 
+public:
+    struct Gradient {
+        SampledSpectrum dRd;
+        SampledSpectrum dRs;
+        Float2 dAlpha;
+    };
+
 private:
     // FresnelBlend Private Data
-    Float4 _rd, _rs;
+    SampledSpectrum _rd, _rs;
     const MicrofacetDistribution *_distribution;
 
 private:
-    [[nodiscard]] Float4 Schlick(Expr<float> cosTheta) const noexcept;
+    [[nodiscard]] SampledSpectrum Schlick(Expr<float> cosTheta) const noexcept;
 
 public:
-    FresnelBlend(Expr<float4> Rd, Expr<float4> Rs, const MicrofacetDistribution *distrib) noexcept
-        : _rd{Rd}, _rs{Rs}, _distribution{distrib} {}
-    [[nodiscard]] Float4 evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
-    [[nodiscard]] Float4 sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept override;
+    FresnelBlend(SampledSpectrum Rd, SampledSpectrum Rs, const MicrofacetDistribution *distrib) noexcept
+        : _rd{std::move(Rd)}, _rs{std::move(Rs)}, _distribution{distrib} {}
+    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
+    [[nodiscard]] SampledSpectrum sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept override;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept override;
-    [[nodiscard]] luisa::vector<Float4> grad(Expr<float3> wo, Expr<float3> wi) const noexcept override;
+    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept;
 };
 
 }// namespace luisa::render
