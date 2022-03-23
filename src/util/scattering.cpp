@@ -77,7 +77,7 @@ SampledSpectrum fresnel_dielectric(
     SampledSpectrum etaI{etaI_in.dimension()};
     SampledSpectrum etaT{etaT_in.dimension()};
     for (auto i = 0u; i < etaI.dimension(); i++) {
-        etaI[i] = ite(entering, etaT_in[i], etaT_in[i]);
+        etaI[i] = ite(entering, etaI_in[i], etaT_in[i]);
         etaT[i] = ite(entering, etaT_in[i], etaI_in[i]);
     }
     cosThetaI = abs(cosThetaI);
@@ -280,16 +280,16 @@ Float BxDF::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {
 }
 
 SampledSpectrum LambertianReflection::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
-    return _r * inv_pi;
+    return _r * ite(same_hemisphere(wo, wi), inv_pi, 0.f);
 }
 
 LambertianReflection::Gradient LambertianReflection::backward(
     Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
-    return {.dR = df * inv_pi};
+    return {.dR = df * ite(same_hemisphere(wo, wi), inv_pi, 0.f)};
 }
 
 SampledSpectrum LambertianTransmission::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
-    return _t * inv_pi;
+    return _t * ite(!same_hemisphere(wo, wi), inv_pi, 0.f);
 }
 
 SampledSpectrum LambertianTransmission::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *p) const noexcept {
@@ -305,26 +305,23 @@ Float LambertianTransmission::pdf(Expr<float3> wo, Expr<float3> wi) const noexce
 
 LambertianTransmission::Gradient LambertianTransmission::backward(
     Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
-    return {.dT = df * inv_pi};
+    return {.dT = df * ite(!same_hemisphere(wo, wi), inv_pi, 0.f)};
 }
 
 SampledSpectrum MicrofacetReflection::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
     using compute::any;
     using compute::normalize;
-    auto cosThetaO = abs_cos_theta(wo);
-    auto cosThetaI = abs_cos_theta(wi);
     auto wh = wi + wo;
-    auto valid = cosThetaI != 0.f & cosThetaO != 0.f & any(wh != 0.f);
+    auto valid = same_hemisphere(wo, wi) & any(wh != 0.f);
     wh = normalize(wh);
     // For the Fresnel call, make sure that wh is in the same hemisphere
     // as the surface normal, so that TIR is handled correctly.
     auto F = _fresnel->evaluate(dot(wi, face_forward(wh, make_float3(0.f, 0.f, 1.f))));
     auto D = _distribution->D(wh);
     auto G = _distribution->G(wo, wi);
-    auto f = 0.25f * _r * D * G * F / (cosThetaI * cosThetaO);
-    return f.map([&valid](auto, auto x) noexcept {
-        return ite(valid, x, 0.f);
-    });
+    auto cos_o = cos_theta(wo);
+    auto cos_i = cos_theta(wi);
+    return _r * F * ite(valid, abs(0.25f * D * G / (cos_i * cos_o)), 0.f);
 }
 
 SampledSpectrum MicrofacetReflection::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *p) const noexcept {
@@ -332,7 +329,9 @@ SampledSpectrum MicrofacetReflection::sample(Expr<float3> wo, Float3 *wi, Expr<f
     *p = 0.0f;
     auto wh = _distribution->sample_wh(wo, u);
     *wi = reflect(wo, wh);
-    auto valid = wo.z != 0.f & same_hemisphere(wo, wh) & same_hemisphere(wo, *wi);
+    auto valid = same_hemisphere(wo, *wi) &
+                 same_hemisphere(wo, wh) &
+                 same_hemisphere(wo, *wi);
     // Compute PDF of _wi_ for microfacet reflection
     *p = ite(valid, _distribution->pdf(wo, wh) / (4.f * dot(wo, wh)), 0.f);
     return evaluate(wo, *wi);
@@ -340,8 +339,9 @@ SampledSpectrum MicrofacetReflection::sample(Expr<float3> wo, Float3 *wi, Expr<f
 
 Float MicrofacetReflection::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {
     auto wh = normalize(wo + wi);
+    auto valid = same_hemisphere(wo, wi) & any(wh != 0.f);
     auto p = _distribution->pdf(wo, wh) / (4.f * dot(wo, wh));
-    return ite(same_hemisphere(wo, wi), p, 0.f);
+    return ite(valid, p, 0.f);
 }
 
 MicrofacetReflection::Gradient MicrofacetReflection::backward(
@@ -500,7 +500,7 @@ SampledSpectrum OrenNayar::evaluate(Expr<float3> wo, Expr<float3> wi) const noex
     auto sinAlpha = ite(absCosThetaI > absCosThetaO, sinThetaO, sinThetaI);
     auto tanBeta = ite(absCosThetaI > absCosThetaO,
                        sinThetaI / absCosThetaI, sinThetaO / absCosThetaO);
-    return _r * inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta);
+    return _r * ite(same_hemisphere(wo, wi), inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta), 0.f);
 }
 
 OrenNayar::Gradient OrenNayar::backward(
@@ -549,7 +549,7 @@ SampledSpectrum FresnelBlend::evaluate(Expr<float3> wo, Expr<float3> wi) const n
                    (1.f - pow5(1.f - .5f * absCosThetaI)) *
                    (1.f - pow5(1.f - .5f * absCosThetaO));
     auto wh = wi + wo;
-    auto valid = any(wh != 0.f);
+    auto valid = same_hemisphere(wo, wi) & any(wh != 0.f);
     wh = normalize(wh);
     auto specular = _distribution->D(wh) /
                     (4.f * abs_dot(wi, wh) * max(absCosThetaI, absCosThetaO)) *

@@ -463,9 +463,9 @@ class MetalClosure final : public Surface::Closure {
 
 private:
     SampledSpectrum _eta_i;
-    FresnelConductor _fresnel;
-    TrowbridgeReitzDistribution _distrib;
-    MicrofacetReflection _lobe;
+    luisa::unique_ptr<FresnelConductor> _fresnel;
+    luisa::unique_ptr<TrowbridgeReitzDistribution> _distrib;
+    luisa::unique_ptr<MicrofacetReflection> _lobe;
 
 public:
     MetalClosure(
@@ -473,24 +473,26 @@ public:
         const Interaction &it, const SampledWavelengths &swl, Expr<float> time,
         const SampledSpectrum &n, const SampledSpectrum &k, Expr<float2> alpha) noexcept
         : Surface::Closure{instance, it, swl, time}, _eta_i{swl.dimension(), 1.f},
-          _fresnel{_eta_i, n, k}, _distrib{alpha}, _lobe{_eta_i, &_distrib, &_fresnel} {}
+          _fresnel{luisa::make_unique<FresnelConductor>(_eta_i, n, k)},
+          _distrib{luisa::make_unique<TrowbridgeReitzDistribution>(alpha)},
+          _lobe{luisa::make_unique<MicrofacetReflection>(_eta_i, _distrib.get(), _fresnel.get())} {}
 
 private:
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
         auto wo_local = _it.wo_local();
         auto wi_local = _it.shading().world_to_local(wi);
-        auto f = _lobe.evaluate(wo_local, wi_local);
-        auto pdf = _lobe.pdf(wo_local, wi_local);
-        return {.f = f, .pdf = pdf, .alpha = _distrib.alpha(), .eta = _eta_i};
+        auto f = _lobe->evaluate(wo_local, wi_local);
+        auto pdf = _lobe->pdf(wo_local, wi_local);
+        return {.f = f, .pdf = pdf, .alpha = _distrib->alpha(), .eta = _eta_i};
     }
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
         auto wo_local = _it.wo_local();
         auto u = sampler.generate_2d();
         auto pdf = def(0.f);
         auto wi_local = def(make_float3(0.f, 0.f, 1.f));
-        auto f = _lobe.sample(wo_local, &wi_local, u, &pdf);
+        auto f = _lobe->sample(wo_local, &wi_local, u, &pdf);
         auto wi = _it.shading().local_to_world(wi_local);
-        return {.wi = wi, .eval = {.f = f, .pdf = pdf, .alpha = _distrib.alpha(), .eta = _eta_i}};
+        return {.wi = wi, .eval = {.f = f, .pdf = pdf, .alpha = _distrib->alpha(), .eta = _eta_i}};
     }
     void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
         LUISA_ERROR_WITH_LOCATION("Metal surface is not differentiable.");

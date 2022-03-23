@@ -183,7 +183,6 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     mean_time *= 1.0 / static_cast<double>(scene.cameras().size());
     pipeline->_mean_time = static_cast<float>(mean_time);
     pipeline->_build_geometry(command_buffer, scene.shapes(), pipeline->_mean_time, AccelBuildHint::FAST_TRACE);
-    pipeline->_integrator = scene.integrator()->build(*pipeline, command_buffer);
     if (auto env = scene.environment(); env != nullptr && !env->is_black()) {
         pipeline->_environment = env->build(*pipeline, command_buffer);
     }
@@ -191,6 +190,7 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
         LUISA_WARNING_WITH_LOCATION(
             "No lights or environment found in the scene.");
     }
+    pipeline->_integrator = scene.integrator()->build(*pipeline, command_buffer);
     command_buffer << pipeline->_bindless_array.update();
     if (auto &&diff = pipeline->_differentiation) {
         diff->materialize(command_buffer);

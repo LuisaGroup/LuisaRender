@@ -84,9 +84,9 @@ public:
 class MirrorClosure final : public Surface::Closure {
 
 private:
-    SchlickFresnel _fresnel;
-    TrowbridgeReitzDistribution _distribution;
-    MicrofacetReflection _refl;
+    luisa::unique_ptr<SchlickFresnel> _fresnel;
+    luisa::unique_ptr<TrowbridgeReitzDistribution> _distribution;
+    luisa::unique_ptr<MicrofacetReflection> _refl;
 
 public:
     MirrorClosure(
@@ -94,27 +94,28 @@ public:
         const Interaction &it, const SampledWavelengths &swl, Expr<float> time,
         const SampledSpectrum &refl, Expr<float2> alpha) noexcept
         : Surface::Closure{instance, it, swl, time},
-          _fresnel{refl}, _distribution{alpha},
-          _refl{refl, &_distribution, &_fresnel} {}
+          _fresnel{luisa::make_unique<SchlickFresnel>(refl)},
+          _distribution{luisa::make_unique<TrowbridgeReitzDistribution>(alpha)},
+          _refl{luisa::make_unique<MicrofacetReflection>(refl, _distribution.get(), _fresnel.get())} {}
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
         auto wo_local = _it.wo_local();
         auto wi_local = _it.shading().world_to_local(wi);
-        auto f = _refl.evaluate(wo_local, wi_local);
-        auto pdf = _refl.pdf(wo_local, wi_local);
+        auto f = _refl->evaluate(wo_local, wi_local);
+        auto pdf = _refl->pdf(wo_local, wi_local);
         return {.f = f,
                 .pdf = pdf,
-                .alpha = _distribution.alpha(),
+                .alpha = _distribution->alpha(),
                 .eta = SampledSpectrum{_swl.dimension(), 1.f}};
     }
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
         auto pdf = def(0.f);
         auto wi_local = def(make_float3(0.f, 0.f, 1.f));
         auto u = sampler.generate_2d();
-        auto f = _refl.sample(_it.wo_local(), &wi_local, u, &pdf);
+        auto f = _refl->sample(_it.wo_local(), &wi_local, u, &pdf);
         return {.wi = _it.shading().local_to_world(wi_local),
                 .eval = {.f = f,
                          .pdf = pdf,
-                         .alpha = _distribution.alpha(),
+                         .alpha = _distribution->alpha(),
                          .eta = SampledSpectrum{_swl.dimension(), 1.f}}};
     }
 

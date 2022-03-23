@@ -18,16 +18,22 @@ public:
         : Texture{scene, desc} {
         auto scale = desc->property_float_or_default("scale", 1.f);
         auto v = desc->property_float_list_or_default("v");
-        if (v.size() > 4u) [[unlikely]] {
+        if (v.empty()) [[unlikely]] {
             LUISA_WARNING(
-                "Too many values (count = {}) for ConstValue. "
+                "No value for ConstantTexture. "
+                "Fallback to single-channel zero. [{}]",
+                desc->source_location().string());
+            v.emplace_back(0.f);
+        } else if (v.size() > 4u) [[unlikely]] {
+            LUISA_WARNING(
+                "Too many values (count = {}) for ConstantTexture. "
                 "Additional values will be discarded. [{}]",
                 v.size(), desc->source_location().string());
             v.resize(4u);
         }
-        _channels = std::max(v.size(), static_cast<size_t>(1u));
+        _channels = v.size();
         for (auto i = 0u; i < v.size(); i++) { _v[i] = scale * v[i]; }
-        for (auto i = _channels; i < 4u; i++) { _v[i] = _v[_channels]; }
+        for (auto i = _channels; i < 4u; i++) { _v[i] = _v[_channels - 1u]; }
     }
     [[nodiscard]] auto v() const noexcept { return _v; }
     [[nodiscard]] bool is_black() const noexcept override { return all(_v == 0.0f); }

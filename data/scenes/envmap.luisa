@@ -33,22 +33,30 @@ Shape teapot : Group {
       file { "../meshes/utah-teapot.obj" }
       two_sided { false }
       surface : Glass {
+        color : Constant {
+          v { 1 }
+        }
         Kr : Constant {
-          // v { 1.0, 0.71, 0.29 }
+          v { 1.0 }
+        }
+        Kd : Constant {
           v { 1.0 }
         }
         Kt : Constant {
           v { 1.0 }
+        }
+        Ks : Constant {
+          v { 0.4 }
           // v { 0.2, 0.3, 0.9 }
           // v { 0.5, 0.5, 0.5 }
         }
         roughness : Constant {
-          v { 0.01 }
+          v { 0.1 }
         }
         // remap_roughness { true }
         // eta { 1.7 }
-        eta { "Sapphire" }
-        // eta { "Ti" }
+        // eta { "Sapphire" }
+        // eta { "Au" }
         // eta : ConstGeneric {
         //   v { 1.5, 1.52, 1.6 }
         // }
@@ -94,10 +102,10 @@ render {
   integrator { @pt }
   environment : Map {
     emission : Image {
-      // file { "../envmaps/photo_studio_01_1k.hdr" }
+      file { "../envmaps/photo_studio_01_1k.hdr" }
       // fp32 { true }
       // file { "../envmaps/envmap.exr" }
-      file { "/Users/mike/Downloads/dreifaltigkeitsberg_8k.exr" }
+      // file { "/Users/mike/Downloads/dreifaltigkeitsberg_8k.exr" }
     }
     transform : SRT {
       rotate { 0, 1, 0, 45 }

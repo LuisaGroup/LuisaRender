@@ -70,8 +70,8 @@ luisa::unique_ptr<Surface::Instance> SubstrateSurface::_build(
 class SubstrateClosure final : public Surface::Closure {
 
 private:
-    TrowbridgeReitzDistribution _distribution;
-    FresnelBlend _blend;
+    luisa::unique_ptr<TrowbridgeReitzDistribution> _distribution;
+    luisa::unique_ptr<FresnelBlend> _blend;
     SampledSpectrum _eta_i;
 
 public:
@@ -79,18 +79,20 @@ public:
         const Surface::Instance *instance,
         const Interaction &it, const SampledWavelengths &swl, Expr<float> time,
         const SampledSpectrum &Kd, const SampledSpectrum &Ks, Expr<float2> alpha) noexcept
-        : Surface::Closure{instance, it, swl, time}, _distribution{alpha},
-          _blend{Kd, Ks, &_distribution}, _eta_i{swl.dimension(), 1.f} {}
+        : Surface::Closure{instance, it, swl, time},
+          _distribution{luisa::make_unique<TrowbridgeReitzDistribution>(alpha)},
+          _blend{luisa::make_unique<FresnelBlend>(Kd, Ks, _distribution.get())},
+          _eta_i{swl.dimension(), 1.f} {}
 
 private:
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
         auto wo_local = _it.wo_local();
         auto wi_local = _it.shading().world_to_local(wi);
-        auto f = _blend.evaluate(wo_local, wi_local);
-        auto pdf = _blend.pdf(wo_local, wi_local);
+        auto f = _blend->evaluate(wo_local, wi_local);
+        auto pdf = _blend->pdf(wo_local, wi_local);
         return {.f = f,
                 .pdf = pdf,
-                .alpha = _distribution.alpha(),
+                .alpha = _distribution->alpha(),
                 .eta = _eta_i};
     }
 
@@ -99,12 +101,12 @@ private:
         auto u = sampler.generate_2d();
         auto pdf = def(0.f);
         auto wi_local = def(make_float3());
-        auto f = _blend.sample(wo_local, &wi_local, u, &pdf);
+        auto f = _blend->sample(wo_local, &wi_local, u, &pdf);
         auto wi = _it.shading().local_to_world(wi_local);
         return {.wi = wi,
                 .eval = {.f = f,
                          .pdf = pdf,
-                         .alpha = _distribution.alpha(),
+                         .alpha = _distribution->alpha(),
                          .eta = _eta_i}};
     }
     void backward(Expr<float3> wi, const SampledSpectrum &grad) const noexcept override {

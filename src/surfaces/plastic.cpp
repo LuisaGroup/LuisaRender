@@ -82,11 +82,11 @@ class PlasticClosure final : public Surface::Closure {
 
 private:
     SampledSpectrum _eta_i;
-    TrowbridgeReitzDistribution _distribution;
-    FresnelDielectric _fresnel;
-    LambertianReflection _lambert;
-    MicrofacetReflection _microfacet;
     Float _kd_ratio;
+    luisa::unique_ptr<TrowbridgeReitzDistribution> _distribution;
+    luisa::unique_ptr<FresnelDielectric> _fresnel;
+    luisa::unique_ptr<LambertianReflection> _lambert;
+    luisa::unique_ptr<MicrofacetReflection> _microfacet;
 
 public:
     PlasticClosure(
@@ -94,21 +94,26 @@ public:
         const Interaction &it, const SampledWavelengths &swl, Expr<float> time,
         const SampledSpectrum &eta, const SampledSpectrum &Kd, const SampledSpectrum &Ks,
         Expr<float2> alpha, Expr<float> Kd_ratio) noexcept
-        : Surface::Closure{instance, it, swl, time}, _eta_i{swl.dimension(), 1.f},
-          _distribution{alpha}, _fresnel{eta, _eta_i},
-          _lambert{Kd}, _microfacet{Ks, &_distribution, &_fresnel}, _kd_ratio{Kd_ratio} {}
+        : Surface::Closure{instance, it, swl, time},
+          _eta_i{swl.dimension(), 1.f}, _kd_ratio{Kd_ratio} {
+        _distribution = luisa::make_unique<TrowbridgeReitzDistribution>(alpha);
+        _fresnel = luisa::make_unique<FresnelDielectric>(_eta_i, eta);
+        _lambert = luisa::make_unique<LambertianReflection>(Kd);
+        _microfacet = luisa::make_unique<MicrofacetReflection>(
+            Ks, _distribution.get(), _fresnel.get());
+    }
 
 private:
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
         auto wo_local = _it.wo_local();
         auto wi_local = _it.shading().world_to_local(wi);
-        auto f_d = _lambert.evaluate(wo_local, wi_local);
-        auto pdf_d = _lambert.pdf(wo_local, wi_local);
-        auto f_s = _microfacet.evaluate(wo_local, wi_local);
-        auto pdf_s = _microfacet.pdf(wo_local, wi_local);
+        auto f_d = _lambert->evaluate(wo_local, wi_local);
+        auto pdf_d = _lambert->pdf(wo_local, wi_local);
+        auto f_s = _microfacet->evaluate(wo_local, wi_local);
+        auto pdf_s = _microfacet->pdf(wo_local, wi_local);
         return {.f = f_d + f_s,
                 .pdf = lerp(pdf_s, pdf_d, _kd_ratio),
-                .alpha = _distribution.alpha(),
+                .alpha = _distribution->alpha(),
                 .eta = _eta_i};
     }
 
@@ -116,28 +121,29 @@ private:
         auto wo_local = _it.wo_local();
         auto u = sampler.generate_2d();
         auto pdf = def(0.f);
-        SampledSpectrum f{_swl.dimension(), 0.f};
+        SampledSpectrum f{_swl.dimension()};
         auto wi_local = def(make_float3(0.0f, 0.0f, 1.0f));
-        auto lobe = cast<int>(u.x >= _kd_ratio);
-        $if(lobe == 0u) {// Lambert
+        $if(u.x < _kd_ratio) {// Lambert
             u.x = u.x / _kd_ratio;
-            f = _lambert.sample(wo_local, &wi_local, u, &pdf) +
-                _microfacet.evaluate(wo_local, wi_local);
-            auto pdf_s = _microfacet.pdf(wo_local, wi_local);
+            auto f_d = _lambert->sample(wo_local, &wi_local, u, &pdf);
+            auto f_s = _microfacet->evaluate(wo_local, wi_local);
+            auto pdf_s = _microfacet->pdf(wo_local, wi_local);
+            f = f_d + f_s;
             pdf = lerp(pdf_s, pdf, _kd_ratio);
         }
         $else {// Microfacet
             u.x = (u.x - _kd_ratio) / (1.f - _kd_ratio);
-            f = _microfacet.sample(wo_local, &wi_local, u, &pdf) +
-                _lambert.evaluate(wo_local, wi_local);
-            auto pdf_d = _lambert.pdf(wo_local, wi_local);
+            auto f_s = _microfacet->sample(wo_local, &wi_local, u, &pdf);
+            auto f_d = _lambert->evaluate(wo_local, wi_local);
+            auto pdf_d = _lambert->pdf(wo_local, wi_local);
+            f = f_d + f_s;
             pdf = lerp(pdf, pdf_d, _kd_ratio);
         };
         auto wi = _it.shading().local_to_world(wi_local);
         return {.wi = wi,
                 .eval = {.f = f,
                          .pdf = pdf,
-                         .alpha = _distribution.alpha(),
+                         .alpha = _distribution->alpha(),
                          .eta = _eta_i}};
     }
     void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
@@ -184,9 +190,9 @@ luisa::unique_ptr<Surface::Closure> PlasticInstance::closure(
             }
         }
     }
-    auto Kd_ratio = ite(Kd_lum == 0.f, 0.f, Kd_lum / (Kd_lum + Ks_lum));
+    auto Kd_ratio = ite(Kd_lum <= 0.f, 0.f, Kd_lum / (Kd_lum + Ks_lum));
     return luisa::make_unique<PlasticClosure>(
-        this, it, swl, time, eta, Kd * scale, Ks * scale,
+        this, it, swl, time, eta, Kd, Ks,
         alpha, clamp(Kd_ratio, .1f, .9f));
 }
 

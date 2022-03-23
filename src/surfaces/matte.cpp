@@ -60,7 +60,7 @@ luisa::unique_ptr<Surface::Instance> MatteSurface::_build(
 class MatteClosure final : public Surface::Closure {
 
 private:
-    OrenNayar _oren_nayar;
+    luisa::unique_ptr<OrenNayar> _oren_nayar;
 
 public:
     MatteClosure(
@@ -68,14 +68,14 @@ public:
         const Interaction &it, const SampledWavelengths &swl,
         Expr<float> time, SampledSpectrum albedo, Expr<float> sigma) noexcept
         : Surface::Closure{instance, it, swl, time},
-          _oren_nayar{std::move(albedo), sigma} {}
+          _oren_nayar{luisa::make_unique<OrenNayar>(std::move(albedo), sigma)} {}
 
 private:
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
         auto wo_local = _it.wo_local();
         auto wi_local = _it.shading().world_to_local(wi);
-        auto f = _oren_nayar.evaluate(wo_local, wi_local);
-        auto pdf = _oren_nayar.pdf(wo_local, wi_local);
+        auto f = _oren_nayar->evaluate(wo_local, wi_local);
+        auto pdf = _oren_nayar->pdf(wo_local, wi_local);
         return {.f = f,
                 .pdf = pdf,
                 .alpha = make_float2(1.f),
@@ -86,7 +86,7 @@ private:
         auto wi_local = def(make_float3(0.0f, 0.0f, 1.0f));
         auto u = sampler.generate_2d();
         auto pdf = def(0.f);
-        auto f = _oren_nayar.sample(wo_local, &wi_local, u, &pdf);
+        auto f = _oren_nayar->sample(wo_local, &wi_local, u, &pdf);
         auto wi = _it.shading().local_to_world(wi_local);
         return {.wi = wi,
                 .eval = {.f = f,
@@ -102,7 +102,7 @@ private:
         if (requires_grad_kd || requires_grad_sigma) {
             auto wo_local = _it.wo_local();
             auto wi_local = _it.shading().world_to_local(wi);
-            auto grad = _oren_nayar.backward(wo_local, wi_local, df);
+            auto grad = _oren_nayar->backward(wo_local, wi_local, df);
             auto R = _instance->Kd()->evaluate(_it, _time).xyz();
             _instance->Kd()->backward_albedo_spectrum(_it, _swl, _time, grad.dR);
             if (auto sigma = _instance->sigma()) {

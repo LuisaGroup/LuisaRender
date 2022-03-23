@@ -1,72 +1,72 @@
 
 Surface mat_Plastic_Orange : Disney {
-  color : ConstColor {
-    color { 1.0, 0.25, 0.013 }
+  color : Constant {
+    v { 1.0, 0.25, 0.013 }
   }
-  eta : ConstGeneric {
+  eta : Constant {
     v { 1.5 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.1 }
   }
-  specular_tint : ConstGeneric {
+  specular_tint : Constant {
     v { 0.9 }
   }
-  clearcoat : ConstGeneric {
+  clearcoat : Constant {
     v { 1 }
   }
-  clearcoat_gloss : ConstGeneric {
+  clearcoat_gloss : Constant {
     v { 0.5 }
   }
 }
 
 Surface mat_Plastic_Black : Disney {
-  color : ConstColor {
-    color { 0.006310000084340572, 0.006310000084340572, 0.006310000084340572 }
+  color : Constant {
+    v { 0.006310000084340572, 0.006310000084340572, 0.006310000084340572 }
   }
-  eta : ConstGeneric {
+  eta : Constant {
     v { 1.5 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.31622776601683794 }
   }
 }
 
 Surface mat_Glass : Glass {
-  Kr : ConstColor {
-    color { 1 }
+  Kr : Constant {
+    v { 1 }
   }
-  Kt : ConstColor {
-    color { 1.0, 1.0, 1.0 }
+  Kt : Constant {
+    v { 1.0, 1.0, 1.0 }
   }
-  eta : ConstGeneric {
+  eta : Constant {
     v { 1.5 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.001 }
   }
 }
 
 Surface mat_Metal : Mirror {
-  color : ConstColor {
-    color { 1.0, 1.0, 1.0 }
+  color : Constant {
+    v { 1.0, 1.0, 1.0 }
   }
 }
 
 Surface mat_Floor : Plastic {
-  Kd : ConstColor {
-    color { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
+  Kd : Constant {
+    v { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
   }
-  Ks : ConstColor {
-    color { 0.15 }
+  Ks : Constant {
+    v { 0.15 }
   }
-  eta : ConstGeneric {
+  eta : Constant {
     v { 1.5 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.001 }
   }
-  metallic : ConstGeneric {
+  metallic : Constant {
     v { 0 }
   }
 }
@@ -338,8 +338,8 @@ Shape shape_20 : Mesh {
   file { "models/square.obj" }
   surface { @mat_Null }
   light : Diffuse {
-    emission : ConstIllum {
-      emission { 2.0, 2.0, 2.0 }
+    emission : Constant {
+      v { 2.0, 2.0, 2.0 }
     }
   }
   transform : Matrix {
@@ -356,8 +356,8 @@ Shape shape_21 : Mesh {
   file { "models/square.obj" }
   surface { @mat_Null }
   light : Diffuse {
-    emission : ConstIllum {
-      emission { 2.0, 2.0, 2.0 }
+    emission : Constant {
+      v { 2.0, 2.0, 2.0 }
     }
   }
   transform : Matrix {
@@ -374,8 +374,8 @@ Shape shape_22 : Mesh {
   file { "models/square.obj" }
   surface { @mat_Null }
   light : Diffuse {
-    emission : ConstIllum {
-      emission { 2.0, 2.0, 2.0 }
+    emission : Constant {
+      v { 2.0, 2.0, 2.0 }
     }
   }
   transform : Matrix {
@@ -399,13 +399,14 @@ Camera camera : Pinhole {
   }
   film : Color {
     resolution { 800.0, 1000.0 }
+    exposure { 1 }
   }
   file { "coffee.exr" }
 }
 
 render {
   cameras { @camera }
-  integrator : WavePath {}
+  integrator : MegaPath {}
   shapes {
     @shape_0,
     @shape_1,

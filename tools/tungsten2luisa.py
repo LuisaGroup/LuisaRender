@@ -10,25 +10,25 @@ def convert_roughness(r):
 
 def convert_albedo_texture(a):
     if isinstance(a, str):
-        return f'''Color {{
+        return f'''Image {{
     file {{ "{a}" }}
   }}'''
     else:
         a = glm.vec3(a)
-        return f'''ConstColor {{
-    color {{ {a.x}, {a.y}, {a.z} }}
+        return f'''Constant {{
+    v {{ {a.x}, {a.y}, {a.z} }}
   }}'''
 
 
 def convert_emission_texture(a):
     if isinstance(a, str):
-        return f'''Illum {{
+        return f'''Image {{
     file {{ "{a}" }}
   }}'''
     else:
         a = glm.vec3(a)
-        return f'''ConstIllum {{
-    color {{ {a.x}, {a.y}, {a.z} }}
+        return f'''Constant {{
+    v {{ {a.x}, {a.y}, {a.z} }}
   }}'''
 
 
@@ -40,13 +40,13 @@ def convert_plastic_material(out_file, material: dict, alpha=""):
     print(f'''
 Surface mat_{name} : Substrate {{
   Kd : {convert_albedo_texture(color)}
-  Ks : ConstColor {{
-    color {{ 0.04 }}
+  Ks : Constant {{
+    v {{ 0.04 }}
   }}
-  eta : ConstGeneric {{
+  eta : Constant {{
     v {{ {ior} }}
   }}
-  roughness : ConstGeneric {{
+  roughness : Constant {{
     v {{ {convert_roughness(roughness)} }}
   }}{alpha}
 }}''', file=out_file)
@@ -59,14 +59,14 @@ def convert_glass_material(out_file, material: dict, alpha=""):
     ior = material["ior"]
     print(f'''
 Surface mat_{name} : Glass {{
-  Kr : ConstColor {{
-    color {{ 1 }}
+  Kr : Constant {{
+    v {{ 1 }}
   }}
   Kt : {convert_albedo_texture(color)}
-  eta : ConstGeneric {{
+  eta : Constant {{
     v {{ {ior} }}
   }}
-  roughness : ConstGeneric {{
+  roughness : Constant {{
     v {{ {convert_roughness(roughness)} }}
   }}{alpha}
 }}''', file=out_file)
@@ -93,7 +93,7 @@ def convert_metal_material(out_file, material: dict, alpha=""):
     print(f'''
 Surface mat_{name} : Metal {{
   eta {{ {eta} }}
-  roughness : ConstGeneric {{
+  roughness : Constant {{
     v {{ {convert_roughness(roughness)} }}
   }}{alpha}
 }}''', file=out_file)
@@ -130,8 +130,9 @@ def convert_material(out_file, material: dict, alpha=""):
         a = material["alpha"]
         a_ext = Path(a).suffix
         aa = f'''
-  alpha : Generic {{
+  alpha : Image {{
     file {{ "{a.replace(a_ext, f"-alpha{a_ext}")}" }}
+    encoding {{ "linear" }}
   }}'''
         base_material = material["base"]
         base_material["name"] = material["name"]
@@ -206,8 +207,8 @@ Env env : Map {{
         else:
             light = f'''
   light : Diffuse {{
-    emission : ConstIllum {{
-      emission {{ {emission.x}, {emission.y}, {emission.z} }}
+    emission : Constant {{
+      v {{ {emission.x}, {emission.y}, {emission.z} }}
     }}
   }}'''
         print(f'''
