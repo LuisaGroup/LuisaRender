@@ -50,7 +50,7 @@ Float3 Spectrum::Instance::cie_xyz(const SampledWavelengths &swl, const SampledS
     return sum / denom;
 }
 
-SampledWavelengths Spectrum::Instance::sample(Sampler::Instance &sampler) noexcept {
+SampledWavelengths Spectrum::Instance::sample(Sampler::Instance &sampler) const noexcept {
     using namespace compute;
     constexpr auto sample_visible_wavelengths = [](auto u) noexcept {
         return clamp(538.0f - 138.888889f * atanh(0.85691062f - 1.82750197f * u),

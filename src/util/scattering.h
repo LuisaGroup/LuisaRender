@@ -218,7 +218,8 @@ public:
 
 private:
     // FresnelBlend Private Data
-    SampledSpectrum _rd, _rs;
+    SampledSpectrum _rd;
+    SampledSpectrum _rs;
     const MicrofacetDistribution *_distribution;
 
 private:

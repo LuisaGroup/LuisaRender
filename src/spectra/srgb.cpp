@@ -12,7 +12,7 @@ struct SRGBSpectrum final : public Spectrum {
     SRGBSpectrum(Scene *scene, const SceneNodeDesc *desc) noexcept : Spectrum{scene, desc} {}
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] bool is_differentiable() const noexcept override { return true; }
-    [[nodiscard]] bool wavelengths_fixed() const noexcept override { return true; }
+    [[nodiscard]] bool is_fixed() const noexcept override { return true; }
     [[nodiscard]] uint dimension() const noexcept override { return 3u; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
@@ -21,7 +21,7 @@ struct SRGBSpectrum final : public Spectrum {
 struct SRGBSpectrumInstance final : public Spectrum::Instance {
     SRGBSpectrumInstance(const Pipeline &pipeline, const Spectrum *spec) noexcept
         : Spectrum::Instance{pipeline, spec} {}
-    [[nodiscard]] SampledWavelengths sample(Sampler::Instance &sampler) noexcept override {
+    [[nodiscard]] SampledWavelengths sample(Sampler::Instance &sampler) const noexcept override {
         SampledWavelengths swl{this};
         auto lambdas = make_float3(700.0f, 546.1f, 435.8f);
         for (auto i = 0u; i < 3u; i++) {

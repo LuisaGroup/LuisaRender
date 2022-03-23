@@ -1,74 +1,74 @@
 
 Surface mat_Backdrop : Metal {
   eta { "V" }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.31622776601683794 }
   }
 }
 
 Surface mat_Floor : Metal {
   eta { "Al" }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.31622776601683794 }
   }
 }
 
 Surface mat_WaterAir : Glass {
-  Kr : ConstColor {
-    color { 1 }
+  Kr : Constant {
+    v { 1 }
   }
-  Kt : ConstColor {
-    color { 1.0, 1.0, 1.0 }
+  Kt : Constant {
+    v { 1.0, 1.0, 1.0 }
   }
-  eta : ConstGeneric {
+  eta : Constant {
     v { 1.33 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.001 }
   }
 }
 
 Surface mat_IceAir : Glass {
-  Kr : ConstColor {
-    color { 1 }
+  Kr : Constant {
+    v { 1 }
   }
-  Kt : ConstColor {
-    color { 1.0, 1.0, 1.0 }
+  Kt : Constant {
+    v { 1.0, 1.0, 1.0 }
   }
-  eta : ConstGeneric {
+  eta : Constant {
     v { 1.31 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.001 }
   }
 }
 
 Surface mat_Glass : Glass {
-  Kr : ConstColor {
-    color { 1 }
+  Kr : Constant {
+    v { 1 }
   }
-  Kt : ConstColor {
-    color { 1.0, 1.0, 1.0 }
+  Kt : Constant {
+    v { 1.0, 1.0, 1.0 }
   }
-  eta : ConstGeneric {
+  eta : Constant {
     v { 1.5 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.001 }
   }
 }
 
 Surface mat_AirIce : Glass {
-  Kr : ConstColor {
-    color { 1 }
+  Kr : Constant {
+    v { 1 }
   }
-  Kt : ConstColor {
-    color { 1.0, 1.0, 1.0 }
+  Kt : Constant {
+    v { 1.0, 1.0, 1.0 }
   }
-  eta : ConstGeneric {
+  eta : Constant {
     v { 0.763 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.001 }
   }
 }
@@ -287,8 +287,8 @@ Shape shape_16 : Mesh {
   file { "models/square.obj" }
   surface { @mat_Null }
   light : Diffuse {
-    emission : ConstIllum {
-      emission { 15.915493965148926, 27.056339263916016, 31.83098793029785 }
+    emission : Constant {
+      v { 15.915493965148926, 27.056339263916016, 31.83098793029785 }
     }
   }
   transform : Matrix {
@@ -306,7 +306,7 @@ Camera camera : Pinhole {
   front { 0.003735453588888049, 0.015855638310313225, -0.9998673796653748 }
   up { 0.0, 1.0, 0.0 }
   fov { 20.11429322446647 }
-  spp { 1024 }
+  spp { 262144 }
   filter : Gaussian {
     radius { 1 }
   }
@@ -319,6 +319,7 @@ Camera camera : Pinhole {
 render {
   cameras { @camera }
   integrator : WavePath {
+    depth { 32 }
     rr_depth { 5 }
   }
   shapes {

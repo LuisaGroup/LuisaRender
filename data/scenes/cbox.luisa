@@ -8,7 +8,7 @@ Camera camera : Pinhole {
   fov { 27.8 }
   spp { 128 }
   film { @film }
-  file { "../renders/cbox.exr" }
+  file { "../renders/cbox-wave.exr" }
   filter : Gaussian {
     radius { 1 }
   }
@@ -16,7 +16,7 @@ Camera camera : Pinhole {
 
 import "../meshes/cbox.luisa"
 
-Integrator pt : MegaPath {
+Integrator pt : WavePath {
   sampler : Independent {}
   depth { 10 }
   // display { true }

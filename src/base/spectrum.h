@@ -34,7 +34,7 @@ public:
         [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_spectrum); }
 
         // interfaces
-        [[nodiscard]] virtual SampledWavelengths sample(Sampler::Instance &sampler) noexcept;
+        [[nodiscard]] virtual SampledWavelengths sample(Sampler::Instance &sampler) const noexcept;
         [[nodiscard]] virtual SampledSpectrum albedo_from_srgb(const SampledWavelengths &swl, Expr<float3> rgb) const noexcept = 0;
         [[nodiscard]] virtual SampledSpectrum illuminant_from_srgb(const SampledWavelengths &swl, Expr<float3> rgb) const noexcept = 0;
         [[nodiscard]] virtual Float cie_y(const SampledWavelengths &swl, const SampledSpectrum &sp) const noexcept;
@@ -60,7 +60,7 @@ public:
 public:
     Spectrum(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] virtual bool is_differentiable() const noexcept = 0;
-    [[nodiscard]] virtual bool wavelengths_fixed() const noexcept = 0;
+    [[nodiscard]] virtual bool is_fixed() const noexcept = 0;
     [[nodiscard]] virtual uint dimension() const noexcept = 0;
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
@@ -80,7 +80,7 @@ public:
     void set_lambda(Expr<uint> i, Expr<float> lambda) noexcept { _lambdas[i] = lambda; }
     void set_pdf(Expr<uint> i, Expr<float> pdf) noexcept { _pdfs[i] = pdf; }
     [[nodiscard]] auto spectrum() const noexcept { return _spectrum; }
-    [[nodiscard]] auto dimension() const noexcept { return _lambdas.size(); }
+    [[nodiscard]] auto dimension() const noexcept { return static_cast<uint>(_lambdas.size()); }
     [[nodiscard]] SampledSpectrum albedo_from_srgb(Expr<float3> rgb) const noexcept;
     [[nodiscard]] SampledSpectrum illuminant_from_srgb(Expr<float3> rgb) const noexcept;
     [[nodiscard]] Float cie_y(const SampledSpectrum &s) const noexcept;

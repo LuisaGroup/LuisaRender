@@ -32,7 +32,7 @@ Shape teapot : Group {
     Mesh {
       file { "../meshes/utah-teapot.obj" }
       two_sided { false }
-      surface : Glass {
+      surface : Substrate {
         color : Constant {
           v { 1 }
         }

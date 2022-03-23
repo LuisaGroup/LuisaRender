@@ -282,8 +282,9 @@ void MegakernelPathTracingInstance::_render_one_camera(
                         auto cos_theta_i = dot(it->shading().n(), wi);
                         auto is_trans = cos_theta_i * cos_theta_o < 0.f;
                         auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
-                        Li += beta * mis_weight * eval.f * abs_dot(it->shading().n(), wi) *
-                              light_sample.eval.L / light_sample.eval.pdf;
+                        Li += mis_weight / light_sample.eval.pdf *
+                              abs_dot(it->shading().n(), wi) *
+                              beta * eval.f * light_sample.eval.L;
                     };
 
                     // sample material
@@ -296,7 +297,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
 
                     // specular transmission, consider eta scale
                     $if(cos_theta_i * cos_theta_o < 0.f &
-                        min(sample.eval.alpha.x, sample.eval.alpha.y) < .05f) {
+                        max(sample.eval.alpha.x, sample.eval.alpha.y) < .05f) {
                         auto entering = cos_theta_o > 0.f;
                         for (auto i = 0u; i < swl.dimension(); i++) {
                             eta_scale[i] = ite(
