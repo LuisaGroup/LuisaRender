@@ -28,7 +28,7 @@ Shape image-light : Mesh {
     translate { 0, 1.2, -0.97 }
   }
   light : Diffuse {
-    emission : Illum {
+    emission : Image {
       file {
         // "/Users/mike/Downloads/_DSC9322.jpg" }
         "/Users/mike/Downloads/WechatIMG16.jpeg" }

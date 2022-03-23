@@ -21,22 +21,9 @@ public:
     MirrorSurface(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Surface{scene, desc},
           _color{scene->load_texture(desc->property_node_or_default(
-              "color", SceneNodeDesc::shared_default_texture("ConstColor")))},
+              "color", SceneNodeDesc::shared_default_texture("Constant")))},
           _roughness{scene->load_texture(desc->property_node_or_default("roughness"))},
-          _remap_roughness{desc->property_bool_or_default("remap_roughness", false)} {
-        if (_color->category() != Texture::Category::COLOR) [[unlikely]] {
-            LUISA_ERROR(
-                "Non-color textures are not "
-                "allowed in MirrorSurface::color. [{}]",
-                desc->source_location().string());
-        }
-        if (_roughness != nullptr && _roughness->category() != Texture::Category::GENERIC) [[unlikely]] {
-            LUISA_ERROR(
-                "Non-generic textures are not "
-                "allowed in MirrorSurface::roughness. [{}]",
-                desc->source_location().string());
-        }
-    }
+          _remap_roughness{desc->property_bool_or_default("remap_roughness", false)} {}
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
 
@@ -71,19 +58,26 @@ using namespace luisa::compute;
 
 class SchlickFresnel final : public Fresnel {
 
+public:
+    struct Gradient {
+        SampledSpectrum dR0;
+    };
+
 private:
-    Float4 R0;
+    SampledSpectrum R0;
 
 public:
-    explicit SchlickFresnel(Expr<float4> R0) noexcept : R0{R0} {}
-    [[nodiscard]] Float4 evaluate(Expr<float> cosI) const noexcept override {
+    explicit SchlickFresnel(SampledSpectrum R0) noexcept : R0{std::move(R0)} {}
+    [[nodiscard]] SampledSpectrum evaluate(Expr<float> cosI) const noexcept override {
         auto m = saturate(1.f - cosI);
         auto weight = sqr(sqr(m)) * m;
-        return lerp(R0, 1.f, weight);
+        return R0.map([weight](auto, auto R) noexcept {
+            return lerp(R, 1.f, weight);
+        });
     }
-    [[nodiscard]] luisa::vector<Float4> grad(Expr<float> cosThetaI) const noexcept override {
+    [[nodiscard]] Gradient backward(Expr<float> cosI, const SampledSpectrum &dFr) const noexcept {
         // TODO
-        LUISA_ERROR_WITH_LOCATION("unimplemented");
+        LUISA_ERROR_WITH_LOCATION("Not implemented.");
     }
 };
 
@@ -98,7 +92,7 @@ public:
     MirrorClosure(
         const Surface::Instance *instance,
         const Interaction &it, const SampledWavelengths &swl, Expr<float> time,
-        Expr<float4> refl, Expr<float2> alpha) noexcept
+        const SampledSpectrum &refl, Expr<float2> alpha) noexcept
         : Surface::Closure{instance, it, swl, time},
           _fresnel{refl}, _distribution{alpha},
           _refl{refl, &_distribution, &_fresnel} {}
@@ -107,7 +101,10 @@ public:
         auto wi_local = _it.shading().world_to_local(wi);
         auto f = _refl.evaluate(wo_local, wi_local);
         auto pdf = _refl.pdf(wo_local, wi_local);
-        return {.f = f, .pdf = pdf, .alpha = _distribution.alpha(), .eta = make_float4(1.f)};
+        return {.f = f,
+                .pdf = pdf,
+                .alpha = _distribution.alpha(),
+                .eta = SampledSpectrum{_swl.dimension(), 1.f}};
     }
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
         auto pdf = def(0.f);
@@ -115,12 +112,15 @@ public:
         auto u = sampler.generate_2d();
         auto f = _refl.sample(_it.wo_local(), &wi_local, u, &pdf);
         return {.wi = _it.shading().local_to_world(wi_local),
-                .eval = {.f = f, .pdf = pdf, .alpha = _distribution.alpha(), .eta = make_float4(1.f)}};
+                .eval = {.f = f,
+                         .pdf = pdf,
+                         .alpha = _distribution.alpha(),
+                         .eta = SampledSpectrum{_swl.dimension(), 1.f}}};
     }
 
-    void backward(Expr<float3> wi, Expr<float4> grad) const noexcept override {
+    void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
         // TODO
-        LUISA_ERROR_WITH_LOCATION("unimplemented");
+        LUISA_ERROR_WITH_LOCATION("Not implemented.");
     }
 };
 
@@ -128,14 +128,14 @@ luisa::unique_ptr<Surface::Closure> MirrorInstance::closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto alpha = def(make_float2(0.f));
     if (_roughness != nullptr) {
-        auto r = _roughness->evaluate(it, swl, time).value;
+        auto r = _roughness->evaluate(it, time);
         auto remap = node<MirrorSurface>()->remap_roughness();
         auto r2a = [](auto &&x) noexcept { return TrowbridgeReitzDistribution::roughness_to_alpha(x); };
         alpha = _roughness->node()->channels() == 1u ?
                     (remap ? make_float2(r2a(r.x)) : r.xx()) :
                     (remap ? r2a(r.xy()) : r.xy());
     }
-    auto color = _color->evaluate(it, swl, time).value;
+    auto color = _color->evaluate_albedo_spectrum(it, swl, time);
     return luisa::make_unique<MirrorClosure>(this, it, swl, time, color, alpha);
 }
 

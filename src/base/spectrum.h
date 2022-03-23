@@ -60,6 +60,7 @@ public:
 public:
     Spectrum(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] virtual bool is_differentiable() const noexcept = 0;
+    [[nodiscard]] virtual bool wavelengths_fixed() const noexcept = 0;
     [[nodiscard]] virtual uint dimension() const noexcept = 0;
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;

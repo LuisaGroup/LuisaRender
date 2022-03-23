@@ -27,6 +27,7 @@ public:
         }
         _channels = std::max(v.size(), static_cast<size_t>(1u));
         for (auto i = 0u; i < v.size(); i++) { _v[i] = scale * v[i]; }
+        for (auto i = _channels; i < 4u; i++) { _v[i] = _v[_channels]; }
     }
     [[nodiscard]] auto v() const noexcept { return _v; }
     [[nodiscard]] bool is_black() const noexcept override { return all(_v == 0.0f); }

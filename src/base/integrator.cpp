@@ -16,7 +16,7 @@ Integrator::Integrator(Scene *scene, const SceneNodeDesc *desc) noexcept
       _light_sampler{scene->load_light_sampler(desc->property_node_or_default(
           "light_sampler", SceneNodeDesc::shared_default_light_sampler("uniform")))},
       _spectrum{scene->load_spectrum(desc->property_node_or_default(
-          "spectrum", SceneNodeDesc::shared_default_spectrum("rgb")))} {}
+          "spectrum", SceneNodeDesc::shared_default_spectrum("srgb")))} {}
 
 Integrator::Instance::Instance(Pipeline &pipeline, CommandBuffer &command_buffer, const Integrator *integrator) noexcept
     : _pipeline{pipeline}, _integrator{integrator},

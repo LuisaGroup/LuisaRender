@@ -68,7 +68,7 @@ Float fresnel_conductor(Float cosThetaI, Float etai, Float etat, Float k) noexce
     return .5f * (Rp + Rs);
 }
 
-SampledSpectrum render::fresnel_dielectric(
+SampledSpectrum fresnel_dielectric(
     Float cosThetaI_in, const SampledSpectrum &etaI_in, const SampledSpectrum &etaT_in) noexcept {
     using namespace compute;
     auto cosThetaI = clamp(cosThetaI_in, -1.f, 1.f);
@@ -98,7 +98,7 @@ SampledSpectrum render::fresnel_dielectric(
     });
 }
 
-SampledSpectrum render::fresnel_conductor(
+SampledSpectrum fresnel_conductor(
     Float cosThetaI, const SampledSpectrum &etai,
     const SampledSpectrum &etat, const SampledSpectrum &k) noexcept {
 
@@ -178,9 +178,9 @@ Float TrowbridgeReitzDistribution::D(Expr<float3> wh) const noexcept {
     using compute::isinf;
     auto tan2Theta = tan2_theta(wh);
     auto cos4Theta = sqr(cos2_theta(wh));
-    auto e = tan2Theta * (sqr(cos_phi(wh) / _alpha.x) +
-                          sqr(sin_phi(wh) / _alpha.y));
-    auto d = 1.0f / (pi * _alpha.x * _alpha.y * cos4Theta * sqr(1.f + e));
+    auto e = tan2Theta * (sqr(cos_phi(wh) / alpha().x) +
+                          sqr(sin_phi(wh) / alpha().y));
+    auto d = 1.0f / (pi * alpha().x * alpha().y * cos4Theta * sqr(1.f + e));
     return ite(isinf(tan2Theta), 0.f, d);
 }
 
@@ -188,8 +188,8 @@ Float TrowbridgeReitzDistribution::Lambda(Expr<float3> w) const noexcept {
     using compute::isinf;
     auto absTanTheta = abs(tan_theta(w));
     // Compute _alpha_ for direction _w_
-    auto alpha2 = cos2_phi(w) * sqr(_alpha.x) +
-                  sin2_phi(w) * sqr(_alpha.y);
+    auto alpha2 = cos2_phi(w) * sqr(alpha().x) +
+                  sin2_phi(w) * sqr(alpha().y);
     auto alpha2Tan2Theta = alpha2 * sqr(absTanTheta);
     auto L = (-1.f + sqrt(1.f + alpha2Tan2Theta)) * .5f;
     return ite(isinf(absTanTheta), 0.f, L);
@@ -256,7 +256,7 @@ Float TrowbridgeReitzDistribution::Lambda(Expr<float3> w) const noexcept {
 
 Float3 TrowbridgeReitzDistribution::sample_wh(Expr<float3> wo, Expr<float2> u) const noexcept {
     auto s = sign(cos_theta(wo));
-    auto wh = TrowbridgeReitzSample(s * wo, _alpha, u);
+    auto wh = TrowbridgeReitzSample(s * wo, alpha(), u);
     return s * wh;
 }
 
@@ -524,15 +524,16 @@ OrenNayar::Gradient OrenNayar::backward(
     auto sigma2 = sqr(radians(_sigma));
 
     // backward
-    auto sigma2_sigma = 2 * radians(_sigma) / 180.f;
-    auto a_sigma2 = -0.165f * sqr(sigma2 + 0.33f);
-    auto b_sigma2 = 0.0405f / sqr(sigma2 + 0.09f);
-    auto d_r = inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta);
-    auto d_a = _r * inv_pi;
-    auto d_b = _r * inv_pi * maxCos * sinAlpha * tanBeta;
-    auto d_sigma2 = d_a * a_sigma2 + d_b * b_sigma2;
-    auto d_sigma = d_sigma2 * sigma2_sigma;
-    return {.dR = df * d_r, .dSigma = df * d_sigma};
+    LUISA_ERROR_WITH_LOCATION("Not implemented.");
+//    auto sigma2_sigma = 2 * radians(_sigma) / 180.f;
+//    auto a_sigma2 = -0.165f * sqr(sigma2 + 0.33f);
+//    auto b_sigma2 = 0.0405f / sqr(sigma2 + 0.09f);
+//    auto d_r = inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta);
+//    auto d_a = _r * inv_pi;
+//    auto d_b = _r * inv_pi * maxCos * sinAlpha * tanBeta;
+//    auto d_sigma2 = d_a * a_sigma2 + d_b * b_sigma2;
+//    auto d_sigma = d_sigma2 * sigma2_sigma;
+//    return {.dR = df * d_r, .dSigma = df * d_sigma};
 }
 
 SampledSpectrum FresnelBlend::Schlick(Expr<float> cosTheta) const noexcept {

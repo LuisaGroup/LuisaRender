@@ -291,8 +291,8 @@ void MegakernelPathTracingInstance::_render_one_camera(
                     auto cos_theta_i = dot(sample.wi, it->shading().n());
                     ray = it->spawn_ray(sample.wi);
                     pdf_bsdf = sample.eval.pdf;
-                    auto t = ite(sample.eval.pdf > 0.f, abs(cos_theta_i), 0.f);
-                    beta *= sample.eval.f * t;
+                    auto w = ite(sample.eval.pdf > 0.f, abs(cos_theta_i) / sample.eval.pdf, 0.f);
+                    beta *= sample.eval.f * w;
 
                     // specular transmission, consider eta scale
                     $if(cos_theta_i * cos_theta_o < 0.f &

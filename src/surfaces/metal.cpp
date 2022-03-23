@@ -357,12 +357,6 @@ public:
         : Surface{scene, desc},
           _roughness{scene->load_texture(desc->property_node_or_default("roughness"))},
           _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {
-        if (_roughness != nullptr && _roughness->category() != Texture::Category::GENERIC) [[unlikely]] {
-            LUISA_ERROR(
-                "Non-generic textures are not "
-                "allowed in MetalSurface::roughness. [{}]",
-                desc->source_location().string());
-        }
         if (auto eta_name = desc->property_string_or_default("eta"); !eta_name.empty()) {
             for (auto &c : eta_name) { c = static_cast<char>(tolower(c)); }
             if (eta_name == "ag" || eta_name == "silver") {
@@ -468,6 +462,7 @@ luisa::unique_ptr<Surface::Instance> MetalSurface::_build(
 class MetalClosure final : public Surface::Closure {
 
 private:
+    SampledSpectrum _eta_i;
     FresnelConductor _fresnel;
     TrowbridgeReitzDistribution _distrib;
     MicrofacetReflection _lobe;
@@ -476,10 +471,9 @@ public:
     MetalClosure(
         const Surface::Instance *instance,
         const Interaction &it, const SampledWavelengths &swl, Expr<float> time,
-        Expr<float4> n, Expr<float4> k, Expr<float2> alpha) noexcept
-        : Surface::Closure{instance, it, swl, time},
-          _fresnel{make_float4(1.f), n, k}, _distrib{alpha},
-          _lobe{make_float4(1.f), &_distrib, &_fresnel} {}
+        const SampledSpectrum &n, const SampledSpectrum &k, Expr<float2> alpha) noexcept
+        : Surface::Closure{instance, it, swl, time}, _eta_i{swl.dimension(), 1.f},
+          _fresnel{_eta_i, n, k}, _distrib{alpha}, _lobe{_eta_i, &_distrib, &_fresnel} {}
 
 private:
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
@@ -487,7 +481,7 @@ private:
         auto wi_local = _it.shading().world_to_local(wi);
         auto f = _lobe.evaluate(wo_local, wi_local);
         auto pdf = _lobe.pdf(wo_local, wi_local);
-        return {.f = f, .pdf = pdf, .alpha = _distrib.alpha(), .eta = make_float4(1.f)};
+        return {.f = f, .pdf = pdf, .alpha = _distrib.alpha(), .eta = _eta_i};
     }
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
         auto wo_local = _it.wo_local();
@@ -496,17 +490,17 @@ private:
         auto wi_local = def(make_float3(0.f, 0.f, 1.f));
         auto f = _lobe.sample(wo_local, &wi_local, u, &pdf);
         auto wi = _it.shading().local_to_world(wi_local);
-        return {.wi = wi, .eval = {.f = f, .pdf = pdf, .alpha = _distrib.alpha(), .eta = make_float4(1.f)}};
+        return {.wi = wi, .eval = {.f = f, .pdf = pdf, .alpha = _distrib.alpha(), .eta = _eta_i}};
     }
-    void backward(Expr<float3> wi, Expr<float4> grad) const noexcept override {
-        LUISA_ERROR_WITH_LOCATION("metal material is not is_differentiable");
+    void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
+        LUISA_ERROR_WITH_LOCATION("Metal surface is not differentiable.");
     }
 };
 
 luisa::unique_ptr<Surface::Closure> MetalInstance::closure(const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto alpha = def(make_float2(.5f));
     if (_roughness != nullptr) {
-        auto r = _roughness->evaluate(it, swl, time).value;
+        auto r = _roughness->evaluate(it, time);
         auto remap = node<MetalSurface>()->remap_roughness();
         auto r2a = [](auto &&x) noexcept { return TrowbridgeReitzDistribution::roughness_to_alpha(x); };
         alpha = _roughness->node()->channels() == 1u ?
@@ -520,14 +514,15 @@ luisa::unique_ptr<Surface::Closure> MetalInstance::closure(const Interaction &it
         auto t = fract(lo);
         return lerp(lut.read(il), lut.read(ih), t);
     };
-    auto lambda = clamp(swl.lambda(), visible_wavelength_min, visible_wavelength_max);
-    auto eta0 = sample_eta_k(lambda.x);
-    auto eta1 = sample_eta_k(lambda.y);
-    auto eta2 = sample_eta_k(lambda.z);
-    auto eta3 = sample_eta_k(lambda.w);
-    auto n = make_float4(eta0.x, eta1.x, eta2.x, eta3.x);
-    auto k = make_float4(eta0.y, eta1.y, eta2.y, eta3.y);
-    return luisa::make_unique<MetalClosure>(this, it, swl, time, n, k, alpha);
+    SampledSpectrum eta{swl.dimension()};
+    SampledSpectrum k{swl.dimension()};
+    for (auto i = 0u; i < swl.dimension(); i++) {
+        auto eta_k = sample_eta_k(swl.lambda(i));
+        eta[i] = eta_k.x;
+        k[i] = eta_k.y;
+    }
+    return luisa::make_unique<MetalClosure>(
+        this, it, swl, time, eta, k, alpha);
 }
 
 }// namespace luisa::render

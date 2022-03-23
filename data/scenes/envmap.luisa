@@ -20,74 +20,35 @@ Camera camera : Pinhole {
 
 Integrator normal : Normal {}
 
-Integrator pt : WavePath {
+Integrator pt : MegaPath {
   sampler : Independent {}
   depth { 16 }
   rr_depth { 5 }
-  display { true }
+  // display { true }
 }
 
 Shape teapot : Group {
   shapes {
-    // Mesh {
-    //   file { "../meshes/utah-teapot-lid.obj" }
-    //   // surface : Mirror {}
-    //   surface : Disney {
-    //     roughness : ConstGeneric {
-    //       v { 0.5 }
-    //     }
-    //     metallic : ConstGeneric {
-    //       v { 1 }
-    //     }
-    //     base_color : ConstColor {
-    //       color { 1, 1, 1 }
-    //     }
-    //   }
-    // },
     Mesh {
       file { "../meshes/utah-teapot.obj" }
-      // surface : Mirror {
-      //   color : ConstColor {
-      //     color { 1.0, 0.71, 0.29 }
-      //   }
-      // }
       two_sided { false }
-      // surface : Disney {
-      //   color : ConstColor {
-      //     color { 1.0 }
-      //   }
-      //   roughness : ConstGeneric {
-      //     v { 0.2 }
-      //   }
-      //   metallic : ConstGeneric {
-      //     v { 0.5 }
-      //   }
-      //   specular_trans : ConstGeneric {
-      //     v { 1 }
-      //   }
-      //   clearcoat : ConstGeneric {
-      //     v { 1 }
-      //   }
-      //   clearcoat_gloss : ConstGeneric {
-      //     v { 1 }
-      //   }
-      //   thin { false }
-      // }
       surface : Glass {
-        Kr : ConstColor {
-          // color { 1.0, 0.71, 0.29 }
+        Kr : Constant {
+          // v { 1.0, 0.71, 0.29 }
+          v { 1.0 }
         }
-        Kt : ConstColor {
-          // color { 0.2, 0.3, 0.9 }
-          // color { 0.5, 0.5, 0.5 }
+        Kt : Constant {
+          v { 1.0 }
+          // v { 0.2, 0.3, 0.9 }
+          // v { 0.5, 0.5, 0.5 }
         }
-        roughness : ConstGeneric {
+        roughness : Constant {
           v { 0.01 }
         }
         // remap_roughness { true }
         // eta { 1.7 }
-        // eta { "Sapphire" }
-        eta { "Ti" }
+        eta { "Sapphire" }
+        // eta { "Ti" }
         // eta : ConstGeneric {
         //   v { 1.5, 1.52, 1.6 }
         // }
@@ -132,7 +93,7 @@ render {
   shapes { @teapot }
   integrator { @pt }
   environment : Map {
-    emission : Illum {
+    emission : Image {
       // file { "../envmaps/photo_studio_01_1k.hdr" }
       // fp32 { true }
       // file { "../envmaps/envmap.exr" }

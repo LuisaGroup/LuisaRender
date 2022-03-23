@@ -86,6 +86,12 @@ public:
         for (auto i = 0u; i < dimension(); i++) { r = f(Expr{r}, i, Expr{(*this)[i]}); }
         return r;
     }
+    [[nodiscard]] auto sum() const noexcept {
+        return reduce(0.f, [](auto r, auto, auto x) noexcept { return r + x; });
+    }
+    [[nodiscard]] auto average() const noexcept {
+        return sum() * static_cast<float>(1.0 / dimension());
+    }
     template<typename F>
     [[nodiscard]] auto any(F &&f) const noexcept {
         return reduce(false, [&f](auto r, auto, auto s) noexcept { return r | f(s); });
