@@ -297,9 +297,10 @@ void MegakernelPathTracingInstance::_render_one_camera(
                     // specular transmission, consider eta scale
                     $if(cos_theta_i * cos_theta_o < 0.f &
                         min(sample.eval.alpha.x, sample.eval.alpha.y) < .05f) {
+                        auto entering = cos_theta_o > 0.f;
                         for (auto i = 0u; i < swl.dimension(); i++) {
                             eta_scale[i] = ite(
-                                cos_theta_o > 0.f,
+                                entering,
                                 sqr(sample.eval.eta[i]),
                                 sqr(1.f / sample.eval.eta[i]));
                         }

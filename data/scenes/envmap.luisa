@@ -73,7 +73,7 @@ Shape teapot : Group {
       //   }
       //   thin { false }
       // }
-      surface : Metal {
+      surface : Glass {
         Kr : ConstColor {
           // color { 1.0, 0.71, 0.29 }
         }
@@ -82,7 +82,7 @@ Shape teapot : Group {
           // color { 0.5, 0.5, 0.5 }
         }
         roughness : ConstGeneric {
-          v { 0.3 }
+          v { 0.01 }
         }
         // remap_roughness { true }
         // eta { 1.7 }
