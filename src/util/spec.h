@@ -58,9 +58,11 @@ public:
     explicit SampledSpectrum(size_t n, Expr<float> s = 0.f) noexcept : _samples{n} {
         for (auto i = 0u; i < n; i++) { _samples[i] = s; }
     }
-    [[nodiscard]] auto dimension() const noexcept { return static_cast<uint>(_samples.size()); }
-    [[nodiscard]] auto &values() noexcept { return _samples; }
-    [[nodiscard]] auto &values() const noexcept { return _samples; }
+    [[nodiscard]] uint dimension() const noexcept {
+        return static_cast<uint>(_samples.size());
+    }
+    [[nodiscard]] Local<float> &values() noexcept { return _samples; }
+    [[nodiscard]] const Local<float> &values() const noexcept { return _samples; }
     [[nodiscard]] Float &at(Expr<uint> i) noexcept { return _samples[i]; }
     [[nodiscard]] Float at(Expr<uint> i) const noexcept { return _samples[i]; }
     [[nodiscard]] Float &operator[](Expr<uint> i) noexcept { return at(i); }
