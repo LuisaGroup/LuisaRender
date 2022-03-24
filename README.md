@@ -5,6 +5,15 @@ on [LuisaCompute](https://github.com/Mike-Leo-Smith/LuisaCompute).
 
 # Demo
 
+- Glass of Water (from [Rendering Resources](https://benedikt-bitterli.me/resources/))
+    - Wave-Front Path Tracing
+    - Glass, Substrate, and Metal Materials
+    - Diffuse Area Lights
+    - Resolution: 1280x720
+    - Max Depth: 32
+
+![GlassOfWater](data/scenes/glass-of-water/color-denoised.png)
+
 - Living-Room Table (from [Rendering Resources](https://benedikt-bitterli.me/resources/))
     - Mega-Kernel Path Tracing
     - Glass, Plastic, and Metal Materials
