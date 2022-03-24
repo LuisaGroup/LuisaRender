@@ -229,8 +229,10 @@ luisa::unique_ptr<Surface::Closure> GlassInstance::closure(
             }
         }
     }
-    auto Fr = fresnel_dielectric(cos_theta(it.wo_local()), 1.f, eta.average());
-    auto Kr_ratio = ite(Kr_lum == 0.f, 0.f, Kr_lum / (Kr_lum + Kt_lum));
+    auto cos_o = cos_theta(it.wo_local());
+    auto mean_eta = eta.average();
+    auto Fr = fresnel_dielectric(cos_o, 1.f, mean_eta);
+    auto Kr_ratio = ite(Kr_lum == 0.f, 0.f, sqrt(Kr_lum) / (sqrt(Kr_lum) + sqrt(Kt_lum)));
     return luisa::make_unique<GlassClosure>(
         this, it, swl, time, Kr, Kt, eta,
         alpha, clamp(Fr * Kr_ratio, 0.1f, 0.9f));
