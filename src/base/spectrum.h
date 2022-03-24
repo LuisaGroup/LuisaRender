@@ -24,6 +24,9 @@ public:
         const Pipeline &_pipeline;
         const Spectrum *_spectrum;
 
+    private:
+        [[noreturn]] void _report_backward_unsupported_or_not_implemented() const noexcept;
+
     public:
         Instance(const Pipeline &pipeline, const Spectrum *spec) noexcept
             : _pipeline{pipeline}, _spectrum{spec} {}
@@ -41,20 +44,25 @@ public:
         [[nodiscard]] virtual Float3 cie_xyz(const SampledWavelengths &swl, const SampledSpectrum &sp) const noexcept;
         [[nodiscard]] virtual Float3 srgb(const SampledWavelengths &swl, const SampledSpectrum &sp) const noexcept;
         [[nodiscard]] virtual Float3 backward_albedo_from_srgb(
-            const SampledWavelengths &swl, Expr<float3> rgb,
-            const SampledSpectrum &dSpec) const noexcept = 0;
+            const SampledWavelengths &swl, Expr<float3> rgb, const SampledSpectrum &dSpec) const noexcept {
+            _report_backward_unsupported_or_not_implemented();
+        }
         [[nodiscard]] virtual Float3 backward_illuminant_from_srgb(
-            const SampledWavelengths &swl, Expr<float3> rgb,
-            const SampledSpectrum &dSpec) const noexcept = 0;
+            const SampledWavelengths &swl, Expr<float3> rgb, const SampledSpectrum &dSpec) const noexcept {
+            _report_backward_unsupported_or_not_implemented();
+        }
         [[nodiscard]] virtual SampledSpectrum backward_cie_y(
-            const SampledWavelengths &swl, const SampledSpectrum &sp,
-            Expr<float> dY) const noexcept = 0;
+            const SampledWavelengths &swl, const SampledSpectrum &sp, Expr<float> dY) const noexcept {
+            _report_backward_unsupported_or_not_implemented();
+        }
         [[nodiscard]] virtual SampledSpectrum backward_cie_xyz(
-            const SampledWavelengths &swl, const SampledSpectrum &sp,
-            Expr<float3> dXYZ) const noexcept = 0;
+            const SampledWavelengths &swl, const SampledSpectrum &sp, Expr<float3> dXYZ) const noexcept {
+            _report_backward_unsupported_or_not_implemented();
+        }
         [[nodiscard]] virtual SampledSpectrum backward_srgb(
-            const SampledWavelengths &swl, const SampledSpectrum &sp,
-            Expr<float3> dSRGB) const noexcept = 0;
+            const SampledWavelengths &swl, const SampledSpectrum &sp, Expr<float3> dSRGB) const noexcept {
+            _report_backward_unsupported_or_not_implemented();
+        }
     };
 
 public:

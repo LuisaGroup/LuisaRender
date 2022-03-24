@@ -51,6 +51,7 @@ Float3 Spectrum::Instance::cie_xyz(const SampledWavelengths &swl, const SampledS
 }
 
 SampledWavelengths Spectrum::Instance::sample(Sampler::Instance &sampler) const noexcept {
+    LUISA_ASSERT(!node()->is_fixed(), "Fixed spectra should not sample.");
     using namespace compute;
     constexpr auto sample_visible_wavelengths = [](auto u) noexcept {
         return clamp(538.0f - 138.888889f * atanh(0.85691062f - 1.82750197f * u),
@@ -71,6 +72,17 @@ SampledWavelengths Spectrum::Instance::sample(Sampler::Instance &sampler) const 
         swl.set_pdf(i, visible_wavelengths_pdf(lambda));
     }
     return swl;
+}
+
+void Spectrum::Instance::_report_backward_unsupported_or_not_implemented() const noexcept {
+    if (node()->is_differentiable()) {
+        LUISA_ERROR_WITH_LOCATION("Backward propagation is not implemented.");
+    } else {
+        LUISA_ERROR_WITH_LOCATION(
+            "Backward propagation is not supported "
+            "in the '{}' Spectrum implementation.",
+            node()->impl_type());
+    }
 }
 
 Spectrum::Spectrum(Scene *scene, const SceneNodeDesc *desc) noexcept

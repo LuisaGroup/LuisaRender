@@ -30,38 +30,54 @@ struct SRGBSpectrumInstance final : public Spectrum::Instance {
         }
         return swl;
     }
-    [[nodiscard]] SampledSpectrum albedo_from_srgb(const SampledWavelengths &swl, Expr<float3> rgb) const noexcept override {
+    [[nodiscard]] SampledSpectrum albedo_from_srgb(
+        const SampledWavelengths &swl, Expr<float3> rgb) const noexcept override {
         SampledSpectrum s{node()->dimension()};
         for (auto i = 0u; i < 3u; i++) { s[i] = saturate(rgb[i]); }
         return s;
     }
-    [[nodiscard]] SampledSpectrum illuminant_from_srgb(const SampledWavelengths &swl, Expr<float3> rgb) const noexcept override {
+    [[nodiscard]] SampledSpectrum illuminant_from_srgb(
+        const SampledWavelengths &swl, Expr<float3> rgb) const noexcept override {
         SampledSpectrum s{node()->dimension()};
         for (auto i = 0u; i < 3u; i++) { s[i] = max(rgb[i], 0.f); }
         return s;
     }
-    [[nodiscard]] Float cie_y(const SampledWavelengths &swl, const SampledSpectrum &sp) const noexcept override {
+    [[nodiscard]] Float cie_y(
+        const SampledWavelengths &swl,
+        const SampledSpectrum &sp) const noexcept override {
         return srgb_to_cie_y(srgb(swl, sp));
     }
-    [[nodiscard]] Float3 cie_xyz(const SampledWavelengths &swl, const SampledSpectrum &sp) const noexcept override {
+    [[nodiscard]] Float3 cie_xyz(
+        const SampledWavelengths &swl,
+        const SampledSpectrum &sp) const noexcept override {
         return srgb_to_cie_xyz(srgb(swl, sp));
     }
-    [[nodiscard]] Float3 srgb(const SampledWavelengths &swl, const SampledSpectrum &sp) const noexcept override {
+    [[nodiscard]] Float3 srgb(
+        const SampledWavelengths &swl,
+        const SampledSpectrum &sp) const noexcept override {
         return make_float3(sp[0u], sp[1u], sp[2u]);
     }
-    [[nodiscard]] Float3 backward_albedo_from_srgb(const SampledWavelengths &swl, Expr<float3> rgb, const SampledSpectrum &dSpec) const noexcept override {
+    [[nodiscard]] Float3 backward_albedo_from_srgb(
+        const SampledWavelengths &swl, Expr<float3> rgb,
+        const SampledSpectrum &dSpec) const noexcept override {
         return make_float3(dSpec[0u], dSpec[1u], dSpec[2u]);
     }
-    [[nodiscard]] Float3 backward_illuminant_from_srgb(const SampledWavelengths &swl, Expr<float3> rgb, const SampledSpectrum &dSpec) const noexcept override {
+    [[nodiscard]] Float3 backward_illuminant_from_srgb(
+        const SampledWavelengths &swl, Expr<float3> rgb,
+        const SampledSpectrum &dSpec) const noexcept override {
         return make_float3(dSpec[0u], dSpec[1u], dSpec[2u]);
     }
-    [[nodiscard]] SampledSpectrum backward_cie_y(const SampledWavelengths &swl, const SampledSpectrum &sp, Expr<float> dY) const noexcept override {
+    [[nodiscard]] SampledSpectrum backward_cie_y(
+        const SampledWavelengths &swl, const SampledSpectrum &sp,
+        Expr<float> dY) const noexcept override {
         SampledSpectrum dSpec{3u};
         constexpr auto m = make_float3(0.212671f, 0.715160f, 0.072169f);
         for (auto i = 0u; i < 3u; i++) { dSpec[i] = dY * m[i]; }
         return dSpec;
     }
-    [[nodiscard]] SampledSpectrum backward_cie_xyz(const SampledWavelengths &swl, const SampledSpectrum &sp, Expr<float3> dXYZ) const noexcept override {
+    [[nodiscard]] SampledSpectrum backward_cie_xyz(
+        const SampledWavelengths &swl, const SampledSpectrum &sp,
+        Expr<float3> dXYZ) const noexcept override {
         SampledSpectrum dSpec{3u};
         constexpr auto m = make_float3x3(
             0.412453f, 0.212671f, 0.019334f,
@@ -71,14 +87,17 @@ struct SRGBSpectrumInstance final : public Spectrum::Instance {
         for (auto i = 0u; i < 3u; i++) { dSpec[i] = dRGB[i]; }
         return dSpec;
     }
-    [[nodiscard]] SampledSpectrum backward_srgb(const SampledWavelengths &swl, const SampledSpectrum &sp, Expr<float3> dSRGB) const noexcept override {
+    [[nodiscard]] SampledSpectrum backward_srgb(
+        const SampledWavelengths &swl, const SampledSpectrum &sp,
+        Expr<float3> dSRGB) const noexcept override {
         SampledSpectrum dSpec{3u};
         for (auto i = 0u; i < 3u; i++) { dSpec[i] = dSRGB[i]; }
         return dSpec;
     }
 };
 
-luisa::unique_ptr<Spectrum::Instance> SRGBSpectrum::build(Pipeline &pipeline, CommandBuffer &) const noexcept {
+luisa::unique_ptr<Spectrum::Instance> SRGBSpectrum::build(
+    Pipeline &pipeline, CommandBuffer &) const noexcept {
     return luisa::make_unique<SRGBSpectrumInstance>(pipeline, this);
 }
 

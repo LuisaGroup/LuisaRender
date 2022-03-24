@@ -3,11 +3,13 @@
 //
 
 #include <luisa-compute.h>
+
 #include <base/spectrum.h>
+#include <base/pipeline.h>
 
 namespace luisa::render {
 
-using namespace compute;
+using namespace luisa::compute;
 
 static constexpr auto rsp_coefficient_scales = make_float3(10000.f, 10.f, 0.01f);
 static constexpr auto inv_rsp_coefficient_scales = make_float3(1e-4f, 1e-1f, 1e2f);
@@ -66,52 +68,8 @@ public:
     constexpr RGB2SpectrumTable(RGB2SpectrumTable &&) noexcept = default;
     constexpr RGB2SpectrumTable(const RGB2SpectrumTable &) noexcept = default;
     [[nodiscard]] static RGB2SpectrumTable srgb() noexcept;
-    [[nodiscard]] float3 decode_albedo(float3 rgb_in) const noexcept {
-        auto rgb = clamp(rgb_in, 0.0f, 1.0f);
-        if (rgb[0] == rgb[1] && rgb[1] == rgb[2]) {
-            return rsp_coefficient_scales *
-                   make_float3(0.0f, 0.0f, (rgb[0] - 0.5f) / std::sqrt(rgb[0] * (1.0f - rgb[0])));
-        }
-
-        // Find maximum component and compute remapped component values
-        auto maxc = (rgb[0] > rgb[1]) ?
-                        ((rgb[0] > rgb[2]) ? 0u : 2u) :
-                        ((rgb[1] > rgb[2]) ? 1u : 2u);
-        auto z = rgb[maxc];
-        auto x = rgb[(maxc + 1u) % 3u] * (resolution - 1u) / z;
-        auto y = rgb[(maxc + 2u) % 3u] * (resolution - 1u) / z;
-        auto zz = _inverse_smooth_step(_inverse_smooth_step(z)) * (resolution - 1u);
-
-        // Compute integer indices and offsets for coefficient interpolation
-        auto xi = std::min(static_cast<uint>(x), resolution - 2u);
-        auto yi = std::min(static_cast<uint>(y), resolution - 2u);
-        auto zi = std::min(static_cast<uint>(zz), resolution - 2u);
-        auto dx = x - static_cast<float>(xi);
-        auto dy = y - static_cast<float>(yi);
-        auto dz = zz - static_cast<float>(zi);
-
-        // Trilinearly interpolate sigmoid polynomial coefficients _c_
-        auto c = make_float3();
-        for (auto i = 0u; i < 3u; i++) {
-            // Define _co_ lambda for looking up sigmoid polynomial coefficients
-            auto co = [=, this](int dx, int dy, int dz) noexcept {
-                return _coefficients[maxc][zi + dz][yi + dy][xi + dx][i];
-            };
-            c[i] = lerp(lerp(lerp(co(0, 0, 0), co(1, 0, 0), dx),
-                             lerp(co(0, 1, 0), co(1, 1, 0), dx), dy),
-                        lerp(lerp(co(0, 0, 1), co(1, 0, 1), dx),
-                             lerp(co(0, 1, 1), co(1, 1, 1), dx), dy),
-                        dz);
-        }
-        return c;
-    }
-    [[nodiscard]] std::pair<float3, float> decode_unbound(float3 rgb) const noexcept {
-        auto m = std::max({rgb.x, rgb.y, rgb.z});
-        auto scale = 2.0f * m;
-        auto c = decode_albedo(scale == 0.0f ? make_float3(0.0f) : rgb / scale);
-        return std::make_pair(c, scale);
-    }
-    [[nodiscard]] RGBSigmoidPolynomial decode_albedo(Expr<BindlessArray> array, Expr<uint> base_index, Expr<float3> rgb_in) const noexcept {
+    [[nodiscard]] RGBSigmoidPolynomial decode_albedo(
+        const BindlessArray &array, Expr<uint> base_index, Expr<float3> rgb_in) const noexcept {
         static Callable decode = [](BindlessVar array, UInt base_index, Float3 rgb_in) noexcept {
             auto rgb = clamp(rgb_in, 0.0f, 1.0f);
             auto c = rsp_coefficient_scales *
@@ -136,9 +94,10 @@ public:
             };
             return c;
         };
-        return RGBSigmoidPolynomial{decode(array, base_index, rgb_in)};
+        return RGBSigmoidPolynomial{decode(Expr{array}, base_index, rgb_in)};
     }
-    [[nodiscard]] std::pair<RGBSigmoidPolynomial, Float> decode_unbound(Expr<BindlessArray> array, Expr<uint> base_index, Expr<float3> rgb) const noexcept {
+    [[nodiscard]] std::pair<RGBSigmoidPolynomial, Float> decode_unbound(
+        const BindlessArray &array, Expr<uint> base_index, Expr<float3> rgb) const noexcept {
         auto m = max(max(rgb.x, rgb.y), rgb.z);
         auto scale = 2.0f * m;
         auto c = decode_albedo(
@@ -146,7 +105,8 @@ public:
             ite(scale == 0.0f, 0.0f, rgb / scale));
         return std::make_pair(std::move(c), std::move(scale));
     }
-    void encode(CommandBuffer &command_buffer, VolumeView<float> t0, VolumeView<float> t1, VolumeView<float> t2) const noexcept {
+    void encode(CommandBuffer &command_buffer,
+                VolumeView<float> t0, VolumeView<float> t1, VolumeView<float> t2) const noexcept {
         command_buffer << t0.copy_from(_coefficients[0])
                        << t1.copy_from(_coefficients[1])
                        << t2.copy_from(_coefficients[2])
@@ -186,4 +146,83 @@ public:
     [[nodiscard]] auto scale() const noexcept { return _scale; }
 };
 
+class HeroWavelengthSpectrum final : public Spectrum {
+
+private:
+    uint _dimension{};
+
+public:
+    HeroWavelengthSpectrum(Scene *scene, const SceneNodeDesc *desc) noexcept
+        : Spectrum{scene, desc},
+          _dimension{std::max(desc->property_uint_or_default("dimension", 4u), 1u)} {}
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] bool is_differentiable() const noexcept override { return false; }
+    [[nodiscard]] bool is_fixed() const noexcept override { return false; }
+    [[nodiscard]] uint dimension() const noexcept override { return _dimension; }
+    [[nodiscard]] luisa::unique_ptr<Instance> build(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
+};
+
+class HeroWavelengthSpectrumInstance final : public Spectrum::Instance {
+
+private:
+    uint _rgb2spec_t0;
+
+public:
+    HeroWavelengthSpectrumInstance(
+        const Pipeline &pipeline, const Spectrum *spectrum, uint t0) noexcept
+        : Spectrum::Instance{pipeline, spectrum}, _rgb2spec_t0{t0} {}
+    [[nodiscard]] SampledSpectrum albedo_from_srgb(
+        const SampledWavelengths &swl, Expr<float3> rgb) const noexcept override {
+        auto rsp = RGB2SpectrumTable::srgb().decode_albedo(
+            pipeline().bindless_array(), _rgb2spec_t0, rgb);
+        auto spec = RGBAlbedoSpectrum{std::move(rsp)};
+        SampledSpectrum s{node()->dimension()};
+        for (auto i = 0u; i < s.dimension(); i++) {
+            s[i] = spec.sample(swl.lambda(i));
+        }
+        return s;
+    }
+    [[nodiscard]] SampledSpectrum illuminant_from_srgb(
+        const SampledWavelengths &swl, Expr<float3> rgb_in) const noexcept override {
+        auto rgb = max(rgb_in, 0.f);
+        auto [rsp, scale] = RGB2SpectrumTable::srgb().decode_unbound(
+            pipeline().bindless_array(), _rgb2spec_t0, rgb);
+        auto spec = RGBIlluminantSpectrum{
+            std::move(rsp), std::move(scale),
+            DenselySampledSpectrum::cie_illum_d65()};
+        SampledSpectrum s{node()->dimension()};
+        for (auto i = 0u; i < s.dimension(); i++) {
+            s[i] = spec.sample(swl.lambda(i));
+        }
+        return s;
+    }
+};
+
+luisa::unique_ptr<Spectrum::Instance> HeroWavelengthSpectrum::build(
+    Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
+    auto rgb2spec_t0 = pipeline.create<Volume<float>>(
+        PixelStorage::FLOAT4, make_uint3(RGB2SpectrumTable::resolution));
+    auto rgb2spec_t1 = pipeline.create<Volume<float>>(
+        PixelStorage::FLOAT4, make_uint3(RGB2SpectrumTable::resolution));
+    auto rgb2spec_t2 = pipeline.create<Volume<float>>(
+        PixelStorage::FLOAT4, make_uint3(RGB2SpectrumTable::resolution));
+    RGB2SpectrumTable::srgb().encode(
+        command_buffer,
+        rgb2spec_t0->view(0u),
+        rgb2spec_t1->view(0u),
+        rgb2spec_t2->view(0u));
+    auto t0 = pipeline.register_bindless(*rgb2spec_t0, TextureSampler::linear_point_zero());
+    auto t1 = pipeline.register_bindless(*rgb2spec_t1, TextureSampler::linear_point_zero());
+    auto t2 = pipeline.register_bindless(*rgb2spec_t2, TextureSampler::linear_point_zero());
+    LUISA_ASSERT(
+        t1 == t0 + 1u && t2 == t0 + 2u,
+        "Invalid RGB2Spec texture indices: "
+        "{}, {}, and {}.",
+        t0, t1, t2);
+    return luisa::make_unique<HeroWavelengthSpectrumInstance>(pipeline, this, t0);
+}
+
 }// namespace luisa::render
+
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::HeroWavelengthSpectrum)
