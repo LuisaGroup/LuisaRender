@@ -67,7 +67,7 @@ public:
         _up = camera->up();
         _left = normalize(cross(_up, _front));
         _up = normalize(cross(_front, _left));
-        _lens_radius = static_cast<float>(.5 * f / camera->aperture() * 2.);// * 2. here to match the real appearance
+        _lens_radius = static_cast<float>(.5 * f / camera->aperture());
         auto resolution = make_float2(camera->film()->resolution());
         _pixel_offset = .5f * resolution;
         if (resolution.x > resolution.y) {// landscape mode

@@ -93,11 +93,21 @@ void NormalVisualizerInstance::_render_one_camera(
         auto [ray, camera_weight] = camera->generate_ray(
             *sampler(), pixel_id, time, camera_to_world);
         auto path_weight = camera_weight;
-        auto interaction = pipeline().intersect(ray);
-        auto color = ite(
-            interaction->valid(),
-            interaction->shading().n() * 0.5f + 0.5f,
-            make_float3());
+        auto it = pipeline().intersect(ray);
+        auto color = def(make_float3());
+        $if(it->valid()) {
+            $if(it->shape()->has_surface()) {
+                auto surface_tag = it->shape()->surface_tag();
+                pipeline().dynamic_dispatch_surface(surface_tag, [&](auto surface) noexcept {
+                    if (auto normal_map = surface->normal()) {
+                        auto normal_local = 2.f * normal_map->evaluate(*it, time).xyz() - 1.f;
+                        auto normal = it->shading().local_to_world(normal_local);
+                        it->set_shading(Frame::make(normal, it->shading().u()));
+                    }
+                });
+            };
+            color = it->shading().n() * .5f + .5f;
+        };
         camera->film()->accumulate(pixel_id, shutter_weight * path_weight * color);
     });
     auto shutter_samples = camera->node()->shutter_samples();
