@@ -10305,12 +10305,14 @@ Camera camera : Pinhole {
   film : Color {
     resolution { 720, 1280 }
   }
-  file { "color-mega.exr" }
+  file { "color-wave-rgb.exr" }
 }
 
 render {
   cameras { @camera }
-  integrator : MegaPath {}
+  integrator : WavePath {
+    spectrum : Hero {}
+  }
   shapes {
     @shape_0,
     @shape_1,
