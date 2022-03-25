@@ -5,8 +5,17 @@ on [LuisaCompute](https://github.com/Mike-Leo-Smith/LuisaCompute).
 
 # Demo
 
-- Glass of Water (from [Rendering Resources](https://benedikt-bitterli.me/resources/))
+- Camera (Model and Environment Map from [PolyHeaven](https://polyhaven.com))
     - Wave-Front Path Tracing
+    - Disney and Glass Materials
+    - Environment Mapping
+    - Resolution: 3840x2160
+    - Max Depth: 10
+
+![Camera](data/renders/camera.png)
+
+- Glass of Water (from [Rendering Resources](https://benedikt-bitterli.me/resources/))
+    - Wavefront Path Tracing
     - Glass, Substrate, and Metal Materials
     - Diffuse Area Lights
     - Resolution: 1280x720
