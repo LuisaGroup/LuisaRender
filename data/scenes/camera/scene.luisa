@@ -169,11 +169,11 @@ Camera camera : Thinlens {
   look_at { -0.03, 0.025, 0.072 }
   aperture { 3.2 }
   focal_length { 70 }
-  spp { 4096 }
+  spp { 524288 }
   film : Color {
     resolution { 4096, 2160 }
   }
-  file { "render-direct.exr" }
+  file { "render-524288spp.exr" }
   filter : Gaussian {
     radius { 1 }
   }
@@ -181,7 +181,6 @@ Camera camera : Thinlens {
 
 Integrator integrator : WavePath {
   spectrum : Hero {}
-  depth { 1 }
 }
 
 render {

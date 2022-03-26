@@ -50,7 +50,7 @@ public:
         Float _time;
 
     public:
-        explicit Closure(
+        Closure(
             const Instance *instance, const Interaction &it,
             const SampledWavelengths &swl, Expr<float> time) noexcept
             : _instance{instance}, _it{it}, _swl{swl}, _time{time} {}
