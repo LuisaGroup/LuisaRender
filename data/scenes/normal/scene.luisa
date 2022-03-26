@@ -1,0 +1,45 @@
+Camera camera : Ortho {
+  position { 0, 0, 1 }
+  zoom { 1 }
+  file { "normal.exr" }
+  spp { 1024 }
+  film : Color {
+    resolution { 8192 }
+  }
+}
+
+Surface surface_square : Disney {
+  color : Image {
+    file { "textures/weathered_brown_planks_diff_16k.jpg" }
+  }
+  normal : Image {
+    file { "textures/weathered_brown_planks_nor_gl_16k.png" }
+  }
+  roughness : Image {
+    file { "textures/weathered_brown_planks_rough_16k.jpg" }
+  }
+}
+
+Shape square : Mesh {
+  file { "floor-low.ply" }
+  surface { @surface_square }
+  transform : SRT {
+    rotate { 1, 0, 0, 90 }
+  }
+}
+
+Integrator normal : Normal {}
+
+render {
+  cameras { @camera }
+  shapes { @square }
+  integrator { @normal }
+  environment : Map {
+    emission : Image {
+      file { "../../envmaps/envmap.exr" }
+    }
+    transform : SRT {
+      rotate { 0, 1, 0, 45 }
+    }
+  }
+}

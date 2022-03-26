@@ -87,27 +87,21 @@ Surface surface_camera_lens : Glass {
 
 Surface surface_backdrop : Disney {
   color : Image {
-    // file { "textures/fabric_pattern_07_col_1_8k.png" }
     file { "textures/weathered_brown_planks_diff_16k.jpg" }
-    // file { "textures/wood_planks_dirt_diff_8k.jpg" }
-    uv_scale { 10 }
-    uv_offset { 0, 0.5 }
   }
   normal : Image {
-    // file { "textures/fabric_pattern_07_nor_8k.exr" }
     file { "textures/weathered_brown_planks_nor_gl_16k.png" }
-    // file { "textures/wood_planks_dirt_nor_gl_8k.png" }
     encoding { "linear" }
-    uv_scale { 10 }
-    uv_offset { 0, 0.5 }
   }
   roughness : Image {
-    // file { "textures/fabric_pattern_07_rough_8k.jpg" }
     file { "textures/weathered_brown_planks_rough_16k.jpg" }
-    // file { "textures/wood_planks_dirt_rough_8k.jpg" }
     encoding { "linear" }
-    uv_scale { 10 }
-    uv_offset { 0, 0.5 }
+  }
+  clearcoat : Constant {
+    v { 0.5 }
+  }
+  clearcoat_gloss : Constant {
+    v { 1 }
   }
 }
 
@@ -139,11 +133,12 @@ Shape shape_camera_strap : Group {
 }
 
 Shape shape_ground : Mesh {
-  file { "square.obj" }
+  file { "floor.obj" }
   surface { @surface_backdrop }
   transform : SRT {
-    scale { 10 }
-    rotate { 0, 1, 0, 0 }
+    scale { 0.6 }
+    rotate { 0, 1, 0, -90 }
+    translate { 0.02, 0, -0.2 }
   }
 }
 
@@ -174,11 +169,11 @@ Camera camera : Thinlens {
   look_at { -0.03, 0.025, 0.072 }
   aperture { 3.2 }
   focal_length { 70 }
-  spp { 262144 }
+  spp { 4096 }
   film : Color {
     resolution { 4096, 2160 }
   }
-  file { "render.exr" }
+  file { "render-direct.exr" }
   filter : Gaussian {
     radius { 1 }
   }
@@ -186,6 +181,7 @@ Camera camera : Thinlens {
 
 Integrator integrator : WavePath {
   spectrum : Hero {}
+  depth { 1 }
 }
 
 render {

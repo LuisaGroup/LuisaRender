@@ -3,10 +3,11 @@ Film film : Color {
   exposure { 0 }
 }
 
-Camera camera : Pinhole {
+Camera camera : Ortho {
   position { 0, 0, 5 }
   fov { 60 }
   spp { 1024 }
+  zoom { -1 }
   film { @film }
   file { "../renders/envmap.exr" }
   shutter_span { 0, 0 }
