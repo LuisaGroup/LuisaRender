@@ -73,7 +73,8 @@ struct DiffuseLightClosure final : public Light::Closure {
                 .pdf = ite(front_face, pdf, 0.0f)};
     }
 
-    [[nodiscard]] Light::Sample sample(Sampler::Instance &sampler, Expr<uint> light_inst_id, Expr<float3> p_from) const noexcept override {
+    [[nodiscard]] Light::Sample sample(Expr<uint> light_inst_id, Expr<float3> p_from,
+                                       Expr<float> u_prim, Expr<float2> u) const noexcept override {
         auto light = instance<DiffuseLightInstance>();
         auto &&pipeline = light->pipeline();
         auto light_inst = pipeline.instance(light_inst_id);
@@ -81,10 +82,10 @@ struct DiffuseLightClosure final : public Light::Closure {
         auto alias_table_buffer_id = light_inst->alias_table_buffer_id();
         auto [triangle_id, _] = sample_alias_table(
             pipeline.buffer<AliasEntry>(alias_table_buffer_id),
-            light_inst->triangle_count(), sampler.generate_1d());
+            light_inst->triangle_count(), u_prim);
         auto triangle = pipeline.triangle(light_inst, triangle_id);
         auto light_to_world_normal = transpose(inverse(make_float3x3(light_to_world)));
-        auto uvw = sample_uniform_triangle(sampler.generate_2d());
+        auto uvw = sample_uniform_triangle(u);
         auto attrib = pipeline.shading_point(light_inst, triangle, uvw, light_to_world, light_to_world_normal);
         auto wo = normalize(p_from - attrib.p);
         Interaction it_light{light_inst, light_inst_id, triangle_id, wo, attrib};

@@ -163,21 +163,17 @@ public:
         return {.f = f, .pdf = pdf, .alpha = _distribution->alpha(), .eta = eta};
     }
 
-    [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
+    [[nodiscard]] Surface::Sample sample(Expr<float> u_lobe, Expr<float2> u) const noexcept override {
         auto wo_local = _it.wo_local();
-        auto u = sampler.generate_2d();
         auto pdf = def(0.f);
         auto f = SampledSpectrum{_swl.dimension()};
         auto wi_local = def(make_float3(0.0f, 0.0f, 1.0f));
-        auto lobe = cast<int>(u.x >= _kr_ratio);
         auto swl = _swl;
-        $if(lobe == 0u) {// Reflection
-            u.x = u.x / _kr_ratio;
+        $if(u_lobe < _kr_ratio) {// Reflection
             f = _refl->sample(wo_local, &wi_local, u, &pdf);
             pdf *= _kr_ratio;
         }
         $else {// Transmission
-            u.x = (u.x - _kr_ratio) / (1.f - _kr_ratio);
             f = _trans->sample(wo_local, &wi_local, u, &pdf);
             pdf *= (1.f - _kr_ratio);
         };

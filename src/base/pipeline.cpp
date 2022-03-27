@@ -229,7 +229,7 @@ Var<Triangle> Pipeline::triangle(const Var<Shape::Handle> &instance, Expr<uint> 
 }
 
 ShadingAttribute Pipeline::shading_point(
-    const Var<Shape::Handle> &instance, const Var<Triangle> &triangle, const Var<float3> &uvw,
+    const Var<Shape::Handle> &instance, const Var<Triangle> &triangle, const Var<float3> &bary,
     const Var<float4x4> &shape_to_world, const Var<float3x3> &shape_to_world_normal) const noexcept {
     auto v_buffer = instance->vertex_buffer_id();
     auto v0 = buffer<Shape::Vertex>(v_buffer).read(triangle.i0);
@@ -238,13 +238,13 @@ ShadingAttribute Pipeline::shading_point(
     auto p0 = make_float3(shape_to_world * make_float4(v0->position(), 1.f));
     auto p1 = make_float3(shape_to_world * make_float4(v1->position(), 1.f));
     auto p2 = make_float3(shape_to_world * make_float4(v2->position(), 1.f));
-    auto p = uvw.x * p0 + uvw.y * p1 + uvw.z * p2;
+    auto p = bary.x * p0 + bary.y * p1 + bary.z * p2;
     auto c = cross(p1 - p0, p2 - p0);
     auto area = 0.5f * length(c);
     auto ng = normalize(c);
-    auto uv = uvw.x * v0->uv() + uvw.y * v1->uv() + uvw.z * v2->uv();
-    auto ns_local = uvw.x * v0->normal() + uvw.y * v1->normal() + uvw.z * v2->normal();
-    auto tangent_local = uvw.x * v0->tangent() + uvw.y * v1->tangent() + uvw.z * v2->tangent();
+    auto uv = bary.x * v0->uv() + bary.y * v1->uv() + bary.z * v2->uv();
+    auto ns_local = bary.x * v0->normal() + bary.y * v1->normal() + bary.z * v2->normal();
+    auto tangent_local = bary.x * v0->tangent() + bary.y * v1->tangent() + bary.z * v2->tangent();
     auto ns = normalize(shape_to_world_normal * ns_local);
     auto tangent = normalize(shape_to_world_normal * tangent_local);
     return {.p = p, .ng = ng, .ns = ns, .tangent = tangent, .uv = uv, .area = area};

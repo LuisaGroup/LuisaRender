@@ -75,7 +75,7 @@ public:
             auto u = sampler.generate_1d();
             $if(u < _env_prob) {
                 sample = pipeline().environment()->sample(
-                    sampler, it_from.p(), env_to_world, swl, time);
+                    it_from.p(), env_to_world, swl, time, sampler.generate_2d());
                 sample.eval.pdf *= _env_prob;
             }
             $else {
@@ -84,9 +84,11 @@ public:
                     auto u_remapped = (u - _env_prob) / (1.f - _env_prob);
                     auto i = cast<uint>(clamp(u_remapped * n, 0.f, n - 1.f));
                     auto handle = pipeline().buffer<Light::Handle>(_light_buffer_id).read(i);
+                    auto u_prim = sampler.generate_1d();
+                    auto u_light = sampler.generate_2d();
                     pipeline().dynamic_dispatch_light(handle.light_tag, [&](auto light) noexcept {
                         auto closure = light->closure(swl, time);
-                        sample = closure->sample(sampler, handle.instance_id, it_from.p());
+                        sample = closure->sample(handle.instance_id, it_from.p(), u_prim, u_light);
                     });
                     sample.eval.pdf *= (1.f - _env_prob) / n;
                 }
@@ -96,9 +98,11 @@ public:
             auto n = static_cast<float>(pipeline().lights().size());
             auto i = cast<uint>(clamp(u * n, 0.f, n - 1.f));
             auto handle = pipeline().buffer<Light::Handle>(_light_buffer_id).read(i);
+            auto u_prim = sampler.generate_1d();
+            auto u_light = sampler.generate_2d();
             pipeline().dynamic_dispatch_light(handle.light_tag, [&](auto light) noexcept {
                 auto closure = light->closure(swl, time);
-                sample = closure->sample(sampler, handle.instance_id, it_from.p());
+                sample = closure->sample(handle.instance_id, it_from.p(), u_prim, u_light);
             });
             sample.eval.pdf *= 1.f / n;
         } else {

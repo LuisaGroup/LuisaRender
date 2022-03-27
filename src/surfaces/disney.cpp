@@ -641,23 +641,19 @@ public:
         auto wi_local = _it.shading().world_to_local(wi);
         return evaluate_local(wo_local, wi_local);
     }
-    [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
-        // TODO: weighted sampling
-
-        auto u = sampler.generate_2d();
+    [[nodiscard]] Surface::Sample sample(Expr<float> u_lobe, Expr<float2> u) const noexcept override {
         auto sampling_tech = def(0u);
         auto sum_weights = def(0.f);
         auto ux_remapped = def(0.f);
         auto lower_sum = def(0.f);
         auto upper_sum = def(1.f);
         for (auto i = 0u; i < max_sampling_techique_count; i++) {
-            auto sel = (_lobes & sampling_techniques[i]) != 0u & (u.x > sum_weights);
+            auto sel = (_lobes & sampling_techniques[i]) != 0u & (u_lobe > sum_weights);
             sampling_tech = ite(sel, i, sampling_tech);
             lower_sum = ite(sel, sum_weights, lower_sum);
             sum_weights += _sampling_weights[i];
             upper_sum = ite(sel, sum_weights, upper_sum);
         }
-        u.x = saturate((u.x - lower_sum) / (upper_sum - lower_sum));
 
         // sample
         auto wo_local = _it.wo_local();

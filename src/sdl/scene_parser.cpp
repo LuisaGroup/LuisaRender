@@ -119,11 +119,11 @@ inline bool SceneParser::_eof() const noexcept {
 
 inline std::string_view SceneParser::_read_identifier() noexcept {
     auto offset = _cursor;
-    if (auto c = _get(); c != '$' && !isalpha(c)) [[unlikely]] {
+    if (auto c = _get(); c != '$' && c != '_' && !isalpha(c)) [[unlikely]] {
         _report_error("Invalid character '{}' in identifier.", c);
     }
     auto is_ident_body = [](auto c) noexcept {
-        return isalnum(c) || c == '_' || c == '$' || c == '-';
+        return isalnum(c) || c == '_' || c == '$' || c == '-' || c == '.';
     };
     while (is_ident_body(_peek())) { _skip(); }
     return std::string_view{_source}

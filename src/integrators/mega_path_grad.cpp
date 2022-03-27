@@ -209,13 +209,15 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
             auto eta_scale = def(make_float4(1.f));
             auto cos_theta_o = it->wo_local().z;
             auto surface_tag = it->shape()->surface_tag();
+            auto u_lobe = sampler->generate_1d();
+            auto u_bsdf = sampler->generate_2d();
             pipeline.dynamic_dispatch_surface(surface_tag, [&](auto surface) {
                 // apply alpha map
                 auto alpha_skip = def(false);
                 if (auto alpha_map = surface->alpha()) {
                     auto alpha = alpha_map->evaluate(*it, swl, time).value.x;
-                    auto u_alpha = sampler->generate_1d();
-                    alpha_skip = alpha < u_alpha;
+                    alpha_skip = alpha < u_lobe;
+                    u_lobe = ite(alpha_skip, (u_lobe - alpha) / (1.f - alpha), u_lobe / alpha);
                 }
 
                 $if(alpha_skip) {
@@ -227,7 +229,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
                     auto closure = surface->closure(*it, swl, time);
 
                     // sample material
-                    auto [wi, eval] = closure->sample(*sampler);
+                    auto [wi, eval] = closure->sample(u_lobe, u_bsdf);
                     auto cos_theta_i = dot(wi, it->shading().n());
                     ray = it->spawn_ray(wi);
                     pdf_bsdf = eval.pdf;
@@ -382,6 +384,8 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
             auto eta_scale = def(make_float4(1.f));
             auto cos_theta_o = it->wo_local().z;
             auto surface_tag = it->shape()->surface_tag();
+            auto u_lobe = sampler->generate_1d();
+            auto u_bsdf = sampler->generate_2d();
             pipeline.dynamic_dispatch_surface(surface_tag, [&](auto surface) {
                 // apply normal map
                 if (auto normal_map = surface->normal()) {
@@ -393,8 +397,8 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
                 auto alpha_skip = def(false);
                 if (auto alpha_map = surface->alpha()) {
                     auto alpha = alpha_map->evaluate(*it, swl, time).value.x;
-                    auto u_alpha = sampler->generate_1d();
-                    alpha_skip = alpha < u_alpha;
+                    alpha_skip = alpha < u_lobe;
+                    u_lobe = ite(alpha_skip, (u_lobe - alpha) / (1.f - alpha), u_lobe / alpha);
                 }
 
                 $if(alpha_skip) {
@@ -418,7 +422,7 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
                     };
 
                     // sample material
-                    auto [wi, eval] = closure->sample(*sampler);
+                    auto [wi, eval] = closure->sample(u_lobe, u_bsdf);
                     auto cos_theta_i = dot(wi, it->shading().n());
                     ray = it->spawn_ray(wi);
                     pdf_bsdf = eval.pdf;

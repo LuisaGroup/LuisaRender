@@ -117,14 +117,12 @@ private:
                 .eta = _eta_i};
     }
 
-    [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
+    [[nodiscard]] Surface::Sample sample(Expr<float> u_lobe, Expr<float2> u) const noexcept override {
         auto wo_local = _it.wo_local();
-        auto u = sampler.generate_2d();
         auto pdf = def(0.f);
         SampledSpectrum f{_swl.dimension()};
         auto wi_local = def(make_float3(0.0f, 0.0f, 1.0f));
-        $if(u.x < _kd_ratio) {// Lambert
-            u.x = u.x / _kd_ratio;
+        $if(u_lobe < _kd_ratio) {// Lambert
             auto f_d = _lambert->sample(wo_local, &wi_local, u, &pdf);
             auto f_s = _microfacet->evaluate(wo_local, wi_local);
             auto pdf_s = _microfacet->pdf(wo_local, wi_local);
@@ -132,7 +130,6 @@ private:
             pdf = lerp(pdf_s, pdf, _kd_ratio);
         }
         $else {// Microfacet
-            u.x = (u.x - _kd_ratio) / (1.f - _kd_ratio);
             auto f_s = _microfacet->sample(wo_local, &wi_local, u, &pdf);
             auto f_d = _lambert->evaluate(wo_local, wi_local);
             auto pdf_d = _lambert->pdf(wo_local, wi_local);

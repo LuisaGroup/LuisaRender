@@ -60,8 +60,8 @@ public:
         [[nodiscard]] virtual Evaluation evaluate(
             const Interaction &it_light, Expr<float3> p_from) const noexcept = 0;
         [[nodiscard]] virtual Sample sample(
-            Sampler::Instance &sampler, Expr<uint> light_inst_id,
-            Expr<float3> p_from) const noexcept = 0;
+            Expr<uint> light_inst_id, Expr<float3> p_from,
+            Expr<float> u_prim, Expr<float2> u) const noexcept = 0;
     };
 
     class Instance {
