@@ -274,24 +274,21 @@ void MegakernelPathTracingInstance::_render_one_camera(
                     $if(light_sample.eval.pdf > 0.0f & !occluded) {
                         auto wi = light_sample.wi;
                         auto eval = closure->evaluate(wi);
-                        auto cos_theta_i = dot(eval.normal, wi);
-                        auto cos_theta_o = dot(eval.normal, it->wo());
-                        auto is_trans = cos_theta_i * cos_theta_o < 0.f;
                         auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
-                        Li += mis_weight / light_sample.eval.pdf * abs(cos_theta_i) *
+                        Li += mis_weight / light_sample.eval.pdf * abs(dot(eval.normal, wi)) *
                               beta * eval.f * light_sample.eval.L;
                     };
 
                     // sample material
                     auto sample = closure->sample(u_lobe, u_bsdf);
-                    auto cos_theta_i = dot(sample.eval.normal, sample.wi);
-                    auto cos_theta_o = dot(sample.eval.normal, it->wo());
                     ray = it->spawn_ray(sample.wi);
                     pdf_bsdf = sample.eval.pdf;
-                    auto w = ite(sample.eval.pdf > 0.f, abs(cos_theta_i) / sample.eval.pdf, 0.f);
-                    beta *= sample.eval.f * w;
+                    auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
+                    beta *= abs(dot(sample.eval.normal, sample.wi)) * w * sample.eval.f;
 
                     // specular transmission, consider eta scale
+                    auto cos_theta_i = dot(it->shading().n(), sample.wi);
+                    auto cos_theta_o = dot(it->shading().n(), it->wo());
                     $if(cos_theta_i * cos_theta_o < 0.f &
                         max(sample.eval.roughness.x, sample.eval.roughness.y) < .05f) {
                         auto entering = cos_theta_o > 0.f;

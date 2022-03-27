@@ -76,13 +76,17 @@ private:
     Float _ratio;
 
 private:
-    [[nodiscard]] auto _mix(const Surface::Evaluation &eval_a,
+    [[nodiscard]] auto _mix(Expr<float3> wi,
+                            const Surface::Evaluation &eval_a,
                             const Surface::Evaluation &eval_b) const noexcept {
         auto t = 1.f - _ratio;
+        auto cos_a = abs(dot(eval_a.normal, wi));
+        auto cos_b = abs(dot(eval_b.normal, wi));
+        auto cos_theta_i = abs(dot(_it.shading().n(), wi));
         return Surface::Evaluation{
-            .f = _ratio * eval_a.f + t * eval_b.f,
+            .f = (_ratio * eval_a.f * cos_a + t * eval_b.f * cos_b) / cos_theta_i,
             .pdf = lerp(eval_a.pdf, eval_b.pdf, t),
-            .normal = normalize(lerp(eval_a.normal, eval_b.normal, t)),
+            .normal = _it.shading().n(),
             .roughness = lerp(eval_a.roughness, eval_b.roughness, t),
             .eta = _ratio * eval_a.eta + t * eval_b.eta};
     }
@@ -110,7 +114,7 @@ public:
         }
         auto eval_a = _a->evaluate(wi);
         auto eval_b = _b->evaluate(wi);
-        return _mix(eval_a, eval_b);
+        return _mix(wi, eval_a, eval_b);
     }
     [[nodiscard]] Surface::Sample sample(Expr<float> u_lobe, Expr<float2> u) const noexcept override {
         if (_a == nullptr) [[unlikely]] {
@@ -134,13 +138,13 @@ public:
             auto sample_a = _a->sample(u_lobe / _ratio, u);
             auto eval_b = _b->evaluate(sample_a.wi);
             sample.wi = sample_a.wi;
-            sample.eval = _mix(sample_a.eval, eval_b);
+            sample.eval = _mix(sample_a.wi, sample_a.eval, eval_b);
         }
         $else {// sample b
             auto sample_b = _b->sample((u_lobe - _ratio) / (1.f - _ratio), u);
             auto eval_a = _a->evaluate(sample_b.wi);
             sample.wi = sample_b.wi;
-            sample.eval = _mix(eval_a, sample_b.eval);
+            sample.eval = _mix(sample_b.wi, eval_a, sample_b.eval);
         };
         return sample;
     }
