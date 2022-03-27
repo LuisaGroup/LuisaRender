@@ -115,6 +115,7 @@ Shape cbox : Group {
 Integrator pt : MegaPathGrad {
   sampler : Independent {}
   depth { 10 }
+  spectrum : sRGB {}
 }
 
 Integrator normal : Normal {}

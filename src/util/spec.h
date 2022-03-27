@@ -109,6 +109,11 @@ public:
     [[nodiscard]] auto operator-() const noexcept {
         return map([](auto, auto s) noexcept { return -s; });
     }
+//    template<uint N>                                                                    \
+//    [[nodiscard]] SampledSpectrum &operator op##=(Var<Vector<float, N>> rhs) noexcept { \
+//        for (auto i = 0u; i < min(N, dimension()); ++i) { (*this)[i] op## = rhs[i]; }   \
+//        return *this;                                                                   \
+//    }
 #define LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP(op)                            \
     [[nodiscard]] auto operator op(Expr<float> rhs) const noexcept {                \
         return map([rhs](auto, auto lhs) { return lhs op rhs; });                   \
