@@ -13,7 +13,6 @@ namespace luisa::render {
 
 using namespace luisa::compute;
 
-// TODO: channels
 class ImageTexture final : public Texture {
 
 public:

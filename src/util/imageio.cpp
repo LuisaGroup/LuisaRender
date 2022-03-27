@@ -35,7 +35,7 @@ namespace luisa::render {
             FreeEXRErrorMessage(err);
         }
         LUISA_ERROR_WITH_LOCATION(
-            "Failed to parse OpenEXR image '{}': {}.",
+            "Failed to parse OpenEXR image '{}': {}",
             filename, error);
     }
     return exr_header;

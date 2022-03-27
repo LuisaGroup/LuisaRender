@@ -252,7 +252,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
             SampledSpectrum eta_scale{swl.dimension(), 1.f};
             auto cos_theta_o = it->wo_local().z;
             auto surface_tag = it->shape()->surface_tag();
-            pipeline.dynamic_dispatch_surface(surface_tag, [&](auto surface) {
+            pipeline.dynamic_dispatch_surface(surface_tag, [&](auto surface) noexcept {
                 // apply normal map
                 if (auto normal_map = surface->normal()) {
                     auto normal_local = 2.f * normal_map->evaluate(*it, time).xyz() - 1.f;
