@@ -95,7 +95,7 @@ Surface surface_camera_lens : Mix {
   a { @surface_camera_lens_glass }
   b { @surface_camera_lens_metal }
   ratio : Constant {
-    v { 0.97 }
+    v { 0.95 }
   }
 }
 

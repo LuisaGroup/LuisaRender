@@ -52,10 +52,13 @@ public:
         const Texture::Instance *roughness) noexcept
         : Surface::Instance{pipeline, surface},
           _kd{Kd}, _ks{Ks}, _roughness{roughness} {}
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
-        const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
     [[nodiscard]] auto Kd() const noexcept { return _kd; }
     [[nodiscard]] auto Ks() const noexcept { return _ks; }
+
+private:
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
+        const Interaction &it, const SampledWavelengths &swl,
+        Expr<float> time) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> SubstrateSurface::_build(
@@ -92,6 +95,7 @@ private:
         auto pdf = _blend->pdf(wo_local, wi_local);
         return {.f = f,
                 .pdf = pdf,
+                .normal = _it.shading().n(),
                 .alpha = _distribution->alpha(),
                 .eta = _eta_i};
     }
@@ -106,6 +110,7 @@ private:
         return {.wi = wi,
                 .eval = {.f = f,
                          .pdf = pdf,
+                         .normal = _it.shading().n(),
                          .alpha = _distribution->alpha(),
                          .eta = _eta_i}};
     }
@@ -125,7 +130,7 @@ private:
     }
 };
 
-luisa::unique_ptr<Surface::Closure> SubstrateInstance::closure(
+luisa::unique_ptr<Surface::Closure> SubstrateInstance::_closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto Kd = _kd->evaluate_albedo_spectrum(it, swl, time);
     auto Ks = _ks->evaluate_albedo_spectrum(it, swl, time);

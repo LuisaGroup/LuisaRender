@@ -406,7 +406,6 @@ void WavefrontPathTracingInstance::_render_one_camera(
             auto Li = path_states.read_radiance(path_id);
             auto swl = path_states.read_swl(path_id);
             auto beta = path_states.read_beta(path_id);
-            auto cos_theta_o = it->wo_local().z;
             auto surface_tag = it->shape()->surface_tag();
             auto pdf_bsdf = def(0.f);
             SampledSpectrum eta_scale{swl.dimension(), 1.f};
@@ -414,12 +413,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
             auto u_lobe = sampler()->generate_1d();
             auto u_bsdf = sampler()->generate_2d();
             pipeline().dynamic_dispatch_surface(surface_tag, [&](auto surface) noexcept {
-                // apply normal map
-                if (auto normal_map = surface->normal()) {
-                    auto normal_local = 2.f * normal_map->evaluate(*it, time).xyz() - 1.f;
-                    auto normal = it->shading().local_to_world(normal_local);
-                    it->set_shading(Frame::make(normal, it->shading().u()));
-                }
+
                 // apply alpha map
                 auto alpha_skip = def(false);
                 if (auto alpha_map = surface->alpha()) {
@@ -442,17 +436,17 @@ void WavefrontPathTracingInstance::_render_one_camera(
                         auto Ld = light_samples.read_emission(queue_id);
                         auto wi = light_samples.read_wi(queue_id);
                         auto eval = closure->evaluate(wi);
-                        auto cos_theta_i = dot(it->shading().n(), wi);
+                        auto cos_theta_o = dot(eval.normal, it->wo());
+                        auto cos_theta_i = dot(eval.normal, wi);
                         auto is_trans = cos_theta_i * cos_theta_o < 0.f;
                         auto mis_weight = balanced_heuristic(pdf_light, eval.pdf);
-                        Li += mis_weight / pdf_light *
-                              abs_dot(it->shading().n(), wi) *
-                              beta * eval.f * Ld;
+                        Li += mis_weight / pdf_light * abs(cos_theta_i) * beta * eval.f * Ld;
                     };
 
                     // sample material
                     auto sample = closure->sample(u_lobe, u_bsdf);
-                    auto cos_theta_i = dot(sample.wi, it->shading().n());
+                    auto cos_theta_o = dot(sample.eval.normal, it->wo());
+                    auto cos_theta_i = dot(sample.eval.normal, sample.wi);
                     ray = it->spawn_ray(sample.wi);
                     pdf_bsdf = sample.eval.pdf;
                     auto w = ite(sample.eval.pdf > 0.0f, abs(cos_theta_i) / sample.eval.pdf, 0.f);

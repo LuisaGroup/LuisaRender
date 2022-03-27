@@ -45,10 +45,12 @@ public:
         luisa::unique_ptr<Surface::Instance> a, luisa::unique_ptr<Surface::Instance> b) noexcept
         : Surface::Instance{pipeline, surface},
           _a{std::move(a)}, _b{std::move(b)}, _ratio{ratio} {}
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
+    [[nodiscard]] auto ratio() const noexcept { return _ratio; }
+
+private:
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
         const Interaction &it, const SampledWavelengths &swl,
         Expr<float> time) const noexcept override;
-    [[nodiscard]] auto ratio() const noexcept { return _ratio; }
 };
 
 luisa::unique_ptr<Surface::Instance> MixSurface::_build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
@@ -76,11 +78,13 @@ private:
 private:
     [[nodiscard]] auto _mix(const Surface::Evaluation &eval_a,
                             const Surface::Evaluation &eval_b) const noexcept {
+        auto t = 1.f - _ratio;
         return Surface::Evaluation{
             .f = _ratio * eval_a.f + (1.f - _ratio) * eval_b.f,
-             .pdf = lerp(eval_a.pdf, eval_b.pdf, 1.f - _ratio),
-             .alpha = lerp(eval_a.alpha, eval_b.alpha, 1.f - _ratio),
-             .eta = _ratio * eval_a.eta + (1.f - _ratio) * eval_b.eta};
+            .pdf = lerp(eval_a.pdf, eval_b.pdf, t),
+            .normal = normalize(lerp(eval_a.normal, eval_b.normal, t)),
+            .alpha = lerp(eval_a.alpha, eval_b.alpha, t),
+            .eta = _ratio * eval_a.eta + t * eval_b.eta};
     }
 
 public:
@@ -123,6 +127,7 @@ public:
             .wi = make_float3(0.f, 0.f, 1.f),
             .eval = {.f = SampledSpectrum{_swl.dimension()},
                      .pdf = 0.f,
+                     .normal = make_float3(0.f, 0.f, 1.f),
                      .alpha = make_float2(),
                      .eta = SampledSpectrum{_swl.dimension(), 1.f}}};
         $if(u_lobe < _ratio) {// sample a
@@ -154,7 +159,7 @@ public:
     }
 };
 
-luisa::unique_ptr<Surface::Closure> MixSurfaceInstance::closure(
+luisa::unique_ptr<Surface::Closure> MixSurfaceInstance::_closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto ratio = _ratio == nullptr ? 0.5f : clamp(_ratio->evaluate(it, time).x, 0.f, 1.f);
     auto a = _a == nullptr ? nullptr : _a->closure(it, swl, time);

@@ -43,7 +43,9 @@ public:
         const Pipeline &pipeline, const Surface *surface,
         const Texture::Instance *color, const Texture::Instance *roughness) noexcept
         : Surface::Instance{pipeline, surface}, _color{color}, _roughness{roughness} {}
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
+
+private:
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
         const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
 };
 
@@ -104,6 +106,7 @@ public:
         auto pdf = _refl->pdf(wo_local, wi_local);
         return {.f = f,
                 .pdf = pdf,
+                .normal = _it.shading().n(),
                 .alpha = _distribution->alpha(),
                 .eta = SampledSpectrum{_swl.dimension(), 1.f}};
     }
@@ -114,6 +117,7 @@ public:
         return {.wi = _it.shading().local_to_world(wi_local),
                 .eval = {.f = f,
                          .pdf = pdf,
+                         .normal = _it.shading().n(),
                          .alpha = _distribution->alpha(),
                          .eta = SampledSpectrum{_swl.dimension(), 1.f}}};
     }
@@ -124,7 +128,7 @@ public:
     }
 };
 
-luisa::unique_ptr<Surface::Closure> MirrorInstance::closure(
+luisa::unique_ptr<Surface::Closure> MirrorInstance::_closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto alpha = def(make_float2(0.f));
     if (_roughness != nullptr) {

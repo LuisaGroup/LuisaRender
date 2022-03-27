@@ -64,8 +64,11 @@ public:
         const Texture::Instance *roughness, const Texture::Instance *eta) noexcept
         : Surface::Instance{pipeline, surface},
           _kd{Kd}, _ks{Ks}, _roughness{roughness}, _eta{eta} {}
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
-        const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
+
+private:
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
+        const Interaction &it, const SampledWavelengths &swl,
+        Expr<float> time) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> PlasticSurface::_build(
@@ -113,6 +116,7 @@ private:
         auto pdf_s = _microfacet->pdf(wo_local, wi_local);
         return {.f = f_d + f_s,
                 .pdf = lerp(pdf_s, pdf_d, _kd_ratio),
+                .normal = _it.shading().n(),
                 .alpha = _distribution->alpha(),
                 .eta = _eta_i};
     }
@@ -140,6 +144,7 @@ private:
         return {.wi = wi,
                 .eval = {.f = f,
                          .pdf = pdf,
+                         .normal = _it.shading().n(),
                          .alpha = _distribution->alpha(),
                          .eta = _eta_i}};
     }
@@ -149,7 +154,7 @@ private:
     }
 };
 
-luisa::unique_ptr<Surface::Closure> PlasticInstance::closure(
+luisa::unique_ptr<Surface::Closure> PlasticInstance::_closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto Kd_rgb = _kd->evaluate(it, time).xyz();
     auto Ks_rgb = _ks->evaluate(it, time).xyz();

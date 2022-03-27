@@ -111,7 +111,9 @@ public:
     [[nodiscard]] auto flatness() const { return _flatness; }
     [[nodiscard]] auto diffuse_trans() const { return _diffuse_trans; }
     [[nodiscard]] auto thin() const { return node<DisneySurface>()->thin(); }
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
+
+private:
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
         const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
 };
 
@@ -631,6 +633,7 @@ public:
         auto thin = instance<DisneySurfaceInstance>()->thin();
         return {.f = f,
                 .pdf = pdf,
+                .normal = _it.shading().n(),
                 .alpha = _distrib->alpha(),
                 .eta = SampledSpectrum{
                     _swl.dimension(),
@@ -679,7 +682,7 @@ public:
     }
 };
 
-luisa::unique_ptr<Surface::Closure> DisneySurfaceInstance::closure(
+luisa::unique_ptr<Surface::Closure> DisneySurfaceInstance::_closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto color_rgb = _color->evaluate(it, time).xyz();
     auto color_lum = srgb_to_cie_y(color_rgb);

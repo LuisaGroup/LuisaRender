@@ -65,7 +65,7 @@ struct alignas(16) Shape::Vertex {
     uint compressed_tangent;
     float compressed_uv[2];
 
-    [[nodiscard]] static constexpr auto oct_encode(float3 n) noexcept {
+    [[nodiscard]] static auto oct_encode(float3 n) noexcept {
         constexpr auto oct_wrap = [](float2 v) noexcept {
             return (1.0f - abs(v.yx())) * select(make_float2(-1.0f), make_float2(1.0f), v >= 0.0f);
         };

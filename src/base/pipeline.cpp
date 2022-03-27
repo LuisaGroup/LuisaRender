@@ -250,6 +250,7 @@ ShadingAttribute Pipeline::shading_point(
     auto tangent_local = bary.x * v0->tangent() + bary.y * v1->tangent() + bary.z * v2->tangent();
     auto ns = normalize(shape_to_world_normal * ns_local);
     auto tangent = normalize(shape_to_world_normal * tangent_local);
+    // TODO: process normal map before offset p?
     // offset p to fake surface for the shadow terminator (reference: Ray Tracing Gems 2, Chap. 4)
     auto temp_u = p - p0;
     auto temp_v = p - p1;

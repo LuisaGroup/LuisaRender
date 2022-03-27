@@ -387,12 +387,6 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
             auto u_lobe = sampler->generate_1d();
             auto u_bsdf = sampler->generate_2d();
             pipeline.dynamic_dispatch_surface(surface_tag, [&](auto surface) {
-                // apply normal map
-                if (auto normal_map = surface->normal()) {
-                    auto normal_local = 2.f * normal_map->evaluate(*it, swl, time).value.xyz() - 1.f;
-                    auto normal = it->shading().local_to_world(normal_local);
-                    it->set_shading(Frame::make(normal, it->shading().u()));
-                }
                 // apply alpha map
                 auto alpha_skip = def(false);
                 if (auto alpha_map = surface->alpha()) {

@@ -106,7 +106,9 @@ public:
         const Texture::Instance *Kr, const Texture::Instance *Kt,
         const Texture::Instance *roughness, const Texture::Instance *eta) noexcept
         : Surface::Instance{pipeline, surface}, _kr{Kr}, _kt{Kt}, _roughness{roughness}, _eta{eta} {}
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
+
+private:
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
         const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
 };
 
@@ -160,7 +162,11 @@ public:
         for (auto i = 0u; i < eta.dimension(); i++) {
             eta[i] = ite(entering, _fresnel->eta_t()[i], 1.f);
         }
-        return {.f = f, .pdf = pdf, .alpha = _distribution->alpha(), .eta = eta};
+        return {.f = f,
+                .pdf = pdf,
+                .normal = _it.shading().n(),
+                .alpha = _distribution->alpha(),
+                .eta = eta};
     }
 
     [[nodiscard]] Surface::Sample sample(Expr<float> u_lobe, Expr<float2> u) const noexcept override {
@@ -183,7 +189,12 @@ public:
         for (auto i = 0u; i < eta.dimension(); i++) {
             eta[i] = ite(entering, _fresnel->eta_t()[i], 1.f);
         }
-        return {.wi = wi, .eval = {.f = f, .pdf = pdf, .alpha = _distribution->alpha(), .eta = eta}};
+        return {.wi = wi,
+                .eval = {.f = f,
+                         .pdf = pdf,
+                         .normal = _it.shading().n(),
+                         .alpha = _distribution->alpha(),
+                         .eta = eta}};
     }
 
     void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
@@ -192,7 +203,7 @@ public:
     }
 };
 
-luisa::unique_ptr<Surface::Closure> GlassInstance::closure(
+luisa::unique_ptr<Surface::Closure> GlassInstance::_closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto Kr_rgb = saturate(_kr->evaluate(it, time).xyz());
     auto Kt_rgb = saturate(_kt->evaluate(it, time).xyz());
