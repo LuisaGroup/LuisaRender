@@ -95,7 +95,7 @@ Surface surface_camera_lens : Mix {
   a { @surface_camera_lens_glass }
   b { @surface_camera_lens_metal }
   ratio : Constant {
-    v { 0.95 }
+    v { 0.97 }
   }
 }
 
@@ -187,7 +187,7 @@ Camera camera : Thinlens {
   film : Color {
     resolution { 4096, 2160 }
   }
-  file { "render-mix.exr" }
+  file { "render-shadow-terminator.exr" }
   filter : Gaussian {
     radius { 1 }
   }

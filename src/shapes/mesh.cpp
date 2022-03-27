@@ -92,7 +92,8 @@ public:
                 auto p = make_float3(ai_positions[i].x, ai_positions[i].y, ai_positions[i].z);
                 auto n = make_float3(ai_normals[i].x, ai_normals[i].y, ai_normals[i].z);
                 loader._vertices[i].pos = p;
-                loader._vertices[i].compressed_normal = Shape::Vertex::oct_encode(n);
+                loader._vertices[i].compressed_normal =
+                    Shape::Vertex::oct_encode(normalize(n));
                 auto uv = compute_uv(i);
                 loader._vertices[i].compressed_uv[0] = uv.x;
                 loader._vertices[i].compressed_uv[1] = uv.y;
@@ -171,18 +172,10 @@ class Mesh final : public Shape {
 
 private:
     std::shared_future<MeshLoader> _loader;
-    AccelBuildHint _build_hint{AccelBuildHint::FAST_TRACE};
 
 public:
     Mesh(Scene *scene, const SceneNodeDesc *desc) noexcept
-        : Shape{scene, desc}, _loader{MeshLoader::load(desc->property_path("file"))} {
-        auto hint = desc->property_string_or_default("build_hint", "");
-        if (hint == "fast_update") {
-            _build_hint = AccelBuildHint::FAST_UPDATE;
-        } else if (hint == "fast_rebuild") {
-            _build_hint = AccelBuildHint::FAST_REBUILD;
-        }
-    }
+        : Shape{scene, desc}, _loader{MeshLoader::load(desc->property_path("file"))} {}
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::span<const Shape *const> children() const noexcept override { return {}; }
     [[nodiscard]] bool deformable() const noexcept override { return false; }

@@ -243,11 +243,25 @@ ShadingAttribute Pipeline::shading_point(
     auto area = 0.5f * length(c);
     auto ng = normalize(c);
     auto uv = bary.x * v0->uv() + bary.y * v1->uv() + bary.z * v2->uv();
-    auto ns_local = bary.x * v0->normal() + bary.y * v1->normal() + bary.z * v2->normal();
+    auto n0 = v0->normal();
+    auto n1 = v1->normal();
+    auto n2 = v2->normal();
+    auto ns_local = bary.x * n0 + bary.y * n1 + bary.z * n2;
     auto tangent_local = bary.x * v0->tangent() + bary.y * v1->tangent() + bary.z * v2->tangent();
     auto ns = normalize(shape_to_world_normal * ns_local);
     auto tangent = normalize(shape_to_world_normal * tangent_local);
-    return {.p = p, .ng = ng, .ns = ns, .tangent = tangent, .uv = uv, .area = area};
+    // offset p to fake surface for the shadow terminator (reference: Ray Tracing Gems 2, Chap. 4)
+    auto temp_u = p - p0;
+    auto temp_v = p - p1;
+    auto temp_w = p - p2;
+    auto dot_u = min(dot(temp_u, n0), 0.f);
+    auto dot_v = min(dot(temp_v, n1), 0.f);
+    auto dot_w = min(dot(temp_w, n2), 0.f);
+    auto dp = bary.x * (temp_u - dot_u * n0) +
+              bary.y * (temp_v - dot_v * n1) +
+              bary.z * (temp_w - dot_w * n2);
+    return {.pg = p, .ng = ng, .ps = p + dp, .ns = ns,
+            .tangent = tangent, .uv = uv, .area = area};
 }
 
 Var<Hit> Pipeline::trace_closest(const Var<Ray> &ray) const noexcept { return _accel.trace_closest(ray); }

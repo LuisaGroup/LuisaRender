@@ -87,12 +87,12 @@ struct DiffuseLightClosure final : public Light::Closure {
         auto light_to_world_normal = transpose(inverse(make_float3x3(light_to_world)));
         auto uvw = sample_uniform_triangle(u);
         auto attrib = pipeline.shading_point(light_inst, triangle, uvw, light_to_world, light_to_world_normal);
-        auto wo = normalize(p_from - attrib.p);
+        auto wo = normalize(p_from - attrib.pg);
         Interaction it_light{light_inst, light_inst_id, triangle_id, wo, attrib};
         DiffuseLightClosure closure{light, _swl, _time};
         return {.eval = closure.evaluate(it_light, p_from),
-                .wi = normalize(attrib.p - p_from),
-                .distance = distance(attrib.p, p_from) * .9999f};
+                .wi = normalize(attrib.pg - p_from),
+                .distance = distance(attrib.pg, p_from) * .9999f};
     }
 };
 
