@@ -19,17 +19,15 @@ public:
     private:
         const Pipeline &_pipeline;
         const Environment *_env;
-        float _select_prob;
 
     public:
-        explicit Instance(const Pipeline &pipeline, const Environment *env) noexcept;
+        Instance(const Pipeline &pipeline, const Environment *env) noexcept;
         virtual ~Instance() noexcept = default;
 
         template<typename T = Environment>
             requires std::is_base_of_v<Environment, T>
         [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_env); }
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
-        [[nodiscard]] auto selection_prob() const noexcept { return _select_prob; }
         [[nodiscard]] virtual Light::Evaluation evaluate(
             Expr<float3> wi, Expr<float3x3> env_to_world,
             const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
@@ -47,7 +45,8 @@ public:
     [[nodiscard]] auto transform() const noexcept { return _transform; }
     [[nodiscard]] auto importance() const noexcept { return _importance; }
     [[nodiscard]] virtual bool is_black() const noexcept = 0;
-    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
+    [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
 };
 
 }// namespace luisa::render

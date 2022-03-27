@@ -48,9 +48,8 @@ public:
                     aiProcess_OptimizeGraph | aiProcess_GenNormals |
                     aiProcess_GenUVCoords | aiProcess_CalcTangentSpace |
                     aiProcess_FixInfacingNormals | aiProcess_RemoveRedundantMaterials |
-                    aiProcess_FindInvalidData | aiProcess_TransformUVCoords |
-                    aiProcess_SortByPType | aiProcess_FindDegenerates |
-                    aiProcess_FlipUVs | aiProcess_FlipUVs);
+                    aiProcess_FindInvalidData | aiProcess_FlipUVs | aiProcess_TransformUVCoords |
+                    aiProcess_SortByPType | aiProcess_FindDegenerates);
             if (model == nullptr || (model->mFlags & AI_SCENE_FLAGS_INCOMPLETE) ||
                 model->mRootNode == nullptr || model->mRootNode->mNumMeshes == 0) [[unlikely]] {
                 LUISA_ERROR_WITH_LOCATION(
@@ -83,16 +82,23 @@ public:
             auto ai_positions = mesh->mVertices;
             auto ai_normals = mesh->mNormals;
             auto ai_tex_coords = mesh->mTextureCoords[0];
-            auto ai_tangents = mesh->mTangents;
+            auto ai_bitangents = mesh->mBitangents;
+            if (ai_bitangents == nullptr) {
+                LUISA_WARNING_WITH_LOCATION(
+                    "Invalid tangent space in mesh '{}'.",
+                    path_string);
+            }
             loader._vertices.resize(vertex_count);
-            auto compute_tangent = [ai_tangents](auto i, float3 n) noexcept {
-                if (ai_tangents == nullptr) {
+            auto compute_tangent = [ai_bitangents](auto i, float3 n) noexcept {
+                if (ai_bitangents == nullptr) {
                     auto b = abs(n.x) > abs(n.z) ?
                                  make_float3(-n.y, n.x, 0.0f) :
                                  make_float3(0.0f, -n.z, n.y);
-                    return normalize(cross(b, make_float3(n.x, n.y, n.z)));
+                    return normalize(cross(b, n));
                 }
-                return make_float3(ai_tangents[i].x, ai_tangents[i].y, ai_tangents[i].z);
+                auto bitangent = make_float3(
+                    ai_bitangents[i].x, ai_bitangents[i].y, ai_bitangents[i].z);
+                return normalize(cross(bitangent, n));
             };
             loader._has_uv = ai_tex_coords != nullptr;
             auto compute_uv = [ai_tex_coords](auto i) noexcept {

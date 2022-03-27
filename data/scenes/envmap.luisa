@@ -3,12 +3,13 @@ Film film : Color {
   exposure { 0 }
 }
 
-Camera camera : Pinhole {
+Camera camera : Ortho {
   position { 0, 0, 5 }
   fov { 60 }
   spp { 1024 }
+  zoom { -1 }
   film { @film }
-  file { "../renders/envmap-new.exr" }
+  file { "../renders/envmap.exr" }
   shutter_span { 0, 0 }
   shutter_samples { 128 }
   shutter_weights { 0, 0.2, 0.5, 3.5, 0.5, 0.2, 0 }
@@ -23,71 +24,46 @@ Integrator normal : Normal {}
 Integrator pt : WavePath {
   sampler : Independent {}
   depth { 16 }
-  rr_depth { 5 }
-  display { true }
+  rr_depth { 3 }
+  // display { true }
 }
 
 Shape teapot : Group {
   shapes {
-    // Mesh {
-    //   file { "../meshes/utah-teapot-lid.obj" }
-    //   // surface : Mirror {}
-    //   surface : Disney {
-    //     roughness : ConstGeneric {
-    //       v { 0.5 }
-    //     }
-    //     metallic : ConstGeneric {
-    //       v { 1 }
-    //     }
-    //     base_color : ConstColor {
-    //       color { 1, 1, 1 }
-    //     }
-    //   }
-    // },
     Mesh {
       file { "../meshes/utah-teapot.obj" }
-      // surface : Mirror {
-      //   color : ConstColor {
-      //     color { 1.0, 0.71, 0.29 }
-      //   }
-      // }
       two_sided { false }
-      // surface : Disney {
-      //   color : ConstColor {
-      //     color { 1.0 }
-      //   }
-      //   roughness : ConstGeneric {
-      //     v { 0.2 }
-      //   }
-      //   metallic : ConstGeneric {
-      //     v { 0.5 }
-      //   }
-      //   specular_trans : ConstGeneric {
-      //     v { 1 }
-      //   }
-      //   clearcoat : ConstGeneric {
-      //     v { 1 }
-      //   }
-      //   clearcoat_gloss : ConstGeneric {
-      //     v { 1 }
-      //   }
-      //   thin { false }
-      // }
-      surface : Metal {
-        Kr : ConstColor {
-          // color { 1.0, 0.71, 0.29 }
+      surface : Substrate {
+        color : Constant {
+          v { 1 }
         }
-        Kt : ConstColor {
-          // color { 0.2, 0.3, 0.9 }
-          // color { 0.5, 0.5, 0.5 }
+        Kr : Constant {
+          v { 0.3, 0.7, 1.0 }
         }
-        roughness : ConstGeneric {
-          v { 0.3 }
+        Kd : Constant {
+          v { 0.3, 0.7, 1.0 }
+        }
+        Kt : Constant {
+          v { 1.0 }
+        }
+        Ks : Constant {
+          v { 0.4 }
+          // v { 0.2, 0.3, 0.9 }
+          // v { 0.5, 0.5, 0.5 }
+        }
+        roughness : Constant {
+          v { 0.2 }
+        }
+        metallic : Constant {
+          v { 0.5 }
+        }
+        specular_trans : Constant {
+          v { 1 }
         }
         // remap_roughness { true }
         // eta { 1.7 }
-        // eta { "Sapphire" }
-        eta { "Ti" }
+        eta { "Sapphire" }
+        // eta { "Au" }
         // eta : ConstGeneric {
         //   v { 1.5, 1.52, 1.6 }
         // }
@@ -132,11 +108,11 @@ render {
   shapes { @teapot }
   integrator { @pt }
   environment : Map {
-    emission : Illum {
+    emission : Image {
       // file { "../envmaps/photo_studio_01_1k.hdr" }
       // fp32 { true }
-      // file { "../envmaps/envmap.exr" }
-      file { "/Users/mike/Downloads/dreifaltigkeitsberg_8k.exr" }
+      file { "../envmaps/envmap.exr" }
+      // file { "/Users/mike/Downloads/dreifaltigkeitsberg_8k.exr" }
     }
     transform : SRT {
       rotate { 0, 1, 0, 45 }

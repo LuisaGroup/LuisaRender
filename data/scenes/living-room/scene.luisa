@@ -1,155 +1,156 @@
 
 Surface mat_Dirt : Matte {
-  Kd : ConstColor {
-    color { 0.09850399941205978, 0.04596799984574318, 0.03588699921965599 }
+  Kd : Constant {
+    v { 0.09850399941205978, 0.04596799984574318, 0.03588699921965599 }
   }
 }
 
 Surface mat_Floor : Substrate {
-  Kd : Color {
+  Kd : Image {
     file { "textures/wood.jpg" }
   }
-  Ks : ConstColor {
-    color { 0.04 }
+  Ks : Constant {
+    v { 0.04 }
   }
-  eta : ConstGeneric {
+  eta : Constant {
     v { 1.5 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.3872983346207417 }
   }
 }
 
 Surface mat_TableWood : Substrate {
-  Kd : Color {
+  Kd : Image {
     file { "textures/wood5.jpg" }
   }
-  Ks : ConstColor {
-    color { 0.04 }
+  Ks : Constant {
+    v { 0.04 }
   }
-  eta : ConstGeneric {
+  eta : Constant {
     v { 1.5 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.22360679774997896 }
   }
 }
 
 Surface mat_Sofa : Matte {
-  Kd : ConstColor {
-    color { 1.0, 1.0, 1.0 }
+  Kd : Constant {
+    v { 1.0, 1.0, 1.0 }
   }
 }
 
 Surface mat_SofaLegs : Matte {
-  Kd : ConstColor {
-    color { 0.10000000149011612, 0.10000000149011612, 0.10000000149011612 }
+  Kd : Constant {
+    v { 0.10000000149011612, 0.10000000149011612, 0.10000000149011612 }
   }
 }
 
 Surface mat_Walls : Matte {
-  Kd : ConstColor {
-    color { 0.10000000149011612, 0.10000000149011612, 0.10000000149011612 }
+  Kd : Constant {
+    v { 0.10000000149011612, 0.10000000149011612, 0.10000000149011612 }
   }
 }
 
 Surface mat_Paneling : Substrate {
-  Kd : ConstColor {
-    color { 0.800000011920929, 0.800000011920929, 0.800000011920929 }
+  Kd : Constant {
+    v { 0.800000011920929, 0.800000011920929, 0.800000011920929 }
   }
-  Ks : ConstColor {
-    color { 0.04 }
+  Ks : Constant {
+    v { 0.04 }
   }
-  eta : ConstGeneric {
+  eta : Constant {
     v { 1.5 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.4472135954999579 }
   }
 }
 
 Surface mat_Mirror : Mirror {
-  color : ConstColor {
-    color { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
+  color : Constant {
+    v { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
   }
 }
 
 Surface mat_BrushedStainlessSteel : Metal {
   eta { "Al" }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.1414213562373095 }
   }
 }
 
 Surface mat_MattePaint : Matte {
-  Kd : ConstColor {
-    color { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
+  Kd : Constant {
+    v { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
   }
 }
 
 Surface mat_Painting : Matte {
-  Kd : Color {
+  Kd : Image {
     file { "textures/picture8.jpg" }
   }
 }
 
 Surface mat_PaintingBack : Matte {
-  Kd : ConstColor {
-    color { 0.25999999046325684, 0.25, 0.14000000059604645 }
+  Kd : Constant {
+    v { 0.25999999046325684, 0.25, 0.14000000059604645 }
   }
 }
 
 Surface mat_Glass : Glass {
-  Kr : ConstColor {
-    color { 1 }
+  Kr : Constant {
+    v { 1 }
   }
-  Kt : ConstColor {
-    color { 1.0, 1.0, 1.0 }
+  Kt : Constant {
+    v { 1.0, 1.0, 1.0 }
   }
-  eta : ConstGeneric {
+  eta : Constant {
     v { 1.5 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.001 }
   }
 }
 
 Surface mat_PlantPot : Matte {
-  Kd : ConstColor {
-    color { 0.10000000149011612, 0.10000000149011612, 0.10000000149011612 }
+  Kd : Constant {
+    v { 0.10000000149011612, 0.10000000149011612, 0.10000000149011612 }
   }
 }
 
 Surface mat_FireplaceGlass : Mirror {
-  color : ConstColor {
-    color { 0.10000000149011612, 0.10000000149011612, 0.10000000149011612 }
+  color : Constant {
+    v { 0.10000000149011612, 0.10000000149011612, 0.10000000149011612 }
   }
 }
 
 Surface mat_Transluscent : Matte {
-  Kd : ConstColor {
-    color { 0.8999999761581421, 0.8999999761581421, 0.8999999761581421 }
+  Kd : Constant {
+    v { 0.8999999761581421, 0.8999999761581421, 0.8999999761581421 }
   }
 }
 
 Surface mat_Leaves : Matte {
-  Kd : Color {
+  Kd : Image {
     file { "textures/leaf.png" }
   }
-  alpha : Generic {
+  alpha : Image {
     file { "textures/leaf-alpha.png" }
+    encoding { "linear" }
   }
 }
 
 Surface mat_Branches : Matte {
-  Kd : ConstColor {
-    color { 0.160443514585495, 0.08241420984268188, 0.019917838275432587 }
+  Kd : Constant {
+    v { 0.160443514585495, 0.08241420984268188, 0.019917838275432587 }
   }
 }
 
 Surface mat_BottleCap : Matte {
-  Kd : ConstColor {
-    color { 0.4562634229660034, 0.0, 0.0 }
+  Kd : Constant {
+    v { 0.4562634229660034, 0.0, 0.0 }
   }
 }
 
@@ -1001,7 +1002,7 @@ Shape shape_64 : Mesh {
 }
 
 Env env : Map {
-  emission : Illum {
+  emission : Image {
     file { "textures/Sky 19.exr" }
   }
   transform : SRT {
@@ -1021,15 +1022,12 @@ Camera camera : Pinhole {
   film : Color {
     resolution { 1280, 720 }
   }
-  file { "color-wavefront.exr" }
+  file { "color.exr" }
 }
 
 render {
   cameras { @camera }
-  integrator : WavePath {
-    // display { true }
-    depth { 12 }
-  }
+  integrator : WavePath {}
   shapes {
     @shape_0,
     @shape_1,

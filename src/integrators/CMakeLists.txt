@@ -1,5 +1,5 @@
 add_library(luisa-render-integrators INTERFACE)
 luisa_render_add_plugin(normal CATEGORY integrator SOURCES normal.cpp)
-luisa_render_add_plugin(megapathgrad CATEGORY integrator SOURCES mega_path_grad.cpp)
+#luisa_render_add_plugin(megapathgrad CATEGORY integrator SOURCES mega_path_grad.cpp)
 luisa_render_add_plugin(megapath CATEGORY integrator SOURCES mega_path.cpp)
 luisa_render_add_plugin(wavepath CATEGORY integrator SOURCES wave_path.cpp)

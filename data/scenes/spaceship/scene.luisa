@@ -1,125 +1,125 @@
 
 Surface mat_Backdrop : Matte {
-  Kd : ConstColor {
-    color { 0.10000000149011612, 0.10000000149011612, 0.10000000149011612 }
+  Kd : Constant {
+    v { 0.10000000149011612, 0.10000000149011612, 0.10000000149011612 }
   }
 }
 
 Surface mat_RoughAluminium : Metal {
   eta { "Al" }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.31622776601683794 }
   }
 }
 
 Surface mat_RoughSteel : Metal {
   eta { 360, 2.0, 0.0, 830, 2.0, 0.0 }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.31622776601683794 }
   }
 }
 
 Surface mat_DarkPlastic : Substrate {
-  Kd : ConstColor {
-    color { 0.009999999776482582, 0.009999999776482582, 0.009999999776482582 }
+  Kd : Constant {
+    v { 0.009999999776482582, 0.009999999776482582, 0.009999999776482582 }
   }
-  Ks : ConstColor {
-    color { 0.04 }
+  Ks : Constant {
+    v { 0.04 }
   }
-  eta : ConstGeneric {
+  eta : Constant {
     v { 1.5 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.4472135954999579 }
   }
 }
 
 Surface mat_PinkLeather : Substrate {
-  Kd : ConstColor {
-    color { 0.25600001215934753, 0.013000000268220901, 0.07999999821186066 }
+  Kd : Constant {
+    v { 0.25600001215934753, 0.013000000268220901, 0.07999999821186066 }
   }
-  Ks : ConstColor {
-    color { 0.04 }
+  Ks : Constant {
+    v { 0.04 }
   }
-  eta : ConstGeneric {
+  eta : Constant {
     v { 1.5 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.6324555320336759 }
   }
 }
 
 Surface mat_Leather : Substrate {
-  Kd : ConstColor {
-    color { 0.03400000184774399, 0.014000000432133675, 0.00800000037997961 }
+  Kd : Constant {
+    v { 0.03400000184774399, 0.014000000432133675, 0.00800000037997961 }
   }
-  Ks : ConstColor {
-    color { 0.04 }
+  Ks : Constant {
+    v { 0.04 }
   }
-  eta : ConstGeneric {
+  eta : Constant {
     v { 1.5 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.6324555320336759 }
   }
 }
 
 Surface mat_RedLeather : Substrate {
-  Kd : ConstColor {
-    color { 0.16300000250339508, 0.029999999329447746, 0.03700000047683716 }
+  Kd : Constant {
+    v { 0.16300000250339508, 0.029999999329447746, 0.03700000047683716 }
   }
-  Ks : ConstColor {
-    color { 0.04 }
+  Ks : Constant {
+    v { 0.04 }
   }
-  eta : ConstGeneric {
+  eta : Constant {
     v { 1.5 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.6324555320336759 }
   }
 }
 
 Surface mat_BrightPinkLeather : Substrate {
-  Kd : ConstColor {
-    color { 0.7720000147819519, 0.17499999701976776, 0.2619999945163727 }
+  Kd : Constant {
+    v { 0.7720000147819519, 0.17499999701976776, 0.2619999945163727 }
   }
-  Ks : ConstColor {
-    color { 0.04 }
+  Ks : Constant {
+    v { 0.04 }
   }
-  eta : ConstGeneric {
+  eta : Constant {
     v { 1.5 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.6324555320336759 }
   }
 }
 
 Surface mat_Glass : Glass {
-  Kr : ConstColor {
-    color { 1 }
+  Kr : Constant {
+    v { 1 }
   }
-  Kt : ConstColor {
-    color { 1.0, 1.0, 1.0 }
+  Kt : Constant {
+    v { 1.0, 1.0, 1.0 }
   }
-  eta : ConstGeneric {
+  eta : Constant {
     v { 1.5 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.1 }
   }
 }
 
 Surface mat_DarkRubber : Substrate {
-  Kd : ConstColor {
-    color { 0.02500000037252903, 0.02500000037252903, 0.02500000037252903 }
+  Kd : Constant {
+    v { 0.02500000037252903, 0.02500000037252903, 0.02500000037252903 }
   }
-  Ks : ConstColor {
-    color { 0.04 }
+  Ks : Constant {
+    v { 0.04 }
   }
-  eta : ConstGeneric {
+  eta : Constant {
     v { 1.5 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.6324555320336759 }
   }
 }
@@ -223,9 +223,8 @@ Shape shape_7 : Mesh {
   file { "models/Mesh043.obj" }
   surface { @mat_Black }
   light : Diffuse {
-    emission : ConstIllum {
-      emission { 20.0, 3.0, 3.0 }
-      scale { 8 }
+    emission : Constant {
+      v { 20.0, 3.0, 3.0 }
     }
   }
   transform : Matrix {
@@ -372,8 +371,8 @@ Shape shape_18 : Mesh {
   file { "models/Mesh029.obj" }
   surface { @mat_Null }
   light : Diffuse {
-    emission : ConstIllum {
-      emission { 3.886280059814453, 3.772550106048584, 3.4313700199127197 }
+    emission : Constant {
+      v { 3.886280059814453, 3.772550106048584, 3.4313700199127197 }
     }
   }
   transform : Matrix {
@@ -1287,8 +1286,8 @@ Shape shape_88 : Mesh {
   file { "models/square.obj" }
   surface { @mat_Null }
   light : Diffuse {
-    emission : ConstIllum {
-      emission { 9.0, 9.0, 10.0 }
+    emission : Constant {
+      v { 9.0, 9.0, 10.0 }
     }
   }
   transform : Matrix {
@@ -1305,8 +1304,8 @@ Shape shape_89 : Mesh {
   file { "models/square.obj" }
   surface { @mat_Null }
   light : Diffuse {
-    emission : ConstIllum {
-      emission { 9.0, 9.0, 10.0 }
+    emission : Constant {
+      v { 9.0, 9.0, 10.0 }
     }
   }
   transform : Matrix {
@@ -1320,11 +1319,13 @@ Shape shape_89 : Mesh {
 }
 
 Env env : Map {
-  emission : ConstIllum {
-    emission { 0.2 }
+  emission : Constant {
+    v { 0.30000001192092896, 0.30000001192092896, 0.30000001192092896 }
+  }
+  transform : SRT {
+    rotate { 0, 1, 0, -90 }
   }
 }
-
 
 Shape shape_91 : Mesh {
   file { "models/square.obj" }
@@ -1344,21 +1345,19 @@ Camera camera : Pinhole {
   front { 0.13595250248908997, -0.05167683959007263, -0.9893665909767151 }
   up { 0.0, 1.0, 0.0 }
   fov { 35.98339777135762 }
-  spp { 4096 }
+  spp { 1024 }
   filter : Gaussian {
     radius { 1 }
   }
   film : Color {
-    file { "color.exr" }
     resolution { 1280, 720 }
   }
+  file { "color.exr" }
 }
 
 render {
   cameras { @camera }
-  integrator : MegaPath {
-    display { true }
-  }
+  integrator : MegaPath {}
   shapes {
     @shape_0,
     @shape_1,

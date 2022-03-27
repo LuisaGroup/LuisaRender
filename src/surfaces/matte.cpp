@@ -23,21 +23,8 @@ public:
     MatteSurface(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Surface{scene, desc},
           _kd{scene->load_texture(desc->property_node_or_default(
-              "Kd", SceneNodeDesc::shared_default_texture("ConstColor")))},
-          _sigma{scene->load_texture(desc->property_node_or_default("sigma"))} {
-        if (_kd->category() != Texture::Category::COLOR) [[unlikely]] {
-            LUISA_ERROR(
-                "Non-color textures are not "
-                "allowed in MatteSurface::Kd. [{}]",
-                desc->source_location().string());
-        }
-        if (_sigma != nullptr && _sigma->category() != Texture::Category::GENERIC) [[unlikely]] {
-            LUISA_ERROR(
-                "Non-generic textures are not "
-                "allowed in MatteSurface::sigma. [{}]",
-                desc->source_location().string());
-        }
-    }
+              "Kd", SceneNodeDesc::shared_default_texture("Constant")))},
+          _sigma{scene->load_texture(desc->property_node_or_default("sigma"))} {}
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
 
 private:
@@ -60,7 +47,7 @@ public:
         const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
 
     [[nodiscard]] auto Kd() const noexcept { return _kd; }
-    [[nodiscard]] auto Sigma() const noexcept { return _sigma; }
+    [[nodiscard]] auto sigma() const noexcept { return _sigma; }
 };
 
 luisa::unique_ptr<Surface::Instance> MatteSurface::_build(
@@ -73,47 +60,53 @@ luisa::unique_ptr<Surface::Instance> MatteSurface::_build(
 class MatteClosure final : public Surface::Closure {
 
 private:
-    OrenNayar _oren_nayar;
+    luisa::unique_ptr<OrenNayar> _oren_nayar;
 
 public:
     MatteClosure(
         const Surface::Instance *instance,
         const Interaction &it, const SampledWavelengths &swl,
-        Expr<float> time, Expr<float4> albedo, Expr<float> sigma) noexcept
+        Expr<float> time, SampledSpectrum albedo, Expr<float> sigma) noexcept
         : Surface::Closure{instance, it, swl, time},
-          _oren_nayar{albedo, sigma} {}
+          _oren_nayar{luisa::make_unique<OrenNayar>(std::move(albedo), sigma)} {}
 
 private:
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
         auto wo_local = _it.wo_local();
         auto wi_local = _it.shading().world_to_local(wi);
-        auto f = _oren_nayar.evaluate(wo_local, wi_local);
-        auto pdf = _oren_nayar.pdf(wo_local, wi_local);
-        return {.f = f, .pdf = pdf, .alpha = make_float2(1.f), .eta = make_float4(1.f)};
+        auto f = _oren_nayar->evaluate(wo_local, wi_local);
+        auto pdf = _oren_nayar->pdf(wo_local, wi_local);
+        return {.f = f,
+                .pdf = pdf,
+                .alpha = make_float2(1.f),
+                .eta = SampledSpectrum{_swl.dimension(), 1.f}};
     }
     [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
         auto wo_local = _it.wo_local();
         auto wi_local = def(make_float3(0.0f, 0.0f, 1.0f));
         auto u = sampler.generate_2d();
         auto pdf = def(0.f);
-        auto f = _oren_nayar.sample(wo_local, &wi_local, u, &pdf);
+        auto f = _oren_nayar->sample(wo_local, &wi_local, u, &pdf);
         auto wi = _it.shading().local_to_world(wi_local);
-        return {.wi = wi, .eval = {.f = f, .pdf = pdf, .alpha = make_float2(1.f), .eta = make_float4(1.f)}};
+        return {.wi = wi,
+                .eval = {.f = f,
+                         .pdf = pdf,
+                         .alpha = make_float2(1.f),
+                         .eta = SampledSpectrum{_swl.dimension(), 1.f}}};
     }
-
-    void backward(Expr<float3> wi, Expr<float4> grad) const noexcept override {
+    void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
         auto _instance = instance<MatteInstance>();
         auto requires_grad_kd = _instance->Kd()->node()->requires_gradients();
-        auto requires_grad_sigma = _instance->Sigma() != nullptr &&
-                                   _instance->Sigma()->node()->requires_gradients();
+        auto requires_grad_sigma = _instance->sigma() != nullptr &&
+                                   _instance->sigma()->node()->requires_gradients();
         if (requires_grad_kd || requires_grad_sigma) {
             auto wo_local = _it.wo_local();
             auto wi_local = _it.shading().world_to_local(wi);
-            auto grad_params = _oren_nayar.grad(wo_local, wi_local);
-
-            _instance->Kd()->backward(_it, _swl, _time, grad_params["d_r"] * grad);
-            if (auto sigma = _instance->Sigma()) {
-                sigma->backward(_it, _swl, _time, grad_params["d_sigma"] * grad);
+            auto grad = _oren_nayar->backward(wo_local, wi_local, df);
+            auto R = _instance->Kd()->evaluate(_it, _time).xyz();
+            _instance->Kd()->backward_albedo_spectrum(_it, _swl, _time, grad.dR);
+            if (auto sigma = _instance->sigma()) {
+                sigma->backward(_it, _time, make_float4(grad.dSigma, 0.f, 0.f, 0.f));
             }
         }
     }
@@ -121,8 +114,8 @@ private:
 
 luisa::unique_ptr<Surface::Closure> MatteInstance::closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    auto Kd = _kd->evaluate(it, swl, time).value;
-    auto sigma = _sigma ? clamp(_sigma->evaluate(it, swl, time).value.x, 0.f, 90.f) : 0.f;
+    auto Kd = _kd->evaluate_albedo_spectrum(it, swl, time);
+    auto sigma = _sigma ? clamp(_sigma->evaluate(it, time).x, 0.f, 90.f) : 0.f;
     return luisa::make_unique<MatteClosure>(this, it, swl, time, Kd, sigma);
 }
 

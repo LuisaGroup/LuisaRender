@@ -15,7 +15,8 @@ using namespace luisa::compute;
 class ColorFilm final : public Film {
 
 private:
-    float3 _scale;
+    float _scale[3]{};
+    float _clamp{};
 
 public:
     ColorFilm(Scene *scene, const SceneNodeDesc *desc) noexcept
@@ -28,8 +29,10 @@ public:
         _scale[0] = std::pow(2.0f, exposure.x);
         _scale[1] = std::pow(2.0f, exposure.y);
         _scale[2] = std::pow(2.0f, exposure.z);
+        _clamp = std::max(1.f, desc->property_float_or_default("clamp", 1024.f));
     }
-    [[nodiscard]] auto scale() const noexcept { return _scale; }
+    [[nodiscard]] auto scale() const noexcept { return make_float3(_scale[0], _scale[1], _scale[2]); }
+    [[nodiscard]] auto clamp() const noexcept { return _clamp; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
@@ -84,7 +87,7 @@ void ColorFilmInstance::download(CommandBuffer &command_buffer, float4 *framebuf
 void ColorFilmInstance::accumulate(Expr<uint2> pixel, Expr<float3> rgb) const noexcept {
     $if(!any(isnan(rgb))) {
         auto pixel_id = pixel.y * node()->resolution().x + pixel.x;
-        auto threshold = 16384.0f;
+        auto threshold = node<ColorFilm>()->clamp();
         auto lum = srgb_to_cie_y(rgb);
         auto c = rgb * (threshold / max(lum, threshold));
         for (auto i = 0u; i < 3u; i++) {

@@ -1,38 +1,38 @@
 Surface bing-white : Substrate {
-  Kd : Color {
+  Kd : Image {
     file { "bingdwendwen/body.jpg" }
   }
-  Ks : ConstColor {
-    color { 0.04 }
+  Ks : Constnant {
+    v { 0.04 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.3 }
   }
 }
 
 Surface bing-black : Matte {
-  Kd : ConstColor {
-    color { 0.3 }
+  Kd : Constant {
+    v { 0.3 }
   }
 }
 
 Surface bing-glass : Glass {
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.01 }
   }
-  Kt : ConstColor {
-    color { 0.9, 0.95, 1.0 }
+  Kt : Constant {
+    v { 0.9, 0.95, 1.0 }
   }
 }
 
 Surface bing-colorful : Substrate {
-  Kd : Color {
+  Kd : Image {
     file { "bingdwendwen/ring.jpg" }
   }
-  Ks : ConstColor {
-    color { 0.04 }
+  Ks : Constant {
+    v { 0.04 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.2 }
   }
 }

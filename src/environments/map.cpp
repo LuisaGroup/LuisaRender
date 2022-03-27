@@ -29,15 +29,8 @@ public:
     EnvironmentMapping(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Environment{scene, desc},
           _emission{scene->load_texture(desc->property_node_or_default(
-              "emission", SceneNodeDesc::shared_default_texture("ConstIllum")))},
-          _scale{std::max(desc->property_float_or_default("scale", 1.0f), 0.0f)} {
-        if (_emission->category() != Texture::Category::ILLUMINANT) [[unlikely]] {
-            LUISA_ERROR(
-                "Non-illuminant textures are not "
-                "allowed in environment mapping. [{}]",
-                desc->source_location().string());
-        }
-    }
+              "emission", SceneNodeDesc::shared_default_texture("Constant")))},
+          _scale{std::max(desc->property_float_or_default("scale", 1.0f), 0.0f)} {}
     [[nodiscard]] auto scale() const noexcept { return _scale; }
     [[nodiscard]] auto emission() const noexcept { return _emission; }
     [[nodiscard]] bool is_black() const noexcept override { return _scale == 0.0f || _emission->is_black(); }
@@ -75,7 +68,7 @@ private:
         auto env = node<EnvironmentMapping>();
         auto uv = EnvironmentMapping::direction_to_uv(wi_local);
         Interaction it{-wi_local, uv};
-        auto L = _texture->evaluate(it, swl, time).value;
+        auto L = _texture->evaluate_illuminant_spectrum(it, swl, time);
         return L * env->scale();
     }
 
@@ -147,7 +140,7 @@ unique_ptr<Environment::Instance> EnvironmentMapping::build(
                       make_float2(sample_map_size);
             auto w = EnvironmentMapping::uv_to_direction(uv);
             auto it = Interaction{-w, uv};
-            auto scale = texture->evaluate(it, {}, 0.f).scale;
+            auto scale = srgb_to_cie_y(texture->evaluate(it, 0.f).xyz());
             auto sin_theta = sin(uv.y * pi);
             auto pixel_id = coord.y * sample_map_size.x + coord.x;
             scale_map_device.write(pixel_id, sin_theta * scale);

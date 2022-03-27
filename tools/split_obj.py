@@ -38,8 +38,8 @@ if __name__ == "__main__":
                 vn.append(line)
             elif line.startswith("vt "):
                 vt.append(line)
-            elif line.startswith("g "):
-                name = line.split()[1]
+            elif line.startswith("usemtl "):
+                name = f"Mesh.{len(meshes):05}.{'.'.join(line.split()[1:])}"
                 meshes[name] = []
             elif line.startswith("f "):
                 # v/vt/vn

@@ -35,7 +35,12 @@ function(luisa_render_add_plugin name)
     add_library(${lib_name} MODULE ${PLUGIN_SOURCES})
     target_link_libraries(${lib_name} PRIVATE luisa-render-util luisa-render-base)
     target_compile_definitions(${lib_name} PRIVATE LUISA_RENDER_PLUGIN_NAME="${name}")
-    add_dependencies(luisa-render-${PLUGIN_CATEGORY}s ${lib_name})
+    if (${PLUGIN_CATEGORY} STREQUAL "spectrum")
+        set(plugin_lib_name luisa-render-spectra)
+    else ()
+        set(plugin_lib_name luisa-render-${PLUGIN_CATEGORY}s)
+    endif ()
+    add_dependencies(${plugin_lib_name} ${lib_name})
     set_target_properties(${lib_name} PROPERTIES
             LIBRARY_OUTPUT_DIRECTORY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/"
             RUNTIME_OUTPUT_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/"
@@ -52,6 +57,7 @@ endfunction()
 add_subdirectory(films)
 add_subdirectory(shapes)
 add_subdirectory(lights)
+add_subdirectory(spectra)
 add_subdirectory(cameras)
 add_subdirectory(filters)
 add_subdirectory(textures)
@@ -74,6 +80,7 @@ target_link_libraries(luisa-render INTERFACE
         luisa-render-shapes
         luisa-render-lights
         luisa-render-filters
+        luisa-render-spectra
         luisa-render-cameras
         luisa-render-textures
         luisa-render-samplers

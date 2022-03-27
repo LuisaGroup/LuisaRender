@@ -3,11 +3,8 @@ add_library(luisa-render-util SHARED
         frame.cpp frame.h
         imageio.cpp imageio.h
         xform.cpp xform.h
-        spectrum.cpp spectrum.h
-        spectrum_cie_xyz.inl.h
-        spectrum_cie_illum_d65.inl.h
+        spec.cpp spec.h
         colorspace.h
-        srgb2spec.cpp
         half.h
         u64.h
         rng.cpp rng.h

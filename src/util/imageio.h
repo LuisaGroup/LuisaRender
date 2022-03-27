@@ -67,6 +67,7 @@ public:
     [[nodiscard]] explicit operator bool() const noexcept { return _pixels != nullptr; }
     [[nodiscard]] static LoadedImage load(const std::filesystem::path &path) noexcept;
     [[nodiscard]] static LoadedImage load(const std::filesystem::path &path, storage_type storage) noexcept;
+    [[nodiscard]] static storage_type parse_storage(const std::filesystem::path &path) noexcept;
 };
 
 class TiledMipmap {

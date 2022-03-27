@@ -18,39 +18,39 @@ Camera camera : Pinhole {
 }
 
 Surface cbox-white : Matte {
-  color : ConstColor {
-    color { 0.725, 0.71, 0.68 }
+  color : Constant {
+    v { 0.725, 0.71, 0.68 }
   }
-  Kd : ConstColor {
-    color { 0.725, 0.71, 0.68 }
+  Kd : Constant {
+    v { 0.725, 0.71, 0.68 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 1 }
   }
 }
 
 Surface cbox-red : Matte {
-  color : ConstColor {
-    color { 0.63, 0.065, 0.05 }
+  color : Constant {
+    v { 0.63, 0.065, 0.05 }
   }
-  Kd : ConstColor {
-    // color { 0.63, 0.065, 0.05 }
-    color { 0.14, 0.45, 0.091 }
+  Kd : Constant {
+    // v { 0.63, 0.065, 0.05 }
+    v { 0.14, 0.45, 0.091 }
     requires_grad { true }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 1 }
   }
 }
 
 Surface cbox-green : Matte {
-  color : ConstColor {
-    color { 0.14, 0.45, 0.091 }
+  color : Constant {
+    v { 0.14, 0.45, 0.091 }
   }
-  Kd : ConstColor {
-    color { 0.14, 0.45, 0.091 }
+  Kd : Constant {
+    v { 0.14, 0.45, 0.091 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 1 }
   }
 }
@@ -75,27 +75,6 @@ Shape cbox-right-wall : Mesh {
   surface { @cbox-green }
 }
 
-Surface cbox-brick : Matte {
-  Kd : Color {
-    file { "../textures/brickwall.jpg" }
-    gamma { 0.5 }
-    encoding { "gamma" }
-  }
-  sigma : ConstGeneric {
-    v { 10 }
-  }
-  normal : Generic {
-    file { "../textures/brickwall_normal.jpg" }
-  }
-}
-
-Surface cbox-metal : Metal {
-  eta { "Au" }
-  roughness : ConstGeneric {
-    v { 0.2 }
-  }
-}
-
 Shape cbox-back-wall : Mesh {
   file { "../meshes/cbox-parts/back-wall.obj" }
   surface { @cbox-white }
@@ -114,8 +93,8 @@ Shape cbox-short-box : Mesh {
 Shape cbox-light : Mesh {
   file { "../meshes/cbox-parts/light.obj" }
   light : Diffuse {
-    emission : ConstIllum {
-      emission { 51.0, 36.0, 12.0 }
+    emission : Constant {
+      v { 51.0, 36.0, 12.0 }
     }
   }
 }
@@ -136,6 +115,7 @@ Shape cbox : Group {
 Integrator pt : MegaPathGrad {
   sampler : Independent {}
   depth { 10 }
+  spectrum : sRGB {}
 }
 
 Integrator normal : Normal {}

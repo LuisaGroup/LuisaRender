@@ -1,212 +1,212 @@
 
 Surface mat_WoodFloor : Substrate {
-  Kd : Color {
+  Kd : Image {
     file { "textures/WoodFloor.jpg" }
   }
-  Ks : ConstColor {
-    color { 0.04 }
+  Ks : Constant {
+    v { 0.04 }
   }
-  eta : ConstGeneric {
+  eta : Constant {
     v { 1.5 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.31622776601683794 }
   }
 }
 
 Surface mat_WoodStairs : Substrate {
-  Kd : Color {
+  Kd : Image {
     file { "textures/WoodPanel.jpg" }
   }
-  Ks : ConstColor {
-    color { 0.04 }
+  Ks : Constant {
+    v { 0.04 }
   }
-  eta : ConstGeneric {
+  eta : Constant {
     v { 1.5 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.31622776601683794 }
   }
 }
 
 Surface mat_WoodChair : Substrate {
-  Kd : Color {
+  Kd : Image {
     file { "textures/Wood.jpg" }
   }
-  Ks : ConstColor {
-    color { 0.04 }
+  Ks : Constant {
+    v { 0.04 }
   }
-  eta : ConstGeneric {
+  eta : Constant {
     v { 1.5 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.31622776601683794 }
   }
 }
 
 Surface mat_WoodLamp : Substrate {
-  Kd : Color {
+  Kd : Image {
     file { "textures/WoodChair.jpg" }
   }
-  Ks : ConstColor {
-    color { 0.04 }
+  Ks : Constant {
+    v { 0.04 }
   }
-  eta : ConstGeneric {
+  eta : Constant {
     v { 1.5 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.31622776601683794 }
   }
 }
 
 Surface mat_Lampshade : Matte {
-  Kd : Color {
+  Kd : Image {
     file { "textures/Fabric.jpg" }
   }
 }
 
 Surface mat_Brass : Metal {
   eta { "VN" }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.31622776601683794 }
   }
 }
 
 Surface mat_BrushedAluminium : Metal {
   eta { "Al" }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.31622776601683794 }
   }
 }
 
 Surface mat_ChairSeat : Matte {
-  Kd : ConstColor {
-    color { 0.11764699965715408, 0.05490199849009514, 0.06666669994592667 }
+  Kd : Constant {
+    v { 0.11764699965715408, 0.05490199849009514, 0.06666669994592667 }
   }
 }
 
 Surface mat_Glass : Glass {
-  Kr : ConstColor {
-    color { 1 }
+  Kr : Constant {
+    v { 1 }
   }
-  Kt : ConstColor {
-    color { 1.0, 1.0, 1.0 }
+  Kt : Constant {
+    v { 1.0, 1.0, 1.0 }
   }
-  eta : ConstGeneric {
+  eta : Constant {
     v { 1.5 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.001 }
   }
 }
 
 Surface mat_MagnoliaPaint : Substrate {
-  Kd : ConstColor {
-    color { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
+  Kd : Constant {
+    v { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
   }
-  Ks : ConstColor {
-    color { 0.04 }
+  Ks : Constant {
+    v { 0.04 }
   }
-  eta : ConstGeneric {
+  eta : Constant {
     v { 1.5 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.31622776601683794 }
   }
 }
 
 Surface mat_WhitePaint : Substrate {
-  Kd : ConstColor {
-    color { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
+  Kd : Constant {
+    v { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
   }
-  Ks : ConstColor {
-    color { 0.04 }
+  Ks : Constant {
+    v { 0.04 }
   }
-  eta : ConstGeneric {
+  eta : Constant {
     v { 1.5 }
   }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.4472135954999579 }
   }
 }
 
 Surface mat_Painting1 : Matte {
-  Kd : Color {
+  Kd : Image {
     file { "textures/Painting1.jpg" }
   }
 }
 
 Surface mat_Painting2 : Matte {
-  Kd : Color {
+  Kd : Image {
     file { "textures/Painting2.jpg" }
   }
 }
 
 Surface mat_Painting3 : Matte {
-  Kd : Color {
+  Kd : Image {
     file { "textures/Painting3.jpg" }
   }
 }
 
 Surface mat_Black : Matte {
-  Kd : ConstColor {
-    color { 0.009999999776482582, 0.009999999776482582, 0.009999999776482582 }
+  Kd : Constant {
+    v { 0.009999999776482582, 0.009999999776482582, 0.009999999776482582 }
   }
 }
 
 Surface mat_StainlessSteel : Metal {
   eta { "Al" }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.001 }
   }
 }
 
 Surface mat_Emission : Matte {
-  Kd : ConstColor {
-    color { 1.0, 1.0, 1.0 }
+  Kd : Constant {
+    v { 1.0, 1.0, 1.0 }
   }
 }
 
 Surface mat_Candles : Matte {
-  Kd : ConstColor {
-    color { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
+  Kd : Constant {
+    v { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
   }
 }
 
 Surface mat_Gold : Metal {
   eta { "Au" }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.001 }
   }
 }
 
 Surface mat_WhitePaint2 : Matte {
-  Kd : ConstColor {
-    color { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
+  Kd : Constant {
+    v { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
   }
 }
 
 Surface mat_White : Matte {
-  Kd : ConstColor {
-    color { 0.6915349960327148, 0.6915349960327148, 0.6915349960327148 }
+  Kd : Constant {
+    v { 0.6915349960327148, 0.6915349960327148, 0.6915349960327148 }
   }
 }
 
 Surface mat_WhitePlastic : Matte {
-  Kd : ConstColor {
-    color { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
+  Kd : Constant {
+    v { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
   }
 }
 
 Surface mat_Copper : Metal {
   eta { "Li" }
-  roughness : ConstGeneric {
+  roughness : Constant {
     v { 0.001 }
   }
 }
 
 Surface mat_Wallpaper : Matte {
-  Kd : Color {
+  Kd : Image {
     file { "textures/Wallpaper.jpg" }
   }
 }
@@ -10279,8 +10279,8 @@ Shape shape_774 : Mesh {
   file { "models/square.obj" }
   surface { @mat_Null }
   light : Diffuse {
-    emission : ConstIllum {
-      emission { 30.0, 30.0, 30.0 }
+    emission : Constant {
+      v { 30.0, 30.0, 30.0 }
     }
   }
   transform : Matrix {
@@ -10305,12 +10305,14 @@ Camera camera : Pinhole {
   film : Color {
     resolution { 720, 1280 }
   }
-  file { "color.exr" }
+  file { "color-wave-spectral.exr" }
 }
 
 render {
   cameras { @camera }
-  integrator : WavePath {}
+  integrator : WavePath {
+    spectrum : Hero {}
+  }
   shapes {
     @shape_0,
     @shape_1,

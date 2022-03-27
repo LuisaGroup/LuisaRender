@@ -35,7 +35,7 @@ namespace luisa::render {
             FreeEXRErrorMessage(err);
         }
         LUISA_ERROR_WITH_LOCATION(
-            "Failed to parse OpenEXR image '{}': {}.",
+            "Failed to parse OpenEXR image '{}': {}",
             filename, error);
     }
     return exr_header;
@@ -323,6 +323,78 @@ LoadedImage LoadedImage::load(const std::filesystem::path &path, LoadedImage::st
     LUISA_ERROR_WITH_LOCATION(
         "Invalid pixel storage: {:02x}.",
         luisa::to_underlying(storage));
+}
+
+LoadedImage::storage_type LoadedImage::parse_storage(const std::filesystem::path &path) noexcept {
+    auto ext = path.extension().string();
+    auto path_string = path.string();
+    for (auto &c : ext) { c = static_cast<char>(tolower(c)); }
+    auto storage = storage_type::FLOAT4;
+    auto size = make_uint2();
+    if (ext == ".exr") {
+        auto exr_header = parse_exr_header(path_string.c_str());
+        if (auto t = exr_header.pixel_types[0];
+            t == TINYEXR_PIXELTYPE_UINT) {
+            if (exr_header.num_channels == 1u) {
+                storage = storage_type::INT1;
+            } else if (exr_header.num_channels == 2u) {
+                storage = storage_type::INT2;
+            } else {
+                storage = storage_type::INT4;
+            }
+        } else if (t == TINYEXR_PIXELTYPE_HALF) {
+            if (exr_header.num_channels == 1u) {
+                storage = storage_type::HALF1;
+            } else if (exr_header.num_channels == 2u) {
+                storage = storage_type::HALF2;
+            } else {
+                storage = storage_type::HALF4;
+            }
+        } else {
+            if (exr_header.num_channels == 1u) {
+                storage = storage_type::FLOAT1;
+            } else if (exr_header.num_channels == 2u) {
+                storage = storage_type::FLOAT2;
+            }
+        }
+        FreeEXRHeader(&exr_header);
+    } else if (ext == ".hdr") {
+        storage = storage_type::HALF4;
+    } else {
+        auto p = path_string.c_str();
+        auto file = fopen(p, "rb");
+        if (file == nullptr) {
+            LUISA_ERROR_WITH_LOCATION(
+                "Failed to open image '{}'.",
+                path_string);
+        }
+        auto width = 0, height = 0, channels = 0;
+        if (!stbi_info_from_file(file, &width, &height, &channels)) [[unlikely]] {
+            fclose(file);
+            LUISA_ERROR_WITH_LOCATION(
+                "Failed to parse info from image '{}': {}.",
+                path_string, stbi_failure_reason());
+        }
+        if (stbi_is_16_bit_from_file(file)) {
+            if (channels == 1) {
+                storage = storage_type::SHORT1;
+            } else if (channels == 2) {
+                storage = storage_type::SHORT2;
+            } else {
+                storage = storage_type::SHORT4;
+            }
+        } else {
+            if (channels == 1) {
+                storage = storage_type::BYTE1;
+            } else if (channels == 2) {
+                storage = storage_type::BYTE2;
+            } else {
+                storage = storage_type::BYTE4;
+            }
+        }
+        fclose(file);
+    }
+    return storage;
 }
 
 LoadedImage LoadedImage::load(const std::filesystem::path &path) noexcept {

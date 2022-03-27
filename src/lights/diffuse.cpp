@@ -20,15 +20,8 @@ public:
     DiffuseLight(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Light{scene, desc},
           _emission{scene->load_texture(desc->property_node_or_default(
-              "emission", SceneNodeDesc::shared_default_texture("ConstIllum")))},
-          _scale{std::max(desc->property_float_or_default("scale", 1.0f), 0.0f)} {
-        if (_emission->category() != Texture::Category::ILLUMINANT) [[unlikely]] {
-            LUISA_ERROR(
-                "Non-illuminant textures are not "
-                "allowed in Diffuse lights. [{}]",
-                desc->source_location().string());
-        }
-    }
+              "emission", SceneNodeDesc::shared_default_texture("Constant")))},
+          _scale{std::max(desc->property_float_or_default("scale", 1.0f), 0.0f)} {}
     [[nodiscard]] auto scale() const noexcept { return _scale; }
     [[nodiscard]] bool is_null() const noexcept override { return _scale == 0.0f || _emission->is_black(); }
     [[nodiscard]] bool is_virtual() const noexcept override { return false; }
@@ -60,14 +53,11 @@ luisa::unique_ptr<Light::Instance> DiffuseLight::build(
 
 using namespace luisa::compute;
 
-class DiffuseLightClosure final : public Light::Closure {
+struct DiffuseLightClosure final : public Light::Closure {
 
-private:
-    Float _time;
-
-public:
     DiffuseLightClosure(const DiffuseLightInstance *light, const SampledWavelengths &swl, Expr<float> time) noexcept
         : Light::Closure{light, swl, time} {}
+
     [[nodiscard]] Light::Evaluation evaluate(const Interaction &it_light, Expr<float3> p_from) const noexcept override {
         using namespace luisa::compute;
         auto light = instance<DiffuseLightInstance>();
@@ -76,11 +66,13 @@ public:
         auto pdf_area = cast<float>(it_light.shape()->triangle_count()) * (pdf_triangle / it_light.triangle_area());
         auto cos_wo = dot(it_light.wo(), it_light.shading().n());
         auto front_face = cos_wo > 0.0f;
-        auto L = light->texture()->evaluate(it_light, _swl, _time).value *
+        auto L = light->texture()->evaluate_illuminant_spectrum(it_light, _swl, _time) *
                  light->node<DiffuseLight>()->scale();
         auto pdf = distance_squared(it_light.p(), p_from) * pdf_area * (1.0f / cos_wo);
-        return Light::Evaluation{.L = L, .pdf = ite(front_face, pdf, 0.0f)};
+        return {.L = L.map([front_face](auto, auto s) noexcept { return ite(front_face, s, 0.f); }),
+                .pdf = ite(front_face, pdf, 0.0f)};
     }
+
     [[nodiscard]] Light::Sample sample(Sampler::Instance &sampler, Expr<uint> light_inst_id, Expr<float3> p_from) const noexcept override {
         auto light = instance<DiffuseLightInstance>();
         auto &&pipeline = light->pipeline();

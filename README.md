@@ -5,6 +5,24 @@ on [LuisaCompute](https://github.com/Mike-Leo-Smith/LuisaCompute).
 
 # Demo
 
+- Camera (Model and Environment Map from [PolyHeaven](https://polyhaven.com))
+    - Wave-Front Path Tracing
+    - Disney and Glass Materials
+    - Environment Mapping
+    - Resolution: 3840x2160
+    - Max Depth: 10
+
+![Camera](data/renders/camera.png)
+
+- Glass of Water (from [Rendering Resources](https://benedikt-bitterli.me/resources/))
+    - Wavefront Path Tracing
+    - Glass, Substrate, and Metal Materials
+    - Diffuse Area Lights
+    - Resolution: 1280x720
+    - Max Depth: 32
+
+![GlassOfWater](data/scenes/glass-of-water/color-denoised.png)
+
 - Living-Room Table (from [Rendering Resources](https://benedikt-bitterli.me/resources/))
     - Mega-Kernel Path Tracing
     - Glass, Plastic, and Metal Materials
