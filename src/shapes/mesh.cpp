@@ -12,14 +12,6 @@
 
 namespace luisa::render {
 
-template <typename Ta, typename Tb, typename Tc, typename Td>
-[[nodiscard]] inline auto difference_of_products(Ta a, Tb b, Tc c, Td d) {
-    auto cd = c * d;
-    auto differenceOfProducts = a * b - cd;
-    auto error = -c * d + cd;
-    return differenceOfProducts + error;
-}
-
 class MeshLoader {
 
 private:
@@ -109,13 +101,19 @@ public:
             auto ai_triangles = mesh->mFaces;
             loader._triangles.resize(triangle_count);
             std::transform(
-                ai_triangles, ai_triangles + triangle_count,
-                loader._triangles.begin(),
+                ai_triangles, ai_triangles + triangle_count, loader._triangles.begin(),
                 [](const aiFace &face) noexcept {
-                    auto t = face.mIndices;
-                    return Triangle{t[0], t[1], t[2]};
+                    return Triangle{face.mIndices[0], face.mIndices[1], face.mIndices[2]};
                 });
-            if (loader._has_uv) {// compute tangent space (code adapted from PBRT-v4).
+
+            // compute tangent space (code adapted from PBRT-v4).
+            if (loader._has_uv) {
+                auto difference_of_products = [](auto a, auto b, auto c, auto d) noexcept {
+                    auto cd = c * d;
+                    auto differenceOfProducts = a * b - cd;
+                    auto error = -c * d + cd;
+                    return differenceOfProducts + error;
+                };
                 for (auto t : loader._triangles) {
                     auto &&v0 = loader._vertices[t.i0];
                     auto &&v1 = loader._vertices[t.i1];
@@ -157,7 +155,7 @@ public:
                     auto b = abs(n.x) > abs(n.z) ?
                                  make_float3(-n.y, n.x, 0.0f) :
                                  make_float3(0.0f, -n.z, n.y);
-                    loader._vertices[i].compressed_normal =
+                    loader._vertices[i].compressed_tangent =
                         Shape::Vertex::oct_encode(normalize(cross(b, n)));
                 }
             }
