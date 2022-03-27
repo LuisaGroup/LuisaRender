@@ -634,7 +634,7 @@ public:
         return {.f = f,
                 .pdf = pdf,
                 .normal = _it.shading().n(),
-                .alpha = _distrib->alpha(),
+                .roughness = _distrib->alpha(),
                 .eta = SampledSpectrum{
                     _swl.dimension(),
                     ite(thin & wi_local.z < 0.f, _fresnel->eta(), 1.f)}};

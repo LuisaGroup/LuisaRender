@@ -117,7 +117,7 @@ private:
         return {.f = f_d + f_s,
                 .pdf = lerp(pdf_s, pdf_d, _kd_ratio),
                 .normal = _it.shading().n(),
-                .alpha = _distribution->alpha(),
+                .roughness = _distribution->alpha(),
                 .eta = _eta_i};
     }
 
@@ -145,7 +145,7 @@ private:
                 .eval = {.f = f,
                          .pdf = pdf,
                          .normal = _it.shading().n(),
-                         .alpha = _distribution->alpha(),
+                         .roughness = _distribution->alpha(),
                          .eta = _eta_i}};
     }
     void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {

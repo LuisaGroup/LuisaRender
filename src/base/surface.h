@@ -32,7 +32,7 @@ public:
         SampledSpectrum f;
         Float pdf;
         Float3 normal;
-        Float2 alpha;
+        Float2 roughness;
         SampledSpectrum eta;
     };
 

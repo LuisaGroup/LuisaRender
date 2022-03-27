@@ -165,7 +165,7 @@ public:
         return {.f = f,
                 .pdf = pdf,
                 .normal = _it.shading().n(),
-                .alpha = _distribution->alpha(),
+                .roughness = _distribution->alpha(),
                 .eta = eta};
     }
 
@@ -193,7 +193,7 @@ public:
                 .eval = {.f = f,
                          .pdf = pdf,
                          .normal = _it.shading().n(),
-                         .alpha = _distribution->alpha(),
+                         .roughness = _distribution->alpha(),
                          .eta = eta}};
     }
 

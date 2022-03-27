@@ -96,7 +96,7 @@ private:
         return {.f = f,
                 .pdf = pdf,
                 .normal = _it.shading().n(),
-                .alpha = _distribution->alpha(),
+                .roughness = _distribution->alpha(),
                 .eta = _eta_i};
     }
 
@@ -111,7 +111,7 @@ private:
                 .eval = {.f = f,
                          .pdf = pdf,
                          .normal = _it.shading().n(),
-                         .alpha = _distribution->alpha(),
+                         .roughness = _distribution->alpha(),
                          .eta = _eta_i}};
     }
     void backward(Expr<float3> wi, const SampledSpectrum &grad) const noexcept override {

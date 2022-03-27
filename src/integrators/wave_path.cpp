@@ -414,7 +414,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
             auto u_bsdf = sampler()->generate_2d();
             pipeline().dynamic_dispatch_surface(surface_tag, [&](auto surface) noexcept {
 
-                // apply alpha map
+                // apply roughness map
                 auto alpha_skip = def(false);
                 if (auto alpha_map = surface->alpha()) {
                     auto alpha = alpha_map->evaluate(*it, time).x;
@@ -454,7 +454,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
 
                     // specular transmission, consider eta scale
                     $if(cos_theta_i * cos_theta_o < 0.f &
-                        max(sample.eval.alpha.x, sample.eval.alpha.y) < .05f) {
+                        max(sample.eval.roughness.x, sample.eval.roughness.y) < .05f) {
                         auto entering = cos_theta_o > 0.f;
                         for (auto i = 0u; i < swl.dimension(); i++) {
                             eta_scale[i] = ite(

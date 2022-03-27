@@ -12,7 +12,7 @@ namespace luisa::render {
 Surface::Surface(Scene *scene, const SceneNodeDesc *desc) noexcept
     : SceneNode{scene, desc, SceneNodeTag::SURFACE},
       _normal{scene->load_texture(desc->property_node_or_default("normal"))},
-      _alpha{scene->load_texture(desc->property_node_or_default("alpha"))} {
+      _alpha{scene->load_texture(desc->property_node_or_default("roughness"))} {
     if (_normal != nullptr && _normal->channels() < 3u) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
             "Expected generic texture with "

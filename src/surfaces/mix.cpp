@@ -80,10 +80,10 @@ private:
                             const Surface::Evaluation &eval_b) const noexcept {
         auto t = 1.f - _ratio;
         return Surface::Evaluation{
-            .f = _ratio * eval_a.f + (1.f - _ratio) * eval_b.f,
+            .f = _ratio * eval_a.f + t * eval_b.f,
             .pdf = lerp(eval_a.pdf, eval_b.pdf, t),
             .normal = normalize(lerp(eval_a.normal, eval_b.normal, t)),
-            .alpha = lerp(eval_a.alpha, eval_b.alpha, t),
+            .roughness = lerp(eval_a.roughness, eval_b.roughness, t),
             .eta = _ratio * eval_a.eta + t * eval_b.eta};
     }
 
@@ -128,7 +128,7 @@ public:
             .eval = {.f = SampledSpectrum{_swl.dimension()},
                      .pdf = 0.f,
                      .normal = make_float3(0.f, 0.f, 1.f),
-                     .alpha = make_float2(),
+                     .roughness = make_float2(),
                      .eta = SampledSpectrum{_swl.dimension(), 1.f}}};
         $if(u_lobe < _ratio) {// sample a
             auto sample_a = _a->sample(u_lobe / _ratio, u);

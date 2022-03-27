@@ -81,7 +81,7 @@ private:
         return {.f = f,
                 .pdf = pdf,
                 .normal = _it.shading().n(),
-                .alpha = make_float2(1.f),
+                .roughness = make_float2(1.f),
                 .eta = SampledSpectrum{_swl.dimension(), 1.f}};
     }
     [[nodiscard]] Surface::Sample sample(Expr<float>, Expr<float2> u) const noexcept override {
@@ -94,7 +94,7 @@ private:
                 .eval = {.f = f,
                          .pdf = pdf,
                          .normal = _it.shading().n(),
-                         .alpha = make_float2(1.f),
+                         .roughness = make_float2(1.f),
                          .eta = SampledSpectrum{_swl.dimension(), 1.f}}};
     }
     void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {

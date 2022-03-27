@@ -107,7 +107,7 @@ public:
         return {.f = f,
                 .pdf = pdf,
                 .normal = _it.shading().n(),
-                .alpha = _distribution->alpha(),
+                .roughness = _distribution->alpha(),
                 .eta = SampledSpectrum{_swl.dimension(), 1.f}};
     }
     [[nodiscard]] Surface::Sample sample(Expr<float>, Expr<float2> u) const noexcept override {
@@ -118,7 +118,7 @@ public:
                 .eval = {.f = f,
                          .pdf = pdf,
                          .normal = _it.shading().n(),
-                         .alpha = _distribution->alpha(),
+                         .roughness = _distribution->alpha(),
                          .eta = SampledSpectrum{_swl.dimension(), 1.f}}};
     }
 
