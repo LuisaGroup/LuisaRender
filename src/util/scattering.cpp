@@ -10,7 +10,6 @@
 namespace luisa::render {
 
 Bool refract(Float3 wi, Float3 n, Float eta, Float3 *wt) noexcept {
-    using namespace compute;
     // Compute $\cos \theta_\roman{t}$ using Snell's law
     auto cosThetaI = dot(n, wi);
     auto sin2ThetaI = max(0.0f, 1.0f - sqr(cosThetaI));
@@ -18,12 +17,11 @@ Bool refract(Float3 wi, Float3 n, Float eta, Float3 *wt) noexcept {
     auto cosThetaT = sqrt(saturate(1.f - sin2ThetaT));
     // Handle total internal reflection for transmission
     auto refr = sin2ThetaT < 1.f;
-    *wt = ite(refr, -eta * wi + (eta * cosThetaI - cosThetaT) * n, reflect(wi, n));
+    *wt = -eta * wi + (eta * cosThetaI - cosThetaT) * n;
     return refr;
 }
 
 Float3 reflect(Float3 wo, Float3 n) noexcept {
-    using compute::dot;
     return -wo + 2.0f * dot(wo, n) * n;
 }
 
@@ -416,6 +414,7 @@ SampledSpectrum MicrofacetTransmission::sample(Expr<float3> wo, Float3 *wi, Expr
     auto eta = ite(cos_theta(wo) > 0.f, eta_a / eta_b, eta_b / eta_a);
     auto u = make_float2(fract(swl_i_float), u_in.y);
     auto wh = _distribution->sample_wh(wo, u);
+    *p = 0.f;
     auto refr = refract(wo, wh, eta, wi);
     SampledSpectrum f{_t.dimension()};
     $if (refr) {

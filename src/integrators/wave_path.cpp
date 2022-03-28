@@ -408,8 +408,6 @@ void WavefrontPathTracingInstance::_render_one_camera(
             auto beta = path_states.read_beta(path_id);
             auto surface_tag = it->shape()->surface_tag();
             auto pdf_bsdf = def(0.f);
-            SampledSpectrum eta_scale{swl.dimension(), 1.f};
-
             auto u_lobe = sampler()->generate_1d();
             auto u_bsdf = sampler()->generate_2d();
             pipeline().dynamic_dispatch_surface(surface_tag, [&](auto surface) noexcept {
@@ -446,22 +444,10 @@ void WavefrontPathTracingInstance::_render_one_camera(
                     pdf_bsdf = sample.eval.pdf;
                     auto w = ite(sample.eval.pdf > 0.0f, 1.f / sample.eval.pdf, 0.f);
                     beta *= abs(dot(sample.eval.normal, sample.wi)) * w * sample.eval.f;
-
-                    // consider eta scale if specular transmission
-                    auto cos_theta_i = dot(it->ng(), sample.wi);
-                    auto cos_theta_o = dot(it->ng(), it->wo());
-                    $if(cos_theta_i * cos_theta_o < 0.f &
-                        max(sample.eval.roughness.x, sample.eval.roughness.y) < .05f) {
-                        auto entering = cos_theta_o > 0.f;
-                        for (auto i = 0u; i < swl.dimension(); i++) {
-                            eta_scale[i] = sqr(ite(
-                                entering, sample.eval.eta[i], 1.f / sample.eval.eta[i]));
-                        }
-                    };
                 };
             });
             $if(beta.any([](auto b) noexcept { return b > 0.f; })) {
-                auto q = max(swl.cie_y(beta * eta_scale), .05f);
+                auto q = max(swl.cie_y(beta), .05f);
                 auto rr_depth = node<WavefrontPathTracing>()->rr_depth();
                 auto rr_threshold = node<WavefrontPathTracing>()->rr_threshold();
                 // rr
