@@ -447,12 +447,12 @@ void WavefrontPathTracingInstance::_render_one_camera(
                     auto w = ite(sample.eval.pdf > 0.0f, 1.f / sample.eval.pdf, 0.f);
                     beta *= sample.eval.f * abs(dot(sample.eval.normal, sample.wi)) * w;
 
-                    // specular transmission, consider eta scale
-                    auto cos_i = dot(it->shading().n(), sample.wi);
-                    auto cos_o = dot(it->shading().n(), it->wo());
-                    $if(cos_i * cos_o < 0.f &
+                    // consider eta scale if specular transmission
+                    auto cos_theta_i = dot(it->ng(), sample.wi);
+                    auto cos_theta_o = dot(it->ng(), it->wo());
+                    $if(cos_theta_i * cos_theta_o < 0.f &
                         max(sample.eval.roughness.x, sample.eval.roughness.y) < .05f) {
-                        auto entering = cos_o > 0.f;
+                        auto entering = cos_theta_o > 0.f;
                         for (auto i = 0u; i < swl.dimension(); i++) {
                             eta_scale[i] = ite(
                                 entering,

@@ -286,9 +286,9 @@ void MegakernelPathTracingInstance::_render_one_camera(
                     auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
                     beta *= abs(dot(sample.eval.normal, sample.wi)) * w * sample.eval.f;
 
-                    // specular transmission, consider eta scale
-                    auto cos_theta_i = dot(it->shading().n(), sample.wi);
-                    auto cos_theta_o = dot(it->shading().n(), it->wo());
+                    // consider eta scale if specular transmission
+                    auto cos_theta_i = dot(it->ng(), sample.wi);
+                    auto cos_theta_o = dot(it->ng(), it->wo());
                     $if(cos_theta_i * cos_theta_o < 0.f &
                         max(sample.eval.roughness.x, sample.eval.roughness.y) < .05f) {
                         auto entering = cos_theta_o > 0.f;

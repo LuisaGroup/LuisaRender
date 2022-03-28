@@ -84,7 +84,7 @@ private:
         auto cos_b = abs(dot(eval_b.normal, wi));
         auto cos_theta_i = abs(dot(_it.shading().n(), wi));
         return Surface::Evaluation{
-            .f = (_ratio * eval_a.f * cos_a + t * eval_b.f * cos_b) / cos_theta_i,
+            .f = (_ratio * eval_a.f * cos_a + t * eval_b.f * cos_b) / cos_theta_i,// convert to mix frame
             .pdf = lerp(eval_a.pdf, eval_b.pdf, t),
             .normal = _it.shading().n(),
             .roughness = lerp(eval_a.roughness, eval_b.roughness, t),
