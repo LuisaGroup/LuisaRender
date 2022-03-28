@@ -183,11 +183,11 @@ Camera camera : Thinlens {
   look_at { -0.03, 0.025, 0.072 }
   aperture { 3.2 }
   focal_length { 70 }
-  spp { 262144 }
+  spp { 4096 }
   film : Color {
     resolution { 4096, 2160 }
   }
-  file { "render-shadow-terminator.exr" }
+  file { "render-shadow-terminator-fix.exr" }
   filter : Gaussian {
     radius { 1 }
   }

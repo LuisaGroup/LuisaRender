@@ -16,9 +16,10 @@ Bool refract(Float3 wi, Float3 n, Float eta, Float3 *wt) noexcept {
     auto sin2ThetaI = max(0.0f, 1.0f - sqr(cosThetaI));
     auto sin2ThetaT = sqr(eta) * sin2ThetaI;
     auto cosThetaT = sqrt(saturate(1.f - sin2ThetaT));
-    *wt = -eta * wi + (eta * cosThetaI - cosThetaT) * n;
     // Handle total internal reflection for transmission
-    return sin2ThetaT < 1.f;
+    auto refr = sin2ThetaT < 1.f;
+    *wt = ite(refr, -eta * wi + (eta * cosThetaI - cosThetaT) * n, reflect(wi, n));
+    return refr;
 }
 
 Float3 reflect(Float3 wo, Float3 n) noexcept {
@@ -416,8 +417,12 @@ SampledSpectrum MicrofacetTransmission::sample(Expr<float3> wo, Float3 *wi, Expr
     auto u = make_float2(fract(swl_i_float), u_in.y);
     auto wh = _distribution->sample_wh(wo, u);
     auto refr = refract(wo, wh, eta, wi);
-    *p = pdf(wo, *wi);
-    return evaluate(wo, *wi);
+    SampledSpectrum f{_t.dimension()};
+    $if (refr) {
+        *p = pdf(wo, *wi);
+        f = evaluate(wo, *wi);
+    };
+    return f;
 }
 
 Float MicrofacetTransmission::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {

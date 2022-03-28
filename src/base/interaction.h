@@ -76,8 +76,10 @@ public:
     [[nodiscard]] const auto &shape() const noexcept { return _shape; }
     [[nodiscard]] auto wo_local() const noexcept { return _shading.world_to_local(_wo); }
     [[nodiscard]] auto spawn_ray(Expr<float3> wi, Expr<float> t_max = std::numeric_limits<float>::max()) const noexcept {
-        return luisa::compute::make_ray_robust(
-            ite(dot(_ps - _pg, wi) > 0.f, _ps, _pg), _ng, wi, t_max);
+        auto ray = luisa::compute::make_ray_robust(_pg, _ng, wi, t_max);
+        auto o = ray->origin();
+        ray->set_origin(ite(dot(_ps - o, wi) > 0.f, _ps, o));
+        return ray;
     }
 };
 

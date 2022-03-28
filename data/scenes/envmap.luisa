@@ -3,7 +3,7 @@ Film film : Color {
   exposure { 0 }
 }
 
-Camera camera : Ortho {
+Camera camera : Pinhole {
   position { 0, 0, 5 }
   fov { 60 }
   spp { 1024 }
@@ -25,6 +25,7 @@ Integrator pt : WavePath {
   sampler : Independent {}
   depth { 16 }
   rr_depth { 3 }
+  spectrum : Hero {}
   // display { true }
 }
 
@@ -33,12 +34,13 @@ Shape teapot : Group {
     Mesh {
       file { "../meshes/utah-teapot.obj" }
       two_sided { false }
-      surface : Substrate {
+      surface : Glass {
         color : Constant {
           v { 1 }
         }
         Kr : Constant {
-          v { 0.3, 0.7, 1.0 }
+          // v { 0.3, 0.7, 1.0 }
+          v { 1.0 }
         }
         Kd : Constant {
           v { 0.3, 0.7, 1.0 }
@@ -52,7 +54,7 @@ Shape teapot : Group {
           // v { 0.5, 0.5, 0.5 }
         }
         roughness : Constant {
-          v { 0.2 }
+          v { 0.01 }
         }
         metallic : Constant {
           v { 0.5 }
@@ -111,8 +113,8 @@ render {
     emission : Image {
       // file { "../envmaps/photo_studio_01_1k.hdr" }
       // fp32 { true }
-      file { "../envmaps/envmap.exr" }
-      // file { "/Users/mike/Downloads/dreifaltigkeitsberg_8k.exr" }
+      // file { "../envmaps/envmap.exr" }
+      file { "/Users/mike/Downloads/dreifaltigkeitsberg_8k.exr" }
     }
     transform : SRT {
       rotate { 0, 1, 0, 45 }
