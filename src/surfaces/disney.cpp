@@ -165,7 +165,7 @@ namespace {
 // For a dielectric, R(0) = (eta - 1)^2 / (eta + 1)^2, assuming we're
 // coming from air..
 [[nodiscard]] inline Float SchlickR0FromEta(Float eta) {
-    return sqr(eta - 1.f) / sqr(eta + 1.f);
+    return sqr((eta - 1.f) / (eta + 1.f));
 }
 
 class DisneyDiffuse final : public BxDF {

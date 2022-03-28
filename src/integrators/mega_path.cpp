@@ -293,10 +293,8 @@ void MegakernelPathTracingInstance::_render_one_camera(
                         max(sample.eval.roughness.x, sample.eval.roughness.y) < .05f) {
                         auto entering = cos_theta_o > 0.f;
                         for (auto i = 0u; i < swl.dimension(); i++) {
-                            eta_scale[i] = ite(
-                                entering,
-                                sqr(sample.eval.eta[i]),
-                                sqr(1.f / sample.eval.eta[i]));
+                            eta_scale[i] = sqr(ite(
+                                entering, sample.eval.eta[i], 1.f / sample.eval.eta[i]));
                         }
                     };
                 };
