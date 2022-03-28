@@ -254,9 +254,9 @@ ShadingAttribute Pipeline::shading_point(
     auto temp_u = p - p0;
     auto temp_v = p - p1;
     auto temp_w = p - p2;
-    auto dot_u = dot(temp_u, n0);
-    auto dot_v = dot(temp_v, n1);
-    auto dot_w = dot(temp_w, n2);
+    auto dot_u = min(dot(temp_u, n0), 0.f);
+    auto dot_v = min(dot(temp_v, n1), 0.f);
+    auto dot_w = min(dot(temp_w, n2), 0.f);
     auto dp = bary.x * (temp_u - dot_u * n0) +
               bary.y * (temp_v - dot_v * n1) +
               bary.z * (temp_w - dot_w * n2);

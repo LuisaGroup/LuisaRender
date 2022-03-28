@@ -127,13 +127,7 @@ public:
             sample.eval.f *= _ratio;
             return sample;
         }
-        Surface::Sample sample{
-            .wi = make_float3(0.f, 0.f, 1.f),
-            .eval = {.f = SampledSpectrum{_swl.dimension()},
-                     .pdf = 0.f,
-                     .normal = make_float3(0.f, 0.f, 1.f),
-                     .roughness = make_float2(),
-                     .eta = SampledSpectrum{_swl.dimension(), 1.f}}};
+        auto sample = Surface::Sample::zero(_swl.dimension());
         $if(u_lobe < _ratio) {// sample a
             auto sample_a = _a->sample(u_lobe / _ratio, u);
             auto eval_b = _b->evaluate(sample_a.wi);

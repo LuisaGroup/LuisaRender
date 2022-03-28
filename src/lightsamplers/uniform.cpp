@@ -40,7 +40,7 @@ public:
     [[nodiscard]] Light::Evaluation evaluate_hit(
         const Interaction &it, Expr<float3> p_from,
         const SampledWavelengths &swl, Expr<float> time) const noexcept override {
-        Light::Evaluation eval{.L = SampledSpectrum{swl.dimension()}, .pdf = 0.f};
+        auto eval = Light::Evaluation::zero(swl.dimension());
         if (pipeline().lights().empty()) [[unlikely]] {// no lights
             LUISA_WARNING_WITH_LOCATION("No lights in scene.");
             return eval;
@@ -67,10 +67,7 @@ public:
     [[nodiscard]] Light::Sample sample(
         Sampler::Instance &sampler, const Interaction &it_from, Expr<float3x3> env_to_world,
         const SampledWavelengths &swl, Expr<float> time) const noexcept override {
-        Light::Sample sample{
-            .eval = {.L = SampledSpectrum{swl.dimension()}, .pdf = 0.f},
-            .wi = {0.f, 1.f, 0.f},
-            .distance = std::numeric_limits<float>::max()};
+        auto sample = Light::Sample::zero(swl.dimension());
         if (_env_prob > 0.f) {// consider environment
             auto u = sampler.generate_1d();
             $if(u < _env_prob) {

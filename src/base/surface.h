@@ -34,11 +34,23 @@ public:
         Float3 normal;
         Float2 roughness;
         SampledSpectrum eta;
+        [[nodiscard]] static auto zero(size_t spec_dim) noexcept {
+            return Evaluation{
+                .f = SampledSpectrum{spec_dim},
+                .pdf = 0.f,
+                .normal = make_float3(0.f, 0.f, 1.f),
+                .roughness = make_float2(),
+                .eta = SampledSpectrum{spec_dim, 1.f}};
+        }
     };
 
     struct Sample {
         Float3 wi;
         Evaluation eval;
+        [[nodiscard]] static auto zero(size_t spec_dim) noexcept {
+            return Sample{.wi = make_float3(0.f, 0.f, 1.f),
+                          .eval = Evaluation::zero(spec_dim)};
+        }
     };
 
     class Instance;
