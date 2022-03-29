@@ -111,7 +111,9 @@ public:
     [[nodiscard]] auto flatness() const { return _flatness; }
     [[nodiscard]] auto diffuse_trans() const { return _diffuse_trans; }
     [[nodiscard]] auto thin() const { return node<DisneySurface>()->thin(); }
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
+
+private:
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
         const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
 };
 
@@ -163,7 +165,7 @@ namespace {
 // For a dielectric, R(0) = (eta - 1)^2 / (eta + 1)^2, assuming we're
 // coming from air..
 [[nodiscard]] inline Float SchlickR0FromEta(Float eta) {
-    return sqr(eta - 1.f) / sqr(eta + 1.f);
+    return sqr((eta - 1.f) / (eta + 1.f));
 }
 
 class DisneyDiffuse final : public BxDF {
@@ -631,7 +633,8 @@ public:
         auto thin = instance<DisneySurfaceInstance>()->thin();
         return {.f = f,
                 .pdf = pdf,
-                .alpha = _distrib->alpha(),
+                .normal = _it.shading().n(),
+                .roughness = _distrib->alpha(),
                 .eta = SampledSpectrum{
                     _swl.dimension(),
                     ite(thin & wi_local.z < 0.f, _fresnel->eta(), 1.f)}};
@@ -641,23 +644,19 @@ public:
         auto wi_local = _it.shading().world_to_local(wi);
         return evaluate_local(wo_local, wi_local);
     }
-    [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
-        // TODO: weighted sampling
-
-        auto u = sampler.generate_2d();
+    [[nodiscard]] Surface::Sample sample(Expr<float> u_lobe, Expr<float2> u) const noexcept override {
         auto sampling_tech = def(0u);
         auto sum_weights = def(0.f);
         auto ux_remapped = def(0.f);
         auto lower_sum = def(0.f);
         auto upper_sum = def(1.f);
         for (auto i = 0u; i < max_sampling_techique_count; i++) {
-            auto sel = (_lobes & sampling_techniques[i]) != 0u & (u.x > sum_weights);
+            auto sel = (_lobes & sampling_techniques[i]) != 0u & (u_lobe > sum_weights);
             sampling_tech = ite(sel, i, sampling_tech);
             lower_sum = ite(sel, sum_weights, lower_sum);
             sum_weights += _sampling_weights[i];
             upper_sum = ite(sel, sum_weights, upper_sum);
         }
-        u.x = saturate((u.x - lower_sum) / (upper_sum - lower_sum));
 
         // sample
         auto wo_local = _it.wo_local();
@@ -683,7 +682,7 @@ public:
     }
 };
 
-luisa::unique_ptr<Surface::Closure> DisneySurfaceInstance::closure(
+luisa::unique_ptr<Surface::Closure> DisneySurfaceInstance::_closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto color_rgb = _color->evaluate(it, time).xyz();
     auto color_lum = srgb_to_cie_y(color_rgb);

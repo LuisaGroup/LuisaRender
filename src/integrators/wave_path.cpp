@@ -406,23 +406,17 @@ void WavefrontPathTracingInstance::_render_one_camera(
             auto Li = path_states.read_radiance(path_id);
             auto swl = path_states.read_swl(path_id);
             auto beta = path_states.read_beta(path_id);
-            auto cos_theta_o = it->wo_local().z;
             auto surface_tag = it->shape()->surface_tag();
             auto pdf_bsdf = def(0.f);
-            SampledSpectrum eta_scale{swl.dimension(), 1.f};
+            auto u_lobe = sampler()->generate_1d();
+            auto u_bsdf = sampler()->generate_2d();
             pipeline().dynamic_dispatch_surface(surface_tag, [&](auto surface) noexcept {
-                // apply normal map
-                if (auto normal_map = surface->normal()) {
-                    auto normal_local = 2.f * normal_map->evaluate(*it, time).xyz() - 1.f;
-                    auto normal = it->shading().local_to_world(normal_local);
-                    it->set_shading(Frame::make(normal, it->shading().u()));
-                }
-                // apply alpha map
+                // apply roughness map
                 auto alpha_skip = def(false);
                 if (auto alpha_map = surface->alpha()) {
                     auto alpha = alpha_map->evaluate(*it, time).x;
-                    auto u_alpha = sampler()->generate_1d();
-                    alpha_skip = alpha < u_alpha;
+                    alpha_skip = alpha < u_lobe;
+                    u_lobe = ite(alpha_skip, (u_lobe - alpha) / (1.f - alpha), u_lobe / alpha);
                 }
 
                 $if(alpha_skip) {
@@ -439,37 +433,21 @@ void WavefrontPathTracingInstance::_render_one_camera(
                         auto Ld = light_samples.read_emission(queue_id);
                         auto wi = light_samples.read_wi(queue_id);
                         auto eval = closure->evaluate(wi);
-                        auto cos_theta_i = dot(it->shading().n(), wi);
-                        auto is_trans = cos_theta_i * cos_theta_o < 0.f;
                         auto mis_weight = balanced_heuristic(pdf_light, eval.pdf);
-                        Li += mis_weight / pdf_light *
-                              abs_dot(it->shading().n(), wi) *
+                        Li += mis_weight / pdf_light * abs(dot(eval.normal, wi)) *
                               beta * eval.f * Ld;
                     };
 
                     // sample material
-                    auto sample = closure->sample(*sampler());
-                    auto cos_theta_i = dot(sample.wi, it->shading().n());
+                    auto sample = closure->sample(u_lobe, u_bsdf);
                     ray = it->spawn_ray(sample.wi);
                     pdf_bsdf = sample.eval.pdf;
-                    auto w = ite(sample.eval.pdf > 0.0f, abs(cos_theta_i) / sample.eval.pdf, 0.f);
-                    beta *= sample.eval.f * w;
-
-                    // specular transmission, consider eta scale
-                    $if(cos_theta_i * cos_theta_o < 0.f &
-                        max(sample.eval.alpha.x, sample.eval.alpha.y) < .05f) {
-                        auto entering = cos_theta_o > 0.f;
-                        for (auto i = 0u; i < swl.dimension(); i++) {
-                            eta_scale[i] = ite(
-                                entering,
-                                sqr(sample.eval.eta[i]),
-                                sqr(1.f / sample.eval.eta[i]));
-                        }
-                    };
+                    auto w = ite(sample.eval.pdf > 0.0f, 1.f / sample.eval.pdf, 0.f);
+                    beta *= abs(dot(sample.eval.normal, sample.wi)) * w * sample.eval.f;
                 };
             });
             $if(beta.any([](auto b) noexcept { return b > 0.f; })) {
-                auto q = max(swl.cie_y(beta * eta_scale), .05f);
+                auto q = max(swl.cie_y(beta), .05f);
                 auto rr_depth = node<WavefrontPathTracing>()->rr_depth();
                 auto rr_threshold = node<WavefrontPathTracing>()->rr_threshold();
                 // rr

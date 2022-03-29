@@ -50,13 +50,12 @@ Filter::Instance::Instance(const Pipeline &pipeline, const Filter *filter) noexc
     }
 }
 
-Filter::Sample Filter::Instance::sample(Sampler::Instance &sampler) const noexcept {
+Filter::Sample Filter::Instance::sample(Expr<float2> u) const noexcept {
     using namespace luisa::compute;
     Constant lut = look_up_table();
     Constant pdfs = pdf_table();
     Constant alias_indices = alias_table_indices();
     Constant alias_probs = alias_table_probabilities();
-    auto u = sampler.generate_pixel_2d();
     auto n = look_up_table_size - 1u;
     auto [iy, uy] = sample_alias_table(alias_probs, alias_indices, n, u.x);
     auto [ix, ux] = sample_alias_table(alias_probs, alias_indices, n, u.y);

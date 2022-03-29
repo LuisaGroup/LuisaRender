@@ -64,8 +64,11 @@ public:
         const Texture::Instance *roughness, const Texture::Instance *eta) noexcept
         : Surface::Instance{pipeline, surface},
           _kd{Kd}, _ks{Ks}, _roughness{roughness}, _eta{eta} {}
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
-        const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
+
+private:
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
+        const Interaction &it, const SampledWavelengths &swl,
+        Expr<float> time) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> PlasticSurface::_build(
@@ -113,18 +116,17 @@ private:
         auto pdf_s = _microfacet->pdf(wo_local, wi_local);
         return {.f = f_d + f_s,
                 .pdf = lerp(pdf_s, pdf_d, _kd_ratio),
-                .alpha = _distribution->alpha(),
+                .normal = _it.shading().n(),
+                .roughness = _distribution->alpha(),
                 .eta = _eta_i};
     }
 
-    [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
+    [[nodiscard]] Surface::Sample sample(Expr<float> u_lobe, Expr<float2> u) const noexcept override {
         auto wo_local = _it.wo_local();
-        auto u = sampler.generate_2d();
         auto pdf = def(0.f);
         SampledSpectrum f{_swl.dimension()};
         auto wi_local = def(make_float3(0.0f, 0.0f, 1.0f));
-        $if(u.x < _kd_ratio) {// Lambert
-            u.x = u.x / _kd_ratio;
+        $if(u_lobe < _kd_ratio) {// Lambert
             auto f_d = _lambert->sample(wo_local, &wi_local, u, &pdf);
             auto f_s = _microfacet->evaluate(wo_local, wi_local);
             auto pdf_s = _microfacet->pdf(wo_local, wi_local);
@@ -132,7 +134,6 @@ private:
             pdf = lerp(pdf_s, pdf, _kd_ratio);
         }
         $else {// Microfacet
-            u.x = (u.x - _kd_ratio) / (1.f - _kd_ratio);
             auto f_s = _microfacet->sample(wo_local, &wi_local, u, &pdf);
             auto f_d = _lambert->evaluate(wo_local, wi_local);
             auto pdf_d = _lambert->pdf(wo_local, wi_local);
@@ -143,7 +144,8 @@ private:
         return {.wi = wi,
                 .eval = {.f = f,
                          .pdf = pdf,
-                         .alpha = _distribution->alpha(),
+                         .normal = _it.shading().n(),
+                         .roughness = _distribution->alpha(),
                          .eta = _eta_i}};
     }
     void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
@@ -152,7 +154,7 @@ private:
     }
 };
 
-luisa::unique_ptr<Surface::Closure> PlasticInstance::closure(
+luisa::unique_ptr<Surface::Closure> PlasticInstance::_closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto Kd_rgb = _kd->evaluate(it, time).xyz();
     auto Ks_rgb = _ks->evaluate(it, time).xyz();

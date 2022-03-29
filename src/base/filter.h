@@ -44,7 +44,7 @@ public:
         [[nodiscard]] auto pdf_table() const noexcept { return luisa::span{_pdf}; }
         [[nodiscard]] auto alias_table_indices() const noexcept { return luisa::span{_alias_indices}; }
         [[nodiscard]] auto alias_table_probabilities() const noexcept { return luisa::span{_alias_probs}; }
-        [[nodiscard]] virtual Sample sample(Sampler::Instance &sampler) const noexcept;
+        [[nodiscard]] virtual Sample sample(Expr<float2> u) const noexcept;
     };
 
 private:

@@ -70,7 +70,7 @@ Surface surface_camera_strap : Disney {
   }
 }
 
-Surface surface_camera_lens : Glass {
+Surface surface_camera_lens_glass : Glass {
   Kr : Constant {
     v { 1, 1, 1 }
   }
@@ -82,6 +82,20 @@ Surface surface_camera_lens : Glass {
   }
   eta : Constant {
     v { 1.7 }
+  }
+}
+
+Surface surface_camera_lens_metal : Mirror {
+  color : Constant {
+    v { 0.3, 0.5, 1 }
+  }
+}
+
+Surface surface_camera_lens : Mix {
+  a { @surface_camera_lens_glass }
+  b { @surface_camera_lens_metal }
+  ratio : Constant {
+    v { 0.95 }
   }
 }
 
@@ -169,11 +183,11 @@ Camera camera : Thinlens {
   look_at { -0.03, 0.025, 0.072 }
   aperture { 3.2 }
   focal_length { 70 }
-  spp { 524288 }
+  spp { 4096 }
   film : Color {
     resolution { 4096, 2160 }
   }
-  file { "render-524288spp.exr" }
+  file { "render-shadow-terminator-fix.exr" }
   filter : Gaussian {
     radius { 1 }
   }

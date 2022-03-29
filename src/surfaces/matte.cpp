@@ -43,11 +43,13 @@ public:
         const Pipeline &pipeline, const Surface *surface,
         const Texture::Instance *Kd, const Texture::Instance *sigma) noexcept
         : Surface::Instance{pipeline, surface}, _kd{Kd}, _sigma{sigma} {}
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
-        const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
-
     [[nodiscard]] auto Kd() const noexcept { return _kd; }
     [[nodiscard]] auto sigma() const noexcept { return _sigma; }
+
+private:
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
+        const Interaction &it, const SampledWavelengths &swl,
+        Expr<float> time) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> MatteSurface::_build(
@@ -78,20 +80,21 @@ private:
         auto pdf = _oren_nayar->pdf(wo_local, wi_local);
         return {.f = f,
                 .pdf = pdf,
-                .alpha = make_float2(1.f),
+                .normal = _it.shading().n(),
+                .roughness = make_float2(1.f),
                 .eta = SampledSpectrum{_swl.dimension(), 1.f}};
     }
-    [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
+    [[nodiscard]] Surface::Sample sample(Expr<float>, Expr<float2> u) const noexcept override {
         auto wo_local = _it.wo_local();
         auto wi_local = def(make_float3(0.0f, 0.0f, 1.0f));
-        auto u = sampler.generate_2d();
         auto pdf = def(0.f);
         auto f = _oren_nayar->sample(wo_local, &wi_local, u, &pdf);
         auto wi = _it.shading().local_to_world(wi_local);
         return {.wi = wi,
                 .eval = {.f = f,
                          .pdf = pdf,
-                         .alpha = make_float2(1.f),
+                         .normal = _it.shading().n(),
+                         .roughness = make_float2(1.f),
                          .eta = SampledSpectrum{_swl.dimension(), 1.f}}};
     }
     void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
@@ -112,7 +115,7 @@ private:
     }
 };
 
-luisa::unique_ptr<Surface::Closure> MatteInstance::closure(
+luisa::unique_ptr<Surface::Closure> MatteInstance::_closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto Kd = _kd->evaluate_albedo_spectrum(it, swl, time);
     auto sigma = _sigma ? clamp(_sigma->evaluate(it, time).x, 0.f, 90.f) : 0.f;

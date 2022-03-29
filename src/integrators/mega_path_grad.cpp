@@ -286,6 +286,8 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
             SampledSpectrum eta_scale{swl.dimension(), 1.f};
             auto cos_theta_o = it->wo_local().z;
             auto surface_tag = it->shape()->surface_tag();
+            auto u_lobe = sampler->generate_1d();
+            auto u_bsdf = sampler->generate_2d();
             pipeline.dynamic_dispatch_surface(surface_tag, [&](auto surface) {
                 // apply normal map
                 if (auto normal_map = surface->normal()) {
@@ -462,6 +464,8 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
             SampledSpectrum eta_scale{swl.dimension(), 1.f};
             auto cos_theta_o = it->wo_local().z;
             auto surface_tag = it->shape()->surface_tag();
+            auto u_lobe = sampler->generate_1d();
+            auto u_bsdf = sampler->generate_2d();
             pipeline.dynamic_dispatch_surface(surface_tag, [&](auto surface) {
                 // apply normal map
                 if (auto normal_map = surface->normal()) {

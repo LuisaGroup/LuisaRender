@@ -10,19 +10,18 @@
 namespace luisa::render {
 
 Bool refract(Float3 wi, Float3 n, Float eta, Float3 *wt) noexcept {
-    using namespace compute;
     // Compute $\cos \theta_\roman{t}$ using Snell's law
     auto cosThetaI = dot(n, wi);
     auto sin2ThetaI = max(0.0f, 1.0f - sqr(cosThetaI));
     auto sin2ThetaT = sqr(eta) * sin2ThetaI;
     auto cosThetaT = sqrt(saturate(1.f - sin2ThetaT));
-    *wt = -eta * wi + (eta * cosThetaI - cosThetaT) * n;
     // Handle total internal reflection for transmission
-    return sin2ThetaT < 1.f;
+    auto refr = sin2ThetaT < 1.f;
+    *wt = -eta * wi + (eta * cosThetaI - cosThetaT) * n;
+    return refr;
 }
 
 Float3 reflect(Float3 wo, Float3 n) noexcept {
-    using compute::dot;
     return -wo + 2.0f * dot(wo, n) * n;
 }
 
@@ -415,9 +414,14 @@ SampledSpectrum MicrofacetTransmission::sample(Expr<float3> wo, Float3 *wi, Expr
     auto eta = ite(cos_theta(wo) > 0.f, eta_a / eta_b, eta_b / eta_a);
     auto u = make_float2(fract(swl_i_float), u_in.y);
     auto wh = _distribution->sample_wh(wo, u);
+    *p = 0.f;
     auto refr = refract(wo, wh, eta, wi);
-    *p = pdf(wo, *wi);
-    return evaluate(wo, *wi);
+    SampledSpectrum f{_t.dimension()};
+    $if(refr) {
+        *p = pdf(wo, *wi);
+        f = evaluate(wo, *wi);
+    };
+    return f;
 }
 
 Float MicrofacetTransmission::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {
@@ -525,15 +529,15 @@ OrenNayar::Gradient OrenNayar::backward(
 
     // backward
     LUISA_ERROR_WITH_LOCATION("Not implemented.");
-//    auto sigma2_sigma = 2 * radians(_sigma) / 180.f;
-//    auto a_sigma2 = -0.165f * sqr(sigma2 + 0.33f);
-//    auto b_sigma2 = 0.0405f / sqr(sigma2 + 0.09f);
-//    auto d_r = inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta);
-//    auto d_a = _r * inv_pi;
-//    auto d_b = _r * inv_pi * maxCos * sinAlpha * tanBeta;
-//    auto d_sigma2 = d_a * a_sigma2 + d_b * b_sigma2;
-//    auto d_sigma = d_sigma2 * sigma2_sigma;
-//    return {.dR = df * d_r, .dSigma = df * d_sigma};
+    //    auto sigma2_sigma = 2 * radians(_sigma) / 180.f;
+    //    auto a_sigma2 = -0.165f * sqr(sigma2 + 0.33f);
+    //    auto b_sigma2 = 0.0405f / sqr(sigma2 + 0.09f);
+    //    auto d_r = inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta);
+    //    auto d_a = _r * inv_pi;
+    //    auto d_b = _r * inv_pi * maxCos * sinAlpha * tanBeta;
+    //    auto d_sigma2 = d_a * a_sigma2 + d_b * b_sigma2;
+    //    auto d_sigma = d_sigma2 * sigma2_sigma;
+    //    return {.dR = df * d_r, .dSigma = df * d_sigma};
 }
 
 SampledSpectrum FresnelBlend::Schlick(Expr<float> cosTheta) const noexcept {

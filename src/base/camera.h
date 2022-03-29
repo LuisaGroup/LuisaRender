@@ -41,7 +41,7 @@ public:
         const Texture::Instance *_target;
 
     private:
-        // generate ray in camera space, should not consider _filter and/or _transform
+        // generate ray in camera space, should not consider _filter or _transform
         [[nodiscard]] virtual Sample _generate_ray(
             Sampler::Instance &sampler,
             Expr<float2> pixel, Expr<float> time) const noexcept = 0;

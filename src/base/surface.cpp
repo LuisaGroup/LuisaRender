@@ -27,4 +27,19 @@ luisa::unique_ptr<Surface::Instance> Surface::build(Pipeline &pipeline, CommandB
     return instance;
 }
 
+Surface::Closure::Closure(
+    const Surface::Instance *instance, Interaction it,
+    const SampledWavelengths &swl, Expr<float> time) noexcept
+    : _instance{instance}, _it{std::move(it)}, _swl{swl}, _time{time} {}
+
+luisa::unique_ptr<Surface::Closure> Surface::Instance::closure(
+    Interaction it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    if (_normal != nullptr) {
+        auto normal_local = 2.f * _normal->evaluate(it, time).xyz() - 1.f;
+        auto normal = it.shading().local_to_world(normal_local);
+        it.set_shading(Frame::make(normal, it.shading().u()));
+    }
+    return _closure(std::move(it), swl, time);
+}
+
 }// namespace luisa::render

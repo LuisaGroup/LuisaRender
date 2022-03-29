@@ -449,7 +449,9 @@ private:
 public:
     MetalInstance(const Pipeline &pipeline, const Surface *surface, const Texture::Instance *roughness) noexcept
         : Surface::Instance{pipeline, surface}, _roughness{roughness} {}
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
+
+private:
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
         const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
 };
 
@@ -483,23 +485,32 @@ private:
         auto wi_local = _it.shading().world_to_local(wi);
         auto f = _lobe->evaluate(wo_local, wi_local);
         auto pdf = _lobe->pdf(wo_local, wi_local);
-        return {.f = f, .pdf = pdf, .alpha = _distrib->alpha(), .eta = _eta_i};
+        return {.f = f,
+                .pdf = pdf,
+                .normal = _it.shading().n(),
+                .roughness = _distrib->alpha(),
+                .eta = _eta_i};
     }
-    [[nodiscard]] Surface::Sample sample(Sampler::Instance &sampler) const noexcept override {
+    [[nodiscard]] Surface::Sample sample(Expr<float>, Expr<float2> u) const noexcept override {
         auto wo_local = _it.wo_local();
-        auto u = sampler.generate_2d();
         auto pdf = def(0.f);
         auto wi_local = def(make_float3(0.f, 0.f, 1.f));
         auto f = _lobe->sample(wo_local, &wi_local, u, &pdf);
         auto wi = _it.shading().local_to_world(wi_local);
-        return {.wi = wi, .eval = {.f = f, .pdf = pdf, .alpha = _distrib->alpha(), .eta = _eta_i}};
+        return {.wi = wi,
+                .eval = {.f = f,
+                         .pdf = pdf,
+                         .normal = _it.shading().n(),
+                         .roughness = _distrib->alpha(),
+                         .eta = _eta_i}};
     }
     void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
         LUISA_ERROR_WITH_LOCATION("Metal surface is not differentiable.");
     }
 };
 
-luisa::unique_ptr<Surface::Closure> MetalInstance::closure(const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
+luisa::unique_ptr<Surface::Closure> MetalInstance::_closure(
+    const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto alpha = def(make_float2(.5f));
     if (_roughness != nullptr) {
         auto r = _roughness->evaluate(it, time);

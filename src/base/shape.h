@@ -65,16 +65,17 @@ struct alignas(16) Shape::Vertex {
     uint compressed_tangent;
     float compressed_uv[2];
 
-    [[nodiscard]] static auto encode(float3 position, float3 normal, float3 tangent, float2 uv) noexcept {
-        constexpr auto oct_encode = [](float3 n) noexcept {
-            constexpr auto oct_wrap = [](float2 v) noexcept {
-                return (1.0f - abs(v.yx())) * select(make_float2(-1.0f), make_float2(1.0f), v >= 0.0f);
-            };
-            auto p = n.xy() * (1.0f / (std::abs(n.x) + std::abs(n.y) + std::abs(n.z)));
-            p = n.z >= 0.0f ? p : oct_wrap(p);// in [-1, 1]
-            auto u = make_uint2(clamp(round((p * 0.5f + 0.5f) * 65535.0f), 0.0f, 65535.0f));
-            return u.x | (u.y << 16u);
+    [[nodiscard]] static auto oct_encode(float3 n) noexcept {
+        constexpr auto oct_wrap = [](float2 v) noexcept {
+            return (1.0f - abs(v.yx())) * select(make_float2(-1.0f), make_float2(1.0f), v >= 0.0f);
         };
+        auto p = n.xy() * (1.0f / (std::abs(n.x) + std::abs(n.y) + std::abs(n.z)));
+        p = n.z >= 0.0f ? p : oct_wrap(p);// in [-1, 1]
+        auto u = make_uint2(clamp(round((p * 0.5f + 0.5f) * 65535.0f), 0.0f, 65535.0f));
+        return u.x | (u.y << 16u);
+    };
+
+    [[nodiscard]] static auto encode(float3 position, float3 normal, float3 tangent, float2 uv) noexcept {
         return Shape::Vertex{
             .pos = position,
             .compressed_normal = oct_encode(normal),

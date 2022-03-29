@@ -97,10 +97,9 @@ public:
         return {.L = L, .pdf = pdf};
     }
     [[nodiscard]] Light::Sample sample(
-        Sampler::Instance &sampler, Expr<float3> p_from, Expr<float3x3> env_to_world,
-        const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        Expr<float3> p_from, Expr<float3x3> env_to_world,
+        const SampledWavelengths &swl, Expr<float> time, Expr<float2> u) const noexcept override {
         auto [wi_local, pdf] = [&] {
-            auto u = sampler.generate_2d();
             if (_texture->node()->is_constant()) {
                 return std::make_pair(sample_uniform_sphere(u), def(uniform_sphere_pdf()));
             }

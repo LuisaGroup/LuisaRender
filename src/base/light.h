@@ -31,12 +31,20 @@ public:
     struct Evaluation {
         SampledSpectrum L;
         Float pdf;
+        [[nodiscard]] static auto zero(size_t spec_dim) noexcept {
+            return Evaluation{.L = SampledSpectrum{spec_dim}, .pdf = 0.f};
+        }
     };
 
     struct Sample {
         Evaluation eval;
         Float3 wi;
         Float distance;
+        [[nodiscard]] static auto zero(size_t spec_dim) noexcept {
+            return Sample{.eval = Evaluation::zero(spec_dim),
+                          .wi = make_float3(0.f, 0.f, 1.f),
+                          .distance = 0.f};
+        }
     };
 
     class Instance;
@@ -60,8 +68,8 @@ public:
         [[nodiscard]] virtual Evaluation evaluate(
             const Interaction &it_light, Expr<float3> p_from) const noexcept = 0;
         [[nodiscard]] virtual Sample sample(
-            Sampler::Instance &sampler, Expr<uint> light_inst_id,
-            Expr<float3> p_from) const noexcept = 0;
+            Expr<uint> light_inst_id, Expr<float3> p_from,
+            Expr<float> u_prim, Expr<float2> u) const noexcept = 0;
     };
 
     class Instance {

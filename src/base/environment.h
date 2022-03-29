@@ -32,8 +32,8 @@ public:
             Expr<float3> wi, Expr<float3x3> env_to_world,
             const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
         [[nodiscard]] virtual Light::Sample sample(
-            Sampler::Instance &sampler, Expr<float3> p_from, Expr<float3x3> env_to_world,
-            const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
+            Expr<float3> p_from, Expr<float3x3> env_to_world,
+            const SampledWavelengths &swl, Expr<float> time, Expr<float2> u) const noexcept = 0;
     };
 
 private:
