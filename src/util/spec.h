@@ -55,6 +55,12 @@ private:
     Local<float> _samples;
 
 public:
+    explicit SampledSpectrum(Float3 s) noexcept : _samples{3u} {
+        for (auto i = 0u; i < 3u; ++i) { _samples[i] = s[i]; }
+    }
+    explicit SampledSpectrum(Float4 s) noexcept : _samples{4u} {
+        for (auto i = 0u; i < 4u; ++i) { _samples[i] = s[i]; }
+    }
     explicit SampledSpectrum(size_t n, Expr<float> s = 0.f) noexcept : _samples{n} {
         for (auto i = 0u; i < n; i++) { _samples[i] = s; }
     }
@@ -111,6 +117,36 @@ public:
     [[nodiscard]] auto operator-() const noexcept {
         return map([](auto, auto s) noexcept { return -s; });
     }
+
+    [[nodiscard]] Float dot(Expr<float> t) const noexcept {
+        Float ans = 0.f;
+        for (auto i = 0u; i < dimension(); i++) { ans += (*this)[i]; }
+        return ans * t;
+    }
+    [[nodiscard]] Float dot(const Float &t) const noexcept {
+        Float ans = 0.f;
+        for (auto i = 0u; i < dimension(); i++) { ans += (*this)[i]; }
+        return ans * t;
+    }
+    [[nodiscard]] Float dot(const Float3 &t) const noexcept {
+        assert(3u == dimension());
+        Float ans = 0.f;
+        for (auto i = 0u; i < 3u; i++) { ans += (*this)[i] * t[i]; }
+        return ans;
+    }
+    [[nodiscard]] Float dot(const Float4 &t) const noexcept {
+        assert(4u == dimension());
+        Float ans = 0.f;
+        for (auto i = 0u; i < 4u; i++) { ans += (*this)[i] * t[i]; }
+        return ans;
+    }
+    [[nodiscard]] Float dot(const SampledSpectrum &t) const noexcept {
+        assert(t.dimension() == dimension());
+        Float ans = 0.f;
+        for (auto i = 0u; i < dimension(); i++) { ans += (*this)[i] * t[i]; }
+        return ans;
+    }
+
 //    template<uint N>                                                                    \
 //    [[nodiscard]] SampledSpectrum &operator op##=(Var<Vector<float, N>> rhs) noexcept { \
 //        for (auto i = 0u; i < min(N, dimension()); ++i) { (*this)[i] op## = rhs[i]; }   \

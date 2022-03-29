@@ -6,13 +6,13 @@ Film film : Color {
 Camera camera : Pinhole {
   position { -0.01, 0.995, 5.0 }
   fov { 27.8 }
-  spp { 4 }
+  spp { 256 }
   film { @film }
   file { "../renders/cbox-diff.exr" }
   filter : Gaussian {
     radius { 1 }
   }
-  target : Illum {
+  target : Image {
     file { "../renders/cbox.exr" }
   }
 }
@@ -116,6 +116,7 @@ Integrator pt : MegaPathGrad {
   sampler : Independent {}
   depth { 10 }
   spectrum : sRGB {}
+  // display { true }
 }
 
 Integrator normal : Normal {}

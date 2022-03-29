@@ -523,16 +523,15 @@ OrenNayar::Gradient OrenNayar::backward(
     auto sigma2 = sqr(radians(_sigma));
 
     // backward
-    LUISA_ERROR_WITH_LOCATION("Not implemented.");
-    //    auto sigma2_sigma = 2 * radians(_sigma) / 180.f;
-    //    auto a_sigma2 = -0.165f * sqr(sigma2 + 0.33f);
-    //    auto b_sigma2 = 0.0405f / sqr(sigma2 + 0.09f);
-    //    auto d_r = inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta);
-    //    auto d_a = _r * inv_pi;
-    //    auto d_b = _r * inv_pi * maxCos * sinAlpha * tanBeta;
-    //    auto d_sigma2 = d_a * a_sigma2 + d_b * b_sigma2;
-    //    auto d_sigma = d_sigma2 * sigma2_sigma;
-    //    return {.dR = df * d_r, .dSigma = df * d_sigma};
+    auto sigma2_sigma = 2 * radians(_sigma) / 180.f;
+    auto a_sigma2 = -0.165f * sqr(sigma2 + 0.33f);
+    auto b_sigma2 = 0.0405f / sqr(sigma2 + 0.09f);
+    auto d_r = inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta);
+    auto d_a = _r * inv_pi;
+    auto d_b = _r * inv_pi * maxCos * sinAlpha * tanBeta;
+    auto d_sigma2 = d_a * a_sigma2 + d_b * b_sigma2;
+    auto d_sigma = d_sigma2 * sigma2_sigma;
+    return {.dR = df * d_r, .dSigma = df.dot(d_sigma)};
 }
 
 SampledSpectrum FresnelBlend::Schlick(Expr<float> cosTheta) const noexcept {

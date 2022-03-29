@@ -82,7 +82,12 @@ public:
     explicit MegakernelGradRadiativeInstance(
         const MegakernelGradRadiative *node,
         Pipeline &pipeline, CommandBuffer &command_buffer) noexcept
-        : Integrator::Instance{pipeline, command_buffer, node} {}
+        : Integrator::Instance{pipeline, command_buffer, node} {
+        if (node->display_enabled()) {
+            auto first_film = pipeline.camera(0u)->film()->node();
+            _window.emplace("Display", first_film->resolution(), true);
+        }
+    }
 
     void display(CommandBuffer &command_buffer, const Film::Instance *film, uint spp) noexcept {
         static auto exposure = 0.f;
@@ -158,12 +163,21 @@ public:
         luisa::vector<float4> pixels;
         pipeline().printer().reset(stream);
 
-        for (auto k = 0u; k < 10u; ++k) {
+        auto learning_rate = 1.0f;
+        auto iteration_num = 100u;
+
+        _last_spp = 0u;
+        _clock.tic();
+        _framerate.clear();
+
+        for (auto k = 0u; k < iteration_num; ++k) {
             // render
             for (auto i = 0u; i < pipeline().camera_count(); i++) {
                 auto camera = pipeline().camera(i);
                 auto resolution = camera->film()->node()->resolution();
                 auto pixel_count = resolution.x * resolution.y;
+
+                _pixels.resize(next_pow2(pixel_count) * 4u);
 
                 _render_one_camera(command_buffer, pipeline(), this, camera);
             }
@@ -175,16 +189,9 @@ public:
             }
 
             // back propagate
-            pipeline().differentiation().step(command_buffer, 0.001f);
+            pipeline().differentiation().step(command_buffer, learning_rate);
         }
 
-<<<<<<< HEAD
-        == == == =
-                     // back propagate
-
-            pipeline().differentiation().step(command_buffer, 10.f);
-
->>>>>>> master
         // save results
         for (auto i = 0u; i < pipeline().camera_count(); i++) {
             auto camera = pipeline().camera(i);
@@ -215,6 +222,9 @@ public:
         }
 
         std::cout << pipeline().printer().retrieve(stream);
+        while (_window && !_window->should_close()) {
+            _window->run_one_frame([] {});
+        }
     }
 };
 
@@ -257,36 +267,23 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
             Float2{
                 (pixel_id.x + 0.5f) / resolution.x,
                 (pixel_id.y + 0.5f) / resolution.y}};
+        Float3 loss;
         switch (pt_exact->loss()) {
             case MegakernelGradRadiative::Loss::L1:
                 // L1 loss
-<<<<<<< HEAD
-                beta *= ite(pipeline.srgb_illuminant_spectrum(
-                                        camera->film()->read(pixel_id).average)
-                                        .sample(swl) -
-                                    camera->target()->evaluate(it, swl, time).value >=
-                                0.0f,
-                            1.0f,
-                            -1.0f);
+                loss = ite(
+                    camera->film()->read(pixel_id).average - camera->target()->evaluate(it, time).xyz() >= 0.0f,
+                    1.0f,
+                    -1.0f);
                 break;
             case MegakernelGradRadiative::Loss::L2:
                 // L2 loss
-                beta *= 2.0f * (pipeline.srgb_illuminant_spectrum(
-                                            camera->film()->read(pixel_id).average)
-                                    .sample(swl) -
-                                camera->target()->evaluate(it, swl, time).value);
-                == == == =
-                             beta *= ite(
-                                 camera->film()->read(pixel_id).average - camera->target()->evaluate(it, time).xyz() >= 0.0f,
-                                 1.0f,
-                                 -1.0f);
+                loss = 2.0f * (camera->film()->read(pixel_id).average -
+                               camera->target()->evaluate(it, time).xyz());
                 break;
-            case MegakernelGradRadiative::Loss::L2:
-                // L2 loss
-                beta *= 2.0f * (camera->film()->read(pixel_id).average -
-                                camera->target()->evaluate(it, time).xyz());
->>>>>>> master
-                break;
+        }
+        for (auto i = 0u; i < 3u; ++i) {
+            beta[i] *= loss[i];
         }
 
         auto ray = camera_ray;
@@ -398,8 +395,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
         }
     }
 
-    command_buffer << commit();
-    command_buffer << synchronize();
+    command_buffer << commit() << synchronize();
 
     LUISA_INFO("Backward propagation finished in {} ms.", clock.toc());
 }
