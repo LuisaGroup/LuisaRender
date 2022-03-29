@@ -6,51 +6,34 @@ Film film : Color {
 Camera camera : Pinhole {
   position { -0.01, 0.995, 5.0 }
   fov { 27.8 }
-  spp { 256 }
+  spp { 1024 }
   film { @film }
-  file { "../renders/cbox-diff.exr" }
+  file { "../renders/cbox-green.exr" }
   filter : Gaussian {
     radius { 1 }
-  }
-  target : Image {
-    file { "../renders/cbox.exr" }
   }
 }
 
 Surface cbox-white : Matte {
-  color : Constant {
-    v { 0.725, 0.71, 0.68 }
+  color : ConstColor {
+    color { 0.725, 0.71, 0.68 }
   }
-  Kd : Constant {
-    v { 0.725, 0.71, 0.68 }
+  Kd : ConstColor {
+    color { 0.725, 0.71, 0.68 }
   }
-  roughness : Constant {
-    v { 1 }
-  }
-}
-
-Surface cbox-red : Matte {
-  color : Constant {
-    v { 0.63, 0.065, 0.05 }
-  }
-  Kd : Constant {
-    // v { 0.63, 0.065, 0.05 }
-    v { 0.14, 0.45, 0.091 }
-    requires_grad { true }
-  }
-  roughness : Constant {
+  roughness : ConstGeneric {
     v { 1 }
   }
 }
 
 Surface cbox-green : Matte {
-  color : Constant {
-    v { 0.14, 0.45, 0.091 }
+  color : ConstColor {
+    color { 0.14, 0.45, 0.091 }
   }
-  Kd : Constant {
-    v { 0.14, 0.45, 0.091 }
+  Kd : ConstColor {
+    color { 0.14, 0.45, 0.091 }
   }
-  roughness : Constant {
+  roughness : ConstGeneric {
     v { 1 }
   }
 }
@@ -67,12 +50,33 @@ Shape cbox-floor : Mesh {
 
 Shape cbox-left-wall : Mesh {
   file { "../meshes/cbox-parts/left-wall.obj" }
-  surface { @cbox-red }
+  surface { @cbox-green }
 }
 
 Shape cbox-right-wall : Mesh {
   file { "../meshes/cbox-parts/right-wall.obj" }
   surface { @cbox-green }
+}
+
+Surface cbox-brick : Matte {
+  Kd : Color {
+    file { "../textures/brickwall.jpg" }
+    gamma { 0.5 }
+    encoding { "gamma" }
+  }
+  sigma : ConstGeneric {
+    v { 10 }
+  }
+  normal : Generic {
+    file { "../textures/brickwall_normal.jpg" }
+  }
+}
+
+Surface cbox-metal : Metal {
+  eta { "Au" }
+  roughness : ConstGeneric {
+    v { 0.2 }
+  }
 }
 
 Shape cbox-back-wall : Mesh {
@@ -93,8 +97,8 @@ Shape cbox-short-box : Mesh {
 Shape cbox-light : Mesh {
   file { "../meshes/cbox-parts/light.obj" }
   light : Diffuse {
-    emission : Constant {
-      v { 51.0, 36.0, 12.0 }
+    emission : ConstIllum {
+      emission { 51.0, 36.0, 12.0 }
     }
   }
 }
@@ -112,11 +116,9 @@ Shape cbox : Group {
   }
 }
 
-Integrator pt : MegaPathGrad {
+Integrator pt : MegaPath {
   sampler : Independent {}
   depth { 10 }
-  spectrum : sRGB {}
-  display { true }
 }
 
 Integrator normal : Normal {}

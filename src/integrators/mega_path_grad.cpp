@@ -82,7 +82,12 @@ public:
     explicit MegakernelGradRadiativeInstance(
         const MegakernelGradRadiative *node,
         Pipeline &pipeline, CommandBuffer &command_buffer) noexcept
-        : Integrator::Instance{pipeline, command_buffer, node} {}
+        : Integrator::Instance{pipeline, command_buffer, node} {
+        if (node->display_enabled()) {
+            auto first_film = pipeline.camera(0u)->film()->node();
+            _window.emplace("Display", first_film->resolution(), true);
+        }
+    }
 
     void display(CommandBuffer &command_buffer, const Film::Instance *film, uint spp) noexcept {
         static auto exposure = 0.f;
@@ -158,24 +163,34 @@ public:
         luisa::vector<float4> pixels;
         pipeline().printer().reset(stream);
 
-        // render
-        for (auto i = 0u; i < pipeline().camera_count(); i++) {
-            auto camera = pipeline().camera(i);
-            auto resolution = camera->film()->node()->resolution();
-            auto pixel_count = resolution.x * resolution.y;
+        auto learning_rate = 1.0f;
+        auto iteration_num = 100u;
 
-            _render_one_camera(command_buffer, pipeline(), this, camera);
+        _last_spp = 0u;
+        _clock.tic();
+        _framerate.clear();
+
+        for (auto k = 0u; k < iteration_num; ++k) {
+            // render
+            for (auto i = 0u; i < pipeline().camera_count(); i++) {
+                auto camera = pipeline().camera(i);
+                auto resolution = camera->film()->node()->resolution();
+                auto pixel_count = resolution.x * resolution.y;
+
+                _pixels.resize(next_pow2(pixel_count) * 4u);
+
+                _render_one_camera(command_buffer, pipeline(), this, camera);
+            }
+
+            // accumulate grads
+            for (auto i = 0u; i < pipeline().camera_count(); i++) {
+                auto camera = pipeline().camera(i);
+                _integrate_one_camera(command_buffer, pipeline(), this, camera);
+            }
+
+            // back propagate
+            pipeline().differentiation().step(command_buffer, learning_rate);
         }
-
-        // accumulate grads
-        for (auto i = 0u; i < pipeline().camera_count(); i++) {
-            auto camera = pipeline().camera(i);
-            _integrate_one_camera(command_buffer, pipeline(), this, camera);
-        }
-
-        // back propagate
-
-        pipeline().differentiation().step(command_buffer, 10.f);
 
         // save results
         for (auto i = 0u; i < pipeline().camera_count(); i++) {
@@ -207,6 +222,9 @@ public:
         }
 
         std::cout << pipeline().printer().retrieve(stream);
+        while (_window && !_window->should_close()) {
+            _window->run_one_frame([] {});
+        }
     }
 };
 
@@ -249,19 +267,23 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
             Float2{
                 (pixel_id.x + 0.5f) / resolution.x,
                 (pixel_id.y + 0.5f) / resolution.y}};
+        Float3 loss;
         switch (pt_exact->loss()) {
             case MegakernelGradRadiative::Loss::L1:
                 // L1 loss
-                beta *= ite(
+                loss = ite(
                     camera->film()->read(pixel_id).average - camera->target()->evaluate(it, time).xyz() >= 0.0f,
                     1.0f,
                     -1.0f);
                 break;
             case MegakernelGradRadiative::Loss::L2:
                 // L2 loss
-                beta *= 2.0f * (camera->film()->read(pixel_id).average -
-                                camera->target()->evaluate(it, time).xyz());
+                loss = 2.0f * (camera->film()->read(pixel_id).average -
+                               camera->target()->evaluate(it, time).xyz());
                 break;
+        }
+        for (auto i = 0u; i < 3u; ++i) {
+            beta[i] *= loss[i];
         }
 
         auto ray = camera_ray;
@@ -289,18 +311,12 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
             auto u_lobe = sampler->generate_1d();
             auto u_bsdf = sampler->generate_2d();
             pipeline.dynamic_dispatch_surface(surface_tag, [&](auto surface) {
-                // apply normal map
-                if (auto normal_map = surface->normal()) {
-                    auto normal_local = 2.f * normal_map->evaluate(*it, time).xyz() - 1.f;
-                    auto normal = it->shading().local_to_world(normal_local);
-                    it->set_shading(Frame::make(normal, it->shading().u()));
-                }
-                // apply alpha map
+                // apply roughness map
                 auto alpha_skip = def(false);
                 if (auto alpha_map = surface->alpha()) {
                     auto alpha = alpha_map->evaluate(*it, time).x;
-                    auto u_alpha = sampler->generate_1d();
-                    alpha_skip = alpha < u_alpha;
+                    alpha_skip = alpha < u_lobe;
+                    u_lobe = ite(alpha_skip, (u_lobe - alpha) / (1.f - alpha), u_lobe / alpha);
                 }
 
                 $if(alpha_skip) {
@@ -312,28 +328,16 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
                     auto closure = surface->closure(*it, swl, time);
 
                     // sample material
-                    auto sample = closure->sample(*sampler);
-                    auto cos_theta_i = dot(sample.wi, it->shading().n());
+                    auto sample = closure->sample(u_lobe, u_bsdf);
                     ray = it->spawn_ray(sample.wi);
                     pdf_bsdf = sample.eval.pdf;
-                    auto w = ite(sample.eval.pdf > 0.f, abs(cos_theta_i) / sample.eval.pdf, 0.f);
+                    auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
 
                     // radiative bp
                     // TODO : how to accumulate grads with different swl
                     closure->backward(sample.wi, beta * dLi);
 
-                    beta *= sample.eval.f * w;
-                    // specular transmission, consider eta scale
-                    $if(cos_theta_i * cos_theta_o < 0.f &
-                        max(sample.eval.alpha.x, sample.eval.alpha.y) < .05f) {
-                        auto entering = cos_theta_o > 0.f;
-                        for (auto i = 0u; i < swl.dimension(); i++) {
-                            eta_scale[i] = ite(
-                                entering,
-                                sqr(sample.eval.eta[i]),
-                                sqr(1.f / sample.eval.eta[i]));
-                        }
-                    };
+                    beta *= abs(dot(sample.eval.normal, sample.wi)) * w * sample.eval.f;
                 };
             });
 
@@ -375,8 +379,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
         }
     }
 
-    command_buffer << commit();
-    command_buffer << synchronize();
+    command_buffer << commit() << synchronize();
 
     LUISA_INFO("Backward propagation finished in {} ms.", clock.toc());
 }
@@ -467,18 +470,12 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
             auto u_lobe = sampler->generate_1d();
             auto u_bsdf = sampler->generate_2d();
             pipeline.dynamic_dispatch_surface(surface_tag, [&](auto surface) {
-                // apply normal map
-                if (auto normal_map = surface->normal()) {
-                    auto normal_local = 2.f * normal_map->evaluate(*it, time).xyz() - 1.f;
-                    auto normal = it->shading().local_to_world(normal_local);
-                    it->set_shading(Frame::make(normal, it->shading().u()));
-                }
-                // apply alpha map
+                // apply roughness map
                 auto alpha_skip = def(false);
                 if (auto alpha_map = surface->alpha()) {
                     auto alpha = alpha_map->evaluate(*it, time).x;
-                    auto u_alpha = sampler->generate_1d();
-                    alpha_skip = alpha < u_alpha;
+                    alpha_skip = alpha < u_lobe;
+                    u_lobe = ite(alpha_skip, (u_lobe - alpha) / (1.f - alpha), u_lobe / alpha);
                 }
 
                 $if(alpha_skip) {
@@ -493,33 +490,18 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
                     $if(light_sample.eval.pdf > 0.0f & !occluded) {
                         auto wi = light_sample.wi;
                         auto eval = closure->evaluate(wi);
-                        auto cos_theta_i = dot(it->shading().n(), wi);
-                        auto is_trans = cos_theta_i * cos_theta_o < 0.f;
                         auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
                         Li += mis_weight / light_sample.eval.pdf *
-                              abs_dot(it->shading().n(), wi) *
+                              abs_dot(eval.normal, wi) *
                               beta * eval.f * light_sample.eval.L;
                     };
 
                     // sample material
-                    auto sample = closure->sample(*sampler);
-                    auto cos_theta_i = dot(sample.wi, it->shading().n());
+                    auto sample = closure->sample(u_lobe, u_bsdf);
                     ray = it->spawn_ray(sample.wi);
                     pdf_bsdf = sample.eval.pdf;
-                    auto w = ite(sample.eval.pdf > 0.f, abs(cos_theta_i) / sample.eval.pdf, 0.f);
-                    beta *= sample.eval.f * w;
-
-                    // specular transmission, consider eta scale
-                    $if(cos_theta_i * cos_theta_o < 0.f &
-                        max(sample.eval.alpha.x, sample.eval.alpha.y) < .05f) {
-                        auto entering = cos_theta_o > 0.f;
-                        for (auto i = 0u; i < swl.dimension(); i++) {
-                            eta_scale[i] = ite(
-                                entering,
-                                sqr(sample.eval.eta[i]),
-                                sqr(1.f / sample.eval.eta[i]));
-                        }
-                    };
+                    auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
+                    beta *= abs(dot(sample.eval.normal, sample.wi)) * w * sample.eval.f;
                 };
             });
 

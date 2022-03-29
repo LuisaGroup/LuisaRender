@@ -116,17 +116,17 @@ private:
     }
     void backward(Expr<float3> wi, const SampledSpectrum &grad) const noexcept override {
         LUISA_ERROR_WITH_LOCATION("Not implemented.");
-//        auto _instance = instance<SubstrateInstance>();
-//        auto requires_grad_kd = _instance->Kd()->node()->requires_gradients(),
-//             requires_grad_ks = _instance->Ks()->node()->requires_gradients();
-//        $if(requires_grad_kd || requires_grad_ks) {
-//            auto wo_local = _it.wo_local();
-//            auto wi_local = _it.shading().world_to_local(wi);
-//            auto grad_params = _blend.grad(wo_local, wi_local);
-//
-//            _instance->Kd()->backward(_it, _swl, _time, grad_params[0] * grad);
-//            _instance->Ks()->backward(_it, _swl, _time, grad_params[1] * grad);
-//        };
+        //        auto _instance = instance<SubstrateInstance>();
+        //        auto requires_grad_kd = _instance->Kd()->node()->requires_gradients(),
+        //             requires_grad_ks = _instance->Ks()->node()->requires_gradients();
+        //        $if(requires_grad_kd || requires_grad_ks) {
+        //            auto wo_local = _it.wo_local();
+        //            auto wi_local = _it.shading().world_to_local(wi);
+        //            auto grad_params = _blend.grad(wo_local, wi_local);
+        //
+        //            _instance->Kd()->backward(_it, _swl, _time, grad_params[0] * grad);
+        //            _instance->Ks()->backward(_it, _swl, _time, grad_params[1] * grad);
+        //        };
     }
 };
 

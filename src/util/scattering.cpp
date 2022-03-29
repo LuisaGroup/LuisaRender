@@ -354,8 +354,8 @@ MicrofacetReflection::Gradient MicrofacetReflection::backward(
     auto wh = wi + wo;
     auto valid = cosThetaI != 0.f & cosThetaO != 0.f & any(wh != 0.f);
     wh = normalize(wh);
-    auto cosThetaI_grad = dot(wi, face_forward(wh, make_float3(0.f, 0.f, 1.f)));
-    auto F = _fresnel->evaluate(cosThetaI_grad);
+    auto cosI = dot(wi, face_forward(wh, make_float3(0.f, 0.f, 1.f)));
+    auto F = _fresnel->evaluate(cosI);
     auto D = _distribution->D(wh);
     auto G = _distribution->G(wo, wi);
 
@@ -509,7 +509,6 @@ SampledSpectrum OrenNayar::evaluate(Expr<float3> wo, Expr<float3> wi) const noex
 
 OrenNayar::Gradient OrenNayar::backward(
     Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
-
     auto sinThetaI = sin_theta(wi);
     auto sinThetaO = sin_theta(wo);
     // Compute cosine term of Oren-Nayar model
@@ -528,16 +527,15 @@ OrenNayar::Gradient OrenNayar::backward(
     auto sigma2 = sqr(radians(_sigma));
 
     // backward
-    LUISA_ERROR_WITH_LOCATION("Not implemented.");
-    //    auto sigma2_sigma = 2 * radians(_sigma) / 180.f;
-    //    auto a_sigma2 = -0.165f * sqr(sigma2 + 0.33f);
-    //    auto b_sigma2 = 0.0405f / sqr(sigma2 + 0.09f);
-    //    auto d_r = inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta);
-    //    auto d_a = _r * inv_pi;
-    //    auto d_b = _r * inv_pi * maxCos * sinAlpha * tanBeta;
-    //    auto d_sigma2 = d_a * a_sigma2 + d_b * b_sigma2;
-    //    auto d_sigma = d_sigma2 * sigma2_sigma;
-    //    return {.dR = df * d_r, .dSigma = df * d_sigma};
+    auto sigma2_sigma = 2 * radians(_sigma) / 180.f;
+    auto a_sigma2 = -0.165f * sqr(sigma2 + 0.33f);
+    auto b_sigma2 = 0.0405f / sqr(sigma2 + 0.09f);
+    auto d_r = inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta);
+    auto d_a = _r * inv_pi;
+    auto d_b = _r * inv_pi * maxCos * sinAlpha * tanBeta;
+    auto d_sigma2 = d_a * a_sigma2 + d_b * b_sigma2;
+    auto d_sigma = d_sigma2 * sigma2_sigma;
+    return {.dR = df * d_r, .dSigma = df.dot(d_sigma)};
 }
 
 SampledSpectrum FresnelBlend::Schlick(Expr<float> cosTheta) const noexcept {
