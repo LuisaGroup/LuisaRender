@@ -163,8 +163,8 @@ public:
         luisa::vector<float4> pixels;
         pipeline().printer().reset(stream);
 
-        auto learning_rate = 1.0f;
-        auto iteration_num = 100u;
+        static auto learning_rate = 5.0f;
+        static auto iteration_num = 100u;
 
         _last_spp = 0u;
         _clock.tic();
@@ -180,11 +180,7 @@ public:
                 _pixels.resize(next_pow2(pixel_count) * 4u);
 
                 _render_one_camera(command_buffer, pipeline(), this, camera);
-            }
 
-            // accumulate grads
-            for (auto i = 0u; i < pipeline().camera_count(); i++) {
-                auto camera = pipeline().camera(i);
                 _integrate_one_camera(command_buffer, pipeline(), this, camera);
             }
 
@@ -251,22 +247,24 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
 
     using namespace luisa::compute;
 
-    Kernel2D bp_kernel = [&](UInt frame_index, Float4x4 camera_to_world, Float3x3 camera_to_world_normal,
-                             Float3x3 env_to_world, Float time, Float shutter_weight) noexcept {
+    static Kernel2D bp_kernel = [&](UInt frame_index, Float4x4 camera_to_world, Float3x3 camera_to_world_normal,
+                                    Float3x3 env_to_world, Float time, Float shutter_weight, UInt spp) noexcept {
         set_block_size(8u, 8u, 1u);
 
         auto pixel_id = dispatch_id().xy();
         sampler->start(pixel_id, frame_index);
         auto [camera_ray, camera_weight] = camera->generate_ray(*sampler, pixel_id, time, camera_to_world);
         auto swl = pt->spectrum()->sample(*sampler);
-        SampledSpectrum beta{swl.dimension(), camera_weight * shutter_weight / float(pixel_count)};
-        SampledSpectrum dLi{swl.dimension(), 1.0f};
+        SampledSpectrum beta{swl.dimension(), camera_weight * shutter_weight / Float(pixel_count * spp)};
+        SampledSpectrum Li{swl.dimension(), 1.0f};
 
         auto it = Interaction{
             make_float3(1.0f),
             Float2{
                 (pixel_id.x + 0.5f) / resolution.x,
                 (pixel_id.y + 0.5f) / resolution.y}};
+
+        // Loss
         Float3 loss;
         switch (pt_exact->loss()) {
             case MegakernelGradRadiative::Loss::L1:
@@ -335,7 +333,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
 
                     // radiative bp
                     // TODO : how to accumulate grads with different swl
-                    closure->backward(sample.wi, beta * dLi);
+                    closure->backward(sample.wi, beta * Li);
 
                     beta *= abs(dot(sample.eval.normal, sample.wi)) * w * sample.eval.f;
                 };
@@ -352,7 +350,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
             };
         };
     };
-    auto bp_shader = pipeline.device().compile(bp_kernel);
+    static auto bp_shader = pipeline.device().compile(bp_kernel);
     auto shutter_samples = camera->node()->shutter_samples();
     command_buffer << synchronize();
 
@@ -370,7 +368,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
                                     env->node()->transform()->matrix(s.point.time))));
         for (auto i = 0u; i < s.spp; i++) {
             command_buffer << bp_shader(sample_id++, camera_to_world, camera_to_world_normal,
-                                        env_to_world, s.point.time, s.point.weight)
+                                        env_to_world, s.point.time, s.point.weight, s.spp)
                                   .dispatch(resolution);
             if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
                 command_buffer << commit();
@@ -415,8 +413,8 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
         return ite(pdf_a > 0.0f, pdf_a / (pdf_a + pdf_b), 0.0f);
     };
 
-    Kernel2D render_kernel = [&](UInt frame_index, Float4x4 camera_to_world, Float3x3 env_to_world,
-                                 Float time, Float shutter_weight) noexcept {
+    static Kernel2D render_kernel = [&](UInt frame_index, Float4x4 camera_to_world, Float3x3 env_to_world,
+                                        Float time, Float shutter_weight) noexcept {
         set_block_size(8u, 8u, 1u);
 
         auto pixel_id = dispatch_id().xy();
@@ -517,7 +515,7 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
         };
         camera->film()->accumulate(pixel_id, swl.srgb(Li * shutter_weight));
     };
-    auto render = pipeline.device().compile(render_kernel);
+    static auto render_shader = pipeline.device().compile(render_kernel);
     auto shutter_samples = camera->node()->shutter_samples();
     command_buffer << synchronize();
 
@@ -539,8 +537,8 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
                 env->node()->transform()->matrix(s.point.time))));
         }
         for (auto i = 0u; i < s.spp; i++) {
-            command_buffer << render(sample_id++, camera_to_world, env_to_world,
-                                     s.point.time, s.point.weight)
+            command_buffer << render_shader(sample_id++, camera_to_world, env_to_world,
+                                            s.point.time, s.point.weight)
                                   .dispatch(resolution);
             if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
                 command_buffer << commit();

@@ -129,19 +129,19 @@ public:
         return ans * t;
     }
     [[nodiscard]] Float dot(const Float3 &t) const noexcept {
-        assert(3u == dimension());
+        LUISA_ASSERT(3u == dimension(), "dimension error in dot operation");
         Float ans = 0.f;
         for (auto i = 0u; i < 3u; i++) { ans += (*this)[i] * t[i]; }
         return ans;
     }
     [[nodiscard]] Float dot(const Float4 &t) const noexcept {
-        assert(4u == dimension());
+        LUISA_ASSERT(4u == dimension(), "dimension error in dot operation");
         Float ans = 0.f;
         for (auto i = 0u; i < 4u; i++) { ans += (*this)[i] * t[i]; }
         return ans;
     }
     [[nodiscard]] Float dot(const SampledSpectrum &t) const noexcept {
-        assert(t.dimension() == dimension());
+        LUISA_ASSERT(t.dimension() == dimension(), "dimension error in dot operation");
         Float ans = 0.f;
         for (auto i = 0u; i < dimension(); i++) { ans += (*this)[i] * t[i]; }
         return ans;
