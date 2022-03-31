@@ -186,8 +186,9 @@ void Differentiation::accumulate(const Differentiation::TexturedParameter &param
             std::make_pair(make_float2(-.5f, +.5f), (1.f - t.x) * t.y),
             std::make_pair(make_float2(+.5f, -.5f), t.x * (1.f - t.y)),
             std::make_pair(make_float2(+.5f, +.5f), t.x * t.y)};
+        auto inv_size = 1.f / make_float2(param.image().size());
         for (auto &&[offset, weight] : offsets_and_weights) {
-            write_grad(map_uv(p + offset), weight * grad);
+            write_grad(map_uv(p + offset * inv_size), weight * grad);
         }
     }
 }
