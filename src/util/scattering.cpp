@@ -663,8 +663,10 @@ FresnelBlend::Gradient FresnelBlend::backward(
 
     auto d_rd = dv * (diffuse_rd);
     auto d_rs = dv * (diffuse_rs + specular_rs);
-    // TODO: alpha
-    return {.dRd = df * d_rd, .dRs = df * d_rs, .dAlpha = make_float2(0.f)};
+    auto d_alpha = dv * _distribution->grad_D(wh).dAlpha /
+                   (4.f * abs_dot(wi, wh) * max(absCosThetaI, absCosThetaO)) *
+                   df.dot(Schlick(dot(wi, wh)));
+    return {.dRd = df * d_rd, .dRs = df * d_rs, .dAlpha = d_alpha};
 }
 
 }// namespace luisa::render

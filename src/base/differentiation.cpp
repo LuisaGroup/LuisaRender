@@ -164,6 +164,8 @@ void Differentiation::accumulate(const Differentiation::TexturedParameter &param
             "Invalid texture address mode.");
     };
     auto write_grad = [&param, this](Expr<float2> uv, Expr<float4> grad) noexcept {
+        auto pixel_count = static_cast<float>(
+            param.image().size().x * param.image().size().y);
         $if(all(uv >= 0.f && uv < 1.f)) {
             auto size = param.image().size();
             auto st = clamp(make_uint2(uv * make_float2(size)), 0u, size - 1u);
@@ -171,7 +173,7 @@ void Differentiation::accumulate(const Differentiation::TexturedParameter &param
             auto nc = pixel_format_channel_count(param.image().format());
             auto offset = param.gradient_buffer_offset() + pixel_id * nc;
             for (auto i = 0u; i < nc; i++) {
-                atomic_float_add(*_grad_buffer, offset + i, grad[i]);
+                atomic_float_add(*_grad_buffer, offset + i, pixel_count * grad[i]);
             }
         };
     };

@@ -28,6 +28,8 @@ private:
     float _rr_threshold;
     Loss _loss_function;
     bool _display;
+    uint _iterations;
+    float _learning_rate;
 
 public:
     MegakernelGradRadiative(Scene *scene, const SceneNodeDesc *desc) noexcept
@@ -35,7 +37,9 @@ public:
           _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)},
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
-          _display{desc->property_bool_or_default("display")} {
+          _display{desc->property_bool_or_default("display")},
+          _iterations{std::max(desc->property_uint_or_default("iterations", 100u), 1u)},
+          _learning_rate{std::max(desc->property_float_or_default("learning_rate", 1.f), 0.f)} {
         auto loss_str = desc->property_string_or_default("loss", "L2");
         for (auto &c : loss_str) { c = static_cast<char>(toupper(c)); }
         if (loss_str == "L1") {
@@ -52,6 +56,8 @@ public:
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
+    [[nodiscard]] auto learning_rate() const noexcept { return _learning_rate; }
+    [[nodiscard]] auto iterations() const noexcept { return _iterations; }
     [[nodiscard]] auto loss() const noexcept { return _loss_function; }
     [[nodiscard]] bool is_differentiable() const noexcept override { return true; }
     [[nodiscard]] bool display_enabled() const noexcept { return _display; }
@@ -134,8 +140,8 @@ public:
         luisa::vector<float4> pixels;
         pipeline().printer().reset(stream);
 
-        static auto learning_rate = 10.0f;
-        static auto iteration_num = 1000u;
+        auto learning_rate = pt->learning_rate();
+        auto iteration_num = pt->iterations();
 
         for (auto k = 0u; k < iteration_num; ++k) {
             // render
