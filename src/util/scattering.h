@@ -46,7 +46,10 @@ public:
     [[nodiscard]] virtual Float3 sample_wh(Expr<float3> wo, Expr<float2> u) const noexcept = 0;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wh) const noexcept;
     [[nodiscard]] auto alpha() const noexcept { return _alpha; }
-    // TODO: backward
+
+    [[nodiscard]] virtual Gradient grad_Lambda(Expr<float3> w) const noexcept = 0;
+    [[nodiscard]] virtual Gradient grad_G(Expr<float3> wo, Expr<float3> wi) const noexcept;
+    [[nodiscard]] virtual Gradient grad_D(Expr<float3> wh) const noexcept = 0;
 };
 
 struct TrowbridgeReitzDistribution : public MicrofacetDistribution {
@@ -56,6 +59,9 @@ struct TrowbridgeReitzDistribution : public MicrofacetDistribution {
     [[nodiscard]] Float3 sample_wh(Expr<float3> wo, Expr<float2> u) const noexcept override;
     [[nodiscard]] static Float roughness_to_alpha(Expr<float> roughness) noexcept;
     [[nodiscard]] static Float2 roughness_to_alpha(Expr<float2> roughness) noexcept;
+
+    [[nodiscard]] Gradient grad_Lambda(Expr<float3> w) const noexcept override;
+    [[nodiscard]] Gradient grad_D(Expr<float3> wh) const noexcept override;
 };
 
 [[nodiscard]] Float fresnel_dielectric(Float cosThetaI, Float etaI, Float etaT) noexcept;

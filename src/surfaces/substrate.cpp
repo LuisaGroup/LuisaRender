@@ -54,6 +54,7 @@ public:
           _kd{Kd}, _ks{Ks}, _roughness{roughness} {}
     [[nodiscard]] auto Kd() const noexcept { return _kd; }
     [[nodiscard]] auto Ks() const noexcept { return _ks; }
+    [[nodiscard]] auto Roughness() const noexcept { return _roughness; }
 
 private:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
@@ -114,19 +115,20 @@ private:
                          .roughness = _distribution->alpha(),
                          .eta = _eta_i}};
     }
-    void backward(Expr<float3> wi, const SampledSpectrum &grad) const noexcept override {
-        LUISA_ERROR_WITH_LOCATION("Not implemented.");
-        //        auto _instance = instance<SubstrateInstance>();
-        //        auto requires_grad_kd = _instance->Kd()->node()->requires_gradients(),
-        //             requires_grad_ks = _instance->Ks()->node()->requires_gradients();
-        //        $if(requires_grad_kd || requires_grad_ks) {
-        //            auto wo_local = _it.wo_local();
-        //            auto wi_local = _it.shading().world_to_local(wi);
-        //            auto grad_params = _blend.grad(wo_local, wi_local);
-        //
-        //            _instance->Kd()->backward(_it, _swl, _time, grad_params[0] * grad);
-        //            _instance->Ks()->backward(_it, _swl, _time, grad_params[1] * grad);
-        //        };
+    void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
+        auto _instance = instance<SubstrateInstance>();
+        auto requires_grad_kd = _instance->Kd()->node()->requires_gradients(),
+             requires_grad_ks = _instance->Ks()->node()->requires_gradients();
+        $if(requires_grad_kd || requires_grad_ks) {
+            auto wo_local = _it.wo_local();
+            auto wi_local = _it.shading().world_to_local(wi);
+            auto grad = _blend->backward(wo_local, wi_local, df);
+
+            _instance->Kd()->backward_albedo_spectrum(_it, _swl, _time, grad.dRd);
+            _instance->Ks()->backward_albedo_spectrum(_it, _swl, _time, grad.dRs);
+            // TODO : roughness
+            //            _instance->Roughness()->backward(_it, _time, );
+        };
     }
 };
 

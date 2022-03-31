@@ -163,10 +163,21 @@ Float MicrofacetDistribution::pdf(Expr<float3> wo, Expr<float3> wh) const noexce
 MicrofacetDistribution::MicrofacetDistribution(Expr<float2> alpha) noexcept
     : _alpha{compute::max(alpha, 1e-3f)} {}
 
+MicrofacetDistribution::Gradient MicrofacetDistribution::grad_G(Expr<float3> wo, Expr<float3> wi) const noexcept {
+    auto k = -1.0f / sqr(1.0f + Lambda(wo) + Lambda(wi));
+    auto grad_Lambda_wo = grad_Lambda(wo);
+    auto grad_Lambda_wi = grad_Lambda(wi);
+    auto d_alpha = k * (grad_Lambda_wo.dAlpha + grad_Lambda_wi.dAlpha);
+
+    return {.dAlpha = d_alpha};
+}
+
 TrowbridgeReitzDistribution::TrowbridgeReitzDistribution(Expr<float2> alpha) noexcept
     : MicrofacetDistribution{alpha} {}
 
-Float TrowbridgeReitzDistribution::roughness_to_alpha(Expr<float> roughness) noexcept { return sqr(roughness); }
+Float TrowbridgeReitzDistribution::roughness_to_alpha(Expr<float> roughness) noexcept {
+    return sqr(roughness);
+}
 Float2 TrowbridgeReitzDistribution::roughness_to_alpha(Expr<float2> roughness) noexcept {
     return compute::make_float2(
         roughness_to_alpha(roughness.x),
@@ -257,6 +268,39 @@ Float3 TrowbridgeReitzDistribution::sample_wh(Expr<float3> wo, Expr<float2> u) c
     auto s = sign(cos_theta(wo));
     auto wh = TrowbridgeReitzSample(s * wo, alpha(), u);
     return s * wh;
+}
+
+MicrofacetDistribution::Gradient TrowbridgeReitzDistribution::grad_Lambda(Expr<float3> w) const noexcept {
+    using compute::isinf;
+    auto absTanTheta = abs(tan_theta(w));
+
+    auto alpha2 = cos2_phi(w) * sqr(alpha().x) +
+                  sin2_phi(w) * sqr(alpha().y);
+    auto alpha2Tan2Theta = alpha2 * sqr(absTanTheta);
+
+    auto d_Lambda = ite(isinf(absTanTheta), 0.f, 1.f);
+    auto d_alpha2Tan2Theta = d_Lambda * .25f / sqrt(1.f + alpha2Tan2Theta);
+    auto d_alpha2 = d_alpha2Tan2Theta * sqr(absTanTheta);
+    auto d_alpha = d_alpha2 * make_float2(.5f * cos2_phi(w) / sqr(alpha().x),
+                                          .5f * sin2_phi(w) / sqr(alpha().y));
+
+    return {.dAlpha = d_alpha};
+}
+MicrofacetDistribution::Gradient TrowbridgeReitzDistribution::grad_D(Expr<float3> wh) const noexcept {
+    using compute::isinf;
+    auto tan2Theta = tan2_theta(wh);
+    auto cos4Theta = sqr(cos2_theta(wh));
+
+    auto e = tan2Theta * (sqr(cos_phi(wh) / alpha().x) +
+                          sqr(sin_phi(wh) / alpha().y));
+    auto D = 1.0f / (pi * alpha().x * alpha().y * cos4Theta * sqr(1.f + e));
+
+    auto d_D = ite(isinf(tan2Theta), 0.f, 1.f);
+    auto d_e = -d_D * 2.f / (1.f + e) * D;
+    auto d_alpha = -make_float2(d_D * D / (alpha().x) + d_e * tan2Theta * 2.f * sqr(cos_phi(wh) / alpha().x) / alpha().x,
+                                d_D * D / (alpha().y) + d_e * tan2Theta * 2.f * sqr(cos_phi(wh) / alpha().y) / alpha().y);
+
+    return {.dAlpha = d_alpha};
 }
 
 SampledSpectrum FresnelConductor::evaluate(Expr<float> cosThetaI) const noexcept {
@@ -604,19 +648,21 @@ FresnelBlend::Gradient FresnelBlend::backward(
     auto absCosThetaO = abs_cos_theta(wo);
 
     auto wh = wi + wo;
-    auto valid = any(wh != 0.f);
+    auto valid = same_hemisphere(wo, wi) & any(wh != 0.f);
     wh = normalize(wh);
 
-    auto diffuse_rd = (28.f / (23.f * pi)) * (1.f - _rs) *
-                      (1.f - pow5(1.f - .5f * absCosThetaI)) *
-                      (1.f - pow5(1.f - .5f * absCosThetaO));
-    auto diffuse_rs = -(28.f / (23.f * pi)) * _rd *
-                      (1.f - pow5(1.f - .5f * absCosThetaI)) *
-                      (1.f - pow5(1.f - .5f * absCosThetaO));
-    auto specular_rs = 1 - pow5(1.f - dot(wi, wh));
+    auto k = (28.f / (23.f * pi)) *
+             (1.f - pow5(1.f - .5f * absCosThetaI)) *
+             (1.f - pow5(1.f - .5f * absCosThetaO));
+    auto dv = ite(valid, 1.f, 0.f);
+    auto diffuse_rd = (1.f - _rs) * k;
+    auto diffuse_rs = -_rd * k;
+    auto specular_rs = _distribution->D(wh) /
+                       (4.f * abs_dot(wi, wh) * max(absCosThetaI, absCosThetaO)) *
+                       (1 - pow5(1.f - dot(wi, wh)));
 
-    auto &&d_rd = diffuse_rd;
-    auto d_rs = diffuse_rs + specular_rs;
+    auto d_rd = dv * (diffuse_rd);
+    auto d_rs = dv * (diffuse_rs + specular_rs);
     // TODO: alpha
     return {.dRd = df * d_rd, .dRs = df * d_rs, .dAlpha = make_float2(0.f)};
 }

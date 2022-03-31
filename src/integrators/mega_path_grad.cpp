@@ -62,9 +62,6 @@ public:
 class MegakernelGradRadiativeInstance final : public Integrator::Instance {
 
 private:
-    uint _last_spp{0u};
-    Clock _clock;
-    Framerate _framerate;
     luisa::vector<float4> _pixels;
     luisa::optional<Window> _window;
 
@@ -102,8 +99,6 @@ public:
                 _window.reset();
                 return;
             }
-            _framerate.record(spp - _last_spp);
-            _last_spp = spp;
             _window->run_one_frame([&] {
                 auto resolution = film->node()->resolution();
                 auto pixel_count = resolution.x * resolution.y;
@@ -128,30 +123,6 @@ public:
                         linear <= 0.00304f);
                     p = make_float4(srgb, 1.f);
                 }
-                ImGui::Begin("Console", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-                ImGui::Text("Frame: %u", spp);
-                ImGui::Text("Time: %.1fs", _clock.toc() * 1e-3);
-                ImGui::Text("FPS: %.2f", _framerate.report());
-                ImGui::Checkbox("ACES", &aces);
-                if (aces) {
-                    ImGui::SameLine();
-                    ImGui::Spacing();
-                    ImGui::SameLine();
-                    if (ImGui::Button("Reset")) {
-                        a = 2.51f;
-                        b = 0.03f;
-                        c = 2.43f;
-                        d = 0.59f;
-                        e = 0.14f;
-                    }
-                    ImGui::SliderFloat("A", &a, 0.f, 3.f, "%.2f");
-                    ImGui::SliderFloat("B", &b, 0.f, 3.f, "%.2f");
-                    ImGui::SliderFloat("C", &c, 0.f, 3.f, "%.2f");
-                    ImGui::SliderFloat("D", &d, 0.f, 3.f, "%.2f");
-                    ImGui::SliderFloat("E", &e, 0.f, 3.f, "%.2f");
-                }
-                ImGui::SliderFloat("Exposure", &exposure, -10.f, 10.f, "%.1f");
-                ImGui::End();
                 _window->set_background(_pixels.data(), resolution);
             });
         }
@@ -163,12 +134,8 @@ public:
         luisa::vector<float4> pixels;
         pipeline().printer().reset(stream);
 
-        static auto learning_rate = 5.0f;
-        static auto iteration_num = 100u;
-
-        _last_spp = 0u;
-        _clock.tic();
-        _framerate.clear();
+        static auto learning_rate = 10.0f;
+        static auto iteration_num = 1000u;
 
         for (auto k = 0u; k < iteration_num; ++k) {
             // render
