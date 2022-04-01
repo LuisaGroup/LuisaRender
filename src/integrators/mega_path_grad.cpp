@@ -88,7 +88,7 @@ public:
         Pipeline &pipeline, CommandBuffer &command_buffer) noexcept
         : Integrator::Instance{pipeline, command_buffer, node} {
         if (node->display_camera_index() >= 0) {
-            LUISA_ASSERT(node->display_camera_index() <= pipeline.camera_count(),
+            LUISA_ASSERT(node->display_camera_index() < pipeline.camera_count(),
                          "display_camera_index exceeds camera count");
 
             auto film = pipeline.camera(node->display_camera_index())->film()->node();
