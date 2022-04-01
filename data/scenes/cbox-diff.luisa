@@ -6,7 +6,7 @@ Film film : Color {
 Camera camera : Pinhole {
   position { -0.01, 0.995, 5.0 }
   fov { 27.8 }
-  spp { 32 }
+  spp { 128 }
   film { @film }
   file { "../renders/cbox-diff.exr" }
   filter : Gaussian {
@@ -32,7 +32,7 @@ Surface cbox-gray : Matte {
   Kd : Image {
     file { "../scenes/gray.png" }
     requires_grad { true }
-    filter { "point" }
+    // filter { "point" }
   }
   sigma : Constant {
     v { 10 }
