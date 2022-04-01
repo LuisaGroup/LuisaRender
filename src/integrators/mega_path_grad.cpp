@@ -27,7 +27,7 @@ private:
     uint _rr_depth;
     float _rr_threshold;
     Loss _loss_function;
-    bool _display;
+    int _display_camera_index;
     uint _iterations;
     float _learning_rate;
 
@@ -37,7 +37,7 @@ public:
           _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)},
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
-          _display{desc->property_bool_or_default("display")},
+          _display_camera_index{desc->property_int_or_default("display_camera_index", -1)},
           _iterations{std::max(desc->property_uint_or_default("iterations", 100u), 1u)},
           _learning_rate{std::max(desc->property_float_or_default("learning_rate", 1.f), 0.f)} {
         auto loss_str = desc->property_string_or_default("loss", "L2");
@@ -60,7 +60,7 @@ public:
     [[nodiscard]] auto iterations() const noexcept { return _iterations; }
     [[nodiscard]] auto loss() const noexcept { return _loss_function; }
     [[nodiscard]] bool is_differentiable() const noexcept override { return true; }
-    [[nodiscard]] bool display_enabled() const noexcept { return _display; }
+    [[nodiscard]] int display_camera_index() const noexcept { return _display_camera_index; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
@@ -74,7 +74,8 @@ private:
 private:
     static void _render_one_camera(
         CommandBuffer &command_buffer, Pipeline &pipeline,
-        MegakernelGradRadiativeInstance *pt, Camera::Instance *camera) noexcept;
+        MegakernelGradRadiativeInstance *pt, Camera::Instance *camera,
+        bool display = false) noexcept;
 
     static void _integrate_one_camera(
         CommandBuffer &command_buffer, Pipeline &pipeline,
@@ -86,9 +87,14 @@ public:
         const MegakernelGradRadiative *node,
         Pipeline &pipeline, CommandBuffer &command_buffer) noexcept
         : Integrator::Instance{pipeline, command_buffer, node} {
-        if (node->display_enabled()) {
-            auto first_film = pipeline.camera(0u)->film()->node();
-            _window.emplace("Display", first_film->resolution(), true);
+        if (node->display_camera_index() >= 0) {
+            LUISA_ASSERT(node->display_camera_index() <= pipeline.camera_count(),
+                         "display_camera_index exceeds camera count");
+
+            auto film = pipeline.camera(node->display_camera_index())->film()->node();
+            _window.emplace("Display", film->resolution(), true);
+            auto pixel_count = film->resolution().x * film->resolution().y;
+            _pixels.resize(next_pow2(pixel_count) * 4u);
         }
     }
 
@@ -150,9 +156,8 @@ public:
                 auto resolution = camera->film()->node()->resolution();
                 auto pixel_count = resolution.x * resolution.y;
 
-                _pixels.resize(next_pow2(pixel_count) * 4u);
-
-                _render_one_camera(command_buffer, pipeline(), this, camera);
+                bool display = pt->display_camera_index() == i;
+                _render_one_camera(command_buffer, pipeline(), this, camera, display);
 
                 _integrate_one_camera(command_buffer, pipeline(), this, camera);
             }
@@ -357,7 +362,8 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
 
 void MegakernelGradRadiativeInstance::_render_one_camera(
     CommandBuffer &command_buffer, Pipeline &pipeline,
-    MegakernelGradRadiativeInstance *pt, Camera::Instance *camera) noexcept {
+    MegakernelGradRadiativeInstance *pt, Camera::Instance *camera,
+    bool display) noexcept {
 
     auto spp = camera->node()->spp();
     auto resolution = camera->film()->node()->resolution();
@@ -491,8 +497,6 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
     static auto render_shader = pipeline.device().compile(render_kernel);
     auto shutter_samples = camera->node()->shutter_samples();
     command_buffer << synchronize();
-
-    auto display = pt->node<MegakernelGradRadiative>()->display_enabled();
 
     Clock clock;
     auto dispatch_count = 0u;
