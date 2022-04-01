@@ -1015,14 +1015,14 @@ Camera camera : Pinhole {
   front { -0.9617919325828552, 0.07440698146820068, 0.2634764611721039 }
   up { 0.0, 1.0, 0.0 }
   fov { 58.71550708558254 }
-  spp { 1024 }
+  spp { 4096 }
   filter : Gaussian {
     radius { 1 }
   }
   film : Color {
     resolution { 1280, 720 }
   }
-  file { "color.exr" }
+  file { "living-room.exr" }
 }
 
 render {

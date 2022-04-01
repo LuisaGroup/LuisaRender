@@ -6,7 +6,7 @@ Film film : Color {
 Camera camera : Pinhole {
   position { -0.01, 0.995, 5.0 }
   fov { 27.8 }
-  spp { 128 }
+  spp { 4 }
   film { @film }
   file { "../renders/cbox-diff.exr" }
   filter : Gaussian {
@@ -57,7 +57,7 @@ Surface cbox-red : Matte {
   }
   Kd : Constant {
     v { 0.63, 0.065, 0.05 }
-    // requires_grad { true }
+    requires_grad { true }
   }
   roughness : Constant {
     v { 1 }
@@ -70,7 +70,7 @@ Surface cbox-green : Matte {
   }
   Kd : Constant {
     v { 0.14, 0.45, 0.091 }
-    // requires_grad { true }
+    requires_grad { true }
   }
   roughness : Constant {
     v { 1 }
@@ -89,12 +89,12 @@ Shape cbox-floor : Mesh {
 
 Shape cbox-left-wall : Mesh {
   file { "../meshes/cbox-parts/left-wall.obj" }
-  surface { @cbox-red }
+  surface { @cbox-green }
 }
 
 Shape cbox-right-wall : Mesh {
   file { "../meshes/cbox-parts/right-wall.obj" }
-  surface { @cbox-green }
+  surface { @cbox-red }
 }
 
 Shape cbox-back-wall : Mesh {

@@ -505,7 +505,7 @@ private:
                          .eta = _eta_i}};
     }
     void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
-        LUISA_ERROR_WITH_LOCATION("Metal surface is not differentiable.");
+        // Metal surface is not differentiable
     }
 };
 

@@ -78,7 +78,7 @@ Surface cbox-metal : Metal {
 
 Shape cbox-back-wall : Mesh {
   file { "cbox-parts/back-wall.obj" }
-  surface { @cbox-brick }
+  surface { @cbox-white }
 }
 
 Shape cbox-tall-box : Mesh {
