@@ -6,9 +6,9 @@ Film film : Color {
 Camera camera : Pinhole {
   position { -0.01, 0.995, 5.0 }
   fov { 27.8 }
-  spp { 128 }
+  spp { 4096 }
   film { @film }
-  file { "../renders/cbox-wave-sRGB.exr" }
+  file { "../renders/cbox-ref-brick.exr" }
   filter : Gaussian {
     radius { 1 }
   }

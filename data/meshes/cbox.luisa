@@ -60,13 +60,13 @@ Surface cbox-brick : Matte {
     gamma { 0.5 }
     encoding { "gamma" }
   }
-  sigma : Constant {
-    v { 10 }
-  }
-  normal : Image {
-    file { "../textures/brickwall_normal.jpg" }
-    encoding { "linear" }
-  }
+  // sigma : Constant {
+  //   v { 10 }
+  // }
+  // normal : Image {
+  //   file { "../textures/brickwall_normal.jpg" }
+  //   encoding { "linear" }
+  // }
 }
 
 Surface cbox-metal : Metal {

@@ -128,10 +128,10 @@ Shape cbox : Group {
 
 Integrator pt : MegaPathGrad {
   sampler : Independent {}
-  depth { 5 }
+  depth { 10 }
   spectrum : sRGB {}
   display { true }
-  learning_rate { 1 }
+  learning_rate { 2.5 }
   iterations { 1000 }
 }
 

@@ -2,8 +2,10 @@
 // Created by ChenXin on 2022/2/23.
 //
 
-#include <luisa-compute.h>
 #include <tinyexr.h>
+#include <stb/stb_image_write.h>
+
+#include <luisa-compute.h>
 
 #include <util/medium_tracker.h>
 #include <base/pipeline.h>
@@ -73,7 +75,7 @@ private:
 
 private:
     static void _render_one_camera(
-        CommandBuffer &command_buffer, Pipeline &pipeline,
+        CommandBuffer &command_buffer, Pipeline &pipeline, uint iteration,
         MegakernelGradRadiativeInstance *pt, Camera::Instance *camera) noexcept;
 
     static void _integrate_one_camera(
@@ -92,7 +94,7 @@ public:
         }
     }
 
-    void display(CommandBuffer &command_buffer, const Film::Instance *film, uint spp) noexcept {
+    void display(CommandBuffer &command_buffer, const Film::Instance *film, uint iteration) noexcept {
         static auto exposure = 0.f;
         static auto aces = false;
         static auto a = 2.51f;
@@ -110,6 +112,10 @@ public:
                 auto pixel_count = resolution.x * resolution.y;
                 film->download(command_buffer, _pixels.data());
                 command_buffer << synchronize();
+                auto file_name = luisa::format("outputs/{:05}.exr", iteration);
+                SaveEXR(reinterpret_cast<const float *>(_pixels.data()),
+                        static_cast<int>(resolution.x), static_cast<int>(resolution.y), 4,
+                        false, file_name.c_str(), nullptr);
                 auto scale = std::pow(2.f, exposure);
                 auto pow = [](auto v, auto a) noexcept {
                     return make_float3(
@@ -149,14 +155,10 @@ public:
                 auto camera = pipeline().camera(i);
                 auto resolution = camera->film()->node()->resolution();
                 auto pixel_count = resolution.x * resolution.y;
-
-                _pixels.resize(next_pow2(pixel_count) * 4u);
-
-                _render_one_camera(command_buffer, pipeline(), this, camera);
-
+                _pixels.resize(next_pow2(pixel_count));
+                _render_one_camera(command_buffer, pipeline(), k, this, camera);
                 _integrate_one_camera(command_buffer, pipeline(), this, camera);
             }
-
             // back propagate
             pipeline().differentiation().step(command_buffer, learning_rate);
         }
@@ -167,9 +169,9 @@ public:
             auto resolution = camera->film()->node()->resolution();
             auto pixel_count = resolution.x * resolution.y;
 
-            _render_one_camera(command_buffer, pipeline(), this, camera);
+            _render_one_camera(command_buffer, pipeline(), iteration_num, this, camera);
 
-            pixels.resize(next_pow2(pixel_count) * 4u);
+            pixels.resize(next_pow2(pixel_count));
             camera->film()->download(command_buffer, pixels.data());
             command_buffer << compute::synchronize();
             auto film_path = camera->node()->file();
@@ -220,6 +222,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
 
     using namespace luisa::compute;
 
+    // FIXME: do not use static here; not safe for JIT
     static Kernel2D bp_kernel = [&](UInt frame_index, Float4x4 camera_to_world, Float3x3 camera_to_world_normal,
                                     Float3x3 env_to_world, Float time, Float shutter_weight, UInt spp) noexcept {
         set_block_size(8u, 8u, 1u);
@@ -356,7 +359,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
 }
 
 void MegakernelGradRadiativeInstance::_render_one_camera(
-    CommandBuffer &command_buffer, Pipeline &pipeline,
+    CommandBuffer &command_buffer, Pipeline &pipeline, uint iteration,
     MegakernelGradRadiativeInstance *pt, Camera::Instance *camera) noexcept {
 
     auto spp = camera->node()->spp();
@@ -386,6 +389,7 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
         return ite(pdf_a > 0.0f, pdf_a / (pdf_a + pdf_b), 0.0f);
     };
 
+    // FIXME: do not use static here; not safe for JIT
     static Kernel2D render_kernel = [&](UInt frame_index, Float4x4 camera_to_world, Float3x3 env_to_world,
                                         Float time, Float shutter_weight) noexcept {
         set_block_size(8u, 8u, 1u);
@@ -496,12 +500,11 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
 
     Clock clock;
     auto dispatch_count = 0u;
-    auto dispatches_per_commit = display ? 4u : 16u;
+    auto dispatches_per_commit = 16u;
     auto sample_id = 0u;
     for (auto s : shutter_samples) {
         if (pipeline.update_geometry(command_buffer, s.point.time)) {
             dispatch_count = 0u;
-            if (display) { pt->display(command_buffer, camera->film(), sample_id); }
         }
         auto camera_to_world = camera->node()->transform()->matrix(s.point.time);
         auto env_to_world = make_float3x3(1.f);
@@ -516,10 +519,10 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
             if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
                 command_buffer << commit();
                 dispatch_count = 0u;
-                if (display) { pt->display(command_buffer, camera->film(), sample_id); }
             }
         }
     }
+    if (display) { pt->display(command_buffer, camera->film(), iteration); }
     command_buffer << synchronize();
     LUISA_INFO("Rendering finished in {} ms.", clock.toc());
 }
