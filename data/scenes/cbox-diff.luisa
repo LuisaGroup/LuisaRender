@@ -32,7 +32,6 @@ Surface cbox-gray : Matte {
   Kd : Image {
     file { "../scenes/gray.png" }
     requires_grad { true }
-    // filter { "point" }
   }
   sigma : Constant {
     v { 10 }
@@ -40,9 +39,6 @@ Surface cbox-gray : Matte {
 }
 
 Surface cbox-white : Matte {
-  color : Constant {
-    v { 0.725, 0.71, 0.68 }
-  }
   Kd : Constant {
     v { 0.725, 0.71, 0.68 }
   }
@@ -52,12 +48,10 @@ Surface cbox-white : Matte {
 }
 
 Surface cbox-red : Matte {
-  color : Constant {
-    v { 0.63, 0.065, 0.05 }
-  }
   Kd : Constant {
-    v { 0.63, 0.065, 0.05 }
-    // requires_grad { true }
+    // v { 0.63, 0.065, 0.05 }
+    v { 0.14, 0.45, 0.091 }
+    requires_grad { true }
   }
   roughness : Constant {
     v { 1 }
@@ -65,12 +59,10 @@ Surface cbox-red : Matte {
 }
 
 Surface cbox-green : Matte {
-  color : Constant {
-    v { 0.14, 0.45, 0.091 }
-  }
   Kd : Constant {
-    v { 0.14, 0.45, 0.091 }
-    // requires_grad { true }
+    // v { 0.14, 0.45, 0.091 }
+    v { 0.63, 0.065, 0.05 }
+    requires_grad { true }
   }
   roughness : Constant {
     v { 1 }

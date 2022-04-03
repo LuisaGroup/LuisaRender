@@ -28,7 +28,7 @@ Differentiation::Differentiation(Pipeline &pipeline) noexcept
             auto y = as<float>(gradients.read(offset + i * 4u + 1u));
             auto z = as<float>(gradients.read(offset + i * 4u + 2u));
             auto w = as<float>(gradients.read(offset + i * 4u + 3u));
-            grad += make_float4(x, y, x, w);
+            grad += make_float4(x, y, z, w);
         }
         auto old = params.read(thread);
         params.write(thread, fma(-alpha, grad, old));
@@ -103,26 +103,28 @@ void Differentiation::apply_gradients(CommandBuffer &command_buffer, float alpha
     LUISA_ASSERT(_grad_buffer, "Gradient buffer is not materialized.");
     if (auto n = _constant_params.size()) {
         luisa::vector<float4> params_before(n);
-        luisa::vector<float4> debug_gradients(n);
+        luisa::vector<float4> collision_avoiding_gradients(
+            n * gradiant_collision_avoidance_block_size);
         luisa::vector<float4> params_after(n);
         command_buffer << _const_param_buffer.subview(0u, n).copy_to(params_before.data())
-                       << _grad_buffer->subview(0u, 4 * n).copy_to(debug_gradients.data())
+                       << _grad_buffer->subview(0u, n * 4u * gradiant_collision_avoidance_block_size)
+                              .copy_to(collision_avoiding_gradients.data())
                        << _apply_grad_const(*_grad_buffer, _const_param_buffer, alpha)
                               .dispatch(n)
                        << _const_param_buffer.subview(0u, n).copy_to(params_after.data())
                        << compute::synchronize();
         for (auto i = 0u; i < n; i++) {
             auto p0 = params_before[i];
-            auto g = debug_gradients[i];
+            auto grad = make_float4();
+            for (auto g = 0u; g < gradiant_collision_avoidance_block_size; g++) {
+                auto index = i * gradiant_collision_avoidance_block_size + g;
+                grad += collision_avoiding_gradients[index];
+            }
             auto p1 = params_after[i];
             LUISA_INFO(
-                "Param #{}: \n"
-                "before = ({}, {}, {}, {}), \n"
-                "grad   = ({}, {}, {}, {}), \n"
-                "after  = ({}, {}, {}, {}).",
-                i,
-                p0.x, p0.y, p0.z, p0.w,
-                g.x, g.y, g.z, g.w,
+                "Param #{}: ({}, {}, {}, {}) - {} * ({}, {}, {}, {}) -> ({}, {}, {}, {}).",
+                i, p0.x, p0.y, p0.z, p0.w,
+                alpha, grad.x, grad.y, grad.z, grad.w,
                 p1.x, p1.y, p1.z, p1.w);
         }
     }
