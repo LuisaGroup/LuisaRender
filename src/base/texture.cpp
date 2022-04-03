@@ -10,6 +10,9 @@ namespace luisa::render {
 
 Texture::Texture(Scene *scene, const SceneNodeDesc *desc) noexcept
     : SceneNode{scene, desc, SceneNodeTag::TEXTURE},
+      _range{desc->property_float2_or_default(
+          "range", make_float2(std::numeric_limits<float>::min(),
+                               std::numeric_limits<float>::max()))},
       _requires_grad{desc->property_bool_or_default("requires_grad", false)} {}
 
 SampledSpectrum Texture::Instance::evaluate_albedo_spectrum(

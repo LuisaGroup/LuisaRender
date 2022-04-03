@@ -79,9 +79,8 @@ private:
         MegakernelGradRadiativeInstance *pt, Camera::Instance *camera) noexcept;
 
     static void _integrate_one_camera(
-        CommandBuffer &command_buffer, Pipeline &pipeline,
-        MegakernelGradRadiativeInstance *pt,
-        const Camera::Instance *camera) noexcept;
+        CommandBuffer &command_buffer, Pipeline &pipeline, uint iteration,
+        MegakernelGradRadiativeInstance *pt, const Camera::Instance *camera) noexcept;
 
 public:
     explicit MegakernelGradRadiativeInstance(
@@ -157,7 +156,7 @@ public:
                 auto pixel_count = resolution.x * resolution.y;
                 _pixels.resize(next_pow2(pixel_count));
                 _render_one_camera(command_buffer, pipeline(), k, this, camera);
-                _integrate_one_camera(command_buffer, pipeline(), this, camera);
+                _integrate_one_camera(command_buffer, pipeline(), k, this, camera);
             }
             // back propagate
             pipeline().differentiation().step(command_buffer, learning_rate);
@@ -191,11 +190,11 @@ public:
                     film_path.string());
             }
         }
-
         std::cout << pipeline().printer().retrieve(stream);
         while (_window && !_window->should_close()) {
             _window->run_one_frame([] {});
         }
+        pipeline().differentiation().dump(command_buffer, "outputs");
     }
 };
 
@@ -204,9 +203,8 @@ unique_ptr<Integrator::Instance> MegakernelGradRadiative::build(Pipeline &pipeli
 }
 
 void MegakernelGradRadiativeInstance::_integrate_one_camera(
-    CommandBuffer &command_buffer, Pipeline &pipeline,
-    MegakernelGradRadiativeInstance *pt,
-    const Camera::Instance *camera) noexcept {
+    CommandBuffer &command_buffer, Pipeline &pipeline, uint iteration,
+    MegakernelGradRadiativeInstance *pt, const Camera::Instance *camera) noexcept {
 
     auto spp = camera->node()->spp();
     auto resolution = camera->node()->film()->resolution();
@@ -343,7 +341,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
                                 transpose(inverse(make_float3x3(
                                     env->node()->transform()->matrix(s.point.time))));
         for (auto i = 0u; i < s.spp; i++) {
-            command_buffer << bp_shader(sample_id++, camera_to_world, camera_to_world_normal,
+            command_buffer << bp_shader(iteration * spp + sample_id++, camera_to_world, camera_to_world_normal,
                                         env_to_world, s.point.time, s.point.weight, s.spp)
                                   .dispatch(resolution);
             if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
@@ -354,8 +352,8 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
     }
 
     command_buffer << commit() << synchronize();
-
-    LUISA_INFO("Backward propagation finished in {} ms.", clock.toc());
+    LUISA_INFO("Backward propagation finished in {} ms (iteration = {}).",
+               clock.toc(), iteration);
 }
 
 void MegakernelGradRadiativeInstance::_render_one_camera(
@@ -513,7 +511,7 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
                 env->node()->transform()->matrix(s.point.time))));
         }
         for (auto i = 0u; i < s.spp; i++) {
-            command_buffer << render_shader(sample_id++, camera_to_world, env_to_world,
+            command_buffer << render_shader(iteration * spp + sample_id++, camera_to_world, env_to_world,
                                             s.point.time, s.point.weight)
                                   .dispatch(resolution);
             if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
@@ -524,7 +522,8 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
     }
     if (display) { pt->display(command_buffer, camera->film(), iteration); }
     command_buffer << synchronize();
-    LUISA_INFO("Rendering finished in {} ms.", clock.toc());
+    LUISA_INFO("Rendering finished in {} ms (iteration = {}).",
+               clock.toc(), iteration);
 }
 
 }// namespace luisa::render

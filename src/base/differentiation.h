@@ -52,12 +52,14 @@ public:
         const Image<float> &_image;
         TextureSampler _sampler;
         uint _grad_offset;
+        float2 _range;
 
     public:
-        TexturedParameter(const Image<float> &image, TextureSampler sampler, uint grad_offset) noexcept
-            : _image{image}, _sampler{sampler}, _grad_offset{grad_offset} {}
+        TexturedParameter(const Image<float> &image, TextureSampler sampler, uint grad_offset, float2 range) noexcept
+            : _image{image}, _sampler{sampler}, _grad_offset{grad_offset}, _range{range} {}
         [[nodiscard]] auto &image() const noexcept { return _image; }
         [[nodiscard]] auto sampler() const noexcept { return _sampler; }
+        [[nodiscard]] auto range() const noexcept { return _range; }
         [[nodiscard]] auto gradient_buffer_offset() const noexcept { return _grad_offset; }
     };
 
@@ -65,26 +67,29 @@ private:
     Pipeline &_pipeline;
     luisa::optional<BufferView<uint>> _grad_buffer;
     BufferView<float4> _const_param_buffer;
+    BufferView<float2> _const_param_range_buffer;
     uint _gradient_buffer_size;
     luisa::vector<float4> _constant_params;
+    luisa::vector<float2> _constant_ranges;
     luisa::vector<TexturedParameter> _textured_params;
     Shader1D<Buffer<uint>> _clear_grad;
-    Shader1D<Buffer<uint>, Buffer<float4>, float> _apply_grad_const;
-    Shader2D<Buffer<uint>, uint, Image<float>, uint, float> _apply_grad_tex;
+    Shader1D<Buffer<uint>, Buffer<float4>, Buffer<float2>, float> _apply_grad_const;
+    Shader2D<Buffer<uint>, uint, Image<float>, uint, float, float2> _apply_grad_tex;
 
 public:
     explicit Differentiation(Pipeline &pipeline) noexcept;
-    [[nodiscard]] ConstantParameter parameter(float x) noexcept;
-    [[nodiscard]] ConstantParameter parameter(float2 x) noexcept;
-    [[nodiscard]] ConstantParameter parameter(float3 x) noexcept;
-    [[nodiscard]] ConstantParameter parameter(float4 x) noexcept;
-    [[nodiscard]] ConstantParameter parameter(float4 x, uint channels) noexcept;
-    [[nodiscard]] TexturedParameter parameter(const Image<float> &image, TextureSampler s) noexcept;
+    [[nodiscard]] ConstantParameter parameter(float x, float2 range) noexcept;
+    [[nodiscard]] ConstantParameter parameter(float2 x, float2 range) noexcept;
+    [[nodiscard]] ConstantParameter parameter(float3 x, float2 range) noexcept;
+    [[nodiscard]] ConstantParameter parameter(float4 x, float2 range) noexcept;
+    [[nodiscard]] ConstantParameter parameter(float4 x, uint channels, float2 range) noexcept;
+    [[nodiscard]] TexturedParameter parameter(const Image<float> &image, TextureSampler s, float2 range) noexcept;
     void materialize(CommandBuffer &command_buffer) noexcept;
     void clear_gradients(CommandBuffer &command_buffer) noexcept;
     void apply_gradients(CommandBuffer &command_buffer, float alpha) noexcept;
     /// Apply then clear the gradients
     void step(CommandBuffer &command_buffer, float alpha) noexcept;
+    void dump(CommandBuffer &command_buffer, const std::filesystem::path &folder) const noexcept;
 
 public:
     [[nodiscard]] Float4 decode(const ConstantParameter &param) const noexcept;

@@ -203,7 +203,7 @@ luisa::unique_ptr<Texture::Instance> ImageTexture::build(Pipeline &pipeline, Com
     luisa::optional<Differentiation::TexturedParameter> param;
     if (requires_gradients()) {
         param.emplace(pipeline.differentiation().parameter(
-            *device_image, _sampler));
+            *device_image, _sampler, range()));
     }
     return luisa::make_unique<ImageTextureInstance>(
         pipeline, this, tex_id, std::move(param));
