@@ -85,7 +85,7 @@ void ColorFilmInstance::download(CommandBuffer &command_buffer, float4 *framebuf
 }
 
 void ColorFilmInstance::accumulate(Expr<uint2> pixel, Expr<float3> rgb) const noexcept {
-    $if(!any(isnan(rgb))) {
+    $if(!any(isnan(rgb) || isinf(rgb))) {
         auto pixel_id = pixel.y * node()->resolution().x + pixel.x;
         auto threshold = node<ColorFilm>()->clamp();
         auto lum = srgb_to_cie_y(rgb);

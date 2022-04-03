@@ -28,6 +28,10 @@ class Differentiation {
 
 public:
     static constexpr auto constant_parameter_buffer_capacity = 4096u;
+    static constexpr auto gradiant_collision_avoidance_block_size = 64u;
+    static constexpr auto constant_parameter_gradient_buffer_size =
+        constant_parameter_buffer_capacity * 4u *
+        gradiant_collision_avoidance_block_size;
 
     class ConstantParameter {
 

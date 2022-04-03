@@ -6,29 +6,32 @@
 #include <base/pipeline.h>
 #include <base/differentiation.h>
 #include <util/atomic.h>
+#include <util/rng.h>
 
 namespace luisa::render {
 
 Differentiation::Differentiation(Pipeline &pipeline) noexcept
     : _pipeline{pipeline},
       _const_param_buffer{*pipeline.create<Buffer<float4>>(constant_parameter_buffer_capacity)},
-      _gradient_buffer_size{constant_parameter_buffer_capacity * 4u} {
-
+      _gradient_buffer_size{constant_parameter_gradient_buffer_size} {
     _constant_params.reserve(constant_parameter_buffer_capacity);
-
     using namespace compute;
     Kernel1D clear_grad = [](BufferUInt gradients) noexcept {
         gradients.write(dispatch_x(), 0u);
     };
     Kernel1D apply_grad_const = [](BufferUInt gradients, BufferFloat4 params, Float alpha) noexcept {
-        auto i = dispatch_x();
-        auto x = as<float>(gradients.read(i * 4u + 0u));
-        auto y = as<float>(gradients.read(i * 4u + 1u));
-        auto z = as<float>(gradients.read(i * 4u + 2u));
-        auto w = as<float>(gradients.read(i * 4u + 3u));
-        auto grad = make_float4(x, y, z, w);
-        auto old = params.read(i);
-        params.write(i, fma(-alpha, grad, old));
+        auto thread = dispatch_x();
+        auto offset = thread * 4u * gradiant_collision_avoidance_block_size;
+        auto grad = def(make_float4());
+        for (auto i = 0u; i < gradiant_collision_avoidance_block_size; i++) {
+            auto x = as<float>(gradients.read(offset + i * 4u + 0u));
+            auto y = as<float>(gradients.read(offset + i * 4u + 1u));
+            auto z = as<float>(gradients.read(offset + i * 4u + 2u));
+            auto w = as<float>(gradients.read(offset + i * 4u + 3u));
+            grad += make_float4(x, y, x, w);
+        }
+        auto old = params.read(thread);
+        params.write(thread, fma(-alpha, grad, old));
     };
     Kernel2D apply_grad_tex = [](BufferUInt gradients, UInt offset, ImageFloat image, UInt channels, Float alpha) noexcept {
         auto coord = dispatch_id().xy();
@@ -138,8 +141,11 @@ Float4 Differentiation::decode(const Differentiation::ConstantParameter &param) 
 
 void Differentiation::accumulate(const Differentiation::ConstantParameter &param, Expr<float4> grad) const noexcept {
     LUISA_ASSERT(_grad_buffer, "Gradient buffer is not materialized.");
+    auto bs = gradiant_collision_avoidance_block_size;
+    auto slots = pcg4d(as<uint4>(grad)) % bs;
     for (auto i = 0u; i < param.channels(); i++) {
-        atomic_float_add(*_grad_buffer, param.index() * 4u + i, grad[i]);
+        auto offset = (param.index() * bs + slots[i]) * 4u + i;
+        atomic_float_add(*_grad_buffer, offset, grad[i]);
     }
 }
 

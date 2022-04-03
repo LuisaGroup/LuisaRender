@@ -15,6 +15,9 @@ namespace luisa::render {
 constexpr auto visible_wavelength_min = 360.0f;
 constexpr auto visible_wavelength_max = 830.0f;
 
+constexpr auto rgb_spectrum_peak_wavelengths =
+    make_float3(602.785f, 539.285f, 445.772f);
+
 using compute::ArrayVar;
 using compute::BindlessArray;
 using compute::Bool;
