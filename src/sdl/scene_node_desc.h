@@ -125,7 +125,7 @@ private:
     const SceneNodeDesc *_base{nullptr};
     SceneNodeTag _tag;
     luisa::vector<luisa::unique_ptr<SceneNodeDesc>> _internal_nodes;
-    luisa::unordered_map<luisa::string, value_list, Hash64> _properties;
+    luisa::unordered_map<luisa::string, value_list, Hash64, std::equal_to<>> _properties;
 
 public:
     template<typename T>
@@ -279,7 +279,7 @@ auto SceneNodeDesc::_property_convert(std::string_view name, Src &&src) const no
 template<typename T>
 inline luisa::optional<luisa::span<const detail::scene_node_raw_property_t<T>>>
 SceneNodeDesc::_property_raw_values(luisa::string_view name) const noexcept {
-    auto iter = _properties.find_as(name, Hash64{}, std::equal_to<>{});
+    auto iter = _properties.find(name);
     if (iter == _properties.cend()) {
         return _base == nullptr ?
                    luisa::nullopt :

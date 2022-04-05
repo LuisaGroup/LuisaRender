@@ -193,18 +193,16 @@ bool Pipeline::update_geometry(CommandBuffer &command_buffer, float time) noexce
     if (_dynamic_transforms.empty()) { return false; }
     if (_dynamic_transforms.size() < 128u) {
         for (auto t : _dynamic_transforms) {
-            _accel.set_transform(
-                t.instance_id(),
-                t.matrix(time));
+            _accel.set_transform_on_update(
+                t.instance_id(), t.matrix(time));
         }
     } else {
         ThreadPool::global().parallel(
             _dynamic_transforms.size(),
             [this, time](auto i) noexcept {
                 auto t = _dynamic_transforms[i];
-                _accel.set_transform(
-                    t.instance_id(),
-                    t.matrix(time));
+                _accel.set_transform_on_update(
+                    t.instance_id(), t.matrix(time));
             });
         ThreadPool::global().synchronize();
     }
@@ -221,7 +219,7 @@ Var<Shape::Handle> Pipeline::instance(Expr<uint> i) const noexcept {
 }
 
 Float4x4 Pipeline::instance_to_world(Expr<uint> i) const noexcept {
-    return _accel.instance_to_world(i);
+    return _accel.instance_transform(i);
 }
 
 Var<Triangle> Pipeline::triangle(const Var<Shape::Handle> &instance, Expr<uint> i) const noexcept {

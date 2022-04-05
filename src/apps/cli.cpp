@@ -83,7 +83,8 @@ int main(int argc, char *argv[]) {
 //        candela_offset += ies_profile.vertical_angles().size();
 //    }
 
-    auto device = context.create_device(backend, {{"index", index}});
+    auto device = context.create_device(
+        backend, luisa::format(R"({{"index": {}}})", index));
     Clock clock;
     auto scene_desc = SceneParser::parse(path);
     LUISA_INFO(
