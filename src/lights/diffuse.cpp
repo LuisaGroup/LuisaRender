@@ -43,7 +43,6 @@ public:
     [[nodiscard]] auto texture() const noexcept { return _texture; }
     [[nodiscard]] luisa::unique_ptr<Light::Closure> closure(
         const SampledWavelengths &swl, Expr<float> time) const noexcept override;
-    [[nodiscard]] auto Texture() const noexcept { return _texture; }
 };
 
 luisa::unique_ptr<Light::Instance> DiffuseLight::build(
