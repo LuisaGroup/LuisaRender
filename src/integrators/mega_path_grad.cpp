@@ -370,8 +370,8 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
     }
 
     command_buffer << commit() << synchronize();
-    LUISA_INFO("Backward propagation finished in {} ms (iteration = {}).",
-               clock.toc(), iteration);
+    LUISA_INFO("Backward propagation finished in {} ms.",
+               clock.toc());
 }
 
 void MegakernelGradRadiativeInstance::_render_one_camera(
@@ -396,6 +396,8 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
     sampler->reset(command_buffer, resolution, pixel_count, spp);
     command_buffer.commit();
 
+    LUISA_INFO("");
+    LUISA_INFO("Iteration = {}", iteration);
     LUISA_INFO(
         "Start rendering of resolution {}x{} at {}spp.",
         resolution.x, resolution.y, spp);
@@ -538,8 +540,8 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
     }
     if (display) { pt->display(command_buffer, camera->film(), iteration); }
     command_buffer << synchronize();
-    LUISA_INFO("Rendering finished in {} ms (iteration = {}).",
-               clock.toc(), iteration);
+    LUISA_INFO("Rendering finished in {} ms.",
+               clock.toc());
 }
 void MegakernelGradRadiativeInstance::_save_image(std::filesystem::path path,
                                                   const luisa::vector<float4> &pixels, uint2 resolution) noexcept {

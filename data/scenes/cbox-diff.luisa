@@ -110,7 +110,7 @@ Shape cbox : Group {
     @cbox-left-wall,
     @cbox-right-wall,
     @cbox-back-wall,
-    // @cbox-tall-box,
+    @cbox-tall-box,
     @cbox-short-box,
     @cbox-light
   }
@@ -121,7 +121,7 @@ Integrator pt : MegaPathGrad {
   depth { 10 }
   spectrum : sRGB {}
   display_camera_index { 0 }
-  learning_rate { 1 }
+  learning_rate { 3 }
   iterations { 256 }
 }
 
