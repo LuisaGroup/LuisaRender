@@ -67,7 +67,8 @@ luisa::unique_ptr<Texture::Instance> ConstantTexture::build(
     Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
     luisa::optional<Differentiation::ConstantParameter> param;
     if (requires_gradients()) {
-        param.emplace(pipeline.differentiation().parameter(_v, _channels));
+        param.emplace(pipeline.differentiation().parameter(
+            _v, _channels, range()));
     }
     return luisa::make_unique<ConstantTextureInstance>(pipeline, this, std::move(param));
 }

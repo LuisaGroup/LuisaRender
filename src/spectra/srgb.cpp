@@ -23,7 +23,7 @@ struct SRGBSpectrumInstance final : public Spectrum::Instance {
         : Spectrum::Instance{pipeline, spec} {}
     [[nodiscard]] SampledWavelengths sample(Sampler::Instance &sampler) const noexcept override {
         SampledWavelengths swl{this};
-        auto lambdas = make_float3(700.0f, 546.1f, 435.8f);
+        auto lambdas = rgb_spectrum_peak_wavelengths;
         for (auto i = 0u; i < 3u; i++) {
             swl.set_lambda(i, lambdas[i]);
             swl.set_pdf(i, 1.f);

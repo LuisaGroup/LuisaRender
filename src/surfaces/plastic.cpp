@@ -183,7 +183,7 @@ luisa::unique_ptr<Surface::Closure> PlasticInstance::_closure(
             for (auto i = 0u; i < eta.dimension(); i++) { eta[i] = e; }
         } else {
             auto e = _eta->evaluate(it, time).xyz();
-            auto inv_bb = sqr(1.f / make_float3(700.0f, 546.1f, 435.8f));
+            auto inv_bb = sqr(1.f / rgb_spectrum_peak_wavelengths);
             auto m = make_float3x3(make_float3(1.f), inv_bb, sqr(inv_bb));
             auto c = inverse(m) * e;
             for (auto i = 0u; i < swl.dimension(); i++) {

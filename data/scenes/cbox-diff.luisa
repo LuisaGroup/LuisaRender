@@ -17,32 +17,16 @@ Camera camera : Pinhole {
   }
 }
 
-Surface cbox-brick : Matte {
-  Kd : Image {
-    file { "../textures/brickwall.jpg" }
-    gamma { 0.5 }
-    encoding { "gamma" }
-  }
-  sigma : Constant {
-    v { 10 }
-  }
-}
-
 Surface cbox-gray : Matte {
-  Kd : Image {
-    file { "../scenes/gray.png" }
+  Kd : Placeholder {
+    resolution { 4096 }
     requires_grad { true }
-    // filter { "point" }
-  }
-  sigma : Constant {
-    v { 10 }
+    range { 0.00001, 0.99999 }
+    uv_scale { 1, -1 }
   }
 }
 
 Surface cbox-white : Matte {
-  color : Constant {
-    v { 0.725, 0.71, 0.68 }
-  }
   Kd : Constant {
     v { 0.725, 0.71, 0.68 }
   }
@@ -52,12 +36,11 @@ Surface cbox-white : Matte {
 }
 
 Surface cbox-red : Matte {
-  color : Constant {
-    v { 0.63, 0.065, 0.05 }
-  }
   Kd : Constant {
-    v { 0.63, 0.065, 0.05 }
-    // requires_grad { true }
+    // v { 0.63, 0.065, 0.05 }
+    v { 0.14, 0.45, 0.091 }
+    requires_grad { true }
+    range { 0, 1 }
   }
   roughness : Constant {
     v { 1 }
@@ -65,12 +48,11 @@ Surface cbox-red : Matte {
 }
 
 Surface cbox-green : Matte {
-  color : Constant {
-    v { 0.14, 0.45, 0.091 }
-  }
   Kd : Constant {
-    v { 0.14, 0.45, 0.091 }
-    // requires_grad { true }
+    // v { 0.14, 0.45, 0.091 }
+    v { 0.63, 0.065, 0.05 }
+    requires_grad { true }
+    range { 0, 1 }
   }
   roughness : Constant {
     v { 1 }
@@ -128,7 +110,7 @@ Shape cbox : Group {
     @cbox-left-wall,
     @cbox-right-wall,
     @cbox-back-wall,
-    @cbox-tall-box,
+    // @cbox-tall-box,
     @cbox-short-box,
     @cbox-light
   }
@@ -136,11 +118,11 @@ Shape cbox : Group {
 
 Integrator pt : MegaPathGrad {
   sampler : Independent {}
-  depth { 5 }
+  depth { 10 }
   spectrum : sRGB {}
   display_camera_index { 0 }
   learning_rate { 1 }
-  iterations { 60 }
+  iterations { 256 }
 }
 
 Integrator normal : Normal {}

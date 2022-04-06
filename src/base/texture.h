@@ -57,10 +57,12 @@ public:
     };
 
 private:
+    float2 _range;
     bool _requires_grad;
 
 public:
     Texture(Scene *scene, const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] auto range() const noexcept { return _range; }
     [[nodiscard]] auto requires_gradients() const noexcept { return _requires_grad; }
     void disable_gradients() noexcept { _requires_grad = false; }
     [[nodiscard]] virtual bool is_black() const noexcept = 0;
