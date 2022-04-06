@@ -298,3 +298,5 @@ CMakeSettings.json
 !out/build/x64-Release/bin/HLSLCompiler/*.*
 
 *.png
+/outputs/
+/imgui.ini

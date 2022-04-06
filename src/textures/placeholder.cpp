@@ -99,7 +99,7 @@ public:
         : Texture::Instance{pipeline, texture},
           _image{image}, _diff_param{std::move(param)} {
         _fill = pipeline.device().compile<2>([](ImageFloat image) noexcept {
-            image.write(dispatch_id().xy(), make_float4(.5f));
+            image.write(dispatch_id().xy(), make_float4(.5f, .5f, .5f, 1.f));
         });
         command_buffer << _fill(_image).dispatch(_image.size());
         _texture_id = pipeline.register_bindless(_image, sampler);

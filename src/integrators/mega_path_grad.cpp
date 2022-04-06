@@ -73,16 +73,16 @@ class MegakernelGradRadiativeInstance final : public Integrator::Instance {
 private:
     luisa::vector<float4> _pixels;
     luisa::optional<Window> _window;
+    luisa::unordered_map<const Camera::Instance *, Shader<2, uint, float4x4, float3x3, float, float>>
+        bp_shaders, render_shaders;
 
 private:
-    static void _render_one_camera(
-        CommandBuffer &command_buffer, Pipeline &pipeline, uint iteration,
-        MegakernelGradRadiativeInstance *pt, Camera::Instance *camera,
+    void _render_one_camera(
+        CommandBuffer &command_buffer, uint iteration, Camera::Instance *camera,
         bool display = false) noexcept;
 
-    static void _integrate_one_camera(
-        CommandBuffer &command_buffer, Pipeline &pipeline, uint iteration,
-        MegakernelGradRadiativeInstance *pt, const Camera::Instance *camera) noexcept;
+    void _integrate_one_camera(
+        CommandBuffer &command_buffer, uint iteration, const Camera::Instance *camera) noexcept;
     static void _save_image(
         std::filesystem::path path,
         const luisa::vector<float4> &pixels, uint2 resolution) noexcept;
@@ -101,6 +101,10 @@ public:
             auto pixel_count = film->resolution().x * film->resolution().y;
             _pixels.resize(next_pow2(pixel_count) * 4u);
         }
+
+        std::filesystem::path output_dir{"outputs"};
+        std::filesystem::remove_all(output_dir);
+        std::filesystem::create_directories(output_dir);
     }
 
     void display(CommandBuffer &command_buffer, const Film::Instance *film, uint iteration) noexcept {
@@ -179,15 +183,10 @@ public:
                 pixels.resize(next_pow2(pixel_count));
 
                 // render
-                _render_one_camera(command_buffer, pipeline(), k, this, camera, pt->display_camera_index() == i);
-
-                // save
-                camera->film()->download(command_buffer, pixels.data());
-                command_buffer << synchronize();
-                _save_image(output_path, pixels, resolution);
+                _render_one_camera(command_buffer, k, camera, pt->display_camera_index() == i);
 
                 // calculate grad
-                _integrate_one_camera(command_buffer, pipeline(), k, this, camera);
+                _integrate_one_camera(command_buffer, k, camera);
             }
             // back propagate
             pipeline().differentiation().step(command_buffer, learning_rate);
@@ -199,7 +198,7 @@ public:
             auto resolution = camera->film()->node()->resolution();
             auto pixel_count = resolution.x * resolution.y;
 
-            _render_one_camera(command_buffer, pipeline(), iteration_num, this, camera);
+            _render_one_camera(command_buffer, iteration_num, camera);
 
             pixels.resize(next_pow2(pixel_count));
             camera->film()->download(command_buffer, pixels.data());
@@ -221,15 +220,16 @@ unique_ptr<Integrator::Instance> MegakernelGradRadiative::build(Pipeline &pipeli
 }
 
 void MegakernelGradRadiativeInstance::_integrate_one_camera(
-    CommandBuffer &command_buffer, Pipeline &pipeline, uint iteration,
-    MegakernelGradRadiativeInstance *pt, const Camera::Instance *camera) noexcept {
+    CommandBuffer &command_buffer, uint iteration, const Camera::Instance *camera) noexcept {
 
     auto spp = camera->node()->spp();
     auto resolution = camera->node()->film()->resolution();
     LUISA_INFO("Start backward propagation.");
 
+    auto pt = this;
+
     auto sampler = pt->sampler();
-    auto env = pipeline.environment();
+    auto env = pipeline().environment();
 
     auto pixel_count = resolution.x * resolution.y;
     sampler->reset(command_buffer, resolution, pixel_count, spp);
@@ -238,111 +238,115 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
 
     using namespace luisa::compute;
 
-    // FIXME: do not use static here; not safe for JIT
-    static Kernel2D bp_kernel = [&](UInt frame_index, Float4x4 camera_to_world, Float3x3 camera_to_world_normal,
-                                    Float3x3 env_to_world, Float time, Float shutter_weight, UInt spp) noexcept {
-        set_block_size(8u, 8u, 1u);
+    auto shader_iter = bp_shaders.find(camera);
+    if (shader_iter == bp_shaders.end()) {
+        Kernel2D bp_kernel = [&](UInt frame_index, Float4x4 camera_to_world,
+                                 Float3x3 env_to_world, Float time, Float shutter_weight) noexcept {
+            set_block_size(8u, 8u, 1u);
 
-        auto pixel_id = dispatch_id().xy();
-        sampler->start(pixel_id, frame_index);
-        auto [camera_ray, camera_weight] = camera->generate_ray(*sampler, pixel_id, time, camera_to_world);
-        auto swl = pt->spectrum()->sample(*sampler);
-        SampledSpectrum beta{swl.dimension(), camera_weight * shutter_weight / Float(pixel_count * spp)};
-        SampledSpectrum Li{swl.dimension(), 1.0f};
+            auto pixel_id = dispatch_id().xy();
+            sampler->start(pixel_id, frame_index);
+            auto [camera_ray, camera_weight] = camera->generate_ray(*sampler, pixel_id, time, camera_to_world);
+            auto swl = pt->spectrum()->sample(*sampler);
+            SampledSpectrum beta{swl.dimension(), camera_weight};
+            SampledSpectrum Li{swl.dimension(), 1.0f};
+            auto grad_weight = shutter_weight / Float(pixel_count * spp);
 
-        auto it = Interaction{
-            make_float3(1.0f),
-            Float2{
-                (pixel_id.x + 0.5f) / resolution.x,
-                (pixel_id.y + 0.5f) / resolution.y}};
+            auto it = Interaction{
+                make_float3(1.0f),
+                Float2{
+                    (pixel_id.x + 0.5f) / resolution.x,
+                    (pixel_id.y + 0.5f) / resolution.y}};
 
-        // Loss
-        Float3 loss;
-        switch (pt_exact->loss()) {
-            case MegakernelGradRadiative::Loss::L1:
-                // L1 loss
-                loss = ite(
-                    camera->film()->read(pixel_id).average - camera->target()->evaluate(it, time).xyz() >= 0.0f,
-                    1.0f,
-                    -1.0f);
-                break;
-            case MegakernelGradRadiative::Loss::L2:
-                // L2 loss
-                loss = 2.0f * (camera->film()->read(pixel_id).average -
-                               camera->target()->evaluate(it, time).xyz());
-                break;
-        }
-        for (auto i = 0u; i < 3u; ++i) {
-            beta[i] *= loss[i];
-        }
+            // Loss
+            Float3 loss;
+            switch (pt_exact->loss()) {
+                case MegakernelGradRadiative::Loss::L1:
+                    // L1 loss
+                    loss = ite(
+                        camera->film()->read(pixel_id).average - camera->target()->evaluate(it, time).xyz() >= 0.0f,
+                        1.0f,
+                        -1.0f);
+                    break;
+                case MegakernelGradRadiative::Loss::L2:
+                    // L2 loss
+                    loss = 2.0f * (camera->film()->read(pixel_id).average -
+                                   camera->target()->evaluate(it, time).xyz());
+                    break;
+            }
+            for (auto i = 0u; i < 3u; ++i) {
+                beta[i] *= loss[i];
+            }
 
-        auto ray = camera_ray;
-        auto pdf_bsdf = def(1e16f);
+            auto ray = camera_ray;
+            auto pdf_bsdf = def(1e16f);
 
-        $for(depth, pt->node<MegakernelGradRadiative>()->max_depth()) {
+            $for(depth, pt->node<MegakernelGradRadiative>()->max_depth()) {
 
-            // trace
-            auto it = pipeline.intersect(ray);
+                // trace
+                auto it = pipeline().intersect(ray);
 
-            // miss
-            $if(!it->valid()) {
-                $break;
-            };
-
-            // hit light
-            // TODO
-
-            $if(!it->shape()->has_surface()) { $break; };
-
-            // evaluate material
-            SampledSpectrum eta_scale{swl.dimension(), 1.f};
-            auto cos_theta_o = it->wo_local().z;
-            auto surface_tag = it->shape()->surface_tag();
-            auto u_lobe = sampler->generate_1d();
-            auto u_bsdf = sampler->generate_2d();
-            pipeline.dynamic_dispatch_surface(surface_tag, [&](auto surface) {
-                // apply roughness map
-                auto alpha_skip = def(false);
-                if (auto alpha_map = surface->alpha()) {
-                    auto alpha = alpha_map->evaluate(*it, time).x;
-                    alpha_skip = alpha < u_lobe;
-                    u_lobe = ite(alpha_skip, (u_lobe - alpha) / (1.f - alpha), u_lobe / alpha);
-                }
-
-                $if(alpha_skip) {
-                    ray = it->spawn_ray(ray->direction());
-                    pdf_bsdf = 1e16f;
-                }
-                $else {
-                    // create closure
-                    auto closure = surface->closure(*it, swl, time);
-
-                    // sample material
-                    auto sample = closure->sample(u_lobe, u_bsdf);
-                    ray = it->spawn_ray(sample.wi);
-                    pdf_bsdf = sample.eval.pdf;
-                    auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
-
-                    // radiative bp
-                    // TODO : how to accumulate grads with different swl
-                    closure->backward(sample.wi, beta * Li);
-
-                    beta *= abs(dot(sample.eval.normal, sample.wi)) * w * sample.eval.f;
+                // miss
+                $if(!it->valid()) {
+                    $break;
                 };
-            });
 
-            // rr
-            $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
-            auto q = max(swl.cie_y(beta * eta_scale), .05f);
-            auto rr_depth = pt->node<MegakernelGradRadiative>()->rr_depth();
-            auto rr_threshold = pt->node<MegakernelGradRadiative>()->rr_threshold();
-            $if(depth >= rr_depth & q < rr_threshold) {
-                $if(sampler->generate_1d() >= q) { $break; };
-                beta *= 1.0f / q;
+                // hit light
+                // TODO
+
+                $if(!it->shape()->has_surface()) { $break; };
+
+                // evaluate material
+                SampledSpectrum eta_scale{swl.dimension(), 1.f};
+                auto cos_theta_o = it->wo_local().z;
+                auto surface_tag = it->shape()->surface_tag();
+                auto u_lobe = sampler->generate_1d();
+                auto u_bsdf = sampler->generate_2d();
+                pipeline().dynamic_dispatch_surface(surface_tag, [&](auto surface) {
+                    // apply roughness map
+                    auto alpha_skip = def(false);
+                    if (auto alpha_map = surface->alpha()) {
+                        auto alpha = alpha_map->evaluate(*it, time).x;
+                        alpha_skip = alpha < u_lobe;
+                        u_lobe = ite(alpha_skip, (u_lobe - alpha) / (1.f - alpha), u_lobe / alpha);
+                    }
+
+                    $if(alpha_skip) {
+                        ray = it->spawn_ray(ray->direction());
+                        pdf_bsdf = 1e16f;
+                    }
+                    $else {
+                        // create closure
+                        auto closure = surface->closure(*it, swl, time);
+
+                        // sample material
+                        auto sample = closure->sample(u_lobe, u_bsdf);
+                        ray = it->spawn_ray(sample.wi);
+                        pdf_bsdf = sample.eval.pdf;
+                        auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
+
+                        // radiative bp
+                        closure->backward(sample.wi, beta * grad_weight * Li);
+
+                        beta *= abs(dot(sample.eval.normal, sample.wi)) * w * sample.eval.f;
+                    };
+                });
+
+                // rr
+                $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
+                auto q = max(swl.cie_y(beta * eta_scale), .05f);
+                auto rr_depth = pt->node<MegakernelGradRadiative>()->rr_depth();
+                auto rr_threshold = pt->node<MegakernelGradRadiative>()->rr_threshold();
+                $if(depth >= rr_depth & q < rr_threshold) {
+                    $if(sampler->generate_1d() >= q) { $break; };
+                    beta *= 1.0f / q;
+                };
             };
         };
-    };
-    static auto bp_shader = pipeline.device().compile(bp_kernel);
+        auto bp_shader = pipeline().device().compile(bp_kernel);
+        shader_iter = bp_shaders.emplace(camera, std::move(bp_shader)).first;
+    }
+    auto &&bp_shader = shader_iter->second;
     auto shutter_samples = camera->node()->shutter_samples();
     command_buffer << synchronize();
 
@@ -351,16 +355,15 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
     auto dispatches_per_commit = 8u;
     auto sample_id = 0u;
     for (auto s : shutter_samples) {
-        if (pipeline.update_geometry(command_buffer, s.point.time)) { dispatch_count = 0u; }
+        if (pipeline().update_geometry(command_buffer, s.point.time)) { dispatch_count = 0u; }
         auto camera_to_world = camera->node()->transform()->matrix(s.point.time);
-        auto camera_to_world_normal = transpose(inverse(make_float3x3(camera_to_world)));
         auto env_to_world = env == nullptr || env->node()->transform()->is_identity() ?
                                 make_float3x3(1.0f) :
                                 transpose(inverse(make_float3x3(
                                     env->node()->transform()->matrix(s.point.time))));
         for (auto i = 0u; i < s.spp; i++) {
-            command_buffer << bp_shader(iteration * spp + sample_id++, camera_to_world, camera_to_world_normal,
-                                        env_to_world, s.point.time, s.point.weight, s.spp)
+            command_buffer << bp_shader(iteration * spp + sample_id++, camera_to_world,
+                                        env_to_world, s.point.time, s.point.weight)
                                   .dispatch(resolution);
             if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
                 command_buffer << commit();
@@ -375,8 +378,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
 }
 
 void MegakernelGradRadiativeInstance::_render_one_camera(
-    CommandBuffer &command_buffer, Pipeline &pipeline, uint iteration,
-    MegakernelGradRadiativeInstance *pt, Camera::Instance *camera,
+    CommandBuffer &command_buffer, uint iteration, Camera::Instance *camera,
     bool display) noexcept {
 
     auto spp = camera->node()->spp();
@@ -384,12 +386,13 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
     auto image_file = camera->node()->file();
 
     camera->film()->clear(command_buffer);
-    if (!pipeline.has_lighting()) [[unlikely]] {
+    if (!pipeline().has_lighting()) [[unlikely]] {
         LUISA_WARNING_WITH_LOCATION(
             "No lights in scene. Rendering aborted.");
         return;
     }
 
+    auto pt = this;
     auto light_sampler = pt->light_sampler();
     auto sampler = pt->sampler();
     auto pixel_count = resolution.x * resolution.y;
@@ -407,110 +410,114 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
         return ite(pdf_a > 0.0f, pdf_a / (pdf_a + pdf_b), 0.0f);
     };
 
-    // FIXME: do not use static here; not safe for JIT
-    static Kernel2D render_kernel = [&](UInt frame_index, Float4x4 camera_to_world, Float3x3 env_to_world,
-                                        Float time, Float shutter_weight) noexcept {
-        set_block_size(8u, 8u, 1u);
+    auto shader_iter = render_shaders.find(camera);
+    if (shader_iter == render_shaders.end()) {
+        Kernel2D render_kernel = [&](UInt frame_index, Float4x4 camera_to_world, Float3x3 env_to_world,
+                                     Float time, Float shutter_weight) noexcept {
+            set_block_size(8u, 8u, 1u);
 
-        auto pixel_id = dispatch_id().xy();
-        sampler->start(pixel_id, frame_index);
-        auto [camera_ray, camera_weight] = camera->generate_ray(
-            *sampler, pixel_id, time, camera_to_world);
-        auto swl = pt->spectrum()->sample(*sampler);
-        SampledSpectrum beta{swl.dimension(), camera_weight};
-        SampledSpectrum Li{swl.dimension()};
+            auto pixel_id = dispatch_id().xy();
+            sampler->start(pixel_id, frame_index);
+            auto [camera_ray, camera_weight] = camera->generate_ray(
+                *sampler, pixel_id, time, camera_to_world);
+            auto swl = pt->spectrum()->sample(*sampler);
+            SampledSpectrum beta{swl.dimension(), camera_weight};
+            SampledSpectrum Li{swl.dimension()};
 
-        auto ray = camera_ray;
-        auto pdf_bsdf = def(1e16f);
-        $for(depth, pt->node<MegakernelGradRadiative>()->max_depth()) {
+            auto ray = camera_ray;
+            auto pdf_bsdf = def(1e16f);
+            $for(depth, pt->node<MegakernelGradRadiative>()->max_depth()) {
 
-            // trace
-            auto it = pipeline.intersect(ray);
+                // trace
+                auto it = pipeline().intersect(ray);
 
-            // miss
-            $if(!it->valid()) {
-                if (pipeline.environment()) {
-                    auto eval = light_sampler->evaluate_miss(
-                        ray->direction(), env_to_world, swl, time);
-                    Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
-                }
-                $break;
-            };
-
-            // hit light
-            if (!pipeline.lights().empty()) {
-                $if(it->shape()->has_light()) {
-                    auto eval = light_sampler->evaluate_hit(
-                        *it, ray->origin(), swl, time);
-                    Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
+                // miss
+                $if(!it->valid()) {
+                    if (pipeline().environment()) {
+                        auto eval = light_sampler->evaluate_miss(
+                            ray->direction(), env_to_world, swl, time);
+                        Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
+                    }
+                    $break;
                 };
-            }
 
-            $if(!it->shape()->has_surface()) { $break; };
-
-            // sample one light
-            Light::Sample light_sample = light_sampler->sample(
-                *sampler, *it, env_to_world, swl, time);
-
-            // trace shadow ray
-            auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
-            auto occluded = pipeline.intersect_any(shadow_ray);
-
-            // evaluate material
-            SampledSpectrum eta_scale{swl.dimension(), 1.f};
-            auto cos_theta_o = it->wo_local().z;
-            auto surface_tag = it->shape()->surface_tag();
-            auto u_lobe = sampler->generate_1d();
-            auto u_bsdf = sampler->generate_2d();
-            pipeline.dynamic_dispatch_surface(surface_tag, [&](auto surface) {
-                // apply roughness map
-                auto alpha_skip = def(false);
-                if (auto alpha_map = surface->alpha()) {
-                    auto alpha = alpha_map->evaluate(*it, time).x;
-                    alpha_skip = alpha < u_lobe;
-                    u_lobe = ite(alpha_skip, (u_lobe - alpha) / (1.f - alpha), u_lobe / alpha);
-                }
-
-                $if(alpha_skip) {
-                    ray = it->spawn_ray(ray->direction());
-                    pdf_bsdf = 1e16f;
-                }
-                $else {
-                    // create closure
-                    auto closure = surface->closure(*it, swl, time);
-
-                    // direct lighting
-                    $if(light_sample.eval.pdf > 0.0f & !occluded) {
-                        auto wi = light_sample.wi;
-                        auto eval = closure->evaluate(wi);
-                        auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
-                        Li += mis_weight / light_sample.eval.pdf *
-                              abs_dot(eval.normal, wi) *
-                              beta * eval.f * light_sample.eval.L;
+                // hit light
+                if (!pipeline().lights().empty()) {
+                    $if(it->shape()->has_light()) {
+                        auto eval = light_sampler->evaluate_hit(
+                            *it, ray->origin(), swl, time);
+                        Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
                     };
+                }
 
-                    // sample material
-                    auto sample = closure->sample(u_lobe, u_bsdf);
-                    ray = it->spawn_ray(sample.wi);
-                    pdf_bsdf = sample.eval.pdf;
-                    auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
-                    beta *= abs(dot(sample.eval.normal, sample.wi)) * w * sample.eval.f;
+                $if(!it->shape()->has_surface()) { $break; };
+
+                // sample one light
+                Light::Sample light_sample = light_sampler->sample(
+                    *sampler, *it, env_to_world, swl, time);
+
+                // trace shadow ray
+                auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
+                auto occluded = pipeline().intersect_any(shadow_ray);
+
+                // evaluate material
+                SampledSpectrum eta_scale{swl.dimension(), 1.f};
+                auto cos_theta_o = it->wo_local().z;
+                auto surface_tag = it->shape()->surface_tag();
+                auto u_lobe = sampler->generate_1d();
+                auto u_bsdf = sampler->generate_2d();
+                pipeline().dynamic_dispatch_surface(surface_tag, [&](auto surface) {
+                    // apply roughness map
+                    auto alpha_skip = def(false);
+                    if (auto alpha_map = surface->alpha()) {
+                        auto alpha = alpha_map->evaluate(*it, time).x;
+                        alpha_skip = alpha < u_lobe;
+                        u_lobe = ite(alpha_skip, (u_lobe - alpha) / (1.f - alpha), u_lobe / alpha);
+                    }
+
+                    $if(alpha_skip) {
+                        ray = it->spawn_ray(ray->direction());
+                        pdf_bsdf = 1e16f;
+                    }
+                    $else {
+                        // create closure
+                        auto closure = surface->closure(*it, swl, time);
+
+                        // direct lighting
+                        $if(light_sample.eval.pdf > 0.0f & !occluded) {
+                            auto wi = light_sample.wi;
+                            auto eval = closure->evaluate(wi);
+                            auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
+                            Li += mis_weight / light_sample.eval.pdf *
+                                  abs_dot(eval.normal, wi) *
+                                  beta * eval.f * light_sample.eval.L;
+                        };
+
+                        // sample material
+                        auto sample = closure->sample(u_lobe, u_bsdf);
+                        ray = it->spawn_ray(sample.wi);
+                        pdf_bsdf = sample.eval.pdf;
+                        auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
+                        beta *= abs(dot(sample.eval.normal, sample.wi)) * w * sample.eval.f;
+                    };
+                });
+
+                // rr
+                $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
+                auto q = max(swl.cie_y(beta * eta_scale), .05f);
+                auto rr_depth = pt->node<MegakernelGradRadiative>()->rr_depth();
+                auto rr_threshold = pt->node<MegakernelGradRadiative>()->rr_threshold();
+                $if(depth >= rr_depth & q < rr_threshold) {
+                    $if(sampler->generate_1d() >= q) { $break; };
+                    beta *= 1.0f / q;
                 };
-            });
-
-            // rr
-            $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
-            auto q = max(swl.cie_y(beta * eta_scale), .05f);
-            auto rr_depth = pt->node<MegakernelGradRadiative>()->rr_depth();
-            auto rr_threshold = pt->node<MegakernelGradRadiative>()->rr_threshold();
-            $if(depth >= rr_depth & q < rr_threshold) {
-                $if(sampler->generate_1d() >= q) { $break; };
-                beta *= 1.0f / q;
             };
+            camera->film()->accumulate(pixel_id, swl.srgb(Li * shutter_weight));
         };
-        camera->film()->accumulate(pixel_id, swl.srgb(Li * shutter_weight));
-    };
-    static auto render_shader = pipeline.device().compile(render_kernel);
+        auto render_shader = pipeline().device().compile(render_kernel);
+        shader_iter = render_shaders.emplace(camera, std::move(render_shader)).first;
+    }
+    auto &&render_shader = shader_iter->second;
     auto shutter_samples = camera->node()->shutter_samples();
     command_buffer << synchronize();
 
@@ -519,12 +526,12 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
     auto dispatches_per_commit = 16u;
     auto sample_id = 0u;
     for (auto s : shutter_samples) {
-        if (pipeline.update_geometry(command_buffer, s.point.time)) {
+        if (pipeline().update_geometry(command_buffer, s.point.time)) {
             dispatch_count = 0u;
         }
         auto camera_to_world = camera->node()->transform()->matrix(s.point.time);
         auto env_to_world = make_float3x3(1.f);
-        if (auto env = pipeline.environment()) {
+        if (auto env = pipeline().environment()) {
             env_to_world = transpose(inverse(make_float3x3(
                 env->node()->transform()->matrix(s.point.time))));
         }
@@ -538,10 +545,10 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
             }
         }
     }
-    if (display) { pt->display(command_buffer, camera->film(), iteration); }
     command_buffer << synchronize();
     LUISA_INFO("Rendering finished in {} ms.",
                clock.toc());
+    if (display) { pt->display(command_buffer, camera->film(), iteration); }
 }
 void MegakernelGradRadiativeInstance::_save_image(std::filesystem::path path,
                                                   const luisa::vector<float4> &pixels, uint2 resolution) noexcept {

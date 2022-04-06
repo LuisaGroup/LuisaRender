@@ -43,6 +43,7 @@ public:
     [[nodiscard]] auto texture() const noexcept { return _texture; }
     [[nodiscard]] luisa::unique_ptr<Light::Closure> closure(
         const SampledWavelengths &swl, Expr<float> time) const noexcept override;
+    [[nodiscard]] auto Texture() const noexcept { return _texture; }
 };
 
 luisa::unique_ptr<Light::Instance> DiffuseLight::build(
@@ -93,6 +94,9 @@ struct DiffuseLightClosure final : public Light::Closure {
         return {.eval = closure.evaluate(it_light, p_from),
                 .wi = normalize(attrib.pg - p_from),
                 .distance = distance(attrib.pg, p_from) * .9999f};
+    }
+    void backward(const Interaction &it_light, Expr<float3> p_from, const SampledSpectrum &df) const noexcept override {
+        LUISA_ERROR_WITH_LOCATION("unimplemented");
     }
 };
 

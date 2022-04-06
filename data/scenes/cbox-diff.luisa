@@ -121,8 +121,8 @@ Integrator pt : MegaPathGrad {
   depth { 10 }
   spectrum : sRGB {}
   display_camera_index { 0 }
-  learning_rate { 3 }
-  iterations { 256 }
+  learning_rate { 1 }
+  iterations { 120 }
 }
 
 Integrator normal : Normal {}
