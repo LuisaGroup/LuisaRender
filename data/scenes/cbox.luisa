@@ -16,7 +16,7 @@ Camera camera : Pinhole {
 
 import "../meshes/cbox.luisa"
 
-Integrator pt : MegaPath {
+Integrator pt : WavePath {
   sampler : Independent {}
   depth { 10 }
   spectrum : sRGB {}
