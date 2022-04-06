@@ -9,6 +9,7 @@
 #include <base/pipeline.h>
 #include <base/integrator.h>
 #include <core/stl.h>
+#include <stb/stb_image_write.h>
 
 namespace luisa::render {
 
@@ -81,6 +82,9 @@ private:
         CommandBuffer &command_buffer, Pipeline &pipeline,
         MegakernelGradRadiativeInstance *pt,
         const Camera::Instance *camera) noexcept;
+    static void _save_image(
+        std::filesystem::path path,
+        const luisa::vector<float4> &pixels, uint2 resolution) noexcept;
 
 public:
     explicit MegakernelGradRadiativeInstance(
@@ -143,11 +147,20 @@ public:
     void render(Stream &stream) noexcept override {
         auto pt = node<MegakernelGradRadiative>();
         auto command_buffer = stream.command_buffer();
-        luisa::vector<float4> pixels;
         pipeline().printer().reset(stream);
+        luisa::vector<float4> pixels;
 
         auto learning_rate = pt->learning_rate();
         auto iteration_num = pt->iterations();
+
+        // delete output buffer
+        for (auto i = 0u; i < pipeline().camera_count(); i++) {
+            auto camera = pipeline().camera(i);
+            auto output_dir = camera->node()->file().parent_path() /
+                              luisa::format("output_buffer_camera_{:03}", i);
+            std::filesystem::remove_all(output_dir);
+            std::filesystem::create_directories(output_dir);
+        }
 
         for (auto k = 0u; k < iteration_num; ++k) {
             // render
@@ -155,10 +168,20 @@ public:
                 auto camera = pipeline().camera(i);
                 auto resolution = camera->film()->node()->resolution();
                 auto pixel_count = resolution.x * resolution.y;
+                auto output_path = camera->node()->file().parent_path() /
+                                   luisa::format("output_buffer_camera_{:03}", i) /
+                                   luisa::format("{:06}.exr", k);
+                pixels.resize(next_pow2(pixel_count) * 4u);
 
-                bool display = pt->display_camera_index() == i;
-                _render_one_camera(command_buffer, pipeline(), this, camera, display);
+                // render
+                _render_one_camera(command_buffer, pipeline(), this, camera, pt->display_camera_index() == i);
 
+                // save
+                camera->film()->download(command_buffer, pixels.data());
+                command_buffer << synchronize();
+                _save_image(output_path, pixels, resolution);
+
+                // calculate grad
                 _integrate_one_camera(command_buffer, pipeline(), this, camera);
             }
 
@@ -178,21 +201,8 @@ public:
             camera->film()->download(command_buffer, pixels.data());
             command_buffer << compute::synchronize();
             auto film_path = camera->node()->file();
-            if (film_path.extension() != ".exr") [[unlikely]] {
-                LUISA_WARNING_WITH_LOCATION(
-                    "Unexpected film file extension. "
-                    "Changing to '.exr'.");
-                film_path.replace_extension(".exr");
-            }
-            auto size = make_int2(resolution);
-            const char *err = nullptr;
-            SaveEXR(reinterpret_cast<const float *>(pixels.data()),
-                    size.x, size.y, 4, false, film_path.string().c_str(), &err);
-            if (err != nullptr) [[unlikely]] {
-                LUISA_ERROR_WITH_LOCATION(
-                    "Failed to save film to '{}'.",
-                    film_path.string());
-            }
+
+            _save_image(film_path, pixels, resolution);
         }
 
         std::cout << pipeline().printer().retrieve(stream);
@@ -383,8 +393,7 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
     command_buffer.commit();
 
     LUISA_INFO(
-        "Rendering to '{}' of resolution {}x{} at {}spp.",
-        image_file.string(),
+        "Start rendering of resolution {}x{} at {}spp.",
         resolution.x, resolution.y, spp);
 
     using namespace luisa::compute;
@@ -526,6 +535,32 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
     }
     command_buffer << synchronize();
     LUISA_INFO("Rendering finished in {} ms.", clock.toc());
+}
+void MegakernelGradRadiativeInstance::_save_image(std::filesystem::path path,
+                                                  const luisa::vector<float4> &pixels, uint2 resolution) noexcept {
+    // save results
+    auto pixel_count = resolution.x * resolution.y;
+    auto size = make_int2(resolution);
+
+    if (path.extension() != ".exr" && path.extension() != ".hdr") [[unlikely]] {
+        LUISA_WARNING_WITH_LOCATION(
+            "Unexpected film file extension. "
+            "Changing to '.exr'.");
+        path.replace_extension(".exr");
+    }
+
+    if (path.extension() == ".exr") {
+        const char *err = nullptr;
+        SaveEXR(reinterpret_cast<const float *>(pixels.data()),
+                size.x, size.y, 4, false, path.string().c_str(), &err);
+        if (err != nullptr) [[unlikely]] {
+            LUISA_ERROR_WITH_LOCATION(
+                "Failed to save film to '{}'.",
+                path.string());
+        }
+    } else if (path.extension() == ".hdr") {
+        stbi_write_hdr(path.string().c_str(), size.x, size.y, 4, reinterpret_cast<const float *>(pixels.data()));
+    }
 }
 
 }// namespace luisa::render
