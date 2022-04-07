@@ -39,7 +39,7 @@ public:
     [[nodiscard]] bool is_differentiable() const noexcept override { return false; }
     [[nodiscard]] auto state_count() const noexcept { return _state_count; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
+    [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
 class PathStateSOA {
@@ -256,8 +256,8 @@ public:
     }
 };
 
-unique_ptr<Integrator::Instance> WavefrontPathTracing::build(Pipeline &pipeline, CommandBuffer &cb) const noexcept {
-    return luisa::make_unique<WavefrontPathTracingInstance>(this, pipeline, cb);
+unique_ptr<Integrator::Instance> WavefrontPathTracing::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
+    return luisa::make_unique<WavefrontPathTracingInstance>(this, pipeline, command_buffer);
 }
 
 void WavefrontPathTracingInstance::_render_one_camera(
@@ -292,7 +292,8 @@ void WavefrontPathTracingInstance::_render_one_camera(
     using BufferHit = BufferVar<Hit>;
 
     LUISA_INFO("Compiling ray generation kernel.");
-    auto generate_rays_shader = device.compile<1>([&](BufferUInt path_indices, BufferRay rays, UInt base_sample_id, Float4x4 c2w, Float time) noexcept {
+    auto generate_rays_shader = device.compile<1>([&](BufferUInt path_indices, BufferRay rays,
+                                                      UInt base_sample_id, Float4x4 c2w, Float time) noexcept {
         auto state_id = dispatch_x();
         auto pixel_id = state_id % pixel_count;
         auto sample_id = base_sample_id + state_id / pixel_count;

@@ -25,7 +25,7 @@ void ProgressBar::done() noexcept {
 void ProgressBar::update(double progress) noexcept {
     using namespace std::chrono_literals;
     _progress = std::clamp(std::max(_progress, progress), 0.0, 1.0);
-    auto pos = static_cast<uint>(_width * _progress);
+    auto pos = static_cast<uint32_t>(_width * _progress);
     auto dt = static_cast<double>((clock_type::now() - _start) / 1ns) * 1e-9;
     std::cout << "\33[2K\r[";
     for (auto i = 0; i < _width; ++i) {
