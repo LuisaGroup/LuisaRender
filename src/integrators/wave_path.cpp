@@ -526,6 +526,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
     auto last_reported_sample_id = 0u;
     constexpr auto launches_per_commit = 16u;
     ProgressBar progress_bar;
+    progress_bar.update(0.0);
     auto progress_report_interval = std::max(spp / 32u, launches_per_commit);
     for (auto s : shutter_samples) {
         auto time = s.point.time;

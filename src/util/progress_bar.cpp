@@ -9,7 +9,7 @@
 
 namespace luisa::render {
 
-ProgressBar::ProgressBar(uint width) noexcept
+ProgressBar::ProgressBar(uint32_t width) noexcept
     : _progress{0.0f}, _width{width}, _start{clock_type::now()} {}
 
 void ProgressBar::reset() noexcept {
@@ -44,7 +44,7 @@ void ProgressBar::update(double progress) noexcept {
         std::cout << "] " << prompt;
     } else {
         auto prompt = luisa::format(
-            "({:.2f}s | {:.1f}%)", dt, _progress * 100);
+            "({:.1f}s | {:.1f}%)", dt, _progress * 100);
         std::cout << "] " << prompt;
     }
     std::cout.flush();

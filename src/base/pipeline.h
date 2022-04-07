@@ -91,8 +91,9 @@ private:
     luisa::vector<luisa::unique_ptr<Camera::Instance>> _cameras;
     luisa::unique_ptr<Integrator::Instance> _integrator;
     luisa::unique_ptr<Environment::Instance> _environment;
-    uint _rgb2spec_index{0u};
-    float _mean_time{0.0f};
+    uint _rgb2spec_index{};
+    float _mean_time{};
+    float _shadow_terminator_factor{};
     luisa::unique_ptr<Differentiation> _differentiation;
 
     Printer _printer;

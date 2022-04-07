@@ -32,6 +32,7 @@ struct Scene::Config {
     Environment *environment{nullptr};
     luisa::vector<Camera *> cameras;
     luisa::vector<Shape *> shapes;
+    float shadow_term_factor{0.f};
 };
 
 const Integrator *Scene::integrator() const noexcept { return _config->integrator; }
@@ -186,6 +187,8 @@ luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc
             "in the scene description.");
     }
     auto scene = luisa::make_unique<Scene>(ctx);
+    scene->_config->shadow_term_factor = std::clamp(
+        desc->root()->property_float_or_default("shadow_terminator", 0.f), 0.f, 1.f);
     scene->_config->integrator = scene->load_integrator(desc->root()->property_node("integrator"));
     scene->_config->environment = scene->load_environment(desc->root()->property_node_or_default("environment"));
     auto cameras = desc->root()->property_node_list("cameras");
@@ -230,6 +233,10 @@ luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc
         }
     }
     return scene;
+}
+
+float Scene::shadow_terminator_factor() const noexcept {
+    return _config->shadow_term_factor;
 }
 
 Scene::~Scene() noexcept = default;

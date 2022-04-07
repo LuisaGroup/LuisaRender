@@ -158,6 +158,7 @@ uint Pipeline::_process_light(CommandBuffer &command_buffer, const Light *light)
 luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, const Scene &scene) noexcept {
     ThreadPool::global().synchronize();
     auto pipeline = luisa::make_unique<Pipeline>(device);
+    pipeline->_shadow_terminator_factor = scene.shadow_terminator_factor();
     if (scene.integrator()->is_differentiable()) {
         pipeline->_differentiation =
             luisa::make_unique<Differentiation>(*pipeline);
@@ -245,7 +246,9 @@ ShadingAttribute Pipeline::shading_point(
     auto n1 = normalize(shape_to_world_normal * v1->normal());
     auto n2 = normalize(shape_to_world_normal * v2->normal());
     auto ns = normalize(bary.x * n0 + bary.y * n1 + bary.z * n2);
-    auto tangent_local = bary.x * v0->tangent() + bary.y * v1->tangent() + bary.z * v2->tangent();
+    auto tangent_local = bary.x * v0->tangent() +
+                         bary.y * v1->tangent() +
+                         bary.z * v2->tangent();
     auto tangent = normalize(shape_to_world_normal * tangent_local);
     // offset p to fake surface for the shadow terminator
     // reference: Ray Tracing Gems 2, Chap. 4
@@ -258,8 +261,13 @@ ShadingAttribute Pipeline::shading_point(
     auto dp = bary.x * (temp_u - dot_u * n0) +
               bary.y * (temp_v - dot_v * n1) +
               bary.z * (temp_w - dot_w * n2);
-    return {.pg = p, .ng = ng, .ps = p + dp, .ns = ns,
-            .tangent = tangent, .uv = uv, .area = area};
+    return {.pg = p,
+            .ng = ng,
+            .ps = p + _shadow_terminator_factor * dp,// FIXME: can be problematic
+            .ns = ns,
+            .tangent = tangent,
+            .uv = uv,
+            .area = area};
 }
 
 Var<Hit> Pipeline::trace_closest(const Var<Ray> &ray) const noexcept { return _accel.trace_closest(ray); }

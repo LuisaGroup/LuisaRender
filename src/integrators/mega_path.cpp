@@ -307,6 +307,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
 
     LUISA_INFO("Rendering started.");
     ProgressBar progress;
+    progress.update(0.0);
 
     auto display = pt->node<MegakernelPathTracing>()->display_enabled();
     auto dispatch_count = 0u;
