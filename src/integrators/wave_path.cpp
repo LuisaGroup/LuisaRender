@@ -498,6 +498,8 @@ void WavefrontPathTracingInstance::_render_one_camera(
     LUISA_INFO("Rendering started.");
     Clock clock;
     auto sample_id = 0u;
+    auto commit_frame_count = 0u;
+    constexpr auto frames_per_commit = 16u;
     for (auto s : shutter_samples) {
         auto time = s.point.time;
         pipeline().update_geometry(command_buffer, time);
@@ -544,8 +546,11 @@ void WavefrontPathTracingInstance::_render_one_camera(
                 std::swap(rays, out_rays);
                 std::swap(path_queue, out_path_queue);
             }
-            command_buffer << accumulate_shader(s.point.weight).dispatch(pixel_count)
-                           << commit();
+            command_buffer << accumulate_shader(s.point.weight).dispatch(pixel_count);
+            if (++commit_frame_count == frames_per_commit) {
+                command_buffer << commit();
+                commit_frame_count = 0u;
+            }
             sample_id++;
         }
     }
