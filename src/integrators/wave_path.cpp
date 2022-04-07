@@ -6,6 +6,7 @@
 #include <luisa-compute.h>
 
 #include <util/medium_tracker.h>
+#include <util/progress_bar.h>
 #include <base/pipeline.h>
 #include <base/integrator.h>
 
@@ -520,9 +521,12 @@ void WavefrontPathTracingInstance::_render_one_camera(
                    << synchronize();
 
     LUISA_INFO("Rendering started.");
-    Clock clock;
     auto sample_id = 0u;
+    auto last_launched_sample_id = 0u;
+    auto last_reported_sample_id = 0u;
     constexpr auto launches_per_commit = 16u;
+    ProgressBar progress_bar;
+    auto progress_report_interval = std::max(spp / 32u, launches_per_commit);
     for (auto s : shutter_samples) {
         auto time = s.point.time;
         pipeline().update_geometry(command_buffer, time);
@@ -574,13 +578,18 @@ void WavefrontPathTracingInstance::_render_one_camera(
             }
             command_buffer << accumulate_shader(s.point.weight).dispatch(launch_state_count);
             sample_id += launch_spp;
-            if (sample_id % launches_per_commit == 0u) {
+            if (sample_id - last_reported_sample_id >= progress_report_interval) {
+                command_buffer << synchronize();
+                last_reported_sample_id = sample_id;
+                progress_bar.update(sample_id / static_cast<double>(spp));
+            } else if (last_launched_sample_id - sample_id >= launches_per_commit) {
+                last_launched_sample_id = sample_id;
                 command_buffer << commit();
             }
         }
     }
     command_buffer << synchronize();
-    LUISA_INFO("Rendering finished in {} ms.", clock.toc());
+    progress_bar.done();
 }
 
 }// namespace luisa::render

@@ -1350,14 +1350,14 @@ Camera camera : Pinhole {
     radius { 1 }
   }
   film : Color {
-    resolution { 1280, 720 }
+    resolution { 3840, 2160 }
   }
   file { "color.exr" }
 }
 
 render {
   cameras { @camera }
-  integrator : MegaPath {}
+  integrator : WavePath {}
   shapes {
     @shape_0,
     @shape_1,

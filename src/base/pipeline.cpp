@@ -206,7 +206,7 @@ bool Pipeline::update_geometry(CommandBuffer &command_buffer, float time) noexce
             });
         ThreadPool::global().synchronize();
     }
-    command_buffer << _accel.update() << compute::commit();
+    command_buffer << _accel.update();
     return true;
 }
 

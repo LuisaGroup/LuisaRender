@@ -6,6 +6,7 @@
 #include <luisa-compute.h>
 
 #include <util/medium_tracker.h>
+#include <util/progress_bar.h>
 #include <base/pipeline.h>
 #include <base/integrator.h>
 
@@ -304,17 +305,15 @@ void MegakernelPathTracingInstance::_render_one_camera(
     auto shutter_samples = camera->node()->shutter_samples();
     command_buffer << synchronize();
 
-    auto display = pt->node<MegakernelPathTracing>()->display_enabled();
+    LUISA_INFO("Rendering started.");
+    ProgressBar progress;
 
-    Clock clock;
+    auto display = pt->node<MegakernelPathTracing>()->display_enabled();
     auto dispatch_count = 0u;
-    auto dispatches_per_commit = display ? 4u : 16u;
+    auto dispatches_per_commit = display ? 4u : 32u;
     auto sample_id = 0u;
     for (auto s : shutter_samples) {
-        if (pipeline.update_geometry(command_buffer, s.point.time)) {
-            dispatch_count = 0u;
-            if (display) { pt->display(command_buffer, camera->film(), sample_id); }
-        }
+        pipeline.update_geometry(command_buffer, s.point.time);
         auto camera_to_world = camera->node()->transform()->matrix(s.point.time);
         auto env_to_world = make_float3x3(1.f);
         if (auto env = pipeline.environment()) {
@@ -326,14 +325,20 @@ void MegakernelPathTracingInstance::_render_one_camera(
                                      s.point.time, s.point.weight)
                                   .dispatch(resolution);
             if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
-                command_buffer << commit();
                 dispatch_count = 0u;
-                if (display) { pt->display(command_buffer, camera->film(), sample_id); }
+                auto p = sample_id / static_cast<double>(spp);
+                if (display) {
+                    pt->display(command_buffer, camera->film(), sample_id);
+                    progress.update(p);
+                } else {
+                    command_buffer << synchronize();
+                    progress.update(p);
+                }
             }
         }
     }
     command_buffer << synchronize();
-    LUISA_INFO("Rendering finished in {} ms.", clock.toc());
+    progress.done();
 }
 
 }// namespace luisa::render

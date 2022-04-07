@@ -10305,13 +10305,13 @@ Camera camera : Pinhole {
   film : Color {
     resolution { 720, 1280 }
   }
-  file { "color-wave-spectral.exr" }
+  file { "color.exr" }
 }
 
 render {
   cameras { @camera }
   integrator : WavePath {
-    depth { 3 }
+    depth { 10 }
     spectrum : sRGB {}
   }
   shapes {
