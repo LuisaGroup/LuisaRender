@@ -3,20 +3,6 @@ Film film : Color {
   exposure { 0 }
 }
 
-Camera camera : Pinhole {
-  position { -0.01, 0.995, 5.0 }
-  fov { 27.8 }
-  spp { 256 }
-  film { @film }
-  file { "../renders/cbox-diff.exr" }
-  filter : Gaussian {
-    radius { 1 }
-  }
-  target : Image {
-    file { "../renders/cbox-ref-brick.exr" }
-  }
-}
-
 Surface cbox-gray : Matte {
   Kd : Placeholder {
     resolution { 4096 }
@@ -131,11 +117,25 @@ Integrator pt : MegaPathGrad {
   depth { 10 }
   spectrum : sRGB {}
   display_camera_index { 0 }
-  learning_rate { 1 }
+  learning_rate { 0.1 }
   iterations { 120 }
 }
 
 Integrator normal : Normal {}
+
+Camera camera : Pinhole {
+  position { -0.01, 0.995, 5.0 }
+  fov { 27.8 }
+  spp { 256 }
+  film { @film }
+  file { "../renders/cbox-diff.exr" }
+  filter : Gaussian {
+    radius { 1 }
+  }
+  target : Image {
+    file { "../renders/cbox-ref-brick.exr" }
+  }
+}
 
 render {
   cameras { @camera }

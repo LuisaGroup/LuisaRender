@@ -135,7 +135,7 @@ Surface mat_Painting1 : Matte {
   //  file { "textures/Painting1.jpg" }
   //}
   Kd : Placeholder {
-    resolution { 1024 }
+    resolution { 128 }
     requires_grad { true }
     range { 0.00001, 0.99999 }
     uv_scale { 1, -1 }
@@ -147,7 +147,7 @@ Surface mat_Painting2 : Matte {
   //  file { "textures/Painting2.jpg" }
   //}
   Kd : Placeholder {
-    resolution { 1024 }
+    resolution { 4096 }
     requires_grad { true }
     range { 0.00001, 0.99999 }
     uv_scale { 1, -1 }
@@ -159,7 +159,7 @@ Surface mat_Painting3 : Matte {
   //  file { "textures/Painting3.jpg" }
   //}
   Kd : Placeholder {
-    resolution { 1024 }
+    resolution { 128 }
     requires_grad { true }
     range { 0.00001, 0.99999 }
     uv_scale { 1, -1 }
@@ -228,7 +228,7 @@ Surface mat_Wallpaper : Matte {
   //  file { "textures/Wallpaper.jpg" }
   //}
   Kd : Placeholder {
-    resolution { 1024 }
+    resolution { 4096 }
     requires_grad { true }
     range { 0.00001, 0.99999 }
     uv_scale { 1, -1 }
@@ -10375,15 +10375,15 @@ Integrator pt : MegaPathGrad {
   sampler : Independent {}
   depth { 10 }
   spectrum : sRGB {}
-  display_camera_index { 0 }
-  learning_rate { 5 }
+  display_camera_index { 1 }
+  learning_rate { 0.02 }
   iterations { 30 }
 }
 
 render {
   cameras {
     @camera0,
-    @camera1,
+    // @camera1,
     @camera2
   }
   integrator {

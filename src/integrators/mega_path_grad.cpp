@@ -269,7 +269,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
             auto swl = pt->spectrum()->sample(*sampler);
             SampledSpectrum beta{swl.dimension(), camera_weight};
             SampledSpectrum Li{swl.dimension(), 1.0f};
-            auto grad_weight = shutter_weight / Float(pixel_count * spp);
+            auto grad_weight = shutter_weight * static_cast<float>(pt->node<MegakernelGradRadiative>()->max_depth());
 
             auto it = Interaction{
                 make_float3(1.0f),

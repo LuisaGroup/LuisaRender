@@ -33,7 +33,6 @@ public:
         }
         _channels = v.size();
         for (auto i = 0u; i < v.size(); i++) { _v[i] = scale * v[i]; }
-        for (auto i = _channels; i < 4u; i++) { _v[i] = _v[_channels - 1u]; }
     }
     [[nodiscard]] auto v() const noexcept { return _v; }
     [[nodiscard]] bool is_black() const noexcept override { return all(_v == 0.0f); }
