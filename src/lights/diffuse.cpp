@@ -43,7 +43,6 @@ public:
     [[nodiscard]] auto texture() const noexcept { return _texture; }
     [[nodiscard]] luisa::unique_ptr<Light::Closure> closure(
         const SampledWavelengths &swl, Expr<float> time) const noexcept override;
-    [[nodiscard]] auto Texture() const noexcept { return _texture; }
 };
 
 luisa::unique_ptr<Light::Instance> DiffuseLight::build(
@@ -96,7 +95,23 @@ struct DiffuseLightClosure final : public Light::Closure {
                 .distance = distance(attrib.pg, p_from) * .9999f};
     }
     void backward(const Interaction &it_light, Expr<float3> p_from, const SampledSpectrum &df) const noexcept override {
-        LUISA_ERROR_WITH_LOCATION("unimplemented");
+        // TODO
+        LUISA_WARNING_WITH_LOCATION("Not implemented.");
+
+        using namespace luisa::compute;
+        auto light = instance<DiffuseLightInstance>();
+        auto cos_wo = dot(it_light.wo(), it_light.shading().n());
+        auto front_face = cos_wo > 0.0f;
+
+        auto L = light->texture()->evaluate_illuminant_spectrum(it_light, _swl, _time) *
+                 light->node<DiffuseLight>()->scale();
+
+        auto d_L = df * ite(front_face, 1.f, 0.f);
+        auto d_texture = d_L * light->node<DiffuseLight>()->scale();
+        auto d_scale = d_L.dot(light->texture()->evaluate_illuminant_spectrum(it_light, _swl, _time));
+
+        light->texture()->backward_albedo_spectrum(it_light, _swl, _time, d_texture);
+        // TODO : scale
     }
 };
 

@@ -22,7 +22,7 @@ Integrator pt : MegaPath {
 
 Shape image-light : Mesh {
   file { "../meshes/square.obj" }
-  two_sided { false }
+  two_sided { true }
   transform : SRT {
     scale { 1.5, 1, 1 }
     translate { 0, 1.2, -0.97 }
@@ -31,7 +31,8 @@ Shape image-light : Mesh {
     emission : Image {
       file {
         // "/Users/mike/Downloads/_DSC9322.jpg" }
-        "/Users/mike/Downloads/WechatIMG16.jpeg" }
+        // "/Users/mike/Downloads/WechatIMG16.jpeg" }
+        "./staircase/color.png" }
       uv_offset { 0, 0 }
       uv_scale { 1 }
       scale { 30 }

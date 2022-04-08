@@ -44,6 +44,14 @@ public:
         [[nodiscard]] virtual Light::Sample sample(
             Sampler::Instance &sampler, const Interaction &it_from, Expr<float3x3> env_to_world,
             const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
+        //        virtual void backward_hit(
+        //            const Interaction &it, Expr<float3> p_from,
+        //            const SampledWavelengths &swl, Expr<float> time,
+        //            const SampledSpectrum &df) const noexcept = 0;
+        //        virtual void backward_miss(
+        //            Expr<float3> wi, Expr<float3x3> env_to_world,
+        //            const SampledWavelengths &swl, Expr<float> time,
+        //            const SampledSpectrum &df) const noexcept = 0;
     };
 
 public:

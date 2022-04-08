@@ -10293,23 +10293,62 @@ Shape shape_774 : Mesh {
   }
 }
 
-Camera camera : Pinhole {
+Camera camera0 : Pinhole {
   position { 0.03242092579603195, 1.526729941368103, 4.881969451904297 }
   front { -0.007646017242223024, 0.04505503550171852, -0.998955249786377 }
   up { 0.0, 1.0, 0.0 }
   fov { 58.543979551022964 }
-  spp { 128 }
+  spp { 512 }
   filter : Gaussian {
     radius { 1 }
   }
   film : Color {
     resolution { 720, 1280 }
   }
-  file { "color-wave-spectral.exr" }
+  file { "staircase0-diff.exr" }
+  target : Image {
+    file { "./staircase0-ref-4096spp.exr" }
+  }
+}
+
+Camera camera1 : Pinhole {
+  position { 0.23242092579603195, 3.026729941368103, 4.881969451904297 }
+  front { -0.0176, -0.2505, -0.967956605432289 }
+  up { 0.0, 1.0, 0.0 }
+  fov { 58.543979551022964 }
+  spp { 512 }
+  filter : Gaussian {
+    radius { 1 }
+  }
+  film : Color {
+    resolution { 720, 1280 }
+  }
+  file { "staircase1-diff.exr" }
+  target : Image {
+    file { "./staircase1-ref-4096spp.exr" }
+  }
+}
+
+Camera camera2 : Pinhole {
+  position { -0.03242092579603195, 5.026729941368103, 0.081969451904297 }
+  front { -0.0176, -0.2505, -0.967956605432289 }
+  up { 0.0, 1.0, 0.0 }
+  fov { 75 }
+  spp { 512 }
+  filter : Gaussian {
+    radius { 1 }
+  }
+  film : Color {
+    resolution { 720, 1280 }
+  }
+  file { "staircase2-diff.exr" }
+  target : Image {
+    file { "./staircase2-ref-4096spp.exr" }
+  }
 }
 
 render {
-  cameras { @camera }
+  cameras { @camera0 }
   integrator : WavePath {
     spectrum : Hero {}
   }

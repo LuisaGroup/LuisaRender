@@ -150,7 +150,7 @@ private:
     }
     void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
         // TODO
-        LUISA_ERROR_WITH_LOCATION("Not implemented.");
+        LUISA_WARNING_WITH_LOCATION("Not implemented.");
     }
 };
 

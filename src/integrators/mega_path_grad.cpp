@@ -51,9 +51,10 @@ public:
             _loss_function = Loss::L2;
         } else {
             LUISA_WARNING_WITH_LOCATION(
-                "unknown loss '{}'. "
+                "Unknown loss '{}'. "
                 "Fallback to L2 loss.",
                 loss_str);
+            _loss_function = Loss::L2;
         }
     }
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
@@ -157,39 +158,49 @@ public:
         auto pt = node<MegakernelGradRadiative>();
         auto command_buffer = stream.command_buffer();
         pipeline().printer().reset(stream);
-        luisa::vector<float4> pixels;
+
+        luisa::vector<float4> rendered;
 
         auto learning_rate = pt->learning_rate();
         auto iteration_num = pt->iterations();
 
-        // delete output buffer
         for (auto i = 0u; i < pipeline().camera_count(); i++) {
             auto camera = pipeline().camera(i);
-            auto output_dir = camera->node()->file().parent_path() /
+
+            // delete output buffer
+            auto output_dir = std::filesystem::path("outputs") /
                               luisa::format("output_buffer_camera_{:03}", i);
             std::filesystem::remove_all(output_dir);
             std::filesystem::create_directories(output_dir);
         }
 
         for (auto k = 0u; k < iteration_num; ++k) {
+            auto loss = 0.f;
+
             // render
             for (auto i = 0u; i < pipeline().camera_count(); i++) {
                 auto camera = pipeline().camera(i);
                 auto resolution = camera->film()->node()->resolution();
                 auto pixel_count = resolution.x * resolution.y;
-                auto output_path = camera->node()->file().parent_path() /
+                auto output_path = std::filesystem::path("outputs") /
                                    luisa::format("output_buffer_camera_{:03}", i) /
                                    luisa::format("{:06}.exr", k);
-                pixels.resize(next_pow2(pixel_count));
 
                 // render
                 _render_one_camera(command_buffer, k, camera, pt->display_camera_index() == i);
 
                 // calculate grad
                 _integrate_one_camera(command_buffer, k, camera);
+
+                // save image
+                rendered.resize(next_pow2(pixel_count));
+                camera->film()->download(command_buffer, rendered.data());
+                command_buffer << synchronize();
+                _save_image(output_path, rendered, resolution);
+
+                // back propagate
+                pipeline().differentiation().step(command_buffer, learning_rate);
             }
-            // back propagate
-            pipeline().differentiation().step(command_buffer, learning_rate);
         }
 
         // save results
@@ -200,18 +211,21 @@ public:
 
             _render_one_camera(command_buffer, iteration_num, camera);
 
-            pixels.resize(next_pow2(pixel_count));
-            camera->film()->download(command_buffer, pixels.data());
+            rendered.resize(next_pow2(pixel_count));
+            camera->film()->download(command_buffer, rendered.data());
             command_buffer << compute::synchronize();
             auto film_path = camera->node()->file();
 
-            _save_image(film_path, pixels, resolution);
+            _save_image(film_path, rendered, resolution);
         }
         std::cout << pipeline().printer().retrieve(stream);
+
+        LUISA_INFO("Dumping differentiable parameters");
+        pipeline().differentiation().dump(command_buffer, "outputs");
+
         while (_window && !_window->should_close()) {
             _window->run_one_frame([] {});
         }
-        pipeline().differentiation().dump(command_buffer, "outputs");
     }
 };
 
@@ -232,14 +246,19 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
     auto env = pipeline().environment();
 
     auto pixel_count = resolution.x * resolution.y;
+    auto light_sampler = pt->light_sampler();
     sampler->reset(command_buffer, resolution, pixel_count, spp);
     command_buffer.commit();
     auto pt_exact = pt->node<MegakernelGradRadiative>();
 
-    using namespace luisa::compute;
-
     auto shader_iter = bp_shaders.find(camera);
     if (shader_iter == bp_shaders.end()) {
+        using namespace luisa::compute;
+
+        Callable balanced_heuristic = [](Float pdf_a, Float pdf_b) noexcept {
+            return ite(pdf_a > 0.0f, pdf_a / (pdf_a + pdf_b), 0.0f);
+        };
+
         Kernel2D bp_kernel = [&](UInt frame_index, Float4x4 camera_to_world,
                                  Float3x3 env_to_world, Float time, Float shutter_weight) noexcept {
             set_block_size(8u, 8u, 1u);
@@ -286,15 +305,35 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
                 // trace
                 auto it = pipeline().intersect(ray);
 
-                // miss
+                // miss, environment light
                 $if(!it->valid()) {
+                    //                    if (pipeline.environment()) {
+                    //                        auto eval = light_sampler->evaluate_miss(
+                    //                            ray->direction(), env_to_world, swl, time);
+                    //                        Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
+                    //                    }
+                    // TODO : backward_miss
                     $break;
                 };
 
                 // hit light
-                // TODO
+                if (!pipeline().lights().empty()) {
+                    //                    $if(it->shape()->has_light()) {
+                    //                        auto eval = light_sampler->evaluate_hit(
+                    //                            *it, ray->origin(), swl, time);
+                    //                        Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
+                    //                    };
+                    // TODO : backward_hit
+                }
 
                 $if(!it->shape()->has_surface()) { $break; };
+
+                //                // sample one light
+                //                Light::Sample light_sample = light_sampler->sample(
+                //                    *sampler, *it, env_to_world, swl, time);
+                //                // trace shadow ray
+                //                auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
+                //                auto occluded = pipeline().intersect_any(shadow_ray);
 
                 // evaluate material
                 SampledSpectrum eta_scale{swl.dimension(), 1.f};
@@ -319,6 +358,18 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
                         // create closure
                         auto closure = surface->closure(*it, swl, time);
 
+                        // direct lighting
+                        //                        $if(light_sample.eval.pdf > 0.0f & !occluded) {
+                        //                            auto wi = light_sample.wi;
+                        //                            auto eval = closure->evaluate(wi);
+                        //                            auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
+                        //
+                        //                            //                            Li += mis_weight / light_sample.eval.pdf * abs(dot(eval.normal, wi)) *
+                        //                            //                                  beta * eval.f * light_sample.eval.L;
+                        //                            auto weight = mis_weight / light_sample.eval.pdf * abs(dot(eval.normal, wi));
+                        //                            // TODO : backward_sample of light
+                        //                        };
+
                         // sample material
                         auto sample = closure->sample(u_lobe, u_bsdf);
                         ray = it->spawn_ray(sample.wi);
@@ -326,8 +377,10 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
                         auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
 
                         // radiative bp
-                        closure->backward(sample.wi, beta * grad_weight * Li);
+                        // Li * d_fs
+                        closure->backward(sample.wi, grad_weight * beta * Li);
 
+                        // d_Li * fs
                         beta *= abs(dot(sample.eval.normal, sample.wi)) * w * sample.eval.f;
                     };
                 });
@@ -405,13 +458,14 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
         "Start rendering of resolution {}x{} at {}spp.",
         resolution.x, resolution.y, spp);
 
-    using namespace luisa::compute;
-    Callable balanced_heuristic = [](Float pdf_a, Float pdf_b) noexcept {
-        return ite(pdf_a > 0.0f, pdf_a / (pdf_a + pdf_b), 0.0f);
-    };
-
     auto shader_iter = render_shaders.find(camera);
     if (shader_iter == render_shaders.end()) {
+        using namespace luisa::compute;
+
+        Callable balanced_heuristic = [](Float pdf_a, Float pdf_b) noexcept {
+            return ite(pdf_a > 0.0f, pdf_a / (pdf_a + pdf_b), 0.0f);
+        };
+
         Kernel2D render_kernel = [&](UInt frame_index, Float4x4 camera_to_world, Float3x3 env_to_world,
                                      Float time, Float shutter_weight) noexcept {
             set_block_size(8u, 8u, 1u);

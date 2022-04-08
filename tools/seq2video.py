@@ -16,10 +16,13 @@ if __name__ == "__main__":
     import cv2 as cv
 
     folder = argv[1]
-    files = sorted(f for f in listdir(folder) if f.endswith(".exr"))
+    frame_rate = 10
+
+    files = sorted(f for f in listdir(folder) if f.endswith(".exr") and not f.startswith("dump-"))
     print(f"Reading images from '{folder}'...")
     images = [cv.imread(f"{folder}/{f}", cv.IMREAD_UNCHANGED) for f in files]
-    writer = cv.VideoWriter(f"{folder}/output.avi", cv.VideoWriter_fourcc('M', 'J', 'P', 'G'), 10, images[0].shape[:2])
+    writer = cv.VideoWriter(f"{folder}/output.avi", cv.VideoWriter_fourcc('M', 'J', 'P', 'G'), frame_rate,
+                            images[0].shape[:2], True)
     for i, image in enumerate(images):
         print(f"Processing frame {i}")
         frame = rgb2srgb(image)
@@ -29,3 +32,4 @@ if __name__ == "__main__":
         writer.write(frame)
     writer.release()
     cv.waitKey()
+    cv.destroyAllWindows()

@@ -403,7 +403,7 @@ MicrofacetReflection::Gradient MicrofacetReflection::backward(
     auto D = _distribution->D(wh);
     auto G = _distribution->G(wo, wi);
 
-    LUISA_ERROR_WITH_LOCATION("Not implemented.");
+    LUISA_WARNING_WITH_LOCATION("Not implemented.");
     // backward
     //    auto grad_fresnel = _fresnel->grad(cosThetaI_grad);
     //    auto d_f = ite(valid, 1.f, 0.f);
@@ -418,6 +418,7 @@ MicrofacetReflection::Gradient MicrofacetReflection::backward(
     //        grad.emplace_back(d_F * v);
     //    }
     //    return grad;
+    return {.dR = SampledSpectrum(4u), .dAlpha = make_float2(0.f)};
 }
 
 SampledSpectrum MicrofacetTransmission::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
@@ -490,7 +491,7 @@ MicrofacetTransmission::Gradient MicrofacetTransmission::backward(
     Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
 
     // TODO
-    LUISA_ERROR_WITH_LOCATION("Not implemented.");
+    LUISA_WARNING_WITH_LOCATION("Not implemented.");
 
     //    auto cosThetaO = cos_theta(wo);
     //    auto cosThetaI = cos_theta(wi);
@@ -523,6 +524,8 @@ MicrofacetTransmission::Gradient MicrofacetTransmission::backward(
     //    //                    (wi * dot(wo, wh) + abs_dot(wi, wh) * wo) /
     //    //                    (cosThetaI * cosThetaO * sqr(sqrtDenom)));
     //    auto d_eta = -d_factor / sqr(eta);// TODO
+
+    return {.dT = SampledSpectrum(4u), .dAlpha = make_float2(0.f)};
 }
 
 OrenNayar::OrenNayar(SampledSpectrum R, Expr<float> sigma) noexcept
@@ -571,15 +574,15 @@ OrenNayar::Gradient OrenNayar::backward(
     auto sigma2 = sqr(radians(_sigma));
 
     // backward
-    auto sigma2_sigma = 2 * radians(_sigma) / 180.f;
-    auto a_sigma2 = -0.165f * sqr(sigma2 + 0.33f);
+    auto sigma2_sigma = 2 * radians(_sigma) * pi / 180.f;
+    auto a_sigma2 = -0.165f / sqr(sigma2 + 0.33f);
     auto b_sigma2 = 0.0405f / sqr(sigma2 + 0.09f);
-    auto d_r = inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta);
-    auto d_a = _r * inv_pi;
-    auto d_b = _r * inv_pi * maxCos * sinAlpha * tanBeta;
+    auto d_r = df * inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta);
+    auto d_a = df.dot(_r * inv_pi);
+    auto d_b = df.dot(_r * inv_pi * maxCos * sinAlpha * tanBeta);
     auto d_sigma2 = d_a * a_sigma2 + d_b * b_sigma2;
     auto d_sigma = d_sigma2 * sigma2_sigma;
-    return {.dR = df * d_r, .dSigma = df.dot(d_sigma)};
+    return {.dR = d_r, .dSigma = d_sigma};
 }
 
 SampledSpectrum FresnelBlend::Schlick(Expr<float> cosTheta) const noexcept {
@@ -654,7 +657,7 @@ FresnelBlend::Gradient FresnelBlend::backward(
     auto k = (28.f / (23.f * pi)) *
              (1.f - pow5(1.f - .5f * absCosThetaI)) *
              (1.f - pow5(1.f - .5f * absCosThetaO));
-    auto dv = ite(valid, 1.f, 0.f);
+    auto dv = df * ite(valid, 1.f, 0.f);
     auto diffuse_rd = (1.f - _rs) * k;
     auto diffuse_rs = -_rd * k;
     auto specular_rs = _distribution->D(wh) /
@@ -663,10 +666,9 @@ FresnelBlend::Gradient FresnelBlend::backward(
 
     auto d_rd = dv * (diffuse_rd);
     auto d_rs = dv * (diffuse_rs + specular_rs);
-    auto d_alpha = dv * _distribution->grad_D(wh).dAlpha /
-                   (4.f * abs_dot(wi, wh) * max(absCosThetaI, absCosThetaO)) *
-                   df.dot(Schlick(dot(wi, wh)));
-    return {.dRd = df * d_rd, .dRs = df * d_rs, .dAlpha = d_alpha};
+    auto d_alpha = dv.dot(Schlick(dot(wi, wh))) * _distribution->grad_D(wh).dAlpha /
+                   (4.f * abs_dot(wi, wh) * max(absCosThetaI, absCosThetaO));
+    return {.dRd = d_rd, .dRs = d_rs, .dAlpha = d_alpha};
 }
 
 }// namespace luisa::render
