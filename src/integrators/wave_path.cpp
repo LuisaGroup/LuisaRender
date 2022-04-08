@@ -523,8 +523,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
 
     LUISA_INFO("Rendering started.");
     auto sample_id = 0u;
-    auto last_launched_sample_id = 0u;
-    auto last_reported_sample_id = 0u;
+    auto last_committed_sample_id = 0u;
     constexpr auto launches_per_commit = 16u;
     ProgressBar progress_bar;
     progress_bar.update(0.0);
@@ -580,12 +579,12 @@ void WavefrontPathTracingInstance::_render_one_camera(
             }
             command_buffer << accumulate_shader(s.point.weight).dispatch(launch_state_count);
             sample_id += launch_spp;
-            if (sample_id - last_reported_sample_id >= progress_report_interval) {
-                last_reported_sample_id = sample_id;
+            if (sample_id - last_committed_sample_id >= progress_report_interval) {
+                last_committed_sample_id = sample_id;
                 auto p = sample_id / static_cast<double>(spp);
                 command_buffer << [p, &progress_bar] { progress_bar.update(p); };
-            } else if (last_launched_sample_id - sample_id >= launches_per_commit) {
-                last_launched_sample_id = sample_id;
+            } else if (sample_id - last_committed_sample_id >= launches_per_commit) {
+                last_committed_sample_id = sample_id;
                 command_buffer << commit();
             }
         }
