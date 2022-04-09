@@ -194,7 +194,7 @@ Camera camera : Thinlens {
   }
 }
 
-Integrator integrator : MegaPath {
+Integrator integrator : WavePath {
   spectrum : Hero {}
   // display { true }
 }

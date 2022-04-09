@@ -293,13 +293,13 @@ void WavefrontPathTracingInstance::_render_one_camera(
 
     LUISA_INFO("Compiling ray generation kernel.");
     auto generate_rays_shader = device.compile<1>([&](BufferUInt path_indices, BufferRay rays,
-                                                      UInt base_sample_id, Float4x4 c2w, Float time) noexcept {
+                                                      UInt base_sample_id, Float time) noexcept {
         auto state_id = dispatch_x();
         auto pixel_id = state_id % pixel_count;
         auto sample_id = base_sample_id + state_id / pixel_count;
         auto pixel_coord = make_uint2(pixel_id % resolution.x, pixel_id / resolution.x);
         sampler()->start(pixel_coord, sample_id);
-        auto camera_sample = camera->generate_ray(*sampler(), pixel_coord, time, c2w);
+        auto camera_sample = camera->generate_ray(*sampler(), pixel_coord, time);
         auto swl = spectrum()->sample(*sampler());
         sampler()->save_state(state_id);
         rays.write(state_id, camera_sample.ray);
@@ -346,8 +346,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
 
     LUISA_INFO("Compiling environment evaluation kernel.");
     auto evaluate_miss_shader = device.compile<1>([&](BufferUInt path_indices, BufferRay rays,
-                                                      BufferUInt queue, BufferUInt queue_size,
-                                                      Float3x3 e2w, Float time) noexcept {
+                                                      BufferUInt queue, BufferUInt queue_size, Float time) noexcept {
         if (pipeline().environment()) {
             auto queue_id = dispatch_x();
             $if(queue_id < queue_size.read(0u)) {
@@ -358,7 +357,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                 auto pdf_bsdf = path_states.read_pdf_bsdf(path_id);
                 auto beta = path_states.read_beta(path_id);
                 auto Li = path_states.read_radiance(path_id);
-                auto eval = light_sampler()->evaluate_miss(wi, e2w, swl, time);
+                auto eval = light_sampler()->evaluate_miss(wi, swl, time);
                 auto mis_weight = balanced_heuristic(pdf_bsdf, eval.pdf);
                 Li += beta * eval.L * mis_weight;
                 path_states.write_radiance(path_id, Li);
@@ -391,7 +390,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
 
     LUISA_INFO("Compiling light sampling kernel.");
     auto sample_light_shader = device.compile<1>([&](BufferUInt path_indices, BufferRay rays, BufferHit hits,
-                                                     BufferUInt queue, BufferUInt queue_size, Float3x3 e2w, Float time) noexcept {
+                                                     BufferUInt queue, BufferUInt queue_size, Float time) noexcept {
         auto queue_id = dispatch_x();
         $if(queue_id < queue_size.read(0u)) {
             auto ray_id = queue.read(queue_id);
@@ -401,7 +400,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
             auto path_id = path_indices.read(ray_id);
             auto swl = path_states.read_swl(path_id);
             sampler()->load_state(path_id);
-            auto light_sample = light_sampler()->sample(*sampler(), *it, e2w, swl, time);
+            auto light_sample = light_sampler()->sample(*sampler(), *it, swl, time);
             sampler()->save_state(path_id);
             // trace shadow ray
             auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
@@ -530,13 +529,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
     auto progress_report_interval = std::max(spp / 128u, launches_per_commit);
     for (auto s : shutter_samples) {
         auto time = s.point.time;
-        pipeline().update_geometry(command_buffer, time);
-        auto camera_to_world = camera->node()->transform()->matrix(time);
-        auto env_to_world = make_float3x3(1.f);
-        if (auto env = pipeline().environment()) {
-            env_to_world = transpose(inverse(make_float3x3(
-                env->node()->transform()->matrix(s.point.time))));
-        }
+        pipeline().update(command_buffer, time);
         for (auto i = 0u; i < s.spp; i += spp_per_launch) {
             auto launch_spp = std::min(s.spp - i, spp_per_launch);
             auto launch_state_count = launch_spp * pixel_count;
@@ -545,7 +538,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
             auto rays = ray_buffer.view();
             auto hits = hit_buffer.view();
             auto out_rays = ray_buffer_out.view();
-            command_buffer << generate_rays_shader(path_indices, rays, sample_id, camera_to_world, time)
+            command_buffer << generate_rays_shader(path_indices, rays, sample_id, time)
                                   .dispatch(launch_state_count);
             for (auto depth = 0u; depth < node<WavefrontPathTracing>()->max_depth(); depth++) {
                 auto surface_indices = surface_queue.prepare_index_buffer(command_buffer);
@@ -560,8 +553,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                                                    light_indices, light_count, miss_indices, miss_count)
                                       .dispatch(launch_state_count);
                 if (pipeline().environment()) {
-                    command_buffer << evaluate_miss_shader(path_indices, rays, miss_indices,
-                                                           miss_count, env_to_world, time)
+                    command_buffer << evaluate_miss_shader(path_indices, rays, miss_indices, miss_count, time)
                                           .dispatch(launch_state_count);
                 }
                 if (!pipeline().lights().empty()) {
@@ -569,8 +561,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                                                             light_indices, light_count, time)
                                           .dispatch(launch_state_count);
                 }
-                command_buffer << sample_light_shader(path_indices, rays, hits, surface_indices,
-                                                      surface_count, env_to_world, time)
+                command_buffer << sample_light_shader(path_indices, rays, hits, surface_indices, surface_count, time)
                                       .dispatch(launch_state_count)
                                << evaluate_surface_shader(path_indices, depth, surface_indices,
                                                           surface_count, rays, hits, out_rays,

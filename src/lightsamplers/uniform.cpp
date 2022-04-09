@@ -54,25 +54,24 @@ public:
         return eval;
     }
     [[nodiscard]] Light::Evaluation evaluate_miss(
-        Expr<float3> wi, Expr<float3x3> env_to_world,
-        const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        Expr<float3> wi, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         if (_env_prob == 0.f) [[unlikely]] {// no environment
             LUISA_WARNING_WITH_LOCATION("No environment in scene");
             return {.L = SampledSpectrum{swl.dimension()}, .pdf = 0.f};
         }
-        auto eval = pipeline().environment()->evaluate(wi, env_to_world, swl, time);
+        auto eval = pipeline().environment()->evaluate(wi, swl, time);
         eval.pdf *= _env_prob;
         return eval;
     }
     [[nodiscard]] Light::Sample sample(
-        Sampler::Instance &sampler, const Interaction &it_from, Expr<float3x3> env_to_world,
+        Sampler::Instance &sampler, const Interaction &it_from,
         const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         auto sample = Light::Sample::zero(swl.dimension());
         if (_env_prob > 0.f) {// consider environment
             auto u = sampler.generate_1d();
             $if(u < _env_prob) {
                 sample = pipeline().environment()->sample(
-                    it_from.p(), env_to_world, swl, time, sampler.generate_2d());
+                    it_from.p(), swl, time, sampler.generate_2d());
                 sample.eval.pdf *= _env_prob;
             }
             $else {

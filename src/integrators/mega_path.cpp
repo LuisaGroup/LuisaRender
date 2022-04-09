@@ -201,14 +201,12 @@ void MegakernelPathTracingInstance::_render_one_camera(
         return ite(pdf_a > 0.0f, pdf_a / (pdf_a + pdf_b), 0.0f);
     };
 
-    Kernel2D render_kernel = [&](UInt frame_index, Float4x4 camera_to_world, Float3x3 env_to_world,
-                                 Float time, Float shutter_weight) noexcept {
+    Kernel2D render_kernel = [&](UInt frame_index, Float time, Float shutter_weight) noexcept {
         set_block_size(8u, 8u, 1u);
 
         auto pixel_id = dispatch_id().xy();
         sampler->start(pixel_id, frame_index);
-        auto [camera_ray, camera_weight] = camera->generate_ray(
-            *sampler, pixel_id, time, camera_to_world);
+        auto [camera_ray, camera_weight] = camera->generate_ray(*sampler, pixel_id, time);
         auto swl = pt->spectrum()->sample(*sampler);
         SampledSpectrum beta{swl.dimension(), camera_weight};
         SampledSpectrum Li{swl.dimension()};
@@ -223,8 +221,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
             // miss
             $if(!it->valid()) {
                 if (pipeline.environment()) {
-                    auto eval = light_sampler->evaluate_miss(
-                        ray->direction(), env_to_world, swl, time);
+                    auto eval = light_sampler->evaluate_miss(ray->direction(), swl, time);
                     Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
                 }
                 $break;
@@ -243,7 +240,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
 
             // sample one light
             Light::Sample light_sample = light_sampler->sample(
-                *sampler, *it, env_to_world, swl, time);
+                *sampler, *it, swl, time);
 
             // trace shadow ray
             auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
@@ -314,16 +311,9 @@ void MegakernelPathTracingInstance::_render_one_camera(
     auto dispatches_per_commit = display ? 4u : 32u;
     auto sample_id = 0u;
     for (auto s : shutter_samples) {
-        pipeline.update_geometry(command_buffer, s.point.time);
-        auto camera_to_world = camera->node()->transform()->matrix(s.point.time);
-        auto env_to_world = make_float3x3(1.f);
-        if (auto env = pipeline.environment()) {
-            env_to_world = transpose(inverse(make_float3x3(
-                env->node()->transform()->matrix(s.point.time))));
-        }
+        pipeline.update(command_buffer, s.point.time);
         for (auto i = 0u; i < s.spp; i++) {
-            command_buffer << render(sample_id++, camera_to_world, env_to_world,
-                                     s.point.time, s.point.weight)
+            command_buffer << render(sample_id++, s.point.time, s.point.weight)
                                   .dispatch(resolution);
             if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
                 dispatch_count = 0u;

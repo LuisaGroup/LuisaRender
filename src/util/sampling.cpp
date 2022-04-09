@@ -3,6 +3,7 @@
 //
 
 #include <util/sampling.h>
+#include <util/scattering.h>
 
 namespace luisa::render {
 
@@ -100,6 +101,17 @@ Float2 invert_uniform_sphere_sample(Expr<float3> w) noexcept {
     auto phi = atan2(w.y, w.x);
     phi = ite(phi < 0.0f, phi + pi * 2.0f, phi);
     return make_float2(0.5f * (1.0f - w.z), phi * (0.5f * inv_pi));
+}
+
+Float uniform_cone_pdf(Expr<float> cos_theta_max) noexcept {
+    return 1.f / (2.f * pi * (1.f - cos_theta_max));
+}
+
+Float3 sample_uniform_cone(Expr<float2> u, Expr<float> cos_theta_max) noexcept {
+    auto cosTheta = (1 - u.x) + u.x * cos_theta_max;
+    auto sinTheta = sqrt(max(1.f - cosTheta * cosTheta, 0.f));
+    auto phi = 2.f * pi * u.y;
+    return spherical_direction(sinTheta, cosTheta, phi);
 }
 
 }// namespace luisa::render

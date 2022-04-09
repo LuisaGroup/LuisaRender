@@ -43,8 +43,7 @@ public:
     private:
         // generate ray in camera space, should not consider _filter or _transform
         [[nodiscard]] virtual Sample _generate_ray(
-            Sampler::Instance &sampler,
-            Expr<float2> pixel, Expr<float> time) const noexcept = 0;
+            Sampler::Instance &sampler, Expr<float2> pixel, Expr<float> time) const noexcept = 0;
 
     public:
         Instance(Pipeline &pipeline, CommandBuffer &command_buffer, const Camera *camera) noexcept;
@@ -59,8 +58,7 @@ public:
         [[nodiscard]] auto filter() const noexcept { return _filter.get(); }
         [[nodiscard]] auto target() const noexcept { return _target; }
         [[nodiscard]] Sample generate_ray(
-            Sampler::Instance &sampler, Expr<uint2> pixel_coord,
-            Expr<float> time, Expr<float4x4> camera_to_world) const noexcept;
+            Sampler::Instance &sampler, Expr<uint2> pixel_coord, Expr<float> time) const noexcept;
     };
 
     struct ShutterPoint {

@@ -3,7 +3,6 @@
 //
 
 #include <numbers>
-#include <tinyexr.h>
 
 #include <util/sampling.h>
 #include <util/imageio.h>
@@ -73,16 +72,14 @@ private:
     }
 
 public:
-    EnvironmentMappingInstance(
-        const Pipeline &pipeline, const Environment *env, const Texture::Instance *texture,
-        luisa::optional<uint> alias_buffer_id, luisa::optional<uint> pdf_buffer_id) noexcept
+    EnvironmentMappingInstance(Pipeline &pipeline, const Environment *env, const Texture::Instance *texture,
+                               luisa::optional<uint> alias_buffer_id, luisa::optional<uint> pdf_buffer_id) noexcept
         : Environment::Instance{pipeline, env}, _texture{texture},
           _alias_buffer_id{std::move(alias_buffer_id)},
           _pdf_buffer_id{std::move(pdf_buffer_id)} {}
     [[nodiscard]] Light::Evaluation evaluate(
-        Expr<float3> wi, Expr<float3x3> env_to_world,
-        const SampledWavelengths &swl, Expr<float> time) const noexcept override {
-        auto world_to_env = transpose(env_to_world);
+        Expr<float3> wi, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        auto world_to_env = transpose(transform_to_world());
         auto wi_local = world_to_env * wi;
         auto L = _evaluate(wi_local, swl, time);
         if (_texture->node()->is_constant()) {
@@ -97,8 +94,8 @@ public:
         return {.L = L, .pdf = pdf};
     }
     [[nodiscard]] Light::Sample sample(
-        Expr<float3> p_from, Expr<float3x3> env_to_world,
-        const SampledWavelengths &swl, Expr<float> time, Expr<float2> u) const noexcept override {
+        Expr<float3> p_from, const SampledWavelengths &swl,
+        Expr<float> time, Expr<float2> u) const noexcept override {
         auto [wi_local, pdf] = [&] {
             if (_texture->node()->is_constant()) {
                 return std::make_pair(sample_uniform_sphere(u), def(uniform_sphere_pdf()));
@@ -117,7 +114,7 @@ public:
             return std::make_pair(EnvironmentMapping::uv_to_direction(uv), p);
         }();
         return {.eval = {.L = _evaluate(wi_local, swl, time), .pdf = pdf},
-                .wi = normalize(env_to_world * wi_local),
+                .wi = normalize(transform_to_world() * wi_local),
                 .distance = std::numeric_limits<float>::max()};
     }
 };

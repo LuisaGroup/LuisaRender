@@ -158,6 +158,14 @@ uint Pipeline::_process_light(CommandBuffer &command_buffer, const Light *light)
 luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, const Scene &scene) noexcept {
     ThreadPool::global().synchronize();
     auto pipeline = luisa::make_unique<Pipeline>(device);
+    auto mean_time = 0.0;
+    for (auto camera : scene.cameras()) {
+        mean_time += (camera->shutter_span().x + camera->shutter_span().y) * 0.5f;
+    }
+    mean_time *= 1.0 / static_cast<double>(scene.cameras().size());
+    pipeline->_mean_time = static_cast<float>(mean_time);
+    pipeline->_transform_matrices.resize(transform_matrix_buffer_size);
+    pipeline->_transform_matrix_buffer = device.create_buffer<float4x4>(transform_matrix_buffer_size);
     pipeline->_shadow_terminator_factor = scene.shadow_terminator_factor();
     if (scene.integrator()->is_differentiable()) {
         pipeline->_differentiation =
@@ -165,13 +173,9 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     }
     pipeline->_cameras.reserve(scene.cameras().size());
     auto command_buffer = stream.command_buffer();
-    auto mean_time = 0.0;
     for (auto camera : scene.cameras()) {
         pipeline->_cameras.emplace_back(camera->build(*pipeline, command_buffer));
-        mean_time += (camera->shutter_span().x + camera->shutter_span().y) * 0.5f;
     }
-    mean_time *= 1.0 / static_cast<double>(scene.cameras().size());
-    pipeline->_mean_time = static_cast<float>(mean_time);
     pipeline->_build_geometry(command_buffer, scene.shapes(), pipeline->_mean_time, AccelBuildHint::FAST_TRACE);
     if (auto env = scene.environment(); env != nullptr && !env->is_black()) {
         pipeline->_environment = env->build(*pipeline, command_buffer);
@@ -185,30 +189,45 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     if (auto &&diff = pipeline->_differentiation) {
         diff->materialize(command_buffer);
     }
-    command_buffer << compute::synchronize();
+    if (!pipeline->_transforms.empty()) {
+        command_buffer << pipeline->_transform_matrix_buffer.view(0u, pipeline->_transforms.size())
+                              .copy_from(pipeline->_transform_matrices.data());
+    }
+    command_buffer << compute::commit();
     return pipeline;
 }
 
-bool Pipeline::update_geometry(CommandBuffer &command_buffer, float time) noexcept {
+bool Pipeline::update(CommandBuffer &command_buffer, float time) noexcept {
     // TODO: support deformable meshes
-    if (_dynamic_transforms.empty()) { return false; }
-    if (_dynamic_transforms.size() < 128u) {
-        for (auto t : _dynamic_transforms) {
-            _accel.set_transform_on_update(
-                t.instance_id(), t.matrix(time));
-        }
-    } else {
-        ThreadPool::global().parallel(
-            _dynamic_transforms.size(),
-            [this, time](auto i) noexcept {
-                auto t = _dynamic_transforms[i];
+    auto updated = false;
+    if (!_dynamic_transforms.empty()) {
+        updated = true;
+        if (_dynamic_transforms.size() < 128u) {
+            for (auto t : _dynamic_transforms) {
                 _accel.set_transform_on_update(
                     t.instance_id(), t.matrix(time));
-            });
-        ThreadPool::global().synchronize();
+            }
+        } else {
+            ThreadPool::global().parallel(
+                _dynamic_transforms.size(),
+                [this, time](auto i) noexcept {
+                    auto t = _dynamic_transforms[i];
+                    _accel.set_transform_on_update(
+                        t.instance_id(), t.matrix(time));
+                });
+            ThreadPool::global().synchronize();
+        }
+        command_buffer << _accel.update();
     }
-    command_buffer << _accel.update();
-    return true;
+    if (_any_dynamic_transforms) {
+        updated = true;
+        for (auto i = 0u; i < _transforms.size(); ++i) {
+            _transform_matrices[i] = _transforms[i]->matrix(time);
+        }
+        command_buffer << _transform_matrix_buffer.view(0u, _transforms.size())
+                              .copy_from(_transform_matrices.data());
+    }
+    return updated;
 }
 
 void Pipeline::render(Stream &stream) noexcept {
@@ -314,6 +333,26 @@ Differentiation &Pipeline::differentiation() noexcept {
 const Differentiation &Pipeline::differentiation() const noexcept {
     LUISA_ASSERT(_differentiation, "Differentiation is not constructed.");
     return *_differentiation;
+}
+
+void Pipeline::register_transform(const Transform *transform) noexcept {
+    if (transform == nullptr) { return; }
+    auto [iter, success] = _transform_to_id.try_emplace(
+        transform, static_cast<uint>(_transforms.size()));
+    LUISA_ASSERT(iter->second < transform_matrix_buffer_size,
+                 "Transform matrix buffer overflows.");
+    if (success) [[likely]] {
+        _transforms.push_back(transform);
+        _any_dynamic_transforms |= !transform->is_static();
+        _transform_matrices[iter->second] = transform->matrix(_mean_time);
+    }
+}
+
+Float4x4 Pipeline::transform(const Transform *transform) const noexcept {
+    if (transform == nullptr) { return make_float4x4(1.f); }
+    auto iter = _transform_to_id.find(transform);
+    LUISA_ASSERT(iter != _transform_to_id.cend(), "Transform is not registered.");
+    return _transform_matrix_buffer.read(iter->second);
 }
 
 }// namespace luisa::render

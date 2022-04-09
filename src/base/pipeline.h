@@ -51,8 +51,10 @@ class Scene;
 class Pipeline {
 
 public:
-    static constexpr size_t bindless_array_capacity = 500'000u;// limitation of Metal
+    static constexpr auto bindless_array_capacity = 500'000u;// limitation of Metal
     static constexpr auto vertex_buffer_arena_size_elements = 1024u * 1024u;
+    static constexpr auto transform_matrix_buffer_size = 1024u;
+
     using ResourceHandle = luisa::unique_ptr<Resource>;
 
     struct MeshGeometry {
@@ -91,11 +93,15 @@ private:
     luisa::vector<luisa::unique_ptr<Camera::Instance>> _cameras;
     luisa::unique_ptr<Integrator::Instance> _integrator;
     luisa::unique_ptr<Environment::Instance> _environment;
-    uint _rgb2spec_index{};
     float _mean_time{};
     float _shadow_terminator_factor{};
     luisa::unique_ptr<Differentiation> _differentiation;
-
+    // registered transforms
+    luisa::unordered_map<const Transform *, uint> _transform_to_id;
+    luisa::vector<const Transform *> _transforms;
+    luisa::vector<float4x4> _transform_matrices;
+    Buffer<float4x4> _transform_matrix_buffer;
+    bool _any_dynamic_transforms{false};
     Printer _printer;
 
 private:
@@ -146,6 +152,8 @@ public:
         return static_cast<uint>(tex3d_id);
     }
 
+    void register_transform(const Transform *transform) noexcept;
+
     template<typename T, typename... Args>
         requires std::is_base_of_v<Resource, T>
     [[nodiscard]] auto create(Args &&...args) noexcept -> T * {
@@ -189,9 +197,8 @@ public:
     [[nodiscard]] auto integrator() const noexcept { return _integrator.get(); }
     [[nodiscard]] auto has_lighting() const noexcept { return !_lights.empty() || _environment != nullptr; }
     [[nodiscard]] auto mean_time() const noexcept { return _mean_time; }
-    [[nodiscard]] const Texture::Instance *build_texture(
-        CommandBuffer &command_buffer, const Texture *texture) noexcept;
-    bool update_geometry(CommandBuffer &command_buffer, float time) noexcept;
+    [[nodiscard]] const Texture::Instance *build_texture(CommandBuffer &command_buffer, const Texture *texture) noexcept;
+    bool update(CommandBuffer &command_buffer, float time) noexcept;
     void render(Stream &stream) noexcept;
     [[nodiscard]] auto &printer() noexcept { return _printer; }
 
@@ -201,6 +208,7 @@ public:
     [[nodiscard]] auto tex2d(I &&i) const noexcept { return _bindless_array.tex2d(std::forward<I>(i)); }
     template<typename I>
     [[nodiscard]] auto tex3d(I &&i) const noexcept { return _bindless_array.tex3d(std::forward<I>(i)); }
+    [[nodiscard]] Float4x4 transform(const Transform *transform) const noexcept;
 
     [[nodiscard]] Var<Hit> trace_closest(const Var<Ray> &ray) const noexcept;
     [[nodiscard]] Var<bool> trace_any(const Var<Ray> &ray) const noexcept;

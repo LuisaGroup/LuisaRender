@@ -73,7 +73,7 @@ class MegakernelGradRadiativeInstance final : public Integrator::Instance {
 private:
     luisa::vector<float4> _pixels;
     luisa::optional<Window> _window;
-    luisa::unordered_map<const Camera::Instance *, Shader<2, uint, float4x4, float3x3, float, float>>
+    luisa::unordered_map<const Camera::Instance *, Shader<2, uint, float, float>>
         bp_shaders, render_shaders;
 
 private:
@@ -240,13 +240,12 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
 
     auto shader_iter = bp_shaders.find(camera);
     if (shader_iter == bp_shaders.end()) {
-        Kernel2D bp_kernel = [&](UInt frame_index, Float4x4 camera_to_world,
-                                 Float3x3 env_to_world, Float time, Float shutter_weight) noexcept {
+        Kernel2D bp_kernel = [&](UInt frame_index, Float time, Float shutter_weight) noexcept {
             set_block_size(8u, 8u, 1u);
 
             auto pixel_id = dispatch_id().xy();
             sampler->start(pixel_id, frame_index);
-            auto [camera_ray, camera_weight] = camera->generate_ray(*sampler, pixel_id, time, camera_to_world);
+            auto [camera_ray, camera_weight] = camera->generate_ray(*sampler, pixel_id, time);
             auto swl = pt->spectrum()->sample(*sampler);
             SampledSpectrum beta{swl.dimension(), camera_weight};
             SampledSpectrum Li{swl.dimension(), 1.0f};
@@ -355,15 +354,9 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
     auto dispatches_per_commit = 8u;
     auto sample_id = 0u;
     for (auto s : shutter_samples) {
-        if (pipeline().update_geometry(command_buffer, s.point.time)) { dispatch_count = 0u; }
-        auto camera_to_world = camera->node()->transform()->matrix(s.point.time);
-        auto env_to_world = env == nullptr || env->node()->transform()->is_identity() ?
-                                make_float3x3(1.0f) :
-                                transpose(inverse(make_float3x3(
-                                    env->node()->transform()->matrix(s.point.time))));
+        if (pipeline().update(command_buffer, s.point.time)) { dispatch_count = 0u; }
         for (auto i = 0u; i < s.spp; i++) {
-            command_buffer << bp_shader(iteration * spp + sample_id++, camera_to_world,
-                                        env_to_world, s.point.time, s.point.weight)
+            command_buffer << bp_shader(iteration * spp + sample_id++, s.point.time, s.point.weight)
                                   .dispatch(resolution);
             if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
                 command_buffer << commit();
@@ -412,14 +405,12 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
 
     auto shader_iter = render_shaders.find(camera);
     if (shader_iter == render_shaders.end()) {
-        Kernel2D render_kernel = [&](UInt frame_index, Float4x4 camera_to_world, Float3x3 env_to_world,
-                                     Float time, Float shutter_weight) noexcept {
+        Kernel2D render_kernel = [&](UInt frame_index, Float time, Float shutter_weight) noexcept {
             set_block_size(8u, 8u, 1u);
 
             auto pixel_id = dispatch_id().xy();
             sampler->start(pixel_id, frame_index);
-            auto [camera_ray, camera_weight] = camera->generate_ray(
-                *sampler, pixel_id, time, camera_to_world);
+            auto [camera_ray, camera_weight] = camera->generate_ray(*sampler, pixel_id, time);
             auto swl = pt->spectrum()->sample(*sampler);
             SampledSpectrum beta{swl.dimension(), camera_weight};
             SampledSpectrum Li{swl.dimension()};
@@ -434,8 +425,7 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
                 // miss
                 $if(!it->valid()) {
                     if (pipeline().environment()) {
-                        auto eval = light_sampler->evaluate_miss(
-                            ray->direction(), env_to_world, swl, time);
+                        auto eval = light_sampler->evaluate_miss(ray->direction(), swl, time);
                         Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
                     }
                     $break;
@@ -454,7 +444,7 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
 
                 // sample one light
                 Light::Sample light_sample = light_sampler->sample(
-                    *sampler, *it, env_to_world, swl, time);
+                    *sampler, *it, swl, time);
 
                 // trace shadow ray
                 auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
@@ -526,17 +516,11 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
     auto dispatches_per_commit = 16u;
     auto sample_id = 0u;
     for (auto s : shutter_samples) {
-        if (pipeline().update_geometry(command_buffer, s.point.time)) {
+        if (pipeline().update(command_buffer, s.point.time)) {
             dispatch_count = 0u;
         }
-        auto camera_to_world = camera->node()->transform()->matrix(s.point.time);
-        auto env_to_world = make_float3x3(1.f);
-        if (auto env = pipeline().environment()) {
-            env_to_world = transpose(inverse(make_float3x3(
-                env->node()->transform()->matrix(s.point.time))));
-        }
         for (auto i = 0u; i < s.spp; i++) {
-            command_buffer << render_shader(iteration * spp + sample_id++, camera_to_world, env_to_world,
+            command_buffer << render_shader(iteration * spp + sample_id++,
                                             s.point.time, s.point.weight)
                                   .dispatch(resolution);
             if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
