@@ -1,0 +1,945 @@
+
+Surface mat_WhitePlastic : Substrate {
+  Kd : Constant {
+    v { 1.0, 1.0, 1.0 }
+  }
+  Ks : Constant {
+    v { 0.04 }
+  }
+  eta : Constant {
+    v { 1.5 }
+  }
+  roughness : Constant {
+    v { 0.31622776601683794 }
+  }
+}
+
+Surface mat_Chrome : Metal {
+  eta { "Cr" }
+  roughness : Constant {
+    v { 0.22360679774997896 }
+  }
+}
+
+Surface mat_BlackRubber : Substrate {
+  Kd : Constant {
+    v { 0.05000000074505806, 0.05000000074505806, 0.05000000074505806 }
+  }
+  Ks : Constant {
+    v { 0.04 }
+  }
+  eta : Constant {
+    v { 1.5 }
+  }
+  roughness : Constant {
+    v { 0.4472135954999579 }
+  }
+}
+
+Surface mat_Walls : Matte {
+  Kd : Constant {
+    v { 0.20000000298023224, 0.20000000298023224, 0.20000000298023224 }
+  }
+}
+
+Surface mat_Artwork : Matte {
+  Kd : Image {
+    file { "textures/picture3.jpg" }
+  }
+}
+
+Surface mat_None : Null {}
+
+Surface mat_FloorTiles : Matte {
+  Kd : Image {
+    file { "textures/Tiles.jpg" }
+  }
+}
+
+Surface mat_BlackPaint : Substrate {
+  Kd : Constant {
+    v { 0.009999999776482582, 0.009999999776482582, 0.009999999776482582 }
+  }
+  Ks : Constant {
+    v { 0.04 }
+  }
+  eta : Constant {
+    v { 1.5 }
+  }
+  roughness : Constant {
+    v { 0.4472135954999579 }
+  }
+}
+
+Surface mat_WhiteMarble : Matte {
+  Kd : Constant {
+    v { 0.32503700256347656, 0.32503700256347656, 0.32503700256347656 }
+  }
+}
+
+Surface mat_Gold : Metal {
+  eta { "Au" }
+  roughness : Constant {
+    v { 0.31622776601683794 }
+  }
+}
+
+Surface mat_Ceramic : Substrate {
+  Kd : Constant {
+    v { 1.0, 1.0, 1.0 }
+  }
+  Ks : Constant {
+    v { 0.04 }
+  }
+  eta : Constant {
+    v { 1.5 }
+  }
+  roughness : Constant {
+    v { 0.1 }
+  }
+}
+
+Surface mat_RoughMetal : Metal {
+  eta { "Al" }
+  roughness : Constant {
+    v { 0.31622776601683794 }
+  }
+}
+
+Surface mat_PaintedCeramic : Substrate {
+  Kd : Image {
+    file { "textures/Teacup.png" }
+  }
+  Ks : Constant {
+    v { 0.04 }
+  }
+  eta : Constant {
+    v { 1.5 }
+  }
+  roughness : Constant {
+    v { 0.1 }
+  }
+}
+
+Surface mat_SkirtWood : Substrate {
+  Kd : Constant {
+    v { 0.6846150159835815, 0.6846150159835815, 0.6846150159835815 }
+  }
+  Ks : Constant {
+    v { 0.04 }
+  }
+  eta : Constant {
+    v { 1.5 }
+  }
+  roughness : Constant {
+    v { 0.31622776601683794 }
+  }
+}
+
+Surface mat_FrostedGlass : Substrate {
+  Kd : Constant {
+    v { 0.7931100130081177, 0.7931100130081177, 0.7931100130081177 }
+  }
+  Ks : Constant {
+    v { 0.04 }
+  }
+  eta : Constant {
+    v { 1.5 }
+  }
+  roughness : Constant {
+    v { 0.31622776601683794 }
+  }
+}
+
+Surface mat_Null : Null {}
+
+Shape shape_0 : Mesh {
+  file { "models/Mesh013.obj" }
+  surface { @mat_FrostedGlass }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_1 : Mesh {
+  file { "models/Mesh016.obj" }
+  surface { @mat_WhitePlastic }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_2 : Mesh {
+  file { "models/Mesh015.obj" }
+  surface { @mat_WhitePlastic }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_3 : Mesh {
+  file { "models/Mesh023.obj" }
+  surface { @mat_FrostedGlass }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_4 : Mesh {
+  file { "models/Mesh020.obj" }
+  surface { @mat_WhitePlastic }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_5 : Mesh {
+  file { "models/Mesh017.obj" }
+  surface { @mat_WhitePlastic }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_6 : Mesh {
+  file { "models/Mesh024.obj" }
+  surface { @mat_None }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_7 : Mesh {
+  file { "models/Mesh041.obj" }
+  surface { @mat_BlackPaint }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_8 : Mesh {
+  file { "models/Mesh011.obj" }
+  surface { @mat_BlackPaint }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_9 : Mesh {
+  file { "models/Mesh026.obj" }
+  surface { @mat_Ceramic }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_10 : Mesh {
+  file { "models/Mesh018.obj" }
+  surface { @mat_Gold }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_11 : Mesh {
+  file { "models/Mesh007.obj" }
+  surface { @mat_RoughMetal }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_12 : Mesh {
+  file { "models/Mesh005.obj" }
+  surface { @mat_PaintedCeramic }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_13 : Mesh {
+  file { "models/Mesh019.obj" }
+  surface { @mat_Gold }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_14 : Mesh {
+  file { "models/Mesh021.obj" }
+  surface { @mat_Ceramic }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_15 : Mesh {
+  file { "models/Mesh037.obj" }
+  surface { @mat_Ceramic }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_16 : Mesh {
+  file { "models/Mesh004.obj" }
+  surface { @mat_Gold }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_17 : Mesh {
+  file { "models/Mesh014.obj" }
+  surface { @mat_PaintedCeramic }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_18 : Mesh {
+  file { "models/Mesh012.obj" }
+  surface { @mat_Gold }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_19 : Mesh {
+  file { "models/Mesh028.obj" }
+  surface { @mat_Ceramic }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_20 : Mesh {
+  file { "models/Mesh025.obj" }
+  surface { @mat_RoughMetal }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_21 : Mesh {
+  file { "models/Mesh008.obj" }
+  surface { @mat_Ceramic }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_22 : Mesh {
+  file { "models/Mesh032.obj" }
+  surface { @mat_WhitePlastic }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_23 : Mesh {
+  file { "models/Mesh035.obj" }
+  surface { @mat_Chrome }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_24 : Mesh {
+  file { "models/Mesh042.obj" }
+  surface { @mat_BlackRubber }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_25 : Mesh {
+  file { "models/Mesh010.obj" }
+  surface { @mat_WhitePlastic }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_26 : Mesh {
+  file { "models/Mesh036.obj" }
+  surface { @mat_Chrome }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_27 : Mesh {
+  file { "models/Mesh027.obj" }
+  surface { @mat_BlackRubber }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_28 : Mesh {
+  file { "models/Mesh043.obj" }
+  surface { @mat_WhitePlastic }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_29 : Mesh {
+  file { "models/Mesh044.obj" }
+  surface { @mat_Chrome }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_30 : Mesh {
+  file { "models/Mesh031.obj" }
+  surface { @mat_BlackRubber }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_31 : Mesh {
+  file { "models/Mesh022.obj" }
+  surface { @mat_WhitePlastic }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_32 : Mesh {
+  file { "models/Mesh038.obj" }
+  surface { @mat_Chrome }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_33 : Mesh {
+  file { "models/Mesh030.obj" }
+  surface { @mat_BlackRubber }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_34 : Mesh {
+  file { "models/Mesh046.obj" }
+  surface { @mat_WhitePlastic }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_35 : Mesh {
+  file { "models/Mesh047.obj" }
+  surface { @mat_Chrome }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_36 : Mesh {
+  file { "models/Mesh034.obj" }
+  surface { @mat_BlackRubber }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_37 : Mesh {
+  file { "models/Mesh033.obj" }
+  surface { @mat_WhiteMarble }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_38 : Mesh {
+  file { "models/Mesh006.obj" }
+  surface { @mat_FloorTiles }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0510599613189697, -0.45210200548171997,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_39 : Mesh {
+  file { "models/Mesh048.obj" }
+  surface { @mat_Walls }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_40 : Mesh {
+  file { "models/Mesh049.obj" }
+  surface { @mat_WhitePlastic }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_41 : Mesh {
+  file { "models/Mesh051.obj" }
+  surface { @mat_Chrome }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_42 : Mesh {
+  file { "models/Mesh040.obj" }
+  surface { @mat_BlackRubber }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_43 : Mesh {
+  file { "models/Mesh003.obj" }
+  surface { @mat_Ceramic }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_44 : Mesh {
+  file { "models/Mesh002.obj" }
+  surface { @mat_Ceramic }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_45 : Mesh {
+  file { "models/Mesh009.obj" }
+  surface { @mat_Gold }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_46 : Mesh {
+  file { "models/Mesh045.obj" }
+  surface { @mat_RoughMetal }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_47 : Mesh {
+  file { "models/Mesh029.obj" }
+  surface { @mat_PaintedCeramic }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_48 : Mesh {
+  file { "models/Mesh039.obj" }
+  surface { @mat_Gold }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_49 : Mesh {
+  file { "models/Mesh050.obj" }
+  surface { @mat_Ceramic }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_50 : Mesh {
+  file { "models/Mesh001.obj" }
+  surface { @mat_Artwork }
+  transform : Matrix {
+    m {
+      -1.0, 0.0, 3.8941436741879443e-07, -0.6213913559913635,
+      0.0, 1.0, 0.0, 4.023089408874512,
+      -3.8941436741879443e-07, 0.0, -1.0, -4.474820613861084,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_51 : Mesh {
+  file { "models/Mesh000.obj" }
+  surface { @mat_SkirtWood }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_52 : Mesh {
+  file { "models/square.obj" }
+  surface { @mat_Walls }
+  transform : Matrix {
+    m {
+      -2.0866940531050204e-07, -2.0063525596469844e-07, 4.589999675750732, -6.299990177154541,
+      -4.773799419403076, 8.77004530466536e-15, -2.0063525596469844e-07, 3.2569499015808105,
+      0.0, -7.34399938583374, -3.210164152278594e-07, 2.700000047683716,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Env dir : Directional {
+  emission : Constant {
+    v { 0.03183098882436752, 0.03183098882436752, 0.03183098882436752 }
+  }
+  angle { 2.0 }
+  direction { 2, 0.62, 0.8 }
+  scale { 12.566370614359172 }
+}
+
+Env sky : Spherical {
+  emission : Image {
+    file { "textures/sky.exr" }
+  }
+  transform : Matrix {
+    m { 0.0, 0.0, -1.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        1.0, 0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0, 1.0 }
+  }
+  scale { 0.4 }
+}
+
+Camera camera : Pinhole {
+  position { -0.5873172879219055, 2.7623000144958496, 9.714289665222168 }
+  front { 0.013057953678071499, -0.06386303901672363, -0.9978732466697693 }
+  up { 0.0, 1.0, 0.0 }
+  fov { 35.98339777135762 }
+  spp { 4096 }
+  filter : Gaussian {
+    radius { 1 }
+  }
+  film : Color {
+    resolution { 1280, 720 }
+  }
+  file { "color.exr" }
+}
+
+render {
+  cameras { @camera }
+  integrator : WavePath {}
+  shapes {
+    @shape_0,
+    @shape_1,
+    @shape_2,
+    @shape_3,
+    @shape_4,
+    @shape_5,
+    @shape_6,
+    @shape_7,
+    @shape_8,
+    @shape_9,
+    @shape_10,
+    @shape_11,
+    @shape_12,
+    @shape_13,
+    @shape_14,
+    @shape_15,
+    @shape_16,
+    @shape_17,
+    @shape_18,
+    @shape_19,
+    @shape_20,
+    @shape_21,
+    @shape_22,
+    @shape_23,
+    @shape_24,
+    @shape_25,
+    @shape_26,
+    @shape_27,
+    @shape_28,
+    @shape_29,
+    @shape_30,
+    @shape_31,
+    @shape_32,
+    @shape_33,
+    @shape_34,
+    @shape_35,
+    @shape_36,
+    @shape_37,
+    @shape_38,
+    @shape_39,
+    @shape_40,
+    @shape_41,
+    @shape_42,
+    @shape_43,
+    @shape_44,
+    @shape_45,
+    @shape_46,
+    @shape_47,
+    @shape_48,
+    @shape_49,
+    @shape_50,
+    @shape_51,
+    @shape_52
+  }
+  environment : Combined {
+    a { @dir }
+    b { @sky }
+  }
+}
+
