@@ -39,7 +39,7 @@ Differentiation::Differentiation(Pipeline &pipeline) noexcept
             grad += make_float4(x, y, z, w);
             count += as<float>(counter.read(counter_offset + i));
         }
-        grad /= max(count, 1.f);
+        grad /= max(count, constant_min_count);
         auto old = params.read(thread);
         auto range = ranges.read(thread);
         auto next = fma(-alpha, grad, old);
@@ -54,7 +54,7 @@ Differentiation::Differentiation(Pipeline &pipeline) noexcept
         auto z = as<float>(gradients.read(grad_offset + i * channels + 2u));
         auto w = as<float>(gradients.read(grad_offset + i * channels + 3u));
         auto grad = clamp(make_float4(x, y, z, w), -1e2f, 1e2f);
-        grad /= max(as<float>(counter.read(counter_offset + i)), 1.f);
+        grad /= max(as<float>(counter.read(counter_offset + i)), constant_min_count);
         auto old = image.read(coord);
         auto next = fma(-alpha, grad, old);
         image.write(coord, clamp(next, range.x, range.y));
@@ -148,14 +148,13 @@ void Differentiation::apply_gradients(CommandBuffer &command_buffer, float alpha
                 grad += collision_avoiding_gradients[index];
                 count += counter[index];
             }
-            grad /= count;
+            grad /= std::max(count, constant_min_count);
             auto p1 = params_after[i];
             LUISA_INFO(
-                "Param #{}: ({}, {}, {}, {}) - {} * ({}, {}, {}, {}) -> ({}, {}, {}, {}). count = {}",
+                "Param #{}: ({}, {}, {}, {}) - {} * ({}, {}, {}, {}) -> ({}, {}, {}, {}).",
                 i, p0.x, p0.y, p0.z, p0.w,
                 alpha, grad.x, grad.y, grad.z, grad.w,
-                p1.x, p1.y, p1.z, p1.w,
-                count);
+                p1.x, p1.y, p1.z, p1.w);
         }
     }
     for (auto &&p : _textured_params) {

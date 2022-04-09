@@ -36,6 +36,8 @@ public:
         constant_parameter_buffer_capacity * 4u *
         gradiant_collision_avoidance_block_size;
 
+    static constexpr auto constant_min_count = 1.f;
+
     class ConstantParameter {
 
     private:

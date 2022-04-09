@@ -197,10 +197,10 @@ public:
                 camera->film()->download(command_buffer, rendered.data());
                 command_buffer << synchronize();
                 _save_image(output_path, rendered, resolution);
-
-                // back propagate
-                pipeline().differentiation().step(command_buffer, learning_rate);
             }
+
+            // back propagate
+            pipeline().differentiation().step(command_buffer, learning_rate);
         }
 
         // save results
