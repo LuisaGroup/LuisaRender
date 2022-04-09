@@ -288,7 +288,7 @@ Camera camera : Pinhole {{
   film : Color {{
     resolution {{ {int(resolution.x)}, {int(resolution.y)} }}
   }}
-  file {{ "color.exr" }}
+  file {{ "render.exr" }}
 }}''', file=out_file)
 
 

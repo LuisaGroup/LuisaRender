@@ -80,7 +80,6 @@ public:
     [[nodiscard]] const Environment *environment() const noexcept;
     [[nodiscard]] luisa::span<const Shape *const> shapes() const noexcept;
     [[nodiscard]] luisa::span<const Camera *const> cameras() const noexcept;
-    [[nodiscard]] float shadow_terminator_factor() const noexcept;
 };
 
 }

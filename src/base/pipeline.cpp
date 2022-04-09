@@ -95,10 +95,12 @@ void Pipeline::_process_shape(
             mesh.resource = mesh_geom.resource;
             mesh.geometry_buffer_id_base = mesh_geom.buffer_id_base;
             mesh.two_sided = shape->two_sided().value_or(false);
+            mesh.shadow_term = shape->shadow_terminator_factor();
             iter = _meshes.emplace(shape, mesh).first;
         }
         auto mesh = iter->second;
-        auto two_sided = overridden_two_sided.value_or(mesh.two_sided);
+        auto two_sided = mesh.two_sided;
+        two_sided = overridden_two_sided.value_or(two_sided);
         auto instance_id = static_cast<uint>(_accel.size());
         auto [t_node, is_static] = _transform_tree.leaf(shape->transform());
         InstancedTransform inst_xform{t_node, instance_id};
@@ -122,7 +124,8 @@ void Pipeline::_process_shape(
         _instances.emplace_back(Shape::Handle::encode(
             mesh.geometry_buffer_id_base,
             properties, surface_tag, light_tag,
-            mesh.resource->triangle_count()));
+            mesh.resource->triangle_count(),
+            mesh.shadow_term));
         if (properties & Shape::property_flag_has_light) {
             _instanced_lights.emplace_back(Light::Handle{
                 .instance_id = instance_id,
@@ -166,7 +169,6 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     pipeline->_mean_time = static_cast<float>(mean_time);
     pipeline->_transform_matrices.resize(transform_matrix_buffer_size);
     pipeline->_transform_matrix_buffer = device.create_buffer<float4x4>(transform_matrix_buffer_size);
-    pipeline->_shadow_terminator_factor = scene.shadow_terminator_factor();
     if (scene.integrator()->is_differentiable()) {
         pipeline->_differentiation =
             luisa::make_unique<Differentiation>(*pipeline);
@@ -186,9 +188,7 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     }
     pipeline->_integrator = scene.integrator()->build(*pipeline, command_buffer);
     command_buffer << pipeline->_bindless_array.update();
-    if (auto &&diff = pipeline->_differentiation) {
-        diff->materialize(command_buffer);
-    }
+    if (auto &&diff = pipeline->_differentiation) { diff->materialize(command_buffer); }
     if (!pipeline->_transforms.empty()) {
         command_buffer << pipeline->_transform_matrix_buffer.view(0u, pipeline->_transforms.size())
                               .copy_from(pipeline->_transform_matrices.data());
@@ -261,15 +261,23 @@ ShadingAttribute Pipeline::shading_point(
     auto area = 0.5f * length(c);
     auto ng = normalize(c);
     auto uv = bary.x * v0->uv() + bary.y * v1->uv() + bary.z * v2->uv();
-    auto ns_local = bary.x * v0->normal() +
-                    bary.y * v1->normal() +
-                    bary.z * v2->normal();
-    auto tangent_local = bary.x * v0->tangent() +
-                         bary.y * v1->tangent() +
-                         bary.z * v2->tangent();
-    auto normal = normalize(shape_to_world_normal * ns_local);
+    auto n0 = normalize(shape_to_world_normal * v0->normal());
+    auto n1 = normalize(shape_to_world_normal * v1->normal());
+    auto n2 = normalize(shape_to_world_normal * v2->normal());
+    auto ns = normalize(bary.x * n0 + bary.y * n1 + bary.z * n2);
+    auto tangent_local = bary.x * v0->tangent() + bary.y * v1->tangent() + bary.z * v2->tangent();
     auto tangent = normalize(shape_to_world_normal * tangent_local);
-    return {.pg = p, .ng = ng, .ps = p, .ns = normal, .tangent = tangent, .uv = uv, .area = area};
+    // offset p to fake surface for the shadow terminator
+    // reference: Ray Tracing Gems 2, Chap. 4
+    auto temp_u = p - p0;
+    auto temp_v = p - p1;
+    auto temp_w = p - p2;
+    auto dot_u = min(dot(temp_u, n0), 0.f);
+    auto dot_v = min(dot(temp_v, n1), 0.f);
+    auto dot_w = min(dot(temp_w, n2), 0.f);
+    auto shadow_term = instance->shadow_terminator_factor();
+    auto dp = bary.x * (temp_u - dot_u * n0) + bary.y * (temp_v - dot_v * n1) + bary.z * (temp_w - dot_w * n2);
+    return {.pg = p, .ng = ng, .ps = p + shadow_term * dp, .ns = ns, .tangent = tangent, .uv = uv, .area = area};
 }
 
 Var<Hit> Pipeline::trace_closest(const Var<Ray> &ray) const noexcept { return _accel.trace_closest(ray); }

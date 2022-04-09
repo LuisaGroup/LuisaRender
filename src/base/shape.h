@@ -42,14 +42,17 @@ private:
     const Surface *_surface;
     const Light *_light;
     const Transform *_transform;
-    luisa::optional<bool> _two_sided;
+    bool _two_sided;
+    bool _two_sided_specified;
+    float _shadow_terminator;
 
 public:
     Shape(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] auto surface() const noexcept { return _surface; }
     [[nodiscard]] auto light() const noexcept { return _light; }
     [[nodiscard]] auto transform() const noexcept { return _transform; }
-    [[nodiscard]] auto two_sided() const noexcept { return _two_sided; }
+    [[nodiscard]] auto two_sided() const noexcept { return _two_sided_specified ? luisa::make_optional(_two_sided) : luisa::nullopt; }
+    [[nodiscard]] auto shadow_terminator_factor() const noexcept { return _shadow_terminator; }
     [[nodiscard]] virtual bool is_mesh() const noexcept = 0;
     [[nodiscard]] virtual luisa::span<const Vertex> vertices() const noexcept = 0;                         // empty if the shape is not a mesh
     [[nodiscard]] virtual luisa::span<const Triangle> triangles() const noexcept = 0;                      // empty if the shape is not a mesh
@@ -104,16 +107,17 @@ struct alignas(16) Shape::Handle {
     uint buffer_base_and_properties;
     uint surface_tag_and_light_tag;
     uint triangle_buffer_size;
-    uint reserved;
+    float shadow_term;
 
-    [[nodiscard]] static auto encode(uint buffer_base, uint flags, uint surface_tag, uint light_tag, uint tri_count) noexcept {
+    [[nodiscard]] static auto encode(uint buffer_base, uint flags, uint surface_tag, uint light_tag, uint tri_count, float shadow_terminator) noexcept {
         LUISA_ASSERT(buffer_base <= buffer_base_max, "Invalid geometry buffer base: {}.", buffer_base);
         LUISA_ASSERT(flags <= property_flag_mask, "Invalid property flags: {:016x}.", flags);
         LUISA_ASSERT(surface_tag <= surface_tag_max, "Invalid surface tag: {}.", surface_tag);
         LUISA_ASSERT(light_tag <= light_tag_mask, "Invalid light tag: {}.", light_tag);
         return Handle{.buffer_base_and_properties = (buffer_base << property_flag_bits) | flags,
                       .surface_tag_and_light_tag = (surface_tag << light_tag_bits) | light_tag,
-                      .triangle_buffer_size = tri_count};
+                      .triangle_buffer_size = tri_count,
+                      .shadow_term = shadow_terminator};
     }
 };
 
@@ -152,7 +156,7 @@ LUISA_STRUCT(
     buffer_base_and_properties,
     surface_tag_and_light_tag,
     triangle_buffer_size,
-    reserved) {
+    shadow_term) {
 
     [[nodiscard]] auto geometry_buffer_base() const noexcept { return buffer_base_and_properties >> luisa::render::Shape::Handle::property_flag_bits; }
     [[nodiscard]] auto property_flags() const noexcept { return buffer_base_and_properties & luisa::render::Shape::Handle::property_flag_mask; }
@@ -167,6 +171,7 @@ LUISA_STRUCT(
     [[nodiscard]] auto two_sided() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_two_sided); }
     [[nodiscard]] auto has_light() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_light); }
     [[nodiscard]] auto has_surface() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_surface); }
+    [[nodiscard]] auto shadow_terminator_factor() const noexcept { return shadow_term; }
 };
 
 // clang-format on

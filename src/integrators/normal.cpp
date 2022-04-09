@@ -94,7 +94,7 @@ void NormalVisualizerInstance::_render_one_camera(
         auto path_weight = camera_weight;
         auto it = pipeline().intersect(ray);
         auto color = def(make_float3());
-        $if(it->valid()) { color = it->shading().n() * .5f + .5f; };
+        $if(it->valid()) { color = it->ng() * .5f + .5f; };
         camera->film()->accumulate(pixel_id, shutter_weight * path_weight * color);
     });
     auto shutter_samples = camera->node()->shutter_samples();
@@ -104,8 +104,7 @@ void NormalVisualizerInstance::_render_one_camera(
     auto dispatch_count = 0u;
     auto dispatches_per_commit = 64u;
     for (auto s : shutter_samples) {
-        if (pipeline().update(command_buffer, s.point.time)) { dispatch_count = 0u; }
-        auto camera_to_world = camera->node()->transform()->matrix(s.point.time);
+        pipeline().update(command_buffer, s.point.time);
         for (auto i = 0u; i < s.spp; i++) {
             command_buffer << render(sample_id++, s.point.time, s.point.weight)
                                   .dispatch(resolution);

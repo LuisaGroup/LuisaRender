@@ -120,7 +120,7 @@ Camera::Camera(Scene *scene, const SceneNodeDesc *desc) noexcept
                     desc->source_location() ?
                         desc->source_location().file()->parent_path() :
                         std::filesystem::current_path()) /
-                    "color.exr");
+                    "render.exr");
     if (auto folder = _file.parent_path();
         !std::filesystem::exists(folder)) {
         std::filesystem::create_directories(folder);

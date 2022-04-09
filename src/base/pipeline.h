@@ -64,9 +64,9 @@ public:
 
     struct MeshData {
         Mesh *resource;
-        uint geometry_buffer_id_base;
-        bool two_sided;
-        bool is_virtual;
+        float shadow_term;
+        uint geometry_buffer_id_base : 24;
+        bool two_sided : 8;
     };
 
 private:
@@ -94,7 +94,6 @@ private:
     luisa::unique_ptr<Integrator::Instance> _integrator;
     luisa::unique_ptr<Environment::Instance> _environment;
     float _mean_time{};
-    float _shadow_terminator_factor{};
     luisa::unique_ptr<Differentiation> _differentiation;
     // registered transforms
     luisa::unordered_map<const Transform *, uint> _transform_to_id;

@@ -156,14 +156,7 @@ Surface mat_Null : Null {}
 Shape shape_0 : Mesh {
   file { "models/Mesh013.obj" }
   surface { @mat_FrostedGlass }
-  transform : Matrix {
-    m {
-      1.0, 0.0, 0.0, 0.0,
-      0.0, 1.0, 0.0, 0.0,
-      0.0, 0.0, 1.0, 0.0,
-      0.0, 0.0, 0.0, 1.0
-    }
-  }
+  shadow_terminator { 1.0 }
 }
 
 Shape shape_1 : Mesh {
@@ -195,14 +188,7 @@ Shape shape_2 : Mesh {
 Shape shape_3 : Mesh {
   file { "models/Mesh023.obj" }
   surface { @mat_FrostedGlass }
-  transform : Matrix {
-    m {
-      1.0, 0.0, 0.0, 0.0,
-      0.0, 1.0, 0.0, 0.0,
-      0.0, 0.0, 1.0, 0.0,
-      0.0, 0.0, 0.0, 1.0
-    }
-  }
+  shadow_terminator { 1.0 }
 }
 
 Shape shape_4 : Mesh {
@@ -869,14 +855,14 @@ Camera camera : Pinhole {
   front { 0.013057953678071499, -0.06386303901672363, -0.9978732466697693 }
   up { 0.0, 1.0, 0.0 }
   fov { 35.98339777135762 }
-  spp { 16384 }
+  spp { 4096 }
   filter : Gaussian {
     radius { 1 }
   }
   film : Color {
-    resolution { 1280, 720 }
+    resolution { 3840, 2160 }
   }
-  file { "color.exr" }
+  file { "render.exr" }
 }
 
 render {
