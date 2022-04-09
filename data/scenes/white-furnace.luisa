@@ -16,17 +16,26 @@ Integrator normal : Normal {
 }
 
 Integrator pt : MegaPath {
-  depth { 16 }
+  depth { 32 }
 }
 
 Shape teapot : Mesh {
   file { "../meshes/utah-teapot.obj" }
-  surface : Disney {
+  surface : Mirror {
+    Kd : Constant {
+      v { 1, 1, 1 }
+    }
+    Kr : Constant {
+      v { 1, 1, 1 }
+    }
+    Kt : Constant {
+      v { 1, 1, 1 }
+    }
     color : Constant {
       v { 1.0, 1.0, 1.0 }
     }
     roughness : Constant {
-      v { 0.1 }
+      v { 0.0 }
     }
     metallic : Constant {
       v { 0.3 }
