@@ -38,12 +38,10 @@ public:
 
 private:
     const Transform *_transform;
-    float _importance;// importance w.r.t. an average light
 
 public:
     Environment(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] auto transform() const noexcept { return _transform; }
-    [[nodiscard]] auto importance() const noexcept { return _importance; }
     [[nodiscard]] virtual bool is_black() const noexcept = 0;
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;

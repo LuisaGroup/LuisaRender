@@ -1029,7 +1029,7 @@ render {
   cameras { @camera }
   integrator : WavePath {
     depth { 12 }
-    spectrum : sRGB {}
+    spectrum : Hero {}
   }
   shapes {
     @shape_0,

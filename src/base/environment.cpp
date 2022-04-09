@@ -9,8 +9,7 @@ namespace luisa::render {
 
 Environment::Environment(Scene *scene, const SceneNodeDesc *desc) noexcept
     : SceneNode{scene, desc, SceneNodeTag::ENVIRONMENT},
-      _transform{scene->load_transform(desc->property_node_or_default("transform"))},
-      _importance{std::max(desc->property_float_or_default("importance", 1.0f), 0.01f)} {}
+      _transform{scene->load_transform(desc->property_node_or_default("transform"))} {}
 
 Environment::Instance::Instance(Pipeline &pipeline, const Environment *env) noexcept
     : _pipeline{pipeline}, _env{env} { pipeline.register_transform(env->transform()); }
