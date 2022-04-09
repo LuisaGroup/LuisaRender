@@ -19,7 +19,7 @@ if __name__ == "__main__":
     files = sorted(f for f in listdir(folder) if f.endswith(".exr"))
     print(f"Reading images from '{folder}'...")
     images = [cv.imread(f"{folder}/{f}", cv.IMREAD_UNCHANGED) for f in files]
-    writer = cv.VideoWriter(f"{folder}/output.avi", cv.VideoWriter_fourcc('M', 'J', 'P', 'G'), 10, (images[0].shape[1], images[0].shape[0]))
+    writer = cv.VideoWriter(f"{folder}/output.mp4", cv.VideoWriter_fourcc('m', 'p', '4', 'v'), 10, (images[0].shape[1], images[0].shape[0]))
     for i, image in enumerate(images):
         print(f"Processing frame {i}")
         frame = rgb2srgb(image)
