@@ -80,7 +80,7 @@ public:
     [[nodiscard]] Light::Evaluation evaluate(
         Expr<float3> wi, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         auto world_to_env = transpose(transform_to_world());
-        auto wi_local = world_to_env * wi;
+        auto wi_local = normalize(world_to_env * wi);
         auto L = _evaluate(wi_local, swl, time);
         if (_texture->node()->is_constant()) {
             return {.L = L, .pdf = uniform_sphere_pdf()};
@@ -119,7 +119,7 @@ public:
     }
 };
 
-unique_ptr<Environment::Instance> EnvironmentMapping::build(
+luisa::unique_ptr<Environment::Instance> EnvironmentMapping::build(
     Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
     auto texture = pipeline.build_texture(command_buffer, _emission);
     luisa::optional<uint> alias_id;

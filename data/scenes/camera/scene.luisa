@@ -178,6 +178,15 @@ Environment environment : Map {
   scale { 1.5 }
 }
 
+Environment directional : Directional {
+  emission : Constant {
+    v { 1, 1, 1 }
+  }
+  direction { 1, 1, 1 }
+  angle { 0.54 }
+  scale { 0.2 }
+}
+
 Camera camera : Thinlens {
   position { 0.3, 0.25, 0.65 }
   look_at { -0.03, 0.025, 0.072 }
@@ -188,7 +197,7 @@ Camera camera : Thinlens {
     resolution { 3840, 2160 }
     clamp { 128 }
   }
-  file { "render-display.exr" }
+  file { "render-directional.exr" }
   filter : Gaussian {
     radius { 1 }
   }
