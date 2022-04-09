@@ -1318,7 +1318,7 @@ Shape shape_89 : Mesh {
   }
 }
 
-Env env : Map {
+Env env : Spherical {
   emission : Constant {
     v { 0.30000001192092896, 0.30000001192092896, 0.30000001192092896 }
   }

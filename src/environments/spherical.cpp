@@ -15,7 +15,7 @@ namespace luisa::render {
 
 using namespace luisa::compute;
 
-class EnvironmentMapping final : public Environment {
+class Spherical final : public Environment {
 
 public:
     static constexpr auto sample_map_size = make_uint2(256u, 128u);
@@ -25,7 +25,7 @@ private:
     float _scale;
 
 public:
-    EnvironmentMapping(Scene *scene, const SceneNodeDesc *desc) noexcept
+    Spherical(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Environment{scene, desc},
           _emission{scene->load_texture(desc->property_node_or_default(
               "emission", SceneNodeDesc::shared_default_texture("Constant")))},
@@ -55,7 +55,7 @@ public:
     }
 };
 
-class EnvironmentMappingInstance final : public Environment::Instance {
+class SphericalInstance final : public Environment::Instance {
 
 private:
     const Texture::Instance *_texture;
@@ -64,16 +64,16 @@ private:
 
 private:
     [[nodiscard]] auto _evaluate(Expr<float3> wi_local, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-        auto env = node<EnvironmentMapping>();
-        auto uv = EnvironmentMapping::direction_to_uv(wi_local);
+        auto env = node<Spherical>();
+        auto uv = Spherical::direction_to_uv(wi_local);
         Interaction it{-wi_local, uv};
         auto L = _texture->evaluate_illuminant_spectrum(it, swl, time);
         return L * env->scale();
     }
 
 public:
-    EnvironmentMappingInstance(Pipeline &pipeline, const Environment *env, const Texture::Instance *texture,
-                               luisa::optional<uint> alias_buffer_id, luisa::optional<uint> pdf_buffer_id) noexcept
+    SphericalInstance(Pipeline &pipeline, const Environment *env, const Texture::Instance *texture,
+                      luisa::optional<uint> alias_buffer_id, luisa::optional<uint> pdf_buffer_id) noexcept
         : Environment::Instance{pipeline, env}, _texture{texture},
           _alias_buffer_id{std::move(alias_buffer_id)},
           _pdf_buffer_id{std::move(pdf_buffer_id)} {}
@@ -85,12 +85,12 @@ public:
         if (_texture->node()->is_constant()) {
             return {.L = L, .pdf = uniform_sphere_pdf()};
         }
-        auto uv = EnvironmentMapping::direction_to_uv(wi_local);
-        auto size = make_float2(EnvironmentMapping::sample_map_size);
+        auto uv = Spherical::direction_to_uv(wi_local);
+        auto size = make_float2(Spherical::sample_map_size);
         auto ix = cast<uint>(clamp(uv.x * size.x, 0.f, size.x - 1.f));
         auto iy = cast<uint>(clamp(uv.y * size.y, 0.f, size.y - 1.f));
         auto pdf_buffer = pipeline().bindless_buffer<float>(*_pdf_buffer_id);
-        auto pdf = pdf_buffer.read(iy * EnvironmentMapping::sample_map_size.x + ix);
+        auto pdf = pdf_buffer.read(iy * Spherical::sample_map_size.x + ix);
         return {.L = L, .pdf = pdf};
     }
     [[nodiscard]] Light::Sample sample(
@@ -102,16 +102,16 @@ public:
             }
             auto alias_buffer = pipeline().bindless_buffer<AliasEntry>(*_alias_buffer_id);
             auto [iy, uy] = sample_alias_table(
-                alias_buffer, EnvironmentMapping::sample_map_size.y, u.y);
-            auto offset = EnvironmentMapping::sample_map_size.y +
-                          iy * EnvironmentMapping::sample_map_size.x;
+                alias_buffer, Spherical::sample_map_size.y, u.y);
+            auto offset = Spherical::sample_map_size.y +
+                          iy * Spherical::sample_map_size.x;
             auto [ix, ux] = sample_alias_table(
-                alias_buffer, EnvironmentMapping::sample_map_size.x, u.x, offset);
+                alias_buffer, Spherical::sample_map_size.x, u.x, offset);
             auto uv = make_float2(cast<float>(ix) + ux, cast<float>(iy) + uy) /
-                      make_float2(EnvironmentMapping::sample_map_size);
-            auto index = iy * EnvironmentMapping::sample_map_size.x + ix;
+                      make_float2(Spherical::sample_map_size);
+            auto index = iy * Spherical::sample_map_size.x + ix;
             auto p = pipeline().bindless_buffer<float>(*_pdf_buffer_id).read(index);
-            return std::make_pair(EnvironmentMapping::uv_to_direction(uv), p);
+            return std::make_pair(Spherical::uv_to_direction(uv), p);
         }();
         return {.eval = {.L = _evaluate(wi_local, swl, time), .pdf = pdf},
                 .wi = normalize(transform_to_world() * wi_local),
@@ -119,7 +119,7 @@ public:
     }
 };
 
-luisa::unique_ptr<Environment::Instance> EnvironmentMapping::build(
+luisa::unique_ptr<Environment::Instance> Spherical::build(
     Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
     auto texture = pipeline.build_texture(command_buffer, _emission);
     luisa::optional<uint> alias_id;
@@ -134,7 +134,7 @@ luisa::unique_ptr<Environment::Instance> EnvironmentMapping::build(
             auto coord = dispatch_id().xy();
             auto uv = (make_float2(coord) + .5f) /
                       make_float2(sample_map_size);
-            auto w = EnvironmentMapping::uv_to_direction(uv);
+            auto w = Spherical::uv_to_direction(uv);
             auto it = Interaction{-w, uv};
             auto scale = srgb_to_cie_y(texture->evaluate(it, 0.f).xyz());
             auto sin_theta = sin(uv.y * pi);
@@ -187,10 +187,10 @@ luisa::unique_ptr<Environment::Instance> EnvironmentMapping::build(
         alias_id.emplace(alias_buffer_id);
         pdf_id.emplace(pdf_buffer_id);
     }
-    return luisa::make_unique<EnvironmentMappingInstance>(
+    return luisa::make_unique<SphericalInstance>(
         pipeline, this, texture, std::move(alias_id), std::move(pdf_id));
 }
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::EnvironmentMapping)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::Spherical)

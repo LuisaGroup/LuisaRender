@@ -168,7 +168,7 @@ Shape shape_camera : Group {
   }
 }
 
-Environment environment : Map {
+Environment environment : Spherical {
   emission : Image {
     file { "textures/kiara_1_dawn_8k.exr" }
   }

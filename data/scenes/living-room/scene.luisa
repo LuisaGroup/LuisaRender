@@ -1001,7 +1001,7 @@ Shape shape_64 : Mesh {
   }
 }
 
-Env env : Map {
+Env env : Spherical {
   emission : Image {
     file { "textures/Sky 19.exr" }
   }

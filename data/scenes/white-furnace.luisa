@@ -22,16 +22,16 @@ Integrator pt : MegaPath {
 Shape teapot : Mesh {
   file { "../meshes/utah-teapot.obj" }
   surface : Disney {
-    color : ConstColor {
-      color { 1.0 }
+    color : Constant {
+      v { 1.0, 1.0, 1.0 }
     }
-    roughness : ConstGeneric {
+    roughness : Constant {
       v { 0.1 }
     }
-    metallic : ConstGeneric {
+    metallic : Constant {
       v { 0.3 }
     }
-    specular_trans : ConstGeneric {
+    specular_trans : Constant {
       v { 1 }
     }
     thin { false }
@@ -52,9 +52,9 @@ render {
   cameras { @camera }
   shapes { @teapot }
   integrator { @pt }
-  environment : Map {
-    emission : ConstIllum {
-      emission { 1 }
+  environment : Spherical {
+    emission : Constant {
+      v { 1 }
     }
     transform : SRT {
       rotate { 0, 1, 0, 45 }
