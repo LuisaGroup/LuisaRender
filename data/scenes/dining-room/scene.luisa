@@ -847,7 +847,7 @@ Env dir : Directional {
     v { 0.03183098882436752, 0.03183098882436752, 0.03183098882436752 }
   }
   angle { 2.0 }
-  direction { 2, 0.62, 0.8 }
+  direction { 2, 0.64, 0.8 }
   scale { 12.566370614359172 }
 }
 
@@ -861,7 +861,7 @@ Env sky : Spherical {
         1.0, 0.0, 0.0, 0.0,
         0.0, 0.0, 0.0, 1.0 }
   }
-  scale { 0.4 }
+  scale { 0.3 }
 }
 
 Camera camera : Pinhole {
@@ -869,7 +869,7 @@ Camera camera : Pinhole {
   front { 0.013057953678071499, -0.06386303901672363, -0.9978732466697693 }
   up { 0.0, 1.0, 0.0 }
   fov { 35.98339777135762 }
-  spp { 4096 }
+  spp { 16384 }
   filter : Gaussian {
     radius { 1 }
   }
