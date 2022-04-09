@@ -306,20 +306,20 @@ Camera camera : Pinhole {
   front { 0.003735453588888049, 0.015855638310313225, -0.9998673796653748 }
   up { 0.0, 1.0, 0.0 }
   fov { 20.11429322446647 }
-  spp { 65536 }
+  spp { 32768 }
   filter : Gaussian {
     radius { 1 }
   }
   film : Color {
     resolution { 3840, 2160 }
   }
-  file { "test.exr" }
+  file { "render.exr" }
 }
 
 render {
   cameras { @camera }
   integrator : WavePath {
-    depth { 32 }
+    depth { 16 }
     rr_depth { 3 }
     spectrum : sRGB {}
   }

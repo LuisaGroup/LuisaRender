@@ -560,17 +560,21 @@ void WavefrontPathTracingInstance::_render_one_camera(
                                                    light_indices, light_count, miss_indices, miss_count)
                                       .dispatch(launch_state_count);
                 if (pipeline().environment()) {
-                    command_buffer << evaluate_miss_shader(path_indices, rays, miss_indices, miss_count, env_to_world, time)
+                    command_buffer << evaluate_miss_shader(path_indices, rays, miss_indices,
+                                                           miss_count, env_to_world, time)
                                           .dispatch(launch_state_count);
                 }
                 if (!pipeline().lights().empty()) {
-                    command_buffer << evaluate_light_shader(path_indices, rays, hits, light_indices, light_count, time)
+                    command_buffer << evaluate_light_shader(path_indices, rays, hits,
+                                                            light_indices, light_count, time)
                                           .dispatch(launch_state_count);
                 }
-                command_buffer << sample_light_shader(path_indices, rays, hits, surface_indices, surface_count, env_to_world, time)
+                command_buffer << sample_light_shader(path_indices, rays, hits, surface_indices,
+                                                      surface_count, env_to_world, time)
                                       .dispatch(launch_state_count)
-                               << evaluate_surface_shader(path_indices, depth, surface_indices, surface_count,
-                                                          rays, hits, out_rays, out_path_indices, out_path_count, time)
+                               << evaluate_surface_shader(path_indices, depth, surface_indices,
+                                                          surface_count, rays, hits, out_rays,
+                                                          out_path_indices, out_path_count, time)
                                       .dispatch(launch_state_count);
                 path_indices = out_path_indices;
                 path_count = out_path_count;
