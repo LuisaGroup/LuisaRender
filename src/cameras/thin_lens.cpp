@@ -11,7 +11,7 @@ namespace luisa::render {
 
 using namespace luisa::compute;
 
-class ThinlensCamera final : public Camera {
+class ThinLensCamera final : public Camera {
 
 private:
     float3 _position;
@@ -21,7 +21,7 @@ private:
     float _focal_length;
 
 public:
-    ThinlensCamera(Scene *scene, const SceneNodeDesc *desc) noexcept
+    ThinLensCamera(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Camera{scene, desc},
           _position{desc->property_float3("position")},
           _look_at{desc->property_float3("look_at")},
@@ -39,7 +39,7 @@ public:
     [[nodiscard]] auto focal_length() const noexcept { return _focal_length; }
 };
 
-class ThinlensCameraInstance final : public Camera::Instance {
+class ThinLensCameraInstance final : public Camera::Instance {
 
 private:
     float3 _position;
@@ -52,9 +52,9 @@ private:
     float _projected_pixel_size{};
 
 public:
-    explicit ThinlensCameraInstance(
+    explicit ThinLensCameraInstance(
         Pipeline &ppl, CommandBuffer &command_buffer,
-        const ThinlensCamera *camera) noexcept
+        const ThinLensCamera *camera) noexcept
         : Camera::Instance{ppl, command_buffer, camera} {
         _position = camera->position();
         auto v = camera->look_at() - _position;
@@ -93,12 +93,12 @@ private:
     }
 };
 
-luisa::unique_ptr<Camera::Instance> ThinlensCamera::build(
+luisa::unique_ptr<Camera::Instance> ThinLensCamera::build(
     Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
-    return luisa::make_unique<ThinlensCameraInstance>(
+    return luisa::make_unique<ThinLensCameraInstance>(
         pipeline, command_buffer, this);
 }
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::ThinlensCamera)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::ThinLensCamera)

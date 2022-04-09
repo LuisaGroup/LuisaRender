@@ -187,7 +187,7 @@ Environment directional : Directional {
   scale { 0.2 }
 }
 
-Camera camera : Thinlens {
+Camera camera : ThinLens {
   position { 0.3, 0.25, 0.65 }
   look_at { -0.03, 0.025, 0.072 }
   aperture { 2.8 }
