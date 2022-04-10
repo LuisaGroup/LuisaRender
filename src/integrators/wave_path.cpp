@@ -198,8 +198,7 @@ public:
     [[nodiscard]] BufferView<uint> prepare_counter_buffer(CommandBuffer &command_buffer) noexcept {
         if (_current_counter == counter_buffer_size) {
             _current_counter = 0u;
-            command_buffer << _clear_counters().dispatch(counter_buffer_size)
-                           << commit();// FIXME: CUDA memory error if omitted; bugs in the command reordering?
+            command_buffer << _clear_counters().dispatch(counter_buffer_size);
         }
         return _counter_buffer.view(_current_counter++, 1u);
     }
