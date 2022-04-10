@@ -34,11 +34,8 @@ create_alias_table(luisa::span<const float> values) noexcept {
     for (auto v : values) { sum += std::abs(v); }
     luisa::vector<float> pdf(values.size());
     if (sum == 0.) [[unlikely]] {
-        LUISA_WARNING_WITH_LOCATION(
-            "All-zero values in alias table construction. "
-            "Fallback to uniform sampling density.");
         auto n = static_cast<double>(values.size());
-        std::fill(pdf.begin(), pdf.end(), 1.0 / n);
+        std::fill(pdf.begin(), pdf.end(), static_cast<float>(1.0 / n));
     } else [[likely]] {
         auto inv_sum = 1.0 / sum;
         std::transform(

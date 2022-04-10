@@ -313,7 +313,7 @@ Camera camera : Pinhole {
   film : Color {
     resolution { 3840, 2160 }
   }
-  file { "render-test.exr" }
+  file { "render.exr" }
 }
 
 render {

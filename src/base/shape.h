@@ -14,7 +14,7 @@ namespace luisa::render {
 class Light;
 class Surface;
 
-using compute::AccelBuildHint;
+using compute::AccelUsageHint;
 using compute::Triangle;
 
 class Light;
@@ -26,12 +26,6 @@ class Shape : public SceneNode {
 public:
     class Handle;
     class Vertex;
-
-    enum struct Tag {
-        MESH,
-        INSTANCE,
-        VIRTUAL
-    };
 
 public:
     static constexpr auto property_flag_two_sided = 1u << 0u;
@@ -58,7 +52,7 @@ public:
     [[nodiscard]] virtual luisa::span<const Triangle> triangles() const noexcept = 0;                      // empty if the shape is not a mesh
     [[nodiscard]] virtual luisa::span<const Shape *const> children() const noexcept = 0;                   // empty if the shape is a mesh
     [[nodiscard]] virtual bool deformable() const noexcept = 0;                                            // true if the shape will not deform
-    [[nodiscard]] virtual AccelBuildHint build_hint() const noexcept { return AccelBuildHint::FAST_TRACE; }// accel struct build quality, only considered for meshes
+    [[nodiscard]] virtual AccelUsageHint build_hint() const noexcept { return AccelUsageHint::FAST_TRACE; }// accel struct build quality, only considered for meshes
 };
 
 struct alignas(16) Shape::Vertex {

@@ -23,7 +23,7 @@ Pipeline::~Pipeline() noexcept = default;
 
 void Pipeline::_build_geometry(
     CommandBuffer &command_buffer, luisa::span<const Shape *const> shapes,
-    float init_time, AccelBuildHint hint) noexcept {
+    float init_time, AccelUsageHint hint) noexcept {
 
     _accel = _device.create_accel(hint);
     for (auto shape : shapes) { _process_shape(command_buffer, shape); }
@@ -178,7 +178,7 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     for (auto camera : scene.cameras()) {
         pipeline->_cameras.emplace_back(camera->build(*pipeline, command_buffer));
     }
-    pipeline->_build_geometry(command_buffer, scene.shapes(), pipeline->_mean_time, AccelBuildHint::FAST_TRACE);
+    pipeline->_build_geometry(command_buffer, scene.shapes(), pipeline->_mean_time, AccelUsageHint::FAST_TRACE);
     if (auto env = scene.environment(); env != nullptr && !env->is_black()) {
         pipeline->_environment = env->build(*pipeline, command_buffer);
     }
@@ -217,7 +217,7 @@ bool Pipeline::update(CommandBuffer &command_buffer, float time) noexcept {
                 });
             ThreadPool::global().synchronize();
         }
-        command_buffer << _accel.update();
+        command_buffer << _accel.build();
     }
     if (_any_dynamic_transforms) {
         updated = true;

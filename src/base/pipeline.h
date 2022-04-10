@@ -25,7 +25,7 @@
 namespace luisa::render {
 
 using compute::Accel;
-using compute::AccelBuildHint;
+using compute::AccelUsageHint;
 using compute::BindlessArray;
 using compute::BindlessBuffer;
 using compute::BindlessTexture2D;
@@ -104,14 +104,13 @@ private:
     Printer _printer;
 
 private:
-    void _build_geometry(
-        CommandBuffer &command_buffer,
-        luisa::span<const Shape *const> shapes,
-        float init_time, AccelBuildHint hint) noexcept;
-    void _process_shape(
-        CommandBuffer &command_buffer, const Shape *shape,
-        luisa::optional<bool> overridden_two_sided = luisa::nullopt,
-        const Surface *overridden_surface = nullptr, const Light *overridden_light = nullptr) noexcept;
+    void _build_geometry(CommandBuffer &command_buffer,
+                         luisa::span<const Shape *const> shapes,
+                         float init_time, AccelUsageHint hint) noexcept;
+    void _process_shape(CommandBuffer &command_buffer, const Shape *shape,
+                        luisa::optional<bool> overridden_two_sided = luisa::nullopt,
+                        const Surface *overridden_surface = nullptr,
+                        const Light *overridden_light = nullptr) noexcept;
     [[nodiscard]] uint _process_surface(CommandBuffer &command_buffer, const Surface *surface) noexcept;
     [[nodiscard]] uint _process_light(CommandBuffer &command_buffer, const Light *light) noexcept;
 
