@@ -12,14 +12,16 @@
 
 namespace luisa::render {
 
-Differentiation::Differentiation(Pipeline &pipeline) noexcept
+Differentiation::Differentiation(Pipeline &pipeline, const Optimizer &optimizer) noexcept
     : _pipeline{pipeline},
+      _optimizer{optimizer},
       _const_param_buffer{*pipeline.create<Buffer<float4>>(constant_parameter_buffer_capacity)},
       _const_param_range_buffer{*pipeline.create<Buffer<float2>>(constant_parameter_buffer_capacity)},
       _gradient_buffer_size{constant_parameter_gradient_buffer_size},
       _counter_size{constant_parameter_counter_size} {
     _constant_params.reserve(constant_parameter_buffer_capacity);
     _constant_ranges.reserve(constant_parameter_buffer_capacity);
+
     using namespace compute;
     Kernel1D clear_buffer = [](BufferUInt gradients) noexcept {
         gradients.write(dispatch_x(), 0u);
@@ -39,6 +41,7 @@ Differentiation::Differentiation(Pipeline &pipeline) noexcept
             grad += make_float4(x, y, z, w);
             count += as<float>(counter.read(counter_offset + i));
         }
+
         grad /= max(count, constant_min_count);
         auto old = params.read(thread);
         auto range = ranges.read(thread);

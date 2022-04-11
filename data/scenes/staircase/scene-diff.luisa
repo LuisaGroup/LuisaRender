@@ -4,7 +4,7 @@ Surface mat_WoodFloor : Substrate {
     file { "textures/WoodFloor.jpg" }
   }
   Ks : Constant {
-    v { 0.04 }
+    v { 0.04, 0.04, 0.04 }
   }
   eta : Constant {
     v { 1.5 }
@@ -19,7 +19,7 @@ Surface mat_WoodStairs : Substrate {
     file { "textures/WoodPanel.jpg" }
   }
   Ks : Constant {
-    v { 0.04 }
+    v { 0.04, 0.04, 0.04 }
   }
   eta : Constant {
     v { 1.5 }
@@ -34,7 +34,7 @@ Surface mat_WoodChair : Substrate {
     file { "textures/Wood.jpg" }
   }
   Ks : Constant {
-    v { 0.04 }
+    v { 0.04, 0.04, 0.04 }
   }
   eta : Constant {
     v { 1.5 }
@@ -49,7 +49,7 @@ Surface mat_WoodLamp : Substrate {
     file { "textures/WoodChair.jpg" }
   }
   Ks : Constant {
-    v { 0.04 }
+    v { 0.04, 0.04, 0.04 }
   }
   eta : Constant {
     v { 1.5 }
@@ -87,7 +87,7 @@ Surface mat_ChairSeat : Matte {
 
 Surface mat_Glass : Glass {
   Kr : Constant {
-    v { 1 }
+    v { 1, 1, 1 }
   }
   Kt : Constant {
     v { 1.0, 1.0, 1.0 }
@@ -105,7 +105,7 @@ Surface mat_MagnoliaPaint : Substrate {
     v { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
   }
   Ks : Constant {
-    v { 0.04 }
+    v { 0.04, 0.04, 0.04 }
   }
   eta : Constant {
     v { 1.5 }
@@ -120,7 +120,7 @@ Surface mat_WhitePaint : Substrate {
     v { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
   }
   Ks : Constant {
-    v { 0.04 }
+    v { 0.04, 0.04, 0.04 }
   }
   eta : Constant {
     v { 1.5 }
@@ -10383,8 +10383,11 @@ Integrator pt_grad : MegaPathGrad {
   depth { 10 }
   spectrum : sRGB {}
   display_camera_index { 1 }
+  save_prcess { true }
+  optimizer { "ATN" }
+  loss { "L2" }
   learning_rate { 0.2 }
-  iterations { 30 }
+  iterations { 300 }
 }
 
 render {

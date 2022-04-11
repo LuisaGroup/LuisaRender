@@ -17,54 +17,35 @@ namespace luisa::render {
 
 using namespace luisa::compute;
 
-class MegakernelGradRadiative final : public Integrator {
-
-public:
-    enum Loss {
-        L1 = 1,
-        L2 = 2,
-    };
+class MegakernelGradRadiative final : public DifferentiableIntegrator {
 
 private:
     uint _max_depth;
     uint _rr_depth;
     float _rr_threshold;
-    Loss _loss_function;
     int _display_camera_index;
     uint _iterations;
     float _learning_rate;
+    bool _save_process;
 
 public:
     MegakernelGradRadiative(Scene *scene, const SceneNodeDesc *desc) noexcept
-        : Integrator{scene, desc},
+        : DifferentiableIntegrator{scene, desc},
           _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)},
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
           _display_camera_index{desc->property_int_or_default("display_camera_index", -1)},
           _iterations{std::max(desc->property_uint_or_default("iterations", 100u), 1u)},
-          _learning_rate{std::max(desc->property_float_or_default("learning_rate", 1.f), 0.f)} {
-        auto loss_str = desc->property_string_or_default("loss", "L2");
-        for (auto &c : loss_str) { c = static_cast<char>(toupper(c)); }
-        if (loss_str == "L1") {
-            _loss_function = Loss::L1;
-        } else if (loss_str == "L2") {
-            _loss_function = Loss::L2;
-        } else {
-            LUISA_WARNING_WITH_LOCATION(
-                "Unknown loss '{}'. "
-                "Fallback to L2 loss.",
-                loss_str);
-            _loss_function = Loss::L2;
-        }
-    }
+          _learning_rate{std::max(desc->property_float_or_default("learning_rate", 1.f), 0.f)},
+          _save_process{desc->property_bool_or_default("save_process", false)} {}
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
     [[nodiscard]] auto learning_rate() const noexcept { return _learning_rate; }
     [[nodiscard]] auto iterations() const noexcept { return _iterations; }
-    [[nodiscard]] auto loss() const noexcept { return _loss_function; }
     [[nodiscard]] bool is_differentiable() const noexcept override { return true; }
     [[nodiscard]] int display_camera_index() const noexcept { return _display_camera_index; }
+    [[nodiscard]] bool save_process() const noexcept { return _save_process; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
@@ -126,10 +107,6 @@ public:
                 auto pixel_count = resolution.x * resolution.y;
                 film->download(command_buffer, _pixels.data());
                 command_buffer << synchronize();
-                auto file_name = luisa::format("outputs/{:05}.exr", iteration);
-                SaveEXR(reinterpret_cast<const float *>(_pixels.data()),
-                        static_cast<int>(resolution.x), static_cast<int>(resolution.y), 4,
-                        false, file_name.c_str(), nullptr);
                 auto scale = std::pow(2.f, exposure);
                 auto pow = [](auto v, auto a) noexcept {
                     return make_float3(
@@ -192,12 +169,21 @@ public:
                 // calculate grad
                 _integrate_one_camera(command_buffer, k, camera);
 
-                // save image
-                rendered.resize(next_pow2(pixel_count));
-                camera->film()->download(command_buffer, rendered.data());
-                command_buffer << synchronize();
-                _save_image(output_path, rendered, resolution);
+                if (pt->save_process()) {
+                    // save image
+                    rendered.resize(next_pow2(pixel_count));
+                    camera->film()->download(command_buffer, rendered.data());
+                    command_buffer << synchronize();
+                    _save_image(output_path, rendered, resolution);
+                }
 
+                if (pt->optimizer() != Optimizer::ATN) {
+                    // back propagate
+                    pipeline().differentiation().step(command_buffer, learning_rate);
+                }
+            }
+
+            if (pt->optimizer() == Optimizer::ATN) {
                 // back propagate
                 pipeline().differentiation().step(command_buffer, learning_rate);
             }
@@ -260,6 +246,30 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
             return ite(pdf_a > 0.0f, pdf_a / (pdf_a + pdf_b), 0.0f);
         };
 
+        Callable bp_loss = [camera, pt_exact](UInt2 pixel_id, Float time) noexcept {
+            auto resolution = camera->film()->node()->resolution();
+            auto it = Interaction{
+                make_float3(1.0f),
+                Float2{
+                    (pixel_id.x + 0.5f) / resolution.x,
+                    (pixel_id.y + 0.5f) / resolution.y}};
+
+            switch (pt_exact->loss()) {
+                case Loss::L1:
+                    // L1 loss
+                    return ite(
+                        camera->film()->read(pixel_id).average - camera->target()->evaluate(it, time).xyz() >= 0.0f,
+                        1.0f,
+                        -1.0f);
+                case Loss::L2:
+                    // L2 loss
+                    return 2.0f * (camera->film()->read(pixel_id).average -
+                                   camera->target()->evaluate(it, time).xyz());
+            }
+
+            return def(make_float3(0.f));
+        };
+
         Kernel2D bp_kernel = [&](UInt frame_index, Float time, Float shutter_weight) noexcept {
             set_block_size(8u, 8u, 1u);
 
@@ -271,30 +281,9 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
             SampledSpectrum Li{swl.dimension(), 1.0f};
             auto grad_weight = shutter_weight * static_cast<float>(pt->node<MegakernelGradRadiative>()->max_depth());
 
-            auto it = Interaction{
-                make_float3(1.0f),
-                Float2{
-                    (pixel_id.x + 0.5f) / resolution.x,
-                    (pixel_id.y + 0.5f) / resolution.y}};
-
-            // Loss
-            Float3 loss;
-            switch (pt_exact->loss()) {
-                case MegakernelGradRadiative::Loss::L1:
-                    // L1 loss
-                    loss = ite(
-                        camera->film()->read(pixel_id).average - camera->target()->evaluate(it, time).xyz() >= 0.0f,
-                        1.0f,
-                        -1.0f);
-                    break;
-                case MegakernelGradRadiative::Loss::L2:
-                    // L2 loss
-                    loss = 2.0f * (camera->film()->read(pixel_id).average -
-                                   camera->target()->evaluate(it, time).xyz());
-                    break;
-            }
+            auto d_loss = bp_loss(pixel_id, time);
             for (auto i = 0u; i < 3u; ++i) {
-                beta[i] *= loss[i];
+                beta[i] *= d_loss[i];
             }
 
             auto ray = camera_ray;
@@ -312,19 +301,19 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
                     //                            ray->direction(), env_to_world, swl, time);
                     //                        Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
                     //                    }
-                    // TODO : backward_miss
+                    //                    // TODO : backward_miss
                     $break;
                 };
 
-                // hit light
-                if (!pipeline().lights().empty()) {
-                    //                    $if(it->shape()->has_light()) {
-                    //                        auto eval = light_sampler->evaluate_hit(
-                    //                            *it, ray->origin(), swl, time);
-                    //                        Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
-                    //                    };
-                    // TODO : backward_hit
-                }
+                //                // hit light
+                //                if (!pipeline().lights().empty()) {
+                //                    $if(it->shape()->has_light()) {
+                //                        auto eval = light_sampler->evaluate_hit(
+                //                            *it, ray->origin(), swl, time);
+                //                        Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
+                //                    };
+                //                    // TODO : backward_hit
+                //                }
 
                 $if(!it->shape()->has_surface()) { $break; };
 

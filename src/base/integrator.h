@@ -9,6 +9,8 @@
 #include <base/sampler.h>
 #include <base/spectrum.h>
 #include <base/light_sampler.h>
+#include <util/loss.h>
+#include <util/optimizer.h>
 
 namespace luisa::render {
 
@@ -58,6 +60,18 @@ public:
     [[nodiscard]] virtual bool is_differentiable() const noexcept = 0;
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
+};
+
+class DifferentiableIntegrator : public Integrator {
+
+private:
+    Loss _loss_function;
+    Optimizer _optimizer;
+
+public:
+    DifferentiableIntegrator(Scene *scene, const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] auto loss() const noexcept { return _loss_function; }
+    [[nodiscard]] auto optimizer() const noexcept { return _optimizer; }
 };
 
 }// namespace luisa::render

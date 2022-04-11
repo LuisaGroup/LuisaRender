@@ -26,4 +26,38 @@ Integrator::Instance::Instance(Pipeline &pipeline, CommandBuffer &command_buffer
                          nullptr},
       _spectrum{integrator->spectrum()->build(pipeline, command_buffer)} {}
 
+DifferentiableIntegrator::DifferentiableIntegrator(Scene *scene, const SceneNodeDesc *desc) noexcept
+    : Integrator(scene, desc) {
+
+    // loss
+    auto loss_str = desc->property_string_or_default("loss", "L2");
+    for (auto &c : loss_str) { c = static_cast<char>(toupper(c)); }
+    if (loss_str == "L1") {
+        _loss_function = Loss::L1;
+    } else if (loss_str == "L2") {
+        _loss_function = Loss::L2;
+    } else {
+        LUISA_WARNING_WITH_LOCATION(
+            "Unknown loss '{}'. "
+            "Fallback to L2 loss.",
+            loss_str);
+        _loss_function = Loss::L2;
+    }
+
+    // optimizer
+    auto optimizer_str = desc->property_string_or_default("optimizer", "GD");
+    for (auto &c : optimizer_str) { c = static_cast<char>(toupper(c)); }
+    if (optimizer_str == "BGD") {
+        _optimizer = Optimizer::BGD;
+    } else if (optimizer_str == "ATN") {
+        _optimizer = Optimizer::ATN;
+    } else {
+        LUISA_WARNING_WITH_LOCATION(
+            "Unsupported optimizer '{}'. "
+            "Fallback to GD optimizer.",
+            optimizer_str);
+        _optimizer = Optimizer::GD;
+    }
+}
+
 }// namespace luisa::render

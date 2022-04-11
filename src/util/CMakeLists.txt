@@ -15,7 +15,9 @@ add_library(luisa-render-util SHARED
         complex.h
         medium_tracker.cpp medium_tracker.h
         atomic.h
-        progress_bar.cpp progress_bar.h)
+        progress_bar.cpp progress_bar.h
+        loss.h
+        optimizer.h)
 target_link_libraries(luisa-render-util PUBLIC
         luisa::compute
         luisa-render-include

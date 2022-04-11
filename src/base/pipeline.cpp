@@ -171,7 +171,9 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     pipeline->_transform_matrix_buffer = device.create_buffer<float4x4>(transform_matrix_buffer_size);
     if (scene.integrator()->is_differentiable()) {
         pipeline->_differentiation =
-            luisa::make_unique<Differentiation>(*pipeline);
+            luisa::make_unique<Differentiation>(
+                *pipeline,
+                dynamic_cast<const DifferentiableIntegrator *>(scene.integrator())->optimizer());
     }
     pipeline->_cameras.reserve(scene.cameras().size());
     auto command_buffer = stream.command_buffer();
