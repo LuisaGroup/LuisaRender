@@ -197,10 +197,10 @@ public:
                 camera->film()->download(command_buffer, rendered.data());
                 command_buffer << synchronize();
                 _save_image(output_path, rendered, resolution);
-            }
 
-            // back propagate
-            pipeline().differentiation().step(command_buffer, learning_rate);
+                // back propagate
+                pipeline().differentiation().step(command_buffer, learning_rate);
+            }
         }
 
         // save results
@@ -222,6 +222,7 @@ public:
 
         LUISA_INFO("Dumping differentiable parameters");
         pipeline().differentiation().dump(command_buffer, "outputs");
+        LUISA_INFO("Finish dumping differentiable parameters");
 
         while (_window && !_window->should_close()) {
             _window->run_one_frame([] {});

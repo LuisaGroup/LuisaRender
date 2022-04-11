@@ -10305,10 +10305,7 @@ Camera camera0 : Pinhole {
   film : Color {
     resolution { 720, 1280 }
   }
-  file { "staircase0-diff.exr" }
-  target : Image {
-    file { "./staircase0-ref-4096spp.exr" }
-  }
+  file { "staircase0.exr" }
 }
 
 Camera camera1 : Pinhole {
@@ -10323,10 +10320,7 @@ Camera camera1 : Pinhole {
   film : Color {
     resolution { 720, 1280 }
   }
-  file { "staircase1-diff.exr" }
-  target : Image {
-    file { "./staircase1-ref-4096spp.exr" }
-  }
+  file { "staircase1.exr" }
 }
 
 Camera camera2 : Pinhole {
@@ -10341,10 +10335,7 @@ Camera camera2 : Pinhole {
   film : Color {
     resolution { 720, 1280 }
   }
-  file { "staircase2-diff.exr" }
-  target : Image {
-    file { "./staircase2-ref-4096spp.exr" }
-  }
+  file { "staircase2.exr" }
 }
 
 render {
