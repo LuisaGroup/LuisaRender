@@ -19,8 +19,7 @@ Camera::Camera(Scene *scene, const SceneNodeDesc *desc) noexcept
       _film{scene->load_film(desc->property_node("film"))},
       _filter{scene->load_filter(desc->property_node_or_default(
           "filter", SceneNodeDesc::shared_default_filter("Box")))},
-      _transform{scene->load_transform(desc->property_node_or_default(
-          "transform", SceneNodeDesc::shared_default_transform("Identity")))},
+      _transform{scene->load_transform(desc->property_node_or_default("transform"))},
       _shutter_span{desc->property_float2_or_default(
           "shutter_span", lazy_construct([desc] {
               return make_float2(desc->property_float_or_default(
@@ -121,7 +120,7 @@ Camera::Camera(Scene *scene, const SceneNodeDesc *desc) noexcept
                     desc->source_location() ?
                         desc->source_location().file()->parent_path() :
                         std::filesystem::current_path()) /
-                    "color.exr");
+                    "render.exr");
     if (auto folder = _file.parent_path();
         !std::filesystem::exists(folder)) {
         std::filesystem::create_directories(folder);
@@ -187,15 +186,17 @@ Camera::Instance::Instance(Pipeline &pipeline, CommandBuffer &command_buffer, co
     : _pipeline{pipeline}, _camera{camera},
       _film{camera->film()->build(pipeline, command_buffer)},
       _filter{camera->filter()->build(pipeline, command_buffer)},
-      _target{pipeline.build_texture(command_buffer, camera->target())} {}
+      _target{pipeline.build_texture(command_buffer, camera->target())} {
+    pipeline.register_transform(camera->transform());
+}
 
 Camera::Sample Camera::Instance::generate_ray(
-    Sampler::Instance &sampler, Expr<uint2> pixel_coord,
-    Expr<float> time, Expr<float4x4> camera_to_world) const noexcept {
+    Sampler::Instance &sampler, Expr<uint2> pixel_coord, Expr<float> time) const noexcept {
     auto [filter_offset, filter_weight] = filter()->sample(sampler.generate_pixel_2d());
     auto pixel = make_float2(pixel_coord) + 0.5f + filter_offset;
     auto sample = _generate_ray(sampler, pixel, time);
     sample.weight *= filter_weight;
+    auto camera_to_world = pipeline().transform(node()->transform());
     sample.ray->set_origin(make_float3(
         camera_to_world * make_float4(sample.ray->origin(), 1.0f)));
     sample.ray->set_direction(normalize(

@@ -14,7 +14,8 @@ add_library(luisa-render-util SHARED
         sobolmatrices.cpp sobolmatrices.h
         complex.h
         medium_tracker.cpp medium_tracker.h
-        atomic.h)
+        atomic.h
+        progress_bar.cpp progress_bar.h)
 target_link_libraries(luisa-render-util PUBLIC
         luisa::compute
         luisa-render-include

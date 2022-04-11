@@ -22,6 +22,8 @@ using luisa::compute::Var;
 [[nodiscard]] Float3 sample_uniform_sphere(Expr<float2> u) noexcept;
 [[nodiscard]] constexpr float uniform_sphere_pdf() noexcept { return inv_pi * 0.25f; }
 [[nodiscard]] Float2 invert_uniform_sphere_sample(Expr<float3> w) noexcept;
+[[nodiscard]] Float uniform_cone_pdf(Expr<float> cos_theta_max) noexcept;
+[[nodiscard]] Float3 sample_uniform_cone(Expr<float2> u, Expr<float> cos_theta_max) noexcept;
 
 struct AliasEntry {
     float prob;

@@ -23,7 +23,7 @@ Pipeline::~Pipeline() noexcept = default;
 
 void Pipeline::_build_geometry(
     CommandBuffer &command_buffer, luisa::span<const Shape *const> shapes,
-    float init_time, AccelBuildHint hint) noexcept {
+    float init_time, AccelUsageHint hint) noexcept {
 
     _accel = _device.create_accel(hint);
     for (auto shape : shapes) { _process_shape(command_buffer, shape); }
@@ -95,10 +95,12 @@ void Pipeline::_process_shape(
             mesh.resource = mesh_geom.resource;
             mesh.geometry_buffer_id_base = mesh_geom.buffer_id_base;
             mesh.two_sided = shape->two_sided().value_or(false);
+            mesh.shadow_term = shape->shadow_terminator_factor();
             iter = _meshes.emplace(shape, mesh).first;
         }
         auto mesh = iter->second;
-        auto two_sided = overridden_two_sided.value_or(mesh.two_sided);
+        auto two_sided = mesh.two_sided;
+        two_sided = overridden_two_sided.value_or(two_sided);
         auto instance_id = static_cast<uint>(_accel.size());
         auto [t_node, is_static] = _transform_tree.leaf(shape->transform());
         InstancedTransform inst_xform{t_node, instance_id};
@@ -122,7 +124,8 @@ void Pipeline::_process_shape(
         _instances.emplace_back(Shape::Handle::encode(
             mesh.geometry_buffer_id_base,
             properties, surface_tag, light_tag,
-            mesh.resource->triangle_count()));
+            mesh.resource->triangle_count(),
+            mesh.shadow_term));
         if (properties & Shape::property_flag_has_light) {
             _instanced_lights.emplace_back(Light::Handle{
                 .instance_id = instance_id,
@@ -158,20 +161,24 @@ uint Pipeline::_process_light(CommandBuffer &command_buffer, const Light *light)
 luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, const Scene &scene) noexcept {
     ThreadPool::global().synchronize();
     auto pipeline = luisa::make_unique<Pipeline>(device);
+    auto mean_time = 0.0;
+    for (auto camera : scene.cameras()) {
+        mean_time += (camera->shutter_span().x + camera->shutter_span().y) * 0.5f;
+    }
+    mean_time *= 1.0 / static_cast<double>(scene.cameras().size());
+    pipeline->_mean_time = static_cast<float>(mean_time);
+    pipeline->_transform_matrices.resize(transform_matrix_buffer_size);
+    pipeline->_transform_matrix_buffer = device.create_buffer<float4x4>(transform_matrix_buffer_size);
     if (scene.integrator()->is_differentiable()) {
         pipeline->_differentiation =
             luisa::make_unique<Differentiation>(*pipeline);
     }
     pipeline->_cameras.reserve(scene.cameras().size());
     auto command_buffer = stream.command_buffer();
-    auto mean_time = 0.0;
     for (auto camera : scene.cameras()) {
         pipeline->_cameras.emplace_back(camera->build(*pipeline, command_buffer));
-        mean_time += (camera->shutter_span().x + camera->shutter_span().y) * 0.5f;
     }
-    mean_time *= 1.0 / static_cast<double>(scene.cameras().size());
-    pipeline->_mean_time = static_cast<float>(mean_time);
-    pipeline->_build_geometry(command_buffer, scene.shapes(), pipeline->_mean_time, AccelBuildHint::FAST_TRACE);
+    pipeline->_build_geometry(command_buffer, scene.shapes(), pipeline->_mean_time, AccelUsageHint::FAST_TRACE);
     if (auto env = scene.environment(); env != nullptr && !env->is_black()) {
         pipeline->_environment = env->build(*pipeline, command_buffer);
     }
@@ -181,35 +188,46 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     }
     pipeline->_integrator = scene.integrator()->build(*pipeline, command_buffer);
     command_buffer << pipeline->_bindless_array.update();
-    if (auto &&diff = pipeline->_differentiation) {
-        diff->materialize(command_buffer);
+    if (auto &&diff = pipeline->_differentiation) { diff->materialize(command_buffer); }
+    if (!pipeline->_transforms.empty()) {
+        command_buffer << pipeline->_transform_matrix_buffer.view(0u, pipeline->_transforms.size())
+                              .copy_from(pipeline->_transform_matrices.data());
     }
-    command_buffer << compute::synchronize();
+    command_buffer << compute::commit();
     return pipeline;
 }
 
-bool Pipeline::update_geometry(CommandBuffer &command_buffer, float time) noexcept {
+bool Pipeline::update(CommandBuffer &command_buffer, float time) noexcept {
     // TODO: support deformable meshes
-    if (_dynamic_transforms.empty()) { return false; }
-    if (_dynamic_transforms.size() < 128u) {
-        for (auto t : _dynamic_transforms) {
-            _accel.set_transform(
-                t.instance_id(),
-                t.matrix(time));
+    auto updated = false;
+    if (!_dynamic_transforms.empty()) {
+        updated = true;
+        if (_dynamic_transforms.size() < 128u) {
+            for (auto t : _dynamic_transforms) {
+                _accel.set_transform_on_update(
+                    t.instance_id(), t.matrix(time));
+            }
+        } else {
+            ThreadPool::global().parallel(
+                _dynamic_transforms.size(),
+                [this, time](auto i) noexcept {
+                    auto t = _dynamic_transforms[i];
+                    _accel.set_transform_on_update(
+                        t.instance_id(), t.matrix(time));
+                });
+            ThreadPool::global().synchronize();
         }
-    } else {
-        ThreadPool::global().parallel(
-            _dynamic_transforms.size(),
-            [this, time](auto i) noexcept {
-                auto t = _dynamic_transforms[i];
-                _accel.set_transform(
-                    t.instance_id(),
-                    t.matrix(time));
-            });
-        ThreadPool::global().synchronize();
+        command_buffer << _accel.build();
     }
-    command_buffer << _accel.update() << compute::commit();
-    return true;
+    if (_any_dynamic_transforms) {
+        updated = true;
+        for (auto i = 0u; i < _transforms.size(); ++i) {
+            _transform_matrices[i] = _transforms[i]->matrix(time);
+        }
+        command_buffer << _transform_matrix_buffer.view(0u, _transforms.size())
+                              .copy_from(_transform_matrices.data());
+    }
+    return updated;
 }
 
 void Pipeline::render(Stream &stream) noexcept {
@@ -221,7 +239,7 @@ Var<Shape::Handle> Pipeline::instance(Expr<uint> i) const noexcept {
 }
 
 Float4x4 Pipeline::instance_to_world(Expr<uint> i) const noexcept {
-    return _accel.instance_to_world(i);
+    return _accel.instance_transform(i);
 }
 
 Var<Triangle> Pipeline::triangle(const Var<Shape::Handle> &instance, Expr<uint> i) const noexcept {
@@ -257,11 +275,9 @@ ShadingAttribute Pipeline::shading_point(
     auto dot_u = min(dot(temp_u, n0), 0.f);
     auto dot_v = min(dot(temp_v, n1), 0.f);
     auto dot_w = min(dot(temp_w, n2), 0.f);
-    auto dp = bary.x * (temp_u - dot_u * n0) +
-              bary.y * (temp_v - dot_v * n1) +
-              bary.z * (temp_w - dot_w * n2);
-    return {.pg = p, .ng = ng, .ps = p + dp, .ns = ns,
-            .tangent = tangent, .uv = uv, .area = area};
+    auto shadow_term = instance->shadow_terminator_factor();
+    auto dp = bary.x * (temp_u - dot_u * n0) + bary.y * (temp_v - dot_v * n1) + bary.z * (temp_w - dot_w * n2);
+    return {.pg = p, .ng = ng, .ps = p + shadow_term * dp, .ns = ns, .tangent = tangent, .uv = uv, .area = area};
 }
 
 Var<Hit> Pipeline::trace_closest(const Var<Ray> &ray) const noexcept { return _accel.trace_closest(ray); }
@@ -325,6 +341,26 @@ Differentiation &Pipeline::differentiation() noexcept {
 const Differentiation &Pipeline::differentiation() const noexcept {
     LUISA_ASSERT(_differentiation, "Differentiation is not constructed.");
     return *_differentiation;
+}
+
+void Pipeline::register_transform(const Transform *transform) noexcept {
+    if (transform == nullptr) { return; }
+    auto [iter, success] = _transform_to_id.try_emplace(
+        transform, static_cast<uint>(_transforms.size()));
+    LUISA_ASSERT(iter->second < transform_matrix_buffer_size,
+                 "Transform matrix buffer overflows.");
+    if (success) [[likely]] {
+        _transforms.push_back(transform);
+        _any_dynamic_transforms |= !transform->is_static();
+        _transform_matrices[iter->second] = transform->matrix(_mean_time);
+    }
+}
+
+Float4x4 Pipeline::transform(const Transform *transform) const noexcept {
+    if (transform == nullptr) { return make_float4x4(1.f); }
+    auto iter = _transform_to_id.find(transform);
+    LUISA_ASSERT(iter != _transform_to_id.cend(), "Transform is not registered.");
+    return _transform_matrix_buffer.read(iter->second);
 }
 
 }// namespace luisa::render

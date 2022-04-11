@@ -34,7 +34,7 @@ render {
   cameras { @camera }
   shapes { @square }
   integrator { @normal }
-  environment : Map {
+  environment : Spherical {
     emission : Image {
       file { "../../envmaps/envmap.exr" }
     }

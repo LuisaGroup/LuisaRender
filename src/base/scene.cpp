@@ -27,7 +27,7 @@ namespace luisa::render {
 
 struct Scene::Config {
     luisa::vector<NodeHandle> internal_nodes;
-    luisa::unordered_map<luisa::string, NodeHandle, Hash64> nodes;
+    luisa::unordered_map<luisa::string, NodeHandle, Hash64, std::equal_to<>> nodes;
     Integrator *integrator{nullptr};
     Environment *environment{nullptr};
     luisa::vector<Camera *> cameras;
@@ -76,8 +76,7 @@ SceneNode *Scene::load_node(SceneNodeTag tag, const SceneNodeDesc *desc) noexcep
             desc->impl_type());
     }
     auto &&plugin = detail::scene_plugin_load(
-        _context.runtime_directory(),
-        tag, desc->impl_type());
+        _context.runtime_directory(), tag, desc->impl_type());
     auto create = plugin.function<NodeCreater>("create");
     auto destroy = plugin.function<NodeDeleter>("destroy");
     if (desc->is_internal()) {
@@ -94,23 +93,22 @@ SceneNode *Scene::load_node(SceneNodeTag tag, const SceneNodeDesc *desc) noexcep
             scene_node_tag_description(tag),
             desc->source_location().string());
     }
-
-    auto [node, first_def] = [this, desc, create, destroy] {
+    auto [node, first_def] = [&] {
         std::scoped_lock lock{_mutex};
-        auto [iter, success] = _config->nodes.try_emplace(
-            luisa::string{desc->identifier()},
-            NodeHandle{nullptr, nullptr});
-        if (success) [[likely]] {
-            LUISA_VERBOSE_WITH_LOCATION(
-                "Constructing scene graph node '{}' (desc = {}).",
-                desc->identifier(), fmt::ptr(desc));
-            iter->second = NodeHandle{create(this, desc), destroy};
+        if (auto iter = _config->nodes.find(desc->identifier());
+            iter != _config->nodes.end()) {
+            return std::make_pair(iter->second.get(), false);
         }
-        return std::make_pair(iter->second.get(), success);
+        LUISA_VERBOSE_WITH_LOCATION(
+            "Constructing scene graph node '{}' (desc = {}).",
+            desc->identifier(), fmt::ptr(desc));
+        NodeHandle new_node{create(this, desc), destroy};
+        auto ptr = new_node.get();
+        _config->nodes.emplace(desc->identifier(), std::move(new_node));
+        return std::make_pair(ptr, true);
     }();
-    if (first_def) { return node; }
-    if (node->tag() != tag ||
-        node->impl_type() != desc->impl_type()) [[unlikely]] {
+    if (!first_def && (node->tag() != tag ||
+                       node->impl_type() != desc->impl_type())) [[unlikely]] {
         LUISA_ERROR(
             "Scene node `{}` (type = {}::{}) is already "
             "in the graph (type = {}::{}). [{}]",

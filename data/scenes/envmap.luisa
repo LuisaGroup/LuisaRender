@@ -34,7 +34,7 @@ Shape teapot : Group {
     Mesh {
       file { "../meshes/utah-teapot.obj" }
       two_sided { false }
-      surface : Glass {
+      surface : Metal {
         color : Constant {
           v { 1 }
         }
@@ -109,12 +109,12 @@ render {
   cameras { @camera }
   shapes { @teapot }
   integrator { @pt }
-  environment : Map {
+  environment : Spherical {
     emission : Image {
       // file { "../envmaps/photo_studio_01_1k.hdr" }
       // fp32 { true }
-      // file { "../envmaps/envmap.exr" }
-      file { "/Users/mike/Downloads/dreifaltigkeitsberg_8k.exr" }
+      file { "../envmaps/envmap.exr" }
+      // file { "/Users/mike/Downloads/dreifaltigkeitsberg_8k.exr" }
     }
     transform : SRT {
       rotate { 0, 1, 0, 45 }

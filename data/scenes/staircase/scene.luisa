@@ -10305,6 +10305,7 @@ Camera camera0 : Pinhole {
   film : Color {
     resolution { 720, 1280 }
   }
+<<<<<<< HEAD
   file { "staircase0.exr" }
 }
 
@@ -10341,7 +10342,8 @@ Camera camera2 : Pinhole {
 render {
   cameras { @camera0 }
   integrator : WavePath {
-    spectrum : Hero {}
+    depth { 10 }
+    spectrum : sRGB {}
   }
   shapes {
     @shape_0,

@@ -39,7 +39,7 @@ SceneNodeDesc *SceneNodeDesc::define_internal(
 }
 
 bool SceneNodeDesc::has_property(luisa::string_view prop) const noexcept {
-    return _properties.find_as(prop, Hash64{}, std::equal_to<>{}) != _properties.cend() ||
+    return _properties.find(prop) != _properties.cend() ||
            (_base != nullptr && _base->has_property(prop));
 }
 

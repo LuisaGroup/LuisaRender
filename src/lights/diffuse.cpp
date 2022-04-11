@@ -90,9 +90,10 @@ struct DiffuseLightClosure final : public Light::Closure {
         auto wo = normalize(p_from - attrib.pg);
         Interaction it_light{light_inst, light_inst_id, triangle_id, wo, attrib};
         DiffuseLightClosure closure{light, _swl, _time};
+        auto p_light = it_light.p_robust(wo);
         return {.eval = closure.evaluate(it_light, p_from),
-                .wi = normalize(attrib.pg - p_from),
-                .distance = distance(attrib.pg, p_from) * .9999f};
+                .wi = normalize(p_light - p_from),
+                .distance = distance(p_light, p_from) * .9999f};
     }
     void backward(const Interaction &it_light, Expr<float3> p_from, const SampledSpectrum &df) const noexcept override {
         // TODO

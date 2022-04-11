@@ -53,7 +53,7 @@ using namespace luisa::render;
 
 int main(int argc, char *argv[]) {
 
-    log_level_info();
+//    log_level_info();
     luisa::compute::Context context{argv[0]};
 
     auto options = parse_cli_options(argc, argv);
@@ -83,7 +83,8 @@ int main(int argc, char *argv[]) {
 //        candela_offset += ies_profile.vertical_angles().size();
 //    }
 
-    auto device = context.create_device(backend, {{"index", index}});
+    auto device = context.create_device(
+        backend, luisa::format(R"({{"index": {}}})", index));
     Clock clock;
     auto scene_desc = SceneParser::parse(path);
     LUISA_INFO(

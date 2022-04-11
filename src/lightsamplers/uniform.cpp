@@ -10,10 +10,16 @@ namespace luisa::render {
 
 class UniformLightSampler final : public LightSampler {
 
+private:
+    float _environment_weight{.5f};
+
 public:
-    luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
-    UniformLightSampler(Scene *scene, const SceneNodeDesc *desc) noexcept : LightSampler{scene, desc} {}
+    UniformLightSampler(Scene *scene, const SceneNodeDesc *desc) noexcept
+        : LightSampler{scene, desc},
+          _environment_weight{desc->property_float_or_default("environment_weight", 0.5f)} {}
+    [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] auto environment_weight() const noexcept { return _environment_weight; }
 };
 
 class UniformLightSamplerInstance final : public LightSampler::Instance {
@@ -23,7 +29,7 @@ private:
     float _env_prob{0.f};
 
 public:
-    UniformLightSamplerInstance(const LightSampler *sampler, Pipeline &pipeline, CommandBuffer &command_buffer) noexcept
+    UniformLightSamplerInstance(const UniformLightSampler *sampler, Pipeline &pipeline, CommandBuffer &command_buffer) noexcept
         : LightSampler::Instance{pipeline, sampler} {
         if (!pipeline.lights().empty()) {
             auto [view, buffer_id] = pipeline.arena_buffer<Light::Handle>(pipeline.lights().size());
@@ -32,9 +38,12 @@ public:
                            << compute::commit();
         }
         if (auto env = pipeline.environment()) {
-            auto n = static_cast<float>(pipeline.lights().size());
-            _env_prob = env->node()->importance() /
-                        (n + env->node()->importance());
+            if (pipeline.lights().empty()) {
+                _env_prob = 1.f;
+            } else {
+                _env_prob = std::clamp(
+                    sampler->environment_weight(), 0.01f, 0.99f);
+            }
         }
     }
     [[nodiscard]] Light::Evaluation evaluate_hit(
@@ -54,25 +63,24 @@ public:
         return eval;
     }
     [[nodiscard]] Light::Evaluation evaluate_miss(
-        Expr<float3> wi, Expr<float3x3> env_to_world,
-        const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        Expr<float3> wi, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         if (_env_prob == 0.f) [[unlikely]] {// no environment
             LUISA_WARNING_WITH_LOCATION("No environment in scene");
             return {.L = SampledSpectrum{swl.dimension()}, .pdf = 0.f};
         }
-        auto eval = pipeline().environment()->evaluate(wi, env_to_world, swl, time);
+        auto eval = pipeline().environment()->evaluate(wi, swl, time);
         eval.pdf *= _env_prob;
         return eval;
     }
     [[nodiscard]] Light::Sample sample(
-        Sampler::Instance &sampler, const Interaction &it_from, Expr<float3x3> env_to_world,
+        Sampler::Instance &sampler, const Interaction &it_from,
         const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         auto sample = Light::Sample::zero(swl.dimension());
         if (_env_prob > 0.f) {// consider environment
             auto u = sampler.generate_1d();
             $if(u < _env_prob) {
                 sample = pipeline().environment()->sample(
-                    it_from.p(), env_to_world, swl, time, sampler.generate_2d());
+                    it_from.p(), swl, time, sampler.generate_2d());
                 sample.eval.pdf *= _env_prob;
             }
             $else {

@@ -87,11 +87,10 @@ void NormalVisualizerInstance::_render_one_camera(
     command_buffer.commit();
 
     using namespace luisa::compute;
-    auto render = pipeline().device().compile<2>([&](UInt frame_index, Float4x4 camera_to_world, Float time, Float shutter_weight) noexcept {
+    auto render = pipeline().device().compile<2>([&](UInt frame_index, Float time, Float shutter_weight) noexcept {
         auto pixel_id = dispatch_id().xy();
         sampler()->start(pixel_id, frame_index);
-        auto [ray, camera_weight] = camera->generate_ray(
-            *sampler(), pixel_id, time, camera_to_world);
+        auto [ray, camera_weight] = camera->generate_ray(*sampler(), pixel_id, time);
         auto path_weight = camera_weight;
         auto it = pipeline().intersect(ray);
         auto color = def(make_float3());
@@ -105,10 +104,9 @@ void NormalVisualizerInstance::_render_one_camera(
     auto dispatch_count = 0u;
     auto dispatches_per_commit = 64u;
     for (auto s : shutter_samples) {
-        if (pipeline().update_geometry(command_buffer, s.point.time)) { dispatch_count = 0u; }
-        auto camera_to_world = camera->node()->transform()->matrix(s.point.time);
+        pipeline().update(command_buffer, s.point.time);
         for (auto i = 0u; i < s.spp; i++) {
-            command_buffer << render(sample_id++, camera_to_world, s.point.time, s.point.weight)
+            command_buffer << render(sample_id++, s.point.time, s.point.weight)
                                   .dispatch(resolution);
             if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
                 command_buffer << commit();

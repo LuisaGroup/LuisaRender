@@ -59,7 +59,7 @@ public:
           _shading{Frame::make(ite(_shape->two_sided() & (dot(ns, wo) < 0.0f), -ns, ns), tangent)},
           _inst_id{inst_id}, _prim_id{prim_id}, _prim_area{prim_area} {}
     Interaction(Var<Shape::Handle> shape, Expr<uint> inst_id, Expr<uint> prim_id,
-                Expr<float3> wo, ShadingAttribute attrib) noexcept
+                Expr<float3> wo, const ShadingAttribute &attrib) noexcept
         : Interaction{std::move(shape), inst_id, prim_id, attrib.area, attrib.pg,
                       wo, attrib.ng, attrib.uv, attrib.ps, attrib.ns, attrib.tangent} {}
     [[nodiscard]] auto p() const noexcept { return _pg; }
@@ -75,11 +75,13 @@ public:
     void set_shading(Frame frame) noexcept { _shading = std::move(frame); }
     [[nodiscard]] const auto &shape() const noexcept { return _shape; }
     [[nodiscard]] auto wo_local() const noexcept { return _shading.world_to_local(_wo); }
+    [[nodiscard]] auto p_robust(Expr<float3> w) const noexcept {
+        return ite(dot(_ng, w) < 0.f,
+                   offset_ray_origin(_pg, -_ng),
+                   offset_ray_origin(_ps, _ng));
+    }
     [[nodiscard]] auto spawn_ray(Expr<float3> wi, Expr<float> t_max = std::numeric_limits<float>::max()) const noexcept {
-        auto ray = luisa::compute::make_ray_robust(_pg, _ng, wi, t_max);
-        auto o = ray->origin();
-        ray->set_origin(ite(dot(_ps - o, wi) > 0.f, _ps, o));
-        return ray;
+        return make_ray(p_robust(wi), wi, 0.f, t_max);
     }
 };
 

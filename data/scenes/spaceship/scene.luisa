@@ -1318,7 +1318,7 @@ Shape shape_89 : Mesh {
   }
 }
 
-Env env : Map {
+Env env : Spherical {
   emission : Constant {
     v { 0.30000001192092896, 0.30000001192092896, 0.30000001192092896 }
   }
@@ -1345,19 +1345,19 @@ Camera camera : Pinhole {
   front { 0.13595250248908997, -0.05167683959007263, -0.9893665909767151 }
   up { 0.0, 1.0, 0.0 }
   fov { 35.98339777135762 }
-  spp { 1024 }
+  spp { 16384 }
   filter : Gaussian {
     radius { 1 }
   }
   film : Color {
-    resolution { 1280, 720 }
+    resolution { 3840, 2160 }
   }
   file { "color.exr" }
 }
 
 render {
   cameras { @camera }
-  integrator : MegaPath {}
+  integrator : WavePath {}
   shapes {
     @shape_0,
     @shape_1,

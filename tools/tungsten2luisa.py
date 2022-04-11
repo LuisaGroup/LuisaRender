@@ -172,12 +172,47 @@ def convert_shape(out_file, index, shape: dict, materials: dict):
     if impl == "infinite_sphere":
         emission = shape["emission"]
         print(f'''
-Env env : Map {{
+Env env : Spherical {{
   emission : {convert_emission_texture(emission)}
   transform : SRT {{
     rotate {{ 0, 1, 0, -90 }}
   }}
 }}''', file=out_file)
+    elif impl == "infinite_sphere_cap":
+        power_scale = 100 * glm.pi()
+        emission = glm.vec3(glm.vec3(shape["power"] / power_scale))
+        angle = shape["cap_angle"]
+        print(f'''
+Env dir : Directional {{
+  emission : Constant {{
+    v {{ {emission.x}, {emission.y}, {emission.z} }}
+  }}
+  angle {{ {angle} }}
+  transform : Matrix {{
+    m {{ {M[0][0]}, {M[1][0]}, {M[2][0]}, {M[3][0]},
+         {M[0][1]}, {M[1][1]}, {M[2][1]}, {M[3][1]},
+         {M[0][2]}, {M[1][2]}, {M[2][2]}, {M[3][2]},
+         {M[0][3]}, {M[1][3]}, {M[2][3]}, {M[3][3]} }}
+  }}
+  scale {{ {glm.pi() * 4.0} }}
+}}''', file=out_file)
+    elif impl == "skydome":
+        M = glm.rotate(glm.radians(-90), glm.vec3(0, 1, 0))
+        print(f'''
+Env sky : Spherical {{
+  emission : Image {{
+    file {{ "textures/sky.exr" }}
+  }}
+  transform : Matrix {{
+    m {{ {M[0][0]}, {M[1][0]}, {M[2][0]}, {M[3][0]},
+         {M[0][1]}, {M[1][1]}, {M[2][1]}, {M[3][1]},
+         {M[0][2]}, {M[1][2]}, {M[2][2]}, {M[3][2]},
+         {M[0][3]}, {M[1][3]}, {M[2][3]}, {M[3][3]} }}
+  }}
+  scale {{ {float(shape['intensity'])} }}
+}}
+''', file=out_file)
+        print(f"Warning: Skydome is not supported: {shape}")
     else:
         alpha = ""
         if impl == "mesh":
@@ -191,7 +226,7 @@ Env env : Map {{
             file = "models/cube.obj"
             M = M * rotateXYZ(glm.radians(glm.vec3(-90, 0, 0))) * glm.scale(glm.vec3(.5))
         else:
-            print(shape)
+            print(f"Unsupported shape: {shape}")
             raise NotImplementedError()
         material = shape["bsdf"]
         if not isinstance(material, str):
@@ -253,18 +288,24 @@ Camera camera : Pinhole {{
   film : Color {{
     resolution {{ {int(resolution.x)}, {int(resolution.y)} }}
   }}
-  file {{ "color.exr" }}
+  file {{ "render.exr" }}
 }}''', file=out_file)
 
 
 def write_render(out_file, shapes):
-    shape_refs = ",\n    ".join(f'@shape_{i}' for i, s in enumerate(shapes) if s["type"] != "infinite_sphere")
-    env = "environment { @env }" if any(
-        s["type"] == "infinite_sphere" for s in shapes) else "environment : Null {}"
+    shape_refs = ",\n    ".join(f'@shape_{i}' for i, s in enumerate(shapes)
+                                if s["type"] != "infinite_sphere" and
+                                s["type"] != "infinite_sphere_cap" and
+                                s["type"] != "skydome")
+    env = "environment : Null {}"
+    if any(s["type"] == "infinite_sphere" for s in shapes):
+        env = "environment { @env }"
+    elif any(s["type"] == "infinite_sphere_cap" for s in shapes):
+        env = "environment { @dir }"
     print(f'''
 render {{
   cameras {{ @camera }}
-  integrator : MegaPath {{}}
+  integrator : WavePath {{}}
   shapes {{
     {shape_refs}
   }}

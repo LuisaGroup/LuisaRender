@@ -168,7 +168,7 @@ Shape shape_camera : Group {
   }
 }
 
-Environment environment : Map {
+Environment environment : Spherical {
   emission : Image {
     file { "textures/kiara_1_dawn_8k.exr" }
   }
@@ -178,18 +178,26 @@ Environment environment : Map {
   scale { 1.5 }
 }
 
-Camera camera : Thinlens {
+Environment directional : Directional {
+  emission : Constant {
+    v { 1, 1, 1 }
+  }
+  direction { 1, 1, 1 }
+  angle { 0.54 }
+  scale { 0.2 }
+}
+
+Camera camera : ThinLens {
   position { 0.3, 0.25, 0.65 }
   look_at { -0.03, 0.025, 0.072 }
-  aperture { 3.2 }
+  aperture { 2.8 }
   focal_length { 70 }
-  spp { 16384 }
+  spp { 1024 }
   film : Color {
     resolution { 3840, 2160 }
-    // resolution { 1280, 720 }
     clamp { 128 }
   }
-  file { "render-display.exr" }
+  file { "render-directional.exr" }
   filter : Gaussian {
     radius { 1 }
   }

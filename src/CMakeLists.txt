@@ -63,7 +63,6 @@ add_subdirectory(filters)
 add_subdirectory(textures)
 add_subdirectory(samplers)
 add_subdirectory(surfaces)
-add_subdirectory(autodiff)
 add_subdirectory(transforms)
 add_subdirectory(integrators)
 add_subdirectory(environments)
@@ -85,7 +84,6 @@ target_link_libraries(luisa-render INTERFACE
         luisa-render-textures
         luisa-render-samplers
         luisa-render-surfaces
-        luisa-render-autodiff
         luisa-render-transforms
         luisa-render-integrators
         luisa-render-environments

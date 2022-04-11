@@ -27,7 +27,7 @@ public:
     struct NodeEqual {
         using is_transparent = void;
         template<typename Lhs, typename Rhs>
-        [[nodiscard]] auto operator()(Lhs &&lhs, Rhs &&rhs) const noexcept {
+        [[nodiscard]] auto operator()(Lhs &&lhs, Rhs &&rhs) const noexcept -> bool {
             return _node_identifier(std::forward<Lhs>(lhs)) == _node_identifier(std::forward<Rhs>(rhs));
         }
     };
