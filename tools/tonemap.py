@@ -1,6 +1,6 @@
 import numpy as np
-import cv2 as cv
 from sys import argv
+from os import environ
 
 
 def rgb2srgb(image):
@@ -26,6 +26,9 @@ def imread(filename):
 
 
 if __name__ == "__main__":
+    environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
+    import cv2 as cv
+
     filename = argv[1]
     exp = 0 if len(argv) == 2 else float(argv[2])
     assert filename.endswith(".exr")
