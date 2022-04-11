@@ -13,11 +13,8 @@ Surface::Surface(Scene *scene, const SceneNodeDesc *desc) noexcept
     : SceneNode{scene, desc, SceneNodeTag::SURFACE},
       _normal{scene->load_texture(desc->property_node_or_default("normal"))},
       _alpha{scene->load_texture(desc->property_node_or_default("alpha"))} {
-    if (_normal != nullptr && _normal->channels() < 3u) [[unlikely]] {
-        LUISA_ERROR_WITH_LOCATION(
-            "Expected generic texture with "
-            "3 channels for Surface::normal.");
-    }
+    LUISA_RENDER_PARAM_CHANNEL_CHECK_EQUAL(Surface, normal, 3);
+    LUISA_RENDER_PARAM_CHANNEL_CHECK_EQUAL(Surface, alpha, 1);
 }
 
 luisa::unique_ptr<Surface::Instance> Surface::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {

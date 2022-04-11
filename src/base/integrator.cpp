@@ -27,7 +27,11 @@ Integrator::Instance::Instance(Pipeline &pipeline, CommandBuffer &command_buffer
       _spectrum{integrator->spectrum()->build(pipeline, command_buffer)} {}
 
 DifferentiableIntegrator::DifferentiableIntegrator(Scene *scene, const SceneNodeDesc *desc) noexcept
-    : Integrator(scene, desc) {
+    : Integrator(scene, desc),
+      _learning_rate{std::max(desc->property_float_or_default("learning_rate", 1.f), 0.f)},
+      _iterations{std::max(desc->property_uint_or_default("iterations", 100u), 1u)},
+      _display_camera_index{desc->property_int_or_default("display_camera_index", -1)},
+      _save_process{desc->property_bool_or_default("save_process", false)} {
 
     // loss
     auto loss_str = desc->property_string_or_default("loss", "L2");
@@ -51,12 +55,14 @@ DifferentiableIntegrator::DifferentiableIntegrator(Scene *scene, const SceneNode
         _optimizer = Optimizer::BGD;
     } else if (optimizer_str == "ATN") {
         _optimizer = Optimizer::ATN;
+    } else if (optimizer_str == "LDGD") {
+        _optimizer = Optimizer::LDGD;
     } else {
         LUISA_WARNING_WITH_LOCATION(
             "Unsupported optimizer '{}'. "
-            "Fallback to GD optimizer.",
+            "Fallback to BGD optimizer.",
             optimizer_str);
-        _optimizer = Optimizer::GD;
+        _optimizer = Optimizer::BGD;
     }
 }
 

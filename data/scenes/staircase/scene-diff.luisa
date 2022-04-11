@@ -10383,11 +10383,11 @@ Integrator pt_grad : MegaPathGrad {
   depth { 10 }
   spectrum : sRGB {}
   display_camera_index { 1 }
-  save_prcess { true }
-  optimizer { "ATN" }
+  save_process { true }
+  optimizer { "LDGD" }
   loss { "L2" }
-  learning_rate { 0.2 }
-  iterations { 300 }
+  learning_rate { 0.01 }
+  iterations { 10 }
 }
 
 render {

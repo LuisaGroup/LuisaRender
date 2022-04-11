@@ -25,6 +25,27 @@ class Sampler;
 class Frame;
 class Interaction;
 
+#define LUISA_RENDER_PARAM_CHANNEL_CHECK_EQUAL(class_name, name, channel_num)                               \
+    if (_##name != nullptr && _##name->channels() != channel_num##u) [[unlikely]] {                         \
+        LUISA_ERROR_WITH_LOCATION("Expected channels == " #channel_num " for " #class_name "::" #name "."); \
+    }
+#define LUISA_RENDER_PARAM_CHANNEL_CHECK_GREATER(class_name, name, channel_num)                            \
+    if (_##name != nullptr && _##name->channels() <= channel_num##u) [[unlikely]] {                        \
+        LUISA_ERROR_WITH_LOCATION("Expected channels > " #channel_num " for " #class_name "::" #name "."); \
+    }
+#define LUISA_RENDER_PARAM_CHANNEL_CHECK_LESS(class_name, name, channel_num)                               \
+    if (_##name != nullptr && _##name->channels() >= channel_num##u) [[unlikely]] {                        \
+        LUISA_ERROR_WITH_LOCATION("Expected channels < " #channel_num " for " #class_name "::" #name "."); \
+    }
+#define LUISA_RENDER_PARAM_CHANNEL_CHECK_GREATER_EQUAL(class_name, name, channel_num)                       \
+    if (_##name != nullptr && _##name->channels() < channel_num##u) [[unlikely]] {                          \
+        LUISA_ERROR_WITH_LOCATION("Expected channels >= " #channel_num " for " #class_name "::" #name "."); \
+    }
+#define LUISA_RENDER_PARAM_CHANNEL_CHECK_LESS_EQUAL(class_name, name, channel_num)                          \
+    if (_##name != nullptr && _##name->channels() > channel_num##u) [[unlikely]] {                          \
+        LUISA_ERROR_WITH_LOCATION("Expected channels <= " #channel_num " for " #class_name "::" #name "."); \
+    }
+
 class Surface : public SceneNode {
 
 public:

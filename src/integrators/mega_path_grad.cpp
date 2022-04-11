@@ -23,29 +23,16 @@ private:
     uint _max_depth;
     uint _rr_depth;
     float _rr_threshold;
-    int _display_camera_index;
-    uint _iterations;
-    float _learning_rate;
-    bool _save_process;
 
 public:
     MegakernelGradRadiative(Scene *scene, const SceneNodeDesc *desc) noexcept
         : DifferentiableIntegrator{scene, desc},
           _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)},
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
-          _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
-          _display_camera_index{desc->property_int_or_default("display_camera_index", -1)},
-          _iterations{std::max(desc->property_uint_or_default("iterations", 100u), 1u)},
-          _learning_rate{std::max(desc->property_float_or_default("learning_rate", 1.f), 0.f)},
-          _save_process{desc->property_bool_or_default("save_process", false)} {}
+          _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)} {}
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
-    [[nodiscard]] auto learning_rate() const noexcept { return _learning_rate; }
-    [[nodiscard]] auto iterations() const noexcept { return _iterations; }
-    [[nodiscard]] bool is_differentiable() const noexcept override { return true; }
-    [[nodiscard]] int display_camera_index() const noexcept { return _display_camera_index; }
-    [[nodiscard]] bool save_process() const noexcept { return _save_process; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
@@ -153,6 +140,13 @@ public:
 
         for (auto k = 0u; k < iteration_num; ++k) {
             auto loss = 0.f;
+
+            LUISA_INFO("");
+            LUISA_INFO("Iteration = {}", k);
+            if (pt->optimizer() == Optimizer::LDGD && ((k + 1u) % 3u) == 0u) {
+                pt->learning_rate() *= 0.8f;
+                LUISA_INFO("learning_rate = {}", pt->learning_rate());
+            }
 
             // render
             for (auto i = 0u; i < pipeline().camera_count(); i++) {
@@ -435,8 +429,6 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
     sampler->reset(command_buffer, resolution, pixel_count, spp);
     command_buffer.commit();
 
-    LUISA_INFO("");
-    LUISA_INFO("Iteration = {}", iteration);
     LUISA_INFO(
         "Start rendering of resolution {}x{} at {}spp.",
         resolution.x, resolution.y, spp);

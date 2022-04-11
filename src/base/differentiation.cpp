@@ -26,8 +26,8 @@ Differentiation::Differentiation(Pipeline &pipeline, const Optimizer &optimizer)
     Kernel1D clear_buffer = [](BufferUInt gradients) noexcept {
         gradients.write(dispatch_x(), 0u);
     };
-    Kernel1D apply_grad_const = [](BufferUInt gradients, BufferFloat4 params, BufferFloat2 ranges,
-                                   Float alpha, BufferUInt counter) noexcept {
+    Kernel1D apply_grad_const = [this](BufferUInt gradients, BufferFloat4 params, BufferFloat2 ranges,
+                                       Float alpha, BufferUInt counter) noexcept {
         auto thread = dispatch_x();
         auto counter_offset = thread * gradiant_collision_avoidance_block_size;
         auto grad_offset = 4u * counter_offset;
@@ -41,23 +41,28 @@ Differentiation::Differentiation(Pipeline &pipeline, const Optimizer &optimizer)
             grad += make_float4(x, y, z, w);
             count += as<float>(counter.read(counter_offset + i));
         }
-
-        grad /= max(count, constant_min_count);
+        // FIXME : "if" will slow down the program
+        if (_optimizer == Optimizer::ATN) {
+            grad /= max(count, constant_min_count);
+        }
         auto old = params.read(thread);
         auto range = ranges.read(thread);
         auto next = fma(-alpha, grad, old);
         params.write(thread, clamp(next, range.x, range.y));
     };
-    Kernel2D apply_grad_tex = [](BufferUInt gradients, UInt grad_offset, ImageFloat image,
-                                 UInt channels, Float alpha, Float2 range, BufferUInt counter, UInt counter_offset) noexcept {
+    Kernel2D apply_grad_tex = [this](BufferUInt gradients, UInt grad_offset, ImageFloat image,
+                                     UInt channels, Float alpha, Float2 range, BufferUInt counter, UInt counter_offset) noexcept {
         auto coord = dispatch_id().xy();
         auto i = coord.y * dispatch_size_x() + coord.x;
         auto x = as<float>(gradients.read(grad_offset + i * channels + 0u));
         auto y = as<float>(gradients.read(grad_offset + i * channels + 1u));
         auto z = as<float>(gradients.read(grad_offset + i * channels + 2u));
         auto w = as<float>(gradients.read(grad_offset + i * channels + 3u));
-        auto grad = clamp(make_float4(x, y, z, w), -1e2f, 1e2f);
-        grad /= max(as<float>(counter.read(counter_offset + i)), constant_min_count);
+        auto grad = make_float4(x, y, z, w);
+        // FIXME : "if" will slow down the program
+        if (_optimizer == Optimizer::ATN) {
+            grad /= max(as<float>(counter.read(counter_offset + i)), constant_min_count);
+        }
         auto old = image.read(coord);
         auto next = fma(-alpha, grad, old);
         image.write(coord, clamp(next, range.x, range.y));
@@ -142,6 +147,7 @@ void Differentiation::apply_gradients(CommandBuffer &command_buffer, float alpha
                               .dispatch(n)
                        << _const_param_buffer.subview(0u, n).copy_to(params_after.data())
                        << compute::synchronize();
+        bool optimizer_ATN = _optimizer == Optimizer::ATN;
         for (auto i = 0u; i < n; i++) {
             auto p0 = params_before[i];
             auto grad = make_float4();
@@ -151,7 +157,10 @@ void Differentiation::apply_gradients(CommandBuffer &command_buffer, float alpha
                 grad += collision_avoiding_gradients[index];
                 count += counter[index];
             }
-            grad /= std::max(count, constant_min_count);
+            // FIXME : "if" will slow down the program
+            if (optimizer_ATN) {
+                grad /= std::max(count, constant_min_count);
+            }
             auto p1 = params_after[i];
             LUISA_INFO(
                 "Param #{}: ({}, {}, {}, {}) - {} * ({}, {}, {}, {}) -> ({}, {}, {}, {}).",
@@ -165,7 +174,8 @@ void Differentiation::apply_gradients(CommandBuffer &command_buffer, float alpha
         auto grad_offset = p.gradient_buffer_offset();
         auto counter_offset = p.counter_offset();
         auto channels = compute::pixel_format_channel_count(image.format());
-        command_buffer << _apply_grad_tex(*_grad_buffer, grad_offset, image, channels, alpha, p.range(), *_counter, counter_offset)
+        command_buffer << _apply_grad_tex(*_grad_buffer, grad_offset, image, channels, alpha,
+                                          p.range(), *_counter, counter_offset)
                               .dispatch(image.size());
     }
 }
@@ -229,6 +239,7 @@ void Differentiation::step(CommandBuffer &command_buffer, float alpha) noexcept 
 }
 
 void Differentiation::dump(CommandBuffer &command_buffer, const std::filesystem::path &folder) const noexcept {
+    // FIXME : several channels will be 0 when grads explode
     for (auto i = 0u; i < _textured_params.size(); i++) {
         auto param = _textured_params[i];
         auto image = param.image().view();
@@ -236,7 +247,7 @@ void Differentiation::dump(CommandBuffer &command_buffer, const std::filesystem:
         auto channels = compute::pixel_storage_channel_count(image.storage());
         luisa::vector<float> pixels(size.x * size.y * channels);
         command_buffer << image.copy_to(pixels.data()) << compute::synchronize();
-        auto file_name = folder / luisa::format("dump-{:03}.exr", i);
+        auto file_name = folder / luisa::format("dump-{:05}.exr", i);
         SaveEXR(pixels.data(), static_cast<int>(size.x), static_cast<int>(size.y),
                 static_cast<int>(channels), false, file_name.string().c_str(), nullptr);
     }

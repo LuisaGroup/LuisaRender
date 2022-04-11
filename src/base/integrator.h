@@ -67,11 +67,21 @@ class DifferentiableIntegrator : public Integrator {
 private:
     Loss _loss_function;
     Optimizer _optimizer;
+    mutable float _learning_rate;
+    uint _iterations;
+    int _display_camera_index;
+    bool _save_process;
 
 public:
     DifferentiableIntegrator(Scene *scene, const SceneNodeDesc *desc) noexcept;
+
+    [[nodiscard]] bool is_differentiable() const noexcept override { return true; }
     [[nodiscard]] auto loss() const noexcept { return _loss_function; }
     [[nodiscard]] auto optimizer() const noexcept { return _optimizer; }
+    [[nodiscard]] float &learning_rate() const noexcept { return _learning_rate; }
+    [[nodiscard]] auto iterations() const noexcept { return _iterations; }
+    [[nodiscard]] int display_camera_index() const noexcept { return _display_camera_index; }
+    [[nodiscard]] bool save_process() const noexcept { return _save_process; }
 };
 
 }// namespace luisa::render
