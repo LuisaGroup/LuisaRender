@@ -41,10 +41,7 @@ Differentiation::Differentiation(Pipeline &pipeline, const Optimizer &optimizer)
             grad += make_float4(x, y, z, w);
             count += as<float>(counter.read(counter_offset + i));
         }
-        // FIXME : "if" will slow down the program
-        if (_optimizer == Optimizer::ATN) {
-            grad /= max(count, constant_min_count);
-        }
+        grad /= max(count, constant_min_count);
         auto old = params.read(thread);
         auto range = ranges.read(thread);
         auto next = fma(-alpha, grad, old);
@@ -59,10 +56,7 @@ Differentiation::Differentiation(Pipeline &pipeline, const Optimizer &optimizer)
         auto z = as<float>(gradients.read(grad_offset + i * channels + 2u));
         auto w = as<float>(gradients.read(grad_offset + i * channels + 3u));
         auto grad = make_float4(x, y, z, w);
-        // FIXME : "if" will slow down the program
-        if (_optimizer == Optimizer::ATN) {
-            grad /= max(as<float>(counter.read(counter_offset + i)), constant_min_count);
-        }
+        grad /= max(as<float>(counter.read(counter_offset + i)), constant_min_count);
         auto old = image.read(coord);
         auto next = fma(-alpha, grad, old);
         image.write(coord, clamp(next, range.x, range.y));
@@ -147,7 +141,6 @@ void Differentiation::apply_gradients(CommandBuffer &command_buffer, float alpha
                               .dispatch(n)
                        << _const_param_buffer.subview(0u, n).copy_to(params_after.data())
                        << compute::synchronize();
-        bool optimizer_ATN = _optimizer == Optimizer::ATN;
         for (auto i = 0u; i < n; i++) {
             auto p0 = params_before[i];
             auto grad = make_float4();
@@ -157,10 +150,7 @@ void Differentiation::apply_gradients(CommandBuffer &command_buffer, float alpha
                 grad += collision_avoiding_gradients[index];
                 count += counter[index];
             }
-            // FIXME : "if" will slow down the program
-            if (optimizer_ATN) {
-                grad /= std::max(count, constant_min_count);
-            }
+            grad /= std::max(count, constant_min_count);
             auto p1 = params_after[i];
             LUISA_INFO(
                 "Param #{}: ({}, {}, {}, {}) - {} * ({}, {}, {}, {}) -> ({}, {}, {}, {}).",

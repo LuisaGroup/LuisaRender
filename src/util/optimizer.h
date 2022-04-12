@@ -11,8 +11,7 @@ enum class Optimizer {
     SGD = 1,
     AdaGrad = 2,
     Adam = 3,
-    ATN = 4,
-    LDGD = 5,
+    LDGD = 4,
 };
 
 }// namespace luisa::render

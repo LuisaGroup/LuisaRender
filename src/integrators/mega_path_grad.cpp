@@ -157,6 +157,9 @@ public:
                                    luisa::format("output_buffer_camera_{:03}", i) /
                                    luisa::format("{:06}.exr", k);
 
+                LUISA_INFO("");
+                LUISA_INFO("Camera {}", i);
+
                 // render
                 _render_one_camera(command_buffer, k, camera, pt->display_camera_index() == i);
 
@@ -170,17 +173,14 @@ public:
                     command_buffer << synchronize();
                     _save_image(output_path, rendered, resolution);
                 }
-
-                if (pt->optimizer() != Optimizer::ATN) {
-                    // back propagate
-                    pipeline().differentiation().step(command_buffer, learning_rate);
-                }
             }
 
-            if (pt->optimizer() == Optimizer::ATN) {
-                // back propagate
-                pipeline().differentiation().step(command_buffer, learning_rate);
-            }
+            // back propagate
+            Clock clock;
+            LUISA_INFO("");
+            LUISA_INFO("Start to step");
+            pipeline().differentiation().step(command_buffer, learning_rate);
+            LUISA_INFO("Step finished in {} ms", clock.toc());
         }
 
         // save results
@@ -219,6 +219,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
 
     auto spp = camera->node()->spp();
     auto resolution = camera->node()->film()->resolution();
+
     LUISA_INFO("Start backward propagation.");
 
     auto pt = this;
