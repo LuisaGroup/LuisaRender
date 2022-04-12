@@ -79,7 +79,7 @@ public:
     }
     [[nodiscard]] Gradient backward(Expr<float> cosI, const SampledSpectrum &dFr) const noexcept {
         // TODO
-        LUISA_WARNING_WITH_LOCATION("Not implemented.");
+        LUISA_ERROR_WITH_LOCATION("Not implemented.");
     }
 };
 
