@@ -184,6 +184,10 @@ Float2 TrowbridgeReitzDistribution::roughness_to_alpha(Expr<float2> roughness) n
         roughness_to_alpha(roughness.y));
 }
 
+Float2 TrowbridgeReitzDistribution::grad_alpha_roughness(Float2 roughness) noexcept {
+    return 2.f * roughness;
+}
+
 Float TrowbridgeReitzDistribution::D(Expr<float3> wh) const noexcept {
     using compute::isinf;
     auto tan2Theta = tan2_theta(wh);
@@ -645,7 +649,6 @@ Float FresnelBlend::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {
 FresnelBlend::Gradient FresnelBlend::backward(
     Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
 
-    // TODO : we didn't deal with distribution here
     auto pow5 = [](auto &&v) noexcept { return sqr(sqr(v)) * v; };
     auto absCosThetaI = abs_cos_theta(wi);
     auto absCosThetaO = abs_cos_theta(wo);

@@ -43,7 +43,7 @@ public:
 
         LUISA_RENDER_PARAM_CHANNEL_CHECK(PlasticSurface, kd, >=, 3);
         LUISA_RENDER_PARAM_CHANNEL_CHECK(PlasticSurface, ks, >=, 3);
-        LUISA_RENDER_PARAM_CHANNEL_CHECK(PlasticSurface, roughness, ==, 1);
+        LUISA_RENDER_PARAM_CHANNEL_CHECK(PlasticSurface, roughness, <=, 2);
     }
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }

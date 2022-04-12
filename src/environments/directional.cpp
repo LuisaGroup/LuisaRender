@@ -36,6 +36,7 @@ public:
                 "Directional environment emission is not constant. "
                 "This may lead to unexpected results.");
         }
+        LUISA_RENDER_PARAM_CHANNEL_CHECK(Directional, emission, >=, 3);
         auto angle = std::clamp(desc->property_float_or_default("angle", 1.0f), 1e-3f, 360.0f);
         auto cos_half_angle = std::cos(.5 * angle * std::numbers::pi / 180.0);
         _cos_half_angle = static_cast<float>(cos_half_angle);

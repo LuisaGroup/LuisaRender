@@ -26,7 +26,7 @@ public:
           _remap_roughness{desc->property_bool_or_default("remap_roughness", false)} {
 
         LUISA_RENDER_PARAM_CHANNEL_CHECK(MirrorSurface, color, >=, 3);
-        LUISA_RENDER_PARAM_CHANNEL_CHECK(MirrorSurface, roughness, ==, 1);
+        LUISA_RENDER_PARAM_CHANNEL_CHECK(MirrorSurface, roughness, <=, 2);
     }
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
