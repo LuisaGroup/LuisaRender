@@ -13,6 +13,15 @@
 
 namespace luisa::render {
 
+#define LUISA_RENDER_PARAM_CHANNEL_CHECK(class_name, name, op, channel_num)                \
+    [&] {                                                                                  \
+        if (!(_##name != nullptr && _##name->channels() op channel_num##u)) [[unlikely]] { \
+            LUISA_ERROR_WITH_LOCATION(                                                     \
+                "Expected channels " #op " " #channel_num                                  \
+                " for " #class_name "::" #name ".");                                       \
+        }                                                                                  \
+    }()
+
 class Pipeline;
 class Interaction;
 class SampledWavelengths;

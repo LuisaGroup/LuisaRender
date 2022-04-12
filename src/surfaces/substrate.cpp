@@ -29,7 +29,12 @@ public:
           _ks{scene->load_texture(desc->property_node_or_default(
               "Ks", SceneNodeDesc::shared_default_texture("Constant")))},
           _roughness{scene->load_texture(desc->property_node_or_default("roughness"))},
-          _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {}
+          _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {
+
+        LUISA_RENDER_PARAM_CHANNEL_CHECK(SubstrateSurface, kd, >=, 3);
+        LUISA_RENDER_PARAM_CHANNEL_CHECK(SubstrateSurface, ks, >=, 3);
+        LUISA_RENDER_PARAM_CHANNEL_CHECK(SubstrateSurface, roughness, ==, 1);
+    }
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
 

@@ -83,6 +83,9 @@ public:
                 }
             }
         }
+        LUISA_RENDER_PARAM_CHANNEL_CHECK(GlassSurface, kr, >=, 3);
+        LUISA_RENDER_PARAM_CHANNEL_CHECK(GlassSurface, kt, >=, 3);
+        LUISA_RENDER_PARAM_CHANNEL_CHECK(GlassSurface, roughness, ==, 1);
     }
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }

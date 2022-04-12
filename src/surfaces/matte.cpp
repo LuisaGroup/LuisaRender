@@ -25,8 +25,8 @@ public:
           _kd{scene->load_texture(desc->property_node_or_default(
               "Kd", SceneNodeDesc::shared_default_texture("Constant")))},
           _sigma{scene->load_texture(desc->property_node_or_default("sigma"))} {
-        LUISA_RENDER_PARAM_CHANNEL_CHECK_GREATER_EQUAL(MatteSurface, kd, 3);
-        LUISA_RENDER_PARAM_CHANNEL_CHECK_EQUAL(MatteSurface, sigma, 1);
+        LUISA_RENDER_PARAM_CHANNEL_CHECK(MatteSurface, kd, >=, 3);
+        LUISA_RENDER_PARAM_CHANNEL_CHECK(MatteSurface, sigma, ==, 1);
     }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
 
