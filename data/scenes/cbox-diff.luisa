@@ -117,8 +117,11 @@ Integrator pt : MegaPathGrad {
   depth { 10 }
   spectrum : sRGB {}
   display_camera_index { 0 }
+  save_process { true }
+  optimizer { "LDGD" }
+  loss { "L2" }
   learning_rate { 0.1 }
-  iterations { 120 }
+  iterations { 30 }
 }
 
 Integrator normal : Normal {}
