@@ -10386,8 +10386,8 @@ Integrator pt_grad : MegaPathGrad {
   save_process { true }
   optimizer { "LDGD" }
   loss { "L2" }
-  learning_rate { 0.01 }
-  iterations { 10 }
+  learning_rate { 0.2 }
+  iterations { 30 }
 }
 
 render {

@@ -29,7 +29,12 @@ public:
           _ks{scene->load_texture(desc->property_node_or_default(
               "Ks", SceneNodeDesc::shared_default_texture("Constant")))},
           _roughness{scene->load_texture(desc->property_node_or_default("roughness"))},
-          _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {}
+          _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {
+
+        LUISA_RENDER_PARAM_CHANNEL_CHECK(SubstrateSurface, kd, >=, 3);
+        LUISA_RENDER_PARAM_CHANNEL_CHECK(SubstrateSurface, ks, >=, 3);
+        LUISA_RENDER_PARAM_CHANNEL_CHECK(SubstrateSurface, roughness, <=, 2);
+    }
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
 
@@ -55,7 +60,7 @@ public:
           _kd{Kd}, _ks{Ks}, _roughness{roughness}, _remap_roughness{remap_roughness} {}
     [[nodiscard]] auto Kd() const noexcept { return _kd; }
     [[nodiscard]] auto Ks() const noexcept { return _ks; }
-    [[nodiscard]] auto Roughness() const noexcept { return _roughness; }
+    [[nodiscard]] auto roughness() const noexcept { return _roughness; }
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
 
 private:
@@ -117,26 +122,30 @@ private:
                          .roughness = _distribution->alpha(),
                          .eta = _eta_i}};
     }
+
     void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
         auto _instance = instance<SubstrateInstance>();
-        auto requires_grad_kd = _instance->Kd()->node()->requires_gradients(),
-             requires_grad_ks = _instance->Ks()->node()->requires_gradients();
-        $if(requires_grad_kd || requires_grad_ks) {
-            auto wo_local = _it.wo_local();
-            auto wi_local = _it.shading().world_to_local(wi);
-            auto grad = _blend->backward(wo_local, wi_local, df);
+        auto wo_local = _it.wo_local();
+        auto wi_local = _it.shading().world_to_local(wi);
 
-            _instance->Kd()->backward_albedo_spectrum(_it, _swl, _time, grad.dRd);
-            _instance->Ks()->backward_albedo_spectrum(_it, _swl, _time, grad.dRs);
-            if (auto roughness = _instance->Roughness()) {
-                //                auto remap = _instance->remap_roughness();
-                //                auto d_alpha = roughness->node()->channels() == 1u ?
-                //                                   (remap ? sqr(r.xx()) : r.xx()) :
-                //                                   (remap ? sqr(r.xy()) : r.xy());
-                //                _instance->Roughness()->backward(_it, _time, d_alpha);
-                // TODO
-            }
-        };
+        auto grad = _blend->backward(wo_local, wi_local, df);
+
+        _instance->Kd()->backward_albedo_spectrum(_it, _swl, _time, grad.dRd);
+        _instance->Ks()->backward_albedo_spectrum(_it, _swl, _time, grad.dRs);
+        if (auto roughness = _instance->roughness()) {
+            auto remap = _instance->remap_roughness();
+            auto r_f4 = roughness->evaluate(_it, _time);
+            auto r = roughness->node()->channels() == 1u ? r_f4.xx() : r_f4.xy();
+
+            auto grad_alpha_roughness = [](auto &&x) noexcept {
+                return TrowbridgeReitzDistribution::grad_alpha_roughness(x);
+            };
+            auto d_r = grad.dAlpha * (remap ? grad_alpha_roughness(r) : make_float2(1.f));
+            auto d_r_f4 = roughness->node()->channels() == 1u ?
+                              make_float4(d_r.x + d_r.y, 0.f, 0.f, 0.f) :
+                              make_float4(d_r.x, d_r.y, 0.f, 0.f);
+            _instance->roughness()->backward(_it, _time, d_r_f4);
+        }
     }
 };
 
@@ -148,7 +157,9 @@ luisa::unique_ptr<Surface::Closure> SubstrateInstance::_closure(
     if (_roughness != nullptr) {
         auto r = _roughness->evaluate(it, time);
         auto remap = node<SubstrateSurface>()->remap_roughness();
-        auto r2a = [](auto &&x) noexcept { return TrowbridgeReitzDistribution::roughness_to_alpha(x); };
+        auto r2a = [](auto &&x) noexcept {
+            return TrowbridgeReitzDistribution::roughness_to_alpha(x);
+        };
         alpha = _roughness->node()->channels() == 1u ?
                     (remap ? make_float2(r2a(r.x)) : r.xx()) :
                     (remap ? r2a(r.xy()) : r.xy());

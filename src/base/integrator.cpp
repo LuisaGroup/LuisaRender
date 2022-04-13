@@ -53,8 +53,6 @@ DifferentiableIntegrator::DifferentiableIntegrator(Scene *scene, const SceneNode
     for (auto &c : optimizer_str) { c = static_cast<char>(toupper(c)); }
     if (optimizer_str == "BGD") {
         _optimizer = Optimizer::BGD;
-    } else if (optimizer_str == "ATN") {
-        _optimizer = Optimizer::ATN;
     } else if (optimizer_str == "LDGD") {
         _optimizer = Optimizer::LDGD;
     } else {

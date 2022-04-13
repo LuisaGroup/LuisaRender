@@ -21,7 +21,10 @@ public:
         : Light{scene, desc},
           _emission{scene->load_texture(desc->property_node_or_default(
               "emission", SceneNodeDesc::shared_default_texture("Constant")))},
-          _scale{std::max(desc->property_float_or_default("scale", 1.0f), 0.0f)} {}
+          _scale{std::max(desc->property_float_or_default("scale", 1.0f), 0.0f)} {
+
+        LUISA_RENDER_PARAM_CHANNEL_CHECK(DiffuseLight, emission, >=, 3);
+    }
     [[nodiscard]] auto scale() const noexcept { return _scale; }
     [[nodiscard]] bool is_null() const noexcept override { return _scale == 0.0f || _emission->is_black(); }
     [[nodiscard]] bool is_virtual() const noexcept override { return false; }

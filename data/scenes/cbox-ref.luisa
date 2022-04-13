@@ -1,45 +1,3 @@
-Film film : Color {
-  resolution { 1024 }
-  exposure { 0 }
-}
-
-
-Surface cbox-gray : Matte {
-  Kd : Placeholder {
-    resolution { 4096 }
-    requires_grad { true }
-    range { 0, 1 }
-    uv_scale { 1, -1 }
-  }
-}
-
-Surface mat-wood : Substrate {
-  Kd : Image {
-    file { "living-room/textures/wood.jpg" }
-  }
-  //Kd : Placeholder {
-  //  resolution { 4096 }
-  //  requires_grad { true }
-  //  range { 0, 1 }
-  //  uv_scale { 1, -1 }
-  //}
-  Ks : Constant {
-    v { 0.2, 0.2, 0.2 }
-    //v { 0, 0.9, 0.56 }
-    //requires_grad { true }
-    range { 0, 1 }
-  }
-  eta : Constant {
-    v { 1.5 }
-  }
-  roughness : Constant {
-    v { 0.3872983346207417 }
-    //v { 0.9 }
-    //requires_grad { true }
-    //range { 0, 1 }
-  }
-}
-
 Surface cbox-white : Matte {
   Kd : Constant {
     v { 0.725, 0.71, 0.68 }
@@ -49,37 +7,58 @@ Surface cbox-white : Matte {
   }
 }
 
-Surface cbox-red : Matte {
+Surface cbox-green : Matte {
   Kd : Constant {
-    v { 0.63, 0.065, 0.05 }
-    // v { 0.14, 0.45, 0.091 }
-    //requires_grad { true }
-    range { 0, 1 }
+    v { 0.14, 0.45, 0.091 }
   }
-  //sigma : Constant {
-  //  v { 45 }
-  //  requires_grad { true }
-  //  range { 0, 90 }
-  //}
   roughness : Constant {
     v { 1 }
   }
 }
 
-Surface cbox-green : Matte {
+Surface cbox-red : Matte {
   Kd : Constant {
-    v { 0.14, 0.45, 0.091 }
-    // v { 0.63, 0.065, 0.05 }
-    //requires_grad { true }
-    range { 0, 1 }
+    v { 0.63, 0.065, 0.05 }
   }
-  //sigma : Constant {
-  //  v { 45 }
-  //  requires_grad { true }
-  //  range { 0, 90 }
-  //}
   roughness : Constant {
     v { 1 }
+  }
+}
+
+Surface mat-wood : Substrate {
+  Kd : Image {
+    file { "living-room/textures/wood.jpg" }
+  }
+  Ks : Constant {
+    v { 0.2, 0.2, 0.2 }
+  }
+  eta : Constant {
+    v { 1.5 }
+  }
+  roughness : Constant {
+    v { 0.3872983346207417 }
+  }
+}
+
+Surface cbox-brick : Matte {
+  Kd : Color {
+    file { "../textures/brickwall.jpg" }
+    gamma { 0.5 }
+    encoding { "gamma" }
+  }
+  sigma : Constant {
+    v { 10 }
+  }
+  normal : Image {
+    file { "../textures/brickwall_normal.jpg" }
+    encoding { "linear" }
+  }
+}
+
+Surface cbox-metal : Metal {
+  eta { "Au" }
+  roughness : Constant {
+    v { 0.2 }
   }
 }
 
@@ -140,17 +119,19 @@ Shape cbox : Group {
   }
 }
 
+Film film : Color {
+  resolution { 1024 }
+  exposure { 0 }
+}
+
 Camera camera0 : Pinhole {
   position { -0.01, 0.995, 5.0 }
   fov { 27.8 }
-  spp { 512 }
+  spp { 4096 }
   film { @film }
-  file { "../renders/cbox-substrate-diff-0.exr" }
+  file { "../renders/cbox-substrate-ref-4096spp-0.exr" }
   filter : Gaussian {
     radius { 1 }
-  }
-  target : Image {
-    file { "../renders/cbox-substrate-ref-4096spp-0.exr" }
   }
 }
 
@@ -158,27 +139,19 @@ Camera camera1 : Pinhole {
   position { 1, 1.6, 2.0 }
   front { -0.4, -0.2, -1 }
   fov { 40 }
-  spp { 512 }
+  spp { 4096 }
   film { @film }
-  file { "../renders/cbox-substrate-diff-1.exr" }
+  file { "../renders/cbox-substrate-ref-4096spp-1.exr" }
   filter : Gaussian {
     radius { 1 }
   }
-  target : Image {
-    file { "../renders/cbox-substrate-ref-4096spp-1.exr" }
-  }
 }
 
-Integrator pt : MegaPathGrad {
+Integrator pt : MegaPath {
   sampler : Independent {}
   depth { 10 }
   spectrum : sRGB {}
-  display_camera_index { 0 }
-  save_process { true }
-  optimizer { "BGD" }
-  loss { "L2" }
-  learning_rate { 0.1 }
-  iterations { 60 }
+  // display { true }
 }
 
 render {
