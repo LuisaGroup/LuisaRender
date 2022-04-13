@@ -415,8 +415,7 @@ public:
     static constexpr auto refl_retro = 1u << 2u;
     static constexpr auto refl_sheen = 1u << 3u;
     static constexpr auto refl_diffuse_like =
-        refl_diffuse | refl_fake_ss |
-        refl_retro | refl_sheen;
+        refl_diffuse | refl_fake_ss | refl_retro | refl_sheen;
     static constexpr auto refl_specular = 1u << 4u;
     static constexpr auto refl_clearcoat = 1u << 5u;
     static constexpr auto trans_specular = 1u << 6u;

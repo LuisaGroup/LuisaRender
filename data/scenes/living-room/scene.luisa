@@ -1020,7 +1020,7 @@ Camera camera : Pinhole {
     radius { 1 }
   }
   film : Color {
-    resolution { 1280, 720 }
+    resolution { 1920, 1080 }
   }
   file { "living-room.exr" }
 }
