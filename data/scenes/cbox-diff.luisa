@@ -34,9 +34,9 @@ Surface mat-wood : Substrate {
   }
   roughness : Constant {
     v { 0.3872983346207417 }
-    // v { 0.56 }
-    // requires_grad { true }
-    range { 0, 1 }
+    //v { 0.9 }
+    //requires_grad { true }
+    //range { 0, 1 }
   }
 }
 
@@ -140,24 +140,10 @@ Shape cbox : Group {
   }
 }
 
-Integrator pt : MegaPathGrad {
-  sampler : Independent {}
-  depth { 10 }
-  spectrum : sRGB {}
-  display_camera_index { 0 }
-  save_process { true }
-  optimizer { "BGD" }
-  loss { "L2" }
-  learning_rate { 0.1 }
-  iterations { 60 }
-}
-
-Integrator normal : Normal {}
-
 Camera camera0 : Pinhole {
   position { -0.01, 0.995, 5.0 }
   fov { 27.8 }
-  spp { 2048 }
+  spp { 512 }
   film { @film }
   file { "../renders/cbox-substrate-diff-0.exr" }
   filter : Gaussian {
@@ -172,7 +158,7 @@ Camera camera1 : Pinhole {
   position { 1, 1.6, 2.0 }
   front { -0.4, -0.2, -1 }
   fov { 40 }
-  spp { 2048 }
+  spp { 512 }
   film { @film }
   file { "../renders/cbox-substrate-diff-1.exr" }
   filter : Gaussian {
@@ -181,6 +167,18 @@ Camera camera1 : Pinhole {
   target : Image {
     file { "../renders/cbox-substrate-ref-4096spp-1.exr" }
   }
+}
+
+Integrator pt : MegaPathGrad {
+  sampler : Independent {}
+  depth { 10 }
+  spectrum : sRGB {}
+  display_camera_index { 0 }
+  save_process { true }
+  optimizer { "BGD" }
+  loss { "L2" }
+  learning_rate { 0.1 }
+  iterations { 60 }
 }
 
 render {
