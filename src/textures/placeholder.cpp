@@ -20,10 +20,12 @@ private:
     float2 _uv_offset;
     uint2 _resolution;
     TextureSampler _sampler{};
+    uint _channels;
 
 public:
     PlaceholderTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
-        : Texture{scene, desc} {
+        : Texture{scene, desc},
+          _channels{std::clamp(desc->property_uint_or_default("channels", 4u), 1u, 4u)} {
         auto filter = desc->property_string_or_default("filter", "bilinear");
         auto address = desc->property_string_or_default("address", "repeat");
         for (auto &c : filter) { c = static_cast<char>(tolower(c)); }
@@ -72,7 +74,7 @@ public:
     [[nodiscard]] auto uv_scale() const noexcept { return _uv_scale; }
     [[nodiscard]] auto uv_offset() const noexcept { return _uv_offset; }
     [[nodiscard]] auto resolution() const noexcept { return _resolution; }
-    [[nodiscard]] uint channels() const noexcept override { return 4u; }
+    [[nodiscard]] uint channels() const noexcept override { return _channels; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
@@ -117,7 +119,13 @@ public:
 };
 
 luisa::unique_ptr<Texture::Instance> PlaceholderTexture::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
-    auto device_image = pipeline.create<Image<float>>(PixelStorage::FLOAT4, _resolution);
+    auto storage = PixelStorage::FLOAT4;
+    if (_channels == 1u) {
+        storage = PixelStorage::FLOAT1;
+    } else if (_channels == 2u) {
+        storage = PixelStorage::FLOAT2;
+    }
+    auto device_image = pipeline.create<Image<float>>(storage, _resolution);
     luisa::optional<Differentiation::TexturedParameter> param;
     if (requires_gradients()) {
         param.emplace(pipeline.differentiation().parameter(

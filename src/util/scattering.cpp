@@ -295,14 +295,15 @@ MicrofacetDistribution::Gradient TrowbridgeReitzDistribution::grad_D(Expr<float3
     auto tan2Theta = tan2_theta(wh);
     auto cos4Theta = sqr(cos2_theta(wh));
 
-    auto e = tan2Theta * (sqr(cos_phi(wh) / alpha().x) +
-                          sqr(sin_phi(wh) / alpha().y));
+    auto e0 = tan2Theta * sqr(cos_phi(wh) / alpha().x);
+    auto e1 = tan2Theta * sqr(sin_phi(wh) / alpha().y);
+    auto e = e0 + e1;
     auto D = 1.0f / (pi * alpha().x * alpha().y * cos4Theta * sqr(1.f + e));
 
     auto d_D = ite(isinf(tan2Theta), 0.f, 1.f);
     auto d_e = -d_D * 2.f / (1.f + e) * D;
-    auto d_alpha = -make_float2(d_D * D / (alpha().x) + d_e * tan2Theta * 2.f * sqr(cos_phi(wh) / alpha().x) / alpha().x,
-                                d_D * D / (alpha().y) + d_e * tan2Theta * 2.f * sqr(cos_phi(wh) / alpha().y) / alpha().y);
+    auto d_alpha = -make_float2((d_D * D + d_e * 2.f * e0) / (alpha().x),
+                                (d_D * D + d_e * 2.f * e1) / (alpha().y));
 
     return {.dAlpha = d_alpha};
 }
@@ -669,6 +670,7 @@ FresnelBlend::Gradient FresnelBlend::backward(
 
     auto d_rd = dv * (diffuse_rd);
     auto d_rs = dv * (diffuse_rs + specular_rs);
+    // FIXME : alpha calculation costs too much time
     auto d_alpha = dv.dot(Schlick(dot(wi, wh))) * _distribution->grad_D(wh).dAlpha /
                    (4.f * abs_dot(wi, wh) * max(absCosThetaI, absCosThetaO));
     return {.dRd = d_rd, .dRs = d_rs, .dAlpha = d_alpha};

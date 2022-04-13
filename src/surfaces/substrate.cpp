@@ -145,8 +145,8 @@ private:
                 auto d_r = grad.dAlpha * (remap ? grad_alpha_roughness(r) : make_float2(1.f));
                 auto d_r_f4 = roughness->node()->channels() == 1u ?
                                   make_float4(d_r.x + d_r.y, 0.f, 0.f, 0.f) :
-                                  make_float4(d_r, 0.f, 0.f);
-                _instance->roughness()->backward(_it, _time, d_r_f4);
+                                  make_float4(d_r.x, d_r.y, 0.f, 0.f);
+                _instance->roughness()->backward(_it, _time, make_float4(1.f));
             }
         };
     }
