@@ -103,17 +103,14 @@ private:
     }
     void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
         auto _instance = instance<MatteInstance>();
-        auto requires_grad_kd = _instance->Kd()->node()->requires_gradients();
-        auto requires_grad_sigma = _instance->sigma() != nullptr &&
-                                   _instance->sigma()->node()->requires_gradients();
-        if (requires_grad_kd || requires_grad_sigma) {
-            auto wo_local = _it.wo_local();
-            auto wi_local = _it.shading().world_to_local(wi);
-            auto grad = _oren_nayar->backward(wo_local, wi_local, df);
-            _instance->Kd()->backward_albedo_spectrum(_it, _swl, _time, grad.dR);
-            if (auto sigma = _instance->sigma()) {
-                sigma->backward(_it, _time, make_float4(grad.dSigma, 0.f, 0.f, 0.f));
-            }
+        auto wo_local = _it.wo_local();
+        auto wi_local = _it.shading().world_to_local(wi);
+
+        auto grad = _oren_nayar->backward(wo_local, wi_local, df);
+
+        _instance->Kd()->backward_albedo_spectrum(_it, _swl, _time, grad.dR);
+        if (auto sigma = _instance->sigma()) {
+            sigma->backward(_it, _time, make_float4(grad.dSigma, 0.f, 0.f, 0.f));
         }
     }
 };

@@ -26,8 +26,8 @@ Differentiation::Differentiation(Pipeline &pipeline, const Optimizer &optimizer)
     Kernel1D clear_buffer = [](BufferUInt gradients) noexcept {
         gradients.write(dispatch_x(), 0u);
     };
-    Kernel1D apply_grad_const = [this](BufferUInt gradients, BufferFloat4 params, BufferFloat2 ranges,
-                                       Float alpha, BufferUInt counter) noexcept {
+    Kernel1D apply_grad_const = [](BufferUInt gradients, BufferFloat4 params, BufferFloat2 ranges,
+                                   Float alpha, BufferUInt counter) noexcept {
         auto thread = dispatch_x();
         auto counter_offset = thread * gradiant_collision_avoidance_block_size;
         auto grad_offset = 4u * counter_offset;
@@ -153,10 +153,14 @@ void Differentiation::apply_gradients(CommandBuffer &command_buffer, float alpha
             grad /= std::max(count, constant_min_count);
             auto p1 = params_after[i];
             LUISA_INFO(
-                "Param #{}: ({}, {}, {}, {}) - {} * ({}, {}, {}, {}) -> ({}, {}, {}, {}).",
+                "Param #{}: ({}, {}, {}, {}) - "
+                "{} * ({}, {}, {}, {}) -> "
+                "({}, {}, {}, {})"
+                ", count = {}",
                 i, p0.x, p0.y, p0.z, p0.w,
                 alpha, grad.x, grad.y, grad.z, grad.w,
-                p1.x, p1.y, p1.z, p1.w);
+                p1.x, p1.y, p1.z, p1.w,
+                std::max(count, constant_min_count));
         }
     }
     for (auto &&p : _textured_params) {

@@ -125,30 +125,27 @@ private:
 
     void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
         auto _instance = instance<SubstrateInstance>();
-        auto requires_grad_kd = _instance->Kd()->node()->requires_gradients(),
-             requires_grad_ks = _instance->Ks()->node()->requires_gradients();
-        $if(requires_grad_kd || requires_grad_ks) {
-            auto wo_local = _it.wo_local();
-            auto wi_local = _it.shading().world_to_local(wi);
-            auto grad = _blend->backward(wo_local, wi_local, df);
+        auto wo_local = _it.wo_local();
+        auto wi_local = _it.shading().world_to_local(wi);
 
-            _instance->Kd()->backward_albedo_spectrum(_it, _swl, _time, grad.dRd);
-            _instance->Ks()->backward_albedo_spectrum(_it, _swl, _time, grad.dRs);
-            if (auto roughness = _instance->roughness()) {
-                auto remap = _instance->remap_roughness();
-                auto r_f4 = roughness->evaluate(_it, _time);
-                auto r = roughness->node()->channels() == 1u ? r_f4.xx() : r_f4.xy();
+        auto grad = _blend->backward(wo_local, wi_local, df);
 
-                auto grad_alpha_roughness = [](auto &&x) noexcept {
-                    return TrowbridgeReitzDistribution::grad_alpha_roughness(x);
-                };
-                auto d_r = grad.dAlpha * (remap ? grad_alpha_roughness(r) : make_float2(1.f));
-                auto d_r_f4 = roughness->node()->channels() == 1u ?
-                                  make_float4(d_r.x + d_r.y, 0.f, 0.f, 0.f) :
-                                  make_float4(d_r.x, d_r.y, 0.f, 0.f);
-                _instance->roughness()->backward(_it, _time, make_float4(1.f));
-            }
-        };
+        _instance->Kd()->backward_albedo_spectrum(_it, _swl, _time, grad.dRd);
+        _instance->Ks()->backward_albedo_spectrum(_it, _swl, _time, grad.dRs);
+        if (auto roughness = _instance->roughness()) {
+            auto remap = _instance->remap_roughness();
+            auto r_f4 = roughness->evaluate(_it, _time);
+            auto r = roughness->node()->channels() == 1u ? r_f4.xx() : r_f4.xy();
+
+            auto grad_alpha_roughness = [](auto &&x) noexcept {
+                return TrowbridgeReitzDistribution::grad_alpha_roughness(x);
+            };
+            auto d_r = grad.dAlpha * (remap ? grad_alpha_roughness(r) : make_float2(1.f));
+            auto d_r_f4 = roughness->node()->channels() == 1u ?
+                              make_float4(d_r.x + d_r.y, 0.f, 0.f, 0.f) :
+                              make_float4(d_r.x, d_r.y, 0.f, 0.f);
+            _instance->roughness()->backward(_it, _time, d_r_f4);
+        }
     }
 };
 
