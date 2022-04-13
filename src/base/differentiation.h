@@ -28,18 +28,19 @@ class Pipeline;
 
 class Differentiation {
 
-public:
-    static constexpr auto constant_parameter_buffer_capacity = 4096u;
-    static constexpr auto gradiant_collision_avoidance_block_size = 512u;
-    static constexpr auto constant_parameter_counter_size =
+private:
+    static constexpr uint gradiant_collision_avoidance_block_size = 512u;
+    static constexpr float constant_min_count = 1.f;
+
+    static constexpr uint constant_parameter_buffer_capacity = 4096u;
+    static constexpr uint constant_parameter_counter_size =
         constant_parameter_buffer_capacity *
         gradiant_collision_avoidance_block_size;
-    static constexpr auto constant_parameter_gradient_buffer_size =
+    static constexpr uint constant_parameter_gradient_buffer_size =
         constant_parameter_buffer_capacity * 4u *
         gradiant_collision_avoidance_block_size;
 
-    static constexpr auto constant_min_count = 1.f;
-
+public:
     class ConstantParameter {
 
     private:
