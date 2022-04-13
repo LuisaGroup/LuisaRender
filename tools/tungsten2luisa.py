@@ -41,7 +41,7 @@ def convert_plastic_material(out_file, material: dict, alpha=""):
 Surface mat_{name} : Substrate {{
   Kd : {convert_albedo_texture(color)}
   Ks : Constant {{
-    v {{ 0.04 }}
+    v {{ 0.04, 0.04, 0.04 }}
   }}
   eta : Constant {{
     v {{ {ior} }}
@@ -60,7 +60,7 @@ def convert_glass_material(out_file, material: dict, alpha=""):
     print(f'''
 Surface mat_{name} : Glass {{
   Kr : Constant {{
-    v {{ 1 }}
+    v {{ 1, 1, 1 }}
   }}
   Kt : {convert_albedo_texture(color)}
   eta : Constant {{
