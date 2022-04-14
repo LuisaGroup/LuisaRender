@@ -302,8 +302,7 @@ MicrofacetDistribution::Gradient TrowbridgeReitzDistribution::grad_D(Expr<float3
 
     auto d_D = ite(isinf(tan2Theta), 0.f, 1.f);
     auto d_e = -d_D * 2.f / (1.f + e) * D;
-    auto d_alpha = -make_float2((d_D * D + d_e * 2.f * e0) / (alpha().x),
-                                (d_D * D + d_e * 2.f * e1) / (alpha().y));
+    auto d_alpha = -d_D * D + d_e * 2.f * make_float2(e0, e1) / alpha();
 
     return {.dAlpha = d_alpha};
 }
