@@ -15,7 +15,7 @@ Surface mat_Floor : Metal {
 
 Surface mat_WaterAir : Glass {
   Kr : Constant {
-    v { 1 }
+    v { 1, 1, 1 }
   }
   Kt : Constant {
     v { 1.0, 1.0, 1.0 }
@@ -30,7 +30,7 @@ Surface mat_WaterAir : Glass {
 
 Surface mat_IceAir : Glass {
   Kr : Constant {
-    v { 1 }
+    v { 1, 1, 1 }
   }
   Kt : Constant {
     v { 1.0, 1.0, 1.0 }
@@ -45,7 +45,7 @@ Surface mat_IceAir : Glass {
 
 Surface mat_Glass : Glass {
   Kr : Constant {
-    v { 1 }
+    v { 1, 1, 1 }
   }
   Kt : Constant {
     v { 1.0, 1.0, 1.0 }
@@ -60,7 +60,7 @@ Surface mat_Glass : Glass {
 
 Surface mat_AirIce : Glass {
   Kr : Constant {
-    v { 1 }
+    v { 1, 1, 1 }
   }
   Kt : Constant {
     v { 1.0, 1.0, 1.0 }

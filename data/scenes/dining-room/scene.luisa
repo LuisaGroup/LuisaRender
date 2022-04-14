@@ -4,7 +4,7 @@ Surface mat_WhitePlastic : Substrate {
     v { 1.0, 1.0, 1.0 }
   }
   Ks : Constant {
-    v { 0.04 }
+    v { 0.04, 0.04, 0.04 }
   }
   eta : Constant {
     v { 1.5 }
@@ -26,7 +26,7 @@ Surface mat_BlackRubber : Substrate {
     v { 0.05000000074505806, 0.05000000074505806, 0.05000000074505806 }
   }
   Ks : Constant {
-    v { 0.04 }
+    v { 0.04, 0.04, 0.04 }
   }
   eta : Constant {
     v { 1.5 }
@@ -61,7 +61,7 @@ Surface mat_BlackPaint : Substrate {
     v { 0.009999999776482582, 0.009999999776482582, 0.009999999776482582 }
   }
   Ks : Constant {
-    v { 0.04 }
+    v { 0.04, 0.04, 0.04 }
   }
   eta : Constant {
     v { 1.5 }
@@ -89,7 +89,7 @@ Surface mat_Ceramic : Substrate {
     v { 1.0, 1.0, 1.0 }
   }
   Ks : Constant {
-    v { 0.04 }
+    v { 0.04, 0.04, 0.04 }
   }
   eta : Constant {
     v { 1.5 }
@@ -111,7 +111,7 @@ Surface mat_PaintedCeramic : Substrate {
     file { "textures/Teacup.png" }
   }
   Ks : Constant {
-    v { 0.04 }
+    v { 0.04, 0.04, 0.04 }
   }
   eta : Constant {
     v { 1.5 }
@@ -126,7 +126,7 @@ Surface mat_SkirtWood : Substrate {
     v { 0.6846150159835815, 0.6846150159835815, 0.6846150159835815 }
   }
   Ks : Constant {
-    v { 0.04 }
+    v { 0.04, 0.04, 0.04 }
   }
   eta : Constant {
     v { 1.5 }
@@ -141,7 +141,7 @@ Surface mat_FrostedGlass : Substrate {
     v { 0.7931100130081177, 0.7931100130081177, 0.7931100130081177 }
   }
   Ks : Constant {
-    v { 0.04 }
+    v { 0.04, 0.04, 0.04 }
   }
   eta : Constant {
     v { 1.5 }
