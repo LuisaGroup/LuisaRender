@@ -146,17 +146,27 @@ public:
         return sample;
     }
     void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
-
-        if (_a != nullptr) [[likely]] { _a->backward(wi, _ratio * df); }
-        if (_b != nullptr) [[likely]] { _b->backward(wi, (1.f - _ratio) * df); }
         if (_a != nullptr && _b != nullptr) [[likely]] {
-            if (auto ratio = instance<MixSurfaceInstance>()->ratio();
-                ratio != nullptr && ratio->node()->requires_gradients()) {
-                auto fa = _a->evaluate(wi).f;
-                auto fb = _b->evaluate(wi).f;
-                auto dt = ((fa - fb) * df).sum();// inner product
-                ratio->backward(_it, _time, make_float4(dt, make_float3()));
+            auto eval_a = _a->evaluate(wi);
+            auto eval_b = _b->evaluate(wi);
+            auto cos_a = abs(dot(eval_a.normal, wi));
+            auto cos_b = abs(dot(eval_b.normal, wi));
+            auto cos_theta_i = abs(dot(_it.shading().n(), wi));
+
+            auto d_a = df * _ratio * cos_a / cos_theta_i;
+            auto d_b = df * (1.f - _ratio) * cos_b / cos_theta_i;
+
+            _a->backward(wi, d_a);
+            _b->backward(wi, d_b);
+
+            if (auto ratio = instance<MixSurfaceInstance>()->ratio()) {
+                auto d_ratio = df.dot(eval_a.f * cos_a - eval_b.f * cos_b) / cos_theta_i;
+                ratio->backward(_it, _time, make_float4(d_ratio, 0.f, 0.f, 0.f));
             }
+        } else if (_a != nullptr) [[likely]] {
+            _a->backward(wi, df * _ratio);
+        } else if (_b != nullptr) [[likely]] {
+            _b->backward(wi, df * (1.f - _ratio));
         }
     }
 };
