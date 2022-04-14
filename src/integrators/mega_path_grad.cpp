@@ -184,6 +184,8 @@ public:
         }
 
         // save results
+        LUISA_INFO("");
+        LUISA_INFO("Start to save results");
         for (auto i = 0u; i < pipeline().camera_count(); i++) {
             auto camera = pipeline().camera(i);
             auto resolution = camera->film()->node()->resolution();
@@ -199,7 +201,10 @@ public:
             _save_image(film_path, rendered, resolution);
         }
         std::cout << pipeline().printer().retrieve(stream);
+        LUISA_INFO("Finish saving results");
 
+        // dump results of textured parameters
+        LUISA_INFO("");
         LUISA_INFO("Dumping differentiable parameters");
         pipeline().differentiation().dump(command_buffer, "outputs");
         LUISA_INFO("Finish dumping differentiable parameters");

@@ -14,15 +14,15 @@ Surface cbox-gray : Matte {
 }
 
 Surface mat-wood : Substrate {
-  Kd : Image {
-    file { "living-room/textures/wood.jpg" }
-  }
-  //Kd : Placeholder {
-  //  resolution { 4096 }
-  //  requires_grad { true }
-  //  range { 0, 1 }
-  //  uv_scale { 1, -1 }
+  //Kd : Image {
+  //  file { "living-room/textures/wood.jpg" }
   //}
+  Kd : Placeholder {
+    resolution { 1024 }
+    requires_grad { true }
+    range { 0, 1 }
+    uv_scale { 1, -1 }
+  }
   Ks : Constant {
     v { 0.2, 0.2, 0.2 }
     //v { 0, 0.9, 0.56 }
@@ -51,9 +51,9 @@ Surface cbox-white : Matte {
 
 Surface cbox-red : Matte {
   Kd : Constant {
-    v { 0.63, 0.065, 0.05 }
-    // v { 0.14, 0.45, 0.091 }
-    //requires_grad { true }
+    //v { 0.63, 0.065, 0.05 }
+    v { 0.14, 0.45, 0.091 }
+    requires_grad { true }
     range { 0, 1 }
   }
   //sigma : Constant {
@@ -69,7 +69,7 @@ Surface cbox-red : Matte {
 Surface cbox-green : Matte {
   Kd : Constant {
     v { 0.14, 0.45, 0.091 }
-    // v { 0.63, 0.065, 0.05 }
+    //v { 0.63, 0.065, 0.05 }
     //requires_grad { true }
     range { 0, 1 }
   }
@@ -178,7 +178,7 @@ Integrator pt : MegaPathGrad {
   optimizer { "BGD" }
   loss { "L2" }
   learning_rate { 0.1 }
-  iterations { 60 }
+  iterations { 30 }
 }
 
 render {
