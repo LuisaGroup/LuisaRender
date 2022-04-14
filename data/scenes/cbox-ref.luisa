@@ -62,6 +62,14 @@ Surface cbox-metal : Metal {
   }
 }
 
+Surface mix : Mix {
+  a { @cbox-red }
+  b { @cbox-green }
+  ratio : Constant {
+    v { 0.7 }
+  }
+}
+
 Shape cbox-ceiling : Mesh {
   file { "../meshes/cbox-parts/ceiling.obj" }
   surface { @cbox-white }
@@ -84,7 +92,7 @@ Shape cbox-right-wall : Mesh {
 
 Shape cbox-back-wall : Mesh {
   file { "../meshes/cbox-parts/back-wall.obj" }
-  surface { @mat-wood }
+  surface { @mix }
 }
 
 Shape cbox-tall-box : Mesh {
@@ -129,7 +137,7 @@ Camera camera0 : Pinhole {
   fov { 27.8 }
   spp { 4096 }
   film { @film }
-  file { "../renders/cbox-substrate-ref-4096spp-0.exr" }
+  file { "../renders/cbox-mix-ref-4096spp-0.exr" }
   filter : Gaussian {
     radius { 1 }
   }
@@ -141,7 +149,7 @@ Camera camera1 : Pinhole {
   fov { 40 }
   spp { 4096 }
   film { @film }
-  file { "../renders/cbox-substrate-ref-4096spp-1.exr" }
+  file { "../renders/cbox-mix-ref-4096spp-1.exr" }
   filter : Gaussian {
     radius { 1 }
   }

@@ -175,4 +175,12 @@ public:
 #undef LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP
 };
 
+SampledSpectrum isnan(const SampledSpectrum &t) noexcept;
+
+Bool any(const SampledSpectrum &t) noexcept;
+Bool all(const SampledSpectrum &t) noexcept;
+
+SampledSpectrum ite(const SampledSpectrum &p,
+                    const SampledSpectrum &t, const SampledSpectrum &f) noexcept;
+
 }// namespace luisa::render

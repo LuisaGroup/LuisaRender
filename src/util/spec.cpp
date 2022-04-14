@@ -3,6 +3,7 @@
 //
 
 #include <dsl/syntax.h>
+#include <dsl/sugar.h>
 #include <util/spec.h>
 
 namespace luisa::render {
@@ -444,6 +445,49 @@ float DenselySampledSpectrum::cie_y_integral() noexcept {
         return static_cast<float>(sum);
     }();
     return integral;
+}
+
+using namespace luisa::compute;
+SampledSpectrum isnan(const SampledSpectrum &t) noexcept {
+    SampledSpectrum ans(t.dimension(), 0.f);
+    for (auto i = 0u; i < t.dimension(); ++i) {
+        $if(compute::isnan(t[i])) {
+            ans[i] = 1.f;
+        };
+    }
+    return ans;
+}
+
+Bool any(const SampledSpectrum &t) noexcept {
+    for (auto i = 0u; i < t.dimension(); ++i) {
+        $if(t[i] != 0.f) {
+            return true;
+        };
+    }
+    return false;
+}
+Bool all(const SampledSpectrum &t) noexcept {
+    for (auto i = 0u; i < t.dimension(); ++i) {
+        $if(t[i] == 0.f) {
+            return false;
+        };
+    }
+    return true;
+}
+
+SampledSpectrum ite(const SampledSpectrum &p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept {
+    SampledSpectrum ans(t.dimension(), 0.f);
+    LUISA_ASSERT(p.dimension() == t.dimension() && p.dimension() == f.dimension(),
+                 "ite of SampledSpectrum : dimensions don't correspond");
+    for (auto i = 0u; i < p.dimension(); ++i) {
+        $if(p[i] != 0.f) {
+            ans[i] = t[i];
+        }
+        $else {
+            ans[i] = f[i];
+        };
+    }
+    return ans;
 }
 
 }// namespace luisa::render

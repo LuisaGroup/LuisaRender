@@ -83,6 +83,35 @@ Surface cbox-green : Matte {
   }
 }
 
+Surface mix : Mix {
+  a {
+    Matte  {
+      Kd : Constant {
+        v { 0.3, 0.8, 0.14 }
+        requires_grad { true }
+        range { 0, 1 }
+      }
+    }
+    //@cbox-red
+  }
+  b {
+    //Matte  {
+    //  Kd : Constant {
+    //    v { 0.3, 0.8, 0.14 }
+    //    requires_grad { true }
+    //    range { 0, 1 }
+    //  }
+    //}
+    @cbox-green
+  }
+  ratio : Constant {
+    v { 0.7 }
+    //v { 0.2 }
+    //requires_grad { true }
+    range { 0, 1 }
+  }
+}
+
 Shape cbox-ceiling : Mesh {
   file { "../meshes/cbox-parts/ceiling.obj" }
   surface { @cbox-white }
@@ -105,7 +134,7 @@ Shape cbox-right-wall : Mesh {
 
 Shape cbox-back-wall : Mesh {
   file { "../meshes/cbox-parts/back-wall.obj" }
-  surface { @mat-wood }
+  surface { @mix }
 }
 
 Shape cbox-tall-box : Mesh {
@@ -143,14 +172,14 @@ Shape cbox : Group {
 Camera camera0 : Pinhole {
   position { -0.01, 0.995, 5.0 }
   fov { 27.8 }
-  spp { 2048 }
+  spp { 512 }
   film { @film }
-  file { "../renders/cbox-substrate-diff-0.exr" }
+  file { "../renders/cbox-mix-diff-0.exr" }
   filter : Gaussian {
     radius { 1 }
   }
   target : Image {
-    file { "../renders/cbox-substrate-ref-4096spp-0.exr" }
+    file { "../renders/cbox-mix-ref-4096spp-0.exr" }
   }
 }
 
@@ -158,14 +187,14 @@ Camera camera1 : Pinhole {
   position { 1, 1.6, 2.0 }
   front { -0.4, -0.2, -1 }
   fov { 40 }
-  spp { 2048 }
+  spp { 512 }
   film { @film }
-  file { "../renders/cbox-substrate-diff-1.exr" }
+  file { "../renders/cbox-mix-diff-1.exr" }
   filter : Gaussian {
     radius { 1 }
   }
   target : Image {
-    file { "../renders/cbox-substrate-ref-4096spp-1.exr" }
+    file { "../renders/cbox-mix-ref-4096spp-1.exr" }
   }
 }
 
@@ -177,8 +206,8 @@ Integrator pt : MegaPathGrad {
   save_process { true }
   optimizer { "BGD" }
   loss { "L2" }
-  learning_rate { 1 }
-  iterations { 30 }
+  learning_rate { 0.1 }
+  iterations { 100 }
 }
 
 render {

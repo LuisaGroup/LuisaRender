@@ -147,6 +147,7 @@ public:
     }
     void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
         if (_a != nullptr && _b != nullptr) [[likely]] {
+            using compute::isnan;
             auto eval_a = _a->evaluate(wi);
             auto eval_b = _b->evaluate(wi);
             auto cos_a = abs(dot(eval_a.normal, wi));
@@ -156,12 +157,12 @@ public:
             auto d_a = df * _ratio * cos_a / cos_theta_i;
             auto d_b = df * (1.f - _ratio) * cos_b / cos_theta_i;
 
-            _a->backward(wi, d_a);
-            _b->backward(wi, d_b);
+            _a->backward(wi, ite(isnan(d_a), SampledSpectrum(d_a.dimension(), 0.f), d_a));
+            _b->backward(wi, ite(isnan(d_b), SampledSpectrum(d_a.dimension(), 0.f), d_b));
 
             if (auto ratio = instance<MixSurfaceInstance>()->ratio()) {
                 auto d_ratio = df.dot(eval_a.f * cos_a - eval_b.f * cos_b) / cos_theta_i;
-                ratio->backward(_it, _time, make_float4(d_ratio, 0.f, 0.f, 0.f));
+                ratio->backward(_it, _time, make_float4(ite(isnan(d_ratio), 0.f, d_ratio), 0.f, 0.f, 0.f));
             }
         } else if (_a != nullptr) [[likely]] {
             _a->backward(wi, df * _ratio);
