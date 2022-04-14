@@ -101,7 +101,7 @@ public:
         luisa::unique_ptr<Surface::Closure> a, luisa::unique_ptr<Surface::Closure> b) noexcept
         : Surface::Closure{instance, it, swl, time},
           _a{std::move(a)}, _b{std::move(b)}, _ratio{ratio} {
-        LUISA_ASSERT(_a != nullptr || _b == nullptr,
+        LUISA_ASSERT(_a != nullptr || _b != nullptr,
                      "Creating closure for null MixSurface.");
     }
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
@@ -146,6 +146,7 @@ public:
         return sample;
     }
     void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
+
         if (_a != nullptr) [[likely]] { _a->backward(wi, _ratio * df); }
         if (_b != nullptr) [[likely]] { _b->backward(wi, (1.f - _ratio) * df); }
         if (_a != nullptr && _b != nullptr) [[likely]] {

@@ -19,6 +19,7 @@ Differentiation::Differentiation(Pipeline &pipeline, const Optimizer &optimizer)
       _const_param_range_buffer{*pipeline.create<Buffer<float2>>(constant_parameter_buffer_capacity)},
       _gradient_buffer_size{constant_parameter_gradient_buffer_size},
       _counter_size{constant_parameter_counter_size} {
+
     _constant_params.reserve(constant_parameter_buffer_capacity);
     _constant_ranges.reserve(constant_parameter_buffer_capacity);
 
@@ -41,7 +42,7 @@ Differentiation::Differentiation(Pipeline &pipeline, const Optimizer &optimizer)
             grad += make_float4(x, y, z, w);
             count += counter.read(counter_offset + i);
         }
-        grad /= max(Float(count), constant_min_count);
+        grad /= Float(max(count, 1u));
         auto old = params.read(thread);
         auto range = ranges.read(thread);
         auto next = fma(-alpha, grad, old);
@@ -56,7 +57,7 @@ Differentiation::Differentiation(Pipeline &pipeline, const Optimizer &optimizer)
         auto z = as<float>(gradients.read(grad_offset + i * channels + 2u));
         auto w = as<float>(gradients.read(grad_offset + i * channels + 3u));
         auto grad = make_float4(x, y, z, w);
-        grad /= max(Float(counter.read(counter_offset + i)), constant_min_count);
+        grad /= Float(max(counter.read(counter_offset + i), 1u));
         auto old = image.read(coord);
         auto next = fma(-alpha, grad, old);
         image.write(coord, clamp(next, range.x, range.y));
@@ -67,9 +68,6 @@ Differentiation::Differentiation(Pipeline &pipeline, const Optimizer &optimizer)
 }
 
 Differentiation::ConstantParameter Differentiation::parameter(float4 x, uint channels, float2 range) noexcept {
-    LUISA_ASSERT(
-        _constant_params.size() < constant_parameter_buffer_capacity,
-        "Too many parameters in differentiation.");
     auto index = static_cast<uint>(_constant_params.size());
     _constant_params.emplace_back(x);
     _constant_ranges.emplace_back(range);
@@ -97,10 +95,9 @@ Differentiation::TexturedParameter Differentiation::parameter(const Image<float>
     auto param_count = pixel_count * nc;
     auto grad_offset = _gradient_buffer_size;
     auto counter_offset = _counter_size;
-    _gradient_buffer_size = (_gradient_buffer_size + param_count + 3u) & ~0b11u;
     _counter_size = (_counter_size + pixel_count + 3u) & ~0b11u;
-    TexturedParameter param{image, s, grad_offset, counter_offset, range};
-    return _textured_params.emplace_back(param);
+    _gradient_buffer_size = (_gradient_buffer_size + param_count + 3u) & ~0b11u;
+    return _textured_params.emplace_back(TexturedParameter{image, s, grad_offset, counter_offset, range});
 }
 
 void Differentiation::materialize(CommandBuffer &command_buffer) noexcept {
@@ -150,7 +147,7 @@ void Differentiation::apply_gradients(CommandBuffer &command_buffer, float alpha
                 grad += collision_avoiding_gradients[index];
                 count_uint += counter[index];
             }
-            auto count = std::max(float(count_uint), constant_min_count);
+            auto count = float(std::max(count_uint, 1u));
             grad /= count;
             auto p1 = params_after[i];
             LUISA_INFO(
@@ -181,13 +178,12 @@ Float4 Differentiation::decode(const Differentiation::ConstantParameter &param) 
 
 void Differentiation::accumulate(const Differentiation::ConstantParameter &param, Expr<float4> grad) const noexcept {
     LUISA_ASSERT(_grad_buffer, "Gradient buffer is not materialized.");
-    auto bs = gradiant_collision_avoidance_block_size;
-    auto slots = pcg4d(as<uint4>(grad)) % bs;
+    auto slots = pcg4d(as<uint4>(grad)) % gradiant_collision_avoidance_block_size;
     for (auto i = 0u; i < param.channels(); i++) {
-        auto grad_offset = (param.index() * bs + slots[i]) * 4u + i;
+        auto grad_offset = (param.index() * gradiant_collision_avoidance_block_size + slots[i]) * 4u + i;
         atomic_float_add(*_grad_buffer, grad_offset, grad[i]);
     }
-    auto counter_offset = param.index() * bs + slots[0];
+    auto counter_offset = param.index() * gradiant_collision_avoidance_block_size + slots[0];
     _counter->atomic(counter_offset).fetch_add(1u);
 }
 
@@ -214,8 +210,8 @@ void Differentiation::accumulate(const Differentiation::TexturedParameter &param
     auto write_grad = [&param, this](Expr<float2> uv, Expr<float4> grad) noexcept {
         $if(all(uv >= 0.f && uv < 1.f)) {
             auto size = param.image().size();
-            auto st = clamp(make_uint2(uv * make_float2(size)), 0u, size - 1u);
-            auto pixel_id = st.y * size.x + st.x;
+            auto coord = clamp(make_uint2(uv * make_float2(size)), 0u, size - 1u);
+            auto pixel_id = coord.y * size.x + coord.x;
             auto nc = pixel_format_channel_count(param.image().format());
             auto grad_offset = param.gradient_buffer_offset() + pixel_id * nc;
             auto counter_offset = param.counter_offset() + pixel_id;

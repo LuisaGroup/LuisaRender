@@ -30,7 +30,6 @@ class Differentiation {
 
 private:
     static constexpr uint gradiant_collision_avoidance_block_size = 512u;
-    static constexpr float constant_min_count = 1.f;
 
     static constexpr uint constant_parameter_buffer_capacity = 4096u;
     static constexpr uint constant_parameter_counter_size =
@@ -73,6 +72,8 @@ public:
         [[nodiscard]] auto range() const noexcept { return _range; }
         [[nodiscard]] auto gradient_buffer_offset() const noexcept { return _grad_offset; }
         [[nodiscard]] auto counter_offset() const noexcept { return _counter_offset; }
+        void set_gradient_buffer_offset(uint offset) noexcept { _grad_offset = offset; }
+        void set_counter_offset(uint offset) noexcept { _counter_offset = offset; }
     };
 
 private:
