@@ -142,7 +142,7 @@ public:
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
     [[nodiscard]] SampledSpectrum sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept override;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept override;
-    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept;
+    [[nodiscard]] static Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) noexcept;
 };
 
 class MicrofacetReflection : public BxDF {

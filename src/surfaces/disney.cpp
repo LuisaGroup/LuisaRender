@@ -405,7 +405,7 @@ public:
         });
     }
     [[nodiscard]] auto &eta() const noexcept { return e; }
-    [[nodiscard]] Gradient backward(Expr<float> cosThetaI, const SampledSpectrum &dFr) const noexcept {
+    [[nodiscard]] Gradient grad(Expr<float> cosThetaI) const noexcept {
         // TODO
         LUISA_ERROR_WITH_LOCATION("Not implemented.");
     }

@@ -351,7 +351,7 @@ Float LambertianTransmission::pdf(Expr<float3> wo, Expr<float3> wi) const noexce
 }
 
 LambertianTransmission::Gradient LambertianTransmission::backward(
-    Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
+    Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) noexcept {
     return {.dT = df * ite(!same_hemisphere(wo, wi), inv_pi, 0.f)};
 }
 
@@ -368,7 +368,8 @@ SampledSpectrum MicrofacetReflection::evaluate(Expr<float3> wo, Expr<float3> wi)
     auto G = _distribution->G(wo, wi);
     auto cos_o = cos_theta(wo);
     auto cos_i = cos_theta(wi);
-    return _r * F * ite(valid, abs(0.25f * D * G / (cos_i * cos_o)), 0.f);
+    auto ans = abs(0.25f * D * G / (cos_i * cos_o));
+    return _r * F * ite(valid, ans, 0.f);
 }
 
 SampledSpectrum MicrofacetReflection::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *p) const noexcept {
@@ -393,36 +394,31 @@ Float MicrofacetReflection::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept
 
 MicrofacetReflection::Gradient MicrofacetReflection::backward(
     Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
-
-    // TODO : we didn't deal with distribution and fresnel here
     using compute::any;
     using compute::normalize;
-    auto cosThetaO = abs_cos_theta(wo);
-    auto cosThetaI = abs_cos_theta(wi);
     auto wh = wi + wo;
-    auto valid = cosThetaI != 0.f & cosThetaO != 0.f & any(wh != 0.f);
+    auto valid = same_hemisphere(wo, wi) & any(wh != 0.f);
     wh = normalize(wh);
-    auto cosI = dot(wi, face_forward(wh, make_float3(0.f, 0.f, 1.f)));
-    auto F = _fresnel->evaluate(cosI);
+    auto F = _fresnel->evaluate(dot(wi, face_forward(wh, make_float3(0.f, 0.f, 1.f))));
     auto D = _distribution->D(wh);
     auto G = _distribution->G(wo, wi);
+    auto cos_o = cos_theta(wo);
+    auto cos_i = cos_theta(wi);
+    auto k0 = 0.25f / (cos_i * cos_o);
+    auto k1 = k0 * D * G;
+    auto ans = abs(k1);
 
-    LUISA_WARNING_WITH_LOCATION("Not implemented.");
     // backward
-    //    auto grad_fresnel = _fresnel->grad(cosThetaI_grad);
-    //    auto d_f = ite(valid, 1.f, 0.f);
-    //    auto d_r = d_f * 0.25f * D * G * F / (cosThetaI * cosThetaO);
-    //    auto d_F = d_f * 0.25f * _r * D * G / (cosThetaI * cosThetaO);
-    //
-    //    // TODO : different type of Fresnel has different grads
-    //    luisa::vector<Float4> grad;
-    //    grad.reserve(1 + grad_fresnel.size());
-    //    grad.emplace_back(d_r);
-    //    for (const auto &v : grad_fresnel) {
-    //        grad.emplace_back(d_F * v);
-    //    }
-    //    return grad;
-    return {.dR = SampledSpectrum(4u), .dAlpha = make_float2(0.f)};
+    auto d_r = df * F * ite(valid, ans, 0.f);
+    auto d_ans = df.dot(_r * F) * ite(valid, 1.f, 0.f);
+    auto d_F = df * _r * ite(valid, ans, 0.f);
+    auto k2 = d_ans * sign(k1) * k0;
+    auto d_D = k2 * G;
+    auto d_G = k2 * D;
+    auto d_alpha = d_D * _distribution->grad_D(wh).dAlpha +
+                   d_G * _distribution->grad_G(wo, wi).dAlpha;
+
+    return {.dR = d_r, .dAlpha = d_alpha};
 }
 
 SampledSpectrum MicrofacetTransmission::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
@@ -669,7 +665,6 @@ FresnelBlend::Gradient FresnelBlend::backward(
 
     auto d_rd = dv * (diffuse_rd);
     auto d_rs = dv * (diffuse_rs + specular_rs);
-    // FIXME : alpha calculation costs too much time
     auto d_alpha = dv.dot(Schlick(dot(wi, wh))) * _distribution->grad_D(wh).dAlpha /
                    (4.f * abs_dot(wi, wh) * max(absCosThetaI, absCosThetaO));
     return {.dRd = d_rd, .dRs = d_rs, .dAlpha = d_alpha};

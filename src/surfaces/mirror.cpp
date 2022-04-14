@@ -41,12 +41,20 @@ class MirrorInstance final : public Surface::Instance {
 private:
     const Texture::Instance *_color;
     const Texture::Instance *_roughness;
+    bool _remap_roughness;
 
 public:
     MirrorInstance(
         const Pipeline &pipeline, const Surface *surface,
-        const Texture::Instance *color, const Texture::Instance *roughness) noexcept
-        : Surface::Instance{pipeline, surface}, _color{color}, _roughness{roughness} {}
+        const Texture::Instance *color, const Texture::Instance *roughness,
+        bool remap_roughness) noexcept
+        : Surface::Instance{pipeline, surface},
+          _color{color},
+          _roughness{roughness},
+          _remap_roughness{remap_roughness} {}
+    [[nodiscard]] auto color() const noexcept { return _color; }
+    [[nodiscard]] auto roughness() const noexcept { return _roughness; }
+    [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
 
 private:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
@@ -57,7 +65,7 @@ luisa::unique_ptr<Surface::Instance> MirrorSurface::_build(
     Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
     auto color = pipeline.build_texture(command_buffer, _color);
     auto roughness = pipeline.build_texture(command_buffer, _roughness);
-    return luisa::make_unique<MirrorInstance>(pipeline, this, color, roughness);
+    return luisa::make_unique<MirrorInstance>(pipeline, this, color, roughness, remap_roughness());
 }
 
 using namespace luisa::compute;
@@ -81,9 +89,10 @@ public:
             return lerp(R, 1.f, weight);
         });
     }
-    [[nodiscard]] Gradient backward(Expr<float> cosI, const SampledSpectrum &dFr) const noexcept {
-        // TODO
-        LUISA_ERROR_WITH_LOCATION("Not implemented.");
+    [[nodiscard]] Gradient grad(Expr<float> cosI) const noexcept {
+        auto m = saturate(1.f - cosI);
+        auto weight = sqr(sqr(m)) * m;
+        return {.dR0 = SampledSpectrum(R0.dimension(), weight)};
     }
 };
 
@@ -127,8 +136,27 @@ public:
     }
 
     void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
-        // TODO
-        LUISA_WARNING_WITH_LOCATION("Not implemented.");
+        auto _instance = instance<MirrorInstance>();
+
+        auto wo_local = _it.wo_local();
+        auto wi_local = _it.shading().world_to_local(wi);
+        auto grad = _refl->backward(wo_local, wi_local, df);
+
+        _instance->color()->backward_albedo_spectrum(_it, _swl, _time, grad.dR);
+        if (auto roughness = _instance->roughness()) {
+            auto remap = _instance->remap_roughness();
+            auto r_f4 = roughness->evaluate(_it, _time);
+            auto r = roughness->node()->channels() == 1u ? r_f4.xx() : r_f4.xy();
+
+            auto grad_alpha_roughness = [](auto &&x) noexcept {
+                return TrowbridgeReitzDistribution::grad_alpha_roughness(x);
+            };
+            auto d_r = grad.dAlpha * (remap ? grad_alpha_roughness(r) : make_float2(1.f));
+            auto d_r_f4 = roughness->node()->channels() == 1u ?
+                              make_float4(d_r.x + d_r.y, 0.f, 0.f, 0.f) :
+                              make_float4(d_r, 0.f, 0.f);
+            _instance->roughness()->backward(_it, _time, ite(isnan(d_r_f4), 0.f, d_r_f4));
+        }
     }
 };
 
@@ -138,7 +166,9 @@ luisa::unique_ptr<Surface::Closure> MirrorInstance::_closure(
     if (_roughness != nullptr) {
         auto r = _roughness->evaluate(it, time);
         auto remap = node<MirrorSurface>()->remap_roughness();
-        auto r2a = [](auto &&x) noexcept { return TrowbridgeReitzDistribution::roughness_to_alpha(x); };
+        auto r2a = [](auto &&x) noexcept {
+            return TrowbridgeReitzDistribution::roughness_to_alpha(x);
+        };
         alpha = _roughness->node()->channels() == 1u ?
                     (remap ? make_float2(r2a(r.x)) : r.xx()) :
                     (remap ? r2a(r.xy()) : r.xy());
