@@ -8,6 +8,8 @@
 #include <base/pipeline.h>
 #include <base/scene.h>
 
+#include <utility>
+
 namespace luisa::render {
 
 class MirrorSurface final : public Surface {
@@ -73,8 +75,11 @@ using namespace luisa::compute;
 class SchlickFresnel final : public Fresnel {
 
 public:
-    struct Gradient {
+    struct Gradient : public Fresnel::Gradient {
         SampledSpectrum dR0;
+
+        explicit Gradient(SampledSpectrum dR0) noexcept
+            : dR0(std::move(dR0)) {}
     };
 
 private:
@@ -89,10 +94,11 @@ public:
             return lerp(R, 1.f, weight);
         });
     }
-    [[nodiscard]] Gradient grad(Expr<float> cosI) const noexcept {
+    [[nodiscard]] luisa::unique_ptr<Fresnel::Gradient> backward(Expr<float> cosI,
+                                                                const SampledSpectrum &df) const noexcept override {
         auto m = saturate(1.f - cosI);
         auto weight = sqr(sqr(m)) * m;
-        return {.dR0 = SampledSpectrum(R0.dimension(), weight)};
+        return luisa::make_unique<SchlickFresnel::Gradient>(df * weight);
     }
 };
 
@@ -141,8 +147,9 @@ public:
         auto wo_local = _it.wo_local();
         auto wi_local = _it.shading().world_to_local(wi);
         auto grad = _refl->backward(wo_local, wi_local, df);
+        auto d_fresnel = dynamic_cast<SchlickFresnel::Gradient *>(grad.dFresnel.get());
 
-        _instance->color()->backward_albedo_spectrum(_it, _swl, _time, grad.dR);
+        _instance->color()->backward_albedo_spectrum(_it, _swl, _time, grad.dR + d_fresnel->dR0);
         if (auto roughness = _instance->roughness()) {
             auto remap = _instance->remap_roughness();
             auto r_f4 = roughness->evaluate(_it, _time);

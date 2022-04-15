@@ -384,10 +384,13 @@ public:
 class DisneyFresnel final : public Fresnel {
 
 public:
-    struct Gradient {
+    struct Gradient : public Fresnel::Gradient {
         SampledSpectrum dR0;
         Float dMetallic;
         Float dEta;
+
+        explicit Gradient(SampledSpectrum dR0, Float dMetallic, Float dEta) noexcept
+            : dR0{std::move(dR0)}, dMetallic{std::move(dMetallic)}, dEta{std::move(dEta)} {}
     };
 
 private:
@@ -405,9 +408,11 @@ public:
         });
     }
     [[nodiscard]] auto &eta() const noexcept { return e; }
-    [[nodiscard]] Gradient grad(Expr<float> cosThetaI) const noexcept {
+    [[nodiscard]] luisa::unique_ptr<Fresnel::Gradient> backward(Expr<float> cosI, const SampledSpectrum &df) const noexcept override {
         // TODO
         LUISA_ERROR_WITH_LOCATION("Not implemented.");
+
+        return luisa::make_unique<DisneyFresnel::Gradient>(SampledSpectrum(df.dimension(), 0.f), 0.f, 0.f);
     }
 };
 
@@ -416,6 +421,10 @@ struct DisneyMicrofacetDistribution final : public TrowbridgeReitzDistribution {
         : TrowbridgeReitzDistribution{alpha} {}
     [[nodiscard]] Float G(Expr<float3> wo, Expr<float3> wi) const noexcept override {
         return G1(wo) * G1(wi);
+    }
+    [[nodiscard]] Gradient grad_G(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+        auto d_alpha = grad_G1(wo).dAlpha * G1(wi) + G1(wo) * grad_G1(wi).dAlpha;
+        return {.dAlpha = d_alpha};
     }
 };
 

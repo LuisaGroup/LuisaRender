@@ -120,7 +120,7 @@ Surface mirror : Mirror {
     range { 0, 1 }
   }
   roughness : Constant {
-    v { 0 }
+    v { 0.2 }
   }
 }
 

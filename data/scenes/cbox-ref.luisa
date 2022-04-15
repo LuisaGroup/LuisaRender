@@ -74,6 +74,9 @@ Surface mirror : Mirror {
   color : Constant {
     v { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
   }
+  roughness : Constant {
+    v { 0.2 }
+  }
 }
 
 Shape cbox-ceiling : Mesh {

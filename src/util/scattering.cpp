@@ -163,12 +163,13 @@ Float MicrofacetDistribution::pdf(Expr<float3> wo, Expr<float3> wh) const noexce
 MicrofacetDistribution::MicrofacetDistribution(Expr<float2> alpha) noexcept
     : _alpha{compute::max(alpha, 1e-3f)} {}
 
-MicrofacetDistribution::Gradient MicrofacetDistribution::grad_G(Expr<float3> wo, Expr<float3> wi) const noexcept {
-    auto k = -1.0f / sqr(1.0f + Lambda(wo) + Lambda(wi));
-    auto grad_Lambda_wo = grad_Lambda(wo);
-    auto grad_Lambda_wi = grad_Lambda(wi);
-    auto d_alpha = k * (grad_Lambda_wo.dAlpha + grad_Lambda_wi.dAlpha);
+MicrofacetDistribution::Gradient MicrofacetDistribution::grad_G1(Expr<float3> w) const noexcept {
+    auto d_alpha = -grad_Lambda(w).dAlpha / sqr(1.0f + Lambda(w));
+    return {.dAlpha = d_alpha};
+}
 
+MicrofacetDistribution::Gradient MicrofacetDistribution::grad_G(Expr<float3> wo, Expr<float3> wi) const noexcept {
+    auto d_alpha = -(grad_Lambda(wo).dAlpha + grad_Lambda(wi).dAlpha) / sqr(1.0f + Lambda(wo) + Lambda(wi));
     return {.dAlpha = d_alpha};
 }
 
@@ -310,9 +311,21 @@ MicrofacetDistribution::Gradient TrowbridgeReitzDistribution::grad_D(Expr<float3
 SampledSpectrum FresnelConductor::evaluate(Expr<float> cosThetaI) const noexcept {
     return fresnel_conductor(abs(cosThetaI), _eta_i, _eta_t, _k);
 }
+luisa::unique_ptr<Fresnel::Gradient> FresnelConductor::backward(Expr<float> cosI, const SampledSpectrum &df) const noexcept {
+    // TODO
+    LUISA_WARNING_WITH_LOCATION("Not implemented.");
+
+    return luisa::make_unique<Fresnel::Gradient>();
+}
 
 SampledSpectrum FresnelDielectric::evaluate(Expr<float> cosThetaI) const noexcept {
     return fresnel_dielectric(cosThetaI, _eta_i, _eta_t);
+}
+luisa::unique_ptr<Fresnel::Gradient> FresnelDielectric::backward(Expr<float> cosI, const SampledSpectrum &df) const noexcept {
+    // TODO
+    LUISA_WARNING_WITH_LOCATION("Not implemented.");
+
+    return luisa::make_unique<Fresnel::Gradient>();
 }
 
 SampledSpectrum BxDF::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *p) const noexcept {
@@ -417,11 +430,8 @@ MicrofacetReflection::Gradient MicrofacetReflection::backward(
     auto d_alpha = d_D * _distribution->grad_D(wh).dAlpha +
                    d_G * _distribution->grad_G(wo, wi).dAlpha;
     auto d_r = df * F * ite(valid, ans, 0.f);
-    // FIXME : we should deal with grads of different kinds of Fresnel here
-    //    if (auto _fres = dynamic_cast<SchlickFresnel *>(_fresnel))
-    //        d_r += d_F * _fres.grad(cosI_eval).dR0;
 
-    return {.dR = d_r, .dAlpha = d_alpha};
+    return {.dR = d_r, .dAlpha = d_alpha, .dFresnel = _fresnel->backward(cosI_eval, d_F)};
 }
 
 SampledSpectrum MicrofacetTransmission::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
