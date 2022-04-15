@@ -49,19 +49,17 @@ private:
     const Texture::Instance *_kd;
     const Texture::Instance *_ks;
     const Texture::Instance *_roughness;
-    bool _remap_roughness;
 
 public:
     SubstrateInstance(
         const Pipeline &pipeline, const Surface *surface,
         const Texture::Instance *Kd, const Texture::Instance *Ks,
-        const Texture::Instance *roughness, bool remap_roughness) noexcept
+        const Texture::Instance *roughness) noexcept
         : Surface::Instance{pipeline, surface},
-          _kd{Kd}, _ks{Ks}, _roughness{roughness}, _remap_roughness{remap_roughness} {}
+          _kd{Kd}, _ks{Ks}, _roughness{roughness} {}
     [[nodiscard]] auto Kd() const noexcept { return _kd; }
     [[nodiscard]] auto Ks() const noexcept { return _ks; }
     [[nodiscard]] auto roughness() const noexcept { return _roughness; }
-    [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
 
 private:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
@@ -75,7 +73,7 @@ luisa::unique_ptr<Surface::Instance> SubstrateSurface::_build(
     auto Ks = pipeline.build_texture(command_buffer, _ks);
     auto roughness = pipeline.build_texture(command_buffer, _roughness);
     return luisa::make_unique<SubstrateInstance>(
-        pipeline, this, Kd, Ks, roughness, remap_roughness());
+        pipeline, this, Kd, Ks, roughness);
 }
 
 class SubstrateClosure final : public Surface::Closure {
@@ -134,7 +132,7 @@ private:
         _instance->Kd()->backward_albedo_spectrum(_it, _swl, _time, grad.dRd);
         _instance->Ks()->backward_albedo_spectrum(_it, _swl, _time, grad.dRs);
         if (auto roughness = _instance->roughness()) {
-            auto remap = _instance->remap_roughness();
+            auto remap = _instance->node<SubstrateSurface>()->remap_roughness();
             auto r_f4 = roughness->evaluate(_it, _time);
             auto r = roughness->node()->channels() == 1u ? r_f4.xx() : r_f4.xy();
 

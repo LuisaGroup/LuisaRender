@@ -33,7 +33,7 @@ public:
           _eta{scene->load_texture(desc->property_node_or_default("eta"))},
           _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {
         if (_eta != nullptr) {
-            if (_eta->channels() == 2u) [[unlikely]] {
+            if (_eta->channels() == 2u || _eta->channels() == 4u) [[unlikely]] {
                 LUISA_ERROR(
                     "Invalid channel count {} "
                     "for PlasticSurface::eta.",
@@ -68,6 +68,10 @@ public:
         const Texture::Instance *roughness, const Texture::Instance *eta) noexcept
         : Surface::Instance{pipeline, surface},
           _kd{Kd}, _ks{Ks}, _roughness{roughness}, _eta{eta} {}
+    [[nodiscard]] auto Kd() const noexcept { return _kd; }
+    [[nodiscard]] auto Ks() const noexcept { return _ks; }
+    [[nodiscard]] auto roughness() const noexcept { return _roughness; }
+    [[nodiscard]] auto eta() const noexcept { return _eta; }
 
 private:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
@@ -153,8 +157,28 @@ private:
                          .eta = _eta_i}};
     }
     void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
-        // TODO
-        LUISA_WARNING_WITH_LOCATION("Not implemented.");
+        auto _instance = instance<PlasticInstance>();
+        auto wo_local = _it.wo_local();
+        auto wi_local = _it.shading().world_to_local(wi);
+        auto d_f_d = _lambert->backward(wo_local, wi_local, df);
+        auto d_f_s = _microfacet->backward(wo_local, wi_local, df);
+
+        if (auto roughness = _instance->roughness()) {
+            auto remap = _instance->node<PlasticSurface>()->remap_roughness();
+            auto r_f4 = roughness->evaluate(_it, _time);
+            auto r = roughness->node()->channels() == 1u ? r_f4.xx() : r_f4.xy();
+
+            auto grad_alpha_roughness = [](auto &&x) noexcept {
+                return TrowbridgeReitzDistribution::grad_alpha_roughness(x);
+            };
+            auto d_r = d_f_s.dAlpha * (remap ? grad_alpha_roughness(r) : make_float2(1.f));
+            auto d_r_f4 = roughness->node()->channels() == 1u ?
+                              make_float4(d_r.x + d_r.y, 0.f, 0.f, 0.f) :
+                              make_float4(d_r, 0.f, 0.f);
+            _instance->roughness()->backward(_it, _time, ite(isnan(d_r_f4), 0.f, d_r_f4));
+        }
+
+        // TODO : backward ks/kd/eta in PlasticInstance::_closure
     }
 };
 
@@ -199,7 +223,7 @@ luisa::unique_ptr<Surface::Closure> PlasticInstance::_closure(
     auto Kd_ratio = ite(Kd_lum <= 0.f, 0.f, Kd_lum / (Kd_lum + Ks_lum));
     return luisa::make_unique<PlasticClosure>(
         this, it, swl, time, eta, Kd, Ks,
-        alpha, clamp(Kd_ratio, .1f, .9f));
+        alpha, clamp(Kd_ratio, 0.1f, 0.9f));
 }
 
 }// namespace luisa::render

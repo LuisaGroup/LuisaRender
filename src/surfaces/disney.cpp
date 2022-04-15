@@ -390,7 +390,8 @@ public:
         Float dEta;
 
         explicit Gradient(SampledSpectrum dR0, Float dMetallic, Float dEta) noexcept
-            : dR0{std::move(dR0)}, dMetallic{std::move(dMetallic)}, dEta{std::move(dEta)} {}
+            : dR0{std::move(dR0)}, dMetallic{std::move(dMetallic)}, dEta{std::move(dEta)} {
+        }
     };
 
 private:

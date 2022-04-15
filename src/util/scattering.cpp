@@ -185,7 +185,7 @@ Float2 TrowbridgeReitzDistribution::roughness_to_alpha(Expr<float2> roughness) n
         roughness_to_alpha(roughness.y));
 }
 
-Float2 TrowbridgeReitzDistribution::grad_alpha_roughness(Float2 roughness) noexcept {
+Float2 TrowbridgeReitzDistribution::grad_alpha_roughness(Expr<float2> roughness) noexcept {
     return 2.f * roughness;
 }
 
@@ -210,8 +210,7 @@ Float TrowbridgeReitzDistribution::Lambda(Expr<float3> w) const noexcept {
     return ite(isinf(absTanTheta), 0.f, L);
 }
 
-[[nodiscard]] inline Float2 TrowbridgeReitzSample11(Float cosTheta, Float2 U) noexcept {
-
+[[nodiscard]] inline Float2 TrowbridgeReitzSample11(Expr<float> cosTheta, Expr<float2> U) noexcept {
     using namespace luisa::compute;
 
     // special case (normal incidence)
@@ -244,7 +243,7 @@ Float TrowbridgeReitzDistribution::Lambda(Expr<float3> w) const noexcept {
     return ite(cosTheta > .9999f, special_slope, slope);
 }
 
-[[nodiscard]] inline Float3 TrowbridgeReitzSample(Float3 wi, Float2 alpha, Float2 U) noexcept {
+[[nodiscard]] inline Float3 TrowbridgeReitzSample(Expr<float3> wi, Expr<float2> alpha, Expr<float2> U) noexcept {
 
     using compute::make_float2;
     using compute::make_float3;
@@ -438,6 +437,9 @@ SampledSpectrum MicrofacetTransmission::evaluate(Expr<float3> wo, Expr<float3> w
     auto cosThetaO = cos_theta(wo);
     auto cosThetaI = cos_theta(wi);
     auto refr = !same_hemisphere(wo, wi) & cosThetaO != 0.f & cosThetaI != 0.f;
+
+    //    SampledSpectrum eta(ite(cosThetaO > 0.f, _eta_b / _eta_a, _eta_a / _eta_b));
+    // TODO : why the codes above don't work?
     SampledSpectrum eta{_eta_a.dimension()};
     for (auto i = 0u; i < eta.dimension(); i++) {
         eta[i] = ite(
@@ -445,6 +447,7 @@ SampledSpectrum MicrofacetTransmission::evaluate(Expr<float3> wo, Expr<float3> w
             _eta_b[i] / _eta_a[i],
             _eta_a[i] / _eta_b[i]);
     }
+
     // Compute $\wh$ from $\wo$ and $\wi$ for microfacet transmission
     auto G = _distribution->G(wo, wi);
     return eta.map([&](auto i, auto e) noexcept {
@@ -503,42 +506,14 @@ Float MicrofacetTransmission::pdf(Expr<float3> wo, Expr<float3> wi) const noexce
 MicrofacetTransmission::Gradient MicrofacetTransmission::backward(
     Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
 
+    auto cosThetaO = cos_theta(wo);
+    auto cosThetaI = cos_theta(wi);
+    auto refr = !same_hemisphere(wo, wi) & cosThetaO != 0.f & cosThetaI != 0.f;
+
     // TODO
     LUISA_WARNING_WITH_LOCATION("Not implemented.");
 
-    //    auto cosThetaO = cos_theta(wo);
-    //    auto cosThetaI = cos_theta(wi);
-    //    // Compute $\wh$ from $\wo$ and $\wi$ for microfacet transmission
-    //    auto eta = ite(cosThetaO > 0.f, _eta_b / _eta_a, _eta_a / _eta_b)[0];// TODO
-    //    auto wh = normalize(wo + wi * eta);
-    //    wh = compute::sign(cos_theta(wh)) * wh;
-    //    auto sqrtDenom = dot(wo, wh) + eta * dot(wi, wh);
-    //    auto factor = 1.f / eta;
-    //    auto F = _fresnel.evaluate(dot(wo, wh));
-    //    auto D = _distribution->D(wh);
-    //    auto G = _distribution->G(wo, wi);
-    //    auto f = (1.f - F) * _t * sqr(factor) *
-    //             abs(D * G * sqr(eta) * abs_dot(wi, wh) * abs_dot(wo, wh) /
-    //                 (cosThetaI * cosThetaO * sqr(sqrtDenom)));
-    //    auto valid = !same_hemisphere(wo, wi) &
-    //                 cosThetaO != 0.f & cosThetaI != 0.f &
-    //                 dot(wo, wh) * dot(wi, wh) < 0.f;
-    //
-    //    // backward
-    //    auto k_0 = abs(D * G * sqr(eta) * dot(wi, wh) * dot(wo, wh) /
-    //                   (cosThetaI * cosThetaO * sqr(sqrtDenom)));
-    //    auto d_f = ite(valid, 1.f, 0.f);
-    //    auto d_t = d_f * (1.f - F) * sqr(factor) * k_0;
-    //    auto d_F = -d_f * _t * sqr(factor) * k_0;
-    //    auto d_factor = d_f * (1.f - F) * _t * k_0 * 2.f * factor;
-    //    auto d_sqrtDenom = d_f * (1.f - F) * _t * sqr(factor) * k_0 / sqrtDenom * (-2.f);
-    //    //    auto d_wh = d_f * (1.f - F) * _t * sqr(factor) * D * G * sqr(eta) *
-    //    //                abs(D * G * sqr(eta) *
-    //    //                    (wi * dot(wo, wh) + abs_dot(wi, wh) * wo) /
-    //    //                    (cosThetaI * cosThetaO * sqr(sqrtDenom)));
-    //    auto d_eta = -d_factor / sqr(eta);// TODO
-
-    return {.dT = SampledSpectrum(4u), .dAlpha = make_float2(0.f)};
+    return {.dT = SampledSpectrum(df.dimension(), 0.f), .dAlpha = make_float2(0.f)};
 }
 
 OrenNayar::OrenNayar(SampledSpectrum R, Expr<float> sigma) noexcept

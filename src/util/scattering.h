@@ -63,7 +63,7 @@ struct TrowbridgeReitzDistribution : public MicrofacetDistribution {
 
     [[nodiscard]] Gradient grad_D(Expr<float3> wh) const noexcept override;
     [[nodiscard]] Gradient grad_Lambda(Expr<float3> w) const noexcept override;
-    [[nodiscard]] static Float2 grad_alpha_roughness(Float2 roughness) noexcept;
+    [[nodiscard]] static Float2 grad_alpha_roughness(Expr<float2> roughness) noexcept;
 };
 
 [[nodiscard]] Float fresnel_dielectric(Float cosThetaI, Float etaI, Float etaT) noexcept;
