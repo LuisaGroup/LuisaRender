@@ -33,9 +33,9 @@ Surface mat-wood : Substrate {
     v { 1.5 }
   }
   roughness : Constant {
-    //v { 0.3872983346207417 }
-    v { 0.9 }
-    requires_grad { true }
+     v { 0.3872983346207417 }
+    //v { 0.9 }
+    //requires_grad { true }
     range { 0.1, 0.9 }
   }
 }
@@ -85,14 +85,14 @@ Surface cbox-green : Matte {
 
 Surface mix : Mix {
   a {
-    Matte  {
-      Kd : Constant {
-        v { 0.3, 0.8, 0.14 }
-        requires_grad { true }
-        range { 0, 1 }
-      }
-    }
-    //@cbox-red
+    //Matte  {
+    //  Kd : Constant {
+    //    v { 0.3, 0.8, 0.14 }
+    //    requires_grad { true }
+    //    range { 0, 1 }
+    //  }
+    //}
+    @cbox-red
   }
   b {
     //Matte  {
@@ -109,6 +109,18 @@ Surface mix : Mix {
     //v { 0.2 }
     //requires_grad { true }
     range { 0, 1 }
+  }
+}
+
+Surface mirror : Mirror {
+  color : Constant {
+    //v { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
+    v { 0.6, 0.2, 0.7 }
+    requires_grad { true }
+    range { 0, 1 }
+  }
+  roughness : Constant {
+    v { 0 }
   }
 }
 
@@ -134,12 +146,12 @@ Shape cbox-right-wall : Mesh {
 
 Shape cbox-back-wall : Mesh {
   file { "../meshes/cbox-parts/back-wall.obj" }
-  surface { @mix }
+  surface { @mat-wood }
 }
 
 Shape cbox-tall-box : Mesh {
   file { "../meshes/cbox-parts/tall-box.obj" }
-  surface { @cbox-white }
+  surface { @mirror }
 }
 
 Shape cbox-short-box : Mesh {
@@ -174,12 +186,12 @@ Camera camera0 : Pinhole {
   fov { 27.8 }
   spp { 512 }
   film { @film }
-  file { "../renders/cbox-mix-diff-0.exr" }
+  file { "../renders/cbox-mirror-diff-0.exr" }
   filter : Gaussian {
     radius { 1 }
   }
   target : Image {
-    file { "../renders/cbox-mix-ref-4096spp-0.exr" }
+    file { "../renders/cbox-mirror-ref-4096spp-0.exr" }
   }
 }
 
@@ -189,12 +201,12 @@ Camera camera1 : Pinhole {
   fov { 40 }
   spp { 512 }
   film { @film }
-  file { "../renders/cbox-mix-diff-1.exr" }
+  file { "../renders/cbox-mirror-diff-1.exr" }
   filter : Gaussian {
     radius { 1 }
   }
   target : Image {
-    file { "../renders/cbox-mix-ref-4096spp-1.exr" }
+    file { "../renders/cbox-mirror-ref-4096spp-1.exr" }
   }
 }
 

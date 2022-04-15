@@ -378,8 +378,7 @@ SampledSpectrum MicrofacetReflection::sample(Expr<float3> wo, Float3 *wi, Expr<f
     auto wh = _distribution->sample_wh(wo, u);
     *wi = reflect(wo, wh);
     auto valid = same_hemisphere(wo, *wi) &
-                 same_hemisphere(wo, wh) &
-                 same_hemisphere(wo, *wi);
+                 same_hemisphere(wo, wh);
     // Compute PDF of _wi_ for microfacet reflection
     *p = ite(valid, _distribution->pdf(wo, wh) / (4.f * dot(wo, wh)), 0.f);
     return evaluate(wo, *wi);
@@ -399,7 +398,8 @@ MicrofacetReflection::Gradient MicrofacetReflection::backward(
     auto wh = wi + wo;
     auto valid = same_hemisphere(wo, wi) & any(wh != 0.f);
     wh = normalize(wh);
-    auto F = _fresnel->evaluate(dot(wi, face_forward(wh, make_float3(0.f, 0.f, 1.f))));
+    auto cosI_eval = dot(wi, face_forward(wh, make_float3(0.f, 0.f, 1.f)));
+    auto F = _fresnel->evaluate(cosI_eval);
     auto D = _distribution->D(wh);
     auto G = _distribution->G(wo, wi);
     auto cos_o = cos_theta(wo);
@@ -409,14 +409,17 @@ MicrofacetReflection::Gradient MicrofacetReflection::backward(
     auto ans = abs(k1);
 
     // backward
-    auto d_r = df * F * ite(valid, ans, 0.f);
-    auto d_ans = df.dot(_r * F) * ite(valid, 1.f, 0.f);
+    auto d_ans = (df * _r * F).sum() * ite(valid, 1.f, 0.f);
     auto d_F = df * _r * ite(valid, ans, 0.f);
     auto k2 = d_ans * sign(k1) * k0;
     auto d_D = k2 * G;
     auto d_G = k2 * D;
     auto d_alpha = d_D * _distribution->grad_D(wh).dAlpha +
                    d_G * _distribution->grad_G(wo, wi).dAlpha;
+    auto d_r = df * F * ite(valid, ans, 0.f);
+    // FIXME : we should deal with grads of different kinds of Fresnel here
+    //    if (auto _fres = dynamic_cast<SchlickFresnel *>(_fresnel))
+    //        d_r += d_F * _fres.grad(cosI_eval).dR0;
 
     return {.dR = d_r, .dAlpha = d_alpha};
 }
@@ -578,8 +581,8 @@ OrenNayar::Gradient OrenNayar::backward(
     auto a_sigma2 = -0.165f / sqr(sigma2 + 0.33f);
     auto b_sigma2 = 0.0405f / sqr(sigma2 + 0.09f);
     auto d_r = df * inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta);
-    auto d_a = df.dot(_r * inv_pi);
-    auto d_b = df.dot(_r * inv_pi * maxCos * sinAlpha * tanBeta);
+    auto d_a = (df * _r).sum() * inv_pi;
+    auto d_b = (df * _r).sum() * inv_pi * maxCos * sinAlpha * tanBeta;
     auto d_sigma2 = d_a * a_sigma2 + d_b * b_sigma2;
     auto d_sigma = d_sigma2 * sigma2_sigma;
     return {.dR = d_r, .dSigma = d_sigma};
@@ -665,7 +668,7 @@ FresnelBlend::Gradient FresnelBlend::backward(
 
     auto d_rd = dv * (diffuse_rd);
     auto d_rs = dv * (diffuse_rs + specular_rs);
-    auto d_alpha = dv.dot(Schlick(dot(wi, wh))) * _distribution->grad_D(wh).dAlpha /
+    auto d_alpha = (dv * Schlick(dot(wi, wh))).sum() * _distribution->grad_D(wh).dAlpha /
                    (4.f * abs_dot(wi, wh) * max(absCosThetaI, absCosThetaO));
     return {.dRd = d_rd, .dRs = d_rs, .dAlpha = d_alpha};
 }

@@ -120,34 +120,11 @@ public:
     [[nodiscard]] auto operator-() const noexcept {
         return map([](auto, auto s) noexcept { return -s; });
     }
-
-    [[nodiscard]] Float dot(Expr<float> t) const noexcept {
-        Float ans = 0.f;
-        for (auto i = 0u; i < dimension(); i++) { ans += (*this)[i]; }
-        return ans * t;
+    [[nodiscard]] auto isnan() const noexcept {
+        return map([](auto, auto s) noexcept { return compute::isnan(s); });
     }
-    [[nodiscard]] Float dot(const Float &t) const noexcept {
-        Float ans = 0.f;
-        for (auto i = 0u; i < dimension(); i++) { ans += (*this)[i]; }
-        return ans * t;
-    }
-    [[nodiscard]] Float dot(const Float3 &t) const noexcept {
-        LUISA_ASSERT(3u == dimension(), "dimension error in dot operation");
-        Float ans = 0.f;
-        for (auto i = 0u; i < 3u; i++) { ans += (*this)[i] * t[i]; }
-        return ans;
-    }
-    [[nodiscard]] Float dot(const Float4 &t) const noexcept {
-        LUISA_ASSERT(4u == dimension(), "dimension error in dot operation");
-        Float ans = 0.f;
-        for (auto i = 0u; i < 4u; i++) { ans += (*this)[i] * t[i]; }
-        return ans;
-    }
-    [[nodiscard]] Float dot(const SampledSpectrum &t) const noexcept {
-        LUISA_ASSERT(t.dimension() == dimension(), "dimension error in dot operation");
-        Float ans = 0.f;
-        for (auto i = 0u; i < dimension(); i++) { ans += (*this)[i] * t[i]; }
-        return ans;
+    [[nodiscard]] auto abs() const noexcept {
+        return map([](auto, auto s) noexcept { return compute::abs(s); });
     }
 
 #define LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP(op)                            \
@@ -175,12 +152,6 @@ public:
 #undef LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP
 };
 
-SampledSpectrum isnan(const SampledSpectrum &t) noexcept;
-
-Bool any(const SampledSpectrum &t) noexcept;
-Bool all(const SampledSpectrum &t) noexcept;
-
-SampledSpectrum ite(const SampledSpectrum &p,
-                    const SampledSpectrum &t, const SampledSpectrum &f) noexcept;
+SampledSpectrum any_nan2zero(const SampledSpectrum &t) noexcept;
 
 }// namespace luisa::render

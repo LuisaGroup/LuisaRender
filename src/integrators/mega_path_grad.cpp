@@ -258,7 +258,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
                 case Loss::L1:
                     // L1 loss
                     return ite(
-                        camera->film()->read(pixel_id).average - camera->target()->evaluate(it, time).xyz() >= 0.0f,
+                        camera->film()->read(pixel_id).average >= camera->target()->evaluate(it, time).xyz(),
                         1.0f,
                         -1.0f);
                 case Loss::L2:
