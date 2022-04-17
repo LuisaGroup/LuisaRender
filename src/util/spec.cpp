@@ -3,6 +3,7 @@
 //
 
 #include <dsl/syntax.h>
+#include <dsl/sugar.h>
 #include <util/spec.h>
 
 namespace luisa::render {
@@ -438,6 +439,32 @@ float DenselySampledSpectrum::cie_y_integral() noexcept {
         return static_cast<float>(sum);
     }();
     return integral;
+}
+
+SampledSpectrum any_nan2zero(const SampledSpectrum &t) noexcept {
+    SampledSpectrum ans = t;
+    $if(t.any([](const auto &value) {
+        return isnan(value);
+    })) {
+        ans = 0.f;
+    };
+    return ans;
+}
+SampledSpectrum SampledSpectrum::ite(const SampledSpectrum &p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept {
+    SampledSpectrum ans = f;
+    for (auto i = 0u; i < ans.dimension(); i++) {
+        $if(p[i] != 0.f) {
+            ans[i] = t[i];
+        };
+    }
+    return ans;
+}
+SampledSpectrum SampledSpectrum::ite(Expr<bool> p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept {
+    SampledSpectrum ans = f;
+    $if(p) {
+        ans = t;
+    };
+    return ans;
 }
 
 }// namespace luisa::render

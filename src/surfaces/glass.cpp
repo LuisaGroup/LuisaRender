@@ -52,8 +52,8 @@ class GlassSurface final : public Surface {
 private:
     const Texture *_kr;
     const Texture *_kt;
-    const Texture *_roughness{nullptr};
-    const Texture *_eta{nullptr};
+    const Texture *_roughness;
+    const Texture *_eta;
     bool _remap_roughness;
 
 public:
@@ -75,7 +75,7 @@ public:
             }
         } else {
             if ((_eta = scene->load_texture(desc->property_node_or_default("eta")))) {
-                if (_eta->channels() == 2u) [[unlikely]] {
+                if (_eta->channels() == 2u || _eta->channels() == 4u) [[unlikely]] {
                     LUISA_ERROR(
                         "Invalid channel count {} "
                         "for GlassSurface::eta.",
@@ -100,8 +100,8 @@ class GlassInstance final : public Surface::Instance {
 private:
     const Texture::Instance *_kr;
     const Texture::Instance *_kt;
-    const Texture::Instance *_roughness{nullptr};
-    const Texture::Instance *_eta{nullptr};
+    const Texture::Instance *_roughness;
+    const Texture::Instance *_eta;
 
 public:
     GlassInstance(

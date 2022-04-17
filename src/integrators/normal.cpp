@@ -2,7 +2,7 @@
 // Created by Mike on 2022/1/7.
 //
 
-#include <tinyexr.h>
+#include <util/imageio.h>
 
 #include <base/pipeline.h>
 #include <base/integrator.h>
@@ -41,32 +41,18 @@ NormalVisualizerInstance::NormalVisualizerInstance(
     : Integrator::Instance{pipeline, cb, integrator} {}
 
 void NormalVisualizerInstance::render(Stream &stream) noexcept {
-    luisa::vector<float> pixels;
+    luisa::vector<float4> pixels;
     auto command_buffer = stream.command_buffer();
     for (auto i = 0u; i < pipeline().camera_count(); i++) {
         auto camera = pipeline().camera(i);
         auto resolution = camera->film()->node()->resolution();
         auto pixel_count = resolution.x * resolution.y;
         _render_one_camera(command_buffer, camera);
-        pixels.resize(next_pow2(pixel_count) * 4u);
+        pixels.resize(next_pow2(pixel_count));
         camera->film()->download(command_buffer, reinterpret_cast<float4 *>(pixels.data()));
         command_buffer << compute::synchronize();
         auto film_path = camera->node()->file();
-        if (film_path.extension() != ".exr") [[unlikely]] {
-            LUISA_WARNING_WITH_LOCATION(
-                "Unexpected film file extension. "
-                "Changing to '.exr'.");
-            film_path.replace_extension(".exr");
-        }
-        auto size = make_int2(resolution);
-        const char *err = nullptr;
-        SaveEXR(pixels.data(), size.x, size.y, 4, false,
-                film_path.string().c_str(), &err);
-        if (err != nullptr) [[unlikely]] {
-            LUISA_ERROR_WITH_LOCATION(
-                "Failed to save film to '{}'.",
-                film_path.string());
-        }
+        save_image(film_path, (const float *)pixels.data(), resolution);
     }
 }
 
