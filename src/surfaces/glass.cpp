@@ -208,12 +208,6 @@ public:
 
 luisa::unique_ptr<Surface::Closure> GlassInstance::_closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    auto Kr_rgb = saturate(_kr->evaluate(it, time).xyz());
-    auto Kt_rgb = saturate(_kt->evaluate(it, time).xyz());
-    auto Kr_lum = srgb_to_cie_y(Kr_rgb);
-    auto Kt_lum = srgb_to_cie_y(Kt_rgb);
-    auto Kr = swl.albedo_from_srgb(Kr_rgb);
-    auto Kt = swl.albedo_from_srgb(Kt_rgb);
     auto alpha = def(make_float2(0.f));
     if (_roughness != nullptr) {
         auto r = _roughness->evaluate(it, time);
@@ -223,6 +217,15 @@ luisa::unique_ptr<Surface::Closure> GlassInstance::_closure(
                     (remap ? make_float2(r2a(r.x)) : r.xx()) :
                     (remap ? r2a(r.xy()) : r.xy());
     }
+
+    auto Kr_rgb = saturate(_kr->evaluate(it, time).xyz());
+    auto Kt_rgb = saturate(_kt->evaluate(it, time).xyz());
+    auto Kr_lum = srgb_to_cie_y(Kr_rgb);
+    auto Kt_lum = srgb_to_cie_y(Kt_rgb);
+    auto Kr = swl.albedo_from_srgb(Kr_rgb);
+    auto Kt = swl.albedo_from_srgb(Kt_rgb);
+    auto Kr_ratio = ite(Kr_lum == 0.f, 0.f, sqrt(Kr_lum) / (sqrt(Kr_lum) + sqrt(Kt_lum)));
+
     SampledSpectrum eta{swl.dimension(), 1.5f};
     if (_eta != nullptr) {
         if (_eta->node()->channels() == 1u) {
@@ -239,10 +242,11 @@ luisa::unique_ptr<Surface::Closure> GlassInstance::_closure(
             }
         }
     }
+
     auto cos_o = cos_theta(it.wo_local());
     auto mean_eta = eta.average();
     auto Fr = fresnel_dielectric(cos_o, 1.f, mean_eta);
-    auto Kr_ratio = ite(Kr_lum == 0.f, 0.f, sqrt(Kr_lum) / (sqrt(Kr_lum) + sqrt(Kt_lum)));
+
     return luisa::make_unique<GlassClosure>(
         this, it, swl, time, Kr, Kt, eta,
         alpha, clamp(Fr * Kr_ratio, 0.1f, 0.9f));

@@ -362,7 +362,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
 
                         // radiative bp
                         // Li * d_fs
-                        closure->backward(sample.wi, grad_weight * beta * Li);
+                        closure->backward(sample.wi, grad_weight * beta * Li * w);
 
                         // d_Li * fs
                         beta *= abs(dot(sample.eval.normal, sample.wi)) * w * sample.eval.f;

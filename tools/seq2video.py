@@ -37,7 +37,7 @@ if __name__ == "__main__":
     import cv2 as cv
 
     folder = argv[1]
-    frame_rate = argv[2]
+    frame_rate = int(argv[2])
 
     files = sorted(f for f in listdir(folder) if f.endswith(".exr") and not f.startswith("dump-"))
     print(f"Reading images from '{folder}'...")
