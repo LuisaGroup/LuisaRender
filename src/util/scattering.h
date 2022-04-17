@@ -81,7 +81,9 @@ struct Fresnel {
 
     virtual ~Fresnel() noexcept = default;
     [[nodiscard]] virtual SampledSpectrum evaluate(Expr<float> cosI) const noexcept = 0;
-    [[nodiscard]] virtual luisa::unique_ptr<Gradient> backward(Expr<float> cosI, const SampledSpectrum &df) const noexcept = 0;
+    [[nodiscard]] virtual luisa::unique_ptr<Gradient> backward(Expr<float> cosI, const SampledSpectrum &df) const noexcept {
+        return luisa::make_unique<Fresnel::Gradient>();
+    }
 };
 
 class FresnelConductor final : public Fresnel {
@@ -95,7 +97,6 @@ public:
     FresnelConductor(SampledSpectrum etaI, SampledSpectrum etaT, SampledSpectrum k) noexcept
         : _eta_i{std::move(etaI)}, _eta_t{std::move(etaT)}, _k{std::move(k)} {}
     [[nodiscard]] SampledSpectrum evaluate(Expr<float> cosThetaI) const noexcept override;
-    [[nodiscard]] luisa::unique_ptr<Fresnel::Gradient> backward(Expr<float> cosI, const SampledSpectrum &df) const noexcept override;
 };
 
 class FresnelDielectric final : public Fresnel {
@@ -109,7 +110,6 @@ public:
     [[nodiscard]] auto eta_i() const noexcept { return _eta_i; }
     [[nodiscard]] auto eta_t() const noexcept { return _eta_t; }
     [[nodiscard]] SampledSpectrum evaluate(Expr<float> cosThetaI) const noexcept override;
-    [[nodiscard]] luisa::unique_ptr<Fresnel::Gradient> backward(Expr<float> cosI, const SampledSpectrum &df) const noexcept override;
 };
 
 struct BxDF {

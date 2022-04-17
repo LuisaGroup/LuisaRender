@@ -456,7 +456,7 @@ SampledSpectrum any_nan2zero(const SampledSpectrum &t) noexcept {
     };
     return ans;
 }
-SampledSpectrum ite(const SampledSpectrum &p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept {
+SampledSpectrum SampledSpectrum::ite(const SampledSpectrum &p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept {
     SampledSpectrum ans = f;
     for (auto i = 0u; i < ans.dimension(); i++) {
         $if(p[i] != 0.f) {
@@ -465,7 +465,7 @@ SampledSpectrum ite(const SampledSpectrum &p, const SampledSpectrum &t, const Sa
     }
     return ans;
 }
-SampledSpectrum ite(Expr<bool> p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept {
+SampledSpectrum SampledSpectrum::ite(Expr<bool> p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept {
     SampledSpectrum ans = f;
     $if(p) {
         ans = t;
