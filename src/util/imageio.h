@@ -77,8 +77,8 @@ private:
     luisa::vector<std::byte> _data;
 
 public:
-
-
 };
+
+void save_image(std::filesystem::path path, const float *pixels, uint2 resolution) noexcept;
 
 }// namespace luisa::render

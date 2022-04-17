@@ -8,6 +8,8 @@
 #include <base/pipeline.h>
 #include <base/scene.h>
 
+#include <utility>
+
 namespace luisa::render {
 
 class MirrorSurface final : public Surface {
@@ -46,7 +48,11 @@ public:
     MirrorInstance(
         const Pipeline &pipeline, const Surface *surface,
         const Texture::Instance *color, const Texture::Instance *roughness) noexcept
-        : Surface::Instance{pipeline, surface}, _color{color}, _roughness{roughness} {}
+        : Surface::Instance{pipeline, surface},
+          _color{color},
+          _roughness{roughness} {}
+    [[nodiscard]] auto color() const noexcept { return _color; }
+    [[nodiscard]] auto roughness() const noexcept { return _roughness; }
 
 private:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
@@ -65,8 +71,11 @@ using namespace luisa::compute;
 class SchlickFresnel final : public Fresnel {
 
 public:
-    struct Gradient {
+    struct Gradient : public Fresnel::Gradient {
         SampledSpectrum dR0;
+
+        explicit Gradient(SampledSpectrum dR0) noexcept
+            : dR0{std::move(dR0)} {}
     };
 
 private:
@@ -81,9 +90,11 @@ public:
             return lerp(R, 1.f, weight);
         });
     }
-    [[nodiscard]] Gradient backward(Expr<float> cosI, const SampledSpectrum &dFr) const noexcept {
-        // TODO
-        LUISA_ERROR_WITH_LOCATION("Not implemented.");
+    [[nodiscard]] luisa::unique_ptr<Fresnel::Gradient> backward(Expr<float> cosI,
+                                                                const SampledSpectrum &df) const noexcept override {
+        auto m = saturate(1.f - cosI);
+        auto weight = sqr(sqr(m)) * m;
+        return luisa::make_unique<SchlickFresnel::Gradient>(df * weight);
     }
 };
 
@@ -127,8 +138,27 @@ public:
     }
 
     void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
-        // TODO
-        LUISA_WARNING_WITH_LOCATION("Not implemented.");
+        auto _instance = instance<MirrorInstance>();
+        auto wo_local = _it.wo_local();
+        auto wi_local = _it.shading().world_to_local(wi);
+        auto grad = _refl->backward(wo_local, wi_local, df);
+        auto d_fresnel = dynamic_cast<SchlickFresnel::Gradient *>(grad.dFresnel.get());
+
+        _instance->color()->backward_albedo_spectrum(_it, _swl, _time, grad.dR + d_fresnel->dR0);
+        if (auto roughness = _instance->roughness()) {
+            auto remap = _instance->node<MirrorSurface>()->remap_roughness();
+            auto r_f4 = roughness->evaluate(_it, _time);
+            auto r = roughness->node()->channels() == 1u ? r_f4.xx() : r_f4.xy();
+
+            auto grad_alpha_roughness = [](auto &&x) noexcept {
+                return TrowbridgeReitzDistribution::grad_alpha_roughness(x);
+            };
+            auto d_r = grad.dAlpha * (remap ? grad_alpha_roughness(r) : make_float2(1.f));
+            auto d_r_f4 = roughness->node()->channels() == 1u ?
+                              make_float4(d_r.x + d_r.y, 0.f, 0.f, 0.f) :
+                              make_float4(d_r, 0.f, 0.f);
+            _instance->roughness()->backward(_it, _time, ite(isnan(d_r_f4), 0.f, d_r_f4));
+        }
     }
 };
 
@@ -138,7 +168,9 @@ luisa::unique_ptr<Surface::Closure> MirrorInstance::_closure(
     if (_roughness != nullptr) {
         auto r = _roughness->evaluate(it, time);
         auto remap = node<MirrorSurface>()->remap_roughness();
-        auto r2a = [](auto &&x) noexcept { return TrowbridgeReitzDistribution::roughness_to_alpha(x); };
+        auto r2a = [](auto &&x) noexcept {
+            return TrowbridgeReitzDistribution::roughness_to_alpha(x);
+        };
         alpha = _roughness->node()->channels() == 1u ?
                     (remap ? make_float2(r2a(r.x)) : r.xx()) :
                     (remap ? r2a(r.xy()) : r.xy());

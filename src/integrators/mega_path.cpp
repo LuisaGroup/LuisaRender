@@ -2,7 +2,7 @@
 // Created by Mike Smith on 2022/1/10.
 //
 
-#include <tinyexr.h>
+#include <util/imageio.h>
 #include <luisa-compute.h>
 
 #include <util/medium_tracker.h>
@@ -144,21 +144,7 @@ public:
             camera->film()->download(command_buffer, _pixels.data());
             command_buffer << compute::synchronize();
             auto film_path = camera->node()->file();
-            if (film_path.extension() != ".exr") [[unlikely]] {
-                LUISA_WARNING_WITH_LOCATION(
-                    "Unexpected film file extension. "
-                    "Changing to '.exr'.");
-                film_path.replace_extension(".exr");
-            }
-            auto size = make_int2(resolution);
-            const char *err = nullptr;
-            SaveEXR(reinterpret_cast<const float *>(_pixels.data()),
-                    size.x, size.y, 4, false, film_path.string().c_str(), &err);
-            if (err != nullptr) [[unlikely]] {
-                LUISA_ERROR_WITH_LOCATION(
-                    "Failed to save film to '{}'.",
-                    film_path.string());
-            }
+            save_image(film_path, (const float *)_pixels.data(), resolution);
         }
         while (_window && !_window->should_close()) {
             _window->run_one_frame([] {});

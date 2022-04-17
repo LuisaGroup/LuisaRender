@@ -2,7 +2,7 @@
 // Created by Mike Smith on 2022/1/10.
 //
 
-#include <tinyexr.h>
+#include <util/imageio.h>
 #include <luisa-compute.h>
 
 #include <util/medium_tracker.h>
@@ -224,7 +224,7 @@ public:
             auto camera = pipeline().camera(i);
             auto resolution = camera->film()->node()->resolution();
             auto pixel_count = resolution.x * resolution.y;
-            pixels.resize(next_pow2(pixel_count) * 4u);
+            pixels.resize(next_pow2(pixel_count));
             auto film_path = camera->node()->file();
             LUISA_INFO(
                 "Rendering to '{}' of resolution {}x{} at {}spp.",
@@ -234,23 +234,7 @@ public:
             _render_one_camera(command_buffer, camera);
             camera->film()->download(command_buffer, pixels.data());
             command_buffer << compute::synchronize();
-            if (film_path.extension() != ".exr") [[unlikely]] {
-                LUISA_WARNING_WITH_LOCATION(
-                    "Unexpected film file extension. "
-                    "Changing to '.exr'.");
-                film_path.replace_extension(".exr");
-            }
-            auto size = make_int2(resolution);
-            const char *err = nullptr;
-            LUISA_INFO("Saving rendering to '{}' at resolution {}x{}.",
-                       film_path.string(), resolution.x, resolution.y);
-            SaveEXR(reinterpret_cast<const float *>(pixels.data()),
-                    size.x, size.y, 4, false, film_path.string().c_str(), &err);
-            if (err != nullptr) [[unlikely]] {
-                LUISA_ERROR_WITH_LOCATION(
-                    "Failed to save film to '{}'.",
-                    film_path.string());
-            }
+            save_image(film_path, (const float *)pixels.data(), resolution);
         }
     }
 };

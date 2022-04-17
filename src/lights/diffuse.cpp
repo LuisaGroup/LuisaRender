@@ -107,15 +107,12 @@ struct DiffuseLightClosure final : public Light::Closure {
         auto cos_wo = dot(it_light.wo(), it_light.shading().n());
         auto front_face = cos_wo > 0.0f;
 
-        auto L = light->texture()->evaluate_illuminant_spectrum(it_light, _swl, _time) *
-                 light->node<DiffuseLight>()->scale();
-
         auto d_L = df * ite(front_face, 1.f, 0.f);
         auto d_texture = d_L * light->node<DiffuseLight>()->scale();
-        auto d_scale = d_L.dot(light->texture()->evaluate_illuminant_spectrum(it_light, _swl, _time));
+        auto d_scale = (d_L * light->texture()->evaluate_illuminant_spectrum(it_light, _swl, _time)).sum();
 
         light->texture()->backward_albedo_spectrum(it_light, _swl, _time, d_texture);
-        // TODO : scale
+        // TODO : backward scale
     }
 };
 

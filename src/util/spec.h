@@ -58,32 +58,20 @@ private:
     Local<float> _samples;
 
 public:
-    explicit SampledSpectrum(Float3 s) noexcept : _samples{3u} {
-        for (auto i = 0u; i < 3u; ++i) { _samples[i] = s[i]; }
+    explicit SampledSpectrum(size_t n, Expr<float> value = 0.f) noexcept : _samples{n} {
+        for (auto i = 0u; i < n; i++) { _samples[i] = value; }
     }
-    explicit SampledSpectrum(Float4 s) noexcept : _samples{4u} {
-        for (auto i = 0u; i < 4u; ++i) { _samples[i] = s[i]; }
-    }
-    explicit SampledSpectrum(size_t n, Expr<float> s = 0.f) noexcept : _samples{n} {
-        for (auto i = 0u; i < n; i++) { _samples[i] = s; }
+    auto &operator=(Expr<float> value) noexcept {
+        for (auto i = 0u; i < dimension(); i++) { _samples[i] = value; }
+        return *this;
     }
     [[nodiscard]] uint dimension() const noexcept {
         return static_cast<uint>(_samples.size());
     }
     [[nodiscard]] Local<float> &values() noexcept { return _samples; }
     [[nodiscard]] const Local<float> &values() const noexcept { return _samples; }
-    [[nodiscard]] Float &at(Expr<uint> i) noexcept { return _samples[i]; }
-    [[nodiscard]] Float at(Expr<uint> i) const noexcept { return _samples[i]; }
-    [[nodiscard]] Float &operator[](Expr<uint> i) noexcept { return at(i); }
-    [[nodiscard]] Float operator[](Expr<uint> i) const noexcept { return at(i); }
-    template<typename F>
-    void for_each(F &&f) noexcept {
-        for (auto i = 0u; i < dimension(); i++) { f(i, (*this)[i]); }
-    }
-    template<typename F>
-    void for_each(F &&f) const noexcept {
-        for (auto i = 0u; i < dimension(); i++) { f(i, Expr{(*this)[i]}); }
-    }
+    [[nodiscard]] Float &operator[](Expr<uint> i) noexcept { return _samples[i]; }
+    [[nodiscard]] Float operator[](Expr<uint> i) const noexcept { return _samples[i]; }
     template<typename F>
     [[nodiscard]] auto map(F &&f) const noexcept {
         SampledSpectrum s{_samples.size()};
@@ -105,11 +93,11 @@ public:
     }
     template<typename F>
     [[nodiscard]] auto any(F &&f) const noexcept {
-        return reduce(false, [&f](auto r, auto, auto s) noexcept { return r | f(s); });
+        return reduce(false, [&f](auto ans, auto, auto value) noexcept { return ans | f(value); });
     }
     template<typename F>
     [[nodiscard]] auto all(F &&f) const noexcept {
-        return reduce(true, [&f](auto r, auto, auto s) noexcept { return r & f(s); });
+        return reduce(true, [&f](auto ans, auto, auto value) noexcept { return ans & f(value); });
     }
     template<typename F>
     [[nodiscard]] auto none(F &&f) const noexcept { return !any(std::forward<F>(f)); }
@@ -120,59 +108,42 @@ public:
     [[nodiscard]] auto operator-() const noexcept {
         return map([](auto, auto s) noexcept { return -s; });
     }
-
-    [[nodiscard]] Float dot(Expr<float> t) const noexcept {
-        Float ans = 0.f;
-        for (auto i = 0u; i < dimension(); i++) { ans += (*this)[i]; }
-        return ans * t;
+    [[nodiscard]] auto isnan() const noexcept {
+        return map([](auto, auto s) noexcept { return compute::isnan(s); });
     }
-    [[nodiscard]] Float dot(const Float &t) const noexcept {
-        Float ans = 0.f;
-        for (auto i = 0u; i < dimension(); i++) { ans += (*this)[i]; }
-        return ans * t;
-    }
-    [[nodiscard]] Float dot(const Float3 &t) const noexcept {
-        LUISA_ASSERT(3u == dimension(), "dimension error in dot operation");
-        Float ans = 0.f;
-        for (auto i = 0u; i < 3u; i++) { ans += (*this)[i] * t[i]; }
-        return ans;
-    }
-    [[nodiscard]] Float dot(const Float4 &t) const noexcept {
-        LUISA_ASSERT(4u == dimension(), "dimension error in dot operation");
-        Float ans = 0.f;
-        for (auto i = 0u; i < 4u; i++) { ans += (*this)[i] * t[i]; }
-        return ans;
-    }
-    [[nodiscard]] Float dot(const SampledSpectrum &t) const noexcept {
-        LUISA_ASSERT(t.dimension() == dimension(), "dimension error in dot operation");
-        Float ans = 0.f;
-        for (auto i = 0u; i < dimension(); i++) { ans += (*this)[i] * t[i]; }
-        return ans;
+    [[nodiscard]] auto abs() const noexcept {
+        return map([](auto, auto s) noexcept { return compute::abs(s); });
     }
 
-#define LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP(op)                            \
-    [[nodiscard]] auto operator op(Expr<float> rhs) const noexcept {                \
-        return map([rhs](auto, auto lhs) { return lhs op rhs; });                   \
-    }                                                                               \
-    [[nodiscard]] auto operator op(const SampledSpectrum &rhs) const noexcept {     \
-        return map([&rhs](auto i, auto lhs) { return lhs op rhs[i]; });             \
-    }                                                                               \
-    friend auto operator op(Expr<float> lhs, const SampledSpectrum &rhs) noexcept { \
-        return rhs.map([lhs](auto, auto r) noexcept { return lhs op r; });          \
-    }                                                                               \
-    SampledSpectrum &operator op##=(Expr<float> rhs) noexcept {                     \
-        for (auto i = 0u; i < dimension(); i++) { (*this)[i] op## = rhs; }          \
-        return *this;                                                               \
-    }                                                                               \
-    SampledSpectrum &operator op##=(const SampledSpectrum &rhs) noexcept {          \
-        for (auto i = 0u; i < dimension(); i++) { (*this)[i] op## = rhs[i]; }       \
-        return *this;                                                               \
+#define LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP(op)                                    \
+    [[nodiscard]] auto operator op(Expr<float> rhs) const noexcept {                        \
+        return map([rhs](auto, const auto &lvalue) { return lvalue op rhs; });              \
+    }                                                                                       \
+    [[nodiscard]] auto operator op(const SampledSpectrum &rhs) const noexcept {             \
+        return map([&rhs](auto i, const auto &lvalue) { return lvalue op rhs[i]; });        \
+    }                                                                                       \
+    friend auto operator op(Expr<float> lhs, const SampledSpectrum &rhs) noexcept {         \
+        return rhs.map([lhs](auto, const auto &rvalue) noexcept { return lhs op rvalue; }); \
+    }                                                                                       \
+    auto &operator op##=(Expr<float> rhs) noexcept {                                        \
+        for (auto i = 0u; i < dimension(); i++) { (*this)[i] op## = rhs; }                  \
+        return *this;                                                                       \
+    }                                                                                       \
+    auto &operator op##=(const SampledSpectrum &rhs) noexcept {                             \
+        for (auto i = 0u; i < dimension(); i++) { (*this)[i] op## = rhs[i]; }               \
+        return *this;                                                                       \
     }
     LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP(+)
     LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP(-)
     LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP(*)
     LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP(/)
 #undef LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP
+
+public:
+    static SampledSpectrum ite(const SampledSpectrum &p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept;
+    static SampledSpectrum ite(Expr<bool> p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept;
 };
+
+SampledSpectrum any_nan2zero(const SampledSpectrum &t) noexcept;
 
 }// namespace luisa::render

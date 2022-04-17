@@ -33,9 +33,9 @@ Surface mat-wood : Substrate {
     v { 1.5 }
   }
   roughness : Constant {
-    //v { 0.3872983346207417 }
-    v { 0.9 }
-    requires_grad { true }
+     v { 0.3872983346207417 }
+    //v { 0.9 }
+    //requires_grad { true }
     range { 0.1, 0.9 }
   }
 }
@@ -83,6 +83,71 @@ Surface cbox-green : Matte {
   }
 }
 
+Surface surface-mix : Mix {
+  a {
+    //Matte  {
+    //  Kd : Constant {
+    //    v { 0.3, 0.8, 0.14 }
+    //    requires_grad { true }
+    //    range { 0, 1 }
+    //  }
+    //}
+    @cbox-red
+  }
+  b {
+    //Matte  {
+    //  Kd : Constant {
+    //    v { 0.3, 0.8, 0.14 }
+    //    requires_grad { true }
+    //    range { 0, 1 }
+    //  }
+    //}
+    @cbox-green
+  }
+  ratio : Constant {
+    v { 0.7 }
+    //v { 0.2 }
+    //requires_grad { true }
+    range { 0, 1 }
+  }
+}
+
+Surface surface-mirror : Mirror {
+  color : Constant {
+    //v { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
+    v { 0.6, 0.2, 0.7 }
+    requires_grad { true }
+    range { 0, 1 }
+  }
+  roughness : Constant {
+    v { 0.2 }
+  }
+}
+
+Surface surface-plastic : Plastic {
+  Kd : Constant {
+    v { 0.9, 0.25, 0.013 }
+    //v { 0.14, 0.45, 0.091 }
+    //requires_grad { true }
+    range { 0, 1 }
+  }
+  Ks : Constant {
+    v { 0.14, 0.45, 0.091 }
+    //v { 0.9, 0.25, 0.013 }
+    //requires_grad { true }
+    range { 0, 1 }
+  }
+  eta : Constant {
+    v { 1.5 }
+  }
+  roughness : Constant {
+    //v { 0.3 }
+    v { 0.2 }
+    requires_grad { true }
+    range { 0, 1 }
+  }
+}
+
 Shape cbox-ceiling : Mesh {
   file { "../meshes/cbox-parts/ceiling.obj" }
   surface { @cbox-white }
@@ -115,7 +180,7 @@ Shape cbox-tall-box : Mesh {
 
 Shape cbox-short-box : Mesh {
   file { "../meshes/cbox-parts/short-box.obj" }
-  surface { @cbox-white }
+  surface { @surface-plastic }
 }
 
 Shape cbox-light : Mesh {
@@ -143,14 +208,14 @@ Shape cbox : Group {
 Camera camera0 : Pinhole {
   position { -0.01, 0.995, 5.0 }
   fov { 27.8 }
-  spp { 2048 }
+  spp { 512 }
   film { @film }
-  file { "../renders/cbox-substrate-diff-0.exr" }
+  file { "../renders/cbox-plastic-diff-0.exr" }
   filter : Gaussian {
     radius { 1 }
   }
   target : Image {
-    file { "../renders/cbox-substrate-ref-4096spp-0.exr" }
+    file { "../renders/cbox-plastic-ref-4096spp-0.exr" }
   }
 }
 
@@ -158,14 +223,14 @@ Camera camera1 : Pinhole {
   position { 1, 1.6, 2.0 }
   front { -0.4, -0.2, -1 }
   fov { 40 }
-  spp { 2048 }
+  spp { 512 }
   film { @film }
-  file { "../renders/cbox-substrate-diff-1.exr" }
+  file { "../renders/cbox-plastic-diff-1.exr" }
   filter : Gaussian {
     radius { 1 }
   }
   target : Image {
-    file { "../renders/cbox-substrate-ref-4096spp-1.exr" }
+    file { "../renders/cbox-plastic-ref-4096spp-1.exr" }
   }
 }
 
@@ -177,8 +242,8 @@ Integrator pt : MegaPathGrad {
   save_process { true }
   optimizer { "BGD" }
   loss { "L2" }
-  learning_rate { 1 }
-  iterations { 30 }
+  learning_rate { 0.1 }
+  iterations { 100 }
 }
 
 render {

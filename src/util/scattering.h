@@ -47,9 +47,10 @@ public:
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wh) const noexcept;
     [[nodiscard]] auto alpha() const noexcept { return _alpha; }
 
-    [[nodiscard]] virtual Gradient grad_Lambda(Expr<float3> w) const noexcept = 0;
+    [[nodiscard]] virtual Gradient grad_G1(Expr<float3> w) const noexcept;
     [[nodiscard]] virtual Gradient grad_G(Expr<float3> wo, Expr<float3> wi) const noexcept;
     [[nodiscard]] virtual Gradient grad_D(Expr<float3> wh) const noexcept = 0;
+    [[nodiscard]] virtual Gradient grad_Lambda(Expr<float3> w) const noexcept = 0;
 };
 
 struct TrowbridgeReitzDistribution : public MicrofacetDistribution {
@@ -60,9 +61,9 @@ struct TrowbridgeReitzDistribution : public MicrofacetDistribution {
     [[nodiscard]] static Float roughness_to_alpha(Expr<float> roughness) noexcept;
     [[nodiscard]] static Float2 roughness_to_alpha(Expr<float2> roughness) noexcept;
 
-    [[nodiscard]] static Float2 grad_alpha_roughness(Float2 roughness) noexcept;
-    [[nodiscard]] Gradient grad_Lambda(Expr<float3> w) const noexcept override;
     [[nodiscard]] Gradient grad_D(Expr<float3> wh) const noexcept override;
+    [[nodiscard]] Gradient grad_Lambda(Expr<float3> w) const noexcept override;
+    [[nodiscard]] static Float2 grad_alpha_roughness(Expr<float2> roughness) noexcept;
 };
 
 [[nodiscard]] Float fresnel_dielectric(Float cosThetaI, Float etaI, Float etaT) noexcept;
@@ -74,8 +75,15 @@ struct TrowbridgeReitzDistribution : public MicrofacetDistribution {
     const SampledSpectrum &etaT, const SampledSpectrum &k) noexcept;
 
 struct Fresnel {
+    struct Gradient {
+        virtual ~Gradient() noexcept = default;
+    };
+
     virtual ~Fresnel() noexcept = default;
     [[nodiscard]] virtual SampledSpectrum evaluate(Expr<float> cosI) const noexcept = 0;
+    [[nodiscard]] virtual luisa::unique_ptr<Gradient> backward(Expr<float> cosI, const SampledSpectrum &df) const noexcept {
+        return luisa::make_unique<Fresnel::Gradient>();
+    }
 };
 
 class FresnelConductor final : public Fresnel {
@@ -99,9 +107,9 @@ private:
 public:
     FresnelDielectric(SampledSpectrum etaI, SampledSpectrum etaT) noexcept
         : _eta_i{std::move(etaI)}, _eta_t{std::move(etaT)} {}
-    [[nodiscard]] SampledSpectrum evaluate(Expr<float> cosThetaI) const noexcept override;
     [[nodiscard]] auto eta_i() const noexcept { return _eta_i; }
     [[nodiscard]] auto eta_t() const noexcept { return _eta_t; }
+    [[nodiscard]] SampledSpectrum evaluate(Expr<float> cosThetaI) const noexcept override;
 };
 
 struct BxDF {
@@ -142,7 +150,7 @@ public:
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
     [[nodiscard]] SampledSpectrum sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept override;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept override;
-    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept;
+    [[nodiscard]] static Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) noexcept;
 };
 
 class MicrofacetReflection : public BxDF {
@@ -151,6 +159,8 @@ public:
     struct Gradient {
         SampledSpectrum dR;
         Float2 dAlpha;
+
+        luisa::unique_ptr<Fresnel::Gradient> dFresnel;
     };
 
 private:
