@@ -368,8 +368,8 @@ SampledSpectrum MicrofacetReflection::evaluate(Expr<float3> wo, Expr<float3> wi)
     auto G = _distribution->G(wo, wi);
     auto cos_o = cos_theta(wo);
     auto cos_i = cos_theta(wi);
-    auto ans = abs(0.25f * D * G / (cos_i * cos_o));
-    return _r * F * ite(valid, ans, 0.f);
+    auto h = abs(0.25f * D * G / (cos_i * cos_o));
+    return _r * F * ite(valid, h, 0.f);
 }
 
 SampledSpectrum MicrofacetReflection::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *p) const noexcept {
@@ -406,17 +406,17 @@ MicrofacetReflection::Gradient MicrofacetReflection::backward(
     auto cos_i = cos_theta(wi);
     auto k0 = 0.25f / (cos_i * cos_o);
     auto k1 = k0 * D * G;
-    auto ans = abs(k1);
+    auto h = abs(k1);
 
     // backward
-    auto d_ans = (df * _r * F).sum() * ite(valid, 1.f, 0.f);
-    auto d_F = df * _r * ite(valid, ans, 0.f);
-    auto k2 = d_ans * sign(k1) * k0;
+    auto d_h = (df * _r * F).sum() * ite(valid, 1.f, 0.f);
+    auto d_F = df * _r * ite(valid, h, 0.f);
+    auto k2 = d_h * sign(k1) * k0;
     auto d_D = k2 * G;
     auto d_G = k2 * D;
     auto d_alpha = d_D * _distribution->grad_D(wh).dAlpha +
                    d_G * _distribution->grad_G(wo, wi).dAlpha;
-    auto d_r = df * F * ite(valid, ans, 0.f);
+    auto d_r = df * F * ite(valid, h, 0.f);
 
     return {.dR = d_r, .dAlpha = d_alpha, .dFresnel = _fresnel->backward(cosI_eval, d_F)};
 }

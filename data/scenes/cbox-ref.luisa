@@ -90,7 +90,7 @@ Surface surface-plastic : Plastic {
     v { 1.5 }
   }
   roughness : Constant {
-    v { 0.3 }
+    v { 0 }
   }
 }
 

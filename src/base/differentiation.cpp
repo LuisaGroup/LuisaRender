@@ -45,7 +45,9 @@ Differentiation::Differentiation(Pipeline &pipeline, const Optimizer &optimizer)
         grad /= Float(max(count, 1u));
         auto old = params.read(thread);
         auto range = ranges.read(thread);
-        auto next = fma(-alpha, grad, old);
+        auto max_step_length = 0.1f * (range.y - range.x);
+        grad = clamp(alpha * grad, -max_step_length, max_step_length);
+        auto next = old - grad;
         params.write(thread, clamp(next, range.x, range.y));
     };
     Kernel2D apply_grad_tex = [](BufferUInt gradients, UInt grad_offset, ImageFloat image,
@@ -59,7 +61,9 @@ Differentiation::Differentiation(Pipeline &pipeline, const Optimizer &optimizer)
         auto grad = make_float4(x, y, z, w);
         grad /= Float(max(counter.read(counter_offset + i), 1u));
         auto old = image.read(coord);
-        auto next = fma(-alpha, grad, old);
+        auto max_step_length = 0.1f * (range.y - range.x);
+        grad = clamp(alpha * grad, -max_step_length, max_step_length);
+        auto next = old - grad;
         image.write(coord, clamp(next, range.x, range.y));
     };
     _clear_buffer = _pipeline.device().compile(clear_buffer);
