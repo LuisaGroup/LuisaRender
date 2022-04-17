@@ -11,4 +11,4 @@ target_link_libraries(luisa-render-sdl PUBLIC
         luisa-render-ext)
 set_target_properties(luisa-render-sdl PROPERTIES
         WINDOWS_EXPORT_ALL_SYMBOLS ON
-        UNITY_BUILD ON)
+        UNITY_BUILD ${LUISA_RENDER_ENABLE_UNITY_BUILD})
