@@ -83,7 +83,7 @@ Surface cbox-green : Matte {
   }
 }
 
-Surface mix : Mix {
+Surface surface-mix : Mix {
   a {
     //Matte  {
     //  Kd : Constant {
@@ -112,7 +112,7 @@ Surface mix : Mix {
   }
 }
 
-Surface mirror : Mirror {
+Surface surface-mirror : Mirror {
   color : Constant {
     //v { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
     v { 0.6, 0.2, 0.7 }
@@ -121,6 +121,30 @@ Surface mirror : Mirror {
   }
   roughness : Constant {
     v { 0.2 }
+  }
+}
+
+Surface surface-plastic : Plastic {
+  Kd : Constant {
+    v { 0.9, 0.25, 0.013 }
+    //v { 0.14, 0.45, 0.091 }
+    //requires_grad { true }
+    range { 0, 1 }
+  }
+  Ks : Constant {
+    v { 0.14, 0.45, 0.091 }
+    //v { 0.9, 0.25, 0.013 }
+    //requires_grad { true }
+    range { 0, 1 }
+  }
+  eta : Constant {
+    v { 1.5 }
+  }
+  roughness : Constant {
+    //v { 0.3 }
+    v { 0.2 }
+    requires_grad { true }
+    range { 0, 1 }
   }
 }
 
@@ -151,12 +175,12 @@ Shape cbox-back-wall : Mesh {
 
 Shape cbox-tall-box : Mesh {
   file { "../meshes/cbox-parts/tall-box.obj" }
-  surface { @mirror }
+  surface { @cbox-white }
 }
 
 Shape cbox-short-box : Mesh {
   file { "../meshes/cbox-parts/short-box.obj" }
-  surface { @cbox-white }
+  surface { @surface-plastic }
 }
 
 Shape cbox-light : Mesh {
@@ -186,12 +210,12 @@ Camera camera0 : Pinhole {
   fov { 27.8 }
   spp { 512 }
   film { @film }
-  file { "../renders/cbox-mirror-diff-0.exr" }
+  file { "../renders/cbox-plastic-diff-0.exr" }
   filter : Gaussian {
     radius { 1 }
   }
   target : Image {
-    file { "../renders/cbox-mirror-ref-4096spp-0.exr" }
+    file { "../renders/cbox-plastic-ref-4096spp-0.exr" }
   }
 }
 
@@ -201,12 +225,12 @@ Camera camera1 : Pinhole {
   fov { 40 }
   spp { 512 }
   film { @film }
-  file { "../renders/cbox-mirror-diff-1.exr" }
+  file { "../renders/cbox-plastic-diff-1.exr" }
   filter : Gaussian {
     radius { 1 }
   }
   target : Image {
-    file { "../renders/cbox-mirror-ref-4096spp-1.exr" }
+    file { "../renders/cbox-plastic-ref-4096spp-1.exr" }
   }
 }
 

@@ -2,8 +2,7 @@
 // Created by ChenXin on 2022/2/23.
 //
 
-#include <tinyexr.h>
-#include <stb/stb_image_write.h>
+#include <util/imageio.h>
 
 #include <luisa-compute.h>
 
@@ -11,7 +10,6 @@
 #include <base/pipeline.h>
 #include <base/integrator.h>
 #include <core/stl.h>
-#include <stb/stb_image_write.h>
 
 namespace luisa::render {
 
@@ -52,9 +50,6 @@ private:
 
     void _integrate_one_camera(
         CommandBuffer &command_buffer, uint iteration, const Camera::Instance *camera) noexcept;
-    static void _save_image(
-        std::filesystem::path path,
-        const luisa::vector<float4> &pixels, uint2 resolution) noexcept;
 
 public:
     explicit MegakernelGradRadiativeInstance(
@@ -171,7 +166,7 @@ public:
                     rendered.resize(next_pow2(pixel_count));
                     camera->film()->download(command_buffer, rendered.data());
                     command_buffer << synchronize();
-                    _save_image(output_path, rendered, resolution);
+                    save_image(output_path, (const float *)rendered.data(), resolution);
                 }
             }
 
@@ -198,7 +193,7 @@ public:
             command_buffer << compute::synchronize();
             auto film_path = camera->node()->file();
 
-            _save_image(film_path, rendered, resolution);
+            save_image(film_path, (const float *)rendered.data(), resolution);
         }
         std::cout << pipeline().printer().retrieve(stream);
         LUISA_INFO("Finish saving results");
@@ -575,32 +570,6 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
     LUISA_INFO("Rendering finished in {} ms.",
                clock.toc());
     if (display) { pt->display(command_buffer, camera->film(), iteration); }
-}
-void MegakernelGradRadiativeInstance::_save_image(std::filesystem::path path,
-                                                  const luisa::vector<float4> &pixels, uint2 resolution) noexcept {
-    // save results
-    auto pixel_count = resolution.x * resolution.y;
-    auto size = make_int2(resolution);
-
-    if (path.extension() != ".exr" && path.extension() != ".hdr") [[unlikely]] {
-        LUISA_WARNING_WITH_LOCATION(
-            "Unexpected film file extension. "
-            "Changing to '.exr'.");
-        path.replace_extension(".exr");
-    }
-
-    if (path.extension() == ".exr") {
-        const char *err = nullptr;
-        SaveEXR(reinterpret_cast<const float *>(pixels.data()),
-                size.x, size.y, 4, false, path.string().c_str(), &err);
-        if (err != nullptr) [[unlikely]] {
-            LUISA_ERROR_WITH_LOCATION(
-                "Failed to save film to '{}'.",
-                path.string());
-        }
-    } else if (path.extension() == ".hdr") {
-        stbi_write_hdr(path.string().c_str(), size.x, size.y, 4, reinterpret_cast<const float *>(pixels.data()));
-    }
 }
 
 }// namespace luisa::render

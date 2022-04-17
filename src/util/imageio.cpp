@@ -6,6 +6,7 @@
 
 #include <tinyexr.h>
 #include <stb/stb_image.h>
+#include <stb/stb_image_write.h>
 
 #include <core/logging.h>
 #include <util/imageio.h>
@@ -516,6 +517,32 @@ LoadedImage LoadedImage::load(const std::filesystem::path &path) noexcept {
             path_string, stbi_failure_reason());
     }
     return {pixels, storage, make_uint2(width, height), stbi_image_free};
+}
+
+void save_image(std::filesystem::path path, const float *pixels, uint2 resolution) noexcept {
+    // save results
+    auto pixel_count = resolution.x * resolution.y;
+    auto size = make_int2(resolution);
+
+    if (path.extension() != ".exr" && path.extension() != ".hdr") [[unlikely]] {
+        LUISA_WARNING_WITH_LOCATION(
+            "Unexpected film file extension. "
+            "Changing to '.exr'.");
+        path.replace_extension(".exr");
+    }
+
+    if (path.extension() == ".exr") {
+        const char *err = nullptr;
+        SaveEXR(reinterpret_cast<const float *>(pixels),
+                size.x, size.y, 4, false, path.string().c_str(), &err);
+        if (err != nullptr) [[unlikely]] {
+            LUISA_ERROR_WITH_LOCATION(
+                "Failed to save film to '{}'.",
+                path.string());
+        }
+    } else if (path.extension() == ".hdr") {
+        stbi_write_hdr(path.string().c_str(), size.x, size.y, 4, reinterpret_cast<const float *>(pixels));
+    }
 }
 
 }// namespace luisa::render
