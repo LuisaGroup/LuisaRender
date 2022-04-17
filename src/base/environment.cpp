@@ -4,6 +4,7 @@
 
 #include <base/environment.h>
 #include <base/pipeline.h>
+#include <base/scene.h>
 
 namespace luisa::render {
 

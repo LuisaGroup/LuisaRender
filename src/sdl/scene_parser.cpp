@@ -9,6 +9,7 @@
 #include <core/logging.h>
 #include <core/thread_pool.h>
 #include <sdl/scene_parser.h>
+#include <sdl/scene_desc.h>
 
 namespace luisa::render {
 
