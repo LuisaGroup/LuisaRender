@@ -1,0 +1,2 @@
+add_executable(test_distribution test_distribution.cpp)
+target_link_libraries(test_distribution PRIVATE luisa::render)

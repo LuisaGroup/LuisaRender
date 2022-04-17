@@ -23,6 +23,14 @@ if (NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "LuisaRender only supports 64-bit platforms")
 endif ()
 
+if (NOT DEFINED LUISA_RENDER_MASTER_PROJECT)
+    if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+        set(LUISA_RENDER_MASTER_PROJECT ON)
+    else ()
+        set(LUISA_RENDER_MASTER_PROJECT OFF)
+    endif ()
+endif ()
+
 if (NOT CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
 
     option(LUISA_RENDER_ENABLE_SCCACHE "Enable sccache to speed up compilation" ON)
@@ -51,6 +59,8 @@ if (NOT CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
         endif ()
     endif ()
 endif ()
+
+option(LUISA_RENDER_BUILD_TESTS "Build tests for LuisaRender" ${LUISA_RENDER_MASTER_PROJECT})
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")

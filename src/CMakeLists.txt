@@ -92,3 +92,7 @@ target_link_libraries(luisa-render INTERFACE
 add_library(luisa::render ALIAS luisa-render)
 
 add_subdirectory(apps)
+
+if (LUISA_RENDER_BUILD_TESTS)
+    add_subdirectory(tests)
+endif ()
