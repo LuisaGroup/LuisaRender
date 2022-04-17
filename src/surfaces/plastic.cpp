@@ -160,9 +160,39 @@ private:
         auto _instance = instance<PlasticInstance>();
         auto wo_local = _it.wo_local();
         auto wi_local = _it.shading().world_to_local(wi);
+
+        auto Kd_rgb = _instance->Kd()->evaluate(_it, _time).xyz();
+        auto Ks_rgb = _instance->Ks()->evaluate(_it, _time).xyz();
+        auto Kd_max = max(max(Kd_rgb.x, Kd_rgb.y), Kd_rgb.z);
+        auto Ks_max = max(max(Ks_rgb.x, Ks_rgb.y), Ks_rgb.z);
+        auto k0 = Kd_max + Ks_max;
+        auto scale = 1.f / max(k0, 1.f);
+
+        // Ks, Kd
         auto d_f_d = _lambert->backward(wo_local, wi_local, df);
         auto d_f_s = _microfacet->backward(wo_local, wi_local, df);
+        $if(scale < 1.f) {
+            Kd_rgb *= scale;
+            Ks_rgb *= scale;
+            auto d_Kd_rgb = _swl.backward_albedo_from_srgb(Kd_rgb, d_f_d.dR);
+            auto d_Ks_rgb = _swl.backward_albedo_from_srgb(Ks_rgb, d_f_s.dR);
+            for (auto i = 0u; i < 3u; ++i) {
+                $if(Kd_max == Kd_rgb[i]) {
+                    d_Kd_rgb *= sqr(scale) * (k0 - Kd_rgb[i]);
+                };
+                $if(Ks_max == Ks_rgb[i]) {
+                    d_Ks_rgb *= sqr(scale) * (k0 - Ks_rgb[i]);
+                };
+            }
+            _instance->Kd()->backward(_it, _time, make_float4(d_Kd_rgb, 0.f));
+            _instance->Ks()->backward(_it, _time, make_float4(d_Ks_rgb, 0.f));
+        }
+        $else {
+            _instance->Kd()->backward_albedo_spectrum(_it, _swl, _time, d_f_d.dR);
+            _instance->Ks()->backward_albedo_spectrum(_it, _swl, _time, d_f_s.dR);
+        };
 
+        // roughness
         if (auto roughness = _instance->roughness()) {
             auto remap = _instance->node<PlasticSurface>()->remap_roughness();
             auto r_f4 = roughness->evaluate(_it, _time);
@@ -177,24 +207,12 @@ private:
                               make_float4(d_r, 0.f, 0.f);
             _instance->roughness()->backward(_it, _time, ite(isnan(d_r_f4), 0.f, d_r_f4));
         }
-
-        // TODO : backward ks/kd/eta in PlasticInstance::_closure
     }
 };
 
 luisa::unique_ptr<Surface::Closure> PlasticInstance::_closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    auto Kd_rgb = _kd->evaluate(it, time).xyz();
-    auto Ks_rgb = _ks->evaluate(it, time).xyz();
-    auto Kd_max = max(max(Kd_rgb.x, Kd_rgb.y), Kd_rgb.z);
-    auto Ks_max = max(max(Ks_rgb.x, Ks_rgb.y), Ks_rgb.z);
-    auto scale = 1.f / max(Kd_max + Ks_max, 1.f);
-    Kd_rgb *= scale;
-    Ks_rgb *= scale;
-    auto Kd_lum = srgb_to_cie_y(Kd_rgb);
-    auto Ks_lum = srgb_to_cie_y(Ks_rgb);
-    auto Kd = swl.albedo_from_srgb(Kd_rgb);
-    auto Ks = swl.albedo_from_srgb(Ks_rgb);
+    // alpha
     auto alpha = def(make_float2(0.f));
     if (_roughness != nullptr) {
         auto r = _roughness->evaluate(it, time);
@@ -204,6 +222,8 @@ luisa::unique_ptr<Surface::Closure> PlasticInstance::_closure(
                     (remap ? make_float2(r2a(r.x)) : r.xx()) :
                     (remap ? r2a(r.xy()) : r.xy());
     }
+
+    // eta
     SampledSpectrum eta{swl.dimension(), 1.5f};
     if (_eta != nullptr) {
         if (_eta->node()->channels() == 1u) {
@@ -220,7 +240,23 @@ luisa::unique_ptr<Surface::Closure> PlasticInstance::_closure(
             }
         }
     }
+
+    // Kd, Ks
+    auto Kd_rgb = _kd->evaluate(it, time).xyz();
+    auto Ks_rgb = _ks->evaluate(it, time).xyz();
+    auto Kd_max = max(max(Kd_rgb.x, Kd_rgb.y), Kd_rgb.z);
+    auto Ks_max = max(max(Ks_rgb.x, Ks_rgb.y), Ks_rgb.z);
+    auto scale = 1.f / max(Kd_max + Ks_max, 1.f);
+    Kd_rgb *= scale;
+    Ks_rgb *= scale;
+    auto Kd = swl.albedo_from_srgb(Kd_rgb);
+    auto Ks = swl.albedo_from_srgb(Ks_rgb);
+
+    // Kd_ratio
+    auto Kd_lum = srgb_to_cie_y(Kd_rgb);
+    auto Ks_lum = srgb_to_cie_y(Ks_rgb);
     auto Kd_ratio = ite(Kd_lum <= 0.f, 0.f, Kd_lum / (Kd_lum + Ks_lum));
+
     return luisa::make_unique<PlasticClosure>(
         this, it, swl, time, eta, Kd, Ks,
         alpha, clamp(Kd_ratio, 0.1f, 0.9f));
