@@ -72,10 +72,10 @@ Surface surface-mix : Mix {
 
 Surface surface-mirror : Mirror {
   color : Constant {
-    v { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
+    v { 0.14, 0.45, 0.091 }
   }
   roughness : Constant {
-    v { 0.2 }
+    v { 0 }
   }
 }
 
@@ -90,7 +90,7 @@ Surface surface-plastic : Plastic {
     v { 1.5 }
   }
   roughness : Constant {
-    v { 0 }
+    v { 0.3 }
   }
 }
 
@@ -121,7 +121,7 @@ Shape cbox-back-wall : Mesh {
 
 Shape cbox-tall-box : Mesh {
   file { "../meshes/cbox-parts/tall-box.obj" }
-  surface { @cbox-white }
+  surface { @surface-mirror }
 }
 
 Shape cbox-short-box : Mesh {

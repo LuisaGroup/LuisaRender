@@ -138,12 +138,11 @@ public:
     LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP(*)
     LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP(/)
 #undef LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP
-
-public:
-    static SampledSpectrum ite(const SampledSpectrum &p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept;
-    static SampledSpectrum ite(Expr<bool> p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept;
 };
 
-SampledSpectrum any_nan2zero(const SampledSpectrum &t) noexcept;
+[[nodiscard]] SampledSpectrum ite(const SampledSpectrum &p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept;
+[[nodiscard]] SampledSpectrum ite(Expr<bool> p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept;
+
+SampledSpectrum zero_if_any_nan(const SampledSpectrum &t) noexcept;
 
 }// namespace luisa::render

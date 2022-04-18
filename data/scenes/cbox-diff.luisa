@@ -114,13 +114,13 @@ Surface surface-mix : Mix {
 
 Surface surface-mirror : Mirror {
   color : Constant {
-    //v { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
-    v { 0.6, 0.2, 0.7 }
+    //v { 0.14, 0.45, 0.091 }
+    v { 0.9, 0.25, 0.013 }
     requires_grad { true }
     range { 0, 1 }
   }
   roughness : Constant {
-    v { 0.2 }
+    v { 0 }
   }
 }
 
@@ -141,10 +141,10 @@ Surface surface-plastic : Plastic {
     v { 1.5 }
   }
   roughness : Constant {
-    //v { 0 }
-    v { 0.0001 }
-    requires_grad { true }
-    range { 0, 1 }
+    v { 0.3 }
+    //v { 0.45 }
+    //requires_grad { true }
+    range { 0.0001, 1 }
   }
 }
 
@@ -175,7 +175,7 @@ Shape cbox-back-wall : Mesh {
 
 Shape cbox-tall-box : Mesh {
   file { "../meshes/cbox-parts/tall-box.obj" }
-  surface { @cbox-white }
+  surface { @surface-mirror }
 }
 
 Shape cbox-short-box : Mesh {
@@ -208,7 +208,7 @@ Shape cbox : Group {
 Camera camera0 : Pinhole {
   position { -0.01, 0.995, 5.0 }
   fov { 27.8 }
-  spp { 4096 }
+  spp { 512 }
   film { @film }
   file { "../renders/cbox-plastic-diff-0.exr" }
   filter : Gaussian {
@@ -223,7 +223,7 @@ Camera camera1 : Pinhole {
   position { 1, 1.6, 2.0 }
   front { -0.4, -0.2, -1 }
   fov { 40 }
-  spp { 4096 }
+  spp { 512 }
   film { @film }
   file { "../renders/cbox-plastic-diff-1.exr" }
   filter : Gaussian {

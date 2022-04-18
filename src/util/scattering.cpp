@@ -425,7 +425,7 @@ SampledSpectrum MicrofacetTransmission::evaluate(Expr<float3> wo, Expr<float3> w
     auto cosThetaO = cos_theta(wo);
     auto cosThetaI = cos_theta(wi);
     auto refr = !same_hemisphere(wo, wi) & cosThetaO != 0.f & cosThetaI != 0.f;
-    SampledSpectrum eta(SampledSpectrum::ite(cosThetaO > 0.f, _eta_b / _eta_a, _eta_a / _eta_b));
+    auto eta = ite(cosThetaO > 0.f, _eta_b / _eta_a, _eta_a / _eta_b);
 
     // Compute $\wh$ from $\wo$ and $\wi$ for microfacet transmission
     auto G = _distribution->G(wo, wi);
@@ -467,10 +467,7 @@ SampledSpectrum MicrofacetTransmission::sample(Expr<float3> wo, Float3 *wi, Expr
 Float MicrofacetTransmission::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {
     auto pdf = def(0.f);
     auto entering = cos_theta(wo) > 0.f;
-    SampledSpectrum eta{_eta_a.dimension()};
-    for (auto i = 0u; i < eta.dimension(); i++) {
-        eta[i] = ite(entering, _eta_b[i] / _eta_a[i], _eta_a[i] / _eta_b[i]);
-    }
+    auto eta = ite(entering, _eta_b / _eta_a, _eta_a / _eta_b);
     for (auto i = 0u; i < eta.dimension(); i++) {
         auto wh = normalize(wo + wi * eta[i]);
         // Compute change of variables _dwh\_dwi_ for microfacet transmission
@@ -487,7 +484,7 @@ MicrofacetTransmission::Gradient MicrofacetTransmission::backward(
     auto cosThetaO = cos_theta(wo);
     auto cosThetaI = cos_theta(wi);
     auto refr = !same_hemisphere(wo, wi) & cosThetaO != 0.f & cosThetaI != 0.f;
-    SampledSpectrum eta(SampledSpectrum::ite(cosThetaO > 0.f, _eta_b / _eta_a, _eta_a / _eta_b));
+    auto eta = ite(cosThetaO > 0.f, _eta_b / _eta_a, _eta_a / _eta_b);
 
     // Compute $\wh$ from $\wo$ and $\wi$ for microfacet transmission
     auto G = _distribution->G(wo, wi);

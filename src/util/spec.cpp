@@ -447,30 +447,17 @@ float DenselySampledSpectrum::cie_y_integral() noexcept {
     return integral;
 }
 
-SampledSpectrum any_nan2zero(const SampledSpectrum &t) noexcept {
-    SampledSpectrum ans = t;
-    $if(t.any([](const auto &value) {
-        return isnan(value);
-    })) {
-        ans = 0.f;
-    };
-    return ans;
+SampledSpectrum zero_if_any_nan(const SampledSpectrum &t) noexcept {
+    auto has_nan = t.any([](const auto &value) { return isnan(value); });
+    return t.map([&has_nan](auto, auto x) noexcept { return ite(has_nan, 0.f, x); });
 }
-SampledSpectrum SampledSpectrum::ite(const SampledSpectrum &p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept {
-    SampledSpectrum ans = f;
-    for (auto i = 0u; i < ans.dimension(); i++) {
-        $if(p[i] != 0.f) {
-            ans[i] = t[i];
-        };
-    }
-    return ans;
+
+SampledSpectrum ite(const SampledSpectrum &p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept {
+    return p.map([&t, &f](auto i, auto b) noexcept { return ite(b != 0.f, t[i], f[i]); });
 }
-SampledSpectrum SampledSpectrum::ite(Expr<bool> p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept {
-    SampledSpectrum ans = f;
-    $if(p) {
-        ans = t;
-    };
-    return ans;
+
+SampledSpectrum ite(Expr<bool> p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept {
+    return t.map([p, &f](auto i, auto x) noexcept { return ite(p, x, f[i]); });
 }
 
 }// namespace luisa::render

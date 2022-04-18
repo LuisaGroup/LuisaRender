@@ -157,8 +157,8 @@ public:
             auto d_a = df * _ratio * cos_a / cos_theta_i;
             auto d_b = df * (1.f - _ratio) * cos_b / cos_theta_i;
 
-            _a->backward(wi, any_nan2zero(d_a));
-            _b->backward(wi, any_nan2zero(d_a));
+            _a->backward(wi, zero_if_any_nan(d_a));
+            _b->backward(wi, zero_if_any_nan(d_a));
 
             if (auto ratio = instance<MixSurfaceInstance>()->ratio()) {
                 auto d_ratio = (df * (eval_a.f * cos_a - eval_b.f * cos_b)).sum() / cos_theta_i;
