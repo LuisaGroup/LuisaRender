@@ -26,4 +26,4 @@ target_link_libraries(luisa-render-base PUBLIC
         luisa-render-util)
 set_target_properties(luisa-render-base PROPERTIES
         WINDOWS_EXPORT_ALL_SYMBOLS ON
-        UNITY_BUILD ON)
+        UNITY_BUILD ${LUISA_RENDER_ENABLE_UNITY_BUILD})

@@ -8,6 +8,8 @@ cmake_policy(SET CMP0091 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0069 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0072 NEW)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 project(LuisaRender LANGUAGES C CXX VERSION 0.1)
 
 set(CMAKE_C_STANDARD 11)
@@ -32,7 +34,6 @@ if (NOT DEFINED LUISA_RENDER_MASTER_PROJECT)
 endif ()
 
 if (NOT CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-
     option(LUISA_RENDER_ENABLE_SCCACHE "Enable sccache to speed up compilation" ON)
     if (LUISA_RENDER_ENABLE_SCCACHE)
         find_program(SCCACHE_EXE sccache)
@@ -46,21 +47,10 @@ if (NOT CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
             message(STATUS "Could not find sccache")
         endif ()
     endif ()
-
-    option(LUISA_RENDER_ENABLE_IPO "Enable IPO/LTO" ON)
-    if (LUISA_RENDER_ENABLE_IPO)
-        include(CheckIPOSupported)
-        check_ipo_supported(RESULT IPO_SUPPORTED OUTPUT CHECK_IPO_SUPPORTED_OUTPUT LANGUAGES C CXX)
-        if (IPO_SUPPORTED)
-            message(STATUS "Build with IPO/LTO")
-            set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
-        else ()
-            message(STATUS "Build without IPO/LTO: ${CHECK_IPO_SUPPORTED_OUTPUT}")
-        endif ()
-    endif ()
 endif ()
 
 option(LUISA_RENDER_BUILD_TESTS "Build tests for LuisaRender" ${LUISA_RENDER_MASTER_PROJECT})
+option(LUISA_RENDER_ENABLE_UNITY_BUILD "Enable unity build to speed up compilation" OFF)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")

@@ -14,7 +14,7 @@
 #include <util/ies.h>
 
 [[nodiscard]] auto parse_cli_options(int argc, const char *const *argv) noexcept {
-    cxxopts::Options cli{"megakernel_path_tracing"};
+    cxxopts::Options cli{"luisa-render-cli"};
     cli.add_option("", "b", "backend", "Compute backend name", cxxopts::value<luisa::string>(), "<backend>");
     cli.add_option("", "d", "device", "Compute device index", cxxopts::value<uint32_t>()->default_value("0"), "<index>");
     cli.add_option("", "", "scene", "Path to scene description file", cxxopts::value<std::filesystem::path>(), "<file>");

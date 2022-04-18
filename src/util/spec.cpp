@@ -9,7 +9,7 @@
 namespace luisa::render {
 
 // from PBRT-v4: https://github.com/mmp/pbrt-v4/blob/master/src/pbrt/util/spectrum.cpp
-static constexpr const std::array cie_x_samples{
+static constexpr const std::array<float, DenselySampledSpectrum::sample_count> cie_x_samples{
     // CIE X function values
     0.0001299000f, 0.0001458470f, 0.0001638021f, 0.0001840037f, 0.0002066902f,
     0.0002321000f, 0.0002607280f, 0.0002930750f, 0.0003293880f, 0.0003699140f,
@@ -107,7 +107,7 @@ static constexpr const std::array cie_x_samples{
     0.000001776509f, 0.000001656215f, 0.000001544022f, 0.000001439440f, 0.000001341977f,
     0.000001251141f};
 
-static constexpr const std::array cie_y_samples{
+static constexpr const std::array<float, DenselySampledSpectrum::sample_count> cie_y_samples{
     // CIE Y function values
     0.000003917000f, 0.000004393581f, 0.000004929604f, 0.000005532136f, 0.000006208245f,
     0.000006965000f, 0.000007813219f, 0.000008767336f, 0.000009839844f, 0.00001104323f,
@@ -205,7 +205,7 @@ static constexpr const std::array cie_y_samples{
     0.0000006415300f, 0.0000005980895f, 0.0000005575746f, 0.0000005198080f, 0.0000004846123f,
     0.0000004518100f};
 
-static constexpr const std::array cie_z_samples{
+static constexpr const std::array<float, DenselySampledSpectrum::sample_count> cie_z_samples{
     // CIE Z function values
     0.0006061000f, 0.0006808792f, 0.0007651456f, 0.0008600124f, 0.0009665928f,
     0.001086000f, 0.001220586f, 0.001372729f, 0.001543579f, 0.001734286f,
@@ -303,11 +303,7 @@ static constexpr const std::array cie_z_samples{
     0.000000000000f, 0.000000000000f, 0.000000000000f, 0.000000000000f, 0.000000000000f,
     0.000000000000f};
 
-static_assert(cie_x_samples.size() == DenselySampledSpectrum::sample_count);
-static_assert(cie_y_samples.size() == DenselySampledSpectrum::sample_count);
-static_assert(cie_z_samples.size() == DenselySampledSpectrum::sample_count);
-
-constexpr const std::array cie_illum_d6500_samples{
+static constexpr const std::array<float, DenselySampledSpectrum::sample_count> cie_illum_d6500_samples{
     0.47161809932375853f, 0.47713008171230636f, 0.48264206410085414f, 0.4881540464894019f, 0.4936660288779497f,
     0.4991780112664976f, 0.5046899936550453f, 0.5102019760435932f, 0.515713958432141f, 0.5212259408206888f,
     0.5267379232092366f, 0.5246005963443631f, 0.5224632694794894f, 0.5203259426146157f, 0.5181886157497422f,
@@ -403,8 +399,6 @@ constexpr const std::array cie_illum_d6500_samples{
     0.5808536311556621f, 0.5837576626342645f, 0.5866616941128667f, 0.5895657255914688f, 0.592469757070071f,
     0.5953737885486733f, 0.5982780283395946f, 0.6011822681305159f, 0.6040865079214371f, 0.6069907477123584f,
     0.6098949875032796f};
-
-static_assert(cie_illum_d6500_samples.size() == DenselySampledSpectrum::sample_count);
 
 const DenselySampledSpectrum &DenselySampledSpectrum::cie_x() noexcept {
     static DenselySampledSpectrum s{cie_x_samples};

@@ -1029,6 +1029,7 @@ render {
   cameras { @camera }
   integrator : WavePath {
     depth { 10 }
+    display { true }
   }
   shapes {
     @shape_0,
@@ -1047,8 +1048,6 @@ render {
     @shape_13,
     @shape_14,
     @shape_15,
-
-
     @shape_16,
     @shape_17,
     @shape_18,

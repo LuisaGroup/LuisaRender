@@ -23,6 +23,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
             /Zc:preprocessor)
 endif ()
 
+set(LUISA_COMPUTE_ENABLE_UNITY_BUILD ${LUISA_RENDER_ENABLE_UNITY_BUILD} CACHE BOOL "" FORCE)
 add_subdirectory(compute)
 
 add_subdirectory(sdl)

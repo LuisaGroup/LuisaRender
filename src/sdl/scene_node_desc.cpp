@@ -18,7 +18,8 @@ void SceneNodeDesc::add_property(luisa::string_view name, SceneNodeDesc::value_l
     }
 }
 
-void SceneNodeDesc::define(SceneNodeTag tag, luisa::string_view t, SceneNodeDesc::SourceLocation l, const SceneNodeDesc *base) noexcept {
+void SceneNodeDesc::define(SceneNodeTag tag, luisa::string_view t,
+                           SceneNodeDesc::SourceLocation l, const SceneNodeDesc *base) noexcept {
     _tag = tag;
     _location = l;
     _impl_type = t;
