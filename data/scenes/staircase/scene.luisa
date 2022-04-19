@@ -10297,15 +10297,15 @@ Camera camera0 : Pinhole {
   position { 0.03242092579603195, 1.526729941368103, 4.881969451904297 }
   front { -0.007646017242223024, 0.04505503550171852, -0.998955249786377 }
   up { 0.0, 1.0, 0.0 }
-  fov { 58.543979551022964 }
-  spp { 512 }
+  // fov { 58.543979551022964 }
+  fov { 35 }
+  spp { 1024 }
   filter : Gaussian {
     radius { 1 }
   }
   film : Color {
-    resolution { 720, 1280 }
+    resolution { 1024 }
   }
-<<<<<<< HEAD
   file { "staircase0.exr" }
 }
 
