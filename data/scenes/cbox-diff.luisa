@@ -1,6 +1,7 @@
 Film film : Color {
   resolution { 1024 }
   exposure { 0 }
+  clamp { 128 }
 }
 
 
@@ -114,15 +115,16 @@ Surface surface-mix : Mix {
 
 Surface surface-mirror : Mirror {
   color : Constant {
-    v { 0.14, 0.45, 0.091 }
+    //v { 0.14, 0.45, 0.091 }
+    v { 1, 1, 1 }
     //v { 0.9, 0.25, 0.013 }
     //requires_grad { true }
     range { 0, 1 }
   }
   roughness : Constant {
-    //v { 0 }
-    v { 0.4 }
-    requires_grad { true }
+    v { 0 }
+    //v { 0.4 }
+    //requires_grad { true }
     range { 0, 1 }
   }
 }
@@ -148,6 +150,30 @@ Surface surface-plastic : Plastic {
     //v { 0.45 }
     //requires_grad { true }
     range { 0.0001, 1 }
+  }
+}
+
+Surface surface-glass : Glass {
+  Kr : Constant {
+    v { 0.2, 0.8, 0.2 }
+    //v { 0.8, 0.2, 0.2 }
+    //requires_grad { true }
+    range { 0, 1 }
+  }
+  Kt : Constant {
+    v { 0.8, 0.2, 0.2 }
+    //v { 0.2, 0.8, 0.2 }
+    //requires_grad { true }
+    range { 0, 1 }
+  }
+  eta : Constant {
+    v { 1.5 }
+  }
+  roughness : Constant {
+    //v { 0.001 }
+    v { 0.2 }
+    requires_grad { true }
+    range { 0.001, 1 }
   }
 }
 
@@ -178,7 +204,7 @@ Shape cbox-back-wall : Mesh {
 
 Shape cbox-tall-box : Mesh {
   file { "../meshes/cbox-parts/tall-box.obj" }
-  surface { @surface-mirror }
+  surface { @surface-glass }
 }
 
 Shape cbox-short-box : Mesh {
@@ -213,12 +239,12 @@ Camera camera0 : Pinhole {
   fov { 27.8 }
   spp { 512 }
   film { @film }
-  file { "../renders/cbox-plastic-diff-0.exr" }
+  file { "../renders/cbox-glass-diff-0.exr" }
   filter : Gaussian {
     radius { 1 }
   }
   target : Image {
-    file { "../renders/cbox-plastic-ref-4096spp-0.exr" }
+    file { "../renders/cbox-glass-ref-4096spp-0.exr" }
   }
 }
 
@@ -228,12 +254,12 @@ Camera camera1 : Pinhole {
   fov { 40 }
   spp { 512 }
   film { @film }
-  file { "../renders/cbox-plastic-diff-1.exr" }
+  file { "../renders/cbox-glass-diff-1.exr" }
   filter : Gaussian {
     radius { 1 }
   }
   target : Image {
-    file { "../renders/cbox-plastic-ref-4096spp-1.exr" }
+    file { "../renders/cbox-glass-ref-4096spp-1.exr" }
   }
 }
 
