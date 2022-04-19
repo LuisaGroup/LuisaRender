@@ -90,7 +90,7 @@ int main(int argc, char *argv[]) {
         atomic_float_add(float_buffer, 14u, grad.dAlpha[0u]);
         atomic_float_add(float_buffer, 15u, grad.dAlpha[1u]);
 
-        atomic_float_add(float_buffer, 16u, 0.f);
+        atomic_float_add(float_buffer, 16u, ite(def(30000.f > 1.f), 0.f, 1.f));
     };
 
     auto clear_shader = device.compile(clear_kernel);
