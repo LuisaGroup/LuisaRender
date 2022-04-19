@@ -15,7 +15,7 @@ namespace luisa::render {
 
 using namespace luisa::compute;
 
-class MegakernelGradRadiative final : public DifferentiableIntegrator {
+class MegakernelReplayDiff final : public DifferentiableIntegrator {
 
 private:
     uint _max_depth;
@@ -23,7 +23,7 @@ private:
     float _rr_threshold;
 
 public:
-    MegakernelGradRadiative(Scene *scene, const SceneNodeDesc *desc) noexcept
+    MegakernelReplayDiff(Scene *scene, const SceneNodeDesc *desc) noexcept
         : DifferentiableIntegrator{scene, desc},
           _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)},
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
@@ -35,13 +35,13 @@ public:
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
-class MegakernelGradRadiativeInstance final : public Integrator::Instance {
+class MegakernelReplayDiffInstance final : public Integrator::Instance {
 
 private:
     luisa::vector<float4> _pixels;
     luisa::optional<Window> _window;
     luisa::unordered_map<const Camera::Instance *, Shader<2, uint, float, float>>
-        bp_shaders, render_shaders;
+        _bp_shaders, _render_shaders;
 
 private:
     void _render_one_camera(
@@ -52,8 +52,8 @@ private:
         CommandBuffer &command_buffer, uint iteration, const Camera::Instance *camera) noexcept;
 
 public:
-    explicit MegakernelGradRadiativeInstance(
-        const MegakernelGradRadiative *node,
+    explicit MegakernelReplayDiffInstance(
+        const MegakernelReplayDiff *node,
         Pipeline &pipeline, CommandBuffer &command_buffer) noexcept
         : Integrator::Instance{pipeline, command_buffer, node} {
         if (node->display_camera_index() >= 0) {
@@ -114,7 +114,7 @@ public:
     }
 
     void render(Stream &stream) noexcept override {
-        auto pt = node<MegakernelGradRadiative>();
+        auto pt = node<MegakernelReplayDiff>();
         auto command_buffer = stream.command_buffer();
         pipeline().printer().reset(stream);
 
@@ -210,11 +210,11 @@ public:
     }
 };
 
-unique_ptr<Integrator::Instance> MegakernelGradRadiative::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
-    return luisa::make_unique<MegakernelGradRadiativeInstance>(this, pipeline, command_buffer);
+unique_ptr<Integrator::Instance> MegakernelReplayDiff::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
+    return luisa::make_unique<MegakernelReplayDiffInstance>(this, pipeline, command_buffer);
 }
 
-void MegakernelGradRadiativeInstance::_integrate_one_camera(
+void MegakernelReplayDiffInstance::_integrate_one_camera(
     CommandBuffer &command_buffer, uint iteration, const Camera::Instance *camera) noexcept {
 
     auto spp = camera->node()->spp();
@@ -231,10 +231,10 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
     auto light_sampler = pt->light_sampler();
     sampler->reset(command_buffer, resolution, pixel_count, spp);
     command_buffer.commit();
-    auto pt_exact = pt->node<MegakernelGradRadiative>();
+    auto pt_exact = pt->node<MegakernelReplayDiff>();
 
-    auto shader_iter = bp_shaders.find(camera);
-    if (shader_iter == bp_shaders.end()) {
+    auto shader_iter = _bp_shaders.find(camera);
+    if (shader_iter == _bp_shaders.end()) {
         using namespace luisa::compute;
 
         Callable balanced_heuristic = [](Float pdf_a, Float pdf_b) noexcept {
@@ -274,7 +274,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
             auto swl = pt->spectrum()->sample(*sampler);
             SampledSpectrum beta{swl.dimension(), camera_weight};
             SampledSpectrum Li{swl.dimension(), 1.0f};
-            auto grad_weight = shutter_weight * static_cast<float>(pt->node<MegakernelGradRadiative>()->max_depth());
+            auto grad_weight = shutter_weight * static_cast<float>(pt->node<MegakernelReplayDiff>()->max_depth());
 
             auto d_loss = bp_loss(pixel_id, time);
             for (auto i = 0u; i < 3u; ++i) {
@@ -284,7 +284,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
             auto ray = camera_ray;
             auto pdf_bsdf = def(1e16f);
 
-            $for(depth, pt->node<MegakernelGradRadiative>()->max_depth()) {
+            $for(depth, pt->node<MegakernelReplayDiff>()->max_depth()) {
 
                 // trace
                 auto it = pipeline().intersect(ray);
@@ -372,8 +372,8 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
                 // rr
                 $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
                 auto q = max(swl.cie_y(beta * eta_scale), .05f);
-                auto rr_depth = pt->node<MegakernelGradRadiative>()->rr_depth();
-                auto rr_threshold = pt->node<MegakernelGradRadiative>()->rr_threshold();
+                auto rr_depth = pt->node<MegakernelReplayDiff>()->rr_depth();
+                auto rr_threshold = pt->node<MegakernelReplayDiff>()->rr_threshold();
                 $if(depth >= rr_depth & q < rr_threshold) {
                     $if(sampler->generate_1d() >= q) { $break; };
                     beta *= 1.0f / q;
@@ -381,7 +381,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
             };
         };
         auto bp_shader = pipeline().device().compile(bp_kernel);
-        shader_iter = bp_shaders.emplace(camera, std::move(bp_shader)).first;
+        shader_iter = _bp_shaders.emplace(camera, std::move(bp_shader)).first;
     }
     auto &&bp_shader = shader_iter->second;
     auto shutter_samples = camera->node()->shutter_samples();
@@ -394,7 +394,8 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
     for (auto s : shutter_samples) {
         if (pipeline().update(command_buffer, s.point.time)) { dispatch_count = 0u; }
         for (auto i = 0u; i < s.spp; i++) {
-            command_buffer << bp_shader(iteration * spp + sample_id++, s.point.time, s.point.weight)
+            command_buffer << bp_shader(iteration * spp + sample_id++,
+                                        s.point.time, s.point.weight)
                                   .dispatch(resolution);
             if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
                 command_buffer << commit();
@@ -408,7 +409,7 @@ void MegakernelGradRadiativeInstance::_integrate_one_camera(
                clock.toc());
 }
 
-void MegakernelGradRadiativeInstance::_render_one_camera(
+void MegakernelReplayDiffInstance::_render_one_camera(
     CommandBuffer &command_buffer, uint iteration, Camera::Instance *camera,
     bool display) noexcept {
 
@@ -434,8 +435,8 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
         "Start rendering of resolution {}x{} at {}spp.",
         resolution.x, resolution.y, spp);
 
-    auto shader_iter = render_shaders.find(camera);
-    if (shader_iter == render_shaders.end()) {
+    auto shader_iter = _render_shaders.find(camera);
+    if (shader_iter == _render_shaders.end()) {
         using namespace luisa::compute;
 
         Callable balanced_heuristic = [](Float pdf_a, Float pdf_b) noexcept {
@@ -454,7 +455,7 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
 
             auto ray = camera_ray;
             auto pdf_bsdf = def(1e16f);
-            $for(depth, pt->node<MegakernelGradRadiative>()->max_depth()) {
+            $for(depth, pt->node<MegakernelReplayDiff>()->max_depth()) {
 
                 // trace
                 auto it = pipeline().intersect(ray);
@@ -532,8 +533,8 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
                 // rr
                 $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
                 auto q = max(swl.cie_y(beta * eta_scale), .05f);
-                auto rr_depth = pt->node<MegakernelGradRadiative>()->rr_depth();
-                auto rr_threshold = pt->node<MegakernelGradRadiative>()->rr_threshold();
+                auto rr_depth = pt->node<MegakernelReplayDiff>()->rr_depth();
+                auto rr_threshold = pt->node<MegakernelReplayDiff>()->rr_threshold();
                 $if(depth >= rr_depth & q < rr_threshold) {
                     $if(sampler->generate_1d() >= q) { $break; };
                     beta *= 1.0f / q;
@@ -542,7 +543,7 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
             camera->film()->accumulate(pixel_id, swl.srgb(Li * shutter_weight));
         };
         auto render_shader = pipeline().device().compile(render_kernel);
-        shader_iter = render_shaders.emplace(camera, std::move(render_shader)).first;
+        shader_iter = _render_shaders.emplace(camera, std::move(render_shader)).first;
     }
     auto &&render_shader = shader_iter->second;
     auto shutter_samples = camera->node()->shutter_samples();
@@ -574,4 +575,4 @@ void MegakernelGradRadiativeInstance::_render_one_camera(
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::MegakernelGradRadiative)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::MegakernelReplayDiff)
