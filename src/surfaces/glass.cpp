@@ -109,6 +109,10 @@ public:
         const Texture::Instance *Kr, const Texture::Instance *Kt,
         const Texture::Instance *roughness, const Texture::Instance *eta) noexcept
         : Surface::Instance{pipeline, surface}, _kr{Kr}, _kt{Kt}, _roughness{roughness}, _eta{eta} {}
+    [[nodiscard]] auto Kr() const noexcept { return _kr; }
+    [[nodiscard]] auto Kt() const noexcept { return _kt; }
+    [[nodiscard]] auto roughness() const noexcept { return _roughness; }
+    [[nodiscard]] auto eta() const noexcept { return _eta; }
 
 private:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
@@ -151,7 +155,6 @@ public:
         auto wi_local = _it.shading().world_to_local(wi);
         SampledSpectrum f{_swl.dimension()};
         auto pdf = def(0.f);
-        auto swl = _swl;
         $if(same_hemisphere(wo_local, wi_local)) {
             f = _refl->evaluate(wo_local, wi_local);
             pdf = _refl->pdf(wo_local, wi_local) * _kr_ratio;
@@ -160,11 +163,8 @@ public:
             f = _trans->evaluate(wo_local, wi_local);
             pdf = _trans->pdf(wo_local, wi_local) * (1.f - _kr_ratio);
         };
-        SampledSpectrum eta{_swl.dimension()};
         auto entering = wi_local.z < 0.f;
-        for (auto i = 0u; i < eta.dimension(); i++) {
-            eta[i] = ite(entering, _fresnel->eta_t()[i], 1.f);
-        }
+        auto eta = ite(entering, _fresnel->eta_t(), 1.f);
         return {.f = f,
                 .pdf = pdf,
                 .normal = _it.shading().n(),
@@ -177,7 +177,6 @@ public:
         auto pdf = def(0.f);
         auto f = SampledSpectrum{_swl.dimension()};
         auto wi_local = def(make_float3(0.0f, 0.0f, 1.0f));
-        auto swl = _swl;
         $if(u_lobe < _kr_ratio) {// Reflection
             f = _refl->sample(wo_local, &wi_local, u, &pdf);
             pdf *= _kr_ratio;
@@ -187,11 +186,8 @@ public:
             pdf *= (1.f - _kr_ratio);
         };
         auto wi = _it.shading().local_to_world(wi_local);
-        SampledSpectrum eta{_swl.dimension()};
         auto entering = wi_local.z < 0.f;
-        for (auto i = 0u; i < eta.dimension(); i++) {
-            eta[i] = ite(entering, _fresnel->eta_t()[i], 1.f);
-        }
+        auto eta = ite(entering, _fresnel->eta_t(), 1.f);
         return {.wi = wi,
                 .eval = {.f = f,
                          .pdf = pdf,
@@ -201,13 +197,47 @@ public:
     }
 
     void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
-        // TODO
-        LUISA_WARNING_WITH_LOCATION("Not implemented.");
+        auto _instance = instance<GlassInstance>();
+        auto wo_local = _it.wo_local();
+        auto wi_local = _it.shading().world_to_local(wi);
+
+        Float2 d_alpha;
+
+        $if(same_hemisphere(wo_local, wi_local)) {
+            // Kr
+            auto d_f = _refl->backward(wo_local, wi_local, df);
+            d_alpha = d_f.dAlpha;
+            _instance->Kr()->backward_albedo_spectrum(_it, _swl, _time, d_f.dR);
+        }
+        $else {
+            // Ks
+            auto d_f = _trans->backward(wo_local, wi_local, df);
+            d_alpha = d_f.dAlpha;
+            _instance->Kt()->backward_albedo_spectrum(_it, _swl, _time, d_f.dT);
+        };
+
+        // roughness
+        if (auto roughness = _instance->roughness()) {
+            auto remap = _instance->node<GlassSurface>()->remap_roughness();
+            auto r_f4 = roughness->evaluate(_it, _time);
+            auto r = roughness->node()->channels() == 1u ? r_f4.xx() : r_f4.xy();
+
+            auto grad_alpha_roughness = [](auto &&x) noexcept {
+                return TrowbridgeReitzDistribution::grad_alpha_roughness(x);
+            };
+            auto d_r = d_alpha * (remap ? grad_alpha_roughness(r) : make_float2(1.f));
+            auto d_r_f4 = roughness->node()->channels() == 1u ?
+                              make_float4(d_r.x + d_r.y, 0.f, 0.f, 0.f) :
+                              make_float4(d_r, 0.f, 0.f);
+            auto roughness_grad_range = 5.f * (roughness->node()->range().y - roughness->node()->range().x);
+            roughness->backward(_it, _time, ite(any(isnan(d_r_f4) || abs(d_r_f4) > roughness_grad_range), 0.f, d_r_f4));
+        }
     }
 };
 
 luisa::unique_ptr<Surface::Closure> GlassInstance::_closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    // roughness
     auto alpha = def(make_float2(0.f));
     if (_roughness != nullptr) {
         auto r = _roughness->evaluate(it, time);
@@ -218,6 +248,7 @@ luisa::unique_ptr<Surface::Closure> GlassInstance::_closure(
                     (remap ? r2a(r.xy()) : r.xy());
     }
 
+    // Kr, Kt
     auto Kr_rgb = saturate(_kr->evaluate(it, time).xyz());
     auto Kt_rgb = saturate(_kt->evaluate(it, time).xyz());
     auto Kr_lum = srgb_to_cie_y(Kr_rgb);
@@ -226,6 +257,7 @@ luisa::unique_ptr<Surface::Closure> GlassInstance::_closure(
     auto Kt = swl.albedo_from_srgb(Kt_rgb);
     auto Kr_ratio = ite(Kr_lum == 0.f, 0.f, sqrt(Kr_lum) / (sqrt(Kr_lum) + sqrt(Kt_lum)));
 
+    // eta
     SampledSpectrum eta{swl.dimension(), 1.5f};
     if (_eta != nullptr) {
         if (_eta->node()->channels() == 1u) {
@@ -243,6 +275,7 @@ luisa::unique_ptr<Surface::Closure> GlassInstance::_closure(
         }
     }
 
+    // fresnel
     auto cos_o = cos_theta(it.wo_local());
     auto mean_eta = eta.average();
     auto Fr = fresnel_dielectric(cos_o, 1.f, mean_eta);

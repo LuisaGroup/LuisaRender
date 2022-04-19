@@ -141,7 +141,11 @@ public:
 };
 
 [[nodiscard]] SampledSpectrum ite(const SampledSpectrum &p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept;
+[[nodiscard]] SampledSpectrum ite(const SampledSpectrum &p, Expr<float> t, const SampledSpectrum &f) noexcept;
+[[nodiscard]] SampledSpectrum ite(const SampledSpectrum &p, const SampledSpectrum &t, Expr<float> f) noexcept;
 [[nodiscard]] SampledSpectrum ite(Expr<bool> p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept;
+[[nodiscard]] SampledSpectrum ite(Expr<bool> p, Expr<float> t, const SampledSpectrum &f) noexcept;
+[[nodiscard]] SampledSpectrum ite(Expr<bool> p, const SampledSpectrum &t, Expr<float> f) noexcept;
 
 SampledSpectrum zero_if_any_nan(const SampledSpectrum &t) noexcept;
 
