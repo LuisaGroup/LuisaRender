@@ -263,7 +263,7 @@ Camera camera1 : Pinhole {
   }
 }
 
-Integrator pt : MegaPathGrad {
+Integrator pt : MegaRadiativeDiff {
   sampler : Independent {}
   depth { 10 }
   spectrum : sRGB {}

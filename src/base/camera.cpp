@@ -185,7 +185,7 @@ auto Camera::shutter_samples() const noexcept -> vector<ShutterSample> {
 Camera::Instance::Instance(Pipeline &pipeline, CommandBuffer &command_buffer, const Camera *camera) noexcept
     : _pipeline{pipeline}, _camera{camera},
       _film{camera->film()->build(pipeline, command_buffer)},
-      _filter{camera->filter()->build(pipeline, command_buffer)},
+      _filter{pipeline.build_filter(command_buffer, camera->filter())},
       _target{pipeline.build_texture(command_buffer, camera->target())} {
     pipeline.register_transform(camera->transform());
 }

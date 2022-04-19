@@ -37,7 +37,7 @@ public:
         const Pipeline &_pipeline;
         const Camera *_camera;
         luisa::unique_ptr<Film::Instance> _film;
-        luisa::unique_ptr<Filter::Instance> _filter;
+        const Filter::Instance *_filter;
         const Texture::Instance *_target;
 
     private:
@@ -53,9 +53,9 @@ public:
         [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_camera); }
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
         [[nodiscard]] auto film() noexcept { return _film.get(); }
-        [[nodiscard]] auto filter() noexcept { return _filter.get(); }
         [[nodiscard]] auto film() const noexcept { return _film.get(); }
-        [[nodiscard]] auto filter() const noexcept { return _filter.get(); }
+        [[nodiscard]] auto filter() noexcept { return _filter; }
+        [[nodiscard]] auto filter() const noexcept { return _filter; }
         [[nodiscard]] auto target() const noexcept { return _target; }
         [[nodiscard]] Sample generate_ray(
             Sampler::Instance &sampler, Expr<uint2> pixel_coord, Expr<float> time) const noexcept;

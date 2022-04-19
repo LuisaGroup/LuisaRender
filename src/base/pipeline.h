@@ -87,6 +87,7 @@ private:
     luisa::unordered_map<const Surface *, uint> _surface_tags;
     luisa::unordered_map<const Light *, uint> _light_tags;
     luisa::unordered_map<const Texture *, luisa::unique_ptr<Texture::Instance>> _textures;
+    luisa::unordered_map<const Filter *, luisa::unique_ptr<Filter::Instance>> _filters;
     luisa::vector<Shape::Handle> _instances;
     luisa::vector<InstancedTransform> _dynamic_transforms;
     Buffer<Shape::Handle> _instance_buffer;
@@ -196,6 +197,7 @@ public:
     [[nodiscard]] auto has_lighting() const noexcept { return !_lights.empty() || _environment != nullptr; }
     [[nodiscard]] auto mean_time() const noexcept { return _mean_time; }
     [[nodiscard]] const Texture::Instance *build_texture(CommandBuffer &command_buffer, const Texture *texture) noexcept;
+    [[nodiscard]] const Filter::Instance *build_filter(CommandBuffer &command_buffer, const Filter *filter) noexcept;
     bool update(CommandBuffer &command_buffer, float time) noexcept;
     void render(Stream &stream) noexcept;
     [[nodiscard]] auto &printer() noexcept { return _printer; }

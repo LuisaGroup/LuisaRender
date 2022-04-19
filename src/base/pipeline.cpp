@@ -311,6 +311,13 @@ const Texture::Instance *Pipeline::build_texture(CommandBuffer &command_buffer, 
     return iter->second.get();
 }
 
+const Filter::Instance *Pipeline::build_filter(CommandBuffer &command_buffer, const Filter *filter) noexcept {
+    if (filter == nullptr) { return nullptr; }
+    auto [iter, not_exists] = _filters.try_emplace(filter, nullptr);
+    if (not_exists) { iter->second = filter->build(*this, command_buffer); }
+    return iter->second.get();
+}
+
 void Pipeline::dynamic_dispatch_surface(
     Expr<uint> tag, const function<void(const Surface::Instance *)> &f) const noexcept {
     if (!_surfaces.empty()) [[likely]] {
