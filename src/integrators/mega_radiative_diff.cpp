@@ -347,11 +347,12 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
                             auto wi = light_sample.wi;
                             auto eval = closure->evaluate(wi);
                             auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
-
-                            auto weight = mis_weight / light_sample.eval.pdf * abs(dot(eval.normal, wi));
                             //                            Li += mis_weight / light_sample.eval.pdf *
                             //                                  abs_dot(eval.normal, wi) *
                             //                                  beta * eval.f * light_sample.eval.L;
+
+                            // TODO : or apply the approximation light_sample.eval.L / light_sample.eval.pdf = 1.f
+                            auto weight = mis_weight / light_sample.eval.pdf * abs(dot(eval.normal, wi));
                             closure->backward(wi, weight * beta * light_sample.eval.L);
                         };
 
@@ -516,7 +517,6 @@ void MegakernelRadiativeDiffInstance::_render_one_camera(
                             auto wi = light_sample.wi;
                             auto eval = closure->evaluate(wi);
                             auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
-                            // TODO : or apply the approximation light_sample.eval.L / light_sample.eval.pdf = 1.f
                             Li += mis_weight / light_sample.eval.pdf *
                                   abs_dot(eval.normal, wi) *
                                   beta * eval.f * light_sample.eval.L;
