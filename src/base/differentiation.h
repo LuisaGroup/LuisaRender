@@ -9,7 +9,7 @@
 #include <runtime/shader.h>
 #include <runtime/command_buffer.h>
 
-#include <util/optimizer.h>
+#include "optimizer.h"
 
 namespace luisa::render {
 

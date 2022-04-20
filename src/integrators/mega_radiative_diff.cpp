@@ -138,10 +138,6 @@ public:
 
             LUISA_INFO("");
             LUISA_INFO("Iteration = {}", k);
-            if (pt->optimizer() == Optimizer::LDGD && ((k + 1u) % 3u) == 0u) {
-                pt->learning_rate() *= 0.8f;
-                LUISA_INFO("learning_rate = {}", pt->learning_rate());
-            }
 
             // render
             for (auto i = 0u; i < pipeline().camera_count(); i++) {
@@ -296,7 +292,7 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
                     //                            ray->direction(), env_to_world, swl, time);
                     //                        Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
                     //                    }
-                    //                    // TODO : backward_miss
+                    //                    // TODO : backward environment light
                     $break;
                 };
 
@@ -307,7 +303,7 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
                 //                            *it, ray->origin(), swl, time);
                 //                        Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
                 //                    };
-                //                    // TODO : backward_hit
+                //                    // TODO : backward hit light
                 //                }
 
                 $if(!it->shape()->has_surface()) { $break; };
@@ -354,6 +350,8 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
                             // TODO : or apply the approximation light_sample.eval.L / light_sample.eval.pdf = 1.f
                             auto weight = mis_weight / light_sample.eval.pdf * abs(dot(eval.normal, wi));
                             closure->backward(wi, weight * beta * light_sample.eval.L);
+
+                            // TODO : backward direct light
                         };
 
                         // sample material
