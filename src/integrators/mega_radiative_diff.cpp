@@ -312,12 +312,12 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
 
                 $if(!it->shape()->has_surface()) { $break; };
 
-                //                // sample one light
-                //                Light::Sample light_sample = light_sampler->sample(
-                //                    *sampler, *it, env_to_world, swl, time);
-                //                // trace shadow ray
-                //                auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
-                //                auto occluded = pipeline().intersect_any(shadow_ray);
+                // sample one light
+                Light::Sample light_sample = light_sampler->sample(
+                    *sampler, *it, swl, time);
+                // trace shadow ray
+                auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
+                auto occluded = pipeline().intersect_any(shadow_ray);
 
                 // evaluate material
                 SampledSpectrum eta_scale{swl.dimension(), 1.f};
@@ -343,16 +343,17 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
                         auto closure = surface->closure(*it, swl, time);
 
                         // direct lighting
-                        //                        $if(light_sample.eval.pdf > 0.0f & !occluded) {
-                        //                            auto wi = light_sample.wi;
-                        //                            auto eval = closure->evaluate(wi);
-                        //                            auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
-                        //
-                        //                            //                            Li += mis_weight / light_sample.eval.pdf * abs(dot(eval.normal, wi)) *
-                        //                            //                                  beta * eval.f * light_sample.eval.L;
-                        //                            auto weight = mis_weight / light_sample.eval.pdf * abs(dot(eval.normal, wi));
-                        //                            // TODO : backward_sample of light
-                        //                        };
+                        $if(light_sample.eval.pdf > 0.0f & !occluded) {
+                            auto wi = light_sample.wi;
+                            auto eval = closure->evaluate(wi);
+                            auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
+
+                            auto weight = mis_weight / light_sample.eval.pdf * abs(dot(eval.normal, wi));
+                            //                            Li += mis_weight / light_sample.eval.pdf *
+                            //                                  abs_dot(eval.normal, wi) *
+                            //                                  beta * eval.f * light_sample.eval.L;
+                            closure->backward(wi, weight * beta * light_sample.eval.L);
+                        };
 
                         // sample material
                         auto sample = closure->sample(u_lobe, u_bsdf);
@@ -515,6 +516,7 @@ void MegakernelRadiativeDiffInstance::_render_one_camera(
                             auto wi = light_sample.wi;
                             auto eval = closure->evaluate(wi);
                             auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
+                            // TODO : or apply the approximation light_sample.eval.L / light_sample.eval.pdf = 1.f
                             Li += mis_weight / light_sample.eval.pdf *
                                   abs_dot(eval.normal, wi) *
                                   beta * eval.f * light_sample.eval.L;
