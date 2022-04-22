@@ -167,9 +167,9 @@ public:
             }
 
             // back propagate
-            Clock clock;
             LUISA_INFO("");
             LUISA_INFO("Start to step");
+            Clock clock;
             pipeline().differentiation().step(command_buffer, learning_rate);
             LUISA_INFO("Step finished in {} ms", clock.toc());
         }

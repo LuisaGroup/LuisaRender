@@ -41,7 +41,8 @@ private:
     luisa::vector<float4> _pixels;
     luisa::optional<Window> _window;
     luisa::unordered_map<const Camera::Instance *, Shader<2, uint, float, float>>
-        _bp_shaders, _render_shaders;
+        _bp_shaders, _render_shaders, _render_1spp_shaders;
+    luisa::unordered_map<const Camera::Instance *, luisa::optional<BufferView<float3>>> _Li;
 
 private:
     void _render_one_camera(
@@ -56,6 +57,8 @@ public:
         const MegakernelReplayDiff *node,
         Pipeline &pipeline, CommandBuffer &command_buffer) noexcept
         : Integrator::Instance{pipeline, command_buffer, node} {
+
+        // display
         if (node->display_camera_index() >= 0) {
             LUISA_ASSERT(node->display_camera_index() < pipeline.camera_count(),
                          "display_camera_index exceeds camera count");
@@ -66,9 +69,20 @@ public:
             _pixels.resize(next_pow2(pixel_count) * 4u);
         }
 
+        // save Li of the 2nd pass
+        for (auto i = 0; i < pipeline.camera_count(); ++i) {
+            auto camera = pipeline.camera(i);
+            auto resolution = camera->film()->node()->resolution();
+            auto pixel_count = resolution.x * resolution.y;
+            _Li.emplace(camera, pipeline.device().create<Buffer<float3>>(pixel_count));
+        }
+
+        // handle output dir
         std::filesystem::path output_dir{"outputs"};
         std::filesystem::remove_all(output_dir);
         std::filesystem::create_directories(output_dir);
+
+        command_buffer << synchronize();
     }
 
     void display(CommandBuffer &command_buffer, const Film::Instance *film, uint iteration) noexcept {
@@ -229,8 +243,121 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
     command_buffer.commit();
     auto pt_exact = pt->node<MegakernelReplayDiff>();
 
-    auto shader_iter = _bp_shaders.find(camera);
-    if (shader_iter == _bp_shaders.end()) {
+    auto render_1spp_shader_iter = _render_1spp_shaders.find(camera);
+    if (render_1spp_shader_iter == _render_1spp_shaders.end()) {
+        using namespace luisa::compute;
+
+        Callable balanced_heuristic = [](Float pdf_a, Float pdf_b) noexcept {
+            return ite(pdf_a > 0.0f, pdf_a / (pdf_a + pdf_b), 0.0f);
+        };
+
+        Kernel2D render_kernel = [&](UInt frame_index, Float time, Float shutter_weight) noexcept {
+            set_block_size(8u, 8u, 1u);
+
+            auto pixel_id = dispatch_id().xy();
+            sampler->start(pixel_id, frame_index);
+            auto [camera_ray, camera_weight] = camera->generate_ray(*sampler, pixel_id, time);
+            auto swl = pt->spectrum()->sample(*sampler);
+            SampledSpectrum beta{swl.dimension(), camera_weight};
+            SampledSpectrum Li{swl.dimension()};
+
+            auto ray = camera_ray;
+            auto pdf_bsdf = def(1e16f);
+            $for(depth, pt->node<MegakernelReplayDiff>()->max_depth()) {
+
+                // trace
+                auto it = pipeline().intersect(ray);
+
+                // miss
+                $if(!it->valid()) {
+                    if (pipeline().environment()) {
+                        auto eval = light_sampler->evaluate_miss(ray->direction(), swl, time);
+                        Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
+                    }
+                    $break;
+                };
+
+                // hit light
+                if (!pipeline().lights().empty()) {
+                    $if(it->shape()->has_light()) {
+                        auto eval = light_sampler->evaluate_hit(
+                            *it, ray->origin(), swl, time);
+                        Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
+                    };
+                }
+
+                $if(!it->shape()->has_surface()) { $break; };
+
+                // sample one light
+                Light::Sample light_sample = light_sampler->sample(
+                    *sampler, *it, swl, time);
+
+                // trace shadow ray
+                auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
+                auto occluded = pipeline().intersect_any(shadow_ray);
+
+                // evaluate material
+                SampledSpectrum eta_scale{swl.dimension(), 1.f};
+                auto cos_theta_o = it->wo_local().z;
+                auto surface_tag = it->shape()->surface_tag();
+                auto u_lobe = sampler->generate_1d();
+                auto u_bsdf = sampler->generate_2d();
+                pipeline().dynamic_dispatch_surface(surface_tag, [&](auto surface) {
+                    // apply roughness map
+                    auto alpha_skip = def(false);
+                    if (auto alpha_map = surface->alpha()) {
+                        auto alpha = alpha_map->evaluate(*it, time).x;
+                        alpha_skip = alpha < u_lobe;
+                        u_lobe = ite(alpha_skip, (u_lobe - alpha) / (1.f - alpha), u_lobe / alpha);
+                    }
+
+                    $if(alpha_skip) {
+                        ray = it->spawn_ray(ray->direction());
+                        pdf_bsdf = 1e16f;
+                    }
+                    $else {
+                        // create closure
+                        auto closure = surface->closure(*it, swl, time);
+
+                        // direct lighting
+                        $if(light_sample.eval.pdf > 0.0f & !occluded) {
+                            auto wi = light_sample.wi;
+                            auto eval = closure->evaluate(wi);
+                            auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
+                            Li += mis_weight / light_sample.eval.pdf *
+                                  abs_dot(eval.normal, wi) *
+                                  beta * eval.f * light_sample.eval.L;
+                        };
+
+                        // sample material
+                        auto sample = closure->sample(u_lobe, u_bsdf);
+                        ray = it->spawn_ray(sample.wi);
+                        pdf_bsdf = sample.eval.pdf;
+                        auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
+                        beta *= abs(dot(sample.eval.normal, sample.wi)) * w * sample.eval.f;
+                    };
+                });
+
+                // rr
+                $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
+                auto q = max(swl.cie_y(beta * eta_scale), .05f);
+                auto rr_depth = pt->node<MegakernelReplayDiff>()->rr_depth();
+                auto rr_threshold = pt->node<MegakernelReplayDiff>()->rr_threshold();
+                $if(depth >= rr_depth & q < rr_threshold) {
+                    $if(sampler->generate_1d() >= q) { $break; };
+                    beta *= 1.0f / q;
+                };
+            };
+            auto pixel_id_1d = pixel_id.y * resolution.x + pixel_id.x;
+            _Li[camera]->write(pixel_id_1d, swl.srgb(Li * shutter_weight));
+        };
+        auto render_shader = pipeline().device().compile(render_kernel);
+        render_1spp_shader_iter = _render_1spp_shaders.emplace(camera, std::move(render_shader)).first;
+    }
+    auto &&render_1spp_shader = render_1spp_shader_iter->second;
+
+    auto bp_shader_iter = _bp_shaders.find(camera);
+    if (bp_shader_iter == _bp_shaders.end()) {
         using namespace luisa::compute;
 
         Callable balanced_heuristic = [](Float pdf_a, Float pdf_b) noexcept {
@@ -269,8 +396,14 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
             auto [camera_ray, camera_weight] = camera->generate_ray(*sampler, pixel_id, time);
             auto swl = pt->spectrum()->sample(*sampler);
             SampledSpectrum beta{swl.dimension(), camera_weight};
-            SampledSpectrum Li{swl.dimension(), 1.0f};
+            SampledSpectrum Li{swl.dimension(), 0.f};
             auto grad_weight = shutter_weight * static_cast<float>(pt->node<MegakernelReplayDiff>()->max_depth());
+
+            auto pixel_id_1d = pixel_id.y * resolution.x + pixel_id.x;
+            auto Li_last_pass = _Li[camera]->read(pixel_id_1d);
+            Li[0u] = Li_last_pass[0u];
+            Li[1u] = Li_last_pass[1u];
+            Li[2u] = Li_last_pass[2u];
 
             auto d_loss = bp_loss(pixel_id, time);
             for (auto i = 0u; i < 3u; ++i) {
@@ -296,15 +429,15 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                     $break;
                 };
 
-                //                // hit light
-                //                if (!pipeline().lights().empty()) {
-                //                    $if(it->shape()->has_light()) {
-                //                        auto eval = light_sampler->evaluate_hit(
-                //                            *it, ray->origin(), swl, time);
-                //                        Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
-                //                    };
-                //                    // TODO : backward hit light
-                //                }
+                // hit light
+                if (!pipeline().lights().empty()) {
+                    $if(it->shape()->has_light()) {
+                        auto eval = light_sampler->evaluate_hit(
+                            *it, ray->origin(), swl, time);
+                        Li -= beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
+                    };
+                    // TODO : backward hit light
+                }
 
                 $if(!it->shape()->has_surface()) { $break; };
 
@@ -343,13 +476,10 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                             auto wi = light_sample.wi;
                             auto eval = closure->evaluate(wi);
                             auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
-                            //                            Li += mis_weight / light_sample.eval.pdf *
-                            //                                  abs_dot(eval.normal, wi) *
-                            //                                  beta * eval.f * light_sample.eval.L;
+                            auto weight = mis_weight / light_sample.eval.pdf * abs(dot(eval.normal, wi)) * beta;
+                            Li -= weight * eval.f * light_sample.eval.L;
 
-                            // TODO : or apply the approximation light_sample.eval.L / light_sample.eval.pdf = 1.f
-                            auto weight = mis_weight / light_sample.eval.pdf * abs(dot(eval.normal, wi));
-                            closure->backward(wi, weight * beta * light_sample.eval.L);
+                            closure->backward(wi, weight * light_sample.eval.L);
 
                             // TODO : backward direct light
                         };
@@ -360,11 +490,11 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                         pdf_bsdf = sample.eval.pdf;
                         auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
 
-                        // radiative bp
-                        // Li * d_fs
-                        closure->backward(sample.wi, grad_weight * beta * Li * w);
+                        // path replay bp
+                        auto df = grad_weight * Li;
+                        df = ite(sample.eval.f == 0.f, 0.f, df / sample.eval.f);
+                        closure->backward(sample.wi, df);
 
-                        // d_Li * fs
                         beta *= abs(dot(sample.eval.normal, sample.wi)) * w * sample.eval.f;
                     };
                 });
@@ -381,30 +511,40 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
             };
         };
         auto bp_shader = pipeline().device().compile(bp_kernel);
-        shader_iter = _bp_shaders.emplace(camera, std::move(bp_shader)).first;
+        bp_shader_iter = _bp_shaders.emplace(camera, std::move(bp_shader)).first;
     }
-    auto &&bp_shader = shader_iter->second;
-    auto shutter_samples = camera->node()->shutter_samples();
+    auto &&bp_shader = bp_shader_iter->second;
     command_buffer << synchronize();
 
     Clock clock;
     auto dispatch_count = 0u;
     auto dispatches_per_commit = 8u;
     auto sample_id = 0u;
+
+    // de-correlate seed from the rendering part
+    // Azinović, Tzu-Mao Li et al. [2019]
+    // Inverse Path Tracing for Joint Material and Lighting Estimation
+    auto seed_start = node<MegakernelReplayDiff>()->iterations() * spp;
+
+    auto shutter_samples = camera->node()->shutter_samples();
     for (auto s : shutter_samples) {
         if (pipeline().update(command_buffer, s.point.time)) { dispatch_count = 0u; }
         for (auto i = 0u; i < s.spp; i++) {
-            command_buffer << bp_shader(iteration * spp + sample_id++,
+            command_buffer << render_1spp_shader(seed_start + iteration * spp + sample_id++,
+                                                 s.point.time, s.point.weight)
+                                  .dispatch(resolution)
+                           << bp_shader(seed_start + iteration * spp + sample_id++,
                                         s.point.time, s.point.weight)
                                   .dispatch(resolution);
-            if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
+            dispatch_count += 2u;
+            if (dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
                 command_buffer << commit();
-                dispatch_count = 0u;
+                dispatch_count -= dispatches_per_commit;
             }
         }
     }
 
-    command_buffer << commit() << synchronize();
+    command_buffer << synchronize();
     LUISA_INFO("Backward propagation finished in {} ms.",
                clock.toc());
 }

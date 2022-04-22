@@ -4,6 +4,7 @@
 
 #include <base/texture.h>
 #include <base/pipeline.h>
+#include <util/rng.h>
 
 namespace luisa::render {
 
@@ -57,8 +58,11 @@ public:
         if (_diff_param) { return pipeline().differentiation().decode(*_diff_param); }
         return def(node<ConstantTexture>()->v());
     }
-    void backward(const Interaction &, Expr<float>, Expr<float4> grad) const noexcept override {
-        if (_diff_param) { pipeline().differentiation().accumulate(*_diff_param, grad); }
+    void backward(const Interaction &it, Expr<float>, Expr<float4> grad) const noexcept override {
+        if (_diff_param) {
+            auto slot_seed = xxhash32(as<uint3>(it.p()));
+            pipeline().differentiation().accumulate(*_diff_param, grad, slot_seed);
+        }
     }
 };
 

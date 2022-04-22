@@ -264,6 +264,7 @@ Camera camera1 : Pinhole {
 }
 
 Integrator pt : MegaRadiativeDiff {
+//Integrator pt : MegaReplayDiff {
   sampler : Independent {}
   depth { 10 }
   spectrum : sRGB {}

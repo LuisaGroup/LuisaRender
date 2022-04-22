@@ -442,26 +442,26 @@ float DenselySampledSpectrum::cie_y_integral() noexcept {
 }
 
 SampledSpectrum zero_if_any_nan(const SampledSpectrum &t) noexcept {
-    auto has_nan = t.any([](const auto &value) { return isnan(value); });
-    return t.map([&has_nan](auto, auto x) noexcept { return ite(has_nan, 0.f, x); });
+    auto any_nan = t.any([](const auto &value) { return isnan(value); });
+    return t.map([&any_nan](auto, auto x) noexcept { return ite(any_nan, 0.f, x); });
 }
 
 SampledSpectrum ite(const SampledSpectrum &p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept {
     return p.map([&t, &f](auto i, auto b) noexcept { return ite(b != 0.f, t[i], f[i]); });
 }
-SampledSpectrum render::ite(const SampledSpectrum &p, Expr<float> t, const SampledSpectrum &f) noexcept {
+SampledSpectrum ite(const SampledSpectrum &p, Expr<float> t, const SampledSpectrum &f) noexcept {
     return p.map([&t, &f](auto i, auto b) noexcept { return ite(b != 0.f, t, f[i]); });
 }
-SampledSpectrum render::ite(const SampledSpectrum &p, const SampledSpectrum &t, Expr<float> f) noexcept {
+SampledSpectrum ite(const SampledSpectrum &p, const SampledSpectrum &t, Expr<float> f) noexcept {
     return p.map([&t, &f](auto i, auto b) noexcept { return ite(b != 0.f, t[i], f); });
 }
 SampledSpectrum ite(Expr<bool> p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept {
     return t.map([p, &f](auto i, auto x) noexcept { return ite(p, x, f[i]); });
 }
-SampledSpectrum render::ite(Expr<bool> p, Expr<float> t, const SampledSpectrum &f) noexcept {
+SampledSpectrum ite(Expr<bool> p, Expr<float> t, const SampledSpectrum &f) noexcept {
     return f.map([p, t](auto i, auto x) noexcept { return ite(p, t, x); });
 }
-SampledSpectrum render::ite(Expr<bool> p, const SampledSpectrum &t, Expr<float> f) noexcept {
+SampledSpectrum ite(Expr<bool> p, const SampledSpectrum &t, Expr<float> f) noexcept {
     return t.map([p, f](auto i, auto x) noexcept { return ite(p, x, f); });
 }
 

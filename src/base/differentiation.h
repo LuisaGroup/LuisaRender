@@ -30,6 +30,7 @@ class Differentiation {
 
 private:
     static constexpr uint gradiant_collision_avoidance_block_size = 512u;
+    static constexpr uint gradiant_collision_avoidance_bit_and = 511u;
 
     static constexpr uint constant_parameter_buffer_capacity = 4096u;
     static constexpr uint constant_parameter_counter_size =
@@ -115,7 +116,7 @@ public:
 
 public:
     [[nodiscard]] Float4 decode(const ConstantParameter &param) const noexcept;
-    void accumulate(const ConstantParameter &param, Expr<float4> grad) const noexcept;
+    void accumulate(const ConstantParameter &param, Expr<float4> grad, Expr<uint> slot_seed) const noexcept;
     void accumulate(const TexturedParameter &param, Expr<float2> p, Expr<float4> grad) const noexcept;
 };
 

@@ -115,29 +115,46 @@ public:
         return map([](auto, auto s) noexcept { return compute::abs(s); });
     }
 
-#define LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP(op)                                    \
-    [[nodiscard]] auto operator op(Expr<float> rhs) const noexcept {                        \
-        return map([rhs](auto, const auto &lvalue) { return lvalue op rhs; });              \
-    }                                                                                       \
-    [[nodiscard]] auto operator op(const SampledSpectrum &rhs) const noexcept {             \
-        return map([&rhs](auto i, const auto &lvalue) { return lvalue op rhs[i]; });        \
-    }                                                                                       \
-    friend auto operator op(Expr<float> lhs, const SampledSpectrum &rhs) noexcept {         \
-        return rhs.map([lhs](auto, const auto &rvalue) noexcept { return lhs op rvalue; }); \
-    }                                                                                       \
-    auto &operator op##=(Expr<float> rhs) noexcept {                                        \
-        for (auto i = 0u; i < dimension(); i++) { (*this)[i] op## = rhs; }                  \
-        return *this;                                                                       \
-    }                                                                                       \
-    auto &operator op##=(const SampledSpectrum &rhs) noexcept {                             \
-        for (auto i = 0u; i < dimension(); i++) { (*this)[i] op## = rhs[i]; }               \
-        return *this;                                                                       \
+#define LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP(op)                                          \
+    [[nodiscard]] auto operator op(Expr<float> rhs) const noexcept {                              \
+        return map([rhs](auto, const auto &lvalue) { return lvalue op rhs; });                    \
+    }                                                                                             \
+    [[nodiscard]] auto operator op(const SampledSpectrum &rhs) const noexcept {                   \
+        return map([&rhs](auto i, const auto &lvalue) { return lvalue op rhs[i]; });              \
+    }                                                                                             \
+    [[nodiscard]] friend auto operator op(Expr<float> lhs, const SampledSpectrum &rhs) noexcept { \
+        return rhs.map([lhs](auto, const auto &rvalue) noexcept { return lhs op rvalue; });       \
+    }                                                                                             \
+    auto &operator op##=(Expr<float> rhs) noexcept {                                              \
+        for (auto i = 0u; i < dimension(); i++) { (*this)[i] op## = rhs; }                        \
+        return *this;                                                                             \
+    }                                                                                             \
+    auto &operator op##=(const SampledSpectrum &rhs) noexcept {                                   \
+        for (auto i = 0u; i < dimension(); i++) { (*this)[i] op## = rhs[i]; }                     \
+        return *this;                                                                             \
     }
     LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP(+)
     LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP(-)
     LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP(*)
     LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP(/)
 #undef LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP
+
+#define LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_COMPARISON_OP(op)                                      \
+    [[nodiscard]] auto operator op(Expr<float> rhs) const noexcept {                              \
+        return map([rhs](auto, const auto &lvalue) { return lvalue op rhs; });                    \
+    }                                                                                             \
+    [[nodiscard]] auto operator op(const SampledSpectrum &rhs) const noexcept {                   \
+        return map([&rhs](auto i, const auto &lvalue) { return lvalue op rhs[i]; });              \
+    }                                                                                             \
+    [[nodiscard]] friend auto operator op(Expr<float> lhs, const SampledSpectrum &rhs) noexcept { \
+        return rhs.map([lhs](auto, const auto &rvalue) noexcept { return lhs op rvalue; });       \
+    }
+    LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_COMPARISON_OP(>)
+    LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_COMPARISON_OP(>=)
+    LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_COMPARISON_OP(<)
+    LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_COMPARISON_OP(<=)
+    LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_COMPARISON_OP(==)
+#undef LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_COMPARISON_OP
 };
 
 [[nodiscard]] SampledSpectrum ite(const SampledSpectrum &p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept;
