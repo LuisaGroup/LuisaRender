@@ -41,8 +41,9 @@ private:
     luisa::vector<float4> _pixels;
     luisa::optional<Window> _window;
     luisa::unordered_map<const Camera::Instance *, Shader<2, uint, float, float>>
-        _bp_shaders, _render_shaders, _render_1spp_shaders;
-    luisa::unordered_map<const Camera::Instance *, luisa::optional<BufferView<float3>>> _Li;
+        _render_shaders;
+    luisa::unordered_map<const Camera::Instance *, Shader<2, uint, float, float, Image<float>>> _bp_shaders, _render_1spp_shaders;
+    luisa::unordered_map<const Camera::Instance *, Image<float>> _Li;
 
 private:
     void _render_one_camera(
@@ -73,8 +74,7 @@ public:
         for (auto i = 0; i < pipeline.camera_count(); ++i) {
             auto camera = pipeline.camera(i);
             auto resolution = camera->film()->node()->resolution();
-            auto pixel_count = resolution.x * resolution.y;
-            _Li.emplace(camera, pipeline.device().create<Buffer<float3>>(pixel_count));
+            _Li.emplace(camera, pipeline.device().create_image<float>(PixelStorage::FLOAT4, resolution));
         }
 
         // handle output dir
@@ -251,7 +251,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
             return ite(pdf_a > 0.0f, pdf_a / (pdf_a + pdf_b), 0.0f);
         };
 
-        Kernel2D render_kernel = [&](UInt frame_index, Float time, Float shutter_weight) noexcept {
+        Kernel2D render_kernel_1spp = [&](UInt frame_index, Float time, Float shutter_weight, ImageFloat Li_1spp) noexcept {
             set_block_size(8u, 8u, 1u);
 
             auto pixel_id = dispatch_id().xy();
@@ -348,10 +348,9 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                     beta *= 1.0f / q;
                 };
             };
-            auto pixel_id_1d = pixel_id.y * resolution.x + pixel_id.x;
-            _Li[camera]->write(pixel_id_1d, swl.srgb(Li * shutter_weight));
+            Li_1spp.write(pixel_id, make_float4(swl.srgb(Li * shutter_weight), 1.f));
         };
-        auto render_shader = pipeline().device().compile(render_kernel);
+        auto render_shader = pipeline().device().compile(render_kernel_1spp);
         render_1spp_shader_iter = _render_1spp_shaders.emplace(camera, std::move(render_shader)).first;
     }
     auto &&render_1spp_shader = render_1spp_shader_iter->second;
@@ -388,7 +387,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
             return def(make_float3(0.f));
         };
 
-        Kernel2D bp_kernel = [&](UInt frame_index, Float time, Float shutter_weight) noexcept {
+        Kernel2D bp_kernel = [&](UInt frame_index, Float time, Float shutter_weight, ImageFloat Li_1spp) noexcept {
             set_block_size(8u, 8u, 1u);
 
             auto pixel_id = dispatch_id().xy();
@@ -399,8 +398,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
             SampledSpectrum Li{swl.dimension(), 0.f};
             auto grad_weight = shutter_weight * static_cast<float>(pt->node<MegakernelReplayDiff>()->max_depth());
 
-            auto pixel_id_1d = pixel_id.y * resolution.x + pixel_id.x;
-            auto Li_last_pass = _Li[camera]->read(pixel_id_1d);
+            auto Li_last_pass = Li_1spp.read(pixel_id);
             Li[0u] = Li_last_pass[0u];
             Li[1u] = Li_last_pass[1u];
             Li[2u] = Li_last_pass[2u];
@@ -491,6 +489,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                         auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
 
                         // path replay bp
+                        Li = ite(Li < 0.f, 0.f, Li);
                         auto df = grad_weight * Li;
                         df = ite(sample.eval.f == 0.f, 0.f, df / sample.eval.f);
                         closure->backward(sample.wi, df);
@@ -526,15 +525,16 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
     // Inverse Path Tracing for Joint Material and Lighting Estimation
     auto seed_start = node<MegakernelReplayDiff>()->iterations() * spp;
 
+    auto &&Li_1spp = _Li[camera];
     auto shutter_samples = camera->node()->shutter_samples();
     for (auto s : shutter_samples) {
         if (pipeline().update(command_buffer, s.point.time)) { dispatch_count = 0u; }
         for (auto i = 0u; i < s.spp; i++) {
             command_buffer << render_1spp_shader(seed_start + iteration * spp + sample_id++,
-                                                 s.point.time, s.point.weight)
+                                                 s.point.time, s.point.weight, Li_1spp)
                                   .dispatch(resolution)
                            << bp_shader(seed_start + iteration * spp + sample_id++,
-                                        s.point.time, s.point.weight)
+                                        s.point.time, s.point.weight, Li_1spp)
                                   .dispatch(resolution);
             dispatch_count += 2u;
             if (dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {

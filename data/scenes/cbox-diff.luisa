@@ -155,9 +155,9 @@ Surface surface-plastic : Plastic {
 
 Surface surface-glass : Glass {
   Kr : Constant {
-    v { 0.2, 0.8, 0.2 }
-    //v { 0.8, 0.2, 0.2 }
-    //requires_grad { true }
+    //v { 0.2, 0.8, 0.2 }
+    v { 0.8, 0.2, 0.2 }
+    requires_grad { true }
     range { 0, 1 }
   }
   Kt : Constant {
@@ -170,9 +170,9 @@ Surface surface-glass : Glass {
     v { 1.5 }
   }
   roughness : Constant {
-    //v { 0.001 }
-    v { 0.2 }
-    requires_grad { true }
+    v { 0.001 }
+    //v { 0.2 }
+    //requires_grad { true }
     range { 0.001, 1 }
   }
 }
@@ -263,8 +263,8 @@ Camera camera1 : Pinhole {
   }
 }
 
-Integrator pt : MegaRadiativeDiff {
-//Integrator pt : MegaReplayDiff {
+//Integrator pt : MegaRadiativeDiff {
+Integrator pt : MegaReplayDiff {
   sampler : Independent {}
   depth { 10 }
   spectrum : sRGB {}
