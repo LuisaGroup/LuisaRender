@@ -53,19 +53,8 @@ public:
         LUISA_RENDER_DISNEY_PARAM_LOAD(diffuse_trans)
 #undef LUISA_RENDER_DISNEY_PARAM_LOAD
 
-        LUISA_RENDER_PARAM_CHANNEL_CHECK(DisneySurface, color, >=, 3);
-        LUISA_RENDER_PARAM_CHANNEL_CHECK(DisneySurface, metallic, ==, 1);
-        LUISA_RENDER_PARAM_CHANNEL_CHECK(DisneySurface, eta, ==, 1);
-        LUISA_RENDER_PARAM_CHANNEL_CHECK(DisneySurface, roughness, ==, 1);
-        LUISA_RENDER_PARAM_CHANNEL_CHECK(DisneySurface, specular_tint, ==, 1);
-        LUISA_RENDER_PARAM_CHANNEL_CHECK(DisneySurface, anisotropic, ==, 1);
-        LUISA_RENDER_PARAM_CHANNEL_CHECK(DisneySurface, sheen, ==, 1);
-        LUISA_RENDER_PARAM_CHANNEL_CHECK(DisneySurface, sheen_tint, ==, 1);
-        LUISA_RENDER_PARAM_CHANNEL_CHECK(DisneySurface, clearcoat, ==, 1);
-        LUISA_RENDER_PARAM_CHANNEL_CHECK(DisneySurface, clearcoat_gloss, ==, 1);
-        LUISA_RENDER_PARAM_CHANNEL_CHECK(DisneySurface, specular_trans, ==, 1);
-        LUISA_RENDER_PARAM_CHANNEL_CHECK(DisneySurface, flatness, ==, 1);
-        LUISA_RENDER_PARAM_CHANNEL_CHECK(DisneySurface, diffuse_trans, ==, 1);
+        // check channels
+        LUISA_RENDER_PARAM_CHANNEL_CHECK(DisneySurface, color, 3);
     }
     [[nodiscard]] auto thin() const noexcept { return _thin; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override {

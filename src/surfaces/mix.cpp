@@ -24,10 +24,7 @@ public:
         : Surface{scene, desc},
           _a{scene->load_surface(desc->property_node_or_default("a"))},
           _b{scene->load_surface(desc->property_node_or_default("b"))},
-          _ratio{scene->load_texture(desc->property_node_or_default("ratio"))} {
-
-        LUISA_RENDER_PARAM_CHANNEL_CHECK(MixSurface, ratio, ==, 1);
-    }
+          _ratio{scene->load_texture(desc->property_node_or_default("ratio"))} {}
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] bool is_null() const noexcept override {
         return (_a == nullptr || _a->is_null()) &&

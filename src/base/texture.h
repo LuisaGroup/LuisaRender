@@ -13,14 +13,14 @@
 
 namespace luisa::render {
 
-#define LUISA_RENDER_PARAM_CHANNEL_CHECK(class_name, name, op, channel_num) \
-    [&] {                                                                   \
-        if ((_##name != nullptr) &&                                         \
-            (!(_##name->channels() op channel_num##u))) [[unlikely]] {      \
-            LUISA_ERROR_WITH_LOCATION(                                      \
-                "Expected channels " #op " " #channel_num                   \
-                " for " #class_name "::" #name ".");                        \
-        }                                                                   \
+#define LUISA_RENDER_PARAM_CHANNEL_CHECK(class_name, name, channel_num) \
+    [&] {                                                               \
+        if ((_##name != nullptr) &&                                     \
+            (_##name->channels() < channel_num##u)) [[unlikely]] {      \
+            LUISA_ERROR_WITH_LOCATION(                                  \
+                "Expected channels >= " #channel_num                    \
+                " for " #class_name "::" #name ".");                    \
+        }                                                               \
     }()
 
 class Pipeline;
@@ -49,8 +49,9 @@ public:
             : _pipeline{pipeline}, _texture{texture} {}
         virtual ~Instance() noexcept = default;
         template<typename T = Texture>
-            requires std::is_base_of_v<Texture, T>
-        [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_texture); }
+            requires std::is_base_of_v<Texture, T> [
+                [nodiscard]] auto
+            node() const noexcept { return static_cast<const T *>(_texture); }
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
         [[nodiscard]] virtual Float4 evaluate(const Interaction &it, Expr<float> time) const noexcept = 0;
         virtual void backward(const Interaction &it, Expr<float> time, Expr<float4> grad) const noexcept = 0;
