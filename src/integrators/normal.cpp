@@ -80,7 +80,7 @@ void NormalVisualizerInstance::_render_one_camera(
         auto path_weight = camera_weight;
         auto it = pipeline().intersect(ray);
         auto color = def(make_float3());
-        $if(it->valid()) { color = it->shading().n() * .5f + .5f; };
+        $if(it->valid()) { color = it->p(); };
         camera->film()->accumulate(pixel_id, shutter_weight * path_weight * color);
     });
     auto shutter_samples = camera->node()->shutter_samples();

@@ -308,7 +308,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
                     pt->display(command_buffer, camera->film(), sample_id);
                     progress.update(p);
                 } else {
-//                    command_buffer << [&progress, p] { progress.update(p); };
+                    command_buffer << [&progress, p] { progress.update(p); };
                 }
             }
         }
