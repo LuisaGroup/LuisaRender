@@ -132,7 +132,9 @@ public:
     void render(Stream &stream) noexcept override {
         auto pt = node<MegakernelReplayDiff>();
         auto command_buffer = stream.command_buffer();
+#ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
         pipeline().printer().reset(stream);
+#endif
 
         luisa::vector<float4> rendered;
 
@@ -207,7 +209,9 @@ public:
 
             save_image(film_path, (const float *)rendered.data(), resolution);
         }
+#ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
         std::cout << pipeline().printer().retrieve(stream);
+#endif
         LUISA_INFO("Finish saving results");
 
         // dump results of textured parameters
@@ -540,8 +544,6 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                                 auto Li_variation = weight * eval.f * light_sample.eval.L;
                                 pipeline().printer().log("direct lighting Li_variation = (",
                                                          Li_variation[0u], ", ", Li_variation[1u], ", ", Li_variation[2u], ")");
-                                pipeline().printer().log("beta = (",
-                                                         beta[0u], ", ", beta[1u], ", ", beta[2u], ")");
                                 pipeline().printer().log("Li = (", Li[0u], ", ", Li[1u], ", ", Li[2u], ")");
                             };
 #endif
@@ -558,7 +560,6 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                         auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
 
                         // path replay bp
-                        //                        Li = ite(Li < 0.f, 0.f, Li);
                         auto df = d_loss * grad_weight * Li;
                         df = ite(sample.eval.f == 0.f, 0.f, df / sample.eval.f);
                         closure->backward(sample.wi, df);
@@ -616,7 +617,9 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                 command_buffer << commit();
                 dispatch_count -= dispatches_per_commit;
             }
+#ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
             std::cout << pipeline().printer().retrieve(command_buffer) << std::flush;
+#endif
         }
     }
 
