@@ -3,7 +3,7 @@
 //
 
 #include <util/imageio.h>
-
+#include <util/rng.h>
 #include <base/pipeline.h>
 #include <base/integrator.h>
 
