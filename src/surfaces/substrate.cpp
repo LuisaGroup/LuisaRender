@@ -129,8 +129,8 @@ private:
 
         auto grad = _blend->backward(wo_local, wi_local, df);
 
-        _instance->Kd()->backward_albedo_spectrum(_it, _swl, _time, grad.dRd);
-        _instance->Ks()->backward_albedo_spectrum(_it, _swl, _time, grad.dRs);
+        _instance->Kd()->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(grad.dRd));
+        _instance->Ks()->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(grad.dRs));
         if (auto roughness = _instance->roughness()) {
             auto remap = _instance->node<SubstrateSurface>()->remap_roughness();
             auto r_f4 = roughness->evaluate(_it, _time);

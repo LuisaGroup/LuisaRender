@@ -184,12 +184,12 @@ private:
                     d_Ks_rgb *= sqr(scale) * (k0 - Ks_rgb[i]);
                 };
             }
-            _instance->Kd()->backward(_it, _time, make_float4(d_Kd_rgb, 0.f));
-            _instance->Ks()->backward(_it, _time, make_float4(d_Ks_rgb, 0.f));
+            _instance->Kd()->backward(_it, _time, make_float4(ite(any(isnan(d_Kd_rgb)), 0.f, d_Kd_rgb), 0.f));
+            _instance->Ks()->backward(_it, _time, make_float4(ite(any(isnan(d_Ks_rgb)), 0.f, d_Ks_rgb), 0.f));
         }
         $else {
-            _instance->Kd()->backward_albedo_spectrum(_it, _swl, _time, d_f_d.dR);
-            _instance->Ks()->backward_albedo_spectrum(_it, _swl, _time, d_f_s.dR);
+            _instance->Kd()->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(d_f_d.dR));
+            _instance->Ks()->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(d_f_s.dR));
         };
 
         // roughness

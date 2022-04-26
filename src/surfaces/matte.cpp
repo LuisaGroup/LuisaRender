@@ -108,9 +108,9 @@ private:
 
         auto grad = _oren_nayar->backward(wo_local, wi_local, df);
 
-        _instance->Kd()->backward_albedo_spectrum(_it, _swl, _time, grad.dR);
+        _instance->Kd()->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(grad.dR));
         if (auto sigma = _instance->sigma()) {
-            sigma->backward(_it, _time, make_float4(grad.dSigma, 0.f, 0.f, 0.f));
+            sigma->backward(_it, _time, make_float4(ite(isnan(grad.dSigma), 0.f, grad.dSigma), 0.f, 0.f, 0.f));
         }
     }
 };
