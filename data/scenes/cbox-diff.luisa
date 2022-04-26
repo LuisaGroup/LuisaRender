@@ -155,9 +155,9 @@ Surface surface-plastic : Plastic {
 
 Surface surface-glass : Glass {
   Kr : Constant {
-    //v { 0.2, 0.8, 0.2 }
-    v { 0.8, 0.2, 0.2 }
-    requires_grad { true }
+    v { 0.2, 0.8, 0.2 }
+    //v { 0.8, 0.2, 0.2 }
+    //requires_grad { true }
     range { 0, 1 }
   }
   Kt : Constant {
@@ -170,9 +170,9 @@ Surface surface-glass : Glass {
     v { 1.5 }
   }
   roughness : Constant {
-    v { 0.001 }
-    //v { 0.2 }
-    //requires_grad { true }
+    //v { 0.001 }
+    v { 0.2 }
+    requires_grad { true }
     range { 0.001, 1 }
   }
 }
@@ -237,7 +237,7 @@ Shape cbox : Group {
 Camera camera0 : Pinhole {
   position { -0.01, 0.995, 5.0 }
   fov { 27.8 }
-  spp { 512 }
+  spp { 1 }
   film { @film }
   file { "../renders/cbox-glass-diff-0.exr" }
   filter : Gaussian {
@@ -252,7 +252,7 @@ Camera camera1 : Pinhole {
   position { 1, 1.6, 2.0 }
   front { -0.4, -0.2, -1 }
   fov { 40 }
-  spp { 512 }
+  spp { 1 }
   film { @film }
   file { "../renders/cbox-glass-diff-1.exr" }
   filter : Gaussian {
@@ -273,7 +273,7 @@ Integrator pt : MegaReplayDiff {
   optimizer { "BGD" }
   loss { "L2" }
   learning_rate { 0.1 }
-  iterations { 100 }
+  iterations { 1 }
 }
 
 render {

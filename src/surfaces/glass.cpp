@@ -231,7 +231,6 @@ public:
                               make_float4(d_r, 0.f, 0.f);
             auto roughness_grad_range = 5.f * (roughness->node()->range().y - roughness->node()->range().x);
             roughness->backward(_it, _time, ite(any(isnan(d_r_f4) || abs(d_r_f4) > roughness_grad_range), 0.f, d_r_f4));
-            //            roughness->backward(_it, _time, make_float4(1.f, 0.f, 0.f, 0.f));
         }
     }
 };

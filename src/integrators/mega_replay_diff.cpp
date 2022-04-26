@@ -508,6 +508,11 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                     beta *= 1.0f / q;
                 };
             };
+
+            $if(all(pixel_id == make_uint2(0u, 0u))) {
+                //                pipeline().printer().log("Li = (", Li[0u], ")");
+                pipeline().printer().log("Li = (", Li[0u], ", ", Li[1u], ", ", Li[2u], ")");
+            };
         };
         auto bp_shader = pipeline().device().compile(bp_kernel);
         bp_shader_iter = _bp_shaders.emplace(camera, std::move(bp_shader)).first;
@@ -530,7 +535,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
     for (auto s : shutter_samples) {
         if (pipeline().update(command_buffer, s.point.time)) { dispatch_count = 0u; }
         for (auto i = 0u; i < s.spp; i++) {
-            command_buffer << render_1spp_shader(seed_start + iteration * spp + sample_id++,
+            command_buffer << render_1spp_shader(seed_start + iteration * spp + sample_id,
                                                  s.point.time, s.point.weight, Li_1spp)
                                   .dispatch(resolution)
                            << bp_shader(seed_start + iteration * spp + sample_id++,
@@ -541,6 +546,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                 command_buffer << commit();
                 dispatch_count -= dispatches_per_commit;
             }
+            std::cout << pipeline().printer().retrieve(command_buffer) << std::flush;
         }
     }
 
