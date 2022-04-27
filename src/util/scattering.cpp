@@ -486,13 +486,11 @@ MicrofacetTransmission::Gradient MicrofacetTransmission::backward(
     auto refr = !same_hemisphere(wo, wi) & cosThetaO != 0.f & cosThetaI != 0.f;
     auto eta = ite(cosThetaO > 0.f, _eta_b / _eta_a, _eta_a / _eta_b);
 
-    // Compute $\wh$ from $\wo$ and $\wi$ for microfacet transmission
     auto G = _distribution->G(wo, wi);
     auto grad_G = _distribution->grad_G(wo, wi);
     auto d_t = SampledSpectrum{df.dimension(), 0.f};
     auto d_alpha = def(make_float2(0.f));
 
-    // TODO : we don't deal with eta here
     for (auto i = 0u; i < eta.dimension(); ++i) {
         auto e = eta[i];
         auto wh = normalize(wo + wi * e);
@@ -564,12 +562,14 @@ OrenNayar::Gradient OrenNayar::backward(
     auto sigma2 = sqr(radians(_sigma));
 
     // backward
-    auto sigma2_sigma = 2 * radians(_sigma) * pi / 180.f;
+    auto sigma2_sigma = radians(_sigma) * pi / 90.f;
     auto a_sigma2 = -0.165f / sqr(sigma2 + 0.33f);
     auto b_sigma2 = 0.0405f / sqr(sigma2 + 0.09f);
-    auto d_r = df * inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta);
-    auto d_a = (df * _r).sum() * inv_pi;
-    auto d_b = (df * _r).sum() * inv_pi * maxCos * sinAlpha * tanBeta;
+    auto k0 = maxCos * sinAlpha * tanBeta;
+    auto d_r = df * inv_pi * (_a + _b * k0);
+    auto k1 = inv_pi * (df * _r).sum();
+    auto d_a = k1;
+    auto d_b = k1 * k0;
     auto d_sigma2 = d_a * a_sigma2 + d_b * b_sigma2;
     auto d_sigma = d_sigma2 * sigma2_sigma;
     return {.dR = d_r, .dSigma = d_sigma};
