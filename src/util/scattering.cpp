@@ -432,6 +432,7 @@ SampledSpectrum MicrofacetTransmission::evaluate(Expr<float3> wo, Expr<float3> w
     return eta.map([&](auto i, auto e) noexcept {
         auto wh = normalize(wo + wi * e);
         wh = compute::sign(cos_theta(wh)) * wh;
+        auto valid = refr & dot(wo, wh) * dot(wi, wh) < 0.f;
         auto sqrtDenom = dot(wo, wh) + e * dot(wi, wh);
         auto factor = 1.f / e;
         auto F = fresnel_dielectric(dot(wo, wh), _eta_a[i], _eta_b[i]);
@@ -439,7 +440,6 @@ SampledSpectrum MicrofacetTransmission::evaluate(Expr<float3> wo, Expr<float3> w
         auto f = (1.f - F) * _t[i] * sqr(factor) *
                  abs(D * G * sqr(e) * dot(wi, wh) * dot(wo, wh) /
                      (cosThetaI * cosThetaO * sqr(sqrtDenom)));
-        auto valid = refr & dot(wo, wh) * dot(wi, wh) < 0.f;
         return ite(valid, f, 0.f);
     });
 }
@@ -507,7 +507,7 @@ MicrofacetTransmission::Gradient MicrofacetTransmission::backward(
         auto k2 = (1.f - F) * sqr(factor);
         auto f = k2 * _t[i] * abs(k1);
 
-        auto d_f = df[i] * ite(valid, 1.f, 0.f);
+        auto d_f = ite(valid, df[i], 0.f);
         d_t[i] = d_f * k2 * abs(k1);
         auto grad_D = _distribution->grad_D(wh);
         d_alpha += d_f * k2 * _t[i] * sign(k1) * k0 * (D * grad_G.dAlpha + G * grad_D.dAlpha);
