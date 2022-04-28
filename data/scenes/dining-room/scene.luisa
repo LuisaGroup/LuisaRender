@@ -867,7 +867,7 @@ Camera camera : Pinhole {
 
 render {
   cameras { @camera }
-  integrator : WavePath {}
+  integrator : MegaPath {}
   shapes {
     @shape_0,
     @shape_1,

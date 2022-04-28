@@ -449,7 +449,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                     beta *= abs(dot(sample.eval.normal, sample.wi)) * w * sample.eval.f;
                 };
             });
-            $if(beta.any([](auto b) noexcept { return b > 0.f; })) {
+            $if(beta.any([](auto b) noexcept { return !isnan(b) & b > 0.f; })) {
                 auto q = max(swl.cie_y(beta), .05f);
                 auto rr_depth = node<WavefrontPathTracing>()->rr_depth();
                 auto rr_threshold = node<WavefrontPathTracing>()->rr_threshold();

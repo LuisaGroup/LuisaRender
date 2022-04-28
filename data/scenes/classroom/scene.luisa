@@ -130,7 +130,7 @@ Surface mat_CeilingLight : Substrate {
     v { 0.6478139758110046, 0.6478139758110046, 0.6478139758110046 }
   }
   Ks : Constant {
-    v { 0.04 }
+    v { 0.04, 0.04, 0.04 }
   }
   eta : Constant {
     v { 1.5 }
@@ -151,7 +151,7 @@ Surface mat_BlackPlastic : Substrate {
     v { 0.006310000084340572, 0.006310000084340572, 0.006310000084340572 }
   }
   Ks : Constant {
-    v { 0.04 }
+    v { 0.04, 0.04, 0.04 }
   }
   eta : Constant {
     v { 1.5 }
@@ -184,7 +184,7 @@ Surface mat_Whiteboard3 : Substrate {
     v { 1.0, 1.0, 1.0 }
   }
   Ks : Constant {
-    v { 0.04 }
+    v { 0.04, 0.04, 0.04 }
   }
   eta : Constant {
     v { 1.5 }
@@ -199,7 +199,7 @@ Surface mat_ChairWood : Substrate {
     file { "textures/wood2.jpg" }
   }
   Ks : Constant {
-    v { 0.04 }
+    v { 0.04, 0.04, 0.04 }
   }
   eta : Constant {
     v { 1.5 }
@@ -295,7 +295,7 @@ Surface mat_FluorescentTube : Substrate {
     v { 0.6120659708976746, 0.6120659708976746, 0.6120659708976746 }
   }
   Ks : Constant {
-    v { 0.04 }
+    v { 0.04, 0.04, 0.04 }
   }
   eta : Constant {
     v { 1.5 }
@@ -1372,7 +1372,7 @@ Camera camera : Pinhole {
   front { 0.1512944996356964, 0.028307145461440086, -0.9880833625793457 }
   up { 0.0, 1.0, 0.0 }
   fov { 35.98339777135762 }
-  spp { 4096 }
+  spp { 1024 }
   filter : Gaussian {
     radius { 1 }
   }

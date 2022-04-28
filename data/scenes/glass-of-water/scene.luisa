@@ -322,6 +322,7 @@ render {
     depth { 16 }
     rr_depth { 3 }
     spectrum : sRGB {}
+    clamp { 128 }
   }
   shapes {
     @shape_0,

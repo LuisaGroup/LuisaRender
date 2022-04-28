@@ -24,7 +24,7 @@ Surface mat_DarkPlastic : Substrate {
     v { 0.009999999776482582, 0.009999999776482582, 0.009999999776482582 }
   }
   Ks : Constant {
-    v { 0.04 }
+    v { 0.04, 0.04, 0.04 }
   }
   eta : Constant {
     v { 1.5 }
@@ -39,7 +39,7 @@ Surface mat_PinkLeather : Substrate {
     v { 0.25600001215934753, 0.013000000268220901, 0.07999999821186066 }
   }
   Ks : Constant {
-    v { 0.04 }
+    v { 0.04, 0.04, 0.04 }
   }
   eta : Constant {
     v { 1.5 }
@@ -54,7 +54,7 @@ Surface mat_Leather : Substrate {
     v { 0.03400000184774399, 0.014000000432133675, 0.00800000037997961 }
   }
   Ks : Constant {
-    v { 0.04 }
+    v { 0.04, 0.04, 0.04 }
   }
   eta : Constant {
     v { 1.5 }
@@ -69,7 +69,7 @@ Surface mat_RedLeather : Substrate {
     v { 0.16300000250339508, 0.029999999329447746, 0.03700000047683716 }
   }
   Ks : Constant {
-    v { 0.04 }
+    v { 0.04, 0.04, 0.04 }
   }
   eta : Constant {
     v { 1.5 }
@@ -84,7 +84,7 @@ Surface mat_BrightPinkLeather : Substrate {
     v { 0.7720000147819519, 0.17499999701976776, 0.2619999945163727 }
   }
   Ks : Constant {
-    v { 0.04 }
+    v { 0.04, 0.04, 0.04 }
   }
   eta : Constant {
     v { 1.5 }
@@ -96,7 +96,7 @@ Surface mat_BrightPinkLeather : Substrate {
 
 Surface mat_Glass : Glass {
   Kr : Constant {
-    v { 1 }
+    v { 1, 1, 1 }
   }
   Kt : Constant {
     v { 1.0, 1.0, 1.0 }
@@ -114,7 +114,7 @@ Surface mat_DarkRubber : Substrate {
     v { 0.02500000037252903, 0.02500000037252903, 0.02500000037252903 }
   }
   Ks : Constant {
-    v { 0.04 }
+    v { 0.04, 0.04, 0.04 }
   }
   eta : Constant {
     v { 1.5 }
@@ -1345,7 +1345,7 @@ Camera camera : Pinhole {
   front { 0.13595250248908997, -0.05167683959007263, -0.9893665909767151 }
   up { 0.0, 1.0, 0.0 }
   fov { 35.98339777135762 }
-  spp { 16384 }
+  spp { 1024 }
   filter : Gaussian {
     radius { 1 }
   }
@@ -1357,7 +1357,7 @@ Camera camera : Pinhole {
 
 render {
   cameras { @camera }
-  integrator : WavePath {}
+  integrator : MegaPath {}
   shapes {
     @shape_0,
     @shape_1,

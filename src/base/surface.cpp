@@ -13,9 +13,7 @@ Surface::Surface(Scene *scene, const SceneNodeDesc *desc) noexcept
     : SceneNode{scene, desc, SceneNodeTag::SURFACE},
       _normal{scene->load_texture(desc->property_node_or_default("normal"))},
       _alpha{scene->load_texture(desc->property_node_or_default("alpha"))} {
-
-    LUISA_RENDER_PARAM_CHANNEL_CHECK(Surface, normal, >=, 3);
-    LUISA_RENDER_PARAM_CHANNEL_CHECK(Surface, alpha, ==, 1);
+    LUISA_RENDER_PARAM_CHANNEL_CHECK(Surface, normal, 3);
 }
 
 luisa::unique_ptr<Surface::Instance> Surface::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {

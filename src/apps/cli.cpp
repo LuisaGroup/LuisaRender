@@ -53,7 +53,7 @@ using namespace luisa::render;
 
 int main(int argc, char *argv[]) {
 
-//    log_level_info();
+    log_level_info();
     luisa::compute::Context context{argv[0]};
 
     auto options = parse_cli_options(argc, argv);

@@ -105,9 +105,9 @@ template<typename T>
                 });
         }
         for (auto i = 0u; i < width * height; i++) {
-            for (auto c = 0u; c < 3u; c++) {
+            for (auto c = 0u; c < 2u; c++) {
                 auto image = exr_image.images[swizzle[c]];
-                pixels[i * 3u + c] = reinterpret_cast<const T *>(image)[i];
+                pixels[i * 2u + c] = reinterpret_cast<const T *>(image)[i];
             }
         }
     } else if (expected_channels == 4u) {
