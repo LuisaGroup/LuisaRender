@@ -273,7 +273,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
             });
 
             // rr
-            $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
+            $if(beta.all([](auto b) noexcept { return isnan(b) | b <= 0.f; })) { $break; };
             auto q = max(swl.cie_y(beta), .05f);
             auto rr_depth = pt->node<MegakernelPathTracing>()->rr_depth();
             auto rr_threshold = pt->node<MegakernelPathTracing>()->rr_threshold();
