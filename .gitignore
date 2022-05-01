@@ -300,3 +300,4 @@ CMakeSettings.json
 *.png
 /outputs/
 /imgui.ini
+/set_accel_kernel
