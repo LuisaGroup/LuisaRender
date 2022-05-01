@@ -15,7 +15,7 @@ Surface mat_Floor : Metal {
 
 Surface mat_WaterAir : Glass {
   Kr : Constant {
-    v { 1, 1, 1 }
+    v { 1.0, 1.0, 1.0 }
   }
   Kt : Constant {
     v { 1.0, 1.0, 1.0 }
@@ -30,7 +30,7 @@ Surface mat_WaterAir : Glass {
 
 Surface mat_IceAir : Glass {
   Kr : Constant {
-    v { 1, 1, 1 }
+    v { 1.0, 1.0, 1.0 }
   }
   Kt : Constant {
     v { 1.0, 1.0, 1.0 }
@@ -45,7 +45,7 @@ Surface mat_IceAir : Glass {
 
 Surface mat_Glass : Glass {
   Kr : Constant {
-    v { 1, 1, 1 }
+    v { 1.0, 1.0, 1.0 }
   }
   Kt : Constant {
     v { 1.0, 1.0, 1.0 }
@@ -60,7 +60,7 @@ Surface mat_Glass : Glass {
 
 Surface mat_AirIce : Glass {
   Kr : Constant {
-    v { 1, 1, 1 }
+    v { 1.0, 1.0, 1.0 }
   }
   Kt : Constant {
     v { 1.0, 1.0, 1.0 }
@@ -313,16 +313,17 @@ Camera camera : Pinhole {
   film : Color {
     resolution { 3840, 2160 }
   }
-  file { "render.exr" }
+  file { "output.exr" }
 }
 
 render {
   cameras { @camera }
   integrator : WavePath {
-    depth { 16 }
-    rr_depth { 3 }
+    sampler : Independent {}
+    depth { 12 }
+    rr_depth { 5 }
+    rr_threshold { 0.95 }
     spectrum : sRGB {}
-    clamp { 128 }
   }
   shapes {
     @shape_0,

@@ -35,7 +35,7 @@ int main(int argc, char *argv[]) {
         R[0u] = 0.14f;
         R[1u] = 0.45f;
         R[2u] = 0.091f;
-        auto alpha = make_float2(1.f);
+        auto alpha = make_float2(1e-3f);
         TrowbridgeReitzDistribution distribution{alpha};
         FresnelDielectric fresnel{SampledSpectrum{3u, 1.f}, SampledSpectrum{3u, 1.5f}};
         MicrofacetReflection reflec{R, &distribution, &fresnel};

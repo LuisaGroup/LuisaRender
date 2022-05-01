@@ -106,7 +106,7 @@ Surface surface-glass : Glass {
     v { 1.5 }
   }
   roughness : Constant {
-    v { 0.001 }
+    v { 0.6 }
   }
 }
 

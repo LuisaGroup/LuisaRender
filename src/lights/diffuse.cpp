@@ -99,7 +99,7 @@ struct DiffuseLightClosure final : public Light::Closure {
     }
     void backward(const Interaction &it_light, Expr<float3> p_from, const SampledSpectrum &df) const noexcept override {
         // TODO
-        LUISA_WARNING_WITH_LOCATION("Not implemented.");
+        LUISA_ERROR_WITH_LOCATION("Not implemented.");
 
         using namespace luisa::compute;
         auto light = instance<DiffuseLightInstance>();

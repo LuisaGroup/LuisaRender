@@ -206,13 +206,13 @@ public:
             // Kr
             auto d_f = _refl->backward(wo_local, wi_local, df);
             d_alpha = d_f.dAlpha;
-            _instance->Kr()->backward_albedo_spectrum(_it, _swl, _time, d_f.dR);
+            _instance->Kr()->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(d_f.dR));
         }
         $else {
             // Ks
             auto d_f = _trans->backward(wo_local, wi_local, df);
             d_alpha = d_f.dAlpha;
-            _instance->Kt()->backward_albedo_spectrum(_it, _swl, _time, d_f.dT);
+            _instance->Kt()->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(d_f.dT));
         };
 
         // roughness
