@@ -116,8 +116,6 @@ public:
     void render(Stream &stream) noexcept override {
         auto pt = node<MegakernelRadiativeDiff>();
         auto command_buffer = stream.command_buffer();
-        pipeline().printer().reset(stream);
-
         luisa::vector<float4> rendered;
 
         auto learning_rate = pt->learning_rate();
@@ -191,7 +189,6 @@ public:
 
             save_image(film_path, (const float *)rendered.data(), resolution);
         }
-        std::cout << pipeline().printer().retrieve(stream);
         LUISA_INFO("Finish saving results");
 
         // dump results of textured parameters

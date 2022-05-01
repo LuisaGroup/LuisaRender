@@ -20,7 +20,7 @@ int main(int argc, char *argv[]) {
     auto stream = device.create_stream();
     auto command_buffer = stream.command_buffer();
     Printer printer{device};
-    printer.reset(stream);
+    stream << printer.reset();
 
     auto buffer_size = 256u;
     auto float_buffer = device.create_buffer<uint>(buffer_size);
@@ -111,8 +111,5 @@ int main(int argc, char *argv[]) {
         }
         LUISA_INFO("float_data[{}] = {}", i, float_data[i]);
     }
-
-    std::cout << printer.retrieve(stream);
-
-    return 0;
+    stream << printer.retrieve() << synchronize();
 }
