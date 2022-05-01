@@ -442,8 +442,8 @@ float DenselySampledSpectrum::cie_y_integral() noexcept {
 }
 
 SampledSpectrum zero_if_any_nan(const SampledSpectrum &t) noexcept {
-    auto has_nan = t.any([](const auto &value) { return isnan(value); });
-    return t.map([&has_nan](auto, auto x) noexcept { return ite(has_nan, 0.f, x); });
+    auto any_nan = t.any([](const auto &value) { return isnan(value); });
+    return t.map([&any_nan](auto, auto x) noexcept { return ite(any_nan, 0.f, x); });
 }
 
 SampledSpectrum ite(const SampledSpectrum &p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept {

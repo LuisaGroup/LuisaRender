@@ -862,12 +862,18 @@ Camera camera : Pinhole {
   film : Color {
     resolution { 3840, 2160 }
   }
-  file { "render.exr" }
+  file { "output.exr" }
 }
 
 render {
   cameras { @camera }
-  integrator : MegaPath {}
+  integrator : WavePath {
+    sampler : Independent {}
+    depth { 12 }
+    rr_depth { 5 }
+    rr_threshold { 0.95 }
+    spectrum : sRGB {}
+  }
   shapes {
     @shape_0,
     @shape_1,

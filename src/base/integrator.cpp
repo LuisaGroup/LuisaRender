@@ -53,8 +53,6 @@ DifferentiableIntegrator::DifferentiableIntegrator(Scene *scene, const SceneNode
     for (auto &c : optimizer_str) { c = static_cast<char>(toupper(c)); }
     if (optimizer_str == "BGD") {
         _optimizer = Optimizer::BGD;
-    } else if (optimizer_str == "LDGD") {
-        _optimizer = Optimizer::LDGD;
     } else {
         LUISA_WARNING_WITH_LOCATION(
             "Unsupported optimizer '{}'. "

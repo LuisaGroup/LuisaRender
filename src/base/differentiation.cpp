@@ -180,9 +180,10 @@ Float4 Differentiation::decode(const Differentiation::ConstantParameter &param) 
     return _const_param_buffer.read(param.index());
 }
 
-void Differentiation::accumulate(const Differentiation::ConstantParameter &param, Expr<float4> grad) const noexcept {
+void Differentiation::accumulate(const Differentiation::ConstantParameter &param, Expr<float4> grad,
+                                 Expr<uint> slot_seed) const noexcept {
     LUISA_ASSERT(_grad_buffer, "Gradient buffer is not materialized.");
-    auto slots = pcg4d(as<uint4>(grad)) % gradiant_collision_avoidance_block_size;
+    auto slots = (slot_seed ^ pcg4d(as<uint4>(grad))) & gradiant_collision_avoidance_bit_and;
     for (auto i = 0u; i < param.channels(); i++) {
         auto grad_offset = (param.index() * gradiant_collision_avoidance_block_size + slots[i]) * 4u + i;
         atomic_float_add(*_grad_buffer, grad_offset, grad[i]);
@@ -191,7 +192,8 @@ void Differentiation::accumulate(const Differentiation::ConstantParameter &param
     _counter->atomic(counter_offset).fetch_add(1u);
 }
 
-void Differentiation::accumulate(const Differentiation::TexturedParameter &param, Expr<float2> p, Expr<float4> grad) const noexcept {
+void Differentiation::accumulate(const Differentiation::TexturedParameter &param, Expr<float2> p,
+                                 Expr<float4> grad) const noexcept {
     LUISA_ASSERT(_grad_buffer, "Gradient buffer is not materialized.");
     using namespace compute;
     auto map_uv = [s = param.sampler()](Expr<float2> uv) noexcept {

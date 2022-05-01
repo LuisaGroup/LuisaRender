@@ -142,7 +142,7 @@ public:
         auto grad = _refl->backward(wo_local, wi_local, df);
         auto d_fresnel = dynamic_cast<SchlickFresnel::Gradient *>(grad.dFresnel.get());
 
-        _instance->color()->backward_albedo_spectrum(_it, _swl, _time, grad.dR + d_fresnel->dR0);
+        _instance->color()->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(grad.dR + d_fresnel->dR0));
         if (auto roughness = _instance->roughness()) {
             auto remap = _instance->node<MirrorSurface>()->remap_roughness();
             auto r_f4 = roughness->evaluate(_it, _time);

@@ -96,7 +96,7 @@ Surface mat_BrightPinkLeather : Substrate {
 
 Surface mat_Glass : Glass {
   Kr : Constant {
-    v { 1, 1, 1 }
+    v { 1.0, 1.0, 1.0 }
   }
   Kt : Constant {
     v { 1.0, 1.0, 1.0 }
@@ -1345,19 +1345,25 @@ Camera camera : Pinhole {
   front { 0.13595250248908997, -0.05167683959007263, -0.9893665909767151 }
   up { 0.0, 1.0, 0.0 }
   fov { 35.98339777135762 }
-  spp { 1024 }
+  spp { 16384 }
   filter : Gaussian {
     radius { 1 }
   }
   film : Color {
     resolution { 3840, 2160 }
   }
-  file { "color.exr" }
+  file { "output.exr" }
 }
 
 render {
   cameras { @camera }
-  integrator : MegaPath {}
+  integrator : WavePath {
+    sampler : Independent {}
+    depth { 12 }
+    rr_depth { 5 }
+    rr_threshold { 0.95 }
+    spectrum : sRGB {}
+  }
   shapes {
     @shape_0,
     @shape_1,

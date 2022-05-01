@@ -9,8 +9,8 @@
 #include <base/sampler.h>
 #include <base/spectrum.h>
 #include <base/light_sampler.h>
-#include <util/loss.h>
-#include <util/optimizer.h>
+#include "loss.h"
+#include "optimizer.h"
 
 namespace luisa::render {
 

@@ -101,7 +101,7 @@ Surface mat_PaintingBack : Matte {
 
 Surface mat_Glass : Glass {
   Kr : Constant {
-    v { 1, 1, 1 }
+    v { 1.0, 1.0, 1.0 }
   }
   Kt : Constant {
     v { 1.0, 1.0, 1.0 }
@@ -1022,14 +1022,17 @@ Camera camera : Pinhole {
   film : Color {
     resolution { 1920, 1080 }
   }
-  file { "living-room.exr" }
+  file { "output.exr" }
 }
 
 render {
   cameras { @camera }
-  integrator : MegaPath {
-    depth { 10 }
-    // display { true }
+  integrator : WavePath {
+    sampler : Independent {}
+    depth { 12 }
+    rr_depth { 5 }
+    rr_threshold { 0.95 }
+    spectrum : sRGB {}
   }
   shapes {
     @shape_0,

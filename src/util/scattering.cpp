@@ -432,6 +432,7 @@ SampledSpectrum MicrofacetTransmission::evaluate(Expr<float3> wo, Expr<float3> w
     return eta.map([&](auto i, auto e) noexcept {
         auto wh = normalize(wo + wi * e);
         wh = compute::sign(cos_theta(wh)) * wh;
+        auto valid = refr & dot(wo, wh) * dot(wi, wh) < 0.f;
         auto sqrtDenom = dot(wo, wh) + e * dot(wi, wh);
         auto factor = 1.f / e;
         auto F = fresnel_dielectric(dot(wo, wh), _eta_a[i], _eta_b[i]);
@@ -439,7 +440,6 @@ SampledSpectrum MicrofacetTransmission::evaluate(Expr<float3> wo, Expr<float3> w
         auto f = (1.f - F) * _t[i] * sqr(factor) *
                  abs(D * G * sqr(e) * dot(wi, wh) * dot(wo, wh) /
                      (cosThetaI * cosThetaO * sqr(sqrtDenom)));
-        auto valid = refr & dot(wo, wh) * dot(wi, wh) < 0.f;
         return ite(valid, f, 0.f);
     });
 }
@@ -486,13 +486,11 @@ MicrofacetTransmission::Gradient MicrofacetTransmission::backward(
     auto refr = !same_hemisphere(wo, wi) & cosThetaO != 0.f & cosThetaI != 0.f;
     auto eta = ite(cosThetaO > 0.f, _eta_b / _eta_a, _eta_a / _eta_b);
 
-    // Compute $\wh$ from $\wo$ and $\wi$ for microfacet transmission
     auto G = _distribution->G(wo, wi);
     auto grad_G = _distribution->grad_G(wo, wi);
     auto d_t = SampledSpectrum{df.dimension(), 0.f};
     auto d_alpha = def(make_float2(0.f));
 
-    // TODO : we don't deal with eta here
     for (auto i = 0u; i < eta.dimension(); ++i) {
         auto e = eta[i];
         auto wh = normalize(wo + wi * e);
@@ -509,7 +507,7 @@ MicrofacetTransmission::Gradient MicrofacetTransmission::backward(
         auto k2 = (1.f - F) * sqr(factor);
         auto f = k2 * _t[i] * abs(k1);
 
-        auto d_f = df[i] * ite(valid, 1.f, 0.f);
+        auto d_f = ite(valid, df[i], 0.f);
         d_t[i] = d_f * k2 * abs(k1);
         auto grad_D = _distribution->grad_D(wh);
         d_alpha += d_f * k2 * _t[i] * sign(k1) * k0 * (D * grad_G.dAlpha + G * grad_D.dAlpha);
@@ -564,12 +562,14 @@ OrenNayar::Gradient OrenNayar::backward(
     auto sigma2 = sqr(radians(_sigma));
 
     // backward
-    auto sigma2_sigma = 2 * radians(_sigma) * pi / 180.f;
+    auto sigma2_sigma = radians(_sigma) * pi / 90.f;
     auto a_sigma2 = -0.165f / sqr(sigma2 + 0.33f);
     auto b_sigma2 = 0.0405f / sqr(sigma2 + 0.09f);
-    auto d_r = df * inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta);
-    auto d_a = (df * _r).sum() * inv_pi;
-    auto d_b = (df * _r).sum() * inv_pi * maxCos * sinAlpha * tanBeta;
+    auto k0 = maxCos * sinAlpha * tanBeta;
+    auto d_r = df * inv_pi * (_a + _b * k0);
+    auto k1 = inv_pi * (df * _r).sum();
+    auto d_a = k1;
+    auto d_b = k1 * k0;
     auto d_sigma2 = d_a * a_sigma2 + d_b * b_sigma2;
     auto d_sigma = d_sigma2 * sigma2_sigma;
     return {.dR = d_r, .dSigma = d_sigma};

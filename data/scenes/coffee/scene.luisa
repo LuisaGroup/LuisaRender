@@ -34,7 +34,7 @@ Surface mat_Plastic_Black : Disney {
 
 Surface mat_Glass : Glass {
   Kr : Constant {
-    v { 1 }
+    v { 1.0, 1.0, 1.0 }
   }
   Kt : Constant {
     v { 1.0, 1.0, 1.0 }
@@ -58,7 +58,7 @@ Surface mat_Floor : Plastic {
     v { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
   }
   Ks : Constant {
-    v { 0.15 }
+    v { 0.15, 0.15, 0.15 }
   }
   eta : Constant {
     v { 1.5 }
@@ -393,7 +393,7 @@ Camera camera : Pinhole {
   front { 0.0072655160911381245, -0.03931873291730881, -0.9992002844810486 }
   up { 0.0, 1.0, 0.0 }
   fov { 31.0 }
-  spp { 4096 }
+  spp { 1024 }
   filter : Gaussian {
     radius { 1 }
   }
@@ -401,12 +401,18 @@ Camera camera : Pinhole {
     resolution { 800.0, 1000.0 }
     exposure { 1 }
   }
-  file { "coffee.exr" }
+  file { "output.exr" }
 }
 
 render {
   cameras { @camera }
-  integrator : WavePath {}
+  integrator : WavePath {
+    sampler : Independent {}
+    depth { 12 }
+    rr_depth { 5 }
+    rr_threshold { 0.95 }
+    spectrum : sRGB {}
+  }
   shapes {
     @shape_0,
     @shape_1,
