@@ -188,7 +188,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
     };
 
     Kernel2D render_kernel = [&](UInt frame_index, Float time, Float shutter_weight) noexcept {
-        set_block_size(8u, 8u, 1u);
+        set_block_size(16u, 16u, 1u);
 
         auto pixel_id = dispatch_id().xy();
         sampler->start(pixel_id, frame_index);
