@@ -450,11 +450,12 @@ void WavefrontPathTracingInstance::_render_one_camera(
                 };
             });
             $if(beta.any([](auto b) noexcept { return !isnan(b) & b > 0.f; })) {
-                auto q = max(swl.cie_y(beta), .05f);
                 auto rr_depth = node<WavefrontPathTracing>()->rr_depth();
                 auto rr_threshold = node<WavefrontPathTracing>()->rr_threshold();
                 // rr
-                $if(trace_depth >= rr_depth & q < rr_threshold) {
+                auto q = swl.cie_y(beta);
+                $if(trace_depth >= rr_depth & q < 1.f) {
+                    q = clamp(q, .05f, rr_threshold);
                     $if(sampler()->generate_1d() < q) {
                         beta *= 1.f / q;
                         auto out_queue_id = out_queue_size.atomic(0u).fetch_add(1u);

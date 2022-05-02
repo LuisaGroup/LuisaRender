@@ -203,10 +203,11 @@ private:
 
                 // rr
                 $if(beta.all([](auto b) noexcept { return isnan(b) | b <= 0.f; })) { $break; };
-                auto q = max(swl.cie_y(beta), .05f);
                 auto rr_depth = node<MegakernelPathTracing>()->rr_depth();
                 auto rr_threshold = node<MegakernelPathTracing>()->rr_threshold();
-                $if(depth >= rr_depth & q < rr_threshold) {
+                auto q = swl.cie_y(beta);
+                $if(depth >= rr_depth & q < 1.f) {
+                    q = clamp(q, .05f, rr_threshold);
                     $if(sampler()->generate_1d() >= q) { $break; };
                     beta *= 1.0f / q;
                 };

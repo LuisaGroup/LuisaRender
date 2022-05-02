@@ -1,28 +1,22 @@
 
-Surface mat_Plastic_Orange : Disney {
-  color : Constant {
+Surface mat_Plastic_Orange : Substrate {
+  Kd : Constant {
     v { 1.0, 0.25, 0.013 }
   }
-  eta : Constant {
-    v { 1.5 }
+  Ks : Constant {
+    v { 0.04, 0.04, 0.04 }
   }
   roughness : Constant {
     v { 0.1 }
   }
-  specular_tint : Constant {
-    v { 0.9 }
-  }
-  clearcoat : Constant {
-    v { 1 }
-  }
-  clearcoat_gloss : Constant {
-    v { 0.5 }
-  }
 }
 
-Surface mat_Plastic_Black : Disney {
-  color : Constant {
+Surface mat_Plastic_Black : Substrate {
+  Kd : Constant {
     v { 0.006310000084340572, 0.006310000084340572, 0.006310000084340572 }
+  }
+  Ks : Constant {
+    v { 0.04, 0.04, 0.04 }
   }
   eta : Constant {
     v { 1.5 }
@@ -53,7 +47,7 @@ Surface mat_Metal : Mirror {
   }
 }
 
-Surface mat_Floor : Plastic {
+Surface mat_Floor : Substrate {
   Kd : Constant {
     v { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
   }
@@ -65,9 +59,6 @@ Surface mat_Floor : Plastic {
   }
   roughness : Constant {
     v { 0.001 }
-  }
-  metallic : Constant {
-    v { 0 }
   }
 }
 
@@ -393,13 +384,13 @@ Camera camera : Pinhole {
   front { 0.0072655160911381245, -0.03931873291730881, -0.9992002844810486 }
   up { 0.0, 1.0, 0.0 }
   fov { 31.0 }
-  spp { 1024 }
+  spp { 128 }
   filter : Gaussian {
     radius { 1 }
   }
   film : Color {
     resolution { 800.0, 1000.0 }
-    exposure { 1 }
+    exposure { 0.75 }
   }
   file { "output.exr" }
 }
