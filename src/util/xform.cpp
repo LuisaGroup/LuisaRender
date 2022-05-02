@@ -13,7 +13,7 @@ DecomposedTransform decompose(float4x4 m) noexcept {
     auto t = m[3].xyz();
     auto N = make_float3x3(m);
     auto near_zero = [](auto f) noexcept {
-        return abs(f) <= 1e-4f;
+        return std::abs(f) <= 1e-4f;
     };
     auto R = N;
     constexpr auto max_iteration_count = 100u;
