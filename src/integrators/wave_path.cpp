@@ -413,7 +413,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
             auto pdf_bsdf = def(0.f);
             auto u_lobe = sampler()->generate_1d();
             auto u_bsdf = sampler()->generate_2d();
-            pipeline().dynamic_dispatch_surface(surface_tag, [&](auto surface) noexcept {
+            pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
                 // apply roughness map
                 auto alpha_skip = def(false);
                 if (auto alpha_map = surface->alpha()) {

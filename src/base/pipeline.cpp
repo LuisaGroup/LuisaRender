@@ -142,19 +142,13 @@ void Pipeline::_process_shape(
 
 uint Pipeline::_process_surface(CommandBuffer &command_buffer, const Surface *surface) noexcept {
     auto [iter, not_existent] = _surface_tags.try_emplace(surface, 0u);
-    if (not_existent) {
-        iter->second = static_cast<uint>(_surfaces.size());
-        _surfaces.emplace_back(surface->build(*this, command_buffer));
-    }
+    if (not_existent) { iter->second = _surfaces.add(surface->build(*this, command_buffer)); }
     return iter->second;
 }
 
 uint Pipeline::_process_light(CommandBuffer &command_buffer, const Light *light) noexcept {
     auto [iter, not_existent] = _light_tags.try_emplace(light, 0u);
-    if (not_existent) {
-        iter->second = static_cast<uint>(_lights.size());
-        _lights.emplace_back(light->build(*this, command_buffer));
-    }
+    if (not_existent) { iter->second = _lights.add(light->build(*this, command_buffer)); }
     return iter->second;
 }
 
@@ -316,30 +310,6 @@ const Filter::Instance *Pipeline::build_filter(CommandBuffer &command_buffer, co
     auto [iter, not_exists] = _filters.try_emplace(filter, nullptr);
     if (not_exists) { iter->second = filter->build(*this, command_buffer); }
     return iter->second.get();
-}
-
-void Pipeline::dynamic_dispatch_surface(
-    Expr<uint> tag, const function<void(const Surface::Instance *)> &f) const noexcept {
-    if (!_surfaces.empty()) [[likely]] {
-        $switch(tag) {
-            for (auto i = 0u; i < _surfaces.size(); i++) {
-                $case(i) { f(_surfaces[i].get()); };
-            }
-            $default { compute::unreachable(); };
-        };
-    }
-}
-
-void Pipeline::dynamic_dispatch_light(
-    Expr<uint> tag, const function<void(const Light::Instance *)> &f) const noexcept {
-    if (!_lights.empty()) [[likely]] {
-        $switch(tag) {
-            for (auto i = 0u; i < _lights.size(); i++) {
-                $case(i) { f(_lights[i].get()); };
-            }
-            $default { compute::unreachable(); };
-        };
-    }
 }
 
 Differentiation &Pipeline::differentiation() noexcept {

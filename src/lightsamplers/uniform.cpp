@@ -54,7 +54,7 @@ public:
             LUISA_WARNING_WITH_LOCATION("No lights in scene.");
             return eval;
         }
-        pipeline().dynamic_dispatch_light(it.shape()->light_tag(), [&](auto light) noexcept {
+        pipeline().lights().dispatch(it.shape()->light_tag(), [&](auto light) noexcept {
             auto closure = light->closure(swl, time);
             eval = closure->evaluate(it, p_from);
         });
@@ -91,7 +91,7 @@ public:
                     auto handle = pipeline().buffer<Light::Handle>(_light_buffer_id).read(i);
                     auto u_prim = sampler.generate_1d();
                     auto u_light = sampler.generate_2d();
-                    pipeline().dynamic_dispatch_light(handle.light_tag, [&](auto light) noexcept {
+                    pipeline().lights().dispatch(handle.light_tag, [&](auto light) noexcept {
                         auto closure = light->closure(swl, time);
                         sample = closure->sample(handle.instance_id, it_from.p(), u_prim, u_light);
                     });
@@ -105,7 +105,7 @@ public:
             auto handle = pipeline().buffer<Light::Handle>(_light_buffer_id).read(i);
             auto u_prim = sampler.generate_1d();
             auto u_light = sampler.generate_2d();
-            pipeline().dynamic_dispatch_light(handle.light_tag, [&](auto light) noexcept {
+            pipeline().lights().dispatch(handle.light_tag, [&](auto light) noexcept {
                 auto closure = light->closure(swl, time);
                 sample = closure->sample(handle.instance_id, it_from.p(), u_prim, u_light);
             });

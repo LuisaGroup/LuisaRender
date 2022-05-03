@@ -39,6 +39,7 @@ using compute::Hit;
 using compute::Image;
 using compute::Mesh;
 using compute::PixelStorage;
+using compute::Polymorphic;
 using compute::Printer;
 using compute::Ray;
 using compute::Resource;
@@ -81,8 +82,8 @@ private:
     luisa::vector<ResourceHandle> _resources;
     luisa::unordered_map<uint64_t, MeshGeometry> _mesh_cache;
     luisa::unordered_map<const Shape *, MeshData> _meshes;
-    luisa::vector<luisa::unique_ptr<Surface::Instance>> _surfaces;
-    luisa::vector<luisa::unique_ptr<Light::Instance>> _lights;
+    Polymorphic<Surface::Instance> _surfaces;
+    Polymorphic<Light::Instance> _lights;
     luisa::vector<Light::Handle> _instanced_lights;
     luisa::unordered_map<const Surface *, uint> _surface_tags;
     luisa::unordered_map<const Light *, uint> _light_tags;
@@ -154,8 +155,9 @@ public:
     void register_transform(const Transform *transform) noexcept;
 
     template<typename T, typename... Args>
-        requires std::is_base_of_v<Resource, T>
-    [[nodiscard]] auto create(Args &&...args) noexcept -> T * {
+        requires std::is_base_of_v<Resource, T> [
+                 [nodiscard]] auto
+        create(Args &&...args) noexcept -> T * {
         auto resource = luisa::make_unique<T>(_device.create<T>(std::forward<Args>(args)...));
         auto p = resource.get();
         _resources.emplace_back(std::move(resource));
@@ -189,8 +191,8 @@ public:
     [[nodiscard]] auto camera_count() const noexcept { return _cameras.size(); }
     [[nodiscard]] auto camera(size_t i) noexcept { return _cameras[i].get(); }
     [[nodiscard]] auto camera(size_t i) const noexcept { return _cameras[i].get(); }
-    [[nodiscard]] auto surfaces() const noexcept { return luisa::span{_surfaces}; }
-    [[nodiscard]] auto lights() const noexcept { return luisa::span{_lights}; }
+    [[nodiscard]] auto &surfaces() const noexcept { return _surfaces; }
+    [[nodiscard]] auto &lights() const noexcept { return _lights; }
     [[nodiscard]] auto instanced_lights() const noexcept { return luisa::span{_instanced_lights}; }
     [[nodiscard]] auto environment() const noexcept { return _environment.get(); }
     [[nodiscard]] auto integrator() const noexcept { return _integrator.get(); }
@@ -221,8 +223,6 @@ public:
         const Var<float4x4> &shape_to_world, const Var<float3x3> &shape_to_world_normal) const noexcept;
     [[nodiscard]] auto intersect(const Var<Ray> &ray) const noexcept { return interaction(ray, trace_closest(ray)); }
     [[nodiscard]] auto intersect_any(const Var<Ray> &ray) const noexcept { return trace_any(ray); }
-    void dynamic_dispatch_surface(Expr<uint> tag, const luisa::function<void(const Surface::Instance *)> &f) const noexcept;
-    void dynamic_dispatch_light(Expr<uint> tag, const luisa::function<void(const Light::Instance *)> &f) const noexcept;
 };
 
 }// namespace luisa::render
