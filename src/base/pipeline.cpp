@@ -142,13 +142,13 @@ void Pipeline::_process_shape(
 
 uint Pipeline::_process_surface(CommandBuffer &command_buffer, const Surface *surface) noexcept {
     auto [iter, not_existent] = _surface_tags.try_emplace(surface, 0u);
-    if (not_existent) { iter->second = _surfaces.add(surface->build(*this, command_buffer)); }
+    if (not_existent) { iter->second = _surfaces.emplace(surface->build(*this, command_buffer)); }
     return iter->second;
 }
 
 uint Pipeline::_process_light(CommandBuffer &command_buffer, const Light *light) noexcept {
     auto [iter, not_existent] = _light_tags.try_emplace(light, 0u);
-    if (not_existent) { iter->second = _lights.add(light->build(*this, command_buffer)); }
+    if (not_existent) { iter->second = _lights.emplace(light->build(*this, command_buffer)); }
     return iter->second;
 }
 
