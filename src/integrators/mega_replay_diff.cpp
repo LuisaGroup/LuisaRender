@@ -421,16 +421,9 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
             Li[2u] = Li_last_pass[2u];
 
             SampledSpectrum d_loss{swl.dimension(), 0.f};
-            {
-                auto pixel_uv_it = Interaction{
-                    make_float3(),
-                    Float2{
-                        (pixel_id.x + 0.5f) / resolution.x,
-                        (pixel_id.y + 0.5f) / resolution.y}};
-                auto d_loss_float3 = pt_exact->loss()->d_loss(camera, pixel_id);
-                for (auto i = 0u; i < 3u; ++i) {
-                    d_loss[i] = d_loss_float3[i];
-                }
+            auto d_loss_float3 = pt_exact->loss()->d_loss(camera, pixel_id);
+            for (auto i = 0u; i < 3u; ++i) {
+                d_loss[i] = d_loss_float3[i];
             }
 
             auto ray = camera_ray;
