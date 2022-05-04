@@ -43,8 +43,8 @@ class ColorFilmInstance final : public Film::Instance {
 private:
     Buffer<uint> _image;
     Buffer<float4> _converted;
-    Shader1D<Buffer<uint>> _clear_image;
-    Shader1D<Buffer<uint>, Buffer<float4>> _convert_image;
+    std::shared_future<Shader1D<Buffer<uint>>> _clear_image;
+    std::shared_future<Shader1D<Buffer<uint>, Buffer<float4>>> _convert_image;
 
 public:
     ColorFilmInstance(Device &device, Pipeline &pipeline, const ColorFilm *film) noexcept;
@@ -60,13 +60,13 @@ ColorFilmInstance::ColorFilmInstance(Device &device, Pipeline &pipeline, const C
     auto pixel_count = resolution.x * resolution.y;
     _image = pipeline.device().create_buffer<uint>(pixel_count * 4u);
     _converted = pipeline.device().create_buffer<float4>(pixel_count);
-    _clear_image = device.compile<1>([](BufferUInt image) noexcept {
+    _clear_image = device.compile_async<1>([](BufferUInt image) noexcept {
         image.write(dispatch_x() * 4u + 0u, 0u);
         image.write(dispatch_x() * 4u + 1u, 0u);
         image.write(dispatch_x() * 4u + 2u, 0u);
         image.write(dispatch_x() * 4u + 3u, 0u);
     });
-    _convert_image = device.compile<1>([this](BufferUInt accum, BufferFloat4 output) noexcept {
+    _convert_image = device.compile_async<1>([this](BufferUInt accum, BufferFloat4 output) noexcept {
         auto i = dispatch_x();
         auto c0 = as<float>(accum.read(i * 4u + 0u));
         auto c1 = as<float>(accum.read(i * 4u + 1u));
@@ -80,7 +80,7 @@ ColorFilmInstance::ColorFilmInstance(Device &device, Pipeline &pipeline, const C
 void ColorFilmInstance::download(CommandBuffer &command_buffer, float4 *framebuffer) const noexcept {
     auto resolution = node()->resolution();
     auto pixel_count = resolution.x * resolution.y;
-    command_buffer << _convert_image(_image, _converted).dispatch(pixel_count)
+    command_buffer << _convert_image.get()(_image, _converted).dispatch(pixel_count)
                    << _converted.copy_to(framebuffer);
 }
 
@@ -99,7 +99,7 @@ void ColorFilmInstance::accumulate(Expr<uint2> pixel, Expr<float3> rgb) const no
 
 void ColorFilmInstance::clear(CommandBuffer &command_buffer) noexcept {
     auto pixel_count = node()->resolution().x * node()->resolution().y;
-    command_buffer << _clear_image(_image).dispatch(pixel_count);
+    command_buffer << _clear_image.get()(_image).dispatch(pixel_count);
 }
 
 Film::Accumulation ColorFilmInstance::read(Expr<uint2> pixel) const noexcept {
