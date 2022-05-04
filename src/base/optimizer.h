@@ -14,4 +14,17 @@ enum class Optimizer {
     LDGD = 4,
 };
 
+class OptimizerTemp {
+
+public:
+    virtual void materialize(CommandBuffer &command_buffer) noexcept = 0;
+    virtual void clear_gradients(CommandBuffer &command_buffer) noexcept = 0;
+    virtual void apply_gradients(CommandBuffer &command_buffer, float alpha) noexcept = 0;
+    /// Apply then clear the gradients
+    void step(CommandBuffer &command_buffer, float alpha) noexcept {
+        apply_gradients(command_buffer, alpha);
+        clear_gradients(command_buffer);
+    }
+};
+
 }// namespace luisa::render

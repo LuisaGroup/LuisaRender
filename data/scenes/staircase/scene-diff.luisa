@@ -10378,7 +10378,7 @@ Integrator pt : MegaPath {
   display { true }
 }
 
-Integrator pt_grad : MegaPathGrad {
+Integrator pt_grad : MegaRadiativeDiff {
   sampler : Independent {}
   depth { 10 }
   spectrum : sRGB {}

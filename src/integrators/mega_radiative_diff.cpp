@@ -234,27 +234,15 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
             return ite(pdf_a > 0.0f, pdf_a / (pdf_a + pdf_b), 0.0f);
         };
 
-        Callable bp_loss = [camera, pt_exact](UInt2 pixel_id, Float time) noexcept {
-            auto resolution = camera->film()->node()->resolution();
-            auto it = Interaction{
-                make_float3(1.0f),
-                Float2{
-                    (pixel_id.x + 0.5f) / resolution.x,
-                    (pixel_id.y + 0.5f) / resolution.y}};
-
+        Callable bp_loss = [pt_exact](Float3 rendered, Float3 target) noexcept {
             switch (pt_exact->loss()) {
                 case Loss::L1:
                     // L1 loss
-                    return ite(
-                        camera->film()->read(pixel_id).average >= camera->target()->evaluate(it, time).xyz(),
-                        1.0f,
-                        -1.0f);
+                    return ite(rendered >= target, 1.0f, -1.0f);
                 case Loss::L2:
                     // L2 loss
-                    return 2.0f * (camera->film()->read(pixel_id).average -
-                                   camera->target()->evaluate(it, time).xyz());
+                    return 2.0f * (rendered - target);
             }
-
             return def(make_float3(0.f));
         };
 
@@ -269,9 +257,17 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
             SampledSpectrum Li{swl.dimension(), 1.0f};
             auto grad_weight = shutter_weight * static_cast<float>(pt->node<MegakernelRadiativeDiff>()->max_depth());
 
-            auto d_loss = bp_loss(pixel_id, time);
-            for (auto i = 0u; i < 3u; ++i) {
-                beta[i] *= d_loss[i];
+            {
+                auto pixel_uv = Interaction{
+                    make_float3(1.0f),
+                    Float2{
+                        (pixel_id.x + 0.5f) / resolution.x,
+                        (pixel_id.y + 0.5f) / resolution.y}};
+                auto d_loss = bp_loss(camera->film()->read(pixel_id).average,
+                                      camera->target()->evaluate(pixel_uv, time).xyz());
+                for (auto i = 0u; i < 3u; ++i) {
+                    beta[i] *= d_loss[i];
+                }
             }
 
             auto ray = camera_ray;

@@ -15,15 +15,15 @@ Surface cbox-gray : Matte {
 }
 
 Surface mat-wood : Substrate {
-  Kd : Image {
-    file { "living-room/textures/wood.jpg" }
-  }
-  //Kd : Placeholder {
-  //  resolution { 1024 }
-  //  requires_grad { true }
-  //  range { 0, 1 }
-  //  uv_scale { 1, -1 }
+  //Kd : Image {
+  //  file { "living-room/textures/wood.jpg" }
   //}
+  Kd : Placeholder {
+    resolution { 1024 }
+    requires_grad { true }
+    range { 0, 1 }
+    uv_scale { 1, -1 }
+  }
   Ks : Constant {
     v { 0.2, 0.2, 0.2 }
     //v { 0, 0.9, 0.56 }
@@ -170,9 +170,9 @@ Surface surface-glass : Glass {
     v { 1.5 }
   }
   roughness : Constant {
-    //v { 0.001 }
     v { 0.6 }
-    requires_grad { true }
+    //v { 0.6 }
+    //requires_grad { true }
     range { 0.001, 1 }
   }
 }
@@ -263,8 +263,8 @@ Camera camera1 : Pinhole {
   }
 }
 
-//Integrator pt : MegaRadiativeDiff {
-Integrator pt : MegaReplayDiff {
+Integrator pt : MegaRadiativeDiff {
+//Integrator pt : MegaReplayDiff {
   sampler : Independent {}
   depth { 10 }
   spectrum : sRGB {}
@@ -272,7 +272,7 @@ Integrator pt : MegaReplayDiff {
   save_process { true }
   optimizer { "BGD" }
   loss { "L2" }
-  learning_rate { 1 }
+  learning_rate { 0.1 }
   iterations { 100 }
 }
 
