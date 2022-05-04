@@ -234,18 +234,6 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
             return ite(pdf_a > 0.0f, pdf_a / (pdf_a + pdf_b), 0.0f);
         };
 
-        Callable bp_loss = [pt_exact](Float3 rendered, Float3 target) noexcept {
-            switch (pt_exact->loss()) {
-                case Loss::L1:
-                    // L1 loss
-                    return ite(rendered >= target, 1.0f, -1.0f);
-                case Loss::L2:
-                    // L2 loss
-                    return 2.0f * (rendered - target);
-            }
-            return def(make_float3(0.f));
-        };
-
         Kernel2D bp_kernel = [&](UInt frame_index, Float time, Float shutter_weight) noexcept {
             set_block_size(16u, 16u, 1u);
 
@@ -258,13 +246,12 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
             auto grad_weight = shutter_weight * static_cast<float>(pt->node<MegakernelRadiativeDiff>()->max_depth());
 
             {
-                auto pixel_uv = Interaction{
-                    make_float3(1.0f),
+                auto pixel_uv_it = Interaction{
+                    make_float3(),
                     Float2{
                         (pixel_id.x + 0.5f) / resolution.x,
                         (pixel_id.y + 0.5f) / resolution.y}};
-                auto d_loss = bp_loss(camera->film()->read(pixel_id).average,
-                                      camera->target()->evaluate(pixel_uv, time).xyz());
+                auto d_loss = pt_exact->loss()->d_loss(camera, pixel_id);
                 for (auto i = 0u; i < 3u; ++i) {
                     beta[i] *= d_loss[i];
                 }

@@ -65,7 +65,7 @@ public:
 class DifferentiableIntegrator : public Integrator {
 
 private:
-    Loss _loss_function;
+    Loss *_loss_function;
     Optimizer _optimizer;
     mutable float _learning_rate;
     uint _iterations;

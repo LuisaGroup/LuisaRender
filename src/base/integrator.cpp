@@ -31,22 +31,9 @@ DifferentiableIntegrator::DifferentiableIntegrator(Scene *scene, const SceneNode
       _learning_rate{std::max(desc->property_float_or_default("learning_rate", 1.f), 0.f)},
       _iterations{std::max(desc->property_uint_or_default("iterations", 100u), 1u)},
       _display_camera_index{desc->property_int_or_default("display_camera_index", -1)},
-      _save_process{desc->property_bool_or_default("save_process", false)} {
-
-    // loss
-    auto loss_str = desc->property_string_or_default("loss", "L2");
-    for (auto &c : loss_str) { c = static_cast<char>(toupper(c)); }
-    if (loss_str == "L1") {
-        _loss_function = Loss::L1;
-    } else if (loss_str == "L2") {
-        _loss_function = Loss::L2;
-    } else {
-        LUISA_WARNING_WITH_LOCATION(
-            "Unknown loss '{}'. "
-            "Fallback to L2 loss.",
-            loss_str);
-        _loss_function = Loss::L2;
-    }
+      _save_process{desc->property_bool_or_default("save_process", false)},
+      _loss_function{scene->load_loss(desc->property_node_or_default(
+          "loss", SceneNodeDesc::shared_default_loss("L1")))} {
 
     // optimizer
     auto optimizer_str = desc->property_string_or_default("optimizer", "GD");

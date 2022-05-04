@@ -263,15 +263,15 @@ Camera camera1 : Pinhole {
   }
 }
 
-Integrator pt : MegaRadiativeDiff {
-//Integrator pt : MegaReplayDiff {
+//Integrator pt : MegaRadiativeDiff {
+Integrator pt : MegaReplayDiff {
   sampler : Independent {}
   depth { 10 }
   spectrum : sRGB {}
   display_camera_index { 0 }
   save_process { true }
   optimizer { "BGD" }
-  loss { "L2" }
+  loss : L2 {}
   learning_rate { 0.1 }
   iterations { 100 }
 }

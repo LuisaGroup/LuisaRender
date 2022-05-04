@@ -179,6 +179,10 @@ Spectrum *Scene::load_spectrum(const SceneNodeDesc *desc) noexcept {
     return dynamic_cast<Spectrum *>(load_node(SceneNodeTag::SPECTRUM, desc));
 }
 
+Loss *Scene::load_loss(const SceneNodeDesc *desc) noexcept {
+    return dynamic_cast<Loss *>(load_node(SceneNodeTag::LOSS, desc));
+}
+
 luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc) noexcept {
     if (!desc->root()->is_defined()) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(

@@ -25,6 +25,8 @@ enum struct SceneNodeTag : uint32_t {
     TEXTURE,
     TEXTURE_MAPPING,
     SPECTRUM,
+    LOSS,
+    OPTIMIZER,
     // TODO: MEDIUM?
 };
 
@@ -48,6 +50,8 @@ constexpr std::string_view scene_node_tag_description(SceneNodeTag tag) noexcept
         case SceneNodeTag::TEXTURE: return "Texture"sv;
         case SceneNodeTag::TEXTURE_MAPPING: return "TextureMapping"sv;
         case SceneNodeTag::SPECTRUM: return "Spectrum"sv;
+        case SceneNodeTag::LOSS: return "Loss"sv;
+        case SceneNodeTag::OPTIMIZER: return "Optimizer"sv;
         default: break;
     }
     return "__invalid__"sv;
