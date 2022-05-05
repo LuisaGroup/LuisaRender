@@ -64,8 +64,20 @@ public:
 
 class DifferentiableIntegrator : public Integrator {
 
+public:
+    class Instance : public Integrator::Instance {
+
+    private:
+        luisa::unique_ptr<Loss::Instance> _loss;
+
+    public:
+        explicit Instance(Pipeline &pipeline, CommandBuffer &command_buffer,
+                          const DifferentiableIntegrator *integrator) noexcept;
+        [[nodiscard]] auto loss() const noexcept { return _loss.get(); }
+    };
+
 private:
-    Loss *_loss_function;
+    Loss *_loss;
     Optimizer _optimizer;
     mutable float _learning_rate;
     uint _iterations;
@@ -76,7 +88,7 @@ public:
     DifferentiableIntegrator(Scene *scene, const SceneNodeDesc *desc) noexcept;
 
     [[nodiscard]] bool is_differentiable() const noexcept override { return true; }
-    [[nodiscard]] auto loss() const noexcept { return _loss_function; }
+    [[nodiscard]] auto loss() const noexcept { return _loss; }
     [[nodiscard]] auto optimizer() const noexcept { return _optimizer; }
     [[nodiscard]] float &learning_rate() const noexcept { return _learning_rate; }
     [[nodiscard]] auto iterations() const noexcept { return _iterations; }

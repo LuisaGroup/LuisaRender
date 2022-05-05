@@ -32,11 +32,11 @@ DifferentiableIntegrator::DifferentiableIntegrator(Scene *scene, const SceneNode
       _iterations{std::max(desc->property_uint_or_default("iterations", 100u), 1u)},
       _display_camera_index{desc->property_int_or_default("display_camera_index", -1)},
       _save_process{desc->property_bool_or_default("save_process", false)},
-      _loss_function{scene->load_loss(desc->property_node_or_default(
+      _loss{scene->load_loss(desc->property_node_or_default(
           "loss", SceneNodeDesc::shared_default_loss("L2")))} {
 
     // optimizer
-    auto optimizer_str = desc->property_string_or_default("optimizer", "GD");
+    auto optimizer_str = desc->property_string_or_default("optimizer", "BGD");
     for (auto &c : optimizer_str) { c = static_cast<char>(toupper(c)); }
     if (optimizer_str == "BGD") {
         _optimizer = Optimizer::BGD;
@@ -48,5 +48,11 @@ DifferentiableIntegrator::DifferentiableIntegrator(Scene *scene, const SceneNode
         _optimizer = Optimizer::BGD;
     }
 }
+
+DifferentiableIntegrator::Instance::Instance(
+    Pipeline &pipeline, CommandBuffer &command_buffer,
+    const DifferentiableIntegrator *integrator) noexcept
+    : Integrator::Instance{pipeline, command_buffer, integrator},
+      _loss{node<DifferentiableIntegrator>()->loss()->build(pipeline, command_buffer)} {}
 
 }// namespace luisa::render

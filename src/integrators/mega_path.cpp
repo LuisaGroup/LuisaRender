@@ -35,7 +35,7 @@ public:
     [[nodiscard]] bool is_differentiable() const noexcept override { return false; }
     [[nodiscard]] bool display_enabled() const noexcept { return _display; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
+    [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
 class MegakernelPathTracingInstance final : public Integrator::Instance {
@@ -152,7 +152,7 @@ public:
     }
 };
 
-unique_ptr<Integrator::Instance> MegakernelPathTracing::build(Pipeline &pipeline, CommandBuffer &cmd_buffer) const noexcept {
+luisa::unique_ptr<Integrator::Instance> MegakernelPathTracing::build(Pipeline &pipeline, CommandBuffer &cmd_buffer) const noexcept {
     return luisa::make_unique<MegakernelPathTracingInstance>(this, pipeline, cmd_buffer);
 }
 

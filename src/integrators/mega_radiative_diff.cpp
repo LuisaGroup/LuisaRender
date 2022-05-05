@@ -32,10 +32,10 @@ public:
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
+    [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
-class MegakernelRadiativeDiffInstance final : public Integrator::Instance {
+class MegakernelRadiativeDiffInstance final : public DifferentiableIntegrator::Instance {
 
 private:
     luisa::vector<float4> _pixels;
@@ -55,7 +55,7 @@ public:
     explicit MegakernelRadiativeDiffInstance(
         const MegakernelRadiativeDiff *node,
         Pipeline &pipeline, CommandBuffer &command_buffer) noexcept
-        : Integrator::Instance{pipeline, command_buffer, node} {
+        : DifferentiableIntegrator::Instance{pipeline, command_buffer, node} {
         if (node->display_camera_index() >= 0) {
             LUISA_ASSERT(node->display_camera_index() < pipeline.camera_count(),
                          "display_camera_index exceeds camera count");
@@ -203,7 +203,7 @@ public:
     }
 };
 
-unique_ptr<Integrator::Instance> MegakernelRadiativeDiff::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
+luisa::unique_ptr<Integrator::Instance> MegakernelRadiativeDiff::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
     return luisa::make_unique<MegakernelRadiativeDiffInstance>(this, pipeline, command_buffer);
 }
 
@@ -245,7 +245,7 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
             SampledSpectrum Li{swl.dimension(), 1.0f};
             auto grad_weight = shutter_weight * static_cast<float>(pt->node<MegakernelRadiativeDiff>()->max_depth());
 
-            auto d_loss = pt_exact->loss()->d_loss(camera, pixel_id);
+            auto d_loss = pt->loss()->d_loss(camera, pixel_id);
             for (auto i = 0u; i < 3u; ++i) {
                 beta[i] *= d_loss[i];
             }

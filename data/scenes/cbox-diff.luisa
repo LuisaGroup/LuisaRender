@@ -268,7 +268,7 @@ Integrator pt : MegaRadiativeDiff {
   sampler : Independent {}
   depth { 10 }
   spectrum : sRGB {}
-  //display_camera_index { 0 }
+  display_camera_index { 0 }
   save_process { true }
   optimizer { "BGD" }
   loss : L2 {}
