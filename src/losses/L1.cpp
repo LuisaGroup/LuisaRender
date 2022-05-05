@@ -12,8 +12,7 @@ class L1 final : public Loss {
 
 public:
     L1(Scene *scene, const SceneNodeDesc *desc)
-    noexcept
-        : Loss{scene, desc} {}
+    noexcept : Loss{scene, desc} {}
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
 
     [[nodiscard]] Float3 loss(const Camera::Instance *camera) const noexcept override {

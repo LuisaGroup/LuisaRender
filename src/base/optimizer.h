@@ -4,6 +4,10 @@
 
 #pragma once
 
+#include <luisa-compute.h>
+
+#include <base/scene_node.h>
+
 namespace luisa::render {
 
 enum class Optimizer {
@@ -14,9 +18,10 @@ enum class Optimizer {
     LDGD = 4,
 };
 
-class OptimizerTemp {
+class OptimizerTemp : public SceneNode {
 
 public:
+    OptimizerTemp(Scene *scene, const SceneNodeDesc *desc) noexcept;
     virtual void materialize(CommandBuffer &command_buffer) noexcept = 0;
     virtual void clear_gradients(CommandBuffer &command_buffer) noexcept = 0;
     virtual void apply_gradients(CommandBuffer &command_buffer, float alpha) noexcept = 0;

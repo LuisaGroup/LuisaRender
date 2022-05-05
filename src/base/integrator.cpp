@@ -33,7 +33,7 @@ DifferentiableIntegrator::DifferentiableIntegrator(Scene *scene, const SceneNode
       _display_camera_index{desc->property_int_or_default("display_camera_index", -1)},
       _save_process{desc->property_bool_or_default("save_process", false)},
       _loss_function{scene->load_loss(desc->property_node_or_default(
-          "loss", SceneNodeDesc::shared_default_loss("L1")))} {
+          "loss", SceneNodeDesc::shared_default_loss("L2")))} {
 
     // optimizer
     auto optimizer_str = desc->property_string_or_default("optimizer", "GD");
