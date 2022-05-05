@@ -32,22 +32,10 @@ DifferentiableIntegrator::DifferentiableIntegrator(Scene *scene, const SceneNode
       _iterations{std::max(desc->property_uint_or_default("iterations", 100u), 1u)},
       _display_camera_index{desc->property_int_or_default("display_camera_index", -1)},
       _save_process{desc->property_bool_or_default("save_process", false)},
+      //      _optimizer{scene->load_optimizer(desc->property_node_or_default(
+      //          "optimizer", SceneNodeDesc::shared_default_optimizer("GD")))},
       _loss{scene->load_loss(desc->property_node_or_default(
-          "loss", SceneNodeDesc::shared_default_loss("L2")))} {
-
-    // optimizer
-    auto optimizer_str = desc->property_string_or_default("optimizer", "BGD");
-    for (auto &c : optimizer_str) { c = static_cast<char>(toupper(c)); }
-    if (optimizer_str == "BGD") {
-        _optimizer = Optimizer::BGD;
-    } else {
-        LUISA_WARNING_WITH_LOCATION(
-            "Unsupported optimizer '{}'. "
-            "Fallback to BGD optimizer.",
-            optimizer_str);
-        _optimizer = Optimizer::BGD;
-    }
-}
+          "loss", SceneNodeDesc::shared_default_loss("L2")))} {}
 
 DifferentiableIntegrator::Instance::Instance(
     Pipeline &pipeline, CommandBuffer &command_buffer,

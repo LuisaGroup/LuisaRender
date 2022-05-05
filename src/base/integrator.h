@@ -69,18 +69,20 @@ public:
 
     private:
         luisa::unique_ptr<Loss::Instance> _loss;
+        //        luisa::unique_ptr<Optimizer::Instance> _optimizer;
 
     public:
         explicit Instance(Pipeline &pipeline, CommandBuffer &command_buffer,
                           const DifferentiableIntegrator *integrator) noexcept;
         [[nodiscard]] auto loss() const noexcept { return _loss.get(); }
+        //        [[nodiscard]] auto optimizer() const noexcept { return _optimizer.get(); }
     };
 
 private:
     Loss *_loss;
-    Optimizer _optimizer;
-    mutable float _learning_rate;
+    //    Optimizer *_optimizer;
     uint _iterations;
+    float _learning_rate;
     int _display_camera_index;
     bool _save_process;
 
@@ -89,8 +91,8 @@ public:
 
     [[nodiscard]] bool is_differentiable() const noexcept override { return true; }
     [[nodiscard]] auto loss() const noexcept { return _loss; }
-    [[nodiscard]] auto optimizer() const noexcept { return _optimizer; }
-    [[nodiscard]] float &learning_rate() const noexcept { return _learning_rate; }
+    //    [[nodiscard]] auto optimizer() const noexcept { return _optimizer; }
+    [[nodiscard]] float learning_rate() const noexcept { return _learning_rate; }
     [[nodiscard]] auto iterations() const noexcept { return _iterations; }
     [[nodiscard]] int display_camera_index() const noexcept { return _display_camera_index; }
     [[nodiscard]] bool save_process() const noexcept { return _save_process; }

@@ -12,9 +12,8 @@
 
 namespace luisa::render {
 
-Differentiation::Differentiation(Pipeline &pipeline, const Optimizer &optimizer) noexcept
+Differentiation::Differentiation(Pipeline &pipeline) noexcept
     : _pipeline{pipeline},
-      _optimizer{optimizer},
       _const_param_buffer{*pipeline.create<Buffer<float4>>(constant_parameter_buffer_capacity)},
       _const_param_range_buffer{*pipeline.create<Buffer<float2>>(constant_parameter_buffer_capacity)},
       _gradient_buffer_size{constant_parameter_gradient_buffer_size},

@@ -183,6 +183,10 @@ Loss *Scene::load_loss(const SceneNodeDesc *desc) noexcept {
     return dynamic_cast<Loss *>(load_node(SceneNodeTag::LOSS, desc));
 }
 
+Optimizer *Scene::load_optimizer(const SceneNodeDesc *desc) noexcept {
+    return dynamic_cast<Optimizer *>(load_node(SceneNodeTag::OPTIMIZER, desc));
+}
+
 luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc) noexcept {
     if (!desc->root()->is_defined()) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(

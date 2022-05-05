@@ -6,9 +6,9 @@
 
 #include <luisa-compute.h>
 
+#include <base/scene_node.h>
 #include <base/camera.h>
 #include <base/interaction.h>
-#include <base/scene_node.h>
 #include <base/spectrum.h>
 
 namespace luisa::render {
@@ -32,6 +32,8 @@ public:
             requires std::is_base_of_v<Loss, T>
         [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_loss); }
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
+
+    public:
         [[nodiscard]] virtual Float3 loss(const Camera::Instance *camera) const noexcept = 0;
         [[nodiscard]] virtual Float3 d_loss(const Camera::Instance *camera, Expr<uint2> pixel_id) const noexcept = 0;
     };
