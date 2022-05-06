@@ -14,9 +14,6 @@ using std::max;
 using std::sin;
 using namespace luisa::compute;
 
-static constexpr auto rsp_coefficient_scales = make_float3(10000.f, 10.f, 0.01f);
-static constexpr auto inv_rsp_coefficient_scales = make_float3(1e-4f, 1e-1f, 1e2f);
-
 class RGBSigmoidPolynomial {
 
 private:
@@ -25,7 +22,7 @@ private:
 private:
     [[nodiscard]] static Float _s(Expr<float> x) noexcept {
         return ite(
-            x > 1e20f,
+            isinf(x),
             cast<float>(x > 0.0f),
             0.5f + 0.5f * x * rsqrt(1.0f + x * x));
     }
@@ -33,9 +30,8 @@ private:
 public:
     RGBSigmoidPolynomial() noexcept = default;
     RGBSigmoidPolynomial(Expr<float> c0, Expr<float> c1, Expr<float> c2) noexcept
-        : _c{make_float3(c0, c1, c2) * inv_rsp_coefficient_scales} {}
-    explicit RGBSigmoidPolynomial(Expr<float3> c) noexcept
-        : _c{c * inv_rsp_coefficient_scales} {}
+        : _c{make_float3(c0, c1, c2)} {}
+    explicit RGBSigmoidPolynomial(Expr<float3> c) noexcept : _c{c} {}
     [[nodiscard]] Float operator()(Expr<float> lambda) const noexcept {
         return _s(fma(lambda, fma(lambda, _c.x, _c.y), _c.z));// c0 * x * x + c1 * x + c2
     }
@@ -75,28 +71,37 @@ public:
         const BindlessArray &array, Expr<uint> base_index, Expr<float3> rgb_in) const noexcept {
         auto rgb = clamp(rgb_in, 0.0f, 1.0f);
         static Callable decode = [](BindlessVar array, UInt base_index, Float3 rgb) noexcept {
-            // Find maximum component and compute remapped component values
-            auto maxc = ite(
-                rgb[0] > rgb[1],
-                ite(rgb[0] > rgb[2], 0u, 2u),
-                ite(rgb[1] > rgb[2], 1u, 2u));
-            auto z = rgb[maxc];
-            auto x = rgb[(maxc + 1u) % 3u] / z;
-            auto y = rgb[(maxc + 2u) % 3u] / z;
-            auto zz = _inverse_smooth_step(_inverse_smooth_step(z));
+            auto c = make_float3(0.0f, 0.0f, (rgb[0] - 0.5f) / sqrt(rgb[0] * (1.0f - rgb[0])));
+            $if(rgb[0] != rgb[1] | rgb[1] != rgb[2]) {
+                // Find maximum component and compute remapped component values
+                auto maxc = ite(
+                    rgb[0] > rgb[1],
+                    ite(rgb[0] > rgb[2], 0u, 2u),
+                    ite(rgb[1] > rgb[2], 1u, 2u));
+                auto z = rgb[maxc];
+                auto x = rgb[(maxc + 1u) % 3u] / z;
+                auto y = rgb[(maxc + 2u) % 3u] / z;
+                auto zz = _inverse_smooth_step(_inverse_smooth_step(z));
 
-            // Trilinearly interpolate sigmoid polynomial coefficients _c_
-            auto coord = fma(
-                make_float3(x, y, zz),
-                (resolution - 1.0f) / resolution,
-                0.5f / resolution);
-            return array.tex3d(base_index + maxc).sample(coord).xyz();
+                // Trilinearly interpolate sigmoid polynomial coefficients _c_
+                auto coord = fma(
+                    make_float3(x, y, zz),
+                    (resolution - 1.0f) / resolution,
+                    0.5f / resolution);
+                c = array.tex3d(base_index + maxc).sample(coord).xyz();
+            };
+            return c;
         };
         return make_float4(decode(Expr{array}, base_index, rgb), srgb_to_cie_y(rgb));
     }
 
     [[nodiscard]] float4 decode_albedo(float3 rgb_in) const noexcept {
         auto rgb = clamp(rgb_in, 0.0f, 1.0f);
+        if (rgb[0] == rgb[1] && rgb[1] == rgb[2]) {
+            return make_float4(0.0f, 0.0f,
+                               (rgb[0] - 0.5f) / std::sqrt(rgb[0] * (1.0f - rgb[0])),
+                               srgb_to_cie_y(rgb));
+        }
         // Find maximum component and compute remapped component values
         auto maxc = (rgb[0] > rgb[1]) ?
                         ((rgb[0] > rgb[2]) ? 0u : 2u) :
