@@ -18,8 +18,8 @@ set(LUISA_RENDER_BASE_SOURCES
         differentiation.cpp differentiation.h
         texture_mapping.cpp texture_mapping.h
         spectrum.cpp spectrum.h
-        optimizer.h
-        loss.h)
+        loss.h loss.cpp
+        optimizer.h optimizer.cpp)
 
 add_library(luisa-render-base SHARED ${LUISA_RENDER_BASE_SOURCES})
 target_link_libraries(luisa-render-base PUBLIC

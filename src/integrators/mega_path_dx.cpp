@@ -37,7 +37,7 @@ public:
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
     [[nodiscard]] bool is_differentiable() const noexcept override { return false; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
+    [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
 class MegakernelPathTracingInstance final : public Integrator::Instance {
@@ -88,9 +88,9 @@ private:
             auto color = camera->film()->read(p).average;
             auto hdr2ldr = [](auto x) noexcept {
                 return clamp(select(1.055f * pow(x, 1.0f / 2.4f) - 0.055f,
-                             12.92f * x,
-                             x <= 0.00031308f),
-                      0.0f, 1.0f);
+                                    12.92f * x,
+                                    x <= 0.00031308f),
+                             0.0f, 1.0f);
             };
             _image.write(p, make_float4(hdr2ldr(color), 1.f));
         });
@@ -277,7 +277,7 @@ public:
     }
 };
 
-unique_ptr<Integrator::Instance> MegakernelPathTracing::build(Pipeline &pipeline, CommandBuffer &cmd_buffer) const noexcept {
+luisa::unique_ptr<Integrator::Instance> MegakernelPathTracing::build(Pipeline &pipeline, CommandBuffer &cmd_buffer) const noexcept {
     return luisa::make_unique<MegakernelPathTracingInstance>(this, pipeline, cmd_buffer);
 }
 

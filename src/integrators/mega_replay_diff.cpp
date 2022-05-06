@@ -34,10 +34,10 @@ public:
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
+    [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
-class MegakernelReplayDiffInstance final : public Integrator::Instance {
+class MegakernelReplayDiffInstance final : public DifferentiableIntegrator::Instance {
 
 private:
     luisa::vector<float4> _pixels;
@@ -59,7 +59,7 @@ public:
     explicit MegakernelReplayDiffInstance(
         const MegakernelReplayDiff *node,
         Pipeline &pipeline, CommandBuffer &command_buffer) noexcept
-        : Integrator::Instance{pipeline, command_buffer, node} {
+        : DifferentiableIntegrator::Instance{pipeline, command_buffer, node} {
 
         // display
         if (node->display_camera_index() >= 0) {
@@ -226,7 +226,7 @@ public:
     }
 };
 
-unique_ptr<Integrator::Instance> MegakernelReplayDiff::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
+luisa::unique_ptr<Integrator::Instance> MegakernelReplayDiff::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
     return luisa::make_unique<MegakernelReplayDiffInstance>(this, pipeline, command_buffer);
 }
 
@@ -404,30 +404,6 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
             return ite(pdf_a > 0.0f, pdf_a / (pdf_a + pdf_b), 0.0f);
         };
 
-        Callable bp_loss = [camera, pt_exact](UInt2 pixel_id, Float time) noexcept {
-            auto resolution = camera->film()->node()->resolution();
-            auto it = Interaction{
-                make_float3(1.0f),
-                Float2{
-                    (pixel_id.x + 0.5f) / resolution.x,
-                    (pixel_id.y + 0.5f) / resolution.y}};
-
-            switch (pt_exact->loss()) {
-                case Loss::L1:
-                    // L1 loss
-                    return ite(
-                        camera->film()->read(pixel_id).average >= camera->target()->evaluate(it, time).xyz(),
-                        1.0f,
-                        -1.0f);
-                case Loss::L2:
-                    // L2 loss
-                    return 2.0f * (camera->film()->read(pixel_id).average -
-                                   camera->target()->evaluate(it, time).xyz());
-            }
-
-            return def(make_float3(0.f));
-        };
-
         Kernel2D bp_kernel = [&](UInt frame_index, Float time, Float shutter_weight, ImageFloat Li_1spp) noexcept {
             set_block_size(16u, 16u, 1u);
 
@@ -445,8 +421,8 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
             Li[1u] = Li_last_pass[1u];
             Li[2u] = Li_last_pass[2u];
 
-            auto d_loss_float3 = bp_loss(pixel_id, time);
             SampledSpectrum d_loss{swl.dimension(), 0.f};
+            auto d_loss_float3 = pt->loss()->d_loss(camera, pixel_id);
             for (auto i = 0u; i < 3u; ++i) {
                 d_loss[i] = d_loss_float3[i];
             }

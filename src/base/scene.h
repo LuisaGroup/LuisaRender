@@ -35,6 +35,8 @@ class Environment;
 class Texture;
 class TextureMapping;
 class Spectrum;
+class Loss;
+class Optimizer;
 
 class Scene {
 
@@ -73,6 +75,8 @@ public:
     [[nodiscard]] Texture *load_texture(const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] TextureMapping *load_texture_mapping(const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] Spectrum *load_spectrum(const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] Loss *load_loss(const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] Optimizer *load_optimizer(const SceneNodeDesc *desc) noexcept;
 
 public:
     [[nodiscard]] static luisa::unique_ptr<Scene> create(const Context &ctx, const SceneDesc *desc) noexcept;
@@ -83,4 +87,4 @@ public:
     [[nodiscard]] luisa::span<const Camera *const> cameras() const noexcept;
 };
 
-}
+}// namespace luisa::render

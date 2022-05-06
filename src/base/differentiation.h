@@ -9,8 +9,6 @@
 #include <runtime/shader.h>
 #include <runtime/command_buffer.h>
 
-#include "optimizer.h"
-
 namespace luisa::render {
 
 using compute::Buffer;
@@ -81,8 +79,6 @@ public:
 private:
     Pipeline &_pipeline;
 
-    Optimizer _optimizer;
-
     luisa::vector<float4> _constant_params;
     luisa::vector<float2> _constant_ranges;
     luisa::vector<TexturedParameter> _textured_params;
@@ -101,7 +97,7 @@ private:
     Shader2D<Buffer<uint>, uint, Image<float>, uint, float, float2, Buffer<uint>, uint> _apply_grad_tex;
 
 public:
-    explicit Differentiation(Pipeline &pipeline, const Optimizer &optimizer) noexcept;
+    explicit Differentiation(Pipeline &pipeline) noexcept;
     [[nodiscard]] ConstantParameter parameter(float x, float2 range) noexcept;
     [[nodiscard]] ConstantParameter parameter(float2 x, float2 range) noexcept;
     [[nodiscard]] ConstantParameter parameter(float3 x, float2 range) noexcept;

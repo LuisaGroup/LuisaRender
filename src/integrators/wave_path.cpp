@@ -39,7 +39,7 @@ public:
     [[nodiscard]] bool is_differentiable() const noexcept override { return false; }
     [[nodiscard]] auto state_count() const noexcept { return _state_count; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
+    [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
 class PathStateSOA {
@@ -235,7 +235,7 @@ public:
     }
 };
 
-unique_ptr<Integrator::Instance> WavefrontPathTracing::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
+luisa::unique_ptr<Integrator::Instance> WavefrontPathTracing::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
     return luisa::make_unique<WavefrontPathTracingInstance>(this, pipeline, command_buffer);
 }
 
@@ -273,7 +273,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
 
     LUISA_INFO("Compiling ray generation kernel.");
     auto generate_rays_shader = device.compile_async<1>([&](BufferUInt path_indices, BufferRay rays,
-                                                      UInt base_sample_id, Float time) noexcept {
+                                                            UInt base_sample_id, Float time) noexcept {
         auto state_id = dispatch_x();
         auto pixel_id = state_id % pixel_count;
         auto sample_id = base_sample_id + state_id / pixel_count;
@@ -292,9 +292,9 @@ void WavefrontPathTracingInstance::_render_one_camera(
 
     LUISA_INFO("Compiling intersection kernel.");
     auto intersect_shader = device.compile_async<1>([&](BufferUInt ray_count, BufferRay rays, BufferHit hits,
-                                                  BufferUInt surface_queue, BufferUInt surface_queue_size,
-                                                  BufferUInt light_queue, BufferUInt light_queue_size,
-                                                  BufferUInt escape_queue, BufferUInt escape_queue_size) noexcept {
+                                                        BufferUInt surface_queue, BufferUInt surface_queue_size,
+                                                        BufferUInt light_queue, BufferUInt light_queue_size,
+                                                        BufferUInt escape_queue, BufferUInt escape_queue_size) noexcept {
         auto ray_id = dispatch_x();
         $if(ray_id < ray_count.read(0u)) {
             auto ray = rays.read(ray_id);
@@ -326,7 +326,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
 
     LUISA_INFO("Compiling environment evaluation kernel.");
     auto evaluate_miss_shader = device.compile_async<1>([&](BufferUInt path_indices, BufferRay rays,
-                                                      BufferUInt queue, BufferUInt queue_size, Float time) noexcept {
+                                                            BufferUInt queue, BufferUInt queue_size, Float time) noexcept {
         if (pipeline().environment()) {
             auto queue_id = dispatch_x();
             $if(queue_id < queue_size.read(0u)) {
@@ -347,7 +347,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
 
     LUISA_INFO("Compiling light evaluation kernel.");
     auto evaluate_light_shader = device.compile_async<1>([&](BufferUInt path_indices, BufferRay rays, BufferHit hits,
-                                                       BufferUInt queue, BufferUInt queue_size, Float time) noexcept {
+                                                             BufferUInt queue, BufferUInt queue_size, Float time) noexcept {
         if (!pipeline().lights().empty()) {
             auto queue_id = dispatch_x();
             $if(queue_id < queue_size.read(0u)) {
@@ -370,7 +370,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
 
     LUISA_INFO("Compiling light sampling kernel.");
     auto sample_light_shader = device.compile_async<1>([&](BufferUInt path_indices, BufferRay rays, BufferHit hits,
-                                                     BufferUInt queue, BufferUInt queue_size, Float time) noexcept {
+                                                           BufferUInt queue, BufferUInt queue_size, Float time) noexcept {
         auto queue_id = dispatch_x();
         $if(queue_id < queue_size.read(0u)) {
             auto ray_id = queue.read(queue_id);
@@ -393,8 +393,8 @@ void WavefrontPathTracingInstance::_render_one_camera(
 
     LUISA_INFO("Compiling surface evaluation kernel.");
     auto evaluate_surface_shader = device.compile_async<1>([&](BufferUInt path_indices, UInt trace_depth, BufferUInt queue, BufferUInt queue_size,
-                                                         BufferRay in_rays, BufferHit in_hits, BufferRay out_rays,
-                                                         BufferUInt out_queue, BufferUInt out_queue_size, Float time) noexcept {
+                                                               BufferRay in_rays, BufferHit in_hits, BufferRay out_rays,
+                                                               BufferUInt out_queue, BufferUInt out_queue_size, Float time) noexcept {
         auto queue_id = dispatch_x();
         $if(queue_id < queue_size.read(0u)) {
             auto ray_id = queue.read(queue_id);
@@ -539,7 +539,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                 auto out_path_indices = out_path_queue.prepare_index_buffer(command_buffer);
                 auto out_path_count = out_path_queue.prepare_counter_buffer(command_buffer);
                 command_buffer << intersect_shader.get()(path_count, rays, hits, surface_indices, surface_count,
-                                                   light_indices, light_count, miss_indices, miss_count)
+                                                         light_indices, light_count, miss_indices, miss_count)
                                       .dispatch(launch_state_count);
                 if (pipeline().environment()) {
                     command_buffer << evaluate_miss_shader.get()(path_indices, rays, miss_indices, miss_count, time)
@@ -547,14 +547,14 @@ void WavefrontPathTracingInstance::_render_one_camera(
                 }
                 if (!pipeline().lights().empty()) {
                     command_buffer << evaluate_light_shader.get()(path_indices, rays, hits,
-                                                            light_indices, light_count, time)
+                                                                  light_indices, light_count, time)
                                           .dispatch(launch_state_count);
                 }
                 command_buffer << sample_light_shader.get()(path_indices, rays, hits, surface_indices, surface_count, time)
                                       .dispatch(launch_state_count)
                                << evaluate_surface_shader.get()(path_indices, depth, surface_indices,
-                                                          surface_count, rays, hits, out_rays,
-                                                          out_path_indices, out_path_count, time)
+                                                                surface_count, rays, hits, out_rays,
+                                                                out_path_indices, out_path_count, time)
                                       .dispatch(launch_state_count);
                 path_indices = out_path_indices;
                 path_count = out_path_count;
