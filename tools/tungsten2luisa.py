@@ -12,11 +12,13 @@ def convert_albedo_texture(a):
     if isinstance(a, str):
         return f'''Image {{
     file {{ "{a}" }}
+    semantic {{ "albedo" }}
   }}'''
     else:
         a = glm.vec3(a)
         return f'''Constant {{
     v {{ {a.x}, {a.y}, {a.z} }}
+    semantic {{ "albedo" }}
   }}'''
 
 
@@ -24,11 +26,13 @@ def convert_emission_texture(a):
     if isinstance(a, str):
         return f'''Image {{
     file {{ "{a}" }}
+    semantic {{ "illuminant" }}
   }}'''
     else:
         a = glm.vec3(a)
         return f'''Constant {{
     v {{ {a.x}, {a.y}, {a.z} }}
+    semantic {{ "illuminant" }}
   }}'''
 
 
@@ -42,6 +46,7 @@ Surface mat_{name} : Substrate {{
   Kd : {convert_albedo_texture(color)}
   Ks : Constant {{
     v {{ 0.04, 0.04, 0.04 }}
+    semantic {{ "albedo" }}
   }}
   eta : Constant {{
     v {{ {ior} }}
@@ -61,6 +66,7 @@ def convert_glass_material(out_file, material: dict, alpha=""):
 Surface mat_{name} : Glass {{
   Kr : Constant {{
     v {{ 1, 1, 1 }}
+    semantic {{ "albedo" }}
   }}
   Kt : {convert_albedo_texture(color)}
   eta : Constant {{
@@ -186,6 +192,7 @@ Env env : Spherical {{
 Env dir : Directional {{
   emission : Constant {{
     v {{ {emission.x}, {emission.y}, {emission.z} }}
+    semantic {{ "illuminant" }}
   }}
   angle {{ {angle} }}
   transform : Matrix {{
@@ -202,6 +209,7 @@ Env dir : Directional {{
 Env sky : Spherical {{
   emission : Image {{
     file {{ "textures/sky.exr" }}
+    semantic {{ "illuminant" }}
   }}
   transform : Matrix {{
     m {{ {M[0][0]}, {M[1][0]}, {M[2][0]}, {M[3][0]},
@@ -244,6 +252,7 @@ Env sky : Spherical {{
   light : Diffuse {{
     emission : Constant {{
       v {{ {emission.x}, {emission.y}, {emission.z} }}
+      semantic {{ "illuminant" }}
     }}
   }}'''
         print(f'''

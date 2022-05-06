@@ -22,11 +22,11 @@ private:
 public:
     MirrorSurface(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Surface{scene, desc},
-          _color{scene->load_texture(desc->property_node_or_default(
-              "color", SceneNodeDesc::shared_default_texture("Constant")))},
+          _color{scene->load_texture(desc->property_node("color"))},
           _roughness{scene->load_texture(desc->property_node_or_default("roughness"))},
           _remap_roughness{desc->property_bool_or_default("remap_roughness", false)} {
-        LUISA_RENDER_PARAM_CHANNEL_CHECK(MirrorSurface, color, 3);
+        LUISA_RENDER_CHECK_ALBEDO_TEXTURE(MirrorSurface, color);
+        LUISA_RENDER_CHECK_GENERIC_TEXTURE(MirrorSurface, roughness, 1);
     }
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
@@ -174,7 +174,7 @@ luisa::unique_ptr<Surface::Closure> MirrorInstance::_closure(
                     (remap ? make_float2(r2a(r.x)) : r.xx()) :
                     (remap ? r2a(r.xy()) : r.xy());
     }
-    auto color = _color->evaluate_albedo_spectrum(it, swl, time);
+    auto color = _color->evaluate_albedo_spectrum(it, swl, time).value;
     return luisa::make_unique<MirrorClosure>(this, it, swl, time, color, alpha);
 }
 

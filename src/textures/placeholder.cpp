@@ -67,6 +67,11 @@ public:
                     "resolution", 1024u));
             }));
         _resolution = clamp(_resolution, 1u, 16384u);
+        switch (semantic()) {
+            case Semantic::ALBEDO: [[fallthrough]];
+            case Semantic::ILLUMINANT: _channels = 4u; break;
+            case Semantic::GENERIC: break;
+        }
     }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] bool is_black() const noexcept override { return false; }
@@ -81,7 +86,6 @@ public:
 class PlaceholderTextureInstance final : public Texture::Instance {
 
 private:
-    Shader<2u, Image<float>> _fill;
     const Image<float> &_image;
     luisa::optional<Differentiation::TexturedParameter> _diff_param;
     uint _texture_id{};
@@ -100,10 +104,10 @@ public:
                                luisa::optional<Differentiation::TexturedParameter> param) noexcept
         : Texture::Instance{pipeline, texture},
           _image{image}, _diff_param{std::move(param)} {
-        _fill = pipeline.device().compile<2>([](ImageFloat image) noexcept {
+        static thread_local Kernel2D fill = [](ImageFloat image) noexcept {
             image.write(dispatch_id().xy(), make_float4(.5f, .5f, .5f, 1.f));
-        });
-        command_buffer << _fill(_image).dispatch(_image.size());
+        };
+        command_buffer << fill(pipeline.device(), _image).dispatch(_image.size());
         _texture_id = pipeline.register_bindless(_image, sampler);
     }
     [[nodiscard]] Float4 evaluate(const Interaction &it, Expr<float> time) const noexcept override {

@@ -27,10 +27,9 @@ private:
 public:
     Spherical(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Environment{scene, desc},
-          _emission{scene->load_texture(desc->property_node_or_default(
-              "emission", SceneNodeDesc::shared_default_texture("Constant")))},
+          _emission{scene->load_texture(desc->property_node("emission"))},
           _scale{std::max(desc->property_float_or_default("scale", 1.0f), 0.0f)} {
-        LUISA_RENDER_PARAM_CHANNEL_CHECK(Spherical, emission, 3);
+        LUISA_RENDER_CHECK_ILLUMINANT_TEXTURE(Spherical, emission);
     }
     [[nodiscard]] auto scale() const noexcept { return _scale; }
     [[nodiscard]] auto emission() const noexcept { return _emission; }
@@ -69,7 +68,7 @@ private:
         auto env = node<Spherical>();
         auto uv = Spherical::direction_to_uv(wi_local);
         Interaction it{-wi_local, uv};
-        auto L = _texture->evaluate_illuminant_spectrum(it, swl, time);
+        auto L = _texture->evaluate_illuminant_spectrum(it, swl, time).value;
         return L * env->scale();
     }
 
@@ -138,7 +137,7 @@ luisa::unique_ptr<Environment::Instance> Spherical::build(
                       make_float2(sample_map_size);
             auto w = Spherical::uv_to_direction(uv);
             auto it = Interaction{-w, uv};
-            auto scale = srgb_to_cie_y(texture->evaluate(it, 0.f).xyz());
+            auto scale = texture->evaluate_illuminant_spectrum(it, pipeline.spectrum()->sample(0.5f), 0.f).strength;
             auto sin_theta = sin(uv.y * pi);
             auto pixel_id = coord.y * sample_map_size.x + coord.x;
             scale_map_device.write(pixel_id, sin_theta * scale);

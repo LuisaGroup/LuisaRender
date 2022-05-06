@@ -29,6 +29,8 @@ Camera::Camera(Scene *scene, const SceneNodeDesc *desc) noexcept
       _spp{desc->property_uint_or_default("spp", 1024u)},
       _target{scene->load_texture(desc->property_node_or_default("target"))} {
 
+    LUISA_RENDER_CHECK_GENERIC_TEXTURE(Camera, target, 3);
+
     if (_shutter_span.y < _shutter_span.x) [[unlikely]] {
         LUISA_ERROR(
             "Invalid time span: [{}, {}]. [{}]",

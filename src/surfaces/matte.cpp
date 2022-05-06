@@ -22,10 +22,10 @@ private:
 public:
     MatteSurface(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Surface{scene, desc},
-          _kd{scene->load_texture(desc->property_node_or_default(
-              "Kd", SceneNodeDesc::shared_default_texture("Constant")))},
+          _kd{scene->load_texture(desc->property_node("Kd"))},
           _sigma{scene->load_texture(desc->property_node_or_default("sigma"))} {
-        LUISA_RENDER_PARAM_CHANNEL_CHECK(MatteSurface, kd, 3);
+        LUISA_RENDER_CHECK_ALBEDO_TEXTURE(MatteSurface, kd);
+        LUISA_RENDER_CHECK_GENERIC_TEXTURE(MatteSurface, sigma, 1);
     }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
 
@@ -115,7 +115,7 @@ private:
 
 luisa::unique_ptr<Surface::Closure> MatteInstance::_closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    auto Kd = _kd->evaluate_albedo_spectrum(it, swl, time);
+    auto Kd = _kd->evaluate_albedo_spectrum(it, swl, time).value;
     auto sigma = _sigma ? clamp(_sigma->evaluate(it, time).x, 0.f, 90.f) : 0.f;
     return luisa::make_unique<MatteClosure>(this, it, swl, time, Kd, sigma);
 }

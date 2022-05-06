@@ -25,10 +25,8 @@ private:
 public:
     PlasticSurface(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Surface{scene, desc},
-          _kd{scene->load_texture(desc->property_node_or_default(
-              "Kd", SceneNodeDesc::shared_default_texture("Constant")))},
-          _ks{scene->load_texture(desc->property_node_or_default(
-              "Ks", SceneNodeDesc::shared_default_texture("Constant")))},
+          _kd{scene->load_texture(desc->property_node("Kd"))},
+          _ks{scene->load_texture(desc->property_node("Ks"))},
           _roughness{scene->load_texture(desc->property_node_or_default("roughness"))},
           _eta{scene->load_texture(desc->property_node_or_default("eta"))},
           _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {
@@ -40,8 +38,10 @@ public:
                     desc->source_location().string());
             }
         }
-        LUISA_RENDER_PARAM_CHANNEL_CHECK(PlasticSurface, kd, 3);
-        LUISA_RENDER_PARAM_CHANNEL_CHECK(PlasticSurface, ks, 3);
+        LUISA_RENDER_CHECK_ALBEDO_TEXTURE(PlasticSurface, kd);
+        LUISA_RENDER_CHECK_ALBEDO_TEXTURE(PlasticSurface, ks);
+        LUISA_RENDER_CHECK_GENERIC_TEXTURE(PlasticSurface, roughness, 1);
+        LUISA_RENDER_CHECK_GENERIC_TEXTURE(PlasticSurface, eta, 1);
     }
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
@@ -159,36 +159,16 @@ private:
         auto wo_local = _it.wo_local();
         auto wi_local = _it.shading().world_to_local(wi);
 
-        auto Kd_rgb = _instance->Kd()->evaluate(_it, _time).xyz();
-        auto Ks_rgb = _instance->Ks()->evaluate(_it, _time).xyz();
-        auto Kd_max = max(max(Kd_rgb.x, Kd_rgb.y), Kd_rgb.z);
-        auto Ks_max = max(max(Ks_rgb.x, Ks_rgb.y), Ks_rgb.z);
-        auto k0 = Kd_max + Ks_max;
+        auto [Kd, Kd_lum] = _instance->Kd()->evaluate_albedo_spectrum(_it, _swl, _time);
+        auto [Ks, Ks_lum] = _instance->Ks()->evaluate_albedo_spectrum(_it, _swl, _time);
+        auto k0 = Kd_lum + Ks_lum;
         auto scale = 1.f / max(k0, 1.f);
 
         // Ks, Kd
         auto d_f_d = _lambert->backward(wo_local, wi_local, df);
         auto d_f_s = _microfacet->backward(wo_local, wi_local, df);
-        $if(scale < 1.f) {
-            Kd_rgb *= scale;
-            Ks_rgb *= scale;
-            auto d_Kd_rgb = _swl.backward_albedo_from_srgb(Kd_rgb, d_f_d.dR);
-            auto d_Ks_rgb = _swl.backward_albedo_from_srgb(Ks_rgb, d_f_s.dR);
-            for (auto i = 0u; i < 3u; ++i) {
-                $if(Kd_max == Kd_rgb[i]) {
-                    d_Kd_rgb *= sqr(scale) * (k0 - Kd_rgb[i]);
-                };
-                $if(Ks_max == Ks_rgb[i]) {
-                    d_Ks_rgb *= sqr(scale) * (k0 - Ks_rgb[i]);
-                };
-            }
-            _instance->Kd()->backward(_it, _time, make_float4(ite(any(isnan(d_Kd_rgb)), 0.f, d_Kd_rgb), 0.f));
-            _instance->Ks()->backward(_it, _time, make_float4(ite(any(isnan(d_Ks_rgb)), 0.f, d_Ks_rgb), 0.f));
-        }
-        $else {
-            _instance->Kd()->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(d_f_d.dR));
-            _instance->Ks()->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(d_f_s.dR));
-        };
+        _instance->Kd()->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(d_f_d.dR * (1.f / scale)));
+        _instance->Ks()->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(d_f_s.dR * (1.f / scale)));
 
         // roughness
         if (auto roughness = _instance->roughness()) {
@@ -241,21 +221,14 @@ luisa::unique_ptr<Surface::Closure> PlasticInstance::_closure(
     }
 
     // Kd, Ks
-    auto Kd_rgb = _kd->evaluate(it, time).xyz();
-    auto Ks_rgb = _ks->evaluate(it, time).xyz();
-    auto Kd_max = max(max(Kd_rgb.x, Kd_rgb.y), Kd_rgb.z);
-    auto Ks_max = max(max(Ks_rgb.x, Ks_rgb.y), Ks_rgb.z);
-    auto scale = 1.f / max(Kd_max + Ks_max, 1.f);
-    Kd_rgb *= scale;
-    Ks_rgb *= scale;
-    auto Kd = swl.albedo_from_srgb(Kd_rgb);
-    auto Ks = swl.albedo_from_srgb(Ks_rgb);
+    auto [Kd, Kd_lum] = _kd->evaluate_albedo_spectrum(it, swl, time);
+    auto [Ks, Ks_lum] = _ks->evaluate_albedo_spectrum(it, swl, time);
+    auto scale = 1.f / max(Kd_lum + Ks_lum, 1.f);
+    Kd *= scale;
+    Ks *= scale;
 
     // Kd_ratio
-    auto Kd_lum = srgb_to_cie_y(Kd_rgb);
-    auto Ks_lum = srgb_to_cie_y(Ks_rgb);
     auto Kd_ratio = ite(Kd_lum <= 0.f, 0.f, Kd_lum / (Kd_lum + Ks_lum));
-
     return luisa::make_unique<PlasticClosure>(
         this, it, swl, time, eta, Kd, Ks,
         alpha, clamp(Kd_ratio, 0.1f, 0.9f));

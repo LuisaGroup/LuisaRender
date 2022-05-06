@@ -22,7 +22,7 @@ public:
           _emission{scene->load_texture(desc->property_node_or_default(
               "emission", SceneNodeDesc::shared_default_texture("Constant")))},
           _scale{std::max(desc->property_float_or_default("scale", 1.0f), 0.0f)} {
-        LUISA_RENDER_PARAM_CHANNEL_CHECK(DiffuseLight, emission, 3);
+        LUISA_RENDER_CHECK_ILLUMINANT_TEXTURE(DiffuseLight, emission);
     }
     [[nodiscard]] auto scale() const noexcept { return _scale; }
     [[nodiscard]] bool is_null() const noexcept override { return _scale == 0.0f || _emission->is_black(); }
@@ -68,7 +68,7 @@ struct DiffuseLightClosure final : public Light::Closure {
         auto pdf_area = cast<float>(it_light.shape()->triangle_count()) * (pdf_triangle / it_light.triangle_area());
         auto cos_wo = dot(it_light.wo(), it_light.shading().n());
         auto front_face = cos_wo > 0.0f;
-        auto L = light->texture()->evaluate_illuminant_spectrum(it_light, _swl, _time) *
+        auto L = light->texture()->evaluate_illuminant_spectrum(it_light, _swl, _time).value *
                  light->node<DiffuseLight>()->scale();
         auto pdf = distance_squared(it_light.p(), p_from) * pdf_area * (1.0f / cos_wo);
         return {.L = L.map([front_face](auto, auto s) noexcept { return ite(front_face, s, 0.f); }),
@@ -108,7 +108,7 @@ struct DiffuseLightClosure final : public Light::Closure {
 
         auto d_L = df * ite(front_face, 1.f, 0.f);
         auto d_texture = d_L * light->node<DiffuseLight>()->scale();
-        auto d_scale = (d_L * light->texture()->evaluate_illuminant_spectrum(it_light, _swl, _time)).sum();
+        auto d_scale = (d_L * light->texture()->evaluate_illuminant_spectrum(it_light, _swl, _time).value).sum();
 
         light->texture()->backward_albedo_spectrum(it_light, _swl, _time, d_texture);
         // TODO : backward scale

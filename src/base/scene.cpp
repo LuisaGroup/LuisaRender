@@ -30,12 +30,14 @@ struct Scene::Config {
     luisa::unordered_map<luisa::string, NodeHandle, Hash64, std::equal_to<>> nodes;
     Integrator *integrator{nullptr};
     Environment *environment{nullptr};
+    Spectrum *spectrum{nullptr};
     luisa::vector<Camera *> cameras;
     luisa::vector<Shape *> shapes;
 };
 
 const Integrator *Scene::integrator() const noexcept { return _config->integrator; }
 const Environment *Scene::environment() const noexcept { return _config->environment; }
+const Spectrum *Scene::spectrum() const noexcept { return _config->spectrum; }
 luisa::span<const Shape *const> Scene::shapes() const noexcept { return _config->shapes; }
 luisa::span<const Camera *const> Scene::cameras() const noexcept { return _config->cameras; }
 
@@ -186,8 +188,12 @@ luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc
             "in the scene description.");
     }
     auto scene = luisa::make_unique<Scene>(ctx);
-    scene->_config->integrator = scene->load_integrator(desc->root()->property_node("integrator"));
-    scene->_config->environment = scene->load_environment(desc->root()->property_node_or_default("environment"));
+    scene->_config->spectrum = scene->load_spectrum(desc->root()->property_node_or_default(
+        "spectrum", SceneNodeDesc::shared_default_spectrum("sRGB")));
+    scene->_config->integrator = scene->load_integrator(
+        desc->root()->property_node("integrator"));
+    scene->_config->environment = scene->load_environment(
+        desc->root()->property_node_or_default("environment"));
     auto cameras = desc->root()->property_node_list("cameras");
     auto shapes = desc->root()->property_node_list("shapes");
     auto environments = desc->root()->property_node_list_or_default("environments");

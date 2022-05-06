@@ -16,9 +16,11 @@ Surface mat_Floor : Metal {
 Surface mat_WaterAir : Glass {
   Kr : Constant {
     v { 1.0, 1.0, 1.0 }
+    semantic { "albedo" }
   }
   Kt : Constant {
     v { 1.0, 1.0, 1.0 }
+    semantic { "albedo" }
   }
   eta : Constant {
     v { 1.33 }
@@ -31,9 +33,11 @@ Surface mat_WaterAir : Glass {
 Surface mat_IceAir : Glass {
   Kr : Constant {
     v { 1.0, 1.0, 1.0 }
+    semantic { "albedo" }
   }
   Kt : Constant {
     v { 1.0, 1.0, 1.0 }
+    semantic { "albedo" }
   }
   eta : Constant {
     v { 1.31 }
@@ -46,9 +50,11 @@ Surface mat_IceAir : Glass {
 Surface mat_Glass : Glass {
   Kr : Constant {
     v { 1.0, 1.0, 1.0 }
+    semantic { "albedo" }
   }
   Kt : Constant {
     v { 1.0, 1.0, 1.0 }
+    semantic { "albedo" }
   }
   eta : Constant {
     v { 1.5 }
@@ -61,9 +67,11 @@ Surface mat_Glass : Glass {
 Surface mat_AirIce : Glass {
   Kr : Constant {
     v { 1.0, 1.0, 1.0 }
+    semantic { "albedo" }
   }
   Kt : Constant {
     v { 1.0, 1.0, 1.0 }
+    semantic { "albedo" }
   }
   eta : Constant {
     v { 0.763 }
@@ -289,6 +297,7 @@ Shape shape_16 : Mesh {
   light : Diffuse {
     emission : Constant {
       v { 15.915493965148926, 27.056339263916016, 31.83098793029785 }
+      semantic { "illuminant" }
     }
   }
   transform : Matrix {
@@ -318,12 +327,12 @@ Camera camera : Pinhole {
 
 render {
   cameras { @camera }
+  spectrum : Hero {}
   integrator : WavePath {
     sampler : Independent {}
     depth { 12 }
     rr_depth { 5 }
     rr_threshold { 0.95 }
-    spectrum : sRGB {}
   }
   shapes {
     @shape_0,

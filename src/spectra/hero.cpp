@@ -9,6 +9,9 @@
 
 namespace luisa::render {
 
+using luisa::select;
+using std::max;
+using std::sin;
 using namespace luisa::compute;
 
 static constexpr auto rsp_coefficient_scales = make_float3(10000.f, 10.f, 0.01f);
@@ -22,7 +25,7 @@ private:
 private:
     [[nodiscard]] static Float _s(Expr<float> x) noexcept {
         return ite(
-            isinf(x),
+            x > 1e20f,
             cast<float>(x > 0.0f),
             0.5f + 0.5f * x * rsqrt(1.0f + x * x));
     }
@@ -68,43 +71,84 @@ public:
     constexpr RGB2SpectrumTable(RGB2SpectrumTable &&) noexcept = default;
     constexpr RGB2SpectrumTable(const RGB2SpectrumTable &) noexcept = default;
     [[nodiscard]] static RGB2SpectrumTable srgb() noexcept;
-    [[nodiscard]] RGBSigmoidPolynomial decode_albedo(
+    [[nodiscard]] Float4 decode_albedo(
         const BindlessArray &array, Expr<uint> base_index, Expr<float3> rgb_in) const noexcept {
-        static Callable decode = [](BindlessVar array, UInt base_index, Float3 rgb_in) noexcept {
-            auto rgb = clamp(rgb_in, 0.0f, 1.0f);
-            auto c = rsp_coefficient_scales *
-                     make_float3(0.0f, 0.0f, (rgb[0] - 0.5f) / sqrt(rgb[0] * (1.0f - rgb[0])));
-            $if(rgb[0] != rgb[1] | rgb[1] != rgb[2]) {
-                // Find maximum component and compute remapped component values
-                auto maxc = ite(
-                    rgb[0] > rgb[1],
-                    ite(rgb[0] > rgb[2], 0u, 2u),
-                    ite(rgb[1] > rgb[2], 1u, 2u));
-                auto z = rgb[maxc];
-                auto x = rgb[(maxc + 1u) % 3u] / z;
-                auto y = rgb[(maxc + 2u) % 3u] / z;
-                auto zz = _inverse_smooth_step(_inverse_smooth_step(z));
+        auto rgb = clamp(rgb_in, 0.0f, 1.0f);
+        static Callable decode = [](BindlessVar array, UInt base_index, Float3 rgb) noexcept {
+            // Find maximum component and compute remapped component values
+            auto maxc = ite(
+                rgb[0] > rgb[1],
+                ite(rgb[0] > rgb[2], 0u, 2u),
+                ite(rgb[1] > rgb[2], 1u, 2u));
+            auto z = rgb[maxc];
+            auto x = rgb[(maxc + 1u) % 3u] / z;
+            auto y = rgb[(maxc + 2u) % 3u] / z;
+            auto zz = _inverse_smooth_step(_inverse_smooth_step(z));
 
-                // Trilinearly interpolate sigmoid polynomial coefficients _c_
-                auto coord = fma(
-                    make_float3(x, y, zz),
-                    (resolution - 1.0f) / resolution,
-                    0.5f / resolution);
-                c = array.tex3d(base_index + maxc).sample(coord).xyz();
-            };
-            return c;
+            // Trilinearly interpolate sigmoid polynomial coefficients _c_
+            auto coord = fma(
+                make_float3(x, y, zz),
+                (resolution - 1.0f) / resolution,
+                0.5f / resolution);
+            return array.tex3d(base_index + maxc).sample(coord).xyz();
         };
-        return RGBSigmoidPolynomial{decode(Expr{array}, base_index, rgb_in)};
+        return make_float4(decode(Expr{array}, base_index, rgb), srgb_to_cie_y(rgb));
     }
-    [[nodiscard]] std::pair<RGBSigmoidPolynomial, Float> decode_unbound(
-        const BindlessArray &array, Expr<uint> base_index, Expr<float3> rgb) const noexcept {
+
+    [[nodiscard]] float4 decode_albedo(float3 rgb_in) const noexcept {
+        auto rgb = clamp(rgb_in, 0.0f, 1.0f);
+        // Find maximum component and compute remapped component values
+        auto maxc = (rgb[0] > rgb[1]) ?
+                        ((rgb[0] > rgb[2]) ? 0u : 2u) :
+                        ((rgb[1] > rgb[2]) ? 1u : 2u);
+        auto z = rgb[maxc];
+        auto x = rgb[(maxc + 1u) % 3u] * (resolution - 1u) / z;
+        auto y = rgb[(maxc + 2u) % 3u] * (resolution - 1u) / z;
+
+        auto zz = _inverse_smooth_step(_inverse_smooth_step(z)) * (resolution - 1u);
+
+        // Compute integer indices and offsets for coefficient interpolation
+        auto xi = std::min(static_cast<uint>(x), resolution - 2u);
+        auto yi = std::min(static_cast<uint>(y), resolution - 2u);
+        auto zi = std::min(static_cast<uint>(zz), resolution - 2u);
+        auto dx = x - static_cast<float>(xi);
+        auto dy = y - static_cast<float>(yi);
+        auto dz = zz - static_cast<float>(zi);
+
+        // Trilinearly interpolate sigmoid polynomial coefficients _c_
+        auto c = make_float3();
+        for (auto i = 0u; i < 3u; i++) {
+            // Define _co_ lambda for looking up sigmoid polynomial coefficients
+            auto co = [=, this](int dx, int dy, int dz) noexcept {
+                return _coefficients[maxc][zi + dz][yi + dy][xi + dx][i];
+            };
+            c[i] = lerp(lerp(lerp(co(0, 0, 0), co(1, 0, 0), dx),
+                             lerp(co(0, 1, 0), co(1, 1, 0), dx), dy),
+                        lerp(lerp(co(0, 0, 1), co(1, 0, 1), dx),
+                             lerp(co(0, 1, 1), co(1, 1, 1), dx), dy),
+                        dz);
+        }
+        return make_float4(c, srgb_to_cie_y(rgb));
+    }
+
+    [[nodiscard]] Float4 decode_unbound(
+        const BindlessArray &array, Expr<uint> base_index, Expr<float3> rgb_in) const noexcept {
+        auto rgb = max(rgb_in, 0.0f);
         auto m = max(max(rgb.x, rgb.y), rgb.z);
         auto scale = 2.0f * m;
         auto c = decode_albedo(
             array, base_index,
             ite(scale == 0.0f, 0.0f, rgb / scale));
-        return std::make_pair(std::move(c), std::move(scale));
+        return make_float4(c.xyz(), scale);
     }
+
+    [[nodiscard]] float4 decode_unbound(float3 rgb) const noexcept {
+        auto m = max(max(rgb.x, rgb.y), rgb.z);
+        auto scale = 2.0f * m;
+        auto c = decode_albedo(scale == 0.f ? make_float3() : rgb / scale);
+        return make_float4(c.xyz(), scale);
+    }
+
     void encode(CommandBuffer &command_buffer,
                 VolumeView<float> t0, VolumeView<float> t1, VolumeView<float> t2) const noexcept {
         command_buffer << t0.copy_from(_coefficients[0])
@@ -161,6 +205,27 @@ public:
     [[nodiscard]] uint dimension() const noexcept override { return _dimension; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
+    [[nodiscard]] bool requires_encoding() const noexcept override { return true; }
+    [[nodiscard]] float4 encode_srgb_albedo(float3 rgb) const noexcept override {
+        return RGB2SpectrumTable::srgb().decode_albedo(rgb);
+    }
+    [[nodiscard]] float4 encode_srgb_illuminant(float3 rgb) const noexcept override {
+        return RGB2SpectrumTable::srgb().decode_unbound(rgb);
+    }
+    [[nodiscard]] PixelStorage encoded_albedo_storage(PixelStorage storage) const noexcept override {
+        LUISA_ASSERT(pixel_storage_channel_count(storage) != 2u,
+                     "Hero-wavelength spectrum does not support 2-channel albedo pixels.");
+        return storage == PixelStorage::FLOAT1 || storage == PixelStorage::FLOAT4 ?
+                   PixelStorage::FLOAT4 :
+                   PixelStorage::HALF4;
+    }
+    [[nodiscard]] PixelStorage encoded_illuminant_storage(PixelStorage storage) const noexcept override {
+        LUISA_ASSERT(pixel_storage_channel_count(storage) != 2u,
+                     "Hero-wavelength spectrum does not support 2-channel illuminant pixels.");
+        return storage == PixelStorage::FLOAT1 || storage == PixelStorage::FLOAT4 ?
+                   PixelStorage::FLOAT4 :
+                   PixelStorage::HALF4;
+    }
 };
 
 class HeroWavelengthSpectrumInstance final : public Spectrum::Instance {
@@ -172,30 +237,31 @@ public:
     HeroWavelengthSpectrumInstance(
         const Pipeline &pipeline, const Spectrum *spectrum, uint t0) noexcept
         : Spectrum::Instance{pipeline, spectrum}, _rgb2spec_t0{t0} {}
-    [[nodiscard]] SampledSpectrum albedo_from_srgb(
-        const SampledWavelengths &swl, Expr<float3> rgb) const noexcept override {
-        auto rsp = RGB2SpectrumTable::srgb().decode_albedo(
-            pipeline().bindless_array(), _rgb2spec_t0, rgb);
-        auto spec = RGBAlbedoSpectrum{std::move(rsp)};
+    [[nodiscard]] Spectrum::Decode decode_albedo(
+        const SampledWavelengths &swl, Expr<float4> v) const noexcept override {
+        auto spec = RGBAlbedoSpectrum{RGBSigmoidPolynomial{v.xyz()}};
         SampledSpectrum s{node()->dimension()};
         for (auto i = 0u; i < s.dimension(); i++) {
             s[i] = spec.sample(swl.lambda(i));
         }
-        return s;
+        return {.value = s, .strength = v.w};
     }
-    [[nodiscard]] SampledSpectrum illuminant_from_srgb(
-        const SampledWavelengths &swl, Expr<float3> rgb_in) const noexcept override {
-        auto rgb = max(rgb_in, 0.f);
-        auto [rsp, scale] = RGB2SpectrumTable::srgb().decode_unbound(
-            pipeline().bindless_array(), _rgb2spec_t0, rgb);
+    [[nodiscard]] Spectrum::Decode decode_illuminant(
+        const SampledWavelengths &swl, Expr<float4> v) const noexcept override {
         auto spec = RGBIlluminantSpectrum{
-            std::move(rsp), std::move(scale),
+            RGBSigmoidPolynomial{v.xyz()}, v.w,
             DenselySampledSpectrum::cie_illum_d65()};
         SampledSpectrum s{node()->dimension()};
         for (auto i = 0u; i < s.dimension(); i++) {
             s[i] = spec.sample(swl.lambda(i));
         }
-        return s;
+        return {.value = s, .strength = v.w};
+    }
+    [[nodiscard]] Float4 encode_srgb_albedo(Expr<float3> rgb) const noexcept override {
+        return RGB2SpectrumTable::srgb().decode_albedo(pipeline().bindless_array(), _rgb2spec_t0, rgb);
+    }
+    [[nodiscard]] Float4 encode_srgb_illuminant(Expr<float3> rgb) const noexcept override {
+        return RGB2SpectrumTable::srgb().decode_unbound(pipeline().bindless_array(), _rgb2spec_t0, rgb);
     }
 };
 

@@ -27,7 +27,6 @@ public:
         const Integrator *_integrator;
         luisa::unique_ptr<Sampler::Instance> _sampler;
         luisa::unique_ptr<LightSampler::Instance> _light_sampler;
-        luisa::unique_ptr<Spectrum::Instance> _spectrum;
 
     public:
         explicit Instance(Pipeline &pipeline, CommandBuffer &command_buffer, const Integrator *integrator) noexcept;
@@ -42,20 +41,16 @@ public:
         [[nodiscard]] auto sampler() const noexcept { return _sampler.get(); }
         [[nodiscard]] auto light_sampler() noexcept { return _light_sampler.get(); }
         [[nodiscard]] auto light_sampler() const noexcept { return _light_sampler.get(); }
-        [[nodiscard]] auto spectrum() noexcept { return _spectrum.get(); }
-        [[nodiscard]] auto spectrum() const noexcept { return _spectrum.get(); }
         virtual void render(Stream &stream) noexcept = 0;
     };
 
 private:
     const Sampler *_sampler;
     const LightSampler *_light_sampler;
-    const Spectrum *_spectrum;
 
 public:
     Integrator(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] auto sampler() const noexcept { return _sampler; }
-    [[nodiscard]] auto spectrum() const noexcept { return _spectrum; }
     [[nodiscard]] auto light_sampler() const noexcept { return _light_sampler; }
     [[nodiscard]] virtual bool is_differentiable() const noexcept = 0;
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(

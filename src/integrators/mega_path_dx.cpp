@@ -122,7 +122,8 @@ private:
             auto pixel_id = dispatch_id().xy();
             sampler()->start(pixel_id, frame_index);
             auto [camera_ray, camera_weight] = camera->generate_ray(*sampler(), pixel_id, time);
-            auto swl = spectrum()->sample(*sampler());
+            auto spectrum = pipeline().spectrum();
+            auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler()->generate_1d());
             SampledSpectrum beta{swl.dimension(), camera_weight};
             SampledSpectrum Li{swl.dimension()};
 
@@ -205,14 +206,14 @@ private:
                 $if(beta.all([](auto b) noexcept { return isnan(b) | b <= 0.f; })) { $break; };
                 auto rr_depth = node<MegakernelPathTracing>()->rr_depth();
                 auto rr_threshold = node<MegakernelPathTracing>()->rr_threshold();
-                auto q = swl.cie_y(beta);
+                auto q = spectrum->cie_y(swl, beta);
                 $if(depth >= rr_depth & q < 1.f) {
                     q = clamp(q, .05f, rr_threshold);
                     $if(sampler()->generate_1d() >= q) { $break; };
                     beta *= 1.0f / q;
                 };
             };
-            camera->film()->accumulate(pixel_id, swl.srgb(Li * shutter_weight));
+            camera->film()->accumulate(pixel_id, spectrum->srgb(swl, Li * shutter_weight));
         };
         auto render = pipeline().device().compile(render_kernel);
         auto shutter_samples = camera->node()->shutter_samples();

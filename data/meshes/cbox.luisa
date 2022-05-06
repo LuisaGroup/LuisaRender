@@ -1,9 +1,7 @@
 Surface cbox-white : Matte {
-  color : Constant {
-    v { 0.725, 0.71, 0.68 }
-  }
   Kd : Constant {
     v { 0.725, 0.71, 0.68 }
+    semantic { "albedo" }
   }
   roughness : Constant {
     v { 1 }
@@ -11,11 +9,9 @@ Surface cbox-white : Matte {
 }
 
 Surface cbox-red : Matte {
-  color : Constant {
-    v { 0.63, 0.065, 0.05 }
-  }
   Kd : Constant {
     v { 0.63, 0.065, 0.05 }
+    semantic { "albedo" }
   }
   roughness : Constant {
     v { 1 }
@@ -23,11 +19,9 @@ Surface cbox-red : Matte {
 }
 
 Surface cbox-green : Matte {
-  color : Constant {
-    v { 0.14, 0.45, 0.091 }
-  }
   Kd : Constant {
     v { 0.14, 0.45, 0.091 }
+    semantic { "albedo" }
   }
   roughness : Constant {
     v { 1 }
@@ -59,6 +53,7 @@ Surface cbox-brick : Matte {
     file { "../textures/brickwall.jpg" }
     gamma { 0.5 }
     encoding { "gamma" }
+    semantic { "albedo" }
   }
   // sigma : Constant {
   //   v { 10 }
@@ -96,6 +91,7 @@ Shape cbox-light : Mesh {
   light : Diffuse {
     emission : Constant {
       v { 51.0, 36.0, 12.0 }
+      semantic { "illuminant" }
     }
   }
 }

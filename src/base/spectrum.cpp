@@ -50,7 +50,7 @@ Float3 Spectrum::Instance::cie_xyz(const SampledWavelengths &swl, const SampledS
     return sum / denom;
 }
 
-SampledWavelengths Spectrum::Instance::sample(Sampler::Instance &sampler) const noexcept {
+SampledWavelengths Spectrum::Instance::sample(Expr<float> u) const noexcept {
     LUISA_ASSERT(!node()->is_fixed(), "Fixed spectra should not sample.");
     using namespace compute;
     constexpr auto sample_visible_wavelengths = [](auto u) noexcept {
@@ -61,9 +61,8 @@ SampledWavelengths Spectrum::Instance::sample(Sampler::Instance &sampler) const 
         constexpr auto sqr = [](auto x) noexcept { return x * x; };
         return 0.0039398042f / sqr(cosh(0.0072f * (lambda - 538.0f)));
     };
-    auto u = sampler.generate_1d();
     auto n = node()->dimension();
-    SampledWavelengths swl{this};
+    SampledWavelengths swl{node()->dimension()};
     for (auto i = 0u; i < n; i++) {
         auto offset = static_cast<float>(i * (1.0 / n));
         auto up = fract(u + offset);
@@ -85,52 +84,35 @@ void Spectrum::Instance::_report_backward_unsupported_or_not_implemented() const
     }
 }
 
+Float4 Spectrum::Instance::backward_decode_albedo(
+    const SampledWavelengths &swl, Expr<float4> v, const SampledSpectrum &dSpec) const noexcept {
+    _report_backward_unsupported_or_not_implemented();
+}
+
+Float4 Spectrum::Instance::backward_decode_illuminant(
+    const SampledWavelengths &swl, Expr<float4> v, const SampledSpectrum &dSpec) const noexcept {
+    _report_backward_unsupported_or_not_implemented();
+}
+
+SampledSpectrum Spectrum::Instance::backward_cie_y(
+    const SampledWavelengths &swl, const SampledSpectrum &sp, Expr<float> dY) const noexcept {
+    _report_backward_unsupported_or_not_implemented();
+}
+
+SampledSpectrum Spectrum::Instance::backward_cie_xyz(
+    const SampledWavelengths &swl, const SampledSpectrum &sp, Expr<float3> dXYZ) const noexcept {
+    _report_backward_unsupported_or_not_implemented();
+}
+
+SampledSpectrum Spectrum::Instance::backward_srgb(
+    const SampledWavelengths &swl, const SampledSpectrum &sp, Expr<float3> dSRGB) const noexcept {
+    _report_backward_unsupported_or_not_implemented();
+}
+
+Spectrum::Instance::Instance(const Pipeline &pipeline, const Spectrum *spec) noexcept
+    : _pipeline{pipeline}, _spectrum{spec} {}
+
 Spectrum::Spectrum(Scene *scene, const SceneNodeDesc *desc) noexcept
     : SceneNode{scene, desc, SceneNodeTag::SPECTRUM} {}
-
-SampledWavelengths::SampledWavelengths(const Spectrum::Instance *spec) noexcept
-    : _spectrum{spec},
-      _lambdas{spec->node()->dimension()},
-      _pdfs{spec->node()->dimension()} {}
-
-SampledSpectrum SampledWavelengths::albedo_from_srgb(Expr<float3> rgb) const noexcept {
-    return _spectrum->albedo_from_srgb(*this, rgb);
-}
-
-SampledSpectrum SampledWavelengths::illuminant_from_srgb(Expr<float3> rgb) const noexcept {
-    return _spectrum->illuminant_from_srgb(*this, rgb);
-}
-
-Float SampledWavelengths::cie_y(const SampledSpectrum &s) const noexcept {
-    return _spectrum->cie_y(*this, s);
-}
-
-Float3 SampledWavelengths::cie_xyz(const SampledSpectrum &s) const noexcept {
-    return _spectrum->cie_xyz(*this, s);
-}
-
-Float3 SampledWavelengths::srgb(const SampledSpectrum &s) const noexcept {
-    return _spectrum->srgb(*this, s);
-}
-
-Float3 SampledWavelengths::backward_albedo_from_srgb(Expr<float3> rgb, const SampledSpectrum &dSpec) const noexcept {
-    return _spectrum->backward_albedo_from_srgb(*this, rgb, dSpec);
-}
-
-Float3 SampledWavelengths::backward_illuminant_from_srgb(Expr<float3> rgb, const SampledSpectrum &dSpec) const noexcept {
-    return _spectrum->backward_illuminant_from_srgb(*this, rgb, dSpec);
-}
-
-SampledSpectrum SampledWavelengths::backward_cie_y(const SampledSpectrum &s, Expr<float> dY) const noexcept {
-    return _spectrum->backward_cie_y(*this, s, dY);
-}
-
-SampledSpectrum SampledWavelengths::backward_cie_xyz(const SampledSpectrum &s, Expr<float3> dXYZ) const noexcept {
-    return _spectrum->backward_cie_xyz(*this, s, dXYZ);
-}
-
-SampledSpectrum SampledWavelengths::backward_srgb(const SampledSpectrum &s, Expr<float3> dSRGB) const noexcept {
-    return _spectrum->backward_srgb(*this, s, dSRGB);
-}
 
 }// namespace luisa::render

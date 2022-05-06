@@ -1,6 +1,7 @@
 Surface surface_camera_body : Disney {
   color : Image {
     file { "textures/Camera_01_body_diff_8k.png" }
+    semantic { "albedo" }
   }
   normal : Image {
     file { "textures/Camera_01_body_nor_gl_8k.png" }
@@ -25,6 +26,7 @@ Surface surface_camera_body : Disney {
 Surface surface_camera_lens_body : Disney {
   color : Image {
     file { "textures/Camera_01_lens_body_diff_8k.png" }
+    semantic { "albedo" }
   }
   normal : Image {
     file { "textures/Camera_01_lens_body_nor_gl_8k.png" }
@@ -49,6 +51,7 @@ Surface surface_camera_lens_body : Disney {
 Surface surface_camera_strap : Disney {
   color : Image {
     file { "textures/Camera_01_strap_diff_8k.png" }
+    semantic { "albedo" }
   }
   normal : Image {
     file { "textures/Camera_01_strap_nor_gl_8k.png" }
@@ -73,9 +76,11 @@ Surface surface_camera_strap : Disney {
 Surface surface_camera_lens_glass : Glass {
   Kr : Constant {
     v { 1, 1, 1 }
+    semantic { "albedo" }
   }
   Kt : Constant {
     v { 1, 1, 1 }
+    semantic { "albedo" }
   }
   roughness : Constant {
     v { 0.03 }
@@ -88,6 +93,7 @@ Surface surface_camera_lens_glass : Glass {
 Surface surface_camera_lens_metal : Mirror {
   color : Constant {
     v { 0.3, 0.5, 1 }
+    semantic { "albedo" }
   }
 }
 
@@ -102,6 +108,7 @@ Surface surface_camera_lens : Mix {
 Surface surface_backdrop : Disney {
   color : Image {
     file { "textures/weathered_brown_planks_diff_16k.jpg" }
+    semantic { "albedo" }
   }
   normal : Image {
     file { "textures/weathered_brown_planks_nor_gl_16k.png" }
@@ -171,6 +178,7 @@ Shape shape_camera : Group {
 Environment environment : Spherical {
   emission : Image {
     file { "textures/kiara_1_dawn_8k.exr" }
+    semantic { "illuminant" }
   }
   transform : SRT {
     rotate { 0, 1, 0, -40 }
@@ -181,6 +189,7 @@ Environment environment : Spherical {
 Environment directional : Directional {
   emission : Constant {
     v { 1, 1, 1 }
+    semantic { "illuminant" }
   }
   direction { 1, 1, 1 }
   angle { 0.54 }
@@ -197,19 +206,19 @@ Camera camera : ThinLens {
     resolution { 3840, 2160 }
     clamp { 128 }
   }
-  file { "render-directional.exr" }
+  file { "render.exr" }
   filter : Gaussian {
     radius { 1 }
   }
 }
 
 Integrator integrator : WavePath {
-  spectrum : Hero {}
   // display { true }
 }
 
 render {
   cameras { @camera }
+  spectrum : Hero {}
   shapes {
     @shape_camera,
     @shape_ground

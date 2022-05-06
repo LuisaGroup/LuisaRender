@@ -13,7 +13,8 @@ Surface::Surface(Scene *scene, const SceneNodeDesc *desc) noexcept
     : SceneNode{scene, desc, SceneNodeTag::SURFACE},
       _normal{scene->load_texture(desc->property_node_or_default("normal"))},
       _alpha{scene->load_texture(desc->property_node_or_default("alpha"))} {
-    LUISA_RENDER_PARAM_CHANNEL_CHECK(Surface, normal, 3);
+    LUISA_RENDER_CHECK_GENERIC_TEXTURE(Surface, normal, 3);
+    LUISA_RENDER_CHECK_GENERIC_TEXTURE(Surface, alpha, 1);
 }
 
 luisa::unique_ptr<Surface::Instance> Surface::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
@@ -35,7 +36,7 @@ luisa::unique_ptr<Surface::Closure> Surface::Instance::closure(
         auto normal = it.shading().local_to_world(normal_local);
         it.set_shading(Frame::make(normal, it.shading().u()));
     }
-    return _closure(std::move(it), swl, time);
+    return _closure(it, swl, time);
 }
 
 }// namespace luisa::render

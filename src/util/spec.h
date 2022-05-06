@@ -166,4 +166,19 @@ public:
 
 SampledSpectrum zero_if_any_nan(const SampledSpectrum &t) noexcept;
 
+class SampledWavelengths {
+
+private:
+    Local<float> _lambdas;
+    Local<float> _pdfs;
+
+public:
+    explicit SampledWavelengths(uint dim) noexcept : _lambdas{dim}, _pdfs{dim} {}
+    [[nodiscard]] auto lambda(Expr<uint> i) const noexcept { return _lambdas[i]; }
+    [[nodiscard]] auto pdf(Expr<uint> i) const noexcept { return _pdfs[i]; }
+    void set_lambda(Expr<uint> i, Expr<float> lambda) noexcept { _lambdas[i] = lambda; }
+    void set_pdf(Expr<uint> i, Expr<float> pdf) noexcept { _pdfs[i] = pdf; }
+    [[nodiscard]] auto dimension() const noexcept { return static_cast<uint>(_lambdas.size()); }
+};
+
 }// namespace luisa::render

@@ -7,6 +7,7 @@
 #include <filesystem>
 
 #include <core/stl.h>
+#include <util/half.h>
 #include <runtime/pixel.h>
 
 namespace luisa::render {
@@ -24,9 +25,7 @@ private:
     luisa::function<void(void *)> _deleter;
 
 private:
-    void _destroy() noexcept {
-        if (*this) { _deleter(_pixels); }
-    }
+    void _destroy() noexcept;
     LoadedImage(void *pixels, storage_type storage, uint2 resolution, luisa::function<void(void *)> deleter) noexcept
         : _pixels{pixels}, _resolution{resolution}, _storage{storage}, _deleter{std::move(deleter)} {}
     [[nodiscard]] static LoadedImage _load_byte(const std::filesystem::path &path, storage_type storage) noexcept;
@@ -68,6 +67,9 @@ public:
     [[nodiscard]] static LoadedImage load(const std::filesystem::path &path) noexcept;
     [[nodiscard]] static LoadedImage load(const std::filesystem::path &path, storage_type storage) noexcept;
     [[nodiscard]] static storage_type parse_storage(const std::filesystem::path &path) noexcept;
+    [[nodiscard]] static LoadedImage create(uint2 resolution, storage_type storage) noexcept;
+    [[nodiscard]] float4 read(uint2 p) const noexcept;
+    void write(uint2 p, float4 v) noexcept;
 };
 
 class TiledMipmap {

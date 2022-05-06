@@ -82,12 +82,8 @@ public:
         }
     }
     [[nodiscard]] auto read_swl(Expr<uint> index) const noexcept {
-        if (_spectrum->node()->is_fixed()) {
-            // FIXME: unsafe
-            auto sampler = static_cast<Sampler::Instance *>(nullptr);
-            return _spectrum->sample(*sampler);
-        }
-        SampledWavelengths swl{_spectrum};
+        if (_spectrum->node()->is_fixed()) { return _spectrum->sample(0.f); }
+        SampledWavelengths swl{_spectrum->node()->dimension()};
         auto offset = index * swl.dimension();
         for (auto i = 0u; i < swl.dimension(); i++) {
             swl.set_lambda(i, _swl_lambda.read(offset + i));
@@ -266,8 +262,9 @@ void WavefrontPathTracingInstance::_render_one_camera(
                "resolution = {}x{}, spp = {}, state_count = {}, spp_per_launch = {}.",
                resolution.x, resolution.y, spp, state_count, spp_per_launch);
 
-    PathStateSOA path_states{spectrum(), state_count};
-    LightSampleSOA light_samples{spectrum(), state_count};
+    auto spectrum = pipeline().spectrum();
+    PathStateSOA path_states{spectrum, state_count};
+    LightSampleSOA light_samples{spectrum, state_count};
     sampler()->reset(command_buffer, resolution, state_count, spp);
     command_buffer.commit();
 
@@ -283,7 +280,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
         auto pixel_coord = make_uint2(pixel_id % resolution.x, pixel_id / resolution.x);
         sampler()->start(pixel_coord, sample_id);
         auto camera_sample = camera->generate_ray(*sampler(), pixel_coord, time);
-        auto swl = spectrum()->sample(*sampler());
+        auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler()->generate_1d());
         sampler()->save_state(state_id);
         rays.write(state_id, camera_sample.ray);
         path_states.write_swl(state_id, swl);
@@ -453,7 +450,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                 auto rr_depth = node<WavefrontPathTracing>()->rr_depth();
                 auto rr_threshold = node<WavefrontPathTracing>()->rr_threshold();
                 // rr
-                auto q = swl.cie_y(beta);
+                auto q = spectrum->cie_y(swl, beta);
                 $if(trace_depth >= rr_depth & q < 1.f) {
                     q = clamp(q, .05f, rr_threshold);
                     $if(sampler()->generate_1d() < q) {
@@ -483,7 +480,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
         auto pixel_coord = make_uint2(pixel_id % resolution.x, pixel_id / resolution.x);
         auto swl = path_states.read_swl(state_id);
         auto Li = path_states.read_radiance(state_id);
-        camera->film()->accumulate(pixel_coord, swl.srgb(Li * shutter_weight));
+        camera->film()->accumulate(pixel_coord, spectrum->srgb(swl, Li * shutter_weight));
     });
 
     // create path states

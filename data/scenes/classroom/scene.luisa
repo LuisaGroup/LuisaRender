@@ -2,135 +2,158 @@
 Surface mat_Walls : Matte {
   Kd : Constant {
     v { 0.6540709733963013, 0.6740800142288208, 0.800000011920929 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_Lectern : Matte {
   Kd : Image {
     file { "textures/wood1.jpg" }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_FlagRed : Matte {
   Kd : Constant {
     v { 0.800000011920929, 0.008213999681174755, 0.0 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_FlagWhite : Matte {
   Kd : Constant {
     v { 1.0, 1.0, 1.0 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_FlagBase : Matte {
   Kd : Constant {
     v { 0.7796609997749329, 0.6531620025634766, 0.3491879999637604 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_ChalkHolder : Matte {
   Kd : Constant {
     v { 0.800000011920929, 0.6449009776115417, 0.4121190011501312 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_ProjectorScreen : Matte {
   Kd : Constant {
     v { 1.0, 1.0, 1.0 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_StickyNote1 : Matte {
   Kd : Constant {
     v { 0.6120659708976746, 0.6120659708976746, 0.6120659708976746 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_Whiteboard : Matte {
   Kd : Constant {
     v { 1.0, 1.0, 1.0 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_StickyNote7 : Matte {
   Kd : Constant {
     v { 0.6120659708976746, 0.6120659708976746, 0.6120659708976746 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_StickyNote8 : Matte {
   Kd : Constant {
     v { 0.6120659708976746, 0.6120659708976746, 0.6120659708976746 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_Bin2 : Matte {
   Kd : Constant {
     v { 0.800000011920929, 0.7175089716911316, 0.19045600295066833 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_Boxes2 : Matte {
   Kd : Constant {
     v { 0.800000011920929, 0.7916420102119446, 0.38839900493621826 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_Boxes1 : Matte {
   Kd : Constant {
     v { 0.6399999856948853, 0.47218799591064453, 0.3192330002784729 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_StickyNote4 : Matte {
   Kd : Constant {
     v { 0.6120659708976746, 0.6120659708976746, 0.6120659708976746 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_Whiteboard2 : Matte {
   Kd : Constant {
     v { 0.7931100130081177, 0.7931100130081177, 0.7931100130081177 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_BluePencil : Matte {
   Kd : Constant {
     v { 0.0, 0.030764000490307808, 0.800000011920929 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_GreenPencil : Matte {
   Kd : Constant {
     v { 0.14567600190639496, 0.6399999856948853, 0.0 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_RedPencil : Matte {
   Kd : Constant {
     v { 0.6266509890556335, 0.0, 0.0 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_Bookshelf : Matte {
   Kd : Constant {
     v { 0.4913010001182556, 0.3051770031452179, 0.800000011920929 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_Hallway : Matte {
   Kd : Constant {
     v { 0.784313976764679, 0.784313976764679, 0.784313976764679 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_CeilingLight : Substrate {
   Kd : Constant {
     v { 0.6478139758110046, 0.6478139758110046, 0.6478139758110046 }
+    semantic { "albedo" }
   }
   Ks : Constant {
     v { 0.04, 0.04, 0.04 }
+    semantic { "albedo" }
   }
   eta : Constant {
     v { 1.5 }
@@ -143,15 +166,18 @@ Surface mat_CeilingLight : Substrate {
 Surface mat_Black : Matte {
   Kd : Constant {
     v { 0.006310000084340572, 0.006310000084340572, 0.006310000084340572 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_BlackPlastic : Substrate {
   Kd : Constant {
     v { 0.006310000084340572, 0.006310000084340572, 0.006310000084340572 }
+    semantic { "albedo" }
   }
   Ks : Constant {
     v { 0.04, 0.04, 0.04 }
+    semantic { "albedo" }
   }
   eta : Constant {
     v { 1.5 }
@@ -164,27 +190,32 @@ Surface mat_BlackPlastic : Substrate {
 Surface mat_Projector : Matte {
   Kd : Constant {
     v { 0.006310000084340572, 0.006310000084340572, 0.006310000084340572 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_ScreenEnds : Matte {
   Kd : Constant {
     v { 0.02899100072681904, 0.02899100072681904, 0.02899100072681904 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_FoamEraser : Matte {
   Kd : Constant {
     v { 0.6846150159835815, 0.6846150159835815, 0.6846150159835815 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_Whiteboard3 : Substrate {
   Kd : Constant {
     v { 1.0, 1.0, 1.0 }
+    semantic { "albedo" }
   }
   Ks : Constant {
     v { 0.04, 0.04, 0.04 }
+    semantic { "albedo" }
   }
   eta : Constant {
     v { 1.5 }
@@ -197,9 +228,11 @@ Surface mat_Whiteboard3 : Substrate {
 Surface mat_ChairWood : Substrate {
   Kd : Image {
     file { "textures/wood2.jpg" }
+    semantic { "albedo" }
   }
   Ks : Constant {
     v { 0.04, 0.04, 0.04 }
+    semantic { "albedo" }
   }
   eta : Constant {
     v { 1.5 }
@@ -226,48 +259,56 @@ Surface mat_ChairStainless : Metal {
 Surface mat_Floor : Matte {
   Kd : Constant {
     v { 0.6592240333557129, 0.5924380421638489, 0.517401397228241 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_WoodFrame : Matte {
   Kd : Image {
     file { "textures/blackboard.jpg" }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_WhiteboardFrame : Matte {
   Kd : Constant {
     v { 0.05617300048470497, 0.05617300048470497, 0.05617300048470497 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_StickyNote3 : Matte {
   Kd : Constant {
     v { 0.6120659708976746, 0.6120659708976746, 0.6120659708976746 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_StickyNote5 : Matte {
   Kd : Constant {
     v { 0.6120659708976746, 0.6120659708976746, 0.6120659708976746 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_StickyNote6 : Matte {
   Kd : Constant {
     v { 0.6120659708976746, 0.6120659708976746, 0.6120659708976746 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_Speakers : Matte {
   Kd : Constant {
     v { 0.03598000109195709, 0.03598000109195709, 0.03598000109195709 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_Wall : Matte {
   Kd : Constant {
     v { 0.4508373439311981, 0.4536627233028412, 0.49960458278656006 }
+    semantic { "albedo" }
   }
 }
 
@@ -281,21 +322,25 @@ Surface mat_WindowFrame : Metal {
 Surface mat_Bin1 : Matte {
   Kd : Constant {
     v { 0.32712534070014954, 0.5785964727401733, 0.2805613875389099 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_Rubber : Matte {
   Kd : Constant {
     v { 0.6870308518409729, 0.7154654264450073, 0.5604991912841797 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_FluorescentTube : Substrate {
   Kd : Constant {
     v { 0.6120659708976746, 0.6120659708976746, 0.6120659708976746 }
+    semantic { "albedo" }
   }
   Ks : Constant {
     v { 0.04, 0.04, 0.04 }
+    semantic { "albedo" }
   }
   eta : Constant {
     v { 1.5 }
@@ -308,6 +353,7 @@ Surface mat_FluorescentTube : Substrate {
 Surface mat_StickyNote2 : Matte {
   Kd : Constant {
     v { 0.6120659708976746, 0.6120659708976746, 0.6120659708976746 }
+    semantic { "albedo" }
   }
 }
 
@@ -1343,6 +1389,7 @@ Shape shape_78 : Mesh {
 Env dir : Directional {
   emission : Constant {
     v { 0.03183098882436752, 0.03183098882436752, 0.03183098882436752 }
+    semantic { "illuminant" }
   }
   angle { 10 }
   transform : Matrix {
@@ -1357,6 +1404,7 @@ Env dir : Directional {
 Env sky : Spherical {
   emission : Image {
     file { "textures/sky.exr" }
+    semantic { "illuminant" }
   }
   transform : Matrix {
     m { 0.0, 0.0, -1.0, 0.0,
@@ -1372,7 +1420,7 @@ Camera camera : Pinhole {
   front { 0.1512944996356964, 0.028307145461440086, -0.9880833625793457 }
   up { 0.0, 1.0, 0.0 }
   fov { 35.98339777135762 }
-  spp { 4096 }
+  spp { 128 }
   filter : Gaussian {
     radius { 1 }
   }
@@ -1384,12 +1432,12 @@ Camera camera : Pinhole {
 
 render {
   cameras { @camera }
+  spectrum : Hero {}
   integrator : WavePath {
     sampler : Independent {}
     depth { 12 }
     rr_depth { 5 }
     rr_threshold { 0.95 }
-    spectrum : sRGB {}
   }
   shapes {
     @shape_0,

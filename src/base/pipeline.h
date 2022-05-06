@@ -93,6 +93,7 @@ private:
     luisa::vector<InstancedTransform> _dynamic_transforms;
     Buffer<Shape::Handle> _instance_buffer;
     luisa::vector<luisa::unique_ptr<Camera::Instance>> _cameras;
+    luisa::unique_ptr<Spectrum::Instance> _spectrum;
     luisa::unique_ptr<Integrator::Instance> _integrator;
     luisa::unique_ptr<Environment::Instance> _environment;
     float _mean_time{};
@@ -196,6 +197,7 @@ public:
     [[nodiscard]] auto instanced_lights() const noexcept { return luisa::span{_instanced_lights}; }
     [[nodiscard]] auto environment() const noexcept { return _environment.get(); }
     [[nodiscard]] auto integrator() const noexcept { return _integrator.get(); }
+    [[nodiscard]] auto spectrum() const noexcept { return _spectrum.get(); }
     [[nodiscard]] auto has_lighting() const noexcept { return !_lights.empty() || _environment != nullptr; }
     [[nodiscard]] auto mean_time() const noexcept { return _mean_time; }
     [[nodiscard]] const Texture::Instance *build_texture(CommandBuffer &command_buffer, const Texture *texture) noexcept;

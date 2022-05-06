@@ -59,10 +59,8 @@ private:
 public:
     GlassSurface(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Surface{scene, desc},
-          _kr{scene->load_texture(desc->property_node_or_default(
-              "Kr", SceneNodeDesc::shared_default_texture("Constant")))},
-          _kt{scene->load_texture(desc->property_node_or_default(
-              "Kt", SceneNodeDesc::shared_default_texture("Constant")))},
+          _kr{scene->load_texture(desc->property_node("Kr"))},
+          _kt{scene->load_texture(desc->property_node("Kt"))},
           _roughness{scene->load_texture(desc->property_node_or_default("roughness"))},
           _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {
         if (auto eta_name = desc->property_string_or_default("eta"); !eta_name.empty()) {
@@ -83,8 +81,10 @@ public:
                 }
             }
         }
-        LUISA_RENDER_PARAM_CHANNEL_CHECK(GlassSurface, kr, 3);
-        LUISA_RENDER_PARAM_CHANNEL_CHECK(GlassSurface, kt, 3);
+        LUISA_RENDER_CHECK_ALBEDO_TEXTURE(GlassSurface, kr);
+        LUISA_RENDER_CHECK_ALBEDO_TEXTURE(GlassSurface, kt);
+        LUISA_RENDER_CHECK_GENERIC_TEXTURE(GlassSurface, roughness, 1);
+        LUISA_RENDER_CHECK_GENERIC_TEXTURE(GlassSurface, eta, 1);
     }
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
@@ -248,12 +248,8 @@ luisa::unique_ptr<Surface::Closure> GlassInstance::_closure(
     }
 
     // Kr, Kt
-    auto Kr_rgb = saturate(_kr->evaluate(it, time).xyz());
-    auto Kt_rgb = saturate(_kt->evaluate(it, time).xyz());
-    auto Kr_lum = srgb_to_cie_y(Kr_rgb);
-    auto Kt_lum = srgb_to_cie_y(Kt_rgb);
-    auto Kr = swl.albedo_from_srgb(Kr_rgb);
-    auto Kt = swl.albedo_from_srgb(Kt_rgb);
+    auto [Kr, Kr_lum] = _kr->evaluate_albedo_spectrum(it, swl, time);
+    auto [Kt, Kt_lum] = _kt->evaluate_albedo_spectrum(it, swl, time);
     auto Kr_ratio = ite(Kr_lum == 0.f, 0.f, sqrt(Kr_lum) / (sqrt(Kr_lum) + sqrt(Kt_lum)));
 
     // eta

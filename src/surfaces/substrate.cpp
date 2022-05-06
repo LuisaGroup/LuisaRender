@@ -24,14 +24,13 @@ private:
 public:
     SubstrateSurface(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Surface{scene, desc},
-          _kd{scene->load_texture(desc->property_node_or_default(
-              "Kd", SceneNodeDesc::shared_default_texture("Constant")))},
-          _ks{scene->load_texture(desc->property_node_or_default(
-              "Ks", SceneNodeDesc::shared_default_texture("Constant")))},
+          _kd{scene->load_texture(desc->property_node("Kd"))},
+          _ks{scene->load_texture(desc->property_node("Ks"))},
           _roughness{scene->load_texture(desc->property_node_or_default("roughness"))},
           _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {
-        LUISA_RENDER_PARAM_CHANNEL_CHECK(SubstrateSurface, kd, 3);
-        LUISA_RENDER_PARAM_CHANNEL_CHECK(SubstrateSurface, ks, 3);
+        LUISA_RENDER_CHECK_ALBEDO_TEXTURE(SubstrateSurface, kd);
+        LUISA_RENDER_CHECK_ALBEDO_TEXTURE(SubstrateSurface, ks);
+        LUISA_RENDER_CHECK_GENERIC_TEXTURE(SubstrateSurface, roughness, 1);
     }
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
@@ -85,10 +84,10 @@ public:
     SubstrateClosure(
         const Surface::Instance *instance,
         const Interaction &it, const SampledWavelengths &swl, Expr<float> time,
-        const SampledSpectrum &Kd, const SampledSpectrum &Ks, Expr<float2> alpha) noexcept
+        const SampledSpectrum &Kd, const SampledSpectrum &Ks, Expr<float2> alpha, Expr<float> Kd_ratio) noexcept
         : Surface::Closure{instance, it, swl, time},
           _distribution{luisa::make_unique<TrowbridgeReitzDistribution>(alpha)},
-          _blend{luisa::make_unique<FresnelBlend>(Kd, Ks, _distribution.get())},
+          _blend{luisa::make_unique<FresnelBlend>(Kd, Ks, _distribution.get(), Kd_ratio)},
           _eta_i{swl.dimension(), 1.f} {}
 
 private:
@@ -149,8 +148,8 @@ private:
 
 luisa::unique_ptr<Surface::Closure> SubstrateInstance::_closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    auto Kd = _kd->evaluate_albedo_spectrum(it, swl, time);
-    auto Ks = _ks->evaluate_albedo_spectrum(it, swl, time);
+    auto [Kd, Kd_lum] = _kd->evaluate_albedo_spectrum(it, swl, time);
+    auto [Ks, Ks_lum] = _ks->evaluate_albedo_spectrum(it, swl, time);
     auto alpha = def(make_float2(.5f));
     if (_roughness != nullptr) {
         auto r = _roughness->evaluate(it, time);
@@ -162,8 +161,10 @@ luisa::unique_ptr<Surface::Closure> SubstrateInstance::_closure(
                     (remap ? make_float2(r2a(r.x)) : r.xx()) :
                     (remap ? r2a(r.xy()) : r.xy());
     }
-    return luisa::make_unique<SubstrateClosure>(
-        this, it, swl, time, Kd, Ks, alpha);
+    auto cos_theta = dot(it.shading().n(), it.wo());
+    auto pow5 = [](auto &&v) { return sqr(sqr(v)) * v; };
+    auto Kd_ratio = Kd_lum / max(Kd_lum + Ks_lum, 1e-5f) * (1.f - pow5(1.f - cos_theta));
+    return luisa::make_unique<SubstrateClosure>(this, it, swl, time, Kd, Ks, alpha, Kd_ratio);
 }
 
 }// namespace luisa::render

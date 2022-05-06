@@ -237,14 +237,15 @@ private:
     // FresnelBlend Private Data
     SampledSpectrum _rd;
     SampledSpectrum _rs;
+    Float _rd_ratio;
     const MicrofacetDistribution *_distribution;
 
 private:
     [[nodiscard]] SampledSpectrum Schlick(Expr<float> cosTheta) const noexcept;
 
 public:
-    FresnelBlend(SampledSpectrum Rd, SampledSpectrum Rs, const MicrofacetDistribution *distrib) noexcept
-        : _rd{std::move(Rd)}, _rs{std::move(Rs)}, _distribution{distrib} {}
+    FresnelBlend(SampledSpectrum Rd, SampledSpectrum Rs, const MicrofacetDistribution *distrib, Expr<float> Rd_sample_ratio = .5f) noexcept
+        : _rd{std::move(Rd)}, _rs{std::move(Rs)}, _rd_ratio{clamp(Rd_sample_ratio, .05f, .95f)},  _distribution{distrib} {}
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
     [[nodiscard]] SampledSpectrum sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept override;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept override;

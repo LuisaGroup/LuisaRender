@@ -34,11 +34,11 @@ private:
 public:
     DisneySurface(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Surface{scene, desc},
+          _color{scene->load_texture(desc->property_node("color"))},
           _thin{desc->property_bool_or_default("thin", false)} {
 #define LUISA_RENDER_DISNEY_PARAM_LOAD(name)                      \
     _##name = scene->load_texture(desc->property_node_or_default( \
         #name, SceneNodeDesc::shared_default_texture("Constant")));
-        LUISA_RENDER_DISNEY_PARAM_LOAD(color)
         LUISA_RENDER_DISNEY_PARAM_LOAD(metallic)
         LUISA_RENDER_DISNEY_PARAM_LOAD(eta)
         LUISA_RENDER_DISNEY_PARAM_LOAD(roughness)
@@ -54,7 +54,19 @@ public:
 #undef LUISA_RENDER_DISNEY_PARAM_LOAD
 
         // check channels
-        LUISA_RENDER_PARAM_CHANNEL_CHECK(DisneySurface, color, 3);
+        LUISA_RENDER_CHECK_ALBEDO_TEXTURE(DisneySurface, color);
+        LUISA_RENDER_CHECK_GENERIC_TEXTURE(DisneySurface, metallic, 1);
+        LUISA_RENDER_CHECK_GENERIC_TEXTURE(DisneySurface, eta, 1);
+        LUISA_RENDER_CHECK_GENERIC_TEXTURE(DisneySurface, roughness, 1);
+        LUISA_RENDER_CHECK_GENERIC_TEXTURE(DisneySurface, specular_tint, 1);
+        LUISA_RENDER_CHECK_GENERIC_TEXTURE(DisneySurface, anisotropic, 1);
+        LUISA_RENDER_CHECK_GENERIC_TEXTURE(DisneySurface, sheen, 1);
+        LUISA_RENDER_CHECK_GENERIC_TEXTURE(DisneySurface, sheen_tint, 1);
+        LUISA_RENDER_CHECK_GENERIC_TEXTURE(DisneySurface, clearcoat, 1);
+        LUISA_RENDER_CHECK_GENERIC_TEXTURE(DisneySurface, clearcoat_gloss, 1);
+        LUISA_RENDER_CHECK_GENERIC_TEXTURE(DisneySurface, specular_trans, 1);
+        LUISA_RENDER_CHECK_GENERIC_TEXTURE(DisneySurface, flatness, 1);
+        LUISA_RENDER_CHECK_GENERIC_TEXTURE(DisneySurface, diffuse_trans, 1);
     }
     [[nodiscard]] auto thin() const noexcept { return _thin; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override {
@@ -696,9 +708,7 @@ public:
 
 luisa::unique_ptr<Surface::Closure> DisneySurfaceInstance::_closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    auto color_rgb = _color->evaluate(it, time).xyz();
-    auto color_lum = srgb_to_cie_y(color_rgb);
-    auto color = swl.albedo_from_srgb(color_rgb);
+    auto [color, color_lum] = _color->evaluate_albedo_spectrum(it, swl, time);
     auto metallic = _metallic ? _metallic->evaluate(it, time).x : 0.f;
     auto eta = _eta ? _eta->evaluate(it, time).x : 1.5f;
     auto roughness = _roughness ? _roughness->evaluate(it, time).x : 1.f;

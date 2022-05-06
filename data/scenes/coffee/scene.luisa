@@ -2,9 +2,11 @@
 Surface mat_Plastic_Orange : Substrate {
   Kd : Constant {
     v { 1.0, 0.25, 0.013 }
+    semantic { "albedo" }
   }
   Ks : Constant {
     v { 0.04, 0.04, 0.04 }
+    semantic { "albedo" }
   }
   roughness : Constant {
     v { 0.1 }
@@ -14,9 +16,11 @@ Surface mat_Plastic_Orange : Substrate {
 Surface mat_Plastic_Black : Substrate {
   Kd : Constant {
     v { 0.006310000084340572, 0.006310000084340572, 0.006310000084340572 }
+    semantic { "albedo" }
   }
   Ks : Constant {
     v { 0.04, 0.04, 0.04 }
+    semantic { "albedo" }
   }
   eta : Constant {
     v { 1.5 }
@@ -29,9 +33,11 @@ Surface mat_Plastic_Black : Substrate {
 Surface mat_Glass : Glass {
   Kr : Constant {
     v { 1.0, 1.0, 1.0 }
+    semantic { "albedo" }
   }
   Kt : Constant {
     v { 1.0, 1.0, 1.0 }
+    semantic { "albedo" }
   }
   eta : Constant {
     v { 1.5 }
@@ -44,15 +50,18 @@ Surface mat_Glass : Glass {
 Surface mat_Metal : Mirror {
   color : Constant {
     v { 1.0, 1.0, 1.0 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_Floor : Substrate {
   Kd : Constant {
     v { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
+    semantic { "albedo" }
   }
   Ks : Constant {
     v { 0.15, 0.15, 0.15 }
+    semantic { "albedo" }
   }
   eta : Constant {
     v { 1.5 }
@@ -331,6 +340,7 @@ Shape shape_20 : Mesh {
   light : Diffuse {
     emission : Constant {
       v { 2.0, 2.0, 2.0 }
+      semantic { "illuminant" }
     }
   }
   transform : Matrix {
@@ -349,6 +359,7 @@ Shape shape_21 : Mesh {
   light : Diffuse {
     emission : Constant {
       v { 2.0, 2.0, 2.0 }
+      semantic { "illuminant" }
     }
   }
   transform : Matrix {
@@ -367,6 +378,7 @@ Shape shape_22 : Mesh {
   light : Diffuse {
     emission : Constant {
       v { 2.0, 2.0, 2.0 }
+      semantic { "illuminant" }
     }
   }
   transform : Matrix {
@@ -397,12 +409,12 @@ Camera camera : Pinhole {
 
 render {
   cameras { @camera }
+  spectrum : sRGB {}
   integrator : WavePath {
     sampler : Independent {}
     depth { 12 }
     rr_depth { 5 }
     rr_threshold { 0.95 }
-    spectrum : sRGB {}
   }
   shapes {
     @shape_0,

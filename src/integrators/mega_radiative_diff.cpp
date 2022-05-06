@@ -2,10 +2,9 @@
 // Created by ChenXin on 2022/2/23.
 //
 
-#include <util/imageio.h>
-
 #include <luisa-compute.h>
 
+#include <util/imageio.h>
 #include <util/medium_tracker.h>
 #include <base/pipeline.h>
 #include <base/integrator.h>
@@ -264,7 +263,8 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
             auto pixel_id = dispatch_id().xy();
             sampler->start(pixel_id, frame_index);
             auto [camera_ray, camera_weight] = camera->generate_ray(*sampler, pixel_id, time);
-            auto swl = pt->spectrum()->sample(*sampler);
+            auto spectrum = pipeline().spectrum();
+            auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler->generate_1d());
             SampledSpectrum beta{swl.dimension(), camera_weight};
             SampledSpectrum Li{swl.dimension(), 1.0f};
             auto grad_weight = shutter_weight * static_cast<float>(pt->node<MegakernelRadiativeDiff>()->max_depth());
@@ -368,7 +368,7 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
 
                 // rr
                 $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
-                auto q = max(swl.cie_y(beta * eta_scale), .05f);
+                auto q = max(spectrum->cie_y(swl, beta * eta_scale), .05f);
                 auto rr_depth = pt->node<MegakernelRadiativeDiff>()->rr_depth();
                 auto rr_threshold = pt->node<MegakernelRadiativeDiff>()->rr_threshold();
                 $if(depth >= rr_depth & q < rr_threshold) {
@@ -445,7 +445,8 @@ void MegakernelRadiativeDiffInstance::_render_one_camera(
             auto pixel_id = dispatch_id().xy();
             sampler->start(pixel_id, frame_index);
             auto [camera_ray, camera_weight] = camera->generate_ray(*sampler, pixel_id, time);
-            auto swl = pt->spectrum()->sample(*sampler);
+            auto spectrum = pipeline().spectrum();
+            auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler->generate_1d());
             SampledSpectrum beta{swl.dimension(), camera_weight};
             SampledSpectrum Li{swl.dimension()};
 
@@ -528,7 +529,7 @@ void MegakernelRadiativeDiffInstance::_render_one_camera(
 
                 // rr
                 $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
-                auto q = max(swl.cie_y(beta * eta_scale), .05f);
+                auto q = max(spectrum->cie_y(swl, beta * eta_scale), .05f);
                 auto rr_depth = pt->node<MegakernelRadiativeDiff>()->rr_depth();
                 auto rr_threshold = pt->node<MegakernelRadiativeDiff>()->rr_threshold();
                 $if(depth >= rr_depth & q < rr_threshold) {
@@ -536,7 +537,7 @@ void MegakernelRadiativeDiffInstance::_render_one_camera(
                     beta *= 1.0f / q;
                 };
             };
-            camera->film()->accumulate(pixel_id, swl.srgb(Li * shutter_weight));
+            camera->film()->accumulate(pixel_id, spectrum->srgb(swl, Li * shutter_weight));
         };
         auto render_shader = pipeline().device().compile(render_kernel);
         shader_iter = _render_shaders.emplace(camera, std::move(render_shader)).first;

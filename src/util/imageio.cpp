@@ -14,6 +14,10 @@
 
 namespace luisa::render {
 
+void LoadedImage::_destroy() noexcept {
+    if (*this) { _deleter(_pixels); }
+}
+
 [[nodiscard]] inline auto parse_exr_header(const char *filename) noexcept {
     EXRVersion exr_version;
     if (ParseEXRVersionFromFile(&exr_version, filename) != TINYEXR_SUCCESS) [[unlikely]] {
@@ -519,6 +523,14 @@ LoadedImage LoadedImage::load(const std::filesystem::path &path) noexcept {
     return {pixels, storage, make_uint2(width, height), stbi_image_free};
 }
 
+LoadedImage LoadedImage::create(uint2 resolution, LoadedImage::storage_type storage) noexcept {
+    auto size_bytes = pixel_storage_size(storage) * resolution.x * resolution.y;
+    auto pixels = luisa::allocate<std::byte>(size_bytes);
+    return {pixels, storage, resolution, luisa::function<void(void *)>{[](void *p) noexcept {
+                luisa::deallocate(static_cast<std::byte *>(p));
+            }}};
+}
+
 void save_image(std::filesystem::path path, const float *pixels, uint2 resolution) noexcept {
     // save results
     auto pixel_count = resolution.x * resolution.y;
@@ -542,6 +554,125 @@ void save_image(std::filesystem::path path, const float *pixels, uint2 resolutio
         }
     } else if (path.extension() == ".hdr") {
         stbi_write_hdr(path.string().c_str(), size.x, size.y, 4, reinterpret_cast<const float *>(pixels));
+    }
+}
+
+float4 LoadedImage::read(uint2 p) const noexcept {
+    auto i = p.x + p.y * _resolution.x;
+    constexpr auto byte_to_float = [](auto x) noexcept { return static_cast<float>(x) * (1.f / 255.f); };
+    constexpr auto short_to_float = [](auto x) noexcept { return static_cast<float>(x) * (1.f / 65535.f); };
+    switch (_storage) {
+        case compute::PixelStorage::BYTE1:
+            return make_float4(byte_to_float(static_cast<const uint8_t *>(_pixels)[i]),
+                               byte_to_float(static_cast<const uint8_t *>(_pixels)[i]),
+                               byte_to_float(static_cast<const uint8_t *>(_pixels)[i]), 1.f);
+        case compute::PixelStorage::BYTE2:
+            return make_float4(byte_to_float(static_cast<const uint8_t *>(_pixels)[i * 2u + 0u]),
+                               byte_to_float(static_cast<const uint8_t *>(_pixels)[i * 2u + 1u]), 0.f, 1.f);
+        case compute::PixelStorage::BYTE4:
+            return make_float4(byte_to_float(static_cast<const uint8_t *>(_pixels)[i * 4u + 0u]),
+                               byte_to_float(static_cast<const uint8_t *>(_pixels)[i * 4u + 1u]),
+                               byte_to_float(static_cast<const uint8_t *>(_pixels)[i * 4u + 2u]),
+                               byte_to_float(static_cast<const uint8_t *>(_pixels)[i * 4u + 3u]));
+        case compute::PixelStorage::SHORT1:
+            return make_float4(short_to_float(static_cast<const uint16_t *>(_pixels)[i]),
+                               short_to_float(static_cast<const uint16_t *>(_pixels)[i]),
+                               short_to_float(static_cast<const uint16_t *>(_pixels)[i]), 1.f);
+        case compute::PixelStorage::SHORT2:
+            return make_float4(short_to_float(static_cast<const uint16_t *>(_pixels)[i * 2u + 0u]),
+                               short_to_float(static_cast<const uint16_t *>(_pixels)[i * 2u + 1u]), 0.f, 0.f);
+        case compute::PixelStorage::SHORT4:
+            return make_float4(short_to_float(static_cast<const uint16_t *>(_pixels)[i * 4u + 0u]),
+                               short_to_float(static_cast<const uint16_t *>(_pixels)[i * 4u + 1u]),
+                               short_to_float(static_cast<const uint16_t *>(_pixels)[i * 4u + 2u]),
+                               short_to_float(static_cast<const uint16_t *>(_pixels)[i * 4u + 3u]));
+        case compute::PixelStorage::HALF1:
+            return make_float4(half_to_float(static_cast<const uint16_t *>(_pixels)[i]),
+                               half_to_float(static_cast<const uint16_t *>(_pixels)[i]),
+                               half_to_float(static_cast<const uint16_t *>(_pixels)[i]), 1.f);
+        case compute::PixelStorage::HALF2:
+            return make_float4(half_to_float(static_cast<const uint16_t *>(_pixels)[i * 2u + 0u]),
+                               half_to_float(static_cast<const uint16_t *>(_pixels)[i * 2u + 1u]), 0.f, 0.f);
+        case compute::PixelStorage::HALF4:
+            return make_float4(half_to_float(static_cast<const uint16_t *>(_pixels)[i * 4u + 0u]),
+                               half_to_float(static_cast<const uint16_t *>(_pixels)[i * 4u + 1u]),
+                               half_to_float(static_cast<const uint16_t *>(_pixels)[i * 4u + 2u]),
+                               half_to_float(static_cast<const uint16_t *>(_pixels)[i * 4u + 3u]));
+        case compute::PixelStorage::FLOAT1:
+            return make_float4(static_cast<const float *>(_pixels)[i],
+                               static_cast<const float *>(_pixels)[i],
+                               static_cast<const float *>(_pixels)[i], 1.f);
+        case compute::PixelStorage::FLOAT2:
+            return make_float4(static_cast<const float *>(_pixels)[i * 2u + 0u],
+                               static_cast<const float *>(_pixels)[i * 2u + 1u], 0.f, 0.f);
+        case compute::PixelStorage::FLOAT4:
+            return make_float4(static_cast<const float *>(_pixels)[i * 4u + 0u],
+                               static_cast<const float *>(_pixels)[i * 4u + 1u],
+                               static_cast<const float *>(_pixels)[i * 4u + 2u],
+                               static_cast<const float *>(_pixels)[i * 4u + 3u]);
+        default: break;
+    }
+    return make_float4();
+}
+
+void LoadedImage::write(uint2 p, float4 v) noexcept {
+    auto i = p.x + p.y * _resolution.x;
+    constexpr auto float_to_byte = [](auto x) noexcept { return static_cast<uint8_t>(std::clamp(std::round(x * 255.f), 0.f, 255.f)); };
+    constexpr auto float_to_short = [](auto x) noexcept { return static_cast<uint16_t>(std::clamp(std::round(x * 65535.f), 0.f, 65535.f)); };
+    switch (_storage) {
+        case compute::PixelStorage::BYTE1:
+            static_cast<uint8_t *>(_pixels)[i] = float_to_byte(v.x);
+            break;
+        case compute::PixelStorage::BYTE2:
+            static_cast<uint8_t *>(_pixels)[i * 2u + 0u] = float_to_byte(v.x);
+            static_cast<uint8_t *>(_pixels)[i * 2u + 1u] = float_to_byte(v.y);
+            break;
+        case compute::PixelStorage::BYTE4:
+            static_cast<uint8_t *>(_pixels)[i * 4u + 0u] = float_to_byte(v.x);
+            static_cast<uint8_t *>(_pixels)[i * 4u + 1u] = float_to_byte(v.y);
+            static_cast<uint8_t *>(_pixels)[i * 4u + 2u] = float_to_byte(v.y);
+            static_cast<uint8_t *>(_pixels)[i * 4u + 3u] = float_to_byte(v.z);
+            break;
+        case compute::PixelStorage::SHORT1:
+            static_cast<uint16_t *>(_pixels)[i] = float_to_short(v.x);
+            break;
+        case compute::PixelStorage::SHORT2:
+            static_cast<uint16_t *>(_pixels)[i * 2u + 0u] = float_to_short(v.x);
+            static_cast<uint16_t *>(_pixels)[i * 2u + 1u] = float_to_short(v.y);
+            break;
+        case compute::PixelStorage::SHORT4:
+            static_cast<uint16_t *>(_pixels)[i * 4u + 0u] = float_to_short(v.x);
+            static_cast<uint16_t *>(_pixels)[i * 4u + 1u] = float_to_short(v.y);
+            static_cast<uint16_t *>(_pixels)[i * 4u + 2u] = float_to_short(v.z);
+            static_cast<uint16_t *>(_pixels)[i * 4u + 3u] = float_to_short(v.w);
+            break;
+        case compute::PixelStorage::HALF1:
+            static_cast<uint16_t *>(_pixels)[i] = float_to_half(v.x);
+            break;
+        case compute::PixelStorage::HALF2:
+            static_cast<uint16_t *>(_pixels)[i * 2u + 0u] = float_to_half(v.x);
+            static_cast<uint16_t *>(_pixels)[i * 2u + 1u] = float_to_half(v.y);
+            break;
+        case compute::PixelStorage::HALF4:
+            static_cast<uint16_t *>(_pixels)[i * 4u + 0u] = float_to_half(v.x);
+            static_cast<uint16_t *>(_pixels)[i * 4u + 1u] = float_to_half(v.y);
+            static_cast<uint16_t *>(_pixels)[i * 4u + 2u] = float_to_half(v.z);
+            static_cast<uint16_t *>(_pixels)[i * 4u + 3u] = float_to_half(v.w);
+            break;
+        case compute::PixelStorage::FLOAT1:
+            static_cast<float *>(_pixels)[i] = v.x;
+            break;
+        case compute::PixelStorage::FLOAT2:
+            static_cast<float *>(_pixels)[i * 2u + 0u] = v.x;
+            static_cast<float *>(_pixels)[i * 2u + 1u] = v.y;
+            break;
+        case compute::PixelStorage::FLOAT4:
+            static_cast<float *>(_pixels)[i * 4u + 0u] = v.x;
+            static_cast<float *>(_pixels)[i * 4u + 1u] = v.y;
+            static_cast<float *>(_pixels)[i * 4u + 2u] = v.z;
+            static_cast<float *>(_pixels)[i * 4u + 3u] = v.w;
+            break;
+        default: break;
     }
 }
 

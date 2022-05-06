@@ -603,8 +603,8 @@ SampledSpectrum FresnelBlend::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u
     auto u = def(uOrig);
     *p = 0.f;
     SampledSpectrum f{_rd.dimension()};
-    $if(u.x < .5f) {
-        u.x = 2.f * u.x;
+    $if(u.x < _rd_ratio) {
+        u.x = u.x / _rd_ratio;
         // Cosine-sample the hemisphere, flipping the direction if necessary
         *wi = sample_cosine_hemisphere(u);
         wi->z *= sign(cos_theta(wo));
@@ -613,7 +613,7 @@ SampledSpectrum FresnelBlend::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u
         f = evaluate(wo, *wi);
     }
     $else {
-        u.x = 2.f * (u.x - .5f);
+        u.x = (u.x - _rd_ratio) / (1.f - _rd_ratio);
         // Sample microfacet orientation $\wh$ and reflected direction $\wi$
         auto wh = _distribution->sample_wh(wo, u);
         *wi = reflect(wo, wh);
@@ -628,7 +628,7 @@ SampledSpectrum FresnelBlend::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u
 Float FresnelBlend::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {
     auto wh = normalize(wo + wi);
     auto pdf_wh = _distribution->pdf(wo, wh);
-    auto p = .5f * (abs_cos_theta(wi) * inv_pi + pdf_wh / (4.f * dot(wo, wh)));
+    auto p = lerp(pdf_wh / (4.f * dot(wo, wh)), abs_cos_theta(wi) * inv_pi, _rd_ratio);
     return ite(same_hemisphere(wo, wi), p, 0.f);
 }
 

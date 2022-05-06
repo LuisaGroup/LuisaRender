@@ -27,8 +27,7 @@ private:
 public:
     Directional(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Environment{scene, desc},
-          _emission{scene->load_texture(desc->property_node_or_default(
-              "emission", SceneNodeDesc::shared_default_texture("Constant")))},
+          _emission{scene->load_texture(desc->property_node("emission"))},
           _scale{std::max(desc->property_float_or_default("scale", 1.0f), 0.0f)},
           _visible{desc->property_bool_or_default("visible", true)} {
         if (!_emission->is_constant()) [[unlikely]] {
@@ -36,7 +35,7 @@ public:
                 "Directional environment emission is not constant. "
                 "This may lead to unexpected results.");
         }
-        LUISA_RENDER_PARAM_CHANNEL_CHECK(Directional, emission, 3);
+        LUISA_RENDER_CHECK_ILLUMINANT_TEXTURE(Directional, emission);
         auto angle = std::clamp(desc->property_float_or_default("angle", 1.0f), 1e-3f, 360.0f);
         auto cos_half_angle = std::cos(.5 * angle * std::numbers::pi / 180.0);
         _cos_half_angle = static_cast<float>(cos_half_angle);
@@ -66,7 +65,7 @@ private:
     [[nodiscard]] auto _evaluate(Expr<float3> wi_local, const SampledWavelengths &swl, Expr<float> time) const noexcept {
         auto env = node<Directional>();
         Interaction it{-wi_local, make_float2(.5f)};
-        auto L = _texture->evaluate_illuminant_spectrum(it, swl, time);
+        auto L = _texture->evaluate_illuminant_spectrum(it, swl, time).value;
         auto pdf = uniform_cone_pdf(env->cos_half_angle());
         auto valid = env->cos_half_angle() < abs_cos_theta(wi_local);
         return Light::Evaluation{.L = L * ite(valid, env->scale(), 0.f),

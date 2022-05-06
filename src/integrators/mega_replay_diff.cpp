@@ -13,7 +13,7 @@
 
 namespace luisa::render {
 
-//#define LUISA_RENDER_PATH_REPLAY_DEBUG
+#define LUISA_RENDER_PATH_REPLAY_DEBUG
 
 using namespace luisa::compute;
 
@@ -133,7 +133,7 @@ public:
         auto pt = node<MegakernelReplayDiff>();
         auto command_buffer = stream.command_buffer();
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
-        pipeline().printer().reset(stream);
+        command_buffer << pipeline().printer().reset();
 #endif
 
         luisa::vector<float4> rendered;
@@ -210,7 +210,7 @@ public:
             save_image(film_path, (const float *)rendered.data(), resolution);
         }
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
-        std::cout << pipeline().printer().retrieve(stream);
+        command_buffer << pipeline().printer().retrieve() << synchronize();
 #endif
         LUISA_INFO("Finish saving results");
 
@@ -267,14 +267,14 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
             auto pixel_id = dispatch_id().xy();
             sampler->start(pixel_id, frame_index);
             auto [camera_ray, camera_weight] = camera->generate_ray(*sampler, pixel_id, time);
-            auto swl = pt->spectrum()->sample(*sampler);
+            auto spectrum = pipeline().spectrum();
+            auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler->generate_1d());
             SampledSpectrum beta{swl.dimension(), camera_weight};
             SampledSpectrum Li{swl.dimension()};
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
             $if(all(pixel_id == pixel_checked)) {
-                pipeline().printer().log("Li_1spp forward");
-                pipeline().printer().log("Li = (", Li[0u], ", ", Li[1u], ", ", Li[2u], ")");
+                pipeline().printer().info("Li_1spp forward: Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
             };
 #endif
 
@@ -293,7 +293,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
                         $if(all(pixel_id == pixel_checked)) {
-                            pipeline().printer().log("Li = (", Li[0u], ", ", Li[1u], ", ", Li[2u], ")");
+                            pipeline().printer().info("Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
                         };
 #endif
                     }
@@ -309,7 +309,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
                         $if(all(pixel_id == pixel_checked)) {
-                            pipeline().printer().log("Li = (", Li[0u], ", ", Li[1u], ", ", Li[2u], ")");
+                            pipeline().printer().info("Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
                         };
 #endif
                     };
@@ -359,7 +359,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
                             $if(all(pixel_id == pixel_checked)) {
-                                pipeline().printer().log("Li = (", Li[0u], ", ", Li[1u], ", ", Li[2u], ")");
+                                pipeline().printer().info("Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
                             };
 #endif
                         };
@@ -375,7 +375,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
 
                 // rr
                 $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
-                auto q = max(swl.cie_y(beta * eta_scale), .05f);
+                auto q = max(spectrum->cie_y(swl, beta * eta_scale), .05f);
                 auto rr_depth = pt->node<MegakernelReplayDiff>()->rr_depth();
                 auto rr_threshold = pt->node<MegakernelReplayDiff>()->rr_threshold();
                 $if(depth >= rr_depth & q < rr_threshold) {
@@ -383,11 +383,11 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                     beta *= 1.0f / q;
                 };
             };
-            Li_1spp.write(pixel_id, make_float4(swl.srgb(Li * shutter_weight), 1.f));
+            Li_1spp.write(pixel_id, make_float4(spectrum->srgb(swl, Li * shutter_weight), 1.f));
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
             $if(all(pixel_id == pixel_checked)) {
-                pipeline().printer().log("Li = (", Li[0u], ", ", Li[1u], ", ", Li[2u], ")");
+                pipeline().printer().info("Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
             };
 #endif
         };
@@ -434,7 +434,8 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
             auto pixel_id = dispatch_id().xy();
             sampler->start(pixel_id, frame_index);
             auto [camera_ray, camera_weight] = camera->generate_ray(*sampler, pixel_id, time);
-            auto swl = pt->spectrum()->sample(*sampler);
+            auto spectrum = pipeline().spectrum();
+            auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler->generate_1d());
             SampledSpectrum beta{swl.dimension(), camera_weight};
             SampledSpectrum Li{swl.dimension(), 0.f};
             auto grad_weight = shutter_weight * static_cast<float>(pt->node<MegakernelReplayDiff>()->max_depth());
@@ -455,9 +456,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
             $if(all(pixel_id == pixel_checked)) {
-                pipeline().printer().log();
-                pipeline().printer().log("Li_1spp backward");
-                pipeline().printer().log("Li = (", Li[0u], ", ", Li[1u], ", ", Li[2u], ")");
+                pipeline().printer().info("Li_1spp backward: Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
             };
 #endif
 
@@ -475,7 +474,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
                         $if(all(pixel_id == pixel_checked)) {
-                            pipeline().printer().log("Li = (", Li[0u], ", ", Li[1u], ", ", Li[2u], ")");
+                            pipeline().printer().info("Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
                         };
 #endif
                     }
@@ -492,7 +491,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
                         $if(all(pixel_id == pixel_checked)) {
-                            pipeline().printer().log("Li = (", Li[0u], ", ", Li[1u], ", ", Li[2u], ")");
+                            pipeline().printer().info("Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
                         };
 #endif
                     };
@@ -542,9 +541,9 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
                             $if(all(pixel_id == pixel_checked)) {
                                 auto Li_variation = weight * eval.f * light_sample.eval.L;
-                                pipeline().printer().log("direct lighting Li_variation = (",
-                                                         Li_variation[0u], ", ", Li_variation[1u], ", ", Li_variation[2u], ")");
-                                pipeline().printer().log("Li = (", Li[0u], ", ", Li[1u], ", ", Li[2u], ")");
+                                pipeline().printer().info("direct lighting Li_variation = ({}, {}, {})",
+                                                         Li_variation[0u], Li_variation[1u], Li_variation[2u]);
+                                pipeline().printer().info("Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
                             };
 #endif
 
@@ -570,7 +569,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
 
                 // rr
                 $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
-                auto q = max(swl.cie_y(beta * eta_scale), .05f);
+                auto q = max(spectrum->cie_y(swl, beta * eta_scale), .05f);
                 auto rr_depth = pt->node<MegakernelReplayDiff>()->rr_depth();
                 auto rr_threshold = pt->node<MegakernelReplayDiff>()->rr_threshold();
                 $if(depth >= rr_depth & q < rr_threshold) {
@@ -581,7 +580,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
             $if(all(pixel_id == pixel_checked)) {
-                pipeline().printer().log("Li = (", Li[0u], ", ", Li[1u], ", ", Li[2u], ")");
+                pipeline().printer().info("Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
             };
 #endif
         };
@@ -618,7 +617,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                 dispatch_count -= dispatches_per_commit;
             }
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
-            std::cout << pipeline().printer().retrieve(command_buffer) << std::flush;
+            command_buffer << pipeline().printer().retrieve() << synchronize();
 #endif
         }
     }
@@ -668,7 +667,8 @@ void MegakernelReplayDiffInstance::_render_one_camera(
             auto pixel_id = dispatch_id().xy();
             sampler->start(pixel_id, frame_index);
             auto [camera_ray, camera_weight] = camera->generate_ray(*sampler, pixel_id, time);
-            auto swl = pt->spectrum()->sample(*sampler);
+            auto spectrum = pipeline().spectrum();
+            auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler->generate_1d());
             SampledSpectrum beta{swl.dimension(), camera_weight};
             SampledSpectrum Li{swl.dimension()};
 
@@ -751,7 +751,7 @@ void MegakernelReplayDiffInstance::_render_one_camera(
 
                 // rr
                 $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
-                auto q = max(swl.cie_y(beta * eta_scale), .05f);
+                auto q = max(spectrum->cie_y(swl, beta * eta_scale), .05f);
                 auto rr_depth = pt->node<MegakernelReplayDiff>()->rr_depth();
                 auto rr_threshold = pt->node<MegakernelReplayDiff>()->rr_threshold();
                 $if(depth >= rr_depth & q < rr_threshold) {
@@ -759,7 +759,7 @@ void MegakernelReplayDiffInstance::_render_one_camera(
                     beta *= 1.0f / q;
                 };
             };
-            camera->film()->accumulate(pixel_id, swl.srgb(Li * shutter_weight));
+            camera->film()->accumulate(pixel_id, spectrum->srgb(swl, Li * shutter_weight));
         };
         auto render_shader = pipeline().device().compile(render_kernel);
         shader_iter = _render_shaders.emplace(camera, std::move(render_shader)).first;

@@ -171,6 +171,7 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     }
     pipeline->_cameras.reserve(scene.cameras().size());
     auto command_buffer = stream.command_buffer();
+    pipeline->_spectrum = scene.spectrum()->build(*pipeline, command_buffer);
     for (auto camera : scene.cameras()) {
         pipeline->_cameras.emplace_back(camera->build(*pipeline, command_buffer));
     }

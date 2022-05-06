@@ -2,9 +2,11 @@
 Surface mat_WhitePlastic : Substrate {
   Kd : Constant {
     v { 1.0, 1.0, 1.0 }
+    semantic { "albedo" }
   }
   Ks : Constant {
     v { 0.04, 0.04, 0.04 }
+    semantic { "albedo" }
   }
   eta : Constant {
     v { 1.5 }
@@ -24,9 +26,11 @@ Surface mat_Chrome : Metal {
 Surface mat_BlackRubber : Substrate {
   Kd : Constant {
     v { 0.05000000074505806, 0.05000000074505806, 0.05000000074505806 }
+    semantic { "albedo" }
   }
   Ks : Constant {
     v { 0.04, 0.04, 0.04 }
+    semantic { "albedo" }
   }
   eta : Constant {
     v { 1.5 }
@@ -39,12 +43,14 @@ Surface mat_BlackRubber : Substrate {
 Surface mat_Walls : Matte {
   Kd : Constant {
     v { 0.20000000298023224, 0.20000000298023224, 0.20000000298023224 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_Artwork : Matte {
   Kd : Image {
     file { "textures/picture3.jpg" }
+    semantic { "albedo" }
   }
 }
 
@@ -53,15 +59,18 @@ Surface mat_None : Null {}
 Surface mat_FloorTiles : Matte {
   Kd : Image {
     file { "textures/Tiles.jpg" }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_BlackPaint : Substrate {
   Kd : Constant {
     v { 0.009999999776482582, 0.009999999776482582, 0.009999999776482582 }
+    semantic { "albedo" }
   }
   Ks : Constant {
     v { 0.04, 0.04, 0.04 }
+    semantic { "albedo" }
   }
   eta : Constant {
     v { 1.5 }
@@ -74,6 +83,7 @@ Surface mat_BlackPaint : Substrate {
 Surface mat_WhiteMarble : Matte {
   Kd : Constant {
     v { 0.32503700256347656, 0.32503700256347656, 0.32503700256347656 }
+    semantic { "albedo" }
   }
 }
 
@@ -87,9 +97,11 @@ Surface mat_Gold : Metal {
 Surface mat_Ceramic : Substrate {
   Kd : Constant {
     v { 1.0, 1.0, 1.0 }
+    semantic { "albedo" }
   }
   Ks : Constant {
     v { 0.04, 0.04, 0.04 }
+    semantic { "albedo" }
   }
   eta : Constant {
     v { 1.5 }
@@ -109,9 +121,11 @@ Surface mat_RoughMetal : Metal {
 Surface mat_PaintedCeramic : Substrate {
   Kd : Image {
     file { "textures/Teacup.png" }
+    semantic { "albedo" }
   }
   Ks : Constant {
     v { 0.04, 0.04, 0.04 }
+    semantic { "albedo" }
   }
   eta : Constant {
     v { 1.5 }
@@ -124,9 +138,11 @@ Surface mat_PaintedCeramic : Substrate {
 Surface mat_SkirtWood : Substrate {
   Kd : Constant {
     v { 0.6846150159835815, 0.6846150159835815, 0.6846150159835815 }
+    semantic { "albedo" }
   }
   Ks : Constant {
     v { 0.04, 0.04, 0.04 }
+    semantic { "albedo" }
   }
   eta : Constant {
     v { 1.5 }
@@ -139,9 +155,11 @@ Surface mat_SkirtWood : Substrate {
 Surface mat_FrostedGlass : Substrate {
   Kd : Constant {
     v { 0.7931100130081177, 0.7931100130081177, 0.7931100130081177 }
+    semantic { "albedo" }
   }
   Ks : Constant {
     v { 0.04, 0.04, 0.04 }
+    semantic { "albedo" }
   }
   eta : Constant {
     v { 1.5 }
@@ -831,6 +849,7 @@ Shape shape_52 : Mesh {
 Env dir : Directional {
   emission : Constant {
     v { 0.03183098882436752, 0.03183098882436752, 0.03183098882436752 }
+    semantic { "illuminant" }
   }
   angle { 2.0 }
   direction { 2, 0.64, 0.8 }
@@ -840,6 +859,7 @@ Env dir : Directional {
 Env sky : Spherical {
   emission : Image {
     file { "textures/sky.exr" }
+    semantic { "illuminant" }
   }
   transform : Matrix {
     m { 0.0, 0.0, -1.0, 0.0,
@@ -855,24 +875,24 @@ Camera camera : Pinhole {
   front { 0.013057953678071499, -0.06386303901672363, -0.9978732466697693 }
   up { 0.0, 1.0, 0.0 }
   fov { 35.98339777135762 }
-  spp { 1024 }
+  spp { 128 }
   filter : Gaussian {
     radius { 1 }
   }
   film : Color {
-    resolution { 3840, 2160 }
+    resolution { 1920, 1080 }
   }
   file { "output.exr" }
 }
 
 render {
   cameras { @camera }
+  spectrum : sRGB {}
   integrator : WavePath {
     sampler : Independent {}
     depth { 12 }
     rr_depth { 5 }
     rr_threshold { 0.95 }
-    spectrum : sRGB {}
   }
   shapes {
     @shape_0,

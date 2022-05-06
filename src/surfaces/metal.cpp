@@ -431,6 +431,7 @@ public:
             }
             _eta = luisa::make_unique<Constant<float2>>(lut);
         }
+        LUISA_RENDER_CHECK_GENERIC_TEXTURE(MetalSurface, roughness, 1);
     }
     [[nodiscard]] auto &eta() const noexcept { return *_eta; }
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }

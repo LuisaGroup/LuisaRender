@@ -2,12 +2,12 @@
 // Created by Mike Smith on 2022/3/23.
 //
 
-#include <core/clock.h>
 #include <core/thread_pool.h>
 #include <util/imageio.h>
 #include <util/half.h>
 #include <base/texture.h>
 #include <base/pipeline.h>
+#include <base/scene.h>
 
 namespace luisa::render {
 
@@ -30,6 +30,100 @@ private:
     Encoding _encoding{};
     float _scale{1.f};
     float _gamma{1.f};
+
+private:
+    [[nodiscard]] static inline auto _srgb_to_linear(float x) noexcept {
+        return x <= 0.04045f ?
+                   x * (1.f / 12.92f) :
+                   std::pow((x + 0.055f) * (1.0f / 1.055f), 2.4f);
+    }
+
+    [[nodiscard]] inline auto _linearize(float x) const noexcept {
+        switch (_encoding) {
+            case Encoding::LINEAR: return x * _scale;
+            case Encoding::SRGB: return _srgb_to_linear(x) * _scale;
+            case Encoding::GAMMA: return std::pow(x, _gamma) * _scale;
+        }
+        return 0.f;
+    }
+    [[nodiscard]] inline auto _linearize(float3 x) const noexcept {
+        return make_float3(_linearize(x.x), _linearize(x.y), _linearize(x.z));
+    }
+
+    template<typename F>
+    [[nodiscard]] auto _load_albedo_or_illuminant_image_for_diff(const std::filesystem::path &path, F &&encode) const noexcept {
+        auto image = LoadedImage::load(path, PixelStorage::FLOAT4);
+        auto pixels = static_cast<float4 *>(image.pixels());
+        auto spec = scene()->spectrum();
+        for (auto i = 0u; i < image.pixel_count(); ++i) {
+            pixels[i] = encode(_linearize(pixels[i].xyz()));
+        }
+        return image;
+    }
+
+    [[nodiscard]] auto _load_generic_image_for_diff(const std::filesystem::path &path, PixelStorage storage) const noexcept {
+        auto channels = pixel_storage_channel_count(storage);
+        auto image = [&] {
+            if (channels == 1u) { return LoadedImage::load(path, PixelStorage::FLOAT1); }
+            if (channels == 2u) { return LoadedImage::load(path, PixelStorage::FLOAT2); }
+            return LoadedImage::load(path, PixelStorage::FLOAT4);
+        }();
+        auto pixels = static_cast<float *>(image.pixels());
+        auto n = image.pixel_count() * image.channels();
+        for (auto i = 0u; i < n; i++) { pixels[i] = _linearize(pixels[i]); }
+        return image;
+    }
+
+    [[nodiscard]] auto _load_encoded_image(const std::filesystem::path &path, PixelStorage storage, const Spectrum *spec) const noexcept {
+        auto image = LoadedImage::load(path, storage);
+        if (spec->requires_encoding()) {
+            if (semantic() == Semantic::ALBEDO) {
+                if (auto encoded_storage = spec->encoded_albedo_storage(image.pixel_storage());
+                    encoded_storage != image.pixel_storage()) {
+                    auto encoded = LoadedImage::create(image.size(), encoded_storage);
+                    for (auto y = 0u; y < image.size().y; y++) {
+                        for (auto x = 0u; x < image.size().x; x++) {
+                            auto p = make_uint2(x, y);
+                            auto v = _linearize(image.read(p).xyz());
+                            encoded.write(p, spec->encode_srgb_albedo(v));
+                        }
+                    }
+                    return encoded;
+                }
+                for (auto y = 0u; y < image.size().y; y++) {
+                    for (auto x = 0u; x < image.size().x; x++) {
+                        auto p = make_uint2(x, y);
+                        auto v = _linearize(image.read(p).xyz());
+                        image.write(p, spec->encode_srgb_albedo(v));
+                    }
+                }
+                return image;
+            }
+            if (semantic() == Semantic::ILLUMINANT) {
+                if (auto encoded_storage = spec->encoded_illuminant_storage(image.pixel_storage());
+                    encoded_storage != image.pixel_storage()) {
+                    auto encoded = LoadedImage::create(image.size(), encoded_storage);
+                    for (auto y = 0u; y < image.size().y; y++) {
+                        for (auto x = 0u; x < image.size().x; x++) {
+                            auto p = make_uint2(x, y);
+                            auto v = _linearize(image.read(p).xyz());
+                            encoded.write(p, spec->encode_srgb_illuminant(v));
+                        }
+                    }
+                    return encoded;
+                }
+                for (auto y = 0u; y < image.size().y; y++) {
+                    for (auto x = 0u; x < image.size().x; x++) {
+                        auto p = make_uint2(x, y);
+                        auto v = _linearize(image.read(p).xyz());
+                        image.write(p, spec->encode_srgb_illuminant(v));
+                    }
+                }
+                return image;
+            }
+        }
+        return image;
+    }
 
 private:
     void _load_image(const SceneNodeDesc *desc) noexcept {
@@ -58,36 +152,29 @@ private:
         }
         _scale = desc->property_float_or_default("scale", 1.f);
         _image = ThreadPool::global().async([this, path = std::move(path)] {
-            if (requires_gradients()) {
-                auto storage = LoadedImage::parse_storage(path);
-                auto channels = pixel_storage_channel_count(storage);
-                auto image = [&] {
-                    if (channels == 1u) { return LoadedImage::load(path, PixelStorage::FLOAT1); }
-                    if (channels == 2u) { return LoadedImage::load(path, PixelStorage::FLOAT2); }
-                    return LoadedImage::load(path, PixelStorage::FLOAT4);
-                }();
-                auto pixels = static_cast<float *>(image.pixels());
-                auto n = image.pixel_count() * image.channels();
-                if (_encoding == Encoding::SRGB) {
-                    for (auto i = 0u; i < n; i++) {
-                        auto x = pixels[i];
-                        auto p = x <= 0.04045f ?
-                                     x * (1.f / 12.92f) :
-                                     std::pow((x + 0.055f) * (1.0f / 1.055f), 2.4f);
-                        pixels[i] = _scale * p;
-                    }
-                } else if (_encoding == Encoding::GAMMA) {
-                    for (auto i = 0u; i < n; i++) {
-                        pixels[i] = _scale * pow(pixels[i], _gamma);
-                    }
-                } else {// _encoding == Encoding::LINEAR
-                    for (auto i = 0u; i < n; i++) {
-                        pixels[i] *= _scale;
-                    }
-                }
-                return image;
+            auto storage = LoadedImage::parse_storage(path);
+            if (pixel_storage_channel_count(storage) == 2 &&
+                (semantic() == Semantic::ALBEDO ||
+                 semantic() == Semantic::ILLUMINANT)) [[unlikely]] {
+                LUISA_ERROR_WITH_LOCATION(
+                    "Image texture with albedo or illuminant "
+                    "semantic does not support 2-channel images.");
             }
-            return LoadedImage::load(path);
+            auto spec = scene()->spectrum();
+            if (requires_gradients()) {
+                switch (semantic()) {
+                    case Semantic::ALBEDO:
+                        return _load_albedo_or_illuminant_image_for_diff(
+                            path, [spec](float3 x) noexcept { return spec->encode_srgb_albedo(x); });
+                    case Semantic::ILLUMINANT:
+                        return _load_albedo_or_illuminant_image_for_diff(
+                            path, [spec](auto x) noexcept { return spec->encode_srgb_illuminant(x); });
+                    case Semantic::GENERIC:
+                        return _load_generic_image_for_diff(path, storage);
+                }
+                LUISA_ERROR_WITH_LOCATION("Unreachable.");
+            }
+            return _load_encoded_image(path, storage, spec);
         });
     }
 
@@ -158,7 +245,7 @@ private:
     }
 
     [[nodiscard]] Float4 _decode(Expr<float4> rgba) const noexcept {
-        if (_diff_param) { return rgba; }// already pre-processed
+        if (_diff_param || pipeline().spectrum()->node()->requires_encoding()) { return rgba; }// already pre-processed
         auto texture = node<ImageTexture>();
         auto encoding = texture->encoding();
         auto scale = texture->scale();

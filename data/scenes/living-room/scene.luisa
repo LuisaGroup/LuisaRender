@@ -2,15 +2,18 @@
 Surface mat_Dirt : Matte {
   Kd : Constant {
     v { 0.09850399941205978, 0.04596799984574318, 0.03588699921965599 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_Floor : Substrate {
   Kd : Image {
     file { "textures/wood.jpg" }
+    semantic { "albedo" }
   }
   Ks : Constant {
     v { 0.04, 0.04, 0.04 }
+    semantic { "albedo" }
   }
   eta : Constant {
     v { 1.5 }
@@ -23,9 +26,11 @@ Surface mat_Floor : Substrate {
 Surface mat_TableWood : Substrate {
   Kd : Image {
     file { "textures/wood5.jpg" }
+    semantic { "albedo" }
   }
   Ks : Constant {
     v { 0.04, 0.04, 0.04 }
+    semantic { "albedo" }
   }
   eta : Constant {
     v { 1.5 }
@@ -38,27 +43,32 @@ Surface mat_TableWood : Substrate {
 Surface mat_Sofa : Matte {
   Kd : Constant {
     v { 1.0, 1.0, 1.0 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_SofaLegs : Matte {
   Kd : Constant {
     v { 0.10000000149011612, 0.10000000149011612, 0.10000000149011612 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_Walls : Matte {
   Kd : Constant {
     v { 0.10000000149011612, 0.10000000149011612, 0.10000000149011612 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_Paneling : Substrate {
   Kd : Constant {
     v { 0.800000011920929, 0.800000011920929, 0.800000011920929 }
+    semantic { "albedo" }
   }
   Ks : Constant {
     v { 0.04, 0.04, 0.04 }
+    semantic { "albedo" }
   }
   eta : Constant {
     v { 1.5 }
@@ -71,6 +81,7 @@ Surface mat_Paneling : Substrate {
 Surface mat_Mirror : Mirror {
   color : Constant {
     v { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
+    semantic { "albedo" }
   }
 }
 
@@ -84,27 +95,32 @@ Surface mat_BrushedStainlessSteel : Metal {
 Surface mat_MattePaint : Matte {
   Kd : Constant {
     v { 0.5785959959030151, 0.5785959959030151, 0.5785959959030151 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_Painting : Matte {
   Kd : Image {
     file { "textures/picture8.jpg" }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_PaintingBack : Matte {
   Kd : Constant {
     v { 0.25999999046325684, 0.25, 0.14000000059604645 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_Glass : Glass {
   Kr : Constant {
     v { 1.0, 1.0, 1.0 }
+    semantic { "albedo" }
   }
   Kt : Constant {
     v { 1.0, 1.0, 1.0 }
+    semantic { "albedo" }
   }
   eta : Constant {
     v { 1.5 }
@@ -117,24 +133,28 @@ Surface mat_Glass : Glass {
 Surface mat_PlantPot : Matte {
   Kd : Constant {
     v { 0.10000000149011612, 0.10000000149011612, 0.10000000149011612 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_FireplaceGlass : Mirror {
   color : Constant {
     v { 0.10000000149011612, 0.10000000149011612, 0.10000000149011612 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_Transluscent : Matte {
   Kd : Constant {
     v { 0.8999999761581421, 0.8999999761581421, 0.8999999761581421 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_Leaves : Matte {
   Kd : Image {
     file { "textures/leaf.png" }
+    semantic { "albedo" }
   }
   alpha : Image {
     file { "textures/leaf-alpha.png" }
@@ -145,12 +165,14 @@ Surface mat_Leaves : Matte {
 Surface mat_Branches : Matte {
   Kd : Constant {
     v { 0.160443514585495, 0.08241420984268188, 0.019917838275432587 }
+    semantic { "albedo" }
   }
 }
 
 Surface mat_BottleCap : Matte {
   Kd : Constant {
     v { 0.4562634229660034, 0.0, 0.0 }
+    semantic { "albedo" }
   }
 }
 
@@ -1004,6 +1026,7 @@ Shape shape_64 : Mesh {
 Env env : Spherical {
   emission : Image {
     file { "textures/Sky 19.exr" }
+    semantic { "illuminant" }
   }
   transform : SRT {
     rotate { 0, 1, 0, -90 }
@@ -1015,7 +1038,7 @@ Camera camera : Pinhole {
   front { -0.9617919325828552, 0.07440698146820068, 0.2634764611721039 }
   up { 0.0, 1.0, 0.0 }
   fov { 58.71550708558254 }
-  spp { 1024 }
+  spp { 128 }
   filter : Gaussian {
     radius { 1 }
   }
@@ -1027,12 +1050,12 @@ Camera camera : Pinhole {
 
 render {
   cameras { @camera }
+  spectrum : Hero {}
   integrator : WavePath {
     sampler : Independent {}
     depth { 12 }
     rr_depth { 5 }
     rr_threshold { 0.95 }
-    spectrum : sRGB {}
   }
   shapes {
     @shape_0,
