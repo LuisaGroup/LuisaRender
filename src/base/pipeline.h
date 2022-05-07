@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "core/hash.h"
 #include <optional>
 
 #include <luisa-compute.h>
@@ -81,14 +82,14 @@ private:
     size_t _bindless_tex3d_count{0u};
     luisa::vector<ResourceHandle> _resources;
     luisa::unordered_map<uint64_t, MeshGeometry> _mesh_cache;
-    luisa::unordered_map<const Shape *, MeshData> _meshes;
+    luisa::unordered_map<const Shape *, MeshData, PointerHash> _meshes;
     Polymorphic<Surface::Instance> _surfaces;
     Polymorphic<Light::Instance> _lights;
     luisa::vector<Light::Handle> _instanced_lights;
-    luisa::unordered_map<const Surface *, uint> _surface_tags;
-    luisa::unordered_map<const Light *, uint> _light_tags;
-    luisa::unordered_map<const Texture *, luisa::unique_ptr<Texture::Instance>> _textures;
-    luisa::unordered_map<const Filter *, luisa::unique_ptr<Filter::Instance>> _filters;
+    luisa::unordered_map<const Surface *, uint, PointerHash> _surface_tags;
+    luisa::unordered_map<const Light *, uint, PointerHash> _light_tags;
+    luisa::unordered_map<const Texture *, luisa::unique_ptr<Texture::Instance>, PointerHash> _textures;
+    luisa::unordered_map<const Filter *, luisa::unique_ptr<Filter::Instance>, PointerHash> _filters;
     luisa::vector<Shape::Handle> _instances;
     luisa::vector<InstancedTransform> _dynamic_transforms;
     Buffer<Shape::Handle> _instance_buffer;
@@ -99,7 +100,7 @@ private:
     float _mean_time{};
     luisa::unique_ptr<Differentiation> _differentiation;
     // registered transforms
-    luisa::unordered_map<const Transform *, uint> _transform_to_id;
+    luisa::unordered_map<const Transform *, uint, PointerHash> _transform_to_id;
     luisa::vector<const Transform *> _transforms;
     luisa::vector<float4x4> _transform_matrices;
     Buffer<float4x4> _transform_matrix_buffer;

@@ -54,8 +54,8 @@ void Pipeline::_process_shape(
                 if (vertices.empty() || triangles.empty()) [[unlikely]] {
                     LUISA_ERROR_WITH_LOCATION("Found mesh without vertices.");
                 }
-                auto hash = luisa::detail::xxh3_hash64(vertices.data(), vertices.size_bytes(), Hash64::default_seed);
-                hash = luisa::detail::xxh3_hash64(triangles.data(), triangles.size_bytes(), hash);
+                auto hash = luisa::detail::murmur2_hash64(vertices.data(), vertices.size_bytes(), Hash64::default_seed);
+                hash = luisa::detail::murmur2_hash64(triangles.data(), triangles.size_bytes(), hash);
                 auto [cache_iter, non_existent] = _mesh_cache.try_emplace(hash, MeshGeometry{});
                 if (!non_existent) { return cache_iter->second; }
 
