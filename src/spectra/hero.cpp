@@ -278,11 +278,7 @@ luisa::unique_ptr<Spectrum::Instance> HeroWavelengthSpectrum::build(
         PixelStorage::FLOAT4, make_uint3(RGB2SpectrumTable::resolution));
     auto rgb2spec_t2 = pipeline.create<Volume<float>>(
         PixelStorage::FLOAT4, make_uint3(RGB2SpectrumTable::resolution));
-    RGB2SpectrumTable::srgb().encode(
-        command_buffer,
-        rgb2spec_t0->view(0u),
-        rgb2spec_t1->view(0u),
-        rgb2spec_t2->view(0u));
+    RGB2SpectrumTable::srgb().encode(command_buffer, *rgb2spec_t0, *rgb2spec_t1, *rgb2spec_t2);
     auto t0 = pipeline.register_bindless(*rgb2spec_t0, TextureSampler::linear_point_zero());
     auto t1 = pipeline.register_bindless(*rgb2spec_t1, TextureSampler::linear_point_zero());
     auto t2 = pipeline.register_bindless(*rgb2spec_t2, TextureSampler::linear_point_zero());
