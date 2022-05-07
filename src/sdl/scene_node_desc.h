@@ -125,7 +125,7 @@ private:
     const SceneNodeDesc *_base{nullptr};
     SceneNodeTag _tag;
     luisa::vector<luisa::unique_ptr<SceneNodeDesc>> _internal_nodes;
-    luisa::unordered_map<luisa::string, value_list, Hash64, std::equal_to<>> _properties;
+    luisa::unordered_map<luisa::string, value_list> _properties;
 
 public:
     template<typename T>

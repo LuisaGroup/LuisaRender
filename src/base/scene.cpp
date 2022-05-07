@@ -27,7 +27,7 @@ namespace luisa::render {
 
 struct Scene::Config {
     luisa::vector<NodeHandle> internal_nodes;
-    luisa::unordered_map<luisa::string, NodeHandle, Hash64, std::equal_to<>> nodes;
+    luisa::unordered_map<luisa::string, NodeHandle> nodes;
     Integrator *integrator{nullptr};
     Environment *environment{nullptr};
     Spectrum *spectrum{nullptr};
@@ -44,7 +44,7 @@ luisa::span<const Camera *const> Scene::cameras() const noexcept { return _confi
 namespace detail {
 
 [[nodiscard]] static auto &scene_plugin_registry() noexcept {
-    static luisa::unordered_map<luisa::string, luisa::unique_ptr<DynamicModule>, Hash64> registry;
+    static luisa::unordered_map<luisa::string, luisa::unique_ptr<DynamicModule>> registry;
     return registry;
 }
 
