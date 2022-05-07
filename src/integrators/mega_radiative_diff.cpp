@@ -39,7 +39,7 @@ class MegakernelRadiativeDiffInstance final : public DifferentiableIntegrator::I
 private:
     luisa::vector<float4> _pixels;
     luisa::optional<Window> _window;
-    luisa::unordered_map<const Camera::Instance *, Shader<2, uint, float, float>, PointerHash>
+    luisa::unordered_map<const Camera::Instance *, Shader<2, uint, float, float>>
         _bp_shaders, _render_shaders;
 
 private:

@@ -43,10 +43,10 @@ class MegakernelReplayDiffInstance final : public DifferentiableIntegrator::Inst
 private:
     luisa::vector<float4> _pixels;
     luisa::optional<Window> _window;
-    luisa::unordered_map<const Camera::Instance *, Shader<2, uint, float, float>, PointerHash>
+    luisa::unordered_map<const Camera::Instance *, Shader<2, uint, float, float>>
         _render_shaders;
-    luisa::unordered_map<const Camera::Instance *, Shader<2, uint, float, float, Image<float>>, PointerHash> _bp_shaders, _render_1spp_shaders;
-    luisa::unordered_map<const Camera::Instance *, Image<float>, PointerHash> _Li;
+    luisa::unordered_map<const Camera::Instance *, Shader<2, uint, float, float, Image<float>>> _bp_shaders, _render_1spp_shaders;
+    luisa::unordered_map<const Camera::Instance *, Image<float>> _Li;
 
 private:
     void _render_one_camera(
