@@ -519,7 +519,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                             $if(all(pixel_id == pixel_checked)) {
                                 auto Li_variation = weight * eval.f * light_sample.eval.L;
                                 pipeline().printer().info("direct lighting Li_variation = ({}, {}, {})",
-                                                         Li_variation[0u], Li_variation[1u], Li_variation[2u]);
+                                                          Li_variation[0u], Li_variation[1u], Li_variation[2u]);
                                 pipeline().printer().info("Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
                             };
 #endif
