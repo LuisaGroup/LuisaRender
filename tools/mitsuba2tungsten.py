@@ -39,17 +39,34 @@ def load_value(context: Element):
 
 
 def load_values(context: Element) -> dict:
-    values_tag = {
-        'integer',
-        'string',
-        'boolean',
-        'float',
-    }
+    values_tag = {'integer', 'string', 'boolean', 'float'}
+    skip_tag = {'sampler', 'rfilter', 'bsdf'}
+
     values = {}
     for child in context:
         if child.tag in values_tag:
             value = load_value(child)
             values[value[0]] = value[1]
+        elif child.tag == 'ref':
+            values['ref'] = child.attrib['id']
+        elif child.tag == 'transform':
+            # TODO
+            pass
+        elif child.tag == 'matrix':
+            # TODO
+            pass
+        elif child.tag == 'rgb':
+            # TODO
+            pass
+        elif child.tag == 'emitter':
+            values.update(load_emitter(child))
+        elif child.tag == 'film':
+            values['film'] = load_values(child)
+        elif child.tag in skip_tag:
+            pass
+        else:
+            raise Exception(f'parse exception "{child.tag}"')
+
     return values
 
 
@@ -84,24 +101,53 @@ def load_material(context: Element) -> dict:
             'diffuse': 'lambert',
         },
     }
-    bsdf_remove = [
-        'ext_ior',
-    ]
-
+    bsdf_remove = ['ext_ior']
     keys = list(material.keys())
     for name_mitsuba2 in keys:
         if name_mitsuba2 in bsdf_remove:
             material.pop(name_mitsuba2)
-        else:
-            material[bsdf_map['key'].get(name_mitsuba2, name_mitsuba2)] = material.pop(name_mitsuba2)
-    if 'type' in material:
-        material['type'] = bsdf_map['type'].get(material['type'], material['type'])
+        elif name_mitsuba2 in bsdf_map['key']:
+            material[bsdf_map['key'][name_mitsuba2]] = material.pop(name_mitsuba2)
+    if 'type' in material and material['type'] in bsdf_map['type']:
+        material['type'] = bsdf_map['type'][material['type']]
 
     return material
 
 
 def load_shape(context: Element) -> dict:
-    return {}
+    shape_map = {
+        'key': {
+            'filename': 'file',
+            'ref': 'bsdf',
+        },
+        'type': {
+            'obj': 'mesh',
+            'rectangle': 'quad',
+        },
+    }
+    shape_remove = ['face_normals']
+
+    shape_type = shape_map['type'][context.attrib['type']]
+    shape = {
+        "transform": {},
+        "type": shape_type,
+        "smooth": False,
+        "backface_culling": False,
+        "recompute_normals": False,
+        "file": "",
+        "bsdf": "",
+    }
+    shape.update(load_values(context))
+
+    # wash data
+    keys = list(shape.keys())
+    for name_mitsuba2 in keys:
+        if name_mitsuba2 in shape_remove:
+            shape.pop(name_mitsuba2)
+        elif name_mitsuba2 in shape_map['key']:
+            shape[shape_map['key'][name_mitsuba2]] = shape.pop(name_mitsuba2)
+
+    return shape
 
 
 def load_emitter(context: Element) -> dict:
@@ -110,10 +156,7 @@ def load_emitter(context: Element) -> dict:
 
 def load_camera(context: Element) -> dict:
     values = load_values(context)
-    film = None
-    film = load_values(context.find('./film'))
-    if film is None:
-        raise Exception('lacking film')
+    film = values['film']
     camera = {
         "tonemap": "filmic",
         "resolution": [
@@ -192,7 +235,8 @@ def load_root(context: Element) -> dict:
         elif child.tag == 'shape':
             scene_dict['primitives'].append(load_shape(child))
         elif child.tag == 'emitter':
-            scene_dict['primitives'].append(load_emitter(child))
+            # TODO
+            pass
         else:
             raise Exception(f'Unexpected node "{child.tag}"')
     return scene_dict
