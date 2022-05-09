@@ -98,9 +98,8 @@ public:
     [[nodiscard]] float4 decode_albedo(float3 rgb_in) const noexcept {
         auto rgb = clamp(rgb_in, 0.0f, 1.0f);
         if (rgb[0] == rgb[1] && rgb[1] == rgb[2]) {
-            return make_float4(0.0f, 0.0f,
-                               (rgb[0] - 0.5f) / std::sqrt(rgb[0] * (1.0f - rgb[0])),
-                               srgb_to_cie_y(rgb));
+            auto s = (rgb[0] - 0.5f) / std::sqrt(rgb[0] * (1.0f - rgb[0]));
+            return make_float4(0.0f, 0.0f, s, srgb_to_cie_y(rgb));
         }
         // Find maximum component and compute remapped component values
         auto maxc = (rgb[0] > rgb[1]) ?

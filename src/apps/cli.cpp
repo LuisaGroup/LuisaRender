@@ -93,7 +93,7 @@ int main(int argc, char *argv[]) {
         path.string(), clock.toc());
 
     auto scene = Scene::create(context, scene_desc.get());
-    auto stream = device.create_stream(false);
+    auto stream = device.create_stream(true);
     auto pipeline = Pipeline::create(device, stream, *scene);
     pipeline->render(stream);
     stream.synchronize();

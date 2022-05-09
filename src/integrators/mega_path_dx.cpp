@@ -231,12 +231,13 @@ private:
                 for (auto i = 0u; i < s.spp; i++) {
                     command_buffer << render(sample_id++, s.point.time, s.point.weight)
                                           .dispatch(resolution);
-                    if (sample_id % 1u == 0u) [[unlikely]] {
+                    static constexpr auto spp_per_dispatch = 16u;
+                    if (sample_id % spp_per_dispatch == 0u) [[unlikely]] {
                         auto p = sample_id / static_cast<double>(spp);
                         command_buffer << copy_shader().dispatch(resolution)
                                        << _swapchain.present(_image)
                                        << [&progress, p, this] {
-                                              _framerate.record(1u);
+                                              _framerate.record(spp_per_dispatch);
                                               LUISA_INFO("{} spp/s", _framerate.report());
                                               progress.update(p);
                                           };
