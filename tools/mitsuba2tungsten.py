@@ -53,8 +53,51 @@ def load_values(context: Element) -> dict:
     return values
 
 
+def load_sub_material(context: Element) -> dict:
+    material = load_values(context)
+
+    if context.attrib['type'] != 'twosided':
+        material['type'] = context.attrib['type']
+
+    return material
+
+
 def load_material(context: Element) -> dict:
-    return {}
+    material = {'name': context.attrib['id']}
+
+    if context.attrib['type'] != 'twosided':
+        material['type'] = context.attrib['type']
+
+    material.update(load_sub_material(context))
+
+    if context[0].tag == 'bsdf':
+        assert len(list(context)) <= 1
+        material.update(load_sub_material(context[0]))
+
+    # wash data
+    bsdf_map = {
+        'key': {
+            'alpha': 'roughness',
+        },
+        'type': {
+            'roughconductor': 'rough_conductor',
+            'diffuse': 'lambert',
+        },
+    }
+    bsdf_remove = [
+        'ext_ior',
+    ]
+
+    keys = list(material.keys())
+    for name_mitsuba2 in keys:
+        if name_mitsuba2 in bsdf_remove:
+            material.pop(name_mitsuba2)
+        else:
+            material[bsdf_map['key'].get(name_mitsuba2, name_mitsuba2)] = material.pop(name_mitsuba2)
+    if 'type' in material:
+        material['type'] = bsdf_map['type'].get(material['type'], material['type'])
+
+    return material
 
 
 def load_shape(context: Element) -> dict:
@@ -66,18 +109,47 @@ def load_emitter(context: Element) -> dict:
 
 
 def load_camera(context: Element) -> dict:
-    return {}
+    values = load_values(context)
+    film = None
+    film = load_values(context.find('./film'))
+    if film is None:
+        raise Exception('lacking film')
+    camera = {
+        "tonemap": "filmic",
+        "resolution": [
+            film['width'],
+            film['height']
+        ],
+        "reconstruction_filter": "tent",
+        "transform": {
+            "position": [
+                -0.5196635723114014,
+                0.8170070052146912,
+                3.824389696121216
+            ],
+            "look_at": [
+                -0.0668703019618988,
+                0.6448959708213806,
+                0.5292789936065674
+            ],
+            "up": [
+                0.0,
+                1.0,
+                0.0
+            ]
+        },
+        "type": "pinhole",
+        "fov": values['fov']
+    }
+    # TODO: camera settings
+    return camera
 
 
 def load_integrator(context: Element) -> dict:
-    max_depth = 16
-    for child in context:
-        if child.tag == 'integer' and child.attrib['name'] == 'max_depth':
-            max_depth = int(child.attrib['value'])
-            break
+    values = load_values(context)
     integrator = {
         "min_bounces": 0,
-        "max_bounces": max_depth,
+        "max_bounces": values['max_depth'],
         "enable_consistency_checks": False,
         "enable_two_sided_shading": True,
         "type": "path_tracer",
