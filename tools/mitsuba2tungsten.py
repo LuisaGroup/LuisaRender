@@ -6,23 +6,41 @@ from xml.etree.ElementTree import *
 
 
 def load_integer(context: Element) -> (str, int):
-    if context.tag == 'integer':
-        return context.attrib['name'], int(context.attrib['value'])
+    return context.attrib['name'], int(context.attrib['value'])
 
 
 def load_string(context: Element) -> (str, str):
-    if context.tag == 'string':
-        return context.attrib['name'], context.attrib['value']
+    return context.attrib['name'], context.attrib['value']
 
 
 def load_bool(context: Element) -> (str, bool):
-    if context.tag == 'boolean':
-        return context.attrib['name'], context.attrib['value'].lower() == 'true'
+    return context.attrib['name'], context.attrib['value'].lower() == 'true'
 
 
 def load_float(context: Element) -> (str, float):
-    if context.tag == 'float':
-        return context.attrib['name'], float(context.attrib['value'])
+    return context.attrib['name'], float(context.attrib['value'])
+
+
+def load_rgb(context: Element) -> (str, list):
+    numbers = context.attrib['value'].split(',')
+    for i in range(len(numbers)):
+        numbers[i] = float(numbers[i])
+    return context.attrib['name'], numbers
+
+
+def load_matrix(context: Element) -> (str, list):
+    value = context.attrib['value'].split(' ')
+    assert len(value) == 16
+    matrix = [
+        [0., 0., 0., 0.],
+        [0., 0., 0., 0.],
+        [0., 0., 0., 0.],
+        [0., 0., 0., 0.],
+    ]
+    for i in range(4):
+        for j in range(4):
+            matrix[i][j] = float(value[i * 4 + j])
+    return 'matrix', matrix
 
 
 def load_value(context: Element):
@@ -34,12 +52,16 @@ def load_value(context: Element):
         return load_bool(context)
     elif context.tag == 'float':
         return load_float(context)
+    elif context.tag == 'rgb':
+        return load_rgb(context)
+    elif context.tag == 'matrix':
+        return load_matrix(context)
     else:
         return None
 
 
 def load_values(context: Element) -> dict:
-    values_tag = {'integer', 'string', 'boolean', 'float'}
+    values_tag = {'integer', 'string', 'boolean', 'float', 'rgb', 'matrix'}
     skip_tag = {'sampler', 'rfilter', 'bsdf'}
 
     values = {}
@@ -50,14 +72,17 @@ def load_values(context: Element) -> dict:
         elif child.tag == 'ref':
             values['ref'] = child.attrib['id']
         elif child.tag == 'transform':
-            # TODO
-            pass
-        elif child.tag == 'matrix':
-            # TODO
-            pass
-        elif child.tag == 'rgb':
-            # TODO
-            pass
+            assert len(list(child)) == 1 and child[0].tag == 'matrix'
+            matrix = load_value(child[0])[1]
+            if matrix == [
+                [1., 0., 0., 0.],
+                [0., 1., 0., 0.],
+                [0., 0., 1., 0.],
+                [0., 0., 0., 1.],
+            ]:
+                values['transform'] = {}
+            else:
+                values['transform'] = {'matrix': matrix}
         elif child.tag == 'emitter':
             values.update(load_emitter(child))
         elif child.tag == 'film':
@@ -95,13 +120,15 @@ def load_material(context: Element) -> dict:
     bsdf_map = {
         'key': {
             'alpha': 'roughness',
+            'int_ior': 'ior',
         },
         'type': {
             'roughconductor': 'rough_conductor',
+            'roughplastic': 'rough_plastic',
             'diffuse': 'lambert',
         },
     }
-    bsdf_remove = ['ext_ior']
+    bsdf_remove = ['ext_ior', 'nonlinear']
     keys = list(material.keys())
     for name_mitsuba2 in keys:
         if name_mitsuba2 in bsdf_remove:
@@ -150,8 +177,27 @@ def load_shape(context: Element) -> dict:
     return shape
 
 
+def load_constant_emitter(context: Element) -> dict:
+    values = load_values(context)
+    emitter = {
+        "transform": {},
+        "emission": values['radiance'],
+        "type": "infinite_sphere",
+        "sample": False
+    }
+    return emitter
+
+
 def load_emitter(context: Element) -> dict:
-    return {}
+    emitter_type = context.attrib['type']
+
+    if emitter_type == 'constant':
+        return load_constant_emitter(context)
+    elif emitter_type == 'area':
+        # TODO
+        return {}
+    else:
+        raise Exception(f'Unknown emitter type "{emitter_type}"')
 
 
 def load_camera(context: Element) -> dict:
@@ -235,8 +281,7 @@ def load_root(context: Element) -> dict:
         elif child.tag == 'shape':
             scene_dict['primitives'].append(load_shape(child))
         elif child.tag == 'emitter':
-            # TODO
-            pass
+            scene_dict['primitives'].append(load_emitter(child))
         else:
             raise Exception(f'Unexpected node "{child.tag}"')
     return scene_dict
