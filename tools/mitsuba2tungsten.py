@@ -116,7 +116,7 @@ def load_transform(context: Element) -> dict:
     if context[0].tag == 'matrix':
         # TODO
         raise Exception('matrix unsupported')
-        
+
         matrix = load_value(context[0])[1]
         if matrix != [
             [1., 0., 0., 0.],
@@ -364,7 +364,7 @@ def load_root(context: Element) -> dict:
     for child in context:
         if child.tag == 'default':
             variables[child.attrib['name']] = child.attrib['value']
-        if child.tag == 'integrator':
+        elif child.tag == 'integrator':
             scene_dict['integrator'] = load_integrator(child)
         elif child.tag == 'sensor':
             scene_dict['camera'] = load_camera(child)
@@ -376,34 +376,42 @@ def load_root(context: Element) -> dict:
             scene_dict['primitives'].append(load_shape(child))
         elif child.tag == 'emitter':
             scene_dict['primitives'].append(load_emitter(child))
+        elif child.tag == 'integer':
+            print(child.attrib)
         else:
             raise Exception(f'Unexpected node "{child.tag}"')
     return scene_dict
 
 
-def load_element(file_name: str) -> Element:
-    assert file_name.endswith(".xml")
-    context = ElementTree(file=file_name).getroot()
-
-    # expand scene
+def expand_node(context: Element):
     index = 0
     while index < len(list(context)):
         child = context[index]
         if child.tag == 'include':
             sub_file_name = child.attrib['filename']
-            context.pop(index)
-            sub_node = load_element(sub_file_name)
+            context.remove(child)
+            _, sub_node = load_element(sub_file_name)
             for sub_node_child in sub_node:
                 context.insert(index, sub_node_child)
                 index += 1
-        index += 1
+        else:
+            print(child.tag)
+            expand_node(context[index])
+            index += 1
 
-    return context
+
+def load_element(file_name: str) -> (ElementTree, Element):
+    assert file_name.endswith(".xml")
+    tree = ElementTree(file=file_name)
+    context = tree.getroot()
+    expand_node(context)
+    return tree, context
 
 
 def mitsuba2json(file_name: str):
     os.chdir(os.path.dirname(os.path.realpath(file_name)))
-    scene_root = load_element(file_name)
+    scene_tree, scene_root = load_element(file_name)
+    scene_tree.write(file_name[:-4] + '_expanded.xml')
 
     with open(f"{file_name[:-4]}.json", "w") as file:
         json.dump(load_root(scene_root), file, indent=4)
