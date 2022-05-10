@@ -8,7 +8,11 @@ variables = {}
 
 
 def get_variable(name: str) -> str:
-    return variables.get(name, name)
+    global variables
+    if name.startswith('$') and name[1:] in variables:
+        return variables[name[1:]]
+    else:
+        return name
 
 
 def load_integer(context: Element) -> (str, int):
@@ -130,8 +134,7 @@ def load_roughplastic(material: dict):
 
     key_remove = ['nonlinear', 'ext_ior']
     for key in key_remove:
-        if key in material:
-            material.pop(key)
+        material.pop(key, None)
 
 
 def load_material(context: Element) -> dict:
@@ -165,38 +168,38 @@ def load_material(context: Element) -> dict:
     return material
 
 
-def load_shape(context: Element) -> dict:
-    shape_map = {
-        'key': {
-            'filename': 'file',
-            'ref': 'bsdf',
-        },
-        'type': {
-            'obj': 'mesh',
-            'rectangle': 'quad',
-        },
-    }
-    key_remove = ['face_normals']
+def load_obj_shape(shape: dict):
+    shape['type'] = 'mesh'
+    shape['smooth'] = False
+    shape['backface_culling'] = False
+    shape['recompute_normals'] = False
+    shape['file'] = shape.pop('filename')
+    shape.pop('face_normals', None)
 
-    shape_type = shape_map['type'][context.attrib['type']]
-    shape = {
-        "transform": {},
-        "type": shape_type,
-        "smooth": False,
-        "backface_culling": False,
-        "recompute_normals": False,
-        "file": "",
-        "bsdf": "",
-    }
+
+def load_rectangle_shape(shape: dict):
+    shape['type'] = 'quad'
+
+
+def load_shape(context: Element) -> dict:
+    shape = {}
     shape.update(load_values(context))
 
-    # wash data
-    keys = list(shape.keys())
-    for name_mitsuba2 in keys:
-        if name_mitsuba2 in key_remove:
-            shape.pop(name_mitsuba2)
-        elif name_mitsuba2 in shape_map['key']:
-            shape[shape_map['key'][name_mitsuba2]] = shape.pop(name_mitsuba2)
+    if context.attrib['type'] == 'obj':
+        load_obj_shape(shape)
+    elif context.attrib['type'] == 'rectangle':
+        load_rectangle_shape(shape)
+    else:
+        raise Exception(f'Unknown shape type "{context.attrib["type"]}"')
+
+    if 'ref' in shape:
+        shape['bsdf'] = shape.pop('ref')
+    elif shape.get('bsdf', None) is None:
+        bsdf = context.find('bsdf')
+        if bsdf is None:
+            raise Exception('primitive lacking bsdf')
+        else:
+            shape['bsdf'] = load_material(bsdf)
 
     return shape
 
@@ -212,14 +215,19 @@ def load_constant_emitter(context: Element) -> dict:
     return emitter
 
 
+def load_area_emitter(context: Element) -> dict:
+    emitter = load_values(context)
+    emitter['emission'] = emitter.pop('radiance')
+    return emitter
+
+
 def load_emitter(context: Element) -> dict:
     emitter_type = context.attrib['type']
 
     if emitter_type == 'constant':
         return load_constant_emitter(context)
     elif emitter_type == 'area':
-        # TODO
-        return {}
+        return load_area_emitter(context)
     else:
         raise Exception(f'Unknown emitter type "{emitter_type}"')
 
@@ -273,7 +281,6 @@ def load_integrator(context: Element) -> dict:
 
 
 def load_root(context: Element) -> dict:
-    global scene_dict
     scene_dict = {
         'media': [],
         'bsdfs': [],
