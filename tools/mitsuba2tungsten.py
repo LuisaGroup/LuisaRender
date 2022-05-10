@@ -39,6 +39,9 @@ def load_rgb(context: Element) -> (str, list):
 
 
 def load_matrix(context: Element) -> (str, list):
+    # TODO
+    raise Exception('matrix unsupported')
+
     value = context.attrib['value'].split(' ')
     assert len(value) == 16
     matrix = [
@@ -70,6 +73,64 @@ def load_value(context: Element):
         return None
 
 
+def load_look_at(context: Element) -> dict:
+    assert len(list(context.attrib)) == 3
+    data = [
+        context.attrib['origin'].split(','),
+        context.attrib['target'].split(','),
+        context.attrib['up'].split(','),
+    ]
+    for i in range(len(data)):
+        for j in range(len(data[i])):
+            data[i][j] = float(data[i][j])
+
+    return {
+        'position': data[0],
+        'look_at': data[1],
+        'up': data[2],
+    }
+
+
+def load_translate(context: Element) -> dict:
+    assert len(list(context.attrib)) == 3
+    return {
+        'position': [
+            float(context.attrib['x']),
+            float(context.attrib['y']),
+            float(context.attrib['z']),
+        ],
+        'scale': 1.,
+        'rotation': [
+            0.,
+            0.,
+            0.,
+        ],
+    }
+
+
+def load_transform(context: Element) -> dict:
+    transform = {}
+    assert len(list(context)) == 1
+
+    if context[0].tag == 'matrix':
+        matrix = load_value(context[0])[1]
+        if matrix != [
+            [1., 0., 0., 0.],
+            [0., 1., 0., 0.],
+            [0., 0., 1., 0.],
+            [0., 0., 0., 1.],
+        ]:
+            transform = {'matrix': matrix}
+    elif context[0].tag == 'lookat':
+        transform = load_look_at(context[0])
+    elif context[0].tag == 'translate':
+        transform = load_translate(context[0])
+    else:
+        raise Exception(f'Unknown transform "{context[0].tag}"')
+
+    return transform
+
+
 def load_values(context: Element) -> dict:
     values_tag = {'integer', 'string', 'boolean', 'float', 'rgb', 'matrix'}
     skip_tag = {'sampler', 'rfilter', 'bsdf'}
@@ -82,17 +143,7 @@ def load_values(context: Element) -> dict:
         elif child.tag == 'ref':
             values['ref'] = child.attrib['id']
         elif child.tag == 'transform':
-            assert len(list(child)) == 1 and child[0].tag == 'matrix'
-            matrix = load_value(child[0])[1]
-            if matrix == [
-                [1., 0., 0., 0.],
-                [0., 1., 0., 0.],
-                [0., 0., 1., 0.],
-                [0., 0., 0., 1.],
-            ]:
-                values['transform'] = {}
-            else:
-                values['transform'] = {'matrix': matrix}
+            values['transfrom'] = load_transform(child)
         elif child.tag == 'emitter':
             values.update(load_emitter(child))
         elif child.tag == 'film':
@@ -242,23 +293,7 @@ def load_camera(context: Element) -> dict:
             film['height']
         ],
         "reconstruction_filter": "tent",
-        "transform": {
-            "position": [
-                -0.5196635723114014,
-                0.8170070052146912,
-                3.824389696121216
-            ],
-            "look_at": [
-                -0.0668703019618988,
-                0.6448959708213806,
-                0.5292789936065674
-            ],
-            "up": [
-                0.0,
-                1.0,
-                0.0
-            ]
-        },
+        "transform": load_transform(context.find('transform')),
         "type": "pinhole",
         "fov": values['fov']
     }
