@@ -5,6 +5,9 @@ import glm
 from xml.etree.ElementTree import *
 
 variables = {}
+scene_dict = {}
+bsdf_name = set()
+bsdf_index = 0
 
 
 def get_variable(name: str) -> str:
@@ -39,8 +42,8 @@ def load_rgb(context: Element) -> (str, list):
 
 
 def load_matrix(context: Element) -> (str, list):
-    # TODO
-    raise Exception('matrix unsupported')
+    # # TODO
+    # raise Exception('matrix unsupported')
 
     value = context.attrib['value'].split(' ')
     assert len(value) == 16
@@ -244,13 +247,30 @@ def load_shape(context: Element) -> dict:
         raise Exception(f'Unknown shape type "{context.attrib["type"]}"')
 
     if 'ref' in shape:
+        # ref bsdf
         shape['bsdf'] = shape.pop('ref')
     elif shape.get('bsdf', None) is None:
-        bsdf = context.find('bsdf')
-        if bsdf is None:
+        material_node = context.find('bsdf')
+        if material_node is None:
             raise Exception('primitive lacking bsdf')
         else:
-            shape['bsdf'] = load_material(bsdf)
+            # bsdf inline
+            material = load_material(material_node)
+
+            # no name, create one
+            if material.get('name', None) is None:
+                # no name
+                global bsdf_name, bsdf_index
+                name = f'mat_{bsdf_index}'
+                while name in bsdf_name:
+                    bsdf_index += 1
+                    name = f'mat_{bsdf_index}'
+                material['name'] = name
+                bsdf_name.add(name)
+
+            global scene_dict
+            scene_dict['bsdfs'].append(material)
+            shape['bsdf'] = material['name']
 
     return shape
 
@@ -316,6 +336,9 @@ def load_integrator(context: Element) -> dict:
 
 
 def load_root(context: Element) -> dict:
+    global scene_dict, bsdf_name, bsdf_index
+    bsdf_name = set()
+    bsdf_index = 0
     scene_dict = {
         'media': [],
         'bsdfs': [],
@@ -345,7 +368,9 @@ def load_root(context: Element) -> dict:
         elif child.tag == 'sensor':
             scene_dict['camera'] = load_camera(child)
         elif child.tag == 'bsdf':
-            scene_dict['bsdfs'].append(load_material(child))
+            material = load_material(child)
+            bsdf_name.add(material['name'])
+            scene_dict['bsdfs'].append(material)
         elif child.tag == 'shape':
             scene_dict['primitives'].append(load_shape(child))
         elif child.tag == 'emitter':
