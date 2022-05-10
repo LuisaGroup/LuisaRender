@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 from sys import argv
 import glm
@@ -42,9 +43,6 @@ def load_rgb(context: Element) -> (str, list):
 
 
 def load_matrix(context: Element) -> (str, list):
-    # # TODO
-    # raise Exception('matrix unsupported')
-
     value = context.attrib['value'].split(' ')
     assert len(value) == 16
     matrix = [
@@ -116,6 +114,9 @@ def load_transform(context: Element) -> dict:
     assert len(list(context)) == 1
 
     if context[0].tag == 'matrix':
+        # TODO
+        raise Exception('matrix unsupported')
+        
         matrix = load_value(context[0])[1]
         if matrix != [
             [1., 0., 0., 0.],
@@ -380,10 +381,29 @@ def load_root(context: Element) -> dict:
     return scene_dict
 
 
-def mitsuba2json(file_name: str):
+def load_element(file_name: str) -> Element:
     assert file_name.endswith(".xml")
-    scene_tree = ElementTree(file=file_name)
-    scene_root = scene_tree.getroot()
+    context = ElementTree(file=file_name).getroot()
+
+    # expand scene
+    index = 0
+    while index < len(list(context)):
+        child = context[index]
+        if child.tag == 'include':
+            sub_file_name = child.attrib['filename']
+            context.pop(index)
+            sub_node = load_element(sub_file_name)
+            for sub_node_child in sub_node:
+                context.insert(index, sub_node_child)
+                index += 1
+        index += 1
+
+    return context
+
+
+def mitsuba2json(file_name: str):
+    os.chdir(os.path.dirname(os.path.realpath(file_name)))
+    scene_root = load_element(file_name)
 
     with open(f"{file_name[:-4]}.json", "w") as file:
         json.dump(load_root(scene_root), file, indent=4)
