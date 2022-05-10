@@ -4,21 +4,27 @@ from sys import argv
 import glm
 from xml.etree.ElementTree import *
 
+variables = {}
+
+
+def get_variable(name: str) -> str:
+    return variables.get(name, name)
+
 
 def load_integer(context: Element) -> (str, int):
-    return context.attrib['name'], int(context.attrib['value'])
+    return context.attrib['name'], int(get_variable(context.attrib['value']))
 
 
 def load_string(context: Element) -> (str, str):
-    return context.attrib['name'], context.attrib['value']
+    return context.attrib['name'], get_variable(context.attrib['value'])
 
 
 def load_bool(context: Element) -> (str, bool):
-    return context.attrib['name'], context.attrib['value'].lower() == 'true'
+    return context.attrib['name'], get_variable(context.attrib['value']).lower() == 'true'
 
 
 def load_float(context: Element) -> (str, float):
-    return context.attrib['name'], float(context.attrib['value'])
+    return context.attrib['name'], float(get_variable(context.attrib['value']))
 
 
 def load_rgb(context: Element) -> (str, list):
@@ -95,48 +101,66 @@ def load_values(context: Element) -> dict:
     return values
 
 
-def load_sub_material(context: Element) -> dict:
-    material = load_values(context)
+def load_diffuse(material: dict):
+    material['type'] = 'lambert'
+    material['albedo'] = material.pop('reflectance')
 
-    if context.attrib['type'] != 'twosided':
-        material['type'] = context.attrib['type']
 
-    return material
+def load_roughconductor(material: dict):
+    material['type'] = 'rough_conductor'
+    material['albedo'] = material.pop('specular_reflectance')
+    material['roughness'] = material.pop('alpha')
+
+
+def load_roughdielectric(material: dict):
+    material['type'] = 'rough_dielectric'
+    material['albedo'] = 1.0
+    material['roughness'] = material.pop('alpha')
+    material['ior'] = material.pop('int_ior')
+    material['enable_refraction'] = True
+
+
+def load_roughplastic(material: dict):
+    material['type'] = 'rough_plastic'
+    material['albedo'] = material.pop('diffuse_reflectance')
+    material['roughness'] = material.pop('alpha')
+    material['ior'] = material.pop('int_ior')
+    material['thickness'] = 1.0
+    material['sigma_a'] = 0.0
+
+    key_remove = ['nonlinear', 'ext_ior']
+    for key in key_remove:
+        if key in material:
+            material.pop(key)
 
 
 def load_material(context: Element) -> dict:
-    material = {'name': context.attrib['id']}
+    material = {}
+    if 'id' in context.attrib:
+        material['name'] = context.attrib['id']
 
     if context.attrib['type'] != 'twosided':
         material['type'] = context.attrib['type']
 
-    material.update(load_sub_material(context))
+    material.update(load_values(context))
 
-    if context[0].tag == 'bsdf':
-        assert len(list(context)) <= 1
-        material.update(load_sub_material(context[0]))
+    if len(list(context)) > 0:
+        child = context.find('bsdf')
+        if not child is None:
+            material.update(load_values(child))
+            if child.attrib['type'] != 'twosided':
+                material['type'] = child.attrib['type']
 
-    # wash data
-    bsdf_map = {
-        'key': {
-            'alpha': 'roughness',
-            'int_ior': 'ior',
-        },
-        'type': {
-            'roughconductor': 'rough_conductor',
-            'roughplastic': 'rough_plastic',
-            'diffuse': 'lambert',
-        },
-    }
-    bsdf_remove = ['ext_ior', 'nonlinear']
-    keys = list(material.keys())
-    for name_mitsuba2 in keys:
-        if name_mitsuba2 in bsdf_remove:
-            material.pop(name_mitsuba2)
-        elif name_mitsuba2 in bsdf_map['key']:
-            material[bsdf_map['key'][name_mitsuba2]] = material.pop(name_mitsuba2)
-    if 'type' in material and material['type'] in bsdf_map['type']:
-        material['type'] = bsdf_map['type'][material['type']]
+    if material['type'] == 'diffuse':
+        load_diffuse(material)
+    elif material['type'] == 'roughconductor':
+        load_roughconductor(material)
+    elif material['type'] == 'roughdielectric':
+        load_roughdielectric(material)
+    elif material['type'] == 'roughplastic':
+        load_roughplastic(material)
+    else:
+        raise Exception(f'Unknown material "{material["type"]}"')
 
     return material
 
@@ -152,7 +176,7 @@ def load_shape(context: Element) -> dict:
             'rectangle': 'quad',
         },
     }
-    shape_remove = ['face_normals']
+    key_remove = ['face_normals']
 
     shape_type = shape_map['type'][context.attrib['type']]
     shape = {
@@ -169,7 +193,7 @@ def load_shape(context: Element) -> dict:
     # wash data
     keys = list(shape.keys())
     for name_mitsuba2 in keys:
-        if name_mitsuba2 in shape_remove:
+        if name_mitsuba2 in key_remove:
             shape.pop(name_mitsuba2)
         elif name_mitsuba2 in shape_map['key']:
             shape[shape_map['key'][name_mitsuba2]] = shape.pop(name_mitsuba2)
@@ -249,6 +273,7 @@ def load_integrator(context: Element) -> dict:
 
 
 def load_root(context: Element) -> dict:
+    global scene_dict
     scene_dict = {
         'media': [],
         'bsdfs': [],
@@ -271,7 +296,8 @@ def load_root(context: Element) -> dict:
         }
     }
     for child in context:
-        print(child.tag, child.attrib)
+        if child.tag == 'default':
+            variables[child.attrib['name']] = child.attrib['value']
         if child.tag == 'integrator':
             scene_dict['integrator'] = load_integrator(child)
         elif child.tag == 'sensor':
