@@ -5,40 +5,58 @@ from sys import argv
 import glm
 from xml.etree.ElementTree import *
 
-variables = {}
 scene_dict = {}
-bsdf_name = set()
+ref_dict = {}
 bsdf_index = 0
 
 
-def get_variable(name: str) -> str:
-    global variables
-    if name.startswith('$') and name[1:] in variables:
-        return variables[name[1:]]
-    else:
-        return name
+def set_ref(context: Element, dict_node: dict):
+    global ref_dict
+    if 'id' in context.attrib:
+        ref_dict[context.attrib['id']] = dict_node
+
+
+def get_ref(name: str) -> str:
+    global ref_dict
+    name = name.strip(' ')
+    if name.startswith('$'):
+        name = name[1:]
+    return ref_dict.get(name, name)
 
 
 def load_integer(context: Element) -> (str, int):
-    return context.attrib['name'], int(get_variable(context.attrib['value']))
+    return context.attrib['name'], int(get_ref(context.attrib['value']))
 
 
 def load_string(context: Element) -> (str, str):
-    return context.attrib['name'], get_variable(context.attrib['value'])
+    return context.attrib['name'], get_ref(context.attrib['value'])
 
 
 def load_bool(context: Element) -> (str, bool):
-    return context.attrib['name'], get_variable(context.attrib['value']).lower() == 'true'
+    return context.attrib['name'], get_ref(context.attrib['value']).lower() == 'true'
 
 
 def load_float(context: Element) -> (str, float):
-    return context.attrib['name'], float(get_variable(context.attrib['value']))
+    return context.attrib['name'], float(get_ref(context.attrib['value']))
 
 
 def load_rgb(context: Element) -> (str, list):
     numbers = context.attrib['value'].split(',')
+    assert len(numbers) == 3
+    values = load_values(context)
+    scale = values.get('scale', 1.0)
     for i in range(len(numbers)):
-        numbers[i] = float(numbers[i])
+        numbers[i] = float(get_ref(numbers[i])) * scale
+    return context.attrib['name'], numbers
+
+
+def load_spectrum(context: Element) -> (str, list):
+    numbers = context.attrib['value'].split(',')
+    assert len(numbers) == 1
+    values = load_values(context)
+    scale = values.get('scale', 1.0)
+    for i in range(len(numbers)):
+        numbers[i] = float(get_ref(numbers[i])) * scale
     return context.attrib['name'], numbers
 
 
@@ -53,7 +71,7 @@ def load_matrix(context: Element) -> (str, list):
     ]
     for i in range(4):
         for j in range(4):
-            matrix[i][j] = float(value[i * 4 + j])
+            matrix[i][j] = float(get_ref(value[i * 4 + j]))
     return 'matrix', matrix
 
 
@@ -68,6 +86,8 @@ def load_value(context: Element):
         return load_float(context)
     elif context.tag == 'rgb':
         return load_rgb(context)
+    elif context.tag == 'spectrum':
+        return load_spectrum(context)
     elif context.tag == 'matrix':
         return load_matrix(context)
     else:
@@ -81,9 +101,11 @@ def load_look_at(context: Element) -> dict:
         context.attrib['target'].split(','),
         context.attrib['up'].split(','),
     ]
+    global ref_dict
+    print(ref_dict)
     for i in range(len(data)):
         for j in range(len(data[i])):
-            data[i][j] = float(data[i][j])
+            data[i][j] = float(get_ref(data[i][j]))
 
     return {
         'position': data[0],
@@ -96,9 +118,9 @@ def load_translate(context: Element) -> dict:
     assert len(list(context.attrib)) == 3
     return {
         'position': [
-            float(context.attrib['x']),
-            float(context.attrib['y']),
-            float(context.attrib['z']),
+            float(get_ref(context.attrib['x'])),
+            float(get_ref(context.attrib['y'])),
+            float(get_ref(context.attrib['z'])),
         ],
         'scale': 1.,
         'rotation': [
@@ -136,7 +158,8 @@ def load_transform(context: Element) -> dict:
 
 
 def load_values(context: Element) -> dict:
-    values_tag = {'integer', 'string', 'boolean', 'float', 'rgb', 'matrix'}
+    global ref_dict
+    values_tag = {'integer', 'string', 'boolean', 'float', 'rgb', 'matrix', 'spectrum'}
     skip_tag = {'sampler', 'rfilter', 'bsdf'}
 
     values = {}
@@ -152,6 +175,8 @@ def load_values(context: Element) -> dict:
             values.update(load_emitter(child))
         elif child.tag == 'film':
             values['film'] = load_values(child)
+            if 'id' in child.attrib:
+                ref_dict[child.attrib['id']] = values['film']
         elif child.tag in skip_tag:
             pass
         else:
@@ -305,8 +330,19 @@ def load_emitter(context: Element) -> dict:
 
 
 def load_camera(context: Element) -> dict:
+    global ref_dict
     values = load_values(context)
-    film = values['film']
+
+    film = values.get('film', None)
+    for iter in context.findall('ref'):
+        name = iter.attrib['id']
+        ref_dict_node = ref_dict.get(name, None)
+        if (not ref_dict_node is None) and 'width' in ref_dict_node:
+            film = ref_dict_node
+            break
+    if film is None:
+        raise Exception('No film in camera')
+
     camera = {
         "tonemap": "filmic",
         "resolution": [
@@ -337,8 +373,8 @@ def load_integrator(context: Element) -> dict:
 
 
 def load_root(context: Element) -> dict:
-    global scene_dict, bsdf_name, bsdf_index
-    bsdf_name = set()
+    global scene_dict, ref_dict, bsdf_index
+    ref_dict = {}
     bsdf_index = 0
     scene_dict = {
         'media': [],
@@ -363,21 +399,26 @@ def load_root(context: Element) -> dict:
     }
     for child in context:
         if child.tag == 'default':
-            variables[child.attrib['name']] = child.attrib['value']
+            name = child.attrib['name']
+            ref_dict[name] = child.attrib['value']
         elif child.tag == 'integrator':
             scene_dict['integrator'] = load_integrator(child)
         elif child.tag == 'sensor':
             scene_dict['camera'] = load_camera(child)
         elif child.tag == 'bsdf':
             material = load_material(child)
-            bsdf_name.add(material['name'])
+            ref_dict[material['name']] = material
             scene_dict['bsdfs'].append(material)
         elif child.tag == 'shape':
             scene_dict['primitives'].append(load_shape(child))
         elif child.tag == 'emitter':
             scene_dict['primitives'].append(load_emitter(child))
         elif child.tag == 'integer':
-            print(child.attrib)
+            pass
+        elif child.tag == 'film':
+            ref_dict[child.attrib['id']] = load_values(child)
+        elif child.tag == 'sampler':
+            pass
         else:
             raise Exception(f'Unexpected node "{child.tag}"')
     return scene_dict
