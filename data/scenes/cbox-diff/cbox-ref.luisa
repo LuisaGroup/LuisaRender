@@ -1,0 +1,227 @@
+Surface cbox-white : Matte {
+  Kd : Constant {
+    v { 0.725, 0.71, 0.68 }
+    semantic { "albedo" }
+  }
+  roughness : Constant {
+    v { 1 }
+  }
+}
+
+Surface cbox-green : Matte {
+  Kd : Constant {
+    v { 0.14, 0.45, 0.091 }
+    semantic { "albedo" }
+  }
+  roughness : Constant {
+    v { 1 }
+  }
+}
+
+Surface cbox-red : Matte {
+  Kd : Constant {
+    v { 0.63, 0.065, 0.05 }
+    semantic { "albedo" }
+  }
+  roughness : Constant {
+    v { 1 }
+  }
+}
+
+
+Shape cbox-ceiling : Mesh {
+  file { "../../meshes/cbox-parts/ceiling.obj" }
+  surface { @cbox-white }
+}
+
+Shape cbox-floor : Mesh {
+  file { "../../meshes/cbox-parts/floor.obj" }
+  surface { @cbox-white }
+}
+
+Shape cbox-left-wall : Mesh {
+  file { "../../meshes/cbox-parts/left-wall.obj" }
+  surface { @cbox-red }
+}
+
+Shape cbox-right-wall : Mesh {
+  file { "../../meshes/cbox-parts/right-wall.obj" }
+  surface { @cbox-green }
+}
+
+Shape cbox-back-wall : Mesh {
+  file { "../../meshes/cbox-parts/back-wall.obj" }
+  surface { @cbox-white }
+}
+
+Shape cbox-tall-box : Mesh {
+  file { "../../meshes/cbox-parts/tall-box.obj" }
+  surface { @cbox-white }
+}
+
+Shape cbox-short-box : Mesh {
+  file { "../../meshes/cbox-parts/short-box.obj" }
+  surface { @cbox-white }
+}
+
+// dragon
+Shape dragon-000 : Mesh {
+  file { "../../meshes/dragon/Mesh000.obj" }
+  surface { @cbox-red }
+}
+Shape dragon-001 : Mesh {
+  file { "../../meshes/dragon/Mesh001.obj" }
+  surface { @cbox-red }
+}
+Shape dragon-002 : Mesh {
+  file { "../../meshes/dragon/Mesh002.obj" }
+  surface { @cbox-red }
+}
+Shape dragon-003 : Mesh {
+  file { "../../meshes/dragon/Mesh003.obj" }
+  surface { @cbox-red }
+}
+Shape dragon-004 : Mesh {
+  file { "../../meshes/dragon/Mesh004.obj" }
+  surface { @cbox-red }
+}
+Shape dragon-005 : Mesh {
+  file { "../../meshes/dragon/Mesh005.obj" }
+  surface { @cbox-red }
+}
+Shape dragon-006 : Mesh {
+  file { "../../meshes/dragon/Mesh006.obj" }
+  surface { @cbox-red }
+}
+Shape dragon-007 : Mesh {
+  file { "../../meshes/dragon/Mesh007.obj" }
+  surface { @cbox-red }
+}
+Shape dragon-008 : Mesh {
+  file { "../../meshes/dragon/Mesh008.obj" }
+  surface { @cbox-red }
+}
+Shape dragon-009 : Mesh {
+  file { "../../meshes/dragon/Mesh009.obj" }
+  surface { @cbox-red }
+}
+Shape dragon-010 : Mesh {
+  file { "../../meshes/dragon/Mesh010.obj" }
+  surface { @cbox-red }
+}
+Shape dragon-011 : Mesh {
+  file { "../../meshes/dragon/Mesh011.obj" }
+  surface { @cbox-red }
+}
+Shape dragon-012 : Mesh {
+  file { "../../meshes/dragon/Mesh012.obj" }
+  surface { @cbox-red }
+}
+Shape dragon-013 : Mesh {
+  file { "../../meshes/dragon/Mesh013.obj" }
+  surface { @cbox-red }
+}
+Shape dragon-014 : Mesh {
+  file { "../../meshes/dragon/Mesh014.obj" }
+  surface { @cbox-red }
+}
+Shape dragon-015 : Mesh {
+  file { "../../meshes/dragon/Mesh015.obj" }
+  surface { @cbox-red }
+}
+
+
+Shape cbox-light : Mesh {
+  file { "../../meshes/cbox-parts/light.obj" }
+  light : Diffuse {
+    emission : Constant {
+      v { 51.0, 36.0, 12.0 }
+    semantic { "illuminant" }
+    }
+  }
+}
+
+
+Shape cbox : Group {
+  shapes {
+    @cbox-floor,
+    @cbox-ceiling,
+    @cbox-left-wall,
+    @cbox-right-wall,
+    @cbox-back-wall,
+    @cbox-light
+  }
+}
+
+Shape dragon : Group {
+  shapes {
+    @dragon-000,
+    @dragon-001,
+    @dragon-002,
+    @dragon-003,
+    @dragon-004,
+    @dragon-005,
+    @dragon-006,
+    @dragon-007,
+    @dragon-008,
+    @dragon-009,
+    @dragon-010,
+    @dragon-011,
+    @dragon-012,
+    @dragon-013,
+    @dragon-014,
+    @dragon-015
+  }
+  transform : SRT {
+    translate { 0, 0.08192, 0.3 }
+    scale { 0.05 }
+    rotate { 0, 1, 0, -35 }
+  }
+}
+
+Film film : Color {
+  resolution { 1024 }
+  exposure { 0 }
+}
+
+Camera camera0 : Pinhole {
+  position { -0.01, 0.995, 5.0 }
+  fov { 27.8 }
+  spp { 32 }
+  film { @film }
+  file { "../../renders/cbox-ref-32-0.exr" }
+  filter : Gaussian {
+    radius { 1 }
+  }
+}
+
+Camera camera1 : Pinhole {
+  position { 1, 1.6, 2.0 }
+  front { -0.4, -0.2, -1 }
+  fov { 40 }
+  spp { 32 }
+  film { @film }
+  file { "../../renders/cbox-ref-32-1.exr" }
+  filter : Gaussian {
+    radius { 1 }
+  }
+}
+
+Integrator pt : MegaPath {
+  sampler : Independent {}
+  depth { 10 }
+  rr_depth { 5 }
+}
+
+render {
+  spectrum : sRGB {}
+  cameras {
+    @camera0
+    // @camera1
+  }
+  shapes {
+    @cbox,
+    @dragon
+  }
+  integrator { @pt }
+}
