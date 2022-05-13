@@ -377,7 +377,7 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
     }
 
     command_buffer << commit() << synchronize();
-    LUISA_INFO("Backward propagation finished in {} ms.",
+    LUISA_INFO("Backward propagation finished in {} ms",
                clock.toc());
 }
 
@@ -541,7 +541,7 @@ void MegakernelRadiativeDiffInstance::_render_one_camera(
         }
     }
     command_buffer << synchronize();
-    LUISA_INFO("Rendering finished in {} ms.",
+    LUISA_INFO("Rendering finished in {} ms",
                clock.toc());
     if (display) { pt->display(command_buffer, camera->film(), iteration); }
 }

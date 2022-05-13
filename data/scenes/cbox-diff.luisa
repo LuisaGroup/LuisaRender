@@ -1,49 +1,10 @@
-Film film : Color {
-  resolution { 1024 }
-  exposure { 0 }
-  clamp { 128 }
-}
-
-
-Surface cbox-gray : Matte {
-  Kd : Placeholder {
-    resolution { 4096 }
-    requires_grad { true }
-    range { 0, 1 }
-    uv_scale { 1, -1 }
-  }
-}
-
-Surface mat-wood : Substrate {
-  //Kd : Image {
-  //  file { "living-room/textures/wood.jpg" }
-  //}
-  Kd : Placeholder {
-    resolution { 1024 }
-    requires_grad { true }
-    range { 0, 1 }
-    uv_scale { 1, -1 }
-  }
-  Ks : Constant {
-    v { 0.2, 0.2, 0.2 }
-    //v { 0, 0.9, 0.56 }
-    //requires_grad { true }
-    range { 0, 1 }
-  }
-  eta : Constant {
-    v { 1.5 }
-  }
-  roughness : Constant {
-     v { 0.3872983346207417 }
-    //v { 0.9 }
-    //requires_grad { true }
-    range { 0.1, 0.9 }
-  }
-}
-
 Surface cbox-white : Matte {
   Kd : Constant {
-    v { 0.725, 0.71, 0.68 }
+    semantic { "albedo" }
+    //v { 0.725, 0.71, 0.68 }
+    v { 0.5, 0.5, 0.5 }
+    requires_grad { true }
+    range { 0, 1 }
   }
   roughness : Constant {
     v { 1 }
@@ -52,16 +13,12 @@ Surface cbox-white : Matte {
 
 Surface cbox-red : Matte {
   Kd : Constant {
-    v { 0.63, 0.065, 0.05 }
-    //v { 0.14, 0.45, 0.091 }
-    //requires_grad { true }
+    semantic { "albedo" }
+    //v { 0.63, 0.065, 0.05 }
+    v { 0.5, 0.5, 0.5 }
+    requires_grad { true }
     range { 0, 1 }
   }
-  //sigma : Constant {
-  //  v { 45 }
-  //  requires_grad { true }
-  //  range { 0, 90 }
-  //}
   roughness : Constant {
     v { 1 }
   }
@@ -69,113 +26,17 @@ Surface cbox-red : Matte {
 
 Surface cbox-green : Matte {
   Kd : Constant {
-    v { 0.14, 0.45, 0.091 }
-    //v { 0.63, 0.065, 0.05 }
-    //requires_grad { true }
+    semantic { "albedo" }
+    //v { 0.14, 0.45, 0.091 }
+    v { 0.5, 0.5, 0.5 }
+    requires_grad { true }
     range { 0, 1 }
   }
-  //sigma : Constant {
-  //  v { 45 }
-  //  requires_grad { true }
-  //  range { 0, 90 }
-  //}
   roughness : Constant {
     v { 1 }
   }
 }
 
-Surface surface-mix : Mix {
-  a {
-    //Matte  {
-    //  Kd : Constant {
-    //    v { 0.3, 0.8, 0.14 }
-    //    requires_grad { true }
-    //    range { 0, 1 }
-    //  }
-    //}
-    @cbox-red
-  }
-  b {
-    //Matte  {
-    //  Kd : Constant {
-    //    v { 0.3, 0.8, 0.14 }
-    //    requires_grad { true }
-    //    range { 0, 1 }
-    //  }
-    //}
-    @cbox-green
-  }
-  ratio : Constant {
-    v { 0.7 }
-    //v { 0.2 }
-    //requires_grad { true }
-    range { 0, 1 }
-  }
-}
-
-Surface surface-mirror : Mirror {
-  color : Constant {
-    //v { 0.14, 0.45, 0.091 }
-    v { 1, 1, 1 }
-    //v { 0.9, 0.25, 0.013 }
-    //requires_grad { true }
-    range { 0, 1 }
-  }
-  roughness : Constant {
-    v { 0 }
-    //v { 0.4 }
-    //requires_grad { true }
-    range { 0, 1 }
-  }
-}
-
-Surface surface-plastic : Plastic {
-  Kd : Constant {
-    v { 0.9, 0.25, 0.013 }
-    //v { 0.14, 0.45, 0.091 }
-    //requires_grad { true }
-    range { 0, 1 }
-  }
-  Ks : Constant {
-    v { 0.14, 0.45, 0.091 }
-    //v { 0.9, 0.25, 0.013 }
-    //requires_grad { true }
-    range { 0, 1 }
-  }
-  eta : Constant {
-    v { 1.5 }
-  }
-  roughness : Constant {
-    v { 0.3 }
-    //v { 0.45 }
-    //requires_grad { true }
-    range { 0.0001, 1 }
-  }
-}
-
-Surface surface-glass : Glass {
-  Kr : Constant {
-    v { 0.2, 0.8, 0.2 }
-    //v { 0.8, 0.2, 0.2 }
-    //requires_grad { true }
-    range { 0, 1 }
-  }
-  Kt : Constant {
-    v { 0.8, 0.2, 0.2 }
-    //v { 0.2, 0.8, 0.2 }
-    //requires_grad { true }
-    range { 0, 1 }
-  }
-  eta : Constant {
-    v { 1.5 }
-  }
-  roughness : Constant {
-    v { 0.6 }
-    //v { 0.6 }
-    //requires_grad { true }
-    range { 0.001, 1 }
-  }
-}
 
 Shape cbox-ceiling : Mesh {
   file { "../meshes/cbox-parts/ceiling.obj" }
@@ -199,17 +60,17 @@ Shape cbox-right-wall : Mesh {
 
 Shape cbox-back-wall : Mesh {
   file { "../meshes/cbox-parts/back-wall.obj" }
-  surface { @mat-wood }
+  surface { @cbox-white }
 }
 
 Shape cbox-tall-box : Mesh {
   file { "../meshes/cbox-parts/tall-box.obj" }
-  surface { @surface-glass }
+  surface { @cbox-white }
 }
 
 Shape cbox-short-box : Mesh {
   file { "../meshes/cbox-parts/short-box.obj" }
-  surface { @surface-plastic }
+  surface { @cbox-white }
 }
 
 Shape cbox-light : Mesh {
@@ -217,6 +78,7 @@ Shape cbox-light : Mesh {
   light : Diffuse {
     emission : Constant {
       v { 51.0, 36.0, 12.0 }
+      semantic { "illuminant" }
     }
   }
 }
@@ -234,17 +96,22 @@ Shape cbox : Group {
   }
 }
 
+Film film : Color {
+  resolution { 256 }
+  exposure { 0 }
+}
+
 Camera camera0 : Pinhole {
   position { -0.01, 0.995, 5.0 }
   fov { 27.8 }
-  spp { 512 }
+  spp { 32 }
   film { @film }
-  file { "../renders/cbox-glass-diff-0.exr" }
+  file { "../renders/cbox-diff-0.exr" }
   filter : Gaussian {
     radius { 1 }
   }
   target : Image {
-    file { "../renders/cbox-glass-ref-4096spp-0.exr" }
+    file { "../renders/cbox-ref-32-0.exr" }
   }
 }
 
@@ -254,12 +121,12 @@ Camera camera1 : Pinhole {
   fov { 40 }
   spp { 512 }
   film { @film }
-  file { "../renders/cbox-glass-diff-1.exr" }
+  file { "../renders/cbox-diff-1.exr" }
   filter : Gaussian {
     radius { 1 }
   }
   target : Image {
-    file { "../renders/cbox-glass-ref-4096spp-1.exr" }
+    file { "../renders/cbox-ref-32-1.exr" }
   }
 }
 
@@ -267,8 +134,9 @@ Integrator pt : MegaRadiativeDiff {
 //Integrator pt : MegaReplayDiff {
   sampler : Independent {}
   depth { 10 }
-  spectrum : sRGB {}
-  display_camera_index { 0 }
+  rr_depth { 5 }
+
+  //display_camera_index { 0 }
   save_process { true }
   loss : L2 {}
   learning_rate { 0.1 }
@@ -276,9 +144,10 @@ Integrator pt : MegaRadiativeDiff {
 }
 
 render {
+  spectrum : sRGB {}
   cameras {
-    @camera0,
-    @camera1
+    @camera0
+    // @camera1
   }
   shapes { @cbox }
   integrator { @pt }

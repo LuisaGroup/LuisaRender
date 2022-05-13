@@ -1,6 +1,7 @@
 Surface cbox-white : Matte {
   Kd : Constant {
     v { 0.725, 0.71, 0.68 }
+    semantic { "albedo" }
   }
   roughness : Constant {
     v { 1 }
@@ -10,6 +11,7 @@ Surface cbox-white : Matte {
 Surface cbox-green : Matte {
   Kd : Constant {
     v { 0.14, 0.45, 0.091 }
+    semantic { "albedo" }
   }
   roughness : Constant {
     v { 1 }
@@ -19,96 +21,13 @@ Surface cbox-green : Matte {
 Surface cbox-red : Matte {
   Kd : Constant {
     v { 0.63, 0.065, 0.05 }
+    semantic { "albedo" }
   }
   roughness : Constant {
     v { 1 }
   }
 }
 
-Surface mat-wood : Substrate {
-  Kd : Image {
-    file { "living-room/textures/wood.jpg" }
-  }
-  Ks : Constant {
-    v { 0.2, 0.2, 0.2 }
-  }
-  eta : Constant {
-    v { 1.5 }
-  }
-  roughness : Constant {
-    v { 0.3872983346207417 }
-  }
-}
-
-Surface cbox-brick : Matte {
-  Kd : Color {
-    file { "../textures/brickwall.jpg" }
-    gamma { 0.5 }
-    encoding { "gamma" }
-  }
-  sigma : Constant {
-    v { 10 }
-  }
-  normal : Image {
-    file { "../textures/brickwall_normal.jpg" }
-    encoding { "linear" }
-  }
-}
-
-Surface cbox-metal : Metal {
-  eta { "Au" }
-  roughness : Constant {
-    v { 0.2 }
-  }
-}
-
-Surface surface-mix : Mix {
-  a { @cbox-red }
-  b { @cbox-green }
-  ratio : Constant {
-    v { 0.7 }
-  }
-}
-
-Surface surface-mirror : Mirror {
-  color : Constant {
-    //v { 0.14, 0.45, 0.091 }
-    v { 1, 1, 1 }
-  }
-  roughness : Constant {
-    v { 0.001 }
-  }
-}
-
-Surface surface-plastic : Plastic {
-  Kd : Constant {
-    v { 0.9, 0.25, 0.013 }
-  }
-  Ks : Constant {
-    v { 0.14, 0.45, 0.091 }
-  }
-  eta : Constant {
-    v { 1.5 }
-  }
-  roughness : Constant {
-    v { 0.3 }
-  }
-}
-
-Surface surface-glass : Glass {
-  Kr : Constant {
-    v { 0.2, 0.8, 0.2 }
-  }
-  Kt : Constant {
-    v { 0.8, 0.2, 0.2 }
-  }
-  eta : Constant {
-    v { 1.5 }
-  }
-  roughness : Constant {
-    v { 0.6 }
-  }
-}
 
 Shape cbox-ceiling : Mesh {
   file { "../meshes/cbox-parts/ceiling.obj" }
@@ -132,17 +51,17 @@ Shape cbox-right-wall : Mesh {
 
 Shape cbox-back-wall : Mesh {
   file { "../meshes/cbox-parts/back-wall.obj" }
-  surface { @mat-wood }
+  surface { @cbox-white }
 }
 
 Shape cbox-tall-box : Mesh {
   file { "../meshes/cbox-parts/tall-box.obj" }
-  surface { @surface-glass }
+  surface { @cbox-white }
 }
 
 Shape cbox-short-box : Mesh {
   file { "../meshes/cbox-parts/short-box.obj" }
-  surface { @surface-plastic }
+  surface { @cbox-white }
 }
 
 Shape cbox-light : Mesh {
@@ -150,6 +69,7 @@ Shape cbox-light : Mesh {
   light : Diffuse {
     emission : Constant {
       v { 51.0, 36.0, 12.0 }
+    semantic { "illuminant" }
     }
   }
 }
@@ -175,9 +95,9 @@ Film film : Color {
 Camera camera0 : Pinhole {
   position { -0.01, 0.995, 5.0 }
   fov { 27.8 }
-  spp { 4096 }
+  spp { 32 }
   film { @film }
-  file { "../renders/cbox-glass-ref-4096spp-0.exr" }
+  file { "../renders/cbox-ref-32-0.exr" }
   filter : Gaussian {
     radius { 1 }
   }
@@ -187,9 +107,9 @@ Camera camera1 : Pinhole {
   position { 1, 1.6, 2.0 }
   front { -0.4, -0.2, -1 }
   fov { 40 }
-  spp { 4096 }
+  spp { 32 }
   film { @film }
-  file { "../renders/cbox-glass-ref-4096spp-1.exr" }
+  file { "../renders/cbox-ref-32-1.exr" }
   filter : Gaussian {
     radius { 1 }
   }
@@ -198,14 +118,14 @@ Camera camera1 : Pinhole {
 Integrator pt : MegaPath {
   sampler : Independent {}
   depth { 10 }
-  spectrum : sRGB {}
-  // display { true }
+  rr_depth { 5 }
 }
 
 render {
+  spectrum : sRGB {}
   cameras {
-    @camera0,
-    @camera1
+    @camera0
+    // @camera1
   }
   shapes { @cbox }
   integrator { @pt }
