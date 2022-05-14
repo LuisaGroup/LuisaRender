@@ -1,21 +1,27 @@
 // mat_cbox
 Surface cbox-white : Matte {
   Kd : Constant {
-    v { 0.725, 0.71, 0.68 }
+    v { 0.5, 0.5, 0.5 }
+    requires_grad { true }
+    range { 0.00001, 0.99999 }
     semantic { "albedo" }
   }
 }
 
 Surface cbox-green : Matte {
   Kd : Constant {
-    v { 0.14, 0.45, 0.091 }
+    v { 0.5, 0.5, 0.5 }
+    requires_grad { true }
+    range { 0.00001, 0.99999 }
     semantic { "albedo" }
   }
 }
 
 Surface cbox-red : Matte {
   Kd : Constant {
-    v { 0.63, 0.065, 0.05 }
+    v { 0.5, 0.5, 0.5 }
+    requires_grad { true }
+    range { 0.00001, 0.99999 }
     semantic { "albedo" }
   }
 }
