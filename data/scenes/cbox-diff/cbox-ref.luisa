@@ -3,18 +3,12 @@ Surface cbox-white : Matte {
     v { 0.725, 0.71, 0.68 }
     semantic { "albedo" }
   }
-  roughness : Constant {
-    v { 1 }
-  }
 }
 
 Surface cbox-green : Matte {
   Kd : Constant {
     v { 0.14, 0.45, 0.091 }
     semantic { "albedo" }
-  }
-  roughness : Constant {
-    v { 1 }
   }
 }
 
@@ -23,8 +17,71 @@ Surface cbox-red : Matte {
     v { 0.63, 0.065, 0.05 }
     semantic { "albedo" }
   }
+}
+
+Surface mat_dragon_body : Mirror {
+  color : Constant {
+    v { 1.0, 0.84, 0.2 }
+    semantic { "albedo" }
+  }
+  //Kt : Constant {
+  //  v { 1.0, 1.0, 1.0 }
+  //  semantic { "albedo" }
+  //}
+  //eta : Constant {
+  //  v { 1.5 }
+  //}
   roughness : Constant {
-    v { 1 }
+    v { 0.15 }
+  }
+}
+
+Surface mat_dragon_plate : Substrate {
+  Kd : Constant {
+    v { 0.1, 0.1, 0.1 }
+    semantic { "albedo" }
+  }
+  Ks : Constant {
+    v { 0.1, 0.1, 0.1 }
+    semantic { "albedo" }
+  }
+  roughness : Constant {
+    v { 0.15 }
+  }
+}
+
+Surface mat_dragon_stone : Substrate {
+  Kd : Constant {
+    v { 0.05, 0.1, 0.1 }
+    semantic { "albedo" }
+  }
+  Ks : Constant {
+    v { 0.05, 0.05, 0.05 }
+    semantic { "albedo" }
+  }
+  roughness : Constant {
+    v { 0.5 }
+  }
+}
+
+Surface mat_dragon_soil : Matte {
+  Kd : Constant {
+    v { 0.92, 0.74, 0.4 }
+    semantic { "albedo" }
+  }
+}
+
+Surface mat_dragon_sword : Substrate {
+  Kd : Constant {
+    v { 0.72, 0.72, 0.72 }
+    semantic { "albedo" }
+  }
+  Ks : Constant {
+    v { 0.3, 0.3, 0.3 }
+    semantic { "albedo" }
+  }
+  roughness : Constant {
+    v { 0.3 }
   }
 }
 
@@ -54,80 +111,54 @@ Shape cbox-back-wall : Mesh {
   surface { @cbox-white }
 }
 
-Shape cbox-tall-box : Mesh {
-  file { "../../meshes/cbox-parts/tall-box.obj" }
-  surface { @cbox-white }
-}
-
-Shape cbox-short-box : Mesh {
-  file { "../../meshes/cbox-parts/short-box.obj" }
-  surface { @cbox-white }
-}
-
 // dragon
 Shape dragon-000 : Mesh {
   file { "../../meshes/dragon/Mesh000.obj" }
-  surface { @cbox-red }
 }
 Shape dragon-001 : Mesh {
   file { "../../meshes/dragon/Mesh001.obj" }
-  surface { @cbox-red }
 }
 Shape dragon-002 : Mesh {
   file { "../../meshes/dragon/Mesh002.obj" }
-  surface { @cbox-red }
 }
 Shape dragon-003 : Mesh {
   file { "../../meshes/dragon/Mesh003.obj" }
-  surface { @cbox-red }
 }
 Shape dragon-004 : Mesh {
   file { "../../meshes/dragon/Mesh004.obj" }
-  surface { @cbox-red }
 }
 Shape dragon-005 : Mesh {
   file { "../../meshes/dragon/Mesh005.obj" }
-  surface { @cbox-red }
 }
 Shape dragon-006 : Mesh {
   file { "../../meshes/dragon/Mesh006.obj" }
-  surface { @cbox-red }
 }
 Shape dragon-007 : Mesh {
   file { "../../meshes/dragon/Mesh007.obj" }
-  surface { @cbox-red }
 }
 Shape dragon-008 : Mesh {
   file { "../../meshes/dragon/Mesh008.obj" }
-  surface { @cbox-red }
 }
 Shape dragon-009 : Mesh {
   file { "../../meshes/dragon/Mesh009.obj" }
-  surface { @cbox-red }
 }
 Shape dragon-010 : Mesh {
   file { "../../meshes/dragon/Mesh010.obj" }
-  surface { @cbox-red }
 }
 Shape dragon-011 : Mesh {
   file { "../../meshes/dragon/Mesh011.obj" }
-  surface { @cbox-red }
 }
 Shape dragon-012 : Mesh {
   file { "../../meshes/dragon/Mesh012.obj" }
-  surface { @cbox-red }
 }
 Shape dragon-013 : Mesh {
   file { "../../meshes/dragon/Mesh013.obj" }
-  surface { @cbox-red }
 }
 Shape dragon-014 : Mesh {
   file { "../../meshes/dragon/Mesh014.obj" }
-  surface { @cbox-red }
 }
 Shape dragon-015 : Mesh {
   file { "../../meshes/dragon/Mesh015.obj" }
-  surface { @cbox-red }
 }
 
 
@@ -135,7 +166,7 @@ Shape cbox-light : Mesh {
   file { "../../meshes/cbox-parts/light.obj" }
   light : Diffuse {
     emission : Constant {
-      v { 51.0, 36.0, 12.0 }
+      v { 45.0, 45.0, 45.0 }
     semantic { "illuminant" }
     }
   }
@@ -153,34 +184,80 @@ Shape cbox : Group {
   }
 }
 
-Shape dragon : Group {
+Shape dragon-body : Group {
+  shapes {
+    @dragon-008,
+    @dragon-011,
+    @dragon-013,
+    @dragon-014,
+    @dragon-015
+  }
+  surface { @mat_dragon_body }
+}
+
+Shape dragon-sword-cloth : Group {
+  shapes {
+    @dragon-010
+  }
+  surface { @cbox-red }
+}
+Shape dragon-sword-blade : Group {
   shapes {
     @dragon-000,
     @dragon-001,
     @dragon-002,
     @dragon-003,
     @dragon-004,
+    @dragon-009
+  }
+  surface { @mat_dragon_sword }
+}
+Shape dragon-sword : Group {
+  shapes {
+    @dragon-sword-blade,
+    @dragon-sword-cloth
+  }
+}
+
+Shape dragon-stone : Group {
+  shapes {
     @dragon-005,
-    @dragon-006,
-    @dragon-007,
-    @dragon-008,
-    @dragon-009,
-    @dragon-010,
-    @dragon-011,
-    @dragon-012,
-    @dragon-013,
-    @dragon-014,
-    @dragon-015
+    @dragon-007
+  }
+  surface { @mat_dragon_stone }
+}
+
+Shape dragon-plate : Group {
+  shapes {
+    @dragon-006
+  }
+  surface { @mat_dragon_plate }
+}
+
+Shape dragon-soil : Group {
+  shapes {
+    @dragon-012
+  }
+  surface { @mat_dragon_soil }
+}
+
+Shape dragon : Group {
+  shapes {
+    @dragon-sword,
+    @dragon-body,
+    @dragon-plate,
+    @dragon-soil,
+    @dragon-stone
   }
   transform : SRT {
-    translate { 0, 0.08192, 0.3 }
     scale { 0.05 }
     rotate { 0, 1, 0, -35 }
+    translate { -0.006655, 0.08242, 0.07285 }
   }
 }
 
 Film film : Color {
-  resolution { 1024 }
+  resolution { 4096 }
   exposure { 0 }
 }
 

@@ -6,9 +6,6 @@ Surface cbox-white : Matte {
     requires_grad { true }
     range { 0, 1 }
   }
-  roughness : Constant {
-    v { 1 }
-  }
 }
 
 Surface cbox-red : Matte {
@@ -19,9 +16,6 @@ Surface cbox-red : Matte {
     requires_grad { true }
     range { 0, 1 }
   }
-  roughness : Constant {
-    v { 1 }
-  }
 }
 
 Surface cbox-green : Matte {
@@ -31,9 +25,6 @@ Surface cbox-green : Matte {
     v { 0.5, 0.5, 0.5 }
     requires_grad { true }
     range { 0, 1 }
-  }
-  roughness : Constant {
-    v { 1 }
   }
 }
 
@@ -60,16 +51,6 @@ Shape cbox-right-wall : Mesh {
 
 Shape cbox-back-wall : Mesh {
   file { "../../meshes/cbox-parts/back-wall.obj" }
-  surface { @cbox-white }
-}
-
-Shape cbox-tall-box : Mesh {
-  file { "../../meshes/cbox-parts/tall-box.obj" }
-  surface { @cbox-white }
-}
-
-Shape cbox-short-box : Mesh {
-  file { "../../meshes/cbox-parts/short-box.obj" }
   surface { @cbox-white }
 }
 
@@ -158,9 +139,12 @@ Shape cbox : Group {
     @cbox-left-wall,
     @cbox-right-wall,
     @cbox-back-wall,
-    @cbox-tall-box,
-    @cbox-short-box,
-    @cbox-light,
+    @cbox-light
+  }
+}
+
+Shape dragon : Group {
+  shapes {
     @dragon-000,
     @dragon-001,
     @dragon-002,
@@ -177,6 +161,11 @@ Shape cbox : Group {
     @dragon-013,
     @dragon-014,
     @dragon-015
+  }
+  transform : SRT {
+    translate { 0, 0.08192, 0.3 }
+    scale { 0.05 }
+    rotate { 0, 1, 0, -35 }
   }
 }
 
@@ -233,6 +222,9 @@ render {
     @camera0
     // @camera1
   }
-  shapes { @cbox }
+  shapes {
+    @cbox,
+    @dragon
+  }
   integrator { @pt }
 }
