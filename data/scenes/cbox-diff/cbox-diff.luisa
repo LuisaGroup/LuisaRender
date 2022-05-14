@@ -1,6 +1,7 @@
 // mat_cbox
 Surface cbox-white : Matte {
   Kd : Constant {
+    //v { 0.725, 0.71, 0.68 }
     v { 0.5, 0.5, 0.5 }
     requires_grad { true }
     range { 0.00001, 0.99999 }
@@ -10,6 +11,7 @@ Surface cbox-white : Matte {
 
 Surface cbox-green : Matte {
   Kd : Constant {
+    //v { 0.14, 0.45, 0.091 }
     v { 0.5, 0.5, 0.5 }
     requires_grad { true }
     range { 0.00001, 0.99999 }
@@ -19,6 +21,7 @@ Surface cbox-green : Matte {
 
 Surface cbox-red : Matte {
   Kd : Constant {
+    //v { 0.63, 0.065, 0.05 }
     v { 0.5, 0.5, 0.5 }
     requires_grad { true }
     range { 0.00001, 0.99999 }
@@ -28,7 +31,10 @@ Surface cbox-red : Matte {
 
 Surface mat_dragon_body : Mirror {
   color : Constant {
-    v { 1.0, 0.84, 0.2 }
+    //v { 1.0, 0.84, 0.2 }
+    v { 0.5, 0.5, 0.5 }
+    requires_grad { true }
+    range { 0.00001, 0.99999 }
     semantic { "albedo" }
   }
   roughness : Constant {
@@ -40,11 +46,17 @@ Surface mat_dragon_body : Mirror {
 // mat_dragon
 Surface mat_dragon_plate : Substrate {
   Kd : Constant {
-    v { 0.1, 0.1, 0.1 }
+    //v { 0.1, 0.1, 0.1 }
+    v { 0.5, 0.5, 0.5 }
+    requires_grad { true }
+    range { 0.00001, 0.99999 }
     semantic { "albedo" }
   }
   Ks : Constant {
-    v { 0.1, 0.1, 0.1 }
+    //v { 0.1, 0.1, 0.1 }
+    v { 0.5, 0.5, 0.5 }
+    requires_grad { true }
+    range { 0.00001, 0.99999 }
     semantic { "albedo" }
   }
   roughness : Constant {
@@ -54,11 +66,17 @@ Surface mat_dragon_plate : Substrate {
 
 Surface mat_dragon_stone : Substrate {
   Kd : Constant {
-    v { 0.05, 0.1, 0.1 }
+    //v { 0.05, 0.1, 0.1 }
+    v { 0.5, 0.5, 0.5 }
+    requires_grad { true }
+    range { 0.00001, 0.99999 }
     semantic { "albedo" }
   }
   Ks : Constant {
-    v { 0.05, 0.05, 0.05 }
+    //v { 0.05, 0.05, 0.05 }
+    v { 0.5, 0.5, 0.5 }
+    requires_grad { true }
+    range { 0.00001, 0.99999 }
     semantic { "albedo" }
   }
   roughness : Constant {
@@ -68,18 +86,27 @@ Surface mat_dragon_stone : Substrate {
 
 Surface mat_dragon_sand : Matte {
   Kd : Constant {
-    v { 0.92, 0.74, 0.4 }
+    //v { 0.92, 0.74, 0.4 }
+    v { 0.5, 0.5, 0.5 }
+    requires_grad { true }
+    range { 0.00001, 0.99999 }
     semantic { "albedo" }
   }
 }
 
 Surface mat_dragon_sword : Substrate {
   Kd : Constant {
-    v { 0.72, 0.72, 0.72 }
+    //v { 0.72, 0.72, 0.72 }
+    v { 0.5, 0.5, 0.5 }
+    requires_grad { true }
+    range { 0.00001, 0.99999 }
     semantic { "albedo" }
   }
   Ks : Constant {
-    v { 0.3, 0.3, 0.3 }
+    //v { 0.3, 0.3, 0.3 }
+    v { 0.5, 0.5, 0.5 }
+    requires_grad { true }
+    range { 0.00001, 0.99999 }
     semantic { "albedo" }
   }
   roughness : Constant {
@@ -90,15 +117,25 @@ Surface mat_dragon_sword : Substrate {
 
 // mat_paintings
 Surface mat_paintings_Landscape : Matte {
-  Kd : Image {
-    file { "./textures/landscape-with-a-lake.jpg" }
+  //Kd : Image {
+  //  file { "./textures/landscape-with-a-lake.jpg" }
+  //  semantic { "albedo" }
+  //}
+  Kd : Placeholder {
+    resolution { 1920, 1280 }
+    requires_grad { true }
+    range { 0.00001, 0.99999 }
+    uv_scale { 1, -1 }
     semantic { "albedo" }
   }
 }
 
 Surface mat_paintings_frame : Matte {
   Kd : Constant {
-    v { 0.258824, 0.207843, 0.145098 }
+    //v { 0.258824, 0.207843, 0.145098 }
+    v { 0.5, 0.5, 0.5 }
+    requires_grad { true }
+    range { 0.00001, 0.99999 }
     semantic { "albedo" }
   }
 }
