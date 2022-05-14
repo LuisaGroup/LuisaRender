@@ -1,34 +1,105 @@
+// mat_cbox
 Surface cbox-white : Matte {
   Kd : Constant {
+    v { 0.725, 0.71, 0.68 }
     semantic { "albedo" }
-    //v { 0.725, 0.71, 0.68 }
-    v { 0.5, 0.5, 0.5 }
-    requires_grad { true }
-    range { 0, 1 }
-  }
-}
-
-Surface cbox-red : Matte {
-  Kd : Constant {
-    semantic { "albedo" }
-    //v { 0.63, 0.065, 0.05 }
-    v { 0.5, 0.5, 0.5 }
-    requires_grad { true }
-    range { 0, 1 }
   }
 }
 
 Surface cbox-green : Matte {
   Kd : Constant {
+    v { 0.14, 0.45, 0.091 }
     semantic { "albedo" }
-    //v { 0.14, 0.45, 0.091 }
-    v { 0.5, 0.5, 0.5 }
-    requires_grad { true }
-    range { 0, 1 }
+  }
+}
+
+Surface cbox-red : Matte {
+  Kd : Constant {
+    v { 0.63, 0.065, 0.05 }
+    semantic { "albedo" }
+  }
+}
+
+Surface mat_dragon_body : Mirror {
+  color : Constant {
+    v { 1.0, 0.84, 0.2 }
+    semantic { "albedo" }
+  }
+  roughness : Constant {
+    v { 0.15 }
   }
 }
 
 
+// mat_dragon
+Surface mat_dragon_plate : Substrate {
+  Kd : Constant {
+    v { 0.1, 0.1, 0.1 }
+    semantic { "albedo" }
+  }
+  Ks : Constant {
+    v { 0.1, 0.1, 0.1 }
+    semantic { "albedo" }
+  }
+  roughness : Constant {
+    v { 0.15 }
+  }
+}
+
+Surface mat_dragon_stone : Substrate {
+  Kd : Constant {
+    v { 0.05, 0.1, 0.1 }
+    semantic { "albedo" }
+  }
+  Ks : Constant {
+    v { 0.05, 0.05, 0.05 }
+    semantic { "albedo" }
+  }
+  roughness : Constant {
+    v { 0.5 }
+  }
+}
+
+Surface mat_dragon_sand : Matte {
+  Kd : Constant {
+    v { 0.92, 0.74, 0.4 }
+    semantic { "albedo" }
+  }
+}
+
+Surface mat_dragon_sword : Substrate {
+  Kd : Constant {
+    v { 0.72, 0.72, 0.72 }
+    semantic { "albedo" }
+  }
+  Ks : Constant {
+    v { 0.3, 0.3, 0.3 }
+    semantic { "albedo" }
+  }
+  roughness : Constant {
+    v { 0.3 }
+  }
+}
+
+
+// mat_paintings
+Surface mat_paintings_Landscape : Matte {
+  Kd : Image {
+    file { "./textures/landscape-with-a-lake.jpg" }
+    semantic { "albedo" }
+  }
+}
+
+Surface mat_paintings_frame : Matte {
+  Kd : Constant {
+    v { 0.258824, 0.207843, 0.145098 }
+    semantic { "albedo" }
+  }
+}
+
+
+
+// shape_cbox
 Shape cbox-ceiling : Mesh {
   file { "../../meshes/cbox-parts/ceiling.obj" }
   surface { @cbox-white }
@@ -55,70 +126,88 @@ Shape cbox-back-wall : Mesh {
 }
 
 
-// dragon
+// shape_paintings
+Shape paintings_frame : Mesh {
+  file { "./models/paintings/Mesh_frame.obj" }
+  surface { @mat_paintings_frame }
+}
+Shape paintings_Landscape : Mesh {
+  file { "./models/paintings/Mesh_paintings.obj" }
+  surface { @mat_paintings_Landscape }
+}
+
+Shape paintings : Group {
+  shapes {
+    @paintings_frame,
+    @paintings_Landscape
+  }
+  transform : Stack {
+      transforms {
+          SRT {
+            translate { 2.8695, -2.2478, 2.6618 }
+          },
+          SRT {
+            scale { 0.75 }
+          },
+          SRT {
+            rotate { 0, 1, 0, -90 }
+          },
+          SRT {
+            translate { 0, 1.2, -0.91 }
+          }
+      }
+  }
+}
+
+
+// shape_dragon
 Shape dragon-000 : Mesh {
-  file { "../../meshes/dragon/Mesh000.obj" }
-  surface { @cbox-red }
+  file { "./models/dragon/Mesh000.obj" }
 }
 Shape dragon-001 : Mesh {
-  file { "../../meshes/dragon/Mesh001.obj" }
-  surface { @cbox-red }
+  file { "./models/dragon/Mesh001.obj" }
 }
 Shape dragon-002 : Mesh {
-  file { "../../meshes/dragon/Mesh002.obj" }
-  surface { @cbox-red }
+  file { "./models/dragon/Mesh002.obj" }
 }
 Shape dragon-003 : Mesh {
-  file { "../../meshes/dragon/Mesh003.obj" }
-  surface { @cbox-red }
+  file { "./models/dragon/Mesh003.obj" }
 }
 Shape dragon-004 : Mesh {
-  file { "../../meshes/dragon/Mesh004.obj" }
-  surface { @cbox-red }
+  file { "./models/dragon/Mesh004.obj" }
 }
 Shape dragon-005 : Mesh {
-  file { "../../meshes/dragon/Mesh005.obj" }
-  surface { @cbox-red }
+  file { "./models/dragon/Mesh005.obj" }
 }
 Shape dragon-006 : Mesh {
-  file { "../../meshes/dragon/Mesh006.obj" }
-  surface { @cbox-red }
+  file { "./models/dragon/Mesh006.obj" }
 }
 Shape dragon-007 : Mesh {
-  file { "../../meshes/dragon/Mesh007.obj" }
-  surface { @cbox-red }
+  file { "./models/dragon/Mesh007.obj" }
 }
 Shape dragon-008 : Mesh {
-  file { "../../meshes/dragon/Mesh008.obj" }
-  surface { @cbox-red }
+  file { "./models/dragon/Mesh008.obj" }
 }
 Shape dragon-009 : Mesh {
-  file { "../../meshes/dragon/Mesh009.obj" }
-  surface { @cbox-red }
+  file { "./models/dragon/Mesh009.obj" }
 }
 Shape dragon-010 : Mesh {
-  file { "../../meshes/dragon/Mesh010.obj" }
-  surface { @cbox-red }
+  file { "./models/dragon/Mesh010.obj" }
 }
 Shape dragon-011 : Mesh {
-  file { "../../meshes/dragon/Mesh011.obj" }
-  surface { @cbox-red }
+  file { "./models/dragon/Mesh011.obj" }
 }
 Shape dragon-012 : Mesh {
-  file { "../../meshes/dragon/Mesh012.obj" }
-  surface { @cbox-red }
+  file { "./models/dragon/Mesh012.obj" }
 }
 Shape dragon-013 : Mesh {
-  file { "../../meshes/dragon/Mesh013.obj" }
-  surface { @cbox-red }
+  file { "./models/dragon/Mesh013.obj" }
 }
 Shape dragon-014 : Mesh {
-  file { "../../meshes/dragon/Mesh014.obj" }
-  surface { @cbox-red }
+  file { "./models/dragon/Mesh014.obj" }
 }
 Shape dragon-015 : Mesh {
-  file { "../../meshes/dragon/Mesh015.obj" }
-  surface { @cbox-red }
+  file { "./models/dragon/Mesh015.obj" }
 }
 
 
@@ -126,11 +215,12 @@ Shape cbox-light : Mesh {
   file { "../../meshes/cbox-parts/light.obj" }
   light : Diffuse {
     emission : Constant {
-      v { 51.0, 36.0, 12.0 }
+      v { 45.0, 45.0, 45.0 }
       semantic { "illuminant" }
     }
   }
 }
+
 
 Shape cbox : Group {
   shapes {
@@ -143,29 +233,83 @@ Shape cbox : Group {
   }
 }
 
-Shape dragon : Group {
+Shape dragon-body : Group {
+  shapes {
+    @dragon-008,
+    @dragon-011,
+    @dragon-013,
+    @dragon-014,
+    @dragon-015
+  }
+  surface { @mat_dragon_body }
+}
+
+Shape dragon-sword-cloth : Group {
+  shapes {
+    @dragon-010
+  }
+  surface { @cbox-red }
+}
+Shape dragon-sword-blade : Group {
   shapes {
     @dragon-000,
     @dragon-001,
     @dragon-002,
     @dragon-003,
     @dragon-004,
-    @dragon-005,
-    @dragon-006,
-    @dragon-007,
-    @dragon-008,
-    @dragon-009,
-    @dragon-010,
-    @dragon-011,
-    @dragon-012,
-    @dragon-013,
-    @dragon-014,
-    @dragon-015
+    @dragon-009
   }
-  transform : SRT {
-    translate { 0, 0.08192, 0.3 }
-    scale { 0.05 }
-    rotate { 0, 1, 0, -35 }
+  surface { @mat_dragon_sword }
+}
+Shape dragon-sword : Group {
+  shapes {
+    @dragon-sword-blade,
+    @dragon-sword-cloth
+  }
+}
+
+Shape dragon-stone : Group {
+  shapes {
+    @dragon-005,
+    @dragon-007
+  }
+  surface { @mat_dragon_stone }
+}
+
+Shape dragon-plate : Group {
+  shapes {
+    @dragon-006
+  }
+  surface { @mat_dragon_plate }
+}
+
+Shape dragon-sand : Group {
+  shapes {
+    @dragon-012
+  }
+  surface { @mat_dragon_sand }
+}
+
+Shape dragon : Group {
+  shapes {
+    @dragon-sword,
+    @dragon-body,
+    @dragon-plate,
+    @dragon-sand,
+    @dragon-stone
+  }
+  transform : Stack {
+      transforms {
+          SRT {
+            translate { -0.1331, 1.6374, 1.4570 }
+          },
+          SRT {
+            scale { 0.05 }
+          },
+          SRT {
+            rotate { 0, 1, 0, -35 }
+          }
+      }
   }
 }
 
@@ -174,32 +318,17 @@ Film film : Color {
   exposure { 0 }
 }
 
-Camera camera0 : Pinhole {
+Camera camera : Pinhole {
   position { -0.01, 0.995, 5.0 }
   fov { 27.8 }
   spp { 32 }
   film { @film }
-  file { "../../renders/cbox-diff-0.exr" }
+  file { "../../renders/cbox-diff.exr" }
   filter : Gaussian {
     radius { 1 }
   }
   target : Image {
-    file { "../../renders/cbox-ref-32-0.exr" }
-  }
-}
-
-Camera camera1 : Pinhole {
-  position { 1, 1.6, 2.0 }
-  front { -0.4, -0.2, -1 }
-  fov { 40 }
-  spp { 512 }
-  film { @film }
-  file { "../../renders/cbox-diff-1.exr" }
-  filter : Gaussian {
-    radius { 1 }
-  }
-  target : Image {
-    file { "../../renders/cbox-ref-32-1.exr" }
+    file { "../../renders/cbox-ref-32.exr" }
   }
 }
 
@@ -219,12 +348,12 @@ Integrator pt : MegaRadiativeDiff {
 render {
   spectrum : sRGB {}
   cameras {
-    @camera0
-    // @camera1
+    @camera
   }
   shapes {
     @cbox,
-    @dragon
+    @dragon,
+    @paintings
   }
   integrator { @pt }
 }

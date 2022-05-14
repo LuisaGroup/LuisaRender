@@ -153,7 +153,7 @@ Shape paintings : Group {
             rotate { 0, 1, 0, -90 }
           },
           SRT {
-            translate { 0, 1.2, -0.91 }
+            translate { 0.0, 1.2, -1.0 }
           }
       }
   }
@@ -318,24 +318,12 @@ Film film : Color {
   exposure { 0 }
 }
 
-Camera camera0 : Pinhole {
+Camera camera : Pinhole {
   position { -0.01, 0.995, 5.0 }
   fov { 27.8 }
   spp { 32 }
   film { @film }
-  file { "../../renders/cbox-ref-32-0.exr" }
-  filter : Gaussian {
-    radius { 1 }
-  }
-}
-
-Camera camera1 : Pinhole {
-  position { 1, 1.6, 2.0 }
-  front { -0.4, -0.2, -1 }
-  fov { 40 }
-  spp { 32 }
-  film { @film }
-  file { "../../renders/cbox-ref-32-1.exr" }
+  file { "../../renders/cbox-ref-32.exr" }
   filter : Gaussian {
     radius { 1 }
   }
@@ -350,8 +338,7 @@ Integrator pt : MegaPath {
 render {
   spectrum : sRGB {}
   cameras {
-    @camera0
-    // @camera1
+    @camera
   }
   shapes {
     @cbox,
