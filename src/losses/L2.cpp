@@ -47,7 +47,7 @@ Float3 L2Instance::loss(const Camera::Instance *camera) const noexcept {
         }
     }
 
-    return loss_sum;
+    return loss_sum / float(resolution.x * resolution.y);
 }
 
 Float3 L2Instance::d_loss(const Camera::Instance *camera, Expr<uint2> pixel_id) const noexcept {

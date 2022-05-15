@@ -20,9 +20,13 @@ Surface cbox-red : Matte {
   }
 }
 
-Surface mat_dragon_body : Mirror {
-  color : Constant {
+Surface mat_dragon_body : Substrate {
+  Kd : Constant {
     v { 1.0, 0.84, 0.2 }
+    semantic { "albedo" }
+  }
+  Ks : Constant {
+    v { 0.04, 0.04, 0.04 }
     semantic { "albedo" }
   }
   roughness : Constant {
@@ -215,7 +219,7 @@ Shape cbox-light : Mesh {
   file { "../../meshes/cbox-parts/light.obj" }
   light : Diffuse {
     emission : Constant {
-      v { 45.0, 45.0, 45.0 }
+      v { 40, 40, 40 }
       semantic { "illuminant" }
     }
   }
@@ -314,14 +318,14 @@ Shape dragon : Group {
 }
 
 Film film : Color {
-  resolution { 256 }
+  resolution { 1024 }
   exposure { 0 }
 }
 
 Camera camera : Pinhole {
-  position { -0.01, 0.995, 5.0 }
+  position { 0.0, 1.0, 5.0 }
   fov { 27.8 }
-  spp { 1024 }
+  spp { 128 }
   film { @film }
   file { "../../renders/cbox-ref-32.exr" }
   filter : Gaussian {
