@@ -378,7 +378,7 @@ Camera camera : Pinhole {
     radius { 1 }
   }
   target : Image {
-    file { "../../renders/cbox-ref-32.exr" }
+    file { "../../renders/cbox-ref.exr" }
   }
 }
 
@@ -391,7 +391,7 @@ Integrator pt : MegaRadiativeDiff {
   //display_camera_index { 0 }
   save_process { true }
   loss : L2 {}
-  learning_rate { 0.1 }
+  learning_rate { 5000 }
   iterations { 100 }
 }
 

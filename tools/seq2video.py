@@ -39,8 +39,8 @@ if __name__ == "__main__":
     folder = argv[1]
     frame_rate = int(argv[2])
 
-    files = sorted(f for f in listdir(folder) if f.endswith(".exr") and not f.startswith("dump-"))
     print(f"Reading images from '{folder}'...")
+    files = sorted(f for f in listdir(folder) if f.endswith(".exr") and not f.startswith("dump-"))
     images = [cv.imread(f"{folder}/{f}", cv.IMREAD_UNCHANGED) for f in files]
     exr2png(images)
 

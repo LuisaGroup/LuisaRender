@@ -318,7 +318,7 @@ Shape dragon : Group {
 }
 
 Film film : Color {
-  resolution { 1024 }
+  resolution { 256 }
   exposure { 0 }
 }
 
@@ -327,7 +327,7 @@ Camera camera : Pinhole {
   fov { 27.8 }
   spp { 128 }
   film { @film }
-  file { "../../renders/cbox-ref-32.exr" }
+  file { "../../renders/cbox-ref.exr" }
   filter : Gaussian {
     radius { 1 }
   }
