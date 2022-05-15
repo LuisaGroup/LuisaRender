@@ -352,14 +352,14 @@ Shape dragon : Group {
 }
 
 Film film : Color {
-  resolution { 256 }
+  resolution { 512 }
   exposure { 0 }
 }
 
 Camera camera : Pinhole {
   position { 0.0, 1.0, 5.0 }
   fov { 27.8 }
-  spp { 32 }
+  spp { 64 }
   film { @film }
   file { "../../renders/cbox-diff.exr" }
   filter : Gaussian {
