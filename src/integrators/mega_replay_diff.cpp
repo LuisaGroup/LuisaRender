@@ -153,8 +153,6 @@ public:
         }
 
         for (auto k = 0u; k < iteration_num; ++k) {
-            auto loss = 0.f;
-
             LUISA_INFO("");
             LUISA_INFO("Iteration = {}", k);
 
@@ -422,10 +420,10 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
             Li[1u] = Li_last_pass[1u];
             Li[2u] = Li_last_pass[2u];
 
-            SampledSpectrum d_loss{swl.dimension(), 0.f};
+            SampledSpectrum d_loss{swl.dimension(), float(pixel_count)};
             auto d_loss_float3 = pt->loss()->d_loss(camera, pixel_id);
             for (auto i = 0u; i < 3u; ++i) {
-                d_loss[i] = d_loss_float3[i];
+                d_loss[i] *= d_loss_float3[i];
             }
 
             auto ray = camera_ray;

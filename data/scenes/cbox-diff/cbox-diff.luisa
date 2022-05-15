@@ -38,14 +38,11 @@ Surface mat_dragon_body : Substrate {
     semantic { "albedo" }
   }
   Ks : Constant {
-    //v { 1.0, 0.84, 0.2 }
-    v { 0.5, 0.5, 0.5 }
-    requires_grad { true }
-    range { 0.00001, 0.99999 }
+    v { 0.04, 0.04, 0.04 }
     semantic { "albedo" }
   }
   roughness : Constant {
-    v { 0.3 }
+    v { 0.4 }
   }
 }
 
@@ -60,14 +57,11 @@ Surface mat_dragon_plate : Substrate {
     semantic { "albedo" }
   }
   Ks : Constant {
-    //v { 0.1, 0.1, 0.1 }
-    v { 0.5, 0.5, 0.5 }
-    requires_grad { true }
-    range { 0.00001, 0.99999 }
+    v { 0.04, 0.04, 0.04 }
     semantic { "albedo" }
   }
   roughness : Constant {
-    v { 0.15 }
+    v { 0.2 }
   }
 }
 
@@ -80,10 +74,7 @@ Surface mat_dragon_stone : Substrate {
     semantic { "albedo" }
   }
   Ks : Constant {
-    //v { 0.05, 0.05, 0.05 }
-    v { 0.5, 0.5, 0.5 }
-    requires_grad { true }
-    range { 0.00001, 0.99999 }
+    v { 0.04, 0.04, 0.04 }
     semantic { "albedo" }
   }
   roughness : Constant {
@@ -110,10 +101,7 @@ Surface mat_dragon_sword : Substrate {
     semantic { "albedo" }
   }
   Ks : Constant {
-    //v { 0.3, 0.3, 0.3 }
-    v { 0.5, 0.5, 0.5 }
-    requires_grad { true }
-    range { 0.00001, 0.99999 }
+    v { 0.04, 0.04, 0.04 }
     semantic { "albedo" }
   }
   roughness : Constant {
@@ -203,7 +191,7 @@ Shape paintings : Group {
             rotate { 0, 1, 0, -90 }
           },
           SRT {
-            translate { 0, 1.2, -0.91 }
+            translate { 0.0, 1.25, -1.0 }
           }
       }
   }
@@ -391,7 +379,7 @@ Integrator pt : MegaRadiativeDiff {
   //display_camera_index { 0 }
   save_process { true }
   loss : L2 {}
-  learning_rate { 5000 }
+  learning_rate { 0.3 }
   iterations { 100 }
 }
 

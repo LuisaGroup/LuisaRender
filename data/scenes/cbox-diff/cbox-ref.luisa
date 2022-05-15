@@ -30,7 +30,7 @@ Surface mat_dragon_body : Substrate {
     semantic { "albedo" }
   }
   roughness : Constant {
-    v { 0.15 }
+    v { 0.4 }
   }
 }
 
@@ -46,7 +46,7 @@ Surface mat_dragon_plate : Substrate {
     semantic { "albedo" }
   }
   roughness : Constant {
-    v { 0.15 }
+    v { 0.2 }
   }
 }
 
@@ -318,7 +318,7 @@ Shape dragon : Group {
 }
 
 Film film : Color {
-  resolution { 256 }
+  resolution { 1024 }
   exposure { 0 }
 }
 
