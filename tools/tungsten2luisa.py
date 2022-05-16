@@ -323,9 +323,7 @@ render {{
 ''', file=out_file)
 
 
-if __name__ == "__main__":
-    file_name = argv[1]
-    spp = int(argv[2])
+def tungsten2luisa(file_name: str, spp: int):
     assert file_name.endswith(".json")
     with open(file_name) as file:
         scene = json.load(file)
@@ -340,3 +338,9 @@ if __name__ == "__main__":
         convert_shapes(file, shapes, materials)
         convert_camera(file, camera, spp)
         write_render(file, shapes)
+
+
+if __name__ == "__main__":
+    file_name = argv[1].strip('"').strip(' ')
+    spp = int(argv[2])
+    tungsten2luisa(file_name, spp)

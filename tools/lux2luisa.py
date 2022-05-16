@@ -128,13 +128,11 @@ def convert_textures(file, scene):
             raise NotImplementedError()
 
 
-if __name__ == "__main__":
-    file_name = argv[1]
+def lux2luisa(file_name: str):
     assert file_name.endswith(".scn")
     with open(file_name) as file:
         lines = [line.split("=") for line in file.readlines()]
     result = {}
-
 
     def process_property(key: str, value: str):
         key = key.strip().split(".")
@@ -153,7 +151,6 @@ if __name__ == "__main__":
                 parent[seg] = {}
             parent = parent[seg]
         parent[key[-1]] = value
-
 
     for line in lines:
         process_property(*line)
@@ -183,3 +180,8 @@ if __name__ == "__main__":
     @{shapes_str}
   }}
 }}''', file=file)
+
+
+if __name__ == "__main__":
+    file_name = argv[1].strip('"').strip(' ')
+    lux2luisa(file_name)

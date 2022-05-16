@@ -47,7 +47,7 @@ Float3 L1Instance::loss(const Camera::Instance *camera) const noexcept {
         }
     }
 
-    return loss_sum;
+    return loss_sum / float(resolution.x * resolution.y);
 }
 
 Float3 L1Instance::d_loss(const Camera::Instance *camera, Expr<uint2> pixel_id) const noexcept {
@@ -57,7 +57,7 @@ Float3 L1Instance::d_loss(const Camera::Instance *camera, Expr<uint2> pixel_id) 
     auto rendered = camera->film()->read(pixel_id).average;
     auto target = camera->target()->evaluate(pixel_uv_it, 0.f).xyz();
 
-    return sign(rendered - target);
+    return sign(rendered - target) / float(resolution.x * resolution.y);
 }
 
 }// namespace luisa::render
