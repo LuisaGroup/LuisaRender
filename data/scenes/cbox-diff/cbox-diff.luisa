@@ -352,7 +352,7 @@ Shape dragon : Group {
 }
 
 Film film : Color {
-  resolution { 512 }
+  resolution { 1024 }
   exposure { 0 }
 }
 
