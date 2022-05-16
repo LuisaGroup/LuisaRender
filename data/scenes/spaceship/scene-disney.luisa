@@ -1,32 +1,43 @@
 
-Surface mat_Backdrop : Matte {
-  Kd : Constant {
+Surface mat_Backdrop : Disney {
+  color : Constant {
     v { 0.10000000149011612, 0.10000000149011612, 0.10000000149011612 }
     semantic { "albedo" }
   }
-}
-
-Surface mat_RoughAluminium : Metal {
-  eta { "Al" }
   roughness : Constant {
-    v { 0.31622776601683794 }
+    v { 1 }
   }
 }
 
-Surface mat_RoughSteel : Metal {
-  eta { 360, 2.0, 0.0, 830, 2.0, 0.0 }
+Surface mat_RoughAluminium : Disney {
   roughness : Constant {
     v { 0.31622776601683794 }
   }
-}
-
-Surface mat_DarkPlastic : Substrate {
-  Kd : Constant {
-    v { 0.009999999776482582, 0.009999999776482582, 0.009999999776482582 }
+  color : Constant {
+    v { 1, 1, 1 }
     semantic { "albedo" }
   }
-  Ks : Constant {
-    v { 0.04, 0.04, 0.04 }
+  metallic : Constant {
+    v { 1 }
+  }
+}
+
+Surface mat_RoughSteel : Disney {
+  color : Constant {
+    v { 0.1, 0.1, 0.1 }
+    semantic { "albedo" }
+  }
+  roughness : Constant {
+    v { 0.31622776601683794 }
+  }
+  metallic : Constant {
+    v { 1 }
+  }
+}
+
+Surface mat_DarkPlastic : Disney {
+  color : Constant {
+    v { 0.009999999776482582, 0.009999999776482582, 0.009999999776482582 }
     semantic { "albedo" }
   }
   eta : Constant {
@@ -37,15 +48,11 @@ Surface mat_DarkPlastic : Substrate {
   }
 }
 
-Surface mat_PinkLeather : Substrate {
-  Kd : Constant {
+Surface mat_PinkLeather : Disney {
+  color : Constant {
     v { 0.25600001215934753, 0.013000000268220901, 0.07999999821186066 }
     semantic { "albedo" }
   }
-  Ks : Constant {
-    v { 0.04, 0.04, 0.04 }
-    semantic { "albedo" }
-  }
   eta : Constant {
     v { 1.5 }
   }
@@ -54,15 +61,11 @@ Surface mat_PinkLeather : Substrate {
   }
 }
 
-Surface mat_Leather : Substrate {
-  Kd : Constant {
+Surface mat_Leather : Disney {
+  color : Constant {
     v { 0.03400000184774399, 0.014000000432133675, 0.00800000037997961 }
     semantic { "albedo" }
   }
-  Ks : Constant {
-    v { 0.04, 0.04, 0.04 }
-    semantic { "albedo" }
-  }
   eta : Constant {
     v { 1.5 }
   }
@@ -71,15 +74,11 @@ Surface mat_Leather : Substrate {
   }
 }
 
-Surface mat_RedLeather : Substrate {
-  Kd : Constant {
+Surface mat_RedLeather : Disney {
+  color : Constant {
     v { 0.16300000250339508, 0.029999999329447746, 0.03700000047683716 }
     semantic { "albedo" }
   }
-  Ks : Constant {
-    v { 0.04, 0.04, 0.04 }
-    semantic { "albedo" }
-  }
   eta : Constant {
     v { 1.5 }
   }
@@ -88,15 +87,11 @@ Surface mat_RedLeather : Substrate {
   }
 }
 
-Surface mat_BrightPinkLeather : Substrate {
-  Kd : Constant {
+Surface mat_BrightPinkLeather : Disney {
+  color : Constant {
     v { 0.7720000147819519, 0.17499999701976776, 0.2619999945163727 }
     semantic { "albedo" }
   }
-  Ks : Constant {
-    v { 0.04, 0.04, 0.04 }
-    semantic { "albedo" }
-  }
   eta : Constant {
     v { 1.5 }
   }
@@ -105,12 +100,8 @@ Surface mat_BrightPinkLeather : Substrate {
   }
 }
 
-Surface mat_Glass : Glass {
-  Kr : Constant {
-    v { 1.0, 1.0, 1.0 }
-    semantic { "albedo" }
-  }
-  Kt : Constant {
+Surface mat_Glass : Disney {
+  color : Constant {
     v { 1.0, 1.0, 1.0 }
     semantic { "albedo" }
   }
@@ -120,15 +111,14 @@ Surface mat_Glass : Glass {
   roughness : Constant {
     v { 0.1 }
   }
+  specular_trans : Constant {
+    v { 1 }
+  }
 }
 
-Surface mat_DarkRubber : Substrate {
-  Kd : Constant {
+Surface mat_DarkRubber : Disney {
+  color : Constant {
     v { 0.02500000037252903, 0.02500000037252903, 0.02500000037252903 }
-    semantic { "albedo" }
-  }
-  Ks : Constant {
-    v { 0.04, 0.04, 0.04 }
     semantic { "albedo" }
   }
   eta : Constant {
@@ -1339,7 +1329,8 @@ Shape shape_89 : Mesh {
 
 Env env : Spherical {
   emission : Constant {
-    v { 0.30000001192092896, 0.30000001192092896, 0.30000001192092896 }
+    // v { 0.30000001192092896, 0.30000001192092896, 0.30000001192092896 }
+    v { 1, 0, 0 }
     semantic { "illuminant" }
   }
   transform : SRT {
@@ -1365,24 +1356,23 @@ Camera camera : Pinhole {
   front { 0.13595250248908997, -0.05167683959007263, -0.9893665909767151 }
   up { 0.0, 1.0, 0.0 }
   fov { 35.98339777135762 }
-  spp { 65536 }
+  spp { 1024 }
   filter : Gaussian {
     radius { 1 }
   }
   film : Color {
     resolution { 1920, 1080 }
   }
-  file { "spaceship.exr" }
+  file { "render-normal.exr" }
 }
 
 render {
   cameras { @camera }
-  spectrum : Hero {}
-  integrator : WavePath {
+  spectrum : sRGB {}
+  integrator : Normal {
     sampler : Independent {}
     depth { 12 }
     rr_depth { 5 }
-    rr_threshold { 0.95 }
   }
   shapes {
     @shape_0,

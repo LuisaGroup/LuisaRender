@@ -315,14 +315,14 @@ Camera camera : Pinhole {
   front { 0.003735453588888049, 0.015855638310313225, -0.9998673796653748 }
   up { 0.0, 1.0, 0.0 }
   fov { 20.11429322446647 }
-  spp { 128 }
+  spp { 65536 }
   filter : Gaussian {
     radius { 1 }
   }
   film : Color {
     resolution { 1920, 1080 }
   }
-  file { "output.exr" }
+  file { "glass-of-water.exr" }
 }
 
 render {
@@ -330,7 +330,7 @@ render {
   spectrum : Hero {}
   integrator : WavePath {
     sampler : Independent {}
-    depth { 12 }
+    depth { 32 }
     rr_depth { 5 }
     rr_threshold { 0.95 }
   }
