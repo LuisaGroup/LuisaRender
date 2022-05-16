@@ -21,7 +21,8 @@ def l2_loss(rendered: np.ndarray, target: np.ndarray) -> float:
 
 
 def read_hdr2ldr(filename: str) -> np.ndarray:
-    image = cv.imread(filename, cv.IMREAD_UNCHANGED)[:, :, :3]
+    image = np.maximum(
+        np.nan_to_num(cv.imread(filename, cv.IMREAD_UNCHANGED)[:, :, :3], nan=0.0, posinf=1e3, neginf=0), 0.0)
     return np.uint8(np.round(np.clip(np.where(
         image <= 0.00304,
         12.92 * image,
