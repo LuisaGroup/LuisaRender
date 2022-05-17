@@ -2,6 +2,8 @@
 // Created by Mike Smith on 2022/1/10.
 //
 
+#include <fstream>
+
 #include <util/imageio.h>
 #include <luisa-compute.h>
 
@@ -514,6 +516,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
     auto sample_id = 0u;
     auto last_committed_sample_id = 0u;
     constexpr auto launches_per_commit = 16u;
+    Clock clock;
     ProgressBar progress_bar;
     progress_bar.update(0.0);
     for (auto s : shutter_samples) {
@@ -572,6 +575,13 @@ void WavefrontPathTracingInstance::_render_one_camera(
     }
     command_buffer << synchronize();
     progress_bar.done();
+
+    auto render_time = clock.toc();
+    LUISA_INFO("Rendering finished in {} ms.", render_time);
+    {
+        std::ofstream file{"results.txt", std::ios::app};
+        file << "Render time = " << render_time << " ms" << std::endl;
+    }
 }
 
 }// namespace luisa::render

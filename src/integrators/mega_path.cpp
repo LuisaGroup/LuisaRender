@@ -2,6 +2,8 @@
 // Created by Mike Smith on 2022/1/10.
 //
 
+#include <fstream>
+
 #include <util/imageio.h>
 #include <luisa-compute.h>
 
@@ -291,6 +293,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
     command_buffer << synchronize();
 
     LUISA_INFO("Rendering started.");
+    Clock clock;
     ProgressBar progress;
     progress.update(0.0);
 
@@ -317,6 +320,13 @@ void MegakernelPathTracingInstance::_render_one_camera(
     }
     command_buffer << synchronize();
     progress.done();
+
+    auto render_time = clock.toc();
+    LUISA_INFO("Rendering finished in {} ms.", render_time);
+    {
+        std::ofstream file{"results.txt", std::ios::app};
+        file << "Render time = " << render_time << " ms" << std::endl;
+    }
 }
 
 }// namespace luisa::render
