@@ -25,27 +25,29 @@
     - Packages: TODO
     - Backend-specific requirements are the same as above
 
+## Build Commands
+
+```bash
+cmake  -S . -B build # optionally with CMake flags behind
+cmake --build build
+```
+
 ## CMake Flags
+
+The ISPC backend is disabled by default. Other backends will automatically be enabled if the corresponding APIs are detected. You can override the default settings by supplying CMake flags manually, in form of `-DFLAG=value` behind the first cmake command.
+
+In case you need to run the ISPC backend, download the [ISPC compiler executable](https://ispc.github.io/downloads.html) of your platform and copy it to `src/backends/ispc/ispc_support/` before compiling.
 
 - `LUISA_COMPUTE_ENABLE_CUDA`: Enable CUDA backend
 - `LUISA_COMPUTE_ENABLE_DX`: Enable DirectX backend
 - `LUISA_COMPUTE_ENABLE_ISPC`: Enable ISPC backend
 - `LUISA_COMPUTE_ENABLE_METAL`: Enable Metal backend
-- `LUISA_COMPUTE_ENABLE_PYTHON`: Enable LuisaCompute Python
-- `LUISA_COMPUTE_ENABLE_GUI`: Enable GUI display in C++ tests
-
-## Build Commands
-
-CMake flags should be add in form of `-DFLAG=value` behind first cmake command.
-
-```bash
-cmake  -S . -B build
-cmake --build build
-```
+- `LUISA_COMPUTE_ENABLE_PYTHON`: Enable LuisaCompute Python (enabled by default)
+- `LUISA_COMPUTE_ENABLE_GUI`: Enable GUI display in C++ tests (enabled by default)
 
 ## Usage
 
-1. The renderer's executable file is named `luisa-render-cli`, which locates in build dir
+1. The renderer's executable file is named `luisa-render-cli`, which locates in build directory
 2. Usage can be accessed by running `luisa-render-cli --help`
 3. The renderer can be simply run as
     ```bash
