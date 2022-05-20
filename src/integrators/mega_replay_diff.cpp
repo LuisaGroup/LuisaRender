@@ -14,7 +14,7 @@
 
 namespace luisa::render {
 
-#define LUISA_RENDER_PATH_REPLAY_DEBUG
+// #define LUISA_RENDER_PATH_REPLAY_DEBUG
 
 using namespace luisa::compute;
 
