@@ -2,6 +2,8 @@
 // Created by Mike Smith on 2022/1/10.
 //
 
+#include <fstream>
+
 #include <util/imageio.h>
 #include <luisa-compute.h>
 
@@ -272,6 +274,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
     using BufferHit = BufferVar<Hit>;
 
     LUISA_INFO("Compiling ray generation kernel.");
+    Clock clock_compile;
     auto generate_rays_shader = device.compile_async<1>([&](BufferUInt path_indices, BufferRay rays,
                                                             UInt base_sample_id, Float time) noexcept {
         auto state_id = dispatch_x();
@@ -483,6 +486,23 @@ void WavefrontPathTracingInstance::_render_one_camera(
         camera->film()->accumulate(pixel_coord, spectrum->srgb(swl, Li * shutter_weight));
     });
 
+    // wait for the compilation of all shaders
+    generate_rays_shader.wait();
+    intersect_shader.wait();
+    evaluate_miss_shader.wait();
+    evaluate_surface_shader.wait();
+    evaluate_light_shader.wait();
+    sample_light_shader.wait();
+    accumulate_shader.wait();
+    auto integrator_shader_compilation_time = clock_compile.toc();
+    LUISA_INFO("Integrator shader compile in {} ms.", integrator_shader_compilation_time);
+    {
+        std::ofstream file{"results.txt", std::ios::app};
+        file << "Shader compile time = " << integrator_shader_compilation_time << " ms" << std::endl;
+    }
+
+
+    LUISA_INFO("Rendering started.");
     // create path states
     RayQueue path_queue{device, state_count};
     RayQueue out_path_queue{device, state_count};
@@ -501,19 +521,10 @@ void WavefrontPathTracingInstance::_render_one_camera(
     command_buffer << state_count_buffer.copy_from(precomputed_state_counts.data())
                    << synchronize();
 
-    // wait for the compilation of all shaders
-    generate_rays_shader.wait();
-    intersect_shader.wait();
-    evaluate_miss_shader.wait();
-    evaluate_surface_shader.wait();
-    evaluate_light_shader.wait();
-    sample_light_shader.wait();
-    accumulate_shader.wait();
-    LUISA_INFO("Rendering started.");
-
     auto sample_id = 0u;
     auto last_committed_sample_id = 0u;
     constexpr auto launches_per_commit = 16u;
+    Clock clock;
     ProgressBar progress_bar;
     progress_bar.update(0.0);
     for (auto s : shutter_samples) {
@@ -572,6 +583,13 @@ void WavefrontPathTracingInstance::_render_one_camera(
     }
     command_buffer << synchronize();
     progress_bar.done();
+
+    auto render_time = clock.toc();
+    LUISA_INFO("Rendering finished in {} ms.", render_time);
+    {
+        std::ofstream file{"results.txt", std::ios::app};
+        file << "Render time = " << render_time << " ms" << std::endl;
+    }
 }
 
 }// namespace luisa::render

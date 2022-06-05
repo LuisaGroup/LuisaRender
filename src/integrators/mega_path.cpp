@@ -2,6 +2,8 @@
 // Created by Mike Smith on 2022/1/10.
 //
 
+#include <fstream>
+
 #include <util/imageio.h>
 #include <luisa-compute.h>
 
@@ -286,11 +288,19 @@ void MegakernelPathTracingInstance::_render_one_camera(
         };
         camera->film()->accumulate(pixel_id, spectrum->srgb(swl, Li * shutter_weight));
     };
+    Clock clock_compile;
     auto render = pipeline.device().compile(render_kernel);
+    auto integrator_shader_compilation_time = clock_compile.toc();
+    LUISA_INFO("Integrator shader compile in {} ms.", integrator_shader_compilation_time);
+    {
+        std::ofstream file{"results.txt", std::ios::app};
+        file << "Shader compile time = " << integrator_shader_compilation_time << " ms" << std::endl;
+    }
     auto shutter_samples = camera->node()->shutter_samples();
     command_buffer << synchronize();
 
     LUISA_INFO("Rendering started.");
+    Clock clock;
     ProgressBar progress;
     progress.update(0.0);
 
@@ -317,6 +327,13 @@ void MegakernelPathTracingInstance::_render_one_camera(
     }
     command_buffer << synchronize();
     progress.done();
+
+    auto render_time = clock.toc();
+    LUISA_INFO("Rendering finished in {} ms.", render_time);
+    {
+        std::ofstream file{"results.txt", std::ios::app};
+        file << "Render time = " << render_time << " ms" << std::endl;
+    }
 }
 
 }// namespace luisa::render

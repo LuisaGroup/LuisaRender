@@ -1038,7 +1038,7 @@ Camera camera : Pinhole {
   front { -0.9617919325828552, 0.07440698146820068, 0.2634764611721039 }
   up { 0.0, 1.0, 0.0 }
   fov { 58.71550708558254 }
-  spp { 128 }
+  spp { 16384 }
   filter : Gaussian {
     radius { 1 }
   }
@@ -1053,7 +1053,7 @@ render {
   spectrum : Hero {}
   integrator : WavePath {
     sampler : Independent {}
-    depth { 12 }
+    depth { 16 }
     rr_depth { 5 }
     rr_threshold { 0.95 }
   }

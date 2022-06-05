@@ -853,7 +853,7 @@ Env dir : Directional {
   }
   angle { 2.0 }
   direction { 2, 0.64, 0.8 }
-  scale { 12.566370614359172 }
+  scale { 25 }
 }
 
 Env sky : Spherical {
@@ -867,7 +867,7 @@ Env sky : Spherical {
         1.0, 0.0, 0.0, 0.0,
         0.0, 0.0, 0.0, 1.0 }
   }
-  scale { 0.3 }
+  scale { 0.5 }
 }
 
 Camera camera : Pinhole {
@@ -875,7 +875,7 @@ Camera camera : Pinhole {
   front { 0.013057953678071499, -0.06386303901672363, -0.9978732466697693 }
   up { 0.0, 1.0, 0.0 }
   fov { 35.98339777135762 }
-  spp { 128 }
+  spp { 16384 }
   filter : Gaussian {
     radius { 1 }
   }
@@ -887,7 +887,7 @@ Camera camera : Pinhole {
 
 render {
   cameras { @camera }
-  spectrum : sRGB {}
+  spectrum : Hero {}
   integrator : WavePath {
     sampler : Independent {}
     depth { 12 }
