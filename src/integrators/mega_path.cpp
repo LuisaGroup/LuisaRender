@@ -236,7 +236,6 @@ void MegakernelPathTracingInstance::_render_one_camera(
             auto occluded = pipeline.intersect_any(shadow_ray);
 
             // evaluate material
-            SampledSpectrum eta_scale{swl.dimension(), 1.f};
             auto surface_tag = it->shape()->surface_tag();
             auto u_lobe = sampler->generate_1d();
             auto u_bsdf = sampler->generate_2d();
