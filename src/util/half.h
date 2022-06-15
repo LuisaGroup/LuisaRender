@@ -4,27 +4,12 @@
 
 #pragma once
 
-#include <dsl/syntax.h>
+#include <core/stl.h>
 
 namespace luisa::render {
 
 constexpr auto half_max = 65504.0f;
 constexpr auto half_min = -65504.0f;
-
-namespace detail {
-
-[[nodiscard]] inline auto half_to_float_bits(auto h) noexcept {
-    return ((h & 0x8000u) << 16u) |
-           (((h & 0x7c00u) + 0x1c000u) << 13u) |
-           ((h & 0x03ffu) << 13u);
-}
-
-}// namespace detail
-
-using compute::as;
-using compute::Expr;
-using compute::Float;
-using compute::UInt;
 
 // from tinyexr: https://github.com/syoyo/tinyexr/blob/master/tinyexr.h
 [[nodiscard]] inline uint float_to_half(float f) noexcept {
@@ -69,13 +54,32 @@ using compute::UInt;
 }
 
 [[nodiscard]] inline float half_to_float(uint h) noexcept {
-    auto x = detail::half_to_float_bits(h);
-    return luisa::bit_cast<float>(x);
-}
+    static_assert(std::endian::native == std::endian::little,
+                  "Only little endian is supported");
+    union FP32 {
+        unsigned int u;
+        float f;
+        struct {// FIXME: assuming little endian here
+            unsigned int Mantissa : 23;
+            unsigned int Exponent : 8;
+            unsigned int Sign : 1;
+        } s;
+    };
+    constexpr auto magic = FP32{113u << 23u};
+    constexpr auto shifted_exp = 0x7c00u << 13u;// exponent mask after shift
+    auto o = FP32{(h & 0x7fffu) << 13u};        // exponent/mantissa bits
+    auto exp_ = shifted_exp & o.u;              // just the exponent
+    o.u += (127u - 15u) << 23u;                 // exponent adjust
 
-[[nodiscard]] inline Float half_to_float(Expr<uint> h) noexcept {
-    auto x = detail::half_to_float_bits(h);
-    return as<float>(x);
+    // handle exponent special cases
+    if (exp_ == shifted_exp) {     // Inf/NaN?
+        o.u += (128u - 16u) << 23u;// extra exp adjust
+    } else if (exp_ == 0u) {       // Zero/Denormal?
+        o.u += 1u << 23u;          // extra exp adjust
+        o.f -= magic.f;            // renormalize
+    }
+    o.u |= (h & 0x8000u) << 16u;// sign bit
+    return o.f;
 }
 
 }// namespace luisa::render
