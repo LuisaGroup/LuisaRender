@@ -10332,13 +10332,14 @@ Camera camera : Pinhole {
   film : Color {
     resolution { 1080, 1920 }
   }
-  file { "staircase-llvm.exr" }
+  file { "staircase.exr" }
 }
 
 render {
   cameras { @camera }
   spectrum : Hero {}
-  integrator : WavePath {
+  integrator : MegaPath {
+    sampler : Sobol {}
     depth { 8 }
     rr_depth { 2 }
   }
