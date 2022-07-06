@@ -10,18 +10,21 @@
 
 namespace luisa::render {
 
+using namespace luisa::compute;
+
 class Optimizer : public SceneNode {
 
 public:
     class Instance {
 
-    private:
+    protected:
         const Pipeline &_pipeline;
         const Optimizer *_optimizer;
+        const uint _length;
 
     public:
-        Instance(const Pipeline &pipeline, const Optimizer *optimizer) noexcept
-            : _pipeline{pipeline}, _optimizer{optimizer} {}
+        Instance(const Pipeline &pipeline, const Optimizer *optimizer, const uint length) noexcept
+            : _pipeline{pipeline}, _optimizer{optimizer}, _length{length} {}
         virtual ~Instance() noexcept = default;
         template<typename T = Optimizer>
             requires std::is_base_of_v<Optimizer, T>
@@ -29,22 +32,16 @@ public:
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
 
     public:
-        virtual void clear_gradients(CommandBuffer &command_buffer) noexcept = 0;
-        virtual void apply_gradients(CommandBuffer &command_buffer, float alpha) noexcept = 0;
-        /// Apply then clear the gradients
-        virtual void step(CommandBuffer &command_buffer, float alpha) noexcept {
-            apply_gradients(command_buffer, alpha);
-            clear_gradients(command_buffer);
-        }
+        virtual void apply_gradients(CommandBuffer &command_buffer, float alpha, BufferView<uint> grad) noexcept = 0;
     };
 
-private:
+protected:
     float _learning_rate;
 
 public:
     Optimizer(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
-        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
+        Pipeline &pipeline, CommandBuffer &command_buffer, uint length) const noexcept = 0;
 
     [[nodiscard]] auto learning_rate() const noexcept { return _learning_rate; }
 };

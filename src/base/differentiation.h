@@ -8,6 +8,7 @@
 #include <runtime/image.h>
 #include <runtime/shader.h>
 #include <runtime/command_buffer.h>
+#include <base/optimizer.h>
 
 namespace luisa::render {
 
@@ -27,6 +28,8 @@ class Pipeline;
 class Differentiation {
 
 private:
+    friend class Optimizer;
+
     static constexpr uint gradiant_collision_avoidance_block_bits = 9u;
     static constexpr uint gradiant_collision_avoidance_block_size = 1u << gradiant_collision_avoidance_block_bits;// 512u
     static constexpr uint gradiant_collision_avoidance_bit_and = gradiant_collision_avoidance_block_size - 1u;    // 511u
@@ -93,6 +96,7 @@ private:
     luisa::optional<BufferView<uint>> _counter;
 
     Shader1D<Buffer<uint>> _clear_buffer;
+    Shader1D<Buffer<uint>, Buffer<uint>> _accumulate_grad_const;
     Shader1D<Buffer<uint>, Buffer<float4>, Buffer<float2>, float, Buffer<uint>> _apply_grad_const;
     Shader2D<Buffer<uint>, uint, Image<float>, uint, float, float2, Buffer<uint>, uint> _apply_grad_tex;
 
