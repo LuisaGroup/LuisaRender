@@ -166,6 +166,7 @@ public:
             LUISA_INFO("Start to step");
             Clock clock;
             pipeline().differentiation().step(command_buffer, learning_rate);
+            command_buffer << commit() << synchronize();
             LUISA_INFO("Step finished in {} ms", clock.toc());
         }
 
