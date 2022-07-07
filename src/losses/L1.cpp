@@ -23,6 +23,8 @@ class L1Instance final : public Loss::Instance {
 public:
     L1Instance(const Pipeline &pipeline, const L1 *loss) noexcept
         : Loss::Instance{pipeline, loss} {}
+
+public:
     [[nodiscard]] Float3 loss(const Camera::Instance *camera) const noexcept override;
     [[nodiscard]] Float3 d_loss(const Camera::Instance *camera, Expr<uint2> pixel_id) const noexcept override;
 };
