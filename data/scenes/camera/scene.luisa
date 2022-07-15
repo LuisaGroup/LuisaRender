@@ -212,7 +212,8 @@ Camera camera : ThinLens {
   }
 }
 
-Integrator integrator : WavePath {
+Integrator integrator : MegaPath {
+  sampler : Sobol {}
   // display { true }
 }
 

@@ -14,7 +14,7 @@ Bool refract(Float3 wi, Float3 n, Float eta, Float3 *wt) noexcept {
     auto cosThetaI = dot(n, wi);
     auto sin2ThetaI = max(0.0f, 1.0f - sqr(cosThetaI));
     auto sin2ThetaT = sqr(eta) * sin2ThetaI;
-    auto cosThetaT = sqrt(saturate(1.f - sin2ThetaT));
+    auto cosThetaT = sqrt(1.f - sin2ThetaT);
     // Handle total internal reflection for transmission
     auto refr = sin2ThetaT < 1.f;
     *wt = -eta * wi + (eta * cosThetaI - cosThetaT) * n;

@@ -875,14 +875,14 @@ Camera camera : Pinhole {
   front { 0.013057953678071499, -0.06386303901672363, -0.9978732466697693 }
   up { 0.0, 1.0, 0.0 }
   fov { 35.98339777135762 }
-  spp { 16384 }
+  spp { 16 }
   filter : Gaussian {
     radius { 1 }
   }
   film : Color {
     resolution { 1920, 1080 }
   }
-  file { "output.exr" }
+  file { "render.exr" }
 }
 
 render {

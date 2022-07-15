@@ -290,11 +290,6 @@ void MegakernelPathTracingInstance::_render_one_camera(
         camera->film()->accumulate(pixel_id, spectrum->srgb(swl, Li * shutter_weight));
     };
 
-    Clock clock_dump;
-    FunctionSerializer serializer{};
-    auto json = serializer.serialize(render_kernel.function());
-    LUISA_INFO("Serialize: {} ms", clock_dump.toc());
-
     Clock clock_compile;
     auto render = pipeline.device().compile(render_kernel);
     auto integrator_shader_compilation_time = clock_compile.toc();
