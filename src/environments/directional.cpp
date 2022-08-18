@@ -67,7 +67,7 @@ private:
         Interaction it{-wi_local, make_float2(.5f)};
         auto L = _texture->evaluate_illuminant_spectrum(it, swl, time).value;
         auto pdf = uniform_cone_pdf(env->cos_half_angle());
-        auto valid = env->cos_half_angle() < abs_cos_theta(wi_local);
+        auto valid = env->cos_half_angle() < cos_theta(wi_local);
         return Light::Evaluation{.L = L * ite(valid, env->scale(), 0.f),
                                  .pdf = ite(valid, pdf, 0.f)};
     }
