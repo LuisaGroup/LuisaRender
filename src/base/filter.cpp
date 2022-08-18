@@ -13,6 +13,10 @@ Filter::Filter(Scene *scene, const SceneNodeDesc *desc) noexcept
       _radius{desc->property_float2_or_default(
           "radius", lazy_construct([desc] {
               return make_float2(desc->property_float_or_default("radius", 0.5f));
+          }))},
+      _shift{desc->property_float2_or_default(
+          "shift", lazy_construct([desc] {
+              return make_float2(desc->property_float_or_default("shift", 0.f));
           }))} {
     if (any(_radius <= 0.0f)) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
@@ -21,7 +25,8 @@ Filter::Filter(Scene *scene, const SceneNodeDesc *desc) noexcept
     }
 }
 
-luisa::unique_ptr<Filter::Instance> Filter::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
+luisa::unique_ptr<Filter::Instance> Filter::build(
+    Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
     return luisa::make_unique<Instance>(pipeline, this);
 }
 
@@ -64,7 +69,7 @@ Filter::Sample Filter::Instance::sample(Expr<float2> u) const noexcept {
     auto p = make_float2(make_uint2(ix, iy)) + make_float2(ux, uy);
     auto inv_size = 1.0f / static_cast<float>(look_up_table_size);
     auto pixel = (p * inv_size * 2.0f - 1.0f) * _filter->radius();
-    return {pixel, f / pdf};
+    return {pixel + node()->shift(), f / pdf};
 }
 
 }// namespace luisa::render

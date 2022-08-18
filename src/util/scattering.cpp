@@ -14,7 +14,7 @@ Bool refract(Float3 wi, Float3 n, Float eta, Float3 *wt) noexcept {
     auto cosThetaI = dot(n, wi);
     auto sin2ThetaI = max(0.0f, 1.0f - sqr(cosThetaI));
     auto sin2ThetaT = sqr(eta) * sin2ThetaI;
-    auto cosThetaT = sqrt(saturate(1.f - sin2ThetaT));
+    auto cosThetaT = sqrt(1.f - sin2ThetaT);
     // Handle total internal reflection for transmission
     auto refr = sin2ThetaT < 1.f;
     *wt = -eta * wi + (eta * cosThetaI - cosThetaT) * n;
@@ -213,34 +213,39 @@ Float TrowbridgeReitzDistribution::Lambda(Expr<float3> w) const noexcept {
 [[nodiscard]] inline Float2 TrowbridgeReitzSample11(Expr<float> cosTheta, Expr<float2> U) noexcept {
     using namespace luisa::compute;
 
+    auto slope = def(make_float2());
+
     // special case (normal incidence)
-    auto r = sqrt(U.x / (1.f - U.x));
-    auto phi = (2.f * pi) * U.y;
-    auto special_slope = r * make_float2(cos(phi), sin(phi));
-    auto sinTheta = sqrt(saturate(1.f - sqr(cosTheta)));
-    auto tanTheta = sinTheta / cosTheta;
-    auto a = 1.f / tanTheta;
-    auto G1 = 2.f / (1.f + sqrt(1.f + 1.f / sqr(a)));
+    $if (cosTheta > .9999f) {
+        auto r = sqrt(U.x / (1.f - U.x));
+        auto phi = (2.f * pi) * U.y;
+        slope = r * make_float2(cos(phi), sin(phi));
+    } $else {
+        auto sinTheta = sqrt(max(0.f, 1.f - sqr(cosTheta)));
+        auto tanTheta = sinTheta / cosTheta;
+        auto a = 1.f / tanTheta;
+        auto G1 = 2.f / (1.f + sqrt(1.f + 1.f / sqr(a)));
 
-    // sample slope_x
-    auto A = 2.f * U.x / G1 - 1.f;
-    auto tmp = min(1.f / (sqr(A) - 1.f), 1e10f);
-    auto B = tanTheta;
-    auto D = sqrt(max(sqr(B) * sqr(tmp) - (sqr(A) - sqr(B)) * tmp, 0.f));
-    auto slope_x_1 = B * tmp - D;
-    auto slope_x_2 = B * tmp + D;
-    auto slope_x = ite(
-        (A < 0.f) | (slope_x_2 > 1.f / tanTheta),
-        slope_x_1, slope_x_2);
+        // sample slope_x
+        auto A = 2.f * U.x / G1 - 1.f;
+        auto tmp = min(1.f / (sqr(A) - 1.f), 1e10f);
+        auto B = tanTheta;
+        auto D = sqrt(max(sqr(B * tmp) - (sqr(A) - sqr(B)) * tmp, 0.f));
+        auto slope_x_1 = B * tmp - D;
+        auto slope_x_2 = B * tmp + D;
+        auto slope_x = ite(
+            (A < 0.f) | (slope_x_2 * tanTheta > 1.f),
+            slope_x_1, slope_x_2);
 
-    // sample slope_y
-    auto S = ite(U.y > .5f, 1.f, -1.f);
-    auto U2 = ite(U.y > .5f, 2.f * (U.y - .5f), 2.f * (.5f - U.y));
-    auto z = (U2 * (U2 * (U2 * 0.27385f - 0.73369f) + 0.46341f)) /
-             (U2 * (U2 * (U2 * 0.093073f + 0.309420f) - 1.000000f) + 0.597999f);
-    auto slope_y = S * z * sqrt(1.f + sqr(slope_x));
-    auto slope = make_float2(slope_x, slope_y);
-    return ite(cosTheta > .9999f, special_slope, slope);
+        // sample slope_y
+        auto S = ite(U.y > .5f, 1.f, -1.f);
+        auto U2 = ite(U.y > .5f, 2.f * (U.y - .5f), 2.f * (.5f - U.y));
+        auto z = (U2 * (U2 * (U2 * 0.27385f - 0.73369f) + 0.46341f)) /
+                (U2 * (U2 * (U2 * 0.093073f + 0.309420f) - 1.000000f) + 0.597999f);
+        auto slope_y = S * z * sqrt(1.f + sqr(slope_x));
+        slope = make_float2(slope_x, slope_y);
+    };
+    return slope;
 }
 
 [[nodiscard]] inline Float3 TrowbridgeReitzSample(Expr<float3> wi, Expr<float2> alpha, Expr<float2> U) noexcept {

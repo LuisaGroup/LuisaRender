@@ -10320,25 +10320,65 @@ Shape shape_774 : Mesh {
   }
 }
 
-Camera camera : Pinhole {
+Filter filter_base {
+  radius { 1 }
+}
+
+Camera camera_base {
   position { 0.03242092579603195, 1.526729941368103, 4.881969451904297 }
   front { -0.007646017242223024, 0.04505503550171852, -0.998955249786377 }
   up { 0.0, 1.0, 0.0 }
   fov { 58.543979551022964 }
-  spp { 16 }
-  filter : Gaussian {
-    radius { 1 }
-  }
+  spp { 128 }
   film : Color {
     resolution { 1080, 1920 }
   }
-  file { "staircase-llvm.exr" }
+}
+
+Camera camera_center : Pinhole(@camera_base) {
+  filter : Gaussian(@filter_base) {}
+  file { "staircase-base.exr" }
+}
+
+Camera camera_shift_x : Pinhole(@camera_base) {
+  filter : Gaussian(@filter_base) {
+    shift { 1, 0 }
+  }
+  file { "staircase-shift-x.exr" }
+}
+
+Camera camera_shift_y : Pinhole(@camera_base) {
+  filter : Gaussian(@filter_base) {
+    shift { 0, 1 }
+  }
+  file { "staircase-shift-y.exr" }
+}
+
+Camera camera_shift_nx : Pinhole(@camera_base) {
+  filter : Gaussian(@filter_base) {
+    shift { -1, 0 }
+  }
+  file { "staircase-shift-nx.exr" }
+}
+
+Camera camera_shift_ny : Pinhole(@camera_base) {
+  filter : Gaussian(@filter_base) {
+    shift { 0, -1 }
+  }
+  file { "staircase-shift-ny.exr" }
 }
 
 render {
-  cameras { @camera }
-  spectrum : Hero {}
+  cameras {
+    @camera_center,
+    @camera_shift_x,
+    @camera_shift_y,
+    @camera_shift_nx,
+    @camera_shift_ny
+  }
+  spectrum : sRGB {}
   integrator : WavePath {
+    // sampler : Sobol {}
     depth { 8 }
     rr_depth { 2 }
   }
