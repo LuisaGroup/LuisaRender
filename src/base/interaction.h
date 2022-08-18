@@ -78,7 +78,7 @@ public:
     [[nodiscard]] auto p_robust(Expr<float3> w) const noexcept {
         return ite(dot(_ng, w) < 0.f,
                    offset_ray_origin(_pg, -_ng),
-                   offset_ray_origin(_ps, _ng));
+                   offset_ray_origin(_pg, _ng));
     }
     [[nodiscard]] auto spawn_ray(Expr<float3> wi, Expr<float> t_max = std::numeric_limits<float>::max()) const noexcept {
         return make_ray(p_robust(wi), wi, 0.f, t_max);
