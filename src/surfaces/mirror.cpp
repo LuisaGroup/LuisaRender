@@ -24,7 +24,7 @@ public:
         : Surface{scene, desc},
           _color{scene->load_texture(desc->property_node("color"))},
           _roughness{scene->load_texture(desc->property_node_or_default("roughness"))},
-          _remap_roughness{desc->property_bool_or_default("remap_roughness", false)} {
+          _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {
         LUISA_RENDER_CHECK_ALBEDO_TEXTURE(MirrorSurface, color);
         LUISA_RENDER_CHECK_GENERIC_TEXTURE(MirrorSurface, roughness, 1);
     }
