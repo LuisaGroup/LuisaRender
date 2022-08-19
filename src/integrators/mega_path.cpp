@@ -188,7 +188,8 @@ void MegakernelPathTracingInstance::_render_one_camera(
 
     using namespace luisa::compute;
     Callable balanced_heuristic = [](Float pdf_a, Float pdf_b) noexcept {
-        return ite(pdf_a > 0.0f, pdf_a / (pdf_a + pdf_b), 0.0f);
+        auto p = pdf_a + pdf_b;
+        return ite(p  > 0.0f, pdf_a / p, 0.0f);
     };
 
     Kernel2D render_kernel = [&](UInt frame_index, Float time, Float shutter_weight) noexcept {
@@ -262,9 +263,9 @@ void MegakernelPathTracingInstance::_render_one_camera(
                     $if(light_sample.eval.pdf > 0.0f & !occluded) {
                         auto wi = light_sample.wi;
                         auto eval = closure->evaluate(wi);
-                        auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
-                        Li += mis_weight / light_sample.eval.pdf * abs(dot(eval.normal, wi)) *
-                              beta * eval.f * light_sample.eval.L;
+                        auto w = balanced_heuristic(light_sample.eval.pdf, eval.pdf) /
+                                 light_sample.eval.pdf;
+                        Li += w * abs(dot(eval.normal, wi)) * beta * eval.f * light_sample.eval.L;
                     };
 
                     // sample material

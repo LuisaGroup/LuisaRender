@@ -201,13 +201,13 @@ Float TrowbridgeReitzDistribution::D(Expr<float3> wh) const noexcept {
 
 Float TrowbridgeReitzDistribution::Lambda(Expr<float3> w) const noexcept {
     using compute::isinf;
-    auto absTanTheta = abs(tan_theta(w));
+    auto tanTheta = abs(tan_theta(w));
     // Compute _alpha_ for direction _w_
     auto alpha2 = cos2_phi(w) * sqr(alpha().x) +
                   sin2_phi(w) * sqr(alpha().y);
-    auto alpha2Tan2Theta = alpha2 * sqr(absTanTheta);
+    auto alpha2Tan2Theta = alpha2 * sqr(tanTheta);
     auto L = (-1.f + sqrt(1.f + alpha2Tan2Theta)) * .5f;
-    return ite(isinf(absTanTheta), 0.f, L);
+    return ite(isinf(tanTheta), 0.f, L);
 }
 
 [[nodiscard]] inline Float2 TrowbridgeReitzSample11(Expr<float> cosTheta, Expr<float2> U) noexcept {
