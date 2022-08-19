@@ -61,7 +61,7 @@ Surface mat_Walls : Matte {
   }
 }
 
-Surface mat_Paneling : Substrate {
+Surface mat_Paneling : Matte {
   Kd : Constant {
     v { 0.800000011920929, 0.800000011920929, 0.800000011920929 }
     semantic { "albedo" }
@@ -1051,6 +1051,7 @@ Camera camera : Pinhole {
   spp { 1024 }
   filter : Gaussian {
     radius { 1 }
+    sigma { 1 }
   }
   film : Color {
     resolution { 1920, 1080 }
@@ -1060,8 +1061,8 @@ Camera camera : Pinhole {
 
 render {
   cameras { @camera }
-  spectrum : sRGB {}
-  integrator : MegaPath {
+  spectrum : Hero {}
+  integrator : WavePath {
     sampler : Independent {}
     depth { 16 }
     rr_depth { 5 }

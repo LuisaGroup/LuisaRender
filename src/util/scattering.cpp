@@ -529,22 +529,28 @@ OrenNayar::OrenNayar(SampledSpectrum R, Expr<float> sigma) noexcept
 }
 
 SampledSpectrum OrenNayar::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
-    auto sinThetaI = sin_theta(wi);
-    auto sinThetaO = sin_theta(wo);
-    // Compute cosine term of Oren-Nayar model
-    auto sinPhiI = sin_phi(wi);
-    auto cosPhiI = cos_phi(wi);
-    auto sinPhiO = sin_phi(wo);
-    auto cosPhiO = cos_phi(wo);
-    auto dCos = cosPhiI * cosPhiO + sinPhiI * sinPhiO;
-    auto maxCos = ite(sinThetaI > 1e-4f & sinThetaO > 1e-4f, max(0.f, dCos), 0.f);
-    // Compute sine and tangent terms of Oren-Nayar model
-    auto absCosThetaI = abs_cos_theta(wi);
-    auto absCosThetaO = abs_cos_theta(wo);
-    auto sinAlpha = ite(absCosThetaI > absCosThetaO, sinThetaO, sinThetaI);
-    auto tanBeta = ite(absCosThetaI > absCosThetaO,
-                       sinThetaI / absCosThetaI, sinThetaO / absCosThetaO);
-    return _r * ite(same_hemisphere(wo, wi), inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta), 0.f);
+    auto valid = same_hemisphere(wo, wi);
+    auto s = ite(valid, inv_pi, 0.f);
+    auto f = _r * s;
+    $if (_sigma != 0.f & s > 0.f) {
+        auto sinThetaI = sin_theta(wi);
+        auto sinThetaO = sin_theta(wo);
+        // Compute cosine term of Oren-Nayar model
+        auto sinPhiI = sin_phi(wi);
+        auto cosPhiI = cos_phi(wi);
+        auto sinPhiO = sin_phi(wo);
+        auto cosPhiO = cos_phi(wo);
+        auto dCos = cosPhiI * cosPhiO + sinPhiI * sinPhiO;
+        auto maxCos = ite(sinThetaI > 1e-4f & sinThetaO > 1e-4f, max(0.f, dCos), 0.f);
+        // Compute sine and tangent terms of Oren-Nayar model
+        auto absCosThetaI = abs_cos_theta(wi);
+        auto absCosThetaO = abs_cos_theta(wo);
+        auto sinAlpha = ite(absCosThetaI > absCosThetaO, sinThetaO, sinThetaI);
+        auto tanBeta = ite(absCosThetaI > absCosThetaO,
+                           sinThetaI / absCosThetaI, sinThetaO / absCosThetaO);
+        f *= (_a + _b * maxCos * sinAlpha * tanBeta);
+    };
+    return f;
 }
 
 OrenNayar::Gradient OrenNayar::backward(

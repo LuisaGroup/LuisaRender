@@ -163,7 +163,8 @@ luisa::unique_ptr<Surface::Closure> SubstrateInstance::_closure(
     }
     auto cos_theta = dot(it.shading().n(), it.wo());
     auto pow5 = [](auto &&v) { return sqr(sqr(v)) * v; };
-    auto Kd_ratio = Kd_lum / max(Kd_lum + Ks_lum, 1e-5f) * (1.f - pow5(1.f - cos_theta));
+//    auto Kd_ratio = Kd_lum / max(Kd_lum + Ks_lum, 1e-5f) * (1.f - pow5(1.f - cos_theta));
+    auto Kd_ratio = Kd_lum / max(Kd_lum + Ks_lum, 1e-5f);
     return luisa::make_unique<SubstrateClosure>(this, it, swl, time, Kd, Ks, alpha, Kd_ratio);
 }
 
