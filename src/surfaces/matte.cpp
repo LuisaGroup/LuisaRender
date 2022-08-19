@@ -80,9 +80,8 @@ private:
         auto wi_local = _it.shading().world_to_local(wi);
         auto f = _oren_nayar->evaluate(wo_local, wi_local);
         auto pdf = _oren_nayar->pdf(wo_local, wi_local);
-        return {.f = f,
+        return {.f = f * abs_cos_theta(wi_local),
                 .pdf = pdf,
-                .normal = _it.shading().n(),
                 .roughness = make_float2(1.f),
                 .eta = SampledSpectrum{_swl.dimension(), 1.f}};
     }
@@ -93,9 +92,8 @@ private:
         auto f = _oren_nayar->sample(wo_local, &wi_local, u, &pdf);
         auto wi = _it.shading().local_to_world(wi_local);
         return {.wi = wi,
-                .eval = {.f = f,
+                .eval = {.f = f * abs_cos_theta(wi_local),
                          .pdf = pdf,
-                         .normal = _it.shading().n(),
                          .roughness = make_float2(1.f),
                          .eta = SampledSpectrum{_swl.dimension(), 1.f}}};
     }

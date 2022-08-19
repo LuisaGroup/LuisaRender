@@ -437,8 +437,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                         auto wi = light_samples.read_wi(queue_id);
                         auto eval = closure->evaluate(wi);
                         auto mis_weight = balanced_heuristic(pdf_light, eval.pdf);
-                        Li += mis_weight / pdf_light * abs(dot(eval.normal, wi)) *
-                              beta * eval.f * Ld;
+                        Li += mis_weight / pdf_light * beta * eval.f * Ld;
                     };
 
                     // sample material
@@ -446,7 +445,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                     ray = it->spawn_ray(sample.wi);
                     pdf_bsdf = sample.eval.pdf;
                     auto w = ite(sample.eval.pdf > 0.0f, 1.f / sample.eval.pdf, 0.f);
-                    beta *= abs(dot(sample.eval.normal, sample.wi)) * w * sample.eval.f;
+                    beta *= w * sample.eval.f;
                 };
             });
             $if(beta.any([](auto b) noexcept { return !isnan(b) & b > 0.f; })) {

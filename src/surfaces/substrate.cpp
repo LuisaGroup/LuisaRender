@@ -96,9 +96,8 @@ private:
         auto wi_local = _it.shading().world_to_local(wi);
         auto f = _blend->evaluate(wo_local, wi_local);
         auto pdf = _blend->pdf(wo_local, wi_local);
-        return {.f = f,
+        return {.f = f * abs_cos_theta(wi_local),
                 .pdf = pdf,
-                .normal = _it.shading().n(),
                 .roughness = _distribution->alpha(),
                 .eta = _eta_i};
     }
@@ -111,9 +110,8 @@ private:
         auto f = _blend->sample(wo_local, &wi_local, u, &pdf);
         auto wi = _it.shading().local_to_world(wi_local);
         return {.wi = wi,
-                .eval = {.f = f,
+                .eval = {.f = f * abs_cos_theta(wi_local),
                          .pdf = pdf,
-                         .normal = _it.shading().n(),
                          .roughness = _distribution->alpha(),
                          .eta = _eta_i}};
     }

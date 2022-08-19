@@ -319,7 +319,7 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
                             //                                  beta * eval.f * light_sample.eval.L;
 
                             // TODO : or apply the approximation light_sample.eval.L / light_sample.eval.pdf = 1.f
-                            auto weight = mis_weight / light_sample.eval.pdf * abs(dot(eval.normal, wi));
+                            auto weight = mis_weight / light_sample.eval.pdf;
                             closure->backward(wi, weight * beta * light_sample.eval.L);
 
                             // TODO : backward direct light
@@ -336,7 +336,7 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
                         closure->backward(sample.wi, grad_weight * beta * Li * w);
 
                         // d_Li * fs
-                        beta *= abs(dot(sample.eval.normal, sample.wi)) * w * sample.eval.f;
+                        beta *= w * sample.eval.f;
                     };
                 });
 
@@ -487,9 +487,7 @@ void MegakernelRadiativeDiffInstance::_render_one_camera(
                             auto wi = light_sample.wi;
                             auto eval = closure->evaluate(wi);
                             auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
-                            Li += mis_weight / light_sample.eval.pdf *
-                                  abs_dot(eval.normal, wi) *
-                                  beta * eval.f * light_sample.eval.L;
+                            Li += mis_weight / light_sample.eval.pdf * beta * eval.f * light_sample.eval.L;
                         };
 
                         // sample material
@@ -497,7 +495,7 @@ void MegakernelRadiativeDiffInstance::_render_one_camera(
                         ray = it->spawn_ray(sample.wi);
                         pdf_bsdf = sample.eval.pdf;
                         auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
-                        beta *= abs(dot(sample.eval.normal, sample.wi)) * w * sample.eval.f;
+                        beta *= w * sample.eval.f;
                     };
                 });
 

@@ -352,9 +352,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                             auto wi = light_sample.wi;
                             auto eval = closure->evaluate(wi);
                             auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
-                            Li += mis_weight / light_sample.eval.pdf *
-                                  abs_dot(eval.normal, wi) *
-                                  beta * eval.f * light_sample.eval.L;
+                            Li += mis_weight / light_sample.eval.pdf * beta * eval.f * light_sample.eval.L;
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
                             $if(all(pixel_id == pixel_checked)) {
@@ -368,7 +366,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                         ray = it->spawn_ray(sample.wi);
                         pdf_bsdf = sample.eval.pdf;
                         auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
-                        beta *= abs(dot(sample.eval.normal, sample.wi)) * w * sample.eval.f;
+                        beta *= w * sample.eval.f;
                     };
                 });
 
@@ -510,7 +508,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                             auto wi = light_sample.wi;
                             auto eval = closure->evaluate(wi);
                             auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
-                            auto weight = mis_weight / light_sample.eval.pdf * abs(dot(eval.normal, wi)) * beta;
+                            auto weight = mis_weight / light_sample.eval.pdf * beta;
                             Li -= weight * eval.f * light_sample.eval.L;
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
@@ -538,7 +536,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                         df = ite(sample.eval.f == 0.f, 0.f, df / sample.eval.f);
                         closure->backward(sample.wi, df);
 
-                        beta *= abs(dot(sample.eval.normal, sample.wi)) * w * sample.eval.f;
+                        beta *= w * sample.eval.f;
                     };
                 });
 
@@ -710,9 +708,7 @@ void MegakernelReplayDiffInstance::_render_one_camera(
                             auto wi = light_sample.wi;
                             auto eval = closure->evaluate(wi);
                             auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
-                            Li += mis_weight / light_sample.eval.pdf *
-                                  abs_dot(eval.normal, wi) *
-                                  beta * eval.f * light_sample.eval.L;
+                            Li += mis_weight / light_sample.eval.pdf * beta * eval.f * light_sample.eval.L;
                         };
 
                         // sample material
@@ -720,7 +716,7 @@ void MegakernelReplayDiffInstance::_render_one_camera(
                         ray = it->spawn_ray(sample.wi);
                         pdf_bsdf = sample.eval.pdf;
                         auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
-                        beta *= abs(dot(sample.eval.normal, sample.wi)) * w * sample.eval.f;
+                        beta *= w * sample.eval.f;
                     };
                 });
 

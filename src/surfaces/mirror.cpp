@@ -117,9 +117,8 @@ public:
         auto wi_local = _it.shading().world_to_local(wi);
         auto f = _refl->evaluate(wo_local, wi_local);
         auto pdf = _refl->pdf(wo_local, wi_local);
-        return {.f = f,
+        return {.f = f * abs_cos_theta(wi_local),
                 .pdf = pdf,
-                .normal = _it.shading().n(),
                 .roughness = _distribution->alpha(),
                 .eta = SampledSpectrum{_swl.dimension(), 1.f}};
     }
@@ -128,9 +127,8 @@ public:
         auto wi_local = def(make_float3(0.f, 0.f, 1.f));
         auto f = _refl->sample(_it.wo_local(), &wi_local, u, &pdf);
         return {.wi = _it.shading().local_to_world(wi_local),
-                .eval = {.f = f,
+                .eval = {.f = f * abs_cos_theta(wi_local),
                          .pdf = pdf,
-                         .normal = _it.shading().n(),
                          .roughness = _distribution->alpha(),
                          .eta = SampledSpectrum{_swl.dimension(), 1.f}}};
     }

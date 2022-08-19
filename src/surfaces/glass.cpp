@@ -164,9 +164,8 @@ public:
         };
         auto entering = wi_local.z < 0.f;
         auto eta = ite(entering, _fresnel->eta_t(), 1.f);
-        return {.f = f,
+        return {.f = f * abs_cos_theta(wi_local),
                 .pdf = pdf,
-                .normal = _it.shading().n(),
                 .roughness = _distribution->alpha(),
                 .eta = eta};
     }
@@ -188,9 +187,8 @@ public:
         auto entering = wi_local.z < 0.f;
         auto eta = ite(entering, _fresnel->eta_t(), 1.f);
         return {.wi = wi,
-                .eval = {.f = f,
+                .eval = {.f = f * abs_cos_theta(wi_local),
                          .pdf = pdf,
-                         .normal = _it.shading().n(),
                          .roughness = _distribution->alpha(),
                          .eta = eta}};
     }

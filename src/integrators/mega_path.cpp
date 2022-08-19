@@ -265,7 +265,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
                         auto eval = closure->evaluate(wi);
                         auto w = balanced_heuristic(light_sample.eval.pdf, eval.pdf) /
                                  light_sample.eval.pdf;
-                        Li += w * abs(dot(eval.normal, wi)) * beta * eval.f * light_sample.eval.L;
+                        Li += w * beta * eval.f * light_sample.eval.L;
                     };
 
                     // sample material
@@ -273,7 +273,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
                     ray = it->spawn_ray(sample.wi);
                     pdf_bsdf = sample.eval.pdf;
                     auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
-                    beta *= abs(dot(sample.eval.normal, sample.wi)) * w * sample.eval.f;
+                    beta *= w * sample.eval.f;
                 };
             });
 

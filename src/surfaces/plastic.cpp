@@ -120,9 +120,8 @@ private:
         auto pdf_d = _lambert->pdf(wo_local, wi_local);
         auto f_s = _microfacet->evaluate(wo_local, wi_local);
         auto pdf_s = _microfacet->pdf(wo_local, wi_local);
-        return {.f = f_d + f_s,
+        return {.f = (f_d + f_s) * abs_cos_theta(wi_local),
                 .pdf = lerp(pdf_s, pdf_d, _kd_ratio),
-                .normal = _it.shading().n(),
                 .roughness = _distribution->alpha(),
                 .eta = _eta_i};
     }
@@ -148,9 +147,8 @@ private:
         };
         auto wi = _it.shading().local_to_world(wi_local);
         return {.wi = wi,
-                .eval = {.f = f,
+                .eval = {.f = f * abs_cos_theta(wi_local),
                          .pdf = pdf,
-                         .normal = _it.shading().n(),
                          .roughness = _distribution->alpha(),
                          .eta = _eta_i}};
     }

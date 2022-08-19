@@ -655,9 +655,8 @@ public:
             };
         };
         auto thin = instance<DisneySurfaceInstance>()->thin();
-        return {.f = f,
+        return {.f = f * abs_cos_theta(wi_local),
                 .pdf = pdf,
-                .normal = _it.shading().n(),
                 .roughness = _distrib->alpha(),
                 .eta = SampledSpectrum{
                     _swl.dimension(),
