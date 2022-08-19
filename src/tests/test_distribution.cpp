@@ -14,6 +14,7 @@ using namespace luisa::render;
 using namespace luisa::compute;
 
 int main(int argc, char *argv[]) {
+
     log_level_info();
     Context context{argv[0]};
     auto device = context.create_device("cuda");
