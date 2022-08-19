@@ -364,17 +364,19 @@ SampledSpectrum MicrofacetReflection::evaluate(Expr<float3> wo, Expr<float3> wi)
     using compute::any;
     using compute::normalize;
     auto wh = wi + wo;
-    auto valid = same_hemisphere(wo, wi) & any(wh != 0.f);
-    wh = normalize(wh);
-    // For the Fresnel call, make sure that wh is in the same hemisphere
-    // as the surface normal, so that TIR is handled correctly.
-    auto F = _fresnel->evaluate(dot(wi, face_forward(wh, make_float3(0.f, 0.f, 1.f))));
-    auto D = _distribution->D(wh);
-    auto G = _distribution->G(wo, wi);
-    auto cos_o = cos_theta(wo);
-    auto cos_i = cos_theta(wi);
-    auto h = abs(0.25f * D * G / (cos_i * cos_o));
-    return _r * F * ite(valid, h, 0.f);
+    SampledSpectrum f{_r.dimension()};
+    $if (same_hemisphere(wo, wi) & any(wh != 0.f)) {
+        wh = normalize(wh);
+        // For the Fresnel call, make sure that wh is in the same hemisphere
+        // as the surface normal, so that TIR is handled correctly.
+        auto F = _fresnel->evaluate(dot(wi, face_forward(wh, make_float3(0.f, 0.f, 1.f))));
+        auto D = _distribution->D(wh);
+        auto G = _distribution->G(wo, wi);
+        auto cos_o = cos_theta(wo);
+        auto cos_i = cos_theta(wi);
+        f = _r * F * abs(0.25f * D * G / (cos_i * cos_o));
+    };
+    return f;
 }
 
 SampledSpectrum MicrofacetReflection::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *p) const noexcept {
@@ -516,7 +518,7 @@ MicrofacetTransmission::Gradient MicrofacetTransmission::backward(
         d_t[i] = d_f * k2 * abs(k1);
         auto grad_D = _distribution->grad_D(wh);
         d_alpha += d_f * k2 * _t[i] * sign(k1) * k0 * (D * grad_G.dAlpha + G * grad_D.dAlpha);
-    };
+    }
 
     return {.dT = d_t, .dAlpha = d_alpha};
 }

@@ -61,7 +61,7 @@ Surface mat_Walls : Matte {
   }
 }
 
-Surface mat_Paneling : Matte {
+Surface mat_Paneling : Substrate {
   Kd : Constant {
     v { 0.800000011920929, 0.800000011920929, 0.800000011920929 }
     semantic { "albedo" }
