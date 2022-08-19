@@ -45,14 +45,14 @@ public:
         auto sin_theta = sin(theta);
         auto x = sin(phi) * sin_theta;
         auto z = cos(phi) * sin_theta;
-        return normalize(make_float3(x, y, z));
+        return std::make_tuple(theta, phi, normalize(make_float3(x, y, z)));
     }
     [[nodiscard]] static auto direction_to_uv(Expr<float3> w) noexcept {
         auto theta = acos(w.y);
         auto phi = atan2(w.x, w.z);
         auto u = 1.f - 0.5f * inv_pi * phi;
         auto v = theta * inv_pi;
-        return fract(make_float2(u, v));
+        return std::make_tuple(theta, phi, fract(make_float2(u, v)));
     }
 };
 
@@ -64,12 +64,17 @@ private:
     luisa::optional<uint> _pdf_buffer_id;
 
 private:
-    [[nodiscard]] auto _evaluate(Expr<float3> wi_local, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-        auto env = node<Spherical>();
-        auto uv = Spherical::direction_to_uv(wi_local);
+    [[nodiscard]] auto _evaluate(Expr<float3> wi_local, Expr<float2> uv,
+                                 const SampledWavelengths &swl, Expr<float> time) const noexcept {
         Interaction it{-wi_local, uv};
         auto L = _texture->evaluate_illuminant_spectrum(it, swl, time).value;
-        return L * env->scale();
+        return L * node<Spherical>()->scale();
+    }
+
+    [[nodiscard]] static auto _directional_pdf(Expr<float> p, Expr<float> theta) noexcept {
+        auto s = sin(theta);
+        auto inv_s = ite(s > 0.f, 1.f / s, 0.f);
+        return p * inv_s * (.5f * inv_pi * inv_pi);
     }
 
 public:
@@ -82,24 +87,27 @@ public:
         Expr<float3> wi, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         auto world_to_env = transpose(transform_to_world());
         auto wi_local = normalize(world_to_env * wi);
-        auto L = _evaluate(wi_local, swl, time);
+        auto [theta, phi, uv] = Spherical::direction_to_uv(wi_local);
+        auto L = _evaluate(wi_local, uv, swl, time);
         if (_texture->node()->is_constant()) {
             return {.L = L, .pdf = uniform_sphere_pdf()};
         }
-        auto uv = Spherical::direction_to_uv(wi_local);
         auto size = make_float2(Spherical::sample_map_size);
         auto ix = cast<uint>(clamp(uv.x * size.x, 0.f, size.x - 1.f));
         auto iy = cast<uint>(clamp(uv.y * size.y, 0.f, size.y - 1.f));
         auto pdf_buffer = pipeline().bindless_buffer<float>(*_pdf_buffer_id);
         auto pdf = pdf_buffer.read(iy * Spherical::sample_map_size.x + ix);
-        return {.L = L, .pdf = pdf};
+        return {.L = L, .pdf = _directional_pdf(pdf, theta)};
     }
     [[nodiscard]] Light::Sample sample(
         Expr<float3> p_from, const SampledWavelengths &swl,
         Expr<float> time, Expr<float2> u) const noexcept override {
-        auto [wi_local, pdf] = [&] {
+        auto [wi, Li, pdf] = [&] {
             if (_texture->node()->is_constant()) {
-                return std::make_pair(sample_uniform_sphere(u), def(uniform_sphere_pdf()));
+                auto w = sample_uniform_sphere(u);
+                auto [theta, phi, uv] = Spherical::direction_to_uv(w);
+                auto L = _evaluate(w, uv, swl, time);
+                return std::make_tuple(w, L, def(uniform_sphere_pdf()));
             }
             auto alias_buffer = pipeline().bindless_buffer<AliasEntry>(*_alias_buffer_id);
             auto [iy, uy] = sample_alias_table(
@@ -112,10 +120,12 @@ public:
                       make_float2(Spherical::sample_map_size);
             auto index = iy * Spherical::sample_map_size.x + ix;
             auto p = pipeline().bindless_buffer<float>(*_pdf_buffer_id).read(index);
-            return std::make_pair(Spherical::uv_to_direction(uv), p);
+            auto [theta, phi, w] = Spherical::uv_to_direction(uv);
+            auto L = _evaluate(w, uv, swl, time);
+            return std::make_tuple(w, L, _directional_pdf(p, theta));
         }();
-        return {.eval = {.L = _evaluate(wi_local, swl, time), .pdf = pdf},
-                .wi = normalize(transform_to_world() * wi_local),
+        return {.eval = {.L = Li, .pdf = pdf},
+                .wi = normalize(transform_to_world() * wi),
                 .distance = std::numeric_limits<float>::max()};
     }
 };
@@ -135,7 +145,7 @@ luisa::unique_ptr<Environment::Instance> Spherical::build(
             auto coord = dispatch_id().xy();
             auto uv = (make_float2(coord) + .5f) /
                       make_float2(sample_map_size);
-            auto w = Spherical::uv_to_direction(uv);
+            auto [theta, phi, w] = Spherical::uv_to_direction(uv);
             auto it = Interaction{-w, uv};
             auto scale = texture->evaluate_illuminant_spectrum(it, pipeline.spectrum()->sample(0.5f), 0.f).strength;
             auto sin_theta = sin(uv.y * pi);
@@ -153,6 +163,7 @@ luisa::unique_ptr<Environment::Instance> Spherical::build(
         luisa::vector<float> row_averages(sample_map_size.y);
         luisa::vector<float> pdfs(pixel_count);
         luisa::vector<AliasEntry> aliases(sample_map_size.y + pixel_count);
+        // construct conditional alias table
         for (auto i = 0u; i < sample_map_size.y; i++) {
             auto sum = 0.;
             auto values = luisa::span{scale_map}.subspan(
@@ -167,13 +178,13 @@ luisa::unique_ptr<Environment::Instance> Spherical::build(
                 alias_table.data(), sample_map_size.x,
                 aliases.data() + sample_map_size.y + i * sample_map_size.x);
         }
+        // construct marginal alias table
         auto [alias_table, pdf_table] = create_alias_table(row_averages);
         std::copy_n(alias_table.data(), sample_map_size.y, aliases.data());
         for (auto y = 0u; y < sample_map_size.y; y++) {
             auto offset = y * sample_map_size.x;
             auto pdf_y = pdf_table[y];
-            auto scale = static_cast<float>(
-                .25 * std::numbers::inv_pi * pdf_y * pixel_count);
+            auto scale = static_cast<float>(pdf_y * pixel_count);
             for (auto x = 0u; x < sample_map_size.x; x++) {
                 pdfs[offset + x] *= scale;
             }
