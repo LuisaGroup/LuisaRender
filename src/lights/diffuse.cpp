@@ -65,7 +65,7 @@ struct DiffuseLightClosure final : public Light::Closure {
         auto light = instance<DiffuseLightInstance>();
         auto &&pipeline = light->pipeline();
         auto pdf_triangle = pipeline.buffer<float>(it_light.shape()->pdf_buffer_id()).read(it_light.triangle_id());
-        auto pdf_area = cast<float>(it_light.shape()->triangle_count()) * (pdf_triangle / it_light.triangle_area());
+        auto pdf_area = pdf_triangle / it_light.triangle_area();
         auto cos_wo = dot(it_light.wo(), it_light.shading().n());
         auto front_face = cos_wo > 0.0f;
         auto L = light->texture()->evaluate_illuminant_spectrum(it_light, _swl, _time).value *
