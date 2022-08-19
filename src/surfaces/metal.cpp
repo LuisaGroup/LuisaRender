@@ -452,7 +452,7 @@ public:
         : Surface::Instance{pipeline, surface}, _roughness{roughness} {}
 
 private:
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
 };
 
@@ -508,7 +508,7 @@ private:
     }
 };
 
-luisa::unique_ptr<Surface::Closure> MetalInstance::_closure(
+luisa::unique_ptr<Surface::Closure> MetalInstance::closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto alpha = def(make_float2(.5f));
     if (_roughness != nullptr) {

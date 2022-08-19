@@ -72,7 +72,7 @@ public:
     [[nodiscard]] auto eta() const noexcept { return _eta; }
 
 private:
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         const Interaction &it, const SampledWavelengths &swl,
         Expr<float> time) const noexcept override;
 };
@@ -188,7 +188,7 @@ private:
     }
 };
 
-luisa::unique_ptr<Surface::Closure> PlasticInstance::_closure(
+luisa::unique_ptr<Surface::Closure> PlasticInstance::closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     // alpha
     auto alpha = def(make_float2(0.f));

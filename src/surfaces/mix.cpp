@@ -50,7 +50,7 @@ public:
     [[nodiscard]] auto ratio() const noexcept { return _ratio; }
 
 private:
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         const Interaction &it, const SampledWavelengths &swl,
         Expr<float> time) const noexcept override;
 };
@@ -161,7 +161,7 @@ public:
     }
 };
 
-luisa::unique_ptr<Surface::Closure> MixSurfaceInstance::_closure(
+luisa::unique_ptr<Surface::Closure> MixSurfaceInstance::closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto ratio = _ratio == nullptr ? 0.5f : clamp(_ratio->evaluate(it, time).x, 0.f, 1.f);
     auto a = _a == nullptr ? nullptr : _a->closure(it, swl, time);

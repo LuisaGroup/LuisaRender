@@ -85,13 +85,6 @@ public:
     private:
         friend class Surface;
         const Texture::Instance *_alpha{nullptr};
-        const Texture::Instance *_normal{nullptr};
-
-    private:
-        [[nodiscard]] virtual luisa::unique_ptr<Closure> _closure(
-            const Interaction &it,
-            const SampledWavelengths &swl,
-            Expr<float> time) const noexcept = 0;
 
     public:
         Instance(const Pipeline &pipeline, const Surface *surface) noexcept
@@ -102,13 +95,12 @@ public:
         [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_surface); }
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
         [[nodiscard]] auto alpha() const noexcept { return _alpha; }
-        [[nodiscard]] auto normal() const noexcept { return _normal; }
-        [[nodiscard]] luisa::unique_ptr<Closure> closure(
-            Interaction it, const SampledWavelengths &swl, Expr<float> time) const noexcept;
+        [[nodiscard]] virtual luisa::unique_ptr<Closure> closure(
+            const Interaction &it, const SampledWavelengths &swl,
+            Expr<float> time) const noexcept = 0;
     };
 
 private:
-    const Texture *_normal;
     const Texture *_alpha;
 
 private:
@@ -117,7 +109,6 @@ private:
 
 public:
     Surface(Scene *scene, const SceneNodeDesc *desc) noexcept;
-    [[nodiscard]] auto normal() const noexcept { return _normal; }
     [[nodiscard]] auto alpha() const noexcept { return _alpha; }
     [[nodiscard]] virtual bool is_null() const noexcept { return false; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(

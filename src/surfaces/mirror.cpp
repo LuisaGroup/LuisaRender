@@ -53,8 +53,9 @@ public:
     [[nodiscard]] auto roughness() const noexcept { return _roughness; }
 
 private:
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
-        const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
+        const Interaction &it, const SampledWavelengths &swl,
+        Expr<float> time) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> MirrorSurface::_build(
@@ -160,7 +161,7 @@ public:
     }
 };
 
-luisa::unique_ptr<Surface::Closure> MirrorInstance::_closure(
+luisa::unique_ptr<Surface::Closure> MirrorInstance::closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto alpha = def(make_float2(0.f));
     if (_roughness != nullptr) {

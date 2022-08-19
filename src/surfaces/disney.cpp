@@ -128,8 +128,9 @@ public:
     [[nodiscard]] auto thin() const { return node<DisneySurface>()->thin(); }
 
 private:
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
-        const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
+        const Interaction &it, const SampledWavelengths &swl,
+        Expr<float> time) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> DisneySurface::_build(
@@ -705,7 +706,7 @@ public:
     }
 };
 
-luisa::unique_ptr<Surface::Closure> DisneySurfaceInstance::_closure(
+luisa::unique_ptr<Surface::Closure> DisneySurfaceInstance::closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto [color, color_lum] = _color->evaluate_albedo_spectrum(it, swl, time);
     auto metallic = _metallic ? _metallic->evaluate(it, time).x : 0.f;

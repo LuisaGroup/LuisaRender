@@ -114,8 +114,9 @@ public:
     [[nodiscard]] auto eta() const noexcept { return _eta; }
 
 private:
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
-        const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
+        const Interaction &it, const SampledWavelengths &swl,
+        Expr<float> time) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> GlassSurface::_build(
@@ -233,7 +234,7 @@ public:
     }
 };
 
-luisa::unique_ptr<Surface::Closure> GlassInstance::_closure(
+luisa::unique_ptr<Surface::Closure> GlassInstance::closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     // roughness
     auto alpha = def(make_float2(0.f));

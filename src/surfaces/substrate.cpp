@@ -59,7 +59,7 @@ public:
     [[nodiscard]] auto roughness() const noexcept { return _roughness; }
 
 private:
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         const Interaction &it, const SampledWavelengths &swl,
         Expr<float> time) const noexcept override;
 };
@@ -145,7 +145,7 @@ private:
     }
 };
 
-luisa::unique_ptr<Surface::Closure> SubstrateInstance::_closure(
+luisa::unique_ptr<Surface::Closure> SubstrateInstance::closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto [Kd, Kd_lum] = _kd->evaluate_albedo_spectrum(it, swl, time);
     auto [Ks, Ks_lum] = _ks->evaluate_albedo_spectrum(it, swl, time);
