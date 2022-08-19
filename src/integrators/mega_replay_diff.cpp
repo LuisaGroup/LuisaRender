@@ -331,12 +331,16 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                 auto u_lobe = sampler->generate_1d();
                 auto u_bsdf = sampler->generate_2d();
                 pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
+
+                    // create closure
+                    auto closure = surface->closure(*it, swl, time);
+
                     // apply roughness map
                     auto alpha_skip = def(false);
-                    if (auto alpha_map = surface->alpha()) {
-                        auto alpha = alpha_map->evaluate(*it, time).x;
-                        alpha_skip = alpha < u_lobe;
-                        u_lobe = ite(alpha_skip, (u_lobe - alpha) / (1.f - alpha), u_lobe / alpha);
+                    if (auto o = closure->opacity()) {
+                        auto opacity = saturate(*o);
+                        alpha_skip = u_lobe >= opacity;
+                        u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
                     }
 
                     $if(alpha_skip) {
@@ -344,8 +348,6 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                         pdf_bsdf = 1e16f;
                     }
                     $else {
-                        // create closure
-                        auto closure = surface->closure(*it, swl, time);
 
                         // direct lighting
                         $if(light_sample.eval.pdf > 0.0f & !occluded) {
@@ -487,12 +489,16 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                 auto u_lobe = sampler->generate_1d();
                 auto u_bsdf = sampler->generate_2d();
                 pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
+
+                    // create closure
+                    auto closure = surface->closure(*it, swl, time);
+
                     // apply roughness map
                     auto alpha_skip = def(false);
-                    if (auto alpha_map = surface->alpha()) {
-                        auto alpha = alpha_map->evaluate(*it, time).x;
-                        alpha_skip = alpha < u_lobe;
-                        u_lobe = ite(alpha_skip, (u_lobe - alpha) / (1.f - alpha), u_lobe / alpha);
+                    if (auto o = closure->opacity()) {
+                        auto opacity = saturate(*o);
+                        alpha_skip = u_lobe >= opacity;
+                        u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
                     }
 
                     $if(alpha_skip) {
@@ -500,8 +506,6 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                         pdf_bsdf = 1e16f;
                     }
                     $else {
-                        // create closure
-                        auto closure = surface->closure(*it, swl, time);
 
                         // direct lighting
                         $if(light_sample.eval.pdf > 0.0f & !occluded) {
@@ -687,12 +691,16 @@ void MegakernelReplayDiffInstance::_render_one_camera(
                 auto u_lobe = sampler->generate_1d();
                 auto u_bsdf = sampler->generate_2d();
                 pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
+
+                    // create closure
+                    auto closure = surface->closure(*it, swl, time);
+
                     // apply roughness map
                     auto alpha_skip = def(false);
-                    if (auto alpha_map = surface->alpha()) {
-                        auto alpha = alpha_map->evaluate(*it, time).x;
-                        alpha_skip = alpha < u_lobe;
-                        u_lobe = ite(alpha_skip, (u_lobe - alpha) / (1.f - alpha), u_lobe / alpha);
+                    if (auto o = closure->opacity()) {
+                        auto opacity = saturate(*o);
+                        alpha_skip = u_lobe >= opacity;
+                        u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
                     }
 
                     $if(alpha_skip) {
@@ -700,9 +708,6 @@ void MegakernelReplayDiffInstance::_render_one_camera(
                         pdf_bsdf = 1e16f;
                     }
                     $else {
-                        // create closure
-                        auto closure = surface->closure(*it, swl, time);
-
                         // direct lighting
                         $if(light_sample.eval.pdf > 0.0f & !occluded) {
                             auto wi = light_sample.wi;
@@ -710,7 +715,6 @@ void MegakernelReplayDiffInstance::_render_one_camera(
                             auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
                             Li += mis_weight / light_sample.eval.pdf * beta * eval.f * light_sample.eval.L;
                         };
-
                         // sample material
                         auto sample = closure->sample(u_lobe, u_bsdf);
                         ray = it->spawn_ray(sample.wi);

@@ -74,6 +74,7 @@ public:
         [[nodiscard]] virtual Sample sample(Expr<float> u_lobe, Expr<float2> u) const noexcept = 0;
         [[nodiscard]] auto &interaction() const noexcept { return _it; }
         virtual void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept = 0;
+        [[nodiscard]] virtual luisa::optional<Float> opacity() const noexcept;
     };
 
     class Instance {

@@ -26,4 +26,12 @@ Surface::Closure::Closure(
     const SampledWavelengths &swl, Expr<float> time) noexcept
     : _instance{instance}, _it{std::move(it)}, _swl{swl}, _time{time} {}
 
+luisa::optional<Float> Surface::Closure::opacity() const noexcept {
+    luisa::optional<Float> o;
+    if (auto alpha = _instance->alpha()) {
+        o.emplace(alpha->evaluate(_it, _time).x);
+    }
+    return o;
+}
+
 }// namespace luisa::render

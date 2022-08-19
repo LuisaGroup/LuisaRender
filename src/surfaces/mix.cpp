@@ -99,6 +99,16 @@ public:
         LUISA_ASSERT(_a != nullptr || _b != nullptr,
                      "Creating closure for null MixSurface.");
     }
+    [[nodiscard]] luisa::optional<Float> opacity() const noexcept override {
+        luisa::optional<Float> opacity_a;
+        luisa::optional<Float> opacity_b;
+        if (_a != nullptr) [[likely]] { opacity_a = _a->opacity(); }
+        if (_b != nullptr) [[likely]] { opacity_b = _b->opacity(); }
+        if (!opacity_a && !opacity_b) { return luisa::nullopt; }
+        auto oa = opacity_a.value_or(1.f);
+        auto ob = opacity_b.value_or(1.f);
+        return lerp(ob, oa, _ratio);
+    }
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
         if (_a == nullptr) [[unlikely]] {
             auto eval = _b->evaluate(wi);
