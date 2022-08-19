@@ -97,13 +97,12 @@ private:
                          .roughness = make_float2(1.f),
                          .eta = SampledSpectrum{_swl.dimension(), 1.f}}};
     }
-    void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
+    void backward(Expr<float3> wi, const SampledSpectrum &df_in) const noexcept override {
         auto _instance = instance<MatteInstance>();
         auto wo_local = _it.wo_local();
         auto wi_local = _it.shading().world_to_local(wi);
-
+        auto df = df_in * abs_cos_theta(wi_local);
         auto grad = _oren_nayar->backward(wo_local, wi_local, df);
-
         _instance->Kd()->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(grad.dR));
         if (auto sigma = _instance->sigma()) {
             sigma->backward(_it, _time, make_float4(ite(isnan(grad.dSigma), 0.f, grad.dSigma), 0.f, 0.f, 0.f));

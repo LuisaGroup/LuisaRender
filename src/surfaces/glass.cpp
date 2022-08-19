@@ -193,10 +193,11 @@ public:
                          .eta = eta}};
     }
 
-    void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
+    void backward(Expr<float3> wi, const SampledSpectrum &df_in) const noexcept override {
         auto _instance = instance<GlassInstance>();
         auto wo_local = _it.wo_local();
         auto wi_local = _it.shading().world_to_local(wi);
+        auto df = df_in * abs_cos_theta(wi_local);
 
         Float2 d_alpha;
 

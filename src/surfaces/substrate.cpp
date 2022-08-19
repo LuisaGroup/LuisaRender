@@ -116,11 +116,12 @@ private:
                          .eta = _eta_i}};
     }
 
-    void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
+    void backward(Expr<float3> wi, const SampledSpectrum &df_in) const noexcept override {
         using compute::isinf;
         auto _instance = instance<SubstrateInstance>();
         auto wo_local = _it.wo_local();
         auto wi_local = _it.shading().world_to_local(wi);
+        auto df = df_in * abs_cos_theta(wi_local);
 
         auto grad = _blend->backward(wo_local, wi_local, df);
 

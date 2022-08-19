@@ -152,10 +152,11 @@ private:
                          .roughness = _distribution->alpha(),
                          .eta = _eta_i}};
     }
-    void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
+    void backward(Expr<float3> wi, const SampledSpectrum &df_in) const noexcept override {
         auto _instance = instance<PlasticInstance>();
         auto wo_local = _it.wo_local();
         auto wi_local = _it.shading().world_to_local(wi);
+        auto df = df_in * abs_cos_theta(wi_local);
 
         auto [Kd, Kd_lum] = _instance->Kd()->evaluate_albedo_spectrum(_it, _swl, _time);
         auto [Ks, Ks_lum] = _instance->Ks()->evaluate_albedo_spectrum(_it, _swl, _time);
