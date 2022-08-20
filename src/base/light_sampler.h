@@ -19,6 +19,13 @@ using compute::UInt;
 class LightSampler : public SceneNode {
 
 public:
+    struct Selection {
+        UInt tag;
+        Float prob;
+    };
+    static constexpr auto selection_environment = ~0u;
+
+public:
     class Instance {
 
     private:
@@ -39,17 +46,18 @@ public:
             const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
         [[nodiscard]] virtual Light::Evaluation evaluate_miss(
             Expr<float3> wi, const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
-        [[nodiscard]] virtual Light::Sample sample(
-            Sampler::Instance &sampler, const Interaction &it_from,
+        [[nodiscard]] virtual Selection select(
+            const Interaction &it_from, Expr<float> u,
             const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
-        //        virtual void backward_hit(
-        //            const Interaction &it, Expr<float3> p_from,
-        //            const SampledWavelengths &swl, Expr<float> time,
-        //            const SampledSpectrum &df) const noexcept = 0;
-        //        virtual void backward_miss(
-        //            Expr<float3> wi, Expr<float3x3> env_to_world,
-        //            const SampledWavelengths &swl, Expr<float> time,
-        //            const SampledSpectrum &df) const noexcept = 0;
+        [[nodiscard]] virtual Light::Sample sample_light(
+            const Interaction &it_from, Expr<uint> tag, Expr<float2> u,
+            const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
+        [[nodiscard]] virtual Light::Sample sample_environment(
+            Expr<float3> p_from, Expr<float2> u,
+            const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
+        [[nodiscard]] virtual Light::Sample sample(
+            const Interaction &it_from, Expr<float> u_sel, Expr<float2> u_light,
+            const SampledWavelengths &swl, Expr<float> time) const noexcept;
     };
 
 public:

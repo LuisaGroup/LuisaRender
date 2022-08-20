@@ -68,8 +68,7 @@ public:
         [[nodiscard]] virtual Evaluation evaluate(
             const Interaction &it_light, Expr<float3> p_from) const noexcept = 0;
         [[nodiscard]] virtual Sample sample(
-            Expr<uint> light_inst_id, Expr<float3> p_from,
-            Expr<float> u_prim, Expr<float2> u) const noexcept = 0;
+            Expr<uint> light_inst_id, Expr<float3> p_from, Expr<float2> u) const noexcept = 0;
         virtual void backward(const Interaction &it_light, Expr<float3> p_from, const SampledSpectrum &df) const noexcept = 0;
     };
 
@@ -94,7 +93,6 @@ public:
 public:
     Light(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] virtual bool is_null() const noexcept { return false; }
-    [[nodiscard]] virtual bool is_virtual() const noexcept { return false; }
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
 };

@@ -231,8 +231,10 @@ void MegakernelPathTracingInstance::_render_one_camera(
             $if(!it->shape()->has_surface()) { $break; };
 
             // sample one light
+            auto u_light_selection = sampler->generate_1d();
+            auto u_light_surface = sampler->generate_2d();
             Light::Sample light_sample = light_sampler->sample(
-                *sampler, *it, swl, time);
+                *it, u_light_selection, u_light_surface, swl, time);
 
             // trace shadow ray
             auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);

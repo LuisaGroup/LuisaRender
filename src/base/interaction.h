@@ -70,7 +70,6 @@ public:
     [[nodiscard]] auto triangle_id() const noexcept { return _prim_id; }
     [[nodiscard]] auto triangle_area() const noexcept { return _prim_area; }
     [[nodiscard]] auto valid() const noexcept { return _inst_id != ~0u; }
-    [[nodiscard]] auto p_shading() const noexcept { return _ps; }
     [[nodiscard]] const auto &shading() const noexcept { return _shading; }
     void set_shading(Frame frame) noexcept { _shading = std::move(frame); }
     [[nodiscard]] const auto &shape() const noexcept { return _shape; }

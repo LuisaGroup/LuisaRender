@@ -90,7 +90,7 @@ Shape cbox-light : Mesh {
   file { "cbox-parts/light.obj" }
   light : Diffuse {
     emission : Constant {
-      v { 51.0, 36.0, 12.0 }
+      v { 17, 12, 4 }
       semantic { "illuminant" }
     }
   }

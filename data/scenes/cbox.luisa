@@ -6,7 +6,7 @@ Film film : Color {
 Camera camera : Pinhole {
   position { -0.01, 0.995, 5.0 }
   fov { 27.8 }
-  spp { 128 }
+  spp { 1024 }
   film { @film }
   file { "../renders/cbox.exr" }
   filter : Gaussian {
@@ -18,8 +18,8 @@ import "../meshes/cbox.luisa"
 
 Integrator pt : MegaPath {
   sampler : Independent {}
-  depth { 10 }
-  spectrum : Hero {}
+  depth { 16 }
+  spectrum : sRGB {}
   // display { true }
 }
 
@@ -32,7 +32,8 @@ render {
   // environment : Directional {
   //   direction { 1, 1.1, 1.3 }
   //   emission : Constant {
-  //     v { 51.0, 36.0, 12.0 }
+  //     v { 17, 12, 4 }
+  //     semantic { "illuminant" }
   //   }
   //   scale { 0.015 }
   //   angle { 0.54 }

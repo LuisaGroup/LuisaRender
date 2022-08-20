@@ -383,7 +383,10 @@ void WavefrontPathTracingInstance::_render_one_camera(
             auto path_id = path_indices.read(ray_id);
             auto swl = path_states.read_swl(path_id);
             sampler()->load_state(path_id);
-            auto light_sample = light_sampler()->sample(*sampler(), *it, swl, time);
+            auto u_light_selection = sampler()->generate_1d();
+            auto u_light_surface = sampler()->generate_2d();
+            Light::Sample light_sample = light_sampler()->sample(
+                *it, u_light_selection, u_light_surface, swl, time);
             sampler()->save_state(path_id);
             // trace shadow ray
             auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
