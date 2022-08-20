@@ -3,6 +3,7 @@
 //
 
 #include <base/light_sampler.h>
+#include <base/pipeline.h>
 
 namespace luisa::render {
 
@@ -18,7 +19,7 @@ Light::Sample LightSampler::Instance::sample(
     if (_pipeline.environment() != nullptr) {// possibly environment lighting
         if (_pipeline.lights().empty()) {// no lights, just environment lighting
             sample = sample_environment(it_from.p(), u_light, swl, time);
-        } else {
+        } else {// environment lighting and lights
             $if(sel.tag == selection_environment) {
                 sample = sample_environment(it_from.p(), u_light, swl, time);
             }
@@ -26,7 +27,7 @@ Light::Sample LightSampler::Instance::sample(
                 sample = sample_light(it_from, sel.tag, u_light, swl, time);
             };
         }
-    } else {// no environment light
+    } else {// no environment lighting, just lights
         sample = sample_light(it_from, sel.tag, u_light, swl, time);
     }
     sample.eval.pdf *= sel.prob;
