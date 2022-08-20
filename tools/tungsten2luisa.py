@@ -96,12 +96,21 @@ def convert_metal_material(out_file, material: dict, alpha=""):
         k = material["k"]
         eta = f"360, {n}, {k}, 830, {n}, {k}"
     roughness = material.get("roughness", 1e-6)
+    albedo = glm.vec3(material.get("albedo", 1.0))
+    if albedo != glm.vec3(1):
+        albedo = f"""
+  Kd : Constant {{
+    v {{ {albedo.x}, {albedo.y}, {albedo.z} }}
+    semantic {{ "albedo" }}
+  }}"""
+    else:
+        albedo = ""
     print(f'''
 Surface mat_{name} : Metal {{
   eta {{ {eta} }}
   roughness : Constant {{
     v {{ {convert_roughness(roughness)} }}
-  }}{alpha}
+  }}{alpha}{albedo}
 }}''', file=out_file)
 
 
