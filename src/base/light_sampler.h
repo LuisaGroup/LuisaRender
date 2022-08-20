@@ -16,7 +16,6 @@ class Interaction;
 using compute::Float;
 using compute::UInt;
 
-// TODO: consider environments
 class LightSampler : public SceneNode {
 
 public:
