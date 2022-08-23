@@ -89,8 +89,9 @@ public:
                 .prob = ite(is_env, _env_prob, (1.f - _env_prob) / n)};
     }
 
-    [[nodiscard]] Light::Sample sample_light(const Interaction &it_from, Expr<uint> tag, Expr<float2> u,
-                                             const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+private:
+    [[nodiscard]] Light::Sample _sample_light(const Interaction &it_from, Expr<uint> tag, Expr<float2> u,
+                                              const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         LUISA_ASSERT(!pipeline().lights().empty(), "No lights in the scene.");
         auto handle = pipeline().buffer<Light::Handle>(_light_buffer_id).read(tag);
         auto sample = Light::Sample::zero(swl.dimension());
@@ -101,8 +102,8 @@ public:
         return sample;
     }
 
-    [[nodiscard]] Light::Sample sample_environment(Expr<float3> p_from, Expr<float2> u,
-                                                   const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+    [[nodiscard]] Light::Sample _sample_environment(Expr<float3> p_from, Expr<float2> u,
+                                                    const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         LUISA_ASSERT(pipeline().environment() != nullptr, "No environment in the scene.");
         return pipeline().environment()->sample(p_from, swl, time, u);
     }

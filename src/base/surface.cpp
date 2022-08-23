@@ -15,7 +15,8 @@ Surface::Surface(Scene *scene, const SceneNodeDesc *desc) noexcept
     LUISA_RENDER_CHECK_GENERIC_TEXTURE(Surface, alpha, 1);
 }
 
-luisa::unique_ptr<Surface::Instance> Surface::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
+luisa::unique_ptr<Surface::Instance> Surface::build(
+    Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
     auto instance = _build(pipeline, command_buffer);
     instance->_alpha = pipeline.build_texture(command_buffer, _alpha);
     return instance;
