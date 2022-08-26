@@ -431,16 +431,16 @@ MicrofacetReflection::Gradient MicrofacetReflection::backward(
 SampledSpectrum MicrofacetTransmission::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
     auto cosThetaO = cos_theta(wo);
     auto cosThetaI = cos_theta(wi);
-    auto refr = !same_hemisphere(wo, wi) & cosThetaO != 0.f & cosThetaI != 0.f;
-    auto eta = ite(cosThetaO > 0.f, _eta_b / _eta_a, _eta_a / _eta_b);
-
-    // Compute $\wh$ from $\wo$ and $\wi$ for microfacet transmission
-    auto G = _distribution->G(wo, wi);
-    return eta.map([&](auto i, auto e) noexcept {
-        auto wh = normalize(wo + wi * e);
-        wh = compute::sign(cos_theta(wh)) * wh;
-        auto f = def(0.f);
-        $if(refr & dot(wo, wh) * dot(wi, wh) < 0.f) {
+    SampledSpectrum ret{_t.dimension()};
+    $if(!same_hemisphere(wo, wi) & cosThetaO != 0.f & cosThetaI != 0.f) {
+        auto eta = ite(cosThetaO > 0.f, _eta_b / _eta_a, _eta_a / _eta_b);
+        // Compute $\wh$ from $\wo$ and $\wi$ for microfacet transmission
+        auto G = _distribution->G(wo, wi);
+        ret = eta.map([&](auto i, auto e) noexcept {
+            auto wh = normalize(wo + wi * e);
+            wh = compute::sign(cos_theta(wh)) * wh;
+            auto f = def(0.f);
+            auto valid = dot(wo, wh) * dot(wi, wh) < 0.f;
             auto sqrtDenom = dot(wo, wh) + e * dot(wi, wh);
             auto factor = 1.f / e;
             auto F = fresnel_dielectric(dot(wo, wh), _eta_a[i], _eta_b[i]);
@@ -448,9 +448,10 @@ SampledSpectrum MicrofacetTransmission::evaluate(Expr<float3> wo, Expr<float3> w
             f = (1.f - F) * _t[i] * sqr(factor) *
                 abs(D * G * sqr(e) * dot(wi, wh) * dot(wo, wh) /
                     (cosThetaI * cosThetaO * sqr(sqrtDenom)));
-        };
-        return f;
-    });
+            return ite(valid, f, 0.f);
+        });
+    };
+    return ret;
 }
 
 SampledSpectrum MicrofacetTransmission::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u_in, Float *p) const noexcept {
@@ -464,9 +465,8 @@ SampledSpectrum MicrofacetTransmission::sample(Expr<float3> wo, Float3 *wi, Expr
     auto u = make_float2(fract(swl_i_float), u_in.y);
     auto wh = _distribution->sample_wh(wo, u);
     *p = 0.f;
-    auto refr = refract(wo, wh, eta, wi);
     SampledSpectrum f{_t.dimension()};
-    $if(refr) {
+    $if(refract(wo, wh, eta, wi)) {
         *p = pdf(wo, *wi);
         f = evaluate(wo, *wi);
     };
@@ -477,15 +477,16 @@ Float MicrofacetTransmission::pdf(Expr<float3> wo, Expr<float3> wi) const noexce
     auto pdf = def(0.f);
     auto entering = cos_theta(wo) > 0.f;
     auto eta = ite(entering, _eta_b / _eta_a, _eta_a / _eta_b);
-    for (auto i = 0u; i < eta.dimension(); i++) {
-        auto wh = normalize(wo + wi * eta[i]);
-        // Compute change of variables _dwh\_dwi_ for microfacet transmission
-        $if(!same_hemisphere(wo, wi) & dot(wo, wh) * dot(wi, wh) < 0.f) {
+    $if(!same_hemisphere(wo, wi)) {
+        for (auto i = 0u; i < eta.dimension(); i++) {
+            auto wh = normalize(wo + wi * eta[i]);
+            // Compute change of variables _dwh\_dwi_ for microfacet transmission
+            auto valid = dot(wo, wh) * dot(wi, wh) < 0.f;
             auto sqrtDenom = dot(wo, wh) + eta[i] * dot(wi, wh);
             auto dwh_dwi = sqr(eta[i] / sqrtDenom) * abs_dot(wi, wh);
-            pdf += _distribution->pdf(wo, wh) * dwh_dwi;
-        };
-    }
+            pdf += ite(valid, _distribution->pdf(wo, wh) * dwh_dwi, 0.f);
+        }
+    };
     return pdf * static_cast<float>(1.0 / eta.dimension());
 }
 
