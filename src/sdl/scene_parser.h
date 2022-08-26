@@ -16,8 +16,14 @@ class SceneNodeDesc;
 
 class SceneParser {
 
+public:
+    using MacroMap = luisa::map<luisa::string, luisa::string>;
+
 private:
     SceneDesc &_desc;
+    const MacroMap &_cli_macros;
+    MacroMap _local_macros;
+    luisa::vector<luisa::string_view> _parsing_macros;
     SceneNodeDesc::SourceLocation _location;
     luisa::string _source;
     size_t _cursor;
@@ -33,12 +39,14 @@ private:
     void _skip() noexcept;
     void _skip_blanks() noexcept;
     [[nodiscard]] char _peek() noexcept;
-    [[nodiscard]] char _get() noexcept;
+    [[nodiscard]] char _get(bool escape_macro = false) noexcept;
     [[nodiscard]] bool _eof() const noexcept;
-    [[nodiscard]] std::string_view _read_identifier() noexcept;
+    [[nodiscard]] luisa::string _read_identifier() noexcept;
     [[nodiscard]] double _read_number() noexcept;
     [[nodiscard]] bool _read_bool() noexcept;
     [[nodiscard]] luisa::string _read_string() noexcept;
+    void _parse_macro() noexcept;
+    void _parse_define() noexcept;
     void _parse_file() noexcept;
     void _parse_source() noexcept;
     void _parse_root_node(SceneNodeDesc::SourceLocation l) noexcept;
@@ -51,14 +59,17 @@ private:
     [[nodiscard]] SceneNodeDesc::string_list _parse_string_list_values() noexcept;
     [[nodiscard]] const SceneNodeDesc *_parse_base_node() noexcept;
 
-    SceneParser(SceneDesc &desc, const std::filesystem::path &path) noexcept;
+    SceneParser(SceneDesc &desc, const std::filesystem::path &path,
+                const MacroMap &cli_macros) noexcept;
 
 public:
     SceneParser(SceneParser &&) noexcept = default;
     SceneParser(const SceneParser &) noexcept = delete;
     SceneParser &operator=(SceneParser &&) noexcept = delete;
     SceneParser &operator=(const SceneParser &) noexcept = delete;
-    [[nodiscard]] static luisa::unique_ptr<SceneDesc> parse(const std::filesystem::path &entry_file) noexcept;
+    [[nodiscard]] static luisa::unique_ptr<SceneDesc> parse(
+        const std::filesystem::path &entry_file,
+        const MacroMap &cli_macros) noexcept;
 };
 
 }// namespace luisa::render

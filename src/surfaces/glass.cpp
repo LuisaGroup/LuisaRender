@@ -26,21 +26,18 @@ inline auto builtin_ior_texture_desc(luisa::string name) noexcept {
         };
         using namespace std::string_view_literals;
         return luisa::fixed_map<luisa::string, luisa::shared_ptr<SceneNodeDesc>, 15>{
-            make_desc("BK7", make_float3(1.5128724797046567f, 1.518526426727177f, 1.5268028319190252f)),
-            make_desc("BAF10", make_float3(1.663482689459752f, 1.6732858980501335f, 1.6882038140269822f)),
-            make_desc("FK51A", make_float3(1.4837998115476296f, 1.487791013531385f, 1.4936507866294566f)),
-            make_desc("LASF9", make_float3(1.8385554755145304f, 1.8562744195711076f, 1.884937209476662f)),
-            make_desc("SF5", make_float3(1.6634157372231755f, 1.677424628301045f, 1.700294496924069f)),
-            make_desc("SF10", make_float3(1.7170541479783665f, 1.734127433196915f, 1.7622659583540365f)),
-            make_desc("SF11", make_float3(1.7713632012573233f, 1.7915573054146121f, 1.8258481620747222f)),
-            make_desc("Diamond", make_float3(2.4076888208234286f, 2.421389479656345f, 2.4442593103910073f)),
-            make_desc("Ice", make_float3(1.3067738983564134f, 1.3110361167927982f, 1.3167829558780912f)),
-            make_desc("Quartz", make_float3(1.4552432604483285f, 1.4599273927275231f, 1.4667353873623656f)),
-            make_desc("SiO2", make_float3(1.4552432604483285f, 1.4599273927275231f, 1.4667353873623656f)),
-            make_desc("Salt", make_float3(1.538654377305543f, 1.5471867947656404f, 1.560368730283437f)),
-            make_desc("NaCl", make_float3(1.538654377305543f, 1.5471867947656404f, 1.560368730283437f)),
-            make_desc("Sapphire", make_float3(1.7630793084415752f, 1.7706125009330247f, 1.7812914892330447f)),
-            make_desc("Al2O3", make_float3(1.7630793084415752f, 1.7706125009330247f, 1.7812914892330447f))};
+            make_desc("bk7", make_float3(1.5140814565098806f, 1.5165571794092296f, 1.5223224896834853f)),
+            make_desc("baf10", make_float3(1.665552211440938f, 1.6698355055693541f, 1.680044942398477f)),
+            make_desc("fk51a", make_float3(1.4846524304153899f, 1.486399794903804f, 1.4904761200647965f)),
+            make_desc("lasf9", make_float3(1.8422161861952726f, 1.8499302872507852f, 1.8690214187351977f)),
+            make_desc("sf5", make_float3(1.6663001504164476f, 1.6723956342450994f, 1.6875677127863755f)),
+            make_desc("sf10", make_float3(1.720557014155419f, 1.7279815121138318f, 1.7465722778961204f)),
+            make_desc("sf11", make_float3(1.7754589288508518f, 1.7842240428294434f, 1.8065917880168352f)),
+            make_desc("diamond", make_float3(2.410486117067883f, 2.4164392529553234f, 2.431466411471524f)),
+            make_desc("ice", make_float3(1.3077084260466776f, 1.3095827995357034f, 1.3137441348487024f)),
+            make_desc("quartz", make_float3(1.4562471554155727f, 1.4582990183632742f, 1.4630571022260817f)),
+            make_desc("salt", make_float3(1.5404463273409252f, 1.5441711411436845f, 1.5531314007749342f)),
+            make_desc("sapphire", make_float3(1.764706495252994f, 1.7680107911479397f, 1.7755615929437936f))};
     }();
     for (auto &c : name) { c = static_cast<char>(tolower(c)); }
     auto iter = nodes.find(name);
@@ -261,7 +258,7 @@ luisa::unique_ptr<Surface::Closure> GlassInstance::closure(
             for (auto i = 0u; i < eta.dimension(); i++) { eta[i] = e; }
         } else {
             auto e = _eta->evaluate(it, swl, time).xyz();
-            auto inv_bb = sqr(1.f / rgb_spectrum_peak_wavelengths);
+            auto inv_bb = sqr(1.f / fraunhofer_wavelengths);
             auto m = make_float3x3(make_float3(1.f), inv_bb, sqr(inv_bb));
             auto c = inverse(m) * e;
             for (auto i = 0u; i < swl.dimension(); i++) {

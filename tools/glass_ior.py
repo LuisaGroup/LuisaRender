@@ -119,7 +119,7 @@ glass_data = {
         773.0, 1.7608801757554, 798.3, 1.7601781977445, 824.4, 1.7594974153468, 851.3, 1.7588353492177]
 }
 
-glass_basis = [700.0, 546.1, 435.8]
+glass_basis = [656.27, 587.56, 486.13]
 
 
 def solve_cauchy_coeff(name, interleaved):
@@ -139,4 +139,4 @@ def solve_cauchy_coeff(name, interleaved):
 if __name__ == "__main__":
     c = {name: solve_cauchy_coeff(name, values) for name, values in glass_data.items()}
     for name, ior in c.items():
-        print(f'make_desc("{name}", make_float3({ior[0]}f, {ior[1]}f, {ior[2]}f)),')
+        print(f'make_desc("{name.lower()}", make_float3({ior[0]}f, {ior[1]}f, {ior[2]}f)),')

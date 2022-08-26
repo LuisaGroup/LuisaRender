@@ -18,7 +18,11 @@
     cli.add_option("", "b", "backend", "Compute backend name", cxxopts::value<luisa::string>(), "<backend>");
     cli.add_option("", "d", "device", "Compute device index", cxxopts::value<uint32_t>()->default_value("0"), "<index>");
     cli.add_option("", "", "scene", "Path to scene description file", cxxopts::value<std::filesystem::path>(), "<file>");
+    cli.add_option("", "D", "define", "Parameter definitions to override scene description macros.",
+                   cxxopts::value<std::vector<std::string>>()->default_value("<none>"), "<key>=<value>");
+    cli.add_option("", "h", "help", "Display this help message", cxxopts::value<bool>()->default_value("false"), "");
     cli.allow_unrecognised_options();
+    cli.positional_help("<file>");
     cli.parse_positional("scene");
     auto options = [&] {
         try {
@@ -31,15 +35,19 @@
             exit(-1);
         }
     }();
+    if (options["help"].as<bool>()) {
+        std::cout << cli.help() << std::endl;
+        exit(0);
+    }
     if (options["scene"].count() == 0u) [[unlikely]] {
         LUISA_WARNING_WITH_LOCATION("Scene file not specified.");
         std::cout << cli.help() << std::endl;
         exit(-1);
     }
     if (auto unknown = options.unmatched(); !unknown.empty()) [[unlikely]] {
-        luisa::string opts;
-        for (auto &&u : unknown) {
-            opts.append(" ").append(u);
+        luisa::string opts{unknown.front()};
+        for (auto &&u : luisa::span{unknown}.subspan(1)) {
+            opts.append("; ").append(u);
         }
         LUISA_WARNING_WITH_LOCATION(
             "Unrecognized options: {}", opts);
@@ -54,16 +62,38 @@ using namespace luisa::render;
 int main(int argc, char *argv[]) {
 
     log_level_info();
-    luisa::compute::Context context{argv[0]};
-
     auto options = parse_cli_options(argc, argv);
+
+    luisa::compute::Context context{argv[0]};
     auto backend = options["backend"].as<luisa::string>();
     auto index = options["device"].as<uint32_t>();
     auto path = options["scene"].as<std::filesystem::path>();
+    auto definitions = options["define"].as<std::vector<std::string>>();
+    SceneParser::MacroMap macros;
+    for (luisa::string_view d : definitions) {
+        if (d == "<none>") { continue; }
+        auto p = d.find('=');
+        if (p == luisa::string::npos) [[unlikely]] {
+            LUISA_WARNING_WITH_LOCATION(
+                "Invalid definition: {}", d);
+            continue;
+        }
+        auto key = d.substr(0, p);
+        auto value = d.substr(p + 1);
+        LUISA_INFO("Parameter definition: {} = '{}'", key, value);
+        if (auto iter = macros.find(key); iter != macros.end()) {
+            LUISA_WARNING_WITH_LOCATION(
+                "Duplicate definition: {} = '{}'. "
+                "Ignoring the previous one: {} = '{}'.",
+                key, value, key, iter->second);
+        }
+        macros[key] = value;
+    }
 
     {
         std::ofstream file{"results.txt", std::ios::app};
-        file << std::endl << "Argv = ";
+        file << std::endl
+             << "Argv = ";
         for (auto i = 0; i < argc; i++) {
             file << argv[i] << " ";
         }
@@ -95,7 +125,7 @@ int main(int argc, char *argv[]) {
     auto device = context.create_device(
         backend, luisa::format(R"({{"index": {}}})", index));
     Clock clock;
-    auto scene_desc = SceneParser::parse(path);
+    auto scene_desc = SceneParser::parse(path, macros);
     auto parse_time = clock.toc();
     {
         std::ofstream file{"results.txt", std::ios::app};
