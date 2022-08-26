@@ -30,7 +30,7 @@ Surface::Closure::Closure(
 luisa::optional<Float> Surface::Closure::opacity() const noexcept {
     luisa::optional<Float> o;
     if (auto alpha = _instance->alpha()) {
-        o.emplace(alpha->evaluate(_it, _time).x);
+        o.emplace(alpha->evaluate(_it, _swl, _time).x);
     }
     return o;
 }

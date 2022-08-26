@@ -34,8 +34,9 @@ public:
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
 
     public:
-        [[nodiscard]] virtual Float3 loss(const Camera::Instance *camera) const noexcept = 0;
-        [[nodiscard]] virtual Float3 d_loss(const Camera::Instance *camera, Expr<uint2> pixel_id) const noexcept = 0;
+        [[nodiscard]] virtual Float3 loss(const Camera::Instance *camera, const SampledWavelengths &swl) const noexcept = 0;
+        [[nodiscard]] virtual Float3 d_loss(const Camera::Instance *camera, Expr<uint2> pixel_id,
+                                            const SampledWavelengths &swl) const noexcept = 0;
     };
 
 public:

@@ -423,7 +423,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
             Li[2u] = Li_last_pass[2u];
 
             SampledSpectrum d_loss{swl.dimension(), float(pixel_count)};
-            auto d_loss_float3 = pt->loss()->d_loss(camera, pixel_id);
+            auto d_loss_float3 = pt->loss()->d_loss(camera, pixel_id, swl);
             for (auto i = 0u; i < 3u; ++i) {
                 d_loss[i] *= d_loss_float3[i];
             }

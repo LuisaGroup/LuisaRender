@@ -105,7 +105,8 @@ private:
         auto grad = _oren_nayar->backward(wo_local, wi_local, df);
         _instance->Kd()->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(grad.dR));
         if (auto sigma = _instance->sigma()) {
-            sigma->backward(_it, _time, make_float4(ite(isnan(grad.dSigma), 0.f, grad.dSigma), 0.f, 0.f, 0.f));
+            auto dv = make_float4(ite(isnan(grad.dSigma), 0.f, grad.dSigma), 0.f, 0.f, 0.f);
+            sigma->backward(_it, _swl, _time, dv);
         }
     }
 };
@@ -113,7 +114,7 @@ private:
 luisa::unique_ptr<Surface::Closure> MatteInstance::closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto Kd = _kd->evaluate_albedo_spectrum(it, swl, time).value;
-    auto sigma = _sigma ? clamp(_sigma->evaluate(it, time).x, 0.f, 90.f) : 0.f;
+    auto sigma = _sigma ? clamp(_sigma->evaluate(it, swl, time).x, 0.f, 90.f) : 0.f;
     return luisa::make_unique<MatteClosure>(this, it, swl, time, Kd, sigma);
 }
 

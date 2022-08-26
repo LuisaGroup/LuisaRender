@@ -243,7 +243,7 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
             SampledSpectrum Li{swl.dimension(), 1.0f};
             auto grad_weight = shutter_weight * static_cast<float>(pt->node<MegakernelRadiativeDiff>()->max_depth());
 
-            auto d_loss = pt->loss()->d_loss(camera, pixel_id);
+            auto d_loss = pt->loss()->d_loss(camera, pixel_id, swl);
             for (auto i = 0u; i < 3u; ++i) {
                 beta[i] *= d_loss[i];
             }

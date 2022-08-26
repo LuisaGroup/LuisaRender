@@ -161,7 +161,8 @@ public:
             _b->backward(wi, zero_if_any_nan(d_a));
             if (auto ratio = instance<MixSurfaceInstance>()->ratio()) {
                 auto d_ratio = (df * (eval_a.f - eval_b.f)).sum();
-                ratio->backward(_it, _time, make_float4(ite(isnan(d_ratio), 0.f, d_ratio), 0.f, 0.f, 0.f));
+                ratio->backward(_it, _swl, _time,
+                                make_float4(ite(isnan(d_ratio), 0.f, d_ratio), 0.f, 0.f, 0.f));
             }
         } else if (_a != nullptr) [[likely]] {
             _a->backward(wi, df * _ratio);
@@ -173,7 +174,7 @@ public:
 
 luisa::unique_ptr<Surface::Closure> MixSurfaceInstance::closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    auto ratio = _ratio == nullptr ? 0.5f : clamp(_ratio->evaluate(it, time).x, 0.f, 1.f);
+    auto ratio = _ratio == nullptr ? 0.5f : clamp(_ratio->evaluate(it, swl, time).x, 0.f, 1.f);
     auto a = _a == nullptr ? nullptr : _a->closure(it, swl, time);
     auto b = _b == nullptr ? nullptr : _b->closure(it, swl, time);
     return luisa::make_unique<MixSurfaceClosure>(

@@ -31,7 +31,8 @@ public:
     DemoSDFTextureInstance(Pipeline &p, const Texture *t) noexcept
         : Texture::Instance{p, t} {}
 
-    [[nodiscard]] Float4 evaluate(const Interaction &it, Expr<float> time) const noexcept override {
+    [[nodiscard]] Float4 evaluate(
+        const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
 
         static constexpr auto max_ray_depth = 6;
         static constexpr auto eps = 1e-4f;
@@ -178,7 +179,8 @@ public:
         LUISA_ERROR_WITH_LOCATION("Unreachable.");
     }
 
-    void backward(const Interaction &, Expr<float>, Expr<float4> grad) const noexcept override {
+    void backward(const Interaction &, const SampledWavelengths &swl,
+                  Expr<float>, Expr<float4> grad) const noexcept override {
         if (node()->requires_gradients()) {
             LUISA_ERROR_WITH_LOCATION("Not supported.");
         }

@@ -268,12 +268,14 @@ public:
                          luisa::optional<Differentiation::TexturedParameter> param) noexcept
         : Texture::Instance{pipeline, texture},
           _texture_id{texture_id}, _diff_param{std::move(param)} {}
-    [[nodiscard]] Float4 evaluate(const Interaction &it, Expr<float> time) const noexcept override {
+    [[nodiscard]] Float4 evaluate(
+        const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         auto uv = _compute_uv(it);
         auto v = pipeline().tex2d(_texture_id).sample(uv);// TODO: LOD
         return _decode(v);
     }
-    void backward(const Interaction &it, Expr<float> time, Expr<float4> grad) const noexcept override {
+    void backward(const Interaction &it, const SampledWavelengths &swl,
+                  Expr<float> time, Expr<float4> grad) const noexcept override {
         if (_diff_param) {
             auto uv = _compute_uv(it);
             pipeline().differentiation().accumulate(*_diff_param, uv, grad);

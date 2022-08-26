@@ -145,7 +145,7 @@ public:
         _instance->color()->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(grad.dR + d_fresnel->dR0));
         if (auto roughness = _instance->roughness()) {
             auto remap = _instance->node<MirrorSurface>()->remap_roughness();
-            auto r_f4 = roughness->evaluate(_it, _time);
+            auto r_f4 = roughness->evaluate(_it, _swl, _time);
             auto r = roughness->node()->channels() == 1u ? r_f4.xx() : r_f4.xy();
 
             auto grad_alpha_roughness = [](auto &&x) noexcept {
@@ -156,7 +156,8 @@ public:
                               make_float4(d_r.x + d_r.y, 0.f, 0.f, 0.f) :
                               make_float4(d_r, 0.f, 0.f);
             auto roughness_grad_range = 5.f * (roughness->node()->range().y - roughness->node()->range().x);
-            roughness->backward(_it, _time, ite(any(isnan(d_r_f4) || abs(d_r_f4) > roughness_grad_range), 0.f, d_r_f4));
+            roughness->backward(_it, _swl, _time,
+                                ite(any(isnan(d_r_f4) || abs(d_r_f4) > roughness_grad_range), 0.f, d_r_f4));
         }
     }
 };
@@ -165,7 +166,7 @@ luisa::unique_ptr<Surface::Closure> MirrorInstance::closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto alpha = def(make_float2(0.f));
     if (_roughness != nullptr) {
-        auto r = _roughness->evaluate(it, time);
+        auto r = _roughness->evaluate(it, swl, time);
         auto remap = node<MirrorSurface>()->remap_roughness();
         auto r2a = [](auto &&x) noexcept {
             return TrowbridgeReitzDistribution::roughness_to_alpha(x);
