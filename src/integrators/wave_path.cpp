@@ -458,7 +458,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                 auto rr_threshold = node<WavefrontPathTracing>()->rr_threshold();
                 // rr
                 auto q = spectrum->cie_y(swl, beta);
-                $if(trace_depth >= rr_depth & q < 1.f) {
+                $if(trace_depth + 1u >= rr_depth & q < 1.f) {
                     q = clamp(q, .05f, rr_threshold);
                     $if(sampler()->generate_1d() < q) {
                         beta *= 1.f / q;

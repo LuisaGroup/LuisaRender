@@ -286,7 +286,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
             auto rr_depth = pt->node<MegakernelPathTracing>()->rr_depth();
             auto rr_threshold = pt->node<MegakernelPathTracing>()->rr_threshold();
             auto q = spectrum->cie_y(swl, beta);
-            $if(depth >= rr_depth & q < 1.f) {
+            $if(depth + 1u >= rr_depth & q < 1.f) {
                 q = clamp(q, .05f, rr_threshold);
                 $if(sampler->generate_1d() >= q) { $break; };
                 beta *= 1.0f / q;

@@ -333,7 +333,6 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                 auto u_lobe = sampler->generate_1d();
                 auto u_bsdf = sampler->generate_2d();
                 pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
-
                     // create closure
                     auto closure = surface->closure(*it, swl, time);
 
@@ -379,7 +378,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                 auto q = max(spectrum->cie_y(swl, beta * eta_scale), .05f);
                 auto rr_depth = pt->node<MegakernelReplayDiff>()->rr_depth();
                 auto rr_threshold = pt->node<MegakernelReplayDiff>()->rr_threshold();
-                $if(depth >= rr_depth & q < rr_threshold) {
+                $if(depth + 1u >= rr_depth & q < rr_threshold) {
                     $if(sampler->generate_1d() >= q) { $break; };
                     beta *= 1.0f / q;
                 };
@@ -494,7 +493,6 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                 auto u_lobe = sampler->generate_1d();
                 auto u_bsdf = sampler->generate_2d();
                 pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
-
                     // create closure
                     auto closure = surface->closure(*it, swl, time);
 
@@ -554,7 +552,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                 auto q = max(spectrum->cie_y(swl, beta * eta_scale), .05f);
                 auto rr_depth = pt->node<MegakernelReplayDiff>()->rr_depth();
                 auto rr_threshold = pt->node<MegakernelReplayDiff>()->rr_threshold();
-                $if(depth >= rr_depth & q < rr_threshold) {
+                $if(depth + 1u >= rr_depth & q < rr_threshold) {
                     $if(sampler->generate_1d() >= q) { $break; };
                     beta *= 1.0f / q;
                 };
@@ -698,7 +696,6 @@ void MegakernelReplayDiffInstance::_render_one_camera(
                 auto u_lobe = sampler->generate_1d();
                 auto u_bsdf = sampler->generate_2d();
                 pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
-
                     // create closure
                     auto closure = surface->closure(*it, swl, time);
 
@@ -736,7 +733,7 @@ void MegakernelReplayDiffInstance::_render_one_camera(
                 auto q = max(spectrum->cie_y(swl, beta * eta_scale), .05f);
                 auto rr_depth = pt->node<MegakernelReplayDiff>()->rr_depth();
                 auto rr_threshold = pt->node<MegakernelReplayDiff>()->rr_threshold();
-                $if(depth >= rr_depth & q < rr_threshold) {
+                $if(depth + 1u >= rr_depth & q < rr_threshold) {
                     $if(sampler->generate_1d() >= q) { $break; };
                     beta *= 1.0f / q;
                 };

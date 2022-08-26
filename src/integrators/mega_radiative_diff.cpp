@@ -350,7 +350,7 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
                 auto q = max(spectrum->cie_y(swl, beta * eta_scale), .05f);
                 auto rr_depth = pt->node<MegakernelRadiativeDiff>()->rr_depth();
                 auto rr_threshold = pt->node<MegakernelRadiativeDiff>()->rr_threshold();
-                $if(depth >= rr_depth & q < rr_threshold) {
+                $if(depth + 1u >= rr_depth & q < rr_threshold) {
                     $if(sampler->generate_1d() >= q) { $break; };
                     beta *= 1.0f / q;
                 };
@@ -513,7 +513,7 @@ void MegakernelRadiativeDiffInstance::_render_one_camera(
                 auto q = max(spectrum->cie_y(swl, beta * eta_scale), .05f);
                 auto rr_depth = pt->node<MegakernelRadiativeDiff>()->rr_depth();
                 auto rr_threshold = pt->node<MegakernelRadiativeDiff>()->rr_threshold();
-                $if(depth >= rr_depth & q < rr_threshold) {
+                $if(depth + 1u >= rr_depth & q < rr_threshold) {
                     $if(sampler->generate_1d() >= q) { $break; };
                     beta *= 1.0f / q;
                 };
