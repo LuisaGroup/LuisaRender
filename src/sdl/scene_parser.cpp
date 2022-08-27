@@ -295,7 +295,7 @@ inline void SceneParser::_parse_global_node(SceneNodeDesc::SourceLocation l, std
     auto name = _read_identifier();
     _skip_blanks();
     const SceneNodeDesc *base = nullptr;
-    luisa::string_view impl_type;
+    luisa::string impl_type;
     if (_peek() == ':') {
         _match(':');
         _skip_blanks();
