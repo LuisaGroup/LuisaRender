@@ -382,18 +382,21 @@ SampledSpectrum MicrofacetReflection::sample(Expr<float3> wo, Float3 *wi, Expr<f
     *p = 0.0f;
     auto wh = _distribution->sample_wh(wo, u);
     *wi = reflect(wo, wh);
-    $if(same_hemisphere(wo, *wi) & same_hemisphere(wo, wh)) {
+    SampledSpectrum f{_r.dimension()};
+    $if (same_hemisphere(wo, *wi) & same_hemisphere(wo, wh)) {
         // Compute PDF of _wi_ for microfacet reflection
         *p = _distribution->pdf(wo, wh) / (4.f * dot(wo, wh));
+        f = evaluate(wo, *wi);
     };
-    return evaluate(wo, *wi);
+    return f;
 }
 
 Float MicrofacetReflection::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {
-    auto wh = normalize(wo + wi);
     auto p = def(0.f);
-    $if(same_hemisphere(wo, wi) & any(wh != 0.f)) {
-        auto p = _distribution->pdf(wo, wh) / (4.f * dot(wo, wh));
+    auto wh = wi + wo;
+    $if (same_hemisphere(wo, wi) & any(wh != 0.f)) {
+        wh = normalize(wh);
+        p = _distribution->pdf(wo, wh) / (4.f * dot(wo, wh));
     };
     return p;
 }
@@ -432,22 +435,21 @@ SampledSpectrum MicrofacetTransmission::evaluate(Expr<float3> wo, Expr<float3> w
     auto cosThetaO = cos_theta(wo);
     auto cosThetaI = cos_theta(wi);
     SampledSpectrum ret{_t.dimension()};
-    $if(!same_hemisphere(wo, wi) & cosThetaO != 0.f & cosThetaI != 0.f) {
+    $if (!same_hemisphere(wo, wi) & cosThetaO != 0.f & cosThetaI != 0.f) {
         auto eta = ite(cosThetaO > 0.f, _eta_b / _eta_a, _eta_a / _eta_b);
         // Compute $\wh$ from $\wo$ and $\wi$ for microfacet transmission
         auto G = _distribution->G(wo, wi);
         ret = eta.map([&](auto i, auto e) noexcept {
             auto wh = normalize(wo + wi * e);
             wh = compute::sign(cos_theta(wh)) * wh;
-            auto f = def(0.f);
             auto valid = dot(wo, wh) * dot(wi, wh) < 0.f;
             auto sqrtDenom = dot(wo, wh) + e * dot(wi, wh);
             auto factor = 1.f / e;
             auto F = fresnel_dielectric(dot(wo, wh), _eta_a[i], _eta_b[i]);
             auto D = _distribution->D(wh);
-            f = (1.f - F) * _t[i] * sqr(factor) *
-                abs(D * G * sqr(e) * dot(wi, wh) * dot(wo, wh) /
-                    (cosThetaI * cosThetaO * sqr(sqrtDenom)));
+            auto f = (1.f - F) * _t[i] * sqr(factor) *
+                     abs(D * G * sqr(e) * dot(wi, wh) * dot(wo, wh) /
+                         (cosThetaI * cosThetaO * sqr(sqrtDenom)));
             return ite(valid, f, 0.f);
         });
     };
@@ -465,8 +467,9 @@ SampledSpectrum MicrofacetTransmission::sample(Expr<float3> wo, Float3 *wi, Expr
     auto u = make_float2(fract(swl_i_float), u_in.y);
     auto wh = _distribution->sample_wh(wo, u);
     *p = 0.f;
+    auto refr = refract(wo, wh, eta, wi);
     SampledSpectrum f{_t.dimension()};
-    $if(refract(wo, wh, eta, wi)) {
+    $if(refr) {
         *p = pdf(wo, *wi);
         f = evaluate(wo, *wi);
     };
@@ -475,19 +478,20 @@ SampledSpectrum MicrofacetTransmission::sample(Expr<float3> wo, Float3 *wi, Expr
 
 Float MicrofacetTransmission::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {
     auto pdf = def(0.f);
-    auto entering = cos_theta(wo) > 0.f;
-    auto eta = ite(entering, _eta_b / _eta_a, _eta_a / _eta_b);
-    $if(!same_hemisphere(wo, wi)) {
+    $if (!same_hemisphere(wo, wi)) {
+        auto entering = cos_theta(wo) > 0.f;
+        auto eta = ite(entering, _eta_b / _eta_a, _eta_a / _eta_b);
         for (auto i = 0u; i < eta.dimension(); i++) {
             auto wh = normalize(wo + wi * eta[i]);
             // Compute change of variables _dwh\_dwi_ for microfacet transmission
-            auto valid = dot(wo, wh) * dot(wi, wh) < 0.f;
             auto sqrtDenom = dot(wo, wh) + eta[i] * dot(wi, wh);
             auto dwh_dwi = sqr(eta[i] / sqrtDenom) * abs_dot(wi, wh);
+            auto valid = dot(wo, wh) * dot(wi, wh) < 0.f;
             pdf += ite(valid, _distribution->pdf(wo, wh) * dwh_dwi, 0.f);
         }
+        pdf *= static_cast<float>(1.0 / eta.dimension());
     };
-    return pdf * static_cast<float>(1.0 / eta.dimension());
+    return pdf;
 }
 
 MicrofacetTransmission::Gradient MicrofacetTransmission::backward(
