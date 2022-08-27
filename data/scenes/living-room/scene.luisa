@@ -90,6 +90,10 @@ Surface mat_BrushedStainlessSteel : Metal {
   roughness : Constant {
     v { 0.1414213562373095 }
   }
+  Kd : Constant {
+    v { 0.578596, 0.578596, 0.578596 }
+    semantic { "albedo" }
+  }
 }
 
 Surface mat_MattePaint : Matte {
@@ -1048,10 +1052,9 @@ Camera camera : Pinhole {
   front { -0.9617919325828552, 0.07440698146820068, 0.2634764611721039 }
   up { 0.0, 1.0, 0.0 }
   fov { 58.71550708558254 }
-  spp { 1024 }
+  spp { 128 }
   filter : Gaussian {
     radius { 1 }
-    sigma { 1 }
   }
   film : Color {
     resolution { 1920, 1080 }
@@ -1061,10 +1064,10 @@ Camera camera : Pinhole {
 
 render {
   cameras { @camera }
-  spectrum : sRGB {}
-  integrator : MegaPath {
+  spectrum : Hero {}
+  integrator : WavePath {
     sampler : Independent {}
-    depth { 16 }
+    depth { 12 }
     rr_depth { 5 }
     rr_threshold { 0.95 }
   }

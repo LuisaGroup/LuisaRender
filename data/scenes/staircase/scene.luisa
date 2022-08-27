@@ -86,6 +86,10 @@ Surface mat_BrushedAluminium : Metal {
   roughness : Constant {
     v { 0.31622776601683794 }
   }
+  Kd : Constant {
+    v { 0.578596, 0.578596, 0.578596 }
+    semantic { "albedo" }
+  }
 }
 
 Surface mat_ChairSeat : Matte {
@@ -178,6 +182,10 @@ Surface mat_StainlessSteel : Metal {
   eta { "Al" }
   roughness : Constant {
     v { 0.001 }
+  }
+  Kd : Constant {
+    v { 0.578596, 0.578596, 0.578596 }
+    semantic { "albedo" }
   }
 }
 
@@ -10306,7 +10314,7 @@ Shape shape_774 : Mesh {
   surface { @mat_Null }
   light : Diffuse {
     emission : Constant {
-      v { 30.0, 30.0, 30.0 }
+      v { 21.5, 21.5, 21.5 }
       semantic { "illuminant" }
     }
   }
@@ -10324,63 +10332,29 @@ Filter filter_base {
   radius { 1 }
 }
 
-Camera camera_base {
+Camera camera : Pinhole {
   position { 0.03242092579603195, 1.526729941368103, 4.881969451904297 }
   front { -0.007646017242223024, 0.04505503550171852, -0.998955249786377 }
   up { 0.0, 1.0, 0.0 }
   fov { 58.543979551022964 }
   spp { 128 }
+  filter : Gaussian {
+    radius { 1 }
+  }
   film : Color {
-    resolution { 1080, 1920 }
+    resolution { 720, 1280 }
   }
-}
-
-Camera camera_center : Pinhole(@camera_base) {
-  filter : Gaussian(@filter_base) {}
-  file { "staircase-base.exr" }
-}
-
-Camera camera_shift_x : Pinhole(@camera_base) {
-  filter : Gaussian(@filter_base) {
-    shift { 1, 0 }
-  }
-  file { "staircase-shift-x.exr" }
-}
-
-Camera camera_shift_y : Pinhole(@camera_base) {
-  filter : Gaussian(@filter_base) {
-    shift { 0, 1 }
-  }
-  file { "staircase-shift-y.exr" }
-}
-
-Camera camera_shift_nx : Pinhole(@camera_base) {
-  filter : Gaussian(@filter_base) {
-    shift { -1, 0 }
-  }
-  file { "staircase-shift-nx.exr" }
-}
-
-Camera camera_shift_ny : Pinhole(@camera_base) {
-  filter : Gaussian(@filter_base) {
-    shift { 0, -1 }
-  }
-  file { "staircase-shift-ny.exr" }
+  file { "output.exr" }
 }
 
 render {
-  cameras {
-    @camera_center,
-    @camera_shift_x,
-    @camera_shift_y,
-    @camera_shift_nx,
-    @camera_shift_ny
-  }
-  spectrum : sRGB {}
+  cameras { @camera }
+  spectrum : Hero {}
   integrator : WavePath {
-    // sampler : Sobol {}
-    depth { 8 }
-    rr_depth { 2 }
+    sampler : Independent {}
+    depth { 12 }
+    rr_depth { 5 }
+    rr_threshold { 0.95 }
   }
   shapes {
     @shape_0,

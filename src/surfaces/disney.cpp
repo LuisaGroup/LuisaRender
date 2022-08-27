@@ -661,7 +661,7 @@ public:
                 .roughness = _distrib->alpha(),
                 .eta = SampledSpectrum{
                     _swl.dimension(),
-                    ite(thin & wi_local.z < 0.f, _fresnel->eta(), 1.f)}};
+                    ite(!thin & wi_local.z < 0.f, _fresnel->eta(), 1.f)}};
     }
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
         auto wo_local = _it.wo_local();

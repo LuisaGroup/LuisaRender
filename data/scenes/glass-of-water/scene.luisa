@@ -4,12 +4,20 @@ Surface mat_Backdrop : Metal {
   roughness : Constant {
     v { 0.31622776601683794 }
   }
+  Kd : Constant {
+    v { 0.578596, 0.578596, 0.578596 }
+    semantic { "albedo" }
+  }
 }
 
 Surface mat_Floor : Metal {
   eta { "Al" }
   roughness : Constant {
     v { 0.31622776601683794 }
+  }
+  Kd : Constant {
+    v { 0.578596, 0.578596, 0.578596 }
+    semantic { "albedo" }
   }
 }
 
@@ -320,17 +328,17 @@ Camera camera : Pinhole {
     radius { 1 }
   }
   film : Color {
-    resolution { 1920, 1080 }
+    resolution { 1280, 720 }
   }
-  file { "glass-of-water.exr" }
+  file { "output.exr" }
 }
 
 render {
   cameras { @camera }
-  spectrum : sRGB {}
-  integrator : MegaPath {
+  spectrum : Hero {}
+  integrator : WavePath {
     sampler : Independent {}
-    depth { 32 }
+    depth { 64 }
     rr_depth { 5 }
     rr_threshold { 0.95 }
   }
