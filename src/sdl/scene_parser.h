@@ -38,10 +38,10 @@ private:
     void _match(char c) noexcept;
     void _skip() noexcept;
     void _skip_blanks() noexcept;
-    [[nodiscard]] char _peek() noexcept;
+    [[nodiscard]] char _peek(bool escape_macro = false) noexcept;
     [[nodiscard]] char _get(bool escape_macro = false) noexcept;
     [[nodiscard]] bool _eof() const noexcept;
-    [[nodiscard]] luisa::string _read_identifier() noexcept;
+    [[nodiscard]] luisa::string _read_identifier(bool escape_macro = false) noexcept;
     [[nodiscard]] double _read_number() noexcept;
     [[nodiscard]] bool _read_bool() noexcept;
     [[nodiscard]] luisa::string _read_string() noexcept;

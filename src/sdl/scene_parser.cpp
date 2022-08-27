@@ -89,7 +89,7 @@ inline void SceneParser::_match(char c) noexcept {
 
 void SceneParser::_skip() noexcept { static_cast<void>(_get(true)); }
 
-inline char SceneParser::_peek() noexcept {
+inline char SceneParser::_peek(bool escape_macro) noexcept {
     auto peek_char = [this] {
         if (!_parsing_macros.empty()) {
             return _parsing_macros.back().front();
@@ -103,10 +103,12 @@ inline char SceneParser::_peek() noexcept {
         return c;
     };
     auto c = peek_char();
-    while (c == '#') {
-        _skip();
-        _parse_macro();
-        c = peek_char();
+    if (!escape_macro) {
+        while (c == '#') {
+            _skip();
+            _parse_macro();
+            c = peek_char();
+        }
     }
     return c;
 }
@@ -152,9 +154,9 @@ inline bool SceneParser::_eof() const noexcept {
     return _parsing_macros.empty() && _cursor >= _source.size();
 }
 
-inline luisa::string SceneParser::_read_identifier() noexcept {
+inline luisa::string SceneParser::_read_identifier(bool escape_macro) noexcept {
     luisa::string identifier;
-    auto c = _get();
+    auto c = _get(escape_macro);
     if (c != '$' && c != '_' && !isalpha(c)) [[unlikely]] {
         _report_error("Invalid character '{}' in identifier.", c);
     }
@@ -162,7 +164,9 @@ inline luisa::string SceneParser::_read_identifier() noexcept {
     auto is_ident_body = [](auto c) noexcept {
         return isalnum(c) || c == '_' || c == '$' || c == '-' || c == '.';
     };
-    while (!_eof() && is_ident_body(_peek())) { identifier.push_back(_get()); }
+    while (!_eof() && is_ident_body(_peek(escape_macro))) {
+        identifier.push_back(_get(escape_macro));
+    }
     return identifier;
 }
 
@@ -232,12 +236,12 @@ inline luisa::string SceneParser::_read_string() noexcept {
 
 inline void SceneParser::_skip_blanks() noexcept {
     while (!_eof()) {
-        if (auto c = _peek(); isblank(c) || c == '\n') {// blank
+        if (auto c = _peek(true); isblank(c) || c == '\n') {// blank
             _skip();
         } else if (c == '/') {// comment
             _skip();
             _match('/');
-            while (!_eof() && _get() != '\n') {}
+            while (!_eof() && _get(true) != '\n') {}
         } else {
             break;
         }
@@ -434,7 +438,7 @@ const SceneNodeDesc *SceneParser::_parse_base_node() noexcept {
 
 void SceneParser::_parse_macro() noexcept {
     _skip_blanks();
-    auto key = _read_identifier();
+    auto key = _read_identifier(true);
     if (auto cli_iter = _cli_macros.find(key);
         cli_iter != _cli_macros.end()) {
         _parsing_macros.emplace_back(cli_iter->second);
@@ -448,10 +452,10 @@ void SceneParser::_parse_macro() noexcept {
 
 void SceneParser::_parse_define() noexcept {
     _skip_blanks();
-    auto key = _read_identifier();
+    auto key = _read_identifier(true);
     _skip_blanks();
     luisa::string value;
-    while (!_eof() && _peek() != '\n' && _peek() != '/') {
+    while (!_eof() && _peek(true) != '\n' && _peek(true) != '/') {
         value.push_back(_get(true));
     }
     if (_cli_macros.contains(key)) {
