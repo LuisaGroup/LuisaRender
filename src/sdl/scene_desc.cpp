@@ -6,7 +6,7 @@
 
 namespace luisa::render {
 
-const SceneNodeDesc *SceneDesc::node(std::string_view identifier) const noexcept {
+const SceneNodeDesc *SceneDesc::node(luisa::string_view identifier) const noexcept {
     if (auto iter = _global_nodes.find(identifier);
         iter != _global_nodes.cend()) {
         return iter->get();
@@ -17,7 +17,7 @@ const SceneNodeDesc *SceneDesc::node(std::string_view identifier) const noexcept
         identifier);
 }
 
-const SceneNodeDesc *SceneDesc::reference(std::string_view identifier) noexcept {
+const SceneNodeDesc *SceneDesc::reference(luisa::string_view identifier) noexcept {
     if (identifier == root_node_identifier) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
             "Invalid reference to root node.");
@@ -33,7 +33,7 @@ const SceneNodeDesc *SceneDesc::reference(std::string_view identifier) noexcept 
 }
 
 SceneNodeDesc *SceneDesc::define(
-    std::string_view identifier, SceneNodeTag tag, std::string_view impl_type,
+    luisa::string_view identifier, SceneNodeTag tag, luisa::string_view impl_type,
     SceneNodeDesc::SourceLocation location, const SceneNodeDesc *base) noexcept {
 
     if (identifier == root_node_identifier ||
