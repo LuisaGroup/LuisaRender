@@ -27,7 +27,19 @@ public:
 
     [[nodiscard]] static auto load(std::filesystem::path path, uint subdiv_level) noexcept {
 
-        return ThreadPool::global().async([path = std::move(path), subdiv_level] {
+        // TODO: static lifetime seems not good...
+        static luisa::lru_cache<uint64_t, std::shared_future<MeshLoader>> loaded_meshes{32u};
+        static std::mutex mutex;
+
+        auto abs_path = std::filesystem::canonical(path).string();
+        auto key = luisa::hash64(abs_path, luisa::hash64(subdiv_level));
+
+        std::scoped_lock lock{mutex};
+        if (auto m = loaded_meshes.at(key)) {
+            return *m;
+        }
+
+        auto future = ThreadPool::global().async([path = std::move(path), subdiv_level] {
             Clock clock;
             auto path_string = path.string();
             Assimp::Importer importer;
@@ -171,6 +183,8 @@ public:
                 path_string, clock.toc());
             return loader;
         });
+        loaded_meshes.emplace(key, future);
+        return future;
     }
 };
 
