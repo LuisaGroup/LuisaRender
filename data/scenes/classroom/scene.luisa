@@ -247,6 +247,10 @@ Surface mat_ChairFrame : Metal {
   roughness : Constant {
     v { 0.31622776601683794 }
   }
+  Kd : Constant {
+    v { 0.751534, 0.751534, 0.751534 }
+    semantic { "albedo" }
+  }
 }
 
 Surface mat_ChairStainless : Metal {

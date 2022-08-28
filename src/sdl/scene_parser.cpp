@@ -162,7 +162,7 @@ inline luisa::string SceneParser::_read_identifier(bool escape_macro) noexcept {
     }
     identifier.push_back(c);
     auto is_ident_body = [](auto c) noexcept {
-        return isalnum(c) || c == '_' || c == '$' || c == '-' || c == '.';
+        return isalnum(c) || c == '_' || c == '$' || c == '-';
     };
     while (!_eof() && is_ident_body(_peek(escape_macro))) {
         identifier.push_back(_get(escape_macro));
