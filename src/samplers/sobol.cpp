@@ -36,7 +36,6 @@ public:
 
 private:
     uint _scale{};
-    uint _width{};
     luisa::optional<UInt> _seed;
     luisa::optional<UInt> _dimension;
     luisa::optional<U64> _sobol_index;
@@ -54,10 +53,6 @@ private:
         v ^= v * 0x05526c56u;
         v ^= v * 0x53a22864u;
         return reverse(v);
-    }
-
-    [[nodiscard]] static auto _binary_permute_scramble(Expr<uint> seed, Expr<uint> v) noexcept {
-        return seed ^ v;
     }
 
     template<bool scramble>
@@ -119,7 +114,6 @@ public:
             _state_buffer = pipeline().device().create_buffer<uint4>(
                 next_pow2(state_count));
         }
-        _width = resolution.x;
         _scale = next_pow2(std::max(resolution.x, resolution.y));
         auto m = std::bit_width(_scale);
         std::array<uint2, SobolMatrixSize> vdc_sobol_matrices;
@@ -132,11 +126,11 @@ public:
         _vdc_sobol_matrices_inv = luisa::make_unique<Constant<uint2>>(vdc_sobol_matrices_inv);
     }
     void start(Expr<uint2> pixel, Expr<uint> sample_index) noexcept override {
-        _dimension.emplace(0u);
+        _dimension.emplace(2u);
         _sobol_index.emplace(_sobol_interval_to_index(
             std::bit_width(_scale), sample_index, pixel));
-        _seed.emplace(xxhash32(make_uint3(
-            (pixel.x << 16u) | pixel.y, sample_index,
+        _seed.emplace(xxhash32(make_uint4(
+            pixel.x, pixel.y, sample_index,
             node<SobolSampler>()->seed())));
     }
     void save_state(Expr<uint> state_id) noexcept override {
@@ -151,12 +145,17 @@ public:
     }
     [[nodiscard]] Float generate_1d() noexcept override {
         auto u = _sobol_sample<true>(*_sobol_index, *_dimension, *_seed);
-        *_dimension = (*_dimension + 1u) % NSobolDimensions;
+        *_dimension = max((*_dimension + 1u) % NSobolDimensions, 2u);
         return u;
     }
     [[nodiscard]] Float2 generate_2d() noexcept override {
         auto ux = generate_1d();
         auto uy = generate_1d();
+        return make_float2(ux, uy);
+    }
+    [[nodiscard]] Float2 generate_pixel_2d() noexcept override {
+        auto ux = _sobol_sample<false>(*_sobol_index, 0u, *_seed);
+        auto uy = _sobol_sample<false>(*_sobol_index, 1u, *_seed);
         return make_float2(ux, uy);
     }
 };

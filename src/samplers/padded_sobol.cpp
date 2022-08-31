@@ -83,8 +83,8 @@ public:
     void start(Expr<uint2> pixel, Expr<uint> sample_index) noexcept override {
         _dimension.emplace(0u);
         _sample_index.emplace(sample_index);
-        _seed.emplace(xxhash32(make_uint3(
-            (pixel.x << 16u) | pixel.y, sample_index,
+        _seed.emplace(xxhash32(make_uint4(
+            pixel.x, pixel.y, sample_index,
             node<PaddedSobolSampler>()->seed())));
     }
     void save_state(Expr<uint> state_id) noexcept override {
