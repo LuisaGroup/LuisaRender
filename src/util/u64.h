@@ -65,6 +65,7 @@ public:
     [[nodiscard]] auto operator|(const U64 &rhs) const noexcept { return U64{_bits | rhs._bits}; }
     [[nodiscard]] auto operator^(Expr<uint> rhs) const noexcept { return U64{hi(), lo() ^ rhs}; }
     [[nodiscard]] auto operator^(const U64 &rhs) const noexcept { return U64{_bits ^ rhs._bits}; }
+    // TODO: optimize this
     [[nodiscard]] auto operator>>(Expr<uint> rhs) const noexcept {
         using compute::if_;
         auto ret = *this;
