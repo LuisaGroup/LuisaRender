@@ -28,7 +28,7 @@ class SobolSamplerInstance final : public Sampler::Instance {
 
 private:
     uint _scale{};
-    luisa::optional<UInt> _seed;
+    luisa::optional<UInt2> _pixel;
     luisa::optional<UInt> _dimension;
     luisa::optional<U64> _sobol_index;
     Buffer<uint> _sobol_matrices;
@@ -57,31 +57,33 @@ private:
             i = i + 1u;
         };
         if constexpr (scramble) { v = _fast_owen_scramble(hash, v); }
-        return min(v * 0x1p-32f, one_minus_epsilon);
+        return v * 0x1p-32f;
     }
 
     [[nodiscard]] auto _sobol_interval_to_index(uint m, UInt frame, Expr<uint2> p) const noexcept {
         if (m == 0u) { return U64{frame}; }
-        U64 delta;
         auto c = def(0u);
-        $while(frame != 0u) {
-            auto vdc = _vdc_sobol_matrices->read(c);
-            auto delta_bits = ite((frame & 1u) != 0u, delta.bits() ^ vdc, delta.bits());
-            delta = U64{delta_bits};
-            frame = frame >> 1u;
-            c = c + 1u;
-        };
-        // flipped b
         auto m2 = m << 1u;
         auto index = U64{frame} << m2;
+        auto delta = U64{0u};
+        $while(frame != 0u) {
+            $if((frame & 1u) != 0u) {
+                auto v = U64{_vdc_sobol_matrices->read(c)};
+                delta = delta ^ v;
+            };
+            frame >>= 1u;
+            c += 1u;
+        };
+        // flipped b
         auto b = delta ^ ((U64{p.x} << m) | p.y);
         auto d = def(0u);
         $while(b != 0u) {
-            auto vdc_inv = _vdc_sobol_matrices_inv->read(d);
-            auto index_bits = ite((b & 1u) != 0u, index.bits() ^ vdc_inv, index.bits());
-            index = U64{index_bits};
+            $if ((b & 1u) != 0u) {
+                auto v = U64{_vdc_sobol_matrices_inv->read(d)};
+                index = index ^ v;
+            };
             b = b >> 1u;
-            d = d + 1u;
+            d += 1u;
         };
         return index;
     }
@@ -107,7 +109,8 @@ public:
                 next_pow2(state_count));
         }
         _scale = next_pow2(std::max(resolution.x, resolution.y));
-        auto m = std::bit_width(_scale);
+        LUISA_ASSERT(_scale <= 0xffffu, "Sobol sampler scale is too large.");
+        auto m = std::bit_width(_scale) - 1u;
         std::array<uint2, SobolMatrixSize> vdc_sobol_matrices;
         std::array<uint2, SobolMatrixSize> vdc_sobol_matrices_inv;
         for (auto i = 0u; i < SobolMatrixSize; i++) {
@@ -120,34 +123,41 @@ public:
     void start(Expr<uint2> pixel, Expr<uint> sample_index) noexcept override {
         _dimension.emplace(2u);
         _sobol_index.emplace(_sobol_interval_to_index(
-            std::bit_width(_scale), sample_index, pixel));
-        _seed.emplace(xxhash32(make_uint4(
-            pixel.x, pixel.y, sample_index, node()->seed())));
+            std::bit_width(_scale) - 1u, sample_index, pixel));
+        _pixel.emplace(pixel);
     }
     void save_state(Expr<uint> state_id) noexcept override {
-        auto state = make_uint4(_sobol_index->bits(), *_dimension, *_seed);
+        auto state = make_uint4(_sobol_index->bits(), *_dimension, (_pixel->y << 16u) | _pixel->x);
         _state_buffer.write(state_id, state);
     }
     void load_state(Expr<uint> state_id) noexcept override {
         auto state = _state_buffer.read(state_id);
         _sobol_index.emplace(state.xy());
         _dimension.emplace(state.z);
-        _seed.emplace(state.w);
+        _pixel.emplace(make_uint2(state.w >> 16u, state.w & 0xffffu));
     }
     [[nodiscard]] Float generate_1d() noexcept override {
-        auto u = _sobol_sample<true>(*_sobol_index, *_dimension, *_seed);
-        *_dimension = max((*_dimension + 1u) % NSobolDimensions, 2u);
-        return u;
+        *_dimension = ite(*_dimension >= NSobolDimensions, 2u, *_dimension);
+        auto hash = xxhash32(make_uint2(*_dimension, node()->seed()));
+        auto u = _sobol_sample<true>(*_sobol_index, *_dimension, hash);
+        *_dimension += 1u;
+        return clamp(u, 0.f, one_minus_epsilon);
     }
     [[nodiscard]] Float2 generate_2d() noexcept override {
-        auto ux = generate_1d();
-        auto uy = generate_1d();
-        return make_float2(ux, uy);
+        *_dimension = ite(*_dimension + 1u >= NSobolDimensions, 2u, *_dimension);
+        auto hx = xxhash32(make_uint2(*_dimension, node()->seed()));
+        auto hy = xxhash32(make_uint2(*_dimension + 1u, node()->seed()));
+        auto ux = _sobol_sample<true>(*_sobol_index, *_dimension, hx);
+        auto uy = _sobol_sample<true>(*_sobol_index, *_dimension + 1u, hx);
+        *_dimension += 2u;
+        return clamp(make_float2(ux, uy), 0.f, one_minus_epsilon);
     }
     [[nodiscard]] Float2 generate_pixel_2d() noexcept override {
-        auto ux = _sobol_sample<false>(*_sobol_index, 0u, *_seed);
-        auto uy = _sobol_sample<false>(*_sobol_index, 1u, *_seed);
-        return make_float2(ux, uy);
+        auto ux = _sobol_sample<false>(*_sobol_index, 0u, 0u);
+        auto uy = _sobol_sample<false>(*_sobol_index, 1u, 0u);
+        auto s = static_cast<float>(_scale);
+        return clamp(make_float2(ux, uy) * s - make_float2(*_pixel),
+                     0.f, one_minus_epsilon);
     }
 };
 
