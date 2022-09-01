@@ -12,7 +12,7 @@ static constexpr auto nPMJ02bnSets = 5u;
 static constexpr auto nPMJ02bnSamples = 65536u;
 
 #ifndef LUISA_RENDER_PMJ02_TABLES_DEFINITION
-LUISA_IMPORT_API const uint32_t pmj02bnSamples[nPMJ02bnSets][nPMJ02bnSamples][2];
+LUISA_IMPORT_API const uint32_t PMJ02bnSamples[nPMJ02bnSets][nPMJ02bnSamples][2];
 #endif
 
 }// namespace luisa::render

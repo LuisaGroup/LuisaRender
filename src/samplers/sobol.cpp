@@ -15,24 +15,16 @@ namespace luisa::render {
 
 class SobolSampler final : public Sampler {
 
-private:
-    uint _seed;
-
 public:
-    SobolSampler(Scene *scene, const SceneNodeDesc *desc) noexcept
-        : Sampler{scene, desc},
-          _seed{desc->property_uint_or_default("seed", 19980810u)} {}
-    [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
+    SobolSampler(Scene *scene, const SceneNodeDesc *desc) noexcept : Sampler{scene, desc} {}
+    [[nodiscard]] luisa::unique_ptr<Instance> build(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] auto seed() const noexcept { return _seed; }
 };
 
 using namespace luisa::compute;
 
 class SobolSamplerInstance final : public Sampler::Instance {
-
-public:
-    static constexpr auto max_dimension = 1024u;
 
 private:
     uint _scale{};
@@ -130,8 +122,7 @@ public:
         _sobol_index.emplace(_sobol_interval_to_index(
             std::bit_width(_scale), sample_index, pixel));
         _seed.emplace(xxhash32(make_uint4(
-            pixel.x, pixel.y, sample_index,
-            node<SobolSampler>()->seed())));
+            pixel.x, pixel.y, sample_index, node()->seed())));
     }
     void save_state(Expr<uint> state_id) noexcept override {
         auto state = make_uint4(_sobol_index->bits(), *_dimension, *_seed);

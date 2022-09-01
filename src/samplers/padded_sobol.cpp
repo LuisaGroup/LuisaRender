@@ -16,12 +16,9 @@ private:
     uint _seed;
 
 public:
-    PaddedSobolSampler(Scene *scene, const SceneNodeDesc *desc) noexcept
-        : Sampler{scene, desc},
-          _seed{desc->property_uint_or_default("seed", 19980810u)} {}
+    PaddedSobolSampler(Scene *scene, const SceneNodeDesc *desc) noexcept : Sampler{scene, desc} {}
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] auto seed() const noexcept { return _seed; }
 };
 
 using namespace luisa::compute;
@@ -69,23 +66,23 @@ private:
         auto i = def(i_in);
         $loop {
             i ^= p;
-            i *= 0xe170893d;
-            i ^= p >> 16;
-            i ^= (i & w) >> 4;
-            i ^= p >> 8;
-            i *= 0x0929eb3f;
-            i ^= p >> 23;
-            i ^= (i & w) >> 1;
-            i *= 1 | p >> 27;
-            i *= 0x6935fa69;
-            i ^= (i & w) >> 11;
-            i *= 0x74dcb303;
-            i ^= (i & w) >> 2;
-            i *= 0x9e501cc3;
-            i ^= (i & w) >> 2;
-            i *= 0xc860a3df;
+            i *= 0xe170893du;
+            i ^= p >> 16u;
+            i ^= (i & w) >> 4u;
+            i ^= p >> 8u;
+            i *= 0x0929eb3fu;
+            i ^= p >> 23u;
+            i ^= (i & w) >> 1u;
+            i *= 1 | p >> 27u;
+            i *= 0x6935fa69u;
+            i ^= (i & w) >> 11u;
+            i *= 0x74dcb303u;
+            i ^= (i & w) >> 2u;
+            i *= 0x9e501cc3u;
+            i ^= (i & w) >> 2u;
+            i *= 0xc860a3dfu;
             i &= w;
-            i ^= i >> 5;
+            i ^= i >> 5u;
             $if(i < l) { $break; };
         };
         return (i + p) % l;
@@ -101,8 +98,7 @@ public:
         _sobol_matrices = luisa::make_unique<Constant<uint>>(sobol_matrices);
     }
     void reset(CommandBuffer &command_buffer, uint2 resolution, uint state_count, uint spp) noexcept override {
-        _spp = next_pow2(spp);
-        if (spp != _spp) {
+        if (next_pow2(spp) != spp) {
             LUISA_WARNING_WITH_LOCATION(
                 "Non power-of-two samples per pixel "
                 "is not optimal for Sobol' sampler.");
@@ -111,6 +107,7 @@ public:
             _state_buffer = pipeline().device().create_buffer<uint4>(
                 next_pow2(state_count));
         }
+        _spp = spp;
     }
     void start(Expr<uint2> pixel, Expr<uint> sample_index) noexcept override {
         _dimension.emplace(0u);
@@ -128,15 +125,15 @@ public:
         _dimension.emplace(state.w);
     }
     [[nodiscard]] Float generate_1d() noexcept override {
-        auto hash = xxhash32(make_uint4(*_pixel, *_sample_index, *_dimension));
+        auto hash = xxhash32(make_uint4(*_pixel, *_sample_index ^ node()->seed(), *_dimension));
         auto index = _permutation_element(*_sample_index, _spp, hash);
         auto u = _sobol_sample(*_sample_index, index, hash);
         *_dimension += 1u;
         return u;
     }
     [[nodiscard]] Float2 generate_2d() noexcept override {
-        auto hx = xxhash32(make_uint4(*_pixel, *_sample_index, *_dimension));
-        auto hy = xxhash32(make_uint4(*_pixel, *_sample_index, *_dimension + 1u));
+        auto hx = xxhash32(make_uint4(*_pixel, *_sample_index ^ node()->seed(), *_dimension));
+        auto hy = xxhash32(make_uint4(*_pixel, *_sample_index ^ node()->seed(), *_dimension + 1u));
         auto index = _permutation_element(*_sample_index, _spp, hx);
         auto ux = _sobol_sample(*_sample_index, index, hx);
         auto uy = _sobol_sample(*_sample_index, index, hy);

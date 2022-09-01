@@ -12,16 +12,11 @@ namespace luisa::render {
 
 class ZSobolSampler final : public Sampler {
 
-private:
-    uint _seed;
-
 public:
-    ZSobolSampler(Scene *scene, const SceneNodeDesc *desc) noexcept
-        : Sampler{scene, desc},
-          _seed{desc->property_uint_or_default("seed", 19980810u)} {}
-    [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
+    ZSobolSampler(Scene *scene, const SceneNodeDesc *desc) noexcept : Sampler{scene, desc} {}
+    [[nodiscard]] luisa::unique_ptr<Instance> build(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] auto seed() const noexcept { return _seed; }
 };
 
 using namespace luisa::compute;
