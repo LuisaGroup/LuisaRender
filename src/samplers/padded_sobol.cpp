@@ -12,9 +12,6 @@ namespace luisa::render {
 
 class PaddedSobolSampler final : public Sampler {
 
-private:
-    uint _seed;
-
 public:
     PaddedSobolSampler(Scene *scene, const SceneNodeDesc *desc) noexcept : Sampler{scene, desc} {}
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
@@ -48,8 +45,10 @@ private:
         auto v = def(0u);
         auto i = def(dimension * SobolMatrixSize);
         $while(a != 0u) {
-            v = ite((a & 1u) != 0u, v ^ _sobol_matrices->read(i), v);
-            a = a >> 1u;
+            $if ((a &1u) != 0u) {
+                v = v ^ _sobol_matrices->read(i);
+            };
+            a >>= 1u;
             i += 1u;
         };
         v = _fast_owen_scramble(hash, v);
@@ -127,7 +126,7 @@ public:
     [[nodiscard]] Float generate_1d() noexcept override {
         auto hash = xxhash32(make_uint4(*_pixel, *_sample_index ^ node()->seed(), *_dimension));
         auto index = _permutation_element(*_sample_index, _spp, hash);
-        auto u = _sobol_sample(*_sample_index, index, hash);
+        auto u = _sobol_sample(index, 0u, hash);
         *_dimension += 1u;
         return u;
     }
@@ -135,8 +134,8 @@ public:
         auto hx = xxhash32(make_uint4(*_pixel, *_sample_index ^ node()->seed(), *_dimension));
         auto hy = xxhash32(make_uint4(*_pixel, *_sample_index ^ node()->seed(), *_dimension + 1u));
         auto index = _permutation_element(*_sample_index, _spp, hx);
-        auto ux = _sobol_sample(*_sample_index, index, hx);
-        auto uy = _sobol_sample(*_sample_index, index, hy);
+        auto ux = _sobol_sample(index, 0u, hx);
+        auto uy = _sobol_sample(index, 1u, hy);
         *_dimension += 2u;
         return make_float2(ux, uy);
     }
