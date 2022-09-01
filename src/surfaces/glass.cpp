@@ -251,13 +251,15 @@ luisa::unique_ptr<Surface::Closure> GlassInstance::closure(
     auto Kr_ratio = ite(Kr_lum == 0.f, 0.f, sqrt(Kr_lum) / (sqrt(Kr_lum) + sqrt(Kt_lum)));
 
     // eta
-    SampledSpectrum eta{swl.dimension(), 1.5f};
+    auto mean_eta = def(1.f);
+    SampledSpectrum eta{swl.dimension(), mean_eta};
     if (_eta != nullptr) {
         if (_eta->node()->channels() == 1u) {
-            auto e = _eta->evaluate(it, swl, time).x;
-            for (auto i = 0u; i < eta.dimension(); i++) { eta[i] = e; }
+            mean_eta = _eta->evaluate(it, swl, time).x;
+            for (auto i = 0u; i < eta.dimension(); i++) { eta[i] = mean_eta; }
         } else {
             auto e = _eta->evaluate(it, swl, time).xyz();
+            mean_eta = e.y;
             auto inv_bb = sqr(1.f / fraunhofer_wavelengths);
             auto m = make_float3x3(make_float3(1.f), inv_bb, sqr(inv_bb));
             auto c = inverse(m) * e;
@@ -270,7 +272,6 @@ luisa::unique_ptr<Surface::Closure> GlassInstance::closure(
 
     // fresnel
     auto cos_o = cos_theta(it.wo_local());
-    auto mean_eta = eta.average();
     auto eta_i = ite(cos_o < 0.f, mean_eta, 1.f);
     auto eta_t = ite(cos_o < 0.f, 1.f, mean_eta);
     auto Fr = fresnel_dielectric(cos_o, eta_i, eta_t);
