@@ -170,8 +170,8 @@ public:
     void load_state(Expr<uint> state_id) noexcept override {
         auto state = _state_buffer.read(state_id);
         _pixel.emplace(state.xy());
-        _dimension.emplace(state.z);
-        _sample_index.emplace(state.w);
+        _sample_index.emplace(state.z);
+        _dimension.emplace(state.w);
     }
     [[nodiscard]] Float generate_1d() noexcept override {
         auto hash = xxhash32(make_uint4(*_pixel, *_dimension, node()->seed()));
