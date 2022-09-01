@@ -148,7 +148,7 @@ public:
         auto hx = xxhash32(make_uint2(*_dimension, node()->seed()));
         auto hy = xxhash32(make_uint2(*_dimension + 1u, node()->seed()));
         auto ux = _sobol_sample<true>(*_sobol_index, *_dimension, hx);
-        auto uy = _sobol_sample<true>(*_sobol_index, *_dimension + 1u, hx);
+        auto uy = _sobol_sample<true>(*_sobol_index, *_dimension + 1u, hy);
         *_dimension += 2u;
         return clamp(make_float2(ux, uy), 0.f, one_minus_epsilon);
     }
