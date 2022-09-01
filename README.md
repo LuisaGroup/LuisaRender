@@ -52,7 +52,7 @@ on [LuisaCompute](https://github.com/Mike-Leo-Smith/LuisaCompute).
   - Resolution: 1280x720
   - Max Depth: 10
 
-![Spaceship](data/scenes/spaceship/color-denoised.png)
+![Spaceship](data/scenes/spaceship/output-spectral.png)
 
 - Cornell Box with Bunnies
     - Mega-Kernel Path Tracing
