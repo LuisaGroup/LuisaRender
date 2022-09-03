@@ -38,16 +38,16 @@ private:
     luisa::optional<BufferView<float>> _m, _v;
     luisa::optional<BufferView<float>> _beta_t;
 
-    Shader1D<Buffer<float>, Buffer<float>, Buffer<float>, Buffer<float>, Buffer<uint>, float, float, float, float> _update_params;
+    Shader1D<Buffer<float>, Buffer<float>, Buffer<float>, Buffer<float>, Buffer<float>, float, float, float, float> _update_params;
 
 public:
     AdamInstance(Pipeline &pipeline, CommandBuffer &command_buffer, const Adam *optimizer) noexcept
         : Optimizer::Instance{pipeline, command_buffer, optimizer} {
 
-        Kernel1D update_params_kernel = [](BufferFloat params, BufferFloat m, BufferFloat v, BufferFloat beta_t, BufferUInt gradients,
-                                           Float beta1, Float beta2, Float epsilon, Float alpha) {
+        Kernel1D update_params_kernel = [](BufferFloat params, BufferFloat m, BufferFloat v, BufferFloat beta_t, BufferFloat gradients,
+                                           Float beta1, Float beta2, Float epsilon, Float alpha) noexcept {
             auto index = dispatch_x();
-            auto grad = as<float>(gradients.read(index));
+            auto grad = gradients.read(index);
             auto m_tm1 = m.read(index);
             auto v_tm1 = v.read(index);
             auto m_t = beta1 * m_tm1 + (1.f - beta1) * grad;
@@ -67,32 +67,35 @@ public:
     }
 
 public:
-    void initialize(CommandBuffer &command_buffer, uint length, BufferView<float> x0) noexcept override;
-    void step(CommandBuffer &command_buffer, BufferView<float> xi, BufferView<uint> gradients) noexcept override;
+    void initialize(CommandBuffer &command_buffer, uint length, BufferView<float> xi,
+                    BufferView<float> gradients, BufferView<float2> ranges) noexcept override;
+    void step(CommandBuffer &command_buffer) noexcept override;
 };
 
-void AdamInstance::initialize(CommandBuffer &command_buffer, uint length, BufferView<float> x0) noexcept {
-    Optimizer::Instance::initialize(command_buffer, length, x0);
-    if (!_m) {
-        _m.emplace(pipeline().device().create<Buffer<float>>(std::max(length, 1u)));
-    }
-    if (!_v) {
-        _v.emplace(pipeline().device().create<Buffer<float>>(std::max(length, 1u)));
-    }
-    if (!_beta_t) {
-        _beta_t.emplace(pipeline().device().create<Buffer<float>>(2u));
-    }
+void AdamInstance::initialize(CommandBuffer &command_buffer, uint length, BufferView<float> xi,
+                              BufferView<float> gradients, BufferView<float2> ranges) noexcept {
+    Optimizer::Instance::initialize(command_buffer, length, xi, gradients, ranges);
+
+    _m.reset();
+    _v.reset();
+    _beta_t.reset();
+
+    _m.emplace(pipeline().device().create<Buffer<float>>(std::max(length, 1u)));
+    _v.emplace(pipeline().device().create<Buffer<float>>(std::max(length, 1u)));
+    _beta_t.emplace(pipeline().device().create<Buffer<float>>(2u));
+
     command_buffer << _clear_float_buffer(*_m).dispatch(length)
                    << _clear_float_buffer(*_v).dispatch(length);
 }
 
-void AdamInstance::step(CommandBuffer &command_buffer, BufferView<float> xi, BufferView<uint> gradients) noexcept {
+void AdamInstance::step(CommandBuffer &command_buffer) noexcept {
     LUISA_ASSERT(_length != -1u, "Optimizer is not initialized.");
     auto node_exact = node<Adam>();
-    command_buffer << _update_params(xi, *_m, *_v, *_beta_t, gradients,
+    command_buffer << _update_params(*_xi, *_m, *_v, *_beta_t, *_gradients,
                                      node_exact->beta1(), node_exact->beta2(),
                                      node_exact->epsilon(), node_exact->learning_rate())
                           .dispatch(_length);
+    clamp_range(command_buffer);
 }
 
 luisa::unique_ptr<Optimizer::Instance> Adam::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {

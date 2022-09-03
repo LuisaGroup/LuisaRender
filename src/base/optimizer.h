@@ -23,8 +23,13 @@ public:
 
     protected:
         uint _length = -1u;
+        luisa::optional<BufferView<float2>> _ranges;
+        luisa::optional<BufferView<float>> _xi;
+        luisa::optional<BufferView<float>> _gradients;
+
         Shader1D<Buffer<uint>> _clear_uint_buffer;
         Shader1D<Buffer<float>> _clear_float_buffer;
+        Shader1D<Buffer<float>, Buffer<float>, Buffer<float2>, float> _clamp_range;
 
     public:
         explicit Instance(Pipeline &pipeline, CommandBuffer &command_buffer, const Optimizer *optimizer) noexcept;
@@ -36,8 +41,9 @@ public:
 
     public:
         // allocate buffer/... space
-        virtual void initialize(CommandBuffer &command_buffer, uint length, BufferView<float> x0) noexcept;
-        virtual void step(CommandBuffer &command_buffer, BufferView<float> xi, BufferView<uint> gradients) noexcept = 0;
+        virtual void initialize(CommandBuffer &command_buffer, uint length, BufferView<float> xi, BufferView<float> gradients, BufferView<float2> ranges) noexcept;
+        virtual void step(CommandBuffer &command_buffer) noexcept = 0;
+        void clamp_range(CommandBuffer &command_buffer) noexcept;
     };
 
 private:

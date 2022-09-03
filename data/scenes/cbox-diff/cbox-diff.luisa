@@ -379,8 +379,11 @@ Integrator pt : MegaRadiativeDiff {
   //display_camera_index { 0 }
   save_process { true }
   loss : L2 {}
-  learning_rate { 0.3 }
   iterations { 100 }
+
+  optimizer : GD {
+    learning_rate { 0.3 }
+  }
 }
 
 render {

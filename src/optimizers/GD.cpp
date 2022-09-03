@@ -21,34 +21,17 @@ public:
 
 class GDInstance final : public Optimizer::Instance {
 
-private:
-    Shader1D<Buffer<float>, Buffer<uint>, float> _update_params;
-
 public:
     GDInstance(Pipeline &pipeline, CommandBuffer &command_buffer, const GD *optimizer) noexcept
-        : Optimizer::Instance{pipeline, command_buffer, optimizer} {
-
-        Kernel1D update_params_kernel = [](BufferFloat params, BufferUInt gradients, Float alpha) {
-            auto index = dispatch_x();
-            auto x = params.read(index);
-            auto grad = as<float>(gradients.read(index));
-            params.write(index, x - alpha * grad);
-        };
-        _update_params = pipeline.device().compile(update_params_kernel);
-    }
+        : Optimizer::Instance{pipeline, command_buffer, optimizer} {}
 
 public:
-    void initialize(CommandBuffer &command_buffer, uint length, BufferView<float> x0) noexcept override;
-    void step(CommandBuffer &command_buffer, BufferView<float> xi, BufferView<uint> gradients) noexcept override;
+    void step(CommandBuffer &command_buffer) noexcept override;
 };
 
-void GDInstance::initialize(CommandBuffer &command_buffer, uint length, BufferView<float> x0) noexcept {
-    Optimizer::Instance::initialize(command_buffer, length, x0);
-}
-
-void GDInstance::step(CommandBuffer &command_buffer, BufferView<float> xi, BufferView<uint> gradients) noexcept {
+void GDInstance::step(CommandBuffer &command_buffer) noexcept {
     LUISA_ASSERT(_length != -1u, "Optimizer is not initialized.");
-    command_buffer << _update_params(xi, gradients, node<GD>()->learning_rate()).dispatch(_length);
+    clamp_range(command_buffer);
 }
 
 luisa::unique_ptr<Optimizer::Instance> GD::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {

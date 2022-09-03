@@ -14,9 +14,10 @@ namespace luisa::render {
 
 Differentiation::Differentiation(Pipeline &pipeline) noexcept
     : _pipeline{pipeline},
-      _const_param_buffer{*pipeline.create<Buffer<float4>>(constant_parameter_buffer_capacity)},
+      //      _const_param_buffer{*pipeline.create<Buffer<float4>>(constant_parameter_buffer_capacity)},
       _const_param_range_buffer{*pipeline.create<Buffer<float2>>(constant_parameter_buffer_capacity)},
       _gradient_buffer_size{constant_parameter_gradient_buffer_size},
+      _param_buffer_size{constant_parameter_buffer_capacity * 4u},
       _counter_size{constant_parameter_counter_size} {
 
     _constant_params.reserve(constant_parameter_buffer_capacity);
@@ -26,7 +27,9 @@ Differentiation::Differentiation(Pipeline &pipeline) noexcept
     Kernel1D clear_buffer = [](BufferUInt gradients) noexcept {
         gradients.write(dispatch_x(), 0u);
     };
-    Kernel1D accumulate_grad_const = [](BufferUInt gradients, BufferUInt counter) noexcept {
+    _clear_buffer = _pipeline.device().compile(clear_buffer);
+
+    Kernel1D accumulate_grad_const_kernel = [](BufferUInt gradients, BufferFloat param_gradients, BufferUInt counter) noexcept {
         auto thread = dispatch_x();
         auto counter_offset = thread * gradiant_collision_avoidance_block_size;
         auto grad_offset = 4u * counter_offset;
@@ -41,48 +44,24 @@ Differentiation::Differentiation(Pipeline &pipeline) noexcept
             count += counter.read(counter_offset + i);
         }
         grad /= Float(max(count, 1u));
-        gradients.write(grad_offset + 0u, as<uint>(grad.x));
-        gradients.write(grad_offset + 1u, as<uint>(grad.y));
-        gradients.write(grad_offset + 2u, as<uint>(grad.z));
-        gradients.write(grad_offset + 3u, as<uint>(grad.w));
+        auto param_offset = thread * 4u;
+        param_gradients.write(param_offset + 0u, grad.x);
+        param_gradients.write(param_offset + 1u, grad.y);
+        param_gradients.write(param_offset + 2u, grad.z);
+        param_gradients.write(param_offset + 3u, grad.w);
     };
-    Kernel1D apply_grad_const = [](BufferUInt gradients, BufferFloat4 params, BufferFloat2 ranges,
-                                   Float alpha, BufferUInt counter) noexcept {
-        auto thread = dispatch_x();
-        auto counter_offset = thread * gradiant_collision_avoidance_block_size;
-        auto grad_offset = 4u * counter_offset;
-        auto x = as<float>(gradients.read(grad_offset + 0u));
-        auto y = as<float>(gradients.read(grad_offset + 1u));
-        auto z = as<float>(gradients.read(grad_offset + 2u));
-        auto w = as<float>(gradients.read(grad_offset + 3u));
-        auto grad = make_float4(x, y, z, w);
-        auto old = params.read(thread);
-        auto range = ranges.read(thread);
-        auto max_step_length = 0.1f * (range.y - range.x);
-        grad = clamp(alpha * grad, -max_step_length, max_step_length);
-        auto next = old - grad;
-        params.write(thread, clamp(next, range.x, range.y));
+    _accumulate_grad_const = _pipeline.device().compile(accumulate_grad_const_kernel);
+
+    Kernel1D accumulate_grad_tex_kernel = [](BufferUInt gradients, UInt grad_offset,
+                                      BufferUInt counter, UInt counter_offset,
+                                      BufferFloat param_gradients, UInt param_offset) noexcept {
+        auto index = dispatch_x();
+        auto grad = as<float>(gradients.read(grad_offset + index));
+        auto count = counter.read(counter_offset + index);
+        grad /= Float(max(count, 1u));
+        param_gradients.write(param_offset + index, grad);
     };
-    Kernel2D apply_grad_tex = [](BufferUInt gradients, UInt grad_offset, ImageFloat image,
-                                 UInt channels, Float alpha, Float2 range, BufferUInt counter, UInt counter_offset) noexcept {
-        auto coord = dispatch_id().xy();
-        auto i = coord.y * dispatch_size_x() + coord.x;
-        auto x = as<float>(gradients.read(grad_offset + i * channels + 0u));
-        auto y = as<float>(gradients.read(grad_offset + i * channels + 1u));
-        auto z = as<float>(gradients.read(grad_offset + i * channels + 2u));
-        auto w = as<float>(gradients.read(grad_offset + i * channels + 3u));
-        auto grad = make_float4(x, y, z, w);
-        grad /= Float(max(counter.read(counter_offset + i), 1u));
-        auto old = image.read(coord);
-        auto max_step_length = 0.1f * (range.y - range.x);
-        grad = clamp(alpha * grad, -max_step_length, max_step_length);
-        auto next = old - grad;
-        image.write(coord, clamp(next, range.x, range.y));
-    };
-    _clear_buffer = _pipeline.device().compile(clear_buffer);
-    _accumulate_grad_const = _pipeline.device().compile(accumulate_grad_const);
-    _apply_grad_const = _pipeline.device().compile(apply_grad_const);
-    _apply_grad_tex = _pipeline.device().compile(apply_grad_tex);
+    _accumulate_grad_tex = _pipeline.device().compile(accumulate_grad_tex_kernel);
 }
 
 Differentiation::ConstantParameter Differentiation::parameter(float4 x, uint channels, float2 range) noexcept {
@@ -112,23 +91,48 @@ Differentiation::TexturedParameter Differentiation::parameter(const Image<float>
     auto pixel_count = image.size().x * image.size().y;
     auto param_count = pixel_count * nc;
     auto grad_offset = _gradient_buffer_size;
+    auto param_offset = _param_buffer_size;
     auto counter_offset = _counter_size;
     _counter_size = (_counter_size + pixel_count + 3u) & ~0b11u;
+    _param_buffer_size = (_param_buffer_size + param_count + 3u) & ~0b11u;
     _gradient_buffer_size = (_gradient_buffer_size + param_count + 3u) & ~0b11u;
-    return _textured_params.emplace_back(TexturedParameter{image, s, grad_offset, counter_offset, range});
+    return _textured_params.emplace_back(TexturedParameter{image, s, grad_offset, param_offset, counter_offset, range});
 }
 
 void Differentiation::materialize(CommandBuffer &command_buffer) noexcept {
     LUISA_ASSERT(!_grad_buffer, "Differentiation already materialized.");
+    _param_buffer_size = _gradient_buffer_size - constant_parameter_gradient_buffer_size + constant_parameter_buffer_capacity * 4u;
+    _param_buffer.emplace(*_pipeline.create<Buffer<float>>(std::max(_param_buffer_size, 1u)));
+    _param_range_buffer.emplace(*_pipeline.create<Buffer<float2>>(std::max(_param_buffer_size, 1u)));
+    _param_grad_buffer.emplace(*_pipeline.create<Buffer<float>>(std::max(_param_buffer_size, 1u)));
     _grad_buffer.emplace(*_pipeline.create<Buffer<uint>>(std::max(_gradient_buffer_size, 1u)));
     _counter.emplace(*_pipeline.create<Buffer<uint>>(std::max(_counter_size, 1u)));
+    clear_gradients(command_buffer);
+
     if (auto n = _constant_params.size()) {
-        command_buffer << _const_param_buffer.subview(0u, n)
-                              .copy_from(_constant_params.data())
-                       << _const_param_range_buffer.subview(0u, n)
-                              .copy_from(_constant_ranges.data());
-        clear_gradients(command_buffer);
+        //        command_buffer << _const_param_buffer.subview(0u, n)
+        //                              .copy_from(_constant_params.data())
+        //                       << _const_param_range_buffer.subview(0u, n)
+        //                              .copy_from(_constant_ranges.data());
+        command_buffer << _param_buffer.value().subview(0u, 4u * n).copy_from(_constant_params.data())
+                       << _param_range_buffer.value().subview(0u, n).copy_from(_constant_ranges.data());
     }
+
+    Kernel1D textured_params_range_kernel = [](BufferFloat2 params_range_buffer, Float2 range, UInt start) noexcept {
+        params_range_buffer.write(start + dispatch_x(), range);
+    };
+    auto textured_params_range_shader = _pipeline.device().compile(textured_params_range_kernel);
+
+    for (auto &&p : _textured_params) {
+        auto image = p.image().view();
+        auto param_offset = p.param_offset();
+        auto channels = compute::pixel_format_channel_count(image.format());
+        auto length = image.size().x * image.size().y * channels;
+        command_buffer << image.copy_to(_param_buffer.value().subview(param_offset, length))
+                       << textured_params_range_shader(*_param_range_buffer, p.range(), param_offset).dispatch(length);
+    }
+
+    _optimizer->initialize(command_buffer, _param_buffer_size, *_param_buffer, *_param_grad_buffer, *_param_range_buffer);
 }
 
 void Differentiation::clear_gradients(CommandBuffer &command_buffer) noexcept {
@@ -141,64 +145,83 @@ void Differentiation::clear_gradients(CommandBuffer &command_buffer) noexcept {
     }
 }
 
-void Differentiation::apply_gradients(CommandBuffer &command_buffer, float alpha) noexcept {
+void Differentiation::apply_gradients(CommandBuffer &command_buffer) noexcept {
     LUISA_ASSERT(_grad_buffer, "Gradient buffer is not materialized.");
 
-    // apply constant parameters
+    // accumulate constant parameters
     if (auto n = _constant_params.size()) {
-        luisa::vector<float4> params_before(n);
-        luisa::vector<uint> counter(n * gradiant_collision_avoidance_block_size);
-        luisa::vector<float4> collision_avoiding_gradients(n * gradiant_collision_avoidance_block_size);
-        luisa::vector<float4> params_after(n);
-        command_buffer << _const_param_buffer.subview(0u, n).copy_to(params_before.data())
-                       << _counter->subview(0u, n * gradiant_collision_avoidance_block_size).copy_to(counter.data())
-                       << _grad_buffer->subview(0u, n * 4u * gradiant_collision_avoidance_block_size)
-                              .copy_to(collision_avoiding_gradients.data())
-                       << _accumulate_grad_const(*_grad_buffer, *_counter).dispatch(n)
-                       << _apply_grad_const(*_grad_buffer, _const_param_buffer, _const_param_range_buffer, alpha, *_counter)
-                              .dispatch(n)
-                       << _const_param_buffer.subview(0u, n).copy_to(params_after.data())
-                       << compute::synchronize();
+        command_buffer << _accumulate_grad_const(*_grad_buffer, *_param_grad_buffer, *_counter).dispatch(n);
 
-        // DEBUG: print constant parameters
-        for (auto i = 0u; i < n; i++) {
-            auto p0 = params_before[i];
-            auto grad = make_float4();
-            auto count_uint = 0u;
-            for (auto g = 0u; g < gradiant_collision_avoidance_block_size; g++) {
-                auto index = i * gradiant_collision_avoidance_block_size + g;
-                grad += collision_avoiding_gradients[index];
-                count_uint += counter[index];
-            }
-            auto count = float(std::max(count_uint, 1u));
-            grad /= count;
-            auto p1 = params_after[i];
-            LUISA_INFO(
-                "Param #{}: ({}, {}, {}, {}) - "
-                "{} * ({}, {}, {}, {}) -> "
-                "({}, {}, {}, {})"
-                ", count = {}",
-                i, p0.x, p0.y, p0.z, p0.w,
-                alpha, grad.x, grad.y, grad.z, grad.w,
-                p1.x, p1.y, p1.z, p1.w,
-                count);
-        }
+        //        luisa::vector<float4> params_before(n);
+        //        luisa::vector<uint> counter(n * gradiant_collision_avoidance_block_size);
+        //        luisa::vector<float4> collision_avoiding_gradients(n * gradiant_collision_avoidance_block_size);
+        //        luisa::vector<float4> params_after(n);
+        //        command_buffer << _const_param_buffer.subview(0u, n).copy_to(params_before.data())
+        //                       << _counter->subview(0u, n * gradiant_collision_avoidance_block_size).copy_to(counter.data())
+        //                       << _grad_buffer->subview(0u, n * 4u * gradiant_collision_avoidance_block_size)
+        //                              .copy_to(collision_avoiding_gradients.data())
+        //                       << _accumulate_grad_const(*_grad_buffer, *_counter).dispatch(n);
     }
+
+    // accumulate textured parameters
+    for (auto &&p : _textured_params) {
+        auto image = p.image().view();
+        auto param_offset = p.param_offset();
+        auto channels = compute::pixel_format_channel_count(image.format());
+        auto length = image.size().x * image.size().y * channels;
+        command_buffer << image.copy_from(_param_buffer.value().subview(param_offset, length));
+    }
+
+    _optimizer->step(command_buffer);
+
+    //    if (auto n = _constant_params.size()) {
+    //        command_buffer << _apply_grad_const(*_grad_buffer, _const_param_buffer, _const_param_range_buffer, alpha, *_counter)
+    //                              .dispatch(n)
+    //                       << _const_param_buffer.subview(0u, n).copy_to(params_after.data())
+    //                       << compute::synchronize();
+    //
+    //        // DEBUG: print constant parameters
+    //        for (auto i = 0u; i < n; i++) {
+    //            auto p0 = params_before[i];
+    //            auto grad = make_float4();
+    //            auto count_uint = 0u;
+    //            for (auto g = 0u; g < gradiant_collision_avoidance_block_size; g++) {
+    //                auto index = i * gradiant_collision_avoidance_block_size + g;
+    //                grad += collision_avoiding_gradients[index];
+    //                count_uint += counter[index];
+    //            }
+    //            auto count = float(std::max(count_uint, 1u));
+    //            grad /= count;
+    //            auto p1 = params_after[i];
+    //            LUISA_INFO(
+    //                "Param #{}: ({}, {}, {}, {}) - "
+    //                "{} * ({}, {}, {}, {}) -> "
+    //                "({}, {}, {}, {})"
+    //                ", count = {}",
+    //                i, p0.x, p0.y, p0.z, p0.w,
+    //                alpha, grad.x, grad.y, grad.z, grad.w,
+    //                p1.x, p1.y, p1.z, p1.w,
+    //                count);
+    //        }
+    //    }
 
     // apply textured parameters
     for (auto &&p : _textured_params) {
         auto image = p.image().view();
-        auto grad_offset = p.gradient_buffer_offset();
-        auto counter_offset = p.counter_offset();
+        auto param_offset = p.param_offset();
         auto channels = compute::pixel_format_channel_count(image.format());
-        command_buffer << _apply_grad_tex(*_grad_buffer, grad_offset, image, channels, alpha,
-                                          p.range(), *_counter, counter_offset)
-                              .dispatch(image.size());
+        auto length = image.size().x * image.size().y * channels;
+        command_buffer << image.copy_from(_param_buffer.value().subview(param_offset, length));
     }
 }
 
 Float4 Differentiation::decode(const Differentiation::ConstantParameter &param) const noexcept {
-    return _const_param_buffer.read(param.index());
+    //    return _const_param_buffer.read(param.index());
+    auto x = _param_buffer.value().read(param.index() * 4u + 0u);
+    auto y = _param_buffer.value().read(param.index() * 4u + 1u);
+    auto z = _param_buffer.value().read(param.index() * 4u + 2u);
+    auto w = _param_buffer.value().read(param.index() * 4u + 3u);
+    return make_float4(x, y, z, w);
 }
 
 void Differentiation::accumulate(const Differentiation::ConstantParameter &param, Expr<float4> grad,
@@ -251,8 +274,8 @@ void Differentiation::accumulate(const Differentiation::TexturedParameter &param
     write_grad(map_uv(p), grad);
 }
 
-void Differentiation::step(CommandBuffer &command_buffer, float alpha) noexcept {
-    apply_gradients(command_buffer, alpha);
+void Differentiation::step(CommandBuffer &command_buffer) noexcept {
+    apply_gradients(command_buffer);
     clear_gradients(command_buffer);
 }
 
@@ -269,6 +292,10 @@ void Differentiation::dump(CommandBuffer &command_buffer, const std::filesystem:
         SaveEXR(pixels.data(), static_cast<int>(size.x), static_cast<int>(size.y),
                 static_cast<int>(channels), false, file_name.string().c_str(), nullptr);
     }
+}
+
+void Differentiation::register_optimizer(Optimizer::Instance *optimizer) noexcept {
+    _optimizer = optimizer;
 }
 
 }// namespace luisa::render

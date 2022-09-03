@@ -23,10 +23,36 @@ Optimizer::Instance::Instance(Pipeline &pipeline, CommandBuffer &command_buffer,
         buffer.write(dispatch_x(), 0.f);
     };
     _clear_float_buffer = _pipeline.device().compile(clear_float_kernel);
+
+    Kernel1D clamp_range_kernel = [](BufferFloat gradients, BufferFloat params, BufferFloat2 ranges, Float alpha) noexcept {
+        auto offset = dispatch_x();
+        auto grad = gradients.read(offset);
+        auto range = ranges.read(offset);
+        auto old = params.read(offset);
+        auto max_step_length = 0.1f * (range.y - range.x);
+        grad = clamp(alpha * grad, -max_step_length, max_step_length);
+        auto next = clamp(old - grad, range.x, range.y);
+        params.write(offset, next);
+    };
+    _clamp_range = _pipeline.device().compile(clamp_range_kernel);
 }
 
-void Optimizer::Instance::initialize(CommandBuffer &command_buffer, uint length, BufferView<float> x0) noexcept {
+void Optimizer::Instance::initialize(CommandBuffer &command_buffer, uint length, BufferView<float> xi,
+                                     BufferView<float> gradients, BufferView<float2> ranges) noexcept {
     _length = length;
+
+    _ranges.reset();
+    _xi.reset();
+    _gradients.reset();
+
+    _ranges.emplace(ranges);
+    _xi.emplace(xi);
+    _gradients.emplace(gradients);
+}
+
+void Optimizer::Instance::clamp_range(CommandBuffer &command_buffer) noexcept {
+    auto learning_rate = node<Optimizer>()->learning_rate();
+    command_buffer << _clamp_range(*_gradients, *_xi, *_ranges, learning_rate).dispatch(_length);
 }
 
 }// namespace luisa::render

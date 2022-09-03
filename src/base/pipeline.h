@@ -157,8 +157,9 @@ public:
     void register_transform(const Transform *transform) noexcept;
 
     template<typename T, typename... Args>
-        requires std::is_base_of_v<Resource, T>
-    [[nodiscard]] auto create(Args &&...args) noexcept -> T* {
+        requires std::is_base_of_v<Resource, T> [
+                 [nodiscard]] auto
+        create(Args &&...args) noexcept -> T * {
         auto resource = luisa::make_unique<T>(_device.create<T>(std::forward<Args>(args)...));
         auto p = resource.get();
         _resources.emplace_back(std::move(resource));

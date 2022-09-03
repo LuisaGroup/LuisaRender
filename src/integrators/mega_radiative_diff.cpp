@@ -117,7 +117,6 @@ public:
         auto command_buffer = stream.command_buffer();
         luisa::vector<float4> rendered;
 
-        auto learning_rate = pt->learning_rate();
         auto iteration_num = pt->iterations();
 
         for (auto i = 0u; i < pipeline().camera_count(); i++) {
@@ -165,7 +164,7 @@ public:
             LUISA_INFO("");
             LUISA_INFO("Start to step");
             Clock clock;
-            pipeline().differentiation().step(command_buffer, learning_rate);
+            pipeline().differentiation().step(command_buffer);
             command_buffer << commit() << synchronize();
             LUISA_INFO("Step finished in {} ms", clock.toc());
         }

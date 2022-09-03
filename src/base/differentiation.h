@@ -62,18 +62,20 @@ public:
         const Image<float> &_image;
         TextureSampler _sampler;
         uint _grad_offset;
+        uint _param_offset;
         uint _counter_offset;
         float2 _range;
 
     public:
-        TexturedParameter(const Image<float> &image, TextureSampler sampler, uint grad_offset,
+        TexturedParameter(const Image<float> &image, TextureSampler sampler, uint grad_offset, uint param_offset,
                           uint counter_offset, float2 range) noexcept
-            : _image{image}, _sampler{sampler}, _grad_offset{grad_offset}, _counter_offset{counter_offset},
-              _range{range} {}
+            : _image{image}, _sampler{sampler}, _grad_offset{grad_offset}, _param_offset{param_offset},
+              _counter_offset{counter_offset}, _range{range} {}
         [[nodiscard]] auto &image() const noexcept { return _image; }
         [[nodiscard]] auto sampler() const noexcept { return _sampler; }
         [[nodiscard]] auto range() const noexcept { return _range; }
         [[nodiscard]] auto gradient_buffer_offset() const noexcept { return _grad_offset; }
+        [[nodiscard]] auto param_offset() const noexcept { return _param_offset; }
         [[nodiscard]] auto counter_offset() const noexcept { return _counter_offset; }
         void set_gradient_buffer_offset(uint offset) noexcept { _grad_offset = offset; }
         void set_counter_offset(uint offset) noexcept { _counter_offset = offset; }
@@ -82,26 +84,35 @@ public:
 private:
     Pipeline &_pipeline;
 
+    Optimizer::Instance *_optimizer;
+
     luisa::vector<float4> _constant_params;
     luisa::vector<float2> _constant_ranges;
     luisa::vector<TexturedParameter> _textured_params;
 
-    BufferView<float4> _const_param_buffer;
-    BufferView<float2> _const_param_range_buffer;
+    //    BufferView<float4> _const_param_buffer;
+    //    BufferView<float2> _const_param_range_buffer;
 
     uint _gradient_buffer_size;
     luisa::optional<BufferView<uint>> _grad_buffer;
+
+    uint _param_buffer_size;
+    luisa::optional<BufferView<float>> _param_buffer;
+    luisa::optional<BufferView<float2>> _param_range_buffer;
+    luisa::optional<BufferView<float>> _param_grad_buffer;
 
     uint _counter_size;
     luisa::optional<BufferView<uint>> _counter;
 
     Shader1D<Buffer<uint>> _clear_buffer;
-    Shader1D<Buffer<uint>, Buffer<uint>> _accumulate_grad_const;
-    Shader1D<Buffer<uint>, Buffer<float4>, Buffer<float2>, float, Buffer<uint>> _apply_grad_const;
-    Shader2D<Buffer<uint>, uint, Image<float>, uint, float, float2, Buffer<uint>, uint> _apply_grad_tex;
+    Shader1D<Buffer<uint>, Buffer<float>, Buffer<uint>> _accumulate_grad_const;
+    Shader1D<Buffer<uint>, uint, Buffer<uint>, uint, Buffer<float>, uint> _accumulate_grad_tex;
+    //    Shader1D<Buffer<uint>, Buffer<float4>, Buffer<float2>, float, Buffer<uint>> _apply_grad_const;
+    //    Shader2D<Buffer<uint>, uint, Image<float>, uint, float, float2, Buffer<uint>, uint> _apply_grad_tex;
 
 public:
     explicit Differentiation(Pipeline &pipeline) noexcept;
+    void register_optimizer(Optimizer::Instance *optimizer) noexcept;
     [[nodiscard]] ConstantParameter parameter(float x, float2 range) noexcept;
     [[nodiscard]] ConstantParameter parameter(float2 x, float2 range) noexcept;
     [[nodiscard]] ConstantParameter parameter(float3 x, float2 range) noexcept;
@@ -110,9 +121,9 @@ public:
     [[nodiscard]] TexturedParameter parameter(const Image<float> &image, TextureSampler s, float2 range) noexcept;
     void materialize(CommandBuffer &command_buffer) noexcept;
     void clear_gradients(CommandBuffer &command_buffer) noexcept;
-    void apply_gradients(CommandBuffer &command_buffer, float alpha) noexcept;
+    void apply_gradients(CommandBuffer &command_buffer) noexcept;
     /// Apply then clear the gradients
-    void step(CommandBuffer &command_buffer, float alpha) noexcept;
+    void step(CommandBuffer &command_buffer) noexcept;
     void dump(CommandBuffer &command_buffer, const std::filesystem::path &folder) const noexcept;
 
 public:
