@@ -394,7 +394,7 @@ render {
   }
   shapes {
     @cbox,
-    //@dragon,
+    @dragon,
     @paintings
   }
   integrator { @pt }

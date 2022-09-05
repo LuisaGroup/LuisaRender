@@ -165,7 +165,7 @@ public:
             LUISA_INFO("Start to step");
             Clock clock;
             pipeline().differentiation().step(command_buffer);
-            command_buffer << commit() << synchronize();
+            command_buffer << synchronize();
             LUISA_INFO("Step finished in {} ms", clock.toc());
         }
 
@@ -374,7 +374,7 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
         }
     }
 
-    command_buffer << commit() << synchronize();
+    command_buffer << synchronize();
     LUISA_INFO("Backward propagation finished in {} ms",
                clock.toc());
 }
