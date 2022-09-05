@@ -15,6 +15,9 @@ using compute::Float2;
 
 class Sampler : public SceneNode {
 
+private:
+    uint _seed;
+
 public:
     class Instance {
 
@@ -48,6 +51,7 @@ public:
     Sampler(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
+    [[nodiscard]] auto seed() const noexcept { return _seed; }
 };
 
 }// namespace luisa::render

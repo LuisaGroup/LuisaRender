@@ -30,10 +30,10 @@ private:
 
 private:
     [[nodiscard]] static auto _mul_u32(Expr<uint> lhs, Expr<uint> rhs) noexcept {
-        auto lhs_lo = lhs >> 16u;
-        auto lhs_hi = lhs & 0xffffu;
-        auto rhs_lo = rhs >> 16u;
-        auto rhs_hi = rhs & 0xffffu;
+        auto lhs_hi = lhs >> 16u;
+        auto lhs_lo = lhs & 0xffffu;
+        auto rhs_hi = rhs >> 16u;
+        auto rhs_lo = rhs & 0xffffu;
         auto hi_lo = lhs_hi * rhs_lo;
         auto lo_lo = lhs_lo * rhs_lo;
         auto lo_hi = lhs_lo * rhs_hi;
@@ -65,8 +65,31 @@ public:
     [[nodiscard]] auto operator|(const U64 &rhs) const noexcept { return U64{_bits | rhs._bits}; }
     [[nodiscard]] auto operator^(Expr<uint> rhs) const noexcept { return U64{hi(), lo() ^ rhs}; }
     [[nodiscard]] auto operator^(const U64 &rhs) const noexcept { return U64{_bits ^ rhs._bits}; }
-    [[nodiscard]] auto operator>>(Expr<uint> rhs) const noexcept { return U64{hi() >> rhs, (hi() << (32u - rhs)) | (lo() >> rhs)}; }
-    [[nodiscard]] auto operator<<(Expr<uint> rhs) const noexcept { return U64{(hi() << rhs) | (lo() >> (32u - rhs)), lo() << rhs}; }
+    // TODO: optimize this
+    [[nodiscard]] auto operator>>(Expr<uint> rhs) const noexcept {
+        using compute::if_;
+        auto ret = *this;
+        if_(rhs != 0u, [&] {
+            if_(rhs >= 32u, [&] {
+                ret = U64{0u, hi() >> (rhs - 32u)};
+            }).else_([&] {
+                ret = U64{hi() >> rhs, (hi() << (32u - rhs)) | (lo() >> rhs)};
+            });
+        });
+        return ret;
+    }
+    [[nodiscard]] auto operator<<(Expr<uint> rhs) const noexcept {
+        using compute::if_;
+        auto ret = *this;
+        if_(rhs != 0u, [&] {
+            if_(rhs >= 32u, [&] {
+                ret = U64{lo() << (rhs - 32u), 0u};
+            }).else_([&] {
+                ret = U64{(hi() << rhs) | (lo() >> (32u - rhs)), lo() << rhs};
+            });
+        });
+        return ret;
+    }
     [[nodiscard]] auto operator==(const U64 &rhs) const noexcept { return all(_bits == rhs._bits); }
     [[nodiscard]] auto operator==(Expr<uint> rhs) const noexcept { return hi() == 0u & lo() == rhs; }
     [[nodiscard]] auto operator!=(const U64 &rhs) const noexcept { return !(*this == rhs); }
@@ -79,19 +102,25 @@ public:
         auto carry = cast<uint>(~0u - lo() < rhs);
         return U64{hi() + carry, lo() + rhs};
     }
+    [[nodiscard]] auto operator-(const U64 &rhs) const noexcept {
+        return *this + ~rhs + 1u;
+    }
+    [[nodiscard]] auto operator-(Expr<uint> rhs) const noexcept {
+        return *this - U64{rhs};
+    }
     [[nodiscard]] auto operator*(const U64 &rhs) const noexcept {
         auto lo_lo = _mul_u32(lo(), rhs.lo());
         auto lo_hi = _mul_u32(lo(), rhs.hi());
         auto hi_lo = _mul_u32(hi(), rhs.lo());
-        return lo_lo + ((lo_hi + hi_lo) << 32u);
+        return U64{lo_lo.hi() + lo_hi.lo() + hi_lo.lo(), lo_lo.lo()};
     }
     [[nodiscard]] auto operator*(Expr<uint> rhs) const noexcept {
         auto lo_lo = _mul_u32(lo(), rhs);
         auto hi_lo = _mul_u32(hi(), rhs);
-        return lo_lo + (hi_lo << 32u);
+        return U64{lo_lo.hi() + hi_lo.lo(), lo_lo.lo()};
     }
     [[nodiscard]] auto operator%(uint rhs) const noexcept {
-        assert(rhs <= 0xffffu);
+        LUISA_ASSERT(rhs <= 0xffffu, "U64::operator% rhs must be <= 0xffff");
         return ((hi() % rhs) * static_cast<uint>(0x1'0000'0000ull % rhs) + lo() % rhs) % rhs;
     }
 };
