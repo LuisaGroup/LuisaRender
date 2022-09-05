@@ -77,8 +77,6 @@ public:
         [[nodiscard]] auto gradient_buffer_offset() const noexcept { return _grad_offset; }
         [[nodiscard]] auto param_offset() const noexcept { return _param_offset; }
         [[nodiscard]] auto counter_offset() const noexcept { return _counter_offset; }
-        void set_gradient_buffer_offset(uint offset) noexcept { _grad_offset = offset; }
-        void set_counter_offset(uint offset) noexcept { _counter_offset = offset; }
     };
 
 private:
@@ -89,9 +87,6 @@ private:
     luisa::vector<float4> _constant_params;
     luisa::vector<float2> _constant_ranges;
     luisa::vector<TexturedParameter> _textured_params;
-
-    //    BufferView<float4> _const_param_buffer;
-    //    BufferView<float2> _const_param_range_buffer;
 
     uint _gradient_buffer_size;
     luisa::optional<BufferView<uint>> _grad_buffer;
@@ -107,8 +102,6 @@ private:
     Shader1D<Buffer<uint>> _clear_buffer;
     Shader1D<Buffer<uint>, Buffer<float>, Buffer<uint>> _accumulate_grad_const;
     Shader1D<Buffer<uint>, uint, Buffer<uint>, uint, Buffer<float>, uint> _accumulate_grad_tex;
-    //    Shader1D<Buffer<uint>, Buffer<float4>, Buffer<float2>, float, Buffer<uint>> _apply_grad_const;
-    //    Shader2D<Buffer<uint>, uint, Image<float>, uint, float, float2, Buffer<uint>, uint> _apply_grad_tex;
 
 public:
     explicit Differentiation(Pipeline &pipeline) noexcept;
