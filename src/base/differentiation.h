@@ -89,7 +89,7 @@ private:
     luisa::vector<TexturedParameter> _textured_params;
 
     uint _gradient_buffer_size;
-    luisa::optional<BufferView<uint>> _grad_buffer;
+    luisa::optional<BufferView<float>> _grad_buffer;
 
     uint _param_buffer_size;
     luisa::optional<BufferView<float>> _param_buffer;
@@ -99,9 +99,10 @@ private:
     uint _counter_size;
     luisa::optional<BufferView<uint>> _counter;
 
-    Shader1D<Buffer<uint>> _clear_buffer;
-    Shader1D<Buffer<uint>, Buffer<float>, Buffer<uint>> _accumulate_grad_const;
-    Shader1D<Buffer<uint>, uint, Buffer<uint>, uint, Buffer<float>, uint> _accumulate_grad_tex;
+    Shader1D<Buffer<uint>> _clear_uint_buffer;
+    Shader1D<Buffer<float>> _clear_float_buffer;
+    Shader1D<Buffer<float>, Buffer<float>, Buffer<uint>> _accumulate_grad_const;
+    Shader1D<Buffer<float>, uint, Buffer<uint>, uint, Buffer<float>, uint> _accumulate_grad_tex;
 
 public:
     explicit Differentiation(Pipeline &pipeline) noexcept;
