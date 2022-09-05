@@ -59,7 +59,7 @@ Float3 L2Instance::d_loss(const Camera::Instance *camera, Expr<uint2> pixel_id) 
     auto rendered = camera->film()->read(pixel_id).average;
     auto target = camera->target()->evaluate(pixel_uv_it, 0.f).xyz();
 
-    return (rendered - target) / float(resolution.x * resolution.y);
+    return 2.f * (rendered - target) / float(resolution.x * resolution.y);
 }
 
 }// namespace luisa::render

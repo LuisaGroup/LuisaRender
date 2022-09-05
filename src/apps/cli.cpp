@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
 
     {
         std::ofstream file{"results.txt", std::ios::app};
-        file << std::endl;
+        file << std::endl << "Argv = ";
         for (auto i = 0; i < argc; i++) {
             file << argv[i] << " ";
         }
