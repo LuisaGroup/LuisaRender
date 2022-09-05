@@ -15,7 +15,7 @@ namespace luisa::render {
 Differentiation::Differentiation(Pipeline &pipeline) noexcept
     : _pipeline{pipeline},
       //      _const_param_buffer{*pipeline.create<Buffer<float4>>(constant_parameter_buffer_capacity)},
-      _const_param_range_buffer{*pipeline.create<Buffer<float2>>(constant_parameter_buffer_capacity)},
+      //      _const_param_range_buffer{*pipeline.create<Buffer<float2>>(constant_parameter_buffer_capacity)},
       _gradient_buffer_size{constant_parameter_gradient_buffer_size},
       _param_buffer_size{constant_parameter_buffer_capacity * 4u},
       _counter_size{constant_parameter_counter_size} {
@@ -53,8 +53,8 @@ Differentiation::Differentiation(Pipeline &pipeline) noexcept
     _accumulate_grad_const = _pipeline.device().compile(accumulate_grad_const_kernel);
 
     Kernel1D accumulate_grad_tex_kernel = [](BufferUInt gradients, UInt grad_offset,
-                                      BufferUInt counter, UInt counter_offset,
-                                      BufferFloat param_gradients, UInt param_offset) noexcept {
+                                             BufferUInt counter, UInt counter_offset,
+                                             BufferFloat param_gradients, UInt param_offset) noexcept {
         auto index = dispatch_x();
         auto grad = as<float>(gradients.read(grad_offset + index));
         auto count = counter.read(counter_offset + index);
@@ -131,6 +131,7 @@ void Differentiation::materialize(CommandBuffer &command_buffer) noexcept {
         command_buffer << image.copy_to(_param_buffer.value().subview(param_offset, length))
                        << textured_params_range_shader(*_param_range_buffer, p.range(), param_offset).dispatch(length);
     }
+    command_buffer << synchronize();
 
     _optimizer->initialize(command_buffer, _param_buffer_size, *_param_buffer, *_param_grad_buffer, *_param_range_buffer);
 }

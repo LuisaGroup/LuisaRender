@@ -21,7 +21,7 @@ public:
 class L1Instance final : public Loss::Instance {
 
 public:
-    L1Instance(const Pipeline &pipeline, const L1 *loss) noexcept
+    L1Instance(Pipeline &pipeline, const L1 *loss) noexcept
         : Loss::Instance{pipeline, loss} {}
 
 public:

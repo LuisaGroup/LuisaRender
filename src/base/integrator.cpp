@@ -25,7 +25,6 @@ Integrator::Instance::Instance(Pipeline &pipeline, CommandBuffer &command_buffer
 
 DifferentiableIntegrator::DifferentiableIntegrator(Scene *scene, const SceneNodeDesc *desc) noexcept
     : Integrator(scene, desc),
-      _learning_rate{std::max(desc->property_float_or_default("learning_rate", 0.1f), 0.f)},
       _iterations{std::max(desc->property_uint_or_default("iterations", 100u), 1u)},
       _display_camera_index{desc->property_int_or_default("display_camera_index", -1)},
       _save_process{desc->property_bool_or_default("save_process", false)},

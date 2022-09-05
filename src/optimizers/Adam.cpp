@@ -38,14 +38,14 @@ private:
     luisa::optional<BufferView<float>> _m, _v;
     luisa::optional<BufferView<float>> _beta_t;
 
-    Shader1D<Buffer<float>, Buffer<float>, Buffer<float>, Buffer<float>, Buffer<float>, float, float, float, float> _update_params;
+    Shader1D<Buffer<float>, Buffer<float>, Buffer<float>, Buffer<float>, float, float, float> _update_params;
 
 public:
     AdamInstance(Pipeline &pipeline, CommandBuffer &command_buffer, const Adam *optimizer) noexcept
         : Optimizer::Instance{pipeline, command_buffer, optimizer} {
 
-        Kernel1D update_params_kernel = [](BufferFloat params, BufferFloat m, BufferFloat v, BufferFloat beta_t, BufferFloat gradients,
-                                           Float beta1, Float beta2, Float epsilon, Float alpha) noexcept {
+        Kernel1D update_params_kernel = [](BufferFloat m, BufferFloat v, BufferFloat beta_t, BufferFloat gradients,
+                                           Float beta1, Float beta2, Float epsilon) noexcept {
             auto index = dispatch_x();
             auto grad = gradients.read(index);
             auto m_tm1 = m.read(index);
@@ -56,12 +56,12 @@ public:
             auto beta_2_t = beta_t.read(1u) * beta2;
             auto m_t_hat = m_t / (1.f - beta_1_t);
             auto v_t_hat = v_t / (1.f - beta_2_t);
-            auto x = params.read(index) - alpha * m_t_hat / (sqrt(v_t_hat) + epsilon);
+            grad = m_t_hat / (sqrt(v_t_hat) + epsilon);
             beta_t.write(0u, beta_1_t);
             beta_t.write(1u, beta_2_t);
             m.write(index, m_t);
             v.write(index, v_t);
-            params.write(index, x);
+            gradients.write(index, grad);
         };
         _update_params = pipeline.device().compile(update_params_kernel);
     }
@@ -91,9 +91,9 @@ void AdamInstance::initialize(CommandBuffer &command_buffer, uint length, Buffer
 void AdamInstance::step(CommandBuffer &command_buffer) noexcept {
     LUISA_ASSERT(_length != -1u, "Optimizer is not initialized.");
     auto node_exact = node<Adam>();
-    command_buffer << _update_params(*_xi, *_m, *_v, *_beta_t, *_gradients,
+    command_buffer << _update_params(*_m, *_v, *_beta_t, *_gradients,
                                      node_exact->beta1(), node_exact->beta2(),
-                                     node_exact->epsilon(), node_exact->learning_rate())
+                                     node_exact->epsilon())
                           .dispatch(_length);
     clamp_range(command_buffer);
 }
