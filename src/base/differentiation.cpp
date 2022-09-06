@@ -12,6 +12,7 @@
 namespace luisa::render {
 
 #define LUISA_RENDER_DIFFERENTIATION_DEBUG
+//#define LUISA_RENDER_USE_BP_TIMES_NORMALIZATION
 
 Differentiation::Differentiation(Pipeline &pipeline) noexcept
     : _pipeline{pipeline},
@@ -46,7 +47,9 @@ Differentiation::Differentiation(Pipeline &pipeline) noexcept
             grad += make_float4(x, y, z, w);
             count += counter.read(counter_offset + i);
         }
+#ifdef LUISA_RENDER_USE_BP_TIMES_NORMALIZATION
         grad /= Float(max(count, 1u));
+#endif
         auto param_offset = thread * 4u;
         param_gradients.write(param_offset + 0u, grad.x);
         param_gradients.write(param_offset + 1u, grad.y);
@@ -62,7 +65,9 @@ Differentiation::Differentiation(Pipeline &pipeline) noexcept
         auto index = dispatch_x();
         auto grad = gradients.read(grad_offset + index);
         auto count = counter.read(counter_offset + index / channels);
+#ifdef LUISA_RENDER_USE_BP_TIMES_NORMALIZATION
         grad /= Float(max(count, 1u));
+#endif
         param_gradients.write(param_offset + index, grad);
     };
     _accumulate_grad_tex = _pipeline.device().compile(accumulate_grad_tex_kernel);
@@ -112,11 +117,6 @@ void Differentiation::materialize(CommandBuffer &command_buffer) noexcept {
     _grad_buffer.emplace(pipeline().create<Buffer<float>>(std::max(_gradient_buffer_size, 1u))->view());
     _counter.emplace(pipeline().create<Buffer<uint>>(std::max(_counter_size, 1u))->view());
     clear_gradients(command_buffer);
-
-#ifdef LUISA_RENDER_DIFFERENTIATION_DEBUG
-    LUISA_INFO("_param_buffer_size = {}, _gradient_buffer_size = {}, _counter_size = {}",
-               _param_buffer_size, _gradient_buffer_size, _counter_size);
-#endif
 
     if (auto n = _constant_params.size()) {
         Kernel1D constant_params_range_kernel = [](BufferFloat2 params_range_buffer, BufferFloat2 ranges) noexcept {
@@ -225,13 +225,6 @@ void Differentiation::apply_gradients(CommandBuffer &command_buffer) noexcept {
         auto grad_offset = p.gradient_buffer_offset();
         auto channels = compute::pixel_format_channel_count(image.format());
         auto length = image.size().x * image.size().y * channels;
-
-#ifdef LUISA_RENDER_DIFFERENTIATION_DEBUG
-        LUISA_INFO("param_offset = {}, counter_offset = {}, grad_offset = {}, channels = {}, length = {}",
-                   param_offset, counter_offset, grad_offset, channels, length);
-        LUISA_INFO("_param_buffer_size = {}, _gradient_buffer_size = {}, _counter_size = {}",
-                   _param_buffer_size, _gradient_buffer_size, _counter_size);
-#endif
         command_buffer << _accumulate_grad_tex(
                               *_grad_buffer, grad_offset,
                               *_counter, counter_offset,
