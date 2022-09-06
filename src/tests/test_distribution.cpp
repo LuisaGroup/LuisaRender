@@ -4,7 +4,6 @@
 
 #include <util/scattering.h>
 
-#include <util/atomic.h>
 #include <util/frame.h>
 
 #include <luisa-compute.h>
@@ -23,11 +22,11 @@ int main(int argc, char *argv[]) {
     stream << printer.reset();
 
     auto buffer_size = 256u;
-    auto float_buffer = device.create_buffer<uint>(buffer_size);
+    auto float_buffer = device.create_buffer<float>(buffer_size);
     luisa::vector<float> float_data(buffer_size);
 
-    Kernel1D clear_kernel = [](BufferUInt t) {
-        t.write(dispatch_x(), 0u);
+    Kernel1D clear_kernel = [](BufferFloat t) {
+        t.write(dispatch_x(), 0.f);
     };
 
     Kernel1D test_kernel = [&]() {
@@ -67,30 +66,30 @@ int main(int argc, char *argv[]) {
 
         auto grad = reflec.backward(wo_local, wi_local, SampledSpectrum{3u, 1.f});
 
-        atomic_float_add(float_buffer, 0u, f[0u]);
-        atomic_float_add(float_buffer, 1u, f[1u]);
-        atomic_float_add(float_buffer, 2u, f[2u]);
+        float_buffer.atomic(0u).fetch_add(f[0u]);
+        float_buffer.atomic(1u).fetch_add(f[1u]);
+        float_buffer.atomic(2u).fetch_add(f[2u]);
 
-        atomic_float_add(float_buffer, 3u, D0);
-        atomic_float_add(float_buffer, 4u, D);
+        float_buffer.atomic(3u).fetch_add(D0);
+        float_buffer.atomic(4u).fetch_add(D);
 
-        atomic_float_add(float_buffer, 5u, G);
+        float_buffer.atomic(5u).fetch_add(G);
 
-        atomic_float_add(float_buffer, 6u, tan2Theta);
-        atomic_float_add(float_buffer, 7u, cos4Theta);
+        float_buffer.atomic(6u).fetch_add(tan2Theta);
+        float_buffer.atomic(7u).fetch_add(cos4Theta);
 
-        atomic_float_add(float_buffer, 8u, F[0u]);
-        atomic_float_add(float_buffer, 9u, F[1u]);
-        atomic_float_add(float_buffer, 10u, F[2u]);
+        float_buffer.atomic(8u).fetch_add(F[0u]);
+        float_buffer.atomic(9u).fetch_add(F[1u]);
+        float_buffer.atomic(10u).fetch_add(F[2u]);
 
-        atomic_float_add(float_buffer, 11u, f0[0u]);
-        atomic_float_add(float_buffer, 12u, f0[1u]);
-        atomic_float_add(float_buffer, 13u, f0[2u]);
+        float_buffer.atomic(11u).fetch_add(f0[0u]);
+        float_buffer.atomic(12u).fetch_add(f0[1u]);
+        float_buffer.atomic(13u).fetch_add(f0[2u]);
 
-        atomic_float_add(float_buffer, 14u, grad.dAlpha[0u]);
-        atomic_float_add(float_buffer, 15u, grad.dAlpha[1u]);
+        float_buffer.atomic(14u).fetch_add(grad.dAlpha[0u]);
+        float_buffer.atomic(15u).fetch_add(grad.dAlpha[1u]);
 
-        atomic_float_add(float_buffer, 16u, ite(def(30000.f > 1.f), 0.f, 1.f));
+        float_buffer.atomic(16u).fetch_add(ite(def(30000.f > 1.f), 0.f, 1.f));
     };
 
     auto clear_shader = device.compile(clear_kernel);

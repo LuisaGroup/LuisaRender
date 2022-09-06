@@ -4,7 +4,6 @@
 
 #include <base/texture.h>
 #include <base/pipeline.h>
-#include <util/atomic.h>
 
 namespace luisa::render {
 

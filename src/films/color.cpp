@@ -5,7 +5,6 @@
 #include <luisa-compute.h>
 #include <base/film.h>
 #include <base/pipeline.h>
-#include <util/atomic.h>
 #include <util/colorspace.h>
 
 namespace luisa::render {
@@ -41,10 +40,10 @@ public:
 class ColorFilmInstance final : public Film::Instance {
 
 private:
-    Buffer<uint> _image;
+    Buffer<float> _image;
     Buffer<float4> _converted;
-    std::shared_future<Shader1D<Buffer<uint>>> _clear_image;
-    std::shared_future<Shader1D<Buffer<uint>, Buffer<float4>>> _convert_image;
+    std::shared_future<Shader1D<Buffer<float>>> _clear_image;
+    std::shared_future<Shader1D<Buffer<float>, Buffer<float4>>> _convert_image;
 
 public:
     ColorFilmInstance(Device &device, Pipeline &pipeline, const ColorFilm *film) noexcept;
@@ -58,20 +57,20 @@ ColorFilmInstance::ColorFilmInstance(Device &device, Pipeline &pipeline, const C
     : Film::Instance{pipeline, film} {
     auto resolution = node()->resolution();
     auto pixel_count = resolution.x * resolution.y;
-    _image = pipeline.device().create_buffer<uint>(pixel_count * 4u);
+    _image = pipeline.device().create_buffer<float>(pixel_count * 4u);
     _converted = pipeline.device().create_buffer<float4>(pixel_count);
-    _clear_image = device.compile_async<1>([](BufferUInt image) noexcept {
-        image.write(dispatch_x() * 4u + 0u, 0u);
-        image.write(dispatch_x() * 4u + 1u, 0u);
-        image.write(dispatch_x() * 4u + 2u, 0u);
-        image.write(dispatch_x() * 4u + 3u, 0u);
+    _clear_image = device.compile_async<1>([](BufferFloat image) noexcept {
+        image.write(dispatch_x() * 4u + 0u, 0.f);
+        image.write(dispatch_x() * 4u + 1u, 0.f);
+        image.write(dispatch_x() * 4u + 2u, 0.f);
+        image.write(dispatch_x() * 4u + 3u, 0.f);
     });
-    _convert_image = device.compile_async<1>([this](BufferUInt accum, BufferFloat4 output) noexcept {
+    _convert_image = device.compile_async<1>([this](BufferFloat accum, BufferFloat4 output) noexcept {
         auto i = dispatch_x();
-        auto c0 = as<float>(accum.read(i * 4u + 0u));
-        auto c1 = as<float>(accum.read(i * 4u + 1u));
-        auto c2 = as<float>(accum.read(i * 4u + 2u));
-        auto n = cast<float>(max(accum.read(i * 4u + 3u), 1u));
+        auto c0 = accum.read(i * 4u + 0u);
+        auto c1 = accum.read(i * 4u + 1u);
+        auto c2 = accum.read(i * 4u + 2u);
+        auto n = max(accum.read(i * 4u + 3u), 1.f);
         auto scale = (1.f / n) * node<ColorFilm>()->scale();
         output.write(i, make_float4(scale * make_float3(c0, c1, c2), 1.f));
     });
@@ -91,9 +90,9 @@ void ColorFilmInstance::accumulate(Expr<uint2> pixel, Expr<float3> rgb) const no
         auto lum = srgb_to_cie_y(rgb);
         auto c = rgb * (threshold / max(lum, threshold));
         for (auto i = 0u; i < 3u; i++) {
-            atomic_float_add(_image, pixel_id * 4u + i, c[i]);
+            _image.atomic(pixel_id * 4u + i).fetch_add(c[i]);
         }
-        _image.atomic(pixel_id * 4u + 3u).fetch_add(1u);
+        _image.atomic(pixel_id * 4u + 3u).fetch_add(1.f);
     };
 }
 

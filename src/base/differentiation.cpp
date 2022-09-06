@@ -7,7 +7,6 @@
 #include <dsl/syntax.h>
 #include <base/pipeline.h>
 #include <base/differentiation.h>
-#include <util/atomic.h>
 #include <util/rng.h>
 
 namespace luisa::render {
