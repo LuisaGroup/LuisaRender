@@ -58,10 +58,11 @@ Differentiation::Differentiation(Pipeline &pipeline) noexcept
 
     Kernel1D accumulate_grad_tex_kernel = [](BufferFloat gradients, UInt grad_offset,
                                              BufferUInt counter, UInt counter_offset,
-                                             BufferFloat param_gradients, UInt param_offset) noexcept {
+                                             BufferFloat param_gradients, UInt param_offset,
+                                             UInt channels) noexcept {
         auto index = dispatch_x();
         auto grad = gradients.read(grad_offset + index);
-        auto count = counter.read(counter_offset + index);
+        auto count = counter.read(counter_offset + index / channels);
         grad /= Float(max(count, 1u));
         param_gradients.write(param_offset + index, grad);
     };
@@ -112,6 +113,11 @@ void Differentiation::materialize(CommandBuffer &command_buffer) noexcept {
     _grad_buffer.emplace(*_pipeline.create<Buffer<float>>(std::max(_gradient_buffer_size, 1u)));
     _counter.emplace(*_pipeline.create<Buffer<uint>>(std::max(_counter_size, 1u)));
     clear_gradients(command_buffer);
+
+#ifdef LUISA_RENDER_DIFFERENTIATION_DEBUG
+    LUISA_INFO("_param_buffer_size = {}, _gradient_buffer_size = {}, _counter_size = {}",
+               _param_buffer_size, _gradient_buffer_size, _counter_size);
+#endif
 
     if (auto n = _constant_params.size()) {
         Kernel1D constant_params_range_kernel = [](BufferFloat2 params_range_buffer, BufferFloat2 ranges) noexcept {
@@ -221,10 +227,17 @@ void Differentiation::apply_gradients(CommandBuffer &command_buffer) noexcept {
         auto channels = compute::pixel_format_channel_count(image.format());
         auto length = image.size().x * image.size().y * channels;
 
+#ifdef LUISA_RENDER_DIFFERENTIATION_DEBUG
+        LUISA_INFO("param_offset = {}, counter_offset = {}, grad_offset = {}, channels = {}, length = {}",
+                   param_offset, counter_offset, grad_offset, channels, length);
+        LUISA_INFO("_param_buffer_size = {}, _gradient_buffer_size = {}, _counter_size = {}",
+                   _param_buffer_size, _gradient_buffer_size, _counter_size);
+#endif
         command_buffer << _accumulate_grad_tex(
                               *_grad_buffer, grad_offset,
                               *_counter, counter_offset,
-                              *_param_grad_buffer, param_offset)
+                              *_param_grad_buffer, param_offset,
+                              channels)
                               .dispatch(length);
     }
 

@@ -102,7 +102,7 @@ private:
     Shader1D<Buffer<uint>> _clear_uint_buffer;
     Shader1D<Buffer<float>> _clear_float_buffer;
     Shader1D<Buffer<float>, Buffer<float>, Buffer<uint>> _accumulate_grad_const;
-    Shader1D<Buffer<float>, uint, Buffer<uint>, uint, Buffer<float>, uint> _accumulate_grad_tex;
+    Shader1D<Buffer<float>, uint, Buffer<uint>, uint, Buffer<float>, uint, uint> _accumulate_grad_tex;
 
 public:
     explicit Differentiation(Pipeline &pipeline) noexcept;
