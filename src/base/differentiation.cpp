@@ -106,11 +106,11 @@ Differentiation::TexturedParameter Differentiation::parameter(const Image<float>
 void Differentiation::materialize(CommandBuffer &command_buffer) noexcept {
     LUISA_ASSERT(!_grad_buffer, "Differentiation already materialized.");
     _param_buffer_size = _gradient_buffer_size - constant_parameter_gradient_buffer_size + constant_parameter_buffer_capacity * 4u;
-    _param_buffer.emplace(*_pipeline.create<Buffer<float>>(std::max(_param_buffer_size, 1u)));
-    _param_range_buffer.emplace(*_pipeline.create<Buffer<float2>>(std::max(_param_buffer_size, 1u)));
-    _param_grad_buffer.emplace(*_pipeline.create<Buffer<float>>(std::max(_param_buffer_size, 1u)));
-    _grad_buffer.emplace(*_pipeline.create<Buffer<float>>(std::max(_gradient_buffer_size, 1u)));
-    _counter.emplace(*_pipeline.create<Buffer<uint>>(std::max(_counter_size, 1u)));
+    _param_buffer.emplace(pipeline().create<Buffer<float>>(std::max(_param_buffer_size, 1u))->view());
+    _param_range_buffer.emplace(pipeline().create<Buffer<float2>>(std::max(_param_buffer_size, 1u))->view());
+    _param_grad_buffer.emplace(pipeline().create<Buffer<float>>(std::max(_param_buffer_size, 1u))->view());
+    _grad_buffer.emplace(pipeline().create<Buffer<float>>(std::max(_gradient_buffer_size, 1u))->view());
+    _counter.emplace(pipeline().create<Buffer<uint>>(std::max(_counter_size, 1u))->view());
     clear_gradients(command_buffer);
 
 #ifdef LUISA_RENDER_DIFFERENTIATION_DEBUG
@@ -128,19 +128,19 @@ void Differentiation::materialize(CommandBuffer &command_buffer) noexcept {
             params_range_buffer.write(index + 2u, range);
             params_range_buffer.write(index + 3u, range);
         };
-        auto constant_params_range_shader = _pipeline.device().compile(constant_params_range_kernel);
-        BufferView<float2> ranges = *_pipeline.create<Buffer<float2>>(n);
+        auto constant_params_range_shader = pipeline().device().compile(constant_params_range_kernel);
+        Buffer<float2> ranges = pipeline().device().create<Buffer<float2>>(n);
 
         command_buffer << _param_buffer->subview(0u, 4u * n).copy_from(_constant_params.data())
-                       << ranges.subview(0u, n).copy_from(_constant_ranges.data())
+                       << ranges.view(0u, n).copy_from(_constant_ranges.data())
                        << constant_params_range_shader(*_param_range_buffer, ranges).dispatch(n)
                        << synchronize();
     }
 
-    Kernel1D textured_params_range_kernel = [](BufferFloat2 params_range_buffer, Float2 range, UInt start) noexcept {
-        params_range_buffer.write(start + dispatch_x(), range);
+    Kernel1D textured_params_range_kernel = [](BufferFloat2 params_range_buffer, Float2 range, UInt offset) noexcept {
+        params_range_buffer.write(offset + dispatch_x(), range);
     };
-    auto textured_params_range_shader = _pipeline.device().compile(textured_params_range_kernel);
+    auto textured_params_range_shader = pipeline().device().compile(textured_params_range_kernel);
 
     for (auto &&p : _textured_params) {
         auto image = p.image().view();
@@ -158,10 +158,10 @@ void Differentiation::materialize(CommandBuffer &command_buffer) noexcept {
 void Differentiation::clear_gradients(CommandBuffer &command_buffer) noexcept {
     LUISA_ASSERT(_grad_buffer, "Gradient buffer is not materialized.");
     if (auto n = _gradient_buffer_size) {
-        command_buffer << _clear_float_buffer(*_grad_buffer).dispatch(n);
+        command_buffer << _clear_float_buffer(*_grad_buffer).dispatch(_grad_buffer->size());
     }
     if (auto n = _counter_size) {
-        command_buffer << _clear_uint_buffer(*_counter).dispatch(n);
+        command_buffer << _clear_uint_buffer(*_counter).dispatch(_counter->size());
     }
 }
 

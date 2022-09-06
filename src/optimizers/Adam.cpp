@@ -76,13 +76,16 @@ void AdamInstance::initialize(CommandBuffer &command_buffer, uint length, Buffer
                               BufferView<float> gradients, BufferView<float2> ranges) noexcept {
     Optimizer::Instance::initialize(command_buffer, length, xi, gradients, ranges);
 
+    command_buffer << synchronize();
+    LUISA_INFO("_length = {}, length = {}", _length, length);
+
     _m.reset();
     _v.reset();
     _beta_t.reset();
 
-    _m.emplace(pipeline().device().create<Buffer<float>>(std::max(length, 1u)));
-    _v.emplace(pipeline().device().create<Buffer<float>>(std::max(length, 1u)));
-    _beta_t.emplace(pipeline().device().create<Buffer<float>>(2u));
+    _m.emplace(pipeline().create<Buffer<float>>(std::max(length, 1u))->view());
+    _v.emplace(pipeline().create<Buffer<float>>(std::max(length, 1u))->view());
+    _beta_t.emplace(pipeline().create<Buffer<float>>(2u)->view());
 
     command_buffer << _clear_float_buffer(*_m).dispatch(length)
                    << _clear_float_buffer(*_v).dispatch(length);

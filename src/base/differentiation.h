@@ -104,6 +104,9 @@ private:
     Shader1D<Buffer<float>, Buffer<float>, Buffer<uint>> _accumulate_grad_const;
     Shader1D<Buffer<float>, uint, Buffer<uint>, uint, Buffer<float>, uint, uint> _accumulate_grad_tex;
 
+private:
+    auto &pipeline() noexcept { return _pipeline; }
+
 public:
     explicit Differentiation(Pipeline &pipeline) noexcept;
     void register_optimizer(Optimizer::Instance *optimizer) noexcept;
