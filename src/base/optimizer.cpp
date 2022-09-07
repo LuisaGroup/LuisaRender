@@ -9,7 +9,7 @@ namespace luisa::render {
 
 Optimizer::Optimizer(Scene *scene, const SceneNodeDesc *desc) noexcept
     : SceneNode{scene, desc, SceneNodeTag::OPTIMIZER},
-      _learning_rate{std::max(desc->property_float_or_default("learning_rate", 0.1f), 0.f)} {}
+      _learning_rate{std::max(desc->property_float_or_default("learning_rate", 0.1f), 1e-40f)} {}
 
 Optimizer::Instance::Instance(Pipeline &pipeline, CommandBuffer &command_buffer, const Optimizer *optimizer) noexcept
     : _pipeline{pipeline}, _optimizer{optimizer} {

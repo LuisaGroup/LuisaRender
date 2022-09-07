@@ -11,7 +11,7 @@
 
 namespace luisa::render {
 
-#define LUISA_RENDER_DIFFERENTIATION_DEBUG
+//#define LUISA_RENDER_DIFFERENTIATION_DEBUG
 //#define LUISA_RENDER_USE_BP_TIMES_NORMALIZATION
 
 Differentiation::Differentiation(Pipeline &pipeline) noexcept

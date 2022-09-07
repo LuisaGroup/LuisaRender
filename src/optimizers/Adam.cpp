@@ -19,8 +19,8 @@ private:
 public:
     Adam(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Optimizer{scene, desc},
-          _beta1{std::max(desc->property_float_or_default("beta1", 0.9f), 0.f)},
-          _beta2{std::max(desc->property_float_or_default("beta2", 0.999f), 0.f)},
+          _beta1{std::min(std::max(desc->property_float_or_default("beta1", 0.9f), 0.f), one_minus_epsilon)},
+          _beta2{std::min(std::max(desc->property_float_or_default("beta2", 0.999f), 0.f), one_minus_epsilon)},
           _epsilon{std::max(desc->property_float_or_default("epsilon", 1e-8f), 1e-40f)} {}
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Optimizer::Instance> build(

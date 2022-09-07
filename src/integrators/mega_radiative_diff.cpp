@@ -239,8 +239,8 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
             auto [camera_ray, camera_weight] = camera->generate_ray(*sampler, pixel_id, time);
             auto spectrum = pipeline().spectrum();
             auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler->generate_1d());
-            SampledSpectrum beta{swl.dimension(), camera_weight * pixel_count};
-//            SampledSpectrum beta{swl.dimension(), camera_weight};
+//            SampledSpectrum beta{swl.dimension(), camera_weight * pixel_count};
+            SampledSpectrum beta{swl.dimension(), camera_weight};
             SampledSpectrum Li{swl.dimension(), 1.0f};
             auto grad_weight = shutter_weight * static_cast<float>(pt->node<MegakernelRadiativeDiff>()->max_depth());
 
