@@ -291,7 +291,6 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
                 auto occluded = pipeline().intersect_any(shadow_ray);
 
                 // evaluate material
-                SampledSpectrum eta_scale{swl.dimension(), 1.f};
                 auto cos_theta_o = it->wo_local().z;
                 auto surface_tag = it->shape()->surface_tag();
                 auto u_lobe = sampler->generate_1d();
@@ -348,7 +347,7 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
 
                 // rr
                 $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
-                auto q = max(spectrum->cie_y(swl, beta * eta_scale), .05f);
+                auto q = max(beta.max(), .05f);
                 auto rr_depth = pt->node<MegakernelRadiativeDiff>()->rr_depth();
                 auto rr_threshold = pt->node<MegakernelRadiativeDiff>()->rr_threshold();
                 $if(depth + 1u >= rr_depth & q < rr_threshold) {
@@ -468,7 +467,6 @@ void MegakernelRadiativeDiffInstance::_render_one_camera(
                 auto occluded = pipeline().intersect_any(shadow_ray);
 
                 // evaluate material
-                SampledSpectrum eta_scale{swl.dimension(), 1.f};
                 auto cos_theta_o = it->wo_local().z;
                 auto surface_tag = it->shape()->surface_tag();
                 auto u_lobe = sampler->generate_1d();
@@ -511,7 +509,7 @@ void MegakernelRadiativeDiffInstance::_render_one_camera(
 
                 // rr
                 $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
-                auto q = max(spectrum->cie_y(swl, beta * eta_scale), .05f);
+                auto q = max(beta.max(), .05f);
                 auto rr_depth = pt->node<MegakernelRadiativeDiff>()->rr_depth();
                 auto rr_threshold = pt->node<MegakernelRadiativeDiff>()->rr_threshold();
                 $if(depth + 1u >= rr_depth & q < rr_threshold) {
