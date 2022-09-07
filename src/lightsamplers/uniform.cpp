@@ -46,6 +46,7 @@ public:
             }
         }
     }
+
     [[nodiscard]] Light::Evaluation evaluate_hit(
         const Interaction &it, Expr<float3> p_from,
         const SampledWavelengths &swl, Expr<float> time) const noexcept override {
@@ -62,6 +63,7 @@ public:
         eval.pdf *= (1.f - _env_prob) / n;
         return eval;
     }
+
     [[nodiscard]] Light::Evaluation evaluate_miss(
         Expr<float3> wi, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         if (_env_prob == 0.f) [[unlikely]] {// no environment
@@ -72,48 +74,38 @@ public:
         eval.pdf *= _env_prob;
         return eval;
     }
-    [[nodiscard]] Light::Sample sample(
-        Sampler::Instance &sampler, const Interaction &it_from,
+
+    [[nodiscard]] LightSampler::Selection select(
+        const Interaction &it_from, Expr<float> u,
         const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        LUISA_ASSERT(pipeline().has_lighting(), "No lights in scene.");
+        auto n = static_cast<float>(pipeline().lights().size());
+        if (_env_prob == 1.f) { return {.tag = LightSampler::selection_environment, .prob = 1.f}; }
+        if (_env_prob == 0.f) { return {.tag = cast<uint>(clamp(u * n, 0.f, n - 1.f)), .prob = 1.f / n}; }
+        auto uu = (u - _env_prob) / (1.f - _env_prob);
+        auto tag = cast<uint>(clamp(uu * n, 0.f, n - 1.f));
+        auto is_env = u < _env_prob;
+        return {.tag = ite(is_env, LightSampler::selection_environment, tag),
+                .prob = ite(is_env, _env_prob, (1.f - _env_prob) / n)};
+    }
+
+private:
+    [[nodiscard]] Light::Sample _sample_light(const Interaction &it_from, Expr<uint> tag, Expr<float2> u,
+                                              const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        LUISA_ASSERT(!pipeline().lights().empty(), "No lights in the scene.");
+        auto handle = pipeline().buffer<Light::Handle>(_light_buffer_id).read(tag);
         auto sample = Light::Sample::zero(swl.dimension());
-        if (_env_prob > 0.f) {// consider environment
-            auto u = sampler.generate_1d();
-            $if(u < _env_prob) {
-                sample = pipeline().environment()->sample(
-                    it_from.p(), swl, time, sampler.generate_2d());
-                sample.eval.pdf *= _env_prob;
-            }
-            $else {
-                if (!pipeline().lights().empty()) {
-                    auto n = static_cast<float>(pipeline().lights().size());
-                    auto u_remapped = (u - _env_prob) / (1.f - _env_prob);
-                    auto i = cast<uint>(clamp(u_remapped * n, 0.f, n - 1.f));
-                    auto handle = pipeline().buffer<Light::Handle>(_light_buffer_id).read(i);
-                    auto u_prim = sampler.generate_1d();
-                    auto u_light = sampler.generate_2d();
-                    pipeline().lights().dispatch(handle.light_tag, [&](auto light) noexcept {
-                        auto closure = light->closure(swl, time);
-                        sample = closure->sample(handle.instance_id, it_from.p(), u_prim, u_light);
-                    });
-                    sample.eval.pdf *= (1.f - _env_prob) / n;
-                }
-            };
-        } else if (!pipeline().lights().empty()) {
-            auto u = sampler.generate_1d();
-            auto n = static_cast<float>(pipeline().lights().size());
-            auto i = cast<uint>(clamp(u * n, 0.f, n - 1.f));
-            auto handle = pipeline().buffer<Light::Handle>(_light_buffer_id).read(i);
-            auto u_prim = sampler.generate_1d();
-            auto u_light = sampler.generate_2d();
-            pipeline().lights().dispatch(handle.light_tag, [&](auto light) noexcept {
-                auto closure = light->closure(swl, time);
-                sample = closure->sample(handle.instance_id, it_from.p(), u_prim, u_light);
-            });
-            sample.eval.pdf *= 1.f / n;
-        } else {
-            LUISA_WARNING_WITH_LOCATION("No light or environment to sample.");
-        }
+        pipeline().lights().dispatch(handle.light_tag, [&](auto light) noexcept {
+            auto closure = light->closure(swl, time);
+            sample = closure->sample(handle.instance_id, it_from.p(), u);
+        });
         return sample;
+    }
+
+    [[nodiscard]] Light::Sample _sample_environment(Expr<float3> p_from, Expr<float2> u,
+                                                    const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        LUISA_ASSERT(pipeline().environment() != nullptr, "No environment in the scene.");
+        return pipeline().environment()->sample(p_from, swl, time, u);
     }
 };
 

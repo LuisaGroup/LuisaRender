@@ -77,7 +77,8 @@ public:
     [[nodiscard]] bool is_constant() const noexcept override { return true; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] uint channels() const noexcept override { return _channels; }
-    [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
+    [[nodiscard]] luisa::unique_ptr<Instance> build(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
 class ConstantTextureInstance final : public Texture::Instance {
@@ -90,11 +91,13 @@ public:
         const Pipeline &p, const Texture *t,
         luisa::optional<Differentiation::ConstantParameter> param) noexcept
         : Texture::Instance{p, t}, _diff_param{std::move(param)} {}
-    [[nodiscard]] Float4 evaluate(const Interaction &it, Expr<float> time) const noexcept override {
+    [[nodiscard]] Float4 evaluate(
+        const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         if (_diff_param) { return pipeline().differentiation().decode(*_diff_param); }
         return def(node<ConstantTexture>()->v());
     }
-    void backward(const Interaction &it, Expr<float>, Expr<float4> grad) const noexcept override {
+    void backward(const Interaction &it, const SampledWavelengths &swl,
+                  Expr<float>, Expr<float4> grad) const noexcept override {
         if (_diff_param) {
             auto slot_seed = xxhash32(as<uint3>(it.p()));
             pipeline().differentiation().accumulate(*_diff_param, grad, slot_seed);

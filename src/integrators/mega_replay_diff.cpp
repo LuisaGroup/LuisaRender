@@ -317,8 +317,10 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                 $if(!it->shape()->has_surface()) { $break; };
 
                 // sample one light
+                auto u_light_selection = sampler->generate_1d();
+                auto u_light_surface = sampler->generate_2d();
                 Light::Sample light_sample = light_sampler->sample(
-                    *sampler, *it, swl, time);
+                    *it, u_light_selection, u_light_surface, swl, time);
 
                 // trace shadow ray
                 auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
@@ -331,12 +333,15 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                 auto u_lobe = sampler->generate_1d();
                 auto u_bsdf = sampler->generate_2d();
                 pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
+                    // create closure
+                    auto closure = surface->closure(*it, swl, time);
+
                     // apply roughness map
                     auto alpha_skip = def(false);
-                    if (auto alpha_map = surface->alpha()) {
-                        auto alpha = alpha_map->evaluate(*it, time).x;
-                        alpha_skip = alpha < u_lobe;
-                        u_lobe = ite(alpha_skip, (u_lobe - alpha) / (1.f - alpha), u_lobe / alpha);
+                    if (auto o = closure->opacity()) {
+                        auto opacity = saturate(*o);
+                        alpha_skip = u_lobe >= opacity;
+                        u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
                     }
 
                     $if(alpha_skip) {
@@ -344,17 +349,13 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                         pdf_bsdf = 1e16f;
                     }
                     $else {
-                        // create closure
-                        auto closure = surface->closure(*it, swl, time);
 
                         // direct lighting
                         $if(light_sample.eval.pdf > 0.0f & !occluded) {
                             auto wi = light_sample.wi;
                             auto eval = closure->evaluate(wi);
                             auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
-                            Li += mis_weight / light_sample.eval.pdf *
-                                  abs_dot(eval.normal, wi) *
-                                  beta * eval.f * light_sample.eval.L;
+                            Li += mis_weight / light_sample.eval.pdf * beta * eval.f * light_sample.eval.L;
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
                             $if(all(pixel_id == pixel_checked)) {
@@ -368,7 +369,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                         ray = it->spawn_ray(sample.wi);
                         pdf_bsdf = sample.eval.pdf;
                         auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
-                        beta *= abs(dot(sample.eval.normal, sample.wi)) * w * sample.eval.f;
+                        beta *= w * sample.eval.f;
                     };
                 });
 
@@ -377,7 +378,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                 auto q = max(spectrum->cie_y(swl, beta * eta_scale), .05f);
                 auto rr_depth = pt->node<MegakernelReplayDiff>()->rr_depth();
                 auto rr_threshold = pt->node<MegakernelReplayDiff>()->rr_threshold();
-                $if(depth >= rr_depth & q < rr_threshold) {
+                $if(depth + 1u >= rr_depth & q < rr_threshold) {
                     $if(sampler->generate_1d() >= q) { $break; };
                     beta *= 1.0f / q;
                 };
@@ -422,7 +423,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
 
 //            SampledSpectrum d_loss{swl.dimension(), float(pixel_count)};
             SampledSpectrum d_loss{swl.dimension(), 1.f};
-            auto d_loss_float3 = pt->loss()->d_loss(camera, pixel_id);
+            auto d_loss_float3 = pt->loss()->d_loss(camera, pixel_id, swl);
             for (auto i = 0u; i < 3u; ++i) {
                 d_loss[i] *= d_loss_float3[i];
             }
@@ -477,8 +478,11 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                 $if(!it->shape()->has_surface()) { $break; };
 
                 // sample one light
+                auto u_light_selection = sampler->generate_1d();
+                auto u_light_surface = sampler->generate_2d();
                 Light::Sample light_sample = light_sampler->sample(
-                    *sampler, *it, swl, time);
+                    *it, u_light_selection, u_light_surface, swl, time);
+
                 // trace shadow ray
                 auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
                 auto occluded = pipeline().intersect_any(shadow_ray);
@@ -490,12 +494,15 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                 auto u_lobe = sampler->generate_1d();
                 auto u_bsdf = sampler->generate_2d();
                 pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
+                    // create closure
+                    auto closure = surface->closure(*it, swl, time);
+
                     // apply roughness map
                     auto alpha_skip = def(false);
-                    if (auto alpha_map = surface->alpha()) {
-                        auto alpha = alpha_map->evaluate(*it, time).x;
-                        alpha_skip = alpha < u_lobe;
-                        u_lobe = ite(alpha_skip, (u_lobe - alpha) / (1.f - alpha), u_lobe / alpha);
+                    if (auto o = closure->opacity()) {
+                        auto opacity = saturate(*o);
+                        alpha_skip = u_lobe >= opacity;
+                        u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
                     }
 
                     $if(alpha_skip) {
@@ -503,15 +510,13 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                         pdf_bsdf = 1e16f;
                     }
                     $else {
-                        // create closure
-                        auto closure = surface->closure(*it, swl, time);
 
                         // direct lighting
                         $if(light_sample.eval.pdf > 0.0f & !occluded) {
                             auto wi = light_sample.wi;
                             auto eval = closure->evaluate(wi);
                             auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
-                            auto weight = mis_weight / light_sample.eval.pdf * abs(dot(eval.normal, wi)) * beta;
+                            auto weight = mis_weight / light_sample.eval.pdf * beta;
                             Li -= weight * eval.f * light_sample.eval.L;
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
@@ -539,7 +544,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                         df = ite(sample.eval.f == 0.f, 0.f, df / sample.eval.f);
                         closure->backward(sample.wi, df);
 
-                        beta *= abs(dot(sample.eval.normal, sample.wi)) * w * sample.eval.f;
+                        beta *= w * sample.eval.f;
                     };
                 });
 
@@ -548,7 +553,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                 auto q = max(spectrum->cie_y(swl, beta * eta_scale), .05f);
                 auto rr_depth = pt->node<MegakernelReplayDiff>()->rr_depth();
                 auto rr_threshold = pt->node<MegakernelReplayDiff>()->rr_threshold();
-                $if(depth >= rr_depth & q < rr_threshold) {
+                $if(depth + 1u >= rr_depth & q < rr_threshold) {
                     $if(sampler->generate_1d() >= q) { $break; };
                     beta *= 1.0f / q;
                 };
@@ -676,8 +681,10 @@ void MegakernelReplayDiffInstance::_render_one_camera(
                 $if(!it->shape()->has_surface()) { $break; };
 
                 // sample one light
+                auto u_light_selection = sampler->generate_1d();
+                auto u_light_surface = sampler->generate_2d();
                 Light::Sample light_sample = light_sampler->sample(
-                    *sampler, *it, swl, time);
+                    *it, u_light_selection, u_light_surface, swl, time);
 
                 // trace shadow ray
                 auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
@@ -690,12 +697,15 @@ void MegakernelReplayDiffInstance::_render_one_camera(
                 auto u_lobe = sampler->generate_1d();
                 auto u_bsdf = sampler->generate_2d();
                 pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
+                    // create closure
+                    auto closure = surface->closure(*it, swl, time);
+
                     // apply roughness map
                     auto alpha_skip = def(false);
-                    if (auto alpha_map = surface->alpha()) {
-                        auto alpha = alpha_map->evaluate(*it, time).x;
-                        alpha_skip = alpha < u_lobe;
-                        u_lobe = ite(alpha_skip, (u_lobe - alpha) / (1.f - alpha), u_lobe / alpha);
+                    if (auto o = closure->opacity()) {
+                        auto opacity = saturate(*o);
+                        alpha_skip = u_lobe >= opacity;
+                        u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
                     }
 
                     $if(alpha_skip) {
@@ -703,25 +713,19 @@ void MegakernelReplayDiffInstance::_render_one_camera(
                         pdf_bsdf = 1e16f;
                     }
                     $else {
-                        // create closure
-                        auto closure = surface->closure(*it, swl, time);
-
                         // direct lighting
                         $if(light_sample.eval.pdf > 0.0f & !occluded) {
                             auto wi = light_sample.wi;
                             auto eval = closure->evaluate(wi);
                             auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
-                            Li += mis_weight / light_sample.eval.pdf *
-                                  abs_dot(eval.normal, wi) *
-                                  beta * eval.f * light_sample.eval.L;
+                            Li += mis_weight / light_sample.eval.pdf * beta * eval.f * light_sample.eval.L;
                         };
-
                         // sample material
                         auto sample = closure->sample(u_lobe, u_bsdf);
                         ray = it->spawn_ray(sample.wi);
                         pdf_bsdf = sample.eval.pdf;
                         auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
-                        beta *= abs(dot(sample.eval.normal, sample.wi)) * w * sample.eval.f;
+                        beta *= w * sample.eval.f;
                     };
                 });
 
@@ -730,7 +734,7 @@ void MegakernelReplayDiffInstance::_render_one_camera(
                 auto q = max(spectrum->cie_y(swl, beta * eta_scale), .05f);
                 auto rr_depth = pt->node<MegakernelReplayDiff>()->rr_depth();
                 auto rr_threshold = pt->node<MegakernelReplayDiff>()->rr_threshold();
-                $if(depth >= rr_depth & q < rr_threshold) {
+                $if(depth + 1u >= rr_depth & q < rr_threshold) {
                     $if(sampler->generate_1d() >= q) { $break; };
                     beta *= 1.0f / q;
                 };

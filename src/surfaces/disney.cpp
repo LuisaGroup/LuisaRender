@@ -128,8 +128,9 @@ public:
     [[nodiscard]] auto thin() const { return node<DisneySurface>()->thin(); }
 
 private:
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
-        const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
+        const Interaction &it, const SampledWavelengths &swl,
+        Expr<float> time) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> DisneySurface::_build(
@@ -655,13 +656,12 @@ public:
             };
         };
         auto thin = instance<DisneySurfaceInstance>()->thin();
-        return {.f = f,
+        return {.f = f * abs_cos_theta(wi_local),
                 .pdf = pdf,
-                .normal = _it.shading().n(),
                 .roughness = _distrib->alpha(),
                 .eta = SampledSpectrum{
                     _swl.dimension(),
-                    ite(thin & wi_local.z < 0.f, _fresnel->eta(), 1.f)}};
+                    ite(!thin & wi_local.z < 0.f, _fresnel->eta(), 1.f)}};
     }
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
         auto wo_local = _it.wo_local();
@@ -706,21 +706,21 @@ public:
     }
 };
 
-luisa::unique_ptr<Surface::Closure> DisneySurfaceInstance::_closure(
+luisa::unique_ptr<Surface::Closure> DisneySurfaceInstance::closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto [color, color_lum] = _color->evaluate_albedo_spectrum(it, swl, time);
-    auto metallic = _metallic ? _metallic->evaluate(it, time).x : 0.f;
-    auto eta = _eta ? _eta->evaluate(it, time).x : 1.5f;
-    auto roughness = _roughness ? _roughness->evaluate(it, time).x : 1.f;
-    auto specular_tint = _specular_tint ? _specular_tint->evaluate(it, time).x : 1.f;
-    auto anisotropic = _anisotropic ? _anisotropic->evaluate(it, time).x : 0.f;
-    auto sheen = _sheen ? _sheen->evaluate(it, time).x : 0.f;
-    auto sheen_tint = _sheen_tint ? _sheen_tint->evaluate(it, time).x : 0.f;
-    auto clearcoat = _clearcoat ? _clearcoat->evaluate(it, time).x : 0.f;
-    auto clearcoat_gloss = _clearcoat_gloss ? _clearcoat_gloss->evaluate(it, time).x : 0.f;
-    auto specular_trans = _specular_trans ? _specular_trans->evaluate(it, time).x : 0.f;
-    auto flatness = _flatness ? _flatness->evaluate(it, time).x : 0.f;
-    auto diffuse_trans = _diffuse_trans ? _diffuse_trans->evaluate(it, time).x : 0.f;
+    auto metallic = _metallic ? _metallic->evaluate(it, swl, time).x : 0.f;
+    auto eta = _eta ? _eta->evaluate(it, swl, time).x : 1.5f;
+    auto roughness = _roughness ? _roughness->evaluate(it, swl, time).x : 1.f;
+    auto specular_tint = _specular_tint ? _specular_tint->evaluate(it, swl, time).x : 1.f;
+    auto anisotropic = _anisotropic ? _anisotropic->evaluate(it, swl, time).x : 0.f;
+    auto sheen = _sheen ? _sheen->evaluate(it, swl, time).x : 0.f;
+    auto sheen_tint = _sheen_tint ? _sheen_tint->evaluate(it, swl, time).x : 0.f;
+    auto clearcoat = _clearcoat ? _clearcoat->evaluate(it, swl, time).x : 0.f;
+    auto clearcoat_gloss = _clearcoat_gloss ? _clearcoat_gloss->evaluate(it, swl, time).x : 0.f;
+    auto specular_trans = _specular_trans ? _specular_trans->evaluate(it, swl, time).x : 0.f;
+    auto flatness = _flatness ? _flatness->evaluate(it, swl, time).x : 0.f;
+    auto diffuse_trans = _diffuse_trans ? _diffuse_trans->evaluate(it, swl, time).x : 0.f;
     return luisa::make_unique<DisneySurfaceClosure>(
         this, it, swl, time, color, color_lum,
         metallic, eta, roughness, specular_tint, anisotropic,

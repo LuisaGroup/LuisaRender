@@ -4,6 +4,8 @@
 
 #include <fstream>
 
+#include <core/json.h>
+#include <ast/function_serializer.h>
 #include <util/imageio.h>
 #include <luisa-compute.h>
 
@@ -186,7 +188,8 @@ void MegakernelPathTracingInstance::_render_one_camera(
 
     using namespace luisa::compute;
     Callable balanced_heuristic = [](Float pdf_a, Float pdf_b) noexcept {
-        return ite(pdf_a > 0.0f, pdf_a / (pdf_a + pdf_b), 0.0f);
+        auto p = pdf_a + pdf_b;
+        return ite(p  > 0.0f, pdf_a / p, 0.0f);
     };
 
     Kernel2D render_kernel = [&](UInt frame_index, Float time, Float shutter_weight) noexcept {
@@ -228,25 +231,30 @@ void MegakernelPathTracingInstance::_render_one_camera(
             $if(!it->shape()->has_surface()) { $break; };
 
             // sample one light
+            auto u_light_selection = sampler->generate_1d();
+            auto u_light_surface = sampler->generate_2d();
             Light::Sample light_sample = light_sampler->sample(
-                *sampler, *it, swl, time);
+                *it, u_light_selection, u_light_surface, swl, time);
 
             // trace shadow ray
             auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
             auto occluded = pipeline.intersect_any(shadow_ray);
 
             // evaluate material
-            SampledSpectrum eta_scale{swl.dimension(), 1.f};
             auto surface_tag = it->shape()->surface_tag();
             auto u_lobe = sampler->generate_1d();
             auto u_bsdf = sampler->generate_2d();
             pipeline.surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
+
+                // create closure
+                auto closure = surface->closure(*it, swl, time);
+
                 // apply roughness map
                 auto alpha_skip = def(false);
-                if (auto alpha_map = surface->alpha()) {
-                    auto alpha = alpha_map->evaluate(*it, time).x;
-                    alpha_skip = alpha < u_lobe;
-                    u_lobe = ite(alpha_skip, (u_lobe - alpha) / (1.f - alpha), u_lobe / alpha);
+                if (auto o = closure->opacity()) {
+                    auto opacity = saturate(*o);
+                    alpha_skip = u_lobe >= opacity;
+                    u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
                 }
 
                 $if(alpha_skip) {
@@ -254,16 +262,14 @@ void MegakernelPathTracingInstance::_render_one_camera(
                     pdf_bsdf = 1e16f;
                 }
                 $else {
-                    // create closure
-                    auto closure = surface->closure(*it, swl, time);
 
                     // direct lighting
                     $if(light_sample.eval.pdf > 0.0f & !occluded) {
                         auto wi = light_sample.wi;
                         auto eval = closure->evaluate(wi);
-                        auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
-                        Li += mis_weight / light_sample.eval.pdf * abs(dot(eval.normal, wi)) *
-                              beta * eval.f * light_sample.eval.L;
+                        auto w = balanced_heuristic(light_sample.eval.pdf, eval.pdf) /
+                                 light_sample.eval.pdf;
+                        Li += w * beta * eval.f * light_sample.eval.L;
                     };
 
                     // sample material
@@ -271,7 +277,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
                     ray = it->spawn_ray(sample.wi);
                     pdf_bsdf = sample.eval.pdf;
                     auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
-                    beta *= abs(dot(sample.eval.normal, sample.wi)) * w * sample.eval.f;
+                    beta *= w * sample.eval.f;
                 };
             });
 
@@ -280,7 +286,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
             auto rr_depth = pt->node<MegakernelPathTracing>()->rr_depth();
             auto rr_threshold = pt->node<MegakernelPathTracing>()->rr_threshold();
             auto q = spectrum->cie_y(swl, beta);
-            $if(depth >= rr_depth & q < 1.f) {
+            $if(depth + 1u >= rr_depth & q < 1.f) {
                 q = clamp(q, .05f, rr_threshold);
                 $if(sampler->generate_1d() >= q) { $break; };
                 beta *= 1.0f / q;
@@ -288,6 +294,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
         };
         camera->film()->accumulate(pixel_id, spectrum->srgb(swl, Li * shutter_weight));
     };
+
     Clock clock_compile;
     auto render = pipeline.device().compile(render_kernel);
     auto integrator_shader_compilation_time = clock_compile.toc();

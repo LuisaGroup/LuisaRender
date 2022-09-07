@@ -4,12 +4,20 @@ Surface mat_Backdrop : Metal {
   roughness : Constant {
     v { 0.31622776601683794 }
   }
+  Kd : Constant {
+    v { 0.578596, 0.578596, 0.578596 }
+    semantic { "albedo" }
+  }
 }
 
 Surface mat_Floor : Metal {
   eta { "Al" }
   roughness : Constant {
     v { 0.31622776601683794 }
+  }
+  Kd : Constant {
+    v { 0.578596, 0.578596, 0.578596 }
+    semantic { "albedo" }
   }
 }
 
@@ -315,14 +323,14 @@ Camera camera : Pinhole {
   front { 0.003735453588888049, 0.015855638310313225, -0.9998673796653748 }
   up { 0.0, 1.0, 0.0 }
   fov { 20.11429322446647 }
-  spp { 65536 }
+  spp { 1024 }
   filter : Gaussian {
     radius { 1 }
   }
   film : Color {
     resolution { 1920, 1080 }
   }
-  file { "glass-of-water.exr" }
+  file { "output.exr" }
 }
 
 render {

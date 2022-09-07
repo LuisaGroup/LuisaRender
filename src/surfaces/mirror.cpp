@@ -24,7 +24,7 @@ public:
         : Surface{scene, desc},
           _color{scene->load_texture(desc->property_node("color"))},
           _roughness{scene->load_texture(desc->property_node_or_default("roughness"))},
-          _remap_roughness{desc->property_bool_or_default("remap_roughness", false)} {
+          _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {
         LUISA_RENDER_CHECK_ALBEDO_TEXTURE(MirrorSurface, color);
         LUISA_RENDER_CHECK_GENERIC_TEXTURE(MirrorSurface, roughness, 1);
     }
@@ -53,8 +53,9 @@ public:
     [[nodiscard]] auto roughness() const noexcept { return _roughness; }
 
 private:
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
-        const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
+        const Interaction &it, const SampledWavelengths &swl,
+        Expr<float> time) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> MirrorSurface::_build(
@@ -117,9 +118,8 @@ public:
         auto wi_local = _it.shading().world_to_local(wi);
         auto f = _refl->evaluate(wo_local, wi_local);
         auto pdf = _refl->pdf(wo_local, wi_local);
-        return {.f = f,
+        return {.f = f * abs_cos_theta(wi_local),
                 .pdf = pdf,
-                .normal = _it.shading().n(),
                 .roughness = _distribution->alpha(),
                 .eta = SampledSpectrum{_swl.dimension(), 1.f}};
     }
@@ -128,24 +128,24 @@ public:
         auto wi_local = def(make_float3(0.f, 0.f, 1.f));
         auto f = _refl->sample(_it.wo_local(), &wi_local, u, &pdf);
         return {.wi = _it.shading().local_to_world(wi_local),
-                .eval = {.f = f,
+                .eval = {.f = f * abs_cos_theta(wi_local),
                          .pdf = pdf,
-                         .normal = _it.shading().n(),
                          .roughness = _distribution->alpha(),
                          .eta = SampledSpectrum{_swl.dimension(), 1.f}}};
     }
 
-    void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
+    void backward(Expr<float3> wi, const SampledSpectrum &df_in) const noexcept override {
         auto _instance = instance<MirrorInstance>();
         auto wo_local = _it.wo_local();
         auto wi_local = _it.shading().world_to_local(wi);
+        auto df = df_in * abs_cos_theta(wi_local);
         auto grad = _refl->backward(wo_local, wi_local, df);
         auto d_fresnel = dynamic_cast<SchlickFresnel::Gradient *>(grad.dFresnel.get());
 
         _instance->color()->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(grad.dR + d_fresnel->dR0));
         if (auto roughness = _instance->roughness()) {
             auto remap = _instance->node<MirrorSurface>()->remap_roughness();
-            auto r_f4 = roughness->evaluate(_it, _time);
+            auto r_f4 = roughness->evaluate(_it, _swl, _time);
             auto r = roughness->node()->channels() == 1u ? r_f4.xx() : r_f4.xy();
 
             auto grad_alpha_roughness = [](auto &&x) noexcept {
@@ -156,16 +156,17 @@ public:
                               make_float4(d_r.x + d_r.y, 0.f, 0.f, 0.f) :
                               make_float4(d_r, 0.f, 0.f);
             auto roughness_grad_range = 5.f * (roughness->node()->range().y - roughness->node()->range().x);
-            roughness->backward(_it, _time, ite(any(isnan(d_r_f4) || abs(d_r_f4) > roughness_grad_range), 0.f, d_r_f4));
+            roughness->backward(_it, _swl, _time,
+                                ite(any(isnan(d_r_f4) || abs(d_r_f4) > roughness_grad_range), 0.f, d_r_f4));
         }
     }
 };
 
-luisa::unique_ptr<Surface::Closure> MirrorInstance::_closure(
+luisa::unique_ptr<Surface::Closure> MirrorInstance::closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto alpha = def(make_float2(0.f));
     if (_roughness != nullptr) {
-        auto r = _roughness->evaluate(it, time);
+        auto r = _roughness->evaluate(it, swl, time);
         auto remap = node<MirrorSurface>()->remap_roughness();
         auto r2a = [](auto &&x) noexcept {
             return TrowbridgeReitzDistribution::roughness_to_alpha(x);

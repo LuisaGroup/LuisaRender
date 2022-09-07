@@ -50,7 +50,7 @@ public:
     [[nodiscard]] auto ratio() const noexcept { return _ratio; }
 
 private:
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         const Interaction &it, const SampledWavelengths &swl,
         Expr<float> time) const noexcept override;
 };
@@ -82,13 +82,9 @@ private:
                             const Surface::Evaluation &eval_a,
                             const Surface::Evaluation &eval_b) const noexcept {
         auto t = 1.f - _ratio;
-        auto cos_a = abs(dot(eval_a.normal, wi));
-        auto cos_b = abs(dot(eval_b.normal, wi));
-        auto cos_theta_i = abs(dot(_it.shading().n(), wi));
         return Surface::Evaluation{
-            .f = (_ratio * eval_a.f * cos_a + t * eval_b.f * cos_b) / cos_theta_i,// convert to mix frame
+            .f = _ratio * eval_a.f + t * eval_b.f,
             .pdf = lerp(eval_a.pdf, eval_b.pdf, t),
-            .normal = _it.shading().n(),
             .roughness = lerp(eval_a.roughness, eval_b.roughness, t),
             .eta = _ratio * eval_a.eta + t * eval_b.eta};
     }
@@ -102,6 +98,16 @@ public:
           _a{std::move(a)}, _b{std::move(b)}, _ratio{ratio} {
         LUISA_ASSERT(_a != nullptr || _b != nullptr,
                      "Creating closure for null MixSurface.");
+    }
+    [[nodiscard]] luisa::optional<Float> opacity() const noexcept override {
+        luisa::optional<Float> opacity_a;
+        luisa::optional<Float> opacity_b;
+        if (_a != nullptr) [[likely]] { opacity_a = _a->opacity(); }
+        if (_b != nullptr) [[likely]] { opacity_b = _b->opacity(); }
+        if (!opacity_a && !opacity_b) { return luisa::nullopt; }
+        auto oa = opacity_a.value_or(1.f);
+        auto ob = opacity_b.value_or(1.f);
+        return lerp(ob, oa, _ratio);
     }
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
         if (_a == nullptr) [[unlikely]] {
@@ -149,19 +155,14 @@ public:
             using compute::isnan;
             auto eval_a = _a->evaluate(wi);
             auto eval_b = _b->evaluate(wi);
-            auto cos_a = abs(dot(eval_a.normal, wi));
-            auto cos_b = abs(dot(eval_b.normal, wi));
-            auto cos_theta_i = abs(dot(_it.shading().n(), wi));
-
-            auto d_a = df * _ratio * cos_a / cos_theta_i;
-            auto d_b = df * (1.f - _ratio) * cos_b / cos_theta_i;
-
+            auto d_a = df * _ratio;
+            auto d_b = df * (1.f - _ratio);
             _a->backward(wi, zero_if_any_nan(d_a));
             _b->backward(wi, zero_if_any_nan(d_a));
-
             if (auto ratio = instance<MixSurfaceInstance>()->ratio()) {
-                auto d_ratio = (df * (eval_a.f * cos_a - eval_b.f * cos_b)).sum() / cos_theta_i;
-                ratio->backward(_it, _time, make_float4(ite(isnan(d_ratio), 0.f, d_ratio), 0.f, 0.f, 0.f));
+                auto d_ratio = (df * (eval_a.f - eval_b.f)).sum();
+                ratio->backward(_it, _swl, _time,
+                                make_float4(ite(isnan(d_ratio), 0.f, d_ratio), 0.f, 0.f, 0.f));
             }
         } else if (_a != nullptr) [[likely]] {
             _a->backward(wi, df * _ratio);
@@ -171,9 +172,9 @@ public:
     }
 };
 
-luisa::unique_ptr<Surface::Closure> MixSurfaceInstance::_closure(
+luisa::unique_ptr<Surface::Closure> MixSurfaceInstance::closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    auto ratio = _ratio == nullptr ? 0.5f : clamp(_ratio->evaluate(it, time).x, 0.f, 1.f);
+    auto ratio = _ratio == nullptr ? 0.5f : clamp(_ratio->evaluate(it, swl, time).x, 0.f, 1.f);
     auto a = _a == nullptr ? nullptr : _a->closure(it, swl, time);
     auto b = _b == nullptr ? nullptr : _b->closure(it, swl, time);
     return luisa::make_unique<MixSurfaceClosure>(

@@ -24,16 +24,16 @@ public:
     L2Instance(Pipeline &pipeline, const L2 *loss) noexcept
         : Loss::Instance{pipeline, loss} {}
 
-public:
-    [[nodiscard]] Float3 loss(const Camera::Instance *camera) const noexcept override;
-    [[nodiscard]] Float3 d_loss(const Camera::Instance *camera, Expr<uint2> pixel_id) const noexcept override;
+    [[nodiscard]] Float3 loss(const Camera::Instance *camera, const SampledWavelengths &swl) const noexcept override;
+    [[nodiscard]] Float3 d_loss(const Camera::Instance *camera, Expr<uint2> pixel_id,
+                                const SampledWavelengths &swl) const noexcept override;
 };
 
 luisa::unique_ptr<Loss::Instance> L2::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
     return luisa::make_unique<L2Instance>(pipeline, this);
 }
 
-Float3 L2Instance::loss(const Camera::Instance *camera) const noexcept {
+Float3 L2Instance::loss(const Camera::Instance *camera, const SampledWavelengths &swl) const noexcept {
     auto resolution = camera->node()->film()->resolution();
     auto loss_sum = def(make_float3(0.f));
 
@@ -43,7 +43,7 @@ Float3 L2Instance::loss(const Camera::Instance *camera) const noexcept {
             auto pixel_uv_it = pixel_xy2uv(pixel_id, resolution);
 
             auto rendered = camera->film()->read(pixel_id).average;
-            auto target = camera->target()->evaluate(pixel_uv_it, 0.f).xyz();
+            auto target = camera->target()->evaluate(pixel_uv_it, swl, 0.f).xyz();
 
             loss_sum += sqr(rendered - target);
         }
@@ -52,12 +52,13 @@ Float3 L2Instance::loss(const Camera::Instance *camera) const noexcept {
     return loss_sum / float(resolution.x * resolution.y);
 }
 
-Float3 L2Instance::d_loss(const Camera::Instance *camera, Expr<uint2> pixel_id) const noexcept {
+Float3 L2Instance::d_loss(const Camera::Instance *camera, Expr<uint2> pixel_id,
+                          const SampledWavelengths &swl) const noexcept {
     auto resolution = camera->node()->film()->resolution();
     auto pixel_uv_it = pixel_xy2uv(pixel_id, resolution);
 
     auto rendered = camera->film()->read(pixel_id).average;
-    auto target = camera->target()->evaluate(pixel_uv_it, 0.f).xyz();
+    auto target = camera->target()->evaluate(pixel_uv_it, swl, 0.f).xyz();
 
     return 2.f * (rendered - target) / float(resolution.x * resolution.y);
 }

@@ -85,6 +85,7 @@ void NormalVisualizerInstance::_render_one_camera(
     });
     auto shutter_samples = camera->node()->shutter_samples();
     command_buffer << synchronize();
+    LUISA_INFO("Rendering started.");
     Clock clock;
     auto sample_id = 0u;
     auto dispatch_count = 0u;

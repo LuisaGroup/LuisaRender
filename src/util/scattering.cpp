@@ -14,7 +14,7 @@ Bool refract(Float3 wi, Float3 n, Float eta, Float3 *wt) noexcept {
     auto cosThetaI = dot(n, wi);
     auto sin2ThetaI = max(0.0f, 1.0f - sqr(cosThetaI));
     auto sin2ThetaT = sqr(eta) * sin2ThetaI;
-    auto cosThetaT = sqrt(saturate(1.f - sin2ThetaT));
+    auto cosThetaT = sqrt(1.f - sin2ThetaT);
     // Handle total internal reflection for transmission
     auto refr = sin2ThetaT < 1.f;
     *wt = -eta * wi + (eta * cosThetaI - cosThetaT) * n;
@@ -201,46 +201,49 @@ Float TrowbridgeReitzDistribution::D(Expr<float3> wh) const noexcept {
 
 Float TrowbridgeReitzDistribution::Lambda(Expr<float3> w) const noexcept {
     using compute::isinf;
-    auto absTanTheta = abs(tan_theta(w));
+    auto tanTheta = abs(tan_theta(w));
     // Compute _alpha_ for direction _w_
     auto alpha2 = cos2_phi(w) * sqr(alpha().x) +
                   sin2_phi(w) * sqr(alpha().y);
-    auto alpha2Tan2Theta = alpha2 * sqr(absTanTheta);
+    auto alpha2Tan2Theta = alpha2 * sqr(tanTheta);
     auto L = (-1.f + sqrt(1.f + alpha2Tan2Theta)) * .5f;
-    return ite(isinf(absTanTheta), 0.f, L);
+    return ite(isinf(tanTheta), 0.f, L);
 }
 
 [[nodiscard]] inline Float2 TrowbridgeReitzSample11(Expr<float> cosTheta, Expr<float2> U) noexcept {
     using namespace luisa::compute;
+    auto slope = def(make_float2());
+    $if(cosTheta <= .9999f) {
+        auto sinTheta = sqrt(max(0.f, 1.f - sqr(cosTheta)));
+        auto tanTheta = sinTheta / cosTheta;
+        auto a = 1.f / tanTheta;
+        auto G1 = 2.f / (1.f + sqrt(1.f + 1.f / sqr(a)));
 
-    // special case (normal incidence)
-    auto r = sqrt(U.x / (1.f - U.x));
-    auto phi = (2.f * pi) * U.y;
-    auto special_slope = r * make_float2(cos(phi), sin(phi));
-    auto sinTheta = sqrt(saturate(1.f - sqr(cosTheta)));
-    auto tanTheta = sinTheta / cosTheta;
-    auto a = 1.f / tanTheta;
-    auto G1 = 2.f / (1.f + sqrt(1.f + 1.f / sqr(a)));
+        // sample slope_x
+        auto A = 2.f * U.x / G1 - 1.f;
+        auto tmp = min(1.f / (sqr(A) - 1.f), 1e10f);
+        auto B = tanTheta;
+        auto D = sqrt(max(sqr(B * tmp) - (sqr(A) - sqr(B)) * tmp, 0.f));
+        auto slope_x_1 = B * tmp - D;
+        auto slope_x_2 = B * tmp + D;
+        auto slope_x = ite(
+            (A < 0.f) | (slope_x_2 * tanTheta > 1.f),
+            slope_x_1, slope_x_2);
 
-    // sample slope_x
-    auto A = 2.f * U.x / G1 - 1.f;
-    auto tmp = min(1.f / (sqr(A) - 1.f), 1e10f);
-    auto B = tanTheta;
-    auto D = sqrt(max(sqr(B) * sqr(tmp) - (sqr(A) - sqr(B)) * tmp, 0.f));
-    auto slope_x_1 = B * tmp - D;
-    auto slope_x_2 = B * tmp + D;
-    auto slope_x = ite(
-        (A < 0.f) | (slope_x_2 > 1.f / tanTheta),
-        slope_x_1, slope_x_2);
-
-    // sample slope_y
-    auto S = ite(U.y > .5f, 1.f, -1.f);
-    auto U2 = ite(U.y > .5f, 2.f * (U.y - .5f), 2.f * (.5f - U.y));
-    auto z = (U2 * (U2 * (U2 * 0.27385f - 0.73369f) + 0.46341f)) /
-             (U2 * (U2 * (U2 * 0.093073f + 0.309420f) - 1.000000f) + 0.597999f);
-    auto slope_y = S * z * sqrt(1.f + sqr(slope_x));
-    auto slope = make_float2(slope_x, slope_y);
-    return ite(cosTheta > .9999f, special_slope, slope);
+        // sample slope_y
+        auto S = ite(U.y > .5f, 1.f, -1.f);
+        auto U2 = ite(U.y > .5f, 2.f * (U.y - .5f), 2.f * (.5f - U.y));
+        auto z = (U2 * (U2 * (U2 * 0.27385f - 0.73369f) + 0.46341f)) /
+                 (U2 * (U2 * (U2 * 0.093073f + 0.309420f) - 1.000000f) + 0.597999f);
+        auto slope_y = S * z * sqrt(1.f + sqr(slope_x));
+        slope = make_float2(slope_x, slope_y);
+    }
+    $else {// special case (normal incidence)
+        auto r = sqrt(U.x / (1.f - U.x));
+        auto phi = (2.f * pi) * U.y;
+        slope = r * make_float2(cos(phi), sin(phi));
+    };
+    return slope;
 }
 
 [[nodiscard]] inline Float3 TrowbridgeReitzSample(Expr<float3> wi, Expr<float2> alpha, Expr<float2> U) noexcept {
@@ -359,17 +362,19 @@ SampledSpectrum MicrofacetReflection::evaluate(Expr<float3> wo, Expr<float3> wi)
     using compute::any;
     using compute::normalize;
     auto wh = wi + wo;
-    auto valid = same_hemisphere(wo, wi) & any(wh != 0.f);
-    wh = normalize(wh);
-    // For the Fresnel call, make sure that wh is in the same hemisphere
-    // as the surface normal, so that TIR is handled correctly.
-    auto F = _fresnel->evaluate(dot(wi, face_forward(wh, make_float3(0.f, 0.f, 1.f))));
-    auto D = _distribution->D(wh);
-    auto G = _distribution->G(wo, wi);
-    auto cos_o = cos_theta(wo);
-    auto cos_i = cos_theta(wi);
-    auto h = abs(0.25f * D * G / (cos_i * cos_o));
-    return _r * F * ite(valid, h, 0.f);
+    SampledSpectrum f{_r.dimension()};
+    $if(same_hemisphere(wo, wi) & any(wh != 0.f)) {
+        wh = normalize(wh);
+        // For the Fresnel call, make sure that wh is in the same hemisphere
+        // as the surface normal, so that TIR is handled correctly.
+        auto F = _fresnel->evaluate(dot(wi, face_forward(wh, make_float3(0.f, 0.f, 1.f))));
+        auto D = _distribution->D(wh);
+        auto G = _distribution->G(wo, wi);
+        auto cos_o = cos_theta(wo);
+        auto cos_i = cos_theta(wi);
+        f = _r * F * abs(0.25f * D * G / (cos_i * cos_o));
+    };
+    return f;
 }
 
 SampledSpectrum MicrofacetReflection::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *p) const noexcept {
@@ -377,18 +382,23 @@ SampledSpectrum MicrofacetReflection::sample(Expr<float3> wo, Float3 *wi, Expr<f
     *p = 0.0f;
     auto wh = _distribution->sample_wh(wo, u);
     *wi = reflect(wo, wh);
-    auto valid = same_hemisphere(wo, *wi) &
-                 same_hemisphere(wo, wh);
-    // Compute PDF of _wi_ for microfacet reflection
-    *p = ite(valid, _distribution->pdf(wo, wh) / (4.f * dot(wo, wh)), 0.f);
-    return evaluate(wo, *wi);
+    SampledSpectrum f{_r.dimension()};
+    $if (same_hemisphere(wo, *wi) & same_hemisphere(wo, wh)) {
+        // Compute PDF of _wi_ for microfacet reflection
+        *p = _distribution->pdf(wo, wh) / (4.f * dot(wo, wh));
+        f = evaluate(wo, *wi);
+    };
+    return f;
 }
 
 Float MicrofacetReflection::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {
-    auto wh = normalize(wo + wi);
-    auto valid = same_hemisphere(wo, wi) & any(wh != 0.f);
-    auto p = _distribution->pdf(wo, wh) / (4.f * dot(wo, wh));
-    return ite(valid, p, 0.f);
+    auto p = def(0.f);
+    auto wh = wi + wo;
+    $if (same_hemisphere(wo, wi) & any(wh != 0.f)) {
+        wh = normalize(wh);
+        p = _distribution->pdf(wo, wh) / (4.f * dot(wo, wh));
+    };
+    return p;
 }
 
 MicrofacetReflection::Gradient MicrofacetReflection::backward(
@@ -424,24 +434,26 @@ MicrofacetReflection::Gradient MicrofacetReflection::backward(
 SampledSpectrum MicrofacetTransmission::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
     auto cosThetaO = cos_theta(wo);
     auto cosThetaI = cos_theta(wi);
-    auto refr = !same_hemisphere(wo, wi) & cosThetaO != 0.f & cosThetaI != 0.f;
-    auto eta = ite(cosThetaO > 0.f, _eta_b / _eta_a, _eta_a / _eta_b);
-
-    // Compute $\wh$ from $\wo$ and $\wi$ for microfacet transmission
-    auto G = _distribution->G(wo, wi);
-    return eta.map([&](auto i, auto e) noexcept {
-        auto wh = normalize(wo + wi * e);
-        wh = compute::sign(cos_theta(wh)) * wh;
-        auto valid = refr & dot(wo, wh) * dot(wi, wh) < 0.f;
-        auto sqrtDenom = dot(wo, wh) + e * dot(wi, wh);
-        auto factor = 1.f / e;
-        auto F = fresnel_dielectric(dot(wo, wh), _eta_a[i], _eta_b[i]);
-        auto D = _distribution->D(wh);
-        auto f = (1.f - F) * _t[i] * sqr(factor) *
-                 abs(D * G * sqr(e) * dot(wi, wh) * dot(wo, wh) /
-                     (cosThetaI * cosThetaO * sqr(sqrtDenom)));
-        return ite(valid, f, 0.f);
-    });
+    SampledSpectrum ret{_t.dimension()};
+    $if (!same_hemisphere(wo, wi) & cosThetaO != 0.f & cosThetaI != 0.f) {
+        auto eta = ite(cosThetaO > 0.f, _eta_b / _eta_a, _eta_a / _eta_b);
+        // Compute $\wh$ from $\wo$ and $\wi$ for microfacet transmission
+        auto G = _distribution->G(wo, wi);
+        ret = eta.map([&](auto i, auto e) noexcept {
+            auto wh = normalize(wo + wi * e);
+            wh = compute::sign(cos_theta(wh)) * wh;
+            auto valid = dot(wo, wh) * dot(wi, wh) < 0.f;
+            auto sqrtDenom = dot(wo, wh) + e * dot(wi, wh);
+            auto factor = 1.f / e;
+            auto F = fresnel_dielectric(dot(wo, wh), _eta_a[i], _eta_b[i]);
+            auto D = _distribution->D(wh);
+            auto f = (1.f - F) * _t[i] * sqr(factor) *
+                     abs(D * G * sqr(e) * dot(wi, wh) * dot(wo, wh) /
+                         (cosThetaI * cosThetaO * sqr(sqrtDenom)));
+            return ite(valid, f, 0.f);
+        });
+    };
+    return ret;
 }
 
 SampledSpectrum MicrofacetTransmission::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u_in, Float *p) const noexcept {
@@ -466,17 +478,20 @@ SampledSpectrum MicrofacetTransmission::sample(Expr<float3> wo, Float3 *wi, Expr
 
 Float MicrofacetTransmission::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {
     auto pdf = def(0.f);
-    auto entering = cos_theta(wo) > 0.f;
-    auto eta = ite(entering, _eta_b / _eta_a, _eta_a / _eta_b);
-    for (auto i = 0u; i < eta.dimension(); i++) {
-        auto wh = normalize(wo + wi * eta[i]);
-        // Compute change of variables _dwh\_dwi_ for microfacet transmission
-        auto sqrtDenom = dot(wo, wh) + eta[i] * dot(wi, wh);
-        auto dwh_dwi = sqr(eta[i] / sqrtDenom) * abs_dot(wi, wh);
-        auto valid = !same_hemisphere(wo, wi) & dot(wo, wh) * dot(wi, wh) < 0.f;
-        pdf += ite(valid, _distribution->pdf(wo, wh) * dwh_dwi, 0.f);
-    }
-    return pdf * static_cast<float>(1.0 / eta.dimension());
+    $if (!same_hemisphere(wo, wi)) {
+        auto entering = cos_theta(wo) > 0.f;
+        auto eta = ite(entering, _eta_b / _eta_a, _eta_a / _eta_b);
+        for (auto i = 0u; i < eta.dimension(); i++) {
+            auto wh = normalize(wo + wi * eta[i]);
+            // Compute change of variables _dwh\_dwi_ for microfacet transmission
+            auto sqrtDenom = dot(wo, wh) + eta[i] * dot(wi, wh);
+            auto dwh_dwi = sqr(eta[i] / sqrtDenom) * abs_dot(wi, wh);
+            auto valid = dot(wo, wh) * dot(wi, wh) < 0.f;
+            pdf += ite(valid, _distribution->pdf(wo, wh) * dwh_dwi, 0.f);
+        }
+        pdf *= static_cast<float>(1.0 / eta.dimension());
+    };
+    return pdf;
 }
 
 MicrofacetTransmission::Gradient MicrofacetTransmission::backward(
@@ -511,7 +526,7 @@ MicrofacetTransmission::Gradient MicrofacetTransmission::backward(
         d_t[i] = d_f * k2 * abs(k1);
         auto grad_D = _distribution->grad_D(wh);
         d_alpha += d_f * k2 * _t[i] * sign(k1) * k0 * (D * grad_G.dAlpha + G * grad_D.dAlpha);
-    };
+    }
 
     return {.dT = d_t, .dAlpha = d_alpha};
 }
@@ -524,22 +539,28 @@ OrenNayar::OrenNayar(SampledSpectrum R, Expr<float> sigma) noexcept
 }
 
 SampledSpectrum OrenNayar::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
-    auto sinThetaI = sin_theta(wi);
-    auto sinThetaO = sin_theta(wo);
-    // Compute cosine term of Oren-Nayar model
-    auto sinPhiI = sin_phi(wi);
-    auto cosPhiI = cos_phi(wi);
-    auto sinPhiO = sin_phi(wo);
-    auto cosPhiO = cos_phi(wo);
-    auto dCos = cosPhiI * cosPhiO + sinPhiI * sinPhiO;
-    auto maxCos = ite(sinThetaI > 1e-4f & sinThetaO > 1e-4f, max(0.f, dCos), 0.f);
-    // Compute sine and tangent terms of Oren-Nayar model
-    auto absCosThetaI = abs_cos_theta(wi);
-    auto absCosThetaO = abs_cos_theta(wo);
-    auto sinAlpha = ite(absCosThetaI > absCosThetaO, sinThetaO, sinThetaI);
-    auto tanBeta = ite(absCosThetaI > absCosThetaO,
-                       sinThetaI / absCosThetaI, sinThetaO / absCosThetaO);
-    return _r * ite(same_hemisphere(wo, wi), inv_pi * (_a + _b * maxCos * sinAlpha * tanBeta), 0.f);
+    auto valid = same_hemisphere(wo, wi);
+    auto s = ite(valid, inv_pi, 0.f);
+    auto f = _r * s;
+    $if(_sigma != 0.f & s > 0.f) {
+        auto sinThetaI = sin_theta(wi);
+        auto sinThetaO = sin_theta(wo);
+        // Compute cosine term of Oren-Nayar model
+        auto sinPhiI = sin_phi(wi);
+        auto cosPhiI = cos_phi(wi);
+        auto sinPhiO = sin_phi(wo);
+        auto cosPhiO = cos_phi(wo);
+        auto dCos = cosPhiI * cosPhiO + sinPhiI * sinPhiO;
+        auto maxCos = ite(sinThetaI > 1e-4f & sinThetaO > 1e-4f, max(0.f, dCos), 0.f);
+        // Compute sine and tangent terms of Oren-Nayar model
+        auto absCosThetaI = abs_cos_theta(wi);
+        auto absCosThetaO = abs_cos_theta(wo);
+        auto sinAlpha = ite(absCosThetaI > absCosThetaO, sinThetaO, sinThetaI);
+        auto tanBeta = ite(absCosThetaI > absCosThetaO,
+                           sinThetaI / absCosThetaI, sinThetaO / absCosThetaO);
+        f *= (_a + _b * maxCos * sinAlpha * tanBeta);
+    };
+    return f;
 }
 
 OrenNayar::Gradient OrenNayar::backward(

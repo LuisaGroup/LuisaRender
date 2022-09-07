@@ -383,7 +383,10 @@ void WavefrontPathTracingInstance::_render_one_camera(
             auto path_id = path_indices.read(ray_id);
             auto swl = path_states.read_swl(path_id);
             sampler()->load_state(path_id);
-            auto light_sample = light_sampler()->sample(*sampler(), *it, swl, time);
+            auto u_light_selection = sampler()->generate_1d();
+            auto u_light_surface = sampler()->generate_2d();
+            Light::Sample light_sample = light_sampler()->sample(
+                *it, u_light_selection, u_light_surface, swl, time);
             sampler()->save_state(path_id);
             // trace shadow ray
             auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
@@ -414,12 +417,16 @@ void WavefrontPathTracingInstance::_render_one_camera(
             auto u_lobe = sampler()->generate_1d();
             auto u_bsdf = sampler()->generate_2d();
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
+
+                // create closure
+                auto closure = surface->closure(*it, swl, time);
+
                 // apply roughness map
                 auto alpha_skip = def(false);
-                if (auto alpha_map = surface->alpha()) {
-                    auto alpha = alpha_map->evaluate(*it, time).x;
-                    alpha_skip = alpha < u_lobe;
-                    u_lobe = ite(alpha_skip, (u_lobe - alpha) / (1.f - alpha), u_lobe / alpha);
+                if (auto o = closure->opacity()) {
+                    auto opacity = saturate(*o);
+                    alpha_skip = u_lobe >= opacity;
+                    u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
                 }
 
                 $if(alpha_skip) {
@@ -427,8 +434,6 @@ void WavefrontPathTracingInstance::_render_one_camera(
                     pdf_bsdf = 1e16f;
                 }
                 $else {
-                    // create closure
-                    auto closure = surface->closure(*it, swl, time);
 
                     // direct lighting
                     auto pdf_light = light_samples.read_pdf(queue_id);
@@ -437,8 +442,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                         auto wi = light_samples.read_wi(queue_id);
                         auto eval = closure->evaluate(wi);
                         auto mis_weight = balanced_heuristic(pdf_light, eval.pdf);
-                        Li += mis_weight / pdf_light * abs(dot(eval.normal, wi)) *
-                              beta * eval.f * Ld;
+                        Li += mis_weight / pdf_light * beta * eval.f * Ld;
                     };
 
                     // sample material
@@ -446,7 +450,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                     ray = it->spawn_ray(sample.wi);
                     pdf_bsdf = sample.eval.pdf;
                     auto w = ite(sample.eval.pdf > 0.0f, 1.f / sample.eval.pdf, 0.f);
-                    beta *= abs(dot(sample.eval.normal, sample.wi)) * w * sample.eval.f;
+                    beta *= w * sample.eval.f;
                 };
             });
             $if(beta.any([](auto b) noexcept { return !isnan(b) & b > 0.f; })) {
@@ -454,7 +458,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                 auto rr_threshold = node<WavefrontPathTracing>()->rr_threshold();
                 // rr
                 auto q = spectrum->cie_y(swl, beta);
-                $if(trace_depth >= rr_depth & q < 1.f) {
+                $if(trace_depth + 1u >= rr_depth & q < 1.f) {
                     q = clamp(q, .05f, rr_threshold);
                     $if(sampler()->generate_1d() < q) {
                         beta *= 1.f / q;

@@ -9,6 +9,8 @@
 #include <base/pipeline.h>
 #include <base/scene.h>
 
+#include <utility>
+
 namespace luisa::render {
 
 namespace ior {
@@ -349,6 +351,7 @@ class MetalSurface final : public Surface {
 
 private:
     const Texture *_roughness;
+    const Texture *_kd;
     luisa::unique_ptr<Constant<float2>> _eta;
     bool _remap_roughness;
 
@@ -356,6 +359,7 @@ public:
     MetalSurface(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Surface{scene, desc},
           _roughness{scene->load_texture(desc->property_node_or_default("roughness"))},
+          _kd{scene->load_texture(desc->property_node_or_default("Kd"))},
           _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {
         if (auto eta_name = desc->property_string_or_default("eta"); !eta_name.empty()) {
             for (auto &c : eta_name) { c = static_cast<char>(tolower(c)); }
@@ -432,6 +436,7 @@ public:
             _eta = luisa::make_unique<Constant<float2>>(lut);
         }
         LUISA_RENDER_CHECK_GENERIC_TEXTURE(MetalSurface, roughness, 1);
+        LUISA_RENDER_CHECK_ALBEDO_TEXTURE(MetalSurface, kd);
     }
     [[nodiscard]] auto &eta() const noexcept { return *_eta; }
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
@@ -446,36 +451,40 @@ class MetalInstance final : public Surface::Instance {
 
 private:
     const Texture::Instance *_roughness;
+    const Texture::Instance *_kd;
 
 public:
-    MetalInstance(const Pipeline &pipeline, const Surface *surface, const Texture::Instance *roughness) noexcept
-        : Surface::Instance{pipeline, surface}, _roughness{roughness} {}
+    MetalInstance(const Pipeline &pipeline, const Surface *surface,
+                  const Texture::Instance *roughness, const Texture::Instance *Kd) noexcept
+        : Surface::Instance{pipeline, surface},
+          _roughness{roughness}, _kd{Kd} {}
 
 private:
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> MetalSurface::_build(
     Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
     auto roughness = pipeline.build_texture(command_buffer, _roughness);
-    return luisa::make_unique<MetalInstance>(pipeline, this, roughness);
+    auto Kd = pipeline.build_texture(command_buffer, _kd);
+    return luisa::make_unique<MetalInstance>(pipeline, this, roughness, Kd);
 }
 
 class MetalClosure final : public Surface::Closure {
 
 private:
     SampledSpectrum _eta_i;
+    luisa::optional<SampledSpectrum> _refl;
     luisa::unique_ptr<FresnelConductor> _fresnel;
     luisa::unique_ptr<TrowbridgeReitzDistribution> _distrib;
     luisa::unique_ptr<MicrofacetReflection> _lobe;
 
 public:
     MetalClosure(
-        const Surface::Instance *instance,
-        const Interaction &it, const SampledWavelengths &swl, Expr<float> time,
-        const SampledSpectrum &n, const SampledSpectrum &k, Expr<float2> alpha) noexcept
-        : Surface::Closure{instance, it, swl, time}, _eta_i{swl.dimension(), 1.f},
+        const Surface::Instance *instance, const Interaction &it, const SampledWavelengths &swl, Expr<float> time,
+        const SampledSpectrum &n, const SampledSpectrum &k, luisa::optional<SampledSpectrum> refl, Expr<float2> alpha) noexcept
+        : Surface::Closure{instance, it, swl, time}, _eta_i{swl.dimension(), 1.f}, _refl{std::move(refl)},
           _fresnel{luisa::make_unique<FresnelConductor>(_eta_i, n, k)},
           _distrib{luisa::make_unique<TrowbridgeReitzDistribution>(alpha)},
           _lobe{luisa::make_unique<MicrofacetReflection>(_eta_i, _distrib.get(), _fresnel.get())} {}
@@ -485,10 +494,10 @@ private:
         auto wo_local = _it.wo_local();
         auto wi_local = _it.shading().world_to_local(wi);
         auto f = _lobe->evaluate(wo_local, wi_local);
+        if (_refl) { f *= *_refl; }
         auto pdf = _lobe->pdf(wo_local, wi_local);
-        return {.f = f,
+        return {.f = f * abs_cos_theta(wi_local),
                 .pdf = pdf,
-                .normal = _it.shading().n(),
                 .roughness = _distrib->alpha(),
                 .eta = _eta_i};
     }
@@ -497,11 +506,11 @@ private:
         auto pdf = def(0.f);
         auto wi_local = def(make_float3(0.f, 0.f, 1.f));
         auto f = _lobe->sample(wo_local, &wi_local, u, &pdf);
+        if (_refl) { f *= *_refl; }
         auto wi = _it.shading().local_to_world(wi_local);
         return {.wi = wi,
-                .eval = {.f = f,
+                .eval = {.f = f * abs_cos_theta(wi_local),
                          .pdf = pdf,
-                         .normal = _it.shading().n(),
                          .roughness = _distrib->alpha(),
                          .eta = _eta_i}};
     }
@@ -510,11 +519,11 @@ private:
     }
 };
 
-luisa::unique_ptr<Surface::Closure> MetalInstance::_closure(
+luisa::unique_ptr<Surface::Closure> MetalInstance::closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto alpha = def(make_float2(.5f));
     if (_roughness != nullptr) {
-        auto r = _roughness->evaluate(it, time);
+        auto r = _roughness->evaluate(it, swl, time);
         auto remap = node<MetalSurface>()->remap_roughness();
         auto r2a = [](auto &&x) noexcept { return TrowbridgeReitzDistribution::roughness_to_alpha(x); };
         alpha = _roughness->node()->channels() == 1u ?
@@ -535,8 +544,12 @@ luisa::unique_ptr<Surface::Closure> MetalInstance::_closure(
         eta[i] = eta_k.x;
         k[i] = eta_k.y;
     }
+    luisa::optional<SampledSpectrum> refl;
+    if (_kd != nullptr) {
+        refl.emplace(_kd->evaluate_albedo_spectrum(it, swl, time).value);
+    }
     return luisa::make_unique<MetalClosure>(
-        this, it, swl, time, eta, k, alpha);
+        this, it, swl, time, eta, k, std::move(refl), alpha);
 }
 
 }// namespace luisa::render

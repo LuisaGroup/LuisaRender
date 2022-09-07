@@ -14,7 +14,7 @@ class SceneDesc {
 private:
     [[nodiscard]] static auto _node_identifier(const luisa::unique_ptr<SceneNodeDesc> &node) noexcept { return node->identifier(); }
     [[nodiscard]] static auto _node_identifier(const SceneNodeDesc *node) noexcept { return node->identifier(); }
-    [[nodiscard]] static auto _node_identifier(std::string_view s) noexcept { return s; }
+    [[nodiscard]] static auto _node_identifier(luisa::string_view s) noexcept { return s; }
 
 public:
     struct NodeHash {
@@ -40,13 +40,13 @@ private:
     std::recursive_mutex _mutex;
 
 public:
-    SceneDesc() noexcept: _root{luisa::string{root_node_identifier}, SceneNodeTag::ROOT} {}
+    SceneDesc() noexcept : _root{luisa::string{root_node_identifier}, SceneNodeTag::ROOT} {}
     [[nodiscard]] auto &nodes() const noexcept { return _global_nodes; }
-    [[nodiscard]] const SceneNodeDesc *node(std::string_view identifier) const noexcept;
+    [[nodiscard]] const SceneNodeDesc *node(luisa::string_view identifier) const noexcept;
     [[nodiscard]] auto root() const noexcept { return &_root; }
-    [[nodiscard]] const SceneNodeDesc *reference(std::string_view identifier) noexcept;
+    [[nodiscard]] const SceneNodeDesc *reference(luisa::string_view identifier) noexcept;
     [[nodiscard]] SceneNodeDesc *define(
-        std::string_view identifier, SceneNodeTag tag, std::string_view impl_type,
+        luisa::string_view identifier, SceneNodeTag tag, luisa::string_view impl_type,
         SceneNodeDesc::SourceLocation location = {}, const SceneNodeDesc *base = nullptr) noexcept;
     [[nodiscard]] SceneNodeDesc *define_root(SceneNodeDesc::SourceLocation location = {}) noexcept;
     const std::filesystem::path *register_path(std::filesystem::path path) noexcept;

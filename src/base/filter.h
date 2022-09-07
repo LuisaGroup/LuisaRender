@@ -49,10 +49,12 @@ public:
 
 private:
     float2 _radius;
+    float2 _shift;
 
 public:
     Filter(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] auto radius() const noexcept { return _radius; }
+    [[nodiscard]] auto shift() const noexcept { return _shift; }
     [[nodiscard]] virtual float evaluate(float x) const noexcept = 0;
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept;
 };

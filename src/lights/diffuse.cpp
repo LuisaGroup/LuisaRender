@@ -26,7 +26,6 @@ public:
     }
     [[nodiscard]] auto scale() const noexcept { return _scale; }
     [[nodiscard]] bool is_null() const noexcept override { return _scale == 0.0f || _emission->is_black(); }
-    [[nodiscard]] bool is_virtual() const noexcept override { return false; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
@@ -65,7 +64,7 @@ struct DiffuseLightClosure final : public Light::Closure {
         auto light = instance<DiffuseLightInstance>();
         auto &&pipeline = light->pipeline();
         auto pdf_triangle = pipeline.buffer<float>(it_light.shape()->pdf_buffer_id()).read(it_light.triangle_id());
-        auto pdf_area = cast<float>(it_light.shape()->triangle_count()) * (pdf_triangle / it_light.triangle_area());
+        auto pdf_area = pdf_triangle / it_light.triangle_area();
         auto cos_wo = dot(it_light.wo(), it_light.shading().n());
         auto front_face = cos_wo > 0.0f;
         auto L = light->texture()->evaluate_illuminant_spectrum(it_light, _swl, _time).value *
@@ -75,19 +74,18 @@ struct DiffuseLightClosure final : public Light::Closure {
                 .pdf = ite(front_face, pdf, 0.0f)};
     }
 
-    [[nodiscard]] Light::Sample sample(Expr<uint> light_inst_id, Expr<float3> p_from,
-                                       Expr<float> u_prim, Expr<float2> u) const noexcept override {
+    [[nodiscard]] Light::Sample sample(Expr<uint> light_inst_id, Expr<float3> p_from, Expr<float2> u_in) const noexcept override {
         auto light = instance<DiffuseLightInstance>();
         auto &&pipeline = light->pipeline();
         auto light_inst = pipeline.instance(light_inst_id);
         auto light_to_world = pipeline.instance_to_world(light_inst_id);
         auto alias_table_buffer_id = light_inst->alias_table_buffer_id();
-        auto [triangle_id, _] = sample_alias_table(
+        auto [triangle_id, ux] = sample_alias_table(
             pipeline.buffer<AliasEntry>(alias_table_buffer_id),
-            light_inst->triangle_count(), u_prim);
+            light_inst->triangle_count(), u_in.x);
         auto triangle = pipeline.triangle(light_inst, triangle_id);
         auto light_to_world_normal = transpose(inverse(make_float3x3(light_to_world)));
-        auto uvw = sample_uniform_triangle(u);
+        auto uvw = sample_uniform_triangle(make_float2(ux, u_in.y));
         auto attrib = pipeline.shading_point(light_inst, triangle, uvw, light_to_world, light_to_world_normal);
         auto wo = normalize(p_from - attrib.pg);
         Interaction it_light{light_inst, light_inst_id, triangle_id, wo, attrib};

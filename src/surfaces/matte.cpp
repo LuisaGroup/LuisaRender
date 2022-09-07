@@ -49,7 +49,7 @@ public:
     [[nodiscard]] auto sigma() const noexcept { return _sigma; }
 
 private:
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         const Interaction &it, const SampledWavelengths &swl,
         Expr<float> time) const noexcept override;
 };
@@ -80,9 +80,8 @@ private:
         auto wi_local = _it.shading().world_to_local(wi);
         auto f = _oren_nayar->evaluate(wo_local, wi_local);
         auto pdf = _oren_nayar->pdf(wo_local, wi_local);
-        return {.f = f,
+        return {.f = f * abs_cos_theta(wi_local),
                 .pdf = pdf,
-                .normal = _it.shading().n(),
                 .roughness = make_float2(1.f),
                 .eta = SampledSpectrum{_swl.dimension(), 1.f}};
     }
@@ -93,30 +92,29 @@ private:
         auto f = _oren_nayar->sample(wo_local, &wi_local, u, &pdf);
         auto wi = _it.shading().local_to_world(wi_local);
         return {.wi = wi,
-                .eval = {.f = f,
+                .eval = {.f = f * abs_cos_theta(wi_local),
                          .pdf = pdf,
-                         .normal = _it.shading().n(),
                          .roughness = make_float2(1.f),
                          .eta = SampledSpectrum{_swl.dimension(), 1.f}}};
     }
-    void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
+    void backward(Expr<float3> wi, const SampledSpectrum &df_in) const noexcept override {
         auto _instance = instance<MatteInstance>();
         auto wo_local = _it.wo_local();
         auto wi_local = _it.shading().world_to_local(wi);
-
+        auto df = df_in * abs_cos_theta(wi_local);
         auto grad = _oren_nayar->backward(wo_local, wi_local, df);
-
         _instance->Kd()->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(grad.dR));
         if (auto sigma = _instance->sigma()) {
-            sigma->backward(_it, _time, make_float4(ite(isnan(grad.dSigma), 0.f, grad.dSigma), 0.f, 0.f, 0.f));
+            auto dv = make_float4(ite(isnan(grad.dSigma), 0.f, grad.dSigma), 0.f, 0.f, 0.f);
+            sigma->backward(_it, _swl, _time, dv);
         }
     }
 };
 
-luisa::unique_ptr<Surface::Closure> MatteInstance::_closure(
+luisa::unique_ptr<Surface::Closure> MatteInstance::closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto Kd = _kd->evaluate_albedo_spectrum(it, swl, time).value;
-    auto sigma = _sigma ? clamp(_sigma->evaluate(it, time).x, 0.f, 90.f) : 0.f;
+    auto sigma = _sigma ? clamp(_sigma->evaluate(it, swl, time).x, 0.f, 90.f) : 0.f;
     return luisa::make_unique<MatteClosure>(this, it, swl, time, Kd, sigma);
 }
 

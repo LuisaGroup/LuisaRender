@@ -70,7 +70,6 @@ public:
     [[nodiscard]] auto triangle_id() const noexcept { return _prim_id; }
     [[nodiscard]] auto triangle_area() const noexcept { return _prim_area; }
     [[nodiscard]] auto valid() const noexcept { return _inst_id != ~0u; }
-    [[nodiscard]] auto p_shading() const noexcept { return _ps; }
     [[nodiscard]] const auto &shading() const noexcept { return _shading; }
     void set_shading(Frame frame) noexcept { _shading = std::move(frame); }
     [[nodiscard]] const auto &shape() const noexcept { return _shape; }
@@ -78,7 +77,7 @@ public:
     [[nodiscard]] auto p_robust(Expr<float3> w) const noexcept {
         return ite(dot(_ng, w) < 0.f,
                    offset_ray_origin(_pg, -_ng),
-                   offset_ray_origin(_ps, _ng));
+                   offset_ray_origin(_pg, _ng));
     }
     [[nodiscard]] auto spawn_ray(Expr<float3> wi, Expr<float> t_max = std::numeric_limits<float>::max()) const noexcept {
         return make_ray(p_robust(wi), wi, 0.f, t_max);

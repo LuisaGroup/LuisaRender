@@ -110,11 +110,13 @@ public:
         command_buffer << fill(pipeline.device(), _image).dispatch(_image.size());
         _texture_id = pipeline.register_bindless(_image, sampler);
     }
-    [[nodiscard]] Float4 evaluate(const Interaction &it, Expr<float> time) const noexcept override {
+    [[nodiscard]] Float4 evaluate(
+        const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         auto uv = _compute_uv(it);
         return pipeline().tex2d(_texture_id).sample(uv);// TODO: LOD
     }
-    void backward(const Interaction &it, Expr<float> time, Expr<float4> grad) const noexcept override {
+    void backward(const Interaction &it, const SampledWavelengths &swl,
+                  Expr<float> time, Expr<float4> grad) const noexcept override {
         if (_diff_param) {
             auto uv = _compute_uv(it);
             pipeline().differentiation().accumulate(*_diff_param, uv, grad);

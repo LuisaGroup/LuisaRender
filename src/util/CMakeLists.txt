@@ -12,11 +12,10 @@ add_library(luisa-render-util SHARED
         scattering.cpp scattering.h
         bluenoise.cpp bluenoise.h
         sobolmatrices.cpp sobolmatrices.h
+        pmj02tables.cpp pmj02tables.h
         complex.h
         medium_tracker.cpp medium_tracker.h
-        progress_bar.cpp progress_bar.h
-        ../base/loss.h
-        ../base/optimizer.h)
+        progress_bar.cpp progress_bar.h)
 target_link_libraries(luisa-render-util PUBLIC
         luisa::compute
         luisa-render-include

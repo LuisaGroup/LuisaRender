@@ -13,8 +13,9 @@
 
 namespace luisa::render {
 
-inline SceneParser::SceneParser(SceneDesc &desc, const std::filesystem::path &path) noexcept
-    : _desc{desc},
+inline SceneParser::SceneParser(SceneDesc &desc, const std::filesystem::path &path,
+                                const MacroMap &cli_macros) noexcept
+    : _desc{desc}, _cli_macros{cli_macros},
       _location{desc.register_path(std::filesystem::canonical(path))},
       _cursor{0u} {}
 
@@ -63,9 +64,11 @@ inline void SceneParser::_parse_source() noexcept {
             std::filesystem::path path{_read_string()};
             if (!path.is_absolute()) { path = _location.file()->parent_path() / path; }
             ThreadPool::global().async(
-                [path = std::move(path), &desc = _desc] {
-                    SceneParser{desc, path}._parse_file();
+                [path = std::move(path), this] {
+                    SceneParser{_desc, path, _cli_macros}._parse_file();
                 });
+        } else if (token == "define") {
+            _parse_define();
         } else if (token == SceneDesc::root_node_identifier) {// root node
             _parse_root_node(loc);
         } else [[likely]] {// scene node
@@ -84,65 +87,105 @@ inline void SceneParser::_match(char c) noexcept {
     }
 }
 
-void SceneParser::_skip() noexcept { static_cast<void>(_get()); }
+void SceneParser::_skip() noexcept { static_cast<void>(_get(true)); }
 
-inline char SceneParser::_peek() noexcept {
-    if (_eof()) [[unlikely]] { _report_error("Premature EOF."); }
-    auto c = _source[_cursor];
-    if (c == '\r') {
-        if (_source[_cursor + 1u] == '\n') { _cursor++; }
-        return '\n';
+inline char SceneParser::_peek(bool escape_macro) noexcept {
+    auto peek_char = [this] {
+        if (!_parsing_macros.empty()) {
+            return _parsing_macros.back().front();
+        }
+        if (_eof()) [[unlikely]] { _report_error("Premature EOF."); }
+        auto c = _source[_cursor];
+        if (c == '\r') {
+            if (_source[_cursor + 1u] == '\n') { _cursor++; }
+            return '\n';
+        }
+        return c;
+    };
+    auto c = peek_char();
+    if (!escape_macro) {
+        while (c == '#') {
+            _skip();
+            _parse_macro();
+            c = peek_char();
+        }
     }
     return c;
 }
 
-inline char SceneParser::_get() noexcept {
-    if (_eof()) [[unlikely]] { _report_error("Premature EOF."); }
-    auto c = _source[_cursor++];
-    if (c == '\r') {
-        if (_source[_cursor] == '\n') { _cursor++; }
-        _location.set_line(_location.line() + 1u);
-        _location.set_column(0u);
-        return '\n';
-    }
-    if (c == '\n') {
-        _location.set_line(_location.line() + 1u);
-        _location.set_column(0u);
-    } else {
-        _location.set_column(_location.column() + 1u);
+inline char SceneParser::_get(bool escape_macro) noexcept {
+    auto get_char = [this] {
+        if (!_parsing_macros.empty()) {
+            auto m = _parsing_macros.back();
+            _parsing_macros.pop_back();
+            auto c = m.front();
+            if (m.size() > 1u) {
+                _parsing_macros.emplace_back(m.substr(1u));
+            }
+            return c;
+        }
+        if (_eof()) [[unlikely]] { _report_error("Premature EOF."); }
+        auto c = _source[_cursor++];
+        if (c == '\r') {
+            if (_source[_cursor] == '\n') { _cursor++; }
+            _location.set_line(_location.line() + 1u);
+            _location.set_column(0u);
+            return '\n';
+        }
+        if (c == '\n') {
+            _location.set_line(_location.line() + 1u);
+            _location.set_column(0u);
+        } else {
+            _location.set_column(_location.column() + 1u);
+        }
+        return c;
+    };
+    auto c = get_char();
+    if (!escape_macro) {
+        while (c == '#') {
+            _parse_macro();
+            c = get_char();
+        }
     }
     return c;
 }
 
 inline bool SceneParser::_eof() const noexcept {
-    return _cursor >= _source.size();
+    return _parsing_macros.empty() && _cursor >= _source.size();
 }
 
-inline std::string_view SceneParser::_read_identifier() noexcept {
-    auto offset = _cursor;
-    if (auto c = _get(); c != '$' && c != '_' && !isalpha(c)) [[unlikely]] {
+inline luisa::string SceneParser::_read_identifier(bool escape_macro) noexcept {
+    luisa::string identifier;
+    auto c = _get(escape_macro);
+    if (c != '$' && c != '_' && !isalpha(c)) [[unlikely]] {
         _report_error("Invalid character '{}' in identifier.", c);
     }
+    identifier.push_back(c);
     auto is_ident_body = [](auto c) noexcept {
-        return isalnum(c) || c == '_' || c == '$' || c == '-' || c == '.';
+        return isalnum(c) || c == '_' || c == '$' || c == '-';
     };
-    while (is_ident_body(_peek())) { _skip(); }
-    return std::string_view{_source}
-        .substr(offset, _cursor - offset);
+    while (!_eof() && is_ident_body(_peek(escape_macro))) {
+        identifier.push_back(_get(escape_macro));
+    }
+    return identifier;
 }
 
 inline double SceneParser::_read_number() noexcept {
-    if (_peek() == '+') [[unlikely]] { _skip(); }
-    // TODO: allow white spaces between +/- and the numbers?
-    auto s = std::string_view{_source}.substr(_cursor);
+    static thread_local luisa::string s;
+    s.clear();
+    if (auto c = _peek(); c == '+') [[unlikely]] {
+        _skip();
+        _skip_blanks();
+    } else if (c == '-') {
+        s.push_back(_get());
+        _skip_blanks();
+    }
+    auto is_digit = [](auto c) noexcept { return isdigit(c) || c == '.' || c == 'e' || c == '-' || c == '+'; };
+    while (!_eof() && is_digit(_peek())) { s.push_back(_get()); }
     auto value = 0.0;
     if (auto result = fast_float::from_chars(s.data(), s.data() + s.size(), value);
         result.ec != std::errc{}) [[unlikely]] {
         _report_error("Invalid number string '{}...'.", s.substr(0, 4));
-    } else [[likely]] {
-        auto n = result.ptr - s.data();
-        _cursor += n;
-        _location.set_column(_location.column() + n);
     }
     return value;
 }
@@ -170,7 +213,7 @@ inline luisa::string SceneParser::_read_string() noexcept {
                 static_cast<int>(c));
         }
         if (c == '\\') [[unlikely]] {// escape
-            c = [this, esc = _get()] {
+            c = [this, esc = _get(true)] {
                 switch (esc) {
                     case 'b': return '\b';
                     case 'f': return '\f';
@@ -180,6 +223,7 @@ inline luisa::string SceneParser::_read_string() noexcept {
                     case '\\': return '\\';
                     case '\'': return '\'';
                     case '"': return '\"';
+                    case '#': return '#';
                     default: _report_error(
                         "Invalid escaped character '{}'.", esc);
                 }
@@ -192,12 +236,12 @@ inline luisa::string SceneParser::_read_string() noexcept {
 
 inline void SceneParser::_skip_blanks() noexcept {
     while (!_eof()) {
-        if (auto c = _peek(); isblank(c) || c == '\n') {// blank
+        if (auto c = _peek(true); isblank(c) || c == '\n') {// blank
             _skip();
         } else if (c == '/') {// comment
             _skip();
             _match('/');
-            while (!_eof() && _get() != '\n') {}
+            while (!_eof() && _get(true) != '\n') {}
         } else {
             break;
         }
@@ -210,7 +254,7 @@ inline void SceneParser::_parse_root_node(SceneNodeDesc::SourceLocation l) noexc
 
 inline void SceneParser::_parse_global_node(SceneNodeDesc::SourceLocation l, std::string_view tag_desc) noexcept {
     using namespace std::string_view_literals;
-    static constexpr auto desc_to_tag_count = 27u;
+    static constexpr auto desc_to_tag_count = 28u;
     static const luisa::fixed_map<std::string_view, SceneNodeTag, desc_to_tag_count> desc_to_tag{
         {"Camera"sv, SceneNodeTag::CAMERA},
         {"Cam"sv, SceneNodeTag::CAMERA},
@@ -238,7 +282,8 @@ inline void SceneParser::_parse_global_node(SceneNodeDesc::SourceLocation l, std
         {"TexMapping"sv, SceneNodeTag::TEXTURE_MAPPING},
         {"Spectrum"sv, SceneNodeTag::SPECTRUM},
         {"Spec"sv, SceneNodeTag::SPECTRUM},
-        {"Generic"sv, SceneNodeTag::DECLARATION}};
+        {"Generic"sv, SceneNodeTag::DECLARATION},
+        {"Template"sv, SceneNodeTag::DECLARATION}};
     auto iter = desc_to_tag.find(tag_desc);
     if (iter == desc_to_tag.cend()) [[unlikely]] {
         _report_error(
@@ -250,7 +295,7 @@ inline void SceneParser::_parse_global_node(SceneNodeDesc::SourceLocation l, std
     auto name = _read_identifier();
     _skip_blanks();
     const SceneNodeDesc *base = nullptr;
-    luisa::string_view impl_type;
+    luisa::string impl_type;
     if (_peek() == ':') {
         _match(':');
         _skip_blanks();
@@ -372,9 +417,10 @@ inline SceneNodeDesc::string_list SceneParser::_parse_string_list_values() noexc
     return list;
 }
 
-luisa::unique_ptr<SceneDesc> SceneParser::parse(const std::filesystem::path &entry_file) noexcept {
+luisa::unique_ptr<SceneDesc> SceneParser::parse(
+    const std::filesystem::path &entry_file, const MacroMap &cli_macros) noexcept {
     auto desc = luisa::make_unique<SceneDesc>();
-    SceneParser{*desc, entry_file}._parse_file();
+    SceneParser{*desc, entry_file, cli_macros}._parse_file();
     ThreadPool::global().synchronize();
     return desc;
 }
@@ -388,6 +434,37 @@ const SceneNodeDesc *SceneParser::_parse_base_node() noexcept {
     _skip_blanks();
     _match(')');
     return base;
+}
+
+void SceneParser::_parse_macro() noexcept {
+    _skip_blanks();
+    auto key = _read_identifier(true);
+    if (auto cli_iter = _cli_macros.find(key);
+        cli_iter != _cli_macros.end()) {
+        _parsing_macros.emplace_back(cli_iter->second);
+    } else if (auto local_iter = _local_macros.find(key);
+               local_iter != _local_macros.end()) {
+        _parsing_macros.emplace_back(local_iter->second);
+    } else {
+        _report_error("Undefined macro '{}'.", key);
+    }
+}
+
+void SceneParser::_parse_define() noexcept {
+    _skip_blanks();
+    auto key = _read_identifier(true);
+    _skip_blanks();
+    luisa::string value;
+    while (!_eof() && _peek(true) != '\n' && _peek(true) != '/') {
+        value.push_back(_get(true));
+    }
+    if (_cli_macros.contains(key)) {
+        _report_warning("Local macro '{}' is shadowed by "
+                        "command-line definition.",
+                        key);
+    } else if (!_local_macros.insert_or_assign(key, value).second) {
+        _report_warning("Macro '{}' is redefined.", key);
+    }
 }
 
 }// namespace luisa::render

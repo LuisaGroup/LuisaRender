@@ -23,28 +23,31 @@ Texture::Texture(Scene *scene, const SceneNodeDesc *desc) noexcept
       }()},
       _requires_grad{desc->property_bool_or_default("requires_grad", false)} {}
 
+bool Texture::requires_gradients() const noexcept { return _requires_grad; }
+void Texture::disable_gradients() noexcept { _requires_grad = false; }
+
 Spectrum::Decode Texture::Instance::evaluate_albedo_spectrum(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    return pipeline().spectrum()->decode_albedo(swl, evaluate(it, time));
+    return pipeline().spectrum()->decode_albedo(swl, evaluate(it, swl, time));
 }
 
 Spectrum::Decode Texture::Instance::evaluate_illuminant_spectrum(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    return pipeline().spectrum()->decode_illuminant(swl, evaluate(it, time));
+    return pipeline().spectrum()->decode_illuminant(swl, evaluate(it, swl, time));
 }
 
 void Texture::Instance::backward_albedo_spectrum(
     const Interaction &it, const SampledWavelengths &swl,
     Expr<float> time, const SampledSpectrum &dSpec) const noexcept {
-    auto dEnc = pipeline().spectrum()->backward_decode_albedo(swl, evaluate(it, time), dSpec);
-    backward(it, time, dEnc);
+    auto dEnc = pipeline().spectrum()->backward_decode_albedo(swl, evaluate(it, swl, time), dSpec);
+    backward(it, swl, time, dEnc);
 }
 
 void Texture::Instance::backward_illuminant_spectrum(
     const Interaction &it, const SampledWavelengths &swl,
     Expr<float> time, const SampledSpectrum &dSpec) const noexcept {
-    auto dEnc = pipeline().spectrum()->backward_decode_illuminant(swl, evaluate(it, time), dSpec);
-    backward(it, time, dEnc);
+    auto dEnc = pipeline().spectrum()->backward_decode_illuminant(swl, evaluate(it, swl, time), dSpec);
+    backward(it, swl, time, dEnc);
 }
 
 }// namespace luisa::render

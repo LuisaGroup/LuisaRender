@@ -59,7 +59,7 @@ public:
     [[nodiscard]] auto roughness() const noexcept { return _roughness; }
 
 private:
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _closure(
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         const Interaction &it, const SampledWavelengths &swl,
         Expr<float> time) const noexcept override;
 };
@@ -96,9 +96,8 @@ private:
         auto wi_local = _it.shading().world_to_local(wi);
         auto f = _blend->evaluate(wo_local, wi_local);
         auto pdf = _blend->pdf(wo_local, wi_local);
-        return {.f = f,
+        return {.f = f * abs_cos_theta(wi_local),
                 .pdf = pdf,
-                .normal = _it.shading().n(),
                 .roughness = _distribution->alpha(),
                 .eta = _eta_i};
     }
@@ -111,18 +110,18 @@ private:
         auto f = _blend->sample(wo_local, &wi_local, u, &pdf);
         auto wi = _it.shading().local_to_world(wi_local);
         return {.wi = wi,
-                .eval = {.f = f,
+                .eval = {.f = f * abs_cos_theta(wi_local),
                          .pdf = pdf,
-                         .normal = _it.shading().n(),
                          .roughness = _distribution->alpha(),
                          .eta = _eta_i}};
     }
 
-    void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
+    void backward(Expr<float3> wi, const SampledSpectrum &df_in) const noexcept override {
         using compute::isinf;
         auto _instance = instance<SubstrateInstance>();
         auto wo_local = _it.wo_local();
         auto wi_local = _it.shading().world_to_local(wi);
+        auto df = df_in * abs_cos_theta(wi_local);
 
         auto grad = _blend->backward(wo_local, wi_local, df);
 
@@ -130,7 +129,7 @@ private:
         _instance->Ks()->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(grad.dRs));
         if (auto roughness = _instance->roughness()) {
             auto remap = _instance->node<SubstrateSurface>()->remap_roughness();
-            auto r_f4 = roughness->evaluate(_it, _time);
+            auto r_f4 = roughness->evaluate(_it, _swl, _time);
             auto r = roughness->node()->channels() == 1u ? r_f4.xx() : r_f4.xy();
 
             auto grad_alpha_roughness = [](auto &&x) noexcept {
@@ -141,18 +140,19 @@ private:
                               make_float4(d_r.x + d_r.y, 0.f, 0.f, 0.f) :
                               make_float4(d_r, 0.f, 0.f);
             auto roughness_grad_range = 5.f * (roughness->node()->range().y - roughness->node()->range().x);
-            roughness->backward(_it, _time, ite(any(isnan(d_r_f4) || abs(d_r_f4) > roughness_grad_range), 0.f, d_r_f4));
+            roughness->backward(_it, _swl, _time,
+                                ite(any(isnan(d_r_f4) || abs(d_r_f4) > roughness_grad_range), 0.f, d_r_f4));
         }
     }
 };
 
-luisa::unique_ptr<Surface::Closure> SubstrateInstance::_closure(
+luisa::unique_ptr<Surface::Closure> SubstrateInstance::closure(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto [Kd, Kd_lum] = _kd->evaluate_albedo_spectrum(it, swl, time);
     auto [Ks, Ks_lum] = _ks->evaluate_albedo_spectrum(it, swl, time);
     auto alpha = def(make_float2(.5f));
     if (_roughness != nullptr) {
-        auto r = _roughness->evaluate(it, time);
+        auto r = _roughness->evaluate(it, swl, time);
         auto remap = node<SubstrateSurface>()->remap_roughness();
         auto r2a = [](auto &&x) noexcept {
             return TrowbridgeReitzDistribution::roughness_to_alpha(x);
@@ -163,7 +163,7 @@ luisa::unique_ptr<Surface::Closure> SubstrateInstance::_closure(
     }
     auto cos_theta = dot(it.shading().n(), it.wo());
     auto pow5 = [](auto &&v) { return sqr(sqr(v)) * v; };
-    auto Kd_ratio = Kd_lum / max(Kd_lum + Ks_lum, 1e-5f) * (1.f - pow5(1.f - cos_theta));
+    auto Kd_ratio = Kd_lum / max(Kd_lum + Ks_lum, 1e-5f);
     return luisa::make_unique<SubstrateClosure>(this, it, swl, time, Kd, Ks, alpha, Kd_ratio);
 }
 

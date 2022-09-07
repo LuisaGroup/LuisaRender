@@ -853,7 +853,7 @@ Env dir : Directional {
   }
   angle { 2.0 }
   direction { 2, 0.64, 0.8 }
-  scale { 12.566370614359172 }
+  scale { 25 }
 }
 
 Env sky : Spherical {
@@ -867,7 +867,7 @@ Env sky : Spherical {
         1.0, 0.0, 0.0, 0.0,
         0.0, 0.0, 0.0, 1.0 }
   }
-  scale { 0.3 }
+  scale { 0.5 }
 }
 
 Camera camera : Pinhole {
@@ -882,12 +882,12 @@ Camera camera : Pinhole {
   film : Color {
     resolution { 1920, 1080 }
   }
-  file { "output.exr" }
+  file { "render.exr" }
 }
 
 render {
   cameras { @camera }
-  spectrum : sRGB {}
+  spectrum : Hero {}
   integrator : WavePath {
     sampler : Independent {}
     depth { 12 }

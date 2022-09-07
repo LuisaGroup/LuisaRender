@@ -52,18 +52,44 @@ Shape teapot : Mesh {
   }
 }
 
+Surface metal : Glass {
+  eta { "Cu" }
+  Kr : Constant {
+    v { 1, 1, 1 }
+    semantic { "albedo" }
+  }
+  Kt : Constant {
+    v { 1, 1, 1 }
+    semantic { "albedo" }
+  }
+  roughness : Constant {
+    v { 0.001 }
+  }
+  metallic : Constant {
+    v { 1 }
+  }
+}
+
+Surface matte : Matte {
+  Kd : Constant {
+    v { 1, 1, 1 }
+    semantic { "albedo" }
+  }
+}
+
 Shape sphere : Mesh {
   file { "../meshes/sphere.obj" }
-  surface : Matte {}
+  surface { @metal }
 }
 
 render {
   cameras { @camera }
-  shapes { @teapot }
+  shapes { @sphere }
   integrator { @pt }
   environment : Spherical {
     emission : Constant {
-      v { 1 }
+      v { 0.5, 0.5, 0.5 }
+      semantic { "illuminant" }
     }
     transform : SRT {
       rotate { 0, 1, 0, 45 }

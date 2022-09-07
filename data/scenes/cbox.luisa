@@ -16,9 +16,9 @@ Camera camera : Pinhole {
 
 import "../meshes/cbox.luisa"
 
-Integrator pt : WavePath {
+Integrator pt : MegaPath {
   sampler : Independent {}
-  depth { 10 }
+  depth { 16 }
   spectrum : sRGB {}
   // display { true }
 }
@@ -32,7 +32,8 @@ render {
   // environment : Directional {
   //   direction { 1, 1.1, 1.3 }
   //   emission : Constant {
-  //     v { 51.0, 36.0, 12.0 }
+  //     v { 17, 12, 4 }
+  //     semantic { "illuminant" }
   //   }
   //   scale { 0.015 }
   //   angle { 0.54 }
