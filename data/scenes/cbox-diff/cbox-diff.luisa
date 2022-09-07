@@ -1,30 +1,30 @@
 // mat_cbox
 Surface cbox-white : Matte {
   Kd : Constant {
-    v { 0.725, 0.71, 0.68 }
-    //v { 0.5, 0.5, 0.5 }
-    //requires_grad { true }
-    //range { 0.00001, 0.99999 }
+    //v { 0.725, 0.71, 0.68 }
+    v { 0.5, 0.5, 0.5 }
+    requires_grad { true }
+    range { 0.00001, 0.99999 }
     semantic { "albedo" }
   }
 }
 
 Surface cbox-green : Matte {
   Kd : Constant {
-    v { 0.14, 0.45, 0.091 }
-    //v { 0.5, 0.5, 0.5 }
-    //requires_grad { true }
-    //range { 0.00001, 0.99999 }
+    //v { 0.14, 0.45, 0.091 }
+    v { 0.5, 0.5, 0.5 }
+    requires_grad { true }
+    range { 0.00001, 0.99999 }
     semantic { "albedo" }
   }
 }
 
 Surface cbox-red : Matte {
   Kd : Constant {
-    v { 0.63, 0.065, 0.05 }
-    //v { 0.5, 0.5, 0.5 }
-    //requires_grad { true }
-    //range { 0.00001, 0.99999 }
+    //v { 0.63, 0.065, 0.05 }
+    v { 0.5, 0.5, 0.5 }
+    requires_grad { true }
+    range { 0.00001, 0.99999 }
     semantic { "albedo" }
   }
 }
@@ -117,8 +117,7 @@ Surface mat_paintings_Landscape : Matte {
   //  semantic { "albedo" }
   //}
   Kd : Placeholder {
-    //resolution { 1920, 1280 }
-    resolution { 1, 1 }
+    resolution { 1920, 1280 }
     requires_grad { true }
     range { 0.00001, 0.99999 }
     uv_scale { 1, -1 }
@@ -377,13 +376,13 @@ Integrator pt : MegaRadiativeDiff {
   depth { 10 }
   rr_depth { 5 }
 
-  //display_camera_index { 0 }
+  display_camera_index { 0 }
   save_process { true }
   loss : L2 {}
   iterations { 100 }
 
-  optimizer : GD {
-    learning_rate { 0.3 }
+  optimizer : Adam {
+    learning_rate { 0.003 }
   }
 }
 
