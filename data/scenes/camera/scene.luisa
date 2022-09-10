@@ -209,7 +209,7 @@ Camera camera : ThinLens {
   look_at { -0.03, 0.025, 0.072 }
   aperture { 2.8 }
   focal_length { 70 }
-  spp { 128 }
+  spp { 65536 }
   film : Color {
     resolution { 3840, 2160 }
     clamp { 128 }
@@ -221,7 +221,7 @@ Camera camera : ThinLens {
 }
 
 Integrator integrator : MegaPath {
-  sampler : Independent {}
+  sampler : PMJ02BN {}
   // display { true }
 }
 
