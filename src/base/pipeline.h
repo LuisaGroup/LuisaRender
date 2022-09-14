@@ -144,8 +144,6 @@ public:
         return std::make_pair(view, buffer_id);
     }
 
-    [[nodiscard]] auto &buffer_arena() noexcept { return *_general_buffer_arena; }
-
     template<typename T>
     [[nodiscard]] auto bindless_buffer(Expr<uint> buffer_id) const noexcept { return _bindless_array.buffer<T>(buffer_id); }
     [[nodiscard]] auto bindless_tex2d(Expr<uint> tex_id) const noexcept { return _bindless_array.tex2d(tex_id); }

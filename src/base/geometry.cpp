@@ -50,6 +50,8 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
                                << triangle_buffer->copy_from(triangles.data())
                                << mesh->build()
                                << compute::commit();
+                auto vertex_buffer_id = _pipeline.register_bindless(vertex_buffer->view());
+                auto triangle_buffer_id = _pipeline.register_bindless(triangle_buffer->view());
                 // compute alias table
                 luisa::vector<float> triangle_areas(triangles.size());
                 std::transform(triangles.cbegin(), triangles.cend(), triangle_areas.begin(), [vertices](auto t) noexcept {
@@ -59,18 +61,14 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
                     return std::abs(length(cross(p1 - p0, p2 - p0)));
                 });
                 auto [alias_table, pdf] = create_alias_table(triangle_areas);
-                auto alias_table_buffer_view = _pipeline.buffer_arena().allocate<AliasEntry>(alias_table.size());
-                auto pdf_buffer_view = _pipeline.buffer_arena().allocate<float>(pdf.size());
-                command_buffer << alias_table_buffer_view.copy_from(alias_table.data())
-                               << pdf_buffer_view.copy_from(pdf.data())
-                               << compute::commit();
-                auto vertex_buffer_id = _pipeline.register_bindless(vertex_buffer->view());
-                auto triangle_buffer_id = _pipeline.register_bindless(triangle_buffer->view());
-                auto alias_buffer_id = _pipeline.register_bindless(alias_table_buffer_view);
-                auto pdf_buffer_id = _pipeline.register_bindless(pdf_buffer_view);
+                auto [alias_table_buffer_view, alias_buffer_id] = _pipeline.arena_buffer<AliasEntry>(alias_table.size());
+                auto [pdf_buffer_view, pdf_buffer_id] = _pipeline.arena_buffer<float>(pdf.size());
                 LUISA_ASSERT(triangle_buffer_id - vertex_buffer_id == Shape::Handle::triangle_buffer_id_offset, "Invalid.");
                 LUISA_ASSERT(alias_buffer_id - vertex_buffer_id == Shape::Handle::alias_table_buffer_id_offset, "Invalid.");
                 LUISA_ASSERT(pdf_buffer_id - vertex_buffer_id == Shape::Handle::pdf_buffer_id_offset, "Invalid.");
+                command_buffer << alias_table_buffer_view.copy_from(alias_table.data())
+                               << pdf_buffer_view.copy_from(pdf.data())
+                               << compute::commit();
                 return cache_iter->second = {mesh, vertex_buffer_id};
             }();
             // assign mesh data
