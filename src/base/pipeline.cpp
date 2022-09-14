@@ -136,4 +136,11 @@ Float4x4 Pipeline::transform(const Transform *transform) const noexcept {
     return _transform_matrix_buffer.read(iter->second);
 }
 
+uint Pipeline::named_id(luisa::string_view name) const noexcept {
+    auto iter = _named_ids.find(name);
+    LUISA_ASSERT(iter != _named_ids.cend(),
+                 "Named ID '{}' not found.", name);
+    return iter->second;
+}
+
 }// namespace luisa::render

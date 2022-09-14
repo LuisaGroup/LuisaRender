@@ -80,6 +80,7 @@ private:
     luisa::vector<const Transform *> _transforms;
     luisa::vector<float4x4> _transform_matrices;
     Buffer<float4x4> _transform_matrix_buffer;
+    luisa::unordered_map<luisa::string, uint> _named_ids;
     // other things
     Printer _printer;
     float _initial_time{};
@@ -126,15 +127,23 @@ public:
     [[nodiscard]] uint register_surface(CommandBuffer &command_buffer, const Surface *surface) noexcept;
     [[nodiscard]] uint register_light(CommandBuffer &command_buffer, const Light *light) noexcept;
 
+    template<typename Create>
+    [[nodiscard]] uint register_named_id(luisa::string_view identifier, Create &&create_id) noexcept {
+        auto [iter, success] = _named_ids.try_emplace(identifier, 0u);
+        if (success) { iter->second = std::invoke(std::forward<Create>(create_id)); }
+        return iter->second;
+    }
+
+    // clang-format off
     template<typename T, typename... Args>
-        requires std::is_base_of_v<Resource, T> [
-                 [nodiscard]] auto
-        create(Args &&...args) noexcept -> T * {
+        requires std::is_base_of_v<Resource, T>
+    [[nodiscard]] auto create(Args &&...args) noexcept -> T * {
         auto resource = luisa::make_unique<T>(_device.create<T>(std::forward<Args>(args)...));
         auto p = resource.get();
         _resources.emplace_back(std::move(resource));
         return p;
     }
+    // clang-format on
 
     template<typename T>
     [[nodiscard]] std::pair<BufferView<T>, uint /* bindless id */> arena_buffer(size_t n) noexcept {
@@ -172,12 +181,23 @@ public:
     bool update(CommandBuffer &command_buffer, float time) noexcept;
     void render(Stream &stream) noexcept;
     [[nodiscard]] auto &printer() noexcept { return _printer; }
+    [[nodiscard]] uint named_id(luisa::string_view name) const noexcept;
     template<typename T, typename I>
     [[nodiscard]] auto buffer(I &&i) const noexcept { return _bindless_array.buffer<T>(std::forward<I>(i)); }
     template<typename I>
     [[nodiscard]] auto tex2d(I &&i) const noexcept { return _bindless_array.tex2d(std::forward<I>(i)); }
     template<typename I>
     [[nodiscard]] auto tex3d(I &&i) const noexcept { return _bindless_array.tex3d(std::forward<I>(i)); }
+    template<typename T>
+    [[nodiscard]] auto named_buffer(luisa::string_view name) const noexcept {
+        return _bindless_array.buffer<T>(named_id(name));
+    }
+    [[nodiscard]] auto tex2d(luisa::string_view name) const noexcept {
+        return _bindless_array.tex2d(named_id(name));
+    }
+    [[nodiscard]] auto tex3d(luisa::string_view name) const noexcept {
+        return _bindless_array.tex3d(named_id(name));
+    }
     [[nodiscard]] Float4x4 transform(const Transform *transform) const noexcept;
 };
 
