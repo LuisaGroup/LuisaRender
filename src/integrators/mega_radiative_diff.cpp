@@ -117,7 +117,6 @@ public:
         auto command_buffer = stream.command_buffer();
         luisa::vector<float4> rendered;
 
-        auto learning_rate = pt->learning_rate();
         auto iteration_num = pt->iterations();
 
         for (auto i = 0u; i < pipeline().camera_count(); i++) {
@@ -165,7 +164,8 @@ public:
             LUISA_INFO("");
             LUISA_INFO("Start to step");
             Clock clock;
-            pipeline().differentiation().step(command_buffer, learning_rate);
+            pipeline().differentiation().step(command_buffer);
+            command_buffer << synchronize();
             LUISA_INFO("Step finished in {} ms", clock.toc());
         }
 
@@ -239,7 +239,8 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
             auto [camera_ray, camera_weight] = camera->generate_ray(*sampler, pixel_id, time);
             auto spectrum = pipeline().spectrum();
             auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler->generate_1d());
-            SampledSpectrum beta{swl.dimension(), camera_weight * float(pixel_count)};
+//            SampledSpectrum beta{swl.dimension(), camera_weight * pixel_count};
+            SampledSpectrum beta{swl.dimension(), camera_weight};
             SampledSpectrum Li{swl.dimension(), 1.0f};
             auto grad_weight = shutter_weight * static_cast<float>(pt->node<MegakernelRadiativeDiff>()->max_depth());
 
@@ -378,7 +379,7 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
         }
     }
 
-    command_buffer << commit() << synchronize();
+    command_buffer << synchronize();
     LUISA_INFO("Backward propagation finished in {} ms",
                clock.toc());
 }

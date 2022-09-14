@@ -2,14 +2,17 @@
 // Created by Mike Smith on 2022/1/19.
 //
 
+#include <core/logging.h>
 #include <dsl/syntax.h>
 #include <dsl/sugar.h>
 #include <util/spec.h>
 
 namespace luisa::render {
 
+static constexpr auto per_nm_sample_count = static_cast<uint>(visible_wavelength_max - visible_wavelength_min) + 1u;
+
 // from PBRT-v4: https://github.com/mmp/pbrt-v4/blob/master/src/pbrt/util/spectrum.cpp
-static constexpr const std::array<float, DenselySampledSpectrum::sample_count> cie_x_samples{
+static constexpr const std::array<float, per_nm_sample_count> cie_x_samples{
     // CIE X function values
     0.0001299000f, 0.0001458470f, 0.0001638021f, 0.0001840037f, 0.0002066902f,
     0.0002321000f, 0.0002607280f, 0.0002930750f, 0.0003293880f, 0.0003699140f,
@@ -107,7 +110,7 @@ static constexpr const std::array<float, DenselySampledSpectrum::sample_count> c
     0.000001776509f, 0.000001656215f, 0.000001544022f, 0.000001439440f, 0.000001341977f,
     0.000001251141f};
 
-static constexpr const std::array<float, DenselySampledSpectrum::sample_count> cie_y_samples{
+static constexpr const std::array<float, per_nm_sample_count> cie_y_samples{
     // CIE Y function values
     0.000003917000f, 0.000004393581f, 0.000004929604f, 0.000005532136f, 0.000006208245f,
     0.000006965000f, 0.000007813219f, 0.000008767336f, 0.000009839844f, 0.00001104323f,
@@ -205,7 +208,7 @@ static constexpr const std::array<float, DenselySampledSpectrum::sample_count> c
     0.0000006415300f, 0.0000005980895f, 0.0000005575746f, 0.0000005198080f, 0.0000004846123f,
     0.0000004518100f};
 
-static constexpr const std::array<float, DenselySampledSpectrum::sample_count> cie_z_samples{
+static constexpr const std::array<float, per_nm_sample_count> cie_z_samples{
     // CIE Z function values
     0.0006061000f, 0.0006808792f, 0.0007651456f, 0.0008600124f, 0.0009665928f,
     0.001086000f, 0.001220586f, 0.001372729f, 0.001543579f, 0.001734286f,
@@ -303,7 +306,7 @@ static constexpr const std::array<float, DenselySampledSpectrum::sample_count> c
     0.000000000000f, 0.000000000000f, 0.000000000000f, 0.000000000000f, 0.000000000000f,
     0.000000000000f};
 
-static constexpr const std::array<float, DenselySampledSpectrum::sample_count> cie_illum_d6500_samples{
+static constexpr const std::array<float, per_nm_sample_count> cie_illum_d6500_samples{
     0.47161809932375853f, 0.47713008171230636f, 0.48264206410085414f, 0.4881540464894019f, 0.4936660288779497f,
     0.4991780112664976f, 0.5046899936550453f, 0.5102019760435932f, 0.515713958432141f, 0.5212259408206888f,
     0.5267379232092366f, 0.5246005963443631f, 0.5224632694794894f, 0.5203259426146157f, 0.5181886157497422f,
@@ -400,30 +403,44 @@ static constexpr const std::array<float, DenselySampledSpectrum::sample_count> c
     0.5953737885486733f, 0.5982780283395946f, 0.6011822681305159f, 0.6040865079214371f, 0.6069907477123584f,
     0.6098949875032796f};
 
+static inline const auto downsample_densely_sampled_spectrum(uint t, const float *spec) noexcept {
+    auto n = 1u + static_cast<uint>((visible_wavelength_max - visible_wavelength_min) /
+                                    static_cast<float>(t));
+    luisa::vector<float> samples(n);
+    for (auto x = 0u; x < n; x++) { samples[x] = spec[x * t]; }
+    return DenselySampledSpectrum{samples, static_cast<float>(t)};
+}
+
+static constexpr auto spd_lut_interval = 10u;
+
 const DenselySampledSpectrum &DenselySampledSpectrum::cie_x() noexcept {
-    static DenselySampledSpectrum s{cie_x_samples};
+    static auto s = downsample_densely_sampled_spectrum(
+        spd_lut_interval, cie_x_samples.data());
     return s;
 }
 
 const DenselySampledSpectrum &DenselySampledSpectrum::cie_y() noexcept {
-    static DenselySampledSpectrum s{cie_y_samples};
+    static auto s = downsample_densely_sampled_spectrum(
+        spd_lut_interval, cie_y_samples.data());
     return s;
 }
 
 const DenselySampledSpectrum &DenselySampledSpectrum::cie_z() noexcept {
-    static DenselySampledSpectrum s{cie_z_samples};
+    static auto s = downsample_densely_sampled_spectrum(
+        spd_lut_interval, cie_z_samples.data());
     return s;
 }
 
 const DenselySampledSpectrum &DenselySampledSpectrum::cie_illum_d65() noexcept {
-    static DenselySampledSpectrum s{cie_illum_d6500_samples};
+    static auto s = downsample_densely_sampled_spectrum(
+        spd_lut_interval, cie_illum_d6500_samples.data());
     return s;
 }
 
 luisa::compute::Float DenselySampledSpectrum::sample(Expr<float> lambda) const noexcept {
     using namespace luisa::compute;
-    auto t = clamp(lambda, visible_wavelength_min, visible_wavelength_max) -
-             visible_wavelength_min;
+    auto t = (clamp(lambda, visible_wavelength_min, visible_wavelength_max) - visible_wavelength_min) / _interval;
+    auto sample_count = static_cast<uint>((visible_wavelength_max - visible_wavelength_min) / _interval) + 1u;
     auto i = cast<uint>(min(t, static_cast<float>(sample_count - 2u)));
     auto s0 = _values[i];
     auto s1 = _values[i + 1u];
@@ -433,12 +450,19 @@ luisa::compute::Float DenselySampledSpectrum::sample(Expr<float> lambda) const n
 float DenselySampledSpectrum::cie_y_integral() noexcept {
     static constexpr auto integral = [] {
         auto sum = 0.0;
-        for (auto i = 0u; i < sample_count - 1u; i++) {
-            sum += 0.5f * (cie_y_samples[i] + cie_y_samples[i + 1u]);
+        auto n = static_cast<uint>((visible_wavelength_max - visible_wavelength_min) / spd_lut_interval) + 1u;
+        for (auto i = 0u; i < n - 1u; i++) {
+            sum += 0.5f * (cie_y_samples[i * spd_lut_interval] + cie_y_samples[(i + 1u) * spd_lut_interval]);
         }
-        return static_cast<float>(sum);
+        return static_cast<float>(sum * spd_lut_interval);
     }();
     return integral;
+}
+
+DenselySampledSpectrum::DenselySampledSpectrum(luisa::span<const float> values, float sample_interval) noexcept
+    : _values{values}, _interval{sample_interval} {
+    auto n = (visible_wavelength_max - visible_wavelength_min) / _interval;
+    LUISA_ASSERT(std::floor(n) == n, "Invalid sample interval {} nm.", _interval);
 }
 
 SampledSpectrum zero_if_any_nan(const SampledSpectrum &t) noexcept {

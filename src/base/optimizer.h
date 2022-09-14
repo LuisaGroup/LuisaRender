@@ -10,18 +10,29 @@
 
 namespace luisa::render {
 
+using namespace luisa::compute;
+
 class Optimizer : public SceneNode {
 
 public:
     class Instance {
 
     private:
-        const Pipeline &_pipeline;
+        Pipeline &_pipeline;
         const Optimizer *_optimizer;
 
+    protected:
+        uint _length = -1u;
+        luisa::optional<BufferView<float2>> _ranges;
+        luisa::optional<BufferView<float>> _xi;
+        luisa::optional<BufferView<float>> _gradients;
+
+        Shader1D<Buffer<uint>> _clear_uint_buffer;
+        Shader1D<Buffer<float>> _clear_float_buffer;
+        Shader1D<Buffer<float>, Buffer<float>, Buffer<float2>, float> _clamp_range;
+
     public:
-        Instance(const Pipeline &pipeline, const Optimizer *optimizer) noexcept
-            : _pipeline{pipeline}, _optimizer{optimizer} {}
+        explicit Instance(Pipeline &pipeline, CommandBuffer &command_buffer, const Optimizer *optimizer) noexcept;
         virtual ~Instance() noexcept = default;
         template<typename T = Optimizer>
             requires std::is_base_of_v<Optimizer, T>
@@ -29,13 +40,10 @@ public:
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
 
     public:
-        virtual void clear_gradients(CommandBuffer &command_buffer) noexcept = 0;
-        virtual void apply_gradients(CommandBuffer &command_buffer, float alpha) noexcept = 0;
-        /// Apply then clear the gradients
-        virtual void step(CommandBuffer &command_buffer, float alpha) noexcept {
-            apply_gradients(command_buffer, alpha);
-            clear_gradients(command_buffer);
-        }
+        // allocate buffer/... space
+        virtual void initialize(CommandBuffer &command_buffer, uint length, BufferView<float> xi, BufferView<float> gradients, BufferView<float2> ranges) noexcept;
+        virtual void step(CommandBuffer &command_buffer) noexcept = 0;
+        void clamp_range(CommandBuffer &command_buffer) noexcept;
     };
 
 private:

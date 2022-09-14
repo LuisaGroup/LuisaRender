@@ -230,14 +230,14 @@ def upsample_metal_ior(data):
     k = data["k"]
     wn, n = n[0::2], n[1::2]
     wk, k = k[0::2], k[1::2]
-    n = [sample_metal_ior(w, wn, n) for w in range(lambda_min, lambda_max + 1, 5)]
-    k = [sample_metal_ior(w, wk, k) for w in range(lambda_min, lambda_max + 1, 5)]
+    n = [sample_metal_ior(w, wn, n) for w in range(lambda_min, lambda_max + 1, 10)]
+    k = [sample_metal_ior(w, wk, k) for w in range(lambda_min, lambda_max + 1, 10)]
     return n, k
 
 
-def codegen(name, data):
+def codegen(name, data, file):
     init_list = ", ".join(f"make_float2({ni:.10}f, {ki:.10}f)" for ni, ki in zip(*data)) + ",\n"
-    print(f"std::array {name}{{\n{init_list}}};")
+    print(f"std::array {name}{{\n{init_list}}};", file=file)
 
 
 if __name__ == "__main__":
@@ -245,5 +245,6 @@ if __name__ == "__main__":
         name: upsample_metal_ior(data) for
         name, data in metal_data.items()
     }
-    for name, data in converted.items():
-        codegen(name, data)
+    with open("metal_ior.cpp", "w") as file:
+        for name, data in converted.items():
+            codegen(name, data, file)

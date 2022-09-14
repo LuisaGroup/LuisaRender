@@ -69,6 +69,8 @@ Float fresnel_conductor(Float cosThetaI, Float etai, Float etat, Float k) noexce
 
 SampledSpectrum fresnel_dielectric(
     Float cosThetaI_in, const SampledSpectrum &etaI_in, const SampledSpectrum &etaT_in) noexcept {
+    auto x = fresnel_dielectric(cosThetaI_in, etaI_in[0u], etaT_in[0u]);
+    return SampledSpectrum{etaI_in.dimension(), x};
     using namespace compute;
     auto cosThetaI = clamp(cosThetaI_in, -1.f, 1.f);
     // Potentially swap indices of refraction

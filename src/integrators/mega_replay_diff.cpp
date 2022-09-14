@@ -14,7 +14,7 @@
 
 namespace luisa::render {
 
-// #define LUISA_RENDER_PATH_REPLAY_DEBUG
+//#define LUISA_RENDER_PATH_REPLAY_DEBUG
 
 using namespace luisa::compute;
 
@@ -139,7 +139,6 @@ public:
 
         luisa::vector<float4> rendered;
 
-        auto learning_rate = pt->learning_rate();
         auto iteration_num = pt->iterations();
 
         for (auto i = 0u; i < pipeline().camera_count(); i++) {
@@ -187,7 +186,8 @@ public:
             Clock clock;
             LUISA_INFO("");
             LUISA_INFO("Start to step");
-            pipeline().differentiation().step(command_buffer, learning_rate);
+            pipeline().differentiation().step(command_buffer);
+            command_buffer << commit() << synchronize();
             LUISA_INFO("Step finished in {} ms", clock.toc());
         }
 
@@ -420,7 +420,8 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
             Li[1u] = Li_last_pass[1u];
             Li[2u] = Li_last_pass[2u];
 
-            SampledSpectrum d_loss{swl.dimension(), float(pixel_count)};
+//            SampledSpectrum d_loss{swl.dimension(), float(pixel_count)};
+            SampledSpectrum d_loss{swl.dimension(), 1.f};
             auto d_loss_float3 = pt->loss()->d_loss(camera, pixel_id, swl);
             for (auto i = 0u; i < 3u; ++i) {
                 d_loss[i] *= d_loss_float3[i];

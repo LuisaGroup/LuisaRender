@@ -25,19 +25,19 @@ Integrator::Instance::Instance(Pipeline &pipeline, CommandBuffer &command_buffer
 
 DifferentiableIntegrator::DifferentiableIntegrator(Scene *scene, const SceneNodeDesc *desc) noexcept
     : Integrator(scene, desc),
-      _learning_rate{std::max(desc->property_float_or_default("learning_rate", 1.f), 0.f)},
       _iterations{std::max(desc->property_uint_or_default("iterations", 100u), 1u)},
       _display_camera_index{desc->property_int_or_default("display_camera_index", -1)},
       _save_process{desc->property_bool_or_default("save_process", false)},
-      //      _optimizer{scene->load_optimizer(desc->property_node_or_default(
-      //          "optimizer", SceneNodeDesc::shared_default_optimizer("GD")))},
       _loss{scene->load_loss(desc->property_node_or_default(
-          "loss", SceneNodeDesc::shared_default_loss("L2")))} {}
+          "loss", SceneNodeDesc::shared_default_loss("L2")))},
+      _optimizer{scene->load_optimizer(desc->property_node_or_default(
+          "optimizer", SceneNodeDesc::shared_default_optimizer("GD")))} {}
 
 DifferentiableIntegrator::Instance::Instance(
     Pipeline &pipeline, CommandBuffer &command_buffer,
     const DifferentiableIntegrator *integrator) noexcept
     : Integrator::Instance{pipeline, command_buffer, integrator},
-      _loss{node<DifferentiableIntegrator>()->loss()->build(pipeline, command_buffer)} {}
+      _loss{node<DifferentiableIntegrator>()->loss()->build(pipeline, command_buffer)},
+      _optimizer{node<DifferentiableIntegrator>()->optimizer()->build(pipeline, command_buffer)} {}
 
 }// namespace luisa::render
