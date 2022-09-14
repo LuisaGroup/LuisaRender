@@ -11,16 +11,6 @@ namespace luisa::render {
 SPD::SPD(Pipeline &pipeline, uint buffer_id, float sample_interval) noexcept
     : _pipeline{pipeline}, _buffer_id{buffer_id}, _sample_interval{sample_interval} {}
 
-static inline auto downsample_densely_sampled_spectrum(uint t, const float *spec) noexcept {
-    auto n = (visible_wavelength_max - visible_wavelength_min) / static_cast<float>(t);
-    LUISA_ASSERT(n == std::floor(n), "Invalid SPD sample interval.");
-    auto nn = static_cast<uint>(n) + 1u;
-    luisa::vector<float> samples(nn);
-    for (auto x = 0u; x < nn; x++) {
-        samples[x] = spec[x * t]; }
-    return samples;
-}
-
 static inline auto densely_sampled_spectrum_integral(uint t, const float *spec) noexcept {
     auto sum = 0.0;
     auto tt = static_cast<float>(t);
@@ -31,6 +21,15 @@ static inline auto densely_sampled_spectrum_integral(uint t, const float *spec) 
         sum += 0.5f * (cie_y_samples[i * t] + cie_y_samples[(i + 1u) * t]);
     }
     return static_cast<float>(sum * tt);
+}
+
+static inline auto downsample_densely_sampled_spectrum(uint t, const float *spec) noexcept {
+    auto n = (visible_wavelength_max - visible_wavelength_min) / static_cast<float>(t);
+    LUISA_ASSERT(n == std::floor(n), "Invalid SPD sample interval.");
+    auto nn = static_cast<uint>(n) + 1u;
+    luisa::vector<float> samples(nn);
+    for (auto x = 0u; x < nn; x++) { samples[x] = spec[x * t]; }
+    return samples;
 }
 
 static constexpr auto spd_lut_interval = 5u;
