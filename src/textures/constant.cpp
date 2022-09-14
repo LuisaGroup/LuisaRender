@@ -93,14 +93,14 @@ public:
         : Texture::Instance{p, t}, _diff_param{std::move(param)} {}
     [[nodiscard]] Float4 evaluate(
         const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
-        if (_diff_param) { return pipeline().differentiation().decode(*_diff_param); }
+        if (_diff_param) { return pipeline().differentiation()->decode(*_diff_param); }
         return def(node<ConstantTexture>()->v());
     }
     void backward(const Interaction &it, const SampledWavelengths &swl,
                   Expr<float>, Expr<float4> grad) const noexcept override {
         if (_diff_param) {
             auto slot_seed = xxhash32(as<uint3>(it.p()));
-            pipeline().differentiation().accumulate(*_diff_param, grad, slot_seed);
+            pipeline().differentiation()->accumulate(*_diff_param, grad, slot_seed);
         }
     }
 };
@@ -109,7 +109,7 @@ luisa::unique_ptr<Texture::Instance> ConstantTexture::build(
     Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
     luisa::optional<Differentiation::ConstantParameter> param;
     if (requires_gradients()) {
-        param.emplace(pipeline.differentiation().parameter(_v, _channels, range()));
+        param.emplace(pipeline.differentiation()->parameter(_v, _channels, range()));
     }
     return luisa::make_unique<ConstantTextureInstance>(pipeline, this, std::move(param));
 }

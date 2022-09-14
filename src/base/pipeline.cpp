@@ -106,14 +106,14 @@ const Filter::Instance *Pipeline::build_filter(CommandBuffer &command_buffer, co
     return iter->second.get();
 }
 
-Differentiation &Pipeline::differentiation() noexcept {
+Differentiation *Pipeline::differentiation() noexcept {
     LUISA_ASSERT(_differentiation, "Differentiation is not constructed.");
-    return *_differentiation;
+    return _differentiation.get();
 }
 
-const Differentiation &Pipeline::differentiation() const noexcept {
+const Differentiation *Pipeline::differentiation() const noexcept {
     LUISA_ASSERT(_differentiation, "Differentiation is not constructed.");
-    return *_differentiation;
+    return _differentiation.get();
 }
 
 void Pipeline::register_transform(const Transform *transform) noexcept {

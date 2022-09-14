@@ -155,8 +155,8 @@ public:
     [[nodiscard]] auto &device() const noexcept { return _device; }
     [[nodiscard]] static luisa::unique_ptr<Pipeline> create(
         Device &device, Stream &stream, const Scene &scene) noexcept;
-    [[nodiscard]] Differentiation &differentiation() noexcept;
-    [[nodiscard]] const Differentiation &differentiation() const noexcept;
+    [[nodiscard]] Differentiation *differentiation() noexcept;
+    [[nodiscard]] const Differentiation *differentiation() const noexcept;
     [[nodiscard]] auto &bindless_array() noexcept { return _bindless_array; }
     [[nodiscard]] auto &bindless_array() const noexcept { return _bindless_array; }
     [[nodiscard]] auto camera_count() const noexcept { return _cameras.size(); }

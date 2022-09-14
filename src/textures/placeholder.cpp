@@ -119,7 +119,7 @@ public:
                   Expr<float> time, Expr<float4> grad) const noexcept override {
         if (_diff_param) {
             auto uv = _compute_uv(it);
-            pipeline().differentiation().accumulate(*_diff_param, uv, grad);
+            pipeline().differentiation()->accumulate(*_diff_param, uv, grad);
         }
     }
 };
@@ -134,7 +134,7 @@ luisa::unique_ptr<Texture::Instance> PlaceholderTexture::build(Pipeline &pipelin
     auto device_image = pipeline.create<Image<float>>(storage, _resolution);
     luisa::optional<Differentiation::TexturedParameter> param;
     if (requires_gradients()) {
-        param.emplace(pipeline.differentiation().parameter(
+        param.emplace(pipeline.differentiation()->parameter(
             *device_image, _sampler, range()));
     }
     return luisa::make_unique<PlaceholderTextureInstance>(

@@ -164,7 +164,7 @@ public:
             LUISA_INFO("");
             LUISA_INFO("Start to step");
             Clock clock;
-            pipeline().differentiation().step(command_buffer);
+            pipeline().differentiation()->step(command_buffer);
             command_buffer << synchronize();
             LUISA_INFO("Step finished in {} ms", clock.toc());
         }
@@ -191,7 +191,7 @@ public:
         // dump results of textured parameters
         LUISA_INFO("");
         LUISA_INFO("Dumping differentiable parameters");
-        pipeline().differentiation().dump(command_buffer, "outputs");
+        pipeline().differentiation()->dump(command_buffer, "outputs");
         LUISA_INFO("Finish dumping differentiable parameters");
 
         while (_window && !_window->should_close()) {
