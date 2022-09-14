@@ -5,6 +5,10 @@
 #pragma once
 
 #include <luisa-compute.h>
+#include <base/transform.h>
+#include <base/light.h>
+#include <base/shape.h>
+#include <base/interaction.h>
 
 namespace luisa::render {
 
@@ -12,6 +16,10 @@ using compute::Accel;
 using compute::Buffer;
 using compute::CommandBuffer;
 using compute::Mesh;
+using compute::Var;
+using compute::Expr;
+using compute::Hit;
+using compute::Float4x4;
 
 class Pipeline;
 
