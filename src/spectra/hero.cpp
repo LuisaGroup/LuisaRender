@@ -21,10 +21,8 @@ private:
 
 private:
     [[nodiscard]] static Float _s(Expr<float> x) noexcept {
-        return ite(
-            isinf(x),
-            cast<float>(x > 0.0f),
-            0.5f + 0.5f * x * rsqrt(1.0f + x * x));
+        return ite(isinf(x), cast<float>(x > 0.0f),
+                   0.5f * fma(x, rsqrt(fma(x, x, 1.f)), 1.f));
     }
 
 public:
@@ -34,16 +32,6 @@ public:
     explicit RGBSigmoidPolynomial(Expr<float3> c) noexcept : _c{c} {}
     [[nodiscard]] Float operator()(Expr<float> lambda) const noexcept {
         return _s(fma(lambda, fma(lambda, _c.x, _c.y), _c.z));// c0 * x * x + c1 * x + c2
-    }
-    [[nodiscard]] Float maximum() const noexcept {
-        auto edge = max(
-            (*this)(visible_wavelength_min),
-            (*this)(visible_wavelength_max));
-        auto mid = (*this)(clamp(
-            -_c.y / (2.0f * _c.x),
-            visible_wavelength_min,
-            visible_wavelength_max));
-        return max(edge, mid);
     }
 };
 

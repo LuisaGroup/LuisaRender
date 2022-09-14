@@ -268,7 +268,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
     PathStateSOA path_states{spectrum, state_count};
     LightSampleSOA light_samples{spectrum, state_count};
     sampler()->reset(command_buffer, resolution, state_count, spp);
-    command_buffer.commit();
+    command_buffer << synchronize();
 
     using BufferRay = BufferVar<Ray>;
     using BufferHit = BufferVar<Hit>;

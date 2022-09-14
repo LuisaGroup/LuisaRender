@@ -35,18 +35,13 @@ using compute::VolumeView;
 
 class DenselySampledSpectrum {
 
-public:
-    static constexpr auto sample_count =
-        static_cast<uint>(visible_wavelength_max - visible_wavelength_min) + 1u;
-
 private:
     Constant<float> _values;
-
-private:
-    explicit DenselySampledSpectrum(luisa::span<const float, sample_count> values) noexcept
-        : _values{values} {}
+    float _interval;
 
 public:
+    DenselySampledSpectrum(
+        luisa::span<const float> values, float sample_interval) noexcept;
     [[nodiscard]] static const DenselySampledSpectrum &cie_x() noexcept;
     [[nodiscard]] static const DenselySampledSpectrum &cie_y() noexcept;
     [[nodiscard]] static const DenselySampledSpectrum &cie_z() noexcept;
