@@ -33,8 +33,9 @@ public:
         virtual ~Instance() noexcept = default;
 
         template<typename T = Integrator>
-            requires std::is_base_of_v<Integrator, T>
-        [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_integrator); }
+            requires std::is_base_of_v<Integrator, T> [
+                [nodiscard]] auto
+            node() const noexcept { return static_cast<const T *>(_integrator); }
         [[nodiscard]] auto &pipeline() noexcept { return _pipeline; }
         [[nodiscard]] const auto &pipeline() const noexcept { return _pipeline; }
         [[nodiscard]] auto sampler() noexcept { return _sampler.get(); }
@@ -64,20 +65,19 @@ public:
 
     private:
         luisa::unique_ptr<Loss::Instance> _loss;
-        //        luisa::unique_ptr<Optimizer::Instance> _optimizer;
+        luisa::unique_ptr<Optimizer::Instance> _optimizer;
 
     public:
         explicit Instance(Pipeline &pipeline, CommandBuffer &command_buffer,
                           const DifferentiableIntegrator *integrator) noexcept;
         [[nodiscard]] auto loss() const noexcept { return _loss.get(); }
-        //        [[nodiscard]] auto optimizer() const noexcept { return _optimizer.get(); }
+        [[nodiscard]] auto optimizer() const noexcept { return _optimizer.get(); }
     };
 
 private:
-    Loss *_loss;
-    //    Optimizer *_optimizer;
+    luisa::unique_ptr<Loss> _loss;
+    luisa::unique_ptr<Optimizer> _optimizer;
     uint _iterations;
-    float _learning_rate;
     int _display_camera_index;
     bool _save_process;
 
@@ -85,9 +85,8 @@ public:
     DifferentiableIntegrator(Scene *scene, const SceneNodeDesc *desc) noexcept;
 
     [[nodiscard]] bool is_differentiable() const noexcept override { return true; }
-    [[nodiscard]] auto loss() const noexcept { return _loss; }
-    //    [[nodiscard]] auto optimizer() const noexcept { return _optimizer; }
-    [[nodiscard]] float learning_rate() const noexcept { return _learning_rate; }
+    [[nodiscard]] auto loss() const noexcept { return _loss.get(); }
+    [[nodiscard]] auto optimizer() const noexcept { return _optimizer.get(); }
     [[nodiscard]] auto iterations() const noexcept { return _iterations; }
     [[nodiscard]] int display_camera_index() const noexcept { return _display_camera_index; }
     [[nodiscard]] bool save_process() const noexcept { return _save_process; }

@@ -86,6 +86,16 @@ public:
     [[nodiscard]] auto sum() const noexcept {
         return reduce(0.f, [](auto r, auto, auto x) noexcept { return r + x; });
     }
+    [[nodiscard]] auto max() const noexcept {
+        return reduce(0.f, [](auto r, auto, auto x) noexcept {
+            return luisa::compute::max(r, x);
+        });
+    }
+    [[nodiscard]] auto min() const noexcept {
+        return reduce(0.f, [](auto r, auto, auto x) noexcept {
+            return luisa::compute::min(r, x);
+        });
+    }
     [[nodiscard]] auto average() const noexcept {
         return sum() * static_cast<float>(1.0 / dimension());
     }

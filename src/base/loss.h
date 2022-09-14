@@ -21,11 +21,11 @@ public:
     class Instance {
 
     private:
-        const Pipeline &_pipeline;
+        Pipeline &_pipeline;
         const Loss *_loss;
 
     public:
-        Instance(const Pipeline &pipeline, const Loss *loss) noexcept
+        Instance(Pipeline &pipeline, const Loss *loss) noexcept
             : _pipeline{pipeline}, _loss{loss} {}
         virtual ~Instance() noexcept = default;
         template<typename T = Loss>

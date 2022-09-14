@@ -21,8 +21,9 @@ public:
 class L2Instance final : public Loss::Instance {
 
 public:
-    L2Instance(const Pipeline &pipeline, const L2 *loss) noexcept
+    L2Instance(Pipeline &pipeline, const L2 *loss) noexcept
         : Loss::Instance{pipeline, loss} {}
+
     [[nodiscard]] Float3 loss(const Camera::Instance *camera, const SampledWavelengths &swl) const noexcept override;
     [[nodiscard]] Float3 d_loss(const Camera::Instance *camera, Expr<uint2> pixel_id,
                                 const SampledWavelengths &swl) const noexcept override;

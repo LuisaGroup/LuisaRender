@@ -15,7 +15,6 @@ add_library(luisa-render-util SHARED
         pmj02tables.cpp pmj02tables.h
         complex.h
         medium_tracker.cpp medium_tracker.h
-        atomic.h
         progress_bar.cpp progress_bar.h)
 target_link_libraries(luisa-render-util PUBLIC
         luisa::compute
