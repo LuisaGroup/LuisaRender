@@ -23,8 +23,8 @@ struct SRGBSpectrum final : public Spectrum {
 };
 
 struct SRGBSpectrumInstance final : public Spectrum::Instance {
-    SRGBSpectrumInstance(const Pipeline &pipeline, const Spectrum *spec) noexcept
-        : Spectrum::Instance{pipeline, spec} {}
+    SRGBSpectrumInstance(Pipeline &pipeline, CommandBuffer &cb, const Spectrum *spec) noexcept
+        : Spectrum::Instance{pipeline, cb, spec} {}
     [[nodiscard]] SampledWavelengths sample(Expr<float>) const noexcept override {
         SampledWavelengths swl{3u};
         auto lambdas = rgb_spectrum_peak_wavelengths;
@@ -109,7 +109,7 @@ struct SRGBSpectrumInstance final : public Spectrum::Instance {
 };
 
 luisa::unique_ptr<Spectrum::Instance> SRGBSpectrum::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
-    return luisa::make_unique<SRGBSpectrumInstance>(pipeline, this);
+    return luisa::make_unique<SRGBSpectrumInstance>(pipeline, command_buffer, this);
 }
 
 }// namespace luisa::render

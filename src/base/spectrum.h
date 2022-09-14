@@ -6,6 +6,7 @@
 
 #include <dsl/syntax.h>
 #include <runtime/command_buffer.h>
+#include <base/spd.h>
 #include <base/scene_node.h>
 #include <base/sampler.h>
 #include <util/spec.h>
@@ -34,12 +35,15 @@ public:
     private:
         const Pipeline &_pipeline;
         const Spectrum *_spectrum;
+        SPD _cie_x;
+        SPD _cie_y;
+        SPD _cie_z;
 
     private:
         [[noreturn]] void _report_backward_unsupported_or_not_implemented() const noexcept;
 
     public:
-        Instance(const Pipeline &pipeline, const Spectrum *spec) noexcept;
+        Instance(Pipeline &pipeline, CommandBuffer &cb, const Spectrum *spec) noexcept;
         virtual ~Instance() noexcept = default;
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
 

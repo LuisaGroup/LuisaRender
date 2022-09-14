@@ -3,7 +3,7 @@
 //
 
 #include <luisa-compute.h>
-
+#include <base/spd.h>
 #include <base/spectrum.h>
 #include <base/pipeline.h>
 
@@ -171,13 +171,13 @@ class RGBIlluminantSpectrum {
 private:
     RGBSigmoidPolynomial _rsp;
     Float _scale;
-    const DenselySampledSpectrum *_illuminant;
+    SPD _illum;
 
 public:
-    RGBIlluminantSpectrum(RGBSigmoidPolynomial rsp, Expr<float> scale, const DenselySampledSpectrum &illum) noexcept
-        : _rsp{std::move(rsp)}, _scale{scale}, _illuminant{&illum} {}
+    RGBIlluminantSpectrum(RGBSigmoidPolynomial rsp, Expr<float> scale, SPD illum) noexcept
+        : _rsp{std::move(rsp)}, _scale{scale}, _illum{illum} {}
     [[nodiscard]] auto sample(Expr<float> lambda) const noexcept {
-        return _rsp(lambda) * _scale * _illuminant->sample(lambda);
+        return _rsp(lambda) * _scale * _illum.sample(lambda);
     }
     [[nodiscard]] auto scale() const noexcept { return _scale; }
 };
@@ -223,12 +223,15 @@ public:
 class HeroWavelengthSpectrumInstance final : public Spectrum::Instance {
 
 private:
+    SPD _illum_d65;
     uint _rgb2spec_t0;
 
 public:
-    HeroWavelengthSpectrumInstance(
-        const Pipeline &pipeline, const Spectrum *spectrum, uint t0) noexcept
-        : Spectrum::Instance{pipeline, spectrum}, _rgb2spec_t0{t0} {}
+    HeroWavelengthSpectrumInstance(Pipeline &pipeline, CommandBuffer &cb,
+                                   const Spectrum *spectrum, uint t0) noexcept
+        : Spectrum::Instance{pipeline, cb, spectrum},
+          _illum_d65{SPD::create_cie_d65(pipeline, cb)},
+          _rgb2spec_t0{t0} {}
     [[nodiscard]] Spectrum::Decode decode_albedo(
         const SampledWavelengths &swl, Expr<float4> v) const noexcept override {
         auto spec = RGBAlbedoSpectrum{RGBSigmoidPolynomial{v.xyz()}};
@@ -241,8 +244,7 @@ public:
     [[nodiscard]] Spectrum::Decode decode_illuminant(
         const SampledWavelengths &swl, Expr<float4> v) const noexcept override {
         auto spec = RGBIlluminantSpectrum{
-            RGBSigmoidPolynomial{v.xyz()}, v.w,
-            DenselySampledSpectrum::cie_illum_d65()};
+            RGBSigmoidPolynomial{v.xyz()}, v.w, _illum_d65};
         SampledSpectrum s{node()->dimension()};
         for (auto i = 0u; i < s.dimension(); i++) {
             s[i] = spec.sample(swl.lambda(i));
@@ -274,7 +276,8 @@ luisa::unique_ptr<Spectrum::Instance> HeroWavelengthSpectrum::build(
         "Invalid RGB2Spec texture indices: "
         "{}, {}, and {}.",
         t0, t1, t2);
-    return luisa::make_unique<HeroWavelengthSpectrumInstance>(pipeline, this, t0);
+    return luisa::make_unique<HeroWavelengthSpectrumInstance>(
+        pipeline, command_buffer, this, t0);
 }
 
 }// namespace luisa::render

@@ -15,24 +15,19 @@ Float3 Spectrum::Instance::srgb(const SampledWavelengths &swl, const SampledSpec
 
 Float Spectrum::Instance::cie_y(const SampledWavelengths &swl, const SampledSpectrum &sp) const noexcept {
     using namespace compute;
-    auto &&y = DenselySampledSpectrum::cie_y();
     auto sum = def(0.f);
     constexpr auto safe_div = [](auto &&a, auto &&b) noexcept {
         return ite(b == 0.0f, 0.0f, a / b);
     };
     for (auto i = 0u; i < swl.dimension(); i++) {
-        sum += safe_div(y.sample(swl.lambda(i)) * sp[i], swl.pdf(i));
+        sum += safe_div(_cie_y.sample(swl.lambda(i)) * sp[i], swl.pdf(i));
     }
-    auto denom = static_cast<float>(swl.dimension()) *
-                 DenselySampledSpectrum::cie_y_integral();
+    auto denom = static_cast<float>(swl.dimension()) * SPD::cie_y_integral();
     return sum / denom;
 }
 
 Float3 Spectrum::Instance::cie_xyz(const SampledWavelengths &swl, const SampledSpectrum &sp) const noexcept {
     using namespace compute;
-    auto &&x = DenselySampledSpectrum::cie_x();
-    auto &&y = DenselySampledSpectrum::cie_y();
-    auto &&z = DenselySampledSpectrum::cie_z();
     constexpr auto safe_div = [](auto a, auto b) noexcept {
         return ite(b == 0.0f, 0.0f, a / b);
     };
@@ -41,12 +36,11 @@ Float3 Spectrum::Instance::cie_xyz(const SampledWavelengths &swl, const SampledS
         auto lambda = swl.lambda(i);
         auto pdf = swl.pdf(i);
         sum += make_float3(
-            safe_div(x.sample(lambda) * sp[i], pdf),
-            safe_div(y.sample(lambda) * sp[i], pdf),
-            safe_div(z.sample(lambda) * sp[i], pdf));
+            safe_div(_cie_x.sample(lambda) * sp[i], pdf),
+            safe_div(_cie_y.sample(lambda) * sp[i], pdf),
+            safe_div(_cie_z.sample(lambda) * sp[i], pdf));
     }
-    auto denom = static_cast<float>(swl.dimension()) *
-                 DenselySampledSpectrum::cie_y_integral();
+    auto denom = static_cast<float>(swl.dimension()) * SPD::cie_y_integral();
     return sum / denom;
 }
 
@@ -109,8 +103,12 @@ SampledSpectrum Spectrum::Instance::backward_srgb(
     _report_backward_unsupported_or_not_implemented();
 }
 
-Spectrum::Instance::Instance(const Pipeline &pipeline, const Spectrum *spec) noexcept
-    : _pipeline{pipeline}, _spectrum{spec} {}
+Spectrum::Instance::Instance(Pipeline &pipeline, CommandBuffer &cb,
+                             const Spectrum *spec) noexcept
+    : _pipeline{pipeline}, _spectrum{spec},
+      _cie_x{SPD::create_cie_x(pipeline, cb)},
+      _cie_y{SPD::create_cie_y(pipeline, cb)},
+      _cie_z{SPD::create_cie_z(pipeline, cb)} {}
 
 Spectrum::Spectrum(Scene *scene, const SceneNodeDesc *desc) noexcept
     : SceneNode{scene, desc, SceneNodeTag::SPECTRUM} {}

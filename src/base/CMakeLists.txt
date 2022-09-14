@@ -20,7 +20,8 @@ set(LUISA_RENDER_BASE_SOURCES
         spectrum.cpp spectrum.h
         loss.h loss.cpp
         optimizer.cpp optimizer.h
-        geometry.cpp geometry.h)
+        geometry.cpp geometry.h
+        spd.cpp spd.h)
 
 add_library(luisa-render-base SHARED ${LUISA_RENDER_BASE_SOURCES})
 target_link_libraries(luisa-render-base PUBLIC

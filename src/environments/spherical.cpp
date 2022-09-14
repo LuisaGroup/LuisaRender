@@ -95,7 +95,7 @@ public:
         auto size = make_float2(Spherical::sample_map_size);
         auto ix = cast<uint>(clamp(uv.x * size.x, 0.f, size.x - 1.f));
         auto iy = cast<uint>(clamp(uv.y * size.y, 0.f, size.y - 1.f));
-        auto pdf_buffer = pipeline().bindless_buffer<float>(*_pdf_buffer_id);
+        auto pdf_buffer = pipeline().buffer<float>(*_pdf_buffer_id);
         auto pdf = pdf_buffer.read(iy * Spherical::sample_map_size.x + ix);
         return {.L = L, .pdf = _directional_pdf(pdf, theta)};
     }
@@ -109,7 +109,7 @@ public:
                 auto L = _evaluate(w, uv, swl, time);
                 return std::make_tuple(w, L, def(uniform_sphere_pdf()));
             }
-            auto alias_buffer = pipeline().bindless_buffer<AliasEntry>(*_alias_buffer_id);
+            auto alias_buffer = pipeline().buffer<AliasEntry>(*_alias_buffer_id);
             auto [iy, uy] = sample_alias_table(
                 alias_buffer, Spherical::sample_map_size.y, u.y);
             auto offset = Spherical::sample_map_size.y +
@@ -119,7 +119,7 @@ public:
             auto uv = make_float2(cast<float>(ix) + ux, cast<float>(iy) + uy) /
                       make_float2(Spherical::sample_map_size);
             auto index = iy * Spherical::sample_map_size.x + ix;
-            auto p = pipeline().bindless_buffer<float>(*_pdf_buffer_id).read(index);
+            auto p = pipeline().buffer<float>(*_pdf_buffer_id).read(index);
             auto [theta, phi, w] = Spherical::uv_to_direction(uv);
             auto L = _evaluate(w, uv, swl, time);
             return std::make_tuple(w, L, _directional_pdf(p, theta));

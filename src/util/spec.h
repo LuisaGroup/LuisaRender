@@ -21,6 +21,15 @@ constexpr auto fraunhofer_wavelengths =
 constexpr auto rgb_spectrum_peak_wavelengths =
     make_float3(602.785f, 539.285f, 445.772f);
 
+constexpr auto cie_sample_count = static_cast<uint>(
+    visible_wavelength_max - visible_wavelength_min + 1.0f);
+static_assert(cie_sample_count == 471u);
+
+LUISA_IMPORT_API const std::array<float, cie_sample_count> cie_x_samples;
+LUISA_IMPORT_API const std::array<float, cie_sample_count> cie_y_samples;
+LUISA_IMPORT_API const std::array<float, cie_sample_count> cie_z_samples;
+LUISA_IMPORT_API const std::array<float, cie_sample_count> cie_d65_samples;
+
 using compute::ArrayVar;
 using compute::BindlessArray;
 using compute::Bool;
@@ -32,23 +41,6 @@ using compute::Float3;
 using compute::Float4;
 using compute::Local;
 using compute::VolumeView;
-
-class DenselySampledSpectrum {
-
-private:
-    Constant<float> _values;
-    float _interval;
-
-public:
-    DenselySampledSpectrum(
-        luisa::span<const float> values, float sample_interval) noexcept;
-    [[nodiscard]] static const DenselySampledSpectrum &cie_x() noexcept;
-    [[nodiscard]] static const DenselySampledSpectrum &cie_y() noexcept;
-    [[nodiscard]] static const DenselySampledSpectrum &cie_z() noexcept;
-    [[nodiscard]] static const DenselySampledSpectrum &cie_illum_d65() noexcept;
-    [[nodiscard]] Float sample(Expr<float> lambda) const noexcept;
-    [[nodiscard]] static float cie_y_integral() noexcept;
-};
 
 class SampledSpectrum {
 

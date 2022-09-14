@@ -153,11 +153,6 @@ public:
         return std::make_pair(view, buffer_id);
     }
 
-    template<typename T>
-    [[nodiscard]] auto bindless_buffer(Expr<uint> buffer_id) const noexcept { return _bindless_array.buffer<T>(buffer_id); }
-    [[nodiscard]] auto bindless_tex2d(Expr<uint> tex_id) const noexcept { return _bindless_array.tex2d(tex_id); }
-    [[nodiscard]] auto bindless_tex3d(Expr<uint> tex_id) const noexcept { return _bindless_array.tex3d(tex_id); }
-
 public:
     [[nodiscard]] auto &device() const noexcept { return _device; }
     [[nodiscard]] static luisa::unique_ptr<Pipeline> create(
@@ -192,10 +187,10 @@ public:
     [[nodiscard]] auto named_buffer(luisa::string_view name) const noexcept {
         return _bindless_array.buffer<T>(named_id(name));
     }
-    [[nodiscard]] auto tex2d(luisa::string_view name) const noexcept {
+    [[nodiscard]] auto named_tex2d(luisa::string_view name) const noexcept {
         return _bindless_array.tex2d(named_id(name));
     }
-    [[nodiscard]] auto tex3d(luisa::string_view name) const noexcept {
+    [[nodiscard]] auto named_tex3d(luisa::string_view name) const noexcept {
         return _bindless_array.tex3d(named_id(name));
     }
     [[nodiscard]] Float4x4 transform(const Transform *transform) const noexcept;
