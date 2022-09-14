@@ -255,7 +255,7 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
             $for(depth, pt->node<MegakernelRadiativeDiff>()->max_depth()) {
 
                 // trace
-                auto it = pipeline().intersect(ray);
+                auto it = pipeline().geometry()->intersect(ray);
 
                 // miss, environment light
                 $if(!it->valid()) {
@@ -288,7 +288,7 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
 
                 // trace shadow ray
                 auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
-                auto occluded = pipeline().intersect_any(shadow_ray);
+                auto occluded = pipeline().geometry()->intersect_any(shadow_ray);
 
                 // evaluate material
                 auto cos_theta_o = it->wo_local().z;
@@ -434,7 +434,7 @@ void MegakernelRadiativeDiffInstance::_render_one_camera(
             $for(depth, pt->node<MegakernelRadiativeDiff>()->max_depth()) {
 
                 // trace
-                auto it = pipeline().intersect(ray);
+                auto it = pipeline().geometry()->intersect(ray);
 
                 // miss
                 $if(!it->valid()) {
@@ -464,7 +464,7 @@ void MegakernelRadiativeDiffInstance::_render_one_camera(
 
                 // trace shadow ray
                 auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
-                auto occluded = pipeline().intersect_any(shadow_ray);
+                auto occluded = pipeline().geometry()->intersect_any(shadow_ray);
 
                 // evaluate material
                 auto cos_theta_o = it->wo_local().z;

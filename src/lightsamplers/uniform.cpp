@@ -34,7 +34,7 @@ public:
         if (!pipeline.lights().empty()) {
             auto [view, buffer_id] = pipeline.arena_buffer<Light::Handle>(pipeline.lights().size());
             _light_buffer_id = buffer_id;
-            command_buffer << view.copy_from(pipeline.instanced_lights().data())
+            command_buffer << view.copy_from(pipeline.geometry()->light_instances().data())
                            << compute::commit();
         }
         if (auto env = pipeline.environment()) {

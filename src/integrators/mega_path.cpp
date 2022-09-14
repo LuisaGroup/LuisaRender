@@ -208,7 +208,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
         $for(depth, pt->node<MegakernelPathTracing>()->max_depth()) {
 
             // trace
-            auto it = pipeline.intersect(ray);
+            auto it = pipeline.geometry()->intersect(ray);
 
             // miss
             $if(!it->valid()) {
@@ -238,7 +238,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
 
             // trace shadow ray
             auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
-            auto occluded = pipeline.intersect_any(shadow_ray);
+            auto occluded = pipeline.geometry()->intersect_any(shadow_ray);
 
             // evaluate material
             auto surface_tag = it->shape()->surface_tag();

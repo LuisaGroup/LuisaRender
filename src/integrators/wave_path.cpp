@@ -301,10 +301,10 @@ void WavefrontPathTracingInstance::_render_one_camera(
         auto ray_id = dispatch_x();
         $if(ray_id < ray_count.read(0u)) {
             auto ray = rays.read(ray_id);
-            auto hit = pipeline().trace_closest(ray);
+            auto hit = pipeline().geometry()->trace_closest(ray);
             hits.write(ray_id, hit);
             $if(!hit->miss()) {
-                auto shape = pipeline().instance(hit.inst);
+                auto shape = pipeline().geometry()->instance(hit.inst);
                 $if(shape->has_surface()) {
                     auto queue_id = surface_queue_size.atomic(0u).fetch_add(1u);
                     surface_queue.write(queue_id, ray_id);
@@ -362,7 +362,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                 auto pdf_bsdf = path_states.read_pdf_bsdf(path_id);
                 auto beta = path_states.read_beta(path_id);
                 auto Li = path_states.read_radiance(path_id);
-                auto it = pipeline().interaction(ray, hit);
+                auto it = pipeline().geometry()->interaction(ray, hit);
                 auto eval = light_sampler()->evaluate_hit(*it, ray->origin(), swl, time);
                 auto mis_weight = balanced_heuristic(pdf_bsdf, eval.pdf);
                 Li += beta * eval.L * mis_weight;
@@ -379,7 +379,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
             auto ray_id = queue.read(queue_id);
             auto ray = rays.read(ray_id);
             auto hit = hits.read(ray_id);
-            auto it = pipeline().interaction(ray, hit);
+            auto it = pipeline().geometry()->interaction(ray, hit);
             auto path_id = path_indices.read(ray_id);
             auto swl = path_states.read_swl(path_id);
             sampler()->load_state(path_id);
@@ -390,7 +390,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
             sampler()->save_state(path_id);
             // trace shadow ray
             auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
-            auto occluded = pipeline().intersect_any(shadow_ray);
+            auto occluded = pipeline().geometry()->intersect_any(shadow_ray);
             light_samples.write_emission(queue_id, ite(occluded, 0.f, 1.f) * light_sample.eval.L);
             light_samples.write_pdf(queue_id, ite(occluded, 0.f, light_sample.eval.pdf));
             light_samples.write_wi(queue_id, shadow_ray->direction());
@@ -406,7 +406,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
             auto ray_id = queue.read(queue_id);
             auto ray = in_rays.read(ray_id);
             auto hit = in_hits.read(ray_id);
-            auto it = pipeline().interaction(ray, hit);
+            auto it = pipeline().geometry()->interaction(ray, hit);
             auto path_id = path_indices.read(ray_id);
             sampler()->load_state(path_id);
             auto Li = path_states.read_radiance(path_id);

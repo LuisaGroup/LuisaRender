@@ -329,7 +329,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
             auto hit = pipeline().trace_closest(ray);
             hits.write(ray_id, hit);
             $if(!hit->miss()) {
-                auto shape = pipeline().instance(hit.inst);
+                auto shape = pipeline().geometry()->instance(hit.inst);
                 $if(shape->has_surface()) {
                     auto queue_id = surface_queue_size.atomic(0u).fetch_add(1u);
                     surface_queue.write(queue_id, ray_id);
