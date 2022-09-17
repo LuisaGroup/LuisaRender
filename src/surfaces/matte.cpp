@@ -77,16 +77,13 @@ public:
           _oren_nayar{luisa::make_unique<OrenNayar>(std::move(albedo), sigma)},
           _eta_i{eta_i} {}
 
-private:
+public:
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
         auto wo_local = _it.wo_local();
         auto wi_local = _it.shading().world_to_local(wi);
         auto f = _oren_nayar->evaluate(wo_local, wi_local);
         auto pdf = _oren_nayar->pdf(wo_local, wi_local);
-        return {.f = f * abs_cos_theta(wi_local),
-                .pdf = pdf,
-                .roughness = make_float2(1.f),
-                .eta = _eta_i};
+        return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
     [[nodiscard]] Surface::Sample sample(Expr<float>, Expr<float2> u) const noexcept override {
         auto wo_local = _it.wo_local();
@@ -94,11 +91,10 @@ private:
         auto pdf = def(0.f);
         auto f = _oren_nayar->sample(wo_local, &wi_local, u, &pdf);
         auto wi = _it.shading().local_to_world(wi_local);
-        return {.wi = wi,
-                .eval = {.f = f * abs_cos_theta(wi_local),
-                         .pdf = pdf,
-                         .roughness = make_float2(1.f),
-                         .eta = _eta_i}};
+        return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf},
+                .wi = wi,
+                .eta = 1.f,
+                .event = Surface::event_reflect};
     }
     void backward(Expr<float3> wi, const SampledSpectrum &df_in) const noexcept override {
         auto _instance = instance<MatteInstance>();
@@ -112,6 +108,7 @@ private:
             sigma->backward(_it, _swl, _time, dv);
         }
     }
+    [[nodiscard]] Float2 roughness() const noexcept override { return make_float2(1.f); }
 };
 
 luisa::unique_ptr<Surface::Closure> MatteInstance::closure(

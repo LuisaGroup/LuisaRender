@@ -295,6 +295,7 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
                 auto surface_tag = it->shape()->surface_tag();
                 auto u_lobe = sampler->generate_1d();
                 auto u_bsdf = sampler->generate_2d();
+                auto eta_scale = def(1.f);
                 pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
 
                     // create closure
@@ -345,12 +346,18 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
 
                         // d_Li * fs
                         beta *= w * sample.eval.f;
+
+                        // apply eta scale
+                        $switch (sample.event) {
+                            $case (Surface::event_enter) { eta_scale = sqr(sample.eta); };
+                            $case (Surface::event_exit) { eta_scale = 1.f / sqr(sample.eta); };
+                        };
                     };
                 });
 
                 // rr
                 $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
-                auto q = max(beta.max(), .05f);
+                auto q = max(beta.max() * eta_scale, .05f);
                 auto rr_depth = pt->node<MegakernelRadiativeDiff>()->rr_depth();
                 auto rr_threshold = pt->node<MegakernelRadiativeDiff>()->rr_threshold();
                 $if(depth + 1u >= rr_depth & q < rr_threshold) {
@@ -474,6 +481,7 @@ void MegakernelRadiativeDiffInstance::_render_one_camera(
                 auto surface_tag = it->shape()->surface_tag();
                 auto u_lobe = sampler->generate_1d();
                 auto u_bsdf = sampler->generate_2d();
+                auto eta_scale = def(1.f);
                 pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
 
                     // create closure
@@ -510,12 +518,18 @@ void MegakernelRadiativeDiffInstance::_render_one_camera(
                         pdf_bsdf = sample.eval.pdf;
                         auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
                         beta *= w * sample.eval.f;
+
+                        // apply eta scale
+                        $switch (sample.event) {
+                            $case (Surface::event_enter) { eta_scale = sqr(sample.eta); };
+                            $case (Surface::event_exit) { eta_scale = 1.f / sqr(sample.eta); };
+                        };
                     };
                 });
 
                 // rr
                 $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
-                auto q = max(beta.max(), .05f);
+                auto q = max(beta.max() * eta_scale, .05f);
                 auto rr_depth = pt->node<MegakernelRadiativeDiff>()->rr_depth();
                 auto rr_threshold = pt->node<MegakernelRadiativeDiff>()->rr_threshold();
                 $if(depth + 1u >= rr_depth & q < rr_threshold) {

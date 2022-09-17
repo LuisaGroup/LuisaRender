@@ -459,7 +459,6 @@ private:
     luisa::unique_ptr<LambertianTransmission> _diff_trans;
     UInt _lobes;
     Float _sampling_weights[max_sampling_techique_count];
-    Float _eta_i;
     Float _eta_t;
 
 public:
@@ -471,7 +470,7 @@ public:
         Expr<float> specular_tint, Expr<float> anisotropic, Expr<float> sheen, Expr<float> sheen_tint,
         Expr<float> clearcoat, Expr<float> clearcoat_gloss, Expr<float> specular_trans_in,
         Expr<float> flatness, Expr<float> diffuse_trans) noexcept
-        : Surface::Closure{instance, it, swl, time}, _lobes{0u}, _eta_i{eta_i} {
+        : Surface::Closure{instance, it, swl, time}, _lobes{0u} {
 
         // TODO: should not generate lobes than are not used.
         constexpr auto black_threshold = 1e-6f;
@@ -486,7 +485,7 @@ public:
         auto Ctint_lum = color_lum * Ctint_weight;
         _eta_t = ite(eta_t_in < black_threshold, 1.5f, eta_t_in);
         auto thin = instance->thin();
-        auto eta = _eta_t / _eta_i;
+        auto eta = _eta_t / eta_i;
 
         // diffuse
         auto diffuse_scale = ite(thin, (1.f - flatness) * (1.f - dt), ite(front_face, 1.f, 0.f));
@@ -538,7 +537,7 @@ public:
         _lobes |= refl_specular;// always consider the specular lobe
 
         // specular reflection sampling weight
-        auto fr = fresnel_dielectric(cos_theta_o, _eta_i, _eta_t);
+        auto fr = fresnel_dielectric(cos_theta_o, eta_i, _eta_t);
         auto F = clamp(lerp(fr, FrSchlick(1.f, cos_theta_o), metallic), 0.1f, 0.9f);
         auto Cspec0_lum = F * lerp(lerp(1.f, Ctint_lum, specular_tint) * SchlickR0, color_lum, metallic);
         _sampling_weights[sampling_technique_specular] = Cspec0_lum;
@@ -558,7 +557,7 @@ public:
         auto Cst_weight = thin ? 0.f : 1.f;
         auto Cst = Cst_weight * T;
         _spec_trans = luisa::make_unique<MicrofacetTransmission>(
-            Cst, _distrib.get(), _eta_i, _eta_t);
+            Cst, _distrib.get(), eta_i, _eta_t);
         auto Cst_lum = Cst_weight * T_lum;
         _lobes |= ite(Cst_lum > black_threshold, trans_specular, 0u);
 
@@ -574,7 +573,7 @@ public:
         auto Ctst = Ctst_weight * T;
         _thin_distrib = luisa::make_unique<TrowbridgeReitzDistribution>(ascaled);
         _thin_spec_trans = luisa::make_unique<MicrofacetTransmission>(
-            Ctst, _thin_distrib.get(), _eta_i, _eta_t);
+            Ctst, _thin_distrib.get(), eta_i, _eta_t);
         auto Ctst_lum = Ctst_weight * T_lum;
         _lobes |= ite(Ctst_lum > black_threshold, trans_thin_specular, 0u);
 
@@ -639,10 +638,7 @@ public:
             };
         };
         auto thin = instance<DisneySurfaceInstance>()->thin();
-        return {.f = f * abs_cos_theta(wi_local),
-                .pdf = pdf,
-                .roughness = _distrib->alpha(),
-                .eta = ite(!thin & wi_local.z < 0.f, _eta_t, _eta_i)};
+        return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
         auto wo_local = _it.wo_local();
@@ -666,19 +662,30 @@ public:
         auto wo_local = _it.wo_local();
         auto wi_local = def(make_float3(0.f, 0.f, 1.f));
         auto pdf = def(0.f);
+        auto event = def(Surface::event_reflect);
         $switch(sampling_tech) {
             $case(0u) { static_cast<void>(_diffuse->sample(wo_local, &wi_local, u, &pdf)); };
             $case(1u) { static_cast<void>(_specular->sample(wo_local, &wi_local, u, &pdf)); };
             $case(2u) { static_cast<void>(_clearcoat->sample(wo_local, &wi_local, u, &pdf)); };
-            $case(3u) { static_cast<void>(_spec_trans->sample(wo_local, &wi_local, u, &pdf)); };
-            $case(4u) { static_cast<void>(_thin_spec_trans->sample(wo_local, &wi_local, u, &pdf)); };
-            $case(5u) { static_cast<void>(_diff_trans->sample(wo_local, &wi_local, u, &pdf)); };
+            $case(3u) {
+                static_cast<void>(_spec_trans->sample(wo_local, &wi_local, u, &pdf));
+                event = ite(cos_theta(wo_local) > 0.f, Surface::event_enter, Surface::event_exit);
+            };
+            $case(4u) {
+                static_cast<void>(_thin_spec_trans->sample(wo_local, &wi_local, u, &pdf));
+                event = Surface::event_through;
+            };
+            $case(5u) {
+                static_cast<void>(_diff_trans->sample(wo_local, &wi_local, u, &pdf));
+                event = Surface::event_through;
+            };
             $default { unreachable(); };
         };
         auto eval = evaluate_local(wo_local, wi_local);
         auto wi = _it.shading().local_to_world(wi_local);
-        return {.wi = std::move(wi), .eval = std::move(eval)};
+        return {.eval = eval, .wi = wi, .eta = _eta_t, .event = event};
     }
+    [[nodiscard]] Float2 roughness() const noexcept override { return _distrib->alpha(); }
 
     void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
         // TODO

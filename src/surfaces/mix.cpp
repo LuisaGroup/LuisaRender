@@ -78,15 +78,12 @@ private:
     Float _ratio;
 
 private:
-    [[nodiscard]] auto _mix(Expr<float3> wi,
-                            const Surface::Evaluation &eval_a,
+    [[nodiscard]] auto _mix(const Surface::Evaluation &eval_a,
                             const Surface::Evaluation &eval_b) const noexcept {
         auto t = 1.f - _ratio;
         return Surface::Evaluation{
             .f = _ratio * eval_a.f + t * eval_b.f,
-            .pdf = lerp(eval_a.pdf, eval_b.pdf, t),
-            .roughness = lerp(eval_a.roughness, eval_b.roughness, t),
-            .eta = _ratio * eval_a.eta + t * eval_b.eta};// TODO: eta should be interpolated in a different way
+            .pdf = lerp(eval_a.pdf, eval_b.pdf, t)};
     }
 
 public:
@@ -109,6 +106,11 @@ public:
         auto ob = opacity_b.value_or(1.f);
         return lerp(ob, oa, _ratio);
     }
+    [[nodiscard]] Float2 roughness() const noexcept override {
+        if (_a == nullptr) { return _b->roughness(); }
+        if (_b == nullptr) { return _a->roughness(); }
+        return lerp(_b->roughness(), _a->roughness(), _ratio);
+    }
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
         if (_a == nullptr) [[unlikely]] {
             auto eval = _b->evaluate(wi);
@@ -122,7 +124,7 @@ public:
         }
         auto eval_a = _a->evaluate(wi);
         auto eval_b = _b->evaluate(wi);
-        return _mix(wi, eval_a, eval_b);
+        return _mix(eval_a, eval_b);
     }
     [[nodiscard]] Surface::Sample sample(Expr<float> u_lobe, Expr<float2> u) const noexcept override {
         if (_a == nullptr) [[unlikely]] {
@@ -139,14 +141,18 @@ public:
         $if(u_lobe < _ratio) {// sample a
             auto sample_a = _a->sample(u_lobe / _ratio, u);
             auto eval_b = _b->evaluate(sample_a.wi);
+            sample.eval = _mix(sample_a.eval, eval_b);
             sample.wi = sample_a.wi;
-            sample.eval = _mix(sample_a.wi, sample_a.eval, eval_b);
+            sample.eta = sample_a.eta;
+            sample.event = sample_a.event;
         }
         $else {// sample b
             auto sample_b = _b->sample((u_lobe - _ratio) / (1.f - _ratio), u);
             auto eval_a = _a->evaluate(sample_b.wi);
+            sample.eval = _mix(eval_a, sample_b.eval);
             sample.wi = sample_b.wi;
-            sample.eval = _mix(sample_b.wi, eval_a, sample_b.eval);
+            sample.eta = sample_b.eta;
+            sample.event = sample_b.event;
         };
         return sample;
     }

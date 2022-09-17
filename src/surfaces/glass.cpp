@@ -165,11 +165,7 @@ public:
             pdf = _trans->pdf(wo_local, wi_local) * (1.f - _kr_ratio);
         };
         auto entering = wi_local.z < 0.f;
-        auto eta = ite(entering, _fresnel->eta_t(), _fresnel->eta_i());
-        return {.f = f * abs_cos_theta(wi_local),
-                .pdf = pdf,
-                .roughness = _distribution->alpha(),
-                .eta = eta};
+        return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
 
     [[nodiscard]] Surface::Sample sample(Expr<float> u_lobe, Expr<float2> u) const noexcept override {
@@ -177,6 +173,7 @@ public:
         auto pdf = def(0.f);
         auto f = SampledSpectrum{_swl.dimension()};
         auto wi_local = def(make_float3(0.0f, 0.0f, 1.0f));
+        auto event = def(Surface::event_reflect);
         $if(u_lobe < _kr_ratio) {// Reflection
             f = _refl->sample(wo_local, &wi_local, u, &pdf);
             pdf *= _kr_ratio;
@@ -184,16 +181,16 @@ public:
         $else {// Transmission
             f = _trans->sample(wo_local, &wi_local, u, &pdf);
             pdf *= (1.f - _kr_ratio);
+            event = ite(cos_theta(wo_local) > 0.f, Surface::event_enter, Surface::event_exit);
         };
         auto wi = _it.shading().local_to_world(wi_local);
         auto entering = wi_local.z < 0.f;
-        auto eta = ite(entering, _fresnel->eta_t(), _fresnel->eta_i());
-        return {.wi = wi,
-                .eval = {.f = f * abs_cos_theta(wi_local),
-                         .pdf = pdf,
-                         .roughness = _distribution->alpha(),
-                         .eta = eta}};
+        return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf},
+                .wi = wi,
+                .eta = _fresnel->eta_t(),
+                .event = event};
     }
+    [[nodiscard]] Float2 roughness() const noexcept override { return _distribution->alpha(); }
 
     void backward(Expr<float3> wi, const SampledSpectrum &df_in) const noexcept override {
         auto _instance = instance<GlassInstance>();

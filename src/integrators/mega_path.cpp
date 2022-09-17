@@ -244,6 +244,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
             auto surface_tag = it->shape()->surface_tag();
             auto u_lobe = sampler->generate_1d();
             auto u_bsdf = sampler->generate_2d();
+            auto eta_scale = def(1.f);
             pipeline.surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
 
                 // create closure
@@ -281,6 +282,12 @@ void MegakernelPathTracingInstance::_render_one_camera(
                     pdf_bsdf = sample.eval.pdf;
                     auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
                     beta *= w * sample.eval.f;
+
+                    // apply eta scale
+                    $switch (sample.event) {
+                        $case (Surface::event_enter) { eta_scale = sqr(sample.eta); };
+                        $case (Surface::event_exit) { eta_scale = 1.f / sqr(sample.eta); };
+                    };
                 };
             });
 
@@ -288,7 +295,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
             $if(beta.all([](auto b) noexcept { return isnan(b) | b <= 0.f; })) { $break; };
             auto rr_depth = pt->node<MegakernelPathTracing>()->rr_depth();
             auto rr_threshold = pt->node<MegakernelPathTracing>()->rr_threshold();
-            auto q = max(beta.max(), .05f);
+            auto q = max(beta.max() * eta_scale, .05f);
             $if(depth + 1u >= rr_depth & q < rr_threshold) {
                 $if(sampler->generate_1d() >= q) { $break; };
                 beta *= 1.0f / q;

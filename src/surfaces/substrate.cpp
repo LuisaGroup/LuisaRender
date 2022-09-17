@@ -87,7 +87,7 @@ public:
         const SampledSpectrum &Kd, const SampledSpectrum &Ks, Expr<float2> alpha, Expr<float> Kd_ratio) noexcept
         : Surface::Closure{instance, it, swl, time},
           _distribution{luisa::make_unique<TrowbridgeReitzDistribution>(alpha)},
-          _blend{luisa::make_unique<FresnelBlend>(Kd, Ks, _distribution.get(), Kd_ratio)} ,
+          _blend{luisa::make_unique<FresnelBlend>(Kd, Ks, _distribution.get(), Kd_ratio)},
           _eta_i{eta_i} {}
 
 private:
@@ -96,10 +96,7 @@ private:
         auto wi_local = _it.shading().world_to_local(wi);
         auto f = _blend->evaluate(wo_local, wi_local);
         auto pdf = _blend->pdf(wo_local, wi_local);
-        return {.f = f * abs_cos_theta(wi_local),
-                .pdf = pdf,
-                .roughness = _distribution->alpha(),
-                .eta = _eta_i};
+        return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
 
     [[nodiscard]] Surface::Sample sample(Expr<float> u_lobe, Expr<float2> u) const noexcept override {
@@ -109,13 +106,16 @@ private:
         // TODO: pass u_lobe to _blend->sample()
         auto f = _blend->sample(wo_local, &wi_local, u, &pdf);
         auto wi = _it.shading().local_to_world(wi_local);
-        return {.wi = wi,
-                .eval = {.f = f * abs_cos_theta(wi_local),
-                         .pdf = pdf,
-                         .roughness = _distribution->alpha(),
-                         .eta = _eta_i}};
+        return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf},
+                .wi = wi,
+                .eta = 1.f,
+                .event = Surface::event_reflect};
     }
 
+public:
+    [[nodiscard]] Float2 roughness() const noexcept override { return _distribution->alpha(); }
+
+private:
     void backward(Expr<float3> wi, const SampledSpectrum &df_in) const noexcept override {
         using compute::isinf;
         auto _instance = instance<SubstrateInstance>();
@@ -162,8 +162,8 @@ luisa::unique_ptr<Surface::Closure> SubstrateInstance::closure(
                     (remap ? make_float2(r2a(r.x)) : r.xx()) :
                     (remap ? r2a(r.xy()) : r.xy());
     }
-//    auto cos_theta = dot(it.shading().n(), it.wo());
-//    auto pow5 = [](auto &&v) { return sqr(sqr(v)) * v; };
+    //    auto cos_theta = dot(it.shading().n(), it.wo());
+    //    auto pow5 = [](auto &&v) { return sqr(sqr(v)) * v; };
     auto Kd_ratio = Kd_lum / max(Kd_lum + Ks_lum, 1e-5f);
     return luisa::make_unique<SubstrateClosure>(
         this, it, swl, time, eta_i, Kd, Ks, alpha, Kd_ratio);

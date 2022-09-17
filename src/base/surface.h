@@ -28,34 +28,31 @@ class Interaction;
 class Surface : public SceneNode {
 
 public:
-    enum struct Event {
-        REFLECT,
-        ENTER,
-        EXIT,
-        THROUGH,
-        INVALID,
-    };
+    static constexpr auto event_reflect = 0x00u;
+    static constexpr auto event_enter = 0x01u;
+    static constexpr auto event_exit = 0x02u;
+    static constexpr auto event_through = 0x04u;
 
     struct Evaluation {
         SampledSpectrum f;
         Float pdf;
-        Float2 roughness;
-        Float eta;
         [[nodiscard]] static auto zero(uint spec_dim) noexcept {
             return Evaluation{
                 .f = SampledSpectrum{spec_dim},
-                .pdf = 0.f,
-                .roughness = make_float2(),
-                .eta = 1.f};
+                .pdf = 0.f};
         }
     };
 
     struct Sample {
-        Float3 wi;
         Evaluation eval;
+        Float3 wi;
+        Float eta;
+        UInt event;
         [[nodiscard]] static auto zero(uint spec_dim) noexcept {
-            return Sample{.wi = make_float3(0.f, 0.f, 1.f),
-                          .eval = Evaluation::zero(spec_dim)};
+            return Sample{.eval = Evaluation::zero(spec_dim),
+                          .wi = make_float3(0.f, 0.f, 1.f),
+                          .eta = 1.f,
+                          .event = event_reflect};
         }
     };
 
@@ -84,6 +81,7 @@ public:
         virtual void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept = 0;
         [[nodiscard]] virtual luisa::optional<Float> opacity() const noexcept;
         [[nodiscard]] virtual luisa::optional<Bool> dispersive() const noexcept;
+        [[nodiscard]] virtual Float2 roughness() const noexcept = 0;
     };
 
     class Instance {

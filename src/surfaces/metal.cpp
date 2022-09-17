@@ -228,10 +228,7 @@ private:
         auto f = _lobe->evaluate(wo_local, wi_local);
         if (_refl) { f *= *_refl; }
         auto pdf = _lobe->pdf(wo_local, wi_local);
-        return {.f = f * abs_cos_theta(wi_local),
-                .pdf = pdf,
-                .roughness = _distrib->alpha(),
-                .eta = _fresnel->eta_i()};
+        return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
     [[nodiscard]] Surface::Sample sample(Expr<float>, Expr<float2> u) const noexcept override {
         auto wo_local = _it.wo_local();
@@ -240,15 +237,17 @@ private:
         auto f = _lobe->sample(wo_local, &wi_local, u, &pdf);
         if (_refl) { f *= *_refl; }
         auto wi = _it.shading().local_to_world(wi_local);
-        return {.wi = wi,
-                .eval = {.f = f * abs_cos_theta(wi_local),
-                         .pdf = pdf,
-                         .roughness = _distrib->alpha(),
-                         .eta = _fresnel->eta_i()}};
+        return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf},
+                .wi = wi,
+                .eta = 1.f,
+                .event = Surface::event_reflect};
     }
     void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
         // Metal surface is not differentiable
     }
+
+public:
+    [[nodiscard]] Float2 roughness() const noexcept override { return _distrib->alpha(); }
 };
 
 luisa::unique_ptr<Surface::Closure> MetalInstance::closure(

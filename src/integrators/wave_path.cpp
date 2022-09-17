@@ -416,6 +416,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
             auto pdf_bsdf = def(0.f);
             auto u_lobe = sampler()->generate_1d();
             auto u_bsdf = sampler()->generate_2d();
+            auto eta_scale = def(1.f);
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
 
                 // create closure
@@ -457,13 +458,19 @@ void WavefrontPathTracingInstance::_render_one_camera(
                     pdf_bsdf = sample.eval.pdf;
                     auto w = ite(sample.eval.pdf > 0.0f, 1.f / sample.eval.pdf, 0.f);
                     beta *= w * sample.eval.f;
+
+                    // apply eta scale
+                    $switch (sample.event) {
+                        $case (Surface::event_enter) { eta_scale = sqr(sample.eta); };
+                        $case (Surface::event_exit) { eta_scale = 1.f / sqr(sample.eta); };
+                    };
                 };
             });
             $if(beta.any([](auto b) noexcept { return !isnan(b) & b > 0.f; })) {
                 auto rr_depth = node<WavefrontPathTracing>()->rr_depth();
                 auto rr_threshold = node<WavefrontPathTracing>()->rr_threshold();
                 // rr
-                auto q = max(beta.max(), 0.05f);
+                auto q = max(beta.max() * eta_scale, 0.05f);
                 $if(trace_depth + 1u >= rr_depth & q < rr_threshold) {
                     $if(sampler()->generate_1d() < q) {
                         beta *= 1.f / q;
