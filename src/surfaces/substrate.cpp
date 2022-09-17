@@ -61,7 +61,7 @@ public:
 private:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         const Interaction &it, const SampledWavelengths &swl,
-        Expr<float> time) const noexcept override;
+        Expr<float> eta_i, Expr<float> time) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> SubstrateSurface::_build(
@@ -78,15 +78,17 @@ class SubstrateClosure final : public Surface::Closure {
 private:
     luisa::unique_ptr<TrowbridgeReitzDistribution> _distribution;
     luisa::unique_ptr<FresnelBlend> _blend;
+    Float _eta_i;
 
 public:
     SubstrateClosure(
         const Surface::Instance *instance,
-        const Interaction &it, const SampledWavelengths &swl, Expr<float> time,
+        const Interaction &it, const SampledWavelengths &swl, Expr<float> time, Expr<float> eta_i,
         const SampledSpectrum &Kd, const SampledSpectrum &Ks, Expr<float2> alpha, Expr<float> Kd_ratio) noexcept
         : Surface::Closure{instance, it, swl, time},
           _distribution{luisa::make_unique<TrowbridgeReitzDistribution>(alpha)},
-          _blend{luisa::make_unique<FresnelBlend>(Kd, Ks, _distribution.get(), Kd_ratio)} {}
+          _blend{luisa::make_unique<FresnelBlend>(Kd, Ks, _distribution.get(), Kd_ratio)} ,
+          _eta_i{eta_i} {}
 
 private:
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
@@ -97,7 +99,7 @@ private:
         return {.f = f * abs_cos_theta(wi_local),
                 .pdf = pdf,
                 .roughness = _distribution->alpha(),
-                .eta = 1.f};
+                .eta = _eta_i};
     }
 
     [[nodiscard]] Surface::Sample sample(Expr<float> u_lobe, Expr<float2> u) const noexcept override {
@@ -111,7 +113,7 @@ private:
                 .eval = {.f = f * abs_cos_theta(wi_local),
                          .pdf = pdf,
                          .roughness = _distribution->alpha(),
-                         .eta = 1.f}};
+                         .eta = _eta_i}};
     }
 
     void backward(Expr<float3> wi, const SampledSpectrum &df_in) const noexcept override {
@@ -145,7 +147,8 @@ private:
 };
 
 luisa::unique_ptr<Surface::Closure> SubstrateInstance::closure(
-    const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    const Interaction &it, const SampledWavelengths &swl,
+    Expr<float> eta_i, Expr<float> time) const noexcept {
     auto [Kd, Kd_lum] = _kd->evaluate_albedo_spectrum(it, swl, time);
     auto [Ks, Ks_lum] = _ks->evaluate_albedo_spectrum(it, swl, time);
     auto alpha = def(make_float2(.5f));
@@ -159,10 +162,11 @@ luisa::unique_ptr<Surface::Closure> SubstrateInstance::closure(
                     (remap ? make_float2(r2a(r.x)) : r.xx()) :
                     (remap ? r2a(r.xy()) : r.xy());
     }
-    auto cos_theta = dot(it.shading().n(), it.wo());
-    auto pow5 = [](auto &&v) { return sqr(sqr(v)) * v; };
+//    auto cos_theta = dot(it.shading().n(), it.wo());
+//    auto pow5 = [](auto &&v) { return sqr(sqr(v)) * v; };
     auto Kd_ratio = Kd_lum / max(Kd_lum + Ks_lum, 1e-5f);
-    return luisa::make_unique<SubstrateClosure>(this, it, swl, time, Kd, Ks, alpha, Kd_ratio);
+    return luisa::make_unique<SubstrateClosure>(
+        this, it, swl, time, eta_i, Kd, Ks, alpha, Kd_ratio);
 }
 
 }// namespace luisa::render

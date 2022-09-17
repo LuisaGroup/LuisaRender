@@ -52,7 +52,7 @@ public:
 private:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         const Interaction &it, const SampledWavelengths &swl,
-        Expr<float> time) const noexcept override;
+        Expr<float> eta_i, Expr<float> time) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> MixSurface::_build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
@@ -86,7 +86,7 @@ private:
             .f = _ratio * eval_a.f + t * eval_b.f,
             .pdf = lerp(eval_a.pdf, eval_b.pdf, t),
             .roughness = lerp(eval_a.roughness, eval_b.roughness, t),
-            .eta = _ratio * eval_a.eta + t * eval_b.eta};
+            .eta = _ratio * eval_a.eta + t * eval_b.eta};// TODO: eta should be interpolated in a different way
     }
 
 public:
@@ -180,10 +180,11 @@ public:
 };
 
 luisa::unique_ptr<Surface::Closure> MixSurfaceInstance::closure(
-    const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    const Interaction &it, const SampledWavelengths &swl,
+    Expr<float> eta_i, Expr<float> time) const noexcept {
     auto ratio = _ratio == nullptr ? 0.5f : clamp(_ratio->evaluate(it, swl, time).x, 0.f, 1.f);
-    auto a = _a == nullptr ? nullptr : _a->closure(it, swl, time);
-    auto b = _b == nullptr ? nullptr : _b->closure(it, swl, time);
+    auto a = _a == nullptr ? nullptr : _a->closure(it, swl, eta_i, time);
+    auto b = _b == nullptr ? nullptr : _b->closure(it, swl, eta_i, time);
     return luisa::make_unique<MixSurfaceClosure>(
         this, it, swl, time, ratio, std::move(a), std::move(b));
 }

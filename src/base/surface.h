@@ -28,6 +28,14 @@ class Interaction;
 class Surface : public SceneNode {
 
 public:
+    enum struct Event {
+        REFLECT,
+        ENTER,
+        EXIT,
+        THROUGH,
+        INVALID,
+    };
+
     struct Evaluation {
         SampledSpectrum f;
         Float pdf;
@@ -99,7 +107,7 @@ public:
         [[nodiscard]] auto alpha() const noexcept { return _alpha; }
         [[nodiscard]] virtual luisa::unique_ptr<Closure> closure(
             const Interaction &it, const SampledWavelengths &swl,
-            Expr<float> time) const noexcept = 0;
+            Expr<float> eta_i, Expr<float> time) const noexcept = 0;
     };
 
 private:

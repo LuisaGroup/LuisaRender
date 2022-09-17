@@ -46,30 +46,8 @@ Float fresnel_dielectric(Float cosThetaI_in, Float etaI_in, Float etaT_in) noexc
     return ite(sinThetaT < 1.f, fr, 1.f);
 }
 
-Float fresnel_conductor(Float cosThetaI, Float etai, Float etat, Float k) noexcept {
-    using namespace compute;
-    cosThetaI = clamp(cosThetaI, -1.f, 1.f);
-    auto eta = etat / etai;
-    auto etak = k / etai;
-    auto cosThetaI2 = cosThetaI * cosThetaI;
-    auto sinThetaI2 = 1.f - cosThetaI2;
-    auto eta2 = eta * eta;
-    auto etak2 = etak * etak;
-    auto t0 = eta2 - etak2 - sinThetaI2;
-    auto a2plusb2 = sqrt(t0 * t0 + 4.f * eta2 * etak2);
-    auto t1 = a2plusb2 + cosThetaI2;
-    auto a = sqrt(.5f * (a2plusb2 + t0));
-    auto t2 = 2.f * cosThetaI * a;
-    auto Rs = (t1 - t2) / (t1 + t2);
-    auto t3 = cosThetaI2 * a2plusb2 + sinThetaI2 * sinThetaI2;
-    auto t4 = t2 * sinThetaI2;
-    auto Rp = Rs * (t3 - t4) / (t3 + t4);
-    return .5f * (Rp + Rs);
-}
-
 SampledSpectrum fresnel_conductor(
-    Float cosThetaI, const SampledSpectrum &etai,
-    const SampledSpectrum &etat, const SampledSpectrum &k) noexcept {
+    Float cosThetaI, Float etai, const SampledSpectrum &etat, const SampledSpectrum &k) noexcept {
 
     using namespace compute;
     cosThetaI = clamp(cosThetaI, -1.f, 1.f);

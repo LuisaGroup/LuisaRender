@@ -55,7 +55,7 @@ public:
 private:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         const Interaction &it, const SampledWavelengths &swl,
-        Expr<float> time) const noexcept override;
+        Expr<float> eta_i, Expr<float> time) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> MirrorSurface::_build(
@@ -103,16 +103,18 @@ private:
     luisa::unique_ptr<SchlickFresnel> _fresnel;
     luisa::unique_ptr<TrowbridgeReitzDistribution> _distribution;
     luisa::unique_ptr<MicrofacetReflection> _refl;
+    Float _eta_i;
 
 public:
     MirrorClosure(
         const Surface::Instance *instance,
         const Interaction &it, const SampledWavelengths &swl, Expr<float> time,
-        const SampledSpectrum &refl, Expr<float2> alpha) noexcept
+        const SampledSpectrum &refl, Expr<float2> alpha, Expr<float> eta_i) noexcept
         : Surface::Closure{instance, it, swl, time},
           _fresnel{luisa::make_unique<SchlickFresnel>(refl)},
           _distribution{luisa::make_unique<TrowbridgeReitzDistribution>(alpha)},
-          _refl{luisa::make_unique<MicrofacetReflection>(refl, _distribution.get(), _fresnel.get())} {}
+          _refl{luisa::make_unique<MicrofacetReflection>(refl, _distribution.get(), _fresnel.get())},
+          _eta_i{eta_i} {}
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
         auto wo_local = _it.wo_local();
         auto wi_local = _it.shading().world_to_local(wi);
@@ -121,7 +123,7 @@ public:
         return {.f = f * abs_cos_theta(wi_local),
                 .pdf = pdf,
                 .roughness = _distribution->alpha(),
-                .eta = 1.f};
+                .eta = _eta_i};
     }
     [[nodiscard]] Surface::Sample sample(Expr<float>, Expr<float2> u) const noexcept override {
         auto pdf = def(0.f);
@@ -131,7 +133,7 @@ public:
                 .eval = {.f = f * abs_cos_theta(wi_local),
                          .pdf = pdf,
                          .roughness = _distribution->alpha(),
-                         .eta = 1.f}};
+                         .eta = _eta_i}};
     }
 
     void backward(Expr<float3> wi, const SampledSpectrum &df_in) const noexcept override {
@@ -163,7 +165,8 @@ public:
 };
 
 luisa::unique_ptr<Surface::Closure> MirrorInstance::closure(
-    const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    const Interaction &it, const SampledWavelengths &swl,
+    Expr<float> eta_i, Expr<float> time) const noexcept {
     auto alpha = def(make_float2(0.f));
     if (_roughness != nullptr) {
         auto r = _roughness->evaluate(it, swl, time);
@@ -176,7 +179,7 @@ luisa::unique_ptr<Surface::Closure> MirrorInstance::closure(
                     (remap ? r2a(r.xy()) : r.xy());
     }
     auto color = _color->evaluate_albedo_spectrum(it, swl, time).value;
-    return luisa::make_unique<MirrorClosure>(this, it, swl, time, color, alpha);
+    return luisa::make_unique<MirrorClosure>(this, it, swl, time, color, alpha, eta_i);
 }
 
 }// namespace luisa::render

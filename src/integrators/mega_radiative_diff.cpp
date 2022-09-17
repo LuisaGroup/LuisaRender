@@ -298,7 +298,7 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
                 pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
 
                     // create closure
-                    auto closure = surface->closure(*it, swl, time);
+                    auto closure = surface->closure(*it, swl, 1.f, time);
                     if (auto dispersive = closure->dispersive()) {
                         $if (*dispersive) { swl.terminate_secondary(); };
                     }
@@ -477,7 +477,7 @@ void MegakernelRadiativeDiffInstance::_render_one_camera(
                 pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
 
                     // create closure
-                    auto closure = surface->closure(*it, swl, time);
+                    auto closure = surface->closure(*it, swl, 1.f, time);
                     if (auto dispersive = closure->dispersive()) {
                         $if (*dispersive) { swl.terminate_secondary(); };
                     }

@@ -51,7 +51,7 @@ public:
 private:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         const Interaction &it, const SampledWavelengths &swl,
-        Expr<float> time) const noexcept override;
+        Expr<float> eta_i, Expr<float> time) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> MatteSurface::_build(
@@ -65,14 +65,17 @@ class MatteClosure final : public Surface::Closure {
 
 private:
     luisa::unique_ptr<OrenNayar> _oren_nayar;
+    Float _eta_i;
 
 public:
     MatteClosure(
         const Surface::Instance *instance,
         const Interaction &it, const SampledWavelengths &swl,
-        Expr<float> time, SampledSpectrum albedo, Expr<float> sigma) noexcept
+        Expr<float> time, SampledSpectrum albedo,
+        Expr<float> sigma, Expr<float> eta_i) noexcept
         : Surface::Closure{instance, it, swl, time},
-          _oren_nayar{luisa::make_unique<OrenNayar>(std::move(albedo), sigma)} {}
+          _oren_nayar{luisa::make_unique<OrenNayar>(std::move(albedo), sigma)},
+          _eta_i{eta_i} {}
 
 private:
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
@@ -83,7 +86,7 @@ private:
         return {.f = f * abs_cos_theta(wi_local),
                 .pdf = pdf,
                 .roughness = make_float2(1.f),
-                .eta = 1.f};
+                .eta = _eta_i};
     }
     [[nodiscard]] Surface::Sample sample(Expr<float>, Expr<float2> u) const noexcept override {
         auto wo_local = _it.wo_local();
@@ -95,7 +98,7 @@ private:
                 .eval = {.f = f * abs_cos_theta(wi_local),
                          .pdf = pdf,
                          .roughness = make_float2(1.f),
-                         .eta = 1.f}};
+                         .eta = _eta_i}};
     }
     void backward(Expr<float3> wi, const SampledSpectrum &df_in) const noexcept override {
         auto _instance = instance<MatteInstance>();
@@ -112,10 +115,11 @@ private:
 };
 
 luisa::unique_ptr<Surface::Closure> MatteInstance::closure(
-    const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    const Interaction &it, const SampledWavelengths &swl,
+    Expr<float> eta_i, Expr<float> time) const noexcept {
     auto Kd = _kd->evaluate_albedo_spectrum(it, swl, time).value;
     auto sigma = _sigma ? clamp(_sigma->evaluate(it, swl, time).x, 0.f, 90.f) : 0.f;
-    return luisa::make_unique<MatteClosure>(this, it, swl, time, Kd, sigma);
+    return luisa::make_unique<MatteClosure>(this, it, swl, time, Kd, sigma, eta_i);
 }
 
 }// namespace luisa::render

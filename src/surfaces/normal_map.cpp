@@ -45,7 +45,7 @@ public:
 private:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         const Interaction &it, const SampledWavelengths &swl,
-        Expr<float> time) const noexcept override;
+        Expr<float> eta_i, Expr<float> time) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> NormalMap::_build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
@@ -60,14 +60,15 @@ luisa::unique_ptr<Surface::Instance> NormalMap::_build(Pipeline &pipeline, Comma
 }
 
 luisa::unique_ptr<Surface::Closure> NormalMapInstance::closure(
-    const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    const Interaction &it, const SampledWavelengths &swl,
+    Expr<float> eta_i, Expr<float> time) const noexcept {
     LUISA_ASSERT(_base != nullptr, "NormalMapInstance has no base surface.");
-    if (_map == nullptr) { return _base->closure(it, swl, time); }
+    if (_map == nullptr) { return _base->closure(it, swl, eta_i, time); }
     auto normal_local = 2.f * _map->evaluate(it, swl, time).xyz() - 1.f;
     auto normal = it.shading().local_to_world(normal_local);
     auto mapped_it = it;
     mapped_it.set_shading(Frame::make(normal, it.shading().u()));
-    return _base->closure(mapped_it, swl, time);
+    return _base->closure(mapped_it, swl, eta_i, time);
 }
 
 }// namespace luisa::render

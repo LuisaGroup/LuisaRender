@@ -333,7 +333,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                 auto u_bsdf = sampler->generate_2d();
                 pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
                     // create closure
-                    auto closure = surface->closure(*it, swl, time);
+                    auto closure = surface->closure(*it, swl, 1.f, time);
                     if (auto dispersive = closure->dispersive()) {
                         $if (*dispersive) { swl.terminate_secondary(); };
                     }
@@ -496,7 +496,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                 auto u_bsdf = sampler->generate_2d();
                 pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
                     // create closure
-                    auto closure = surface->closure(*it, swl, time);
+                    auto closure = surface->closure(*it, swl, 1.f, time);
                     if (auto dispersive = closure->dispersive()) {
                         $if (*dispersive) { swl.terminate_secondary(); };
                     }
@@ -702,7 +702,7 @@ void MegakernelReplayDiffInstance::_render_one_camera(
                 auto u_bsdf = sampler->generate_2d();
                 pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
                     // create closure
-                    auto closure = surface->closure(*it, swl, time);
+                    auto closure = surface->closure(*it, swl, 1.f, time);
                     if (auto dispersive = closure->dispersive()) {
                         $if (*dispersive) { swl.terminate_secondary(); };
                     }

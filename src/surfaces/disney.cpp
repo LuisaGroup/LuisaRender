@@ -130,7 +130,7 @@ public:
 private:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         const Interaction &it, const SampledWavelengths &swl,
-        Expr<float> time) const noexcept override;
+        Expr<float> eta, Expr<float> time) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> DisneySurface::_build(
@@ -391,8 +391,8 @@ private:
     Float e;
 
 public:
-    DisneyFresnel(SampledSpectrum R0, Float metallic, Float eta) noexcept
-        : R0{std::move(R0)}, metallic{std::move(metallic)}, e{std::move(eta)} {}
+    DisneyFresnel(const SampledSpectrum &R0, Float metallic, Float eta) noexcept
+        : R0{R0}, metallic{std::move(metallic)}, e{std::move(eta)} {}
     [[nodiscard]] SampledSpectrum evaluate(Expr<float> cosI) const noexcept override {
         auto fr = fresnel_dielectric(cosI, 1.f, e);
         return R0.map([&](auto, auto R) noexcept {
@@ -459,16 +459,19 @@ private:
     luisa::unique_ptr<LambertianTransmission> _diff_trans;
     UInt _lobes;
     Float _sampling_weights[max_sampling_techique_count];
+    Float _eta_i;
+    Float _eta_t;
 
 public:
     DisneySurfaceClosure(
         const DisneySurfaceInstance *instance, const Interaction &it,
         const SampledWavelengths &swl, Expr<float> time,
-        const SampledSpectrum &color, Expr<float> color_lum, Expr<float> metallic_in, Expr<float> eta_in, Expr<float> roughness,
+        const SampledSpectrum &color, Expr<float> color_lum, Expr<float> metallic_in,
+        Expr<float> eta_i, Expr<float> eta_t_in, Expr<float> roughness,
         Expr<float> specular_tint, Expr<float> anisotropic, Expr<float> sheen, Expr<float> sheen_tint,
         Expr<float> clearcoat, Expr<float> clearcoat_gloss, Expr<float> specular_trans_in,
         Expr<float> flatness, Expr<float> diffuse_trans) noexcept
-        : Surface::Closure{instance, it, swl, time}, _lobes{0u} {
+        : Surface::Closure{instance, it, swl, time}, _lobes{0u}, _eta_i{eta_i} {
 
         // TODO: should not generate lobes than are not used.
         constexpr auto black_threshold = 1e-6f;
@@ -481,8 +484,9 @@ public:
         auto Ctint_weight = ite(color_lum > 0.f, 1.f / color_lum, 1.f);
         auto Ctint = color * Ctint_weight;// normalize lum. to isolate hue+sat
         auto Ctint_lum = color_lum * Ctint_weight;
-        auto eta = ite(eta_in < black_threshold, 1.5f, eta_in);
+        _eta_t = ite(eta_t_in < black_threshold, 1.5f, eta_t_in);
         auto thin = instance->thin();
+        auto eta = _eta_t / _eta_i;
 
         // diffuse
         auto diffuse_scale = ite(thin, (1.f - flatness) * (1.f - dt), ite(front_face, 1.f, 0.f));
@@ -534,7 +538,7 @@ public:
         _lobes |= refl_specular;// always consider the specular lobe
 
         // specular reflection sampling weight
-        auto fr = fresnel_dielectric(cos_theta_o, 1.f, eta);
+        auto fr = fresnel_dielectric(cos_theta_o, _eta_i, _eta_t);
         auto F = clamp(lerp(fr, FrSchlick(1.f, cos_theta_o), metallic), 0.1f, 0.9f);
         auto Cspec0_lum = F * lerp(lerp(1.f, Ctint_lum, specular_tint) * SchlickR0, color_lum, metallic);
         _sampling_weights[sampling_technique_specular] = Cspec0_lum;
@@ -554,7 +558,7 @@ public:
         auto Cst_weight = thin ? 0.f : 1.f;
         auto Cst = Cst_weight * T;
         _spec_trans = luisa::make_unique<MicrofacetTransmission>(
-            Cst, _distrib.get(), 1.f, eta);
+            Cst, _distrib.get(), _eta_i, _eta_t);
         auto Cst_lum = Cst_weight * T_lum;
         _lobes |= ite(Cst_lum > black_threshold, trans_specular, 0u);
 
@@ -570,7 +574,7 @@ public:
         auto Ctst = Ctst_weight * T;
         _thin_distrib = luisa::make_unique<TrowbridgeReitzDistribution>(ascaled);
         _thin_spec_trans = luisa::make_unique<MicrofacetTransmission>(
-            Ctst, _thin_distrib.get(), 1.f, eta);
+            Ctst, _thin_distrib.get(), _eta_i, _eta_t);
         auto Ctst_lum = Ctst_weight * T_lum;
         _lobes |= ite(Ctst_lum > black_threshold, trans_thin_specular, 0u);
 
@@ -638,7 +642,7 @@ public:
         return {.f = f * abs_cos_theta(wi_local),
                 .pdf = pdf,
                 .roughness = _distrib->alpha(),
-                .eta = ite(!thin & wi_local.z < 0.f, _fresnel->eta(), 1.f)};
+                .eta = ite(!thin & wi_local.z < 0.f, _eta_t, _eta_i)};
     }
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
         auto wo_local = _it.wo_local();
@@ -648,7 +652,6 @@ public:
     [[nodiscard]] Surface::Sample sample(Expr<float> u_lobe, Expr<float2> u) const noexcept override {
         auto sampling_tech = def(0u);
         auto sum_weights = def(0.f);
-        auto ux_remapped = def(0.f);
         auto lower_sum = def(0.f);
         auto upper_sum = def(1.f);
         for (auto i = 0u; i < max_sampling_techique_count; i++) {
@@ -684,7 +687,8 @@ public:
 };
 
 luisa::unique_ptr<Surface::Closure> DisneySurfaceInstance::closure(
-    const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    const Interaction &it, const SampledWavelengths &swl,
+    Expr<float> eta_i, Expr<float> time) const noexcept {
     auto [color, color_lum] = _color->evaluate_albedo_spectrum(it, swl, time);
     auto metallic = _metallic ? _metallic->evaluate(it, swl, time).x : 0.f;
     auto eta = _eta ? _eta->evaluate(it, swl, time).x : 1.5f;
@@ -700,7 +704,7 @@ luisa::unique_ptr<Surface::Closure> DisneySurfaceInstance::closure(
     auto diffuse_trans = _diffuse_trans ? _diffuse_trans->evaluate(it, swl, time).x : 0.f;
     return luisa::make_unique<DisneySurfaceClosure>(
         this, it, swl, time, color, color_lum,
-        metallic, eta, roughness, specular_tint, anisotropic,
+        metallic, eta_i, eta, roughness, specular_tint, anisotropic,
         sheen, sheen_tint, clearcoat, clearcoat_gloss,
         specular_trans, flatness, diffuse_trans);
 }

@@ -66,13 +66,10 @@ struct TrowbridgeReitzDistribution : public MicrofacetDistribution {
     [[nodiscard]] static Float2 grad_alpha_roughness(Expr<float2> roughness) noexcept;
 };
 
-[[nodiscard]] Float fresnel_dielectric(Float cosThetaI, Float etaI, Float etaT) noexcept;
-[[nodiscard]] Float fresnel_conductor(Float cosThetaI, Float etaI, Float etaT, Float k) noexcept;
-[[nodiscard]] SampledSpectrum fresnel_dielectric(
-    Float cosThetaI, const SampledSpectrum &etaI, const SampledSpectrum &etaT) noexcept;
+[[nodiscard]] Float fresnel_dielectric(
+    Float cosThetaI, Float etaI, Float etaT) noexcept;
 [[nodiscard]] SampledSpectrum fresnel_conductor(
-    Float cosThetaI, const SampledSpectrum &etaI,
-    const SampledSpectrum &etaT, const SampledSpectrum &k) noexcept;
+    Float cosThetaI, Float etaI, const SampledSpectrum &etaT, const SampledSpectrum &k) noexcept;
 
 struct Fresnel {
     struct Gradient {
@@ -90,15 +87,16 @@ struct Fresnel {
 class FresnelConductor final : public Fresnel {
 
 private:
-    SampledSpectrum _eta_i;
+    Float _eta_i;
     SampledSpectrum _eta_t;
     SampledSpectrum _k;
 
 public:
-    FresnelConductor(const SampledSpectrum &etaI,
-                     const SampledSpectrum &etaT,
-                     const SampledSpectrum &k) noexcept
+    FresnelConductor(Expr<float> etaI, const SampledSpectrum &etaT, const SampledSpectrum &k) noexcept
         : _eta_i{etaI}, _eta_t{etaT}, _k{k} {}
+    [[nodiscard]] auto eta_i() const noexcept { return _eta_i; }
+    [[nodiscard]] auto eta_t() const noexcept { return _eta_t; }
+    [[nodiscard]] auto k() const noexcept { return _k; }
     [[nodiscard]] SampledSpectrum evaluate(Expr<float> cosThetaI) const noexcept override;
 };
 

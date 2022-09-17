@@ -177,7 +177,8 @@ public:
 
 private:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
-        const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override;
+        const Interaction &it, const SampledWavelengths &swl,
+        Expr<float> eta_i, Expr<float> time) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> MetalSurface::_build(
@@ -211,10 +212,12 @@ private:
 
 public:
     MetalClosure(
-        const Surface::Instance *instance, const Interaction &it, const SampledWavelengths &swl, Expr<float> time,
-        const SampledSpectrum &n, const SampledSpectrum &k, luisa::optional<SampledSpectrum> refl, Expr<float2> alpha) noexcept
+        const Surface::Instance *instance, const Interaction &it,
+        const SampledWavelengths &swl, Expr<float> time,
+        Expr<float> eta_i, const SampledSpectrum &n, const SampledSpectrum &k,
+        luisa::optional<SampledSpectrum> refl, Expr<float2> alpha) noexcept
         : Surface::Closure{instance, it, swl, time}, _refl{std::move(refl)},
-          _fresnel{luisa::make_unique<FresnelConductor>(SampledSpectrum{1.f}, n, k)},
+          _fresnel{luisa::make_unique<FresnelConductor>(eta_i, n, k)},
           _distrib{luisa::make_unique<TrowbridgeReitzDistribution>(alpha)},
           _lobe{luisa::make_unique<MicrofacetReflection>(SampledSpectrum{swl.dimension(), 1.f}, _distrib.get(), _fresnel.get())} {}
 
@@ -228,7 +231,7 @@ private:
         return {.f = f * abs_cos_theta(wi_local),
                 .pdf = pdf,
                 .roughness = _distrib->alpha(),
-                .eta = 1.f};
+                .eta = _fresnel->eta_i()};
     }
     [[nodiscard]] Surface::Sample sample(Expr<float>, Expr<float2> u) const noexcept override {
         auto wo_local = _it.wo_local();
@@ -241,7 +244,7 @@ private:
                 .eval = {.f = f * abs_cos_theta(wi_local),
                          .pdf = pdf,
                          .roughness = _distrib->alpha(),
-                         .eta = 1.f}};
+                         .eta = _fresnel->eta_i()}};
     }
     void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
         // Metal surface is not differentiable
@@ -249,7 +252,8 @@ private:
 };
 
 luisa::unique_ptr<Surface::Closure> MetalInstance::closure(
-    const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    const Interaction &it, const SampledWavelengths &swl,
+    Expr<float> eta_i, Expr<float> time) const noexcept {
     auto alpha = def(make_float2(.5f));
     if (_roughness != nullptr) {
         auto r = _roughness->evaluate(it, swl, time);
@@ -271,7 +275,8 @@ luisa::unique_ptr<Surface::Closure> MetalInstance::closure(
         refl.emplace(_kd->evaluate_albedo_spectrum(it, swl, time).value);
     }
     return luisa::make_unique<MetalClosure>(
-        this, it, swl, time, eta, k, std::move(refl), alpha);
+        this, it, swl, time, eta_i,
+        eta, k, std::move(refl), alpha);
 }
 
 }// namespace luisa::render
