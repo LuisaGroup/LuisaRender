@@ -48,9 +48,12 @@ private:
     Local<float> _samples;
 
 public:
-    explicit SampledSpectrum(size_t n, Expr<float> value = 0.f) noexcept : _samples{n} {
+    SampledSpectrum(uint n, Expr<float> value) noexcept : _samples{n} {
         for (auto i = 0u; i < n; i++) { _samples[i] = value; }
     }
+    explicit SampledSpectrum(uint n) noexcept : SampledSpectrum{n, 0.f} {}
+    explicit SampledSpectrum(Expr<float> value) noexcept : SampledSpectrum{1u, value} {}
+    explicit SampledSpectrum(float value) noexcept : SampledSpectrum{1u, value} {}
     auto &operator=(Expr<float> value) noexcept {
         for (auto i = 0u; i < dimension(); i++) { _samples[i] = value; }
         return *this;
@@ -58,13 +61,24 @@ public:
     [[nodiscard]] uint dimension() const noexcept {
         return static_cast<uint>(_samples.size());
     }
+    auto &operator=(const SampledSpectrum &rhs) noexcept {
+        LUISA_ASSERT(rhs.dimension() == 1u || dimension() == rhs.dimension(),
+                     "Invalid spectrum dimensions for operator=: {} vs {}.",
+                     dimension(), rhs.dimension());
+        for (auto i = 0u; i < dimension(); i++) { _samples[i] = rhs[i]; }
+        return *this;
+    }
     [[nodiscard]] Local<float> &values() noexcept { return _samples; }
     [[nodiscard]] const Local<float> &values() const noexcept { return _samples; }
-    [[nodiscard]] Float &operator[](Expr<uint> i) noexcept { return _samples[i]; }
-    [[nodiscard]] Float operator[](Expr<uint> i) const noexcept { return _samples[i]; }
+    [[nodiscard]] Float &operator[](Expr<uint> i) noexcept {
+        return dimension() == 1u ? _samples[0u] : _samples[i];
+    }
+    [[nodiscard]] Float operator[](Expr<uint> i) const noexcept {
+        return dimension() == 1u ? _samples[0u] : _samples[i];
+    }
     template<typename F>
     [[nodiscard]] auto map(F &&f) const noexcept {
-        SampledSpectrum s{_samples.size()};
+        SampledSpectrum s{dimension()};
         for (auto i = 0u; i < dimension(); i++) { s[i] = f(i, Expr{(*this)[i]}); }
         return s;
     }
@@ -84,7 +98,7 @@ public:
         });
     }
     [[nodiscard]] auto min() const noexcept {
-        return reduce(0.f, [](auto r, auto, auto x) noexcept {
+        return reduce(std::numeric_limits<float>::max(), [](auto r, auto, auto x) noexcept {
             return luisa::compute::min(r, x);
         });
     }
@@ -115,23 +129,32 @@ public:
         return map([](auto, auto s) noexcept { return compute::abs(s); });
     }
 
-#define LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP(op)                                          \
-    [[nodiscard]] auto operator op(Expr<float> rhs) const noexcept {                              \
-        return map([rhs](auto, const auto &lvalue) { return lvalue op rhs; });                    \
-    }                                                                                             \
-    [[nodiscard]] auto operator op(const SampledSpectrum &rhs) const noexcept {                   \
-        return map([&rhs](auto i, const auto &lvalue) { return lvalue op rhs[i]; });              \
-    }                                                                                             \
-    [[nodiscard]] friend auto operator op(Expr<float> lhs, const SampledSpectrum &rhs) noexcept { \
-        return rhs.map([lhs](auto, const auto &rvalue) noexcept { return lhs op rvalue; });       \
-    }                                                                                             \
-    auto &operator op##=(Expr<float> rhs) noexcept {                                              \
-        for (auto i = 0u; i < dimension(); i++) { (*this)[i] op## = rhs; }                        \
-        return *this;                                                                             \
-    }                                                                                             \
-    auto &operator op##=(const SampledSpectrum &rhs) noexcept {                                   \
-        for (auto i = 0u; i < dimension(); i++) { (*this)[i] op## = rhs[i]; }                     \
-        return *this;                                                                             \
+#define LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP(op)                                           \
+    [[nodiscard]] auto operator op(Expr<float> rhs) const noexcept {                               \
+        return map([rhs](auto, const auto &lvalue) { return lvalue op rhs; });                     \
+    }                                                                                              \
+    [[nodiscard]] auto operator op(const SampledSpectrum &rhs) const noexcept {                    \
+        LUISA_ASSERT(dimension() == 1u || rhs.dimension() == 1u || dimension() == rhs.dimension(), \
+                     "Invalid sampled spectrum dimension for operator" #op ": {} vs {}.",          \
+                     dimension(), rhs.dimension());                                                \
+        SampledSpectrum s{std::max(dimension(), rhs.dimension())};                                 \
+        for (auto i = 0u; i < s.dimension(); i++) { s[i] = (*this)[i] op rhs[i]; }                 \
+        return s;                                                                                  \
+    }                                                                                              \
+    [[nodiscard]] friend auto operator op(Expr<float> lhs, const SampledSpectrum &rhs) noexcept {  \
+        return rhs.map([lhs](auto, const auto &rvalue) noexcept { return lhs op rvalue; });        \
+    }                                                                                              \
+    auto &operator op##=(Expr<float> rhs) noexcept {                                               \
+        for (auto i = 0u; i < dimension(); i++) { (*this)[i] op## = rhs; }                         \
+        return *this;                                                                              \
+    }                                                                                              \
+    auto &operator op##=(const SampledSpectrum &rhs) noexcept {                                    \
+        LUISA_ASSERT(rhs.dimension() == 1u || dimension() == rhs.dimension(),                      \
+                     "Invalid sampled spectrum dimension for operator" #op "=: {} vs {}.",         \
+                     dimension(), rhs.dimension());                                                \
+        if (rhs.dimension() == 1u) { return *this op## = rhs[0u]; }                                \
+        for (auto i = 0u; i < dimension(); i++) { (*this)[i] op## = rhs[i]; }                      \
+        return *this;                                                                              \
     }
     LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP(+)
     LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP(-)
@@ -179,6 +202,7 @@ public:
     void set_lambda(Expr<uint> i, Expr<float> lambda) noexcept { _lambdas[i] = lambda; }
     void set_pdf(Expr<uint> i, Expr<float> pdf) noexcept { _pdfs[i] = pdf; }
     [[nodiscard]] auto dimension() const noexcept { return static_cast<uint>(_lambdas.size()); }
+    void terminate_secondary() const noexcept;
 };
 
 }// namespace luisa::render

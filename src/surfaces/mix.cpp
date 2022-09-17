@@ -170,6 +170,13 @@ public:
             _b->backward(wi, df * (1.f - _ratio));
         }
     }
+    [[nodiscard]] luisa::optional<Bool> dispersive() const noexcept override {
+        auto a_dispersive = _a == nullptr ? luisa::nullopt : _a->dispersive();
+        auto b_dispersive = _b == nullptr ? luisa::nullopt : _b->dispersive();
+        if (!a_dispersive) { return b_dispersive; }
+        if (!b_dispersive) { return a_dispersive; }
+        return *a_dispersive | *b_dispersive;
+    }
 };
 
 luisa::unique_ptr<Surface::Closure> MixSurfaceInstance::closure(

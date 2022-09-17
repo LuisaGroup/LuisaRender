@@ -407,22 +407,62 @@ SampledSpectrum zero_if_any_nan(const SampledSpectrum &t) noexcept {
 }
 
 SampledSpectrum ite(const SampledSpectrum &p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept {
-    return p.map([&t, &f](auto i, auto b) noexcept { return ite(b != 0.f, t[i], f[i]); });
+    auto n = std::max({p.dimension(), t.dimension(), f.dimension()});
+    LUISA_ASSERT((p.dimension() == 1u || p.dimension() == n) &&
+                     (t.dimension() == 1u || t.dimension() == n) &&
+                     (f.dimension() == 1u || f.dimension() == n),
+                 "Invalid spectrum dimensions for ite: (p = {}, t = {}, f = {}).",
+                 p.dimension(), t.dimension(), f.dimension());
+    auto r = SampledSpectrum{n};
+    for (auto i = 0u; i < n; i++) { r[i] = ite(p[i] != 0.f, t[i], f[i]); }
+    return r;
 }
+
 SampledSpectrum ite(const SampledSpectrum &p, Expr<float> t, const SampledSpectrum &f) noexcept {
-    return p.map([&t, &f](auto i, auto b) noexcept { return ite(b != 0.f, t, f[i]); });
+    LUISA_ASSERT(f.dimension() == 1u || p.dimension() == 1u || f.dimension() == p.dimension(),
+                 "Invalid spectrum dimensions for ite: (p = {}, t = 1, f = {}).",
+                 p.dimension(), f.dimension());
+    auto r = SampledSpectrum{std::max(f.dimension(), p.dimension())};
+    for (auto i = 0u; i < r.dimension(); i++) { r[i] = ite(p[i] != 0.f, t, f[i]); }
+    return r;
 }
+
 SampledSpectrum ite(const SampledSpectrum &p, const SampledSpectrum &t, Expr<float> f) noexcept {
-    return p.map([&t, &f](auto i, auto b) noexcept { return ite(b != 0.f, t[i], f); });
+    LUISA_ASSERT(t.dimension() == 1u || p.dimension() == 1u || t.dimension() == p.dimension(),
+                 "Invalid spectrum dimensions for ite: (p = {}, t = {}, f = 1).",
+                 p.dimension(), t.dimension());
+    auto r = SampledSpectrum{std::max(t.dimension(), p.dimension())};
+    for (auto i = 0u; i < r.dimension(); i++) { r[i] = ite(p[i] != 0.f, t[i], f); }
+    return r;
 }
+
 SampledSpectrum ite(Expr<bool> p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept {
-    return t.map([p, &f](auto i, auto x) noexcept { return ite(p, x, f[i]); });
+    LUISA_ASSERT(t.dimension() == 1u || f.dimension() == 1u || t.dimension() == f.dimension(),
+                 "Invalid spectrum dimensions for ite: (p = 1, t = {}, f = {}).",
+                 t.dimension(), f.dimension());
+    auto r = SampledSpectrum{std::max(t.dimension(), f.dimension())};
+    for (auto i = 0u; i < r.dimension(); i++) { r[i] = ite(p, t[i], f[i]); }
+    return r;
 }
+
 SampledSpectrum ite(Expr<bool> p, Expr<float> t, const SampledSpectrum &f) noexcept {
     return f.map([p, t](auto i, auto x) noexcept { return ite(p, t, x); });
 }
+
 SampledSpectrum ite(Expr<bool> p, const SampledSpectrum &t, Expr<float> f) noexcept {
     return t.map([p, f](auto i, auto x) noexcept { return ite(p, x, f); });
+}
+
+void SampledWavelengths::terminate_secondary() const noexcept {
+    using namespace luisa::compute;
+    auto terminated = def(true);
+    for (auto i = 1u; i < dimension(); i++) {
+        terminated &= _pdfs[i] == 0.f;
+        _pdfs[i] = 0.f;
+    }
+    $if (!terminated) {
+        _pdfs[0] *= static_cast<float>(1. / dimension());
+    };
 }
 
 }// namespace luisa::render

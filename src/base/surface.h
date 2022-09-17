@@ -32,20 +32,20 @@ public:
         SampledSpectrum f;
         Float pdf;
         Float2 roughness;
-        SampledSpectrum eta;
-        [[nodiscard]] static auto zero(size_t spec_dim) noexcept {
+        Float eta;
+        [[nodiscard]] static auto zero(uint spec_dim) noexcept {
             return Evaluation{
                 .f = SampledSpectrum{spec_dim},
                 .pdf = 0.f,
                 .roughness = make_float2(),
-                .eta = SampledSpectrum{spec_dim, 1.f}};
+                .eta = 1.f};
         }
     };
 
     struct Sample {
         Float3 wi;
         Evaluation eval;
-        [[nodiscard]] static auto zero(size_t spec_dim) noexcept {
+        [[nodiscard]] static auto zero(uint spec_dim) noexcept {
             return Sample{.wi = make_float3(0.f, 0.f, 1.f),
                           .eval = Evaluation::zero(spec_dim)};
         }
@@ -75,6 +75,7 @@ public:
         [[nodiscard]] auto &interaction() const noexcept { return _it; }
         virtual void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept = 0;
         [[nodiscard]] virtual luisa::optional<Float> opacity() const noexcept;
+        [[nodiscard]] virtual luisa::optional<Bool> dispersive() const noexcept;
     };
 
     class Instance {

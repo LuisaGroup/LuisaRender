@@ -299,6 +299,9 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
 
                     // create closure
                     auto closure = surface->closure(*it, swl, time);
+                    if (auto dispersive = closure->dispersive()) {
+                        $if (*dispersive) { swl.terminate_secondary(); };
+                    }
 
                     // apply roughness map
                     auto alpha_skip = def(false);
@@ -475,6 +478,9 @@ void MegakernelRadiativeDiffInstance::_render_one_camera(
 
                     // create closure
                     auto closure = surface->closure(*it, swl, time);
+                    if (auto dispersive = closure->dispersive()) {
+                        $if (*dispersive) { swl.terminate_secondary(); };
+                    }
 
                     // apply roughness map
                     auto alpha_skip = def(false);

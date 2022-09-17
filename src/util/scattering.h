@@ -81,8 +81,9 @@ struct Fresnel {
 
     virtual ~Fresnel() noexcept = default;
     [[nodiscard]] virtual SampledSpectrum evaluate(Expr<float> cosI) const noexcept = 0;
-    [[nodiscard]] virtual luisa::unique_ptr<Gradient> backward(Expr<float> cosI, const SampledSpectrum &df) const noexcept {
-        return luisa::make_unique<Fresnel::Gradient>();
+    [[nodiscard]] virtual luisa::unique_ptr<Gradient> backward(
+        Expr<float> cosI, const SampledSpectrum &df) const noexcept {
+        return nullptr;
     }
 };
 
@@ -94,19 +95,21 @@ private:
     SampledSpectrum _k;
 
 public:
-    FresnelConductor(SampledSpectrum etaI, SampledSpectrum etaT, SampledSpectrum k) noexcept
-        : _eta_i{std::move(etaI)}, _eta_t{std::move(etaT)}, _k{std::move(k)} {}
+    FresnelConductor(const SampledSpectrum &etaI,
+                     const SampledSpectrum &etaT,
+                     const SampledSpectrum &k) noexcept
+        : _eta_i{etaI}, _eta_t{etaT}, _k{k} {}
     [[nodiscard]] SampledSpectrum evaluate(Expr<float> cosThetaI) const noexcept override;
 };
 
 class FresnelDielectric final : public Fresnel {
 
 private:
-    SampledSpectrum _eta_i, _eta_t;
+    Float _eta_i, _eta_t;
 
 public:
-    FresnelDielectric(SampledSpectrum etaI, SampledSpectrum etaT) noexcept
-        : _eta_i{std::move(etaI)}, _eta_t{std::move(etaT)} {}
+    FresnelDielectric(Expr<float> etaI, Expr<float> etaT) noexcept
+        : _eta_i{etaI}, _eta_t{etaT} {}
     [[nodiscard]] auto eta_i() const noexcept { return _eta_i; }
     [[nodiscard]] auto eta_t() const noexcept { return _eta_t; }
     [[nodiscard]] SampledSpectrum evaluate(Expr<float> cosThetaI) const noexcept override;
@@ -130,7 +133,7 @@ private:
     SampledSpectrum _r;
 
 public:
-    explicit LambertianReflection(SampledSpectrum R) noexcept : _r{std::move(R)} {}
+    explicit LambertianReflection(const SampledSpectrum &R) noexcept : _r{R} {}
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
     [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept;
 };
@@ -146,7 +149,7 @@ private:
     SampledSpectrum _t;
 
 public:
-    explicit LambertianTransmission(SampledSpectrum T) noexcept : _t{std::move(T)} {}
+    explicit LambertianTransmission(const SampledSpectrum &T) noexcept : _t{T} {}
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
     [[nodiscard]] SampledSpectrum sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept override;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept override;
@@ -159,7 +162,6 @@ public:
     struct Gradient {
         SampledSpectrum dR;
         Float2 dAlpha;
-
         luisa::unique_ptr<Fresnel::Gradient> dFresnel;
     };
 
@@ -170,8 +172,8 @@ private:
     const Fresnel *_fresnel;
 
 public:
-    MicrofacetReflection(SampledSpectrum R, const MicrofacetDistribution *d, const Fresnel *f) noexcept
-        : _r{std::move(R)}, _distribution{d}, _fresnel{f} {}
+    MicrofacetReflection(const SampledSpectrum &R, const MicrofacetDistribution *d, const Fresnel *f) noexcept
+        : _r{R}, _distribution{d}, _fresnel{f} {}
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
     [[nodiscard]] SampledSpectrum sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept override;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept override;
@@ -190,14 +192,15 @@ private:
     // MicrofacetTransmission Private Data
     SampledSpectrum _t;
     const MicrofacetDistribution *_distribution;
-    SampledSpectrum _eta_a;
-    SampledSpectrum _eta_b;
+    Float _eta_a;
+    Float _eta_b;
 
 public:
     // MicrofacetTransmission Public Methods
-    MicrofacetTransmission(SampledSpectrum T, const MicrofacetDistribution *d,
-                           SampledSpectrum etaA, SampledSpectrum etaB) noexcept
-        : _t{std::move(T)}, _distribution{d}, _eta_a{std::move(etaA)}, _eta_b{std::move(etaB)} {}
+    MicrofacetTransmission(const SampledSpectrum &T,
+                           const MicrofacetDistribution *d,
+                           Expr<float> etaA, Expr<float> etaB) noexcept
+        : _t{T}, _distribution{d}, _eta_a{etaA}, _eta_b{etaB} {}
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
     [[nodiscard]] SampledSpectrum sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept override;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept override;
@@ -244,8 +247,9 @@ private:
     [[nodiscard]] SampledSpectrum Schlick(Expr<float> cosTheta) const noexcept;
 
 public:
-    FresnelBlend(SampledSpectrum Rd, SampledSpectrum Rs, const MicrofacetDistribution *distrib, Expr<float> Rd_sample_ratio = .5f) noexcept
-        : _rd{std::move(Rd)}, _rs{std::move(Rs)}, _rd_ratio{clamp(Rd_sample_ratio, .05f, .95f)},  _distribution{distrib} {}
+    FresnelBlend(const SampledSpectrum &Rd, const SampledSpectrum &Rs,
+                 const MicrofacetDistribution *distrib, Expr<float> Rd_sample_ratio = .5f) noexcept
+        : _rd{Rd}, _rs{Rs}, _rd_ratio{clamp(Rd_sample_ratio, .05f, .95f)},  _distribution{distrib} {}
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
     [[nodiscard]] SampledSpectrum sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept override;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept override;

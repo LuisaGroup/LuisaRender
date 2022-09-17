@@ -204,7 +204,6 @@ luisa::unique_ptr<Surface::Instance> MetalSurface::_build(
 class MetalClosure final : public Surface::Closure {
 
 private:
-    SampledSpectrum _eta_i;
     luisa::optional<SampledSpectrum> _refl;
     luisa::unique_ptr<FresnelConductor> _fresnel;
     luisa::unique_ptr<TrowbridgeReitzDistribution> _distrib;
@@ -214,10 +213,10 @@ public:
     MetalClosure(
         const Surface::Instance *instance, const Interaction &it, const SampledWavelengths &swl, Expr<float> time,
         const SampledSpectrum &n, const SampledSpectrum &k, luisa::optional<SampledSpectrum> refl, Expr<float2> alpha) noexcept
-        : Surface::Closure{instance, it, swl, time}, _eta_i{swl.dimension(), 1.f}, _refl{std::move(refl)},
-          _fresnel{luisa::make_unique<FresnelConductor>(_eta_i, n, k)},
+        : Surface::Closure{instance, it, swl, time}, _refl{std::move(refl)},
+          _fresnel{luisa::make_unique<FresnelConductor>(SampledSpectrum{1.f}, n, k)},
           _distrib{luisa::make_unique<TrowbridgeReitzDistribution>(alpha)},
-          _lobe{luisa::make_unique<MicrofacetReflection>(_eta_i, _distrib.get(), _fresnel.get())} {}
+          _lobe{luisa::make_unique<MicrofacetReflection>(SampledSpectrum{swl.dimension(), 1.f}, _distrib.get(), _fresnel.get())} {}
 
 private:
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
@@ -229,7 +228,7 @@ private:
         return {.f = f * abs_cos_theta(wi_local),
                 .pdf = pdf,
                 .roughness = _distrib->alpha(),
-                .eta = _eta_i};
+                .eta = 1.f};
     }
     [[nodiscard]] Surface::Sample sample(Expr<float>, Expr<float2> u) const noexcept override {
         auto wo_local = _it.wo_local();
@@ -242,7 +241,7 @@ private:
                 .eval = {.f = f * abs_cos_theta(wi_local),
                          .pdf = pdf,
                          .roughness = _distrib->alpha(),
-                         .eta = _eta_i}};
+                         .eta = 1.f}};
     }
     void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
         // Metal surface is not differentiable

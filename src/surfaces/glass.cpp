@@ -128,7 +128,7 @@ luisa::unique_ptr<Surface::Instance> GlassSurface::_build(
 class GlassClosure final : public Surface::Closure {
 
 private:
-    SampledSpectrum _eta_i;
+    Bool _dispersive;
     luisa::unique_ptr<TrowbridgeReitzDistribution> _distribution;
     luisa::unique_ptr<FresnelDielectric> _fresnel;
     luisa::unique_ptr<MicrofacetReflection> _refl;
@@ -140,13 +140,17 @@ public:
         const Surface::Instance *instance, const Interaction &it,
         const SampledWavelengths &swl, Expr<float> time,
         const SampledSpectrum &Kr, const SampledSpectrum &Kt,
-        const SampledSpectrum &eta, Expr<float2> alpha, Expr<float> Kr_ratio) noexcept
-        : Surface::Closure{instance, it, swl, time}, _eta_i{swl.dimension(), 1.f},
+        Expr<float> eta, Expr<bool> dispersive,
+        Expr<float2> alpha, Expr<float> Kr_ratio) noexcept
+        : Surface::Closure{instance, it, swl, time}, _dispersive{dispersive},
           _distribution{luisa::make_unique<TrowbridgeReitzDistribution>(alpha)},
-          _fresnel{luisa::make_unique<FresnelDielectric>(_eta_i, eta)},
+          _fresnel{luisa::make_unique<FresnelDielectric>(1.f, eta)},
           _refl{luisa::make_unique<MicrofacetReflection>(Kr, _distribution.get(), _fresnel.get())},
-          _trans{luisa::make_unique<MicrofacetTransmission>(Kt, _distribution.get(), _eta_i, eta)},
+          _trans{luisa::make_unique<MicrofacetTransmission>(Kt, _distribution.get(), 1.f, eta)},
           _kr_ratio{Kr_ratio} {}
+
+    [[nodiscard]] luisa::optional<Bool> dispersive() const noexcept override { return _dispersive; }
+
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
         auto wo_local = _it.wo_local();
         auto wi_local = _it.shading().world_to_local(wi);
@@ -251,34 +255,30 @@ luisa::unique_ptr<Surface::Closure> GlassInstance::closure(
     auto Kr_ratio = ite(Kr_lum == 0.f, 0.f, sqrt(Kr_lum) / (sqrt(Kr_lum) + sqrt(Kt_lum)));
 
     // eta
-    auto mean_eta = def(1.f);
-    SampledSpectrum eta{swl.dimension(), mean_eta};
+    auto eta = def(1.5f);
+    auto dispersive = def(false);
     if (_eta != nullptr) {
         if (_eta->node()->channels() == 1u) {
-            mean_eta = _eta->evaluate(it, swl, time).x;
-            for (auto i = 0u; i < eta.dimension(); i++) { eta[i] = mean_eta; }
+            eta = _eta->evaluate(it, swl, time).x;
         } else {
             auto e = _eta->evaluate(it, swl, time).xyz();
-            mean_eta = e.y;
             auto inv_bb = sqr(1.f / fraunhofer_wavelengths);
             auto m = make_float3x3(make_float3(1.f), inv_bb, sqr(inv_bb));
             auto c = inverse(m) * e;
-            for (auto i = 0u; i < swl.dimension(); i++) {
-                auto inv_ll = sqr(1.f / swl.lambda(i));
-                eta[i] = c.x + c.y * inv_ll + c.z * sqr(inv_ll);
-            }
+            auto inv_ll = sqr(1.f / swl.lambda(0u));
+            eta = c.x + c.y * inv_ll + c.z * sqr(inv_ll);
+            dispersive = !(e.x == e.y & e.y == e.z);
         }
     }
 
     // fresnel
     auto cos_o = cos_theta(it.wo_local());
-    auto eta_i = ite(cos_o < 0.f, mean_eta, 1.f);
-    auto eta_t = ite(cos_o < 0.f, 1.f, mean_eta);
+    auto eta_i = ite(cos_o < 0.f, eta, 1.f);
+    auto eta_t = ite(cos_o < 0.f, 1.f, eta);
     auto Fr = fresnel_dielectric(cos_o, eta_i, eta_t);
-
     return luisa::make_unique<GlassClosure>(
-        this, it, swl, time, Kr, Kt, eta, alpha,
-        clamp(Fr * Kr_ratio, .05f, .95f));
+        this, it, swl, time, Kr, Kt, eta, dispersive,
+        alpha, clamp(Fr * Kr_ratio, .05f, .95f));
 }
 
 }// namespace luisa::render

@@ -35,4 +35,8 @@ luisa::optional<Float> Surface::Closure::opacity() const noexcept {
     return o;
 }
 
+luisa::optional<Bool> Surface::Closure::dispersive() const noexcept {
+    return luisa::nullopt;
+}
+
 }// namespace luisa::render

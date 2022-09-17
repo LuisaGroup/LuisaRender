@@ -45,7 +45,7 @@ void MediumTracker::exit(Expr<uint> priority) noexcept {
 
 Var<MediumInfo> MediumTracker::current() const noexcept {
     auto m = def<MediumInfo>();
-    m.eta = ite(vacuum(), make_float4(1.f), _medium_list[0].eta);
+    m.eta = ite(vacuum(), 1.f, _medium_list[0].eta);
     return m;
 }
 

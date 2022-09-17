@@ -420,6 +420,12 @@ void WavefrontPathTracingInstance::_render_one_camera(
 
                 // create closure
                 auto closure = surface->closure(*it, swl, time);
+                if (auto dispersive = closure->dispersive()) {
+                    $if (*dispersive) {
+                        swl.terminate_secondary();
+                        path_states.write_swl(path_id, swl);
+                    };
+                }
 
                 // apply roughness map
                 auto alpha_skip = def(false);

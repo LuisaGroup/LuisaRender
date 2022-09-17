@@ -78,7 +78,6 @@ class SubstrateClosure final : public Surface::Closure {
 private:
     luisa::unique_ptr<TrowbridgeReitzDistribution> _distribution;
     luisa::unique_ptr<FresnelBlend> _blend;
-    SampledSpectrum _eta_i;
 
 public:
     SubstrateClosure(
@@ -87,8 +86,7 @@ public:
         const SampledSpectrum &Kd, const SampledSpectrum &Ks, Expr<float2> alpha, Expr<float> Kd_ratio) noexcept
         : Surface::Closure{instance, it, swl, time},
           _distribution{luisa::make_unique<TrowbridgeReitzDistribution>(alpha)},
-          _blend{luisa::make_unique<FresnelBlend>(Kd, Ks, _distribution.get(), Kd_ratio)},
-          _eta_i{swl.dimension(), 1.f} {}
+          _blend{luisa::make_unique<FresnelBlend>(Kd, Ks, _distribution.get(), Kd_ratio)} {}
 
 private:
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
@@ -99,7 +97,7 @@ private:
         return {.f = f * abs_cos_theta(wi_local),
                 .pdf = pdf,
                 .roughness = _distribution->alpha(),
-                .eta = _eta_i};
+                .eta = 1.f};
     }
 
     [[nodiscard]] Surface::Sample sample(Expr<float> u_lobe, Expr<float2> u) const noexcept override {
@@ -113,7 +111,7 @@ private:
                 .eval = {.f = f * abs_cos_theta(wi_local),
                          .pdf = pdf,
                          .roughness = _distribution->alpha(),
-                         .eta = _eta_i}};
+                         .eta = 1.f}};
     }
 
     void backward(Expr<float3> wi, const SampledSpectrum &df_in) const noexcept override {

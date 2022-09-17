@@ -121,7 +121,7 @@ public:
         return {.f = f * abs_cos_theta(wi_local),
                 .pdf = pdf,
                 .roughness = _distribution->alpha(),
-                .eta = SampledSpectrum{_swl.dimension(), 1.f}};
+                .eta = 1.f};
     }
     [[nodiscard]] Surface::Sample sample(Expr<float>, Expr<float2> u) const noexcept override {
         auto pdf = def(0.f);
@@ -131,7 +131,7 @@ public:
                 .eval = {.f = f * abs_cos_theta(wi_local),
                          .pdf = pdf,
                          .roughness = _distribution->alpha(),
-                         .eta = SampledSpectrum{_swl.dimension(), 1.f}}};
+                         .eta = 1.f}};
     }
 
     void backward(Expr<float3> wi, const SampledSpectrum &df_in) const noexcept override {

@@ -1,0 +1,92 @@
+Camera camera : Pinhole {
+  position { 50, 40, 180 }
+  front { 1, -1, -18 }
+  fov { 50 }
+  film : Color {
+    resolution { 1920, 1080 }
+  }
+  spp { 64 }
+  filter : Gaussian {}
+  file { "render.exr" }
+}
+
+Shape box : Group {
+  surface : Glass {
+    eta { "BAF10" }
+    Kr : Constant {
+      v { 1, 1, 1 }
+      semantic { "albedo" }
+    }
+    Kt : Constant {
+      v { 1, 1, 1 }
+      semantic { "albedo" }
+    }
+    roughness : Constant {
+      v { 0 }
+    }
+  }
+  shapes {
+    Mesh { file { "mesh_00001.ply" } },
+    Mesh { file { "mesh_00002.ply" } },
+    Mesh { file { "mesh_00003.ply" } },
+    Mesh { file { "mesh_00004.ply" } },
+    Mesh { file { "mesh_00005.ply" } },
+    Mesh { file { "mesh_00006.ply" } }
+  }
+}
+
+Shape water : Mesh {
+  surface : Glass {
+    eta { "SF11" }
+    Kr : Constant {
+      v { 1, 1, 1 }
+      semantic { "albedo" }
+    }
+    Kt : Constant {
+      v { 1, 1, 1 }
+      semantic { "albedo" }
+    }
+    roughness : Constant {
+      v { 0 }
+    }
+  }
+  file { "dambreak0.ply" }
+  transform : SRT {
+    translate { -0.6, -0.02, -0.6 }
+    scale { 1.001 }
+  }
+}
+
+Shape backdrop : Mesh {
+  surface : Matte {
+    Kd : Constant {
+      v { 1, 1, 1 }
+      semantic { "albedo" }
+    }
+  }
+  file { "mesh_00008.ply" }
+  transform : SRT {
+    translate { 0, -0.04, 0 }
+  }
+}
+
+render {
+  cameras { @camera }
+  spectrum : Hero {
+    dimension { 4 }
+  }
+  integrator : WavePath {
+    depth { 64 }
+    rr_depth { 16 }
+  }
+  sampler : PMJ02BN {}
+  shapes { @box, @backdrop, @water }
+  environment : Directional {
+    emission : Constant {
+      v { 0.25, 0.3, 0.36 }
+      semantic { "illuminant" }
+    }
+    angle { 0.53 }
+    direction { 1, 1.5, 0.5 }
+  }
+}

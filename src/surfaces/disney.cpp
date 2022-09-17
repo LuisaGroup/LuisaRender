@@ -385,17 +385,6 @@ public:
 // a mixture between dielectric and the Schlick Fresnel approximation.
 class DisneyFresnel final : public Fresnel {
 
-public:
-    struct Gradient : public Fresnel::Gradient {
-        SampledSpectrum dR0;
-        Float dMetallic;
-        Float dEta;
-
-        explicit Gradient(SampledSpectrum dR0, Float dMetallic, Float dEta) noexcept
-            : dR0{std::move(dR0)}, dMetallic{std::move(dMetallic)}, dEta{std::move(dEta)} {
-        }
-    };
-
 private:
     SampledSpectrum R0;
     Float metallic;
@@ -411,12 +400,6 @@ public:
         });
     }
     [[nodiscard]] auto &eta() const noexcept { return e; }
-    [[nodiscard]] luisa::unique_ptr<Fresnel::Gradient> backward(Expr<float> cosI, const SampledSpectrum &df) const noexcept override {
-        // TODO
-        LUISA_ERROR_WITH_LOCATION("Not implemented.");
-
-        return luisa::make_unique<DisneyFresnel::Gradient>(SampledSpectrum(df.dimension(), 0.f), 0.f, 0.f);
-    }
 };
 
 struct DisneyMicrofacetDistribution final : public TrowbridgeReitzDistribution {
@@ -571,9 +554,7 @@ public:
         auto Cst_weight = thin ? 0.f : 1.f;
         auto Cst = Cst_weight * T;
         _spec_trans = luisa::make_unique<MicrofacetTransmission>(
-            Cst, _distrib.get(),
-            SampledSpectrum{swl.dimension(), 1.f},
-            SampledSpectrum{swl.dimension(), eta});
+            Cst, _distrib.get(), 1.f, eta);
         auto Cst_lum = Cst_weight * T_lum;
         _lobes |= ite(Cst_lum > black_threshold, trans_specular, 0u);
 
@@ -589,9 +570,7 @@ public:
         auto Ctst = Ctst_weight * T;
         _thin_distrib = luisa::make_unique<TrowbridgeReitzDistribution>(ascaled);
         _thin_spec_trans = luisa::make_unique<MicrofacetTransmission>(
-            Ctst, _thin_distrib.get(),
-            SampledSpectrum{swl.dimension(), 1.f},
-            SampledSpectrum{swl.dimension(), eta});
+            Ctst, _thin_distrib.get(), 1.f, eta);
         auto Ctst_lum = Ctst_weight * T_lum;
         _lobes |= ite(Ctst_lum > black_threshold, trans_thin_specular, 0u);
 
@@ -659,9 +638,7 @@ public:
         return {.f = f * abs_cos_theta(wi_local),
                 .pdf = pdf,
                 .roughness = _distrib->alpha(),
-                .eta = SampledSpectrum{
-                    _swl.dimension(),
-                    ite(!thin & wi_local.z < 0.f, _fresnel->eta(), 1.f)}};
+                .eta = ite(!thin & wi_local.z < 0.f, _fresnel->eta(), 1.f)};
     }
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
         auto wo_local = _it.wo_local();

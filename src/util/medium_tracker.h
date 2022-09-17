@@ -16,9 +16,8 @@ using compute::Float4;
 using compute::UInt;
 using compute::Var;
 
-// TODO: use spectrum
 struct MediumInfo {
-    float4 eta;
+    float eta;
 };
 
 class MediumTracker {

@@ -334,6 +334,9 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                 pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
                     // create closure
                     auto closure = surface->closure(*it, swl, time);
+                    if (auto dispersive = closure->dispersive()) {
+                        $if (*dispersive) { swl.terminate_secondary(); };
+                    }
 
                     // apply roughness map
                     auto alpha_skip = def(false);
@@ -494,6 +497,9 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                 pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
                     // create closure
                     auto closure = surface->closure(*it, swl, time);
+                    if (auto dispersive = closure->dispersive()) {
+                        $if (*dispersive) { swl.terminate_secondary(); };
+                    }
 
                     // apply roughness map
                     auto alpha_skip = def(false);
@@ -697,6 +703,9 @@ void MegakernelReplayDiffInstance::_render_one_camera(
                 pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
                     // create closure
                     auto closure = surface->closure(*it, swl, time);
+                    if (auto dispersive = closure->dispersive()) {
+                        $if (*dispersive) { swl.terminate_secondary(); };
+                    }
 
                     // apply roughness map
                     auto alpha_skip = def(false);
