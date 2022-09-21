@@ -13,7 +13,7 @@ inline Pipeline::Pipeline(Device &device) noexcept
     : _device{device},
       _bindless_array{device.create_bindless_array(bindless_array_capacity)},
       _general_buffer_arena{luisa::make_unique<BufferArena>(device, 16_mb)},
-      _printer{compute::Printer{device}} {}
+      _printer{luisa::make_unique<compute::Printer>(device)} {}
 
 Pipeline::~Pipeline() noexcept = default;
 
@@ -32,6 +32,7 @@ uint Pipeline::register_light(CommandBuffer &command_buffer, const Light *light)
 luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, const Scene &scene) noexcept {
     ThreadPool::global().synchronize();
     auto pipeline = luisa::make_unique<Pipeline>(device);
+    stream << pipeline->printer().reset();
     auto initial_time = std::numeric_limits<float>::max();
     for (auto c : scene.cameras()) {
         if (c->shutter_span().x < initial_time) {

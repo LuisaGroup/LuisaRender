@@ -48,7 +48,7 @@ public:
                 }
                 _black = all(_v.xyz() <= 0.f);
                 _v = scene->spectrum()->encode_srgb_albedo(_v.xyz());
-                LUISA_INFO("Encoded: ({}, {}, {}, {})", _v[0], _v[1], _v[2], _v[3]);
+//                LUISA_INFO("Encoded: ({}, {}, {}, {})", _v[0], _v[1], _v[2], _v[3]);
                 _channels = compute::pixel_storage_channel_count(
                     scene->spectrum()->encoded_albedo_storage(PixelStorage::FLOAT4));
                 break;

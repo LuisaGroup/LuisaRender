@@ -31,6 +31,7 @@ public:
     static constexpr auto event_reflect = 0x00u;
     static constexpr auto event_enter = 0x01u;
     static constexpr auto event_exit = 0x02u;
+    static constexpr auto event_transmit = event_enter | event_exit;
     static constexpr auto event_through = 0x04u;
 
     struct Evaluation {

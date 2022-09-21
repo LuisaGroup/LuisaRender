@@ -189,7 +189,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
     using namespace luisa::compute;
     Callable balanced_heuristic = [](Float pdf_a, Float pdf_b) noexcept {
         auto p = pdf_a + pdf_b;
-        return ite(p  > 0.0f, pdf_a / p, 0.0f);
+        return ite(p > 0.0f, pdf_a / p, 0.0f);
     };
 
     Kernel2D render_kernel = [&](UInt frame_index, Float time, Float shutter_weight) noexcept {
@@ -245,12 +245,15 @@ void MegakernelPathTracingInstance::_render_one_camera(
             auto u_lobe = sampler->generate_1d();
             auto u_bsdf = sampler->generate_2d();
             auto eta_scale = def(1.f);
+            static constexpr auto eta_stack_capacity = 16u;
+            ArrayFloat<eta_stack_capacity> eta_stack;
+            auto eta_stack_size = def(0u);
             pipeline.surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
-
                 // create closure
-                auto closure = surface->closure(*it, swl, 1.f, time);
+                auto eta = ite(eta_stack_size > 0u, eta_stack[eta_stack_size - 1u], 1.f);
+                auto closure = surface->closure(*it, swl, eta, time);
                 if (auto dispersive = closure->dispersive()) {
-                    $if (*dispersive) { swl.terminate_secondary(); };
+                    $if(*dispersive) { swl.terminate_secondary(); };
                 }
 
                 // apply roughness map
@@ -284,9 +287,16 @@ void MegakernelPathTracingInstance::_render_one_camera(
                     beta *= w * sample.eval.f;
 
                     // apply eta scale
-                    $switch (sample.event) {
-                        $case (Surface::event_enter) { eta_scale = sqr(sample.eta); };
-                        $case (Surface::event_exit) { eta_scale = 1.f / sqr(sample.eta); };
+                    $switch(sample.event) {
+                        $case(Surface::event_enter) {
+                            eta_scale = sqr(sample.eta / eta);
+                            eta_stack_size = min(eta_stack_size + 1u, eta_stack_capacity);
+                            eta_stack[eta_stack_size - 1u] = sample.eta;
+                        };
+                        $case(Surface::event_exit) {
+                            eta_scale = sqr(eta / sample.eta);
+                            eta_stack_size = max(eta_stack_size, 1u) - 1u;
+                        };
                     };
                 };
             });

@@ -82,7 +82,7 @@ private:
     Buffer<float4x4> _transform_matrix_buffer;
     luisa::unordered_map<luisa::string, uint> _named_ids;
     // other things
-    Printer _printer;
+    luisa::unique_ptr<Printer> _printer;
     float _initial_time{};
     bool _any_dynamic_transforms{false};
 
@@ -175,7 +175,8 @@ public:
     [[nodiscard]] const Filter::Instance *build_filter(CommandBuffer &command_buffer, const Filter *filter) noexcept;
     bool update(CommandBuffer &command_buffer, float time) noexcept;
     void render(Stream &stream) noexcept;
-    [[nodiscard]] auto &printer() noexcept { return _printer; }
+    [[nodiscard]] auto &printer() noexcept { return *_printer; }
+    [[nodiscard]] auto &printer() const noexcept { return *_printer; }
     [[nodiscard]] uint named_id(luisa::string_view name) const noexcept;
     template<typename T, typename I>
     [[nodiscard]] auto buffer(I &&i) const noexcept { return _bindless_array.buffer<T>(std::forward<I>(i)); }
