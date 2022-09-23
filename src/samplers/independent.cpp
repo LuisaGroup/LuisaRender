@@ -55,7 +55,7 @@ void IndependentSamplerInstance::reset(
 }
 
 void IndependentSamplerInstance::start(Expr<uint2> pixel, Expr<uint> index) noexcept {
-    _state.emplace(xxhash32(make_uint3(node()->seed(), index, (pixel.x << 16u) | pixel.y)));
+    _state.emplace(xxhash32(make_uint4(pixel, node()->seed(), index)));
 }
 
 void IndependentSamplerInstance::save_state(Expr<uint> state_id) noexcept {

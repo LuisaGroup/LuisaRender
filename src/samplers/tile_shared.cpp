@@ -5,6 +5,7 @@
 #include <base/sampler.h>
 #include <base/scene.h>
 #include <util/rng.h>
+#include <base/pipeline.h>
 
 namespace luisa::render {
 
