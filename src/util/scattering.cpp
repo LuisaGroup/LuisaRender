@@ -266,18 +266,20 @@ SampledSpectrum FresnelDielectric::evaluate(Expr<float> cosThetaI) const noexcep
     return SampledSpectrum{fresnel_dielectric(cosThetaI, _eta_i, _eta_t)};
 }
 
-SampledSpectrum BxDF::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *p) const noexcept {
+SampledSpectrum BxDF::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u,
+                             Float *p, TransportMode mode) const noexcept {
     *wi = sample_cosine_hemisphere(u);
     wi->z *= compute::sign(cos_theta(wo));
-    *p = pdf(wo, *wi);
-    return evaluate(wo, *wi);
+    *p = pdf(wo, *wi, mode);
+    return evaluate(wo, *wi, mode);
 }
 
-Float BxDF::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {
+Float BxDF::pdf(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept {
     return compute::ite(same_hemisphere(wo, wi), abs_cos_theta(wi) * inv_pi, 0.0f);
 }
 
-SampledSpectrum LambertianReflection::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
+SampledSpectrum LambertianReflection::evaluate(
+    Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept {
     return _r * ite(same_hemisphere(wo, wi), inv_pi, 0.f);
 }
 
@@ -286,18 +288,20 @@ LambertianReflection::Gradient LambertianReflection::backward(
     return {.dR = df * ite(same_hemisphere(wo, wi), inv_pi, 0.f)};
 }
 
-SampledSpectrum LambertianTransmission::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
+SampledSpectrum LambertianTransmission::evaluate(
+    Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept {
     return _t * ite(!same_hemisphere(wo, wi), inv_pi, 0.f);
 }
 
-SampledSpectrum LambertianTransmission::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *p) const noexcept {
+SampledSpectrum LambertianTransmission::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u,
+                                               Float *p, TransportMode mode) const noexcept {
     *wi = sample_cosine_hemisphere(u);
     wi->z *= -compute::sign(cos_theta(wo));
-    *p = pdf(wo, *wi);
-    return evaluate(wo, *wi);
+    *p = pdf(wo, *wi, mode);
+    return evaluate(wo, *wi, mode);
 }
 
-Float LambertianTransmission::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {
+Float LambertianTransmission::pdf(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept {
     return compute::ite(same_hemisphere(wo, wi), 0.0f, abs_cos_theta(wi) * inv_pi);
 }
 
@@ -306,7 +310,8 @@ LambertianTransmission::Gradient LambertianTransmission::backward(
     return {.dT = df * ite(!same_hemisphere(wo, wi), inv_pi, 0.f)};
 }
 
-SampledSpectrum MicrofacetReflection::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
+SampledSpectrum MicrofacetReflection::evaluate(
+    Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept {
     using compute::any;
     using compute::normalize;
     auto wh = wi + wo;
@@ -325,7 +330,8 @@ SampledSpectrum MicrofacetReflection::evaluate(Expr<float3> wo, Expr<float3> wi)
     return f;
 }
 
-SampledSpectrum MicrofacetReflection::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *p) const noexcept {
+SampledSpectrum MicrofacetReflection::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u,
+                                             Float *p, TransportMode mode) const noexcept {
     // Sample microfacet orientation $\wh$ and reflected direction $\wi$
     *p = 0.0f;
     auto wh = _distribution->sample_wh(wo, u);
@@ -334,12 +340,12 @@ SampledSpectrum MicrofacetReflection::sample(Expr<float3> wo, Float3 *wi, Expr<f
     $if(same_hemisphere(wo, *wi) & same_hemisphere(wo, wh)) {
         // Compute PDF of _wi_ for microfacet reflection
         *p = _distribution->pdf(wo, wh) / (4.f * dot(wo, wh));
-        f = evaluate(wo, *wi);
+        f = evaluate(wo, *wi, mode);
     };
     return f;
 }
 
-Float MicrofacetReflection::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {
+Float MicrofacetReflection::pdf(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept {
     auto p = def(0.f);
     auto wh = wi + wo;
     $if(same_hemisphere(wo, wi) & any(wh != 0.f)) {
@@ -379,7 +385,8 @@ MicrofacetReflection::Gradient MicrofacetReflection::backward(
     return {.dR = d_r, .dAlpha = d_alpha, .dFresnel = _fresnel->backward(cosI_eval, d_F)};
 }
 
-SampledSpectrum MicrofacetTransmission::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
+SampledSpectrum MicrofacetTransmission::evaluate(
+    Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept {
     auto cosThetaO = cos_theta(wo);
     auto cosThetaI = cos_theta(wi);
     auto eta = ite(cosThetaO > 0.f, _eta_b / _eta_a, _eta_a / _eta_b);
@@ -392,17 +399,19 @@ SampledSpectrum MicrofacetTransmission::evaluate(Expr<float3> wo, Expr<float3> w
         // Compute $\wh$ from $\wo$ and $\wi$ for microfacet transmission
         auto G = _distribution->G(wo, wi);
         auto sqrtDenom = dot(wo, wh) + eta * dot(wi, wh);
-        auto factor = 1.f / eta;
         auto F = fresnel_dielectric(dot(wo, wh), _eta_a, _eta_b);
         auto D = _distribution->D(wh);
-        f = (1.f - F) * _t * sqr(factor) *
-            abs(D * G * sqr(eta) * dot(wi, wh) * dot(wo, wh) /
-                (cosThetaI * cosThetaO * sqr(sqrtDenom)));
+        f = (1.f - F) * _t * D * G * dot(wi, wh) * dot(wo, wh) /
+            (cosThetaI * cosThetaO * sqr(sqrtDenom));
+        if (mode == TransportMode::IMPORTANCE) {
+            f *= sqr(eta);
+        }
     };
     return f;
 }
 
-SampledSpectrum MicrofacetTransmission::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *p) const noexcept {
+SampledSpectrum MicrofacetTransmission::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u,
+                                               Float *p, TransportMode mode) const noexcept {
     using namespace compute;
     auto eta = ite(cos_theta(wo) > 0.f, _eta_a / _eta_b, _eta_b / _eta_a);
     auto wh = _distribution->sample_wh(wo, u);
@@ -410,13 +419,13 @@ SampledSpectrum MicrofacetTransmission::sample(Expr<float3> wo, Float3 *wi, Expr
     auto refr = refract(wo, wh, eta, wi);
     SampledSpectrum f{_t.dimension()};
     $if(refr) {
-        *p = pdf(wo, *wi);
-        f = evaluate(wo, *wi);
+        *p = pdf(wo, *wi, mode);
+        f = evaluate(wo, *wi, mode);
     };
     return f;
 }
 
-Float MicrofacetTransmission::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {
+Float MicrofacetTransmission::pdf(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept {
     auto pdf = def(0.f);
     auto entering = cos_theta(wo) > 0.f;
     auto eta = ite(entering, _eta_b / _eta_a, _eta_a / _eta_b);
@@ -432,7 +441,7 @@ Float MicrofacetTransmission::pdf(Expr<float3> wo, Expr<float3> wi) const noexce
 }
 
 MicrofacetTransmission::Gradient MicrofacetTransmission::backward(
-    Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
+    Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df, TransportMode mode) const noexcept {
     auto cosThetaO = cos_theta(wo);
     auto cosThetaI = cos_theta(wi);
     auto refr = !same_hemisphere(wo, wi) & cosThetaO != 0.f & cosThetaI != 0.f;
@@ -449,8 +458,9 @@ MicrofacetTransmission::Gradient MicrofacetTransmission::backward(
 
     auto F = fresnel_dielectric(dot(wo, wh), _eta_a, _eta_b);
     auto D = _distribution->D(wh);
-    auto k0 = sqr(e) * dot(wi, wh) * dot(wo, wh) /
+    auto k0 = dot(wi, wh) * dot(wo, wh) /
               (cosThetaI * cosThetaO * sqr(sqrtDenom));
+    if (mode == TransportMode::IMPORTANCE) { k0 *= sqr(e); }
     auto k1 = D * G * k0;
     auto k2 = (1.f - F) * sqr(factor);
     auto f = k2 * _t * abs(k1);
@@ -463,18 +473,18 @@ MicrofacetTransmission::Gradient MicrofacetTransmission::backward(
         d_alpha += d_f[i] * k2 * _t[i] * sign(k1) * k0 *
                    (D * grad_G.dAlpha + G * grad_D.dAlpha);
     }
-
     return {.dT = d_t, .dAlpha = d_alpha};
 }
 
-OrenNayar::OrenNayar(SampledSpectrum R, Expr<float> sigma) noexcept
-    : _r{std::move(R)}, _sigma{sigma} {
+OrenNayar::OrenNayar(const SampledSpectrum &R, Expr<float> sigma) noexcept
+    : _r{R}, _sigma{sigma} {
     auto sigma2 = sqr(radians(sigma));
     _a = 1.f - (sigma2 / (2.f * sigma2 + 0.66f));
     _b = 0.45f * sigma2 / (sigma2 + 0.09f);
 }
 
-SampledSpectrum OrenNayar::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
+SampledSpectrum OrenNayar::evaluate(
+    Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept {
     auto valid = same_hemisphere(wo, wi);
     auto s = ite(valid, inv_pi, 0.f);
     auto f = _r * s;
@@ -537,7 +547,8 @@ SampledSpectrum FresnelBlend::Schlick(Expr<float> cosTheta) const noexcept {
     return _rs + pow5(1.f - cosTheta) * (1.f - _rs);
 }
 
-SampledSpectrum FresnelBlend::evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
+SampledSpectrum FresnelBlend::evaluate(
+    Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept {
     auto pow5 = [](auto &&v) noexcept { return sqr(sqr(v)) * v; };
     auto absCosThetaI = abs_cos_theta(wi);
     auto absCosThetaO = abs_cos_theta(wo);
@@ -555,7 +566,8 @@ SampledSpectrum FresnelBlend::evaluate(Expr<float3> wo, Expr<float3> wi) const n
     });
 }
 
-SampledSpectrum FresnelBlend::sample(Expr<float3> wo, Float3 *wi, Expr<float2> uOrig, Float *p) const noexcept {
+SampledSpectrum FresnelBlend::sample(Expr<float3> wo, Float3 *wi, Expr<float2> uOrig,
+                                     Float *p, TransportMode mode) const noexcept {
     using compute::sign;
     auto u = def(uOrig);
     *p = 0.f;
@@ -566,8 +578,8 @@ SampledSpectrum FresnelBlend::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u
         *wi = sample_cosine_hemisphere(u);
         wi->z *= sign(cos_theta(wo));
         compute::assume(same_hemisphere(wo, *wi));
-        *p = pdf(wo, *wi);
-        f = evaluate(wo, *wi);
+        *p = pdf(wo, *wi, mode);
+        f = evaluate(wo, *wi, mode);
     }
     $else {
         u.x = (u.x - _rd_ratio) / (1.f - _rd_ratio);
@@ -575,14 +587,14 @@ SampledSpectrum FresnelBlend::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u
         auto wh = _distribution->sample_wh(wo, u);
         *wi = reflect(wo, wh);
         $if(same_hemisphere(wo, *wi)) {
-            *p = pdf(wo, *wi);
-            f = evaluate(wo, *wi);
+            *p = pdf(wo, *wi, mode);
+            f = evaluate(wo, *wi, mode);
         };
     };
     return f;
 }
 
-Float FresnelBlend::pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {
+Float FresnelBlend::pdf(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept {
     auto wh = normalize(wo + wi);
     auto pdf_wh = _distribution->pdf(wo, wh);
     auto p = lerp(pdf_wh / (4.f * dot(wo, wh)), abs_cos_theta(wi) * inv_pi, _rd_ratio);

@@ -196,7 +196,7 @@ private:
 
 public:
     explicit DisneyDiffuse(SampledSpectrum R) noexcept : R{std::move(R)} {}
-    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
         auto Fo = SchlickWeight(abs_cos_theta(wo));
         auto Fi = SchlickWeight(abs_cos_theta(wi));
 
@@ -228,7 +228,7 @@ private:
 public:
     DisneyFakeSS(SampledSpectrum R, Float roughness) noexcept
         : R{std::move(R)}, roughness{std::move(roughness)} {}
-    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
         auto wh = wi + wo;
         auto valid = any(wh != 0.f);
         wh = normalize(wh);
@@ -263,7 +263,7 @@ private:
 public:
     DisneyRetro(SampledSpectrum R, Float roughness) noexcept
         : R{std::move(R)}, roughness{std::move(roughness)} {}
-    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
         auto wh = wi + wo;
         auto valid = any(wh != 0.f);
         wh = normalize(wh);
@@ -294,7 +294,7 @@ private:
 
 public:
     explicit DisneySheen(SampledSpectrum R) noexcept : R{std::move(R)} {}
-    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
         auto wh = wi + wo;
         auto valid = any(wh != 0.f);
         wh = normalize(wh);
@@ -608,15 +608,15 @@ private:
         auto pdf = def(0.f);
         // TODO: performance test
         $if(same_hemisphere(wo_local, wi_local)) {// reflection
-            f = _specular->evaluate(wo_local, wi_local) +
-                _diffuse->evaluate(wo_local, wi_local) +
-                _fake_ss->evaluate(wo_local, wi_local) +
-                _retro->evaluate(wo_local, wi_local) +
-                _sheen->evaluate(wo_local, wi_local);
+            f = _specular->evaluate(wo_local, wi_local, mode) +
+                _diffuse->evaluate(wo_local, wi_local, mode) +
+                _fake_ss->evaluate(wo_local, wi_local, mode) +
+                _retro->evaluate(wo_local, wi_local, mode) +
+                _sheen->evaluate(wo_local, wi_local, mode);
             pdf = _sampling_weights[sampling_technique_specular] *
-                      _specular->pdf(wo_local, wi_local) +
+                      _specular->pdf(wo_local, wi_local, mode) +
                   _sampling_weights[sampling_technique_diffuse] *
-                      _diffuse->pdf(wo_local, wi_local);
+                      _diffuse->pdf(wo_local, wi_local, mode);
             $if((_lobes & refl_clearcoat) != 0u) {
                 f += _clearcoat->evaluate(wo_local, wi_local);
                 pdf += _sampling_weights[sampling_technique_clearcoat] *
@@ -625,17 +625,17 @@ private:
         }
         $else {// transmission
             $if((_lobes & trans_specular) != 0u) {
-                f = _spec_trans->evaluate(wo_local, wi_local);
+                f = _spec_trans->evaluate(wo_local, wi_local, mode);
                 pdf = _sampling_weights[sampling_technique_specular_trans] *
-                      _spec_trans->pdf(wo_local, wi_local);
+                      _spec_trans->pdf(wo_local, wi_local, mode);
             }
             $else {
-                f = _diff_trans->evaluate(wo_local, wi_local) +
-                    _thin_spec_trans->evaluate(wo_local, wi_local);
+                f = _diff_trans->evaluate(wo_local, wi_local, mode) +
+                    _thin_spec_trans->evaluate(wo_local, wi_local, mode);
                 pdf = _sampling_weights[sampling_technique_thin_diffuse_trans] *
-                          _diff_trans->pdf(wo_local, wi_local) +
+                          _diff_trans->pdf(wo_local, wi_local, mode) +
                       _sampling_weights[sampling_technique_thin_specular_trans] *
-                          _thin_spec_trans->pdf(wo_local, wi_local);
+                          _thin_spec_trans->pdf(wo_local, wi_local, mode);
             };
         };
         auto thin = instance<DisneySurfaceInstance>()->thin();
@@ -667,19 +667,19 @@ private:
         auto pdf = def(0.f);
         auto event = def(Surface::event_reflect);
         $switch(sampling_tech) {
-            $case(0u) { static_cast<void>(_diffuse->sample(wo_local, &wi_local, u, &pdf)); };
-            $case(1u) { static_cast<void>(_specular->sample(wo_local, &wi_local, u, &pdf)); };
+            $case(0u) { static_cast<void>(_diffuse->sample(wo_local, &wi_local, u, &pdf, mode)); };
+            $case(1u) { static_cast<void>(_specular->sample(wo_local, &wi_local, u, &pdf, mode)); };
             $case(2u) { static_cast<void>(_clearcoat->sample(wo_local, &wi_local, u, &pdf)); };
             $case(3u) {
-                static_cast<void>(_spec_trans->sample(wo_local, &wi_local, u, &pdf));
+                static_cast<void>(_spec_trans->sample(wo_local, &wi_local, u, &pdf, mode));
                 event = ite(cos_theta(wo_local) > 0.f, Surface::event_enter, Surface::event_exit);
             };
             $case(4u) {
-                static_cast<void>(_thin_spec_trans->sample(wo_local, &wi_local, u, &pdf));
+                static_cast<void>(_thin_spec_trans->sample(wo_local, &wi_local, u, &pdf, mode));
                 event = Surface::event_through;
             };
             $case(5u) {
-                static_cast<void>(_diff_trans->sample(wo_local, &wi_local, u, &pdf));
+                static_cast<void>(_diff_trans->sample(wo_local, &wi_local, u, &pdf, mode));
                 event = Surface::event_through;
             };
             $default { unreachable(); };

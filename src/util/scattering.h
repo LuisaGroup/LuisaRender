@@ -120,9 +120,9 @@ public:
 
 struct BxDF {
     virtual ~BxDF() noexcept = default;
-    [[nodiscard]] virtual SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept = 0;
-    [[nodiscard]] virtual SampledSpectrum sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept;
-    [[nodiscard]] virtual Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept;
+    [[nodiscard]] virtual SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept = 0;
+    [[nodiscard]] virtual SampledSpectrum sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf, TransportMode mode) const noexcept;
+    [[nodiscard]] virtual Float pdf(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept;
 };
 
 class LambertianReflection : public BxDF {
@@ -137,7 +137,7 @@ private:
 
 public:
     explicit LambertianReflection(const SampledSpectrum &R) noexcept : _r{R} {}
-    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
+    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
     [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept;
 };
 
@@ -153,9 +153,9 @@ private:
 
 public:
     explicit LambertianTransmission(const SampledSpectrum &T) noexcept : _t{T} {}
-    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
-    [[nodiscard]] SampledSpectrum sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept override;
-    [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept override;
+    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
+    [[nodiscard]] SampledSpectrum sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf, TransportMode mode) const noexcept override;
+    [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
     [[nodiscard]] static Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) noexcept;
 };
 
@@ -177,9 +177,9 @@ private:
 public:
     MicrofacetReflection(const SampledSpectrum &R, const MicrofacetDistribution *d, const Fresnel *f) noexcept
         : _r{R}, _distribution{d}, _fresnel{f} {}
-    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
-    [[nodiscard]] SampledSpectrum sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept override;
-    [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept override;
+    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
+    [[nodiscard]] SampledSpectrum sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf, TransportMode mode) const noexcept override;
+    [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
     [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept;
 };
 
@@ -204,10 +204,10 @@ public:
                            const MicrofacetDistribution *d,
                            Expr<float> etaA, Expr<float> etaB) noexcept
         : _t{T}, _distribution{d}, _eta_a{etaA}, _eta_b{etaB} {}
-    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
-    [[nodiscard]] SampledSpectrum sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept override;
-    [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept override;
-    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept;
+    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
+    [[nodiscard]] SampledSpectrum sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf, TransportMode mode) const noexcept override;
+    [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
+    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df, TransportMode mode) const noexcept;
 };
 
 class OrenNayar : public BxDF {
@@ -225,8 +225,8 @@ private:
     Float _b;
 
 public:
-    OrenNayar(SampledSpectrum R, Expr<float> sigma) noexcept;
-    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
+    OrenNayar(const SampledSpectrum &R, Expr<float> sigma) noexcept;
+    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
     [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept;
 };
 
@@ -253,9 +253,9 @@ public:
     FresnelBlend(const SampledSpectrum &Rd, const SampledSpectrum &Rs,
                  const MicrofacetDistribution *distrib, Expr<float> Rd_sample_ratio = .5f) noexcept
         : _rd{Rd}, _rs{Rs}, _rd_ratio{clamp(Rd_sample_ratio, .05f, .95f)},  _distribution{distrib} {}
-    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override;
-    [[nodiscard]] SampledSpectrum sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf) const noexcept override;
-    [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept override;
+    [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
+    [[nodiscard]] SampledSpectrum sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf, TransportMode mode) const noexcept override;
+    [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
     [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept;
 };
 

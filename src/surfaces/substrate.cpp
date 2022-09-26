@@ -97,8 +97,8 @@ private:
                                                 TransportMode mode) const noexcept override {
         auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = _it.shading().world_to_local(wi);
-        auto f = _blend->evaluate(wo_local, wi_local);
-        auto pdf = _blend->pdf(wo_local, wi_local);
+        auto f = _blend->evaluate(wo_local, wi_local, mode);
+        auto pdf = _blend->pdf(wo_local, wi_local, mode);
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
 
@@ -108,7 +108,7 @@ private:
         auto pdf = def(0.f);
         auto wi_local = def(make_float3());
         // TODO: pass u_lobe to _blend->sample()
-        auto f = _blend->sample(wo_local, &wi_local, u, &pdf);
+        auto f = _blend->sample(wo_local, &wi_local, u, &pdf, mode);
         auto wi = _it.shading().local_to_world(wi_local);
         return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf},
                 .wi = wi,

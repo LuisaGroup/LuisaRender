@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
         auto valid = same_hemisphere(wo_local, wi_local) & any(wh != 0.f);
         auto f0 = R * F * ite(valid, abs(0.25f * D * G / (cosThetaI * cosThetaO)), 0.f);
 
-        auto f = reflec.evaluate(wo_local, wi_local);
+        auto f = reflec.evaluate(wo_local, wi_local, {});
 
         auto grad = reflec.backward(wo_local, wi_local, SampledSpectrum{3u, 1.f});
 

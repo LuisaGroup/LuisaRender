@@ -245,13 +245,9 @@ void MegakernelPathTracingInstance::_render_one_camera(
             auto u_lobe = sampler->generate_1d();
             auto u_bsdf = sampler->generate_2d();
             auto eta_scale = def(1.f);
-            static constexpr auto eta_stack_capacity = 16u;
-            ArrayFloat<eta_stack_capacity> eta_stack;
-            auto eta_stack_size = def(0u);
             pipeline.surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
                 // create closure
-                auto eta = ite(eta_stack_size > 0u, eta_stack[eta_stack_size - 1u], 1.f);
-                auto closure = surface->closure(*it, swl, eta, time);
+                auto closure = surface->closure(*it, swl, 1.f, time);
                 if (auto dispersive = closure->dispersive()) {
                     $if(*dispersive) { swl.terminate_secondary(); };
                 }
@@ -290,15 +286,8 @@ void MegakernelPathTracingInstance::_render_one_camera(
 
                     // apply eta scale
                     $switch(sample.event) {
-                        $case(Surface::event_enter) {
-                            eta_scale = sqr(sample.eta / eta);
-                            eta_stack_size = min(eta_stack_size + 1u, eta_stack_capacity);
-                            eta_stack[eta_stack_size - 1u] = sample.eta;
-                        };
-                        $case(Surface::event_exit) {
-                            eta_scale = sqr(eta / sample.eta);
-                            eta_stack_size = max(eta_stack_size, 1u) - 1u;
-                        };
+                        $case(Surface::event_enter) { eta_scale = sqr(sample.eta); };
+                        $case(Surface::event_exit) { eta_scale = sqr(1.f / sample.eta); };
                     };
                 };
             });

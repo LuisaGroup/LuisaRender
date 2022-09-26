@@ -161,12 +161,12 @@ private:
         auto pdf = def(0.f);
         auto ratio = _kr_ratio * _fresnel->evaluate(cos_theta(wo_local))[0u];
         $if(same_hemisphere(wo_local, wi_local)) {
-            f = _refl->evaluate(wo_local, wi_local);
-            pdf = _refl->pdf(wo_local, wi_local) * ratio;
+            f = _refl->evaluate(wo_local, wi_local, mode);
+            pdf = _refl->pdf(wo_local, wi_local, mode) * ratio;
         }
         $else {
-            f = _trans->evaluate(wo_local, wi_local);
-            pdf = _trans->pdf(wo_local, wi_local) * (1.f - ratio);
+            f = _trans->evaluate(wo_local, wi_local, mode);
+            pdf = _trans->pdf(wo_local, wi_local, mode) * (1.f - ratio);
         };
         auto entering = wi_local.z < 0.f;
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
@@ -181,11 +181,11 @@ private:
         auto event = def(Surface::event_reflect);
         auto ratio = _kr_ratio * _fresnel->evaluate(cos_theta(wo_local))[0u];
         $if(u_lobe < ratio) {// Reflection
-            f = _refl->sample(wo_local, &wi_local, u, &pdf);
+            f = _refl->sample(wo_local, &wi_local, u, &pdf, mode);
             pdf *= ratio;
         }
         $else {// Transmission
-            f = _trans->sample(wo_local, &wi_local, u, &pdf);
+            f = _trans->sample(wo_local, &wi_local, u, &pdf, mode);
             pdf *= (1.f - ratio);
             event = ite(cos_theta(wo_local) > 0.f, Surface::event_enter, Surface::event_exit);
         };
@@ -214,7 +214,7 @@ private:
         }
         $else {
             // Ks
-            auto d_f = _trans->backward(wo_local, wi_local, df);
+            auto d_f = _trans->backward(wo_local, wi_local, df, mode);
             d_alpha = d_f.dAlpha;
             _instance->Kt()->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(d_f.dT));
         };

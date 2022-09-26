@@ -121,8 +121,8 @@ private:
                                                 TransportMode mode) const noexcept override {
         auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = _it.shading().world_to_local(wi);
-        auto f = _refl->evaluate(wo_local, wi_local);
-        auto pdf = _refl->pdf(wo_local, wi_local);
+        auto f = _refl->evaluate(wo_local, wi_local, mode);
+        auto pdf = _refl->pdf(wo_local, wi_local, mode);
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
     [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float>, Expr<float2> u,
@@ -130,7 +130,7 @@ private:
         auto pdf = def(0.f);
         auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = def(make_float3(0.f, 0.f, 1.f));
-        auto f = _refl->sample(wo_local, &wi_local, u, &pdf);
+        auto f = _refl->sample(wo_local, &wi_local, u, &pdf, mode);
         return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf},
                 .wi = _it.shading().local_to_world(wi_local),
                 .eta = 1.f,
