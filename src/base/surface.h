@@ -76,10 +76,10 @@ public:
         template<typename T = Instance>
             requires std::is_base_of_v<Instance, T>
         [[nodiscard]] auto instance() const noexcept { return static_cast<const T *>(_instance); }
-        [[nodiscard]] virtual Evaluation evaluate(Expr<float3> wi) const noexcept = 0;
-        [[nodiscard]] virtual Sample sample(Expr<float> u_lobe, Expr<float2> u) const noexcept = 0;
+        [[nodiscard]] virtual Evaluation evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept = 0;
+        [[nodiscard]] virtual Sample sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u) const noexcept = 0;
         [[nodiscard]] auto &interaction() const noexcept { return _it; }
-        virtual void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept = 0;
+        virtual void backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept = 0;
         [[nodiscard]] virtual luisa::optional<Float> opacity() const noexcept;
         [[nodiscard]] virtual luisa::optional<Bool> dispersive() const noexcept;
         [[nodiscard]] virtual Float2 roughness() const noexcept = 0;

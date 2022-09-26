@@ -151,36 +151,38 @@ public:
 
     [[nodiscard]] luisa::optional<Bool> dispersive() const noexcept override { return _dispersive; }
 
-    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
-        auto wo_local = _it.wo_local();
+    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+        auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = _it.shading().world_to_local(wi);
         SampledSpectrum f{_swl.dimension()};
         auto pdf = def(0.f);
+        auto ratio = _kr_ratio * _fresnel->evaluate(cos_theta(wo_local))[0u];
         $if(same_hemisphere(wo_local, wi_local)) {
             f = _refl->evaluate(wo_local, wi_local);
-            pdf = _refl->pdf(wo_local, wi_local) * _kr_ratio;
+            pdf = _refl->pdf(wo_local, wi_local) * ratio;
         }
         $else {
             f = _trans->evaluate(wo_local, wi_local);
-            pdf = _trans->pdf(wo_local, wi_local) * (1.f - _kr_ratio);
+            pdf = _trans->pdf(wo_local, wi_local) * (1.f - ratio);
         };
         auto entering = wi_local.z < 0.f;
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
 
-    [[nodiscard]] Surface::Sample sample(Expr<float> u_lobe, Expr<float2> u) const noexcept override {
-        auto wo_local = _it.wo_local();
+    [[nodiscard]] Surface::Sample sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u) const noexcept override {
+        auto wo_local = _it.shading().world_to_local(wo);
         auto pdf = def(0.f);
         auto f = SampledSpectrum{_swl.dimension()};
         auto wi_local = def(make_float3(0.0f, 0.0f, 1.0f));
         auto event = def(Surface::event_reflect);
-        $if(u_lobe < _kr_ratio) {// Reflection
+        auto ratio = _kr_ratio * _fresnel->evaluate(cos_theta(wo_local))[0u];
+        $if(u_lobe < ratio) {// Reflection
             f = _refl->sample(wo_local, &wi_local, u, &pdf);
-            pdf *= _kr_ratio;
+            pdf *= ratio;
         }
         $else {// Transmission
             f = _trans->sample(wo_local, &wi_local, u, &pdf);
-            pdf *= (1.f - _kr_ratio);
+            pdf *= (1.f - ratio);
             event = ite(cos_theta(wo_local) > 0.f, Surface::event_enter, Surface::event_exit);
         };
         auto wi = _it.shading().local_to_world(wi_local);
@@ -192,9 +194,9 @@ public:
     }
     [[nodiscard]] Float2 roughness() const noexcept override { return _distribution->alpha(); }
 
-    void backward(Expr<float3> wi, const SampledSpectrum &df_in) const noexcept override {
+    void backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df_in) const noexcept override {
         auto _instance = instance<GlassInstance>();
-        auto wo_local = _it.wo_local();
+        auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = _it.shading().world_to_local(wi);
         auto df = df_in * abs_cos_theta(wi_local);
 
@@ -270,11 +272,9 @@ luisa::unique_ptr<Surface::Closure> GlassInstance::closure(
     }
 
     // fresnel
-    auto cos_o = cos_theta(it.wo_local());
-    auto Fr = fresnel_dielectric(cos_o, eta_i, eta);
     return luisa::make_unique<GlassClosure>(
         this, it, swl, time, Kr, Kt, eta_i, eta,
-        dispersive, alpha, clamp(Fr * Kr_ratio, .05f, .95f));
+        dispersive, alpha, clamp(Kr_ratio, .05f, .95f));
 }
 
 }// namespace luisa::render

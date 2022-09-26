@@ -79,7 +79,7 @@ void NormalVisualizerInstance::_render_one_camera(
         auto [ray, camera_weight] = camera->generate_ray(*sampler(), pixel_id, time);
         auto path_weight = camera_weight;
         auto it = pipeline().geometry()->intersect(ray);
-        auto color = def(make_float3());
+        auto color = def(make_float3(1.f));
         $if(it->valid()) { color = it->shading().n() * .5f + .5f; };
         camera->film()->accumulate(pixel_id, shutter_weight * path_weight * color);
     });

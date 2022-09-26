@@ -111,44 +111,44 @@ public:
         if (_b == nullptr) { return _a->roughness(); }
         return lerp(_b->roughness(), _a->roughness(), _ratio);
     }
-    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
+    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override {
         if (_a == nullptr) [[unlikely]] {
-            auto eval = _b->evaluate(wi);
+            auto eval = _b->evaluate(wo, wi);
             eval.f *= 1.f - _ratio;
             return eval;
         }
         if (_b == nullptr) [[unlikely]] {
-            auto eval = _a->evaluate(wi);
+            auto eval = _a->evaluate(wo, wi);
             eval.f *= _ratio;
             return eval;
         }
-        auto eval_a = _a->evaluate(wi);
-        auto eval_b = _b->evaluate(wi);
+        auto eval_a = _a->evaluate(wo, wi);
+        auto eval_b = _b->evaluate(wo, wi);
         return _mix(eval_a, eval_b);
     }
-    [[nodiscard]] Surface::Sample sample(Expr<float> u_lobe, Expr<float2> u) const noexcept override {
+    [[nodiscard]] Surface::Sample sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u) const noexcept override {
         if (_a == nullptr) [[unlikely]] {
-            auto sample = _b->sample(u_lobe, u);
+            auto sample = _b->sample(wo, u_lobe, u);
             sample.eval.f *= 1.f - _ratio;
             return sample;
         }
         if (_b == nullptr) [[unlikely]] {
-            auto sample = _a->sample(u_lobe, u);
+            auto sample = _a->sample(wo, u_lobe, u);
             sample.eval.f *= _ratio;
             return sample;
         }
         auto sample = Surface::Sample::zero(_swl.dimension());
         $if(u_lobe < _ratio) {// sample a
-            auto sample_a = _a->sample(u_lobe / _ratio, u);
-            auto eval_b = _b->evaluate(sample_a.wi);
+            auto sample_a = _a->sample(wo, u_lobe / _ratio, u);
+            auto eval_b = _b->evaluate(wo, sample_a.wi);
             sample.eval = _mix(sample_a.eval, eval_b);
             sample.wi = sample_a.wi;
             sample.eta = sample_a.eta;
             sample.event = sample_a.event;
         }
         $else {// sample b
-            auto sample_b = _b->sample((u_lobe - _ratio) / (1.f - _ratio), u);
-            auto eval_a = _a->evaluate(sample_b.wi);
+            auto sample_b = _b->sample(wo, (u_lobe - _ratio) / (1.f - _ratio), u);
+            auto eval_a = _a->evaluate(wo, sample_b.wi);
             sample.eval = _mix(eval_a, sample_b.eval);
             sample.wi = sample_b.wi;
             sample.eta = sample_b.eta;
@@ -156,24 +156,24 @@ public:
         };
         return sample;
     }
-    void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
+    void backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
         if (_a != nullptr && _b != nullptr) [[likely]] {
             using compute::isnan;
-            auto eval_a = _a->evaluate(wi);
-            auto eval_b = _b->evaluate(wi);
+            auto eval_a = _a->evaluate(wo, wi);
+            auto eval_b = _b->evaluate(wo, wi);
             auto d_a = df * _ratio;
             auto d_b = df * (1.f - _ratio);
-            _a->backward(wi, zero_if_any_nan(d_a));
-            _b->backward(wi, zero_if_any_nan(d_a));
+            _a->backward(wo, wi, zero_if_any_nan(d_a));
+            _b->backward(wo, wi, zero_if_any_nan(d_a));
             if (auto ratio = instance<MixSurfaceInstance>()->ratio()) {
                 auto d_ratio = (df * (eval_a.f - eval_b.f)).sum();
                 ratio->backward(_it, _swl, _time,
                                 make_float4(ite(isnan(d_ratio), 0.f, d_ratio), 0.f, 0.f, 0.f));
             }
         } else if (_a != nullptr) [[likely]] {
-            _a->backward(wi, df * _ratio);
+            _a->backward(wo, wi, df * _ratio);
         } else if (_b != nullptr) [[likely]] {
-            _b->backward(wi, df * (1.f - _ratio));
+            _b->backward(wo, wi, df * (1.f - _ratio));
         }
     }
     [[nodiscard]] luisa::optional<Bool> dispersive() const noexcept override {

@@ -270,17 +270,19 @@ void MegakernelPathTracingInstance::_render_one_camera(
                 }
                 $else {
 
+                    auto wo = -ray->direction();
+
                     // direct lighting
                     $if(light_sample.eval.pdf > 0.0f & !occluded) {
                         auto wi = light_sample.wi;
-                        auto eval = closure->evaluate(wi);
+                        auto eval = closure->evaluate(wo, wi);
                         auto w = balanced_heuristic(light_sample.eval.pdf, eval.pdf) /
                                  light_sample.eval.pdf;
                         Li += w * beta * eval.f * light_sample.eval.L;
                     };
 
                     // sample material
-                    auto sample = closure->sample(u_lobe, u_bsdf);
+                    auto sample = closure->sample(wo, u_lobe, u_bsdf);
                     ray = it->spawn_ray(sample.wi);
                     pdf_bsdf = sample.eval.pdf;
                     auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);

@@ -65,13 +65,11 @@ struct DiffuseLightClosure final : public Light::Closure {
         auto &&pipeline = light->pipeline();
         auto pdf_triangle = pipeline.buffer<float>(it_light.shape()->pdf_buffer_id()).read(it_light.triangle_id());
         auto pdf_area = pdf_triangle / it_light.triangle_area();
-        auto cos_wo = dot(it_light.wo(), it_light.shading().n());
-        auto front_face = cos_wo > 0.0f;
+        auto cos_wo = dot(normalize(p_from - it_light.p()), it_light.ng());
         auto L = light->texture()->evaluate_illuminant_spectrum(it_light, _swl, _time).value *
                  light->node<DiffuseLight>()->scale();
         auto pdf = distance_squared(it_light.p(), p_from) * pdf_area * (1.0f / cos_wo);
-        return {.L = L.map([front_face](auto, auto s) noexcept { return ite(front_face, s, 0.f); }),
-                .pdf = ite(front_face, pdf, 0.0f)};
+        return {.L = ite(it_light.back_facing(), 0.f, L), .pdf = ite(it_light.back_facing(), 0.0f, pdf)};
     }
 
     [[nodiscard]] Light::Sample sample(Expr<uint> light_inst_id, Expr<float3> p_from, Expr<float2> u_in) const noexcept override {
@@ -88,12 +86,12 @@ struct DiffuseLightClosure final : public Light::Closure {
         auto uvw = sample_uniform_triangle(make_float2(ux, u_in.y));
         auto attrib = pipeline.geometry()->shading_point(
             light_inst, triangle, uvw, light_to_world, light_to_world_normal);
-        auto wo = normalize(p_from - attrib.pg);
-        Interaction it_light{light_inst, light_inst_id, triangle_id, wo, attrib};
+        auto light_wo = normalize(p_from - attrib.pg);
+        Interaction it_light{light_inst, light_inst_id, triangle_id, attrib, dot(light_wo, attrib.ng) < 0.0f};
         DiffuseLightClosure closure{light, _swl, _time};
-        auto p_light = it_light.p_robust(wo);
+        auto p_light = it_light.p_robust(light_wo);
         return {.eval = closure.evaluate(it_light, p_from),
-                .wi = normalize(p_light - p_from),
+                .wi = -light_wo,
                 .distance = distance(p_light, p_from) * .9999f};
     }
     void backward(const Interaction &it_light, Expr<float3> p_from, const SampledSpectrum &df) const noexcept override {
@@ -102,10 +100,7 @@ struct DiffuseLightClosure final : public Light::Closure {
 
         using namespace luisa::compute;
         auto light = instance<DiffuseLightInstance>();
-        auto cos_wo = dot(it_light.wo(), it_light.shading().n());
-        auto front_face = cos_wo > 0.0f;
-
-        auto d_L = df * ite(front_face, 1.f, 0.f);
+        auto d_L = df * ite(it_light.back_facing(), 0.f, 1.f);
         auto d_texture = d_L * light->node<DiffuseLight>()->scale();
         auto d_scale = (d_L * light->texture()->evaluate_illuminant_spectrum(it_light, _swl, _time).value).sum();
 

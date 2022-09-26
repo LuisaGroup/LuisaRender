@@ -157,18 +157,14 @@ Var<bool> Geometry::trace_any(const Var<Ray> &ray) const noexcept {
 luisa::unique_ptr<Interaction> Geometry::interaction(const Var<Ray> &ray, const Var<Hit> &hit) const noexcept {
     using namespace luisa::compute;
     Interaction it;
-    $if(hit->miss()) {
-        it = Interaction{-ray->direction()};
-    }
-    $else {
+    $if(!hit->miss()) {
         auto shape = instance(hit.inst);
         auto m = instance_to_world(hit.inst);
         auto n = transpose(inverse(make_float3x3(m)));
         auto tri = triangle(shape, hit.prim);
         auto uvw = make_float3(1.0f - hit.bary.x - hit.bary.y, hit.bary);
         auto attrib = shading_point(shape, tri, uvw, m, n);
-        auto wo = -ray->direction();
-        it = Interaction{std::move(shape), hit.inst, hit.prim, wo, attrib};
+        it = {std::move(shape), hit.inst, hit.prim, attrib, dot(ray->direction(), attrib.ng) > 0.0f};
     };
     return luisa::make_unique<Interaction>(std::move(it));
 }

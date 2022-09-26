@@ -113,26 +113,27 @@ public:
           _fresnel{luisa::make_unique<SchlickFresnel>(refl)},
           _distribution{luisa::make_unique<TrowbridgeReitzDistribution>(alpha)},
           _refl{luisa::make_unique<MicrofacetReflection>(refl, _distribution.get(), _fresnel.get())} {}
-    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
-        auto wo_local = _it.wo_local();
+    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+        auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = _it.shading().world_to_local(wi);
         auto f = _refl->evaluate(wo_local, wi_local);
         auto pdf = _refl->pdf(wo_local, wi_local);
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
-    [[nodiscard]] Surface::Sample sample(Expr<float>, Expr<float2> u) const noexcept override {
+    [[nodiscard]] Surface::Sample sample(Expr<float3> wo, Expr<float>, Expr<float2> u) const noexcept override {
         auto pdf = def(0.f);
+        auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = def(make_float3(0.f, 0.f, 1.f));
-        auto f = _refl->sample(_it.wo_local(), &wi_local, u, &pdf);
+        auto f = _refl->sample(wo_local, &wi_local, u, &pdf);
         return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf},
                 .wi = _it.shading().local_to_world(wi_local),
                 .eta = 1.f,
                 .event = Surface::event_reflect};
     }
     [[nodiscard]] Float2 roughness() const noexcept override { return _distribution->alpha(); }
-    void backward(Expr<float3> wi, const SampledSpectrum &df_in) const noexcept override {
+    void backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df_in) const noexcept override {
         auto _instance = instance<MirrorInstance>();
-        auto wo_local = _it.wo_local();
+        auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = _it.shading().world_to_local(wi);
         auto df = df_in * abs_cos_theta(wi_local);
         auto grad = _refl->backward(wo_local, wi_local, df);

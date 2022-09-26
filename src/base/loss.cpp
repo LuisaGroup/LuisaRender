@@ -11,10 +11,8 @@ Loss::Loss(Scene *scene, const SceneNodeDesc *desc) noexcept
 
 Interaction pixel_xy2uv(Expr<uint2> pixel_id, uint2 resolution) noexcept {
     return Interaction{
-        make_float3(),
-        Float2{
-            (pixel_id.x + 0.5f) / resolution.x,
-            (pixel_id.y + 0.5f) / resolution.y}};
+        Float2{(pixel_id.x + 0.5f) / resolution.x,
+               (pixel_id.y + 0.5f) / resolution.y}};
 }
 
 }// namespace luisa::render

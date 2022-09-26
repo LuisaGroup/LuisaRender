@@ -327,7 +327,6 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                 auto occluded = pipeline().geometry()->intersect_any(shadow_ray);
 
                 // evaluate material
-                auto cos_theta_o = it->wo_local().z;
                 auto surface_tag = it->shape()->surface_tag();
                 auto u_lobe = sampler->generate_1d();
                 auto u_bsdf = sampler->generate_2d();
@@ -353,10 +352,12 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                     }
                     $else {
 
+                        auto wo = -ray->direction();
+
                         // direct lighting
                         $if(light_sample.eval.pdf > 0.0f & !occluded) {
                             auto wi = light_sample.wi;
-                            auto eval = closure->evaluate(wi);
+                            auto eval = closure->evaluate(wo, wi);
                             auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
                             Li += mis_weight / light_sample.eval.pdf * beta * eval.f * light_sample.eval.L;
 
@@ -368,7 +369,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                         };
 
                         // sample material
-                        auto sample = closure->sample(u_lobe, u_bsdf);
+                        auto sample = closure->sample(wo, u_lobe, u_bsdf);
                         ray = it->spawn_ray(sample.wi);
                         pdf_bsdf = sample.eval.pdf;
                         auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
@@ -497,7 +498,6 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                 auto occluded = pipeline().geometry()->intersect_any(shadow_ray);
 
                 // evaluate material
-                auto cos_theta_o = it->wo_local().z;
                 auto surface_tag = it->shape()->surface_tag();
                 auto u_lobe = sampler->generate_1d();
                 auto u_bsdf = sampler->generate_2d();
@@ -523,10 +523,12 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                     }
                     $else {
 
+                        auto wo = -ray->direction();
+
                         // direct lighting
                         $if(light_sample.eval.pdf > 0.0f & !occluded) {
                             auto wi = light_sample.wi;
-                            auto eval = closure->evaluate(wi);
+                            auto eval = closure->evaluate(wo, wi);
                             auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
                             auto weight = mis_weight / light_sample.eval.pdf * beta;
                             Li -= weight * eval.f * light_sample.eval.L;
@@ -540,13 +542,13 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                             };
 #endif
 
-                            closure->backward(wi, d_loss * weight * light_sample.eval.L);
+                            closure->backward(wo, wi, d_loss * weight * light_sample.eval.L);
 
                             // TODO : backward direct light
                         };
 
                         // sample material
-                        auto sample = closure->sample(u_lobe, u_bsdf);
+                        auto sample = closure->sample(wo, u_lobe, u_bsdf);
                         ray = it->spawn_ray(sample.wi);
                         pdf_bsdf = sample.eval.pdf;
                         auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
@@ -554,7 +556,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                         // path replay bp
                         auto df = d_loss * grad_weight * Li;
                         df = ite(sample.eval.f == 0.f, 0.f, df / sample.eval.f);
-                        closure->backward(sample.wi, df);
+                        closure->backward(wo, sample.wi, df);
 
                         beta *= w * sample.eval.f;
 
@@ -709,7 +711,6 @@ void MegakernelReplayDiffInstance::_render_one_camera(
                 auto occluded = pipeline().geometry()->intersect_any(shadow_ray);
 
                 // evaluate material
-                auto cos_theta_o = it->wo_local().z;
                 auto surface_tag = it->shape()->surface_tag();
                 auto u_lobe = sampler->generate_1d();
                 auto u_bsdf = sampler->generate_2d();
@@ -734,15 +735,18 @@ void MegakernelReplayDiffInstance::_render_one_camera(
                         pdf_bsdf = 1e16f;
                     }
                     $else {
+
+                        auto wo = -ray->direction();
+
                         // direct lighting
                         $if(light_sample.eval.pdf > 0.0f & !occluded) {
                             auto wi = light_sample.wi;
-                            auto eval = closure->evaluate(wi);
+                            auto eval = closure->evaluate(wo, wi);
                             auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
                             Li += mis_weight / light_sample.eval.pdf * beta * eval.f * light_sample.eval.L;
                         };
                         // sample material
-                        auto sample = closure->sample(u_lobe, u_bsdf);
+                        auto sample = closure->sample(wo, u_lobe, u_bsdf);
                         ray = it->spawn_ray(sample.wi);
                         pdf_bsdf = sample.eval.pdf;
                         auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);

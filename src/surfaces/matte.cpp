@@ -78,15 +78,15 @@ public:
           _eta_i{eta_i} {}
 
 public:
-    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
-        auto wo_local = _it.wo_local();
+    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+        auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = _it.shading().world_to_local(wi);
         auto f = _oren_nayar->evaluate(wo_local, wi_local);
         auto pdf = _oren_nayar->pdf(wo_local, wi_local);
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
-    [[nodiscard]] Surface::Sample sample(Expr<float>, Expr<float2> u) const noexcept override {
-        auto wo_local = _it.wo_local();
+    [[nodiscard]] Surface::Sample sample(Expr<float3> wo, Expr<float>, Expr<float2> u) const noexcept override {
+        auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = def(make_float3(0.0f, 0.0f, 1.0f));
         auto pdf = def(0.f);
         auto f = _oren_nayar->sample(wo_local, &wi_local, u, &pdf);
@@ -96,9 +96,9 @@ public:
                 .eta = 1.f,
                 .event = Surface::event_reflect};
     }
-    void backward(Expr<float3> wi, const SampledSpectrum &df_in) const noexcept override {
+    void backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df_in) const noexcept override {
         auto _instance = instance<MatteInstance>();
-        auto wo_local = _it.wo_local();
+        auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = _it.shading().world_to_local(wi);
         auto df = df_in * abs_cos_theta(wi_local);
         auto grad = _oren_nayar->backward(wo_local, wi_local, df);

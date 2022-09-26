@@ -291,7 +291,6 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
                 auto occluded = pipeline().geometry()->intersect_any(shadow_ray);
 
                 // evaluate material
-                auto cos_theta_o = it->wo_local().z;
                 auto surface_tag = it->shape()->surface_tag();
                 auto u_lobe = sampler->generate_1d();
                 auto u_bsdf = sampler->generate_2d();
@@ -317,11 +316,12 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
                         pdf_bsdf = 1e16f;
                     }
                     $else {
+                        auto wo = -ray->direction();
 
                         // direct lighting
                         $if(light_sample.eval.pdf > 0.0f & !occluded) {
                             auto wi = light_sample.wi;
-                            auto eval = closure->evaluate(wi);
+                            auto eval = closure->evaluate(wo, wi);
                             auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
                             //                            Li += mis_weight / light_sample.eval.pdf *
                             //                                  abs_dot(eval.normal, wi) *
@@ -329,20 +329,20 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
 
                             // TODO : or apply the approximation light_sample.eval.L / light_sample.eval.pdf = 1.f
                             auto weight = mis_weight / light_sample.eval.pdf;
-                            closure->backward(wi, weight * beta * light_sample.eval.L);
+                            closure->backward(wo, wi, weight * beta * light_sample.eval.L);
 
                             // TODO : backward direct light
                         };
 
                         // sample material
-                        auto sample = closure->sample(u_lobe, u_bsdf);
+                        auto sample = closure->sample(wo, u_lobe, u_bsdf);
                         ray = it->spawn_ray(sample.wi);
                         pdf_bsdf = sample.eval.pdf;
                         auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
 
                         // radiative bp
                         // Li * d_fs
-                        closure->backward(sample.wi, grad_weight * beta * Li * w);
+                        closure->backward(wo, sample.wi, grad_weight * beta * Li * w);
 
                         // d_Li * fs
                         beta *= w * sample.eval.f;
@@ -477,7 +477,6 @@ void MegakernelRadiativeDiffInstance::_render_one_camera(
                 auto occluded = pipeline().geometry()->intersect_any(shadow_ray);
 
                 // evaluate material
-                auto cos_theta_o = it->wo_local().z;
                 auto surface_tag = it->shape()->surface_tag();
                 auto u_lobe = sampler->generate_1d();
                 auto u_bsdf = sampler->generate_2d();
@@ -504,16 +503,18 @@ void MegakernelRadiativeDiffInstance::_render_one_camera(
                     }
                     $else {
 
+                        auto wo = -ray->direction();
+
                         // direct lighting
                         $if(light_sample.eval.pdf > 0.0f & !occluded) {
                             auto wi = light_sample.wi;
-                            auto eval = closure->evaluate(wi);
+                            auto eval = closure->evaluate(wo, wi);
                             auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
                             Li += mis_weight / light_sample.eval.pdf * beta * eval.f * light_sample.eval.L;
                         };
 
                         // sample material
-                        auto sample = closure->sample(u_lobe, u_bsdf);
+                        auto sample = closure->sample(wo, u_lobe, u_bsdf);
                         ray = it->spawn_ray(sample.wi);
                         pdf_bsdf = sample.eval.pdf;
                         auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);

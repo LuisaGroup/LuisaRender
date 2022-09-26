@@ -441,19 +441,20 @@ void WavefrontPathTracingInstance::_render_one_camera(
                     pdf_bsdf = 1e16f;
                 }
                 $else {
+                    auto wo = -ray->direction();
 
                     // direct lighting
                     auto pdf_light = light_samples.read_pdf(queue_id);
                     $if(pdf_light > 0.0f) {
                         auto Ld = light_samples.read_emission(queue_id);
                         auto wi = light_samples.read_wi(queue_id);
-                        auto eval = closure->evaluate(wi);
+                        auto eval = closure->evaluate(wo, wi);
                         auto mis_weight = balanced_heuristic(pdf_light, eval.pdf);
                         Li += mis_weight / pdf_light * beta * eval.f * Ld;
                     };
 
                     // sample material
-                    auto sample = closure->sample(u_lobe, u_bsdf);
+                    auto sample = closure->sample(wo, u_lobe, u_bsdf);
                     ray = it->spawn_ray(sample.wi);
                     pdf_bsdf = sample.eval.pdf;
                     auto w = ite(sample.eval.pdf > 0.0f, 1.f / sample.eval.pdf, 0.f);

@@ -64,7 +64,7 @@ private:
 private:
     [[nodiscard]] auto _evaluate(Expr<float3> wi_local, const SampledWavelengths &swl, Expr<float> time) const noexcept {
         auto env = node<Directional>();
-        Interaction it{-wi_local, make_float2(.5f)};
+        Interaction it{make_float2(.5f)};
         auto L = _texture->evaluate_illuminant_spectrum(it, swl, time).value;
         auto pdf = uniform_cone_pdf(env->cos_half_angle());
         auto valid = env->cos_half_angle() < cos_theta(wi_local);

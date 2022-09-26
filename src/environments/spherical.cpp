@@ -66,7 +66,7 @@ private:
 private:
     [[nodiscard]] auto _evaluate(Expr<float3> wi_local, Expr<float2> uv,
                                  const SampledWavelengths &swl, Expr<float> time) const noexcept {
-        Interaction it{-wi_local, uv};
+        Interaction it{uv};
         auto L = _texture->evaluate_illuminant_spectrum(it, swl, time).value;
         return L * node<Spherical>()->scale();
     }
@@ -146,7 +146,7 @@ luisa::unique_ptr<Environment::Instance> Spherical::build(
             auto uv = (make_float2(coord) + .5f) /
                       make_float2(sample_map_size);
             auto [theta, phi, w] = Spherical::uv_to_direction(uv);
-            auto it = Interaction{-w, uv};
+            auto it = Interaction{uv};
             auto scale = texture->evaluate_illuminant_spectrum(it, pipeline.spectrum()->sample(0.5f), 0.f).strength;
             auto sin_theta = sin(uv.y * pi);
             auto pixel_id = coord.y * sample_map_size.x + coord.x;

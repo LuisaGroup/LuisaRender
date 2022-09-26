@@ -222,16 +222,16 @@ public:
           _lobe{luisa::make_unique<MicrofacetReflection>(SampledSpectrum{swl.dimension(), 1.f}, _distrib.get(), _fresnel.get())} {}
 
 private:
-    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
-        auto wo_local = _it.wo_local();
+    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+        auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = _it.shading().world_to_local(wi);
         auto f = _lobe->evaluate(wo_local, wi_local);
         if (_refl) { f *= *_refl; }
         auto pdf = _lobe->pdf(wo_local, wi_local);
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
-    [[nodiscard]] Surface::Sample sample(Expr<float>, Expr<float2> u) const noexcept override {
-        auto wo_local = _it.wo_local();
+    [[nodiscard]] Surface::Sample sample(Expr<float3> wo, Expr<float>, Expr<float2> u) const noexcept override {
+        auto wo_local = _it.shading().world_to_local(wo);
         auto pdf = def(0.f);
         auto wi_local = def(make_float3(0.f, 0.f, 1.f));
         auto f = _lobe->sample(wo_local, &wi_local, u, &pdf);
@@ -242,7 +242,7 @@ private:
                 .eta = 1.f,
                 .event = Surface::event_reflect};
     }
-    void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
+    void backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
         // Metal surface is not differentiable
     }
 

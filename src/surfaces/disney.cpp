@@ -474,8 +474,7 @@ public:
 
         // TODO: should not generate lobes than are not used.
         constexpr auto black_threshold = 1e-6f;
-        auto cos_theta_o = dot(_it.wo(), _it.shading().n());
-        auto front_face = cos_theta_o > 0.f;
+        auto front_face = !_it.back_facing();
         auto metallic = ite(front_face, metallic_in, 0.f);
         auto specular_trans = (1.f - metallic) * specular_trans_in;
         auto diffuse_weight = (1.f - metallic) * (1.f - specular_trans);
@@ -537,9 +536,7 @@ public:
         _lobes |= refl_specular;// always consider the specular lobe
 
         // specular reflection sampling weight
-        auto fr = fresnel_dielectric(cos_theta_o, eta_i, _eta_t);
-        auto F = clamp(lerp(fr, FrSchlick(1.f, cos_theta_o), metallic), 0.1f, 0.9f);
-        auto Cspec0_lum = F * lerp(lerp(1.f, Ctint_lum, specular_tint) * SchlickR0, color_lum, metallic);
+        auto Cspec0_lum = lerp(lerp(1.f, Ctint_lum, specular_tint) * SchlickR0, color_lum, metallic);
         _sampling_weights[sampling_technique_specular] = Cspec0_lum;
 
         // clearcoat
@@ -562,7 +559,7 @@ public:
         _lobes |= ite(Cst_lum > black_threshold, trans_specular, 0u);
 
         // specular transmission sampling weight
-        _sampling_weights[sampling_technique_specular_trans] = (1.f - F) * Cst_lum;
+        _sampling_weights[sampling_technique_specular_trans] = Cst_lum;
 
         // thin specular transmission
         auto rscaled = (.65f * eta - .35f) * roughness;
@@ -578,7 +575,7 @@ public:
         _lobes |= ite(Ctst_lum > black_threshold, trans_thin_specular, 0u);
 
         // thin specular transmission sampling weight
-        _sampling_weights[sampling_technique_thin_specular_trans] = (1.f - F) * Ctst_lum;
+        _sampling_weights[sampling_technique_thin_specular_trans] = Ctst_lum;
 
         // thin diffuse transmission
         auto Cdt_weight = ite(thin, dt, 0.f);
@@ -640,12 +637,12 @@ public:
         auto thin = instance<DisneySurfaceInstance>()->thin();
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
-    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
-        auto wo_local = _it.wo_local();
+    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+        auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = _it.shading().world_to_local(wi);
         return evaluate_local(wo_local, wi_local);
     }
-    [[nodiscard]] Surface::Sample sample(Expr<float> u_lobe, Expr<float2> u) const noexcept override {
+    [[nodiscard]] Surface::Sample sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u) const noexcept override {
         auto sampling_tech = def(0u);
         auto sum_weights = def(0.f);
         auto lower_sum = def(0.f);
@@ -659,7 +656,7 @@ public:
         }
 
         // sample
-        auto wo_local = _it.wo_local();
+        auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = def(make_float3(0.f, 0.f, 1.f));
         auto pdf = def(0.f);
         auto event = def(Surface::event_reflect);
@@ -687,7 +684,7 @@ public:
     }
     [[nodiscard]] Float2 roughness() const noexcept override { return _distrib->alpha(); }
 
-    void backward(Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
+    void backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
         // TODO
         LUISA_WARNING_WITH_LOCATION("Not implemented.");
     }

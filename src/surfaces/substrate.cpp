@@ -91,16 +91,16 @@ public:
           _eta_i{eta_i} {}
 
 private:
-    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wi) const noexcept override {
-        auto wo_local = _it.wo_local();
+    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+        auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = _it.shading().world_to_local(wi);
         auto f = _blend->evaluate(wo_local, wi_local);
         auto pdf = _blend->pdf(wo_local, wi_local);
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
 
-    [[nodiscard]] Surface::Sample sample(Expr<float> u_lobe, Expr<float2> u) const noexcept override {
-        auto wo_local = _it.wo_local();
+    [[nodiscard]] Surface::Sample sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u) const noexcept override {
+        auto wo_local = _it.shading().world_to_local(wo);
         auto pdf = def(0.f);
         auto wi_local = def(make_float3());
         // TODO: pass u_lobe to _blend->sample()
@@ -116,10 +116,10 @@ public:
     [[nodiscard]] Float2 roughness() const noexcept override { return _distribution->alpha(); }
 
 private:
-    void backward(Expr<float3> wi, const SampledSpectrum &df_in) const noexcept override {
+    void backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df_in) const noexcept override {
         using compute::isinf;
         auto _instance = instance<SubstrateInstance>();
-        auto wo_local = _it.wo_local();
+        auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = _it.shading().world_to_local(wi);
         auto df = df_in * abs_cos_theta(wi_local);
 
@@ -131,7 +131,6 @@ private:
             auto remap = _instance->node<SubstrateSurface>()->remap_roughness();
             auto r_f4 = roughness->evaluate(_it, _swl, _time);
             auto r = roughness->node()->channels() == 1u ? r_f4.xx() : r_f4.xy();
-
             auto grad_alpha_roughness = [](auto &&x) noexcept {
                 return TrowbridgeReitzDistribution::grad_alpha_roughness(x);
             };
