@@ -77,15 +77,19 @@ public:
           _oren_nayar{luisa::make_unique<OrenNayar>(std::move(albedo), sigma)},
           _eta_i{eta_i} {}
 
-public:
-    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+    [[nodiscard]] Float2 roughness() const noexcept override { return make_float2(1.f); }
+
+private:
+    [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
+                                                TransportMode mode) const noexcept override {
         auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = _it.shading().world_to_local(wi);
         auto f = _oren_nayar->evaluate(wo_local, wi_local);
         auto pdf = _oren_nayar->pdf(wo_local, wi_local);
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
-    [[nodiscard]] Surface::Sample sample(Expr<float3> wo, Expr<float>, Expr<float2> u) const noexcept override {
+    [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float>, Expr<float2> u,
+                                          TransportMode mode) const noexcept override {
         auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = def(make_float3(0.0f, 0.0f, 1.0f));
         auto pdf = def(0.f);
@@ -96,7 +100,8 @@ public:
                 .eta = 1.f,
                 .event = Surface::event_reflect};
     }
-    void backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df_in) const noexcept override {
+    void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df_in,
+                   TransportMode mode) const noexcept override {
         auto _instance = instance<MatteInstance>();
         auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = _it.shading().world_to_local(wi);
@@ -108,7 +113,6 @@ public:
             sigma->backward(_it, _swl, _time, dv);
         }
     }
-    [[nodiscard]] Float2 roughness() const noexcept override { return make_float2(1.f); }
 };
 
 luisa::unique_ptr<Surface::Closure> MatteInstance::closure(

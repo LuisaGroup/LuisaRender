@@ -219,10 +219,15 @@ public:
         : Surface::Closure{instance, it, swl, time}, _refl{std::move(refl)},
           _fresnel{luisa::make_unique<FresnelConductor>(eta_i, n, k)},
           _distrib{luisa::make_unique<TrowbridgeReitzDistribution>(alpha)},
-          _lobe{luisa::make_unique<MicrofacetReflection>(SampledSpectrum{swl.dimension(), 1.f}, _distrib.get(), _fresnel.get())} {}
+          _lobe{luisa::make_unique<MicrofacetReflection>(
+              SampledSpectrum{swl.dimension(), 1.f},
+              _distrib.get(), _fresnel.get())} {}
+
+    [[nodiscard]] Float2 roughness() const noexcept override { return _distrib->alpha(); }
 
 private:
-    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+    [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
+                                                TransportMode mode) const noexcept override {
         auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = _it.shading().world_to_local(wi);
         auto f = _lobe->evaluate(wo_local, wi_local);
@@ -230,7 +235,8 @@ private:
         auto pdf = _lobe->pdf(wo_local, wi_local);
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
-    [[nodiscard]] Surface::Sample sample(Expr<float3> wo, Expr<float>, Expr<float2> u) const noexcept override {
+    [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float>, Expr<float2> u,
+                                          TransportMode mode) const noexcept override {
         auto wo_local = _it.shading().world_to_local(wo);
         auto pdf = def(0.f);
         auto wi_local = def(make_float3(0.f, 0.f, 1.f));
@@ -242,12 +248,12 @@ private:
                 .eta = 1.f,
                 .event = Surface::event_reflect};
     }
-    void backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
+    void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df,
+                   TransportMode mode) const noexcept override {
         // Metal surface is not differentiable
     }
 
 public:
-    [[nodiscard]] Float2 roughness() const noexcept override { return _distrib->alpha(); }
 };
 
 luisa::unique_ptr<Surface::Closure> MetalInstance::closure(

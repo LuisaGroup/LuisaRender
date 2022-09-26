@@ -39,4 +39,22 @@ luisa::optional<Bool> Surface::Closure::dispersive() const noexcept {
     return luisa::nullopt;
 }
 
+Surface::Evaluation Surface::Closure::evaluate(
+    Expr<float3> wo, Expr<float3> wi,
+    TransportMode mode) const noexcept {
+    return _evaluate(wo, wi, mode);
+}
+
+Surface::Sample Surface::Closure::sample(
+    Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u,
+    TransportMode mode) const noexcept {
+    return _sample(wo, u_lobe, u, mode);
+}
+
+void Surface::Closure::backward(
+    Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df,
+    TransportMode mode) const noexcept {
+    _backward(wo, wi, df, mode);
+}
+
 }// namespace luisa::render

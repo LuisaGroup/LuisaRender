@@ -26,6 +26,11 @@ using compute::Float4;
 [[nodiscard]] Float spherical_theta(Float3 v) noexcept;
 [[nodiscard]] Float spherical_phi(Float3 v) noexcept;
 
+enum TransportMode {
+    RADIANCE,
+    IMPORTANCE
+};
+
 class MicrofacetDistribution {
 
 public:

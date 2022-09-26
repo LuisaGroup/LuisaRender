@@ -5,6 +5,7 @@
 #pragma once
 
 #include <util/spec.h>
+#include <util/scattering.h>
 #include <base/scene_node.h>
 #include <base/texture.h>
 #include <base/sampler.h>
@@ -69,6 +70,11 @@ public:
         const SampledWavelengths &_swl;
         Float _time;
 
+    private:
+        [[nodiscard]] virtual Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept = 0;
+        [[nodiscard]] virtual Sample _sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u, TransportMode mode) const noexcept = 0;
+        virtual void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df, TransportMode mode) const noexcept = 0;
+
     public:
         Closure(const Instance *instance, Interaction it,
                 const SampledWavelengths &swl, Expr<float> time) noexcept;
@@ -76,10 +82,10 @@ public:
         template<typename T = Instance>
             requires std::is_base_of_v<Instance, T>
         [[nodiscard]] auto instance() const noexcept { return static_cast<const T *>(_instance); }
-        [[nodiscard]] virtual Evaluation evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept = 0;
-        [[nodiscard]] virtual Sample sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u) const noexcept = 0;
+        [[nodiscard]] Evaluation evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode = TransportMode::RADIANCE) const noexcept;
+        [[nodiscard]] Sample sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u, TransportMode mode = TransportMode::RADIANCE) const noexcept;
+        void backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df, TransportMode mode = TransportMode::RADIANCE) const noexcept;
         [[nodiscard]] auto &interaction() const noexcept { return _it; }
-        virtual void backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept = 0;
         [[nodiscard]] virtual luisa::optional<Float> opacity() const noexcept;
         [[nodiscard]] virtual luisa::optional<Bool> dispersive() const noexcept;
         [[nodiscard]] virtual Float2 roughness() const noexcept = 0;

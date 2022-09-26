@@ -150,8 +150,11 @@ public:
           _kr_ratio{Kr_ratio} {}
 
     [[nodiscard]] luisa::optional<Bool> dispersive() const noexcept override { return _dispersive; }
+    [[nodiscard]] Float2 roughness() const noexcept override { return _distribution->alpha(); }
 
-    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+private:
+    [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
+                                                TransportMode mode) const noexcept override {
         auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = _it.shading().world_to_local(wi);
         SampledSpectrum f{_swl.dimension()};
@@ -169,7 +172,8 @@ public:
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
 
-    [[nodiscard]] Surface::Sample sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u) const noexcept override {
+    [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u,
+                                          TransportMode mode) const noexcept override {
         auto wo_local = _it.shading().world_to_local(wo);
         auto pdf = def(0.f);
         auto f = SampledSpectrum{_swl.dimension()};
@@ -192,9 +196,9 @@ public:
                 .eta = _fresnel->eta_t(),
                 .event = event};
     }
-    [[nodiscard]] Float2 roughness() const noexcept override { return _distribution->alpha(); }
 
-    void backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df_in) const noexcept override {
+    void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df_in,
+                   TransportMode mode) const noexcept override {
         auto _instance = instance<GlassInstance>();
         auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = _it.shading().world_to_local(wi);

@@ -599,7 +599,11 @@ public:
         auto inv_sum_weights = 1.f / sum_weights;
         for (auto &s : _sampling_weights) { s *= inv_sum_weights; }
     }
-    [[nodiscard]] Surface::Evaluation evaluate_local(Float3 wo_local, Float3 wi_local) const noexcept {
+    [[nodiscard]] Float2 roughness() const noexcept override { return _distrib->alpha(); }
+
+private:
+    [[nodiscard]] Surface::Evaluation _evaluate_local(Float3 wo_local, Float3 wi_local,
+                                                      TransportMode mode) const noexcept {
         SampledSpectrum f{_swl.dimension()};
         auto pdf = def(0.f);
         // TODO: performance test
@@ -637,12 +641,14 @@ public:
         auto thin = instance<DisneySurfaceInstance>()->thin();
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
-    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+    [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
+                                                TransportMode mode) const noexcept override {
         auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = _it.shading().world_to_local(wi);
-        return evaluate_local(wo_local, wi_local);
+        return _evaluate_local(wo_local, wi_local, mode);
     }
-    [[nodiscard]] Surface::Sample sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u) const noexcept override {
+    [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float> u_lobe,
+                                          Expr<float2> u, TransportMode mode) const noexcept override {
         auto sampling_tech = def(0u);
         auto sum_weights = def(0.f);
         auto lower_sum = def(0.f);
@@ -678,13 +684,12 @@ public:
             };
             $default { unreachable(); };
         };
-        auto eval = evaluate_local(wo_local, wi_local);
+        auto eval = _evaluate_local(wo_local, wi_local, mode);
         auto wi = _it.shading().local_to_world(wi_local);
         return {.eval = eval, .wi = wi, .eta = _eta_t, .event = event};
     }
-    [[nodiscard]] Float2 roughness() const noexcept override { return _distrib->alpha(); }
-
-    void backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept override {
+    void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df,
+                   TransportMode mode) const noexcept override {
         // TODO
         LUISA_WARNING_WITH_LOCATION("Not implemented.");
     }
