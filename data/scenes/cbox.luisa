@@ -18,9 +18,7 @@ import "../meshes/cbox.luisa"
 
 Integrator pt : MegaPath {
   sampler : Independent {}
-  depth { 16 }
-  spectrum : sRGB {}
-  // display { true }
+  depth { 10 }
 }
 
 Integrator normal : Normal {}
@@ -29,6 +27,7 @@ render {
   cameras { @camera }
   shapes { @cbox }
   integrator { @pt }
+  spectrum : sRGB {}
   // environment : Directional {
   //   direction { 1, 1.1, 1.3 }
   //   emission : Constant {

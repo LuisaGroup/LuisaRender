@@ -3,9 +3,9 @@ Camera camera : Pinhole {
   front { 1, -1, -18 }
   fov { 50 }
   film : Color {
-    resolution { 1920, 1080 }
+    resolution { 480, 270 }
   }
-  spp { 64 }
+  spp { 1024 }
   filter : Gaussian {}
   file { "render.exr" }
 }
@@ -37,7 +37,7 @@ Shape box : Group {
 
 Shape water : Mesh {
   surface : Glass {
-    eta { "SF11" }
+    // eta { "SF11" }
     Kr : Constant {
       v { 1, 1, 1 }
       semantic { "albedo" }
@@ -50,7 +50,7 @@ Shape water : Mesh {
       v { 0 }
     }
   }
-  file { "dambreak0.ply" }
+  file { "dambreak0.obj" }
   transform : SRT {
     translate { -0.6, -0.02, -0.6 }
     scale { 1.001 }
@@ -72,21 +72,26 @@ Shape backdrop : Mesh {
 
 render {
   cameras { @camera }
-  spectrum : Hero {
+  spectrum : sRGB {
     dimension { 4 }
   }
-  integrator : WavePath {
+  integrator : MegaPath {
     depth { 64 }
-    rr_depth { 16 }
+    rr_depth { 5 }
   }
   sampler : PMJ02BN {}
-  shapes { @box, @backdrop, @water }
+  shapes {
+    // @box,
+    @backdrop,
+    @water
+  }
   environment : Directional {
     emission : Constant {
       v { 0.25, 0.3, 0.36 }
+      scale { 0.5 }
       semantic { "illuminant" }
     }
-    angle { 0.53 }
+    angle { 10 }
     direction { 1, 1.5, 0.5 }
   }
 }

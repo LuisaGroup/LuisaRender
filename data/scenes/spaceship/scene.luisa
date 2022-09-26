@@ -122,9 +122,10 @@ Surface mat_Glass : Glass {
     v { 1.0, 1.0, 1.0 }
     semantic { "albedo" }
   }
-  eta : Constant {
-    v { 1.5 }
-  }
+  // eta : Constant {
+  //   v { 1.5 }
+  // }
+  eta { "SF11" }
   roughness : Constant {
     v { 0.05 }
   }
@@ -1373,7 +1374,7 @@ Camera camera : Pinhole {
   front { 0.5, -0.5, -1 }
   up { 0.0, 1.0, 0.0 }
   fov { 35.98339777135762 }
-  spp { 16384 }
+  spp { 4096 }
   filter : Gaussian {
     radius { 1 }
   }
@@ -1381,13 +1382,13 @@ Camera camera : Pinhole {
     clamp { 128 }
     resolution { 1920, 1080 }
   }
-  file { "output-spectral.exr" }
+  file { "render-spectral.exr" }
 }
 
 render {
   cameras { @camera }
   spectrum : Hero {}
-  integrator : WavePath {
+  integrator : MegaPath {
     sampler : PMJ02BN {}
     depth { 16 }
     rr_depth { 5 }

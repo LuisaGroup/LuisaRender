@@ -209,20 +209,23 @@ Camera camera : ThinLens {
   look_at { -0.03, 0.025, 0.072 }
   aperture { 2.8 }
   focal_length { 70 }
-  spp { 65536 }
+  spp { 64 }
   film : Color {
-    resolution { 3840, 2160 }
+    resolution { 1920, 1080 }
     clamp { 128 }
   }
-  file { "output.exr" }
+  file { "render-tiled.exr" }
   filter : Gaussian {
     radius { 1 }
   }
 }
 
-Integrator integrator : MegaPath {
-  sampler : PMJ02BN {}
-  // display { true }
+Integrator integrator : WavePath {
+  sampler : TileShared {
+    base : PMJ02BN {}
+    tile_size { 1 }
+    jitter { false }
+  }
 }
 
 render {

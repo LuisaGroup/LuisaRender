@@ -49,6 +49,11 @@ if (NOT CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     endif ()
 endif ()
 
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND
+        CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 15.0)
+    add_compile_options(-Wno-deprecated-builtins)
+endif ()
+
 option(LUISA_RENDER_BUILD_TESTS "Build tests for LuisaRender" ${LUISA_RENDER_MASTER_PROJECT})
 option(LUISA_RENDER_ENABLE_UNITY_BUILD "Enable unity build to speed up compilation" OFF)
 
