@@ -30,6 +30,28 @@ void SceneParserJSON::parse() const noexcept {
 }
 
 void SceneParserJSON::_parse_node(SceneNodeDesc &desc, const json &node) const noexcept {
+
+    auto parse_internal = [&desc, &node, this](luisa::string_view key, const json &n) noexcept {
+        LUISA_ASSERT(n.is_object(), "Invalid node reference in '{}'.'{}': {}",
+                     desc.identifier(), key, node.dump(2));
+        for (auto &&prop : n.items()) {
+            LUISA_ASSERT(prop.key() == "type" || prop.key() == "impl" ||
+                             prop.key() == "base" || prop.key() == "prop",
+                         "Invalid internal node property '{}.{}': {}",
+                         key, prop.key(), prop.value().dump(2));
+        }
+        auto n_impl_desc = n.at("impl").get<luisa::string>();
+        const SceneNodeDesc *n_base = nullptr;
+        if (auto iter = n.find("base"); iter != n.end()) {
+            n_base = _reference(iter->get<luisa::string>());
+        }
+        auto internal = desc.define_internal(n_impl_desc, _location, n_base);
+        if (auto iter_prop = n.find("prop"); iter_prop != n.end()) {
+            _parse_node(*internal, iter_prop.value());
+        }
+        return internal;
+    };
+
     for (auto &&item : node.items()) {
         // semantic properties, already processed
         if (item.key() == "type" ||
@@ -41,7 +63,7 @@ void SceneParserJSON::_parse_node(SceneNodeDesc &desc, const json &node) const n
             if (value.starts_with('@')) {
                 desc.add_property(item.key(), _reference(value));
             } else {
-                desc.add_property(item.key(), value);
+                desc.add_property(item.key(), std::move(value));
             }
         } else if (item.value().is_number()) {
             desc.add_property(item.key(), item.value().get<double>());
@@ -62,24 +84,7 @@ void SceneParserJSON::_parse_node(SceneNodeDesc &desc, const json &node) const n
                         if (n.is_string()) {// reference
                             nodes.emplace_back(_reference(n.get<luisa::string>()));
                         } else {// internal node
-                            LUISA_ASSERT(n.is_object(), "Invalid node reference in '{}'.'{}': {}",
-                                         desc.identifier(), item.key(), node.dump(2));
-                            for (auto &&prop : n.items()) {
-                                LUISA_ASSERT(prop.key() == "type" || prop.key() == "impl" ||
-                                                 prop.key() == "base" || prop.key() == "prop",
-                                             "Invalid internal node property '{}.{}': {}",
-                                             item.key(), prop.key(), prop.value().dump(2));
-                            }
-                            auto n_impl_desc = n.at("impl").get<luisa::string>();
-                            const SceneNodeDesc *n_base = nullptr;
-                            if (auto iter = n.find("base"); iter != n.end()) {
-                                n_base = _reference(iter->get<luisa::string>());
-                            }
-                            auto internal = desc.define_internal(n_impl_desc, _location, n_base);
-                            if (auto iter_prop = n.find("prop"); iter_prop != n.end()) {
-                                _parse_node(*internal, iter_prop.value());
-                            }
-                            nodes.emplace_back(internal);
+                            nodes.emplace_back(parse_internal(item.key(), n));
                         }
                     }
                     desc.add_property(item.key(), std::move(nodes));
@@ -103,29 +108,20 @@ void SceneParserJSON::_parse_node(SceneNodeDesc &desc, const json &node) const n
                 for (auto &&v : array) { values.emplace_back(v.get<bool>()); }
                 desc.add_property(item.key(), std::move(values));
             } else {
-                LUISA_WARNING_WITH_LOCATION("Unsupported array type for '{}'.'{}': {}",
-                                            desc.identifier(), item.key(), node.dump(2));
+                luisa::vector<const SceneNodeDesc *> nodes;
+                nodes.reserve(array.size());
+                for (auto &&n : array) {
+                    if (n.is_string()) {// reference
+                        nodes.emplace_back(_reference(n.get<luisa::string>()));
+                    } else {// internal node
+                        nodes.emplace_back(parse_internal(item.key(), n));
+                    }
+                }
+                desc.add_property(item.key(), std::move(nodes));
             }
         } else {// inline nodes
             if (!item.value().is_null()) {
-                LUISA_ASSERT(item.value().is_object(), "Invalid internal node in '{}'.'{}': {}",
-                             desc.identifier(), item.key(), node.dump(2));
-                for (auto &&prop : item.value().items()) {
-                    LUISA_ASSERT(prop.key() == "type" || prop.key() == "impl" ||
-                                     prop.key() == "base" || prop.key() == "prop",
-                                 "Invalid internal node property '{}.{}': {}",
-                                 item.key(), prop.key(), prop.value().dump(2));
-                }
-                auto n_impl_desc = item.value().at("impl").get<luisa::string>();
-                const SceneNodeDesc *n_base = nullptr;
-                if (auto iter = item.value().find("base"); iter != item.value().end()) {
-                    n_base = _reference(iter->get<luisa::string>());
-                }
-                auto internal = desc.define_internal(n_impl_desc, _location, n_base);
-                if (auto iter_prop = item.value().find("prop"); iter_prop != item.value().end()) {
-                    _parse_node(*internal, iter_prop.value());
-                }
-                desc.add_property(item.key(), internal);
+                desc.add_property(item.key(), parse_internal(item.key(), item.value()));
             }
         }
     }
