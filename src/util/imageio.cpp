@@ -531,7 +531,7 @@ LoadedImage LoadedImage::create(uint2 resolution, LoadedImage::storage_type stor
             }}};
 }
 
-void save_image(std::filesystem::path path, const float *pixels, uint2 resolution) noexcept {
+void save_image(std::filesystem::path path, const float *pixels, uint2 resolution, const uint components) noexcept {
     // save results
     auto pixel_count = resolution.x * resolution.y;
     auto size = make_int2(resolution);
@@ -545,22 +545,15 @@ void save_image(std::filesystem::path path, const float *pixels, uint2 resolutio
 
     if (path.extension() == ".exr") {
         const char *err = nullptr;
-        luisa::vector<float> pixels_rgb(pixel_count * 3u);
-        for (auto i = 0u; i < pixel_count; i++) {
-            pixels_rgb[i * 3u + 0u] = pixels[i * 4u + 0u];
-            pixels_rgb[i * 3u + 1u] = pixels[i * 4u + 1u];
-            pixels_rgb[i * 3u + 2u] = pixels[i * 4u + 2u];
-        }
-        SaveEXR(pixels_rgb.data(), size.x, size.y, 3,
-                false, path.string().c_str(), &err);
+        SaveEXR(reinterpret_cast<const float *>(pixels),
+                size.x, size.y, components, false, path.string().c_str(), &err);
         if (err != nullptr) [[unlikely]] {
             LUISA_ERROR_WITH_LOCATION(
                 "Failed to save film to '{}'.",
                 path.string());
         }
     } else if (path.extension() == ".hdr") {
-        stbi_write_hdr(path.string().c_str(), size.x, size.y, 4,
-                       reinterpret_cast<const float *>(pixels));
+        stbi_write_hdr(path.string().c_str(), size.x, size.y, components, reinterpret_cast<const float *>(pixels));
     }
 }
 

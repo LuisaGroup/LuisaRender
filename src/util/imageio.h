@@ -81,6 +81,6 @@ private:
 public:
 };
 
-void save_image(std::filesystem::path path, const float *pixels, uint2 resolution) noexcept;
+void save_image(std::filesystem::path path, const float *pixels, uint2 resolution, const uint components = 4) noexcept;
 
 }// namespace luisa::render
