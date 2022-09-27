@@ -10,6 +10,7 @@
 #include <core/thread_pool.h>
 #include <sdl/scene_parser.h>
 #include <sdl/scene_desc.h>
+#include <sdl/scene_parser_json.h>
 
 namespace luisa::render {
 
@@ -18,6 +19,19 @@ inline SceneParser::SceneParser(SceneDesc &desc, const std::filesystem::path &pa
     : _desc{desc}, _cli_macros{cli_macros},
       _location{desc.register_path(std::filesystem::canonical(path))},
       _cursor{0u} {}
+
+void SceneParser::_dispatch_parse(SceneDesc &desc, const std::filesystem::path &path,
+                                  const MacroMap &cli_macros) noexcept {
+    auto ext = path.extension().string();
+    for (auto &c : ext) { c = static_cast<char>(tolower(c)); }
+    if (ext == ".json") {
+        SceneParserJSON p{desc, path, cli_macros};
+        p.parse();
+    } else {
+        SceneParser p{desc, path, cli_macros};
+        p._parse_file();
+    }
+}
 
 template<typename... Args>
 inline void SceneParser::_report_error(std::string_view format, Args &&...args) const noexcept {
@@ -63,10 +77,9 @@ inline void SceneParser::_parse_source() noexcept {
             _skip_blanks();
             std::filesystem::path path{_read_string()};
             if (!path.is_absolute()) { path = _location.file()->parent_path() / path; }
-            ThreadPool::global().async(
-                [path = std::move(path), this] {
-                    SceneParser{_desc, path, _cli_macros}._parse_file();
-                });
+            ThreadPool::global().async([path = std::move(path), &desc = _desc, &cli_macros = _cli_macros] {
+                SceneParser::_dispatch_parse(desc, path, cli_macros);
+            });
         } else if (token == "define") {
             _parse_define();
         } else if (token == SceneDesc::root_node_identifier) {// root node
@@ -253,44 +266,12 @@ inline void SceneParser::_parse_root_node(SceneNodeDesc::SourceLocation l) noexc
 }
 
 inline void SceneParser::_parse_global_node(SceneNodeDesc::SourceLocation l, std::string_view tag_desc) noexcept {
-    using namespace std::string_view_literals;
-    static constexpr auto desc_to_tag_count = 28u;
-    static const luisa::fixed_map<std::string_view, SceneNodeTag, desc_to_tag_count> desc_to_tag{
-        {"Camera"sv, SceneNodeTag::CAMERA},
-        {"Cam"sv, SceneNodeTag::CAMERA},
-        {"Shape"sv, SceneNodeTag::SHAPE},
-        {"Object"sv, SceneNodeTag::SHAPE},
-        {"Obj"sv, SceneNodeTag::SHAPE},
-        {"Surface"sv, SceneNodeTag::SURFACE},
-        {"Surf"sv, SceneNodeTag::SURFACE},
-        {"LightSource"sv, SceneNodeTag::LIGHT},
-        {"Light"sv, SceneNodeTag::LIGHT},
-        {"Illuminant"sv, SceneNodeTag::LIGHT},
-        {"Illum"sv, SceneNodeTag::LIGHT},
-        {"Transform"sv, SceneNodeTag::TRANSFORM},
-        {"Xform"sv, SceneNodeTag::TRANSFORM},
-        {"Film"sv, SceneNodeTag::FILM},
-        {"Filter"sv, SceneNodeTag::FILTER},
-        {"Sampler"sv, SceneNodeTag::SAMPLER},
-        {"Integrator"sv, SceneNodeTag::INTEGRATOR},
-        {"LightSampler"sv, SceneNodeTag::LIGHT_SAMPLER},
-        {"Environment"sv, SceneNodeTag::ENVIRONMENT},
-        {"Env"sv, SceneNodeTag::ENVIRONMENT},
-        {"Texture"sv, SceneNodeTag::TEXTURE},
-        {"Tex"sv, SceneNodeTag::TEXTURE},
-        {"TextureMapping"sv, SceneNodeTag::TEXTURE_MAPPING},
-        {"TexMapping"sv, SceneNodeTag::TEXTURE_MAPPING},
-        {"Spectrum"sv, SceneNodeTag::SPECTRUM},
-        {"Spec"sv, SceneNodeTag::SPECTRUM},
-        {"Generic"sv, SceneNodeTag::DECLARATION},
-        {"Template"sv, SceneNodeTag::DECLARATION}};
-    auto iter = desc_to_tag.find(tag_desc);
-    if (iter == desc_to_tag.cend()) [[unlikely]] {
+    auto tag = parse_scene_node_tag(tag_desc);
+    if (tag == SceneNodeTag::ROOT) [[unlikely]] {
         _report_error(
             "Invalid scene node type '{}'.",
             tag_desc);
     }
-    auto tag = iter->second;
     _skip_blanks();
     auto name = _read_identifier();
     _skip_blanks();
@@ -420,7 +401,7 @@ inline SceneNodeDesc::string_list SceneParser::_parse_string_list_values() noexc
 luisa::unique_ptr<SceneDesc> SceneParser::parse(
     const std::filesystem::path &entry_file, const MacroMap &cli_macros) noexcept {
     auto desc = luisa::make_unique<SceneDesc>();
-    SceneParser{*desc, entry_file, cli_macros}._parse_file();
+    _dispatch_parse(*desc, entry_file, cli_macros);
     ThreadPool::global().synchronize();
     return desc;
 }

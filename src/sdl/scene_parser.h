@@ -13,6 +13,7 @@ namespace luisa::render {
 
 class SceneDesc;
 class SceneNodeDesc;
+class SceneParserJSON;
 
 class SceneParser {
 
@@ -59,8 +60,11 @@ private:
     [[nodiscard]] SceneNodeDesc::string_list _parse_string_list_values() noexcept;
     [[nodiscard]] const SceneNodeDesc *_parse_base_node() noexcept;
 
+    friend class SceneParserJSON;
     SceneParser(SceneDesc &desc, const std::filesystem::path &path,
                 const MacroMap &cli_macros) noexcept;
+    static void _dispatch_parse(SceneDesc &desc, const std::filesystem::path &path,
+                                const MacroMap &cli_macros) noexcept;
 
 public:
     SceneParser(SceneParser &&) noexcept = default;
