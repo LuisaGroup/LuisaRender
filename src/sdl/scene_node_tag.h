@@ -1,6 +1,7 @@
 //
 // Created by Mike on 2021/12/20.
 //
+#pragma once
 
 #include <cstdint>
 #include <string_view>
