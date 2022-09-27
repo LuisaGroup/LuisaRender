@@ -3,17 +3,25 @@ Camera camera : Pinhole {
   front { 1, -1, -18 }
   fov { 50 }
   film : Color {
-    resolution { 1280, 720 }
+    resolution { 1920, 1080 }
+    clamp { 1024 }
   }
-  spp { 1024 }
+  spp { 16384 }
   filter : Gaussian {}
-  file { "render.exr" }
+  file { "render-glass.exr" }
 }
 
 Shape box : Group {
   surface : Glass {
     eta { "BAF10" }
+    // eta : Constant {
+    //   v { 1.5 }
+    // }
     Kr : Constant {
+      v { 1, 1, 1 }
+      semantic { "albedo" }
+    }
+    color : Constant {
       v { 1, 1, 1 }
       semantic { "albedo" }
     }
@@ -23,6 +31,9 @@ Shape box : Group {
     }
     roughness : Constant {
       v { 0 }
+    }
+    specular_trans : Constant {
+      v { 1 }
     }
   }
   shapes {
@@ -38,6 +49,16 @@ Shape box : Group {
 Shape water : Mesh {
   surface : Glass {
     eta { "SF11" }
+    // eta : Constant {
+    //   v { 1.5 }
+    // }
+    specular_trans : Constant {
+      v { 1 }
+    }
+    color : Constant {
+      v { 1, 1, 1 }
+      semantic { "albedo" }
+    }
     Kr : Constant {
       v { 1, 1, 1 }
       semantic { "albedo" }
@@ -73,7 +94,7 @@ Shape backdrop : Mesh {
 render {
   cameras { @camera }
   spectrum : Hero {
-    dimension { 3 }
+    dimension { 4 }
   }
   integrator : WavePath {
     depth { 32 }
@@ -81,17 +102,25 @@ render {
   }
   sampler : PMJ02BN {}
   shapes {
-    // @box,
-    @backdrop,
+    @box,
+    //@backdrop,
     @water
   }
-  environment : Directional {
-    emission : Constant {
-      v { 0.25, 0.3, 0.36 }
-      scale { 0.5 }
+  environment : Spherical {
+    emission : Image {
+      // file { "/Users/mike/Downloads/abandoned_bakery_8k.exr" }
+      // file { "/Users/mike/Downloads/clarens_night_01_4k.exr" }
+      file { "/Users/mike/ClionProjects/LuisaRender/data/scenes/camera/textures/kiara_1_dawn_8k.exr" }
       semantic { "illuminant" }
     }
-    angle { 10 }
-    direction { 1, 1.5, 0.5 }
   }
+  // environment : Directional {
+  //   emission : Constant {
+  //     v { 0.25, 0.3, 0.36 }
+  //     scale { 0.5 }
+  //     semantic { "illuminant" }
+  //   }
+  //   angle { 10 }
+  //   direction { 1, 1.5, 0.5 }
+  // }
 }

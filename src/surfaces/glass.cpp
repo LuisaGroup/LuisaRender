@@ -160,6 +160,7 @@ private:
         SampledSpectrum f{_swl.dimension()};
         auto pdf = def(0.f);
         auto ratio = _kr_ratio * _fresnel->evaluate(cos_theta(wo_local))[0u];
+//        auto ratio = .5f;
         $if(same_hemisphere(wo_local, wi_local)) {
             f = _refl->evaluate(wo_local, wi_local, mode);
             pdf = _refl->pdf(wo_local, wi_local, mode) * ratio;
@@ -180,6 +181,7 @@ private:
         auto wi_local = def(make_float3(0.0f, 0.0f, 1.0f));
         auto event = def(Surface::event_reflect);
         auto ratio = _kr_ratio * _fresnel->evaluate(cos_theta(wo_local))[0u];
+//        auto ratio = .5f;
         $if(u_lobe < ratio) {// Reflection
             f = _refl->sample(wo_local, &wi_local, u, &pdf, mode);
             pdf *= ratio;
@@ -262,7 +264,8 @@ luisa::unique_ptr<Surface::Closure> GlassInstance::closure(
     auto eta = def(1.5f);
     auto dispersive = def(false);
     if (_eta != nullptr) {
-        if (_eta->node()->channels() == 1u) {
+        if (_eta->node()->channels() == 1u ||
+            pipeline().spectrum()->node()->is_fixed()) {
             eta = _eta->evaluate(it, swl, time).x;
         } else {
             auto e = _eta->evaluate(it, swl, time).xyz();

@@ -1066,7 +1066,7 @@ render {
   cameras { @camera }
   spectrum : sRGB {}
   integrator : WavePath {
-    sampler : PMJ02N {}
+    sampler : PMJ02BN {}
     depth { 12 }
     rr_depth { 5 }
     rr_threshold { 0.95 }

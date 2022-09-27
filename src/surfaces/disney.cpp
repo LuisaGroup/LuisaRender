@@ -195,7 +195,7 @@ private:
     SampledSpectrum R;
 
 public:
-    explicit DisneyDiffuse(SampledSpectrum R) noexcept : R{std::move(R)} {}
+    explicit DisneyDiffuse(const SampledSpectrum &R) noexcept : R{R} {}
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
         auto Fo = SchlickWeight(abs_cos_theta(wo));
         auto Fi = SchlickWeight(abs_cos_theta(wi));
@@ -226,8 +226,8 @@ private:
     Float roughness;
 
 public:
-    DisneyFakeSS(SampledSpectrum R, Float roughness) noexcept
-        : R{std::move(R)}, roughness{std::move(roughness)} {}
+    DisneyFakeSS(const SampledSpectrum &R, Float roughness) noexcept
+        : R{R}, roughness{std::move(roughness)} {}
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
         auto wh = wi + wo;
         auto valid = any(wh != 0.f);
@@ -261,8 +261,8 @@ private:
     Float roughness;
 
 public:
-    DisneyRetro(SampledSpectrum R, Float roughness) noexcept
-        : R{std::move(R)}, roughness{std::move(roughness)} {}
+    DisneyRetro(const SampledSpectrum &R, Float roughness) noexcept
+        : R{R}, roughness{std::move(roughness)} {}
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
         auto wh = wi + wo;
         auto valid = any(wh != 0.f);
@@ -293,7 +293,7 @@ private:
     SampledSpectrum R;
 
 public:
-    explicit DisneySheen(SampledSpectrum R) noexcept : R{std::move(R)} {}
+    explicit DisneySheen(const SampledSpectrum &R) noexcept : R{R} {}
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
         auto wh = wi + wo;
         auto valid = any(wh != 0.f);
