@@ -24,16 +24,19 @@ private:
     uint _max_depth;
     uint _rr_depth;
     float _rr_threshold;
+    uint _noisy_count;
 
 public:
     AuxiliaryBufferPathTracing(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Integrator{scene, desc},
           _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)},
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
-          _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)} {}
+          _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
+          _noisy_count{std::max(desc->property_uint_or_default("noisy_count", 4u), 4u)} {}
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
+    [[nodiscard]] auto noisy_count() const noexcept { return _noisy_count; }
     [[nodiscard]] bool is_differentiable() const noexcept override { return false; }
     [[nodiscard]] bool display_enabled() const noexcept { return false; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
@@ -155,9 +158,9 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
             // trace
             auto it = pipeline.geometry()->intersect(ray);
 
-            //$if(depth == 0 & it->valid()) {
-            //    auxiliary_normal.write(pixel_id, make_float4(it->shading().n(), 1.0f));
-            //};
+            $if(depth == 0) {
+                auxiliary_normal.write(dispatch_id().xy(), make_float4(it->shading().n(), 1.f));
+            };
 
             // miss
             $if(!it->valid()) {
@@ -194,13 +197,9 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
             auto u_lobe = sampler->generate_1d();
             auto u_bsdf = sampler->generate_2d();
             auto eta_scale = def(1.f);
-            static constexpr auto eta_stack_capacity = 16u;
-            ArrayFloat<eta_stack_capacity> eta_stack;
-            auto eta_stack_size = def(0u);
             pipeline.surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
                 // create closure
-                auto eta = ite(eta_stack_size > 0u, eta_stack[eta_stack_size - 1u], 1.f);
-                auto closure = surface->closure(*it, swl, eta, time);
+                auto closure = surface->closure(*it, swl, 1.f, time);
                 if (auto dispersive = closure->dispersive()) {
                     $if(*dispersive) { swl.terminate_secondary(); };
                 }
@@ -219,17 +218,19 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                 }
                 $else {
 
+                    auto wo = -ray->direction();
+
                     // direct lighting
                     $if(light_sample.eval.pdf > 0.0f & !occluded) {
                         auto wi = light_sample.wi;
-                        auto eval = closure->evaluate(wi);
+                        auto eval = closure->evaluate(wo, wi);
                         auto w = balanced_heuristic(light_sample.eval.pdf, eval.pdf) /
                                  light_sample.eval.pdf;
                         Li += w * beta * eval.f * light_sample.eval.L;
                     };
 
                     // sample material
-                    auto sample = closure->sample(u_lobe, u_bsdf);
+                    auto sample = closure->sample(wo, u_lobe, u_bsdf);
                     ray = it->spawn_ray(sample.wi);
                     pdf_bsdf = sample.eval.pdf;
                     auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
@@ -237,15 +238,8 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
 
                     // apply eta scale
                     $switch(sample.event) {
-                        $case(Surface::event_enter) {
-                            eta_scale = sqr(sample.eta / eta);
-                            eta_stack_size = min(eta_stack_size + 1u, eta_stack_capacity);
-                            eta_stack[eta_stack_size - 1u] = sample.eta;
-                        };
-                        $case(Surface::event_exit) {
-                            eta_scale = sqr(eta / sample.eta);
-                            eta_stack_size = max(eta_stack_size, 1u) - 1u;
-                        };
+                        $case(Surface::event_enter) { eta_scale = sqr(sample.eta); };
+                        $case(Surface::event_exit) { eta_scale = sqr(1.f / sample.eta); };
                     };
                 };
             });
@@ -286,15 +280,20 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
     for (auto s : shutter_samples) {
         pipeline.update(command_buffer, s.point.time);
         for (auto i = 0u; i < s.spp; i++) {
-            std::vector<float> hostaux_normal(pixel_count * 4);
-            command_buffer << clear_shader().dispatch(resolution)
-                           << render(sample_id++, s.point.time, s.point.weight)
-                                  .dispatch(resolution)
-                           << auxiliary_normal.copy_to(hostaux_normal.data())
-                           << synchronize();
-            // normal
-            auto fpath = camera->node()->file().parent_path() / "normal.exr";
-            save_image(fpath, hostaux_normal.data(), resolution);
+            if (i < pt->node<AuxiliaryBufferPathTracing>()->noisy_count()) {
+                std::vector<float> hostaux_normal(pixel_count * 4);
+                command_buffer << clear_shader().dispatch(resolution)
+                               << render(sample_id++, s.point.time, s.point.weight)
+                                      .dispatch(resolution)
+                               << auxiliary_normal.copy_to(hostaux_normal.data())
+                               << synchronize();
+                // normal
+                auto nrm_path = camera->node()->file().parent_path() / fmt::format("s{}_normal.exr", i+1);
+                save_image(nrm_path, hostaux_normal.data(), resolution);
+            } else {
+                command_buffer << render(sample_id++, s.point.time, s.point.weight)
+                                      .dispatch(resolution);
+            }
 
             if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
                 dispatch_count = 0u;
