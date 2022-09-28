@@ -129,10 +129,11 @@ private:
     void _load_image(const SceneNodeDesc *desc) noexcept {
         auto path = desc->property_path("file");
         auto encoding = desc->property_string_or_default(
-            "encoding", lazy_construct([&path]() noexcept -> luisa::string {
+            "encoding", lazy_construct([&path, this]() noexcept -> luisa::string {
                 auto ext = path.extension().string();
                 for (auto &c : ext) { c = static_cast<char>(tolower(c)); }
-                if (ext == ".exr" || ext == ".hdr") { return "linear"; }
+                if (ext == ".exr" || ext == ".hdr" ||
+                    semantic() == Semantic::GENERIC) { return "linear"; }
                 return "sRGB";
             }));
         for (auto &c : encoding) { c = static_cast<char>(tolower(c)); }

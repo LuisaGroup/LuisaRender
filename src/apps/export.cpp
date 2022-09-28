@@ -7,8 +7,8 @@
 #include <fstream>
 
 #include <assimp/Importer.hpp>
-#include <assimp/scene.h>
 #include <assimp/material.h>
+#include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
 #include <stb/stb_image.h>
@@ -20,6 +20,8 @@
 #include <core/mathematics.h>
 
 int main(int argc, char *argv[]) {
+
+    // TODO: Parse command line arguments.
 
     using namespace std::string_view_literals;
     if (argc < 2 || argv[1] == "-h"sv || argv[1] == "--help"sv) {
@@ -35,11 +37,10 @@ int main(int argc, char *argv[]) {
     Assimp::Importer importer;
     importer.SetPropertyInteger(AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_POINT | aiPrimitiveType_LINE);
     auto scene = importer.ReadFile(path.string(),
-                                   aiProcess_JoinIdenticalVertices | aiProcess_FindInstances |
+                                   aiProcess_FindInstances | aiProcess_SortByPType |
                                        aiProcess_RemoveComponent | aiProcess_Debone |
                                        aiProcess_GenBoundingBoxes | aiProcess_TransformUVCoords |
                                        aiProcess_RemoveRedundantMaterials | aiProcess_FixInfacingNormals |
-                                       aiProcess_SortByPType | aiProcess_FindDegenerates |
                                        aiProcess_FindInvalidData | aiProcess_GenUVCoords);
     LUISA_ASSERT(scene != nullptr, "Failed to load scene: {}.", importer.GetErrorString());
     LUISA_INFO("Loaded scene '{}' with {} camera(s), {} mesh(es), and {} material(s).",
@@ -102,12 +103,13 @@ int main(int argc, char *argv[]) {
     }
 
     // materials
-    luisa::vector<bool> is_light(scene->mNumMaterials, false);
     luisa::unordered_map<uint64_t, luisa::string> loaded_textures;
+    luisa::unordered_map<uint, luisa::string> material_names;
+    luisa::unordered_map<uint, luisa::string> light_names;
     for (auto i = 0u; i < scene->mNumMaterials; i++) {
         auto m = scene->mMaterials[i];
-        auto name = luisa::format("Surface:{:05}:{}", i, m->GetName().C_Str());
-        LUISA_INFO("Converting material '{}'...", name);
+        auto mat_name = luisa::format("Surface:{:05}:{}", i, m->GetName().C_Str());
+        LUISA_INFO("Converting material '{}'...", mat_name);
         auto parse_texture = [&](auto key, auto type, auto index,
                                  luisa::string_view semantic) noexcept
             -> luisa::optional<luisa::string> {
@@ -169,26 +171,51 @@ int main(int argc, char *argv[]) {
         };
         auto color_map = parse_texture(AI_MATKEY_TEXTURE_DIFFUSE(0), "albedo")
                              .value_or(parse_constant(AI_MATKEY_COLOR_DIFFUSE, "albedo", true).value());
-        auto normal_map = parse_texture(AI_MATKEY_TEXTURE_NORMALS(0), "generic");
         auto specular_map = parse_texture(AI_MATKEY_TEXTURE_SPECULAR(0), "albedo");
         auto shininess_map = parse_texture(AI_MATKEY_TEXTURE_SHININESS(0), "generic");
-        auto bump_map = parse_texture(AI_MATKEY_TEXTURE_DISPLACEMENT(0), "generic");
-        scene_materials[name] = {
+        if (specular_map) { LUISA_INFO("Specular: {}", *specular_map); }
+        if (shininess_map) { LUISA_INFO("Shininess: {}", *shininess_map); }
+
+        auto rough = 1.f;
+        m->Get(AI_MATKEY_ROUGHNESS_FACTOR, rough);
+        scene_materials[mat_name] = {
             {"type", "Surface"},
-            {"impl", "Matte"},
-            {"prop", {{"Kd", color_map}}}};
+            {"impl", "Substrate"},
+            {"prop",
+             {{"Kd", color_map},
+              {"Ks",
+               {{"impl", "Constant"},
+                {"prop",
+                 {{"v", {0.04f, 0.04f, 0.04f}},
+                  {"semantic", "albedo"}}}}},
+              {"roughness",
+               {{"impl", "Constant"},
+                {"prop", {{"v", {rough}}}}}}}}};
+        material_names[i] = mat_name;
+        if (auto normal_map = parse_texture(AI_MATKEY_TEXTURE_NORMALS(0), "generic")) {
+            scene_materials[normal_map->substr(1)]["prop"]["encoding"] = "linear";
+            auto normal_mat_name = luisa::format("{}:NormalMapped", mat_name);
+            scene_materials[normal_mat_name] = {
+                {"type", "Surface"},
+                {"impl", "NormalMap"},
+                {"prop",
+                 {{"map", *normal_map},
+                  {"base", luisa::format("@{}", mat_name)}}}};
+            material_names[i] = normal_mat_name;
+        }
         // light
         if (auto emission = parse_texture(AI_MATKEY_TEXTURE_EMISSIVE(0), "illuminant")
                                 .value_or(parse_constant(AI_MATKEY_COLOR_EMISSIVE, "illuminant").value_or(""));
             !emission.empty()) {
+            auto intensity = 1.f;
+            m->Get(AI_MATKEY_COLOR_EMISSIVE, intensity);
             auto light_name = luisa::format("Light:{:05}:{}", i, m->GetName().C_Str());
             scene_materials[light_name] = {
                 {"type", "Light"},
                 {"impl", "Diffuse"},
-                {"prop", {{"emission", emission},
-                          {"scale", 1.f}}}};
-            is_light[i] = true;
+                {"prop", {{"emission", emission}, {"scale", intensity}}}};
             LUISA_INFO("Found light '{}'.", light_name);
+            light_names[i] = light_name;
         }
     }
 
@@ -236,19 +263,17 @@ int main(int argc, char *argv[]) {
             file << '\n';
         }
         auto mat_id = m->mMaterialIndex;
-        auto mat_name = luisa::format("@Surface:{:05}:{}",
-                                      mat_id, scene->mMaterials[mat_id]->GetName().C_Str());
+        auto mat_name = luisa::format("@{}", material_names.at(mat_id));
         auto mesh_name = luisa::format("Mesh:{:05}:{}", i, m->mName.C_Str());
         scene_geometry[mesh_name] = {
             {"type", "Shape"},
             {"impl", "Mesh"},
             {"prop",
              {{"file", relative(file_path, folder).string()},
-              {"flip_uv", false},
+              {"flip_uv", true},
               {"surface", mat_name}}}};
-        if (is_light[mat_id]) {
-            scene_geometry[mesh_name]["prop"]["light"] = luisa::format(
-                "@Light:{:05}:{}", mat_id, scene->mMaterials[mat_id]->GetName().C_Str());
+        if (auto iter = light_names.find(mat_id); iter != light_names.end()) {
+            scene_geometry[mesh_name]["prop"]["light"] = luisa::format("@{}", iter->second);
         }
         meshes.emplace_back(std::move(mesh_name));
     }
