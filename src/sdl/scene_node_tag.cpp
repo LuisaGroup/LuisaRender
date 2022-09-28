@@ -7,38 +7,40 @@
 
 namespace luisa::render {
 
-SceneNodeTag parse_scene_node_tag(std::string_view tag) noexcept {
+SceneNodeTag parse_scene_node_tag(luisa::string_view tag_desc) noexcept {
+    luisa::string tag{tag_desc};
+    for (auto &c : tag) { c = static_cast<char>(std::tolower(c)); }
     using namespace std::string_view_literals;
     static constexpr auto desc_to_tag_count = 28u;
     static const luisa::fixed_map<std::string_view, SceneNodeTag, desc_to_tag_count> desc_to_tag{
-        {"Camera"sv, SceneNodeTag::CAMERA},
-        {"Cam"sv, SceneNodeTag::CAMERA},
-        {"Shape"sv, SceneNodeTag::SHAPE},
-        {"Object"sv, SceneNodeTag::SHAPE},
-        {"Obj"sv, SceneNodeTag::SHAPE},
-        {"Surface"sv, SceneNodeTag::SURFACE},
-        {"Surf"sv, SceneNodeTag::SURFACE},
-        {"LightSource"sv, SceneNodeTag::LIGHT},
-        {"Light"sv, SceneNodeTag::LIGHT},
-        {"Illuminant"sv, SceneNodeTag::LIGHT},
-        {"Illum"sv, SceneNodeTag::LIGHT},
-        {"Transform"sv, SceneNodeTag::TRANSFORM},
-        {"Xform"sv, SceneNodeTag::TRANSFORM},
-        {"Film"sv, SceneNodeTag::FILM},
-        {"Filter"sv, SceneNodeTag::FILTER},
-        {"Sampler"sv, SceneNodeTag::SAMPLER},
-        {"Integrator"sv, SceneNodeTag::INTEGRATOR},
-        {"LightSampler"sv, SceneNodeTag::LIGHT_SAMPLER},
-        {"Environment"sv, SceneNodeTag::ENVIRONMENT},
-        {"Env"sv, SceneNodeTag::ENVIRONMENT},
-        {"Texture"sv, SceneNodeTag::TEXTURE},
-        {"Tex"sv, SceneNodeTag::TEXTURE},
-        {"TextureMapping"sv, SceneNodeTag::TEXTURE_MAPPING},
-        {"TexMapping"sv, SceneNodeTag::TEXTURE_MAPPING},
-        {"Spectrum"sv, SceneNodeTag::SPECTRUM},
-        {"Spec"sv, SceneNodeTag::SPECTRUM},
-        {"Generic"sv, SceneNodeTag::DECLARATION},
-        {"Template"sv, SceneNodeTag::DECLARATION}};
+        {"camera"sv, SceneNodeTag::CAMERA},
+        {"cam"sv, SceneNodeTag::CAMERA},
+        {"shape"sv, SceneNodeTag::SHAPE},
+        {"object"sv, SceneNodeTag::SHAPE},
+        {"obj"sv, SceneNodeTag::SHAPE},
+        {"surface"sv, SceneNodeTag::SURFACE},
+        {"surf"sv, SceneNodeTag::SURFACE},
+        {"lightsource"sv, SceneNodeTag::LIGHT},
+        {"light"sv, SceneNodeTag::LIGHT},
+        {"illuminant"sv, SceneNodeTag::LIGHT},
+        {"illum"sv, SceneNodeTag::LIGHT},
+        {"transform"sv, SceneNodeTag::TRANSFORM},
+        {"xform"sv, SceneNodeTag::TRANSFORM},
+        {"film"sv, SceneNodeTag::FILM},
+        {"filter"sv, SceneNodeTag::FILTER},
+        {"sampler"sv, SceneNodeTag::SAMPLER},
+        {"integrator"sv, SceneNodeTag::INTEGRATOR},
+        {"lightsampler"sv, SceneNodeTag::LIGHT_SAMPLER},
+        {"environment"sv, SceneNodeTag::ENVIRONMENT},
+        {"env"sv, SceneNodeTag::ENVIRONMENT},
+        {"texture"sv, SceneNodeTag::TEXTURE},
+        {"tex"sv, SceneNodeTag::TEXTURE},
+        {"texturemapping"sv, SceneNodeTag::TEXTURE_MAPPING},
+        {"texmapping"sv, SceneNodeTag::TEXTURE_MAPPING},
+        {"spectrum"sv, SceneNodeTag::SPECTRUM},
+        {"spec"sv, SceneNodeTag::SPECTRUM},
+        {"generic"sv, SceneNodeTag::DECLARATION},
+        {"template"sv, SceneNodeTag::DECLARATION}};
     if (auto iter = desc_to_tag.find(tag); iter != desc_to_tag.end()) {
         return iter->second;
     }

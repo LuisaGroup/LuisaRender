@@ -25,7 +25,7 @@ public:
     [[nodiscard]] auto triangles() const noexcept { return luisa::span{_triangles}; }
     [[nodiscard]] auto has_uv() const noexcept { return _has_uv; }
 
-    [[nodiscard]] static auto load(std::filesystem::path path, uint subdiv_level) noexcept {
+    [[nodiscard]] static auto load(std::filesystem::path path, uint subdiv_level, bool flip_uv) noexcept {
 
         // TODO: static lifetime seems not good...
         static luisa::lru_cache<uint64_t, std::shared_future<MeshLoader>> loaded_meshes{32u};
@@ -39,7 +39,7 @@ public:
             return *m;
         }
 
-        auto future = ThreadPool::global().async([path = std::move(path), subdiv_level] {
+        auto future = ThreadPool::global().async([path = std::move(path), subdiv_level, flip_uv] {
             Clock clock;
             auto path_string = path.string();
             Assimp::Importer importer;
@@ -48,10 +48,11 @@ public:
             importer.SetPropertyBool(AI_CONFIG_PP_FD_CHECKAREA, false);
             auto import_flags = aiProcess_JoinIdenticalVertices | aiProcess_RemoveComponent |
                                 aiProcess_OptimizeGraph | aiProcess_GenUVCoords |
-                                aiProcess_FlipUVs | aiProcess_TransformUVCoords |
+                                aiProcess_TransformUVCoords | aiProcess_GenNormals |
                                 aiProcess_FixInfacingNormals | aiProcess_RemoveRedundantMaterials |
-                                aiProcess_FindInvalidData | aiProcess_SortByPType | aiProcess_GenNormals |
+                                aiProcess_FindInvalidData | aiProcess_SortByPType |
                                 aiProcess_FindDegenerates | aiProcess_ImproveCacheLocality;
+            if (!flip_uv) { import_flags |= aiProcess_FlipUVs; }
             auto remove_flags = aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS |
                                 aiComponent_CAMERAS | aiComponent_COLORS |
                                 aiComponent_LIGHTS | aiComponent_MATERIALS |
@@ -198,7 +199,8 @@ public:
         : Shape{scene, desc},
           _loader{MeshLoader::load(
               desc->property_path("file"),
-              desc->property_uint_or_default("subdivision", 0u))} {}
+              desc->property_uint_or_default("subdivision", 0u),
+              desc->property_bool_or_default("flip_uv", false))} {}
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::span<const Shape *const> children() const noexcept override { return {}; }
     [[nodiscard]] bool deformable() const noexcept override { return false; }
