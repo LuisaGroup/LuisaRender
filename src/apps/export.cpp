@@ -19,6 +19,8 @@
 #include <core/json.h>
 #include <core/mathematics.h>
 
+using luisa::uint;
+
 int main(int argc, char *argv[]) {
 
     // TODO: Parse command line arguments.
