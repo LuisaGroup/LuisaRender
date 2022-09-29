@@ -143,11 +143,17 @@ def convert_material(out_file, material: dict, alpha=""):
         convert_matte_material(out_file, material, alpha)
     elif impl == "transparency":  # TODO
         a = material["alpha"]
-        a_ext = Path(a).suffix
-        aa = f'''
-  alpha : Image {{
-    file {{ "{a.replace(a_ext, f"-alpha{a_ext}")}" }}
-    encoding {{ "linear" }}
+        if type(a) is float:
+          aa = f'''
+  alpha : Constant {{
+    v {{ {float(a)} }}
+  }}'''
+        else:         
+          a_ext = Path(a).suffix
+          aa = f'''
+    alpha : Image {{
+      file {{ "{a.replace(a_ext, f"-alpha{a_ext}")}" }}
+      encoding {{ "linear" }}
   }}'''
         base_material = material["base"]
         base_material["name"] = material["name"]
@@ -156,6 +162,14 @@ def convert_material(out_file, material: dict, alpha=""):
         convert_null_material(out_file, material)
     else:
         print(material)
+        print(f'''
+Surface mat_{material["name"]} : Matte {{
+  Kd : Constant {{
+      v {{ 1, 1, 1 }}
+      semantic {{ "albedo" }}
+    }}
+}}''', file=out_file)
+        return
         raise NotImplementedError()
 
 
@@ -238,10 +252,12 @@ Env sky : Spherical {{
             file = f"{file[:-4]}.obj"
         elif impl == "quad":
             file = "models/square.obj"
-            M = M * rotateXYZ(glm.radians(glm.vec3(-90, 0, 0))) * glm.scale(glm.vec3(.5))
+            M = M * rotateXYZ(glm.radians(glm.vec3(-90, 0, 0))
+                              ) * glm.scale(glm.vec3(.5))
         elif impl == "cube":
             file = "models/cube.obj"
-            M = M * rotateXYZ(glm.radians(glm.vec3(-90, 0, 0))) * glm.scale(glm.vec3(.5))
+            M = M * rotateXYZ(glm.radians(glm.vec3(-90, 0, 0))
+                              ) * glm.scale(glm.vec3(.5))
         else:
             print(f"Unsupported shape: {shape}")
             raise NotImplementedError()
@@ -253,7 +269,8 @@ Env sky : Spherical {{
         M2 = ", ".join(str(x) for x in glm.transpose(M)[2])
         M3 = ", ".join(str(x) for x in glm.transpose(M)[3])
         power_scale = 100 * glm.pi()
-        emission = glm.vec3(shape.get("emission", glm.vec3(shape.get("power", 0)) / power_scale))
+        emission = glm.vec3(shape.get("emission", glm.vec3(
+            shape.get("power", 0)) / power_scale))
         if emission.x == emission.y == emission.z == 0:
             light = ""
         else:
@@ -287,7 +304,8 @@ def convert_shapes(out_file, shapes, materials):
 def convert_camera(out_file, camera: dict, spp):
     resolution = glm.vec2(camera["resolution"])
     fov = glm.radians(camera["fov"])
-    fov = glm.degrees(2 * glm.atan(resolution.y * glm.tan(0.5 * fov) / resolution.x))
+    fov = glm.degrees(2 * glm.atan(resolution.y *
+                      glm.tan(0.5 * fov) / resolution.x))
     transform = camera["transform"]
     position = glm.vec3(transform["position"])
     look_at = glm.vec3(transform["look_at"])
