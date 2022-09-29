@@ -723,9 +723,9 @@ luisa::unique_ptr<Surface::Closure> DisneySurfaceInstance::closure(
         specular_trans, flatness, diffuse_trans);
 }
 
-using OpacityDisneySurface = OpacitySurfaceMixin<
-    DisneySurface, DisneySurfaceInstance, DisneySurfaceClosure>;
+using NormalMapOpacityDisneySurface = NormalMapMixin<OpacitySurfaceMixin<
+    DisneySurface, DisneySurfaceInstance, DisneySurfaceClosure>>;
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::OpacityDisneySurface)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::NormalMapOpacityDisneySurface)

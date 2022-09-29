@@ -17,7 +17,7 @@ Surface mat_Floor : Layered {
       semantic { "albedo" }
     }
     roughness : Constant {
-      v { 0.38 }
+      v { 0.3872983346207417 }
     }
     specular_trans : Constant {
       v { 1 }
@@ -34,7 +34,7 @@ Surface mat_Floor : Layered {
     semantic { "albedo" }
   }
   max_depth { 10 }
-  samples { 100 }
+  samples { 1 }
   thickness : Constant {
       v { 0.1 }
     }
@@ -1069,7 +1069,7 @@ Camera camera : Pinhole {
   front { -0.9617919325828552, 0.07440698146820068, 0.2634764611721039 }
   up { 0.0, 1.0, 0.0 }
   fov { 58.71550708558254 }
-  spp { 2048 }
+  spp { 256 }
   filter : Gaussian {
     radius { 1 }
   }
@@ -1085,7 +1085,6 @@ render {
   integrator : WavePath {
     sampler : PMJ02BN {}
     depth { 12 }
-    rr_depth { 5 }
     rr_threshold { 0.95 }
   }
   shapes {

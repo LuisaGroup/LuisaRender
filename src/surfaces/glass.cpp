@@ -44,7 +44,7 @@ inline auto builtin_ior_texture_desc(luisa::string name) noexcept {
     return iter == nodes.cend() ? nullptr : iter->second.get();
 }
 
-class GlassSurface final : public Surface {
+class GlassSurface : public Surface {
 
 private:
     const Texture *_kr;
@@ -89,12 +89,12 @@ public:
         return property_reflective | property_transmissive | property_differentiable;
     }
 
-private:
+protected:
     [[nodiscard]] luisa::unique_ptr<Instance> _build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
-class GlassInstance final : public Surface::Instance {
+class GlassInstance : public Surface::Instance {
 
 private:
     const Texture::Instance *_kr;
@@ -113,7 +113,7 @@ public:
     [[nodiscard]] auto roughness() const noexcept { return _roughness; }
     [[nodiscard]] auto eta() const noexcept { return _eta; }
 
-private:
+public:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         const Interaction &it, const SampledWavelengths &swl,
         Expr<float> eta_i, Expr<float> time) const noexcept override;
@@ -291,6 +291,9 @@ luisa::unique_ptr<Surface::Closure> GlassInstance::closure(
         dispersive, alpha, clamp(Kr_ratio, .05f, .95f));
 }
 
+using NormalMapGlassSurface = NormalMapMixin<
+    GlassSurface, GlassInstance>;
+
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::GlassSurface)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::NormalMapGlassSurface)

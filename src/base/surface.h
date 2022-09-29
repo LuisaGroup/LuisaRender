@@ -141,7 +141,7 @@ public:
 template<typename BaseSurface,
          typename BaseInstance = typename BaseSurface::Instance,
          typename BaseClosure = typename BaseSurface::Closure>
-class OpacitySurfaceMixin final : public BaseSurface {
+class OpacitySurfaceMixin : public BaseSurface {
 
 public:
     class Closure final : public BaseClosure {
@@ -190,6 +190,56 @@ protected:
             std::move(*dynamic_cast<BaseInstance *>(base.release())),
             [this](auto &pipeline, auto &command_buffer) noexcept {
                 return pipeline.build_texture(command_buffer, _opacity);
+            }(pipeline, command_buffer));
+    }
+};
+
+template<typename BaseSurface,
+         typename BaseInstance = typename BaseSurface::Instance>
+class NormalMapMixin : public BaseSurface {
+
+public:
+    class Instance : public BaseInstance {
+
+    private:
+        const Texture::Instance *_map;
+
+    public:
+        Instance(BaseInstance &&base, const Texture::Instance *normal) noexcept
+            : BaseInstance{std::move(base)}, _map{normal} {}
+        [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
+            const Interaction &it, const SampledWavelengths &swl,
+            Expr<float> eta_i, Expr<float> time) const noexcept override {
+            if (_map == nullptr) {
+                return BaseInstance::closure(it, swl, eta_i, time);
+            }
+            auto normal_local = 2.f * _map->evaluate(it, swl, time).xyz() - 1.f;
+            auto normal = it.shading().local_to_world(normal_local);
+            auto mapped_it = it;
+            normal = ite(dot(normal, it.ng()) > 0.f, normal, it.shading().n());
+            mapped_it.set_shading(Frame::make(normal, it.shading().u()));
+            return BaseInstance::closure(mapped_it, swl, eta_i, time);
+        }
+    };
+
+private:
+    const Texture *_normal_map;
+
+public:
+    NormalMapMixin(Scene *scene, const SceneNodeDesc *desc) noexcept
+        : BaseSurface{scene, desc},
+          _normal_map{[](auto scene, auto desc) noexcept {
+              return scene->load_texture(desc->property_node_or_default("normal_map"));
+          }(scene, desc)} {}
+
+protected:
+    [[nodiscard]] luisa::unique_ptr<Surface::Instance> _build(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
+        auto base = BaseSurface::_build(pipeline, command_buffer);
+        return luisa::make_unique<Instance>(
+            std::move(*dynamic_cast<BaseInstance *>(base.release())),
+            [this](auto &pipeline, auto &command_buffer) noexcept {
+                return pipeline.build_texture(command_buffer, _normal_map);
             }(pipeline, command_buffer));
     }
 };

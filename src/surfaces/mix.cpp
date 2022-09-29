@@ -8,14 +8,14 @@
 
 namespace luisa::render {
 
-class MixSurface final : public Surface {
+class MixSurface : public Surface {
 
 private:
     const Surface *_a;
     const Surface *_b;
     const Texture *_ratio;
 
-private:
+protected:
     [[nodiscard]] luisa::unique_ptr<Instance> _build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 
@@ -35,7 +35,7 @@ public:
     [[nodiscard]] uint properties() const noexcept override { return _a->properties() | _b->properties(); }
 };
 
-class MixSurfaceInstance final : public Surface::Instance {
+class MixSurfaceInstance : public Surface::Instance {
 
 private:
     luisa::unique_ptr<Surface::Instance> _a;
@@ -50,7 +50,7 @@ public:
           _a{std::move(a)}, _b{std::move(b)}, _ratio{ratio} {}
     [[nodiscard]] auto ratio() const noexcept { return _ratio; }
 
-private:
+public:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         const Interaction &it, const SampledWavelengths &swl,
         Expr<float> eta_i, Expr<float> time) const noexcept override;
@@ -64,7 +64,7 @@ luisa::unique_ptr<Surface::Instance> MixSurface::_build(Pipeline &pipeline, Comm
         pipeline, this, ratio, std::move(a), std::move(b));
 }
 
-class MixSurfaceClosure final : public Surface::Closure {
+class MixSurfaceClosure : public Surface::Closure {
 
 private:
     luisa::unique_ptr<Surface::Closure> _a;
@@ -164,6 +164,9 @@ luisa::unique_ptr<Surface::Closure> MixSurfaceInstance::closure(
         this, it, swl, time, ratio, std::move(a), std::move(b));
 }
 
+using NormalMapMixSurface = NormalMapMixin<
+    MixSurface, MixSurfaceInstance>;
+
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::MixSurface)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::NormalMapMixSurface)
