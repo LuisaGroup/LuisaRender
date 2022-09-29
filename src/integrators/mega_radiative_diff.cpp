@@ -403,7 +403,7 @@ void MegakernelRadiativeDiffInstance::_render_one_camera(
     auto resolution = camera->film()->node()->resolution();
     auto image_file = camera->node()->file();
 
-    camera->film()->clear(command_buffer);
+    camera->film()->prepare(command_buffer);
     if (!pipeline().has_lighting()) [[unlikely]] {
         LUISA_WARNING_WITH_LOCATION(
             "No lights in scene. Rendering aborted.");

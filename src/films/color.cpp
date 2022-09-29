@@ -40,25 +40,25 @@ public:
 class ColorFilmInstance final : public Film::Instance {
 
 private:
-    Buffer<float> _image;
-    Buffer<float4> _converted;
+    mutable Buffer<float> _image;
+    mutable Buffer<float4> _converted;
     std::shared_future<Shader1D<Buffer<float>>> _clear_image;
     std::shared_future<Shader1D<Buffer<float>, Buffer<float4>>> _convert_image;
+
+private:
+    void _check_prepared() const noexcept { LUISA_ASSERT(_image && _converted, "Film is not prepared."); }
 
 public:
     ColorFilmInstance(Device &device, Pipeline &pipeline, const ColorFilm *film) noexcept;
     void accumulate(Expr<uint2> pixel, Expr<float3> rgb) const noexcept override;
-    void clear(CommandBuffer &command_buffer) noexcept override;
+    void prepare(CommandBuffer &command_buffer) noexcept override;
     void download(CommandBuffer &command_buffer, float4 *framebuffer) const noexcept override;
     [[nodiscard]] Film::Accumulation read(Expr<uint2> pixel) const noexcept override;
+    void release() const noexcept override;
 };
 
 ColorFilmInstance::ColorFilmInstance(Device &device, Pipeline &pipeline, const ColorFilm *film) noexcept
     : Film::Instance{pipeline, film} {
-    auto resolution = node()->resolution();
-    auto pixel_count = resolution.x * resolution.y;
-    _image = pipeline.device().create_buffer<float>(pixel_count * 4u);
-    _converted = pipeline.device().create_buffer<float4>(pixel_count);
     _clear_image = device.compile_async<1>([](BufferFloat image) noexcept {
         image.write(dispatch_x() * 4u + 0u, 0.f);
         image.write(dispatch_x() * 4u + 1u, 0.f);
@@ -77,6 +77,7 @@ ColorFilmInstance::ColorFilmInstance(Device &device, Pipeline &pipeline, const C
 }
 
 void ColorFilmInstance::download(CommandBuffer &command_buffer, float4 *framebuffer) const noexcept {
+    _check_prepared();
     auto resolution = node()->resolution();
     auto pixel_count = resolution.x * resolution.y;
     command_buffer << _convert_image.get()(_image, _converted).dispatch(pixel_count)
@@ -84,6 +85,7 @@ void ColorFilmInstance::download(CommandBuffer &command_buffer, float4 *framebuf
 }
 
 void ColorFilmInstance::accumulate(Expr<uint2> pixel, Expr<float3> rgb) const noexcept {
+    _check_prepared();
     $if(!any(isnan(rgb) || isinf(rgb))) {
         auto pixel_id = pixel.y * node()->resolution().x + pixel.x;
         auto threshold = node<ColorFilm>()->clamp();
@@ -96,12 +98,16 @@ void ColorFilmInstance::accumulate(Expr<uint2> pixel, Expr<float3> rgb) const no
     };
 }
 
-void ColorFilmInstance::clear(CommandBuffer &command_buffer) noexcept {
-    auto pixel_count = node()->resolution().x * node()->resolution().y;
+void ColorFilmInstance::prepare(CommandBuffer &command_buffer) noexcept {
+    auto resolution = node()->resolution();
+    auto pixel_count = resolution.x * resolution.y;
+    if (!_image) { _image = pipeline().device().create_buffer<float>(pixel_count * 4u); }
+    if (!_converted) { _converted = pipeline().device().create_buffer<float4>(pixel_count); }
     command_buffer << _clear_image.get()(_image).dispatch(pixel_count);
 }
 
 Film::Accumulation ColorFilmInstance::read(Expr<uint2> pixel) const noexcept {
+    _check_prepared();
     auto width = node()->resolution().x;
     auto i = pixel.y * width + pixel.x;
     auto c0 = as<float>(_image.read(i * 4u + 0u));
@@ -111,6 +117,11 @@ Film::Accumulation ColorFilmInstance::read(Expr<uint2> pixel) const noexcept {
     auto inv_n = (1.f / max(cast<float>(n), 1.f));
     auto scale = inv_n * node<ColorFilm>()->scale();
     return {.average = scale * make_float3(c0, c1, c2), .sample_count = n};
+}
+
+void ColorFilmInstance::release() const noexcept {
+    _image = {};
+    _converted = {};
 }
 
 luisa::unique_ptr<Film::Instance> ColorFilm::build(

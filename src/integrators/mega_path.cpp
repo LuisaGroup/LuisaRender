@@ -145,9 +145,11 @@ public:
             _clock.tic();
             _framerate.clear();
             _pixels.resize(next_pow2(pixel_count) * 4u);
+            camera->film()->prepare(command_buffer);
             _render_one_camera(command_buffer, pipeline(), this, camera);
             camera->film()->download(command_buffer, _pixels.data());
             command_buffer << compute::synchronize();
+            camera->film()->release();
             auto film_path = camera->node()->file();
             save_image(film_path, (const float *)_pixels.data(), resolution);
         }
@@ -171,7 +173,6 @@ void MegakernelPathTracingInstance::_render_one_camera(
     auto resolution = camera->film()->node()->resolution();
     auto image_file = camera->node()->file();
 
-    camera->film()->clear(command_buffer);
     if (!pipeline.has_lighting()) [[unlikely]] {
         LUISA_WARNING_WITH_LOCATION(
             "No lights in scene. Rendering aborted.");

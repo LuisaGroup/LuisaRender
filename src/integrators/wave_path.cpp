@@ -229,9 +229,11 @@ public:
                 film_path.string(),
                 resolution.x, resolution.y,
                 camera->node()->spp());
+            camera->film()->prepare(command_buffer);
             _render_one_camera(command_buffer, camera);
             camera->film()->download(command_buffer, pixels.data());
             command_buffer << compute::synchronize();
+            camera->film()->release();
             save_image(film_path, (const float *)pixels.data(), resolution);
         }
     }
@@ -245,8 +247,6 @@ void WavefrontPathTracingInstance::_render_one_camera(
     CommandBuffer &command_buffer, Camera::Instance *camera) noexcept {
 
     auto &&device = camera->pipeline().device();
-
-    camera->film()->clear(command_buffer);
     if (!pipeline().has_lighting()) [[unlikely]] {
         LUISA_WARNING_WITH_LOCATION(
             "No lights in scene. Rendering aborted.");
