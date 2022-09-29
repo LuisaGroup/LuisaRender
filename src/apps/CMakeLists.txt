@@ -5,3 +5,4 @@ function(luisa_render_add_application name)
 endfunction()
 
 luisa_render_add_application(luisa-render-cli SOURCES cli.cpp)
+luisa_render_add_application(luisa-render-export SOURCES export.cpp)

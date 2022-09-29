@@ -53,10 +53,6 @@ void SceneParserJSON::_parse_node(SceneNodeDesc &desc, const json &node) const n
     };
 
     for (auto &&item : node.items()) {
-        // semantic properties, already processed
-        if (item.key() == "type" ||
-            item.key() == "impl" ||
-            item.key() == "base") { continue; }
         // process properties
         if (item.value().is_string()) {
             auto value = item.value().get<luisa::string>();

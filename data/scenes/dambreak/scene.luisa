@@ -6,7 +6,7 @@ Camera camera : Pinhole {
     resolution { 1920, 1080 }
     clamp { 1024 }
   }
-  spp { 16384 }
+  spp { 1024 }
   filter : Gaussian {}
   file { "render-glass.exr" }
 }
@@ -93,7 +93,7 @@ Shape backdrop : Mesh {
 
 render {
   cameras { @camera }
-  spectrum : Hero {
+  spectrum : sRGB {
     dimension { 4 }
   }
   integrator : WavePath {

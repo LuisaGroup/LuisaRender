@@ -18,7 +18,7 @@ using namespace luisa::compute;
 class Spherical final : public Environment {
 
 public:
-    static constexpr auto sample_map_size = make_uint2(256u, 128u);
+    static constexpr auto sample_map_size = make_uint2(2048u, 1024u);
 
 private:
     const Texture *_emission;

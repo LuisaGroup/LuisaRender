@@ -59,6 +59,6 @@ constexpr std::string_view scene_node_tag_description(SceneNodeTag tag) noexcept
     return "__invalid__"sv;
 }
 
-[[nodiscard]] SceneNodeTag parse_scene_node_tag(std::string_view tag) noexcept;
+[[nodiscard]] SceneNodeTag parse_scene_node_tag(luisa::string_view tag_desc) noexcept;
 
 }// namespace luisa::render
