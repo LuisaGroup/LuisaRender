@@ -35,7 +35,7 @@ struct AliasEntry {
 create_alias_table(luisa::span<const float> values) noexcept;
 
 template<typename Table>
-[[nodiscard]] auto sample_alias_table(
+[[nodiscard]] inline auto sample_alias_table(
     const Table &table, Expr<uint> n, Expr<float> u_in, Expr<uint> offset = 0u) noexcept {
     using namespace luisa::compute;
     auto u = u_in * cast<float>(n);
@@ -50,7 +50,7 @@ template<typename Table>
 }
 
 template<typename ProbTable, typename AliasTable>
-[[nodiscard]] auto sample_alias_table(
+[[nodiscard]] inline auto sample_alias_table(
     const ProbTable &probs, const AliasTable &indices,
     Expr<uint> n, Expr<float> u_in, Expr<uint> offset = 0u) noexcept {
     using namespace luisa::compute;
@@ -63,6 +63,17 @@ template<typename ProbTable, typename AliasTable>
         u_remapped < prob, u_remapped / prob,
         (u_remapped - prob) / (1.0f - prob));
     return std::make_pair(index, uu);
+}
+
+[[nodiscard]] inline Float balance_heuristic(int nf, Float fPdf, int ng, Float gPdf) noexcept {
+    return (nf * fPdf) / (nf * fPdf + ng * gPdf);
+}
+
+[[nodiscard]] inline Float power_heuristic(int nf, Float fPdf, int ng, Float gPdf) noexcept {
+    Float f = nf * fPdf, g = ng * gPdf;
+    auto ff = f * f;
+    auto gg = g * g;
+    return ite(isinf(ff), 1.f, ff / (ff + gg));
 }
 
 }// namespace luisa::render

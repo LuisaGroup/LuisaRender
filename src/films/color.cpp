@@ -87,7 +87,7 @@ void ColorFilmInstance::accumulate(Expr<uint2> pixel, Expr<float3> rgb) const no
     $if(!any(isnan(rgb) || isinf(rgb))) {
         auto pixel_id = pixel.y * node()->resolution().x + pixel.x;
         auto threshold = node<ColorFilm>()->clamp();
-        auto strength = max(max(rgb.x, rgb.y), rgb.z);
+        auto strength = max(max(max(rgb.x, rgb.y), rgb.z), 0.f);
         auto c = rgb * (threshold / max(strength, threshold));
         for (auto i = 0u; i < 3u; i++) {
             _image.atomic(pixel_id * 4u + i).fetch_add(c[i]);

@@ -89,6 +89,7 @@ public:
         [[nodiscard]] virtual luisa::optional<Float> opacity() const noexcept;
         [[nodiscard]] virtual luisa::optional<Bool> dispersive() const noexcept;
         [[nodiscard]] virtual Float2 roughness() const noexcept = 0;
+        [[nodiscard]] auto &swl() const noexcept { return _swl; }
     };
 
     class Instance {

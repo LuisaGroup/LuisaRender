@@ -13,6 +13,7 @@ using compute::UInt;
 using compute::UInt2;
 using compute::UInt3;
 using compute::UInt4;
+using compute::Float;
 
 [[nodiscard]] UInt xxhash32(Expr<uint> p) noexcept;
 [[nodiscard]] UInt xxhash32(Expr<uint2> p) noexcept;
@@ -23,5 +24,7 @@ using compute::UInt4;
 [[nodiscard]] UInt2 pcg2d(Expr<uint2> v_in) noexcept;
 [[nodiscard]] UInt3 pcg3d(Expr<uint3> v_in) noexcept;
 [[nodiscard]] UInt4 pcg4d(Expr<uint4> v_in) noexcept;
+
+[[nodiscard]] Float lcg(UInt &state) noexcept;
 
 }// namespace luisa::render
