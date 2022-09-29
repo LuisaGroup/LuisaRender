@@ -299,7 +299,7 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
 
                     // create closure
                     auto closure = surface->closure(*it, swl, 1.f, time);
-                    if (auto dispersive = closure->dispersive()) {
+                    if (auto dispersive = closure->is_dispersive()) {
                         $if (*dispersive) { swl.terminate_secondary(); };
                     }
 
@@ -348,9 +348,10 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
                         beta *= w * sample.eval.f;
 
                         // apply eta scale
+                        auto eta = closure->eta().value_or(1.f);
                         $switch (sample.event) {
-                            $case (Surface::event_enter) { eta_scale = sqr(sample.eta); };
-                            $case (Surface::event_exit) { eta_scale = 1.f / sqr(sample.eta); };
+                            $case (Surface::event_enter) { eta_scale = sqr(eta); };
+                            $case (Surface::event_exit) { eta_scale = 1.f / sqr(eta); };
                         };
                     };
                 });
@@ -485,7 +486,7 @@ void MegakernelRadiativeDiffInstance::_render_one_camera(
 
                     // create closure
                     auto closure = surface->closure(*it, swl, 1.f, time);
-                    if (auto dispersive = closure->dispersive()) {
+                    if (auto dispersive = closure->is_dispersive()) {
                         $if (*dispersive) { swl.terminate_secondary(); };
                     }
 
@@ -521,9 +522,10 @@ void MegakernelRadiativeDiffInstance::_render_one_camera(
                         beta *= w * sample.eval.f;
 
                         // apply eta scale
+                        auto eta = closure->eta().value_or(1.f);
                         $switch (sample.event) {
-                            $case (Surface::event_enter) { eta_scale = sqr(sample.eta); };
-                            $case (Surface::event_exit) { eta_scale = 1.f / sqr(sample.eta); };
+                            $case (Surface::event_enter) { eta_scale = sqr(eta); };
+                            $case (Surface::event_exit) { eta_scale = 1.f / sqr(eta); };
                         };
                     };
                 });

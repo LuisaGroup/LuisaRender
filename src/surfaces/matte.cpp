@@ -13,7 +13,7 @@ namespace luisa::render {
 
 using namespace luisa::compute;
 
-class MatteSurface final : public Surface {
+class MatteSurface : public Surface {
 
 private:
     const Texture *_kd;
@@ -22,19 +22,20 @@ private:
 public:
     MatteSurface(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Surface{scene, desc},
-          _kd{scene->load_texture(desc->property_node("Kd"))},
+          _kd{scene->load_texture(desc->property_node_or_default("Kd"))},
           _sigma{scene->load_texture(desc->property_node_or_default("sigma"))} {
         LUISA_RENDER_CHECK_ALBEDO_TEXTURE(MatteSurface, kd);
         LUISA_RENDER_CHECK_GENERIC_TEXTURE(MatteSurface, sigma, 1);
     }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] uint properties() const noexcept override { return property_reflective | property_differentiable; }
 
-private:
+protected:
     [[nodiscard]] luisa::unique_ptr<Instance> _build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
-class MatteInstance final : public Surface::Instance {
+class MatteInstance : public Surface::Instance {
 
 private:
     const Texture::Instance *_kd;
@@ -48,7 +49,7 @@ public:
     [[nodiscard]] auto Kd() const noexcept { return _kd; }
     [[nodiscard]] auto sigma() const noexcept { return _sigma; }
 
-private:
+public:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         const Interaction &it, const SampledWavelengths &swl,
         Expr<float> eta_i, Expr<float> time) const noexcept override;
@@ -61,23 +62,18 @@ luisa::unique_ptr<Surface::Instance> MatteSurface::_build(
     return luisa::make_unique<MatteInstance>(pipeline, this, Kd, sigma);
 }
 
-class MatteClosure final : public Surface::Closure {
+class MatteClosure : public Surface::Closure {
 
 private:
     luisa::unique_ptr<OrenNayar> _oren_nayar;
-    Float _eta_i;
 
 public:
     MatteClosure(
         const Surface::Instance *instance,
         const Interaction &it, const SampledWavelengths &swl,
-        Expr<float> time, SampledSpectrum albedo,
-        Expr<float> sigma, Expr<float> eta_i) noexcept
+        Expr<float> time, SampledSpectrum albedo, Expr<float> sigma) noexcept
         : Surface::Closure{instance, it, swl, time},
-          _oren_nayar{luisa::make_unique<OrenNayar>(std::move(albedo), sigma)},
-          _eta_i{eta_i} {}
-
-    [[nodiscard]] Float2 roughness() const noexcept override { return make_float2(1.f); }
+          _oren_nayar{luisa::make_unique<OrenNayar>(std::move(albedo), sigma)} {}
 
 private:
     [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
@@ -97,7 +93,6 @@ private:
         auto wi = _it.shading().local_to_world(wi_local);
         return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf},
                 .wi = wi,
-                .eta = 1.f,
                 .event = Surface::event_reflect};
     }
     void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df_in,
@@ -107,7 +102,9 @@ private:
         auto wi_local = _it.shading().world_to_local(wi);
         auto df = df_in * abs_cos_theta(wi_local);
         auto grad = _oren_nayar->backward(wo_local, wi_local, df);
-        _instance->Kd()->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(grad.dR));
+        if (auto kd = _instance->Kd()) {
+            kd->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(grad.dR));
+        }
         if (auto sigma = _instance->sigma()) {
             auto dv = make_float4(ite(isnan(grad.dSigma), 0.f, grad.dSigma), 0.f, 0.f, 0.f);
             sigma->backward(_it, _swl, _time, dv);
@@ -118,11 +115,14 @@ private:
 luisa::unique_ptr<Surface::Closure> MatteInstance::closure(
     const Interaction &it, const SampledWavelengths &swl,
     Expr<float> eta_i, Expr<float> time) const noexcept {
-    auto Kd = _kd->evaluate_albedo_spectrum(it, swl, time).value;
+    auto [Kd, _] = _kd ? _kd->evaluate_albedo_spectrum(it, swl, time) : Spectrum::Decode::one(swl.dimension());
     auto sigma = _sigma ? clamp(_sigma->evaluate(it, swl, time).x, 0.f, 90.f) : 0.f;
-    return luisa::make_unique<MatteClosure>(this, it, swl, time, Kd, sigma, eta_i);
+    return luisa::make_unique<MatteClosure>(this, it, swl, time, Kd, sigma);
 }
+
+using OpacityMatteSurface = OpacitySurfaceMixin<
+    MatteSurface, MatteInstance, MatteClosure>;
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::MatteSurface)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::OpacityMatteSurface)

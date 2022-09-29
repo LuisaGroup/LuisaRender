@@ -56,8 +56,8 @@ private:
 public:
     GlassSurface(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Surface{scene, desc},
-          _kr{scene->load_texture(desc->property_node("Kr"))},
-          _kt{scene->load_texture(desc->property_node("Kt"))},
+          _kr{scene->load_texture(desc->property_node_or_default("Kr"))},
+          _kt{scene->load_texture(desc->property_node_or_default("Kt"))},
           _roughness{scene->load_texture(desc->property_node_or_default("roughness"))},
           _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {
         if (auto eta_name = desc->property_string_or_default("eta"); !eta_name.empty()) {
@@ -85,6 +85,9 @@ public:
     }
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] uint properties() const noexcept override {
+        return property_reflective | property_transmissive | property_differentiable;
+    }
 
 private:
     [[nodiscard]] luisa::unique_ptr<Instance> _build(
@@ -149,9 +152,6 @@ public:
           _trans{luisa::make_unique<MicrofacetTransmission>(Kt, _distribution.get(), eta_i, eta_t)},
           _kr_ratio{Kr_ratio} {}
 
-    [[nodiscard]] luisa::optional<Bool> dispersive() const noexcept override { return _dispersive; }
-    [[nodiscard]] Float2 roughness() const noexcept override { return _distribution->alpha(); }
-
 private:
     [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
                                                 TransportMode mode) const noexcept override {
@@ -160,7 +160,7 @@ private:
         SampledSpectrum f{_swl.dimension()};
         auto pdf = def(0.f);
         auto ratio = _kr_ratio * _fresnel->evaluate(cos_theta(wo_local))[0u];
-//        auto ratio = .5f;
+        //        auto ratio = .5f;
         $if(same_hemisphere(wo_local, wi_local)) {
             f = _refl->evaluate(wo_local, wi_local, mode);
             pdf = _refl->pdf(wo_local, wi_local, mode) * ratio;
@@ -181,7 +181,7 @@ private:
         auto wi_local = def(make_float3(0.0f, 0.0f, 1.0f));
         auto event = def(Surface::event_reflect);
         auto ratio = _kr_ratio * _fresnel->evaluate(cos_theta(wo_local))[0u];
-//        auto ratio = .5f;
+        //        auto ratio = .5f;
         $if(u_lobe < ratio) {// Reflection
             f = _refl->sample(wo_local, &wi_local, u, &pdf, mode);
             pdf *= ratio;
@@ -195,7 +195,6 @@ private:
         auto entering = wi_local.z < 0.f;
         return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf},
                 .wi = wi,
-                .eta = _fresnel->eta_t(),
                 .event = event};
     }
 
@@ -210,23 +209,27 @@ private:
 
         $if(same_hemisphere(wo_local, wi_local)) {
             // Kr
-            auto d_f = _refl->backward(wo_local, wi_local, df);
-            d_alpha = d_f.dAlpha;
-            _instance->Kr()->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(d_f.dR));
+            if (_instance->Kr() && _instance->Kr()->node()->requires_gradients()) {
+                auto d_f = _refl->backward(wo_local, wi_local, df);
+                d_alpha = d_f.dAlpha;
+                _instance->Kr()->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(d_f.dR));
+            }
         }
         $else {
             // Ks
-            auto d_f = _trans->backward(wo_local, wi_local, df, mode);
-            d_alpha = d_f.dAlpha;
-            _instance->Kt()->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(d_f.dT));
+            if (_instance->Kt() && _instance->Kt()->node()->requires_gradients()) {
+                auto d_f = _trans->backward(wo_local, wi_local, df, mode);
+                d_alpha = d_f.dAlpha;
+                _instance->Kt()->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(d_f.dT));
+            }
         };
 
         // roughness
-        if (auto roughness = _instance->roughness()) {
+        if (auto roughness = _instance->roughness();
+            roughness != nullptr && roughness->node()->requires_gradients()) {
             auto remap = _instance->node<GlassSurface>()->remap_roughness();
             auto r_f4 = roughness->evaluate(_it, _swl, _time);
             auto r = roughness->node()->channels() == 1u ? r_f4.xx() : r_f4.xy();
-
             auto grad_alpha_roughness = [](auto &&x) noexcept {
                 return TrowbridgeReitzDistribution::grad_alpha_roughness(x);
             };
@@ -239,6 +242,10 @@ private:
                                 ite(any(isnan(d_r_f4) || abs(d_r_f4) > roughness_grad_range), 0.f, d_r_f4));
         }
     }
+
+private:
+    [[nodiscard]] optional<Float> _eta() const noexcept override { return _fresnel->eta_t(); }
+    [[nodiscard]] luisa::optional<Bool> _is_dispersive() const noexcept override { return _dispersive; }
 };
 
 luisa::unique_ptr<Surface::Closure> GlassInstance::closure(
@@ -256,8 +263,8 @@ luisa::unique_ptr<Surface::Closure> GlassInstance::closure(
     }
 
     // Kr, Kt
-    auto [Kr, Kr_lum] = _kr->evaluate_albedo_spectrum(it, swl, time);
-    auto [Kt, Kt_lum] = _kt->evaluate_albedo_spectrum(it, swl, time);
+    auto [Kr, Kr_lum] = _kr ? _kr->evaluate_albedo_spectrum(it, swl, time) : Spectrum::Decode::one(swl.dimension());
+    auto [Kt, Kt_lum] = _kt ? _kt->evaluate_albedo_spectrum(it, swl, time) : Spectrum::Decode::one(swl.dimension());
     auto Kr_ratio = ite(Kr_lum == 0.f, 0.f, sqrt(Kr_lum) / (sqrt(Kr_lum) + sqrt(Kt_lum)));
 
     // eta

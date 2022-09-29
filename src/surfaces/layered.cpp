@@ -15,16 +15,16 @@ public:
     };
 
     // HGPhaseFunction Public Methods
-    HGPhaseFunction() = default;
+    HGPhaseFunction() noexcept = default;
 
-    HGPhaseFunction(Float g) : g(g) {}
+    explicit HGPhaseFunction(Float g) noexcept : g(g) {}
 
-    Float HenyeyGreenstein(Float cosTheta, Float g) const {
+    [[nodiscard]] Float HenyeyGreenstein(Float cosTheta, Float g) const noexcept {
         Float denom = 1 + sqr(g) + 2 * g * cosTheta;
         return inv_pi / 4.0f * (1 - sqr(g)) / (denom * sqrt(denom));
     }
 
-    Float3 SampleHenyeyGreenstein(Float3 wo, Float g, Float2 u, Float &pdf) const {
+    [[nodiscard]] Float3 SampleHenyeyGreenstein(Float3 wo, Float g, Float2 u, Float &pdf) const noexcept {
         // Compute $\cos \theta$ for Henyey--Greenstein sample
         Float cosTheta;
         cosTheta = ite(abs(g) < 1e-3f, 1 - 2 * u.x,
@@ -40,15 +40,15 @@ public:
         return wi;
     }
 
-    Float p(Float3 wo, Float3 wi) const { return HenyeyGreenstein(dot(wo, wi), g); }
+    [[nodiscard]] Float p(Float3 wo, Float3 wi) const noexcept { return HenyeyGreenstein(dot(wo, wi), g); }
 
-    auto Sample_p(Float3 wo, Float2 u) const {
+    [[nodiscard]] auto Sample_p(Float3 wo, Float2 u) const noexcept {
         Float pdf;
         Float3 wi = SampleHenyeyGreenstein(wo, g, u, pdf);
         return PhaseFunctionSample{pdf, wi, pdf};
     }
 
-    Float PDF(Float3 wo, Float3 wi) const { return p(wo, wi); }
+    [[nodiscard]] Float PDF(Float3 wo, Float3 wi) const noexcept { return p(wo, wi); }
 
 private:
     // HGPhaseFunction Private Members
@@ -96,18 +96,18 @@ public:
 
     [[nodiscard]] auto to_local(Expr<float3> w) const noexcept {
         return ite(_is_top,
-                   _top.interaction().shading().world_to_local(w),
-                   _bottom.interaction().shading().world_to_local(w));
+                   _top.it().shading().world_to_local(w),
+                   _bottom.it().shading().world_to_local(w));
     }
 
     [[nodiscard]] auto to_world(Expr<float3> w) const noexcept {
         return ite(_is_top,
-                   _top.interaction().shading().local_to_world(w),
-                   _bottom.interaction().shading().local_to_world(w));
+                   _top.it().shading().local_to_world(w),
+                   _bottom.it().shading().local_to_world(w));
     }
 };
 
-class LayeredSurface final : public Surface {
+class LayeredSurface : public Surface {
 
 private:
     const Surface *_top;
@@ -118,7 +118,7 @@ private:
     uint _max_depth;
     uint _samples;
 
-private:
+protected:
     [[nodiscard]] luisa::unique_ptr<Instance> _build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 
@@ -129,7 +129,7 @@ public:
           _bottom{scene->load_surface(desc->property_node("bottom"))},
           _thickness{scene->load_texture(desc->property_node_or_default("thickness"))},
           _g{scene->load_texture(desc->property_node_or_default("g"))},
-          _albedo{scene->load_texture(desc->property_node("albedo"))},
+          _albedo{scene->load_texture(desc->property_node_or_default("albedo"))},
           _max_depth{desc->property_uint_or_default("max_depth", 10u)},
           _samples{desc->property_uint_or_default("samples", 1u)} {
         LUISA_RENDER_CHECK_ALBEDO_TEXTURE(LayeredSurface, albedo);
@@ -141,9 +141,16 @@ public:
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto samples() const noexcept { return _samples; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] uint properties() const noexcept override {
+        auto p = 0u;
+        if (_top->is_thin() && _bottom->is_thin()) { p |= property_thin; }
+        if (_top->is_reflective() || _bottom->is_reflective()) { p |= property_reflective; }
+        if (_top->is_transmissive() && _bottom->is_transmissive()) { p |= property_transmissive; }
+        return p;
+    }
 };
 
-class LayeredSurfaceInstance final : public Surface::Instance {
+class LayeredSurfaceInstance : public Surface::Instance {
 
 private:
     luisa::unique_ptr<Surface::Instance> _top;
@@ -162,7 +169,7 @@ public:
     [[nodiscard]] auto g() const noexcept { return _g; }
     [[nodiscard]] auto albedo() const noexcept { return _albedo; }
 
-private:
+public:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         const Interaction &it, const SampledWavelengths &swl,
         Expr<float> eta_i, Expr<float> time) const noexcept override;
@@ -178,7 +185,7 @@ luisa::unique_ptr<Surface::Instance> LayeredSurface::_build(Pipeline &pipeline, 
         pipeline, this, thickness, g, albedo, std::move(top), std::move(bottom));
 }
 
-class LayeredSurfaceClosure final : public Surface::Closure {
+class LayeredSurfaceClosure : public Surface::Closure {
 
 private:
     luisa::unique_ptr<Surface::Closure> _top;
@@ -198,7 +205,6 @@ public:
         : Surface::Closure{instance, it, swl, time},
           _top{std::move(top)}, _bottom{std::move(bottom)}, _thickness{thickness},
           _g{g}, _albedo{albedo}, _max_depth{max_depth}, _samples{samples} {}
-    [[nodiscard]] Float2 roughness() const noexcept override { return _top->roughness(); }
 
 private:
     [[nodiscard]] static inline auto Tr(Expr<float> dz, Expr<float3> w) noexcept {
@@ -405,7 +411,6 @@ private:
                         s = Surface::Sample{
                             .eval = {.f = f, .pdf = pdf},
                             .wi = w,
-                            .eta = bs.eta,
                             .event = ite(same_hemisphere(w_local, wo_local),
                                          Surface::event_reflect,
                                          ite(w_local.z > 0.f, Surface::event_exit, Surface::event_enter))};
@@ -420,31 +425,41 @@ private:
                    TransportMode mode) const noexcept override {
         LUISA_WARNING_WITH_LOCATION("LayeredSurfaceClosure::backward() ignored.");
     }
-    [[nodiscard]] luisa::optional<Bool> dispersive() const noexcept override {
-        auto top_dispersive = _top == nullptr ? luisa::nullopt : _top->dispersive();
-        auto bottom_dispersive = _bottom == nullptr ? luisa::nullopt : _bottom->dispersive();
+    [[nodiscard]] luisa::optional<Bool> _is_dispersive() const noexcept override {
+        auto top_dispersive = _top->is_dispersive();
+        auto bottom_dispersive = _bottom->is_dispersive();
         if (!top_dispersive) { return bottom_dispersive; }
         if (!bottom_dispersive) { return top_dispersive; }
         return *top_dispersive | *bottom_dispersive;
+    }
+    [[nodiscard]] luisa::optional<Float> _eta() const noexcept override {
+        return _bottom->eta();
+    }
+    [[nodiscard]] luisa::optional<Float> _opacity() const noexcept override {
+        if (instance()->node()->is_transmissive()) { return luisa::nullopt; }
+        return 1.f - ((1.f - _top->opacity().value_or(1.f)) *
+                      (1.f - _bottom->opacity().value_or(1.f)));
     }
 };
 
 luisa::unique_ptr<Surface::Closure> LayeredSurfaceInstance::closure(
     const Interaction &it, const SampledWavelengths &swl,
     Expr<float> eta_i, Expr<float> time) const noexcept {
-    auto thickness = _thickness == nullptr ? 0.5f : max(_thickness->evaluate(it, swl, time).x, std::numeric_limits<float>::min());
+    auto thickness = _thickness == nullptr ? .1f : max(_thickness->evaluate(it, swl, time).x, std::numeric_limits<float>::min());
     auto g = _g == nullptr ? 0.f : _g->evaluate(it, swl, time).x;
-    auto albedo = _albedo->evaluate_albedo_spectrum(it, swl, time).value;
+    auto [albedo, _] = _albedo ? _albedo->evaluate_albedo_spectrum(it, swl, time) : Spectrum::Decode::one(swl.dimension());
     auto max_depth = node<LayeredSurface>()->max_depth();
     auto samples = node<LayeredSurface>()->samples();
     auto top = _top == nullptr ? nullptr : _top->closure(it, swl, eta_i, time);
-    auto bottom = _bottom == nullptr ? nullptr : _bottom->closure(it, swl, eta_i, time);// FIXME: eta_i is wrong
+    auto bottom = _bottom == nullptr ? nullptr : _bottom->closure(it, swl, top->eta().value_or(1.f), time);// FIXME: eta_i is wrong
     return luisa::make_unique<LayeredSurfaceClosure>(
-        this, it, swl, time, thickness,
-        g, albedo, max_depth, samples,
-        std::move(top), std::move(bottom));
+        this, it, swl, time, thickness, g, albedo, max_depth,
+        samples, std::move(top), std::move(bottom));
 }
+
+using OpacityLayeredSurface = OpacitySurfaceMixin<
+    LayeredSurface, LayeredSurfaceInstance, LayeredSurfaceClosure>;
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::LayeredSurface)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::OpacityLayeredSurface)

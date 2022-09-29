@@ -15,11 +15,11 @@ namespace luisa::render {
 
 class Pipeline;
 
-using compute::PixelStorage;
-using compute::Float4;
 using compute::Expr;
+using compute::Float4;
 using compute::Image;
 using compute::ImageView;
+using compute::PixelStorage;
 using compute::Shader;
 
 class Spectrum : public SceneNode {
@@ -28,6 +28,11 @@ public:
     struct Decode {
         SampledSpectrum value;
         Float strength;
+        [[nodiscard]] static auto constant(uint dim, float value) noexcept {
+            return Decode{.value = {dim, value}, .strength = value};
+        }
+        [[nodiscard]] static auto one(uint dim) noexcept { return constant(dim, 1.f); }
+        [[nodiscard]] static auto zero(uint dim) noexcept { return constant(dim, 0.f); }
     };
 
     class Instance {

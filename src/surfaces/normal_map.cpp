@@ -27,6 +27,7 @@ public:
     }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] bool is_null() const noexcept override { return _base == nullptr || _base->is_null(); }
+    [[nodiscard]] uint properties() const noexcept override { return _base->properties(); }
 };
 
 class NormalMapInstance final : public Surface::Instance {

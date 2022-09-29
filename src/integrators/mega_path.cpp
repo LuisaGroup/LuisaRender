@@ -251,7 +251,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
             pipeline.surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
                 // create closure
                 auto closure = surface->closure(*it, swl, 1.f, time);
-                if (auto dispersive = closure->dispersive()) {
+                if (auto dispersive = closure->is_dispersive()) {
                     $if(*dispersive) { swl.terminate_secondary(); };
                 }
 
@@ -288,9 +288,10 @@ void MegakernelPathTracingInstance::_render_one_camera(
                     beta *= w * sample.eval.f;
 
                     // apply eta scale
+                    auto eta = closure->eta().value_or(1.f);
                     $switch(sample.event) {
-                        $case(Surface::event_enter) { eta_scale = sqr(sample.eta); };
-                        $case(Surface::event_exit) { eta_scale = sqr(1.f / sample.eta); };
+                        $case(Surface::event_enter) { eta_scale = sqr(eta); };
+                        $case(Surface::event_exit) { eta_scale = sqr(1.f / eta); };
                     };
                 };
             });

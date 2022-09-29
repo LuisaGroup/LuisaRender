@@ -8,11 +8,9 @@
 #include <base/pipeline.h>
 #include <base/scene.h>
 
-#include <utility>
-
 namespace luisa::render {
 
-class MirrorSurface final : public Surface {
+class MirrorSurface : public Surface {
 
 private:
     const Texture *_color;
@@ -22,7 +20,7 @@ private:
 public:
     MirrorSurface(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Surface{scene, desc},
-          _color{scene->load_texture(desc->property_node("color"))},
+          _color{scene->load_texture(desc->property_node_or_default("color"))},
           _roughness{scene->load_texture(desc->property_node_or_default("roughness"))},
           _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {
         LUISA_RENDER_CHECK_ALBEDO_TEXTURE(MirrorSurface, color);
@@ -30,13 +28,14 @@ public:
     }
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] uint properties() const noexcept override { return property_reflective | property_differentiable; }
 
-private:
+protected:
     [[nodiscard]] luisa::unique_ptr<Instance> _build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
-class MirrorInstance final : public Surface::Instance {
+class MirrorInstance : public Surface::Instance {
 
 private:
     const Texture::Instance *_color;
@@ -47,12 +46,11 @@ public:
         const Pipeline &pipeline, const Surface *surface,
         const Texture::Instance *color, const Texture::Instance *roughness) noexcept
         : Surface::Instance{pipeline, surface},
-          _color{color},
-          _roughness{roughness} {}
+          _color{color}, _roughness{roughness} {}
     [[nodiscard]] auto color() const noexcept { return _color; }
     [[nodiscard]] auto roughness() const noexcept { return _roughness; }
 
-private:
+public:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         const Interaction &it, const SampledWavelengths &swl,
         Expr<float> eta_i, Expr<float> time) const noexcept override;
@@ -67,21 +65,19 @@ luisa::unique_ptr<Surface::Instance> MirrorSurface::_build(
 
 using namespace luisa::compute;
 
-class SchlickFresnel final : public Fresnel {
+class SchlickFresnel : public Fresnel {
 
 public:
     struct Gradient : public Fresnel::Gradient {
         SampledSpectrum dR0;
-
-        explicit Gradient(SampledSpectrum dR0) noexcept
-            : dR0{std::move(dR0)} {}
+        explicit Gradient(const SampledSpectrum &dR0) noexcept : dR0{dR0} {}
     };
 
 private:
     SampledSpectrum R0;
 
 public:
-    explicit SchlickFresnel(SampledSpectrum R0) noexcept : R0{std::move(R0)} {}
+    explicit SchlickFresnel(const SampledSpectrum &R0) noexcept : R0{R0} {}
     [[nodiscard]] SampledSpectrum evaluate(Expr<float> cosI) const noexcept override {
         auto m = saturate(1.f - cosI);
         auto weight = sqr(sqr(m)) * m;
@@ -89,15 +85,15 @@ public:
             return lerp(R, 1.f, weight);
         });
     }
-    [[nodiscard]] luisa::unique_ptr<Fresnel::Gradient> backward(Expr<float> cosI,
-                                                                const SampledSpectrum &df) const noexcept override {
+    [[nodiscard]] luisa::unique_ptr<Fresnel::Gradient> backward(
+        Expr<float> cosI, const SampledSpectrum &df) const noexcept override {
         auto m = saturate(1.f - cosI);
         auto weight = sqr(sqr(m)) * m;
         return luisa::make_unique<SchlickFresnel::Gradient>(df * weight);
     }
 };
 
-class MirrorClosure final : public Surface::Closure {
+class MirrorClosure : public Surface::Closure {
 
 private:
     luisa::unique_ptr<SchlickFresnel> _fresnel;
@@ -113,8 +109,6 @@ public:
           _fresnel{luisa::make_unique<SchlickFresnel>(refl)},
           _distribution{luisa::make_unique<TrowbridgeReitzDistribution>(alpha)},
           _refl{luisa::make_unique<MicrofacetReflection>(refl, _distribution.get(), _fresnel.get())} {}
-
-    [[nodiscard]] Float2 roughness() const noexcept override { return _distribution->alpha(); }
 
 private:
     [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
@@ -133,7 +127,6 @@ private:
         auto f = _refl->sample(wo_local, &wi_local, u, &pdf, mode);
         return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf},
                 .wi = _it.shading().local_to_world(wi_local),
-                .eta = 1.f,
                 .event = Surface::event_reflect};
     }
     void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df_in,
@@ -144,8 +137,9 @@ private:
         auto df = df_in * abs_cos_theta(wi_local);
         auto grad = _refl->backward(wo_local, wi_local, df);
         auto d_fresnel = dynamic_cast<SchlickFresnel::Gradient *>(grad.dFresnel.get());
-
-        _instance->color()->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(grad.dR + d_fresnel->dR0));
+        if (auto color = _instance->color()) {
+            color->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(grad.dR + d_fresnel->dR0));
+        }
         if (auto roughness = _instance->roughness()) {
             auto remap = _instance->node<MirrorSurface>()->remap_roughness();
             auto r_f4 = roughness->evaluate(_it, _swl, _time);
@@ -179,10 +173,13 @@ luisa::unique_ptr<Surface::Closure> MirrorInstance::closure(
                     (remap ? make_float2(r2a(r.x)) : r.xx()) :
                     (remap ? r2a(r.xy()) : r.xy());
     }
-    auto color = _color->evaluate_albedo_spectrum(it, swl, time).value;
+    auto [color, _] = _color ? _color->evaluate_albedo_spectrum(it, swl, time) : Spectrum::Decode::one(swl.dimension());
     return luisa::make_unique<MirrorClosure>(this, it, swl, time, color, alpha);
 }
 
+using OpacityMirrorSurface = OpacitySurfaceMixin<
+    MirrorSurface, MirrorInstance, MirrorClosure>;
+
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::MirrorSurface)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::OpacityMirrorSurface)
