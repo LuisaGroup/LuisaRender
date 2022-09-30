@@ -26,7 +26,7 @@ static constexpr auto lut_size = (lut_max - lut_min) / lut_step + 1;
 
 using namespace luisa::compute;
 
-class MetalSurface final : public Surface {
+class MetalSurface : public Surface {
 
 public:
     struct ComplexIOR {
@@ -154,13 +154,14 @@ public:
     [[nodiscard]] auto ior() const noexcept { return _ior; }
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] uint properties() const noexcept override { return property_reflective | property_differentiable; }
 
-private:
+protected:
     [[nodiscard]] luisa::unique_ptr<Instance> _build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
-class MetalInstance final : public Surface::Instance {
+class MetalInstance : public Surface::Instance {
 
 private:
     const Texture::Instance *_roughness;
@@ -174,8 +175,9 @@ public:
                   SPD eta, SPD k) noexcept
         : Surface::Instance{pipeline, surface},
           _roughness{roughness}, _kd{Kd}, _eta{eta}, _k{k} {}
+    [[nodiscard]] auto Kd() const noexcept { return _kd; }
 
-private:
+public:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         const Interaction &it, const SampledWavelengths &swl,
         Expr<float> eta_i, Expr<float> time) const noexcept override;
@@ -202,7 +204,7 @@ luisa::unique_ptr<Surface::Instance> MetalSurface::_build(
         SPD{pipeline, k_buffer_id, static_cast<float>(ior::lut_step)});
 }
 
-class MetalClosure final : public Surface::Closure {
+class MetalClosure : public Surface::Closure {
 
 private:
     luisa::optional<SampledSpectrum> _refl;
@@ -222,8 +224,6 @@ public:
           _lobe{luisa::make_unique<MicrofacetReflection>(
               SampledSpectrum{swl.dimension(), 1.f},
               _distrib.get(), _fresnel.get())} {}
-
-    [[nodiscard]] Float2 roughness() const noexcept override { return _distrib->alpha(); }
 
 private:
     [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
@@ -245,15 +245,19 @@ private:
         auto wi = _it.shading().local_to_world(wi_local);
         return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf},
                 .wi = wi,
-                .eta = 1.f,
                 .event = Surface::event_reflect};
     }
     void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df,
                    TransportMode mode) const noexcept override {
-        // Metal surface is not differentiable
+        if (auto Kd = instance<MetalInstance>()->Kd();
+            Kd != nullptr && Kd->node()->requires_gradients()) {
+            auto wi_local = _it.shading().world_to_local(wi);
+            auto eval = _lobe->evaluate(wi_local, _it.shading().world_to_local(wi), mode);
+            auto dKd = df * abs_cos_theta(wi_local) * eval;
+            Kd->backward_albedo_spectrum(_it, _swl, _time, dKd);
+        }
+        // FIXME: differentiate roughness
     }
-
-public:
 };
 
 luisa::unique_ptr<Surface::Closure> MetalInstance::closure(
@@ -284,6 +288,10 @@ luisa::unique_ptr<Surface::Closure> MetalInstance::closure(
         eta, k, std::move(refl), alpha);
 }
 
+using NormalMapOpacityMetalSurface = NormalMapMixin<OpacitySurfaceMixin<
+    MetalSurface, MetalInstance, MetalClosure>>;
+
+
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::MetalSurface)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::NormalMapOpacityMetalSurface)

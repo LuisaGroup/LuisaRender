@@ -1,0 +1,465 @@
+#include <base/surface.h>
+#include <base/scene.h>
+#include <base/pipeline.h>
+#include <util/rng.h>
+#include <util/sampling.h>
+
+namespace luisa::render {
+
+class HGPhaseFunction {
+public:
+    struct PhaseFunctionSample {
+        Float p;
+        Float3 wi;
+        Float pdf;
+    };
+
+    // HGPhaseFunction Public Methods
+    HGPhaseFunction() noexcept = default;
+
+    explicit HGPhaseFunction(Float g) noexcept : g(g) {}
+
+    [[nodiscard]] Float HenyeyGreenstein(Float cosTheta, Float g) const noexcept {
+        Float denom = 1 + sqr(g) + 2 * g * cosTheta;
+        return inv_pi / 4.0f * (1 - sqr(g)) / (denom * sqrt(denom));
+    }
+
+    [[nodiscard]] Float3 SampleHenyeyGreenstein(Float3 wo, Float g, Float2 u, Float &pdf) const noexcept {
+        // Compute $\cos \theta$ for Henyey--Greenstein sample
+        Float cosTheta;
+        cosTheta = ite(abs(g) < 1e-3f, 1 - 2 * u.x,
+                       -1 / (2 * g) * (1 + sqr(g) - sqr((1 - sqr(g)) / (1 + g - 2 * g * u.x))));
+
+        // Compute direction _wi_ for Henyey--Greenstein sample
+        Float sinTheta = sqrt(1 - sqr(cosTheta));
+        Float phi = 2 * pi * u.y;
+        Frame wFrame = Frame::make(wo);
+        Float3 wi = wFrame.local_to_world(spherical_direction(sinTheta, cosTheta, phi));
+
+        pdf = HenyeyGreenstein(cosTheta, g);
+        return wi;
+    }
+
+    [[nodiscard]] Float p(Float3 wo, Float3 wi) const noexcept { return HenyeyGreenstein(dot(wo, wi), g); }
+
+    [[nodiscard]] auto Sample_p(Float3 wo, Float2 u) const noexcept {
+        Float pdf;
+        Float3 wi = SampleHenyeyGreenstein(wo, g, u, pdf);
+        return PhaseFunctionSample{pdf, wi, pdf};
+    }
+
+    [[nodiscard]] Float PDF(Float3 wo, Float3 wi) const noexcept { return p(wo, wi); }
+
+private:
+    // HGPhaseFunction Private Members
+    Float g;
+};
+
+class TopOrBottom {
+
+private:
+    const Surface::Closure &_top;
+    const Surface::Closure &_bottom;
+    Bool _is_top;
+
+public:
+    TopOrBottom(const Surface::Closure &top,
+                const Surface::Closure &bottom,
+                Expr<bool> is_top) noexcept
+        : _top{top}, _bottom{bottom}, _is_top{is_top} {}
+
+    [[nodiscard]] auto evaluate(
+        Expr<float3> wo, Expr<float3> wi,
+        TransportMode mode) const noexcept {
+        auto eval = Surface::Evaluation::zero(_top.swl().dimension());
+        $if(_is_top) {
+            eval = _top.evaluate(wo, wi, mode);
+        }
+        $else {
+            eval = _bottom.evaluate(wo, wi, mode);
+        };
+        return eval;
+    }
+
+    [[nodiscard]] auto sample(
+        Expr<float3> wo, Expr<float> u_lobe,
+        Expr<float2> u, TransportMode mode) const noexcept {
+        auto s = Surface::Sample::zero(_top.swl().dimension());
+        $if(_is_top) {
+            s = _top.sample(wo, u_lobe, u, mode);
+        }
+        $else {
+            s = _bottom.sample(wo, u_lobe, u, mode);
+        };
+        return s;
+    }
+
+    [[nodiscard]] auto to_local(Expr<float3> w) const noexcept {
+        return ite(_is_top,
+                   _top.it().shading().world_to_local(w),
+                   _bottom.it().shading().world_to_local(w));
+    }
+
+    [[nodiscard]] auto to_world(Expr<float3> w) const noexcept {
+        return ite(_is_top,
+                   _top.it().shading().local_to_world(w),
+                   _bottom.it().shading().local_to_world(w));
+    }
+};
+
+class LayeredSurface : public Surface {
+
+private:
+    const Surface *_top;
+    const Surface *_bottom;
+    const Texture *_thickness;
+    const Texture *_g;
+    const Texture *_albedo;
+    uint _max_depth;
+    uint _samples;
+
+protected:
+    [[nodiscard]] luisa::unique_ptr<Instance> _build(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
+
+public:
+    LayeredSurface(Scene *scene, const SceneNodeDesc *desc) noexcept
+        : Surface{scene, desc},
+          _top{scene->load_surface(desc->property_node("top"))},
+          _bottom{scene->load_surface(desc->property_node("bottom"))},
+          _thickness{scene->load_texture(desc->property_node_or_default("thickness"))},
+          _g{scene->load_texture(desc->property_node_or_default("g"))},
+          _albedo{scene->load_texture(desc->property_node_or_default("albedo"))},
+          _max_depth{desc->property_uint_or_default("max_depth", 10u)},
+          _samples{desc->property_uint_or_default("samples", 1u)} {
+        LUISA_RENDER_CHECK_ALBEDO_TEXTURE(LayeredSurface, albedo);
+        // TODO
+        LUISA_ASSERT(_top != nullptr && !_top->is_null() &&
+                         _bottom != nullptr && !_bottom->is_null(),
+                     "Creating closure for null LayeredSurface.");
+    }
+    [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
+    [[nodiscard]] auto samples() const noexcept { return _samples; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] uint properties() const noexcept override {
+        auto p = 0u;
+        if (_top->is_thin() && _bottom->is_thin()) { p |= property_thin; }
+        if (_top->is_reflective() || _bottom->is_reflective()) { p |= property_reflective; }
+        if (_top->is_transmissive() && _bottom->is_transmissive()) { p |= property_transmissive; }
+        return p;
+    }
+};
+
+class LayeredSurfaceInstance : public Surface::Instance {
+
+private:
+    luisa::unique_ptr<Surface::Instance> _top;
+    luisa::unique_ptr<Surface::Instance> _bottom;
+    const Texture::Instance *_thickness;
+    const Texture::Instance *_g;
+    const Texture::Instance *_albedo;
+
+public:
+    LayeredSurfaceInstance(
+        const Pipeline &pipeline, const LayeredSurface *surface, const Texture::Instance *thickness, const Texture::Instance *g,
+        const Texture::Instance *albedo, luisa::unique_ptr<Surface::Instance> top, luisa::unique_ptr<Surface::Instance> bottom) noexcept
+        : Surface::Instance{pipeline, surface},
+          _top{std::move(top)}, _bottom{std::move(bottom)}, _thickness{thickness}, _g{g}, _albedo{albedo} {}
+    [[nodiscard]] auto thickness() const noexcept { return _thickness; }
+    [[nodiscard]] auto g() const noexcept { return _g; }
+    [[nodiscard]] auto albedo() const noexcept { return _albedo; }
+
+public:
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
+        const Interaction &it, const SampledWavelengths &swl,
+        Expr<float> eta_i, Expr<float> time) const noexcept override;
+};
+
+luisa::unique_ptr<Surface::Instance> LayeredSurface::_build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
+    auto top = _top->build(pipeline, command_buffer);
+    auto bottom = _bottom->build(pipeline, command_buffer);
+    auto thickness = pipeline.build_texture(command_buffer, _thickness);
+    auto g = pipeline.build_texture(command_buffer, _g);
+    auto albedo = pipeline.build_texture(command_buffer, _albedo);
+    return luisa::make_unique<LayeredSurfaceInstance>(
+        pipeline, this, thickness, g, albedo, std::move(top), std::move(bottom));
+}
+
+class LayeredSurfaceClosure : public Surface::Closure {
+
+private:
+    luisa::unique_ptr<Surface::Closure> _top;
+    luisa::unique_ptr<Surface::Closure> _bottom;
+    Float _thickness;
+    Float _g;
+    SampledSpectrum _albedo;
+    uint _max_depth;
+    uint _samples;
+
+public:
+    LayeredSurfaceClosure(
+        const LayeredSurfaceInstance *instance, const Interaction &it,
+        const SampledWavelengths &swl, Expr<float> time, Expr<float> thickness, Expr<float> g,
+        const SampledSpectrum &albedo, uint max_depth, uint samples,
+        luisa::unique_ptr<Surface::Closure> top, luisa::unique_ptr<Surface::Closure> bottom) noexcept
+        : Surface::Closure{instance, it, swl, time},
+          _top{std::move(top)}, _bottom{std::move(bottom)}, _thickness{thickness},
+          _g{g}, _albedo{albedo}, _max_depth{max_depth}, _samples{samples} {}
+
+private:
+    [[nodiscard]] static inline auto Tr(Expr<float> dz, Expr<float3> w) noexcept {
+        return ite(abs(dz) <= std::numeric_limits<float>::min(),
+                   1.f, exp(-abs(dz / w.z)));
+    }
+    [[nodiscard]] Surface::Evaluation _evaluate(
+        Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
+        auto wi_local = _it.shading().world_to_local(wi);
+        auto wo_local = _it.shading().world_to_local(wo);
+        auto entered_top = wo_local.z > 0.f;
+        auto enter_interface = TopOrBottom(*_top, *_bottom, entered_top);
+        auto exit_interface = TopOrBottom(*_bottom, *_top, same_hemisphere(wo_local, wi_local) | entered_top);
+        auto nonexit_interface = TopOrBottom(*_top, *_bottom, same_hemisphere(wo_local, wi_local) | entered_top);
+        auto exitZ = ite(same_hemisphere(wo_local, wi_local) | entered_top, 0.f, _thickness);
+        auto f = ite(same_hemisphere(wi_local, wo_local),
+                     static_cast<float>(_samples) * enter_interface.evaluate(wo, wi, mode).f,
+                     SampledSpectrum(0.f));
+        auto seed = xxhash32(make_uint4(as<UInt3>(_it.p()), xxhash32(as<UInt3>(wi))));
+        auto pdf_sum = ite(same_hemisphere(wi_local, wo_local),
+                           ite(entered_top,
+                               _samples * _top->evaluate(wo, wi, mode).pdf,
+                               _samples * _bottom->evaluate(wo, wi, mode).pdf),
+                           0.f);
+        // f
+        $for(i, _samples) {
+            auto wos = enter_interface.sample(wo, lcg(seed), make_float2(lcg(seed), lcg(seed)), mode);
+            $if(wos.eval.f.is_zero() | wos.eval.pdf <= 0.f) { $continue; };
+            auto reverse_mode = mode == TransportMode::IMPORTANCE ? TransportMode::RADIANCE : TransportMode::IMPORTANCE;
+            auto wis = exit_interface.sample(wi, lcg(seed), make_float2(lcg(seed), lcg(seed)), reverse_mode);
+            auto wis_wi_local = exit_interface.to_local(wis.wi);
+            $if(wis.eval.f.is_zero() | wis.eval.pdf <= 0.f) { $continue; };
+            auto beta = wos.eval.f / wos.eval.pdf;
+            auto z = ite(entered_top, _thickness, 0.f);
+            auto w = wos.wi;
+            auto w_local = enter_interface.to_local(w);
+            HGPhaseFunction phase(_g);
+            $for(depth, _max_depth) {
+                $if(depth > 3 & beta.max() < 0.25f) {
+                    auto q = max(0.f, 1.f - beta.max());
+                    $if(lcg(seed) < q) {
+                        $break;
+                    };
+                    beta /= 1 - q;
+                };
+                $if(!_albedo.is_zero()) {
+                    z = ite(z == _thickness, 0.f, _thickness);
+                    beta *= Tr(_thickness, w_local);
+                }
+                $else {
+                    auto sigma_t = 1.f;
+                    auto dz = -log(1.f - lcg(seed)) / (sigma_t / abs(w_local.z));
+                    auto zp = ite(w_local.z > 0.f, z + dz, z - dz);
+                    $if(z == zp) { $continue; };
+                    $if(zp > 0.f & zp < _thickness) {
+                        auto wt = 1.f;
+                        f += beta * _albedo * phase.p(-w_local, -wis_wi_local) * wt *
+                             Tr(zp - exitZ, wis_wi_local) * wis.eval.f / wis.eval.pdf;
+                        auto u = make_float2(lcg(seed), lcg(seed));
+                        auto ps = phase.Sample_p(-w_local, u);
+                        $if(ps.pdf <= 0.f | ps.wi.z == 0.f) { $continue; };
+                        beta *= _albedo * ps.p / ps.pdf;
+                        w_local = ps.wi;
+                        w = exit_interface.to_world(w_local);
+                        z = zp;
+                        $if(((z<exitZ & w_local.z> 0.f) | (z > exitZ & w_local.z < 0.f))) {
+                            // Account for scattering through _exitInterface_
+                            auto fExit = exit_interface.evaluate(-w, wi, mode).f;
+                            $if(!fExit.is_zero()) {
+                                Float exitPDF = exit_interface.evaluate(-w, wi, mode).pdf;
+                                Float wt = power_heuristic(1, ps.pdf, 1, exitPDF);
+                                f += beta * Tr(zp - exitZ, w_local) * fExit * wt;
+                            };
+                        };
+                        $continue;
+                    };
+                    z = clamp(zp, 0.f, _thickness);
+                };
+                $if(z == exitZ) {
+                    auto uc = lcg(seed);
+                    auto bs = exit_interface.sample(-w, uc, make_float2(lcg(seed), lcg(seed)), mode);
+                    $if(bs.eval.f.is_zero() | bs.eval.pdf <= 0.f) { $break; };
+                    beta *= bs.eval.f / bs.eval.pdf;
+                    w = bs.wi;
+                    w_local = exit_interface.to_local(w);
+                }
+                $else {
+                    auto wns = nonexit_interface.evaluate(-w, -wis.wi, mode);
+                    auto wt = power_heuristic(1, wis.eval.pdf, 1, wns.pdf);
+                    f += beta * wns.f * wt * Tr(_thickness, wis_wi_local) * wis.eval.f /
+                         wis.eval.pdf;
+                    auto uc = lcg(seed);
+                    auto u = make_float2(lcg(seed), lcg(seed));
+                    auto bs = nonexit_interface.sample(-w, uc, u, mode);
+                    $if(bs.eval.f.is_zero() | bs.eval.pdf <= 0.f) { $break; };
+                    beta *= bs.eval.f / bs.eval.pdf;
+                    w = bs.wi;
+                    w_local = nonexit_interface.to_local(w);
+                    auto wes = exit_interface.evaluate(-w, wi, mode);
+                    auto fExit = wes.f;
+                    $if(!fExit.is_zero()) {
+                        auto exit_pdf = wes.pdf;
+                        auto wt = power_heuristic(1, bs.eval.pdf, 1, exit_pdf);
+                        f += beta * Tr(_thickness, nonexit_interface.to_local(bs.wi)) * fExit * wt;
+                    };
+                };
+            };
+        };
+
+        // pdf
+        $for(s, _samples) {
+            $if(same_hemisphere(wo_local, wi_local)) {
+                auto r_interface = TopOrBottom(*_bottom, *_top, entered_top);
+                auto t_interface = TopOrBottom(*_top, *_bottom, entered_top);
+                auto reverse_mode = mode == TransportMode::IMPORTANCE ? TransportMode::RADIANCE : TransportMode::IMPORTANCE;
+                auto wos = t_interface.sample(wo, lcg(seed), make_float2(lcg(seed), lcg(seed)), mode);
+                auto wis = t_interface.sample(wi, lcg(seed), make_float2(lcg(seed), lcg(seed)), reverse_mode);
+                $if(!wos.eval.f.is_zero() & wos.eval.pdf > 0.f & !wis.eval.f.is_zero() & wis.eval.pdf > 0.f) {
+                    auto rs = r_interface.sample(-wos.wi, lcg(seed), make_float2(lcg(seed), lcg(seed)), mode);
+                    $if(!rs.eval.f.is_zero() & rs.eval.pdf > 0.f) {
+                        auto r_pdf = r_interface.evaluate(-wos.wi, -wis.wi, mode).pdf;
+                        auto wt = power_heuristic(1, wis.eval.pdf, 1, r_pdf);
+                        pdf_sum += wt * r_pdf;
+                        auto t_pdf = t_interface.evaluate(-rs.wi, wi, mode).pdf;
+                        wt = power_heuristic(1, rs.eval.pdf, 1, t_pdf);
+                        pdf_sum += wt * t_pdf;
+                    };
+                };
+            }
+            $else {
+                auto ti_interface = TopOrBottom(*_bottom, *_top, entered_top);
+                auto to_interface = TopOrBottom(*_top, *_bottom, entered_top);
+                auto reverse_mode = mode == TransportMode::IMPORTANCE ? TransportMode::RADIANCE : TransportMode::IMPORTANCE;
+                auto wos = to_interface.sample(wo, lcg(seed), make_float2(lcg(seed), lcg(seed)), mode);
+                auto wis = ti_interface.sample(wi, lcg(seed), make_float2(lcg(seed), lcg(seed)), reverse_mode);
+                $if(wos.eval.f.is_zero() | wos.eval.pdf <= 0.f |
+                    wis.eval.f.is_zero() | wis.eval.pdf <= 0.f) { $continue; };
+                pdf_sum += .5f * (to_interface.evaluate(wo, -wis.wi, mode).pdf +
+                                  ti_interface.evaluate(-wos.wi, wi, mode).pdf);
+            };
+        };
+        return {.f = f / static_cast<float>(_samples),
+                .pdf = lerp(1.f / (4.f * pi), pdf_sum / static_cast<float>(_samples), 0.9f)};
+    }
+    [[nodiscard]] Surface::Sample _sample(
+        Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u, TransportMode mode) const noexcept override {
+        auto wo_local = _it.shading().world_to_local(wo);
+        auto entered_top = wo_local.z > 0.f;
+        auto b_surf = TopOrBottom(*_top, *_bottom, entered_top);
+        auto bs = b_surf.sample(wo, u_lobe, u, mode);
+        auto s = Surface::Sample::zero(_swl.dimension());
+        $if(!bs.eval.f.is_zero() & bs.eval.pdf != 0.f) {
+            auto wi_local = _it.shading().world_to_local(bs.wi);
+            $if(same_hemisphere(wi_local, wo_local)) {
+                s = bs;
+            }
+            $else {
+                auto w = bs.wi;
+                auto w_local = _it.shading().world_to_local(bs.wi);
+                auto seed = xxhash32(make_uint4(as<UInt3>(make_float3(u, u_lobe)), xxhash32(as<UInt3>(wo))));
+                auto f = bs.eval.f;
+                auto pdf = bs.eval.pdf;
+                auto z = ite(entered_top, _thickness, 0.f);
+                HGPhaseFunction phase(_g);
+                $for(depth, _max_depth) {
+                    auto rr_beta = f.max() / pdf;
+                    $if(depth > 3 & rr_beta < 0.25f) {
+                        auto q = max(0.f, 1.f - rr_beta);
+                        $if(lcg(seed) < q) { $break; };
+                        pdf *= 1 - q;
+                    };
+                    $if(w_local.z == 0.f) { $break; };
+                    $if(!_albedo.is_zero()) {
+                        auto sigma_t = 1.f;
+                        auto dz = -log(1.f - lcg(seed)) / (sigma_t / abs(w_local.z));
+                        auto zp = ite(w_local.z > 0.f, z + dz, z - dz);
+                        $if(z == zp) { $break; };
+                        $if(0.f < zp & zp < _thickness) {
+                            auto ps = phase.Sample_p(-w_local, make_float2(lcg(seed), lcg(seed)));
+                            $if(ps.pdf <= 0.f) { $break; };
+                            f *= _albedo * ps.p;
+                            pdf *= ps.pdf;
+                            w = ps.wi;
+                            w_local = _it.shading().world_to_local(w);
+                            z = zp;
+                            $continue;
+                        };
+                        z = clamp(zp, 0.f, _thickness);
+                    }
+                    $else {
+                        z = ite(z == _thickness, 0.f, _thickness);
+                        f *= Tr(_thickness, w_local);
+                    };
+                    auto interface = TopOrBottom(*_bottom, *_top, z == 0.f);
+                    auto uc = lcg(seed);
+                    auto u = make_float2(lcg(seed), lcg(seed));
+                    auto bs = interface.sample(-w, uc, u, mode);
+                    $if(bs.eval.f.is_zero() | bs.eval.pdf <= 0.f) { $break; };
+                    f *= bs.eval.f;
+                    pdf *= bs.eval.pdf;
+                    w = bs.wi;
+                    w_local = _it.shading().world_to_local(w);
+                    $if((bs.event & Surface::event_transmit) != 0u) {
+                        s = Surface::Sample{
+                            .eval = {.f = f, .pdf = pdf},
+                            .wi = w,
+                            .event = ite(same_hemisphere(w_local, wo_local),
+                                         Surface::event_reflect,
+                                         ite(w_local.z > 0.f, Surface::event_exit, Surface::event_enter))};
+                        $break;
+                    };
+                };
+            };
+        };
+        return s;
+    }
+    void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df,
+                   TransportMode mode) const noexcept override {
+        LUISA_WARNING_WITH_LOCATION("LayeredSurfaceClosure::backward() ignored.");
+    }
+    [[nodiscard]] luisa::optional<Bool> _is_dispersive() const noexcept override {
+        auto top_dispersive = _top->is_dispersive();
+        auto bottom_dispersive = _bottom->is_dispersive();
+        if (!top_dispersive) { return bottom_dispersive; }
+        if (!bottom_dispersive) { return top_dispersive; }
+        return *top_dispersive | *bottom_dispersive;
+    }
+    [[nodiscard]] luisa::optional<Float> _eta() const noexcept override {
+        return _bottom->eta();
+    }
+    [[nodiscard]] luisa::optional<Float> _opacity() const noexcept override {
+        if (instance()->node()->is_transmissive()) { return luisa::nullopt; }
+        return 1.f - ((1.f - _top->opacity().value_or(1.f)) *
+                      (1.f - _bottom->opacity().value_or(1.f)));
+    }
+};
+
+luisa::unique_ptr<Surface::Closure> LayeredSurfaceInstance::closure(
+    const Interaction &it, const SampledWavelengths &swl,
+    Expr<float> eta_i, Expr<float> time) const noexcept {
+    auto thickness = _thickness == nullptr ? .1f : max(_thickness->evaluate(it, swl, time).x, std::numeric_limits<float>::min());
+    auto g = _g == nullptr ? 0.f : _g->evaluate(it, swl, time).x;
+    auto [albedo, _] = _albedo ? _albedo->evaluate_albedo_spectrum(it, swl, time) : Spectrum::Decode::one(swl.dimension());
+    auto max_depth = node<LayeredSurface>()->max_depth();
+    auto samples = node<LayeredSurface>()->samples();
+    auto top = _top == nullptr ? nullptr : _top->closure(it, swl, eta_i, time);
+    auto bottom = _bottom == nullptr ? nullptr : _bottom->closure(it, swl, top->eta().value_or(1.f), time);// FIXME: eta_i is wrong
+    return luisa::make_unique<LayeredSurfaceClosure>(
+        this, it, swl, time, thickness, g, albedo, max_depth,
+        samples, std::move(top), std::move(bottom));
+}
+
+using NormalMapOpacityLayeredSurface = NormalMapMixin<OpacitySurfaceMixin<
+    LayeredSurface, LayeredSurfaceInstance, LayeredSurfaceClosure>>;
+
+}// namespace luisa::render
+
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::NormalMapOpacityLayeredSurface)

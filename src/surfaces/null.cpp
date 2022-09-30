@@ -12,9 +12,13 @@ public:
     NullSurface(Scene *scene, const SceneNodeDesc *desc) noexcept : Surface{scene, desc} {}
     [[nodiscard]] bool is_null() const noexcept override { return true; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] uint properties() const noexcept override { return 0u; }
 
 private:
-    [[nodiscard]] luisa::unique_ptr<Instance> _build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override { return nullptr; }
+    [[nodiscard]] luisa::unique_ptr<Instance> _build(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
+        LUISA_ERROR_WITH_LOCATION("NullSurface cannot be instantiated.");
+    }
 };
 
 }// namespace luisa::render

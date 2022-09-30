@@ -113,6 +113,9 @@ public:
     [[nodiscard]] auto all(F &&f) const noexcept {
         return reduce(true, [&f](auto ans, auto, auto value) noexcept { return ans & f(value); });
     }
+    [[nodiscard]] auto is_zero() const noexcept {
+        return all([](auto x) noexcept { return x == 0.f; });
+    }
     template<typename F>
     [[nodiscard]] auto none(F &&f) const noexcept { return !any(std::forward<F>(f)); }
 

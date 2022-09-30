@@ -47,10 +47,12 @@ void NormalVisualizerInstance::render(Stream &stream) noexcept {
         auto camera = pipeline().camera(i);
         auto resolution = camera->film()->node()->resolution();
         auto pixel_count = resolution.x * resolution.y;
+        camera->film()->prepare(command_buffer);
         _render_one_camera(command_buffer, camera);
         pixels.resize(next_pow2(pixel_count));
         camera->film()->download(command_buffer, reinterpret_cast<float4 *>(pixels.data()));
         command_buffer << compute::synchronize();
+        camera->film()->release();
         auto film_path = camera->node()->file();
         save_image(film_path, (const float *)pixels.data(), resolution);
     }
@@ -68,7 +70,6 @@ void NormalVisualizerInstance::_render_one_camera(
         resolution.x, resolution.y, spp);
 
     auto pixel_count = resolution.x * resolution.y;
-    camera->film()->clear(command_buffer);
     sampler()->reset(command_buffer, resolution, pixel_count, spp);
     command_buffer.commit();
 

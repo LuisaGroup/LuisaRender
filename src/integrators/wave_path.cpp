@@ -229,9 +229,11 @@ public:
                 film_path.string(),
                 resolution.x, resolution.y,
                 camera->node()->spp());
+            camera->film()->prepare(command_buffer);
             _render_one_camera(command_buffer, camera);
             camera->film()->download(command_buffer, pixels.data());
             command_buffer << compute::synchronize();
+            camera->film()->release();
             save_image(film_path, (const float *)pixels.data(), resolution);
         }
     }
@@ -245,8 +247,6 @@ void WavefrontPathTracingInstance::_render_one_camera(
     CommandBuffer &command_buffer, Camera::Instance *camera) noexcept {
 
     auto &&device = camera->pipeline().device();
-
-    camera->film()->clear(command_buffer);
     if (!pipeline().has_lighting()) [[unlikely]] {
         LUISA_WARNING_WITH_LOCATION(
             "No lights in scene. Rendering aborted.");
@@ -421,7 +421,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
 
                 // create closure
                 auto closure = surface->closure(*it, swl, 1.f, time);
-                if (auto dispersive = closure->dispersive()) {
+                if (auto dispersive = closure->is_dispersive()) {
                     $if (*dispersive) {
                         swl.terminate_secondary();
                         path_states.write_swl(path_id, swl);
@@ -461,9 +461,10 @@ void WavefrontPathTracingInstance::_render_one_camera(
                     beta *= w * sample.eval.f;
 
                     // apply eta scale
+                    auto eta = closure->eta().value_or(1.f);
                     $switch (sample.event) {
-                        $case (Surface::event_enter) { eta_scale = sqr(sample.eta); };
-                        $case (Surface::event_exit) { eta_scale = 1.f / sqr(sample.eta); };
+                        $case (Surface::event_enter) { eta_scale = sqr(eta); };
+                        $case (Surface::event_exit) { eta_scale = 1.f / sqr(eta); };
                     };
                 };
             });

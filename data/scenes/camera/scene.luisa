@@ -1,81 +1,75 @@
-Surface surface_camera_body : NormalMap {
-  map : Image {
+Surface surface_camera_body : Disney {
+  color : Image {
+    file { "textures/Camera_01_body_diff_8k.png" }
+    semantic { "albedo" }
+  }
+  roughness : Image {
+    file { "textures/Camera_01_body_roughness_8k.png" }
+    encoding { "linear" }
+  }
+  metallic : Image {
+    file { "textures/Camera_01_body_metallic_8k.png" }
+    encoding { "linear" }
+  }
+  clearcoat : Constant {
+    v { 1 }
+  }
+  clearcoat_gloss : Constant {
+    v { 1 }
+  }
+  normal_map : Image {
     file { "textures/Camera_01_body_nor_gl_8k.png" }
     encoding { "linear" }
   }
-  base : Disney {
-    color : Image {
-      file { "textures/Camera_01_body_diff_8k.png" }
-      semantic { "albedo" }
-    }
-    roughness : Image {
-      file { "textures/Camera_01_body_roughness_8k.png" }
-      encoding { "linear" }
-    }
-    metallic : Image {
-      file { "textures/Camera_01_body_metallic_8k.png" }
-      encoding { "linear" }
-    }
-    clearcoat : Constant {
-      v { 1 }
-    }
-    clearcoat_gloss : Constant {
-      v { 1 }
-    }
-  }
 }
 
-Surface surface_camera_lens_body : NormalMap {
-  map : Image {
+Surface surface_camera_lens_body : Disney {
+  color : Image {
+    file { "textures/Camera_01_lens_body_diff_8k.png" }
+    semantic { "albedo" }
+  }
+  roughness : Image {
+    file { "textures/Camera_01_lens_body_roughness_8k.png" }
+    encoding { "linear" }
+  }
+  metallic : Image {
+    file { "textures/Camera_01_lens_body_metallic_8k.png" }
+    encoding { "linear" }
+  }
+  clearcoat : Constant {
+    v { 1 }
+  }
+  clearcoat_gloss : Constant {
+    v { 1 }
+  }
+  normal_map : Image {
     file { "textures/Camera_01_lens_body_nor_gl_8k.png" }
     encoding { "linear" }
   }
-  base : Disney {
-    color : Image {
-      file { "textures/Camera_01_lens_body_diff_8k.png" }
-      semantic { "albedo" }
-    }
-    roughness : Image {
-      file { "textures/Camera_01_lens_body_roughness_8k.png" }
-      encoding { "linear" }
-    }
-    metallic : Image {
-      file { "textures/Camera_01_lens_body_metallic_8k.png" }
-      encoding { "linear" }
-    }
-    clearcoat : Constant {
-      v { 1 }
-    }
-    clearcoat_gloss : Constant {
-      v { 1 }
-    }
-  }
 }
 
-Surface surface_camera_strap : NormalMap {
-  map : Image {
-    file { "textures/Camera_01_strap_nor_gl_8k.png" }
+Surface surface_camera_strap : Disney {
+  color : Image {
+    file { "textures/Camera_01_strap_diff_8k.png" }
+    semantic { "albedo" }
+  }
+  roughness : Image {
+    file { "textures/Camera_01_strap_roughness_8k.png" }
     encoding { "linear" }
   }
-  base : Disney {
-    color : Image {
-      file { "textures/Camera_01_strap_diff_8k.png" }
-      semantic { "albedo" }
-    }
-    roughness : Image {
-      file { "textures/Camera_01_strap_roughness_8k.png" }
-      encoding { "linear" }
-    }
-    metallic : Image {
-      file { "textures/Camera_01_strap_metallic_8k.png" }
-      encoding { "linear" }
-    }
-    clearcoat : Constant {
-      v { 1 }
-    }
-    clearcoat_gloss : Constant {
-      v { 1 }
-    }
+  metallic : Image {
+    file { "textures/Camera_01_strap_metallic_8k.png" }
+    encoding { "linear" }
+  }
+  clearcoat : Constant {
+    v { 1 }
+  }
+  clearcoat_gloss : Constant {
+    v { 1 }
+  }
+  normal_map : Image {
+    file { "textures/Camera_01_strap_nor_gl_8k.png" }
+    encoding { "linear" }
   }
 }
 
@@ -111,26 +105,24 @@ Surface surface_camera_lens : Mix {
   }
 }
 
-Surface surface_backdrop : NormalMap {
-  map : Image {
-    file { "textures/weathered_brown_planks_nor_gl_16k.png" }
+Surface surface_backdrop : Disney {
+  color : Image {
+    file { "textures/weathered_brown_planks_diff_16k.jpg" }
+    semantic { "albedo" }
+  }
+  roughness : Image {
+    file { "textures/weathered_brown_planks_rough_16k.jpg" }
     encoding { "linear" }
   }
-  base : Disney {
-    color : Image {
-      file { "textures/weathered_brown_planks_diff_16k.jpg" }
-      semantic { "albedo" }
-    }
-    roughness : Image {
-      file { "textures/weathered_brown_planks_rough_16k.jpg" }
-      encoding { "linear" }
-    }
-    clearcoat : Constant {
-      v { 0.5 }
-    }
-    clearcoat_gloss : Constant {
-      v { 1 }
-    }
+  clearcoat : Constant {
+    v { 0.5 }
+  }
+  clearcoat_gloss : Constant {
+    v { 1 }
+  }
+  normal_map : Image {
+    file { "textures/weathered_brown_planks_nor_gl_16k.png" }
+    encoding { "linear" }
   }
 }
 

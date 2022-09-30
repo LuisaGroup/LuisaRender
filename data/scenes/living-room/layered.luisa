@@ -6,21 +6,38 @@ Surface mat_Dirt : Matte {
   }
 }
 
-Surface mat_Floor : Substrate {
-  Kd : Image {
-    file { "textures/wood.jpg" }
+Surface mat_Floor : Layered {
+  top : Glass {
+    Kr : Constant {
+      v { 1, 1, 1 }
+      semantic { "albedo" }
+    }
+    Kt : Constant {
+      v { 1, 1, 1 }
+      semantic { "albedo" }
+    }
+    roughness : Constant {
+      v { 0.3872983346207417 }
+    }
+    specular_trans : Constant {
+      v { 1 }
+    }
+  }
+  bottom : Matte {
+    Kd : Image {
+      file { "textures/wood.jpg" }
+      semantic { "albedo" }
+    }
+  }
+  albedo : Constant {
+    v { 1, 1, 1 }
     semantic { "albedo" }
   }
-  Ks : Constant {
-    v { 0.04, 0.04, 0.04 }
-    semantic { "albedo" }
-  }
-  eta : Constant {
-    v { 1.5 }
-  }
-  roughness : Constant {
-    v { 0.3872983346207417 }
-  }
+  max_depth { 10 }
+  samples { 1 }
+  thickness : Constant {
+      v { 0.1 }
+    }
 }
 
 Surface mat_TableWood : Substrate {
@@ -1068,7 +1085,6 @@ render {
   integrator : WavePath {
     sampler : PMJ02BN {}
     depth { 12 }
-    rr_depth { 5 }
     rr_threshold { 0.95 }
   }
   shapes {
