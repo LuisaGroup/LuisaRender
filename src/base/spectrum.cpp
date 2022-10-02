@@ -110,6 +110,14 @@ Spectrum::Instance::Instance(Pipeline &pipeline, CommandBuffer &cb,
       _cie_y{SPD::create_cie_y(pipeline, cb)},
       _cie_z{SPD::create_cie_z(pipeline, cb)} {}
 
+Float3 Spectrum::Instance::backward_encode_srgb_albedo(Expr<float4> dEnc) const noexcept {
+    _report_backward_unsupported_or_not_implemented();
+}
+
+Float3 Spectrum::Instance::backward_encode_srgb_illuminant(Expr<float4> dEnc) const noexcept {
+    _report_backward_unsupported_or_not_implemented();
+}
+
 Spectrum::Spectrum(Scene *scene, const SceneNodeDesc *desc) noexcept
     : SceneNode{scene, desc, SceneNodeTag::SPECTRUM} {}
 

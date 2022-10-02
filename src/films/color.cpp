@@ -46,7 +46,9 @@ private:
     std::shared_future<Shader1D<Buffer<float>, Buffer<float4>>> _convert_image;
 
 private:
-    void _check_prepared() const noexcept { LUISA_ASSERT(_image && _converted, "Film is not prepared."); }
+    void _check_prepared() const noexcept {
+        LUISA_ASSERT(_image && _converted, "Film is not prepared.");
+    }
 
 public:
     ColorFilmInstance(Device &device, Pipeline &pipeline, const ColorFilm *film) noexcept;

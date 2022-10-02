@@ -14,13 +14,33 @@
 
 namespace luisa::render {
 
-#define LUISA_RENDER_CHECK_ALBEDO_TEXTURE(class_name, name)                              \
-    LUISA_ASSERT(_##name == nullptr || _##name->semantic() == Texture::Semantic::ALBEDO, \
-                 "Expected albedo texture for " #class_name "::" #name ".")
+#define LUISA_RENDER_CHECK_ALBEDO_TEXTURE(class_name, name)                      \
+    [&] {                                                                        \
+        LUISA_ASSERT(_##name == nullptr ||                                       \
+                         _##name->semantic() == Texture::Semantic::ALBEDO ||     \
+                         _##name->semantic() == Texture::Semantic::GENERIC,      \
+                     "Expected albedo texture for " #class_name "::" #name "."); \
+        if (_##name->semantic() == Texture::Semantic::GENERIC) {                 \
+            LUISA_WARNING_WITH_LOCATION(                                         \
+                #class_name "::" #name " requires an albedo texture. "           \
+                            "Using a generic texture might be inefficient "      \
+                            "due to spectrum conversion overhead.");             \
+        }                                                                        \
+    }()
 
-#define LUISA_RENDER_CHECK_ILLUMINANT_TEXTURE(class_name, name)                              \
-    LUISA_ASSERT(_##name == nullptr || _##name->semantic() == Texture::Semantic::ILLUMINANT, \
-                 "Expected illuminant texture for " #class_name "::" #name ".")
+#define LUISA_RENDER_CHECK_ILLUMINANT_TEXTURE(class_name, name)                      \
+    [&] {                                                                            \
+        LUISA_ASSERT(_##name == nullptr ||                                           \
+                         _##name->semantic() == Texture::Semantic::ILLUMINANT ||     \
+                         _##name->semantic() == Texture::Semantic::GENERIC,          \
+                     "Expected illuminant texture for " #class_name "::" #name "."); \
+        if (_##name->semantic() == Texture::Semantic::GENERIC) {                     \
+            LUISA_WARNING_WITH_LOCATION(                                             \
+                #class_name "::" #name " requires an illuminant texture. "           \
+                            "Using a generic texture might be inefficient "          \
+                            "due to spectrum conversion overhead.");                 \
+        }                                                                            \
+    }()
 
 #define LUISA_RENDER_CHECK_GENERIC_TEXTURE(class_name, name, channel_num)  \
     LUISA_ASSERT(_##name == nullptr ||                                     \

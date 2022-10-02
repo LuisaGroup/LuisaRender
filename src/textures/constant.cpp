@@ -36,41 +36,7 @@ public:
         }
         _channels = v.size();
         for (auto i = 0u; i < v.size(); i++) { _v[i] = scale * v[i]; }
-        switch (semantic()) {
-            case Semantic::ALBEDO: {
-                if (_channels == 1u) {
-                    _v[1] = _v[0];
-                    _v[2] = _v[0];
-                } else if (_channels == 2u) {
-                    LUISA_ERROR_WITH_LOCATION(
-                        "ConstantTexture with semantic 'albedo' "
-                        "requires 1, 3, or 4 channels, but got 2.");
-                }
-                _black = all(_v.xyz() <= 0.f);
-                _v = scene->spectrum()->encode_srgb_albedo(_v.xyz());
-//                LUISA_INFO("Encoded: ({}, {}, {}, {})", _v[0], _v[1], _v[2], _v[3]);
-                _channels = compute::pixel_storage_channel_count(
-                    scene->spectrum()->encoded_albedo_storage(PixelStorage::FLOAT4));
-                break;
-            }
-            case Semantic::ILLUMINANT:
-                if (_channels == 1u) {
-                    _v[1] = _v[0];
-                    _v[2] = _v[0];
-                } else if (_channels == 2u) {
-                    LUISA_ERROR_WITH_LOCATION(
-                        "ConstantTexture with semantic 'illuminant' "
-                        "requires 1, 3, or 4 channels, but got 2.");
-                }
-                _black = all(_v.xyz() <= 0.f);
-                _v = scene->spectrum()->encode_srgb_illuminant(_v.xyz());
-                _channels = compute::pixel_storage_channel_count(
-                    scene->spectrum()->encoded_illuminant_storage(PixelStorage::FLOAT4));
-                break;
-            case Semantic::GENERIC:
-                _black = all(_v == 0.f);
-                break;
-        }
+        _black = all(_v == 0.f);
     }
     [[nodiscard]] auto v() const noexcept { return _v; }
     [[nodiscard]] bool is_black() const noexcept override { return _black; }
@@ -95,6 +61,34 @@ public:
         const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         if (_diff_param) { return pipeline().differentiation()->decode(*_diff_param); }
         return def(node<ConstantTexture>()->v());
+    }
+    [[nodiscard]] Spectrum::Decode evaluate_albedo_spectrum(
+        const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        if (_diff_param) { return Instance::evaluate_albedo_spectrum(it, swl, time); }
+        auto tex = node<ConstantTexture>();
+        if (tex->semantic() == Texture::Semantic::ALBEDO ||
+            tex->semantic() == Texture::Semantic::GENERIC) {
+            auto spec = pipeline().spectrum();
+            auto enc = spec->node()->encode_srgb_albedo(tex->v().xyz());
+            return spec->decode_albedo(swl, enc);
+        }
+        LUISA_ERROR_WITH_LOCATION(
+            "ConstantTexture with semantic 'illuminant'"
+            " cannot be used as albedo.");
+    }
+    [[nodiscard]] Spectrum::Decode evaluate_illuminant_spectrum(
+        const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        if (_diff_param) { return Instance::evaluate_illuminant_spectrum(it, swl, time); }
+        auto tex = node<ConstantTexture>();
+        if (tex->semantic() == Texture::Semantic::ILLUMINANT ||
+            tex->semantic() == Texture::Semantic::GENERIC) {
+            auto spec = pipeline().spectrum();
+            auto enc = spec->node()->encode_srgb_illuminant(tex->v().xyz());
+            return spec->decode_illuminant(swl, enc);
+        }
+        LUISA_ERROR_WITH_LOCATION(
+            "ConstantTexture with semantic 'albedo'"
+            " cannot be used as illuminant.");
     }
     void backward(const Interaction &it, const SampledWavelengths &swl,
                   Expr<float>, Expr<float4> grad) const noexcept override {
