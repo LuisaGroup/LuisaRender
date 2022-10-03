@@ -61,8 +61,8 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
                     return std::abs(length(cross(p1 - p0, p2 - p0)));
                 });
                 auto [alias_table, pdf] = create_alias_table(triangle_areas);
-                auto [alias_table_buffer_view, alias_buffer_id] = _pipeline.arena_buffer<AliasEntry>(alias_table.size());
-                auto [pdf_buffer_view, pdf_buffer_id] = _pipeline.arena_buffer<float>(pdf.size());
+                auto [alias_table_buffer_view, alias_buffer_id] = _pipeline.bindless_arena_buffer<AliasEntry>(alias_table.size());
+                auto [pdf_buffer_view, pdf_buffer_id] = _pipeline.bindless_arena_buffer<float>(pdf.size());
                 LUISA_ASSERT(triangle_buffer_id - vertex_buffer_id == Shape::Handle::triangle_buffer_id_offset, "Invalid.");
                 LUISA_ASSERT(alias_buffer_id - vertex_buffer_id == Shape::Handle::alias_table_buffer_id_offset, "Invalid.");
                 LUISA_ASSERT(pdf_buffer_id - vertex_buffer_id == Shape::Handle::pdf_buffer_id_offset, "Invalid.");

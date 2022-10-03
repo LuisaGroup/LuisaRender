@@ -134,7 +134,6 @@ public:
         return iter->second;
     }
 
-    // clang-format off
     template<typename T, typename... Args>
         requires std::is_base_of_v<Resource, T>
     [[nodiscard]] auto create(Args &&...args) noexcept -> T * {
@@ -143,12 +142,16 @@ public:
         _resources.emplace_back(std::move(resource));
         return p;
     }
-    // clang-format on
 
     template<typename T>
-    [[nodiscard]] std::pair<BufferView<T>, uint /* bindless id */> arena_buffer(size_t n) noexcept {
-        auto view = _general_buffer_arena->allocate<T>(
+    [[nodiscard]] BufferView<T> arena_buffer(size_t n) noexcept {
+        return _general_buffer_arena->allocate<T>(
             std::max(n, static_cast<size_t>(1u)));
+    }
+
+    template<typename T>
+    [[nodiscard]] std::pair<BufferView<T>, uint /* bindless id */> bindless_arena_buffer(size_t n) noexcept {
+        auto view = arena_buffer<T>(n);
         auto buffer_id = register_bindless(view);
         return std::make_pair(view, buffer_id);
     }

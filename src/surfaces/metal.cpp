@@ -189,12 +189,12 @@ luisa::unique_ptr<Surface::Instance> MetalSurface::_build(
     auto Kd = pipeline.build_texture(command_buffer, _kd);
     auto &&eta_k = _known_ior().at(_ior);
     auto eta_buffer_id = pipeline.register_named_id(luisa::format("{}.eta", _ior), [&] {
-        auto [eta_view, eta_id] = pipeline.arena_buffer<float>(eta_k.eta.size());
+        auto [eta_view, eta_id] = pipeline.bindless_arena_buffer<float>(eta_k.eta.size());
         command_buffer << eta_view.copy_from(eta_k.eta.data());
         return eta_id;
     });
     auto k_buffer_id = pipeline.register_named_id(luisa::format("{}.k", _ior), [&] {
-        auto [k_view, k_id] = pipeline.arena_buffer<float>(eta_k.k.size());
+        auto [k_view, k_id] = pipeline.bindless_arena_buffer<float>(eta_k.k.size());
         command_buffer << k_view.copy_from(eta_k.k.data());
         return k_id;
     });
@@ -290,7 +290,6 @@ luisa::unique_ptr<Surface::Closure> MetalInstance::closure(
 
 using NormalMapOpacityMetalSurface = NormalMapMixin<OpacitySurfaceMixin<
     MetalSurface, MetalInstance, MetalClosure>>;
-
 
 }// namespace luisa::render
 

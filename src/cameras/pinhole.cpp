@@ -14,13 +14,15 @@ struct PinholeCameraData {
     float3 front;
     float3 right;
     float3 up;
+    float2 resolution;
     float tan_half_fov;
 };
 
 }// namespace luisa::render
 
 LUISA_STRUCT(luisa::render::PinholeCameraData,
-             position, front, right, up, tan_half_fov){};
+             position, front, right, up,
+             resolution, tan_half_fov){};
 
 namespace luisa::render {
 
@@ -79,8 +81,9 @@ public:
               .front = front,
               .right = right,
               .up = up,
+              .resolution = make_float2(camera->film()->resolution()),
               .tan_half_fov = tan(fov * 0.5f)},
-          _device_data{ppl.create<Buffer<PinholeCameraData>>(1u)->view()} {
+          _device_data{ppl.arena_buffer<PinholeCameraData>(1u)} {
         command_buffer << _device_data.copy_from(&_host_data);
     }
 
@@ -92,9 +95,8 @@ private:
 
 Camera::Sample PinholeCameraInstance::_generate_ray(
     Sampler::Instance & /* sampler */, Expr<float2> pixel, Expr<float> /* time */) const noexcept {
-    auto resolution = make_float2(node()->film()->resolution());
     auto data = _device_data.read(0u);
-    auto p = (pixel * 2.0f - resolution) * (data.tan_half_fov / resolution.y);
+    auto p = (pixel * 2.0f - data.resolution) * (data.tan_half_fov / data.resolution.y);
     auto direction = normalize(p.x * data.right - p.y * data.up + data.front);
     return Camera::Sample{make_ray(data.position, direction), 1.0f};
 }

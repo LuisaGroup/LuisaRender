@@ -190,9 +190,9 @@ luisa::unique_ptr<Environment::Instance> Spherical::build(
             }
         }
         auto [alias_buffer_view, alias_buffer_id] =
-            pipeline.arena_buffer<AliasEntry>(aliases.size());
+            pipeline.bindless_arena_buffer<AliasEntry>(aliases.size());
         auto [pdf_buffer_view, pdf_buffer_id] =
-            pipeline.arena_buffer<float>(pdfs.size());
+            pipeline.bindless_arena_buffer<float>(pdfs.size());
         command_buffer << alias_buffer_view.copy_from(aliases.data())
                        << pdf_buffer_view.copy_from(pdfs.data())
                        << commit();
