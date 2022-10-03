@@ -192,7 +192,7 @@ Camera camera : ThinLens {
   look_at { -0.03, 0.025, 0.072 }
   aperture { 2.8 }
   focal_length { 70 }
-  spp { 256 }
+  spp { 64 }
   film : Color {
     resolution { 1920, 1080 }
     clamp { 128 }

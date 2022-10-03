@@ -60,7 +60,7 @@ public:
         auto rgb = clamp(rgb_in, 0.0f, 1.0f);
         static Callable decode = [](BindlessVar array, UInt base_index, Float3 rgb) noexcept {
             auto c = make_float3(0.0f, 0.0f, (rgb[0] - 0.5f) * rsqrt(rgb[0] * (1.0f - rgb[0])));
-            $if(rgb[0] != rgb[1] | rgb[1] != rgb[2]) {
+            $if(!(rgb[0] == rgb[1] & rgb[1] == rgb[2])) {
                 // Find maximum component and compute remapped component values
                 auto maxc = ite(
                     rgb[0] > rgb[1],
