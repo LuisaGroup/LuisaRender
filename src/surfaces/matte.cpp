@@ -120,7 +120,7 @@ luisa::unique_ptr<Surface::Closure> MatteInstance::closure(
     return luisa::make_unique<MatteClosure>(this, it, swl, time, Kd, sigma);
 }
 
-using NormalMapOpacityMatteSurface = NormalMapMixin<OpacitySurfaceMixin<
+using NormalMapOpacityMatteSurface = NormalMapWrapper<OpacitySurfaceWrapper<
     MatteSurface, MatteInstance, MatteClosure>>;
 
 }// namespace luisa::render

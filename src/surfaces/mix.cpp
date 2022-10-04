@@ -164,7 +164,7 @@ luisa::unique_ptr<Surface::Closure> MixSurfaceInstance::closure(
         this, it, swl, time, ratio, std::move(a), std::move(b));
 }
 
-using NormalMapMixSurface = NormalMapMixin<
+using NormalMapMixSurface = NormalMapWrapper<
     MixSurface, MixSurfaceInstance>;
 
 }// namespace luisa::render

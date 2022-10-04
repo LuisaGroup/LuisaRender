@@ -177,7 +177,7 @@ luisa::unique_ptr<Surface::Closure> MirrorInstance::closure(
     return luisa::make_unique<MirrorClosure>(this, it, swl, time, color, alpha);
 }
 
-using NormalMapOpacityMirrorSurface = NormalMapMixin<OpacitySurfaceMixin<
+using NormalMapOpacityMirrorSurface = NormalMapWrapper<OpacitySurfaceWrapper<
     MirrorSurface, MirrorInstance, MirrorClosure>>;
 
 }// namespace luisa::render

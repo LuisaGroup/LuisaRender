@@ -288,7 +288,7 @@ luisa::unique_ptr<Surface::Closure> MetalInstance::closure(
         eta, k, std::move(refl), alpha);
 }
 
-using NormalMapOpacityMetalSurface = NormalMapMixin<OpacitySurfaceMixin<
+using NormalMapOpacityMetalSurface = NormalMapWrapper<OpacitySurfaceWrapper<
     MetalSurface, MetalInstance, MetalClosure>>;
 
 }// namespace luisa::render

@@ -165,7 +165,7 @@ luisa::unique_ptr<Surface::Closure> SubstrateInstance::closure(
         this, it, swl, time, eta_i, Kd, Ks, alpha, Kd_ratio);
 }
 
-using NormalMapOpacitySubstrateSurface = NormalMapMixin<OpacitySurfaceMixin<
+using NormalMapOpacitySubstrateSurface = NormalMapWrapper<OpacitySurfaceWrapper<
     SubstrateSurface, SubstrateInstance, SubstrateClosure>>;
 
 }// namespace luisa::render

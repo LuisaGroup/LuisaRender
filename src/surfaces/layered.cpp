@@ -457,9 +457,9 @@ luisa::unique_ptr<Surface::Closure> LayeredSurfaceInstance::closure(
         samples, std::move(top), std::move(bottom));
 }
 
-using NormalMapOpacityLayeredSurface = NormalMapMixin<OpacitySurfaceMixin<
-    LayeredSurface, LayeredSurfaceInstance, LayeredSurfaceClosure>>;
+using TwoSidedNormalMapOpacityLayeredSurface = TwoSidedWrapper<NormalMapWrapper<OpacitySurfaceWrapper<
+    LayeredSurface, LayeredSurfaceInstance, LayeredSurfaceClosure>>>;
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::NormalMapOpacityLayeredSurface)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::TwoSidedNormalMapOpacityLayeredSurface)
