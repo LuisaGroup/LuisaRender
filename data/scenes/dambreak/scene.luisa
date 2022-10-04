@@ -110,8 +110,10 @@ render {
     emission : Image {
       // file { "/Users/mike/Downloads/abandoned_bakery_8k.exr" }
       // file { "/Users/mike/Downloads/clarens_night_01_4k.exr" }
-      file { "/Users/mike/ClionProjects/LuisaRender/data/scenes/camera/textures/kiara_1_dawn_8k.exr" }
+      // file { "/Users/mike/ClionProjects/LuisaRender/data/scenes/camera/textures/kiara_1_dawn_8k.exr" }
+      file { "../dining-room/textures/sky.exr" }
       semantic { "illuminant" }
+      scale { 0.01 }
     }
   }
   // environment : Directional {
