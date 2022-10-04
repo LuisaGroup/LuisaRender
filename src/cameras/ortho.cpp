@@ -5,6 +5,23 @@
 #include <rtx/ray.h>
 #include <base/camera.h>
 #include <base/film.h>
+#include <base/pipeline.h>
+
+namespace luisa::render {
+
+struct OrthoCameraData {
+    float3 position;
+    float3 front;
+    float3 left;
+    float3 up;
+    float2 resolution;
+    float scale;
+};
+
+}// namespace luisa::render
+
+LUISA_STRUCT(luisa::render::OrthoCameraData,
+             position, front, left, up, resolution, scale){};
 
 namespace luisa::render {
 
@@ -12,19 +29,6 @@ using namespace luisa::compute;
 
 class OrthoCamera;
 class OrthoCameraInstance;
-
-class OrthoCameraInstance final : public Camera::Instance {
-
-public:
-    explicit OrthoCameraInstance(
-        Pipeline &ppl, CommandBuffer &command_buffer,
-        const OrthoCamera *camera) noexcept;
-
-private:
-    [[nodiscard]] Camera::Sample _generate_ray(
-        Sampler::Instance &sampler,
-        Expr<float2> pixel, Expr<float> time) const noexcept override;
-};
 
 class OrthoCamera final : public Camera {
 
@@ -48,10 +52,7 @@ public:
     }
 
     [[nodiscard]] luisa::unique_ptr<Camera::Instance> build(
-        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
-        return luisa::make_unique<OrthoCameraInstance>(
-            pipeline, command_buffer, this);
-    }
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] auto position() const noexcept { return _position; }
@@ -61,21 +62,51 @@ public:
     [[nodiscard]] auto zoom() const noexcept { return _zoom; }
 };
 
+class OrthoCameraInstance final : public Camera::Instance {
+
+private:
+    OrthoCameraData _host_data;
+    BufferView<OrthoCameraData> _device_data;
+
+public:
+    explicit OrthoCameraInstance(
+        Pipeline &ppl, CommandBuffer &command_buffer,
+        const OrthoCamera *camera) noexcept;
+
+private:
+    [[nodiscard]] Camera::Sample _generate_ray(
+        Sampler::Instance &sampler,
+        Expr<float2> pixel, Expr<float> time) const noexcept override;
+};
+
 OrthoCameraInstance::OrthoCameraInstance(
     Pipeline &ppl, CommandBuffer &command_buffer, const OrthoCamera *camera) noexcept
-    : Camera::Instance{ppl, command_buffer, camera} {}
+    : Camera::Instance{ppl, command_buffer, camera},
+      _host_data{.position = camera->position(),
+                 .front = camera->front(),
+                 .left = camera->left(),
+                 .up = camera->up(),
+                 .resolution = make_float2(camera->film()->resolution()),
+                 .scale = std::pow(2.f, camera->zoom())},
+      _device_data{ppl.arena_buffer<OrthoCameraData>(1u)} {
+    command_buffer << _device_data.copy_from(&_host_data);
+}
 
 Camera::Sample OrthoCameraInstance::_generate_ray(
     Sampler::Instance & /* sampler */, Expr<float2> pixel, Expr<float> /* time */) const noexcept {
-    auto resolution = make_float2(node()->film()->resolution());
-    auto position = node<OrthoCamera>()->position();
-    auto scale = std::pow(2.f, -node<OrthoCamera>()->zoom());
-    auto p = (resolution - pixel * 2.0f) / resolution.y * scale;
-    auto u = node<OrthoCamera>()->left();
-    auto v = node<OrthoCamera>()->up();
-    auto w = node<OrthoCamera>()->front();
-    auto origin = p.x * u + p.y * v + position;
+    auto data = _device_data.read(0u);
+    auto p = (data.resolution - pixel * 2.0f) / data.resolution.y * data.scale;
+    auto u = data.left;
+    auto v = data.up;
+    auto w = data.front;
+    auto origin = p.x * u + p.y * v + data.position;
     return Camera::Sample{make_ray(origin, w), 1.0f};
+}
+
+luisa::unique_ptr<Camera::Instance> OrthoCamera::build(
+    Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
+    return luisa::make_unique<OrthoCameraInstance>(
+        pipeline, command_buffer, this);
 }
 
 }// namespace luisa::render

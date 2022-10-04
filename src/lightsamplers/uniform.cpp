@@ -32,7 +32,7 @@ public:
     UniformLightSamplerInstance(const UniformLightSampler *sampler, Pipeline &pipeline, CommandBuffer &command_buffer) noexcept
         : LightSampler::Instance{pipeline, sampler} {
         if (!pipeline.lights().empty()) {
-            auto [view, buffer_id] = pipeline.arena_buffer<Light::Handle>(pipeline.lights().size());
+            auto [view, buffer_id] = pipeline.bindless_arena_buffer<Light::Handle>(pipeline.lights().size());
             _light_buffer_id = buffer_id;
             command_buffer << view.copy_from(pipeline.geometry()->light_instances().data())
                            << compute::commit();

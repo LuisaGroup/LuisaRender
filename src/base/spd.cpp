@@ -39,7 +39,7 @@ SPD SPD::create_cie_x(Pipeline &pipeline, CommandBuffer &cb) noexcept {
         "__internal_spd_cie_x", [&pipeline, &cb] {
             auto s = downsample_densely_sampled_spectrum(
                 spd_lut_interval, cie_x_samples.data());
-            auto [view, index] = pipeline.arena_buffer<float>(s.size());
+            auto [view, index] = pipeline.bindless_arena_buffer<float>(s.size());
             cb << view.copy_from(s.data()) << compute::commit();
             return index;
         });
@@ -51,7 +51,7 @@ SPD SPD::create_cie_y(Pipeline &pipeline, CommandBuffer &cb) noexcept {
         "__internal_spd_cie_y", [&pipeline, &cb] {
             auto s = downsample_densely_sampled_spectrum(
                 spd_lut_interval, cie_y_samples.data());
-            auto [view, index] = pipeline.arena_buffer<float>(s.size());
+            auto [view, index] = pipeline.bindless_arena_buffer<float>(s.size());
             cb << view.copy_from(s.data()) << compute::commit();
             return index;
         });
@@ -63,7 +63,7 @@ SPD SPD::create_cie_z(Pipeline &pipeline, CommandBuffer &cb) noexcept {
         "__internal_spd_cie_z", [&pipeline, &cb] {
             auto s = downsample_densely_sampled_spectrum(
                 spd_lut_interval, cie_z_samples.data());
-            auto [view, index] = pipeline.arena_buffer<float>(s.size());
+            auto [view, index] = pipeline.bindless_arena_buffer<float>(s.size());
             cb << view.copy_from(s.data()) << compute::commit();
             return index;
         });
@@ -75,7 +75,7 @@ SPD SPD::create_cie_d65(Pipeline &pipeline, CommandBuffer &cb) noexcept {
         "__internal_spd_cie_d65", [&pipeline, &cb] {
             auto s = downsample_densely_sampled_spectrum(
                 spd_lut_interval, cie_d65_samples.data());
-            auto [view, index] = pipeline.arena_buffer<float>(s.size());
+            auto [view, index] = pipeline.bindless_arena_buffer<float>(s.size());
             cb << view.copy_from(s.data()) << compute::commit();
             return index;
         });

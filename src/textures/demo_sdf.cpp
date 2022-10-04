@@ -168,15 +168,7 @@ public:
         auto uv = it.uv();
         auto seed = xxhash32(as<uint3>(it.p()));
         auto color = render(seed, uv);
-        switch (node()->semantic()) {
-            case Texture::Semantic::ALBEDO:
-                return pipeline().spectrum()->encode_srgb_albedo(color);
-            case Texture::Semantic::ILLUMINANT:
-                return pipeline().spectrum()->encode_srgb_illuminant(color);
-            case Texture::Semantic::GENERIC:
-                return make_float4(color, 1.0f);
-        }
-        LUISA_ERROR_WITH_LOCATION("Unreachable.");
+        return make_float4(color, 1.0f);
     }
 
     void backward(const Interaction &, const SampledWavelengths &swl,

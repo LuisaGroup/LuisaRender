@@ -71,6 +71,8 @@ public:
             const SampledWavelengths &swl, Expr<float4> v, const SampledSpectrum &dSpec) const noexcept;
         [[nodiscard]] virtual Float4 backward_decode_illuminant(
             const SampledWavelengths &swl, Expr<float4> v, const SampledSpectrum &dSpec) const noexcept;
+        [[nodiscard]] virtual Float3 backward_encode_srgb_albedo(Expr<float4> dEnc) const noexcept;
+        [[nodiscard]] virtual Float3 backward_encode_srgb_illuminant(Expr<float4> dEnc) const noexcept;
         [[nodiscard]] virtual SampledSpectrum backward_cie_y(
             const SampledWavelengths &swl, const SampledSpectrum &sp, Expr<float> dY) const noexcept;
         [[nodiscard]] virtual SampledSpectrum backward_cie_xyz(

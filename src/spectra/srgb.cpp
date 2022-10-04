@@ -106,6 +106,12 @@ struct SRGBSpectrumInstance final : public Spectrum::Instance {
     [[nodiscard]] Float4 encode_srgb_illuminant(Expr<float3> rgb) const noexcept override {
         return make_float4(max(rgb, 0.f), 1.f);
     }
+    [[nodiscard]] Float3 backward_encode_srgb_albedo(Expr<float4> dEnc) const noexcept override {
+        return dEnc.xyz();
+    }
+    [[nodiscard]] Float3 backward_encode_srgb_illuminant(Expr<float4> dEnc) const noexcept override {
+        return dEnc.xyz();
+    }
 };
 
 luisa::unique_ptr<Spectrum::Instance> SRGBSpectrum::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
