@@ -609,39 +609,43 @@ public:
 
 private:
     [[nodiscard]] Surface::Evaluation _evaluate_local(Float3 wo_local, Float3 wi_local,
-                                                      TransportMode mode) const noexcept {
+                                                      Bool geom_same_sided, TransportMode mode) const noexcept {
         SampledSpectrum f{_swl.dimension()};
         auto pdf = def(0.f);
         // TODO: performance test
         $if(same_hemisphere(wo_local, wi_local)) {// reflection
-            f = _specular->evaluate(wo_local, wi_local, mode) +
-                _diffuse->evaluate(wo_local, wi_local, mode) +
-                _fake_ss->evaluate(wo_local, wi_local, mode) +
-                _retro->evaluate(wo_local, wi_local, mode) +
-                _sheen->evaluate(wo_local, wi_local, mode);
-            pdf = _sampling_weights[sampling_technique_specular] *
-                      _specular->pdf(wo_local, wi_local, mode) +
-                  _sampling_weights[sampling_technique_diffuse] *
-                      _diffuse->pdf(wo_local, wi_local, mode);
-            $if((_lobes & refl_clearcoat) != 0u) {
-                f += _clearcoat->evaluate(wo_local, wi_local);
-                pdf += _sampling_weights[sampling_technique_clearcoat] *
-                       _clearcoat->pdf(wo_local, wi_local);
+            $if(geom_same_sided) {
+                f = _specular->evaluate(wo_local, wi_local, mode) +
+                    _diffuse->evaluate(wo_local, wi_local, mode) +
+                    _fake_ss->evaluate(wo_local, wi_local, mode) +
+                    _retro->evaluate(wo_local, wi_local, mode) +
+                    _sheen->evaluate(wo_local, wi_local, mode);
+                pdf = _sampling_weights[sampling_technique_specular] *
+                          _specular->pdf(wo_local, wi_local, mode) +
+                      _sampling_weights[sampling_technique_diffuse] *
+                          _diffuse->pdf(wo_local, wi_local, mode);
+                $if((_lobes & refl_clearcoat) != 0u) {
+                    f += _clearcoat->evaluate(wo_local, wi_local);
+                    pdf += _sampling_weights[sampling_technique_clearcoat] *
+                           _clearcoat->pdf(wo_local, wi_local);
+                };
             };
         }
         $else {// transmission
-            $if((_lobes & trans_specular) != 0u) {
-                f = _spec_trans->evaluate(wo_local, wi_local, mode);
-                pdf = _sampling_weights[sampling_technique_specular_trans] *
-                      _spec_trans->pdf(wo_local, wi_local, mode);
-            }
-            $else {
-                f = _diff_trans->evaluate(wo_local, wi_local, mode) +
-                    _thin_spec_trans->evaluate(wo_local, wi_local, mode);
-                pdf = _sampling_weights[sampling_technique_thin_diffuse_trans] *
-                          _diff_trans->pdf(wo_local, wi_local, mode) +
-                      _sampling_weights[sampling_technique_thin_specular_trans] *
-                          _thin_spec_trans->pdf(wo_local, wi_local, mode);
+            $if(!geom_same_sided) {
+                $if((_lobes & trans_specular) != 0u) {
+                    f = _spec_trans->evaluate(wo_local, wi_local, mode);
+                    pdf = _sampling_weights[sampling_technique_specular_trans] *
+                          _spec_trans->pdf(wo_local, wi_local, mode);
+                }
+                $else {
+                    f = _diff_trans->evaluate(wo_local, wi_local, mode) +
+                        _thin_spec_trans->evaluate(wo_local, wi_local, mode);
+                    pdf = _sampling_weights[sampling_technique_thin_diffuse_trans] *
+                              _diff_trans->pdf(wo_local, wi_local, mode) +
+                          _sampling_weights[sampling_technique_thin_specular_trans] *
+                              _thin_spec_trans->pdf(wo_local, wi_local, mode);
+                };
             };
         };
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
@@ -650,7 +654,7 @@ private:
                                                 TransportMode mode) const noexcept override {
         auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = _it.shading().world_to_local(wi);
-        return _evaluate_local(wo_local, wi_local, mode);
+        return _evaluate_local(wo_local, wi_local, dot(_it.ng(), wo) * dot(_it.ng(), wi) > 0.f, mode);
     }
     [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float> u_lobe,
                                           Expr<float2> u, TransportMode mode) const noexcept override {
@@ -689,8 +693,8 @@ private:
             };
             $default { unreachable(); };
         };
-        auto eval = _evaluate_local(wo_local, wi_local, mode);
         auto wi = _it.shading().local_to_world(wi_local);
+        auto eval = _evaluate_local(wo_local, wi_local, dot(_it.ng(), wo) * dot(_it.ng(), wi) > 0.f, mode);
         return {.eval = eval, .wi = wi, .event = event};
     }
     void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df,

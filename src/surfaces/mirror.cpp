@@ -117,7 +117,9 @@ private:
         auto wi_local = _it.shading().world_to_local(wi);
         auto f = _refl->evaluate(wo_local, wi_local, mode);
         auto pdf = _refl->pdf(wo_local, wi_local, mode);
-        return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
+        auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f, 1.f, 0.f);
+        return {.f = f * abs_cos_theta(wi_local) * same_sided,
+                .pdf = pdf * same_sided};
     }
     [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float>, Expr<float2> u,
                                           TransportMode mode) const noexcept override {
@@ -125,8 +127,11 @@ private:
         auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = def(make_float3(0.f, 0.f, 1.f));
         auto f = _refl->sample(wo_local, &wi_local, u, &pdf, mode);
-        return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf},
-                .wi = _it.shading().local_to_world(wi_local),
+        auto wi = _it.shading().local_to_world(wi_local);
+        auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f, 1.f, 0.f);
+        return {.eval = {.f = f * abs_cos_theta(wi_local) * same_sided,
+                         .pdf = pdf * same_sided},
+                .wi = wi,
                 .event = Surface::event_reflect};
     }
     void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df_in,

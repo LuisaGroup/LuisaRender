@@ -98,7 +98,8 @@ private:
         auto wi_local = _it.shading().world_to_local(wi);
         auto f = _blend->evaluate(wo_local, wi_local, mode);
         auto pdf = _blend->pdf(wo_local, wi_local, mode);
-        return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
+        auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f, 1.f, 0.f);
+        return {.f = f * abs_cos_theta(wi_local) * same_sided, .pdf = pdf * same_sided};
     }
 
     [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u,
@@ -109,7 +110,8 @@ private:
         // TODO: pass u_lobe to _blend->sample()
         auto f = _blend->sample(wo_local, &wi_local, u, &pdf, mode);
         auto wi = _it.shading().local_to_world(wi_local);
-        return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf},
+        auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f, 1.f, 0.f);
+        return {.eval = {.f = f * abs_cos_theta(wi_local) * same_sided, .pdf = pdf * same_sided},
                 .wi = wi,
                 .event = Surface::event_reflect};
     }
