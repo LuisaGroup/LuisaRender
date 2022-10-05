@@ -260,12 +260,12 @@ public:
         [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
             const Interaction &it, const SampledWavelengths &swl,
             Expr<float> eta_i, Expr<float> time) const noexcept override {
-            if (_two_sided) {
-                auto it_copy = it;
-                auto frame = Frame::make(-it.shading().n(), it.shading().u());
-                it_copy.set_shading(frame);
-                return BaseInstance::closure(it_copy, swl, eta_i, time);
-            }
+            //            if (_two_sided) {// FIXME: This is wrong...
+            //                auto it_copy = it;
+            //                auto frame = Frame::make(-it.shading().n(), it.shading().u());
+            //                it_copy.set_shading(frame);
+            //                return BaseInstance::closure(it_copy, swl, eta_i, time);
+            //            }
             return BaseInstance::closure(it, swl, eta_i, time);
         }
     };

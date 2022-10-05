@@ -178,21 +178,72 @@ int main(int argc, char *argv[]) {
         if (specular_map) { LUISA_INFO("Specular: {}", *specular_map); }
         if (shininess_map) { LUISA_INFO("Shininess: {}", *shininess_map); }
 
-        auto rough = 1.f;
-        m->Get(AI_MATKEY_ROUGHNESS_FACTOR, rough);
-        scene_materials[mat_name] = {
-            {"type", "Surface"},
-            {"impl", "Substrate"},
-            {"prop",
-             {{"Kd", color_map},
-              {"Ks",
-               {{"impl", "Constant"},
+        // roughness
+        aiString rough_tex;
+        aiString metallic_tex;
+        luisa::string roughness_tex_name;
+        luisa::string metallic_tex_name;
+        if (m->GetTexture(AI_MATKEY_ROUGHNESS_TEXTURE, &rough_tex) == AI_SUCCESS) {
+            LUISA_INFO("Roughness texture: {}", rough_tex.C_Str());
+            roughness_tex_name = luisa::format("Texture:{}", rough_tex.C_Str());
+            scene_materials[roughness_tex_name] = {
+                {"type", "Texture"},
+                {"impl", "Image"},
+                {"prop", {{"file", rough_tex.C_Str()}, {"encoding", "linear"}}}};
+        }
+        if (m->GetTexture(AI_MATKEY_METALLIC_TEXTURE, &metallic_tex) == AI_SUCCESS) {
+            LUISA_INFO("Metallic texture: {}", metallic_tex.C_Str());
+            metallic_tex_name = luisa::format("Texture:{}", rough_tex.C_Str());
+            scene_materials[metallic_tex_name] = {
+                {"type", "Texture"},
+                {"impl", "Image"},
+                {"prop", {{"file", metallic_tex.C_Str()}, {"encoding", "linear"}}}};
+        }
+        if (rough_tex.length != 0u && metallic_tex == rough_tex) {// assume gltf
+            auto swizzle_rough_name = roughness_tex_name + ":Roughness";
+            auto swizzle_metal_name = metallic_tex_name + ":Metallic";
+            scene_materials[swizzle_rough_name] = {
+                {"type", "Texture"},
+                {"impl", "Swizzle"},
                 {"prop",
-                 {{"v", {0.04f, 0.04f, 0.04f}},
-                  {"semantic", "albedo"}}}}},
-              {"roughness",
-               {{"impl", "Constant"},
-                {"prop", {{"v", {rough}}}}}}}}};
+                 {{"base", luisa::format("@{}", roughness_tex_name)},
+                  {"swizzle", "y"}}}};
+            scene_materials[swizzle_metal_name] = {
+                {"type", "Texture"},
+                {"impl", "Swizzle"},
+                {"prop",
+                 {{"base", luisa::format("@{}", metallic_tex_name)},
+                  {"swizzle", "x"}}}};
+            roughness_tex_name = swizzle_rough_name;
+            metallic_tex_name = swizzle_metal_name;
+        }
+        auto has_roughness = !roughness_tex_name.empty();
+        auto has_metallic = !metallic_tex_name.empty();
+        if (has_roughness || has_metallic) {
+            if (has_metallic) {
+                scene_materials[mat_name] = {
+                    {"type", "Surface"},
+                    {"impl", "Disney"},
+                    {"prop",
+                     {{"color", color_map},
+                      {"metallic", luisa::format("@{}", metallic_tex_name)}}}};
+            } else {
+                scene_materials[mat_name] = {
+                    {"type", "Surface"},
+                    {"impl", "Substrate"},
+                    {"prop",
+                     {{"Kd", color_map}}}};
+            }
+            if (has_roughness) {
+                scene_materials[mat_name]["prop"]["roughness"] = luisa::format("@{}", roughness_tex_name);
+            }
+        } else {
+            scene_materials[mat_name] = {
+                {"type", "Surface"},
+                {"impl", "Matte"},
+                {"prop",
+                 {{"Kd", color_map}}}};
+        }
         material_names[i] = mat_name;
         if (auto normal_map = parse_texture(AI_MATKEY_TEXTURE_NORMALS(0), "generic")) {
             scene_materials[normal_map->substr(1)]["prop"]["encoding"] = "linear";
@@ -265,7 +316,7 @@ int main(int argc, char *argv[]) {
             {"impl", "Mesh"},
             {"prop",
              {{"file", relative(file_path, folder).string()},
-              {"flip_uv", true},
+              {"flip_uv", false},
               {"surface", mat_name}}}};
         if (auto iter = light_names.find(mat_id); iter != light_names.end()) {
             scene_geometry[mesh_name]["prop"]["light"] = luisa::format("@{}", iter->second);
