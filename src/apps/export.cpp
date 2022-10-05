@@ -196,14 +196,7 @@ int main(int argc, char *argv[]) {
         material_names[i] = mat_name;
         if (auto normal_map = parse_texture(AI_MATKEY_TEXTURE_NORMALS(0), "generic")) {
             scene_materials[normal_map->substr(1)]["prop"]["encoding"] = "linear";
-            auto normal_mat_name = luisa::format("{}:NormalMapped", mat_name);
-            scene_materials[normal_mat_name] = {
-                {"type", "Surface"},
-                {"impl", "NormalMap"},
-                {"prop",
-                 {{"map", *normal_map},
-                  {"base", luisa::format("@{}", mat_name)}}}};
-            material_names[i] = normal_mat_name;
+            scene_materials[mat_name]["prop"]["normal_map"] = luisa::json{*normal_map};
         }
         // light
         if (auto emission = parse_texture(AI_MATKEY_TEXTURE_EMISSIVE(0), "illuminant")
