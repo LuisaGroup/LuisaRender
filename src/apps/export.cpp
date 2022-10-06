@@ -226,6 +226,7 @@ int main(int argc, char *argv[]) {
                     {"impl", "Disney"},
                     {"prop",
                      {{"color", color_map},
+                      {"two_sided", true},
                       {"metallic", luisa::format("@{}", metallic_tex_name)}}}};
             } else {
                 scene_materials[mat_name] = {

@@ -63,6 +63,7 @@ public:
                       attrib.uv, attrib.ps, attrib.ns, attrib.tangent, back_facing} {}
 
     [[nodiscard]] auto p() const noexcept { return _pg; }
+    [[nodiscard]] auto p_shading() const noexcept { return _ps; }
     [[nodiscard]] auto ng() const noexcept { return _ng; }
     [[nodiscard]] auto uv() const noexcept { return _uv; }
     [[nodiscard]] auto instance_id() const noexcept { return _inst_id; }
