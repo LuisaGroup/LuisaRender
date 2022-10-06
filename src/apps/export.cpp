@@ -267,6 +267,8 @@ int main(int argc, char *argv[]) {
     }
 
     // meshes
+    size_t total_vertices = 0u;
+    size_t total_faces = 0u;
     std::vector<luisa::string> meshes;
     std::filesystem::create_directories(folder / "lr_exported_meshes");
     for (auto i = 0u; i < scene->mNumMeshes; i++) {
@@ -275,6 +277,7 @@ int main(int argc, char *argv[]) {
         LUISA_INFO("Converting mesh '{}'...", file_name);
         auto file_path = folder / "lr_exported_meshes" / file_name;
         std::ofstream file{file_path};
+        total_vertices += m->mNumVertices;
         for (auto iv = 0u; iv < m->mNumVertices; iv++) {
             auto v = m->mVertices[iv];
             file << "v " << v.x << ' ' << v.y << ' ' << v.z << '\n';
@@ -291,6 +294,7 @@ int main(int argc, char *argv[]) {
                 file << "vt " << v.x << ' ' << v.y << '\n';
             }
         }
+        total_faces += m->mNumFaces;
         for (auto f = 0u; f < m->mNumFaces; f++) {
             file << "f";
             for (auto j = 0u; j < 3u; j++) {
@@ -384,6 +388,8 @@ int main(int argc, char *argv[]) {
         {"impl", "Group"},
         {"prop", {{"shapes", std::move(groups)}}}};
 
+    LUISA_INFO("Total vertices: {}", total_vertices);
+    LUISA_INFO("Total faces: {}", total_faces);
     LUISA_INFO("Scene AABB: ({}, {}, {}) -> ({}, {}, {}).",
                aabb.mMin.x, aabb.mMin.y, aabb.mMin.z,
                aabb.mMax.x, aabb.mMax.y, aabb.mMax.z);

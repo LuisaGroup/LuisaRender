@@ -30,6 +30,7 @@ private:
     uint _blue_noise_texture_id{0u};
     uint _sample_table_buffer_id{0u};
     uint _spp{0u};
+    uint _w{0u};
     uint _pixel_tile_size{0u};
     Buffer<float2> _pixel_samples;
     Buffer<uint4> _state_buffer;
@@ -38,49 +39,46 @@ private:
     luisa::optional<UInt> _dimension;
 
 private:
-    [[nodiscard]] auto _blue_noise(Expr<uint> tex_index, Expr<uint2> p) const noexcept {
+    [[nodiscard]] static auto _blue_noise(Expr<uint> tex_index, Expr<uint2> p,
+                                          Expr<BindlessArray> array, Expr<uint> bn_texture_id) noexcept {
         auto uvw = make_uint3(p.yx() % BlueNoiseResolution,
                               tex_index % NumBlueNoiseTextures);
-        return pipeline().tex3d(_blue_noise_texture_id).read(uvw).x;
+        return array.tex3d(bn_texture_id).read(uvw).x;
     }
 
-    [[nodiscard]] auto _pmj02bn_sample(Expr<uint> set_id, Expr<uint> sample_id) const noexcept {
+    [[nodiscard]] static auto _pmj02bn_sample(Expr<uint> set_id, Expr<uint> sample_id, Expr<BindlessArray> array, Expr<uint> buffer_id) noexcept {
         auto set_index = set_id % nPMJ02bnSets;
         auto i = set_index * nPMJ02bnSamples + sample_id;
-        auto sample = pipeline().buffer<uint2>(_sample_table_buffer_id).read(i);
+        auto sample = array.buffer<uint2>(buffer_id).read(i);
         return make_float2(sample) * 0x1p-32f;
     }
 
-    [[nodiscard]] static auto _permutation_element(Expr<uint> i_in, uint l, Expr<uint> p) noexcept {
-        auto w = l - 1u;
-        w |= w >> 1u;
-        w |= w >> 2u;
-        w |= w >> 4u;
-        w |= w >> 8u;
-        w |= w >> 16u;
-        auto i = def(i_in);
-        $loop {
-            i ^= p;
-            i *= 0xe170893du;
-            i ^= p >> 16u;
-            i ^= (i & w) >> 4u;
-            i ^= p >> 8u;
-            i *= 0x0929eb3fu;
-            i ^= p >> 23u;
-            i ^= (i & w) >> 1u;
-            i *= 1 | p >> 27u;
-            i *= 0x6935fa69u;
-            i ^= (i & w) >> 11u;
-            i *= 0x74dcb303u;
-            i ^= (i & w) >> 2u;
-            i *= 0x9e501cc3u;
-            i ^= (i & w) >> 2u;
-            i *= 0xc860a3dfu;
-            i &= w;
-            i ^= i >> 5u;
-            $if(i < l) { $break; };
+    [[nodiscard]] static auto _permutation_element(Expr<uint> i, Expr<uint> l, Expr<uint> w, Expr<uint> p) noexcept {
+        static Callable impl = [](UInt i, UInt w, UInt l, UInt p) noexcept {
+            $loop {
+                i ^= p;
+                i *= 0xe170893du;
+                i ^= p >> 16u;
+                i ^= (i & w) >> 4u;
+                i ^= p >> 8u;
+                i *= 0x0929eb3fu;
+                i ^= p >> 23u;
+                i ^= (i & w) >> 1u;
+                i *= 1 | p >> 27u;
+                i *= 0x6935fa69u;
+                i ^= (i & w) >> 11u;
+                i *= 0x74dcb303u;
+                i ^= (i & w) >> 2u;
+                i *= 0x9e501cc3u;
+                i ^= (i & w) >> 2u;
+                i *= 0xc860a3dfu;
+                i &= w;
+                i ^= i >> 5u;
+                $if(i < l) { $break; };
+            };
+            return (i + p) % l;
         };
-        return (i + p) % l;
+        return impl(i, w, l, p);
     }
 
 public:
@@ -116,6 +114,12 @@ public:
                 "with power-of-4 samples per pixel.");
         }
         _spp = spp;
+        _w = _spp - 1u;
+        _w |= _w >> 1u;
+        _w |= _w >> 2u;
+        _w |= _w >> 4u;
+        _w |= _w >> 8u;
+        _w |= _w >> 16u;
         _pixel_tile_size = 1u << (log4(nPMJ02bnSamples) - log4(next_pow4(spp)));
         auto pixel_sample_count = _pixel_tile_size * _pixel_tile_size * spp;
         if (_pixel_samples.size() < pixel_sample_count) {
@@ -173,25 +177,37 @@ public:
         _dimension.emplace(state.w);
     }
     [[nodiscard]] Float generate_1d() noexcept override {
-        auto hash = xxhash32(make_uint4(*_pixel, *_dimension, node()->seed()));
-        auto index = _permutation_element(*_sample_index, _spp, hash);
-        auto delta = _blue_noise(*_dimension, *_pixel);
+        static Callable impl = [](UInt2 pixel, UInt dimension, UInt seed, UInt sample_index,
+                                  UInt spp, UInt w, BindlessVar array, UInt bn_tex_id) noexcept {
+            auto hash = xxhash32(make_uint4(pixel, dimension, seed));
+            auto index = _permutation_element(sample_index, spp, w, hash);
+            auto delta = _blue_noise(dimension, pixel, array, bn_tex_id);
+            auto u = (cast<float>(index) + delta) * cast<float>(1.f / spp);
+            return clamp(u, 0.f, one_minus_epsilon);
+        };
+        auto u = impl(*_pixel, *_dimension, node()->seed(), *_sample_index,
+                      _spp, _w, pipeline().bindless_array(), _blue_noise_texture_id);
         *_dimension += 1u;
-        auto u = (cast<float>(index) + delta) * static_cast<float>(1.0 / _spp);
-        return compute::min(u, one_minus_epsilon);
+        return u;
     }
     [[nodiscard]] Float2 generate_2d() noexcept override {
-        auto index = *_sample_index;
-        auto pmj_instance = *_dimension / 2u;
-        $if(pmj_instance >= nPMJ02bnSets) {
-            auto hash = xxhash32(make_uint4(*_pixel, *_dimension, node()->seed()));
-            index = _permutation_element(*_sample_index, _spp, hash);
+        static Callable impl = [](UInt2 pixel, UInt dimension, UInt seed, UInt sample_index,
+                                  UInt spp, UInt w, BindlessVar array, UInt bn_tex_id, UInt table) noexcept {
+            auto index = sample_index;
+            auto pmj_instance = dimension / 2u;
+            $if(pmj_instance >= nPMJ02bnSets) {
+                auto hash = xxhash32(make_uint4(pixel, dimension, seed));
+                index = _permutation_element(sample_index, spp, w, hash);
+            };
+            auto u = _pmj02bn_sample(pmj_instance, index, array, table) +
+                     make_float2(_blue_noise(dimension, pixel, array, bn_tex_id),
+                                 _blue_noise(dimension + 1u, pixel, array, bn_tex_id));
+            return fract(u);
         };
-        auto u = _pmj02bn_sample(pmj_instance, index) +
-                 make_float2(_blue_noise(*_dimension, *_pixel),
-                             _blue_noise(*_dimension + 1u, *_pixel));
+        auto u = impl(*_pixel, *_dimension, node()->seed(), *_sample_index, _spp, _w,
+                      pipeline().bindless_array(), _blue_noise_texture_id, _sample_table_buffer_id);
         *_dimension += 2u;
-        return fract(u);
+        return u;
     }
     [[nodiscard]] Float2 generate_pixel_2d() noexcept override {
         auto p = *_pixel % _pixel_tile_size;
