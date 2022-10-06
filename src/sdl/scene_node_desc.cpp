@@ -51,17 +51,16 @@ const SceneNodeDesc *SceneNodeDesc::shared_default(SceneNodeTag tag, luisa::stri
     for (auto &c : impl) { c = static_cast<char>(tolower(c)); }
     auto hash = hash64(impl, hash64(to_underlying(tag), seed));
     std::scoped_lock lock{mutex};
-    auto [iter, not_defined] = descriptions.try_emplace(hash, nullptr);
-    if (not_defined) {
-        auto identifier = luisa::format(
-            "__shared_default_{}_{}",
-            scene_node_tag_description(tag), impl);
-        for (auto &c : identifier) { c = static_cast<char>(tolower(c)); }
-        iter->second = luisa::make_unique<SceneNodeDesc>(
-            std::move(identifier), tag);
-        iter->second->define(tag, impl, {});
-    }
-    return iter->second.get();
+    if (auto iter = descriptions.find(hash);
+        iter != descriptions.cend()) { return iter->second.get(); }
+    auto identifier = luisa::format(
+        "__shared_default_{}_{}",
+        scene_node_tag_description(tag), impl);
+    for (auto &c : identifier) { c = static_cast<char>(tolower(c)); }
+    auto desc = luisa::make_unique<SceneNodeDesc>(
+        std::move(identifier), tag);
+    desc->define(tag, impl, {});
+    return descriptions.emplace(hash, std::move(desc)).first->second.get();
 }
 
 }// namespace luisa::render

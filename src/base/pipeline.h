@@ -129,9 +129,12 @@ public:
 
     template<typename Create>
     [[nodiscard]] uint register_named_id(luisa::string_view identifier, Create &&create_id) noexcept {
-        auto [iter, success] = _named_ids.try_emplace(identifier, 0u);
-        if (success) { iter->second = std::invoke(std::forward<Create>(create_id)); }
-        return iter->second;
+        if (auto it = _named_ids.find(identifier); it != _named_ids.end()) {
+            return it->second;
+        }
+        auto new_id = std::invoke(std::forward<Create>(create_id));
+        _named_ids.emplace(identifier, new_id);
+        return new_id;
     }
 
     template<typename T, typename... Args>

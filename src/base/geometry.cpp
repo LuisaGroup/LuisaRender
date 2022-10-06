@@ -39,9 +39,10 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
                 }
                 auto hash = luisa::detail::murmur2_hash64(vertices.data(), vertices.size_bytes(), Hash64::default_seed);
                 hash = luisa::detail::murmur2_hash64(triangles.data(), triangles.size_bytes(), hash);
-                auto [cache_iter, non_existent] = _mesh_cache.try_emplace(hash, MeshGeometry{});
-                if (!non_existent) { return cache_iter->second; }
-
+                if (auto mesh_iter = _mesh_cache.find(hash);
+                    mesh_iter != _mesh_cache.end()) {
+                    return mesh_iter->second;
+                }
                 // create mesh
                 auto vertex_buffer = _pipeline.create<Buffer<Shape::Vertex>>(vertices.size());
                 auto triangle_buffer = _pipeline.create<Buffer<Triangle>>(triangles.size());
@@ -69,7 +70,9 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
                 command_buffer << alias_table_buffer_view.copy_from(alias_table.data())
                                << pdf_buffer_view.copy_from(pdf.data())
                                << compute::commit();
-                return cache_iter->second = {mesh, vertex_buffer_id};
+                auto geom = MeshGeometry{mesh, vertex_buffer_id};
+                _mesh_cache.emplace(hash, geom);
+                return geom;
             }();
             // assign mesh data
             MeshData mesh{};

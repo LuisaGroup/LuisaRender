@@ -217,8 +217,12 @@ int main(int argc, char *argv[]) {
             roughness_tex_name = swizzle_rough_name;
             metallic_tex_name = swizzle_metal_name;
         }
-        auto has_roughness = !roughness_tex_name.empty();
-        auto has_metallic = !metallic_tex_name.empty();
+        auto metallic_factor = -1.f;
+        auto rough_factor = -1.f;
+        m->Get(AI_MATKEY_METALLIC_FACTOR, metallic_factor);
+        m->Get(AI_MATKEY_ROUGHNESS_FACTOR, rough_factor);
+        auto has_roughness = !roughness_tex_name.empty() && rough_factor != 0.f;
+        auto has_metallic = !metallic_tex_name.empty() && metallic_factor != 0.f;
         if (has_roughness || has_metallic) {
             if (has_metallic) {
                 scene_materials[mat_name] = {
@@ -233,7 +237,11 @@ int main(int argc, char *argv[]) {
                     {"type", "Surface"},
                     {"impl", "Substrate"},
                     {"prop",
-                     {{"Kd", color_map}}}};
+                     {{"Kd", color_map},
+                      {"Ks",
+                       {{"impl", "Constant"},
+                        {"prop",
+                         {{"v", {.04f, .04f, .04f}}}}}}}}};
             }
             if (has_roughness) {
                 scene_materials[mat_name]["prop"]["roughness"] = luisa::format("@{}", roughness_tex_name);
