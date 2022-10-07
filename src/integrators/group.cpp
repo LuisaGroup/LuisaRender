@@ -28,7 +28,7 @@ class GroupIntegrator final : public Integrator {
 
 public:
     GroupIntegrator(Scene *scene, const SceneNodeDesc *desc) noexcept : Integrator{scene, desc} {
-        auto children = desc->property_node_list_or_default("integrator");
+        auto children = desc->property_node_list_or_default("integrators");
         luisa::vector<const Integrator *> integrators(children.size());
         for (auto i = 0u; i < children.size(); i++) {
             integrators[i] = scene->load_integrator(children[i]);

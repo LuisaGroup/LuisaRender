@@ -144,6 +144,7 @@ def convert_material(out_file, material: dict, alpha=""):
     elif impl == "transparency":  # TODO
         a = material["alpha"]
         if type(a) is float:
+<<<<<<< HEAD
             aa = f'''
   alpha : Constant {{
     v {{ {float(a)} }}
@@ -151,6 +152,15 @@ def convert_material(out_file, material: dict, alpha=""):
         else:
             a_ext = Path(a).suffix
             aa = f'''
+=======
+          aa = f'''
+  alpha : Constant {{
+    v {{ {float(a)} }}
+  }}'''
+        else:         
+          a_ext = Path(a).suffix
+          aa = f'''
+>>>>>>> auxbuffer
     alpha : Image {{
       file {{ "{a.replace(a_ext, f"-alpha{a_ext}")}" }}
       encoding {{ "linear" }}
@@ -258,12 +268,15 @@ Env sky : Spherical {{
             file = "models/cube.obj"
             M = M * rotateXYZ(glm.radians(glm.vec3(-90, 0, 0))
                               ) * glm.scale(glm.vec3(.5))
+<<<<<<< HEAD
         elif impl == "disk":
             file = "models/disk.obj"
         elif impl == "sphere":
             file = "models/sphere.obj"
         elif impl == "curves":
             return
+=======
+>>>>>>> auxbuffer
         else:
             print(f"Unsupported shape: {shape}")
             raise NotImplementedError()
