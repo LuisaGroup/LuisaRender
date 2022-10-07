@@ -141,7 +141,7 @@ public:
 template<typename BaseSurface,
          typename BaseInstance = typename BaseSurface::Instance,
          typename BaseClosure = typename BaseSurface::Closure>
-class OpacitySurfaceMixin : public BaseSurface {
+class OpacitySurfaceWrapper : public BaseSurface {
 
 public:
     class Closure final : public BaseClosure {
@@ -176,7 +176,7 @@ private:
     const Texture *_opacity;
 
 public:
-    OpacitySurfaceMixin(Scene *scene, const SceneNodeDesc *desc) noexcept
+    OpacitySurfaceWrapper(Scene *scene, const SceneNodeDesc *desc) noexcept
         : BaseSurface{scene, desc},
           _opacity{[](auto scene, auto desc) noexcept {
               return scene->load_texture(desc->property_node_or_default("alpha"));
@@ -196,7 +196,7 @@ protected:
 
 template<typename BaseSurface,
          typename BaseInstance = typename BaseSurface::Instance>
-class NormalMapMixin : public BaseSurface {
+class NormalMapWrapper : public BaseSurface {
 
 public:
     class Instance : public BaseInstance {
@@ -226,7 +226,7 @@ private:
     const Texture *_normal_map;
 
 public:
-    NormalMapMixin(Scene *scene, const SceneNodeDesc *desc) noexcept
+    NormalMapWrapper(Scene *scene, const SceneNodeDesc *desc) noexcept
         : BaseSurface{scene, desc},
           _normal_map{[](auto scene, auto desc) noexcept {
               return scene->load_texture(desc->property_node_or_default("normal_map"));
@@ -241,6 +241,56 @@ protected:
             [this](auto &pipeline, auto &command_buffer) noexcept {
                 return pipeline.build_texture(command_buffer, _normal_map);
             }(pipeline, command_buffer));
+    }
+};
+
+template<typename BaseSurface,
+         typename BaseInstance = typename BaseSurface::Instance>
+class TwoSidedWrapper : public BaseSurface {
+
+public:
+    class Instance : public BaseInstance {
+
+    private:
+        bool _two_sided;
+
+    public:
+        Instance(BaseInstance &&base, bool two_sided) noexcept
+            : BaseInstance{std::move(base)}, _two_sided{two_sided} {}
+        [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
+            const Interaction &it, const SampledWavelengths &swl,
+            Expr<float> eta_i, Expr<float> time) const noexcept override {
+            if (_two_sided) {
+                Interaction it_copy{
+                    it.shape(), it.instance_id(), it.triangle_id(),
+                    it.triangle_area(), it.p(), it.ng(), it.uv(), it.p_shading(),
+                    ite(it.back_facing(), -1.f, 1.f) * it.shading().n(),
+                    it.shading().u(), false};
+                return BaseInstance::closure(it_copy, swl, eta_i, time);
+            }
+            return BaseInstance::closure(it, swl, eta_i, time);
+        }
+    };
+
+private:
+    bool _two_sided;
+
+public:
+    TwoSidedWrapper(Scene *scene, const SceneNodeDesc *desc) noexcept
+        : BaseSurface{scene, desc},
+          _two_sided{desc->property_bool_or_default("two_sided", false)} {}
+
+protected:
+    [[nodiscard]] luisa::unique_ptr<Surface::Instance> _build(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
+        auto base = BaseSurface::_build(pipeline, command_buffer);
+        return luisa::make_unique<Instance>(
+            std::move(*dynamic_cast<BaseInstance *>(base.release())),
+            _two_sided);
+    }
+    [[nodiscard]] uint properties() const noexcept override {
+        auto p = BaseSurface::properties();
+        return _two_sided ? p & (~Surface::property_transmissive) : p;
     }
 };
 

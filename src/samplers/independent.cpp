@@ -67,13 +67,6 @@ void IndependentSamplerInstance::load_state(Expr<uint> state_id) noexcept {
 }
 
 Float IndependentSamplerInstance::generate_1d() noexcept {
-    auto lcg = [](UInt &state) noexcept {
-        constexpr auto lcg_a = 1664525u;
-        constexpr auto lcg_c = 1013904223u;
-        state = lcg_a * state + lcg_c;
-        return cast<float>(state & 0x00ffffffu) *
-               (1.0f / static_cast<float>(0x01000000u));
-    };
     return lcg(*_state);
 }
 

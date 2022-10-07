@@ -291,7 +291,7 @@ luisa::unique_ptr<Surface::Closure> GlassInstance::closure(
         dispersive, alpha, clamp(Kr_ratio, .05f, .95f));
 }
 
-using NormalMapGlassSurface = NormalMapMixin<
+using NormalMapGlassSurface = NormalMapWrapper<
     GlassSurface, GlassInstance>;
 
 }// namespace luisa::render

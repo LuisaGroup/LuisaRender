@@ -82,7 +82,9 @@ private:
         auto wi_local = _it.shading().world_to_local(wi);
         auto f = _oren_nayar->evaluate(wo_local, wi_local, mode);
         auto pdf = _oren_nayar->pdf(wo_local, wi_local, mode);
-        return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
+        auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f, 1.f, 0.f);
+        return {.f = f * abs_cos_theta(wi_local) * same_sided,
+                .pdf = pdf * same_sided};
     }
     [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float>, Expr<float2> u,
                                           TransportMode mode) const noexcept override {
@@ -91,7 +93,9 @@ private:
         auto pdf = def(0.f);
         auto f = _oren_nayar->sample(wo_local, &wi_local, u, &pdf, mode);
         auto wi = _it.shading().local_to_world(wi_local);
-        return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf},
+        auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f, 1.f, 0.f);
+        return {.eval = {.f = f * abs_cos_theta(wi_local) * same_sided,
+                         .pdf = pdf * same_sided},
                 .wi = wi,
                 .event = Surface::event_reflect};
     }
@@ -120,7 +124,7 @@ luisa::unique_ptr<Surface::Closure> MatteInstance::closure(
     return luisa::make_unique<MatteClosure>(this, it, swl, time, Kd, sigma);
 }
 
-using NormalMapOpacityMatteSurface = NormalMapMixin<OpacitySurfaceMixin<
+using NormalMapOpacityMatteSurface = NormalMapWrapper<OpacitySurfaceWrapper<
     MatteSurface, MatteInstance, MatteClosure>>;
 
 }// namespace luisa::render

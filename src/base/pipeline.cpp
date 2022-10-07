@@ -18,15 +18,19 @@ inline Pipeline::Pipeline(Device &device) noexcept
 Pipeline::~Pipeline() noexcept = default;
 
 uint Pipeline::register_surface(CommandBuffer &command_buffer, const Surface *surface) noexcept {
-    auto [iter, not_existent] = _surface_tags.try_emplace(surface, 0u);
-    if (not_existent) { iter->second = _surfaces.emplace(surface->build(*this, command_buffer)); }
-    return iter->second;
+    if (auto iter = _surface_tags.find(surface);
+        iter != _surface_tags.end()) { return iter->second; }
+    auto tag = _surfaces.emplace(surface->build(*this, command_buffer));
+    _surface_tags.emplace(surface, tag);
+    return tag;
 }
 
 uint Pipeline::register_light(CommandBuffer &command_buffer, const Light *light) noexcept {
-    auto [iter, not_existent] = _light_tags.try_emplace(light, 0u);
-    if (not_existent) { iter->second = _lights.emplace(light->build(*this, command_buffer)); }
-    return iter->second;
+    if (auto iter = _light_tags.find(light);
+        iter != _light_tags.end()) { return iter->second; }
+    auto tag = _lights.emplace(light->build(*this, command_buffer));
+    _light_tags.emplace(light, tag);
+    return tag;
 }
 
 luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, const Scene &scene) noexcept {
@@ -95,16 +99,20 @@ void Pipeline::render(Stream &stream) noexcept {
 
 const Texture::Instance *Pipeline::build_texture(CommandBuffer &command_buffer, const Texture *texture) noexcept {
     if (texture == nullptr) { return nullptr; }
-    auto [iter, not_exists] = _textures.try_emplace(texture, nullptr);
-    if (not_exists) { iter->second = texture->build(*this, command_buffer); }
-    return iter->second.get();
+    if (auto iter = _textures.find(texture); iter != _textures.end()) {
+        return iter->second.get();
+    }
+    auto t = texture->build(*this, command_buffer);
+    return _textures.emplace(texture, std::move(t)).first->second.get();
 }
 
 const Filter::Instance *Pipeline::build_filter(CommandBuffer &command_buffer, const Filter *filter) noexcept {
     if (filter == nullptr) { return nullptr; }
-    auto [iter, not_exists] = _filters.try_emplace(filter, nullptr);
-    if (not_exists) { iter->second = filter->build(*this, command_buffer); }
-    return iter->second.get();
+    if (auto iter = _filters.find(filter); iter != _filters.end()) {
+        return iter->second.get();
+    }
+    auto f = filter->build(*this, command_buffer);
+    return _filters.emplace(filter, std::move(f)).first->second.get();
 }
 
 Differentiation *Pipeline::differentiation() noexcept {
@@ -119,14 +127,14 @@ const Differentiation *Pipeline::differentiation() const noexcept {
 
 void Pipeline::register_transform(const Transform *transform) noexcept {
     if (transform == nullptr) { return; }
-    auto [iter, success] = _transform_to_id.try_emplace(
-        transform, static_cast<uint>(_transforms.size()));
-    LUISA_ASSERT(iter->second < transform_matrix_buffer_size,
-                 "Transform matrix buffer overflows.");
-    if (success) [[likely]] {
+    if (!_transform_to_id.contains(transform)) {
+        auto transform_id = static_cast<uint>(_transforms.size());
+        LUISA_ASSERT(transform_id < transform_matrix_buffer_size,
+                     "Transform matrix buffer overflows.");
+        _transform_to_id.emplace(transform, transform_id);
         _transforms.push_back(transform);
         _any_dynamic_transforms |= !transform->is_static();
-        _transform_matrices[iter->second] = transform->matrix(_initial_time);
+        _transform_matrices[transform_id] = transform->matrix(_initial_time);
     }
 }
 

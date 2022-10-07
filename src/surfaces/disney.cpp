@@ -203,12 +203,14 @@ private:
 public:
     explicit DisneyDiffuse(const SampledSpectrum &R) noexcept : R{R} {}
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
-        auto Fo = SchlickWeight(abs_cos_theta(wo));
-        auto Fi = SchlickWeight(abs_cos_theta(wi));
-
-        // Diffuse fresnel - go from 1 at normal incidence to .5 at grazing.
-        // Burley 2015, eq (4).
-        return R * inv_pi * (1.f - Fo * .5f) * (1.f - Fi * .5f);
+        static Callable impl = [](Float3 wo, Float3 wi) noexcept {
+            auto Fo = SchlickWeight(abs_cos_theta(wo));
+            auto Fi = SchlickWeight(abs_cos_theta(wi));
+            // Diffuse fresnel - go from 1 at normal incidence to .5 at grazing.
+            // Burley 2015, eq (4).
+            return inv_pi * (1.f - Fo * .5f) * (1.f - Fi * .5f);
+        };
+        return R * impl(wo, wi);
     }
     [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
         auto Fo = SchlickWeight(abs_cos_theta(wo));
@@ -235,18 +237,21 @@ public:
     DisneyFakeSS(const SampledSpectrum &R, Float roughness) noexcept
         : R{R}, roughness{std::move(roughness)} {}
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
-        auto wh = wi + wo;
-        auto valid = any(wh != 0.f);
-        wh = normalize(wh);
-        auto cosThetaD = dot(wi, wh);
-        // Fss90 used to "flatten" retroreflection based on roughness
-        auto Fss90 = cosThetaD * cosThetaD * roughness;
-        auto Fo = SchlickWeight(abs_cos_theta(wo));
-        auto Fi = SchlickWeight(abs_cos_theta(wi));
-        auto Fss = lerp(1.0f, Fss90, Fo) * lerp(1.0f, Fss90, Fi);
-        // 1.25 scale is used to (roughly) preserve albedo
-        auto ss = 1.25f * (Fss * (1.f / (abs_cos_theta(wo) + abs_cos_theta(wi)) - .5f) + .5f);
-        return R * ite(valid, inv_pi * ss, 0.f);
+        static Callable impl = [](Float3 wo, Float3 wi, Float roughness) noexcept {
+            auto wh = wi + wo;
+            auto valid = any(wh != 0.f);
+            wh = normalize(wh);
+            auto cosThetaD = dot(wi, wh);
+            // Fss90 used to "flatten" retroreflection based on roughness
+            auto Fss90 = cosThetaD * cosThetaD * roughness;
+            auto Fo = SchlickWeight(abs_cos_theta(wo));
+            auto Fi = SchlickWeight(abs_cos_theta(wi));
+            auto Fss = lerp(1.0f, Fss90, Fo) * lerp(1.0f, Fss90, Fi);
+            // 1.25 scale is used to (roughly) preserve albedo
+            auto ss = 1.25f * (Fss * (1.f / (abs_cos_theta(wo) + abs_cos_theta(wi)) - .5f) + .5f);
+            return ite(valid, inv_pi * ss, 0.f);
+        };
+        return R * impl(wo, wi, roughness);
     }
     [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
         // TODO
@@ -270,17 +275,18 @@ public:
     DisneyRetro(const SampledSpectrum &R, Float roughness) noexcept
         : R{R}, roughness{std::move(roughness)} {}
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
-        auto wh = wi + wo;
-        auto valid = any(wh != 0.f);
-        wh = normalize(wh);
-        auto cosThetaD = dot(wi, wh);
-        auto Fo = SchlickWeight(abs_cos_theta(wo));
-        auto Fi = SchlickWeight(abs_cos_theta(wi));
-        auto Rr = 2.f * roughness * cosThetaD * cosThetaD;
-
-        // Burley 2015, eq (4).
-        auto f = ite(valid, inv_pi * Rr * (Fo + Fi + Fo * Fi * (Rr - 1.f)), 0.f);
-        return R * f;
+        static Callable impl = [](Float3 wo, Float3 wi, Float roughness) noexcept {
+            auto wh = wi + wo;
+            auto valid = any(wh != 0.f);
+            wh = normalize(wh);
+            auto cosThetaD = dot(wi, wh);
+            auto Fo = SchlickWeight(abs_cos_theta(wo));
+            auto Fi = SchlickWeight(abs_cos_theta(wi));
+            auto Rr = 2.f * roughness * cosThetaD * cosThetaD;
+            // Burley 2015, eq (4).
+            return ite(valid, inv_pi * Rr * (Fo + Fi + Fo * Fi * (Rr - 1.f)), 0.f);
+        };
+        return R * impl(wo, wi, roughness);
     }
     [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
         // TODO
@@ -301,11 +307,14 @@ private:
 public:
     explicit DisneySheen(const SampledSpectrum &R) noexcept : R{R} {}
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
-        auto wh = wi + wo;
-        auto valid = any(wh != 0.f);
-        wh = normalize(wh);
-        auto cosThetaD = dot(wi, wh);
-        return R * ite(valid, SchlickWeight(cosThetaD), 0.f);
+        static Callable impl = [](Float3 wo, Float3 wi) noexcept {
+            auto wh = wi + wo;
+            auto valid = any(wh != 0.f);
+            wh = normalize(wh);
+            auto cosThetaD = dot(wi, wh);
+            return ite(valid, SchlickWeight(cosThetaD), 0.f);
+        };
+        return R * impl(wo, wi);
     }
     [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
         // TODO
@@ -338,48 +347,65 @@ private:
     Float weight;
     Float gloss;
 
+private:
+    [[nodiscard]] static auto _pdf(Expr<float3> wo, Expr<float3> wi, Expr<float> gloss) noexcept {
+        static Callable impl = [](Float3 wo, Float3 wi, Float gloss) noexcept {
+            auto wh = wi + wo;
+            auto valid = same_hemisphere(wo, wi) & any(wh != 0.f);
+            wh = normalize(wh);
+            // The sampling routine samples wh exactly from the GTR1 distribution.
+            // Thus, the final value of the PDF is just the value of the
+            // distribution for wh converted to a mesure with respect to the
+            // surface normal.
+            auto Dr = GTR1(abs_cos_theta(wh), gloss);
+            return ite(valid, Dr * abs_cos_theta(wh) / (4.f * dot(wo, wh)), 0.f);
+        };
+        return impl(wo, wi, gloss);
+    }
+
 public:
     DisneyClearcoat(Float weight, Float gloss) noexcept
         : weight{std::move(weight)}, gloss{std::move(gloss)} {}
     [[nodiscard]] Float evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
-        auto wh = wi + wo;
-        auto valid = any(wh != 0.f);
-        wh = normalize(wh);
-        // Clearcoat has ior = 1.5 hardcoded -> F0 = 0.04. It then uses the
-        // GTR1 distribution, which has even fatter tails than Trowbridge-Reitz
-        // (which is GTR2).
-        auto Dr = GTR1(abs_cos_theta(wh), gloss);
-        auto Fr = FrSchlick(.04f, dot(wo, wh));
-        // The geometric term always based on alpha = 0.25.
-        auto Gr = smithG_GGX(abs_cos_theta(wo), .25f) *
-                  smithG_GGX(abs_cos_theta(wi), .25f);
-        return ite(valid, weight * Gr * Fr * Dr * .25f, 0.f);
+        static Callable impl = [](Float3 wo, Float3 wi, Float weight, Float gloss) noexcept {
+            auto wh = wi + wo;
+            auto valid = any(wh != 0.f);
+            wh = normalize(wh);
+            // Clearcoat has ior = 1.5 hardcoded -> F0 = 0.04. It then uses the
+            // GTR1 distribution, which has even fatter tails than Trowbridge-Reitz
+            // (which is GTR2).
+            auto Dr = GTR1(abs_cos_theta(wh), gloss);
+            auto Fr = FrSchlick(.04f, dot(wo, wh));
+            // The geometric term always based on alpha = 0.25.
+            auto Gr = smithG_GGX(abs_cos_theta(wo), .25f) *
+                      smithG_GGX(abs_cos_theta(wi), .25f);
+            return ite(valid, weight * Gr * Fr * Dr * .25f, 0.f);
+        };
+        return impl(wo, wi, weight, gloss);
     }
     [[nodiscard]] Float sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *p) const noexcept {
-        // TODO: double check all this: there still seem to be some very
-        // occasional fireflies with clearcoat; presumably there is a bug
-        // somewhere.
-        auto alpha2 = gloss * gloss;
-        auto cosTheta = sqrt(max(0.f, (1.f - pow(alpha2, 1.f - u[0])) / (1.f - alpha2)));
-        auto sinTheta = sqrt(max(0.f, 1.f - cosTheta * cosTheta));
-        auto phi = 2.f * pi * u[1];
-        auto wh = spherical_direction(sinTheta, cosTheta, phi);
-        wh = ite(same_hemisphere(wo, wh), wh, -wh);
-        *wi = reflect(wo, wh);
-        auto valid = wo.z != 0.f & same_hemisphere(wo, *wi);
-        *p = ite(valid, pdf(wo, *wi), 0.f);
-        return ite(valid, evaluate(wo, *wi), 0.f);
+        static Callable impl = [](Float3 wo, Float2 u, Float gloss) noexcept {
+            // TODO: double check all this: there still seem to be some very
+            // occasional fireflies with clearcoat; presumably there is a bug
+            // somewhere.
+            auto alpha2 = gloss * gloss;
+            auto cosTheta = sqrt(max(0.f, (1.f - pow(alpha2, 1.f - u[0])) / (1.f - alpha2)));
+            auto sinTheta = sqrt(max(0.f, 1.f - cosTheta * cosTheta));
+            auto phi = 2.f * pi * u[1];
+            auto wh = spherical_direction(sinTheta, cosTheta, phi);
+            wh = ite(same_hemisphere(wo, wh), wh, -wh);
+            auto wi = reflect(wo, wh);
+            auto valid = wo.z != 0.f & same_hemisphere(wo, wi);
+            auto p = ite(valid, _pdf(wo, wi, gloss), 0.f);
+            return make_float4(wi, p);
+        };
+        auto v = impl(wo, u, gloss);
+        *wi = v.xyz();
+        *p = v.w;
+        return ite(v.w > 0.f, evaluate(wo, *wi), 0.f);
     }
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi) const noexcept {
-        auto wh = wi + wo;
-        auto valid = same_hemisphere(wo, wi) & any(wh != 0.f);
-        wh = normalize(wh);
-        // The sampling routine samples wh exactly from the GTR1 distribution.
-        // Thus, the final value of the PDF is just the value of the
-        // distribution for wh converted to a mesure with respect to the
-        // surface normal.
-        auto Dr = GTR1(abs_cos_theta(wh), gloss);
-        return ite(valid, Dr * abs_cos_theta(wh) / (4.f * dot(wo, wh)), 0.f);
+        return _pdf(wo, wi, gloss);
     }
     [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
         // TODO
@@ -609,39 +635,43 @@ public:
 
 private:
     [[nodiscard]] Surface::Evaluation _evaluate_local(Float3 wo_local, Float3 wi_local,
-                                                      TransportMode mode) const noexcept {
+                                                      Bool geom_same_sided, TransportMode mode) const noexcept {
         SampledSpectrum f{_swl.dimension()};
         auto pdf = def(0.f);
         // TODO: performance test
         $if(same_hemisphere(wo_local, wi_local)) {// reflection
-            f = _specular->evaluate(wo_local, wi_local, mode) +
-                _diffuse->evaluate(wo_local, wi_local, mode) +
-                _fake_ss->evaluate(wo_local, wi_local, mode) +
-                _retro->evaluate(wo_local, wi_local, mode) +
-                _sheen->evaluate(wo_local, wi_local, mode);
-            pdf = _sampling_weights[sampling_technique_specular] *
-                      _specular->pdf(wo_local, wi_local, mode) +
-                  _sampling_weights[sampling_technique_diffuse] *
-                      _diffuse->pdf(wo_local, wi_local, mode);
-            $if((_lobes & refl_clearcoat) != 0u) {
-                f += _clearcoat->evaluate(wo_local, wi_local);
-                pdf += _sampling_weights[sampling_technique_clearcoat] *
-                       _clearcoat->pdf(wo_local, wi_local);
+            $if(geom_same_sided) {
+                f = _specular->evaluate(wo_local, wi_local, mode) +
+                    _diffuse->evaluate(wo_local, wi_local, mode) +
+                    _fake_ss->evaluate(wo_local, wi_local, mode) +
+                    _retro->evaluate(wo_local, wi_local, mode) +
+                    _sheen->evaluate(wo_local, wi_local, mode);
+                pdf = _sampling_weights[sampling_technique_specular] *
+                          _specular->pdf(wo_local, wi_local, mode) +
+                      _sampling_weights[sampling_technique_diffuse] *
+                          _diffuse->pdf(wo_local, wi_local, mode);
+                $if((_lobes & refl_clearcoat) != 0u) {
+                    f += _clearcoat->evaluate(wo_local, wi_local);
+                    pdf += _sampling_weights[sampling_technique_clearcoat] *
+                           _clearcoat->pdf(wo_local, wi_local);
+                };
             };
         }
         $else {// transmission
-            $if((_lobes & trans_specular) != 0u) {
-                f = _spec_trans->evaluate(wo_local, wi_local, mode);
-                pdf = _sampling_weights[sampling_technique_specular_trans] *
-                      _spec_trans->pdf(wo_local, wi_local, mode);
-            }
-            $else {
-                f = _diff_trans->evaluate(wo_local, wi_local, mode) +
-                    _thin_spec_trans->evaluate(wo_local, wi_local, mode);
-                pdf = _sampling_weights[sampling_technique_thin_diffuse_trans] *
-                          _diff_trans->pdf(wo_local, wi_local, mode) +
-                      _sampling_weights[sampling_technique_thin_specular_trans] *
-                          _thin_spec_trans->pdf(wo_local, wi_local, mode);
+            $if(!geom_same_sided) {
+                $if((_lobes & trans_specular) != 0u) {
+                    f = _spec_trans->evaluate(wo_local, wi_local, mode);
+                    pdf = _sampling_weights[sampling_technique_specular_trans] *
+                          _spec_trans->pdf(wo_local, wi_local, mode);
+                }
+                $else {
+                    f = _diff_trans->evaluate(wo_local, wi_local, mode) +
+                        _thin_spec_trans->evaluate(wo_local, wi_local, mode);
+                    pdf = _sampling_weights[sampling_technique_thin_diffuse_trans] *
+                              _diff_trans->pdf(wo_local, wi_local, mode) +
+                          _sampling_weights[sampling_technique_thin_specular_trans] *
+                              _thin_spec_trans->pdf(wo_local, wi_local, mode);
+                };
             };
         };
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
@@ -650,7 +680,7 @@ private:
                                                 TransportMode mode) const noexcept override {
         auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = _it.shading().world_to_local(wi);
-        return _evaluate_local(wo_local, wi_local, mode);
+        return _evaluate_local(wo_local, wi_local, dot(_it.ng(), wo) * dot(_it.ng(), wi) > 0.f, mode);
     }
     [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float> u_lobe,
                                           Expr<float2> u, TransportMode mode) const noexcept override {
@@ -689,8 +719,8 @@ private:
             };
             $default { unreachable(); };
         };
-        auto eval = _evaluate_local(wo_local, wi_local, mode);
         auto wi = _it.shading().local_to_world(wi_local);
+        auto eval = _evaluate_local(wo_local, wi_local, dot(_it.ng(), wo) * dot(_it.ng(), wi) > 0.f, mode);
         return {.eval = eval, .wi = wi, .event = event};
     }
     void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df,
@@ -723,9 +753,9 @@ luisa::unique_ptr<Surface::Closure> DisneySurfaceInstance::closure(
         specular_trans, flatness, diffuse_trans);
 }
 
-using NormalMapOpacityDisneySurface = NormalMapMixin<OpacitySurfaceMixin<
-    DisneySurface, DisneySurfaceInstance, DisneySurfaceClosure>>;
+using TwoSidedNormalMapOpacityDisneySurface = TwoSidedWrapper<NormalMapWrapper<OpacitySurfaceWrapper<
+    DisneySurface, DisneySurfaceInstance, DisneySurfaceClosure>>>;
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::NormalMapOpacityDisneySurface)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::TwoSidedNormalMapOpacityDisneySurface)

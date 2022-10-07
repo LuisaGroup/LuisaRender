@@ -44,7 +44,7 @@ private:
 
 public:
     Interaction() noexcept : _inst_id{~0u}, _prim_id{~0u} {}
-    Interaction(Expr<float2> uv) noexcept: _uv{uv}, _inst_id{~0u}, _prim_id{~0u} {}
+    explicit Interaction(Expr<float2> uv) noexcept: _uv{uv}, _inst_id{~0u}, _prim_id{~0u} {}
 
     Interaction(Var<Shape::Handle> shape, Expr<uint> inst_id, Expr<uint> prim_id, Expr<float> prim_area,
                 Expr<float3> p, Expr<float3> ng, Expr<bool> back_facing) noexcept
@@ -63,6 +63,7 @@ public:
                       attrib.uv, attrib.ps, attrib.ns, attrib.tangent, back_facing} {}
 
     [[nodiscard]] auto p() const noexcept { return _pg; }
+    [[nodiscard]] auto p_shading() const noexcept { return _ps; }
     [[nodiscard]] auto ng() const noexcept { return _ng; }
     [[nodiscard]] auto uv() const noexcept { return _uv; }
     [[nodiscard]] auto instance_id() const noexcept { return _inst_id; }
