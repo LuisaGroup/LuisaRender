@@ -92,8 +92,9 @@ public:
           _eta_i{eta_i} {}
 
 private:
-    [[nodiscard]] SampledSpectrum albedo() const noexcept {
-        return _blend->albedo();
+    [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _blend->albedo(); }
+    [[nodiscard]] Float2 roughness() const noexcept override {
+        return TrowbridgeReitzDistribution::alpha_to_roughness(_distribution->alpha());
     }
 
     [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,

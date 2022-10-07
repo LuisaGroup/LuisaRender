@@ -111,8 +111,10 @@ public:
           _refl{luisa::make_unique<MicrofacetReflection>(refl, _distribution.get(), _fresnel.get())} {}
 
 private:
-    [[nodiscard]] SampledSpectrum albedo() const noexcept { return _refl->albedo(); }
-
+    [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _refl->albedo(); }
+    [[nodiscard]] Float2 roughness() const noexcept override {
+        return TrowbridgeReitzDistribution::alpha_to_roughness(_distribution->alpha());
+    }
     [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
                                                 TransportMode mode) const noexcept override {
         auto wo_local = _it.shading().world_to_local(wo);

@@ -206,7 +206,9 @@ public:
           _top{std::move(top)}, _bottom{std::move(bottom)}, _thickness{thickness},
           _g{g}, _albedo{albedo}, _max_depth{max_depth}, _samples{samples} {}
 
+    // TODO: are these OK?
     [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _top->albedo(); }
+    [[nodiscard]] Float2 roughness() const noexcept override { return _top->roughness(); }
 
 private:
     [[nodiscard]] static inline auto Tr(Expr<float> dz, Expr<float3> w) noexcept {

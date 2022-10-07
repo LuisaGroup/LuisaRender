@@ -90,10 +90,13 @@ public:
         LUISA_ASSERT(_a != nullptr || _b != nullptr,
                      "Creating closure for null MixSurface.");
     }
-    [[nodiscard]] SampledSpectrum albedo() const noexcept { 
+    [[nodiscard]] SampledSpectrum albedo() const noexcept override {
         auto albedo_a = _a->albedo();
         auto albedo_b = _b->albedo();
         return albedo_a * _ratio + albedo_b * (1.f - _ratio);
+    }
+    [[nodiscard]] Float2 roughness() const noexcept override {
+        return _a->roughness() * _ratio + _b->roughness() * (1.f - _ratio);
     }
 
     [[nodiscard]] luisa::optional<Float> _opacity() const noexcept override {

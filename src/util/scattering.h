@@ -65,6 +65,8 @@ struct TrowbridgeReitzDistribution : public MicrofacetDistribution {
     [[nodiscard]] Float3 sample_wh(Expr<float3> wo, Expr<float2> u) const noexcept override;
     [[nodiscard]] static Float roughness_to_alpha(Expr<float> roughness) noexcept;
     [[nodiscard]] static Float2 roughness_to_alpha(Expr<float2> roughness) noexcept;
+    [[nodiscard]] static Float alpha_to_roughness(Expr<float> alpha) noexcept;
+    [[nodiscard]] static Float2 alpha_to_roughness(Expr<float2> alpha) noexcept;
 
     [[nodiscard]] Gradient grad_D(Expr<float3> wh) const noexcept override;
     [[nodiscard]] Gradient grad_Lambda(Expr<float3> w) const noexcept override;

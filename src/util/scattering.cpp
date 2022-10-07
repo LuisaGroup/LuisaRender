@@ -137,9 +137,15 @@ Float TrowbridgeReitzDistribution::roughness_to_alpha(Expr<float> roughness) noe
 }
 
 Float2 TrowbridgeReitzDistribution::roughness_to_alpha(Expr<float2> roughness) noexcept {
-    return compute::make_float2(
-        roughness_to_alpha(roughness.x),
-        roughness_to_alpha(roughness.y));
+    return sqr(roughness);
+}
+
+Float TrowbridgeReitzDistribution::alpha_to_roughness(Expr<float> alpha) noexcept {
+    return sqrt(alpha);
+}
+
+Float2 TrowbridgeReitzDistribution::alpha_to_roughness(Expr<float2> alpha) noexcept {
+    return sqrt(alpha);
 }
 
 Float2 TrowbridgeReitzDistribution::grad_alpha_roughness(Expr<float2> roughness) noexcept {

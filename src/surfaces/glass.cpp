@@ -152,6 +152,9 @@ public:
           _trans{luisa::make_unique<MicrofacetTransmission>(Kt, _distribution.get(), eta_i, eta_t)},
           _kr_ratio{Kr_ratio} {}
     [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _refl->albedo(); }
+    [[nodiscard]] Float2 roughness() const noexcept override {
+        return TrowbridgeReitzDistribution::alpha_to_roughness(_distribution->alpha());
+    }
 
 private:
     [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,

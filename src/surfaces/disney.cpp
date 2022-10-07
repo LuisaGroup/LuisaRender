@@ -202,7 +202,6 @@ private:
 
 public:
     explicit DisneyDiffuse(const SampledSpectrum &R) noexcept : R{R} {}
-
     [[nodiscard]] SampledSpectrum albedo() const noexcept override { return R; }
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
         static Callable impl = [](Float3 wo, Float3 wi) noexcept {
@@ -482,6 +481,7 @@ public:
     static_assert(max_sampling_techique_count == std::size(sampling_techniques));
 
 private:
+    SampledSpectrum _color;
     luisa::unique_ptr<DisneyDiffuse> _diffuse;
     luisa::unique_ptr<DisneyFakeSS> _fake_ss;
     luisa::unique_ptr<DisneyRetro> _retro;
@@ -499,7 +499,10 @@ private:
     Float _eta_t;
 
 public:
-    [[nodiscard]] SampledSpectrum albedo() const noexcept { return _diffuse->albedo(); }
+    [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _color; }
+    [[nodiscard]] Float2 roughness() const noexcept override {
+        return DisneyMicrofacetDistribution::alpha_to_roughness(_distrib->alpha());
+    }
 
     DisneySurfaceClosure(
         const DisneySurfaceInstance *instance, const Interaction &it,
@@ -509,7 +512,8 @@ public:
         Expr<float> specular_tint, Expr<float> anisotropic, Expr<float> sheen, Expr<float> sheen_tint,
         Expr<float> clearcoat, Expr<float> clearcoat_gloss, Expr<float> specular_trans_in,
         Expr<float> flatness, Expr<float> diffuse_trans) noexcept
-        : Surface::Closure{instance, it, swl, time}, _lobes{0u} {
+        : Surface::Closure{instance, it, swl, time},
+          _color{color}, _lobes{0u} {
 
         // TODO: should not generate lobes than are not used.
         constexpr auto black_threshold = 1e-6f;
