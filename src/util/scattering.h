@@ -123,6 +123,7 @@ struct BxDF {
     [[nodiscard]] virtual SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept = 0;
     [[nodiscard]] virtual SampledSpectrum sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf, TransportMode mode) const noexcept;
     [[nodiscard]] virtual Float pdf(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept;
+    [[nodiscard]] virtual SampledSpectrum albedo() const noexcept = 0;
 };
 
 class LambertianReflection : public BxDF {
@@ -139,6 +140,7 @@ public:
     explicit LambertianReflection(const SampledSpectrum &R) noexcept : _r{R} {}
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
     [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept;
+    [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _r; }
 };
 
 class LambertianTransmission : public BxDF {
@@ -157,6 +159,7 @@ public:
     [[nodiscard]] SampledSpectrum sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf, TransportMode mode) const noexcept override;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
     [[nodiscard]] static Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) noexcept;
+    [[nodiscard]] SampledSpectrum albedo() const noexcept override { return SampledSpectrum(0.f); }
 };
 
 class MicrofacetReflection : public BxDF {
@@ -181,6 +184,7 @@ public:
     [[nodiscard]] SampledSpectrum sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf, TransportMode mode) const noexcept override;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
     [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept;
+    [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _r; }
 };
 
 class MicrofacetTransmission : public BxDF {
@@ -208,6 +212,7 @@ public:
     [[nodiscard]] SampledSpectrum sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf, TransportMode mode) const noexcept override;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
     [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df, TransportMode mode) const noexcept;
+    [[nodiscard]] SampledSpectrum albedo() const noexcept override { return SampledSpectrum(0.f); }
 };
 
 class OrenNayar : public BxDF {
@@ -228,6 +233,7 @@ public:
     OrenNayar(const SampledSpectrum &R, Expr<float> sigma) noexcept;
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
     [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept;
+    [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _r; }
 };
 
 class FresnelBlend : public BxDF {
@@ -252,11 +258,12 @@ private:
 public:
     FresnelBlend(const SampledSpectrum &Rd, const SampledSpectrum &Rs,
                  const MicrofacetDistribution *distrib, Expr<float> Rd_sample_ratio = .5f) noexcept
-        : _rd{Rd}, _rs{Rs}, _rd_ratio{clamp(Rd_sample_ratio, .05f, .95f)},  _distribution{distrib} {}
+        : _rd{Rd}, _rs{Rs}, _rd_ratio{clamp(Rd_sample_ratio, .05f, .95f)}, _distribution{distrib} {}
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
     [[nodiscard]] SampledSpectrum sample(Expr<float3> wo, Float3 *wi, Expr<float2> u, Float *pdf, TransportMode mode) const noexcept override;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
     [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept;
+    [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _rd; }
 };
 
 }// namespace luisa::render

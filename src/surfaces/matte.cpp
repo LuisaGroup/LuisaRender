@@ -76,6 +76,8 @@ public:
           _oren_nayar{luisa::make_unique<OrenNayar>(std::move(albedo), sigma)} {}
 
 private:
+    [[nodiscard]] SampledSpectrum albedo() const noexcept { return _oren_nayar->albedo(); }
+
     [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
                                                 TransportMode mode) const noexcept override {
         auto wo_local = _it.shading().world_to_local(wo);

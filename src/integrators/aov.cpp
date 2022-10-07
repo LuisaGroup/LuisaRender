@@ -127,7 +127,6 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
     auto auxiliary_normal = pipeline.device().create_image<float>(PixelStorage::FLOAT4, resolution);
     auto auxiliary_depth = pipeline.device().create_image<float>(PixelStorage::FLOAT1, resolution);
     auto auxiliary_albedo = pipeline.device().create_image<float>(PixelStorage::FLOAT4, resolution);
-    auto auxiliary_roughness = pipeline.device().create_image<float>(PixelStorage::FLOAT2, resolution);
 
     Kernel2D clear_kernel = [&]() noexcept {
         auxiliary_noisy.write(dispatch_id().xy(), make_float4(0.0f));
@@ -136,7 +135,6 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
         auxiliary_normal.write(dispatch_id().xy(), make_float4(0.0f));
         auxiliary_depth.write(dispatch_id().xy(), make_float4(0.0f));
         auxiliary_albedo.write(dispatch_id().xy(), make_float4(0.0f));
-        auxiliary_roughness.write(dispatch_id().xy(), make_float4(0.0f));
     };
 
     sampler->reset(command_buffer, resolution, pixel_count, node<AuxiliaryBufferPathTracing>()->noisy_count());
@@ -152,6 +150,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
         auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler->generate_1d());
         SampledSpectrum beta{swl.dimension(), camera_weight};
         SampledSpectrum Li{swl.dimension()};
+        SampledSpectrum beta_diffuse{swl.dimension(), camera_weight}, Li_diffuse{swl.dimension()};
 
         auto ray = camera_ray;
         auto pdf_bsdf = def(1e16f);
@@ -166,7 +165,8 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                 pipeline.surfaces().dispatch(it->shape()->surface_tag(), [&](auto surface) noexcept {
                     // create closure
                     auto closure = surface->closure(*it, swl, 1.f, time);
-                    
+                    auto albedo = closure->albedo();
+                    auxiliary_albedo.write(dispatch_id().xy(), make_float4(spectrum->srgb(swl, albedo), 1.f));
                 });
             };
 
@@ -304,6 +304,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
             std::vector<float> hostaux_noisy(pixel_count * 4);
             std::vector<float> hostaux_normal(pixel_count * 4);
             std::vector<float> hostaux_depth(pixel_count * 1);
+            std::vector<float> hostaux_albedo(pixel_count * 4);
             command_buffer << render_auxiliary(auxiliary_sample_id++, s.point.time, s.point.weight)
                                   .dispatch(resolution)
                            << convert_image(auxiliary_noisy, auxiliary_output).dispatch(resolution)

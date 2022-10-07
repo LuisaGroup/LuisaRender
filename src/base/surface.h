@@ -93,6 +93,8 @@ public:
         [[nodiscard]] luisa::optional<Float> opacity() const noexcept;     // nullopt if never possible to be non-opaque
         [[nodiscard]] luisa::optional<Float> eta() const noexcept;         // nullopt if never possible to be transmissive
         [[nodiscard]] luisa::optional<Bool> is_dispersive() const noexcept;// nullopt if never possible to be dispersive
+
+        [[nodiscard]] virtual SampledSpectrum albedo() const noexcept = 0;
     };
 
     class Instance {

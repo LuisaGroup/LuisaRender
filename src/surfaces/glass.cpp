@@ -151,6 +151,7 @@ public:
           _refl{luisa::make_unique<MicrofacetReflection>(Kr, _distribution.get(), _fresnel.get())},
           _trans{luisa::make_unique<MicrofacetTransmission>(Kt, _distribution.get(), eta_i, eta_t)},
           _kr_ratio{Kr_ratio} {}
+    [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _refl->albedo(); }
 
 private:
     [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,

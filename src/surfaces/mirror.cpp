@@ -111,6 +111,8 @@ public:
           _refl{luisa::make_unique<MicrofacetReflection>(refl, _distribution.get(), _fresnel.get())} {}
 
 private:
+    [[nodiscard]] SampledSpectrum albedo() const noexcept { return _refl->albedo(); }
+
     [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
                                                 TransportMode mode) const noexcept override {
         auto wo_local = _it.shading().world_to_local(wo);

@@ -202,6 +202,8 @@ private:
 
 public:
     explicit DisneyDiffuse(const SampledSpectrum &R) noexcept : R{R} {}
+
+    [[nodiscard]] SampledSpectrum albedo() const noexcept override { return R; }
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
         static Callable impl = [](Float3 wo, Float3 wi) noexcept {
             auto Fo = SchlickWeight(abs_cos_theta(wo));
@@ -236,6 +238,7 @@ private:
 public:
     DisneyFakeSS(const SampledSpectrum &R, Float roughness) noexcept
         : R{R}, roughness{std::move(roughness)} {}
+    [[nodiscard]] SampledSpectrum albedo() const noexcept override { return R; }
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
         static Callable impl = [](Float3 wo, Float3 wi, Float roughness) noexcept {
             auto wh = wi + wo;
@@ -274,6 +277,7 @@ private:
 public:
     DisneyRetro(const SampledSpectrum &R, Float roughness) noexcept
         : R{R}, roughness{std::move(roughness)} {}
+    [[nodiscard]] SampledSpectrum albedo() const noexcept override { return R; }
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
         static Callable impl = [](Float3 wo, Float3 wi, Float roughness) noexcept {
             auto wh = wi + wo;
@@ -306,6 +310,7 @@ private:
 
 public:
     explicit DisneySheen(const SampledSpectrum &R) noexcept : R{R} {}
+    [[nodiscard]] SampledSpectrum albedo() const noexcept override { return R; }
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
         static Callable impl = [](Float3 wo, Float3 wi) noexcept {
             auto wh = wi + wo;
@@ -494,6 +499,8 @@ private:
     Float _eta_t;
 
 public:
+    [[nodiscard]] SampledSpectrum albedo() const noexcept { return _diffuse->albedo(); }
+
     DisneySurfaceClosure(
         const DisneySurfaceInstance *instance, const Interaction &it,
         const SampledWavelengths &swl, Expr<float> time,
