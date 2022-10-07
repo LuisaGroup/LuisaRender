@@ -33,7 +33,7 @@ public:
           _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)},
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
-          _noisy_count{std::max(desc->property_uint_or_default("noisy_count", 4u), 4u)} {}
+          _noisy_count{std::max(desc->property_uint_or_default("noisy_count", 8u), 8u)} {}
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
@@ -45,8 +45,6 @@ public:
 };
 
 class AuxiliaryBufferPathTracingInstance final : public Integrator::Instance {
-
-    const int AUXILIARY_BUFFER_COUNT = 18;
 
 private:
     uint _last_spp{0u};
@@ -77,6 +75,7 @@ public:
             camera->film()->prepare(command_buffer);
             _render_one_camera(command_buffer, pipeline(), this, camera);
             command_buffer << compute::synchronize();
+            camera->film()->release();
         }
         while (_window && !_window->should_close()) {
             _window->run_one_frame([] {});
@@ -92,7 +91,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
     CommandBuffer &command_buffer, Pipeline &pipeline,
     AuxiliaryBufferPathTracingInstance *pt, Camera::Instance *camera) noexcept {
 
-    auto spp = camera->node()->spp();
+    auto spp = node<AuxiliaryBufferPathTracing>()->noisy_count();
     auto resolution = camera->film()->node()->resolution();
     auto image_file = camera->node()->file();
 
@@ -137,9 +136,6 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
         auxiliary_albedo.write(dispatch_id().xy(), make_float4(0.0f));
     };
 
-    sampler->reset(command_buffer, resolution, pixel_count, node<AuxiliaryBufferPathTracing>()->noisy_count());
-    command_buffer << synchronize();
-
     Kernel2D render_auxiliary_kernel = [&](UInt frame_index, Float time, Float shutter_weight) noexcept {
         set_block_size(16u, 16u, 1u);
 
@@ -150,7 +146,6 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
         auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler->generate_1d());
         SampledSpectrum beta{swl.dimension(), camera_weight};
         SampledSpectrum Li{swl.dimension()};
-        SampledSpectrum beta_diffuse{swl.dimension(), camera_weight}, Li_diffuse{swl.dimension()};
 
         auto ray = camera_ray;
         auto pdf_bsdf = def(1e16f);
@@ -296,31 +291,47 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
     auto dispatch_count = 0u;
     auto dispatches_per_commit = 32u;
     auto sample_id = 0u;
-    auto auxiliary_sample_id = 0u;
+    auto check_sample_output = [](uint32_t n) -> bool {
+        return n == 0 || (n > 0 && ((n & (-n)) == n) && n % 3 == 1);
+    };
     for (auto s : shutter_samples) {
         pipeline.update(command_buffer, s.point.time);
         command_buffer << clear_shader().dispatch(resolution);
+        auto parent_path = camera->node()->file().parent_path();
+        auto filename = camera->node()->file().stem().string();
+        auto ext = camera->node()->file().extension().string();
         for (auto i = 0u; i < pt->node<AuxiliaryBufferPathTracing>()->noisy_count(); i++) {
             std::vector<float> hostaux_noisy(pixel_count * 4);
-            std::vector<float> hostaux_normal(pixel_count * 4);
-            std::vector<float> hostaux_depth(pixel_count * 1);
-            std::vector<float> hostaux_albedo(pixel_count * 4);
-            command_buffer << render_auxiliary(auxiliary_sample_id++, s.point.time, s.point.weight)
-                                  .dispatch(resolution)
-                           << convert_image(auxiliary_noisy, auxiliary_output).dispatch(resolution)
-                           << auxiliary_output.copy_to(hostaux_noisy.data())
-                           << auxiliary_normal.copy_to(hostaux_normal.data())
-                           << auxiliary_depth.copy_to(hostaux_depth.data())
-                           << synchronize();
-            // noisy
-            auto noisy_path = camera->node()->file().parent_path() / fmt::format("s{}_noisy.exr", i + 1);
-            save_image(noisy_path, hostaux_noisy.data(), resolution);
-            // normal
-            auto nrm_path = camera->node()->file().parent_path() / fmt::format("s{}_normal.exr", i + 1);
-            save_image(nrm_path, hostaux_normal.data(), resolution);
-            // depth
-            auto dep_path = camera->node()->file().parent_path() / fmt::format("s{}_depth.exr", i + 1);
-            save_image(dep_path, hostaux_depth.data(), resolution, 1);
+            command_buffer << render_auxiliary(sample_id++, s.point.time, s.point.weight)
+                                  .dispatch(resolution);
+            if (i == 0) {
+                std::vector<float> hostaux_normal(pixel_count * 4);
+                std::vector<float> hostaux_depth(pixel_count * 1);
+                std::vector<float> hostaux_albedo(pixel_count * 4);
+                command_buffer
+                    << auxiliary_normal.copy_to(hostaux_normal.data())
+                    << auxiliary_depth.copy_to(hostaux_depth.data())
+                    << auxiliary_albedo.copy_to(hostaux_albedo.data())
+                    << synchronize();
+                // normal
+                auto nrm_path = parent_path / fmt::format("{}_normal{}", filename, ext);
+                save_image(nrm_path, hostaux_normal.data(), resolution);
+                // depth
+                auto dep_path = parent_path / fmt::format("{}_depth{}", filename, ext);
+                save_image(dep_path, hostaux_depth.data(), resolution, 1);
+                // albedo
+                auto abd_path = parent_path / fmt::format("{}_albedo{}", filename, ext);
+                save_image(abd_path, hostaux_albedo.data(), resolution);
+            }
+
+            if (check_sample_output(i)) {
+                command_buffer << convert_image(auxiliary_noisy, auxiliary_output).dispatch(resolution)
+                               << auxiliary_output.copy_to(hostaux_noisy.data())
+                               << synchronize();
+                auto noisy_path = parent_path / fmt::format("{}_sample{:02d}{}", filename, i, ext);
+                save_image(noisy_path, hostaux_noisy.data(), resolution);
+            }
+            command_buffer << synchronize();
         }
     }
     command_buffer << synchronize();
