@@ -31,11 +31,9 @@ private:
     luisa::optional<UInt> _dimension{};
     luisa::optional<U64> _morton_index{};
     luisa::unique_ptr<Constant<uint2>> _sample_hash;
-    luisa::unique_ptr<Constant<uint4>> _permutations;
-    luisa::unique_ptr<Constant<uint>> _sobol_matrices;
+    Buffer<uint> _sobol_matrices;
     Buffer<uint3> _state_buffer;
     luisa::unique_ptr<Callable<uint2(uint2, uint)>> _get_sample_index_impl;
-    luisa::unique_ptr<Callable<float(uint2, uint, uint)>> _sobol_sample_impl;
 
 private:
     [[nodiscard]] auto _get_sample_index() const noexcept {
@@ -53,11 +51,23 @@ private:
     }
 
     [[nodiscard]] auto _sobol_sample(U64 a, uint dimension, Expr<uint> hash) const noexcept {
-        return (*_sobol_sample_impl)(a.bits(), dimension, hash);
+        static Callable impl = [](UInt2 a_bits, UInt dimension, UInt hash, BufferVar<uint> sobol_matrices) noexcept {
+            auto a = U64{a_bits};
+            auto v = def(0u);
+            auto i = def(dimension * SobolMatrixSize);
+            $while(a != 0u) {
+                v = ite((a & 1u) != 0u, v ^ sobol_matrices.read(i), v);
+                a = a >> 1u;
+                i += 1u;
+            };
+            v = _fast_owen_scramble(hash, v);
+            return min(v * 0x1p-32f, one_minus_epsilon);
+        };
+        return impl(a.bits(), dimension, hash, _sobol_matrices.view());
     }
 
 public:
-    explicit ZSobolSamplerInstance(const Pipeline &pipeline, const ZSobolSampler *s) noexcept
+    explicit ZSobolSamplerInstance(const Pipeline &pipeline, CommandBuffer &command_buffer, const ZSobolSampler *s) noexcept
         : Sampler::Instance{pipeline, s} {
         std::array<uint2, max_dimension> sample_hash{};
         for (auto i = 0u; i < max_dimension; i++) {
@@ -67,31 +77,10 @@ public:
                 static_cast<uint>(hash & ~0u),
                 static_cast<uint>(hash >> 32u));
         }
-        std::array permutations{
-            make_uint4(0, 1, 2, 3), make_uint4(0, 1, 3, 2), make_uint4(0, 2, 1, 3), make_uint4(0, 2, 3, 1),
-            make_uint4(0, 3, 2, 1), make_uint4(0, 3, 1, 2), make_uint4(1, 0, 2, 3), make_uint4(1, 0, 3, 2),
-            make_uint4(1, 2, 0, 3), make_uint4(1, 2, 3, 0), make_uint4(1, 3, 2, 0), make_uint4(1, 3, 0, 2),
-            make_uint4(2, 1, 0, 3), make_uint4(2, 1, 3, 0), make_uint4(2, 0, 1, 3), make_uint4(2, 0, 3, 1),
-            make_uint4(2, 3, 0, 1), make_uint4(2, 3, 1, 0), make_uint4(3, 1, 2, 0), make_uint4(3, 1, 0, 2),
-            make_uint4(3, 2, 1, 0), make_uint4(3, 2, 0, 1), make_uint4(3, 0, 2, 1), make_uint4(3, 0, 1, 2)};
         std::array<uint, SobolMatrixSize * 2u> sobol_matrices{};
-        std::memcpy(sobol_matrices.data(), SobolMatrices32, luisa::span{sobol_matrices}.size_bytes());
+        _sobol_matrices = pipeline.device().create_buffer<uint>(SobolMatrixSize * 2u);
+        command_buffer << _sobol_matrices.copy_from(SobolMatrices32);
         _sample_hash = luisa::make_unique<Constant<uint2>>(sample_hash);
-        _permutations = luisa::make_unique<Constant<uint4>>(permutations);
-        _sobol_matrices = luisa::make_unique<Constant<uint>>(sobol_matrices);
-        _sobol_sample_impl = luisa::make_unique<Callable<float(uint2, uint, uint)>>(
-            [this](UInt2 a_bits, UInt dimension, UInt hash) noexcept {
-                auto a = U64{a_bits};
-                auto v = def(0u);
-                auto i = def(dimension * SobolMatrixSize);
-                $while(a != 0u) {
-                    v = ite((a & 1u) != 0u, v ^ _sobol_matrices->read(i), v);
-                    a = a >> 1u;
-                    i += 1u;
-                };
-                v = _fast_owen_scramble(hash, v);
-                return min(v * 0x1p-32f, one_minus_epsilon);
-            });
     }
     void reset(CommandBuffer &command_buffer, uint2 resolution, uint state_count, uint spp) noexcept override {
         if (spp != next_pow2(spp)) {
@@ -109,6 +98,13 @@ public:
         _log2_spp = log2(spp);
         _get_sample_index_impl = luisa::make_unique<Callable<uint2(uint2, uint)>>(
             [this, resolution](UInt2 morton, UInt dimension) noexcept {
+                static Constant<uint4> permutations{std::array{
+                    make_uint4(0, 1, 2, 3), make_uint4(0, 1, 3, 2), make_uint4(0, 2, 1, 3), make_uint4(0, 2, 3, 1),
+                    make_uint4(0, 3, 2, 1), make_uint4(0, 3, 1, 2), make_uint4(1, 0, 2, 3), make_uint4(1, 0, 3, 2),
+                    make_uint4(1, 2, 0, 3), make_uint4(1, 2, 3, 0), make_uint4(1, 3, 2, 0), make_uint4(1, 3, 0, 2),
+                    make_uint4(2, 1, 0, 3), make_uint4(2, 1, 3, 0), make_uint4(2, 0, 1, 3), make_uint4(2, 0, 3, 1),
+                    make_uint4(2, 3, 0, 1), make_uint4(2, 3, 1, 0), make_uint4(3, 1, 2, 0), make_uint4(3, 1, 0, 2),
+                    make_uint4(3, 2, 1, 0), make_uint4(3, 2, 0, 1), make_uint4(3, 0, 2, 1), make_uint4(3, 0, 1, 2)}};
                 static constexpr auto mix_bits = [](U64 v) noexcept {
                     v = v ^ (v >> 31u);
                     v = v * U64{0x7fb5d329728ea185ull};
@@ -128,7 +124,7 @@ public:
                     auto digit = (morton_index >> digit_shift) & 3u;
                     auto higher_digits = morton_index >> (digit_shift + 2u);
                     auto p = (mix_bits(higher_digits ^ (dimension * 0x55555555u)) >> 24u) % 24u;
-                    U64 perm_digit{_permutations->read(p)[digit]};
+                    U64 perm_digit{permutations.read(p)[digit]};
                     sample_index = sample_index | (perm_digit << digit_shift);
                 }
                 if (pow2_samples) {
@@ -140,22 +136,22 @@ public:
             });
     }
     void start(Expr<uint2> pixel, Expr<uint> sample_index) noexcept override {
-        static constexpr auto left_shift2 = [](auto x_in) noexcept {
-            U64 x{x_in};
-            x = (x ^ (x << 16u)) & U64{0x0000ffff0000ffffull};
-            x = (x ^ (x << 8u)) & U64{0x00ff00ff00ff00ffull};
-            x = (x ^ (x << 4u)) & U64{0x0f0f0f0f0f0f0f0full};
-            x = (x ^ (x << 2u)) & U64{0x3333333333333333ull};
-            x = (x ^ (x << 1u)) & U64{0x5555555555555555ull};
-            return x;
-        };
-        static constexpr auto encode_morton = [](auto x, auto y) noexcept -> U64 {
-            return (left_shift2(y) << 1u) | left_shift2(x);
+        static Callable encode_morton = [](UInt x, UInt y) noexcept {
+            static constexpr auto left_shift2 = [](auto x_in) noexcept {
+                U64 x{x_in};
+                x = (x ^ (x << 16u)) & U64{0x0000ffff0000ffffull};
+                x = (x ^ (x << 8u)) & U64{0x00ff00ff00ff00ffull};
+                x = (x ^ (x << 4u)) & U64{0x0f0f0f0f0f0f0f0full};
+                x = (x ^ (x << 2u)) & U64{0x3333333333333333ull};
+                x = (x ^ (x << 1u)) & U64{0x5555555555555555ull};
+                return x;
+            };
+            return ((left_shift2(y) << 1u) | left_shift2(x)).bits();
         };
         _dimension = luisa::nullopt;
         _morton_index = luisa::nullopt;
         _dimension = def(0u);
-        _morton_index = (encode_morton(pixel.x, pixel.y) << _log2_spp) | sample_index;
+        _morton_index = (U64{encode_morton(pixel.x, pixel.y)} << _log2_spp) | sample_index;
     }
     void save_state(Expr<uint> state_id) noexcept override {
         auto state = make_uint3(_morton_index->bits(), *_dimension);
@@ -184,8 +180,8 @@ public:
     }
 };
 
-luisa::unique_ptr<Sampler::Instance> ZSobolSampler::build(Pipeline &pipeline, CommandBuffer &) const noexcept {
-    return luisa::make_unique<ZSobolSamplerInstance>(pipeline, this);
+luisa::unique_ptr<Sampler::Instance> ZSobolSampler::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
+    return luisa::make_unique<ZSobolSamplerInstance>(pipeline, command_buffer, this);
 }
 
 }// namespace luisa::render

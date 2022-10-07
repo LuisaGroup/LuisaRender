@@ -32,8 +32,8 @@ private:
     luisa::optional<UInt> _dimension;
     luisa::optional<U64> _sobol_index;
     Buffer<uint> _sobol_matrices;
-    luisa::unique_ptr<Constant<uint2>> _vdc_sobol_matrices;
-    luisa::unique_ptr<Constant<uint2>> _vdc_sobol_matrices_inv;
+    Buffer<uint2> _vdc_sobol_matrices;
+    Buffer<uint2> _vdc_sobol_matrices_inv;
     Buffer<uint4> _state_buffer;
 
 private:
@@ -49,43 +49,50 @@ private:
 
     template<bool scramble>
     [[nodiscard]] auto _sobol_sample(U64 a, Expr<uint> dimension, Expr<uint> hash) const noexcept {
-        auto v = def(0u);
-        auto i = def(dimension * SobolMatrixSize);
-        $while(a != 0u) {
-            v = ite((a & 1u) != 0u, v ^ _sobol_matrices.read(i), v);
-            a = a >> 1u;
-            i = i + 1u;
+        static Callable impl = [](UInt2 a_in, UInt dimension, BufferVar<uint> sobol_matrices, UInt hash) noexcept {
+            auto v = def(0u);
+            auto i = def(dimension * SobolMatrixSize);
+            auto a = U64{a_in};
+            $while(a != 0u) {
+                v = ite((a & 1u) != 0u, v ^ sobol_matrices.read(i), v);
+                a = a >> 1u;
+                i = i + 1u;
+            };
+            if constexpr (scramble) { v = _fast_owen_scramble(hash, v); }
+            return v * 0x1p-32f;
         };
-        if constexpr (scramble) { v = _fast_owen_scramble(hash, v); }
-        return v * 0x1p-32f;
+        return impl(a.bits(), dimension, _sobol_matrices.view(), hash);
     }
 
     [[nodiscard]] auto _sobol_interval_to_index(uint m, UInt frame, Expr<uint2> p) const noexcept {
         if (m == 0u) { return U64{frame}; }
-        auto c = def(0u);
-        auto m2 = m << 1u;
-        auto index = U64{frame} << m2;
-        auto delta = U64{0u};
-        $while(frame != 0u) {
-            $if((frame & 1u) != 0u) {
-                auto v = U64{_vdc_sobol_matrices->read(c)};
-                delta = delta ^ v;
+        static Callable impl = [](UInt m, UInt frame, UInt2 p, BufferVar<uint2> vdc, BufferVar<uint2> vdc_inv) noexcept {
+            auto c = def(0u);
+            auto m2 = m << 1u;
+            auto index = U64{frame} << m2;
+            auto delta = U64{0u};
+            $while(frame != 0u) {
+                $if((frame & 1u) != 0u) {
+                    auto v = U64{vdc.read(c)};
+                    delta = delta ^ v;
+                };
+                frame >>= 1u;
+                c += 1u;
             };
-            frame >>= 1u;
-            c += 1u;
-        };
-        // flipped b
-        auto b = delta ^ ((U64{p.x} << m) | p.y);
-        auto d = def(0u);
-        $while(b != 0u) {
-            $if ((b & 1u) != 0u) {
-                auto v = U64{_vdc_sobol_matrices_inv->read(d)};
-                index = index ^ v;
+            // flipped b
+            auto b = delta ^ ((U64{p.x} << m) | p.y);
+            auto d = def(0u);
+            $while(b != 0u) {
+                $if((b & 1u) != 0u) {
+                    auto v = U64{vdc_inv.read(d)};
+                    index = index ^ v;
+                };
+                b = b >> 1u;
+                d += 1u;
             };
-            b = b >> 1u;
-            d += 1u;
+            return index.bits();
         };
-        return index;
+        return U64{impl(m, frame, p, _vdc_sobol_matrices.view(), _vdc_sobol_matrices_inv.view())};
     }
 
 public:
@@ -93,10 +100,10 @@ public:
         const Pipeline &pipeline, CommandBuffer &command_buffer,
         const SobolSampler *s) noexcept
         : Sampler::Instance{pipeline, s} {
-        luisa::vector<uint4> vdc_sobol_matrices(SobolMatrixSize * VdCSobolMatrixSize);
         _sobol_matrices = pipeline.device().create_buffer<uint>(SobolMatrixSize * NSobolDimensions);
-        command_buffer << _sobol_matrices.copy_from(SobolMatrices32)
-                       << commit();
+        _vdc_sobol_matrices = pipeline.device().create_buffer<uint2>(SobolMatrixSize);
+        _vdc_sobol_matrices_inv = pipeline.device().create_buffer<uint2>(SobolMatrixSize);
+        command_buffer << _sobol_matrices.copy_from(SobolMatrices32);
     }
     void reset(CommandBuffer &command_buffer, uint2 resolution, uint state_count, uint spp) noexcept override {
         if (spp != next_pow2(spp)) {
@@ -117,8 +124,9 @@ public:
             vdc_sobol_matrices[i] = u64_to_uint2(VdCSobolMatrices[m - 1u][i]);
             vdc_sobol_matrices_inv[i] = u64_to_uint2(VdCSobolMatricesInv[m - 1u][i]);
         }
-        _vdc_sobol_matrices = luisa::make_unique<Constant<uint2>>(vdc_sobol_matrices);
-        _vdc_sobol_matrices_inv = luisa::make_unique<Constant<uint2>>(vdc_sobol_matrices_inv);
+        command_buffer << _vdc_sobol_matrices.copy_from(vdc_sobol_matrices.data())
+                       << _vdc_sobol_matrices_inv.copy_from(vdc_sobol_matrices_inv.data())
+                       << commit();
     }
     void start(Expr<uint2> pixel, Expr<uint> sample_index) noexcept override {
         _dimension.emplace(2u);

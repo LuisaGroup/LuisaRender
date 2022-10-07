@@ -3,14 +3,11 @@
 //
 
 #include <fstream>
-
-#include <core/json.h>
-#include <ast/function_serializer.h>
-#include <util/imageio.h>
 #include <luisa-compute.h>
-
+#include <util/imageio.h>
 #include <util/medium_tracker.h>
 #include <util/progress_bar.h>
+#include <util/sampling.h>
 #include <base/pipeline.h>
 #include <base/integrator.h>
 
@@ -191,10 +188,6 @@ void MegakernelPathTracingInstance::_render_one_camera(
         resolution.x, resolution.y, spp);
 
     using namespace luisa::compute;
-    Callable balanced_heuristic = [](Float pdf_a, Float pdf_b) noexcept {
-        auto p = pdf_a + pdf_b;
-        return ite(p > 0.0f, pdf_a / p, 0.0f);
-    };
 
     Kernel2D render_kernel = [&](UInt frame_index, Float time, Float shutter_weight) noexcept {
         set_block_size(16u, 16u, 1u);
@@ -218,7 +211,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
             $if(!it->valid()) {
                 if (pipeline.environment()) {
                     auto eval = light_sampler->evaluate_miss(ray->direction(), swl, time);
-                    Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
+                    Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
                 }
                 $break;
             };
@@ -228,7 +221,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
                 $if(it->shape()->has_light()) {
                     auto eval = light_sampler->evaluate_hit(
                         *it, ray->origin(), swl, time);
-                    Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
+                    Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
                 };
             }
 
@@ -276,7 +269,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
                     $if(light_sample.eval.pdf > 0.0f & !occluded) {
                         auto wi = light_sample.wi;
                         auto eval = closure->evaluate(wo, wi);
-                        auto w = balanced_heuristic(light_sample.eval.pdf, eval.pdf) /
+                        auto w = balance_heuristic(light_sample.eval.pdf, eval.pdf) /
                                  light_sample.eval.pdf;
                         Li += w * beta * eval.f * light_sample.eval.L;
                     };

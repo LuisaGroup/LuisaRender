@@ -65,16 +65,10 @@ template<typename ProbTable, typename AliasTable>
     return std::make_pair(index, uu);
 }
 
-[[nodiscard]] inline Float balance_heuristic(int nf, Float fPdf, int ng, Float gPdf) noexcept {
-    return (nf * fPdf) / (nf * fPdf + ng * gPdf);
-}
-
-[[nodiscard]] inline Float power_heuristic(int nf, Float fPdf, int ng, Float gPdf) noexcept {
-    Float f = nf * fPdf, g = ng * gPdf;
-    auto ff = f * f;
-    auto gg = g * g;
-    return ite(isinf(ff), 1.f, ff / (ff + gg));
-}
+[[nodiscard]] Float balance_heuristic(Expr<uint> nf, Expr<float> fPdf, Expr<uint> ng, Expr<float> gPdf) noexcept;
+[[nodiscard]] Float power_heuristic(Expr<uint> nf, Expr<float> fPdf, Expr<uint> ng, Expr<float> gPdf) noexcept;
+[[nodiscard]] Float balance_heuristic(Expr<float> fPdf, Expr<float> gPdf) noexcept;
+[[nodiscard]] Float power_heuristic(Expr<float> fPdf, Expr<float> gPdf) noexcept;
 
 }// namespace luisa::render
 

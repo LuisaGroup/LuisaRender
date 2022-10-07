@@ -2,11 +2,9 @@
 // Created by ChenXin on 2022/2/23.
 //
 
-#include "core/hash.h"
-#include <util/imageio.h>
-
 #include <luisa-compute.h>
-
+#include <util/imageio.h>
+#include <util/sampling.h>
 #include <util/medium_tracker.h>
 #include <base/pipeline.h>
 #include <base/integrator.h>
@@ -254,11 +252,8 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
 
     auto render_1spp_shader_iter = _render_1spp_shaders.find(camera);
     if (render_1spp_shader_iter == _render_1spp_shaders.end()) {
-        using namespace luisa::compute;
 
-        Callable balanced_heuristic = [](Float pdf_a, Float pdf_b) noexcept {
-            return ite(pdf_a > 0.0f, pdf_a / (pdf_a + pdf_b), 0.0f);
-        };
+        using namespace luisa::compute;
 
         Kernel2D render_kernel_1spp = [&](UInt frame_index, Float time, Float shutter_weight, ImageFloat Li_1spp) noexcept {
             set_block_size(16u, 16u, 1u);
@@ -288,7 +283,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                 $if(!it->valid()) {
                     if (pipeline().environment()) {
                         auto eval = light_sampler->evaluate_miss(ray->direction(), swl, time);
-                        Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
+                        Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
                         $if(all(pixel_id == pixel_checked)) {
@@ -304,7 +299,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                     $if(it->shape()->has_light()) {
                         auto eval = light_sampler->evaluate_hit(
                             *it, ray->origin(), swl, time);
-                        Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
+                        Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
                         $if(all(pixel_id == pixel_checked)) {
@@ -358,7 +353,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                         $if(light_sample.eval.pdf > 0.0f & !occluded) {
                             auto wi = light_sample.wi;
                             auto eval = closure->evaluate(wo, wi);
-                            auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
+                            auto mis_weight = balance_heuristic(light_sample.eval.pdf, eval.pdf);
                             Li += mis_weight / light_sample.eval.pdf * beta * eval.f * light_sample.eval.L;
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
@@ -409,11 +404,8 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
 
     auto bp_shader_iter = _bp_shaders.find(camera);
     if (bp_shader_iter == _bp_shaders.end()) {
-        using namespace luisa::compute;
 
-        Callable balanced_heuristic = [](Float pdf_a, Float pdf_b) noexcept {
-            return ite(pdf_a > 0.0f, pdf_a / (pdf_a + pdf_b), 0.0f);
-        };
+        using namespace luisa::compute;
 
         Kernel2D bp_kernel = [&](UInt frame_index, Float time, Float shutter_weight, ImageFloat Li_1spp) noexcept {
             set_block_size(16u, 16u, 1u);
@@ -458,7 +450,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                     if (pipeline().environment()) {
                         auto eval = light_sampler->evaluate_miss(
                             ray->direction(), swl, time);
-                        Li -= beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
+                        Li -= beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
                         $if(all(pixel_id == pixel_checked)) {
@@ -475,7 +467,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                     $if(it->shape()->has_light()) {
                         auto eval = light_sampler->evaluate_hit(
                             *it, ray->origin(), swl, time);
-                        Li -= beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
+                        Li -= beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
                         $if(all(pixel_id == pixel_checked)) {
@@ -530,7 +522,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                         $if(light_sample.eval.pdf > 0.0f & !occluded) {
                             auto wi = light_sample.wi;
                             auto eval = closure->evaluate(wo, wi);
-                            auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
+                            auto mis_weight = balance_heuristic(light_sample.eval.pdf, eval.pdf);
                             auto weight = mis_weight / light_sample.eval.pdf * beta;
                             Li -= weight * eval.f * light_sample.eval.L;
 
@@ -660,10 +652,6 @@ void MegakernelReplayDiffInstance::_render_one_camera(
     if (shader_iter == _render_shaders.end()) {
         using namespace luisa::compute;
 
-        Callable balanced_heuristic = [](Float pdf_a, Float pdf_b) noexcept {
-            return ite(pdf_a > 0.0f, pdf_a / (pdf_a + pdf_b), 0.0f);
-        };
-
         Kernel2D render_kernel = [&](UInt frame_index, Float time, Float shutter_weight) noexcept {
             set_block_size(16u, 16u, 1u);
 
@@ -686,7 +674,7 @@ void MegakernelReplayDiffInstance::_render_one_camera(
                 $if(!it->valid()) {
                     if (pipeline().environment()) {
                         auto eval = light_sampler->evaluate_miss(ray->direction(), swl, time);
-                        Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
+                        Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
                     }
                     $break;
                 };
@@ -696,7 +684,7 @@ void MegakernelReplayDiffInstance::_render_one_camera(
                     $if(it->shape()->has_light()) {
                         auto eval = light_sampler->evaluate_hit(
                             *it, ray->origin(), swl, time);
-                        Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
+                        Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
                     };
                 }
 
@@ -744,7 +732,7 @@ void MegakernelReplayDiffInstance::_render_one_camera(
                         $if(light_sample.eval.pdf > 0.0f & !occluded) {
                             auto wi = light_sample.wi;
                             auto eval = closure->evaluate(wo, wi);
-                            auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
+                            auto mis_weight = balance_heuristic(light_sample.eval.pdf, eval.pdf);
                             Li += mis_weight / light_sample.eval.pdf * beta * eval.f * light_sample.eval.L;
                         };
                         // sample material

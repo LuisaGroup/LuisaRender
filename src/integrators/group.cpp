@@ -1,5 +1,4 @@
 #include <util/imageio.h>
-#include <util/rng.h>
 #include <base/pipeline.h>
 #include <base/integrator.h>
 #include <base/scene.h>
@@ -10,11 +9,6 @@ class GroupIntegrator;
 
 class GroupIntegratorInstance final : public Integrator::Instance {
     luisa::vector<luisa::unique_ptr<Integrator::Instance>> _integrators;
-
-private:
-    void _render_one_camera(
-        CommandBuffer &command_buffer,
-        Camera::Instance *camera) noexcept;
 
 public:
     explicit GroupIntegratorInstance(
