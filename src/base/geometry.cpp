@@ -29,8 +29,10 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
             LUISA_ERROR_WITH_LOCATION(
                 "Deformable meshes are not yet supported.");
         }
-        auto iter = _meshes.find(shape);
-        if (iter == _meshes.end()) {
+        auto mesh = [&] {
+            if (auto iter = _meshes.find(shape); iter != _meshes.end()) {
+                return iter->second;
+            }
             auto mesh_geom = [&] {
                 auto vertices = shape->vertices();
                 auto triangles = shape->triangles();
@@ -75,14 +77,14 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
                 return geom;
             }();
             // assign mesh data
-            MeshData mesh{};
-            mesh.resource = mesh_geom.resource;
-            mesh.geometry_buffer_id_base = mesh_geom.buffer_id_base;
-            mesh.two_sided = shape->two_sided().value_or(false);
-            mesh.shadow_term = shape->shadow_terminator_factor();
-            iter = _meshes.emplace(shape, mesh).first;
-        }
-        auto mesh = iter->second;
+            MeshData mesh_data{};
+            mesh_data.resource = mesh_geom.resource;
+            mesh_data.geometry_buffer_id_base = mesh_geom.buffer_id_base;
+            mesh_data.two_sided = shape->two_sided().value_or(false);
+            mesh_data.shadow_term = shape->shadow_terminator_factor();
+            _meshes.emplace(shape, mesh_data);
+            return mesh_data;
+        }();
         auto two_sided = mesh.two_sided;
         two_sided = overridden_two_sided.value_or(two_sided);
         auto instance_id = static_cast<uint>(_accel.size());
