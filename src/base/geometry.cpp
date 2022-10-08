@@ -203,12 +203,12 @@ Var<Triangle> Geometry::triangle(const Var<Shape::Handle> &instance, Expr<uint> 
         auto det = difference_of_products(duv02.x, duv12.y, duv02.y, duv12.x);
         auto dpdu = def(make_float3());
         auto dpdv = def(make_float3());
-        auto degenerate_uv = abs(det) < 1e-9f;
+        auto degenerate_uv = abs(det) < 1e-8f;
         $if(!degenerate_uv) {
             // Compute triangle $\dpdu$ and $\dpdv$ via matrix inversion
             auto invdet = 1.f / det;
-            dpdu = difference_of_products(duv12[1], dp02, duv02[1], dp12) * invdet;
-            dpdv = difference_of_products(duv02[0], dp12, duv12[0], dp02) * invdet;
+            dpdu = difference_of_products(duv12.y, dp02, duv02.y, dp12) * invdet;
+            dpdv = difference_of_products(duv02.x, dp12, duv12.x, dp02) * invdet;
         };
         // Handle degenerate triangle $(u,v)$ parameterization or partial derivatives
         $if(degenerate_uv | length_squared(cross(dpdu, dpdv)) == 0.f) {
