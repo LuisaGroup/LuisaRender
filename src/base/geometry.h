@@ -34,8 +34,7 @@ public:
     struct MeshData {
         Mesh *resource;
         float shadow_term;
-        uint geometry_buffer_id_base : 24;
-        bool two_sided : 8;
+        uint geometry_buffer_id_base;
     };
 
 private:
@@ -50,11 +49,7 @@ private:
     Buffer<Shape::Handle> _instance_buffer;
 
 private:
-    void _build_geometry(CommandBuffer &command_buffer,
-                         luisa::span<const Shape *const> shapes,
-                         float init_time, AccelUsageHint hint) noexcept;
     void _process_shape(CommandBuffer &command_buffer, const Shape *shape, float init_time,
-                        luisa::optional<bool> overridden_two_sided = luisa::nullopt,
                         const Surface *overridden_surface = nullptr,
                         const Light *overridden_light = nullptr) noexcept;
 

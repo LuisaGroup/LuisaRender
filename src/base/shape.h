@@ -28,7 +28,6 @@ public:
     class Vertex;
 
 public:
-    static constexpr auto property_flag_two_sided = 1u << 0u;
     static constexpr auto property_flag_has_surface = 1u << 1u;
     static constexpr auto property_flag_has_light = 1u << 2u;
 
@@ -36,8 +35,6 @@ private:
     const Surface *_surface;
     const Light *_light;
     const Transform *_transform;
-    bool _two_sided;
-    bool _two_sided_specified;
     float _shadow_terminator;
 
 public:
@@ -45,7 +42,6 @@ public:
     [[nodiscard]] auto surface() const noexcept { return _surface; }
     [[nodiscard]] auto light() const noexcept { return _light; }
     [[nodiscard]] auto transform() const noexcept { return _transform; }
-    [[nodiscard]] auto two_sided() const noexcept { return _two_sided_specified ? luisa::make_optional(_two_sided) : luisa::nullopt; }
     [[nodiscard]] auto shadow_terminator_factor() const noexcept { return _shadow_terminator; }
     [[nodiscard]] virtual bool is_mesh() const noexcept = 0;
     [[nodiscard]] virtual luisa::span<const Vertex> vertices() const noexcept = 0;                         // empty if the shape is not a mesh
@@ -162,7 +158,6 @@ LUISA_STRUCT(
     [[nodiscard]] auto surface_tag() const noexcept { return surface_tag_and_light_tag >> luisa::render::Shape::Handle::light_tag_bits; }
     [[nodiscard]] auto light_tag() const noexcept { return surface_tag_and_light_tag & luisa::render::Shape::Handle::light_tag_mask; }
     [[nodiscard]] auto test_property_flag(luisa::uint flag) const noexcept { return (property_flags() & flag) != 0u; }
-    [[nodiscard]] auto two_sided() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_two_sided); }
     [[nodiscard]] auto has_light() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_light); }
     [[nodiscard]] auto has_surface() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_surface); }
     [[nodiscard]] auto shadow_terminator_factor() const noexcept { return shadow_term; }
