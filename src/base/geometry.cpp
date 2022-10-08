@@ -57,9 +57,9 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
                 // compute alias table
                 luisa::vector<float> triangle_areas(triangles.size());
                 std::transform(triangles.cbegin(), triangles.cend(), triangle_areas.begin(), [vertices](auto t) noexcept {
-                    auto p0 = vertices[t.i0].pos;
-                    auto p1 = vertices[t.i1].pos;
-                    auto p2 = vertices[t.i2].pos;
+                    auto p0 = make_float3(vertices[t.i0].compressed_p[0], vertices[t.i0].compressed_p[1], vertices[t.i0].compressed_p[2]);
+                    auto p1 = make_float3(vertices[t.i1].compressed_p[0], vertices[t.i1].compressed_p[1], vertices[t.i1].compressed_p[2]);
+                    auto p2 = make_float3(vertices[t.i2].compressed_p[0], vertices[t.i2].compressed_p[1], vertices[t.i2].compressed_p[2]);
                     return std::abs(length(cross(p1 - p0, p2 - p0)));
                 });
                 auto [alias_table, pdf] = create_alias_table(triangle_areas);
@@ -78,8 +78,10 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
             // assign mesh data
             MeshData mesh_data{};
             mesh_data.resource = mesh_geom.resource;
-            mesh_data.geometry_buffer_id_base = mesh_geom.buffer_id_base;
             mesh_data.shadow_term = shape->shadow_terminator_factor();
+            mesh_data.geometry_buffer_id_base = mesh_geom.buffer_id_base;
+            mesh_data.has_normal = shape->has_normal();
+            mesh_data.has_uv = shape->has_uv();
             _meshes.emplace(shape, mesh_data);
             return mesh_data;
         }();
@@ -102,6 +104,8 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
             light_tag = _pipeline.register_light(command_buffer, light);
             properties |= Shape::property_flag_has_light;
         }
+        if (mesh.has_normal) { properties |= Shape::property_flag_has_normal; }
+        if (mesh.has_uv) { properties |= Shape::property_flag_has_uv; }
         _instances.emplace_back(Shape::Handle::encode(
             mesh.geometry_buffer_id_base,
             properties, surface_tag, light_tag,
@@ -232,11 +236,14 @@ ShadingAttribute Geometry::shading_point(const Var<Shape::Handle> &instance, con
     auto p2 = v2->position();
     auto p = bary.x * p0 + bary.y * p1 + bary.z * p2;
     auto ng = cross(p1 - p0, p2 - p0);
-    auto uv = bary.x * v0->uv() + bary.y * v1->uv() + bary.z * v2->uv();
-    auto tangent = _compute_tangent(p0, p1, p2, v0->uv(), v1->uv(), v2->uv());
-    auto n0 = v0->normal();
-    auto n1 = v1->normal();
-    auto n2 = v2->normal();
+    auto uv0 = ite(instance->has_normal(), v0->uv(), make_float2());
+    auto uv1 = ite(instance->has_normal(), v1->uv(), make_float2());
+    auto uv2 = ite(instance->has_normal(), v2->uv(), make_float2());
+    auto uv = bary.x * uv0 + bary.y * uv1 + bary.z * uv2;
+    auto tangent = _compute_tangent(p0, p1, p2, uv0, uv1, uv2);
+    auto n0 = ite(instance->has_normal(), v0->normal(), ng);
+    auto n1 = ite(instance->has_normal(), v1->normal(), ng);
+    auto n2 = ite(instance->has_normal(), v2->normal(), ng);
     auto ns = bary.x * n0 + bary.y * n1 + bary.z * n2;
     // offset p to fake surface for the shadow terminator
     // reference: Ray Tracing Gems 2, Chap. 4

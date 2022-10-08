@@ -15,11 +15,11 @@ namespace luisa::render {
 using compute::Accel;
 using compute::Buffer;
 using compute::CommandBuffer;
+using compute::Expr;
+using compute::Float4x4;
+using compute::Hit;
 using compute::Mesh;
 using compute::Var;
-using compute::Expr;
-using compute::Hit;
-using compute::Float4x4;
 
 class Pipeline;
 
@@ -34,7 +34,9 @@ public:
     struct MeshData {
         Mesh *resource;
         float shadow_term;
-        uint geometry_buffer_id_base;
+        uint geometry_buffer_id_base : 30;
+        bool has_normal : 1;
+        bool has_uv : 1;
     };
 
 private:
