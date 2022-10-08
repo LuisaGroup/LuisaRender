@@ -120,12 +120,15 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
 
     // 3 diffuse, 3 specular, 3 normal, 1 depth, 3 albedo, 1 roughness, 1 emissive, 1 metallic, 1 transmissive, 1 specular-bounce
     auto auxiliary_output = pipeline.device().create_image<float>(PixelStorage::FLOAT4, resolution);
+    auto auxiliary_output_diffuse = pipeline.device().create_image<float>(PixelStorage::FLOAT4, resolution);
+    auto auxiliary_output_specular = pipeline.device().create_image<float>(PixelStorage::FLOAT4, resolution);
     auto auxiliary_noisy = pipeline.device().create_image<float>(PixelStorage::FLOAT4, resolution);
     auto auxiliary_diffuse = pipeline.device().create_image<float>(PixelStorage::FLOAT4, resolution);
     auto auxiliary_specular = pipeline.device().create_image<float>(PixelStorage::FLOAT4, resolution);
     auto auxiliary_normal = pipeline.device().create_image<float>(PixelStorage::FLOAT4, resolution);
     auto auxiliary_depth = pipeline.device().create_image<float>(PixelStorage::FLOAT1, resolution);
     auto auxiliary_albedo = pipeline.device().create_image<float>(PixelStorage::FLOAT4, resolution);
+    auto auxiliary_roughness = pipeline.device().create_image<float>(PixelStorage::FLOAT4, resolution);
 
     Kernel2D clear_kernel = [&]() noexcept {
         auxiliary_noisy.write(dispatch_id().xy(), make_float4(0.0f));
@@ -147,8 +150,13 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
         SampledSpectrum beta{swl.dimension(), camera_weight};
         SampledSpectrum Li{swl.dimension()};
 
+        SampledSpectrum beta_diffuse{swl.dimension(), camera_weight};
+        SampledSpectrum Li_diffuse{swl.dimension()};
+
         auto ray = camera_ray;
         auto pdf_bsdf = def(1e16f);
+        auto specular_bounce = def(false);
+
         $for(depth, pt->node<AuxiliaryBufferPathTracing>()->max_depth()) {
 
             // trace
@@ -161,7 +169,9 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                     // create closure
                     auto closure = surface->closure(*it, swl, 1.f, time);
                     auto albedo = closure->albedo();
+                    auto roughness = closure->roughness();
                     auxiliary_albedo.write(dispatch_id().xy(), make_float4(spectrum->srgb(swl, albedo), 1.f));
+                    auxiliary_roughness.write(dispatch_id().xy(), make_float4(roughness, 0.f, 0.f));
                 });
             };
 
@@ -170,6 +180,9 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                 if (pipeline.environment()) {
                     auto eval = light_sampler->evaluate_miss(ray->direction(), swl, time);
                     Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
+                    $if(!specular_bounce) {
+                        Li_diffuse += beta_diffuse * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
+                    };
                 }
                 $break;
             };
@@ -180,6 +193,9 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                     auto eval = light_sampler->evaluate_hit(
                         *it, ray->origin(), swl, time);
                     Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
+                    $if(!specular_bounce) {
+                        Li_diffuse += beta_diffuse * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
+                    };
                 };
             }
 
@@ -200,6 +216,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
             auto u_lobe = sampler->generate_1d();
             auto u_bsdf = sampler->generate_2d();
             auto eta_scale = def(1.f);
+
             pipeline.surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
                 // create closure
                 auto closure = surface->closure(*it, swl, 1.f, time);
@@ -220,7 +237,6 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                     pdf_bsdf = 1e16f;
                 }
                 $else {
-
                     auto wo = -ray->direction();
 
                     // direct lighting
@@ -230,6 +246,9 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                         auto w = balanced_heuristic(light_sample.eval.pdf, eval.pdf) /
                                  light_sample.eval.pdf;
                         Li += w * beta * eval.f * light_sample.eval.L;
+                        $if(!specular_bounce) {
+                            Li_diffuse += w * beta_diffuse * eval.f * light_sample.eval.L;
+                        };
                     };
 
                     // sample material
@@ -238,6 +257,9 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                     pdf_bsdf = sample.eval.pdf;
                     auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
                     beta *= w * sample.eval.f;
+                    $if(!specular_bounce) {
+                        beta_diffuse *= w * sample.eval.f;
+                    };
 
                     // apply eta scale
                     auto eta = closure->eta().value_or(1.f);
@@ -248,18 +270,21 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                 };
             });
 
-            // rr
-            $if(beta.all([](auto b) noexcept { return isnan(b) | b <= 0.f; })) { $break; };
-            auto rr_depth = pt->node<AuxiliaryBufferPathTracing>()->rr_depth();
-            auto rr_threshold = pt->node<AuxiliaryBufferPathTracing>()->rr_threshold();
-            auto q = max(beta.max() * eta_scale, .05f);
-            $if(depth + 1u >= rr_depth & q < rr_threshold) {
-                $if(sampler->generate_1d() >= q) { $break; };
-                beta *= 1.0f / q;
-            };
+            pipeline.surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
+                auto closure = surface->closure(*it, swl, 1.f, time);
+                specular_bounce = false;
+                $if((closure->roughness().x < 0.05f) & (closure->roughness().y < 0.05f)) {
+                    specular_bounce = true;
+                };
+            });
+            // rr is closed for aov
         };
         auto curr = auxiliary_noisy.read(pixel_id);
         auxiliary_noisy.write(pixel_id, curr + make_float4(spectrum->srgb(swl, Li * shutter_weight), 1.f));
+        curr = auxiliary_diffuse.read(pixel_id);
+        auxiliary_diffuse.write(pixel_id, curr + make_float4(spectrum->srgb(swl, Li_diffuse * shutter_weight), 1.f));
+        curr = auxiliary_specular.read(pixel_id);
+        auxiliary_specular.write(pixel_id, curr + make_float4(spectrum->srgb(swl, (Li - Li_diffuse) * shutter_weight), 1.f));
     };
 
     Kernel2D convert_image_kernel = [](ImageFloat accum, ImageFloat output) noexcept {
@@ -292,7 +317,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
     auto dispatches_per_commit = 32u;
     auto sample_id = 0u;
     auto check_sample_output = [](uint32_t n) -> bool {
-        return n == 0 || (n > 0 && ((n & (-n)) == n) && n % 3 == 1);
+        return n > 0 && ((n & (n - 1)) == 0);
     };
     for (auto s : shutter_samples) {
         pipeline.update(command_buffer, s.point.time);
@@ -301,17 +326,18 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
         auto filename = camera->node()->file().stem().string();
         auto ext = camera->node()->file().extension().string();
         for (auto i = 0u; i < pt->node<AuxiliaryBufferPathTracing>()->noisy_count(); i++) {
-            std::vector<float> hostaux_noisy(pixel_count * 4);
             command_buffer << render_auxiliary(sample_id++, s.point.time, s.point.weight)
                                   .dispatch(resolution);
             if (i == 0) {
                 std::vector<float> hostaux_normal(pixel_count * 4);
                 std::vector<float> hostaux_depth(pixel_count * 1);
                 std::vector<float> hostaux_albedo(pixel_count * 4);
+                std::vector<float> hostaux_roughness(pixel_count * 4);
                 command_buffer
                     << auxiliary_normal.copy_to(hostaux_normal.data())
                     << auxiliary_depth.copy_to(hostaux_depth.data())
                     << auxiliary_albedo.copy_to(hostaux_albedo.data())
+                    << auxiliary_roughness.copy_to(hostaux_roughness.data())
                     << synchronize();
                 // normal
                 auto nrm_path = parent_path / fmt::format("{}_normal{}", filename, ext);
@@ -322,14 +348,28 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                 // albedo
                 auto abd_path = parent_path / fmt::format("{}_albedo{}", filename, ext);
                 save_image(abd_path, hostaux_albedo.data(), resolution);
+                // roughness
+                auto rough_path = parent_path / fmt::format("{}_roughness{}", filename, ext);
+                save_image(rough_path, hostaux_roughness.data(), resolution);
             }
 
-            if (check_sample_output(i)) {
+            if (check_sample_output(i + 1)) {
+                std::vector<float> hostaux_noisy(pixel_count * 4);
+                std::vector<float> hostaux_diffuse(pixel_count * 4);
+                std::vector<float> hostaux_specular(pixel_count * 4);
                 command_buffer << convert_image(auxiliary_noisy, auxiliary_output).dispatch(resolution)
                                << auxiliary_output.copy_to(hostaux_noisy.data())
+                               << convert_image(auxiliary_diffuse, auxiliary_output_diffuse).dispatch(resolution)
+                               << auxiliary_output_diffuse.copy_to(hostaux_diffuse.data())
+                               << convert_image(auxiliary_specular, auxiliary_output_specular).dispatch(resolution)
+                               << auxiliary_output_specular.copy_to(hostaux_specular.data())
                                << synchronize();
                 auto noisy_path = parent_path / fmt::format("{}_sample{:02d}{}", filename, i, ext);
                 save_image(noisy_path, hostaux_noisy.data(), resolution);
+                auto diffuse_path = parent_path / fmt::format("{}_diffuse{:02d}{}", filename, i, ext);
+                save_image(diffuse_path, hostaux_diffuse.data(), resolution);
+                auto specular_path = parent_path / fmt::format("{}_specular{:02d}{}", filename, i, ext);
+                save_image(specular_path, hostaux_specular.data(), resolution);
             }
             command_buffer << synchronize();
         }
