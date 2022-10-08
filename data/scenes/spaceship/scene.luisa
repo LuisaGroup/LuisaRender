@@ -122,10 +122,10 @@ Surface mat_Glass : Glass {
     v { 1.0, 1.0, 1.0 }
     semantic { "albedo" }
   }
-  // eta : Constant {
-  //   v { 1.5 }
-  // }
-  eta { "SF11" }
+  eta : Constant {
+    v { 1.5 }
+  }
+  // eta { "SF11" }
   roughness : Constant {
     v { 0.05 }
   }
@@ -1387,7 +1387,7 @@ Camera camera : Pinhole {
 
 render {
   cameras { @camera }
-  spectrum : sRGB {}
+  spectrum : Hero {}
   integrator : MegaPath {
     sampler : PMJ02BN {}
     depth { 16 }

@@ -164,14 +164,14 @@ private:
         SampledSpectrum f{_swl.dimension()};
         auto pdf = def(0.f);
         auto ratio = _kr_ratio * _fresnel->evaluate(cos_theta(wo_local))[0u];
-        //        auto ratio = .5f;
+        auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f, 1.f, 0.f);
         $if(same_hemisphere(wo_local, wi_local)) {
-            f = _refl->evaluate(wo_local, wi_local, mode);
-            pdf = _refl->pdf(wo_local, wi_local, mode) * ratio;
+            f = _refl->evaluate(wo_local, wi_local, mode) * same_sided;
+            pdf = _refl->pdf(wo_local, wi_local, mode) * ratio * same_sided;
         }
         $else {
-            f = _trans->evaluate(wo_local, wi_local, mode);
-            pdf = _trans->pdf(wo_local, wi_local, mode) * (1.f - ratio);
+            f = _trans->evaluate(wo_local, wi_local, mode) * (1.f - same_sided);
+            pdf = _trans->pdf(wo_local, wi_local, mode) * (1.f - ratio) * (1.f - same_sided);
         };
         auto entering = wi_local.z < 0.f;
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
@@ -185,17 +185,22 @@ private:
         auto wi_local = def(make_float3(0.0f, 0.0f, 1.0f));
         auto event = def(Surface::event_reflect);
         auto ratio = _kr_ratio * _fresnel->evaluate(cos_theta(wo_local))[0u];
-        //        auto ratio = .5f;
+        auto wi = def(make_float3());
         $if(u_lobe < ratio) {// Reflection
             f = _refl->sample(wo_local, &wi_local, u, &pdf, mode);
-            pdf *= ratio;
+            wi = _it.shading().local_to_world(wi_local);
+            auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f, 1.f, 0.f);
+            pdf *= ratio * same_sided;
+            f *= same_sided;
         }
         $else {// Transmission
             f = _trans->sample(wo_local, &wi_local, u, &pdf, mode);
-            pdf *= (1.f - ratio);
+            wi = _it.shading().local_to_world(wi_local);
+            auto different_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) < 0.0f, 1.f, 0.f);
+            f *= different_sided;
+            pdf *= (1.f - ratio) * different_sided;
             event = ite(cos_theta(wo_local) > 0.f, Surface::event_enter, Surface::event_exit);
         };
-        auto wi = _it.shading().local_to_world(wi_local);
         auto entering = wi_local.z < 0.f;
         return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf},
                 .wi = wi,
