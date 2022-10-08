@@ -28,7 +28,8 @@ public:
     [[nodiscard]] auto has_uv() const noexcept { return _has_uv; }
 
     // Load the mesh from a file.
-    [[nodiscard]] static auto load(std::filesystem::path path, uint subdiv_level, bool flip_uv) noexcept {
+    [[nodiscard]] static auto load(std::filesystem::path path, uint subdiv_level,
+                                   bool flip_uv, bool drop_normal) noexcept {
 
         // TODO: static lifetime seems not good...
         static luisa::lru_cache<uint64_t, std::shared_future<MeshLoader>> loaded_meshes{32u};
@@ -42,7 +43,7 @@ public:
             return *m;
         }
 
-        auto future = ThreadPool::global().async([path = std::move(path), subdiv_level, flip_uv] {
+        auto future = ThreadPool::global().async([path = std::move(path), subdiv_level, flip_uv, drop_normal] {
             Clock clock;
             auto path_string = path.string();
             Assimp::Importer importer;
@@ -55,6 +56,7 @@ public:
                                 aiProcess_FindInvalidData | aiProcess_SortByPType |
                                 aiProcess_FindDegenerates | aiProcess_ImproveCacheLocality;
             if (!flip_uv) { import_flags |= aiProcess_FlipUVs; }
+            if (drop_normal) { import_flags |= aiProcess_DropNormals; }
             auto remove_flags = aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS |
                                 aiComponent_CAMERAS | aiComponent_COLORS |
                                 aiComponent_LIGHTS | aiComponent_MATERIALS |
@@ -93,15 +95,15 @@ public:
             auto ai_normals = mesh->mNormals;
             auto ai_tex_coords = mesh->mTextureCoords[0];
             loader._has_uv = ai_tex_coords != nullptr;
-            loader._has_normal = ai_normals != nullptr;
+            loader._has_normal = !drop_normal && ai_normals != nullptr;
             for (auto i = 0; i < vertex_count; i++) {
                 auto p = make_float3(ai_positions[i].x, ai_positions[i].y, ai_positions[i].z);
-                auto n = ai_normals == nullptr ?
-                             make_float3(0.f) :
-                             make_float3(ai_normals[i].x, ai_normals[i].y, ai_normals[i].z);
-                auto uv = ai_tex_coords == nullptr ?
-                              make_float2(0.f) :
-                              make_float2(ai_tex_coords[i].x, ai_tex_coords[i].y);
+                auto n = loader._has_normal ?
+                             normalize(make_float3(ai_normals[i].x, ai_normals[i].y, ai_normals[i].z)) :
+                             make_float3(0.f);
+                auto uv = loader._has_uv ?
+                              make_float2(ai_tex_coords[i].x, ai_tex_coords[i].y) :
+                              make_float2(0.f);
                 loader._vertices[i] = Shape::Vertex::encode(p, n, uv);
             }
             if (subdiv_level == 0u) {
@@ -110,6 +112,7 @@ public:
                 std::transform(
                     ai_triangles, ai_triangles + mesh->mNumFaces, loader._triangles.begin(),
                     [](const aiFace &face) noexcept {
+                        assert(face.mNumIndices == 3u);
                         return Triangle{face.mIndices[0], face.mIndices[1], face.mIndices[2]};
                     });
             } else {
@@ -117,6 +120,7 @@ public:
                 loader._triangles.resize(mesh->mNumFaces * 2u);
                 for (auto i = 0u; i < mesh->mNumFaces; i++) {
                     auto &face = ai_quads[i];
+                    assert(face.mNumIndices == 4u);
                     loader._triangles[i * 2u + 0u] = {face.mIndices[0], face.mIndices[1], face.mIndices[2]};
                     loader._triangles[i * 2u + 1u] = {face.mIndices[0], face.mIndices[2], face.mIndices[3]};
                 }
@@ -142,7 +146,8 @@ public:
           _loader{MeshLoader::load(
               desc->property_path("file"),
               desc->property_uint_or_default("subdivision", 0u),
-              desc->property_bool_or_default("flip_uv", false))} {}
+              desc->property_bool_or_default("flip_uv", false),
+              desc->property_bool_or_default("drop_normal", false))} {}
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::span<const Shape *const> children() const noexcept override { return {}; }
     [[nodiscard]] bool deformable() const noexcept override { return false; }

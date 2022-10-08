@@ -205,10 +205,11 @@ public:
 
     private:
         const Texture::Instance *_map;
+        float _strength;
 
     public:
-        Instance(BaseInstance &&base, const Texture::Instance *normal) noexcept
-            : BaseInstance{std::move(base)}, _map{normal} {}
+        Instance(BaseInstance &&base, const Texture::Instance *normal, float strength) noexcept
+            : BaseInstance{std::move(base)}, _map{normal}, _strength{strength} {}
         [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
             const Interaction &it, const SampledWavelengths &swl,
             Expr<float> eta_i, Expr<float> time) const noexcept override {
@@ -216,6 +217,9 @@ public:
                 return BaseInstance::closure(it, swl, eta_i, time);
             }
             auto normal_local = 2.f * _map->evaluate(it, swl, time).xyz() - 1.f;
+            if (_strength != 1.f) {
+                normal_local *= make_float3(_strength, _strength, 1.f);
+            }
             auto normal = it.shading().local_to_world(normal_local);
             auto mapped_it = it;
             mapped_it.set_shading(Frame::make(normal, it.shading().u()));
@@ -225,13 +229,15 @@ public:
 
 private:
     const Texture *_normal_map;
+    float _strength;
 
 public:
     NormalMapWrapper(Scene *scene, const SceneNodeDesc *desc) noexcept
         : BaseSurface{scene, desc},
           _normal_map{[](auto scene, auto desc) noexcept {
               return scene->load_texture(desc->property_node_or_default("normal_map"));
-          }(scene, desc)} {}
+          }(scene, desc)},
+          _strength{desc->property_float_or_default("normal_map_strength", 1.f)} {}
 
 protected:
     [[nodiscard]] luisa::unique_ptr<Surface::Instance> _build(
@@ -241,7 +247,8 @@ protected:
             std::move(*dynamic_cast<BaseInstance *>(base.release())),
             [this](auto &pipeline, auto &command_buffer) noexcept {
                 return pipeline.build_texture(command_buffer, _normal_map);
-            }(pipeline, command_buffer));
+            }(pipeline, command_buffer),
+            _strength);
     }
 };
 
