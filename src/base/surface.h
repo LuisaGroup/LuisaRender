@@ -213,14 +213,10 @@ public:
         [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
             const Interaction &it, const SampledWavelengths &swl,
             Expr<float> eta_i, Expr<float> time) const noexcept override {
-            if (_map == nullptr) {
-                return BaseInstance::closure(it, swl, eta_i, time);
-            }
+            if (_map == nullptr) { return BaseInstance::closure(it, swl, eta_i, time); }
             auto normal_local = 2.f * _map->evaluate(it, swl, time).xyz() - 1.f;
-            if (_strength != 1.f) {
-                normal_local *= make_float3(_strength, _strength, 1.f);
-            }
-            auto normal = it.shading().local_to_world(normal_local);
+            if (_strength != 1.f) { normal_local *= make_float3(_strength, _strength, 1.f); }
+            auto normal = normalize(it.shading().local_to_world(normal_local));
             auto mapped_it = it;
             mapped_it.set_shading(Frame::make(normal, it.shading().u()));
             return BaseInstance::closure(mapped_it, swl, eta_i, time);
