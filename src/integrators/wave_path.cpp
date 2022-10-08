@@ -4,9 +4,9 @@
 
 #include <fstream>
 
-#include <util/imageio.h>
 #include <luisa-compute.h>
-
+#include <util/imageio.h>
+#include <util/sampling.h>
 #include <util/medium_tracker.h>
 #include <util/progress_bar.h>
 #include <base/pipeline.h>
@@ -323,10 +323,6 @@ void WavefrontPathTracingInstance::_render_one_camera(
         };
     });
 
-    Callable balanced_heuristic = [](Float pdf_a, Float pdf_b) noexcept {
-        return ite(pdf_a > 0.0f, pdf_a / (pdf_a + pdf_b), 0.0f);
-    };
-
     LUISA_INFO("Compiling environment evaluation kernel.");
     auto evaluate_miss_shader = device.compile_async<1>([&](BufferUInt path_indices, BufferRay rays,
                                                             BufferUInt queue, BufferUInt queue_size, Float time) noexcept {
@@ -341,7 +337,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                 auto beta = path_states.read_beta(path_id);
                 auto Li = path_states.read_radiance(path_id);
                 auto eval = light_sampler()->evaluate_miss(wi, swl, time);
-                auto mis_weight = balanced_heuristic(pdf_bsdf, eval.pdf);
+                auto mis_weight = balance_heuristic(pdf_bsdf, eval.pdf);
                 Li += beta * eval.L * mis_weight;
                 path_states.write_radiance(path_id, Li);
             };
@@ -364,7 +360,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                 auto Li = path_states.read_radiance(path_id);
                 auto it = pipeline().geometry()->interaction(ray, hit);
                 auto eval = light_sampler()->evaluate_hit(*it, ray->origin(), swl, time);
-                auto mis_weight = balanced_heuristic(pdf_bsdf, eval.pdf);
+                auto mis_weight = balance_heuristic(pdf_bsdf, eval.pdf);
                 Li += beta * eval.L * mis_weight;
                 path_states.write_radiance(path_id, Li);
             };
@@ -449,7 +445,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                         auto Ld = light_samples.read_emission(queue_id);
                         auto wi = light_samples.read_wi(queue_id);
                         auto eval = closure->evaluate(wo, wi);
-                        auto mis_weight = balanced_heuristic(pdf_light, eval.pdf);
+                        auto mis_weight = balance_heuristic(pdf_light, eval.pdf);
                         Li += mis_weight / pdf_light * beta * eval.f * Ld;
                     };
 

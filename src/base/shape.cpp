@@ -17,12 +17,6 @@ Shape::Shape(Scene *scene, const SceneNodeDesc *desc) noexcept
       _surface{scene->load_surface(desc->property_node_or_default("surface"))},
       _light{scene->load_light(desc->property_node_or_default("light"))},
       _transform{scene->load_transform(desc->property_node_or_default("transform"))},
-      _two_sided{}, _two_sided_specified{},
-      _shadow_terminator{std::clamp(desc->property_float_or_default("shadow_terminator", 0.0f), 0.f, 1.f)} {
-    if (desc->has_property("two_sided")) {
-        _two_sided = desc->property_bool("two_sided");
-        _two_sided_specified = true;
-    }
-}
+      _shadow_terminator{std::clamp(desc->property_float_or_default("shadow_terminator", 0.0f), 0.f, 1.f)} {}
 
 }// namespace luisa::render

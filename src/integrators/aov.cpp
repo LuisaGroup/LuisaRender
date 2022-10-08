@@ -11,6 +11,7 @@
 
 #include <util/medium_tracker.h>
 #include <util/progress_bar.h>
+#include <util/sampling.h>
 #include <base/pipeline.h>
 #include <base/integrator.h>
 #include <base/scene.h>
@@ -113,10 +114,6 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
         resolution.x, resolution.y, spp);
 
     using namespace luisa::compute;
-    Callable balanced_heuristic = [](Float pdf_a, Float pdf_b) noexcept {
-        auto p = pdf_a + pdf_b;
-        return ite(p > 0.0f, pdf_a / p, 0.0f);
-    };
 
     // 3 diffuse, 3 specular, 3 normal, 1 depth, 3 albedo, 1 roughness, 1 emissive, 1 metallic, 1 transmissive, 1 specular-bounce
     auto auxiliary_output = pipeline.device().create_image<float>(PixelStorage::FLOAT4, resolution);
@@ -243,7 +240,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                     $if(light_sample.eval.pdf > 0.0f & !occluded) {
                         auto wi = light_sample.wi;
                         auto eval = closure->evaluate(wo, wi);
-                        auto w = balanced_heuristic(light_sample.eval.pdf, eval.pdf) /
+                        auto w = balance_heuristic(light_sample.eval.pdf, eval.pdf) /
                                  light_sample.eval.pdf;
                         Li += w * beta * eval.f * light_sample.eval.L;
                         $if(!specular_bounce) {

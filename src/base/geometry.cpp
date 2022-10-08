@@ -18,7 +18,6 @@ void Geometry::build(CommandBuffer &command_buffer, luisa::span<const Shape *con
 }
 
 void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape, float init_time,
-                              luisa::optional<bool> overridden_two_sided,
                               const Surface *overridden_surface, const Light *overridden_light) noexcept {
 
     auto surface = overridden_surface == nullptr ? shape->surface() : overridden_surface;
@@ -29,8 +28,10 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
             LUISA_ERROR_WITH_LOCATION(
                 "Deformable meshes are not yet supported.");
         }
-        auto iter = _meshes.find(shape);
-        if (iter == _meshes.end()) {
+        auto mesh = [&] {
+            if (auto iter = _meshes.find(shape); iter != _meshes.end()) {
+                return iter->second;
+            }
             auto mesh_geom = [&] {
                 auto vertices = shape->vertices();
                 auto triangles = shape->triangles();
@@ -56,9 +57,9 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
                 // compute alias table
                 luisa::vector<float> triangle_areas(triangles.size());
                 std::transform(triangles.cbegin(), triangles.cend(), triangle_areas.begin(), [vertices](auto t) noexcept {
-                    auto p0 = vertices[t.i0].pos;
-                    auto p1 = vertices[t.i1].pos;
-                    auto p2 = vertices[t.i2].pos;
+                    auto p0 = make_float3(vertices[t.i0].compressed_p[0], vertices[t.i0].compressed_p[1], vertices[t.i0].compressed_p[2]);
+                    auto p1 = make_float3(vertices[t.i1].compressed_p[0], vertices[t.i1].compressed_p[1], vertices[t.i1].compressed_p[2]);
+                    auto p2 = make_float3(vertices[t.i2].compressed_p[0], vertices[t.i2].compressed_p[1], vertices[t.i2].compressed_p[2]);
                     return std::abs(length(cross(p1 - p0, p2 - p0)));
                 });
                 auto [alias_table, pdf] = create_alias_table(triangle_areas);
@@ -75,16 +76,15 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
                 return geom;
             }();
             // assign mesh data
-            MeshData mesh{};
-            mesh.resource = mesh_geom.resource;
-            mesh.geometry_buffer_id_base = mesh_geom.buffer_id_base;
-            mesh.two_sided = shape->two_sided().value_or(false);
-            mesh.shadow_term = shape->shadow_terminator_factor();
-            iter = _meshes.emplace(shape, mesh).first;
-        }
-        auto mesh = iter->second;
-        auto two_sided = mesh.two_sided;
-        two_sided = overridden_two_sided.value_or(two_sided);
+            MeshData mesh_data{};
+            mesh_data.resource = mesh_geom.resource;
+            mesh_data.shadow_term = shape->shadow_terminator_factor();
+            mesh_data.geometry_buffer_id_base = mesh_geom.buffer_id_base;
+            mesh_data.has_normal = shape->has_normal();
+            mesh_data.has_uv = shape->has_uv();
+            _meshes.emplace(shape, mesh_data);
+            return mesh_data;
+        }();
         auto instance_id = static_cast<uint>(_accel.size());
         auto [t_node, is_static] = _transform_tree.leaf(shape->transform());
         InstancedTransform inst_xform{t_node, instance_id};
@@ -96,7 +96,6 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
         auto properties = 0u;
         auto surface_tag = 0u;
         auto light_tag = 0u;
-        if (two_sided) { properties |= Shape::property_flag_two_sided; }
         if (surface != nullptr && !surface->is_null()) {
             surface_tag = _pipeline.register_surface(command_buffer, surface);
             properties |= Shape::property_flag_has_surface;
@@ -105,6 +104,8 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
             light_tag = _pipeline.register_light(command_buffer, light);
             properties |= Shape::property_flag_has_light;
         }
+        if (mesh.has_normal) { properties |= Shape::property_flag_has_normal; }
+        if (mesh.has_uv) { properties |= Shape::property_flag_has_uv; }
         _instances.emplace_back(Shape::Handle::encode(
             mesh.geometry_buffer_id_base,
             properties, surface_tag, light_tag,
@@ -118,8 +119,8 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
     } else {
         _transform_tree.push(shape->transform());
         for (auto child : shape->children()) {
-            _process_shape(command_buffer, child, init_time,
-                           shape->two_sided(), surface, light);
+            _process_shape(command_buffer, child,
+                           init_time, surface, light);
         }
         _transform_tree.pop(shape->transform());
     }
@@ -184,27 +185,66 @@ Var<Triangle> Geometry::triangle(const Var<Shape::Handle> &instance, Expr<uint> 
     return _pipeline.buffer<Triangle>(instance->triangle_buffer_id()).read(index);
 }
 
+[[nodiscard]] static auto _compute_tangent(
+    Expr<float3> p0, Expr<float3> p1, Expr<float3> p2,
+    Expr<float2> uv0, Expr<float2> uv1, Expr<float2> uv2) noexcept {
+    static Callable impl = [](Float3 p0, Float3 p1, Float3 p2,
+                              Float2 uv0, Float2 uv1, Float2 uv2) noexcept {
+        auto difference_of_products = [](auto a, auto b, auto c, auto d) noexcept {
+            auto cd = c * d;
+            auto differenceOfProducts = a * b - cd;
+            auto error = -c * d + cd;
+            return differenceOfProducts + error;
+        };
+        auto duv02 = uv0 - uv2;
+        auto duv12 = uv1 - uv2;
+        auto dp02 = p0 - p2;
+        auto dp12 = p1 - p2;
+        auto det = difference_of_products(duv02.x, duv12.y, duv02.y, duv12.x);
+        auto dpdu = def(make_float3());
+        auto dpdv = def(make_float3());
+        auto degenerate_uv = abs(det) < 1e-9f;
+        $if(!degenerate_uv) {
+            // Compute triangle $\dpdu$ and $\dpdv$ via matrix inversion
+            auto invdet = 1.f / det;
+            dpdu = difference_of_products(duv12[1], dp02, duv02[1], dp12) * invdet;
+            dpdv = difference_of_products(duv02[0], dp12, duv12[0], dp02) * invdet;
+        };
+        // Handle degenerate triangle $(u,v)$ parameterization or partial derivatives
+        $if(degenerate_uv | length_squared(cross(dpdu, dpdv)) == 0.f) {
+            auto n = cross(p2 - p0, p1 - p0);
+            auto b = ite(abs(n.x) > abs(n.z),
+                         make_float3(-n.y, n.x, 0.0f),
+                         make_float3(0.0f, -n.z, n.y));
+            dpdu = cross(b, n);
+        };
+        return dpdu;
+    };
+    return impl(p0, p1, p2, uv0, uv1, uv2);
+}
+
 ShadingAttribute Geometry::shading_point(const Var<Shape::Handle> &instance, const Var<Triangle> &triangle,
                                          const Var<float3> &bary, const Var<float4x4> &shape_to_world,
                                          const Var<float3x3> &shape_to_world_normal) const noexcept {
     auto v_buffer = instance->vertex_buffer_id();
+    // The following calculations are all in the object space.
     auto v0 = _pipeline.buffer<Shape::Vertex>(v_buffer).read(triangle.i0);
     auto v1 = _pipeline.buffer<Shape::Vertex>(v_buffer).read(triangle.i1);
     auto v2 = _pipeline.buffer<Shape::Vertex>(v_buffer).read(triangle.i2);
-    auto p0 = make_float3(shape_to_world * make_float4(v0->position(), 1.f));
-    auto p1 = make_float3(shape_to_world * make_float4(v1->position(), 1.f));
-    auto p2 = make_float3(shape_to_world * make_float4(v2->position(), 1.f));
+    auto p0 = v0->position();
+    auto p1 = v1->position();
+    auto p2 = v2->position();
     auto p = bary.x * p0 + bary.y * p1 + bary.z * p2;
-    auto c = cross(p1 - p0, p2 - p0);
-    auto area = 0.5f * length(c);
-    auto ng = normalize(c);
-    auto uv = bary.x * v0->uv() + bary.y * v1->uv() + bary.z * v2->uv();
-    auto n0 = normalize(shape_to_world_normal * v0->normal());
-    auto n1 = normalize(shape_to_world_normal * v1->normal());
-    auto n2 = normalize(shape_to_world_normal * v2->normal());
-    auto ns = normalize(bary.x * n0 + bary.y * n1 + bary.z * n2);
-    auto tangent_local = bary.x * v0->tangent() + bary.y * v1->tangent() + bary.z * v2->tangent();
-    auto tangent = normalize(shape_to_world_normal * tangent_local);
+    auto ng = cross(p1 - p0, p2 - p0);
+    auto uv0 = ite(instance->has_normal(), v0->uv(), make_float2());
+    auto uv1 = ite(instance->has_normal(), v1->uv(), make_float2());
+    auto uv2 = ite(instance->has_normal(), v2->uv(), make_float2());
+    auto uv = bary.x * uv0 + bary.y * uv1 + bary.z * uv2;
+    auto tangent = _compute_tangent(p0, p1, p2, uv0, uv1, uv2);
+    auto n0 = ite(instance->has_normal(), v0->normal(), ng);
+    auto n1 = ite(instance->has_normal(), v1->normal(), ng);
+    auto n2 = ite(instance->has_normal(), v2->normal(), ng);
+    auto ns = bary.x * n0 + bary.y * n1 + bary.z * n2;
     // offset p to fake surface for the shadow terminator
     // reference: Ray Tracing Gems 2, Chap. 4
     auto temp_u = p - p0;
@@ -215,7 +255,19 @@ ShadingAttribute Geometry::shading_point(const Var<Shape::Handle> &instance, con
     auto dot_w = min(dot(temp_w, n2), 0.f);
     auto shadow_term = instance->shadow_terminator_factor();
     auto dp = bary.x * (temp_u - dot_u * n0) + bary.y * (temp_v - dot_v * n1) + bary.z * (temp_w - dot_w * n2);
-    return {.pg = p, .ng = ng, .ps = p + shadow_term * dp, .ns = ns, .tangent = tangent, .uv = uv, .area = area};
+    auto ps = p + shadow_term * dp;
+    // Now, let's go into the world space.
+    // A * (x, 1.f) - A * (y, 1.f) = A * (x - y, 0.f)
+    auto c = cross(make_float3(shape_to_world * make_float4(p1 - p0, 0.f)),
+                   make_float3(shape_to_world * make_float4(p2 - p0, 0.f)));
+    auto area = 0.5f * length(c);
+    return {.pg = make_float3(shape_to_world * make_float4(p, 1.f)),
+            .ng = normalize(shape_to_world_normal * ng),
+            .ps = make_float3(shape_to_world * make_float4(p + shadow_term * dp, 1.f)),
+            .ns = normalize(shape_to_world_normal * ns),
+            .tangent = normalize(shape_to_world_normal * tangent),
+            .uv = uv,
+            .area = area};
 }
 
 }// namespace luisa::render

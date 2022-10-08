@@ -279,7 +279,7 @@ private:
                             auto fExit = exit_interface.evaluate(-w, wi, mode).f;
                             $if(!fExit.is_zero()) {
                                 Float exitPDF = exit_interface.evaluate(-w, wi, mode).pdf;
-                                Float wt = power_heuristic(1, ps.pdf, 1, exitPDF);
+                                Float wt = power_heuristic(1u, ps.pdf, 1u, exitPDF);
                                 f += beta * Tr(zp - exitZ, w_local) * fExit * wt;
                             };
                         };
@@ -297,7 +297,7 @@ private:
                 }
                 $else {
                     auto wns = nonexit_interface.evaluate(-w, -wis.wi, mode);
-                    auto wt = power_heuristic(1, wis.eval.pdf, 1, wns.pdf);
+                    auto wt = power_heuristic(1u, wis.eval.pdf, 1u, wns.pdf);
                     f += beta * wns.f * wt * Tr(_thickness, wis_wi_local) * wis.eval.f /
                          wis.eval.pdf;
                     auto uc = lcg(seed);
@@ -311,7 +311,7 @@ private:
                     auto fExit = wes.f;
                     $if(!fExit.is_zero()) {
                         auto exit_pdf = wes.pdf;
-                        auto wt = power_heuristic(1, bs.eval.pdf, 1, exit_pdf);
+                        auto wt = power_heuristic(1u, bs.eval.pdf, 1u, exit_pdf);
                         f += beta * Tr(_thickness, nonexit_interface.to_local(bs.wi)) * fExit * wt;
                     };
                 };
@@ -330,10 +330,10 @@ private:
                     auto rs = r_interface.sample(-wos.wi, lcg(seed), make_float2(lcg(seed), lcg(seed)), mode);
                     $if(!rs.eval.f.is_zero() & rs.eval.pdf > 0.f) {
                         auto r_pdf = r_interface.evaluate(-wos.wi, -wis.wi, mode).pdf;
-                        auto wt = power_heuristic(1, wis.eval.pdf, 1, r_pdf);
+                        auto wt = power_heuristic(1u, wis.eval.pdf, 1u, r_pdf);
                         pdf_sum += wt * r_pdf;
                         auto t_pdf = t_interface.evaluate(-rs.wi, wi, mode).pdf;
-                        wt = power_heuristic(1, rs.eval.pdf, 1, t_pdf);
+                        wt = power_heuristic(1u, rs.eval.pdf, 1u, t_pdf);
                         pdf_sum += wt * t_pdf;
                     };
                 };

@@ -36,8 +36,8 @@ Surface mat_Floor : Layered {
   max_depth { 10 }
   samples { 1 }
   thickness : Constant {
-      v { 0.1 }
-    }
+    v { 0.1 }
+  }
 }
 
 Surface mat_TableWood : Substrate {

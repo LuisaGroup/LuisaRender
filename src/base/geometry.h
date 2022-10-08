@@ -15,11 +15,11 @@ namespace luisa::render {
 using compute::Accel;
 using compute::Buffer;
 using compute::CommandBuffer;
+using compute::Expr;
+using compute::Float4x4;
+using compute::Hit;
 using compute::Mesh;
 using compute::Var;
-using compute::Expr;
-using compute::Hit;
-using compute::Float4x4;
 
 class Pipeline;
 
@@ -34,8 +34,9 @@ public:
     struct MeshData {
         Mesh *resource;
         float shadow_term;
-        uint geometry_buffer_id_base : 24;
-        bool two_sided : 8;
+        uint geometry_buffer_id_base : 30;
+        bool has_normal : 1;
+        bool has_uv : 1;
     };
 
 private:
@@ -50,11 +51,7 @@ private:
     Buffer<Shape::Handle> _instance_buffer;
 
 private:
-    void _build_geometry(CommandBuffer &command_buffer,
-                         luisa::span<const Shape *const> shapes,
-                         float init_time, AccelUsageHint hint) noexcept;
     void _process_shape(CommandBuffer &command_buffer, const Shape *shape, float init_time,
-                        luisa::optional<bool> overridden_two_sided = luisa::nullopt,
                         const Surface *overridden_surface = nullptr,
                         const Light *overridden_light = nullptr) noexcept;
 

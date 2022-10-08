@@ -1374,7 +1374,7 @@ Camera camera : Pinhole {
   front { 0.5, -0.5, -1 }
   up { 0.0, 1.0, 0.0 }
   fov { 35.98339777135762 }
-  spp { 4096 }
+  spp { 256 }
   filter : Gaussian {
     radius { 1 }
   }
@@ -1387,7 +1387,7 @@ Camera camera : Pinhole {
 
 render {
   cameras { @camera }
-  spectrum : Hero {}
+  spectrum : sRGB {}
   integrator : MegaPath {
     sampler : PMJ02BN {}
     depth { 16 }

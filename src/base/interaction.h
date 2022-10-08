@@ -44,7 +44,7 @@ private:
 
 public:
     Interaction() noexcept : _inst_id{~0u}, _prim_id{~0u} {}
-    explicit Interaction(Expr<float2> uv) noexcept: _uv{uv}, _inst_id{~0u}, _prim_id{~0u} {}
+    explicit Interaction(Expr<float2> uv) noexcept : _uv{uv}, _inst_id{~0u}, _prim_id{~0u} {}
 
     Interaction(Var<Shape::Handle> shape, Expr<uint> inst_id, Expr<uint> prim_id, Expr<float> prim_area,
                 Expr<float3> p, Expr<float3> ng, Expr<bool> back_facing) noexcept

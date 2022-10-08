@@ -6,6 +6,7 @@
 
 #include <util/imageio.h>
 #include <util/medium_tracker.h>
+#include <util/sampling.h>
 #include <base/pipeline.h>
 #include <base/integrator.h>
 #include <core/stl.h>
@@ -227,10 +228,6 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
     if (shader_iter == _bp_shaders.end()) {
         using namespace luisa::compute;
 
-        Callable balanced_heuristic = [](Float pdf_a, Float pdf_b) noexcept {
-            return ite(pdf_a > 0.0f, pdf_a / (pdf_a + pdf_b), 0.0f);
-        };
-
         Kernel2D bp_kernel = [&](UInt frame_index, Float time, Float shutter_weight) noexcept {
             set_block_size(16u, 16u, 1u);
 
@@ -262,7 +259,7 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
                     //                    if (pipeline.environment()) {
                     //                        auto eval = light_sampler->evaluate_miss(
                     //                            ray->direction(), env_to_world, swl, time);
-                    //                        Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
+                    //                        Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
                     //                    }
                     //                    // TODO : backward environment light
                     $break;
@@ -273,7 +270,7 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
                 //                    $if(it->shape()->has_light()) {
                 //                        auto eval = light_sampler->evaluate_hit(
                 //                            *it, ray->origin(), swl, time);
-                //                        Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
+                //                        Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
                 //                    };
                 //                    // TODO : backward hit light
                 //                }
@@ -322,7 +319,7 @@ void MegakernelRadiativeDiffInstance::_integrate_one_camera(
                         $if(light_sample.eval.pdf > 0.0f & !occluded) {
                             auto wi = light_sample.wi;
                             auto eval = closure->evaluate(wo, wi);
-                            auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
+                            auto mis_weight = balance_heuristic(light_sample.eval.pdf, eval.pdf);
                             //                            Li += mis_weight / light_sample.eval.pdf *
                             //                                  abs_dot(eval.normal, wi) *
                             //                                  beta * eval.f * light_sample.eval.L;
@@ -425,10 +422,6 @@ void MegakernelRadiativeDiffInstance::_render_one_camera(
     if (shader_iter == _render_shaders.end()) {
         using namespace luisa::compute;
 
-        Callable balanced_heuristic = [](Float pdf_a, Float pdf_b) noexcept {
-            return ite(pdf_a > 0.0f, pdf_a / (pdf_a + pdf_b), 0.0f);
-        };
-
         Kernel2D render_kernel = [&](UInt frame_index, Float time, Float shutter_weight) noexcept {
             set_block_size(16u, 16u, 1u);
 
@@ -451,7 +444,7 @@ void MegakernelRadiativeDiffInstance::_render_one_camera(
                 $if(!it->valid()) {
                     if (pipeline().environment()) {
                         auto eval = light_sampler->evaluate_miss(ray->direction(), swl, time);
-                        Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
+                        Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
                     }
                     $break;
                 };
@@ -461,7 +454,7 @@ void MegakernelRadiativeDiffInstance::_render_one_camera(
                     $if(it->shape()->has_light()) {
                         auto eval = light_sampler->evaluate_hit(
                             *it, ray->origin(), swl, time);
-                        Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
+                        Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
                     };
                 }
 
@@ -510,7 +503,7 @@ void MegakernelRadiativeDiffInstance::_render_one_camera(
                         $if(light_sample.eval.pdf > 0.0f & !occluded) {
                             auto wi = light_sample.wi;
                             auto eval = closure->evaluate(wo, wi);
-                            auto mis_weight = balanced_heuristic(light_sample.eval.pdf, eval.pdf);
+                            auto mis_weight = balance_heuristic(light_sample.eval.pdf, eval.pdf);
                             Li += mis_weight / light_sample.eval.pdf * beta * eval.f * light_sample.eval.L;
                         };
 

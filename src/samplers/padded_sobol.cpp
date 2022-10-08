@@ -26,7 +26,7 @@ private:
     luisa::optional<UInt2> _pixel;
     luisa::optional<UInt> _dimension;
     luisa::optional<UInt> _sample_index;
-    luisa::unique_ptr<Constant<uint>> _sobol_matrices;
+    Buffer<uint> _sobol_matrices;
     Buffer<uint4> _state_buffer;
     uint _spp{};
 
@@ -42,59 +42,61 @@ private:
     }
 
     [[nodiscard]] auto _sobol_sample(UInt a, Expr<uint> dimension, Expr<uint> hash) const noexcept {
-        auto v = def(0u);
-        auto i = def(dimension * SobolMatrixSize);
-        $while(a != 0u) {
-            $if ((a &1u) != 0u) {
-                v = v ^ _sobol_matrices->read(i);
+        static Callable impl = [](UInt a, UInt dimension, UInt hash, BufferVar<uint> sobol_matrices) noexcept {
+            auto v = def(0u);
+            auto i = def(dimension * SobolMatrixSize);
+            $while(a != 0u) {
+                $if((a & 1u) != 0u) { v = v ^ sobol_matrices.read(i); };
+                a >>= 1u;
+                i += 1u;
             };
-            a >>= 1u;
-            i += 1u;
+            v = _fast_owen_scramble(hash, v);
+            return min(v * 0x1p-32f, one_minus_epsilon);
         };
-        v = _fast_owen_scramble(hash, v);
-        return min(v * 0x1p-32f, one_minus_epsilon);
+        return impl(a, dimension, hash, _sobol_matrices.view());
     }
 
-    [[nodiscard]] static auto _permutation_element(Expr<uint> i_in, uint l, Expr<uint> p) noexcept {
+    [[nodiscard]] static auto _permutation_element(Expr<uint> i, uint l, Expr<uint> p) noexcept {
         auto w = l - 1u;
         w |= w >> 1u;
         w |= w >> 2u;
         w |= w >> 4u;
         w |= w >> 8u;
         w |= w >> 16u;
-        auto i = def(i_in);
-        $loop {
-            i ^= p;
-            i *= 0xe170893du;
-            i ^= p >> 16u;
-            i ^= (i & w) >> 4u;
-            i ^= p >> 8u;
-            i *= 0x0929eb3fu;
-            i ^= p >> 23u;
-            i ^= (i & w) >> 1u;
-            i *= 1 | p >> 27u;
-            i *= 0x6935fa69u;
-            i ^= (i & w) >> 11u;
-            i *= 0x74dcb303u;
-            i ^= (i & w) >> 2u;
-            i *= 0x9e501cc3u;
-            i ^= (i & w) >> 2u;
-            i *= 0xc860a3dfu;
-            i &= w;
-            i ^= i >> 5u;
-            $if(i < l) { $break; };
+        static Callable impl = [](UInt i, UInt l, UInt w, UInt p) noexcept {
+            $loop {
+                i ^= p;
+                i *= 0xe170893du;
+                i ^= p >> 16u;
+                i ^= (i & w) >> 4u;
+                i ^= p >> 8u;
+                i *= 0x0929eb3fu;
+                i ^= p >> 23u;
+                i ^= (i & w) >> 1u;
+                i *= 1 | p >> 27u;
+                i *= 0x6935fa69u;
+                i ^= (i & w) >> 11u;
+                i *= 0x74dcb303u;
+                i ^= (i & w) >> 2u;
+                i *= 0x9e501cc3u;
+                i ^= (i & w) >> 2u;
+                i *= 0xc860a3dfu;
+                i &= w;
+                i ^= i >> 5u;
+                $if(i < l) { $break; };
+            };
+            return (i + p) % l;
         };
-        return (i + p) % l;
+        return impl(i, l, w, p);
     }
 
 public:
     explicit PaddedSobolSamplerInstance(
         const Pipeline &pipeline, CommandBuffer &command_buffer,
         const PaddedSobolSampler *s) noexcept
-        : Sampler::Instance{pipeline, s} {
-        std::array<uint, SobolMatrixSize * 2u> sobol_matrices{};
-        std::memcpy(sobol_matrices.data(), SobolMatrices32, luisa::span{sobol_matrices}.size_bytes());
-        _sobol_matrices = luisa::make_unique<Constant<uint>>(sobol_matrices);
+        : Sampler::Instance{pipeline, s},
+          _sobol_matrices{pipeline.device().create_buffer<uint>(SobolMatrixSize * 2u)} {
+        command_buffer << _sobol_matrices.copy_from(SobolMatrices32);
     }
     void reset(CommandBuffer &command_buffer, uint2 resolution, uint state_count, uint spp) noexcept override {
         if (next_pow2(spp) != spp) {
