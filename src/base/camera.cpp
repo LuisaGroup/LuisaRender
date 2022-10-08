@@ -27,7 +27,8 @@ Camera::Camera(Scene *scene, const SceneNodeDesc *desc) noexcept
           }))},
       _shutter_samples{desc->property_uint_or_default("shutter_samples", 0u)},// 0 means default
       _spp{desc->property_uint_or_default("spp", 1024u)},
-      _target{scene->load_texture(desc->property_node_or_default("target"))} {
+      _target{scene->load_texture(desc->property_node_or_default("target"))},
+      _near_plane{std::max(desc->property_float_or_default("near_plane", 0.f), 0.f)} {
 
     LUISA_RENDER_CHECK_GENERIC_TEXTURE(Camera, target, 3);
 
@@ -198,6 +199,8 @@ Camera::Sample Camera::Instance::generate_ray(
     auto pixel = make_float2(pixel_coord) + 0.5f + filter_offset;
     auto sample = _generate_ray(sampler, pixel, time);
     sample.weight *= filter_weight;
+    auto t_min = node()->near_plane() / sample.ray->direction().z;
+    sample.ray->set_origin(sample.ray->origin() - sample.ray->direction() * t_min);
     auto camera_to_world = pipeline().transform(node()->transform());
     sample.ray->set_origin(make_float3(
         camera_to_world * make_float4(sample.ray->origin(), 1.0f)));

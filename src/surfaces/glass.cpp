@@ -164,14 +164,17 @@ private:
         SampledSpectrum f{_swl.dimension()};
         auto pdf = def(0.f);
         auto ratio = _kr_ratio * _fresnel->evaluate(cos_theta(wo_local))[0u];
-        auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f, 1.f, 0.f);
         $if(same_hemisphere(wo_local, wi_local)) {
+            auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f |
+                                      _it.shape()->shadow_terminator_factor() > 0.f,
+                                  1.f, 0.f);
             f = _refl->evaluate(wo_local, wi_local, mode) * same_sided;
             pdf = _refl->pdf(wo_local, wi_local, mode) * ratio * same_sided;
         }
         $else {
-            f = _trans->evaluate(wo_local, wi_local, mode) * (1.f - same_sided);
-            pdf = _trans->pdf(wo_local, wi_local, mode) * (1.f - ratio) * (1.f - same_sided);
+            auto different_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) < 0.0f, 1.f, 0.f);
+            f = _trans->evaluate(wo_local, wi_local, mode) * different_sided;
+            pdf = _trans->pdf(wo_local, wi_local, mode) * (1.f - ratio) * different_sided;
         };
         auto entering = wi_local.z < 0.f;
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
@@ -189,7 +192,9 @@ private:
         $if(u_lobe < ratio) {// Reflection
             f = _refl->sample(wo_local, &wi_local, u, &pdf, mode);
             wi = _it.shading().local_to_world(wi_local);
-            auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f, 1.f, 0.f);
+            auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f |
+                                      _it.shape()->shadow_terminator_factor() > 0.f,
+                                  1.f, 0.f);
             pdf *= ratio * same_sided;
             f *= same_sided;
         }

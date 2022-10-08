@@ -81,6 +81,7 @@ private:
     std::filesystem::path _file;
     luisa::vector<ShutterPoint> _shutter_points;
     const Texture *_target;
+    float _near_plane;
 
 public:
     Camera(Scene *scene, const SceneNodeDesc *desc) noexcept;
@@ -93,6 +94,7 @@ public:
     [[nodiscard]] auto spp() const noexcept { return _spp; }
     [[nodiscard]] auto file() const noexcept { return _file; }
     [[nodiscard]] auto target() const noexcept { return _target; }
+    [[nodiscard]] auto near_plane() const noexcept { return _near_plane; }
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
 };

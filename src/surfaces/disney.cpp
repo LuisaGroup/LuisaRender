@@ -651,7 +651,7 @@ private:
         auto pdf = def(0.f);
         // TODO: performance test
         $if(same_hemisphere(wo_local, wi_local)) {// reflection
-            $if(geom_same_sided) {
+            $if(geom_same_sided | _it.shape()->shadow_terminator_factor() > 0.f) {
                 f = _specular->evaluate(wo_local, wi_local, mode) +
                     _diffuse->evaluate(wo_local, wi_local, mode) +
                     _fake_ss->evaluate(wo_local, wi_local, mode) +
