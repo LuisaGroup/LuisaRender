@@ -82,7 +82,7 @@ SampledSpectrum fresnel_conductor(
 }
 
 Float3 face_forward(Float3 v, Float3 n) noexcept {
-    return sign(dot(v, n)) * v;
+    return ite(dot(v, n) < 0.f, -v, v);
 }
 
 Float3 spherical_direction(Float sinTheta, Float cosTheta, Float phi) noexcept {

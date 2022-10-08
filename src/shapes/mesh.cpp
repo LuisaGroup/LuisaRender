@@ -50,8 +50,8 @@ public:
                 AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_LINE | aiPrimitiveType_POINT);
             importer.SetPropertyBool(AI_CONFIG_PP_FD_CHECKAREA, false);
             auto import_flags = aiProcess_JoinIdenticalVertices | aiProcess_RemoveComponent |
-                                aiProcess_OptimizeGraph | aiProcess_GenUVCoords | aiProcess_TransformUVCoords |
-                                aiProcess_FixInfacingNormals | aiProcess_RemoveRedundantMaterials |
+                                aiProcess_OptimizeGraph | aiProcess_GenUVCoords |
+                                aiProcess_TransformUVCoords | aiProcess_RemoveRedundantMaterials |
                                 aiProcess_FindInvalidData | aiProcess_SortByPType |
                                 aiProcess_FindDegenerates | aiProcess_ImproveCacheLocality;
             if (!flip_uv) { import_flags |= aiProcess_FlipUVs; }

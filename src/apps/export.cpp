@@ -42,8 +42,8 @@ int main(int argc, char *argv[]) {
                                    aiProcess_FindInstances | aiProcess_SortByPType |
                                        aiProcess_RemoveComponent | aiProcess_Debone |
                                        aiProcess_GenBoundingBoxes | aiProcess_TransformUVCoords |
-                                       aiProcess_RemoveRedundantMaterials | aiProcess_FixInfacingNormals |
-                                       aiProcess_FindInvalidData | aiProcess_GenUVCoords);
+                                       aiProcess_RemoveRedundantMaterials | aiProcess_FindInvalidData |
+                                       aiProcess_GenUVCoords);
     LUISA_ASSERT(scene != nullptr, "Failed to load scene: {}.", importer.GetErrorString());
     LUISA_INFO("Loaded scene '{}' with {} camera(s), {} mesh(es), and {} material(s).",
                path.filename().string(), scene->mNumCameras,

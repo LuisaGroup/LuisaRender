@@ -218,7 +218,6 @@ public:
             auto normal_local = 2.f * _map->evaluate(it, swl, time).xyz() - 1.f;
             auto normal = it.shading().local_to_world(normal_local);
             auto mapped_it = it;
-            normal = ite(dot(normal, it.ng()) > 0.f, normal, it.shading().n());
             mapped_it.set_shading(Frame::make(normal, it.shading().u()));
             return BaseInstance::closure(mapped_it, swl, eta_i, time);
         }
