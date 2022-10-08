@@ -250,11 +250,10 @@ ShadingAttribute Geometry::shading_point(const Var<Shape::Handle> &instance, con
     auto temp_u = p - p0;
     auto temp_v = p - p1;
     auto temp_w = p - p2;
-    auto dot_u = min(dot(temp_u, n0), 0.f);
-    auto dot_v = min(dot(temp_v, n1), 0.f);
-    auto dot_w = min(dot(temp_w, n2), 0.f);
     auto shadow_term = instance->shadow_terminator_factor();
-    auto dp = bary.x * (temp_u - dot_u * n0) + bary.y * (temp_v - dot_v * n1) + bary.z * (temp_w - dot_w * n2);
+    auto dp = bary.x * (temp_u - min(dot(temp_u, n0), 0.f) * n0) +
+              bary.y * (temp_v - min(dot(temp_v, n1), 0.f) * n1) +
+              bary.z * (temp_w - min(dot(temp_w, n2), 0.f) * n2);
     auto ps = p + shadow_term * dp;
     // Now, let's go into the world space.
     // A * (x, 1.f) - A * (y, 1.f) = A * (x - y, 0.f)
@@ -263,7 +262,7 @@ ShadingAttribute Geometry::shading_point(const Var<Shape::Handle> &instance, con
     auto area = 0.5f * length(c);
     return {.pg = make_float3(shape_to_world * make_float4(p, 1.f)),
             .ng = normalize(shape_to_world_normal * ng),
-            .ps = make_float3(shape_to_world * make_float4(p + shadow_term * dp, 1.f)),
+            .ps = make_float3(shape_to_world * make_float4(ps, 1.f)),
             .ns = normalize(shape_to_world_normal * ns),
             .tangent = normalize(shape_to_world_normal * tangent),
             .uv = uv,
