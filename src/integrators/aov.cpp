@@ -176,9 +176,9 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
             $if(!it->valid()) {
                 if (pipeline.environment()) {
                     auto eval = light_sampler->evaluate_miss(ray->direction(), swl, time);
-                    Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
+                    Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
                     $if(!specular_bounce) {
-                        Li_diffuse += beta_diffuse * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
+                        Li_diffuse += beta_diffuse * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
                     };
                 }
                 $break;
@@ -189,9 +189,9 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                 $if(it->shape()->has_light()) {
                     auto eval = light_sampler->evaluate_hit(
                         *it, ray->origin(), swl, time);
-                    Li += beta * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
+                    Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
                     $if(!specular_bounce) {
-                        Li_diffuse += beta_diffuse * eval.L * balanced_heuristic(pdf_bsdf, eval.pdf);
+                        Li_diffuse += beta_diffuse * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
                     };
                 };
             }
