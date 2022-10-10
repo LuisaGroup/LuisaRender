@@ -401,7 +401,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
             luisa::vector<luisa::function<void()>> savers;
             if (check_sample_output(sample_id)) {
                 for (auto &[component, buffer] : aux_buffers) {
-                    auto path = parent_path / fmt::format("{}_{}{:05}{}", filename, component, sample_id, ext);
+                    auto path = parent_path / fmt::format("{}_{}_{:05}{}", filename, component, sample_id, ext);
                     if (auto saver = buffer->save(command_buffer, path, sample_id)) {
                         savers.emplace_back(std::move(saver));
                     }
@@ -411,7 +411,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                                    << synchronize();
                 }
             }
-            if (++sample_id % 16u == 0u) { command_buffer << commit(); }
+            if (sample_id % 16u == 0u) { command_buffer << commit(); }
         }
     }
     command_buffer << synchronize();
