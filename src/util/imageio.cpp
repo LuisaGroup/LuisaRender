@@ -549,8 +549,8 @@ void save_image(std::filesystem::path path, const float *pixels, uint2 resolutio
                 size.x, size.y, components, false, path.string().c_str(), &err);
         if (err != nullptr) [[unlikely]] {
             LUISA_ERROR_WITH_LOCATION(
-                "Failed to save film to '{}'.",
-                path.string());
+                "Failed to save film to '{}': {}.",
+                path.string(), err);
         }
     } else if (path.extension() == ".hdr") {
         stbi_write_hdr(path.string().c_str(), size.x, size.y, components, reinterpret_cast<const float *>(pixels));

@@ -1077,15 +1077,17 @@ Camera camera : Pinhole {
     resolution { 1920, 1080 }
   }
   file { "output.exr" }
+  clip_plane { 0, 10 }
 }
 
 render {
   cameras { @camera }
   spectrum : sRGB {}
-  integrator : WavePath {
+  integrator : AOV {
     sampler : PMJ02BN {}
     depth { 12 }
     rr_threshold { 0.95 }
+    noisy_count { 256 }
   }
   shapes {
     @shape_0,

@@ -128,7 +128,7 @@ public:
     [[nodiscard]] uint register_light(CommandBuffer &command_buffer, const Light *light) noexcept;
 
     template<typename Create>
-    [[nodiscard]] uint register_named_id(luisa::string_view identifier, Create &&create_id) noexcept {
+    uint register_named_id(luisa::string_view identifier, Create &&create_id) noexcept {
         if (auto it = _named_ids.find(identifier); it != _named_ids.end()) {
             return it->second;
         }
@@ -144,6 +144,18 @@ public:
         auto p = resource.get();
         _resources.emplace_back(std::move(resource));
         return p;
+    }
+
+    template<uint dim, typename Def>
+    void register_shader(luisa::string_view name, Def &&def) noexcept {
+        static_assert(dim == 1u || dim == 2u || dim == 3u);
+        register_named_id(name, [&] {
+            auto shader = _device.compile<dim>(std::forward<Def>(def));
+            auto resource = luisa::make_unique<decltype(shader)>(std::move(shader));
+            auto index = static_cast<uint>(_resources.size());
+            _resources.emplace_back(std::move(resource));
+            return index;
+        });
     }
 
     template<typename T>
@@ -201,6 +213,13 @@ public:
         return _bindless_array.tex3d(named_id(name));
     }
     [[nodiscard]] Float4x4 transform(const Transform *transform) const noexcept;
+
+    template<uint dim, typename... Args, typename... CallArgs>
+    [[nodiscard]] auto shader(luisa::string_view name, CallArgs &&...call_args) const noexcept {
+        auto shader = dynamic_cast<const Shader<dim, Args...> *>(
+            _resources[named_id(name)].get());
+        return (*shader)(std::forward<CallArgs>(call_args)...);
+    }
 };
 
 }// namespace luisa::render

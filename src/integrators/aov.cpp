@@ -88,6 +88,54 @@ luisa::unique_ptr<Integrator::Instance> AuxiliaryBufferPathTracing::build(Pipeli
     return luisa::make_unique<AuxiliaryBufferPathTracingInstance>(this, pipeline, cmd_buffer);
 }
 
+class AuxiliaryBuffer {
+
+private:
+    Pipeline &_pipeline;
+    Image<float> _image;
+
+private:
+    static constexpr auto clear_shader_name = luisa::string_view{"__aux_buffer_clear_shader"};
+
+public:
+    AuxiliaryBuffer(Pipeline &pipeline, uint2 resolution, uint channels) noexcept
+        : _pipeline{pipeline},
+          _image{pipeline.device().create_image<float>(
+              channels == 1u ?
+                  PixelStorage::FLOAT1 :
+              channels == 2u ?
+                  PixelStorage::FLOAT2 :
+                  PixelStorage::FLOAT4,
+              resolution)} {
+        _pipeline.register_shader<2u>(
+            clear_shader_name, [](ImageFloat image) noexcept {
+                image.write(dispatch_id().xy(), make_float4(0.f));
+            });
+    }
+    void clear(CommandBuffer &command_buffer) const noexcept {
+        command_buffer << _pipeline.shader<2u, Image<float>>(clear_shader_name, _image)
+                              .dispatch(_image.size());
+    }
+    [[nodiscard]] auto save(CommandBuffer &command_buffer, std::filesystem::path path, uint total_samples) const noexcept {
+        auto host_image = luisa::make_shared<luisa::vector<float>>();
+        auto nc = pixel_storage_channel_count(_image.storage());
+        host_image->resize(_image.size().x * _image.size().y * nc);
+        command_buffer << _image.copy_to(host_image->data());
+        return [host_image, total_samples, nc, size = _image.size(), path = std::move(path)] {
+            auto scale = static_cast<float>(1. / total_samples);
+            for (auto &p : *host_image) { p *= scale; }
+            LUISA_INFO("Saving auxiliary buffer to '{}'.", path.string());
+            save_image(path.string(), host_image->data(), size, nc);
+        };
+    }
+    void accumulate(Expr<uint2> p, Expr<float4> value) noexcept {
+        $if(!any(isnan(value))) {
+            auto old = _image.read(p);
+            _image.write(p, old + value);
+        };
+    }
+};
+
 void AuxiliaryBufferPathTracingInstance::_render_one_camera(
     CommandBuffer &command_buffer, Pipeline &pipeline,
     AuxiliaryBufferPathTracingInstance *pt, Camera::Instance *camera) noexcept {
@@ -116,27 +164,21 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
     using namespace luisa::compute;
 
     // 3 diffuse, 3 specular, 3 normal, 1 depth, 3 albedo, 1 roughness, 1 emissive, 1 metallic, 1 transmissive, 1 specular-bounce
-    auto auxiliary_output = pipeline.device().create_image<float>(PixelStorage::FLOAT4, resolution);
-    auto auxiliary_output_diffuse = pipeline.device().create_image<float>(PixelStorage::FLOAT4, resolution);
-    auto auxiliary_output_specular = pipeline.device().create_image<float>(PixelStorage::FLOAT4, resolution);
-    auto auxiliary_noisy = pipeline.device().create_image<float>(PixelStorage::FLOAT4, resolution);
-    auto auxiliary_diffuse = pipeline.device().create_image<float>(PixelStorage::FLOAT4, resolution);
-    auto auxiliary_specular = pipeline.device().create_image<float>(PixelStorage::FLOAT4, resolution);
-    auto auxiliary_normal = pipeline.device().create_image<float>(PixelStorage::FLOAT4, resolution);
-    auto auxiliary_depth = pipeline.device().create_image<float>(PixelStorage::FLOAT1, resolution);
-    auto auxiliary_albedo = pipeline.device().create_image<float>(PixelStorage::FLOAT4, resolution);
-    auto auxiliary_roughness = pipeline.device().create_image<float>(PixelStorage::FLOAT4, resolution);
-    auto auxiliary_ndc = pipeline.device().create_image<float>(PixelStorage::FLOAT4, resolution);
+    luisa::unordered_map<luisa::string, luisa::unique_ptr<AuxiliaryBuffer>> color_buffers;
+    luisa::unordered_map<luisa::string, luisa::unique_ptr<AuxiliaryBuffer>> aux_buffers;
+    color_buffers.emplace("sample", luisa::make_unique<AuxiliaryBuffer>(pipeline, resolution, 4u));
+    color_buffers.emplace("diffuse", luisa::make_unique<AuxiliaryBuffer>(pipeline, resolution, 4u));
+    color_buffers.emplace("specular", luisa::make_unique<AuxiliaryBuffer>(pipeline, resolution, 4u));
+    aux_buffers.emplace("normal", luisa::make_unique<AuxiliaryBuffer>(pipeline, resolution, 4u));
+    aux_buffers.emplace("depth", luisa::make_unique<AuxiliaryBuffer>(pipeline, resolution, 1u));
+    aux_buffers.emplace("albedo", luisa::make_unique<AuxiliaryBuffer>(pipeline, resolution, 4u));
+    aux_buffers.emplace("roughness", luisa::make_unique<AuxiliaryBuffer>(pipeline, resolution, 4u));
+    aux_buffers.emplace("ndc", luisa::make_unique<AuxiliaryBuffer>(pipeline, resolution, 4u));
 
-    Kernel2D clear_kernel = [&]() noexcept {
-        auxiliary_noisy.write(dispatch_id().xy(), make_float4(0.0f));
-        auxiliary_diffuse.write(dispatch_id().xy(), make_float4(0.0f));
-        auxiliary_specular.write(dispatch_id().xy(), make_float4(0.0f));
-        auxiliary_normal.write(dispatch_id().xy(), make_float4(0.0f));
-        auxiliary_depth.write(dispatch_id().xy(), make_float4(0.0f));
-        auxiliary_albedo.write(dispatch_id().xy(), make_float4(0.0f));
-        auxiliary_roughness.write(dispatch_id().xy(), make_float4(0.0f));
-        auxiliary_ndc.write(dispatch_id().xy(), make_float4(0.0f));
+    // clear auxiliary buffers
+    auto clear_auxiliary_buffers = [&] {
+        for (auto &[_, buffer] : aux_buffers) { buffer->clear(command_buffer); }
+        for (auto &[_, buffer] : color_buffers) { buffer->clear(command_buffer); }
     };
 
     Kernel2D render_auxiliary_kernel = [&](UInt frame_index, Float time, Float shutter_weight) noexcept {
@@ -163,20 +205,20 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
             auto it = pipeline.geometry()->intersect(ray);
 
             $if(depth == 0 & it->valid()) {
-                auxiliary_normal.write(dispatch_id().xy(), make_float4(it->shading().n(), 1.f));
-                auxiliary_depth.write(dispatch_id().xy(), make_float4(length(it->p() - ray->origin()), 0.f, 0.f, 0.f));
+                aux_buffers.at("normal")->accumulate(dispatch_id().xy(), make_float4(it->shading().n(), 1.f));
+                aux_buffers.at("depth")->accumulate(dispatch_id().xy(), make_float4(length(it->p() - ray->origin())));
                 auto p_cs = make_float3(inverse(camera->camera_to_world()) * make_float4(it->p(), 1.f));
                 auto clip = camera->node()->clip_plane();
-                auxiliary_ndc.write(dispatch_id().xy(),
-                                    make_float4((camera_sample.pixel / make_float2(resolution) * 2.f - 1.f) * make_float2(1.f, -1.f),
-                                                (-p_cs.z - clip.x) / (clip.y - clip.x), 1.f));
+                auto p_ndc = make_float3((camera_sample.pixel / make_float2(resolution) * 2.f - 1.f) * make_float2(1.f, -1.f),
+                                         (-p_cs.z - clip.x) / (clip.y - clip.x));
+                aux_buffers.at("ndc")->accumulate(dispatch_id().xy(), make_float4(p_ndc, 1.f));
                 pipeline.surfaces().dispatch(it->shape()->surface_tag(), [&](auto surface) noexcept {
                     // create closure
                     auto closure = surface->closure(*it, swl, 1.f, time);
                     auto albedo = closure->albedo();
                     auto roughness = closure->roughness();
-                    auxiliary_albedo.write(dispatch_id().xy(), make_float4(spectrum->srgb(swl, albedo), 1.f));
-                    auxiliary_roughness.write(dispatch_id().xy(), make_float4(roughness, 0.f, 0.f));
+                    aux_buffers.at("albedo")->accumulate(dispatch_id().xy(), make_float4(spectrum->srgb(swl, albedo), 1.f));
+                    aux_buffers.at("roughness")->accumulate(dispatch_id().xy(), make_float4(roughness, 0.f, 1.f));
                 });
             };
 
@@ -284,32 +326,15 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
             });
             // rr is closed for aov
         };
-        auto curr = auxiliary_noisy.read(pixel_id);
-        auxiliary_noisy.write(pixel_id, curr + make_float4(spectrum->srgb(swl, Li * shutter_weight), 1.f));
-        curr = auxiliary_diffuse.read(pixel_id);
-        auxiliary_diffuse.write(pixel_id, curr + make_float4(spectrum->srgb(swl, Li_diffuse * shutter_weight), 1.f));
-        curr = auxiliary_specular.read(pixel_id);
-        auxiliary_specular.write(pixel_id, curr + make_float4(spectrum->srgb(swl, (Li - Li_diffuse) * shutter_weight), 1.f));
+        color_buffers.at("sample")->accumulate(pixel_id, make_float4(spectrum->srgb(swl, Li * shutter_weight), 1.f));
+        color_buffers.at("diffuse")->accumulate(pixel_id, make_float4(spectrum->srgb(swl, Li_diffuse * shutter_weight), 1.f));
+        color_buffers.at("specular")->accumulate(pixel_id, make_float4(spectrum->srgb(swl, (Li - Li_diffuse) * shutter_weight), 1.f));
     };
-
-    Kernel2D convert_image_kernel = [](ImageFloat accum, ImageFloat output) noexcept {
-        auto pixel_id = dispatch_id().xy();
-        auto curr = accum.read(pixel_id).xyz();
-        auto scale = 1.f / accum.read(pixel_id).w;
-        output.write(pixel_id, make_float4(scale * curr, 1.f));
-    };
-
-    auto convert_image = pipeline.device().compile(convert_image_kernel);
 
     Clock clock_compile;
-    auto clear_shader = pipeline.device().compile(clear_kernel);
     auto render_auxiliary = pipeline.device().compile(render_auxiliary_kernel);
     auto integrator_shader_compilation_time = clock_compile.toc();
     LUISA_INFO("Integrator shader compile in {} ms.", integrator_shader_compilation_time);
-    {
-        std::ofstream file{"results.txt", std::ios::app};
-        file << "Shader compile time = " << integrator_shader_compilation_time << " ms" << std::endl;
-    }
     auto shutter_samples = camera->node()->shutter_samples();
     command_buffer << synchronize();
 
@@ -326,62 +351,30 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
     };
     for (auto s : shutter_samples) {// FIXME: compatibility with motion blur
         pipeline.update(command_buffer, s.point.time);
-        command_buffer << clear_shader().dispatch(resolution);
+        clear_auxiliary_buffers();
         auto parent_path = camera->node()->file().parent_path();
         auto filename = camera->node()->file().stem().string();
         auto ext = camera->node()->file().extension().string();
         for (auto i = 0u; i < pt->node<AuxiliaryBufferPathTracing>()->noisy_count(); i++) {
             command_buffer << render_auxiliary(sample_id++, s.point.time, s.point.weight)
                                   .dispatch(resolution);
+            luisa::vector<luisa::function<void()>> savers;
             if (i == 0) {
-                std::vector<float> hostaux_normal(pixel_count * 4);
-                std::vector<float> hostaux_depth(pixel_count * 1);
-                std::vector<float> hostaux_albedo(pixel_count * 4);
-                std::vector<float> hostaux_roughness(pixel_count * 4);
-                std::vector<float> hostaux_ndc(pixel_count * 4);
-                command_buffer
-                    << auxiliary_normal.copy_to(hostaux_normal.data())
-                    << auxiliary_depth.copy_to(hostaux_depth.data())
-                    << auxiliary_albedo.copy_to(hostaux_albedo.data())
-                    << auxiliary_roughness.copy_to(hostaux_roughness.data())
-                    << auxiliary_ndc.copy_to(hostaux_ndc.data())
-                    << synchronize();
-                // normal
-                auto nrm_path = parent_path / fmt::format("{}_normal{}", filename, ext);
-                save_image(nrm_path, hostaux_normal.data(), resolution);
-                // depth
-                auto dep_path = parent_path / fmt::format("{}_depth{}", filename, ext);
-                save_image(dep_path, hostaux_depth.data(), resolution, 1);
-                // albedo
-                auto abd_path = parent_path / fmt::format("{}_albedo{}", filename, ext);
-                save_image(abd_path, hostaux_albedo.data(), resolution);
-                // roughness
-                auto rough_path = parent_path / fmt::format("{}_roughness{}", filename, ext);
-                save_image(rough_path, hostaux_roughness.data(), resolution);
-                // ndc
-                auto ndc_path = parent_path / fmt::format("{}_ndc{}", filename, ext);
-                save_image(ndc_path, hostaux_ndc.data(), resolution);
+                for (auto &[component, buffer] : aux_buffers) {
+                    auto path = parent_path / fmt::format("{}_{}{}", filename, component, ext);
+                    savers.emplace_back(buffer->save(command_buffer, path, i + 1u));
+                }
             }
-
             if (check_sample_output(i + 1)) {
-                std::vector<float> hostaux_noisy(pixel_count * 4);
-                std::vector<float> hostaux_diffuse(pixel_count * 4);
-                std::vector<float> hostaux_specular(pixel_count * 4);
-                command_buffer << convert_image(auxiliary_noisy, auxiliary_output).dispatch(resolution)
-                               << auxiliary_output.copy_to(hostaux_noisy.data())
-                               << convert_image(auxiliary_diffuse, auxiliary_output_diffuse).dispatch(resolution)
-                               << auxiliary_output_diffuse.copy_to(hostaux_diffuse.data())
-                               << convert_image(auxiliary_specular, auxiliary_output_specular).dispatch(resolution)
-                               << auxiliary_output_specular.copy_to(hostaux_specular.data())
-                               << synchronize();
-                auto noisy_path = parent_path / fmt::format("{}_sample{:02d}{}", filename, i, ext);
-                save_image(noisy_path, hostaux_noisy.data(), resolution);
-                auto diffuse_path = parent_path / fmt::format("{}_diffuse{:02d}{}", filename, i, ext);
-                save_image(diffuse_path, hostaux_diffuse.data(), resolution);
-                auto specular_path = parent_path / fmt::format("{}_specular{:02d}{}", filename, i, ext);
-                save_image(specular_path, hostaux_specular.data(), resolution);
+                for (auto &[component, buffer] : color_buffers) {
+                    auto path = parent_path / fmt::format("{}_{}{:02}{}", filename, component, i, ext);
+                    savers.emplace_back(buffer->save(command_buffer, path, i + 1u));
+                }
             }
-            command_buffer << synchronize();
+            if (!savers.empty()) {
+                command_buffer << [&] { for (auto &s : savers) { s(); } }
+                               << synchronize();
+            }
         }
     }
     command_buffer << synchronize();
