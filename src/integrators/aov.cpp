@@ -20,6 +20,15 @@ namespace luisa::render {
 
 using namespace compute;
 
+static const luisa::unordered_map<luisa::string_view, uint>
+    aov_component_to_channels{{"sample", 3u},
+                              {"diffuse", 3u},
+                              {"specular", 3u},
+                              {"normal", 3u},
+                              {"depth", 1u},
+                              {"roughness", 2u},
+                              {"ndc", 3u}};
+
 class AuxiliaryBufferPathTracing final : public Integrator {
 
 private:
@@ -27,6 +36,7 @@ private:
     uint _rr_depth;
     float _rr_threshold;
     uint _noisy_count;
+    luisa::unordered_set<luisa::string_view> _enabled_aov;
 
 public:
     AuxiliaryBufferPathTracing(Scene *scene, const SceneNodeDesc *desc) noexcept
@@ -34,13 +44,23 @@ public:
           _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)},
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
-          _noisy_count{std::max(desc->property_uint_or_default("noisy_count", 8u), 8u)} {}
+          _noisy_count{std::max(desc->property_uint_or_default("noisy_count", 8u), 8u)} {
+        for (auto [c, _] : aov_component_to_channels) {
+            auto option = luisa::format("enable_{}", c);
+            if (desc->property_bool_or_default(option, false)) {
+                _enabled_aov.emplace(c);
+            }
+        }
+    }
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
     [[nodiscard]] auto noisy_count() const noexcept { return _noisy_count; }
     [[nodiscard]] bool is_differentiable() const noexcept override { return false; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] auto is_component_enabled(luisa::string_view component) const noexcept {
+        return _enabled_aov.contains(component);
+    }
     [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
@@ -98,25 +118,32 @@ private:
     static constexpr auto clear_shader_name = luisa::string_view{"__aux_buffer_clear_shader"};
 
 public:
-    AuxiliaryBuffer(Pipeline &pipeline, uint2 resolution, uint channels) noexcept
-        : _pipeline{pipeline},
-          _image{pipeline.device().create_image<float>(
-              channels == 1u ?
-                  PixelStorage::FLOAT1 :
-              channels == 2u ?
-                  PixelStorage::FLOAT2 :
-                  PixelStorage::FLOAT4,
-              resolution)} {
+    AuxiliaryBuffer(Pipeline &pipeline, uint2 resolution, uint channels, bool enabled = true) noexcept
+        : _pipeline{pipeline} {
         _pipeline.register_shader<2u>(
             clear_shader_name, [](ImageFloat image) noexcept {
                 image.write(dispatch_id().xy(), make_float4(0.f));
             });
+        if (enabled) {
+            _image = pipeline.device().create_image<float>(
+                channels == 1u ?
+                    PixelStorage::FLOAT1 :
+                channels == 2u ?
+                    PixelStorage::FLOAT2 :
+                    PixelStorage::FLOAT4,
+                resolution);
+        }
     }
     void clear(CommandBuffer &command_buffer) const noexcept {
-        command_buffer << _pipeline.shader<2u, Image<float>>(clear_shader_name, _image)
-                              .dispatch(_image.size());
+        if (_image) {
+            command_buffer << _pipeline.shader<2u, Image<float>>(clear_shader_name, _image)
+                                  .dispatch(_image.size());
+        }
     }
-    [[nodiscard]] auto save(CommandBuffer &command_buffer, std::filesystem::path path, uint total_samples) const noexcept {
+    [[nodiscard]] auto save(CommandBuffer &command_buffer,
+                            std::filesystem::path path, uint total_samples) const noexcept
+        -> luisa::function<void()> {
+        if (!_image) { return {}; }
         auto host_image = luisa::make_shared<luisa::vector<float>>();
         auto nc = pixel_storage_channel_count(_image.storage());
         host_image->resize(_image.size().x * _image.size().y * nc);
@@ -129,10 +156,12 @@ public:
         };
     }
     void accumulate(Expr<uint2> p, Expr<float4> value) noexcept {
-        $if(!any(isnan(value))) {
-            auto old = _image.read(p);
-            _image.write(p, old + value);
-        };
+        if (_image) {
+            $if(!any(isnan(value))) {
+                auto old = _image.read(p);
+                _image.write(p, old + value);
+            };
+        }
     }
 };
 
@@ -165,14 +194,11 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
 
     // 3 diffuse, 3 specular, 3 normal, 1 depth, 3 albedo, 1 roughness, 1 emissive, 1 metallic, 1 transmissive, 1 specular-bounce
     luisa::unordered_map<luisa::string, luisa::unique_ptr<AuxiliaryBuffer>> aux_buffers;
-    aux_buffers.emplace("sample", luisa::make_unique<AuxiliaryBuffer>(pipeline, resolution, 4u));
-    aux_buffers.emplace("diffuse", luisa::make_unique<AuxiliaryBuffer>(pipeline, resolution, 4u));
-    aux_buffers.emplace("specular", luisa::make_unique<AuxiliaryBuffer>(pipeline, resolution, 4u));
-    aux_buffers.emplace("normal", luisa::make_unique<AuxiliaryBuffer>(pipeline, resolution, 4u));
-    aux_buffers.emplace("depth", luisa::make_unique<AuxiliaryBuffer>(pipeline, resolution, 1u));
-    aux_buffers.emplace("albedo", luisa::make_unique<AuxiliaryBuffer>(pipeline, resolution, 4u));
-    aux_buffers.emplace("roughness", luisa::make_unique<AuxiliaryBuffer>(pipeline, resolution, 4u));
-    aux_buffers.emplace("ndc", luisa::make_unique<AuxiliaryBuffer>(pipeline, resolution, 4u));
+    for (auto [comp, nc] : aov_component_to_channels) {
+        auto enabled = node<AuxiliaryBufferPathTracing>()->is_component_enabled(comp);
+        auto v = luisa::make_unique<AuxiliaryBuffer>(pipeline, resolution, nc, enabled);
+        aux_buffers.emplace(comp, std::move(v));
+    }
 
     // clear auxiliary buffers
     auto clear_auxiliary_buffers = [&] {
@@ -362,10 +388,14 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
             if (check_sample_output(i + 1)) {
                 for (auto &[component, buffer] : aux_buffers) {
                     auto path = parent_path / fmt::format("{}_{}{:02}{}", filename, component, i, ext);
-                    savers.emplace_back(buffer->save(command_buffer, path, i + 1u));
+                    if (auto saver = buffer->save(command_buffer, path, i + 1u)) {
+                        savers.emplace_back(std::move(saver));
+                    }
                 }
-                command_buffer << [&] { for (auto &s : savers) { s(); } }
-                               << synchronize();
+                if (!savers.empty()) {
+                    command_buffer << [&] { for (auto &s : savers) { s(); } }
+                                   << synchronize();
+                }
             }
         }
     }
