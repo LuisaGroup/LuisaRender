@@ -168,7 +168,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                 auto p_cs = make_float3(inverse(camera->camera_to_world()) * make_float4(it->p(), 1.f));
                 auto clip = camera->node()->clip_plane();
                 auxiliary_ndc.write(dispatch_id().xy(),
-                                    make_float4(camera_sample.pixel / make_float2(resolution) * 2.f - 1.f,
+                                    make_float4((camera_sample.pixel / make_float2(resolution) * 2.f - 1.f) * make_float2(1.f, -1.f),
                                                 (-p_cs.z - clip.x) / (clip.y - clip.x), 1.f));
                 pipeline.surfaces().dispatch(it->shape()->surface_tag(), [&](auto surface) noexcept {
                     // create closure
