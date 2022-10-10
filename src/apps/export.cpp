@@ -21,6 +21,16 @@
 
 using luisa::uint;
 
+void replace(luisa::string &str, luisa::string_view from, luisa::string_view to) {
+    if (!from.empty()) {
+        size_t start_pos = 0u;
+        while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
+            str.replace(start_pos, from.length(), to);
+            start_pos += to.length();// In case 'to' contains 'from', like replacing 'x' with 'yx'
+        }
+    }
+}
+
 int main(int argc, char *argv[]) {
 
     // TODO: Parse command line arguments.
@@ -120,6 +130,7 @@ int main(int argc, char *argv[]) {
                 for (auto &c : tex) {
                     if (c == '\\') { c = '/'; }
                 }
+                replace(tex, "%20", " ");
                 // embedded texture
                 if (tex.starts_with('*')) {
                     auto end = tex.data() + tex.length() - 1u;
@@ -178,28 +189,47 @@ int main(int argc, char *argv[]) {
         if (specular_map) { LUISA_INFO("Specular: {}", *specular_map); }
         if (shininess_map) { LUISA_INFO("Shininess: {}", *shininess_map); }
 
+        // TODO: transparency & transmission
+
         // roughness
-        aiString rough_tex;
-        aiString metallic_tex;
+        luisa::string rough_tex;
+        luisa::string metallic_tex;
         luisa::string roughness_tex_name;
         luisa::string metallic_tex_name;
-        if (m->GetTexture(AI_MATKEY_ROUGHNESS_TEXTURE, &rough_tex) == AI_SUCCESS) {
-            LUISA_INFO("Roughness texture: {}", rough_tex.C_Str());
-            roughness_tex_name = luisa::format("Texture:{}", rough_tex.C_Str());
+        if (aiString ai_rough_tex; m->GetTexture(AI_MATKEY_ROUGHNESS_TEXTURE, &ai_rough_tex) == AI_SUCCESS) {
+            rough_tex = ai_rough_tex.C_Str();
+            replace(rough_tex, "%20", " ");
+            replace(rough_tex, "\\", "/");
+            if (rough_tex.starts_with('*')) {
+                auto end = rough_tex.data() + rough_tex.length() - 1u;
+                auto id = std::strtoul(rough_tex.data() + 1u, &end, 10);
+                rough_tex = embedded_textures.at(id);
+            }
+            LUISA_INFO("Roughness texture: {}", rough_tex);
+            roughness_tex_name = luisa::format("Texture:{}", rough_tex);
             scene_materials[roughness_tex_name] = {
                 {"type", "Texture"},
                 {"impl", "Image"},
-                {"prop", {{"file", rough_tex.C_Str()}, {"encoding", "linear"}}}};
+                {"prop", {{"file", rough_tex}, {"encoding", "linear"}}}};
         }
-        if (m->GetTexture(AI_MATKEY_METALLIC_TEXTURE, &metallic_tex) == AI_SUCCESS) {
-            LUISA_INFO("Metallic texture: {}", metallic_tex.C_Str());
-            metallic_tex_name = luisa::format("Texture:{}", rough_tex.C_Str());
+        // metallic
+        if (aiString ai_metallic_tex; m->GetTexture(AI_MATKEY_METALLIC_TEXTURE, &ai_metallic_tex) == AI_SUCCESS) {
+            metallic_tex = ai_metallic_tex.C_Str();
+            replace(metallic_tex, "%20", " ");
+            replace(metallic_tex, "\\", "/");
+            if (metallic_tex.starts_with('*')) {
+                auto end = metallic_tex.data() + metallic_tex.length() - 1u;
+                auto id = std::strtoul(metallic_tex.data() + 1u, &end, 10);
+                metallic_tex = embedded_textures.at(id);
+            }
+            LUISA_INFO("Metallic texture: {}", metallic_tex);
+            metallic_tex_name = luisa::format("Texture:{}", metallic_tex);
             scene_materials[metallic_tex_name] = {
                 {"type", "Texture"},
                 {"impl", "Image"},
-                {"prop", {{"file", metallic_tex.C_Str()}, {"encoding", "linear"}}}};
+                {"prop", {{"file", metallic_tex}, {"encoding", "linear"}}}};
         }
-        if (rough_tex.length != 0u && metallic_tex == rough_tex) {// assume gltf
+        if (!rough_tex.empty() && metallic_tex == rough_tex) {// assume gltf
             auto swizzle_rough_name = roughness_tex_name + ":Roughness";
             auto swizzle_metal_name = metallic_tex_name + ":Metallic";
             scene_materials[swizzle_rough_name] = {
@@ -296,20 +326,42 @@ int main(int argc, char *argv[]) {
                 file << "vn " << v.x << ' ' << v.y << ' ' << v.z << '\n';
             }
         }
-        if (m->HasTextureCoords(0)) {
+        auto tex_coords = m->mTextureCoords[0];
+        for (auto t = 0u; t < AI_MAX_NUMBER_OF_TEXTURECOORDS; t++) {
+            if (m->HasTextureCoords(t)) {
+                tex_coords = m->mTextureCoords[t];
+                if (m->mNumUVComponents[t] == 2) { break; }
+            }
+        }
+        auto has_tex_coords = tex_coords != nullptr;
+        if (has_tex_coords) {
             for (auto iv = 0u; iv < m->mNumVertices; iv++) {
-                auto v = m->mTextureCoords[0][iv];
+                auto v = tex_coords[iv];
                 file << "vt " << v.x << ' ' << v.y << '\n';
             }
+        } else if (m->HasNormals()) {// generate tex coords
+            for (auto iv = 0u; iv < m->mNumVertices; iv++) {
+                auto p = m->mVertices[iv];
+                auto aabb = m->mAABB;
+                auto uvw = (p - aabb.mMin) / (aabb.mMax - aabb.mMin);
+                auto ai_n = m->mNormals[iv];
+                auto n = luisa::abs(luisa::make_float3(ai_n.x, ai_n.y, ai_n.z));
+                n = n / (n.x + n.y + n.z);
+                auto uv = n.x * luisa::make_float2(uvw.y, uvw.z) +
+                          n.y * luisa::make_float2(uvw.z, uvw.x) +
+                          n.z * luisa::make_float2(uvw.x, uvw.y);
+                file << "vt " << uv.x << ' ' << uv.y << '\n';
+            }
+            has_tex_coords = true;
         }
         total_faces += m->mNumFaces;
         for (auto f = 0u; f < m->mNumFaces; f++) {
             file << "f";
-            for (auto j = 0u; j < 3u; j++) {
+            for (auto j = 0u; j < m->mFaces[f].mNumIndices; j++) {
                 auto idx = m->mFaces[f].mIndices[j] + 1u;
                 file << " " << idx;
-                if (m->HasTextureCoords(0u) || m->HasNormals()) {
-                    if (m->HasTextureCoords(0)) {
+                if (has_tex_coords || m->HasNormals()) {
+                    if (has_tex_coords) {
                         file << '/' << idx;
                     } else {
                         file << "/";
@@ -330,6 +382,7 @@ int main(int argc, char *argv[]) {
             {"prop",
              {{"file", relative(file_path, folder).string()},
               {"flip_uv", false},
+              {"shadow_terminator", 1.f},
               {"surface", mat_name}}}};
         if (auto iter = light_names.find(mat_id); iter != light_names.end()) {
             scene_geometry[mesh_name]["prop"]["light"] = luisa::format("@{}", iter->second);
@@ -410,20 +463,24 @@ int main(int argc, char *argv[]) {
         auto name = luisa::format("Camera:{}:{}", i, camera->mName.C_Str());
         LUISA_INFO("Processing camera '{}'...", name);
         auto front = (camera->mLookAt - camera->mPosition).NormalizeSafe();
+        auto position = camera->mPosition + front * camera->mClipPlaneNear;
+        auto height = static_cast<uint>(1920.f / camera->mAspect);
+        auto vertical_fov = std::atan(std::tan(camera->mHorizontalFOV * 0.5f) / camera->mAspect) * 2.0f;
         scene_configs[name] = {
             {"type", "Camera"},
             {"impl", "Pinhole"},
             {"prop",
-             {{"position", {camera->mPosition.x, camera->mPosition.y, camera->mPosition.z}},
+             {{"position", {position.x, position.y, position.z}},
               {"front", {front.x, front.y, front.z}},
               {"up", {camera->mUp.x, camera->mUp.y, camera->mUp.z}},
-              {"fov", luisa::degrees(camera->mHorizontalFOV)},
-              {"spp", 128u},
-              {"file", "render.exr"},
+              {"fov", luisa::degrees(vertical_fov)},
+              {"spp", 256u},
+              {"near_plane", camera->mClipPlaneNear},
+              {"file", luisa::format("render-view-{:02}.exr", cameras.size())},
               {"film",
                {{"impl", "Color"},
                 {"prop",
-                 {{"resolution", {1920, 1080}},
+                 {{"resolution", {1920, height}},
                   {"filter", {{"impl", "Gaussian"}}}}}}}}}};
         cameras.emplace_back(luisa::format("@{}", name));
     }
@@ -442,7 +499,7 @@ int main(int argc, char *argv[]) {
               {"front", {0, 0, -1}},
               {"up", {0, 1, 0}},
               {"fov", 50},
-              {"spp", 128u},
+              {"spp", 256u},
               {"file", "render.exr"},
               {"film",
                {{"impl", "Color"},
