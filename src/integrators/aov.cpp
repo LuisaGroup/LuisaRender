@@ -40,9 +40,9 @@ public:
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
     [[nodiscard]] auto noisy_count() const noexcept { return _noisy_count; }
     [[nodiscard]] bool is_differentiable() const noexcept override { return false; }
-    [[nodiscard]] bool display_enabled() const noexcept { return false; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
+    [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
 class AuxiliaryBufferPathTracingInstance final : public Integrator::Instance {
@@ -126,6 +126,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
     auto auxiliary_depth = pipeline.device().create_image<float>(PixelStorage::FLOAT1, resolution);
     auto auxiliary_albedo = pipeline.device().create_image<float>(PixelStorage::FLOAT4, resolution);
     auto auxiliary_roughness = pipeline.device().create_image<float>(PixelStorage::FLOAT4, resolution);
+    auto auxiliary_ndc = pipeline.device().create_image<float>(PixelStorage::FLOAT4, resolution);
 
     Kernel2D clear_kernel = [&]() noexcept {
         auxiliary_noisy.write(dispatch_id().xy(), make_float4(0.0f));
@@ -134,6 +135,8 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
         auxiliary_normal.write(dispatch_id().xy(), make_float4(0.0f));
         auxiliary_depth.write(dispatch_id().xy(), make_float4(0.0f));
         auxiliary_albedo.write(dispatch_id().xy(), make_float4(0.0f));
+        auxiliary_roughness.write(dispatch_id().xy(), make_float4(0.0f));
+        auxiliary_ndc.write(dispatch_id().xy(), make_float4(0.0f));
     };
 
     Kernel2D render_auxiliary_kernel = [&](UInt frame_index, Float time, Float shutter_weight) noexcept {
@@ -141,16 +144,16 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
 
         auto pixel_id = dispatch_id().xy();
         sampler->start(pixel_id, frame_index);
-        auto [camera_ray, camera_weight] = camera->generate_ray(*sampler, pixel_id, time);
+        auto camera_sample = camera->generate_ray(*sampler, pixel_id, time);
         auto spectrum = pipeline.spectrum();
         auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler->generate_1d());
-        SampledSpectrum beta{swl.dimension(), camera_weight};
+        SampledSpectrum beta{swl.dimension(), camera_sample.weight};
         SampledSpectrum Li{swl.dimension()};
 
-        SampledSpectrum beta_diffuse{swl.dimension(), camera_weight};
+        SampledSpectrum beta_diffuse{swl.dimension(), camera_sample.weight};
         SampledSpectrum Li_diffuse{swl.dimension()};
 
-        auto ray = camera_ray;
+        auto ray = camera_sample.ray;
         auto pdf_bsdf = def(1e16f);
         auto specular_bounce = def(false);
 
@@ -162,6 +165,11 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
             $if(depth == 0 & it->valid()) {
                 auxiliary_normal.write(dispatch_id().xy(), make_float4(it->shading().n(), 1.f));
                 auxiliary_depth.write(dispatch_id().xy(), make_float4(length(it->p() - ray->origin()), 0.f, 0.f, 0.f));
+                auto p_cs = make_float3(inverse(camera->camera_to_world()) * make_float4(it->p(), 1.f));
+                auto clip = camera->node()->clip_plane();
+                auxiliary_ndc.write(dispatch_id().xy(),
+                                    make_float4(camera_sample.pixel / make_float2(resolution) * 2.f - 1.f,
+                                                (p_cs.z - clip.x) / (clip.y - clip.x), 1.f));
                 pipeline.surfaces().dispatch(it->shape()->surface_tag(), [&](auto surface) noexcept {
                     // create closure
                     auto closure = surface->closure(*it, swl, 1.f, time);
@@ -316,7 +324,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
     auto check_sample_output = [](uint32_t n) -> bool {
         return n > 0 && ((n & (n - 1)) == 0);
     };
-    for (auto s : shutter_samples) {
+    for (auto s : shutter_samples) {// FIXME: compatibility with motion blur
         pipeline.update(command_buffer, s.point.time);
         command_buffer << clear_shader().dispatch(resolution);
         auto parent_path = camera->node()->file().parent_path();
@@ -330,11 +338,13 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                 std::vector<float> hostaux_depth(pixel_count * 1);
                 std::vector<float> hostaux_albedo(pixel_count * 4);
                 std::vector<float> hostaux_roughness(pixel_count * 4);
+                std::vector<float> hostaux_ndc(pixel_count * 4);
                 command_buffer
                     << auxiliary_normal.copy_to(hostaux_normal.data())
                     << auxiliary_depth.copy_to(hostaux_depth.data())
                     << auxiliary_albedo.copy_to(hostaux_albedo.data())
                     << auxiliary_roughness.copy_to(hostaux_roughness.data())
+                    << auxiliary_ndc.copy_to(hostaux_ndc.data())
                     << synchronize();
                 // normal
                 auto nrm_path = parent_path / fmt::format("{}_normal{}", filename, ext);
@@ -348,6 +358,9 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                 // roughness
                 auto rough_path = parent_path / fmt::format("{}_roughness{}", filename, ext);
                 save_image(rough_path, hostaux_roughness.data(), resolution);
+                // ndc
+                auto ndc_path = parent_path / fmt::format("{}_ndc{}", filename, ext);
+                save_image(ndc_path, hostaux_ndc.data(), resolution);
             }
 
             if (check_sample_output(i + 1)) {

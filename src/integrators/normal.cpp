@@ -77,7 +77,7 @@ void NormalVisualizerInstance::_render_one_camera(
     auto render = pipeline().device().compile<2>([&](UInt frame_index, Float time, Float shutter_weight) noexcept {
         auto pixel_id = dispatch_id().xy();
         sampler()->start(pixel_id, frame_index);
-        auto [ray, camera_weight] = camera->generate_ray(*sampler(), pixel_id, time);
+        auto [ray, _, camera_weight] = camera->generate_ray(*sampler(), pixel_id, time);
         auto swl = pipeline().spectrum()->sample(sampler()->generate_1d());
         auto path_weight = camera_weight;
         auto it = pipeline().geometry()->intersect(ray);

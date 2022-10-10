@@ -88,17 +88,17 @@ public:
     }
 
 private:
-    [[nodiscard]] Camera::Sample _generate_ray(
+    [[nodiscard]] Camera::Sample _generate_ray_in_camera_space(
         Sampler::Instance &sampler,
         Expr<float2> pixel, Expr<float> time) const noexcept override;
 };
 
-Camera::Sample PinholeCameraInstance::_generate_ray(
+Camera::Sample PinholeCameraInstance::_generate_ray_in_camera_space(
     Sampler::Instance & /* sampler */, Expr<float2> pixel, Expr<float> /* time */) const noexcept {
     auto data = _device_data.read(0u);
     auto p = (pixel * 2.0f - data.resolution) * (data.tan_half_fov / data.resolution.y);
     auto direction = normalize(p.x * data.right - p.y * data.up + data.front);
-    return Camera::Sample{make_ray(data.position, direction), 1.0f};
+    return Camera::Sample{make_ray(data.position, direction), pixel, 1.0f};
 }
 
 luisa::unique_ptr<Camera::Instance> PinholeCamera::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {

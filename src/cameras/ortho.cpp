@@ -74,7 +74,7 @@ public:
         const OrthoCamera *camera) noexcept;
 
 private:
-    [[nodiscard]] Camera::Sample _generate_ray(
+    [[nodiscard]] Camera::Sample _generate_ray_in_camera_space(
         Sampler::Instance &sampler,
         Expr<float2> pixel, Expr<float> time) const noexcept override;
 };
@@ -92,7 +92,7 @@ OrthoCameraInstance::OrthoCameraInstance(
     command_buffer << _device_data.copy_from(&_host_data);
 }
 
-Camera::Sample OrthoCameraInstance::_generate_ray(
+Camera::Sample OrthoCameraInstance::_generate_ray_in_camera_space(
     Sampler::Instance & /* sampler */, Expr<float2> pixel, Expr<float> /* time */) const noexcept {
     auto data = _device_data.read(0u);
     auto p = (data.resolution - pixel * 2.0f) / data.resolution.y * data.scale;
@@ -100,7 +100,7 @@ Camera::Sample OrthoCameraInstance::_generate_ray(
     auto v = data.up;
     auto w = data.front;
     auto origin = p.x * u + p.y * v + data.position;
-    return Camera::Sample{make_ray(origin, w), 1.0f};
+    return Camera::Sample{make_ray(origin, w), pixel, 1.0f};
 }
 
 luisa::unique_ptr<Camera::Instance> OrthoCamera::build(

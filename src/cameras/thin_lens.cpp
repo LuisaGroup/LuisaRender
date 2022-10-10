@@ -101,13 +101,13 @@ public:
 
 private:
     [[nodiscard]] Camera::Sample
-    _generate_ray(Sampler::Instance &sampler, Expr<float2> pixel, Expr<float> time) const noexcept override {
+    _generate_ray_in_camera_space(Sampler::Instance &sampler, Expr<float2> pixel, Expr<float> time) const noexcept override {
         auto data = _device_data.read(0u);
         auto coord_focal = (data.pixel_offset - pixel) * data.projected_pixel_size;
         auto p_focal = coord_focal.x * data.left + coord_focal.y * data.up + data.focal_plane * data.front;
         auto coord_lens = sample_uniform_disk_concentric(sampler.generate_2d()) * data.lens_radius;
         auto p_lens = coord_lens.x * data.left + coord_lens.y * data.up;
-        return {.ray = make_ray(p_lens + data.position, normalize(p_focal - p_lens)), .weight = 1.f};
+        return {.ray = make_ray(p_lens + data.position, normalize(p_focal - p_lens)), .pixel = pixel, .weight = 1.f};
     }
 };
 

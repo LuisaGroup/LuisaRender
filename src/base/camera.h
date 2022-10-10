@@ -28,6 +28,7 @@ class Camera : public SceneNode {
 public:
     struct Sample {
         Var<Ray> ray;
+        Float2 pixel;
         Float weight;
     };
 
@@ -42,7 +43,7 @@ public:
 
     private:
         // generate ray in camera space, should not consider _filter or _transform
-        [[nodiscard]] virtual Sample _generate_ray(
+        [[nodiscard]] virtual Sample _generate_ray_in_camera_space(
             Sampler::Instance &sampler, Expr<float2> pixel, Expr<float> time) const noexcept = 0;
 
     public:
@@ -59,6 +60,7 @@ public:
         [[nodiscard]] auto target() const noexcept { return _target; }
         [[nodiscard]] Sample generate_ray(
             Sampler::Instance &sampler, Expr<uint2> pixel_coord, Expr<float> time) const noexcept;
+        [[nodiscard]] Float4x4 camera_to_world() const noexcept;
     };
 
     struct ShutterPoint {
@@ -81,7 +83,7 @@ private:
     std::filesystem::path _file;
     luisa::vector<ShutterPoint> _shutter_points;
     const Texture *_target;
-    float _near_plane;
+    float2 _clip_plane;
 
 public:
     Camera(Scene *scene, const SceneNodeDesc *desc) noexcept;
@@ -94,7 +96,7 @@ public:
     [[nodiscard]] auto spp() const noexcept { return _spp; }
     [[nodiscard]] auto file() const noexcept { return _file; }
     [[nodiscard]] auto target() const noexcept { return _target; }
-    [[nodiscard]] auto near_plane() const noexcept { return _near_plane; }
+    [[nodiscard]] auto clip_plane() const noexcept { return _clip_plane; }
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
 };

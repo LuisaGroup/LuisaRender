@@ -260,7 +260,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
 
             auto pixel_id = dispatch_id().xy();
             sampler->start(pixel_id, frame_index);
-            auto [camera_ray, camera_weight] = camera->generate_ray(*sampler, pixel_id, time);
+            auto [camera_ray, _, camera_weight] = camera->generate_ray(*sampler, pixel_id, time);
             auto spectrum = pipeline().spectrum();
             auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler->generate_1d());
             SampledSpectrum beta{swl.dimension(), camera_weight};
@@ -412,7 +412,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
 
             auto pixel_id = dispatch_id().xy();
             sampler->start(pixel_id, frame_index);
-            auto [camera_ray, camera_weight] = camera->generate_ray(*sampler, pixel_id, time);
+            auto [camera_ray, _, camera_weight] = camera->generate_ray(*sampler, pixel_id, time);
             auto spectrum = pipeline().spectrum();
             auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler->generate_1d());
             SampledSpectrum beta{swl.dimension(), camera_weight};
@@ -657,7 +657,7 @@ void MegakernelReplayDiffInstance::_render_one_camera(
 
             auto pixel_id = dispatch_id().xy();
             sampler->start(pixel_id, frame_index);
-            auto [camera_ray, camera_weight] = camera->generate_ray(*sampler, pixel_id, time);
+            auto [camera_ray, _, camera_weight] = camera->generate_ray(*sampler, pixel_id, time);
             auto spectrum = pipeline().spectrum();
             auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler->generate_1d());
             SampledSpectrum beta{swl.dimension(), camera_weight};

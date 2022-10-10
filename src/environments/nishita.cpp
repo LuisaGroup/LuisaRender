@@ -4,7 +4,7 @@
 
 #include <base/environment.h>
 
-// adapted from https://www.scratchapixel.com/code.php?id=52
+// adapted from Cycles: https://developer.blender.org/diffusion/B/browse/master/intern/sky/source/sky_nishita.cpp
 namespace luisa::render {
 
 class NishitaSky final : public Environment {
@@ -12,6 +12,7 @@ class NishitaSky final : public Environment {
 private:
 
 
+
 };
 
-}
+}// namespace luisa::render

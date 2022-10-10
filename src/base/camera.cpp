@@ -28,8 +28,14 @@ Camera::Camera(Scene *scene, const SceneNodeDesc *desc) noexcept
       _shutter_samples{desc->property_uint_or_default("shutter_samples", 0u)},// 0 means default
       _spp{desc->property_uint_or_default("spp", 1024u)},
       _target{scene->load_texture(desc->property_node_or_default("target"))},
-      _near_plane{std::max(desc->property_float_or_default("near_plane", 0.f), 0.f)} {
-
+      _clip_plane{desc->property_float2_or_default(
+          "clip_plane", lazy_construct([desc] {
+              return make_float2(desc->property_float_or_default("clip_plane", 0.f), 1e10f);
+          }))} {
+    _clip_plane = clamp(_clip_plane, 0.f, 1e10f);
+    if (_clip_plane.x > _clip_plane.y) {
+        std::swap(_clip_plane.x, _clip_plane.y);
+    }
     LUISA_RENDER_CHECK_GENERIC_TEXTURE(Camera, target, 3);
 
     if (_shutter_span.y < _shutter_span.x) [[unlikely]] {
@@ -197,16 +203,22 @@ Camera::Sample Camera::Instance::generate_ray(
     Sampler::Instance &sampler, Expr<uint2> pixel_coord, Expr<float> time) const noexcept {
     auto [filter_offset, filter_weight] = filter()->sample(sampler.generate_pixel_2d());
     auto pixel = make_float2(pixel_coord) + 0.5f + filter_offset;
-    auto sample = _generate_ray(sampler, pixel, time);
+    auto sample = _generate_ray_in_camera_space(sampler, pixel, time);
     sample.weight *= filter_weight;
-    auto t_min = node()->near_plane() / sample.ray->direction().z;
-    sample.ray->set_origin(sample.ray->origin() - sample.ray->direction() * t_min);
-    auto camera_to_world = pipeline().transform(node()->transform());
+    auto clip = node()->clip_plane() / abs(sample.ray->direction().z);
+    sample.ray->set_t_min(max(sample.ray->t_min(), clip.x));
+    sample.ray->set_t_max(min(sample.ray->t_max(), clip.y));
+    auto c2w = camera_to_world();
     sample.ray->set_origin(make_float3(
-        camera_to_world * make_float4(sample.ray->origin(), 1.0f)));
-    sample.ray->set_direction(normalize(
-        make_float3x3(camera_to_world) * sample.ray->direction()));
+        c2w * make_float4(sample.ray->origin(), 1.0f)));
+    auto c2w_normal = transpose(inverse(make_float3x3(c2w)));
+    auto d = normalize(c2w_normal * sample.ray->direction());
+    sample.ray->set_direction(d);
     return sample;
+}
+
+Float4x4 Camera::Instance::camera_to_world() const noexcept {
+    return pipeline().transform(node()->transform());
 }
 
 }// namespace luisa::render
