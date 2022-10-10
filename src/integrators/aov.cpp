@@ -48,7 +48,7 @@ public:
           _noisy_count{std::max(desc->property_uint_or_default("noisy_count", 8u), 8u)} {
         for (auto [c, _] : aov_component_to_channels) {
             auto option = luisa::format("enable_{}", c);
-            if (desc->property_bool_or_default(option, false)) {
+            if (desc->property_bool_or_default(option, true)) {
                 _enabled_aov.emplace(c);
             }
         }
@@ -80,7 +80,9 @@ private:
         AuxiliaryBufferPathTracingInstance *pt, Camera::Instance *camera) noexcept;
 
 public:
-    explicit AuxiliaryBufferPathTracingInstance(const AuxiliaryBufferPathTracing *node, Pipeline &pipeline, CommandBuffer &cmd_buffer) noexcept
+    explicit AuxiliaryBufferPathTracingInstance(
+        const AuxiliaryBufferPathTracing *node,
+        Pipeline &pipeline, CommandBuffer &cmd_buffer) noexcept
         : Integrator::Instance{pipeline, cmd_buffer, node} {
     }
 
@@ -105,8 +107,10 @@ public:
     }
 };
 
-luisa::unique_ptr<Integrator::Instance> AuxiliaryBufferPathTracing::build(Pipeline &pipeline, CommandBuffer &cmd_buffer) const noexcept {
-    return luisa::make_unique<AuxiliaryBufferPathTracingInstance>(this, pipeline, cmd_buffer);
+luisa::unique_ptr<Integrator::Instance> AuxiliaryBufferPathTracing::build(
+    Pipeline &pipeline, CommandBuffer &cmd_buffer) const noexcept {
+    return luisa::make_unique<AuxiliaryBufferPathTracingInstance>(
+        this, pipeline, cmd_buffer);
 }
 
 class AuxiliaryBuffer {
