@@ -164,11 +164,10 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
     using namespace luisa::compute;
 
     // 3 diffuse, 3 specular, 3 normal, 1 depth, 3 albedo, 1 roughness, 1 emissive, 1 metallic, 1 transmissive, 1 specular-bounce
-    luisa::unordered_map<luisa::string, luisa::unique_ptr<AuxiliaryBuffer>> color_buffers;
     luisa::unordered_map<luisa::string, luisa::unique_ptr<AuxiliaryBuffer>> aux_buffers;
-    color_buffers.emplace("sample", luisa::make_unique<AuxiliaryBuffer>(pipeline, resolution, 4u));
-    color_buffers.emplace("diffuse", luisa::make_unique<AuxiliaryBuffer>(pipeline, resolution, 4u));
-    color_buffers.emplace("specular", luisa::make_unique<AuxiliaryBuffer>(pipeline, resolution, 4u));
+    aux_buffers.emplace("sample", luisa::make_unique<AuxiliaryBuffer>(pipeline, resolution, 4u));
+    aux_buffers.emplace("diffuse", luisa::make_unique<AuxiliaryBuffer>(pipeline, resolution, 4u));
+    aux_buffers.emplace("specular", luisa::make_unique<AuxiliaryBuffer>(pipeline, resolution, 4u));
     aux_buffers.emplace("normal", luisa::make_unique<AuxiliaryBuffer>(pipeline, resolution, 4u));
     aux_buffers.emplace("depth", luisa::make_unique<AuxiliaryBuffer>(pipeline, resolution, 1u));
     aux_buffers.emplace("albedo", luisa::make_unique<AuxiliaryBuffer>(pipeline, resolution, 4u));
@@ -177,8 +176,9 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
 
     // clear auxiliary buffers
     auto clear_auxiliary_buffers = [&] {
-        for (auto &[_, buffer] : aux_buffers) { buffer->clear(command_buffer); }
-        for (auto &[_, buffer] : color_buffers) { buffer->clear(command_buffer); }
+        for (auto &[_, buffer] : aux_buffers) {
+            buffer->clear(command_buffer);
+        }
     };
 
     Kernel2D render_auxiliary_kernel = [&](UInt frame_index, Float time, Float shutter_weight) noexcept {
@@ -326,9 +326,9 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
             });
             // rr is closed for aov
         };
-        color_buffers.at("sample")->accumulate(pixel_id, make_float4(spectrum->srgb(swl, Li * shutter_weight), 1.f));
-        color_buffers.at("diffuse")->accumulate(pixel_id, make_float4(spectrum->srgb(swl, Li_diffuse * shutter_weight), 1.f));
-        color_buffers.at("specular")->accumulate(pixel_id, make_float4(spectrum->srgb(swl, (Li - Li_diffuse) * shutter_weight), 1.f));
+        aux_buffers.at("sample")->accumulate(pixel_id, make_float4(spectrum->srgb(swl, Li * shutter_weight), 1.f));
+        aux_buffers.at("diffuse")->accumulate(pixel_id, make_float4(spectrum->srgb(swl, Li_diffuse * shutter_weight), 1.f));
+        aux_buffers.at("specular")->accumulate(pixel_id, make_float4(spectrum->srgb(swl, (Li - Li_diffuse) * shutter_weight), 1.f));
     };
 
     Clock clock_compile;
@@ -359,19 +359,11 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
             command_buffer << render_auxiliary(sample_id++, s.point.time, s.point.weight)
                                   .dispatch(resolution);
             luisa::vector<luisa::function<void()>> savers;
-            if (i == 0) {
-                for (auto &[component, buffer] : aux_buffers) {
-                    auto path = parent_path / fmt::format("{}_{}{}", filename, component, ext);
-                    savers.emplace_back(buffer->save(command_buffer, path, i + 1u));
-                }
-            }
             if (check_sample_output(i + 1)) {
-                for (auto &[component, buffer] : color_buffers) {
+                for (auto &[component, buffer] : aux_buffers) {
                     auto path = parent_path / fmt::format("{}_{}{:02}{}", filename, component, i, ext);
                     savers.emplace_back(buffer->save(command_buffer, path, i + 1u));
                 }
-            }
-            if (!savers.empty()) {
                 command_buffer << [&] { for (auto &s : savers) { s(); } }
                                << synchronize();
             }
