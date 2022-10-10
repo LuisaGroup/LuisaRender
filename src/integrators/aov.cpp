@@ -25,6 +25,7 @@ static const luisa::unordered_map<luisa::string_view, uint>
                               {"diffuse", 3u},
                               {"specular", 3u},
                               {"normal", 3u},
+                              {"albedo", 3u},
                               {"depth", 1u},
                               {"roughness", 2u},
                               {"ndc", 3u}};
@@ -126,10 +127,8 @@ public:
             });
         if (enabled) {
             _image = pipeline.device().create_image<float>(
-                channels == 1u ?
+                channels == 1u ?// TODO: support FLOAT2
                     PixelStorage::FLOAT1 :
-                channels == 2u ?
-                    PixelStorage::FLOAT2 :
                     PixelStorage::FLOAT4,
                 resolution);
         }
@@ -371,24 +370,35 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
 
     auto dispatch_count = 0u;
     auto dispatches_per_commit = 32u;
-    auto sample_id = 0u;
+    auto aux_spp = pt->node<AuxiliaryBufferPathTracing>()->noisy_count();
     auto check_sample_output = [](uint32_t n) -> bool {
         return n > 0 && ((n & (n - 1)) == 0);
     };
-    for (auto s : shutter_samples) {// FIXME: compatibility with motion blur
+    LUISA_ASSERT(shutter_samples.size() == 1u || camera->node()->spp() == aux_spp,
+                 "AOVIntegrator is not compatible with motion blur "
+                 "if rendered with different spp from the camera.");
+    if (aux_spp != camera->node()->spp()) {
+        Camera::ShutterSample ss{
+            .point = {.time = camera->node()->shutter_span().x,
+                      .weight = 1.f},
+            .spp = aux_spp};
+        shutter_samples = {ss};
+    }
+    auto sample_id = 0u;
+    for (auto s : shutter_samples) {
         pipeline.update(command_buffer, s.point.time);
         clear_auxiliary_buffers();
         auto parent_path = camera->node()->file().parent_path();
         auto filename = camera->node()->file().stem().string();
         auto ext = camera->node()->file().extension().string();
-        for (auto i = 0u; i < pt->node<AuxiliaryBufferPathTracing>()->noisy_count(); i++) {
+        for (auto i = 0u; i < s.spp; i++) {
             command_buffer << render_auxiliary(sample_id++, s.point.time, s.point.weight)
                                   .dispatch(resolution);
             luisa::vector<luisa::function<void()>> savers;
-            if (check_sample_output(i + 1)) {
+            if (check_sample_output(sample_id)) {
                 for (auto &[component, buffer] : aux_buffers) {
-                    auto path = parent_path / fmt::format("{}_{}{:02}{}", filename, component, i, ext);
-                    if (auto saver = buffer->save(command_buffer, path, i + 1u)) {
+                    auto path = parent_path / fmt::format("{}_{}{:05}{}", filename, component, sample_id, ext);
+                    if (auto saver = buffer->save(command_buffer, path, sample_id)) {
                         savers.emplace_back(std::move(saver));
                     }
                 }
@@ -397,6 +407,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                                    << synchronize();
                 }
             }
+            if (++sample_id % 16u == 0u) { command_buffer << commit(); }
         }
     }
     command_buffer << synchronize();
