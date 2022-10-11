@@ -79,26 +79,38 @@ public:
     template<typename F>
     [[nodiscard]] auto map(F &&f) const noexcept {
         SampledSpectrum s{dimension()};
-        for (auto i = 0u; i < dimension(); i++) { s[i] = f(i, Expr{(*this)[i]}); }
+        for (auto i = 0u; i < dimension(); i++) {
+            if constexpr (std::invocable<F, Expr<float>>) {
+                s[i] = f(Expr{(*this)[i]});
+            } else {
+                s[i] = f(i, Expr{(*this)[i]});
+            }
+        }
         return s;
     }
     template<typename T, typename F>
     [[nodiscard]] auto reduce(T &&initial, F &&f) const noexcept {
         using compute::def;
         auto r = def(std::forward<T>(initial));
-        for (auto i = 0u; i < dimension(); i++) { r = f(Expr{r}, i, Expr{(*this)[i]}); }
+        for (auto i = 0u; i < dimension(); i++) {
+            if constexpr (std::invocable<F, Expr<compute::expr_value_t<decltype(r)>>, Expr<float>>) {
+                r = f(r, Expr{(*this)[i]});
+            } else {
+                r = f(Expr{r}, i, Expr{(*this)[i]});
+            }
+        }
         return r;
     }
     [[nodiscard]] auto sum() const noexcept {
-        return reduce(0.f, [](auto r, auto, auto x) noexcept { return r + x; });
+        return reduce(0.f, [](auto r, auto x) noexcept { return r + x; });
     }
     [[nodiscard]] auto max() const noexcept {
-        return reduce(0.f, [](auto r, auto, auto x) noexcept {
+        return reduce(0.f, [](auto r, auto x) noexcept {
             return luisa::compute::max(r, x);
         });
     }
     [[nodiscard]] auto min() const noexcept {
-        return reduce(std::numeric_limits<float>::max(), [](auto r, auto, auto x) noexcept {
+        return reduce(std::numeric_limits<float>::max(), [](auto r, auto x) noexcept {
             return luisa::compute::min(r, x);
         });
     }
@@ -107,11 +119,11 @@ public:
     }
     template<typename F>
     [[nodiscard]] auto any(F &&f) const noexcept {
-        return reduce(false, [&f](auto ans, auto, auto value) noexcept { return ans | f(value); });
+        return reduce(false, [&f](auto ans, auto value) noexcept { return ans | f(value); });
     }
     template<typename F>
     [[nodiscard]] auto all(F &&f) const noexcept {
-        return reduce(true, [&f](auto ans, auto, auto value) noexcept { return ans & f(value); });
+        return reduce(true, [&f](auto ans, auto value) noexcept { return ans & f(value); });
     }
     [[nodiscard]] auto is_zero() const noexcept {
         return all([](auto x) noexcept { return x == 0.f; });
@@ -120,21 +132,15 @@ public:
     [[nodiscard]] auto none(F &&f) const noexcept { return !any(std::forward<F>(f)); }
 
     [[nodiscard]] auto operator+() const noexcept {
-        return map([](auto, auto s) noexcept { return s; });
+        return map([](auto s) noexcept { return s; });
     }
     [[nodiscard]] auto operator-() const noexcept {
-        return map([](auto, auto s) noexcept { return -s; });
-    }
-    [[nodiscard]] auto isnan() const noexcept {
-        return map([](auto, auto s) noexcept { return compute::isnan(s); });
-    }
-    [[nodiscard]] auto abs() const noexcept {
-        return map([](auto, auto s) noexcept { return compute::abs(s); });
+        return map([](auto s) noexcept { return -s; });
     }
 
 #define LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP(op)                                           \
     [[nodiscard]] auto operator op(Expr<float> rhs) const noexcept {                               \
-        return map([rhs](auto, const auto &lvalue) { return lvalue op rhs; });                     \
+        return map([rhs](const auto &lvalue) { return lvalue op rhs; });                           \
     }                                                                                              \
     [[nodiscard]] auto operator op(const SampledSpectrum &rhs) const noexcept {                    \
         LUISA_ASSERT(dimension() == 1u || rhs.dimension() == 1u || dimension() == rhs.dimension(), \
@@ -145,7 +151,7 @@ public:
         return s;                                                                                  \
     }                                                                                              \
     [[nodiscard]] friend auto operator op(Expr<float> lhs, const SampledSpectrum &rhs) noexcept {  \
-        return rhs.map([lhs](auto, const auto &rvalue) noexcept { return lhs op rvalue; });        \
+        return rhs.map([lhs](const auto &rvalue) noexcept { return lhs op rvalue; });              \
     }                                                                                              \
     auto &operator op##=(Expr<float> rhs) noexcept {                                               \
         for (auto i = 0u; i < dimension(); i++) { (*this)[i] op## = rhs; }                         \
@@ -167,13 +173,13 @@ public:
 
 #define LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_COMPARISON_OP(op)                                      \
     [[nodiscard]] auto operator op(Expr<float> rhs) const noexcept {                              \
-        return map([rhs](auto, const auto &lvalue) { return lvalue op rhs; });                    \
+        return map([rhs](const auto &lvalue) { return lvalue op rhs; });                          \
     }                                                                                             \
     [[nodiscard]] auto operator op(const SampledSpectrum &rhs) const noexcept {                   \
         return map([&rhs](auto i, const auto &lvalue) { return lvalue op rhs[i]; });              \
     }                                                                                             \
     [[nodiscard]] friend auto operator op(Expr<float> lhs, const SampledSpectrum &rhs) noexcept { \
-        return rhs.map([lhs](auto, const auto &rvalue) noexcept { return lhs op rvalue; });       \
+        return rhs.map([lhs](const auto &rvalue) noexcept { return lhs op rvalue; });             \
     }
     LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_COMPARISON_OP(>)
     LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_COMPARISON_OP(>=)
@@ -190,7 +196,25 @@ public:
 [[nodiscard]] SampledSpectrum ite(Expr<bool> p, Expr<float> t, const SampledSpectrum &f) noexcept;
 [[nodiscard]] SampledSpectrum ite(Expr<bool> p, const SampledSpectrum &t, Expr<float> f) noexcept;
 
-SampledSpectrum zero_if_any_nan(const SampledSpectrum &t) noexcept;
+[[nodiscard]] SampledSpectrum zero_if_any_nan(const SampledSpectrum &t) noexcept;
+
+// some math functions
+[[nodiscard]] SampledSpectrum saturate(const SampledSpectrum &t) noexcept;
+[[nodiscard]] SampledSpectrum abs(const SampledSpectrum &t) noexcept;
+[[nodiscard]] SampledSpectrum sqrt(const SampledSpectrum &t) noexcept;
+// TODO: other math functions
+
+using luisa::lerp;
+using luisa::compute::lerp;
+
+template<typename A, typename B, typename T>
+    requires std::disjunction_v<
+        std::is_same<std::remove_cvref_t<A>, SampledSpectrum>,
+        std::is_same<std::remove_cvref_t<B>, SampledSpectrum>,
+        std::is_same<std::remove_cvref_t<T>, SampledSpectrum>>
+[[nodiscard]] auto lerp(A &&a, B &&b, T &&t) noexcept {
+    return t * (b - a) + a;
+}
 
 class SampledWavelengths {
 

@@ -76,7 +76,7 @@ private:
                             const Surface::Evaluation &eval_b) const noexcept {
         auto t = 1.f - _ratio;
         return Surface::Evaluation{
-            .f = _ratio * eval_a.f + t * eval_b.f,
+            .f = lerp(eval_a.f, eval_b.f, t),
             .pdf = lerp(eval_a.pdf, eval_b.pdf, t)};
     }
 

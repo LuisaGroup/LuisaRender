@@ -403,7 +403,7 @@ LUISA_EXPORT_API const std::array<float, cie_sample_count> cie_d65_samples{
 
 SampledSpectrum zero_if_any_nan(const SampledSpectrum &t) noexcept {
     auto any_nan = t.any([](const auto &value) { return isnan(value); });
-    return t.map([&any_nan](auto, auto x) noexcept { return ite(any_nan, 0.f, x); });
+    return t.map([&any_nan](auto x) noexcept { return ite(any_nan, 0.f, x); });
 }
 
 SampledSpectrum ite(const SampledSpectrum &p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept {
@@ -451,6 +451,18 @@ SampledSpectrum ite(Expr<bool> p, Expr<float> t, const SampledSpectrum &f) noexc
 
 SampledSpectrum ite(Expr<bool> p, const SampledSpectrum &t, Expr<float> f) noexcept {
     return t.map([p, f](auto i, auto x) noexcept { return ite(p, x, f); });
+}
+
+SampledSpectrum saturate(const SampledSpectrum &t) noexcept {
+    return t.map([](auto x) noexcept { return saturate(x); });
+}
+
+SampledSpectrum abs(const SampledSpectrum &t) noexcept {
+    return t.map([](auto x) noexcept { return abs(x); });
+}
+
+SampledSpectrum sqrt(const SampledSpectrum &t) noexcept {
+    return t.map([](auto x) noexcept { return sqrt(x); });
 }
 
 void SampledWavelengths::terminate_secondary() const noexcept {

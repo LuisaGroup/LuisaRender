@@ -66,13 +66,9 @@ SampledSpectrum fresnel_conductor(
     auto eta2 = eta * eta;
     auto etak2 = etak * etak;
     auto t0 = eta2 - etak2 - sinThetaI2;
-    auto a2plusb2 = t0.map([&eta2, &etak2](auto i, auto t) noexcept {
-        return sqrt(t * t + 4.f * eta2[i] * etak2[i]);
-    });
+    auto a2plusb2 = sqrt(t0 * t0 + 4.f * eta2 * etak2);
     auto t1 = a2plusb2 + cosThetaI2;
-    auto a = t0.map([&a2plusb2](auto i, auto t) noexcept {
-        return sqrt(.5f * (a2plusb2[i] + t));
-    });
+    auto a = sqrt(.5f * (a2plusb2 + t0));
     auto t2 = 2.f * cosThetaI * a;
     auto Rs = (t1 - t2) / (t1 + t2);
     auto t3 = cosThetaI2 * a2plusb2 + sinThetaI2 * sinThetaI2;
@@ -573,9 +569,7 @@ SampledSpectrum FresnelBlend::evaluate(
                    (1.f - pow5(1.f - .5f * absCosThetaO));
     auto specular = D / (4.f * abs_dot(wi, wh) * max(absCosThetaI, absCosThetaO)) *
                     Schlick(dot(wi, wh));
-    return (diffuse + specular).map([valid](auto, auto f) noexcept {
-        return ite(valid, f, 0.f);
-    });
+    return ite(valid, diffuse + specular, 0.f);
 }
 
 BxDF::SampledDirection FresnelBlend::sample_wi(Expr<float3> wo, Expr<float2> uOrig, TransportMode mode) const noexcept {

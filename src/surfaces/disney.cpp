@@ -34,7 +34,10 @@ private:
 public:
     DisneySurface(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Surface{scene, desc},
-          _color{scene->load_texture(desc->property_node("color"))},
+          _color{scene->load_texture(desc->property_node_or_default(
+              "color", lazy_construct([desc] {
+                  return desc->property_node_or_default("Kd");
+              })))},
           _thin{desc->property_bool_or_default("thin", false)} {
         LUISA_RENDER_CHECK_ALBEDO_TEXTURE(DisneySurface, color);
 #define LUISA_RENDER_DISNEY_PARAM_LOAD(name)                              \
@@ -145,7 +148,7 @@ luisa::unique_ptr<Surface::Instance> DisneySurface::_build(
     auto clearcoat_gloss = pipeline.build_texture(command_buffer, _clearcoat_gloss);
     auto specular_trans = pipeline.build_texture(command_buffer, _specular_trans);
     auto flatness = pipeline.build_texture(command_buffer, _flatness);
-    auto diffuse_trans = pipeline.build_texture(command_buffer, _diffuse_trans);
+    auto diffuse_trans = is_thin() ? pipeline.build_texture(command_buffer, _diffuse_trans) : nullptr;
     return luisa::make_unique<DisneySurfaceInstance>(
         pipeline, this,
         color, metallic, eta, roughness,
@@ -413,9 +416,8 @@ public:
         : R0{R0}, metallic{std::move(metallic)}, e{std::move(eta)} {}
     [[nodiscard]] SampledSpectrum evaluate(Expr<float> cosI) const noexcept override {
         auto fr = fresnel_dielectric(cosI, 1.f, e);
-        return R0.map([&](auto, auto R) noexcept {
-            return lerp(fr, FrSchlick(R, cosI), metallic);
-        });
+        auto f0 = R0.map([cosI](auto x) noexcept { return FrSchlick(x, cosI); });
+        return lerp(fr, f0, metallic);
     }
     [[nodiscard]] auto &eta() const noexcept { return e; }
 };
@@ -484,7 +486,7 @@ public:
         auto flatness = flatness_tex ? flatness_tex->evaluate(it, swl, time).x : 0.f;
         auto roughness = roughness_tex ? roughness_tex->evaluate(it, swl, time).x : 0.f;
         auto tint_weight = ite(color_lum > 0.f, 1.f / color_lum, 1.f);
-        auto tint = _color * tint_weight;// normalize lum. to isolate hue+sat
+        auto tint = saturate(_color * tint_weight);// normalize lum. to isolate hue+sat
         auto tint_lum = color_lum * tint_weight;
 
         static constexpr auto black_threshold = 1e-4f;
@@ -507,7 +509,7 @@ public:
                 auto sheen = sheen_tex->evaluate(it, swl, time).x;
                 auto sheen_tint = sheen_tint_tex ? sheen_tint_tex->evaluate(it, swl, time).x : 0.f;
                 auto Csheen_weight = diffuse_weight * sheen;
-                auto Csheen = Csheen_weight * (tint * sheen_tint + (1.f - sheen_tint));
+                auto Csheen = Csheen_weight * lerp(1.f, tint, sheen_tint);
                 _sheen = luisa::make_unique<DisneySheen>(Csheen);
                 auto sheen_lum = Csheen_weight * lerp(1.f, tint_lum, sheen_tint);
                 sampling_weight += sheen_lum * .1f;
@@ -522,7 +524,7 @@ public:
         auto eta = _eta_t / eta_i;
         // specular is Trowbridge-Reitz with a modified Fresnel function
         auto SchlickR0 = SchlickR0FromEta(eta);
-        auto Cspec0 = (tint * spec_tint + (1.f - spec_tint)) * SchlickR0 * (1.f - metallic) + _color * metallic;
+        auto Cspec0 = lerp(lerp(1.f, tint, spec_tint) * SchlickR0, _color, metallic);
         _fresnel = luisa::make_unique<DisneyFresnel>(Cspec0, metallic, eta);
 
         // create the microfacet distribution for metallic and/or specular transmittance
@@ -551,7 +553,7 @@ public:
         // specular transmission
         if (spec_trans_tex && !spec_trans_tex->node()->is_black()) {
             auto Cst_weight = (1.f - metallic) * specular_trans;
-            auto Cst = Cst_weight * _color.map([](auto, auto c) noexcept { return sqrt(c); });
+            auto Cst = Cst_weight * sqrt(_color);
             _spec_trans = luisa::make_unique<MicrofacetTransmission>(
                 Cst, _distrib.get(), eta_i, _eta_t);
             auto Cst_lum = Cst_weight * sqrt(color_lum);
@@ -725,7 +727,7 @@ public:
         auto diff_refl_weight = diffuse_weight * (1.f - diffuse_trans);
         auto diff_trans_weight = diffuse_weight * diffuse_trans;
         auto tint_weight = ite(color_lum > 0.f, 1.f / color_lum, 1.f);
-        auto tint = _color * tint_weight;// normalize lum. to isolate hue+sat
+        auto tint = saturate(_color * tint_weight);// normalize lum. to isolate hue+sat
         auto tint_lum = color_lum * tint_weight;
 
         static constexpr auto black_threshold = 1e-4f;
@@ -748,7 +750,7 @@ public:
                 auto sheen = sheen_tex->evaluate(it, swl, time).x;
                 auto sheen_tint = sheen_tint_tex ? sheen_tint_tex->evaluate(it, swl, time).x : 0.f;
                 auto Csheen_weight = diff_refl_weight * sheen * (1.f - diffuse_trans);
-                auto Csheen = Csheen_weight * (tint * sheen_tint + (1.f - sheen_tint));
+                auto Csheen = Csheen_weight * lerp(1.f, tint, sheen_tint);
                 _sheen = luisa::make_unique<DisneySheen>(Csheen);
                 auto sheen_lum = Csheen_weight * lerp(1.f, tint_lum, sheen_tint);
                 sampling_weight += sheen_lum * .1f;
@@ -763,7 +765,7 @@ public:
         auto eta = _eta_t / eta_i;
         // specular is Trowbridge-Reitz with a modified Fresnel function
         auto SchlickR0 = SchlickR0FromEta(eta);
-        auto Cspec0 = (tint * spec_tint + (1.f - spec_tint)) * SchlickR0 * (1.f - metallic) + _color * metallic;
+        auto Cspec0 = lerp(lerp(1.f, tint, spec_tint) * SchlickR0, _color, metallic);
         _fresnel = luisa::make_unique<DisneyFresnel>(Cspec0, metallic, eta);
 
         // create the microfacet distribution for metallic and/or specular transmittance
@@ -792,7 +794,7 @@ public:
         // specular transmission
         if (spec_trans_tex && !spec_trans_tex->node()->is_black()) {
             // thin specular transmission distribution
-            auto rscaled = (.65f * eta - .35f) * roughness;
+            auto rscaled = fma(eta, .65f, -.35f) * roughness;
             auto ascaled = make_float2(max(.001f, sqr(rscaled) / aspect),
                                        max(.001f, sqr(rscaled) * aspect));
             _thin_distrib = luisa::make_unique<TrowbridgeReitzDistribution>(ascaled);

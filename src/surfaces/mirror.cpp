@@ -20,7 +20,10 @@ private:
 public:
     MirrorSurface(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Surface{scene, desc},
-          _color{scene->load_texture(desc->property_node_or_default("color"))},
+          _color{scene->load_texture(desc->property_node_or_default(
+              "color", lazy_construct([desc] {
+                  return desc->property_node_or_default("Kd");
+              })))},
           _roughness{scene->load_texture(desc->property_node_or_default("roughness"))},
           _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {
         LUISA_RENDER_CHECK_ALBEDO_TEXTURE(MirrorSurface, color);
@@ -81,9 +84,7 @@ public:
     [[nodiscard]] SampledSpectrum evaluate(Expr<float> cosI) const noexcept override {
         auto m = saturate(1.f - cosI);
         auto weight = sqr(sqr(m)) * m;
-        return R0.map([weight](auto, auto R) noexcept {
-            return lerp(R, 1.f, weight);
-        });
+        return (1.f - weight) * R0 + weight;
     }
     [[nodiscard]] luisa::unique_ptr<Fresnel::Gradient> backward(
         Expr<float> cosI, const SampledSpectrum &df) const noexcept override {
