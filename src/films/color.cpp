@@ -28,7 +28,7 @@ public:
         _scale[0] = std::pow(2.0f, exposure.x);
         _scale[1] = std::pow(2.0f, exposure.y);
         _scale[2] = std::pow(2.0f, exposure.z);
-        _clamp = std::max(1.f, desc->property_float_or_default("clamp", 1024.f));
+        _clamp = std::max(1.f, desc->property_float_or_default("clamp", 256.f));
     }
     [[nodiscard]] auto scale() const noexcept { return make_float3(_scale[0], _scale[1], _scale[2]); }
     [[nodiscard]] auto clamp() const noexcept { return _clamp; }

@@ -23,15 +23,18 @@ public:
 private:
     const Texture *_emission;
     float _scale;
+    bool _compensate_mis;
 
 public:
     Spherical(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Environment{scene, desc},
           _emission{scene->load_texture(desc->property_node("emission"))},
-          _scale{std::max(desc->property_float_or_default("scale", 1.0f), 0.0f)} {
+          _scale{std::max(desc->property_float_or_default("scale", 1.0f), 0.0f)},
+          _compensate_mis{desc->property_bool_or_default("compensate_mis", true)} {
         LUISA_RENDER_CHECK_ILLUMINANT_TEXTURE(Spherical, emission);
     }
     [[nodiscard]] auto scale() const noexcept { return _scale; }
+    [[nodiscard]] auto compensate_mis() const noexcept { return _compensate_mis; }
     [[nodiscard]] auto emission() const noexcept { return _emission; }
     [[nodiscard]] bool is_black() const noexcept override { return _scale == 0.0f || _emission->is_black(); }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
@@ -156,10 +159,12 @@ luisa::unique_ptr<Environment::Instance> Spherical::build(
         command_buffer << generate_weight_map().dispatch(sample_map_size)
                        << scale_map_device.copy_to(scale_map.data())
                        << synchronize();
-        auto sum_scale = 0.;
-        for (auto s : scale_map) { sum_scale += s; }
-        auto average_scale = static_cast<float>(sum_scale / pixel_count);
-        for (auto &&s : scale_map) { s = std::max(s - average_scale, 0.f); }
+        if (compensate_mis()) {
+            auto sum_scale = 0.;
+            for (auto s : scale_map) { sum_scale += s; }
+            auto average_scale = static_cast<float>(sum_scale / pixel_count);
+            for (auto &&s : scale_map) { s = std::max(s - average_scale, 0.f); }
+        }
         luisa::vector<float> row_averages(sample_map_size.y);
         luisa::vector<float> pdfs(pixel_count);
         luisa::vector<AliasEntry> aliases(sample_map_size.y + pixel_count);

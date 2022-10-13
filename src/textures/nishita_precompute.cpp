@@ -314,11 +314,9 @@ void SKY_nishita_skymodel_precompute_texture(NishitaSkyData data, float4 *pixels
     for (auto y = y_range.x; y < y_range.y; y++) {
         /* sample more pixels toward the horizon */
         auto sqr = [](auto x) noexcept { return x * x; };
-        // difference from Cycles: add .5f to y to sample
-        // the center of the pixel and also flip y
+        // difference from Cycles: add .5f to y to sample the center of the pixel
         auto latitude = (pi_over_two + half_lat_step) *
-                        sqr((static_cast<float>(resolution.y - 1u - y) + .5f) /
-                            static_cast<float>(resolution.y));
+                        sqr((static_cast<float>(y) + .5f) / static_cast<float>(resolution.y));
         auto pixel_row = pixels + y * resolution.x;
         // difference from Cycles: we do not store the other half of the
         // texture, so we use the image width rather than a half of it and
