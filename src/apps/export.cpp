@@ -353,6 +353,14 @@ int main(int argc, char *argv[]) {
                 file << "vt " << uv.x << ' ' << uv.y << '\n';
             }
             has_tex_coords = true;
+        } else {
+            for (auto iv = 0u; iv < m->mNumVertices; iv++) {
+                auto p = m->mVertices[iv];
+                auto aabb = m->mAABB;
+                auto uvw = (p - aabb.mMin) / (aabb.mMax - aabb.mMin);
+                file << "vt " << uvw.x << ' ' << uvw.y << '\n';
+            }
+            has_tex_coords = true;
         }
         total_faces += m->mNumFaces;
         for (auto f = 0u; f < m->mNumFaces; f++) {

@@ -1059,14 +1059,17 @@ Camera camera : Pinhole {
   film : Color {
     resolution { 1920, 1080 }
   }
-  file { "output.exr" }
+  file { "output-srn.exr" }
 }
 
 render {
   cameras { @camera }
   spectrum : sRGB {}
-  integrator : WavePath {
-    sampler : PMJ02BN {}
+  integrator : MegaPath {
+    sampler : TileShared {
+      base: PMJ02BN {}
+      tile_size { 1 }
+    }
     depth { 12 }
     rr_depth { 5 }
     rr_threshold { 0.95 }

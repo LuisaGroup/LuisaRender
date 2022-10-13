@@ -531,7 +531,7 @@ LoadedImage LoadedImage::create(uint2 resolution, LoadedImage::storage_type stor
             }}};
 }
 
-void save_image(std::filesystem::path path, const float *pixels, uint2 resolution, const uint components) noexcept {
+void save_image(std::filesystem::path path, const float *pixels, uint2 resolution, uint components) noexcept {
     // save results
     auto pixel_count = resolution.x * resolution.y;
     auto size = make_int2(resolution);
