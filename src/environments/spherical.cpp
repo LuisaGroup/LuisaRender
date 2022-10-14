@@ -150,16 +150,19 @@ luisa::unique_ptr<Environment::Instance> Spherical::build(
                       make_float2(sample_map_size);
             auto [theta, phi, w] = Spherical::uv_to_direction(uv);
             auto it = Interaction{uv};
+            // TODO: filter
             auto scale = texture->evaluate_illuminant_spectrum(it, pipeline.spectrum()->sample(0.5f), 0.f).strength;
             auto sin_theta = sin(uv.y * pi);
             auto pixel_id = coord.y * sample_map_size.x + coord.x;
-            // TODO: filter
             scale_map_device.write(pixel_id, sin_theta * scale);
         };
         auto generate_weight_map = device.compile(generate_weight_map_kernel);
+        Clock clk;
         command_buffer << generate_weight_map().dispatch(sample_map_size)
                        << scale_map_device.copy_to(scale_map.data())
                        << synchronize();
+        LUISA_INFO_WITH_LOCATION(
+            "Spherical::build: Generated weight map in {} ms.", clk.toc());
         if (compensate_mis()) {
             auto sum_scale = 0.;
             for (auto s : scale_map) { sum_scale += s; }
