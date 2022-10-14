@@ -6,7 +6,7 @@ Camera camera : Pinhole {
     resolution { 1920, 1080 }
     clamp { 1024 }
   }
-  spp { 1024 }
+  spp { 256 }
   filter : Gaussian {}
   file { "render-glass.exr" }
 }
@@ -103,17 +103,30 @@ render {
   sampler : PMJ02BN {}
   shapes {
     @box,
-    //@backdrop,
+    @backdrop,
     @water
   }
   environment : Spherical {
-    emission : Image {
-      // file { "/Users/mike/Downloads/abandoned_bakery_8k.exr" }
-      // file { "/Users/mike/Downloads/clarens_night_01_4k.exr" }
-      // file { "/Users/mike/ClionProjects/LuisaRender/data/scenes/camera/textures/kiara_1_dawn_8k.exr" }
-      file { "../dining-room/textures/sky.exr" }
-      semantic { "illuminant" }
-      scale { 0.01 }
+    // emission : Image {
+    //   // file { "/Users/mike/Downloads/abandoned_bakery_8k.exr" }
+    //   // file { "/Users/mike/Downloads/clarens_night_01_4k.exr" }
+    //   // file { "/Users/mike/ClionProjects/LuisaRender/data/scenes/camera/textures/kiara_1_dawn_8k.exr" }
+    //   file { "../dining-room/textures/sky.exr" }
+    //   semantic { "illuminant" }
+    //   scale { 0.01 }
+    // }
+    emission : NishitaSky {
+      sun_elevation { 50 }
+      sun_angle { 0.545 }
+      altitude { 100 }
+      air_density { 0 }
+      dust_density { 10 }
+      ozone_density { 8 }
+      sun_disc { false }
+    }
+    scale { 0.1 }
+    transform : SRT {
+      rotate { 0, 1, 0, 60 }
     }
   }
   // environment : Directional {

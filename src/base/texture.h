@@ -117,6 +117,7 @@ public:
     virtual void disable_gradients() noexcept;
     [[nodiscard]] virtual bool is_black() const noexcept = 0;
     [[nodiscard]] virtual bool is_constant() const noexcept = 0;
+    [[nodiscard]] virtual bool is_spectral_encoding() const noexcept { return false; }
     [[nodiscard]] virtual uint channels() const noexcept { return 4u; }
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;

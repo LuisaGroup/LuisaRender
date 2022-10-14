@@ -32,7 +32,8 @@ Spectrum::Decode Texture::Instance::evaluate_albedo_spectrum(
                      node()->semantic() == Semantic::GENERIC,
                  "Decoding albedo spectrum with non-albedo texture.");
     auto v = evaluate(it, swl, time);
-    if (node()->semantic() == Semantic::GENERIC) {
+    if (_pipeline.spectrum()->node()->requires_encoding() &&
+        !node()->is_spectral_encoding()) {
         v = pipeline().spectrum()->encode_srgb_albedo(v.xyz());
     }
     return pipeline().spectrum()->decode_albedo(swl, v);
@@ -44,7 +45,8 @@ Spectrum::Decode Texture::Instance::evaluate_illuminant_spectrum(
                      node()->semantic() == Semantic::GENERIC,
                  "Decoding illuminant spectrum with non-illuminant texture.");
     auto v = evaluate(it, swl, time);
-    if (node()->semantic() == Semantic::GENERIC) {
+    if (_pipeline.spectrum()->node()->requires_encoding() &&
+        !node()->is_spectral_encoding()) {
         v = pipeline().spectrum()->encode_srgb_illuminant(v.xyz());
     }
     return pipeline().spectrum()->decode_illuminant(swl, v);
@@ -57,7 +59,8 @@ void Texture::Instance::backward_albedo_spectrum(
                      node()->semantic() == Semantic::GENERIC,
                  "Decoding albedo spectrum with non-albedo texture.");
     auto dEnc = pipeline().spectrum()->backward_decode_albedo(swl, evaluate(it, swl, time), dSpec);
-    if (node()->semantic() == Semantic::GENERIC) {
+    if (_pipeline.spectrum()->node()->requires_encoding() &&
+        !node()->is_spectral_encoding()) {
         dEnc = make_float4(pipeline().spectrum()->backward_encode_srgb_albedo(dEnc), 1.f);
     }
     backward(it, swl, time, dEnc);
@@ -70,7 +73,8 @@ void Texture::Instance::backward_illuminant_spectrum(
                      node()->semantic() == Semantic::GENERIC,
                  "Decoding illuminant spectrum with non-illuminant texture.");
     auto dEnc = pipeline().spectrum()->backward_decode_illuminant(swl, evaluate(it, swl, time), dSpec);
-    if (node()->semantic() == Semantic::GENERIC) {
+    if (_pipeline.spectrum()->node()->requires_encoding() &&
+        !node()->is_spectral_encoding()) {
         dEnc = make_float4(pipeline().spectrum()->backward_encode_srgb_illuminant(dEnc), 1.f);
     }
     backward(it, swl, time, dEnc);

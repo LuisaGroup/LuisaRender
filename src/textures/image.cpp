@@ -227,7 +227,11 @@ public:
     [[nodiscard]] auto uv_offset() const noexcept { return _uv_offset; }
     [[nodiscard]] auto encoding() const noexcept { return _encoding; }
     [[nodiscard]] uint channels() const noexcept override { return _image.get().channels(); }
-    [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
+    [[nodiscard]] bool is_spectral_encoding() const noexcept override {
+        return semantic() != Semantic::GENERIC;
+    }
+    [[nodiscard]] luisa::unique_ptr<Instance> build(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
 class ImageTextureInstance final : public Texture::Instance {

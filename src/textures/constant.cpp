@@ -41,6 +41,7 @@ public:
     [[nodiscard]] auto v() const noexcept { return _v; }
     [[nodiscard]] bool is_black() const noexcept override { return _black; }
     [[nodiscard]] bool is_constant() const noexcept override { return true; }
+    [[nodiscard]] bool is_spectral_encoding() const noexcept override { return true; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] uint channels() const noexcept override { return _channels; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(
