@@ -52,6 +52,212 @@ or
 
 # Scenes
 
-LuisaRender supports a JSON-based and a custom text-based formats for scene description. Please visit [LuisaRenderScenes](https://github.com/LuisaGroup/LuisaRenderScenes) for demo scenes and their renderings.
+LuisaRender supports a JSON-based and a custom text-based formats for scene description. We maintain the demo scenes in a separate [repo](https://github.com/LuisaGroup/LuisaRenderScenes). We sincerely thank all the authors, [Rendering Resources](https://benedikt-bitterli.me/resources), [Poly Heaven](https://polyhaven.com), and [Blender Demo Files](https://download.blender.org/demo/cycles/lone-monk_cycles_and_exposure-node_demo.blend) for sharing these amazing resources.
 
 We also provide a simple script at `tools/tungsten2luisa.py` to convert Tungsten scenes into LuisaRender's custom scene description language; and a CLI application at `src/apps/export.cpp` (compiled to `<build-folder>/bin/luisa-render-export`) to convert glTF scenes to LuisaRender's JSON-based format. But please note that both tools are not perfect. Manual tweaks is necessary to fix conversion errors and/or align the converted scenes to their original appearances.
+
+## Contemporary Bathroom
+
+Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases/download/scenes/bathroom.zip)
+
+- Credit: [Mareck](http://www.blendswap.com/users/view/Mareck) (CC0)
+- Converted from Tungsten version at [Rendering Resources](https://benedikt-bitterli.me/resources)
+- Resolution: 1024x1024
+- Samples: 65536
+- Tonemapping: ACES (exposure = -0.5)
+
+<img src="https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/bathroom.png" width="80%" alt="Bathroom"/>
+
+## Bedroom
+
+Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases/download/scenes/bedroom.zip)
+
+- Credit: [SlykDrako](http://www.blendswap.com/user/SlykDrako) (CC0)
+- Converted from Tungsten version at [Rendering Resources](https://benedikt-bitterli.me/resources)
+- Resolution: 1280x720
+- Samples: 65536
+- Tonemapping: ACES (exposure = -0.5)
+
+![Bedroom](https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/bedroom.png)
+
+## Camera
+
+Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases/download/scenes/camera.zip)
+
+- Credit: All resources in the scene are from [Poly Heaven](https://polyhaven.com) (CC0, see the contained `README.txt` for the detail of each resource)
+- Resolution: 3840x2160
+- Samples: 65536
+- Tonemapping: Uncharted2
+
+![Camera](https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/camera.png)
+
+## Kitchen
+
+Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases/download/scenes/kitchen.zip)
+
+- Credit: [Jay-Artist](http://www.blendswap.com/user/Jay-Artist) ([CC BY 3.0](https://creativecommons.org/licenses/by/3.0))
+- Converted from Tungsten version at [Rendering Resources](https://benedikt-bitterli.me/resources)
+- Resolution: 1280x720
+- Samples: 65536
+- Tonemapping: ACES (exposure = -0.5)
+
+![Kitchen](https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/kitchen.png)
+
+## Spaceship
+
+Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases/download/scenes/spaceship.zip)
+
+- Credit: [thecali](http://www.blendswap.com/user/thecali) (CC0)
+- Converted from Tungsten version at [Rendering Resources](https://benedikt-bitterli.me/resources)
+- Resolution: 1920x1080
+- Samples: 16384
+- Tonemapping: Uncharted2
+
+![Kitchen](https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/spaceship.png)
+
+## Modern Hall
+
+Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases/download/scenes/staircase2.zip)
+
+- Credit: [NewSee2l035](http://www.blendswap.com/user/NewSee2l035) ([CC BY 3.0](https://creativecommons.org/licenses/by/3.0/))
+- Converted from Tungsten version at [Rendering Resources](https://benedikt-bitterli.me/resources)
+- Resolution: 1024x1024
+- Samples: 65536
+- Tonemapping: ACES (exposure = -0.5)
+
+<img src="https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/staircase2.png" width="80%" alt="Staircase2"/>
+
+## The Wooden Staircase
+
+Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases/download/scenes/staircase.zip)
+
+- Credit: [Wig42](http://www.blendswap.com/users/view/Wig42) ([CC BY 3.0](https://creativecommons.org/licenses/by/3.0/))
+- Converted from Tungsten version at [Rendering Resources](https://benedikt-bitterli.me/resources)
+- Resolution: 1080x1920
+- Samples: 16384
+- Tonemapping: Uncharted2 (exposure = 0.5)
+
+<img src="https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/staircase.png" width="60%" alt="Staircase"/>
+
+## Coffee Maker
+
+Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases/download/scenes/coffee.zip)
+
+- Credit: [cekuhnen](http://www.blendswap.com/user/cekuhnen) ([CC BY 3.0](https://creativecommons.org/licenses/by/3.0/))
+- Converted from Tungsten version at [Rendering Resources](https://benedikt-bitterli.me/resources)
+- Resolution: 1200x1800
+- Samples: 16384
+- Tonemapping: Uncharted2 (exposure = 0.5)
+
+<img src="https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/coffee.png" width="70%" alt="Coffee"/>
+
+## Japanese Classroom
+
+Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases/download/scenes/classroom.zip)
+
+- Credit: [NovaZeeke](http://www.blendswap.com/users/view/NovaZeeke) ([CC BY 3.0](https://creativecommons.org/licenses/by/3.0/))
+- Converted from Tungsten version at [Rendering Resources](https://benedikt-bitterli.me/resources)
+- Resolution: 1920x1080
+- Samples: 16384
+- Tonemapping: Uncharted2 (exposure = 0.5)
+
+<img src="https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/classroom.png" alt="Classroom"/>
+
+## The Breakfast Room
+
+Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases/download/scenes/dining-room.zip)
+
+- Credit: [Wig42](http://www.blendswap.com/users/view/Wig42) ([CC BY 3.0](https://creativecommons.org/licenses/by/3.0/))
+- Converted from Tungsten version at [Rendering Resources](https://benedikt-bitterli.me/resources)
+- Resolution: 1920x1080
+- Samples: 16384
+- Tonemapping: Uncharted2 (exposure = 0.5)
+
+<img src="https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/dining-room.png" alt="Dining Room"/>
+
+## The Grey & White Room
+
+Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases/download/scenes/living-room.zip)
+
+- Credit: [Wig42](http://www.blendswap.com/users/view/Wig42) ([CC BY 3.0](https://creativecommons.org/licenses/by/3.0/))
+- Converted from Tungsten version at [Rendering Resources](https://benedikt-bitterli.me/resources)
+- Resolution: 1920x1080
+- Samples: 16384
+- Tonemapping: Uncharted2 (exposure = 0.5)
+
+<img src="https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/living-room.png" alt="Living Room"/>
+
+## The White Room
+
+Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases/download/scenes/living-room-2.zip)
+
+- Credit: [Jay-Artist](http://www.blendswap.com/user/Jay-Artist) ([CC BY 3.0](https://creativecommons.org/licenses/by/3.0/))
+- Converted from Tungsten version at [Rendering Resources](https://benedikt-bitterli.me/resources)
+- Resolution: 1280x720
+- Samples: 65536
+- Tonemapping: ACES (exposure = 0.5)
+
+<img src="https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/living-room-2.png" alt="Living Room 2"/>
+
+## The Modern Living Room
+
+Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases/download/scenes/living-room-3.zip)
+
+- Credit: [Wig42](http://www.blendswap.com/users/view/Wig42) ([CC BY 3.0](https://creativecommons.org/licenses/by/3.0/))
+- Converted from Tungsten version at [Rendering Resources](https://benedikt-bitterli.me/resources)
+- Resolution: 1280x720
+- Samples: 65536
+- Tonemapping: ACES (exposure = 0.5)
+
+<img src="https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/living-room-3.png" alt="Living Room 3"/>
+
+## Glass of Water
+
+Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases/download/scenes/glass-of-water.zip)
+
+- Credit: [aXel](http://www.blendswap.com/user/aXel) (CC0)
+- Converted from Tungsten version at [Rendering Resources](https://benedikt-bitterli.me/resources)
+- Resolution: 1920x1080
+- Samples: 16384
+- Tonemapping: Uncharted2
+
+<img src="https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/glass-of-water.png" alt="Glass of Water"/>
+
+## Salle de bain
+
+Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases/download/scenes/bathroom2.zip)
+
+- Credit: [nacimus](http://www.blendswap.com/users/view/nacimus) ([CC BY 3.0](https://creativecommons.org/licenses/by/3.0/))
+- Converted from Tungsten version at [Rendering Resources](https://benedikt-bitterli.me/resources)
+- Resolution: 1280x720
+- Samples: 65536
+- Tonemapping: ACES (exposure = -0.5)
+
+<img src="https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/bathroom2.png" alt="Salle de bain"/>
+
+
+## Lone Monk
+
+Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases/download/scenes/lone-monk.zip)
+
+- Credit: Carlo Bergonzini / [Monorender](http://www.monorender.com) ([CC-BY](https://creativecommons.org/licenses/by/2.0/))
+- Converted from Blender Cycles format at [Blender Demo Files](https://download.blender.org/demo/cycles/lone-monk_cycles_and_exposure-node_demo.blend)
+- Resolution: 6000x4000
+- Samples: 65536
+- Tonemapping: Uncharted2 (exposure = +1)
+
+<img src="https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/lone-monk.jpg" alt="Lone Monk"/>
+
+
+## Sky Texture Demo
+
+Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases/download/scenes/sky-texture-demo.zip)
+
+- Credit: Blender Studio (CC0)
+- Converted from Blender Cycles format at [Blender Demo Files](https://download.blender.org/demo/cycles/lone-monk_cycles_and_exposure-node_demo.blend)
+- Resolution: 3840x2160
+- Samples: 1024
+- Tonemapping: Uncharted2 (exposure = +1)
+
+<img src="https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/sky-texture-demo.png" alt="Sky Texture Demo"/>
+
