@@ -7,7 +7,7 @@ add_library(fast_float INTERFACE)
 target_include_directories(fast_float INTERFACE fast_float/include)
 target_link_libraries(luisa-render-ext INTERFACE fast_float)
 
-find_package(assimp CONFIG)
+#find_package(assimp CONFIG)
 if (NOT assimp_FOUND)
     set(ASSIMP_BUILD_ZLIB ON CACHE BOOL "" FORCE)
     set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
