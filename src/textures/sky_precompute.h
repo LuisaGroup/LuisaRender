@@ -22,10 +22,6 @@ struct NishitaSkyPrecomputedSun {
     float3 top;
 };
 
-// from Cycles: https://developer.blender.org/diffusion/B/browse/master/intern/sky/include/sky_model.h
-
-/* SPDX-License-Identifier: Apache-2.0
-* Copyright 2011-2020 Blender Foundation. */
 void SKY_nishita_skymodel_precompute_texture(
     NishitaSkyData data, float4 *pixels,
     uint2 resolution, uint2 y_range) noexcept;
