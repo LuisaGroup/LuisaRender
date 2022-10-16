@@ -1,6 +1,6 @@
 [submodule "src/compute"]
 	path = src/compute
-	url = git@github.com:LuisaGroup/LuisaCompute.git
+	url = https://github.com/LuisaGroup/LuisaCompute.git
 [submodule "src/ext/cxxopts"]
 	path = src/ext/cxxopts
 	url = https://github.com/jarro2783/cxxopts.git
