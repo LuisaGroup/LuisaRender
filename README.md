@@ -76,7 +76,7 @@ Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases
 - Converted from Tungsten version at [Rendering Resources](https://benedikt-bitterli.me/resources)
 - Resolution: 1280x720
 - Samples: 65536
-- Tonemapping: ACES (exposure = -0.5)
+- Tonemapping: Uncharted2
 
 ![Bedroom](https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/bedroom.png)
 
@@ -99,7 +99,7 @@ Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases
 - Converted from Tungsten version at [Rendering Resources](https://benedikt-bitterli.me/resources)
 - Resolution: 1280x720
 - Samples: 65536
-- Tonemapping: ACES (exposure = -0.5)
+- Tonemapping: ACES
 
 ![Kitchen](https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/kitchen.png)
 
@@ -123,7 +123,7 @@ Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases
 - Converted from Tungsten version at [Rendering Resources](https://benedikt-bitterli.me/resources)
 - Resolution: 1024x1024
 - Samples: 65536
-- Tonemapping: ACES (exposure = -0.5)
+- Tonemapping: Uncharted2 (exposure = +1)
 
 <img src="https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/staircase2.png" width="80%" alt="Staircase2"/>
 
@@ -135,7 +135,7 @@ Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases
 - Converted from Tungsten version at [Rendering Resources](https://benedikt-bitterli.me/resources)
 - Resolution: 1080x1920
 - Samples: 16384
-- Tonemapping: Uncharted2 (exposure = 0.5)
+- Tonemapping: Uncharted2 (exposure = +0.5)
 
 <img src="https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/staircase.png" width="60%" alt="Staircase"/>
 
@@ -147,7 +147,7 @@ Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases
 - Converted from Tungsten version at [Rendering Resources](https://benedikt-bitterli.me/resources)
 - Resolution: 1200x1800
 - Samples: 16384
-- Tonemapping: Uncharted2 (exposure = 0.5)
+- Tonemapping: Uncharted2 (exposure = +0.5)
 
 <img src="https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/coffee.png" width="70%" alt="Coffee"/>
 
@@ -159,7 +159,7 @@ Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases
 - Converted from Tungsten version at [Rendering Resources](https://benedikt-bitterli.me/resources)
 - Resolution: 1920x1080
 - Samples: 16384
-- Tonemapping: Uncharted2 (exposure = 0.5)
+- Tonemapping: Uncharted2 (exposure = +0.5)
 
 <img src="https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/classroom.png" alt="Classroom"/>
 
@@ -171,7 +171,7 @@ Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases
 - Converted from Tungsten version at [Rendering Resources](https://benedikt-bitterli.me/resources)
 - Resolution: 1920x1080
 - Samples: 16384
-- Tonemapping: Uncharted2 (exposure = 0.5)
+- Tonemapping: Uncharted2 (exposure = +0.5)
 
 <img src="https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/dining-room.png" alt="Dining Room"/>
 
@@ -183,7 +183,7 @@ Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases
 - Converted from Tungsten version at [Rendering Resources](https://benedikt-bitterli.me/resources)
 - Resolution: 1920x1080
 - Samples: 16384
-- Tonemapping: Uncharted2 (exposure = 0.5)
+- Tonemapping: Uncharted2 (exposure = +0.5)
 
 <img src="https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/living-room.png" alt="Living Room"/>
 
@@ -195,7 +195,7 @@ Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases
 - Converted from Tungsten version at [Rendering Resources](https://benedikt-bitterli.me/resources)
 - Resolution: 1280x720
 - Samples: 65536
-- Tonemapping: ACES (exposure = 0.5)
+- Tonemapping: ACES (exposure = +0.5)
 
 <img src="https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/living-room-2.png" alt="Living Room 2"/>
 
@@ -207,7 +207,7 @@ Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases
 - Converted from Tungsten version at [Rendering Resources](https://benedikt-bitterli.me/resources)
 - Resolution: 1280x720
 - Samples: 65536
-- Tonemapping: ACES (exposure = 0.5)
+- Tonemapping: Uncharted2
 
 <img src="https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/living-room-3.png" alt="Living Room 3"/>
 
@@ -231,7 +231,7 @@ Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases
 - Converted from Tungsten version at [Rendering Resources](https://benedikt-bitterli.me/resources)
 - Resolution: 1280x720
 - Samples: 65536
-- Tonemapping: ACES (exposure = -0.5)
+- Tonemapping: Uncharted2 (exposure = +1)
 
 <img src="https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/bathroom2.png" alt="Salle de bain"/>
 
