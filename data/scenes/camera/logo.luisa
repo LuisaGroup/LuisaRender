@@ -1,0 +1,234 @@
+Surface surface_camera_body : Disney {
+  color : Image {
+    file { "textures/Camera_01_body_diff_8k.png" }
+    semantic { "albedo" }
+  }
+  roughness : Image {
+    file { "textures/Camera_01_body_roughness_8k.png" }
+    encoding { "linear" }
+  }
+  metallic : Image {
+    file { "textures/Camera_01_body_metallic_8k.png" }
+    encoding { "linear" }
+  }
+  clearcoat : Constant {
+    v { 1 }
+  }
+  clearcoat_gloss : Constant {
+    v { 1 }
+  }
+  normal_map : Image {
+    file { "textures/Camera_01_body_nor_gl_8k.png" }
+    encoding { "linear" }
+  }
+}
+
+Surface surface_camera_lens_body : Disney {
+  color : Image {
+    file { "textures/Camera_01_lens_body_diff_8k.png" }
+    semantic { "albedo" }
+  }
+  roughness : Image {
+    file { "textures/Camera_01_lens_body_roughness_8k.png" }
+    encoding { "linear" }
+  }
+  metallic : Image {
+    file { "textures/Camera_01_lens_body_metallic_8k.png" }
+    encoding { "linear" }
+  }
+  clearcoat : Constant {
+    v { 1 }
+  }
+  clearcoat_gloss : Constant {
+    v { 1 }
+  }
+  normal_map : Image {
+    file { "textures/Camera_01_lens_body_nor_gl_8k.png" }
+    encoding { "linear" }
+  }
+}
+
+Surface surface_camera_strap : Disney {
+  color : Image {
+    file { "textures/Camera_01_strap_diff_8k.png" }
+    semantic { "albedo" }
+  }
+  roughness : Image {
+    file { "textures/Camera_01_strap_roughness_8k.png" }
+    encoding { "linear" }
+  }
+  metallic : Image {
+    file { "textures/Camera_01_strap_metallic_8k.png" }
+    encoding { "linear" }
+  }
+  clearcoat : Constant {
+    v { 1 }
+  }
+  clearcoat_gloss : Constant {
+    v { 1 }
+  }
+  normal_map : Image {
+    file { "textures/Camera_01_strap_nor_gl_8k.png" }
+    encoding { "linear" }
+  }
+}
+
+Surface surface_camera_lens_glass : Glass {
+  Kr : Constant {
+    v { 1, 1, 1 }
+    semantic { "albedo" }
+  }
+  Kt : Constant {
+    v { 1, 1, 1 }
+    semantic { "albedo" }
+  }
+  roughness : Constant {
+    v { 0.03 }
+  }
+  eta : Constant {
+    v { 1.7 }
+  }
+}
+
+Surface surface_camera_lens_metal : Mirror {
+  color : Constant {
+    v { 0.3, 0.5, 1 }
+    semantic { "albedo" }
+  }
+}
+
+Surface surface_camera_lens : Mix {
+  a { @surface_camera_lens_glass }
+  b { @surface_camera_lens_metal }
+  ratio : Constant {
+    v { 0.95 }
+  }
+}
+
+Surface surface_backdrop : Disney {
+  color : Image {
+    file { "textures/weathered_brown_planks_diff_16k.jpg" }
+    semantic { "albedo" }
+  }
+  roughness : Image {
+    file { "textures/weathered_brown_planks_rough_16k.jpg" }
+    encoding { "linear" }
+  }
+  clearcoat : Constant {
+    v { 0.5 }
+  }
+  clearcoat_gloss : Constant {
+    v { 1 }
+  }
+  normal_map : Image {
+    file { "textures/weathered_brown_planks_nor_gl_16k.png" }
+    encoding { "linear" }
+  }
+}
+
+Shape shape_camera_body : Mesh {
+  file { "Mesh.00003.obj" }
+  surface { @surface_camera_body }
+}
+
+Shape shape_camera_lens_body : Mesh {
+  file { "Mesh.00001.obj" }
+  surface { @surface_camera_lens_body }
+}
+
+Shape shape_camera_lens : Mesh {
+  file { "Mesh.00002.obj" }
+  surface { @surface_camera_lens }
+}
+
+Shape shape_camera_strap : Group {
+  shapes {
+    Mesh {
+      file { "Mesh.00000.obj" }
+    },
+    Mesh {
+      file { "Mesh.00004.obj" }
+    }
+  }
+  surface { @surface_camera_strap }
+}
+
+Shape shape_ground : Mesh {
+  file { "floor.obj" }
+  surface { @surface_backdrop }
+  transform : SRT {
+    scale { 0.6 }
+    rotate { 0, 1, 0, -90 }
+    translate { 0.02, 0, -0.2 }
+  }
+}
+
+Shape shape_camera : Group {
+  shapes {
+    @shape_camera_body,
+    @shape_camera_lens_body,
+    @shape_camera_lens,
+    @shape_camera_strap
+  }
+  transform : SRT {
+    scale { 0.01 }
+  }
+}
+
+Environment environment : Spherical {
+  emission : Image {
+    file { "textures/kiara_1_dawn_8k.exr" }
+    semantic { "illuminant" }
+  }
+  transform : SRT {
+    rotate { 0, 1, 0, -40 }
+  }
+  scale { 1.5 }
+}
+
+Environment directional : Directional {
+  emission : Constant {
+    v { 1, 1, 1 }
+    semantic { "illuminant" }
+  }
+  direction { 1, 1, 1 }
+  angle { 0.54 }
+  scale { 0.2 }
+}
+
+Camera camera : ThinLens {
+  position { 0.3, 0.25, 0.65 }
+  look_at { -0.03, 0.025, 0.072 }
+  aperture { 2.8 }
+  focal_length { 70 }
+  spp { 256 }
+  film : Color {
+    resolution { 1920, 1080 }
+    clamp { 128 }
+  }
+  file { "render.exr" }
+  filter : Gaussian {
+    radius { 1 }
+  }
+}
+
+Integrator integrator : MegaPath {
+  sampler : PMJ02BN {}
+}
+
+Shape logo : Mesh {
+  file { "luisa-logo.obj" }
+  surface : Mirror {}
+}
+
+render {
+  cameras { @camera }
+  spectrum : Hero {}
+  shapes {
+    @logo
+    // @shape_camera,
+    // @shape_ground
+  }
+  integrator { @integrator }
+  environment { @environment }
+}
