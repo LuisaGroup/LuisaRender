@@ -57,6 +57,7 @@ LuisaRender supports a JSON-based and a custom text-based formats for scene desc
 
 We also provide a simple script at `tools/tungsten2luisa.py` to convert Tungsten scenes into LuisaRender's custom scene description language; and a CLI application at `src/apps/export.cpp` (compiled to `<build-folder>/bin/luisa-render-export`) to convert glTF scenes to LuisaRender's JSON-based format. But please note that both tools are not perfect. Manual tweaks is necessary to fix conversion errors and/or align the converted scenes to their original appearances.
 
+
 ## Contemporary Bathroom
 
 Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases/download/scenes/bathroom.zip)
@@ -261,4 +262,16 @@ Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases
 - Tonemapping: Uncharted2 (exposure = +1)
 
 <img src="https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/sky-texture-demo.png" alt="Sky Texture Demo"/>
+
+
+## Bathroom Interior
+
+Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases/download/scenes/bathroom-interior.zip)
+
+- Credit: [Akshaykhedkar97](https://sketchfab.com/3d-models/bathroom-interior-7609ef43ffc04cc280f1525ffdc6d89a) ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/))
+- Resolution: 1920x1080
+- Samples: 1024
+- Tonemapping: Uncharted2 (exposure = +0.5)
+
+<img src="https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/bathroom-interior.png" alt="Sky Texture Demo"/>
 
