@@ -31,19 +31,20 @@ if __name__ == "__main__":
     vt = []
     meshes = {}
     with open(argv[1], "r") as file:
-        for line in file.readlines():
+        for i, line in enumerate(file.readlines()):
             if line.startswith("v "):
                 v.append(line)
             elif line.startswith("vn "):
                 vn.append(line)
             elif line.startswith("vt "):
                 vt.append(line)
-            elif line.startswith("usemtl "):
+            elif line.startswith("usemtl ") or line.startswith("g ") or line.startswith("o "):
                 name = f"Mesh.{len(meshes):05}.{'.'.join(line.split()[1:])}"
                 meshes[name] = []
             elif line.startswith("f "):
                 # v/vt/vn
                 meshes[name].append([[int(x) for x in v.split('/')] for v in line.split()[1:]])
     for name, mesh in meshes.items():
-        filename = f"{path.dirname(argv[1])}/{name}.obj"
-        process_mesh(filename, v, vt, vn, np.array(mesh))
+        if mesh:
+            filename = f"{path.dirname(argv[1])}/{name}.obj"
+            process_mesh(filename, v, vt, vn, np.array(mesh))
