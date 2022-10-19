@@ -15,16 +15,19 @@ class DiffuseLight final : public Light {
 private:
     const Texture *_emission;
     float _scale;
+    bool _two_sided;
 
 public:
     DiffuseLight(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Light{scene, desc},
           _emission{scene->load_texture(desc->property_node_or_default(
               "emission", SceneNodeDesc::shared_default_texture("Constant")))},
-          _scale{std::max(desc->property_float_or_default("scale", 1.0f), 0.0f)} {
+          _scale{std::max(desc->property_float_or_default("scale", 1.0f), 0.0f)},
+          _two_sided{desc->property_bool_or_default("two_sided", false)} {
         LUISA_RENDER_CHECK_ILLUMINANT_TEXTURE(DiffuseLight, emission);
     }
     [[nodiscard]] auto scale() const noexcept { return _scale; }
+    [[nodiscard]] auto two_sided() const noexcept { return _two_sided; }
     [[nodiscard]] bool is_null() const noexcept override { return _scale == 0.0f || _emission->is_black(); }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(
@@ -65,11 +68,13 @@ struct DiffuseLightClosure final : public Light::Closure {
         auto &&pipeline = light->pipeline();
         auto pdf_triangle = pipeline.buffer<float>(it_light.shape()->pdf_buffer_id()).read(it_light.triangle_id());
         auto pdf_area = pdf_triangle / it_light.triangle_area();
-        auto cos_wo = dot(normalize(p_from - it_light.p()), it_light.ng());
+        auto cos_wo = abs_dot(normalize(p_from - it_light.p()), it_light.ng());
         auto L = light->texture()->evaluate_illuminant_spectrum(it_light, _swl, _time).value *
                  light->node<DiffuseLight>()->scale();
         auto pdf = distance_squared(it_light.p(), p_from) * pdf_area * (1.0f / cos_wo);
-        return {.L = ite(it_light.back_facing(), 0.f, L), .pdf = ite(it_light.back_facing(), 0.0f, pdf)};
+        auto two_sided = light->node<DiffuseLight>()->two_sided();
+        return {.L = ite(!two_sided & it_light.back_facing(), 0.f, L),
+                .pdf = ite(!two_sided & it_light.back_facing(), 0.0f, pdf)};
     }
 
     [[nodiscard]] Light::Sample sample(Expr<uint> light_inst_id, Expr<float3> p_from, Expr<float2> u_in) const noexcept override {

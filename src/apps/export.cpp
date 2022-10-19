@@ -196,6 +196,8 @@ int main(int argc, char *argv[]) {
         luisa::string metallic_tex;
         luisa::string roughness_tex_name;
         luisa::string metallic_tex_name;
+        auto metallic_factor = -1.f;
+        auto rough_factor = -1.f;
         if (aiString ai_rough_tex; m->GetTexture(AI_MATKEY_ROUGHNESS_TEXTURE, &ai_rough_tex) == AI_SUCCESS) {
             rough_tex = ai_rough_tex.C_Str();
             replace(rough_tex, "%20", " ");
@@ -211,6 +213,13 @@ int main(int argc, char *argv[]) {
                 {"type", "Texture"},
                 {"impl", "Image"},
                 {"prop", {{"file", rough_tex}, {"encoding", "linear"}}}};
+            m->Get(AI_MATKEY_ROUGHNESS_FACTOR, rough_factor);
+        } else if (m->Get(AI_MATKEY_ROUGHNESS_FACTOR, rough_factor) == AI_SUCCESS) {
+            roughness_tex_name = luisa::format("Texture:Roughness:{}", rough_factor);
+            scene_materials[roughness_tex_name] = {
+                {"type", "Texture"},
+                {"impl", "Constant"},
+                {"prop", {{"v", rough_factor}}}};
         }
         // metallic
         if (aiString ai_metallic_tex; m->GetTexture(AI_MATKEY_METALLIC_TEXTURE, &ai_metallic_tex) == AI_SUCCESS) {
@@ -228,6 +237,13 @@ int main(int argc, char *argv[]) {
                 {"type", "Texture"},
                 {"impl", "Image"},
                 {"prop", {{"file", metallic_tex}, {"encoding", "linear"}}}};
+            m->Get(AI_MATKEY_METALLIC_FACTOR, metallic_factor);
+        } else if (m->Get(AI_MATKEY_METALLIC_FACTOR, metallic_factor) == AI_SUCCESS) {
+            metallic_tex_name = luisa::format("Texture:Metallic:{}", metallic_factor);
+            scene_materials[metallic_tex_name] = {
+                {"type", "Texture"},
+                {"impl", "Constant"},
+                {"prop", {{"v", metallic_factor}}}};
         }
         if (!rough_tex.empty() && metallic_tex == rough_tex) {// assume gltf
             auto swizzle_rough_name = roughness_tex_name + ":Roughness";
@@ -247,34 +263,62 @@ int main(int argc, char *argv[]) {
             roughness_tex_name = swizzle_rough_name;
             metallic_tex_name = swizzle_metal_name;
         }
-        auto metallic_factor = -1.f;
-        auto rough_factor = -1.f;
-        m->Get(AI_MATKEY_METALLIC_FACTOR, metallic_factor);
-        m->Get(AI_MATKEY_ROUGHNESS_FACTOR, rough_factor);
+        // transmission
+        auto trans_factor = -1.f;
+        luisa::string trans_tex_name;
+        if (aiString ai_trans_tex; m->GetTexture(AI_MATKEY_TRANSMISSION_TEXTURE, &ai_trans_tex) == AI_SUCCESS) {
+            luisa::string trans_tex = ai_trans_tex.C_Str();
+            replace(trans_tex, "%20", " ");
+            replace(trans_tex, "\\", "/");
+            if (trans_tex.starts_with('*')) {
+                auto end = trans_tex.data() + trans_tex.length() - 1u;
+                auto id = std::strtoul(trans_tex.data() + 1u, &end, 10);
+                trans_tex = embedded_textures.at(id);
+            }
+            LUISA_INFO("Transmission texture: {}", trans_tex);
+            trans_tex_name = luisa::format("Texture:{}", trans_tex);
+            scene_materials[trans_tex_name] = {
+                {"type", "Texture"},
+                {"impl", "Image"},
+                {"prop", {{"file", trans_tex}, {"encoding", "linear"}}}};
+            m->Get(AI_MATKEY_TRANSMISSION_FACTOR, trans_factor);
+        } else if (m->Get(AI_MATKEY_TRANSMISSION_FACTOR, trans_factor) == AI_SUCCESS) {
+            trans_tex_name = luisa::format("Texture:Transmission:{}", trans_factor);
+            scene_materials[trans_tex_name] = {
+                {"type", "Texture"},
+                {"impl", "Constant"},
+                {"prop", {{"v", trans_factor}}}};
+        }
+
         auto has_roughness = !roughness_tex_name.empty() && rough_factor != 0.f;
         auto has_metallic = !metallic_tex_name.empty() && metallic_factor != 0.f;
-        if (has_roughness || has_metallic) {
-            if (has_metallic) {
-                scene_materials[mat_name] = {
-                    {"type", "Surface"},
-                    {"impl", "Disney"},
-                    {"prop",
-                     {{"color", color_map},
-                      {"two_sided", true},
-                      {"metallic", luisa::format("@{}", metallic_tex_name)}}}};
-            } else {
-                scene_materials[mat_name] = {
-                    {"type", "Surface"},
-                    {"impl", "Substrate"},
-                    {"prop",
-                     {{"Kd", color_map},
-                      {"Ks",
-                       {{"impl", "Constant"},
-                        {"prop",
-                         {{"v", {.04f, .04f, .04f}}}}}}}}};
-            }
+        auto has_transmission = !trans_tex_name.empty() && trans_factor != 0.f;
+        if (has_roughness || has_metallic || has_transmission) {
+            //            if (has_metallic || has_transmission) {
+            scene_materials[mat_name] = {
+                {"type", "Surface"},
+                {"impl", "Disney"},
+                {"prop",
+                 {{"color", color_map}}}};
+            //            } else {
+            //                scene_materials[mat_name] = {
+            //                    {"type", "Surface"},
+            //                    {"impl", "Substrate"},
+            //                    {"prop",
+            //                     {{"Kd", color_map},
+            //                      {"Ks",
+            //                       {{"impl", "Constant"},
+            //                        {"prop",
+            //                         {{"v", {.04f, .04f, .04f}}}}}}}}};
+            //            }
             if (has_roughness) {
                 scene_materials[mat_name]["prop"]["roughness"] = luisa::format("@{}", roughness_tex_name);
+            }
+            if (has_transmission) {
+                scene_materials[mat_name]["prop"]["specular_trans"] = luisa::format("@{}", trans_tex_name);
+            }
+            if (has_metallic) {
+                scene_materials[mat_name]["prop"]["metallic"] = luisa::format("@{}", metallic_tex_name);
             }
         } else {
             scene_materials[mat_name] = {
@@ -292,13 +336,18 @@ int main(int argc, char *argv[]) {
         if (auto emission = parse_texture(AI_MATKEY_TEXTURE_EMISSIVE(0), "illuminant")
                                 .value_or(parse_constant(AI_MATKEY_COLOR_EMISSIVE, "illuminant").value_or(""));
             !emission.empty()) {
+            auto two_sided = false;
+            m->Get(AI_MATKEY_TWOSIDED, two_sided);
             auto intensity = 1.f;
             m->Get(AI_MATKEY_COLOR_EMISSIVE, intensity);
             auto light_name = luisa::format("Light:{:05}:{}", i, m->GetName().C_Str());
             scene_materials[light_name] = {
                 {"type", "Light"},
                 {"impl", "Diffuse"},
-                {"prop", {{"emission", emission}, {"scale", intensity}}}};
+                {"prop",
+                 {{"emission", emission},
+                  {"scale", intensity},
+                  {"two_sided", two_sided}}}};
             LUISA_INFO("Found light '{}'.", light_name);
             light_names[i] = light_name;
         }
