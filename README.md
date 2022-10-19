@@ -55,7 +55,7 @@ or
 
 LuisaRender supports a JSON-based and a custom text-based formats for scene description. We maintain the demo scenes in a separate [repo](https://github.com/LuisaGroup/LuisaRenderScenes). We sincerely thank all the authors, [Rendering Resources](https://benedikt-bitterli.me/resources), [Poly Heaven](https://polyhaven.com), and [Blender Demo Files](https://download.blender.org/demo/cycles/lone-monk_cycles_and_exposure-node_demo.blend) for sharing these amazing resources.
 
-We also provide a simple script at `tools/tungsten2luisa.py` to convert Tungsten scenes into LuisaRender's custom scene description language; and a CLI application at `src/apps/export.cpp` (compiled to `<build-folder>/bin/luisa-render-export`) to convert glTF scenes to LuisaRender's JSON-based format. But please note that both tools are not perfect. Manual tweaks is necessary to fix conversion errors and/or align the converted scenes to their original appearances.
+We also provide a simple script at `tools/tungsten2luisa.py` to convert Tungsten scenes into LuisaRender's custom scene description language; and a CLI application at `src/apps/export.cpp` (compiled to `<build-folder>/bin/luisa-render-export`) to convert glTF scenes to LuisaRender's JSON-based format. But please note that both tools are not perfect. Manual tweaks are sometimes necessary to fix conversion errors and/or align the converted scenes to their original appearances.
 
 
 ## Contemporary Bathroom
