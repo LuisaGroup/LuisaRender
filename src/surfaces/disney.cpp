@@ -953,6 +953,43 @@ luisa::unique_ptr<Surface::Closure> DisneySurfaceInstance::closure(
 using NormalMapOpacityDisneySurface = NormalMapWrapper<OpacitySurfaceWrapper<
     DisneySurface, DisneySurfaceInstance, DisneySurfaceClosure>>;
 
+using NormalMapOpacityThinDisneySurface = NormalMapWrapper<OpacitySurfaceWrapper<
+    DisneySurface, DisneySurfaceInstance, ThinDisneySurfaceClosure>>;
+
+class DisneySurfaceSelector final : public Surface {
+
+private:
+    luisa::unique_ptr<NormalMapOpacityDisneySurface> _surface;
+    luisa::unique_ptr<NormalMapOpacityThinDisneySurface> _thin_surface;
+
+public:
+    [[nodiscard]] DisneySurfaceSelector(Scene *scene, const SceneNodeDesc *desc)
+        : Surface{scene, desc} {
+        if (desc->property_bool_or_default("thin", false)) {
+            _thin_surface = luisa::make_unique<NormalMapOpacityThinDisneySurface>(scene, desc);
+        } else {
+            _surface = luisa::make_unique<NormalMapOpacityDisneySurface>(scene, desc);
+        }
+    }
+    [[nodiscard]] string_view impl_type() const noexcept override {
+        return _surface ? _surface->impl_type() : _thin_surface->impl_type();
+    }
+    [[nodiscard]] uint properties() const noexcept override {
+        return _surface ? _surface->properties() : _thin_surface->properties();
+    }
+    [[nodiscard]] bool is_null() const noexcept override {
+        return _surface ? _surface->is_null() : _thin_surface->is_null();
+    }
+
+protected:
+    [[nodiscard]] unique_ptr<Instance> _build(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
+        return _surface ?
+                   _surface->build(pipeline, command_buffer) :
+                   _thin_surface->build(pipeline, command_buffer);
+    }
+};
+
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::NormalMapOpacityDisneySurface)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::DisneySurfaceSelector)

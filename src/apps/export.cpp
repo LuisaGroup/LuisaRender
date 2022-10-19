@@ -149,7 +149,7 @@ int main(int argc, char *argv[]) {
                     scene_materials[name] = {
                         {"type", "Texture"},
                         {"impl", "Image"},
-                        {"prop", {{"file", rel_path.string()}, {"semantic", semantic}}}};
+                        {"prop", {{"file", rel_path.string()}}}};
                     loaded_textures[hash] = name;
                     return luisa::format("@{}", name);
                 } catch (const std::exception &e) {
@@ -176,7 +176,7 @@ int main(int argc, char *argv[]) {
                 scene_materials[name] = {
                     {"type", "Texture"},
                     {"impl", "Constant"},
-                    {"prop", {{"v", {c.r, c.g, c.b}}, {"semantic", semantic}}}};
+                    {"prop", {{"v", {c.r, c.g, c.b}}}}};
                 loaded_textures[hash] = name;
                 return luisa::format("@{}", name);
             }
@@ -266,7 +266,8 @@ int main(int argc, char *argv[]) {
         // transmission
         auto trans_factor = -1.f;
         luisa::string trans_tex_name;
-        if (aiString ai_trans_tex; m->GetTexture(AI_MATKEY_TRANSMISSION_TEXTURE, &ai_trans_tex) == AI_SUCCESS) {
+        if (aiString ai_trans_tex;
+            m->GetTexture(AI_MATKEY_TRANSMISSION_TEXTURE, &ai_trans_tex) == AI_SUCCESS) {
             luisa::string trans_tex = ai_trans_tex.C_Str();
             replace(trans_tex, "%20", " ");
             replace(trans_tex, "\\", "/");
@@ -354,6 +355,7 @@ int main(int argc, char *argv[]) {
     }
 
     // meshes
+    auto has_lights = false;
     size_t total_vertices = 0u;
     size_t total_faces = 0u;
     std::vector<luisa::string> meshes;
@@ -443,6 +445,7 @@ int main(int argc, char *argv[]) {
               {"surface", mat_name}}}};
         if (auto iter = light_names.find(mat_id); iter != light_names.end()) {
             scene_geometry[mesh_name]["prop"]["light"] = luisa::format("@{}", iter->second);
+            has_lights = true;
         }
         meshes.emplace_back(std::move(mesh_name));
     }
@@ -569,6 +572,23 @@ int main(int argc, char *argv[]) {
     scene_configs["render"] = {{"cameras", std::move(cameras)},
                                {"shapes", {"@lr_exported_geometry"}},
                                {"integrator", {{"impl", "WavePath"}, {"prop", {{"sampler", {{"impl", "PMJ02BN"}}}}}}}};
+    if (!has_lights) {
+        scene_configs["render"]["environment"] = {
+            {"impl", "Spherical"},
+            {"prop",
+             {{"emission",
+               {{"impl", "NishitaSky"},
+                {"prop",
+                 {{"sun_elevation", 60},
+                  {"sun_angle", 1},
+                  {"altitude", 500},
+                  {"air_density", 1},
+                  {"dust_density", 1},
+                  {"ozone_density", 2},
+                  {"sun_disc", true},
+                  {"sun_intensity", 0.2}}}}},
+              {"scale", 0.1}}}};
+    }
 
     // save
     auto save = [&folder](auto &&file_name, auto &&json) noexcept {
