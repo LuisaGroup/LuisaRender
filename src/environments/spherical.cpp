@@ -145,16 +145,31 @@ luisa::unique_ptr<Environment::Instance> Spherical::build(
         luisa::vector<float> scale_map(pixel_count);
         auto scale_map_device = device.create_buffer<float>(pixel_count);
         Kernel2D generate_weight_map_kernel = [&] {
-            auto coord = dispatch_id().xy();
-            auto uv = (make_float2(coord) + .5f) /
-                      make_float2(sample_map_size);
-            auto [theta, phi, w] = Spherical::uv_to_direction(uv);
-            auto it = Interaction{uv};
-            // TODO: filter
-            auto scale = texture->evaluate_illuminant_spectrum(it, pipeline.spectrum()->sample(0.5f), 0.f).strength;
-            auto sin_theta = sin(uv.y * pi);
-            auto pixel_id = coord.y * sample_map_size.x + coord.x;
-            scale_map_device.write(pixel_id, sin_theta * scale);
+            auto pixel = dispatch_id().xy();
+            auto center = make_float2(pixel) + .5f;
+            auto sum_weight = def(0.f);
+            auto sum_scale = def(0.f);
+            constexpr auto filter_radius = 2.f;
+            constexpr auto filter_step = .25f;
+            auto n = static_cast<int>(std::ceil(filter_radius / filter_step));
+            // kind of brute-force but it's only done once
+            $for(dy, -n, n + 1) {
+                $for(dx, -n, n + 1) {
+                    auto offset = make_float2(make_int2(dx, dy)) * filter_step;
+                    auto uv = (center + offset) / make_float2(sample_map_size);
+                    auto [theta, phi, w] = Spherical::uv_to_direction(uv);
+                    auto it = Interaction{uv};
+                    // TODO: filter
+                    auto scale = texture->evaluate_illuminant_spectrum(it, pipeline.spectrum()->sample(0.5f), 0.f).strength;
+                    auto sin_theta = sin(uv.y * pi);
+                    auto weight = exp(-length_squared(offset));// gaussian kernel with an approximate radius of 2
+                    auto value = scale * weight * sin_theta;
+                    sum_weight += weight;
+                    sum_scale += value;
+                };
+            };
+            auto pixel_id = pixel.y * sample_map_size.x + pixel.x;
+            scale_map_device.write(pixel_id, sum_scale / sum_weight);
         };
         auto generate_weight_map = device.compile(generate_weight_map_kernel);
         Clock clk;

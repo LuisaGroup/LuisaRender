@@ -295,23 +295,23 @@ int main(int argc, char *argv[]) {
         auto has_metallic = !metallic_tex_name.empty() && metallic_factor != 0.f;
         auto has_transmission = !trans_tex_name.empty() && trans_factor != 0.f;
         if (has_roughness || has_metallic || has_transmission) {
-            //            if (has_metallic || has_transmission) {
-            scene_materials[mat_name] = {
-                {"type", "Surface"},
-                {"impl", "Disney"},
-                {"prop",
-                 {{"color", color_map}}}};
-            //            } else {
-            //                scene_materials[mat_name] = {
-            //                    {"type", "Surface"},
-            //                    {"impl", "Substrate"},
-            //                    {"prop",
-            //                     {{"Kd", color_map},
-            //                      {"Ks",
-            //                       {{"impl", "Constant"},
-            //                        {"prop",
-            //                         {{"v", {.04f, .04f, .04f}}}}}}}}};
-            //            }
+            if (has_metallic || has_transmission) {
+                scene_materials[mat_name] = {
+                    {"type", "Surface"},
+                    {"impl", "Disney"},
+                    {"prop",
+                     {{"color", color_map}}}};
+            } else {
+                scene_materials[mat_name] = {
+                    {"type", "Surface"},
+                    {"impl", "Substrate"},
+                    {"prop",
+                     {{"Kd", color_map},
+                      {"Ks",
+                       {{"impl", "Constant"},
+                        {"prop",
+                         {{"v", {.04f, .04f, .04f}}}}}}}}};
+            }
             if (has_roughness) {
                 scene_materials[mat_name]["prop"]["roughness"] = luisa::format("@{}", roughness_tex_name);
             }
