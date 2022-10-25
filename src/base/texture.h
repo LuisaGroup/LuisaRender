@@ -56,6 +56,7 @@ public:
     Texture(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] virtual bool is_black() const noexcept = 0;
     [[nodiscard]] virtual bool is_constant() const noexcept = 0;
+    [[nodiscard]] virtual luisa::optional<float4> evaluate_static() const noexcept;
     [[nodiscard]] virtual uint channels() const noexcept { return 4u; }
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;

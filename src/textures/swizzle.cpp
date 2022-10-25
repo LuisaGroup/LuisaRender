@@ -62,6 +62,14 @@ public:
     }
     [[nodiscard]] bool is_black() const noexcept override { return _base->is_black(); }
     [[nodiscard]] bool is_constant() const noexcept override { return _base->is_constant(); }
+    [[nodiscard]] luisa::optional<float4> evaluate_static() const noexcept override {
+        if (auto v = _base->evaluate_static()) {
+            auto s = make_float4(0.f);
+            for (auto i = 0u; i < channels(); i++) { s[i] = (*v)[swizzle(i)]; }
+            return s;
+        }
+        return nullopt;
+    }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] uint channels() const noexcept override { return _swizzle >> 16u; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(
@@ -90,7 +98,6 @@ public:
         }
         return make_float4();
     }
-    // TODO: evaluate_albedo/illuminant_spectrum should be overloaded for constant textures
 };
 
 luisa::unique_ptr<Texture::Instance> SwizzleTexture::build(

@@ -41,6 +41,7 @@ public:
     [[nodiscard]] auto v() const noexcept { return _v; }
     [[nodiscard]] bool is_black() const noexcept override { return _black; }
     [[nodiscard]] bool is_constant() const noexcept override { return true; }
+    [[nodiscard]] optional<float4> evaluate_static() const noexcept override { return _v; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] uint channels() const noexcept override { return _channels; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(
@@ -55,21 +56,7 @@ public:
     [[nodiscard]] Float4 evaluate(const Interaction &it,
                                   const SampledWavelengths &swl,
                                   Expr<float> time) const noexcept override {
-        return def(node<ConstantTexture>()->v());
-    }
-    [[nodiscard]] Spectrum::Decode evaluate_albedo_spectrum(
-        const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
-        auto tex = node<ConstantTexture>();
-        auto spec = pipeline().spectrum();
-        auto enc = spec->node()->encode_srgb_albedo(tex->v().xyz());
-        return spec->decode_albedo(swl, enc);
-    }
-    [[nodiscard]] Spectrum::Decode evaluate_illuminant_spectrum(
-        const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
-        auto tex = node<ConstantTexture>();
-        auto spec = pipeline().spectrum();
-        auto enc = spec->node()->encode_srgb_illuminant(tex->v().xyz());
-        return spec->decode_illuminant(swl, enc);
+        return node<ConstantTexture>()->v();
     }
 };
 
