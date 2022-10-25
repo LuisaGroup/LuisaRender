@@ -160,7 +160,7 @@ public:
                 fade = sqr(fade) * fade;
                 /* interpolation */
                 auto x = latlon.y * inv_pi;
-                v = fade * pipeline().tex2d(_texture_id).sample(make_float2(x, .5f)).xyz();
+                v = fade * pipeline().tex2d(_texture_id).sample(make_float2(x, 0.f)).xyz();
             };
             return v * scale;
         };

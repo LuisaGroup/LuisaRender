@@ -149,8 +149,8 @@ luisa::unique_ptr<Environment::Instance> Spherical::build(
             auto center = make_float2(pixel) + .5f;
             auto sum_weight = def(0.f);
             auto sum_scale = def(0.f);
-            constexpr auto filter_radius = 2.f;
-            constexpr auto filter_step = .25f;
+            constexpr auto filter_radius = 1.f;
+            constexpr auto filter_step = .125f;
             auto n = static_cast<int>(std::ceil(filter_radius / filter_step));
             // kind of brute-force but it's only done once
             $for(dy, -n, n + 1) {
@@ -159,10 +159,9 @@ luisa::unique_ptr<Environment::Instance> Spherical::build(
                     auto uv = (center + offset) / make_float2(sample_map_size);
                     auto [theta, phi, w] = Spherical::uv_to_direction(uv);
                     auto it = Interaction{uv};
-                    // TODO: filter
                     auto scale = texture->evaluate_illuminant_spectrum(it, pipeline.spectrum()->sample(0.5f), 0.f).strength;
                     auto sin_theta = sin(uv.y * pi);
-                    auto weight = exp(-length_squared(offset));// gaussian kernel with an approximate radius of 2
+                    auto weight = exp(-4.f * length_squared(offset));// gaussian kernel with an approximate radius of 1
                     auto value = scale * weight * sin_theta;
                     sum_weight += weight;
                     sum_scale += value;
