@@ -30,9 +30,7 @@ public:
         : Environment{scene, desc},
           _emission{scene->load_texture(desc->property_node("emission"))},
           _scale{std::max(desc->property_float_or_default("scale", 1.0f), 0.0f)},
-          _compensate_mis{desc->property_bool_or_default("compensate_mis", true)} {
-        LUISA_RENDER_CHECK_ILLUMINANT_TEXTURE(Spherical, emission);
-    }
+          _compensate_mis{desc->property_bool_or_default("compensate_mis", true)} {}
     [[nodiscard]] auto scale() const noexcept { return _scale; }
     [[nodiscard]] auto compensate_mis() const noexcept { return _compensate_mis; }
     [[nodiscard]] auto emission() const noexcept { return _emission; }

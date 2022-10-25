@@ -39,10 +39,8 @@ public:
                   return desc->property_node_or_default("Kd");
               })))},
           _thin{desc->property_bool_or_default("thin", false)} {
-        LUISA_RENDER_CHECK_ALBEDO_TEXTURE(DisneySurface, color);
-#define LUISA_RENDER_DISNEY_PARAM_LOAD(name)                              \
-    _##name = scene->load_texture(desc->property_node_or_default(#name)); \
-    LUISA_RENDER_CHECK_GENERIC_TEXTURE(DisneySurface, name, 1);
+#define LUISA_RENDER_DISNEY_PARAM_LOAD(name) \
+    _##name = scene->load_texture(desc->property_node_or_default(#name));
         LUISA_RENDER_DISNEY_PARAM_LOAD(metallic)
         LUISA_RENDER_DISNEY_PARAM_LOAD(eta)
         LUISA_RENDER_DISNEY_PARAM_LOAD(roughness)
@@ -187,11 +185,6 @@ namespace {
 
 class DisneyDiffuse final : public BxDF {
 
-public:
-    struct Gradient {
-        SampledSpectrum dR;
-    };
-
 private:
     SampledSpectrum R;
 
@@ -208,22 +201,11 @@ public:
         };
         return R * impl(wo, wi);
     }
-    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
-        auto Fo = SchlickWeight(abs_cos_theta(wo));
-        auto Fi = SchlickWeight(abs_cos_theta(wi));
-        return {.dR = df * inv_pi * (1.f - Fo * .5f) * (1.f - Fi * .5f)};
-    }
 };
 
 // "Fake" subsurface scattering lobe, based on the Hanrahan-Krueger BRDF
 // approximation of the BSSRDF.
 class DisneyFakeSS final : public BxDF {
-
-public:
-    struct Gradient {
-        SampledSpectrum dR;
-        Float dRoughness;
-    };
 
 private:
     SampledSpectrum R;
@@ -250,19 +232,9 @@ public:
         };
         return R * impl(wo, wi, roughness);
     }
-    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
-        // TODO
-        LUISA_ERROR_WITH_LOCATION("Not implemented.");
-    }
 };
 
 class DisneyRetro final : public BxDF {
-
-public:
-    struct Gradient {
-        SampledSpectrum dR;
-        Float dRoughness;
-    };
 
 private:
     SampledSpectrum R;
@@ -286,18 +258,9 @@ public:
         };
         return R * impl(wo, wi, roughness);
     }
-    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
-        // TODO
-        LUISA_ERROR_WITH_LOCATION("Not implemented.");
-    }
 };
 
 class DisneySheen final : public BxDF {
-
-public:
-    struct Gradient {
-        SampledSpectrum dR;
-    };
 
 private:
     SampledSpectrum R;
@@ -315,10 +278,6 @@ public:
         };
         return R * impl(wo, wi);
     }
-    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
-        // TODO
-        LUISA_ERROR_WITH_LOCATION("Not implemented.");
-    }
 };
 
 [[nodiscard]] inline Float GTR1(Float cosTheta, Float alpha) noexcept {
@@ -335,12 +294,6 @@ public:
 }
 
 class DisneyClearcoat final {
-
-public:
-    struct Gradient {
-        Float dWeight;
-        Float dGloss;
-    };
 
 private:
     Float weight;
@@ -395,10 +348,6 @@ public:
             return ite(valid, Dr * abs_cos_theta(wh) / (4.f * dot(wo, wh)), 0.f);
         };
         return impl(wo, wi, gloss);
-    }
-    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
-        // TODO
-        LUISA_ERROR_WITH_LOCATION("Not implemented.");
     }
 };
 
@@ -662,12 +611,6 @@ private:
         };
         return {.eval = eval, .wi = wi, .event = event};
     }
-
-    void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df,
-                   TransportMode mode) const noexcept override {
-        // TODO
-        LUISA_WARNING_WITH_LOCATION("Not implemented.");
-    }
 };
 
 class ThinDisneySurfaceClosure : public Surface::Closure {
@@ -924,12 +867,6 @@ private:
             eval = _evaluate_local(wo_local, wi_sample.wi, dot(_it.ng(), wo) * dot(_it.ng(), wi) > 0.f, mode);
         };
         return {.eval = eval, .wi = wi, .event = event};
-    }
-
-    void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df,
-                   TransportMode mode) const noexcept override {
-        // TODO
-        LUISA_WARNING_WITH_LOCATION("Not implemented.");
     }
 };
 

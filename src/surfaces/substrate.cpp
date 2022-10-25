@@ -27,14 +27,10 @@ public:
           _kd{scene->load_texture(desc->property_node_or_default("Kd"))},
           _ks{scene->load_texture(desc->property_node_or_default("Ks"))},
           _roughness{scene->load_texture(desc->property_node_or_default("roughness"))},
-          _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {
-        LUISA_RENDER_CHECK_ALBEDO_TEXTURE(SubstrateSurface, kd);
-        LUISA_RENDER_CHECK_ALBEDO_TEXTURE(SubstrateSurface, ks);
-        LUISA_RENDER_CHECK_GENERIC_TEXTURE(SubstrateSurface, roughness, 1);
-    }
+          _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {}
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] uint properties() const noexcept override { return property_reflective | property_differentiable; }
+    [[nodiscard]] uint properties() const noexcept override { return property_reflective; }
 
 protected:
     [[nodiscard]] luisa::unique_ptr<Instance> _build(
@@ -123,35 +119,6 @@ private:
         return {.eval = {.f = f * abs_cos_theta(wi_local) * same_sided, .pdf = pdf * same_sided},
                 .wi = wi,
                 .event = Surface::event_reflect};
-    }
-
-    void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df_in,
-                   TransportMode mode) const noexcept override {
-        using compute::isinf;
-        auto _instance = instance<SubstrateInstance>();
-        auto wo_local = _it.shading().world_to_local(wo);
-        auto wi_local = _it.shading().world_to_local(wi);
-        auto df = df_in * abs_cos_theta(wi_local);
-
-        auto grad = _blend->backward(wo_local, wi_local, df);
-
-        if (auto kd = _instance->Kd()) { kd->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(grad.dRd)); }
-        if (auto ks = _instance->Ks()) { ks->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(grad.dRs)); }
-        if (auto roughness = _instance->roughness()) {
-            auto remap = _instance->node<SubstrateSurface>()->remap_roughness();
-            auto r_f4 = roughness->evaluate(_it, _swl, _time);
-            auto r = roughness->node()->channels() == 1u ? r_f4.xx() : r_f4.xy();
-            auto grad_alpha_roughness = [](auto &&x) noexcept {
-                return TrowbridgeReitzDistribution::grad_alpha_roughness(x);
-            };
-            auto d_r = grad.dAlpha * (remap ? grad_alpha_roughness(r) : make_float2(1.f));
-            auto d_r_f4 = roughness->node()->channels() == 1u ?
-                              make_float4(d_r.x + d_r.y, 0.f, 0.f, 0.f) :
-                              make_float4(d_r, 0.f, 0.f);
-            auto roughness_grad_range = 5.f * (roughness->node()->range().y - roughness->node()->range().x);
-            roughness->backward(_it, _swl, _time,
-                                ite(any(isnan(d_r_f4) || abs(d_r_f4) > roughness_grad_range), 0.f, d_r_f4));
-        }
     }
 };
 

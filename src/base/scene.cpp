@@ -181,14 +181,6 @@ Spectrum *Scene::load_spectrum(const SceneNodeDesc *desc) noexcept {
     return dynamic_cast<Spectrum *>(load_node(SceneNodeTag::SPECTRUM, desc));
 }
 
-Loss *Scene::load_loss(const SceneNodeDesc *desc) noexcept {
-    return dynamic_cast<Loss *>(load_node(SceneNodeTag::LOSS, desc));
-}
-
-Optimizer *Scene::load_optimizer(const SceneNodeDesc *desc) noexcept {
-    return dynamic_cast<Optimizer *>(load_node(SceneNodeTag::OPTIMIZER, desc));
-}
-
 luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc) noexcept {
     if (!desc->root()->is_defined()) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
@@ -216,33 +208,6 @@ luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc
             scene->load_shape(s));
     }
     ThreadPool::global().synchronize();
-    if (!scene->_config->integrator->is_differentiable()) {
-        auto disabled = 0u;
-        for (auto &&node : scene->_config->internal_nodes) {
-            if (node->tag() == SceneNodeTag::TEXTURE) {
-                auto texture = static_cast<Texture *>(node.get());
-                if (texture->requires_gradients()) {
-                    disabled++;
-                    texture->disable_gradients();
-                }
-            }
-        }
-        for (auto &&[_, node] : scene->_config->nodes) {
-            if (node->tag() == SceneNodeTag::TEXTURE) {
-                auto texture = static_cast<Texture *>(node.get());
-                if (texture->requires_gradients()) {
-                    disabled++;
-                    texture->disable_gradients();
-                }
-            }
-        }
-        if (disabled != 0u) {
-            LUISA_WARNING_WITH_LOCATION(
-                "Disabled gradient computation in {} "
-                "texture{} for non-is_differentiable integrator.",
-                disabled, disabled > 1u ? "s" : "");
-        }
-    }
     return scene;
 }
 

@@ -9,8 +9,6 @@
 #include <base/sampler.h>
 #include <base/spectrum.h>
 #include <base/light_sampler.h>
-#include "loss.h"
-#include "optimizer.h"
 
 namespace luisa::render {
 
@@ -56,40 +54,6 @@ public:
     [[nodiscard]] virtual bool is_differentiable() const noexcept = 0;
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
-};
-
-class DifferentiableIntegrator : public Integrator {
-
-public:
-    class Instance : public Integrator::Instance {
-
-    private:
-        luisa::unique_ptr<Loss::Instance> _loss;
-        luisa::unique_ptr<Optimizer::Instance> _optimizer;
-
-    public:
-        explicit Instance(Pipeline &pipeline, CommandBuffer &command_buffer,
-                          const DifferentiableIntegrator *integrator) noexcept;
-        [[nodiscard]] auto loss() const noexcept { return _loss.get(); }
-        [[nodiscard]] auto optimizer() const noexcept { return _optimizer.get(); }
-    };
-
-private:
-    luisa::unique_ptr<Loss> _loss;
-    luisa::unique_ptr<Optimizer> _optimizer;
-    uint _iterations;
-    int _display_camera_index;
-    bool _save_process;
-
-public:
-    DifferentiableIntegrator(Scene *scene, const SceneNodeDesc *desc) noexcept;
-
-    [[nodiscard]] bool is_differentiable() const noexcept override { return true; }
-    [[nodiscard]] auto loss() const noexcept { return _loss.get(); }
-    [[nodiscard]] auto optimizer() const noexcept { return _optimizer.get(); }
-    [[nodiscard]] auto iterations() const noexcept { return _iterations; }
-    [[nodiscard]] int display_camera_index() const noexcept { return _display_camera_index; }
-    [[nodiscard]] bool save_process() const noexcept { return _save_process; }
 };
 
 }// namespace luisa::render

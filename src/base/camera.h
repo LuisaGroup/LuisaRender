@@ -16,6 +16,7 @@ namespace luisa::render {
 
 using compute::Expr;
 using compute::Float3;
+using compute::Float4x4;
 using compute::Image;
 using compute::Ray;
 using compute::Var;
@@ -39,7 +40,6 @@ public:
         const Camera *_camera;
         luisa::unique_ptr<Film::Instance> _film;
         const Filter::Instance *_filter;
-        const Texture::Instance *_target;
 
     private:
         // generate ray in camera space, should not consider _filter or _transform
@@ -57,7 +57,6 @@ public:
         [[nodiscard]] auto film() const noexcept { return _film.get(); }
         [[nodiscard]] auto filter() noexcept { return _filter; }
         [[nodiscard]] auto filter() const noexcept { return _filter; }
-        [[nodiscard]] auto target() const noexcept { return _target; }
         [[nodiscard]] Sample generate_ray(
             Sampler::Instance &sampler, Expr<uint2> pixel_coord, Expr<float> time) const noexcept;
         [[nodiscard]] Float4x4 camera_to_world() const noexcept;
@@ -82,7 +81,6 @@ private:
     uint _spp;
     std::filesystem::path _file;
     luisa::vector<ShutterPoint> _shutter_points;
-    const Texture *_target;
     float2 _clip_plane;
 
 public:
@@ -95,7 +93,6 @@ public:
     [[nodiscard]] auto shutter_samples() const noexcept -> luisa::vector<ShutterSample>;
     [[nodiscard]] auto spp() const noexcept { return _spp; }
     [[nodiscard]] auto file() const noexcept { return _file; }
-    [[nodiscard]] auto target() const noexcept { return _target; }
     [[nodiscard]] auto clip_plane() const noexcept { return _clip_plane; }
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;

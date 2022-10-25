@@ -67,56 +67,12 @@ SampledWavelengths Spectrum::Instance::sample(Expr<float> u) const noexcept {
     return swl;
 }
 
-void Spectrum::Instance::_report_backward_unsupported_or_not_implemented() const noexcept {
-    if (node()->is_differentiable()) {
-        LUISA_ERROR_WITH_LOCATION("Backward propagation is not implemented.");
-    } else {
-        LUISA_ERROR_WITH_LOCATION(
-            "Backward propagation is not supported "
-            "in the '{}' Spectrum implementation.",
-            node()->impl_type());
-    }
-}
-
-Float4 Spectrum::Instance::backward_decode_albedo(
-    const SampledWavelengths &swl, Expr<float4> v, const SampledSpectrum &dSpec) const noexcept {
-    _report_backward_unsupported_or_not_implemented();
-}
-
-Float4 Spectrum::Instance::backward_decode_illuminant(
-    const SampledWavelengths &swl, Expr<float4> v, const SampledSpectrum &dSpec) const noexcept {
-    _report_backward_unsupported_or_not_implemented();
-}
-
-SampledSpectrum Spectrum::Instance::backward_cie_y(
-    const SampledWavelengths &swl, const SampledSpectrum &sp, Expr<float> dY) const noexcept {
-    _report_backward_unsupported_or_not_implemented();
-}
-
-SampledSpectrum Spectrum::Instance::backward_cie_xyz(
-    const SampledWavelengths &swl, const SampledSpectrum &sp, Expr<float3> dXYZ) const noexcept {
-    _report_backward_unsupported_or_not_implemented();
-}
-
-SampledSpectrum Spectrum::Instance::backward_srgb(
-    const SampledWavelengths &swl, const SampledSpectrum &sp, Expr<float3> dSRGB) const noexcept {
-    _report_backward_unsupported_or_not_implemented();
-}
-
 Spectrum::Instance::Instance(Pipeline &pipeline, CommandBuffer &cb,
                              const Spectrum *spec) noexcept
     : _pipeline{pipeline}, _spectrum{spec},
       _cie_x{SPD::create_cie_x(pipeline, cb)},
       _cie_y{SPD::create_cie_y(pipeline, cb)},
       _cie_z{SPD::create_cie_z(pipeline, cb)} {}
-
-Float3 Spectrum::Instance::backward_encode_srgb_albedo(Expr<float4> dEnc) const noexcept {
-    _report_backward_unsupported_or_not_implemented();
-}
-
-Float3 Spectrum::Instance::backward_encode_srgb_illuminant(Expr<float4> dEnc) const noexcept {
-    _report_backward_unsupported_or_not_implemented();
-}
 
 Spectrum::Spectrum(Scene *scene, const SceneNodeDesc *desc) noexcept
     : SceneNode{scene, desc, SceneNodeTag::SPECTRUM} {}

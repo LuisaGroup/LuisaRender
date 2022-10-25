@@ -79,16 +79,8 @@ struct TrowbridgeReitzDistribution : public MicrofacetDistribution {
     Float cosThetaI, Float etaI, const SampledSpectrum &etaT, const SampledSpectrum &k) noexcept;
 
 struct Fresnel {
-    struct Gradient {
-        virtual ~Gradient() noexcept = default;
-    };
-
     virtual ~Fresnel() noexcept = default;
     [[nodiscard]] virtual SampledSpectrum evaluate(Expr<float> cosI) const noexcept = 0;
-    [[nodiscard]] virtual luisa::unique_ptr<Gradient> backward(
-        Expr<float> cosI, const SampledSpectrum &df) const noexcept {
-        return nullptr;
-    }
 };
 
 class FresnelConductor final : public Fresnel {
@@ -139,27 +131,16 @@ public:
 
 class LambertianReflection : public BxDF {
 
-public:
-    struct Gradient {
-        SampledSpectrum dR;
-    };
-
 private:
     SampledSpectrum _r;
 
 public:
     explicit LambertianReflection(const SampledSpectrum &R) noexcept : _r{R} {}
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
-    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept;
     [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _r; }
 };
 
 class LambertianTransmission : public BxDF {
-
-public:
-    struct Gradient {
-        SampledSpectrum dT;
-    };
 
 private:
     SampledSpectrum _t;
@@ -169,18 +150,10 @@ public:
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
     [[nodiscard]] SampledDirection sample_wi(Expr<float3> wo, Expr<float2> u, TransportMode mode) const noexcept override;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
-    [[nodiscard]] static Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) noexcept;
     [[nodiscard]] SampledSpectrum albedo() const noexcept override { return SampledSpectrum(0.f); }
 };
 
 class MicrofacetReflection : public BxDF {
-
-public:
-    struct Gradient {
-        SampledSpectrum dR;
-        Float2 dAlpha;
-        luisa::unique_ptr<Fresnel::Gradient> dFresnel;
-    };
 
 private:
     // MicrofacetReflection Private Data
@@ -194,17 +167,10 @@ public:
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
     [[nodiscard]] SampledDirection sample_wi(Expr<float3> wo, Expr<float2> u, TransportMode mode) const noexcept override;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
-    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept;
     [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _r; }
 };
 
 class MicrofacetTransmission : public BxDF {
-
-public:
-    struct Gradient {
-        SampledSpectrum dT;
-        Float2 dAlpha;
-    };
 
 private:
     // MicrofacetTransmission Private Data
@@ -222,17 +188,10 @@ public:
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
     [[nodiscard]] SampledDirection sample_wi(Expr<float3> wo, Expr<float2> u, TransportMode mode) const noexcept override;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
-    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df, TransportMode mode) const noexcept;
     [[nodiscard]] SampledSpectrum albedo() const noexcept override { return SampledSpectrum(0.f); }
 };
 
 class OrenNayar : public BxDF {
-
-public:
-    struct Gradient {
-        SampledSpectrum dR;
-        Float dSigma;
-    };
 
 private:
     SampledSpectrum _r;
@@ -243,18 +202,10 @@ private:
 public:
     OrenNayar(const SampledSpectrum &R, Expr<float> sigma) noexcept;
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
-    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept;
     [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _r; }
 };
 
 class FresnelBlend : public BxDF {
-
-public:
-    struct Gradient {
-        SampledSpectrum dRd;
-        SampledSpectrum dRs;
-        Float2 dAlpha;
-    };
 
 private:
     // FresnelBlend Private Data
@@ -273,7 +224,6 @@ public:
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
     [[nodiscard]] SampledDirection sample_wi(Expr<float3> wo, Expr<float2> u, TransportMode mode) const noexcept override;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
-    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept;
     [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _rd; }
 };
 

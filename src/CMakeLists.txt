@@ -51,7 +51,6 @@ function(luisa_render_add_plugin name)
 endfunction()
 
 add_subdirectory(films)
-add_subdirectory(losses)
 add_subdirectory(shapes)
 add_subdirectory(lights)
 add_subdirectory(spectra)
@@ -60,7 +59,6 @@ add_subdirectory(filters)
 add_subdirectory(textures)
 add_subdirectory(samplers)
 add_subdirectory(surfaces)
-add_subdirectory(optimizers)
 add_subdirectory(transforms)
 add_subdirectory(integrators)
 add_subdirectory(environments)
@@ -74,7 +72,6 @@ target_link_libraries(luisa-render INTERFACE
         luisa-render-base
         luisa-render-util
         luisa-render-films
-        luisa-render-losses
         luisa-render-shapes
         luisa-render-lights
         luisa-render-filters
@@ -83,7 +80,6 @@ target_link_libraries(luisa-render INTERFACE
         luisa-render-textures
         luisa-render-samplers
         luisa-render-surfaces
-        luisa-render-optimizers
         luisa-render-transforms
         luisa-render-integrators
         luisa-render-environments

@@ -27,7 +27,6 @@ Camera::Camera(Scene *scene, const SceneNodeDesc *desc) noexcept
           }))},
       _shutter_samples{desc->property_uint_or_default("shutter_samples", 0u)},// 0 means default
       _spp{desc->property_uint_or_default("spp", 1024u)},
-      _target{scene->load_texture(desc->property_node_or_default("target"))},
       _clip_plane{desc->property_float2_or_default(
           "clip_plane", lazy_construct([desc] {
               return make_float2(desc->property_float_or_default("clip_plane", 0.f), 1e10f);
@@ -36,7 +35,6 @@ Camera::Camera(Scene *scene, const SceneNodeDesc *desc) noexcept
     if (_clip_plane.x > _clip_plane.y) {
         std::swap(_clip_plane.x, _clip_plane.y);
     }
-    LUISA_RENDER_CHECK_GENERIC_TEXTURE(Camera, target, 3);
 
     if (_shutter_span.y < _shutter_span.x) [[unlikely]] {
         LUISA_ERROR(
@@ -194,8 +192,7 @@ auto Camera::shutter_samples() const noexcept -> vector<ShutterSample> {
 Camera::Instance::Instance(Pipeline &pipeline, CommandBuffer &command_buffer, const Camera *camera) noexcept
     : _pipeline{pipeline}, _camera{camera},
       _film{camera->film()->build(pipeline, command_buffer)},
-      _filter{pipeline.build_filter(command_buffer, camera->filter())},
-      _target{pipeline.build_texture(command_buffer, camera->target())} {
+      _filter{pipeline.build_filter(command_buffer, camera->filter())} {
     pipeline.register_transform(camera->transform());
 }
 

@@ -46,10 +46,6 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     pipeline->_initial_time = initial_time;
     pipeline->_transform_matrices.resize(transform_matrix_buffer_size);
     pipeline->_transform_matrix_buffer = device.create_buffer<float4x4>(transform_matrix_buffer_size);
-    if (scene.integrator()->is_differentiable()) {
-        pipeline->_differentiation =
-            luisa::make_unique<Differentiation>(*pipeline);
-    }
     pipeline->_cameras.reserve(scene.cameras().size());
     auto command_buffer = stream.command_buffer();
     pipeline->_spectrum = scene.spectrum()->build(*pipeline, command_buffer);
@@ -67,15 +63,11 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     }
     pipeline->_integrator = scene.integrator()->build(*pipeline, command_buffer);
     command_buffer << pipeline->_bindless_array.update();
-    if (auto &&diff = pipeline->_differentiation) {
-        diff->register_optimizer(dynamic_cast<DifferentiableIntegrator::Instance *>(pipeline->_integrator.get())->optimizer());
-        diff->materialize(command_buffer);
-    }
     if (!pipeline->_transforms.empty()) {
         command_buffer << pipeline->_transform_matrix_buffer.view(0u, pipeline->_transforms.size())
                               .copy_from(pipeline->_transform_matrices.data());
     }
-    command_buffer << commit();
+    command_buffer << compute::commit();
     return pipeline;
 }
 
@@ -113,16 +105,6 @@ const Filter::Instance *Pipeline::build_filter(CommandBuffer &command_buffer, co
     }
     auto f = filter->build(*this, command_buffer);
     return _filters.emplace(filter, std::move(f)).first->second.get();
-}
-
-Differentiation *Pipeline::differentiation() noexcept {
-    LUISA_ASSERT(_differentiation, "Differentiation is not constructed.");
-    return _differentiation.get();
-}
-
-const Differentiation *Pipeline::differentiation() const noexcept {
-    LUISA_ASSERT(_differentiation, "Differentiation is not constructed.");
-    return _differentiation.get();
 }
 
 void Pipeline::register_transform(const Transform *transform) noexcept {
