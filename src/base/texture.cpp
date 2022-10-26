@@ -22,7 +22,7 @@ Spectrum::Decode Texture::Instance::evaluate_albedo_spectrum(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     // skip the expensive encoding/decoding if the texture is static
     if (auto v = node()->evaluate_static()) {
-        auto enc = pipeline().spectrum()->node()->encode_srgb_albedo(
+        auto enc = pipeline().spectrum()->node()->encode_static_srgb_albedo(
             extend_color_to_rgb(v->xyz(), node()->channels()));
         return pipeline().spectrum()->decode_albedo(swl, enc);
     }
@@ -37,7 +37,7 @@ Spectrum::Decode Texture::Instance::evaluate_illuminant_spectrum(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     // skip the expensive encoding/decoding if the texture is static
     if (auto v = node()->evaluate_static()) {
-        auto enc = pipeline().spectrum()->node()->encode_srgb_illuminant(
+        auto enc = pipeline().spectrum()->node()->encode_static_srgb_illuminant(
             extend_color_to_rgb(v->xyz(), node()->channels()));
         return pipeline().spectrum()->decode_illuminant(swl, enc);
     }

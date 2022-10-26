@@ -30,6 +30,7 @@ private:
     const Texture *_flatness{};
     const Texture *_diffuse_trans{};
     bool _thin;
+    bool _remap_roughness;
 
 public:
     DisneySurface(Scene *scene, const SceneNodeDesc *desc) noexcept
@@ -38,7 +39,8 @@ public:
               "color", lazy_construct([desc] {
                   return desc->property_node_or_default("Kd");
               })))},
-          _thin{desc->property_bool_or_default("thin", false)} {
+          _thin{desc->property_bool_or_default("thin", false)},
+          _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {
 #define LUISA_RENDER_DISNEY_PARAM_LOAD(name) \
     _##name = scene->load_texture(desc->property_node_or_default(#name));
         LUISA_RENDER_DISNEY_PARAM_LOAD(metallic)
@@ -72,6 +74,7 @@ public:
         }
         return properties;
     }
+    [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
 
 protected:
     [[nodiscard]] luisa::unique_ptr<Instance> _build(
@@ -434,6 +437,9 @@ public:
         auto diffuse_weight = (1.f - metallic) * (1.f - specular_trans);
         auto flatness = flatness_tex ? flatness_tex->evaluate(it, swl, time).x : 0.f;
         auto roughness = roughness_tex ? roughness_tex->evaluate(it, swl, time).x : 0.f;
+        if (instance->node<DisneySurface>()->remap_roughness()) {
+            roughness = DisneyMicrofacetDistribution::roughness_to_alpha(roughness);
+        }
         auto tint_weight = ite(color_lum > 0.f, 1.f / color_lum, 1.f);
         auto tint = saturate(_color * tint_weight);// normalize lum. to isolate hue+sat
         auto tint_lum = color_lum * tint_weight;
@@ -479,8 +485,8 @@ public:
         // create the microfacet distribution for metallic and/or specular transmittance
         auto aniso = aniso_tex ? aniso_tex->evaluate(it, swl, time).x : 0.f;
         auto aspect = sqrt(1.f - aniso * .9f);
-        auto alpha = make_float2(max(0.001f, sqr(roughness) / aspect),
-                                 max(0.001f, sqr(roughness) * aspect));
+        auto alpha = make_float2(max(0.001f, roughness / aspect),
+                                 max(0.001f, roughness * aspect));
         _distrib = luisa::make_unique<DisneyMicrofacetDistribution>(alpha);
         _specular = luisa::make_unique<MicrofacetReflection>(
             SampledSpectrum{swl.dimension(), 1.f}, _distrib.get(), _fresnel.get());
@@ -665,6 +671,9 @@ public:
         auto specular_trans = spec_trans_tex ? spec_trans_tex->evaluate(it, swl, time).x : 0.f;
         auto flatness = flatness_tex ? flatness_tex->evaluate(it, swl, time).x : 0.f;
         auto roughness = roughness_tex ? roughness_tex->evaluate(it, swl, time).x : .5f;
+        if (instance->node<DisneySurface>()->remap_roughness()) {
+            roughness = DisneyMicrofacetDistribution::roughness_to_alpha(roughness);
+        }
         auto diffuse_trans = diff_trans_tex ? diff_trans_tex->evaluate(it, swl, time).x * .5f : 0.f;
         auto diffuse_weight = (1.f - metallic) * (1.f - specular_trans);
         auto diff_refl_weight = diffuse_weight * (1.f - diffuse_trans);
@@ -714,8 +723,8 @@ public:
         // create the microfacet distribution for metallic and/or specular transmittance
         auto aniso = aniso_tex ? aniso_tex->evaluate(it, swl, time).x : 0.f;
         auto aspect = sqrt(1.f - aniso * .9f);
-        auto alpha = make_float2(max(0.001f, sqr(roughness) / aspect),
-                                 max(0.001f, sqr(roughness) * aspect));
+        auto alpha = make_float2(max(0.001f, roughness / aspect),
+                                 max(0.001f, roughness * aspect));
         _distrib = luisa::make_unique<DisneyMicrofacetDistribution>(alpha);
         _specular = luisa::make_unique<MicrofacetReflection>(
             SampledSpectrum{swl.dimension(), 1.f}, _distrib.get(), _fresnel.get());
@@ -738,8 +747,8 @@ public:
         if (spec_trans_tex && !spec_trans_tex->node()->is_black()) {
             // thin specular transmission distribution
             auto rscaled = fma(eta, .65f, -.35f) * roughness;
-            auto ascaled = make_float2(max(.001f, sqr(rscaled) / aspect),
-                                       max(.001f, sqr(rscaled) * aspect));
+            auto ascaled = make_float2(max(.001f, rscaled / aspect),
+                                       max(.001f, rscaled * aspect));
             _thin_distrib = luisa::make_unique<TrowbridgeReitzDistribution>(ascaled);
             auto Cst_weight = (1.f - metallic) * specular_trans;
             auto Cst = Cst_weight * _color;

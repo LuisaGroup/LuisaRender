@@ -71,16 +71,6 @@ int main(int argc, char *argv[]) {
         }
     };
 
-    // check flattened
-    //    LUISA_ASSERT(scene->mRootNode->mTransformation.IsIdentity(),
-    //                 "Scene must be flattened.");
-    //    for (auto i = 0u; i < scene->mRootNode->mNumChildren; i++) {
-    //        auto node = scene->mRootNode->mChildren[i];
-    //        LUISA_ASSERT(node->mChildren == nullptr &&
-    //                         node->mTransformation.IsIdentity(),
-    //                     "Scene must be flattened.");
-    //    }
-
     // convert
     luisa::json scene_materials;
     luisa::json scene_geometry;
@@ -300,7 +290,8 @@ int main(int argc, char *argv[]) {
                     {"type", "Surface"},
                     {"impl", "Disney"},
                     {"prop",
-                     {{"color", color_map}}}};
+                     {{"color", color_map},
+                      {"remap_roughness", true}}}};
             } else {
                 scene_materials[mat_name] = {
                     {"type", "Surface"},
@@ -310,7 +301,8 @@ int main(int argc, char *argv[]) {
                       {"Ks",
                        {{"impl", "Constant"},
                         {"prop",
-                         {{"v", {.04f, .04f, .04f}}}}}}}}};
+                         {{"v", {.04f, .04f, .04f}},
+                          {"remap_roughness", true}}}}}}}};
             }
             if (has_roughness) {
                 scene_materials[mat_name]["prop"]["roughness"] = luisa::format("@{}", roughness_tex_name);

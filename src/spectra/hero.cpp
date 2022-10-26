@@ -196,10 +196,10 @@ public:
     [[nodiscard]] uint dimension() const noexcept override { return _dimension; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
-    [[nodiscard]] float4 encode_srgb_albedo(float3 rgb) const noexcept override {
+    [[nodiscard]] float4 encode_static_srgb_albedo(float3 rgb) const noexcept override {
         return RGB2SpectrumTable::srgb().decode_albedo(rgb);
     }
-    [[nodiscard]] float4 encode_srgb_illuminant(float3 rgb) const noexcept override {
+    [[nodiscard]] float4 encode_static_srgb_illuminant(float3 rgb) const noexcept override {
         return RGB2SpectrumTable::srgb().decode_unbound(rgb);
     }
 };

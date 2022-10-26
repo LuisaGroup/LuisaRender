@@ -49,11 +49,11 @@ public:
         virtual ~Instance() noexcept = default;
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
 
-        // clang-format off
         template<typename T = Spectrum>
             requires std::is_base_of_v<Spectrum, T>
-        [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_spectrum); }
-        // clang-format on
+        [[nodiscard]] auto node() const noexcept {
+            return static_cast<const T *>(_spectrum);
+        }
 
         // interfaces
         [[nodiscard]] virtual SampledWavelengths sample(Expr<float> u) const noexcept;
@@ -70,8 +70,8 @@ public:
     Spectrum(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] virtual bool is_fixed() const noexcept = 0;
     [[nodiscard]] virtual uint dimension() const noexcept = 0;
-    [[nodiscard]] virtual float4 encode_srgb_albedo(float3 rgb) const noexcept = 0;
-    [[nodiscard]] virtual float4 encode_srgb_illuminant(float3 rgb) const noexcept = 0;
+    [[nodiscard]] virtual float4 encode_static_srgb_albedo(float3 rgb) const noexcept = 0;
+    [[nodiscard]] virtual float4 encode_static_srgb_illuminant(float3 rgb) const noexcept = 0;
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
 };
