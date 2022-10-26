@@ -54,7 +54,8 @@ public:
                                 aiProcess_OptimizeGraph | aiProcess_GenUVCoords |
                                 aiProcess_TransformUVCoords | aiProcess_RemoveRedundantMaterials |
                                 aiProcess_FindInvalidData | aiProcess_SortByPType |
-                                aiProcess_FindDegenerates | aiProcess_ImproveCacheLocality;
+                                aiProcess_FindDegenerates | aiProcess_ImproveCacheLocality |
+                                aiProcess_PreTransformVertices | aiProcess_OptimizeMeshes;
             if (!flip_uv) { import_flags |= aiProcess_FlipUVs; }
             if (drop_normal) { import_flags |= aiProcess_DropNormals; }
             auto remove_flags = aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS |
@@ -70,6 +71,7 @@ public:
                     "Failed to load mesh '{}': {}.",
                     path_string, importer.GetErrorString());
             }
+            LUISA_ASSERT(model->mNumMeshes == 1u, "Only single mesh is supported.");
             auto mesh = model->mMeshes[0];
             if (subdiv_level > 0u) {
                 auto subdiv = Assimp::Subdivider::Create(Assimp::Subdivider::CATMULL_CLARKE);
