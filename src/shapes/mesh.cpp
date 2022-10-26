@@ -54,7 +54,8 @@ public:
                                 aiProcess_OptimizeGraph | aiProcess_GenUVCoords |
                                 aiProcess_TransformUVCoords | aiProcess_RemoveRedundantMaterials |
                                 aiProcess_FindInvalidData | aiProcess_SortByPType |
-                                aiProcess_FindDegenerates | aiProcess_ImproveCacheLocality;
+                                aiProcess_FindDegenerates | aiProcess_ImproveCacheLocality |
+                                aiProcess_PreTransformVertices | aiProcess_OptimizeMeshes;
             if (!flip_uv) { import_flags |= aiProcess_FlipUVs; }
             if (drop_normal) { import_flags |= aiProcess_DropNormals; }
             auto remove_flags = aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS |
