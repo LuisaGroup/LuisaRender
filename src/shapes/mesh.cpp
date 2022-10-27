@@ -50,26 +50,33 @@ public:
             importer.SetPropertyInteger(
                 AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_LINE | aiPrimitiveType_POINT);
             importer.SetPropertyBool(AI_CONFIG_PP_FD_CHECKAREA, false);
+            importer.SetPropertyFloat(AI_CONFIG_PP_GSN_MAX_SMOOTHING_ANGLE, 120.f);
             auto import_flags = aiProcess_JoinIdenticalVertices | aiProcess_RemoveComponent |
                                 aiProcess_OptimizeGraph | aiProcess_GenUVCoords |
                                 aiProcess_TransformUVCoords | aiProcess_RemoveRedundantMaterials |
-                                aiProcess_FindInvalidData | aiProcess_SortByPType |
-                                aiProcess_FindDegenerates | aiProcess_ImproveCacheLocality |
-                                aiProcess_PreTransformVertices | aiProcess_OptimizeMeshes;
+                                aiProcess_SortByPType | aiProcess_ValidateDataStructure |
+                                aiProcess_ImproveCacheLocality | aiProcess_PreTransformVertices |
+                                aiProcess_OptimizeMeshes;
             if (!flip_uv) { import_flags |= aiProcess_FlipUVs; }
-            if (drop_normal) { import_flags |= aiProcess_DropNormals; }
+            import_flags |= drop_normal ? aiProcess_DropNormals : aiProcess_GenSmoothNormals;
             auto remove_flags = aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS |
                                 aiComponent_CAMERAS | aiComponent_COLORS |
                                 aiComponent_LIGHTS | aiComponent_MATERIALS |
                                 aiComponent_TEXTURES;
-            if (subdiv_level == 0) { import_flags |= aiProcess_Triangulate; }
             importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, static_cast<int>(remove_flags));
+            if (subdiv_level == 0) { import_flags |= aiProcess_Triangulate; }
             auto model = importer.ReadFile(path_string.c_str(), import_flags);
             if (model == nullptr || (model->mFlags & AI_SCENE_FLAGS_INCOMPLETE) ||
                 model->mRootNode == nullptr || model->mRootNode->mNumMeshes == 0) [[unlikely]] {
                 LUISA_ERROR_WITH_LOCATION(
                     "Failed to load mesh '{}': {}.",
                     path_string, importer.GetErrorString());
+            }
+            if (auto err = importer.GetErrorString();
+                err != nullptr && err[0] != '\0') [[unlikely]] {
+                LUISA_WARNING_WITH_LOCATION(
+                    "Mesh '{}' has warnings: {}.",
+                    path_string, err);
             }
             LUISA_ASSERT(model->mNumMeshes == 1u, "Only single mesh is supported.");
             auto mesh = model->mMeshes[0];
@@ -98,6 +105,12 @@ public:
             auto ai_tex_coords = mesh->mTextureCoords[0];
             loader._has_uv = ai_tex_coords != nullptr;
             loader._has_normal = !drop_normal && ai_normals != nullptr;
+            if (!loader._has_normal) {
+                LUISA_WARNING_WITH_LOCATION(
+                    "Mesh '{}' has no normal data, "
+                    "which may cause incorrect shading.",
+                    path_string);
+            }
             for (auto i = 0; i < vertex_count; i++) {
                 auto p = make_float3(ai_positions[i].x, ai_positions[i].y, ai_positions[i].z);
                 auto n = loader._has_normal ?

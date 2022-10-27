@@ -26,6 +26,7 @@ def do_conversion(nodes):
     spp = 1024
     resolution = [1920, 1080]
     env_scale = 1.0
+    hide_emissive = False
     for tag, prop in nodes:
         if tag == "renderer":
             for k, v in prop.items():
@@ -53,6 +54,8 @@ def do_conversion(nodes):
                     resolution = [int(v[0]), int(v[1])]
                 elif k == "envmapintensity":
                     env_scale = float(v[0])
+                elif k == "hideemitters":
+                    hide_emissive = (v[0] == "true")
         elif tag == "mesh":
             file = None
             material = None
@@ -113,9 +116,12 @@ def do_conversion(nodes):
             surface = {
                 "type": "Surface",
                 "impl": "Disney",
-                "prop": {}
+                "prop": {
+                    "remap_roughness": False
+                }
             }
             name = prop["name"][0]
+
             def get_texture(name):
                 if name not in textures:
                     textures[name] = {
@@ -126,6 +132,7 @@ def do_conversion(nodes):
                         }
                     }
                 return f"@Texture:{name}"
+
             for k, v in prop.items():
                 if k == "color":
                     if "color" in surface["prop"]:
@@ -319,13 +326,23 @@ def do_conversion(nodes):
             render["cameras"].append(camera)
         else:
             raise NotImplementedError(f"Unsupported node type: {tag}")
+    if hide_emissive:
+        for s in render["shapes"]:
+            if "light" in s["prop"]:
+                s["prop"]["visible"] = False
     if "environment" in render:
         render["environment"]["prop"]["scale"] = env_scale
     for camera in render["cameras"]:
         camera["prop"]["film"] = {
             "impl": "Color",
             "prop": {
-                "resolution": resolution
+                "resolution": resolution,
+                "filter": {
+                    "impl": "Gaussian",
+                    "prop": {
+                        "radius": 1.0
+                    }
+                }
             }
         }
         camera["prop"]["spp"] = spp
@@ -358,9 +375,10 @@ def convert_scene(path):
             if line[0] == "material":
                 curr_node[1]["name"] = [line[1]]
         elif line[0] == "}":  # end group
-            nodes.append(curr_node)
+            if curr_node is not None:
+                nodes.append(curr_node)
             curr_node = None
-        elif line[0] != "{":
+        elif line[0] != "{" and curr_node is not None:
             curr_node[1][line[0]] = line[1:]
     for n in nodes:
         print(n)

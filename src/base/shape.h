@@ -38,12 +38,14 @@ private:
     const Light *_light;
     const Transform *_transform;
     float _shadow_terminator;
+    bool _visible;
 
 public:
     Shape(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] auto surface() const noexcept { return _surface; }
     [[nodiscard]] auto light() const noexcept { return _light; }
     [[nodiscard]] auto transform() const noexcept { return _transform; }
+    [[nodiscard]] auto visible() const noexcept { return _visible; }
     [[nodiscard]] auto shadow_terminator_factor() const noexcept { return _shadow_terminator; }
     [[nodiscard]] virtual bool is_mesh() const noexcept = 0;
     [[nodiscard]] virtual bool has_normal() const noexcept = 0;

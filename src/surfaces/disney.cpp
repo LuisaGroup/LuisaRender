@@ -498,7 +498,7 @@ public:
         // clearcoat
         if (clearcoat_tex && !clearcoat_tex->node()->is_black()) {
             auto cc = clearcoat_tex->evaluate(it, swl, time).x;
-            auto gloss = lerp(.1f, .001f, clearcoat_gloss_tex ? clearcoat_gloss_tex->evaluate(it, swl, time).x : 0.f);
+            auto gloss = lerp(.1f, .001f, clearcoat_gloss_tex ? clearcoat_gloss_tex->evaluate(it, swl, time).x : 1.f);
             _clearcoat = luisa::make_unique<DisneyClearcoat>(cc, gloss);
             // clearcoat sampling weight
             _clearcoat_technique_index = _sampling_technique_count++;
@@ -736,7 +736,7 @@ public:
         // clearcoat
         if (clearcoat_tex && !clearcoat_tex->node()->is_black()) {
             auto cc = clearcoat_tex->evaluate(it, swl, time).x;
-            auto gloss = lerp(.1f, .001f, clearcoat_gloss_tex ? clearcoat_gloss_tex->evaluate(it, swl, time).x : 0.f);
+            auto gloss = lerp(.1f, .001f, clearcoat_gloss_tex ? clearcoat_gloss_tex->evaluate(it, swl, time).x : 1.f);
             _clearcoat = luisa::make_unique<DisneyClearcoat>(cc, gloss);
             // clearcoat sampling weight
             _clearcoat_technique_index = _sampling_technique_count++;

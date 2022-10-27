@@ -18,10 +18,12 @@ void Geometry::build(CommandBuffer &command_buffer, luisa::span<const Shape *con
 }
 
 void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape, float init_time,
-                              const Surface *overridden_surface, const Light *overridden_light) noexcept {
+                              const Surface *overridden_surface, const Light *overridden_light,
+                              bool overriden_visible) noexcept {
 
     auto surface = overridden_surface == nullptr ? shape->surface() : overridden_surface;
     auto light = overridden_light == nullptr ? shape->light() : overridden_light;
+    auto visible = overriden_visible && shape->visible();
 
     if (shape->is_mesh()) {
         if (shape->deformable()) [[unlikely]] {
@@ -90,7 +92,7 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
         InstancedTransform inst_xform{t_node, instance_id};
         if (!is_static) { _dynamic_transforms.emplace_back(inst_xform); }
         auto object_to_world = inst_xform.matrix(init_time);
-        _accel.emplace_back(*mesh.resource, object_to_world, true);
+        _accel.emplace_back(*mesh.resource, object_to_world, visible);
 
         // create instance
         auto properties = 0u;
@@ -119,8 +121,8 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
     } else {
         _transform_tree.push(shape->transform());
         for (auto child : shape->children()) {
-            _process_shape(command_buffer, child,
-                           init_time, surface, light);
+            _process_shape(command_buffer, child, init_time,
+                           surface, light, visible);
         }
         _transform_tree.pop(shape->transform());
     }
