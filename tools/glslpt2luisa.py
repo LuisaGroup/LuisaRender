@@ -78,20 +78,24 @@ def do_conversion(nodes):
                     angle = glm.degrees(2 * glm.acos(quat.w))
                     axis = glm.normalize(glm.vec3(quat.x, quat.y, quat.z))
                     rotation = [axis.x, axis.y, axis.z, angle]
+                elif k == "scale":
+                    scale = [float(x) for x in v]
             assert file is not None and material is not None
             if file not in meshes:
                 meshes[file] = {
                     "type": "Shape",
                     "impl": "Mesh",
                     "prop": {
-                        "file": file
+                        "file": file,
+                        "shadow_terminator": 1.0
                     }
                 }
             shape = {
                 "impl": "Instance",
                 "prop": {
                     "shape": f"@Mesh:{file}",
-                    "surface": f"@Surface:{material}"
+                    "surface": f"@Surface:{material}",
+                    "shadow_terminator": 1.0
                 }
             }
             if material in emissive_surfaces:
@@ -117,19 +121,20 @@ def do_conversion(nodes):
             surface = {
                 "type": "Surface",
                 "impl": "Disney",
-                "prop": {
-                    "remap_roughness": False
-                }
+                "prop": {}
             }
             name = prop["name"][0]
 
-            def get_texture(name):
+            def get_texture(name, linear=True):
+                if name.endswith(".exr") or name.endswith(".hdr"):
+                    linear = True
                 if name not in textures:
                     textures[name] = {
                         "type": "Texture",
                         "impl": "Image",
                         "prop": {
-                            "file": name
+                            "file": name,
+                            "encoding": "sRGB" if not linear else "Linear"
                         }
                     }
                 return f"@Texture:{name}"
@@ -161,7 +166,7 @@ def do_conversion(nodes):
                         continue
                     surface["prop"]["roughness"] = {
                         "impl": "Constant",
-                        "prop": {"v": float(v[0])}
+                        "prop": {"v": glm.sqrt(float(v[0]))}
                     }
                 elif k == "subsurface":
                     if "subsurface" in surface["prop"]:
@@ -240,7 +245,7 @@ def do_conversion(nodes):
                         }
                     }
                 elif k == "albedotexture":
-                    surface["prop"]["color"] = get_texture(v[0])
+                    surface["prop"]["color"] = get_texture(v[0], False)
                 elif k == "metallicroughnesstexture":
                     t = get_texture(v[0])
                     surface["prop"]["metallic"] = {
@@ -264,7 +269,7 @@ def do_conversion(nodes):
                         "type": "Light",
                         "impl": "Diffuse",
                         "prop": {
-                            "emission": get_texture(v[0])
+                            "emission": get_texture(v[0], False)
                         }
                     }
                 elif k != "name":
@@ -333,6 +338,8 @@ def do_conversion(nodes):
                 s["prop"]["visible"] = False
     if "environment" in render:
         render["environment"]["prop"]["scale"] = env_scale
+    if (r := max(*resolution)) < 1920:
+        resolution = [int(round(x * 1920 / r)) for x in resolution]
     for camera in render["cameras"]:
         camera["prop"]["film"] = {
             "impl": "Color",

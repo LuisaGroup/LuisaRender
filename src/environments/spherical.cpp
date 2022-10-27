@@ -159,7 +159,7 @@ luisa::unique_ptr<Environment::Instance> Spherical::build(
                     auto scale = texture->evaluate_illuminant_spectrum(it, pipeline.spectrum()->sample(0.5f), 0.f).strength;
                     auto sin_theta = sin(uv.y * pi);
                     auto weight = exp(-4.f * length_squared(offset));// gaussian kernel with an approximate radius of 1
-                    auto value = scale * weight * sin_theta;
+                    auto value = weight * min(scale * sin_theta, 1e8f);
                     sum_weight += weight;
                     sum_scale += value;
                 };
