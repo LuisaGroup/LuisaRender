@@ -61,7 +61,7 @@ public:
             auto remove_flags = aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS |
                                 aiComponent_CAMERAS | aiComponent_COLORS |
                                 aiComponent_LIGHTS | aiComponent_MATERIALS |
-                                aiComponent_TEXTURES;
+                                aiComponent_TEXTURES | aiComponent_TANGENTS_AND_BITANGENTS;
             importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, static_cast<int>(remove_flags));
             if (subdiv_level == 0) { import_flags |= aiProcess_Triangulate; }
             importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, static_cast<int>(remove_flags));
