@@ -342,7 +342,8 @@ def do_conversion(nodes):
                     "prop": {
                         "radius": 1.0
                     }
-                }
+                },
+                "clamp": 64
             }
         }
         camera["prop"]["spp"] = spp
