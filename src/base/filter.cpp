@@ -19,9 +19,10 @@ Filter::Filter(Scene *scene, const SceneNodeDesc *desc) noexcept
               return make_float2(desc->property_float_or_default("shift", 0.f));
           }))} {
     if (any(_radius <= 0.0f)) [[unlikely]] {
-        LUISA_ERROR_WITH_LOCATION(
-            "Invalid filter radius: ({}, {}).",
+        LUISA_WARNING_WITH_LOCATION(
+            "Invalid filter radius: ({}, {}). Clamping to 0.001.",
             _radius.x, _radius.y);
+        _radius = max(_radius, 1e-3f);
     }
 }
 
