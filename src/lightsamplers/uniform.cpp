@@ -97,7 +97,7 @@ private:
         auto sample = Light::Sample::zero(swl.dimension());
         pipeline().lights().dispatch(handle.light_tag, [&](auto light) noexcept {
             auto closure = light->closure(swl, time);
-            sample = closure->sample(handle.instance_id, it_from.p(), u);
+            sample = closure->sample(handle.instance_id, it_from.p_shading(), u);
         });
         return sample;
     }

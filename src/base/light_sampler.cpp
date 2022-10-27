@@ -20,7 +20,7 @@ Light::Sample LightSampler::Instance::sample_selection(
             sample = sample_environment(it_from.p(), sel.prob, u, swl, time);
         } else {// environment lighting and lights
             $if(sel.tag == selection_environment) {
-                sample = sample_environment(it_from.p(), sel.prob, u, swl, time);
+                sample = sample_environment(it_from.p_shading(), sel.prob, u, swl, time);
             }
             $else {
                 sample = sample_light(it_from, sel, u, swl, time);

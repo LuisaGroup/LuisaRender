@@ -344,7 +344,7 @@ def do_conversion(nodes):
         camera["prop"]["filter"] = {
             "impl": "Gaussian",
             "prop": {
-                "radius": 0.5 * round(min(*resolution) / 1024 * 2)
+                "radius": glm.clamp(0.5 * round(min(*resolution) / 1024 * 2), 1, 3)
             }
         }
         camera["prop"]["spp"] = spp

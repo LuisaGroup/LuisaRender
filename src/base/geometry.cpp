@@ -249,13 +249,16 @@ ShadingAttribute Geometry::shading_point(const Var<Shape::Handle> &instance, con
     auto ns = bary.x * n0 + bary.y * n1 + bary.z * n2;
     // offset p to fake surface for the shadow terminator
     // reference: Ray Tracing Gems 2, Chap. 4
-    auto temp_u = p - p0;
-    auto temp_v = p - p1;
-    auto temp_w = p - p2;
+    auto dp = def(make_float3());
     auto shadow_term = instance->shadow_terminator_factor();
-    auto dp = bary.x * (temp_u - min(dot(temp_u, n0), 0.f) * n0) +
-              bary.y * (temp_v - min(dot(temp_v, n1), 0.f) * n1) +
-              bary.z * (temp_w - min(dot(temp_w, n2), 0.f) * n2);
+    $if(instance->has_normal() & shadow_term > 0.f) {
+        auto temp_u = p - p0;
+        auto temp_v = p - p1;
+        auto temp_w = p - p2;
+        dp = bary.x * (temp_u - min(dot(temp_u, n0), 0.f) * n0) +
+             bary.y * (temp_v - min(dot(temp_v, n1), 0.f) * n1) +
+             bary.z * (temp_w - min(dot(temp_w, n2), 0.f) * n2);
+    };
     auto ps = p + shadow_term * dp;
     // Now, let's go into the world space.
     // A * (x, 1.f) - A * (y, 1.f) = A * (x - y, 0.f)

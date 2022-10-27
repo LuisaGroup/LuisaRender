@@ -31,9 +31,7 @@ public:
         auto G = [s = 2.0f * _sigma * _sigma](auto x) noexcept {
             return 1.0f / std::sqrt(pi * s) * std::exp(-x * x / s);
         };
-        auto f = G(x) - G(radius());
-        LUISA_INFO("GaussianFilter::evaluate: x = {}, f = {}", x, f);
-        return f;
+        return G(x) - G(radius());
     }
 };
 
