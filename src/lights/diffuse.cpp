@@ -75,7 +75,7 @@ struct DiffuseLightClosure final : public Light::Closure {
                 .pdf = ite(!two_sided & it_light.back_facing(), 0.0f, pdf)};
     }
 
-    [[nodiscard]] Light::Sample sample(Expr<uint> light_inst_id, Expr<float3> p_from, Expr<float2> u_in) const noexcept override {
+    [[nodiscard]] Light::Sample sample(Expr<uint> light_inst_id, const Interaction &it_from, Expr<float2> u_in) const noexcept override {
         auto light = instance<DiffuseLightInstance>();
         auto &&pipeline = light->pipeline();
         auto light_inst = pipeline.geometry()->instance(light_inst_id);
@@ -89,13 +89,13 @@ struct DiffuseLightClosure final : public Light::Closure {
         auto uvw = sample_uniform_triangle(make_float2(ux, u_in.y));
         auto attrib = pipeline.geometry()->shading_point(
             light_inst, triangle, uvw, light_to_world, light_to_world_normal);
-        auto light_wo = normalize(p_from - attrib.pg);
+        auto light_wo = normalize(it_from.p() - attrib.pg);
         Interaction it_light{light_inst, light_inst_id, triangle_id, attrib, dot(light_wo, attrib.ng) < 0.0f};
         DiffuseLightClosure closure{light, _swl, _time};
         auto p_light = it_light.p_robust(light_wo);
-        return {.eval = closure.evaluate(it_light, p_from),
-                .wi = -light_wo,
-                .distance = distance(p_light, p_from) * .9999f};
+        auto p_from = it_from.p_robust(-light_wo);
+        return {.eval = closure.evaluate(it_light, it_from.p_shading()),
+                .ray = it_from.spawn_ray(-light_wo, distance(p_light, p_from) * .999f)};
     }
 };
 

@@ -259,7 +259,7 @@ ShadingAttribute Geometry::shading_point(const Var<Shape::Handle> &instance, con
              bary.y * (temp_v - min(dot(temp_v, n1), 0.f) * n1) +
              bary.z * (temp_w - min(dot(temp_w, n2), 0.f) * n2);
     };
-    auto ps = p + shadow_term * dp;
+    auto ps = p + 0.f * dp;
     // Now, let's go into the world space.
     // A * (x, 1.f) - A * (y, 1.f) = A * (x - y, 0.f)
     auto c = cross(make_float3(shape_to_world * make_float4(p1 - p0, 0.f)),

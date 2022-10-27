@@ -83,15 +83,13 @@ public:
         auto wi_local = normalize(frame.world_to_local(world_to_env * wi));
         return _evaluate(wi_local, swl, time);
     }
-    [[nodiscard]] Light::Sample sample(
-        Expr<float3> p_from, const SampledWavelengths &swl,
-        Expr<float> time, Expr<float2> u) const noexcept override {
+    [[nodiscard]] Light::Sample sample(const Interaction &it_from, const SampledWavelengths &swl,
+                                       Expr<float> time, Expr<float2> u) const noexcept override {
         auto env = node<Directional>();
         auto wi_local = sample_uniform_cone(u, env->cos_half_angle());
         auto frame = Frame::make(env->direction());
         return {.eval = _evaluate(wi_local, swl, time),
-                .wi = normalize(transform_to_world() * frame.local_to_world(wi_local)),
-                .distance = std::numeric_limits<float>::max()};
+                .ray = it_from.spawn_ray(transform_to_world() * frame.local_to_world(wi_local))};
     }
 };
 

@@ -101,7 +101,7 @@ public:
         return {.L = L, .pdf = _directional_pdf(pdf, theta)};
     }
     [[nodiscard]] Light::Sample sample(
-        Expr<float3> p_from, const SampledWavelengths &swl,
+        const Interaction &it_from, const SampledWavelengths &swl,
         Expr<float> time, Expr<float2> u) const noexcept override {
         auto [wi, Li, pdf] = [&] {
             if (_texture->node()->is_constant()) {
@@ -126,8 +126,7 @@ public:
             return std::make_tuple(w, L, _directional_pdf(p, theta));
         }();
         return {.eval = {.L = Li, .pdf = pdf},
-                .wi = normalize(transform_to_world() * wi),
-                .distance = std::numeric_limits<float>::max()};
+                .ray = it_from.spawn_ray(normalize(transform_to_world() * wi))};
     }
 };
 

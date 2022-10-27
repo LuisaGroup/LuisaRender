@@ -234,8 +234,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
                 *it, u_light_selection, u_light_surface, swl, time);
 
             // trace shadow ray
-            auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
-            auto occluded = pipeline.geometry()->intersect_any(shadow_ray);
+            auto occluded = pipeline.geometry()->intersect_any(light_sample.ray);
 
             // evaluate material
             auto surface_tag = it->shape()->surface_tag();
@@ -267,7 +266,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
 
                     // direct lighting
                     $if(light_sample.eval.pdf > 0.0f & !occluded) {
-                        auto wi = light_sample.wi;
+                        auto wi = light_sample.ray->direction();
                         auto eval = closure->evaluate(wo, wi);
                         auto w = balance_heuristic(light_sample.eval.pdf, eval.pdf) /
                                  light_sample.eval.pdf;

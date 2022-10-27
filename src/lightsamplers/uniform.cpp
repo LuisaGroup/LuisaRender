@@ -97,15 +97,15 @@ private:
         auto sample = Light::Sample::zero(swl.dimension());
         pipeline().lights().dispatch(handle.light_tag, [&](auto light) noexcept {
             auto closure = light->closure(swl, time);
-            sample = closure->sample(handle.instance_id, it_from.p_shading(), u);
+            sample = closure->sample(handle.instance_id, it_from, u);
         });
         return sample;
     }
 
-    [[nodiscard]] Light::Sample _sample_environment(Expr<float3> p_from, Expr<float2> u,
+    [[nodiscard]] Light::Sample _sample_environment(const Interaction &it_from, Expr<float2> u,
                                                     const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         LUISA_ASSERT(pipeline().environment() != nullptr, "No environment in the scene.");
-        return pipeline().environment()->sample(p_from, swl, time, u);
+        return pipeline().environment()->sample(it_from, swl, time, u);
     }
 };
 

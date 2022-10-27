@@ -37,7 +37,7 @@ public:
             const Interaction &it_from, Expr<uint> tag, Expr<float2> u,
             const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
         [[nodiscard]] virtual Light::Sample _sample_environment(
-            Expr<float3> p_from, Expr<float2> u,
+            const Interaction &it_from, Expr<float2> u,
             const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
 
     public:
@@ -61,7 +61,7 @@ public:
             const Interaction &it_from, const Selection &sel, Expr<float2> u,
             const SampledWavelengths &swl, Expr<float> time) const noexcept;
         [[nodiscard]] Light::Sample sample_environment(
-            Expr<float3> p_from, Expr<float> prob, Expr<float2> u,
+            const Interaction &it_from, Expr<float> prob, Expr<float2> u,
             const SampledWavelengths &swl, Expr<float> time) const noexcept;
         [[nodiscard]] virtual Light::Sample sample_selection(
             const Interaction &it_from, const Selection &sel, Expr<float2> u,
