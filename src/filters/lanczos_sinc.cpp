@@ -16,6 +16,7 @@ public:
         : Filter{scene, desc}, _tau{desc->property_float_or_default("tau", 3.0f)} {}
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] float evaluate(float x) const noexcept override {
+        x = x / radius();
         static constexpr auto sin_x_over_x = [](auto x) noexcept {
             return 1.0f + x * x == 1.0f ? 1.0f : std::sin(x) / x;
         };

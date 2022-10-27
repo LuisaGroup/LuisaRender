@@ -4,6 +4,7 @@
 import glm
 import json
 import sys
+import math
 
 
 def do_conversion(nodes):
@@ -337,13 +338,13 @@ def do_conversion(nodes):
             "impl": "Color",
             "prop": {
                 "resolution": resolution,
-                "filter": {
-                    "impl": "Gaussian",
-                    "prop": {
-                        "radius": 1.0
-                    }
-                },
                 "clamp": 64
+            }
+        }
+        camera["prop"]["filter"] = {
+            "impl": "Gaussian",
+            "prop": {
+                "radius": 0.5 * round(min(*resolution) / 1024 * 2)
             }
         }
         camera["prop"]["spp"] = spp

@@ -10,21 +10,11 @@ namespace luisa::render {
 
 Filter::Filter(Scene *scene, const SceneNodeDesc *desc) noexcept
     : SceneNode{scene, desc, SceneNodeTag::FILTER},
-      _radius{desc->property_float2_or_default(
-          "radius", lazy_construct([desc] {
-              return make_float2(desc->property_float_or_default("radius", 0.5f));
-          }))},
+      _radius{std::max(desc->property_float_or_default("radius", 0.5f), 1e-3f)},
       _shift{desc->property_float2_or_default(
           "shift", lazy_construct([desc] {
               return make_float2(desc->property_float_or_default("shift", 0.f));
-          }))} {
-    if (any(_radius <= 0.0f)) [[unlikely]] {
-        LUISA_WARNING_WITH_LOCATION(
-            "Invalid filter radius: ({}, {}). Clamping to 0.001.",
-            _radius.x, _radius.y);
-        _radius = max(_radius, 1e-3f);
-    }
-}
+          }))} {}
 
 luisa::unique_ptr<Filter::Instance> Filter::build(
     Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
@@ -36,11 +26,11 @@ Filter::Instance::Instance(const Pipeline &pipeline, const Filter *filter) noexc
     static constexpr auto n = Filter::look_up_table_size - 1u;
     static constexpr auto inv_n = 1.0f / static_cast<float>(n);
     std::array<float, n> abs_f{};
-    _lut[0u] = filter->evaluate(-1.0f);
+    _lut[0u] = filter->evaluate(-filter->radius());
     auto integral = 0.0f;
     for (auto i = 0u; i < n; i++) {
         auto x = static_cast<float>(i + 1u) * inv_n * 2.0f - 1.0f;
-        _lut[i + 1u] = filter->evaluate(x);
+        _lut[i + 1u] = filter->evaluate(x * filter->radius());
         auto f_mid = 0.5f * (_lut[i] + _lut[i + 1u]);
         integral += f_mid;
         abs_f[i] = std::abs(f_mid);

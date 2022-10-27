@@ -15,7 +15,7 @@ public:
     GaussianFilter(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Filter{scene, desc}, _sigma{desc->property_float_or_default("sigma", 0.f)} {
         if (_sigma <= 0.f) {// invalid sigma, compute from radius
-            auto r = max(radius().x, radius().y);
+            auto r = radius();
             // G = 1.f / (sqrt(2.f * pi) * sigma) * exp(-r * r / (2.f * sigma * sigma)).
             // Ignoring the normalization factor, we have
             // F(r) = exp(-r * r / (2.f * sigma * sigma)),
@@ -31,7 +31,9 @@ public:
         auto G = [s = 2.0f * _sigma * _sigma](auto x) noexcept {
             return 1.0f / std::sqrt(pi * s) * std::exp(-x * x / s);
         };
-        return G(x) - G(1.0f);
+        auto f = G(x) - G(radius());
+        LUISA_INFO("GaussianFilter::evaluate: x = {}, f = {}", x, f);
+        return f;
     }
 };
 
