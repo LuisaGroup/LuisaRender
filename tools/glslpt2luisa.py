@@ -7,7 +7,7 @@ import sys
 import math
 
 
-def do_conversion(nodes):
+def do_conversion(scene_name, nodes):
     textures = {}
     surfaces = {}
     meshes = {}
@@ -104,7 +104,7 @@ def do_conversion(nodes):
                 shape["prop"]["transform"] = {
                     "impl": "Matrix",
                     "prop": {
-                        "matrix": transform_matrix
+                        "m": transform_matrix
                     }
                 }
             elif translation or rotation or scale:
@@ -312,7 +312,8 @@ def do_conversion(nodes):
                 elif k == "fov":
                     fov = float(v[0])
                 elif k == "matrix":
-                    matrix = glm.transpose(glm.mat4([float(x) for x in v]))
+                    # transpose the matrix
+                    matrix = [[float(v[j * 4 + i]) for j in range(4)] for i in range(4)]
             assert matrix is not None or (position is not None and target is not None)
             assert fov is not None
             if matrix is not None:
@@ -340,7 +341,7 @@ def do_conversion(nodes):
         render["environment"]["prop"]["scale"] = env_scale
     if (r := max(*resolution)) < 1920:
         resolution = [int(round(x * 1920 / r)) for x in resolution]
-    for camera in render["cameras"]:
+    for i, camera in enumerate(render["cameras"]):
         camera["prop"]["film"] = {
             "impl": "Color",
             "prop": {
@@ -348,6 +349,7 @@ def do_conversion(nodes):
                 "clamp": 64
             }
         }
+        camera["prop"]["file"] = f"{scene_name}-view-{i}.exr"
         camera["prop"]["filter"] = {
             "impl": "Gaussian",
             "prop": {
@@ -391,7 +393,8 @@ def convert_scene(path):
             curr_node[1][line[0]] = line[1:]
     for n in nodes:
         print(n)
-    scene = do_conversion(nodes)
+    import pathlib
+    scene = do_conversion(pathlib.Path(path).stem, nodes)
     with open(path[:-len(".scene")] + ".json", 'w') as file:
         json.dump(scene, file, indent=4)
 
