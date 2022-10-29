@@ -273,5 +273,16 @@ Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases
 - Samples: 1024
 - Tonemapping: Uncharted2 (exposure = +0.5)
 
-<img src="https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/bathroom-interior.png" alt="Sky Texture Demo"/>
+<img src="https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/bathroom-interior.png" alt="Bathroom Interior"/>
 
+## JINX!
+
+Download: [LuisaRender](https://github.com/LuisaGroup/LuisaRenderScenes/releases/download/scenes/jinx.zip)
+
+- Credit: [eric3dee](https://sketchfab.com/3d-models/jinx-794dfd320a694a36a5e5a79fb594a5ef) ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/))
+- Camera and environment configuration from [GLSL-PathTracer](https://github.com/knightcrawler25/GLSL-PathTracer)
+- Resolution: 1920x1080
+- Samples: 4096
+- Tonemapping: Uncharted2
+
+<img src="https://github.com/LuisaGroup/LuisaRenderScenes/raw/main/renders/jinx.png" alt="JINX!"/>
