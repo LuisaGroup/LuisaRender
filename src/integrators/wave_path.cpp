@@ -599,10 +599,6 @@ void WavefrontPathTracingInstance::_render_one_camera(
 
     auto render_time = clock.toc();
     LUISA_INFO("Rendering finished in {} ms.", render_time);
-    {
-        std::ofstream file{"results.txt", std::ios::app};
-        file << "Render time = " << render_time << " ms" << std::endl;
-    }
 }
 
 }// namespace luisa::render
