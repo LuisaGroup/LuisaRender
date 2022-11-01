@@ -54,13 +54,6 @@ In case you need to run the ISPC backend, download the [ISPC compiler executable
 - `LUISA_COMPUTE_ENABLE_METAL`: Enable Metal backend
 - `LUISA_COMPUTE_ENABLE_GUI`: Enable GUI display in C++ tests (enabled by default)
 
-Note: Due to license restrictions, we are not allowed to provide OptiX headers directly in tree.
-Therefore, if you would like to enable the CUDA backend, you will need to either
-- Manually copy the OptiX header files under `<optix-installation>/include` to `src/compute/src/backends/cuda/optix` (so that the folder *directly* contains `optix.h`); or
-- Specify the OptiX installation directory with `-D OptiX_DIR=<optix-installation>`
-
-*before* configuration and building. The default location of the OptiX installation is `C:\ProgramData\NVIDIA Corporation\OptiX SDK 7.x.0\include` on Windows, and `/home/<user>/NVIDIA-OptiX-SDK-7.x.0-linux64-x86_64/include` on Linux.
-
 Note: On Windows, please remember to replace the backslashes `\\` in the paths with `/` when passing arguments to CMake.
 
 ## Usage
