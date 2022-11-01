@@ -32,33 +32,14 @@ private:
     float _gamma{1.f};
 
 private:
-    void _load_image(const SceneNodeDesc *desc) noexcept {
-        auto path = desc->property_path("file");
-        auto encoding = desc->property_string_or_default(
-            "encoding", lazy_construct([&path]() noexcept -> luisa::string {
-                auto ext = path.extension().string();
-                for (auto &c : ext) { c = static_cast<char>(tolower(c)); }
-                if (ext == ".exr" || ext == ".hdr") { return "linear"; }
-                return "sRGB";
-            }));
-        for (auto &c : encoding) { c = static_cast<char>(tolower(c)); }
-        if (encoding == "srgb") {
-            _encoding = Encoding::SRGB;
-        } else if (encoding == "gamma") {
-            _encoding = Encoding::GAMMA;
-            _gamma = desc->property_float_or_default("gamma", 1.f);
-        } else {
-            if (encoding != "linear") [[unlikely]] {
-                LUISA_WARNING_WITH_LOCATION(
-                    "Unknown texture encoding '{}'. "
-                    "Fallback to linear encoding. [{}]",
-                    encoding, desc->source_location().string());
+    void _load_image(std::filesystem::path path) noexcept {
+        _image = ThreadPool::global().async([path = std::move(path), filter = _sampler.filter()] {
+            auto image = LoadedImage::load(path);
+            if (filter == TextureSampler::Filter::LINEAR_LINEAR ||
+                filter == TextureSampler::Filter::ANISOTROPIC) {
+                image.generate_mipmaps();
             }
-            _encoding = Encoding::LINEAR;
-        }
-        _scale = desc->property_float_or_default("scale", 1.f);
-        _image = ThreadPool::global().async([path = std::move(path)] {
-            return LoadedImage::load(path);
+            return image;
         });
     }
 
@@ -100,7 +81,31 @@ public:
                 return make_float2(desc->property_float_or_default(
                     "uv_offset", 0.0f));
             }));
-        _load_image(desc);
+        auto path = desc->property_path("file");
+        auto encoding = desc->property_string_or_default(
+            "encoding", lazy_construct([&path]() noexcept -> luisa::string {
+                auto ext = path.extension().string();
+                for (auto &c : ext) { c = static_cast<char>(tolower(c)); }
+                if (ext == ".exr" || ext == ".hdr") { return "linear"; }
+                return "sRGB";
+            }));
+        for (auto &c : encoding) { c = static_cast<char>(tolower(c)); }
+        if (encoding == "srgb") {
+            _encoding = Encoding::SRGB;
+        } else if (encoding == "gamma") {
+            _encoding = Encoding::GAMMA;
+            _gamma = desc->property_float_or_default("gamma", 1.f);
+        } else {
+            if (encoding != "linear") [[unlikely]] {
+                LUISA_WARNING_WITH_LOCATION(
+                    "Unknown texture encoding '{}'. "
+                    "Fallback to linear encoding. [{}]",
+                    encoding, desc->source_location().string());
+            }
+            _encoding = Encoding::LINEAR;
+        }
+        _scale = desc->property_float_or_default("scale", 1.f);
+        _load_image(path);
     }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] bool is_black() const noexcept override { return _scale == 0.f; }
