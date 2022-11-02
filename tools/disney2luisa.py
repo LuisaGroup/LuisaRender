@@ -3,6 +3,18 @@ from pathlib2 import Path
 from sys import argv
 import glm
 import json
+import numpy as np
+import re
+
+material_map = {}
+re_material_map = {}
+
+
+def check_path(input_path: Path, output_path: Path):
+    if not Path.exists(input_path):
+        raise FileNotFoundError(f'Path {input_path} not found')
+    if not Path.exists(output_path):
+        Path.mkdir(output_path)
 
 
 def convert_camera(camera: dict) -> (str, dict):
@@ -46,10 +58,10 @@ def convert_camera(camera: dict) -> (str, dict):
 
 
 def convert_light(light: dict, name: str) -> (str, dict):
-    transform = light['translationMatrix']
+    transform = np.array(light['translationMatrix'], dtype=np.float32)
+    transform = transform.reshape(4, 4).transpose()
     exposure = light['exposure']
     color = glm.vec4(light['color']).xyz * exposure
-    light_dict = {}
 
     if light['type'] == 'quad':
         light_dict = {
@@ -77,7 +89,7 @@ def convert_light(light: dict, name: str) -> (str, dict):
                                 'type': 'Transform',
                                 'impl': 'Matrix',
                                 'prop': {
-                                    'm': transform,
+                                    'm': transform.reshape(16).tolist(),
                                 }
                             },
                         ]
@@ -142,11 +154,47 @@ def convert_light(light: dict, name: str) -> (str, dict):
     return name, light_dict
 
 
-def check_path(input_path: Path, output_path: Path):
-    if not Path.exists(input_path):
-        raise FileNotFoundError(f'Path {input_path} not found')
-    if not Path.exists(output_path):
-        Path.mkdir(output_path)
+def convert_material(material: dict, name: str) -> (str, dict):
+    if name == 'hidden':
+        material_dict = {
+            'type': 'Surface',
+            'impl': 'Null',
+        }
+    else:
+        thin = material['type'] == 'thin'
+        prop = {
+            'color': material['baseColor'],
+            'thin': thin,
+            'metallic': material['metallic'],
+            'eta': material['ior'],
+            'roughness': material['roughness'],
+            'specular_tint': material['specularTint'],
+            'anisotropic': material['anisotropic'],
+            'sheen': material['sheen'],
+            'sheen_tint': material['sheenTint'],
+            'clearcoat': material['clearcoat'],
+            'clearcoat_gloss': material['clearcoatGloss'],
+            'specular_trans': material['specTrans'],
+        }
+        if thin:
+            prop['flatness'] = material['flatness']
+            prop['diffuse_trans'] = material['diffTrans']
+
+        material_dict = {
+            'type': 'Surface',
+            'impl': 'Disney',
+            'prop': prop
+        }
+
+    assignment = material['assignment']
+    for shape in assignment:
+        if '*' in shape:
+            shape = shape.replace('*', '[0-9a-zA-Z_]*')
+            re_material_map[shape] = name
+        else:
+            material_map[shape] = name
+
+    return name, material_dict
 
 
 def disney2luisa(input_path: Path, output_path: Path):
@@ -156,10 +204,12 @@ def disney2luisa(input_path: Path, output_path: Path):
     path_in = input_path / 'json'
     path_out = output_path / 'json'
     check_path(path_in, path_out)
+    geo_names = [x.name for x in path_in.iterdir()
+                 if x.is_dir() and x.name != 'cameras' and x.name != 'lights']
 
     # cameras
-    path_in = path_in / 'cameras'
-    path_out = path_out / 'cameras'
+    path_in = input_path / 'json' / 'cameras'
+    path_out = output_path / 'json' / 'cameras'
     check_path(path_in, path_out)
     for camera_file in path_in.iterdir():
         with open(camera_file, 'r') as f:
@@ -168,12 +218,10 @@ def disney2luisa(input_path: Path, output_path: Path):
         camera_dict = {name: camera_dict}
         with open(path_out / camera_file.name, 'w') as f:
             json.dump(camera_dict, f, indent=2)
-    path_in = path_in.parent
-    path_out = path_out.parent
 
     # lights
-    path_in = path_in / 'lights'
-    path_out = path_out / 'lights'
+    path_in = input_path / 'json' / 'lights'
+    path_out = output_path / 'json' / 'lights'
     check_path(path_in, path_out)
     quad = '''
 v   1.00   1.00   0.00
@@ -196,6 +244,24 @@ f -4 -3 -2 -1
             lights_dict.update(light_dict)
         with open(path_out / light_file.name, 'w') as f:
             json.dump(lights_dict, f, indent=2)
+
+    # geometries
+    for geo_name in geo_names:
+        path_in = input_path / 'json' / geo_name
+        path_out = output_path / 'json' / geo_name
+        check_path(path_in, path_out)
+
+        # materials
+        material_file = path_in / 'materials.json'
+        with open(material_file, 'r') as f:
+            materials = json.load(f)
+        materials_dict = {}
+        for name, material in materials.items():
+            name, material_dict = convert_material(material, name)
+            material_dict = {name: material_dict}
+            materials_dict.update(material_dict)
+        with open(path_out / 'materials.json', 'w') as f:
+            json.dump(materials_dict, f, indent=2)
 
 
 if __name__ == '__main__':
