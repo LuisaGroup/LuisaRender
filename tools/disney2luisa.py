@@ -5,60 +5,114 @@ import glm
 import json
 
 
-def rotateXYZ(R):
-    return glm.rotate(R.z, (0, 0, 1)) * glm.rotate(R.y, (0, 1, 0)) * glm.rotate(R.x, (1, 0, 0))
-
-
-def rotateYXZ(R):
-    return glm.rotate(R.z, (0, 0, 1)) * glm.rotate(R.x, (1, 0, 0)) * glm.rotate(R.y, (0, 1, 0))
-
-
-def convert_camera(camera: dict) -> dict:
-    resolution_ratio = camera["ratio"]
-    name = camera["name"]
-    fov = camera["fov"]
-    position = glm.vec3(camera["eye"])
-    look_at = glm.vec3(camera["look"])
+def convert_camera(camera: dict) -> (str, dict):
+    resolution_ratio = camera['ratio']
+    name = camera['name']
+    fov = camera['fov']
+    position = glm.vec3(camera['eye'])
+    look_at = glm.vec3(camera['look'])
     front = glm.normalize(look_at - position)
-    up = glm.vec3(camera["up"])
+    up = glm.vec3(camera['up'])
 
     camera_dict = {
-        name: {
-            "type": "Camera",
-            "impl": "Pinhole",
-            "prop": {
-                "position": list(position),
-                "front": list(front),
-                "up": list(up),
-            },
-            "fov": fov,
-            "spp": 1,
-            "film": {
-                "type": "Film",
-                "impl": "Color",
-                "prop": {
-                    "resolution": [
+        'type': 'Camera',
+        'impl': 'Pinhole',
+        'prop': {
+            'position': list(position),
+            'front': list(front),
+            'up': list(up),
+            'fov': fov,
+            'spp': 1,
+            'film': {
+                'type': 'Film',
+                'impl': 'Color',
+                'prop': {
+                    'resolution': [
                         1024,
                         int(1024 / resolution_ratio)
                     ],
-                    "exposure": 0,
+                    'exposure': 0,
                 }
             },
-            "file": "output.exr",
-            "filter": {
-                "impl": "Gaussian",
-                "prop": {
-                    "radius": 1
+            'file': 'output.exr',
+            'filter': {
+                'type': 'Filter',
+                'impl': 'Gaussian',
+                'prop': {
+                    'radius': 1
                 }
             }
         }
     }
-    return camera_dict
+
+    return name, camera_dict
+
+
+def convert_light(light: dict, name: str) -> (str, dict):
+    transform = light['translationMatrix']
+    exposure = light['exposure']
+    color = glm.vec4(light['color']).xyz * exposure
+    light_dict = {}
+
+    if light['type'] == 'quad':
+        height = light['height']
+        width = light['width']
+        light_dict = {
+            'type': 'Shape',
+            'impl': 'Mesh',
+            'prop': {
+                'file': 'quad.obj',
+                'surface': {
+                    'type': 'Surface',
+                    'impl': 'Null',
+                },
+                'transform': {
+                    'type': 'Transform',
+                    'impl': 'Stack',
+                    'prop': {
+                        'transforms': [
+                            {
+                                'type': 'Transform',
+                                'impl': 'SRT',
+                                'prop': {
+                                    'scale': [width / 2, height / 2, 1],
+                                }
+                            },
+                            {
+                                'type': 'Transform',
+                                'impl': 'Matrix',
+                                'prop': {
+                                    'm': transform,
+                                }
+                            }
+                        ]
+                    }
+                },
+                'light': {
+                    'type': 'Light',
+                    'impl': 'Diffuse',
+                    'prop': {
+                        'emission': {
+                            'type': 'Texture',
+                            'impl': 'Constant',
+                            'prop': {
+                                'v': list(color),
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    else:
+        print(f'Light type {light["type"]} not supported')
+        return None, None
+
+    return name, light_dict
 
 
 def check_path(input_path: Path, output_path: Path):
     if not Path.exists(input_path):
-        raise FileNotFoundError(f"Path {input_path} not found")
+        raise FileNotFoundError(f'Path {input_path} not found')
     if not Path.exists(output_path):
         Path.mkdir(output_path)
 
@@ -67,19 +121,49 @@ def disney2luisa(input_path: Path, output_path: Path):
     shutil.rmtree(output_path)
     check_path(input_path, output_path)
 
-    path_in = input_path / "json"
-    path_out = output_path / "json"
+    path_in = input_path / 'json'
+    path_out = output_path / 'json'
     check_path(path_in, path_out)
 
-    path_in = path_in / "cameras"
-    path_out = path_out / "cameras"
+    # cameras
+    path_in = path_in / 'cameras'
+    path_out = path_out / 'cameras'
     check_path(path_in, path_out)
     for camera_file in path_in.iterdir():
-        with open(camera_file, "r") as f:
+        with open(camera_file, 'r') as f:
             camera = json.load(f)
-        camera_dict = convert_camera(camera)
-        with open(path_out / camera_file.name, "w") as f:
+        name, camera_dict = convert_camera(camera)
+        camera_dict = {name: camera_dict}
+        with open(path_out / camera_file.name, 'w') as f:
             json.dump(camera_dict, f, indent=2)
+    path_in = path_in.parent
+    path_out = path_out.parent
+
+    # lights
+    path_in = path_in / 'lights'
+    path_out = path_out / 'lights'
+    check_path(path_in, path_out)
+    quad = '''
+v   1.00   1.00   0.00
+v  -1.00   1.00   0.00
+v  -1.00  -1.00   0.00
+v   1.00  -1.00   0.00
+f -4 -3 -2 -1
+'''
+    with open(path_out / 'quad.obj', 'w') as f:
+        f.write(quad)
+    for light_file in path_in.iterdir():
+        lights_dict = {}
+        with open(light_file, 'r') as f:
+            lights = json.load(f)
+        for name, light in lights.items():
+            name, light_dict = convert_light(light, name)
+            if name is None:
+                continue
+            light_dict = {name: light_dict}
+            lights_dict.update(light_dict)
+        with open(path_out / light_file.name, 'w') as f:
+            json.dump(lights_dict, f, indent=2)
 
 
 if __name__ == '__main__':

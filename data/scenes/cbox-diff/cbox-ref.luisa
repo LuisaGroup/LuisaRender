@@ -152,11 +152,7 @@ Shape paintings : Group {
           },
           SRT {
             scale { 0.75 }
-          },
-          SRT {
             rotate { 0, 1, 0, -90 }
-          },
-          SRT {
             translate { 0.0, 1.25, -1.0 }
           }
       }
@@ -309,8 +305,6 @@ Shape dragon : Group {
           },
           SRT {
             scale { 0.05 }
-          },
-          SRT {
             rotate { 0, 1, 0, -35 }
           }
       }
