@@ -265,11 +265,10 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
             $if(depth == 0 & it->valid()) {
                 aux_buffers.at("mask")->accumulate(dispatch_id().xy(), make_float4(1.f));
                 aux_buffers.at("normal")->accumulate(dispatch_id().xy(), make_float4(it->shading().n(), 1.f));
-                aux_buffers.at("depth")->accumulate(dispatch_id().xy(), make_float4(length(it->p() - ray->origin())));
-                auto p_cs = make_float3(inverse(camera->camera_to_world()) * make_float4(it->p(), 1.f));
-                auto clip = camera->node()->clip_plane();
+                auto depth = length(it->p() - ray->origin());
+                aux_buffers.at("depth")->accumulate(dispatch_id().xy(), make_float4(depth));
                 auto p_ndc = make_float3((camera_sample.pixel / make_float2(resolution) * 2.f - 1.f) * make_float2(1.f, -1.f),
-                                         (-p_cs.z - clip.x) / (clip.y - clip.x));
+                                         depth / (ray->t_max() - ray->t_min()));
                 aux_buffers.at("ndc")->accumulate(dispatch_id().xy(), make_float4(p_ndc, 1.f));
                 pipeline.surfaces().dispatch(it->shape()->surface_tag(), [&](auto surface) noexcept {
                     // create closure

@@ -33,6 +33,7 @@ public:
     [[nodiscard]] luisa::unique_ptr<Camera::Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] bool requires_lens_sampling() const noexcept override { return true; }
     [[nodiscard]] auto position() const noexcept { return _position; }
     [[nodiscard]] auto look_at() const noexcept { return _look_at; }
     [[nodiscard]] auto up() const noexcept { return _up; }
@@ -101,11 +102,11 @@ public:
 
 private:
     [[nodiscard]] Camera::Sample
-    _generate_ray_in_camera_space(Sampler::Instance &sampler, Expr<float2> pixel, Expr<float> time) const noexcept override {
+    _generate_ray_in_camera_space(Expr<float2> pixel, Expr<float2> u_lens, Expr<float> /* time */) const noexcept override {
         auto data = _device_data.read(0u);
         auto coord_focal = (data.pixel_offset - pixel) * data.projected_pixel_size;
         auto p_focal = coord_focal.x * data.left + coord_focal.y * data.up + data.focal_plane * data.front;
-        auto coord_lens = sample_uniform_disk_concentric(sampler.generate_2d()) * data.lens_radius;
+        auto coord_lens = sample_uniform_disk_concentric(u_lens) * data.lens_radius;
         auto p_lens = coord_lens.x * data.left + coord_lens.y * data.up;
         return {.ray = make_ray(p_lens + data.position, normalize(p_focal - p_lens)), .pixel = pixel, .weight = 1.f};
     }

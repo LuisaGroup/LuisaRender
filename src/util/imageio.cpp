@@ -7,6 +7,7 @@
 #include <tinyexr.h>
 #include <stb/stb_image.h>
 #include <stb/stb_image_write.h>
+#include <stb/stb_image_resize.h>
 
 #include <core/logging.h>
 #include <util/imageio.h>
@@ -15,12 +16,7 @@
 namespace luisa::render {
 
 void LoadedImage::_destroy() noexcept {
-    if (*this) {
-        _deleter(_pixels);
-        if (_mipmap_pixels != nullptr) {
-            _deleter(_mipmap_pixels);
-        }
-    }
+    if (*this) { _deleter(_pixels); }
 }
 
 [[nodiscard]] inline auto parse_exr_header(const char *filename) noexcept {
@@ -536,6 +532,33 @@ LoadedImage LoadedImage::create(uint2 resolution, LoadedImage::storage_type stor
             }}};
 }
 
+LoadedImage &LoadedImage::operator=(LoadedImage &&rhs) noexcept {
+    if (&rhs != this) [[likely]] {
+        _destroy();
+        _pixels = rhs._pixels;
+        _resolution = rhs._resolution;
+        _storage = rhs._storage;
+        _deleter = std::move(rhs._deleter);
+        rhs._pixels = nullptr;
+    }
+    return *this;
+}
+
+LoadedImage::LoadedImage(LoadedImage &&another) noexcept
+    : _pixels{another._pixels},
+      _resolution{another._resolution},
+      _storage{another._storage},
+      _deleter{std::move(another._deleter)} { another._pixels = nullptr; }
+
+LoadedImage::~LoadedImage() noexcept { _destroy(); }
+
+LoadedImage::LoadedImage(void *pixels,
+                         LoadedImage::storage_type storage,
+                         uint2 resolution,
+                         luisa::function<void(void *)> deleter) noexcept
+    : _pixels{pixels}, _resolution{resolution},
+      _storage{storage}, _deleter{std::move(deleter)} {}
+
 void save_image(std::filesystem::path path, const float *pixels, uint2 resolution, uint components) noexcept {
     // save results
     auto pixel_count = resolution.x * resolution.y;
@@ -680,19 +703,5 @@ void save_image(std::filesystem::path path, const float *pixels, uint2 resolutio
 //        default: break;
 //    }
 //}
-
-void LoadedImage::generate_mipmaps(uint levels) noexcept {
-    // TODO
-}
-
-const void *LoadedImage::pixels(uint level) const noexcept {
-    if (level == 0u) { return _pixels; }
-    // TODO
-    return nullptr;
-}
-
-void *LoadedImage::pixels(uint level) noexcept {
-    return const_cast<void *>(std::as_const(*this).pixels(level));
-}
 
 }// namespace luisa::render

@@ -30,18 +30,18 @@ private:
     Encoding _encoding{};
     float _scale{1.f};
     float _gamma{1.f};
+    uint _mipmaps{0u};
 
 private:
     void _load_image(std::filesystem::path path) noexcept {
-        _image = ThreadPool::global().async([path = std::move(path), filter = _sampler.filter()] {
-            auto image = LoadedImage::load(path);
-            if (filter == TextureSampler::Filter::LINEAR_LINEAR ||
-                filter == TextureSampler::Filter::ANISOTROPIC) {
-                image.generate_mipmaps();
-            }
-            return image;
+        _image = ThreadPool::global().async([path = std::move(path)] {
+            return LoadedImage::load(path);
         });
     }
+
+    void _generate_mipmaps_gamma(Pipeline &pipeline, CommandBuffer &command_buffer, Image<float> &image) const noexcept;
+    void _generate_mipmaps_linear(Pipeline &pipeline, CommandBuffer &command_buffer, Image<float> &image) const noexcept;
+    void _generate_mipmaps_sRGB(Pipeline &pipeline, CommandBuffer &command_buffer, Image<float> &image) const noexcept;
 
 public:
     ImageTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
@@ -105,6 +105,9 @@ public:
             _encoding = Encoding::LINEAR;
         }
         _scale = desc->property_float_or_default("scale", 1.f);
+        _mipmaps = desc->property_uint_or_default(
+            "mipmaps", filter_mode == TextureSampler::Filter::ANISOTROPIC ? 0u : 1u);
+        if (filter_mode == TextureSampler::Filter::POINT) { _mipmaps = 1u; }
         _load_image(path);
     }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
@@ -167,11 +170,30 @@ public:
 
 luisa::unique_ptr<Texture::Instance> ImageTexture::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
     auto &&image = _image.get();
-    auto device_image = pipeline.create<Image<float>>(image.pixel_storage(), image.size());
+    auto device_image = pipeline.create<Image<float>>(image.pixel_storage(), image.size(), _mipmaps);
     auto tex_id = pipeline.register_bindless(*device_image, _sampler);
-    command_buffer << device_image->copy_from(image.pixels())
-                   << compute::commit();
+    command_buffer << device_image->copy_from(image.pixels()) << compute::commit();
+    if (device_image->mip_levels() > 1u) {
+        switch (_encoding) {
+            case Encoding::LINEAR: _generate_mipmaps_linear(pipeline, command_buffer, *device_image); break;
+            case Encoding::SRGB: _generate_mipmaps_sRGB(pipeline, command_buffer, *device_image); break;
+            case Encoding::GAMMA: _generate_mipmaps_gamma(pipeline, command_buffer, *device_image); break;
+            default: LUISA_ERROR_WITH_LOCATION("Unknown texture encoding.");
+        }
+    }
     return luisa::make_unique<ImageTextureInstance>(pipeline, this, tex_id);
+}
+
+void ImageTexture::_generate_mipmaps_gamma(Pipeline &pipeline, CommandBuffer &command_buffer, Image<float> &image) const noexcept {
+    // TODO
+}
+
+void ImageTexture::_generate_mipmaps_linear(Pipeline &pipeline, CommandBuffer &command_buffer, Image<float> &image) const noexcept {
+    // TODO
+}
+
+void ImageTexture::_generate_mipmaps_sRGB(Pipeline &pipeline, CommandBuffer &command_buffer, Image<float> &image) const noexcept {
+    // TODO
 }
 
 }// namespace luisa::render

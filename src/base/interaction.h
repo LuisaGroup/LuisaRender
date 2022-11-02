@@ -28,6 +28,19 @@ struct ShadingAttribute {
     Float area;
 };
 
+class RayDifferential {
+
+private:
+    Var<Ray> _ray;
+    Float3 _rx_origin;
+    Float3 _ry_origin;
+    Float3 _rx_direction;
+    Float3 _ry_direction;
+
+public:
+
+};
+
 class Interaction {
 
 private:

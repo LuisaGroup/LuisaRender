@@ -44,7 +44,7 @@ public:
     private:
         // generate ray in camera space, should not consider _filter or _transform
         [[nodiscard]] virtual Sample _generate_ray_in_camera_space(
-            Sampler::Instance &sampler, Expr<float2> pixel, Expr<float> time) const noexcept = 0;
+            Expr<float2> pixel, Expr<float2> u_lens, Expr<float> time) const noexcept = 0;
 
     public:
         Instance(Pipeline &pipeline, CommandBuffer &command_buffer, const Camera *camera) noexcept;
@@ -93,7 +93,7 @@ public:
     [[nodiscard]] auto shutter_samples() const noexcept -> luisa::vector<ShutterSample>;
     [[nodiscard]] auto spp() const noexcept { return _spp; }
     [[nodiscard]] auto file() const noexcept { return _file; }
-    [[nodiscard]] auto clip_plane() const noexcept { return _clip_plane; }
+    [[nodiscard]] virtual bool requires_lens_sampling() const noexcept = 0;
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
 };
