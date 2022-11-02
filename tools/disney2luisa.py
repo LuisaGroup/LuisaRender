@@ -6,9 +6,6 @@ import json
 
 
 def convert_camera(camera: dict) -> (str, dict):
-    resolution_ratio = camera['ratio']
-    name = camera['name']
-    fov = camera['fov']
     position = glm.vec3(camera['eye'])
     look_at = glm.vec3(camera['look'])
     front = glm.normalize(look_at - position)
@@ -21,7 +18,7 @@ def convert_camera(camera: dict) -> (str, dict):
             'position': list(position),
             'front': list(front),
             'up': list(up),
-            'fov': fov,
+            'fov': camera['fov'],
             'spp': 1,
             'film': {
                 'type': 'Film',
@@ -29,7 +26,7 @@ def convert_camera(camera: dict) -> (str, dict):
                 'prop': {
                     'resolution': [
                         1024,
-                        int(1024 / resolution_ratio)
+                        int(1024 / camera['ratio'])
                     ],
                     'exposure': 0,
                 }
@@ -45,7 +42,7 @@ def convert_camera(camera: dict) -> (str, dict):
         }
     }
 
-    return name, camera_dict
+    return camera['name'], camera_dict
 
 
 def convert_light(light: dict, name: str) -> (str, dict):
@@ -55,8 +52,6 @@ def convert_light(light: dict, name: str) -> (str, dict):
     light_dict = {}
 
     if light['type'] == 'quad':
-        height = light['height']
-        width = light['width']
         light_dict = {
             'type': 'Shape',
             'impl': 'Mesh',
@@ -75,7 +70,7 @@ def convert_light(light: dict, name: str) -> (str, dict):
                                 'type': 'Transform',
                                 'impl': 'SRT',
                                 'prop': {
-                                    'scale': [width / 2, height / 2, 1],
+                                    'scale': [light['width'] / 2, light['height'] / 2, 1],
                                 }
                             },
                             {
@@ -84,7 +79,7 @@ def convert_light(light: dict, name: str) -> (str, dict):
                                 'prop': {
                                     'm': transform,
                                 }
-                            }
+                            },
                         ]
                     }
                 },
@@ -101,6 +96,43 @@ def convert_light(light: dict, name: str) -> (str, dict):
                         }
                     }
                 }
+            }
+        }
+    elif light['type'] == 'dome':
+        light_dict = {
+            'type': 'Environment',
+            'impl': 'Spherical',
+            'prop': {
+                'emission': {
+                    'type': 'Texture',
+                    'impl': 'Image',
+                    'prop': {
+                        'file': light['envmapCamera'],
+                    }
+                },
+                'transform': {
+                    'type': 'Transform',
+                    'impl': 'Stack',
+                    'prop': {
+                        'transforms': [
+                            {
+                                'type': 'Transform',
+                                'impl': 'SRT',
+                                'prop': {
+                                    'scale': [-1, 1, 1],
+                                    'rotate': [-1, 0, 0, 90],
+                                }
+                            },
+                            {
+                                'type': 'Transform',
+                                'impl': 'SRT',
+                                'prop': {
+                                    'rotate': [0, 0, 1, 65],
+                                }
+                            },
+                        ]
+                    }
+                },
             }
         }
     else:
