@@ -6,8 +6,9 @@ import json
 import numpy as np
 import re
 
+shape2material = {}
+re_shape2material = {}
 material_map = {}
-re_material_map = {}
 
 
 def check_path(input_path: Path, output_path: Path):
@@ -154,7 +155,7 @@ def convert_light(light: dict, name: str) -> (str, dict):
     return name, light_dict
 
 
-def convert_material(material: dict, name: str) -> (str, dict):
+def convert_material(material: dict, name: str, geo_name: str) -> (str, dict):
     if name == 'hidden':
         material_dict = {
             'type': 'Surface',
@@ -185,14 +186,28 @@ def convert_material(material: dict, name: str) -> (str, dict):
             'impl': 'Disney',
             'prop': prop
         }
+    name = f'{geo_name}_{name}'
 
     assignment = material['assignment']
     for shape in assignment:
         if '*' in shape:
+            shape2material_geo = re_shape2material[geo_name]
             shape = shape.replace('*', '[0-9a-zA-Z_]*')
-            re_material_map[shape] = name
+            shape = f'^{shape}$'
         else:
-            material_map[shape] = name
+            shape2material_geo = shape2material[geo_name]
+        mateial_map_geo = material_map[geo_name]
+
+        name_existed = shape2material_geo.get(shape, name)
+        if name_existed != name and mateial_map_geo[name_existed] != material_dict:
+            err = f'Material of shape "{shape}" already specified, ' \
+                  f'"{shape2material_geo[shape]}" -> "{name}"'
+            print(mateial_map_geo[name_existed])
+            print(material_dict)
+            raise ValueError(err)
+
+        shape2material_geo[shape] = name
+        mateial_map_geo[name] = material_dict
 
     return name, material_dict
 
@@ -247,6 +262,11 @@ f -4 -3 -2 -1
 
     # geometries
     for geo_name in geo_names:
+        material_map[geo_name] = {}
+        shape2material[geo_name] = {}
+        re_shape2material[geo_name] = {}
+
+    for geo_name in geo_names:
         path_in = input_path / 'json' / geo_name
         path_out = output_path / 'json' / geo_name
         check_path(path_in, path_out)
@@ -257,11 +277,15 @@ f -4 -3 -2 -1
             materials = json.load(f)
         materials_dict = {}
         for name, material in materials.items():
-            name, material_dict = convert_material(material, name)
+            name, material_dict = convert_material(material, name, geo_name)
             material_dict = {name: material_dict}
             materials_dict.update(material_dict)
         with open(path_out / 'materials.json', 'w') as f:
             json.dump(materials_dict, f, indent=2)
+
+    json.dump(shape2material, open(output_path / 'shape2material.json', 'w'), indent=2)
+    json.dump(re_shape2material, open(output_path / 're_shape2material.json', 'w'), indent=2)
+    json.dump(material_map, open(output_path / 'material_map.json', 'w'), indent=2)
 
 
 if __name__ == '__main__':
