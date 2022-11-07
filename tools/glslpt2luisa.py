@@ -274,6 +274,13 @@ def do_conversion(scene_name, nodes):
                     }
                 elif k != "name":
                     print(f"Unrecognized material property: {k}")
+            if "roughness" not in surface["prop"]:
+                surface["prop"]["roughness"] = {
+                    "impl": "Constant",
+                    "prop": {
+                        "v": 1
+                    }
+                }
             surfaces[name] = surface
         elif tag == "light":
             assert prop["type"][0] == "quad"

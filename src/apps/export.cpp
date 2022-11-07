@@ -524,7 +524,7 @@ int main(int argc, char *argv[]) {
             {"prop",
              {{"fov", luisa::degrees(vertical_fov)},
               {"spp", 256u},
-              {"near_plane", camera->mClipPlaneNear},
+              {"clip", camera->mClipPlaneNear},
               {"file", luisa::format("render-view-{:02}.exr", cameras.size())},
               {"film",
                {{"impl", "Color"},
