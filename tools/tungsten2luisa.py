@@ -319,9 +319,6 @@ def convert_camera(out_file, camera: dict, spp):
     up = glm.vec3(transform["up"])
     print(f'''
 Camera camera : Pinhole {{
-  position {{ {position.x}, {position.y}, {position.z} }}
-  front {{ {front.x}, {front.y}, {front.z} }}
-  up {{ {up.x}, {up.y}, {up.z} }}
   fov {{ {fov} }}
   spp {{ {spp} }}
   filter : Gaussian {{
@@ -331,6 +328,11 @@ Camera camera : Pinhole {{
     resolution {{ {int(resolution.x)}, {int(resolution.y)} }}
   }}
   file {{ "render.exr" }}
+  transform : View {{
+    position {{ {position.x}, {position.y}, {position.z} }}
+    front {{ {front.x}, {front.y}, {front.z} }}
+    up {{ {up.x}, {up.y}, {up.z} }}
+  }}
 }}''', file=out_file)
 
 

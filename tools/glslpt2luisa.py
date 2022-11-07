@@ -325,9 +325,14 @@ def do_conversion(scene_name, nodes):
             camera = {
                 "impl": "Pinhole",
                 "prop": {
-                    "position": position,
-                    "front": front,
-                    "fov": fov
+                    "fov": fov,
+                    "transform": {
+                        "impl": "View",
+                        "prop": {
+                            "position": position,
+                            "front": front
+                        }
+                    }
                 }
             }
             render["cameras"].append(camera)

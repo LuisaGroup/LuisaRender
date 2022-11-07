@@ -522,10 +522,7 @@ int main(int argc, char *argv[]) {
             {"type", "Camera"},
             {"impl", "Pinhole"},
             {"prop",
-             {{"position", {position.x, position.y, position.z}},
-              {"front", {front.x, front.y, front.z}},
-              {"up", {camera->mUp.x, camera->mUp.y, camera->mUp.z}},
-              {"fov", luisa::degrees(vertical_fov)},
+             {{"fov", luisa::degrees(vertical_fov)},
               {"spp", 256u},
               {"near_plane", camera->mClipPlaneNear},
               {"file", luisa::format("render-view-{:02}.exr", cameras.size())},
@@ -533,7 +530,13 @@ int main(int argc, char *argv[]) {
                {{"impl", "Color"},
                 {"prop",
                  {{"resolution", {1920, height}},
-                  {"filter", {{"impl", "Gaussian"}}}}}}}}}};
+                  {"filter", {{"impl", "Gaussian"}}}}}}},
+              {"transform",
+               {{"impl", "View"},
+                {"prop",
+                 {{"position", {position.x, position.y, position.z}},
+                  {"front", {front.x, front.y, front.z}},
+                  {"up", {camera->mUp.x, camera->mUp.y, camera->mUp.z}}}}}}}}};
         cameras.emplace_back(luisa::format("@{}", name));
     }
     // create default camera if non-existent
@@ -547,17 +550,20 @@ int main(int argc, char *argv[]) {
             {"type", "Camera"},
             {"impl", "Pinhole"},
             {"prop",
-             {{"position", {position.x, position.y, position.z}},
-              {"front", {0, 0, -1}},
-              {"up", {0, 1, 0}},
-              {"fov", 50},
+             {{"fov", 50},
               {"spp", 256u},
               {"file", "render.exr"},
               {"film",
                {{"impl", "Color"},
                 {"prop",
                  {{"resolution", {1920, 1080}},
-                  {"filter", {{"impl", "Gaussian"}}}}}}}}}};
+                  {"filter", {{"impl", "Gaussian"}}}}}}},
+              {"transform",
+               {{"impl", "View"},
+                {"prop",
+                 {{"position", {position.x, position.y, position.z}},
+                  {"front", {0, 0, -1}},
+                  {"up", {0, 1, 0}}}}}}}}};
         cameras.emplace_back(luisa::format("@{}", name));
     }
     scene_configs["import"] = {"lr_exported_materials.json", "lr_exported_geometry.json"};

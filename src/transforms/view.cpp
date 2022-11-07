@@ -17,7 +17,10 @@ private:
 public:
     ViewTransform(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Transform{scene, desc},
-          _origin{desc->property_float3("origin")} {
+          _origin{desc->property_float3_or_default(
+              "origin", lazy_construct([desc] {
+                  return desc->property_float3_or_default("position");
+              }))} {
         auto front = desc->property_float3_or_default("front", make_float3(0.0f, 0.0f, -1.0f));
         auto up = desc->property_float3_or_default("up", make_float3(0.0f, 1.0f, 0.0f));
         _w = normalize(-front);

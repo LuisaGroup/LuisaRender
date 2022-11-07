@@ -12,15 +12,17 @@ def convert_camera(file, scene):
     up = glm.normalize(camera["up"])
     fov = camera["fieldofview"]
     print(f"""Camera camera : Pinhole {{
-  position {{ {position.x}, {position.y}, {position.z} }}
-  front {{ {front.x}, {front.y}, {front.z} }}
-  up {{ {up.x}, {up.y}, {up.z} }}
   fov {{ {fov} }}
   filter : Gaussian {{
     radius {{ 1 }}
   }}
   film : Color {{}}
   spp {{ 1024 }}
+  transform : View {{
+    position {{ {position.x}, {position.y}, {position.z} }}
+    front {{ {front.x}, {front.y}, {front.z} }}
+    up {{ {up.x}, {up.y}, {up.z} }}
+  }}
 }}
 """, file=file)
 
