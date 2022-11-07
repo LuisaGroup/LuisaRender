@@ -77,18 +77,19 @@ void NormalVisualizerInstance::_render_one_camera(
     auto render = pipeline().device().compile<2>([&](UInt frame_index, Float time, Float shutter_weight) noexcept {
         auto pixel_id = dispatch_id().xy();
         sampler()->start(pixel_id, frame_index);
-        auto [ray, _, camera_weight] = camera->generate_ray(*sampler(), pixel_id, time);
+        auto cs = camera->generate_ray(*sampler(), pixel_id, time);
         auto swl = pipeline().spectrum()->sample(sampler()->generate_1d());
-        auto path_weight = camera_weight;
-        auto it = pipeline().geometry()->intersect(ray);
+        auto path_weight = cs.weight;
+        auto it = pipeline().geometry()->intersect(cs.ray);
         auto color = def(make_float3(0.f));
-        auto wo = -ray->direction();
+        auto wo = -cs.ray->direction();
         $if(it->valid()) {
             pipeline().surfaces().dispatch(it->shape()->surface_tag(), [&](auto surface) noexcept {
                 auto closure = surface->closure(*it, swl, 1.f, time);
                 color = closure->it().shading().n() * .5f + .5f;
             });
         };
+//        color = cs.ray->origin();
         camera->film()->accumulate(pixel_id, shutter_weight * path_weight * color);
     });
     auto shutter_samples = camera->node()->shutter_samples();

@@ -39,9 +39,7 @@ public:
         auto key = luisa::hash64(abs_path, luisa::hash64(subdiv_level));
 
         std::scoped_lock lock{mutex};
-        if (auto m = loaded_meshes.at(key)) {
-            return *m;
-        }
+        if (auto m = loaded_meshes.at(key)) { return *m; }
 
         auto future = ThreadPool::global().async([path = std::move(path), subdiv_level, flip_uv, drop_normal] {
             Clock clock;

@@ -5,9 +5,7 @@
 #include <random>
 
 #include <base/scene.h>
-#include <base/film.h>
 #include <base/filter.h>
-#include <base/transform.h>
 #include <sdl/scene_node_desc.h>
 #include <base/camera.h>
 #include <base/pipeline.h>
@@ -26,15 +24,7 @@ Camera::Camera(Scene *scene, const SceneNodeDesc *desc) noexcept
                   "shutter_span", 0.0f));
           }))},
       _shutter_samples{desc->property_uint_or_default("shutter_samples", 0u)},// 0 means default
-      _spp{desc->property_uint_or_default("spp", 1024u)},
-      _clip_plane{desc->property_float2_or_default(
-          "clip_plane", lazy_construct([desc] {
-              return make_float2(desc->property_float_or_default("clip_plane", 0.f), 1e10f);
-          }))} {
-    _clip_plane = clamp(_clip_plane, 0.f, 1e10f);
-    if (_clip_plane.x > _clip_plane.y) {
-        std::swap(_clip_plane.x, _clip_plane.y);
-    }
+      _spp{desc->property_uint_or_default("spp", 1024u)} {
 
     if (_shutter_span.y < _shutter_span.x) [[unlikely]] {
         LUISA_ERROR(
@@ -190,7 +180,7 @@ auto Camera::shutter_samples() const noexcept -> vector<ShutterSample> {
 }
 
 Camera::Instance::Instance(Pipeline &pipeline, CommandBuffer &command_buffer, const Camera *camera) noexcept
-    : _pipeline{pipeline}, _camera{camera},
+    : _pipeline{&pipeline}, _camera{camera},
       _film{camera->film()->build(pipeline, command_buffer)},
       _filter{pipeline.build_filter(command_buffer, camera->filter())} {
     pipeline.register_transform(camera->transform());
@@ -204,10 +194,9 @@ Camera::Sample Camera::Instance::generate_ray(
     auto sample = _generate_ray_in_camera_space(pixel, u_lens, time);
     sample.weight *= filter_weight;
     auto c2w = camera_to_world();
-    sample.ray->set_origin(make_float3(
-        c2w * make_float4(sample.ray->origin(), 1.0f)));
-    auto c2w_normal = transpose(inverse(make_float3x3(c2w)));
-    auto d = normalize(c2w_normal * sample.ray->direction());
+    auto o = make_float3(c2w * make_float4(sample.ray->origin(), 1.0f));
+    auto d = normalize(make_float3x3(c2w) * sample.ray->direction());
+    sample.ray->set_origin(o);
     sample.ray->set_direction(d);
     return sample;
 }

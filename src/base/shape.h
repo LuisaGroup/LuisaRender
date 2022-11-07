@@ -122,8 +122,7 @@ static_assert(sizeof(Shape::Handle) == 16u);
 
 // clang-format off
 
-LUISA_STRUCT(
-    luisa::render::Shape::Vertex,
+LUISA_STRUCT(luisa::render::Shape::Vertex,
     compressed_p, compressed_n, compressed_uv) {
 
     [[nodiscard]] static auto oct_decode(luisa::compute::Expr<luisa::uint> u) noexcept {
@@ -141,8 +140,7 @@ LUISA_STRUCT(
     [[nodiscard]] auto uv() const noexcept { return make_float2(compressed_uv[0], compressed_uv[1]); }
 };
 
-LUISA_STRUCT(
-    luisa::render::Shape::Handle,
+LUISA_STRUCT(luisa::render::Shape::Handle,
     buffer_base_and_properties,
     surface_tag_and_light_tag,
     triangle_buffer_size,

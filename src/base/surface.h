@@ -166,7 +166,7 @@ public:
             Expr<float> eta_i, Expr<float> time) const noexcept override {
             auto base = BaseInstance::closure(it, swl, eta_i, time);
             auto alpha = _opacity ? luisa::make_optional(_opacity->evaluate(it, swl, time).x) : luisa::nullopt;
-            return luisa::make_unique<Closure>(std::move(*dynamic_cast<BaseClosure *>(base.release())), std::move(alpha));
+            return luisa::make_unique<Closure>(std::move(dynamic_cast<BaseClosure &>(*base)), std::move(alpha));
         }
     };
 
@@ -185,7 +185,7 @@ protected:
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
         auto base = BaseSurface::_build(pipeline, command_buffer);
         return luisa::make_unique<Instance>(
-            std::move(*dynamic_cast<BaseInstance *>(base.release())),
+            std::move(dynamic_cast<BaseInstance &>(*base)),
             [this](auto &pipeline, auto &command_buffer) noexcept {
                 return pipeline.build_texture(command_buffer, _opacity);
             }(pipeline, command_buffer));
@@ -236,7 +236,7 @@ protected:
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
         auto base = BaseSurface::_build(pipeline, command_buffer);
         return luisa::make_unique<Instance>(
-            std::move(*dynamic_cast<BaseInstance *>(base.release())),
+            std::move(dynamic_cast<BaseInstance &>(*base)),
             [this](auto &pipeline, auto &command_buffer) noexcept {
                 return pipeline.build_texture(command_buffer, _normal_map);
             }(pipeline, command_buffer),
@@ -285,8 +285,7 @@ protected:
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
         auto base = BaseSurface::_build(pipeline, command_buffer);
         return luisa::make_unique<Instance>(
-            std::move(*dynamic_cast<BaseInstance *>(base.release())),
-            _two_sided);
+            std::move(dynamic_cast<BaseInstance &>(*base)), _two_sided);
     }
     [[nodiscard]] uint properties() const noexcept override {
         auto p = BaseSurface::properties();
