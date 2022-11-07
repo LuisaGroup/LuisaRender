@@ -304,6 +304,8 @@ def do_conversion(scene_name, nodes):
             target = None
             fov = None
             matrix = None
+            lens_diameter = 0.001
+            focus_distance = None
             for k, v in prop.items():
                 if k == "position":
                     position = [float(x) for x in v]
@@ -314,25 +316,42 @@ def do_conversion(scene_name, nodes):
                 elif k == "matrix":
                     # transpose the matrix
                     matrix = [[float(v[j * 4 + i]) for j in range(4)] for i in range(4)]
+                elif k == "aperture":
+                    lens_diameter = float(v[0])
+                elif k == "focaldist":
+                    focus_distance = float(v[0])
             assert matrix is not None or (position is not None and target is not None)
             assert fov is not None
+            focal_length = 18 / glm.tan(glm.radians(fov) / 2)
+            # hfov to vfov
+            fov = glm.degrees(2 * glm.atan(glm.tan(glm.radians(fov) / 2) * resolution[1] / resolution[0]))
+            aperture = focal_length / 100000 / lens_diameter
             if matrix is not None:
                 position = [x for x in matrix[3][:3]]
                 front = [x for x in matrix[2][:3]]
             else:
                 front = [x for x in glm.normalize(glm.vec3(target) - glm.vec3(position))]
-            # hfov to vfov
-            camera = {
-                "impl": "Pinhole",
-                "prop": {
-                    "fov": fov,
-                    "transform": {
-                        "impl": "View",
-                        "prop": {
-                            "position": position,
-                            "front": front
-                        }
+            if focus_distance:
+                camera = {
+                    "impl": "ThinLens",
+                    "prop": {
+                        "focal_length": focal_length,
+                        "focus_distance": focus_distance,
+                        "aperture": aperture
                     }
+                }
+            else:
+                camera = {
+                    "impl": "Pinhole",
+                    "prop": {
+                        "fov": fov
+                    }
+                }
+            camera["prop"]["transform"] = {
+                "impl": "View",
+                "prop": {
+                    "position": position,
+                    "front": front
                 }
             }
             render["cameras"].append(camera)
@@ -346,7 +365,7 @@ def do_conversion(scene_name, nodes):
         render["environment"]["prop"]["scale"] = env_scale
     if (r := max(*resolution)) < 1920:
         resolution = [int(round(x * 1920 / r)) for x in resolution]
-    for i, camera in enumerate(render["cameras"]):
+    for i, camera in enumerate(cc := render["cameras"]):
         camera["prop"]["film"] = {
             "impl": "Color",
             "prop": {
@@ -354,16 +373,14 @@ def do_conversion(scene_name, nodes):
                 "clamp": 64
             }
         }
-        camera["prop"]["file"] = f"{scene_name}-view-{i}.exr"
+        camera["prop"]["file"] = f"{scene_name}-view-{i}.exr" if len(cc) > 1 else f"{scene_name}.exr"
         camera["prop"]["filter"] = {
             "impl": "Gaussian",
             "prop": {
-                "radius": glm.clamp(0.5 * round(min(*resolution) / 1024 * 2), 1, 3)
+                "radius": glm.clamp(0.5 * round(min(*resolution) / 1024 * 3), 1, 3)
             }
         }
         camera["prop"]["spp"] = spp
-        hfov = camera["prop"]["fov"]
-        camera["prop"]["fov"] = glm.degrees(2 * glm.atan(glm.tan(glm.radians(hfov) / 2) * resolution[1] / resolution[0]))
     scene = {"render": render}
     for name, mesh in meshes.items():
         scene[f"Mesh:{name}"] = mesh

@@ -54,8 +54,10 @@ public:
     [[nodiscard]] Camera::Sample _generate_ray_in_camera_space(
         Expr<float2> pixel, Expr<float2> /* u_lens */, Expr<float> /* time */) const noexcept override {
         auto data = _device_data.read(0u);
-        auto p = (data.resolution - pixel * 2.0f) / data.resolution.y * data.scale;
-        return Camera::Sample{make_ray(make_float3(p, 0.f), make_float3(0.f, 0.f, -1.f)), pixel, 1.0f};
+        auto p = (pixel * 2.0f - data.resolution) / data.resolution.y * data.scale;
+        return Camera::Sample{make_ray(make_float3(p.x, -p.y, 0.f),
+                                       make_float3(0.f, 0.f, -1.f)),
+                              pixel, 1.0f};
     }
 };
 
