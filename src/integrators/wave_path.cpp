@@ -508,11 +508,6 @@ void WavefrontPathTracingInstance::_render_one_camera(
     accumulate_shader.wait();
     auto integrator_shader_compilation_time = clock_compile.toc();
     LUISA_INFO("Integrator shader compile in {} ms.", integrator_shader_compilation_time);
-    {
-        std::ofstream file{"results.txt", std::ios::app};
-        file << "Shader compile time = " << integrator_shader_compilation_time << " ms" << std::endl;
-    }
-
 
     LUISA_INFO("Rendering started.");
     // create path states

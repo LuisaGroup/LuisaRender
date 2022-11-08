@@ -305,10 +305,6 @@ void MegakernelPathTracingInstance::_render_one_camera(
     auto render = pipeline.device().compile(render_kernel);
     auto integrator_shader_compilation_time = clock_compile.toc();
     LUISA_INFO("Integrator shader compile in {} ms.", integrator_shader_compilation_time);
-    {
-        std::ofstream file{"results.txt", std::ios::app};
-        file << "Shader compile time = " << integrator_shader_compilation_time << " ms" << std::endl;
-    }
     auto shutter_samples = camera->node()->shutter_samples();
     command_buffer << synchronize();
 
