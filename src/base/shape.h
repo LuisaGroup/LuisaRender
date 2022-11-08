@@ -6,7 +6,7 @@
 
 #include <rtx/mesh.h>
 #include <util/half.h>
-#include <util/imageio.h>
+#include <util/vertex.h>
 #include <base/scene_node.h>
 
 namespace luisa::render {
@@ -25,7 +25,6 @@ class Shape : public SceneNode {
 
 public:
     class Handle;
-    class Vertex;
 
 public:
     static constexpr auto property_flag_has_normal = 1u << 0u;
@@ -95,30 +94,6 @@ public:
     [[nodiscard]] bool visible() const noexcept override { return _visible; }
 };
 
-struct alignas(16) Shape::Vertex {
-
-    std::array<float, 3> compressed_p;
-    std::array<float, 3> compressed_n;
-    std::array<float, 2> compressed_uv;
-
-    [[nodiscard]] static auto oct_encode(float3 n) noexcept {
-        constexpr auto oct_wrap = [](float2 v) noexcept {
-            return (1.0f - abs(v.yx())) * select(make_float2(-1.0f), make_float2(1.0f), v >= 0.0f);
-        };
-        auto p = n.xy() * (1.0f / (std::abs(n.x) + std::abs(n.y) + std::abs(n.z)));
-        p = n.z >= 0.0f ? p : oct_wrap(p);// in [-1, 1]
-        auto u = make_uint2(clamp(round((p * 0.5f + 0.5f) * 65535.0f), 0.0f, 65535.0f));
-        return u.x | (u.y << 16u);
-    };
-
-    [[nodiscard]] static auto encode(float3 position, float3 normal, float2 uv) noexcept {
-        return Shape::Vertex{
-            .compressed_p = {position.x, position.y, position.z},
-            .compressed_n = {normal.x, normal.y, normal.z},
-            .compressed_uv = {uv.x, uv.y}};
-    };
-};
-
 struct alignas(16) Shape::Handle {
 
     static constexpr auto property_flag_bits = 10u;
@@ -163,31 +138,11 @@ struct alignas(16) Shape::Handle {
     }
 };
 
-static_assert(sizeof(Shape::Vertex) == 32u);
 static_assert(sizeof(Shape::Handle) == 16u);
 
 }// namespace luisa::render
 
 // clang-format off
-
-LUISA_STRUCT(luisa::render::Shape::Vertex,
-    compressed_p, compressed_n, compressed_uv) {
-
-    [[nodiscard]] static auto oct_decode(luisa::compute::Expr<luisa::uint> u) noexcept {
-        using namespace luisa::compute;
-        auto p = make_float2(
-            cast<float>((u & 0xffffu) * (1.0f / 65535.0f)),
-            cast<float>((u >> 16u) * (1.0f / 65535.0f)));
-        p = p * 2.0f - 1.0f;// map to [-1, 1]
-        auto n = make_float3(p, 1.0f - abs(p.x) - abs(p.y));
-        auto t = saturate(-n.z);
-        return normalize(make_float3(n.xy() + select(t, -t, n.xy() >= 0.0f), n.z));
-    }
-    [[nodiscard]] auto position() const noexcept { return make_float3(compressed_p[0], compressed_p[1], compressed_p[2]); }
-    [[nodiscard]] auto normal() const noexcept { return make_float3(compressed_n[0], compressed_n[1], compressed_n[2]); }
-    [[nodiscard]] auto uv() const noexcept { return make_float2(compressed_uv[0], compressed_uv[1]); }
-};
-
 LUISA_STRUCT(luisa::render::Shape::Handle,
     buffer_base_and_properties,
     surface_tag_and_light_tag,
@@ -220,5 +175,4 @@ public:
     [[nodiscard]] auto shadow_terminator_factor() const noexcept { return _decode_fixed_point(shadow_term_and_intersection_offset >> 16u); }
     [[nodiscard]] auto intersection_offset_factor() const noexcept { return _decode_fixed_point(shadow_term_and_intersection_offset & 0xffffu); }
 };
-
 // clang-format on

@@ -24,17 +24,20 @@ struct SDVertex;
 struct SDVertex {
 
     float3 p;
+    float2 uv;
     SDFace *startFace{};
     SDVertex *child{};
     bool regular{};
     bool boundary{};
 
     // SDVertex Constructor
-    explicit SDVertex(float3 p = make_float3()) noexcept : p{p} {}
+    explicit SDVertex(Vertex v = {}) noexcept
+        : p{make_float3(v.compressed_p[0], v.compressed_p[1], v.compressed_p[2])},
+          uv{make_float2(v.compressed_uv[0], v.compressed_uv[1])} {}
 
     // SDVertex Methods
     [[nodiscard]] uint valence() noexcept;
-    void oneRing(float3 *p) noexcept;
+    void oneRing(float3 *pp, float2 *puv) noexcept;
 };
 
 struct SDFace {
@@ -88,8 +91,8 @@ struct SDEdgeHash {
 };
 
 // LoopSubdiv Local Declarations
-[[nodiscard]] static float3 weightOneRing(SDVertex *vert, float beta) noexcept;
-[[nodiscard]] static float3 weightBoundary(SDVertex *vert, float beta) noexcept;
+[[nodiscard]] static std::pair<float3, float2> weightOneRing(SDVertex *vert, float beta) noexcept;
+[[nodiscard]] static std::pair<float3, float2> weightBoundary(SDVertex *vert, float beta) noexcept;
 
 // LoopSubdiv Inline Functions
 [[nodiscard]] inline uint SDVertex::valence() noexcept {
@@ -117,23 +120,23 @@ struct SDEdgeHash {
 }
 
 // LoopSubdiv Function Definitions
-std::pair<luisa::vector<float3>, luisa::vector<Triangle>>
-loop_subdivide(luisa::span<const float3> positions,
+std::pair<luisa::vector<Vertex>, luisa::vector<Triangle>>
+loop_subdivide(luisa::span<const Vertex> vertices,
                luisa::span<const Triangle> triangles,
                uint level) noexcept {
 
     if (level == 0u) {
-        return std::make_pair(luisa::vector<float3>{positions.begin(), positions.end()},
+        return std::make_pair(luisa::vector<Vertex>{vertices.begin(), vertices.end()},
                               luisa::vector<Triangle>{triangles.begin(), triangles.end()});
     }
 
-    luisa::vector<SDVertex *> vertices;
+    luisa::vector<SDVertex *> vs;
     luisa::vector<SDFace *> faces;
     // Allocate _LoopSubdiv_ vertices and faces
-    auto verts = luisa::make_unique<SDVertex[]>(positions.size());
-    for (auto i = 0u; i < positions.size(); ++i) {
-        verts[i] = SDVertex(positions[i]);
-        vertices.emplace_back(&verts[i]);
+    auto verts = luisa::make_unique<SDVertex[]>(vertices.size());
+    for (auto i = 0u; i < vertices.size(); ++i) {
+        verts[i] = SDVertex{vertices[i]};
+        vs.emplace_back(&verts[i]);
     }
     auto nFaces = triangles.size();
     auto fs = luisa::make_unique<SDFace[]>(nFaces);
@@ -144,7 +147,7 @@ loop_subdivide(luisa::span<const float3> positions,
         auto f = faces[i];
         auto t = make_uint3(triangles[i].i0, triangles[i].i1, triangles[i].i2);
         for (auto j = 0u; j < 3u; j++) {
-            auto v = vertices[t[j]];
+            auto v = vs[t[j]];
             f->v[j] = v;
             v->startFace = f;
         }
@@ -175,8 +178,8 @@ loop_subdivide(luisa::span<const float3> positions,
     }
 
     // Finish vertex initialization
-    for (auto i = 0u; i < positions.size(); i++) {
-        auto v = vertices[i];
+    for (auto i = 0u; i < vertices.size(); i++) {
+        auto v = vs[i];
         auto f = v->startFace;
         do {
             f = f->nextFace(v);
@@ -188,7 +191,7 @@ loop_subdivide(luisa::span<const float3> positions,
 
     // Refine _LoopSubdiv_ into triangles
     auto f = faces;
-    auto v = vertices;
+    auto v = vs;
     Pool<SDVertex, false, false> vertexAllocator;
     Pool<SDFace, false, false> faceAllocator;
 
@@ -217,11 +220,11 @@ loop_subdivide(luisa::span<const float3> positions,
         for (auto vertex : v) {
             if (!vertex->boundary) {
                 // Apply one-ring rule for even vertex
-                vertex->child->p = weightOneRing(
-                    vertex, vertex->regular ? 1.f / 16.f : beta(vertex->valence()));
+                auto b = vertex->regular ? 1.f / 16.f : beta(vertex->valence());
+                std::tie(vertex->child->p, vertex->child->uv) = weightOneRing(vertex, b);
             } else {
                 // Apply boundary rule for even vertex
-                vertex->child->p = weightBoundary(vertex, 1.f / 8.f);
+                std::tie(vertex->child->p, vertex->child->uv) = weightBoundary(vertex, 1.f / 8.f);
             }
         }
 
@@ -235,20 +238,23 @@ loop_subdivide(luisa::span<const float3> positions,
                 if (vert == nullptr) {
                     // Create and initialize new odd vertex
                     vert = vertexAllocator.create();
-                    newVertices.push_back(vert);
+                    newVertices.emplace_back(vert);
                     vert->regular = true;
                     vert->boundary = (face->f[k] == nullptr);
                     vert->startFace = face->children[3u];
                     // Apply edge rules to compute new vertex position
                     if (vert->boundary) {
-                        vert->p = 0.5f * edge.v[0u]->p;
-                        vert->p += 0.5f * edge.v[1u]->p;
+                        vert->p = .5f * edge.v[0u]->p + .5f * edge.v[1u]->p;
+                        vert->uv = .5f * edge.v[0u]->uv + .5f * edge.v[1u]->uv;
                     } else {
-                        vert->p = 3.f / 8.f * edge.v[0u]->p;
-                        vert->p += 3.f / 8.f * edge.v[1u]->p;
-                        vert->p += 1.f / 8.f * face->otherVert(edge.v[0u], edge.v[1u])->p;
-                        vert->p +=
-                            1.f / 8.f * face->f[k]->otherVert(edge.v[0u], edge.v[1u])->p;
+                        vert->p = 3.f / 8.f * edge.v[0u]->p +
+                                  3.f / 8.f * edge.v[1u]->p +
+                                  1.f / 8.f * face->otherVert(edge.v[0u], edge.v[1u])->p +
+                                  1.f / 8.f * face->f[k]->otherVert(edge.v[0u], edge.v[1u])->p;
+                        vert->uv = 3.f / 8.f * edge.v[0u]->uv +
+                                   3.f / 8.f * edge.v[1u]->uv +
+                                   1.f / 8.f * face->otherVert(edge.v[0u], edge.v[1u])->uv +
+                                   1.f / 8.f * face->f[k]->otherVert(edge.v[0u], edge.v[1u])->uv;
                     }
                     edgeVerts[edge] = vert;
                 }
@@ -293,73 +299,131 @@ loop_subdivide(luisa::span<const float3> positions,
         }
 
         // Prepare for next level of subdivision
-        f = newFaces;
-        v = newVertices;
+        f = std::move(newFaces);
+        v = std::move(newVertices);
     }
 
     // Push vertices to limit surface
     luisa::vector<float3> pLimit(v.size());
+    luisa::vector<float2> uvLimit(v.size());
     for (auto i = 0u; i < v.size(); i++) {
-        pLimit[i] = v[i]->boundary ?
-                        weightBoundary(v[i], 1.f / 5.f) :
-                        weightOneRing(v[i], loopGamma(v[i]->valence()));
+        std::tie(pLimit[i], uvLimit[i]) =
+            v[i]->boundary ?
+                weightBoundary(v[i], 1.f / 5.f) :
+                weightOneRing(v[i], loopGamma(v[i]->valence()));
     }
     for (auto i = 0u; i < v.size(); i++) { v[i]->p = pLimit[i]; }
 
+    // Compute vertex tangents on limit surface
+    luisa::vector<float3> pRing(16u);
+    luisa::vector<float2> uvRing(16u);
+    luisa::vector<float3> nLimit(v.size());
+    for (auto i = 0u; i < v.size(); i++) {
+        auto S = make_float3();
+        auto T = make_float3();
+        auto vertex = v[i];
+        auto valence = vertex->valence();
+        if (valence > pRing.size()) {
+            pRing.resize(valence);
+            uvRing.resize(valence);
+        }
+        vertex->oneRing(pRing.data(), uvRing.data());
+        if (!vertex->boundary) {
+            // Compute tangents of interior face
+            for (auto j = 0u; j < valence; j++) {
+                S += std::cos(2.f * pi * static_cast<float>(j) / static_cast<float>(valence)) * pRing[j];
+                T += std::sin(2.f * pi * static_cast<float>(j) / static_cast<float>(valence)) * pRing[j];
+            }
+        } else {
+            // Compute tangents of boundary face
+            S = pRing[valence - 1u] - pRing[0u];
+            if (valence == 2u) {
+                T = pRing[0] + pRing[1u] - 2.f * vertex->p;
+            } else if (valence == 3u) {
+                T = pRing[1u] - vertex->p;
+            } else if (valence == 4u) {// regular
+                T = -1.f * pRing[0u] + 2.f * pRing[1u] + 2.f * pRing[2u] - 1.f * pRing[3] - 2.f * vertex->p;
+            } else {
+                auto theta = pi / float(valence - 1u);
+                T = std::sin(theta) * (pRing[0] + pRing[valence - 1u]);
+                for (auto k = 1u; k < valence - 1u; k++) {
+                    auto wt = (2.f * std::cos(theta) - 2.f) * std::sin(static_cast<float>(k) * theta);
+                    T += wt * pRing[k];
+                }
+                T = -T;
+            }
+        }
+        nLimit[i] = normalize(cross(T, S));
+    }
+
     // Create triangle mesh from subdivision mesh
+    luisa::vector<Vertex> vv(v.size());
     luisa::vector<Triangle> tris(f.size());
     luisa::unordered_map<SDVertex *, uint> usedVerts;
-    for (auto i = 0u; i < v.size(); i++) { usedVerts[v[i]] = i; }
+    for (auto i = 0u; i < v.size(); i++) {
+        usedVerts[v[i]] = i;
+        vv[i] = Vertex::encode(pLimit[i], nLimit[i], uvLimit[i]);
+    }
     for (auto i = 0u; i < f.size(); ++i) {
         tris[i] = {usedVerts[f[i]->v[0u]],
                    usedVerts[f[i]->v[1u]],
                    usedVerts[f[i]->v[2u]]};
     }
-    return std::make_pair(std::move(pLimit), std::move(tris));
+    return std::make_pair(std::move(vv), std::move(tris));
 }
 
-static float3 weightOneRing(SDVertex *vert, float beta) noexcept {
+static std::pair<float3, float2> weightOneRing(SDVertex *vert, float beta) noexcept {
     // Put _vert_ one-ring in _pRing_
     auto valence = vert->valence();
     luisa::fixed_vector<float3, 16u> pRing(valence);
-
-    vert->oneRing(pRing.data());
-    float3 p = (1.f - static_cast<float>(valence) * beta) * vert->p;
-    for (auto i = 0u; i < valence; i++) { p += beta * pRing[i]; }
-    return p;
+    luisa::fixed_vector<float2, 16u> uvRing(valence);
+    vert->oneRing(pRing.data(), uvRing.data());
+    auto p = (1.f - static_cast<float>(valence) * beta) * vert->p;
+    auto uv = (1.f - static_cast<float>(valence) * beta) * vert->uv;
+    for (auto i = 0u; i < valence; i++) {
+        p += beta * pRing[i];
+        uv += beta * uvRing[i];
+    }
+    return std::make_pair(p, uv);
 }
 
-void SDVertex::oneRing(float3 *p) noexcept {
+void SDVertex::oneRing(float3 *pp, float2 *puv) noexcept {
     if (!boundary) {
         // Get one-ring vertices for interior vertex
-        SDFace *face = startFace;
+        auto face = startFace;
         do {
-            *p++ = face->nextVert(this)->p;
+            *pp++ = face->nextVert(this)->p;
+            *puv++ = face->nextVert(this)->uv;
             face = face->nextFace(this);
         } while (face != startFace);
     } else {
         // Get one-ring vertices for boundary vertex
-        SDFace *face = startFace, *f2;
-        while ((f2 = face->nextFace(this)) != nullptr) {
-            face = f2;
-        }
-        *p++ = face->nextVert(this)->p;
+        auto face = startFace;
+        SDFace *f2{nullptr};
+        while ((f2 = face->nextFace(this)) != nullptr) { face = f2; }
+        *pp++ = face->nextVert(this)->p;
+        *puv++ = face->nextVert(this)->uv;
         do {
-            *p++ = face->prevVert(this)->p;
+            *pp++ = face->prevVert(this)->p;
+            *puv++ = face->prevVert(this)->uv;
             face = face->prevFace(this);
         } while (face != nullptr);
     }
 }
 
-static float3 weightBoundary(SDVertex *vert, float beta) noexcept {
+static std::pair<float3, float2> weightBoundary(SDVertex *vert, float beta) noexcept {
     // Put _vert_ one-ring in _pRing_
     auto valence = vert->valence();
     luisa::fixed_vector<float3, 16u> pRing(valence);
-    vert->oneRing(pRing.data());
-    float3 p = (1 - 2 * beta) * vert->p;
-    p += beta * pRing[0];
-    p += beta * pRing[valence - 1];
-    return p;
+    luisa::fixed_vector<float2, 16u> uvRing(valence);
+    vert->oneRing(pRing.data(), uvRing.data());
+    auto p = (1.f - 2.f * beta) * vert->p +
+             beta * pRing[0] +
+             beta * pRing[valence - 1];
+    auto uv = (1.f - 2.f * beta) * vert->uv +
+              beta * uvRing[0] +
+              beta * uvRing[valence - 1];
+    return std::make_pair(p, uv);
 }
 
 }// namespace luisa::render

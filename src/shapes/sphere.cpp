@@ -49,11 +49,11 @@ static constexpr std::array sphere_base_triangles{
 class SphereGeometry {
 
 private:
-    luisa::vector<Shape::Vertex> _vertices;
+    luisa::vector<Vertex> _vertices;
     luisa::vector<Triangle> _triangles;
 
 private:
-    SphereGeometry(luisa::vector<Shape::Vertex> vertices,
+    SphereGeometry(luisa::vector<Vertex> vertices,
                    luisa::vector<Triangle> triangles) noexcept
         : _vertices{std::move(vertices)}, _triangles{std::move(triangles)} {}
 
@@ -67,17 +67,22 @@ public:
         std::scoped_lock lock{mutex};
         if (auto g = cache.at(subdiv); g.valid()) { return g; }
         auto future = ThreadPool::global().async([subdiv] {
-            auto [positions, triangles] = loop_subdivide(
-                sphere_base_vertices, sphere_base_triangles, subdiv);
-            luisa::vector<Shape::Vertex> vertices(positions.size());
-            for (auto i = 0u; i < positions.size(); i++) {
+            std::array<Vertex, sphere_base_vertices.size()> base_vertices{};
+            for (auto i = 0u; i < sphere_base_vertices.size(); i++) {
+                base_vertices[i] = Vertex::encode(
+                    sphere_base_vertices[i], make_float3(), make_float2());
+            }
+            auto [vertices, triangles] = loop_subdivide(
+                base_vertices, sphere_base_triangles, subdiv);
+            for (auto &v : vertices) {
                 auto direction_to_uv = [](float3 w) noexcept {
                     auto theta = acos(w.y);
                     auto phi = atan2(w.x, w.z);
                     return fract(make_float2(.5f * inv_pi * phi, theta * inv_pi));
                 };
-                auto w = normalize(positions[i]);
-                vertices[i] = Shape::Vertex::encode(w, w, direction_to_uv(w));
+                auto p = v.compressed_p;
+                auto w = normalize(make_float3(p[0], p[1], p[2]));
+                v = Vertex::encode(w, w, direction_to_uv(w));
             }
             return SphereGeometry{std::move(vertices), std::move(triangles)};
         });

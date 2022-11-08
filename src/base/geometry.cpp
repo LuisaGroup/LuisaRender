@@ -47,7 +47,7 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
                     return mesh_iter->second;
                 }
                 // create mesh
-                auto vertex_buffer = _pipeline.create<Buffer<Shape::Vertex>>(vertices.size());
+                auto vertex_buffer = _pipeline.create<Buffer<Vertex>>(vertices.size());
                 auto triangle_buffer = _pipeline.create<Buffer<Triangle>>(triangles.size());
                 auto mesh = _pipeline.create<Mesh>(*vertex_buffer, *triangle_buffer, shape->build_hint());
                 command_buffer << vertex_buffer->copy_from(vertices.data())
@@ -234,9 +234,9 @@ ShadingAttribute Geometry::shading_point(const Var<Shape::Handle> &instance, con
                                          const Var<float3> &bary, const Var<float4x4> &shape_to_world,
                                          const Var<float3x3> &shape_to_world_normal) const noexcept {
     auto v_buffer = instance->vertex_buffer_id();
-    auto v0 = _pipeline.buffer<Shape::Vertex>(v_buffer).read(triangle.i0);
-    auto v1 = _pipeline.buffer<Shape::Vertex>(v_buffer).read(triangle.i1);
-    auto v2 = _pipeline.buffer<Shape::Vertex>(v_buffer).read(triangle.i2);
+    auto v0 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i0);
+    auto v1 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i1);
+    auto v2 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i2);
     auto p0 = make_float3(shape_to_world * make_float4(v0->position(), 1.f));
     auto p1 = make_float3(shape_to_world * make_float4(v1->position(), 1.f));
     auto p2 = make_float3(shape_to_world * make_float4(v2->position(), 1.f));

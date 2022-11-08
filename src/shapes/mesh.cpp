@@ -16,7 +16,7 @@ namespace luisa::render {
 class MeshLoader {
 
 private:
-    luisa::vector<Shape::Vertex> _vertices;
+    luisa::vector<Vertex> _vertices;
     luisa::vector<Triangle> _triangles;
     bool _has_uv{};
     bool _has_normal{};
@@ -115,7 +115,7 @@ public:
                 auto uv = loader._has_uv ?
                               make_float2(ai_tex_coords[i].x, ai_tex_coords[i].y) :
                               make_float2(0.f);
-                loader._vertices[i] = Shape::Vertex::encode(p, n, uv);
+                loader._vertices[i] = Vertex::encode(p, n, uv);
             }
             if (subdiv_level == 0u) {
                 auto ai_triangles = mesh->mFaces;

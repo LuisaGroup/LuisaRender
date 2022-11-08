@@ -252,7 +252,7 @@ def do_conversion(scene_name, nodes):
                         "impl": "Swizzle",
                         "prop": {
                             "base": t,
-                            "swizzle": 0
+                            "swizzle": 2
                         }
                     }
                     surface["prop"]["roughness"] = {

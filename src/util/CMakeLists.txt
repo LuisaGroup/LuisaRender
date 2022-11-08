@@ -16,7 +16,7 @@ add_library(luisa-render-util SHARED
         complex.h
         medium_tracker.cpp medium_tracker.h
         progress_bar.cpp progress_bar.h
-        loop_subdiv.cpp loop_subdiv.h)
+        loop_subdiv.cpp loop_subdiv.h vertex.h)
 target_link_libraries(luisa-render-util PUBLIC
         luisa::compute
         luisa-render-include
