@@ -54,13 +54,14 @@ public:
         return _geometry.valid() ? _geometry.get().second : _mesh->triangles();
     }
     [[nodiscard]] bool has_normal() const noexcept override { return true; }
-    [[nodiscard]] bool has_uv() const noexcept override { return true; }
-    [[nodiscard]] float shadow_terminator_factor() const noexcept override { return _mesh->shadow_terminator_factor(); }
-    [[nodiscard]] float intersection_offset_factor() const noexcept override { return _mesh->intersection_offset_factor(); }
+    [[nodiscard]] bool has_uv() const noexcept override { return _mesh->has_uv(); }
     [[nodiscard]] AccelUsageHint build_hint() const noexcept override { return _mesh->build_hint(); }
 };
 
-using LoopSubdivWrapper = VisibilityShapeWrapper<LoopSubdiv>;
+using LoopSubdivWrapper =
+    VisibilityShapeWrapper<
+        ShadowTerminatorShapeWrapper<
+            IntersectionOffsetShapeWrapper<LoopSubdiv>>>;
 
 }// namespace luisa::render
 
