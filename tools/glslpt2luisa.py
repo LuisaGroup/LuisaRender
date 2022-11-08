@@ -283,29 +283,63 @@ def do_conversion(scene_name, nodes):
                 }
             surfaces[name] = surface
         elif tag == "light":
-            assert prop["type"][0] == "quad"
-            p0 = glm.vec3([float(x) for x in prop["position"]])
-            p1 = glm.vec3([float(x) for x in prop["v1"]])
-            p3 = glm.vec3([float(x) for x in prop["v2"]])
-            p2 = p3 + p1 - p0
-            p = [p0.x, p0.y, p0.z, p1.x, p1.y, p1.z, p2.x, p2.y, p2.z, p3.x, p3.y, p3.z]
-            t = [0, 1, 2, 0, 2, 3]
-            render["shapes"].append({
-                "impl": "InlineMesh",
-                "prop": {
-                    "indices": t,
-                    "positions": p,
-                    "light": {
-                        "impl": "Diffuse",
-                        "prop": {
-                            "emission": {
-                                "impl": "Constant",
-                                "prop": {"v": [float(x) for x in prop["emission"]]}
+            assert prop["type"][0] == "quad" or prop["type"][0] == "sphere"
+            if prop["type"][0] == "quad":
+                p0 = glm.vec3([float(x) for x in prop["position"]])
+                p1 = glm.vec3([float(x) for x in prop["v1"]])
+                p3 = glm.vec3([float(x) for x in prop["v2"]])
+                p2 = p3 + p1 - p0
+                p = [p0.x, p0.y, p0.z, p1.x, p1.y, p1.z, p2.x, p2.y, p2.z, p3.x, p3.y, p3.z]
+                t = [0, 1, 2, 0, 2, 3]
+                render["shapes"].append({
+                    "impl": "InlineMesh",
+                    "prop": {
+                        "indices": t,
+                        "positions": p,
+                        "light": {
+                            "impl": "Diffuse",
+                            "prop": {
+                                "emission": {
+                                    "impl": "Constant",
+                                    "prop": {"v": [float(x) for x in prop["emission"]]}
+                                }
                             }
                         }
                     }
+                })
+            else:  # sphere
+                radius = float(prop["radius"][0])
+                position = [float(x) for x in prop["position"]]
+                emission = [float(x) for x in prop["emission"]]
+                meshes["luisa-render-sphere"] = {
+                    "type": "Shape",
+                    "impl": "Sphere",
+                    "prop": {
+                        "subdivision": 4
+                    }
                 }
-            })
+                render["shapes"].append({
+                    "impl": "Instance",
+                    "prop": {
+                        "shape": "@Mesh:luisa-render-sphere",
+                        "transform": {
+                            "impl": "SRT",
+                            "prop": {
+                                "scale": radius,
+                                "translate": position
+                            }
+                        },
+                        "light": {
+                            "impl": "Diffuse",
+                            "prop": {
+                                "emission": {
+                                    "impl": "Constant",
+                                    "prop": {"v": emission}
+                                }
+                            }
+                        }
+                    }
+                })
         elif tag == "camera":
             position = None
             target = None
