@@ -38,11 +38,9 @@ public:
         Instance(const Pipeline &pipeline, const Texture *texture) noexcept
             : _pipeline{pipeline}, _texture{texture} {}
         virtual ~Instance() noexcept = default;
-        // clang-format off
         template<typename T = Texture>
             requires std::is_base_of_v<Texture, T>
         [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_texture); }
-        // clang-format on
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
         [[nodiscard]] virtual Float4 evaluate(
             const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;

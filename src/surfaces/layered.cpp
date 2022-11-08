@@ -6,6 +6,11 @@
 
 namespace luisa::render {
 
+// The following code is from PBRT-v4.
+// License: Apache 2.0
+// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
+// The pbrt source code is licensed under the Apache License, Version 2.0.
+
 class HGPhaseFunction {
 public:
     struct PhaseFunctionSample {
