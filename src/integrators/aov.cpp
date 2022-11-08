@@ -89,7 +89,6 @@ public:
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
     [[nodiscard]] auto noisy_count() const noexcept { return _noisy_count; }
-    [[nodiscard]] bool is_differentiable() const noexcept override { return false; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] auto dump_strategy() const noexcept { return _dump_strategy; }
     [[nodiscard]] auto is_component_enabled(luisa::string_view component) const noexcept {

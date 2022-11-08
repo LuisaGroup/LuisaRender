@@ -146,7 +146,7 @@ public:
     }
 };
 
-class Mesh final : public Shape {
+class Mesh : public Shape {
 
 private:
     std::shared_future<MeshLoader> _loader;
@@ -169,6 +169,11 @@ public:
     [[nodiscard]] bool has_uv() const noexcept override { return _loader.get().has_uv(); }
 };
 
+using MeshWrapper =
+    VisibilityShapeWrapper<
+        ShadowTerminatorShapeWrapper<
+            IntersectionOffsetShapeWrapper<Mesh>>>;
+
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::Mesh)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::MeshWrapper)

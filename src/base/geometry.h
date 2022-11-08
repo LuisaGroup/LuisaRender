@@ -31,13 +31,16 @@ public:
         uint buffer_id_base;
     };
 
-    struct MeshData {
+    struct alignas(16u) MeshData {
         Mesh *resource;
-        float shadow_term;
+        uint16_t shadow_term;
+        uint16_t intersection_offset;
         uint geometry_buffer_id_base : 30;
         bool has_normal : 1;
         bool has_uv : 1;
     };
+
+    static_assert(sizeof(MeshData) == 16u);
 
 private:
     Pipeline &_pipeline;

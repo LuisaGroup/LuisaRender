@@ -31,8 +31,6 @@ public:
     }
 
     [[nodiscard]] luisa::vector<const Integrator *> integrators() const noexcept { return _integrators; }
-
-    [[nodiscard]] bool is_differentiable() const noexcept override { return false; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(Pipeline &pipeline, CommandBuffer &cb) const noexcept override {
         return luisa::make_unique<GroupIntegratorInstance>(this, pipeline, cb);

@@ -9,7 +9,23 @@
 
 namespace luisa::render {
 
-class NormalVisualizer;
+class NormalVisualizer final : public Integrator {
+
+private:
+    bool _remap;
+    bool _shading;
+
+public:
+    NormalVisualizer(Scene *scene, const SceneNodeDesc *desc) noexcept
+        : Integrator{scene, desc},
+          _remap{desc->property_bool_or_default("remap", true)},
+          _shading{desc->property_bool_or_default("shading", true)} {}
+    [[nodiscard]] auto remap() const noexcept { return _remap; }
+    [[nodiscard]] auto shading() const noexcept { return _shading; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(
+        Pipeline &pipeline, CommandBuffer &cb) const noexcept override;
+};
 
 class NormalVisualizerInstance final : public Integrator::Instance {
 
@@ -23,17 +39,6 @@ public:
         const NormalVisualizer *integrator,
         Pipeline &pipeline, CommandBuffer &cb) noexcept;
     void render(Stream &stream) noexcept override;
-};
-
-class NormalVisualizer final : public Integrator {
-
-public:
-    NormalVisualizer(Scene *scene, const SceneNodeDesc *desc) noexcept : Integrator{scene, desc} {}
-    [[nodiscard]] bool is_differentiable() const noexcept override { return false; }
-    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(Pipeline &pipeline, CommandBuffer &cb) const noexcept override {
-        return luisa::make_unique<NormalVisualizerInstance>(this, pipeline, cb);
-    }
 };
 
 NormalVisualizerInstance::NormalVisualizerInstance(
@@ -81,16 +86,27 @@ void NormalVisualizerInstance::_render_one_camera(
         auto swl = pipeline().spectrum()->sample(sampler()->generate_1d());
         auto path_weight = cs.weight;
         auto it = pipeline().geometry()->intersect(cs.ray);
-        auto color = def(make_float3(0.f));
+        auto ns = def(make_float3(0.f));
         auto wo = -cs.ray->direction();
         $if(it->valid()) {
-            pipeline().surfaces().dispatch(it->shape()->surface_tag(), [&](auto surface) noexcept {
-                auto closure = surface->closure(*it, swl, 1.f, time);
-                color = closure->it().shading().n() * .5f + .5f;
-            });
+            if (node<NormalVisualizer>()->shading()) {
+                $if(it->shape()->has_surface()) {
+                    pipeline().surfaces().dispatch(it->shape()->surface_tag(), [&](auto surface) noexcept {
+                        auto closure = surface->closure(*it, swl, 1.f, time);
+                        ns = closure->it().shading().n();
+                    });
+                }
+                $else {
+                    ns = it->shading().n();
+                };
+            } else {
+                ns = it->ng();
+            }
+            if (node<NormalVisualizer>()->remap()) {
+                ns = ns * .5f + .5f;
+            }
         };
-//        color = cs.ray->origin();
-        camera->film()->accumulate(pixel_id, shutter_weight * path_weight * color);
+        camera->film()->accumulate(pixel_id, shutter_weight * path_weight * ns);
     });
     auto shutter_samples = camera->node()->shutter_samples();
     command_buffer << synchronize();
@@ -112,6 +128,11 @@ void NormalVisualizerInstance::_render_one_camera(
     }
     command_buffer << synchronize();
     LUISA_INFO("Rendering finished in {} ms.", clock.toc());
+}
+
+luisa::unique_ptr<Integrator::Instance> NormalVisualizer::build(
+    Pipeline &pipeline, CommandBuffer &cb) const noexcept {
+    return luisa::make_unique<NormalVisualizerInstance>(this, pipeline, cb);
 }
 
 }// namespace luisa::render
