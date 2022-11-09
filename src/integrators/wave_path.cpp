@@ -410,32 +410,29 @@ void WavefrontPathTracingInstance::_render_one_camera(
             auto pdf_bsdf = def(0.f);
             auto u_lobe = sampler()->generate_1d();
             auto u_bsdf = sampler()->generate_2d();
+            auto eta = def(1.f);
             auto eta_scale = def(1.f);
+            auto wo = -ray->direction();
+            auto surface_sample = Surface::Sample::zero(swl.dimension());
+            auto alpha_skip = def(false);
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
-
                 // create closure
                 auto closure = surface->closure(*it, swl, 1.f, time);
                 if (auto dispersive = closure->is_dispersive()) {
-                    $if (*dispersive) {
+                    $if(*dispersive) {
                         swl.terminate_secondary();
                         path_states.write_swl(path_id, swl);
                     };
                 }
 
                 // apply roughness map
-                auto alpha_skip = def(false);
                 if (auto o = closure->opacity()) {
                     auto opacity = saturate(*o);
                     alpha_skip = u_lobe >= opacity;
                     u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
                 }
 
-                $if(alpha_skip) {
-                    ray = it->spawn_ray(ray->direction());
-                    pdf_bsdf = 1e16f;
-                }
-                $else {
-                    auto wo = -ray->direction();
+                $if(!alpha_skip) {
 
                     // direct lighting
                     auto pdf_light = light_samples.read_pdf(queue_id);
@@ -448,20 +445,26 @@ void WavefrontPathTracingInstance::_render_one_camera(
                     };
 
                     // sample material
-                    auto sample = closure->sample(wo, u_lobe, u_bsdf);
-                    ray = it->spawn_ray(sample.wi);
-                    pdf_bsdf = sample.eval.pdf;
-                    auto w = ite(sample.eval.pdf > 0.0f, 1.f / sample.eval.pdf, 0.f);
-                    beta *= w * sample.eval.f;
-
-                    // apply eta scale
-                    auto eta = closure->eta().value_or(1.f);
-                    $switch (sample.event) {
-                        $case (Surface::event_enter) { eta_scale = sqr(eta); };
-                        $case (Surface::event_exit) { eta_scale = 1.f / sqr(eta); };
-                    };
+                    surface_sample = closure->sample(wo, u_lobe, u_bsdf);
+                    eta = closure->eta().value_or(1.f);
                 };
             });
+
+            $if(alpha_skip) {
+                ray = it->spawn_ray(ray->direction());
+                pdf_bsdf = 1e16f;
+            }
+            $else {
+                ray = it->spawn_ray(surface_sample.wi);
+                pdf_bsdf = surface_sample.eval.pdf;
+                auto w = ite(surface_sample.eval.pdf > 0.0f, 1.f / surface_sample.eval.pdf, 0.f);
+                beta *= w * surface_sample.eval.f;
+                $switch(surface_sample.event) {
+                    $case(Surface::event_enter) { eta_scale = sqr(eta); };
+                    $case(Surface::event_exit) { eta_scale = 1.f / sqr(eta); };
+                };
+            };
+
             $if(beta.any([](auto b) noexcept { return !isnan(b) & b > 0.f; })) {
                 auto rr_depth = node<WavefrontPathTracing>()->rr_depth();
                 auto rr_threshold = node<WavefrontPathTracing>()->rr_threshold();
