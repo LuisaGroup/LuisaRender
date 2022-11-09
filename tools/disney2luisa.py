@@ -180,9 +180,15 @@ def convert_camera(camera: dict) -> (str, dict):
         'type': 'Camera',
         'impl': 'Pinhole',
         'prop': {
-            'position': position.tolist(),
-            'front': front.tolist(),
-            'up': up.tolist(),
+            'transform': {
+                'type': 'Transform',
+                'impl': 'View',
+                'prop': {
+                    'position': position.tolist(),
+                    'front': front.tolist(),
+                    'up': up.tolist(),
+                }
+            },
             'fov': camera['fov'],
             'spp': 1,
             'film': {
@@ -196,7 +202,7 @@ def convert_camera(camera: dict) -> (str, dict):
                     'exposure': 0,
                 }
             },
-            'file': f'./outputs/{name}.exr',
+            'file': f'../../outputs/{name}.exr',
             'filter': {
                 'type': 'Filter',
                 'impl': 'Gaussian',
@@ -315,7 +321,6 @@ def convert_material(material: dict, name: str, geo_name: str) -> (str, dict):
                 'impl': 'Constant',
                 'prop': {
                     'v': value,
-                    'semantic': 'albedo',
                 }
             }
 
