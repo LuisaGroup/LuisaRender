@@ -447,7 +447,10 @@ void WavefrontPathTracingInstance::_render_one_camera(
                     eta = closure->eta().value_or(1.f);
                 };
             });
+            path_states.write_radiance(path_id, Li);
 
+            // prepare for the next bounce
+            auto terminated = def(false);
             $if(alpha_skip) {
                 ray = it->spawn_ray(ray->direction());
                 pdf_bsdf = 1e16f;
@@ -461,30 +464,30 @@ void WavefrontPathTracingInstance::_render_one_camera(
                     $case(Surface::event_enter) { eta_scale = sqr(eta); };
                     $case(Surface::event_exit) { eta_scale = 1.f / sqr(eta); };
                 };
-                $if(beta.any([](auto b) noexcept { return !isnan(b) & b > 0.f; })) {
+                beta = zero_if_any_nan(beta);
+                $if(beta.all([](auto b) noexcept { return b <= 0.f; })) {
+                    terminated = true;
+                }
+                $else {
                     auto rr_depth = node<WavefrontPathTracing>()->rr_depth();
                     auto rr_threshold = node<WavefrontPathTracing>()->rr_threshold();
                     // rr
                     auto q = max(beta.max() * eta_scale, 0.05f);
                     $if(trace_depth + 1u >= rr_depth & q < rr_threshold) {
-                        $if(sampler()->generate_1d() < q) {
-                            beta *= 1.f / q;
-                            auto out_queue_id = out_queue_size.atomic(0u).fetch_add(1u);
-                            out_queue.write(out_queue_id, path_id);
-                            out_rays.write(out_queue_id, ray);
-                        };
-                    }
-                    $else {
-                        auto out_queue_id = out_queue_size.atomic(0u).fetch_add(1u);
-                        out_queue.write(out_queue_id, path_id);
-                        out_rays.write(out_queue_id, ray);
+                        auto u = sampler()->generate_1d();
+                        terminated = u >= q;
+                        beta *= 1.f / q;
                     };
                 };
             };
-            sampler()->save_state(path_id);
-            path_states.write_radiance(path_id, Li);
-            path_states.write_beta(path_id, beta);
-            path_states.write_pdf_bsdf(path_id, pdf_bsdf);
+            $if(!terminated) {
+                auto out_queue_id = out_queue_size.atomic(0u).fetch_add(1u);
+                out_queue.write(out_queue_id, path_id);
+                out_rays.write(out_queue_id, ray);
+                sampler()->save_state(path_id);
+                path_states.write_beta(path_id, beta);
+                path_states.write_pdf_bsdf(path_id, pdf_bsdf);
+            };
         };
     });
 

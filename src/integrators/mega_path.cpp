@@ -287,7 +287,8 @@ void MegakernelPathTracingInstance::_render_one_camera(
                     $case(Surface::event_exit) { eta_scale = sqr(1.f / eta); };
                 };
                 // rr
-                $if(beta.all([](auto b) noexcept { return isnan(b) | b <= 0.f; })) { $break; };
+                beta = zero_if_any_nan(beta);
+                $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
                 auto rr_depth = pt->node<MegakernelPathTracing>()->rr_depth();
                 auto rr_threshold = pt->node<MegakernelPathTracing>()->rr_threshold();
                 auto q = max(beta.max() * eta_scale, .05f);
