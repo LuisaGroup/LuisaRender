@@ -2,7 +2,6 @@
 // Created by Mike Smith on 2022/1/10.
 //
 
-#include <util/imageio.h>
 #include <util/sampling.h>
 #include <base/pipeline.h>
 #include <base/integrator.h>

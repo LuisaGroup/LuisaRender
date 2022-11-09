@@ -3,8 +3,6 @@
 //
 
 #include <util/imageio.h>
-#include <luisa-compute.h>
-
 #include <util/medium_tracker.h>
 #include <util/progress_bar.h>
 #include <util/sampling.h>
