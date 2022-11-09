@@ -3,117 +3,53 @@
 //
 
 #include <util/imageio.h>
-#include <util/medium_tracker.h>
-#include <util/progress_bar.h>
 #include <util/sampling.h>
 #include <base/pipeline.h>
 #include <base/integrator.h>
-#include <base/display.h>
 
 namespace luisa::render {
 
 using namespace compute;
 
-class MegakernelPathTracing final : public Integrator {
+class MegakernelPathTracing final : public ProgressiveIntegrator {
 
 private:
     uint _max_depth;
     uint _rr_depth;
     float _rr_threshold;
-    uint _display_interval;
-    bool _display;
 
 public:
     MegakernelPathTracing(Scene *scene, const SceneNodeDesc *desc) noexcept
-        : Integrator{scene, desc},
+        : ProgressiveIntegrator{scene, desc},
           _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)},
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
-          _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
-          _display_interval{std::max(desc->property_uint_or_default("display_interval", 1u), 1u)},
-          _display{desc->property_bool_or_default("display")} {}
+          _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)} {}
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
-    [[nodiscard]] auto display_enabled() const noexcept { return _display; }
-    [[nodiscard]] auto display_interval() const noexcept { return _display_interval; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
-class MegakernelPathTracingInstance final : public Integrator::Instance {
-
-private:
-    luisa::unique_ptr<Display> _display;
-
-private:
-    void _render_one_camera(CommandBuffer &command_buffer, Camera::Instance *camera) noexcept;
+class MegakernelPathTracingInstance final : public ProgressiveIntegrator::Instance {
 
 public:
-    explicit MegakernelPathTracingInstance(const MegakernelPathTracing *node,
-                                           Pipeline &pipeline,
-                                           CommandBuffer &cmd_buffer) noexcept
-        : Integrator::Instance{pipeline, cmd_buffer, node} {
-        if (node->display_enabled()) {
-            auto first_film = pipeline.camera(0u)->film()->node();
-            _display = luisa::make_unique<Display>("Display");
+    using ProgressiveIntegrator::Instance::Instance;
+
+protected:
+    void _render_one_camera(CommandBuffer &command_buffer, Camera::Instance *camera) noexcept override {
+        if (!pipeline().has_lighting()) [[unlikely]] {
+            LUISA_WARNING_WITH_LOCATION(
+                "No lights in scene. Rendering aborted.");
+            return;
         }
+        Instance::_render_one_camera(command_buffer, camera);
     }
 
-    void render(Stream &stream) noexcept override {
-        auto command_buffer = stream.command_buffer();
-        for (auto i = 0u; i < pipeline().camera_count(); i++) {
-            auto camera = pipeline().camera(i);
-            auto resolution = camera->film()->node()->resolution();
-            auto pixel_count = resolution.x * resolution.y;
-            camera->film()->prepare(command_buffer);
-            if (_display) { _display->reset(command_buffer, camera->film()); }
-            _render_one_camera(command_buffer, camera);
-            while (_display && _display->idle(command_buffer)) {}
-            luisa::vector<float4> pixels(pixel_count);
-            camera->film()->download(command_buffer, pixels.data());
-            command_buffer << compute::synchronize();
-            camera->film()->release();
-            auto film_path = camera->node()->file();
-            save_image(film_path, reinterpret_cast<const float *>(pixels.data()), resolution);
-        }
-    }
-};
+    [[nodiscard]] Float3 Li(const Camera::Instance *camera, Expr<uint> frame_index,
+                            Expr<uint2> pixel_id, Expr<float> time) const noexcept override {
 
-luisa::unique_ptr<Integrator::Instance> MegakernelPathTracing::build(
-    Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
-    return luisa::make_unique<MegakernelPathTracingInstance>(
-        this, pipeline, command_buffer);
-}
-
-void MegakernelPathTracingInstance::_render_one_camera(
-    CommandBuffer &command_buffer, Camera::Instance *camera) noexcept {
-
-    auto spp = camera->node()->spp();
-    auto resolution = camera->film()->node()->resolution();
-    auto image_file = camera->node()->file();
-
-    if (!pipeline().has_lighting()) [[unlikely]] {
-        LUISA_WARNING_WITH_LOCATION(
-            "No lights in scene. Rendering aborted.");
-        return;
-    }
-
-    auto pixel_count = resolution.x * resolution.y;
-    sampler()->reset(command_buffer, resolution, pixel_count, spp);
-    command_buffer << synchronize();
-
-    LUISA_INFO(
-        "Rendering to '{}' of resolution {}x{} at {}spp.",
-        image_file.string(),
-        resolution.x, resolution.y, spp);
-
-    using namespace luisa::compute;
-
-    Kernel2D render_kernel = [&](UInt frame_index, Float time, Float shutter_weight) noexcept {
-        set_block_size(16u, 16u, 1u);
-
-        auto pixel_id = dispatch_id().xy();
         sampler()->start(pixel_id, frame_index);
         auto [camera_ray, _, camera_weight] = camera->generate_ray(*sampler(), pixel_id, time);
         auto spectrum = pipeline().spectrum();
@@ -221,47 +157,14 @@ void MegakernelPathTracingInstance::_render_one_camera(
                 };
             };
         };
-        camera->film()->accumulate(pixel_id, spectrum->srgb(swl, Li * shutter_weight));
-    };
-
-    Clock clock_compile;
-    auto render = pipeline().device().compile(render_kernel);
-    auto integrator_shader_compilation_time = clock_compile.toc();
-    LUISA_INFO("Integrator shader compile in {} ms.", integrator_shader_compilation_time);
-    auto shutter_samples = camera->node()->shutter_samples();
-    command_buffer << synchronize();
-
-    LUISA_INFO("Rendering started.");
-    Clock clock;
-    ProgressBar progress;
-    progress.update(0.0);
-    auto dispatch_count = 0u;
-    auto sample_id = 0u;
-    for (auto s : shutter_samples) {
-        pipeline().update(command_buffer, s.point.time);
-        for (auto i = 0u; i < s.spp; i++) {
-            command_buffer << render(sample_id++, s.point.time, s.point.weight)
-                                  .dispatch(resolution);
-            auto dispatches_per_commit =
-                _display && !_display->should_close() ?
-                    node<MegakernelPathTracing>()->display_interval() :
-                    32u;
-            if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
-                dispatch_count = 0u;
-                auto p = sample_id / static_cast<double>(spp);
-                if (_display && _display->update(command_buffer, sample_id)) {
-                    progress.update(p);
-                } else {
-                    command_buffer << [&progress, p] { progress.update(p); };
-                }
-            }
-        }
+        return spectrum->srgb(swl, Li);
     }
-    command_buffer << synchronize();
-    progress.done();
+};
 
-    auto render_time = clock.toc();
-    LUISA_INFO("Rendering finished in {} ms.", render_time);
+luisa::unique_ptr<Integrator::Instance> MegakernelPathTracing::build(
+    Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
+    return luisa::make_unique<MegakernelPathTracingInstance>(
+        pipeline, command_buffer, this);
 }
 
 }// namespace luisa::render

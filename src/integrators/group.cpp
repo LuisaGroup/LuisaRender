@@ -8,6 +8,8 @@ namespace luisa::render {
 class GroupIntegrator;
 
 class GroupIntegratorInstance final : public Integrator::Instance {
+
+private:
     luisa::vector<luisa::unique_ptr<Integrator::Instance>> _integrators;
 
 public:
@@ -48,8 +50,8 @@ GroupIntegratorInstance::GroupIntegratorInstance(
 }
 
 void GroupIntegratorInstance::render(Stream &stream) noexcept {
-    for (auto i = 0u; i < _integrators.size(); i++) {
-        _integrators[i]->render(stream);
+    for (auto &_integrator : _integrators) {
+        _integrator->render(stream);
     }
 }
 
