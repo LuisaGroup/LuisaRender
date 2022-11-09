@@ -9,8 +9,8 @@
 
 namespace luisa::render {
 
-Display::Display(const char *name, uint2 initial_resolution) noexcept
-    : _window{luisa::make_unique<Window>(name, initial_resolution)},
+Display::Display(luisa::string name) noexcept
+    : _name{std::move(name)},
       _tone_mapper{ToneMapper::UNCHARTED2},
       _exposure{0.f} {}
 
@@ -18,7 +18,7 @@ void Display::reset(CommandBuffer &command_buffer, const Film::Instance *film) n
     using namespace luisa::compute;
     auto &&device = film->pipeline().device();
     auto resolution = film->node()->resolution();
-    _window->set_size(resolution);
+    _window = luisa::make_unique<Window>(_name.c_str(), resolution);
     _pixels.resize(resolution.x * resolution.y);
     _converted = device.create_image<float>(PixelStorage::BYTE4, resolution);
     _convert = device.compile_async<1>([film, w = resolution.x, this](UInt tone_mapper, Float exposure) noexcept {
@@ -55,8 +55,11 @@ void Display::reset(CommandBuffer &command_buffer, const Film::Instance *film) n
     });
 }
 
-void Display::update(CommandBuffer &command_buffer, uint spp) noexcept {
-    if (_window->should_close()) { return; }
+bool Display::update(CommandBuffer &command_buffer, uint spp) noexcept {
+    if (should_close()) {
+        _window.reset();
+        return false;
+    }
     command_buffer << _convert.get()(luisa::to_underlying(_tone_mapper), _exposure)
                           .dispatch(_pixels.size())
                    << _converted.copy_to(_pixels.data())
@@ -84,12 +87,20 @@ void Display::update(CommandBuffer &command_buffer, uint spp) noexcept {
         ImGui::SliderFloat("Exposure", &_exposure, -10.f, 10.f, "%.1f");
         ImGui::End();
     });
+    return true;
 }
 
-void Display::idle() noexcept {
-    if (!_window->should_close()) {
-        _window->run_one_frame([] {});
+bool Display::idle() noexcept {
+    if (should_close()) {
+        _window.reset();
+        return false;
     }
+    _window->run_one_frame([] {});
+    return true;
+}
+
+bool Display::should_close() const noexcept {
+    return _window == nullptr || _window->should_close();
 }
 
 }// namespace luisa::render

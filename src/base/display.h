@@ -24,6 +24,7 @@ public:
     };
 
 private:
+    luisa::string _name;
     luisa::unique_ptr<Window> _window;
     Image<float> _converted;
     luisa::vector<std::array<uint8_t, 4u>> _pixels;
@@ -35,11 +36,11 @@ private:
     float _exposure{};
 
 public:
-    Display(const char *name, uint2 initial_resolution) noexcept;
+    explicit Display(luisa::string name) noexcept;
     void reset(CommandBuffer &command_buffer, const Film::Instance *film) noexcept;
-    [[nodiscard]] auto should_close() const noexcept { return _window->should_close(); }
-    void update(CommandBuffer &command_buffer, uint spp) noexcept;
-    void idle() noexcept;
+    [[nodiscard]] bool should_close() const noexcept;
+    bool update(CommandBuffer &command_buffer, uint spp) noexcept;
+    bool idle() noexcept;
 };
 
 }// namespace luisa::render

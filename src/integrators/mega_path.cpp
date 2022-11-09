@@ -54,11 +54,13 @@ private:
         Camera::Instance *camera) noexcept;
 
 public:
-    explicit MegakernelPathTracingInstance(const MegakernelPathTracing *node, Pipeline &pipeline, CommandBuffer &cmd_buffer) noexcept
+    explicit MegakernelPathTracingInstance(const MegakernelPathTracing *node,
+                                           Pipeline &pipeline,
+                                           CommandBuffer &cmd_buffer) noexcept
         : Integrator::Instance{pipeline, cmd_buffer, node} {
         if (node->display_enabled()) {
             auto first_film = pipeline.camera(0u)->film()->node();
-            _display = luisa::make_unique<Display>("Display", first_film->resolution());
+            _display = luisa::make_unique<Display>("Display");
         }
     }
 
@@ -79,7 +81,7 @@ public:
             auto film_path = camera->node()->file();
             save_image(film_path, reinterpret_cast<const float *>(pixels.data()), resolution);
         }
-        while (_display && !_display->should_close()) { _display->idle(); }
+        while (_display && _display->idle()) {}
     }
 };
 
@@ -239,19 +241,20 @@ void MegakernelPathTracingInstance::_render_one_camera(
     ProgressBar progress;
     progress.update(0.0);
     auto dispatch_count = 0u;
-    auto dispatches_per_commit =
-        _display ? node<MegakernelPathTracing>()->display_interval() : 32u;
     auto sample_id = 0u;
     for (auto s : shutter_samples) {
         pipeline.update(command_buffer, s.point.time);
         for (auto i = 0u; i < s.spp; i++) {
             command_buffer << render(sample_id++, s.point.time, s.point.weight)
                                   .dispatch(resolution);
+            auto dispatches_per_commit =
+                _display && !_display->should_close() ?
+                    node<MegakernelPathTracing>()->display_interval() :
+                    32u;
             if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
                 dispatch_count = 0u;
                 auto p = sample_id / static_cast<double>(spp);
-                if (_display) {
-                    _display->update(command_buffer, sample_id);
+                if (_display && _display->update(command_buffer, sample_id)) {
                     progress.update(p);
                 } else {
                     command_buffer << [&progress, p] { progress.update(p); };
