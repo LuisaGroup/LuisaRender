@@ -88,6 +88,7 @@ public:
         [[nodiscard]] Sample sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u, TransportMode mode = TransportMode::RADIANCE) const noexcept;
         [[nodiscard]] auto &swl() const noexcept { return _swl; }          // sampled wavelengths
         [[nodiscard]] auto &it() const noexcept { return _it; }            // interaction, possibly normal mapped
+        [[nodiscard]] auto time() const noexcept { return _time; }         // time
         [[nodiscard]] luisa::optional<Float> opacity() const noexcept;     // nullopt if never possible to be non-opaque
         [[nodiscard]] luisa::optional<Float> eta() const noexcept;         // nullopt if never possible to be transmissive
         [[nodiscard]] luisa::optional<Bool> is_dispersive() const noexcept;// nullopt if never possible to be dispersive
