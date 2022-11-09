@@ -17,7 +17,6 @@ shape_names = set()
 
 
 def split_obj(path: Path, output_dir: Path) -> dict:
-
     class GeometryIndex:
         def __init__(self):
             self.v_index = 0
@@ -39,10 +38,24 @@ def split_obj(path: Path, output_dir: Path) -> dict:
             else:
                 raise IndexError
 
+        def __add__(self, other):
+            v = GeometryIndex()
+            v.v_index = self.v_index + other.v_index
+            v.vt_index = self.vt_index + other.vt_index
+            v.vn_index = self.vn_index + other.vn_index
+            return v
+
+        def __sub__(self, other):
+            v = GeometryIndex()
+            v.v_index = self.v_index - other.v_index
+            v.vt_index = self.vt_index - other.vt_index
+            v.vn_index = self.vn_index - other.vn_index
+            return v
+
         def __str__(self):
             return f"v:{self.v_index}, vt:{self.vt_index}, vn:{self.vn_index}"
 
-        def clone(self):
+        def copy(self):
             v = GeometryIndex()
             v.v_index = self.v_index
             v.vt_index = self.vt_index
@@ -51,10 +64,11 @@ def split_obj(path: Path, output_dir: Path) -> dict:
 
     index = GeometryIndex()
     index_next = GeometryIndex()
+    geos = {}
     geo2material = {}
 
     with open(path, 'r') as f:
-        geo_name = 'default'
+        geo_name = ''
         text = ''
 
         def reindex(line: str, index: GeometryIndex) -> str:
@@ -81,23 +95,36 @@ def split_obj(path: Path, output_dir: Path) -> dict:
             with open(new_obj_file_path, 'w') as f:
                 f.write(objtext)
 
+        def merge_geo(geo_name: str, text: str, index_num: GeometryIndex, geos: dict):
+            if geo_name in geos:
+                geos[geo_name]['text'] += text
+                geos[geo_name]['index_num'] += index_num
+            else:
+                geos[geo_name] = {
+                    'text': text,
+                    'index_num': index_num
+                }
+
         g_mode = False
         for line in f:
             if line.startswith('g '):
                 if g_mode:
+                    assert line[2:].strip() == 'default'
                     g_mode = False
-                    write_geo(text, geo_name)
+                    index_num = index_next - index
+                    merge_geo(geo_name, text, index_num, geos)
                     text = ''
-                    index = index_next.clone()
-
-                geo_name = line[2:].strip()
-                if geo_name == 'default':
-                    continue
-                geo_name = f'{path.stem}_{geo_name}'
-                assert geo_name not in geo2material
-                g_mode = True
+                    index = index_next.copy()
+                else:
+                    geo_name = line[2:].strip()
+                    if geo_name != 'default':
+                        g_mode = True
             elif line.startswith('f '):
-                text += f'f {reindex(line, index)}\n'
+                if geo_name in geos:
+                    face = reindex(line, index - geos[geo_name]['index_num'])
+                else:
+                    face = reindex(line, index)
+                text += f'f {face}\n'
             elif line.startswith('usemtl '):
                 material = line[7:].strip()
                 geo2material[geo_name] = material
@@ -111,14 +138,20 @@ def split_obj(path: Path, output_dir: Path) -> dict:
                 index_next.vt_index += 1
                 text += line
 
-        if g_mode:
-            write_geo(text, geo_name)
+        index_num = index_next - index
+        merge_geo(geo_name, text, index_num, geos)
+        for geo_name in geos:
+            write_geo(geos[geo_name]['text'], geo_name)
 
     return geo2material
 
 
 def get_transform(array: list) -> np.ndarray:
     return np.array(array, dtype=np.float32).reshape(4, 4).transpose()
+
+
+def identity_list(dim: int) -> list:
+    return [1.0 if i == j else 0.0 for i in range(dim) for j in range(dim)]
 
 
 def flatten_matrix4(m: np.ndarray) -> list:
@@ -329,7 +362,7 @@ def convert_material(material: dict, name: str, geo_name: str) -> (str, dict):
     return name, material_dict
 
 
-def convert_geometry(input_project_dir: Path, output_project_dir: Path, geo_name: str):
+def convert_geometry(input_project_dir: Path, output_project_dir: Path, geo_name: str) -> dict:
     input_json_dir = input_project_dir / 'json' / geo_name
     output_json_dir = output_project_dir / 'json' / geo_name
     check_dir(input_json_dir, output_json_dir)
@@ -350,49 +383,69 @@ def convert_geometry(input_project_dir: Path, output_project_dir: Path, geo_name
     materials_dict = {}
     for name, material in materials.items():
         name, material_dict = convert_material(material, name, geo_name)
-        material_dict = {name: material_dict}
-        materials_dict.update(material_dict)
+        materials_dict[name] = material_dict
     material_file = output_project_dir / geo['matFile']
     with open(material_file, 'w') as f:
         json.dump(materials_dict, f, indent=2)
     material_file = material_file.relative_to(output_json_dir)
 
-    json2obj_path = os.path.relpath(
-        output_project_dir / geo['geomObjFile'],
-        output_json_dir)
-    json2obj_path = str(json2obj_path).replace('\\', '/')
     geo_obj_dict = {
         'type': 'Shape',
-        'impl': 'Mesh',
+        'impl': 'Group',
         'prop': {
-            'file': json2obj_path,
-            'surface': 'TODO',
-        }
-    }
-    geo2material = split_obj(input_project_dir / geo['geomObjFile'], output_geo_dir)
-    exit(0)
-
-    geo_dict = {
-        'import': [
-            material_file
-        ],
-        geo['name']: {
-            'type': 'Shape',
-            'impl': 'Group',
-            'prop': {
-                'shapes': [
-
-                ],
-                'transform': {
-                    'type': 'Transform',
-                    'impl': 'Matrix',
-                    'prop': {
-                        'm': flatten_matrix4(get_transform(geo['transformMatrix'])),
-                    }
+            'shapes': [],
+            'transform': {
+                'type': 'Transform',
+                'impl': 'Matrix',
+                'prop': {
+                    'm': [],
                 }
             }
         }
     }
+
+    # geometry of itself
+    if 'geomObjFile' in geo:
+        geo_file = input_project_dir / geo['geomObjFile']
+        geo2material = split_obj(geo_file, output_geo_dir)
+        for shape, material in geo2material.items():
+            geo_file = input_project_dir / (shape + '.obj')
+            json2obj_path = os.path.relpath(
+                geo_file,
+                output_json_dir)
+            json2obj_path = str(json2obj_path).replace('\\', '/')
+            obj_part = {
+                'type': 'Shape',
+                'impl': 'Mesh',
+                'prop': {
+                    'file': json2obj_path,
+                    'surface': f'@{geo_name}_{material}',
+                }
+            }
+            geo_obj_dict['prop']['shapes'].append(obj_part)
+
+    geo_dict = {
+        'import': [
+            str(material_file).replace('\\', '/'),
+        ],
+    }
+
+    # instanced copy
+    instanced_copies = geo.get('instancedCopies', {}).copy()
+    instanced_copies[geo_name] = {
+        "transformMatrix": geo.get('transformMatrix', identity_list(4)),
+        "name": geo_name,
+    }
+    instanced_copy_names = list(instanced_copies.keys())
+    instanced_copy_transforms = [instanced_copies[copy_name]['transformMatrix'] for copy_name in instanced_copy_names]
+    for copy_name, instanced_copy_transform in zip(instanced_copy_names, instanced_copy_transforms):
+        assert copy_name == instanced_copies[copy_name]['name']
+        instanced_copy_transform = flatten_matrix4(get_transform(instanced_copy_transform))
+        geo_obj_dict['prop']['transform']['prop']['m'] = instanced_copy_transform
+        geo_dict[copy_name] = geo_obj_dict.copy()
+        shape_names.add(copy_name)
+
+    return geo_dict
 
 
 def copy_texture(src: Path, dst: Path):
@@ -492,8 +545,7 @@ f -4 -3 -2 -1
             name, light_dict = convert_light(light, name)
             if name is None:
                 continue
-            light_dict = {name: light_dict}
-            lights_dict.update(light_dict)
+            lights_dict[name] = light_dict
         with open(path_out / light_file.name, 'w') as f:
             json.dump(lights_dict, f, indent=2)
 
@@ -503,12 +555,16 @@ f -4 -3 -2 -1
         re_shape2material[geo_name] = {}
 
     for geo_name in geo_names:
+        if geo_name != 'isBeach':
+            continue
         path_in = input_path / 'json' / geo_name
         path_out = output_path / 'json' / geo_name
         check_dir(path_in, path_out)
 
         # geometries
-        convert_geometry(input_path, output_path, geo_name)
+        geo_dict = convert_geometry(input_path, output_path, geo_name)
+        with open(path_out / f'{geo_name}.json', 'w') as f:
+            json.dump(geo_dict, f, indent=2)
 
     json.dump(re_shape2material, open(output_path / 're_shape2material.json', 'w'), indent=2)
     json.dump(material_map, open(output_path / 'material_map.json', 'w'), indent=2)
