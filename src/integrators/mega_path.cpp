@@ -292,9 +292,10 @@ void MegakernelPathTracingInstance::_render_one_camera(
                 auto rr_depth = pt->node<MegakernelPathTracing>()->rr_depth();
                 auto rr_threshold = pt->node<MegakernelPathTracing>()->rr_threshold();
                 auto q = max(beta.max() * eta_scale, .05f);
-                $if(depth + 1u >= rr_depth & q < rr_threshold) {
-                    $if(sampler->generate_1d() >= q) { $break; };
-                    beta *= 1.0f / q;
+                $if(depth + 1u >= rr_depth) {
+                    auto u = sampler->generate_1d();
+                    $if(q < rr_threshold & u >= q) { $break; };
+                    beta *= ite(q < rr_threshold, 1.0f / q, 1.f);
                 };
             };
         };

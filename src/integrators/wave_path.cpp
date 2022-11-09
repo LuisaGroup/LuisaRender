@@ -473,10 +473,10 @@ void WavefrontPathTracingInstance::_render_one_camera(
                     auto rr_threshold = node<WavefrontPathTracing>()->rr_threshold();
                     // rr
                     auto q = max(beta.max() * eta_scale, 0.05f);
-                    $if(trace_depth + 1u >= rr_depth & q < rr_threshold) {
+                    $if(trace_depth + 1u >= rr_depth) {
                         auto u = sampler()->generate_1d();
-                        terminated = u >= q;
-                        beta *= 1.f / q;
+                        terminated = q < rr_threshold & u >= q;
+                        beta *= ite(q < rr_threshold, 1.f / q, 1.f);
                     };
                 };
             };
