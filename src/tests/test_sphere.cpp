@@ -10,7 +10,8 @@ using namespace luisa::compute;
 using namespace luisa::render;
 
 void dump_obj(const SphereGeometry &g, uint level) noexcept {
-    std::ofstream out{luisa::format("sphere-{}.obj", level)};
+    auto path = format("sphere-{}.obj", level);
+    std::ofstream out{path.c_str()};
     auto dump_vertex = [&out](auto v, auto t) noexcept {
         if (v.size() == 2u) {
             out << luisa::format("{} {} {}\n", t, v[0], v[1]);
