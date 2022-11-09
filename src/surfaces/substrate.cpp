@@ -102,7 +102,7 @@ private:
         auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f |
                                   _it.shape()->shadow_terminator_factor() > 0.f,
                               1.f, 0.f);
-        return {.f = f * abs_cos_theta(wi_local) * same_sided, .pdf = pdf * same_sided};
+        return {.f = f * abs_cos_theta(wi_local) * same_sided, .pdf = pdf};
     }
 
     [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u,
@@ -116,7 +116,7 @@ private:
         auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f |
                                   _it.shape()->shadow_terminator_factor() > 0.f,
                               1.f, 0.f);
-        return {.eval = {.f = f * abs_cos_theta(wi_local) * same_sided, .pdf = pdf * same_sided},
+        return {.eval = {.f = f * abs_cos_theta(wi_local) * same_sided, .pdf = pdf},
                 .wi = wi,
                 .event = Surface::event_reflect};
     }

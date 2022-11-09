@@ -218,8 +218,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
             // hit light
             if (!pipeline.lights().empty()) {
                 $if(it->shape()->has_light()) {
-                    auto eval = light_sampler->evaluate_hit(
-                        *it, ray->origin(), swl, time);
+                    auto eval = light_sampler->evaluate_hit(*it, ray->origin(), swl, time);
                     Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
                 };
             }
@@ -278,18 +277,15 @@ void MegakernelPathTracingInstance::_render_one_camera(
                 pdf_bsdf = 1e16f;
             }
             $else {
-
                 ray = it->spawn_ray(surface_sample.wi);
                 pdf_bsdf = surface_sample.eval.pdf;
                 auto w = ite(surface_sample.eval.pdf > 0.f, 1.f / surface_sample.eval.pdf, 0.f);
                 beta *= w * surface_sample.eval.f;
-
                 // apply eta scale
                 $switch(surface_sample.event) {
                     $case(Surface::event_enter) { eta_scale = sqr(eta); };
                     $case(Surface::event_exit) { eta_scale = sqr(1.f / eta); };
                 };
-
                 // rr
                 $if(beta.all([](auto b) noexcept { return isnan(b) | b <= 0.f; })) { $break; };
                 auto rr_depth = pt->node<MegakernelPathTracing>()->rr_depth();
