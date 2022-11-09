@@ -407,7 +407,6 @@ void WavefrontPathTracingInstance::_render_one_camera(
             auto swl = path_states.read_swl(path_id);
             auto beta = path_states.read_beta(path_id);
             auto surface_tag = it->shape()->surface_tag();
-            auto pdf_bsdf = def(0.f);
             auto u_lobe = sampler()->generate_1d();
             auto u_bsdf = sampler()->generate_2d();
             auto eta = def(1.f);
@@ -450,6 +449,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
             path_states.write_radiance(path_id, Li);
 
             // prepare for the next bounce
+            auto pdf_bsdf = def(0.f);
             auto terminated = def(false);
             $if(alpha_skip) {
                 ray = it->spawn_ray(ray->direction());
