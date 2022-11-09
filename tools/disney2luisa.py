@@ -11,9 +11,16 @@ material_map = {}
 re_shape2material = {}
 
 material_names = set()
-light_names = set()
+environment_name = None
 camera_names = set()
 shape_names = set()
+
+input_project_dir = Path()
+output_project_dir = Path()
+input_json_dir = Path()
+output_json_dir = Path()
+input_geo_dir = Path()
+output_geo_dir = Path()
 
 
 def split_obj(path: Path, output_dir: Path) -> dict:
@@ -218,7 +225,7 @@ def convert_camera(camera: dict) -> (str, dict):
     return name, camera_dict
 
 
-def convert_light(light: dict, name: str) -> (str, dict):
+def convert_light(light_file_path: Path, light: dict, name: str) -> (str, dict):
     transform = flatten_matrix4(get_transform(light['translationMatrix']))
     exposure = light['exposure']
     color = np.array(light['color'], dtype=np.float32)[:3] * exposure
@@ -270,7 +277,11 @@ def convert_light(light: dict, name: str) -> (str, dict):
                 }
             }
         }
+        shape_names.add(name)
     elif light['type'] == 'dome':
+        env_map_path = os.path.relpath(
+            output_project_dir / light['envmapCamera'].lstrip('island/'),
+            output_json_dir / 'lights')
         light_dict = {
             'type': 'Environment',
             'impl': 'Spherical',
@@ -279,7 +290,7 @@ def convert_light(light: dict, name: str) -> (str, dict):
                     'type': 'Texture',
                     'impl': 'Image',
                     'prop': {
-                        'file': light['envmapCamera'],
+                        'file': str(env_map_path).replace('\\', '/'),
                     }
                 },
                 'transform': {
@@ -291,11 +302,12 @@ def convert_light(light: dict, name: str) -> (str, dict):
                 },
             }
         }
+        global environment_name
+        environment_name = name
     else:
         print(f'Light type {light["type"]} not supported')
         return None, None
 
-    light_names.add(name)
     print(f'Light {name} converted')
 
     return name, light_dict
@@ -383,15 +395,11 @@ def convert_material(material: dict, name: str, geo_name: str) -> (str, dict):
     return name, material_dict
 
 
-def convert_geometry(input_project_dir: Path, output_project_dir: Path, geo_name: str) -> dict:
-    input_json_dir = input_project_dir / 'json' / geo_name
-    output_json_dir = output_project_dir / 'json' / geo_name
-    check_dir(input_json_dir, output_json_dir)
-    input_geo_dir = input_project_dir / 'obj' / geo_name
-    output_geo_dir = output_project_dir / 'obj' / geo_name
-    check_dir(input_geo_dir, output_geo_dir)
+def convert_geometry(geo_name: str) -> dict:
+    check_dir(input_json_dir / geo_name, output_json_dir / geo_name)
+    check_dir(input_geo_dir / geo_name, output_geo_dir / geo_name)
 
-    with open(input_json_dir / f'{geo_name}.json', 'r') as f:
+    with open(input_json_dir / geo_name / f'{geo_name}.json', 'r') as f:
         geo = json.load(f)
     assert geo['name'] == geo_name
     assert Path(geo['geomObjFile']) == Path(f'obj/{geo_name}/{geo_name}.obj')
@@ -408,7 +416,7 @@ def convert_geometry(input_project_dir: Path, output_project_dir: Path, geo_name
     material_file = output_project_dir / geo['matFile']
     with open(material_file, 'w') as f:
         json.dump(materials_dict, f, indent=2)
-    material_file = material_file.relative_to(output_json_dir)
+    material_file = os.path.relpath(material_file, output_json_dir / geo_name)
 
     geo_obj_dict = {
         'type': 'Shape',
@@ -428,12 +436,12 @@ def convert_geometry(input_project_dir: Path, output_project_dir: Path, geo_name
     # geometry of itself
     if 'geomObjFile' in geo:
         geo_file = input_project_dir / geo['geomObjFile']
-        geo2material = split_obj(geo_file, output_geo_dir)
+        geo2material = split_obj(geo_file, output_geo_dir / geo_name)
         for shape, material in geo2material.items():
-            geo_file = input_project_dir / (shape + '.obj')
+            geo_file = output_geo_dir / geo_name / (shape + '.obj')
             json2obj_path = os.path.relpath(
                 geo_file,
-                output_json_dir)
+                output_json_dir / geo_name)
             obj_part = {
                 'type': 'Shape',
                 'impl': 'Mesh',
@@ -521,9 +529,11 @@ def create_main_scene_file(scene_dir: Path):
             'spectrum': {
                 'type': 'Spectrum',
                 'impl': 'sRGB',
-            }
+            },
         }
     }
+    if environment_name is not None:
+        scene['render']['environment'] = f'@{environment_name}'
 
     json.dump(scene, open(scene_dir / 'scene.json', 'w'), indent=2)
 
@@ -532,17 +542,25 @@ def disney2luisa(input_path: Path, output_path: Path):
     shutil.rmtree(output_path)
     check_dir(input_path, output_path)
 
-    check_dir(input_path / 'obj', output_path / 'obj')
-    path_in = input_path / 'json'
-    path_out = output_path / 'json'
+    global input_project_dir, output_project_dir, input_json_dir, output_json_dir, input_geo_dir, output_geo_dir
+    input_project_dir = input_path
+    output_project_dir = output_path
+    input_json_dir = input_project_dir / 'json'
+    output_json_dir = output_project_dir / 'json'
+    input_geo_dir = input_project_dir / 'obj'
+    output_geo_dir = output_project_dir / 'obj'
+
+    check_dir(input_geo_dir, output_geo_dir)
+    path_in = input_json_dir
+    path_out = output_json_dir
     check_dir(path_in, path_out)
 
     geo_names = [x.name for x in path_in.iterdir()
                  if x.is_dir() and x.name != 'cameras' and x.name != 'lights']
 
     # cameras
-    path_in = input_path / 'json' / 'cameras'
-    path_out = output_path / 'json' / 'cameras'
+    path_in = input_json_dir / 'cameras'
+    path_out = output_json_dir / 'cameras'
     check_dir(path_in, path_out)
     for camera_file in path_in.iterdir():
         with open(camera_file, 'r') as f:
@@ -553,8 +571,8 @@ def disney2luisa(input_path: Path, output_path: Path):
             json.dump(camera_dict, f, indent=2)
 
     # lights
-    path_in = input_path / 'json' / 'lights'
-    path_out = output_path / 'json' / 'lights'
+    path_in = input_json_dir / 'lights'
+    path_out = output_json_dir / 'lights'
     check_dir(path_in, path_out)
     quad = '''
 v   1.00   1.00   0.00
@@ -570,7 +588,7 @@ f -4 -3 -2 -1
         with open(light_file, 'r') as f:
             lights = json.load(f)
         for name, light in lights.items():
-            name, light_dict = convert_light(light, name)
+            name, light_dict = convert_light(light_file, light, name)
             if name is None:
                 continue
             lights_dict[name] = light_dict
@@ -588,20 +606,20 @@ f -4 -3 -2 -1
         # DEBUG
         if geo_name not in test_geo_names:
             continue
-        path_in = input_path / 'json' / geo_name
-        path_out = output_path / 'json' / geo_name
+        path_in = input_json_dir / geo_name
+        path_out = output_json_dir / geo_name
         check_dir(path_in, path_out)
 
         # geometries
-        geo_dict = convert_geometry(input_path, output_path, geo_name)
+        geo_dict = convert_geometry(geo_name)
         with open(path_out / f'{geo_name}.json', 'w') as f:
             json.dump(geo_dict, f, indent=2)
 
     json.dump(re_shape2material, open(output_path / 're_shape2material.json', 'w'), indent=2)
     json.dump(material_map, open(output_path / 'material_map.json', 'w'), indent=2)
 
-    # # textures
-    # copy_texture(input_path / 'textures', output_path / 'textures')
+    # textures
+    copy_texture(input_path / 'textures', output_path / 'textures')
 
     create_main_scene_file(output_path)
 
