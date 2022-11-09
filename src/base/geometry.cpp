@@ -78,16 +78,17 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
                 return geom;
             }();
             auto encode_fixed_point = [](float x) noexcept {
-                return static_cast<uint16_t>(std::clamp(std::round(x * 65535.f), 0.f, 65535.f));
+                return static_cast<uint16_t>(std::clamp(
+                    std::round(x * 65535.f), 0.f, 65535.f));
             };
             // assign mesh data
-            MeshData mesh_data{};
-            mesh_data.resource = mesh_geom.resource;
-            mesh_data.shadow_term = encode_fixed_point(shape->shadow_terminator_factor());
-            mesh_data.intersection_offset = encode_fixed_point(shape->intersection_offset_factor());
-            mesh_data.geometry_buffer_id_base = mesh_geom.buffer_id_base;
-            mesh_data.has_normal = shape->has_normal();
-            mesh_data.has_uv = shape->has_uv();
+            MeshData mesh_data{
+                .resource = mesh_geom.resource,
+                .shadow_term = encode_fixed_point(shape->shadow_terminator_factor()),
+                .intersection_offset = encode_fixed_point(shape->intersection_offset_factor()),
+                .geometry_buffer_id_base = mesh_geom.buffer_id_base,
+                .has_normal = shape->has_normal(),
+                .has_uv = shape->has_uv()};
             _meshes.emplace(shape, mesh_data);
             return mesh_data;
         }();
