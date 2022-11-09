@@ -34,6 +34,12 @@ public:
         const Pipeline &_pipeline;
         const Texture *_texture;
 
+    protected:
+        [[nodiscard]] Spectrum::Decode _evaluate_static_albedo_spectrum(
+            const SampledWavelengths &swl, float4 v) const noexcept;
+        [[nodiscard]] Spectrum::Decode _evaluate_static_illuminant_spectrum(
+            const SampledWavelengths &swl, float4 v) const noexcept;
+
     public:
         Instance(const Pipeline &pipeline, const Texture *texture) noexcept
             : _pipeline{pipeline}, _texture{texture} {}
