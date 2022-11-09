@@ -31,7 +31,7 @@ public:
         uint buffer_id_base;
     };
 
-    struct alignas(16u) MeshData {
+    struct MeshData {
         Mesh *resource;
         uint16_t shadow_term;
         uint16_t intersection_offset;
