@@ -31,7 +31,7 @@ public:
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
           _display{desc->property_bool_or_default("display")},
-          _display_interval{desc->property_uint_or_default("display_interval", 1u)} {}
+          _display_interval{std::max(desc->property_uint_or_default("display_interval", 1u), 1u)} {}
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
@@ -74,6 +74,7 @@ public:
             camera->film()->prepare(command_buffer);
             if (_display) { _display->reset(command_buffer, camera->film()); }
             _render_one_camera(command_buffer, pipeline(), camera);
+            while (_display && _display->idle(command_buffer)) {}
             luisa::vector<float4> pixels(pixel_count);
             camera->film()->download(command_buffer, pixels.data());
             command_buffer << compute::synchronize();
@@ -81,7 +82,6 @@ public:
             auto film_path = camera->node()->file();
             save_image(film_path, reinterpret_cast<const float *>(pixels.data()), resolution);
         }
-        while (_display && _display->idle()) {}
     }
 };
 

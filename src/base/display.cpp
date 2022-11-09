@@ -90,12 +90,33 @@ bool Display::update(CommandBuffer &command_buffer, uint spp) noexcept {
     return true;
 }
 
-bool Display::idle() noexcept {
+bool Display::idle(CommandBuffer &command_buffer) noexcept {
     if (should_close()) {
         _window.reset();
         return false;
     }
-    _window->run_one_frame([] {});
+    command_buffer << _convert.get()(luisa::to_underlying(_tone_mapper), _exposure)
+                          .dispatch(_pixels.size())
+                   << _converted.copy_to(_pixels.data())
+                   << compute::synchronize();
+    _window->run_one_frame([&] {
+        _window->set_background(_pixels.data(), _converted.size());
+        ImGui::Begin("Console", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+        static constexpr std::array tone_mapper_names{
+            "None",
+            "ACES",
+            "Uncharted2",
+        };
+        ImGui::Text("Tone Mapper");
+        for (auto i = 0u; i < tone_mapper_names.size(); i++) {
+            ImGui::SameLine();
+            if (ImGui::RadioButton(tone_mapper_names[i], luisa::to_underlying(_tone_mapper) == i)) {
+                _tone_mapper = static_cast<ToneMapper>(i);
+            }
+        }
+        ImGui::SliderFloat("Exposure", &_exposure, -10.f, 10.f, "%.1f");
+        ImGui::End();
+    });
     return true;
 }
 

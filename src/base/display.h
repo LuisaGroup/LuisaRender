@@ -40,7 +40,7 @@ public:
     void reset(CommandBuffer &command_buffer, const Film::Instance *film) noexcept;
     [[nodiscard]] bool should_close() const noexcept;
     bool update(CommandBuffer &command_buffer, uint spp) noexcept;
-    bool idle() noexcept;
+    bool idle(CommandBuffer &command_buffer) noexcept;
 };
 
 }// namespace luisa::render
