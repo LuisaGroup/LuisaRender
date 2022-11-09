@@ -434,7 +434,6 @@ public:
     [[nodiscard]] Float2 roughness() const noexcept override {
         return DisneyMicrofacetDistribution::alpha_to_roughness(_distrib->alpha());
     }
-
     DisneySurfaceClosureImpl(const Surface::Closure *cls, Expr<float> eta_i,
                              const Texture::Instance *color_tex, const Texture::Instance *metallic_tex,
                              const Texture::Instance *eta_tex, const Texture::Instance *roughness_tex,
@@ -946,7 +945,7 @@ luisa::unique_ptr<Surface::Closure> DisneySurfaceInstance::closure(
     const Interaction &it, const SampledWavelengths &swl,
     Expr<float> eta_i, Expr<float> time) const noexcept {
     return luisa::make_unique<DisneySurfaceClosure>(
-        this, it, swl, time, eta_i,
+        this, it, swl, eta_i, time,
         _color, _metallic, _eta, _roughness, _specular_tint,
         _anisotropic, _sheen, _sheen_tint, _clearcoat,
         _clearcoat_gloss, _specular_trans, _flatness, _diffuse_trans);
