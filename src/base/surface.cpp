@@ -35,12 +35,6 @@ Surface::Sample Surface::Closure::sample(
     return _sample(wo, u_lobe, u, mode);
 }
 
-void Surface::Closure::backward(
-    Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df,
-    TransportMode mode) const noexcept {
-    if (instance()->node()->is_differentiable()) { _backward(wo, wi, df, mode); }
-}
-
 luisa::optional<Float> Surface::Closure::_opacity() const noexcept { return luisa::nullopt; }
 luisa::optional<Bool> Surface::Closure::_is_dispersive() const noexcept { return luisa::nullopt; }
 luisa::optional<Float> Surface::Closure::_eta() const noexcept { return luisa::nullopt; }

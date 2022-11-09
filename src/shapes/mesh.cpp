@@ -4,8 +4,8 @@
 
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
-#include <assimp/scene.h>
 #include <assimp/mesh.h>
+#include <assimp/scene.h>
 #include <assimp/Subdivision.h>
 
 #include <core/thread_pool.h>
@@ -16,7 +16,7 @@ namespace luisa::render {
 class MeshLoader {
 
 private:
-    luisa::vector<Shape::Vertex> _vertices;
+    luisa::vector<Vertex> _vertices;
     luisa::vector<Triangle> _triangles;
     bool _has_uv{};
     bool _has_normal{};
@@ -39,9 +39,7 @@ public:
         auto key = luisa::hash64(abs_path, luisa::hash64(subdiv_level));
 
         std::scoped_lock lock{mutex};
-        if (auto m = loaded_meshes.at(key)) {
-            return *m;
-        }
+        if (auto m = loaded_meshes.at(key)) { return *m; }
 
         auto future = ThreadPool::global().async([path = std::move(path), subdiv_level, flip_uv, drop_normal] {
             Clock clock;
@@ -51,11 +49,10 @@ public:
                 AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_LINE | aiPrimitiveType_POINT);
             importer.SetPropertyFloat(AI_CONFIG_PP_GSN_MAX_SMOOTHING_ANGLE, 45.f);
             auto import_flags = aiProcess_JoinIdenticalVertices | aiProcess_RemoveComponent |
-                                aiProcess_OptimizeGraph | aiProcess_GenUVCoords |
-                                aiProcess_TransformUVCoords | aiProcess_RemoveRedundantMaterials |
-                                aiProcess_SortByPType | aiProcess_ValidateDataStructure |
-                                aiProcess_ImproveCacheLocality | aiProcess_PreTransformVertices |
-                                aiProcess_OptimizeMeshes | aiProcess_FindInvalidData;
+                                aiProcess_OptimizeMeshes | aiProcess_GenUVCoords |
+                                aiProcess_TransformUVCoords | aiProcess_SortByPType |
+                                aiProcess_ValidateDataStructure | aiProcess_ImproveCacheLocality |
+                                aiProcess_PreTransformVertices | aiProcess_FindInvalidData;
             if (!flip_uv) { import_flags |= aiProcess_FlipUVs; }
             import_flags |= drop_normal ? aiProcess_DropNormals : aiProcess_GenSmoothNormals;
             auto remove_flags = aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS |
@@ -64,7 +61,6 @@ public:
                                 aiComponent_TEXTURES | aiComponent_TANGENTS_AND_BITANGENTS;
             importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, static_cast<int>(remove_flags));
             if (subdiv_level == 0) { import_flags |= aiProcess_Triangulate; }
-            importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, static_cast<int>(remove_flags));
             auto model = importer.ReadFile(path_string.c_str(), import_flags);
             if (model == nullptr || (model->mFlags & AI_SCENE_FLAGS_INCOMPLETE) ||
                 model->mRootNode == nullptr || model->mRootNode->mNumMeshes == 0) [[unlikely]] {
@@ -72,6 +68,13 @@ public:
                     "Failed to load mesh '{}': {}.",
                     path_string, importer.GetErrorString());
             }
+            if (auto err = importer.GetErrorString();
+                err != nullptr && err[0] != '\0') [[unlikely]] {
+                LUISA_WARNING_WITH_LOCATION(
+                    "Mesh '{}' has warnings: {}.",
+                    path_string, err);
+            }
+            LUISA_ASSERT(model->mNumMeshes == 1u, "Only single mesh is supported.");
             auto mesh = model->mMeshes[0];
             if (subdiv_level > 0u) {
                 auto subdiv = Assimp::Subdivider::Create(Assimp::Subdivider::CATMULL_CLARKE);
@@ -98,6 +101,12 @@ public:
             auto ai_tex_coords = mesh->mTextureCoords[0];
             loader._has_uv = ai_tex_coords != nullptr;
             loader._has_normal = !drop_normal && ai_normals != nullptr;
+            if (!loader._has_normal) {
+                LUISA_WARNING_WITH_LOCATION(
+                    "Mesh '{}' has no normal data, "
+                    "which may cause incorrect shading.",
+                    path_string);
+            }
             for (auto i = 0; i < vertex_count; i++) {
                 auto p = make_float3(ai_positions[i].x, ai_positions[i].y, ai_positions[i].z);
                 auto n = loader._has_normal ?
@@ -106,7 +115,7 @@ public:
                 auto uv = loader._has_uv ?
                               make_float2(ai_tex_coords[i].x, ai_tex_coords[i].y) :
                               make_float2(0.f);
-                loader._vertices[i] = Shape::Vertex::encode(p, n, uv);
+                loader._vertices[i] = Vertex::encode(p, n, uv);
             }
             if (subdiv_level == 0u) {
                 auto ai_triangles = mesh->mFaces;
@@ -137,7 +146,7 @@ public:
     }
 };
 
-class Mesh final : public Shape {
+class Mesh : public Shape {
 
 private:
     std::shared_future<MeshLoader> _loader;
@@ -160,6 +169,11 @@ public:
     [[nodiscard]] bool has_uv() const noexcept override { return _loader.get().has_uv(); }
 };
 
+using MeshWrapper =
+    VisibilityShapeWrapper<
+        ShadowTerminatorShapeWrapper<
+            IntersectionOffsetShapeWrapper<Mesh>>>;
+
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::Mesh)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::MeshWrapper)

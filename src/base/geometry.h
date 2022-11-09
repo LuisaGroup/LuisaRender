@@ -33,11 +33,14 @@ public:
 
     struct MeshData {
         Mesh *resource;
-        float shadow_term;
+        uint16_t shadow_term;
+        uint16_t intersection_offset;
         uint geometry_buffer_id_base : 30;
-        bool has_normal : 1;
-        bool has_uv : 1;
+        uint has_normal : 1;
+        uint has_uv : 1;
     };
+
+    static_assert(sizeof(MeshData) == 16u);
 
 private:
     Pipeline &_pipeline;
@@ -53,7 +56,8 @@ private:
 private:
     void _process_shape(CommandBuffer &command_buffer, const Shape *shape, float init_time,
                         const Surface *overridden_surface = nullptr,
-                        const Light *overridden_light = nullptr) noexcept;
+                        const Light *overridden_light = nullptr,
+                        bool overridden_visible = true) noexcept;
 
 public:
     explicit Geometry(Pipeline &pipeline) noexcept : _pipeline{pipeline} {};

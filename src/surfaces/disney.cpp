@@ -30,6 +30,7 @@ private:
     const Texture *_flatness{};
     const Texture *_diffuse_trans{};
     bool _thin;
+    bool _remap_roughness;
 
 public:
     DisneySurface(Scene *scene, const SceneNodeDesc *desc) noexcept
@@ -38,11 +39,10 @@ public:
               "color", lazy_construct([desc] {
                   return desc->property_node_or_default("Kd");
               })))},
-          _thin{desc->property_bool_or_default("thin", false)} {
-        LUISA_RENDER_CHECK_ALBEDO_TEXTURE(DisneySurface, color);
-#define LUISA_RENDER_DISNEY_PARAM_LOAD(name)                              \
-    _##name = scene->load_texture(desc->property_node_or_default(#name)); \
-    LUISA_RENDER_CHECK_GENERIC_TEXTURE(DisneySurface, name, 1);
+          _thin{desc->property_bool_or_default("thin", false)},
+          _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {
+#define LUISA_RENDER_DISNEY_PARAM_LOAD(name) \
+    _##name = scene->load_texture(desc->property_node_or_default(#name));
         LUISA_RENDER_DISNEY_PARAM_LOAD(metallic)
         LUISA_RENDER_DISNEY_PARAM_LOAD(eta)
         LUISA_RENDER_DISNEY_PARAM_LOAD(roughness)
@@ -74,6 +74,7 @@ public:
         }
         return properties;
     }
+    [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
 
 protected:
     [[nodiscard]] luisa::unique_ptr<Instance> _build(
@@ -187,11 +188,6 @@ namespace {
 
 class DisneyDiffuse final : public BxDF {
 
-public:
-    struct Gradient {
-        SampledSpectrum dR;
-    };
-
 private:
     SampledSpectrum R;
 
@@ -208,22 +204,11 @@ public:
         };
         return R * impl(wo, wi);
     }
-    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
-        auto Fo = SchlickWeight(abs_cos_theta(wo));
-        auto Fi = SchlickWeight(abs_cos_theta(wi));
-        return {.dR = df * inv_pi * (1.f - Fo * .5f) * (1.f - Fi * .5f)};
-    }
 };
 
 // "Fake" subsurface scattering lobe, based on the Hanrahan-Krueger BRDF
 // approximation of the BSSRDF.
 class DisneyFakeSS final : public BxDF {
-
-public:
-    struct Gradient {
-        SampledSpectrum dR;
-        Float dRoughness;
-    };
 
 private:
     SampledSpectrum R;
@@ -250,19 +235,9 @@ public:
         };
         return R * impl(wo, wi, roughness);
     }
-    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
-        // TODO
-        LUISA_ERROR_WITH_LOCATION("Not implemented.");
-    }
 };
 
 class DisneyRetro final : public BxDF {
-
-public:
-    struct Gradient {
-        SampledSpectrum dR;
-        Float dRoughness;
-    };
 
 private:
     SampledSpectrum R;
@@ -286,18 +261,9 @@ public:
         };
         return R * impl(wo, wi, roughness);
     }
-    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
-        // TODO
-        LUISA_ERROR_WITH_LOCATION("Not implemented.");
-    }
 };
 
 class DisneySheen final : public BxDF {
-
-public:
-    struct Gradient {
-        SampledSpectrum dR;
-    };
 
 private:
     SampledSpectrum R;
@@ -315,10 +281,6 @@ public:
         };
         return R * impl(wo, wi);
     }
-    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
-        // TODO
-        LUISA_ERROR_WITH_LOCATION("Not implemented.");
-    }
 };
 
 [[nodiscard]] inline Float GTR1(Float cosTheta, Float alpha) noexcept {
@@ -335,12 +297,6 @@ public:
 }
 
 class DisneyClearcoat final {
-
-public:
-    struct Gradient {
-        Float dWeight;
-        Float dGloss;
-    };
 
 private:
     Float weight;
@@ -395,10 +351,6 @@ public:
             return ite(valid, Dr * abs_cos_theta(wh) / (4.f * dot(wo, wh)), 0.f);
         };
         return impl(wo, wi, gloss);
-    }
-    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
-        // TODO
-        LUISA_ERROR_WITH_LOCATION("Not implemented.");
     }
 };
 
@@ -485,6 +437,9 @@ public:
         auto diffuse_weight = (1.f - metallic) * (1.f - specular_trans);
         auto flatness = flatness_tex ? flatness_tex->evaluate(it, swl, time).x : 0.f;
         auto roughness = roughness_tex ? roughness_tex->evaluate(it, swl, time).x : 0.f;
+        if (instance->node<DisneySurface>()->remap_roughness()) {
+            roughness = DisneyMicrofacetDistribution::roughness_to_alpha(roughness);
+        }
         auto tint_weight = ite(color_lum > 0.f, 1.f / color_lum, 1.f);
         auto tint = saturate(_color * tint_weight);// normalize lum. to isolate hue+sat
         auto tint_lum = color_lum * tint_weight;
@@ -530,8 +485,8 @@ public:
         // create the microfacet distribution for metallic and/or specular transmittance
         auto aniso = aniso_tex ? aniso_tex->evaluate(it, swl, time).x : 0.f;
         auto aspect = sqrt(1.f - aniso * .9f);
-        auto alpha = make_float2(max(0.001f, sqr(roughness) / aspect),
-                                 max(0.001f, sqr(roughness) * aspect));
+        auto alpha = make_float2(max(0.001f, roughness / aspect),
+                                 max(0.001f, roughness * aspect));
         _distrib = luisa::make_unique<DisneyMicrofacetDistribution>(alpha);
         _specular = luisa::make_unique<MicrofacetReflection>(
             SampledSpectrum{swl.dimension(), 1.f}, _distrib.get(), _fresnel.get());
@@ -543,7 +498,7 @@ public:
         // clearcoat
         if (clearcoat_tex && !clearcoat_tex->node()->is_black()) {
             auto cc = clearcoat_tex->evaluate(it, swl, time).x;
-            auto gloss = lerp(.1f, .001f, clearcoat_gloss_tex ? clearcoat_gloss_tex->evaluate(it, swl, time).x : 0.f);
+            auto gloss = lerp(.1f, .001f, clearcoat_gloss_tex ? clearcoat_gloss_tex->evaluate(it, swl, time).x : 1.f);
             _clearcoat = luisa::make_unique<DisneyClearcoat>(cc, gloss);
             // clearcoat sampling weight
             _clearcoat_technique_index = _sampling_technique_count++;
@@ -662,12 +617,6 @@ private:
         };
         return {.eval = eval, .wi = wi, .event = event};
     }
-
-    void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df,
-                   TransportMode mode) const noexcept override {
-        // TODO
-        LUISA_WARNING_WITH_LOCATION("Not implemented.");
-    }
 };
 
 class ThinDisneySurfaceClosure : public Surface::Closure {
@@ -722,6 +671,9 @@ public:
         auto specular_trans = spec_trans_tex ? spec_trans_tex->evaluate(it, swl, time).x : 0.f;
         auto flatness = flatness_tex ? flatness_tex->evaluate(it, swl, time).x : 0.f;
         auto roughness = roughness_tex ? roughness_tex->evaluate(it, swl, time).x : .5f;
+        if (instance->node<DisneySurface>()->remap_roughness()) {
+            roughness = DisneyMicrofacetDistribution::roughness_to_alpha(roughness);
+        }
         auto diffuse_trans = diff_trans_tex ? diff_trans_tex->evaluate(it, swl, time).x * .5f : 0.f;
         auto diffuse_weight = (1.f - metallic) * (1.f - specular_trans);
         auto diff_refl_weight = diffuse_weight * (1.f - diffuse_trans);
@@ -771,8 +723,8 @@ public:
         // create the microfacet distribution for metallic and/or specular transmittance
         auto aniso = aniso_tex ? aniso_tex->evaluate(it, swl, time).x : 0.f;
         auto aspect = sqrt(1.f - aniso * .9f);
-        auto alpha = make_float2(max(0.001f, sqr(roughness) / aspect),
-                                 max(0.001f, sqr(roughness) * aspect));
+        auto alpha = make_float2(max(0.001f, roughness / aspect),
+                                 max(0.001f, roughness * aspect));
         _distrib = luisa::make_unique<DisneyMicrofacetDistribution>(alpha);
         _specular = luisa::make_unique<MicrofacetReflection>(
             SampledSpectrum{swl.dimension(), 1.f}, _distrib.get(), _fresnel.get());
@@ -784,7 +736,7 @@ public:
         // clearcoat
         if (clearcoat_tex && !clearcoat_tex->node()->is_black()) {
             auto cc = clearcoat_tex->evaluate(it, swl, time).x;
-            auto gloss = lerp(.1f, .001f, clearcoat_gloss_tex ? clearcoat_gloss_tex->evaluate(it, swl, time).x : 0.f);
+            auto gloss = lerp(.1f, .001f, clearcoat_gloss_tex ? clearcoat_gloss_tex->evaluate(it, swl, time).x : 1.f);
             _clearcoat = luisa::make_unique<DisneyClearcoat>(cc, gloss);
             // clearcoat sampling weight
             _clearcoat_technique_index = _sampling_technique_count++;
@@ -795,8 +747,8 @@ public:
         if (spec_trans_tex && !spec_trans_tex->node()->is_black()) {
             // thin specular transmission distribution
             auto rscaled = fma(eta, .65f, -.35f) * roughness;
-            auto ascaled = make_float2(max(.001f, sqr(rscaled) / aspect),
-                                       max(.001f, sqr(rscaled) * aspect));
+            auto ascaled = make_float2(max(.001f, rscaled / aspect),
+                                       max(.001f, rscaled * aspect));
             _thin_distrib = luisa::make_unique<TrowbridgeReitzDistribution>(ascaled);
             auto Cst_weight = (1.f - metallic) * specular_trans;
             auto Cst = Cst_weight * _color;
@@ -924,12 +876,6 @@ private:
             eval = _evaluate_local(wo_local, wi_sample.wi, dot(_it.ng(), wo) * dot(_it.ng(), wi) > 0.f, mode);
         };
         return {.eval = eval, .wi = wi, .event = event};
-    }
-
-    void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df,
-                   TransportMode mode) const noexcept override {
-        // TODO
-        LUISA_WARNING_WITH_LOCATION("Not implemented.");
     }
 };
 

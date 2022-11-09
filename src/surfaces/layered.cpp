@@ -6,6 +6,11 @@
 
 namespace luisa::render {
 
+// The following code is from PBRT-v4.
+// License: Apache 2.0
+// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
+// The pbrt source code is licensed under the Apache License, Version 2.0.
+
 class HGPhaseFunction {
 public:
     struct PhaseFunctionSample {
@@ -132,8 +137,6 @@ public:
           _albedo{scene->load_texture(desc->property_node_or_default("albedo"))},
           _max_depth{desc->property_uint_or_default("max_depth", 10u)},
           _samples{desc->property_uint_or_default("samples", 1u)} {
-        LUISA_RENDER_CHECK_ALBEDO_TEXTURE(LayeredSurface, albedo);
-        // TODO
         LUISA_ASSERT(_top != nullptr && !_top->is_null() &&
                          _bottom != nullptr && !_bottom->is_null(),
                      "Creating closure for null LayeredSurface.");
@@ -424,10 +427,6 @@ private:
             };
         };
         return s;
-    }
-    void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df,
-                   TransportMode mode) const noexcept override {
-        LUISA_WARNING_WITH_LOCATION("LayeredSurfaceClosure::backward() ignored.");
     }
     [[nodiscard]] luisa::optional<Bool> _is_dispersive() const noexcept override {
         auto top_dispersive = _top->is_dispersive();

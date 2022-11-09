@@ -71,16 +71,6 @@ int main(int argc, char *argv[]) {
         }
     };
 
-    // check flattened
-    //    LUISA_ASSERT(scene->mRootNode->mTransformation.IsIdentity(),
-    //                 "Scene must be flattened.");
-    //    for (auto i = 0u; i < scene->mRootNode->mNumChildren; i++) {
-    //        auto node = scene->mRootNode->mChildren[i];
-    //        LUISA_ASSERT(node->mChildren == nullptr &&
-    //                         node->mTransformation.IsIdentity(),
-    //                     "Scene must be flattened.");
-    //    }
-
     // convert
     luisa::json scene_materials;
     luisa::json scene_geometry;
@@ -300,7 +290,8 @@ int main(int argc, char *argv[]) {
                     {"type", "Surface"},
                     {"impl", "Disney"},
                     {"prop",
-                     {{"color", color_map}}}};
+                     {{"color", color_map},
+                      {"remap_roughness", true}}}};
             } else {
                 scene_materials[mat_name] = {
                     {"type", "Surface"},
@@ -310,7 +301,8 @@ int main(int argc, char *argv[]) {
                       {"Ks",
                        {{"impl", "Constant"},
                         {"prop",
-                         {{"v", {.04f, .04f, .04f}}}}}}}}};
+                         {{"v", {.04f, .04f, .04f}},
+                          {"remap_roughness", true}}}}}}}};
             }
             if (has_roughness) {
                 scene_materials[mat_name]["prop"]["roughness"] = luisa::format("@{}", roughness_tex_name);
@@ -530,18 +522,21 @@ int main(int argc, char *argv[]) {
             {"type", "Camera"},
             {"impl", "Pinhole"},
             {"prop",
-             {{"position", {position.x, position.y, position.z}},
-              {"front", {front.x, front.y, front.z}},
-              {"up", {camera->mUp.x, camera->mUp.y, camera->mUp.z}},
-              {"fov", luisa::degrees(vertical_fov)},
+             {{"fov", luisa::degrees(vertical_fov)},
               {"spp", 256u},
-              {"near_plane", camera->mClipPlaneNear},
+              {"clip", camera->mClipPlaneNear},
               {"file", luisa::format("render-view-{:02}.exr", cameras.size())},
               {"film",
                {{"impl", "Color"},
                 {"prop",
                  {{"resolution", {1920, height}},
-                  {"filter", {{"impl", "Gaussian"}}}}}}}}}};
+                  {"filter", {{"impl", "Gaussian"}}}}}}},
+              {"transform",
+               {{"impl", "View"},
+                {"prop",
+                 {{"position", {position.x, position.y, position.z}},
+                  {"front", {front.x, front.y, front.z}},
+                  {"up", {camera->mUp.x, camera->mUp.y, camera->mUp.z}}}}}}}}};
         cameras.emplace_back(luisa::format("@{}", name));
     }
     // create default camera if non-existent
@@ -555,17 +550,20 @@ int main(int argc, char *argv[]) {
             {"type", "Camera"},
             {"impl", "Pinhole"},
             {"prop",
-             {{"position", {position.x, position.y, position.z}},
-              {"front", {0, 0, -1}},
-              {"up", {0, 1, 0}},
-              {"fov", 50},
+             {{"fov", 50},
               {"spp", 256u},
               {"file", "render.exr"},
               {"film",
                {{"impl", "Color"},
                 {"prop",
                  {{"resolution", {1920, 1080}},
-                  {"filter", {{"impl", "Gaussian"}}}}}}}}}};
+                  {"filter", {{"impl", "Gaussian"}}}}}}},
+              {"transform",
+               {{"impl", "View"},
+                {"prop",
+                 {{"position", {position.x, position.y, position.z}},
+                  {"front", {0, 0, -1}},
+                  {"up", {0, 1, 0}}}}}}}}};
         cameras.emplace_back(luisa::format("@{}", name));
     }
     scene_configs["import"] = {"lr_exported_materials.json", "lr_exported_geometry.json"};

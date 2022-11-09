@@ -6,7 +6,7 @@
 
 namespace luisa::render {
 
-class InlineMesh final : public Shape {
+class InlineMesh : public Shape {
 
 private:
     luisa::vector<Vertex> _vertices;
@@ -72,6 +72,11 @@ public:
     [[nodiscard]] bool has_uv() const noexcept override { return _has_uv; }
 };
 
+using InlineMeshWrapper =
+    VisibilityShapeWrapper<
+        ShadowTerminatorShapeWrapper<
+            IntersectionOffsetShapeWrapper<InlineMesh>>>;
+
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::InlineMesh)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::InlineMeshWrapper)

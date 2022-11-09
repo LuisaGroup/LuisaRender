@@ -25,13 +25,10 @@ public:
                   return desc->property_node_or_default("Kd");
               })))},
           _roughness{scene->load_texture(desc->property_node_or_default("roughness"))},
-          _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {
-        LUISA_RENDER_CHECK_ALBEDO_TEXTURE(MirrorSurface, color);
-        LUISA_RENDER_CHECK_GENERIC_TEXTURE(MirrorSurface, roughness, 1);
-    }
+          _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {}
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] uint properties() const noexcept override { return property_reflective | property_differentiable; }
+    [[nodiscard]] uint properties() const noexcept override { return property_reflective; }
 
 protected:
     [[nodiscard]] luisa::unique_ptr<Instance> _build(
@@ -70,12 +67,6 @@ using namespace luisa::compute;
 
 class SchlickFresnel : public Fresnel {
 
-public:
-    struct Gradient : public Fresnel::Gradient {
-        SampledSpectrum dR0;
-        explicit Gradient(const SampledSpectrum &dR0) noexcept : dR0{dR0} {}
-    };
-
 private:
     SampledSpectrum R0;
 
@@ -85,12 +76,6 @@ public:
         auto m = saturate(1.f - cosI);
         auto weight = sqr(sqr(m)) * m;
         return (1.f - weight) * R0 + weight;
-    }
-    [[nodiscard]] luisa::unique_ptr<Fresnel::Gradient> backward(
-        Expr<float> cosI, const SampledSpectrum &df) const noexcept override {
-        auto m = saturate(1.f - cosI);
-        auto weight = sqr(sqr(m)) * m;
-        return luisa::make_unique<SchlickFresnel::Gradient>(df * weight);
     }
 };
 
@@ -125,8 +110,7 @@ private:
         auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f |
                                   _it.shape()->shadow_terminator_factor() > 0.f,
                               1.f, 0.f);
-        return {.f = f * abs_cos_theta(wi_local) * same_sided,
-                .pdf = pdf * same_sided};
+        return {.f = f * abs_cos_theta(wi_local) * same_sided, .pdf = pdf};
     }
     [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float>, Expr<float2> u,
                                           TransportMode mode) const noexcept override {
@@ -138,38 +122,9 @@ private:
         auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f |
                                   _it.shape()->shadow_terminator_factor() > 0.f,
                               1.f, 0.f);
-        return {.eval = {.f = f * abs_cos_theta(wi_local) * same_sided,
-                         .pdf = pdf * same_sided},
+        return {.eval = {.f = f * abs_cos_theta(wi_local) * same_sided, .pdf = pdf},
                 .wi = wi,
                 .event = Surface::event_reflect};
-    }
-    void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df_in,
-                   TransportMode mode) const noexcept override {
-        auto _instance = instance<MirrorInstance>();
-        auto wo_local = _it.shading().world_to_local(wo);
-        auto wi_local = _it.shading().world_to_local(wi);
-        auto df = df_in * abs_cos_theta(wi_local);
-        auto grad = _refl->backward(wo_local, wi_local, df);
-        auto d_fresnel = dynamic_cast<SchlickFresnel::Gradient *>(grad.dFresnel.get());
-        if (auto color = _instance->color()) {
-            color->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(grad.dR + d_fresnel->dR0));
-        }
-        if (auto roughness = _instance->roughness()) {
-            auto remap = _instance->node<MirrorSurface>()->remap_roughness();
-            auto r_f4 = roughness->evaluate(_it, _swl, _time);
-            auto r = roughness->node()->channels() == 1u ? r_f4.xx() : r_f4.xy();
-
-            auto grad_alpha_roughness = [](auto &&x) noexcept {
-                return TrowbridgeReitzDistribution::grad_alpha_roughness(x);
-            };
-            auto d_r = grad.dAlpha * (remap ? grad_alpha_roughness(r) : make_float2(1.f));
-            auto d_r_f4 = roughness->node()->channels() == 1u ?
-                              make_float4(d_r.x + d_r.y, 0.f, 0.f, 0.f) :
-                              make_float4(d_r, 0.f, 0.f);
-            auto roughness_grad_range = 5.f * (roughness->node()->range().y - roughness->node()->range().x);
-            roughness->backward(_it, _swl, _time,
-                                ite(any(isnan(d_r_f4) || abs(d_r_f4) > roughness_grad_range), 0.f, d_r_f4));
-        }
     }
 };
 

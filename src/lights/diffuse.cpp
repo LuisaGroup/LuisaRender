@@ -23,9 +23,7 @@ public:
           _emission{scene->load_texture(desc->property_node_or_default(
               "emission", SceneNodeDesc::shared_default_texture("Constant")))},
           _scale{std::max(desc->property_float_or_default("scale", 1.0f), 0.0f)},
-          _two_sided{desc->property_bool_or_default("two_sided", false)} {
-        LUISA_RENDER_CHECK_ILLUMINANT_TEXTURE(DiffuseLight, emission);
-    }
+          _two_sided{desc->property_bool_or_default("two_sided", false)} {}
     [[nodiscard]] auto scale() const noexcept { return _scale; }
     [[nodiscard]] auto two_sided() const noexcept { return _two_sided; }
     [[nodiscard]] bool is_null() const noexcept override { return _scale == 0.0f || _emission->is_black(); }
@@ -77,7 +75,7 @@ struct DiffuseLightClosure final : public Light::Closure {
                 .pdf = ite(!two_sided & it_light.back_facing(), 0.0f, pdf)};
     }
 
-    [[nodiscard]] Light::Sample sample(Expr<uint> light_inst_id, Expr<float3> p_from, Expr<float2> u_in) const noexcept override {
+    [[nodiscard]] Light::Sample sample(Expr<uint> light_inst_id, const Interaction &it_from, Expr<float2> u_in) const noexcept override {
         auto light = instance<DiffuseLightInstance>();
         auto &&pipeline = light->pipeline();
         auto light_inst = pipeline.geometry()->instance(light_inst_id);
@@ -91,26 +89,13 @@ struct DiffuseLightClosure final : public Light::Closure {
         auto uvw = sample_uniform_triangle(make_float2(ux, u_in.y));
         auto attrib = pipeline.geometry()->shading_point(
             light_inst, triangle, uvw, light_to_world, light_to_world_normal);
-        auto light_wo = normalize(p_from - attrib.pg);
+        auto light_wo = normalize(it_from.p() - attrib.pg);
         Interaction it_light{light_inst, light_inst_id, triangle_id, attrib, dot(light_wo, attrib.ng) < 0.0f};
         DiffuseLightClosure closure{light, _swl, _time};
         auto p_light = it_light.p_robust(light_wo);
-        return {.eval = closure.evaluate(it_light, p_from),
-                .wi = -light_wo,
-                .distance = distance(p_light, p_from) * .9999f};
-    }
-    void backward(const Interaction &it_light, Expr<float3> p_from, const SampledSpectrum &df) const noexcept override {
-        // TODO
-        LUISA_ERROR_WITH_LOCATION("Not implemented.");
-
-        using namespace luisa::compute;
-        auto light = instance<DiffuseLightInstance>();
-        auto d_L = df * ite(it_light.back_facing(), 0.f, 1.f);
-        auto d_texture = d_L * light->node<DiffuseLight>()->scale();
-        auto d_scale = (d_L * light->texture()->evaluate_illuminant_spectrum(it_light, _swl, _time).value).sum();
-
-        light->texture()->backward_albedo_spectrum(it_light, _swl, _time, d_texture);
-        // TODO : backward scale
+        auto p_from = it_from.p_robust(-light_wo);
+        return {.eval = closure.evaluate(it_light, it_from.p_shading()),
+                .ray = it_from.spawn_ray(-light_wo, distance(p_light, p_from) * .999f)};
     }
 };
 

@@ -12,13 +12,27 @@ def convert_albedo_texture(a):
     if isinstance(a, str):
         return f'''Image {{
     file {{ "{a}" }}
-    semantic {{ "albedo" }}
+  }}'''
+    elif isinstance(a, dict):
+        assert a["type"] == "checker"
+        on_color = glm.vec3(a["on_color"])
+        off_color = glm.vec3(a["off_color"])
+        res_u = a["res_u"]
+        res_v = a["res_v"]
+        return f'''Checkerboard {{
+    on : Constant {{
+      v {{ {on_color.x}, {on_color.y}, {on_color.z} }}
+    }}
+    off : Constant {{
+      v {{ {off_color.x}, {off_color.y}, {off_color.z} }}
+    }}
+    scale {{ {res_u}, {res_v} }}
   }}'''
     else:
+        print(type(a))
         a = glm.vec3(a)
         return f'''Constant {{
     v {{ {a.x}, {a.y}, {a.z} }}
-    semantic {{ "albedo" }}
   }}'''
 
 
@@ -26,13 +40,26 @@ def convert_emission_texture(a):
     if isinstance(a, str):
         return f'''Image {{
     file {{ "{a}" }}
-    semantic {{ "illuminant" }}
+  }}'''
+    elif isinstance(a, dict):
+        assert a["type"] == "checker"
+        on_color = glm.vec3(a["on_color"])
+        off_color = glm.vec3(a["off_color"])
+        res_u = a["res_u"]
+        res_v = a["res_v"]
+        return f'''Checkerboard {{
+    on : Constant {{
+      v {{ {on_color.x}, {on_color.y}, {on_color.z} }}
+    }}
+    off : Constant {{
+      v {{ {off_color.x}, {off_color.y}, {off_color.z} }}
+    }}
+    scale {{ {res_u}, {res_v} }}
   }}'''
     else:
         a = glm.vec3(a)
         return f'''Constant {{
     v {{ {a.x}, {a.y}, {a.z} }}
-    semantic {{ "illuminant" }}
   }}'''
 
 
@@ -46,7 +73,6 @@ Surface mat_{name} : Substrate {{
   Kd : {convert_albedo_texture(color)}
   Ks : Constant {{
     v {{ 0.04, 0.04, 0.04 }}
-    semantic {{ "albedo" }}
   }}
   eta : Constant {{
     v {{ {ior} }}
@@ -66,7 +92,6 @@ def convert_glass_material(out_file, material: dict, alpha=""):
 Surface mat_{name} : Glass {{
   Kr : Constant {{
     v {{ 1, 1, 1 }}
-    semantic {{ "albedo" }}
   }}
   Kt : {convert_albedo_texture(color)}
   eta : Constant {{
@@ -96,13 +121,10 @@ def convert_metal_material(out_file, material: dict, alpha=""):
         k = material["k"]
         eta = f"360, {n}, {k}, 830, {n}, {k}"
     roughness = material.get("roughness", 1e-6)
-    albedo = glm.vec3(material.get("albedo", 1.0))
+    albedo = material.get("albedo")
     if albedo != glm.vec3(1):
         albedo = f"""
-  Kd : Constant {{
-    v {{ {albedo.x}, {albedo.y}, {albedo.z} }}
-    semantic {{ "albedo" }}
-  }}"""
+  Kd : {convert_albedo_texture(albedo)}"""
     else:
         albedo = ""
     print(f'''
@@ -166,11 +188,8 @@ def convert_material(out_file, material: dict, alpha=""):
 Surface mat_{material["name"]} : Matte {{
   Kd : Constant {{
       v {{ 1, 1, 1 }}
-      semantic {{ "albedo" }}
     }}
 }}''', file=out_file)
-        return
-        raise NotImplementedError()
 
 
 def convert_materials(out_file, materials):
@@ -215,7 +234,6 @@ Env env : Spherical {{
 Env dir : Directional {{
   emission : Constant {{
     v {{ {emission.x}, {emission.y}, {emission.z} }}
-    semantic {{ "illuminant" }}
   }}
   angle {{ {angle} }}
   transform : Matrix {{
@@ -232,7 +250,6 @@ Env dir : Directional {{
 Env sky : Spherical {{
   emission : Image {{
     file {{ "textures/sky.exr" }}
-    semantic {{ "illuminant" }}
   }}
   transform : Matrix {{
     m {{ {M[0][0]}, {M[1][0]}, {M[2][0]}, {M[3][0]},
@@ -256,8 +273,7 @@ Env sky : Spherical {{
                               ) * glm.scale(glm.vec3(.5))
         elif impl == "cube":
             file = "models/cube.obj"
-            M = M * rotateXYZ(glm.radians(glm.vec3(-90, 0, 0))
-                              ) * glm.scale(glm.vec3(.5))
+            M = M * rotateXYZ(glm.radians(glm.vec3(-90, 0, 0))) * glm.scale(glm.vec3(.5))
         elif impl == "disk":
             file = "models/disk.obj"
         elif impl == "sphere":
@@ -284,7 +300,6 @@ Env sky : Spherical {{
   light : Diffuse {{
     emission : Constant {{
       v {{ {emission.x}, {emission.y}, {emission.z} }}
-      semantic {{ "illuminant" }}
     }}
   }}'''
         print(f'''
@@ -319,9 +334,6 @@ def convert_camera(out_file, camera: dict, spp):
     up = glm.vec3(transform["up"])
     print(f'''
 Camera camera : Pinhole {{
-  position {{ {position.x}, {position.y}, {position.z} }}
-  front {{ {front.x}, {front.y}, {front.z} }}
-  up {{ {up.x}, {up.y}, {up.z} }}
   fov {{ {fov} }}
   spp {{ {spp} }}
   filter : Gaussian {{
@@ -331,6 +343,11 @@ Camera camera : Pinhole {{
     resolution {{ {int(resolution.x)}, {int(resolution.y)} }}
   }}
   file {{ "render.exr" }}
+  transform : View {{
+    position {{ {position.x}, {position.y}, {position.z} }}
+    front {{ {front.x}, {front.y}, {front.z} }}
+    up {{ {up.x}, {up.y}, {up.z} }}
+  }}
 }}''', file=out_file)
 
 
@@ -347,7 +364,9 @@ def write_render(out_file, shapes):
     print(f'''
 render {{
   cameras {{ @camera }}
-  integrator : WavePath {{}}
+  integrator : WavePath {{
+    sampler : PMJ02BN {{}}
+  }}
   shapes {{
     {shape_refs}
   }}

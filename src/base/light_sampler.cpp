@@ -17,10 +17,10 @@ Light::Sample LightSampler::Instance::sample_selection(
     if (!pipeline().has_lighting()) { return sample; }
     if (_pipeline.environment() != nullptr) {// possibly environment lighting
         if (_pipeline.lights().empty()) {    // no lights, just environment lighting
-            sample = sample_environment(it_from.p(), sel.prob, u, swl, time);
+            sample = sample_environment(it_from, sel.prob, u, swl, time);
         } else {// environment lighting and lights
             $if(sel.tag == selection_environment) {
-                sample = sample_environment(it_from.p(), sel.prob, u, swl, time);
+                sample = sample_environment(it_from, sel.prob, u, swl, time);
             }
             $else {
                 sample = sample_light(it_from, sel, u, swl, time);
@@ -49,9 +49,9 @@ Light::Sample LightSampler::Instance::sample_light(
 }
 
 Light::Sample LightSampler::Instance::sample_environment(
-    Expr<float3> p_from, Expr<float> prob, Expr<float2> u,
+    const Interaction &it_from, Expr<float> prob, Expr<float2> u,
     const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    auto s = _sample_environment(p_from, u, swl, time);
+    auto s = _sample_environment(it_from, u, swl, time);
     s.eval.pdf *= prob;
     return s;
 }

@@ -29,7 +29,6 @@ public:
         auto prop = _a->properties() | _b->properties();
         LUISA_ASSERT(!((prop & property_thin) && (prop & property_transmissive)),
                      "MixSurface: Cannot mix thin and transmissive surfaces.");
-        LUISA_RENDER_CHECK_GENERIC_TEXTURE(MixSurface, ratio, 1);
     }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] uint properties() const noexcept override { return _a->properties() | _b->properties(); }
@@ -145,21 +144,6 @@ private:
             sample.event = sample_b.event;
         };
         return sample;
-    }
-    void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df,
-                   TransportMode mode) const noexcept override {
-        using compute::isnan;
-        auto eval_a = _a->evaluate(wo, wi, mode);
-        auto eval_b = _b->evaluate(wo, wi, mode);
-        auto d_a = df * _ratio;
-        auto d_b = df * (1.f - _ratio);
-        _a->backward(wo, wi, zero_if_any_nan(d_a), mode);
-        _b->backward(wo, wi, zero_if_any_nan(d_a), mode);
-        if (auto ratio = instance<MixSurfaceInstance>()->ratio()) {
-            auto d_ratio = (df * (eval_a.f - eval_b.f)).sum();
-            ratio->backward(_it, _swl, _time,
-                            make_float4(ite(isnan(d_ratio), 0.f, d_ratio), 0.f, 0.f, 0.f));
-        }
     }
 };
 

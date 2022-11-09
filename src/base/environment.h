@@ -31,7 +31,7 @@ public:
         [[nodiscard]] virtual Light::Evaluation evaluate(
             Expr<float3> wi, const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
         [[nodiscard]] virtual Light::Sample sample(
-            Expr<float3> p_from, const SampledWavelengths &swl,
+            const Interaction &it_from, const SampledWavelengths &swl,
             Expr<float> time, Expr<float2> u) const noexcept = 0;
         [[nodiscard]] Float3x3 transform_to_world() const noexcept;
     };

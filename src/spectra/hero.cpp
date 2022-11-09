@@ -192,31 +192,15 @@ public:
         : Spectrum{scene, desc},
           _dimension{std::max(desc->property_uint_or_default("dimension", 4u), 1u)} {}
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] bool is_differentiable() const noexcept override { return false; }
     [[nodiscard]] bool is_fixed() const noexcept override { return false; }
     [[nodiscard]] uint dimension() const noexcept override { return _dimension; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
-    [[nodiscard]] bool requires_encoding() const noexcept override { return true; }
-    [[nodiscard]] float4 encode_srgb_albedo(float3 rgb) const noexcept override {
+    [[nodiscard]] float4 encode_static_srgb_albedo(float3 rgb) const noexcept override {
         return RGB2SpectrumTable::srgb().decode_albedo(rgb);
     }
-    [[nodiscard]] float4 encode_srgb_illuminant(float3 rgb) const noexcept override {
+    [[nodiscard]] float4 encode_static_srgb_illuminant(float3 rgb) const noexcept override {
         return RGB2SpectrumTable::srgb().decode_unbound(rgb);
-    }
-    [[nodiscard]] PixelStorage encoded_albedo_storage(PixelStorage storage) const noexcept override {
-        LUISA_ASSERT(pixel_storage_channel_count(storage) != 2u,
-                     "Hero-wavelength spectrum does not support 2-channel albedo pixels.");
-        return storage == PixelStorage::FLOAT1 || storage == PixelStorage::FLOAT4 ?
-                   PixelStorage::FLOAT4 :
-                   PixelStorage::HALF4;
-    }
-    [[nodiscard]] PixelStorage encoded_illuminant_storage(PixelStorage storage) const noexcept override {
-        LUISA_ASSERT(pixel_storage_channel_count(storage) != 2u,
-                     "Hero-wavelength spectrum does not support 2-channel illuminant pixels.");
-        return storage == PixelStorage::FLOAT1 || storage == PixelStorage::FLOAT4 ?
-                   PixelStorage::FLOAT4 :
-                   PixelStorage::HALF4;
     }
 };
 

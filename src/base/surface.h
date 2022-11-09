@@ -71,7 +71,6 @@ public:
     private:
         [[nodiscard]] virtual Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept = 0;
         [[nodiscard]] virtual Sample _sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u, TransportMode mode) const noexcept = 0;
-        virtual void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df, TransportMode mode) const noexcept = 0;
 
     private:
         [[nodiscard]] virtual luisa::optional<Float> _opacity() const noexcept;
@@ -87,7 +86,6 @@ public:
         [[nodiscard]] auto instance() const noexcept { return static_cast<const T *>(_instance); }
         [[nodiscard]] Evaluation evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode = TransportMode::RADIANCE) const noexcept;
         [[nodiscard]] Sample sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u, TransportMode mode = TransportMode::RADIANCE) const noexcept;
-        void backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df, TransportMode mode = TransportMode::RADIANCE) const noexcept;
         [[nodiscard]] auto &swl() const noexcept { return _swl; }          // sampled wavelengths
         [[nodiscard]] auto &it() const noexcept { return _it; }            // interaction, possibly normal mapped
         [[nodiscard]] luisa::optional<Float> opacity() const noexcept;     // nullopt if never possible to be non-opaque
@@ -123,7 +121,6 @@ public:
     static constexpr auto property_reflective = 1u << 0u;
     static constexpr auto property_transmissive = 1u << 1u;
     static constexpr auto property_thin = 1u << 2u;
-    static constexpr auto property_differentiable = 1u << 3u;
 
 protected:
     [[nodiscard]] virtual luisa::unique_ptr<Instance> _build(
@@ -136,7 +133,6 @@ public:
     [[nodiscard]] auto is_reflective() const noexcept { return static_cast<bool>(properties() & property_reflective); }
     [[nodiscard]] auto is_transmissive() const noexcept { return static_cast<bool>(properties() & property_transmissive); }
     [[nodiscard]] auto is_thin() const noexcept { return static_cast<bool>(properties() & property_thin); }
-    [[nodiscard]] auto is_differentiable() const noexcept { return static_cast<bool>(properties() & property_differentiable); }
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept;
 };
 
@@ -170,7 +166,7 @@ public:
             Expr<float> eta_i, Expr<float> time) const noexcept override {
             auto base = BaseInstance::closure(it, swl, eta_i, time);
             auto alpha = _opacity ? luisa::make_optional(_opacity->evaluate(it, swl, time).x) : luisa::nullopt;
-            return luisa::make_unique<Closure>(std::move(*dynamic_cast<BaseClosure *>(base.release())), std::move(alpha));
+            return luisa::make_unique<Closure>(std::move(dynamic_cast<BaseClosure &>(*base)), std::move(alpha));
         }
     };
 
@@ -189,7 +185,7 @@ protected:
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
         auto base = BaseSurface::_build(pipeline, command_buffer);
         return luisa::make_unique<Instance>(
-            std::move(*dynamic_cast<BaseInstance *>(base.release())),
+            std::move(dynamic_cast<BaseInstance &>(*base)),
             [this](auto &pipeline, auto &command_buffer) noexcept {
                 return pipeline.build_texture(command_buffer, _opacity);
             }(pipeline, command_buffer));
@@ -240,7 +236,7 @@ protected:
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
         auto base = BaseSurface::_build(pipeline, command_buffer);
         return luisa::make_unique<Instance>(
-            std::move(*dynamic_cast<BaseInstance *>(base.release())),
+            std::move(dynamic_cast<BaseInstance &>(*base)),
             [this](auto &pipeline, auto &command_buffer) noexcept {
                 return pipeline.build_texture(command_buffer, _normal_map);
             }(pipeline, command_buffer),
@@ -289,8 +285,7 @@ protected:
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
         auto base = BaseSurface::_build(pipeline, command_buffer);
         return luisa::make_unique<Instance>(
-            std::move(*dynamic_cast<BaseInstance *>(base.release())),
-            _two_sided);
+            std::move(dynamic_cast<BaseInstance &>(*base)), _two_sided);
     }
     [[nodiscard]] uint properties() const noexcept override {
         auto p = BaseSurface::properties();

@@ -78,15 +78,11 @@ public:
                 }
             }
         }
-        LUISA_RENDER_CHECK_ALBEDO_TEXTURE(GlassSurface, kr);
-        LUISA_RENDER_CHECK_ALBEDO_TEXTURE(GlassSurface, kt);
-        LUISA_RENDER_CHECK_GENERIC_TEXTURE(GlassSurface, roughness, 1);
-        LUISA_RENDER_CHECK_GENERIC_TEXTURE(GlassSurface, eta, 1);
     }
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] uint properties() const noexcept override {
-        return property_reflective | property_transmissive | property_differentiable;
+        return property_reflective | property_transmissive;
     }
 
 protected:
@@ -169,12 +165,12 @@ private:
                                       _it.shape()->shadow_terminator_factor() > 0.f,
                                   1.f, 0.f);
             f = _refl->evaluate(wo_local, wi_local, mode) * same_sided;
-            pdf = _refl->pdf(wo_local, wi_local, mode) * ratio * same_sided;
+            pdf = _refl->pdf(wo_local, wi_local, mode) * ratio;
         }
         $else {
             auto different_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) < 0.0f, 1.f, 0.f);
             f = _trans->evaluate(wo_local, wi_local, mode) * different_sided;
-            pdf = _trans->pdf(wo_local, wi_local, mode) * (1.f - ratio) * different_sided;
+            pdf = _trans->pdf(wo_local, wi_local, mode) * (1.f - ratio);
         };
         auto entering = wi_local.z < 0.f;
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
@@ -192,69 +188,22 @@ private:
         $if(u_lobe < ratio) {// Reflection
             f = _refl->sample(wo_local, &wi_local, u, &pdf, mode);
             wi = _it.shading().local_to_world(wi_local);
-            auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f |
+            f *= ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f |
                                       _it.shape()->shadow_terminator_factor() > 0.f,
                                   1.f, 0.f);
-            pdf *= ratio * same_sided;
-            f *= same_sided;
+            pdf *= ratio;
         }
         $else {// Transmission
             f = _trans->sample(wo_local, &wi_local, u, &pdf, mode);
             wi = _it.shading().local_to_world(wi_local);
-            auto different_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) < 0.0f, 1.f, 0.f);
-            f *= different_sided;
-            pdf *= (1.f - ratio) * different_sided;
+            f *= ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) < 0.0f, 1.f, 0.f);
+            pdf *= (1.f - ratio);
             event = ite(cos_theta(wo_local) > 0.f, Surface::event_enter, Surface::event_exit);
         };
         auto entering = wi_local.z < 0.f;
         return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf},
                 .wi = wi,
                 .event = event};
-    }
-
-    void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df_in,
-                   TransportMode mode) const noexcept override {
-        auto _instance = instance<GlassInstance>();
-        auto wo_local = _it.shading().world_to_local(wo);
-        auto wi_local = _it.shading().world_to_local(wi);
-        auto df = df_in * abs_cos_theta(wi_local);
-
-        Float2 d_alpha;
-
-        $if(same_hemisphere(wo_local, wi_local)) {
-            // Kr
-            if (_instance->Kr() && _instance->Kr()->node()->requires_gradients()) {
-                auto d_f = _refl->backward(wo_local, wi_local, df);
-                d_alpha = d_f.dAlpha;
-                _instance->Kr()->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(d_f.dR));
-            }
-        }
-        $else {
-            // Ks
-            if (_instance->Kt() && _instance->Kt()->node()->requires_gradients()) {
-                auto d_f = _trans->backward(wo_local, wi_local, df, mode);
-                d_alpha = d_f.dAlpha;
-                _instance->Kt()->backward_albedo_spectrum(_it, _swl, _time, zero_if_any_nan(d_f.dT));
-            }
-        };
-
-        // roughness
-        if (auto roughness = _instance->roughness();
-            roughness != nullptr && roughness->node()->requires_gradients()) {
-            auto remap = _instance->node<GlassSurface>()->remap_roughness();
-            auto r_f4 = roughness->evaluate(_it, _swl, _time);
-            auto r = roughness->node()->channels() == 1u ? r_f4.xx() : r_f4.xy();
-            auto grad_alpha_roughness = [](auto &&x) noexcept {
-                return TrowbridgeReitzDistribution::grad_alpha_roughness(x);
-            };
-            auto d_r = d_alpha * (remap ? grad_alpha_roughness(r) : make_float2(1.f));
-            auto d_r_f4 = roughness->node()->channels() == 1u ?
-                              make_float4(d_r.x + d_r.y, 0.f, 0.f, 0.f) :
-                              make_float4(d_r, 0.f, 0.f);
-            auto roughness_grad_range = 5.f * (roughness->node()->range().y - roughness->node()->range().x);
-            roughness->backward(_it, _swl, _time,
-                                ite(any(isnan(d_r_f4) || abs(d_r_f4) > roughness_grad_range), 0.f, d_r_f4));
-        }
     }
 
 private:

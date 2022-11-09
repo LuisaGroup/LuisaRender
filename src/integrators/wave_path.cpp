@@ -2,21 +2,19 @@
 // Created by Mike Smith on 2022/1/10.
 //
 
-#include <fstream>
-
-#include <luisa-compute.h>
 #include <util/imageio.h>
 #include <util/sampling.h>
 #include <util/medium_tracker.h>
 #include <util/progress_bar.h>
 #include <base/pipeline.h>
 #include <base/integrator.h>
+#include <base/display.h>
 
 namespace luisa::render {
 
 using namespace compute;
 
-class WavefrontPathTracing final : public Integrator {
+class WavefrontPathTracing final : public ProgressiveIntegrator {
 
 public:
     static constexpr auto min_state_count = 1024u * 1024u;
@@ -30,7 +28,7 @@ private:
 
 public:
     WavefrontPathTracing(Scene *scene, const SceneNodeDesc *desc) noexcept
-        : Integrator{scene, desc},
+        : ProgressiveIntegrator{scene, desc},
           _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)},
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
@@ -38,7 +36,6 @@ public:
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
-    [[nodiscard]] bool is_differentiable() const noexcept override { return false; }
     [[nodiscard]] auto state_count() const noexcept { return _state_count; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
@@ -205,42 +202,17 @@ public:
     }
 };
 
-class WavefrontPathTracingInstance final : public Integrator::Instance {
-
-private:
-    void _render_one_camera(CommandBuffer &command_buffer, Camera::Instance *camera) noexcept;
+class WavefrontPathTracingInstance final : public ProgressiveIntegrator::Instance {
 
 public:
-    WavefrontPathTracingInstance(const WavefrontPathTracing *node, Pipeline &pipeline, CommandBuffer &cb) noexcept
-        : Integrator::Instance{pipeline, cb, node} {}
+    using ProgressiveIntegrator::Instance::Instance;
 
-    void render(Stream &stream) noexcept override {
-        auto pt = node<WavefrontPathTracing>();
-        auto command_buffer = stream.command_buffer();
-        luisa::vector<float4> pixels;
-        for (auto i = 0u; i < pipeline().camera_count(); i++) {
-            auto camera = pipeline().camera(i);
-            auto resolution = camera->film()->node()->resolution();
-            auto pixel_count = resolution.x * resolution.y;
-            pixels.resize(next_pow2(pixel_count));
-            auto film_path = camera->node()->file();
-            LUISA_INFO(
-                "Rendering to '{}' of resolution {}x{} at {}spp.",
-                film_path.string(),
-                resolution.x, resolution.y,
-                camera->node()->spp());
-            camera->film()->prepare(command_buffer);
-            _render_one_camera(command_buffer, camera);
-            camera->film()->download(command_buffer, pixels.data());
-            command_buffer << compute::synchronize();
-            camera->film()->release();
-            save_image(film_path, (const float *)pixels.data(), resolution);
-        }
-    }
+protected:
+    void _render_one_camera(CommandBuffer &command_buffer, Camera::Instance *camera) noexcept override;
 };
 
 luisa::unique_ptr<Integrator::Instance> WavefrontPathTracing::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
-    return luisa::make_unique<WavefrontPathTracingInstance>(this, pipeline, command_buffer);
+    return luisa::make_unique<WavefrontPathTracingInstance>(pipeline, command_buffer, this);
 }
 
 void WavefrontPathTracingInstance::_render_one_camera(
@@ -385,11 +357,10 @@ void WavefrontPathTracingInstance::_render_one_camera(
                 *it, u_light_selection, u_light_surface, swl, time);
             sampler()->save_state(path_id);
             // trace shadow ray
-            auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
-            auto occluded = pipeline().geometry()->intersect_any(shadow_ray);
+            auto occluded = pipeline().geometry()->intersect_any(light_sample.ray);
             light_samples.write_emission(queue_id, ite(occluded, 0.f, 1.f) * light_sample.eval.L);
             light_samples.write_pdf(queue_id, ite(occluded, 0.f, light_sample.eval.pdf));
-            light_samples.write_wi(queue_id, shadow_ray->direction());
+            light_samples.write_wi(queue_id, light_sample.ray->direction());
         };
     });
 
@@ -409,36 +380,31 @@ void WavefrontPathTracingInstance::_render_one_camera(
             auto swl = path_states.read_swl(path_id);
             auto beta = path_states.read_beta(path_id);
             auto surface_tag = it->shape()->surface_tag();
-            auto pdf_bsdf = def(0.f);
             auto u_lobe = sampler()->generate_1d();
             auto u_bsdf = sampler()->generate_2d();
+            auto eta = def(1.f);
             auto eta_scale = def(1.f);
+            auto wo = -ray->direction();
+            auto surface_sample = Surface::Sample::zero(swl.dimension());
+            auto alpha_skip = def(false);
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
-
                 // create closure
                 auto closure = surface->closure(*it, swl, 1.f, time);
-                if (auto dispersive = closure->is_dispersive()) {
-                    $if (*dispersive) {
-                        swl.terminate_secondary();
-                        path_states.write_swl(path_id, swl);
-                    };
-                }
 
                 // apply roughness map
-                auto alpha_skip = def(false);
                 if (auto o = closure->opacity()) {
                     auto opacity = saturate(*o);
                     alpha_skip = u_lobe >= opacity;
                     u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
                 }
 
-                $if(alpha_skip) {
-                    ray = it->spawn_ray(ray->direction());
-                    pdf_bsdf = 1e16f;
-                }
-                $else {
-                    auto wo = -ray->direction();
-
+                $if(!alpha_skip) {
+                    if (auto dispersive = closure->is_dispersive()) {
+                        $if(*dispersive) {
+                            swl.terminate_secondary();
+                            path_states.write_swl(path_id, swl);
+                        };
+                    }
                     // direct lighting
                     auto pdf_light = light_samples.read_pdf(queue_id);
                     $if(pdf_light > 0.0f) {
@@ -448,45 +414,53 @@ void WavefrontPathTracingInstance::_render_one_camera(
                         auto mis_weight = balance_heuristic(pdf_light, eval.pdf);
                         Li += mis_weight / pdf_light * beta * eval.f * Ld;
                     };
-
                     // sample material
-                    auto sample = closure->sample(wo, u_lobe, u_bsdf);
-                    ray = it->spawn_ray(sample.wi);
-                    pdf_bsdf = sample.eval.pdf;
-                    auto w = ite(sample.eval.pdf > 0.0f, 1.f / sample.eval.pdf, 0.f);
-                    beta *= w * sample.eval.f;
-
-                    // apply eta scale
-                    auto eta = closure->eta().value_or(1.f);
-                    $switch (sample.event) {
-                        $case (Surface::event_enter) { eta_scale = sqr(eta); };
-                        $case (Surface::event_exit) { eta_scale = 1.f / sqr(eta); };
-                    };
+                    surface_sample = closure->sample(wo, u_lobe, u_bsdf);
+                    eta = closure->eta().value_or(1.f);
                 };
             });
-            $if(beta.any([](auto b) noexcept { return !isnan(b) & b > 0.f; })) {
-                auto rr_depth = node<WavefrontPathTracing>()->rr_depth();
-                auto rr_threshold = node<WavefrontPathTracing>()->rr_threshold();
-                // rr
-                auto q = max(beta.max() * eta_scale, 0.05f);
-                $if(trace_depth + 1u >= rr_depth & q < rr_threshold) {
-                    $if(sampler()->generate_1d() < q) {
-                        beta *= 1.f / q;
-                        auto out_queue_id = out_queue_size.atomic(0u).fetch_add(1u);
-                        out_queue.write(out_queue_id, path_id);
-                        out_rays.write(out_queue_id, ray);
-                    };
+            path_states.write_radiance(path_id, Li);
+
+            // prepare for the next bounce
+            auto pdf_bsdf = def(0.f);
+            auto terminated = def(false);
+            $if(alpha_skip) {
+                ray = it->spawn_ray(ray->direction());
+                pdf_bsdf = 1e16f;
+            }
+            $else {
+                ray = it->spawn_ray(surface_sample.wi);
+                pdf_bsdf = surface_sample.eval.pdf;
+                auto w = ite(surface_sample.eval.pdf > 0.0f, 1.f / surface_sample.eval.pdf, 0.f);
+                beta *= w * surface_sample.eval.f;
+                $switch(surface_sample.event) {
+                    $case(Surface::event_enter) { eta_scale = sqr(eta); };
+                    $case(Surface::event_exit) { eta_scale = 1.f / sqr(eta); };
+                };
+                beta = zero_if_any_nan(beta);
+                $if(beta.all([](auto b) noexcept { return b <= 0.f; })) {
+                    terminated = true;
                 }
                 $else {
-                    auto out_queue_id = out_queue_size.atomic(0u).fetch_add(1u);
-                    out_queue.write(out_queue_id, path_id);
-                    out_rays.write(out_queue_id, ray);
+                    auto rr_depth = node<WavefrontPathTracing>()->rr_depth();
+                    auto rr_threshold = node<WavefrontPathTracing>()->rr_threshold();
+                    // rr
+                    auto q = max(beta.max() * eta_scale, 0.05f);
+                    $if(trace_depth + 1u >= rr_depth) {
+                        auto u = sampler()->generate_1d();
+                        terminated = q < rr_threshold & u >= q;
+                        beta *= ite(q < rr_threshold, 1.f / q, 1.f);
+                    };
                 };
             };
-            sampler()->save_state(path_id);
-            path_states.write_radiance(path_id, Li);
-            path_states.write_beta(path_id, beta);
-            path_states.write_pdf_bsdf(path_id, pdf_bsdf);
+            $if(!terminated) {
+                auto out_queue_id = out_queue_size.atomic(0u).fetch_add(1u);
+                out_queue.write(out_queue_id, path_id);
+                out_rays.write(out_queue_id, ray);
+                sampler()->save_state(path_id);
+                path_states.write_beta(path_id, beta);
+                path_states.write_pdf_bsdf(path_id, pdf_bsdf);
+            };
         };
     });
 
@@ -510,11 +484,6 @@ void WavefrontPathTracingInstance::_render_one_camera(
     accumulate_shader.wait();
     auto integrator_shader_compilation_time = clock_compile.toc();
     LUISA_INFO("Integrator shader compile in {} ms.", integrator_shader_compilation_time);
-    {
-        std::ofstream file{"results.txt", std::ios::app};
-        file << "Shader compile time = " << integrator_shader_compilation_time << " ms" << std::endl;
-    }
-
 
     LUISA_INFO("Rendering started.");
     // create path states
@@ -537,7 +506,6 @@ void WavefrontPathTracingInstance::_render_one_camera(
 
     auto sample_id = 0u;
     auto last_committed_sample_id = 0u;
-    constexpr auto launches_per_commit = 16u;
     Clock clock;
     ProgressBar progress_bar;
     progress_bar.update(0.0);
@@ -588,10 +556,18 @@ void WavefrontPathTracingInstance::_render_one_camera(
             }
             command_buffer << accumulate_shader.get()(s.point.weight).dispatch(launch_state_count);
             sample_id += launch_spp;
+            auto launches_per_commit =
+                display() && !display()->should_close() ?
+                    node<WavefrontPathTracing>()->display_interval() :
+                    16u;
             if (sample_id - last_committed_sample_id >= launches_per_commit) {
                 last_committed_sample_id = sample_id;
                 auto p = sample_id / static_cast<double>(spp);
-                command_buffer << [p, &progress_bar] { progress_bar.update(p); };
+                if (display() && display()->update(command_buffer, sample_id)) {
+                    progress_bar.update(p);
+                } else {
+                    command_buffer << [p, &progress_bar] { progress_bar.update(p); };
+                }
             }
         }
     }
@@ -600,10 +576,6 @@ void WavefrontPathTracingInstance::_render_one_camera(
 
     auto render_time = clock.toc();
     LUISA_INFO("Rendering finished in {} ms.", render_time);
-    {
-        std::ofstream file{"results.txt", std::ios::app};
-        file << "Render time = " << render_time << " ms" << std::endl;
-    }
 }
 
 }// namespace luisa::render

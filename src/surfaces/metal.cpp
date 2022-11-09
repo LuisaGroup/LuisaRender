@@ -148,13 +148,11 @@ public:
                     eta.data(), eta.size() * sizeof(float), 19980810u));
             _ior = register_eta_k(name, lut);
         }
-        LUISA_RENDER_CHECK_GENERIC_TEXTURE(MetalSurface, roughness, 1);
-        LUISA_RENDER_CHECK_ALBEDO_TEXTURE(MetalSurface, kd);
     }
     [[nodiscard]] auto ior() const noexcept { return _ior; }
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] uint properties() const noexcept override { return property_reflective | property_differentiable; }
+    [[nodiscard]] uint properties() const noexcept override { return property_reflective; }
 
 protected:
     [[nodiscard]] luisa::unique_ptr<Instance> _build(
@@ -240,8 +238,7 @@ private:
         auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f |
                                   _it.shape()->shadow_terminator_factor() > 0.f,
                               1.f, 0.f);
-        return {.f = f * abs_cos_theta(wi_local) * same_sided,
-                .pdf = pdf * same_sided};
+        return {.f = f * abs_cos_theta(wi_local) * same_sided, .pdf = pdf};
     }
     [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float>, Expr<float2> u,
                                           TransportMode mode) const noexcept override {
@@ -254,21 +251,9 @@ private:
         auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f |
                                   _it.shape()->shadow_terminator_factor() > 0.f,
                               1.f, 0.f);
-        return {.eval = {.f = f * abs_cos_theta(wi_local) * same_sided,
-                         .pdf = pdf * same_sided},
+        return {.eval = {.f = f * abs_cos_theta(wi_local) * same_sided, .pdf = pdf},
                 .wi = wi,
                 .event = Surface::event_reflect};
-    }
-    void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df,
-                   TransportMode mode) const noexcept override {
-        if (auto Kd = instance<MetalInstance>()->Kd();
-            Kd != nullptr && Kd->node()->requires_gradients()) {
-            auto wi_local = _it.shading().world_to_local(wi);
-            auto eval = _lobe->evaluate(wi_local, _it.shading().world_to_local(wi), mode);
-            auto dKd = df * abs_cos_theta(wi_local) * eval;
-            Kd->backward_albedo_spectrum(_it, _swl, _time, dKd);
-        }
-        // FIXME: differentiate roughness
     }
 };
 

@@ -2,10 +2,6 @@
 // Created by Mike Smith on 2022/1/10.
 //
 
-#include <fstream>
-
-#include <core/json.h>
-#include <ast/function_serializer.h>
 #include <util/imageio.h>
 #include <luisa-compute.h>
 
@@ -28,16 +24,25 @@ static const luisa::unordered_map<luisa::string_view, uint>
                               {"albedo", 3u},
                               {"depth", 1u},
                               {"roughness", 2u},
-                              {"ndc", 3u}};
+                              {"ndc", 3u},
+                              {"mask", 1u}};
 
 class AuxiliaryBufferPathTracing final : public Integrator {
+
+public:
+    enum struct DumpStrategy {
+        POWER2,
+        ALL,
+        FINAL,
+    };
 
 private:
     uint _max_depth;
     uint _rr_depth;
     float _rr_threshold;
     uint _noisy_count;
-    luisa::unordered_set<luisa::string_view> _enabled_aov;
+    DumpStrategy _dump_strategy{};
+    luisa::unordered_set<luisa::string> _enabled_aov;
 
 public:
     AuxiliaryBufferPathTracing(Scene *scene, const SceneNodeDesc *desc) noexcept
@@ -46,19 +51,46 @@ public:
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
           _noisy_count{std::max(desc->property_uint_or_default("noisy_count", 8u), 8u)} {
-        for (auto [c, _] : aov_component_to_channels) {
-            auto option = luisa::format("enable_{}", c);
-            if (desc->property_bool_or_default(option, true)) {
-                _enabled_aov.emplace(c);
+        auto components = desc->property_string_list_or_default("components", {"all"});
+        for (auto &comp : components) {
+            for (auto &c : comp) { c = static_cast<char>(std::tolower(c)); }
+            if (comp == "all") {
+                for (auto &[name, _] : aov_component_to_channels) {
+                    _enabled_aov.emplace(name);
+                }
+            } else if (aov_component_to_channels.contains(comp)) {
+                _enabled_aov.emplace(comp);
+            } else {
+                LUISA_WARNING_WITH_LOCATION(
+                    "Ignoring unknown AOV component '{}'. [{}]",
+                    comp, desc->source_location().string());
             }
+        }
+        for (auto &&comp : _enabled_aov) {
+            LUISA_INFO("Enabled AOV component '{}'.", comp);
+        }
+        auto dump = desc->property_string_or_default("dump", "power2");
+        for (auto &c : dump) { c = static_cast<char>(std::tolower(c)); }
+        if (dump == "all") {
+            _dump_strategy = DumpStrategy::ALL;
+        } else if (dump == "final") {
+            _dump_strategy = DumpStrategy::FINAL;
+        } else {
+            if (dump != "power2") [[unlikely]] {
+                LUISA_WARNING_WITH_LOCATION(
+                    "Unknown dump strategy '{}'. "
+                    "Fallback to power2 strategy. [{}]",
+                    dump, desc->source_location().string());
+            }
+            _dump_strategy = DumpStrategy::POWER2;
         }
     }
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
     [[nodiscard]] auto noisy_count() const noexcept { return _noisy_count; }
-    [[nodiscard]] bool is_differentiable() const noexcept override { return false; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] auto dump_strategy() const noexcept { return _dump_strategy; }
     [[nodiscard]] auto is_component_enabled(luisa::string_view component) const noexcept {
         return _enabled_aov.contains(component);
     }
@@ -188,17 +220,13 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
     sampler->reset(command_buffer, resolution, pixel_count, spp);
     command_buffer << synchronize();
 
-    LUISA_INFO(
-        "Rendering to '{}' of resolution {}x{} at {}spp.",
-        image_file.string(),
-        resolution.x, resolution.y, spp);
-
     using namespace luisa::compute;
 
     // 3 diffuse, 3 specular, 3 normal, 1 depth, 3 albedo, 1 roughness, 1 emissive, 1 metallic, 1 transmissive, 1 specular-bounce
     luisa::unordered_map<luisa::string, luisa::unique_ptr<AuxiliaryBuffer>> aux_buffers;
     for (auto [comp, nc] : aov_component_to_channels) {
         auto enabled = node<AuxiliaryBufferPathTracing>()->is_component_enabled(comp);
+        LUISA_INFO("Component {} is {}.", comp, enabled ? "enabled" : "disabled");
         auto v = luisa::make_unique<AuxiliaryBuffer>(pipeline, resolution, nc, enabled);
         aux_buffers.emplace(comp, std::move(v));
     }
@@ -234,12 +262,12 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
             auto it = pipeline.geometry()->intersect(ray);
 
             $if(depth == 0 & it->valid()) {
+                aux_buffers.at("mask")->accumulate(dispatch_id().xy(), make_float4(1.f));
                 aux_buffers.at("normal")->accumulate(dispatch_id().xy(), make_float4(it->shading().n(), 1.f));
-                aux_buffers.at("depth")->accumulate(dispatch_id().xy(), make_float4(length(it->p() - ray->origin())));
-                auto p_cs = make_float3(inverse(camera->camera_to_world()) * make_float4(it->p(), 1.f));
-                auto clip = camera->node()->clip_plane();
+                auto depth = length(it->p() - ray->origin());
+                aux_buffers.at("depth")->accumulate(dispatch_id().xy(), make_float4(depth));
                 auto p_ndc = make_float3((camera_sample.pixel / make_float2(resolution) * 2.f - 1.f) * make_float2(1.f, -1.f),
-                                         (-p_cs.z - clip.x) / (clip.y - clip.x));
+                                         depth / (ray->t_max() - ray->t_min()));
                 aux_buffers.at("ndc")->accumulate(dispatch_id().xy(), make_float4(p_ndc, 1.f));
                 pipeline.surfaces().dispatch(it->shape()->surface_tag(), [&](auto surface) noexcept {
                     // create closure
@@ -284,8 +312,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                 *it, u_light_selection, u_light_surface, swl, time);
 
             // trace shadow ray
-            auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
-            auto occluded = pipeline.geometry()->intersect_any(shadow_ray);
+            auto occluded = pipeline.geometry()->intersect_any(light_sample.ray);
 
             // evaluate material
             auto surface_tag = it->shape()->surface_tag();
@@ -317,7 +344,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
 
                     // direct lighting
                     $if(light_sample.eval.pdf > 0.0f & !occluded) {
-                        auto wi = light_sample.wi;
+                        auto wi = light_sample.ray->direction();
                         auto eval = closure->evaluate(wo, wi);
                         auto w = balance_heuristic(light_sample.eval.pdf, eval.pdf) /
                                  light_sample.eval.pdf;
@@ -375,8 +402,15 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
     auto dispatch_count = 0u;
     auto dispatches_per_commit = 32u;
     auto aux_spp = pt->node<AuxiliaryBufferPathTracing>()->noisy_count();
-    auto check_sample_output = [](uint32_t n) -> bool {
-        return n > 0 && ((n & (n - 1)) == 0);
+    auto should_dump = [this, aux_spp](uint32_t n) -> bool {
+        auto strategy = node<AuxiliaryBufferPathTracing>()->dump_strategy();
+        if (strategy == AuxiliaryBufferPathTracing::DumpStrategy::POWER2) {
+            return n > 0 && ((n & (n - 1)) == 0);
+        }
+        if (strategy == AuxiliaryBufferPathTracing::DumpStrategy::ALL) {
+            return true;
+        }
+        return n == aux_spp;
     };
     LUISA_ASSERT(shutter_samples.size() == 1u || camera->node()->spp() == aux_spp,
                  "AOVIntegrator is not compatible with motion blur "
@@ -388,7 +422,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
             .spp = aux_spp};
         shutter_samples = {ss};
     }
-    auto sample_id = 0u;
+    auto sample_count = 0u;
     for (auto s : shutter_samples) {
         pipeline.update(command_buffer, s.point.time);
         clear_auxiliary_buffers();
@@ -396,13 +430,17 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
         auto filename = camera->node()->file().stem().string();
         auto ext = camera->node()->file().extension().string();
         for (auto i = 0u; i < s.spp; i++) {
-            command_buffer << render_auxiliary(sample_id++, s.point.time, s.point.weight)
+            command_buffer << render_auxiliary(sample_count++, s.point.time, s.point.weight)
                                   .dispatch(resolution);
-            luisa::vector<luisa::function<void()>> savers;
-            if (check_sample_output(sample_id)) {
+            if (should_dump(sample_count)) {
+                LUISA_INFO("Saving AOVs at sample #{}.", sample_count);
+                luisa::vector<luisa::function<void()>> savers;
                 for (auto &[component, buffer] : aux_buffers) {
-                    auto path = parent_path / fmt::format("{}_{}_{:05}{}", filename, component, sample_id, ext);
-                    if (auto saver = buffer->save(command_buffer, path, sample_id)) {
+                    auto path = node<AuxiliaryBufferPathTracing>()->dump_strategy() ==
+                                        AuxiliaryBufferPathTracing::DumpStrategy::FINAL ?
+                                    parent_path / fmt::format("{}_{}{}", filename, component, ext) :
+                                    parent_path / fmt::format("{}_{}_{:05}{}", filename, component, sample_count, ext);
+                    if (auto saver = buffer->save(command_buffer, path, sample_count)) {
                         savers.emplace_back(std::move(saver));
                     }
                 }
@@ -411,7 +449,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                                    << synchronize();
                 }
             }
-            if (sample_id % 16u == 0u) { command_buffer << commit(); }
+            if (sample_count % 16u == 0u) { command_buffer << commit(); }
         }
     }
     command_buffer << synchronize();
@@ -419,10 +457,6 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
 
     auto render_time = clock.toc();
     LUISA_INFO("Rendering finished in {} ms.", render_time);
-    {
-        std::ofstream file{"results.txt", std::ios::app};
-        file << "Render time = " << render_time << " ms" << std::endl;
-    }
 }
 
 }// namespace luisa::render

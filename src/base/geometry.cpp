@@ -18,10 +18,12 @@ void Geometry::build(CommandBuffer &command_buffer, luisa::span<const Shape *con
 }
 
 void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape, float init_time,
-                              const Surface *overridden_surface, const Light *overridden_light) noexcept {
+                              const Surface *overridden_surface, const Light *overridden_light,
+                              bool overriden_visible) noexcept {
 
     auto surface = overridden_surface == nullptr ? shape->surface() : overridden_surface;
     auto light = overridden_light == nullptr ? shape->light() : overridden_light;
+    auto visible = overriden_visible && shape->visible();
 
     if (shape->is_mesh()) {
         if (shape->deformable()) [[unlikely]] {
@@ -45,7 +47,7 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
                     return mesh_iter->second;
                 }
                 // create mesh
-                auto vertex_buffer = _pipeline.create<Buffer<Shape::Vertex>>(vertices.size());
+                auto vertex_buffer = _pipeline.create<Buffer<Vertex>>(vertices.size());
                 auto triangle_buffer = _pipeline.create<Buffer<Triangle>>(triangles.size());
                 auto mesh = _pipeline.create<Mesh>(*vertex_buffer, *triangle_buffer, shape->build_hint());
                 command_buffer << vertex_buffer->copy_from(vertices.data())
@@ -75,13 +77,18 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
                 _mesh_cache.emplace(hash, geom);
                 return geom;
             }();
+            auto encode_fixed_point = [](float x) noexcept {
+                return static_cast<uint16_t>(std::clamp(
+                    std::round(x * 65535.f), 0.f, 65535.f));
+            };
             // assign mesh data
-            MeshData mesh_data{};
-            mesh_data.resource = mesh_geom.resource;
-            mesh_data.shadow_term = shape->shadow_terminator_factor();
-            mesh_data.geometry_buffer_id_base = mesh_geom.buffer_id_base;
-            mesh_data.has_normal = shape->has_normal();
-            mesh_data.has_uv = shape->has_uv();
+            MeshData mesh_data{
+                .resource = mesh_geom.resource,
+                .shadow_term = encode_fixed_point(shape->shadow_terminator_factor()),
+                .intersection_offset = encode_fixed_point(shape->intersection_offset_factor()),
+                .geometry_buffer_id_base = mesh_geom.buffer_id_base,
+                .has_normal = shape->has_normal(),
+                .has_uv = shape->has_uv()};
             _meshes.emplace(shape, mesh_data);
             return mesh_data;
         }();
@@ -90,7 +97,7 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
         InstancedTransform inst_xform{t_node, instance_id};
         if (!is_static) { _dynamic_transforms.emplace_back(inst_xform); }
         auto object_to_world = inst_xform.matrix(init_time);
-        _accel.emplace_back(*mesh.resource, object_to_world, true);
+        _accel.emplace_back(*mesh.resource, object_to_world, visible);
 
         // create instance
         auto properties = 0u;
@@ -110,7 +117,8 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
             mesh.geometry_buffer_id_base,
             properties, surface_tag, light_tag,
             mesh.resource->triangle_count(),
-            mesh.shadow_term));
+            static_cast<float>(mesh.shadow_term) / 65535.f,
+            static_cast<float>(mesh.intersection_offset) / 65535.f));
         if (properties & Shape::property_flag_has_light) {
             _instanced_lights.emplace_back(Light::Handle{
                 .instance_id = instance_id,
@@ -119,8 +127,8 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
     } else {
         _transform_tree.push(shape->transform());
         for (auto child : shape->children()) {
-            _process_shape(command_buffer, child,
-                           init_time, surface, light);
+            _process_shape(command_buffer, child, init_time,
+                           surface, light, visible);
         }
         _transform_tree.pop(shape->transform());
     }
@@ -227,44 +235,43 @@ ShadingAttribute Geometry::shading_point(const Var<Shape::Handle> &instance, con
                                          const Var<float3> &bary, const Var<float4x4> &shape_to_world,
                                          const Var<float3x3> &shape_to_world_normal) const noexcept {
     auto v_buffer = instance->vertex_buffer_id();
-    // The following calculations are all in the object space.
-    auto v0 = _pipeline.buffer<Shape::Vertex>(v_buffer).read(triangle.i0);
-    auto v1 = _pipeline.buffer<Shape::Vertex>(v_buffer).read(triangle.i1);
-    auto v2 = _pipeline.buffer<Shape::Vertex>(v_buffer).read(triangle.i2);
-    auto p0 = v0->position();
-    auto p1 = v1->position();
-    auto p2 = v2->position();
+    auto v0 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i0);
+    auto v1 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i1);
+    auto v2 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i2);
+    auto p0 = make_float3(shape_to_world * make_float4(v0->position(), 1.f));
+    auto p1 = make_float3(shape_to_world * make_float4(v1->position(), 1.f));
+    auto p2 = make_float3(shape_to_world * make_float4(v2->position(), 1.f));
     auto p = bary.x * p0 + bary.y * p1 + bary.z * p2;
-    auto ng = cross(p1 - p0, p2 - p0);
+    auto c = cross(p1 - p0, p2 - p0);
+    auto area = .5f * length(c);
+    auto ng = normalize(c);
     auto uv0 = ite(instance->has_uv(), v0->uv(), make_float2());
     auto uv1 = ite(instance->has_uv(), v1->uv(), make_float2());
     auto uv2 = ite(instance->has_uv(), v2->uv(), make_float2());
     auto uv = bary.x * uv0 + bary.y * uv1 + bary.z * uv2;
     auto tangent = _compute_tangent(p0, p1, p2, uv0, uv1, uv2);
-    auto n0 = ite(instance->has_normal(), v0->normal(), ng);
-    auto n1 = ite(instance->has_normal(), v1->normal(), ng);
-    auto n2 = ite(instance->has_normal(), v2->normal(), ng);
-    auto ns = bary.x * n0 + bary.y * n1 + bary.z * n2;
+    auto n0 = ite(instance->has_normal(), normalize(shape_to_world_normal * v0->normal()), ng);
+    auto n1 = ite(instance->has_normal(), normalize(shape_to_world_normal * v1->normal()), ng);
+    auto n2 = ite(instance->has_normal(), normalize(shape_to_world_normal * v2->normal()), ng);
+    auto ns = normalize(bary.x * n0 + bary.y * n1 + bary.z * n2);
     // offset p to fake surface for the shadow terminator
     // reference: Ray Tracing Gems 2, Chap. 4
-    auto temp_u = p - p0;
-    auto temp_v = p - p1;
-    auto temp_w = p - p2;
+    auto dp = def(make_float3());
     auto shadow_term = instance->shadow_terminator_factor();
-    auto dp = bary.x * (temp_u - min(dot(temp_u, n0), 0.f) * n0) +
-              bary.y * (temp_v - min(dot(temp_v, n1), 0.f) * n1) +
-              bary.z * (temp_w - min(dot(temp_w, n2), 0.f) * n2);
+    $if(instance->has_normal() & shadow_term > 0.f) {
+        auto temp_u = p - p0;
+        auto temp_v = p - p1;
+        auto temp_w = p - p2;
+        dp = bary.x * (temp_u - min(dot(temp_u, n0), 0.f) * n0) +
+             bary.y * (temp_v - min(dot(temp_v, n1), 0.f) * n1) +
+             bary.z * (temp_w - min(dot(temp_w, n2), 0.f) * n2);
+    };
     auto ps = p + shadow_term * dp;
-    // Now, let's go into the world space.
-    // A * (x, 1.f) - A * (y, 1.f) = A * (x - y, 0.f)
-    auto c = cross(make_float3(shape_to_world * make_float4(p1 - p0, 0.f)),
-                   make_float3(shape_to_world * make_float4(p2 - p0, 0.f)));
-    auto area = 0.5f * length(c);
-    return {.pg = make_float3(shape_to_world * make_float4(p, 1.f)),
-            .ng = normalize(shape_to_world_normal * ng),
-            .ps = make_float3(shape_to_world * make_float4(ps, 1.f)),
-            .ns = normalize(shape_to_world_normal * ns),
-            .tangent = normalize(shape_to_world_normal * tangent),
+    return {.pg = p,
+            .ng = ng,
+            .ps = ps,
+            .ns = ns,
+            .tangent = tangent,
             .uv = uv,
             .area = area};
 }

@@ -8,7 +8,7 @@
 
 namespace luisa::render {
 
-class ShapeInstance final : public Shape {
+class ShapeInstance : public Shape {
 
 private:
     const Shape *_shape;
@@ -26,6 +26,8 @@ public:
     [[nodiscard]] bool deformable() const noexcept override { return false; }
 };
 
+using InstanceWrapper = VisibilityShapeWrapper<ShapeInstance>;
+
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::ShapeInstance)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::InstanceWrapper)

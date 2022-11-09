@@ -174,6 +174,7 @@ def convert_camera(camera: dict) -> (str, dict):
     look_at = np.array(camera['look'], dtype=np.float32)
     front = normalize(look_at - position)
     up = normalize(np.array(camera['up'], dtype=np.float32))
+    name = camera['name']
 
     camera_dict = {
         'type': 'Camera',
@@ -195,7 +196,7 @@ def convert_camera(camera: dict) -> (str, dict):
                     'exposure': 0,
                 }
             },
-            'file': 'output.exr',
+            'file': f'./outputs/{name}.exr',
             'filter': {
                 'type': 'Filter',
                 'impl': 'Gaussian',
@@ -205,7 +206,6 @@ def convert_camera(camera: dict) -> (str, dict):
             }
         }
     }
-    name = camera['name']
     camera_names.add(name)
     print(f'Camera {name} converted')
 
@@ -303,23 +303,39 @@ def convert_material(material: dict, name: str, geo_name: str) -> (str, dict):
         }
     else:
         thin = material['type'] == 'thin'
+
+        def make_constant_texture(v: list) -> dict:
+            value = v
+            if type(value) != list:
+                value = [value]
+            if len(value) > 3:
+                value = v[:3]
+            return {
+                'type': 'Texture',
+                'impl': 'Constant',
+                'prop': {
+                    'v': value,
+                    'semantic': 'albedo',
+                }
+            }
+
         prop = {
-            'color': material['baseColor'],
             'thin': thin,
-            'metallic': material['metallic'],
-            'eta': material['ior'],
-            'roughness': material['roughness'],
-            'specular_tint': material['specularTint'],
-            'anisotropic': material['anisotropic'],
-            'sheen': material['sheen'],
-            'sheen_tint': material['sheenTint'],
-            'clearcoat': material['clearcoat'],
-            'clearcoat_gloss': material['clearcoatGloss'],
-            'specular_trans': material['specTrans'],
+            'color': make_constant_texture(material['baseColor']),
+            'metallic': make_constant_texture(material['metallic']),
+            'eta': make_constant_texture(material['ior']),
+            'roughness': make_constant_texture(material['roughness']),
+            'specular_tint': make_constant_texture(material['specularTint']),
+            'anisotropic': make_constant_texture(material['anisotropic']),
+            'sheen': make_constant_texture(material['sheen']),
+            'sheen_tint': make_constant_texture(material['sheenTint']),
+            'clearcoat': make_constant_texture(material['clearcoat']),
+            'clearcoat_gloss': make_constant_texture(material['clearcoatGloss']),
+            'specular_trans': make_constant_texture(material['specTrans']),
         }
         if thin:
-            prop['flatness'] = material['flatness']
-            prop['diffuse_trans'] = material['diffTrans']
+            prop['flatness'] = make_constant_texture(material['flatness'])
+            prop['diffuse_trans'] = make_constant_texture(material['diffTrans'])
 
         # # TODO: ignore textures and displacement now
         # if material.get('displacementMap', '') != '':
@@ -413,16 +429,18 @@ def convert_geometry(input_project_dir: Path, output_project_dir: Path, geo_name
             json2obj_path = os.path.relpath(
                 geo_file,
                 output_json_dir)
-            json2obj_path = str(json2obj_path).replace('\\', '/')
             obj_part = {
                 'type': 'Shape',
                 'impl': 'Mesh',
                 'prop': {
-                    'file': json2obj_path,
+                    'file': str(json2obj_path).replace('\\', '/'),
                     'surface': f'@{geo_name}_{material}',
                 }
             }
             geo_obj_dict['prop']['shapes'].append(obj_part)
+
+    # primitives
+    # TODO
 
     geo_dict = {
         'import': [
@@ -444,6 +462,8 @@ def convert_geometry(input_project_dir: Path, output_project_dir: Path, geo_name
         geo_obj_dict['prop']['transform']['prop']['m'] = instanced_copy_transform
         geo_dict[copy_name] = geo_obj_dict.copy()
         shape_names.add(copy_name)
+
+    print(f'Geometry {geo_name} converted')
 
     return geo_dict
 
@@ -477,12 +497,15 @@ def create_main_scene_file(scene_dir: Path):
         shapes.append(f'@{shape_name}')
     imports = []
 
-    json_dir = scene_dir / 'json'
-    for d in json_dir.iterdir():
+    geo_names = [x.name for x in (scene_dir / 'json').iterdir()
+                 if x.is_dir() and x.name != 'cameras' and x.name != 'lights']
+    for d in [scene_dir / 'json' / 'cameras', scene_dir / 'json' / 'lights']:
         for f in d.iterdir():
             if f.suffix == '.json':
                 import_path = str(f.relative_to(scene_dir)).replace('\\', '/')
                 imports.append(import_path)
+    for geo_name in geo_names:
+        imports.append(f'json/{geo_name}/{geo_name}.json')
 
     scene = {
         'import': imports,
@@ -554,8 +577,11 @@ f -4 -3 -2 -1
         material_map[geo_name] = {}
         re_shape2material[geo_name] = {}
 
+    test_geo_names = ['isBeach', 'isCoastline']
+
     for geo_name in geo_names:
-        if geo_name != 'isBeach':
+        # DEBUG
+        if geo_name not in test_geo_names:
             continue
         path_in = input_path / 'json' / geo_name
         path_out = output_path / 'json' / geo_name

@@ -18,8 +18,8 @@ public:
           _b{desc->property_float_or_default("b", 1.0f / 3.0f)},
           _c{desc->property_float_or_default("c", 1.0f / 3.0f)} {}
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] float evaluate(float x_in) const noexcept override {
-        auto x = std::abs(x_in);
+    [[nodiscard]] float evaluate(float x) const noexcept override {
+        x = 2.f * std::abs(x / radius());
         if (x <= 1.0f) {
             return ((12.0f - 9.0f * _b - 6.0f * _c) * x * x * x +
                     (-18.0f + 12.0f * _b + 6.0f * _c) * x * x +
