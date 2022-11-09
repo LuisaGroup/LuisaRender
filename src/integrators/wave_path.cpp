@@ -8,12 +8,13 @@
 #include <util/progress_bar.h>
 #include <base/pipeline.h>
 #include <base/integrator.h>
+#include <base/display.h>
 
 namespace luisa::render {
 
 using namespace compute;
 
-class WavefrontPathTracing final : public Integrator {
+class WavefrontPathTracing final : public ProgressiveIntegrator {
 
 public:
     static constexpr auto min_state_count = 1024u * 1024u;
@@ -27,7 +28,7 @@ private:
 
 public:
     WavefrontPathTracing(Scene *scene, const SceneNodeDesc *desc) noexcept
-        : Integrator{scene, desc},
+        : ProgressiveIntegrator{scene, desc},
           _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)},
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
@@ -201,42 +202,17 @@ public:
     }
 };
 
-class WavefrontPathTracingInstance final : public Integrator::Instance {
-
-private:
-    void _render_one_camera(CommandBuffer &command_buffer, Camera::Instance *camera) noexcept;
+class WavefrontPathTracingInstance final : public ProgressiveIntegrator::Instance {
 
 public:
-    WavefrontPathTracingInstance(const WavefrontPathTracing *node, Pipeline &pipeline, CommandBuffer &cb) noexcept
-        : Integrator::Instance{pipeline, cb, node} {}
+    using ProgressiveIntegrator::Instance::Instance;
 
-    void render(Stream &stream) noexcept override {
-        auto pt = node<WavefrontPathTracing>();
-        auto command_buffer = stream.command_buffer();
-        luisa::vector<float4> pixels;
-        for (auto i = 0u; i < pipeline().camera_count(); i++) {
-            auto camera = pipeline().camera(i);
-            auto resolution = camera->film()->node()->resolution();
-            auto pixel_count = resolution.x * resolution.y;
-            pixels.resize(next_pow2(pixel_count));
-            auto film_path = camera->node()->file();
-            LUISA_INFO(
-                "Rendering to '{}' of resolution {}x{} at {}spp.",
-                film_path.string(),
-                resolution.x, resolution.y,
-                camera->node()->spp());
-            camera->film()->prepare(command_buffer);
-            _render_one_camera(command_buffer, camera);
-            camera->film()->download(command_buffer, pixels.data());
-            command_buffer << compute::synchronize();
-            camera->film()->release();
-            save_image(film_path, (const float *)pixels.data(), resolution);
-        }
-    }
+protected:
+    void _render_one_camera(CommandBuffer &command_buffer, Camera::Instance *camera) noexcept override;
 };
 
 luisa::unique_ptr<Integrator::Instance> WavefrontPathTracing::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
-    return luisa::make_unique<WavefrontPathTracingInstance>(this, pipeline, command_buffer);
+    return luisa::make_unique<WavefrontPathTracingInstance>(pipeline, command_buffer, this);
 }
 
 void WavefrontPathTracingInstance::_render_one_camera(
@@ -530,7 +506,6 @@ void WavefrontPathTracingInstance::_render_one_camera(
 
     auto sample_id = 0u;
     auto last_committed_sample_id = 0u;
-    constexpr auto launches_per_commit = 16u;
     Clock clock;
     ProgressBar progress_bar;
     progress_bar.update(0.0);
@@ -581,10 +556,18 @@ void WavefrontPathTracingInstance::_render_one_camera(
             }
             command_buffer << accumulate_shader.get()(s.point.weight).dispatch(launch_state_count);
             sample_id += launch_spp;
+            auto launches_per_commit =
+                display() && !display()->should_close() ?
+                    node<WavefrontPathTracing>()->display_interval() :
+                    16u;
             if (sample_id - last_committed_sample_id >= launches_per_commit) {
                 last_committed_sample_id = sample_id;
                 auto p = sample_id / static_cast<double>(spp);
-                command_buffer << [p, &progress_bar] { progress_bar.update(p); };
+                if (display() && display()->update(command_buffer, sample_id)) {
+                    progress_bar.update(p);
+                } else {
+                    command_buffer << [p, &progress_bar] { progress_bar.update(p); };
+                }
             }
         }
     }
