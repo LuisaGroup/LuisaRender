@@ -2,7 +2,6 @@
 // Created by Mike Smith on 2022/1/10.
 //
 
-#include <fstream>
 #include <util/imageio.h>
 #include <util/medium_tracker.h>
 #include <util/progress_bar.h>
@@ -30,8 +29,8 @@ public:
           _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)},
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
-          _display{desc->property_bool_or_default("display")},
-          _display_interval{std::max(desc->property_uint_or_default("display_interval", 1u), 1u)} {}
+          _display_interval{std::max(desc->property_uint_or_default("display_interval", 1u), 1u)},
+          _display{desc->property_bool_or_default("display")} {}
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
@@ -48,10 +47,7 @@ private:
     luisa::unique_ptr<Display> _display;
 
 private:
-    void _render_one_camera(
-        CommandBuffer &command_buffer,
-        Pipeline &pipeline,
-        Camera::Instance *camera) noexcept;
+    void _render_one_camera(CommandBuffer &command_buffer, Camera::Instance *camera) noexcept;
 
 public:
     explicit MegakernelPathTracingInstance(const MegakernelPathTracing *node,
@@ -65,7 +61,6 @@ public:
     }
 
     void render(Stream &stream) noexcept override {
-        auto pt = node<MegakernelPathTracing>();
         auto command_buffer = stream.command_buffer();
         for (auto i = 0u; i < pipeline().camera_count(); i++) {
             auto camera = pipeline().camera(i);
@@ -73,7 +68,7 @@ public:
             auto pixel_count = resolution.x * resolution.y;
             camera->film()->prepare(command_buffer);
             if (_display) { _display->reset(command_buffer, camera->film()); }
-            _render_one_camera(command_buffer, pipeline(), camera);
+            _render_one_camera(command_buffer, camera);
             while (_display && _display->idle(command_buffer)) {}
             luisa::vector<float4> pixels(pixel_count);
             camera->film()->download(command_buffer, pixels.data());
@@ -92,13 +87,13 @@ luisa::unique_ptr<Integrator::Instance> MegakernelPathTracing::build(
 }
 
 void MegakernelPathTracingInstance::_render_one_camera(
-    CommandBuffer &command_buffer, Pipeline &pipeline, Camera::Instance *camera) noexcept {
+    CommandBuffer &command_buffer, Camera::Instance *camera) noexcept {
 
     auto spp = camera->node()->spp();
     auto resolution = camera->film()->node()->resolution();
     auto image_file = camera->node()->file();
 
-    if (!pipeline.has_lighting()) [[unlikely]] {
+    if (!pipeline().has_lighting()) [[unlikely]] {
         LUISA_WARNING_WITH_LOCATION(
             "No lights in scene. Rendering aborted.");
         return;
@@ -121,7 +116,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
         auto pixel_id = dispatch_id().xy();
         sampler()->start(pixel_id, frame_index);
         auto [camera_ray, _, camera_weight] = camera->generate_ray(*sampler(), pixel_id, time);
-        auto spectrum = pipeline.spectrum();
+        auto spectrum = pipeline().spectrum();
         auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler()->generate_1d());
         SampledSpectrum beta{swl.dimension(), camera_weight};
         SampledSpectrum Li{swl.dimension()};
@@ -131,11 +126,11 @@ void MegakernelPathTracingInstance::_render_one_camera(
         $for(depth, node<MegakernelPathTracing>()->max_depth()) {
 
             // trace
-            auto it = pipeline.geometry()->intersect(ray);
+            auto it = pipeline().geometry()->intersect(ray);
 
             // miss
             $if(!it->valid()) {
-                if (pipeline.environment()) {
+                if (pipeline().environment()) {
                     auto eval = light_sampler()->evaluate_miss(ray->direction(), swl, time);
                     Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
                 }
@@ -143,7 +138,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
             };
 
             // hit light
-            if (!pipeline.lights().empty()) {
+            if (!pipeline().lights().empty()) {
                 $if(it->shape()->has_light()) {
                     auto eval = light_sampler()->evaluate_hit(*it, ray->origin(), swl, time);
                     Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
@@ -159,7 +154,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
                 *it, u_light_selection, u_light_surface, swl, time);
 
             // trace shadow ray
-            auto occluded = pipeline.geometry()->intersect_any(light_sample.ray);
+            auto occluded = pipeline().geometry()->intersect_any(light_sample.ray);
 
             // evaluate material
             auto surface_tag = it->shape()->surface_tag();
@@ -170,7 +165,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
             auto alpha_skip = def(false);
             auto wo = -ray->direction();
             auto surface_sample = Surface::Sample::zero(swl.dimension());
-            pipeline.surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
+            pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
                 // create closure
                 auto closure = surface->closure(*it, swl, 1.f, time);
 
@@ -230,7 +225,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
     };
 
     Clock clock_compile;
-    auto render = pipeline.device().compile(render_kernel);
+    auto render = pipeline().device().compile(render_kernel);
     auto integrator_shader_compilation_time = clock_compile.toc();
     LUISA_INFO("Integrator shader compile in {} ms.", integrator_shader_compilation_time);
     auto shutter_samples = camera->node()->shutter_samples();
@@ -243,7 +238,7 @@ void MegakernelPathTracingInstance::_render_one_camera(
     auto dispatch_count = 0u;
     auto sample_id = 0u;
     for (auto s : shutter_samples) {
-        pipeline.update(command_buffer, s.point.time);
+        pipeline().update(command_buffer, s.point.time);
         for (auto i = 0u; i < s.spp; i++) {
             command_buffer << render(sample_id++, s.point.time, s.point.weight)
                                   .dispatch(resolution);

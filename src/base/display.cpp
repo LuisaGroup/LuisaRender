@@ -77,13 +77,13 @@ bool Display::update(CommandBuffer &command_buffer, uint spp) noexcept {
             "ACES",
             "Uncharted2",
         };
-        ImGui::Text("Tone Mapper");
         for (auto i = 0u; i < tone_mapper_names.size(); i++) {
-            ImGui::SameLine();
             if (ImGui::RadioButton(tone_mapper_names[i], luisa::to_underlying(_tone_mapper) == i)) {
                 _tone_mapper = static_cast<ToneMapper>(i);
             }
+            ImGui::SameLine();
         }
+        ImGui::Text("Tone Mapper");
         ImGui::SliderFloat("Exposure", &_exposure, -10.f, 10.f, "%.1f");
         ImGui::End();
     });
@@ -107,13 +107,13 @@ bool Display::idle(CommandBuffer &command_buffer) noexcept {
             "ACES",
             "Uncharted2",
         };
-        ImGui::Text("Tone Mapper");
         for (auto i = 0u; i < tone_mapper_names.size(); i++) {
-            ImGui::SameLine();
             if (ImGui::RadioButton(tone_mapper_names[i], luisa::to_underlying(_tone_mapper) == i)) {
                 _tone_mapper = static_cast<ToneMapper>(i);
             }
+            ImGui::SameLine();
         }
+        ImGui::Text("Tone Mapper");
         ImGui::SliderFloat("Exposure", &_exposure, -10.f, 10.f, "%.1f");
         ImGui::End();
     });

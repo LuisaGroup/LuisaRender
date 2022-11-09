@@ -2,9 +2,6 @@
 // Created by Mike Smith on 2022/1/10.
 //
 
-#include <fstream>
-
-#include <luisa-compute.h>
 #include <util/imageio.h>
 #include <util/sampling.h>
 #include <util/medium_tracker.h>
