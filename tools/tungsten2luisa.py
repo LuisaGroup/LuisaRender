@@ -364,7 +364,9 @@ def write_render(out_file, shapes):
     print(f'''
 render {{
   cameras {{ @camera }}
-  integrator : WavePath {{}}
+  integrator : WavePath {{
+    sampler : PMJ02BN {{}}
+  }}
   shapes {{
     {shape_refs}
   }}
