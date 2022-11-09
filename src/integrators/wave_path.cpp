@@ -418,12 +418,6 @@ void WavefrontPathTracingInstance::_render_one_camera(
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
                 // create closure
                 auto closure = surface->closure(*it, swl, 1.f, time);
-                if (auto dispersive = closure->is_dispersive()) {
-                    $if(*dispersive) {
-                        swl.terminate_secondary();
-                        path_states.write_swl(path_id, swl);
-                    };
-                }
 
                 // apply roughness map
                 if (auto o = closure->opacity()) {
@@ -433,7 +427,12 @@ void WavefrontPathTracingInstance::_render_one_camera(
                 }
 
                 $if(!alpha_skip) {
-
+                    if (auto dispersive = closure->is_dispersive()) {
+                        $if(*dispersive) {
+                            swl.terminate_secondary();
+                            path_states.write_swl(path_id, swl);
+                        };
+                    }
                     // direct lighting
                     auto pdf_light = light_samples.read_pdf(queue_id);
                     $if(pdf_light > 0.0f) {
@@ -443,7 +442,6 @@ void WavefrontPathTracingInstance::_render_one_camera(
                         auto mis_weight = balance_heuristic(pdf_light, eval.pdf);
                         Li += mis_weight / pdf_light * beta * eval.f * Ld;
                     };
-
                     // sample material
                     surface_sample = closure->sample(wo, u_lobe, u_bsdf);
                     eta = closure->eta().value_or(1.f);
@@ -463,25 +461,24 @@ void WavefrontPathTracingInstance::_render_one_camera(
                     $case(Surface::event_enter) { eta_scale = sqr(eta); };
                     $case(Surface::event_exit) { eta_scale = 1.f / sqr(eta); };
                 };
-            };
-
-            $if(beta.any([](auto b) noexcept { return !isnan(b) & b > 0.f; })) {
-                auto rr_depth = node<WavefrontPathTracing>()->rr_depth();
-                auto rr_threshold = node<WavefrontPathTracing>()->rr_threshold();
-                // rr
-                auto q = max(beta.max() * eta_scale, 0.05f);
-                $if(trace_depth + 1u >= rr_depth & q < rr_threshold) {
-                    $if(sampler()->generate_1d() < q) {
-                        beta *= 1.f / q;
+                $if(beta.any([](auto b) noexcept { return !isnan(b) & b > 0.f; })) {
+                    auto rr_depth = node<WavefrontPathTracing>()->rr_depth();
+                    auto rr_threshold = node<WavefrontPathTracing>()->rr_threshold();
+                    // rr
+                    auto q = max(beta.max() * eta_scale, 0.05f);
+                    $if(trace_depth + 1u >= rr_depth & q < rr_threshold) {
+                        $if(sampler()->generate_1d() < q) {
+                            beta *= 1.f / q;
+                            auto out_queue_id = out_queue_size.atomic(0u).fetch_add(1u);
+                            out_queue.write(out_queue_id, path_id);
+                            out_rays.write(out_queue_id, ray);
+                        };
+                    }
+                    $else {
                         auto out_queue_id = out_queue_size.atomic(0u).fetch_add(1u);
                         out_queue.write(out_queue_id, path_id);
                         out_rays.write(out_queue_id, ray);
                     };
-                }
-                $else {
-                    auto out_queue_id = out_queue_size.atomic(0u).fetch_add(1u);
-                    out_queue.write(out_queue_id, path_id);
-                    out_rays.write(out_queue_id, ray);
                 };
             };
             sampler()->save_state(path_id);
