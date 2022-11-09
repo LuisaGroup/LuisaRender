@@ -13,9 +13,9 @@ private:
     luisa::vector<luisa::unique_ptr<Integrator::Instance>> _integrators;
 
 public:
-    explicit GroupIntegratorInstance(
-        const GroupIntegrator *integrator,
-        Pipeline &pipeline, CommandBuffer &cb) noexcept;
+    GroupIntegratorInstance(const GroupIntegrator *group,
+                            Pipeline &pipeline,
+                            CommandBuffer &cb) noexcept;
     void render(Stream &stream) noexcept override;
 };
 
