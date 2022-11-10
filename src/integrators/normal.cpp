@@ -35,7 +35,9 @@ protected:
     [[nodiscard]] Float3 Li(const Camera::Instance *camera, Expr<uint> frame_index,
                             Expr<uint2> pixel_id, Expr<float> time) const noexcept override {
         sampler()->start(pixel_id, frame_index);
-        auto cs = camera->generate_ray(*sampler(), pixel_id, time);
+        auto u_filter = sampler()->generate_pixel_2d();
+        auto u_lens = camera->node()->requires_lens_sampling() ? sampler()->generate_2d() : make_float2(.5f);
+        auto cs = camera->generate_ray(pixel_id, time, u_filter, u_lens);
         auto swl = pipeline().spectrum()->sample(sampler()->generate_1d());
         auto path_weight = cs.weight;
         auto it = pipeline().geometry()->intersect(cs.ray);

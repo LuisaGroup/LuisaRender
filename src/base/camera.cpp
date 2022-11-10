@@ -186,11 +186,10 @@ Camera::Instance::Instance(Pipeline &pipeline, CommandBuffer &command_buffer, co
     pipeline.register_transform(camera->transform());
 }
 
-Camera::Sample Camera::Instance::generate_ray(
-    Sampler::Instance &sampler, Expr<uint2> pixel_coord, Expr<float> time) const noexcept {
-    auto [filter_offset, filter_weight] = filter()->sample(sampler.generate_pixel_2d());
+Camera::Sample Camera::Instance::generate_ray(Expr<uint2> pixel_coord, Expr<float> time,
+                                              Expr<float2> u_filter, Expr<float2> u_lens) const noexcept {
+    auto [filter_offset, filter_weight] = filter()->sample(u_filter);
     auto pixel = make_float2(pixel_coord) + 0.5f + filter_offset;
-    auto u_lens = node()->requires_lens_sampling() ? sampler.generate_2d() : make_float2(0.5f);
     auto sample = _generate_ray_in_camera_space(pixel, u_lens, time);
     sample.weight *= filter_weight;
     auto c2w = camera_to_world();

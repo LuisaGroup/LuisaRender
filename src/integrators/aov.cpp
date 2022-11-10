@@ -105,9 +105,7 @@ private:
     luisa::optional<Window> _window;
 
 private:
-    void _render_one_camera(
-        CommandBuffer &command_buffer, Pipeline &pipeline,
-        AuxiliaryBufferPathTracingInstance *pt, Camera::Instance *camera) noexcept;
+    void _render_one_camera(CommandBuffer &command_buffer, Camera::Instance *camera) noexcept;
 
 public:
     explicit AuxiliaryBufferPathTracingInstance(
@@ -127,7 +125,7 @@ public:
             _clock.tic();
             _framerate.clear();
             camera->film()->prepare(command_buffer);
-            _render_one_camera(command_buffer, pipeline(), this, camera);
+            _render_one_camera(command_buffer, camera);
             command_buffer << compute::synchronize();
             camera->film()->release();
         }
@@ -199,23 +197,20 @@ public:
 };
 
 void AuxiliaryBufferPathTracingInstance::_render_one_camera(
-    CommandBuffer &command_buffer, Pipeline &pipeline,
-    AuxiliaryBufferPathTracingInstance *pt, Camera::Instance *camera) noexcept {
+    CommandBuffer &command_buffer, Camera::Instance *camera) noexcept {
 
     auto spp = node<AuxiliaryBufferPathTracing>()->noisy_count();
     auto resolution = camera->film()->node()->resolution();
     auto image_file = camera->node()->file();
 
-    if (!pipeline.has_lighting()) [[unlikely]] {
+    if (!pipeline().has_lighting()) [[unlikely]] {
         LUISA_WARNING_WITH_LOCATION(
             "No lights in scene. Rendering aborted.");
         return;
     }
-
-    auto light_sampler = pt->light_sampler();
-    auto sampler = pt->sampler();
+    
     auto pixel_count = resolution.x * resolution.y;
-    sampler->reset(command_buffer, resolution, pixel_count, spp);
+    sampler()->reset(command_buffer, resolution, pixel_count, spp);
     command_buffer << synchronize();
 
     using namespace luisa::compute;
@@ -225,7 +220,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
     for (auto [comp, nc] : aov_component_to_channels) {
         auto enabled = node<AuxiliaryBufferPathTracing>()->is_component_enabled(comp);
         LUISA_INFO("Component {} is {}.", comp, enabled ? "enabled" : "disabled");
-        auto v = luisa::make_unique<AuxiliaryBuffer>(pipeline, resolution, nc, enabled);
+        auto v = luisa::make_unique<AuxiliaryBuffer>(pipeline(), resolution, nc, enabled);
         aux_buffers.emplace(comp, std::move(v));
     }
 
@@ -240,10 +235,12 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
         set_block_size(16u, 16u, 1u);
 
         auto pixel_id = dispatch_id().xy();
-        sampler->start(pixel_id, frame_index);
-        auto camera_sample = camera->generate_ray(*sampler, pixel_id, time);
-        auto spectrum = pipeline.spectrum();
-        auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler->generate_1d());
+        sampler()->start(pixel_id, frame_index);
+        auto u_filter = sampler()->generate_pixel_2d();
+        auto u_lens = camera->node()->requires_lens_sampling() ? sampler()->generate_2d() : make_float2(.5f);
+        auto camera_sample = camera->generate_ray(pixel_id, time, u_filter, u_lens);
+        auto spectrum = pipeline().spectrum();
+        auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler()->generate_1d());
         SampledSpectrum beta{swl.dimension(), camera_sample.weight};
         SampledSpectrum Li{swl.dimension()};
 
@@ -254,10 +251,10 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
         auto pdf_bsdf = def(1e16f);
         auto specular_bounce = def(false);
 
-        $for(depth, pt->node<AuxiliaryBufferPathTracing>()->max_depth()) {
+        $for(depth, node<AuxiliaryBufferPathTracing>()->max_depth()) {
 
             // trace
-            auto it = pipeline.geometry()->intersect(ray);
+            auto it = pipeline().geometry()->intersect(ray);
 
             $if(depth == 0 & it->valid()) {
                 aux_buffers.at("mask")->accumulate(dispatch_id().xy(), make_float4(1.f));
@@ -267,7 +264,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                 auto p_ndc = make_float3((camera_sample.pixel / make_float2(resolution) * 2.f - 1.f) * make_float2(1.f, -1.f),
                                          depth / (ray->t_max() - ray->t_min()));
                 aux_buffers.at("ndc")->accumulate(dispatch_id().xy(), make_float4(p_ndc, 1.f));
-                pipeline.surfaces().dispatch(it->shape()->surface_tag(), [&](auto surface) noexcept {
+                pipeline().surfaces().dispatch(it->shape()->surface_tag(), [&](auto surface) noexcept {
                     // create closure
                     auto closure = surface->closure(*it, swl, 1.f, time);
                     auto albedo = closure->albedo();
@@ -279,8 +276,8 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
 
             // miss
             $if(!it->valid()) {
-                if (pipeline.environment()) {
-                    auto eval = light_sampler->evaluate_miss(ray->direction(), swl, time);
+                if (pipeline().environment()) {
+                    auto eval = light_sampler()->evaluate_miss(ray->direction(), swl, time);
                     Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
                     $if(!specular_bounce) {
                         Li_diffuse += beta_diffuse * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
@@ -290,9 +287,9 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
             };
 
             // hit light
-            if (!pipeline.lights().empty()) {
+            if (!pipeline().lights().empty()) {
                 $if(it->shape()->has_light()) {
-                    auto eval = light_sampler->evaluate_hit(
+                    auto eval = light_sampler()->evaluate_hit(
                         *it, ray->origin(), swl, time);
                     Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
                     $if(!specular_bounce) {
@@ -304,21 +301,21 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
             $if(!it->shape()->has_surface()) { $break; };
 
             // sample one light
-            auto u_light_selection = sampler->generate_1d();
-            auto u_light_surface = sampler->generate_2d();
-            Light::Sample light_sample = light_sampler->sample(
+            auto u_light_selection = sampler()->generate_1d();
+            auto u_light_surface = sampler()->generate_2d();
+            Light::Sample light_sample = light_sampler()->sample(
                 *it, u_light_selection, u_light_surface, swl, time);
 
             // trace shadow ray
-            auto occluded = pipeline.geometry()->intersect_any(light_sample.ray);
+            auto occluded = pipeline().geometry()->intersect_any(light_sample.ray);
 
             // evaluate material
             auto surface_tag = it->shape()->surface_tag();
-            auto u_lobe = sampler->generate_1d();
-            auto u_bsdf = sampler->generate_2d();
+            auto u_lobe = sampler()->generate_1d();
+            auto u_bsdf = sampler()->generate_2d();
             auto eta_scale = def(1.f);
 
-            pipeline.surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
+            pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
                 // create closure
                 auto closure = surface->closure(*it, swl, 1.f, time);
                 if (auto dispersive = closure->is_dispersive()) {
@@ -371,7 +368,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                 };
             });
 
-            pipeline.surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
+            pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
                 auto closure = surface->closure(*it, swl, 1.f, time);
                 specular_bounce = false;
                 $if((closure->roughness().x < 0.05f) & (closure->roughness().y < 0.05f)) {
@@ -386,7 +383,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
     };
 
     Clock clock_compile;
-    auto render_auxiliary = pipeline.device().compile(render_auxiliary_kernel);
+    auto render_auxiliary = pipeline().device().compile(render_auxiliary_kernel);
     auto integrator_shader_compilation_time = clock_compile.toc();
     LUISA_INFO("Integrator shader compile in {} ms.", integrator_shader_compilation_time);
     auto shutter_samples = camera->node()->shutter_samples();
@@ -399,7 +396,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
 
     auto dispatch_count = 0u;
     auto dispatches_per_commit = 32u;
-    auto aux_spp = pt->node<AuxiliaryBufferPathTracing>()->noisy_count();
+    auto aux_spp = node<AuxiliaryBufferPathTracing>()->noisy_count();
     auto should_dump = [this, aux_spp](uint32_t n) -> bool {
         auto strategy = node<AuxiliaryBufferPathTracing>()->dump_strategy();
         if (strategy == AuxiliaryBufferPathTracing::DumpStrategy::POWER2) {
@@ -422,7 +419,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
     }
     auto sample_count = 0u;
     for (auto s : shutter_samples) {
-        pipeline.update(command_buffer, s.point.time);
+        pipeline().update(command_buffer, s.point.time);
         clear_auxiliary_buffers();
         auto parent_path = camera->node()->file().parent_path();
         auto filename = camera->node()->file().stem().string();

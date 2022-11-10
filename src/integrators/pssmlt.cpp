@@ -11,17 +11,16 @@ namespace luisa::render {
 
 struct PrimarySample {
     float value;
-    uint last_modification_iteration;
     float value_backup;
-    uint modification_backup;
+    uint2 last_modification_iteration;
+    uint2 modification_backup;
 };
 
 }// namespace luisa::render
 
 // clang-format off
 LUISA_STRUCT(luisa::render::PrimarySample,
-             value, last_modification_iteration,
-             value_backup, modification_backup){
+             value, value_backup, last_modification_iteration, modification_backup) {
     void backup() noexcept {
         value_backup = value;
         modification_backup = last_modification_iteration;
@@ -61,6 +60,7 @@ public:
     PCG32() noexcept : _state{default_state}, _inc{default_stream} {}
     PCG32(U64 state, U64 inc) noexcept : _state{state}, _inc{inc} {}
     explicit PCG32(U64 seq_index) noexcept { set_sequence(seq_index); }
+    explicit PCG32(Expr<uint> seq_index) noexcept { set_sequence(U64{seq_index}); }
     // clang-format on
     [[nodiscard]] auto uniform_uint() noexcept {
         auto oldstate = _state;
@@ -88,11 +88,21 @@ class PSSMLTSampler {
 public:
     struct State {
         PCG32 rng;
-        UInt current_iteration;
+        U64 current_iteration;
         Bool large_step;
-        UInt last_large_step_iteration;
+        U64 last_large_step_iteration;
         UInt sample_index;
         Local<PrimarySample> primary_samples;
+
+        [[nodiscard]] static auto create(uint pss_dim, Expr<uint> rng_sequence) noexcept {
+            return luisa::make_unique<State>(State{
+                .rng = PCG32{rng_sequence},
+                .current_iteration = U64{0u},
+                .large_step = true,
+                .last_large_step_iteration = U64{0u},
+                .sample_index = UInt{0u},
+                .primary_samples = Local<PrimarySample>{pss_dim}});
+        }
     };
 
 private:
@@ -100,7 +110,7 @@ private:
     float _sigma;
     float _large_step_probability;
     uint _pss_dimension;
-    luisa::optional<State> _state;
+    luisa::unique_ptr<State> _state;
 
 private:
     [[nodiscard]] static auto _erf_inv(Expr<float> x) noexcept {
@@ -141,25 +151,25 @@ private:
     void _ensure_ready(Expr<uint> index) noexcept {
         auto &Xi = _state->primary_samples[index];
         // Reset Xi if a large step took place in the meantime
-        auto needs_reset = Xi.last_modification_iteration < _state->last_large_step_iteration;
+        auto needs_reset = U64{Xi.last_modification_iteration} < _state->last_large_step_iteration;
         Xi.value = ite(needs_reset, _state->rng.uniform_float(), Xi.value);
-        Xi.last_modification_iteration = _state->last_large_step_iteration;
+        Xi.last_modification_iteration = ite(needs_reset, _state->last_large_step_iteration.bits(), Xi.last_modification_iteration);
         // Apply remaining sequence of mutations to _sample_
         Xi->backup();
         $if(_state->large_step) {
             Xi.value = _state->rng.uniform_float();
         }
         $else {
-            auto nSmall = _state->current_iteration - Xi.last_modification_iteration;
+            auto nSmall = (_state->current_iteration - U64{Xi.last_modification_iteration}).lo();
             // Apply _nSmall_ small step mutations
             // Sample the standard normal distribution N(0, 1)
             auto normalSample = sqrt_two * _erf_inv(2.f * _state->rng.uniform_float() - 1.f);
             // Compute the effective standard deviation and apply perturbation to Xi
-            auto effSigma = _sigma * sqrt((Float)nSmall);
+            auto effSigma = _sigma * sqrt(cast<float>(nSmall));
             Xi.value += normalSample * effSigma;
             Xi.value -= floor(Xi.value);
         };
-        Xi.last_modification_iteration = _state->current_iteration;
+        Xi.last_modification_iteration = _state->current_iteration.bits();
     }
 
 public:
@@ -169,6 +179,10 @@ public:
           _sigma{sigma},
           _large_step_probability{large_step_prob},
           _pss_dimension{pss_dim} {}
+
+    void reset(Expr<uint> rng_sequence) noexcept {
+        _state = State::create(_pss_dimension, rng_sequence);
+    }
 
     void accept() noexcept {
         _state->last_large_step_iteration = ite(
@@ -180,9 +194,9 @@ public:
     void reject() noexcept {
         for (auto i = 0u; i < _pss_dimension; i++) {
             auto &sample = _state->primary_samples[i];
-            sample->restore_if(sample.last_modification_iteration == _state->current_iteration);
+            sample->restore_if(U64{sample.last_modification_iteration} == _state->current_iteration);
         }
-        _state->current_iteration -= 1u;
+        _state->current_iteration = _state->current_iteration - 1u;
     }
 
     void start_stream() noexcept { _state->sample_index = 0u; }
@@ -199,7 +213,7 @@ public:
     }
 
     void start_iteration() noexcept {
-        _state->current_iteration += 1u;
+        _state->current_iteration = _state->current_iteration + 1u;
         _state->large_step = _state->rng.uniform_float() < _large_step_probability;
     }
 };
@@ -246,7 +260,9 @@ protected:
                             Expr<uint2> pixel_id, Expr<float> time) const noexcept override {
 
         sampler()->start(pixel_id, frame_index);
-        auto [camera_ray, _, camera_weight] = camera->generate_ray(*sampler(), pixel_id, time);
+        auto u_filter = sampler()->generate_pixel_2d();
+        auto u_lens = camera->node()->requires_lens_sampling() ? sampler()->generate_2d() : make_float2(.5f);
+        auto [camera_ray, _, camera_weight] = camera->generate_ray(pixel_id, time, u_filter, u_lens);
         auto spectrum = pipeline().spectrum();
         auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler()->generate_1d());
         SampledSpectrum beta{swl.dimension(), camera_weight};

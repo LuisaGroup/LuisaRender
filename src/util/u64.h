@@ -92,8 +92,23 @@ public:
     }
     [[nodiscard]] auto operator==(const U64 &rhs) const noexcept { return all(_bits == rhs._bits); }
     [[nodiscard]] auto operator==(Expr<uint> rhs) const noexcept { return hi() == 0u & lo() == rhs; }
+    [[nodiscard]] friend auto operator==(Expr<uint> lhs, const U64 &rhs) noexcept { return rhs == lhs; }
     [[nodiscard]] auto operator!=(const U64 &rhs) const noexcept { return !(*this == rhs); }
     [[nodiscard]] auto operator!=(Expr<uint> rhs) const noexcept { return !(*this == rhs); }
+    [[nodiscard]] friend auto operator!=(Expr<uint> lhs, const U64 &rhs) noexcept { return rhs != lhs; }
+    [[nodiscard]] auto operator<(const U64 &rhs) const noexcept { return hi() < rhs.hi() | (hi() == rhs.hi() & lo() < rhs.lo()); }
+    [[nodiscard]] auto operator<(Expr<uint> rhs) const noexcept { return hi() == 0u & lo() < rhs; }
+    [[nodiscard]] friend auto operator<(Expr<uint> lhs, const U64 &rhs) noexcept { return rhs.hi() > 0u | lhs < rhs.lo(); }
+    [[nodiscard]] auto operator>(const U64 &rhs) const noexcept { return rhs < *this; }
+    [[nodiscard]] auto operator>(Expr<uint> rhs) const noexcept { return rhs < *this; }
+    [[nodiscard]] friend auto operator>(Expr<uint> lhs, const U64 &rhs) noexcept { return rhs < lhs; }
+    [[nodiscard]] auto operator<=(const U64 &rhs) const noexcept { return !(rhs < *this); }
+    [[nodiscard]] auto operator<=(Expr<uint> rhs) const noexcept { return !(rhs < *this); }
+    [[nodiscard]] friend auto operator<=(Expr<uint> lhs, const U64 &rhs) noexcept { return !(rhs < lhs); }
+    [[nodiscard]] auto operator>=(const U64 &rhs) const noexcept { return !(*this < rhs); }
+    [[nodiscard]] auto operator>=(Expr<uint> rhs) const noexcept { return !(*this < rhs); }
+    [[nodiscard]] friend auto operator>=(Expr<uint> lhs, const U64 &rhs) noexcept { return !(lhs < rhs); }
+
     [[nodiscard]] auto operator+(const U64 &rhs) const noexcept -> U64 {
         auto carry = cast<uint>(~0u - lo() < rhs.lo());
         return U64{hi() + rhs.hi() + carry, lo() + rhs.lo()};
@@ -123,6 +138,26 @@ public:
         LUISA_ASSERT(rhs <= 0xffffu, "U64::operator% rhs must be <= 0xffff");
         return ((hi() % rhs) * static_cast<uint>(0x1'0000'0000ull % rhs) + lo() % rhs) % rhs;
     }
+
+    // conversions
+    [[nodiscard]] auto to_uint() const noexcept { return lo(); }
+    [[nodiscard]] auto to_float() const noexcept {
+        return fma(cast<float>(hi() >> 16u), 0x1p48f,
+                   fma(cast<float>(hi() & 0xffffu), 0x1p32f,
+                       cast<float>(lo())));
+    }
 };
+
+[[nodiscard]] inline auto ite(Expr<bool> p, Expr<uint> t, const U64 &f) noexcept {
+    return U64{ite(p, make_uint2(0u, t), f.bits())};
+}
+
+[[nodiscard]] inline auto ite(Expr<bool> p, const U64 &t, Expr<uint> f) noexcept {
+    return U64{ite(p, t.bits(), make_uint2(0u, f))};
+}
+
+[[nodiscard]] inline auto ite(Expr<bool> p, const U64 &t, const U64 &f) noexcept {
+    return U64{ite(p, t.bits(), f.bits())};
+}
 
 }// namespace luisa::render
