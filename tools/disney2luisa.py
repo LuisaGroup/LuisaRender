@@ -24,6 +24,7 @@ output_geo_dir = Path()
 
 
 def split_obj(path: Path, output_dir: Path) -> dict:
+
     class GeometryIndex:
         def __init__(self):
             self.v_index = 0
@@ -69,86 +70,105 @@ def split_obj(path: Path, output_dir: Path) -> dict:
             v.vn_index = self.vn_index
             return v
 
-    index = GeometryIndex()
-    index_next = GeometryIndex()
-    geos = {}
-    geo2material = {}
+    def reindex(line: str, index: GeometryIndex) -> str:
+        line = line[2:].strip().split(' ')
+        for i in range(len(line)):
+            line[i] = line[i].split('/')
+            assert len(line[i]) == 3
+            for j in range(3):
+                a = line[i][j]
+                if a == '':
+                    continue
+                a = int(a)
+                if a >= 0:
+                    line[i][j] = str(a - index[j])
+            line[i] = '/'.join(line[i])
+        return ' '.join(line)
+
+    def merge_geo(geo_name: str, index_num: GeometryIndex, geo_index_nums: dict):
+        if geo_name in geo_index_nums:
+            geo_index_nums[geo_name] += index_num
+        else:
+            geo_index_nums[geo_name] = index_num
+
+    def write_geo_line(line: str, name: str, geo_lines: dict):
+        lines = geo_lines.get(name, [])
+        lines.append(line)
+        geo_lines[name] = lines
+        if len(lines) >= 1000000:
+            write_geo_force(name, geo_lines)
+
+    def write_geo_force(name: str, geo_lines: dict):
+        lines = geo_lines[name]
+        if len(lines) == 0:
+            return
+        new_obj_file_path = output_dir / (name + '.obj')
+        with open(new_obj_file_path, 'a') as f:
+            f.writelines(lines)
+        geo_lines[name] = []
+
+    def move_default_to_geo(name: str, geo_lines: dict):
+        write_geo_force('default', geo_lines)
+        input_path = output_dir / 'default.obj'
+        output_path = output_dir / (name + '.obj')
+        # print(f'Trying to move {input_path} to {output_path}')
+        if input_path == output_path:
+            return
+        with open(input_path, 'r') as input_f:
+            with open(output_path, 'a') as output_f:
+                while True:
+                    data = input_f.read(65536)
+                    if not data:
+                        break
+                    output_f.write(data)
+        os.remove(input_path)
 
     with open(path, 'r') as f:
-        geo_name = ''
-        text = ''
-
-        def reindex(line: str, index: GeometryIndex) -> str:
-            line = line[2:].strip().split(' ')
-            for i in range(len(line)):
-                line[i] = line[i].split('/')
-                assert len(line[i]) == 3
-                for j in range(3):
-                    a = line[i][j]
-                    if a == '':
-                        continue
-                    a = int(a)
-                    if a >= 0:
-                        line[i][j] = str(a - index[j])
-                line[i] = '/'.join(line[i])
-            return ' '.join(line)
-
-        def write_geo(objtext: str, name: str):
-            if name == 'default' or objtext == '':
-                return
-            new_obj_file_path = output_dir / (name + '.obj')
-            if new_obj_file_path.exists():
-                raise FileExistsError(f'File {new_obj_file_path} already exists')
-            with open(new_obj_file_path, 'w') as f:
-                f.write(objtext)
-
-        def merge_geo(geo_name: str, text: str, index_num: GeometryIndex, geos: dict):
-            if geo_name in geos:
-                geos[geo_name]['text'] += text
-                geos[geo_name]['index_num'] += index_num
-            else:
-                geos[geo_name] = {
-                    'text': text,
-                    'index_num': index_num
-                }
-
         g_mode = False
+        index = GeometryIndex()
+        index_next = GeometryIndex()
+        geo_index_nums = {}
+        geo_lines = {}
+        geo_lines.setdefault('default', [])
+        geo2material = {}
+        geo_name = None
+
         for line in f:
             if line.startswith('g '):
+                geo_name_new = line[2:].strip()
+                # print(f'geo_name transform: {geo_name} -> {geo_name_new}')
+                # print(f'g_mode: {g_mode}')
                 if g_mode:
-                    assert line[2:].strip() == 'default'
                     g_mode = False
                     index_num = index_next - index
-                    merge_geo(geo_name, text, index_num, geos)
-                    text = ''
+                    merge_geo(geo_name, index_num, geo_index_nums)
                     index = index_next.copy()
-                else:
-                    geo_name = line[2:].strip()
-                    if geo_name != 'default':
-                        g_mode = True
+                elif geo_name is not None:
+                    g_mode = True
+                    move_default_to_geo(geo_name_new, geo_lines)
+                geo_name = geo_name_new
             elif line.startswith('f '):
-                if geo_name in geos:
-                    face = reindex(line, index - geos[geo_name]['index_num'])
+                if geo_name in geo_index_nums:
+                    face = reindex(line, index - geo_index_nums[geo_name])
                 else:
                     face = reindex(line, index)
-                text += f'f {face}\n'
+                write_geo_line(f'f {face}\n', geo_name, geo_lines)
             elif line.startswith('usemtl '):
                 material = line[7:].strip()
                 geo2material[geo_name] = material
             elif line.startswith('v '):
                 index_next.v_index += 1
-                text += line
+                write_geo_line(line, geo_name, geo_lines)
             elif line.startswith('vn '):
                 index_next.vn_index += 1
-                text += line
+                write_geo_line(line, geo_name, geo_lines)
             elif line.startswith('vt '):
                 index_next.vt_index += 1
-                text += line
+                write_geo_line(line, geo_name, geo_lines)
 
-        index_num = index_next - index
-        merge_geo(geo_name, text, index_num, geos)
-        for geo_name in geos:
-            write_geo(geos[geo_name]['text'], geo_name)
+        geo_lines.pop('default')
+        for name in geo_lines:
+            write_geo_force(name, geo_lines)
 
     return geo2material
 
@@ -182,6 +202,12 @@ def convert_camera(camera: dict) -> (str, dict):
     front = normalize(look_at - position)
     up = normalize(np.array(camera['up'], dtype=np.float32))
     name = camera['name']
+    width_div_height = camera['ratio']
+    width = 1000
+    height = int(width / width_div_height)
+    hfov = camera['fov']
+    vfov = 2 * np.arctan(np.tan(hfov / 2 * np.pi / 180) / width_div_height) * 180 / np.pi
+    vfov = float(vfov)
 
     camera_dict = {
         'type': 'Camera',
@@ -196,15 +222,15 @@ def convert_camera(camera: dict) -> (str, dict):
                     'up': up.tolist(),
                 }
             },
-            'fov': camera['fov'],
-            'spp': 1,
+            'fov': vfov,
+            'spp': 64,
             'film': {
                 'type': 'Film',
                 'impl': 'Color',
                 'prop': {
                     'resolution': [
-                        1024,
-                        int(1024 / camera['ratio'])
+                        width,
+                        height
                     ],
                     'exposure': 0,
                 }
@@ -225,7 +251,7 @@ def convert_camera(camera: dict) -> (str, dict):
     return name, camera_dict
 
 
-def convert_light(light_file_path: Path, light: dict, name: str) -> (str, dict):
+def convert_light(light: dict, name: str) -> (str, dict):
     transform = flatten_matrix4(get_transform(light['translationMatrix']))
     exposure = light['exposure']
     color = np.array(light['color'], dtype=np.float32)[:3] * exposure
@@ -272,9 +298,11 @@ def convert_light(light_file_path: Path, light: dict, name: str) -> (str, dict):
                             'prop': {
                                 'v': color.tolist(),
                             }
-                        }
+                        },
+                        'two_sided': True,
                     }
-                }
+                },
+                'visible': False,
             }
         }
         shape_names.add(name)
@@ -303,6 +331,8 @@ def convert_light(light_file_path: Path, light: dict, name: str) -> (str, dict):
             }
         }
         global environment_name
+        if environment_name is not None:
+            raise ValueError(f'Only one environment is supported, but {environment_name} and {name} are found')
         environment_name = name
     else:
         print(f'Light type {light["type"]} not supported')
@@ -493,8 +523,8 @@ def create_main_scene_file(scene_dir: Path):
         'type': 'Integrator',
         'impl': 'MegaPath',
         'prop': {
-            'depth': 12,
-            'rr_depth': 5,
+            'depth': 8,
+            'rr_depth': 2,
             'rr_threshold': 0.95,
             'sampler': {
                 'type': 'Sampler',
@@ -579,7 +609,7 @@ v   1.00   1.00   0.00
 v  -1.00   1.00   0.00
 v  -1.00  -1.00   0.00
 v   1.00  -1.00   0.00
-f -4 -3 -2 -1
+f   -4   -3   -2   -1
 '''
     with open(path_out / 'quad.obj', 'w') as f:
         f.write(quad)
@@ -588,7 +618,7 @@ f -4 -3 -2 -1
         with open(light_file, 'r') as f:
             lights = json.load(f)
         for name, light in lights.items():
-            name, light_dict = convert_light(light_file, light, name)
+            name, light_dict = convert_light(light, name)
             if name is None:
                 continue
             lights_dict[name] = light_dict
@@ -600,7 +630,7 @@ f -4 -3 -2 -1
         material_map[geo_name] = {}
         re_shape2material[geo_name] = {}
 
-    test_geo_names = ['isBeach', 'isCoastline']
+    test_geo_names = ['isBeach', 'isCoastline', 'osOcean', 'isDunesA', 'isDunesB', 'isMountainA', 'isMountainB']
 
     for geo_name in geo_names:
         # DEBUG
