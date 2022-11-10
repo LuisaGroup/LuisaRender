@@ -52,7 +52,8 @@ private:
     luisa::vector<Vertex> _vertices;
     luisa::vector<Triangle> _triangles;
 
-private:
+public:
+    SphereGeometry() noexcept = default;
     SphereGeometry(luisa::vector<Vertex> vertices,
                    luisa::vector<Triangle> triangles) noexcept
         : _vertices{std::move(vertices)}, _triangles{std::move(triangles)} {}
