@@ -50,50 +50,11 @@ namespace luisa::render {
 
 using namespace compute;
 
-class PCG32 {
-
-private:
-    static constexpr auto default_state = 0x853c49e6748fea9bull;
-    static constexpr auto default_stream = 0xda3e39cb94b95bdbull;
-    static constexpr auto mult = 0x5851f42d4c957f2dull;
-
-private:
-    U64 _state;
-    U64 _inc;
-
-public:
-    // clang-format off
-    PCG32() noexcept : _state{default_state}, _inc{default_stream} {}
-    PCG32(U64 state, U64 inc) noexcept : _state{state}, _inc{inc} {}
-    explicit PCG32(U64 seq_index) noexcept { set_sequence(seq_index); }
-    explicit PCG32(Expr<uint> seq_index) noexcept { set_sequence(U64{seq_index}); }
-    // clang-format on
-    [[nodiscard]] auto uniform_uint() noexcept {
-        auto oldstate = _state;
-        _state = oldstate * U64{mult} + _inc;
-        auto xorshifted = (((oldstate >> 18u) ^ oldstate) >> 27u).lo();
-        auto rot = (oldstate >> 59u).lo();
-        return (xorshifted >> rot) | (xorshifted << ((~rot + 1u) & 31u));
-    }
-    void set_sequence(U64 init_seq) noexcept {
-        _state = U64{0u};
-        _inc = (init_seq << 1u) | 1u;
-        static_cast<void>(uniform_uint());
-        _state = _state + U64{default_state};
-        static_cast<void>(uniform_uint());
-    }
-    [[nodiscard]] auto uniform_float() noexcept {
-        return min(one_minus_epsilon, uniform_uint() * 0x1p-32f);
-    }
-    [[nodiscard]] auto state() const noexcept { return _state; }
-    [[nodiscard]] auto inc() const noexcept { return _inc; }
-};
-
 class PSSMLTSampler {
 
 public:
     struct State {
-        PCG32 rng;
+        UInt rng_state;
         U64 current_iteration;
         Bool large_step;
         U64 last_large_step_iteration;
@@ -102,7 +63,7 @@ public:
 
         [[nodiscard]] static auto create(uint pss_dim, Expr<uint> rng_sequence) noexcept {
             return luisa::make_unique<State>(State{
-                .rng = PCG32{rng_sequence},
+                .rng_state = xxhash32(rng_sequence),
                 .current_iteration = U64{0u},
                 .large_step = true,
                 .last_large_step_iteration = U64{0u},
@@ -111,26 +72,24 @@ public:
         }
 
         [[nodiscard]] static auto size_words(uint pss_dim) noexcept {
-            return 4u +// rng
-                   2u +// current_iteration, last_large_step_iteration
+            return 1u +// rng
+                   2u +// current_iteration
                    1u +// large_step
+                   2u +// last_large_step_iteration
                    pss_dim * PrimarySample::size_words;
         }
 
         [[nodiscard]] static auto load(BufferView<uint> state_buffer, Expr<uint> index, uint pss_dim) noexcept {
             auto offset = index * size_words(pss_dim);
-            auto rng_state = make_uint2(state_buffer.read(offset + 0u),
-                                        state_buffer.read(offset + 1u));
-            auto rng_inc = make_uint2(state_buffer.read(offset + 2u),
-                                      state_buffer.read(offset + 3u));
-            auto current_iteration = make_uint2(state_buffer.read(offset + 4u),
-                                                state_buffer.read(offset + 5u));
-            auto large_step = state_buffer.read(offset + 6u) != 0u;
-            auto last_large_step_iteration = make_uint2(state_buffer.read(offset + 7u),
-                                                        state_buffer.read(offset + 8u));
+            auto rng_state = state_buffer.read(offset + 0u);
+            auto current_iteration = make_uint2(state_buffer.read(offset + 1u),
+                                                state_buffer.read(offset + 2u));
+            auto large_step = state_buffer.read(offset + 3u) != 0u;
+            auto last_large_step_iteration = make_uint2(state_buffer.read(offset + 4u),
+                                                        state_buffer.read(offset + 5u));
             auto primary_samples = Local<PrimarySample>{pss_dim};
             for (auto i = 0u; i < pss_dim; i++) {
-                auto sample_offset = offset + 9u + i * PrimarySample::size_words;
+                auto sample_offset = offset + 6u + i * PrimarySample::size_words;
                 primary_samples[i].value = as<float>(state_buffer.read(sample_offset + 0u));
                 primary_samples[i].value_backup = as<float>(state_buffer.read(sample_offset + 1u));
                 primary_samples[i].last_modification_iteration = make_uint2(state_buffer.read(sample_offset + 2u),
@@ -139,7 +98,7 @@ public:
                                                                     state_buffer.read(sample_offset + 5u));
             }
             return luisa::make_unique<State>(State{
-                .rng = PCG32{U64{rng_state}, U64{rng_inc}},
+                .rng_state = rng_state,
                 .current_iteration = U64{current_iteration},
                 .large_step = large_step,
                 .last_large_step_iteration = U64{last_large_step_iteration},
@@ -149,17 +108,14 @@ public:
 
         void save(BufferView<uint> state_buffer, Expr<uint> index) noexcept {
             auto offset = index * size_words(primary_samples.size());
-            state_buffer.write(offset + 0u, rng.state().bits().x);
-            state_buffer.write(offset + 1u, rng.state().bits().y);
-            state_buffer.write(offset + 2u, rng.inc().bits().x);
-            state_buffer.write(offset + 3u, rng.inc().bits().y);
-            state_buffer.write(offset + 4u, current_iteration.bits().x);
-            state_buffer.write(offset + 5u, current_iteration.bits().y);
-            state_buffer.write(offset + 6u, ite(large_step, 1u, 0u));
-            state_buffer.write(offset + 7u, last_large_step_iteration.bits().x);
-            state_buffer.write(offset + 8u, last_large_step_iteration.bits().y);
+            state_buffer.write(offset + 0u, rng_state);
+            state_buffer.write(offset + 1u, current_iteration.bits().x);
+            state_buffer.write(offset + 2u, current_iteration.bits().y);
+            state_buffer.write(offset + 3u, ite(large_step, 1u, 0u));
+            state_buffer.write(offset + 4u, last_large_step_iteration.bits().x);
+            state_buffer.write(offset + 5u, last_large_step_iteration.bits().y);
             for (auto i = 0u; i < primary_samples.size(); i++) {
-                auto sample_offset = offset + 9u + i * PrimarySample::size_words;
+                auto sample_offset = offset + 6u + i * PrimarySample::size_words;
                 state_buffer.write(sample_offset + 0u, as<uint>(primary_samples[i].value));
                 state_buffer.write(sample_offset + 1u, as<uint>(primary_samples[i].value_backup));
                 state_buffer.write(sample_offset + 2u, primary_samples[i].last_modification_iteration.x);
@@ -216,18 +172,18 @@ private:
         auto &Xi = _state->primary_samples[index];
         // Reset Xi if a large step took place in the meantime
         auto needs_reset = U64{Xi.last_modification_iteration} < _state->last_large_step_iteration;
-        Xi.value = ite(needs_reset, _state->rng.uniform_float(), Xi.value);
+        Xi.value = ite(needs_reset, lcg(_state->rng_state), Xi.value);
         Xi.last_modification_iteration = ite(needs_reset, _state->last_large_step_iteration.bits(), Xi.last_modification_iteration);
         // Apply remaining sequence of mutations to _sample_
         Xi->backup();
         $if(_state->large_step) {
-            Xi.value = _state->rng.uniform_float();
+            Xi.value = lcg(_state->rng_state);
         }
         $else {
             auto nSmall = (_state->current_iteration - U64{Xi.last_modification_iteration}).lo();
             // Apply _nSmall_ small step mutations
             // Sample the standard normal distribution N(0, 1)
-            auto normalSample = sqrt_two * _erf_inv(2.f * _state->rng.uniform_float() - 1.f);
+            auto normalSample = sqrt_two * _erf_inv(2.f * lcg(_state->rng_state) - 1.f);
             // Compute the effective standard deviation and apply perturbation to Xi
             auto effSigma = _sigma * sqrt(cast<float>(nSmall));
             Xi.value += normalSample * effSigma;
@@ -283,7 +239,7 @@ public:
 
     void start_iteration() noexcept {
         _state->current_iteration = _state->current_iteration + 1u;
-        _state->large_step = _state->rng.uniform_float() < _large_step_probability;
+        _state->large_step = lcg(_state->rng_state) < _large_step_probability;
     }
 };
 
@@ -306,7 +262,7 @@ public:
           _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)},
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
-          _bootstrap_samples{std::max(desc->property_uint_or_default("bootstrap_samples", 16u * 1024u * 1024u), 1u)},
+          _bootstrap_samples{std::max(desc->property_uint_or_default("bootstrap_samples", 256u * 1024u), 1u)},
           _chains{std::max(desc->property_uint_or_default("chains", 1024u * 1024u), 1u)},
           _large_step_probability{std::clamp(
               desc->property_float_or_default(
@@ -512,20 +468,24 @@ private:
                    "primary sample(s) of {} dimension(s) per pixel.",
                    chains, camera->node()->spp(), pss_dim);
 
+        auto resolution = camera->film()->node()->resolution();
+        auto pixel_count = resolution.x * resolution.y;
+
         auto state_buffer = pipeline().device().create_buffer<uint>(
             chains * PSSMLTSampler::State::size_words(pss_dim));
         auto radiance_buffer = pipeline().device().create_buffer<float3>(chains);
         auto position_buffer = pipeline().device().create_buffer<uint2>(chains);
         auto shutter_weight_buffer = pipeline().device().create_buffer<float>(chains);
+        auto accumulate_buffer = pipeline().device().create_buffer<float>(pixel_count * 3u);
 
         Clock clk;
         LUISA_INFO("PSSMLT: compiling create_chains kernel...");
         auto create_chains = pipeline().device().compile<1u>([&](Float time, Float shutter_weight) noexcept {
             auto chain_id = dispatch_x();
-            PCG32 rng{chain_id};
+            auto seed = xxhash32(chain_id);
+            auto u = lcg(seed);
             auto [bootstrap_id, _] = sample_alias_table(bootstrap_sampling_table,
-                                                        static_cast<uint>(bootstrap_sampling_table.size()),
-                                                        rng.uniform_float());
+                                                        static_cast<uint>(bootstrap_sampling_table.size()), u);
             PSSMLTSampler sampler{sigma, large_step_prob, pss_dim};
             sampler.create(bootstrap_id);
             auto [p, L] = Li(sampler, camera, time);
@@ -537,16 +497,8 @@ private:
         LUISA_INFO("PSSMLT: compiled create_chains kernel in {} ms.", clk.toc());
 
         clk.tic();
-        command_buffer << create_chains(shutter_samples.front().point.time,
-                                        shutter_samples.front().point.weight)
-                              .dispatch(chains)
-                       << synchronize();
-        LUISA_INFO("PSSMLT: created {} chain(s) in {} ms.", chains, clk.toc());
-
-        clk.tic();
         LUISA_INFO("PSSMLT: compiling render kernel...");
-        auto render = pipeline().device().compile<1u>([&](UInt2 frame_index, Float time,
-                                                          Float shutter_weight, Float scale) noexcept {
+        auto render = pipeline().device().compile<1u>([&](UInt mutation_index, Float time, Float shutter_weight) noexcept {
             auto chain_id = dispatch_id().x;
             PSSMLTSampler sampler{sigma, large_step_prob, pss_dim};
             sampler.load(state_buffer, chain_id);
@@ -562,13 +514,21 @@ private:
             // Compute acceptance probability for proposed sample
             auto accept = min(1.f, proposed_y / curr_y);
             // Splat both current and proposed samples to _film_
-            $if(accept > 0.f) {
-                camera->film()->accumulate(
-                    proposed_p, (shutter_weight * scale * accept / proposed_y) * proposed_L);
+            auto accum = [&](Expr<uint2> p, Expr<float3> L) noexcept {
+                auto offset = (p.y * resolution.x + p.x) * 3u;
+                $if(!any(isnan(L))) {
+                    for (auto i = 0u; i < 3u; i++) {
+                        accumulate_buffer.atomic(offset + i).fetch_add(L[i]);
+                    }
+                };
             };
-            camera->film()->accumulate(curr_p, ((1.f - accept) * curr_w * scale / curr_y) * curr_L);
+            $if(accept > 0.f) {
+                accum(proposed_p, (accept * shutter_weight / proposed_y) * proposed_L);
+                accum(curr_p, ((1.f - accept) * curr_w / curr_y) * curr_L);
+            };
             // Accept or reject the proposal
-            auto u = xxhash32(make_uint3(frame_index, chain_id));
+            auto seed = xxhash32(make_uint2(chain_id, mutation_index));
+            auto u = lcg(seed);
             $if(u < accept) {
                 position_buffer.write(chain_id, proposed_p);
                 radiance_buffer.write(chain_id, proposed_L);
@@ -582,22 +542,56 @@ private:
         });
         LUISA_INFO("PSSMLT: compiled render kernel in {} ms.", clk.toc());
 
-        LUISA_INFO("Rendering started.");
         clk.tic();
+        LUISA_INFO("PSSMLT: compiling clear kernel...");
+        auto clear = pipeline().device().compile<1u>([&]() noexcept {
+            auto pixel_id = dispatch_id().x;
+            accumulate_buffer.write(pixel_id, 0.f);
+        });
+        LUISA_INFO("PSSMLT: compiled clear kernel in {} ms.", clk.toc());
+
+        clk.tic();
+        LUISA_INFO("PSSMLT: compiling accumulate kernel...");
+        auto accumulate = pipeline().device().compile<2>([&] {
+            auto p = dispatch_id().xy();
+            auto offset = (p.y * resolution.x + p.x) * 3u;
+            auto L = make_float3(accumulate_buffer.read(offset + 0u),
+                                 accumulate_buffer.read(offset + 1u),
+                                 accumulate_buffer.read(offset + 2u));
+            camera->film()->accumulate(p, L);
+        });
+        LUISA_INFO("PSSMLT: compiled accumulate kernel in {} ms.", clk.toc());
+
+        auto total_mutations_per_chain = 0ull;
+        for (auto s : shutter_samples) {
+            total_mutations_per_chain += (static_cast<uint64_t>(s.spp) * pixel_count + chains - 1u) / chains;
+        }
+        auto shutter_weight_scale = static_cast<float>(b / static_cast<double>(total_mutations_per_chain));
+        LUISA_ASSERT(total_mutations_per_chain < ~0u, "Too many mutations per chain.");
+        LUISA_INFO("PSSMLT: {} mutation(s) per chain.", total_mutations_per_chain);
+
+        clk.tic();
+        command_buffer << create_chains(shutter_samples.front().point.time,
+                                        shutter_samples.front().point.weight * shutter_weight_scale)
+                              .dispatch(chains)
+                       << synchronize();
+        LUISA_INFO("PSSMLT: created {} chain(s) in {} ms.", chains, clk.toc());
+
+        clk.tic();
+        LUISA_INFO("Rendering started.");
         ProgressBar progress;
         progress.update(0.);
-        auto pixel_count = camera->film()->node()->resolution().x *
-                           camera->film()->node()->resolution().y;
-        auto total_mutations = static_cast<uint64_t>(camera->node()->spp()) * pixel_count;
         auto dispatch_count = 0ull;
         auto mutation_count = 0ull;
         for (auto s : shutter_samples) {
             pipeline().update(command_buffer, s.point.time);
             auto chain_mutations = (static_cast<uint64_t>(s.spp) * pixel_count + chains - 1u) / chains;
             for (auto i = 0u; i < chain_mutations; i++) {
-                command_buffer << render(luisa::bit_cast<uint2>(mutation_count++), s.point.time,
-                                         s.point.weight, b / static_cast<float>(camera->node()->spp()))
-                                      .dispatch(chains);
+                command_buffer << clear().dispatch(pixel_count * 3u)
+                               << render(static_cast<uint>(mutation_count++), s.point.time,
+                                         s.point.weight * shutter_weight_scale)
+                                      .dispatch(chains)
+                               << accumulate().dispatch(resolution);
                 auto dispatches_per_commit =
                     display() && !display()->should_close() ?
                         node<ProgressiveIntegrator>()->display_interval() :
@@ -605,7 +599,7 @@ private:
                 if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
                     dispatch_count = 0u;
                     auto p = static_cast<double>(mutation_count) /
-                             static_cast<double>(total_mutations);
+                             static_cast<double>(total_mutations_per_chain);
                     if (display() && display()->update(command_buffer, mutation_count)) {
                         progress.update(p);
                     } else {
