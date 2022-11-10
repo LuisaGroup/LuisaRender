@@ -107,7 +107,7 @@ public:
                 .large_step = true,
                 .last_large_step_iteration = U64{0u},
                 .primary_samples = Local<PrimarySample>{pss_dim},
-                .sample_index = UInt{0u}});
+                .sample_index = 0u});
         }
 
         [[nodiscard]] static auto size_words(uint pss_dim) noexcept {
@@ -269,8 +269,6 @@ public:
         _state->current_iteration = _state->current_iteration - 1u;
     }
 
-    void start_stream() noexcept { _state->sample_index = 0u; }
-
     [[nodiscard]] auto generate_1d() noexcept {
         _state->sample_index += 1u;
         _ensure_ready(_state->sample_index);
@@ -308,8 +306,8 @@ public:
           _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)},
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
-          _bootstrap_samples{std::max(desc->property_uint_or_default("bootstrap_samples", 1024u * 1024u), 1u)},
-          _chains{std::max(desc->property_uint_or_default("chains", 256u * 1024u), 1u)},
+          _bootstrap_samples{std::max(desc->property_uint_or_default("bootstrap_samples", 16u * 1024u * 1024u), 1u)},
+          _chains{std::max(desc->property_uint_or_default("chains", 1024u * 1024u), 1u)},
           _large_step_probability{std::clamp(
               desc->property_float_or_default(
                   "large_step_probability", lazy_construct([desc] {
@@ -340,6 +338,7 @@ private:
         auto rr_depth = std::clamp(node<PSSMLT>()->rr_depth(), 1u, max_depth - 1u);
         auto dim = 3u;// pixel and wavelength
         if (camera->requires_lens_sampling()) { dim += 2u; }
+        if (!pipeline().spectrum()->node()->is_fixed()) { dim += 1u; }
         for (auto depth = 0u; depth < max_depth; depth++) {
             dim += 1u +// light selection
                    2u +// light area
