@@ -665,7 +665,8 @@ f   -4   -3   -2   -1
         converter_info.material_map[geo_name] = {}
         converter_info.re_shape2material[geo_name] = {}
 
-    test_geo_names = ['isBeach', 'isCoastline', 'osOcean', 'isDunesA', 'isDunesB', 'isMountainA', 'isMountainB']
+    # test_geo_names = ['isBeach', 'isCoastline', 'osOcean', 'isDunesA', 'isDunesB', 'isMountainA', 'isMountainB']
+    test_geo_names = ['isBeach', 'isCoastline', 'osOcean']
 
     pool = multiprocessing.Pool()
     threads = []
@@ -677,14 +678,24 @@ f   -4   -3   -2   -1
         threads.append(pool.apply_async(convert_geometry, args=(converter_info.copy(), geo_name)))
     pool.close()
 
-    for thread_t in threads:
-        converter_info_t, geo_name, geo_dict = thread_t.get()
-        converter_info.merge(converter_info_t)
-        path_in = converter_info.input_json_dir / geo_name
-        path_out = converter_info.output_json_dir / geo_name
-        check_dir(path_in, path_out)
-        with open(path_out / f'{geo_name}.json', 'w') as f:
-            json.dump(geo_dict, f, indent=2)
+    finished_threads = 0
+    thread_count = len(threads)
+    while len(threads) > 0:
+        threads_next = []
+        for thread_t in threads:
+            if not thread_t.ready():
+                threads_next.append(thread_t)
+                continue
+            converter_info_t, geo_name, geo_dict = thread_t.get()
+            converter_info.merge(converter_info_t)
+            path_in = converter_info.input_json_dir / geo_name
+            path_out = converter_info.output_json_dir / geo_name
+            check_dir(path_in, path_out)
+            with open(path_out / f'{geo_name}.json', 'w') as f:
+                json.dump(geo_dict, f, indent=2)
+            finished_threads += 1
+            log_info(f'Thread {finished_threads}/{thread_count} finished. Geometry {geo_name} dumped')
+        threads = threads_next
     pool.join()
     log_info('All geometries converted')
 
