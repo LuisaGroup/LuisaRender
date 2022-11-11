@@ -295,6 +295,7 @@ private:
         auto rr_depth = std::clamp(node<PSSMLT>()->rr_depth(), 1u, max_depth - 1u);
         auto dim = 2u;// pixel
         if (camera->requires_lens_sampling()) { dim += 2u; }
+        if (!pipeline().spectrum()->node()->is_fixed()) { dim += 1u; }
         for (auto depth = 0u; depth < max_depth; depth++) {
             dim += 1u +// light selection
                    2u +// light area
@@ -303,6 +304,13 @@ private:
             if (depth + 1u >= rr_depth) { dim += 1u /* RR */; }
         }
         return dim;
+    }
+
+    [[nodiscard]] static auto _s(Expr<float3> L) noexcept {
+        //                return max(srgb_to_cie_y(L), 0.f);
+        auto v = clamp(L, 0.f, 1e3f);
+        return v.x + v.y + v.z;
+        //        return max(max(L.x, L.y), max(L.z, 0.f));
     }
 
     [[nodiscard]] auto Li(PSSMLTSampler &sampler,
@@ -441,7 +449,7 @@ private:
             sampler.create(bootstrap_id);
             auto rng_state = xxhash32(make_uint2(bootstrap_id, 0xdeadbeefu));
             auto [_, L] = Li(sampler, camera, time, rng_state);
-            bootstrap_weights.write(bootstrap_id, srgb_to_cie_y(L));
+            bootstrap_weights.write(bootstrap_id, _s(L));
         });
         LUISA_INFO("PSSMLT: running bootstrap kernel.");
         luisa::vector<float> bw(bootstrap_count);
@@ -517,8 +525,8 @@ private:
             auto proposed = Li(sampler, camera, time, seed);
             auto proposed_p = proposed.first;
             auto proposed_L = proposed.second;
-            auto curr_y = srgb_to_cie_y(curr_L);
-            auto proposed_y = srgb_to_cie_y(proposed_L);
+            auto curr_y = _s(curr_L);
+            auto proposed_y = _s(proposed_L);
             // Compute acceptance probability for proposed sample
             auto accept = min(1.f, proposed_y / curr_y);
             // Splat both current and proposed samples to _film_

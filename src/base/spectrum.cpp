@@ -29,16 +29,15 @@ Float Spectrum::Instance::cie_y(const SampledWavelengths &swl, const SampledSpec
 Float3 Spectrum::Instance::cie_xyz(const SampledWavelengths &swl, const SampledSpectrum &sp) const noexcept {
     using namespace compute;
     constexpr auto safe_div = [](auto a, auto b) noexcept {
-        return ite(b == 0.0f, 0.0f, a / b);
+        return ite(b == 0.f, 0.f, a / b);
     };
     auto sum = def(make_float3());
     for (auto i = 0u; i < swl.dimension(); i++) {
         auto lambda = swl.lambda(i);
         auto pdf = swl.pdf(i);
-        sum += make_float3(
-            safe_div(_cie_x.sample(lambda) * sp[i], pdf),
-            safe_div(_cie_y.sample(lambda) * sp[i], pdf),
-            safe_div(_cie_z.sample(lambda) * sp[i], pdf));
+        sum += make_float3(safe_div(_cie_x.sample(lambda) * sp[i], pdf),
+                           safe_div(_cie_y.sample(lambda) * sp[i], pdf),
+                           safe_div(_cie_z.sample(lambda) * sp[i], pdf));
     }
     auto denom = static_cast<float>(swl.dimension()) * SPD::cie_y_integral();
     return sum / denom;
