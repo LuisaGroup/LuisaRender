@@ -57,6 +57,7 @@ public:
     void download(CommandBuffer &command_buffer, float4 *framebuffer) const noexcept override;
     [[nodiscard]] Film::Accumulation read(Expr<uint2> pixel) const noexcept override;
     void release() const noexcept override;
+    void clear(CommandBuffer &command_buffer) noexcept override;
 };
 
 ColorFilmInstance::ColorFilmInstance(Device &device, Pipeline &pipeline, const ColorFilm *film) noexcept
@@ -105,6 +106,12 @@ void ColorFilmInstance::prepare(CommandBuffer &command_buffer) noexcept {
     auto pixel_count = resolution.x * resolution.y;
     if (!_image) { _image = pipeline().device().create_buffer<float>(pixel_count * 4u); }
     if (!_converted) { _converted = pipeline().device().create_buffer<float4>(pixel_count); }
+    clear(command_buffer);
+}
+
+void ColorFilmInstance::clear(CommandBuffer &command_buffer) noexcept {
+    auto resolution = node()->resolution();
+    auto pixel_count = resolution.x * resolution.y;
     command_buffer << _clear_image.get()(_image).dispatch(pixel_count);
 }
 

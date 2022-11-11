@@ -262,8 +262,8 @@ public:
           _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)},
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
-          _bootstrap_samples{std::max(desc->property_uint_or_default("bootstrap_samples", 256u * 1024u), 1u)},
-          _chains{std::max(desc->property_uint_or_default("chains", 1024u * 1024u), 1u)},
+          _bootstrap_samples{std::max(desc->property_uint_or_default("bootstrap_samples", 1024u * 1024u), 1u)},
+          _chains{std::max(desc->property_uint_or_default("chains", 256u * 1024u), 1u)},
           _large_step_probability{std::clamp(
               desc->property_float_or_default(
                   "large_step_probability", lazy_construct([desc] {
@@ -438,8 +438,8 @@ private:
                                   node<PSSMLT>()->large_step_probability(),
                                   _compute_pss_dimension(camera->node())};
             sampler.create(bootstrap_id);
-            auto L = Li(sampler, camera, time);
-            bootstrap_weights.write(bootstrap_id, srgb_to_cie_y(L.second));
+            auto [_, L] = Li(sampler, camera, time);
+            bootstrap_weights.write(bootstrap_id, srgb_to_cie_y(L));
         });
         LUISA_INFO("PSSMLT: running bootstrap kernel.");
         luisa::vector<float> bw(bootstrap_count);
@@ -448,7 +448,9 @@ private:
                        << synchronize();
         LUISA_INFO("PSSMLT: Generated {} bootstrap sample(s) in {} ms.",
                    bootstrap_count, clk.toc());
-        auto b = std::accumulate(bw.cbegin(), bw.cend(), 0.f);
+        auto b = 0.;
+        for (auto w : bw) { b += w; }
+        b /= static_cast<double>(bootstrap_count);
         LUISA_INFO("PSSMLT: normalization factor is {}.", b);
         auto [alias_table, _] = create_alias_table(bw);
         auto bootstrap_sampling_table = pipeline().device().create_buffer<AliasEntry>(alias_table.size());
@@ -459,7 +461,7 @@ private:
 
     void _render(CommandBuffer &command_buffer, Camera::Instance *camera,
                  luisa::span<const Camera::ShutterSample> shutter_samples,
-                 Buffer<AliasEntry> bootstrap_sampling_table, float b) noexcept {
+                 Buffer<AliasEntry> bootstrap_sampling_table, double b) noexcept {
         auto pss_dim = _compute_pss_dimension(camera->node());
         auto sigma = node<PSSMLT>()->sigma();
         auto large_step_prob = node<PSSMLT>()->large_step_probability();
@@ -546,36 +548,35 @@ private:
         LUISA_INFO("PSSMLT: compiling clear kernel...");
         auto clear = pipeline().device().compile<1u>([&]() noexcept {
             auto pixel_id = dispatch_id().x;
-            accumulate_buffer.write(pixel_id, 0.f);
+            accumulate_buffer.write(pixel_id * 3u + 0u, 0.f);
+            accumulate_buffer.write(pixel_id * 3u + 1u, 0.f);
+            accumulate_buffer.write(pixel_id * 3u + 2u, 0.f);
         });
         LUISA_INFO("PSSMLT: compiled clear kernel in {} ms.", clk.toc());
 
         clk.tic();
         LUISA_INFO("PSSMLT: compiling accumulate kernel...");
-        auto accumulate = pipeline().device().compile<2>([&] {
+        auto blit = pipeline().device().compile<2>([&](Float scale) {
             auto p = dispatch_id().xy();
             auto offset = (p.y * resolution.x + p.x) * 3u;
             auto L = make_float3(accumulate_buffer.read(offset + 0u),
                                  accumulate_buffer.read(offset + 1u),
                                  accumulate_buffer.read(offset + 2u));
-            camera->film()->accumulate(p, L);
+            camera->film()->accumulate(p, scale * L);
         });
-        LUISA_INFO("PSSMLT: compiled accumulate kernel in {} ms.", clk.toc());
-
-        auto total_mutations_per_chain = 0ull;
-        for (auto s : shutter_samples) {
-            total_mutations_per_chain += (static_cast<uint64_t>(s.spp) * pixel_count + chains - 1u) / chains;
-        }
-        auto shutter_weight_scale = static_cast<float>(b / static_cast<double>(total_mutations_per_chain));
-        LUISA_ASSERT(total_mutations_per_chain < ~0u, "Too many mutations per chain.");
-        LUISA_INFO("PSSMLT: {} mutation(s) per chain.", total_mutations_per_chain);
+        LUISA_INFO("PSSMLT: compiled blit kernel in {} ms.", clk.toc());
 
         clk.tic();
         command_buffer << create_chains(shutter_samples.front().point.time,
-                                        shutter_samples.front().point.weight * shutter_weight_scale)
+                                        shutter_samples.front().point.weight)
                               .dispatch(chains)
+                       << clear().dispatch(pixel_count)
                        << synchronize();
         LUISA_INFO("PSSMLT: created {} chain(s) in {} ms.", chains, clk.toc());
+
+        auto blit_scale = [b, pixel_count, chains](double effective_spp) noexcept {
+            return static_cast<float>(b * pixel_count / (chains * effective_spp));
+        };
 
         clk.tic();
         LUISA_INFO("Rendering started.");
@@ -583,24 +584,29 @@ private:
         progress.update(0.);
         auto dispatch_count = 0ull;
         auto mutation_count = 0ull;
+        auto mutation_per_chain_count = 0ull;
+        auto total_mutations = static_cast<uint64_t>(camera->node()->spp()) * pixel_count;
         for (auto s : shutter_samples) {
             pipeline().update(command_buffer, s.point.time);
-            auto chain_mutations = (static_cast<uint64_t>(s.spp) * pixel_count + chains - 1u) / chains;
-            for (auto i = 0u; i < chain_mutations; i++) {
-                command_buffer << clear().dispatch(pixel_count * 3u)
-                               << render(static_cast<uint>(mutation_count++), s.point.time,
-                                         s.point.weight * shutter_weight_scale)
-                                      .dispatch(chains)
-                               << accumulate().dispatch(resolution);
+            auto mutations = static_cast<uint64_t>(s.spp) * pixel_count;
+            auto mutations_per_chain = (mutations + chains - 1u) / chains;
+            for (auto i = 0ull; i < mutations_per_chain; i++) {
+                auto chains_to_dispatch = std::min((i + 1u) * chains, mutations) - i * chains;
+                command_buffer << render(static_cast<uint>(mutation_per_chain_count++),
+                                         s.point.time, s.point.weight)
+                                      .dispatch(chains_to_dispatch);
+                mutation_count += chains_to_dispatch;
                 auto dispatches_per_commit =
                     display() && !display()->should_close() ?
-                        node<ProgressiveIntegrator>()->display_interval() :
-                        32u;
+                        node<ProgressiveIntegrator>()->display_interval() * std::max(pixel_count / chains, 1u) :
+                        64u;
                 if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
+                    auto p = static_cast<double>(mutation_count) / static_cast<double>(total_mutations);
+                    auto effective_spp = p * camera->node()->spp();
+                    camera->film()->clear(command_buffer);
+                    command_buffer << blit(blit_scale(effective_spp)).dispatch(resolution);
                     dispatch_count = 0u;
-                    auto p = static_cast<double>(mutation_count) /
-                             static_cast<double>(total_mutations_per_chain);
-                    if (display() && display()->update(command_buffer, mutation_count)) {
+                    if (display() && display()->update(command_buffer, static_cast<uint>(effective_spp))) {
                         progress.update(p);
                     } else {
                         command_buffer << [&progress, p] { progress.update(p); };
@@ -608,6 +614,9 @@ private:
                 }
             }
         }
+        // final
+        camera->film()->clear(command_buffer);
+        command_buffer << blit(blit_scale(camera->node()->spp())).dispatch(resolution);
         command_buffer << synchronize();
         progress.done();
 

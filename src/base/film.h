@@ -35,6 +35,7 @@ public:
         [[nodiscard]] virtual Accumulation read(Expr<uint2> pixel) const noexcept = 0;
         virtual void accumulate(Expr<uint2> pixel, Expr<float3> rgb) const noexcept = 0;
         virtual void prepare(CommandBuffer &command_buffer) noexcept = 0;
+        virtual void clear(CommandBuffer &command_buffer) noexcept = 0;
         virtual void download(CommandBuffer &command_buffer, float4 *framebuffer) const noexcept = 0;
         virtual void release() const noexcept = 0;
     };
