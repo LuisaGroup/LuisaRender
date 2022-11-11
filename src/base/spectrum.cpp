@@ -45,26 +45,7 @@ Float3 Spectrum::Instance::cie_xyz(const SampledWavelengths &swl, const SampledS
 }
 
 SampledWavelengths Spectrum::Instance::sample(Expr<float> u) const noexcept {
-    LUISA_ASSERT(!node()->is_fixed(), "Fixed spectra should not sample.");
-    using namespace compute;
-    constexpr auto sample_visible_wavelengths = [](auto u) noexcept {
-        return clamp(538.0f - 138.888889f * atanh(0.85691062f - 1.82750197f * u),
-                     visible_wavelength_min, visible_wavelength_max);
-    };
-    constexpr auto visible_wavelengths_pdf = [](auto lambda) noexcept {
-        constexpr auto sqr = [](auto x) noexcept { return x * x; };
-        return 0.0039398042f / sqr(cosh(0.0072f * (lambda - 538.0f)));
-    };
-    auto n = node()->dimension();
-    SampledWavelengths swl{node()->dimension()};
-    for (auto i = 0u; i < n; i++) {
-        auto offset = static_cast<float>(i * (1.0 / n));
-        auto up = fract(u + offset);
-        auto lambda = sample_visible_wavelengths(up);
-        swl.set_lambda(i, lambda);
-        swl.set_pdf(i, visible_wavelengths_pdf(lambda));
-    }
-    return swl;
+    LUISA_ERROR_WITH_LOCATION("Spectrum::sample() is not implemented.");
 }
 
 Spectrum::Instance::Instance(Pipeline &pipeline, CommandBuffer &cb,

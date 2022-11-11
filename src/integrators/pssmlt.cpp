@@ -226,9 +226,10 @@ public:
     }
 
     [[nodiscard]] auto generate_1d() noexcept {
+        auto index = _state->sample_index;
         _state->sample_index += 1u;
-        _ensure_ready(_state->sample_index);
-        return _state->primary_samples[_state->sample_index].value;
+        _ensure_ready(index);
+        return _state->primary_samples[index].value;
     }
 
     [[nodiscard]] auto generate_2d() noexcept {
@@ -292,9 +293,8 @@ private:
     [[nodiscard]] auto _compute_pss_dimension(const Camera *camera) const noexcept {
         auto max_depth = node<PSSMLT>()->max_depth();
         auto rr_depth = std::clamp(node<PSSMLT>()->rr_depth(), 1u, max_depth - 1u);
-        auto dim = 3u;// pixel and wavelength
+        auto dim = 2u;// pixel
         if (camera->requires_lens_sampling()) { dim += 2u; }
-        if (!pipeline().spectrum()->node()->is_fixed()) { dim += 1u; }
         for (auto depth = 0u; depth < max_depth; depth++) {
             dim += 1u +// light selection
                    2u +// light area
@@ -307,7 +307,8 @@ private:
 
     [[nodiscard]] auto Li(PSSMLTSampler &sampler,
                           const Camera::Instance *camera,
-                          Expr<float> time) const noexcept {
+                          Expr<float> time,
+                          UInt &rng_state) const noexcept {
 
         auto res = make_float2(camera->film()->node()->resolution());
         auto p = sampler.generate_2d() * res;
@@ -316,7 +317,7 @@ private:
         auto u_lens = camera->node()->requires_lens_sampling() ? sampler.generate_2d() : make_float2(.5f);
         auto [camera_ray, _, camera_weight] = camera->generate_ray(pixel_id, time, u_filter, u_lens);
         auto spectrum = pipeline().spectrum();
-        auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler.generate_1d());
+        auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : lcg(rng_state));
         SampledSpectrum beta{swl.dimension(), camera_weight};
         SampledSpectrum Li{swl.dimension()};
 
@@ -438,7 +439,8 @@ private:
                                   node<PSSMLT>()->large_step_probability(),
                                   _compute_pss_dimension(camera->node())};
             sampler.create(bootstrap_id);
-            auto [_, L] = Li(sampler, camera, time);
+            auto rng_state = xxhash32(make_uint2(bootstrap_id, 0xdeadbeefu));
+            auto [_, L] = Li(sampler, camera, time, rng_state);
             bootstrap_weights.write(bootstrap_id, srgb_to_cie_y(L));
         });
         LUISA_INFO("PSSMLT: running bootstrap kernel.");
@@ -479,36 +481,40 @@ private:
         auto position_buffer = pipeline().device().create_buffer<uint2>(chains);
         auto shutter_weight_buffer = pipeline().device().create_buffer<float>(chains);
         auto accumulate_buffer = pipeline().device().create_buffer<float>(pixel_count * 3u);
+        auto statistics_buffer = pipeline().device().create_buffer<uint>(4u);
 
         Clock clk;
         LUISA_INFO("PSSMLT: compiling create_chains kernel...");
         auto create_chains = pipeline().device().compile<1u>([&](Float time, Float shutter_weight) noexcept {
             auto chain_id = dispatch_x();
-            auto seed = xxhash32(chain_id);
+            auto seed = xxhash32(make_uint2(chain_id, 0xabadfaceu));
             auto u = lcg(seed);
             auto [bootstrap_id, _] = sample_alias_table(bootstrap_sampling_table,
                                                         static_cast<uint>(bootstrap_sampling_table.size()), u);
             PSSMLTSampler sampler{sigma, large_step_prob, pss_dim};
             sampler.create(bootstrap_id);
-            auto [p, L] = Li(sampler, camera, time);
+            auto [p, L] = Li(sampler, camera, time, seed);
             position_buffer.write(chain_id, p);
             radiance_buffer.write(chain_id, L);
             shutter_weight_buffer.write(chain_id, shutter_weight);
             sampler.save(state_buffer, chain_id);
+            $if(dispatch_x() < 4u) { statistics_buffer.write(dispatch_x(), 0u); };
         });
         LUISA_INFO("PSSMLT: compiled create_chains kernel in {} ms.", clk.toc());
 
         clk.tic();
         LUISA_INFO("PSSMLT: compiling render kernel...");
         auto render = pipeline().device().compile<1u>([&](UInt mutation_index, Float time, Float shutter_weight) noexcept {
+            set_block_size(8u, 8u, 1u);
             auto chain_id = dispatch_id().x;
+            auto seed = xxhash32(make_uint3(chain_id, mutation_index, 0xfacebeefu));
             PSSMLTSampler sampler{sigma, large_step_prob, pss_dim};
             sampler.load(state_buffer, chain_id);
             auto curr_p = position_buffer.read(chain_id);
             auto curr_L = radiance_buffer.read(chain_id);
             auto curr_w = shutter_weight_buffer.read(chain_id);
             sampler.start_iteration();
-            auto proposed = Li(sampler, camera, time);
+            auto proposed = Li(sampler, camera, time, seed);
             auto proposed_p = proposed.first;
             auto proposed_L = proposed.second;
             auto curr_y = srgb_to_cie_y(curr_L);
@@ -524,21 +530,26 @@ private:
                     }
                 };
             };
+            auto record = [&statistics_buffer](Expr<uint> index) noexcept {
+                auto old = statistics_buffer.atomic(index * 2u + 0u).fetch_add(1u);
+                $if(old == ~0u) { statistics_buffer.atomic(index * 2u + 1u).fetch_add(1u); };
+            };
             $if(accept > 0.f) {
                 accum(proposed_p, (accept * shutter_weight / proposed_y) * proposed_L);
             };
             accum(curr_p, ((1.f - accept) * curr_w / curr_y) * curr_L);
             // Accept or reject the proposal
-            auto seed = xxhash32(make_uint2(chain_id, mutation_index));
             auto u = lcg(seed);
             $if(u < accept) {
                 position_buffer.write(chain_id, proposed_p);
                 radiance_buffer.write(chain_id, proposed_L);
                 shutter_weight_buffer.write(chain_id, shutter_weight);
                 sampler.accept();
+                record(0u);
             }
             $else {
                 sampler.reject();
+                record(1u);
             };
             sampler.save(state_buffer, chain_id);
         });
@@ -599,8 +610,17 @@ private:
                 if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
                     auto p = static_cast<double>(mutation_count) / static_cast<double>(total_mutations);
                     auto effective_spp = p * camera->node()->spp();
+                    auto statistics = luisa::make_shared<uint4>();
                     camera->film()->clear(command_buffer);
-                    command_buffer << blit(static_cast<float>(b / effective_spp)).dispatch(resolution);
+                    command_buffer << blit(static_cast<float>(b / effective_spp)).dispatch(resolution)
+                                   << statistics_buffer.copy_to(statistics.get())
+                                   << [statistics] {
+                                          auto accepted = (static_cast<uint64_t>(statistics->y) << 32u) | statistics->x;
+                                          auto rejected = (static_cast<uint64_t>(statistics->w) << 32u) | statistics->z;
+                                          auto total = accepted + rejected;
+                                          LUISA_INFO("PSSMLT: {}/{} mutation(s) accepted ({:.2f}%).",
+                                                     accepted, total, static_cast<double>(accepted) / static_cast<double>(total) * 100.);
+                                      };
                     dispatch_count = 0u;
                     if (display() && display()->update(command_buffer, static_cast<uint>(effective_spp))) {
                         progress.update(p);

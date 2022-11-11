@@ -184,16 +184,38 @@ public:
 
 class HeroWavelengthSpectrum final : public Spectrum {
 
+public:
+    enum struct SamplingMethod {
+        VISIBLE,
+        UNIFORM
+    };
+
 private:
     uint _dimension{};
+    SamplingMethod _method{};
 
 public:
     HeroWavelengthSpectrum(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Spectrum{scene, desc},
-          _dimension{std::max(desc->property_uint_or_default("dimension", 4u), 1u)} {}
+          _dimension{std::max(desc->property_uint_or_default("dimension", 4u), 1u)} {
+        auto m = desc->property_string_or_default("sample", "visible");
+        for (auto &c : m) { c = static_cast<char>(std::tolower(c)); }
+        if (m == "visible") {
+            _method = SamplingMethod::VISIBLE;
+        } else if (m == "uniform") {
+            _method = SamplingMethod::UNIFORM;
+        } else {
+            LUISA_WARNING_WITH_LOCATION(
+                "Invalid sampling method \"{}\" for "
+                "HeroWavelengthSpectrum, using \"visible\" instead.",
+                m);
+            _method = SamplingMethod::VISIBLE;
+        }
+    }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] bool is_fixed() const noexcept override { return false; }
     [[nodiscard]] uint dimension() const noexcept override { return _dimension; }
+    [[nodiscard]] auto sampling_method() const noexcept { return _method; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
     [[nodiscard]] float4 encode_static_srgb_albedo(float3 rgb) const noexcept override {
@@ -203,6 +225,8 @@ public:
         return RGB2SpectrumTable::srgb().decode_unbound(rgb);
     }
 };
+
+using namespace compute;
 
 class HeroWavelengthSpectrumInstance final : public Spectrum::Instance {
 
@@ -240,6 +264,53 @@ public:
     }
     [[nodiscard]] Float4 encode_srgb_illuminant(Expr<float3> rgb) const noexcept override {
         return RGB2SpectrumTable::srgb().decode_unbound(pipeline().bindless_array(), _rgb2spec_t0, rgb);
+    }
+
+private:
+    [[nodiscard]] auto _sample_uniform(Expr<float> u) const noexcept {
+        SampledWavelengths swl{node()->dimension()};
+        swl.set_lambda(0u, lerp(visible_wavelength_min, visible_wavelength_max, u));
+        Float delta = (visible_wavelength_max - visible_wavelength_min) /
+                      static_cast<float>(swl.dimension());
+        for (auto i = 1u; i < node()->dimension(); i++) {
+            auto lambda = swl.lambda(i - 1u) + delta;
+            lambda = ite(lambda > visible_wavelength_max,
+                         visible_wavelength_min + (lambda - visible_wavelength_max),
+                         lambda);
+            swl.set_lambda(i, lambda);
+        }
+        for (auto i = 0u; i < node()->dimension(); i++) {
+            swl.set_pdf(i, 1.f / (visible_wavelength_max - visible_wavelength_min));
+        }
+        return swl;
+    }
+    [[nodiscard]] SampledWavelengths _sample_visible(Expr<float> u) const noexcept {
+        constexpr auto sample_visible_wavelengths = [](auto u) noexcept {
+            return clamp(538.0f - 138.888889f * atanh(0.85691062f - 1.82750197f * u),
+                         visible_wavelength_min, visible_wavelength_max);
+        };
+        constexpr auto visible_wavelengths_pdf = [](auto lambda) noexcept {
+            constexpr auto sqr = [](auto x) noexcept { return x * x; };
+            return 0.0039398042f / sqr(cosh(0.0072f * (lambda - 538.0f)));
+        };
+        auto n = node()->dimension();
+        SampledWavelengths swl{node()->dimension()};
+        for (auto i = 0u; i < n; i++) {
+            auto offset = static_cast<float>(i * (1.0 / n));
+            auto up = fract(u + offset);
+            auto lambda = sample_visible_wavelengths(up);
+            swl.set_lambda(i, lambda);
+            swl.set_pdf(i, visible_wavelengths_pdf(lambda));
+        }
+        return swl;
+    }
+
+public:
+    [[nodiscard]] SampledWavelengths sample(Expr<float> u) const noexcept override {
+        auto m = node<HeroWavelengthSpectrum>()->sampling_method();
+        return m == HeroWavelengthSpectrum::SamplingMethod::UNIFORM ?
+                   _sample_uniform(u) :
+                   _sample_visible(u);
     }
 };
 
