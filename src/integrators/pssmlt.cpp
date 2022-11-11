@@ -586,7 +586,7 @@ private:
             pipeline().update(command_buffer, s.point.time);
             auto mutations = static_cast<uint64_t>(s.spp) * pixel_count;
             auto mutations_per_chain = (mutations + chains - 1u) / chains;
-            for (auto i = 0ull; i < mutations_per_chain; i++) {
+            for (auto i = static_cast<uint64_t>(0u); i < mutations_per_chain; i++) {
                 auto chains_to_dispatch = std::min((i + 1u) * chains, mutations) - i * chains;
                 command_buffer << render(static_cast<uint>(mutation_per_chain_count++),
                                          s.point.time, s.point.weight)
