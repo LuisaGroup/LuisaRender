@@ -450,7 +450,7 @@ private:
                    bootstrap_count, clk.toc());
         auto b = 0.;
         for (auto w : bw) { b += w; }
-        b /= static_cast<double>(bootstrap_count);
+        b /= bootstrap_count;
         LUISA_INFO("PSSMLT: normalization factor is {}.", b);
         auto [alias_table, _] = create_alias_table(bw);
         auto bootstrap_sampling_table = pipeline().device().create_buffer<AliasEntry>(alias_table.size());
@@ -516,7 +516,7 @@ private:
             // Compute acceptance probability for proposed sample
             auto accept = min(1.f, proposed_y / curr_y);
             // Splat both current and proposed samples to _film_
-            auto accum = [&](Expr<uint2> p, Expr<float3> L) noexcept {
+            auto accum = [&accumulate_buffer, resolution](Expr<uint2> p, Expr<float3> L) noexcept {
                 auto offset = (p.y * resolution.x + p.x) * 3u;
                 $if(!any(isnan(L))) {
                     for (auto i = 0u; i < 3u; i++) {
@@ -526,8 +526,8 @@ private:
             };
             $if(accept > 0.f) {
                 accum(proposed_p, (accept * shutter_weight / proposed_y) * proposed_L);
-                accum(curr_p, ((1.f - accept) * curr_w / curr_y) * curr_L);
             };
+            accum(curr_p, ((1.f - accept) * curr_w / curr_y) * curr_L);
             // Accept or reject the proposal
             auto seed = xxhash32(make_uint2(chain_id, mutation_index));
             auto u = lcg(seed);
@@ -574,10 +574,6 @@ private:
                        << synchronize();
         LUISA_INFO("PSSMLT: created {} chain(s) in {} ms.", chains, clk.toc());
 
-        auto blit_scale = [b, pixel_count, chains](double effective_spp) noexcept {
-            return static_cast<float>(b * pixel_count / (chains * effective_spp));
-        };
-
         clk.tic();
         LUISA_INFO("Rendering started.");
         ProgressBar progress;
@@ -604,7 +600,7 @@ private:
                     auto p = static_cast<double>(mutation_count) / static_cast<double>(total_mutations);
                     auto effective_spp = p * camera->node()->spp();
                     camera->film()->clear(command_buffer);
-                    command_buffer << blit(blit_scale(effective_spp)).dispatch(resolution);
+                    command_buffer << blit(static_cast<float>(b / effective_spp)).dispatch(resolution);
                     dispatch_count = 0u;
                     if (display() && display()->update(command_buffer, static_cast<uint>(effective_spp))) {
                         progress.update(p);
@@ -616,7 +612,7 @@ private:
         }
         // final
         camera->film()->clear(command_buffer);
-        command_buffer << blit(blit_scale(camera->node()->spp())).dispatch(resolution);
+        command_buffer << blit(static_cast<float>(b / camera->node()->spp())).dispatch(resolution);
         command_buffer << synchronize();
         progress.done();
 
