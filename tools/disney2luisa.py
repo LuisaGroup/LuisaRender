@@ -7,6 +7,8 @@ import numpy as np
 import re
 import multiprocessing
 
+from colorama import Fore, Style
+
 
 class ConverterInfo:
     def __init__(self,
@@ -51,6 +53,10 @@ class ConverterInfo:
             self.environment_name = other.environment_name
         elif other.environment_name is not None and self.environment_name != other.environment_name:
             raise Exception('Multiple environment names found')
+
+
+def log_info(msg, *args, **kwargs):
+    print(f'{Fore.GREEN}[INFO]{Style.RESET_ALL} {msg}', *args, **kwargs)
 
 
 def split_obj(path: Path, output_dir: Path) -> dict:
@@ -141,7 +147,7 @@ def split_obj(path: Path, output_dir: Path) -> dict:
         write_geo_force('default', geo_lines)
         input_path = output_dir / 'default.obj'
         output_path = output_dir / (name + '.obj')
-        # print(f'Trying to move {input_path} to {output_path}')
+        # log_info(f'Trying to move {input_path} to {output_path}')
         if input_path == output_path:
             return
         with open(input_path, 'r') as input_f:
@@ -166,8 +172,8 @@ def split_obj(path: Path, output_dir: Path) -> dict:
         for line in f:
             if line.startswith('g '):
                 geo_name_new = line[2:].strip()
-                # print(f'geo_name transform: {geo_name} -> {geo_name_new}')
-                # print(f'g_mode: {g_mode}')
+                # log_info(f'geo_name transform: {geo_name} -> {geo_name_new}')
+                # log_info(f'g_mode: {g_mode}')
                 if g_mode:
                     g_mode = False
                     index_num = index_next - index
@@ -276,7 +282,7 @@ def convert_camera(converter_info: ConverterInfo, camera: dict) -> (str, dict):
         }
     }
     converter_info.camera_names.add(name)
-    print(f'Camera {name} converted')
+    log_info(f'Camera {name} converted')
 
     return name, camera_dict
 
@@ -364,10 +370,10 @@ def convert_light(converter_info: ConverterInfo, light: dict, name: str) -> (str
             raise ValueError(f'Only one environment is supported, but {converter_info.environment_name} and {name} are found')
         converter_info.environment_name = name
     else:
-        print(f'Light type {light["type"]} not supported')
+        log_info(f'Light type {light["type"]} not supported')
         return None, None
 
-    print(f'Light {name} converted')
+    log_info(f'Light {name} converted')
 
     return name, light_dict
 
@@ -441,21 +447,19 @@ def convert_material(converter_info: ConverterInfo, material: dict, name: str, g
         if name_existed != name and mateial_map_geo[name_existed] != material_dict:
             err = f'Material of shape "{shape}" already specified, ' \
                   f'"{shape2material_geo[shape]}" -> "{name}"'
-            print(mateial_map_geo[name_existed])
-            print(material_dict)
             raise ValueError(err)
 
         shape2material_geo[shape] = name
         mateial_map_geo[name] = material_dict
 
     converter_info.material_names.add(name)
-    print(f'Material {name} converted')
+    log_info(f'Material {name} converted')
 
     return name, material_dict
 
 
 def convert_geometry(converter_info: ConverterInfo, geo_name: str) -> (ConverterInfo, str, dict):
-    print(f'Start to convert geometry {geo_name}')
+    log_info(f'Start to convert geometry {geo_name}')
 
     check_dir(converter_info.input_json_dir / geo_name, converter_info.output_json_dir / geo_name)
     check_dir(converter_info.input_geo_dir / geo_name, converter_info.output_geo_dir / geo_name)
@@ -537,7 +541,7 @@ def convert_geometry(converter_info: ConverterInfo, geo_name: str) -> (Converter
         geo_dict[copy_name] = geo_obj_dict.copy()
         converter_info.shape_names.add(copy_name)
 
-    print(f'Geometry {geo_name} converted')
+    log_info(f'Geometry {geo_name} converted')
 
     return converter_info, geo_name, geo_dict
 
@@ -549,7 +553,7 @@ def copy_texture(src: Path, dst: Path):
             shutil.copy(file, dst)
 
 
-def create_main_scene_file(scene_dir: Path):
+def create_main_scene_file(converter_info: ConverterInfo):
     integrator = {
         'type': 'Integrator',
         'impl': 'MegaPath',
@@ -571,12 +575,12 @@ def create_main_scene_file(scene_dir: Path):
         shapes.append(f'@{shape_name}')
     imports = []
 
-    geo_names = [x.name for x in (scene_dir / 'json').iterdir()
+    geo_names = [x.name for x in (converter_info.output_project_dir / 'json').iterdir()
                  if x.is_dir() and x.name != 'cameras' and x.name != 'lights']
-    for d in [scene_dir / 'json' / 'cameras', scene_dir / 'json' / 'lights']:
+    for d in [converter_info.output_project_dir / 'json' / 'cameras', converter_info.output_project_dir / 'json' / 'lights']:
         for f in d.iterdir():
             if f.suffix == '.json':
-                import_path = str(f.relative_to(scene_dir)).replace('\\', '/')
+                import_path = str(f.relative_to(converter_info.output_project_dir)).replace('\\', '/')
                 imports.append(import_path)
     for geo_name in geo_names:
         imports.append(f'json/{geo_name}/{geo_name}.json')
@@ -596,7 +600,7 @@ def create_main_scene_file(scene_dir: Path):
     if converter_info.environment_name is not None:
         scene['render']['environment'] = f'@{converter_info.environment_name}'
 
-    json.dump(scene, open(scene_dir / 'scene.json', 'w'), indent=2)
+    json.dump(scene, open(converter_info.output_project_dir / 'scene.json', 'w'), indent=2)
 
 
 def disney2luisa(input_project_dir: Path, output_project_dir: Path):
@@ -607,7 +611,6 @@ def disney2luisa(input_project_dir: Path, output_project_dir: Path):
     output_json_dir = output_project_dir / 'json'
     input_geo_dir = input_project_dir / 'obj'
     output_geo_dir = output_project_dir / 'obj'
-    global converter_info
     converter_info = ConverterInfo(input_project_dir, output_project_dir, input_json_dir, output_json_dir, input_geo_dir, output_geo_dir)
 
     check_dir(converter_info.input_geo_dir, converter_info.output_geo_dir)
@@ -629,6 +632,7 @@ def disney2luisa(input_project_dir: Path, output_project_dir: Path):
         camera_dict = {name: camera_dict}
         with open(path_out / camera_file.name, 'w') as f:
             json.dump(camera_dict, f, indent=2)
+    log_info('All cameras converted')
 
     # lights
     path_in = converter_info.input_json_dir / 'lights'
@@ -654,6 +658,7 @@ f   -4   -3   -2   -1
             lights_dict[name] = light_dict
         with open(path_out / light_file.name, 'w') as f:
             json.dump(lights_dict, f, indent=2)
+    log_info('All lights converted')
 
     # geometries
     for geo_name in geo_names:
@@ -665,14 +670,12 @@ f   -4   -3   -2   -1
     pool = multiprocessing.Pool()
     threads = []
     for geo_name in geo_names:
-        # DEBUG
+        # # DEBUG
         # if geo_name not in test_geo_names:
         #     continue
         # geometries
         threads.append(pool.apply_async(convert_geometry, args=(converter_info.copy(), geo_name)))
-
     pool.close()
-    pool.join()
 
     for thread_t in threads:
         converter_info_t, geo_name, geo_dict = thread_t.get()
@@ -682,18 +685,24 @@ f   -4   -3   -2   -1
         check_dir(path_in, path_out)
         with open(path_out / f'{geo_name}.json', 'w') as f:
             json.dump(geo_dict, f, indent=2)
+    pool.join()
+    log_info('All geometries converted')
 
+    # materials for DEBUG
     json.dump(converter_info.re_shape2material, open(converter_info.output_project_dir / 're_shape2material.json', 'w'), indent=2)
     json.dump(converter_info.material_map, open(converter_info.output_project_dir / 'material_map.json', 'w'), indent=2)
+    log_info('Materials for DEBUG dumped')
 
     # textures
     copy_texture(input_project_dir / 'textures', converter_info.output_project_dir / 'textures')
+    log_info('Textures copied')
 
-    create_main_scene_file(converter_info.output_project_dir)
+    create_main_scene_file(converter_info)
+    log_info('Main scene file created')
 
 
 if __name__ == '__main__':
     if len(argv) == 3:
         disney2luisa(Path(argv[1]).absolute(), Path(argv[2]).absolute())
     else:
-        print('Usage: disney2luisa.py <input.json> <output.luisa>')
+        log_info('Usage: disney2luisa.py <input.json> <output.luisa>')
