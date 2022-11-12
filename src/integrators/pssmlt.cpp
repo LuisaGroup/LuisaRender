@@ -525,7 +525,9 @@ private:
             radiance_buffer.write(chain_id, L);
             shutter_weight_buffer.write(chain_id, shutter_weight);
             _sampler->save();
-            $if(dispatch_x() < 4u) { statistics_buffer.write(dispatch_x(), 0u); };
+            if (node<PSSMLT>()->enable_statistics()) {
+                $if(dispatch_x() < 4u) { statistics_buffer.write(dispatch_x(), 0u); };
+            }
         });
         LUISA_INFO("PSSMLT: compiled create_chains kernel in {} ms.", clk.toc());
 
