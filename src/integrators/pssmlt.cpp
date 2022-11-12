@@ -48,11 +48,50 @@ namespace luisa::render {
 
 using namespace compute;
 
+class PCG32 {
+
+private:
+    static constexpr auto default_state = 0x853c49e6748fea9bull;
+    static constexpr auto default_stream = 0xda3e39cb94b95bdbull;
+    static constexpr auto mult = 0x5851f42d4c957f2dull;
+
+private:
+    U64 _state;
+    U64 _inc;
+
+public:
+    // clang-format off
+    PCG32() noexcept : _state{default_state}, _inc{default_stream} {}
+    PCG32(U64 state, U64 inc) noexcept : _state{state}, _inc{inc} {}
+    explicit PCG32(U64 seq_index) noexcept { set_sequence(seq_index); }
+    explicit PCG32(Expr<uint> seq_index) noexcept { set_sequence(U64{seq_index}); }
+    // clang-format on
+    [[nodiscard]] auto uniform_uint() noexcept {
+        auto oldstate = _state;
+        _state = oldstate * U64{mult} + _inc;
+        auto xorshifted = (((oldstate >> 18u) ^ oldstate) >> 27u).lo();
+        auto rot = (oldstate >> 59u).lo();
+        return (xorshifted >> rot) | (xorshifted << ((~rot + 1u) & 31u));
+    }
+    void set_sequence(U64 init_seq) noexcept {
+        _state = U64{0u};
+        _inc = (init_seq << 1u) | 1u;
+        static_cast<void>(uniform_uint());
+        _state = _state + U64{default_state};
+        static_cast<void>(uniform_uint());
+    }
+    [[nodiscard]] auto uniform_float() noexcept {
+        return min(one_minus_epsilon, uniform_uint() * 0x1p-32f);
+    }
+    [[nodiscard]] auto state() const noexcept { return _state; }
+    [[nodiscard]] auto inc() const noexcept { return _inc; }
+};
+
 class PSSMLTSampler {
 
 public:
     struct State {
-        UInt rng_state;
+        PCG32 rng;
         U64 current_iteration;
         Bool large_step;
         U64 last_large_step_iteration;
@@ -69,7 +108,7 @@ private:
 
 private:
     uint _chains{};
-    Buffer<uint> _rng_state_buffer;
+    Buffer<uint4> _rng_buffer;
     Buffer<uint2> _current_iteration_buffer;
     Buffer<uint> _large_step_and_initialized_dimensions_buffer;
     Buffer<uint2> _last_large_step_iteration_buffer;
@@ -82,8 +121,8 @@ public:
         LUISA_ASSERT(static_cast<uint64_t>(chains) * pss_dim <= ~0u,
                      "Too many primary samples.");
         command_buffer << synchronize();
-        if (auto n = next_pow2(chains); n > _rng_state_buffer.size()) {
-            _rng_state_buffer = _device.create_buffer<uint>(n);
+        if (auto n = next_pow2(chains); n > _rng_buffer.size()) {
+            _rng_buffer = _device.create_buffer<uint4>(n);
             _current_iteration_buffer = _device.create_buffer<uint2>(n);
             _large_step_and_initialized_dimensions_buffer = _device.create_buffer<uint>(n);
             _last_large_step_iteration_buffer = _device.create_buffer<uint2>(n);
@@ -149,18 +188,18 @@ private:
         };
         // Reset Xi if a large step took place in the meantime
         auto needs_reset = U64{Xi.last_modification_iteration} < _state->last_large_step_iteration;
-        Xi.value = ite(needs_reset, lcg(_state->rng_state), Xi.value);
+        Xi.value = ite(needs_reset, _state->rng.uniform_float(), Xi.value);
         Xi.last_modification_iteration = ite(needs_reset, _state->last_large_step_iteration.bits(), Xi.last_modification_iteration);
         // Apply remaining sequence of mutations to _sample_
         Xi->backup();
         $if(_state->large_step) {
-            Xi.value = lcg(_state->rng_state);
+            Xi.value = _state->rng.uniform_float();
         }
         $else {
             auto nSmall = (_state->current_iteration - U64{Xi.last_modification_iteration}).lo();
             // Apply _nSmall_ small step mutations
             // Sample the standard normal distribution N(0, 1)
-            auto normalSample = sqrt_two * _erf_inv(2.f * lcg(_state->rng_state) - 1.f);
+            auto normalSample = sqrt_two * _erf_inv(2.f * _state->rng.uniform_float() - 1.f);
             // Compute the effective standard deviation and apply perturbation to Xi
             auto effSigma = _sigma * sqrt(cast<float>(nSmall));
             Xi.value = fract(Xi.value + normalSample * effSigma);
@@ -175,9 +214,9 @@ public:
     PSSMLTSampler(Device &device, float sigma, float large_step_prob) noexcept
         : _device{device}, _sigma{sigma}, _large_step_probability{large_step_prob} {}
 
-    void create(Expr<uint> chain_index, Expr<uint> rng_stream) noexcept {
+    void create(Expr<uint> chain_index, Expr<uint> rng_sequence) noexcept {
         _state = luisa::make_unique<State>(State{
-            .rng_state = xxhash32(rng_stream),
+            .rng = PCG32{rng_sequence},
             .current_iteration = U64{0u},
             .large_step = true,
             .last_large_step_iteration = U64{0u},
@@ -187,12 +226,12 @@ public:
     }
 
     void load(Expr<uint> chain_index) noexcept {
-        auto rng_state = _rng_state_buffer.read(chain_index);
+        auto rng_state = _rng_buffer.read(chain_index);
         auto current_iteration = _current_iteration_buffer.read(chain_index);
         auto large_step_and_dimensions = _large_step_and_initialized_dimensions_buffer.read(chain_index);
         auto last_large_step_iteration = _last_large_step_iteration_buffer.read(chain_index);
         _state = luisa::make_unique<State>(State{
-            .rng_state = rng_state,
+            .rng = PCG32{U64{rng_state.xy()}, U64{rng_state.zw()}},
             .current_iteration = U64{current_iteration},
             .large_step = (large_step_and_dimensions & 1u) != 0u,
             .last_large_step_iteration = U64{last_large_step_iteration},
@@ -202,7 +241,7 @@ public:
     }
 
     void save() noexcept {
-        _rng_state_buffer.write(_state->chain_index, _state->rng_state);
+        _rng_buffer.write(_state->chain_index, make_uint4(_state->rng.state().bits(), _state->rng.inc().bits()));
         _current_iteration_buffer.write(_state->chain_index, _state->current_iteration.bits());
         _large_step_and_initialized_dimensions_buffer.write(
             _state->chain_index, ite(_state->large_step, 1u, 0u) | (_state->initialized_dimensions << 1u));
@@ -246,7 +285,7 @@ public:
 
     void start_iteration() noexcept {
         _state->current_iteration = _state->current_iteration + 1u;
-        _state->large_step = lcg(_state->rng_state) < _large_step_probability;
+        _state->large_step = _state->rng.uniform_float() < _large_step_probability;
     }
 };
 
@@ -333,7 +372,7 @@ private:
     [[nodiscard]] auto Li(PSSMLTSampler &sampler,
                           const Camera::Instance *camera,
                           Expr<float> time,
-                          UInt &rng_state) const noexcept {
+                          PCG32 &rng) const noexcept {
 
         auto res = make_float2(camera->film()->node()->resolution());
         auto p = sampler.generate_2d() * res;
@@ -342,7 +381,7 @@ private:
         auto u_lens = camera->node()->requires_lens_sampling() ? sampler.generate_2d() : make_float2(.5f);
         auto [camera_ray, _, camera_weight] = camera->generate_ray(pixel_id, time, u_filter, u_lens);
         auto spectrum = pipeline().spectrum();
-        auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : lcg(rng_state));
+        auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : rng.uniform_float());
         SampledSpectrum beta{swl.dimension(), camera_weight};
         SampledSpectrum Li{swl.dimension()};
         auto is_visible_light = def(false);
@@ -465,8 +504,8 @@ private:
             auto chain_id = dispatch_x();
             auto bootstrap_id = chain_id + bootsrape_offset;
             _sampler->create(chain_id, bootstrap_id);
-            auto rng_state = xxhash32(make_uint2(bootstrap_id, 0xdeadbeefu));
-            auto [_, L, is_light] = Li(*_sampler, camera, time, rng_state);
+            PCG32 rng{xxhash32(make_uint2(bootstrap_id, 0xdeadbeefu))};
+            auto [_, L, is_light] = Li(*_sampler, camera, time, rng);
             bootstrap_weights.write(bootstrap_id, _s(L, is_light));
         });
         LUISA_INFO("PSSMLT: running bootstrap kernel.");
@@ -518,12 +557,12 @@ private:
         LUISA_INFO("PSSMLT: compiling create_chains kernel...");
         auto create_chains = pipeline().device().compile<1u>([&](Float time, Float shutter_weight) noexcept {
             auto chain_id = dispatch_x();
-            auto seed = xxhash32(make_uint2(chain_id, 0xabadfaceu));
-            auto u = lcg(seed);
+            PCG32 rng{xxhash32(make_uint2(chain_id, 0xabadfaceu))};
             auto [bootstrap_id, _] = sample_alias_table(bootstrap_sampling_table,
-                                                        static_cast<uint>(bootstrap_sampling_table.size()), u);
+                                                        static_cast<uint>(bootstrap_sampling_table.size()),
+                                                        rng.uniform_float());
             _sampler->create(chain_id, bootstrap_id);
-            auto [p, L, is_light] = Li(*_sampler, camera, time, seed);
+            auto [p, L, is_light] = Li(*_sampler, camera, time, rng);
             position_buffer.write(chain_id, p);
             radiance_and_contribution_buffer.write(chain_id, make_float4(L, _s(L, is_light)));
             shutter_weight_buffer.write(chain_id, shutter_weight);
@@ -538,7 +577,7 @@ private:
         LUISA_INFO("PSSMLT: compiling render kernel...");
         auto render = pipeline().device().compile<1u>([&](UInt mutation_index, Float time, Float shutter_weight, Float b) noexcept {
             auto chain_id = dispatch_id().x;
-            auto seed = xxhash32(make_uint3(chain_id, mutation_index, 0xfacebeefu));
+            PCG32 rng{xxhash32(make_uint3(chain_id, mutation_index, 0xfacebeefu))};
             _sampler->load(chain_id);
             auto p_old = position_buffer.read(chain_id);
             auto L_and_y_old = radiance_and_contribution_buffer.read(chain_id);
@@ -546,7 +585,7 @@ private:
             auto y_old = L_and_y_old.w;
             auto shutter_weight_old = shutter_weight_buffer.read(chain_id);
             _sampler->start_iteration();
-            auto proposed = Li(*_sampler, camera, time, seed);
+            auto proposed = Li(*_sampler, camera, time, rng);
             auto p_new = std::get<0u>(proposed);
             auto L_new = std::get<1u>(proposed);
             auto y_new = _s(L_new, std::get<2u>(proposed));
@@ -573,8 +612,7 @@ private:
             accum(p_new, shutter_weight * w_new * L_new);
             accum(p_old, shutter_weight_old * w_old * L_old);
             // Accept or reject the proposal
-            auto u = lcg(seed);
-            $if(u < accept) {
+            $if(rng.uniform_float() < accept) {
                 position_buffer.write(chain_id, p_new);
                 radiance_and_contribution_buffer.write(chain_id, make_float4(L_new, y_new));
                 shutter_weight_buffer.write(chain_id, shutter_weight);
@@ -643,7 +681,7 @@ private:
                         node<ProgressiveIntegrator>()->display_interval() *
                             std::max(pixel_count / chains, 1u) :
                         64u;
-                if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
+                if (++dispatch_count >= dispatches_per_commit) [[unlikely]] {
                     auto p = static_cast<double>(mutation_count) /
                              static_cast<double>(total_mutations);
                     auto effective_spp = p * camera->node()->spp();
