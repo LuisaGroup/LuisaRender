@@ -13,4 +13,9 @@ Film::Film(Scene *scene, const SceneNodeDesc *desc) noexcept
               return make_uint2(desc->property_uint_or_default("resolution", 1024u));
           }))} {}
 
+void Film::Instance::accumulate(Expr<uint2> pixel, Expr<float3> rgb,
+                                Expr<float> effective_spp) const noexcept {
+    _accumulate(pixel, rgb, effective_spp);
+}
+
 }// namespace luisa::render

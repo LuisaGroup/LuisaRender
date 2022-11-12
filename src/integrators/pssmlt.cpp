@@ -591,13 +591,13 @@ private:
 
         clk.tic();
         LUISA_INFO("PSSMLT: compiling accumulate kernel...");
-        auto blit = pipeline().device().compile<2>([&](Float scale) {
+        auto accumulate = pipeline().device().compile<2>([&](Float b, Float effective_spp) {
             auto p = dispatch_id().xy();
             auto offset = (p.y * resolution.x + p.x) * 3u;
             auto L = make_float3(accumulate_buffer.read(offset + 0u),
                                  accumulate_buffer.read(offset + 1u),
                                  accumulate_buffer.read(offset + 2u));
-            camera->film()->accumulate(p, scale * L);
+            camera->film()->accumulate(p, b * L, effective_spp);
         });
         LUISA_INFO("PSSMLT: compiled blit kernel in {} ms.", clk.toc());
 
@@ -617,6 +617,7 @@ private:
         auto mutation_count = 0ull;
         auto mutation_per_chain_count = 0ull;
         auto total_mutations = static_cast<uint64_t>(camera->node()->spp()) * pixel_count;
+        auto last_effective_spp = 0.;
         for (auto s : shutter_samples) {
             pipeline().update(command_buffer, s.point.time);
             auto mutations = static_cast<uint64_t>(s.spp) * pixel_count;
@@ -629,13 +630,18 @@ private:
                 mutation_count += chains_to_dispatch;
                 auto dispatches_per_commit =
                     display() && !display()->should_close() ?
-                        node<ProgressiveIntegrator>()->display_interval() * std::max(pixel_count / chains, 1u) :
+                        node<ProgressiveIntegrator>()->display_interval() *
+                            std::max(pixel_count / chains, 1u) :
                         64u;
                 if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
-                    auto p = static_cast<double>(mutation_count) / static_cast<double>(total_mutations);
+                    auto p = static_cast<double>(mutation_count) /
+                             static_cast<double>(total_mutations);
                     auto effective_spp = p * camera->node()->spp();
-                    camera->film()->clear(command_buffer);
-                    command_buffer << blit(static_cast<float>(b / effective_spp)).dispatch(resolution);
+                    command_buffer << accumulate(static_cast<float>(b),
+                                                 static_cast<float>(effective_spp - last_effective_spp))
+                                          .dispatch(resolution)
+                                   << clear().dispatch(pixel_count);
+                    last_effective_spp = effective_spp;
                     if (node<PSSMLT>()->enable_statistics()) {
                         auto statistics = luisa::make_shared<uint4>();
                         command_buffer << statistics_buffer.copy_to(statistics.get())
@@ -643,8 +649,9 @@ private:
                                               auto accepted = (static_cast<uint64_t>(statistics->y) << 32u) | statistics->x;
                                               auto rejected = (static_cast<uint64_t>(statistics->w) << 32u) | statistics->z;
                                               auto total = accepted + rejected;
+                                              auto rate = static_cast<double>(accepted) / static_cast<double>(total);
                                               LUISA_INFO("PSSMLT: {}/{} mutation(s) accepted ({:.2f}%).",
-                                                         accepted, total, static_cast<double>(accepted) / static_cast<double>(total) * 100.);
+                                                         accepted, total, rate * 100.);
                                           };
                     }
                     dispatch_count = 0u;
@@ -657,9 +664,10 @@ private:
             }
         }
         // final
-        camera->film()->clear(command_buffer);
-        command_buffer << blit(static_cast<float>(b / camera->node()->spp())).dispatch(resolution);
-        command_buffer << synchronize();
+        command_buffer << accumulate(static_cast<float>(b),
+                                     static_cast<float>(camera->node()->spp() - last_effective_spp))
+                              .dispatch(resolution)
+                       << synchronize();
         progress.done();
 
         auto render_time = clk.toc();
