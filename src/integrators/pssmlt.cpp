@@ -13,39 +13,6 @@
 
 namespace luisa::render {
 
-struct PrimarySample {
-    float value;
-    float value_backup;
-    uint2 last_modification_iteration;
-    uint2 modification_backup;
-};
-
-}// namespace luisa::render
-
-// clang-format off
-LUISA_STRUCT(luisa::render::PrimarySample,
-             value, value_backup, last_modification_iteration, modification_backup) {
-    void backup() noexcept {
-        value_backup = value;
-        modification_backup = last_modification_iteration;
-    }
-    void restore() noexcept {
-        value = value_backup;
-        last_modification_iteration = modification_backup;
-    }
-    void backup_if(luisa::compute::Expr<bool> p) noexcept {
-        value_backup = ite(p, value, value_backup);
-        modification_backup = ite(p, last_modification_iteration, modification_backup);
-    }
-    void restore_if(luisa::compute::Expr<bool> p) noexcept {
-        value = ite(p, value_backup, value);
-        last_modification_iteration = ite(p, modification_backup, last_modification_iteration);
-    }
-};
-// clang-format on
-
-namespace luisa::render {
-
 using namespace compute;
 
 class PCG32 {
@@ -100,6 +67,23 @@ public:
         UInt initialized_dimensions;
     };
 
+    struct PrimarySample {
+
+        Float value;
+        Float value_backup;
+        U64 last_modification_iteration;
+        U64 modification_backup;
+
+        void backup() noexcept {
+            value_backup = value;
+            modification_backup = last_modification_iteration;
+        }
+        void restore() noexcept {
+            value = value_backup;
+            last_modification_iteration = modification_backup;
+        }
+    };
+
 private:
     Device &_device;
     float _sigma;
@@ -113,8 +97,7 @@ private:
     Buffer<uint> _large_step_and_initialized_dimensions_buffer;
     Buffer<uint2> _last_large_step_iteration_buffer;
     // SoA-style primary sample buffers
-    Buffer<float> _primary_sample_value_buffer;
-    Buffer<float> _primary_sample_value_backup_buffer;
+    Buffer<float2> _primary_sample_value_buffer;
     Buffer<uint4> _primary_sample_modification_buffer;
 
 public:
@@ -131,8 +114,7 @@ public:
             _last_large_step_iteration_buffer = _device.create_buffer<uint2>(n);
         }
         if (auto n = next_pow2(chains * pss_dim); n > _primary_sample_value_buffer.size()) {
-            _primary_sample_value_buffer = _device.create_buffer<float>(n);
-            _primary_sample_value_backup_buffer = _device.create_buffer<float>(n);
+            _primary_sample_value_buffer = _device.create_buffer<float2>(n);
             _primary_sample_modification_buffer = _device.create_buffer<uint4>(n);
         }
     }
@@ -145,18 +127,19 @@ private:
 
     [[nodiscard]] auto _read_primary_sample(Expr<uint> dim) const noexcept {
         auto i = _primary_sample_index(dim);
-        auto value = _primary_sample_value_buffer.read(i);
-        auto value_backup = _primary_sample_value_backup_buffer.read(i);
-        auto modification = _primary_sample_modification_buffer.read(i);
-        return def<PrimarySample>(value, value_backup, modification.xy(), modification.zw());
+        auto v = _primary_sample_value_buffer.read(i);
+        auto m = _primary_sample_modification_buffer.read(i);
+        return PrimarySample{.value = v.x,
+                             .value_backup = v.y,
+                             .last_modification_iteration = U64{m.xy()},
+                             .modification_backup = U64{m.zw()}};
     }
 
-    void _write_primary_sample(Expr<uint> dim, Expr<PrimarySample> sample) noexcept {
+    void _write_primary_sample(Expr<uint> dim, const PrimarySample &sample) noexcept {
         auto i = _primary_sample_index(dim);
-        _primary_sample_value_buffer.write(i, sample.value);
-        _primary_sample_value_backup_buffer.write(i, sample.value_backup);
-        _primary_sample_modification_buffer.write(i, make_uint4(sample.last_modification_iteration,
-                                                                sample.modification_backup));
+        _primary_sample_value_buffer.write(i, make_float2(sample.value, sample.value_backup));
+        auto m = make_uint4(sample.last_modification_iteration.bits(), sample.modification_backup.bits());
+        _primary_sample_modification_buffer.write(i, m);
     }
 
     [[nodiscard]] static auto _erf_inv(Expr<float> x) noexcept {
@@ -195,23 +178,24 @@ private:
     }
 
     [[nodiscard]] auto _sample(Expr<uint> index) noexcept {
-        auto Xi = def<PrimarySample>();
+        PrimarySample Xi;
         $if(_state->initialized_dimensions <= index) {// Initialize the sample
             Xi.value = 0.f;
             Xi.value_backup = 0.f;
-            Xi.last_modification_iteration = make_uint2();
-            Xi.modification_backup = make_uint2();
+            Xi.last_modification_iteration = U64{0u};
+            Xi.modification_backup = U64{0u};
             _state->initialized_dimensions += 1u;
         }
         $else {// Load the sample
             Xi = _read_primary_sample(index);
         };
         // Reset Xi if a large step took place in the meantime
-        auto needs_reset = U64{Xi.last_modification_iteration} < _state->last_large_step_iteration;
-        Xi.value = ite(needs_reset, _state->rng.uniform_float(), Xi.value);
-        Xi.last_modification_iteration = ite(needs_reset, _state->last_large_step_iteration.bits(), Xi.last_modification_iteration);
+        $if(Xi.last_modification_iteration < _state->last_large_step_iteration) {
+            Xi.value = _state->rng.uniform_float();
+            Xi.last_modification_iteration = _state->last_large_step_iteration;
+        };
         // Apply remaining sequence of mutations to _sample_
-        Xi->backup();
+        Xi.backup();
         $if(_state->large_step) {
             Xi.value = _state->rng.uniform_float();
         }
@@ -224,7 +208,7 @@ private:
             auto effSigma = _sigma * sqrt(cast<float>(nSmall));
             Xi.value = fract(Xi.value + normalSample * effSigma);
         };
-        Xi.last_modification_iteration = _state->current_iteration.bits();
+        Xi.last_modification_iteration = _state->current_iteration;
         // Store the sample
         _write_primary_sample(index, Xi);
         return Xi.value;
@@ -279,7 +263,7 @@ public:
         $for(i, _state->initialized_dimensions) {
             auto sample = _read_primary_sample(i);
             $if(U64{sample.last_modification_iteration} == _state->current_iteration) {
-                sample->restore();
+                sample.restore();
                 _write_primary_sample(i, sample);
             };
         };
@@ -338,11 +322,11 @@ public:
                   "large_step_probability", lazy_construct([desc] {
                       return desc->property_float_or_default(
                           "large_step", lazy_construct([desc] {
-                              return desc->property_float_or_default("p_large", .25f);
+                              return desc->property_float_or_default("p_large", .3f);
                           }));
                   })),
               0.f, 1.f)},
-          _sigma{std::max(desc->property_float_or_default("sigma", 1e-2f), 1e-4f)},
+          _sigma{std::max(desc->property_float_or_default("sigma", 5e-3f), 1e-4f)},
           _statistics{desc->property_bool_or_default(
               "statistics", lazy_construct([desc] {
                   return desc->property_bool_or_default("stat", false);
