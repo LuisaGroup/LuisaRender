@@ -359,7 +359,7 @@ private:
     [[nodiscard]] auto _compute_pss_dimension(const Camera *camera) const noexcept {
         auto max_depth = node<PSSMLT>()->max_depth();
         auto rr_depth = node<PSSMLT>()->rr_depth();
-        auto dim = 2u;// pixel
+        auto dim = 4u;// pixel and filter
         if (camera->requires_lens_sampling()) { dim += 2u; }
         for (auto depth = 0u; depth < max_depth; depth++) {
             dim += 1u +// light selection
@@ -383,7 +383,7 @@ private:
         auto res = make_float2(camera->film()->node()->resolution());
         auto p = sampler.generate_2d() * res;
         auto pixel_id = make_uint2(clamp(p, 0.f, res - 1.f));
-        auto u_filter = fract(p);
+        auto u_filter = sampler.generate_2d();
         auto u_lens = camera->node()->requires_lens_sampling() ? sampler.generate_2d() : make_float2(.5f);
         auto [camera_ray, _, camera_weight] = camera->generate_ray(pixel_id, time, u_filter, u_lens);
         auto spectrum = pipeline().spectrum();
