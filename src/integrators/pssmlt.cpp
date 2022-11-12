@@ -268,7 +268,7 @@ public:
         : ProgressiveIntegrator{scene, desc},
           _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)},
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
-          _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
+          _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), .05f)},
           _bootstrap_samples{std::max(desc->property_uint_or_default("bootstrap_samples", 1024u * 1024u), 1u)},
           _chains{std::max(desc->property_uint_or_default("chains", 256u * 1024u), 1u)},
           _large_step_probability{std::clamp(
@@ -276,7 +276,7 @@ public:
                   "large_step_probability", lazy_construct([desc] {
                       return desc->property_float_or_default(
                           "large_step", lazy_construct([desc] {
-                              return desc->property_float_or_default("p_large", 0.3f);
+                              return desc->property_float_or_default("p_large", .25f);
                           }));
                   })),
               0.f, 1.f)},
@@ -325,8 +325,8 @@ private:
         return dim;
     }
 
-    [[nodiscard]] static auto _s(Expr<float3> L) noexcept {
-        auto v = clamp(L, 0.f, 1e3f);
+    [[nodiscard]] static auto _s(Expr<float3> L, Expr<bool> is_light) noexcept {
+        auto v = clamp(L, 0.f, ite(is_light, 1.f, 1e3f));
         return v.x + v.y + v.z;
     }
 
@@ -345,6 +345,7 @@ private:
         auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : lcg(rng_state));
         SampledSpectrum beta{swl.dimension(), camera_weight};
         SampledSpectrum Li{swl.dimension()};
+        auto is_visible_light = def(false);
 
         auto ray = camera_ray;
         auto pdf_bsdf = def(1e16f);
@@ -358,6 +359,7 @@ private:
                 if (pipeline().environment()) {
                     auto eval = light_sampler()->evaluate_miss(ray->direction(), swl, time);
                     Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
+                    is_visible_light |= depth == 0u;
                 }
                 $break;
             };
@@ -367,6 +369,7 @@ private:
                 $if(it->shape()->has_light()) {
                     auto eval = light_sampler()->evaluate_hit(*it, ray->origin(), swl, time);
                     Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
+                    is_visible_light |= depth == 0u;
                 };
             }
 
@@ -446,7 +449,7 @@ private:
                 };
             };
         };
-        return std::make_pair(pixel_id, spectrum->srgb(swl, Li));
+        return std::make_tuple(pixel_id, spectrum->srgb(swl, Li), is_visible_light);
     }
 
 private:
@@ -463,8 +466,8 @@ private:
             auto bootstrap_id = chain_id + bootsrape_offset;
             _sampler->create(chain_id, bootstrap_id);
             auto rng_state = xxhash32(make_uint2(bootstrap_id, 0xdeadbeefu));
-            auto [_, L] = Li(*_sampler, camera, time, rng_state);
-            bootstrap_weights.write(bootstrap_id, _s(L));
+            auto [_, L, is_light] = Li(*_sampler, camera, time, rng_state);
+            bootstrap_weights.write(bootstrap_id, _s(L, is_light));
         });
         LUISA_INFO("PSSMLT: running bootstrap kernel.");
         luisa::vector<float> bw(bootstrap_count);
@@ -501,7 +504,7 @@ private:
 
         auto resolution = camera->film()->node()->resolution();
         auto pixel_count = resolution.x * resolution.y;
-        auto radiance_buffer = pipeline().device().create_buffer<float3>(chains);
+        auto radiance_and_contribution_buffer = pipeline().device().create_buffer<float4>(chains);
         auto position_buffer = pipeline().device().create_buffer<uint2>(chains);
         auto shutter_weight_buffer = pipeline().device().create_buffer<float>(chains);
         auto accumulate_buffer = pipeline().device().create_buffer<float>(pixel_count * 3u);
@@ -520,9 +523,9 @@ private:
             auto [bootstrap_id, _] = sample_alias_table(bootstrap_sampling_table,
                                                         static_cast<uint>(bootstrap_sampling_table.size()), u);
             _sampler->create(chain_id, bootstrap_id);
-            auto [p, L] = Li(*_sampler, camera, time, seed);
+            auto [p, L, is_light] = Li(*_sampler, camera, time, seed);
             position_buffer.write(chain_id, p);
-            radiance_buffer.write(chain_id, L);
+            radiance_and_contribution_buffer.write(chain_id, make_float4(L, _s(L, is_light)));
             shutter_weight_buffer.write(chain_id, shutter_weight);
             _sampler->save();
             if (node<PSSMLT>()->enable_statistics()) {
@@ -538,14 +541,15 @@ private:
             auto seed = xxhash32(make_uint3(chain_id, mutation_index, 0xfacebeefu));
             _sampler->load(chain_id);
             auto p_old = position_buffer.read(chain_id);
-            auto L_old = radiance_buffer.read(chain_id);
+            auto L_and_y_old = radiance_and_contribution_buffer.read(chain_id);
+            auto L_old = L_and_y_old.xyz();
+            auto y_old = L_and_y_old.w;
             auto shutter_weight_old = shutter_weight_buffer.read(chain_id);
             _sampler->start_iteration();
             auto proposed = Li(*_sampler, camera, time, seed);
-            auto p_new = proposed.first;
-            auto L_new = proposed.second;
-            auto y_old = _s(L_old);
-            auto y_new = _s(L_new);
+            auto p_new = std::get<0u>(proposed);
+            auto L_new = std::get<1u>(proposed);
+            auto y_new = _s(L_new, std::get<2u>(proposed));
             auto accum = [&accumulate_buffer, resolution](Expr<uint2> p, Expr<float3> L) noexcept {
                 auto offset = (p.y * resolution.x + p.x) * 3u;
                 $if(!any(isnan(L))) {
@@ -572,7 +576,7 @@ private:
             auto u = lcg(seed);
             $if(u < accept) {
                 position_buffer.write(chain_id, p_new);
-                radiance_buffer.write(chain_id, L_new);
+                radiance_and_contribution_buffer.write(chain_id, make_float4(L_new, y_new));
                 shutter_weight_buffer.write(chain_id, shutter_weight);
                 _sampler->accept();
                 record(0u);
