@@ -278,10 +278,10 @@ public:
     void reject() noexcept {
         $for(i, _state->initialized_dimensions) {
             auto sample = _read_primary_sample(i);
-//            $if(U64{sample.last_modification_iteration} == _state->current_iteration) {
-                sample->restore_if(U64{sample.last_modification_iteration} == _state->current_iteration);
+            $if(U64{sample.last_modification_iteration} == _state->current_iteration) {
+                sample->restore();
                 _write_primary_sample(i, sample);
-//            };
+            };
         };
         _state->current_iteration = _state->current_iteration - 1u;
     }
