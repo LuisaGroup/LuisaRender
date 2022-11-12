@@ -472,11 +472,7 @@ private:
         auto dispatches = (bootstrap_count + chains - 1u) / chains;
         for (auto i = 0u; i < dispatches; i++) {
             auto chains_to_dispatch = std::min((i + 1u) * chains, bootstrap_count) - i * chains;
-            LUISA_INFO("PSSMLT: dispatching {} bootstrap chains.", chains_to_dispatch);
-            command_buffer << bootstrap(i * chains, initial_time)
-                                  .dispatch(chains_to_dispatch)
-                           << synchronize();
-            LUISA_INFO("PSSMLT: dispatch #{} finished.", i);
+            command_buffer << bootstrap(i * chains, initial_time).dispatch(chains_to_dispatch);
         }
         command_buffer << bootstrap_weights.copy_to(bw.data()) << synchronize();
         LUISA_INFO("PSSMLT: Generated {} bootstrap sample(s) in {} ms.",
@@ -601,13 +597,13 @@ private:
 
         clk.tic();
         LUISA_INFO("PSSMLT: compiling accumulate kernel...");
-        auto accumulate = pipeline().device().compile<2>([&](Float b, Float effective_spp) {
+        auto accumulate = pipeline().device().compile<2>([&](Float effective_spp) {
             auto p = dispatch_id().xy();
             auto offset = (p.y * resolution.x + p.x) * 3u;
             auto L = make_float3(accumulate_buffer.read(offset + 0u),
                                  accumulate_buffer.read(offset + 1u),
                                  accumulate_buffer.read(offset + 2u));
-            camera->film()->accumulate(p, b * L, effective_spp);
+            camera->film()->accumulate(p, L, effective_spp);
         });
         LUISA_INFO("PSSMLT: compiled blit kernel in {} ms.", clk.toc());
 
@@ -647,8 +643,7 @@ private:
                     auto p = static_cast<double>(mutation_count) /
                              static_cast<double>(total_mutations);
                     auto effective_spp = p * camera->node()->spp();
-                    command_buffer << accumulate(static_cast<float>(b),
-                                                 static_cast<float>(effective_spp - last_effective_spp))
+                    command_buffer << accumulate(static_cast<float>(effective_spp - last_effective_spp))
                                           .dispatch(resolution)
                                    << clear().dispatch(pixel_count);
                     last_effective_spp = effective_spp;
@@ -674,8 +669,7 @@ private:
             }
         }
         // final
-        command_buffer << accumulate(static_cast<float>(b),
-                                     static_cast<float>(camera->node()->spp() - last_effective_spp))
+        command_buffer << accumulate(static_cast<float>(camera->node()->spp() - last_effective_spp))
                               .dispatch(resolution)
                        << synchronize();
         progress.done();
