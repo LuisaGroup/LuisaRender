@@ -228,6 +228,10 @@ public:
         _state->current_iteration = _state->current_iteration - 1u;
     }
 
+    [[nodiscard]] auto large_step() const noexcept {
+        return _state->large_step;
+    }
+
     [[nodiscard]] auto generate_1d() noexcept {
         auto x = _sample(_state->sample_index);
         _state->sample_index += 1u;
@@ -270,7 +274,10 @@ public:
           _large_step_probability{std::clamp(
               desc->property_float_or_default(
                   "large_step_probability", lazy_construct([desc] {
-                      return desc->property_float_or_default("large_step", .3f);
+                      return desc->property_float_or_default(
+                          "large_step", lazy_construct([desc] {
+                              return desc->property_float_or_default("p_large", 0.3f);
+                          }));
                   })),
               0.f, 1.f)},
           _sigma{std::max(desc->property_float_or_default("sigma", 1e-2f), 1e-4f)},
@@ -490,7 +497,7 @@ private:
                  Buffer<AliasEntry> bootstrap_sampling_table, double b) noexcept {
         auto pss_dim = _compute_pss_dimension(camera->node());
         auto sigma = node<PSSMLT>()->sigma();
-        auto large_step_prob = node<PSSMLT>()->large_step_probability();
+        auto p_large = node<PSSMLT>()->large_step_probability();
         auto chains = node<PSSMLT>()->chains();
         LUISA_INFO("PSSMLT: rendering {} chain(s) with {} "
                    "sample(s) of {} PSS dimension(s) per pixel.",
@@ -530,19 +537,19 @@ private:
 
         clk.tic();
         LUISA_INFO("PSSMLT: compiling render kernel...");
-        auto render = pipeline().device().compile<1u>([&](UInt mutation_index, Float time, Float shutter_weight) noexcept {
+        auto render = pipeline().device().compile<1u>([&](UInt mutation_index, Float time, Float shutter_weight, Float b) noexcept {
             auto chain_id = dispatch_id().x;
             auto seed = xxhash32(make_uint3(chain_id, mutation_index, 0xfacebeefu));
             _sampler->load(chain_id);
-            auto curr_p = position_buffer.read(chain_id);
-            auto curr_L = radiance_buffer.read(chain_id);
-            auto curr_w = shutter_weight_buffer.read(chain_id);
+            auto p_old = position_buffer.read(chain_id);
+            auto L_old = radiance_buffer.read(chain_id);
+            auto shutter_weight_old = shutter_weight_buffer.read(chain_id);
             _sampler->start_iteration();
             auto proposed = Li(*_sampler, camera, time, seed);
-            auto proposed_p = proposed.first;
-            auto proposed_L = proposed.second;
-            auto curr_y = _s(curr_L);
-            auto proposed_y = _s(proposed_L);
+            auto p_new = proposed.first;
+            auto L_new = proposed.second;
+            auto y_old = _s(L_old);
+            auto y_new = _s(L_new);
             auto accum = [&accumulate_buffer, resolution](Expr<uint2> p, Expr<float3> L) noexcept {
                 auto offset = (p.y * resolution.x + p.x) * 3u;
                 $if(!any(isnan(L))) {
@@ -558,15 +565,18 @@ private:
                 }
             };
             // Compute acceptance probability for proposed sample
-            auto accept = min(1.f, proposed_y / curr_y);
+            auto accept = clamp(y_new / y_old, 0.f, 1.f);
             // Splat both current and proposed samples to _film_
-            accum(proposed_p, (accept * shutter_weight / proposed_y) * proposed_L);
-            accum(curr_p, ((1.f - accept) * curr_w / curr_y) * curr_L);
+            // Use the MIS weights proposed by [Csaba Kelemen and László Szirmay-Kalos, 2001]
+            auto w_new = (accept + ite(_sampler->large_step(), 1.f, 0.f)) / (y_new / b + p_large);
+            auto w_old = (1.f - accept) / (y_old / b + p_large);
+            accum(p_new, shutter_weight * w_new * L_new);
+            accum(p_old, shutter_weight_old * w_old * L_old);
             // Accept or reject the proposal
             auto u = lcg(seed);
             $if(u < accept) {
-                position_buffer.write(chain_id, proposed_p);
-                radiance_buffer.write(chain_id, proposed_L);
+                position_buffer.write(chain_id, p_new);
+                radiance_buffer.write(chain_id, L_new);
                 shutter_weight_buffer.write(chain_id, shutter_weight);
                 _sampler->accept();
                 record(0u);
@@ -625,7 +635,7 @@ private:
             for (auto i = static_cast<uint64_t>(0u); i < mutations_per_chain; i++) {
                 auto chains_to_dispatch = std::min((i + 1u) * chains, mutations) - i * chains;
                 command_buffer << render(static_cast<uint>(mutation_per_chain_count++),
-                                         s.point.time, s.point.weight)
+                                         s.point.time, s.point.weight, static_cast<float>(b))
                                       .dispatch(chains_to_dispatch);
                 mutation_count += chains_to_dispatch;
                 auto dispatches_per_commit =
