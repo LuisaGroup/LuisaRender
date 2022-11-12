@@ -295,7 +295,6 @@ private:
         auto rr_depth = std::clamp(node<PSSMLT>()->rr_depth(), 1u, max_depth - 1u);
         auto dim = 2u;// pixel
         if (camera->requires_lens_sampling()) { dim += 2u; }
-        if (!pipeline().spectrum()->node()->is_fixed()) { dim += 1u; }
         for (auto depth = 0u; depth < max_depth; depth++) {
             dim += 1u +// light selection
                    2u +// light area
@@ -307,10 +306,8 @@ private:
     }
 
     [[nodiscard]] static auto _s(Expr<float3> L) noexcept {
-        //                return max(srgb_to_cie_y(L), 0.f);
         auto v = clamp(L, 0.f, 1e3f);
         return v.x + v.y + v.z;
-        //        return max(max(L.x, L.y), max(L.z, 0.f));
     }
 
     [[nodiscard]] auto Li(PSSMLTSampler &sampler,
@@ -527,9 +524,6 @@ private:
             auto proposed_L = proposed.second;
             auto curr_y = _s(curr_L);
             auto proposed_y = _s(proposed_L);
-            // Compute acceptance probability for proposed sample
-            auto accept = min(1.f, proposed_y / curr_y);
-            // Splat both current and proposed samples to _film_
             auto accum = [&accumulate_buffer, resolution](Expr<uint2> p, Expr<float3> L) noexcept {
                 auto offset = (p.y * resolution.x + p.x) * 3u;
                 $if(!any(isnan(L))) {
@@ -542,9 +536,10 @@ private:
                 auto old = statistics_buffer.atomic(index * 2u + 0u).fetch_add(1u);
                 $if(old == ~0u) { statistics_buffer.atomic(index * 2u + 1u).fetch_add(1u); };
             };
-            $if(accept > 0.f) {
-                accum(proposed_p, (accept * shutter_weight / proposed_y) * proposed_L);
-            };
+            // Compute acceptance probability for proposed sample
+            auto accept = min(1.f, proposed_y / curr_y);
+            // Splat both current and proposed samples to _film_
+            accum(proposed_p, (accept * shutter_weight / proposed_y) * proposed_L);
             accum(curr_p, ((1.f - accept) * curr_w / curr_y) * curr_L);
             // Accept or reject the proposal
             auto u = lcg(seed);
