@@ -283,6 +283,10 @@ public:
         return make_float2(x, y);
     }
 
+    [[nodiscard]] auto random() noexcept {
+        return _state->rng.uniform_float();
+    }
+
     void start_iteration() noexcept {
         _state->current_iteration = _state->current_iteration + 1u;
         _state->large_step = _state->rng.uniform_float() < _large_step_probability;
@@ -371,8 +375,7 @@ private:
 
     [[nodiscard]] auto Li(PSSMLTSampler &sampler,
                           const Camera::Instance *camera,
-                          Expr<float> time,
-                          PCG32 &rng) const noexcept {
+                          Expr<float> time) const noexcept {
 
         auto res = make_float2(camera->film()->node()->resolution());
         auto p = sampler.generate_2d() * res;
@@ -381,7 +384,7 @@ private:
         auto u_lens = camera->node()->requires_lens_sampling() ? sampler.generate_2d() : make_float2(.5f);
         auto [camera_ray, _, camera_weight] = camera->generate_ray(pixel_id, time, u_filter, u_lens);
         auto spectrum = pipeline().spectrum();
-        auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : rng.uniform_float());
+        auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler.random());
         SampledSpectrum beta{swl.dimension(), camera_weight};
         SampledSpectrum Li{swl.dimension()};
         auto is_visible_light = def(false);
@@ -504,8 +507,7 @@ private:
             auto chain_id = dispatch_x();
             auto bootstrap_id = chain_id + bootsrape_offset;
             _sampler->create(chain_id, bootstrap_id);
-            PCG32 rng{xxhash32(make_uint2(bootstrap_id, 0xdeadbeefu))};
-            auto [_, L, is_light] = Li(*_sampler, camera, time, rng);
+            auto [_, L, is_light] = Li(*_sampler, camera, time);
             bootstrap_weights.write(bootstrap_id, _s(L, is_light));
         });
         LUISA_INFO("PSSMLT: running bootstrap kernel.");
@@ -557,12 +559,12 @@ private:
         LUISA_INFO("PSSMLT: compiling create_chains kernel...");
         auto create_chains = pipeline().device().compile<1u>([&](Float time, Float shutter_weight) noexcept {
             auto chain_id = dispatch_x();
-            PCG32 rng{xxhash32(make_uint2(chain_id, 0xabadfaceu))};
+            auto seed = xxhash32(make_uint2(chain_id, 0xdeadbeefu));
             auto [bootstrap_id, _] = sample_alias_table(bootstrap_sampling_table,
                                                         static_cast<uint>(bootstrap_sampling_table.size()),
-                                                        rng.uniform_float());
+                                                        lcg(seed));
             _sampler->create(chain_id, bootstrap_id);
-            auto [p, L, is_light] = Li(*_sampler, camera, time, rng);
+            auto [p, L, is_light] = Li(*_sampler, camera, time);
             position_buffer.write(chain_id, p);
             radiance_and_contribution_buffer.write(chain_id, make_float4(L, _s(L, is_light)));
             shutter_weight_buffer.write(chain_id, shutter_weight);
@@ -577,7 +579,6 @@ private:
         LUISA_INFO("PSSMLT: compiling render kernel...");
         auto render = pipeline().device().compile<1u>([&](UInt mutation_index, Float time, Float shutter_weight, Float b) noexcept {
             auto chain_id = dispatch_id().x;
-            PCG32 rng{xxhash32(make_uint3(chain_id, mutation_index, 0xfacebeefu))};
             _sampler->load(chain_id);
             auto p_old = position_buffer.read(chain_id);
             auto L_and_y_old = radiance_and_contribution_buffer.read(chain_id);
@@ -585,7 +586,7 @@ private:
             auto y_old = L_and_y_old.w;
             auto shutter_weight_old = shutter_weight_buffer.read(chain_id);
             _sampler->start_iteration();
-            auto proposed = Li(*_sampler, camera, time, rng);
+            auto proposed = Li(*_sampler, camera, time);
             auto p_new = std::get<0u>(proposed);
             auto L_new = std::get<1u>(proposed);
             auto y_new = _s(L_new, std::get<2u>(proposed));
@@ -612,7 +613,7 @@ private:
             accum(p_new, shutter_weight * w_new * L_new);
             accum(p_old, shutter_weight_old * w_old * L_old);
             // Accept or reject the proposal
-            $if(rng.uniform_float() < accept) {
+            $if(_sampler->random() < accept) {
                 position_buffer.write(chain_id, p_new);
                 radiance_and_contribution_buffer.write(chain_id, make_float4(L_new, y_new));
                 shutter_weight_buffer.write(chain_id, shutter_weight);
