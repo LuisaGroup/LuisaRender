@@ -112,7 +112,10 @@ private:
     Buffer<uint2> _current_iteration_buffer;
     Buffer<uint> _large_step_and_initialized_dimensions_buffer;
     Buffer<uint2> _last_large_step_iteration_buffer;
-    Buffer<PrimarySample> _primary_samples_buffer;
+    // SoA-style primary sample buffers
+    Buffer<float> _primary_sample_value_buffer;
+    Buffer<float> _primary_sample_value_backup_buffer;
+    Buffer<uint4> _primary_sample_modification_buffer;
 
 public:
     void reset(CommandBuffer &command_buffer, uint chains, uint pss_dim) noexcept {
@@ -127,8 +130,10 @@ public:
             _large_step_and_initialized_dimensions_buffer = _device.create_buffer<uint>(n);
             _last_large_step_iteration_buffer = _device.create_buffer<uint2>(n);
         }
-        if (auto n = next_pow2(chains * pss_dim); n > _primary_samples_buffer.size()) {
-            _primary_samples_buffer = _device.create_buffer<PrimarySample>(n);
+        if (auto n = next_pow2(chains * pss_dim); n > _primary_sample_value_buffer.size()) {
+            _primary_sample_value_buffer = _device.create_buffer<float>(n);
+            _primary_sample_value_backup_buffer = _device.create_buffer<float>(n);
+            _primary_sample_modification_buffer = _device.create_buffer<uint4>(n);
         }
     }
 
@@ -136,6 +141,22 @@ private:
     [[nodiscard]] auto _primary_sample_index(Expr<uint> dim) const noexcept {
         // use the SoA layout to improve memory access locality
         return dim * _chains + _state->chain_index;
+    }
+
+    [[nodiscard]] auto _read_primary_sample(Expr<uint> dim) const noexcept {
+        auto i = _primary_sample_index(dim);
+        auto value = _primary_sample_value_buffer.read(i);
+        auto value_backup = _primary_sample_value_backup_buffer.read(i);
+        auto modification = _primary_sample_modification_buffer.read(i);
+        return def<PrimarySample>(value, value_backup, modification.xy(), modification.zw());
+    }
+
+    void _write_primary_sample(Expr<uint> dim, Expr<PrimarySample> sample) noexcept {
+        auto i = _primary_sample_index(dim);
+        _primary_sample_value_buffer.write(i, sample.value);
+        _primary_sample_value_backup_buffer.write(i, sample.value_backup);
+        _primary_sample_modification_buffer.write(i, make_uint4(sample.last_modification_iteration,
+                                                                sample.modification_backup));
     }
 
     [[nodiscard]] static auto _erf_inv(Expr<float> x) noexcept {
@@ -174,7 +195,6 @@ private:
     }
 
     [[nodiscard]] auto _sample(Expr<uint> index) noexcept {
-        auto i = _primary_sample_index(index);
         auto Xi = def<PrimarySample>();
         $if(_state->initialized_dimensions <= index) {// Initialize the sample
             Xi.value = 0.f;
@@ -184,7 +204,7 @@ private:
             _state->initialized_dimensions += 1u;
         }
         $else {// Load the sample
-            Xi = _primary_samples_buffer.read(i);
+            Xi = _read_primary_sample(index);
         };
         // Reset Xi if a large step took place in the meantime
         auto needs_reset = U64{Xi.last_modification_iteration} < _state->last_large_step_iteration;
@@ -206,7 +226,7 @@ private:
         };
         Xi.last_modification_iteration = _state->current_iteration.bits();
         // Store the sample
-        _primary_samples_buffer.write(i, Xi);
+        _write_primary_sample(index, Xi);
         return Xi.value;
     }
 
@@ -257,12 +277,11 @@ public:
 
     void reject() noexcept {
         $for(i, _state->initialized_dimensions) {
-            auto pss_index = _primary_sample_index(i);
-            auto sample = _primary_samples_buffer.read(pss_index);
-            $if(U64{sample.last_modification_iteration} == _state->current_iteration) {
-                sample->restore();
-                _primary_samples_buffer.write(pss_index, sample);
-            };
+            auto sample = _read_primary_sample(i);
+//            $if(U64{sample.last_modification_iteration} == _state->current_iteration) {
+                sample->restore_if(U64{sample.last_modification_iteration} == _state->current_iteration);
+                _write_primary_sample(i, sample);
+//            };
         };
         _state->current_iteration = _state->current_iteration - 1u;
     }
