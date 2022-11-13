@@ -665,15 +665,15 @@ private:
             accum(p_new, shutter_weight * w_new * L_new);
             accum(p_old, shutter_weight_old * w_old * L_old);
             auto pixel_index_new = p_new.x + p_new.y * resolution.x;
-            mutation_counter->record(pixel_index_new);
+            mutation_counter.record(pixel_index_new);
             // Accept or reject the proposal
             $if(rng.uniform_float() < accept) {
                 position_buffer.write(chain_id, p_new);
                 radiance_and_contribution_buffer.write(chain_id, make_float4(L_new, y_new));
                 shutter_weight_buffer.write(chain_id, shutter_weight);
                 _sampler->accept();
-                accept_counter->record(pixel_index_new);
-                global_accept_counter->record(0u);
+                accept_counter.record(pixel_index_new);
+                global_accept_counter.record(0u);
             }
             $else {
                 _sampler->reject();
