@@ -54,6 +54,28 @@ public:
     [[nodiscard]] auto inc() const noexcept { return _inc; }
 };
 
+class CounterBuffer {
+
+private:
+    Buffer<uint2> _buffer;
+
+public:
+    CounterBuffer(Device &device, uint size) noexcept
+        : _buffer{device.create_buffer<uint2>(size)} {}
+    void record(Expr<uint> index, Expr<uint> count = 1u) noexcept {
+        auto view = _buffer.view().as<uint>();
+        auto old = view.atomic(index * 2u + 0u).fetch_add(count);
+        $if(count != 0u & (old + count < old)) { view.atomic(index * 2u + 1u).fetch_add(1u); };
+    }
+    void clear(Expr<uint> index) noexcept {
+        auto view = _buffer.view().as<uint>();
+        view.write(index * 2u + 0u, 0u);
+        view.write(index * 2u + 1u, 0u);
+    }
+    [[nodiscard]] auto size() const noexcept { return _buffer.size() / 2u; }
+    [[nodiscard]] auto copy_to(void *data) const noexcept { return _buffer.copy_to(data); }
+};
+
 class PSSMLTSampler {
 
 public:
@@ -553,9 +575,21 @@ private:
         auto shutter_weight_buffer = pipeline().device().create_buffer<float>(chains);
         auto accumulate_buffer = pipeline().device().create_buffer<float>(pixel_count * 3u);
 
-        Buffer<uint> statistics_buffer;
+        luisa::unique_ptr<CounterBuffer> accept_counter;
+        luisa::unique_ptr<CounterBuffer> mutation_counter;
+        luisa::unique_ptr<CounterBuffer> global_accept_counter;
+        Shader1D<> clear_statistics;
         if (node<PSSMLT>()->enable_statistics()) {
-            statistics_buffer = pipeline().device().create_buffer<uint>(4u);
+            accept_counter = luisa::make_unique<CounterBuffer>(pipeline().device(), pixel_count);
+            mutation_counter = luisa::make_unique<CounterBuffer>(pipeline().device(), pixel_count);
+            global_accept_counter = luisa::make_unique<CounterBuffer>(pipeline().device(), 1u);
+            clear_statistics = pipeline().device().compile<1u>([&] {
+                auto i = dispatch_x();
+                $if(i == 0u) { global_accept_counter->clear(i); };
+                accept_counter->clear(i);
+                mutation_counter->clear(i);
+            });
+            command_buffer << clear_statistics().dispatch(pixel_count);
         }
 
         Clock clk;
@@ -572,9 +606,6 @@ private:
             radiance_and_contribution_buffer.write(chain_id, make_float4(L, _s(L, is_light)));
             shutter_weight_buffer.write(chain_id, shutter_weight);
             _sampler->save();
-            if (node<PSSMLT>()->enable_statistics()) {
-                $if(dispatch_x() < 4u) { statistics_buffer.write(dispatch_x(), 0u); };
-            }
         });
         LUISA_INFO("PSSMLT: compiled create_chains kernel in {} ms.", clk.toc());
 
@@ -601,12 +632,6 @@ private:
                     }
                 };
             };
-            auto record = [&](Expr<uint> index) noexcept {
-                if (node<PSSMLT>()->enable_statistics()) {
-                    auto old = statistics_buffer.atomic(index * 2u + 0u).fetch_add(1u);
-                    $if(old == ~0u) { statistics_buffer.atomic(index * 2u + 1u).fetch_add(1u); };
-                }
-            };
             // Compute acceptance probability for proposed sample
             auto accept = clamp(y_new / y_old, 0.f, 1.f);
             // Splat both current and proposed samples to _film_
@@ -615,17 +640,19 @@ private:
             auto w_old = (1.f - accept) / (y_old / b + p_large);
             accum(p_new, shutter_weight * w_new * L_new);
             accum(p_old, shutter_weight_old * w_old * L_old);
+            auto pixel_index_new = p_new.x + p_new.y * resolution.x;
+            mutation_counter->record(pixel_index_new);
             // Accept or reject the proposal
             $if(_sampler->random() < accept) {
                 position_buffer.write(chain_id, p_new);
                 radiance_and_contribution_buffer.write(chain_id, make_float4(L_new, y_new));
                 shutter_weight_buffer.write(chain_id, shutter_weight);
                 _sampler->accept();
-                record(0u);
+                accept_counter->record(pixel_index_new);
+                global_accept_counter->record(0u);
             }
             $else {
                 _sampler->reject();
-                record(1u);
             };
             _sampler->save();
         });
@@ -694,12 +721,10 @@ private:
                                    << clear().dispatch(pixel_count);
                     last_effective_spp = effective_spp;
                     if (node<PSSMLT>()->enable_statistics()) {
-                        auto statistics = luisa::make_shared<uint4>();
-                        command_buffer << statistics_buffer.copy_to(statistics.get())
-                                       << [statistics] {
-                                              auto accepted = (static_cast<uint64_t>(statistics->y) << 32u) | statistics->x;
-                                              auto rejected = (static_cast<uint64_t>(statistics->w) << 32u) | statistics->z;
-                                              auto total = accepted + rejected;
+                        auto a = luisa::make_shared<uint64_t>();
+                        command_buffer << global_accept_counter->copy_to(a.get())
+                                       << [a, total = mutation_count] {
+                                              auto accepted = *a;
                                               auto rate = static_cast<double>(accepted) / static_cast<double>(total);
                                               LUISA_INFO("PSSMLT: {}/{} mutation(s) accepted ({:.2f}%).",
                                                          accepted, total, rate * 100.);
@@ -719,9 +744,35 @@ private:
                               .dispatch(resolution)
                        << synchronize();
         progress.done();
-
         auto render_time = clk.toc();
         LUISA_INFO("Rendering finished in {} ms.", render_time);
+
+        // retrieve statistics
+        if (node<PSSMLT>()->enable_statistics()) {
+            LUISA_INFO("PSSMLT: saving statistic images...");
+            luisa::vector<uint64_t> accept(pixel_count);
+            luisa::vector<uint64_t> mutation(pixel_count);
+            command_buffer << accept_counter->copy_to(accept.data())
+                           << mutation_counter->copy_to(mutation.data())
+                           << synchronize();
+            luisa::vector<float> accept_rate(pixel_count);
+            luisa::vector<float> density(pixel_count);
+            std::transform(accept.cbegin(), accept.cend(), mutation.cbegin(), accept_rate.begin(),
+                           [](auto a, auto m) noexcept {
+                               return static_cast<float>(static_cast<double>(a) /
+                                                         static_cast<double>(m));
+                           });
+            std::transform(mutation.cbegin(), mutation.cend(), density.begin(),
+                           [n = static_cast<double>(camera->node()->spp())](auto m) noexcept {
+                               return static_cast<float>(static_cast<double>(m) / n);
+                           });
+            auto rate_file_name = camera->node()->file();
+            auto density_file_name = camera->node()->file();
+            rate_file_name.replace_extension(".accept.exr");
+            density_file_name.replace_extension(".density.exr");
+            save_image(rate_file_name, accept_rate.data(), resolution, 1u);
+            save_image(density_file_name, density.data(), resolution, 1u);
+        }
     }
 
 protected:
