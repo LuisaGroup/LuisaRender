@@ -60,20 +60,26 @@ private:
     Buffer<uint2> _buffer;
 
 public:
+    CounterBuffer() noexcept = default;
     CounterBuffer(Device &device, uint size) noexcept
         : _buffer{device.create_buffer<uint2>(size)} {}
     void record(Expr<uint> index, Expr<uint> count = 1u) noexcept {
-        auto view = _buffer.view().as<uint>();
-        auto old = view.atomic(index * 2u + 0u).fetch_add(count);
-        $if(count != 0u & (old + count < old)) { view.atomic(index * 2u + 1u).fetch_add(1u); };
+        if (_buffer) {
+            auto view = _buffer.view().as<uint>();
+            auto old = view.atomic(index * 2u + 0u).fetch_add(count);
+            $if(count != 0u & (old + count < old)) { view.atomic(index * 2u + 1u).fetch_add(1u); };
+        }
     }
     void clear(Expr<uint> index) noexcept {
-        auto view = _buffer.view().as<uint>();
-        view.write(index * 2u + 0u, 0u);
-        view.write(index * 2u + 1u, 0u);
+        if (_buffer) {
+            auto view = _buffer.view().as<uint>();
+            view.write(index * 2u + 0u, 0u);
+            view.write(index * 2u + 1u, 0u);
+        }
     }
-    [[nodiscard]] auto size() const noexcept { return _buffer.size() / 2u; }
-    [[nodiscard]] auto copy_to(void *data) const noexcept { return _buffer.copy_to(data); }
+    [[nodiscard]] auto size() const noexcept { return _buffer ? _buffer.size() / 2u : 0u; }
+    [[nodiscard]] auto copy_to(void *data) const noexcept { return _buffer ? _buffer.copy_to(data) : nullptr; }
+    [[nodiscard]] explicit operator bool() const noexcept { return static_cast<bool>(_buffer); }
 };
 
 class PSSMLTSampler {
@@ -584,19 +590,19 @@ private:
         auto shutter_weight_buffer = pipeline().device().create_buffer<float>(chains);
         auto accumulate_buffer = pipeline().device().create_buffer<float>(pixel_count * 3u);
 
-        luisa::unique_ptr<CounterBuffer> accept_counter;
-        luisa::unique_ptr<CounterBuffer> mutation_counter;
-        luisa::unique_ptr<CounterBuffer> global_accept_counter;
+        CounterBuffer accept_counter;
+        CounterBuffer mutation_counter;
+        CounterBuffer global_accept_counter;
         Shader1D<> clear_statistics;
         if (node<PSSMLT>()->enable_statistics()) {
-            accept_counter = luisa::make_unique<CounterBuffer>(pipeline().device(), pixel_count);
-            mutation_counter = luisa::make_unique<CounterBuffer>(pipeline().device(), pixel_count);
-            global_accept_counter = luisa::make_unique<CounterBuffer>(pipeline().device(), 1u);
+            accept_counter = {pipeline().device(), pixel_count};
+            mutation_counter = {pipeline().device(), pixel_count};
+            global_accept_counter = {pipeline().device(), 1u};
             clear_statistics = pipeline().device().compile<1u>([&] {
                 auto i = dispatch_x();
-                $if(i == 0u) { global_accept_counter->clear(i); };
-                accept_counter->clear(i);
-                mutation_counter->clear(i);
+                $if(i == 0u) { global_accept_counter.clear(i); };
+                accept_counter.clear(i);
+                mutation_counter.clear(i);
             });
             command_buffer << clear_statistics().dispatch(pixel_count);
         }
@@ -741,7 +747,7 @@ private:
                     last_effective_spp = effective_spp;
                     if (node<PSSMLT>()->enable_statistics()) {
                         auto a = luisa::make_shared<uint64_t>();
-                        command_buffer << global_accept_counter->copy_to(a.get())
+                        command_buffer << global_accept_counter.copy_to(a.get())
                                        << [a, total = mutation_count] {
                                               auto accepted = *a;
                                               auto rate = static_cast<double>(accepted) / static_cast<double>(total);
@@ -771,8 +777,8 @@ private:
             LUISA_INFO("PSSMLT: saving statistic images...");
             luisa::vector<uint64_t> accept(pixel_count);
             luisa::vector<uint64_t> mutation(pixel_count);
-            command_buffer << accept_counter->copy_to(accept.data())
-                           << mutation_counter->copy_to(mutation.data())
+            command_buffer << accept_counter.copy_to(accept.data())
+                           << mutation_counter.copy_to(mutation.data())
                            << synchronize();
             luisa::vector<float> accept_rate(pixel_count);
             luisa::vector<float> density(pixel_count);
