@@ -187,11 +187,13 @@ public:
     }
 
     void update(Expr<bool> accept) noexcept {
-        $for(dim, _pss_dim) {
-            auto i = _primary_sample_index(_state->chain_id, dim);
-            auto old_sample = _primary_sample_buffer.read(i);
-            auto new_sample = _mutated_primary_sample_buffer.read(i);
-            _primary_sample_buffer.write(i, ite(accept, new_sample, old_sample));
+        $if (accept) {
+            $for(dim, _pss_dim) {
+                auto i = _primary_sample_index(_state->chain_id, dim);
+                auto old_sample = _primary_sample_buffer.read(i);
+                auto new_sample = _mutated_primary_sample_buffer.read(i);
+                _primary_sample_buffer.write(i, new_sample);
+            };
         };
     }
 
@@ -248,7 +250,7 @@ public:
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), .05f)},
           _bootstrap_samples{std::max(desc->property_uint_or_default("bootstrap_samples", 1024u * 1024u), 1u)},
-          _chains{std::max(desc->property_uint_or_default("chains", 256u * 1024u), 1u)},
+          _chains{std::max(desc->property_uint_or_default("chains", 16u * 1024u), 1u)},
           _large_step_probability{std::clamp(
               desc->property_float_or_default(
                   "large_step_probability", lazy_construct([desc] {
