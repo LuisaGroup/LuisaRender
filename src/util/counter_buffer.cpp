@@ -30,7 +30,7 @@ size_t CounterBuffer::size() const noexcept {
     return _buffer ? _buffer.size() / 2u : 0u;
 }
 
-luisa::unique_ptr<Command> CounterBuffer::copy_to(void *data) const noexcept {
+Command *CounterBuffer::copy_to(void *data) const noexcept {
     return _buffer ? _buffer.copy_to(data) : nullptr;
 }
 

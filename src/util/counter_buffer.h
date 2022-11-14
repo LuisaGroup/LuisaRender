@@ -26,7 +26,7 @@ public:
     void record(Expr<uint> index, Expr<uint> count = 1u) noexcept;
     void clear(Expr<uint> index) noexcept;
     [[nodiscard]] size_t size() const noexcept;
-    [[nodiscard]] luisa::unique_ptr<Command> copy_to(void *data) const noexcept;
+    [[nodiscard]] Command *copy_to(void *data) const noexcept;
     [[nodiscard]] explicit operator bool() const noexcept;
 };
 
