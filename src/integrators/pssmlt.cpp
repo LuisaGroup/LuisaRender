@@ -523,6 +523,8 @@ private:
         auto pixel_count = resolution.x * resolution.y;
         auto radiance_and_contribution_buffer = pipeline().device().create_buffer<float4>(chains);
         auto position_buffer = pipeline().device().create_buffer<uint2>(chains);
+        auto proposed_radiance_and_contribution_buffer = pipeline().device().create_buffer<float4>(chains);
+        auto proposed_position_buffer = pipeline().device().create_buffer<uint2>(chains);
         auto shutter_weight_buffer = pipeline().device().create_buffer<float>(chains);
         auto accumulate_buffer = pipeline().device().create_buffer<float>(pixel_count * 3u);
 
@@ -566,23 +568,42 @@ private:
         LUISA_INFO("PSSMLT: compiled create_chains kernel in {} ms.", clk.toc());
 
         clk.tic();
-        LUISA_INFO("PSSMLT: compiling render kernel...");
-        auto render = pipeline().device().compile<1u>([&](UInt mutation_index, Float time, Float shutter_weight, Float b) noexcept {
+        LUISA_INFO("PSSMLT: compiling propose kernel...");
+        auto propose = pipeline().device().compile<1u>([&](Float time) noexcept {
             auto chain_id = dispatch_id().x;
-            auto seed = rng_state_buffer.read(chain_id);
-            auto u_wavelength = pipeline().spectrum()->node()->is_fixed() ? def(0.f) : lcg(seed);
+            auto u_wavelength = def(0.f);
+            if (!pipeline().spectrum()->node()->is_fixed()) {
+                auto seed = rng_state_buffer.read(chain_id);
+                u_wavelength = lcg(seed);
+                rng_state_buffer.write(chain_id, seed);
+            }
             auto swl = pipeline().spectrum()->sample(u_wavelength);
             _sampler->load(chain_id);
+            _sampler->start_iteration();
+            auto proposed = Li(*_sampler, camera, swl, time);
+            _sampler->save();
+            auto p_new = std::get<0u>(proposed);
+            auto L_new = std::get<1u>(proposed);
+            auto y_new = _s(L_new, std::get<2u>(proposed));
+            proposed_position_buffer.write(chain_id, p_new);
+            proposed_radiance_and_contribution_buffer.write(chain_id, make_float4(L_new, y_new));
+        });
+        LUISA_INFO("PSSMLT: compiled propose kernel in {} ms.", clk.toc());
+
+        clk.tic();
+        LUISA_INFO("PSSMLT: compiling mutate kernel...");
+        auto mutate = pipeline().device().compile<1u>([&](Float shutter_weight, Float b) noexcept {
+            auto chain_id = dispatch_id().x;
             auto p_old = position_buffer.read(chain_id);
             auto L_and_y_old = radiance_and_contribution_buffer.read(chain_id);
             auto L_old = L_and_y_old.xyz();
             auto y_old = L_and_y_old.w;
             auto shutter_weight_old = shutter_weight_buffer.read(chain_id);
-            _sampler->start_iteration();
-            auto proposed = Li(*_sampler, camera, swl, time);
-            auto p_new = std::get<0u>(proposed);
-            auto L_new = std::get<1u>(proposed);
-            auto y_new = _s(L_new, std::get<2u>(proposed));
+            auto p_new = proposed_position_buffer.read(chain_id);
+            auto L_and_y_new = proposed_radiance_and_contribution_buffer.read(chain_id);
+            auto L_new = L_and_y_new.xyz();
+            auto y_new = L_and_y_new.w;
+
             auto accum = [&accumulate_buffer, resolution](Expr<uint2> p, Expr<float3> L) noexcept {
                 auto offset = (p.y * resolution.x + p.x) * 3u;
                 $if(!any(isnan(L))) {
@@ -601,7 +622,10 @@ private:
             accum(p_old, shutter_weight_old * w_old * L_old);
             auto pixel_index_new = p_new.x + p_new.y * resolution.x;
             mutation_counter.record(pixel_index_new);
+
             // Accept or reject the proposal
+            auto seed = rng_state_buffer.read(chain_id);
+            _sampler->load(chain_id);
             $if(lcg(seed) < accept) {
                 position_buffer.write(chain_id, p_new);
                 radiance_and_contribution_buffer.write(chain_id, make_float4(L_new, y_new));
@@ -616,7 +640,7 @@ private:
             _sampler->save();
             rng_state_buffer.write(chain_id, seed);
         });
-        LUISA_INFO("PSSMLT: compiled render kernel in {} ms.", clk.toc());
+        LUISA_INFO("PSSMLT: compiled mutate kernel in {} ms.", clk.toc());
 
         clk.tic();
         LUISA_INFO("PSSMLT: compiling clear kernel...");
@@ -654,7 +678,6 @@ private:
         progress.update(0.);
         auto dispatch_count = 0ull;
         auto mutation_count = 0ull;
-        auto mutation_per_chain_count = 0ull;
         auto total_mutations = static_cast<uint64_t>(camera->node()->spp()) * pixel_count;
         auto last_effective_spp = 0.;
         for (auto s : shutter_samples) {
@@ -663,8 +686,8 @@ private:
             auto mutations_per_chain = (mutations + chains - 1u) / chains;
             for (auto i = static_cast<uint64_t>(0u); i < mutations_per_chain; i++) {
                 auto chains_to_dispatch = std::min((i + 1u) * chains, mutations) - i * chains;
-                command_buffer << render(static_cast<uint>(mutation_per_chain_count++),
-                                         s.point.time, s.point.weight, static_cast<float>(b))
+                command_buffer << propose(s.point.time).dispatch(chains_to_dispatch)
+                               << mutate(s.point.weight, static_cast<float>(b))
                                       .dispatch(chains_to_dispatch);
                 mutation_count += chains_to_dispatch;
                 auto dispatches_per_commit =
