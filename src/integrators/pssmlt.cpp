@@ -14,6 +14,33 @@
 
 namespace luisa::render {
 
+struct alignas(8) PrimarySample {
+    float value;
+    float value_backup;
+    uint2 last_modification;
+    uint2 modification_backup;
+};
+
+}// namespace luisa::render
+
+// clang-format off
+LUISA_STRUCT(luisa::render::PrimarySample,
+             value, value_backup,
+             last_modification,
+             modification_backup){
+    void backup() noexcept {
+        value_backup = value;
+        modification_backup = last_modification;
+    }
+    void restore() noexcept {
+        value = value_backup;
+        last_modification = modification_backup;
+    }
+};
+// clang-format on
+
+namespace luisa::render {
+
 using namespace compute;
 
 class PSSMLTSampler {
@@ -29,23 +56,6 @@ public:
         UInt initialized_dimensions;
     };
 
-    struct PrimarySample {
-
-        Float value;
-        Float value_backup;
-        U64 last_modification_iteration;
-        U64 modification_backup;
-
-        void backup() noexcept {
-            value_backup = value;
-            modification_backup = last_modification_iteration;
-        }
-        void restore() noexcept {
-            value = value_backup;
-            last_modification_iteration = modification_backup;
-        }
-    };
-
 private:
     Device &_device;
     float _sigma;
@@ -54,18 +64,18 @@ private:
 
 private:
     uint _chains{};
+    uint _pss_dim{};
     Buffer<uint> _rng_buffer;
     Buffer<uint2> _current_iteration_buffer;
     Buffer<uint> _large_step_and_initialized_dimensions_buffer;
     Buffer<uint2> _last_large_step_iteration_buffer;
-    // SoA-style primary sample buffers
-    Buffer<float2> _primary_sample_value_buffer;
-    Buffer<uint4> _primary_sample_modification_buffer;
+    Buffer<PrimarySample> _primary_sample_buffer;
 
 public:
     void reset(CommandBuffer &command_buffer, uint chains, uint pss_dim) noexcept {
         LUISA_INFO("PSSMLT: Resetting sampler with {} chains and {} dimensions.", chains, pss_dim);
         _chains = chains;
+        _pss_dim = pss_dim;
         LUISA_ASSERT(static_cast<uint64_t>(chains) * pss_dim <= ~0u,
                      "Too many primary samples.");
         command_buffer << synchronize();
@@ -75,9 +85,8 @@ public:
             _large_step_and_initialized_dimensions_buffer = _device.create_buffer<uint>(n);
             _last_large_step_iteration_buffer = _device.create_buffer<uint2>(n);
         }
-        if (auto n = next_pow2(chains * pss_dim); n > _primary_sample_value_buffer.size()) {
-            _primary_sample_value_buffer = _device.create_buffer<float2>(n);
-            _primary_sample_modification_buffer = _device.create_buffer<uint4>(n);
+        if (auto n = next_pow2(chains * pss_dim); n > _primary_sample_buffer.size()) {
+            _primary_sample_buffer = _device.create_buffer<PrimarySample>(n);
         }
     }
 
@@ -89,19 +98,12 @@ private:
 
     [[nodiscard]] auto _read_primary_sample(Expr<uint> dim) const noexcept {
         auto i = _primary_sample_index(dim);
-        auto v = _primary_sample_value_buffer.read(i);
-        auto m = _primary_sample_modification_buffer.read(i);
-        return PrimarySample{.value = v.x,
-                             .value_backup = v.y,
-                             .last_modification_iteration = U64{m.xy()},
-                             .modification_backup = U64{m.zw()}};
+        return _primary_sample_buffer.read(i);
     }
 
-    void _write_primary_sample(Expr<uint> dim, const PrimarySample &sample) noexcept {
+    void _write_primary_sample(Expr<uint> dim, Expr<PrimarySample> sample) noexcept {
         auto i = _primary_sample_index(dim);
-        _primary_sample_value_buffer.write(i, make_float2(sample.value, sample.value_backup));
-        auto m = make_uint4(sample.last_modification_iteration.bits(), sample.modification_backup.bits());
-        _primary_sample_modification_buffer.write(i, m);
+        _primary_sample_buffer.write(i, sample);
     }
 
     [[nodiscard]] static auto _erf_inv(Expr<float> x) noexcept {
@@ -140,29 +142,29 @@ private:
     }
 
     [[nodiscard]] auto _sample(Expr<uint> index) noexcept {
-        PrimarySample Xi;
+        auto Xi = def<PrimarySample>();
         $if(_state->initialized_dimensions <= index) {// Initialize the sample
             Xi.value = 0.f;
             Xi.value_backup = 0.f;
-            Xi.last_modification_iteration = U64{0u};
-            Xi.modification_backup = U64{0u};
+            Xi.last_modification = make_uint2();
+            Xi.modification_backup = make_uint2();
             _state->initialized_dimensions += 1u;
         }
         $else {// Load the sample
             Xi = _read_primary_sample(index);
         };
         // Reset Xi if a large step took place in the meantime
-        $if(Xi.last_modification_iteration < _state->last_large_step_iteration) {
+        $if(U64{Xi.last_modification} < _state->last_large_step_iteration) {
             Xi.value = lcg(_state->rng_state);
-            Xi.last_modification_iteration = _state->last_large_step_iteration;
+            Xi.last_modification = _state->last_large_step_iteration.bits();
         };
         // Apply remaining sequence of mutations to _sample_
-        Xi.backup();
+        Xi->backup();
         $if(_state->large_step) {
             Xi.value = lcg(_state->rng_state);
         }
         $else {
-            auto nSmall = (_state->current_iteration - Xi.last_modification_iteration).lo();
+            auto nSmall = (_state->current_iteration - U64{Xi.last_modification}).lo();
             // Apply _nSmall_ small step mutations
             // Sample the standard normal distribution N(0, 1)
             auto normalSample = sqrt_two * _erf_inv(2.f * lcg(_state->rng_state) - 1.f);
@@ -170,7 +172,7 @@ private:
             auto effSigma = _sigma * sqrt(cast<float>(nSmall));
             Xi.value = fract(Xi.value + normalSample * effSigma);
         };
-        Xi.last_modification_iteration = _state->current_iteration;
+        Xi.last_modification = _state->current_iteration.bits();
         // Store the sample
         _write_primary_sample(index, Xi);
         return Xi.value;
@@ -224,8 +226,8 @@ public:
     void reject() noexcept {
         $for(i, _state->initialized_dimensions) {
             auto sample = _read_primary_sample(i);
-            $if(U64{sample.last_modification_iteration} == _state->current_iteration) {
-                sample.restore();
+            $if(U64{sample.last_modification} == _state->current_iteration) {
+                sample->restore();
                 _write_primary_sample(i, sample);
             };
         };
