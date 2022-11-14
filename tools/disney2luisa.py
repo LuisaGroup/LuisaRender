@@ -6,8 +6,10 @@ import json
 import numpy as np
 import re
 import multiprocessing
+import time
 
-from colorama import Fore, Style
+# from colorama import Fore, Style
+import logging
 
 
 class ConverterInfo:
@@ -55,8 +57,25 @@ class ConverterInfo:
             raise Exception('Multiple environment names found')
 
 
-def log_info(msg, *args, **kwargs):
-    print(f'{Fore.GREEN}[INFO]{Style.RESET_ALL} {msg}', *args, **kwargs)
+# def log_info(msg, *args, **kwargs):
+#     print(f'{Fore.GREEN}[INFO]{Style.RESET_ALL} {msg}', *args, **kwargs)
+
+
+global logger
+def logger_init():
+    log_format = '[%(asctime)s] [%(levelname)s] %(message)s'
+    date_format = '%Y-%m-%d %H:%M:%S'
+    formatter = logging.Formatter(fmt=log_format, datefmt=date_format)
+
+    logging.basicConfig(level=logging.DEBUG, format=log_format, datefmt=date_format)
+
+    global logger
+    logger = logging.getLogger(__file__)
+
+    # file_handler = logging.FileHandler(log_file)
+    # file_handler.setFormatter(formatter)
+    # file_handler.setLevel(logging.DEBUG)
+    # logger.addHandler(file_handler)
 
 
 def split_obj(path: Path, output_dir: Path) -> dict:
@@ -122,10 +141,8 @@ def split_obj(path: Path, output_dir: Path) -> dict:
         return ' '.join(line)
 
     def merge_geo(geo_name: str, index_num: GeometryIndex, geo_index_nums: dict):
-        if geo_name in geo_index_nums:
-            geo_index_nums[geo_name] += index_num
-        else:
-            geo_index_nums[geo_name] = index_num
+        t = geo_index_nums.get(geo_name, GeometryIndex()) + index_num
+        geo_index_nums[geo_name] = t
 
     def write_geo_line(line: str, name: str, geo_lines: dict):
         lines = geo_lines.get(name, [])
@@ -143,12 +160,14 @@ def split_obj(path: Path, output_dir: Path) -> dict:
             f.writelines(lines)
         geo_lines[name] = []
 
-    def move_default_to_geo(name: str, geo_lines: dict):
-        write_geo_force('default', geo_lines)
-        input_path = output_dir / 'default.obj'
-        output_path = output_dir / (name + '.obj')
-        # log_info(f'Trying to move {input_path} to {output_path}')
+    def move_to_end_of(src: str, dst: str):
+        input_path = output_dir / f'{src}.obj'
+        output_path = output_dir / f'{dst}.obj'
+        # logger.info(f'Trying to move {input_path} to {output_path}')
         if input_path == output_path:
+            return
+        if not output_path.exists():
+            os.rename(input_path, output_path)
             return
         with open(input_path, 'r') as input_f:
             with open(output_path, 'a') as output_f:
@@ -163,35 +182,49 @@ def split_obj(path: Path, output_dir: Path) -> dict:
         g_mode = False
         index = GeometryIndex()
         index_next = GeometryIndex()
+        index_num = GeometryIndex()
         geo_index_nums = {}
         geo_lines = {}
         geo_lines.setdefault('default', [])
-        geo2material = {}
+        geo2material = {
+            # 'geo_isBeach_sand': 'mat_isBeach_sand',
+        }
         geo_name = None
+        material = None
+        geo_name2file_name = {
+            'default': 'default',
+            # 'beach_geo': 'geo_isBeach_sand',
+        }
 
         for line in f:
             if line.startswith('g '):
                 geo_name_new = line[2:].strip()
-                # log_info(f'geo_name transform: {geo_name} -> {geo_name_new}')
-                # log_info(f'g_mode: {g_mode}')
+                material = None
+                write_geo_line(line, geo_name_new, geo_lines)
                 if g_mode:
                     g_mode = False
                     index_num = index_next - index
-                    merge_geo(geo_name, index_num, geo_index_nums)
                     index = index_next.copy()
                 elif geo_name is not None:
                     g_mode = True
-                    move_default_to_geo(geo_name_new, geo_lines)
+                    write_geo_force('default', geo_lines)
+                    move_to_end_of('default', geo_name_new)
                 geo_name = geo_name_new
             elif line.startswith('f '):
-                if geo_name in geo_index_nums:
-                    face = reindex(line, index - geo_index_nums[geo_name])
-                else:
-                    face = reindex(line, index)
+                if material is None:
+                    geo_name = geo_name2file_name[geo_name]
+                    material = geo2material[geo_name]
+                face = reindex(line, index - geo_index_nums[geo_name])
                 write_geo_line(f'f {face}\n', geo_name, geo_lines)
             elif line.startswith('usemtl '):
                 material = line[7:].strip()
+                geo_name2file_name[geo_name] = f'geo_{path.stem}_{material}'
+                material = f'mat_{path.stem}_{material}'
+                move_to_end_of(geo_name, geo_name2file_name[geo_name])
+                geo_name = geo_name2file_name[geo_name]
                 geo2material[geo_name] = material
+                merge_geo(geo_name, index_num, geo_index_nums)
+                write_geo_line(line, geo_name, geo_lines)
             elif line.startswith('v '):
                 index_next.v_index += 1
                 write_geo_line(line, geo_name, geo_lines)
@@ -282,7 +315,7 @@ def convert_camera(converter_info: ConverterInfo, camera: dict) -> (str, dict):
         }
     }
     converter_info.camera_names.add(name)
-    log_info(f'Camera {name} converted')
+    logger.info(f'Camera {name} converted')
 
     return name, camera_dict
 
@@ -370,10 +403,10 @@ def convert_light(converter_info: ConverterInfo, light: dict, name: str) -> (str
             raise ValueError(f'Only one environment is supported, but {converter_info.environment_name} and {name} are found')
         converter_info.environment_name = name
     else:
-        log_info(f'Light type {light["type"]} not supported')
+        logger.info(f'Light type {light["type"]} not supported')
         return None, None
 
-    log_info(f'Light {name} converted')
+    logger.info(f'Light {name} converted')
 
     return name, light_dict
 
@@ -453,13 +486,13 @@ def convert_material(converter_info: ConverterInfo, material: dict, name: str, g
         mateial_map_geo[name] = material_dict
 
     converter_info.material_names.add(name)
-    log_info(f'Material {name} converted')
+    logger.info(f'Material {name} converted')
 
     return name, material_dict
 
 
 def convert_geometry(converter_info: ConverterInfo, geo_name: str) -> (ConverterInfo, str, dict):
-    log_info(f'Start to convert geometry {geo_name}')
+    logger.info(f'Start to convert geometry {geo_name}')
 
     check_dir(converter_info.input_json_dir / geo_name, converter_info.output_json_dir / geo_name)
     check_dir(converter_info.input_geo_dir / geo_name, converter_info.output_geo_dir / geo_name)
@@ -512,7 +545,7 @@ def convert_geometry(converter_info: ConverterInfo, geo_name: str) -> (Converter
                 'impl': 'Mesh',
                 'prop': {
                     'file': str(json2obj_path).replace('\\', '/'),
-                    'surface': f'@{geo_name}_{material}',
+                    'surface': material,
                 }
             }
             geo_obj_dict['prop']['shapes'].append(obj_part)
@@ -541,7 +574,7 @@ def convert_geometry(converter_info: ConverterInfo, geo_name: str) -> (Converter
         geo_dict[copy_name] = geo_obj_dict.copy()
         converter_info.shape_names.add(copy_name)
 
-    log_info(f'Geometry {geo_name} converted')
+    logger.info(f'Geometry {geo_name} converted')
 
     return converter_info, geo_name, geo_dict
 
@@ -632,7 +665,7 @@ def disney2luisa(input_project_dir: Path, output_project_dir: Path):
         camera_dict = {name: camera_dict}
         with open(path_out / camera_file.name, 'w') as f:
             json.dump(camera_dict, f, indent=2)
-    log_info('All cameras converted')
+    logger.info('All cameras converted')
 
     # lights
     path_in = converter_info.input_json_dir / 'lights'
@@ -658,7 +691,7 @@ f   -4   -3   -2   -1
             lights_dict[name] = light_dict
         with open(path_out / light_file.name, 'w') as f:
             json.dump(lights_dict, f, indent=2)
-    log_info('All lights converted')
+    logger.info('All lights converted')
 
     # geometries
     for geo_name in geo_names:
@@ -666,19 +699,25 @@ f   -4   -3   -2   -1
         converter_info.re_shape2material[geo_name] = {}
 
     # test_geo_names = ['isBeach', 'isCoastline', 'osOcean', 'isDunesA', 'isDunesB', 'isMountainA', 'isMountainB']
-    test_geo_names = ['isBeach', 'isCoastline', 'osOcean']
+    test_geo_names = ['isBeach']
 
     pool = multiprocessing.Pool()
     threads = []
+    thread2geo_name = {}
     for geo_name in geo_names:
         # # DEBUG
         # if geo_name not in test_geo_names:
         #     continue
         # geometries
-        threads.append(pool.apply_async(convert_geometry, args=(converter_info.copy(), geo_name)))
+        thread_t = pool.apply_async(convert_geometry, args=(converter_info.copy(), geo_name))
+        threads.append(thread_t)
+        thread2geo_name[thread_t] = geo_name
     pool.close()
 
     finished_threads = 0
+    time_last = time.perf_counter()
+    time_delta = 0.0
+    print_every_seconds = 5.0
     thread_count = len(threads)
     while len(threads) > 0:
         threads_next = []
@@ -694,26 +733,34 @@ f   -4   -3   -2   -1
             with open(path_out / f'{geo_name}.json', 'w') as f:
                 json.dump(geo_dict, f, indent=2)
             finished_threads += 1
-            log_info(f'Thread {finished_threads}/{thread_count} finished. Geometry {geo_name} dumped')
+            logger.info(f'Thread {finished_threads}/{thread_count} finished. Geometry {geo_name} dumped')
         threads = threads_next
+        time_now = time.perf_counter()
+        time_delta += time_now - time_last
+        time_last = time_now
+        if time_delta >= print_every_seconds:
+            time_delta = 0.0
+            thread_names = [thread2geo_name[thread_t] for thread_t in threads]
+            logger.info(f'Thread {finished_threads}/{thread_count} finished. Unfinished threads: ', thread_names)
     pool.join()
-    log_info('All geometries converted')
+    logger.info('All geometries converted')
 
     # materials for DEBUG
     json.dump(converter_info.re_shape2material, open(converter_info.output_project_dir / 're_shape2material.json', 'w'), indent=2)
     json.dump(converter_info.material_map, open(converter_info.output_project_dir / 'material_map.json', 'w'), indent=2)
-    log_info('Materials for DEBUG dumped')
+    logger.info('Materials for DEBUG dumped')
 
     # textures
     copy_texture(input_project_dir / 'textures', converter_info.output_project_dir / 'textures')
-    log_info('Textures copied')
+    logger.info('Textures copied')
 
     create_main_scene_file(converter_info)
-    log_info('Main scene file created')
+    logger.info('Main scene file created')
 
 
 if __name__ == '__main__':
+    logger_init()
     if len(argv) == 3:
         disney2luisa(Path(argv[1]).absolute(), Path(argv[2]).absolute())
     else:
-        log_info('Usage: disney2luisa.py <input.json> <output.luisa>')
+        logger.info('Usage: disney2luisa.py <input.json> <output.luisa>')
