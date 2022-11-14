@@ -142,23 +142,31 @@ def split_obj(path: Path, output_dir: Path) -> dict:
             f.writelines(lines)
         geo_lines[name] = []
 
-    def move_to_end_of(src: str, dst: str):
+    def move_to_end_of(src: str, dst: str, geo_lines: dict):
         input_path = output_dir / f'{src}.obj'
         output_path = output_dir / f'{dst}.obj'
         # log_info(f'Trying to move {input_path} to {output_path}')
         if input_path == output_path:
             return
-        if not output_path.exists():
-            os.rename(input_path, output_path)
-            return
-        with open(input_path, 'r') as input_f:
-            with open(output_path, 'a') as output_f:
-                while True:
-                    data = input_f.read(65536)
-                    if not data:
-                        break
-                    output_f.write(data)
-        os.remove(input_path)
+        if input_path.exists():
+            if os.stat(input_path).st_size <= 64 * 1024 * 1024:
+                with open(input_path, 'r') as f:
+                    lines = f.readlines()
+                geo_lines.setdefault(dst, [])
+                geo_lines[dst].extend(lines)
+            else:
+                write_geo_force(dst, geo_lines)
+                with open(input_path, 'r') as input_f:
+                    with open(output_path, 'a') as output_f:
+                        while True:
+                            data = input_f.read(65536)
+                            if not data:
+                                break
+                            output_f.write(data)
+            os.remove(input_path)
+        geo_lines.setdefault(dst, [])
+        geo_lines[dst].extend(geo_lines[src])
+        geo_lines[src] = []
 
     with open(path, 'r') as f:
         g_mode = False
@@ -188,11 +196,9 @@ def split_obj(path: Path, output_dir: Path) -> dict:
                     g_mode = False
                     index_num = index_next - index
                     index = index_next.copy()
-                    write_geo_force(file_name, geo_lines)
                 elif geo_name is not None:
                     g_mode = True
-                    write_geo_force(file_name, geo_lines)
-                    move_to_end_of(file_name, file_name_new)
+                    move_to_end_of(file_name, file_name_new, geo_lines)
                 geo_name = geo_name_new
                 file_name = geo_name_new
                 write_geo_line(line, file_name, geo_lines)
@@ -200,8 +206,7 @@ def split_obj(path: Path, output_dir: Path) -> dict:
                 if material is None:
                     file_name_new = geo_name2file_name[geo_name]
                     material = file2material[file_name_new]
-                    write_geo_force(file_name, geo_lines)
-                    move_to_end_of(file_name, file_name_new)
+                    move_to_end_of(file_name, file_name_new, geo_lines)
                     merge_geo(geo_name, index_num, geo_index_nums)
                     file_name = file_name_new
                 face = reindex(line, index - geo_index_nums[geo_name])
@@ -211,8 +216,7 @@ def split_obj(path: Path, output_dir: Path) -> dict:
                 file_name = f'geo_{path.stem}_{material}'
                 geo_name2file_name[geo_name] = file_name
                 material = f'mat_{path.stem}_{material}'
-                write_geo_force(geo_name, geo_lines)
-                move_to_end_of(geo_name, file_name)
+                move_to_end_of(geo_name, file_name, geo_lines)
                 merge_geo(geo_name, index_num, geo_index_nums)
                 file2material[file_name] = material
                 write_geo_line(line, file_name, geo_lines)
@@ -690,7 +694,8 @@ f   -4   -3   -2   -1
         converter_info.re_shape2material[geo_name] = {}
 
     # test_geo_names = ['isBeach', 'isCoastline', 'osOcean', 'isDunesA', 'isDunesB', 'isMountainA', 'isMountainB']
-    test_geo_names = ['isBeach']
+    # test_geo_names = ['isBeach']
+    test_geo_names = ['isIronwoodA1']
 
     pool = multiprocessing.Pool()
     threads = []
