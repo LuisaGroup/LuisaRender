@@ -26,6 +26,8 @@ using compute::Float;
 [[nodiscard]] UInt3 pcg3d(Expr<uint3> v_in) noexcept;
 [[nodiscard]] UInt4 pcg4d(Expr<uint4> v_in) noexcept;
 
+[[nodiscard]] Float uniform_uint_to_float(Expr<uint> u) noexcept;
+
 [[nodiscard]] Float lcg(UInt &state) noexcept;
 
 class PCG32 {

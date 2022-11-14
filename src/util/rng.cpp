@@ -125,13 +125,17 @@ UInt4 pcg4d(Expr<uint4> v) noexcept {
     return impl(v);
 }
 
+Float uniform_uint_to_float(Expr<uint> u) noexcept {
+    return cast<float>(u & 0x00ffffffu) *
+           (1.0f / static_cast<float>(0x01000000u));
+}
+
 Float lcg(UInt &state) noexcept {
     static Callable impl = [](UInt &state) noexcept {
         constexpr auto lcg_a = 1664525u;
         constexpr auto lcg_c = 1013904223u;
         state = lcg_a * state + lcg_c;
-        return cast<float>(state & 0x00ffffffu) *
-               (1.0f / static_cast<float>(0x01000000u));
+        return uniform_uint_to_float(state);
     };
     return impl(state);
 }
