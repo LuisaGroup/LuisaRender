@@ -136,4 +136,38 @@ Float lcg(UInt &state) noexcept {
     return impl(state);
 }
 
+UInt PCG32::uniform_uint() noexcept {
+    auto oldstate = _state;
+    _state = oldstate * U64{mult} + _inc;
+    auto xorshifted = (((oldstate >> 18u) ^ oldstate) >> 27u).lo();
+    auto rot = (oldstate >> 59u).lo();
+    return (xorshifted >> rot) | (xorshifted << ((~rot + 1u) & 31u));
+}
+
+void PCG32::set_sequence(U64 init_seq) noexcept {
+    _state = U64{0u};
+    _inc = (init_seq << 1u) | 1u;
+    static_cast<void>(uniform_uint());
+    _state = _state + U64{default_state};
+    static_cast<void>(uniform_uint());
+}
+
+Float PCG32::uniform_float() noexcept {
+    return min(one_minus_epsilon, uniform_uint() * 0x1p-32f);
+}
+
+PCG32::PCG32() noexcept
+    : _state{default_state}, _inc{default_stream} {}
+
+PCG32::PCG32(U64 state, U64 inc) noexcept
+    : _state{std::move(state)}, _inc{std::move(inc)} {}
+
+PCG32::PCG32(U64 seq_index) noexcept {
+    set_sequence(std::move(seq_index));
+}
+
+PCG32::PCG32(Expr<uint> seq_index) noexcept {
+    set_sequence(U64{seq_index});
+}
+
 }// namespace luisa::render

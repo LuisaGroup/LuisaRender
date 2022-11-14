@@ -7,6 +7,7 @@
 #include <util/sampling.h>
 #include <util/colorspace.h>
 #include <util/progress_bar.h>
+#include <util/counter_buffer.h>
 #include <base/pipeline.h>
 #include <base/integrator.h>
 #include <base/display.h>
@@ -14,73 +15,6 @@
 namespace luisa::render {
 
 using namespace compute;
-
-class PCG32 {
-
-private:
-    static constexpr auto default_state = 0x853c49e6748fea9bull;
-    static constexpr auto default_stream = 0xda3e39cb94b95bdbull;
-    static constexpr auto mult = 0x5851f42d4c957f2dull;
-
-private:
-    U64 _state;
-    U64 _inc;
-
-public:
-    // clang-format off
-    PCG32() noexcept : _state{default_state}, _inc{default_stream} {}
-    PCG32(U64 state, U64 inc) noexcept : _state{state}, _inc{inc} {}
-    explicit PCG32(U64 seq_index) noexcept { set_sequence(seq_index); }
-    explicit PCG32(Expr<uint> seq_index) noexcept { set_sequence(U64{seq_index}); }
-    // clang-format on
-    [[nodiscard]] auto uniform_uint() noexcept {
-        auto oldstate = _state;
-        _state = oldstate * U64{mult} + _inc;
-        auto xorshifted = (((oldstate >> 18u) ^ oldstate) >> 27u).lo();
-        auto rot = (oldstate >> 59u).lo();
-        return (xorshifted >> rot) | (xorshifted << ((~rot + 1u) & 31u));
-    }
-    void set_sequence(U64 init_seq) noexcept {
-        _state = U64{0u};
-        _inc = (init_seq << 1u) | 1u;
-        static_cast<void>(uniform_uint());
-        _state = _state + U64{default_state};
-        static_cast<void>(uniform_uint());
-    }
-    [[nodiscard]] auto uniform_float() noexcept {
-        return min(one_minus_epsilon, uniform_uint() * 0x1p-32f);
-    }
-    [[nodiscard]] auto state() const noexcept { return _state; }
-    [[nodiscard]] auto inc() const noexcept { return _inc; }
-};
-
-class CounterBuffer {
-
-private:
-    Buffer<uint2> _buffer;
-
-public:
-    CounterBuffer() noexcept = default;
-    CounterBuffer(Device &device, uint size) noexcept
-        : _buffer{device.create_buffer<uint2>(size)} {}
-    void record(Expr<uint> index, Expr<uint> count = 1u) noexcept {
-        if (_buffer) {
-            auto view = _buffer.view().as<uint>();
-            auto old = view.atomic(index * 2u + 0u).fetch_add(count);
-            $if(count != 0u & (old + count < old)) { view.atomic(index * 2u + 1u).fetch_add(1u); };
-        }
-    }
-    void clear(Expr<uint> index) noexcept {
-        if (_buffer) {
-            auto view = _buffer.view().as<uint>();
-            view.write(index * 2u + 0u, 0u);
-            view.write(index * 2u + 1u, 0u);
-        }
-    }
-    [[nodiscard]] auto size() const noexcept { return _buffer ? _buffer.size() / 2u : 0u; }
-    [[nodiscard]] auto copy_to(void *data) const noexcept { return _buffer ? _buffer.copy_to(data) : nullptr; }
-    [[nodiscard]] explicit operator bool() const noexcept { return static_cast<bool>(_buffer); }
-};
 
 class PSSMLTSampler {
 
