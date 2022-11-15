@@ -126,8 +126,7 @@ UInt4 pcg4d(Expr<uint4> v) noexcept {
 }
 
 Float uniform_uint_to_float(Expr<uint> u) noexcept {
-    return cast<float>(u & 0x00ffffffu) *
-           (1.0f / static_cast<float>(0x01000000u));
+    return min(one_minus_epsilon, u * 0x1p-32f);
 }
 
 Float lcg(UInt &state) noexcept {
@@ -157,7 +156,7 @@ void PCG32::set_sequence(U64 init_seq) noexcept {
 }
 
 Float PCG32::uniform_float() noexcept {
-    return min(one_minus_epsilon, uniform_uint() * 0x1p-32f);
+    return uniform_uint_to_float(uniform_uint());
 }
 
 PCG32::PCG32() noexcept
