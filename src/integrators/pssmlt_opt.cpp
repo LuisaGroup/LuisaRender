@@ -65,6 +65,7 @@ private:
                  Buffer<uint> /* rng */,
                  Buffer<float> /* primary */,
                  Buffer<float> /* mutated */,
+                 uint /* chains */,
                  uint /* pss dimension */>>
         _create_shader;
     std::shared_future<
@@ -72,21 +73,24 @@ private:
                  Buffer<float> /* primary */,
                  Buffer<float> /* mutated */,
                  Buffer<uint> /* large step */,
+                 uint /* chains */,
                  uint /* pss dimension */>>
         _mutate_shader;
 
 private:
-    [[nodiscard]] auto _primary_sample_index(Expr<uint> chain_id, Expr<uint> dim) const noexcept {
-        return _chains * dim + chain_id;// SoA layout
+    [[nodiscard]] static auto _primary_sample_index(Expr<uint> chains, Expr<uint> chain_id,
+                                                    Expr<uint> dim, Expr<uint> pss_dim) noexcept {
+        return chains * dim + chain_id;// SoA layout
     }
 
 public:
     PSSMLTSampler(Device &device, uint chains, float sigma, float p_large) noexcept
         : _device{device}, _chains{chains} {
 
-        _create_shader = device.compile_async<1>([this](BufferVar<AliasEntry> bootstrap, UInt bootstrap_size,
-                                                        BufferUInt bootstrap_index, BufferUInt rng_state,
-                                                        BufferFloat primary, BufferFloat mutated, UInt pss_dim) noexcept {
+        _create_shader = device.compile_async<1>([](BufferVar<AliasEntry> bootstrap, UInt bootstrap_size,
+                                                    BufferUInt bootstrap_index, BufferUInt rng_state,
+                                                    BufferFloat primary, BufferFloat mutated,
+                                                    UInt chains, UInt pss_dim) noexcept {
             auto chain_id = dispatch_x();
             // select a bootstrap sample
             auto u_bootstrap = uniform_uint_to_float(xxhash32(make_uint2(0xbadc0ffeu, chain_id)));
@@ -95,23 +99,26 @@ public:
             // make state
             auto seed = xxhash32(bootstrap_id);
             $for(dim, pss_dim) {
-                auto i = _primary_sample_index(chain_id, dim);
+                auto i = _primary_sample_index(chains, chain_id, dim, pss_dim);
                 auto u = lcg(seed);
+                primary.write(i, u);
                 mutated.write(i, u);
             };
             rng_state.write(chain_id, seed);
         });
 
-        _mutate_shader = device.compile_async<1>([sigma, p_large, this](BufferUInt rng_state,
-                                                                        BufferFloat primary, BufferFloat mutated,
-                                                                        BufferUInt large_step, UInt pss_dim) noexcept {
+        _mutate_shader = device.compile_async<1>([sigma, p_large](BufferUInt rng_state,
+                                                                  BufferFloat primary, BufferFloat mutated,
+                                                                  BufferUInt large_step,
+                                                                  UInt chains, UInt pss_dim) noexcept {
             auto chain_id = dispatch_x();
             auto seed = rng_state.read(chain_id);
             auto large = lcg(seed) < p_large;
+//            auto large = def(true);
             large_step.write(chain_id, ite(large, 1u, 0u));
             $for(dim, pss_dim) {
                 auto u = lcg(seed);
-                auto i = _primary_sample_index(chain_id, dim);
+                auto i = _primary_sample_index(chains, chain_id, dim, pss_dim);
                 auto s = fract(primary.read(i) + sigma * sqrt_two * erf_inv(2.f * u - 1.f));
                 mutated.write(i, ite(large, u, s));
             };
@@ -149,6 +156,7 @@ public:
                                                _rng_buffer,
                                                _primary_sample_buffer,
                                                _mutated_primary_sample_buffer,
+                                               _chains,
                                                _pss_dim)
                               .dispatch(_chains);
     }
@@ -158,6 +166,7 @@ public:
                                                _primary_sample_buffer,
                                                _mutated_primary_sample_buffer,
                                                _large_step_buffer,
+                                               _chains,
                                                _pss_dim)
                               .dispatch(chains_to_dispatch);
     }
@@ -174,8 +183,7 @@ private:
 public:
     void start(Expr<uint> chain_id) noexcept {
         _state = luisa::make_unique<State>(State{
-            .chain_id = chain_id,
-            .dimension = 0u});
+            .chain_id = chain_id, .dimension = 0u});
     }
 
     [[nodiscard]] auto large_step() const noexcept {
@@ -187,9 +195,9 @@ public:
     }
 
     void update(Expr<bool> accept) noexcept {
-        $if (accept) {
+        $if(accept) {
             $for(dim, _pss_dim) {
-                auto i = _primary_sample_index(_state->chain_id, dim);
+                auto i = _primary_sample_index(_chains, _state->chain_id, dim, _pss_dim);
                 auto old_sample = _primary_sample_buffer.read(i);
                 auto new_sample = _mutated_primary_sample_buffer.read(i);
                 _primary_sample_buffer.write(i, new_sample);
@@ -198,14 +206,16 @@ public:
     }
 
     [[nodiscard]] auto generate_1d() noexcept {
-        auto i = _primary_sample_index(_state->chain_id, _state->dimension);
+        auto i = _primary_sample_index(
+            _chains, _state->chain_id, _state->dimension, _pss_dim);
         auto sample = _mutated_primary_sample_buffer.read(i);
         _state->dimension += 1u;
         return sample;
     }
 
     [[nodiscard]] auto generate_2d() noexcept {
-        auto i = _primary_sample_index(_state->chain_id, _state->dimension);
+        auto i = _primary_sample_index(
+            _chains, _state->chain_id, _state->dimension, _pss_dim);
         auto sample = make_float2(_mutated_primary_sample_buffer.read(i + 0u),
                                   _mutated_primary_sample_buffer.read(i + 1u));
         _state->dimension += 2u;
@@ -220,7 +230,7 @@ private:
     UInt _state;
 
 public:
-    explicit LCG(Expr<uint> seed) noexcept : _state{xxhash32(seed)} {}
+    explicit LCG(Expr<uint> seed) noexcept : _state{seed} {}
     [[nodiscard]] auto state() const noexcept { return _state; }
     [[nodiscard]] auto generate_1d() noexcept { return lcg(_state); }
     [[nodiscard]] auto generate_2d() noexcept {
@@ -250,7 +260,7 @@ public:
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), .05f)},
           _bootstrap_samples{std::max(desc->property_uint_or_default("bootstrap_samples", 1024u * 1024u), 1u)},
-          _chains{std::max(desc->property_uint_or_default("chains", 16u * 1024u), 1u)},
+          _chains{std::max(desc->property_uint_or_default("chains", 256u * 1024u), 1u)},
           _large_step_probability{std::clamp(
               desc->property_float_or_default(
                   "large_step_probability", lazy_construct([desc] {
@@ -449,7 +459,7 @@ private:
             auto u_wavelength = uniform_uint_to_float(
                 xxhash32(make_uint2(bootstrap_id, 0xdeadbeefu)));
             auto swl = pipeline().spectrum()->sample(u_wavelength);
-            LCG sampler{bootstrap_id};
+            LCG sampler{xxhash32(bootstrap_id)};
             auto [_, L, is_light] = Li(sampler, camera, swl, time);
             bootstrap_weights.write(bootstrap_id, _s(L, is_light));
         });
@@ -528,7 +538,6 @@ private:
             auto u_wavelength = uniform_uint_to_float(seed);
             auto swl = pipeline().spectrum()->sample(u_wavelength);
             auto [p, L, is_light] = Li(*_sampler, camera, swl, time);
-            _sampler->update(true);
             position_buffer.write(chain_id, p);
             radiance_and_contribution_buffer.write(chain_id, make_float4(L, _s(L, is_light)));
             shutter_weight_buffer.write(chain_id, shutter_weight);

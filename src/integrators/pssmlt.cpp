@@ -184,7 +184,7 @@ public:
 
     void create(Expr<uint> chain_index, Expr<uint> rng_sequence) noexcept {
         _state = luisa::make_unique<State>(State{
-            .rng_state = xxhash32(make_uint2(rng_sequence, 0xabadfaceu)),
+            .rng_state = xxhash32(rng_sequence),
             .current_iteration = U64{0u},
             .large_step = true,
             .last_large_step_iteration = U64{0u},
@@ -469,22 +469,12 @@ private:
         auto bootstrap = pipeline().device().compile<1u>([&](UInt bootsrape_offset, Float time) noexcept {
             auto chain_id = dispatch_x();
             auto bootstrap_id = chain_id + bootsrape_offset;
-            constexpr auto wavelength_samples = 4u;
-            ArrayFloat<wavelength_samples> u_wavelength;
-            if (!pipeline().spectrum()->node()->is_fixed()) {
-                auto seed = xxhash32(make_uint3(chain_id, bootstrap_id, 0xdeadbeefu));
-                for (auto i = 0u; i < wavelength_samples; i++) {
-                    u_wavelength[i] = lcg(seed);
-                }
-            }
-            auto c = def(0.f);
-            $for(i, wavelength_samples) {
-                auto swl = pipeline().spectrum()->sample(u_wavelength[i]);
-                _sampler->create(chain_id, bootstrap_id);
-                auto [_, L, is_light] = Li(*_sampler, camera, swl, time);
-                c += _s(L, is_light);
-            };
-            bootstrap_weights.write(bootstrap_id, c);
+            auto u_wavelength = uniform_uint_to_float(
+                xxhash32(make_uint2(bootstrap_id, 0xdeadbeefu)));
+            auto swl = pipeline().spectrum()->sample(u_wavelength);
+            _sampler->create(chain_id, bootstrap_id);
+            auto [_, L, is_light] = Li(*_sampler, camera, swl, time);
+            bootstrap_weights.write(bootstrap_id, _s(L, is_light));
         });
         LUISA_INFO("PSSMLT: running bootstrap kernel.");
         luisa::vector<float> bw(bootstrap_count);
@@ -551,12 +541,13 @@ private:
         LUISA_INFO("PSSMLT: compiling create_chains kernel...");
         auto create_chains = pipeline().device().compile<1u>([&](Float time, Float shutter_weight) noexcept {
             auto chain_id = dispatch_x();
-            auto seed = xxhash32(make_uint2(chain_id, 0x19980810u));
+            auto u_bootstrap = uniform_uint_to_float(xxhash32(make_uint2(chain_id, 0x19980810u)));
             auto [bootstrap_id, _] = sample_alias_table(bootstrap_sampling_table,
                                                         static_cast<uint>(bootstrap_sampling_table.size()),
-                                                        lcg(seed));
+                                                        u_bootstrap);
             _sampler->create(chain_id, bootstrap_id);
-            auto u_wavelength = pipeline().spectrum()->node()->is_fixed() ? def(0.f) : lcg(seed);
+            auto seed = xxhash32(make_uint2(bootstrap_id, 0xdeadbeefu));
+            auto u_wavelength = uniform_uint_to_float(seed);
             auto swl = pipeline().spectrum()->sample(u_wavelength);
             auto [p, L, is_light] = Li(*_sampler, camera, swl, time);
             position_buffer.write(chain_id, p);
