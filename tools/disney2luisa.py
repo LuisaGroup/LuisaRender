@@ -541,7 +541,7 @@ def convert_geometry(converter_info: ConverterInfo, geo_name: str) -> (Converter
                 'impl': 'Mesh',
                 'prop': {
                     'file': str(json2obj_path).replace('\\', '/'),
-                    'surface': material,
+                    'surface': f'@{material}',
                 }
             }
             geo_obj_dict['prop']['shapes'].append(obj_part)
@@ -633,6 +633,8 @@ def create_main_scene_file(converter_info: ConverterInfo):
 
 
 def disney2luisa(input_project_dir: Path, output_project_dir: Path):
+    start_time = time.perf_counter()
+
     if output_project_dir.exists():
         shutil.rmtree(output_project_dir)
     check_dir(input_project_dir, output_project_dir)
@@ -712,10 +714,10 @@ f   -4   -3   -2   -1
         thread2geo_name[thread_t] = geo_name
     pool.close()
 
-    finished_threads = 0
-    time_last = time.perf_counter()
-    time_delta = 0.0
+    # time_last = time.perf_counter()
+    # time_delta = 0.0
     print_every_seconds = 5.0
+    finished_threads = 0
     thread_count = len(threads)
     while len(threads) > 0:
         threads_next = []
@@ -733,13 +735,27 @@ f   -4   -3   -2   -1
             finished_threads += 1
             log_info(f'Thread {finished_threads}/{thread_count} finished. Geometry {geo_name} dumped')
         threads = threads_next
-        time_now = time.perf_counter()
-        time_delta += time_now - time_last
-        time_last = time_now
-        if time_delta >= print_every_seconds:
-            time_delta = 0.0
-            thread_names = [thread2geo_name[thread_t] for thread_t in threads]
-            log_info(f'Thread {finished_threads}/{thread_count} finished. Unfinished threads: ', thread_names)
+        if len(threads) > 0:
+            break
+
+        thread_names = [thread2geo_name[thread_t] for thread_t in threads]
+        time_consumption = time.perf_counter() - start_time
+        log_info(f'Thread {finished_threads}/{thread_count} finished. '
+                 f'Used time: {time_consumption:.2f}s. '
+                 f'Unfinished threads: ', thread_names)
+        time.sleep(print_every_seconds)
+
+        # time_now = time.perf_counter()
+        # time_delta += time_now - time_last
+        # time_last = time_now
+        # if time_delta >= print_every_seconds:
+        #     time_delta = 0.0
+        #     thread_names = [thread2geo_name[thread_t] for thread_t in threads]
+        #     time_consumption = time.perf_counter() - start_time
+        #     log_info(f'Thread {finished_threads}/{thread_count} finished. '
+        #              f'Used time: {time_consumption:.2f}s. '
+        #              f'Unfinished threads: ', thread_names)
+
     pool.join()
     log_info('All geometries converted')
 
@@ -755,9 +771,12 @@ f   -4   -3   -2   -1
     create_main_scene_file(converter_info)
     log_info('Main scene file created')
 
+    time_consumption = time.perf_counter() - start_time
+    log_info(f'All done in {time_consumption:.2f}s')
+
 
 if __name__ == '__main__':
     if len(argv) == 3:
         disney2luisa(Path(argv[1]).absolute(), Path(argv[2]).absolute())
     else:
-        log_info('Usage: disney2luisa.py <input.json> <output.luisa>')
+        log_info('Usage: python disney2luisa.py <input_dir> <output_dir (must be empty)>')
