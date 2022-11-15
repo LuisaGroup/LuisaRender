@@ -7,6 +7,7 @@ import numpy as np
 import re
 import multiprocessing
 import time
+import random
 
 from colorama import Fore, Style
 
@@ -60,7 +61,16 @@ def log_info(msg, *args, **kwargs):
     print(f'{Fore.GREEN}[INFO]{Style.RESET_ALL} {msg}', *args, **kwargs)
 
 
-def split_obj(path: Path, output_dir: Path) -> dict:
+def log_warning(msg, *args, **kwargs):
+    print(f'{Fore.YELLOW}[WARNING]{Style.RESET_ALL} {msg}', *args, **kwargs)
+
+
+def log_error(msg, *args, **kwargs):
+    print(f'{Fore.RED}[ERROR]{Style.RESET_ALL} {msg}', *args, **kwargs)
+    exit(-1)
+
+
+def split_obj(path: Path, output_dir: Path, materials_dict: dict) -> dict:
 
     class GeometryIndex:
         def __init__(self):
@@ -216,9 +226,18 @@ def split_obj(path: Path, output_dir: Path) -> dict:
                 write_geo_line(f'f {face}\n', file_name, geo_lines)
             elif line.startswith('usemtl '):
                 material = line[7:].strip()
-                file_name = f'geo_{path.stem}_{material}'
-                geo_name2file_name[geo_name] = file_name
-                material = f'mat_{path.stem}_{material}'
+                if material == '':
+                    # FIXME: This is a bug in the original file, we take random material here
+                    material_names = list(materials_dict.keys())
+                    index_m = random.randint(0, len(material_names) - 1)
+                    material = material_names[index_m]
+                    log_warning(f'Empty material name for geometry {geo_name}, using random material {material}')
+                    file_name = f'geo_{material[4:]}'
+                    geo_name2file_name[geo_name] = file_name
+                else:
+                    file_name = f'geo_{path.stem}_{material}'
+                    geo_name2file_name[geo_name] = file_name
+                    material = f'mat_{path.stem}_{material}'
                 move_to_end_of(geo_name, file_name, geo_lines)
                 file2material[file_name] = material
                 write_geo_line(line, file_name, geo_lines)
@@ -288,7 +307,7 @@ def convert_camera(converter_info: ConverterInfo, camera: dict) -> (str, dict):
                 }
             },
             'fov': vfov,
-            'spp': 64,
+            'spp': 1024,
             'film': {
                 'type': 'Film',
                 'impl': 'Color',
@@ -530,7 +549,7 @@ def convert_geometry(converter_info: ConverterInfo, geo_name: str) -> (Converter
     # geometry of itself
     if 'geomObjFile' in geo:
         geo_file = converter_info.input_project_dir / geo['geomObjFile']
-        geo2material = split_obj(geo_file, converter_info.output_geo_dir / geo_name)
+        geo2material = split_obj(geo_file, converter_info.output_geo_dir / geo_name, materials_dict)
         for shape, material in geo2material.items():
             geo_file = converter_info.output_geo_dir / geo_name / (shape + '.obj')
             json2obj_path = os.path.relpath(
@@ -735,7 +754,7 @@ f   -4   -3   -2   -1
             finished_threads += 1
             log_info(f'Thread {finished_threads}/{thread_count} finished. Geometry {geo_name} dumped')
         threads = threads_next
-        if len(threads) > 0:
+        if len(threads) == 0:
             break
 
         thread_names = [thread2geo_name[thread_t] for thread_t in threads]
