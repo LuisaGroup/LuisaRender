@@ -134,7 +134,7 @@ def split_obj(path: Path, output_dir: Path) -> dict:
             write_geo_force(name, geo_lines)
 
     def write_geo_force(name: str, geo_lines: dict):
-        lines = geo_lines[name]
+        lines = geo_lines.get(name, [])
         if len(lines) == 0:
             return
         new_obj_file_path = output_dir / (name + '.obj')
@@ -149,21 +149,24 @@ def split_obj(path: Path, output_dir: Path) -> dict:
         if input_path == output_path:
             return
         if input_path.exists():
-            if os.stat(input_path).st_size <= 64 * 1024 * 1024:
-                with open(input_path, 'r') as f:
-                    lines = f.readlines()
-                geo_lines.setdefault(dst, [])
-                geo_lines[dst].extend(lines)
+            if not output_path.exists():
+                input_path.rename(output_path)
             else:
-                write_geo_force(dst, geo_lines)
-                with open(input_path, 'r') as input_f:
-                    with open(output_path, 'a') as output_f:
-                        while True:
-                            data = input_f.read(65536)
-                            if not data:
-                                break
-                            output_f.write(data)
-            os.remove(input_path)
+                if os.stat(input_path).st_size <= 64 * 1024 * 1024:
+                    with open(input_path, 'r') as f:
+                        lines = f.readlines()
+                    geo_lines.setdefault(dst, [])
+                    geo_lines[dst].extend(lines)
+                else:
+                    write_geo_force(dst, geo_lines)
+                    with open(input_path, 'r') as input_f:
+                        with open(output_path, 'a') as output_f:
+                            while True:
+                                data = input_f.read(65536)
+                                if not data:
+                                    break
+                                output_f.write(data)
+                os.remove(input_path)
         geo_lines.setdefault(dst, [])
         geo_lines[dst].extend(geo_lines[src])
         geo_lines[src] = []
@@ -173,7 +176,7 @@ def split_obj(path: Path, output_dir: Path) -> dict:
         index = GeometryIndex()
         index_next = GeometryIndex()
         index_num = GeometryIndex()
-        geo_index_nums = {}
+        file_index_nums = {}
         geo_lines = {}
         geo_lines.setdefault('default', [])
         file2material = {
@@ -195,6 +198,7 @@ def split_obj(path: Path, output_dir: Path) -> dict:
                 if g_mode:
                     g_mode = False
                     index_num = index_next - index
+                    merge_geo(file_name, index_num, file_index_nums)
                     index = index_next.copy()
                 elif geo_name is not None:
                     g_mode = True
@@ -207,9 +211,8 @@ def split_obj(path: Path, output_dir: Path) -> dict:
                     file_name_new = geo_name2file_name[geo_name]
                     material = file2material[file_name_new]
                     move_to_end_of(file_name, file_name_new, geo_lines)
-                    merge_geo(geo_name, index_num, geo_index_nums)
                     file_name = file_name_new
-                face = reindex(line, index - geo_index_nums[geo_name])
+                face = reindex(line, index - file_index_nums.get(file_name, GeometryIndex()))
                 write_geo_line(f'f {face}\n', file_name, geo_lines)
             elif line.startswith('usemtl '):
                 material = line[7:].strip()
@@ -217,7 +220,6 @@ def split_obj(path: Path, output_dir: Path) -> dict:
                 geo_name2file_name[geo_name] = file_name
                 material = f'mat_{path.stem}_{material}'
                 move_to_end_of(geo_name, file_name, geo_lines)
-                merge_geo(geo_name, index_num, geo_index_nums)
                 file2material[file_name] = material
                 write_geo_line(line, file_name, geo_lines)
             elif line.startswith('v '):
@@ -461,7 +463,7 @@ def convert_material(converter_info: ConverterInfo, material: dict, name: str, g
             'impl': 'Disney',
             'prop': prop
         }
-    name = f'{geo_name}_{name}'
+    name = f'mat_{geo_name}_{name}'
 
     assignment = material['assignment']
     for shape in assignment:
@@ -695,15 +697,15 @@ f   -4   -3   -2   -1
 
     # test_geo_names = ['isBeach', 'isCoastline', 'osOcean', 'isDunesA', 'isDunesB', 'isMountainA', 'isMountainB']
     # test_geo_names = ['isBeach']
-    test_geo_names = ['isIronwoodA1']
+    test_geo_names = ['isGardeniaA']
 
     pool = multiprocessing.Pool()
     threads = []
     thread2geo_name = {}
     for geo_name in geo_names:
-        # DEBUG
-        if geo_name not in test_geo_names:
-            continue
+        # # DEBUG
+        # if geo_name not in test_geo_names:
+        #     continue
         # geometries
         thread_t = pool.apply_async(convert_geometry, args=(converter_info.copy(), geo_name))
         threads.append(thread_t)
