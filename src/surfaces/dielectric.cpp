@@ -279,7 +279,7 @@ luisa::unique_ptr<Surface::Closure> GlassInstance::closure(
     // Kr, Kt
     auto [Kr, Kr_lum] = _kr ? _kr->evaluate_albedo_spectrum(it, swl, time) : Spectrum::Decode::one(swl.dimension());
     auto [Kt, Kt_lum] = _kt ? _kt->evaluate_albedo_spectrum(it, swl, time) : Spectrum::Decode::one(swl.dimension());
-    auto Kr_ratio = ite(Kr_lum == 0.f, 0.f, Kr_lum / Kt_lum);
+    auto Kr_ratio = ite(Kr_lum == 0.f, 0.f, sqrt(Kr_lum) / (sqrt(Kr_lum) + sqrt(Kt_lum)));
 
     // eta
     auto eta = def(1.5f);
@@ -302,7 +302,7 @@ luisa::unique_ptr<Surface::Closure> GlassInstance::closure(
     // fresnel
     return luisa::make_unique<GlassClosure>(
         this, it, swl, time, Kr, Kt, eta_i, eta,
-        dispersive, alpha, Kr_ratio);
+        dispersive, alpha, clamp(Kr_ratio, .05f, .95f));
 }
 
 using NormalMapGlassSurface = NormalMapWrapper<
