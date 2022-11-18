@@ -57,6 +57,23 @@ class ConverterInfo:
             raise Exception('Multiple environment names found')
 
 
+def shape_group():
+    return {
+        'type': 'Shape',
+        'impl': 'Group',
+        'prop': {
+            'shapes': [],
+            'transform': {
+                'type': 'Transform',
+                'impl': 'Matrix',
+                'prop': {
+                    'm': identity_list(4),
+                }
+            }
+        }
+    }
+
+
 def log_info(msg, *args, **kwargs):
     print(f'{Fore.GREEN}[INFO]{Style.RESET_ALL} {msg}', *args, **kwargs)
 
@@ -70,7 +87,56 @@ def log_error(msg, *args, **kwargs):
     exit(-1)
 
 
-def split_obj(path: Path, output_dir: Path, materials_dict: dict) -> dict:
+def get_transform(array: list) -> np.ndarray:
+    return np.array(array, dtype=np.float32).reshape(4, 4).transpose()
+
+
+def identity_list(dim: int) -> list:
+    return [1.0 if i == j else 0.0 for i in range(dim) for j in range(dim)]
+
+
+def flatten_matrix4(m: np.ndarray) -> list:
+    return m.reshape(16).tolist()
+
+
+def normalize(v: np.ndarray) -> np.ndarray:
+    return v / np.linalg.norm(v)
+
+
+def check_dir(input_dir: Path, output_dir: Path, input_force_exist: bool = True):
+    if input_force_exist and not Path.exists(input_dir):
+        log_error(f'Input dir {input_dir} does not exist')
+        raise FileNotFoundError(f'Input dir {input_dir} does not exist')
+    if not Path.exists(output_dir):
+        Path.mkdir(output_dir)
+
+
+def split_obj(file_path_relative: Path, output_dir: Path, materials_dict: dict, geo_name: str, converter_info: ConverterInfo) -> dict:
+    json_name_last = f'file2material_{file_path_relative.stem}.json'
+    file2material_path = output_dir / json_name_last
+    file_path_str = str(file_path_relative).replace('\\', '/')
+    index0 = file_path_str.find('obj/') + 4
+    index1 = file_path_str.find('/', index0)
+    geo_name_real = file_path_str[index0:index1]
+    if geo_name_real != geo_name:
+        file2material_path = (converter_info.output_project_dir / file_path_relative).parent / json_name_last
+        file2material_path_str = str(file2material_path).replace('\\', '/')
+        index0 = file2material_path_str.find('obj/') + 4
+        index1 = file2material_path_str.find('/', index0)
+        file2material_path = Path(file2material_path_str[:index0]) / geo_name_real / Path(file2material_path_str[index1+1:])
+        log_info(f'Multiprocessing waiting start: {file2material_path}, geo_name_real={geo_name_real}, geo_name={geo_name}')
+        geo_name_real_finished_path = converter_info.output_geo_dir / geo_name_real / 'finished.txt'
+        split_tag = False
+        while not file2material_path.exists() or file2material_path.stat().st_size == 0:
+            if geo_name_real_finished_path.exists():
+                split_tag = True
+                break
+            log_info(f'Multiprocessing sleep: {file2material_path}, geo_name_real={geo_name_real}, geo_name={geo_name}')
+            time.sleep(5.0)
+        if not split_tag:
+            log_info(f'Multiprocessing waiting end: {file2material_path}, geo_name_real={geo_name_real}, geo_name={geo_name}')
+            with open(file2material_path, 'r') as f:
+                return json.load(f)
 
     class GeometryIndex:
         def __init__(self):
@@ -181,7 +247,7 @@ def split_obj(path: Path, output_dir: Path, materials_dict: dict) -> dict:
         geo_lines[dst].extend(geo_lines[src])
         geo_lines[src] = []
 
-    with open(path, 'r') as f:
+    with open(converter_info.input_project_dir / file_path_relative, 'r') as f:
         g_mode = False
         index = GeometryIndex()
         index_next = GeometryIndex()
@@ -192,33 +258,33 @@ def split_obj(path: Path, output_dir: Path, materials_dict: dict) -> dict:
         file2material = {
             # 'geo_isBeach_sand': 'mat_isBeach_sand',
         }
-        geo_name = None
+        g_name = None
         file_name = None
         material = None
-        geo_name2file_name = {
+        g_name2file_name = {
             'default': 'default',
             # 'beach_geo': 'geo_isBeach_sand',
         }
 
         for line in f:
             if line.startswith('g '):
-                geo_name_new = line[2:].strip()
-                file_name_new = geo_name_new
+                g_name_new = line[2:].strip()
+                file_name_new = g_name_new
                 material = None
                 if g_mode:
                     g_mode = False
                     index_num = index_next - index
                     merge_geo(file_name, index_num, file_index_nums)
                     index = index_next.copy()
-                elif geo_name is not None:
+                elif g_name is not None:
                     g_mode = True
                     move_to_end_of(file_name, file_name_new, geo_lines)
-                geo_name = geo_name_new
-                file_name = geo_name_new
+                g_name = g_name_new
+                file_name = g_name_new
                 write_geo_line(line, file_name, geo_lines)
             elif line.startswith('f '):
                 if material is None:
-                    file_name_new = geo_name2file_name[geo_name]
+                    file_name_new = g_name2file_name[g_name]
                     material = file2material[file_name_new]
                     move_to_end_of(file_name, file_name_new, geo_lines)
                     file_name = file_name_new
@@ -231,14 +297,14 @@ def split_obj(path: Path, output_dir: Path, materials_dict: dict) -> dict:
                     material_names = list(materials_dict.keys())
                     index_m = random.randint(0, len(material_names) - 1)
                     material = material_names[index_m]
-                    log_warning(f'Empty material name for geometry {geo_name}, using random material {material}')
+                    log_warning(f'Empty material name for geometry {g_name}, using random material {material}')
                     file_name = f'geo_{material[4:]}'
-                    geo_name2file_name[geo_name] = file_name
+                    g_name2file_name[g_name] = file_name
                 else:
-                    file_name = f'geo_{path.stem}_{material}'
-                    geo_name2file_name[geo_name] = file_name
-                    material = f'mat_{path.stem}_{material}'
-                move_to_end_of(geo_name, file_name, geo_lines)
+                    file_name = f'geo_{file_path_relative.stem}_{material}'
+                    g_name2file_name[g_name] = file_name
+                    material = f'mat_{geo_name_real}_{material}'
+                move_to_end_of(g_name, file_name, geo_lines)
                 file2material[file_name] = material
                 write_geo_line(line, file_name, geo_lines)
             elif line.startswith('v '):
@@ -254,30 +320,10 @@ def split_obj(path: Path, output_dir: Path, materials_dict: dict) -> dict:
         for name in geo_lines:
             write_geo_force(name, geo_lines)
 
+    with open(file2material_path, 'w') as f:
+        json.dump(file2material, f, indent=2)
+
     return file2material
-
-
-def get_transform(array: list) -> np.ndarray:
-    return np.array(array, dtype=np.float32).reshape(4, 4).transpose()
-
-
-def identity_list(dim: int) -> list:
-    return [1.0 if i == j else 0.0 for i in range(dim) for j in range(dim)]
-
-
-def flatten_matrix4(m: np.ndarray) -> list:
-    return m.reshape(16).tolist()
-
-
-def normalize(v: np.ndarray) -> np.ndarray:
-    return v / np.linalg.norm(v)
-
-
-def check_dir(input_path: Path, output_path: Path):
-    if not Path.exists(input_path):
-        raise FileNotFoundError(f'Path {input_path} not found')
-    if not Path.exists(output_path):
-        Path.mkdir(output_path)
 
 
 def convert_camera(converter_info: ConverterInfo, camera: dict) -> (str, dict):
@@ -307,14 +353,14 @@ def convert_camera(converter_info: ConverterInfo, camera: dict) -> (str, dict):
                 }
             },
             'fov': vfov,
-            'spp': 1024,
+            'spp': 64,
             'film': {
                 'type': 'Film',
                 'impl': 'Color',
                 'prop': {
                     'resolution': [
                         width,
-                        height
+                        height,
                     ],
                     'exposure': 0,
                 }
@@ -415,7 +461,8 @@ def convert_light(converter_info: ConverterInfo, light: dict, name: str) -> (str
             }
         }
         if converter_info.environment_name is not None:
-            raise ValueError(f'Only one environment is supported, but {converter_info.environment_name} and {name} are found')
+            raise ValueError(
+                f'Only one environment is supported, but {converter_info.environment_name} and {name} are found')
         converter_info.environment_name = name
     else:
         log_info(f'Light type {light["type"]} not supported')
@@ -511,6 +558,9 @@ def convert_geometry(converter_info: ConverterInfo, geo_name: str) -> (Converter
 
     check_dir(converter_info.input_json_dir / geo_name, converter_info.output_json_dir / geo_name)
     check_dir(converter_info.input_geo_dir / geo_name, converter_info.output_geo_dir / geo_name)
+    input_archive_geo_dir = converter_info.input_geo_dir / geo_name / 'archives'
+    output_archive_geo_dir = converter_info.output_geo_dir / geo_name / 'archives'
+    check_dir(input_archive_geo_dir, output_archive_geo_dir, input_force_exist=False)
 
     with open(converter_info.input_json_dir / geo_name / f'{geo_name}.json', 'r') as f:
         geo = json.load(f)
@@ -524,38 +574,34 @@ def convert_geometry(converter_info: ConverterInfo, geo_name: str) -> (Converter
         materials = json.load(f)
     materials_dict = {}
     for name, material in materials.items():
-        name, material_dict = convert_material(converter_info=converter_info, material=material, name=name, geo_name=geo_name)
+        name, material_dict = convert_material(converter_info=converter_info, material=material, name=name,
+                                               geo_name=geo_name)
         materials_dict[name] = material_dict
     material_file = converter_info.output_project_dir / geo['matFile']
     with open(material_file, 'w') as f:
         json.dump(materials_dict, f, indent=2)
     material_file = os.path.relpath(material_file, converter_info.output_json_dir / geo_name)
 
-    geo_obj_dict = {
-        'type': 'Shape',
-        'impl': 'Group',
-        'prop': {
-            'shapes': [],
-            'transform': {
-                'type': 'Transform',
-                'impl': 'Matrix',
-                'prop': {
-                    'm': [],
-                }
-            }
-        }
+    geo_dict = {
+        'import': [
+            str(material_file).replace('\\', '/'),
+        ],
     }
 
-    # geometry of itself
-    if 'geomObjFile' in geo:
-        geo_file = converter_info.input_project_dir / geo['geomObjFile']
-        geo2material = split_obj(geo_file, converter_info.output_geo_dir / geo_name, materials_dict)
+    geo_obj_dict = shape_group()
+    main_cache = {
+        'geomObjFile': {},
+        'instancedPrimitiveJsonFiles': {},
+    }
+
+    def write_obj_json(geo2material: dict, output_json_path: Path, output_geo_dir: Path) -> (list, dict):
+        imports = []
+        shapes = []
+        json_dict = {}
         for shape, material in geo2material.items():
-            geo_file = converter_info.output_geo_dir / geo_name / (shape + '.obj')
-            json2obj_path = os.path.relpath(
-                geo_file,
-                converter_info.output_json_dir / geo_name)
-            obj_part = {
+            geo_file = output_geo_dir / f'{shape}.obj'
+            json2obj_path = os.path.relpath(geo_file, output_json_path.parent)
+            obj_dict = {
                 'type': 'Shape',
                 'impl': 'Mesh',
                 'prop': {
@@ -563,16 +609,78 @@ def convert_geometry(converter_info: ConverterInfo, geo_name: str) -> (Converter
                     'surface': f'@{material}',
                 }
             }
-            geo_obj_dict['prop']['shapes'].append(obj_part)
+            shapes.append(f'@{shape}')
+            json_dict[shape] = obj_dict
+        imports.append(output_json_path.absolute())
+        with open(output_json_path, 'w') as f:
+            json.dump(json_dict, f, indent=2)
+        return imports, shapes
+
+    # geometry of itself
+    geo_obj_file = geo.get('geomObjFile', None)
+    output_dir = converter_info.output_geo_dir / geo_name
+    if geo_obj_file is not None:
+        assert output_dir == (converter_info.output_project_dir / geo_obj_file).parent
+        geo2material = split_obj(file_path_relative=Path(geo_obj_file), output_dir=output_dir, materials_dict=materials_dict,
+                                 geo_name=geo_name, converter_info=converter_info)
+        objs = write_obj_json(geo2material=geo2material,
+                              output_json_path=converter_info.output_json_dir / geo_name / f'main_{Path(geo_obj_file).stem}.json',
+                              output_geo_dir=output_dir)
+        for import_absolute in objs[0]:
+            import_relative = os.path.relpath(import_absolute, converter_info.output_json_dir / geo_name)
+            geo_dict['import'].append(str(import_relative).replace('\\', '/'))
+        geo_obj_dict['prop']['shapes'].extend(objs[1])
+        main_cache['geomObjFile']['import'] = objs[0]
+        main_cache['geomObjFile']['shapes'] = objs[1]
 
     # primitives
-    # TODO
+    primitives = geo.get('instancedPrimitiveJsonFiles', None)
+    output_dir = converter_info.output_geo_dir / geo_name / 'archives'
+    if primitives is not None:
+        for name_p, primitive in primitives.items():
+            if primitive['type'] != 'archive':
+                log_warning(f'Primitive {name_p} type "{primitive["type"]}" not supported, passed')
+                continue
 
-    geo_dict = {
-        'import': [
-            str(material_file).replace('\\', '/'),
-        ],
-    }
+            main_cache['instancedPrimitiveJsonFiles'][name_p] = {
+                'import': [],
+                'shapes': [],
+            }
+            primitive_name = f'geo_{geo_name}_{name_p}'  # geo_isBeach_xgStones   # TODO
+            primitive_dict = shape_group()
+
+            instanced_primitive = json.load(open(converter_info.input_project_dir / primitive['jsonFile'], 'r'))
+            for geo_obj_file, copies in instanced_primitive.items():
+                geo2material = split_obj(file_path_relative=Path(geo_obj_file), output_dir=output_dir,
+                                         materials_dict=materials_dict, geo_name=geo_name,
+                                         converter_info=converter_info)
+                objs = write_obj_json(geo2material=geo2material,
+                                      output_json_path=converter_info.output_json_dir / geo_name / f'archive_{Path(geo_obj_file).stem}.json',
+                                      output_geo_dir=output_dir)
+                for import_absolute in objs[0]:
+                    import_relative = os.path.relpath(import_absolute, converter_info.output_json_dir / geo_name)
+                    geo_dict['import'].append(str(import_relative).replace('\\', '/'))
+
+                primitive_part_name = f'geo_{geo_name}_{name_p}_{Path(geo_obj_file).stem}'  # TODO
+                # geo_isBeach_xgStones_xgStones_archiveRock0006_geo
+                geo_dict[primitive_part_name] = {
+                    'type': 'Shape',
+                    'impl': 'Group',
+                    'prop': {
+                        'shapes': objs[1],
+                    }
+                }
+                for copy_name, copy_transform in copies.items():
+                    copy_group = shape_group()
+                    copy_group['prop']['shapes'] = [f'@{primitive_part_name}']
+                    copy_group['prop']['transform']['prop']['m'] = flatten_matrix4(get_transform(copy_transform))
+                    primitive_dict['prop']['shapes'].append(copy_group)
+
+                main_cache['instancedPrimitiveJsonFiles'][name_p]['import'].extend(objs[0])
+                main_cache['instancedPrimitiveJsonFiles'][name_p]['shapes'].extend(objs[1])
+
+            geo_dict[primitive_name] = primitive_dict
+            geo_obj_dict['prop']['shapes'].append(f'@{primitive_name}')
 
     # instanced copy
     instanced_copies = geo.get('instancedCopies', {}).copy()
@@ -582,6 +690,11 @@ def convert_geometry(converter_info: ConverterInfo, geo_name: str) -> (Converter
     }
     instanced_copy_names = list(instanced_copies.keys())
     instanced_copy_transforms = [instanced_copies[copy_name]['transformMatrix'] for copy_name in instanced_copy_names]
+
+    # variants
+    variants = geo.get('variants', {})
+    # TODO
+
     for copy_name, instanced_copy_transform in zip(instanced_copy_names, instanced_copy_transforms):
         assert copy_name == instanced_copies[copy_name]['name']
         instanced_copy_transform = flatten_matrix4(get_transform(instanced_copy_transform))
@@ -625,7 +738,8 @@ def create_main_scene_file(converter_info: ConverterInfo):
 
     geo_names = [x.name for x in (converter_info.output_project_dir / 'json').iterdir()
                  if x.is_dir() and x.name != 'cameras' and x.name != 'lights']
-    for d in [converter_info.output_project_dir / 'json' / 'cameras', converter_info.output_project_dir / 'json' / 'lights']:
+    for d in [converter_info.output_project_dir / 'json' / 'cameras',
+              converter_info.output_project_dir / 'json' / 'lights']:
         for f in d.iterdir():
             if f.suffix == '.json':
                 import_path = str(f.relative_to(converter_info.output_project_dir)).replace('\\', '/')
@@ -662,7 +776,8 @@ def disney2luisa(input_project_dir: Path, output_project_dir: Path):
     output_json_dir = output_project_dir / 'json'
     input_geo_dir = input_project_dir / 'obj'
     output_geo_dir = output_project_dir / 'obj'
-    converter_info = ConverterInfo(input_project_dir, output_project_dir, input_json_dir, output_json_dir, input_geo_dir, output_geo_dir)
+    converter_info = ConverterInfo(input_project_dir, output_project_dir, input_json_dir, output_json_dir,
+                                   input_geo_dir, output_geo_dir)
 
     check_dir(converter_info.input_geo_dir, converter_info.output_geo_dir)
     path_in = converter_info.input_json_dir
@@ -711,6 +826,10 @@ f   -4   -3   -2   -1
             json.dump(lights_dict, f, indent=2)
     log_info('All lights converted')
 
+    # textures
+    copy_texture(input_project_dir / 'textures', converter_info.output_project_dir / 'textures')
+    log_info('Textures copied')
+
     # geometries
     for geo_name in geo_names:
         converter_info.material_map[geo_name] = {}
@@ -718,7 +837,7 @@ f   -4   -3   -2   -1
 
     # test_geo_names = ['isBeach', 'isCoastline', 'osOcean', 'isDunesA', 'isDunesB', 'isMountainA', 'isMountainB']
     # test_geo_names = ['isBeach']
-    test_geo_names = ['isGardeniaA']
+    test_geo_names = ['isDunesA']
 
     pool = multiprocessing.Pool()
     threads = []
@@ -728,6 +847,9 @@ f   -4   -3   -2   -1
         # if geo_name not in test_geo_names:
         #     continue
         # geometries
+        path_in = converter_info.input_json_dir / geo_name
+        path_out = converter_info.output_json_dir / geo_name
+        check_dir(path_in, path_out)
         thread_t = pool.apply_async(convert_geometry, args=(converter_info.copy(), geo_name))
         threads.append(thread_t)
         thread2geo_name[thread_t] = geo_name
@@ -746,16 +868,22 @@ f   -4   -3   -2   -1
                 continue
             converter_info_t, geo_name, geo_dict = thread_t.get()
             converter_info.merge(converter_info_t)
-            path_in = converter_info.input_json_dir / geo_name
-            path_out = converter_info.output_json_dir / geo_name
-            check_dir(path_in, path_out)
             with open(path_out / f'{geo_name}.json', 'w') as f:
                 json.dump(geo_dict, f, indent=2)
             finished_threads += 1
+            with open(converter_info.output_geo_dir / geo_name / 'finished.txt', 'w') as f:
+                pass
             log_info(f'Thread {finished_threads}/{thread_count} finished. Geometry {geo_name} dumped')
         threads = threads_next
         if len(threads) == 0:
             break
+
+        # materials for DEBUG
+        json.dump(converter_info.re_shape2material, open(converter_info.output_project_dir / 're_shape2material.json', 'w'),
+                  indent=2)
+        json.dump(converter_info.material_map, open(converter_info.output_project_dir / 'material_map.json', 'w'), indent=2)
+        # main scene for DEBUG
+        create_main_scene_file(converter_info)
 
         thread_names = [thread2geo_name[thread_t] for thread_t in threads]
         time_consumption = time.perf_counter() - start_time
@@ -782,10 +910,6 @@ f   -4   -3   -2   -1
     json.dump(converter_info.re_shape2material, open(converter_info.output_project_dir / 're_shape2material.json', 'w'), indent=2)
     json.dump(converter_info.material_map, open(converter_info.output_project_dir / 'material_map.json', 'w'), indent=2)
     log_info('Materials for DEBUG dumped')
-
-    # textures
-    copy_texture(input_project_dir / 'textures', converter_info.output_project_dir / 'textures')
-    log_info('Textures copied')
 
     create_main_scene_file(converter_info)
     log_info('Main scene file created')
