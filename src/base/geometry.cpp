@@ -245,9 +245,9 @@ ShadingAttribute Geometry::shading_point(const Var<Shape::Handle> &instance, con
     auto c = cross(p1 - p0, p2 - p0);
     auto area = .5f * length(c);
     auto ng = normalize(c);
-    auto uv0 = ite(instance->has_uv(), v0->uv(), make_float2());
-    auto uv1 = ite(instance->has_uv(), v1->uv(), make_float2());
-    auto uv2 = ite(instance->has_uv(), v2->uv(), make_float2());
+    auto uv0 = ite(instance->has_uv(), v0->uv(), make_float2(0.f, 0.f));
+    auto uv1 = ite(instance->has_uv(), v1->uv(), make_float2(1.f, 0.f));
+    auto uv2 = ite(instance->has_uv(), v2->uv(), make_float2(0.f, 1.f));
     auto uv = bary.x * uv0 + bary.y * uv1 + bary.z * uv2;
     auto tangent = _compute_tangent(p0, p1, p2, uv0, uv1, uv2);
     auto n0 = ite(instance->has_normal(), normalize(shape_to_world_normal * v0->normal()), ng);

@@ -65,6 +65,7 @@ public:
                luisa::span<const Shape *const> shapes,
                float init_time, AccelUsageHint hint) noexcept;
     bool update(CommandBuffer &command_buffer, float time) noexcept;
+    [[nodiscard]] auto instances() const noexcept { return luisa::span{_instances}; }
     [[nodiscard]] auto light_instances() const noexcept { return luisa::span{_instanced_lights}; }
     [[nodiscard]] Var<Hit> trace_closest(const Var<Ray> &ray) const noexcept;
     [[nodiscard]] Var<bool> trace_any(const Var<Ray> &ray) const noexcept;

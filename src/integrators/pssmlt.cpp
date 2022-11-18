@@ -5,7 +5,6 @@
 #include <util/u64.h>
 #include <util/rng.h>
 #include <util/sampling.h>
-#include <util/colorspace.h>
 #include <util/progress_bar.h>
 #include <util/counter_buffer.h>
 #include <base/pipeline.h>
@@ -337,8 +336,8 @@ private:
     }
 
     [[nodiscard]] auto Li(PSSMLTSampler &sampler,
+                          UInt &rng_state,
                           const Camera::Instance *camera,
-                          const SampledWavelengths &swl,
                           Expr<float> time) const noexcept {
 
         auto res = make_float2(camera->film()->node()->resolution());
@@ -348,6 +347,7 @@ private:
         auto u_lens = camera->node()->requires_lens_sampling() ? sampler.generate_2d() : make_float2(.5f);
         auto [camera_ray, _, camera_weight] = camera->generate_ray(pixel_id, time, u_filter, u_lens);
         auto spectrum = pipeline().spectrum();
+        auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : lcg(rng_state));
         SampledSpectrum beta{swl.dimension(), camera_weight};
         SampledSpectrum Li{swl.dimension()};
         auto is_visible_light = def(false);
@@ -469,11 +469,9 @@ private:
         auto bootstrap = pipeline().device().compile<1u>([&](UInt bootsrape_offset, Float time) noexcept {
             auto chain_id = dispatch_x();
             auto bootstrap_id = chain_id + bootsrape_offset;
-            auto u_wavelength = uniform_uint_to_float(
-                xxhash32(make_uint2(bootstrap_id, 0xdeadbeefu)));
-            auto swl = pipeline().spectrum()->sample(u_wavelength);
+            auto seed = xxhash32(make_uint2(bootstrap_id, 0xdeadbeefu));
             _sampler->create(chain_id, bootstrap_id);
-            auto [_, L, is_light] = Li(*_sampler, camera, swl, time);
+            auto [_, L, is_light] = Li(*_sampler, seed, camera, time);
             bootstrap_weights.write(bootstrap_id, _s(L, is_light));
         });
         LUISA_INFO("PSSMLT: running bootstrap kernel.");
@@ -544,9 +542,7 @@ private:
                                                         u_bootstrap);
             _sampler->create(chain_id, bootstrap_id);
             auto seed = xxhash32(make_uint2(bootstrap_id, 0xdeadbeefu));
-            auto u_wavelength = uniform_uint_to_float(seed);
-            auto swl = pipeline().spectrum()->sample(u_wavelength);
-            auto [p, L, is_light] = Li(*_sampler, camera, swl, time);
+            auto [p, L, is_light] = Li(*_sampler, seed, camera, time);
             position_buffer.write(chain_id, p);
             radiance_and_contribution_buffer.write(
                 chain_id, make_float4(L * shutter_weight, _s(L, is_light)));
@@ -561,13 +557,9 @@ private:
             auto chain_id = dispatch_id().x;
             auto u_wavelength = def(0.f);
             auto seed = rng_state_buffer.read(chain_id);
-            if (!pipeline().spectrum()->node()->is_fixed()) {
-                u_wavelength = lcg(seed);
-            }
-            auto swl = pipeline().spectrum()->sample(u_wavelength);
             _sampler->load(chain_id);
             _sampler->start_iteration();
-            auto proposed = Li(*_sampler, camera, swl, time);
+            auto proposed = Li(*_sampler, seed, camera, time);
             auto p_new = std::get<0u>(proposed);
             auto L_new = std::get<1u>(proposed);
             auto y_new = _s(L_new, std::get<2u>(proposed));
