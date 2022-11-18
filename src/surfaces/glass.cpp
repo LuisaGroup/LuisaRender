@@ -196,13 +196,13 @@ private:
                                       _it.shape()->shadow_terminator_factor() > 0.f,
                                   1.f, 0.f);
             pdf *= ratio;
-            //            f *= same_sided;
+            f *= same_sided;
         }
         $else {// Transmission
             f = _trans->sample(wo_local, &wi_local, u, &pdf, mode);
             wi = _it.shading().local_to_world(wi_local);
             auto different_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) < 0.0f, 1.f, 0.f);
-            //            f *= different_sided;
+            f *= different_sided;
             pdf *= (1.f - ratio);
             event = ite(cos_theta(wo_local) > 0.f, Surface::event_enter, Surface::event_exit);
         };
