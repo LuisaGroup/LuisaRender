@@ -156,6 +156,13 @@ public:
         return TrowbridgeReitzDistribution::alpha_to_roughness(_distribution->alpha());
     }
 
+    [[nodiscard]] auto _refl_prob(Expr<float3> wo) const noexcept {
+        auto F = _fresnel->evaluate(cos_theta(wo))[0u];
+        auto r = _kr_ratio * F;
+        auto t = (1.f - _kr_ratio) * (1.f - F);
+        return ite(r == 0.f, 0.f, r / (r + t));
+    }
+
 private:
     [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
                                                 TransportMode mode) const noexcept override {
@@ -163,7 +170,7 @@ private:
         auto wi_local = _it.shading().world_to_local(wi);
         SampledSpectrum f{_swl.dimension()};
         auto pdf = def(0.f);
-        auto ratio = _kr_ratio * _fresnel->evaluate(cos_theta(wo_local))[0u];
+        auto ratio = _refl_prob(wo_local);
         $if(same_hemisphere(wo_local, wi_local)) {
             auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f |
                                       _it.shape()->shadow_terminator_factor() > 0.f,
@@ -187,7 +194,7 @@ private:
         auto f = SampledSpectrum{_swl.dimension()};
         auto wi_local = def(make_float3(0.0f, 0.0f, 1.0f));
         auto event = def(Surface::event_reflect);
-        auto ratio = _kr_ratio * _fresnel->evaluate(cos_theta(wo_local))[0u];
+        auto ratio = _refl_prob(wo_local);
         auto wi = def(make_float3());
         $if(u_lobe < ratio) {// Reflection
             f = _refl->sample(wo_local, &wi_local, u, &pdf, mode);
@@ -279,7 +286,7 @@ luisa::unique_ptr<Surface::Closure> GlassInstance::closure(
     // Kr, Kt
     auto [Kr, Kr_lum] = _kr ? _kr->evaluate_albedo_spectrum(it, swl, time) : Spectrum::Decode::one(swl.dimension());
     auto [Kt, Kt_lum] = _kt ? _kt->evaluate_albedo_spectrum(it, swl, time) : Spectrum::Decode::one(swl.dimension());
-    auto Kr_ratio = ite(Kr_lum == 0.f, 0.f, Kr_lum / Kt_lum);
+    auto Kr_ratio = ite(Kr_lum == 0.f, 0.f, Kr_lum / (Kr_lum + Kt_lum));
 
     // eta
     auto eta = def(1.5f);
