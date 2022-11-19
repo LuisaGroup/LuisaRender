@@ -50,12 +50,10 @@ public:
             importer.SetPropertyInteger(
                 AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_LINE | aiPrimitiveType_POINT);
             importer.SetPropertyFloat(AI_CONFIG_PP_GSN_MAX_SMOOTHING_ANGLE, 45.f);
-            auto import_flags = aiProcess_JoinIdenticalVertices | aiProcess_RemoveComponent |
-                                aiProcess_GenUVCoords | aiProcess_OptimizeMeshes |
-                                aiProcess_TransformUVCoords | aiProcess_RemoveRedundantMaterials |
-                                aiProcess_SortByPType | aiProcess_ValidateDataStructure |
-                                aiProcess_ImproveCacheLocality | aiProcess_PreTransformVertices |
-                                aiProcess_FindInvalidData;
+            auto import_flags = aiProcess_RemoveComponent | aiProcess_GenUVCoords |
+                                aiProcess_TransformUVCoords | aiProcess_SortByPType |
+                                aiProcess_ValidateDataStructure | aiProcess_ImproveCacheLocality |
+                                aiProcess_PreTransformVertices | aiProcess_FindInvalidData;
             if (!flip_uv) { import_flags |= aiProcess_FlipUVs; }
             import_flags |= drop_normal ? aiProcess_DropNormals : aiProcess_GenSmoothNormals;
             auto remove_flags = aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS |
@@ -64,7 +62,6 @@ public:
                                 aiComponent_TEXTURES | aiComponent_TANGENTS_AND_BITANGENTS;
             importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, static_cast<int>(remove_flags));
             if (subdiv_level == 0) { import_flags |= aiProcess_Triangulate; }
-            importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, static_cast<int>(remove_flags));
             auto model = importer.ReadFile(path_string.c_str(), import_flags);
             if (model == nullptr || (model->mFlags & AI_SCENE_FLAGS_INCOMPLETE) ||
                 model->mRootNode == nullptr || model->mRootNode->mNumMeshes == 0) [[unlikely]] {
