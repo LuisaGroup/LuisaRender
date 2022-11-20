@@ -53,7 +53,7 @@ public:
                                 aiProcess_ValidateDataStructure | aiProcess_ImproveCacheLocality |
                                 aiProcess_PreTransformVertices | aiProcess_FindInvalidData;
             if (!flip_uv) { import_flags |= aiProcess_FlipUVs; }
-            import_flags |= drop_normal ? aiProcess_DropNormals : aiProcess_GenSmoothNormals;
+//            import_flags |= drop_normal ? aiProcess_DropNormals : aiProcess_GenSmoothNormals;
             auto remove_flags = aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS |
                                 aiComponent_CAMERAS | aiComponent_COLORS |
                                 aiComponent_LIGHTS | aiComponent_MATERIALS |

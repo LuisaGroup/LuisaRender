@@ -178,7 +178,10 @@ public:
     OpacitySurfaceWrapper(Scene *scene, const SceneNodeDesc *desc) noexcept
         : BaseSurface{scene, desc},
           _opacity{[](auto scene, auto desc) noexcept {
-              return scene->load_texture(desc->property_node_or_default("alpha"));
+              return scene->load_texture(desc->property_node_or_default(
+                  "alpha", lazy_construct([desc]{
+                      return desc->property_node_or_default("opacity");
+                  })));
           }(scene, desc)} {}
 
 protected:

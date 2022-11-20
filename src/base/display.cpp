@@ -24,7 +24,7 @@ void Display::reset(CommandBuffer &command_buffer, const Film::Instance *film) n
     _converted = device.create_image<float>(PixelStorage::BYTE4, resolution);
     _convert = device.compile_async<1>([film, w = resolution.x, this](UInt tone_mapper, Float exposure) noexcept {
         auto p = make_uint2(dispatch_x() % w, dispatch_x() / w);
-        auto x = film->read(p).average * pow(2.f, exposure);
+        auto x = clamp(film->read(p).average * pow(2.f, exposure), 0.f, 1e3f);
         $switch(tone_mapper) {
             $case(luisa::to_underlying(ToneMapper::NONE)){/* do nothing */};
             $case(luisa::to_underlying(ToneMapper::ACES)) {
