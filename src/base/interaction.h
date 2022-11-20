@@ -87,19 +87,11 @@ public:
     [[nodiscard]] const auto &shape() const noexcept { return _shape; }
     [[nodiscard]] auto back_facing() const noexcept { return _back_facing; }
     [[nodiscard]] auto p_robust(Expr<float3> w) const noexcept {
-        auto offset_factor = clamp(_shape->intersection_offset_factor() * 15.f + 1.f, 1.f, 16.f);
-        //        return ite(dot(_ng, w) < 0.f,
-        //                   offset_ray_origin(_pg, -_ng),
-        //                   offset_ray_origin(_ps, _ng));
-        // switched to the following method to match Mitsuba 3
-        // Float mag = (1.f + dr::max(dr::abs(p))) * math::RayEpsilon<Float>;
-        //        mag = dr::detach(dr::mulsign(mag, dr::dot(n, d)));
-        //        return dr::fmadd(mag, dr::detach(n), p);
-        auto max_comp = [](auto v) noexcept { return max(max(v.x, v.y), v.z); };
-        constexpr auto ray_eps = 0x1p-24f * 1.5e3f;
+        auto offset_factor = clamp(_shape->intersection_offset_factor() * 255.f + 1.f, 1.f, 256.f);
         auto front = dot(_ng, w) > 0.f;
-        auto mag = (1.f + max_comp(abs(_pg))) * ray_eps * offset_factor * ite(front, 1.f, -1.f);
-        return fma(mag, _ng, ite(front, _ps, _pg));
+        auto p = ite(front, _ps, _pg);
+        auto n = ite(front, _ng, -_ng);
+        return offset_ray_origin(p, offset_factor * n);
     }
     [[nodiscard]] auto spawn_ray(Expr<float3> wi, Expr<float> t_max = std::numeric_limits<float>::max()) const noexcept {
         return make_ray(p_robust(wi), wi, 0.f, t_max);
