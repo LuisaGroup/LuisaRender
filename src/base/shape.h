@@ -64,7 +64,7 @@ private:
 public:
     ShadowTerminatorShapeWrapper(Scene *scene, const SceneNodeDesc *desc) noexcept
         : BaseShape{scene, desc},
-          _shadow_terminator{std::clamp(desc->property_float_or_default("shadow_terminator", 0.f), 0.f, 1.f)} {}
+          _shadow_terminator{std::clamp(desc->property_float_or_default("shadow_terminator", 1.f), 0.f, 1.f)} {}
     [[nodiscard]] float shadow_terminator_factor() const noexcept override { return _shadow_terminator; }
 };
 

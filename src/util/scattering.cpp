@@ -113,7 +113,7 @@ Float MicrofacetDistribution::pdf(Expr<float3> wo, Expr<float3> wh) const noexce
 }
 
 MicrofacetDistribution::MicrofacetDistribution(Expr<float2> alpha) noexcept
-    : _alpha{compute::max(alpha, 1e-3f)} {}
+    : _alpha{compute::max(alpha, 1e-4f)} {}
 
 MicrofacetDistribution::Gradient MicrofacetDistribution::grad_G1(Expr<float3> w) const noexcept {
     auto d_alpha = -grad_Lambda(w).dAlpha / sqr(1.0f + Lambda(w));
