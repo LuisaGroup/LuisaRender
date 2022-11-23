@@ -51,11 +51,6 @@ public:
     [[nodiscard]] virtual Float3 sample_wh(Expr<float3> wo, Expr<float2> u) const noexcept = 0;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wh) const noexcept;
     [[nodiscard]] auto alpha() const noexcept { return _alpha; }
-
-    [[nodiscard]] virtual Gradient grad_G1(Expr<float3> w) const noexcept;
-    [[nodiscard]] virtual Gradient grad_G(Expr<float3> wo, Expr<float3> wi) const noexcept;
-    [[nodiscard]] virtual Gradient grad_D(Expr<float3> wh) const noexcept = 0;
-    [[nodiscard]] virtual Gradient grad_Lambda(Expr<float3> w) const noexcept = 0;
 };
 
 struct TrowbridgeReitzDistribution : public MicrofacetDistribution {
@@ -67,16 +62,15 @@ struct TrowbridgeReitzDistribution : public MicrofacetDistribution {
     [[nodiscard]] static Float2 roughness_to_alpha(Expr<float2> roughness) noexcept;
     [[nodiscard]] static Float alpha_to_roughness(Expr<float> alpha) noexcept;
     [[nodiscard]] static Float2 alpha_to_roughness(Expr<float2> alpha) noexcept;
-
-    [[nodiscard]] Gradient grad_D(Expr<float3> wh) const noexcept override;
-    [[nodiscard]] Gradient grad_Lambda(Expr<float3> w) const noexcept override;
-    [[nodiscard]] static Float2 grad_alpha_roughness(Expr<float2> roughness) noexcept;
 };
 
-[[nodiscard]] Float fresnel_dielectric(
-    Float cosThetaI, Float etaI, Float etaT) noexcept;
-[[nodiscard]] SampledSpectrum fresnel_conductor(
-    Float cosThetaI, Float etaI, const SampledSpectrum &etaT, const SampledSpectrum &k) noexcept;
+[[nodiscard]] Float fresnel_dielectric(Float cosThetaI, Float etaI, Float etaT) noexcept;
+[[nodiscard]] SampledSpectrum fresnel_conductor(Float cosThetaI, Float etaI,
+                                                const SampledSpectrum &etaT,
+                                                const SampledSpectrum &k) noexcept;
+
+// approx. integration of Fr(cosTheta) * cosTheta
+[[nodiscard]] Float fresnel_dielectric_integral(Float eta) noexcept;
 
 struct Fresnel {
     virtual ~Fresnel() noexcept = default;

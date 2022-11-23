@@ -448,13 +448,13 @@ private:
 luisa::unique_ptr<Surface::Closure> LayeredSurfaceInstance::closure(
     const Interaction &it, const SampledWavelengths &swl,
     Expr<float> eta_i, Expr<float> time) const noexcept {
-    auto thickness = _thickness == nullptr ? .1f : max(_thickness->evaluate(it, swl, time).x, std::numeric_limits<float>::min());
-    auto g = _g == nullptr ? 0.f : _g->evaluate(it, swl, time).x;
+    auto thickness = _thickness ? max(_thickness->evaluate(it, swl, time).x, std::numeric_limits<float>::min()) : 1e-2f;
+    auto g = _g ? _g->evaluate(it, swl, time).x : 0.f;
     auto [albedo, _] = _albedo ? _albedo->evaluate_albedo_spectrum(it, swl, time) : Spectrum::Decode::one(swl.dimension());
     auto max_depth = node<LayeredSurface>()->max_depth();
     auto samples = node<LayeredSurface>()->samples();
-    auto top = _top == nullptr ? nullptr : _top->closure(it, swl, eta_i, time);
-    auto bottom = _bottom == nullptr ? nullptr : _bottom->closure(it, swl, top->eta().value_or(1.f), time);// FIXME: eta_i is wrong
+    auto top = _top->closure(it, swl, eta_i, time);
+    auto bottom = _bottom->closure(it, swl, top->eta().value_or(1.f), time);// FIXME: eta_i is wrong
     return luisa::make_unique<LayeredSurfaceClosure>(
         this, it, swl, time, thickness, g, albedo, max_depth,
         samples, std::move(top), std::move(bottom));

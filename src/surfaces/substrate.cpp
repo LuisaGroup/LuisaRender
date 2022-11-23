@@ -75,17 +75,15 @@ class SubstrateClosure : public Surface::Closure {
 private:
     luisa::unique_ptr<TrowbridgeReitzDistribution> _distribution;
     luisa::unique_ptr<FresnelBlend> _blend;
-    Float _eta_i;
 
 public:
-    SubstrateClosure(
-        const Surface::Instance *instance,
-        const Interaction &it, const SampledWavelengths &swl, Expr<float> time, Expr<float> eta_i,
-        const SampledSpectrum &Kd, const SampledSpectrum &Ks, Expr<float2> alpha, Expr<float> Kd_ratio) noexcept
+    SubstrateClosure(const Surface::Instance *instance, const Interaction &it,
+                     const SampledWavelengths &swl, Expr<float> time,
+                     const SampledSpectrum &Kd, const SampledSpectrum &Ks,
+                     Expr<float2> alpha, Expr<float> Kd_ratio) noexcept
         : Surface::Closure{instance, it, swl, time},
           _distribution{luisa::make_unique<TrowbridgeReitzDistribution>(alpha)},
-          _blend{luisa::make_unique<FresnelBlend>(Kd, Ks, _distribution.get(), Kd_ratio)},
-          _eta_i{eta_i} {}
+          _blend{luisa::make_unique<FresnelBlend>(Kd, Ks, _distribution.get(), Kd_ratio)} {}
 
 private:
     [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _blend->albedo(); }
@@ -140,7 +138,7 @@ luisa::unique_ptr<Surface::Closure> SubstrateInstance::closure(
     }
     auto Kd_ratio = Kd_lum / max(Kd_lum + Ks_lum, 1e-5f);
     return luisa::make_unique<SubstrateClosure>(
-        this, it, swl, time, eta_i, Kd, Ks, alpha, Kd_ratio);
+        this, it, swl, time, Kd, Ks, alpha, Kd_ratio);
 }
 
 using NormalMapOpacitySubstrateSurface = NormalMapWrapper<OpacitySurfaceWrapper<

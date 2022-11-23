@@ -379,13 +379,6 @@ public:
 struct DisneyMicrofacetDistribution final : public TrowbridgeReitzDistribution {
     explicit DisneyMicrofacetDistribution(Expr<float2> alpha) noexcept
         : TrowbridgeReitzDistribution{alpha} {}
-    [[nodiscard]] Float G(Expr<float3> wo, Expr<float3> wi) const noexcept override {
-        return G1(wo) * G1(wi);
-    }
-    [[nodiscard]] Gradient grad_G(Expr<float3> wo, Expr<float3> wi) const noexcept override {
-        auto d_alpha = grad_G1(wo).dAlpha * G1(wi) + G1(wo) * grad_G1(wi).dAlpha;
-        return {.dAlpha = d_alpha};
-    }
 };
 
 }// namespace

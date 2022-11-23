@@ -39,20 +39,20 @@ private:
 
 public:
     Shape(Scene *scene, const SceneNodeDesc *desc) noexcept;
-    [[nodiscard]] auto surface() const noexcept { return _surface; }
-    [[nodiscard]] auto light() const noexcept { return _light; }
-    [[nodiscard]] auto transform() const noexcept { return _transform; }
-    [[nodiscard]] virtual bool visible() const noexcept { return true; }
-    [[nodiscard]] virtual float shadow_terminator_factor() const noexcept { return 0.f; }
-    [[nodiscard]] virtual float intersection_offset_factor() const noexcept { return 0.f; }
+    [[nodiscard]] const Surface *surface() const noexcept;
+    [[nodiscard]] const Light *light() const noexcept;
+    [[nodiscard]] const Transform *transform() const noexcept;
+    [[nodiscard]] virtual bool visible() const noexcept;
+    [[nodiscard]] virtual float shadow_terminator_factor() const noexcept;
+    [[nodiscard]] virtual float intersection_offset_factor() const noexcept;
     [[nodiscard]] virtual bool is_mesh() const noexcept = 0;
     [[nodiscard]] virtual bool has_normal() const noexcept = 0;
     [[nodiscard]] virtual bool has_uv() const noexcept = 0;
-    [[nodiscard]] virtual luisa::span<const Vertex> vertices() const noexcept = 0;                         // empty if the shape is not a mesh
-    [[nodiscard]] virtual luisa::span<const Triangle> triangles() const noexcept = 0;                      // empty if the shape is not a mesh
-    [[nodiscard]] virtual luisa::span<const Shape *const> children() const noexcept = 0;                   // empty if the shape is a mesh
-    [[nodiscard]] virtual bool deformable() const noexcept = 0;                                            // true if the shape will not deform
-    [[nodiscard]] virtual AccelUsageHint build_hint() const noexcept { return AccelUsageHint::FAST_TRACE; }// accel struct build quality, only considered for meshes
+    [[nodiscard]] virtual luisa::span<const Vertex> vertices() const noexcept = 0;      // empty if the shape is not a mesh
+    [[nodiscard]] virtual luisa::span<const Triangle> triangles() const noexcept = 0;   // empty if the shape is not a mesh
+    [[nodiscard]] virtual luisa::span<const Shape *const> children() const noexcept = 0;// empty if the shape is a mesh
+    [[nodiscard]] virtual bool deformable() const noexcept = 0;                         // true if the shape will not deform
+    [[nodiscard]] virtual AccelUsageHint build_hint() const noexcept;                   // accel struct build quality, only considered for meshes
 };
 
 template<typename BaseShape>
@@ -64,7 +64,7 @@ private:
 public:
     ShadowTerminatorShapeWrapper(Scene *scene, const SceneNodeDesc *desc) noexcept
         : BaseShape{scene, desc},
-          _shadow_terminator{std::clamp(desc->property_float_or_default("shadow_terminator", 1.f), 0.f, 1.f)} {}
+          _shadow_terminator{std::clamp(desc->property_float_or_default("shadow_terminator", 0.f), 0.f, 1.f)} {}
     [[nodiscard]] float shadow_terminator_factor() const noexcept override { return _shadow_terminator; }
 };
 
@@ -116,26 +116,9 @@ struct alignas(16) Shape::Handle {
     uint triangle_buffer_size;
     uint shadow_term_and_intersection_offset;
 
-    [[nodiscard]] static auto encode(uint buffer_base, uint flags, uint surface_tag, uint light_tag, uint tri_count,
-                                     float shadow_terminator, float intersection_offset) noexcept {
-        LUISA_ASSERT(buffer_base <= buffer_base_max, "Invalid geometry buffer base: {}.", buffer_base);
-        LUISA_ASSERT(flags <= property_flag_mask, "Invalid property flags: {:016x}.", flags);
-        LUISA_ASSERT(surface_tag <= surface_tag_max, "Invalid surface tag: {}.", surface_tag);
-        LUISA_ASSERT(light_tag <= light_tag_mask, "Invalid light tag: {}.", light_tag);
-        constexpr auto fixed_point_bits = 16u;
-        auto encode_fixed_point = [](float x) noexcept {
-            x = clamp(x, 0.0f, 1.0f);
-            constexpr auto fixed_point_mask = (1u << fixed_point_bits) - 1u;
-            constexpr auto fixed_point_scale = 1.0f / static_cast<float>(1u << fixed_point_bits);
-            return static_cast<uint>(std::clamp(round(x / fixed_point_scale), 0.f, static_cast<float>(fixed_point_mask)));
-        };
-        return Handle{.buffer_base_and_properties = (buffer_base << property_flag_bits) | flags,
-                      .surface_tag_and_light_tag = (surface_tag << light_tag_bits) | light_tag,
-                      .triangle_buffer_size = tri_count,
-                      .shadow_term_and_intersection_offset =
-                          (encode_fixed_point(shadow_terminator) << 16u) |
-                          encode_fixed_point(intersection_offset)};
-    }
+    [[nodiscard]] static Shape::Handle encode(uint buffer_base, uint flags,
+                                              uint surface_tag, uint light_tag, uint tri_count,
+                                              float shadow_terminator, float intersection_offset) noexcept;
 };
 
 static_assert(sizeof(Shape::Handle) == 16u);

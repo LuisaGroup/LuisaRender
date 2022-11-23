@@ -98,6 +98,19 @@ Float spherical_phi(Float3 v) noexcept {
     return ite(p < 0.f, p + 2.f * pi, p);
 }
 
+Float fresnel_dielectric_integral(Float eta) noexcept {
+    static Callable fit_less_one = [](Float eta) noexcept {
+        constexpr std::array c{0.75985009f, -2.09069066f, 2.23559031f, -0.90663979f};
+        return fma(fma(fma(c[3], eta, c[2]), eta, c[1]), eta, c[0]);
+    };
+    static Callable fit_greater_one = [](Float eta) noexcept {
+        constexpr std::array c{0.97945724f, 0.21762732f, -1.18995376f};
+        auto e = 1.f / eta;
+        return fma(fma(c[2], e, c[1]), e, c[0]);
+    };
+    return saturate(ite(eta == 1.f, 0.f, ite(eta < 1.f, fit_less_one(eta), fit_greater_one(eta))));
+}
+
 Float MicrofacetDistribution::G1(Expr<float3> w) const noexcept {
     return 1.0f / (1.0f + Lambda(w));
 }
@@ -114,16 +127,6 @@ Float MicrofacetDistribution::pdf(Expr<float3> wo, Expr<float3> wh) const noexce
 
 MicrofacetDistribution::MicrofacetDistribution(Expr<float2> alpha) noexcept
     : _alpha{compute::max(alpha, 1e-4f)} {}
-
-MicrofacetDistribution::Gradient MicrofacetDistribution::grad_G1(Expr<float3> w) const noexcept {
-    auto d_alpha = -grad_Lambda(w).dAlpha / sqr(1.0f + Lambda(w));
-    return {.dAlpha = d_alpha};
-}
-
-MicrofacetDistribution::Gradient MicrofacetDistribution::grad_G(Expr<float3> wo, Expr<float3> wi) const noexcept {
-    auto d_alpha = -(grad_Lambda(wo).dAlpha + grad_Lambda(wi).dAlpha) / sqr(1.0f + Lambda(wo) + Lambda(wi));
-    return {.dAlpha = d_alpha};
-}
 
 TrowbridgeReitzDistribution::TrowbridgeReitzDistribution(Expr<float2> alpha) noexcept
     : MicrofacetDistribution{alpha} {}
@@ -142,10 +145,6 @@ Float TrowbridgeReitzDistribution::alpha_to_roughness(Expr<float> alpha) noexcep
 
 Float2 TrowbridgeReitzDistribution::alpha_to_roughness(Expr<float2> alpha) noexcept {
     return sqrt(alpha);
-}
-
-Float2 TrowbridgeReitzDistribution::grad_alpha_roughness(Expr<float2> roughness) noexcept {
-    return 2.f * roughness;
 }
 
 Float TrowbridgeReitzDistribution::D(Expr<float3> wh) const noexcept {
@@ -240,40 +239,6 @@ Float3 TrowbridgeReitzDistribution::sample_wh(Expr<float3> wo, Expr<float2> u) c
     auto s = sign(cos_theta(wo));
     auto wh = TrowbridgeReitzSample(s * wo, alpha(), u);
     return s * wh;
-}
-
-MicrofacetDistribution::Gradient TrowbridgeReitzDistribution::grad_Lambda(Expr<float3> w) const noexcept {
-    using compute::isinf;
-    auto absTanTheta = abs(tan_theta(w));
-
-    auto alpha2 = cos2_phi(w) * sqr(alpha().x) +
-                  sin2_phi(w) * sqr(alpha().y);
-    auto alpha2Tan2Theta = alpha2 * sqr(absTanTheta);
-
-    auto d_Lambda = ite(isinf(absTanTheta), 0.f, 1.f);
-    auto d_alpha2Tan2Theta = d_Lambda * .25f / sqrt(1.f + alpha2Tan2Theta);
-    auto d_alpha2 = d_alpha2Tan2Theta * sqr(absTanTheta);
-    auto d_alpha = d_alpha2 * make_float2(.5f * cos2_phi(w) / sqr(alpha().x),
-                                          .5f * sin2_phi(w) / sqr(alpha().y));
-
-    return {.dAlpha = d_alpha};
-}
-
-MicrofacetDistribution::Gradient TrowbridgeReitzDistribution::grad_D(Expr<float3> wh) const noexcept {
-    using compute::isinf;
-    auto tan2Theta = tan2_theta(wh);
-    auto cos4Theta = sqr(cos2_theta(wh));
-
-    auto e0 = tan2Theta * sqr(cos_phi(wh) / alpha().x);
-    auto e1 = tan2Theta * sqr(sin_phi(wh) / alpha().y);
-    auto e = e0 + e1;
-    auto D = 1.0f / (pi * alpha().x * alpha().y * cos4Theta * sqr(1.f + e));
-
-    auto d_D = ite(isinf(tan2Theta), 0.f, 1.f);
-    auto d_e = -d_D * 2.f / (1.f + e) * D;
-    auto d_alpha = -d_D * D + d_e * 2.f * make_float2(e0, e1) / alpha();
-
-    return {.dAlpha = d_alpha};
 }
 
 SampledSpectrum FresnelConductor::evaluate(Expr<float> cosThetaI) const noexcept {
