@@ -27,6 +27,29 @@ const Surface *Shape::surface() const noexcept { return _surface; }
 const Light *Shape::light() const noexcept { return _light; }
 const Transform *Shape::transform() const noexcept { return _transform; }
 
+bool Shape::has_vertex_normal() const noexcept {
+    return is_mesh() && (vertex_properties() & property_flag_has_vertex_normal) != 0u;
+}
+
+bool Shape::has_vertex_uv() const noexcept {
+    return is_mesh() && (vertex_properties() & property_flag_has_vertex_uv) != 0u;
+}
+
+bool Shape::has_vertex_tangent() const noexcept {
+    return is_mesh() && (vertex_properties() & property_flag_has_vertex_tangent) != 0u;
+}
+
+bool Shape::has_vertex_color() const noexcept {
+    return is_mesh() && (vertex_properties() & property_flag_has_vertex_color) != 0u;
+}
+
+bool Shape::is_mesh() const noexcept { return false; }
+uint Shape::vertex_properties() const noexcept { return 0u; }
+luisa::span<const Vertex> Shape::vertices() const noexcept { return {}; }
+luisa::span<const Triangle> Shape::triangles() const noexcept { return {}; }
+luisa::span<const Shape *const> Shape::children() const noexcept { return {}; }
+bool Shape::deformable() const noexcept { return false; }
+
 Shape::Handle Shape::Handle::encode(uint buffer_base, uint flags, uint surface_tag, uint light_tag,
                                     uint tri_count, float shadow_terminator, float intersection_offset) noexcept {
     LUISA_ASSERT(buffer_base <= buffer_base_max, "Invalid geometry buffer base: {}.", buffer_base);

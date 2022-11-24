@@ -24,7 +24,14 @@ public:
         : Camera{scene, desc},
           _aperture{desc->property_float_or_default("aperture", 2.f)},
           _focal_length{desc->property_float_or_default("focal_length", 35.f)},
-          _focus_distance{std::max(desc->property_float("focus_distance"), 1.f)} {}
+          _focus_distance{desc->property_float_or_default(
+              "focus_distance", lazy_construct([desc] {
+                  auto target = desc->property_float3("look_at");
+                  auto position = desc->property_float3("position");
+                  return length(target - position);
+              }))} {
+        _focus_distance = std::max(std::abs(_focus_distance), 1e-4f);
+    }
     [[nodiscard]] luisa::unique_ptr<Camera::Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
@@ -87,7 +94,7 @@ public:
         auto coord_focal = (pixel - data.pixel_offset) * data.projected_pixel_size;
         auto p_focal = make_float3(coord_focal.x, -coord_focal.y, -data.focus_distance);
         auto coord_lens = sample_uniform_disk_concentric(u_lens) * data.lens_radius;
-        auto p_lens = make_float3(coord_lens.x, coord_lens.y, 0.f);
+        auto p_lens = make_float3(coord_lens, 0.f);
         return {.ray = make_ray(p_lens, normalize(p_focal - p_lens)), .pixel = pixel, .weight = 1.f};
     }
 };

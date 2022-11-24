@@ -56,35 +56,51 @@ public:
     SphereGeometry() noexcept = default;
     SphereGeometry(luisa::vector<Vertex> vertices,
                    luisa::vector<Triangle> triangles) noexcept
-        : _vertices{std::move(vertices)}, _triangles{std::move(triangles)} {}
+        : _vertices{std::move(vertices)},
+          _triangles{std::move(triangles)} {}
 
 public:
     [[nodiscard]] auto vertices() const noexcept { return luisa::span{_vertices}; }
     [[nodiscard]] auto triangles() const noexcept { return luisa::span{_triangles}; }
     [[nodiscard]] static auto create(uint subdiv) noexcept {
+        static constexpr auto direction_to_uv = [](float3 w) noexcept {
+            auto theta = acos(w.y);
+            auto phi = atan2(w.x, w.z);
+            return fract(make_float2(.5f * inv_pi * phi, theta * inv_pi));
+        };
+        static constexpr auto spherical_tangent = [](float3 w) noexcept {
+            if (w.y > 1.f - 1e-8f) { return make_float3(1.f, 0.f, 0.f); }
+            return normalize(make_float3(-w.z, 0.f, w.x));
+        };
+        static auto base_vertices = [] {
+            std::array<Vertex, sphere_base_vertices.size()> bv{};
+            for (auto i = 0u; i < sphere_base_vertices.size(); i++) {
+                auto p = normalize(sphere_base_vertices[i]);
+                auto t = spherical_tangent(p);
+                auto uv = direction_to_uv(p);
+                bv[i] = Vertex::encode(p, make_float3(1.f), p, t, uv);
+            }
+            return bv;
+        }();
         LUISA_ASSERT(subdiv <= sphere_max_subdivision_level, "Subdivision level {} is too high.", subdiv);
         static std::array<std::shared_future<SphereGeometry>, sphere_max_subdivision_level + 1u> cache;
         static std::mutex mutex;
         std::scoped_lock lock{mutex};
         if (auto g = cache.at(subdiv); g.valid()) { return g; }
         auto future = ThreadPool::global().async([subdiv] {
-            std::array<Vertex, sphere_base_vertices.size()> base_vertices{};
-            for (auto i = 0u; i < sphere_base_vertices.size(); i++) {
-                base_vertices[i] = Vertex::encode(
-                    sphere_base_vertices[i], make_float3(), make_float2());
+            auto m = loop_subdivide(base_vertices, sphere_base_triangles, subdiv);
+            luisa::vector<Vertex> vertices;
+            luisa::vector<Triangle> triangles;
+            vertices.reserve(m.vertices.size());
+            triangles.reserve(m.triangles.size());
+            for (auto &v : m.vertices) {
+                auto p = normalize(make_float3(v.px, v.py, v.pz));
+                auto n = oct_decode(v.n);
+                auto t = spherical_tangent(p);
+                auto uv = direction_to_uv(p);
+                vertices.emplace_back(Vertex::encode(p, make_float3(1.f), n, t, uv));
             }
-            auto [vertices, triangles] = loop_subdivide(
-                base_vertices, sphere_base_triangles, subdiv);
-            for (auto &v : vertices) {
-                auto direction_to_uv = [](float3 w) noexcept {
-                    auto theta = acos(w.y);
-                    auto phi = atan2(w.x, w.z);
-                    return fract(make_float2(.5f * inv_pi * phi, theta * inv_pi));
-                };
-                auto p = v.compressed_p;
-                auto w = normalize(make_float3(p[0], p[1], p[2]));
-                v = Vertex::encode(w, w, direction_to_uv(w));
-            }
+            for (auto &t : m.triangles) { triangles.emplace_back(t.t); }
             return SphereGeometry{std::move(vertices), std::move(triangles)};
         });
         cache[subdiv] = future;
@@ -104,13 +120,14 @@ public:
               std::min(desc->property_uint_or_default("subdivision", 0u),
                        sphere_max_subdivision_level))} {}
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] luisa::span<const Shape *const> children() const noexcept override { return {}; }
-    [[nodiscard]] bool deformable() const noexcept override { return false; }
     [[nodiscard]] bool is_mesh() const noexcept override { return true; }
     [[nodiscard]] luisa::span<const Vertex> vertices() const noexcept override { return _geometry.get().vertices(); }
     [[nodiscard]] luisa::span<const Triangle> triangles() const noexcept override { return _geometry.get().triangles(); }
-    [[nodiscard]] bool has_normal() const noexcept override { return true; }
-    [[nodiscard]] bool has_uv() const noexcept override { return true; }
+    [[nodiscard]] uint vertex_properties() const noexcept override {
+        return Shape::property_flag_has_vertex_normal |
+               Shape::property_flag_has_vertex_tangent |
+               Shape::property_flag_has_vertex_uv;
+    }
 };
 
 using SphereWrapper =

@@ -13,15 +13,15 @@ void dump_obj(const SphereGeometry &g, uint level) noexcept {
     auto path = format("sphere-{}.obj", level);
     std::ofstream out{path.c_str()};
     auto dump_vertex = [&out](auto v, auto t) noexcept {
-        if (v.size() == 2u) {
+        if (std::same_as<decltype(v), float2>) {
             out << luisa::format("{} {} {}\n", t, v[0], v[1]);
         } else {
             out << luisa::format("{} {} {} {}\n", t, v[0], v[1], v[2]);
         }
     };
-    for (auto v : g.vertices()) { dump_vertex(v.compressed_p, "v"); }
-    for (auto v : g.vertices()) { dump_vertex(v.compressed_n, "vn"); }
-    for (auto v : g.vertices()) { dump_vertex(v.compressed_uv, "vt"); }
+    for (auto v : g.vertices()) { dump_vertex(v.position(), "v"); }
+    for (auto v : g.vertices()) { dump_vertex(v.normal(), "vn"); }
+    for (auto v : g.vertices()) { dump_vertex(v.uv(), "vt"); }
     for (auto [a, b, c] : g.triangles()) {
         out << luisa::format("f {}/{}/{} {}/{}/{} {}/{}/{}\n",
                              a + 1u, a + 1u, a + 1u,

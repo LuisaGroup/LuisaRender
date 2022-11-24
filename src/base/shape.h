@@ -27,10 +27,13 @@ public:
     class Handle;
 
 public:
-    static constexpr auto property_flag_has_normal = 1u << 0u;
-    static constexpr auto property_flag_has_uv = 1u << 1u;
-    static constexpr auto property_flag_has_surface = 1u << 2u;
-    static constexpr auto property_flag_has_light = 1u << 3u;
+    static constexpr auto property_flag_has_vertex_normal = 1u << 0u;
+    static constexpr auto property_flag_has_vertex_tangent = 1u << 1u;
+    static constexpr auto property_flag_has_vertex_uv = 1u << 2u;
+    static constexpr auto property_flag_has_vertex_color = 1u << 3u;
+    static constexpr auto property_flag_has_surface = 1u << 4u;
+    static constexpr auto property_flag_has_light = 1u << 5u;
+    static constexpr auto property_flag_has_medium = 1u << 6u;
 
 private:
     const Surface *_surface;
@@ -45,14 +48,17 @@ public:
     [[nodiscard]] virtual bool visible() const noexcept;
     [[nodiscard]] virtual float shadow_terminator_factor() const noexcept;
     [[nodiscard]] virtual float intersection_offset_factor() const noexcept;
-    [[nodiscard]] virtual bool is_mesh() const noexcept = 0;
-    [[nodiscard]] virtual bool has_normal() const noexcept = 0;
-    [[nodiscard]] virtual bool has_uv() const noexcept = 0;
-    [[nodiscard]] virtual luisa::span<const Vertex> vertices() const noexcept = 0;      // empty if the shape is not a mesh
-    [[nodiscard]] virtual luisa::span<const Triangle> triangles() const noexcept = 0;   // empty if the shape is not a mesh
-    [[nodiscard]] virtual luisa::span<const Shape *const> children() const noexcept = 0;// empty if the shape is a mesh
-    [[nodiscard]] virtual bool deformable() const noexcept = 0;                         // true if the shape will not deform
-    [[nodiscard]] virtual AccelUsageHint build_hint() const noexcept;                   // accel struct build quality, only considered for meshes
+    [[nodiscard]] virtual bool is_mesh() const noexcept;
+    [[nodiscard]] virtual uint vertex_properties() const noexcept;
+    [[nodiscard]] bool has_vertex_normal() const noexcept;
+    [[nodiscard]] bool has_vertex_uv() const noexcept;
+    [[nodiscard]] bool has_vertex_tangent() const noexcept;
+    [[nodiscard]] bool has_vertex_color() const noexcept;
+    [[nodiscard]] virtual luisa::span<const Vertex> vertices() const noexcept;      // empty if the shape is not a mesh
+    [[nodiscard]] virtual luisa::span<const Triangle> triangles() const noexcept;   // empty if the shape is not a mesh
+    [[nodiscard]] virtual luisa::span<const Shape *const> children() const noexcept;// empty if the shape is a mesh
+    [[nodiscard]] virtual bool deformable() const noexcept;                         // true if the shape will not deform
+    [[nodiscard]] virtual AccelUsageHint build_hint() const noexcept;               // accel struct build quality, only considered for meshes
 };
 
 template<typename BaseShape>
@@ -151,10 +157,13 @@ public:
     [[nodiscard]] auto surface_tag() const noexcept { return surface_tag_and_light_tag >> luisa::render::Shape::Handle::light_tag_bits; }
     [[nodiscard]] auto light_tag() const noexcept { return surface_tag_and_light_tag & luisa::render::Shape::Handle::light_tag_mask; }
     [[nodiscard]] auto test_property_flag(luisa::uint flag) const noexcept { return (property_flags() & flag) != 0u; }
-    [[nodiscard]] auto has_normal() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_normal); }
-    [[nodiscard]] auto has_uv() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_uv); }
+    [[nodiscard]] auto has_vertex_normal() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_vertex_normal); }
+    [[nodiscard]] auto has_vertex_tangent() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_vertex_tangent); }
+    [[nodiscard]] auto has_vertex_color() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_vertex_color); }
+    [[nodiscard]] auto has_vertex_uv() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_vertex_uv); }
     [[nodiscard]] auto has_light() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_light); }
     [[nodiscard]] auto has_surface() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_surface); }
+    [[nodiscard]] auto has_medium() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_medium); }
     [[nodiscard]] auto shadow_terminator_factor() const noexcept { return _decode_fixed_point(shadow_term_and_intersection_offset >> 16u); }
     [[nodiscard]] auto intersection_offset_factor() const noexcept { return _decode_fixed_point(shadow_term_and_intersection_offset & 0xffffu); }
 };

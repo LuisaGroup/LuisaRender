@@ -28,11 +28,15 @@ Camera::Camera(Scene *scene, const SceneNodeDesc *desc) noexcept
 
     // For compatibility with older scene description versions
     if (_transform == nullptr) {
-        constexpr auto default_position = make_float3(0.f, 0.f, 0.f);
-        constexpr auto default_front = make_float3(0.f, 0.f, -1.f);
-        constexpr auto default_up = make_float3(0.f, 1.f, 0.f);
+        static constexpr auto default_position = make_float3(0.f, 0.f, 0.f);
+        static constexpr auto default_front = make_float3(0.f, 0.f, -1.f);
+        static constexpr auto default_up = make_float3(0.f, 1.f, 0.f);
         auto position = desc->property_float3_or_default("position", default_position);
-        auto front = desc->property_float3_or_default("front", default_front);
+        auto front = desc->property_float3_or_default(
+            "front", lazy_construct([desc, position] {
+                auto look_at = desc->property_float3_or_default("look_at", position + default_front);
+                return normalize(look_at - position);
+            }));
         auto up = desc->property_float3_or_default("up", default_up);
         if (!all(position == default_position && front == default_front && up == default_up)) {
             SceneNodeDesc d{luisa::format("{}$transform", desc->identifier()), SceneNodeTag::TRANSFORM};

@@ -12,9 +12,28 @@ namespace luisa::render {
 
 using compute::Triangle;
 
-[[nodiscard]] std::pair<luisa::vector<Vertex>, luisa::vector<Triangle>>
-loop_subdivide(luisa::span<const Vertex> vertices,
-               luisa::span<const Triangle> triangles,
-               uint level) noexcept;
+struct alignas(16) SubdivVertex {
+    float px;
+    float py;
+    float pz;
+    uint n;
+};
+
+struct alignas(16) SubdivTriangle {
+    Triangle t;
+    uint base;
+};
+
+static_assert(sizeof(SubdivVertex) == 16u);
+static_assert(sizeof(SubdivTriangle) == 16u);
+
+struct SubdivMesh {
+    std::vector<SubdivVertex> vertices;
+    std::vector<SubdivTriangle> triangles;
+};
+
+[[nodiscard]] SubdivMesh loop_subdivide(luisa::span<const Vertex> vertices,
+                                        luisa::span<const Triangle> triangles,
+                                        uint level) noexcept;
 
 }// namespace luisa::render

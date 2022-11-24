@@ -35,9 +35,8 @@ public:
         Mesh *resource;
         uint16_t shadow_term;
         uint16_t intersection_offset;
-        uint geometry_buffer_id_base : 30;
-        uint has_normal : 1;
-        uint has_uv : 1;
+        uint geometry_buffer_id_base : 22;
+        uint vertex_properties : 10;
     };
 
     static_assert(sizeof(MeshData) == 16u);

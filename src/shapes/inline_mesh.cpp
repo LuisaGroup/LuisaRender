@@ -11,8 +11,7 @@ class InlineMesh : public Shape {
 private:
     luisa::vector<Vertex> _vertices;
     luisa::vector<Triangle> _triangles;
-    bool _has_uv{};
-    bool _has_normal{};
+    uint _properties{};
 
 public:
     InlineMesh(Scene *scene, const SceneNodeDesc *desc) noexcept
@@ -21,24 +20,33 @@ public:
         auto triangles = desc->property_uint_list("indices");
         auto positions = desc->property_float_list("positions");
         auto normals = desc->property_float_list_or_default("normals");
+        auto tangents = desc->property_float_list_or_default("tangents");
         auto uvs = desc->property_float_list_or_default("uvs");
+        auto colors = desc->property_float_list_or_default("colors");
 
         if (triangles.size() % 3u != 0u ||
             positions.size() % 3u != 0u ||
             normals.size() % 3u != 0u ||
+            tangents.size() % 3u != 0u ||
             uvs.size() % 2u != 0u ||
+            colors.size() % 3u != 0u ||
             (!normals.empty() && normals.size() != positions.size()) ||
-            (!uvs.empty() && uvs.size() / 2u != positions.size() / 3u)) [[unlikely]] {
-            LUISA_ERROR_WITH_LOCATION(
-                "Invalid vertex or triangle count.");
+            (!tangents.empty() && tangents.size() != positions.size()) ||
+            (!uvs.empty() && uvs.size() / 2u != positions.size() / 3u) ||
+            (!colors.empty() && colors.size() != positions.size())) [[unlikely]] {
+            LUISA_ERROR_WITH_LOCATION("Invalid vertex or triangle count.");
         }
 
         auto triangle_count = triangles.size() / 3u;
         auto vertex_count = positions.size() / 3u;
         _vertices.reserve(vertex_count);
         _triangles.reserve(triangle_count);
-        _has_uv = !uvs.empty();
-        _has_normal = !normals.empty();
+        _properties = (!uvs.empty() ? Shape::property_flag_has_vertex_uv : 0u) |
+                      (!normals.empty() ? Shape::property_flag_has_vertex_normal : 0u) |
+                      (!tangents.empty() ? Shape::property_flag_has_vertex_tangent : 0u) |
+                      (!colors.empty() ? Shape::property_flag_has_vertex_color : 0u);
+
+        auto has_normal = !normals.empty();
         for (auto i = 0u; i < triangle_count; i++) {
             auto t0 = triangles[i * 3u + 0u];
             auto t1 = triangles[i * 3u + 1u];
@@ -53,14 +61,21 @@ public:
             auto p1 = positions[i * 3u + 1u];
             auto p2 = positions[i * 3u + 2u];
             auto p = make_float3(p0, p1, p2);
-            auto n = _has_normal ?
-                         make_float3(normals[i * 3u + 0u], normals[i * 3u + 1u], normals[i * 3u + 2u]) :
-                         make_float3(0.f);
-            auto uv = _has_uv ?
-                          make_float2(uvs[i * 2u + 0u], uvs[i * 2u + 1u]) :
-                          make_float2(0.f);
-            _vertices.emplace_back(Vertex::encode(p, n, uv));
+            auto n = normals.empty() ?
+                         make_float3(0.f) :
+                         make_float3(normals[i * 3u + 0u], normals[i * 3u + 1u], normals[i * 3u + 2u]);
+            auto s = tangents.empty() ?
+                         make_float3(0.f) :
+                         make_float3(tangents[i * 3u + 0u], tangents[i * 3u + 1u], tangents[i * 3u + 2u]);
+            auto uv = uvs.empty() ?
+                          make_float2(0.f) :
+                          make_float2(uvs[i * 2u + 0u], uvs[i * 2u + 1u]);
+            auto c = colors.empty() ?
+                         make_float3(1.f) :
+                         make_float3(colors[i * 3u + 0u], colors[i * 3u + 1u], colors[i * 3u + 2u]);
+            _vertices.emplace_back(Vertex::encode(p, c, n, s, uv));
         }
+        if (tangents.empty()) { compute_tangents(_vertices, _triangles); }
     }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] bool is_mesh() const noexcept override { return true; }
@@ -68,8 +83,7 @@ public:
     [[nodiscard]] luisa::span<const Triangle> triangles() const noexcept override { return _triangles; }
     [[nodiscard]] luisa::span<const Shape *const> children() const noexcept override { return {}; }
     [[nodiscard]] bool deformable() const noexcept override { return false; }
-    [[nodiscard]] bool has_normal() const noexcept override { return _has_normal; }
-    [[nodiscard]] bool has_uv() const noexcept override { return _has_uv; }
+    [[nodiscard]] uint vertex_properties() const noexcept override { return _properties; }
 };
 
 using InlineMeshWrapper =
