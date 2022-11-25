@@ -66,7 +66,7 @@ public:
             } else {
                 import_flags |= aiProcess_GenSmoothNormals;
             }
-            if (subdiv_level == 0) { import_flags |= aiProcess_Triangulate; }
+            if (subdiv_level == 0u) { import_flags |= aiProcess_Triangulate; }
             importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, static_cast<int>(remove_flags));
             auto model = importer.ReadFile(path_string.c_str(), import_flags);
             if (model == nullptr || (model->mFlags & AI_SCENE_FLAGS_INCOMPLETE) ||
@@ -123,20 +123,19 @@ public:
             if (subdiv_level == 0u) {
                 auto ai_triangles = mesh->mFaces;
                 loader._triangles.resize(mesh->mNumFaces);
-                std::transform(
-                    ai_triangles, ai_triangles + mesh->mNumFaces, loader._triangles.begin(),
-                    [](const aiFace &face) noexcept {
-                        assert(face.mNumIndices == 3u);
-                        return Triangle{face.mIndices[0], face.mIndices[1], face.mIndices[2]};
-                    });
+                for (auto i = 0; i < mesh->mNumFaces; i++) {
+                    auto &&face = ai_triangles[i];
+                    assert(face.mNumIndices == 3u);
+                    loader._triangles[i] = {face.mIndices[0], face.mIndices[1], face.mIndices[2]};
+                }
             } else {
                 auto ai_quads = mesh->mFaces;
                 loader._triangles.resize(mesh->mNumFaces * 2u);
                 for (auto i = 0u; i < mesh->mNumFaces; i++) {
-                    auto &face = ai_quads[i];
+                    auto &&face = ai_quads[i];
                     assert(face.mNumIndices == 4u);
                     loader._triangles[i * 2u + 0u] = {face.mIndices[0], face.mIndices[1], face.mIndices[2]};
-                    loader._triangles[i * 2u + 1u] = {face.mIndices[0], face.mIndices[2], face.mIndices[3]};
+                    loader._triangles[i * 2u + 1u] = {face.mIndices[2], face.mIndices[3], face.mIndices[0]};
                 }
             }
             LUISA_INFO("Loaded triangle mesh '{}' in {} ms.", path_string, clock.toc());
