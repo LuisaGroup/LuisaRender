@@ -21,6 +21,12 @@ class Light;
 class Surface;
 class Transform;
 
+struct MeshView {
+    luisa::span<const Vertex> vertices;
+    luisa::span<const float2> uvs;
+    luisa::span<const Triangle> triangles;
+};
+
 class Shape : public SceneNode {
 
 public:
@@ -28,12 +34,10 @@ public:
 
 public:
     static constexpr auto property_flag_has_vertex_normal = 1u << 0u;
-    static constexpr auto property_flag_has_vertex_tangent = 1u << 1u;
-    static constexpr auto property_flag_has_vertex_uv = 1u << 2u;
-    static constexpr auto property_flag_has_vertex_color = 1u << 3u;
-    static constexpr auto property_flag_has_surface = 1u << 4u;
-    static constexpr auto property_flag_has_light = 1u << 5u;
-    static constexpr auto property_flag_has_medium = 1u << 6u;
+    static constexpr auto property_flag_has_vertex_uv = 1u << 1u;
+    static constexpr auto property_flag_has_surface = 1u << 2u;
+    static constexpr auto property_flag_has_light = 1u << 3u;
+    static constexpr auto property_flag_has_medium = 1u << 4u;
 
 private:
     const Surface *_surface;
@@ -52,10 +56,7 @@ public:
     [[nodiscard]] virtual uint vertex_properties() const noexcept;
     [[nodiscard]] bool has_vertex_normal() const noexcept;
     [[nodiscard]] bool has_vertex_uv() const noexcept;
-    [[nodiscard]] bool has_vertex_tangent() const noexcept;
-    [[nodiscard]] bool has_vertex_color() const noexcept;
-    [[nodiscard]] virtual luisa::span<const Vertex> vertices() const noexcept;      // empty if the shape is not a mesh
-    [[nodiscard]] virtual luisa::span<const Triangle> triangles() const noexcept;   // empty if the shape is not a mesh
+    [[nodiscard]] virtual MeshView mesh() const noexcept;                           // empty if the shape is not a mesh
     [[nodiscard]] virtual luisa::span<const Shape *const> children() const noexcept;// empty if the shape is a mesh
     [[nodiscard]] virtual bool deformable() const noexcept;                         // true if the shape will not deform
     [[nodiscard]] virtual AccelUsageHint build_hint() const noexcept;               // accel struct build quality, only considered for meshes
@@ -116,6 +117,7 @@ struct alignas(16) Shape::Handle {
     static constexpr auto triangle_buffer_id_offset = 1u;
     static constexpr auto alias_table_buffer_id_offset = 2u;
     static constexpr auto pdf_buffer_id_offset = 3u;
+    static constexpr auto uv_buffer_id_offset = 4u;// might be empty, goes last
 
     uint buffer_base_and_properties;
     uint surface_tag_and_light_tag;
@@ -150,6 +152,7 @@ public:
     [[nodiscard]] auto geometry_buffer_base() const noexcept { return buffer_base_and_properties >> luisa::render::Shape::Handle::property_flag_bits; }
     [[nodiscard]] auto property_flags() const noexcept { return buffer_base_and_properties & luisa::render::Shape::Handle::property_flag_mask; }
     [[nodiscard]] auto vertex_buffer_id() const noexcept { return geometry_buffer_base() + luisa::render::Shape::Handle::vertex_buffer_id_offset; }
+    [[nodiscard]] auto uv_buffer_id() const noexcept { return geometry_buffer_base() + luisa::render::Shape::Handle::uv_buffer_id_offset; }
     [[nodiscard]] auto triangle_buffer_id() const noexcept { return geometry_buffer_base() + luisa::render::Shape::Handle::triangle_buffer_id_offset; }
     [[nodiscard]] auto triangle_count() const noexcept { return triangle_buffer_size; }
     [[nodiscard]] auto alias_table_buffer_id() const noexcept { return geometry_buffer_base() + luisa::render::Shape::Handle::alias_table_buffer_id_offset; }
@@ -158,8 +161,6 @@ public:
     [[nodiscard]] auto light_tag() const noexcept { return surface_tag_and_light_tag & luisa::render::Shape::Handle::light_tag_mask; }
     [[nodiscard]] auto test_property_flag(luisa::uint flag) const noexcept { return (property_flags() & flag) != 0u; }
     [[nodiscard]] auto has_vertex_normal() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_vertex_normal); }
-    [[nodiscard]] auto has_vertex_tangent() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_vertex_tangent); }
-    [[nodiscard]] auto has_vertex_color() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_vertex_color); }
     [[nodiscard]] auto has_vertex_uv() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_vertex_uv); }
     [[nodiscard]] auto has_light() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_light); }
     [[nodiscard]] auto has_surface() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_surface); }

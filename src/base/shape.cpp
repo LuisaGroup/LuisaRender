@@ -35,18 +35,9 @@ bool Shape::has_vertex_uv() const noexcept {
     return is_mesh() && (vertex_properties() & property_flag_has_vertex_uv) != 0u;
 }
 
-bool Shape::has_vertex_tangent() const noexcept {
-    return is_mesh() && (vertex_properties() & property_flag_has_vertex_tangent) != 0u;
-}
-
-bool Shape::has_vertex_color() const noexcept {
-    return is_mesh() && (vertex_properties() & property_flag_has_vertex_color) != 0u;
-}
-
 bool Shape::is_mesh() const noexcept { return false; }
 uint Shape::vertex_properties() const noexcept { return 0u; }
-luisa::span<const Vertex> Shape::vertices() const noexcept { return {}; }
-luisa::span<const Triangle> Shape::triangles() const noexcept { return {}; }
+MeshView Shape::mesh() const noexcept { return {}; }
 luisa::span<const Shape *const> Shape::children() const noexcept { return {}; }
 bool Shape::deformable() const noexcept { return false; }
 

@@ -17,12 +17,12 @@ class MeshLoader {
 
 private:
     luisa::vector<Vertex> _vertices;
+    luisa::vector<float2> _uvs;
     luisa::vector<Triangle> _triangles;
     uint _properties{};
 
 public:
-    [[nodiscard]] auto vertices() const noexcept { return luisa::span{_vertices}; }
-    [[nodiscard]] auto triangles() const noexcept { return luisa::span{_triangles}; }
+    [[nodiscard]] auto mesh() const noexcept { return MeshView{_vertices, _uvs, _triangles}; }
     [[nodiscard]] auto properties() const noexcept { return _properties; }
 
     // Load the mesh from a file.
@@ -30,7 +30,7 @@ public:
                                    bool flip_uv, bool drop_normal) noexcept {
 
         // TODO: static lifetime seems not good...
-        static luisa::lru_cache<uint64_t, std::shared_future<MeshLoader>> loaded_meshes{32u};
+        static luisa::lru_cache<uint64_t, std::shared_future<MeshLoader>> loaded_meshes{256u};
         static std::mutex mutex;
 
         auto abs_path = std::filesystem::canonical(path).string();
@@ -54,7 +54,8 @@ public:
             import_flags |= drop_normal ? aiProcess_DropNormals : aiProcess_GenSmoothNormals;
             auto remove_flags = aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS |
                                 aiComponent_CAMERAS | aiComponent_LIGHTS |
-                                aiComponent_MATERIALS | aiComponent_TEXTURES;
+                                aiComponent_MATERIALS | aiComponent_TEXTURES |
+                                aiComponent_COLORS | aiComponent_TANGENTS_AND_BITANGENTS;
             importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, static_cast<int>(remove_flags));
             if (subdiv_level == 0) { import_flags |= aiProcess_Triangulate; }
             auto model = importer.ReadFile(path_string.c_str(), import_flags);
@@ -92,14 +93,13 @@ public:
             MeshLoader loader;
             auto vertex_count = mesh->mNumVertices;
             loader._vertices.resize(vertex_count);
+            loader._uvs.resize(vertex_count);
             auto ai_positions = mesh->mVertices;
             auto ai_normals = mesh->mNormals;
             auto ai_colors = mesh->mColors[0];
             auto ai_tex_coords = mesh->mTextureCoords[0];
             auto ai_tangents = mesh->mTangents;
             loader._properties = (ai_tex_coords != nullptr ? Shape::property_flag_has_vertex_uv : 0u) |
-                                 (ai_colors != nullptr ? Shape::property_flag_has_vertex_color : 0u) |
-                                 (ai_tangents != nullptr || ai_tex_coords != nullptr ? Shape::property_flag_has_vertex_tangent : 0u) |
                                  (ai_normals != nullptr ? Shape::property_flag_has_vertex_normal : 0u);
             for (auto i = 0; i < vertex_count; i++) {
                 auto p = make_float3(ai_positions[i].x, ai_positions[i].y, ai_positions[i].z);
@@ -109,13 +109,8 @@ public:
                 auto uv = ai_tex_coords ?
                               make_float2(ai_tex_coords[i].x, ai_tex_coords[i].y) :
                               make_float2(0.f);
-                auto t = ai_tangents ?
-                             normalize(make_float3(ai_tangents[i].x, ai_tangents[i].y, ai_tangents[i].z)) :
-                             make_float3(0.f);
-                auto c = ai_colors ?
-                             make_float3(ai_colors[i].r, ai_colors[i].g, ai_colors[i].b) :
-                             make_float3(1.f);
-                loader._vertices[i] = Vertex::encode(p, c, n, t, uv);
+                loader._vertices[i] = Vertex::encode(p, n);
+                loader._uvs[i] = uv;
             }
             if (subdiv_level == 0u) {
                 auto ai_triangles = mesh->mFaces;
@@ -136,7 +131,6 @@ public:
                     loader._triangles[i * 2u + 1u] = {face.mIndices[0], face.mIndices[2], face.mIndices[3]};
                 }
             }
-            if (ai_tangents == nullptr) { compute_tangents(loader._vertices, loader._triangles); }
             LUISA_INFO("Loaded triangle mesh '{}' in {} ms.", path_string, clock.toc());
             return loader;
         });
@@ -159,8 +153,7 @@ public:
                                    desc->property_bool_or_default("drop_normal", false))} {}
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] bool is_mesh() const noexcept override { return true; }
-    [[nodiscard]] luisa::span<const Vertex> vertices() const noexcept override { return _loader.get().vertices(); }
-    [[nodiscard]] luisa::span<const Triangle> triangles() const noexcept override { return _loader.get().triangles(); }
+    [[nodiscard]] MeshView mesh() const noexcept override { return _loader.get().mesh(); }
     [[nodiscard]] uint vertex_properties() const noexcept override { return _loader.get().properties(); }
 };
 

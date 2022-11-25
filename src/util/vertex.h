@@ -33,70 +33,32 @@ template<typename T>
     return normalize(make_float3(n.xy() + select(t, -t, n.xy() >= 0.f), n.z));
 }
 
-template<typename T>
-    requires std::same_as<luisa::compute::expr_value_t<T>, float3>
-[[nodiscard]] inline auto rgb_encode(T c) noexcept {
-    auto u = make_uint3(clamp(round(c * 255.f), 0.f, 255.f));
-    return u.x | (u.y << 8u) | (u.z << 16u);
-};
-
-template<typename T>
-    requires std::same_as<luisa::compute::expr_value_t<T>, uint>
-[[nodiscard]] inline auto rgb_decode(T c) noexcept {
-    auto rgb_u8 = make_uint3(c & 0xffu, (c >> 8u) & 0xffu, (c >> 16u) & 0xffu);
-    return make_float3(rgb_u8) * (1.f / 255.f);
-}
-
 struct alignas(16) Vertex {
 
     float px;
     float py;
     float pz;
-    uint rgb;
     uint n;
-    uint s;
-    float u;
-    float v;
 
-    [[nodiscard]] static auto encode(float3 position, float3 color,
-                                     float3 normal, float3 tangent, float2 uv) noexcept {
-        return Vertex{position.x, position.y, position.z, rgb_encode(color),
-                      oct_encode(normal), oct_encode(tangent), uv.x, uv.y};
+    [[nodiscard]] static auto encode(float3 position, float3 normal) noexcept {
+        return Vertex{position.x, position.y, position.z, oct_encode(normal)};
     };
-
     [[nodiscard]] auto position() const noexcept { return make_float3(px, py, pz); }
-    [[nodiscard]] auto color() const noexcept { return rgb_decode(rgb); }
     [[nodiscard]] auto normal() const noexcept { return oct_decode(n); }
-    [[nodiscard]] auto tangent() const noexcept { return oct_decode(s); }
-    [[nodiscard]] auto uv() const noexcept { return make_float2(u, v); }
 };
 
-[[nodiscard]] float3 compute_tangent(float3 p0, float3 p1, float3 p2,
-                                     float2 uv0, float2 uv1, float2 uv2) noexcept;
-void compute_tangents(luisa::span<Vertex> vertices,
-                      luisa::span<const compute::Triangle> triangles,
-                      bool area_weighted = true) noexcept;
+static_assert(sizeof(Vertex) == 16u);
 
 }// namespace luisa::render
 
 // clang-format off
-LUISA_STRUCT(luisa::render::Vertex, px, py, pz, rgb, n, s, u, v) {
-
+LUISA_STRUCT(luisa::render::Vertex, px, py, pz, n) {
     [[nodiscard]] static auto encode(luisa::compute::Expr<luisa::float3> position,
-                                     luisa::compute::Expr<luisa::float3> color,
-                                     luisa::compute::Expr<luisa::float3> normal,
-                                     luisa::compute::Expr<luisa::float3> tangent,
-                                     luisa::compute::Expr<luisa::float2> uv) noexcept {
+                                     luisa::compute::Expr<luisa::float3> normal) noexcept {
         return def<luisa::render::Vertex>(position.x, position.y, position.z,
-                                          luisa::render::rgb_encode(color),
-                                          luisa::render::oct_encode(normal),
-                                          luisa::render::oct_encode(tangent),
-                                          uv.x, uv.y);
+                                          luisa::render::oct_encode(normal));
     };
     [[nodiscard]] auto position() const noexcept { return make_float3(px, py, pz); }
-    [[nodiscard]] auto color() const noexcept { return luisa::render::rgb_decode(rgb); }
     [[nodiscard]] auto normal() const noexcept { return luisa::render::oct_decode(n); }
-    [[nodiscard]] auto tangent() const noexcept { return luisa::render::oct_decode(s); }
-    [[nodiscard]] auto uv() const noexcept { return make_float2(u, v); }
 };
 // clang-format on

@@ -129,17 +129,13 @@ SubdivMesh loop_subdivide(luisa::span<const Vertex> vertices,
                           uint level) noexcept {
 
     if (level == 0u) {
-        SubdivMesh mesh;
-        mesh.vertices.resize(vertices.size());
-        mesh.triangles.resize(triangles.size());
-        for (auto i = 0u; i < vertices.size(); i++) {
-            auto v = vertices[i];
-            mesh.vertices[i] = {v.px, v.py, v.pz, v.n};
-        }
-        for (auto i = 0u; i < triangles.size(); i++) {
-            mesh.triangles[i] = {triangles[i], i};
-        }
-        return mesh;
+        return {.vertices = {vertices.begin(), vertices.end()},
+                .triangles = {triangles.begin(), triangles.end()},
+                .base_triangle_indices = [n = triangles.size()] {
+                    luisa::vector<uint> indices(n);
+                    std::iota(indices.begin(), indices.end(), 0u);
+                    return indices;
+                }()};
     }
 
     luisa::vector<SDVertex *> vs;
@@ -365,6 +361,7 @@ SubdivMesh loop_subdivide(luisa::span<const Vertex> vertices,
     SubdivMesh mesh;
     mesh.vertices.resize(v.size());
     mesh.triangles.resize(f.size());
+    mesh.base_triangle_indices.resize(f.size());
     luisa::unordered_map<SDVertex *, uint> usedVerts;
     for (auto i = 0u; i < v.size(); i++) {
         usedVerts[v[i]] = i;
@@ -375,8 +372,8 @@ SubdivMesh loop_subdivide(luisa::span<const Vertex> vertices,
     for (auto i = 0u; i < f.size(); ++i) {
         mesh.triangles[i] = {usedVerts[f[i]->v[0u]],
                              usedVerts[f[i]->v[1u]],
-                             usedVerts[f[i]->v[2u]],
-                             f[i]->baseTriangle};
+                             usedVerts[f[i]->v[2u]]};
+        mesh.base_triangle_indices[i] = f[i]->baseTriangle;
     }
     return {};
 }

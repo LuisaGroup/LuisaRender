@@ -35,13 +35,15 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
                 return iter->second;
             }
             auto mesh_geom = [&] {
-                auto vertices = shape->vertices();
-                auto triangles = shape->triangles();
-                if (vertices.empty() || triangles.empty()) [[unlikely]] {
-                    LUISA_ERROR_WITH_LOCATION("Found mesh without vertices.");
-                }
+                auto [vertices, uvs, triangles] = shape->mesh();
+                LUISA_ASSERT(!vertices.empty() && !triangles.empty(), "Empty mesh.");
+                LUISA_ASSERT(shape->has_vertex_uv() == !uvs.empty(), "UV mismatch.");
+                LUISA_ASSERT(uvs.empty() || uvs.size() == vertices.size(),
+                             "UV count {} mismatch with vertex count {}.",
+                             uvs.size(), vertices.size());
                 auto hash = luisa::detail::murmur2_hash64(vertices.data(), vertices.size_bytes(), Hash64::default_seed);
                 hash = luisa::detail::murmur2_hash64(triangles.data(), triangles.size_bytes(), hash);
+                hash = luisa::detail::murmur2_hash64(uvs.data(), uvs.size_bytes(), hash);
                 if (auto mesh_iter = _mesh_cache.find(hash);
                     mesh_iter != _mesh_cache.end()) {
                     return mesh_iter->second;
@@ -58,12 +60,13 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
                 auto triangle_buffer_id = _pipeline.register_bindless(triangle_buffer->view());
                 // compute alias table
                 luisa::vector<float> triangle_areas(triangles.size());
-                std::transform(triangles.cbegin(), triangles.cend(), triangle_areas.begin(), [vertices](auto t) noexcept {
+                for (auto i = 0u; i < triangles.size(); i++) {
+                    auto t = triangles[i];
                     auto p0 = vertices[t.i0].position();
                     auto p1 = vertices[t.i1].position();
                     auto p2 = vertices[t.i2].position();
-                    return std::abs(length(cross(p1 - p0, p2 - p0)));
-                });
+                    triangle_areas[i] = std::abs(length(cross(p1 - p0, p2 - p0)));
+                }
                 auto [alias_table, pdf] = create_alias_table(triangle_areas);
                 auto [alias_table_buffer_view, alias_buffer_id] = _pipeline.bindless_arena_buffer<AliasEntry>(alias_table.size());
                 auto [pdf_buffer_view, pdf_buffer_id] = _pipeline.bindless_arena_buffer<float>(pdf.size());
@@ -71,8 +74,13 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
                 LUISA_ASSERT(alias_buffer_id - vertex_buffer_id == Shape::Handle::alias_table_buffer_id_offset, "Invalid.");
                 LUISA_ASSERT(pdf_buffer_id - vertex_buffer_id == Shape::Handle::pdf_buffer_id_offset, "Invalid.");
                 command_buffer << alias_table_buffer_view.copy_from(alias_table.data())
-                               << pdf_buffer_view.copy_from(pdf.data())
-                               << compute::commit();
+                               << pdf_buffer_view.copy_from(pdf.data());
+                if (!uvs.empty()) {
+                    auto [uv_buffer_view, uv_buffer_id] = _pipeline.bindless_arena_buffer<float2>(uvs.size());
+                    LUISA_ASSERT(uv_buffer_id - vertex_buffer_id == Shape::Handle::uv_buffer_id_offset, "Invalid.");
+                    command_buffer << uv_buffer_view.copy_from(uvs.data());
+                }
+                command_buffer << compute::commit();
                 auto geom = MeshGeometry{mesh, vertex_buffer_id};
                 _mesh_cache.emplace(hash, geom);
                 return geom;
@@ -206,24 +214,9 @@ Var<Triangle> Geometry::triangle(const Var<Shape::Handle> &instance, Expr<uint> 
         auto dp02 = p0 - p2;
         auto dp12 = p1 - p2;
         auto det = difference_of_products(duv02.x, duv12.y, duv02.y, duv12.x);
-        auto dpdu = def(make_float3());
-        auto dpdv = def(make_float3());
-        auto degenerate_uv = abs(det) < 1e-8f;
-        $if(!degenerate_uv) {
-            // Compute triangle $\dpdu$ and $\dpdv$ via matrix inversion
-            auto invdet = 1.f / det;
-            dpdu = difference_of_products(duv12.y, dp02, duv02.y, dp12) * invdet;
-            dpdv = difference_of_products(duv02.x, dp12, duv12.x, dp02) * invdet;
-        };
-        // Handle degenerate triangle $(u,v)$ parameterization or partial derivatives
-        $if(degenerate_uv | length_squared(cross(dpdu, dpdv)) == 0.f) {
-            auto n = cross(p2 - p0, p1 - p0);
-            auto b = ite(abs(n.x) > abs(n.z),
-                         make_float3(-n.y, n.x, 0.0f),
-                         make_float3(0.0f, -n.z, n.y));
-            dpdu = cross(b, n);
-        };
-        return dpdu;
+        auto inv_det = 1.f / det;
+        auto dpdu = difference_of_products(duv12.y, dp02, duv02.y, dp12) * inv_det;
+        return ite(abs(det) < 1e-8f, make_float3(0.f), normalize(dpdu));
     };
     return impl(p0, p1, p2, uv0, uv1, uv2);
 }
@@ -242,15 +235,16 @@ ShadingAttribute Geometry::shading_point(const Var<Shape::Handle> &instance, con
     auto c = cross(p1 - p0, p2 - p0);
     auto area = .5f * length(c);
     auto ng = normalize(c);
-    auto uv0 = ite(instance->has_vertex_uv(), v0->uv(), make_float2(0.f, 0.f));
-    auto uv1 = ite(instance->has_vertex_uv(), v1->uv(), make_float2(1.f, 0.f));
-    auto uv2 = ite(instance->has_vertex_uv(), v2->uv(), make_float2(0.f, 1.f));
-    auto uv = bary.x * uv0 + bary.y * uv1 + bary.z * uv2;
-    //    auto tangent = _compute_tangent(p0, p1, p2, uv0, uv1, uv2);
-    auto s_local = bary.x * v0->tangent() +
-                   bary.y * v1->tangent() +
-                   bary.z * v2->tangent();
-    auto s = normalize(shape_to_world_normal * s_local);
+    auto uv = bary.yz();
+    auto s = def(make_float3(0.f));
+    $if (instance->has_vertex_uv()) {
+        auto uv_buffer = instance->uv_buffer_id();
+        auto uv0 = _pipeline.buffer<float2>(uv_buffer).read(triangle.i0);
+        auto uv1 = _pipeline.buffer<float2>(uv_buffer).read(triangle.i1);
+        auto uv2 = _pipeline.buffer<float2>(uv_buffer).read(triangle.i2);
+        uv = bary.x * uv0 + bary.y * uv1 + bary.z * uv2;
+        s = _compute_tangent(p0, p1, p2, uv0, uv1, uv2);
+    };
     auto n0 = ite(instance->has_vertex_normal(), normalize(shape_to_world_normal * v0->normal()), ng);
     auto n1 = ite(instance->has_vertex_normal(), normalize(shape_to_world_normal * v1->normal()), ng);
     auto n2 = ite(instance->has_vertex_normal(), normalize(shape_to_world_normal * v2->normal()), ng);
