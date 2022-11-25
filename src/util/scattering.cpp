@@ -401,9 +401,7 @@ SampledSpectrum OrenNayar::evaluate(
                            sinThetaI / absCosThetaI, sinThetaO / absCosThetaO);
         return (a + b * maxCos * sinAlpha * tanBeta);
     };
-    auto f = _r * s;
-    $if(_sigma != 0.f & s > 0.f) { f *= scale(wo, wi, _a, _b); };
-    return f;
+    return s * scale(wo, wi, _a, _b) * _r;
 }
 
 SampledSpectrum FresnelBlend::Schlick(Expr<float> cosTheta) const noexcept {
