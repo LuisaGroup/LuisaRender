@@ -111,7 +111,7 @@ luisa::unique_ptr<Surface::Closure> MatteInstance::closure(
     Expr<float> eta_i, Expr<float> time) const noexcept {
     auto [Kd, _] = _kd ? _kd->evaluate_albedo_spectrum(it, swl, time) : Spectrum::Decode::one(swl.dimension());
     auto sigma = _sigma && !_sigma->node()->is_black() ?
-                     luisa::make_optional(clamp(_sigma->evaluate(it, swl, time).x, 0.f, 90.f)) :
+                     luisa::make_optional(saturate(_sigma->evaluate(it, swl, time).x) * 90.f) :
                      luisa::nullopt;
     return luisa::make_unique<MatteClosure>(this, it, swl, time, Kd, std::move(sigma));
 }
