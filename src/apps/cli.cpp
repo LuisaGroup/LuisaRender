@@ -90,16 +90,6 @@ int main(int argc, char *argv[]) {
         macros[key] = value;
     }
 
-    {
-        std::ofstream file{"results.txt", std::ios::app};
-        file << std::endl
-             << "Argv = ";
-        for (auto i = 0; i < argc; i++) {
-            file << argv[i] << " ";
-        }
-        file << std::endl;
-    }
-
     //    auto ies_profile = IESProfile::parse("/Users/mike/Downloads/002bb0e37aa7e5f1d7851fb1db032628.ies");
     //    LUISA_INFO(
     //        "Loaded IES profile with "
@@ -127,30 +117,12 @@ int main(int argc, char *argv[]) {
     Clock clock;
     auto scene_desc = SceneParser::parse(path, macros);
     auto parse_time = clock.toc();
-    {
-        std::ofstream file{"results.txt", std::ios::app};
-        file << "Scene parse time = " << parse_time << " ms" << std::endl;
-    }
-    LUISA_INFO(
-        "Parsed scene description "
-        "file '{}' in {} ms.",
-        path.string(), parse_time);
 
-    clock.tic();
+    LUISA_INFO("Parsed scene description file '{}' in {} ms.",
+               path.string(), parse_time);
     auto scene = Scene::create(context, scene_desc.get());
-    {
-        auto scene_load_time = clock.toc();
-        std::ofstream file{"results.txt", std::ios::app};
-        file << "Scene load time = " << scene_load_time << " ms" << std::endl;
-    }
-    auto stream = device.create_stream(true);
-    clock.tic();
+    auto stream = device.create_stream(false);
     auto pipeline = Pipeline::create(device, stream, *scene);
-    {
-        auto pipeline_create_time = clock.toc();
-        std::ofstream file{"results.txt", std::ios::app};
-        file << "Pipeline create time = " << pipeline_create_time << " ms" << std::endl;
-    }
     pipeline->render(stream);
     stream.synchronize();
 }
