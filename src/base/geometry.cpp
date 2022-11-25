@@ -245,20 +245,24 @@ ShadingAttribute Geometry::shading_point(const Var<Shape::Handle> &instance, con
         uv = bary.x * uv0 + bary.y * uv1 + bary.z * uv2;
         s = _compute_tangent(p0, p1, p2, uv0, uv1, uv2);
     };
-    auto n0 = ite(instance->has_vertex_normal(), normalize(shape_to_world_normal * v0->normal()), ng);
-    auto n1 = ite(instance->has_vertex_normal(), normalize(shape_to_world_normal * v1->normal()), ng);
-    auto n2 = ite(instance->has_vertex_normal(), normalize(shape_to_world_normal * v2->normal()), ng);
-    auto ns = normalize(bary.x * n0 + bary.y * n1 + bary.z * n2);
-    // offset p to fake surface for the shadow terminator
-    // reference: Ray Tracing Gems 2, Chap. 4
-    auto shadow_term = instance->shadow_terminator_factor();
-    auto temp_u = p - p0;
-    auto temp_v = p - p1;
-    auto temp_w = p - p2;
-    auto dp = bary.x * (temp_u - min(dot(temp_u, n0), 0.f) * n0) +
-              bary.y * (temp_v - min(dot(temp_v, n1), 0.f) * n1) +
-              bary.z * (temp_w - min(dot(temp_w, n2), 0.f) * n2);
-    auto ps = p + shadow_term * dp;
+    auto ns = ng;
+    auto ps = p;
+    $if (instance->has_vertex_normal()) {
+        auto n0 = ite(instance->has_vertex_normal(), normalize(shape_to_world_normal * v0->normal()), ng);
+        auto n1 = ite(instance->has_vertex_normal(), normalize(shape_to_world_normal * v1->normal()), ng);
+        auto n2 = ite(instance->has_vertex_normal(), normalize(shape_to_world_normal * v2->normal()), ng);
+        ns = normalize(bary.x * n0 + bary.y * n1 + bary.z * n2);
+        // offset p to fake surface for the shadow terminator
+        // reference: Ray Tracing Gems 2, Chap. 4
+        auto shadow_term = instance->shadow_terminator_factor();
+        auto temp_u = p - p0;
+        auto temp_v = p - p1;
+        auto temp_w = p - p2;
+        auto dp = bary.x * (temp_u - min(dot(temp_u, n0), 0.f) * n0) +
+                  bary.y * (temp_v - min(dot(temp_v, n1), 0.f) * n1) +
+                  bary.z * (temp_w - min(dot(temp_w, n2), 0.f) * n2);
+        ps = p + shadow_term * dp;
+    };
     return {.pg = p,
             .ng = ng,
             .ps = ps,
