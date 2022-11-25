@@ -375,7 +375,7 @@ SubdivMesh loop_subdivide(luisa::span<const Vertex> vertices,
                              usedVerts[f[i]->v[2u]]};
         mesh.base_triangle_indices[i] = f[i]->baseTriangle;
     }
-    return {};
+    return mesh;
 }
 
 static float3 weightOneRing(SDVertex *vert, float beta) noexcept {

@@ -27,7 +27,7 @@ public:
 
     // Load the mesh from a file.
     [[nodiscard]] static auto load(std::filesystem::path path, uint subdiv_level,
-                                   bool flip_uv, bool drop_normal) noexcept {
+                                   bool flip_uv, bool drop_normal, bool drop_uv) noexcept {
 
         // TODO: static lifetime seems not good...
         static luisa::lru_cache<uint64_t, std::shared_future<MeshLoader>> loaded_meshes{256u};
@@ -39,25 +39,35 @@ public:
         std::scoped_lock lock{mutex};
         if (auto m = loaded_meshes.at(key)) { return *m; }
 
-        auto future = ThreadPool::global().async([path = std::move(path), subdiv_level, flip_uv, drop_normal] {
+        auto future = ThreadPool::global().async([path = std::move(path), subdiv_level, flip_uv, drop_normal, drop_uv] {
             Clock clock;
             auto path_string = path.string();
             Assimp::Importer importer;
             importer.SetPropertyInteger(
                 AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_LINE | aiPrimitiveType_POINT);
             importer.SetPropertyFloat(AI_CONFIG_PP_GSN_MAX_SMOOTHING_ANGLE, 45.f);
-            auto import_flags = aiProcess_RemoveComponent | aiProcess_GenUVCoords |
-                                aiProcess_TransformUVCoords | aiProcess_SortByPType |
+            auto import_flags = aiProcess_RemoveComponent | aiProcess_SortByPType |
                                 aiProcess_ValidateDataStructure | aiProcess_ImproveCacheLocality |
-                                aiProcess_PreTransformVertices | aiProcess_FindInvalidData;
-            if (!flip_uv) { import_flags |= aiProcess_FlipUVs; }
-            import_flags |= drop_normal ? aiProcess_DropNormals : aiProcess_GenSmoothNormals;
+                                aiProcess_PreTransformVertices | aiProcess_FindInvalidData |
+                                aiProcess_JoinIdenticalVertices;
             auto remove_flags = aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS |
                                 aiComponent_CAMERAS | aiComponent_LIGHTS |
                                 aiComponent_MATERIALS | aiComponent_TEXTURES |
                                 aiComponent_COLORS | aiComponent_TANGENTS_AND_BITANGENTS;
-            importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, static_cast<int>(remove_flags));
+            if (drop_uv) {
+                remove_flags |= aiComponent_TEXCOORDS;
+            } else {
+                if (!flip_uv) { import_flags |= aiProcess_FlipUVs; }
+                import_flags |= aiProcess_GenUVCoords | aiProcess_TransformUVCoords;
+            }
+            if (drop_normal) {
+                import_flags |= aiProcess_DropNormals;
+                remove_flags |= aiComponent_NORMALS;
+            } else {
+                import_flags |= aiProcess_GenSmoothNormals;
+            }
             if (subdiv_level == 0) { import_flags |= aiProcess_Triangulate; }
+            importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, static_cast<int>(remove_flags));
             auto model = importer.ReadFile(path_string.c_str(), import_flags);
             if (model == nullptr || (model->mFlags & AI_SCENE_FLAGS_INCOMPLETE) ||
                 model->mRootNode == nullptr || model->mRootNode->mNumMeshes == 0) [[unlikely]] {
@@ -148,7 +158,8 @@ public:
           _loader{MeshLoader::load(desc->property_path("file"),
                                    desc->property_uint_or_default("subdivision", 0u),
                                    desc->property_bool_or_default("flip_uv", false),
-                                   desc->property_bool_or_default("drop_normal", false))} {}
+                                   desc->property_bool_or_default("drop_normal", false),
+                                   desc->property_bool_or_default("drop_uv", false))} {}
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] bool is_mesh() const noexcept override { return true; }
     [[nodiscard]] MeshView mesh() const noexcept override { return _loader.get().mesh(); }
