@@ -90,27 +90,25 @@ public:
                     static_cast<void *>(mesh->mTextureCoords[0]),
                     mesh->mNumUVComponents[0]);
             }
-            MeshLoader loader;
             auto vertex_count = mesh->mNumVertices;
-            loader._vertices.resize(vertex_count);
-            loader._uvs.resize(vertex_count);
             auto ai_positions = mesh->mVertices;
             auto ai_normals = mesh->mNormals;
-            auto ai_colors = mesh->mColors[0];
-            auto ai_tex_coords = mesh->mTextureCoords[0];
-            auto ai_tangents = mesh->mTangents;
-            loader._properties = (ai_tex_coords != nullptr ? Shape::property_flag_has_vertex_uv : 0u) |
-                                 (ai_normals != nullptr ? Shape::property_flag_has_vertex_normal : 0u);
+            MeshLoader loader;
+            loader._vertices.resize(vertex_count);
+            if (ai_normals) { loader._properties |= Shape::property_flag_has_vertex_normal; }
             for (auto i = 0; i < vertex_count; i++) {
                 auto p = make_float3(ai_positions[i].x, ai_positions[i].y, ai_positions[i].z);
                 auto n = ai_normals ?
                              normalize(make_float3(ai_normals[i].x, ai_normals[i].y, ai_normals[i].z)) :
-                             make_float3(0.f);
-                auto uv = ai_tex_coords ?
-                              make_float2(ai_tex_coords[i].x, ai_tex_coords[i].y) :
-                              make_float2(0.f);
+                             make_float3(0.f, 0.f, 1.f);
                 loader._vertices[i] = Vertex::encode(p, n);
-                loader._uvs[i] = uv;
+            }
+            if (auto ai_tex_coords = mesh->mTextureCoords[0]) {
+                loader._uvs.resize(vertex_count);
+                loader._properties |= Shape::property_flag_has_vertex_uv;
+                for (auto i = 0; i < vertex_count; i++) {
+                    loader._uvs[i] = make_float2(ai_tex_coords[i].x, ai_tex_coords[i].y);
+                }
             }
             if (subdiv_level == 0u) {
                 auto ai_triangles = mesh->mFaces;

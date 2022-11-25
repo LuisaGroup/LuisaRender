@@ -92,7 +92,7 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
             // assign mesh data
             MeshData mesh_data{
                 .resource = mesh_geom.resource,
-                .shadow_term = encode_fixed_point(shape->shadow_terminator_factor()),
+                .shadow_term = encode_fixed_point(shape->has_vertex_normal() ? shape->shadow_terminator_factor() : 0.f),
                 .intersection_offset = encode_fixed_point(shape->intersection_offset_factor()),
                 .geometry_buffer_id_base = mesh_geom.buffer_id_base,
                 .vertex_properties = shape->vertex_properties()};
@@ -237,7 +237,7 @@ ShadingAttribute Geometry::shading_point(const Var<Shape::Handle> &instance, con
     auto ng = normalize(c);
     auto uv = bary.yz();
     auto s = def(make_float3(0.f));
-    $if (instance->has_vertex_uv()) {
+    $if(instance->has_vertex_uv()) {
         auto uv_buffer = instance->uv_buffer_id();
         auto uv0 = _pipeline.buffer<float2>(uv_buffer).read(triangle.i0);
         auto uv1 = _pipeline.buffer<float2>(uv_buffer).read(triangle.i1);
@@ -247,7 +247,7 @@ ShadingAttribute Geometry::shading_point(const Var<Shape::Handle> &instance, con
     };
     auto ns = ng;
     auto ps = p;
-    $if (instance->has_vertex_normal()) {
+    $if(instance->has_vertex_normal()) {
         auto n0 = ite(instance->has_vertex_normal(), normalize(shape_to_world_normal * v0->normal()), ng);
         auto n1 = ite(instance->has_vertex_normal(), normalize(shape_to_world_normal * v1->normal()), ng);
         auto n2 = ite(instance->has_vertex_normal(), normalize(shape_to_world_normal * v2->normal()), ng);

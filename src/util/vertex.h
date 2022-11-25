@@ -12,7 +12,8 @@ namespace luisa::render {
 
 template<typename T>
     requires std::same_as<luisa::compute::expr_value_t<T>, float3>
-[[nodiscard]] inline auto oct_encode(T n) noexcept {
+[[nodiscard]] inline auto oct_encode(T n_in) noexcept {
+    auto n = select(normalize(n_in), make_float3(0.f, 0.f, 1.f), all(n_in == 0.f));
     constexpr auto oct_wrap = [](auto v) noexcept {
         return (1.f - abs(v.yx())) * select(make_float2(-1.f), make_float2(1.f), v >= 0.0f);
     };
