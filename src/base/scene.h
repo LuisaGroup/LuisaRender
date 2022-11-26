@@ -81,6 +81,8 @@ public:
     [[nodiscard]] const Spectrum *spectrum() const noexcept;
     [[nodiscard]] luisa::span<const Shape *const> shapes() const noexcept;
     [[nodiscard]] luisa::span<const Camera *const> cameras() const noexcept;
+    [[nodiscard]] float shadow_terminator_factor() const noexcept;
+    [[nodiscard]] float intersection_offset_factor() const noexcept;
 };
 
 }// namespace luisa::render

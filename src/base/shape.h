@@ -8,6 +8,7 @@
 #include <util/half.h>
 #include <util/vertex.h>
 #include <base/scene_node.h>
+#include <base/scene.h>
 
 namespace luisa::render {
 
@@ -71,8 +72,14 @@ private:
 public:
     ShadowTerminatorShapeWrapper(Scene *scene, const SceneNodeDesc *desc) noexcept
         : BaseShape{scene, desc},
-          _shadow_terminator{std::clamp(desc->property_float_or_default("shadow_terminator", 0.f), 0.f, 1.f)} {}
-    [[nodiscard]] float shadow_terminator_factor() const noexcept override { return _shadow_terminator; }
+          _shadow_terminator{std::clamp(
+              desc->property_float_or_default(
+                  "shadow_terminator",
+                  scene->shadow_terminator_factor()),
+              0.f, 1.f)} {}
+    [[nodiscard]] float shadow_terminator_factor() const noexcept override {
+        return _shadow_terminator;
+    }
 };
 
 template<typename BaseShape>
@@ -84,8 +91,14 @@ private:
 public:
     IntersectionOffsetShapeWrapper(Scene *scene, const SceneNodeDesc *desc) noexcept
         : BaseShape{scene, desc},
-          _intersection_offset{std::clamp(desc->property_float_or_default("intersection_offset", 0.f), 0.f, 1.f)} {}
-    [[nodiscard]] float intersection_offset_factor() const noexcept override { return _intersection_offset; }
+          _intersection_offset{std::clamp(
+              desc->property_float_or_default(
+                  "intersection_offset",
+                  scene->intersection_offset_factor()),
+              0.f, 1.f)} {}
+    [[nodiscard]] float intersection_offset_factor() const noexcept override {
+        return _intersection_offset;
+    }
 };
 
 template<typename BaseShape>
