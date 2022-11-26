@@ -37,7 +37,7 @@ public:
         [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_film); }
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
         [[nodiscard]] virtual Accumulation read(Expr<uint2> pixel) const noexcept = 0;
-        virtual void accumulate(Expr<uint2> pixel, Expr<float3> rgb, Expr<float> effective_spp = 1.f) const noexcept;
+        void accumulate(Expr<uint2> pixel, Expr<float3> rgb, Expr<float> effective_spp = 1.f) const noexcept;
         virtual void prepare(CommandBuffer &command_buffer) noexcept = 0;
         virtual void clear(CommandBuffer &command_buffer) noexcept = 0;
         virtual void download(CommandBuffer &command_buffer, float4 *framebuffer) const noexcept = 0;
