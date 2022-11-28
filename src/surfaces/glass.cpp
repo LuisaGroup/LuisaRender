@@ -172,16 +172,12 @@ private:
         auto pdf = def(0.f);
         auto ratio = _refl_prob(wo_local);
         $if(same_hemisphere(wo_local, wi_local)) {
-            auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f |
-                                      _it.shape()->shadow_terminator_factor() > 0.f,
-                                  1.f, 0.f);
-            f = _refl->evaluate(wo_local, wi_local, mode) * same_sided;
-            pdf = _refl->pdf(wo_local, wi_local, mode) * ratio * same_sided;
+            f = _refl->evaluate(wo_local, wi_local, mode);
+            pdf = _refl->pdf(wo_local, wi_local, mode) * ratio;
         }
         $else {
-            auto different_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) < 0.0f, 1.f, 0.f);
-            f = _trans->evaluate(wo_local, wi_local, mode) * different_sided;
-            pdf = _trans->pdf(wo_local, wi_local, mode) * (1.f - ratio) * different_sided;
+            f = _trans->evaluate(wo_local, wi_local, mode);
+            pdf = _trans->pdf(wo_local, wi_local, mode) * (1.f - ratio);
         };
         auto entering = wi_local.z < 0.f;
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
@@ -199,17 +195,11 @@ private:
         $if(u_lobe < ratio) {// Reflection
             f = _refl->sample(wo_local, &wi_local, u, &pdf, mode);
             wi = _it.shading().local_to_world(wi_local);
-            auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f |
-                                      _it.shape()->shadow_terminator_factor() > 0.f,
-                                  1.f, 0.f);
             pdf *= ratio;
-            f *= same_sided;
         }
         $else {// Transmission
             f = _trans->sample(wo_local, &wi_local, u, &pdf, mode);
             wi = _it.shading().local_to_world(wi_local);
-            auto different_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) < 0.0f, 1.f, 0.f);
-            f *= different_sided;
             pdf *= (1.f - ratio);
             event = ite(cos_theta(wo_local) > 0.f, Surface::event_enter, Surface::event_exit);
         };

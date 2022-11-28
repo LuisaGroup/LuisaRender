@@ -237,11 +237,7 @@ private:
         auto f = _lobe->evaluate(wo_local, wi_local, mode);
         if (_refl) { f *= *_refl; }
         auto pdf = _lobe->pdf(wo_local, wi_local, mode);
-        auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f |
-                                  _it.shape()->shadow_terminator_factor() > 0.f,
-                              1.f, 0.f);
-        return {.f = f * abs_cos_theta(wi_local) * same_sided,
-                .pdf = pdf * same_sided};
+        return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
     [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float>, Expr<float2> u,
                                           TransportMode mode) const noexcept override {
@@ -251,11 +247,7 @@ private:
         auto f = _lobe->sample(wo_local, &wi_local, u, &pdf, mode);
         if (_refl) { f *= *_refl; }
         auto wi = _it.shading().local_to_world(wi_local);
-        auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f |
-                                  _it.shape()->shadow_terminator_factor() > 0.f,
-                              1.f, 0.f);
-        return {.eval = {.f = f * abs_cos_theta(wi_local) * same_sided,
-                         .pdf = pdf * same_sided},
+        return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf},
                 .wi = wi,
                 .event = Surface::event_reflect};
     }

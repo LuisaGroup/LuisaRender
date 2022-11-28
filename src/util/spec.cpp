@@ -465,6 +465,10 @@ SampledSpectrum sqrt(const SampledSpectrum &t) noexcept {
     return t.map([](auto x) noexcept { return sqrt(x); });
 }
 
+SampledSpectrum exp(const SampledSpectrum &t) noexcept {
+    return t.map([](auto x) noexcept { return exp(x); });
+}
+
 void SampledWavelengths::terminate_secondary() const noexcept {
     using namespace luisa::compute;
     auto terminated = def(true);

@@ -576,12 +576,13 @@ public:
     }
 
 private:
-    [[nodiscard]] Surface::Evaluation _evaluate_local(Float3 wo_local, Float3 wi_local,
-                                                      Bool geom_same_sided, TransportMode mode) const noexcept {
+    [[nodiscard]] Surface::Evaluation _evaluate_local(Float3 wo_local,
+                                                      Float3 wi_local,
+                                                      TransportMode mode) const noexcept {
         SampledSpectrum f{_swl.dimension(), 0.f};
         auto pdf = def(0.f);
         $if(same_hemisphere(wo_local, wi_local)) {// reflection
-            $if(geom_same_sided | _it.shape()->shadow_terminator_factor() > 0.f) {
+            $if(_it.shape()->shadow_terminator_factor() > 0.f) {
                 if (_diffuse) {
                     f += _diffuse->evaluate(wo_local, wi_local, mode);
                     f += _retro->evaluate(wo_local, wi_local, mode);
@@ -604,11 +605,9 @@ private:
         }
         $else {// transmission
             if (_spec_trans) {
-                $if(!geom_same_sided) {
-                    f = _spec_trans->evaluate(wo_local, wi_local, mode);
-                    pdf = _sampling_weights[_spec_trans_technique_index] *
-                          _spec_trans->pdf(wo_local, wi_local, mode);
-                };
+                f = _spec_trans->evaluate(wo_local, wi_local, mode);
+                pdf = _sampling_weights[_spec_trans_technique_index] *
+                      _spec_trans->pdf(wo_local, wi_local, mode);
             }
         };
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
@@ -617,7 +616,7 @@ private:
                                                 TransportMode mode) const noexcept override {
         auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = _it.shading().world_to_local(wi);
-        return _evaluate_local(wo_local, wi_local, dot(_it.ng(), wo) * dot(_it.ng(), wi) > 0.f, mode);
+        return _evaluate_local(wo_local, wi_local, mode);
     }
     [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float> u_lobe,
                                           Expr<float2> u, TransportMode mode) const noexcept override {
@@ -658,7 +657,7 @@ private:
         auto eval = Surface::Evaluation::zero(_color.dimension());
         auto wi = _it.shading().local_to_world(wi_sample.wi);
         $if(wi_sample.valid) {
-            eval = _evaluate_local(wo_local, wi_sample.wi, dot(_it.ng(), wo) * dot(_it.ng(), wi) > 0.f, mode);
+            eval = _evaluate_local(wo_local, wi_sample.wi, mode);
         };
         return {.eval = eval, .wi = wi, .event = event};
     }
@@ -828,12 +827,13 @@ public:
     [[nodiscard]] luisa::optional<Float> _eta() const noexcept override { return luisa::nullopt; }
 
 private:
-    [[nodiscard]] Surface::Evaluation _evaluate_local(Float3 wo_local, Float3 wi_local,
-                                                      Bool geom_same_sided, TransportMode mode) const noexcept {
+    [[nodiscard]] Surface::Evaluation _evaluate_local(Float3 wo_local,
+                                                      Float3 wi_local,
+                                                      TransportMode mode) const noexcept {
         SampledSpectrum f{_swl.dimension(), 0.f};
         auto pdf = def(0.f);
         $if(same_hemisphere(wo_local, wi_local)) {// reflection
-            $if(geom_same_sided | _it.shape()->shadow_terminator_factor() > 0.f) {
+            $if(_it.shape()->shadow_terminator_factor() > 0.f) {
                 if (_diffuse) {
                     f += _diffuse->evaluate(wo_local, wi_local, mode);
                     f += _retro->evaluate(wo_local, wi_local, mode);
@@ -855,18 +855,16 @@ private:
             };
         }
         $else {// transmission
-            $if(!geom_same_sided) {
-                if (_spec_trans) {
-                    f += _spec_trans->evaluate(wo_local, wi_local, mode);
-                    pdf += _sampling_weights[_spec_trans_technique_index] *
-                           _spec_trans->pdf(wo_local, wi_local, mode);
-                }
-                if (_diff_trans) {
-                    f += _diff_trans->evaluate(wo_local, wi_local, mode);
-                    pdf += _sampling_weights[_diff_trans_technique_index] *
-                           _diff_trans->pdf(wo_local, wi_local, mode);
-                }
-            };
+            if (_spec_trans) {
+                f += _spec_trans->evaluate(wo_local, wi_local, mode);
+                pdf += _sampling_weights[_spec_trans_technique_index] *
+                       _spec_trans->pdf(wo_local, wi_local, mode);
+            }
+            if (_diff_trans) {
+                f += _diff_trans->evaluate(wo_local, wi_local, mode);
+                pdf += _sampling_weights[_diff_trans_technique_index] *
+                       _diff_trans->pdf(wo_local, wi_local, mode);
+            }
         };
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
@@ -874,7 +872,7 @@ private:
                                                 TransportMode mode) const noexcept override {
         auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = _it.shading().world_to_local(wi);
-        return _evaluate_local(wo_local, wi_local, dot(_it.ng(), wo) * dot(_it.ng(), wi) > 0.f, mode);
+        return _evaluate_local(wo_local, wi_local, mode);
     }
     [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float> u_lobe,
                                           Expr<float2> u, TransportMode mode) const noexcept override {
@@ -921,7 +919,7 @@ private:
         auto eval = Surface::Evaluation::zero(_color.dimension());
         auto wi = _it.shading().local_to_world(wi_sample.wi);
         $if(wi_sample.valid) {
-            eval = _evaluate_local(wo_local, wi_sample.wi, dot(_it.ng(), wo) * dot(_it.ng(), wi) > 0.f, mode);
+            eval = _evaluate_local(wo_local, wi_sample.wi, mode);
         };
         return {.eval = eval, .wi = wi, .event = event};
     }
