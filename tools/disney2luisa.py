@@ -120,13 +120,14 @@ def check_dir(input_dir: Path, output_dir: Path, input_force_exist: bool = True)
 
 def split_obj(file_path_relative: Path, output_dir: Path,
               materials_dict: dict, geo_name: str, converter_info: ConverterInfo) -> (dict, bool):
+    if not output_dir.exists():
+        os.mkdir(output_dir)
     json_name_last = f'file2material_{file_path_relative.stem}.json'
     file2material_path = output_dir / json_name_last
     file_path_str = str(file_path_relative).replace('\\', '/')
     index0 = file_path_str.find('obj/') + 4
     index1 = file_path_str.find('/', index0)
     geo_name_real = file_path_str[index0:index1]
-    split_tag = None
 
     if geo_name_real != geo_name:
         file2material_path = (converter_info.output_project_dir / file_path_relative).parent / json_name_last
@@ -138,14 +139,14 @@ def split_obj(file_path_relative: Path, output_dir: Path,
         log_info(
             f'Multiprocessing waiting start: {file2material_path}, geo_name_real={geo_name_real}, geo_name={geo_name}')
         geo_name_real_finished_path = converter_info.output_geo_dir / geo_name_real / 'finished.txt'
-        split_tag = False
+        split_by_itself = False
         while not file2material_path.exists() or file2material_path.stat().st_size == 0:
             if geo_name_real_finished_path.exists():
-                split_tag = True
+                split_by_itself = True
                 break
             log_info(f'Multiprocessing sleep: {file2material_path}, geo_name_real={geo_name_real}, geo_name={geo_name}')
             time.sleep(5.0)
-        if not split_tag:
+        if not split_by_itself:
             log_info(
                 f'Multiprocessing waiting end: {file2material_path}, geo_name_real={geo_name_real}, geo_name={geo_name}')
             with open(file2material_path, 'r') as f:
@@ -226,7 +227,7 @@ def split_obj(file_path_relative: Path, output_dir: Path,
         lines = geo_lines.get(name, [])
         if len(lines) == 0:
             return
-        new_obj_file_path = output_dir / (name + '.obj')
+        new_obj_file_path = output_dir / f'{name}.obj'
         with open(new_obj_file_path, 'a') as f:
             f.writelines(lines)
         geo_lines[name] = []
@@ -333,9 +334,8 @@ def split_obj(file_path_relative: Path, output_dir: Path,
         for name in geo_lines:
             write_geo_force(name, geo_lines)
 
-    if split_tag is not None:
-        with open(file2material_path, 'w') as f:
-            json.dump(file2material, f, indent=2)
+    with open(file2material_path, 'w') as f:
+        json.dump(file2material, f, indent=2)
 
     return file2material, True
 
@@ -638,9 +638,8 @@ def convert_geometry(converter_info: ConverterInfo, geo_name: str) -> (Converter
 
     # geometry of itself
     geo_obj_file = geo.get('geomObjFile', None)
-    output_dir = converter_info.output_geo_dir / geo_name
     if geo_obj_file is not None:
-        assert output_dir == (converter_info.output_project_dir / geo_obj_file).parent
+        output_dir = (converter_info.output_project_dir / geo_obj_file).parent
         geo2material, split_by_itself = split_obj(file_path_relative=Path(geo_obj_file), output_dir=output_dir,
                                                   materials_dict=materials_dict, geo_name=geo_name,
                                                   converter_info=converter_info)
@@ -656,30 +655,34 @@ def convert_geometry(converter_info: ConverterInfo, geo_name: str) -> (Converter
 
     # primitives
     primitives = geo.get('instancedPrimitiveJsonFiles', None)
-    output_dir = converter_info.output_geo_dir / geo_name / 'archives'
     if primitives is not None:
         for name_p, primitive in primitives.items():
             if primitive['type'] != 'archive':
                 log_warning(f'Primitive {name_p} type "{primitive["type"]}" not supported, passed')
                 continue
 
+            input_path = converter_info.input_project_dir / primitive['jsonFile']
+
             main_cache['instancedPrimitiveJsonFiles'][name_p] = []
             primitive_name = f'geo_{geo_name}_{name_p}'  # geo_isBeach_xgStones   # TODO
             primitive_dict = shape_group()
 
-            instanced_primitive = json.load(open(converter_info.input_project_dir / primitive['jsonFile'], 'r'))
+            instanced_primitive = json.load(open(input_path, 'r'))
             for geo_obj_file, copies in instanced_primitive.items():
+                output_dir = (converter_info.output_project_dir / geo_obj_file).parent
                 geo2material, split_by_itself = split_obj(file_path_relative=Path(geo_obj_file), output_dir=output_dir,
                                                           materials_dict=materials_dict, geo_name=geo_name,
                                                           converter_info=converter_info)
                 if split_by_itself:
+                    log_info(f'Primitive {name_p} geo {geo_obj_file} split by itself')
                     imports, shapes = write_obj_json(geo2material=geo2material,
-                                          output_json_path=converter_info.output_json_dir / geo_name / f'archive_{Path(geo_obj_file).stem}.json',
-                                          output_geo_dir=output_dir)
+                                                     output_json_path=converter_info.output_json_dir / geo_name / f'archive_{Path(geo_obj_file).stem}.json',
+                                                     output_geo_dir=output_dir)
                     for import_absolute in imports:
                         import_relative = os.path.relpath(import_absolute, converter_info.output_json_dir / geo_name)
                         geo_dict['import'].append(str(import_relative).replace('\\', '/'))
                 else:
+                    log_info(f'Primitive {name_p} geo {geo_obj_file} not split by itself')
                     shapes = ref_obj_json(geo2material=geo2material)
 
                 primitive_part_name = f'geo_{geo_name}_{name_p}_{Path(geo_obj_file).stem}'  # TODO
@@ -864,7 +867,7 @@ f   -4   -3   -2   -1
 
     # test_geo_names = ['isBeach', 'isCoastline', 'osOcean', 'isDunesA', 'isDunesB', 'isMountainA', 'isMountainB']
     # test_geo_names = ['isBeach']
-    test_geo_names = ['isDunesA']
+    test_geo_names = ['isDunesA', 'isCoastline', ]
 
     pool = multiprocessing.Pool()
     threads = []
