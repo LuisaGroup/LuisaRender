@@ -4,9 +4,9 @@
 
 #include <random>
 
-#include <base/scene.h>
-#include <base/filter.h>
 #include <sdl/scene_node_desc.h>
+#include <base/filter.h>
+#include <base/scene.h>
 #include <base/camera.h>
 #include <base/pipeline.h>
 
@@ -25,6 +25,28 @@ Camera::Camera(Scene *scene, const SceneNodeDesc *desc) noexcept
           }))},
       _shutter_samples{desc->property_uint_or_default("shutter_samples", 0u)},// 0 means default
       _spp{desc->property_uint_or_default("spp", 1024u)} {
+
+    // For compatibility with older scene description versions
+    if (_transform == nullptr) {
+        static constexpr auto default_position = make_float3(0.f, 0.f, 0.f);
+        static constexpr auto default_front = make_float3(0.f, 0.f, -1.f);
+        static constexpr auto default_up = make_float3(0.f, 1.f, 0.f);
+        auto position = desc->property_float3_or_default("position", default_position);
+        auto front = desc->property_float3_or_default(
+            "front", lazy_construct([desc, position] {
+                auto look_at = desc->property_float3_or_default("look_at", position + default_front);
+                return normalize(look_at - position);
+            }));
+        auto up = desc->property_float3_or_default("up", default_up);
+        if (!all(position == default_position && front == default_front && up == default_up)) {
+            SceneNodeDesc d{luisa::format("{}$transform", desc->identifier()), SceneNodeTag::TRANSFORM};
+            d.define(SceneNodeTag::TRANSFORM, "View", desc->source_location());
+            d.add_property("position", SceneNodeDesc::number_list{position.x, position.y, position.z});
+            d.add_property("front", SceneNodeDesc::number_list{front.x, front.y, front.z});
+            d.add_property("up", SceneNodeDesc::number_list{up.x, up.y, up.z});
+            _transform = scene->load_transform(&d);
+        }
+    }
 
     if (_shutter_span.y < _shutter_span.x) [[unlikely]] {
         LUISA_ERROR(
@@ -186,11 +208,10 @@ Camera::Instance::Instance(Pipeline &pipeline, CommandBuffer &command_buffer, co
     pipeline.register_transform(camera->transform());
 }
 
-Camera::Sample Camera::Instance::generate_ray(
-    Sampler::Instance &sampler, Expr<uint2> pixel_coord, Expr<float> time) const noexcept {
-    auto [filter_offset, filter_weight] = filter()->sample(sampler.generate_pixel_2d());
+Camera::Sample Camera::Instance::generate_ray(Expr<uint2> pixel_coord, Expr<float> time,
+                                              Expr<float2> u_filter, Expr<float2> u_lens) const noexcept {
+    auto [filter_offset, filter_weight] = filter()->sample(u_filter);
     auto pixel = make_float2(pixel_coord) + 0.5f + filter_offset;
-    auto u_lens = node()->requires_lens_sampling() ? sampler.generate_2d() : make_float2(0.5f);
     auto sample = _generate_ray_in_camera_space(pixel, u_lens, time);
     sample.weight *= filter_weight;
     auto c2w = camera_to_world();

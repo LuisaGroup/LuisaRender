@@ -12,9 +12,14 @@ namespace luisa::render {
 
 using compute::Triangle;
 
-[[nodiscard]] std::pair<luisa::vector<Vertex>, luisa::vector<Triangle>>
-loop_subdivide(luisa::span<const Vertex> vertices,
-               luisa::span<const Triangle> triangles,
-               uint level) noexcept;
+struct SubdivMesh {
+    luisa::vector<Vertex> vertices;
+    luisa::vector<Triangle> triangles;
+    luisa::vector<uint> base_triangle_indices;
+};
+
+[[nodiscard]] SubdivMesh loop_subdivide(luisa::span<const Vertex> vertices,
+                                        luisa::span<const Triangle> triangles,
+                                        uint level) noexcept;
 
 }// namespace luisa::render

@@ -68,6 +68,12 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
                               .copy_from(pipeline->_transform_matrices.data());
     }
     command_buffer << compute::commit();
+    LUISA_INFO("Created pipeline with {} camera(s), {} shape instance(s), "
+               "{} surface instance(s), and {} light instance(s).",
+               pipeline->_cameras.size(),
+               pipeline->_geometry->instances().size(),
+               pipeline->_surfaces.size(),
+               pipeline->_lights.size());
     return pipeline;
 }
 

@@ -8,6 +8,7 @@
 #include <util/half.h>
 #include <util/vertex.h>
 #include <base/scene_node.h>
+#include <base/scene.h>
 
 namespace luisa::render {
 
@@ -21,16 +22,23 @@ class Light;
 class Surface;
 class Transform;
 
+struct MeshView {
+    luisa::span<const Vertex> vertices;
+    luisa::span<const float2> uvs;
+    luisa::span<const Triangle> triangles;
+};
+
 class Shape : public SceneNode {
 
 public:
     class Handle;
 
 public:
-    static constexpr auto property_flag_has_normal = 1u << 0u;
-    static constexpr auto property_flag_has_uv = 1u << 1u;
+    static constexpr auto property_flag_has_vertex_normal = 1u << 0u;
+    static constexpr auto property_flag_has_vertex_uv = 1u << 1u;
     static constexpr auto property_flag_has_surface = 1u << 2u;
     static constexpr auto property_flag_has_light = 1u << 3u;
+    static constexpr auto property_flag_has_medium = 1u << 4u;
 
 private:
     const Surface *_surface;
@@ -39,20 +47,20 @@ private:
 
 public:
     Shape(Scene *scene, const SceneNodeDesc *desc) noexcept;
-    [[nodiscard]] auto surface() const noexcept { return _surface; }
-    [[nodiscard]] auto light() const noexcept { return _light; }
-    [[nodiscard]] auto transform() const noexcept { return _transform; }
-    [[nodiscard]] virtual bool visible() const noexcept { return true; }
-    [[nodiscard]] virtual float shadow_terminator_factor() const noexcept { return 0.f; }
-    [[nodiscard]] virtual float intersection_offset_factor() const noexcept { return 0.f; }
-    [[nodiscard]] virtual bool is_mesh() const noexcept = 0;
-    [[nodiscard]] virtual bool has_normal() const noexcept = 0;
-    [[nodiscard]] virtual bool has_uv() const noexcept = 0;
-    [[nodiscard]] virtual luisa::span<const Vertex> vertices() const noexcept = 0;                         // empty if the shape is not a mesh
-    [[nodiscard]] virtual luisa::span<const Triangle> triangles() const noexcept = 0;                      // empty if the shape is not a mesh
-    [[nodiscard]] virtual luisa::span<const Shape *const> children() const noexcept = 0;                   // empty if the shape is a mesh
-    [[nodiscard]] virtual bool deformable() const noexcept = 0;                                            // true if the shape will not deform
-    [[nodiscard]] virtual AccelUsageHint build_hint() const noexcept { return AccelUsageHint::FAST_TRACE; }// accel struct build quality, only considered for meshes
+    [[nodiscard]] const Surface *surface() const noexcept;
+    [[nodiscard]] const Light *light() const noexcept;
+    [[nodiscard]] const Transform *transform() const noexcept;
+    [[nodiscard]] virtual bool visible() const noexcept;
+    [[nodiscard]] virtual float shadow_terminator_factor() const noexcept;
+    [[nodiscard]] virtual float intersection_offset_factor() const noexcept;
+    [[nodiscard]] virtual bool is_mesh() const noexcept;
+    [[nodiscard]] virtual uint vertex_properties() const noexcept;
+    [[nodiscard]] bool has_vertex_normal() const noexcept;
+    [[nodiscard]] bool has_vertex_uv() const noexcept;
+    [[nodiscard]] virtual MeshView mesh() const noexcept;                           // empty if the shape is not a mesh
+    [[nodiscard]] virtual luisa::span<const Shape *const> children() const noexcept;// empty if the shape is a mesh
+    [[nodiscard]] virtual bool deformable() const noexcept;                         // true if the shape will not deform
+    [[nodiscard]] virtual AccelUsageHint build_hint() const noexcept;               // accel struct build quality, only considered for meshes
 };
 
 template<typename BaseShape>
@@ -64,8 +72,14 @@ private:
 public:
     ShadowTerminatorShapeWrapper(Scene *scene, const SceneNodeDesc *desc) noexcept
         : BaseShape{scene, desc},
-          _shadow_terminator{std::clamp(desc->property_float_or_default("shadow_terminator", 0.f), 0.f, 1.f)} {}
-    [[nodiscard]] float shadow_terminator_factor() const noexcept override { return _shadow_terminator; }
+          _shadow_terminator{std::clamp(
+              desc->property_float_or_default(
+                  "shadow_terminator",
+                  scene->shadow_terminator_factor()),
+              0.f, 1.f)} {}
+    [[nodiscard]] float shadow_terminator_factor() const noexcept override {
+        return _shadow_terminator;
+    }
 };
 
 template<typename BaseShape>
@@ -77,8 +91,14 @@ private:
 public:
     IntersectionOffsetShapeWrapper(Scene *scene, const SceneNodeDesc *desc) noexcept
         : BaseShape{scene, desc},
-          _intersection_offset{std::clamp(desc->property_float_or_default("intersection_offset", 0.f), 0.f, 1.f)} {}
-    [[nodiscard]] float intersection_offset_factor() const noexcept override { return _intersection_offset; }
+          _intersection_offset{std::clamp(
+              desc->property_float_or_default(
+                  "intersection_offset",
+                  scene->intersection_offset_factor()),
+              0.f, 1.f)} {}
+    [[nodiscard]] float intersection_offset_factor() const noexcept override {
+        return _intersection_offset;
+    }
 };
 
 template<typename BaseShape>
@@ -110,32 +130,16 @@ struct alignas(16) Shape::Handle {
     static constexpr auto triangle_buffer_id_offset = 1u;
     static constexpr auto alias_table_buffer_id_offset = 2u;
     static constexpr auto pdf_buffer_id_offset = 3u;
+    static constexpr auto uv_buffer_id_offset = 4u;// might be empty, goes last
 
     uint buffer_base_and_properties;
     uint surface_tag_and_light_tag;
     uint triangle_buffer_size;
     uint shadow_term_and_intersection_offset;
 
-    [[nodiscard]] static auto encode(uint buffer_base, uint flags, uint surface_tag, uint light_tag, uint tri_count,
-                                     float shadow_terminator, float intersection_offset) noexcept {
-        LUISA_ASSERT(buffer_base <= buffer_base_max, "Invalid geometry buffer base: {}.", buffer_base);
-        LUISA_ASSERT(flags <= property_flag_mask, "Invalid property flags: {:016x}.", flags);
-        LUISA_ASSERT(surface_tag <= surface_tag_max, "Invalid surface tag: {}.", surface_tag);
-        LUISA_ASSERT(light_tag <= light_tag_mask, "Invalid light tag: {}.", light_tag);
-        constexpr auto fixed_point_bits = 16u;
-        auto encode_fixed_point = [](float x) noexcept {
-            x = clamp(x, 0.0f, 1.0f);
-            constexpr auto fixed_point_mask = (1u << fixed_point_bits) - 1u;
-            constexpr auto fixed_point_scale = 1.0f / static_cast<float>(1u << fixed_point_bits);
-            return static_cast<uint>(std::clamp(round(x / fixed_point_scale), 0.f, static_cast<float>(fixed_point_mask)));
-        };
-        return Handle{.buffer_base_and_properties = (buffer_base << property_flag_bits) | flags,
-                      .surface_tag_and_light_tag = (surface_tag << light_tag_bits) | light_tag,
-                      .triangle_buffer_size = tri_count,
-                      .shadow_term_and_intersection_offset =
-                          (encode_fixed_point(shadow_terminator) << 16u) |
-                          encode_fixed_point(intersection_offset)};
-    }
+    [[nodiscard]] static Shape::Handle encode(uint buffer_base, uint flags,
+                                              uint surface_tag, uint light_tag, uint tri_count,
+                                              float shadow_terminator, float intersection_offset) noexcept;
 };
 
 static_assert(sizeof(Shape::Handle) == 16u);
@@ -161,6 +165,7 @@ public:
     [[nodiscard]] auto geometry_buffer_base() const noexcept { return buffer_base_and_properties >> luisa::render::Shape::Handle::property_flag_bits; }
     [[nodiscard]] auto property_flags() const noexcept { return buffer_base_and_properties & luisa::render::Shape::Handle::property_flag_mask; }
     [[nodiscard]] auto vertex_buffer_id() const noexcept { return geometry_buffer_base() + luisa::render::Shape::Handle::vertex_buffer_id_offset; }
+    [[nodiscard]] auto uv_buffer_id() const noexcept { return geometry_buffer_base() + luisa::render::Shape::Handle::uv_buffer_id_offset; }
     [[nodiscard]] auto triangle_buffer_id() const noexcept { return geometry_buffer_base() + luisa::render::Shape::Handle::triangle_buffer_id_offset; }
     [[nodiscard]] auto triangle_count() const noexcept { return triangle_buffer_size; }
     [[nodiscard]] auto alias_table_buffer_id() const noexcept { return geometry_buffer_base() + luisa::render::Shape::Handle::alias_table_buffer_id_offset; }
@@ -168,10 +173,11 @@ public:
     [[nodiscard]] auto surface_tag() const noexcept { return surface_tag_and_light_tag >> luisa::render::Shape::Handle::light_tag_bits; }
     [[nodiscard]] auto light_tag() const noexcept { return surface_tag_and_light_tag & luisa::render::Shape::Handle::light_tag_mask; }
     [[nodiscard]] auto test_property_flag(luisa::uint flag) const noexcept { return (property_flags() & flag) != 0u; }
-    [[nodiscard]] auto has_normal() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_normal); }
-    [[nodiscard]] auto has_uv() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_uv); }
+    [[nodiscard]] auto has_vertex_normal() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_vertex_normal); }
+    [[nodiscard]] auto has_vertex_uv() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_vertex_uv); }
     [[nodiscard]] auto has_light() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_light); }
     [[nodiscard]] auto has_surface() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_surface); }
+    [[nodiscard]] auto has_medium() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_medium); }
     [[nodiscard]] auto shadow_terminator_factor() const noexcept { return _decode_fixed_point(shadow_term_and_intersection_offset >> 16u); }
     [[nodiscard]] auto intersection_offset_factor() const noexcept { return _decode_fixed_point(shadow_term_and_intersection_offset & 0xffffu); }
 };

@@ -35,9 +35,8 @@ public:
         Mesh *resource;
         uint16_t shadow_term;
         uint16_t intersection_offset;
-        uint geometry_buffer_id_base : 30;
-        uint has_normal : 1;
-        uint has_uv : 1;
+        uint geometry_buffer_id_base : 22;
+        uint vertex_properties : 10;
     };
 
     static_assert(sizeof(MeshData) == 16u);
@@ -65,6 +64,7 @@ public:
                luisa::span<const Shape *const> shapes,
                float init_time, AccelUsageHint hint) noexcept;
     bool update(CommandBuffer &command_buffer, float time) noexcept;
+    [[nodiscard]] auto instances() const noexcept { return luisa::span{_instances}; }
     [[nodiscard]] auto light_instances() const noexcept { return luisa::span{_instanced_lights}; }
     [[nodiscard]] Var<Hit> trace_closest(const Var<Ray> &ray) const noexcept;
     [[nodiscard]] Var<bool> trace_any(const Var<Ray> &ray) const noexcept;

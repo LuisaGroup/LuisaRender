@@ -4,8 +4,7 @@
 
 #pragma once
 
-#include <cstdint>
-#include <string_view>
+#include <core/stl.h>
 
 namespace luisa::render {
 

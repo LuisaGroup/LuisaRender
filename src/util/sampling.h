@@ -43,9 +43,8 @@ template<typename Table>
     auto u_remapped = fract(u);
     auto entry = table.read(i + offset);
     auto index = ite(u_remapped < entry.prob, i, entry.alias);
-    auto uu = ite(
-        u_remapped < entry.prob, u_remapped / entry.prob,
-        (u_remapped - entry.prob) / (1.0f - entry.prob));
+    auto uu = ite(u_remapped < entry.prob, u_remapped / entry.prob,
+                  (u_remapped - entry.prob) / (1.0f - entry.prob));
     return std::make_pair(index, uu);
 }
 

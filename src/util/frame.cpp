@@ -16,6 +16,13 @@ Frame::Frame() noexcept
       _v{0.0f, 1.0f, 0.0f},
       _n{0.0f, 0.0f, 1.0f} {}
 
+[[nodiscard]] inline auto fallback_tangent(Expr<float3> n) noexcept {
+    return normalize(ite(
+        abs(n.x) > abs(n.z),
+        make_float3(n.z, 0.f, -n.x),
+        make_float3(0.f, n.z, -n.y)));
+}
+
 Frame Frame::make(Expr<float3> normal) noexcept {
     auto tangent = normalize(ite(
         abs(normal.x) > abs(normal.z),
@@ -25,10 +32,10 @@ Frame Frame::make(Expr<float3> normal) noexcept {
     return Frame{std::move(tangent), std::move(bitangent), normal};
 }
 
-Frame Frame::make(Expr<float3> normal, Expr<float3> tangent) noexcept {
+Frame Frame::make(Expr<float3> normal, Expr<float3> tangent_in) noexcept {
+    auto tangent = ite(all(tangent_in == 0.f), fallback_tangent(normal), tangent_in);
     auto bitangent = normalize(cross(normal, tangent));
-    auto t = normalize(cross(bitangent, normal));
-    return Frame{std::move(t), std::move(bitangent), normal};
+    return Frame{normalize(cross(bitangent, normal)), std::move(bitangent), normal};
 }
 
 Float3 Frame::local_to_world(Expr<float3> d) const noexcept {

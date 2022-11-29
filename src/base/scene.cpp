@@ -26,6 +26,8 @@
 namespace luisa::render {
 
 struct Scene::Config {
+    float shadow_terminator{0.f};
+    float intersection_offset{0.f};
     luisa::vector<NodeHandle> internal_nodes;
     luisa::unordered_map<luisa::string, NodeHandle> nodes;
     Integrator *integrator{nullptr};
@@ -40,6 +42,8 @@ const Environment *Scene::environment() const noexcept { return _config->environ
 const Spectrum *Scene::spectrum() const noexcept { return _config->spectrum; }
 luisa::span<const Shape *const> Scene::shapes() const noexcept { return _config->shapes; }
 luisa::span<const Camera *const> Scene::cameras() const noexcept { return _config->cameras; }
+float Scene::shadow_terminator_factor() const noexcept { return _config->shadow_terminator; }
+float Scene::intersection_offset_factor() const noexcept { return _config->intersection_offset; }
 
 namespace detail {
 
@@ -188,6 +192,8 @@ luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc
             "in the scene description.");
     }
     auto scene = luisa::make_unique<Scene>(ctx);
+    scene->_config->shadow_terminator = desc->root()->property_float_or_default("shadow_terminator", 0.f);
+    scene->_config->intersection_offset = desc->root()->property_float_or_default("intersection_offset", 0.f);
     scene->_config->spectrum = scene->load_spectrum(desc->root()->property_node_or_default(
         "spectrum", SceneNodeDesc::shared_default_spectrum("sRGB")));
     scene->_config->integrator = scene->load_integrator(

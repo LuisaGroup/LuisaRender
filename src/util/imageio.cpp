@@ -559,32 +559,6 @@ LoadedImage::LoadedImage(void *pixels,
     : _pixels{pixels}, _resolution{resolution},
       _storage{storage}, _deleter{std::move(deleter)} {}
 
-void save_image(std::filesystem::path path, const float *pixels, uint2 resolution, uint components) noexcept {
-    // save results
-    auto pixel_count = resolution.x * resolution.y;
-    auto size = make_int2(resolution);
-
-    if (path.extension() != ".exr" && path.extension() != ".hdr") [[unlikely]] {
-        LUISA_WARNING_WITH_LOCATION(
-            "Unexpected film file extension. "
-            "Changing to '.exr'.");
-        path.replace_extension(".exr");
-    }
-
-    if (path.extension() == ".exr") {
-        const char *err = nullptr;
-        SaveEXR(reinterpret_cast<const float *>(pixels),
-                size.x, size.y, components, false, path.string().c_str(), &err);
-        if (err != nullptr) [[unlikely]] {
-            LUISA_ERROR_WITH_LOCATION(
-                "Failed to save film to '{}': {}.",
-                path.string(), err);
-        }
-    } else if (path.extension() == ".hdr") {
-        stbi_write_hdr(path.string().c_str(), size.x, size.y, components, reinterpret_cast<const float *>(pixels));
-    }
-}
-
 //float4 LoadedImage::read(uint2 p) const noexcept {
 //    auto i = p.x + p.y * _resolution.x;
 //    constexpr auto byte_to_float = [](auto x) noexcept { return static_cast<float>(x) * (1.f / 255.f); };
@@ -703,5 +677,81 @@ void save_image(std::filesystem::path path, const float *pixels, uint2 resolutio
 //        default: break;
 //    }
 //}
+
+void save_image(std::filesystem::path path, const float *pixels, uint2 resolution, uint components) noexcept {
+    // save results
+    auto pixel_count = resolution.x * resolution.y;
+    auto size = make_int2(resolution);
+    auto ext = path.extension().string();
+    for (auto &c : ext) { c = static_cast<char>(std::tolower(c)); }
+    if (ext != ".exr" && ext != ".hdr") [[unlikely]] {
+        LUISA_WARNING_WITH_LOCATION(
+            "Unsupported image extension '{}' in path '{}'. "
+            "Falling back to '.exr'.",
+            ext, path.string());
+        path.replace_extension(".exr");
+    }
+
+    auto c = static_cast<int>(std::clamp(components, 1u, 4u));
+    if (ext == ".exr") {
+        const char *err = nullptr;
+        SaveEXR(reinterpret_cast<const float *>(pixels),
+                size.x, size.y, c, false, path.string().c_str(), &err);
+        if (err != nullptr) [[unlikely]] {
+            LUISA_WARNING_WITH_LOCATION(
+                "Failed to save film to '{}': {}.",
+                path.string(), err);
+        }
+    } else if (ext == ".hdr") {
+        if (!stbi_write_hdr(path.string().c_str(), size.x, size.y,
+                            c, reinterpret_cast<const float *>(pixels))) {
+            LUISA_WARNING_WITH_LOCATION(
+                "Failed to save film to '{}': {}.",
+                path.string(), stbi_failure_reason());
+        }
+    }
+}
+
+void save_image(std::filesystem::path path, const uint8_t *pixels, uint2 resolution, uint components) noexcept {
+    auto ext = path.extension().string();
+    for (auto &c : ext) { c = static_cast<char>(std::tolower(c)); }
+    if (ext != ".png" && ext != ".jpg" && ext != ".jpeg" &&
+        ext != ".bmp" && ext != ".tga") [[unlikely]] {
+        LUISA_WARNING_WITH_LOCATION(
+            "Unsupported image extension '{}' in path '{}'. "
+            "Falling back to '.png'.",
+            ext, path.string());
+        path.replace_extension(".png");
+    }
+    auto w = static_cast<int>(resolution.x);
+    auto h = static_cast<int>(resolution.y);
+    auto c = static_cast<int>(std::clamp(components, 1u, 4u));
+    auto p = path.string();
+    if (ext == ".png") {
+        if (!stbi_write_png(p.c_str(), w, h, c, pixels, 0)) {
+            LUISA_WARNING_WITH_LOCATION(
+                "Failed to save image to '{}': {}.",
+                p, stbi_failure_reason());
+        }
+    } else if (ext == ".jpg" || ext == ".jpeg") {
+        if (!stbi_write_jpg(p.c_str(), w, h, c, pixels, 100)) {
+            LUISA_WARNING_WITH_LOCATION(
+                "Failed to save image to '{}': {}.",
+                p, stbi_failure_reason());
+        }
+    } else if (ext == "bmp") {
+        if (!stbi_write_bmp(p.c_str(), w, h, c, pixels)) {
+            LUISA_WARNING_WITH_LOCATION(
+                "Failed to save image to '{}': {}.",
+                p, stbi_failure_reason());
+        }
+    } else if (ext == "tga") {
+        if (!stbi_write_tga(p.c_str(), w, h, c, pixels)) {
+            LUISA_WARNING_WITH_LOCATION(
+                "Failed to save image to '{}': {}.",
+                p, stbi_failure_reason());
+        }
+    }
+}
 
 }// namespace luisa::render

@@ -253,9 +253,12 @@ void WavefrontPathTracingInstance::_render_one_camera(
         auto sample_id = base_sample_id + state_id / pixel_count;
         auto pixel_coord = make_uint2(pixel_id % resolution.x, pixel_id / resolution.x);
         sampler()->start(pixel_coord, sample_id);
-        auto camera_sample = camera->generate_ray(*sampler(), pixel_coord, time);
-        auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler()->generate_1d());
+        auto u_filter = sampler()->generate_pixel_2d();
+        auto u_lens = camera->node()->requires_lens_sampling() ? sampler()->generate_2d() : make_float2(.5f);
+        auto u_wavelength = spectrum->node()->is_fixed() ? 0.f : sampler()->generate_1d();
         sampler()->save_state(state_id);
+        auto camera_sample = camera->generate_ray(pixel_coord, time, u_filter, u_lens);
+        auto swl = spectrum->sample(u_wavelength);
         rays.write(state_id, camera_sample.ray);
         path_states.write_swl(state_id, swl);
         path_states.write_beta(state_id, SampledSpectrum{swl.dimension(), camera_sample.weight});

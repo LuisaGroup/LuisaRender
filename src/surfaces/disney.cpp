@@ -362,11 +362,13 @@ private:
     SampledSpectrum R0;
     Float metallic;
     Float e;
+    bool two_sided;
 
 public:
-    DisneyFresnel(const SampledSpectrum &R0, Float metallic, Float eta) noexcept
-        : R0{R0}, metallic{std::move(metallic)}, e{std::move(eta)} {}
-    [[nodiscard]] SampledSpectrum evaluate(Expr<float> cosI) const noexcept override {
+    DisneyFresnel(const SampledSpectrum &R0, Float metallic, Float eta, bool two_sided) noexcept
+        : R0{R0}, metallic{std::move(metallic)}, e{std::move(eta)}, two_sided{two_sided} {}
+    [[nodiscard]] SampledSpectrum evaluate(Expr<float> cosI_in) const noexcept override {
+        auto cosI = two_sided ? abs(cosI_in) : def(cosI_in);
         auto fr = fresnel_dielectric(cosI, 1.f, e);
         auto f0 = R0.map([cosI](auto x) noexcept { return FrSchlick(x, cosI); });
         return lerp(fr, f0, metallic);
@@ -377,13 +379,6 @@ public:
 struct DisneyMicrofacetDistribution final : public TrowbridgeReitzDistribution {
     explicit DisneyMicrofacetDistribution(Expr<float2> alpha) noexcept
         : TrowbridgeReitzDistribution{alpha} {}
-    [[nodiscard]] Float G(Expr<float3> wo, Expr<float3> wi) const noexcept override {
-        return G1(wo) * G1(wi);
-    }
-    [[nodiscard]] Gradient grad_G(Expr<float3> wo, Expr<float3> wi) const noexcept override {
-        auto d_alpha = grad_G1(wo).dAlpha * G1(wi) + G1(wo) * grad_G1(wi).dAlpha;
-        return {.dAlpha = d_alpha};
-    }
 };
 
 }// namespace
@@ -495,7 +490,8 @@ public:
         // specular is Trowbridge-Reitz with a modified Fresnel function
         auto SchlickR0 = SchlickR0FromEta(eta);
         auto Cspec0 = lerp(lerp(1.f, tint, spec_tint) * SchlickR0, _color, metallic);
-        _fresnel = luisa::make_unique<DisneyFresnel>(Cspec0, metallic, eta);
+        _fresnel = luisa::make_unique<DisneyFresnel>(
+            Cspec0, metallic, eta, !cls->instance()->node()->is_transmissive());
 
         // create the microfacet distribution for metallic and/or specular transmittance
         auto aniso = aniso_tex ? aniso_tex->evaluate(cls->it(), cls->swl(), cls->time()).x : 0.f;
@@ -728,7 +724,8 @@ public:
         // specular is Trowbridge-Reitz with a modified Fresnel function
         auto SchlickR0 = SchlickR0FromEta(eta);
         auto Cspec0 = lerp(lerp(1.f, tint, spec_tint) * SchlickR0, _color, metallic);
-        _fresnel = luisa::make_unique<DisneyFresnel>(Cspec0, metallic, eta);
+        _fresnel = luisa::make_unique<DisneyFresnel>(
+            Cspec0, metallic, eta, !cls->instance()->node()->is_transmissive());
 
         // create the microfacet distribution for metallic and/or specular transmittance
         auto aniso = aniso_tex ? aniso_tex->evaluate(cls->it(), cls->swl(), cls->time()).x : 0.f;

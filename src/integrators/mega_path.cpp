@@ -50,7 +50,9 @@ protected:
                             Expr<uint2> pixel_id, Expr<float> time) const noexcept override {
 
         sampler()->start(pixel_id, frame_index);
-        auto [camera_ray, _, camera_weight] = camera->generate_ray(*sampler(), pixel_id, time);
+        auto u_filter = sampler()->generate_pixel_2d();
+        auto u_lens = camera->node()->requires_lens_sampling() ? sampler()->generate_2d() : make_float2(.5f);
+        auto [camera_ray, _, camera_weight] = camera->generate_ray(pixel_id, time, u_filter, u_lens);
         auto spectrum = pipeline().spectrum();
         auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler()->generate_1d());
         SampledSpectrum beta{swl.dimension(), camera_weight};

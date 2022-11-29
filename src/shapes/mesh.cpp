@@ -17,22 +17,19 @@ class MeshLoader {
 
 private:
     luisa::vector<Vertex> _vertices;
+    luisa::vector<float2> _uvs;
     luisa::vector<Triangle> _triangles;
-    bool _has_uv{};
-    bool _has_normal{};
+    uint _properties{};
 
 public:
-    [[nodiscard]] auto vertices() const noexcept { return luisa::span{_vertices}; }
-    [[nodiscard]] auto triangles() const noexcept { return luisa::span{_triangles}; }
-    [[nodiscard]] auto has_normal() const noexcept { return _has_normal; }
-    [[nodiscard]] auto has_uv() const noexcept { return _has_uv; }
+    [[nodiscard]] auto mesh() const noexcept { return MeshView{_vertices, _uvs, _triangles}; }
+    [[nodiscard]] auto properties() const noexcept { return _properties; }
 
     // Load the mesh from a file.
     [[nodiscard]] static auto load(std::filesystem::path path, uint subdiv_level,
-                                   bool flip_uv, bool drop_normal) noexcept {
+                                   bool flip_uv, bool drop_normal, bool drop_uv) noexcept {
 
-        // TODO: static lifetime seems no good...
-        static luisa::lru_cache<uint64_t, std::shared_future<MeshLoader>> loaded_meshes{1024u};
+        static luisa::lru_cache<uint64_t, std::shared_future<MeshLoader>> loaded_meshes{256u};
         static std::mutex mutex;
 
         auto abs_path = std::filesystem::canonical(path).string();
@@ -41,27 +38,35 @@ public:
         std::scoped_lock lock{mutex};
         if (auto m = loaded_meshes.at(key)) { return *m; }
 
-        auto future = ThreadPool::global().async([path = std::move(path), subdiv_level, flip_uv, drop_normal] {
+        auto future = ThreadPool::global().async([path = std::move(path), subdiv_level, flip_uv, drop_normal, drop_uv] {
             Clock clock;
             auto path_string = path.string();
             Assimp::Importer importer;
             importer.SetPropertyInteger(
                 AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_LINE | aiPrimitiveType_POINT);
             importer.SetPropertyFloat(AI_CONFIG_PP_GSN_MAX_SMOOTHING_ANGLE, 45.f);
-            auto import_flags = aiProcess_JoinIdenticalVertices |
-                                aiProcess_RemoveComponent |
-                                aiProcess_OptimizeMeshes | aiProcess_GenUVCoords |
-                                aiProcess_TransformUVCoords | aiProcess_SortByPType |
+            auto import_flags = aiProcess_RemoveComponent | aiProcess_SortByPType |
                                 aiProcess_ValidateDataStructure | aiProcess_ImproveCacheLocality |
-                                aiProcess_PreTransformVertices | aiProcess_FindInvalidData;
-            if (!flip_uv) { import_flags |= aiProcess_FlipUVs; }
-            import_flags |= drop_normal ? aiProcess_DropNormals : aiProcess_GenSmoothNormals;
+                                aiProcess_PreTransformVertices | aiProcess_FindInvalidData |
+                                aiProcess_JoinIdenticalVertices;
             auto remove_flags = aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS |
-                                aiComponent_CAMERAS | aiComponent_COLORS |
-                                aiComponent_LIGHTS | aiComponent_MATERIALS |
-                                aiComponent_TEXTURES | aiComponent_TANGENTS_AND_BITANGENTS;
+                                aiComponent_CAMERAS | aiComponent_LIGHTS |
+                                aiComponent_MATERIALS | aiComponent_TEXTURES |
+                                aiComponent_COLORS | aiComponent_TANGENTS_AND_BITANGENTS;
+            if (drop_uv) {
+                remove_flags |= aiComponent_TEXCOORDS;
+            } else {
+                if (!flip_uv) { import_flags |= aiProcess_FlipUVs; }
+                import_flags |= aiProcess_GenUVCoords | aiProcess_TransformUVCoords;
+            }
+            if (drop_normal) {
+                import_flags |= aiProcess_DropNormals;
+                remove_flags |= aiComponent_NORMALS;
+            } else {
+                import_flags |= aiProcess_GenSmoothNormals;
+            }
+            if (subdiv_level == 0u) { import_flags |= aiProcess_Triangulate; }
             importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, static_cast<int>(remove_flags));
-            if (subdiv_level == 0) { import_flags |= aiProcess_Triangulate; }
             auto model = importer.ReadFile(path_string.c_str(), import_flags);
             if (model == nullptr || (model->mFlags & AI_SCENE_FLAGS_INCOMPLETE) ||
                 model->mRootNode == nullptr || model->mRootNode->mNumMeshes == 0) [[unlikely]] {
@@ -94,52 +99,45 @@ public:
                     static_cast<void *>(mesh->mTextureCoords[0]),
                     mesh->mNumUVComponents[0]);
             }
-            MeshLoader loader;
             auto vertex_count = mesh->mNumVertices;
-            loader._vertices.resize(vertex_count);
             auto ai_positions = mesh->mVertices;
             auto ai_normals = mesh->mNormals;
-            auto ai_tex_coords = mesh->mTextureCoords[0];
-            loader._has_uv = ai_tex_coords != nullptr;
-            loader._has_normal = !drop_normal && ai_normals != nullptr;
-            if (!loader._has_normal) {
-                LUISA_WARNING_WITH_LOCATION(
-                    "Mesh '{}' has no normal data, "
-                    "which may cause incorrect shading.",
-                    path_string);
-            }
+            MeshLoader loader;
+            loader._vertices.resize(vertex_count);
+            if (ai_normals) { loader._properties |= Shape::property_flag_has_vertex_normal; }
             for (auto i = 0; i < vertex_count; i++) {
                 auto p = make_float3(ai_positions[i].x, ai_positions[i].y, ai_positions[i].z);
-                auto n = loader._has_normal ?
+                auto n = ai_normals ?
                              normalize(make_float3(ai_normals[i].x, ai_normals[i].y, ai_normals[i].z)) :
-                             make_float3(0.f);
-                auto uv = loader._has_uv ?
-                              make_float2(ai_tex_coords[i].x, ai_tex_coords[i].y) :
-                              make_float2(0.f);
-                loader._vertices[i] = Vertex::encode(p, n, uv);
+                             make_float3(0.f, 0.f, 1.f);
+                loader._vertices[i] = Vertex::encode(p, n);
+            }
+            if (auto ai_tex_coords = mesh->mTextureCoords[0]) {
+                loader._uvs.resize(vertex_count);
+                loader._properties |= Shape::property_flag_has_vertex_uv;
+                for (auto i = 0; i < vertex_count; i++) {
+                    loader._uvs[i] = make_float2(ai_tex_coords[i].x, ai_tex_coords[i].y);
+                }
             }
             if (subdiv_level == 0u) {
                 auto ai_triangles = mesh->mFaces;
                 loader._triangles.resize(mesh->mNumFaces);
-                std::transform(
-                    ai_triangles, ai_triangles + mesh->mNumFaces, loader._triangles.begin(),
-                    [](const aiFace &face) noexcept {
-                        assert(face.mNumIndices == 3u);
-                        return Triangle{face.mIndices[0], face.mIndices[1], face.mIndices[2]};
-                    });
+                for (auto i = 0; i < mesh->mNumFaces; i++) {
+                    auto &&face = ai_triangles[i];
+                    assert(face.mNumIndices == 3u);
+                    loader._triangles[i] = {face.mIndices[0], face.mIndices[1], face.mIndices[2]};
+                }
             } else {
                 auto ai_quads = mesh->mFaces;
                 loader._triangles.resize(mesh->mNumFaces * 2u);
                 for (auto i = 0u; i < mesh->mNumFaces; i++) {
-                    auto &face = ai_quads[i];
+                    auto &&face = ai_quads[i];
                     assert(face.mNumIndices == 4u);
                     loader._triangles[i * 2u + 0u] = {face.mIndices[0], face.mIndices[1], face.mIndices[2]};
-                    loader._triangles[i * 2u + 1u] = {face.mIndices[0], face.mIndices[2], face.mIndices[3]};
+                    loader._triangles[i * 2u + 1u] = {face.mIndices[2], face.mIndices[3], face.mIndices[0]};
                 }
             }
-            LUISA_INFO(
-                "Loaded triangle mesh '{}' in {} ms.",
-                path_string, clock.toc());
+            LUISA_INFO("Loaded triangle mesh '{}' in {} ms.", path_string, clock.toc());
             return loader;
         });
         loaded_meshes.emplace(key, future);
@@ -155,19 +153,15 @@ private:
 public:
     Mesh(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Shape{scene, desc},
-          _loader{MeshLoader::load(
-              desc->property_path("file"),
-              desc->property_uint_or_default("subdivision", 0u),
-              desc->property_bool_or_default("flip_uv", false),
-              desc->property_bool_or_default("drop_normal", false))} {}
+          _loader{MeshLoader::load(desc->property_path("file"),
+                                   desc->property_uint_or_default("subdivision", 0u),
+                                   desc->property_bool_or_default("flip_uv", false),
+                                   desc->property_bool_or_default("drop_normal", false),
+                                   desc->property_bool_or_default("drop_uv", false))} {}
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] luisa::span<const Shape *const> children() const noexcept override { return {}; }
-    [[nodiscard]] bool deformable() const noexcept override { return false; }
     [[nodiscard]] bool is_mesh() const noexcept override { return true; }
-    [[nodiscard]] luisa::span<const Vertex> vertices() const noexcept override { return _loader.get().vertices(); }
-    [[nodiscard]] luisa::span<const Triangle> triangles() const noexcept override { return _loader.get().triangles(); }
-    [[nodiscard]] bool has_normal() const noexcept override { return _loader.get().has_normal(); }
-    [[nodiscard]] bool has_uv() const noexcept override { return _loader.get().has_uv(); }
+    [[nodiscard]] MeshView mesh() const noexcept override { return _loader.get().mesh(); }
+    [[nodiscard]] uint vertex_properties() const noexcept override { return _loader.get().properties(); }
 };
 
 using MeshWrapper =

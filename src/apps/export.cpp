@@ -295,14 +295,9 @@ int main(int argc, char *argv[]) {
             } else {
                 scene_materials[mat_name] = {
                     {"type", "Surface"},
-                    {"impl", "Substrate"},
+                    {"impl", "Plastic"},
                     {"prop",
-                     {{"Kd", color_map},
-                      {"Ks",
-                       {{"impl", "Constant"},
-                        {"prop",
-                         {{"v", {.04f, .04f, .04f}},
-                          {"remap_roughness", true}}}}}}}};
+                     {{"Kd", color_map}}}};
             }
             if (has_roughness) {
                 scene_materials[mat_name]["prop"]["roughness"] = luisa::format("@{}", roughness_tex_name);

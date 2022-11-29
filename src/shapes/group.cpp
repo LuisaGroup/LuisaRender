@@ -23,13 +23,7 @@ public:
         }
     }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] span<const Vertex> vertices() const noexcept override { return {}; }
-    [[nodiscard]] span<const Triangle> triangles() const noexcept override { return {}; }
     [[nodiscard]] span<const Shape *const> children() const noexcept override { return _children; }
-    [[nodiscard]] bool is_mesh() const noexcept override { return false; }
-    [[nodiscard]] bool deformable() const noexcept override { return false; }
-    [[nodiscard]] bool has_normal() const noexcept override { return false; }
-    [[nodiscard]] bool has_uv() const noexcept override { return false; }
 };
 
 using GroupWrapper = VisibilityShapeWrapper<ShapeGroup>;

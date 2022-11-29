@@ -202,6 +202,7 @@ public:
 [[nodiscard]] SampledSpectrum saturate(const SampledSpectrum &t) noexcept;
 [[nodiscard]] SampledSpectrum abs(const SampledSpectrum &t) noexcept;
 [[nodiscard]] SampledSpectrum sqrt(const SampledSpectrum &t) noexcept;
+[[nodiscard]] SampledSpectrum exp(const SampledSpectrum &t) noexcept;
 // TODO: other math functions
 
 using luisa::lerp;

@@ -61,8 +61,8 @@ public:
         [[nodiscard]] auto film() const noexcept { return _film.get(); }
         [[nodiscard]] auto filter() noexcept { return _filter; }
         [[nodiscard]] auto filter() const noexcept { return _filter; }
-        [[nodiscard]] Sample generate_ray(
-            Sampler::Instance &sampler, Expr<uint2> pixel_coord, Expr<float> time) const noexcept;
+        [[nodiscard]] Sample generate_ray(Expr<uint2> pixel_coord, Expr<float> time,
+                                          Expr<float2> u_filter, Expr<float2> u_lens) const noexcept;
         [[nodiscard]] Float4x4 camera_to_world() const noexcept;
     };
 

@@ -69,11 +69,8 @@ def convert_plastic_material(out_file, material: dict, alpha=""):
     ior = material["ior"]
     color = material["albedo"]
     print(f'''
-Surface mat_{name} : Substrate {{
+Surface mat_{name} : Plastic {{
   Kd : {convert_albedo_texture(color)}
-  Ks : Constant {{
-    v {{ 0.04, 0.04, 0.04 }}
-  }}
   eta : Constant {{
     v {{ {ior} }}
   }}
