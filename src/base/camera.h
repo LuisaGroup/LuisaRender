@@ -11,6 +11,7 @@
 #include <base/film.h>
 #include <base/filter.h>
 #include <base/texture.h>
+#include <base/interaction.h>
 
 namespace luisa::render {
 
@@ -29,6 +30,12 @@ class Camera : public SceneNode {
 public:
     struct Sample {
         Var<Ray> ray;
+        Float2 pixel;
+        Float weight;
+    };
+
+    struct SampleDifferential {
+        RayDifferential ray_differential;
         Float2 pixel;
         Float weight;
     };
@@ -63,6 +70,8 @@ public:
         [[nodiscard]] auto filter() const noexcept { return _filter; }
         [[nodiscard]] Sample generate_ray(Expr<uint2> pixel_coord, Expr<float> time,
                                           Expr<float2> u_filter, Expr<float2> u_lens) const noexcept;
+        [[nodiscard]] SampleDifferential generate_ray_differential(Expr<uint2> pixel_coord, Expr<float> time,
+                                                                   Expr<float2> u_filter, Expr<float2> u_lens) const noexcept;
         [[nodiscard]] Float4x4 camera_to_world() const noexcept;
     };
 

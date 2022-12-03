@@ -222,6 +222,22 @@ Camera::Sample Camera::Instance::generate_ray(Expr<uint2> pixel_coord, Expr<floa
     return sample;
 }
 
+Camera::SampleDifferential Camera::Instance::generate_ray_differential(Expr<uint2> pixel_coord, Expr<float> time,
+                                                                       Expr<float2> u_filter, Expr<float2> u_lens) const noexcept {
+    auto central_sample = generate_ray(pixel_coord, time, u_filter, u_lens);
+    auto x_sample = generate_ray(pixel_coord + make_uint2(1u, 0u), time, u_filter, u_lens);
+    auto y_sample = generate_ray(pixel_coord + make_uint2(0u, 1u), time, u_filter, u_lens);
+    return Camera::SampleDifferential{
+        .ray_differential = RayDifferential{
+            central_sample.ray,
+            x_sample.ray->origin() - central_sample.ray->origin(),
+            y_sample.ray->origin() - central_sample.ray->origin(),
+            x_sample.ray->direction() - central_sample.ray->direction(),
+            y_sample.ray->direction() - central_sample.ray->direction()},
+        .pixel = central_sample.pixel,
+        .weight = central_sample.weight};
+}
+
 Float4x4 Camera::Instance::camera_to_world() const noexcept {
     return pipeline().transform(node()->transform());
 }
