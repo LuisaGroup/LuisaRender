@@ -37,7 +37,8 @@ public:
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
     [[nodiscard]] auto state_count() const noexcept { return _state_count; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
+    [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
 class PathStateSOA {
@@ -359,7 +360,11 @@ void WavefrontPathTracingInstance::_render_one_camera(
                 *it, u_light_selection, u_light_surface, swl, time);
             sampler()->save_state(path_id);
             // trace shadow ray
-            auto occluded = pipeline().geometry()->intersect_any(light_sample.ray);
+            auto occluded = def(true);
+            $if(light_sample.eval.pdf > 0.f &
+                light_sample.eval.L.any([](auto x) { return x > 0.f; })) {
+                occluded = pipeline().geometry()->intersect_any(light_sample.ray);
+            };
             light_samples.write_emission(queue_id, ite(occluded, 0.f, 1.f) * light_sample.eval.L);
             light_samples.write_pdf(queue_id, ite(occluded, 0.f, light_sample.eval.pdf));
             light_samples.write_wi(queue_id, light_sample.ray->direction());

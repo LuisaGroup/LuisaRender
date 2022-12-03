@@ -105,12 +105,10 @@ private:
                                                 TransportMode mode) const noexcept override {
         auto wo_local = _it.shading().world_to_local(wo);
         auto wi_local = _it.shading().world_to_local(wi);
+        auto cos_theta_i = ite(_it.same_sided(wo, wi), abs_cos_theta(wi_local), 0.f);
         auto f = _refl->evaluate(wo_local, wi_local, mode);
         auto pdf = _refl->pdf(wo_local, wi_local, mode);
-        auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f |
-                                  _it.shape()->shadow_terminator_factor() > 0.f,
-                              1.f, 0.f);
-        return {.f = f * abs_cos_theta(wi_local) * same_sided, .pdf = pdf};
+        return {.f = f * cos_theta_i, .pdf = pdf};
     }
     [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float>, Expr<float2> u,
                                           TransportMode mode) const noexcept override {
@@ -119,10 +117,8 @@ private:
         auto wi_local = def(make_float3(0.f, 0.f, 1.f));
         auto f = _refl->sample(wo_local, &wi_local, u, &pdf, mode);
         auto wi = _it.shading().local_to_world(wi_local);
-        auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f |
-                                  _it.shape()->shadow_terminator_factor() > 0.f,
-                              1.f, 0.f);
-        return {.eval = {.f = f * abs_cos_theta(wi_local) * same_sided, .pdf = pdf},
+        auto cos_theta_i = ite(_it.same_sided(wo, wi), abs_cos_theta(wi_local), 0.f);
+        return {.eval = {.f = f * cos_theta_i, .pdf = pdf},
                 .wi = wi,
                 .event = Surface::event_reflect};
     }
@@ -142,7 +138,8 @@ luisa::unique_ptr<Surface::Closure> MirrorInstance::closure(
                     (remap ? make_float2(r2a(r.x)) : r.xx()) :
                     (remap ? r2a(r.xy()) : r.xy());
     }
-    auto [color, _] = _color ? _color->evaluate_albedo_spectrum(it, swl, time) : Spectrum::Decode::one(swl.dimension());
+    auto [color, _] = _color ? _color->evaluate_albedo_spectrum(it, swl, time) :
+                               Spectrum::Decode::one(swl.dimension());
     return luisa::make_unique<MirrorClosure>(this, it, swl, time, color, alpha);
 }
 

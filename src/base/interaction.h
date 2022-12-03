@@ -86,16 +86,9 @@ public:
     void set_shading(Frame frame) noexcept { _shading = std::move(frame); }
     [[nodiscard]] const auto &shape() const noexcept { return _shape; }
     [[nodiscard]] auto back_facing() const noexcept { return _back_facing; }
-    [[nodiscard]] auto p_robust(Expr<float3> w) const noexcept {
-        auto offset_factor = clamp(_shape->intersection_offset_factor() * 255.f + 1.f, 1.f, 256.f);
-        auto front = dot(_ng, w) > 0.f;
-        auto p = ite(front, _ps, _pg);
-        auto n = ite(front, _ng, -_ng);
-        return offset_ray_origin(p, offset_factor * n);
-    }
-    [[nodiscard]] auto spawn_ray(Expr<float3> wi, Expr<float> t_max = std::numeric_limits<float>::max()) const noexcept {
-        return make_ray(p_robust(wi), wi, 0.f, t_max);
-    }
+    [[nodiscard]] Bool same_sided(Expr<float3> wo, Expr<float3> wi) const noexcept;
+    [[nodiscard]] Float3 p_robust(Expr<float3> w) const noexcept;
+    [[nodiscard]] Var<Ray> spawn_ray(Expr<float3> wi, Expr<float> t_max = std::numeric_limits<float>::max()) const noexcept;
 };
 
 }// namespace luisa::render

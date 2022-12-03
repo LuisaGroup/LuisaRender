@@ -145,6 +145,7 @@ private:
                         make_float3(1.f, 1.f, 1.f));
         wo_local *= sign;
         auto wi_local = sign * _it.shading().world_to_local(wi);
+        auto cos_theta_i = ite(_it.same_sided(wo, wi), abs_cos_theta(wi_local), 0.f);
         // specular
         auto f_coat = _coat->evaluate(wo_local, wi_local, mode);
         auto pdf_coat = _coat->pdf(wo_local, wi_local, mode);
@@ -157,11 +158,9 @@ private:
                          _substrate->evaluate(wo_local, wi_local, mode);
         auto pdf_diffuse = _substrate->pdf(wo_local, wi_local, mode);
         auto substrate_weight = _substrate_weight(Fo);
+        auto f = (f_coat + f_diffuse) * cos_theta_i;
         auto pdf = lerp(pdf_coat, pdf_diffuse, substrate_weight);
-        auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f |
-                                  _it.shape()->shadow_terminator_factor() > 0.f,
-                              1.f, 0.f);
-        return {.f = (f_coat + f_diffuse) * (abs_cos_theta(wi_local) * same_sided), .pdf = pdf};
+        return {.f = f, .pdf = pdf};
     }
 
     [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u,
@@ -174,28 +173,33 @@ private:
         auto eta = _fresnel->eta_t();
         auto Fo = fresnel_dielectric(abs_cos_theta(wo_local), 1.f, eta);
         auto substrate_weight = _substrate_weight(Fo);
-        auto wi_local = def(make_float3());
+        BxDF::SampledDirection wi_sample;
         $if(u_lobe < substrate_weight) {// samples diffuse
-            wi_local = _substrate->sample_wi(wo_local, u, mode).wi;
+            wi_sample = _substrate->sample_wi(wo_local, u, mode);
         }
         $else {// samples specular
-            wi_local = _coat->sample_wi(wo_local, u, mode).wi;
+            wi_sample = _coat->sample_wi(wo_local, u, mode);
         };
-        auto f_coat = _coat->evaluate(wo_local, wi_local, mode);
-        auto pdf_coat = _coat->pdf(wo_local, wi_local, mode);
-        // diffuse
-        auto Fi = fresnel_dielectric(abs_cos_theta(wi_local), 1.f, eta);
-        auto a = exp(-(1.f / abs_cos_theta(wi_local) + 1.f / abs_cos_theta(wo_local)) * _sigma_a);
-        auto ee = sqr(1.f / _fresnel->eta_t());
-        auto f_diffuse = (1.f - Fi) * (1.f - Fo) * sqr(1.f / eta) * a *
-                         _substrate->evaluate(wo_local, wi_local, mode);
-        auto pdf_diffuse = _substrate->pdf(wo_local, wi_local, mode);
-        auto pdf = lerp(pdf_coat, pdf_diffuse, substrate_weight);
-        auto wi = _it.shading().local_to_world(wi_local * sign);
-        auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f |
-                                  _it.shape()->shadow_terminator_factor() > 0.f,
-                              1.f, 0.f);
-        return {.eval = {.f = (f_coat + f_diffuse) * (abs_cos_theta(wi_local) * same_sided), .pdf = pdf},
+        SampledSpectrum f{swl().dimension(), 0.f};
+        auto pdf = def(0.f);
+        auto wi = def(make_float3(0.f, 0.f, 1.f));
+        $if(wi_sample.valid) {
+            auto wi_local = wi_sample.wi;
+            wi = _it.shading().local_to_world(wi_sample.wi * sign);
+            auto cos_theta_i = ite(_it.same_sided(wo, wi), abs_cos_theta(wi_local), 0.f);
+            auto f_coat = _coat->evaluate(wo_local, wi_local, mode);
+            auto pdf_coat = _coat->pdf(wo_local, wi_local, mode);
+            // diffuse
+            auto Fi = fresnel_dielectric(abs_cos_theta(wi_local), 1.f, eta);
+            auto a = exp(-(1.f / abs_cos_theta(wi_local) + 1.f / abs_cos_theta(wo_local)) * _sigma_a);
+            auto ee = sqr(1.f / _fresnel->eta_t());
+            auto f_diffuse = (1.f - Fi) * (1.f - Fo) * sqr(1.f / eta) * a *
+                             _substrate->evaluate(wo_local, wi_local, mode);
+            auto pdf_diffuse = _substrate->pdf(wo_local, wi_local, mode);
+            f = (f_coat + f_diffuse) * cos_theta_i;
+            pdf = lerp(pdf_coat, pdf_diffuse, substrate_weight);
+        };
+        return {.eval = {.f = f, .pdf = pdf},
                 .wi = wi,
                 .event = Surface::event_reflect};
     }
