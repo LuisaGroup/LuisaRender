@@ -568,7 +568,9 @@ private:
                 pdf += _sampling_weights[_clearcoat_technique_index] *
                        _clearcoat->pdf(wo_local, wi_local);
             }
-            cos_theta_i = ite(cls->it().same_sided(wo, wi), abs_cos_theta(wi_local), 0.f);
+            cos_theta_i = ite(cls->it().shape()->shadow_terminator_factor() > 0.f |
+                                  cls->it().same_sided(wo, wi),
+                              abs_cos_theta(wi_local), 0.f);
         }
         $else {// transmission
             if (_spec_trans) {
@@ -815,7 +817,9 @@ private:
                 pdf += _sampling_weights[_clearcoat_technique_index] *
                        _clearcoat->pdf(wo_local, wi_local);
             }
-            cos_theta_i = ite(cls->it().same_sided(wo, wi), abs_cos_theta(wi_local), 0.f);
+            cos_theta_i = ite(cls->it().shape()->shadow_terminator_factor() > 0.f |
+                                  cls->it().same_sided(wo, wi),
+                              abs_cos_theta(wi_local), 0.f);
         }
         $else {// transmission
             if (_spec_trans) {

@@ -145,7 +145,9 @@ private:
                         make_float3(1.f, 1.f, 1.f));
         wo_local *= sign;
         auto wi_local = sign * _it.shading().world_to_local(wi);
-        auto cos_theta_i = ite(_it.same_sided(wo, wi), abs_cos_theta(wi_local), 0.f);
+        auto cos_theta_i = ite(_it.shape()->shadow_terminator_factor() > 0.f |
+                                   _it.same_sided(wo, wi),
+                               abs_cos_theta(wi_local), 0.f);
         // specular
         auto f_coat = _coat->evaluate(wo_local, wi_local, mode);
         auto pdf_coat = _coat->pdf(wo_local, wi_local, mode);
@@ -186,7 +188,9 @@ private:
         $if(wi_sample.valid) {
             auto wi_local = wi_sample.wi;
             wi = _it.shading().local_to_world(wi_sample.wi * sign);
-            auto cos_theta_i = ite(_it.same_sided(wo, wi), abs_cos_theta(wi_local), 0.f);
+            auto cos_theta_i = ite(_it.shape()->shadow_terminator_factor() > 0.f |
+                                       _it.same_sided(wo, wi),
+                                   abs_cos_theta(wi_local), 0.f);
             auto f_coat = _coat->evaluate(wo_local, wi_local, mode);
             auto pdf_coat = _coat->pdf(wo_local, wi_local, mode);
             // diffuse
