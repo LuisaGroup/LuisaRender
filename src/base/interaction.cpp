@@ -7,8 +7,7 @@
 namespace luisa::render {
 
 Bool Interaction::same_sided(Expr<float3> wo, Expr<float3> wi) const noexcept {
-    return _shape->shadow_terminator_factor() > 0.f |
-           dot(wi, _ng) * dot(wo, _ng) > 0.0f;
+    return dot(wi, _ng) * dot(wo, _ng) > 0.0f;
 }
 
 Float3 Interaction::p_robust(Expr<float3> w) const noexcept {
