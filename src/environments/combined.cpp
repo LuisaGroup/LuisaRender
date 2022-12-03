@@ -79,14 +79,14 @@ public:
             $if(u.x < weight_a) {// sample a
                 u.x = u.x / weight_a;
                 sample = _a->sample(it_from, swl, time, u);
-                auto eval_b = _b->evaluate(sample.ray->direction(), swl, time);
+                auto eval_b = _b->evaluate(sample.wi, swl, time);
                 sample.eval.L = sample.eval.L * scales.x + eval_b.L * scales.y;
                 sample.eval.pdf = lerp(sample.eval.pdf, eval_b.pdf, 1.f - weight_a);
             }
             $else {// sample b
                 u.x = (u.x - weight_a) / (1.f - weight_a);
                 sample = _b->sample(it_from, swl, time, u);
-                auto eval_a = _a->evaluate(sample.ray->direction(), swl, time);
+                auto eval_a = _a->evaluate(sample.wi, swl, time);
                 sample.eval.L = eval_a.L * scales.x + sample.eval.L * scales.y;
                 sample.eval.pdf = lerp(eval_a.pdf, sample.eval.pdf, 1.f - weight_a);
             };
@@ -97,8 +97,8 @@ public:
             sample = _b->sample(it_from, swl, time, u);
             sample.eval.L *= scales.y;
         }
-        auto wi = normalize(transform_to_world() * sample.ray->direction());
-        sample.ray = it_from.spawn_ray(wi);
+        sample.wi = normalize(transform_to_world() * sample.wi);
+        sample.distance = std::numeric_limits<float>::max();
         return sample;
     }
 };

@@ -363,11 +363,12 @@ void WavefrontPathTracingInstance::_render_one_camera(
             auto occluded = def(true);
             $if(light_sample.eval.pdf > 0.f &
                 light_sample.eval.L.any([](auto x) { return x > 0.f; })) {
-                occluded = pipeline().geometry()->intersect_any(light_sample.ray);
+                auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
+                occluded = pipeline().geometry()->intersect_any(shadow_ray);
             };
             light_samples.write_emission(queue_id, ite(occluded, 0.f, 1.f) * light_sample.eval.L);
             light_samples.write_pdf(queue_id, ite(occluded, 0.f, light_sample.eval.pdf));
-            light_samples.write_wi(queue_id, light_sample.ray->direction());
+            light_samples.write_wi(queue_id, light_sample.wi);
         };
     });
 

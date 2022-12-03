@@ -126,7 +126,8 @@ public:
             return std::make_tuple(w, L, _directional_pdf(p, theta));
         }();
         return {.eval = {.L = Li, .pdf = pdf},
-                .ray = it_from.spawn_ray(normalize(transform_to_world() * wi))};
+                .wi = normalize(transform_to_world() * wi),
+                .distance = std::numeric_limits<float>::max()};
     }
 };
 

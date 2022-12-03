@@ -38,10 +38,12 @@ public:
 
     struct Sample {
         Evaluation eval;
-        Var<Ray> ray;
+        Float3 wi;
+        Float distance;
         [[nodiscard]] static auto zero(uint spec_dim) noexcept {
             return Sample{.eval = Evaluation::zero(spec_dim),
-                          .ray = compute::make_ray(make_float3(), make_float3(0.f, 0.f, 1.f), 0.f, 0.f)};
+                          .wi = make_float3(),
+                          .distance = 0.f};
         }
     };
 

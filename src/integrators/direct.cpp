@@ -116,7 +116,11 @@ protected:
                     *it, u_light_selection, u_light_surface, swl, time);
 
                 // trace shadow ray
-                occluded = pipeline().geometry()->intersect_any(light_sample.ray);
+                $if(light_sample.eval.pdf > 0.f &
+                    light_sample.eval.L.any([](auto x) { return x > 0.f; })) {
+                    auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
+                    occluded = pipeline().geometry()->intersect_any(shadow_ray);
+                };
             }
 
             // evaluate material
@@ -149,7 +153,7 @@ protected:
                     // direct lighting
                     if (samples_lights) {
                         $if(light_sample.eval.pdf > 0.0f & !occluded) {
-                            auto wi = light_sample.ray->direction();
+                            auto wi = light_sample.wi;
                             auto eval = closure->evaluate(wo, wi);
                             $if(eval.pdf > 0.f) {
                                 auto w = def(1.f);

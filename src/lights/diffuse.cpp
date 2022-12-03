@@ -95,7 +95,8 @@ struct DiffuseLightClosure final : public Light::Closure {
         auto p_light = it_light.p_robust(light_wo);
         auto p_from = it_from.p_robust(-light_wo);
         return {.eval = closure.evaluate(it_light, it_from.p_shading()),
-                .ray = it_from.spawn_ray(-light_wo, distance(p_light, p_from) * .999f)};
+                .wi = -light_wo,
+                .distance = distance(p_light, p_from) * .999f};
     }
 };
 

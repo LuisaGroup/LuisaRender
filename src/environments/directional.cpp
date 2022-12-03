@@ -89,7 +89,8 @@ public:
         auto wi_local = sample_uniform_cone(u, env->cos_half_angle());
         auto frame = Frame::make(env->direction());
         return {.eval = _evaluate(wi_local, swl, time),
-                .ray = it_from.spawn_ray(transform_to_world() * frame.local_to_world(wi_local))};
+                .wi = normalize(transform_to_world() * frame.local_to_world(wi_local)),
+                .distance = std::numeric_limits<float>::max()};
     }
 };
 
