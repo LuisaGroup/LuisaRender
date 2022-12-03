@@ -576,7 +576,7 @@ private:
                 pdf = _sampling_weights[_spec_trans_technique_index] *
                       _spec_trans->pdf(wo_local, wi_local, mode);
             }
-            auto cos_theta_i = ite(cls->it().same_sided(wo, wi), 0.f, abs_cos_theta(wi_local));
+            cos_theta_i = abs_cos_theta(wi_local);
         };
         return {.f = f * cos_theta_i, .pdf = pdf};
     }
@@ -828,7 +828,7 @@ private:
                 pdf += _sampling_weights[_diff_trans_technique_index] *
                        _diff_trans->pdf(wo_local, wi_local, mode);
             }
-            cos_theta_i = ite(cls->it().same_sided(wo, wi), 0.f, abs_cos_theta(wi_local));
+            cos_theta_i = abs_cos_theta(wi_local);
         };
         return {.f = f * cos_theta_i, .pdf = pdf};
     }

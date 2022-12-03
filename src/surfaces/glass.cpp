@@ -168,16 +168,14 @@ private:
         auto pdf = def(0.f);
         auto ratio = _refl_prob(wo_local);
         $if(same_hemisphere(wo_local, wi_local)) {
-            auto cos_theta_i = ite(_it.same_sided(wo, wi), abs_cos_theta(wi_local), 0.f);
-            f = _refl->evaluate(wo_local, wi_local, mode) * cos_theta_i;
+            f = _refl->evaluate(wo_local, wi_local, mode);
             pdf = _refl->pdf(wo_local, wi_local, mode) * ratio;
         }
         $else {
-            auto cos_theta_i = ite(_it.same_sided(wo, wi), 0.f, abs_cos_theta(wi_local));
-            f = _trans->evaluate(wo_local, wi_local, mode) * cos_theta_i;
+            f = _trans->evaluate(wo_local, wi_local, mode);
             pdf = _trans->pdf(wo_local, wi_local, mode) * (1.f - ratio);
         };
-        return {.f = f, .pdf = pdf};
+        return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
 
     [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u,
@@ -192,19 +190,15 @@ private:
         $if(u_lobe < ratio) {// Reflection
             f = _refl->sample(wo_local, &wi_local, u, &pdf, mode);
             wi = _it.shading().local_to_world(wi_local);
-            auto cos_theta_i = ite(_it.same_sided(wo, wi), abs_cos_theta(wi_local), 0.f);
             pdf *= ratio;
-            f *= cos_theta_i;
         }
         $else {// Transmission
             f = _trans->sample(wo_local, &wi_local, u, &pdf, mode);
             wi = _it.shading().local_to_world(wi_local);
-            auto cos_theta_i = ite(_it.same_sided(wo, wi), 0.f, abs_cos_theta(wi_local));
             pdf *= (1.f - ratio);
-            f *= cos_theta_i;
             event = ite(cos_theta(wo_local) > 0.f, Surface::event_enter, Surface::event_exit);
         };
-        return {.eval = {.f = f, .pdf = pdf}, .wi = wi, .event = event};
+        return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf}, .wi = wi, .event = event};
     }
 
 private:
