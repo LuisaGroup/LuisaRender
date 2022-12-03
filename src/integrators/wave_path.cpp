@@ -128,8 +128,7 @@ class LightSampleSOA {
 private:
     const Spectrum::Instance *_spectrum;
     Buffer<float> _emission;
-    Buffer<float> _pdf;
-    Buffer<float3> _wi;
+    Buffer<float4> _wi_and_pdf;
 
 public:
     LightSampleSOA(const Spectrum::Instance *spec, size_t size) noexcept
@@ -137,8 +136,7 @@ public:
         auto &&device = spec->pipeline().device();
         auto dimension = spec->node()->dimension();
         _emission = device.create_buffer<float>(size * dimension);
-        _pdf = device.create_buffer<float>(size);
-        _wi = device.create_buffer<float3>(size);
+        _wi_and_pdf = device.create_buffer<float4>(size);
     }
     [[nodiscard]] auto read_emission(Expr<uint> index) const noexcept {
         auto dimension = _spectrum->node()->dimension();
@@ -156,17 +154,11 @@ public:
             _emission.write(offset + i, s[i]);
         }
     }
-    [[nodiscard]] auto read_pdf(Expr<uint> index) const noexcept {
-        return _pdf.read(index);
+    [[nodiscard]] auto read_wi_and_pdf(Expr<uint> index) const noexcept {
+        return _wi_and_pdf.read(index);
     }
-    void write_pdf(Expr<uint> index, Expr<float> pdf) noexcept {
-        _pdf.write(index, pdf);
-    }
-    [[nodiscard]] auto read_wi(Expr<uint> index) const noexcept {
-        return _wi.read(index);
-    }
-    void write_wi(Expr<uint> index, Expr<float3> wi) const noexcept {
-        _wi.write(index, wi);
+    void write_wi_and_pdf(Expr<uint> index, Expr<float3> wi, Expr<float> pdf) noexcept {
+        _wi_and_pdf.write(index, make_float4(wi, pdf));
     }
 };
 
@@ -367,8 +359,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                 occluded = pipeline().geometry()->intersect_any(shadow_ray);
             };
             light_samples.write_emission(queue_id, ite(occluded, 0.f, 1.f) * light_sample.eval.L);
-            light_samples.write_pdf(queue_id, ite(occluded, 0.f, light_sample.eval.pdf));
-            light_samples.write_wi(queue_id, light_sample.wi);
+            light_samples.write_wi_and_pdf(queue_id, light_sample.wi, ite(occluded, 0.f, light_sample.eval.pdf));
         };
     });
 
@@ -414,11 +405,11 @@ void WavefrontPathTracingInstance::_render_one_camera(
                         };
                     }
                     // direct lighting
-                    auto pdf_light = light_samples.read_pdf(queue_id);
-                    $if(pdf_light > 0.0f) {
+                    auto light_wi_and_pdf = light_samples.read_wi_and_pdf(queue_id);
+                    auto pdf_light = light_wi_and_pdf.w;
+                    $if(light_wi_and_pdf.w > 0.0f) {
                         auto Ld = light_samples.read_emission(queue_id);
-                        auto wi = light_samples.read_wi(queue_id);
-                        auto eval = closure->evaluate(wo, wi);
+                        auto eval = closure->evaluate(wo, light_wi_and_pdf.xyz());
                         auto mis_weight = balance_heuristic(pdf_light, eval.pdf);
                         Li += mis_weight / pdf_light * beta * eval.f * Ld;
                     };
