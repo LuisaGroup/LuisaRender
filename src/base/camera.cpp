@@ -2,6 +2,7 @@
 // Created by Mike on 2021/12/8.
 //
 
+#include "core/basic_types.h"
 #include <random>
 
 #include <sdl/scene_node_desc.h>
@@ -224,18 +225,23 @@ Camera::Sample Camera::Instance::generate_ray(Expr<uint2> pixel_coord, Expr<floa
 
 Camera::SampleDifferential Camera::Instance::generate_ray_differential(Expr<uint2> pixel_coord, Expr<float> time,
                                                                        Expr<float2> u_filter, Expr<float2> u_lens) const noexcept {
-    auto central_sample = generate_ray(pixel_coord, time, u_filter, u_lens);
-    auto x_sample = generate_ray(pixel_coord + make_uint2(1u, 0u), time, u_filter, u_lens);
-    auto y_sample = generate_ray(pixel_coord + make_uint2(0u, 1u), time, u_filter, u_lens);
+    auto [filter_offset, filter_weight] = filter()->sample(u_filter);
+    auto pixel = make_float2(pixel_coord) + 0.5f + filter_offset;
+    auto central_sample = _generate_ray_in_camera_space(pixel, u_lens, time);
+    auto x_sample = _generate_ray_in_camera_space(pixel + make_float2(1.f, 0.f), u_lens, time);
+    auto y_sample = _generate_ray_in_camera_space(pixel + make_float2(0.f, 1.f), u_lens, time);
+    auto weight = central_sample.weight * filter_weight;
+    auto c2w = camera_to_world();
+    auto c_o = make_float3(c2w * make_float4(central_sample.ray->origin(), 1.0f));
+    auto c_d = normalize(make_float3x3(c2w) * central_sample.ray->direction());
+    auto rx_o = make_float3(c2w * make_float4(x_sample.ray->origin(), 1.0f));
+    auto rx_d = normalize(make_float3x3(c2w) * x_sample.ray->direction());
+    auto ry_o = make_float3(c2w * make_float4(y_sample.ray->origin(), 1.0f));
+    auto ry_d = normalize(make_float3x3(c2w) * y_sample.ray->direction());
     return Camera::SampleDifferential{
-        .ray_differential = RayDifferential{
-            central_sample.ray,
-            x_sample.ray->origin() - central_sample.ray->origin(),
-            y_sample.ray->origin() - central_sample.ray->origin(),
-            x_sample.ray->direction() - central_sample.ray->direction(),
-            y_sample.ray->direction() - central_sample.ray->direction()},
-        .pixel = central_sample.pixel,
-        .weight = central_sample.weight};
+        .ray_differential = RayDifferential{central_sample.ray, rx_o, ry_o, rx_d, ry_d},
+        .pixel = pixel,
+        .weight = weight};
 }
 
 Float4x4 Camera::Instance::camera_to_world() const noexcept {
