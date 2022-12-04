@@ -213,35 +213,36 @@ Camera::Sample Camera::Instance::generate_ray(Expr<uint2> pixel_coord, Expr<floa
                                               Expr<float2> u_filter, Expr<float2> u_lens) const noexcept {
     auto [filter_offset, filter_weight] = filter()->sample(u_filter);
     auto pixel = make_float2(pixel_coord) + 0.5f + filter_offset;
-    auto sample = _generate_ray_in_camera_space(pixel, u_lens, time);
-    sample.weight *= filter_weight;
+    auto [ray, weight] = _generate_ray_in_camera_space(pixel, u_lens, time);
+    weight *= filter_weight;
     auto c2w = camera_to_world();
-    auto o = make_float3(c2w * make_float4(sample.ray->origin(), 1.0f));
-    auto d = normalize(make_float3x3(c2w) * sample.ray->direction());
-    sample.ray->set_origin(o);
-    sample.ray->set_direction(d);
-    return sample;
+    auto o = make_float3(c2w * make_float4(ray->origin(), 1.0f));
+    auto d = normalize(make_float3x3(c2w) * ray->direction());
+    ray->set_origin(o);
+    ray->set_direction(d);
+    return {ray, pixel, weight};
 }
 
 Camera::SampleDifferential Camera::Instance::generate_ray_differential(Expr<uint2> pixel_coord, Expr<float> time,
                                                                        Expr<float2> u_filter, Expr<float2> u_lens) const noexcept {
     auto [filter_offset, filter_weight] = filter()->sample(u_filter);
     auto pixel = make_float2(pixel_coord) + 0.5f + filter_offset;
-    auto central_sample = _generate_ray_in_camera_space(pixel, u_lens, time);
-    auto x_sample = _generate_ray_in_camera_space(pixel + make_float2(1.f, 0.f), u_lens, time);
-    auto y_sample = _generate_ray_in_camera_space(pixel + make_float2(0.f, 1.f), u_lens, time);
-    auto weight = central_sample.weight * filter_weight;
+    auto [central_ray, central_weight] = _generate_ray_in_camera_space(pixel, u_lens, time);
+    auto [x_ray, x_weight] = _generate_ray_in_camera_space(pixel + make_float2(1.f, 0.f), u_lens, time);
+    auto [y_ray, y_weight] = _generate_ray_in_camera_space(pixel + make_float2(0.f, 1.f), u_lens, time);
+    auto weight = central_weight * filter_weight;
     auto c2w = camera_to_world();
-    auto c_o = make_float3(c2w * make_float4(central_sample.ray->origin(), 1.0f));
-    auto c_d = normalize(make_float3x3(c2w) * central_sample.ray->direction());
-    auto rx_o = make_float3(c2w * make_float4(x_sample.ray->origin(), 1.0f));
-    auto rx_d = normalize(make_float3x3(c2w) * x_sample.ray->direction());
-    auto ry_o = make_float3(c2w * make_float4(y_sample.ray->origin(), 1.0f));
-    auto ry_d = normalize(make_float3x3(c2w) * y_sample.ray->direction());
-    return Camera::SampleDifferential{
-        .ray_differential = RayDifferential{central_sample.ray, rx_o, ry_o, rx_d, ry_d},
-        .pixel = pixel,
-        .weight = weight};
+    auto c_o = make_float3(c2w * make_float4(central_ray->origin(), 1.0f));
+    auto c_d = normalize(make_float3x3(c2w) * central_ray->direction());
+    central_ray->set_origin(c_o);
+    central_ray->set_direction(c_d);
+    auto rx_o = make_float3(c2w * make_float4(x_ray->origin(), 1.0f));
+    auto rx_d = normalize(make_float3x3(c2w) * x_ray->direction());
+    auto ry_o = make_float3(c2w * make_float4(y_ray->origin(), 1.0f));
+    auto ry_d = normalize(make_float3x3(c2w) * y_ray->direction());
+    return {.ray_differential = RayDifferential{central_ray, rx_o, ry_o, rx_d, ry_d},
+            .pixel = pixel,
+            .weight = weight};
 }
 
 Float4x4 Camera::Instance::camera_to_world() const noexcept {

@@ -50,8 +50,10 @@ public:
 
     private:
         // generate ray in camera space, should not consider _filter or _transform
-        [[nodiscard]] virtual Sample _generate_ray_in_camera_space(
-            Expr<float2> pixel, Expr<float2> u_lens, Expr<float> time) const noexcept = 0;
+        [[nodiscard]] virtual std::pair<Var<Ray>, Float /* weight */>
+        _generate_ray_in_camera_space(Expr<float2> pixel,
+                                      Expr<float2> u_lens,
+                                      Expr<float> time) const noexcept = 0;
 
     public:
         Instance(Pipeline &pipeline, CommandBuffer &command_buffer, const Camera *camera) noexcept;
@@ -134,14 +136,16 @@ public:
     public:
         explicit Instance(BaseInstance base) noexcept
             : BaseInstance{std::move(base)} {}
-        [[nodiscard]] Camera::Sample _generate_ray_in_camera_space(
-            Expr<float2> pixel, Expr<float2> u_lens, Expr<float> time) const noexcept override {
-            auto s = BaseInstance::_generate_ray_in_camera_space(pixel, u_lens, time);
+        [[nodiscard]] std::pair<Var<Ray>, Float>
+        _generate_ray_in_camera_space(Expr<float2> pixel,
+                                      Expr<float2> u_lens,
+                                      Expr<float> time) const noexcept override {
+            auto [ray, weight] = BaseInstance::_generate_ray_in_camera_space(pixel, u_lens, time);
             auto t = this->template node<ClipPlaneCameraWrapper>()->clip_plane() /
-                     dot(s.ray->direction(), make_float3(0.f, 0.f, -1.f));
-            s.ray->set_t_min(t.x);
-            s.ray->set_t_max(t.y);
-            return s;
+                     dot(ray->direction(), make_float3(0.f, 0.f, -1.f));
+            ray->set_t_min(t.x);
+            ray->set_t_max(t.y);
+            return std::make_pair(std::move(ray), std::move(weight));
         }
     };
     [[nodiscard]] auto clip_plane() const noexcept { return _clip_plane; }

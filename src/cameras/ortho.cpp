@@ -51,13 +51,12 @@ public:
     explicit OrthoCameraInstance(
         Pipeline &ppl, CommandBuffer &command_buffer,
         const OrthoCamera *camera) noexcept;
-    [[nodiscard]] Camera::Sample _generate_ray_in_camera_space(
+    [[nodiscard]] std::pair<Var<Ray>, Float> _generate_ray_in_camera_space(
         Expr<float2> pixel, Expr<float2> /* u_lens */, Expr<float> /* time */) const noexcept override {
         auto data = _device_data.read(0u);
         auto p = (pixel * 2.0f - data.resolution) / data.resolution.y * data.scale;
-        return Camera::Sample{make_ray(make_float3(p.x, -p.y, 0.f),
-                                       make_float3(0.f, 0.f, -1.f)),
-                              pixel, 1.0f};
+        auto ray = make_ray(make_float3(p.x, -p.y, 0.f), make_float3(0.f, 0.f, -1.f));
+        return std::make_pair(std::move(ray), 1.0f);
     }
 };
 

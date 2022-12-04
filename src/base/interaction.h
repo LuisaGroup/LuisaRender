@@ -39,9 +39,10 @@ private:
 
 public:
     RayDifferential() noexcept = default;
-    RayDifferential(Var<Ray> ray, Expr<float3> rx_origin, Expr<float3> ry_origin,
+    RayDifferential(Expr<Ray> ray,
+                    Expr<float3> rx_origin, Expr<float3> ry_origin,
                     Expr<float3> rx_direction, Expr<float3> ry_direction) noexcept :
-        _ray(std::move(ray)), _rx_origin(rx_origin), _ry_origin(ry_origin),
+        _ray(ray), _rx_origin(rx_origin), _ry_origin(ry_origin),
         _rx_direction(rx_direction), _ry_direction(ry_direction) {}
 
     [[nodiscard]] auto ray() const noexcept { return _ray; }

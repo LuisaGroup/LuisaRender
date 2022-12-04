@@ -88,14 +88,16 @@ public:
         command_buffer << _device_data.copy_from(&host_data) << commit();
     }
 
-    [[nodiscard]] Camera::Sample
-    _generate_ray_in_camera_space(Expr<float2> pixel, Expr<float2> u_lens, Expr<float> /* time */) const noexcept override {
+    [[nodiscard]] std::pair<Var<Ray>, Float> _generate_ray_in_camera_space(Expr<float2> pixel,
+                                                                           Expr<float2> u_lens,
+                                                                           Expr<float> /* time */) const noexcept override {
         auto data = _device_data.read(0u);
         auto coord_focal = (pixel - data.pixel_offset) * data.projected_pixel_size;
         auto p_focal = make_float3(coord_focal.x, -coord_focal.y, -data.focus_distance);
         auto coord_lens = sample_uniform_disk_concentric(u_lens) * data.lens_radius;
         auto p_lens = make_float3(coord_lens, 0.f);
-        return {.ray = make_ray(p_lens, normalize(p_focal - p_lens)), .pixel = pixel, .weight = 1.f};
+        auto ray = make_ray(p_lens, normalize(p_focal - p_lens));
+        return std::make_pair(std::move(ray), 1.f);
     }
 };
 

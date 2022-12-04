@@ -69,12 +69,13 @@ public:
                                     tan(camera->fov() * 0.5f)};
         command_buffer << _device_data.copy_from(&host_data) << commit();
     }
-    [[nodiscard]] Camera::Sample _generate_ray_in_camera_space(
+    [[nodiscard]] std::pair<Var<Ray>, Float> _generate_ray_in_camera_space(
         Expr<float2> pixel, Expr<float2> /* u_lens */, Expr<float> /* time */) const noexcept override {
         auto data = _device_data.read(0u);
         auto p = (pixel * 2.0f - data.resolution) * (data.tan_half_fov / data.resolution.y);
         auto direction = normalize(make_float3(p.x, -p.y, -1.f));
-        return Camera::Sample{make_ray(make_float3(), direction), pixel, 1.0f};
+        auto ray = make_ray(make_float3(), direction);
+        return std::make_pair(std::move(ray), 1.f);
     }
 };
 
