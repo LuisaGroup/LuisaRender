@@ -15,15 +15,11 @@ using namespace compute;
 
 class WavefrontPathTracing final : public ProgressiveIntegrator {
 
-public:
-    static constexpr auto min_state_count = 1024u * 1024u;
-    static constexpr auto default_state_count = 16u * min_state_count;
-
 private:
     uint _max_depth;
     uint _rr_depth;
     float _rr_threshold;
-    uint _state_count;
+    uint _samples_per_pass;
 
 public:
     WavefrontPathTracing(Scene *scene, const SceneNodeDesc *desc) noexcept
@@ -31,11 +27,11 @@ public:
           _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)},
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
-          _state_count{std::max(desc->property_uint_or_default("states", default_state_count), min_state_count)} {}
+          _samples_per_pass{std::max(desc->property_uint_or_default("samples_per_pass", 16u), 1u)} {}
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
-    [[nodiscard]] auto state_count() const noexcept { return _state_count; }
+    [[nodiscard]] auto samples_per_pass() const noexcept { return _samples_per_pass; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
@@ -221,12 +217,14 @@ void WavefrontPathTracingInstance::_render_one_camera(
     auto spp = camera->node()->spp();
     auto resolution = camera->film()->node()->resolution();
     auto pixel_count = resolution.x * resolution.y;
-    auto state_count = node<WavefrontPathTracing>()->state_count();
-    auto spp_per_launch = (state_count + pixel_count - 1u) / pixel_count;
-    state_count = spp_per_launch * pixel_count;
+    auto max_samples_per_pass = ((1ull << 30u) + pixel_count - 1u) / pixel_count;
+    auto samples_per_pass = std::min(node<WavefrontPathTracing>()->samples_per_pass(),
+                                     static_cast<uint32_t>(max_samples_per_pass));
+    auto state_count = static_cast<uint64_t>(samples_per_pass) *
+                       static_cast<uint64_t>(pixel_count);
     LUISA_INFO("Wavefront path tracing configurations: "
-               "resolution = {}x{}, spp = {}, state_count = {}, spp_per_launch = {}.",
-               resolution.x, resolution.y, spp, state_count, spp_per_launch);
+               "resolution = {}x{}, spp = {}, state_count = {}, samples_per_pass = {}.",
+               resolution.x, resolution.y, spp, state_count, samples_per_pass);
 
     auto spectrum = pipeline().spectrum();
     PathStateSOA path_states{spectrum, state_count};
@@ -490,9 +488,9 @@ void WavefrontPathTracingInstance::_render_one_camera(
     auto ray_buffer = device.create_buffer<Ray>(state_count);
     auto ray_buffer_out = device.create_buffer<Ray>(state_count);
     auto hit_buffer = device.create_buffer<Hit>(state_count);
-    auto state_count_buffer = device.create_buffer<uint>(spp_per_launch);
-    luisa::vector<uint> precomputed_state_counts(spp_per_launch);
-    for (auto i = 0; i < spp_per_launch; i++) {
+    auto state_count_buffer = device.create_buffer<uint>(samples_per_pass);
+    luisa::vector<uint> precomputed_state_counts(samples_per_pass);
+    for (auto i = 0u; i < samples_per_pass; i++) {
         precomputed_state_counts[i] = (i + 1u) * pixel_count;
     }
     auto shutter_samples = camera->node()->shutter_samples();
@@ -507,8 +505,8 @@ void WavefrontPathTracingInstance::_render_one_camera(
     for (auto s : shutter_samples) {
         auto time = s.point.time;
         pipeline().update(command_buffer, time);
-        for (auto i = 0u; i < s.spp; i += spp_per_launch) {
-            auto launch_spp = std::min(s.spp - i, spp_per_launch);
+        for (auto i = 0u; i < s.spp; i += samples_per_pass) {
+            auto launch_spp = std::min(s.spp - i, samples_per_pass);
             auto launch_state_count = launch_spp * pixel_count;
             auto path_indices = path_queue.prepare_index_buffer(command_buffer);
             auto path_count = state_count_buffer.view(launch_spp - 1u, 1u);
