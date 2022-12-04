@@ -374,16 +374,15 @@ void WavefrontPathTracingInstance::_render_one_camera(
             auto hit = in_hits.read(ray_id);
             auto it = pipeline().geometry()->interaction(ray, hit);
             auto path_id = path_indices.read(ray_id);
-            sampler()->load_state(path_id);
-            auto Li = path_states.read_radiance(path_id);
             auto swl = path_states.read_swl(path_id);
             auto beta = path_states.read_beta(path_id);
             auto surface_tag = it->shape()->surface_tag();
+            sampler()->load_state(path_id);
             auto u_lobe = sampler()->generate_1d();
             auto u_bsdf = sampler()->generate_2d();
+            sampler()->save_state(path_id);
             auto eta_scale = def(1.f);
             auto wo = -ray->direction();
-            auto pdf_bsdf = def(0.f);
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
                 // create closure
                 auto closure = surface->closure(*it, swl, 1.f, time);
@@ -398,7 +397,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
 
                 $if(alpha_skip) {
                     ray = it->spawn_ray(ray->direction());
-                    pdf_bsdf = 1e16f;
+                    path_states.write_pdf_bsdf(path_id, 1e16f);
                 }
                 $else {
                     if (auto dispersive = closure->is_dispersive()) {
@@ -410,26 +409,29 @@ void WavefrontPathTracingInstance::_render_one_camera(
                     // direct lighting
                     auto light_wi_and_pdf = light_samples.read_wi_and_pdf(queue_id);
                     auto pdf_light = light_wi_and_pdf.w;
-                    $if(light_wi_and_pdf.w > 0.0f) {
-                        auto Ld = light_samples.read_emission(queue_id);
+                    $if(light_wi_and_pdf.w > 0.f) {
                         auto eval = closure->evaluate(wo, light_wi_and_pdf.xyz());
                         auto mis_weight = balance_heuristic(pdf_light, eval.pdf);
+                        // update Li
+                        auto Ld = light_samples.read_emission(queue_id);
+                        auto Li = path_states.read_radiance(path_id);
                         Li += mis_weight / pdf_light * beta * eval.f * Ld;
+                        path_states.write_radiance(path_id, Li);
                     };
                     // sample material
                     auto surface_sample = closure->sample(wo, u_lobe, u_bsdf);
-                    auto eta = closure->eta().value_or(1.f);
+                    path_states.write_pdf_bsdf(path_id, surface_sample.eval.pdf);
                     ray = it->spawn_ray(surface_sample.wi);
-                    pdf_bsdf = surface_sample.eval.pdf;
                     auto w = ite(surface_sample.eval.pdf > 0.0f, 1.f / surface_sample.eval.pdf, 0.f);
                     beta *= w * surface_sample.eval.f;
+                    // eta scale
+                    auto eta = closure->eta().value_or(1.f);
                     $switch(surface_sample.event) {
                         $case(Surface::event_enter) { eta_scale = sqr(eta); };
                         $case(Surface::event_exit) { eta_scale = 1.f / sqr(eta); };
                     };
                 };
             });
-            path_states.write_radiance(path_id, Li);
 
             // prepare for next bounce
             auto terminated = def(false);
@@ -452,9 +454,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                 auto out_queue_id = out_queue_size.atomic(0u).fetch_add(1u);
                 out_queue.write(out_queue_id, path_id);
                 out_rays.write(out_queue_id, ray);
-                sampler()->save_state(path_id);
                 path_states.write_beta(path_id, beta);
-                path_states.write_pdf_bsdf(path_id, pdf_bsdf);
             };
         };
     });
