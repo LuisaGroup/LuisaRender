@@ -91,12 +91,8 @@ protected:
                 *it, u_light_selection, u_light_surface, swl, time);
 
             // trace shadow ray
-            auto occluded = def(true);
-            $if(light_sample.eval.pdf > 0.f &
-                light_sample.eval.L.any([](auto x) { return x > 0.f; })) {
-                auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
-                occluded = pipeline().geometry()->intersect_any(shadow_ray);
-            };
+            auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
+            auto occluded = pipeline().geometry()->intersect_any(shadow_ray);
 
             // evaluate material
             auto surface_tag = it->shape()->surface_tag();

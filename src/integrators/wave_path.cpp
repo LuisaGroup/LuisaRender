@@ -350,12 +350,8 @@ void WavefrontPathTracingInstance::_render_one_camera(
                 *it, u_light_selection, u_light_surface, swl, time);
             sampler()->save_state(path_id);
             // trace shadow ray
-            auto occluded = def(true);
-            $if(light_sample.eval.pdf > 0.f &
-                light_sample.eval.L.any([](auto x) { return x > 0.f; })) {
-                auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
-                occluded = pipeline().geometry()->intersect_any(shadow_ray);
-            };
+            auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
+            auto occluded = pipeline().geometry()->intersect_any(shadow_ray);
             light_samples.write_emission(queue_id, ite(occluded, 0.f, 1.f) * light_sample.eval.L);
             light_samples.write_wi_and_pdf(queue_id, light_sample.wi, ite(occluded, 0.f, light_sample.eval.pdf));
         };

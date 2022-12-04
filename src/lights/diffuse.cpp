@@ -100,7 +100,7 @@ public:
         auto p_from = it_from.p_robust(-light_wo);
         return {.eval = closure.evaluate(it_light, p_from),
                 .wi = -light_wo,
-                .distance = distance(attrib.p, p_from) * .999f};
+                .distance = distance(attrib.p, p_from) * .9999f};
     }
 };
 
