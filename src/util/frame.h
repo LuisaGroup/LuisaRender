@@ -23,6 +23,7 @@ private:
 public:
     Frame() noexcept;
     Frame(Float3 u, Float3 v, Float3 n) noexcept;
+    void flip() noexcept;
     [[nodiscard]] static Frame make(Expr<float3> normal) noexcept;
     [[nodiscard]] static Frame make(Expr<float3> normal, Expr<float3> tangent) noexcept;
     [[nodiscard]] Float3 local_to_world(Expr<float3> d) const noexcept;

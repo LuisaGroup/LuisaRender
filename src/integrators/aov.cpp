@@ -266,7 +266,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                 aux_buffers.at("ndc")->accumulate(dispatch_id().xy(), make_float4(p_ndc, 1.f));
                 pipeline().surfaces().dispatch(it->shape()->surface_tag(), [&](auto surface) noexcept {
                     // create closure
-                    auto closure = surface->closure(*it, swl, 1.f, time);
+                    auto closure = surface->closure(it, swl, 1.f, time);
                     auto albedo = closure->albedo();
                     auto roughness = closure->roughness();
                     aux_buffers.at("albedo")->accumulate(dispatch_id().xy(), make_float4(spectrum->srgb(swl, albedo), 1.f));
@@ -322,7 +322,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
 
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
                 // create closure
-                auto closure = surface->closure(*it, swl, 1.f, time);
+                auto closure = surface->closure(it, swl, 1.f, time);
                 if (auto dispersive = closure->is_dispersive()) {
                     $if(*dispersive) { swl.terminate_secondary(); };
                 }
@@ -374,7 +374,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
             });
 
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
-                auto closure = surface->closure(*it, swl, 1.f, time);
+                auto closure = surface->closure(it, swl, 1.f, time);
                 specular_bounce = false;
                 $if((closure->roughness().x < 0.05f) & (closure->roughness().y < 0.05f)) {
                     specular_bounce = true;

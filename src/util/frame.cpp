@@ -47,4 +47,9 @@ Float3 Frame::world_to_local(Expr<float3> d) const noexcept {
     return make_float3(dot(d, _u), dot(d, _v), dot(d, _n));
 }
 
+void Frame::flip() noexcept {
+    _n = -_n;
+    _v = -_v;
+}
+
 }// namespace luisa::render

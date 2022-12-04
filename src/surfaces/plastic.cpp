@@ -87,7 +87,7 @@ public:
 
 public:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
-        const Interaction &it, const SampledWavelengths &swl,
+        luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
         Expr<float> eta_i, Expr<float> time) const noexcept override;
 };
 
@@ -113,12 +113,11 @@ private:
     Float _kd_weight;
 
 public:
-    SubstrateClosure(const Surface::Instance *instance, const Interaction &it,
-                     const SampledWavelengths &swl, Expr<float> time,
-                     const SampledSpectrum &Kd, Expr<float> Kd_weight,
-                     const SampledSpectrum &sigma_a, Expr<float> eta,
-                     Expr<float2> roughness) noexcept
-        : Surface::Closure{instance, it, swl, time},
+    SubstrateClosure(const Surface::Instance *instance, luisa::shared_ptr<Interaction> it,
+                     const SampledWavelengths &swl, Expr<float> time, const SampledSpectrum &Kd,
+                     Expr<float> Kd_weight, const SampledSpectrum &sigma_a,
+                     Expr<float> eta, Expr<float2> roughness) noexcept
+        : Surface::Closure{instance, std::move(it), swl, time},
           _distribution{luisa::make_unique<TrowbridgeReitzDistribution>(roughness)},
           _fresnel{luisa::make_unique<FresnelDielectric>(1.0f, eta)},
           _coat{luisa::make_unique<MicrofacetReflection>(SampledSpectrum{swl.dimension(), 1.f},
@@ -139,14 +138,14 @@ private:
 
     [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
                                                 TransportMode mode) const noexcept override {
-        auto wo_local = _it.shading().world_to_local(wo);
+        auto wo_local = it()->shading().world_to_local(wo);
         auto sign = ite(cos_theta(wo_local) < 0.f,
                         make_float3(1.f, 1.f, -1.f),
                         make_float3(1.f, 1.f, 1.f));
         wo_local *= sign;
-        auto wi_local = sign * _it.shading().world_to_local(wi);
-        auto cos_theta_i = ite(_it.shape()->shadow_terminator_factor() > 0.f |
-                                   _it.same_sided(wo, wi),
+        auto wi_local = sign * it()->shading().world_to_local(wi);
+        auto cos_theta_i = ite(it()->shape()->shadow_terminator_factor() > 0.f |
+                                   it()->same_sided(wo, wi),
                                abs_cos_theta(wi_local), 0.f);
         // specular
         auto f_coat = _coat->evaluate(wo_local, wi_local, mode);
@@ -167,7 +166,7 @@ private:
 
     [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u,
                                           TransportMode mode) const noexcept override {
-        auto wo_local = _it.shading().world_to_local(wo);
+        auto wo_local = it()->shading().world_to_local(wo);
         auto sign = ite(cos_theta(wo_local) < 0.f,
                         make_float3(1.f, 1.f, -1.f),
                         make_float3(1.f, 1.f, 1.f));
@@ -187,9 +186,9 @@ private:
         auto wi = def(make_float3(0.f, 0.f, 1.f));
         $if(wi_sample.valid) {
             auto wi_local = wi_sample.wi;
-            wi = _it.shading().local_to_world(wi_sample.wi * sign);
-            auto cos_theta_i = ite(_it.shape()->shadow_terminator_factor() > 0.f |
-                                       _it.same_sided(wo, wi),
+            wi = it()->shading().local_to_world(wi_sample.wi * sign);
+            auto cos_theta_i = ite(it()->shape()->shadow_terminator_factor() > 0.f |
+                                       it()->same_sided(wo, wi),
                                    abs_cos_theta(wi_local), 0.f);
             auto f_coat = _coat->evaluate(wo_local, wi_local, mode);
             auto pdf_coat = _coat->pdf(wo_local, wi_local, mode);
@@ -210,22 +209,24 @@ private:
 };
 
 luisa::unique_ptr<Surface::Closure> SubstrateInstance::closure(
-    const Interaction &it, const SampledWavelengths &swl,
+    luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
     Expr<float> eta_i, Expr<float> time) const noexcept {
 
     auto roughness = def(make_float2(0.f));
     if (_roughness != nullptr) {
-        auto r = _roughness->evaluate(it, swl, time);
+        auto r = _roughness->evaluate(*it, swl, time);
         auto remap = node<PlasticSurface>()->remap_roughness();
         auto r2a = [](auto &&x) noexcept { return TrowbridgeReitzDistribution::roughness_to_alpha(x); };
         roughness = _roughness->node()->channels() == 1u ?
                         (remap ? make_float2(r2a(r.x)) : r.xx()) :
                         (remap ? r2a(r.xy()) : r.xy());
     }
-    auto eta = (_eta ? _eta->evaluate(it, swl, time).x : 1.5f) / eta_i;
-    auto [Kd, Kd_lum] = _kd ? _kd->evaluate_albedo_spectrum(it, swl, time) : Spectrum::Decode::one(swl.dimension());
-    auto [sigma_a, sigma_a_lum] = _sigma_a ? _sigma_a->evaluate_albedo_spectrum(it, swl, time) : Spectrum::Decode::zero(swl.dimension());
-    auto thickness = _thickness ? _thickness->evaluate(it, swl, time).x : 1.f;
+    auto eta = (_eta ? _eta->evaluate(*it, swl, time).x : 1.5f) / eta_i;
+    auto [Kd, Kd_lum] = _kd ? _kd->evaluate_albedo_spectrum(*it, swl, time) :
+                              Spectrum::Decode::one(swl.dimension());
+    auto [sigma_a, sigma_a_lum] = _sigma_a ? _sigma_a->evaluate_albedo_spectrum(*it, swl, time) :
+                                             Spectrum::Decode::zero(swl.dimension());
+    auto thickness = _thickness ? _thickness->evaluate(*it, swl, time).x : 1.f;
     auto scaled_sigma_a = sigma_a * thickness;
     auto average_transmittance = exp(-2.f * sigma_a_lum * thickness);
     // Difference from the Tungsten renderer:
@@ -233,7 +234,7 @@ luisa::unique_ptr<Surface::Closure> SubstrateInstance::closure(
     // Fresnel reflectance, rather than compute it on the fly.
     auto diffuse_fresnel = fresnel_dielectric_integral(eta);
     return luisa::make_unique<SubstrateClosure>(
-        this, it, swl, time, Kd / (1.f - Kd * diffuse_fresnel),
+        this, std::move(it), swl, time, Kd / (1.f - Kd * diffuse_fresnel),
         Kd_lum * average_transmittance, sigma_a, eta, roughness);
 }
 

@@ -63,14 +63,17 @@ public:
     private:
         const Instance *_instance;
 
-    protected:
-        Interaction _it;
+    private:
+        luisa::shared_ptr<Interaction> _it;
         const SampledWavelengths &_swl;
         Float _time;
 
     private:
-        [[nodiscard]] virtual Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept = 0;
-        [[nodiscard]] virtual Sample _sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u, TransportMode mode) const noexcept = 0;
+        [[nodiscard]] virtual Evaluation _evaluate(Expr<float3> wo,
+                                                   Expr<float3> wi,
+                                                   TransportMode mode) const noexcept = 0;
+        [[nodiscard]] virtual Sample _sample(Expr<float3> wo, Expr<float> u_lobe,
+                                             Expr<float2> u, TransportMode mode) const noexcept = 0;
 
     private:
         [[nodiscard]] virtual luisa::optional<Float> _opacity() const noexcept;
@@ -78,7 +81,7 @@ public:
         [[nodiscard]] virtual luisa::optional<Float> _eta() const noexcept;
 
     public:
-        Closure(const Instance *instance, Interaction it,
+        Closure(const Instance *instance, luisa::shared_ptr<Interaction> it,
                 const SampledWavelengths &swl, Expr<float> time) noexcept;
         virtual ~Closure() noexcept = default;
         template<typename T = Instance>
@@ -86,8 +89,9 @@ public:
         [[nodiscard]] auto instance() const noexcept { return static_cast<const T *>(_instance); }
         [[nodiscard]] Evaluation evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode = TransportMode::RADIANCE) const noexcept;
         [[nodiscard]] Sample sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u, TransportMode mode = TransportMode::RADIANCE) const noexcept;
-        [[nodiscard]] auto &swl() const noexcept { return _swl; }          // sampled wavelengths
-        [[nodiscard]] auto &it() const noexcept { return _it; }            // interaction, possibly normal mapped
+        [[nodiscard]] auto &swl() const noexcept { return _swl; }
+        [[nodiscard]] auto it() const noexcept { return _it.get(); }
+        [[nodiscard]] auto shared_it() const noexcept { return _it; }
         [[nodiscard]] auto time() const noexcept { return _time; }         // time
         [[nodiscard]] luisa::optional<Float> opacity() const noexcept;     // nullopt if never possible to be non-opaque
         [[nodiscard]] luisa::optional<Float> eta() const noexcept;         // nullopt if never possible to be transmissive
@@ -114,7 +118,7 @@ public:
         [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_surface); }
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
         [[nodiscard]] virtual luisa::unique_ptr<Closure> closure(
-            const Interaction &it, const SampledWavelengths &swl,
+            luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
             Expr<float> eta_i, Expr<float> time) const noexcept = 0;
     };
 
@@ -163,10 +167,10 @@ public:
         Instance(BaseInstance &&base, const Texture::Instance *opacity) noexcept
             : BaseInstance{std::move(base)}, _opacity{opacity} {}
         [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
-            const Interaction &it, const SampledWavelengths &swl,
+            luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
             Expr<float> eta_i, Expr<float> time) const noexcept override {
-            auto base = BaseInstance::closure(it, swl, eta_i, time);
-            auto alpha = _opacity ? luisa::make_optional(_opacity->evaluate(it, swl, time).x) : luisa::nullopt;
+            auto alpha = _opacity ? luisa::make_optional(_opacity->evaluate(*it, swl, time).x) : luisa::nullopt;
+            auto base = BaseInstance::closure(std::move(it), swl, eta_i, time);
             return luisa::make_unique<Closure>(std::move(dynamic_cast<BaseClosure &>(*base)), std::move(alpha));
         }
     };
@@ -179,7 +183,7 @@ public:
         : BaseSurface{scene, desc},
           _opacity{[](auto scene, auto desc) noexcept {
               return scene->load_texture(desc->property_node_or_default(
-                  "alpha", lazy_construct([desc]{
+                  "alpha", lazy_construct([desc] {
                       return desc->property_node_or_default("opacity");
                   })));
           }(scene, desc)} {}
@@ -211,15 +215,15 @@ public:
         Instance(BaseInstance &&base, const Texture::Instance *normal, float strength) noexcept
             : BaseInstance{std::move(base)}, _map{normal}, _strength{strength} {}
         [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
-            const Interaction &it, const SampledWavelengths &swl,
+            luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
             Expr<float> eta_i, Expr<float> time) const noexcept override {
-            if (_map == nullptr) { return BaseInstance::closure(it, swl, eta_i, time); }
-            auto normal_local = 2.f * _map->evaluate(it, swl, time).xyz() - 1.f;
+            if (_map == nullptr) { return BaseInstance::closure(std::move(it), swl, eta_i, time); }
+            auto normal_local = 2.f * _map->evaluate(*it, swl, time).xyz() - 1.f;
             if (_strength != 1.f) { normal_local *= make_float3(_strength, _strength, 1.f); }
-            auto normal = normalize(it.shading().local_to_world(normal_local));
-            auto mapped_it = it;
-            mapped_it.set_shading(Frame::make(normal, it.shading().u()));
-            return BaseInstance::closure(mapped_it, swl, eta_i, time);
+            auto mapped_it = luisa::make_shared<Interaction>(*it);
+            auto normal = normalize(it->shading().local_to_world(normal_local));
+            mapped_it->set_shading(Frame::make(normal, it->shading().u()));
+            return BaseInstance::closure(std::move(mapped_it), swl, eta_i, time);
         }
     };
 
@@ -262,15 +266,12 @@ public:
         Instance(BaseInstance &&base, bool two_sided) noexcept
             : BaseInstance{std::move(base)}, _two_sided{two_sided} {}
         [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
-            const Interaction &it, const SampledWavelengths &swl,
+            luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
             Expr<float> eta_i, Expr<float> time) const noexcept override {
             if (_two_sided) {
-                Interaction it_copy{
-                    it.shared_shape(), it.instance_id(), it.triangle_id(),
-                    it.triangle_area(), it.p(), it.ng(), it.uv(), it.p_shading(),
-                    ite(it.back_facing(), -1.f, 1.f) * it.shading().n(),
-                    it.shading().u(), false};
-                return BaseInstance::closure(it_copy, swl, eta_i, time);
+                auto it_copy = luisa::make_shared<Interaction>(*it);
+                it_copy->shading().flip();
+                return BaseInstance::closure(std::move(it_copy), swl, eta_i, time);
             }
             return BaseInstance::closure(it, swl, eta_i, time);
         }

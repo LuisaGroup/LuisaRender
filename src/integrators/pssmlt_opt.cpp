@@ -351,7 +351,7 @@ private:
             auto wo = -ray->direction();
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
                 // create closure
-                auto closure = surface->closure(*it, swl, 1.f, time);
+                auto closure = surface->closure(it, swl, 1.f, time);
 
                 // apply opacity map
                 auto alpha_skip = def(false);
