@@ -71,7 +71,8 @@ private:
 
 public:
     Interaction() noexcept : _inst_id{~0u}, _prim_id{~0u} {}
-    explicit Interaction(Expr<float2> uv) noexcept : _uv{uv}, _inst_id{~0u}, _prim_id{~0u} {}
+    explicit Interaction(Expr<float2> uv) noexcept
+        : _uv{uv}, _inst_id{~0u}, _prim_id{~0u} {}
 
     Interaction(luisa::shared_ptr<Shape::Handle> shape, Expr<uint> inst_id,
                 Expr<uint> prim_id, Expr<float> prim_area, Expr<float3> p,
@@ -106,7 +107,10 @@ public:
     [[nodiscard]] auto back_facing() const noexcept { return _back_facing; }
     [[nodiscard]] Bool same_sided(Expr<float3> wo, Expr<float3> wi) const noexcept;
     [[nodiscard]] Float3 p_robust(Expr<float3> w) const noexcept;
-    [[nodiscard]] Var<Ray> spawn_ray(Expr<float3> wi, Expr<float> t_max = std::numeric_limits<float>::max()) const noexcept;
+
+public:
+    static constexpr auto default_t_max = std::numeric_limits<float>::max();
+    [[nodiscard]] Var<Ray> spawn_ray(Expr<float3> wi, Expr<float> t_max = default_t_max) const noexcept;
 };
 
 }// namespace luisa::render

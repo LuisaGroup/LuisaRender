@@ -183,7 +183,7 @@ luisa::shared_ptr<Interaction> Geometry::interaction(const Var<Ray> &ray, const 
         auto attrib = shading_point(*shape, tri, uvw, m, n);
         it = {std::move(shape), hit.inst, hit.prim, attrib, dot(ray->direction(), attrib.g.n) > 0.0f};
     };
-    return luisa::make_unique<Interaction>(std::move(it));
+    return luisa::make_shared<Interaction>(std::move(it));
 }
 
 luisa::shared_ptr<Shape::Handle> Geometry::instance(Expr<uint> index) const noexcept {
