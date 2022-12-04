@@ -84,13 +84,13 @@ struct DiffuseLightClosure final : public Light::Closure {
         auto [triangle_id, ux] = sample_alias_table(
             pipeline.buffer<AliasEntry>(alias_table_buffer_id),
             light_inst->triangle_count(), u_in.x);
-        auto triangle = pipeline.geometry()->triangle(light_inst, triangle_id);
+        auto triangle = pipeline.geometry()->triangle(*light_inst, triangle_id);
         auto light_to_world_normal = transpose(inverse(make_float3x3(light_to_world)));
         auto uvw = sample_uniform_triangle(make_float2(ux, u_in.y));
         auto attrib = pipeline.geometry()->shading_point(
-            light_inst, triangle, uvw, light_to_world, light_to_world_normal);
+            *light_inst, triangle, uvw, light_to_world, light_to_world_normal);
         auto light_wo = normalize(it_from.p() - attrib.pg);
-        Interaction it_light{light_inst, light_inst_id, triangle_id, attrib, dot(light_wo, attrib.ng) < 0.0f};
+        Interaction it_light{std::move(light_inst), light_inst_id, triangle_id, attrib, dot(light_wo, attrib.ng) < 0.0f};
         DiffuseLightClosure closure{light, _swl, _time};
         auto p_light = it_light.p_robust(light_wo);
         auto p_from = it_from.p_robust(-light_wo);

@@ -12,7 +12,7 @@ void Geometry::build(CommandBuffer &command_buffer, luisa::span<const Shape *con
                      float init_time, AccelUsageHint hint) noexcept {
     _accel = _pipeline.device().create_accel(hint);
     for (auto shape : shapes) { _process_shape(command_buffer, shape, init_time); }
-    _instance_buffer = _pipeline.device().create_buffer<Shape::Handle>(_instances.size());
+    _instance_buffer = _pipeline.device().create_buffer<uint4>(_instances.size());
     command_buffer << _instance_buffer.copy_from(_instances.data())
                    << _accel.build();
 }
@@ -171,31 +171,31 @@ Var<bool> Geometry::trace_any(const Var<Ray> &ray) const noexcept {
     return _accel.trace_any(ray);
 }
 
-luisa::unique_ptr<Interaction> Geometry::interaction(const Var<Ray> &ray, const Var<Hit> &hit) const noexcept {
+luisa::shared_ptr<Interaction> Geometry::interaction(const Var<Ray> &ray, const Var<Hit> &hit) const noexcept {
     using namespace luisa::compute;
     Interaction it;
     $if(!hit->miss()) {
         auto shape = instance(hit.inst);
         auto m = instance_to_world(hit.inst);
         auto n = transpose(inverse(make_float3x3(m)));
-        auto tri = triangle(shape, hit.prim);
+        auto tri = triangle(*shape, hit.prim);
         auto uvw = make_float3(1.0f - hit.bary.x - hit.bary.y, hit.bary);
-        auto attrib = shading_point(shape, tri, uvw, m, n);
+        auto attrib = shading_point(*shape, tri, uvw, m, n);
         it = {std::move(shape), hit.inst, hit.prim, attrib, dot(ray->direction(), attrib.ng) > 0.0f};
     };
     return luisa::make_unique<Interaction>(std::move(it));
 }
 
-Var<Shape::Handle> Geometry::instance(Expr<uint> index) const noexcept {
-    return _instance_buffer.read(index);
+luisa::shared_ptr<Shape::Handle> Geometry::instance(Expr<uint> index) const noexcept {
+    return Shape::Handle::decode(_instance_buffer.read(index));
 }
 
 Float4x4 Geometry::instance_to_world(Expr<uint> index) const noexcept {
     return _accel.instance_transform(index);
 }
 
-Var<Triangle> Geometry::triangle(const Var<Shape::Handle> &instance, Expr<uint> index) const noexcept {
-    return _pipeline.buffer<Triangle>(instance->triangle_buffer_id()).read(index);
+Var<Triangle> Geometry::triangle(const Shape::Handle &instance, Expr<uint> index) const noexcept {
+    return _pipeline.buffer<Triangle>(instance.triangle_buffer_id()).read(index);
 }
 
 [[nodiscard]] static auto _compute_tangent(
@@ -221,10 +221,10 @@ Var<Triangle> Geometry::triangle(const Var<Shape::Handle> &instance, Expr<uint> 
     return impl(p0, p1, p2, uv0, uv1, uv2);
 }
 
-ShadingAttribute Geometry::shading_point(const Var<Shape::Handle> &instance, const Var<Triangle> &triangle,
+ShadingAttribute Geometry::shading_point(const Shape::Handle &instance, const Var<Triangle> &triangle,
                                          const Var<float3> &bary, const Var<float4x4> &shape_to_world,
                                          const Var<float3x3> &shape_to_world_normal) const noexcept {
-    auto v_buffer = instance->vertex_buffer_id();
+    auto v_buffer = instance.vertex_buffer_id();
     auto v0 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i0);
     auto v1 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i1);
     auto v2 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i2);
@@ -235,26 +235,16 @@ ShadingAttribute Geometry::shading_point(const Var<Shape::Handle> &instance, con
     auto c = cross(p1 - p0, p2 - p0);
     auto area = .5f * length(c);
     auto ng = normalize(c);
-    auto uv = bary.yz();
-    auto s = def(make_float3(0.f));
-    $if(instance->has_vertex_uv()) {
-        auto uv_buffer = instance->uv_buffer_id();
-        auto uv0 = _pipeline.buffer<float2>(uv_buffer).read(triangle.i0);
-        auto uv1 = _pipeline.buffer<float2>(uv_buffer).read(triangle.i1);
-        auto uv2 = _pipeline.buffer<float2>(uv_buffer).read(triangle.i2);
-        uv = bary.x * uv0 + bary.y * uv1 + bary.z * uv2;
-        s = _compute_tangent(p0, p1, p2, uv0, uv1, uv2);
-    };
     auto ns = ng;
     auto ps = p;
-    $if(instance->has_vertex_normal()) {
-        auto n0 = ite(instance->has_vertex_normal(), normalize(shape_to_world_normal * v0->normal()), ng);
-        auto n1 = ite(instance->has_vertex_normal(), normalize(shape_to_world_normal * v1->normal()), ng);
-        auto n2 = ite(instance->has_vertex_normal(), normalize(shape_to_world_normal * v2->normal()), ng);
+    $if(instance.has_vertex_normal()) {
+        auto n0 = ite(instance.has_vertex_normal(), normalize(shape_to_world_normal * v0->normal()), ng);
+        auto n1 = ite(instance.has_vertex_normal(), normalize(shape_to_world_normal * v1->normal()), ng);
+        auto n2 = ite(instance.has_vertex_normal(), normalize(shape_to_world_normal * v2->normal()), ng);
         ns = normalize(bary.x * n0 + bary.y * n1 + bary.z * n2);
         // offset p to fake surface for the shadow terminator
         // reference: Ray Tracing Gems 2, Chap. 4
-        auto shadow_term = instance->shadow_terminator_factor();
+        auto shadow_term = instance.shadow_terminator_factor();
         auto temp_u = p - p0;
         auto temp_v = p - p1;
         auto temp_w = p - p2;
@@ -262,6 +252,16 @@ ShadingAttribute Geometry::shading_point(const Var<Shape::Handle> &instance, con
                   bary.y * (temp_v - min(dot(temp_v, n1), 0.f) * n1) +
                   bary.z * (temp_w - min(dot(temp_w, n2), 0.f) * n2);
         ps = p + shadow_term * dp;
+    };
+    auto uv = bary.yz();
+    auto s = def(make_float3(0.f));
+    $if(instance.has_vertex_uv()) {
+        auto uv_buffer = instance.uv_buffer_id();
+        auto uv0 = _pipeline.buffer<float2>(uv_buffer).read(triangle.i0);
+        auto uv1 = _pipeline.buffer<float2>(uv_buffer).read(triangle.i1);
+        auto uv2 = _pipeline.buffer<float2>(uv_buffer).read(triangle.i2);
+        uv = bary.x * uv0 + bary.y * uv1 + bary.z * uv2;
+        s = _compute_tangent(p0, p1, p2, uv0, uv1, uv2);
     };
     return {.pg = p,
             .ng = ng,

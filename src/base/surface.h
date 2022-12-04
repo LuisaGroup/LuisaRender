@@ -266,7 +266,7 @@ public:
             Expr<float> eta_i, Expr<float> time) const noexcept override {
             if (_two_sided) {
                 Interaction it_copy{
-                    it.shape(), it.instance_id(), it.triangle_id(),
+                    it.shared_shape(), it.instance_id(), it.triangle_id(),
                     it.triangle_area(), it.p(), it.ng(), it.uv(), it.p_shading(),
                     ite(it.back_facing(), -1.f, 1.f) * it.shading().n(),
                     it.shading().u(), false};

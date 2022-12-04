@@ -54,7 +54,7 @@ struct RayDifferential {
 class Interaction {
 
 private:
-    Var<Shape::Handle> _shape;
+    luisa::shared_ptr<Shape::Handle> _shape;
     Float3 _pg;
     Float3 _ng;
     Float2 _uv;
@@ -69,18 +69,18 @@ public:
     Interaction() noexcept : _inst_id{~0u}, _prim_id{~0u} {}
     explicit Interaction(Expr<float2> uv) noexcept : _uv{uv}, _inst_id{~0u}, _prim_id{~0u} {}
 
-    Interaction(Var<Shape::Handle> shape, Expr<uint> inst_id, Expr<uint> prim_id, Expr<float> prim_area,
+    Interaction(luisa::shared_ptr<Shape::Handle> shape, Expr<uint> inst_id, Expr<uint> prim_id, Expr<float> prim_area,
                 Expr<float3> p, Expr<float3> ng, Expr<bool> back_facing) noexcept
         : _shape{std::move(shape)}, _pg{p}, _ng{ng}, _shading{Frame::make(_ng)}, _ps{p},
           _inst_id{~0u}, _prim_id{prim_id}, _prim_area{prim_area}, _back_facing{back_facing} {}
 
-    Interaction(Var<Shape::Handle> shape, Expr<uint> inst_id, Expr<uint> prim_id,
+    Interaction(luisa::shared_ptr<Shape::Handle> shape, Expr<uint> inst_id, Expr<uint> prim_id,
                 Expr<float> prim_area, Expr<float3> pg, Expr<float3> ng, Expr<float2> uv,
                 Expr<float3> ps, Expr<float3> ns, Expr<float3> tangent, Expr<bool> back_facing) noexcept
         : _shape{std::move(shape)}, _pg{pg}, _ng{ng}, _uv{uv}, _ps{ps}, _shading{Frame::make(ns, tangent)},
           _inst_id{inst_id}, _prim_id{prim_id}, _prim_area{prim_area}, _back_facing{back_facing} {}
 
-    Interaction(Var<Shape::Handle> shape, Expr<uint> inst_id, Expr<uint> prim_id,
+    Interaction(luisa::shared_ptr<Shape::Handle> shape, Expr<uint> inst_id, Expr<uint> prim_id,
                 const ShadingAttribute &attrib, Expr<bool> back_facing) noexcept
         : Interaction{std::move(shape), inst_id, prim_id, attrib.area, attrib.pg, attrib.ng,
                       attrib.uv, attrib.ps, attrib.ns, attrib.tangent, back_facing} {}
@@ -95,7 +95,8 @@ public:
     [[nodiscard]] auto valid() const noexcept { return _inst_id != ~0u; }
     [[nodiscard]] const auto &shading() const noexcept { return _shading; }
     void set_shading(Frame frame) noexcept { _shading = std::move(frame); }
-    [[nodiscard]] const auto &shape() const noexcept { return _shape; }
+    [[nodiscard]] auto shape() const noexcept { return _shape.get(); }
+    [[nodiscard]] auto shared_shape() const noexcept { return _shape; }
     [[nodiscard]] auto back_facing() const noexcept { return _back_facing; }
     [[nodiscard]] Bool same_sided(Expr<float3> wo, Expr<float3> wi) const noexcept;
     [[nodiscard]] Float3 p_robust(Expr<float3> w) const noexcept;

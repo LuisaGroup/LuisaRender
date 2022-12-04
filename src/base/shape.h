@@ -114,8 +114,13 @@ public:
     [[nodiscard]] bool visible() const noexcept override { return _visible; }
 };
 
-struct alignas(16) Shape::Handle {
+using compute::Expr;
+using compute::Float;
+using compute::UInt;
 
+class Shape::Handle {
+
+public:
     static constexpr auto property_flag_bits = 10u;
     static constexpr auto property_flag_mask = (1u << property_flag_bits) - 1u;
 
@@ -132,53 +137,50 @@ struct alignas(16) Shape::Handle {
     static constexpr auto pdf_buffer_id_offset = 3u;
     static constexpr auto uv_buffer_id_offset = 4u;// might be empty, goes last
 
-    uint buffer_base_and_properties;
-    uint surface_tag_and_light_tag;
-    uint triangle_buffer_size;
-    uint shadow_term_and_intersection_offset;
-
-    [[nodiscard]] static Shape::Handle encode(uint buffer_base, uint flags,
-                                              uint surface_tag, uint light_tag, uint tri_count,
-                                              float shadow_terminator, float intersection_offset) noexcept;
-};
-
-static_assert(sizeof(Shape::Handle) == 16u);
-
-}// namespace luisa::render
-
-// clang-format off
-LUISA_STRUCT(luisa::render::Shape::Handle,
-    buffer_base_and_properties,
-    surface_tag_and_light_tag,
-    triangle_buffer_size,
-    shadow_term_and_intersection_offset) {
+private:
+    UInt _buffer_base;
+    UInt _properties;
+    UInt _surface_tag;
+    UInt _light_tag;
+    UInt _triangle_count;
+    Float _shadow_terminator;
+    Float _intersection_offset;
 
 private:
-    [[nodiscard]] static auto _decode_fixed_point(auto x) noexcept {
-        constexpr auto fixed_point_bits = 16u;
-        constexpr auto fixed_point_mask = (1u << fixed_point_bits) - 1u;
-        constexpr auto fixed_point_scale = 1.0f / static_cast<float>(1u << fixed_point_bits);
-        return cast<float>(x & fixed_point_mask) * fixed_point_scale;
-    }
+    Handle(Expr<uint> buffer_base, Expr<uint> flags,
+           Expr<uint> surface_tag, Expr<uint> light_tag, Expr<uint> triangle_count,
+           Expr<float> shadow_terminator, Expr<float> intersection_offset) noexcept
+        : _buffer_base{buffer_base}, _properties{flags},
+          _surface_tag{surface_tag}, _light_tag{light_tag},
+          _triangle_count{triangle_count},
+          _shadow_terminator{shadow_terminator},
+          _intersection_offset{intersection_offset} {}
 
 public:
-    [[nodiscard]] auto geometry_buffer_base() const noexcept { return buffer_base_and_properties >> luisa::render::Shape::Handle::property_flag_bits; }
-    [[nodiscard]] auto property_flags() const noexcept { return buffer_base_and_properties & luisa::render::Shape::Handle::property_flag_mask; }
+    [[nodiscard]] static uint4 encode(uint buffer_base, uint flags,
+                                      uint surface_tag, uint light_tag, uint tri_count,
+                                      float shadow_terminator, float intersection_offset) noexcept;
+    [[nodiscard]] static luisa::shared_ptr<Shape::Handle> decode(Expr<uint4> compressed) noexcept;
+
+public:
+    [[nodiscard]] auto geometry_buffer_base() const noexcept { return _buffer_base; }
+    [[nodiscard]] auto property_flags() const noexcept { return _properties; }
     [[nodiscard]] auto vertex_buffer_id() const noexcept { return geometry_buffer_base() + luisa::render::Shape::Handle::vertex_buffer_id_offset; }
     [[nodiscard]] auto uv_buffer_id() const noexcept { return geometry_buffer_base() + luisa::render::Shape::Handle::uv_buffer_id_offset; }
     [[nodiscard]] auto triangle_buffer_id() const noexcept { return geometry_buffer_base() + luisa::render::Shape::Handle::triangle_buffer_id_offset; }
-    [[nodiscard]] auto triangle_count() const noexcept { return triangle_buffer_size; }
+    [[nodiscard]] auto triangle_count() const noexcept { return _triangle_count; }
     [[nodiscard]] auto alias_table_buffer_id() const noexcept { return geometry_buffer_base() + luisa::render::Shape::Handle::alias_table_buffer_id_offset; }
     [[nodiscard]] auto pdf_buffer_id() const noexcept { return geometry_buffer_base() + luisa::render::Shape::Handle::pdf_buffer_id_offset; }
-    [[nodiscard]] auto surface_tag() const noexcept { return surface_tag_and_light_tag >> luisa::render::Shape::Handle::light_tag_bits; }
-    [[nodiscard]] auto light_tag() const noexcept { return surface_tag_and_light_tag & luisa::render::Shape::Handle::light_tag_mask; }
+    [[nodiscard]] auto surface_tag() const noexcept { return _surface_tag; }
+    [[nodiscard]] auto light_tag() const noexcept { return _light_tag; }
     [[nodiscard]] auto test_property_flag(luisa::uint flag) const noexcept { return (property_flags() & flag) != 0u; }
     [[nodiscard]] auto has_vertex_normal() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_vertex_normal); }
     [[nodiscard]] auto has_vertex_uv() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_vertex_uv); }
     [[nodiscard]] auto has_light() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_light); }
     [[nodiscard]] auto has_surface() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_surface); }
     [[nodiscard]] auto has_medium() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_medium); }
-    [[nodiscard]] auto shadow_terminator_factor() const noexcept { return _decode_fixed_point(shadow_term_and_intersection_offset >> 16u); }
-    [[nodiscard]] auto intersection_offset_factor() const noexcept { return _decode_fixed_point(shadow_term_and_intersection_offset & 0xffffu); }
+    [[nodiscard]] auto shadow_terminator_factor() const noexcept { return _shadow_terminator; }
+    [[nodiscard]] auto intersection_offset_factor() const noexcept { return _intersection_offset; }
 };
-// clang-format on
+
+}// namespace luisa::render

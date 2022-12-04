@@ -11,7 +11,7 @@ Bool Interaction::same_sided(Expr<float3> wo, Expr<float3> wi) const noexcept {
 }
 
 Float3 Interaction::p_robust(Expr<float3> w) const noexcept {
-    auto offset_factor = clamp(_shape->intersection_offset_factor() * 255.f + 1.f, 1.f, 256.f);
+    auto offset_factor = _shape->intersection_offset_factor();
     auto front = dot(_shading.n(), w) > 0.f;
     auto p = ite(front, _ps, _pg);
     auto n = ite(front, _ng, -_ng);
