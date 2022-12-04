@@ -28,41 +28,26 @@ struct ShadingAttribute {
     Float area;
 };
 
-class RayDifferential {
+struct RayDifferential {
 
-private:
-    Var<Ray> _ray;
-    Float3 _rx_origin;
-    Float3 _ry_origin;
-    Float3 _rx_direction;
-    Float3 _ry_direction;
-
-public:
-    RayDifferential() noexcept = default;
-    RayDifferential(Expr<Ray> ray,
-                    Expr<float3> rx_origin, Expr<float3> ry_origin,
-                    Expr<float3> rx_direction, Expr<float3> ry_direction) noexcept :
-        _ray(ray), _rx_origin(rx_origin), _ry_origin(ry_origin),
-        _rx_direction(rx_direction), _ry_direction(ry_direction) {}
-
-    [[nodiscard]] auto ray() const noexcept { return _ray; }
-    [[nodiscard]] auto rx_origin() const noexcept { return _rx_origin; }
-    [[nodiscard]] auto ry_origin() const noexcept { return _ry_origin; }
-    [[nodiscard]] auto rx_direction() const noexcept { return _rx_direction; }
-    [[nodiscard]] auto ry_direction() const noexcept { return _ry_direction; }
+    Var<Ray> ray;
+    Float3 rx_origin;
+    Float3 ry_origin;
+    Float3 rx_direction;
+    Float3 ry_direction;
 
     void scale_differential(Expr<float> amount) noexcept {
-        _rx_origin = _ray->origin() + (_rx_origin - _ray->origin()) * amount;
-        _ry_origin = _ray->origin() + (_ry_origin - _ray->origin()) * amount;
-        _rx_direction = _ray->direction() + (_rx_direction - _ray->direction()) * amount;
-        _ry_direction = _ray->direction() + (_ry_direction - _ray->direction()) * amount;
+        rx_origin = ray->origin() + (rx_origin - ray->origin()) * amount;
+        ry_origin = ray->origin() + (ry_origin - ray->origin()) * amount;
+        rx_direction = ray->direction() + (rx_direction - ray->direction()) * amount;
+        ry_direction = ray->direction() + (ry_direction - ray->direction()) * amount;
     }
 
     void scale_differential_uv(Expr<float2> amount_uv) noexcept {
-        _rx_origin = _ray->origin() + (_rx_origin - _ray->origin()) * amount_uv.x;
-        _ry_origin = _ray->origin() + (_ry_origin - _ray->origin()) * amount_uv.y;
-        _rx_direction = _ray->direction() + (_rx_direction - _ray->direction()) * amount_uv.x;
-        _ry_direction = _ray->direction() + (_ry_direction - _ray->direction()) * amount_uv.y;
+        rx_origin = ray->origin() + (rx_origin - ray->origin()) * amount_uv.x;
+        ry_origin = ray->origin() + (ry_origin - ray->origin()) * amount_uv.y;
+        rx_direction = ray->direction() + (rx_direction - ray->direction()) * amount_uv.x;
+        ry_direction = ray->direction() + (ry_direction - ray->direction()) * amount_uv.y;
     }
 };
 
