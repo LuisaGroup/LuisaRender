@@ -18,14 +18,18 @@ using luisa::compute::Float4x4;
 using luisa::compute::Ray;
 using luisa::compute::UInt;
 
+struct GeometryAttribute {
+    Float3 p;
+    Float3 n;
+    Float area;
+};
+
 struct ShadingAttribute {
-    Float3 pg;
-    Float3 ng;
+    GeometryAttribute g;
     Float3 ps;
     Float3 ns;
     Float3 tangent;
     Float2 uv;
-    Float area;
 };
 
 struct RayDifferential {
@@ -69,8 +73,9 @@ public:
     Interaction() noexcept : _inst_id{~0u}, _prim_id{~0u} {}
     explicit Interaction(Expr<float2> uv) noexcept : _uv{uv}, _inst_id{~0u}, _prim_id{~0u} {}
 
-    Interaction(luisa::shared_ptr<Shape::Handle> shape, Expr<uint> inst_id, Expr<uint> prim_id, Expr<float> prim_area,
-                Expr<float3> p, Expr<float3> ng, Expr<bool> back_facing) noexcept
+    Interaction(luisa::shared_ptr<Shape::Handle> shape, Expr<uint> inst_id,
+                Expr<uint> prim_id, Expr<float> prim_area, Expr<float3> p,
+                Expr<float3> ng, Expr<bool> back_facing) noexcept
         : _shape{std::move(shape)}, _pg{p}, _ng{ng}, _shading{Frame::make(_ng)}, _ps{p},
           _inst_id{~0u}, _prim_id{prim_id}, _prim_area{prim_area}, _back_facing{back_facing} {}
 
@@ -82,7 +87,7 @@ public:
 
     Interaction(luisa::shared_ptr<Shape::Handle> shape, Expr<uint> inst_id, Expr<uint> prim_id,
                 const ShadingAttribute &attrib, Expr<bool> back_facing) noexcept
-        : Interaction{std::move(shape), inst_id, prim_id, attrib.area, attrib.pg, attrib.ng,
+        : Interaction{std::move(shape), inst_id, prim_id, attrib.g.area, attrib.g.p, attrib.g.n,
                       attrib.uv, attrib.ps, attrib.ns, attrib.tangent, back_facing} {}
 
     [[nodiscard]] auto p() const noexcept { return _pg; }

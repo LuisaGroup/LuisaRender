@@ -55,8 +55,9 @@ luisa::unique_ptr<Light::Instance> DiffuseLight::build(
 
 using namespace luisa::compute;
 
-struct DiffuseLightClosure final : public Light::Closure {
+class DiffuseLightClosure final : public Light::Closure {
 
+public:
     DiffuseLightClosure(const DiffuseLightInstance *light, const SampledWavelengths &swl, Expr<float> time) noexcept
         : Light::Closure{light, swl, time} {}
 
@@ -87,16 +88,17 @@ struct DiffuseLightClosure final : public Light::Closure {
         auto triangle = pipeline.geometry()->triangle(*light_inst, triangle_id);
         auto light_to_world_normal = transpose(inverse(make_float3x3(light_to_world)));
         auto uvw = sample_uniform_triangle(make_float2(ux, u_in.y));
-        auto attrib = pipeline.geometry()->shading_point(
+        auto attrib = pipeline.geometry()->geometry_point(
             *light_inst, triangle, uvw, light_to_world, light_to_world_normal);
-        auto light_wo = normalize(it_from.p() - attrib.pg);
-        Interaction it_light{std::move(light_inst), light_inst_id, triangle_id, attrib, dot(light_wo, attrib.ng) < 0.0f};
+        auto light_wo = normalize(it_from.p() - attrib.p);
+        Interaction it_light{std::move(light_inst), light_inst_id,
+                             triangle_id, attrib.area, attrib.p, attrib.n,
+                             dot(light_wo, attrib.n) < 0.0f};
         DiffuseLightClosure closure{light, _swl, _time};
-        auto p_light = it_light.p_robust(light_wo);
         auto p_from = it_from.p_robust(-light_wo);
-        return {.eval = closure.evaluate(it_light, it_from.p_shading()),
+        return {.eval = closure.evaluate(it_light, p_from),
                 .wi = -light_wo,
-                .distance = distance(p_light, p_from) * .999f};
+                .distance = distance(attrib.p, p_from) * .999f};
     }
 };
 

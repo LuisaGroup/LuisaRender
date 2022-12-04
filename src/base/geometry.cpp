@@ -181,7 +181,7 @@ luisa::shared_ptr<Interaction> Geometry::interaction(const Var<Ray> &ray, const 
         auto tri = triangle(*shape, hit.prim);
         auto uvw = make_float3(1.0f - hit.bary.x - hit.bary.y, hit.bary);
         auto attrib = shading_point(*shape, tri, uvw, m, n);
-        it = {std::move(shape), hit.inst, hit.prim, attrib, dot(ray->direction(), attrib.ng) > 0.0f};
+        it = {std::move(shape), hit.inst, hit.prim, attrib, dot(ray->direction(), attrib.g.n) > 0.0f};
     };
     return luisa::make_unique<Interaction>(std::move(it));
 }
@@ -221,6 +221,23 @@ Var<Triangle> Geometry::triangle(const Shape::Handle &instance, Expr<uint> index
     return impl(p0, p1, p2, uv0, uv1, uv2);
 }
 
+GeometryAttribute Geometry::geometry_point(const Shape::Handle &instance, const Var<Triangle> &triangle,
+                                           const Var<float3> &bary, const Var<float4x4> &shape_to_world,
+                                           const Var<float3x3> &shape_to_world_normal) const noexcept {
+    auto v_buffer = instance.vertex_buffer_id();
+    auto v0 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i0);
+    auto v1 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i1);
+    auto v2 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i2);
+    auto p0 = make_float3(shape_to_world * make_float4(v0->position(), 1.f));
+    auto p1 = make_float3(shape_to_world * make_float4(v1->position(), 1.f));
+    auto p2 = make_float3(shape_to_world * make_float4(v2->position(), 1.f));
+    auto p = bary.x * p0 + bary.y * p1 + bary.z * p2;
+    auto c = cross(p1 - p0, p2 - p0);
+    auto area = .5f * length(c);
+    auto ng = normalize(c);
+    return {.p = p, .n = ng, .area = area};
+}
+
 ShadingAttribute Geometry::shading_point(const Shape::Handle &instance, const Var<Triangle> &triangle,
                                          const Var<float3> &bary, const Var<float4x4> &shape_to_world,
                                          const Var<float3x3> &shape_to_world_normal) const noexcept {
@@ -238,9 +255,9 @@ ShadingAttribute Geometry::shading_point(const Shape::Handle &instance, const Va
     auto ns = ng;
     auto ps = p;
     $if(instance.has_vertex_normal()) {
-        auto n0 = ite(instance.has_vertex_normal(), normalize(shape_to_world_normal * v0->normal()), ng);
-        auto n1 = ite(instance.has_vertex_normal(), normalize(shape_to_world_normal * v1->normal()), ng);
-        auto n2 = ite(instance.has_vertex_normal(), normalize(shape_to_world_normal * v2->normal()), ng);
+        auto n0 = normalize(shape_to_world_normal * v0->normal());
+        auto n1 = normalize(shape_to_world_normal * v1->normal());
+        auto n2 = normalize(shape_to_world_normal * v2->normal());
         ns = normalize(bary.x * n0 + bary.y * n1 + bary.z * n2);
         // offset p to fake surface for the shadow terminator
         // reference: Ray Tracing Gems 2, Chap. 4
@@ -263,13 +280,13 @@ ShadingAttribute Geometry::shading_point(const Shape::Handle &instance, const Va
         uv = bary.x * uv0 + bary.y * uv1 + bary.z * uv2;
         s = _compute_tangent(p0, p1, p2, uv0, uv1, uv2);
     };
-    return {.pg = p,
-            .ng = ng,
+    return {.g = {.p = p,
+                  .n = ng,
+                  .area = area},
             .ps = ps,
             .ns = ns,
             .tangent = s,
-            .uv = uv,
-            .area = area};
+            .uv = uv};
 }
 
 }// namespace luisa::render

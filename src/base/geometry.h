@@ -72,9 +72,12 @@ public:
     [[nodiscard]] luisa::shared_ptr<Shape::Handle> instance(Expr<uint> index) const noexcept;
     [[nodiscard]] Float4x4 instance_to_world(Expr<uint> index) const noexcept;
     [[nodiscard]] Var<Triangle> triangle(const Shape::Handle &instance, Expr<uint> index) const noexcept;
-    [[nodiscard]] ShadingAttribute shading_point(
-        const Shape::Handle &instance, const Var<Triangle> &triangle, const Var<float3> &bary,
-        const Var<float4x4> &shape_to_world, const Var<float3x3> &shape_to_world_normal) const noexcept;
+    [[nodiscard]] GeometryAttribute geometry_point(const Shape::Handle &instance, const Var<Triangle> &triangle,
+                                                   const Var<float3> &bary, const Var<float4x4> &shape_to_world,
+                                                   const Var<float3x3> &shape_to_world_normal) const noexcept;
+    [[nodiscard]] ShadingAttribute shading_point(const Shape::Handle &instance, const Var<Triangle> &triangle,
+                                                 const Var<float3> &bary, const Var<float4x4> &shape_to_world,
+                                                 const Var<float3x3> &shape_to_world_normal) const noexcept;
     [[nodiscard]] auto intersect(const Var<Ray> &ray) const noexcept { return interaction(ray, trace_closest(ray)); }
     [[nodiscard]] auto intersect_any(const Var<Ray> &ray) const noexcept { return trace_any(ray); }
 };
