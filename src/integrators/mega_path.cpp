@@ -102,23 +102,25 @@ protected:
             auto surface_tag = it->shape()->surface_tag();
             auto u_lobe = sampler()->generate_1d();
             auto u_bsdf = sampler()->generate_2d();
-            auto eta = def(1.f);
             auto eta_scale = def(1.f);
-            auto alpha_skip = def(false);
             auto wo = -ray->direction();
-            auto surface_sample = Surface::Sample::zero(swl.dimension());
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
                 // create closure
                 auto closure = surface->closure(*it, swl, 1.f, time);
 
-                // apply roughness map
+                // apply opacity map
+                auto alpha_skip = def(false);
                 if (auto o = closure->opacity()) {
                     auto opacity = saturate(*o);
                     alpha_skip = u_lobe >= opacity;
                     u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
                 }
 
-                $if(!alpha_skip) {
+                $if(alpha_skip) {
+                    ray = it->spawn_ray(ray->direction());
+                    pdf_bsdf = 1e16f;
+                }
+                $else {
                     if (auto dispersive = closure->is_dispersive()) {
                         $if(*dispersive) { swl.terminate_secondary(); };
                     }
@@ -131,36 +133,28 @@ protected:
                         Li += w * beta * eval.f * light_sample.eval.L;
                     };
                     // sample material
-                    surface_sample = closure->sample(wo, u_lobe, u_bsdf);
-                    eta = closure->eta().value_or(1.f);
+                    auto surface_sample = closure->sample(wo, u_lobe, u_bsdf);
+                    ray = it->spawn_ray(surface_sample.wi);
+                    pdf_bsdf = surface_sample.eval.pdf;
+                    auto w = ite(surface_sample.eval.pdf > 0.f, 1.f / surface_sample.eval.pdf, 0.f);
+                    beta *= w * surface_sample.eval.f;
+                    // apply eta scale
+                    auto eta = closure->eta().value_or(1.f);
+                    $switch(surface_sample.event) {
+                        $case(Surface::event_enter) { eta_scale = sqr(eta); };
+                        $case(Surface::event_exit) { eta_scale = sqr(1.f / eta); };
+                    };
                 };
             });
-
-            $if(alpha_skip) {
-                ray = it->spawn_ray(ray->direction());
-                pdf_bsdf = 1e16f;
-            }
-            $else {
-                ray = it->spawn_ray(surface_sample.wi);
-                pdf_bsdf = surface_sample.eval.pdf;
-                auto w = ite(surface_sample.eval.pdf > 0.f, 1.f / surface_sample.eval.pdf, 0.f);
-                beta *= w * surface_sample.eval.f;
-                // apply eta scale
-                $switch(surface_sample.event) {
-                    $case(Surface::event_enter) { eta_scale = sqr(eta); };
-                    $case(Surface::event_exit) { eta_scale = sqr(1.f / eta); };
-                };
-                // rr
-                beta = zero_if_any_nan(beta);
-                $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
-                auto rr_depth = node<MegakernelPathTracing>()->rr_depth();
-                auto rr_threshold = node<MegakernelPathTracing>()->rr_threshold();
-                auto q = max(beta.max() * eta_scale, .05f);
-                $if(depth + 1u >= rr_depth) {
-                    auto u = sampler()->generate_1d();
-                    $if(q < rr_threshold & u >= q) { $break; };
-                    beta *= ite(q < rr_threshold, 1.0f / q, 1.f);
-                };
+            beta = zero_if_any_nan(beta);
+            $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
+            auto rr_depth = node<MegakernelPathTracing>()->rr_depth();
+            auto rr_threshold = node<MegakernelPathTracing>()->rr_threshold();
+            auto q = max(beta.max() * eta_scale, .05f);
+            $if(depth + 1u >= rr_depth) {
+                auto u = sampler()->generate_1d();
+                $if(q < rr_threshold & u >= q) { $break; };
+                beta *= ite(q < rr_threshold, 1.0f / q, 1.f);
             };
         };
         return spectrum->srgb(swl, Li);

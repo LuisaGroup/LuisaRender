@@ -327,7 +327,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                     $if(*dispersive) { swl.terminate_secondary(); };
                 }
 
-                // apply roughness map
+                // apply opacity map
                 auto alpha_skip = def(false);
                 if (auto o = closure->opacity()) {
                     auto opacity = saturate(*o);

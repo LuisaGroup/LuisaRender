@@ -134,7 +134,7 @@ protected:
                 // create closure
                 auto closure = surface->closure(*it, swl, 1.f, time);
 
-                // apply roughness map
+                // apply opacity map
                 if (auto o = closure->opacity()) {
                     auto opacity = saturate(*o);
                     alpha_skip = u_lobe >= opacity;
