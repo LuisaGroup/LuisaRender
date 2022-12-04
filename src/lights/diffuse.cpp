@@ -58,7 +58,9 @@ using namespace luisa::compute;
 class DiffuseLightClosure final : public Light::Closure {
 
 public:
-    DiffuseLightClosure(const DiffuseLightInstance *light, const SampledWavelengths &swl, Expr<float> time) noexcept
+    DiffuseLightClosure(const DiffuseLightInstance *light,
+                        const SampledWavelengths &swl,
+                        Expr<float> time) noexcept
         : Light::Closure{light, swl, time} {}
 
     [[nodiscard]] Light::Evaluation evaluate(const Interaction &it_light, Expr<float3> p_from) const noexcept override {
@@ -68,7 +70,7 @@ public:
         auto pdf_triangle = pipeline.buffer<float>(it_light.shape()->pdf_buffer_id()).read(it_light.triangle_id());
         auto pdf_area = pdf_triangle / it_light.triangle_area();
         auto cos_wo = abs_dot(normalize(p_from - it_light.p()), it_light.ng());
-        auto L = light->texture()->evaluate_illuminant_spectrum(it_light, _swl, _time).value *
+        auto L = light->texture()->evaluate_illuminant_spectrum(it_light, swl(), time()).value *
                  light->node<DiffuseLight>()->scale();
         auto pdf = distance_squared(it_light.p(), p_from) * pdf_area * (1.0f / cos_wo);
         auto two_sided = light->node<DiffuseLight>()->two_sided();
@@ -94,7 +96,7 @@ public:
         Interaction it_light{std::move(light_inst), light_inst_id,
                              triangle_id, attrib.area, attrib.p, attrib.n,
                              dot(light_wo, attrib.n) < 0.0f};
-        DiffuseLightClosure closure{light, _swl, _time};
+        DiffuseLightClosure closure{light, swl(), time()};
         auto p_from = it_from.p_robust(-light_wo);
         return {.eval = closure.evaluate(it_light, p_from),
                 .wi = -light_wo,
