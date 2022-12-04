@@ -54,17 +54,21 @@ public:
     private:
         const Instance *_instance;
 
-    protected:
+    private:
         const SampledWavelengths &_swl;
         Float _time;
 
     public:
-        Closure(const Instance *instance, const SampledWavelengths &swl, Expr<float> time) noexcept
+        Closure(const Instance *instance,
+                const SampledWavelengths &swl,
+                Expr<float> time) noexcept
             : _instance{instance}, _swl{swl}, _time{time} {}
         virtual ~Closure() noexcept = default;
         template<typename T = Instance>
             requires std::is_base_of_v<Instance, T>
         [[nodiscard]] auto instance() const noexcept { return static_cast<const T *>(_instance); }
+        [[nodiscard]] auto &swl() const noexcept { return _swl; }
+        [[nodiscard]] auto time() const noexcept { return _time; }
         [[nodiscard]] virtual Evaluation evaluate(
             const Interaction &it_light, Expr<float3> p_from) const noexcept = 0;
         [[nodiscard]] virtual Sample sample(
