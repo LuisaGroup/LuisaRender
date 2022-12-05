@@ -234,7 +234,7 @@ template<typename T>
                                       const T &v0,
                                       const T &v1,
                                       const T &v2) noexcept {
-    return fma(uvw.x, v0, fma(uvw.y, v1, fma(uvw.z, v2, 0.f)));
+    return uvw.x * v0 + uvw.y * v1 + uvw.z * v2;
 }
 
 GeometryAttribute Geometry::geometry_point(const Shape::Handle &instance, const Var<Triangle> &triangle,
