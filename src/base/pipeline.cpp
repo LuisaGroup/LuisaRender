@@ -128,6 +128,7 @@ void Pipeline::register_transform(const Transform *transform) noexcept {
 
 Float4x4 Pipeline::transform(const Transform *transform) const noexcept {
     if (transform == nullptr) { return make_float4x4(1.f); }
+    if (transform->is_identity()) { return make_float4x4(1.f); }
     auto iter = _transform_to_id.find(transform);
     LUISA_ASSERT(iter != _transform_to_id.cend(), "Transform is not registered.");
     return _transform_matrix_buffer.read(iter->second);
