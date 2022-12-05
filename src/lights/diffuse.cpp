@@ -102,10 +102,9 @@ public:
         auto uvw = sample_uniform_triangle(make_float2(ux, u_in.y));
         auto attrib = pipeline.geometry()->geometry_point(
             *light_inst, triangle, uvw, light_to_world, light_to_world_normal);
-        auto light_wo = normalize(p_from - attrib.p);
         Interaction it_light{std::move(light_inst), light_inst_id,
                              triangle_id, attrib.area, attrib.p, attrib.n,
-                             dot(light_wo, attrib.n) < 0.0f};
+                             dot(p_from - attrib.p, attrib.n) < 0.0f};
         DiffuseLightClosure closure{light, swl(), time()};
         return {.eval = closure._evaluate(it_light, p_from), .p = attrib.p};
     }

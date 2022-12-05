@@ -171,17 +171,25 @@ Var<bool> Geometry::trace_any(const Var<Ray> &ray) const noexcept {
     return _accel.trace_any(ray);
 }
 
+luisa::shared_ptr<Interaction> Geometry::interaction(Expr<uint> inst_id, Expr<uint> prim_id,
+                                                     Expr<float3> bary, Expr<float3> wo) const noexcept {
+    auto shape = instance(inst_id);
+    auto m = instance_to_world(inst_id);
+    auto n = transpose(inverse(make_float3x3(m)));
+    auto tri = triangle(*shape, prim_id);
+    auto attrib = shading_point(*shape, tri, bary, m, n);
+    return luisa::make_shared<Interaction>(
+        std::move(shape), inst_id, prim_id,
+        attrib, dot(wo, attrib.g.n) < 0.0f);
+}
+
 luisa::shared_ptr<Interaction> Geometry::interaction(const Var<Ray> &ray, const Var<Hit> &hit) const noexcept {
     using namespace luisa::compute;
     Interaction it;
     $if(!hit->miss()) {
-        auto shape = instance(hit.inst);
-        auto m = instance_to_world(hit.inst);
-        auto n = transpose(inverse(make_float3x3(m)));
-        auto tri = triangle(*shape, hit.prim);
-        auto uvw = make_float3(1.0f - hit.bary.x - hit.bary.y, hit.bary);
-        auto attrib = shading_point(*shape, tri, uvw, m, n);
-        it = {std::move(shape), hit.inst, hit.prim, attrib, dot(ray->direction(), attrib.g.n) > 0.0f};
+        it = *interaction(hit.inst, hit.prim,
+                          make_float3(1.f - hit.bary.x - hit.bary.y, hit.bary),
+                          -ray->direction());
     };
     return luisa::make_shared<Interaction>(std::move(it));
 }
