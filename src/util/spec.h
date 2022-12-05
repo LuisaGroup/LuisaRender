@@ -192,6 +192,7 @@ public:
 [[nodiscard]] SampledSpectrum ite(const SampledSpectrum &p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept;
 [[nodiscard]] SampledSpectrum ite(const SampledSpectrum &p, Expr<float> t, const SampledSpectrum &f) noexcept;
 [[nodiscard]] SampledSpectrum ite(const SampledSpectrum &p, const SampledSpectrum &t, Expr<float> f) noexcept;
+[[nodiscard]] SampledSpectrum ite(const SampledSpectrum &p, Expr<float> t, Expr<float> f) noexcept;
 [[nodiscard]] SampledSpectrum ite(Expr<bool> p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept;
 [[nodiscard]] SampledSpectrum ite(Expr<bool> p, Expr<float> t, const SampledSpectrum &f) noexcept;
 [[nodiscard]] SampledSpectrum ite(Expr<bool> p, const SampledSpectrum &t, Expr<float> f) noexcept;
@@ -205,16 +206,26 @@ public:
 [[nodiscard]] SampledSpectrum exp(const SampledSpectrum &t) noexcept;
 // TODO: other math functions
 
+
 using luisa::lerp;
 using luisa::compute::lerp;
+using luisa::compute::fma;
+
+[[nodiscard]] SampledSpectrum fma(const SampledSpectrum &a, const SampledSpectrum &b, const SampledSpectrum &c) noexcept;
+[[nodiscard]] SampledSpectrum fma(const SampledSpectrum &a, const SampledSpectrum &b, Expr<float> c) noexcept;
+[[nodiscard]] SampledSpectrum fma(const SampledSpectrum &a, Expr<float> b, const SampledSpectrum &c) noexcept;
+[[nodiscard]] SampledSpectrum fma(const SampledSpectrum &a, Expr<float> b, Expr<float> c) noexcept;
+[[nodiscard]] SampledSpectrum fma(Expr<float> a, const SampledSpectrum &b, const SampledSpectrum &c) noexcept;
+[[nodiscard]] SampledSpectrum fma(Expr<float> a, const SampledSpectrum &b, Expr<float> c) noexcept;
+[[nodiscard]] SampledSpectrum fma(Expr<float> a, Expr<float> b, const SampledSpectrum &c) noexcept;
 
 template<typename A, typename B, typename T>
     requires std::disjunction_v<
         std::is_same<std::remove_cvref_t<A>, SampledSpectrum>,
         std::is_same<std::remove_cvref_t<B>, SampledSpectrum>,
         std::is_same<std::remove_cvref_t<T>, SampledSpectrum>>
-[[nodiscard]] auto lerp(A &&a, B &&b, T &&t) noexcept {
-    return t * (b - a) + a;
+[[nodiscard]] auto lerp(const A &a, const B &b, const T &t) noexcept {
+    return fma(t, b - a, a);
 }
 
 class SampledWavelengths {

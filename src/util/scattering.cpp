@@ -19,7 +19,7 @@ Bool refract(Float3 wi, Float3 n, Float eta, Float3 *wt) noexcept {
         auto sin2ThetaT = sqr(eta) * sin2ThetaI;
         auto cosThetaT = sqrt(1.f - sin2ThetaT);
         // Handle total internal reflection for transmission
-        auto wt = -eta * wi + (eta * cosThetaI - cosThetaT) * n;
+        auto wt = fma(fma(eta, cosThetaI, -cosThetaT), n, -eta * wi);
         return make_float4(wt, sin2ThetaT);
     };
     auto v = impl(wi, n, eta);
@@ -28,7 +28,7 @@ Bool refract(Float3 wi, Float3 n, Float eta, Float3 *wt) noexcept {
 }
 
 Float3 reflect(Float3 wo, Float3 n) noexcept {
-    return -wo + 2.0f * dot(wo, n) * n;
+    return fma(2.f, dot(wo, n) * n, -wo);
 }
 
 Float fresnel_dielectric(Float cosThetaI_in, Float etaI_in, Float etaT_in) noexcept {
@@ -41,13 +41,13 @@ Float fresnel_dielectric(Float cosThetaI_in, Float etaI_in, Float etaT_in) noexc
         auto etaT = ite(entering, etaT_in, etaI_in);
         cosThetaI = abs(cosThetaI);
         // Compute _cosThetaT_ using Snell's law
-        auto sinThetaI = sqrt(max(0.f, 1.f - sqr(cosThetaI)));
+        auto sinThetaI = sqrt(max(0.f, one_minus_sqr(cosThetaI)));
         auto sinThetaT = etaI / etaT * sinThetaI;
-        auto cosThetaT = sqrt(max(0.f, 1.f - sqr(sinThetaT)));
-        auto Rparl = ((etaT * cosThetaI) - (etaI * cosThetaT)) /
-                     ((etaT * cosThetaI) + (etaI * cosThetaT));
-        auto Rperp = ((etaI * cosThetaI) - (etaT * cosThetaT)) /
-                     ((etaI * cosThetaI) + (etaT * cosThetaT));
+        auto cosThetaT = sqrt(max(0.f, one_minus_sqr(sinThetaT)));
+        auto Rparl = fma(etaT, cosThetaI, -etaI * cosThetaT) /
+                     fma(etaT, cosThetaI, +etaI * cosThetaT);
+        auto Rperp = fma(etaI, cosThetaI, -etaT * cosThetaT) /
+                     fma(etaI, cosThetaI, +etaT * cosThetaT);
         auto fr = (Rparl * Rparl + Rperp * Rperp) * .5f;
         // Handle total internal reflection
         return ite(sinThetaT < 1.f, fr, 1.f);
