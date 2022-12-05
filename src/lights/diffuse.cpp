@@ -104,7 +104,7 @@ public:
             *light_inst, triangle, uvw, light_to_world, light_to_world_normal);
         Interaction it_light{std::move(light_inst), light_inst_id,
                              triangle_id, attrib.area, attrib.p, attrib.n,
-                             dot(p_from - attrib.p, attrib.n) < 0.0f};
+                             dot(p_from - attrib.p, attrib.n) < 0.f};
         DiffuseLightClosure closure{light, swl(), time()};
         return {.eval = closure._evaluate(it_light, p_from), .p = attrib.p};
     }

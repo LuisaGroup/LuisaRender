@@ -54,6 +54,7 @@ luisa::optional<Float> Surface::Closure::eta() const noexcept {
 }
 
 luisa::optional<Bool> Surface::Closure::is_dispersive() const noexcept {
+    if (instance()->pipeline().spectrum()->node()->is_fixed()) { return nullopt; }
     return _is_dispersive();
 }
 

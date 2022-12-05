@@ -29,7 +29,6 @@ class OrthoCamera : public Camera {
 
 private:
     float _zoom;
-    float2 _clip_plane;
 
 public:
     OrthoCamera(Scene *scene, const SceneNodeDesc *desc) noexcept
@@ -39,7 +38,6 @@ public:
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] bool requires_lens_sampling() const noexcept override { return false; }
     [[nodiscard]] auto zoom() const noexcept { return _zoom; }
-    [[nodiscard]] auto clip_plane() const noexcept { return _clip_plane; }
 };
 
 class OrthoCameraInstance : public Camera::Instance {

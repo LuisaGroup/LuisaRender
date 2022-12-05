@@ -29,29 +29,17 @@ class PinholeCameraInstance;
 class PinholeCamera : public Camera {
 
 private:
-    float2 _clip_plane;
     float _fov;
 
 public:
     PinholeCamera(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Camera{scene, desc},
-          _fov{desc->property_float_or_default("fov", 35.0f)},
-          _clip_plane{desc->property_float2_or_default(
-              "clip_plane", lazy_construct([desc] {
-                  return make_float2(desc->property_float_or_default("clip_plane", 0.f), 1e10f);
-              }))} {
-        _clip_plane = clamp(_clip_plane, 0.f, 1e10f);
-        if (_clip_plane.x > _clip_plane.y) {
-            std::swap(_clip_plane.x, _clip_plane.y);
-        }
-        _fov = radians(_fov);
-    }
+          _fov{radians(std::clamp(desc->property_float_or_default("fov", 35.0f), 1e-3f, 180.f - 1e-3f))} {}
     [[nodiscard]] luisa::unique_ptr<Camera::Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] bool requires_lens_sampling() const noexcept override { return false; }
     [[nodiscard]] auto fov() const noexcept { return _fov; }
-    [[nodiscard]] auto clip_plane() const noexcept { return _clip_plane; }
 };
 
 class PinholeCameraInstance : public Camera::Instance {

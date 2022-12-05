@@ -67,7 +67,7 @@ protected:
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
-class SubstrateInstance : public Surface::Instance {
+class PlasticInstance : public Surface::Instance {
 
 private:
     const Texture::Instance *_kd;
@@ -77,7 +77,7 @@ private:
     const Texture::Instance *_thickness;
 
 public:
-    SubstrateInstance(const Pipeline &pipeline, const Surface *surface,
+    PlasticInstance(const Pipeline &pipeline, const Surface *surface,
                       const Texture::Instance *Kd, const Texture::Instance *roughness,
                       const Texture::Instance *sigma_a, const Texture::Instance *eta,
                       const Texture::Instance *thickness) noexcept
@@ -98,11 +98,11 @@ luisa::unique_ptr<Surface::Instance> PlasticSurface::_build(
     auto sigma_a = pipeline.build_texture(command_buffer, _sigma_a);
     auto eta = pipeline.build_texture(command_buffer, _eta);
     auto thickness = pipeline.build_texture(command_buffer, _thickness);
-    return luisa::make_unique<SubstrateInstance>(
+    return luisa::make_unique<PlasticInstance>(
         pipeline, this, Kd, roughness, sigma_a, eta, thickness);
 }
 
-class SubstrateClosure : public Surface::Closure {
+class PlasticClosure : public Surface::Closure {
 
 private:
     luisa::unique_ptr<TrowbridgeReitzDistribution> _distribution;
@@ -113,7 +113,7 @@ private:
     Float _kd_weight;
 
 public:
-    SubstrateClosure(const Surface::Instance *instance, luisa::shared_ptr<Interaction> it,
+    PlasticClosure(const Surface::Instance *instance, luisa::shared_ptr<Interaction> it,
                      const SampledWavelengths &swl, Expr<float> time, const SampledSpectrum &Kd,
                      Expr<float> Kd_weight, const SampledSpectrum &sigma_a,
                      Expr<float> eta, Expr<float2> roughness) noexcept
@@ -208,7 +208,7 @@ private:
     }
 };
 
-luisa::unique_ptr<Surface::Closure> SubstrateInstance::closure(
+luisa::unique_ptr<Surface::Closure> PlasticInstance::closure(
     luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
     Expr<float> eta_i, Expr<float> time) const noexcept {
 
@@ -233,13 +233,13 @@ luisa::unique_ptr<Surface::Closure> SubstrateInstance::closure(
     // We use the fitted polynomial to approximate the integrated
     // Fresnel reflectance, rather than compute it on the fly.
     auto diffuse_fresnel = fresnel_dielectric_integral(eta);
-    return luisa::make_unique<SubstrateClosure>(
+    return luisa::make_unique<PlasticClosure>(
         this, std::move(it), swl, time, Kd / (1.f - Kd * diffuse_fresnel),
         Kd_lum * average_transmittance, sigma_a, eta, roughness);
 }
 
 using NormalMapOpacityPlasticSurface = NormalMapWrapper<OpacitySurfaceWrapper<
-    PlasticSurface, SubstrateInstance, SubstrateClosure>>;
+    PlasticSurface, PlasticInstance, PlasticClosure>>;
 
 }// namespace luisa::render
 

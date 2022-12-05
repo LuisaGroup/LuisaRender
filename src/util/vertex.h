@@ -27,11 +27,11 @@ template<typename T>
 template<typename T>
     requires std::same_as<luisa::compute::expr_value_t<T>, uint>
 [[nodiscard]] inline auto oct_decode(T u) noexcept {
-    auto p = make_float2(make_uint2(u & 0xffffu, u >> 16u)) * ((1.f / 65535.f) * 2.f) - 1.f;
+    auto p = fma(make_float2(make_uint2(u & 0xffffu, u >> 16u)), ((1.f / 65535.f) * 2.f), -1.f);
     auto abs_p = abs(p);
     auto n = make_float3(p, 1.f - abs_p.x - abs_p.y);
     auto t = make_float2(clamp(-n.z, 0.f, 1.f));
-    return normalize(make_float3(n.xy() + select(t, -t, n.xy() >= 0.f), n.z));
+    return make_float3(n.xy() + select(t, -t, n.xy() >= 0.f), n.z);
 }
 
 struct alignas(16) Vertex {

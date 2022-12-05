@@ -62,14 +62,6 @@ protected:
         auto pdf_bsdf = def(1e16f);
         $for(depth, node<MegakernelPathTracing>()->max_depth()) {
 
-            auto u_light_selection = sampler()->generate_1d();
-            auto u_light_surface = sampler()->generate_2d();
-            auto u_lobe = sampler()->generate_1d();
-            auto u_bsdf = sampler()->generate_2d();
-            auto u_rr = def(0.f);
-            auto rr_depth = node<MegakernelPathTracing>()->rr_depth();
-            $if (depth + 1u >= rr_depth) { u_rr = sampler()->generate_1d(); };
-
             // trace
             auto it = pipeline().geometry()->intersect(ray);
 
@@ -92,6 +84,15 @@ protected:
 
             $if(!it->shape()->has_surface()) { $break; };
 
+            // generate uniform samples
+            auto u_light_selection = sampler()->generate_1d();
+            auto u_light_surface = sampler()->generate_2d();
+            auto u_lobe = sampler()->generate_1d();
+            auto u_bsdf = sampler()->generate_2d();
+            auto u_rr = def(0.f);
+            auto rr_depth = node<MegakernelPathTracing>()->rr_depth();
+            $if (depth + 1u >= rr_depth) { u_rr = sampler()->generate_1d(); };
+
             // sample one light
             auto light_sample = light_sampler()->sample(
                 *it, u_light_selection, u_light_surface, swl, time);
@@ -102,7 +103,6 @@ protected:
             // evaluate material
             auto surface_tag = it->shape()->surface_tag();
             auto eta_scale = def(1.f);
-            auto wo = -ray->direction();
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
                 // create closure
                 auto closure = surface->closure(it, swl, 1.f, time);
@@ -124,6 +124,7 @@ protected:
                         $if(*dispersive) { swl.terminate_secondary(); };
                     }
                     // direct lighting
+                    auto wo = -ray->direction();
                     $if(light_sample.eval.pdf > 0.0f & !occluded) {
                         auto wi = light_sample.shadow_ray->direction();
                         auto eval = closure->evaluate(wo, wi);

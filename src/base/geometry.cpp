@@ -209,12 +209,13 @@ Var<Triangle> Geometry::triangle(const Shape::Handle &instance, Expr<uint> index
 [[nodiscard]] static auto _compute_tangent(
     Expr<float3> p0, Expr<float3> p1, Expr<float3> p2,
     Expr<float2> uv0, Expr<float2> uv1, Expr<float2> uv2) noexcept {
+
     static Callable impl = [](Float3 p0, Float3 p1, Float3 p2,
                               Float2 uv0, Float2 uv1, Float2 uv2) noexcept {
         auto difference_of_products = [](auto a, auto b, auto c, auto d) noexcept {
             auto cd = c * d;
-            auto differenceOfProducts = fma(a, b, -cd);
-            auto error = fma(-c, d, cd);
+            auto differenceOfProducts = a * b - cd;
+            auto error = -c * d + cd;
             return differenceOfProducts + error;
         };
         auto duv02 = uv0 - uv2;
@@ -222,9 +223,24 @@ Var<Triangle> Geometry::triangle(const Shape::Handle &instance, Expr<uint> index
         auto dp02 = p0 - p2;
         auto dp12 = p1 - p2;
         auto det = difference_of_products(duv02.x, duv12.y, duv02.y, duv12.x);
-        auto inv_det = 1.f / det;
-        auto dpdu = difference_of_products(duv12.y, dp02, duv02.y, dp12) * inv_det;
-        return ite(abs(det) < 1e-8f, make_float3(0.f), normalize(dpdu));
+        auto dpdu = def(make_float3());
+        auto dpdv = def(make_float3());
+        auto degenerate_uv = abs(det) < 1e-8f;
+        $if(!degenerate_uv) {
+            // Compute triangle $\dpdu$ and $\dpdv$ via matrix inversion
+            auto invdet = 1.f / det;
+            dpdu = difference_of_products(duv12.y, dp02, duv02.y, dp12) * invdet;
+            dpdv = difference_of_products(duv02.x, dp12, duv12.x, dp02) * invdet;
+        };
+        // Handle degenerate triangle $(u,v)$ parameterization or partial derivatives
+        $if(degenerate_uv | length_squared(cross(dpdu, dpdv)) == 0.f) {
+            auto n = cross(p2 - p0, p1 - p0);
+            auto b = ite(abs(n.x) > abs(n.z),
+                         make_float3(-n.y, n.x, 0.0f),
+                         make_float3(0.0f, -n.z, n.y));
+            dpdu = cross(b, n);
+        };
+        return dpdu;
     };
     return impl(p0, p1, p2, uv0, uv1, uv2);
 }
@@ -258,45 +274,42 @@ ShadingAttribute Geometry::shading_point(const Shape::Handle &instance, const Va
                                          const Var<float3> &bary, const Var<float4x4> &shape_to_world,
                                          const Var<float3x3> &shape_to_world_normal) const noexcept {
     auto v_buffer = instance.vertex_buffer_id();
-    auto uv = bary.yz();
-    auto s = def(make_float3(0.f));
     auto v0 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i0);
     auto v1 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i1);
     auto v2 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i2);
     auto p0 = make_float3(shape_to_world * make_float4(v0->position(), 1.f));
     auto p1 = make_float3(shape_to_world * make_float4(v1->position(), 1.f));
     auto p2 = make_float3(shape_to_world * make_float4(v2->position(), 1.f));
+    auto uv0 = def(make_float2());
+    auto uv1 = def(make_float2());
+    auto uv2 = def(make_float2());
     $if(instance.has_vertex_uv()) {
         auto uv_buffer = instance.uv_buffer_id();
-        auto uv0 = _pipeline.buffer<float2>(uv_buffer).read(triangle.i0);
-        auto uv1 = _pipeline.buffer<float2>(uv_buffer).read(triangle.i1);
-        auto uv2 = _pipeline.buffer<float2>(uv_buffer).read(triangle.i2);
-        uv = interpolate(bary, uv0, uv1, uv2);
-        s = _compute_tangent(p0, p1, p2, uv0, uv1, uv2);
+        uv0 = _pipeline.buffer<float2>(uv_buffer).read(triangle.i0);
+        uv1 = _pipeline.buffer<float2>(uv_buffer).read(triangle.i1);
+        uv2 = _pipeline.buffer<float2>(uv_buffer).read(triangle.i2);
     };
+    auto s = _compute_tangent(p0, p1, p2, uv0, uv1, uv2);
+    auto uv = interpolate(bary, uv0, uv1, uv2);
     auto p = interpolate(bary, p0, p1, p2);
     auto c = cross(p1 - p0, p2 - p0);
     auto area = .5f * length(c);
     auto ng = normalize(c);
-    auto ns = ng;
-    auto ps = p;
-    $if(instance.has_vertex_normal()) {
-        auto n0 = normalize(shape_to_world_normal * v0->normal());
-        auto n1 = normalize(shape_to_world_normal * v1->normal());
-        auto n2 = normalize(shape_to_world_normal * v2->normal());
-        ns = normalize(interpolate(bary, n0, n1, n2));
-        // offset p to fake surface for the shadow terminator
-        // reference: Ray Tracing Gems 2, Chap. 4
-        auto shadow_term = instance.shadow_terminator_factor();
-        auto temp_u = p - p0;
-        auto temp_v = p - p1;
-        auto temp_w = p - p2;
-        auto dp = interpolate(bary,
-                              fma(-min(dot(temp_u, n0), 0.f), n0, temp_u),
-                              fma(-min(dot(temp_v, n1), 0.f), n1, temp_v),
-                              fma(-min(dot(temp_w, n2), 0.f), n2, temp_w));
-        ps = fma(shadow_term, dp, p);
-    };
+    auto n0 = ite(instance.has_vertex_normal(), normalize(shape_to_world_normal * v0->normal()), ng);
+    auto n1 = ite(instance.has_vertex_normal(), normalize(shape_to_world_normal * v1->normal()), ng);
+    auto n2 = ite(instance.has_vertex_normal(), normalize(shape_to_world_normal * v2->normal()), ng);
+    auto ns = normalize(interpolate(bary, n0, n1, n2));
+    // offset p to fake surface for the shadow terminator
+    // reference: Ray Tracing Gems 2, Chap. 4
+    auto shadow_term = instance.shadow_terminator_factor();
+    auto temp_u = p - p0;
+    auto temp_v = p - p1;
+    auto temp_w = p - p2;
+    auto dp = interpolate(bary,
+                          fma(-min(dot(temp_u, n0), 0.f), n0, temp_u),
+                          fma(-min(dot(temp_v, n1), 0.f), n1, temp_v),
+                          fma(-min(dot(temp_w, n2), 0.f), n2, temp_w));
+    auto ps = fma(shadow_term, dp, p);
     return {.g = {.p = p,
                   .n = ng,
                   .area = area},

@@ -32,8 +32,7 @@ Frame Frame::make(Expr<float3> normal) noexcept {
     return Frame{std::move(tangent), std::move(bitangent), normal};
 }
 
-Frame Frame::make(Expr<float3> normal, Expr<float3> tangent_in) noexcept {
-    auto tangent = ite(all(tangent_in == 0.f), fallback_tangent(normal), tangent_in);
+Frame Frame::make(Expr<float3> normal, Expr<float3> tangent) noexcept {
     auto bitangent = normalize(cross(normal, tangent));
     return Frame{normalize(cross(bitangent, normal)), std::move(bitangent), normal};
 }
