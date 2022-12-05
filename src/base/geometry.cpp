@@ -295,21 +295,25 @@ ShadingAttribute Geometry::shading_point(const Shape::Handle &instance, const Va
     auto c = cross(p1 - p0, p2 - p0);
     auto area = .5f * length(c);
     auto ng = normalize(c);
-    auto n0 = ite(instance.has_vertex_normal(), normalize(shape_to_world_normal * v0->normal()), ng);
-    auto n1 = ite(instance.has_vertex_normal(), normalize(shape_to_world_normal * v1->normal()), ng);
-    auto n2 = ite(instance.has_vertex_normal(), normalize(shape_to_world_normal * v2->normal()), ng);
-    auto ns = normalize(interpolate(bary, n0, n1, n2));
-    // offset p to fake surface for the shadow terminator
-    // reference: Ray Tracing Gems 2, Chap. 4
-    auto shadow_term = instance.shadow_terminator_factor();
-    auto temp_u = p - p0;
-    auto temp_v = p - p1;
-    auto temp_w = p - p2;
-    auto dp = interpolate(bary,
-                          fma(-min(dot(temp_u, n0), 0.f), n0, temp_u),
-                          fma(-min(dot(temp_v, n1), 0.f), n1, temp_v),
-                          fma(-min(dot(temp_w, n2), 0.f), n2, temp_w));
-    auto ps = fma(shadow_term, dp, p);
+    auto ns = ng;
+    auto ps = p;
+    $if (instance.has_vertex_normal()) {
+        auto n0 = normalize(shape_to_world_normal * v0->normal());
+        auto n1 = normalize(shape_to_world_normal * v1->normal());
+        auto n2 = normalize(shape_to_world_normal * v2->normal());
+        ns = normalize(interpolate(bary, n0, n1, n2));
+        // offset p to fake surface for the shadow terminator
+        // reference: Ray Tracing Gems 2, Chap. 4
+        auto shadow_term = instance.shadow_terminator_factor();
+        auto temp_u = p - p0;
+        auto temp_v = p - p1;
+        auto temp_w = p - p2;
+        auto dp = interpolate(bary,
+                              fma(-min(dot(temp_u, n0), 0.f), n0, temp_u),
+                              fma(-min(dot(temp_v, n1), 0.f), n1, temp_v),
+                              fma(-min(dot(temp_w, n2), 0.f), n2, temp_w));
+        ps = fma(shadow_term, dp, p);
+    };
     return {.g = {.p = p,
                   .n = ng,
                   .area = area},
