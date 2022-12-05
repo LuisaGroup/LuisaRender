@@ -69,10 +69,11 @@ public:
         [[nodiscard]] auto instance() const noexcept { return static_cast<const T *>(_instance); }
         [[nodiscard]] auto &swl() const noexcept { return _swl; }
         [[nodiscard]] auto time() const noexcept { return _time; }
-        [[nodiscard]] virtual Evaluation evaluate(
-            const Interaction &it_light, Expr<float3> p_from) const noexcept = 0;
-        [[nodiscard]] virtual Sample sample(
-            Expr<uint> light_inst_id, const Interaction &it_from, Expr<float2> u) const noexcept = 0;
+        [[nodiscard]] virtual Evaluation evaluate(const Interaction &it_light,
+                                                  Expr<float3> p_from) const noexcept = 0;
+        [[nodiscard]] virtual Sample sample(Expr<uint> light_inst_id,
+                                            const Interaction &it_from,
+                                            Expr<float2> u) const noexcept = 0;
     };
 
     class Instance {

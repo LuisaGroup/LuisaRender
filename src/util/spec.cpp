@@ -436,7 +436,7 @@ SampledSpectrum ite(const SampledSpectrum &p, const SampledSpectrum &t, Expr<flo
     return r;
 }
 
-SampledSpectrum render::ite(const SampledSpectrum &p, Expr<float> t, Expr<float> f) noexcept {
+SampledSpectrum ite(const SampledSpectrum &p, Expr<float> t, Expr<float> f) noexcept {
     return p.map([t, f](auto x) noexcept { return ite(x != 0.f, t, f); });
 }
 
@@ -472,7 +472,7 @@ SampledSpectrum sqrt(const SampledSpectrum &t) noexcept {
 SampledSpectrum exp(const SampledSpectrum &t) noexcept {
     return t.map([](auto x) noexcept { return exp(x); });
 }
-SampledSpectrum render::fma(const SampledSpectrum &a, const SampledSpectrum &b, const SampledSpectrum &c) noexcept {
+SampledSpectrum fma(const SampledSpectrum &a, const SampledSpectrum &b, const SampledSpectrum &c) noexcept {
     auto n = std::max({a.dimension(), b.dimension(), c.dimension()});
     LUISA_ASSERT((a.dimension() == 1u || a.dimension() == n) &&
                      (b.dimension() == 1u || b.dimension() == n) &&
@@ -484,27 +484,27 @@ SampledSpectrum render::fma(const SampledSpectrum &a, const SampledSpectrum &b, 
     return r;
 }
 
-SampledSpectrum render::fma(const SampledSpectrum &a, const SampledSpectrum &b, Expr<float> c) noexcept {
+SampledSpectrum fma(const SampledSpectrum &a, const SampledSpectrum &b, Expr<float> c) noexcept {
     return fma(a, b, SampledSpectrum{c});
 }
 
-SampledSpectrum render::fma(const SampledSpectrum &a, Expr<float> b, const SampledSpectrum &c) noexcept {
+SampledSpectrum fma(const SampledSpectrum &a, Expr<float> b, const SampledSpectrum &c) noexcept {
     return fma(a, SampledSpectrum{b}, c);
 }
 
-SampledSpectrum render::fma(const SampledSpectrum &a, Expr<float> b, Expr<float> c) noexcept {
+SampledSpectrum fma(const SampledSpectrum &a, Expr<float> b, Expr<float> c) noexcept {
     return fma(a, SampledSpectrum{b}, SampledSpectrum{c});
 }
 
-SampledSpectrum render::fma(Expr<float> a, const SampledSpectrum &b, const SampledSpectrum &c) noexcept {
+SampledSpectrum fma(Expr<float> a, const SampledSpectrum &b, const SampledSpectrum &c) noexcept {
     return fma(SampledSpectrum{a}, b, c);
 }
 
-SampledSpectrum render::fma(Expr<float> a, const SampledSpectrum &b, Expr<float> c) noexcept {
+SampledSpectrum fma(Expr<float> a, const SampledSpectrum &b, Expr<float> c) noexcept {
     return fma(SampledSpectrum{a}, b, SampledSpectrum{c});
 }
 
-SampledSpectrum render::fma(Expr<float> a, Expr<float> b, const SampledSpectrum &c) noexcept {
+SampledSpectrum fma(Expr<float> a, Expr<float> b, const SampledSpectrum &c) noexcept {
     return fma(SampledSpectrum{a}, SampledSpectrum{b}, c);
 }
 
