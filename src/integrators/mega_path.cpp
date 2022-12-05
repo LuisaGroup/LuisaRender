@@ -66,6 +66,9 @@ protected:
             auto u_light_surface = sampler()->generate_2d();
             auto u_lobe = sampler()->generate_1d();
             auto u_bsdf = sampler()->generate_2d();
+            auto u_rr = def(0.f);
+            auto rr_depth = node<MegakernelPathTracing>()->rr_depth();
+            $if (depth + 1u >= rr_depth) { u_rr = sampler()->generate_1d(); };
 
             // trace
             auto it = pipeline().geometry()->intersect(ray);
@@ -144,12 +147,10 @@ protected:
             });
             beta = zero_if_any_nan(beta);
             $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
-            auto rr_depth = node<MegakernelPathTracing>()->rr_depth();
             auto rr_threshold = node<MegakernelPathTracing>()->rr_threshold();
             auto q = max(beta.max() * eta_scale, .05f);
             $if(depth + 1u >= rr_depth) {
-                auto u = sampler()->generate_1d();
-                $if(q < rr_threshold & u >= q) { $break; };
+                $if(q < rr_threshold & u_rr >= q) { $break; };
                 beta *= ite(q < rr_threshold, 1.0f / q, 1.f);
             };
         };
