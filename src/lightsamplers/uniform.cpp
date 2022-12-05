@@ -120,7 +120,7 @@ private:
         auto eval = Light::Evaluation::zero(swl.dimension());
         pipeline().lights().dispatch(it->shape()->light_tag(), [&](auto light) noexcept {
             auto closure = light->closure(swl, time);
-            eval = closure->evaluate(*it, it_from.p());
+            eval = closure->evaluate(*it, it_from.p_shading());
         });
         return {.eval = std::move(eval), .p = it->p()};
     }
