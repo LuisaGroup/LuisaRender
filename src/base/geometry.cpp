@@ -297,14 +297,14 @@ ShadingAttribute Geometry::shading_point(const Shape::Handle &instance, const Va
     auto ng = normalize(c);
     auto ns = ng;
     auto ps = p;
-    $if (instance.has_vertex_normal()) {
+    auto shadow_term = instance.shadow_terminator_factor();
+    $if (instance.has_vertex_normal() & shadow_term > 0.f) {
         auto n0 = normalize(shape_to_world_normal * v0->normal());
         auto n1 = normalize(shape_to_world_normal * v1->normal());
         auto n2 = normalize(shape_to_world_normal * v2->normal());
         ns = normalize(interpolate(bary, n0, n1, n2));
         // offset p to fake surface for the shadow terminator
         // reference: Ray Tracing Gems 2, Chap. 4
-        auto shadow_term = instance.shadow_terminator_factor();
         auto temp_u = p - p0;
         auto temp_v = p - p1;
         auto temp_w = p - p2;
