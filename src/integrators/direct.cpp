@@ -105,7 +105,7 @@ protected:
             // compute direct lighting
             $if(!it->shape()->has_surface()) { $break; };
 
-            auto light_sample = Light::Sample::zero(swl.dimension());
+            auto light_sample = LightSampler::Sample::zero(swl.dimension());
             auto occluded = def(false);
 
             if (samples_lights) {
@@ -118,8 +118,7 @@ protected:
                 // trace shadow ray
                 $if(light_sample.eval.pdf > 0.f &
                     light_sample.eval.L.any([](auto x) { return x > 0.f; })) {
-                    auto shadow_ray = it->spawn_ray(light_sample.wi, light_sample.distance);
-                    occluded = pipeline().geometry()->intersect_any(shadow_ray);
+                    occluded = pipeline().geometry()->intersect_any(light_sample.shadow_ray);
                 };
             }
 
@@ -153,7 +152,7 @@ protected:
                     // direct lighting
                     if (samples_lights) {
                         $if(light_sample.eval.pdf > 0.0f & !occluded) {
-                            auto wi = light_sample.wi;
+                            auto wi = light_sample.shadow_ray->direction();
                             auto eval = closure->evaluate(wo, wi);
                             $if(eval.pdf > 0.f) {
                                 auto w = def(1.f);

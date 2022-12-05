@@ -63,7 +63,9 @@ public:
                         Expr<float> time) noexcept
         : Light::Closure{light, swl, time} {}
 
-    [[nodiscard]] Light::Evaluation evaluate(const Interaction &it_light, Expr<float3> p_from) const noexcept override {
+private:
+    [[nodiscard]] auto _evaluate(const Interaction &it_light,
+                                 Expr<float3> p_from) const noexcept {
         using namespace luisa::compute;
         auto light = instance<DiffuseLightInstance>();
         auto &&pipeline = light->pipeline();
@@ -74,12 +76,18 @@ public:
                  light->node<DiffuseLight>()->scale();
         auto pdf = distance_squared(it_light.p(), p_from) * pdf_area * (1.0f / cos_wo);
         auto two_sided = light->node<DiffuseLight>()->two_sided();
-        return {.L = ite(!two_sided & it_light.back_facing(), 0.f, L),
-                .pdf = ite(!two_sided & it_light.back_facing(), 0.0f, pdf)};
+        return Light::Evaluation{.L = ite(!two_sided & it_light.back_facing(), 0.f, L),
+                                 .pdf = ite(!two_sided & it_light.back_facing(), 0.0f, pdf)};
+    }
+
+public:
+    [[nodiscard]] Light::Evaluation evaluate(const Interaction &it_light,
+                                             Expr<float3> p_from) const noexcept override {
+        return _evaluate(it_light, p_from);
     }
 
     [[nodiscard]] Light::Sample sample(Expr<uint> light_inst_id,
-                                       const Interaction &it_from,
+                                       Expr<float3> p_from,
                                        Expr<float2> u_in) const noexcept override {
         auto light = instance<DiffuseLightInstance>();
         auto &&pipeline = light->pipeline();
@@ -94,15 +102,12 @@ public:
         auto uvw = sample_uniform_triangle(make_float2(ux, u_in.y));
         auto attrib = pipeline.geometry()->geometry_point(
             *light_inst, triangle, uvw, light_to_world, light_to_world_normal);
-        auto light_wo = normalize(it_from.p() - attrib.p);
+        auto light_wo = normalize(p_from - attrib.p);
         Interaction it_light{std::move(light_inst), light_inst_id,
                              triangle_id, attrib.area, attrib.p, attrib.n,
                              dot(light_wo, attrib.n) < 0.0f};
         DiffuseLightClosure closure{light, swl(), time()};
-        auto p_from = it_from.p_robust(-light_wo);
-        return {.eval = closure.evaluate(it_light, p_from),
-                .wi = -light_wo,
-                .distance = distance(attrib.p, p_from) * .9999f};
+        return {.eval = closure._evaluate(it_light, p_from), .p = attrib.p};
     }
 };
 

@@ -90,22 +90,26 @@ public:
     }
 
 private:
-    [[nodiscard]] Light::Sample _sample_light(const Interaction &it_from, Expr<uint> tag, Expr<float2> u,
-                                              const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+    [[nodiscard]] Light::Sample _sample_light(const Interaction &it_from,
+                                              Expr<uint> tag, Expr<float2> u,
+                                              const SampledWavelengths &swl,
+                                              Expr<float> time) const noexcept override {
         LUISA_ASSERT(!pipeline().lights().empty(), "No lights in the scene.");
         auto handle = pipeline().buffer<Light::Handle>(_light_buffer_id).read(tag);
         auto sample = Light::Sample::zero(swl.dimension());
+        auto p_from = it_from.p_shading();
         pipeline().lights().dispatch(handle.light_tag, [&](auto light) noexcept {
             auto closure = light->closure(swl, time);
-            sample = closure->sample(handle.instance_id, it_from, u);
+            sample = closure->sample(handle.instance_id, p_from, u);
         });
         return sample;
     }
 
-    [[nodiscard]] Light::Sample _sample_environment(const Interaction &it_from, Expr<float2> u,
-                                                    const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+    [[nodiscard]] Environment::Sample _sample_environment(Expr<float2> u,
+                                                          const SampledWavelengths &swl,
+                                                          Expr<float> time) const noexcept override {
         LUISA_ASSERT(pipeline().environment() != nullptr, "No environment in the scene.");
-        return pipeline().environment()->sample(it_from, swl, time, u);
+        return pipeline().environment()->sample(swl, time, u);
     }
 };
 
