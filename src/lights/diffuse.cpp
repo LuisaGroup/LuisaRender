@@ -78,7 +78,9 @@ public:
                 .pdf = ite(!two_sided & it_light.back_facing(), 0.0f, pdf)};
     }
 
-    [[nodiscard]] Light::Sample sample(Expr<uint> light_inst_id, const Interaction &it_from, Expr<float2> u_in) const noexcept override {
+    [[nodiscard]] Light::Sample sample(Expr<uint> light_inst_id,
+                                       const Interaction &it_from,
+                                       Expr<float2> u_in) const noexcept override {
         auto light = instance<DiffuseLightInstance>();
         auto &&pipeline = light->pipeline();
         auto light_inst = pipeline.geometry()->instance(light_inst_id);
