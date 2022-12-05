@@ -2,7 +2,6 @@
 // Created by Mike Smith on 2022/1/10.
 //
 
-#include <luisa-compute.h>
 #include <util/sampling.h>
 #include <base/light_sampler.h>
 #include <base/pipeline.h>

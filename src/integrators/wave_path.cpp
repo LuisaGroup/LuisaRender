@@ -338,17 +338,17 @@ void WavefrontPathTracingInstance::_render_one_camera(
         auto queue_id = dispatch_x();
         $if(queue_id < queue_size.read(0u)) {
             auto ray_id = queue.read(queue_id);
-            auto ray = rays.read(ray_id);
-            auto hit = hits.read(ray_id);
-            auto it = pipeline().geometry()->interaction(ray, hit);
             auto path_id = path_indices.read(ray_id);
-            auto swl = path_states.read_swl(path_id);
             sampler()->load_state(path_id);
             auto u_light_selection = sampler()->generate_1d();
             auto u_light_surface = sampler()->generate_2d();
+            sampler()->save_state(path_id);
+            auto ray = rays.read(ray_id);
+            auto hit = hits.read(ray_id);
+            auto it = pipeline().geometry()->interaction(ray, hit);
+            auto swl = path_states.read_swl(path_id);
             auto light_sample = light_sampler()->sample(
                 *it, u_light_selection, u_light_surface, swl, time);
-            sampler()->save_state(path_id);
             // trace shadow ray
             auto occluded = pipeline().geometry()->intersect_any(light_sample.shadow_ray);
             light_samples.write_emission(queue_id, ite(occluded, 0.f, 1.f) * light_sample.eval.L);
@@ -364,17 +364,20 @@ void WavefrontPathTracingInstance::_render_one_camera(
         auto queue_id = dispatch_x();
         $if(queue_id < queue_size.read(0u)) {
             auto ray_id = queue.read(queue_id);
-            auto ray = in_rays.read(ray_id);
-            auto hit = in_hits.read(ray_id);
-            auto it = pipeline().geometry()->interaction(ray, hit);
             auto path_id = path_indices.read(ray_id);
-            auto swl = path_states.read_swl(path_id);
-            auto beta = path_states.read_beta(path_id);
-            auto surface_tag = it->shape()->surface_tag();
             sampler()->load_state(path_id);
             auto u_lobe = sampler()->generate_1d();
             auto u_bsdf = sampler()->generate_2d();
+            auto u_rr = def(0.f);
+            auto rr_depth = node<WavefrontPathTracing>()->rr_depth();
+            $if(trace_depth + 1u >= rr_depth) { u_rr = sampler()->generate_1d(); };
             sampler()->save_state(path_id);
+            auto ray = in_rays.read(ray_id);
+            auto hit = in_hits.read(ray_id);
+            auto it = pipeline().geometry()->interaction(ray, hit);
+            auto swl = path_states.read_swl(path_id);
+            auto beta = path_states.read_beta(path_id);
+            auto surface_tag = it->shape()->surface_tag();
             auto eta_scale = def(1.f);
             auto wo = -ray->direction();
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
@@ -434,13 +437,11 @@ void WavefrontPathTracingInstance::_render_one_camera(
                 terminated = true;
             }
             $else {
-                auto rr_depth = node<WavefrontPathTracing>()->rr_depth();
-                auto rr_threshold = node<WavefrontPathTracing>()->rr_threshold();
                 // rr
+                auto rr_threshold = node<WavefrontPathTracing>()->rr_threshold();
                 auto q = max(beta.max() * eta_scale, 0.05f);
                 $if(trace_depth + 1u >= rr_depth) {
-                    auto u = sampler()->generate_1d();
-                    terminated = q < rr_threshold & u >= q;
+                    terminated = q < rr_threshold & u_rr >= q;
                     beta *= ite(q < rr_threshold, 1.f / q, 1.f);
                 };
             };
