@@ -289,8 +289,6 @@ ShadingAttribute Geometry::shading_point(const Shape::Handle &instance, const Va
         uv1 = _pipeline.buffer<float2>(uv_buffer).read(triangle.i1);
         uv2 = _pipeline.buffer<float2>(uv_buffer).read(triangle.i2);
     };
-    auto s = _compute_tangent(p0, p1, p2, uv0, uv1, uv2);
-    auto uv = interpolate(bary, uv0, uv1, uv2);
     auto p = interpolate(bary, p0, p1, p2);
     auto c = cross(p1 - p0, p2 - p0);
     auto area = .5f * length(c);
@@ -314,6 +312,8 @@ ShadingAttribute Geometry::shading_point(const Shape::Handle &instance, const Va
                               fma(-min(dot(temp_w, n2), 0.f), n2, temp_w));
         ps = fma(shadow_term, dp, p);
     };
+    auto s = _compute_tangent(p0, p1, p2, uv0, uv1, uv2);
+    auto uv = interpolate(bary, uv0, uv1, uv2);
     return {.g = {.p = p,
                   .n = ng,
                   .area = area},

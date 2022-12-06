@@ -30,8 +30,9 @@ template<typename T>
     auto p = fma(make_float2(make_uint2(u & 0xffffu, u >> 16u)), ((1.f / 65535.f) * 2.f), -1.f);
     auto abs_p = abs(p);
     auto n = make_float3(p, 1.f - abs_p.x - abs_p.y);
-    auto t = make_float2(clamp(-n.z, 0.f, 1.f));
-    return make_float3(n.xy() + select(t, -t, n.xy() >= 0.f), n.z);
+    auto t = make_float2(clamp(n.z, -1.f, 0.f));
+    auto xy = fma(sign(n.xy()), t, n.xy());
+    return make_float3(xy, n.z);
 }
 
 struct alignas(16) Vertex {
