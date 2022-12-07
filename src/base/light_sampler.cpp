@@ -62,10 +62,7 @@ LightSampler::Sample LightSampler::Sample::zero(uint spec_dim) noexcept {
 
 LightSampler::Sample LightSampler::Sample::from_light(const Light::Sample &s,
                                                       const Interaction &it_from) noexcept {
-    auto L = s.p - it_from.p_shading();
-    auto distance = length(L);
-    auto wi = L * (1.f / distance);
-    return Sample{.eval = s.eval, .shadow_ray = it_from.spawn_ray(wi, distance * .9999f)};
+    return Sample{.eval = s.eval, .shadow_ray = it_from.spawn_ray_to(s.p)};
 }
 
 LightSampler::Sample LightSampler::Sample::from_environment(const Environment::Sample &s,

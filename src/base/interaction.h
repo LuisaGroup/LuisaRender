@@ -112,6 +112,7 @@ public:
 public:
     static constexpr auto default_t_max = std::numeric_limits<float>::max();
     [[nodiscard]] Var<Ray> spawn_ray(Expr<float3> wi, Expr<float> t_max = default_t_max) const noexcept;
+    [[nodiscard]] Var<Ray> spawn_ray_to(Expr<float3> p) const noexcept;
 };
 
 }// namespace luisa::render

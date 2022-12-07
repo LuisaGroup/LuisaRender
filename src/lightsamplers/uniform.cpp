@@ -101,10 +101,8 @@ private:
             pipeline().buffer<AliasEntry>(alias_table_buffer_id),
             light_inst->triangle_count(), u_in.x);
         auto triangle = pipeline().geometry()->triangle(*light_inst, triangle_id);
-        auto light_to_world_normal = transpose(inverse(make_float3x3(light_to_world)));
         auto uvw = sample_uniform_triangle(make_float2(ux, u_in.y));
-        auto attrib = pipeline().geometry()->shading_point(
-            *light_inst, triangle, uvw, light_to_world, light_to_world_normal);
+        auto attrib = pipeline().geometry()->shading_point(*light_inst, triangle, uvw, light_to_world);
         return luisa::make_shared<Interaction>(std::move(light_inst), handle.instance_id,
                                                triangle_id, std::move(attrib),
                                                dot(attrib.g.n, p_from - attrib.g.p) < 0.f);

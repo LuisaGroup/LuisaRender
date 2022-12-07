@@ -166,9 +166,8 @@ luisa::shared_ptr<Interaction> Geometry::interaction(Expr<uint> inst_id, Expr<ui
                                                      Expr<float3> bary, Expr<float3> wo) const noexcept {
     auto shape = instance(inst_id);
     auto m = instance_to_world(inst_id);
-    auto n = transpose(inverse(make_float3x3(m)));
     auto tri = triangle(*shape, prim_id);
-    auto attrib = shading_point(*shape, tri, bary, m, n);
+    auto attrib = shading_point(*shape, tri, bary, m);
     return luisa::make_shared<Interaction>(
         std::move(shape), inst_id, prim_id,
         attrib, dot(wo, attrib.g.n) < 0.0f);
@@ -206,52 +205,63 @@ template<typename T>
 }
 
 GeometryAttribute Geometry::geometry_point(const Shape::Handle &instance, const Var<Triangle> &triangle,
-                                           const Var<float3> &bary, const Var<float4x4> &shape_to_world,
-                                           const Var<float3x3> &shape_to_world_normal) const noexcept {
+                                           const Var<float3> &bary, const Var<float4x4> &shape_to_world) const noexcept {
     auto v_buffer = instance.vertex_buffer_id();
     auto v0 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i0);
     auto v1 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i1);
     auto v2 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i2);
-    auto p0 = make_float3(shape_to_world * make_float4(v0->position(), 1.f));
-    auto p1 = make_float3(shape_to_world * make_float4(v1->position(), 1.f));
-    auto p2 = make_float3(shape_to_world * make_float4(v2->position(), 1.f));
-    auto p = interpolate(bary, p0, p1, p2);
-    auto c = cross(p1 - p0, p2 - p0);
-    auto area = .5f * length(c);
+    // object space
+    auto p0 = v0->position();
+    auto p1 = v1->position();
+    auto p2 = v2->position();
+    auto m = make_float3x3(shape_to_world);
+    auto t = make_float3(shape_to_world[3]);
+    // world space
+    auto p = m * interpolate(bary, p0, p1, p2) + t;
+    auto dp0 = p1 - p0;
+    auto dp1 = p2 - p0;
+    auto c = cross(m * dp0, m * dp1);
+    auto area = length(c) * .5f;
     auto ng = normalize(c);
     return {.p = p, .n = ng, .area = area};
 }
 
 ShadingAttribute Geometry::shading_point(const Shape::Handle &instance, const Var<Triangle> &triangle,
-                                         const Var<float3> &bary, const Var<float4x4> &shape_to_world,
-                                         const Var<float3x3> &shape_to_world_normal) const noexcept {
+                                         const Var<float3> &bary, const Var<float4x4> &shape_to_world) const noexcept {
     auto v_buffer = instance.vertex_buffer_id();
     auto v0 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i0);
     auto v1 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i1);
     auto v2 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i2);
-    auto p0 = make_float3(shape_to_world * make_float4(v0->position(), 1.f));
-    auto p1 = make_float3(shape_to_world * make_float4(v1->position(), 1.f));
-    auto p2 = make_float3(shape_to_world * make_float4(v2->position(), 1.f));
-    auto dp0 = p1 - p0;
-    auto dp1 = p2 - p0;
-    auto c = cross(dp0, dp1);
-    auto area = .5f * length(c);
-    auto ng = normalize(c);
+    // object space
+    auto p0_local = v0->position();
+    auto p1_local = v1->position();
+    auto p2_local = v2->position();
     auto ns_local = interpolate(bary, v0->normal(), v1->normal(), v2->normal());
-    auto ns = ite(instance.has_vertex_normal(), normalize(shape_to_world_normal * ns_local), ng);
-    auto p = interpolate(bary, p0, p1, p2);
-    auto uv0 = ite(instance.has_vertex_uv(), v0->uv(), make_float2(0.f));
-    auto uv1 = ite(instance.has_vertex_uv(), v1->uv(), make_float2(0.f));
-    auto uv2 = ite(instance.has_vertex_uv(), v2->uv(), make_float2(0.f));
-    auto uv = ite(instance.has_vertex_uv(), interpolate(bary, uv0, uv1, uv2), bary.yz());
     // compute dpdu and dpdv
+    auto uv0 = v0->uv();
+    auto uv1 = v1->uv();
+    auto uv2 = v2->uv();
     auto duv0 = uv1 - uv0;
     auto duv1 = uv2 - uv0;
     auto det = duv0.x * duv1.y - duv0.y * duv1.x;
     auto inv_det = 1.f / det;
+    auto dp0_local = p1_local - p0_local;
+    auto dp1_local = p2_local - p0_local;
+    auto dpdu_local = (dp0_local * duv1.y - dp1_local * duv0.y) * inv_det;
+    auto dpdv_local = (dp1_local * duv0.x - dp0_local * duv1.x) * inv_det;
+    // world space
+    auto m = make_float3x3(shape_to_world);
+    auto t = make_float3(shape_to_world[3]);
+    auto p = m * interpolate(bary, p0_local, p1_local, p2_local) + t;
+    auto c = cross(m * dp0_local, m * dp1_local);
+    auto area = length(c) * .5f;
+    auto ng = normalize(c);
     auto fallback_frame = Frame::make(ng);
-    auto dpdu = ite(det == 0.f, fallback_frame.s(), (dp0 * duv1.y - dp1 * duv0.y) * inv_det);
-    auto dpdv = ite(det == 0.f, fallback_frame.t(), (dp1 * duv0.x - dp0 * duv1.x) * inv_det);
+    auto dpdu = ite(det == 0.f, fallback_frame.s(), m * dpdu_local);
+    auto dpdv = ite(det == 0.f, fallback_frame.t(), m * dpdv_local);
+    auto mn = transpose(inverse(m));
+    auto ns = ite(instance.has_vertex_normal(), normalize(mn * ns_local), ng);
+    auto uv = ite(instance.has_vertex_uv(), interpolate(bary, uv0, uv1, uv2), bary.yz());
     return {.g = {.p = p,
                   .n = ng,
                   .area = area},

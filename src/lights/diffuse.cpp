@@ -98,10 +98,8 @@ public:
             pipeline.buffer<AliasEntry>(alias_table_buffer_id),
             light_inst->triangle_count(), u_in.x);
         auto triangle = pipeline.geometry()->triangle(*light_inst, triangle_id);
-        auto light_to_world_normal = transpose(inverse(make_float3x3(light_to_world)));
         auto uvw = sample_uniform_triangle(make_float2(ux, u_in.y));
-        auto attrib = pipeline.geometry()->geometry_point(
-            *light_inst, triangle, uvw, light_to_world, light_to_world_normal);
+        auto attrib = pipeline.geometry()->geometry_point(*light_inst, triangle, uvw, light_to_world);
         Interaction it_light{std::move(light_inst), light_inst_id,
                              triangle_id, attrib.area, attrib.p, attrib.n,
                              dot(p_from - attrib.p, attrib.n) < 0.f};
