@@ -41,8 +41,7 @@ class PathStateSOA {
 
 private:
     const Spectrum::Instance *_spectrum;
-    Buffer<float> _swl_lambda;
-    Buffer<float> _swl_pdf;
+    Buffer<float> _wl_sample;
     Buffer<float> _beta;
     Buffer<float> _radiance;
     Buffer<float> _pdf_bsdf;
@@ -56,8 +55,7 @@ public:
         _radiance = device.create_buffer<float>(size * dimension);
         _pdf_bsdf = device.create_buffer<float>(size);
         if (!spectrum->node()->is_fixed()) {
-            _swl_lambda = device.create_buffer<float>(size * dimension);
-            _swl_pdf = device.create_buffer<float>(size * dimension);
+            _wl_sample = device.create_buffer<float>(size);
         }
     }
     [[nodiscard]] auto read_beta(Expr<uint> index) const noexcept {
@@ -77,22 +75,22 @@ public:
         }
     }
     [[nodiscard]] auto read_swl(Expr<uint> index) const noexcept {
-        if (_spectrum->node()->is_fixed()) { return _spectrum->sample(0.f); }
-        SampledWavelengths swl{_spectrum->node()->dimension()};
-        auto offset = index * swl.dimension();
-        for (auto i = 0u; i < swl.dimension(); i++) {
-            swl.set_lambda(i, _swl_lambda.read(offset + i));
-            swl.set_pdf(i, _swl_pdf.read(offset + i));
+        if (_spectrum->node()->is_fixed()) {
+            return std::make_pair(def(0.f), _spectrum->sample(0.f));
         }
-        return swl;
+        auto u_wl = _wl_sample.read(index);
+        auto swl = _spectrum->sample(abs(u_wl));
+        $if (u_wl < 0.f) { swl.terminate_secondary(); };
+        return std::make_pair(abs(u_wl), swl);
     }
-    void write_swl(Expr<uint> index, const SampledWavelengths &swl) noexcept {
+    void write_wavelength_sample(Expr<uint> index, Expr<float> u_wl) noexcept {
         if (!_spectrum->node()->is_fixed()) {
-            auto offset = index * swl.dimension();
-            for (auto i = 0u; i < swl.dimension(); i++) {
-                _swl_lambda.write(offset + i, swl.lambda(i));
-                _swl_pdf.write(offset + i, swl.pdf(i));
-            }
+            _wl_sample.write(index, u_wl);
+        }
+    }
+    void terminate_secondary_wavelengths(Expr<uint> index, Expr<float> u_wl) noexcept {
+        if (!_spectrum->node()->is_fixed()) {
+            _wl_sample.write(index, -u_wl);
         }
     }
     [[nodiscard]] auto read_radiance(Expr<uint> index) const noexcept {
@@ -161,7 +159,7 @@ public:
 class RayQueue {
 
 public:
-    static constexpr auto counter_buffer_size = 1024u;
+    static constexpr auto counter_buffer_size = 16u * 1024u;
 
 private:
     Buffer<uint> _index_buffer;
@@ -249,11 +247,10 @@ void WavefrontPathTracingInstance::_render_one_camera(
         auto u_wavelength = spectrum->node()->is_fixed() ? 0.f : sampler()->generate_1d();
         sampler()->save_state(state_id);
         auto camera_sample = camera->generate_ray(pixel_coord, time, u_filter, u_lens);
-        auto swl = spectrum->sample(u_wavelength);
         rays.write(state_id, camera_sample.ray);
-        path_states.write_swl(state_id, swl);
-        path_states.write_beta(state_id, SampledSpectrum{swl.dimension(), camera_sample.weight});
-        path_states.write_radiance(state_id, SampledSpectrum{swl.dimension()});
+        path_states.write_wavelength_sample(state_id, u_wavelength);
+        path_states.write_beta(state_id, SampledSpectrum{spectrum->node()->dimension(), camera_sample.weight});
+        path_states.write_radiance(state_id, SampledSpectrum{spectrum->node()->dimension()});
         path_states.write_pdf_bsdf(state_id, 1e16f);
         path_indices.write(state_id, state_id);
     });
@@ -297,7 +294,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                 auto ray_id = queue.read(queue_id);
                 auto wi = rays.read(ray_id)->direction();
                 auto path_id = path_indices.read(ray_id);
-                auto swl = path_states.read_swl(path_id);
+                auto [u_wl, swl] = path_states.read_swl(path_id);
                 auto pdf_bsdf = path_states.read_pdf_bsdf(path_id);
                 auto beta = path_states.read_beta(path_id);
                 auto Li = path_states.read_radiance(path_id);
@@ -319,7 +316,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                 auto ray = rays.read(ray_id);
                 auto hit = hits.read(ray_id);
                 auto path_id = path_indices.read(ray_id);
-                auto swl = path_states.read_swl(path_id);
+                auto [u_wl, swl] = path_states.read_swl(path_id);
                 auto pdf_bsdf = path_states.read_pdf_bsdf(path_id);
                 auto beta = path_states.read_beta(path_id);
                 auto Li = path_states.read_radiance(path_id);
@@ -346,7 +343,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
             auto ray = rays.read(ray_id);
             auto hit = hits.read(ray_id);
             auto it = pipeline().geometry()->interaction(ray, hit);
-            auto swl = path_states.read_swl(path_id);
+            auto [u_wl, swl] = path_states.read_swl(path_id);
             auto light_sample = light_sampler()->sample(
                 *it, u_light_selection, u_light_surface, swl, time);
             // trace shadow ray
@@ -375,7 +372,9 @@ void WavefrontPathTracingInstance::_render_one_camera(
             auto ray = in_rays.read(ray_id);
             auto hit = in_hits.read(ray_id);
             auto it = pipeline().geometry()->interaction(ray, hit);
-            auto swl = path_states.read_swl(path_id);
+            auto u_wl_and_swl = path_states.read_swl(path_id);
+            auto &&u_wl = u_wl_and_swl.first;
+            auto &&swl = u_wl_and_swl.second;
             auto beta = path_states.read_beta(path_id);
             auto surface_tag = it->shape()->surface_tag();
             auto eta_scale = def(1.f);
@@ -400,7 +399,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                     if (auto dispersive = closure->is_dispersive()) {
                         $if(*dispersive) {
                             swl.terminate_secondary();
-                            path_states.write_swl(path_id, swl);
+                            path_states.terminate_secondary_wavelengths(path_id, u_wl);
                         };
                     }
                     // direct lighting
@@ -459,7 +458,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
         auto state_id = dispatch_x();
         auto pixel_id = state_id % pixel_count;
         auto pixel_coord = make_uint2(pixel_id % resolution.x, pixel_id / resolution.x);
-        auto swl = path_states.read_swl(state_id);
+        auto [u_wl, swl] = path_states.read_swl(state_id);
         auto Li = path_states.read_radiance(state_id);
         camera->film()->accumulate(pixel_coord, spectrum->srgb(swl, Li * shutter_weight));
     });
