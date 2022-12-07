@@ -548,7 +548,6 @@ private:
                                                       TransportMode mode) const noexcept {
         SampledSpectrum f{cls->swl().dimension(), 0.f};
         auto pdf = def(0.f);
-        auto cos_theta_i = def(0.f);
         $if(same_hemisphere(wo_local, wi_local)) {// reflection
             if (_diffuse) {
                 f += _diffuse->evaluate(wo_local, wi_local, mode);
@@ -568,9 +567,6 @@ private:
                 pdf += _sampling_weights[_clearcoat_technique_index] *
                        _clearcoat->pdf(wo_local, wi_local);
             }
-            cos_theta_i = ite(cls->it()->shape()->shadow_terminator_factor() > 0.f |
-                                  cls->it()->same_sided(wo, wi),
-                              abs_cos_theta(wi_local), 0.f);
         }
         $else {// transmission
             if (_spec_trans) {
@@ -578,9 +574,8 @@ private:
                 pdf = _sampling_weights[_spec_trans_technique_index] *
                       _spec_trans->pdf(wo_local, wi_local, mode);
             }
-            cos_theta_i = abs_cos_theta(wi_local);
         };
-        return {.f = f * cos_theta_i, .pdf = pdf};
+        return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
     [[nodiscard]] Surface::Evaluation evaluate(const Surface::Closure *cls,
                                                Expr<float3> wo, Expr<float3> wi,
@@ -797,7 +792,6 @@ private:
                                                       TransportMode mode) const noexcept {
         SampledSpectrum f{cls->swl().dimension(), 0.f};
         auto pdf = def(0.f);
-        auto cos_theta_i = def(1.f);
         $if(same_hemisphere(wo_local, wi_local)) {// reflection
             if (_diffuse) {
                 f += _diffuse->evaluate(wo_local, wi_local, mode);
@@ -817,9 +811,6 @@ private:
                 pdf += _sampling_weights[_clearcoat_technique_index] *
                        _clearcoat->pdf(wo_local, wi_local);
             }
-            cos_theta_i = ite(cls->it()->shape()->shadow_terminator_factor() > 0.f |
-                                  cls->it()->same_sided(wo, wi),
-                              abs_cos_theta(wi_local), 0.f);
         }
         $else {// transmission
             if (_spec_trans) {
@@ -832,9 +823,8 @@ private:
                 pdf += _sampling_weights[_diff_trans_technique_index] *
                        _diff_trans->pdf(wo_local, wi_local, mode);
             }
-            cos_theta_i = abs_cos_theta(wi_local);
         };
-        return {.f = f * cos_theta_i, .pdf = pdf};
+        return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
     [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _color; }
     [[nodiscard]] Float2 roughness() const noexcept override {

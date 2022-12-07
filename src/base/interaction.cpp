@@ -13,9 +13,8 @@ Bool Interaction::same_sided(Expr<float3> wo, Expr<float3> wi) const noexcept {
 Float3 Interaction::p_robust(Expr<float3> w) const noexcept {
     auto offset_factor = _shape->intersection_offset_factor();
     auto front = dot(_shading.n(), w) > 0.f;
-    auto p = ite(front, _ps, _pg);
     auto n = ite(front, _ng, -_ng);
-    return offset_ray_origin(p, offset_factor * n);
+    return offset_ray_origin(_pg, offset_factor * n);
 }
 
 Var<Ray> Interaction::spawn_ray(Expr<float3> wi, Expr<float> t_max) const noexcept {
