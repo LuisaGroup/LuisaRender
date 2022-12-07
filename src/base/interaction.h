@@ -28,7 +28,8 @@ struct ShadingAttribute {
     GeometryAttribute g;
     Float3 ps;
     Float3 ns;
-    Float3 tangent;
+    Float3 dpdu;
+    Float3 dpdv;
     Float2 uv;
 };
 
@@ -89,7 +90,7 @@ public:
     Interaction(luisa::shared_ptr<Shape::Handle> shape, Expr<uint> inst_id, Expr<uint> prim_id,
                 const ShadingAttribute &attrib, Expr<bool> back_facing) noexcept
         : Interaction{std::move(shape), inst_id, prim_id, attrib.g.area, attrib.g.p, attrib.g.n,
-                      attrib.uv, attrib.ps, attrib.ns, attrib.tangent, back_facing} {}
+                      attrib.uv, attrib.ps, attrib.ns, attrib.dpdu, back_facing} {}
 
     [[nodiscard]] auto p() const noexcept { return _pg; }
     [[nodiscard]] auto p_shading() const noexcept { return _ps; }

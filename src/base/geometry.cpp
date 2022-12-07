@@ -250,14 +250,15 @@ ShadingAttribute Geometry::shading_point(const Shape::Handle &instance, const Va
     auto det = duv0.x * duv1.y - duv0.y * duv1.x;
     auto inv_det = 1.f / det;
     auto fallback_frame = Frame::make(ng);
-    auto dpdu = ite(det < 1e-9f, fallback_frame.s(), (dp0 * duv1.y - dp1 * duv0.y) * inv_det);
-    auto dpdv = ite(det < 1e-9f, fallback_frame.t(), (dp1 * duv0.x - dp0 * duv1.x) * inv_det);
+    auto dpdu = ite(det == 0.f, fallback_frame.s(), (dp0 * duv1.y - dp1 * duv0.y) * inv_det);
+    auto dpdv = ite(det == 0.f, fallback_frame.t(), (dp1 * duv0.x - dp0 * duv1.x) * inv_det);
     return {.g = {.p = p,
                   .n = ng,
                   .area = area},
             .ps = p,
             .ns = ns,
-            .tangent = dpdu,
+            .dpdu = dpdu,
+            .dpdv = dpdv,
             .uv = uv};
 }
 
