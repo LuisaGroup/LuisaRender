@@ -20,9 +20,13 @@ private:
     Float3 _c;
 
 private:
-    [[nodiscard]] static Float _s(Expr<float> x) noexcept {
-        return ite(isinf(x), cast<float>(x > 0.0f),
-                   0.5f * fma(x, rsqrt(fma(x, x, 1.f)), 1.f));
+    [[nodiscard]] static auto _fma(Expr<float> a, Expr<float> b, Expr<float> c) noexcept {
+        return a * b + c;
+    }
+
+    [[nodiscard]] static auto _s(Expr<float> x) noexcept {
+        return ite(isinf(x), cast<float>(x > 0.f),
+                   .5f + x / (2.f * sqrt(1.f + sqr(x))));
     }
 
 public:
@@ -31,7 +35,7 @@ public:
         : _c{make_float3(c0, c1, c2)} {}
     explicit RGBSigmoidPolynomial(Expr<float3> c) noexcept : _c{c} {}
     [[nodiscard]] Float operator()(Expr<float> lambda) const noexcept {
-        return _s(fma(lambda, fma(lambda, _c.x, _c.y), _c.z));// c0 * x * x + c1 * x + c2
+        return _s(polynomial(lambda, _c.z, _c.y, _c.x));// c0 * x * x + c1 * x + c2
     }
 };
 
@@ -46,7 +50,7 @@ private:
 
 private:
     [[nodiscard]] inline static auto _inverse_smooth_step(auto x) noexcept {
-        return 0.5f - sin(asin(1.0f - 2.0f * x) * (1.0f / 3.0f));
+        return .5f - sin(asin(1.f - 2.f * x) * (1.f / 3.f));
     }
 
 public:

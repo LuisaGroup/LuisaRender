@@ -101,12 +101,11 @@ Float spherical_phi(Float3 v) noexcept {
 Float fresnel_dielectric_integral(Float eta) noexcept {
     static Callable fit_less_one = [](Float eta) noexcept {
         constexpr std::array c{0.75985009f, -2.09069066f, 2.23559031f, -0.90663979f};
-        return fma(fma(fma(c[3], eta, c[2]), eta, c[1]), eta, c[0]);
+        return polynomial(eta, c[0], c[1], c[2], c[3]);
     };
     static Callable fit_greater_one = [](Float eta) noexcept {
         constexpr std::array c{0.97945724f, 0.21762732f, -1.18995376f};
-        auto e = 1.f / eta;
-        return fma(fma(c[2], e, c[1]), e, c[0]);
+        return polynomial(1.f / eta, c[0], c[1], c[2]);
     };
     return saturate(ite(eta == 1.f, 0.f, ite(eta < 1.f, fit_less_one(eta), fit_greater_one(eta))));
 }

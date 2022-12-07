@@ -296,7 +296,7 @@ ShadingAttribute Geometry::shading_point(const Shape::Handle &instance, const Va
     auto ns = ng;
     auto ps = p;
     auto shadow_term = instance.shadow_terminator_factor();
-    $if (instance.has_vertex_normal() & shadow_term > 0.f) {
+    $if(instance.has_vertex_normal() & shadow_term > 0.f) {
         auto n0 = normalize(shape_to_world_normal * v0->normal());
         auto n1 = normalize(shape_to_world_normal * v1->normal());
         auto n2 = normalize(shape_to_world_normal * v2->normal());
@@ -307,10 +307,10 @@ ShadingAttribute Geometry::shading_point(const Shape::Handle &instance, const Va
         auto temp_v = p - p1;
         auto temp_w = p - p2;
         auto dp = interpolate(bary,
-                              fma(-min(dot(temp_u, n0), 0.f), n0, temp_u),
-                              fma(-min(dot(temp_v, n1), 0.f), n1, temp_v),
-                              fma(-min(dot(temp_w, n2), 0.f), n2, temp_w));
-        ps = fma(shadow_term, dp, p);
+                              temp_u - min(dot(temp_u, n0), 0.f) * n0,
+                              temp_v - min(dot(temp_v, n1), 0.f) * n1,
+                              temp_w - min(dot(temp_w, n2), 0.f) * n2);
+        ps = p + shadow_term * dp;
     };
     auto s = _compute_tangent(p0, p1, p2, uv0, uv1, uv2);
     auto uv = interpolate(bary, uv0, uv1, uv2);

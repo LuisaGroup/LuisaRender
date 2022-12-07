@@ -757,7 +757,7 @@ public:
         // specular transmission
         if (spec_trans_tex && !spec_trans_tex->node()->is_black()) {
             // thin specular transmission distribution
-            auto rscaled = fma(eta, .65f, -.35f) * roughness;
+            auto rscaled = (.65f * eta - .35f) * roughness;
             auto ascaled = make_float2(max(.001f, rscaled / aspect),
                                        max(.001f, rscaled * aspect));
             _thin_distrib = luisa::make_unique<TrowbridgeReitzDistribution>(ascaled);

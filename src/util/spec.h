@@ -42,6 +42,14 @@ using compute::Float4;
 using compute::Local;
 using compute::VolumeView;
 
+template<typename X, typename C0>
+[[nodiscard]] inline auto &polynomial(const X &x, const C0 &c0) noexcept { return c0; }
+
+template<typename X, typename C0, typename... C>
+[[nodiscard]] inline auto polynomial(const X &x, const C0 &c0, const C &...c) noexcept {
+    return x * polynomial(x, c...) + c0;
+}
+
 class SampledSpectrum {
 
 private:
@@ -206,18 +214,19 @@ public:
 [[nodiscard]] SampledSpectrum exp(const SampledSpectrum &t) noexcept;
 // TODO: other math functions
 
-
+using luisa::fma;
 using luisa::lerp;
-using luisa::compute::lerp;
 using luisa::compute::fma;
+using luisa::compute::lerp;
 
-[[nodiscard]] SampledSpectrum fma(const SampledSpectrum &a, const SampledSpectrum &b, const SampledSpectrum &c) noexcept;
-[[nodiscard]] SampledSpectrum fma(const SampledSpectrum &a, const SampledSpectrum &b, Expr<float> c) noexcept;
-[[nodiscard]] SampledSpectrum fma(const SampledSpectrum &a, Expr<float> b, const SampledSpectrum &c) noexcept;
-[[nodiscard]] SampledSpectrum fma(const SampledSpectrum &a, Expr<float> b, Expr<float> c) noexcept;
-[[nodiscard]] SampledSpectrum fma(Expr<float> a, const SampledSpectrum &b, const SampledSpectrum &c) noexcept;
-[[nodiscard]] SampledSpectrum fma(Expr<float> a, const SampledSpectrum &b, Expr<float> c) noexcept;
-[[nodiscard]] SampledSpectrum fma(Expr<float> a, Expr<float> b, const SampledSpectrum &c) noexcept;
+template<typename A, typename B, typename C>
+    requires std::disjunction_v<
+        std::is_same<std::remove_cvref_t<A>, SampledSpectrum>,
+        std::is_same<std::remove_cvref_t<B>, SampledSpectrum>,
+        std::is_same<std::remove_cvref_t<C>, SampledSpectrum>>
+[[nodiscard]] auto fma(const A &a, const B &b, const C &c) noexcept {
+    return a * b + c;
+}
 
 template<typename A, typename B, typename T>
     requires std::disjunction_v<
@@ -225,7 +234,7 @@ template<typename A, typename B, typename T>
         std::is_same<std::remove_cvref_t<B>, SampledSpectrum>,
         std::is_same<std::remove_cvref_t<T>, SampledSpectrum>>
 [[nodiscard]] auto lerp(const A &a, const B &b, const T &t) noexcept {
-    return fma(t, b - a, a);
+    return t * (b - a) + a;
 }
 
 class SampledWavelengths {

@@ -46,7 +46,7 @@ using compute::sqrt;
 using compute::saturate;
 
 [[nodiscard]] inline auto sqr(auto x) noexcept { return x * x; }
-[[nodiscard]] inline auto one_minus_sqr(auto x) noexcept { return fma(x, -x, 1.f); }
+[[nodiscard]] inline auto one_minus_sqr(auto x) noexcept { return 1.f - sqr(x); }
 [[nodiscard]] inline Float abs_dot(Float3 u, Float3 v) noexcept { return abs(dot(u, v)); }
 [[nodiscard]] inline Float cos_theta(Float3 w) { return w.z; }
 [[nodiscard]] inline Float cos2_theta(Float3 w) { return sqr(w.z); }
