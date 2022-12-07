@@ -196,45 +196,6 @@ Var<Triangle> Geometry::triangle(const Shape::Handle &instance, Expr<uint> index
     return _pipeline.buffer<Triangle>(instance.triangle_buffer_id()).read(index);
 }
 
-[[nodiscard]] static auto _compute_tangent(
-    Expr<float3> p0, Expr<float3> p1, Expr<float3> p2,
-    Expr<float2> uv0, Expr<float2> uv1, Expr<float2> uv2) noexcept {
-
-    static Callable impl = [](Float3 p0, Float3 p1, Float3 p2,
-                              Float2 uv0, Float2 uv1, Float2 uv2) noexcept {
-        auto difference_of_products = [](auto a, auto b, auto c, auto d) noexcept {
-            auto cd = c * d;
-            auto differenceOfProducts = a * b - cd;
-            auto error = -c * d + cd;
-            return differenceOfProducts + error;
-        };
-        auto duv02 = uv0 - uv2;
-        auto duv12 = uv1 - uv2;
-        auto dp02 = p0 - p2;
-        auto dp12 = p1 - p2;
-        auto det = difference_of_products(duv02.x, duv12.y, duv02.y, duv12.x);
-        auto dpdu = def(make_float3());
-        auto dpdv = def(make_float3());
-        auto degenerate_uv = abs(det) < 1e-8f;
-        $if(!degenerate_uv) {
-            // Compute triangle $\dpdu$ and $\dpdv$ via matrix inversion
-            auto invdet = 1.f / det;
-            dpdu = difference_of_products(duv12.y, dp02, duv02.y, dp12) * invdet;
-            dpdv = difference_of_products(duv02.x, dp12, duv12.x, dp02) * invdet;
-        };
-        // Handle degenerate triangle $(u,v)$ parameterization or partial derivatives
-        $if(degenerate_uv | length_squared(cross(dpdu, dpdv)) == 0.f) {
-            auto n = cross(p2 - p0, p1 - p0);
-            auto b = ite(abs(n.x) > abs(n.z),
-                         make_float3(-n.y, n.x, 0.0f),
-                         make_float3(0.0f, -n.z, n.y));
-            dpdu = cross(b, n);
-        };
-        return dpdu;
-    };
-    return impl(p0, p1, p2, uv0, uv1, uv2);
-}
-
 template<typename T>
 [[nodiscard]] inline auto interpolate(Expr<float3> uvw,
                                       const T &v0,
@@ -270,40 +231,44 @@ ShadingAttribute Geometry::shading_point(const Shape::Handle &instance, const Va
     auto p0 = make_float3(shape_to_world * make_float4(v0->position(), 1.f));
     auto p1 = make_float3(shape_to_world * make_float4(v1->position(), 1.f));
     auto p2 = make_float3(shape_to_world * make_float4(v2->position(), 1.f));
+    auto p = interpolate(bary, p0, p1, p2);
+    auto dp0 = p1 - p0;
+    auto dp1 = p2 - p0;
+    auto c = cross(dp0, dp1);
+    auto area = .5f * length(c);
+    auto ng = normalize(c);
     auto uv0 = ite(instance.has_vertex_uv(), v0->uv(), make_float2(0.f));
     auto uv1 = ite(instance.has_vertex_uv(), v1->uv(), make_float2(0.f));
     auto uv2 = ite(instance.has_vertex_uv(), v2->uv(), make_float2(0.f));
-    auto s = _compute_tangent(p0, p1, p2, uv0, uv1, uv2);
-    auto p = interpolate(bary, p0, p1, p2);
     auto uv = interpolate(bary, uv0, uv1, uv2);
-    auto c = cross(p1 - p0, p2 - p0);
-    auto area = .5f * length(c);
-    auto ng = normalize(c);
-    auto ns = ng;
-    auto ps = p;
-    auto shadow_term = instance.shadow_terminator_factor();
-    $if(instance.has_vertex_normal() & shadow_term > 0.f) {
-        auto n0 = normalize(shape_to_world_normal * v0->normal());
-        auto n1 = normalize(shape_to_world_normal * v1->normal());
-        auto n2 = normalize(shape_to_world_normal * v2->normal());
-        ns = normalize(interpolate(bary, n0, n1, n2));
-        // offset p to fake surface for the shadow terminator
-        // reference: Ray Tracing Gems 2, Chap. 4
-        auto temp_u = p - p0;
-        auto temp_v = p - p1;
-        auto temp_w = p - p2;
-        auto dp = interpolate(bary,
-                              temp_u - min(dot(temp_u, n0), 0.f) * n0,
-                              temp_v - min(dot(temp_v, n1), 0.f) * n1,
-                              temp_w - min(dot(temp_w, n2), 0.f) * n2);
-        ps = p + shadow_term * dp;
-    };
+    // compute dpdu and dpdv
+    auto duv0 = uv1 - uv0;
+    auto duv1 = uv2 - uv0;
+    auto det = duv0.x * duv1.y - duv0.y * duv1.x;
+    auto inv_det = 1.f / det;
+    auto fallback_frame = Frame::make(ng);
+    auto dpdu = ite(det < 1e-9f, fallback_frame.s(), (dp0 * duv1.y - dp1 * duv0.y) * inv_det);
+    auto dpdv = ite(det < 1e-9f, fallback_frame.t(), (dp1 * duv0.x - dp0 * duv1.x) * inv_det);
+    auto n0 = ite(instance.has_vertex_normal(), normalize(shape_to_world_normal * v0->normal()), ng);
+    auto n1 = ite(instance.has_vertex_normal(), normalize(shape_to_world_normal * v1->normal()), ng);
+    auto n2 = ite(instance.has_vertex_normal(), normalize(shape_to_world_normal * v2->normal()), ng);
+    auto ns = normalize(interpolate(bary, n0, n1, n2));
+    // offset p to fake surface for the shadow terminator
+    // reference: Ray Tracing Gems 2, Chap. 4
+    auto temp_u = p - p0;
+    auto temp_v = p - p1;
+    auto temp_w = p - p2;
+    auto dp = interpolate(bary,
+                          temp_u - min(dot(temp_u, n0), 0.f) * n0,
+                          temp_v - min(dot(temp_v, n1), 0.f) * n1,
+                          temp_w - min(dot(temp_w, n2), 0.f) * n2);
+    auto ps = p + instance.shadow_terminator_factor() * dp;
     return {.g = {.p = p,
                   .n = ng,
                   .area = area},
             .ps = ps,
             .ns = ns,
-            .tangent = s,
+            .tangent = dpdu,
             .uv = uv};
 }
 
