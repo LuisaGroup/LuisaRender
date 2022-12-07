@@ -24,7 +24,6 @@ class Transform;
 
 struct MeshView {
     luisa::span<const Vertex> vertices;
-    luisa::span<const float2> uvs;
     luisa::span<const Triangle> triangles;
 };
 
@@ -135,7 +134,6 @@ public:
     static constexpr auto triangle_buffer_id_offset = 1u;
     static constexpr auto alias_table_buffer_id_offset = 2u;
     static constexpr auto pdf_buffer_id_offset = 3u;
-    static constexpr auto uv_buffer_id_offset = 4u;// might be empty, goes last
 
 private:
     UInt _buffer_base;
@@ -166,7 +164,6 @@ public:
     [[nodiscard]] auto geometry_buffer_base() const noexcept { return _buffer_base; }
     [[nodiscard]] auto property_flags() const noexcept { return _properties; }
     [[nodiscard]] auto vertex_buffer_id() const noexcept { return geometry_buffer_base() + luisa::render::Shape::Handle::vertex_buffer_id_offset; }
-    [[nodiscard]] auto uv_buffer_id() const noexcept { return geometry_buffer_base() + luisa::render::Shape::Handle::uv_buffer_id_offset; }
     [[nodiscard]] auto triangle_buffer_id() const noexcept { return geometry_buffer_base() + luisa::render::Shape::Handle::triangle_buffer_id_offset; }
     [[nodiscard]] auto triangle_count() const noexcept { return _triangle_count; }
     [[nodiscard]] auto alias_table_buffer_id() const noexcept { return geometry_buffer_base() + luisa::render::Shape::Handle::alias_table_buffer_id_offset; }

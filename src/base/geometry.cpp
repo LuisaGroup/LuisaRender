@@ -35,15 +35,10 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
                 return iter->second;
             }
             auto mesh_geom = [&] {
-                auto [vertices, uvs, triangles] = shape->mesh();
+                auto [vertices, triangles] = shape->mesh();
                 LUISA_ASSERT(!vertices.empty() && !triangles.empty(), "Empty mesh.");
-                LUISA_ASSERT(shape->has_vertex_uv() == !uvs.empty(), "UV mismatch.");
-                LUISA_ASSERT(uvs.empty() || uvs.size() == vertices.size(),
-                             "UV count {} mismatch with vertex count {}.",
-                             uvs.size(), vertices.size());
                 auto hash = luisa::detail::murmur2_hash64(vertices.data(), vertices.size_bytes(), Hash64::default_seed);
                 hash = luisa::detail::murmur2_hash64(triangles.data(), triangles.size_bytes(), hash);
-                hash = luisa::detail::murmur2_hash64(uvs.data(), uvs.size_bytes(), hash);
                 if (auto mesh_iter = _mesh_cache.find(hash);
                     mesh_iter != _mesh_cache.end()) {
                     return mesh_iter->second;
@@ -75,11 +70,6 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
                 LUISA_ASSERT(pdf_buffer_id - vertex_buffer_id == Shape::Handle::pdf_buffer_id_offset, "Invalid.");
                 command_buffer << alias_table_buffer_view.copy_from(alias_table.data())
                                << pdf_buffer_view.copy_from(pdf.data());
-                if (!uvs.empty()) {
-                    auto [uv_buffer_view, uv_buffer_id] = _pipeline.bindless_arena_buffer<float2>(uvs.size());
-                    LUISA_ASSERT(uv_buffer_id - vertex_buffer_id == Shape::Handle::uv_buffer_id_offset, "Invalid.");
-                    command_buffer << uv_buffer_view.copy_from(uvs.data());
-                }
                 command_buffer << compute::commit();
                 auto geom = MeshGeometry{mesh, vertex_buffer_id};
                 _mesh_cache.emplace(hash, geom);
@@ -280,16 +270,12 @@ ShadingAttribute Geometry::shading_point(const Shape::Handle &instance, const Va
     auto p0 = make_float3(shape_to_world * make_float4(v0->position(), 1.f));
     auto p1 = make_float3(shape_to_world * make_float4(v1->position(), 1.f));
     auto p2 = make_float3(shape_to_world * make_float4(v2->position(), 1.f));
-    auto uv0 = def(make_float2());
-    auto uv1 = def(make_float2());
-    auto uv2 = def(make_float2());
-    $if(instance.has_vertex_uv()) {
-        auto uv_buffer = instance.uv_buffer_id();
-        uv0 = _pipeline.buffer<float2>(uv_buffer).read(triangle.i0);
-        uv1 = _pipeline.buffer<float2>(uv_buffer).read(triangle.i1);
-        uv2 = _pipeline.buffer<float2>(uv_buffer).read(triangle.i2);
-    };
+    auto uv0 = ite(instance.has_vertex_uv(), v0->uv(), make_float2(0.f));
+    auto uv1 = ite(instance.has_vertex_uv(), v1->uv(), make_float2(0.f));
+    auto uv2 = ite(instance.has_vertex_uv(), v2->uv(), make_float2(0.f));
+    auto s = _compute_tangent(p0, p1, p2, uv0, uv1, uv2);
     auto p = interpolate(bary, p0, p1, p2);
+    auto uv = interpolate(bary, uv0, uv1, uv2);
     auto c = cross(p1 - p0, p2 - p0);
     auto area = .5f * length(c);
     auto ng = normalize(c);
@@ -312,8 +298,6 @@ ShadingAttribute Geometry::shading_point(const Shape::Handle &instance, const Va
                               temp_w - min(dot(temp_w, n2), 0.f) * n2);
         ps = p + shadow_term * dp;
     };
-    auto s = _compute_tangent(p0, p1, p2, uv0, uv1, uv2);
-    auto uv = interpolate(bary, uv0, uv1, uv2);
     return {.g = {.p = p,
                   .n = ng,
                   .area = area},

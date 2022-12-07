@@ -17,12 +17,11 @@ class MeshLoader {
 
 private:
     luisa::vector<Vertex> _vertices;
-    luisa::vector<float2> _uvs;
     luisa::vector<Triangle> _triangles;
     uint _properties{};
 
 public:
-    [[nodiscard]] auto mesh() const noexcept { return MeshView{_vertices, _uvs, _triangles}; }
+    [[nodiscard]] auto mesh() const noexcept { return MeshView{_vertices, _triangles}; }
     [[nodiscard]] auto properties() const noexcept { return _properties; }
 
     // Load the mesh from a file.
@@ -103,22 +102,18 @@ public:
             auto vertex_count = mesh->mNumVertices;
             auto ai_positions = mesh->mVertices;
             auto ai_normals = mesh->mNormals;
+            auto ai_uvs = mesh->mTextureCoords[0];
             MeshLoader loader;
             loader._vertices.resize(vertex_count);
             if (ai_normals) { loader._properties |= Shape::property_flag_has_vertex_normal; }
+            if (ai_uvs) { loader._properties |= Shape::property_flag_has_vertex_uv; }
             for (auto i = 0; i < vertex_count; i++) {
                 auto p = make_float3(ai_positions[i].x, ai_positions[i].y, ai_positions[i].z);
                 auto n = ai_normals ?
                              normalize(make_float3(ai_normals[i].x, ai_normals[i].y, ai_normals[i].z)) :
                              make_float3(0.f, 0.f, 1.f);
-                loader._vertices[i] = Vertex::encode(p, n);
-            }
-            if (auto ai_tex_coords = mesh->mTextureCoords[0]) {
-                loader._uvs.resize(vertex_count);
-                loader._properties |= Shape::property_flag_has_vertex_uv;
-                for (auto i = 0; i < vertex_count; i++) {
-                    loader._uvs[i] = make_float2(ai_tex_coords[i].x, ai_tex_coords[i].y);
-                }
+                auto uv = ai_uvs ? make_float2(ai_uvs[i].x, ai_uvs[i].y) : make_float2(0.f, 0.f);
+                loader._vertices[i] = Vertex::encode(p, n, uv);
             }
             if (subdiv_level == 0u) {
                 auto ai_triangles = mesh->mFaces;

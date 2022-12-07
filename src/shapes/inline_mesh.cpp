@@ -53,18 +53,13 @@ public:
             auto n = normals.empty() ?
                          make_float3(0.f, 0.f, 1.f) :
                          make_float3(normals[i * 3u + 0u], normals[i * 3u + 1u], normals[i * 3u + 2u]);
-            _vertices[i] = Vertex::encode(p, n);
-        }
-        if (!_uvs.empty()) {
-            _uvs.resize(vertex_count);
-            for (auto i = 0u; i < vertex_count; i++) {
-                _uvs[i] = make_float2(uvs[i * 2u + 0u], uvs[i * 2u + 1u]);
-            }
+            auto uv = uvs.empty() ? make_float2(0.f) : make_float2(uvs[i * 2u + 0u], uvs[i * 2u + 1u]);
+            _vertices[i] = Vertex::encode(p, n, uv);
         }
     }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] bool is_mesh() const noexcept override { return true; }
-    [[nodiscard]] MeshView mesh() const noexcept override { return {_vertices, _uvs, _triangles}; }
+    [[nodiscard]] MeshView mesh() const noexcept override { return {_vertices, _triangles}; }
     [[nodiscard]] bool deformable() const noexcept override { return false; }
     [[nodiscard]] uint vertex_properties() const noexcept override { return _properties; }
 };

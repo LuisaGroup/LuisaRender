@@ -40,27 +40,28 @@ struct alignas(16) Vertex {
     float px;
     float py;
     float pz;
-    uint n;
+    float nx;
+    float ny;
+    float nz;
+    float u;
+    float v;
 
-    [[nodiscard]] static auto encode(float3 position, float3 normal) noexcept {
-        return Vertex{position.x, position.y, position.z, oct_encode(normal)};
+    [[nodiscard]] static auto encode(float3 p, float3 n, float2 uv) noexcept {
+        return Vertex{p.x, p.y, p.z, n.x, n.y, n.z, uv.x, uv.y};
     };
     [[nodiscard]] auto position() const noexcept { return make_float3(px, py, pz); }
-    [[nodiscard]] auto normal() const noexcept { return oct_decode(n); }
+    [[nodiscard]] auto normal() const noexcept { return make_float3(nx, ny, nz); }
+    [[nodiscard]] auto uv() const noexcept { return make_float2(u, v); }
 };
 
-static_assert(sizeof(Vertex) == 16u);
+static_assert(sizeof(Vertex) == 32u);
 
 }// namespace luisa::render
 
 // clang-format off
-LUISA_STRUCT(luisa::render::Vertex, px, py, pz, n) {
-    [[nodiscard]] static auto encode(luisa::compute::Expr<luisa::float3> position,
-                                     luisa::compute::Expr<luisa::float3> normal) noexcept {
-        return def<luisa::render::Vertex>(position.x, position.y, position.z,
-                                          luisa::render::oct_encode(normal));
-    };
+LUISA_STRUCT(luisa::render::Vertex, px, py, pz, nx, ny, nz, u, v) {
     [[nodiscard]] auto position() const noexcept { return make_float3(px, py, pz); }
-    [[nodiscard]] auto normal() const noexcept { return luisa::render::oct_decode(n); }
+    [[nodiscard]] auto normal() const noexcept { return make_float3(nx, ny, nz); }
+    [[nodiscard]] auto uv() const noexcept { return make_float2(u, v); }
 };
 // clang-format on
