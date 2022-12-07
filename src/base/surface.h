@@ -221,7 +221,7 @@ public:
             auto normal_local = 2.f * _map->evaluate(*it, swl, time).xyz() - 1.f;
             if (_strength != 1.f) { normal_local *= make_float3(_strength, _strength, 1.f); }
             auto mapped_it = luisa::make_shared<Interaction>(*it);
-            auto normal = normalize(it->shading().local_to_world(normal_local));
+            auto normal = it->shading().local_to_world(normal_local);
             mapped_it->set_shading(Frame::make(normal, it->shading().s()));
             return BaseInstance::closure(std::move(mapped_it), swl, eta_i, time);
         }

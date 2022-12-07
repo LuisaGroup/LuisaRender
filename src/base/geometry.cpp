@@ -240,7 +240,7 @@ ShadingAttribute Geometry::shading_point(const Shape::Handle &instance, const Va
     auto uv0 = ite(instance.has_vertex_uv(), v0->uv(), make_float2(0.f));
     auto uv1 = ite(instance.has_vertex_uv(), v1->uv(), make_float2(0.f));
     auto uv2 = ite(instance.has_vertex_uv(), v2->uv(), make_float2(0.f));
-    auto uv = interpolate(bary, uv0, uv1, uv2);
+    auto uv = ite(instance.has_vertex_uv(), interpolate(bary, uv0, uv1, uv2), bary.yz());
     // compute dpdu and dpdv
     auto duv0 = uv1 - uv0;
     auto duv1 = uv2 - uv0;
