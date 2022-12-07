@@ -49,6 +49,7 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
                 auto mesh = _pipeline.create<Mesh>(*vertex_buffer, *triangle_buffer, shape->build_hint());
                 command_buffer << vertex_buffer->copy_from(vertices.data())
                                << triangle_buffer->copy_from(triangles.data())
+                               << compute::commit()
                                << mesh->build()
                                << compute::commit();
                 auto vertex_buffer_id = _pipeline.register_bindless(vertex_buffer->view());
@@ -231,12 +232,14 @@ ShadingAttribute Geometry::shading_point(const Shape::Handle &instance, const Va
     auto p0 = make_float3(shape_to_world * make_float4(v0->position(), 1.f));
     auto p1 = make_float3(shape_to_world * make_float4(v1->position(), 1.f));
     auto p2 = make_float3(shape_to_world * make_float4(v2->position(), 1.f));
-    auto p = interpolate(bary, p0, p1, p2);
     auto dp0 = p1 - p0;
     auto dp1 = p2 - p0;
     auto c = cross(dp0, dp1);
     auto area = .5f * length(c);
     auto ng = normalize(c);
+    auto ns_local = interpolate(bary, v0->normal(), v1->normal(), v2->normal());
+    auto ns = ite(instance.has_vertex_normal(), normalize(shape_to_world_normal * ns_local), ng);
+    auto p = interpolate(bary, p0, p1, p2);
     auto uv0 = ite(instance.has_vertex_uv(), v0->uv(), make_float2(0.f));
     auto uv1 = ite(instance.has_vertex_uv(), v1->uv(), make_float2(0.f));
     auto uv2 = ite(instance.has_vertex_uv(), v2->uv(), make_float2(0.f));
@@ -249,24 +252,10 @@ ShadingAttribute Geometry::shading_point(const Shape::Handle &instance, const Va
     auto fallback_frame = Frame::make(ng);
     auto dpdu = ite(det < 1e-9f, fallback_frame.s(), (dp0 * duv1.y - dp1 * duv0.y) * inv_det);
     auto dpdv = ite(det < 1e-9f, fallback_frame.t(), (dp1 * duv0.x - dp0 * duv1.x) * inv_det);
-    auto n0 = ite(instance.has_vertex_normal(), normalize(shape_to_world_normal * v0->normal()), ng);
-    auto n1 = ite(instance.has_vertex_normal(), normalize(shape_to_world_normal * v1->normal()), ng);
-    auto n2 = ite(instance.has_vertex_normal(), normalize(shape_to_world_normal * v2->normal()), ng);
-    auto ns = normalize(interpolate(bary, n0, n1, n2));
-    // offset p to fake surface for the shadow terminator
-    // reference: Ray Tracing Gems 2, Chap. 4
-    auto temp_u = p - p0;
-    auto temp_v = p - p1;
-    auto temp_w = p - p2;
-    auto dp = interpolate(bary,
-                          temp_u - min(dot(temp_u, n0), 0.f) * n0,
-                          temp_v - min(dot(temp_v, n1), 0.f) * n1,
-                          temp_w - min(dot(temp_w, n2), 0.f) * n2);
-    auto ps = p + instance.shadow_terminator_factor() * dp;
     return {.g = {.p = p,
                   .n = ng,
                   .area = area},
-            .ps = ps,
+            .ps = p,
             .ns = ns,
             .tangent = dpdu,
             .uv = uv};

@@ -22,12 +22,12 @@ Frame Frame::make(Expr<float3> n) noexcept {
     auto b = n.x * n.y * a;
     auto s = make_float3(1.f + sgn * sqr(n.x) * a, sgn * b, -sgn * n.x);
     auto t = make_float3(b, sgn + sqr(n.y) * a, -n.y);
-    return {s, t, n};
+    return {normalize(s), normalize(t), n};
 }
 
 Frame Frame::make(Expr<float3> n, Expr<float3> s) noexcept {
     auto ss = normalize(s - n * dot(n, s));
-    auto tt = cross(n, ss);
+    auto tt = normalize(cross(n, ss));
     return {ss, tt, n};
 }
 
@@ -41,7 +41,7 @@ Float3 Frame::world_to_local(Expr<float3> d) const noexcept {
 
 void Frame::flip() noexcept {
     _n = -_n;
-    _s = -_s;
+    _t = -_t;
 }
 
 }// namespace luisa::render
