@@ -36,8 +36,10 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
             -Wno-unused-but-set-variable
             -Wno-sign-conversion
             -Wno-nonportable-system-include-path
-            -Wno-old-style-cast
-            -Wno-unsafe-buffer-usage)
+            -Wno-old-style-cast)
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 16.0)
+        target_compile_options(tinyexr PRIVATE -Wno-unsafe-buffer-usage)
+    endif ()
 endif ()
 target_include_directories(tinyexr PUBLIC tinyexr)
 set_target_properties(tinyexr PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
