@@ -33,13 +33,12 @@ set(TINYEXR_USE_MINIZ ON CACHE BOOL "" FORCE)
 add_subdirectory(tinyexr)
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(tinyexr PRIVATE
+            -Wno-unknown-warning-option
             -Wno-unused-but-set-variable
             -Wno-sign-conversion
             -Wno-nonportable-system-include-path
-            -Wno-old-style-cast)
-    if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 16.0)
-        target_compile_options(tinyexr PRIVATE -Wno-unsafe-buffer-usage)
-    endif ()
+            -Wno-old-style-cast
+            -Wno-unsafe-buffer-usage)
 endif ()
 target_include_directories(tinyexr PUBLIC tinyexr)
 set_target_properties(tinyexr PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
