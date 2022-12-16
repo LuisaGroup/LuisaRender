@@ -56,7 +56,7 @@ public:
           _roughness{scene->load_texture(desc->property_node_or_default("roughness"))},
           _kd{scene->load_texture(desc->property_node_or_default("Kd"))},
           _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {
-        auto register_eta_k = [&](luisa::string_view name, luisa::span<float2> eta_k) noexcept {
+        auto register_eta_k = [&](const luisa::string &name, luisa::span<float2> eta_k) noexcept {
             std::scoped_lock lock{_mutex()};
             auto [iter, success] = _known_ior().try_emplace(name, ComplexIOR{});
             if (success) {

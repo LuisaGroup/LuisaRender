@@ -295,7 +295,7 @@ SceneNodeDesc::_property_raw_values(luisa::string_view name) const noexcept {
             _identifier, source_location().string());
         return luisa::nullopt;
     }
-    return luisa::span{*ptr};
+    return luisa::span{std::as_const(*ptr)};
 }
 
 template<typename T>

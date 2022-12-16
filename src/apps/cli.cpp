@@ -19,7 +19,7 @@
     cli.add_option("", "d", "device", "Compute device index", cxxopts::value<uint32_t>()->default_value("0"), "<index>");
     cli.add_option("", "", "scene", "Path to scene description file", cxxopts::value<std::filesystem::path>(), "<file>");
     cli.add_option("", "D", "define", "Parameter definitions to override scene description macros.",
-                   cxxopts::value<std::vector<std::string>>()->default_value("<none>"), "<key>=<value>");
+                   cxxopts::value<std::vector<luisa::string>>()->default_value("<none>"), "<key>=<value>");
     cli.add_option("", "h", "help", "Display this help message", cxxopts::value<bool>()->default_value("false"), "");
     cli.allow_unrecognised_options();
     cli.positional_help("<file>");
@@ -68,9 +68,9 @@ int main(int argc, char *argv[]) {
     auto backend = options["backend"].as<luisa::string>();
     auto index = options["device"].as<uint32_t>();
     auto path = options["scene"].as<std::filesystem::path>();
-    auto definitions = options["define"].as<std::vector<std::string>>();
+    auto definitions = options["define"].as<std::vector<luisa::string>>();
     SceneParser::MacroMap macros;
-    for (luisa::string_view d : definitions) {
+    for (std::string_view d : definitions) {
         if (d == "<none>") { continue; }
         auto p = d.find('=');
         if (p == luisa::string::npos) [[unlikely]] {
@@ -87,7 +87,7 @@ int main(int argc, char *argv[]) {
                 "Ignoring the previous one: {} = '{}'.",
                 key, value, key, iter->second);
         }
-        macros[key] = value;
+        macros.insert_or_assign(luisa::string{key}, value);
     }
 
     //    auto ies_profile = IESProfile::parse("/Users/mike/Downloads/002bb0e37aa7e5f1d7851fb1db032628.ies");
