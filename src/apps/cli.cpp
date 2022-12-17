@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
     auto path = options["scene"].as<std::filesystem::path>();
     auto definitions = options["define"].as<std::vector<luisa::string>>();
     SceneParser::MacroMap macros;
-    for (std::string_view d : definitions) {
+    for (auto &&d : definitions) {
         if (d == "<none>") { continue; }
         auto p = d.find('=');
         if (p == luisa::string::npos) [[unlikely]] {
@@ -87,7 +87,7 @@ int main(int argc, char *argv[]) {
                 "Ignoring the previous one: {} = '{}'.",
                 key, value, key, iter->second);
         }
-        macros.insert_or_assign(luisa::string{key}, value);
+        macros.insert_or_assign(key, value);
     }
 
     //    auto ies_profile = IESProfile::parse("/Users/mike/Downloads/002bb0e37aa7e5f1d7851fb1db032628.ies");
