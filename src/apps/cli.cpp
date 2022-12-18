@@ -11,8 +11,6 @@
 #include <base/scene.h>
 #include <base/pipeline.h>
 
-#include <util/ies.h>
-
 [[nodiscard]] auto parse_cli_options(int argc, const char *const *argv) noexcept {
     cxxopts::Options cli{"luisa-render-cli"};
     cli.add_option("", "b", "backend", "Compute backend name", cxxopts::value<luisa::string>(), "<backend>");
@@ -70,7 +68,7 @@ int main(int argc, char *argv[]) {
     auto path = options["scene"].as<std::filesystem::path>();
     auto definitions = options["define"].as<std::vector<luisa::string>>();
     SceneParser::MacroMap macros;
-    for (auto &&d : definitions) {
+    for (luisa::string_view d : definitions) {
         if (d == "<none>") { continue; }
         auto p = d.find('=');
         if (p == luisa::string::npos) [[unlikely]] {
@@ -86,31 +84,11 @@ int main(int argc, char *argv[]) {
                 "Duplicate definition: {} = '{}'. "
                 "Ignoring the previous one: {} = '{}'.",
                 key, value, key, iter->second);
+            iter->second = value;
+        } else {
+            macros.emplace(key, value);
         }
-        macros.insert_or_assign(key, value);
     }
-
-    //    auto ies_profile = IESProfile::parse("/Users/mike/Downloads/002bb0e37aa7e5f1d7851fb1db032628.ies");
-    //    LUISA_INFO(
-    //        "Loaded IES profile with "
-    //        "{} vertical angle(s) and "
-    //        "{} horizontal angle(s):",
-    //        ies_profile.vertical_angles().size(),
-    //        ies_profile.horizontal_angles().size());
-    //    std::cout << "Vertical Angles:";
-    //    for (auto v : ies_profile.vertical_angles()) {
-    //        std::cout << " " << v;
-    //    }
-    //    std::cout << "\n";
-    //    auto candela_offset = 0u;
-    //    for (auto h : ies_profile.horizontal_angles()) {
-    //        std::cout << "@" << h << ":";
-    //        for (auto i = 0u; i < ies_profile.vertical_angles().size(); i++) {
-    //            std::cout << " " << ies_profile.candela_values()[candela_offset + i];
-    //        }
-    //        std::cout << "\n";
-    //        candela_offset += ies_profile.vertical_angles().size();
-    //    }
 
     auto device = context.create_device(
         backend, luisa::format(R"({{"index": {}}})", index));
