@@ -25,22 +25,9 @@ if (NOT assimp_FOUND)
 endif ()
 target_link_libraries(luisa-render-ext INTERFACE assimp::assimp)
 
-set(TINYEXR_BUILD_SAMPLE OFF CACHE BOOL "" FORCE)
-set(TINYEXR_USE_MINIZ ON CACHE BOOL "" FORCE)
-add_subdirectory(tinyexr)
-if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    target_compile_options(tinyexr PRIVATE
-            -Wno-unknown-warning-option
-            -Wno-unused-but-set-variable
-            -Wno-sign-conversion
-            -Wno-nonportable-system-include-path
-            -Wno-old-style-cast
-            -Wno-unsafe-buffer-usage)
-endif ()
-target_include_directories(tinyexr PUBLIC tinyexr)
+# tinyexr & miniz
+add_library(tinyexr SHARED tinyexr/tinyexr.cc tinyexr/deps/miniz/miniz.c)
+target_include_directories(tinyexr PUBLIC tinyexr tinyexr/deps/miniz)
+target_link_libraries(tinyexr PUBLIC ${CMAKE_DL_LIBS})
 set_target_properties(tinyexr PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
-if (UNIX AND NOT APPLE)
-    target_compile_options(tinyexr PRIVATE -fPIC)
-    target_compile_options(miniz PRIVATE -fPIC)
-endif ()
 target_link_libraries(luisa-render-ext INTERFACE tinyexr)
