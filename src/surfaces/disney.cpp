@@ -30,6 +30,7 @@ private:
     const Texture *_flatness{};
     const Texture *_diffuse_trans{};
     bool _thin;
+    bool _remap_roughness;
 
 public:
     DisneySurface(Scene *scene, const SceneNodeDesc *desc) noexcept
@@ -38,11 +39,10 @@ public:
               "color", lazy_construct([desc] {
                   return desc->property_node_or_default("Kd");
               })))},
-          _thin{desc->property_bool_or_default("thin", false)} {
-        LUISA_RENDER_CHECK_ALBEDO_TEXTURE(DisneySurface, color);
-#define LUISA_RENDER_DISNEY_PARAM_LOAD(name)                              \
-    _##name = scene->load_texture(desc->property_node_or_default(#name)); \
-    LUISA_RENDER_CHECK_GENERIC_TEXTURE(DisneySurface, name, 1);
+          _thin{desc->property_bool_or_default("thin", false)},
+          _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {
+#define LUISA_RENDER_DISNEY_PARAM_LOAD(name) \
+    _##name = scene->load_texture(desc->property_node_or_default(#name));
         LUISA_RENDER_DISNEY_PARAM_LOAD(metallic)
         LUISA_RENDER_DISNEY_PARAM_LOAD(eta)
         LUISA_RENDER_DISNEY_PARAM_LOAD(roughness)
@@ -74,6 +74,7 @@ public:
         }
         return properties;
     }
+    [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
 
 protected:
     [[nodiscard]] luisa::unique_ptr<Instance> _build(
@@ -130,7 +131,7 @@ public:
 
 public:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
-        const Interaction &it, const SampledWavelengths &swl,
+        luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
         Expr<float> eta, Expr<float> time) const noexcept override;
 };
 
@@ -187,11 +188,6 @@ namespace {
 
 class DisneyDiffuse final : public BxDF {
 
-public:
-    struct Gradient {
-        SampledSpectrum dR;
-    };
-
 private:
     SampledSpectrum R;
 
@@ -208,22 +204,11 @@ public:
         };
         return R * impl(wo, wi);
     }
-    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
-        auto Fo = SchlickWeight(abs_cos_theta(wo));
-        auto Fi = SchlickWeight(abs_cos_theta(wi));
-        return {.dR = df * inv_pi * (1.f - Fo * .5f) * (1.f - Fi * .5f)};
-    }
 };
 
 // "Fake" subsurface scattering lobe, based on the Hanrahan-Krueger BRDF
 // approximation of the BSSRDF.
 class DisneyFakeSS final : public BxDF {
-
-public:
-    struct Gradient {
-        SampledSpectrum dR;
-        Float dRoughness;
-    };
 
 private:
     SampledSpectrum R;
@@ -250,19 +235,9 @@ public:
         };
         return R * impl(wo, wi, roughness);
     }
-    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
-        // TODO
-        LUISA_ERROR_WITH_LOCATION("Not implemented.");
-    }
 };
 
 class DisneyRetro final : public BxDF {
-
-public:
-    struct Gradient {
-        SampledSpectrum dR;
-        Float dRoughness;
-    };
 
 private:
     SampledSpectrum R;
@@ -286,18 +261,9 @@ public:
         };
         return R * impl(wo, wi, roughness);
     }
-    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
-        // TODO
-        LUISA_ERROR_WITH_LOCATION("Not implemented.");
-    }
 };
 
 class DisneySheen final : public BxDF {
-
-public:
-    struct Gradient {
-        SampledSpectrum dR;
-    };
 
 private:
     SampledSpectrum R;
@@ -315,10 +281,6 @@ public:
         };
         return R * impl(wo, wi);
     }
-    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
-        // TODO
-        LUISA_ERROR_WITH_LOCATION("Not implemented.");
-    }
 };
 
 [[nodiscard]] inline Float GTR1(Float cosTheta, Float alpha) noexcept {
@@ -335,12 +297,6 @@ public:
 }
 
 class DisneyClearcoat final {
-
-public:
-    struct Gradient {
-        Float dWeight;
-        Float dGloss;
-    };
 
 private:
     Float weight;
@@ -396,10 +352,6 @@ public:
         };
         return impl(wo, wi, gloss);
     }
-    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
-        // TODO
-        LUISA_ERROR_WITH_LOCATION("Not implemented.");
-    }
 };
 
 // Specialized Fresnel function used for the specular component, based on
@@ -410,11 +362,13 @@ private:
     SampledSpectrum R0;
     Float metallic;
     Float e;
+    bool two_sided;
 
 public:
-    DisneyFresnel(const SampledSpectrum &R0, Float metallic, Float eta) noexcept
-        : R0{R0}, metallic{std::move(metallic)}, e{std::move(eta)} {}
-    [[nodiscard]] SampledSpectrum evaluate(Expr<float> cosI) const noexcept override {
+    DisneyFresnel(const SampledSpectrum &R0, Float metallic, Float eta, bool two_sided) noexcept
+        : R0{R0}, metallic{std::move(metallic)}, e{std::move(eta)}, two_sided{two_sided} {}
+    [[nodiscard]] SampledSpectrum evaluate(Expr<float> cosI_in) const noexcept override {
+        auto cosI = two_sided ? abs(cosI_in) : def(cosI_in);
         auto fr = fresnel_dielectric(cosI, 1.f, e);
         auto f0 = R0.map([cosI](auto x) noexcept { return FrSchlick(x, cosI); });
         return lerp(fr, f0, metallic);
@@ -425,18 +379,28 @@ public:
 struct DisneyMicrofacetDistribution final : public TrowbridgeReitzDistribution {
     explicit DisneyMicrofacetDistribution(Expr<float2> alpha) noexcept
         : TrowbridgeReitzDistribution{alpha} {}
-    [[nodiscard]] Float G(Expr<float3> wo, Expr<float3> wi) const noexcept override {
-        return G1(wo) * G1(wi);
-    }
-    [[nodiscard]] Gradient grad_G(Expr<float3> wo, Expr<float3> wi) const noexcept override {
-        auto d_alpha = grad_G1(wo).dAlpha * G1(wi) + G1(wo) * grad_G1(wi).dAlpha;
-        return {.dAlpha = d_alpha};
-    }
 };
 
 }// namespace
 
-class DisneySurfaceClosure : public Surface::Closure {
+// pImpl idiom.
+class DisneyClosureImplBase {
+
+public:
+    virtual ~DisneyClosureImplBase() noexcept = default;
+    [[nodiscard]] virtual SampledSpectrum albedo() const noexcept = 0;
+    [[nodiscard]] virtual Float2 roughness() const noexcept = 0;
+    [[nodiscard]] virtual luisa::optional<Float> eta() const noexcept = 0;
+    // Note: evaluation and sample should rely on the back pointer to the closure
+    [[nodiscard]] virtual Surface::Evaluation evaluate(
+        const Surface::Closure *cls, Expr<float3> wo,
+        Expr<float3> wi, TransportMode mode) const noexcept = 0;
+    [[nodiscard]] virtual Surface::Sample sample(
+        const Surface::Closure *cls, Expr<float3> wo,
+        Expr<float> u_lobe, Expr<float2> u, TransportMode mode) const noexcept = 0;
+};
+
+class DisneySurfaceClosureImpl final : public DisneyClosureImplBase {
 
 public:
     static constexpr auto max_sampling_techique_count = 4u;
@@ -465,26 +429,27 @@ public:
     [[nodiscard]] Float2 roughness() const noexcept override {
         return DisneyMicrofacetDistribution::alpha_to_roughness(_distrib->alpha());
     }
-
-    DisneySurfaceClosure(
-        const DisneySurfaceInstance *instance, const Interaction &it,
-        const SampledWavelengths &swl, Expr<float> time, Expr<float> eta_i,
-        const Texture::Instance *color_tex, const Texture::Instance *metallic_tex,
-        const Texture::Instance *eta_tex, const Texture::Instance *roughness_tex,
-        const Texture::Instance *spec_tint_tex, const Texture::Instance *aniso_tex,
-        const Texture::Instance *sheen_tex, const Texture::Instance *sheen_tint_tex,
-        const Texture::Instance *clearcoat_tex, const Texture::Instance *clearcoat_gloss_tex,
-        const Texture::Instance *spec_trans_tex, const Texture::Instance *flatness_tex) noexcept
-        : Surface::Closure{instance, it, swl, time}, _color{swl.dimension(), 0.f} {
-
-        auto color_decode = color_tex ? color_tex->evaluate_albedo_spectrum(it, swl, time) : Spectrum::Decode::one(swl.dimension());
+    DisneySurfaceClosureImpl(const Surface::Closure *cls, Expr<float> eta_i,
+                             const Texture::Instance *color_tex, const Texture::Instance *metallic_tex,
+                             const Texture::Instance *eta_tex, const Texture::Instance *roughness_tex,
+                             const Texture::Instance *spec_tint_tex, const Texture::Instance *aniso_tex,
+                             const Texture::Instance *sheen_tex, const Texture::Instance *sheen_tint_tex,
+                             const Texture::Instance *clearcoat_tex, const Texture::Instance *clearcoat_gloss_tex,
+                             const Texture::Instance *spec_trans_tex, const Texture::Instance *flatness_tex) noexcept
+        : _color{cls->swl().dimension()} {
+        auto color_decode = color_tex ?
+                                color_tex->evaluate_albedo_spectrum(*cls->it(), cls->swl(), cls->time()) :
+                                Spectrum::Decode::one(cls->swl().dimension());
         _color = color_decode.value;
         auto color_lum = color_decode.strength;
-        auto metallic = metallic_tex ? metallic_tex->evaluate(it, swl, time).x : 0.f;
-        auto specular_trans = spec_trans_tex ? spec_trans_tex->evaluate(it, swl, time).x : 0.f;
+        auto metallic = metallic_tex ? metallic_tex->evaluate(*cls->it(), cls->swl(), cls->time()).x : 0.f;
+        auto specular_trans = spec_trans_tex ? spec_trans_tex->evaluate(*cls->it(), cls->swl(), cls->time()).x : 0.f;
         auto diffuse_weight = (1.f - metallic) * (1.f - specular_trans);
-        auto flatness = flatness_tex ? flatness_tex->evaluate(it, swl, time).x : 0.f;
-        auto roughness = roughness_tex ? roughness_tex->evaluate(it, swl, time).x : 0.f;
+        auto flatness = flatness_tex ? flatness_tex->evaluate(*cls->it(), cls->swl(), cls->time()).x : 0.f;
+        auto roughness = roughness_tex ? roughness_tex->evaluate(*cls->it(), cls->swl(), cls->time()).x : 0.f;
+        if (cls->instance()->node<DisneySurface>()->remap_roughness()) {
+            roughness = DisneyMicrofacetDistribution::roughness_to_alpha(roughness);
+        }
         auto tint_weight = ite(color_lum > 0.f, 1.f / color_lum, 1.f);
         auto tint = saturate(_color * tint_weight);// normalize lum. to isolate hue+sat
         auto tint_lum = color_lum * tint_weight;
@@ -506,8 +471,8 @@ public:
             auto sampling_weight = diffuse_weight * color_lum;
             // sheen
             if (sheen_tex && !sheen_tex->node()->is_black()) {
-                auto sheen = sheen_tex->evaluate(it, swl, time).x;
-                auto sheen_tint = sheen_tint_tex ? sheen_tint_tex->evaluate(it, swl, time).x : 0.f;
+                auto sheen = sheen_tex->evaluate(*cls->it(), cls->swl(), cls->time()).x;
+                auto sheen_tint = sheen_tint_tex ? sheen_tint_tex->evaluate(*cls->it(), cls->swl(), cls->time()).x : 0.f;
                 auto Csheen_weight = diffuse_weight * sheen;
                 auto Csheen = Csheen_weight * lerp(1.f, tint, sheen_tint);
                 _sheen = luisa::make_unique<DisneySheen>(Csheen);
@@ -519,22 +484,23 @@ public:
         }
 
         // specular lobes: clearcoat, microfacet reflection, and optionally microfacet transmission
-        auto spec_tint = spec_tint_tex ? spec_tint_tex->evaluate(it, swl, time).x : 0.f;
-        _eta_t = eta_tex ? eta_tex->evaluate(it, swl, time).x : 1.5f;
+        auto spec_tint = spec_tint_tex ? spec_tint_tex->evaluate(*cls->it(), cls->swl(), cls->time()).x : 0.f;
+        _eta_t = eta_tex ? eta_tex->evaluate(*cls->it(), cls->swl(), cls->time()).x : 1.5f;
         auto eta = _eta_t / eta_i;
         // specular is Trowbridge-Reitz with a modified Fresnel function
         auto SchlickR0 = SchlickR0FromEta(eta);
         auto Cspec0 = lerp(lerp(1.f, tint, spec_tint) * SchlickR0, _color, metallic);
-        _fresnel = luisa::make_unique<DisneyFresnel>(Cspec0, metallic, eta);
+        _fresnel = luisa::make_unique<DisneyFresnel>(
+            Cspec0, metallic, eta, !cls->instance()->node()->is_transmissive());
 
         // create the microfacet distribution for metallic and/or specular transmittance
-        auto aniso = aniso_tex ? aniso_tex->evaluate(it, swl, time).x : 0.f;
+        auto aniso = aniso_tex ? aniso_tex->evaluate(*cls->it(), cls->swl(), cls->time()).x : 0.f;
         auto aspect = sqrt(1.f - aniso * .9f);
-        auto alpha = make_float2(max(0.001f, sqr(roughness) / aspect),
-                                 max(0.001f, sqr(roughness) * aspect));
+        auto alpha = make_float2(max(0.001f, roughness / aspect),
+                                 max(0.001f, roughness * aspect));
         _distrib = luisa::make_unique<DisneyMicrofacetDistribution>(alpha);
         _specular = luisa::make_unique<MicrofacetReflection>(
-            SampledSpectrum{swl.dimension(), 1.f}, _distrib.get(), _fresnel.get());
+            SampledSpectrum{cls->swl().dimension(), 1.f}, _distrib.get(), _fresnel.get());
         // specular reflection sampling weight
         auto Cspec0_lum = lerp(lerp(1.f, tint_lum, spec_tint) * SchlickR0, color_lum, metallic);
         _specular_technique_index = _sampling_technique_count++;
@@ -542,8 +508,8 @@ public:
 
         // clearcoat
         if (clearcoat_tex && !clearcoat_tex->node()->is_black()) {
-            auto cc = clearcoat_tex->evaluate(it, swl, time).x;
-            auto gloss = lerp(.1f, .001f, clearcoat_gloss_tex ? clearcoat_gloss_tex->evaluate(it, swl, time).x : 0.f);
+            auto cc = clearcoat_tex->evaluate(*cls->it(), cls->swl(), cls->time()).x;
+            auto gloss = lerp(.1f, .001f, clearcoat_gloss_tex ? clearcoat_gloss_tex->evaluate(*cls->it(), cls->swl(), cls->time()).x : 1.f);
             _clearcoat = luisa::make_unique<DisneyClearcoat>(cc, gloss);
             // clearcoat sampling weight
             _clearcoat_technique_index = _sampling_technique_count++;
@@ -570,38 +536,37 @@ public:
         auto inv_sum_weights = ite(sum_weights == 0.f, 0.f, 1.f / sum_weights);
         for (auto &s : _sampling_weights) { s *= inv_sum_weights; }
     }
-    [[nodiscard]] luisa::optional<Float> _eta() const noexcept override {
+    [[nodiscard]] luisa::optional<Float> eta() const noexcept override {
         if (_spec_trans == nullptr) { return luisa::nullopt; }
         return _eta_t;
     }
 
 private:
-    [[nodiscard]] Surface::Evaluation _evaluate_local(Float3 wo_local,
-                                                      Float3 wi_local,
+    [[nodiscard]] Surface::Evaluation _evaluate_local(const Surface::Closure *cls,
+                                                      Expr<float3> wo, Expr<float3> wi,
+                                                      Expr<float3> wo_local, Expr<float3> wi_local,
                                                       TransportMode mode) const noexcept {
-        SampledSpectrum f{_swl.dimension(), 0.f};
+        SampledSpectrum f{cls->swl().dimension(), 0.f};
         auto pdf = def(0.f);
         $if(same_hemisphere(wo_local, wi_local)) {// reflection
-            $if(_it.shape()->shadow_terminator_factor() > 0.f) {
-                if (_diffuse) {
-                    f += _diffuse->evaluate(wo_local, wi_local, mode);
-                    f += _retro->evaluate(wo_local, wi_local, mode);
-                    if (_fake_ss) { f += _fake_ss->evaluate(wo_local, wi_local, mode); }
-                    if (_sheen) { f += _sheen->evaluate(wo_local, wi_local, mode); }
-                    pdf += _sampling_weights[_diffuse_like_technique_index] *
-                           _diffuse->pdf(wo_local, wi_local, mode);
-                }
-                if (_specular) {
-                    f += _specular->evaluate(wo_local, wi_local, mode);
-                    pdf += _sampling_weights[_specular_technique_index] *
-                           _specular->pdf(wo_local, wi_local, mode);
-                }
-                if (_clearcoat) {
-                    f += _clearcoat->evaluate(wo_local, wi_local);
-                    pdf += _sampling_weights[_clearcoat_technique_index] *
-                           _clearcoat->pdf(wo_local, wi_local);
-                }
-            };
+            if (_diffuse) {
+                f += _diffuse->evaluate(wo_local, wi_local, mode);
+                f += _retro->evaluate(wo_local, wi_local, mode);
+                if (_fake_ss) { f += _fake_ss->evaluate(wo_local, wi_local, mode); }
+                if (_sheen) { f += _sheen->evaluate(wo_local, wi_local, mode); }
+                pdf += _sampling_weights[_diffuse_like_technique_index] *
+                       _diffuse->pdf(wo_local, wi_local, mode);
+            }
+            if (_specular) {
+                f += _specular->evaluate(wo_local, wi_local, mode);
+                pdf += _sampling_weights[_specular_technique_index] *
+                       _specular->pdf(wo_local, wi_local, mode);
+            }
+            if (_clearcoat) {
+                f += _clearcoat->evaluate(wo_local, wi_local);
+                pdf += _sampling_weights[_clearcoat_technique_index] *
+                       _clearcoat->pdf(wo_local, wi_local);
+            }
         }
         $else {// transmission
             if (_spec_trans) {
@@ -612,14 +577,16 @@ private:
         };
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
-    [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
-                                                TransportMode mode) const noexcept override {
-        auto wo_local = _it.shading().world_to_local(wo);
-        auto wi_local = _it.shading().world_to_local(wi);
-        return _evaluate_local(wo_local, wi_local, mode);
+    [[nodiscard]] Surface::Evaluation evaluate(const Surface::Closure *cls,
+                                               Expr<float3> wo, Expr<float3> wi,
+                                               TransportMode mode) const noexcept override {
+        auto wo_local = cls->it()->shading().world_to_local(wo);
+        auto wi_local = cls->it()->shading().world_to_local(wi);
+        return _evaluate_local(cls, wo, wi, wo_local, wi_local, mode);
     }
-    [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float> u_lobe,
-                                          Expr<float2> u, TransportMode mode) const noexcept override {
+    [[nodiscard]] Surface::Sample sample(const Surface::Closure *cls,
+                                         Expr<float3> wo, Expr<float> u_lobe,
+                                         Expr<float2> u, TransportMode mode) const noexcept override {
         auto sampling_tech = def(0u);
         auto sum_weights = def(0.f);
         for (auto i = 0u; i < _sampling_technique_count; i++) {
@@ -627,7 +594,7 @@ private:
             sum_weights += _sampling_weights[i];
         }
         // sample
-        auto wo_local = _it.shading().world_to_local(wo);
+        auto wo_local = cls->it()->shading().world_to_local(wo);
         auto event = def(Surface::event_reflect);
         BxDF::SampledDirection wi_sample;
         $switch(sampling_tech) {
@@ -655,21 +622,15 @@ private:
             $default { unreachable(); };
         };
         auto eval = Surface::Evaluation::zero(_color.dimension());
-        auto wi = _it.shading().local_to_world(wi_sample.wi);
+        auto wi = cls->it()->shading().local_to_world(wi_sample.wi);
         $if(wi_sample.valid) {
-            eval = _evaluate_local(wo_local, wi_sample.wi, mode);
+            eval = _evaluate_local(cls, wo, wi, wo_local, wi_sample.wi, mode);
         };
         return {.eval = eval, .wi = wi, .event = event};
     }
-
-    void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df,
-                   TransportMode mode) const noexcept override {
-        // TODO
-        LUISA_WARNING_WITH_LOCATION("Not implemented.");
-    }
 };
 
-class ThinDisneySurfaceClosure : public Surface::Closure {
+class ThinDisneySurfaceClosureImpl : public DisneyClosureImplBase {
 
 public:
     static constexpr auto max_sampling_techique_count = 5u;
@@ -697,31 +658,28 @@ private:
     uint _diff_trans_technique_index{~0u};
 
 public:
-    [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _color; }
-    [[nodiscard]] Float2 roughness() const noexcept override {
-        return DisneyMicrofacetDistribution::alpha_to_roughness(_distrib->alpha());
-    }
-
-    ThinDisneySurfaceClosure(
-        const DisneySurfaceInstance *instance, const Interaction &it,
-        const SampledWavelengths &swl, Expr<float> time, Expr<float> eta_i,
-        const Texture::Instance *color_tex, const Texture::Instance *metallic_tex,
-        const Texture::Instance *eta_tex, const Texture::Instance *roughness_tex,
-        const Texture::Instance *spec_tint_tex, const Texture::Instance *aniso_tex,
-        const Texture::Instance *sheen_tex, const Texture::Instance *sheen_tint_tex,
-        const Texture::Instance *clearcoat_tex, const Texture::Instance *clearcoat_gloss_tex,
-        const Texture::Instance *spec_trans_tex, const Texture::Instance *flatness_tex,
-        const Texture::Instance *diff_trans_tex) noexcept
-        : Surface::Closure{instance, it, swl, time}, _color{swl.dimension(), 0.f} {
-
-        auto color_decode = color_tex ? color_tex->evaluate_albedo_spectrum(it, swl, time) : Spectrum::Decode::one(swl.dimension());
+    ThinDisneySurfaceClosureImpl(const Surface::Closure *cls, Expr<float> eta_i,
+                                 const Texture::Instance *color_tex, const Texture::Instance *metallic_tex,
+                                 const Texture::Instance *eta_tex, const Texture::Instance *roughness_tex,
+                                 const Texture::Instance *spec_tint_tex, const Texture::Instance *aniso_tex,
+                                 const Texture::Instance *sheen_tex, const Texture::Instance *sheen_tint_tex,
+                                 const Texture::Instance *clearcoat_tex, const Texture::Instance *clearcoat_gloss_tex,
+                                 const Texture::Instance *spec_trans_tex, const Texture::Instance *flatness_tex,
+                                 const Texture::Instance *diff_trans_tex) noexcept
+        : _color{cls->swl().dimension()} {
+        auto color_decode = color_tex ?
+                                color_tex->evaluate_albedo_spectrum(*cls->it(), cls->swl(), cls->time()) :
+                                Spectrum::Decode::one(cls->swl().dimension());
         _color = color_decode.value;
         auto color_lum = color_decode.strength;
-        auto metallic = metallic_tex ? metallic_tex->evaluate(it, swl, time).x : 0.f;
-        auto specular_trans = spec_trans_tex ? spec_trans_tex->evaluate(it, swl, time).x : 0.f;
-        auto flatness = flatness_tex ? flatness_tex->evaluate(it, swl, time).x : 0.f;
-        auto roughness = roughness_tex ? roughness_tex->evaluate(it, swl, time).x : .5f;
-        auto diffuse_trans = diff_trans_tex ? diff_trans_tex->evaluate(it, swl, time).x * .5f : 0.f;
+        auto metallic = metallic_tex ? metallic_tex->evaluate(*cls->it(), cls->swl(), cls->time()).x : 0.f;
+        auto specular_trans = spec_trans_tex ? spec_trans_tex->evaluate(*cls->it(), cls->swl(), cls->time()).x : 0.f;
+        auto flatness = flatness_tex ? flatness_tex->evaluate(*cls->it(), cls->swl(), cls->time()).x : 0.f;
+        auto roughness = roughness_tex ? roughness_tex->evaluate(*cls->it(), cls->swl(), cls->time()).x : .5f;
+        if (cls->instance()->node<DisneySurface>()->remap_roughness()) {
+            roughness = DisneyMicrofacetDistribution::roughness_to_alpha(roughness);
+        }
+        auto diffuse_trans = diff_trans_tex ? diff_trans_tex->evaluate(*cls->it(), cls->swl(), cls->time()).x * .5f : 0.f;
         auto diffuse_weight = (1.f - metallic) * (1.f - specular_trans);
         auto diff_refl_weight = diffuse_weight * (1.f - diffuse_trans);
         auto diff_trans_weight = diffuse_weight * diffuse_trans;
@@ -746,8 +704,8 @@ public:
             auto sampling_weight = diff_refl_weight * color_lum;
             // sheen
             if (sheen_tex && !sheen_tex->node()->is_black()) {
-                auto sheen = sheen_tex->evaluate(it, swl, time).x;
-                auto sheen_tint = sheen_tint_tex ? sheen_tint_tex->evaluate(it, swl, time).x : 0.f;
+                auto sheen = sheen_tex->evaluate(*cls->it(), cls->swl(), cls->time()).x;
+                auto sheen_tint = sheen_tint_tex ? sheen_tint_tex->evaluate(*cls->it(), cls->swl(), cls->time()).x : 0.f;
                 auto Csheen_weight = diff_refl_weight * sheen * (1.f - diffuse_trans);
                 auto Csheen = Csheen_weight * lerp(1.f, tint, sheen_tint);
                 _sheen = luisa::make_unique<DisneySheen>(Csheen);
@@ -759,22 +717,23 @@ public:
         }
 
         // specular lobes: clearcoat, microfacet reflection, and optionally microfacet transmission
-        auto spec_tint = spec_tint_tex ? spec_tint_tex->evaluate(it, swl, time).x : 0.f;
-        _eta_t = eta_tex ? eta_tex->evaluate(it, swl, time).x : 1.5f;
+        auto spec_tint = spec_tint_tex ? spec_tint_tex->evaluate(*cls->it(), cls->swl(), cls->time()).x : 0.f;
+        _eta_t = eta_tex ? eta_tex->evaluate(*cls->it(), cls->swl(), cls->time()).x : 1.5f;
         auto eta = _eta_t / eta_i;
         // specular is Trowbridge-Reitz with a modified Fresnel function
         auto SchlickR0 = SchlickR0FromEta(eta);
         auto Cspec0 = lerp(lerp(1.f, tint, spec_tint) * SchlickR0, _color, metallic);
-        _fresnel = luisa::make_unique<DisneyFresnel>(Cspec0, metallic, eta);
+        _fresnel = luisa::make_unique<DisneyFresnel>(
+            Cspec0, metallic, eta, !cls->instance()->node()->is_transmissive());
 
         // create the microfacet distribution for metallic and/or specular transmittance
-        auto aniso = aniso_tex ? aniso_tex->evaluate(it, swl, time).x : 0.f;
+        auto aniso = aniso_tex ? aniso_tex->evaluate(*cls->it(), cls->swl(), cls->time()).x : 0.f;
         auto aspect = sqrt(1.f - aniso * .9f);
-        auto alpha = make_float2(max(0.001f, sqr(roughness) / aspect),
-                                 max(0.001f, sqr(roughness) * aspect));
+        auto alpha = make_float2(max(0.001f, roughness / aspect),
+                                 max(0.001f, roughness * aspect));
         _distrib = luisa::make_unique<DisneyMicrofacetDistribution>(alpha);
         _specular = luisa::make_unique<MicrofacetReflection>(
-            SampledSpectrum{swl.dimension(), 1.f}, _distrib.get(), _fresnel.get());
+            SampledSpectrum{cls->swl().dimension(), 1.f}, _distrib.get(), _fresnel.get());
         // specular reflection sampling weight
         auto Cspec0_lum = lerp(lerp(1.f, tint_lum, spec_tint) * SchlickR0, color_lum, metallic);
         _specular_technique_index = _sampling_technique_count++;
@@ -782,8 +741,8 @@ public:
 
         // clearcoat
         if (clearcoat_tex && !clearcoat_tex->node()->is_black()) {
-            auto cc = clearcoat_tex->evaluate(it, swl, time).x;
-            auto gloss = lerp(.1f, .001f, clearcoat_gloss_tex ? clearcoat_gloss_tex->evaluate(it, swl, time).x : 0.f);
+            auto cc = clearcoat_tex->evaluate(*cls->it(), cls->swl(), cls->time()).x;
+            auto gloss = lerp(.1f, .001f, clearcoat_gloss_tex ? clearcoat_gloss_tex->evaluate(*cls->it(), cls->swl(), cls->time()).x : 1.f);
             _clearcoat = luisa::make_unique<DisneyClearcoat>(cc, gloss);
             // clearcoat sampling weight
             _clearcoat_technique_index = _sampling_technique_count++;
@@ -793,9 +752,9 @@ public:
         // specular transmission
         if (spec_trans_tex && !spec_trans_tex->node()->is_black()) {
             // thin specular transmission distribution
-            auto rscaled = fma(eta, .65f, -.35f) * roughness;
-            auto ascaled = make_float2(max(.001f, sqr(rscaled) / aspect),
-                                       max(.001f, sqr(rscaled) * aspect));
+            auto rscaled = (.65f * eta - .35f) * roughness;
+            auto ascaled = make_float2(max(.001f, rscaled / aspect),
+                                       max(.001f, rscaled * aspect));
             _thin_distrib = luisa::make_unique<TrowbridgeReitzDistribution>(ascaled);
             auto Cst_weight = (1.f - metallic) * specular_trans;
             auto Cst = Cst_weight * _color;
@@ -824,35 +783,34 @@ public:
         auto inv_sum_weights = ite(sum_weights == 0.f, 0.f, 1.f / sum_weights);
         for (auto &s : _sampling_weights) { s *= inv_sum_weights; }
     }
-    [[nodiscard]] luisa::optional<Float> _eta() const noexcept override { return luisa::nullopt; }
+    [[nodiscard]] luisa::optional<Float> eta() const noexcept override { return luisa::nullopt; }
 
 private:
-    [[nodiscard]] Surface::Evaluation _evaluate_local(Float3 wo_local,
-                                                      Float3 wi_local,
+    [[nodiscard]] Surface::Evaluation _evaluate_local(const Surface::Closure *cls,
+                                                      Expr<float3> wo, Expr<float3> wi,
+                                                      Expr<float3> wo_local, Expr<float3> wi_local,
                                                       TransportMode mode) const noexcept {
-        SampledSpectrum f{_swl.dimension(), 0.f};
+        SampledSpectrum f{cls->swl().dimension(), 0.f};
         auto pdf = def(0.f);
         $if(same_hemisphere(wo_local, wi_local)) {// reflection
-            $if(_it.shape()->shadow_terminator_factor() > 0.f) {
-                if (_diffuse) {
-                    f += _diffuse->evaluate(wo_local, wi_local, mode);
-                    f += _retro->evaluate(wo_local, wi_local, mode);
-                    if (_fake_ss) { f += _fake_ss->evaluate(wo_local, wi_local, mode); }
-                    if (_sheen) { f += _sheen->evaluate(wo_local, wi_local, mode); }
-                    pdf += _sampling_weights[_diffuse_like_technique_index] *
-                           _diffuse->pdf(wo_local, wi_local, mode);
-                }
-                if (_specular) {
-                    f += _specular->evaluate(wo_local, wi_local, mode);
-                    pdf += _sampling_weights[_specular_technique_index] *
-                           _specular->pdf(wo_local, wi_local, mode);
-                }
-                if (_clearcoat) {
-                    f += _clearcoat->evaluate(wo_local, wi_local);
-                    pdf += _sampling_weights[_clearcoat_technique_index] *
-                           _clearcoat->pdf(wo_local, wi_local);
-                }
-            };
+            if (_diffuse) {
+                f += _diffuse->evaluate(wo_local, wi_local, mode);
+                f += _retro->evaluate(wo_local, wi_local, mode);
+                if (_fake_ss) { f += _fake_ss->evaluate(wo_local, wi_local, mode); }
+                if (_sheen) { f += _sheen->evaluate(wo_local, wi_local, mode); }
+                pdf += _sampling_weights[_diffuse_like_technique_index] *
+                       _diffuse->pdf(wo_local, wi_local, mode);
+            }
+            if (_specular) {
+                f += _specular->evaluate(wo_local, wi_local, mode);
+                pdf += _sampling_weights[_specular_technique_index] *
+                       _specular->pdf(wo_local, wi_local, mode);
+            }
+            if (_clearcoat) {
+                f += _clearcoat->evaluate(wo_local, wi_local);
+                pdf += _sampling_weights[_clearcoat_technique_index] *
+                       _clearcoat->pdf(wo_local, wi_local);
+            }
         }
         $else {// transmission
             if (_spec_trans) {
@@ -868,14 +826,20 @@ private:
         };
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
-    [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
-                                                TransportMode mode) const noexcept override {
-        auto wo_local = _it.shading().world_to_local(wo);
-        auto wi_local = _it.shading().world_to_local(wi);
-        return _evaluate_local(wo_local, wi_local, mode);
+    [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _color; }
+    [[nodiscard]] Float2 roughness() const noexcept override {
+        return DisneyMicrofacetDistribution::alpha_to_roughness(_distrib->alpha());
     }
-    [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float> u_lobe,
-                                          Expr<float2> u, TransportMode mode) const noexcept override {
+    [[nodiscard]] Surface::Evaluation evaluate(const Surface::Closure *cls,
+                                               Expr<float3> wo, Expr<float3> wi,
+                                               TransportMode mode) const noexcept override {
+        auto wo_local = cls->it()->shading().world_to_local(wo);
+        auto wi_local = cls->it()->shading().world_to_local(wi);
+        return _evaluate_local(cls, wo, wi, wo_local, wi_local, mode);
+    }
+    [[nodiscard]] Surface::Sample sample(const Surface::Closure *cls,
+                                         Expr<float3> wo, Expr<float> u_lobe,
+                                         Expr<float2> u, TransportMode mode) const noexcept override {
         auto sampling_tech = def(0u);
         auto sum_weights = def(0.f);
         for (auto i = 0u; i < _sampling_technique_count; i++) {
@@ -883,7 +847,7 @@ private:
             sum_weights += _sampling_weights[i];
         }
         // sample
-        auto wo_local = _it.shading().world_to_local(wo);
+        auto wo_local = cls->it()->shading().world_to_local(wo);
         auto event = def(Surface::event_reflect);
         BxDF::SampledDirection wi_sample;
         $switch(sampling_tech) {
@@ -917,77 +881,74 @@ private:
             $default { unreachable(); };
         };
         auto eval = Surface::Evaluation::zero(_color.dimension());
-        auto wi = _it.shading().local_to_world(wi_sample.wi);
+        auto wi = cls->it()->shading().local_to_world(wi_sample.wi);
         $if(wi_sample.valid) {
-            eval = _evaluate_local(wo_local, wi_sample.wi, mode);
+            eval = _evaluate_local(cls, wo, wi, wo_local, wi_sample.wi, mode);
         };
         return {.eval = eval, .wi = wi, .event = event};
     }
+};
 
-    void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df,
-                   TransportMode mode) const noexcept override {
-        // TODO
-        LUISA_WARNING_WITH_LOCATION("Not implemented.");
+class DisneySurfaceClosure : public Surface::Closure {
+
+private:
+    luisa::unique_ptr<DisneyClosureImplBase> _impl;
+
+public:
+    [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _impl->albedo(); }
+    [[nodiscard]] Float2 roughness() const noexcept override { return _impl->roughness(); }
+
+private:
+    [[nodiscard]] optional<Float> _eta() const noexcept override { return _impl->eta(); }
+    [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
+                                                TransportMode mode) const noexcept override {
+        return _impl->evaluate(this, wo, wi, mode);
+    }
+    [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float> u_lobe,
+                                          Expr<float2> u, TransportMode mode) const noexcept override {
+        return _impl->sample(this, wo, u_lobe, u, mode);
+    }
+
+public:
+    DisneySurfaceClosure(const DisneySurfaceInstance *instance, luisa::shared_ptr<Interaction> it,
+                         const SampledWavelengths &swl, Expr<float> eta_i, Expr<float> time,
+                         const Texture::Instance *color_tex, const Texture::Instance *metallic_tex,
+                         const Texture::Instance *eta_tex, const Texture::Instance *roughness_tex,
+                         const Texture::Instance *spec_tint_tex, const Texture::Instance *aniso_tex,
+                         const Texture::Instance *sheen_tex, const Texture::Instance *sheen_tint_tex,
+                         const Texture::Instance *clearcoat_tex, const Texture::Instance *clearcoat_gloss_tex,
+                         const Texture::Instance *spec_trans_tex, const Texture::Instance *flatness_tex,
+                         const Texture::Instance *diff_trans_tex) noexcept
+        : Surface::Closure{instance, std::move(it), swl, time} {
+        if (instance->node()->is_thin()) {
+            _impl = luisa::make_unique<ThinDisneySurfaceClosureImpl>(
+                this, eta_i,
+                color_tex, metallic_tex, eta_tex, roughness_tex, spec_tint_tex,
+                aniso_tex, sheen_tex, sheen_tint_tex, clearcoat_tex,
+                clearcoat_gloss_tex, spec_trans_tex, flatness_tex, diff_trans_tex);
+        } else {
+            _impl = luisa::make_unique<DisneySurfaceClosureImpl>(
+                this, eta_i,
+                color_tex, metallic_tex, eta_tex, roughness_tex, spec_tint_tex,
+                aniso_tex, sheen_tex, sheen_tint_tex, clearcoat_tex,
+                clearcoat_gloss_tex, spec_trans_tex, flatness_tex);
+        }
     }
 };
 
 luisa::unique_ptr<Surface::Closure> DisneySurfaceInstance::closure(
-    const Interaction &it, const SampledWavelengths &swl,
+    luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
     Expr<float> eta_i, Expr<float> time) const noexcept {
-    if (node()->is_thin()) {
-        return luisa::make_unique<ThinDisneySurfaceClosure>(
-            this, it, swl, time, eta_i,
-            _color, _metallic, _eta, _roughness, _specular_tint,
-            _anisotropic, _sheen, _sheen_tint, _clearcoat,
-            _clearcoat_gloss, _specular_trans, _flatness, _diffuse_trans);
-    };
     return luisa::make_unique<DisneySurfaceClosure>(
-        this, it, swl, time, eta_i,
+        this, std::move(it), swl, eta_i, time,
         _color, _metallic, _eta, _roughness, _specular_tint,
         _anisotropic, _sheen, _sheen_tint, _clearcoat,
-        _clearcoat_gloss, _specular_trans, _flatness);
+        _clearcoat_gloss, _specular_trans, _flatness, _diffuse_trans);
 }
 
 using NormalMapOpacityDisneySurface = NormalMapWrapper<OpacitySurfaceWrapper<
     DisneySurface, DisneySurfaceInstance, DisneySurfaceClosure>>;
 
-using NormalMapOpacityThinDisneySurface = NormalMapWrapper<OpacitySurfaceWrapper<
-    DisneySurface, DisneySurfaceInstance, ThinDisneySurfaceClosure>>;
-
-class DisneySurfaceSelector final : public Surface {
-
-private:
-    luisa::unique_ptr<NormalMapOpacityDisneySurface> _surface;
-    luisa::unique_ptr<NormalMapOpacityThinDisneySurface> _thin_surface;
-
-public:
-    [[nodiscard]] DisneySurfaceSelector(Scene *scene, const SceneNodeDesc *desc)
-        : Surface{scene, desc} {
-        if (desc->property_bool_or_default("thin", false)) {
-            _thin_surface = luisa::make_unique<NormalMapOpacityThinDisneySurface>(scene, desc);
-        } else {
-            _surface = luisa::make_unique<NormalMapOpacityDisneySurface>(scene, desc);
-        }
-    }
-    [[nodiscard]] string_view impl_type() const noexcept override {
-        return _surface ? _surface->impl_type() : _thin_surface->impl_type();
-    }
-    [[nodiscard]] uint properties() const noexcept override {
-        return _surface ? _surface->properties() : _thin_surface->properties();
-    }
-    [[nodiscard]] bool is_null() const noexcept override {
-        return _surface ? _surface->is_null() : _thin_surface->is_null();
-    }
-
-protected:
-    [[nodiscard]] unique_ptr<Instance> _build(
-        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
-        return _surface ?
-                   _surface->build(pipeline, command_buffer) :
-                   _thin_surface->build(pipeline, command_buffer);
-    }
-};
-
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::DisneySurfaceSelector)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::NormalMapOpacityDisneySurface)

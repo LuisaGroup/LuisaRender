@@ -6,6 +6,11 @@
 
 namespace luisa::render {
 
+// The following code is from PBRT-v4.
+// License: Apache 2.0
+// pbrt is Copyright(c) 1998-2020 Matt Pharr, Wenzel Jakob, and Greg Humphreys.
+// The pbrt source code is licensed under the Apache License, Version 2.0.
+
 class HGPhaseFunction {
 public:
     struct PhaseFunctionSample {
@@ -81,9 +86,8 @@ public:
         return eval;
     }
 
-    [[nodiscard]] auto sample(
-        Expr<float3> wo, Expr<float> u_lobe,
-        Expr<float2> u, TransportMode mode) const noexcept {
+    [[nodiscard]] auto sample(Expr<float3> wo, Expr<float> u_lobe,
+                              Expr<float2> u, TransportMode mode) const noexcept {
         auto s = Surface::Sample::zero(_top.swl().dimension());
         $if(_is_top) {
             s = _top.sample(wo, u_lobe, u, mode);
@@ -96,14 +100,14 @@ public:
 
     [[nodiscard]] auto to_local(Expr<float3> w) const noexcept {
         return ite(_is_top,
-                   _top.it().shading().world_to_local(w),
-                   _bottom.it().shading().world_to_local(w));
+                   _top.it()->shading().world_to_local(w),
+                   _bottom.it()->shading().world_to_local(w));
     }
 
     [[nodiscard]] auto to_world(Expr<float3> w) const noexcept {
         return ite(_is_top,
-                   _top.it().shading().local_to_world(w),
-                   _bottom.it().shading().local_to_world(w));
+                   _top.it()->shading().local_to_world(w),
+                   _bottom.it()->shading().local_to_world(w));
     }
 };
 
@@ -132,8 +136,6 @@ public:
           _albedo{scene->load_texture(desc->property_node_or_default("albedo"))},
           _max_depth{desc->property_uint_or_default("max_depth", 10u)},
           _samples{desc->property_uint_or_default("samples", 1u)} {
-        LUISA_RENDER_CHECK_ALBEDO_TEXTURE(LayeredSurface, albedo);
-        // TODO
         LUISA_ASSERT(_top != nullptr && !_top->is_null() &&
                          _bottom != nullptr && !_bottom->is_null(),
                      "Creating closure for null LayeredSurface.");
@@ -171,7 +173,7 @@ public:
 
 public:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
-        const Interaction &it, const SampledWavelengths &swl,
+        luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
         Expr<float> eta_i, Expr<float> time) const noexcept override;
 };
 
@@ -198,11 +200,11 @@ private:
 
 public:
     LayeredSurfaceClosure(
-        const LayeredSurfaceInstance *instance, const Interaction &it,
+        const LayeredSurfaceInstance *instance, luisa::shared_ptr<Interaction> it,
         const SampledWavelengths &swl, Expr<float> time, Expr<float> thickness, Expr<float> g,
         const SampledSpectrum &albedo, uint max_depth, uint samples,
         luisa::unique_ptr<Surface::Closure> top, luisa::unique_ptr<Surface::Closure> bottom) noexcept
-        : Surface::Closure{instance, it, swl, time},
+        : Surface::Closure{instance, std::move(it), swl, time},
           _top{std::move(top)}, _bottom{std::move(bottom)}, _thickness{thickness},
           _g{g}, _albedo{albedo}, _max_depth{max_depth}, _samples{samples} {}
 
@@ -217,8 +219,8 @@ private:
     }
     [[nodiscard]] Surface::Evaluation _evaluate(
         Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
-        auto wi_local = _it.shading().world_to_local(wi);
-        auto wo_local = _it.shading().world_to_local(wo);
+        auto wi_local = it()->shading().world_to_local(wi);
+        auto wo_local = it()->shading().world_to_local(wo);
         auto entered_top = wo_local.z > 0.f;
         auto enter_interface = TopOrBottom(*_top, *_bottom, entered_top);
         auto exit_interface = TopOrBottom(*_bottom, *_top, same_hemisphere(wo_local, wi_local) | entered_top);
@@ -227,7 +229,7 @@ private:
         auto f = ite(same_hemisphere(wi_local, wo_local),
                      static_cast<float>(_samples) * enter_interface.evaluate(wo, wi, mode).f,
                      SampledSpectrum(0.f));
-        auto seed = xxhash32(make_uint4(as<UInt3>(_it.p()), xxhash32(as<UInt3>(wi))));
+        auto seed = xxhash32(make_uint4(as<UInt3>(it()->p()), xxhash32(as<UInt3>(wi))));
         auto pdf_sum = ite(same_hemisphere(wi_local, wo_local),
                            ite(entered_top,
                                _samples * _top->evaluate(wo, wi, mode).pdf,
@@ -353,21 +355,21 @@ private:
         return {.f = f / static_cast<float>(_samples),
                 .pdf = lerp(1.f / (4.f * pi), pdf_sum / static_cast<float>(_samples), 0.9f)};
     }
-    [[nodiscard]] Surface::Sample _sample(
-        Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u, TransportMode mode) const noexcept override {
-        auto wo_local = _it.shading().world_to_local(wo);
+    [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float> u_lobe,
+                                          Expr<float2> u, TransportMode mode) const noexcept override {
+        auto wo_local = it()->shading().world_to_local(wo);
         auto entered_top = wo_local.z > 0.f;
         auto b_surf = TopOrBottom(*_top, *_bottom, entered_top);
         auto bs = b_surf.sample(wo, u_lobe, u, mode);
-        auto s = Surface::Sample::zero(_swl.dimension());
+        auto s = Surface::Sample::zero(swl().dimension());
         $if(!bs.eval.f.is_zero() & bs.eval.pdf != 0.f) {
-            auto wi_local = _it.shading().world_to_local(bs.wi);
+            auto wi_local = it()->shading().world_to_local(bs.wi);
             $if(same_hemisphere(wi_local, wo_local)) {
                 s = bs;
             }
             $else {
                 auto w = bs.wi;
-                auto w_local = _it.shading().world_to_local(bs.wi);
+                auto w_local = it()->shading().world_to_local(bs.wi);
                 auto seed = xxhash32(make_uint4(as<UInt3>(make_float3(u, u_lobe)), xxhash32(as<UInt3>(wo))));
                 auto f = bs.eval.f;
                 auto pdf = bs.eval.pdf;
@@ -392,7 +394,7 @@ private:
                             f *= _albedo * ps.p;
                             pdf *= ps.pdf;
                             w = ps.wi;
-                            w_local = _it.shading().world_to_local(w);
+                            w_local = it()->shading().world_to_local(w);
                             z = zp;
                             $continue;
                         };
@@ -410,7 +412,7 @@ private:
                     f *= bs.eval.f;
                     pdf *= bs.eval.pdf;
                     w = bs.wi;
-                    w_local = _it.shading().world_to_local(w);
+                    w_local = it()->shading().world_to_local(w);
                     $if((bs.event & Surface::event_transmit) != 0u) {
                         s = Surface::Sample{
                             .eval = {.f = f, .pdf = pdf},
@@ -424,10 +426,6 @@ private:
             };
         };
         return s;
-    }
-    void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df,
-                   TransportMode mode) const noexcept override {
-        LUISA_WARNING_WITH_LOCATION("LayeredSurfaceClosure::backward() ignored.");
     }
     [[nodiscard]] luisa::optional<Bool> _is_dispersive() const noexcept override {
         auto top_dispersive = _top->is_dispersive();
@@ -447,18 +445,18 @@ private:
 };
 
 luisa::unique_ptr<Surface::Closure> LayeredSurfaceInstance::closure(
-    const Interaction &it, const SampledWavelengths &swl,
+    luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
     Expr<float> eta_i, Expr<float> time) const noexcept {
-    auto thickness = _thickness == nullptr ? .1f : max(_thickness->evaluate(it, swl, time).x, std::numeric_limits<float>::min());
-    auto g = _g == nullptr ? 0.f : _g->evaluate(it, swl, time).x;
-    auto [albedo, _] = _albedo ? _albedo->evaluate_albedo_spectrum(it, swl, time) : Spectrum::Decode::one(swl.dimension());
+    auto thickness = _thickness ? max(_thickness->evaluate(*it, swl, time).x, std::numeric_limits<float>::min()) : 1e-2f;
+    auto g = _g ? _g->evaluate(*it, swl, time).x : 0.f;
+    auto [albedo, _] = _albedo ? _albedo->evaluate_albedo_spectrum(*it, swl, time) : Spectrum::Decode::one(swl.dimension());
     auto max_depth = node<LayeredSurface>()->max_depth();
     auto samples = node<LayeredSurface>()->samples();
-    auto top = _top == nullptr ? nullptr : _top->closure(it, swl, eta_i, time);
-    auto bottom = _bottom == nullptr ? nullptr : _bottom->closure(it, swl, top->eta().value_or(1.f), time);// FIXME: eta_i is wrong
+    auto top = _top->closure(it, swl, eta_i, time);
+    auto bottom = _bottom->closure(it, swl, top->eta().value_or(1.f), time);// FIXME: eta_i is wrong
     return luisa::make_unique<LayeredSurfaceClosure>(
-        this, it, swl, time, thickness, g, albedo, max_depth,
-        samples, std::move(top), std::move(bottom));
+        this, std::move(it), swl, time, thickness, g, albedo,
+        max_depth, samples, std::move(top), std::move(bottom));
 }
 
 using TwoSidedNormalMapOpacityLayeredSurface = TwoSidedWrapper<NormalMapWrapper<OpacitySurfaceWrapper<

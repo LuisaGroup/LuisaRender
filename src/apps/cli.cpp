@@ -11,15 +11,13 @@
 #include <base/scene.h>
 #include <base/pipeline.h>
 
-#include <util/ies.h>
-
 [[nodiscard]] auto parse_cli_options(int argc, const char *const *argv) noexcept {
     cxxopts::Options cli{"luisa-render-cli"};
     cli.add_option("", "b", "backend", "Compute backend name", cxxopts::value<luisa::string>(), "<backend>");
     cli.add_option("", "d", "device", "Compute device index", cxxopts::value<uint32_t>()->default_value("0"), "<index>");
     cli.add_option("", "", "scene", "Path to scene description file", cxxopts::value<std::filesystem::path>(), "<file>");
     cli.add_option("", "D", "define", "Parameter definitions to override scene description macros.",
-                   cxxopts::value<std::vector<std::string>>()->default_value("<none>"), "<key>=<value>");
+                   cxxopts::value<std::vector<luisa::string>>()->default_value("<none>"), "<key>=<value>");
     cli.add_option("", "h", "help", "Display this help message", cxxopts::value<bool>()->default_value("false"), "");
     cli.allow_unrecognised_options();
     cli.positional_help("<file>");
@@ -68,7 +66,7 @@ int main(int argc, char *argv[]) {
     auto backend = options["backend"].as<luisa::string>();
     auto index = options["device"].as<uint32_t>();
     auto path = options["scene"].as<std::filesystem::path>();
-    auto definitions = options["define"].as<std::vector<std::string>>();
+    auto definitions = options["define"].as<std::vector<luisa::string>>();
     SceneParser::MacroMap macros;
     for (luisa::string_view d : definitions) {
         if (d == "<none>") { continue; }
@@ -86,71 +84,23 @@ int main(int argc, char *argv[]) {
                 "Duplicate definition: {} = '{}'. "
                 "Ignoring the previous one: {} = '{}'.",
                 key, value, key, iter->second);
+            iter->second = value;
+        } else {
+            macros.emplace(key, value);
         }
-        macros[key] = value;
     }
-
-    {
-        std::ofstream file{"results.txt", std::ios::app};
-        file << std::endl
-             << "Argv = ";
-        for (auto i = 0; i < argc; i++) {
-            file << argv[i] << " ";
-        }
-        file << std::endl;
-    }
-
-    //    auto ies_profile = IESProfile::parse("/Users/mike/Downloads/002bb0e37aa7e5f1d7851fb1db032628.ies");
-    //    LUISA_INFO(
-    //        "Loaded IES profile with "
-    //        "{} vertical angle(s) and "
-    //        "{} horizontal angle(s):",
-    //        ies_profile.vertical_angles().size(),
-    //        ies_profile.horizontal_angles().size());
-    //    std::cout << "Vertical Angles:";
-    //    for (auto v : ies_profile.vertical_angles()) {
-    //        std::cout << " " << v;
-    //    }
-    //    std::cout << "\n";
-    //    auto candela_offset = 0u;
-    //    for (auto h : ies_profile.horizontal_angles()) {
-    //        std::cout << "@" << h << ":";
-    //        for (auto i = 0u; i < ies_profile.vertical_angles().size(); i++) {
-    //            std::cout << " " << ies_profile.candela_values()[candela_offset + i];
-    //        }
-    //        std::cout << "\n";
-    //        candela_offset += ies_profile.vertical_angles().size();
-    //    }
 
     auto device = context.create_device(
         backend, luisa::format(R"({{"index": {}}})", index));
     Clock clock;
     auto scene_desc = SceneParser::parse(path, macros);
     auto parse_time = clock.toc();
-    {
-        std::ofstream file{"results.txt", std::ios::app};
-        file << "Scene parse time = " << parse_time << " ms" << std::endl;
-    }
-    LUISA_INFO(
-        "Parsed scene description "
-        "file '{}' in {} ms.",
-        path.string(), parse_time);
 
-    clock.tic();
+    LUISA_INFO("Parsed scene description file '{}' in {} ms.",
+               path.string(), parse_time);
     auto scene = Scene::create(context, scene_desc.get());
-    {
-        auto scene_load_time = clock.toc();
-        std::ofstream file{"results.txt", std::ios::app};
-        file << "Scene load time = " << scene_load_time << " ms" << std::endl;
-    }
-    auto stream = device.create_stream(true);
-    clock.tic();
+    auto stream = device.create_stream(false);
     auto pipeline = Pipeline::create(device, stream, *scene);
-    {
-        auto pipeline_create_time = clock.toc();
-        std::ofstream file{"results.txt", std::ios::app};
-        file << "Pipeline create time = " << pipeline_create_time << " ms" << std::endl;
-    }
     pipeline->render(stream);
     stream.synchronize();
 }

@@ -35,7 +35,6 @@ public:
                 "Directional environment emission is not constant. "
                 "This may lead to unexpected results.");
         }
-        LUISA_RENDER_CHECK_ILLUMINANT_TEXTURE(Directional, emission);
         auto angle = std::clamp(desc->property_float_or_default("angle", 1.0f), 1e-3f, 360.0f);
         auto cos_half_angle = std::cos(.5 * angle * std::numbers::pi / 180.0);
         _cos_half_angle = static_cast<float>(cos_half_angle);
@@ -68,15 +67,18 @@ private:
         auto L = _texture->evaluate_illuminant_spectrum(it, swl, time).value;
         auto pdf = uniform_cone_pdf(env->cos_half_angle());
         auto valid = env->cos_half_angle() < cos_theta(wi_local);
-        return Light::Evaluation{.L = L * ite(valid, env->scale(), 0.f),
-                                 .pdf = ite(valid, pdf, 0.f)};
+        return Environment::Evaluation{.L = L * ite(valid, env->scale(), 0.f),
+                                       .pdf = ite(valid, pdf, 0.f)};
     }
 
 public:
-    DirectionalInstance(Pipeline &pipeline, const Environment *env, const Texture::Instance *texture) noexcept
+    DirectionalInstance(Pipeline &pipeline, const Environment *env,
+                        const Texture::Instance *texture) noexcept
         : Environment::Instance{pipeline, env}, _texture{texture} {}
-    [[nodiscard]] Light::Evaluation evaluate(
-        Expr<float3> wi, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+
+    [[nodiscard]] Environment::Evaluation evaluate(Expr<float3> wi,
+                                                   const SampledWavelengths &swl,
+                                                   Expr<float> time) const noexcept override {
         auto env = node<Directional>();
         if (!env->visible()) { return Light::Evaluation::zero(swl.dimension()); }
         auto world_to_env = transpose(transform_to_world());
@@ -84,15 +86,15 @@ public:
         auto wi_local = normalize(frame.world_to_local(world_to_env * wi));
         return _evaluate(wi_local, swl, time);
     }
-    [[nodiscard]] Light::Sample sample(
-        Expr<float3> p_from, const SampledWavelengths &swl,
-        Expr<float> time, Expr<float2> u) const noexcept override {
+
+    [[nodiscard]] Environment::Sample sample(const SampledWavelengths &swl,
+                                             Expr<float> time,
+                                             Expr<float2> u) const noexcept override {
         auto env = node<Directional>();
         auto wi_local = sample_uniform_cone(u, env->cos_half_angle());
         auto frame = Frame::make(env->direction());
         return {.eval = _evaluate(wi_local, swl, time),
-                .wi = normalize(transform_to_world() * frame.local_to_world(wi_local)),
-                .distance = std::numeric_limits<float>::max()};
+                .wi = normalize(transform_to_world() * frame.local_to_world(wi_local))};
     }
 };
 

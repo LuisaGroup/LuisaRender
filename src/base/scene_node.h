@@ -19,16 +19,16 @@ class CommandBuffer;
 
 namespace luisa::render {
 
+using compute::CommandBuffer;
 using compute::Device;
 using compute::Stream;
-using compute::CommandBuffer;
 
 using compute::Expr;
-using compute::Var;
 using compute::Float;
 using compute::Float2;
 using compute::Float3;
 using compute::Float4;
+using compute::Var;
 
 class Scene;
 class Pipeline;
@@ -39,8 +39,8 @@ public:
     using Tag = SceneNodeTag;
 
 private:
-    const Scene *_scene;
-    Tag _tag;
+    intptr_t _scene : 56u;
+    Tag _tag : 8u;
 
 public:
     SceneNode(const Scene *scene, const SceneNodeDesc *desc, Tag tag) noexcept;
@@ -49,7 +49,7 @@ public:
     SceneNode &operator=(SceneNode &&) noexcept = delete;
     SceneNode &operator=(const SceneNode &) noexcept = delete;
     virtual ~SceneNode() noexcept = default;
-    [[nodiscard]] auto scene() const noexcept { return _scene; }
+    [[nodiscard]] auto scene() const noexcept { return reinterpret_cast<const Scene *>(_scene); }
     [[nodiscard]] auto tag() const noexcept { return _tag; }
     [[nodiscard]] virtual std::string_view impl_type() const noexcept = 0;
 };

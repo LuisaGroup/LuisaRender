@@ -46,10 +46,6 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     pipeline->_initial_time = initial_time;
     pipeline->_transform_matrices.resize(transform_matrix_buffer_size);
     pipeline->_transform_matrix_buffer = device.create_buffer<float4x4>(transform_matrix_buffer_size);
-    if (scene.integrator()->is_differentiable()) {
-        pipeline->_differentiation =
-            luisa::make_unique<Differentiation>(*pipeline);
-    }
     pipeline->_cameras.reserve(scene.cameras().size());
     auto command_buffer = stream.command_buffer();
     pipeline->_spectrum = scene.spectrum()->build(*pipeline, command_buffer);
@@ -67,15 +63,17 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     }
     pipeline->_integrator = scene.integrator()->build(*pipeline, command_buffer);
     command_buffer << pipeline->_bindless_array.update();
-    if (auto &&diff = pipeline->_differentiation) {
-        diff->register_optimizer(dynamic_cast<DifferentiableIntegrator::Instance *>(pipeline->_integrator.get())->optimizer());
-        diff->materialize(command_buffer);
-    }
     if (!pipeline->_transforms.empty()) {
         command_buffer << pipeline->_transform_matrix_buffer.view(0u, pipeline->_transforms.size())
                               .copy_from(pipeline->_transform_matrices.data());
     }
-    command_buffer << commit();
+    command_buffer << compute::commit();
+    LUISA_INFO("Created pipeline with {} camera(s), {} shape instance(s), "
+               "{} surface instance(s), and {} light instance(s).",
+               pipeline->_cameras.size(),
+               pipeline->_geometry->instances().size(),
+               pipeline->_surfaces.size(),
+               pipeline->_lights.size());
     return pipeline;
 }
 
@@ -115,16 +113,6 @@ const Filter::Instance *Pipeline::build_filter(CommandBuffer &command_buffer, co
     return _filters.emplace(filter, std::move(f)).first->second.get();
 }
 
-Differentiation *Pipeline::differentiation() noexcept {
-    LUISA_ASSERT(_differentiation, "Differentiation is not constructed.");
-    return _differentiation.get();
-}
-
-const Differentiation *Pipeline::differentiation() const noexcept {
-    LUISA_ASSERT(_differentiation, "Differentiation is not constructed.");
-    return _differentiation.get();
-}
-
 void Pipeline::register_transform(const Transform *transform) noexcept {
     if (transform == nullptr) { return; }
     if (!_transform_to_id.contains(transform)) {
@@ -140,6 +128,7 @@ void Pipeline::register_transform(const Transform *transform) noexcept {
 
 Float4x4 Pipeline::transform(const Transform *transform) const noexcept {
     if (transform == nullptr) { return make_float4x4(1.f); }
+    if (transform->is_identity()) { return make_float4x4(1.f); }
     auto iter = _transform_to_id.find(transform);
     LUISA_ASSERT(iter != _transform_to_id.cend(), "Transform is not registered.");
     return _transform_matrix_buffer.read(iter->second);

@@ -2,13 +2,12 @@
 // Created by Mike on 2021/12/8.
 //
 
+#include "core/basic_types.h"
 #include <random>
 
-#include <base/scene.h>
-#include <base/film.h>
-#include <base/filter.h>
-#include <base/transform.h>
 #include <sdl/scene_node_desc.h>
+#include <base/filter.h>
+#include <base/scene.h>
 #include <base/camera.h>
 #include <base/pipeline.h>
 
@@ -26,17 +25,29 @@ Camera::Camera(Scene *scene, const SceneNodeDesc *desc) noexcept
                   "shutter_span", 0.0f));
           }))},
       _shutter_samples{desc->property_uint_or_default("shutter_samples", 0u)},// 0 means default
-      _spp{desc->property_uint_or_default("spp", 1024u)},
-      _target{scene->load_texture(desc->property_node_or_default("target"))},
-      _clip_plane{desc->property_float2_or_default(
-          "clip_plane", lazy_construct([desc] {
-              return make_float2(desc->property_float_or_default("clip_plane", 0.f), 1e10f);
-          }))} {
-    _clip_plane = clamp(_clip_plane, 0.f, 1e10f);
-    if (_clip_plane.x > _clip_plane.y) {
-        std::swap(_clip_plane.x, _clip_plane.y);
+      _spp{desc->property_uint_or_default("spp", 1024u)} {
+
+    // For compatibility with older scene description versions
+    if (_transform == nullptr) {
+        static constexpr auto default_position = make_float3(0.f, 0.f, 0.f);
+        static constexpr auto default_front = make_float3(0.f, 0.f, -1.f);
+        static constexpr auto default_up = make_float3(0.f, 1.f, 0.f);
+        auto position = desc->property_float3_or_default("position", default_position);
+        auto front = desc->property_float3_or_default(
+            "front", lazy_construct([desc, position] {
+                auto look_at = desc->property_float3_or_default("look_at", position + default_front);
+                return normalize(look_at - position);
+            }));
+        auto up = desc->property_float3_or_default("up", default_up);
+        if (!all(position == default_position && front == default_front && up == default_up)) {
+            SceneNodeDesc d{luisa::format("{}$transform", desc->identifier()), SceneNodeTag::TRANSFORM};
+            d.define(SceneNodeTag::TRANSFORM, "View", desc->source_location());
+            d.add_property("position", SceneNodeDesc::number_list{position.x, position.y, position.z});
+            d.add_property("front", SceneNodeDesc::number_list{front.x, front.y, front.z});
+            d.add_property("up", SceneNodeDesc::number_list{up.x, up.y, up.z});
+            _transform = scene->load_transform(&d);
+        }
     }
-    LUISA_RENDER_CHECK_GENERIC_TEXTURE(Camera, target, 3);
 
     if (_shutter_span.y < _shutter_span.x) [[unlikely]] {
         LUISA_ERROR(
@@ -192,29 +203,52 @@ auto Camera::shutter_samples() const noexcept -> vector<ShutterSample> {
 }
 
 Camera::Instance::Instance(Pipeline &pipeline, CommandBuffer &command_buffer, const Camera *camera) noexcept
-    : _pipeline{pipeline}, _camera{camera},
+    : _pipeline{&pipeline}, _camera{camera},
       _film{camera->film()->build(pipeline, command_buffer)},
-      _filter{pipeline.build_filter(command_buffer, camera->filter())},
-      _target{pipeline.build_texture(command_buffer, camera->target())} {
+      _filter{pipeline.build_filter(command_buffer, camera->filter())} {
     pipeline.register_transform(camera->transform());
 }
 
-Camera::Sample Camera::Instance::generate_ray(
-    Sampler::Instance &sampler, Expr<uint2> pixel_coord, Expr<float> time) const noexcept {
-    auto [filter_offset, filter_weight] = filter()->sample(sampler.generate_pixel_2d());
-    auto pixel = make_float2(pixel_coord) + 0.5f + filter_offset;
-    auto sample = _generate_ray_in_camera_space(sampler, pixel, time);
-    sample.weight *= filter_weight;
-    auto clip = node()->clip_plane() / abs(sample.ray->direction().z);
-    sample.ray->set_t_min(max(sample.ray->t_min(), clip.x));
-    sample.ray->set_t_max(min(sample.ray->t_max(), clip.y));
+Camera::Sample Camera::Instance::generate_ray(Expr<uint2> pixel_coord, Expr<float> time,
+                                              Expr<float2> u_filter, Expr<float2> u_lens) const noexcept {
+    auto [filter_offset, filter_weight] = filter()->sample(u_filter);
+    auto pixel = make_float2(pixel_coord) + .5f + filter_offset;
+    auto [ray, weight] = _generate_ray_in_camera_space(pixel, u_lens, time);
+    weight *= filter_weight;
     auto c2w = camera_to_world();
-    sample.ray->set_origin(make_float3(
-        c2w * make_float4(sample.ray->origin(), 1.0f)));
-    auto c2w_normal = transpose(inverse(make_float3x3(c2w)));
-    auto d = normalize(c2w_normal * sample.ray->direction());
-    sample.ray->set_direction(d);
-    return sample;
+    auto o = make_float3(c2w * make_float4(ray->origin(), 1.f));
+    auto d = normalize(make_float3x3(c2w) * ray->direction());
+    ray->set_origin(o);
+    ray->set_direction(d);
+    return {std::move(ray), pixel, weight};
+}
+
+Camera::SampleDifferential Camera::Instance::generate_ray_differential(Expr<uint2> pixel_coord, Expr<float> time,
+                                                                       Expr<float2> u_filter, Expr<float2> u_lens) const noexcept {
+    auto [filter_offset, filter_weight] = filter()->sample(u_filter);
+    auto pixel = make_float2(pixel_coord) + .5f + filter_offset;
+    auto [central_ray, central_weight] = _generate_ray_in_camera_space(pixel, u_lens, time);
+    auto [x_ray, x_weight] = _generate_ray_in_camera_space(pixel + make_float2(1.f, 0.f), u_lens, time);
+    auto [y_ray, y_weight] = _generate_ray_in_camera_space(pixel + make_float2(0.f, 1.f), u_lens, time);
+    auto weight = central_weight * filter_weight;
+    auto c2w = camera_to_world();
+    auto c2w_n = make_float3x3(c2w);
+    auto c_o = make_float3(c2w * make_float4(central_ray->origin(), 1.f));
+    auto c_d = normalize(c2w_n * central_ray->direction());
+    central_ray->set_origin(c_o);
+    central_ray->set_direction(c_d);
+    auto rx_o = make_float3(c2w * make_float4(x_ray->origin(), 1.f));
+    auto rx_d = normalize(c2w_n * x_ray->direction());
+    auto ry_o = make_float3(c2w * make_float4(y_ray->origin(), 1.f));
+    auto ry_d = normalize(c2w_n * y_ray->direction());
+    return {.ray_differential = {
+                .ray = std::move(central_ray),
+                .rx_origin = rx_o,
+                .ry_origin = ry_o,
+                .rx_direction = rx_d,
+                .ry_direction = ry_d},
+            .pixel = pixel,
+            .weight = weight};
 }
 
 Float4x4 Camera::Instance::camera_to_world() const noexcept {

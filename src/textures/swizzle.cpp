@@ -18,13 +18,10 @@ public:
     SwizzleTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Texture{scene, desc},
           _base{scene->load_texture(desc->property_node("base"))} {
-        LUISA_RENDER_CHECK_GENERIC_TEXTURE(SwizzleTexture, base, 1u);
-        auto base_channels = _base->channels();
         auto swizzle = desc->property_uint_list_or_default(
             "swizzle", lazy_construct([&] {
                 using namespace std::string_view_literals;
-                auto s = desc->property_string_or_default(
-                    "swizzle", "rgba"sv.substr(0, base_channels));
+                auto s = desc->property_string_or_default("swizzle", "rgba");
                 luisa::vector<uint> swizzle_channels;
                 for (auto c : s) {
                     switch (c) {
@@ -52,8 +49,7 @@ public:
         }
         for (auto i = 0u; i < swizzle.size(); i++) {
             auto c = swizzle[i];
-            LUISA_ASSERT(c < base_channels,
-                         "Swizzle channel '{}' out of range. [{}]",
+            LUISA_ASSERT(c < 4u, "Swizzle channel '{}' out of range. [{}]",
                          c, desc->source_location().string());
             _swizzle |= c << (i * 4u);
         }
@@ -66,12 +62,18 @@ public:
     }
     [[nodiscard]] bool is_black() const noexcept override { return _base->is_black(); }
     [[nodiscard]] bool is_constant() const noexcept override { return _base->is_constant(); }
+    [[nodiscard]] luisa::optional<float4> evaluate_static() const noexcept override {
+        if (auto v = _base->evaluate_static()) {
+            auto s = make_float4(0.f);
+            for (auto i = 0u; i < channels(); i++) { s[i] = (*v)[swizzle(i)]; }
+            return s;
+        }
+        return nullopt;
+    }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] uint channels() const noexcept override { return _swizzle >> 16u; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
-    [[nodiscard]] bool requires_gradients() const noexcept override { return _base->requires_gradients(); }
-    void disable_gradients() noexcept override { _base->disable_gradients(); }
 };
 
 class SwizzleTextureInstance final : public Texture::Instance {
@@ -83,7 +85,9 @@ public:
     SwizzleTextureInstance(const Pipeline &pipeline, const Texture *node,
                            const Texture::Instance *base) noexcept
         : Texture::Instance{pipeline, node}, _base{base} {}
-    [[nodiscard]] Float4 evaluate(const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+    [[nodiscard]] Float4 evaluate(const Interaction &it,
+                                  const SampledWavelengths &swl,
+                                  Expr<float> time) const noexcept override {
         auto v = _base->evaluate(it, swl, time);
         switch (auto n = node<SwizzleTexture>(); n->channels()) {
             case 1u: return make_float4(v[n->swizzle(0u)]);
@@ -93,17 +97,6 @@ public:
             default: LUISA_ERROR_WITH_LOCATION("Unreachable");
         }
         return make_float4();
-    }
-    void backward(const Interaction &it, const SampledWavelengths &swl, Expr<float> time, Expr<float4> grad) const noexcept override {
-        if (node()->requires_gradients()) {
-            auto g = def(make_float4());
-            auto n = node<SwizzleTexture>();
-            for (auto i = 0u; i < n->channels(); i++) {
-                auto c = n->swizzle(i);
-                g[c] += grad[i];
-            }
-            _base->backward(it, swl, time, g);
-        }
     }
 };
 

@@ -20,9 +20,13 @@ private:
     Float3 _c;
 
 private:
-    [[nodiscard]] static Float _s(Expr<float> x) noexcept {
-        return ite(isinf(x), cast<float>(x > 0.0f),
-                   0.5f * fma(x, rsqrt(fma(x, x, 1.f)), 1.f));
+    [[nodiscard]] static auto _fma(Expr<float> a, Expr<float> b, Expr<float> c) noexcept {
+        return a * b + c;
+    }
+
+    [[nodiscard]] static auto _s(Expr<float> x) noexcept {
+        return ite(isinf(x), cast<float>(x > 0.f),
+                   .5f + x / (2.f * sqrt(1.f + sqr(x))));
     }
 
 public:
@@ -31,7 +35,7 @@ public:
         : _c{make_float3(c0, c1, c2)} {}
     explicit RGBSigmoidPolynomial(Expr<float3> c) noexcept : _c{c} {}
     [[nodiscard]] Float operator()(Expr<float> lambda) const noexcept {
-        return _s(fma(lambda, fma(lambda, _c.x, _c.y), _c.z));// c0 * x * x + c1 * x + c2
+        return _s(polynomial(lambda, _c.z, _c.y, _c.x));// c0 * x * x + c1 * x + c2
     }
 };
 
@@ -46,7 +50,7 @@ private:
 
 private:
     [[nodiscard]] inline static auto _inverse_smooth_step(auto x) noexcept {
-        return 0.5f - sin(asin(1.0f - 2.0f * x) * (1.0f / 3.0f));
+        return .5f - sin(asin(1.f - 2.f * x) * (1.f / 3.f));
     }
 
 public:
@@ -184,41 +188,49 @@ public:
 
 class HeroWavelengthSpectrum final : public Spectrum {
 
+public:
+    enum struct SamplingMethod {
+        VISIBLE,
+        UNIFORM
+    };
+
 private:
     uint _dimension{};
+    SamplingMethod _method{};
 
 public:
     HeroWavelengthSpectrum(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Spectrum{scene, desc},
-          _dimension{std::max(desc->property_uint_or_default("dimension", 4u), 1u)} {}
+          _dimension{std::max(desc->property_uint_or_default("dimension", 4u), 1u)} {
+        auto m = desc->property_string_or_default("sample", "visible");
+        for (auto &c : m) { c = static_cast<char>(std::tolower(c)); }
+        if (m == "visible") {
+            _method = SamplingMethod::VISIBLE;
+        } else if (m == "uniform") {
+            _method = SamplingMethod::UNIFORM;
+        } else {
+            LUISA_WARNING_WITH_LOCATION(
+                "Invalid sampling method \"{}\" for "
+                "HeroWavelengthSpectrum, using \"visible\" instead.",
+                m);
+            _method = SamplingMethod::VISIBLE;
+        }
+    }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] bool is_differentiable() const noexcept override { return false; }
     [[nodiscard]] bool is_fixed() const noexcept override { return false; }
     [[nodiscard]] uint dimension() const noexcept override { return _dimension; }
+    [[nodiscard]] auto sampling_method() const noexcept { return _method; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
-    [[nodiscard]] bool requires_encoding() const noexcept override { return true; }
-    [[nodiscard]] float4 encode_srgb_albedo(float3 rgb) const noexcept override {
+    [[nodiscard]] float4 encode_static_srgb_albedo(float3 rgb) const noexcept override {
         return RGB2SpectrumTable::srgb().decode_albedo(rgb);
     }
-    [[nodiscard]] float4 encode_srgb_illuminant(float3 rgb) const noexcept override {
+    [[nodiscard]] float4 encode_static_srgb_illuminant(float3 rgb) const noexcept override {
         return RGB2SpectrumTable::srgb().decode_unbound(rgb);
     }
-    [[nodiscard]] PixelStorage encoded_albedo_storage(PixelStorage storage) const noexcept override {
-        LUISA_ASSERT(pixel_storage_channel_count(storage) != 2u,
-                     "Hero-wavelength spectrum does not support 2-channel albedo pixels.");
-        return storage == PixelStorage::FLOAT1 || storage == PixelStorage::FLOAT4 ?
-                   PixelStorage::FLOAT4 :
-                   PixelStorage::HALF4;
-    }
-    [[nodiscard]] PixelStorage encoded_illuminant_storage(PixelStorage storage) const noexcept override {
-        LUISA_ASSERT(pixel_storage_channel_count(storage) != 2u,
-                     "Hero-wavelength spectrum does not support 2-channel illuminant pixels.");
-        return storage == PixelStorage::FLOAT1 || storage == PixelStorage::FLOAT4 ?
-                   PixelStorage::FLOAT4 :
-                   PixelStorage::HALF4;
-    }
 };
+
+using namespace compute;
 
 class HeroWavelengthSpectrumInstance final : public Spectrum::Instance {
 
@@ -256,6 +268,53 @@ public:
     }
     [[nodiscard]] Float4 encode_srgb_illuminant(Expr<float3> rgb) const noexcept override {
         return RGB2SpectrumTable::srgb().decode_unbound(pipeline().bindless_array(), _rgb2spec_t0, rgb);
+    }
+
+private:
+    [[nodiscard]] auto _sample_uniform(Expr<float> u) const noexcept {
+        SampledWavelengths swl{node()->dimension()};
+        swl.set_lambda(0u, lerp(visible_wavelength_min, visible_wavelength_max, u));
+        Float delta = (visible_wavelength_max - visible_wavelength_min) /
+                      static_cast<float>(swl.dimension());
+        for (auto i = 1u; i < node()->dimension(); i++) {
+            auto lambda = swl.lambda(i - 1u) + delta;
+            lambda = ite(lambda > visible_wavelength_max,
+                         visible_wavelength_min + (lambda - visible_wavelength_max),
+                         lambda);
+            swl.set_lambda(i, lambda);
+        }
+        for (auto i = 0u; i < node()->dimension(); i++) {
+            swl.set_pdf(i, 1.f / (visible_wavelength_max - visible_wavelength_min));
+        }
+        return swl;
+    }
+    [[nodiscard]] SampledWavelengths _sample_visible(Expr<float> u) const noexcept {
+        constexpr auto sample_visible_wavelengths = [](auto u) noexcept {
+            return clamp(538.0f - 138.888889f * atanh(0.85691062f - 1.82750197f * u),
+                         visible_wavelength_min, visible_wavelength_max);
+        };
+        constexpr auto visible_wavelengths_pdf = [](auto lambda) noexcept {
+            constexpr auto sqr = [](auto x) noexcept { return x * x; };
+            return 0.0039398042f / sqr(cosh(0.0072f * (lambda - 538.0f)));
+        };
+        auto n = node()->dimension();
+        SampledWavelengths swl{node()->dimension()};
+        for (auto i = 0u; i < n; i++) {
+            auto offset = static_cast<float>(i * (1.0 / n));
+            auto up = fract(u + offset);
+            auto lambda = sample_visible_wavelengths(up);
+            swl.set_lambda(i, lambda);
+            swl.set_pdf(i, visible_wavelengths_pdf(lambda));
+        }
+        return swl;
+    }
+
+public:
+    [[nodiscard]] SampledWavelengths sample(Expr<float> u) const noexcept override {
+        auto m = node<HeroWavelengthSpectrum>()->sampling_method();
+        return m == HeroWavelengthSpectrum::SamplingMethod::UNIFORM ?
+                   _sample_uniform(u) :
+                   _sample_visible(u);
     }
 };
 

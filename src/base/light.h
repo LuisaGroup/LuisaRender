@@ -38,12 +38,9 @@ public:
 
     struct Sample {
         Evaluation eval;
-        Float3 wi;
-        Float distance;
+        Float3 p;
         [[nodiscard]] static auto zero(uint spec_dim) noexcept {
-            return Sample{.eval = Evaluation::zero(spec_dim),
-                          .wi = make_float3(0.f, 0.f, 1.f),
-                          .distance = 0.f};
+            return Sample{.eval = Evaluation::zero(spec_dim), .p = make_float3()};
         }
     };
 
@@ -54,22 +51,26 @@ public:
     private:
         const Instance *_instance;
 
-    protected:
+    private:
         const SampledWavelengths &_swl;
         Float _time;
 
     public:
-        Closure(const Instance *instance, const SampledWavelengths &swl, Expr<float> time) noexcept
+        Closure(const Instance *instance,
+                const SampledWavelengths &swl,
+                Expr<float> time) noexcept
             : _instance{instance}, _swl{swl}, _time{time} {}
         virtual ~Closure() noexcept = default;
         template<typename T = Instance>
             requires std::is_base_of_v<Instance, T>
         [[nodiscard]] auto instance() const noexcept { return static_cast<const T *>(_instance); }
-        [[nodiscard]] virtual Evaluation evaluate(
-            const Interaction &it_light, Expr<float3> p_from) const noexcept = 0;
-        [[nodiscard]] virtual Sample sample(
-            Expr<uint> light_inst_id, Expr<float3> p_from, Expr<float2> u) const noexcept = 0;
-        virtual void backward(const Interaction &it_light, Expr<float3> p_from, const SampledSpectrum &df) const noexcept = 0;
+        [[nodiscard]] auto &swl() const noexcept { return _swl; }
+        [[nodiscard]] auto time() const noexcept { return _time; }
+        [[nodiscard]] virtual Evaluation evaluate(const Interaction &it_light,
+                                                  Expr<float3> p_from) const noexcept = 0;
+        [[nodiscard]] virtual Sample sample(Expr<uint> light_inst_id,
+                                            Expr<float3> p_from,
+                                            Expr<float2> u) const noexcept = 0;
     };
 
     class Instance {

@@ -16,19 +16,20 @@ using luisa::compute::Float3;
 class Frame {
 
 private:
-    Float3 _u;
-    Float3 _v;
+    Float3 _s;
+    Float3 _t;
     Float3 _n;
 
 public:
     Frame() noexcept;
-    Frame(Float3 u, Float3 v, Float3 n) noexcept;
-    [[nodiscard]] static Frame make(Expr<float3> normal) noexcept;
-    [[nodiscard]] static Frame make(Expr<float3> normal, Expr<float3> tangent) noexcept;
+    Frame(Expr<float3> s, Expr<float3> t, Expr<float3> n) noexcept;
+    void flip() noexcept;
+    [[nodiscard]] static Frame make(Expr<float3> n) noexcept;
+    [[nodiscard]] static Frame make(Expr<float3> n, Expr<float3> s) noexcept;
     [[nodiscard]] Float3 local_to_world(Expr<float3> d) const noexcept;
     [[nodiscard]] Float3 world_to_local(Expr<float3> d) const noexcept;
-    [[nodiscard]] Expr<float3> u() const noexcept { return _u; }
-    [[nodiscard]] Expr<float3> v() const noexcept { return _v; }
+    [[nodiscard]] Expr<float3> s() const noexcept { return _s; }
+    [[nodiscard]] Expr<float3> t() const noexcept { return _t; }
     [[nodiscard]] Expr<float3> n() const noexcept { return _n; }
 };
 
@@ -45,27 +46,28 @@ using compute::sqrt;
 using compute::saturate;
 
 [[nodiscard]] inline auto sqr(auto x) noexcept { return x * x; }
-[[nodiscard]] inline Float abs_dot(Float3 u, Float3 v) noexcept { return abs(dot(u, v)); }
-[[nodiscard]] inline Float cos_theta(Float3 w) { return w.z; }
-[[nodiscard]] inline Float cos2_theta(Float3 w) { return sqr(w.z); }
-[[nodiscard]] inline Float abs_cos_theta(Float3 w) { return abs(w.z); }
-[[nodiscard]] inline Float sin2_theta(Float3 w) { return saturate(1.0f - cos2_theta(w)); }
-[[nodiscard]] inline Float sin_theta(Float3 w) { return sqrt(sin2_theta(w)); }
-[[nodiscard]] inline Float tan_theta(Float3 w) { return sin_theta(w) / cos_theta(w); }
-[[nodiscard]] inline Float tan2_theta(Float3 w) { return sin2_theta(w) / cos2_theta(w); }
+[[nodiscard]] inline auto one_minus_sqr(auto x) noexcept { return 1.f - sqr(x); }
+[[nodiscard]] inline auto abs_dot(Expr<float3> u, Expr<float3> v) noexcept { return abs(dot(u, v)); }
+[[nodiscard]] inline auto cos_theta(Expr<float3> w) { return w.z; }
+[[nodiscard]] inline auto cos2_theta(Expr<float3> w) { return sqr(w.z); }
+[[nodiscard]] inline auto abs_cos_theta(Expr<float3> w) { return abs(w.z); }
+[[nodiscard]] inline auto sin2_theta(Expr<float3> w) { return saturate(1.0f - cos2_theta(w)); }
+[[nodiscard]] inline auto sin_theta(Expr<float3> w) { return sqrt(sin2_theta(w)); }
+[[nodiscard]] inline auto tan_theta(Expr<float3> w) { return sin_theta(w) / cos_theta(w); }
+[[nodiscard]] inline auto tan2_theta(Expr<float3> w) { return sin2_theta(w) / cos2_theta(w); }
 
-[[nodiscard]] inline Float cos_phi(Float3 w) {
+[[nodiscard]] inline auto cos_phi(Expr<float3> w) {
     auto sinTheta = sin_theta(w);
     return ite(sinTheta == 0.0f, 1.0f, clamp(w.x / sinTheta, -1.0f, 1.0f));
 }
 
-[[nodiscard]] inline Float sin_phi(Float3 w) {
+[[nodiscard]] inline auto sin_phi(Expr<float3> w) {
     auto sinTheta = sin_theta(w);
     return ite(sinTheta == 0.0f, 0.0f, clamp(w.y / sinTheta, -1.0f, 1.0f));
 }
 
-[[nodiscard]] inline Float cos2_phi(Float3 w) { return sqr(cos_phi(w)); }
-[[nodiscard]] inline Float sin2_phi(Float3 w) { return sqr(sin_phi(w)); }
-[[nodiscard]] inline Bool same_hemisphere(Float3 w, Float3 wp) noexcept { return w.z * wp.z > 0.0f; }
+[[nodiscard]] inline auto cos2_phi(Expr<float3> w) { return sqr(cos_phi(w)); }
+[[nodiscard]] inline auto sin2_phi(Expr<float3> w) { return sqr(sin_phi(w)); }
+[[nodiscard]] inline auto same_hemisphere(Expr<float3> w, Expr<float3> wp) noexcept { return w.z * wp.z > 0.0f; }
 
 }// namespace luisa::render

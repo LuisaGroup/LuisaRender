@@ -5,7 +5,7 @@ add_library(luisa-render-util SHARED
         xform.cpp xform.h
         spec.cpp spec.h
         colorspace.h
-        half.h
+        half.cpp half.h
         u64.h
         rng.cpp rng.h
         ies.cpp ies.h
@@ -15,7 +15,10 @@ add_library(luisa-render-util SHARED
         pmj02tables.cpp pmj02tables.h
         complex.h
         medium_tracker.cpp medium_tracker.h
-        progress_bar.cpp progress_bar.h)
+        progress_bar.cpp progress_bar.h
+        loop_subdiv.cpp loop_subdiv.h
+        vertex.h
+        counter_buffer.cpp counter_buffer.h)
 target_link_libraries(luisa-render-util PUBLIC
         luisa::compute
         luisa-render-include

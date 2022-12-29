@@ -15,6 +15,17 @@ using compute::Float3x3;
 class Environment : public SceneNode {
 
 public:
+    using Evaluation = Light::Evaluation;
+
+    struct Sample {
+        Evaluation eval;
+        Float3 wi;
+        [[nodiscard]] static auto zero(uint spec_dim) noexcept {
+            return Sample{.eval = Evaluation::zero(spec_dim), .wi = make_float3()};
+        }
+    };
+
+public:
     class Instance {
 
     private:
@@ -28,11 +39,12 @@ public:
             requires std::is_base_of_v<Environment, T>
         [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_env); }
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
-        [[nodiscard]] virtual Light::Evaluation evaluate(
-            Expr<float3> wi, const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
-        [[nodiscard]] virtual Light::Sample sample(
-            Expr<float3> p_from, const SampledWavelengths &swl,
-            Expr<float> time, Expr<float2> u) const noexcept = 0;
+        [[nodiscard]] virtual Evaluation evaluate(Expr<float3> wi,
+                                                  const SampledWavelengths &swl,
+                                                  Expr<float> time) const noexcept = 0;
+        [[nodiscard]] virtual Sample sample(const SampledWavelengths &swl,
+                                            Expr<float> time,
+                                            Expr<float2> u) const noexcept = 0;
         [[nodiscard]] Float3x3 transform_to_world() const noexcept;
     };
 

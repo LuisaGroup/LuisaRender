@@ -8,7 +8,7 @@
 
 namespace luisa::render {
 
-class ShapeGroup final : public Shape {
+class ShapeGroup : public Shape {
 
 private:
     luisa::vector<const Shape *> _children;
@@ -23,15 +23,11 @@ public:
         }
     }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] span<const Shape::Vertex> vertices() const noexcept override { return {}; }
-    [[nodiscard]] span<const Triangle> triangles() const noexcept override { return {}; }
     [[nodiscard]] span<const Shape *const> children() const noexcept override { return _children; }
-    [[nodiscard]] bool is_mesh() const noexcept override { return false; }
-    [[nodiscard]] bool deformable() const noexcept override { return false; }
-    [[nodiscard]] bool has_normal() const noexcept override { return false; }
-    [[nodiscard]] bool has_uv() const noexcept override { return false; }
 };
+
+using GroupWrapper = VisibilityShapeWrapper<ShapeGroup>;
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::ShapeGroup)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::GroupWrapper)

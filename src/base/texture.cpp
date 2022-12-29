@@ -8,76 +8,53 @@
 namespace luisa::render {
 
 Texture::Texture(Scene *scene, const SceneNodeDesc *desc) noexcept
-    : SceneNode{scene, desc, SceneNodeTag::TEXTURE},
-      _range{desc->property_float2_or_default(
-          "range", make_float2(std::numeric_limits<float>::min(),
-                               std::numeric_limits<float>::max()))},
-      _semantic{[desc] {
-          auto s = desc->property_string_or_default("semantic", "generic");
-          for (auto &c : s) { c = static_cast<char>(c); }
-          if (s == "albedo" || s == "color") { return Semantic::ALBEDO; }
-          if (s == "illuminant" || s == "illum" || s == "emission") { return Semantic::ILLUMINANT; }
-          if (s == "generic") { return Semantic::GENERIC; }
-          LUISA_WARNING_WITH_LOCATION("Unknown texture semantic '{}'. Fallback to generic.", s);
-          return Semantic::GENERIC;
-      }()},
-      _requires_grad{desc->property_bool_or_default("requires_grad", false)} {}
+    : SceneNode{scene, desc, SceneNodeTag::TEXTURE} {}
 
-bool Texture::requires_gradients() const noexcept { return _requires_grad; }
-void Texture::disable_gradients() noexcept { _requires_grad = false; }
+luisa::optional<float4> Texture::evaluate_static() const noexcept { return luisa::nullopt; }
+
+[[nodiscard]] inline auto extend_color_to_rgb(auto color, uint n) noexcept {
+    if (n == 1u) { return color.xxx(); }
+    if (n == 2u) { return make_float3(color.xy(), 1.f); }
+    return color;
+}
 
 Spectrum::Decode Texture::Instance::evaluate_albedo_spectrum(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    LUISA_ASSERT(node()->semantic() == Semantic::ALBEDO ||
-                     node()->semantic() == Semantic::GENERIC,
-                 "Decoding albedo spectrum with non-albedo texture.");
-    auto v = evaluate(it, swl, time);
-    if (_pipeline.spectrum()->node()->requires_encoding() &&
-        !node()->is_spectral_encoding()) {
-        v = pipeline().spectrum()->encode_srgb_albedo(v.xyz());
+    // skip the expensive encoding/decoding if the texture is static
+    if (auto v = node()->evaluate_static()) {
+        return _evaluate_static_albedo_spectrum(swl, *v);
     }
+    // we have got no luck, do the expensive encoding/decoding
+    auto v = evaluate(it, swl, time);
+    v = pipeline().spectrum()->encode_srgb_albedo(
+        extend_color_to_rgb(v.xyz(), node()->channels()));
     return pipeline().spectrum()->decode_albedo(swl, v);
 }
 
 Spectrum::Decode Texture::Instance::evaluate_illuminant_spectrum(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    LUISA_ASSERT(node()->semantic() == Semantic::ILLUMINANT ||
-                     node()->semantic() == Semantic::GENERIC,
-                 "Decoding illuminant spectrum with non-illuminant texture.");
-    auto v = evaluate(it, swl, time);
-    if (_pipeline.spectrum()->node()->requires_encoding() &&
-        !node()->is_spectral_encoding()) {
-        v = pipeline().spectrum()->encode_srgb_illuminant(v.xyz());
+    // skip the expensive encoding/decoding if the texture is static
+    if (auto v = node()->evaluate_static()) {
+        return _evaluate_static_illuminant_spectrum(swl, *v);
     }
+    // we have got no luck, do the expensive encoding/decoding
+    auto v = evaluate(it, swl, time);
+    v = pipeline().spectrum()->encode_srgb_illuminant(v.xyz());
     return pipeline().spectrum()->decode_illuminant(swl, v);
 }
 
-void Texture::Instance::backward_albedo_spectrum(
-    const Interaction &it, const SampledWavelengths &swl,
-    Expr<float> time, const SampledSpectrum &dSpec) const noexcept {
-    LUISA_ASSERT(node()->semantic() == Semantic::ALBEDO ||
-                     node()->semantic() == Semantic::GENERIC,
-                 "Decoding albedo spectrum with non-albedo texture.");
-    auto dEnc = pipeline().spectrum()->backward_decode_albedo(swl, evaluate(it, swl, time), dSpec);
-    if (_pipeline.spectrum()->node()->requires_encoding() &&
-        !node()->is_spectral_encoding()) {
-        dEnc = make_float4(pipeline().spectrum()->backward_encode_srgb_albedo(dEnc), 1.f);
-    }
-    backward(it, swl, time, dEnc);
+Spectrum::Decode Texture::Instance::_evaluate_static_albedo_spectrum(
+    const SampledWavelengths &swl, float4 v) const noexcept {
+    auto enc = pipeline().spectrum()->node()->encode_static_srgb_albedo(
+        extend_color_to_rgb(v.xyz(), node()->channels()));
+    return pipeline().spectrum()->decode_albedo(swl, enc);
 }
 
-void Texture::Instance::backward_illuminant_spectrum(
-    const Interaction &it, const SampledWavelengths &swl,
-    Expr<float> time, const SampledSpectrum &dSpec) const noexcept {
-    LUISA_ASSERT(node()->semantic() == Semantic::ILLUMINANT ||
-                     node()->semantic() == Semantic::GENERIC,
-                 "Decoding illuminant spectrum with non-illuminant texture.");
-    auto dEnc = pipeline().spectrum()->backward_decode_illuminant(swl, evaluate(it, swl, time), dSpec);
-    if (_pipeline.spectrum()->node()->requires_encoding() &&
-        !node()->is_spectral_encoding()) {
-        dEnc = make_float4(pipeline().spectrum()->backward_encode_srgb_illuminant(dEnc), 1.f);
-    }
-    backward(it, swl, time, dEnc);
+Spectrum::Decode Texture::Instance::_evaluate_static_illuminant_spectrum(
+    const SampledWavelengths &swl, float4 v) const noexcept {
+    auto enc = pipeline().spectrum()->node()->encode_static_srgb_illuminant(
+        extend_color_to_rgb(v.xyz(), node()->channels()));
+    return pipeline().spectrum()->decode_illuminant(swl, enc);
 }
 
 }// namespace luisa::render

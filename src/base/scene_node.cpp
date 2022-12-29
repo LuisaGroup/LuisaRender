@@ -8,7 +8,7 @@
 namespace luisa::render {
 
 SceneNode::SceneNode(const Scene *scene, const SceneNodeDesc *desc, SceneNodeTag tag) noexcept
-    : _scene{scene}, _tag{tag} {
+    : _scene{reinterpret_cast<intptr_t>(scene)}, _tag{tag} {
     if (!desc->is_defined()) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
             "Undefined scene description "

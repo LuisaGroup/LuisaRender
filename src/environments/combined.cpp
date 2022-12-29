@@ -48,8 +48,10 @@ public:
     CombinedInstance(Pipeline &pipeline, const Environment *env,
                      luisa::unique_ptr<Instance> a, luisa::unique_ptr<Instance> b) noexcept
         : Environment::Instance{pipeline, env}, _a{std::move(a)}, _b{std::move(b)} {}
-    [[nodiscard]] Light::Evaluation evaluate(
-        Expr<float3> wi, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+
+    [[nodiscard]] Environment::Evaluation evaluate(Expr<float3> wi,
+                                                   const SampledWavelengths &swl,
+                                                   Expr<float> time) const noexcept override {
         auto scales = node<Combined>()->scales();
         auto world_to_env = transpose(transform_to_world());
         auto wi_local = normalize(world_to_env * wi);
@@ -68,33 +70,34 @@ public:
         auto eval = _b->evaluate(wi_local, swl, time);
         return {.L = eval.L * scales.y, .pdf = eval.pdf};
     }
-    [[nodiscard]] Light::Sample sample(
-        Expr<float3> p_from, const SampledWavelengths &swl,
-        Expr<float> time, Expr<float2> u_in) const noexcept override {
+
+    [[nodiscard]] Environment::Sample sample(const SampledWavelengths &swl,
+                                             Expr<float> time,
+                                             Expr<float2> u_in) const noexcept override {
         auto u = make_float2(u_in);
         auto scales = node<Combined>()->scales();
-        auto sample = Light::Sample::zero(swl.dimension());
+        auto sample = Environment::Sample::zero(swl.dimension());
         if (_a != nullptr && _b != nullptr) [[likely]] {
             auto weight_a = scales.x / (scales.x + scales.y);
             $if(u.x < weight_a) {// sample a
                 u.x = u.x / weight_a;
-                sample = _a->sample(p_from, swl, time, u);
+                sample = _a->sample(swl, time, u);
                 auto eval_b = _b->evaluate(sample.wi, swl, time);
                 sample.eval.L = sample.eval.L * scales.x + eval_b.L * scales.y;
                 sample.eval.pdf = lerp(sample.eval.pdf, eval_b.pdf, 1.f - weight_a);
             }
             $else {// sample b
                 u.x = (u.x - weight_a) / (1.f - weight_a);
-                sample = _b->sample(p_from, swl, time, u);
+                sample = _b->sample(swl, time, u);
                 auto eval_a = _a->evaluate(sample.wi, swl, time);
                 sample.eval.L = eval_a.L * scales.x + sample.eval.L * scales.y;
                 sample.eval.pdf = lerp(eval_a.pdf, sample.eval.pdf, 1.f - weight_a);
             };
         } else if (_a != nullptr) [[unlikely]] {
-            sample = _a->sample(p_from, swl, time, u);
+            sample = _a->sample(swl, time, u);
             sample.eval.L *= scales.x;
         } else {
-            sample = _b->sample(p_from, swl, time, u);
+            sample = _b->sample(swl, time, u);
             sample.eval.L *= scales.y;
         }
         sample.wi = normalize(transform_to_world() * sample.wi);

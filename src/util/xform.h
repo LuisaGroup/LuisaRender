@@ -44,4 +44,4 @@ struct DecomposedTransform {
 [[nodiscard]] Quaternion normalize(Quaternion q) noexcept;
 [[nodiscard]] Quaternion slerp(Quaternion q1, Quaternion q2, float t) noexcept;
 
-}
+}// namespace luisa::render

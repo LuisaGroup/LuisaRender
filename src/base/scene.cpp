@@ -26,6 +26,8 @@
 namespace luisa::render {
 
 struct Scene::Config {
+    float shadow_terminator{0.f};
+    float intersection_offset{0.f};
     luisa::vector<NodeHandle> internal_nodes;
     luisa::unordered_map<luisa::string, NodeHandle> nodes;
     Integrator *integrator{nullptr};
@@ -40,6 +42,8 @@ const Environment *Scene::environment() const noexcept { return _config->environ
 const Spectrum *Scene::spectrum() const noexcept { return _config->spectrum; }
 luisa::span<const Shape *const> Scene::shapes() const noexcept { return _config->shapes; }
 luisa::span<const Camera *const> Scene::cameras() const noexcept { return _config->cameras; }
+float Scene::shadow_terminator_factor() const noexcept { return _config->shadow_terminator; }
+float Scene::intersection_offset_factor() const noexcept { return _config->intersection_offset; }
 
 namespace detail {
 
@@ -181,14 +185,6 @@ Spectrum *Scene::load_spectrum(const SceneNodeDesc *desc) noexcept {
     return dynamic_cast<Spectrum *>(load_node(SceneNodeTag::SPECTRUM, desc));
 }
 
-Loss *Scene::load_loss(const SceneNodeDesc *desc) noexcept {
-    return dynamic_cast<Loss *>(load_node(SceneNodeTag::LOSS, desc));
-}
-
-Optimizer *Scene::load_optimizer(const SceneNodeDesc *desc) noexcept {
-    return dynamic_cast<Optimizer *>(load_node(SceneNodeTag::OPTIMIZER, desc));
-}
-
 luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc) noexcept {
     if (!desc->root()->is_defined()) [[unlikely]] {
         LUISA_ERROR_WITH_LOCATION(
@@ -196,6 +192,8 @@ luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc
             "in the scene description.");
     }
     auto scene = luisa::make_unique<Scene>(ctx);
+    scene->_config->shadow_terminator = desc->root()->property_float_or_default("shadow_terminator", 0.f);
+    scene->_config->intersection_offset = desc->root()->property_float_or_default("intersection_offset", 0.f);
     scene->_config->spectrum = scene->load_spectrum(desc->root()->property_node_or_default(
         "spectrum", SceneNodeDesc::shared_default_spectrum("sRGB")));
     scene->_config->integrator = scene->load_integrator(
@@ -216,33 +214,6 @@ luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc
             scene->load_shape(s));
     }
     ThreadPool::global().synchronize();
-    if (!scene->_config->integrator->is_differentiable()) {
-        auto disabled = 0u;
-        for (auto &&node : scene->_config->internal_nodes) {
-            if (node->tag() == SceneNodeTag::TEXTURE) {
-                auto texture = static_cast<Texture *>(node.get());
-                if (texture->requires_gradients()) {
-                    disabled++;
-                    texture->disable_gradients();
-                }
-            }
-        }
-        for (auto &&[_, node] : scene->_config->nodes) {
-            if (node->tag() == SceneNodeTag::TEXTURE) {
-                auto texture = static_cast<Texture *>(node.get());
-                if (texture->requires_gradients()) {
-                    disabled++;
-                    texture->disable_gradients();
-                }
-            }
-        }
-        if (disabled != 0u) {
-            LUISA_WARNING_WITH_LOCATION(
-                "Disabled gradient computation in {} "
-                "texture{} for non-is_differentiable integrator.",
-                disabled, disabled > 1u ? "s" : "");
-        }
-    }
     return scene;
 }
 

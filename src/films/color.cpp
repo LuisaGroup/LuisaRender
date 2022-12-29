@@ -52,11 +52,14 @@ private:
 
 public:
     ColorFilmInstance(Device &device, Pipeline &pipeline, const ColorFilm *film) noexcept;
-    void accumulate(Expr<uint2> pixel, Expr<float3> rgb) const noexcept override;
     void prepare(CommandBuffer &command_buffer) noexcept override;
     void download(CommandBuffer &command_buffer, float4 *framebuffer) const noexcept override;
     [[nodiscard]] Film::Accumulation read(Expr<uint2> pixel) const noexcept override;
     void release() const noexcept override;
+    void clear(CommandBuffer &command_buffer) noexcept override;
+
+protected:
+    void _accumulate(Expr<uint2> pixel, Expr<float3> rgb, Expr<float> effective_spp) const noexcept override;
 };
 
 ColorFilmInstance::ColorFilmInstance(Device &device, Pipeline &pipeline, const ColorFilm *film) noexcept
@@ -86,17 +89,17 @@ void ColorFilmInstance::download(CommandBuffer &command_buffer, float4 *framebuf
                    << _converted.copy_to(framebuffer);
 }
 
-void ColorFilmInstance::accumulate(Expr<uint2> pixel, Expr<float3> rgb) const noexcept {
+void ColorFilmInstance::_accumulate(Expr<uint2> pixel, Expr<float3> rgb, Expr<float> effective_spp) const noexcept {
     _check_prepared();
     $if(!any(isnan(rgb) || isinf(rgb))) {
         auto pixel_id = pixel.y * node()->resolution().x + pixel.x;
-        auto threshold = node<ColorFilm>()->clamp();
+        auto threshold = node<ColorFilm>()->clamp() * max(effective_spp, 1.f);
         auto strength = max(max(max(rgb.x, rgb.y), rgb.z), 0.f);
         auto c = rgb * (threshold / max(strength, threshold));
         for (auto i = 0u; i < 3u; i++) {
             _image.atomic(pixel_id * 4u + i).fetch_add(c[i]);
         }
-        _image.atomic(pixel_id * 4u + 3u).fetch_add(1.f);
+        _image.atomic(pixel_id * 4u + 3u).fetch_add(effective_spp);
     };
 }
 
@@ -105,6 +108,12 @@ void ColorFilmInstance::prepare(CommandBuffer &command_buffer) noexcept {
     auto pixel_count = resolution.x * resolution.y;
     if (!_image) { _image = pipeline().device().create_buffer<float>(pixel_count * 4u); }
     if (!_converted) { _converted = pipeline().device().create_buffer<float4>(pixel_count); }
+    clear(command_buffer);
+}
+
+void ColorFilmInstance::clear(CommandBuffer &command_buffer) noexcept {
+    auto resolution = node()->resolution();
+    auto pixel_count = resolution.x * resolution.y;
     command_buffer << _clear_image.get()(_image).dispatch(pixel_count);
 }
 

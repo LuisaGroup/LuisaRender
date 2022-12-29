@@ -19,11 +19,10 @@ int main() {
                         .dust_density = 7.f,
                         .ozone_density = 2.783f};
     static constexpr auto resolution = make_uint2(2048u);
-    auto image = LoadedImage::create(resolution, PixelStorage::FLOAT4);
+    luisa::vector<float4> image(resolution.x * resolution.y);
     ThreadPool::global().parallel(resolution.y / 16u, [&](uint32_t y) noexcept {
         SKY_nishita_skymodel_precompute_texture(
-            data, static_cast<float4 *>(image.pixels()),
-            resolution, make_uint2(y * 16u, (y + 1u) * 16u));
+            data, image.data(), resolution, make_uint2(y * 16u, (y + 1u) * 16u));
     });
     auto sun = SKY_nishita_skymodel_precompute_sun(data);
     LUISA_INFO("Sun: ({}, {}, {}) -> ({}, {}, {})",
@@ -31,6 +30,6 @@ int main() {
                sun.top.x, sun.top.y, sun.top.z);
     ThreadPool::global().synchronize();
     save_image("sky_precompute_test.exr",
-               reinterpret_cast<const float *>(image.pixels()),
+               reinterpret_cast<const float *>(image.data()),
                resolution);
 }

@@ -30,9 +30,7 @@ public:
         : Environment{scene, desc},
           _emission{scene->load_texture(desc->property_node("emission"))},
           _scale{std::max(desc->property_float_or_default("scale", 1.0f), 0.0f)},
-          _compensate_mis{desc->property_bool_or_default("compensate_mis", true)} {
-        LUISA_RENDER_CHECK_ILLUMINANT_TEXTURE(Spherical, emission);
-    }
+          _compensate_mis{desc->property_bool_or_default("compensate_mis", true)} {}
     [[nodiscard]] auto scale() const noexcept { return _scale; }
     [[nodiscard]] auto compensate_mis() const noexcept { return _compensate_mis; }
     [[nodiscard]] auto emission() const noexcept { return _emission; }
@@ -86,8 +84,10 @@ public:
         : Environment::Instance{pipeline, env}, _texture{texture},
           _alias_buffer_id{std::move(alias_buffer_id)},
           _pdf_buffer_id{std::move(pdf_buffer_id)} {}
-    [[nodiscard]] Light::Evaluation evaluate(
-        Expr<float3> wi, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+
+    [[nodiscard]] Environment::Evaluation evaluate(Expr<float3> wi,
+                                                   const SampledWavelengths &swl,
+                                                   Expr<float> time) const noexcept override {
         auto world_to_env = transpose(transform_to_world());
         auto wi_local = normalize(world_to_env * wi);
         auto [theta, phi, uv] = Spherical::direction_to_uv(wi_local);
@@ -102,9 +102,10 @@ public:
         auto pdf = pdf_buffer.read(iy * Spherical::sample_map_size.x + ix);
         return {.L = L, .pdf = _directional_pdf(pdf, theta)};
     }
-    [[nodiscard]] Light::Sample sample(
-        Expr<float3> p_from, const SampledWavelengths &swl,
-        Expr<float> time, Expr<float2> u) const noexcept override {
+
+    [[nodiscard]] Environment::Sample sample(const SampledWavelengths &swl,
+                                             Expr<float> time,
+                                             Expr<float2> u) const noexcept override {
         auto [wi, Li, pdf] = [&] {
             if (_texture->node()->is_constant()) {
                 auto w = sample_uniform_sphere(u);
@@ -128,8 +129,7 @@ public:
             return std::make_tuple(w, L, _directional_pdf(p, theta));
         }();
         return {.eval = {.L = Li, .pdf = pdf},
-                .wi = normalize(transform_to_world() * wi),
-                .distance = std::numeric_limits<float>::max()};
+                .wi = normalize(transform_to_world() * wi)};
     }
 };
 
@@ -162,7 +162,7 @@ luisa::unique_ptr<Environment::Instance> Spherical::build(
                     auto scale = texture->evaluate_illuminant_spectrum(it, pipeline.spectrum()->sample(0.5f), 0.f).strength;
                     auto sin_theta = sin(uv.y * pi);
                     auto weight = exp(-4.f * length_squared(offset));// gaussian kernel with an approximate radius of 1
-                    auto value = scale * weight * sin_theta;
+                    auto value = weight * min(scale * sin_theta, 1e8f);
                     sum_weight += weight;
                     sum_scale += value;
                 };

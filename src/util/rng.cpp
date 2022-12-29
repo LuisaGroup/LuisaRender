@@ -125,15 +125,52 @@ UInt4 pcg4d(Expr<uint4> v) noexcept {
     return impl(v);
 }
 
+Float uniform_uint_to_float(Expr<uint> u) noexcept {
+    return min(one_minus_epsilon, u * 0x1p-32f);
+}
+
 Float lcg(UInt &state) noexcept {
     static Callable impl = [](UInt &state) noexcept {
         constexpr auto lcg_a = 1664525u;
         constexpr auto lcg_c = 1013904223u;
         state = lcg_a * state + lcg_c;
-        return cast<float>(state & 0x00ffffffu) *
-               (1.0f / static_cast<float>(0x01000000u));
+        return uniform_uint_to_float(state);
     };
     return impl(state);
+}
+
+UInt PCG32::uniform_uint() noexcept {
+    auto oldstate = _state;
+    _state = oldstate * U64{mult} + _inc;
+    auto xorshifted = (((oldstate >> 18u) ^ oldstate) >> 27u).lo();
+    auto rot = (oldstate >> 59u).lo();
+    return (xorshifted >> rot) | (xorshifted << ((~rot + 1u) & 31u));
+}
+
+void PCG32::set_sequence(U64 init_seq) noexcept {
+    _state = U64{0u};
+    _inc = (init_seq << 1u) | 1u;
+    static_cast<void>(uniform_uint());
+    _state = _state + U64{default_state};
+    static_cast<void>(uniform_uint());
+}
+
+Float PCG32::uniform_float() noexcept {
+    return uniform_uint_to_float(uniform_uint());
+}
+
+PCG32::PCG32() noexcept
+    : _state{default_state}, _inc{default_stream} {}
+
+PCG32::PCG32(U64 state, U64 inc) noexcept
+    : _state{std::move(state)}, _inc{std::move(inc)} {}
+
+PCG32::PCG32(U64 seq_index) noexcept {
+    set_sequence(std::move(seq_index));
+}
+
+PCG32::PCG32(Expr<uint> seq_index) noexcept {
+    set_sequence(U64{seq_index});
 }
 
 }// namespace luisa::render
