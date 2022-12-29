@@ -2,6 +2,8 @@
 // Created by Mike Smith on 2022/11/18.
 //
 
+#include <bit>
+
 #include <core/stl.h>
 #include <util/half.h>
 
@@ -9,6 +11,8 @@ namespace luisa::render {
 
 // from tinyexr: https://github.com/syoyo/tinyexr/blob/master/tinyexr.h
 float half_to_float(uint h) noexcept {
+    static_assert(std::endian::native == std::endian::little,
+                  "Only little endian is supported");
     union FP32 {
         uint u;
         float f;
