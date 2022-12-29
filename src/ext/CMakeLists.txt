@@ -18,6 +18,9 @@ if (NOT assimp_FOUND)
     set(ASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT ON CACHE BOOL "" FORCE)
     add_subdirectory(assimp)
     set_target_properties(assimp PROPERTIES UNITY_BUILD OFF)
+    if (UNIX AND NOT APPLE) # TODO: fix this
+        target_compile_definitions(assimp PRIVATE USE_FILE32API=1)
+    endif ()
     if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND
             CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 15.0)
         target_compile_options(assimp PRIVATE -Wno-deprecated-non-prototype)
