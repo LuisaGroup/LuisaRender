@@ -55,6 +55,11 @@ jobs:
           fi
           cmake -S . -B build -G Ninja -D CMAKE_BUILD_TYPE=${{ matrix.config }} -D CMAKE_C_COMPILER=${LUISA_CC} -D CMAKE_CXX_COMPILER=${LUISA_CXX} -D CMAKE_CXX_FLAGS="${LUISA_FLAGS}" -D LLVM_ROOT=/usr/lib/llvm-${{ matrix.llvm }}
           cmake --build build
+      - uses: actions/upload-artifact@v3
+          with:
+            name: ${{ matrix.os }}-${{ matrix.config }}-${{ matrix.compiler }}-llvm-${{ matrix.llvm }}
+            path: build/bin
+
   build-macos:
     strategy:
       fail-fast: false
@@ -81,6 +86,11 @@ jobs:
           fi
           cmake -S . -B build -G Ninja -D CMAKE_BUILD_TYPE=${{ matrix.config }} -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++
           cmake --build build
+      - uses: actions/upload-artifact@v3
+          with:
+            name: ${{ matrix.os }}-${{ matrix.config }}-${{ matrix.compiler }}
+            path: build/bin
+
   build-windows:
     strategy:
       fail-fast: false
@@ -110,3 +120,7 @@ jobs:
           )
           cmake -S . -G Ninja -B build -D CMAKE_BUILD_TYPE=${{ matrix.config }} -D CMAKE_C_COMPILER:FILEPATH=${{ matrix.compiler }}.exe -D CMAKE_CXX_COMPILER:FILEPATH=${{ matrix.compiler }}.exe
           cmake --build build
+      - uses: actions/upload-artifact@v3
+          with:
+            name: windows-${{ matrix.os }}-${{ matrix.config }}-${{ matrix.compiler }}
+            path: build/bin
