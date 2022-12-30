@@ -72,7 +72,7 @@ jobs:
         exclude:
           - os: macos-11
             compiler: system-clang
-    name: ${{ matrix.os }} / ${{ matrix.config }} / ${{ matrix.arch }} / ${{ matrix.compiler }}
+    name: ${{ matrix.os }}-${{ matrix.arch }} / ${{ matrix.config }} / ${{ matrix.compiler }}
     runs-on:
       - ${{ matrix.os }}
       - ${{ matrix.arch }}
@@ -93,7 +93,7 @@ jobs:
       - name: "Upload Artifacts"
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.os }}-${{ matrix.config }}-${{ matrix.arch }}-${{ matrix.compiler }}
+          name: ${{ matrix.os }}-${{ matrix.arch }}-${{ matrix.config }}-${{ matrix.compiler }}
           path: build/bin
 
   build-windows:
