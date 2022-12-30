@@ -72,9 +72,7 @@ jobs:
           - os: macos-11
             compiler: system-clang
     name: ${{ matrix.os }} / ${{ matrix.config }} / ${{ matrix.compiler }}
-    runs-on:
-      - ${{ matrix.os }}
-      - ${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
         with:
