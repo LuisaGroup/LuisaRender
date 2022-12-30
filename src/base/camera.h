@@ -56,7 +56,9 @@ public:
                                       Expr<float> time) const noexcept = 0;
 
     public:
-        Instance(Pipeline &pipeline, CommandBuffer &command_buffer, const Camera *camera) noexcept;
+        Instance(Pipeline &pipeline,
+                 CommandBuffer &command_buffer,
+                 const Camera *camera) noexcept;
         Instance(const Instance &) noexcept = delete;
         Instance(Instance &&another) noexcept = default;
         Instance &operator=(const Instance &) noexcept = delete;
@@ -126,11 +128,11 @@ public:
               "clip", lazy_construct([desc] {
                   return desc->property_float2_or_default(
                       "clip_plane", lazy_construct([desc] {
-                          auto near = desc->property_float_or_default(
+                          auto near_plane = desc->property_float_or_default(
                               "clip", lazy_construct([desc] {
                                   return desc->property_float_or_default("clip_plane", 0.f);
                               }));
-                          return make_float2(near, 1e10f);
+                          return make_float2(near_plane, 1e10f);
                       }));
               }))} {
         _clip_plane = clamp(_clip_plane, 0.f, 1e10f);
