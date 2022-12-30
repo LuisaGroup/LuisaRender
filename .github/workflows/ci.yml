@@ -66,13 +66,14 @@ jobs:
       fail-fast: false
       matrix:
         os: [ macos-11, macos-12 ]
+        arch: [ x64, ARM64 ]
         compiler: [ homebrew-clang, system-clang ]
         config: [ Release, Debug ]
         exclude:
           - os: macos-11
             compiler: system-clang
-    name: ${{ matrix.os }} / ${{ matrix.config }} / ${{ matrix.compiler }}
-    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.os }} / ${{ matrix.config }} / ${{ matrix.arch }} / ${{ matrix.compiler }}
+    runs-on: [ ${{ matrix.os }}, ${{ matrix.arch }} ]
     steps:
       - uses: actions/checkout@v3
         with:
@@ -90,7 +91,7 @@ jobs:
       - name: "Upload Artifacts"
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.os }}-${{ matrix.config }}-${{ matrix.compiler }}
+          name: ${{ matrix.os }}-${{ matrix.config }}-${{ matrix.arch }}-${{ matrix.compiler }}
           path: build/bin
 
   build-windows:
