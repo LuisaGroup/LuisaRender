@@ -124,7 +124,14 @@ public:
         : Base{scene, desc},
           _clip_plane{desc->property_float2_or_default(
               "clip", lazy_construct([desc] {
-                  return make_float2(desc->property_float_or_default("clip", 0.f), 1e10f);
+                  return desc->property_float2_or_default(
+                      "clip_plane", lazy_construct([desc] {
+                          auto near = desc->property_float_or_default(
+                              "clip", lazy_construct([desc] {
+                                  return desc->property_float_or_default("clip_plane", 0.f);
+                              }));
+                          return make_float2(near, 1e10f);
+                      }));
               }))} {
         _clip_plane = clamp(_clip_plane, 0.f, 1e10f);
         if (_clip_plane.x > _clip_plane.y) { std::swap(_clip_plane.x, _clip_plane.y); }
