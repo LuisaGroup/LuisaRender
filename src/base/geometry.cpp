@@ -266,7 +266,7 @@ ShadingAttribute Geometry::shading_point(const Shape::Handle &instance, const Va
                   .n = ng,
                   .area = area},
             .ps = p,
-            .ns = ns,
+            .ns = face_forward(ns, ng),
             .dpdu = dpdu,
             .dpdv = dpdv,
             .uv = uv};

@@ -543,7 +543,6 @@ public:
 
 private:
     [[nodiscard]] Surface::Evaluation _evaluate_local(const Surface::Closure *cls,
-                                                      Expr<float3> wo, Expr<float3> wi,
                                                       Expr<float3> wo_local, Expr<float3> wi_local,
                                                       TransportMode mode) const noexcept {
         SampledSpectrum f{cls->swl().dimension(), 0.f};
@@ -582,7 +581,7 @@ private:
                                                TransportMode mode) const noexcept override {
         auto wo_local = cls->it()->shading().world_to_local(wo);
         auto wi_local = cls->it()->shading().world_to_local(wi);
-        return _evaluate_local(cls, wo, wi, wo_local, wi_local, mode);
+        return _evaluate_local(cls, wo_local, wi_local, mode);
     }
     [[nodiscard]] Surface::Sample sample(const Surface::Closure *cls,
                                          Expr<float3> wo, Expr<float> u_lobe,
@@ -624,7 +623,7 @@ private:
         auto eval = Surface::Evaluation::zero(_color.dimension());
         auto wi = cls->it()->shading().local_to_world(wi_sample.wi);
         $if(wi_sample.valid) {
-            eval = _evaluate_local(cls, wo, wi, wo_local, wi_sample.wi, mode);
+            eval = _evaluate_local(cls, wo_local, wi_sample.wi, mode);
         };
         return {.eval = eval, .wi = wi, .event = event};
     }
@@ -787,7 +786,6 @@ public:
 
 private:
     [[nodiscard]] Surface::Evaluation _evaluate_local(const Surface::Closure *cls,
-                                                      Expr<float3> wo, Expr<float3> wi,
                                                       Expr<float3> wo_local, Expr<float3> wi_local,
                                                       TransportMode mode) const noexcept {
         SampledSpectrum f{cls->swl().dimension(), 0.f};
@@ -835,7 +833,7 @@ private:
                                                TransportMode mode) const noexcept override {
         auto wo_local = cls->it()->shading().world_to_local(wo);
         auto wi_local = cls->it()->shading().world_to_local(wi);
-        return _evaluate_local(cls, wo, wi, wo_local, wi_local, mode);
+        return _evaluate_local(cls, wo_local, wi_local, mode);
     }
     [[nodiscard]] Surface::Sample sample(const Surface::Closure *cls,
                                          Expr<float3> wo, Expr<float> u_lobe,
@@ -883,7 +881,7 @@ private:
         auto eval = Surface::Evaluation::zero(_color.dimension());
         auto wi = cls->it()->shading().local_to_world(wi_sample.wi);
         $if(wi_sample.valid) {
-            eval = _evaluate_local(cls, wo, wi, wo_local, wi_sample.wi, mode);
+            eval = _evaluate_local(cls, wo_local, wi_sample.wi, mode);
         };
         return {.eval = eval, .wi = wi, .event = event};
     }

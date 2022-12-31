@@ -258,7 +258,7 @@ SampledSpectrum BxDF::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u,
 }
 
 Float BxDF::pdf(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept {
-    return compute::ite(same_hemisphere(wo, wi), abs_cos_theta(wi) * inv_pi, 0.0f);
+    return compute::ite(same_hemisphere(wo, wi), abs_cos_theta(wi) * inv_pi, 0.f);
 }
 
 BxDF::SampledDirection BxDF::sample_wi(Expr<float3> wo, Expr<float2> u, TransportMode mode) const noexcept {
