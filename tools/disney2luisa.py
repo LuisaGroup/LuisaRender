@@ -74,6 +74,23 @@ def shape_group():
     }
 
 
+def levenshtein_distance(s1: str, s2: str) -> int:
+    if len(s1) < len(s2):
+        return levenshtein_distance(s2, s1)
+    if not s1:
+        return len(s2)
+    previous_row = range(len(s2) + 1)
+    for i, c1 in enumerate(s1):
+        current_row = [i + 1]
+        for j, c2 in enumerate(s2):
+            insertions = previous_row[j + 1] + 1
+            deletions = current_row[j] + 1
+            substitutions = previous_row[j] + (c1 != c2)
+            current_row.append(min(insertions, deletions, substitutions))
+        previous_row = current_row
+    return previous_row[-1]
+
+
 def log_info(msg, *args, **kwargs):
     print(f'{Fore.GREEN}[INFO]{Style.RESET_ALL} {msg}', *args, **kwargs)
 
@@ -118,39 +135,20 @@ def check_dir(input_dir: Path, output_dir: Path, input_force_exist: bool = True)
         Path.mkdir(output_dir)
 
 
-def split_obj(file_path_relative: Path, output_dir: Path,
-              materials_dict: dict, geo_name: str, converter_info: ConverterInfo) -> (dict, bool):
+def split_obj(file_path_relative: Path, materials_dict: dict, geo_name: str, converter_info: ConverterInfo) -> (dict, bool):
+    json_name_last = f'file2material_{file_path_relative.stem}.json'
+    output_dir = (converter_info.output_project_dir / file_path_relative).parent
     if not output_dir.exists():
         os.mkdir(output_dir)
-    json_name_last = f'file2material_{file_path_relative.stem}.json'
     file2material_path = output_dir / json_name_last
     file_path_str = str(file_path_relative).replace('\\', '/')
     index0 = file_path_str.find('obj/') + 4
     index1 = file_path_str.find('/', index0)
     geo_name_real = file_path_str[index0:index1]
 
-    if geo_name_real != geo_name:
-        file2material_path = (converter_info.output_project_dir / file_path_relative).parent / json_name_last
-        file2material_path_str = str(file2material_path).replace('\\', '/')
-        index0 = file2material_path_str.find('obj/') + 4
-        index1 = file2material_path_str.find('/', index0)
-        file2material_path = Path(file2material_path_str[:index0]) / geo_name_real / Path(
-            file2material_path_str[index1 + 1:])
-        log_info(
-            f'Multiprocessing waiting start: {file2material_path}, geo_name_real={geo_name_real}, geo_name={geo_name}')
-        geo_name_real_finished_path = converter_info.output_geo_dir / geo_name_real / 'finished.txt'
-        split_by_itself = False
-        while not file2material_path.exists() or file2material_path.stat().st_size == 0:
-            if geo_name_real_finished_path.exists():
-                split_by_itself = True
-                break
-            log_info(f'Multiprocessing sleep: {file2material_path}, geo_name_real={geo_name_real}, geo_name={geo_name}')
-            time.sleep(5.0)
-        if not split_by_itself:
-            log_info(
-                f'Multiprocessing waiting end: {file2material_path}, geo_name_real={geo_name_real}, geo_name={geo_name}')
-            with open(file2material_path, 'r') as f:
-                return json.load(f), False
+    if file2material_path.exists():
+        with open(file2material_path, 'r') as f:
+            return json.load(f), False
 
     class GeometryIndex:
         def __init__(self):
@@ -212,9 +210,9 @@ def split_obj(file_path_relative: Path, output_dir: Path,
             line[i] = '/'.join(line[i])
         return ' '.join(line)
 
-    def merge_geo(geo_name: str, index_num: GeometryIndex, geo_index_nums: dict):
-        t = geo_index_nums.get(geo_name, GeometryIndex()) + index_num
-        geo_index_nums[geo_name] = t
+    def merge_geo(g_name: str, index_num: GeometryIndex, geo_index_nums: dict):
+        t = geo_index_nums.get(g_name, GeometryIndex()) + index_num
+        geo_index_nums[g_name] = t
 
     def write_geo_line(line: str, name: str, geo_lines: dict):
         lines = geo_lines.get(name, [])
@@ -296,6 +294,7 @@ def split_obj(file_path_relative: Path, output_dir: Path,
                 g_name = g_name_new
                 file_name = g_name_new
                 write_geo_line(line, file_name, geo_lines)
+                log_info(f'Parse geo {g_name} of {geo_name}.{file_path_relative.stem}')
             elif line.startswith('f '):
                 if material is None:
                     file_name_new = g_name2file_name[g_name]
@@ -307,19 +306,28 @@ def split_obj(file_path_relative: Path, output_dir: Path,
             elif line.startswith('usemtl '):
                 material = line[7:].strip()
                 if material == '':
-                    # FIXME: This is a bug in the original file, we take random material here
+                    # FIXME: This is a bug in the original file
+                    # FIXME: we use the material with the shortest levenstein distance here
+                    # TODO: Use re_shape2material
                     material_names = list(materials_dict.keys())
-                    index_m = random.randint(0, len(material_names) - 1)
-                    material = material_names[index_m]
-                    log_warning(f'Empty material name for geometry {g_name}, using random material {material}')
-                    file_name = f'geo_{material[4:]}'
+                    material = min(material_names, key=lambda x: levenshtein_distance(x, file_path_relative.stem))
+                    log_error(f'Empty material name for geometry {g_name} of {file_path_relative.stem}, using material {material}')
+                    file_name = f'geo_{geo_name}_{file_path_relative.stem}_{material.lstrip("mat_")}'
                     g_name2file_name[g_name] = file_name
                 else:
-                    file_name = f'geo_{file_path_relative.stem}_{material}'
+                    file_name = f'geo_{geo_name}_{file_path_relative.stem}_{material}'
                     g_name2file_name[g_name] = file_name
-                    material = f'mat_{geo_name_real}_{material}'
+                    material = f'mat_{geo_name}_{material}'
                 move_to_end_of(g_name, file_name, geo_lines)
                 file2material[file_name] = material
+                # FIXME: This is a bug in the original file
+                # FIXME: we use the material with the shortest levenstein distance here
+                # TODO: Use re_shape2material
+                if material not in materials_dict:
+                    material_names = list(materials_dict.keys())
+                    material_match = min(material_names, key=lambda x: levenshtein_distance(x, material))
+                    log_error(f'Unknown material {material} for geometry {g_name}, using material {material_match}')
+                    material = material_match
                 write_geo_line(line, file_name, geo_lines)
             elif line.startswith('v '):
                 index_next.v_index += 1
@@ -552,8 +560,8 @@ def convert_material(converter_info: ConverterInfo, material: dict, name: str, g
         shape = f'^{shape}$'
         mateial_map_geo = converter_info.material_map[geo_name]
 
-        name_existed = shape2material_geo.get(shape, name)
-        if name_existed != name and mateial_map_geo[name_existed] != material_dict:
+        name_existed = shape2material_geo.get(shape, None)
+        if name_existed is not None and mateial_map_geo[name_existed] != material_dict:
             err = f'Material of shape "{shape}" already specified, ' \
                   f'"{shape2material_geo[shape]}" -> "{name}"'
             raise ValueError(err)
@@ -569,6 +577,7 @@ def convert_material(converter_info: ConverterInfo, material: dict, name: str, g
 
 def convert_geometry(converter_info: ConverterInfo, geo_name: str) -> (ConverterInfo, str, dict):
     log_info(f'Start to convert geometry {geo_name}')
+    time_start = time.perf_counter()
 
     check_dir(converter_info.input_json_dir / geo_name, converter_info.output_json_dir / geo_name)
     check_dir(converter_info.input_geo_dir / geo_name, converter_info.output_geo_dir / geo_name)
@@ -579,7 +588,6 @@ def convert_geometry(converter_info: ConverterInfo, geo_name: str) -> (Converter
     with open(converter_info.input_json_dir / geo_name / f'{geo_name}.json', 'r') as f:
         geo = json.load(f)
     assert geo['name'] == geo_name
-    assert Path(geo['geomObjFile']) == Path(f'obj/{geo_name}/{geo_name}.obj')
     assert Path(geo['matFile']) == Path(f'json/{geo_name}/materials.json')
 
     # materials
@@ -639,8 +647,9 @@ def convert_geometry(converter_info: ConverterInfo, geo_name: str) -> (Converter
     # geometry of itself
     geo_obj_file = geo.get('geomObjFile', None)
     if geo_obj_file is not None:
+        assert Path(geo_obj_file) == Path(f'obj/{geo_name}/{geo_name}.obj')
         output_dir = (converter_info.output_project_dir / geo_obj_file).parent
-        geo2material, split_by_itself = split_obj(file_path_relative=Path(geo_obj_file), output_dir=output_dir,
+        geo2material, split_by_itself = split_obj(file_path_relative=Path(geo_obj_file),
                                                   materials_dict=materials_dict, geo_name=geo_name,
                                                   converter_info=converter_info)
         assert split_by_itself
@@ -670,7 +679,7 @@ def convert_geometry(converter_info: ConverterInfo, geo_name: str) -> (Converter
             instanced_primitive = json.load(open(input_path, 'r'))
             for geo_obj_file, copies in instanced_primitive.items():
                 output_dir = (converter_info.output_project_dir / geo_obj_file).parent
-                geo2material, split_by_itself = split_obj(file_path_relative=Path(geo_obj_file), output_dir=output_dir,
+                geo2material, split_by_itself = split_obj(file_path_relative=Path(geo_obj_file),
                                                           materials_dict=materials_dict, geo_name=geo_name,
                                                           converter_info=converter_info)
                 if split_by_itself:
@@ -732,7 +741,8 @@ def convert_geometry(converter_info: ConverterInfo, geo_name: str) -> (Converter
     with open(converter_info.output_json_dir / geo_name / f'{geo_name}.json', 'w') as f:
         json.dump(geo_dict, f, indent=2)
 
-    log_info(f'Geometry {geo_name} converted')
+    time_converted = time.perf_counter() - time_start
+    log_info(f'Geometry {geo_name} converted, time: {time_converted:.2f} s')
 
     return converter_info, geo_name, geo_dict
 
@@ -866,8 +876,7 @@ f   -4   -3   -2   -1
         converter_info.re_shape2material[geo_name] = {}
 
     # test_geo_names = ['isBeach', 'isCoastline', 'osOcean', 'isDunesA', 'isDunesB', 'isMountainA', 'isMountainB']
-    # test_geo_names = ['isBeach']
-    test_geo_names = ['isDunesA', 'isCoastline', ]
+    test_geo_names = ['isCoral', 'isDunesB', 'isIronwoodA1']
 
     pool = multiprocessing.Pool()
     threads = []
@@ -880,6 +889,9 @@ f   -4   -3   -2   -1
         path_in = converter_info.input_json_dir / geo_name
         path_out = converter_info.output_json_dir / geo_name
         check_dir(path_in, path_out)
+        path_in = converter_info.input_geo_dir / geo_name
+        path_out = converter_info.output_geo_dir / geo_name
+        check_dir(path_in, path_out)
         thread_t = pool.apply_async(convert_geometry, args=(converter_info.copy(), geo_name))
         threads.append(thread_t)
         thread2geo_name[thread_t] = geo_name
@@ -887,7 +899,7 @@ f   -4   -3   -2   -1
 
     # time_last = time.perf_counter()
     # time_delta = 0.0
-    print_every_seconds = 5.0
+    print_every_seconds = 600.0
     finished_threads = 0
     thread_count = len(threads)
     while len(threads) > 0:
@@ -897,8 +909,6 @@ f   -4   -3   -2   -1
                 threads_next.append(thread_t)
                 continue
             converter_info_t, geo_name, geo_dict = thread_t.get()
-            with open(converter_info.output_geo_dir / geo_name / 'finished.txt', 'w') as f:
-                pass
             converter_info.merge(converter_info_t)
             finished_threads += 1
             log_info(f'Thread {finished_threads}/{thread_count} finished. Geometry {geo_name} dumped')
