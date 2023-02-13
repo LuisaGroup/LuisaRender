@@ -11,6 +11,7 @@
 #include <base/film.h>
 #include <base/filter.h>
 #include <base/texture.h>
+#include <base/interaction.h>
 
 namespace luisa::render {
 
@@ -33,6 +34,12 @@ public:
         Float weight;
     };
 
+    struct SampleDifferential {
+        RayDifferential ray_differential;
+        Float2 pixel;
+        Float weight;
+    };
+
     class Instance {
 
     private:
@@ -43,11 +50,15 @@ public:
 
     private:
         // generate ray in camera space, should not consider _filter or _transform
-        [[nodiscard]] virtual Sample _generate_ray_in_camera_space(
-            Expr<float2> pixel, Expr<float2> u_lens, Expr<float> time) const noexcept = 0;
+        [[nodiscard]] virtual std::pair<Var<Ray>, Float /* weight */>
+        _generate_ray_in_camera_space(Expr<float2> pixel,
+                                      Expr<float2> u_lens,
+                                      Expr<float> time) const noexcept = 0;
 
     public:
-        Instance(Pipeline &pipeline, CommandBuffer &command_buffer, const Camera *camera) noexcept;
+        Instance(Pipeline &pipeline,
+                 CommandBuffer &command_buffer,
+                 const Camera *camera) noexcept;
         Instance(const Instance &) noexcept = delete;
         Instance(Instance &&another) noexcept = default;
         Instance &operator=(const Instance &) noexcept = delete;
@@ -63,6 +74,8 @@ public:
         [[nodiscard]] auto filter() const noexcept { return _filter; }
         [[nodiscard]] Sample generate_ray(Expr<uint2> pixel_coord, Expr<float> time,
                                           Expr<float2> u_filter, Expr<float2> u_lens) const noexcept;
+        [[nodiscard]] SampleDifferential generate_ray_differential(Expr<uint2> pixel_coord, Expr<float> time,
+                                                                   Expr<float2> u_filter, Expr<float2> u_lens) const noexcept;
         [[nodiscard]] Float4x4 camera_to_world() const noexcept;
     };
 
@@ -113,7 +126,14 @@ public:
         : Base{scene, desc},
           _clip_plane{desc->property_float2_or_default(
               "clip", lazy_construct([desc] {
-                  return make_float2(desc->property_float_or_default("clip", 0.f), 1e10f);
+                  return desc->property_float2_or_default(
+                      "clip_plane", lazy_construct([desc] {
+                          auto near_plane = desc->property_float_or_default(
+                              "clip", lazy_construct([desc] {
+                                  return desc->property_float_or_default("clip_plane", 0.f);
+                              }));
+                          return make_float2(near_plane, 1e10f);
+                      }));
               }))} {
         _clip_plane = clamp(_clip_plane, 0.f, 1e10f);
         if (_clip_plane.x > _clip_plane.y) { std::swap(_clip_plane.x, _clip_plane.y); }
@@ -125,14 +145,16 @@ public:
     public:
         explicit Instance(BaseInstance base) noexcept
             : BaseInstance{std::move(base)} {}
-        [[nodiscard]] Camera::Sample _generate_ray_in_camera_space(
-            Expr<float2> pixel, Expr<float2> u_lens, Expr<float> time) const noexcept override {
-            auto s = BaseInstance::_generate_ray_in_camera_space(pixel, u_lens, time);
+        [[nodiscard]] std::pair<Var<Ray>, Float>
+        _generate_ray_in_camera_space(Expr<float2> pixel,
+                                      Expr<float2> u_lens,
+                                      Expr<float> time) const noexcept override {
+            auto [ray, weight] = BaseInstance::_generate_ray_in_camera_space(pixel, u_lens, time);
             auto t = this->template node<ClipPlaneCameraWrapper>()->clip_plane() /
-                     dot(s.ray->direction(), make_float3(0.f, 0.f, -1.f));
-            s.ray->set_t_min(t.x);
-            s.ray->set_t_max(t.y);
-            return s;
+                     dot(ray->direction(), make_float3(0.f, 0.f, -1.f));
+            ray->set_t_min(t.x);
+            ray->set_t_max(t.y);
+            return std::make_pair(std::move(ray), std::move(weight));
         }
     };
     [[nodiscard]] auto clip_plane() const noexcept { return _clip_plane; }

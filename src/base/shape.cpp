@@ -41,8 +41,8 @@ MeshView Shape::mesh() const noexcept { return {}; }
 luisa::span<const Shape *const> Shape::children() const noexcept { return {}; }
 bool Shape::deformable() const noexcept { return false; }
 
-Shape::Handle Shape::Handle::encode(uint buffer_base, uint flags, uint surface_tag, uint light_tag,
-                                    uint tri_count, float shadow_terminator, float intersection_offset) noexcept {
+uint4 Shape::Handle::encode(uint buffer_base, uint flags, uint surface_tag, uint light_tag,
+                            uint tri_count, float shadow_terminator, float intersection_offset) noexcept {
     LUISA_ASSERT(buffer_base <= buffer_base_max, "Invalid geometry buffer base: {}.", buffer_base);
     LUISA_ASSERT(flags <= property_flag_mask, "Invalid property flags: {:016x}.", flags);
     LUISA_ASSERT(surface_tag <= surface_tag_max, "Invalid surface tag: {}.", surface_tag);
@@ -54,12 +54,37 @@ Shape::Handle Shape::Handle::encode(uint buffer_base, uint flags, uint surface_t
         constexpr auto fixed_point_scale = 1.f / static_cast<float>(1u << fixed_point_bits);
         return static_cast<uint>(std::clamp(round(x / fixed_point_scale), 0.f, static_cast<float>(fixed_point_mask)));
     };
-    return Handle{.buffer_base_and_properties = (buffer_base << property_flag_bits) | flags,
-                  .surface_tag_and_light_tag = (surface_tag << light_tag_bits) | light_tag,
-                  .triangle_buffer_size = tri_count,
-                  .shadow_term_and_intersection_offset =
-                      (encode_fixed_point(shadow_terminator) << 16u) |
-                      encode_fixed_point(intersection_offset)};
+    auto buffer_base_and_properties = (buffer_base << property_flag_bits) | flags;
+    auto surface_tag_and_light_tag = (surface_tag << light_tag_bits) | light_tag;
+    auto shadow_term_and_intersection_offset = (encode_fixed_point(shadow_terminator) << 16u) |
+                                               encode_fixed_point(intersection_offset);
+    return make_uint4(buffer_base_and_properties,
+                      surface_tag_and_light_tag,
+                      tri_count,
+                      shadow_term_and_intersection_offset);
+}
+
+luisa::shared_ptr<Shape::Handle> Shape::Handle::decode(Expr<uint4> compressed) noexcept {
+    auto buffer_base_and_properties = compressed.x;
+    auto surface_tag_and_light_tag = compressed.y;
+    auto triangle_buffer_size = compressed.z;
+    auto shadow_term_and_intersection_offset = compressed.w;
+    auto buffer_base = buffer_base_and_properties >> property_flag_bits;
+    auto flags = buffer_base_and_properties & property_flag_mask;
+    auto surface_tag = surface_tag_and_light_tag >> light_tag_bits;
+    auto light_tag = surface_tag_and_light_tag & light_tag_mask;
+    static constexpr auto decode_fixed_point = [](Expr<uint> x) noexcept {
+        constexpr auto fixed_point_bits = 16u;
+        constexpr auto fixed_point_mask = (1u << fixed_point_bits) - 1u;
+        constexpr auto fixed_point_scale = 1.0f / static_cast<float>(1u << fixed_point_bits);
+        return cast<float>(x & fixed_point_mask) * fixed_point_scale;
+    };
+    auto shadow_terminator = decode_fixed_point(shadow_term_and_intersection_offset >> 16u);
+    auto intersection_offset = decode_fixed_point(shadow_term_and_intersection_offset & 0xffffu);
+    Shape::Handle shape{buffer_base, flags, surface_tag, light_tag,
+                        triangle_buffer_size, shadow_terminator,
+                        clamp(intersection_offset * 255.f + 1.f, 1.f, 256.f)};
+    return luisa::make_shared<Shape::Handle>(std::move(shape));
 }
 
 }// namespace luisa::render

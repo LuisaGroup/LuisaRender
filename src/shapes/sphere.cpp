@@ -50,20 +50,17 @@ class SphereGeometry {
 
 private:
     luisa::vector<Vertex> _vertices;
-    luisa::vector<float2> _uvs;
     luisa::vector<Triangle> _triangles;
 
 public:
     SphereGeometry() noexcept = default;
     SphereGeometry(luisa::vector<Vertex> vertices,
-                   luisa::vector<float2> uvs,
                    luisa::vector<Triangle> triangles) noexcept
         : _vertices{std::move(vertices)},
-          _uvs{std::move(uvs)},
           _triangles{std::move(triangles)} {}
 
 public:
-    [[nodiscard]] auto mesh() const noexcept { return MeshView{_vertices, _uvs, _triangles}; }
+    [[nodiscard]] auto mesh() const noexcept { return MeshView{_vertices, _triangles}; }
     [[nodiscard]] static auto create(uint subdiv) noexcept {
         static constexpr auto direction_to_uv = [](float3 w) noexcept {
             auto theta = acos(w.y);
@@ -78,7 +75,7 @@ public:
             std::array<Vertex, sphere_base_vertices.size()> bv{};
             for (auto i = 0u; i < sphere_base_vertices.size(); i++) {
                 auto p = normalize(sphere_base_vertices[i]);
-                bv[i] = Vertex::encode(p, p);
+                bv[i] = Vertex::encode(p, p, make_float2());
             }
             return bv;
         }();
@@ -89,10 +86,12 @@ public:
         if (auto g = cache.at(subdiv); g.valid()) { return g; }
         auto future = ThreadPool::global().async([subdiv] {
             auto [vertices, triangles, _] = loop_subdivide(base_vertices, sphere_base_triangles, subdiv);
-            luisa::vector<float2> uvs(vertices.size());
-            std::transform(vertices.begin(), vertices.end(), uvs.begin(),
-                           [](auto v) noexcept { return direction_to_uv(v.position()); });
-            return SphereGeometry{std::move(vertices), std::move(uvs), std::move(triangles)};
+            for (auto &v : vertices) {
+                auto p = normalize(v.position());
+                auto uv = direction_to_uv(v.position());
+                v = Vertex::encode(p, p, uv);
+            }
+            return SphereGeometry{std::move(vertices), std::move(triangles)};
         });
         cache[subdiv] = future;
         return future;

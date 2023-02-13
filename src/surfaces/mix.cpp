@@ -51,11 +51,12 @@ public:
 
 public:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
-        const Interaction &it, const SampledWavelengths &swl,
+        luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
         Expr<float> eta_i, Expr<float> time) const noexcept override;
 };
 
-luisa::unique_ptr<Surface::Instance> MixSurface::_build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
+luisa::unique_ptr<Surface::Instance> MixSurface::_build(
+    Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
     auto a = _a->build(pipeline, command_buffer);
     auto b = _b->build(pipeline, command_buffer);
     auto ratio = pipeline.build_texture(command_buffer, _ratio);
@@ -81,10 +82,10 @@ private:
 
 public:
     MixSurfaceClosure(
-        const MixSurfaceInstance *instance, const Interaction &it,
+        const MixSurfaceInstance *instance, luisa::shared_ptr<Interaction> it,
         const SampledWavelengths &swl, Expr<float> time, Expr<float> ratio,
         luisa::unique_ptr<Surface::Closure> a, luisa::unique_ptr<Surface::Closure> b) noexcept
-        : Surface::Closure{instance, it, swl, time},
+        : Surface::Closure{instance, std::move(it), swl, time},
           _a{std::move(a)}, _b{std::move(b)}, _ratio{ratio} {
         LUISA_ASSERT(_a != nullptr || _b != nullptr,
                      "Creating closure for null MixSurface.");
@@ -128,7 +129,7 @@ private:
     }
     [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u,
                                           TransportMode mode) const noexcept override {
-        auto sample = Surface::Sample::zero(_swl.dimension());
+        auto sample = Surface::Sample::zero(swl().dimension());
         $if(u_lobe < _ratio) {// sample a
             auto sample_a = _a->sample(wo, u_lobe / _ratio, u, mode);
             auto eval_b = _b->evaluate(wo, sample_a.wi, mode);
@@ -148,13 +149,13 @@ private:
 };
 
 luisa::unique_ptr<Surface::Closure> MixSurfaceInstance::closure(
-    const Interaction &it, const SampledWavelengths &swl,
+    luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
     Expr<float> eta_i, Expr<float> time) const noexcept {
-    auto ratio = _ratio == nullptr ? 0.5f : clamp(_ratio->evaluate(it, swl, time).x, 0.f, 1.f);
+    auto ratio = _ratio == nullptr ? 0.5f : clamp(_ratio->evaluate(*it, swl, time).x, 0.f, 1.f);
     auto a = _a->closure(it, swl, eta_i, time);
     auto b = _b->closure(it, swl, eta_i, time);
     return luisa::make_unique<MixSurfaceClosure>(
-        this, it, swl, time, ratio, std::move(a), std::move(b));
+        this, std::move(it), swl, time, ratio, std::move(a), std::move(b));
 }
 
 using NormalMapMixSurface = NormalMapWrapper<

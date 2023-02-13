@@ -2,6 +2,8 @@
 // Created by Mike Smith on 2022/11/18.
 //
 
+#include <bit>
+
 #include <core/stl.h>
 #include <util/half.h>
 

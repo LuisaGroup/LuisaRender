@@ -105,7 +105,7 @@ protected:
             // compute direct lighting
             $if(!it->shape()->has_surface()) { $break; };
 
-            auto light_sample = Light::Sample::zero(swl.dimension());
+            auto light_sample = LightSampler::Sample::zero(swl.dimension());
             auto occluded = def(false);
 
             if (samples_lights) {
@@ -116,7 +116,10 @@ protected:
                     *it, u_light_selection, u_light_surface, swl, time);
 
                 // trace shadow ray
-                occluded = pipeline().geometry()->intersect_any(light_sample.ray);
+                $if(light_sample.eval.pdf > 0.f &
+                    light_sample.eval.L.any([](auto x) { return x > 0.f; })) {
+                    occluded = pipeline().geometry()->intersect_any(light_sample.shadow_ray);
+                };
             }
 
             // evaluate material
@@ -128,9 +131,9 @@ protected:
             auto alpha_skip = def(false);
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
                 // create closure
-                auto closure = surface->closure(*it, swl, 1.f, time);
+                auto closure = surface->closure(it, swl, 1.f, time);
 
-                // apply roughness map
+                // apply opacity map
                 if (auto o = closure->opacity()) {
                     auto opacity = saturate(*o);
                     alpha_skip = u_lobe >= opacity;
@@ -149,7 +152,7 @@ protected:
                     // direct lighting
                     if (samples_lights) {
                         $if(light_sample.eval.pdf > 0.0f & !occluded) {
-                            auto wi = light_sample.ray->direction();
+                            auto wi = light_sample.shadow_ray->direction();
                             auto eval = closure->evaluate(wo, wi);
                             $if(eval.pdf > 0.f) {
                                 auto w = def(1.f);

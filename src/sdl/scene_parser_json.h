@@ -20,7 +20,9 @@ class SceneNodeDesc;
 class SceneParserJSON {
 
 public:
-    using MacroMap = luisa::map<luisa::string, luisa::string>;
+    using MacroMap = luisa::unordered_map<luisa::string,
+                                          luisa::string,
+                                          luisa::string_hash>;
 
 private:
     SceneDesc &_desc;

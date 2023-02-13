@@ -367,7 +367,8 @@ SubdivMesh loop_subdivide(luisa::span<const Vertex> vertices,
         usedVerts[v[i]] = i;
         auto p = pLimit[i];
         auto n = nLimit[i];
-        mesh.vertices[i] = {p.x, p.y, p.z, oct_encode(n)};
+        // FIXME: uv
+        mesh.vertices[i] = Vertex::encode(p, n, make_float2(0.f));
     }
     for (auto i = 0u; i < f.size(); ++i) {
         mesh.triangles[i] = {usedVerts[f[i]->v[0u]],

@@ -47,8 +47,8 @@ protected:
             if (node<NormalVisualizer>()->shading()) {
                 $if(it->shape()->has_surface()) {
                     pipeline().surfaces().dispatch(it->shape()->surface_tag(), [&](auto surface) noexcept {
-                        auto closure = surface->closure(*it, swl, 1.f, time);
-                        ns = closure->it().shading().n();
+                        auto closure = surface->closure(it, swl, 1.f, time);
+                        ns = closure->it()->shading().n();
                     });
                 }
                 $else {

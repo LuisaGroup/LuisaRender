@@ -12,13 +12,14 @@ set(LUISA_RENDER_BASE_SOURCES
         environment.cpp environment.h
         light.cpp light.h
         pipeline.cpp pipeline.h
-        interaction.h
+        interaction.cpp interaction.h
         light_sampler.cpp light_sampler.h
         texture.cpp texture.h
         texture_mapping.cpp texture_mapping.h
         spectrum.cpp spectrum.h
         geometry.cpp geometry.h
-        spd.cpp spd.h display.cpp display.h)
+        spd.cpp spd.h
+        display.cpp display.h)
 
 add_library(luisa-render-base SHARED ${LUISA_RENDER_BASE_SOURCES})
 target_link_libraries(luisa-render-base PUBLIC

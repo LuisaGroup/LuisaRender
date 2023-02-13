@@ -19,7 +19,18 @@ void Display::reset(CommandBuffer &command_buffer, const Film::Instance *film) n
     using namespace luisa::compute;
     auto &&device = film->pipeline().device();
     auto resolution = film->node()->resolution();
-    _window = luisa::make_unique<Window>(_name.c_str(), resolution);
+    _window = [&] {
+        auto w = luisa::make_unique<Window>(_name.c_str(), resolution, true);
+        auto fw = 0;
+        auto fh = 0;
+        glfwGetFramebufferSize(w->handle(), &fw, &fh);
+        if (auto fs = make_uint2(fw, fh); !all(fs == resolution)) {
+            auto scale = make_float2(fs) / make_float2(resolution);
+            auto scaled_resolution = make_uint2(make_float2(resolution) / scale);
+            w->set_size(max(scaled_resolution, 1u));
+        }
+        return w;
+    }();
     _pixels.resize(resolution.x * resolution.y);
     _converted = device.create_image<float>(PixelStorage::BYTE4, resolution);
     _convert = device.compile_async<1>([film, w = resolution.x, this](UInt tone_mapper, Float exposure) noexcept {

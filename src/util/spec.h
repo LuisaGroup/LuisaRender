@@ -42,6 +42,14 @@ using compute::Float4;
 using compute::Local;
 using compute::VolumeView;
 
+template<typename X, typename C0>
+[[nodiscard]] inline auto &polynomial(const X &x, const C0 &c0) noexcept { return c0; }
+
+template<typename X, typename C0, typename... C>
+[[nodiscard]] inline auto polynomial(const X &x, const C0 &c0, const C &...c) noexcept {
+    return x * polynomial(x, c...) + c0;
+}
+
 class SampledSpectrum {
 
 private:
@@ -192,6 +200,7 @@ public:
 [[nodiscard]] SampledSpectrum ite(const SampledSpectrum &p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept;
 [[nodiscard]] SampledSpectrum ite(const SampledSpectrum &p, Expr<float> t, const SampledSpectrum &f) noexcept;
 [[nodiscard]] SampledSpectrum ite(const SampledSpectrum &p, const SampledSpectrum &t, Expr<float> f) noexcept;
+[[nodiscard]] SampledSpectrum ite(const SampledSpectrum &p, Expr<float> t, Expr<float> f) noexcept;
 [[nodiscard]] SampledSpectrum ite(Expr<bool> p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept;
 [[nodiscard]] SampledSpectrum ite(Expr<bool> p, Expr<float> t, const SampledSpectrum &f) noexcept;
 [[nodiscard]] SampledSpectrum ite(Expr<bool> p, const SampledSpectrum &t, Expr<float> f) noexcept;
@@ -206,14 +215,24 @@ public:
 // TODO: other math functions
 
 using luisa::lerp;
+using luisa::compute::fma;
 using luisa::compute::lerp;
+
+template<typename A, typename B, typename C>
+    requires std::disjunction_v<
+        std::is_same<std::remove_cvref_t<A>, SampledSpectrum>,
+        std::is_same<std::remove_cvref_t<B>, SampledSpectrum>,
+        std::is_same<std::remove_cvref_t<C>, SampledSpectrum>>
+[[nodiscard]] auto fma(const A &a, const B &b, const C &c) noexcept {
+    return a * b + c;
+}
 
 template<typename A, typename B, typename T>
     requires std::disjunction_v<
         std::is_same<std::remove_cvref_t<A>, SampledSpectrum>,
         std::is_same<std::remove_cvref_t<B>, SampledSpectrum>,
         std::is_same<std::remove_cvref_t<T>, SampledSpectrum>>
-[[nodiscard]] auto lerp(A &&a, B &&b, T &&t) noexcept {
+[[nodiscard]] auto lerp(const A &a, const B &b, const T &t) noexcept {
     return t * (b - a) + a;
 }
 

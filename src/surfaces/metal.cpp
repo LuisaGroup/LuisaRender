@@ -56,7 +56,7 @@ public:
           _roughness{scene->load_texture(desc->property_node_or_default("roughness"))},
           _kd{scene->load_texture(desc->property_node_or_default("Kd"))},
           _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {
-        auto register_eta_k = [&](luisa::string_view name, luisa::span<float2> eta_k) noexcept {
+        auto register_eta_k = [&](const luisa::string &name, luisa::span<float2> eta_k) noexcept {
             std::scoped_lock lock{_mutex()};
             auto [iter, success] = _known_ior().try_emplace(name, ComplexIOR{});
             if (success) {
@@ -177,7 +177,7 @@ public:
 
 public:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
-        const Interaction &it, const SampledWavelengths &swl,
+        luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
         Expr<float> eta_i, Expr<float> time) const noexcept override;
 };
 
@@ -211,12 +211,11 @@ private:
     luisa::unique_ptr<MicrofacetReflection> _lobe;
 
 public:
-    MetalClosure(
-        const Surface::Instance *instance, const Interaction &it,
-        const SampledWavelengths &swl, Expr<float> time,
-        Expr<float> eta_i, const SampledSpectrum &n, const SampledSpectrum &k,
-        luisa::optional<SampledSpectrum> refl, Expr<float2> alpha) noexcept
-        : Surface::Closure{instance, it, swl, time}, _refl{std::move(refl)},
+    MetalClosure(const Surface::Instance *instance, luisa::shared_ptr<Interaction> it,
+                 const SampledWavelengths &swl, Expr<float> time, Expr<float> eta_i,
+                 const SampledSpectrum &n, const SampledSpectrum &k,
+                 luisa::optional<SampledSpectrum> refl, Expr<float2> alpha) noexcept
+        : Surface::Closure{instance, std::move(it), swl, time}, _refl{std::move(refl)},
           _fresnel{luisa::make_unique<FresnelConductor>(eta_i, n, k)},
           _distrib{luisa::make_unique<TrowbridgeReitzDistribution>(alpha)},
           _lobe{luisa::make_unique<MicrofacetReflection>(
@@ -230,39 +229,33 @@ private:
     }
     [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
                                                 TransportMode mode) const noexcept override {
-        auto wo_local = _it.shading().world_to_local(wo);
-        auto wi_local = _it.shading().world_to_local(wi);
+        auto wo_local = it()->shading().world_to_local(wo);
+        auto wi_local = it()->shading().world_to_local(wi);
         auto f = _lobe->evaluate(wo_local, wi_local, mode);
         if (_refl) { f *= *_refl; }
         auto pdf = _lobe->pdf(wo_local, wi_local, mode);
-        auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f |
-                                  _it.shape()->shadow_terminator_factor() > 0.f,
-                              1.f, 0.f);
-        return {.f = f * abs_cos_theta(wi_local) * same_sided, .pdf = pdf};
+        return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
     [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float>, Expr<float2> u,
                                           TransportMode mode) const noexcept override {
-        auto wo_local = _it.shading().world_to_local(wo);
+        auto wo_local = it()->shading().world_to_local(wo);
         auto pdf = def(0.f);
         auto wi_local = def(make_float3(0.f, 0.f, 1.f));
         auto f = _lobe->sample(wo_local, &wi_local, u, &pdf, mode);
         if (_refl) { f *= *_refl; }
-        auto wi = _it.shading().local_to_world(wi_local);
-        auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f |
-                                  _it.shape()->shadow_terminator_factor() > 0.f,
-                              1.f, 0.f);
-        return {.eval = {.f = f * abs_cos_theta(wi_local) * same_sided, .pdf = pdf},
+        auto wi = it()->shading().local_to_world(wi_local);
+        return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf},
                 .wi = wi,
                 .event = Surface::event_reflect};
     }
 };
 
 luisa::unique_ptr<Surface::Closure> MetalInstance::closure(
-    const Interaction &it, const SampledWavelengths &swl,
+    luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
     Expr<float> eta_i, Expr<float> time) const noexcept {
     auto alpha = def(make_float2(.5f));
     if (_roughness != nullptr) {
-        auto r = _roughness->evaluate(it, swl, time);
+        auto r = _roughness->evaluate(*it, swl, time);
         auto remap = node<MetalSurface>()->remap_roughness();
         auto r2a = [](auto &&x) noexcept { return TrowbridgeReitzDistribution::roughness_to_alpha(x); };
         alpha = _roughness->node()->channels() == 1u ?
@@ -278,10 +271,10 @@ luisa::unique_ptr<Surface::Closure> MetalInstance::closure(
     }
     luisa::optional<SampledSpectrum> refl;
     if (_kd != nullptr) {
-        refl.emplace(_kd->evaluate_albedo_spectrum(it, swl, time).value);
+        refl.emplace(_kd->evaluate_albedo_spectrum(*it, swl, time).value);
     }
     return luisa::make_unique<MetalClosure>(
-        this, it, swl, time, eta_i,
+        this, std::move(it), swl, time, eta_i,
         eta, k, std::move(refl), alpha);
 }
 

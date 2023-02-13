@@ -48,7 +48,7 @@ public:
     [[nodiscard]] bool is_mesh() const noexcept override { return true; }
     [[nodiscard]] MeshView mesh() const noexcept override {
         return _geometry.valid() ?
-                   MeshView{_geometry.get().first, {}, _geometry.get().second} :
+                   MeshView{_geometry.get().first, _geometry.get().second} :
                    _mesh->mesh();
     }
     [[nodiscard]] uint vertex_properties() const noexcept override {

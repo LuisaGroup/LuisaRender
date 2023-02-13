@@ -15,11 +15,11 @@ Bool refract(Float3 wi, Float3 n, Float eta, Float3 *wt) noexcept {
     static Callable impl = [](Float3 wi, Float3 n, Float eta) noexcept {
         // Compute $\cos \theta_\roman{t}$ using Snell's law
         auto cosThetaI = dot(n, wi);
-        auto sin2ThetaI = max(0.0f, 1.0f - sqr(cosThetaI));
+        auto sin2ThetaI = max(0.0f, one_minus_sqr(cosThetaI));
         auto sin2ThetaT = sqr(eta) * sin2ThetaI;
         auto cosThetaT = sqrt(1.f - sin2ThetaT);
         // Handle total internal reflection for transmission
-        auto wt = -eta * wi + (eta * cosThetaI - cosThetaT) * n;
+        auto wt = (eta * cosThetaI - cosThetaT) * n - eta * wi;
         return make_float4(wt, sin2ThetaT);
     };
     auto v = impl(wi, n, eta);
@@ -28,7 +28,7 @@ Bool refract(Float3 wi, Float3 n, Float eta, Float3 *wt) noexcept {
 }
 
 Float3 reflect(Float3 wo, Float3 n) noexcept {
-    return -wo + 2.0f * dot(wo, n) * n;
+    return 2.f * dot(wo, n) * n - wo;
 }
 
 Float fresnel_dielectric(Float cosThetaI_in, Float etaI_in, Float etaT_in) noexcept {
@@ -41,13 +41,13 @@ Float fresnel_dielectric(Float cosThetaI_in, Float etaI_in, Float etaT_in) noexc
         auto etaT = ite(entering, etaT_in, etaI_in);
         cosThetaI = abs(cosThetaI);
         // Compute _cosThetaT_ using Snell's law
-        auto sinThetaI = sqrt(max(0.f, 1.f - sqr(cosThetaI)));
+        auto sinThetaI = sqrt(max(0.f, one_minus_sqr(cosThetaI)));
         auto sinThetaT = etaI / etaT * sinThetaI;
-        auto cosThetaT = sqrt(max(0.f, 1.f - sqr(sinThetaT)));
-        auto Rparl = ((etaT * cosThetaI) - (etaI * cosThetaT)) /
-                     ((etaT * cosThetaI) + (etaI * cosThetaT));
-        auto Rperp = ((etaI * cosThetaI) - (etaT * cosThetaT)) /
-                     ((etaI * cosThetaI) + (etaT * cosThetaT));
+        auto cosThetaT = sqrt(max(0.f, one_minus_sqr(sinThetaT)));
+        auto Rparl = (etaT * cosThetaI - etaI * cosThetaT) /
+                     (etaT * cosThetaI + etaI * cosThetaT);
+        auto Rperp = (etaI * cosThetaI - etaT * cosThetaT) /
+                     (etaI * cosThetaI + etaT * cosThetaT);
         auto fr = (Rparl * Rparl + Rperp * Rperp) * .5f;
         // Handle total internal reflection
         return ite(sinThetaT < 1.f, fr, 1.f);
@@ -101,12 +101,11 @@ Float spherical_phi(Float3 v) noexcept {
 Float fresnel_dielectric_integral(Float eta) noexcept {
     static Callable fit_less_one = [](Float eta) noexcept {
         constexpr std::array c{0.75985009f, -2.09069066f, 2.23559031f, -0.90663979f};
-        return fma(fma(fma(c[3], eta, c[2]), eta, c[1]), eta, c[0]);
+        return polynomial(eta, c[0], c[1], c[2], c[3]);
     };
     static Callable fit_greater_one = [](Float eta) noexcept {
         constexpr std::array c{0.97945724f, 0.21762732f, -1.18995376f};
-        auto e = 1.f / eta;
-        return fma(fma(c[2], e, c[1]), e, c[0]);
+        return polynomial(1.f / eta, c[0], c[1], c[2]);
     };
     return saturate(ite(eta == 1.f, 0.f, ite(eta < 1.f, fit_less_one(eta), fit_greater_one(eta))));
 }
@@ -259,7 +258,7 @@ SampledSpectrum BxDF::sample(Expr<float3> wo, Float3 *wi, Expr<float2> u,
 }
 
 Float BxDF::pdf(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept {
-    return compute::ite(same_hemisphere(wo, wi), abs_cos_theta(wi) * inv_pi, 0.0f);
+    return compute::ite(same_hemisphere(wo, wi), abs_cos_theta(wi) * inv_pi, 0.f);
 }
 
 BxDF::SampledDirection BxDF::sample_wi(Expr<float3> wo, Expr<float2> u, TransportMode mode) const noexcept {

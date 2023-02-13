@@ -208,7 +208,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
             "No lights in scene. Rendering aborted.");
         return;
     }
-    
+
     auto pixel_count = resolution.x * resolution.y;
     sampler()->reset(command_buffer, resolution, pixel_count, spp);
     command_buffer << synchronize();
@@ -266,7 +266,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                 aux_buffers.at("ndc")->accumulate(dispatch_id().xy(), make_float4(p_ndc, 1.f));
                 pipeline().surfaces().dispatch(it->shape()->surface_tag(), [&](auto surface) noexcept {
                     // create closure
-                    auto closure = surface->closure(*it, swl, 1.f, time);
+                    auto closure = surface->closure(it, swl, 1.f, time);
                     auto albedo = closure->albedo();
                     auto roughness = closure->roughness();
                     aux_buffers.at("albedo")->accumulate(dispatch_id().xy(), make_float4(spectrum->srgb(swl, albedo), 1.f));
@@ -303,11 +303,11 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
             // sample one light
             auto u_light_selection = sampler()->generate_1d();
             auto u_light_surface = sampler()->generate_2d();
-            Light::Sample light_sample = light_sampler()->sample(
+            auto light_sample = light_sampler()->sample(
                 *it, u_light_selection, u_light_surface, swl, time);
 
             // trace shadow ray
-            auto occluded = pipeline().geometry()->intersect_any(light_sample.ray);
+            auto occluded = pipeline().geometry()->intersect_any(light_sample.shadow_ray);
 
             // evaluate material
             auto surface_tag = it->shape()->surface_tag();
@@ -317,12 +317,12 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
 
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
                 // create closure
-                auto closure = surface->closure(*it, swl, 1.f, time);
+                auto closure = surface->closure(it, swl, 1.f, time);
                 if (auto dispersive = closure->is_dispersive()) {
                     $if(*dispersive) { swl.terminate_secondary(); };
                 }
 
-                // apply roughness map
+                // apply opacity map
                 auto alpha_skip = def(false);
                 if (auto o = closure->opacity()) {
                     auto opacity = saturate(*o);
@@ -339,7 +339,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
 
                     // direct lighting
                     $if(light_sample.eval.pdf > 0.0f & !occluded) {
-                        auto wi = light_sample.ray->direction();
+                        auto wi = light_sample.shadow_ray->direction();
                         auto eval = closure->evaluate(wo, wi);
                         auto w = balance_heuristic(light_sample.eval.pdf, eval.pdf) /
                                  light_sample.eval.pdf;
@@ -369,7 +369,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
             });
 
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
-                auto closure = surface->closure(*it, swl, 1.f, time);
+                auto closure = surface->closure(it, swl, 1.f, time);
                 specular_bounce = false;
                 $if((closure->roughness().x < 0.05f) & (closure->roughness().y < 0.05f)) {
                     specular_bounce = true;

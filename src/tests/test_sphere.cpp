@@ -21,7 +21,7 @@ void dump_obj(MeshView m, uint level) noexcept {
     };
     for (auto v : m.vertices) { dump_vertex(v.position(), "v"); }
     for (auto v : m.vertices) { dump_vertex(v.normal(), "vn"); }
-    for (auto v : m.uvs) { dump_vertex(v, "vt"); }
+    for (auto v : m.vertices) { dump_vertex(v.uv(), "vt"); }
     for (auto [a, b, c] : m.triangles) {
         out << luisa::format("f {}/{}/{} {}/{}/{} {}/{}/{}\n",
                              a + 1u, a + 1u, a + 1u,

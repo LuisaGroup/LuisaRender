@@ -52,7 +52,7 @@ public:
 
 public:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
-        const Interaction &it, const SampledWavelengths &swl,
+        luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
         Expr<float> eta_i, Expr<float> time) const noexcept override;
 };
 
@@ -88,10 +88,10 @@ private:
 
 public:
     MirrorClosure(
-        const Surface::Instance *instance,
-        const Interaction &it, const SampledWavelengths &swl, Expr<float> time,
+        const Surface::Instance *instance,luisa::shared_ptr<Interaction> it,
+        const SampledWavelengths &swl, Expr<float> time,
         const SampledSpectrum &refl, Expr<float2> alpha) noexcept
-        : Surface::Closure{instance, it, swl, time},
+        : Surface::Closure{instance, std::move(it), swl, time},
           _fresnel{luisa::make_unique<SchlickFresnel>(refl)},
           _distribution{luisa::make_unique<TrowbridgeReitzDistribution>(alpha)},
           _refl{luisa::make_unique<MicrofacetReflection>(refl, _distribution.get(), _fresnel.get())} {}
@@ -103,37 +103,31 @@ private:
     }
     [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
                                                 TransportMode mode) const noexcept override {
-        auto wo_local = _it.shading().world_to_local(wo);
-        auto wi_local = _it.shading().world_to_local(wi);
+        auto wo_local = it()->shading().world_to_local(wo);
+        auto wi_local = it()->shading().world_to_local(wi);
         auto f = _refl->evaluate(wo_local, wi_local, mode);
         auto pdf = _refl->pdf(wo_local, wi_local, mode);
-        auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f |
-                                  _it.shape()->shadow_terminator_factor() > 0.f,
-                              1.f, 0.f);
-        return {.f = f * abs_cos_theta(wi_local) * same_sided, .pdf = pdf};
+        return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
     [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float>, Expr<float2> u,
                                           TransportMode mode) const noexcept override {
         auto pdf = def(0.f);
-        auto wo_local = _it.shading().world_to_local(wo);
+        auto wo_local = it()->shading().world_to_local(wo);
         auto wi_local = def(make_float3(0.f, 0.f, 1.f));
         auto f = _refl->sample(wo_local, &wi_local, u, &pdf, mode);
-        auto wi = _it.shading().local_to_world(wi_local);
-        auto same_sided = ite(dot(wo, _it.ng()) * dot(wi, _it.ng()) > 0.0f |
-                                  _it.shape()->shadow_terminator_factor() > 0.f,
-                              1.f, 0.f);
-        return {.eval = {.f = f * abs_cos_theta(wi_local) * same_sided, .pdf = pdf},
+        auto wi = it()->shading().local_to_world(wi_local);
+        return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf},
                 .wi = wi,
                 .event = Surface::event_reflect};
     }
 };
 
 luisa::unique_ptr<Surface::Closure> MirrorInstance::closure(
-    const Interaction &it, const SampledWavelengths &swl,
+    luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
     Expr<float> eta_i, Expr<float> time) const noexcept {
     auto alpha = def(make_float2(0.f));
     if (_roughness != nullptr) {
-        auto r = _roughness->evaluate(it, swl, time);
+        auto r = _roughness->evaluate(*it, swl, time);
         auto remap = node<MirrorSurface>()->remap_roughness();
         auto r2a = [](auto &&x) noexcept {
             return TrowbridgeReitzDistribution::roughness_to_alpha(x);
@@ -142,8 +136,10 @@ luisa::unique_ptr<Surface::Closure> MirrorInstance::closure(
                     (remap ? make_float2(r2a(r.x)) : r.xx()) :
                     (remap ? r2a(r.xy()) : r.xy());
     }
-    auto [color, _] = _color ? _color->evaluate_albedo_spectrum(it, swl, time) : Spectrum::Decode::one(swl.dimension());
-    return luisa::make_unique<MirrorClosure>(this, it, swl, time, color, alpha);
+    auto [color, _] = _color ? _color->evaluate_albedo_spectrum(*it, swl, time) :
+                               Spectrum::Decode::one(swl.dimension());
+    return luisa::make_unique<MirrorClosure>(
+        this, std::move(it), swl, time, color, alpha);
 }
 
 using NormalMapOpacityMirrorSurface = NormalMapWrapper<OpacitySurfaceWrapper<

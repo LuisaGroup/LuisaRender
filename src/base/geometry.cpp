@@ -12,7 +12,7 @@ void Geometry::build(CommandBuffer &command_buffer, luisa::span<const Shape *con
                      float init_time, AccelUsageHint hint) noexcept {
     _accel = _pipeline.device().create_accel(hint);
     for (auto shape : shapes) { _process_shape(command_buffer, shape, init_time); }
-    _instance_buffer = _pipeline.device().create_buffer<Shape::Handle>(_instances.size());
+    _instance_buffer = _pipeline.device().create_buffer<uint4>(_instances.size());
     command_buffer << _instance_buffer.copy_from(_instances.data())
                    << _accel.build();
 }
@@ -35,15 +35,10 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
                 return iter->second;
             }
             auto mesh_geom = [&] {
-                auto [vertices, uvs, triangles] = shape->mesh();
+                auto [vertices, triangles] = shape->mesh();
                 LUISA_ASSERT(!vertices.empty() && !triangles.empty(), "Empty mesh.");
-                LUISA_ASSERT(shape->has_vertex_uv() == !uvs.empty(), "UV mismatch.");
-                LUISA_ASSERT(uvs.empty() || uvs.size() == vertices.size(),
-                             "UV count {} mismatch with vertex count {}.",
-                             uvs.size(), vertices.size());
                 auto hash = luisa::detail::murmur2_hash64(vertices.data(), vertices.size_bytes(), Hash64::default_seed);
                 hash = luisa::detail::murmur2_hash64(triangles.data(), triangles.size_bytes(), hash);
-                hash = luisa::detail::murmur2_hash64(uvs.data(), uvs.size_bytes(), hash);
                 if (auto mesh_iter = _mesh_cache.find(hash);
                     mesh_iter != _mesh_cache.end()) {
                     return mesh_iter->second;
@@ -54,6 +49,7 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
                 auto mesh = _pipeline.create<Mesh>(*vertex_buffer, *triangle_buffer, shape->build_hint());
                 command_buffer << vertex_buffer->copy_from(vertices.data())
                                << triangle_buffer->copy_from(triangles.data())
+                               << compute::commit()
                                << mesh->build()
                                << compute::commit();
                 auto vertex_buffer_id = _pipeline.register_bindless(vertex_buffer->view());
@@ -75,11 +71,6 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
                 LUISA_ASSERT(pdf_buffer_id - vertex_buffer_id == Shape::Handle::pdf_buffer_id_offset, "Invalid.");
                 command_buffer << alias_table_buffer_view.copy_from(alias_table.data())
                                << pdf_buffer_view.copy_from(pdf.data());
-                if (!uvs.empty()) {
-                    auto [uv_buffer_view, uv_buffer_id] = _pipeline.bindless_arena_buffer<float2>(uvs.size());
-                    LUISA_ASSERT(uv_buffer_id - vertex_buffer_id == Shape::Handle::uv_buffer_id_offset, "Invalid.");
-                    command_buffer << uv_buffer_view.copy_from(uvs.data());
-                }
                 command_buffer << compute::commit();
                 auto geom = MeshGeometry{mesh, vertex_buffer_id};
                 _mesh_cache.emplace(hash, geom);
@@ -171,105 +162,114 @@ Var<bool> Geometry::trace_any(const Var<Ray> &ray) const noexcept {
     return _accel.trace_any(ray);
 }
 
-luisa::unique_ptr<Interaction> Geometry::interaction(const Var<Ray> &ray, const Var<Hit> &hit) const noexcept {
+luisa::shared_ptr<Interaction> Geometry::interaction(Expr<uint> inst_id, Expr<uint> prim_id,
+                                                     Expr<float3> bary, Expr<float3> wo) const noexcept {
+    auto shape = instance(inst_id);
+    auto m = instance_to_world(inst_id);
+    auto tri = triangle(*shape, prim_id);
+    auto attrib = shading_point(*shape, tri, bary, m);
+    return luisa::make_shared<Interaction>(
+        std::move(shape), inst_id, prim_id,
+        attrib, dot(wo, attrib.g.n) < 0.0f);
+}
+
+luisa::shared_ptr<Interaction> Geometry::interaction(const Var<Ray> &ray, const Var<Hit> &hit) const noexcept {
     using namespace luisa::compute;
     Interaction it;
     $if(!hit->miss()) {
-        auto shape = instance(hit.inst);
-        auto m = instance_to_world(hit.inst);
-        auto n = transpose(inverse(make_float3x3(m)));
-        auto tri = triangle(shape, hit.prim);
-        auto uvw = make_float3(1.0f - hit.bary.x - hit.bary.y, hit.bary);
-        auto attrib = shading_point(shape, tri, uvw, m, n);
-        it = {std::move(shape), hit.inst, hit.prim, attrib, dot(ray->direction(), attrib.ng) > 0.0f};
+        it = *interaction(hit.inst, hit.prim,
+                          make_float3(1.f - hit.bary.x - hit.bary.y, hit.bary),
+                          -ray->direction());
     };
-    return luisa::make_unique<Interaction>(std::move(it));
+    return luisa::make_shared<Interaction>(std::move(it));
 }
 
-Var<Shape::Handle> Geometry::instance(Expr<uint> index) const noexcept {
-    return _instance_buffer.read(index);
+luisa::shared_ptr<Shape::Handle> Geometry::instance(Expr<uint> index) const noexcept {
+    return Shape::Handle::decode(_instance_buffer.read(index));
 }
 
 Float4x4 Geometry::instance_to_world(Expr<uint> index) const noexcept {
     return _accel.instance_transform(index);
 }
 
-Var<Triangle> Geometry::triangle(const Var<Shape::Handle> &instance, Expr<uint> index) const noexcept {
-    return _pipeline.buffer<Triangle>(instance->triangle_buffer_id()).read(index);
+Var<Triangle> Geometry::triangle(const Shape::Handle &instance, Expr<uint> index) const noexcept {
+    return _pipeline.buffer<Triangle>(instance.triangle_buffer_id()).read(index);
 }
 
-[[nodiscard]] static auto _compute_tangent(
-    Expr<float3> p0, Expr<float3> p1, Expr<float3> p2,
-    Expr<float2> uv0, Expr<float2> uv1, Expr<float2> uv2) noexcept {
-    static Callable impl = [](Float3 p0, Float3 p1, Float3 p2,
-                              Float2 uv0, Float2 uv1, Float2 uv2) noexcept {
-        auto difference_of_products = [](auto a, auto b, auto c, auto d) noexcept {
-            auto cd = c * d;
-            auto differenceOfProducts = a * b - cd;
-            auto error = -c * d + cd;
-            return differenceOfProducts + error;
-        };
-        auto duv02 = uv0 - uv2;
-        auto duv12 = uv1 - uv2;
-        auto dp02 = p0 - p2;
-        auto dp12 = p1 - p2;
-        auto det = difference_of_products(duv02.x, duv12.y, duv02.y, duv12.x);
-        auto inv_det = 1.f / det;
-        auto dpdu = difference_of_products(duv12.y, dp02, duv02.y, dp12) * inv_det;
-        return ite(abs(det) < 1e-8f, make_float3(0.f), normalize(dpdu));
-    };
-    return impl(p0, p1, p2, uv0, uv1, uv2);
+template<typename T>
+[[nodiscard]] inline auto interpolate(Expr<float3> uvw,
+                                      const T &v0,
+                                      const T &v1,
+                                      const T &v2) noexcept {
+    return uvw.x * v0 + uvw.y * v1 + uvw.z * v2;
 }
 
-ShadingAttribute Geometry::shading_point(const Var<Shape::Handle> &instance, const Var<Triangle> &triangle,
-                                         const Var<float3> &bary, const Var<float4x4> &shape_to_world,
-                                         const Var<float3x3> &shape_to_world_normal) const noexcept {
-    auto v_buffer = instance->vertex_buffer_id();
+GeometryAttribute Geometry::geometry_point(const Shape::Handle &instance, const Var<Triangle> &triangle,
+                                           const Var<float3> &bary, const Var<float4x4> &shape_to_world) const noexcept {
+    auto v_buffer = instance.vertex_buffer_id();
     auto v0 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i0);
     auto v1 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i1);
     auto v2 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i2);
-    auto p0 = make_float3(shape_to_world * make_float4(v0->position(), 1.f));
-    auto p1 = make_float3(shape_to_world * make_float4(v1->position(), 1.f));
-    auto p2 = make_float3(shape_to_world * make_float4(v2->position(), 1.f));
-    auto p = bary.x * p0 + bary.y * p1 + bary.z * p2;
-    auto c = cross(p1 - p0, p2 - p0);
-    auto area = .5f * length(c);
+    // object space
+    auto p0 = v0->position();
+    auto p1 = v1->position();
+    auto p2 = v2->position();
+    auto m = make_float3x3(shape_to_world);
+    auto t = make_float3(shape_to_world[3]);
+    // world space
+    auto p = m * interpolate(bary, p0, p1, p2) + t;
+    auto dp0 = p1 - p0;
+    auto dp1 = p2 - p0;
+    auto c = cross(m * dp0, m * dp1);
+    auto area = length(c) * .5f;
     auto ng = normalize(c);
-    auto uv = bary.yz();
-    auto s = def(make_float3(0.f));
-    $if(instance->has_vertex_uv()) {
-        auto uv_buffer = instance->uv_buffer_id();
-        auto uv0 = _pipeline.buffer<float2>(uv_buffer).read(triangle.i0);
-        auto uv1 = _pipeline.buffer<float2>(uv_buffer).read(triangle.i1);
-        auto uv2 = _pipeline.buffer<float2>(uv_buffer).read(triangle.i2);
-        uv = bary.x * uv0 + bary.y * uv1 + bary.z * uv2;
-        s = _compute_tangent(p0, p1, p2, uv0, uv1, uv2);
-    };
-    auto ns = ng;
-    auto ps = p;
-    $if(instance->has_vertex_normal()) {
-        auto n0 = ite(instance->has_vertex_normal(), normalize(shape_to_world_normal * v0->normal()), ng);
-        auto n1 = ite(instance->has_vertex_normal(), normalize(shape_to_world_normal * v1->normal()), ng);
-        auto n2 = ite(instance->has_vertex_normal(), normalize(shape_to_world_normal * v2->normal()), ng);
-        ns = normalize(bary.x * n0 + bary.y * n1 + bary.z * n2);
-        // offset p to fake surface for the shadow terminator
-        // reference: Ray Tracing Gems 2, Chap. 4
-        auto shadow_term = instance->shadow_terminator_factor();
-        auto temp_u = p - p0;
-        auto temp_v = p - p1;
-        auto temp_w = p - p2;
-        auto dp = bary.x * (temp_u - min(dot(temp_u, n0), 0.f) * n0) +
-                  bary.y * (temp_v - min(dot(temp_v, n1), 0.f) * n1) +
-                  bary.z * (temp_w - min(dot(temp_w, n2), 0.f) * n2);
-        ps = p + shadow_term * dp;
-    };
-    return {.pg = p,
-            .ng = ng,
-            .ps = ps,
-            .ns = ns,
-            .tangent = s,
-            .uv = uv,
-            .area = area};
+    return {.p = p, .n = ng, .area = area};
+}
+
+ShadingAttribute Geometry::shading_point(const Shape::Handle &instance, const Var<Triangle> &triangle,
+                                         const Var<float3> &bary, const Var<float4x4> &shape_to_world) const noexcept {
+    auto v_buffer = instance.vertex_buffer_id();
+    auto v0 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i0);
+    auto v1 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i1);
+    auto v2 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i2);
+    // object space
+    auto p0_local = v0->position();
+    auto p1_local = v1->position();
+    auto p2_local = v2->position();
+    auto ns_local = interpolate(bary, v0->normal(), v1->normal(), v2->normal());
+    // compute dpdu and dpdv
+    auto uv0 = v0->uv();
+    auto uv1 = v1->uv();
+    auto uv2 = v2->uv();
+    auto duv0 = uv1 - uv0;
+    auto duv1 = uv2 - uv0;
+    auto det = duv0.x * duv1.y - duv0.y * duv1.x;
+    auto inv_det = 1.f / det;
+    auto dp0_local = p1_local - p0_local;
+    auto dp1_local = p2_local - p0_local;
+    auto dpdu_local = (dp0_local * duv1.y - dp1_local * duv0.y) * inv_det;
+    auto dpdv_local = (dp1_local * duv0.x - dp0_local * duv1.x) * inv_det;
+    // world space
+    auto m = make_float3x3(shape_to_world);
+    auto t = make_float3(shape_to_world[3]);
+    auto p = m * interpolate(bary, p0_local, p1_local, p2_local) + t;
+    auto c = cross(m * dp0_local, m * dp1_local);
+    auto area = length(c) * .5f;
+    auto ng = normalize(c);
+    auto fallback_frame = Frame::make(ng);
+    auto dpdu = ite(det == 0.f, fallback_frame.s(), m * dpdu_local);
+    auto dpdv = ite(det == 0.f, fallback_frame.t(), m * dpdv_local);
+    auto mn = transpose(inverse(m));
+    auto ns = ite(instance.has_vertex_normal(), normalize(mn * ns_local), ng);
+    auto uv = ite(instance.has_vertex_uv(), interpolate(bary, uv0, uv1, uv2), bary.yz());
+    return {.g = {.p = p,
+                  .n = ng,
+                  .area = area},
+            .ps = p,
+            .ns = face_forward(ns, ng),
+            .dpdu = dpdu,
+            .dpdv = dpdv,
+            .uv = uv};
 }
 
 }// namespace luisa::render

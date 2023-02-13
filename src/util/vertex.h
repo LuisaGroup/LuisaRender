@@ -30,8 +30,9 @@ template<typename T>
     auto p = make_float2(make_uint2(u & 0xffffu, u >> 16u)) * ((1.f / 65535.f) * 2.f) - 1.f;
     auto abs_p = abs(p);
     auto n = make_float3(p, 1.f - abs_p.x - abs_p.y);
-    auto t = make_float2(clamp(-n.z, 0.f, 1.f));
-    return normalize(make_float3(n.xy() + select(t, -t, n.xy() >= 0.f), n.z));
+    auto t = clamp(n.z, -1.f, 0.f);
+    auto xy = sign(n.xy()) * t + n.xy();
+    return make_float3(xy, n.z);
 }
 
 struct alignas(16) Vertex {
@@ -39,27 +40,28 @@ struct alignas(16) Vertex {
     float px;
     float py;
     float pz;
-    uint n;
+    float nx;
+    float ny;
+    float nz;
+    float u;
+    float v;
 
-    [[nodiscard]] static auto encode(float3 position, float3 normal) noexcept {
-        return Vertex{position.x, position.y, position.z, oct_encode(normal)};
+    [[nodiscard]] static auto encode(float3 p, float3 n, float2 uv) noexcept {
+        return Vertex{p.x, p.y, p.z, n.x, n.y, n.z, uv.x, uv.y};
     };
     [[nodiscard]] auto position() const noexcept { return make_float3(px, py, pz); }
-    [[nodiscard]] auto normal() const noexcept { return oct_decode(n); }
+    [[nodiscard]] auto normal() const noexcept { return make_float3(nx, ny, nz); }
+    [[nodiscard]] auto uv() const noexcept { return make_float2(u, v); }
 };
 
-static_assert(sizeof(Vertex) == 16u);
+static_assert(sizeof(Vertex) == 32u);
 
 }// namespace luisa::render
 
 // clang-format off
-LUISA_STRUCT(luisa::render::Vertex, px, py, pz, n) {
-    [[nodiscard]] static auto encode(luisa::compute::Expr<luisa::float3> position,
-                                     luisa::compute::Expr<luisa::float3> normal) noexcept {
-        return def<luisa::render::Vertex>(position.x, position.y, position.z,
-                                          luisa::render::oct_encode(normal));
-    };
+LUISA_STRUCT(luisa::render::Vertex, px, py, pz, nx, ny, nz, u, v) {
     [[nodiscard]] auto position() const noexcept { return make_float3(px, py, pz); }
-    [[nodiscard]] auto normal() const noexcept { return luisa::render::oct_decode(n); }
+    [[nodiscard]] auto normal() const noexcept { return make_float3(nx, ny, nz); }
+    [[nodiscard]] auto uv() const noexcept { return make_float2(u, v); }
 };
 // clang-format on

@@ -11,15 +11,13 @@
 #include <base/scene.h>
 #include <base/pipeline.h>
 
-#include <util/ies.h>
-
 [[nodiscard]] auto parse_cli_options(int argc, const char *const *argv) noexcept {
     cxxopts::Options cli{"luisa-render-cli"};
     cli.add_option("", "b", "backend", "Compute backend name", cxxopts::value<luisa::string>(), "<backend>");
     cli.add_option("", "d", "device", "Compute device index", cxxopts::value<uint32_t>()->default_value("0"), "<index>");
     cli.add_option("", "", "scene", "Path to scene description file", cxxopts::value<std::filesystem::path>(), "<file>");
     cli.add_option("", "D", "define", "Parameter definitions to override scene description macros.",
-                   cxxopts::value<std::vector<std::string>>()->default_value("<none>"), "<key>=<value>");
+                   cxxopts::value<std::vector<luisa::string>>()->default_value("<none>"), "<key>=<value>");
     cli.add_option("", "h", "help", "Display this help message", cxxopts::value<bool>()->default_value("false"), "");
     cli.allow_unrecognised_options();
     cli.positional_help("<file>");
@@ -68,7 +66,7 @@ int main(int argc, char *argv[]) {
     auto backend = options["backend"].as<luisa::string>();
     auto index = options["device"].as<uint32_t>();
     auto path = options["scene"].as<std::filesystem::path>();
-    auto definitions = options["define"].as<std::vector<std::string>>();
+    auto definitions = options["define"].as<std::vector<luisa::string>>();
     SceneParser::MacroMap macros;
     for (luisa::string_view d : definitions) {
         if (d == "<none>") { continue; }
@@ -86,31 +84,11 @@ int main(int argc, char *argv[]) {
                 "Duplicate definition: {} = '{}'. "
                 "Ignoring the previous one: {} = '{}'.",
                 key, value, key, iter->second);
+            iter->second = value;
+        } else {
+            macros.emplace(key, value);
         }
-        macros[key] = value;
     }
-
-    //    auto ies_profile = IESProfile::parse("/Users/mike/Downloads/002bb0e37aa7e5f1d7851fb1db032628.ies");
-    //    LUISA_INFO(
-    //        "Loaded IES profile with "
-    //        "{} vertical angle(s) and "
-    //        "{} horizontal angle(s):",
-    //        ies_profile.vertical_angles().size(),
-    //        ies_profile.horizontal_angles().size());
-    //    std::cout << "Vertical Angles:";
-    //    for (auto v : ies_profile.vertical_angles()) {
-    //        std::cout << " " << v;
-    //    }
-    //    std::cout << "\n";
-    //    auto candela_offset = 0u;
-    //    for (auto h : ies_profile.horizontal_angles()) {
-    //        std::cout << "@" << h << ":";
-    //        for (auto i = 0u; i < ies_profile.vertical_angles().size(); i++) {
-    //            std::cout << " " << ies_profile.candela_values()[candela_offset + i];
-    //        }
-    //        std::cout << "\n";
-    //        candela_offset += ies_profile.vertical_angles().size();
-    //    }
 
     auto device = context.create_device(
         backend, luisa::format(R"({{"index": {}}})", index));

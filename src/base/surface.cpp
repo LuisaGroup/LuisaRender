@@ -19,9 +19,8 @@ luisa::unique_ptr<Surface::Instance> Surface::build(
     return _build(pipeline, command_buffer);
 }
 
-Surface::Closure::Closure(
-    const Surface::Instance *instance, Interaction it,
-    const SampledWavelengths &swl, Expr<float> time) noexcept
+Surface::Closure::Closure(const Surface::Instance *instance, luisa::shared_ptr<Interaction> it,
+                          const SampledWavelengths &swl, Expr<float> time) noexcept
     : _instance{instance}, _it{std::move(it)}, _swl{swl}, _time{time} {}
 
 Surface::Evaluation Surface::Closure::evaluate(
@@ -55,6 +54,7 @@ luisa::optional<Float> Surface::Closure::eta() const noexcept {
 }
 
 luisa::optional<Bool> Surface::Closure::is_dispersive() const noexcept {
+    if (instance()->pipeline().spectrum()->node()->is_fixed()) { return nullopt; }
     return _is_dispersive();
 }
 
