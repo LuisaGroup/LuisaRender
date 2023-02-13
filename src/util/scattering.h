@@ -221,4 +221,37 @@ public:
     [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _rd; }
 };
 
+
+class PhaseFunction {
+public:
+    struct SampledDirection {
+        Float3 wi;
+        Bool valid;
+    };
+
+    // evaluate phase function
+    [[nodiscard]] virtual Float evaluate(Expr<float3> wo, Expr<float3> wi) const = 0;
+
+    // sample incident direction
+    // its pdf is proportional to the shape of phase function
+    [[nodiscard]] virtual Float sample_wi(Expr<float3> wo, SampledDirection &wi, Expr<float2> u) const = 0;
+};
+
+class IsotropicPhaseFunction : public PhaseFunction {
+public:
+    [[nodiscard]] Float evaluate(Expr<float3> wo, Expr<float3> wi) const override;
+    [[nodiscard]] Float sample_wi(Expr<float3> wo, SampledDirection &wi, Expr<float2> u) const override;
+};
+
+// https://pbr-book.org/3ed-2018/Volume_Scattering/Phase_Functions#PhaseHG
+class HenyeyGreenstein : public PhaseFunction {
+protected:
+    Float _g;
+
+public:
+    explicit HenyeyGreenstein(Expr<float> g) noexcept : _g{g} {}
+    [[nodiscard]] Float evaluate(Expr<float3> wo, Expr<float3> wi) const override;
+    [[nodiscard]] Float sample_wi(Expr<float3> wo, SampledDirection &wi, Expr<float2> u) const override;
+};
+
 }// namespace luisa::render
