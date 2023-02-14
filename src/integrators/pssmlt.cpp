@@ -356,6 +356,7 @@ private:
         $for(depth, node<PSSMLT>()->max_depth()) {
 
             // trace
+            auto wo = -ray->direction();
             auto it = pipeline().geometry()->intersect(ray);
 
             // miss
@@ -393,10 +394,10 @@ private:
             auto u_lobe = sampler.generate_1d();
             auto u_bsdf = sampler.generate_2d();
             auto eta_scale = def(1.f);
-            auto wo = -ray->direction();
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
+
                 // create closure
-                auto closure = surface->closure(it, swl, 1.f, time);
+                auto closure = surface->closure(it, swl, wo, 1.f, time);
 
                 // apply opacity map
                 auto alpha_skip = def(false);

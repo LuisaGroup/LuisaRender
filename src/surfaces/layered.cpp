@@ -174,7 +174,7 @@ public:
 public:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-        Expr<float> eta_i, Expr<float> time) const noexcept override;
+        Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> LayeredSurface::_build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
@@ -223,9 +223,9 @@ private:
         auto wo_local = it()->shading().world_to_local(wo);
         auto entered_top = wo_local.z > 0.f;
         auto enter_interface = TopOrBottom(*_top, *_bottom, entered_top);
-        auto exit_interface = TopOrBottom(*_bottom, *_top, same_hemisphere(wo_local, wi_local) | entered_top);
-        auto nonexit_interface = TopOrBottom(*_top, *_bottom, same_hemisphere(wo_local, wi_local) | entered_top);
-        auto exitZ = ite(same_hemisphere(wo_local, wi_local) | entered_top, 0.f, _thickness);
+        auto exit_interface = TopOrBottom(*_bottom, *_top, same_hemisphere(wo_local, wi_local) ^ entered_top);
+        auto nonexit_interface = TopOrBottom(*_top, *_bottom, same_hemisphere(wo_local, wi_local) ^ entered_top);
+        auto exitZ = ite(same_hemisphere(wo_local, wi_local) ^ entered_top, 0.f, _thickness);
         auto f = ite(same_hemisphere(wi_local, wo_local),
                      static_cast<float>(_samples) * enter_interface.evaluate(wo, wi, mode).f,
                      SampledSpectrum(0.f));
@@ -256,7 +256,7 @@ private:
                     };
                     beta /= 1 - q;
                 };
-                $if(!_albedo.is_zero()) {
+                $if(_albedo.is_zero()) {
                     z = ite(z == _thickness, 0.f, _thickness);
                     beta *= Tr(_thickness, w_local);
                 }
@@ -266,7 +266,8 @@ private:
                     auto zp = ite(w_local.z > 0.f, z + dz, z - dz);
                     $if(z == zp) { $continue; };
                     $if(zp > 0.f & zp < _thickness) {
-                        auto wt = 1.f;
+                        auto wt = power_heuristic(1u, wis.eval.pdf, 1u,
+                                                  nonexit_interface.evaluate(-w, -wis.wi, mode).pdf);
                         f += beta * _albedo * phase.p(-w_local, -wis_wi_local) * wt *
                              Tr(zp - exitZ, wis_wi_local) * wis.eval.f / wis.eval.pdf;
                         auto u = make_float2(lcg(seed), lcg(seed));
@@ -276,7 +277,7 @@ private:
                         w_local = ps.wi;
                         w = exit_interface.to_world(w_local);
                         z = zp;
-                        $if(((z<exitZ & w_local.z> 0.f) | (z > exitZ & w_local.z < 0.f))) {
+                        $if((((z < exitZ) & (w_local.z) > 0.f) | (z > exitZ & w_local.z < 0.f))) {
                             // Account for scattering through _exitInterface_
                             auto fExit = exit_interface.evaluate(-w, wi, mode).f;
                             $if(!fExit.is_zero()) {
@@ -446,14 +447,14 @@ private:
 
 luisa::unique_ptr<Surface::Closure> LayeredSurfaceInstance::closure(
     luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-    Expr<float> eta_i, Expr<float> time) const noexcept {
+    Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept {
     auto thickness = _thickness ? max(_thickness->evaluate(*it, swl, time).x, std::numeric_limits<float>::min()) : 1e-2f;
     auto g = _g ? _g->evaluate(*it, swl, time).x : 0.f;
     auto [albedo, _] = _albedo ? _albedo->evaluate_albedo_spectrum(*it, swl, time) : Spectrum::Decode::one(swl.dimension());
     auto max_depth = node<LayeredSurface>()->max_depth();
     auto samples = node<LayeredSurface>()->samples();
-    auto top = _top->closure(it, swl, eta_i, time);
-    auto bottom = _bottom->closure(it, swl, top->eta().value_or(1.f), time);// FIXME: eta_i is wrong
+    auto top = _top->closure(it, swl, wo, eta_i, time);
+    auto bottom = _bottom->closure(it, swl, wo, top->eta().value_or(1.f), time);// FIXME: eta_i is wrong
     return luisa::make_unique<LayeredSurfaceClosure>(
         this, std::move(it), swl, time, thickness, g, albedo,
         max_depth, samples, std::move(top), std::move(bottom));

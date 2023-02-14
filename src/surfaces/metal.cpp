@@ -178,7 +178,7 @@ public:
 public:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-        Expr<float> eta_i, Expr<float> time) const noexcept override;
+        Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> MetalSurface::_build(
@@ -252,7 +252,7 @@ private:
 
 luisa::unique_ptr<Surface::Closure> MetalInstance::closure(
     luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-    Expr<float> eta_i, Expr<float> time) const noexcept {
+    Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept {
     auto alpha = def(make_float2(.5f));
     if (_roughness != nullptr) {
         auto r = _roughness->evaluate(*it, swl, time);

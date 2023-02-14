@@ -83,6 +83,7 @@ protected:
         $loop {
 
             // trace
+            auto wo = -ray->direction();
             auto it = pipeline().geometry()->intersect(ray);
 
             // miss
@@ -131,7 +132,7 @@ protected:
             auto alpha_skip = def(false);
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
                 // create closure
-                auto closure = surface->closure(it, swl, 1.f, time);
+                auto closure = surface->closure(it, swl, wo, 1.f, time);
 
                 // apply opacity map
                 if (auto o = closure->opacity()) {
@@ -145,7 +146,6 @@ protected:
                 }
                 $else {
                     // some preparations
-                    auto wo = -ray->direction();
                     if (auto dispersive = closure->is_dispersive()) {
                         $if(*dispersive) { swl.terminate_secondary(); };
                     }

@@ -119,7 +119,7 @@ public:
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
         [[nodiscard]] virtual luisa::unique_ptr<Closure> closure(
             luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-            Expr<float> eta_i, Expr<float> time) const noexcept = 0;
+            Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept = 0;
     };
 
 public:
@@ -168,9 +168,9 @@ public:
             : BaseInstance{std::move(base)}, _opacity{opacity} {}
         [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
             luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-            Expr<float> eta_i, Expr<float> time) const noexcept override {
+            Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept override {
             auto alpha = _opacity ? luisa::make_optional(_opacity->evaluate(*it, swl, time).x) : luisa::nullopt;
-            auto base = BaseInstance::closure(std::move(it), swl, eta_i, time);
+            auto base = BaseInstance::closure(std::move(it), swl, wo, eta_i, time);
             return luisa::make_unique<Closure>(std::move(dynamic_cast<BaseClosure &>(*base)), std::move(alpha));
         }
     };
@@ -216,14 +216,15 @@ public:
             : BaseInstance{std::move(base)}, _map{normal}, _strength{strength} {}
         [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
             luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-            Expr<float> eta_i, Expr<float> time) const noexcept override {
-            if (_map == nullptr) { return BaseInstance::closure(std::move(it), swl, eta_i, time); }
+            Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept override {
+            if (_map == nullptr) { return BaseInstance::closure(std::move(it), swl, wo, eta_i, time); }
             auto normal_local = 2.f * _map->evaluate(*it, swl, time).xyz() - 1.f;
             if (_strength != 1.f) { normal_local *= make_float3(_strength, _strength, 1.f); }
             auto mapped_it = luisa::make_shared<Interaction>(*it);
             auto normal = it->shading().local_to_world(normal_local);
-            mapped_it->set_shading(Frame::make(normal, it->shading().s()));
-            return BaseInstance::closure(std::move(mapped_it), swl, eta_i, time);
+            mapped_it->set_shading(Frame::make(clamp_shading_normal(normal, it->ng(), wo),
+                                               it->shading().s()));
+            return BaseInstance::closure(std::move(mapped_it), swl, wo, eta_i, time);
         }
     };
 
@@ -267,13 +268,13 @@ public:
             : BaseInstance{std::move(base)}, _two_sided{two_sided} {}
         [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
             luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-            Expr<float> eta_i, Expr<float> time) const noexcept override {
+            Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept override {
             if (_two_sided) {
                 auto it_copy = luisa::make_shared<Interaction>(*it);
                 it_copy->shading().flip();
-                return BaseInstance::closure(std::move(it_copy), swl, eta_i, time);
+                return BaseInstance::closure(std::move(it_copy), swl, wo, eta_i, time);
             }
-            return BaseInstance::closure(it, swl, eta_i, time);
+            return BaseInstance::closure(it, swl, wo, eta_i, time);
         }
     };
 

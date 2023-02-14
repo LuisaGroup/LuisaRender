@@ -63,6 +63,7 @@ protected:
         $for(depth, node<MegakernelPathTracing>()->max_depth()) {
 
             // trace
+            auto wo = -ray->direction();
             auto it = pipeline().geometry()->intersect(ray);
 
             // miss
@@ -105,7 +106,7 @@ protected:
             auto eta_scale = def(1.f);
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
                 // create closure
-                auto closure = surface->closure(it, swl, 1.f, time);
+                auto closure = surface->closure(it, swl, wo, 1.f, time);
 
                 // apply opacity map
                 auto alpha_skip = def(false);
@@ -124,7 +125,6 @@ protected:
                         $if(*dispersive) { swl.terminate_secondary(); };
                     }
                     // direct lighting
-                    auto wo = -ray->direction();
                     $if(light_sample.eval.pdf > 0.0f & !occluded) {
                         auto wi = light_sample.shadow_ray->direction();
                         auto eval = closure->evaluate(wo, wi);
