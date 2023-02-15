@@ -269,7 +269,7 @@ ReconnectionShiftResult reconnect_shift(
         result.jacobian = jacobian;
         result.wo = shifted_wo;
     };
-    
+
     return result;
 }
 
@@ -292,6 +292,12 @@ ReconnectionShiftResult environment_shift(
 
     return result;
 }
+
+struct SurfaceSampleResult {
+    Surface::Sample sample;
+    SampledSpectrum weight;
+    Float pdf;
+};
 
 void GradientPathTracingInstance::_render_one_camera(
     CommandBuffer &command_buffer, Camera::Instance *camera) noexcept {
