@@ -1,3 +1,17 @@
+#include "EASTL/unique_ptr.h"
+#include "base/geometry.h"
+#include "base/interaction.h"
+#include "base/spectrum.h"
+#include "core/basic_traits.h"
+#include "core/basic_types.h"
+#include "core/mathematics.h"
+#include "dsl/builtin.h"
+#include "dsl/expr.h"
+#include "dsl/var.h"
+#include "rtx/ray.h"
+#include "util/frame.h"
+#include "util/scattering.h"
+#include "util/spec.h"
 #include <util/imageio.h>
 #include <util/medium_tracker.h>
 #include <util/progress_bar.h>
@@ -84,6 +98,167 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
     Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
     return luisa::make_unique<GradientPathTracingInstance>(
         this, pipeline, command_buffer);
+}
+
+const float D_EPSILON = 1e-14f;
+
+struct GPTConfig {
+    int m_max_depth;
+	int m_min_depth;
+    int m_rr_depth;
+	bool m_strict_normals;
+	float m_shift_threshold;
+	bool m_reconstruct_L1;
+	bool m_reconstruct_L2;
+	float m_reconstruct_alpha;
+};
+
+enum VertexType {
+    VERTEX_TYPE_GLOSSY,
+    VERTEX_TYPE_DIFFUSE
+};
+
+enum RayConnection {
+	RAY_NOT_CONNECTED,
+	RAY_RECENTLY_CONNECTED,
+	RAY_CONNECTED
+};
+
+struct RayState {
+    RayDifferential ray;
+    SampledSpectrum throughput;
+    Float pdf;
+    SampledSpectrum radiance;
+    SampledSpectrum gradient;
+    // RadianceQueryRecord rRec;        ///< The radiance query record for this ray.
+    Float eta;                      // Current refractive index
+    Bool alive;
+    RayConnection connection_status;
+
+    RayState() : radiance(0.0f), gradient(0.0f), eta(1.0f), pdf(1.0f), 
+                 throughput(0.0f), alive(true), connection_status(RAY_NOT_CONNECTED) {}
+
+    inline void add_radiance(const SampledSpectrum& contribution, Expr<float> weight) noexcept {
+        auto color = contribution * weight;
+        radiance += color;
+    }
+
+    inline void add_gradient(const SampledSpectrum& contribution, Expr<float> weight) noexcept {
+        auto color = contribution * weight;
+        gradient += color;
+    }
+};
+
+auto test_visibility(const Geometry* geometry, Expr<float3> point1, Expr<float3> point2) {
+    const float epsilon = 1e-4f;
+    const float shadow_epsilon = 1e-3f;
+    auto shadow_ray = make_ray(
+        point1, point2, epsilon, 1.f - shadow_epsilon
+    );
+    return !geometry->intersect_any(shadow_ray);
+}
+
+auto get_vertex_type() noexcept { // no diffuse here
+    return VertexType::VERTEX_TYPE_GLOSSY;
+}
+
+struct HalfVectorShiftResult {
+    Bool success;
+    Float jacobian;
+    Float3 wo;
+};
+
+HalfVectorShiftResult half_vector_shift(
+    Float3 tangent_space_main_wi,
+    Float3 tangent_space_main_wo,
+    Float3 tangent_space_shifted_wi,
+    Float main_eta, Float shifted_eta) {
+    HalfVectorShiftResult result;
+
+    $if(cos_theta(tangent_space_main_wi) * cos_theta(tangent_space_shifted_wi) < 0.f) {
+        // Refraction
+
+        result.success = true;
+        $if(main_eta == 1.f | shifted_eta == 1.f) {
+            result.success = false;
+        } $else {
+            auto tangent_space_half_vector_non_normalized_main = ite(
+                cos_theta(tangent_space_main_wi) < 0.f,
+                -(tangent_space_main_wi * main_eta + tangent_space_main_wo),
+                -(tangent_space_main_wi + tangent_space_main_wo * main_eta)
+            );
+
+            auto tangent_space_half_vector = normalize(tangent_space_half_vector_non_normalized_main);
+            
+            Float3 tangent_space_shifted_wo; 
+            auto refract_not_internal = refract(tangent_space_shifted_wi, tangent_space_half_vector, shifted_eta, &tangent_space_shifted_wo); 
+
+            $if(!refract_not_internal) {
+                result.success = false;
+            } $else {
+                auto tangent_space_half_vector_non_normalized_shifted = ite(
+                    cos_theta(tangent_space_shifted_wi) < 0.f,
+                    -(tangent_space_shifted_wi * shifted_eta + tangent_space_shifted_wo),
+                    -(tangent_space_shifted_wi + tangent_space_shifted_wo * shifted_eta)
+                );
+
+                auto h_length_squared = length_squared(tangent_space_half_vector_non_normalized_shifted);
+                auto wo_dot_h = abs(dot(tangent_space_main_wo, tangent_space_half_vector)) / (D_EPSILON + abs(dot(tangent_space_shifted_wo, tangent_space_half_vector)));
+                
+                result.success = true;
+                result.wo = tangent_space_shifted_wo;
+                result.jacobian = h_length_squared * wo_dot_h;
+            };
+        };
+    } $else {
+        // Reflection
+        auto tangent_space_half_vector = normalize(tangent_space_main_wi + tangent_space_main_wo);
+        auto tangent_space_shifted_wo = reflect(tangent_space_shifted_wi, tangent_space_half_vector);
+
+        auto wo_dot_h = dot(tangent_space_shifted_wo, tangent_space_half_vector) / dot(tangent_space_main_wo, tangent_space_half_vector);
+        auto jacobian = abs(wo_dot_h);
+
+        result.success = true;
+        result.wo = tangent_space_shifted_wo;
+        result.jacobian = jacobian;
+    };
+
+    return result;
+}
+
+struct ReconnectionShiftResult {
+    Bool success;
+    Float jacobian;
+    Float3 wo;
+};
+
+ReconnectionShiftResult reconnect_shift(
+    const Geometry* geometry, 
+    Expr<float3> main_source_vertex, 
+    Expr<float3> target_vertex,
+    Expr<float3> shift_source_vertex,
+    Expr<float3> target_normal) {
+    ReconnectionShiftResult result;
+    result.success = false;
+    $if(test_visibility(geometry, shift_source_vertex, target_vertex)) {
+        auto main_edge = main_source_vertex - target_vertex;
+        auto shifted_edge = shift_source_vertex - target_vertex;
+
+        auto main_edge_length_squared = length_squared(main_edge);
+        auto shifted_edge_length_squared = length_squared(shifted_edge);
+
+        auto shifted_wo = -shifted_edge / sqrt(shifted_edge_length_squared);
+
+        auto main_opposing_cosine = dot(main_edge, target_normal) / sqrt(main_edge_length_squared);
+        auto shifted_opposing_cosine = dot(shifted_wo, target_normal);
+
+        auto jacobian = abs(shifted_opposing_cosine * main_edge_length_squared) / (D_EPSILON + abs(main_opposing_cosine * shifted_edge_length_squared));
+
+        result.success = true;
+        result.jacobian = jacobian;
+        result.wo = shifted_wo;
+    };
+    return result;
 }
 
 void GradientPathTracingInstance::_render_one_camera(
