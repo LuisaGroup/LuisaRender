@@ -12,6 +12,7 @@
 #include "util/frame.h"
 #include "util/scattering.h"
 #include "util/spec.h"
+#include <limits>
 #include <util/imageio.h>
 #include <util/medium_tracker.h>
 #include <util/progress_bar.h>
@@ -149,13 +150,23 @@ struct RayState {
     }
 };
 
-auto test_visibility(const Geometry* geometry, Expr<float3> point1, Expr<float3> point2) {
-    const float epsilon = 1e-4f;
-    const float shadow_epsilon = 1e-3f;
+const float epsilon = 1e-4f;
+const float shadow_epsilon = 1e-3f;
+
+auto test_visibility(const Pipeline& pipeline, Expr<float3> point1, Expr<float3> point2) {
     auto shadow_ray = make_ray(
-        point1, point2, epsilon, 1.f - shadow_epsilon
+        point1, point2 - point1, epsilon, 1.f - shadow_epsilon
     );
-    return !geometry->intersect_any(shadow_ray);
+    return !pipeline.geometry()->intersect_any(shadow_ray);
+}
+
+auto test_environment_visibility(const Pipeline& pipeline, const Var<Ray>& ray) {
+    if(!pipeline.environment()) return def(false);
+    auto shadow_ray = make_ray(
+        ray->origin(), ray->direction(), epsilon, std::numeric_limits<float>::max()
+    );
+    // Miss = Intersect with env
+    return !pipeline.geometry()->intersect_any(shadow_ray); 
 }
 
 auto get_vertex_type() noexcept { // no diffuse here
@@ -233,14 +244,14 @@ struct ReconnectionShiftResult {
 };
 
 ReconnectionShiftResult reconnect_shift(
-    const Geometry* geometry, 
+    const Pipeline& pipeline, 
     Expr<float3> main_source_vertex, 
     Expr<float3> target_vertex,
     Expr<float3> shift_source_vertex,
     Expr<float3> target_normal) {
     ReconnectionShiftResult result;
     result.success = false;
-    $if(test_visibility(geometry, shift_source_vertex, target_vertex)) {
+    $if(test_visibility(pipeline, shift_source_vertex, target_vertex)) {
         auto main_edge = main_source_vertex - target_vertex;
         auto shifted_edge = shift_source_vertex - target_vertex;
 
@@ -258,6 +269,27 @@ ReconnectionShiftResult reconnect_shift(
         result.jacobian = jacobian;
         result.wo = shifted_wo;
     };
+    
+    return result;
+}
+
+ReconnectionShiftResult environment_shift(
+    const Pipeline& pipeline,
+    const Var<Ray>& main_ray,
+    Expr<float3> shift_source_vertex) {
+    ReconnectionShiftResult result;
+    result.success = false;
+
+    auto offset_ray = make_ray(
+        shift_source_vertex, main_ray->direction(), main_ray->t_min(), main_ray->t_max()
+    );
+
+    $if(test_environment_visibility(pipeline, offset_ray)) {
+        result.success = true;
+        result.jacobian = 1.f;
+        result.wo = main_ray->direction();
+    };
+
     return result;
 }
 
