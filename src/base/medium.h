@@ -16,6 +16,10 @@ using compute::Expr;
 using compute::Var;
 
 class Medium : public SceneNode {
+private:
+    uint _priority;
+    float _eta;
+
 public:
     class Instance;
 
@@ -24,6 +28,10 @@ public:
         const Pipeline &_pipeline;
         const Medium *_medium;
         friend class Medium;
+
+    public:
+        [[nodiscard]] auto priority() const noexcept { return _medium->_priority; }
+        [[nodiscard]] auto eta() const noexcept { return _medium->_eta; }
 
     public:
         Instance(const Pipeline &pipeline, const Medium *medium) noexcept

@@ -18,7 +18,7 @@ using compute::UInt;
 using compute::Var;
 
 struct MediumInfo {
-    float eta;
+    bool vacuum;
     uint medium_tag;
 };
 
@@ -43,4 +43,4 @@ public:
 
 }// namespace luisa::render
 
-LUISA_STRUCT(luisa::render::MediumInfo, eta, medium_tag){};
+LUISA_STRUCT(luisa::render::MediumInfo, vacuum, medium_tag){};

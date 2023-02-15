@@ -40,7 +40,10 @@ SceneNodeTag parse_scene_node_tag(luisa::string_view tag_desc) noexcept {
         {"spectrum"sv, SceneNodeTag::SPECTRUM},
         {"spec"sv, SceneNodeTag::SPECTRUM},
         {"generic"sv, SceneNodeTag::DECLARATION},
-        {"template"sv, SceneNodeTag::DECLARATION}};
+        {"template"sv, SceneNodeTag::DECLARATION},
+        {"medium"sv, SceneNodeTag::MEDIUM},
+        {"phasefunction"sv, SceneNodeTag::PHASE_FUNCTION},
+    };
     if (auto iter = desc_to_tag.find(tag); iter != desc_to_tag.end()) {
         return iter->second;
     }

@@ -17,25 +17,24 @@ private:
 
 public:
     class HenyeyGreensteinInstance : public PhaseFunction::Instance {
-    private:
-        Float _g;
-
     protected:
         friend class HenyeyGreenstein;
 
     public:
         [[nodiscard]] Float evaluate(Expr<float3> wo, Expr<float3> wi) const override {
+            auto g = node<HenyeyGreenstein>()->_g;
             auto cosTheta = dot(wo, wi);
-            auto denom = 1.f + _g * _g + 2.f * _g * cosTheta;
-            return inv_pi / 4.f * (1.f - _g * _g) / (denom * sqrt(max(0.f, denom)));
+            auto denom = 1.f + g * g + 2.f * g * cosTheta;
+            return inv_pi / 4.f * (1.f - g * g) / (denom * sqrt(max(0.f, denom)));
         }
         [[nodiscard]] SampledDirection sample_wi(Expr<float3> wo, Expr<float2> u) const override {
+            auto g = node<HenyeyGreenstein>()->_g;
             // sample cosTheta
             auto cosTheta = ite(
-                abs(_g) < 1e-3f,
+                std::abs(g) < 1e-3f,
                 1.f - 2.f * u.x,
-                //        1.f + _g * _g - sqr((1.f - _g * _g) / (1 - _g + 2 * _g * u.x)) / (2.f * _g)
-                -1.f / (2.f * _g) * (1.f + sqr(_g) - sqr((1.f - sqr(_g)) / (1.f + _g - 2.f * _g * u.x)))
+                //        1.f + g * g - sqr((1.f - g * g) / (1 - g + 2 * g * u.x)) / (2.f * g)
+                -1.f / (2.f * g) * (1.f + sqr(g) - sqr((1.f - sqr(g)) / (1.f + g - 2.f * g * u.x)))
             );
 
             // compute direction
@@ -50,14 +49,14 @@ public:
 
     public:
         explicit HenyeyGreensteinInstance(
-            Pipeline &pipeline, const HenyeyGreenstein *phase_function, Expr<float> g) noexcept
-            : PhaseFunction::Instance{pipeline, phase_function}, _g{g} {}
+            Pipeline &pipeline, const HenyeyGreenstein *phase_function) noexcept
+            : PhaseFunction::Instance{pipeline, phase_function} {}
     };
 
 protected:
     [[nodiscard]] luisa::unique_ptr<Instance> _build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
-        return make_unique<HenyeyGreensteinInstance>(pipeline, this, _g);
+        return make_unique<HenyeyGreensteinInstance>(pipeline, this);
     }
 
 public:

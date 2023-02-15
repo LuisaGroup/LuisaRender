@@ -63,7 +63,11 @@ public:
         _sigma_a = scene->load_texture(desc->property_node_or_default("sigma_a"));
         _sigma_s = scene->load_texture(desc->property_node_or_default("sigma_s"));
         _Le = scene->load_texture(desc->property_node_or_default("Le"));
-        _phase_function = scene->load_phase_function(desc->property_node_or_default("phase_function"));
+        _phase_function = scene->load_phase_function(desc->property_node_or_default("phasefunction"));
+        LUISA_ASSERT(_sigma_a == nullptr || _sigma_a->is_constant(), "sigma_a must be constant");
+        LUISA_ASSERT(_sigma_s == nullptr || _sigma_s->is_constant(), "sigma_s must be constant");
+        LUISA_ASSERT(_Le == nullptr || _Le->is_constant(), "Le must be constant");
+        LUISA_ASSERT(_phase_function != nullptr, "Phase function must be specified");
     }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
 

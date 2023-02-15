@@ -53,10 +53,12 @@ private:
     Buffer<uint4> _instance_buffer;
 
 private:
-    void _process_shape(CommandBuffer &command_buffer, const Shape *shape, float init_time,
-                        const Surface *overridden_surface = nullptr,
-                        const Light *overridden_light = nullptr,
-                        bool overridden_visible = true) noexcept;
+    void _process_shape(
+        CommandBuffer &command_buffer, const Shape *shape, float init_time,
+        const Surface *overridden_surface = nullptr,
+        const Light *overridden_light = nullptr,
+        const Medium *overridden_medium = nullptr,
+        bool overridden_visible = true) noexcept;
 
 public:
     explicit Geometry(Pipeline &pipeline) noexcept : _pipeline{pipeline} {};
