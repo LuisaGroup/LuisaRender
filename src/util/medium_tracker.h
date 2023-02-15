@@ -6,6 +6,7 @@
 
 #include <dsl/syntax.h>
 #include <base/spectrum.h>
+#include <base/medium.h>
 
 namespace luisa::render {
 
@@ -18,6 +19,7 @@ using compute::Var;
 
 struct MediumInfo {
     float eta;
+    uint medium_tag;
 };
 
 class MediumTracker {
@@ -41,4 +43,4 @@ public:
 
 }// namespace luisa::render
 
-LUISA_STRUCT(luisa::render::MediumInfo, eta){};
+LUISA_STRUCT(luisa::render::MediumInfo, eta, medium_tag){};

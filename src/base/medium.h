@@ -5,10 +5,8 @@
 #pragma once
 
 #include <util/spec.h>
-#include <util/scattering.h>
 #include <base/scene_node.h>
 #include <base/spectrum.h>
-#include <base/interaction.h>
 
 #include <utility>
 
@@ -18,12 +16,10 @@ using compute::Expr;
 using compute::Var;
 
 class Medium : public SceneNode {
-
 public:
     class Instance;
 
     class Instance {
-
     protected:
         const Pipeline &_pipeline;
         const Medium *_medium;

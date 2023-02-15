@@ -22,6 +22,8 @@
 #include <base/texture_mapping.h>
 #include <base/spectrum.h>
 #include <base/scene.h>
+#include <base/medium.h>
+#include <base/phase_function.h>
 
 namespace luisa::render {
 
@@ -183,6 +185,14 @@ TextureMapping *Scene::load_texture_mapping(const SceneNodeDesc *desc) noexcept 
 
 Spectrum *Scene::load_spectrum(const SceneNodeDesc *desc) noexcept {
     return dynamic_cast<Spectrum *>(load_node(SceneNodeTag::SPECTRUM, desc));
+}
+
+Medium *Scene::load_medium(const SceneNodeDesc *desc) noexcept {
+    return dynamic_cast<Medium *>(load_node(SceneNodeTag::MEDIUM, desc));
+}
+
+PhaseFunction *Scene::load_phase_function(const SceneNodeDesc *desc) noexcept {
+    return dynamic_cast<PhaseFunction *>(load_node(SceneNodeTag::PHASE_FUNCTION, desc));
 }
 
 luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc) noexcept {

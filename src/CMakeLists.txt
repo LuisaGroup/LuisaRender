@@ -64,6 +64,7 @@ add_subdirectory(transforms)
 add_subdirectory(integrators)
 add_subdirectory(environments)
 add_subdirectory(lightsamplers)
+add_subdirectory(phasefunctions)
 add_subdirectory(texturemappings)
 add_library(luisa-render INTERFACE)
 
@@ -86,6 +87,7 @@ target_link_libraries(luisa-render INTERFACE
         luisa-render-integrators
         luisa-render-environments
         luisa-render-lightsamplers
+        luisa-render-phasefunctions
         luisa-render-texturemappings)
 add_library(luisa::render ALIAS luisa-render)
 

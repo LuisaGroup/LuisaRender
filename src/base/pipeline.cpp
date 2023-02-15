@@ -33,6 +33,14 @@ uint Pipeline::register_light(CommandBuffer &command_buffer, const Light *light)
     return tag;
 }
 
+uint Pipeline::register_medium(CommandBuffer &command_buffer, const Medium *medium) noexcept {
+    if (auto iter = _medium_tags.find(medium);
+        iter != _medium_tags.end()) { return iter->second; }
+    auto tag = _media.emplace(medium->build(*this, command_buffer));
+    _medium_tags.emplace(medium, tag);
+    return tag;
+}
+
 luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, const Scene &scene) noexcept {
     ThreadPool::global().synchronize();
     auto pipeline = luisa::make_unique<Pipeline>(device);
@@ -111,6 +119,15 @@ const Filter::Instance *Pipeline::build_filter(CommandBuffer &command_buffer, co
     }
     auto f = filter->build(*this, command_buffer);
     return _filters.emplace(filter, std::move(f)).first->second.get();
+}
+
+const PhaseFunction::Instance *Pipeline::build_phasefunction(CommandBuffer &command_buffer, const PhaseFunction *phasefunction) noexcept {
+    if (phasefunction == nullptr) { return nullptr; }
+    if (auto iter = _phasefunctions.find(phasefunction); iter != _phasefunctions.end()) {
+        return iter->second.get();
+    }
+    auto pf = phasefunction->build(*this, command_buffer);
+    return _phasefunctions.emplace(phasefunction, std::move(pf)).first->second.get();
 }
 
 void Pipeline::register_transform(const Transform *transform) noexcept {

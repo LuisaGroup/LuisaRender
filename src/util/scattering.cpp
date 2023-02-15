@@ -450,38 +450,4 @@ Float FresnelBlend::pdf(Expr<float3> wo, Expr<float3> wi, TransportMode mode) co
     return ite(same_hemisphere(wo, wi), p, 0.f);
 }
 
-
-Float IsotropicPhaseFunction::evaluate(Expr<float3> wo, Expr<float3> wi) const {
-    return 1.f / (4.f * pi);
-}
-
-Float IsotropicPhaseFunction::sample_wi(Expr<float3> wo, PhaseFunction::SampledDirection &wi, Expr<float2> u) const {
-    wi.wi = sample_cosine_hemisphere(u);
-    wi.valid = true;
-    return 1.f / (4.f * pi);
-}
-
-Float HenyeyGreenstein::evaluate(Expr<float3> wo, Expr<float3> wi) const {
-    auto cosTheta = dot(wo, wi);
-    auto denom = 1.f + _g * _g + 2.f * _g * cosTheta;
-    return inv_pi / 4.f * (1.f - _g * _g) / (denom * sqrt(denom));
-}
-
-Float HenyeyGreenstein::sample_wi(Expr<float3> wo, PhaseFunction::SampledDirection &wi, Expr<float2> u) const {
-    // sample cosTheta
-    auto cosTheta = ite(
-        abs(_g) < 1e-3f,
-        1.f - 2.f * u.x,
-        1.f + _g * _g - sqr((1.f - _g * _g) / (1 - _g + 2 * _g * u.x)) / (2.f * _g)
-        );
-
-    // compute direction
-    auto sinTheta = sqrt(max(0.f, 1.f - cosTheta * cosTheta));
-    auto phi = 2.f * pi * u.y;
-    wi.wi = make_float3(sinTheta * cos(phi), cosTheta, sinTheta * sin(phi));
-    wi.valid = true;
-
-    return evaluate(wo, wi.wi);
-}
-
 }// namespace luisa::render

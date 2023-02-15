@@ -13,7 +13,7 @@ public:
 
     class NullMediumInstance : public Medium::Instance {
 
-    protected:
+    private:
         friend class NullMedium;
 
     public:
