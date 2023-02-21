@@ -186,6 +186,7 @@ public:
     [[nodiscard]] auto camera(size_t i) const noexcept { return _cameras[i].get(); }
     [[nodiscard]] auto &surfaces() const noexcept { return _surfaces; }
     [[nodiscard]] auto &lights() const noexcept { return _lights; }
+    [[nodiscard]] auto &media() const noexcept { return _media; }
     [[nodiscard]] auto environment() const noexcept { return _environment.get(); }
     [[nodiscard]] auto integrator() const noexcept { return _integrator.get(); }
     [[nodiscard]] auto spectrum() const noexcept { return _spectrum.get(); }

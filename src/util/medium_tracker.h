@@ -18,14 +18,15 @@ using compute::UInt;
 using compute::Var;
 
 struct MediumInfo {
-    bool vacuum;
     uint medium_tag;
 };
+
+[[nodiscard]] Bool equal(Expr<MediumInfo> a, Expr<MediumInfo> b) noexcept;
 
 class MediumTracker {
 
 public:
-    static constexpr auto capacity = 8u;
+    static constexpr auto capacity = 16u;
 
 private:
     ArrayVar<uint, capacity> _priority_list;
@@ -38,9 +39,10 @@ public:
     [[nodiscard]] Bool vacuum() const noexcept;
     [[nodiscard]] Bool true_hit(Expr<uint> priority) const noexcept;
     void enter(Expr<uint> priority, Expr<MediumInfo> value) noexcept;
-    void exit(Expr<uint> priority) noexcept;
+    void exit(Expr<uint> priority, Expr<MediumInfo> value) noexcept;
+    Bool exist(Expr<uint> priority, Expr<MediumInfo> value) noexcept;
 };
 
 }// namespace luisa::render
 
-LUISA_STRUCT(luisa::render::MediumInfo, vacuum, medium_tag){};
+LUISA_STRUCT(luisa::render::MediumInfo, medium_tag){};

@@ -47,6 +47,19 @@ protected:
         Instance::_render_one_camera(command_buffer, camera);
     }
 
+    [[nodiscard]] auto event(luisa::shared_ptr<Interaction> it, Expr<float3> wo, Expr<float3> wi) const noexcept {
+        auto shading = it->shading();
+        auto wo_local = shading.world_to_local(wo);
+        auto wi_local = shading.world_to_local(wi);
+        return ite(
+            wo_local.z * wi_local.z > 0.f,
+            Surface::event_reflect,
+            ite(
+                wi_local.z > 0.f,
+                Surface::event_exit,
+                Surface::event_enter));
+    }
+
     [[nodiscard]] Float3 Li(const Camera::Instance *camera, Expr<uint> frame_index,
                             Expr<uint2> pixel_id, Expr<float> time) const noexcept override {
         sampler()->start(pixel_id, frame_index);
@@ -60,12 +73,54 @@ protected:
         auto rr_depth = node<MegakernelVolumePathTracing>()->rr_depth();
         auto medium_tracker = MediumTracker();
 
+        // initialize medium tracker
         auto ray = camera_ray;
+        $while(true) {
+            auto it = pipeline().geometry()->intersect(ray);
+
+            $if(!it->valid()) { $break; };
+
+            auto surface_tag = it->shape()->surface_tag();
+            auto medium_tag = it->shape()->medium_tag();
+
+            auto medium_info = def<MediumInfo>();
+            medium_info.medium_tag = medium_tag;
+            auto medium_priority = def<uint>(0u);
+
+            pipeline().media().dispatch(medium_tag, [&](auto medium) {
+                medium_priority = medium->priority();
+            });
+
+            pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
+                // create closure
+                auto closure = surface->closure(it, swl, 1.f, time);
+
+                auto surface_event = event(it, -ray->direction(), ray->direction());
+
+                // update medium tracker
+                $switch(surface_event) {
+                    $case(Surface::event_enter) {
+                        medium_tracker.enter(medium_priority, medium_info);
+                    };
+                    $case(Surface::event_exit) {
+                        $if(medium_tracker.exist(medium_priority, medium_info)) {
+                            medium_tracker.exit(medium_priority, medium_info);
+                        }
+                        $else {
+                            medium_tracker.enter(medium_priority, medium_info);
+                        };
+                    };
+                };
+                ray = it->spawn_ray(ray->direction());
+            });
+        };
+
+        ray = camera_ray;
         auto pdf_bsdf = def(1e16f);
         $for(depth, node<MegakernelVolumePathTracing>()->max_depth()) {
             auto eta_scale = def(1.f);
             auto u_rr = def(0.f);
-            $if (depth + 1u >= rr_depth) { u_rr = sampler()->generate_1d(); };
+            $if(depth + 1u >= rr_depth) { u_rr = sampler()->generate_1d(); };
 
             // trace
             auto it = pipeline().geometry()->intersect(ray);
@@ -75,11 +130,13 @@ protected:
             // sample the participating medium
             auto is_scattered = def(false);
             $if(!medium_tracker.vacuum()) {
-                // TODO
+                auto medium_tag = medium_tracker.current().medium_tag;
+                pipeline().media().dispatch(medium_tag, [&](auto medium) {
+                    // TODO
+                });
             };
 
-            // normal path tracing
-            UInt surface_event;
+            // sample the surface
             $if(!is_scattered) {
                 // miss
                 $if(!it->valid()) {
@@ -112,6 +169,14 @@ protected:
 
                 // trace shadow ray
                 auto occluded = pipeline().geometry()->intersect_any(light_sample.shadow_ray);
+
+                auto medium_tag = it->shape()->medium_tag();
+                auto medium_priority = def(0u);
+                auto medium_info = def<MediumInfo>();
+                medium_info.medium_tag = medium_tag;
+                pipeline().media().dispatch(medium_tag, [&](auto medium) {
+                    medium_priority = medium->priority();
+                });
 
                 // evaluate material
                 auto surface_tag = it->shape()->surface_tag();
@@ -154,19 +219,18 @@ protected:
                         // apply eta scale & update medium tracker
                         auto eta = closure->eta().value_or(1.f);
                         $switch(surface_sample.event) {
-                            $case(Surface::event_enter) { eta_scale = sqr(eta); };
-                            $case(Surface::event_exit) { eta_scale = sqr(1.f / eta); };
+                            $case(Surface::event_enter) {
+                                eta_scale = sqr(eta);
+                                medium_tracker.enter(medium_priority, medium_info);
+                            };
+                            $case(Surface::event_exit) {
+                                eta_scale = sqr(1.f / eta);
+                                medium_tracker.exit(medium_priority, medium_info);
+                            };
                         };
-                        surface_event = surface_sample.event;
                     };
                 });
             };
-
-//            // update medium tracker
-//            $switch(surface_event) {
-//                $case(Surface::event_enter) { medium_tracker.enter(); };
-//                $case(Surface::event_exit) { medium_tracker.exit(); };
-//            };
 
             beta = zero_if_any_nan(beta);
             $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
