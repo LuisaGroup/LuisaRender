@@ -6,10 +6,30 @@
 
 namespace luisa::render {
 
+using compute::Ray;
+
 class NullMedium : public Medium {
 
 public:
     class NullMediumInstance;
+
+    class NullMediumClosure : public Medium::Closure {
+
+    private:
+        [[nodiscard]] Sample _sample(Expr<float> t_max, Sampler::Instance *sampler) const noexcept override {
+            LUISA_ERROR_WITH_LOCATION("Null medium cannot be sampled.");
+        }
+        SampledSpectrum _transmittance(Expr<float> t, Sampler::Instance *sampler) const noexcept override {
+            return {swl().dimension(), 1.0f};
+        }
+
+    public:
+        NullMediumClosure(
+            const NullMediumInstance *instance, Expr<Ray> ray, luisa::shared_ptr<Interaction> it,
+            const SampledWavelengths &swl, Expr<float> time) noexcept
+            : Medium::Closure{instance, ray, std::move(it), swl, time, 1.0f} {}
+
+    };
 
     class NullMediumInstance : public Medium::Instance {
 
@@ -19,6 +39,10 @@ public:
     public:
         NullMediumInstance(const Pipeline &pipeline, const Medium *medium) noexcept
             : Medium::Instance(pipeline, medium) {}
+        [[nodiscard]] luisa::unique_ptr<Closure> closure(
+            Expr<Ray> ray, luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+            return luisa::make_unique<NullMediumClosure>(this, ray, std::move(it), swl, time);
+        }
     };
 
 protected:
@@ -29,9 +53,14 @@ protected:
 
 public:
     NullMedium(Scene *scene, const SceneNodeDesc *desc) noexcept
-        : Medium{scene, desc} {}
+        : Medium{scene, desc} {
+        _priority = 0u;
+    }
     [[nodiscard]] bool is_null() const noexcept override { return true; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
 
 };
 
 }// namespace luisa::render
+
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::NullMedium)

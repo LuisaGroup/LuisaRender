@@ -82,6 +82,7 @@ public:
     [[nodiscard]] static luisa::unique_ptr<Scene> create(const Context &ctx, const SceneDesc *desc) noexcept;
     [[nodiscard]] const Integrator *integrator() const noexcept;
     [[nodiscard]] const Environment *environment() const noexcept;
+    [[nodiscard]] const Medium *environment_medium() const noexcept;
     [[nodiscard]] const Spectrum *spectrum() const noexcept;
     [[nodiscard]] luisa::span<const Shape *const> shapes() const noexcept;
     [[nodiscard]] luisa::span<const Camera *const> cameras() const noexcept;

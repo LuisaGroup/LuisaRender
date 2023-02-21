@@ -12,7 +12,7 @@ using namespace luisa::compute;
 MediumTracker::MediumTracker() noexcept : _size{0u} {
     for (auto i = 0u; i < capacity; i++) {
         _priority_list[i] = 0u;
-        _medium_list[i] = MediumInfo{0u};
+        _medium_list[i] = def<MediumInfo>();
     }
 }
 
@@ -22,7 +22,7 @@ Bool MediumTracker::true_hit(Expr<uint> priority) const noexcept {
 
 void MediumTracker::enter(Expr<uint> priority, Expr<MediumInfo> value) noexcept {
     $if(_size == capacity) {
-        LUISA_ERROR_WITH_LOCATION("Medium stack overflow.");
+        // TODO: throw exception
     };
     _size += 1u;
     auto x = def(priority);
@@ -50,7 +50,7 @@ void MediumTracker::exit(Expr<uint> priority, Expr<MediumInfo> value) noexcept {
     $if(remove_num != 0u) {
         _size -= 1u;
         _priority_list[_size] = 0u;
-        _medium_list[_size] = MediumInfo{};
+        _medium_list[_size] = def<MediumInfo>();
     };
 }
 

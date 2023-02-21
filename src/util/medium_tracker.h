@@ -18,7 +18,7 @@ using compute::UInt;
 using compute::Var;
 
 struct MediumInfo {
-    uint medium_tag;
+    uint medium_tag{Medium::INVALID_TAG};
 };
 
 [[nodiscard]] Bool equal(Expr<MediumInfo> a, Expr<MediumInfo> b) noexcept;

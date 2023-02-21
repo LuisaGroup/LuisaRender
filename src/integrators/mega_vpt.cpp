@@ -47,7 +47,7 @@ protected:
         Instance::_render_one_camera(command_buffer, camera);
     }
 
-    [[nodiscard]] auto event(luisa::shared_ptr<Interaction> it, Expr<float3> wo, Expr<float3> wi) const noexcept {
+    [[nodiscard]] auto event(const Interaction *it, Expr<float3> wo, Expr<float3> wi) const noexcept {
         auto shading = it->shading();
         auto wo_local = shading.world_to_local(wo);
         auto wi_local = shading.world_to_local(wi);
@@ -74,6 +74,10 @@ protected:
         auto medium_tracker = MediumTracker();
 
         // initialize medium tracker
+        auto env_medium_tag = pipeline().environment_medium_tag();
+        pipeline().media().dispatch(env_medium_tag, [&](auto medium) {
+            medium_tracker.enter(medium->priority(), def<MediumInfo>(env_medium_tag));
+        });
         auto ray = camera_ray;
         $while(true) {
             auto it = pipeline().geometry()->intersect(ray);
@@ -86,16 +90,19 @@ protected:
             auto medium_info = def<MediumInfo>();
             medium_info.medium_tag = medium_tag;
             auto medium_priority = def<uint>(0u);
+            auto eta = def(1.f);
 
             pipeline().media().dispatch(medium_tag, [&](auto medium) {
                 medium_priority = medium->priority();
+                auto closure = medium->closure(ray, it, swl, time);
+                eta = closure->eta();
             });
 
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
                 // create closure
-                auto closure = surface->closure(it, swl, 1.f, time);
+                auto closure = surface->closure(it, swl, eta, time);
 
-                auto surface_event = event(it, -ray->direction(), ray->direction());
+                auto surface_event = event(it.get(), -ray->direction(), ray->direction());
 
                 // update medium tracker
                 $switch(surface_event) {
@@ -133,6 +140,16 @@ protected:
                 auto medium_tag = medium_tracker.current().medium_tag;
                 pipeline().media().dispatch(medium_tag, [&](auto medium) {
                     // TODO
+                    auto closure = medium->closure(ray, it, swl, time);
+
+                    auto vol_sample = closure->sample(tMax, sampler());
+                    is_scattered = vol_sample.is_scattered;
+
+                    // advance ray
+                    ray = vol_sample.ray;
+
+                    // update throughput
+                    beta *= vol_sample.eval.f;
                 });
             };
 
@@ -174,15 +191,18 @@ protected:
                 auto medium_priority = def(0u);
                 auto medium_info = def<MediumInfo>();
                 medium_info.medium_tag = medium_tag;
+                auto eta = def(1.f);
                 pipeline().media().dispatch(medium_tag, [&](auto medium) {
                     medium_priority = medium->priority();
+                    auto closure = medium->closure(ray, it, swl, time);
+                    eta = closure->eta();
                 });
 
                 // evaluate material
                 auto surface_tag = it->shape()->surface_tag();
                 pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
                     // create closure
-                    auto closure = surface->closure(it, swl, 1.f, time);
+                    auto closure = surface->closure(it, swl, eta, time);
 
                     // apply opacity map
                     auto alpha_skip = def(false);

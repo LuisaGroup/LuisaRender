@@ -77,6 +77,7 @@ private:
     luisa::unique_ptr<Spectrum::Instance> _spectrum;
     luisa::unique_ptr<Integrator::Instance> _integrator;
     luisa::unique_ptr<Environment::Instance> _environment;
+    uint _environment_medium_tag{Medium::INVALID_TAG};
     luisa::unique_ptr<Geometry> _geometry;
     // registered transforms
     luisa::unordered_map<const Transform *, uint> _transform_to_id;
@@ -188,6 +189,7 @@ public:
     [[nodiscard]] auto &lights() const noexcept { return _lights; }
     [[nodiscard]] auto &media() const noexcept { return _media; }
     [[nodiscard]] auto environment() const noexcept { return _environment.get(); }
+    [[nodiscard]] auto environment_medium_tag() const noexcept { return _environment_medium_tag; }
     [[nodiscard]] auto integrator() const noexcept { return _integrator.get(); }
     [[nodiscard]] auto spectrum() const noexcept { return _spectrum.get(); }
     [[nodiscard]] auto geometry() const noexcept { return _geometry.get(); }

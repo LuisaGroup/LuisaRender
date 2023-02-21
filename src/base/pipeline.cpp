@@ -65,6 +65,9 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     if (auto env = scene.environment(); env != nullptr && !env->is_black()) {
         pipeline->_environment = env->build(*pipeline, command_buffer);
     }
+    if (auto environment_medium = scene.environment_medium(); environment_medium != nullptr) {
+        pipeline->_environment_medium_tag = pipeline->register_medium(command_buffer, environment_medium);
+    }
     if (pipeline->_lights.empty() && pipeline->_environment == nullptr) [[unlikely]] {
         LUISA_WARNING_WITH_LOCATION(
             "No lights or environment found in the scene.");

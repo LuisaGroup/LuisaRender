@@ -34,6 +34,7 @@ struct Scene::Config {
     luisa::unordered_map<luisa::string, NodeHandle> nodes;
     Integrator *integrator{nullptr};
     Environment *environment{nullptr};
+    Medium *environment_medium{nullptr};
     Spectrum *spectrum{nullptr};
     luisa::vector<Camera *> cameras;
     luisa::vector<Shape *> shapes;
@@ -41,6 +42,7 @@ struct Scene::Config {
 
 const Integrator *Scene::integrator() const noexcept { return _config->integrator; }
 const Environment *Scene::environment() const noexcept { return _config->environment; }
+const Medium *Scene::environment_medium() const noexcept { return _config->environment_medium; }
 const Spectrum *Scene::spectrum() const noexcept { return _config->spectrum; }
 luisa::span<const Shape *const> Scene::shapes() const noexcept { return _config->shapes; }
 luisa::span<const Camera *const> Scene::cameras() const noexcept { return _config->cameras; }
@@ -210,9 +212,11 @@ luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc
         desc->root()->property_node("integrator"));
     scene->_config->environment = scene->load_environment(
         desc->root()->property_node_or_default("environment"));
+    scene->_config->environment_medium = scene->load_medium(
+        desc->root()->property_node_or_default("environment_medium"));
     auto cameras = desc->root()->property_node_list("cameras");
     auto shapes = desc->root()->property_node_list("shapes");
-    auto environments = desc->root()->property_node_list_or_default("environments");
+    auto environments = desc->root()->property_node_or_default("environments", SceneNodeDesc::shared_default_medium("Null"));
     scene->_config->cameras.reserve(cameras.size());
     scene->_config->shapes.reserve(shapes.size());
     for (auto c : cameras) {
