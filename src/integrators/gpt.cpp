@@ -34,6 +34,7 @@ private:
     uint _max_depth;
     uint _rr_depth;
     float _rr_threshold;
+    float _shift_threshold;
     bool _central_radiance;
 
 public:
@@ -42,10 +43,12 @@ public:
           _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)},
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
+          _shift_threshold{std::max(desc->property_float_or_default("shift_threshold", 0.0f), 0.0f)},
           _central_radiance{desc->property_bool_or_default("central_radiance", false)} {}
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
+    [[nodiscard]] auto shift_threshold() const noexcept { return _shift_threshold; }
     [[nodiscard]] auto central_radiance() const noexcept { return _central_radiance; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(
@@ -67,17 +70,6 @@ private:
     };
 
     const float D_EPSILON = 1e-14f;
-
-    struct GPTConfig {
-        uint m_max_depth;
-        uint m_min_depth;
-        uint m_rr_depth;
-        bool m_strict_normals;
-        float m_shift_threshold;
-        bool m_reconstruct_L1;
-        bool m_reconstruct_L2;
-        float m_reconstruct_alpha;
-    };
 
     enum VertexType : uint {
         VERTEX_TYPE_GLOSSY,
@@ -161,8 +153,6 @@ private:
     [[nodiscard]] auto sample_surface(RayState &state, SampledWavelengths &swl, Expr<float> time) const noexcept;
     [[nodiscard]] SampledSpectrum evaluate(RayState &main, RayState *shifteds, SampledWavelengths &swl, Expr<float> time, Expr<uint2> pixel_id) const noexcept;
 
-    luisa::unique_ptr<GPTConfig> _config;
-
 protected:
     void _render_one_camera(CommandBuffer &command_buffer,
                             Camera::Instance *camera) noexcept override;
@@ -194,7 +184,7 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
 }
 
 [[nodiscard]] auto GradientPathTracingInstance::get_vertex_type_by_roughness(Expr<float> roughness) const noexcept {
-    return ite(roughness <= _config->m_shift_threshold, (uint)VertexType::VERTEX_TYPE_GLOSSY, (uint)VertexType::VERTEX_TYPE_DIFFUSE);
+    return ite(roughness <= node<GradientPathTracing>()->shift_threshold(), (uint)VertexType::VERTEX_TYPE_GLOSSY, (uint)VertexType::VERTEX_TYPE_DIFFUSE);
 }
 
 [[nodiscard]] auto GradientPathTracingInstance::get_vertex_type(luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
@@ -423,11 +413,11 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
         // TODO
 
         // Main PT Loop
-        $for(depth, _config->m_max_depth) {
+        $for(depth, node<GradientPathTracing>()->max_depth()) {
             // Strict normal check to produce the same results as bidirectional methods when normal mapping is used.
             // TODO
 
-            auto last_segment = depth + 1 == _config->m_max_depth;
+            auto last_segment = depth + 1 == node<GradientPathTracing>()->max_depth();
 
             //
             // Direct Illumination Sampling
@@ -461,7 +451,7 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                     main.add_radiance(main.throughput * main_light_eval.f * main_light_sample.eval.L, main_weight_numerator / (D_EPSILON + main_weight_denominator));
                 }
 
-                if (!_config->m_strict_normals || true) {// strict normal not implemented TODO
+                if (!/*node<GradientPathTracing>()->strict_normals()*/ true) {// strict normal not implemented TODO
                     for (int i = 0; i < 4; i++) {
                         auto &shifted = shifteds[i];
                         SampledSpectrum main_contribution{swl.dimension(), 0.f};
@@ -620,17 +610,16 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
             main.pdf *= main_bsdf_result.pdf;
             main.eta *= main_bsdf_result.eta;
 
-            auto main_lum_pdf = ite(
-                main_hit_emitter & depth + 1u >= _config->m_min_depth /* TODO :& !(mainBsdfResult.bRec.sampledType & BSDF::EDelta)*/,
-                main_emitter_pdf, 0.f);
+            // auto main_lum_pdf = ite(
+            //     main_hit_emitter & depth + 1u >= node<GradientPathTracing>()->min_depth /* TODO :& !(mainBsdfResult.bRec.sampledType & BSDF::EDelta)*/,
+            //     main_emitter_pdf, 0.f);
+            auto main_lum_pdf = main_emitter_pdf;
 
             auto main_weight_numerator = main_previous_pdf * main_bsdf_pdf;
             auto main_weight_denominator = (main_previous_pdf * main_previous_pdf) * (main_lum_pdf * main_lum_pdf + main_bsdf_pdf * main_bsdf_pdf);
 
             if (node<GradientPathTracing>()->central_radiance()) {
-                $if(depth + 1 >= _config->m_min_depth) {
-                    main.add_radiance(main.throughput * main_emitter_radiance, main_weight_numerator / (D_EPSILON + main_weight_denominator));
-                };
+                main.add_radiance(main.throughput * main_emitter_radiance, main_weight_numerator / (D_EPSILON + main_weight_denominator));
             }
 
             for (int i = 0; i < 4; i++) {
@@ -881,13 +870,11 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                     shifted_contribution = SampledSpectrum{swl.dimension(), 0.f};
                 };
 
-                $if(depth + 1 >= _config->m_min_depth) {
-                    if (node<GradientPathTracing>()->central_radiance()) {
-                        main.add_radiance(main_contribution, weight);
-                        shifted.add_radiance(shifted_contribution, weight);
-                    }
-                    shifted.add_gradient(shifted_contribution - main_contribution, weight);
-                };
+                if (node<GradientPathTracing>()->central_radiance()) {
+                    main.add_radiance(main_contribution, weight);
+                    shifted.add_radiance(shifted_contribution, weight);
+                }
+                shifted.add_gradient(shifted_contribution - main_contribution, weight);
 
                 shifted.alive = ite(postponed_shift_end, false, shifted.alive);
             }
@@ -898,7 +885,7 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                 $break;
             };
 
-            $if(depth >= _config->m_rr_depth) {
+            $if(depth >= node<GradientPathTracing>()->rr_depth()) {
                 // Russian Roulette
                 auto q = max((main.throughput / main.pdf).max() * main.eta * main.eta, 0.05f);
                 $if(sampler()->generate_1d() >= q) {
@@ -923,13 +910,6 @@ void GradientPathTracingInstance::_render_one_camera(
             "No lights in scene. Rendering aborted.");
         return;
     }
-
-    _config = make_unique<GPTConfig>(GPTConfig{
-        .m_max_depth = node<GradientPathTracing>()->max_depth(),
-        .m_min_depth = 0u,
-        .m_rr_depth = node<GradientPathTracing>()->rr_depth(),
-        .m_shift_threshold = 0.0f// TODO
-    });
 
     Instance::_render_one_camera(command_buffer, camera);
 }
