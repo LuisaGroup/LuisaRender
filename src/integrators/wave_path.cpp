@@ -267,11 +267,11 @@ void WavefrontPathTracingInstance::_render_one_camera(
             hits.write(ray_id, hit);
             $if(!hit->miss()) {
                 auto shape = pipeline().geometry()->instance(hit.inst);
-                $if(shape->has_surface()) {
+                $if(shape.has_surface()) {
                     auto queue_id = surface_queue_size.atomic(0u).fetch_add(1u);
                     surface_queue.write(queue_id, ray_id);
                 };
-                $if(shape->has_light()) {
+                $if(shape.has_light()) {
                     auto queue_id = light_queue_size.atomic(0u).fetch_add(1u);
                     light_queue.write(queue_id, ray_id);
                 };
@@ -376,7 +376,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
             auto &&u_wl = u_wl_and_swl.first;
             auto &&swl = u_wl_and_swl.second;
             auto beta = path_states.read_beta(path_id);
-            auto surface_tag = it->shape()->surface_tag();
+            auto surface_tag = it->shape().surface_tag();
             auto eta_scale = def(1.f);
             auto wo = -ray->direction();
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
