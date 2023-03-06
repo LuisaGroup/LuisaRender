@@ -25,22 +25,13 @@
 #include <base/integrator.h>
 #include <base/scene.h>
 
+#define CENTRAL_RADIANCE
+
 namespace luisa::render {
 
 using namespace compute;
 
-static const luisa::unordered_map<luisa::string_view, uint>
-    aov_component_to_channels{{"sample", 3u},
-                              {"diffuse", 3u},
-                              {"specular", 3u},
-                              {"normal", 3u},
-                              {"albedo", 3u},
-                              {"depth", 1u},
-                              {"roughness", 2u},
-                              {"ndc", 3u},
-                              {"mask", 1u}};
-
-class GradientPathTracing final : public Integrator {
+class GradientPathTracing final : public ProgressiveIntegrator {
 private:
     uint _max_depth;
     uint _rr_depth;
@@ -48,7 +39,7 @@ private:
 
 public:
     GradientPathTracing(Scene *scene, const SceneNodeDesc *desc) noexcept
-        : Integrator{scene, desc},
+        : ProgressiveIntegrator{scene, desc},
           _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)},
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)} {}
@@ -60,62 +51,17 @@ public:
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
-class GradientPathTracingInstance final : public Integrator::Instance {
-
-private:
-    uint _last_spp{0u};
-    Clock _clock;
-    Framerate _framerate;
-    luisa::optional<Window> _window;
-
-private:
-    void _render_one_camera(CommandBuffer &command_buffer, Camera::Instance *camera) noexcept;
-
-public:
-    explicit GradientPathTracingInstance(
-        const GradientPathTracing *node,
-        Pipeline &pipeline, CommandBuffer &cmd_buffer) noexcept
-        : Integrator::Instance{pipeline, cmd_buffer, node} {
-    }
-
-    void render(Stream &stream) noexcept override {
-        auto pt = node<GradientPathTracing>();
-        auto command_buffer = stream.command_buffer();
-        for (auto i = 0u; i < pipeline().camera_count(); i++) {
-            auto camera = pipeline().camera(i);
-            auto resolution = camera->film()->node()->resolution();
-            auto pixel_count = resolution.x * resolution.y;
-            _last_spp = 0u;
-            _clock.tic();
-            _framerate.clear();
-            camera->film()->prepare(command_buffer);
-            _render_one_camera(command_buffer, camera);
-            command_buffer << compute::synchronize();
-            camera->film()->release();
-        }
-        while (_window && !_window->should_close()) {
-            _window->run_one_frame([] {});
-        }
-    }
-};
-
-luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
-    Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
-    return luisa::make_unique<GradientPathTracingInstance>(
-        this, pipeline, command_buffer);
-}
-
 const float D_EPSILON = 1e-14f;
 
 struct GPTConfig {
     uint m_max_depth;
-	uint m_min_depth;
+    uint m_min_depth;
     uint m_rr_depth;
-	bool m_strict_normals;
-	float m_shift_threshold;
-	bool m_reconstruct_L1;
-	bool m_reconstruct_L2;
-	float m_reconstruct_alpha;
+    bool m_strict_normals;
+    float m_shift_threshold;
+    bool m_reconstruct_L1;
+    bool m_reconstruct_L2;
+    float m_reconstruct_alpha;
 };
 
 enum VertexType : uint {
@@ -124,9 +70,9 @@ enum VertexType : uint {
 };
 
 enum RayConnection : uint {
-	RAY_NOT_CONNECTED,
-	RAY_RECENTLY_CONNECTED,
-	RAY_CONNECTED
+    RAY_NOT_CONNECTED,
+    RAY_RECENTLY_CONNECTED,
+    RAY_CONNECTED
 };
 
 struct RayState {
@@ -137,19 +83,19 @@ struct RayState {
     SampledSpectrum gradient;
     // RadianceQueryRecord rRec;        ///< The radiance query record for this ray.
     luisa::shared_ptr<Interaction> it;
-    Float eta;                      // Current refractive index
+    Float eta;// Current refractive index
     Bool alive;
     UInt connection_status;
 
-    RayState() : radiance(0.0f), gradient(0.0f), it(nullptr), eta(1.0f), pdf(1.0f), 
-                 throughput(0.0f), alive(true), connection_status((uint) RAY_NOT_CONNECTED) {}
+    explicit RayState(uint dimension) : radiance(dimension, 0.0f), gradient(dimension, 0.0f), it(luisa::make_shared<Interaction>()), eta(1.0f), pdf(1.0f),
+                                        throughput(dimension, 0.0f), alive(true), connection_status((uint)RAY_NOT_CONNECTED) {}
 
-    inline void add_radiance(const SampledSpectrum& contribution, Expr<float> weight) noexcept {
+    inline void add_radiance(const SampledSpectrum &contribution, Expr<float> weight) noexcept {
         auto color = contribution * weight;
         radiance += color;
     }
 
-    inline void add_gradient(const SampledSpectrum& contribution, Expr<float> weight) noexcept {
+    inline void add_gradient(const SampledSpectrum &contribution, Expr<float> weight) noexcept {
         auto color = contribution * weight;
         gradient += color;
     }
@@ -158,28 +104,26 @@ struct RayState {
 const float epsilon = 1e-4f;
 const float shadow_epsilon = 1e-3f;
 
-[[nodiscard]] auto test_visibility(const Pipeline* pipeline, Expr<float3> point1, Expr<float3> point2) noexcept {
+[[nodiscard]] auto test_visibility(const Pipeline *pipeline, Expr<float3> point1, Expr<float3> point2) noexcept {
     auto shadow_ray = make_ray(
-        point1, point2 - point1, epsilon, 1.f - shadow_epsilon
-    );
+        point1, point2 - point1, epsilon, 1.f - shadow_epsilon);
     return !pipeline->geometry()->intersect_any(shadow_ray);
 }
 
-[[nodiscard]] auto test_environment_visibility(const Pipeline* pipeline, const Var<Ray>& ray) noexcept {
-    if(!pipeline->environment()) return def(false);
+[[nodiscard]] auto test_environment_visibility(const Pipeline *pipeline, const Var<Ray> &ray) noexcept {
+    if (!pipeline->environment()) return def(false);
     auto shadow_ray = make_ray(
-        ray->origin(), ray->direction(), epsilon, std::numeric_limits<float>::max()
-    );
+        ray->origin(), ray->direction(), epsilon, std::numeric_limits<float>::max());
     // Miss = Intersect with env TODO
-    return !pipeline->geometry()->intersect_any(shadow_ray); 
+    return !pipeline->geometry()->intersect_any(shadow_ray);
 }
 
-[[nodiscard]] auto get_vertex_type_by_roughness(Expr<float> roughness, const GPTConfig* config) noexcept {
-    return ite(roughness <= config->m_shift_threshold, (uint) VertexType::VERTEX_TYPE_GLOSSY, (uint)VertexType::VERTEX_TYPE_DIFFUSE);
+[[nodiscard]] auto get_vertex_type_by_roughness(Expr<float> roughness, const GPTConfig *config) noexcept {
+    return ite(roughness <= config->m_shift_threshold, (uint)VertexType::VERTEX_TYPE_GLOSSY, (uint)VertexType::VERTEX_TYPE_DIFFUSE);
 }
 
-[[nodiscard]] auto get_vertex_type(const Pipeline* pipeline, luisa::shared_ptr<Interaction> it, const GPTConfig* config, const SampledWavelengths& swl, Expr<float> time) noexcept {
-    auto surface_tag = it->shape()->surface_tag();
+[[nodiscard]] auto get_vertex_type(const Pipeline *pipeline, luisa::shared_ptr<Interaction> it, const GPTConfig *config, const SampledWavelengths &swl, Expr<float> time) noexcept {
+    auto surface_tag = it->shape().surface_tag();
     Float2 roughness;
     pipeline->surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
         auto closure = surface->closure(it, swl, 1.f, time);
@@ -206,36 +150,37 @@ struct HalfVectorShiftResult {
 
         $if(main_eta == 1.f | shifted_eta == 1.f) {
             result.success = false;
-        } $else {
+        }
+        $else {
             auto tangent_space_half_vector_non_normalized_main = ite(
                 cos_theta(tangent_space_main_wi) < 0.f,
                 -(tangent_space_main_wi * main_eta + tangent_space_main_wo),
-                -(tangent_space_main_wi + tangent_space_main_wo * main_eta)
-            );
+                -(tangent_space_main_wi + tangent_space_main_wo * main_eta));
 
             auto tangent_space_half_vector = normalize(tangent_space_half_vector_non_normalized_main);
-            
-            Float3 tangent_space_shifted_wo; 
-            auto refract_not_internal = refract(tangent_space_shifted_wi, tangent_space_half_vector, shifted_eta, &tangent_space_shifted_wo); 
+
+            Float3 tangent_space_shifted_wo;
+            auto refract_not_internal = refract(tangent_space_shifted_wi, tangent_space_half_vector, shifted_eta, &tangent_space_shifted_wo);
 
             $if(!refract_not_internal) {
                 result.success = false;
-            } $else {
+            }
+            $else {
                 auto tangent_space_half_vector_non_normalized_shifted = ite(
                     cos_theta(tangent_space_shifted_wi) < 0.f,
                     -(tangent_space_shifted_wi * shifted_eta + tangent_space_shifted_wo),
-                    -(tangent_space_shifted_wi + tangent_space_shifted_wo * shifted_eta)
-                );
+                    -(tangent_space_shifted_wi + tangent_space_shifted_wo * shifted_eta));
 
                 auto h_length_squared = length_squared(tangent_space_half_vector_non_normalized_shifted);
                 auto wo_dot_h = abs(dot(tangent_space_main_wo, tangent_space_half_vector)) / (D_EPSILON + abs(dot(tangent_space_shifted_wo, tangent_space_half_vector)));
-                
+
                 result.success = true;
                 result.wo = tangent_space_shifted_wo;
                 result.jacobian = h_length_squared * wo_dot_h;
             };
         };
-    } $else {
+    }
+    $else {
         // Reflection
         auto tangent_space_half_vector = normalize(tangent_space_main_wi + tangent_space_main_wo);
         auto tangent_space_shifted_wo = reflect(tangent_space_shifted_wi, tangent_space_half_vector);
@@ -258,8 +203,8 @@ struct ReconnectionShiftResult {
 };
 
 [[nodiscard]] ReconnectionShiftResult reconnect_shift(
-    const Pipeline* pipeline, 
-    Expr<float3> main_source_vertex, 
+    const Pipeline *pipeline,
+    Expr<float3> main_source_vertex,
     Expr<float3> target_vertex,
     Expr<float3> shift_source_vertex,
     Expr<float3> target_normal) noexcept {
@@ -288,15 +233,14 @@ struct ReconnectionShiftResult {
 }
 
 [[nodiscard]] ReconnectionShiftResult environment_shift(
-    const Pipeline* pipeline,
-    const Var<Ray>& main_ray,
+    const Pipeline *pipeline,
+    const Var<Ray> &main_ray,
     Expr<float3> shift_source_vertex) noexcept {
     ReconnectionShiftResult result;
     result.success = false;
 
     auto offset_ray = make_ray(
-        shift_source_vertex, main_ray->direction(), main_ray->t_min(), main_ray->t_max()
-    );
+        shift_source_vertex, main_ray->direction(), main_ray->t_min(), main_ray->t_max());
 
     $if(test_environment_visibility(pipeline, offset_ray)) {
         result.success = true;
@@ -317,11 +261,11 @@ struct SurfaceSampleResult {
 
 class GradientPathTracingImpl {
 private:
-    const Pipeline* _pipeline;
-    Sampler::Instance* _sampler;
-    LightSampler::Instance* _light_sampler;
-    const Camera::Instance* _camera;
-    const GPTConfig* _config;
+    const Pipeline *_pipeline;
+    Sampler::Instance *_sampler;
+    LightSampler::Instance *_light_sampler;
+    const Camera::Instance *_camera;
+    const GPTConfig *_config;
 
 public:
     struct Evaluation {
@@ -332,8 +276,8 @@ public:
         SampledWavelengths swl;
     };
 
-    GradientPathTracingImpl(const Pipeline* pipeline, Sampler::Instance* sampler, LightSampler::Instance* light_sampler, const Camera::Instance* camera, const GPTConfig* config)
-        : _pipeline(pipeline), _sampler(sampler),_light_sampler(light_sampler) ,_camera(camera), _config(config) {}
+    GradientPathTracingImpl(const Pipeline *pipeline, Sampler::Instance *sampler, LightSampler::Instance *light_sampler, const Camera::Instance *camera, const GPTConfig *config)
+        : _pipeline(pipeline), _sampler(sampler), _light_sampler(light_sampler), _camera(camera), _config(config) {}
 
     // Entrance function of GPT
     [[nodiscard]] auto evaluate_point(Expr<uint2> pixel_coord, Expr<uint> sample_index, Expr<float> time, float diff_scale_factor) noexcept {
@@ -344,21 +288,24 @@ public:
         auto spectrum = _pipeline->spectrum();
         auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : _sampler->generate_1d());
 
-        RayState main_ray;
+        RayState main_ray{swl.dimension()};
         main_ray.ray = main_ray_diff;
         main_ray.ray.scale_differential(diff_scale_factor);
         main_ray.throughput = SampledSpectrum{swl.dimension(), main_ray_weight};
         // TODO: rRec
 
-        RayState shifted_rays[4];
+        RayState shifted_rays[4] = {
+            RayState{swl.dimension()},
+            RayState{swl.dimension()},
+            RayState{swl.dimension()},
+            RayState{swl.dimension()}};
         static const UInt2 pixel_shifts[4] = {
             make_uint2(1, 0),
             make_uint2(0, 1),
             make_uint2(-1, 0),
-            make_uint2(0, -1)
-        };
+            make_uint2(0, -1)};
 
-        for(int i = 0; i < 4; i++) {
+        for (int i = 0; i < 4; i++) {
             auto [shifted_diff, _, shifted_weight] = _camera->generate_ray_differential(pixel_coord + pixel_shifts[i], time, u_filter, u_lens);
             shifted_rays[i].ray = shifted_diff;
             shifted_rays[i].ray.scale_differential(diff_scale_factor);
@@ -367,7 +314,7 @@ public:
         }
 
         // Actual implementation
-        SampledSpectrum very_direct = evaluate(main_ray, shifted_rays, swl, time);
+        SampledSpectrum very_direct = evaluate(main_ray, shifted_rays, swl, time, pixel_coord);
 
         return Evaluation{
             .very_direct = very_direct,
@@ -376,29 +323,21 @@ public:
                 shifted_rays[0].gradient,
                 shifted_rays[1].gradient,
                 shifted_rays[2].gradient,
-                shifted_rays[3].gradient
-            },
-            .neighbor_throughput = {
-                shifted_rays[0].radiance,
-                shifted_rays[1].radiance,
-                shifted_rays[2].radiance,
-                shifted_rays[3].radiance
-            },
-            .swl = swl
-        };
+                shifted_rays[3].gradient},
+            .neighbor_throughput = {shifted_rays[0].radiance, shifted_rays[1].radiance, shifted_rays[2].radiance, shifted_rays[3].radiance},
+            .swl = swl};
     }
 
-    [[nodiscard]] SurfaceSampleResult sample_surface(RayState& state, SampledWavelengths& swl, Expr<float> time) noexcept {
-        auto& it = state.it;
-        auto& ray = state.ray;
+    [[nodiscard]] SurfaceSampleResult sample_surface(RayState &state, SampledWavelengths &swl, Expr<float> time) noexcept {
+        auto &it = state.it;
+        auto &ray = state.ray;
 
-        SurfaceSampleResult result {
+        SurfaceSampleResult result{
             .sample = Surface::Sample::zero(swl.dimension()),
             .weight = SampledSpectrum{swl.dimension(), 0.f},
             .pdf = def(0.f),
-            .eta = def(0.f)
-        };
-        auto surface_tag = it->shape()->surface_tag();
+            .eta = def(0.f)};
+        auto surface_tag = it->shape().surface_tag();
         auto u_lobe = _sampler->generate_1d();
         auto u_bsdf = _sampler->generate_2d();
         _pipeline->surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
@@ -413,45 +352,46 @@ public:
         return result;
     }
 
-    [[nodiscard]] SampledSpectrum evaluate(RayState& main, RayState* shifteds, SampledWavelengths& swl, Expr<float> time) noexcept {
+    [[nodiscard]] SampledSpectrum evaluate(RayState &main, RayState *shifteds, SampledWavelengths &swl, Expr<float> time, Expr<uint2> pixel_id) noexcept {
         SampledSpectrum result{swl.dimension(), 0.f};
 
-        main.it = _pipeline->geometry()->intersect(main.ray.ray);
+        *main.it = *_pipeline->geometry()->intersect(main.ray.ray);
         main.ray.ray->set_t_min(epsilon);
 
-        for(int i = 0; i < 4; i++) {
-            auto& shifted =shifteds[i];
-            shifted.it = _pipeline->geometry()->intersect(shifted.ray.ray);
+        for (int i = 0; i < 4; i++) {
+            auto &shifted = shifteds[i];
+            *shifted.it = *_pipeline->geometry()->intersect(shifted.ray.ray);
             shifted.ray.ray->set_t_min(epsilon);
         }
 
         $if(!main.it->valid()) {
-            if(_pipeline->environment()) {
+            if (_pipeline->environment()) {
                 auto eval = _light_sampler->evaluate_miss(main.ray.ray->direction(), swl, time);
                 result += main.throughput * eval.L;
             };
-        } $else {
-            if(!_pipeline->lights().empty()) {
-                $if(main.it->shape()->has_light()) {
+        }
+        $else {
+            if (!_pipeline->lights().empty()) {
+                $if(main.it->shape().has_light()) {
                     auto eval = _light_sampler->evaluate_hit(*main.it, main.ray.ray->origin(), swl, time);
                     result += main.throughput * eval.L;
                 };
             }
             // Subsurface omitted TODO
 
-            for(int i = 0; i < 4; i++) {
-                auto& shifted = shifteds[i];
+            for (int i = 0; i < 4; i++) {
+                auto &shifted = shifteds[i];
                 $if(!shifted.it->valid()) {
                     shifted.alive = false;
                 };
             }
 
-            // Strict normal check to produce the same results as bidirectional methods when normal mapping is used. 
+            // Strict normal check to produce the same results as bidirectional methods when normal mapping is used.
             // TODO
 
             // Main PT Loop
             $for(depth, _config->m_max_depth) {
-                // Strict normal check to produce the same results as bidirectional methods when normal mapping is used. 
+                // Strict normal check to produce the same results as bidirectional methods when normal mapping is used.
                 // TODO
 
                 auto last_segment = depth + 1 == _config->m_max_depth;
@@ -464,15 +404,14 @@ public:
                 auto u_light_selection = _sampler->generate_1d();
                 auto u_light_surface = _sampler->generate_2d();
                 auto main_light_sample = _light_sampler->sample(*main.it, u_light_selection, u_light_surface, swl, time);
-                // TODO: main.it = main_light_sample?
                 auto main_occluded_it = _pipeline->geometry()->intersect(main_light_sample.shadow_ray);
 
-                auto main_surface_tag = main.it->shape()->surface_tag();
+                auto main_surface_tag = main.it->shape().surface_tag();
                 auto wo = -main.ray.ray->direction();
                 $if(main_light_sample.eval.pdf > 0.f & !main_occluded_it->valid()) {
                     auto wi = main_light_sample.shadow_ray->direction();
 
-                    Surface::Evaluation main_light_eval{.f = SampledSpectrum{0.f}, .pdf=0.f};
+                    Surface::Evaluation main_light_eval{.f = SampledSpectrum{swl.dimension(), 0.f}, .pdf = 0.f};
                     _pipeline->surfaces().dispatch(main_surface_tag, [&](auto surface) noexcept {
                         auto closure = surface->closure(main.it, swl, 1.f, time);
                         main_light_eval = closure->evaluate(wo, wi);
@@ -483,39 +422,38 @@ public:
 
                     auto main_weight_numerator = main.pdf * main_light_sample.eval.pdf;
                     auto main_bsdf_pdf = main_light_eval.pdf;
-                    auto main_weight_denominator = main.pdf * main.pdf  * (
-                        main_light_sample.eval.pdf * main_light_sample.eval.pdf + main_bsdf_pdf * main_bsdf_pdf
-                    );
+                    auto main_weight_denominator = main.pdf * main.pdf * (main_light_sample.eval.pdf * main_light_sample.eval.pdf + main_bsdf_pdf * main_bsdf_pdf);
 
-                    if(!_config->m_strict_normals) { // strict normal not implemented TODO
-                        for(int i = 0; i < 4; i++) {
-                            auto& shifted = shifteds[i];
-                            SampledSpectrum main_contribution{ swl.dimension(), 0.f };
-                            SampledSpectrum shifted_contribution{ swl.dimension(), 0.f };
+#ifdef CENTRAL_RADIANCE
+                    main.add_radiance(main.throughput * main_light_eval.f * main_light_sample.eval.L, main_weight_numerator / (D_EPSILON + main_weight_denominator));
+#endif
+                    if (!_config->m_strict_normals || true) {// strict normal not implemented TODO
+                        for (int i = 0; i < 4; i++) {
+                            auto &shifted = shifteds[i];
+                            SampledSpectrum main_contribution{swl.dimension(), 0.f};
+                            SampledSpectrum shifted_contribution{swl.dimension(), 0.f};
                             auto weight = def(0.f);
 
                             auto shift_successful = shifted.alive;
 
                             $if(shift_successful) {
                                 $switch(shifted.connection_status) {
-                                    $case((uint) RayConnection::RAY_CONNECTED) {
+                                    $case((uint)RayConnection::RAY_CONNECTED) {
                                         auto shifted_bsdf_pdf = main_bsdf_pdf;
                                         auto shifted_emitter_pdf = main_light_sample.eval.pdf;
                                         auto shifted_bsdf_value = main_light_eval.f;
                                         auto shifted_emitter_radiance = main_light_sample.eval.L * main_light_sample.eval.pdf;
                                         auto jacobian = 1.f;
 
-                                        auto shifted_weight_denominator = (jacobian * shifted.pdf) * (jacobian * shifted.pdf) * (
-                                            shifted_emitter_pdf * shifted_emitter_pdf + shifted_bsdf_pdf * shifted_bsdf_pdf
-                                        );
+                                        auto shifted_weight_denominator = (jacobian * shifted.pdf) * (jacobian * shifted.pdf) * (shifted_emitter_pdf * shifted_emitter_pdf + shifted_bsdf_pdf * shifted_bsdf_pdf);
                                         weight = main_weight_numerator / (D_EPSILON + shifted_weight_denominator + main_weight_denominator);
                                         main_contribution = main.throughput * main_light_eval.f * main_light_sample.eval.L * main_light_sample.eval.pdf;
                                         shifted_contribution = jacobian * shifted.throughput * (shifted_bsdf_value * shifted_emitter_radiance);
                                     };
-                                    $case((uint) RayConnection::RAY_RECENTLY_CONNECTED) {
+                                    $case((uint)RayConnection::RAY_RECENTLY_CONNECTED) {
                                         auto incoming_direction = normalize(shifted.it->p() - main.it->p());
 
-                                        Surface::Evaluation shifted_bsdf_eval{ .f=SampledSpectrum{0.f}, .pdf=0.f };
+                                        Surface::Evaluation shifted_bsdf_eval{.f = SampledSpectrum{swl.dimension(), 0.f}, .pdf = 0.f};
                                         _pipeline->surfaces().dispatch(main_surface_tag, [&](auto surface) noexcept {
                                             auto closure = surface->closure(main.it, swl, 1.f, time);
                                             shifted_bsdf_eval = closure->evaluate(-incoming_direction, main_light_sample.shadow_ray->direction());
@@ -526,45 +464,41 @@ public:
                                         auto shifted_emitter_radiance = main_light_sample.eval.L * main_light_sample.eval.pdf;
                                         auto jacobian = 1.f;
 
-                                        auto shifted_weight_denominator = (jacobian * shifted.pdf) * (jacobian * shifted.pdf) * (
-                                            shifted_emitter_pdf * shifted_emitter_pdf + shifted_bsdf_pdf * shifted_bsdf_pdf
-                                        );
+                                        auto shifted_weight_denominator = (jacobian * shifted.pdf) * (jacobian * shifted.pdf) * (shifted_emitter_pdf * shifted_emitter_pdf + shifted_bsdf_pdf * shifted_bsdf_pdf);
                                         weight = main_weight_numerator / (D_EPSILON + shifted_weight_denominator + main_weight_denominator);
                                         main_contribution = main.throughput * main_light_eval.f * main_light_sample.eval.L * main_light_sample.eval.pdf;
                                         shifted_contribution = jacobian * shifted.throughput * (shifted_bsdf_value * shifted_emitter_radiance);
                                     };
-                                    $case((uint) RayConnection::RAY_NOT_CONNECTED) {
+                                    $case((uint)RayConnection::RAY_NOT_CONNECTED) {
                                         // TODO
                                         auto main_vertex_type = get_vertex_type(_pipeline, main.it, _config, swl, time);
                                         auto shifted_vertex_type = get_vertex_type(_pipeline, shifted.it, _config, swl, time);
 
-                                        $if(main_vertex_type == (uint) VertexType::VERTEX_TYPE_DIFFUSE & shifted_vertex_type == (uint) VertexType::VERTEX_TYPE_DIFFUSE) {
+                                        $if(main_vertex_type == (uint)VertexType::VERTEX_TYPE_DIFFUSE & shifted_vertex_type == (uint)VertexType::VERTEX_TYPE_DIFFUSE) {
                                             auto shifted_light_sample = _light_sampler->sample(*shifted.it, u_light_selection, u_light_surface, swl, time);
                                             // TODO: shifted.it = shifted_light_sample?
                                             auto shifted_occluded_it = _pipeline->geometry()->intersect(shifted_light_sample.shadow_ray);
 
                                             auto shifted_emitter_radiance = shifted_light_sample.eval.L * shifted_light_sample.eval.pdf;
                                             auto shifted_drec_pdf = shifted_light_sample.eval.pdf;
-                                            
+
                                             auto shifted_distance_squared = length_squared(shifted.it->p() - shifted_occluded_it->p());
                                             auto emitter_direction = (shifted.it->p() - shifted_occluded_it->p()) / sqrt(shifted_distance_squared);
                                             auto shifted_opposing_cosine = -dot(shifted_occluded_it->ng(), emitter_direction);
 
                                             // TODO: No strict normal here
-                                            auto shifted_surface_tag = shifted.it->shape()->surface_tag();
-                                            Surface::Evaluation shifted_light_eval{.f = SampledSpectrum{0.f}, .pdf=0.f};
+                                            auto shifted_surface_tag = shifted.it->shape().surface_tag();
+                                            Surface::Evaluation shifted_light_eval{.f = SampledSpectrum{swl.dimension(), 0.f}, .pdf = 0.f};
                                             _pipeline->surfaces().dispatch(shifted_surface_tag, [&](auto surface) noexcept {
                                                 auto closure = surface->closure(shifted.it, swl, 1.f, time);
-                                                shifted_light_eval = closure->evaluate(-shifted.ray.ray->direction(), -emitter_direction); // TODO: check +-
+                                                shifted_light_eval = closure->evaluate(-shifted.ray.ray->direction(), -emitter_direction);// TODO: check +-
                                             });
 
                                             auto shifted_bsdf_value = shifted_light_eval.f;
                                             auto shifted_bsdf_pdf = ite(shifted_occluded_it->valid(), shifted_light_eval.pdf, 0.f);
                                             auto jacobian = abs(shifted_opposing_cosine * main_distance_squared) / (epsilon + abs(main_opposing_cosine * shifted_distance_squared));
 
-                                            auto shifted_weight_denominator = (jacobian * shifted.pdf) * (jacobian * shifted.pdf) * (
-                                                shifted_drec_pdf * shifted_drec_pdf + shifted_bsdf_pdf * shifted_bsdf_pdf
-                                            );
+                                            auto shifted_weight_denominator = (jacobian * shifted.pdf) * (jacobian * shifted.pdf) * (shifted_drec_pdf * shifted_drec_pdf + shifted_bsdf_pdf * shifted_bsdf_pdf);
                                             weight = main_weight_numerator / (D_EPSILON + shifted_weight_denominator + main_weight_denominator);
 
                                             main_contribution = main.throughput * main_light_eval.f * main_light_sample.eval.L * main_light_sample.eval.pdf;
@@ -572,17 +506,20 @@ public:
                                         };
                                     };
                                 };
-                            } $else { // shift_successful == false
+                            }
+                            $else {// shift_successful == false
                                 auto shifted_weight_denominator = 0.f;
                                 weight = main_weight_numerator / (D_EPSILON + main_weight_denominator);
 
                                 main_contribution = main.throughput * main_light_eval.f * main_light_sample.eval.L * main_light_sample.eval.pdf;
-                                shifted_contribution = SampledSpectrum{ swl.dimension(), 0.f };
+                                shifted_contribution = SampledSpectrum{swl.dimension(), 0.f};
                             };
 
+#ifndef CENTRAL_RADIANCE
                             // TODO: Check if add valid
                             main.add_radiance(main_contribution, weight);
                             shifted.add_radiance(shifted_contribution, weight);
+#endif
 
                             shifted.add_gradient(shifted_contribution - main_contribution, weight);
                         }
@@ -594,424 +531,423 @@ public:
                 //
 
                 auto main_bsdf_result = sample_surface(main, swl, time);
-                $if(main_bsdf_result.pdf > 0.f) {
-                    auto main_wo = main.ray.ray->direction();
+                $if(main_bsdf_result.pdf <= 0.f) {
+                    $break;
+                };
+                auto main_wo = main_bsdf_result.sample.wi;
 
-                    auto main_wo_dot_ng = dot(main.it->ng(), main_wo);
-                    // TODO: strict normal
+                auto main_wo_dot_ng = dot(main.it->ng(), main_wo);
+                // TODO: strict normal
 
-                    auto previous_main_it = *main.it;
+                auto previous_main_it = *main.it;
 
-                    auto main_hit_emitter = def(false);
-                    auto main_emitter_radiance = SampledSpectrum{swl.dimension(), 0.f};
-                    auto main_emitter_pdf = def(0.f);
+                auto main_hit_emitter = def(false);
+                auto main_emitter_radiance = SampledSpectrum{swl.dimension(), 0.f};
+                auto main_emitter_pdf = def(0.f);
 
-                    auto main_vertex_type = get_vertex_type(_pipeline, main.it, _config, swl, time);
-                    auto main_next_vertex_type = def(0u);
-                    auto neither_hit_nor_env_flag = def(false);
+                auto main_vertex_type = get_vertex_type(_pipeline, main.it, _config, swl, time);
+                auto main_next_vertex_type = def(0u);
 
-                    main.ray = RayDifferential{ .ray = make_ray(main.it->p(), main_wo) };
-                    main.it = _pipeline->geometry()->intersect(main.ray.ray);
-                    $if(main.it->valid()) {
-                        if(!_pipeline->lights().empty()) {
-                            $if(main.it->shape()->has_light()) {
-                                auto eval = _light_sampler->evaluate_hit(*main.it, main.ray.ray->origin(), swl, time);
-                                main_emitter_radiance = eval.L;
-                                main_emitter_pdf = eval.pdf;
-                                main_hit_emitter = true;
-                                // TODO: setQuery?
-                            };
-                        }
-
-                        // TODO: subsurface scattering
-
-                        main_next_vertex_type = get_vertex_type(_pipeline, main.it, _config, swl, time);
-                    } $else {
-                        if(_pipeline->environment()) {
-                            auto eval = _light_sampler->evaluate_miss(main.ray.ray->direction(), swl, time);
+                main.ray = RayDifferential{.ray = main.it->spawn_ray(main_wo)};
+                *main.it = *_pipeline->geometry()->intersect(main.ray.ray);
+                $if(main.it->valid()) {
+                    if (!_pipeline->lights().empty()) {
+                        $if(main.it->shape().has_light()) {
+                            auto eval = _light_sampler->evaluate_hit(*main.it, main.ray.ray->origin(), swl, time);
                             main_emitter_radiance = eval.L;
                             main_emitter_pdf = eval.pdf;
                             main_hit_emitter = true;
+                        };
+                    }
 
-                            main_next_vertex_type = (uint) VERTEX_TYPE_DIFFUSE;
-                        } else {
-                            neither_hit_nor_env_flag = true;
-                        }
-                    };
+                    // TODO: subsurface scattering
 
-                    $if(!neither_hit_nor_env_flag) { // hit something or hit environment
-                        // Continue the shift
-                        auto main_bsdf_pdf = main_bsdf_result.pdf;
-                        auto main_previous_pdf = main.pdf;
+                    main_next_vertex_type = get_vertex_type(_pipeline, main.it, _config, swl, time);
+                }
+                $else {
+                    if (_pipeline->environment()) {
+                        auto eval = _light_sampler->evaluate_miss(main.ray.ray->direction(), swl, time);
+                        main_emitter_radiance = eval.L;
+                        main_emitter_pdf = eval.pdf;
+                        main_hit_emitter = true;
 
-                        main.throughput *= main_bsdf_result.weight * main_bsdf_result.pdf;
-                        main.pdf *= main_bsdf_result.pdf;
-                        main.eta *= main_bsdf_result.eta;
+                        main_next_vertex_type = (uint)VERTEX_TYPE_DIFFUSE;
+                    } else { // hit nothing
+                        $break;
+                    }
+                };
 
-                        auto main_lum_pdf = ite(
-                            main_hit_emitter & depth + 1u >= _config->m_max_depth /* TODO :& !(mainBsdfResult.bRec.sampledType & BSDF::EDelta)*/,
-                            main_emitter_pdf, 0.f
-                        );
+                // Continue the shift
+                auto main_bsdf_pdf = main_bsdf_result.pdf;
+                auto main_previous_pdf = main.pdf;
 
-                        auto main_weight_numerator = main_previous_pdf * main_bsdf_result.pdf;
-                        auto main_weight_denominator = (main_previous_pdf * main_previous_pdf) * (
-                            main_lum_pdf * main_lum_pdf + main_bsdf_pdf * main_bsdf_pdf
-                        );
+                main.throughput *= main_bsdf_result.sample.eval.f;
+                main.pdf *= main_bsdf_result.pdf;
+                main.eta *= main_bsdf_result.eta;
 
-                        for(int i = 0; i < 4; i++) {
-                            auto& shifted = shifteds[i];
+                auto main_lum_pdf = ite(
+                    main_hit_emitter & depth + 1u >= _config->m_min_depth /* TODO :& !(mainBsdfResult.bRec.sampledType & BSDF::EDelta)*/,
+                    main_emitter_pdf, 0.f);
 
-                            SampledSpectrum shifted_emitter_radiance{ swl.dimension(), 0.f };
-                            SampledSpectrum main_contribution{ swl.dimension(), 0.f };
-                            SampledSpectrum shifted_contribution{ swl.dimension(), 0.f };
-                            auto weight = def(0.f);
+                auto main_weight_numerator = main_previous_pdf * main_bsdf_pdf;
+                auto main_weight_denominator = (main_previous_pdf * main_previous_pdf) * (main_lum_pdf * main_lum_pdf + main_bsdf_pdf * main_bsdf_pdf);
 
-                            auto postponed_shift_end = def(false); // Kills the shift after evaluating the current radiance.
+#ifdef CENTRAL_RADIANCE
+                $if(depth + 1 >= _config->m_min_depth) {
+                    main.add_radiance(main.throughput * main_emitter_radiance, main_weight_numerator / (D_EPSILON + main_weight_denominator));
+                };
+#endif
 
-                            $if(shifted.alive) {
-                                auto shifted_previous_pdf = shifted.pdf;
-                                $switch(shifted.connection_status) {
-                                    $case((uint) RayConnection::RAY_CONNECTED) {
-                                        auto shifted_bsdf_value = main_bsdf_result.weight * main_bsdf_result.pdf;
-                                        auto shifted_bsdf_pdf = main_bsdf_pdf;
-                                        auto shifted_lum_pdf = main_lum_pdf;
-                                        auto shifted_emitter_radiance = main_emitter_radiance;
+                for (int i = 0; i < 4; i++) {
+                    auto &shifted = shifteds[i];
 
-                                        shifted.throughput *= shifted_bsdf_value;
-                                        shifted.pdf *= shifted_bsdf_pdf;
+                    SampledSpectrum shifted_emitter_radiance{swl.dimension(), 0.f};
+                    SampledSpectrum main_contribution{swl.dimension(), 0.f};
+                    SampledSpectrum shifted_contribution{swl.dimension(), 0.f};
+                    auto weight = def(0.f);
 
-                                        auto shifted_weight_denominator = (shifted_previous_pdf * shifted_previous_pdf) * (
-                                            shifted_lum_pdf * shifted_lum_pdf + shifted_bsdf_pdf * shifted_bsdf_pdf
-                                        );
+                    auto postponed_shift_end = def(false);// Kills the shift after evaluating the current radiance.
 
-                                        weight = main_weight_numerator / (D_EPSILON + shifted_weight_denominator + main_weight_denominator);
+                    $if(shifted.alive) {
+                        auto shifted_previous_pdf = shifted.pdf;
+                        $switch(shifted.connection_status) {
+                            $case((uint)RayConnection::RAY_CONNECTED) {
+                                auto shifted_bsdf_value = main_bsdf_result.weight * main_bsdf_result.pdf;
+                                auto shifted_bsdf_pdf = main_bsdf_pdf;
+                                auto shifted_lum_pdf = main_lum_pdf;
+                                auto shifted_emitter_radiance = main_emitter_radiance;
 
-                                        main_contribution = main.throughput * main_emitter_radiance;
-                                        shifted_contribution = shifted.throughput * shifted_emitter_radiance;
-                                    };
-                                    $case((uint) RayConnection::RAY_RECENTLY_CONNECTED) {
-                                        auto incoming_direction = normalize(shifted.it->p() - main.ray.ray->origin());
-                                        Surface::Evaluation shifted_bsdf_eval{ .f=SampledSpectrum{0.f}, .pdf=0.f };
-                                        _pipeline->surfaces().dispatch(previous_main_it.shape()->surface_tag(), [&](auto surface) noexcept {
-                                            auto closure = surface->closure(make_shared<Interaction>(previous_main_it), swl, 1.f, time);
-                                            shifted_bsdf_eval = closure->evaluate(-incoming_direction, main_light_sample.shadow_ray->direction());
-                                        });
+                                shifted.throughput *= shifted_bsdf_value;
+                                shifted.pdf *= shifted_bsdf_pdf;
 
-                                        auto shifted_bsdf_value = shifted_bsdf_eval.f;
-                                        auto shifted_bsdf_pdf = shifted_bsdf_eval.pdf;
-                                        auto shifted_lum_pdf = main_lum_pdf;
-                                        auto shifted_emitter_radiance = main_emitter_radiance;
+                                auto shifted_weight_denominator = (shifted_previous_pdf * shifted_previous_pdf) * (shifted_lum_pdf * shifted_lum_pdf + shifted_bsdf_pdf * shifted_bsdf_pdf);
 
-                                        shifted.throughput *= shifted_bsdf_value;
-                                        shifted.pdf *= shifted_bsdf_pdf;
+                                weight = main_weight_numerator / (D_EPSILON + shifted_weight_denominator + main_weight_denominator);
 
-                                        shifted.connection_status = (uint) RayConnection::RAY_CONNECTED;
+                                main_contribution = main.throughput * main_emitter_radiance;
+                                shifted_contribution = shifted.throughput * shifted_emitter_radiance;
+                            };
+                            $case((uint)RayConnection::RAY_RECENTLY_CONNECTED) {
+                                auto incoming_direction = normalize(shifted.it->p() - main.ray.ray->origin());
+                                Surface::Evaluation shifted_bsdf_eval{.f = SampledSpectrum{swl.dimension(), 0.f}, .pdf = 0.f};
+                                _pipeline->surfaces().dispatch(previous_main_it.shape().surface_tag(), [&](auto surface) noexcept {
+                                    auto closure = surface->closure(make_shared<Interaction>(previous_main_it), swl, 1.f, time);
+                                    shifted_bsdf_eval = closure->evaluate(-incoming_direction, main_light_sample.shadow_ray->direction());
+                                });
 
-                                        auto shifted_weight_denominator = (shifted_previous_pdf * shifted_previous_pdf) * (
-                                            shifted_lum_pdf * shifted_lum_pdf + shifted_bsdf_pdf * shifted_bsdf_pdf
-                                        );
+                                auto shifted_bsdf_value = shifted_bsdf_eval.f;
+                                auto shifted_bsdf_pdf = shifted_bsdf_eval.pdf;
+                                auto shifted_lum_pdf = main_lum_pdf;
+                                auto shifted_emitter_radiance = main_emitter_radiance;
 
-                                        weight = main_weight_numerator / (D_EPSILON + shifted_weight_denominator + main_weight_denominator);
+                                shifted.throughput *= shifted_bsdf_value;
+                                shifted.pdf *= shifted_bsdf_pdf;
 
-                                        main_contribution = main.throughput * main_emitter_radiance;
-                                        shifted_contribution = shifted.throughput * shifted_emitter_radiance;
-                                    };
-                                    $case((uint) RayConnection::RAY_NOT_CONNECTED) {
-                                        auto shifted_vertex_type = get_vertex_type(_pipeline, shifted.it, _config, swl, time);
-                                        $if(main_vertex_type == (uint) VertexType::VERTEX_TYPE_DIFFUSE & main_next_vertex_type == (uint) VertexType::VERTEX_TYPE_DIFFUSE 
-                                            & shifted_vertex_type == (uint) VertexType::VERTEX_TYPE_DIFFUSE) {
-                                            // Reconnect shift
-                                            $if(!last_segment | main_hit_emitter /*| main.it has subsurface TODO*/) {
-                                                ReconnectionShiftResult shift_result;
-                                                auto environment_connection = def(false);
+                                shifted.connection_status = (uint)RayConnection::RAY_CONNECTED;
+
+                                auto shifted_weight_denominator = (shifted_previous_pdf * shifted_previous_pdf) * (shifted_lum_pdf * shifted_lum_pdf + shifted_bsdf_pdf * shifted_bsdf_pdf);
+
+                                weight = main_weight_numerator / (D_EPSILON + shifted_weight_denominator + main_weight_denominator);
+
+                                main_contribution = main.throughput * main_emitter_radiance;
+                                shifted_contribution = shifted.throughput * shifted_emitter_radiance;
+                            };
+                            $case((uint)RayConnection::RAY_NOT_CONNECTED) {
+                                auto shifted_vertex_type = get_vertex_type(_pipeline, shifted.it, _config, swl, time);
+                                $if(main_vertex_type == (uint)VertexType::VERTEX_TYPE_DIFFUSE & main_next_vertex_type == (uint)VertexType::VERTEX_TYPE_DIFFUSE & shifted_vertex_type == (uint)VertexType::VERTEX_TYPE_DIFFUSE) {
+                                    // Reconnect shift
+                                    $if(!last_segment | main_hit_emitter /*| main.it has subsurface TODO*/) {
+                                        ReconnectionShiftResult shift_result;
+                                        auto environment_connection = def(false);
+
+                                        $if(main.it->valid()) {
+                                            shift_result = reconnect_shift(_pipeline, main.ray.ray->origin(), main.it->p(), shifted.it->p(), main.it->ng());
+                                        }
+                                        $else {
+                                            environment_connection = true;
+                                            shift_result = environment_shift(_pipeline, main.ray.ray, shifted.it->p());
+                                        };
+
+                                        auto shift_failed_flag = def(true);
+                                        $if(!shift_result.success) {
+                                            shifted.alive = false;
+                                            shift_failed_flag = true;
+                                        };
+
+                                        $if(!shift_failed_flag) {
+                                            auto incoming_direction = -shifted.ray.ray->direction();
+                                            auto outgoing_direction = shift_result.wo;
+
+                                            // TODO strict normal check
+                                            auto shifted_bsdf_pdf = def(0.f);
+                                            _pipeline->surfaces().dispatch(shifted.it->shape().surface_tag(), [&](auto surface) noexcept {
+                                                auto closure = surface->closure(shifted.it, swl, 1.f, time);
+                                                auto shifted_bsdf_eval = closure->evaluate(incoming_direction, outgoing_direction);// TODO check
+                                                shifted.throughput *= shifted_bsdf_eval.f * shift_result.jacobian;
+                                                shifted.pdf *= shifted_bsdf_eval.pdf * shift_result.jacobian;
+                                                shifted_bsdf_pdf = shifted_bsdf_eval.pdf;
+                                            });
+
+                                            shifted.connection_status = (uint)RayConnection::RAY_RECENTLY_CONNECTED;
+
+                                            $if(main_hit_emitter /*| has subsurface TODO*/) {
+                                                SampledSpectrum shifted_emitter_radiance{swl.dimension(), 0.f};
+                                                auto shifted_lum_pdf = def(0.f);
 
                                                 $if(main.it->valid()) {
-                                                    shift_result = reconnect_shift(_pipeline, main.ray.ray->origin(), main.it->p(), shifted.it->p(), main.it->ng());
-                                                } $else {
-                                                    environment_connection = true;
-                                                    shift_result = environment_shift(_pipeline, main.ray.ray, shifted.it->p());
-                                                };
-
-                                                auto shift_failed_flag = def(true);
-                                                $if(!shift_result.success) {
-                                                    shifted.alive = false;
-                                                    shift_failed_flag = true;
-                                                };
-
-                                                $if(!shift_failed_flag) {
-                                                    auto incoming_direction = -shifted.ray.ray->direction();
-                                                    auto outgoing_direction = shift_result.wo;
-
-                                                    // TODO strict normal check
-                                                    auto shifted_bsdf_pdf = def(0.f);
-                                                    _pipeline->surfaces().dispatch(shifted.it->shape()->surface_tag(), [&](auto surface) noexcept {
-                                                        auto closure = surface->closure(shifted.it, swl, 1.f, time);
-                                                        auto shifted_bsdf_eval = closure->evaluate(incoming_direction, outgoing_direction); // TODO check
-                                                        shifted.throughput *= shifted_bsdf_eval.f * shift_result.jacobian;
-                                                        shifted.pdf *= shifted_bsdf_eval.pdf * shift_result.jacobian;
-                                                        shifted_bsdf_pdf = shifted_bsdf_eval.pdf;
-                                                    });
-
-                                                    shifted.connection_status = (uint) RayConnection::RAY_RECENTLY_CONNECTED;
-
-                                                    $if(main_hit_emitter /*| has subsurface TODO*/ ) {
-                                                        SampledSpectrum shifted_emitter_radiance{ swl.dimension(), 0.f };
-                                                        auto shifted_lum_pdf = def(0.f);
-
-                                                        $if(main.it->valid()) {
-                                                            $if(main_hit_emitter) {
-                                                                // Check if correct TODO
-                                                                // From shift.p -> main.p
-                                                                auto eval = _light_sampler->evaluate_hit(*main.it, shifted.it->p(), swl, time);
-                                                                shifted_emitter_radiance = eval.L;
-                                                                shifted_lum_pdf = eval.pdf;
-                                                            };
-
-                                                            // TODO subsurface
-                                                        } $else {
-                                                            shifted_emitter_radiance = main_emitter_radiance;
-                                                            shifted_lum_pdf = main_lum_pdf;
-                                                        };
-
-                                                        auto shifted_weight_denominator = (shifted_previous_pdf * shifted_previous_pdf) * (
-                                                            shifted_lum_pdf * shifted_lum_pdf + shifted_bsdf_pdf * shifted_bsdf_pdf
-                                                        );
-
-                                                        weight = main_weight_numerator / (D_EPSILON + shifted_weight_denominator + main_weight_denominator);
-
-                                                        main_contribution = main.throughput * main_emitter_radiance;
-                                                        shifted_contribution = shifted.throughput * shifted_emitter_radiance;
+                                                    $if(main_hit_emitter) {
+                                                        // Check if correct TODO
+                                                        // From shift.p -> main.p
+                                                        auto eval = _light_sampler->evaluate_hit(*main.it, shifted.it->p(), swl, time);
+                                                        shifted_emitter_radiance = eval.L;
+                                                        shifted_lum_pdf = eval.pdf;
                                                     };
+
+                                                    // TODO subsurface
+                                                }
+                                                $else {
+                                                    shifted_emitter_radiance = main_emitter_radiance;
+                                                    shifted_lum_pdf = main_lum_pdf;
                                                 };
+
+                                                auto shifted_weight_denominator = (shifted_previous_pdf * shifted_previous_pdf) * (shifted_lum_pdf * shifted_lum_pdf + shifted_bsdf_pdf * shifted_bsdf_pdf);
+
+                                                weight = main_weight_numerator / (D_EPSILON + shifted_weight_denominator + main_weight_denominator);
+
+                                                main_contribution = main.throughput * main_emitter_radiance;
+                                                shifted_contribution = shifted.throughput * shifted_emitter_radiance;
                                             };
-                                        } $else {
-                                            // Half-vector shift
-                                            auto tangent_space_incoming_direction = shifted.it->shading().world_to_local(-shifted.ray.ray->direction());
-                                            auto tangent_space_outgoing_direction = def(make_float3(0.f));
-                                            SampledSpectrum shifted_emitter_radiance{ swl.dimension(), 0.f };
+                                        };
+                                    };
+                                }
+                                $else {
+                                    // Half-vector shift
+                                    auto tangent_space_incoming_direction = shifted.it->shading().world_to_local(-shifted.ray.ray->direction());
+                                    auto tangent_space_outgoing_direction = def(make_float3(0.f));
+                                    SampledSpectrum shifted_emitter_radiance{swl.dimension(), 0.f};
 
-                                            // Deny shifts between Dirac and non-Dirac BSDFs. TODO
+                                    // Deny shifts between Dirac and non-Dirac BSDFs. TODO
 
-                                            // TODO check if wo is wo
-                                            auto main_bsdf_eta = def(0.f); // eta at previous main it
-                                            _pipeline->surfaces().dispatch(previous_main_it.shape()->surface_tag(), [&](auto surface) noexcept {
-                                                auto closure = surface->closure(make_shared<Interaction>(previous_main_it), swl, 1.f, time);
-                                                main_bsdf_eta = closure->eta().value_or(1.f);
-                                            });
-                                            auto shifted_bsdf_eta = def(0.f); // eta at previous main it
-                                            _pipeline->surfaces().dispatch(shifted.it->shape()->surface_tag(), [&](auto surface) noexcept {
-                                                auto closure = surface->closure(shifted.it, swl, 1.f, time);
-                                                shifted_bsdf_eta = closure->eta().value_or(1.f);
-                                            });
-                                            auto shift_result = half_vector_shift(
-                                                main_bsdf_result.wo, main_bsdf_result.sample.wi,
-                                                tangent_space_incoming_direction,
-                                                main_bsdf_eta, shifted_bsdf_eta
-                                            );
+                                    // TODO check if wo is wo
+                                    auto main_bsdf_eta = def(0.f);// eta at previous main it
+                                    _pipeline->surfaces().dispatch(previous_main_it.shape().surface_tag(), [&](auto surface) noexcept {
+                                        auto closure = surface->closure(make_shared<Interaction>(previous_main_it), swl, 1.f, time);
+                                        main_bsdf_eta = closure->eta().value_or(1.f);
+                                    });
+                                    auto shifted_bsdf_eta = def(0.f);// eta at previous main it
+                                    _pipeline->surfaces().dispatch(shifted.it->shape().surface_tag(), [&](auto surface) noexcept {
+                                        auto closure = surface->closure(shifted.it, swl, 1.f, time);
+                                        shifted_bsdf_eta = closure->eta().value_or(1.f);
+                                    });
+                                    auto shift_result = half_vector_shift(
+                                        main_bsdf_result.wo, main_bsdf_result.sample.wi,
+                                        tangent_space_incoming_direction,
+                                        main_bsdf_eta, shifted_bsdf_eta);
 
-                                            // TODO  BSDF:EDelta
+                                    // TODO  BSDF:EDelta
 
-                                            auto shift_failed_flag = def(false);
-                                            $if(shift_result.success) {
-                                                shifted.throughput *= shift_result.jacobian;
-                                                shifted.pdf *= shift_result.jacobian;
-                                                tangent_space_outgoing_direction = shift_result.wo;
-                                            } $else {
+                                    auto shift_failed_flag = def(false);
+                                    $if(shift_result.success) {
+                                        shifted.throughput *= shift_result.jacobian;
+                                        shifted.pdf *= shift_result.jacobian;
+                                        tangent_space_outgoing_direction = shift_result.wo;
+                                    }
+                                    $else {
+                                        shifted.alive = false;
+                                        shift_failed_flag = true;
+                                    };
+
+                                    auto outgoing_direction = shifted.it->shading().local_to_world(tangent_space_outgoing_direction);
+                                    $if(!shift_failed_flag) {
+                                        _pipeline->surfaces().dispatch(shifted.it->shape().surface_tag(), [&](auto surface) noexcept {
+                                            auto closure = surface->closure(shifted.it, swl, 1.f, time);
+                                            auto eval = closure->evaluate(tangent_space_incoming_direction, tangent_space_outgoing_direction);
+
+                                            shifted.pdf *= eval.pdf;
+                                            shifted.throughput *= eval.f;
+                                        });
+                                        shift_failed_flag = shifted.pdf == 0.f;
+                                        // Strict normal TODO
+                                    };
+
+                                    $if(!shift_failed_flag) {
+                                        auto shifted_vertex_type = get_vertex_type(_pipeline, shifted.it, _config, swl, time);
+                                        shifted.ray.ray = make_ray(shifted.it->p(), outgoing_direction);
+                                        shifted.it = _pipeline->geometry()->intersect(shifted.ray.ray);
+
+                                        $if(!shifted.it->valid()) {
+                                            if (!_pipeline->environment()) {
                                                 shifted.alive = false;
                                                 shift_failed_flag = true;
-                                            };
-
-                                            auto outgoing_direction = shifted.it->shading().local_to_world(tangent_space_outgoing_direction);
-                                            $if(!shift_failed_flag) {
-                                                _pipeline->surfaces().dispatch(shifted.it->shape()->surface_tag(), [&](auto surface) noexcept {
-                                                    auto closure = surface->closure(shifted.it, swl, 1.f, time);
-                                                    auto eval = closure->evaluate(tangent_space_incoming_direction, tangent_space_outgoing_direction);
-                                                    
-                                                    shifted.pdf *= eval.pdf;
-                                                    shifted.throughput *= eval.f;
-                                                });
-                                                shift_failed_flag = shifted.pdf == 0.f;
-                                                // Strict normal TODO
-                                            };
-
-                                            $if(!shift_failed_flag) {
-                                                auto shifted_vertex_type = get_vertex_type(_pipeline, shifted.it, _config, swl, time);
-                                                shifted.ray.ray = make_ray(shifted.it->p(), outgoing_direction);
-                                                shifted.it = _pipeline->geometry()->intersect(shifted.ray.ray);
-
-                                                $if(!shifted.it->valid()) {
-                                                    if(!_pipeline->environment()) {
-                                                        shifted.alive = false;
-                                                        shift_failed_flag = true;
-                                                    } else {
-                                                        $if(main.it->valid()) {
-                                                            shifted.alive = false;
-                                                            shift_failed_flag = true;
-                                                        } $elif(main_vertex_type == (uint) VertexType::VERTEX_TYPE_DIFFUSE & shifted_vertex_type == (uint) VertexType::VERTEX_TYPE_DIFFUSE) {
-                                                            shifted.alive = false;
-                                                            shift_failed_flag = true;
-                                                        } $else {
-                                                            auto eval = _light_sampler->evaluate_miss(shifted.ray.ray->direction(), swl, time);
-                                                            shifted_emitter_radiance = eval.L;
-                                                            postponed_shift_end = true;
-                                                        };
-                                                    }
-                                                } $else {
-                                                    $if(!main.it->valid()) {
-                                                        shifted.alive = false;
-                                                        shift_failed_flag = true;
-                                                    } $else {
-                                                        auto shifted_next_vertex_type = get_vertex_type(_pipeline, shifted.it, _config, swl, time);
-                                                        $if(main_vertex_type == (uint) VertexType::VERTEX_TYPE_DIFFUSE &
-                                                            shifted_vertex_type == (uint) VertexType::VERTEX_TYPE_DIFFUSE &
-                                                            shifted_next_vertex_type == (uint) VertexType::VERTEX_TYPE_DIFFUSE
-                                                        ) {
-                                                            shifted.alive = false;
-                                                            shift_failed_flag = true;
-                                                        } $else {
-                                                            $if(shifted.it->shape()->has_light()) {
-                                                                auto eval = _light_sampler->evaluate_hit(*shifted.it, shifted.ray.ray->origin(), swl, time);
-                                                                shifted_emitter_radiance = eval.L;
-                                                            };
-                                                            // TODO subsurface
-                                                        };
-                                                    };
-                                                };
-                                                // half vector shifted failed should go here
-                                                $if(shifted.alive) {
-                                                    weight = main.pdf / (shifted.pdf * shifted.pdf + main.pdf * main.pdf);
-                                                    main_contribution = main.throughput * main_emitter_radiance;
-                                                    shifted_contribution = shifted_contribution * shifted_emitter_radiance;
-                                                } $else {
-                                                    weight = 1.f / main.pdf;
-                                                    main_contribution = main.throughput * main_emitter_radiance;
-                                                    shifted_contribution = SampledSpectrum{ swl.dimension(), 0.f };
-
-                                                    // Disable the failure detection below since the failure was already handled.
-                                                    shifted.alive = true;
+                                            } else {
+                                                $if(main.it->valid()) {
+                                                    shifted.alive = false;
+                                                    shift_failed_flag = true;
+                                                }
+                                                $elif(main_vertex_type == (uint)VertexType::VERTEX_TYPE_DIFFUSE & shifted_vertex_type == (uint)VertexType::VERTEX_TYPE_DIFFUSE) {
+                                                    shifted.alive = false;
+                                                    shift_failed_flag = true;
+                                                }
+                                                $else {
+                                                    auto eval = _light_sampler->evaluate_miss(shifted.ray.ray->direction(), swl, time);
+                                                    shifted_emitter_radiance = eval.L;
                                                     postponed_shift_end = true;
                                                 };
+                                            }
+                                        }
+                                        $else {
+                                            $if(!main.it->valid()) {
+                                                shifted.alive = false;
+                                                shift_failed_flag = true;
+                                            }
+                                            $else {
+                                                auto shifted_next_vertex_type = get_vertex_type(_pipeline, shifted.it, _config, swl, time);
+                                                $if(main_vertex_type == (uint)VertexType::VERTEX_TYPE_DIFFUSE &
+                                                    shifted_vertex_type == (uint)VertexType::VERTEX_TYPE_DIFFUSE &
+                                                    shifted_next_vertex_type == (uint)VertexType::VERTEX_TYPE_DIFFUSE) {
+                                                    shifted.alive = false;
+                                                    shift_failed_flag = true;
+                                                }
+                                                $else {
+                                                    $if(shifted.it->shape().has_light()) {
+                                                        auto eval = _light_sampler->evaluate_hit(*shifted.it, shifted.ray.ray->origin(), swl, time);
+                                                        shifted_emitter_radiance = eval.L;
+                                                    };
+                                                    // TODO subsurface
+                                                };
                                             };
+                                        };
+                                        // half vector shifted failed should go here
+                                        $if(shifted.alive) {
+                                            weight = main.pdf / (shifted.pdf * shifted.pdf + main.pdf * main.pdf);
+                                            main_contribution = main.throughput * main_emitter_radiance;
+                                            shifted_contribution = shifted_contribution * shifted_emitter_radiance;
+                                        }
+                                        $else {
+                                            weight = 1.f / main.pdf;
+                                            main_contribution = main.throughput * main_emitter_radiance;
+                                            shifted_contribution = SampledSpectrum{swl.dimension(), 0.f};
+
+                                            // Disable the failure detection below since the failure was already handled.
+                                            shifted.alive = true;
+                                            postponed_shift_end = true;
                                         };
                                     };
                                 };
                             };
-
-                            // shift failed should go here
-                            $if(!shifted.alive) {
-                                weight = main_weight_numerator / (D_EPSILON + main_weight_denominator);
-                                main_contribution = main.throughput * main_emitter_radiance;
-                                shifted_contribution = SampledSpectrum{ swl.dimension(), 0.f };
-                            };
-
-                            $if(depth + 1 >= _config->m_max_depth) {
-                                main.add_radiance(main_contribution, weight);
-                                shifted.add_radiance(shifted_contribution, weight);
-                                shifted.add_gradient(shifted_contribution - main_contribution, weight);
-                            };
-
-                            shifted.alive = ite(postponed_shift_end, false, shifted.alive);
-                        }
-
-			            // Stop if the base path hit the environment.
-                        // TODO main.rRec.type
-                        $if(!main.it->valid() /*| !(main.rRec.type & RadianceQueryRecord::EIndirectSurfaceRadiance)*/) {
-                            $break;
-                        };
-
-                        depth += 1;
-                        $if(depth > _config->m_rr_depth) {
-                            // Russian Roulette
-                            auto q = min((main.throughput / main.pdf).max() * main.eta * main.eta, 0.95f);
-                            $if(_sampler->generate_1d() >= q) {
-                                $break;
-                            };
-
-                            main.pdf *= q;
-                            for(int i = 0; i < 4; i++) {
-                                shifteds[i].pdf *= q;
-                            }
                         };
                     };
+
+                    // shift failed should go here
+                    $if(!shifted.alive) {
+                        weight = main_weight_numerator / (D_EPSILON + main_weight_denominator);
+                        main_contribution = main.throughput * main_emitter_radiance;
+                        shifted_contribution = SampledSpectrum{swl.dimension(), 0.f};
+                    };
+
+                    $if(depth + 1 >= _config->m_min_depth) {
+#ifndef CENTRAL_RADIANCE
+                        main.add_radiance(main_contribution, weight);
+                        shifted.add_radiance(shifted_contribution, weight);
+#endif
+                        shifted.add_gradient(shifted_contribution - main_contribution, weight);
+                    };
+
+                    shifted.alive = ite(postponed_shift_end, false, shifted.alive);
+                }
+
+                // Stop if the base path hit the environment.
+                // TODO main.rRec.type
+                $if(!main.it->valid() /*| !(main.rRec.type & RadianceQueryRecord::EIndirectSurfaceRadiance)*/) {
+                    $break;
+                };
+
+                $if(depth >= _config->m_rr_depth) {
+                    // Russian Roulette
+                    auto q = max((main.throughput / main.pdf).max() * main.eta * main.eta, 0.05f);
+                    $if(_sampler->generate_1d() >= q) {
+                        $break;
+                    };
+
+                    main.pdf *= q;
+                    for (int i = 0; i < 4; i++) {
+                        shifteds[i].pdf *= q;
+                    }
                 };
             };
         };
 
-        return result; 
+        return result;
     };
 };
 
+class GradientPathTracingInstance final : public ProgressiveIntegrator::Instance {
+
+public:
+    using ProgressiveIntegrator::Instance::Instance;
+
+private:
+    luisa::unique_ptr<GPTConfig> _config;
+    luisa::unique_ptr<GradientPathTracingImpl> _impl;
+
+protected:
+    void _render_one_camera(CommandBuffer &command_buffer,
+                            Camera::Instance *camera) noexcept override;
+
+    [[nodiscard]] Float3 Li(const Camera::Instance *camera,
+                            Expr<uint> frame_index,
+                            Expr<uint2> pixel_id,
+                            Expr<float> time) const noexcept override;
+};
+
+luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
+    Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
+    return luisa::make_unique<GradientPathTracingInstance>(
+        pipeline, command_buffer, this);
+}
+
 void GradientPathTracingInstance::_render_one_camera(
     CommandBuffer &command_buffer, Camera::Instance *camera) noexcept {
-    auto spp = camera->node()->spp();
-    auto resolution = camera->film()->node()->resolution();
-    auto image_file = camera->node()->file();
+    if (!pipeline().has_lighting()) [[unlikely]] {
+        LUISA_WARNING_WITH_LOCATION(
+            "No lights in scene. Rendering aborted.");
+        return;
+    }
 
-    auto pixel_count = resolution.x * resolution.y;
-    sampler()->reset(command_buffer, resolution, pixel_count, spp);
-    command_buffer << compute::synchronize();
-
-    LUISA_INFO(
-        "Rendering to '{}' of resolution {}x{} at {}spp.",
-        image_file.string(),
-        resolution.x, resolution.y, spp);
-
-    using namespace luisa::compute;
-
-    GPTConfig config{
+    _config = make_unique<GPTConfig>(GPTConfig{
         .m_max_depth = node<GradientPathTracing>()->max_depth(),
+        .m_min_depth = 0u,
         .m_rr_depth = node<GradientPathTracing>()->rr_depth(),
-        .m_shift_threshold = 0.1f // TODO
-    };
+        .m_shift_threshold = 0.0f// TODO
+    });
 
-    GradientPathTracingImpl impl(
+    _impl = make_unique<GradientPathTracingImpl>(
         &pipeline(),
         sampler(),
         light_sampler(),
         camera,
-        &config
-    );
-    float diff_scale_factor = 1.0f / std::sqrt(spp);
+        _config.get());
 
-    Kernel2D render_kernel = [&](UInt frame_index, Float time, Float shutter_weight) noexcept {
-        set_block_size(16u, 16u, 1u);
-        auto pixel_id = dispatch_id().xy();
-        auto eval = impl.evaluate_point(pixel_id, frame_index, time, diff_scale_factor);
-        // auto L = Li(camera, frame_index, pixel_id, time);
-        camera->film()->accumulate(pixel_id, shutter_weight * pipeline().spectrum()->srgb(eval.swl, eval.very_direct));
-    };
+    // Kernel2D render_kernel = [&](UInt frame_index, Float time, Float shutter_weight) noexcept {
+    //     set_block_size(16u, 16u, 1u);
+    //     auto pixel_id = dispatch_id().xy();
+    //     auto eval = impl.evaluate_point(pixel_id, frame_index, time, diff_scale_factor);
+    //     // auto L = Li(camera, frame_index, pixel_id, time);
+    //     camera->film()->accumulate(pixel_id, shutter_weight * pipeline().spectrum()->srgb(eval.swl, eval.very_direct));
+    // };
 
-    Clock clock_compile;
-    auto render = pipeline().device().compile(render_kernel);
-    auto integrator_shader_compilation_time = clock_compile.toc();
-    LUISA_INFO("Integrator shader compile in {} ms.", integrator_shader_compilation_time);
-    auto shutter_samples = camera->node()->shutter_samples();
-    command_buffer << synchronize();
+    Instance::_render_one_camera(command_buffer, camera);
+}
 
-    LUISA_INFO("Rendering started.");
-    Clock clock;
-    ProgressBar progress;
-    progress.update(0.);
-    auto dispatch_count = 0u;
-    auto sample_id = 0u;
-    for (auto s : shutter_samples) {
-        pipeline().update(command_buffer, s.point.time);
-        for (auto i = 0u; i < s.spp; i++) {
-            command_buffer << render(sample_id++, s.point.time, s.point.weight)
-                                  .dispatch(resolution);
-            auto dispatches_per_commit = 32u;
-            if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
-                dispatch_count = 0u;
-                auto p = sample_id / static_cast<double>(spp);
-                command_buffer << [&progress, p] { progress.update(p); };
-            }
-        }
-    }
-    command_buffer << synchronize();
-    progress.done();
+[[nodiscard]] Float3 GradientPathTracingInstance::Li(const Camera::Instance *camera,
+                                                     Expr<uint> frame_index,
+                                                     Expr<uint2> pixel_id,
+                                                     Expr<float> time) const noexcept {
+    auto spp = camera->node()->spp();
+    float diff_scale_factor = 1.0f / std::sqrt((float)spp);
+    auto eval = _impl->evaluate_point(pixel_id, frame_index, time, diff_scale_factor);
 
-    auto render_time = clock.toc();
-    LUISA_INFO("Rendering finished in {} ms.", render_time);    
+    return pipeline().spectrum()->srgb(eval.swl, eval.very_direct + eval.throughput);
 }
 
 }// namespace luisa::render

@@ -370,14 +370,14 @@ private:
 
             // hit light
             if (!pipeline().lights().empty()) {
-                $if(it->shape()->has_light()) {
+                $if(it->shape().has_light()) {
                     auto eval = light_sampler()->evaluate_hit(*it, ray->origin(), swl, time);
                     Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
                     is_visible_light |= depth == 0u;
                 };
             }
 
-            $if(!it->shape()->has_surface()) { $break; };
+            $if(!it->shape().has_surface()) { $break; };
 
             // sample one light
             auto u_light_selection = sampler.generate_1d();
@@ -389,7 +389,7 @@ private:
             auto occluded = pipeline().geometry()->intersect_any(light_sample.shadow_ray);
 
             // evaluate material
-            auto surface_tag = it->shape()->surface_tag();
+            auto surface_tag = it->shape().surface_tag();
             auto u_lobe = sampler.generate_1d();
             auto u_bsdf = sampler.generate_2d();
             auto eta_scale = def(1.f);
