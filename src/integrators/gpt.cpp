@@ -639,7 +639,7 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                             auto shifted_bsdf_value = main_bsdf_result.weight * main_bsdf_result.pdf;
                             auto shifted_bsdf_pdf = main_bsdf_pdf;
                             auto shifted_lum_pdf = main_lum_pdf;
-                            auto shifted_emitter_radiance = main_emitter_radiance;
+                            auto& shifted_emitter_radiance = main_emitter_radiance;
 
                             shifted.throughput *= shifted_bsdf_value;
                             shifted.pdf *= shifted_bsdf_pdf;
@@ -662,7 +662,7 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                             auto shifted_bsdf_value = shifted_bsdf_eval.f;
                             auto shifted_bsdf_pdf = shifted_bsdf_eval.pdf;
                             auto shifted_lum_pdf = main_lum_pdf;
-                            auto shifted_emitter_radiance = main_emitter_radiance;
+                            auto& shifted_emitter_radiance = main_emitter_radiance;
 
                             shifted.throughput *= shifted_bsdf_value;
                             shifted.pdf *= shifted_bsdf_pdf;
