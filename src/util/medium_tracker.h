@@ -16,6 +16,7 @@ using compute::Expr;
 using compute::Float4;
 using compute::UInt;
 using compute::Var;
+using compute::Printer;
 
 struct MediumInfo {
     uint medium_tag{Medium::INVALID_TAG};
@@ -26,15 +27,22 @@ struct MediumInfo {
 class MediumTracker {
 
 public:
-    static constexpr auto capacity = 16u;
+    static constexpr auto capacity = 32u;
 
 private:
     ArrayVar<uint, capacity> _priority_list;
     ArrayVar<MediumInfo, capacity> _medium_list;
     UInt _size;
+    Printer &_printer;
 
 public:
-    MediumTracker() noexcept;
+    explicit MediumTracker(Printer &printer) noexcept;
+
+protected:
+    [[nodiscard]] auto &printer() noexcept { return _printer; }
+    [[nodiscard]] const auto &printer() const noexcept { return _printer; }
+
+public:
     [[nodiscard]] Var<MediumInfo> current() const noexcept;
     [[nodiscard]] Bool vacuum() const noexcept;
     [[nodiscard]] Bool true_hit(Expr<uint> priority) const noexcept;

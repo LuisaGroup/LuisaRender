@@ -9,7 +9,7 @@ namespace luisa::render {
 
 using namespace luisa::compute;
 
-MediumTracker::MediumTracker() noexcept : _size{0u} {
+MediumTracker::MediumTracker(Printer &printer) noexcept : _size{0u}, _printer{printer} {
     for (auto i = 0u; i < capacity; i++) {
         _priority_list[i] = 0u;
         _medium_list[i] = def<MediumInfo>();
@@ -22,7 +22,8 @@ Bool MediumTracker::true_hit(Expr<uint> priority) const noexcept {
 
 void MediumTracker::enter(Expr<uint> priority, Expr<MediumInfo> value) noexcept {
     $if(_size == capacity) {
-        // TODO: throw exception
+        printer().error_with_location("Medium stack overflow");
+//        printer().error_with_location("Medium stack overflow when trying to enter priority={}, medium_tag={}", priority, value.medium_tag);
     };
     _size += 1u;
     auto x = def(priority);
@@ -43,7 +44,7 @@ void MediumTracker::exit(Expr<uint> priority, Expr<MediumInfo> value) noexcept {
     for (auto i = 0u; i < capacity - 1u; i++) {
         auto p = _priority_list[i];
         auto should_remove = (p == priority) & equal(_medium_list[i], value) & (remove_num == 0u);
-        remove_num += ite(should_remove, 1u, 0u);
+        remove_num = ite(should_remove, 1u, 0u);
         _priority_list[i] = _priority_list[i + remove_num];
         _medium_list[i] = _medium_list[i + remove_num];
     }

@@ -3,6 +3,7 @@
 //
 
 #include <base/medium.h>
+#include <base/pipeline.h>
 
 namespace luisa::render {
 
@@ -17,7 +18,8 @@ public:
 
     private:
         [[nodiscard]] Sample _sample(Expr<float> t_max, Sampler::Instance *sampler) const noexcept override {
-            LUISA_ERROR_WITH_LOCATION("Null medium cannot be sampled.");
+            instance()->pipeline().printer().error_with_location("NullMediumClosure::sample() is not implemented. Priority={}", instance()->priority());
+            return Sample::zero(swl().dimension());
         }
         SampledSpectrum _transmittance(Expr<float> t, Sampler::Instance *sampler) const noexcept override {
             return {swl().dimension(), 1.0f};

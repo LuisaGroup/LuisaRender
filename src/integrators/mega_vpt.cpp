@@ -21,7 +21,7 @@ private:
 public:
     MegakernelVolumePathTracing(Scene *scene, const SceneNodeDesc *desc) noexcept
         : ProgressiveIntegrator{scene, desc},
-          _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)},
+          _max_depth{std::max(desc->property_uint_or_default("depth", 20u), 1u)},
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)} {}
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
@@ -48,7 +48,7 @@ protected:
     }
 
     [[nodiscard]] auto event(const Interaction *it, Expr<float3> wo, Expr<float3> wi) const noexcept {
-        auto shading = it->shading();
+        const auto& shading = it->shading();
         auto wo_local = shading.world_to_local(wo);
         auto wi_local = shading.world_to_local(wi);
         return ite(
@@ -71,7 +71,7 @@ protected:
         SampledSpectrum beta{swl.dimension(), camera_weight};
         SampledSpectrum Li{swl.dimension()};
         auto rr_depth = node<MegakernelVolumePathTracing>()->rr_depth();
-        auto medium_tracker = MediumTracker();
+        auto medium_tracker = MediumTracker(pipeline().printer());
 
         // initialize medium tracker
         auto env_medium_tag = pipeline().environment_medium_tag();
@@ -80,9 +80,11 @@ protected:
         });
         auto ray = camera_ray;
         $while(true) {
+//            pipeline().printer().info_with_location("ray origin=({}, {}, {})", ray->origin().x, ray->origin().y, ray->origin().z);
+
             auto it = pipeline().geometry()->intersect(ray);
 
-            $if(!it->valid()) { $break; };
+            $if(!it->valid() | !it->shape()->has_surface()) { $break; };
 
             auto surface_tag = it->shape()->surface_tag();
             auto medium_tag = it->shape()->medium_tag();
@@ -91,12 +93,15 @@ protected:
             medium_info.medium_tag = medium_tag;
             auto medium_priority = def<uint>(0u);
             auto eta = def(1.f);
+            auto has_medium = it->shape()->has_medium();
 
-            pipeline().media().dispatch(medium_tag, [&](auto medium) {
-                medium_priority = medium->priority();
-                auto closure = medium->closure(ray, it, swl, time);
-                eta = closure->eta();
-            });
+            $if (has_medium) {
+                pipeline().media().dispatch(medium_tag, [&](auto medium) {
+                    medium_priority = medium->priority();
+                    auto closure = medium->closure(ray, it, swl, time);
+                    eta = closure->eta();
+                });
+            };
 
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
                 // create closure
@@ -104,17 +109,19 @@ protected:
 
                 auto surface_event = event(it.get(), -ray->direction(), ray->direction());
 
-                // update medium tracker
-                $switch(surface_event) {
-                    $case(Surface::event_enter) {
-                        medium_tracker.enter(medium_priority, medium_info);
-                    };
-                    $case(Surface::event_exit) {
-                        $if(medium_tracker.exist(medium_priority, medium_info)) {
-                            medium_tracker.exit(medium_priority, medium_info);
-                        }
-                        $else {
+                $if (has_medium) {
+                    // update medium tracker
+                    $switch(surface_event) {
+                        $case(Surface::event_enter) {
                             medium_tracker.enter(medium_priority, medium_info);
+                        };
+                        $case(Surface::event_exit) {
+                            $if(medium_tracker.exist(medium_priority, medium_info)) {
+                                medium_tracker.exit(medium_priority, medium_info);
+                            }
+                            $else {
+                                medium_tracker.enter(medium_priority, medium_info);
+                            };
                         };
                     };
                 };
@@ -131,6 +138,7 @@ protected:
 
             // trace
             auto it = pipeline().geometry()->intersect(ray);
+            auto has_medium = it->shape()->has_medium();
 
             auto tMax = ite(it->valid(), length(it->p() - ray->origin()), Interaction::default_t_max);
 
@@ -192,11 +200,13 @@ protected:
                 auto medium_info = def<MediumInfo>();
                 medium_info.medium_tag = medium_tag;
                 auto eta = def(1.f);
-                pipeline().media().dispatch(medium_tag, [&](auto medium) {
-                    medium_priority = medium->priority();
-                    auto closure = medium->closure(ray, it, swl, time);
-                    eta = closure->eta();
-                });
+                $if (has_medium) {
+                    pipeline().media().dispatch(medium_tag, [&](auto medium) {
+                        medium_priority = medium->priority();
+                        auto closure = medium->closure(ray, it, swl, time);
+                        eta = closure->eta();
+                    });
+                };
 
                 // evaluate material
                 auto surface_tag = it->shape()->surface_tag();
@@ -238,14 +248,16 @@ protected:
                         beta *= w * surface_sample.eval.f;
                         // apply eta scale & update medium tracker
                         auto eta = closure->eta().value_or(1.f);
-                        $switch(surface_sample.event) {
-                            $case(Surface::event_enter) {
-                                eta_scale = sqr(eta);
-                                medium_tracker.enter(medium_priority, medium_info);
-                            };
-                            $case(Surface::event_exit) {
-                                eta_scale = sqr(1.f / eta);
-                                medium_tracker.exit(medium_priority, medium_info);
+                        $if (has_medium) {
+                            $switch(surface_sample.event) {
+                                $case(Surface::event_enter) {
+                                    eta_scale = sqr(eta);
+                                    medium_tracker.enter(medium_priority, medium_info);
+                                };
+                                $case(Surface::event_exit) {
+                                    eta_scale = sqr(1.f / eta);
+                                    medium_tracker.exit(medium_priority, medium_info);
+                                };
                             };
                         };
                     };
