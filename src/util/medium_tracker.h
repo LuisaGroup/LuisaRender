@@ -48,7 +48,8 @@ public:
     [[nodiscard]] Bool true_hit(Expr<uint> priority) const noexcept;
     void enter(Expr<uint> priority, Expr<MediumInfo> value) noexcept;
     void exit(Expr<uint> priority, Expr<MediumInfo> value) noexcept;
-    Bool exist(Expr<uint> priority, Expr<MediumInfo> value) noexcept;
+    [[nodiscard]] Bool exist(Expr<uint> priority, Expr<MediumInfo> value) noexcept;
+    [[nodiscard]] UInt size() const noexcept { return _size; }
 };
 
 }// namespace luisa::render

@@ -22,21 +22,22 @@ Bool MediumTracker::true_hit(Expr<uint> priority) const noexcept {
 
 void MediumTracker::enter(Expr<uint> priority, Expr<MediumInfo> value) noexcept {
     $if(_size == capacity) {
-        printer().error_with_location("Medium stack overflow");
 //        printer().error_with_location("Medium stack overflow when trying to enter priority={}, medium_tag={}", priority, value.medium_tag);
-    };
-    _size += 1u;
-    auto x = def(priority);
-    auto v = def(value);
-    for (auto i = 0u; i < capacity; i++) {
-        auto p = _priority_list[i];
-        auto m = _medium_list[i];
-        auto should_swap = p <= x;
-        _priority_list[i] = ite(should_swap, x, p);
-        _medium_list[i] = ite(should_swap, v, m);
-        x = ite(should_swap, p, x);
-        v = ite(should_swap, m, v);
     }
+    $else{
+        _size += 1u;
+        auto x = def(priority);
+        auto v = def(value);
+        for (auto i = 0u; i < capacity; i++) {
+            auto p = _priority_list[i];
+            auto m = _medium_list[i];
+            auto should_swap = p <= x;
+            _priority_list[i] = ite(should_swap, x, p);
+            _medium_list[i] = ite(should_swap, v, m);
+            x = ite(should_swap, p, x);
+            v = ite(should_swap, m, v);
+        }
+    };
 }
 
 void MediumTracker::exit(Expr<uint> priority, Expr<MediumInfo> value) noexcept {

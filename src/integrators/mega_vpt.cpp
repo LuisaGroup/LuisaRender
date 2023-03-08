@@ -47,8 +47,8 @@ protected:
         Instance::_render_one_camera(command_buffer, camera);
     }
 
-    [[nodiscard]] auto event(const Interaction *it, Expr<float3> wo, Expr<float3> wi) const noexcept {
-        const auto& shading = it->shading();
+    [[nodiscard]] static auto event(const Interaction *it, Expr<float3> wo, Expr<float3> wi) noexcept {
+        const auto &shading = it->shading();
         auto wo_local = shading.world_to_local(wo);
         auto wi_local = shading.world_to_local(wi);
         return ite(
@@ -80,36 +80,25 @@ protected:
         });
         auto ray = camera_ray;
         $while(true) {
-//            pipeline().printer().info_with_location("ray origin=({}, {}, {})", ray->origin().x, ray->origin().y, ray->origin().z);
-
             auto it = pipeline().geometry()->intersect(ray);
+            $if((!it->valid()) | (!it->shape()->has_surface())) { $break; };
 
-            $if(!it->valid() | !it->shape()->has_surface()) { $break; };
+            $if(it->shape()->has_medium()) {
+                auto surface_tag = it->shape()->surface_tag();
+                auto medium_tag = it->shape()->medium_tag();
 
-            auto surface_tag = it->shape()->surface_tag();
-            auto medium_tag = it->shape()->medium_tag();
+                auto medium_info = def<MediumInfo>();
+                medium_info.medium_tag = medium_tag;
+                auto medium_priority = def<uint>(0u);
 
-            auto medium_info = def<MediumInfo>();
-            medium_info.medium_tag = medium_tag;
-            auto medium_priority = def<uint>(0u);
-            auto eta = def(1.f);
-            auto has_medium = it->shape()->has_medium();
-
-            $if (has_medium) {
                 pipeline().media().dispatch(medium_tag, [&](auto medium) {
                     medium_priority = medium->priority();
-                    auto closure = medium->closure(ray, it, swl, time);
-                    eta = closure->eta();
                 });
-            };
-
-            pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
-                // create closure
-                auto closure = surface->closure(it, swl, eta, time);
-
-                auto surface_event = event(it.get(), -ray->direction(), ray->direction());
-
-                $if (has_medium) {
+                pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
+                    auto surface_event = event(it.get(), -ray->direction(), ray->direction());
+                    $if(all(dispatch_id().xy() == make_uint2(510, 781))) {
+                        pipeline().printer().info_with_location("surface event: {}", surface_event);
+                    };
                     // update medium tracker
                     $switch(surface_event) {
                         $case(Surface::event_enter) {
@@ -124,9 +113,12 @@ protected:
                             };
                         };
                     };
-                };
-                ray = it->spawn_ray(ray->direction());
-            });
+                });
+            };
+            ray = it->spawn_ray(ray->direction());
+        };
+        $if(all(dispatch_id().xy() == make_uint2(510, 781))) {
+            pipeline().printer().info_with_location("medium tracker size: {}", medium_tracker.size());
         };
 
         ray = camera_ray;
@@ -147,7 +139,6 @@ protected:
             $if(!medium_tracker.vacuum()) {
                 auto medium_tag = medium_tracker.current().medium_tag;
                 pipeline().media().dispatch(medium_tag, [&](auto medium) {
-                    // TODO
                     auto closure = medium->closure(ray, it, swl, time);
 
                     auto vol_sample = closure->sample(tMax, sampler());
@@ -200,7 +191,7 @@ protected:
                 auto medium_info = def<MediumInfo>();
                 medium_info.medium_tag = medium_tag;
                 auto eta = def(1.f);
-                $if (has_medium) {
+                $if(has_medium) {
                     pipeline().media().dispatch(medium_tag, [&](auto medium) {
                         medium_priority = medium->priority();
                         auto closure = medium->closure(ray, it, swl, time);
@@ -248,7 +239,7 @@ protected:
                         beta *= w * surface_sample.eval.f;
                         // apply eta scale & update medium tracker
                         auto eta = closure->eta().value_or(1.f);
-                        $if (has_medium) {
+                        $if(has_medium) {
                             $switch(surface_sample.event) {
                                 $case(Surface::event_enter) {
                                     eta_scale = sqr(eta);

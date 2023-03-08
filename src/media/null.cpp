@@ -11,46 +11,10 @@ using compute::Ray;
 
 class NullMedium : public Medium {
 
-public:
-    class NullMediumInstance;
-
-    class NullMediumClosure : public Medium::Closure {
-
-    private:
-        [[nodiscard]] Sample _sample(Expr<float> t_max, Sampler::Instance *sampler) const noexcept override {
-            instance()->pipeline().printer().error_with_location("NullMediumClosure::sample() is not implemented. Priority={}", instance()->priority());
-            return Sample::zero(swl().dimension());
-        }
-        SampledSpectrum _transmittance(Expr<float> t, Sampler::Instance *sampler) const noexcept override {
-            return {swl().dimension(), 1.0f};
-        }
-
-    public:
-        NullMediumClosure(
-            const NullMediumInstance *instance, Expr<Ray> ray, luisa::shared_ptr<Interaction> it,
-            const SampledWavelengths &swl, Expr<float> time) noexcept
-            : Medium::Closure{instance, ray, std::move(it), swl, time, 1.0f} {}
-
-    };
-
-    class NullMediumInstance : public Medium::Instance {
-
-    private:
-        friend class NullMedium;
-
-    public:
-        NullMediumInstance(const Pipeline &pipeline, const Medium *medium) noexcept
-            : Medium::Instance(pipeline, medium) {}
-        [[nodiscard]] luisa::unique_ptr<Closure> closure(
-            Expr<Ray> ray, luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
-            return luisa::make_unique<NullMediumClosure>(this, ray, std::move(it), swl, time);
-        }
-    };
-
 protected:
     [[nodiscard]] luisa::unique_ptr<Instance> _build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
-        return luisa::make_unique<NullMediumInstance>(pipeline, this);
+        return nullptr;
     }
 
 public:
