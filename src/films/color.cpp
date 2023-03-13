@@ -137,7 +137,7 @@ Film::Accumulation ColorFilmInstance::read(Expr<uint2> pixel) const noexcept {
     auto c1 = as<float>(_image.read(i * 4u + 1u));
     auto c2 = as<float>(_image.read(i * 4u + 2u));
     auto n = _image.read(i * 4u + 3u);
-    auto inv_n = (1.f / max(cast<float>(n), 1.f));
+    auto inv_n = (1.f / max(cast<float>(n), 1e-6f));
     auto scale = inv_n * node<ColorFilm>()->scale();
     return {.average = scale * make_float3(c0, c1, c2), .sample_count = n};
 }

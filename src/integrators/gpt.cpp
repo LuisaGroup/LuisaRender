@@ -86,7 +86,8 @@ private:
         RayDifferential ray;
         SampledSpectrum throughput;
         Float pdf;
-        Float inv_pdf;
+        SampledSpectrum weight;// throughput / pdf
+        Float pdf_div_main_pdf;// shifted.pdf / main.pdf
         SampledSpectrum radiance;
         SampledSpectrum gradient;
         // RadianceQueryRecord rRec;        ///< The radiance query record for this ray.
@@ -96,16 +97,14 @@ private:
         UInt connection_status;
 
         explicit RayState(uint dimension) : radiance(dimension, 0.0f), gradient(dimension, 0.0f), it(luisa::make_shared<Interaction>()), eta(1.0f), pdf(1.0f),
-                                            inv_pdf(1.f), throughput(dimension, 0.0f), alive(true), connection_status((uint)RAY_NOT_CONNECTED) {}
+                                            weight(dimension, 0.f), pdf_div_main_pdf(1.f), throughput(dimension, 0.0f), alive(true), connection_status((uint)RAY_NOT_CONNECTED) {}
 
-        inline void add_radiance(const SampledSpectrum &contribution, Expr<float> weight) noexcept {
-            auto color = contribution * weight;
-            radiance += color;
+        inline void add_radiance(const SampledSpectrum &contribution) noexcept {
+            radiance += contribution;
         }
 
-        inline void add_gradient(const SampledSpectrum &contribution, Expr<float> weight) noexcept {
-            auto color = contribution * weight;
-            gradient += color;
+        inline void add_gradient(const SampledSpectrum &contribution) noexcept {
+            gradient += contribution;
         }
     };
 
@@ -376,6 +375,7 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
     main_ray.ray = main_ray_diff;
     main_ray.ray.scale_differential(diff_scale_factor);
     main_ray.throughput = SampledSpectrum{swl.dimension(), main_ray_weight};
+    main_ray.weight = SampledSpectrum{swl.dimension(), main_ray_weight};
 
     RayState shifted_rays[4] = {
         RayState{swl.dimension()},
@@ -388,6 +388,7 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
         shifted_rays[i].ray = shifted_diff;
         shifted_rays[i].ray.scale_differential(diff_scale_factor);
         shifted_rays[i].throughput = SampledSpectrum{swl.dimension(), shifted_weight};
+        shifted_rays[i].weight = SampledSpectrum{swl.dimension(), shifted_weight};
     }
 
     // Actual implementation
@@ -444,14 +445,16 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
     $if(!main.it->valid()) {
         if (pipeline().environment()) {
             auto eval = light_sampler()->evaluate_miss(main.ray.ray->direction(), swl, time);
-            result += main.throughput * eval.L;
+            // result += main.throughput * eval.L;
+            result += main.weight * eval.L;
         };
     }
     $else {
         if (!pipeline().lights().empty()) {
             $if(main.it->shape().has_light()) {
                 auto eval = light_sampler()->evaluate_hit(*main.it, main.ray.ray->origin(), swl, time);
-                result += main.throughput * eval.L;
+                // result += main.throughput * eval.L;
+                result += main.weight * eval.L;
             };
         }
         // Subsurface omitted TODO
@@ -498,19 +501,12 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                 auto main_opposing_cosine = dot(main_light_sample.eval.ng, main.it->p() - main_light_sample.eval.p) / sqrt(main_distance_squared);
 
                 auto main_bsdf_pdf = main_light_eval.pdf;
-                // Power Heuristic
-                // auto main_weight_numerator = main.pdf * main_light_sample.eval.pdf;
-                // auto main_weight_denominator = main.pdf * main.pdf * (main_light_sample.eval.pdf * main_light_sample.eval.pdf + main_bsdf_pdf * main_bsdf_pdf);
 
                 // Balance Heuristic
-                auto main_weight = main.inv_pdf / (main_light_sample.eval.pdf + main_bsdf_pdf);// TODO_EPSILON
-                auto main_weight_numerator = 1.f;
-                auto main_weight_denominator = main.pdf * (main_light_sample.eval.pdf + main_bsdf_pdf);
+                auto main_weight = main.weight / (main_light_sample.eval.pdf + main_bsdf_pdf);// main.throughput / (main.pdf * (light sample pdf + bsdf pdf))
 
                 if (node<GradientPathTracing>()->central_radiance()) {
-                    main.add_radiance(main.throughput,//main.throughput * main_light_eval.f * main_light_sample.eval.L,
-                                      //   main_weight_numerator / (D_EPSILON + main_weight_denominator));
-                                      main_weight);
+                    main.add_radiance(main_weight * main_light_eval.f * main_light_sample.eval.L);
                 }
 
                 if (/*!node<GradientPathTracing>()->strict_normals()*/ true) {// strict normal not implemented TODO
@@ -519,6 +515,7 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                         SampledSpectrum main_contribution{swl.dimension(), 0.f};
                         SampledSpectrum shifted_contribution{swl.dimension(), 0.f};
                         auto weight = def(0.f);
+                        auto shifted_pdf_div_main_pdf = shifted.pdf_div_main_pdf;
 
                         auto shift_successful = shifted.alive;
 
@@ -531,11 +528,11 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                                     auto shifted_emitter_radiance = main_light_sample.eval.L;
                                     auto jacobian = 1.f;
 
-                                    // auto shifted_weight_denominator = (jacobian * shifted.pdf) * (jacobian * shifted.pdf) * (shifted_emitter_pdf * shifted_emitter_pdf + shifted_bsdf_pdf * shifted_bsdf_pdf);
-                                    auto shifted_weight_denominator = (jacobian * shifted.pdf) * (shifted_emitter_pdf + shifted_bsdf_pdf);
-                                    weight = main_weight_numerator / (D_EPSILON + shifted_weight_denominator + main_weight_denominator);
-                                    main_contribution = main.throughput * main_light_eval.f * main_light_sample.eval.L;
-                                    shifted_contribution = jacobian * shifted.throughput * (shifted_bsdf_value * shifted_emitter_radiance);
+                                    auto shifted_weight = shifted.weight / jacobian / (shifted_emitter_pdf + shifted_bsdf_pdf);
+                                    shifted_pdf_div_main_pdf *= jacobian * (shifted_emitter_pdf + shifted_bsdf_pdf) / (main_light_sample.eval.pdf + main_bsdf_pdf);
+                                    // auto shifted_weight_denominator = (jacobian * shifted.pdf) * (shifted_emitter_pdf + shifted_bsdf_pdf);
+                                    main_contribution = main_light_eval.f * main_light_sample.eval.L * main_weight / (1.f + shifted_pdf_div_main_pdf);
+                                    shifted_contribution = jacobian * (shifted_bsdf_value * shifted_emitter_radiance) * shifted_weight / (1.f + 1.f / shifted_pdf_div_main_pdf);
                                 };
                                 $case((uint)RayConnection::RAY_RECENTLY_CONNECTED) {
                                     auto incoming_direction = normalize(shifted.it->p() - main.it->p());
@@ -552,11 +549,11 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                                     auto shifted_emitter_radiance = main_light_sample.eval.L;
                                     auto jacobian = 1.f;
 
-                                    // auto shifted_weight_denominator = (jacobian * shifted.pdf) * (jacobian * shifted.pdf) * (shifted_emitter_pdf * shifted_emitter_pdf + shifted_bsdf_pdf * shifted_bsdf_pdf);
-                                    auto shifted_weight_denominator = (jacobian * shifted.pdf) * (shifted_emitter_pdf + shifted_bsdf_pdf);
-                                    weight = main_weight_numerator / (D_EPSILON + shifted_weight_denominator + main_weight_denominator);
-                                    main_contribution = main.throughput * main_light_eval.f * main_light_sample.eval.L;
-                                    shifted_contribution = jacobian * shifted.throughput * (shifted_bsdf_value * shifted_emitter_radiance);
+                                    auto shifted_weight = shifted.weight / jacobian / (shifted_emitter_pdf + shifted_bsdf_pdf);
+                                    shifted_pdf_div_main_pdf *= jacobian * (shifted_emitter_pdf + shifted_bsdf_pdf) / (main_light_sample.eval.pdf + main_bsdf_pdf);
+                                    // auto shifted_weight_denominator = (jacobian * shifted.pdf) * (shifted_emitter_pdf + shifted_bsdf_pdf);
+                                    main_contribution = main_light_eval.f * main_light_sample.eval.L * main_weight / (1.f + shifted_pdf_div_main_pdf);
+                                    shifted_contribution = jacobian * (shifted_bsdf_value * shifted_emitter_radiance) * shifted_weight / (1.f + 1.f / shifted_pdf_div_main_pdf);
                                 };
                                 $case((uint)RayConnection::RAY_NOT_CONNECTED) {
                                     // TODO
@@ -586,31 +583,26 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                                         auto shifted_bsdf_pdf = ite(!shifted_occluded, shifted_light_eval.pdf, 0.f);
                                         auto jacobian = abs(shifted_opposing_cosine * main_distance_squared) / (epsilon + abs(main_opposing_cosine * shifted_distance_squared));
 
-                                        // auto shifted_weight_denominator = (jacobian * shifted.pdf) * (jacobian * shifted.pdf) * (shifted_drec_pdf * shifted_drec_pdf + shifted_bsdf_pdf * shifted_bsdf_pdf);
-                                        auto shifted_weight_denominator = (jacobian * shifted.pdf) * (shifted_drec_pdf + shifted_bsdf_pdf);
-                                        weight = main_weight_numerator / (D_EPSILON + shifted_weight_denominator + main_weight_denominator);
-
-                                        main_contribution = main.throughput * main_light_eval.f * main_light_sample.eval.L;
-                                        shifted_contribution = jacobian * shifted.throughput * (shifted_bsdf_value * shifted_emitter_radiance);
+                                        auto shifted_weight = shifted.weight / jacobian / (shifted_drec_pdf + shifted_bsdf_pdf);
+                                        shifted_pdf_div_main_pdf *= jacobian * (shifted_drec_pdf + shifted_bsdf_pdf) / (main_light_sample.eval.pdf + main_bsdf_pdf);
+                                        // auto shifted_weight_denominator = (jacobian * shifted.pdf) * (shifted_drec_pdf + shifted_bsdf_pdf);
+                                        main_contribution = main_light_eval.f * main_light_sample.eval.L * main_weight / (1.f + shifted_pdf_div_main_pdf);
+                                        shifted_contribution = jacobian * (shifted_bsdf_value * shifted_emitter_radiance) * shifted_weight / (1.f + 1.f / shifted_pdf_div_main_pdf);
                                     };
                                 };
                             };
                         }
                         $else {// shift_successful == false
-                            auto shifted_weight_denominator = 0.f;
-                            weight = main_weight_numerator / (D_EPSILON + main_weight_denominator);
-
-                            main_contribution = main.throughput * main_light_eval.f * main_light_sample.eval.L;
+                            main_contribution = main_weight * main_light_eval.f * main_light_sample.eval.L;
                             shifted_contribution = SampledSpectrum{swl.dimension(), 0.f};
                         };
 
                         if (!node<GradientPathTracing>()->central_radiance()) {
-                            // TODO: Check if add valid
-                            main.add_radiance(main_contribution, weight);
-                            shifted.add_radiance(shifted_contribution, weight);
+                            main.add_radiance(main_contribution);
+                            shifted.add_radiance(shifted_contribution);
                         }
 
-                        shifted.add_gradient(shifted_contribution - main_contribution, weight);
+                        shifted.add_gradient(shifted_contribution - main_contribution);
                     }
                 }
             };
@@ -668,19 +660,9 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
 
             // Continue the shift
             auto main_bsdf_pdf = main_bsdf_result.pdf;
-            auto main_previous_pdf = main.pdf;
+            auto main_previous_weight = main.weight;
 
-            $if(main_bsdf_result.sample.eval.f.any([](auto x) { return isnan(x) | isinf(x); })) {
-                pipeline().printer().warning_with_location("NaN {} ({},{})", main_bsdf_result.pdf, pixel_id.x, pixel_id.y);
-            }
-            $else {
-
-                main.throughput *= main_bsdf_result.sample.eval.f;
-            };
-            $if(main.throughput.any([](auto x) { return isnan(x) | isinf(x); })) {
-                pipeline().printer().warning_with_location("NaN pdf = {} weight = ({}, {}, {})", main_bsdf_result.pdf, main_bsdf_result.weight[0u], main_bsdf_result.weight[1u], main_bsdf_result.weight[2u]);
-            };
-            main.pdf *= main_bsdf_result.pdf;
+            main.weight *= main_bsdf_result.sample.eval.f / main_bsdf_result.pdf;
             main.eta *= main_bsdf_result.eta;
 
             // auto main_lum_pdf = ite(
@@ -688,15 +670,10 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
             //     main_emitter_pdf, 0.f);
             auto main_lum_pdf = main_emitter_pdf;
 
-            // auto main_weight_numerator = main_previous_pdf * main_bsdf_pdf;
-            // auto main_weight_denominator = (main_previous_pdf * main_previous_pdf) * (main_lum_pdf * main_lum_pdf + main_bsdf_pdf * main_bsdf_pdf);
-
-            auto main_weight_numerator = 1.f;
-            auto main_weight_denominator = main_previous_pdf * (main_lum_pdf + main_bsdf_pdf);
+            auto main_weight = main_previous_weight / (main_lum_pdf + main_bsdf_pdf);// TODO_EPSILON
 
             if (node<GradientPathTracing>()->central_radiance()) {
-                // main.add_radiance(main.throughput * main_emitter_radiance,
-                //                   main_weight_numerator / (D_EPSILON + main_weight_denominator));
+                main.add_radiance(main_emitter_radiance * main.weight * main_bsdf_pdf / (main_lum_pdf + main_bsdf_pdf));
             }
 
             for (int i = 0; i < 4; i++) {
@@ -710,7 +687,8 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                 auto postponed_shift_end = def(false);// Kills the shift after evaluating the current radiance.
 
                 $if(shifted.alive) {
-                    auto shifted_previous_pdf = shifted.pdf;
+                    // auto shifted_previous_pdf = shifted.pdf;
+                    auto shifted_previous_weight = shifted.weight;
                     $switch(shifted.connection_status) {
                         $case((uint)RayConnection::RAY_CONNECTED) {
                             auto shifted_bsdf_value = main_bsdf_result.weight;
@@ -718,16 +696,16 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                             auto shifted_lum_pdf = main_lum_pdf;
                             auto &shifted_emitter_radiance = main_emitter_radiance;
 
-                            shifted.throughput *= shifted_bsdf_value;
-                            shifted.pdf *= shifted_bsdf_pdf;
+                            // shifted.throughput *= shifted_bsdf_value;
+                            shifted.weight *= shifted_bsdf_value / shifted_bsdf_pdf;
+                            // shifted.pdf *= shifted_bsdf_pdf;
 
                             // auto shifted_weight_denominator = (shifted_previous_pdf * shifted_previous_pdf) * (shifted_lum_pdf * shifted_lum_pdf + shifted_bsdf_pdf * shifted_bsdf_pdf);
-                            auto shifted_weight_denominator = shifted_previous_pdf * (shifted_lum_pdf + shifted_bsdf_pdf);
+                            // auto shifted_weight_denominator = shifted_previous_pdf * (shifted_lum_pdf + shifted_bsdf_pdf);
+                            auto shifted_weight = shifted_previous_weight / (shifted_lum_pdf + shifted_bsdf_pdf);
 
-                            weight = main_weight_numerator / (D_EPSILON + shifted_weight_denominator + main_weight_denominator);
-
-                            main_contribution = main.throughput * main_emitter_radiance;
-                            shifted_contribution = shifted.throughput * shifted_emitter_radiance;
+                            main_contribution = main_weight * main_emitter_radiance;
+                            shifted_contribution = shifted_weight * shifted_emitter_radiance;
                         };
                         $case((uint)RayConnection::RAY_RECENTLY_CONNECTED) {
                             auto incoming_direction = normalize(shifted.it->p() - main.ray.ray->origin());
@@ -742,18 +720,18 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                             auto shifted_lum_pdf = main_lum_pdf;
                             auto &shifted_emitter_radiance = main_emitter_radiance;
 
-                            shifted.throughput *= shifted_bsdf_value;
-                            shifted.pdf *= shifted_bsdf_pdf;
+                            // shifted.throughput *= shifted_bsdf_value;
+                            shifted.weight *= shifted_bsdf_value / shifted_bsdf_pdf;
+                            // shifted.pdf *= shifted_bsdf_pdf;
 
                             shifted.connection_status = (uint)RayConnection::RAY_CONNECTED;
 
                             // auto shifted_weight_denominator = (shifted_previous_pdf * shifted_previous_pdf) * (shifted_lum_pdf * shifted_lum_pdf + shifted_bsdf_pdf * shifted_bsdf_pdf);
-                            auto shifted_weight_denominator = shifted_previous_pdf * (shifted_lum_pdf + shifted_bsdf_pdf);
+                            // auto shifted_weight_denominator = shifted_previous_pdf * (shifted_lum_pdf + shifted_bsdf_pdf);
+                            auto shifted_weight = shifted_previous_weight / (shifted_lum_pdf + shifted_bsdf_pdf);
 
-                            weight = main_weight_numerator / (D_EPSILON + shifted_weight_denominator + main_weight_denominator);
-
-                            main_contribution = main.throughput * main_emitter_radiance;
-                            shifted_contribution = shifted.throughput * shifted_emitter_radiance;
+                            main_contribution = main_weight * main_emitter_radiance;
+                            shifted_contribution = shifted_weight * shifted_emitter_radiance;
                         };
                         $case((uint)RayConnection::RAY_NOT_CONNECTED) {
                             auto shifted_vertex_type = get_vertex_type(shifted.it, swl, time);
@@ -786,8 +764,9 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                                         pipeline().surfaces().dispatch(shifted.it->shape().surface_tag(), [&](auto surface) noexcept {
                                             auto closure = surface->closure(shifted.it, swl, incoming_direction, 1.f, time);
                                             auto shifted_bsdf_eval = closure->evaluate(incoming_direction, outgoing_direction);// TODO check
-                                            shifted.throughput *= shifted_bsdf_eval.f * shift_result.jacobian;
-                                            shifted.pdf *= shifted_bsdf_eval.pdf * shift_result.jacobian;
+                                            // shifted.throughput *= shifted_bsdf_eval.f * shift_result.jacobian;
+                                            // shifted.pdf *= shifted_bsdf_eval.pdf * shift_result.jacobian;
+                                            shifted.weight *= shifted_bsdf_eval.f / shifted_bsdf_eval.pdf;
                                             shifted_bsdf_pdf = shifted_bsdf_eval.pdf;
                                         });
 
@@ -814,12 +793,11 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                                             };
 
                                             // auto shifted_weight_denominator = (shifted_previous_pdf * shifted_previous_pdf) * (shifted_lum_pdf * shifted_lum_pdf + shifted_bsdf_pdf * shifted_bsdf_pdf);
-                                            auto shifted_weight_denominator = shifted_previous_pdf * (shifted_lum_pdf + shifted_bsdf_pdf);
+                                            // auto shifted_weight_denominator = shifted_previous_pdf * (shifted_lum_pdf + shifted_bsdf_pdf);
+                                            auto shifted_weight = shifted_previous_weight / (shifted_lum_pdf + shifted_bsdf_pdf);
 
-                                            weight = main_weight_numerator / (D_EPSILON + shifted_weight_denominator + main_weight_denominator);
-
-                                            main_contribution = main.throughput * main_emitter_radiance;
-                                            shifted_contribution = shifted.throughput * shifted_emitter_radiance;
+                                            main_contribution = main_weight * main_emitter_radiance;
+                                            shifted_contribution = shifted_weight * shifted_emitter_radiance;
                                         };
                                     };
                                 };
@@ -852,8 +830,9 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
 
                                 auto shift_failed_flag = def(false);
                                 $if(shift_result.success) {
-                                    shifted.throughput *= shift_result.jacobian;
-                                    shifted.pdf *= shift_result.jacobian;
+                                    // shifted.throughput *= shift_result.jacobian;
+                                    // shifted.inv_pdf /= shift_result.jacobian;
+                                    // shifted.pdf *= shift_result.jacobian;
                                     tangent_space_outgoing_direction = shift_result.wo;
                                 }
                                 $else {
@@ -868,8 +847,10 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                                         // TODO check if tangent space is correct
                                         auto eval = closure->evaluate(tangent_space_incoming_direction, tangent_space_outgoing_direction);
 
-                                        shifted.pdf *= eval.pdf;
-                                        shifted.throughput *= eval.f;
+                                        // shifted.inv_pdf /= eval.pdf;
+                                        // shifted.pdf *= eval.pdf;
+                                        // shifted.throughput *= eval.f;
+                                        shifted.weight *= eval.f / eval.pdf;
                                     });
                                     shift_failed_flag = shifted.pdf == 0.f;
                                     // Strict normal TODO
@@ -924,14 +905,11 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                                     };
                                     // half vector shifted failed should go here
                                     $if(shifted.alive) {
-                                        // weight = main.pdf / (shifted.pdf * shifted.pdf + main.pdf * main.pdf);
-                                        weight = 1.f / (shifted.pdf + main.pdf + D_EPSILON);
-                                        main_contribution = main.throughput * main_emitter_radiance;
-                                        shifted_contribution = shifted_contribution * shifted_emitter_radiance;
+                                        main_contribution = main.weight * main_emitter_radiance;
+                                        shifted_contribution = shifted.weight * shifted_emitter_radiance;
                                     }
                                     $else {
-                                        weight = 1.f / (main.pdf + D_EPSILON);
-                                        main_contribution = main.throughput * main_emitter_radiance;
+                                        main_contribution = main.weight * main_emitter_radiance;
                                         shifted_contribution = SampledSpectrum{swl.dimension(), 0.f};
 
                                         // Disable the failure detection below since the failure was already handled.
@@ -946,16 +924,16 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
 
                 // shift failed should go here
                 $if(!shifted.alive) {
-                    weight = main_weight_numerator / (D_EPSILON + main_weight_denominator);
-                    main_contribution = main.throughput * main_emitter_radiance;
+                    // weight = main_weight_numerator / (D_EPSILON + main_weight_denominator);
+                    main_contribution = main_weight * main_emitter_radiance;
                     shifted_contribution = SampledSpectrum{swl.dimension(), 0.f};
                 };
 
                 if (!node<GradientPathTracing>()->central_radiance()) {
-                    main.add_radiance(main_contribution, weight);
-                    shifted.add_radiance(shifted_contribution, weight);
+                    main.add_radiance(main_contribution);
+                    shifted.add_radiance(shifted_contribution);
                 }
-                shifted.add_gradient(shifted_contribution - main_contribution, weight);
+                shifted.add_gradient(shifted_contribution - main_contribution);
 
                 shifted.alive = ite(postponed_shift_end, false, shifted.alive);
             }
@@ -968,15 +946,18 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
 
             $if(depth >= node<GradientPathTracing>()->rr_depth()) {
                 // Russian Roulette
-                auto q = max((main.throughput / (main.pdf + D_EPSILON)).max() * main.eta * main.eta, 0.05f);
-                $if(sampler()->generate_1d() >= q) {
+                auto threshold = node<GradientPathTracing>()->rr_threshold();
+                auto q = max((main.weight).max(), 0.05f);
+                $if(q < threshold & sampler()->generate_1d() >= q) {
                     $break;
                 };
 
-                main.pdf *= q;
-                for (int i = 0; i < 4; i++) {
-                    shifteds[i].pdf *= q;
-                }
+                $if(q < threshold) {
+                    main.weight /= q;
+                    for (int i = 0; i < 4; i++) {
+                        shifteds[i].weight /= q;
+                    }
+                };
             };
         };
     };
