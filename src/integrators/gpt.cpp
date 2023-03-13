@@ -86,6 +86,7 @@ private:
         RayDifferential ray;
         SampledSpectrum throughput;
         Float pdf;
+        Float inv_pdf;
         SampledSpectrum radiance;
         SampledSpectrum gradient;
         // RadianceQueryRecord rRec;        ///< The radiance query record for this ray.
@@ -95,7 +96,7 @@ private:
         UInt connection_status;
 
         explicit RayState(uint dimension) : radiance(dimension, 0.0f), gradient(dimension, 0.0f), it(luisa::make_shared<Interaction>()), eta(1.0f), pdf(1.0f),
-                                            throughput(dimension, 0.0f), alive(true), connection_status((uint)RAY_NOT_CONNECTED) {}
+                                            inv_pdf(1.f), throughput(dimension, 0.0f), alive(true), connection_status((uint)RAY_NOT_CONNECTED) {}
 
         inline void add_radiance(const SampledSpectrum &contribution, Expr<float> weight) noexcept {
             auto color = contribution * weight;
@@ -212,7 +213,7 @@ public:
                 p = make_float4(p.xyz() / p.w, 1.f);
             }
             LUISA_INFO("Saving auxiliary buffer to '{}'.", path.string());
-            save_image(path.string(), reinterpret_cast<const float*>(host_image->data()), size, 4);
+            save_image(path.string(), reinterpret_cast<const float *>(host_image->data()), size, 4);
         };
     }
     void accumulate(Expr<uint2> p, Expr<float3> value, Expr<float> effective_spp = 1.f) noexcept {
@@ -502,11 +503,14 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                 // auto main_weight_denominator = main.pdf * main.pdf * (main_light_sample.eval.pdf * main_light_sample.eval.pdf + main_bsdf_pdf * main_bsdf_pdf);
 
                 // Balance Heuristic
+                auto main_weight = main.inv_pdf / (main_light_sample.eval.pdf + main_bsdf_pdf);// TODO_EPSILON
                 auto main_weight_numerator = 1.f;
                 auto main_weight_denominator = main.pdf * (main_light_sample.eval.pdf + main_bsdf_pdf);
 
                 if (node<GradientPathTracing>()->central_radiance()) {
-                    main.add_radiance(main.throughput * main_light_eval.f * main_light_sample.eval.L, main_weight_numerator / (D_EPSILON + main_weight_denominator));
+                    main.add_radiance(main.throughput,//main.throughput * main_light_eval.f * main_light_sample.eval.L,
+                                      //   main_weight_numerator / (D_EPSILON + main_weight_denominator));
+                                      main_weight);
                 }
 
                 if (/*!node<GradientPathTracing>()->strict_normals()*/ true) {// strict normal not implemented TODO
@@ -666,7 +670,16 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
             auto main_bsdf_pdf = main_bsdf_result.pdf;
             auto main_previous_pdf = main.pdf;
 
-            main.throughput *= main_bsdf_result.sample.eval.f;
+            $if(main_bsdf_result.sample.eval.f.any([](auto x) { return isnan(x) | isinf(x); })) {
+                pipeline().printer().warning_with_location("NaN {} ({},{})", main_bsdf_result.pdf, pixel_id.x, pixel_id.y);
+            }
+            $else {
+
+                main.throughput *= main_bsdf_result.sample.eval.f;
+            };
+            $if(main.throughput.any([](auto x) { return isnan(x) | isinf(x); })) {
+                pipeline().printer().warning_with_location("NaN pdf = {} weight = ({}, {}, {})", main_bsdf_result.pdf, main_bsdf_result.weight[0u], main_bsdf_result.weight[1u], main_bsdf_result.weight[2u]);
+            };
             main.pdf *= main_bsdf_result.pdf;
             main.eta *= main_bsdf_result.eta;
 
@@ -682,7 +695,8 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
             auto main_weight_denominator = main_previous_pdf * (main_lum_pdf + main_bsdf_pdf);
 
             if (node<GradientPathTracing>()->central_radiance()) {
-                main.add_radiance(main.throughput * main_emitter_radiance, main_weight_numerator / (D_EPSILON + main_weight_denominator));
+                // main.add_radiance(main.throughput * main_emitter_radiance,
+                //                   main_weight_numerator / (D_EPSILON + main_weight_denominator));
             }
 
             for (int i = 0; i < 4; i++) {
