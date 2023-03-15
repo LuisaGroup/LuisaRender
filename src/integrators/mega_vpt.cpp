@@ -6,6 +6,7 @@
 #include <base/pipeline.h>
 #include <base/integrator.h>
 #include <util/medium_tracker.h>
+#include <util/rng.h>
 
 namespace luisa::render {
 
@@ -69,7 +70,8 @@ protected:
         auto spectrum = pipeline().spectrum();
         auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler()->generate_1d());
         SampledSpectrum beta{swl.dimension(), camera_weight};
-        SampledSpectrum Li{swl.dimension()};
+        SampledSpectrum Li{swl.dimension(), 0.f};
+        SampledSpectrum r_u{swl.dimension(), 1.f}, r_l{swl.dimension(), 1.f};
         auto rr_depth = node<MegakernelVolumePathTracing>()->rr_depth();
         auto medium_tracker = MediumTracker(pipeline().printer());
 
@@ -96,34 +98,50 @@ protected:
                 });
                 pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
                     auto surface_event = event(it.get(), -ray->direction(), ray->direction());
-                    $if(all(dispatch_id().xy() == make_uint2(510, 781))) {
-                        pipeline().printer().info_with_location("surface event: {}", surface_event);
+                    $if(TEST_COND) {
+                        pipeline().printer().verbose_with_location("surface event={}", surface_event);
                     };
                     // update medium tracker
                     $switch(surface_event) {
                         $case(Surface::event_enter) {
                             medium_tracker.enter(medium_priority, medium_info);
+                            $if(TEST_COND) {
+                                pipeline().printer().verbose_with_location("enter: priority={}, medium_tag={}", medium_priority, medium_tag);
+                            };
                         };
                         $case(Surface::event_exit) {
                             $if(medium_tracker.exist(medium_priority, medium_info)) {
                                 medium_tracker.exit(medium_priority, medium_info);
+                                $if(TEST_COND) {
+                                    pipeline().printer().verbose_with_location("exit exist: priority={}, medium_tag={}", medium_priority, medium_tag);
+                                };
                             }
                             $else {
                                 medium_tracker.enter(medium_priority, medium_info);
+                                $if(TEST_COND) {
+                                    pipeline().printer().verbose_with_location("exit nonexistent: priority={}, medium_tag={}", medium_priority, medium_tag);
+                                };
                             };
                         };
                     };
                 });
             };
+            $if(TEST_COND) {
+                pipeline().printer().verbose_with_location("it->shape()->has_medium()={}", it->shape()->has_medium());
+                pipeline().printer().verbose_with_location("medium tracker size={}", medium_tracker.size());
+                pipeline().printer().verbose_with_location("it->p()=({}, {}, {})", it->p().x, it->p().y, it->p().z);
+                pipeline().printer().verbose("");
+            };
             ray = it->spawn_ray(ray->direction());
         };
-        $if(all(dispatch_id().xy() == make_uint2(510, 781))) {
-            pipeline().printer().info_with_location("medium tracker size: {}", medium_tracker.size());
+        $if(TEST_COND) {
+            pipeline().printer().verbose_with_location("Final medium tracker size={}", medium_tracker.size());
         };
 
         ray = camera_ray;
         auto pdf_bsdf = def(1e16f);
-        $for(depth, node<MegakernelVolumePathTracing>()->max_depth()) {
+        auto depth = def(0u);
+        $while(depth < node<MegakernelVolumePathTracing>()->max_depth()) {
             auto eta_scale = def(1.f);
             auto u_rr = def(0.f);
             $if(depth + 1u >= rr_depth) { u_rr = sampler()->generate_1d(); };
@@ -132,23 +150,32 @@ protected:
             auto it = pipeline().geometry()->intersect(ray);
             auto has_medium = it->shape()->has_medium();
 
-            auto tMax = ite(it->valid(), length(it->p() - ray->origin()), Interaction::default_t_max);
-
             // sample the participating medium
             auto is_scattered = def(false);
             $if(!medium_tracker.vacuum()) {
+                // Normalize ray direction and update t_max accordingly
+                ray->set_direction(normalize(ray->direction()));
+                auto t_max = ite(it->valid(), length(it->p() - ray->origin()), Interaction::default_t_max);
+
+                // Initialize RNG for sampling the majorant transmittance
+                auto hash0 = U64(as<UInt2>(sampler()->generate_2d()));
+                auto hash1 = U64(as<UInt2>(sampler()->generate_2d()));
+                PCG32 rng(hash0, hash1);
+
+                // Sample medium using delta tracking
+                Float u = sampler()->generate_1d();
+                Float u_behavior = sampler()->generate_1d();
+
                 auto medium_tag = medium_tracker.current().medium_tag;
                 pipeline().media().dispatch(medium_tag, [&](auto medium) {
-                    auto closure = medium->closure(ray, it, swl, time);
+                    auto closure = medium->closure(ray, swl, time);
 
-                    auto vol_sample = closure->sample(tMax, sampler());
-                    is_scattered = vol_sample.is_scattered;
+                    closure->sampleT_maj(
+                        t_max, u, rng,
+                        [&](luisa::unique_ptr<Medium::Closure> closure, Expr<float3> p,
+                            SampledSpectrum sigma_maj, SampledSpectrum T_maj) {
 
-                    // advance ray
-                    ray = vol_sample.ray;
-
-                    // update throughput
-                    beta *= vol_sample.eval.f;
+                        });
                 });
             };
 
@@ -191,11 +218,19 @@ protected:
                 auto medium_info = def<MediumInfo>();
                 medium_info.medium_tag = medium_tag;
                 auto eta = def(1.f);
+                $if(!medium_tracker.vacuum()) {
+                    pipeline().media().dispatch(medium_tracker.current().medium_tag, [&](auto medium) {
+                        auto closure = medium->closure(ray, swl, time);
+                        eta = closure->eta();
+                    });
+                };
                 $if(has_medium) {
                     pipeline().media().dispatch(medium_tag, [&](auto medium) {
                         medium_priority = medium->priority();
-                        auto closure = medium->closure(ray, it, swl, time);
-                        eta = closure->eta();
+                        auto closure = medium->closure(ray, swl, time);
+                        $if(TEST_COND) {
+                            pipeline().printer().verbose_with_location("eta={}", closure->eta());
+                        };
                     });
                 };
 
@@ -256,12 +291,24 @@ protected:
             };
 
             beta = zero_if_any_nan(beta);
+            $if(TEST_COND) {
+                pipeline().printer().verbose_with_location("beta_before_break=({}, {}, {})", beta[0u], beta[1u], beta[2u]);
+            };
             $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
             auto rr_threshold = node<MegakernelVolumePathTracing>()->rr_threshold();
             auto q = max(beta.max() * eta_scale, .05f);
             $if(depth + 1u >= rr_depth) {
                 $if(q < rr_threshold & u_rr >= q) { $break; };
                 beta *= ite(q < rr_threshold, 1.0f / q, 1.f);
+            };
+            depth += 1u;
+
+            $if(TEST_COND) {
+                pipeline().printer().verbose_with_location("it->p(): ({}, {}, {})", it->p().x, it->p().y, it->p().z);
+                pipeline().printer().verbose_with_location(
+                    "depth={}, is_scattered={}, beta=({}, {}, {}), pdf_bsdf={}, Li: ({}, {}, {})",
+                    depth, is_scattered, beta[0u], beta[1u], beta[2u], pdf_bsdf, Li[0u], Li[1u], Li[2u]);
+                pipeline().printer().verbose("");
             };
         };
         return spectrum->srgb(swl, Li);

@@ -69,6 +69,10 @@ template<typename ProbTable, typename AliasTable>
 [[nodiscard]] Float balance_heuristic(Expr<float> fPdf, Expr<float> gPdf) noexcept;
 [[nodiscard]] Float power_heuristic(Expr<float> fPdf, Expr<float> gPdf) noexcept;
 
+
+[[nodiscard]] inline UInt sample_discrete(Expr<float3> weights, Expr<float> u) noexcept;
+[[nodiscard]] inline Float sample_exponential(Expr<float> u, Expr<float> a) noexcept { return -log(1.f - u) / a; }
+
 }// namespace luisa::render
 
 LUISA_STRUCT(luisa::render::AliasEntry, prob, alias){};

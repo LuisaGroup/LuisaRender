@@ -9,6 +9,8 @@
 #include <base/scene_node.h>
 #include <base/spectrum.h>
 #include <base/interaction.h>
+#include <util/sampling.h>
+#include <util/rng.h>
 
 #include <utility>
 
@@ -28,6 +30,15 @@ protected:
     uint _priority;
 
 public:
+    static constexpr auto event_absorb = 0x00u;
+    static constexpr auto event_scatter = 0x01u;
+    static constexpr auto event_null = 0x02u;
+
+    static UInt sample_behavior(Expr<float> p_absorb, Expr<float> p_scatter,
+                                Expr<float> p_null, Expr<float> u) noexcept {
+        return sample_discrete(make_float3(p_absorb, p_scatter, p_null), u);
+    }
+
     struct Evaluation {
         SampledSpectrum f;
 
@@ -41,12 +52,32 @@ public:
         Evaluation eval;
         Var<Ray> ray;
         Bool is_scattered;
+        Float t;
 
         [[nodiscard]] static auto zero(uint spec_dim) noexcept {
             return Sample{.eval = Evaluation::zero(spec_dim),
                           .ray = def<Ray>(),
-                          .is_scattered = false};
+                          .is_scattered = false,
+                          .t = 0.0f};
         }
+    };
+
+    struct RayMajorantSegment {
+        Float t_min, t_max;
+        SampledSpectrum sigma_maj;
+
+        [[nodiscard]] static auto one(uint spec_dim) noexcept {
+            return RayMajorantSegment{.t_min = 0.0f,
+                                      .t_max = Interaction::default_t_max,
+                                      .sigma_maj = SampledSpectrum{spec_dim, 1.f}};
+        }
+    };
+
+    class RayMajorantIterator {
+
+    public:
+        [[nodiscard]] virtual luisa::optional<RayMajorantSegment> next() noexcept = 0;
+
     };
 
     class Instance;
@@ -59,7 +90,6 @@ public:
     private:
         const SampledWavelengths &_swl;
         Var<Ray> _ray;
-        luisa::shared_ptr<Interaction> _it;
         Float _time;
         Float _eta;
 
@@ -70,25 +100,93 @@ public:
             return exp(-sigma * t);
         }
 
-    private:
-        [[nodiscard]] virtual Sample _sample(Expr<float> t_max, Sampler::Instance *sampler) const noexcept = 0;
-        [[nodiscard]] virtual SampledSpectrum _transmittance(Expr<float> t, Sampler::Instance *sampler) const noexcept = 0;
-
     public:
-        Closure(const Instance *instance, Expr<Ray> ray, luisa::shared_ptr<Interaction> it,
+        Closure(const Instance *instance, Expr<Ray> ray,
                 const SampledWavelengths &swl, Expr<float> time, Expr<float> eta) noexcept;
         virtual ~Closure() noexcept = default;
         template<typename T = Instance>
             requires std::is_base_of_v<Instance, T>
         [[nodiscard]] auto instance() const noexcept { return static_cast<const T *>(_instance); }
-        [[nodiscard]] auto it() const noexcept { return _it.get(); }
-        [[nodiscard]] auto shared_it() const noexcept { return _it; }
         [[nodiscard]] auto &swl() const noexcept { return _swl; }
         [[nodiscard]] auto ray() const noexcept { return _ray; }
         [[nodiscard]] auto time() const noexcept { return _time; }
         [[nodiscard]] auto eta() const noexcept { return _eta; }
-        [[nodiscard]] Sample sample(Expr<float> t_max, Sampler::Instance *sampler) const noexcept;
-        [[nodiscard]] SampledSpectrum transmittance(Expr<float> t, Sampler::Instance *sampler) const noexcept;
+
+        [[nodiscard]] virtual Sample sample(Expr<float> t_max, PCG32 &rng) const noexcept = 0;
+        [[nodiscard]] virtual SampledSpectrum transmittance(Expr<float> t, PCG32 &rng) const noexcept = 0;
+        [[nodiscard]] virtual luisa::unique_ptr<RayMajorantIterator> sample_iterator(Expr<float> t_max) const noexcept = 0;
+        // from PBRT-v4
+        template<typename F>
+        [[nodiscard]] SampledSpectrum sampleT_maj(
+            Expr<float> t_max, Expr<float> u, PCG32 &rng,
+//            const luisa::function<Bool(luisa::unique_ptr<Medium::Closure> closure, Expr<float3> p,
+//                                       SampledSpectrum sigma_maj, SampledSpectrum T_maj)> &callback
+            F &&callback) const noexcept {
+            Float u_local = u;
+
+            // Initialize RayMajorantIterator for ray majorant sampling
+            auto majorant_iter = sample_iterator(t_max);
+
+            // Generate ray majorant samples until termination
+            SampledSpectrum T_maj(swl().dimension(), 1.f);
+            Bool done = def(false);
+            $while(!done) {
+                // Get next majorant segment from iterator and sample it
+                auto seg = majorant_iter->next();
+                $if(!seg) {
+                    done = true;
+                    $break;
+                };
+
+                // Handle zero-valued majorant for current segment
+                $if(seg->sigma_maj[0u] == 0.f) {
+                    Float dt = seg->t_max - seg->t_min;
+                    // Handle infinite _dt_ for ray majorant segment
+                    $if (isinf(dt)) {
+                        dt = std::numeric_limits<float>::max();
+                    };
+
+                    T_maj *= exp(-dt * seg->sigma_maj);
+                    $continue;
+                };
+
+                // Generate samples along current majorant segment
+                Float t_min = seg->t_min;
+                $while(true) {
+                    // Try to generate sample along current majorant segment
+                    Float t = t_min + sample_exponential(u_local, seg->sigma_maj[0u]);\
+                    u_local = rng.uniform_float();
+                    $if(t < seg->t_max) {
+                        // Call callback function for sample within segment
+                        T_maj *= exp(-(t - t_min) * seg->sigma_maj);
+                        Float3 p = ray()->origin() + ray()->direction() * t;
+                        auto closure_t = instance()->closure(compute::make_ray(p, ray()->direction()), swl(), time());
+                        $if(!callback(std::move(closure_t), p, seg->sigma_maj, T_maj)) {
+                            // Returning out of doubly-nested while loop is not as good perf. wise
+                            // on the GPU vs using "done" here.
+                            done = true;
+                            T_maj = SampledSpectrum(1.f);
+                            $break;
+                        };
+                        T_maj = SampledSpectrum(1.f);
+                        t_min = t;
+                    }
+                    $else {
+                        // Handle sample past end of majorant segment
+                        Float dt = seg->t_max - t_min;
+                        // Handle infinite _dt_ for ray majorant segment
+                        $if(isinf(dt)) {
+                            dt = std::numeric_limits<float>::max();
+                        };
+
+                        T_maj *= exp(-dt * seg->sigma_maj);
+                        $break;
+                    };
+                };
+            };
+
+            return T_maj;
+        }
     };
 
     class Instance {
@@ -109,7 +207,7 @@ public:
         [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_medium); }
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
         [[nodiscard]] virtual luisa::unique_ptr<Closure> closure(
-            Expr<Ray> ray, luisa::shared_ptr<Interaction> interaction, const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
+            Expr<Ray> ray, const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
     };
 
 protected:

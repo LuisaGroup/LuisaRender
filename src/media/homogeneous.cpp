@@ -20,6 +20,25 @@ private:
     const PhaseFunction *_phase_function;// phase function
 
 public:
+    class HomogeneousMajorantIterator : public RayMajorantIterator {
+    public:
+        explicit HomogeneousMajorantIterator(Float t_min, Float t_max, SampledSpectrum sigma_maj) noexcept
+            : _seg{t_min, t_max, sigma_maj}, _called(def(false)) {}
+
+        [[nodiscard]] optional<RayMajorantSegment> next() noexcept override {
+            luisa::optional<RayMajorantSegment> seg;
+            $if(!_called){
+                seg = _seg;
+                _called = true;
+            };
+            return seg;
+        }
+
+    private:
+        RayMajorantSegment _seg;
+        Bool _called;
+    };
+
     class HomogeneousMediumInstance;
 
     class HomogeneousMediumClosure : public Medium::Closure {
@@ -31,20 +50,20 @@ public:
         SampledSpectrum _le;        // emission coefficient
         const PhaseFunction::Instance *_phase_function;
 
-    private:
-        [[nodiscard]] Sample _sample(Expr<float> t_max, Sampler::Instance *sampler) const noexcept override {
+    public:
+        [[nodiscard]] Sample sample(Expr<float> t_max, PCG32 &rng) const noexcept override {
             // TODO
             auto sample = Sample::zero(swl().dimension());
 
             // sample collision-free distance
-            auto t = -log(max(1.f - sampler->generate_1d(), 1.f)) / _sigma_t.average();
+            auto t = -log(max(1.f - rng.uniform_float(), 1e-6f)) / _sigma_t.average();
+            sample.t = t;
 
             // hit volume boundary, no collision
             $if(t > t_max - RAY_EPSILON){
-                sample.ray->set_origin(it()->p());
-                sample.ray->set_direction(ray()->direction());
+                sample.ray = ray();
 
-                auto tr = transmittance(t_max, sampler);
+                auto tr = transmittance(t_max, rng);
                 auto p_surface = tr;
                 auto pdf = p_surface;
                 sample.eval.f = tr / pdf.sum();
@@ -53,12 +72,11 @@ public:
             // in-scattering
             $else{
                 // sample direction
-                auto sampled_direction = _phase_function->sample_wi(ray()->direction(), sampler->generate_2d());
+                auto pf_sample = _phase_function->sample_p(
+                    ray()->direction(), make_float2(rng.uniform_float(), rng.uniform_float()));
+                sample.ray = make_ray(ray()->origin() + ray()->direction() * t, pf_sample.wi);
 
-                sample.ray->set_origin(ray()->origin() + ray()->direction() * t);
-                sample.ray->set_direction(sampled_direction.wi);
-
-                auto tr = transmittance(t, sampler);
+                auto tr = transmittance(t, rng);
                 auto pdf_distance = _sigma_t * tr;
                 auto pdf = pdf_distance;
                 sample.eval.f = _sigma_s * tr / pdf.sum();
@@ -67,17 +85,20 @@ public:
 
             return sample;
         }
-        SampledSpectrum _transmittance(Expr<float> t, Sampler::Instance *sampler) const noexcept override {
+        [[nodiscard]] SampledSpectrum transmittance(Expr<float> t, PCG32 &rng) const noexcept override {
             return analyticTransmittance(t, _sigma_t);
+        }
+        [[nodiscard]] unique_ptr<RayMajorantIterator> sample_iterator(Expr<float> t_max) const noexcept override {
+            return luisa::make_unique<HomogeneousMajorantIterator>(0.f, t_max, _sigma_a + _sigma_s);
         }
 
     public:
         HomogeneousMediumClosure(
-            const HomogeneousMediumInstance *instance, Expr<Ray> ray, luisa::shared_ptr<Interaction> it,
+            const HomogeneousMediumInstance *instance, Expr<Ray> ray,
             const SampledWavelengths &swl, Expr<float> time, Expr<float> eta,
             const SampledSpectrum &sigma_a, const SampledSpectrum &sigma_s, const SampledSpectrum &le,
             const PhaseFunction::Instance *phase_function) noexcept
-            : Medium::Closure{instance, ray, std::move(it), swl, time, eta},
+            : Medium::Closure{instance, ray, swl, time, eta},
               _sigma_a{sigma_a}, _sigma_s{sigma_s}, _sigma_t{sigma_a + sigma_s},
               _le{le}, _phase_function{phase_function} {}
     };
@@ -100,12 +121,13 @@ public:
             const Texture::Instance *Le, const PhaseFunction::Instance *phase_function) noexcept
             : Medium::Instance(pipeline, medium), _sigma_a{sigma_a}, _sigma_s{sigma_s}, _le{Le}, _phase_function{phase_function} {}
         [[nodiscard]] luisa::unique_ptr<Closure> closure(
-            Expr<Ray> ray, luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
-            auto [sigma_a, strength_a] = _sigma_a != nullptr ? _sigma_a->evaluate_albedo_spectrum(*it, swl, time) : Spectrum::Decode::one(swl.dimension());
-            auto [sigma_s, strength_s] = _sigma_s != nullptr ? _sigma_s->evaluate_albedo_spectrum(*it, swl, time) : Spectrum::Decode::one(swl.dimension());
-            auto [Le, strength_Le] = _le != nullptr ? _le->evaluate_albedo_spectrum(*it, swl, time) : Spectrum::Decode::one(swl.dimension());
+            Expr<Ray> ray, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+            Interaction it;
+            auto [sigma_a, strength_a] = _sigma_a != nullptr ? _sigma_a->evaluate_albedo_spectrum(it, swl, time) : Spectrum::Decode::one(swl.dimension());
+            auto [sigma_s, strength_s] = _sigma_s != nullptr ? _sigma_s->evaluate_albedo_spectrum(it, swl, time) : Spectrum::Decode::one(swl.dimension());
+            auto [Le, strength_Le] = _le != nullptr ? _le->evaluate_albedo_spectrum(it, swl, time) : Spectrum::Decode::one(swl.dimension());
             return luisa::make_unique<HomogeneousMediumClosure>(
-                this, ray, std::move(it), swl, time, node<HomogeneousMedium>()->_eta,
+                this, ray, swl, time, node<HomogeneousMedium>()->_eta,
                 sigma_a, sigma_s, Le, _phase_function);
         }
     };
@@ -128,9 +150,9 @@ public:
           _sigma_s{scene->load_texture(desc->property_node_or_default("sigma_s"))},
           _le{scene->load_texture(desc->property_node_or_default("Le"))},
           _phase_function{scene->load_phase_function(desc->property_node_or_default("phasefunction"))} {
-        LUISA_ASSERT(_sigma_a == nullptr || _sigma_a->is_constant(), "sigma_a must be constant");
-        LUISA_ASSERT(_sigma_s == nullptr || _sigma_s->is_constant(), "sigma_s must be constant");
-        LUISA_ASSERT(_le == nullptr || _le->is_constant(), "Le must be constant");
+        LUISA_ASSERT(_sigma_a != nullptr && _sigma_a->is_constant(), "sigma_a must be specified as constant");
+        LUISA_ASSERT(_sigma_s != nullptr && _sigma_s->is_constant(), "sigma_s must be specified as constant");
+        LUISA_ASSERT(_le != nullptr && _le->is_constant(), "Le must be specified as constant");
         LUISA_ASSERT(_phase_function != nullptr, "Phase function must be specified");
     }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }

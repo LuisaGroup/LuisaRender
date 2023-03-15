@@ -22,7 +22,8 @@ public:
 
     class Instance {
     public:
-        struct SampledDirection {
+        struct PhaseFunctionSample {
+            Float p;
             Float3 wi;
             Float pdf;
         };
@@ -33,12 +34,9 @@ public:
         friend class PhaseFunction;
 
     public:
-        // evaluate phase function
-        [[nodiscard]] virtual Float evaluate(Expr<float3> wo, Expr<float3> wi) const = 0;
-
-        // sample incident direction
-        // its pdf is proportional to the shape of phase function
-        [[nodiscard]] virtual SampledDirection sample_wi(Expr<float3> wo, Expr<float2> u) const = 0;
+        [[nodiscard]] virtual Float p(Expr<float3> wo, Expr<float3> wi) const = 0;
+        [[nodiscard]] virtual PhaseFunctionSample sample_p(Expr<float3> wo, Expr<float2> u) const = 0;
+        [[nodiscard]] virtual Float pdf(Expr<float3> wo, Expr<float3> wi) const = 0;
 
     public:
         Instance(const Pipeline &pipeline, const PhaseFunction *phase_function) noexcept

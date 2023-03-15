@@ -113,9 +113,9 @@ void ProgressiveIntegrator::Instance::_render_one_camera(
                     command_buffer << [&progress, p] { progress.update(p); };
                 }
             }
+            command_buffer << pipeline().printer().retrieve();
         }
     }
-    command_buffer << pipeline().printer().retrieve();
     command_buffer << synchronize();
     progress.done();
 

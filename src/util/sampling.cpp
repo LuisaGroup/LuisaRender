@@ -4,6 +4,7 @@
 
 #include <util/sampling.h>
 #include <util/scattering.h>
+#include <dsl/sugar.h>
 
 namespace luisa::render {
 
@@ -155,6 +156,20 @@ Float balance_heuristic(Expr<float> fPdf, Expr<float> gPdf) noexcept {
 
 Float power_heuristic(Expr<float> fPdf, Expr<float> gPdf) noexcept {
     return power_heuristic(1u, fPdf, 1u, gPdf);
+}
+
+UInt sample_discrete(Expr<float3> weights, Expr<float> u) noexcept {
+    UInt ans = def<uint>(-1);
+    Float accum_sum = 0.0f;
+    Float u_rescaled = u / (weights.x + weights.y + weights.z);
+    $for(i, 3) {
+        accum_sum += weights[i];
+        $if(u_rescaled <= accum_sum) {
+            ans = i;
+            $break;
+        };
+    };
+    return ans;
 }
 
 }// namespace luisa::render

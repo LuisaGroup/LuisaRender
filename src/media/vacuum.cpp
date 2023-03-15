@@ -12,24 +12,33 @@ using compute::Ray;
 class VacuumMedium : public Medium {
 
 public:
+    class VacuumMajorantIterator : public RayMajorantIterator {
+    public:
+        [[nodiscard]] optional<RayMajorantSegment> next() noexcept override {
+            return {};
+        }
+    };
+
     class VacuumMediumInstance;
 
     class VacuumMediumClosure : public Medium::Closure {
-
-    private:
-        [[nodiscard]] Sample _sample(Expr<float> t_max, Sampler::Instance *sampler) const noexcept override {
+    public:
+        [[nodiscard]] Sample sample(Expr<float> t_max, PCG32 &rng) const noexcept override {
             instance()->pipeline().printer().error_with_location("VacuumMediumClosure::sample() is not implemented. Priority={}", instance()->priority());
             return Sample::zero(swl().dimension());
         }
-        SampledSpectrum _transmittance(Expr<float> t, Sampler::Instance *sampler) const noexcept override {
+        [[nodiscard]] SampledSpectrum transmittance(Expr<float> t, PCG32 &rng) const noexcept override {
             return {swl().dimension(), 1.0f};
+        }
+        [[nodiscard]] unique_ptr<RayMajorantIterator> sample_iterator(Expr<float> t_max) const noexcept override {
+            return luisa::make_unique<VacuumMajorantIterator>();
         }
 
     public:
         VacuumMediumClosure(
-            const VacuumMediumInstance *instance, Expr<Ray> ray, luisa::shared_ptr<Interaction> it,
+            const VacuumMediumInstance *instance, Expr<Ray> ray,
             const SampledWavelengths &swl, Expr<float> time) noexcept
-            : Medium::Closure{instance, ray, std::move(it), swl, time, 1.0f} {}
+            : Medium::Closure{instance, ray, swl, time, 1.0f} {}
 
     };
 
@@ -42,8 +51,8 @@ public:
         VacuumMediumInstance(const Pipeline &pipeline, const Medium *medium) noexcept
             : Medium::Instance(pipeline, medium) {}
         [[nodiscard]] luisa::unique_ptr<Closure> closure(
-            Expr<Ray> ray, luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
-            return luisa::make_unique<VacuumMediumClosure>(this, ray, std::move(it), swl, time);
+            Expr<Ray> ray, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+            return luisa::make_unique<VacuumMediumClosure>(this, ray, swl, time);
         }
     };
 

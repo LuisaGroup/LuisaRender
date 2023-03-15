@@ -21,13 +21,13 @@ public:
         friend class HenyeyGreenstein;
 
     public:
-        [[nodiscard]] Float evaluate(Expr<float3> wo, Expr<float3> wi) const override {
+        [[nodiscard]] Float p(Expr<float3> wo, Expr<float3> wi) const override {
             auto g = node<HenyeyGreenstein>()->_g;
             auto cosTheta = dot(wo, wi);
-            auto denom = 1.f + g * g + 2.f * g * cosTheta;
-            return inv_pi / 4.f * (1.f - g * g) / (denom * sqrt(max(0.f, denom)));
+            auto denom = 1.f + sqr(g) + 2.f * g * cosTheta;
+            return inv_pi / 4.f * (1.f - sqr(g)) / (denom * sqrt(max(0.f, denom)));
         }
-        [[nodiscard]] SampledDirection sample_wi(Expr<float3> wo, Expr<float2> u) const override {
+        [[nodiscard]] PhaseFunctionSample sample_p(Expr<float3> wo, Expr<float2> u) const override {
             auto g = node<HenyeyGreenstein>()->_g;
             // sample cosTheta
             auto cosTheta = ite(
@@ -41,10 +41,14 @@ public:
             auto sinTheta = sqrt(max(0.f, 1.f - sqr(cosTheta)));
             auto phi = 2.f * pi * u.y;
 
-            SampledDirection wi;
-            wi.wi = make_float3(sinTheta * cos(phi), cosTheta, sinTheta * sin(phi));
-            wi.pdf = evaluate(wo, wi.wi);
-            return wi;
+            PhaseFunctionSample pf_sample;
+            pf_sample.wi = make_float3(sinTheta * cos(phi), cosTheta, sinTheta * sin(phi));
+            pf_sample.p = p(wo, pf_sample.wi);
+            pf_sample.pdf = pf_sample.p;
+            return pf_sample;
+        }
+        [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi) const override {
+            return p(wo, wi);
         }
 
     public:
