@@ -23,10 +23,6 @@ public:
 
     class VacuumMediumClosure : public Medium::Closure {
     public:
-        [[nodiscard]] Sample sample(Expr<float> t_max, PCG32 &rng) const noexcept override {
-            instance()->pipeline().printer().error_with_location("VacuumMediumClosure::sample() is not implemented. Priority={}", instance()->priority());
-            return Sample::zero(swl().dimension());
-        }
         [[nodiscard]] SampledSpectrum transmittance(Expr<float> t, PCG32 &rng) const noexcept override {
             return {swl().dimension(), 1.0f};
         }
@@ -38,8 +34,9 @@ public:
         VacuumMediumClosure(
             const VacuumMediumInstance *instance, Expr<Ray> ray,
             const SampledWavelengths &swl, Expr<float> time) noexcept
-            : Medium::Closure{instance, ray, swl, time, 1.0f} {}
-
+            : Medium::Closure{instance, ray, swl, time, 1.0f,
+                              SampledSpectrum{swl.dimension(), 0.f}, SampledSpectrum{swl.dimension(), 0.f},
+                              SampledSpectrum{swl.dimension(), 0.f}, nullptr} {}
     };
 
     class VacuumMediumInstance : public Medium::Instance {
@@ -68,7 +65,6 @@ public:
         _priority = 0u;
     }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-
 };
 
 }// namespace luisa::render

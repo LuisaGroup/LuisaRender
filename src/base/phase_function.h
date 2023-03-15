@@ -18,15 +18,16 @@ using compute::Var;
 
 class PhaseFunction : public SceneNode {
 public:
+    struct PhaseFunctionSample {
+        Float p;
+        Float3 wi;
+        Float pdf;
+    };
+
     class Instance;
 
     class Instance {
     public:
-        struct PhaseFunctionSample {
-            Float p;
-            Float3 wi;
-            Float pdf;
-        };
 
     protected:
         const Pipeline &_pipeline;

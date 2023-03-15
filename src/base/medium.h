@@ -8,6 +8,7 @@
 #include <util/spec.h>
 #include <base/scene_node.h>
 #include <base/spectrum.h>
+#include <base/phase_function.h>
 #include <base/interaction.h>
 #include <util/sampling.h>
 #include <util/rng.h>
@@ -26,15 +27,15 @@ class Medium : public SceneNode {
 public:
     static uint constexpr INVALID_TAG = uint(0u) - uint(1u);
 
-protected:
-    uint _priority;
-
-public:
     static constexpr auto event_absorb = 0x00u;
     static constexpr auto event_scatter = 0x01u;
     static constexpr auto event_null = 0x02u;
 
-    static UInt sample_behavior(Expr<float> p_absorb, Expr<float> p_scatter,
+protected:
+    uint _priority;
+
+public:
+    [[nodiscard]] static UInt sample_event(Expr<float> p_absorb, Expr<float> p_scatter,
                                 Expr<float> p_null, Expr<float> u) noexcept {
         return sample_discrete(make_float3(p_absorb, p_scatter, p_null), u);
     }
@@ -92,6 +93,10 @@ public:
         Var<Ray> _ray;
         Float _time;
         Float _eta;
+        SampledSpectrum _sigma_a;   // absorption coefficient
+        SampledSpectrum _sigma_s;   // scattering coefficient
+        SampledSpectrum _le;        // emission coefficient
+        const PhaseFunction::Instance *_phase_function;
 
     protected:
         [[nodiscard]] SampledSpectrum analyticTransmittance(
@@ -102,7 +107,9 @@ public:
 
     public:
         Closure(const Instance *instance, Expr<Ray> ray,
-                const SampledWavelengths &swl, Expr<float> time, Expr<float> eta) noexcept;
+                const SampledWavelengths &swl, Expr<float> time, Expr<float> eta,
+                const SampledSpectrum& sigma_a, const SampledSpectrum& sigma_s, const SampledSpectrum& le,
+                const PhaseFunction::Instance *phase_function) noexcept;
         virtual ~Closure() noexcept = default;
         template<typename T = Instance>
             requires std::is_base_of_v<Instance, T>
@@ -111,8 +118,11 @@ public:
         [[nodiscard]] auto ray() const noexcept { return _ray; }
         [[nodiscard]] auto time() const noexcept { return _time; }
         [[nodiscard]] auto eta() const noexcept { return _eta; }
+        [[nodiscard]] auto sigma_a() const noexcept { return _sigma_a; }
+        [[nodiscard]] auto sigma_s() const noexcept { return _sigma_s; }
+        [[nodiscard]] auto le() const noexcept { return _le; }
+        [[nodiscard]] auto phase_function() const noexcept { return _phase_function; }
 
-        [[nodiscard]] virtual Sample sample(Expr<float> t_max, PCG32 &rng) const noexcept = 0;
         [[nodiscard]] virtual SampledSpectrum transmittance(Expr<float> t, PCG32 &rng) const noexcept = 0;
         [[nodiscard]] virtual luisa::unique_ptr<RayMajorantIterator> sample_iterator(Expr<float> t_max) const noexcept = 0;
         // from PBRT-v4
