@@ -479,13 +479,13 @@ protected:
 
             // hit light
             if (!pipeline().lights().empty()) {
-                $if(it->shape()->has_light()) {
+                $if(it->shape().has_light()) {
                     auto eval = light_sampler()->evaluate_hit(*it, ray->origin(), swl, time);
                     Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
                 };
             }
 
-            $if(!it->shape()->has_surface()) { $break; };
+            $if(!it->shape().has_surface()) { $break; };
 
             // generate uniform samples
             auto u_light_selection = sampler()->generate_1d();
@@ -504,7 +504,7 @@ protected:
             auto occluded = pipeline().geometry()->intersect_any(light_sample.shadow_ray);
 
             // evaluate material
-            auto surface_tag = it->shape()->surface_tag();
+            auto surface_tag = it->shape().surface_tag();
             auto eta_scale = def(1.f);
             Bool stop_direct = false;
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
@@ -595,7 +595,7 @@ protected:
 
                 // hit light
                 if (!pipeline().lights().empty()) {
-                    $if(it_next->shape()->has_light()) {
+                    $if(it_next->shape().has_light()) {
                         auto eval = light_sampler()->evaluate_hit(*it_next, ray->origin(), swl, time);
                         Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
                     };
@@ -640,7 +640,7 @@ protected:
                 $break;
             };
 
-            $if(!it->shape()->has_surface()) { $break; };
+            $if(!it->shape().has_surface()) { $break; };
 
             // generate uniform samples
             auto u_lobe = sampler()->generate_1d();
@@ -652,7 +652,7 @@ protected:
                 photons.push(it->p(), beta, wi);
             };
             // evaluate material
-            auto surface_tag = it->shape()->surface_tag();
+            auto surface_tag = it->shape().surface_tag();
             auto eta_scale = def(1.f);
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
                 // create closure

@@ -152,7 +152,7 @@ private:
         auto light_inst = pipeline().geometry()->instance(handle.instance_id);
         auto sp=Light::Sample::zero(swl.dimension());
         Float3 dir = make_float3();
-        pipeline().lights().dispatch(light_inst->light_tag(), [&](auto light) noexcept {
+        pipeline().lights().dispatch(light_inst.light_tag(), [&](auto light) noexcept {
             auto closure = light->closure(swl, time);
             auto [sp_tp,dir_tp] = closure->sample_le(handle.instance_id, u_light, u_direction);
             sp = sp_tp;

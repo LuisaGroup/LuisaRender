@@ -85,7 +85,7 @@ private:
         using namespace luisa::compute;
         auto light = instance<DiffuseLightInstance>();
         auto &&pipeline = light->pipeline();
-        auto pdf_triangle = pipeline.buffer<float>(it_light.shape()->pdf_buffer_id()).read(it_light.triangle_id());
+        auto pdf_triangle = pipeline.buffer<float>(it_light.shape().pdf_buffer_id()).read(it_light.triangle_id());
         auto pdf_area = pdf_triangle / it_light.triangle_area();
         auto L = light->texture()->evaluate_illuminant_spectrum(it_light, swl(), time()).value *
                  light->node<DiffuseLight>()->scale();
@@ -127,13 +127,13 @@ public:
         auto &&pipeline = light->pipeline();
         auto light_inst = pipeline.geometry()->instance(light_inst_id);
         auto light_to_world = pipeline.geometry()->instance_to_world(light_inst_id);
-        auto alias_table_buffer_id = light_inst->alias_table_buffer_id();
+        auto alias_table_buffer_id = light_inst.alias_table_buffer_id();
         auto [triangle_id, ux] = sample_alias_table(
             pipeline.buffer<AliasEntry>(alias_table_buffer_id),
-            light_inst->triangle_count(), u_light.x);
-        auto triangle = pipeline.geometry()->triangle(*light_inst, triangle_id);
+            light_inst.triangle_count(), u_light.x);
+        auto triangle = pipeline.geometry()->triangle(light_inst, triangle_id);
         auto uvw = sample_uniform_triangle(make_float2(ux, u_light.y));
-        auto attrib = pipeline.geometry()->geometry_point(*light_inst, triangle, uvw, light_to_world);
+        auto attrib = pipeline.geometry()->geometry_point(light_inst, triangle, uvw, light_to_world);
         auto two_sided = light->node<DiffuseLight>()->two_sided();
         Float3 we = make_float3();
         if (two_sided) {
