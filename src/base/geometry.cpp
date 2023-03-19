@@ -166,8 +166,8 @@ luisa::shared_ptr<Interaction> Geometry::interaction(Expr<uint> inst_id, Expr<ui
                                                      Expr<float3> bary, Expr<float3> wo) const noexcept {
     auto shape = instance(inst_id);
     auto m = instance_to_world(inst_id);
-    auto tri = triangle(*shape, prim_id);
-    auto attrib = shading_point(*shape, tri, bary, m);
+    auto tri = triangle(shape, prim_id);
+    auto attrib = shading_point(shape, tri, bary, m);
     return luisa::make_shared<Interaction>(
         std::move(shape), inst_id, prim_id,
         attrib, dot(wo, attrib.g.n) < 0.0f);
@@ -184,7 +184,7 @@ luisa::shared_ptr<Interaction> Geometry::interaction(const Var<Ray> &ray, const 
     return luisa::make_shared<Interaction>(std::move(it));
 }
 
-luisa::shared_ptr<Shape::Handle> Geometry::instance(Expr<uint> index) const noexcept {
+Shape::Handle Geometry::instance(Expr<uint> index) const noexcept {
     return Shape::Handle::decode(_instance_buffer.read(index));
 }
 

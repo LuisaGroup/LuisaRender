@@ -55,7 +55,7 @@ public:
             LUISA_WARNING_WITH_LOCATION("No lights in scene.");
             return eval;
         }
-        pipeline().lights().dispatch(it.shape()->light_tag(), [&](auto light) noexcept {
+        pipeline().lights().dispatch(it.shape().light_tag(), [&](auto light) noexcept {
             auto closure = light->closure(swl, time);
             eval = closure->evaluate(it, p_from);
         });
@@ -110,13 +110,13 @@ private:
         auto handle = pipeline().buffer<Light::Handle>(_light_buffer_id).read(tag);
         auto light_inst = pipeline().geometry()->instance(handle.instance_id);
         auto light_to_world = pipeline().geometry()->instance_to_world(handle.instance_id);
-        auto alias_table_buffer_id = light_inst->alias_table_buffer_id();
+        auto alias_table_buffer_id = light_inst.alias_table_buffer_id();
         auto [triangle_id, ux] = sample_alias_table(
             pipeline().buffer<AliasEntry>(alias_table_buffer_id),
-            light_inst->triangle_count(), u_in.x);
-        auto triangle = pipeline().geometry()->triangle(*light_inst, triangle_id);
+            light_inst.triangle_count(), u_in.x);
+        auto triangle = pipeline().geometry()->triangle(light_inst, triangle_id);
         auto uvw = sample_uniform_triangle(make_float2(ux, u_in.y));
-        auto attrib = pipeline().geometry()->shading_point(*light_inst, triangle, uvw, light_to_world);
+        auto attrib = pipeline().geometry()->shading_point(light_inst, triangle, uvw, light_to_world);
         return luisa::make_shared<Interaction>(std::move(light_inst), handle.instance_id,
                                                triangle_id, std::move(attrib),
                                                dot(attrib.g.n, p_from - attrib.g.p) < 0.f);
@@ -129,7 +129,7 @@ private:
         LUISA_ASSERT(!pipeline().lights().empty(), "No lights in the scene.");
         auto it = _sample_area(it_from.p(), tag, u);
         auto eval = Light::Evaluation::zero(swl.dimension());
-        pipeline().lights().dispatch(it->shape()->light_tag(), [&](auto light) noexcept {
+        pipeline().lights().dispatch(it->shape().light_tag(), [&](auto light) noexcept {
             auto closure = light->closure(swl, time);
             eval = closure->evaluate(*it, it_from.p_shading());
         });

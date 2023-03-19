@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "core/basic_types.h"
 #include <rtx/ray.h>
 #include <runtime/bindless_array.h>
 #include <util/spec.h>
@@ -31,8 +32,10 @@ public:
     struct Evaluation {
         SampledSpectrum L;
         Float pdf;
+        Float3 p; // pos on light
+        Float3 ng;// ng at p
         [[nodiscard]] static auto zero(uint spec_dim) noexcept {
-            return Evaluation{.L = SampledSpectrum{spec_dim}, .pdf = 0.f};
+            return Evaluation{.L = SampledSpectrum{spec_dim}, .pdf = 0.f, .p = make_float3(0.f), .ng = make_float3(0.f)};
         }
     };
 

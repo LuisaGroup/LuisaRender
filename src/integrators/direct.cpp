@@ -97,14 +97,14 @@ protected:
 
             // hit light
             if (!pipeline().lights().empty()) {
-                $if(it->shape()->has_light()) {
+                $if(it->shape().has_light()) {
                     auto eval = light_sampler()->evaluate_hit(*it, ray->origin(), swl, time);
                     Li += cs.weight * eval.L;
                 };
             }
 
             // compute direct lighting
-            $if(!it->shape()->has_surface()) { $break; };
+            $if(!it->shape().has_surface()) { $break; };
 
             auto light_sample = LightSampler::Sample::zero(swl.dimension());
             auto occluded = def(false);
@@ -124,7 +124,7 @@ protected:
             }
 
             // evaluate material
-            auto surface_tag = it->shape()->surface_tag();
+            auto surface_tag = it->shape().surface_tag();
             auto u_lobe = sampler()->generate_1d();
             auto u_bsdf = def(make_float2());
             if (samples_surfaces) { u_bsdf = sampler()->generate_2d(); }
@@ -186,7 +186,7 @@ protected:
                     $else {
                         // hit light
                         if (!pipeline().lights().empty()) {
-                            $if(bsdf_it->shape()->has_light()) {
+                            $if(bsdf_it->shape().has_light()) {
                                 light_eval = light_sampler()->evaluate_hit(*bsdf_it, ray->origin(), swl, time);
                             };
                         }

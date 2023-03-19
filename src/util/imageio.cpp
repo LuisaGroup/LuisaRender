@@ -713,6 +713,8 @@ void save_image(std::filesystem::path path, const float *pixels, uint2 resolutio
 }
 
 void save_image(std::filesystem::path path, const uint8_t *pixels, uint2 resolution, uint components) noexcept {
+    LUISA_INFO("Saving image ({}x{}x{}) to '{}'.",
+               resolution.x, resolution.y, components, path.string());
     auto ext = path.extension().string();
     for (auto &c : ext) { c = static_cast<char>(std::tolower(c)); }
     if (ext != ".png" && ext != ".jpg" && ext != ".jpeg" &&

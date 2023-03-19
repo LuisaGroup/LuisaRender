@@ -2,6 +2,7 @@
 // Created by Mike on 2022/1/7.
 //
 
+#include <limits>
 #include <luisa-compute.h>
 #include <base/film.h>
 #include <base/pipeline.h>
@@ -16,10 +17,12 @@ class ColorFilm final : public Film {
 private:
     float _scale[3]{};
     float _clamp{};
+    bool _warn_nan{};
 
 public:
     ColorFilm(Scene *scene, const SceneNodeDesc *desc) noexcept
-        : Film{scene, desc} {
+        : Film{scene, desc},
+          _warn_nan{desc->property_bool_or_default("warn_nan", false)} {
         auto exposure = desc->property_float3_or_default(
             "exposure", lazy_construct([desc] {
                 return make_float3(desc->property_float_or_default(
@@ -32,6 +35,7 @@ public:
     }
     [[nodiscard]] auto scale() const noexcept { return make_float3(_scale[0], _scale[1], _scale[2]); }
     [[nodiscard]] auto clamp() const noexcept { return _clamp; }
+    [[nodiscard]] auto warn_nan() const noexcept { return _warn_nan; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
@@ -91,8 +95,8 @@ void ColorFilmInstance::download(CommandBuffer &command_buffer, float4 *framebuf
 
 void ColorFilmInstance::_accumulate(Expr<uint2> pixel, Expr<float3> rgb, Expr<float> effective_spp) const noexcept {
     _check_prepared();
+    auto pixel_id = pixel.y * node()->resolution().x + pixel.x;
     $if(!any(isnan(rgb) || isinf(rgb))) {
-        auto pixel_id = pixel.y * node()->resolution().x + pixel.x;
         auto threshold = node<ColorFilm>()->clamp() * max(effective_spp, 1.f);
         auto strength = max(max(max(rgb.x, rgb.y), rgb.z), 0.f);
         auto c = rgb * (threshold / max(strength, threshold));
@@ -100,6 +104,14 @@ void ColorFilmInstance::_accumulate(Expr<uint2> pixel, Expr<float3> rgb, Expr<fl
             _image.atomic(pixel_id * 4u + i).fetch_add(c[i]);
         }
         _image.atomic(pixel_id * 4u + 3u).fetch_add(effective_spp);
+    }
+    $else {
+        if (node<ColorFilm>()->warn_nan()) {
+            _image.write(pixel_id * 4u + 0u, std::numeric_limits<float>::infinity());
+            _image.write(pixel_id * 4u + 1u, 0.f);
+            _image.write(pixel_id * 4u + 2u, 0.f);
+            _image.write(pixel_id * 4u + 3u, 1.f);
+        }
     };
 }
 
@@ -125,7 +137,7 @@ Film::Accumulation ColorFilmInstance::read(Expr<uint2> pixel) const noexcept {
     auto c1 = as<float>(_image.read(i * 4u + 1u));
     auto c2 = as<float>(_image.read(i * 4u + 2u));
     auto n = _image.read(i * 4u + 3u);
-    auto inv_n = (1.f / max(cast<float>(n), 1.f));
+    auto inv_n = (1.f / max(cast<float>(n), 1e-6f));
     auto scale = inv_n * node<ColorFilm>()->scale();
     return {.average = scale * make_float3(c0, c1, c2), .sample_count = n};
 }

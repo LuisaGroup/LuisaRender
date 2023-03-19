@@ -71,7 +71,7 @@ public:
     [[nodiscard]] luisa::shared_ptr<Interaction> interaction(const Var<Ray> &ray, const Var<Hit> &hit) const noexcept;
     [[nodiscard]] luisa::shared_ptr<Interaction> interaction(Expr<uint> inst_id, Expr<uint> prim_id,
                                                              Expr<float3> bary, Expr<float3> wo) const noexcept;
-    [[nodiscard]] luisa::shared_ptr<Shape::Handle> instance(Expr<uint> index) const noexcept;
+    [[nodiscard]] Shape::Handle instance(Expr<uint> index) const noexcept;
     [[nodiscard]] Float4x4 instance_to_world(Expr<uint> index) const noexcept;
     [[nodiscard]] Var<Triangle> triangle(const Shape::Handle &instance, Expr<uint> index) const noexcept;
     [[nodiscard]] GeometryAttribute geometry_point(const Shape::Handle &instance, const Var<Triangle> &triangle,

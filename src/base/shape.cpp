@@ -64,7 +64,7 @@ uint4 Shape::Handle::encode(uint buffer_base, uint flags, uint surface_tag, uint
                       shadow_term_and_intersection_offset);
 }
 
-luisa::shared_ptr<Shape::Handle> Shape::Handle::decode(Expr<uint4> compressed) noexcept {
+Shape::Handle Shape::Handle::decode(Expr<uint4> compressed) noexcept {
     auto buffer_base_and_properties = compressed.x;
     auto surface_tag_and_light_tag = compressed.y;
     auto triangle_buffer_size = compressed.z;
@@ -81,10 +81,9 @@ luisa::shared_ptr<Shape::Handle> Shape::Handle::decode(Expr<uint4> compressed) n
     };
     auto shadow_terminator = decode_fixed_point(shadow_term_and_intersection_offset >> 16u);
     auto intersection_offset = decode_fixed_point(shadow_term_and_intersection_offset & 0xffffu);
-    Shape::Handle shape{buffer_base, flags, surface_tag, light_tag,
-                        triangle_buffer_size, shadow_terminator,
-                        clamp(intersection_offset * 255.f + 1.f, 1.f, 256.f)};
-    return luisa::make_shared<Shape::Handle>(std::move(shape));
+    return {buffer_base, flags, surface_tag, light_tag,
+            triangle_buffer_size, shadow_terminator,
+            clamp(intersection_offset * 255.f + 1.f, 1.f, 256.f)};
 }
 
 }// namespace luisa::render
