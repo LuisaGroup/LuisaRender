@@ -88,6 +88,20 @@ public:
         return {.tag = ite(is_env, LightSampler::selection_environment, tag),
                 .prob = ite(is_env, _env_prob, (1.f - _env_prob) / n)};
     }
+    [[nodiscard]] LightSampler::Selection select(
+        Expr<float> u,
+        const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        LUISA_ASSERT(pipeline().has_lighting(), "No lights in scene.");
+        auto n = static_cast<float>(pipeline().lights().size());
+        if (_env_prob == 1.f) { return {.tag = LightSampler::selection_environment, .prob = 1.f}; }
+        if (_env_prob == 0.f) { return {.tag = cast<uint>(clamp(u * n, 0.f, n - 1.f)), .prob = 1.f / n}; }
+        auto uu = (u - _env_prob) / (1.f - _env_prob);
+        auto tag = cast<uint>(clamp(uu * n, 0.f, n - 1.f));
+        auto is_env = u < _env_prob;
+        return {.tag = ite(is_env, LightSampler::selection_environment, tag),
+                .prob = ite(is_env, _env_prob, (1.f - _env_prob) / n)};
+    }
+
 
 private:
     [[nodiscard]] auto _sample_area(Expr<float3> p_from,
@@ -127,6 +141,24 @@ private:
                                                           Expr<float> time) const noexcept override {
         LUISA_ASSERT(pipeline().environment() != nullptr, "No environment in the scene.");
         return pipeline().environment()->sample(swl, time, u);
+    }
+    //sample single light for L_emit.
+    [[nodiscard]] LightSampler::Sample _sample_light_le(
+                                              Expr<uint> tag, Expr<float2> u_light, Expr<float2> u_direction,
+                                              const SampledWavelengths &swl,
+                                              Expr<float> time) const noexcept override {
+        LUISA_ASSERT(!pipeline().lights().empty(), "No lights in the scene.");
+        auto handle = pipeline().buffer<Light::Handle>(_light_buffer_id).read(tag);
+        auto light_inst = pipeline().geometry()->instance(handle.instance_id);
+        auto sp=Light::Sample::zero(swl.dimension());
+        Float3 dir = make_float3();
+        pipeline().lights().dispatch(light_inst.light_tag(), [&](auto light) noexcept {
+            auto closure = light->closure(swl, time);
+            auto [sp_tp,dir_tp] = closure->sample_le(handle.instance_id, u_light, u_direction);
+            sp = sp_tp;
+            dir = dir_tp;
+        });
+        return {.eval = sp.eval, .shadow_ray = make_ray(sp.p,dir)};
     }
 };
 

@@ -4,6 +4,7 @@
 
 #include <base/light_sampler.h>
 #include <base/pipeline.h>
+#include <util/sampling.h>
 
 namespace luisa::render {
 
@@ -31,6 +32,27 @@ LightSampler::Sample LightSampler::Instance::sample_selection(
     }
     return sample;
 }
+LightSampler::Sample LightSampler::Instance::sample_selection_le(
+    const Selection &sel, Expr<float2> u_light, Expr<float2> u_direction, 
+    const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    auto sample = Sample::zero(swl.dimension());
+    if (!pipeline().has_lighting()) { return sample; }
+    if (_pipeline.environment() != nullptr) {// possibly environment lighting
+        if (_pipeline.lights().empty()) {    // no lights, just environment lighting
+            sample = sample_environment_le(sel, u_light,u_direction, swl, time);
+        } else {// environment lighting and lights
+            $if(sel.tag == selection_environment) {
+                sample = sample_environment_le(sel, u_light, u_direction, swl, time);
+            }
+            $else {
+                sample = sample_light_le(sel, u_light, u_direction, swl, time);
+            };
+        }
+    } else {// no environment lighting, just lights
+        sample = sample_light_le(sel, u_light, u_direction, swl, time);
+    }
+    return sample;
+}
 
 LightSampler::Sample LightSampler::Instance::sample(
     const Interaction &it_from, Expr<float> u_sel, Expr<float2> u_light,
@@ -38,6 +60,13 @@ LightSampler::Sample LightSampler::Instance::sample(
     if (!_pipeline.has_lighting()) { return Sample::zero(swl.dimension()); }
     auto sel = select(it_from, u_sel, swl, time);
     return sample_selection(it_from, sel, u_light, swl, time);
+}
+LightSampler::Sample LightSampler::Instance::sample_le(
+    Expr<float> u_sel, Expr<float2> u_light, Expr<float2> u_direction,
+    const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    if (!_pipeline.has_lighting()) { return Sample::zero(swl.dimension()); }
+    auto sel = select(u_sel, swl, time);
+    return sample_selection_le(sel, u_light, u_direction, swl, time);
 }
 
 LightSampler::Sample LightSampler::Instance::sample_light(
@@ -54,6 +83,26 @@ LightSampler::Sample LightSampler::Instance::sample_environment(
     auto s = _sample_environment(u, swl, time);
     s.eval.pdf *= sel.prob;
     return Sample::from_environment(s, it_from);
+}
+LightSampler::Sample LightSampler::Instance::sample_light_le(
+    const LightSampler::Selection &sel, Expr<float2> u_light, Expr<float2> u_direction,
+    const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    auto s = _sample_light_le(sel.tag, u_light,u_direction, swl, time);
+    s.eval.pdf *= sel.prob;
+    return s;
+}
+
+LightSampler::Sample LightSampler::Instance::sample_environment_le(
+    const LightSampler::Selection &sel, Expr<float2> u_light, Expr<float2>u_direction,
+    const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    auto s = _sample_environment(u_direction, swl, time);
+    s.eval.pdf *= sel.prob;
+    auto cd = sample_uniform_disk_concentric(u_light);
+    const Float WorldR = 1000.0f;
+    Frame fr = Frame::make(s.wi);
+    auto origin =WorldR * (fr.local_to_world(make_float3(cd.x,cd.y,-1.0f)));
+    s.eval.pdf *= 1 / (pi * WorldR * WorldR);
+    return Sample{.eval = s.eval, .shadow_ray = make_ray(origin,s.wi)};
 }
 
 LightSampler::Sample LightSampler::Sample::zero(uint spec_dim) noexcept {

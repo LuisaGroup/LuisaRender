@@ -81,6 +81,18 @@ private:
                                  .p = it_light.p(),
                                  .ng = it_light.ng()};
     }
+    [[nodiscard]] auto _evaluate_pt(const Interaction &it_light) const noexcept {
+        using namespace luisa::compute;
+        auto light = instance<DiffuseLightInstance>();
+        auto &&pipeline = light->pipeline();
+        auto pdf_triangle = pipeline.buffer<float>(it_light.shape().pdf_buffer_id()).read(it_light.triangle_id());
+        auto pdf_area = pdf_triangle / it_light.triangle_area();
+        auto L = light->texture()->evaluate_illuminant_spectrum(it_light, swl(), time()).value *
+                 light->node<DiffuseLight>()->scale();
+        auto two_sided = light->node<DiffuseLight>()->two_sided();
+        return Light::Evaluation{.L = L,
+                                 .pdf = pdf_area};
+    }
 
 public:
     [[nodiscard]] Light::Evaluation evaluate(const Interaction &it_light,
@@ -107,6 +119,50 @@ public:
                              dot(p_from - attrib.p, attrib.n) < 0.f};
         DiffuseLightClosure closure{light, swl(), time()};
         return {.eval = closure._evaluate(it_light, p_from), .p = attrib.p};
+    }
+    [[nodiscard]] std::pair<Light::Sample,Float3> sample_le(Expr<uint> light_inst_id,
+                                       Expr<float2> u_light,
+                                       Expr<float2> u_direction) const noexcept override {
+        auto light = instance<DiffuseLightInstance>();
+        auto &&pipeline = light->pipeline();
+        auto light_inst = pipeline.geometry()->instance(light_inst_id);
+        auto light_to_world = pipeline.geometry()->instance_to_world(light_inst_id);
+        auto alias_table_buffer_id = light_inst.alias_table_buffer_id();
+        auto [triangle_id, ux] = sample_alias_table(
+            pipeline.buffer<AliasEntry>(alias_table_buffer_id),
+            light_inst.triangle_count(), u_light.x);
+        auto triangle = pipeline.geometry()->triangle(light_inst, triangle_id);
+        auto uvw = sample_uniform_triangle(make_float2(ux, u_light.y));
+        auto attrib = pipeline.geometry()->geometry_point(light_inst, triangle, uvw, light_to_world);
+        auto two_sided = light->node<DiffuseLight>()->two_sided();
+        Float3 we = make_float3();
+        if (two_sided) {
+            $if(u_direction.x > 0.5f) {
+                we = sample_cosine_hemisphere(make_float2(u_direction.x * 2.f - 1.f, u_direction.y));
+            }
+            $else {
+                we = sample_cosine_hemisphere(make_float2(u_direction.x * 2.f, u_direction.y));
+                we.z *= -1;
+            };
+        } else {
+            we = sample_cosine_hemisphere(u_direction);
+        }
+        Interaction it_light{std::move(light_inst), light_inst_id,
+                             triangle_id, attrib.area, attrib.p, attrib.n,
+                             true};
+        auto we_world = it_light.shading().local_to_world(we);
+        DiffuseLightClosure closure{light, swl(), time()};
+        auto eval = closure._evaluate_pt(it_light);
+        //if (two_sided) {
+        //    eval.pdf *= cosine_hemisphere_pdf(we.z)*0.5f;
+        //} else {
+        //    eval.pdf *= cosine_hemisphere_pdf(we.z);
+        //}
+        //cancel out the cos term from outside le->beta
+        if (two_sided) {
+            eval.pdf *= 0.5f;
+        }
+        return std::make_pair(Light::Sample{.eval = eval, .p = attrib.p},we_world);
     }
 };
 
