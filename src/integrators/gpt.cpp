@@ -1048,7 +1048,7 @@ void GradientPathTracingInstance::_render_one_camera(
                 auto key = i % 2 == 0 ? "gradient_x" : "gradient_y";
                 auto sign = i < 2 ? 1.f : -1.f;
                 $if(all(current_pixel >= 0u && current_pixel < resolution)) {
-                    auto L = pipeline().spectrum()->srgb(eval.swl, 2.f * sign * eval.gradients[i]);
+                    auto L = pipeline().spectrum()->srgb(eval.swl, sign * (2.f * eval.gradients[i] - eval.very_direct));
                     image_buffers.at(key)->accumulate(current_pixel, shutter_weight * L, 1.f);
                 };
             }
