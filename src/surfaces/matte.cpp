@@ -47,7 +47,7 @@ public:
 public:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-        Expr<float> eta_i, Expr<float> time) const noexcept override;
+        Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> MatteSurface::_build(
@@ -100,7 +100,7 @@ private:
 
 luisa::unique_ptr<Surface::Closure> MatteInstance::closure(
     luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-    Expr<float> eta_i, Expr<float> time) const noexcept {
+    Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept {
     auto [Kd, _] = _kd ? _kd->evaluate_albedo_spectrum(*it, swl, time) :
                          Spectrum::Decode::one(swl.dimension());
     auto sigma = _sigma && !_sigma->node()->is_black() ?

@@ -55,7 +55,7 @@ public:
             LUISA_WARNING_WITH_LOCATION("No lights in scene.");
             return eval;
         }
-        pipeline().lights().dispatch(it.shape()->light_tag(), [&](auto light) noexcept {
+        pipeline().lights().dispatch(it.shape().light_tag(), [&](auto light) noexcept {
             auto closure = light->closure(swl, time);
             eval = closure->evaluate(it, p_from);
         });
@@ -88,6 +88,20 @@ public:
         return {.tag = ite(is_env, LightSampler::selection_environment, tag),
                 .prob = ite(is_env, _env_prob, (1.f - _env_prob) / n)};
     }
+    [[nodiscard]] LightSampler::Selection select(
+        Expr<float> u,
+        const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        LUISA_ASSERT(pipeline().has_lighting(), "No lights in scene.");
+        auto n = static_cast<float>(pipeline().lights().size());
+        if (_env_prob == 1.f) { return {.tag = LightSampler::selection_environment, .prob = 1.f}; }
+        if (_env_prob == 0.f) { return {.tag = cast<uint>(clamp(u * n, 0.f, n - 1.f)), .prob = 1.f / n}; }
+        auto uu = (u - _env_prob) / (1.f - _env_prob);
+        auto tag = cast<uint>(clamp(uu * n, 0.f, n - 1.f));
+        auto is_env = u < _env_prob;
+        return {.tag = ite(is_env, LightSampler::selection_environment, tag),
+                .prob = ite(is_env, _env_prob, (1.f - _env_prob) / n)};
+    }
+
 
 private:
     [[nodiscard]] auto _sample_area(Expr<float3> p_from,
@@ -96,13 +110,13 @@ private:
         auto handle = pipeline().buffer<Light::Handle>(_light_buffer_id).read(tag);
         auto light_inst = pipeline().geometry()->instance(handle.instance_id);
         auto light_to_world = pipeline().geometry()->instance_to_world(handle.instance_id);
-        auto alias_table_buffer_id = light_inst->alias_table_buffer_id();
+        auto alias_table_buffer_id = light_inst.alias_table_buffer_id();
         auto [triangle_id, ux] = sample_alias_table(
             pipeline().buffer<AliasEntry>(alias_table_buffer_id),
-            light_inst->triangle_count(), u_in.x);
-        auto triangle = pipeline().geometry()->triangle(*light_inst, triangle_id);
+            light_inst.triangle_count(), u_in.x);
+        auto triangle = pipeline().geometry()->triangle(light_inst, triangle_id);
         auto uvw = sample_uniform_triangle(make_float2(ux, u_in.y));
-        auto attrib = pipeline().geometry()->shading_point(*light_inst, triangle, uvw, light_to_world);
+        auto attrib = pipeline().geometry()->shading_point(light_inst, triangle, uvw, light_to_world);
         return luisa::make_shared<Interaction>(std::move(light_inst), handle.instance_id,
                                                triangle_id, std::move(attrib),
                                                dot(attrib.g.n, p_from - attrib.g.p) < 0.f);
@@ -115,7 +129,7 @@ private:
         LUISA_ASSERT(!pipeline().lights().empty(), "No lights in the scene.");
         auto it = _sample_area(it_from.p(), tag, u);
         auto eval = Light::Evaluation::zero(swl.dimension());
-        pipeline().lights().dispatch(it->shape()->light_tag(), [&](auto light) noexcept {
+        pipeline().lights().dispatch(it->shape().light_tag(), [&](auto light) noexcept {
             auto closure = light->closure(swl, time);
             eval = closure->evaluate(*it, it_from.p_shading());
         });
@@ -127,6 +141,24 @@ private:
                                                           Expr<float> time) const noexcept override {
         LUISA_ASSERT(pipeline().environment() != nullptr, "No environment in the scene.");
         return pipeline().environment()->sample(swl, time, u);
+    }
+    //sample single light for L_emit.
+    [[nodiscard]] LightSampler::Sample _sample_light_le(
+                                              Expr<uint> tag, Expr<float2> u_light, Expr<float2> u_direction,
+                                              const SampledWavelengths &swl,
+                                              Expr<float> time) const noexcept override {
+        LUISA_ASSERT(!pipeline().lights().empty(), "No lights in the scene.");
+        auto handle = pipeline().buffer<Light::Handle>(_light_buffer_id).read(tag);
+        auto light_inst = pipeline().geometry()->instance(handle.instance_id);
+        auto sp=Light::Sample::zero(swl.dimension());
+        Float3 dir = make_float3();
+        pipeline().lights().dispatch(light_inst.light_tag(), [&](auto light) noexcept {
+            auto closure = light->closure(swl, time);
+            auto [sp_tp,dir_tp] = closure->sample_le(handle.instance_id, u_light, u_direction);
+            sp = sp_tp;
+            dir = dir_tp;
+        });
+        return {.eval = sp.eval, .shadow_ray = make_ray(sp.p,dir)};
     }
 };
 

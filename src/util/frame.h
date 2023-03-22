@@ -8,8 +8,8 @@
 
 namespace luisa::render {
 
-using luisa::compute::Expr;
 using luisa::compute::Bool;
+using luisa::compute::Expr;
 using luisa::compute::Float;
 using luisa::compute::Float3;
 
@@ -40,10 +40,10 @@ using compute::def;
 using compute::dot;
 using compute::ite;
 using compute::max;
+using compute::saturate;
 using compute::sign;
 using compute::sin;
 using compute::sqrt;
-using compute::saturate;
 
 [[nodiscard]] inline auto sqr(auto x) noexcept { return x * x; }
 [[nodiscard]] inline auto one_minus_sqr(auto x) noexcept { return 1.f - sqr(x); }
@@ -69,5 +69,8 @@ using compute::saturate;
 [[nodiscard]] inline auto cos2_phi(Expr<float3> w) { return sqr(cos_phi(w)); }
 [[nodiscard]] inline auto sin2_phi(Expr<float3> w) { return sqr(sin_phi(w)); }
 [[nodiscard]] inline auto same_hemisphere(Expr<float3> w, Expr<float3> wp) noexcept { return w.z * wp.z > 0.0f; }
+
+// clamp the shading normal `ns` so that `w` and its reflection will go to the same hemisphere w.r.t. `ng`
+[[nodiscard]] Float3 clamp_shading_normal(Expr<float3> ns, Expr<float3> ng, Expr<float3> w) noexcept;
 
 }// namespace luisa::render

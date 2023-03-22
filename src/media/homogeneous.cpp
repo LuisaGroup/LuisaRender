@@ -25,7 +25,7 @@ public:
             : _seg{RayMajorantSegment{t_min, t_max, sigma_maj, false}}, _called(def(false)) {}
 
         [[nodiscard]] RayMajorantSegment next() noexcept override {
-            RayMajorantSegment seg = RayMajorantSegment::one(0u);
+            RayMajorantSegment seg = RayMajorantSegment::one(_seg.sigma_maj.dimension());
             $if(!_called){
                 seg = _seg;
                 _called = true;

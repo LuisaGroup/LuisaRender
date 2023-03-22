@@ -52,7 +52,7 @@ public:
 public:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-        Expr<float> eta_i, Expr<float> time) const noexcept override;
+        Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> MixSurface::_build(
@@ -150,10 +150,10 @@ private:
 
 luisa::unique_ptr<Surface::Closure> MixSurfaceInstance::closure(
     luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-    Expr<float> eta_i, Expr<float> time) const noexcept {
+    Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept {
     auto ratio = _ratio == nullptr ? 0.5f : clamp(_ratio->evaluate(*it, swl, time).x, 0.f, 1.f);
-    auto a = _a->closure(it, swl, eta_i, time);
-    auto b = _b->closure(it, swl, eta_i, time);
+    auto a = _a->closure(it, swl, wo, eta_i, time);
+    auto b = _b->closure(it, swl, wo, eta_i, time);
     return luisa::make_unique<MixSurfaceClosure>(
         this, std::move(it), swl, time, ratio, std::move(a), std::move(b));
 }

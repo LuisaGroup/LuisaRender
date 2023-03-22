@@ -100,6 +100,9 @@ void ProgressiveIntegrator::Instance::_render_one_camera(
         for (auto i = 0u; i < s.spp; i++) {
             command_buffer << render(sample_id++, s.point.time, s.point.weight)
                                   .dispatch(resolution);
+            if (auto &&p = pipeline().printer(); !p.empty()) {
+                command_buffer << p.retrieve();
+            }
             auto dispatches_per_commit =
                 _display && !_display->should_close() ?
                     node<ProgressiveIntegrator>()->display_interval() :

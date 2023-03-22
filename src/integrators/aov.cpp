@@ -254,6 +254,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
         $for(depth, node<AuxiliaryBufferPathTracing>()->max_depth()) {
 
             // trace
+            auto wo = -ray->direction();
             auto it = pipeline().geometry()->intersect(ray);
 
             $if(depth == 0 & it->valid()) {
@@ -264,9 +265,9 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                 auto p_ndc = make_float3((camera_sample.pixel / make_float2(resolution) * 2.f - 1.f) * make_float2(1.f, -1.f),
                                          depth / (ray->t_max() - ray->t_min()));
                 aux_buffers.at("ndc")->accumulate(dispatch_id().xy(), make_float4(p_ndc, 1.f));
-                pipeline().surfaces().dispatch(it->shape()->surface_tag(), [&](auto surface) noexcept {
+                pipeline().surfaces().dispatch(it->shape().surface_tag(), [&](auto surface) noexcept {
                     // create closure
-                    auto closure = surface->closure(it, swl, 1.f, time);
+                    auto closure = surface->closure(it, swl, wo, 1.f, time);
                     auto albedo = closure->albedo();
                     auto roughness = closure->roughness();
                     aux_buffers.at("albedo")->accumulate(dispatch_id().xy(), make_float4(spectrum->srgb(swl, albedo), 1.f));
@@ -288,7 +289,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
 
             // hit light
             if (!pipeline().lights().empty()) {
-                $if(it->shape()->has_light()) {
+                $if(it->shape().has_light()) {
                     auto eval = light_sampler()->evaluate_hit(
                         *it, ray->origin(), swl, time);
                     Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
@@ -298,7 +299,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                 };
             }
 
-            $if(!it->shape()->has_surface()) { $break; };
+            $if(!it->shape().has_surface()) { $break; };
 
             // sample one light
             auto u_light_selection = sampler()->generate_1d();
@@ -310,14 +311,15 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
             auto occluded = pipeline().geometry()->intersect_any(light_sample.shadow_ray);
 
             // evaluate material
-            auto surface_tag = it->shape()->surface_tag();
+            auto surface_tag = it->shape().surface_tag();
             auto u_lobe = sampler()->generate_1d();
             auto u_bsdf = sampler()->generate_2d();
             auto eta_scale = def(1.f);
 
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
+
                 // create closure
-                auto closure = surface->closure(it, swl, 1.f, time);
+                auto closure = surface->closure(it, swl, wo, 1.f, time);
                 if (auto dispersive = closure->is_dispersive()) {
                     $if(*dispersive) { swl.terminate_secondary(); };
                 }
@@ -335,7 +337,6 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                     pdf_bsdf = 1e16f;
                 }
                 $else {
-                    auto wo = -ray->direction();
 
                     // direct lighting
                     $if(light_sample.eval.pdf > 0.0f & !occluded) {
@@ -369,7 +370,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
             });
 
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
-                auto closure = surface->closure(it, swl, 1.f, time);
+                auto closure = surface->closure(it, swl, wo, 1.f, time);
                 specular_bounce = false;
                 $if((closure->roughness().x < 0.05f) & (closure->roughness().y < 0.05f)) {
                     specular_bounce = true;

@@ -63,6 +63,7 @@ protected:
         $for(depth, node<MegakernelPathTracing>()->max_depth()) {
 
             // trace
+            auto wo = -ray->direction();
             auto it = pipeline().geometry()->intersect(ray);
 
             // miss
@@ -76,13 +77,13 @@ protected:
 
             // hit light
             if (!pipeline().lights().empty()) {
-                $if(it->shape()->has_light()) {
+                $if(it->shape().has_light()) {
                     auto eval = light_sampler()->evaluate_hit(*it, ray->origin(), swl, time);
                     Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
                 };
             }
 
-            $if(!it->shape()->has_surface()) { $break; };
+            $if(!it->shape().has_surface()) { $break; };
 
             // generate uniform samples
             auto u_light_selection = sampler()->generate_1d();
@@ -101,11 +102,11 @@ protected:
             auto occluded = pipeline().geometry()->intersect_any(light_sample.shadow_ray);
 
             // evaluate material
-            auto surface_tag = it->shape()->surface_tag();
+            auto surface_tag = it->shape().surface_tag();
             auto eta_scale = def(1.f);
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
                 // create closure
-                auto closure = surface->closure(it, swl, 1.f, time);
+                auto closure = surface->closure(it, swl, wo, 1.f, time);
 
                 // apply opacity map
                 auto alpha_skip = def(false);
@@ -124,7 +125,6 @@ protected:
                         $if(*dispersive) { swl.terminate_secondary(); };
                     }
                     // direct lighting
-                    auto wo = -ray->direction();
                     $if(light_sample.eval.pdf > 0.0f & !occluded) {
                         auto wi = light_sample.shadow_ray->direction();
                         auto eval = closure->evaluate(wo, wi);

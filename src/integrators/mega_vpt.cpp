@@ -89,11 +89,11 @@ protected:
         auto ray = camera_ray;
         $while(true) {
             auto it = pipeline().geometry()->intersect(ray);
-            $if((!it->valid()) | (!it->shape()->has_surface())) { $break; };
+            $if((!it->valid()) | (!it->shape().has_surface())) { $break; };
 
-            $if(it->shape()->has_medium()) {
-                auto surface_tag = it->shape()->surface_tag();
-                auto medium_tag = it->shape()->medium_tag();
+            $if(it->shape().has_medium()) {
+                auto surface_tag = it->shape().surface_tag();
+                auto medium_tag = it->shape().medium_tag();
 
                 auto medium_info = def<MediumInfo>();
                 medium_info.medium_tag = medium_tag;
@@ -133,7 +133,7 @@ protected:
                 });
             };
             $if(TEST_COND) {
-                pipeline().printer().verbose_with_location("it->shape()->has_medium()={}", it->shape()->has_medium());
+                pipeline().printer().verbose_with_location("it->shape().has_medium()={}", it->shape().has_medium());
                 pipeline().printer().verbose_with_location("medium tracker size={}", medium_tracker.size());
                 pipeline().printer().verbose_with_location("it->p()=({}, {}, {})", it->p().x, it->p().y, it->p().z);
                 pipeline().printer().verbose("");
@@ -157,7 +157,7 @@ protected:
 
             // trace
             auto it = pipeline().geometry()->intersect(ray);
-            auto has_medium = it->shape()->has_medium();
+            auto has_medium = it->shape().has_medium();
 
             // sample the participating medium
             $if(!medium_tracker.vacuum()) {
@@ -237,31 +237,31 @@ protected:
                                             beta *= T_maj * closure->sigma_s() / pdf;
                                             r_u *= T_maj * closure->sigma_s() / pdf;
 
-                                            $if(beta.any(non_zero) & r_u.any(non_zero)) {
-//                                                // TODO
-//                                                // Sample direct lighting at volume scattering event
-//                                                MediumInteraction intr(p, closure->ray()->direction(), closure->time(), ray.medium,
-//                                                                       closure->phase_function());
-//                                                Li += SampleLd(intr, nullptr, lambda, sampler, beta, r_u);
-//
-//                                                // Sample new direction at real scattering event
-//                                                Float2 u = sampler()->generate_2d();
-//                                                luisa::optional<PhaseFunction::PhaseFunctionSample> ps =
-//                                                    intr.phase_function().sample_p(closure->ray()->direction(), u);
-//                                                $if(!ps | ps->pdf == 0.f) {
-//                                                    terminated = true;
-//                                                }
-//                                                $else {
-//                                                    // Update ray path state for indirect volume scattering
-//                                                    beta *= ps->p / ps->pdf;
-//                                                    r_l = r_u / ps->pdf;
-//                                                    prevIntrContext = LightSampleContext(intr);
-//                                                    scattered = true;
-//                                                    ray.o = p;
-//                                                    ray.d = ps->wi;
-//                                                    specularBounce = false;
-//                                                    anyNonSpecularBounces = true;
-//                                                };
+                                            $if(beta.any(non_zero) & r_u.any(non_zero)){
+                                                //                                                // TODO
+                                                //                                                // Sample direct lighting at volume scattering event
+                                                //                                                MediumInteraction intr(p, closure->ray()->direction(), closure->time(), ray.medium,
+                                                //                                                                       closure->phase_function());
+                                                //                                                Li += SampleLd(intr, nullptr, lambda, sampler, beta, r_u);
+                                                //
+                                                //                                                // Sample new direction at real scattering event
+                                                //                                                Float2 u = sampler()->generate_2d();
+                                                //                                                luisa::optional<PhaseFunction::PhaseFunctionSample> ps =
+                                                //                                                    intr.phase_function().sample_p(closure->ray()->direction(), u);
+                                                //                                                $if(!ps | ps->pdf == 0.f) {
+                                                //                                                    terminated = true;
+                                                //                                                }
+                                                //                                                $else {
+                                                //                                                    // Update ray path state for indirect volume scattering
+                                                //                                                    beta *= ps->p / ps->pdf;
+                                                //                                                    r_l = r_u / ps->pdf;
+                                                //                                                    prevIntrContext = LightSampleContext(intr);
+                                                //                                                    scattered = true;
+                                                //                                                    ray.o = p;
+                                                //                                                    ray.d = ps->wi;
+                                                //                                                    specularBounce = false;
+                                                //                                                    anyNonSpecularBounces = true;
+                                                //                                                };
                                             };
                                             ans = false;
                                         };
@@ -314,7 +314,7 @@ protected:
 
             // hit light
             if (!pipeline().lights().empty()) {
-                $if(it->shape()->has_light()) {
+                $if(it->shape().has_light()) {
                     auto eval = light_sampler()->evaluate_hit(*it, ray->origin(), swl, time);
                     // TODO: depth = 0
                     r_l *= eval.pdf;
@@ -322,7 +322,7 @@ protected:
                 };
             }
 
-            $if(!it->shape()->has_surface()) { $break; };
+            $if(!it->shape().has_surface()) { $break; };
 
             // TODO
 
@@ -339,7 +339,7 @@ protected:
             // trace shadow ray
             auto occluded = pipeline().geometry()->intersect_any(light_sample.shadow_ray);
 
-            auto medium_tag = it->shape()->medium_tag();
+            auto medium_tag = it->shape().medium_tag();
             auto medium_priority = def(0u);
             auto medium_info = def<MediumInfo>();
             medium_info.medium_tag = medium_tag;
@@ -359,10 +359,11 @@ protected:
             };
 
             // evaluate material
-            auto surface_tag = it->shape()->surface_tag();
+            auto surface_tag = it->shape().surface_tag();
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
                 // create closure
-                auto closure = surface->closure(it, swl, eta, time);
+                auto wo = -ray->direction();
+                auto closure = surface->closure(it, swl, wo, eta, time);
 
                 // apply opacity map
                 auto alpha_skip = def(false);
@@ -381,7 +382,6 @@ protected:
                         $if(*dispersive) { swl.terminate_secondary(); };
                     }
                     // direct lighting
-                    auto wo = -ray->direction();
                     $if(light_sample.eval.pdf > 0.0f & !occluded) {
                         auto wi = light_sample.shadow_ray->direction();
                         auto eval = closure->evaluate(wo, wi);

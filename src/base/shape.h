@@ -161,11 +161,11 @@ private:
           _intersection_offset{intersection_offset} {}
 
 public:
-    [[nodiscard]] static uint4 encode(
-        uint buffer_base, uint flags,
-        uint surface_tag, uint light_tag, uint medium_tag,
-        uint tri_count, float shadow_terminator, float intersection_offset) noexcept;
-    [[nodiscard]] static luisa::shared_ptr<Shape::Handle> decode(Expr<uint4> compressed) noexcept;
+    Handle() noexcept = default;
+    [[nodiscard]] static uint4 encode(uint buffer_base, uint flags, uint medium_tag,
+                                      uint surface_tag, uint light_tag, uint tri_count,
+                                      float shadow_terminator, float intersection_offset) noexcept;
+    [[nodiscard]] static Shape::Handle decode(Expr<uint4> compressed) noexcept;
 
 public:
     [[nodiscard]] auto geometry_buffer_base() const noexcept { return _buffer_base; }

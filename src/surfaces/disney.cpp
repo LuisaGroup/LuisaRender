@@ -132,7 +132,7 @@ public:
 public:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-        Expr<float> eta, Expr<float> time) const noexcept override;
+        Expr<float3> wo, Expr<float> eta, Expr<float> time) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> DisneySurface::_build(
@@ -936,7 +936,7 @@ public:
 
 luisa::unique_ptr<Surface::Closure> DisneySurfaceInstance::closure(
     luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-    Expr<float> eta_i, Expr<float> time) const noexcept {
+    Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept {
     return luisa::make_unique<DisneySurfaceClosure>(
         this, std::move(it), swl, eta_i, time,
         _color, _metallic, _eta, _roughness, _specular_tint,

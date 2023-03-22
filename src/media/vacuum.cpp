@@ -13,9 +13,13 @@ class VacuumMedium : public Medium {
 
 public:
     class VacuumMajorantIterator : public RayMajorantIterator {
+    private:
+        uint _dim;
+
     public:
+        explicit VacuumMajorantIterator(uint dim) noexcept : _dim(dim) {}
         [[nodiscard]] RayMajorantSegment next() noexcept override {
-            return RayMajorantSegment::one(0u);
+            return RayMajorantSegment::one(_dim);
         }
     };
 
@@ -27,7 +31,7 @@ public:
             return {swl().dimension(), 1.0f};
         }
         [[nodiscard]] unique_ptr<RayMajorantIterator> sample_iterator(Expr<float> t_max) const noexcept override {
-            return luisa::make_unique<VacuumMajorantIterator>();
+            return luisa::make_unique<VacuumMajorantIterator>(swl().dimension());
         }
 
     public:

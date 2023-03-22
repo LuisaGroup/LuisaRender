@@ -155,12 +155,8 @@ public:
                 $if(seg.sigma_maj[0u] == 0.f) {
                     Float dt = seg.t_max - seg.t_min;
                     // Handle infinite _dt_ for ray majorant segment
-                    $if(isinf(dt)) {
-                        dt = std::numeric_limits<float>::max();
-                    };
+                    dt = ite(isinf(dt), std::numeric_limits<float>::max(), dt);
 
-                    LUISA_INFO_WITH_LOCATION("seg = (t_min={}, t_max={}, dimension={}, empty={})",
-                                             seg.t_min, seg.t_max, seg.sigma_maj.dimension(), seg.empty);
                     T_maj *= exp(-dt * seg.sigma_maj);
                     $continue;
                 };
@@ -189,10 +185,8 @@ public:
                     $else {
                         // Handle sample past end of majorant segment
                         Float dt = seg.t_max - t_min;
-                        // Handle infinite _dt_ for ray majorant segment
-                        $if(isinf(dt)) {
-                            dt = std::numeric_limits<float>::max();
-                        };
+                        // Handle infinite dt for ray majorant segment
+                        dt = ite(isinf(dt), std::numeric_limits<float>::max(), dt);
 
                         T_maj *= exp(-dt * seg.sigma_maj);
                         $break;

@@ -88,7 +88,7 @@ public:
 public:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-        Expr<float> eta_i, Expr<float> time) const noexcept override;
+        Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> PlasticSurface::_build(
@@ -204,7 +204,7 @@ private:
 
 luisa::unique_ptr<Surface::Closure> PlasticInstance::closure(
     luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-    Expr<float> eta_i, Expr<float> time) const noexcept {
+    Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept {
 
     auto roughness = def(make_float2(0.f));
     if (_roughness != nullptr) {

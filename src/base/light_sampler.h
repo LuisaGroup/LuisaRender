@@ -51,6 +51,10 @@ public:
         [[nodiscard]] virtual Environment::Sample _sample_environment(Expr<float2> u,
                                                                       const SampledWavelengths &swl,
                                                                       Expr<float> time) const noexcept = 0;
+        [[nodiscard]] virtual LightSampler::Sample _sample_light_le(
+                                                          Expr<uint> tag, Expr<float2> u_light, Expr<float2> u_direction,
+                                                          const SampledWavelengths &swl,
+                                                          Expr<float> time) const noexcept = 0;
 
     public:
         explicit Instance(const Pipeline &pipeline, const LightSampler *light_dist) noexcept
@@ -69,17 +73,31 @@ public:
         [[nodiscard]] virtual Selection select(
             const Interaction &it_from, Expr<float> u,
             const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
+        [[nodiscard]] virtual Selection select(
+            Expr<float> u, const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
         [[nodiscard]] Sample sample_light(
             const Interaction &it_from, const Selection &sel, Expr<float2> u,
             const SampledWavelengths &swl, Expr<float> time) const noexcept;
         [[nodiscard]] Sample sample_environment(
             const Interaction &it_from, const Selection &sel, Expr<float2> u,
             const SampledWavelengths &swl, Expr<float> time) const noexcept;
+        [[nodiscard]] Sample sample_light_le(
+            const Selection &sel, Expr<float2> u_light, Expr<float2> u_direction,
+            const SampledWavelengths &swl, Expr<float> time) const noexcept;
+        [[nodiscard]] Sample sample_environment_le(
+            const Selection &sel, Expr<float2> u_light, Expr<float2> u_direction,
+            const SampledWavelengths &swl, Expr<float> time) const noexcept;
         [[nodiscard]] virtual Sample sample_selection(
             const Interaction &it_from, const Selection &sel, Expr<float2> u,
             const SampledWavelengths &swl, Expr<float> time) const noexcept;
+        [[nodiscard]] virtual Sample sample_selection_le(
+            const Selection &sel, Expr<float2> u_light, Expr<float2> u_direction,
+            const SampledWavelengths &swl, Expr<float> time) const noexcept;
         [[nodiscard]] virtual Sample sample(
             const Interaction &it_from, Expr<float> u_sel, Expr<float2> u_light,
+            const SampledWavelengths &swl, Expr<float> time) const noexcept;
+        [[nodiscard]] virtual Sample sample_le(
+            Expr<float> u_sel, Expr<float2> u_light, Expr<float2> u_direction,
             const SampledWavelengths &swl, Expr<float> time) const noexcept;
     };
 
