@@ -76,8 +76,9 @@ private:
                  light->node<DiffuseLight>()->scale();
         auto pdf = distance_squared(it_light.p(), p_from) * pdf_area * (1.0f / cos_wo);
         auto two_sided = light->node<DiffuseLight>()->two_sided();
-        return Light::Evaluation{.L = ite(!two_sided & it_light.back_facing(), 0.f, L),
-                                 .pdf = ite(!two_sided & it_light.back_facing(), 0.0f, pdf),
+        auto invalid = abs(cos_wo) < 1e-6f | (!two_sided & it_light.back_facing());
+        return Light::Evaluation{.L = ite(invalid, 0.f, L),
+                                 .pdf = ite(invalid, 0.0f, pdf),
                                  .p = it_light.p(),
                                  .ng = it_light.ng()};
     }

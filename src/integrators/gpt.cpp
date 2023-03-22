@@ -174,29 +174,27 @@ class ImageBuffer {
 
 private:
     Pipeline &_pipeline;
-    Image<float> _image;
+    Buffer<float> _image;
+    uint2 _resolution;
 
 private:
-    static constexpr auto clear_shader_name = luisa::string_view{"__image_buffer_clear_shader"};
+    static constexpr auto clear_shader_name = luisa::string_view{"__gpt_image_buffer_clear_shader"};
 
 public:
-    ImageBuffer(Pipeline &pipeline, uint2 resolution, uint channels, bool enabled = true) noexcept
-        : _pipeline{pipeline} {
-        _pipeline.register_shader<2u>(
-            clear_shader_name, [](ImageFloat image) noexcept {
-                image.write(dispatch_id().xy(), make_float4(0.f));
+    ImageBuffer(Pipeline &pipeline, uint2 resolution, bool enabled = true) noexcept
+        : _pipeline{pipeline}, _resolution{resolution} {
+        _pipeline.register_shader<1u>(
+            clear_shader_name, [resolution](BufferFloat image) noexcept {
+                image.write(dispatch_x(), 0.f);
             });
         if (enabled) {
-            _image = pipeline.device().create_image<float>(
-                channels == 1u ?// TODO: support FLOAT2
-                    PixelStorage::FLOAT1 :
-                    PixelStorage::FLOAT4,
-                resolution);
+            _image = pipeline.device().create_buffer<float>(
+                resolution.x * resolution.y * 4u);
         }
     }
     void clear(CommandBuffer &command_buffer) const noexcept {
         if (_image) {
-            command_buffer << _pipeline.shader<2u, Image<float>>(clear_shader_name, _image)
+            command_buffer << _pipeline.shader<1u, Buffer<float>>(clear_shader_name, _image)
                                   .dispatch(_image.size());
         }
     }
@@ -205,9 +203,9 @@ public:
         -> luisa::function<void()> {
         if (!_image) { return {}; }
         auto host_image = luisa::make_shared<luisa::vector<float4>>();
-        host_image->resize(_image.size().x * _image.size().y);
+        host_image->resize(_resolution.x * _resolution.y);
         command_buffer << _image.copy_to(host_image->data());
-        return [host_image, size = _image.size(), path = std::move(path)] {
+        return [host_image, size = _resolution, path = std::move(path)] {
             for (auto &p : *host_image) {
                 p = make_float4(p.xyz() / p.w, 1.f);
             }
@@ -218,8 +216,11 @@ public:
     void accumulate(Expr<uint2> p, Expr<float3> value, Expr<float> effective_spp = 1.f) noexcept {
         if (_image) {
             $if(!any(isnan(value))) {
-                auto old = _image.read(p);
-                _image.write(p, old + make_float4(value, effective_spp));
+                auto index = p.y * _resolution.x + p.x;
+                auto v = make_float4(value, effective_spp);
+                for (auto ch = 0u; ch < 4u; ch++) {
+                    _image.atomic(index * 4u + ch).fetch_add(v[ch]);
+                }
             };
         }
     }
@@ -479,6 +480,7 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
             // TODO
 
             auto last_segment = depth + 1 == node<GradientPathTracing>()->max_depth();
+            $if(!main.it->shape().has_surface()) { $break; };
 
             //
             // Direct Illumination Sampling
@@ -707,8 +709,6 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                             };
                         };
                         $case((uint)RayConnection::RAY_RECENTLY_CONNECTED) {
-                                shifted.alive = false;
-
                             auto incoming_direction = normalize(shifted.it->p() - main.ray.ray->origin());
                             Surface::Evaluation shifted_bsdf_eval{.f = SampledSpectrum{swl.dimension(), 0.f}, .pdf = 0.f};
                             pipeline().surfaces().dispatch(previous_main_it.shape().surface_tag(), [&](auto surface) noexcept {
@@ -1003,8 +1003,8 @@ void GradientPathTracingInstance::_render_one_camera(
 
     luisa::unordered_map<luisa::string, luisa::unique_ptr<ImageBuffer>> image_buffers;
     if (!node<GradientPathTracing>()->central_radiance()) {
-        image_buffers.emplace("gradient_x", luisa::make_unique<ImageBuffer>(pipeline(), resolution, 4u));
-        image_buffers.emplace("gradient_y", luisa::make_unique<ImageBuffer>(pipeline(), resolution, 4u));
+        image_buffers.emplace("gradient_x", luisa::make_unique<ImageBuffer>(pipeline(), resolution));
+        image_buffers.emplace("gradient_y", luisa::make_unique<ImageBuffer>(pipeline(), resolution));
     }
 
     auto clear_image_buffer = [&] {
