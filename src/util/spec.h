@@ -197,6 +197,15 @@ public:
 #undef LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_COMPARISON_OP
 };
 
+// functions
+using luisa::compute::ite;
+using luisa::min;
+using luisa::compute::min;
+using luisa::max;
+using luisa::compute::max;
+using luisa::clamp;
+using luisa::compute::clamp;
+
 [[nodiscard]] SampledSpectrum ite(const SampledSpectrum &p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept;
 [[nodiscard]] SampledSpectrum ite(const SampledSpectrum &p, Expr<float> t, const SampledSpectrum &f) noexcept;
 [[nodiscard]] SampledSpectrum ite(const SampledSpectrum &p, const SampledSpectrum &t, Expr<float> f) noexcept;
@@ -204,6 +213,16 @@ public:
 [[nodiscard]] SampledSpectrum ite(Expr<bool> p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept;
 [[nodiscard]] SampledSpectrum ite(Expr<bool> p, Expr<float> t, const SampledSpectrum &f) noexcept;
 [[nodiscard]] SampledSpectrum ite(Expr<bool> p, const SampledSpectrum &t, Expr<float> f) noexcept;
+[[nodiscard]] SampledSpectrum max(const SampledSpectrum &a, Expr<float> b) noexcept;
+[[nodiscard]] SampledSpectrum max(Expr<float> a, const SampledSpectrum &b) noexcept;
+[[nodiscard]] SampledSpectrum max(const SampledSpectrum &a, const SampledSpectrum &b) noexcept;
+[[nodiscard]] SampledSpectrum min(const SampledSpectrum &a, Expr<float> b) noexcept;
+[[nodiscard]] SampledSpectrum min(Expr<float> a, const SampledSpectrum &b) noexcept;
+[[nodiscard]] SampledSpectrum min(const SampledSpectrum &a, const SampledSpectrum &b) noexcept;
+[[nodiscard]] SampledSpectrum clamp(const SampledSpectrum &v, Expr<float> l, Expr<float> r) noexcept;
+[[nodiscard]] SampledSpectrum clamp(const SampledSpectrum &v, const SampledSpectrum &l, Expr<float> r) noexcept;
+[[nodiscard]] SampledSpectrum clamp(const SampledSpectrum &v, Expr<float> l, const SampledSpectrum &r) noexcept;
+[[nodiscard]] SampledSpectrum clamp(const SampledSpectrum &v, const SampledSpectrum &l, const SampledSpectrum &r) noexcept;
 
 [[nodiscard]] SampledSpectrum zero_if_any_nan(const SampledSpectrum &t) noexcept;
 
