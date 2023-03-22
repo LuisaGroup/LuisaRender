@@ -237,31 +237,31 @@ protected:
                                             beta *= T_maj * closure->sigma_s() / pdf;
                                             r_u *= T_maj * closure->sigma_s() / pdf;
 
-                                            $if(beta.any(non_zero) & r_u.any(non_zero)){
-                                                //                                                // TODO
-                                                //                                                // Sample direct lighting at volume scattering event
-                                                //                                                MediumInteraction intr(p, closure->ray()->direction(), closure->time(), ray.medium,
-                                                //                                                                       closure->phase_function());
-                                                //                                                Li += SampleLd(intr, nullptr, lambda, sampler, beta, r_u);
-                                                //
-                                                //                                                // Sample new direction at real scattering event
-                                                //                                                Float2 u = sampler()->generate_2d();
-                                                //                                                luisa::optional<PhaseFunction::PhaseFunctionSample> ps =
-                                                //                                                    intr.phase_function().sample_p(closure->ray()->direction(), u);
-                                                //                                                $if (!ps | ps->pdf == 0.f) {
-                                                //                                                    terminated = true;
-                                                //                                                }
-                                                //                                                $else {
-                                                //                                                    // Update ray path state for indirect volume scattering
-                                                //                                                    beta *= ps->p / ps->pdf;
-                                                //                                                    r_l = r_u / ps->pdf;
-                                                //                                                    prevIntrContext = LightSampleContext(intr);
-                                                //                                                    scattered = true;
-                                                //                                                    ray.o = p;
-                                                //                                                    ray.d = ps->wi;
-                                                //                                                    specularBounce = false;
-                                                //                                                    anyNonSpecularBounces = true;
-                                                //                                                };
+                                            $if(beta.any(non_zero) & r_u.any(non_zero)) {
+//                                                // TODO
+//                                                // Sample direct lighting at volume scattering event
+//                                                MediumInteraction intr(p, closure->ray()->direction(), closure->time(), ray.medium,
+//                                                                       closure->phase_function());
+//                                                Li += SampleLd(intr, nullptr, lambda, sampler, beta, r_u);
+//
+//                                                // Sample new direction at real scattering event
+//                                                Float2 u = sampler()->generate_2d();
+//                                                luisa::optional<PhaseFunction::PhaseFunctionSample> ps =
+//                                                    intr.phase_function().sample_p(closure->ray()->direction(), u);
+//                                                $if(!ps | ps->pdf == 0.f) {
+//                                                    terminated = true;
+//                                                }
+//                                                $else {
+//                                                    // Update ray path state for indirect volume scattering
+//                                                    beta *= ps->p / ps->pdf;
+//                                                    r_l = r_u / ps->pdf;
+//                                                    prevIntrContext = LightSampleContext(intr);
+//                                                    scattered = true;
+//                                                    ray.o = p;
+//                                                    ray.d = ps->wi;
+//                                                    specularBounce = false;
+//                                                    anyNonSpecularBounces = true;
+//                                                };
                                             };
                                             ans = false;
                                         };

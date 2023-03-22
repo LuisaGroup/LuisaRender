@@ -14,8 +14,8 @@ class VacuumMedium : public Medium {
 public:
     class VacuumMajorantIterator : public RayMajorantIterator {
     public:
-        [[nodiscard]] optional<RayMajorantSegment> next() noexcept override {
-            return {};
+        [[nodiscard]] RayMajorantSegment next() noexcept override {
+            return RayMajorantSegment::one(0u);
         }
     };
 

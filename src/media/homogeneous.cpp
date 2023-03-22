@@ -22,10 +22,10 @@ public:
     class HomogeneousMajorantIterator : public RayMajorantIterator {
     public:
         explicit HomogeneousMajorantIterator(Float t_min, Float t_max, SampledSpectrum sigma_maj) noexcept
-            : _seg{t_min, t_max, sigma_maj}, _called(def(false)) {}
+            : _seg{RayMajorantSegment{t_min, t_max, sigma_maj, false}}, _called(def(false)) {}
 
-        [[nodiscard]] optional<RayMajorantSegment> next() noexcept override {
-            luisa::optional<RayMajorantSegment> seg;
+        [[nodiscard]] RayMajorantSegment next() noexcept override {
+            RayMajorantSegment seg = RayMajorantSegment::one(0u);
             $if(!_called){
                 seg = _seg;
                 _called = true;

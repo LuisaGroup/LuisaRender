@@ -36,7 +36,7 @@ protected:
 
 public:
     [[nodiscard]] static UInt sample_event(Expr<float> p_absorb, Expr<float> p_scatter,
-                                Expr<float> p_null, Expr<float> u) noexcept {
+                                           Expr<float> p_null, Expr<float> u) noexcept {
         return sample_discrete(make_float3(p_absorb, p_scatter, p_null), u);
     }
 
@@ -66,19 +66,21 @@ public:
     struct RayMajorantSegment {
         Float t_min, t_max;
         SampledSpectrum sigma_maj;
+        Bool empty;
 
         [[nodiscard]] static auto one(uint spec_dim) noexcept {
-            return RayMajorantSegment{.t_min = 0.0f,
-                                      .t_max = Interaction::default_t_max,
-                                      .sigma_maj = SampledSpectrum{spec_dim, 1.f}};
+            return RayMajorantSegment{
+                .t_min = 0.0f,
+                .t_max = Interaction::default_t_max,
+                .sigma_maj = SampledSpectrum{spec_dim, 1.f},
+                .empty = true};
         }
     };
 
     class RayMajorantIterator {
 
     public:
-        [[nodiscard]] virtual luisa::optional<RayMajorantSegment> next() noexcept = 0;
-
+        [[nodiscard]] virtual RayMajorantSegment next() noexcept = 0;
     };
 
     class Instance;
@@ -93,9 +95,9 @@ public:
         Var<Ray> _ray;
         Float _time;
         Float _eta;
-        SampledSpectrum _sigma_a;   // absorption coefficient
-        SampledSpectrum _sigma_s;   // scattering coefficient
-        SampledSpectrum _le;        // emission coefficient
+        SampledSpectrum _sigma_a;// absorption coefficient
+        SampledSpectrum _sigma_s;// scattering coefficient
+        SampledSpectrum _le;     // emission coefficient
         const PhaseFunction::Instance *_phase_function;
 
     protected:
@@ -108,7 +110,7 @@ public:
     public:
         Closure(const Instance *instance, Expr<Ray> ray,
                 const SampledWavelengths &swl, Expr<float> time, Expr<float> eta,
-                const SampledSpectrum& sigma_a, const SampledSpectrum& sigma_s, const SampledSpectrum& le,
+                const SampledSpectrum &sigma_a, const SampledSpectrum &sigma_s, const SampledSpectrum &le,
                 const PhaseFunction::Instance *phase_function) noexcept;
         virtual ~Closure() noexcept = default;
         template<typename T = Instance>
@@ -123,15 +125,15 @@ public:
         [[nodiscard]] auto le() const noexcept { return _le; }
         [[nodiscard]] auto phase_function() const noexcept { return _phase_function; }
 
-//        [[nodiscard]] virtual Medium::Sample sample(Expr<float> t_max, PCG32 &rng) const noexcept = 0;
+        //        [[nodiscard]] virtual Medium::Sample sample(Expr<float> t_max, PCG32 &rng) const noexcept = 0;
         [[nodiscard]] virtual SampledSpectrum transmittance(Expr<float> t, PCG32 &rng) const noexcept = 0;
         [[nodiscard]] virtual luisa::unique_ptr<RayMajorantIterator> sample_iterator(Expr<float> t_max) const noexcept = 0;
         // from PBRT-v4
         template<typename F>
         [[nodiscard]] SampledSpectrum sampleT_maj(
             Expr<float> t_max, Expr<float> u, PCG32 &rng,
-//            const luisa::function<Bool(luisa::unique_ptr<Medium::Closure> closure, Expr<float3> p,
-//                                       SampledSpectrum sigma_maj, SampledSpectrum T_maj)> &callback
+            //            const luisa::function<Bool(luisa::unique_ptr<Medium::Closure> closure, Expr<float3> p,
+            //                                       SampledSpectrum sigma_maj, SampledSpectrum T_maj)> &callback
             F &&callback) const noexcept {
             Float u_local = u;
 
@@ -144,35 +146,37 @@ public:
             $while(!done) {
                 // Get next majorant segment from iterator and sample it
                 auto seg = majorant_iter->next();
-                $if(!seg) {
+                $if(seg.empty) {
                     done = true;
                     $break;
                 };
 
                 // Handle zero-valued majorant for current segment
-                $if(seg->sigma_maj[0u] == 0.f) {
-                    Float dt = seg->t_max - seg->t_min;
+                $if(seg.sigma_maj[0u] == 0.f) {
+                    Float dt = seg.t_max - seg.t_min;
                     // Handle infinite _dt_ for ray majorant segment
-                    $if (isinf(dt)) {
+                    $if(isinf(dt)) {
                         dt = std::numeric_limits<float>::max();
                     };
 
-                    T_maj *= exp(-dt * seg->sigma_maj);
+                    LUISA_INFO_WITH_LOCATION("seg = (t_min={}, t_max={}, dimension={}, empty={})",
+                                             seg.t_min, seg.t_max, seg.sigma_maj.dimension(), seg.empty);
+                    T_maj *= exp(-dt * seg.sigma_maj);
                     $continue;
                 };
 
                 // Generate samples along current majorant segment
-                Float t_min = seg->t_min;
+                Float t_min = seg.t_min;
                 $while(true) {
                     // Try to generate sample along current majorant segment
-                    Float t = t_min + sample_exponential(u_local, seg->sigma_maj[0u]);\
+                    Float t = t_min + sample_exponential(u_local, seg.sigma_maj[0u]);
                     u_local = rng.uniform_float();
-                    $if(t < seg->t_max) {
+                    $if(t < seg.t_max) {
                         // Call callback function for sample within segment
-                        T_maj *= exp(-(t - t_min) * seg->sigma_maj);
+                        T_maj *= exp(-(t - t_min) * seg.sigma_maj);
                         Float3 p = ray()->origin() + ray()->direction() * t;
                         auto closure_t = instance()->closure(compute::make_ray(p, ray()->direction()), swl(), time());
-                        $if(!callback(std::move(closure_t), p, seg->sigma_maj, T_maj)) {
+                        $if(!callback(std::move(closure_t), p, seg.sigma_maj, T_maj)) {
                             // Returning out of doubly-nested while loop is not as good perf. wise
                             // on the GPU vs using "done" here.
                             done = true;
@@ -184,13 +188,13 @@ public:
                     }
                     $else {
                         // Handle sample past end of majorant segment
-                        Float dt = seg->t_max - t_min;
+                        Float dt = seg.t_max - t_min;
                         // Handle infinite _dt_ for ray majorant segment
                         $if(isinf(dt)) {
                             dt = std::numeric_limits<float>::max();
                         };
 
-                        T_maj *= exp(-dt * seg->sigma_maj);
+                        T_maj *= exp(-dt * seg.sigma_maj);
                         $break;
                     };
                 };

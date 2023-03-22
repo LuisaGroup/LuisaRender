@@ -172,4 +172,8 @@ UInt sample_discrete(Expr<float3> weights, Expr<float> u) noexcept {
     return ans;
 }
 
+Float sample_exponential(Expr<float> u, Expr<float> a) noexcept {
+    return -log(1.f - u) / a;
+}
+
 }// namespace luisa::render
