@@ -68,6 +68,7 @@ public:
         : Medium{scene, desc} {
         _priority = 0u;
     }
+    [[nodiscard]] bool is_vacuum() const noexcept override { return true; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
 };
 

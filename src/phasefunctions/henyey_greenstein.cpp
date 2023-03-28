@@ -6,8 +6,6 @@
 #include <base/pipeline.h>
 #include <base/scene.h>
 
-
-
 namespace luisa::render {
 
 // https://pbr-book.org/3ed-2018/Volume_Scattering/Phase_Functions#PhaseHG
@@ -34,18 +32,19 @@ public:
                 std::abs(g) < 1e-3f,
                 1.f - 2.f * u.x,
                 //        1.f + g * g - sqr((1.f - g * g) / (1 - g + 2 * g * u.x)) / (2.f * g)
-                -1.f / (2.f * g) * (1.f + sqr(g) - sqr((1.f - sqr(g)) / (1.f + g - 2.f * g * u.x)))
-            );
+                -1.f / (2.f * g) * (1.f + sqr(g) - sqr((1.f - sqr(g)) / (1.f + g - 2.f * g * u.x))));
 
             // compute direction
             auto sinTheta = sqrt(max(0.f, 1.f - sqr(cosTheta)));
             auto phi = 2.f * pi * u.y;
 
-            PhaseFunctionSample pf_sample;
-            pf_sample.wi = make_float3(sinTheta * cos(phi), cosTheta, sinTheta * sin(phi));
-            pf_sample.p = p(wo, pf_sample.wi);
-            pf_sample.pdf = pf_sample.p;
-            return pf_sample;
+            auto wi = make_float3(sinTheta * cos(phi), cosTheta, sinTheta * sin(phi));
+            auto p_value = p(wo, wi);
+            return PhaseFunctionSample{
+                .p = p_value,
+                .wi = wi,
+                .pdf = p_value,
+                .valid = def(true)};
         }
         [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi) const override {
             return p(wo, wi);
@@ -65,9 +64,8 @@ protected:
 
 public:
     HenyeyGreenstein(Scene *scene, const SceneNodeDesc *desc) noexcept
-        : PhaseFunction{scene, desc} {
-        _g = desc->property_float_or_default("g", 0.f);
-    }
+        : PhaseFunction{scene, desc},
+          _g{desc->property_float_or_default("g", 0.f)} {}
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
 };
 

@@ -87,59 +87,68 @@ protected:
             medium_tracker.enter(medium->priority(), def<MediumInfo>(env_medium_tag));
         });
         auto ray = camera_ray;
-        $while(true) {
-            auto it = pipeline().geometry()->intersect(ray);
-            $if((!it->valid()) | (!it->shape().has_surface())) { $break; };
-
-            $if(it->shape().has_medium()) {
-                auto surface_tag = it->shape().surface_tag();
-                auto medium_tag = it->shape().medium_tag();
-
-                auto medium_info = def<MediumInfo>();
-                medium_info.medium_tag = medium_tag;
-                auto medium_priority = def<uint>(0u);
-
-                pipeline().media().dispatch(medium_tag, [&](auto medium) {
-                    medium_priority = medium->priority();
-                });
-                pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
-                    auto surface_event = event(it.get(), -ray->direction(), ray->direction());
-                    $if(TEST_COND) {
-                        pipeline().printer().verbose_with_location("surface event={}", surface_event);
-                    };
-                    // update medium tracker
-                    $switch(surface_event) {
-                        $case(Surface::event_enter) {
-                            medium_tracker.enter(medium_priority, medium_info);
-                            $if(TEST_COND) {
-                                pipeline().printer().verbose_with_location("enter: priority={}, medium_tag={}", medium_priority, medium_tag);
-                            };
-                        };
-                        $case(Surface::event_exit) {
-                            $if(medium_tracker.exist(medium_priority, medium_info)) {
-                                medium_tracker.exit(medium_priority, medium_info);
-                                $if(TEST_COND) {
-                                    pipeline().printer().verbose_with_location("exit exist: priority={}, medium_tag={}", medium_priority, medium_tag);
-                                };
-                            }
-                            $else {
-                                medium_tracker.enter(medium_priority, medium_info);
-                                $if(TEST_COND) {
-                                    pipeline().printer().verbose_with_location("exit nonexistent: priority={}, medium_tag={}", medium_priority, medium_tag);
-                                };
-                            };
-                        };
-                    };
-                });
-            };
-            $if(TEST_COND) {
-                pipeline().printer().verbose_with_location("it->shape().has_medium()={}", it->shape().has_medium());
-                pipeline().printer().verbose_with_location("medium tracker size={}", medium_tracker.size());
-                pipeline().printer().verbose_with_location("it->p()=({}, {}, {})", it->p().x, it->p().y, it->p().z);
-                pipeline().printer().verbose("");
-            };
-            ray = it->spawn_ray(ray->direction());
-        };
+        // TODO: bug in initialization of medium tracker, disabled for now
+//        auto depth_track = def<uint>(0u);
+//        $while(true) {
+//            auto it = pipeline().geometry()->intersect(ray);
+//            $if((!it->valid()) | (!it->shape().has_surface())) { $break; };
+//
+//            $if(TEST_COND) {
+//                pipeline().printer().verbose_with_location("depth={}", depth_track);
+//            };
+//
+//            $if(it->shape().has_medium()) {
+//                auto surface_tag = it->shape().surface_tag();
+//                auto medium_tag = it->shape().medium_tag();
+//
+//                auto medium_info = def<MediumInfo>();
+//                medium_info.medium_tag = medium_tag;
+//                auto medium_priority = def<uint>(0u);
+//
+//                pipeline().media().dispatch(medium_tag, [&](auto medium) {
+//                    medium_priority = medium->priority();
+//                });
+//                pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
+//                    auto surface_event = event(it.get(), -ray->direction(), ray->direction());
+//                    $if(TEST_COND) {
+//                        pipeline().printer().verbose_with_location("surface event={}", surface_event);
+//                    };
+//                    // update medium tracker
+//                    $switch(surface_event) {
+//                        $case(Surface::event_enter) {
+//                            medium_tracker.enter(medium_priority, medium_info);
+//                            $if(TEST_COND) {
+//                                pipeline().printer().verbose_with_location("enter: priority={}, medium_tag={}", medium_priority, medium_tag);
+//                            };
+//                        };
+//                        $case(Surface::event_exit) {
+//                            $if(medium_tracker.exist(medium_priority, medium_info)) {
+//                                medium_tracker.exit(medium_priority, medium_info);
+//                                $if(TEST_COND) {
+//                                    pipeline().printer().verbose_with_location("exit exist: priority={}, medium_tag={}", medium_priority, medium_tag);
+//                                };
+//                            }
+//                            $else {
+//                                medium_tracker.enter(medium_priority, medium_info);
+//                                $if(TEST_COND) {
+//                                    pipeline().printer().verbose_with_location("exit nonexistent: priority={}, medium_tag={}", medium_priority, medium_tag);
+//                                };
+//                            };
+//                        };
+//                    };
+//                });
+//            };
+//            $if(TEST_COND) {
+//                pipeline().printer().verbose_with_location("it->shape().has_medium()={}", it->shape().has_medium());
+//                pipeline().printer().verbose_with_location("medium tracker size={}", medium_tracker.size());
+//                pipeline().printer().verbose_with_location("it->p()=({}, {}, {})", it->p().x, it->p().y, it->p().z);
+//                auto dir = ray->direction();
+//                pipeline().printer().verbose_with_location("ray->direction()=({}, {}, {})", dir.x, dir.y, dir.z);
+//                pipeline().printer().verbose("");
+//            };
+//            ray = it->spawn_ray(ray->direction());
+//            depth_track += 1u;
+//        };
         $if(TEST_COND) {
             pipeline().printer().verbose_with_location("Final medium tracker size={}", medium_tracker.size());
         };
@@ -181,122 +190,125 @@ protected:
                     auto closure = medium->closure(ray, swl, time);
                     eta = closure->eta();
 
-                    SampledSpectrum T_maj = closure->sampleT_maj(
-                        t_max, u, rng,
-                        [&](luisa::unique_ptr<Medium::Closure> closure, Expr<float3> p,
-                            SampledSpectrum sigma_maj, SampledSpectrum T_maj) -> Bool {
-                            Bool ans = def(false);
+                    if (!closure->instance()->node()->is_vacuum()) {
+                        SampledSpectrum T_maj = closure->sampleT_maj(
+                            t_max, u, rng,
+                            [&](luisa::unique_ptr<Medium::Closure> closure_p, Expr<float3> p,
+                                SampledSpectrum sigma_maj, SampledSpectrum T_maj) -> Bool {
+                                Bool ans = def(false);
 
-                            // Handle medium scattering event for ray
-                            $if(beta.all([](auto b) noexcept { return b <= 0.f; })) {
-                                terminated = true;
-                                ans = false;
-                            }
-                            $else {
-                                // Add emission from medium scattering event
-                                $if(depth < max_depth) {// TODO: closure->Le() is not 0
-                                    // Compute $\beta'$ at new path vertex
-                                    Float pdf = sigma_maj[0u] * T_maj[0u];
-                                    SampledSpectrum betap = beta * T_maj / pdf;
+                                // Handle medium scattering event for ray
+                                $if(beta.all([](auto b) noexcept { return b <= 0.f; })) {
+                                    terminated = true;
+                                    ans = false;
+                                }
+                                $else {
+                                    // Add emission from medium scattering event
+                                    $if(depth < max_depth) {// TODO: closure->Le() is not 0
+                                        // Compute $\beta'$ at new path vertex
+                                        Float pdf = sigma_maj[0u] * T_maj[0u];
+                                        SampledSpectrum betap = beta * T_maj / pdf;
 
-                                    // Compute rescaled path probability for absorption at path vertex
-                                    SampledSpectrum r_e = r_u * sigma_maj * T_maj / pdf;
+                                        // Compute rescaled path probability for absorption at path vertex
+                                        SampledSpectrum r_e = r_u * sigma_maj * T_maj / pdf;
 
-                                    // Update Li for medium emission
-                                    $if(r_e.any(non_zero)) {
-                                        Li += betap * closure->sigma_a() * closure->le() / r_e.average();
+                                        // Update Li for medium emission
+                                        $if(r_e.any(non_zero)) {
+                                            Li += betap * closure_p->sigma_a() * closure_p->le() / r_e.average();
+                                        };
                                     };
-                                };
 
-                                // Compute medium event probabilities for interaction
-                                Float pAbsorb = closure->sigma_a()[0u] / sigma_maj[0u];
-                                Float pScatter = closure->sigma_s()[0u] / sigma_maj[0u];
-                                Float pNull = max(0.f, 1 - pAbsorb - pScatter);
+                                    // Compute medium event probabilities for interaction
+                                    Float pAbsorb = closure_p->sigma_a()[0u] / sigma_maj[0u];
+                                    Float pScatter = closure_p->sigma_s()[0u] / sigma_maj[0u];
+                                    Float pNull = max(0.f, 1 - pAbsorb - pScatter);
 
-                                // Sample medium scattering event type and update path
-                                Float um = rng.uniform_float();
-                                UInt medium_event = Medium::sample_event(pAbsorb, pScatter, pNull, um);
-                                $switch(medium_event) {
-                                    $case(Medium::event_absorb) {
-                                        // Handle absorption along ray path
-                                        terminated = true;
-                                        ans = false;
-                                        $break;
-                                    };
-                                    $case(Medium::event_scatter) {
-                                        // Handle scattering along ray path
-                                        // Stop path sampling if maximum depth has been reached
-                                        depth += 1u;
-                                        $if(depth >= max_depth) {
+                                    // Sample medium scattering event type and update path
+                                    Float um = rng.uniform_float();
+                                    UInt medium_event = Medium::sample_event(pAbsorb, pScatter, pNull, um);
+                                    $switch(medium_event) {
+                                        $case(Medium::event_absorb) {
+                                            // Handle absorption along ray path
                                             terminated = true;
                                             ans = false;
-                                        }
-                                        $else {
-                                            // Update beta and r_u for real scattering event
-                                            Float pdf = T_maj[0u] * closure->sigma_s()[0u];
-                                            beta *= T_maj * closure->sigma_s() / pdf;
-                                            r_u *= T_maj * closure->sigma_s() / pdf;
+                                            $break;
+                                        };
+                                        $case(Medium::event_scatter) {
+                                            // Handle scattering along ray path
+                                            // Stop path sampling if maximum depth has been reached
+                                            depth += 1u;
+                                            $if(depth >= max_depth) {
+                                                terminated = true;
+                                                ans = false;
+                                            }
+                                            $else {
+                                                // Update beta and r_u for real scattering event
+                                                Float pdf = T_maj[0u] * closure_p->sigma_s()[0u];
+                                                beta *= T_maj * closure_p->sigma_s() / pdf;
+                                                r_u *= T_maj * closure_p->sigma_s() / pdf;
 
-                                            $if(beta.any(non_zero) & r_u.any(non_zero)){
-                                                //                                                // TODO
-                                                //                                                // Sample direct lighting at volume scattering event
-                                                //                                                MediumInteraction intr(p, closure->ray()->direction(), closure->time(), ray.medium,
-                                                //                                                                       closure->phase_function());
-                                                //                                                Li += SampleLd(intr, nullptr, lambda, sampler, beta, r_u);
-                                                //
-                                                //                                                // Sample new direction at real scattering event
-                                                //                                                Float2 u = sampler()->generate_2d();
-                                                //                                                luisa::optional<PhaseFunction::PhaseFunctionSample> ps =
-                                                //                                                    intr.phase_function().sample_p(closure->ray()->direction(), u);
-                                                //                                                $if(!ps | ps->pdf == 0.f) {
-                                                //                                                    terminated = true;
-                                                //                                                }
-                                                //                                                $else {
-                                                //                                                    // Update ray path state for indirect volume scattering
-                                                //                                                    beta *= ps->p / ps->pdf;
-                                                //                                                    r_l = r_u / ps->pdf;
-                                                //                                                    prevIntrContext = LightSampleContext(intr);
-                                                //                                                    scattered = true;
-                                                //                                                    ray.o = p;
-                                                //                                                    ray.d = ps->wi;
-                                                //                                                    specularBounce = false;
-                                                //                                                    anyNonSpecularBounces = true;
-                                                //                                                };
+                                                $if(beta.any(non_zero) & r_u.any(non_zero)) {
+                                                    //                                                // TODO
+                                                    //                                                // Sample direct lighting at volume scattering event
+                                                    //                                                MediumInteraction intr(p, closure->ray()->direction(), closure->time(), ray.medium,
+                                                    //                                                                       closure->phase_function());
+                                                    //                                                Li += SampleLd(intr, nullptr, lambda, sampler, beta, r_u);
+                                                    //
+
+                                                    // Sample new direction at real scattering event
+                                                    Float2 u = sampler()->generate_2d();
+                                                    auto ps = closure->phase_function()->sample_p(-ray->direction(), u);
+                                                    $if(!ps.valid | (ps.pdf == 0.f)) {
+                                                        terminated = true;
+                                                    }
+                                                    $else {
+                                                        // Update ray path state for indirect volume scattering
+                                                        beta *= ps.p / ps.pdf;
+                                                        r_l = r_u / ps.pdf;
+                                                        scattered = true;
+                                                        ray = make_ray(p, ps.wi);
+                                                        $if(TEST_COND) {
+                                                            pipeline().printer().verbose_with_location(
+                                                                "Medium scattering event at depth={}, p=({}, {}, {})",
+                                                                depth, p.x, p.y, p.z);
+                                                        };
+                                                    };
+                                                };
+                                                ans = false;
                                             };
-                                            ans = false;
+                                            $break;
                                         };
-                                        $break;
-                                    };
-                                    $case(Medium::event_null) {
-                                        // Handle null scattering along ray path
-                                        SampledSpectrum sigma_n = max(sigma_maj - closure->sigma_a() - closure->sigma_s(), 0.f);
-                                        Float pdf = T_maj[0u] * sigma_n[0u];
-                                        beta *= T_maj * sigma_n / pdf;
-                                        $if(pdf == 0.f) {
-                                            beta = 0.f;
+                                        $case(Medium::event_null) {
+                                            // Handle null scattering along ray path
+                                            SampledSpectrum sigma_n = max(sigma_maj - closure_p->sigma_a() - closure_p->sigma_s(), 0.f);
+                                            Float pdf = T_maj[0u] * sigma_n[0u];
+                                            beta *= T_maj * sigma_n / pdf;
+                                            $if(pdf == 0.f) {
+                                                beta = 0.f;
+                                            };
+                                            r_u *= T_maj * sigma_n / pdf;
+                                            r_l *= T_maj * sigma_maj / pdf;
+                                            ans = beta.any(non_zero) & r_u.any(non_zero);
+                                            $break;
                                         };
-                                        r_u *= T_maj * sigma_n / pdf;
-                                        r_l *= T_maj * sigma_maj / pdf;
-                                        ans = beta.any(non_zero) & r_u.any(non_zero);
-                                        $break;
                                     };
                                 };
-                            };
-                            return ans;
-                        });
+                                return ans;
+                            });
 
-                    // Handle terminated, scattered, and unscattered medium rays
-                    $if(terminated | beta.all(le_zero) | r_u.all(le_zero)) {
-                        // Terminate path sampling if ray has been terminated
-                        $break;
-                    };
-                    $if(scattered) {
-                        $continue;
-                    };
+                        // Handle terminated, scattered, and unscattered medium rays
+                        $if(terminated | beta.all(le_zero) | r_u.all(le_zero)) {
+                            // Terminate path sampling if ray has been terminated
+                            $break;
+                        };
+                        $if(scattered) {
+                            $continue;
+                        };
 
-                    beta *= T_maj / T_maj[0u];
-                    r_u *= T_maj / T_maj[0u];
-                    r_l *= T_maj / T_maj[0u];
+                        beta *= T_maj / T_maj[0u];
+                        r_u *= T_maj / T_maj[0u];
+                        r_l *= T_maj / T_maj[0u];
+                    }
                 });
             };
 
@@ -306,7 +318,7 @@ protected:
                 if (pipeline().environment()) {
                     auto eval = light_sampler()->evaluate_miss(ray->direction(), swl, time);
                     // TODO: depth = 0
-                    r_l *= eval.pdf;
+                    r_l *= balance_heuristic(pdf_bsdf, eval.pdf);
                     Li += beta * eval.L / (r_u + r_l).average();
                 }
                 $break;
@@ -317,100 +329,115 @@ protected:
                 $if(it->shape().has_light()) {
                     auto eval = light_sampler()->evaluate_hit(*it, ray->origin(), swl, time);
                     // TODO: depth = 0
-                    r_l *= eval.pdf;
+                    r_l *= balance_heuristic(pdf_bsdf, eval.pdf);
                     Li += beta * eval.L / (r_u + r_l).average();
+                    $if(TEST_COND) {
+                        pipeline().printer().verbose_with_location(
+                            "eval.pdf={}, "
+                            "eval.L=({}, {}, {}), "
+                            "r_u=({}, {}, {}), "
+                            "r_l=({}, {}, {})",
+                            eval.pdf, eval.L[0u], eval.L[1u], eval.L[2u],
+                            r_u[0u], r_u[1u], r_u[2u],
+                            r_l[0u], r_l[1u], r_l[2u]);
+                    };
                 };
             }
 
-            $if(!it->shape().has_surface()) { $break; };
+            $if(!it->shape().has_surface()) {
+                ray = it->spawn_ray(ray->direction());
+                pdf_bsdf = 1e16f;
+            }
+            $else {
+                // TODO
 
-            // TODO
+                // generate uniform samples
+                auto u_light_selection = sampler()->generate_1d();
+                auto u_light_surface = sampler()->generate_2d();
+                auto u_lobe = sampler()->generate_1d();
+                auto u_bsdf = sampler()->generate_2d();
 
-            // generate uniform samples
-            auto u_light_selection = sampler()->generate_1d();
-            auto u_light_surface = sampler()->generate_2d();
-            auto u_lobe = sampler()->generate_1d();
-            auto u_bsdf = sampler()->generate_2d();
+                // sample one light
+                auto light_sample = light_sampler()->sample(
+                    *it, u_light_selection, u_light_surface, swl, time);
 
-            // sample one light
-            auto light_sample = light_sampler()->sample(
-                *it, u_light_selection, u_light_surface, swl, time);
+                // trace shadow ray
+                auto occluded = pipeline().geometry()->intersect_any(light_sample.shadow_ray);
 
-            // trace shadow ray
-            auto occluded = pipeline().geometry()->intersect_any(light_sample.shadow_ray);
-
-            auto medium_tag = it->shape().medium_tag();
-            auto medium_priority = def(0u);
-            auto medium_info = def<MediumInfo>();
-            medium_info.medium_tag = medium_tag;
-            auto eta_next = def(1.f);
-            pipeline().media().dispatch(medium_tag, [&](auto medium) {
-                auto closure = medium->closure(ray, swl, time);
-                eta_next = closure->eta();
-            });
-            $if(has_medium) {
+                auto medium_tag = it->shape().medium_tag();
+                auto medium_priority = def(0u);
+                auto medium_info = def<MediumInfo>();
+                medium_info.medium_tag = medium_tag;
+                auto eta_next = def(1.f);
                 pipeline().media().dispatch(medium_tag, [&](auto medium) {
-                    medium_priority = medium->priority();
                     auto closure = medium->closure(ray, swl, time);
-                    $if(TEST_COND) {
-                        pipeline().printer().verbose_with_location("eta={}", closure->eta());
-                    };
+                    eta_next = closure->eta();
                 });
-            };
+                $if(has_medium) {
+                    pipeline().media().dispatch(medium_tag, [&](auto medium) {
+                        medium_priority = medium->priority();
+                        auto closure = medium->closure(ray, swl, time);
+                        $if(TEST_COND) {
+                            pipeline().printer().verbose_with_location("eta={}", closure->eta());
+                        };
+                    });
+                };
 
-            // evaluate material
-            auto surface_tag = it->shape().surface_tag();
-            pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
-                // create closure
-                auto wo = -ray->direction();
-                auto closure = surface->closure(it, swl, wo, eta, time);
+                // evaluate material
+                auto surface_tag = it->shape().surface_tag();
+                pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
+                    // create closure
+                    auto wo = -ray->direction();
+                    auto closure = surface->closure(it, swl, wo, eta, time);
 
-                // apply opacity map
-                auto alpha_skip = def(false);
-                if (auto o = closure->opacity()) {
-                    auto opacity = saturate(*o);
-                    alpha_skip = u_lobe >= opacity;
-                    u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
-                }
-
-                $if(alpha_skip) {
-                    ray = it->spawn_ray(ray->direction());
-                    pdf_bsdf = 1e16f;
-                }
-                $else {
-                    if (auto dispersive = closure->is_dispersive()) {
-                        $if(*dispersive) { swl.terminate_secondary(); };
+                    // apply opacity map
+                    auto alpha_skip = def(false);
+                    if (auto o = closure->opacity()) {
+                        auto opacity = saturate(*o);
+                        alpha_skip = u_lobe >= opacity;
+                        u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
                     }
-                    // direct lighting
-                    $if(light_sample.eval.pdf > 0.0f & !occluded) {
-                        auto wi = light_sample.shadow_ray->direction();
-                        auto eval = closure->evaluate(wo, wi);
-                        auto w = balance_heuristic(light_sample.eval.pdf, eval.pdf) /
-                                 light_sample.eval.pdf;
-                        Li += w * beta * eval.f * light_sample.eval.L;
-                    };
-                    // sample material
-                    auto surface_sample = closure->sample(wo, u_lobe, u_bsdf);
 
-                    ray = it->spawn_ray(surface_sample.wi);
-                    pdf_bsdf = surface_sample.eval.pdf;
-                    auto w = ite(surface_sample.eval.pdf > 0.f, 1.f / surface_sample.eval.pdf, 0.f);
-                    beta *= w * surface_sample.eval.f;
-                    // apply eta scale & update medium tracker
-                    $if(has_medium) {
-                        $switch(surface_sample.event) {
-                            $case(Surface::event_enter) {
-                                eta_scale = sqr(eta_next / eta);
-                                medium_tracker.enter(medium_priority, medium_info);
-                            };
-                            $case(Surface::event_exit) {
-                                eta_scale = sqr(eta / eta_next);
-                                medium_tracker.exit(medium_priority, medium_info);
+                    $if(alpha_skip) {
+                        ray = it->spawn_ray(ray->direction());
+                        pdf_bsdf = 1e16f;
+                    }
+                    $else {
+                        if (auto dispersive = closure->is_dispersive()) {
+                            $if(*dispersive) { swl.terminate_secondary(); };
+                        }
+                        // direct lighting
+                        $if(light_sample.eval.pdf > 0.0f & !occluded) {
+                            auto wi = light_sample.shadow_ray->direction();
+                            auto eval = closure->evaluate(wo, wi);
+                            auto w = balance_heuristic(light_sample.eval.pdf, eval.pdf) /
+                                     light_sample.eval.pdf;
+                            Li += w * beta * eval.f * light_sample.eval.L;
+                        };
+                        // sample material
+                        auto surface_sample = closure->sample(wo, u_lobe, u_bsdf);
+
+                        ray = it->spawn_ray(surface_sample.wi);
+                        pdf_bsdf = surface_sample.eval.pdf;
+                        auto w = ite(surface_sample.eval.pdf > 0.f, 1.f / surface_sample.eval.pdf, 0.f);
+                        beta *= w * surface_sample.eval.f;
+                        r_l = r_u * w;
+                        // apply eta scale & update medium tracker
+                        $if(has_medium) {
+                            $switch(surface_sample.event) {
+                                $case(Surface::event_enter) {
+                                    eta_scale = sqr(eta_next / eta);
+                                    medium_tracker.enter(medium_priority, medium_info);
+                                };
+                                $case(Surface::event_exit) {
+                                    eta_scale = sqr(eta / eta_next);
+                                    medium_tracker.exit(medium_priority, medium_info);
+                                };
                             };
                         };
                     };
-                };
-            });
+                });
+            };
 
             beta = zero_if_any_nan(beta);
             $if(TEST_COND) {

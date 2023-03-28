@@ -226,6 +226,7 @@ protected:
 public:
     Medium(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] virtual bool is_null() const noexcept { return false; }
+    [[nodiscard]] virtual bool is_vacuum() const noexcept { return false; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept;
 };
 

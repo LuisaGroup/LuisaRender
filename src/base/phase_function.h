@@ -22,6 +22,7 @@ public:
         Float p;
         Float3 wi;
         Float pdf;
+        Bool valid;
     };
 
     class Instance;

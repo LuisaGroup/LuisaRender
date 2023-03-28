@@ -10,8 +10,8 @@
 
 namespace luisa::render {
 
-//#define TEST_COND all(dispatch_id().xy() == make_uint2(648, 811))
-#define TEST_COND false
+#define TEST_COND all(dispatch_id().xy() == make_uint2(395, 853))
+//#define TEST_COND false
 
 using compute::ArrayVar;
 using compute::Bool;
