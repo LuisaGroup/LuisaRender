@@ -300,3 +300,8 @@ protected:
 };
 
 }// namespace luisa::render
+
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::Surface::Instance)
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::Surface::Closure)
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::Surface::Sample)
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::Surface::Evaluation)

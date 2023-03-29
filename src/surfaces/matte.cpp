@@ -90,7 +90,8 @@ private:
         auto wo_local = it()->shading().world_to_local(wo);
         auto wi_local = def(make_float3(0.0f, 0.0f, 1.0f));
         auto pdf = def(0.f);
-        auto f = _refl->sample(wo_local, &wi_local, u, &pdf, mode);
+        auto f = _refl->sample(wo_local, std::addressof(wi_local),
+                               u, std::addressof(pdf), mode);
         auto wi = it()->shading().local_to_world(wi_local);
         return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf},
                 .wi = wi,

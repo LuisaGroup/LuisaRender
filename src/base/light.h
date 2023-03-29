@@ -107,3 +107,8 @@ public:
 }// namespace luisa::render
 
 LUISA_STRUCT(luisa::render::Light::Handle, instance_id, light_tag){};
+
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::Light::Evaluation)
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::Light::Sample)
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::Light::Instance)
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::Light::Closure)

@@ -77,3 +77,6 @@ public:
 };
 
 }// namespace luisa::render
+
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::Spectrum::Instance)
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::Spectrum::Decode)

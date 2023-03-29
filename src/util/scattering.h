@@ -33,11 +33,6 @@ enum TransportMode {
 
 class MicrofacetDistribution {
 
-public:
-    struct Gradient {
-        Float2 dAlpha;
-    };
-
 private:
     Float2 _alpha;
 
@@ -222,3 +217,16 @@ public:
 };
 
 }// namespace luisa::render
+
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::BxDF)
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::BxDF::SampledDirection)
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::MicrofacetDistribution)
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::Fresnel)
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::FresnelConductor)
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::FresnelDielectric)
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::LambertianReflection)
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::LambertianTransmission)
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::MicrofacetReflection)
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::MicrofacetTransmission)
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::OrenNayar)
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::FresnelBlend)
