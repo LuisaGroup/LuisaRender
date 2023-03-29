@@ -50,10 +50,28 @@ protected:
         Instance::_render_one_camera(command_buffer, camera);
     }
 
-    [[nodiscard]] static auto event(const Interaction *it, Expr<float3> wo, Expr<float3> wi) noexcept {
-        const auto &shading = it->shading();
-        auto wo_local = shading.world_to_local(wo);
-        auto wi_local = shading.world_to_local(wi);
+    [[nodiscard]] UInt event(const SampledWavelengths &swl, luisa::shared_ptr<Interaction> it, Expr<float> time,
+                             Expr<float3> wo, Expr<float3> wi) const noexcept {
+        Float3 wo_local, wi_local;
+        $if(it->shape().has_surface()) {
+            pipeline().surfaces().dispatch(it->shape().surface_tag(), [&](auto surface) noexcept {
+                auto closure = surface->closure(it, swl, wo, 1.f, time);
+                auto shading = closure->it()->shading();
+                wo_local = shading.world_to_local(wo);
+                wi_local = shading.world_to_local(wi);
+            });
+        }
+        $else {
+            auto shading = it->shading();
+            wo_local = shading.world_to_local(wo);
+            wi_local = shading.world_to_local(wi);
+        };
+        $if(TEST_COND) {
+            pipeline().printer().verbose_with_location(
+                "wo_local: ({}, {}, {}), wi_local: ({}, {}, {})",
+                wo_local.x, wo_local.y, wo_local.z,
+                wi_local.x, wi_local.y, wi_local.z);
+        };
         return ite(
             wo_local.z * wi_local.z > 0.f,
             Surface::event_reflect,
@@ -61,6 +79,12 @@ protected:
                 wi_local.z > 0.f,
                 Surface::event_exit,
                 Surface::event_enter));
+    }
+
+    [[nodiscard]] SampledSpectrum Ld_medium(
+        Expr<Ray> ray, Expr<uint> frame_index, Expr<uint2> pixel_id, Expr<float> time,
+        const SampledWavelengths &swl) const noexcept {
+
     }
 
     [[nodiscard]] Float3 Li(const Camera::Instance *camera, Expr<uint> frame_index,
@@ -88,67 +112,70 @@ protected:
         });
         auto ray = camera_ray;
         // TODO: bug in initialization of medium tracker, disabled for now
-//        auto depth_track = def<uint>(0u);
-//        $while(true) {
-//            auto it = pipeline().geometry()->intersect(ray);
-//            $if((!it->valid()) | (!it->shape().has_surface())) { $break; };
-//
-//            $if(TEST_COND) {
-//                pipeline().printer().verbose_with_location("depth={}", depth_track);
-//            };
-//
-//            $if(it->shape().has_medium()) {
-//                auto surface_tag = it->shape().surface_tag();
-//                auto medium_tag = it->shape().medium_tag();
-//
-//                auto medium_info = def<MediumInfo>();
-//                medium_info.medium_tag = medium_tag;
-//                auto medium_priority = def<uint>(0u);
-//
-//                pipeline().media().dispatch(medium_tag, [&](auto medium) {
-//                    medium_priority = medium->priority();
-//                });
-//                pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
-//                    auto surface_event = event(it.get(), -ray->direction(), ray->direction());
-//                    $if(TEST_COND) {
-//                        pipeline().printer().verbose_with_location("surface event={}", surface_event);
-//                    };
-//                    // update medium tracker
-//                    $switch(surface_event) {
-//                        $case(Surface::event_enter) {
-//                            medium_tracker.enter(medium_priority, medium_info);
-//                            $if(TEST_COND) {
-//                                pipeline().printer().verbose_with_location("enter: priority={}, medium_tag={}", medium_priority, medium_tag);
-//                            };
-//                        };
-//                        $case(Surface::event_exit) {
-//                            $if(medium_tracker.exist(medium_priority, medium_info)) {
-//                                medium_tracker.exit(medium_priority, medium_info);
-//                                $if(TEST_COND) {
-//                                    pipeline().printer().verbose_with_location("exit exist: priority={}, medium_tag={}", medium_priority, medium_tag);
-//                                };
-//                            }
-//                            $else {
-//                                medium_tracker.enter(medium_priority, medium_info);
-//                                $if(TEST_COND) {
-//                                    pipeline().printer().verbose_with_location("exit nonexistent: priority={}, medium_tag={}", medium_priority, medium_tag);
-//                                };
-//                            };
-//                        };
-//                    };
-//                });
-//            };
-//            $if(TEST_COND) {
-//                pipeline().printer().verbose_with_location("it->shape().has_medium()={}", it->shape().has_medium());
-//                pipeline().printer().verbose_with_location("medium tracker size={}", medium_tracker.size());
-//                pipeline().printer().verbose_with_location("it->p()=({}, {}, {})", it->p().x, it->p().y, it->p().z);
-//                auto dir = ray->direction();
-//                pipeline().printer().verbose_with_location("ray->direction()=({}, {}, {})", dir.x, dir.y, dir.z);
-//                pipeline().printer().verbose("");
-//            };
-//            ray = it->spawn_ray(ray->direction());
-//            depth_track += 1u;
-//        };
+        auto depth_track = def<uint>(0u);
+        $while(true) {
+            auto it = pipeline().geometry()->intersect(ray);
+            $if(!it->valid()) { $break; };
+
+            $if(TEST_COND) {
+                pipeline().printer().verbose_with_location("depth={}", depth_track);
+            };
+
+            $if(it->shape().has_medium()) {
+                auto surface_tag = it->shape().surface_tag();
+                auto medium_tag = it->shape().medium_tag();
+
+                auto medium_info = def<MediumInfo>();
+                medium_info.medium_tag = medium_tag;
+                auto medium_priority = def<uint>(0u);
+
+                pipeline().media().dispatch(medium_tag, [&](auto medium) {
+                    medium_priority = medium->priority();
+                });
+                // deal with medium tracker
+                auto surface_event = event(swl, it, time, -ray->direction(), ray->direction());
+                pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
+                    $if(TEST_COND) {
+                        pipeline().printer().verbose_with_location("surface event={}", surface_event);
+                    };
+                    // update medium tracker
+                    $switch(surface_event) {
+                        $case(Surface::event_enter) {
+                            medium_tracker.enter(medium_priority, medium_info);
+                            $if(TEST_COND) {
+                                pipeline().printer().verbose_with_location("enter: priority={}, medium_tag={}", medium_priority, medium_tag);
+                            };
+                        };
+                        $case(Surface::event_exit) {
+                            $if(medium_tracker.exist(medium_priority, medium_info)) {
+                                medium_tracker.exit(medium_priority, medium_info);
+                                $if(TEST_COND) {
+                                    pipeline().printer().verbose_with_location("exit exist: priority={}, medium_tag={}", medium_priority, medium_tag);
+                                };
+                            }
+                            $else {
+                                medium_tracker.enter(medium_priority, medium_info);
+                                $if(TEST_COND) {
+                                    pipeline().printer().verbose_with_location("exit nonexistent: priority={}, medium_tag={}", medium_priority, medium_tag);
+                                };
+                            };
+                        };
+                    };
+                });
+            };
+            $if(TEST_COND) {
+                pipeline().printer().verbose_with_location("medium tracker size={}", medium_tracker.size());
+                auto dir = ray->direction();
+                auto origin = ray->origin();
+                pipeline().printer().verbose_with_location("ray->origin()=({}, {}, {})", origin.x, origin.y, origin.z);
+                pipeline().printer().verbose_with_location("ray->direction()=({}, {}, {})", dir.x, dir.y, dir.z);
+                pipeline().printer().verbose_with_location("it->p()=({}, {}, {})", it->p().x, it->p().y, it->p().z);
+                pipeline().printer().verbose_with_location("it->shape().has_medium()={}", it->shape().has_medium());
+                pipeline().printer().verbose("");
+            };
+            ray = it->spawn_ray(ray->direction());
+            depth_track += 1u;
+        };
         $if(TEST_COND) {
             pipeline().printer().verbose_with_location("Final medium tracker size={}", medium_tracker.size());
         };
@@ -171,7 +198,6 @@ protected:
             // sample the participating medium
             $if(!medium_tracker.vacuum()) {
                 // Sample the participating medium
-                Bool terminated = def(false);
                 // Normalize ray direction and update t_max accordingly
                 ray->set_direction(normalize(ray->direction()));
                 auto t_max = ite(it->valid(), length(it->p() - ray->origin()), Interaction::default_t_max);
@@ -191,6 +217,7 @@ protected:
                     eta = closure->eta();
 
                     if (!closure->instance()->node()->is_vacuum()) {
+                        Bool terminated = def(false);
                         SampledSpectrum T_maj = closure->sampleT_maj(
                             t_max, u, rng,
                             [&](luisa::unique_ptr<Medium::Closure> closure_p, Expr<float3> p,
@@ -204,8 +231,8 @@ protected:
                                 }
                                 $else {
                                     // Add emission from medium scattering event
-                                    $if(depth < max_depth) {// TODO: closure->Le() is not 0
-                                        // Compute $\beta'$ at new path vertex
+                                    $if(depth < max_depth & closure_p->le().any(non_zero)) {
+                                        // Compute beta' at new path vertex
                                         Float pdf = sigma_maj[0u] * T_maj[0u];
                                         SampledSpectrum betap = beta * T_maj / pdf;
 
@@ -213,9 +240,8 @@ protected:
                                         SampledSpectrum r_e = r_u * sigma_maj * T_maj / pdf;
 
                                         // Update Li for medium emission
-                                        $if(r_e.any(non_zero)) {
-                                            Li += betap * closure_p->sigma_a() * closure_p->le() / r_e.average();
-                                        };
+                                        auto Le_medium = betap * closure_p->sigma_a() * closure_p->le() / r_e.average();
+                                        Li += ite(r_e.any(non_zero), Le_medium, 0.f);
                                     };
 
                                     // Compute medium event probabilities for interaction
@@ -305,6 +331,11 @@ protected:
                             $continue;
                         };
 
+                        $if(TEST_COND) {
+                            pipeline().printer().verbose_with_location(
+                                "T_maj=({}, {}, {})", T_maj[0u], T_maj[1u], T_maj[2u]);
+                        };
+
                         beta *= T_maj / T_maj[0u];
                         r_u *= T_maj / T_maj[0u];
                         r_l *= T_maj / T_maj[0u];
@@ -344,6 +375,7 @@ protected:
                 };
             }
 
+            // hit normal surface
             $if(!it->shape().has_surface()) {
                 ray = it->spawn_ray(ray->direction());
                 pdf_bsdf = 1e16f;
