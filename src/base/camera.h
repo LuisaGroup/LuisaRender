@@ -167,3 +167,7 @@ public:
 };
 
 }// namespace luisa::render
+
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(::luisa::render::Camera::Instance)
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(::luisa::render::Camera::Sample)
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(::luisa::render::Camera::SampleDifferential)

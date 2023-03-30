@@ -11,9 +11,9 @@
 namespace luisa::render {
 
 using compute::Buffer;
+using compute::Command;
 using compute::Device;
 using compute::Expr;
-using compute::Command;
 
 class CounterBuffer {
 
@@ -30,4 +30,4 @@ public:
     [[nodiscard]] explicit operator bool() const noexcept;
 };
 
-}
+}// namespace luisa::render

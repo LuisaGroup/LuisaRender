@@ -116,3 +116,8 @@ public:
 };
 
 }// namespace luisa::render
+
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::GeometryAttribute)
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::ShadingAttribute)
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::RayDifferential)
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::Interaction)

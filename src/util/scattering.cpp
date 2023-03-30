@@ -352,7 +352,7 @@ BxDF::SampledDirection MicrofacetTransmission::sample_wi(Expr<float3> wo, Expr<f
     auto eta = ite(cos_theta(wo) > 0.f, _eta_a / _eta_b, _eta_b / _eta_a);
     auto wh = _distribution->sample_wh(wo, u);
     auto wi = compute::def(make_float3(0.f));
-    auto refr = refract(wo, wh, eta, &wi);
+    auto refr = refract(wo, wh, eta, std::addressof(wi));
     return {.wi = wi, .valid = refr & !same_hemisphere(wo, wi)};
 }
 

@@ -60,3 +60,6 @@ public:
 };
 
 }// namespace luisa::render
+
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(::luisa::render::Environment::Instance)
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(::luisa::render::Environment::Sample)
