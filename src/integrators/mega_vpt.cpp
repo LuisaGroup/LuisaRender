@@ -12,6 +12,9 @@
 
 namespace luisa::render {
 
+//#define TEST_COND all(dispatch_id().xy() == make_uint2(300, 700))
+#define TEST_COND false
+
 using namespace compute;
 
 class MegakernelVolumePathTracing final : public ProgressiveIntegrator {
@@ -101,10 +104,10 @@ protected:
         // initialize medium tracker
         auto env_medium_tag = pipeline().environment_medium_tag();
         pipeline().media().dispatch(env_medium_tag, [&](auto medium) {
-            medium_tracker.enter(medium->priority(), def<MediumInfo>(env_medium_tag));
+            medium_tracker.enter(medium->priority(), make_medium_info(medium->priority(), env_medium_tag));
         });
         auto ray = camera_ray;
-        // TODO: bug in initialization of medium tracker, disabled for now
+        // TODO: bug in initialization of medium tracker where the angle between shared edge is small
         auto depth_track = def<uint>(0u);
         $while(true) {
             auto it = pipeline().geometry()->intersect(ray);
@@ -118,13 +121,12 @@ protected:
                 auto surface_tag = it->shape().surface_tag();
                 auto medium_tag = it->shape().medium_tag();
 
-                auto medium_info = def<MediumInfo>();
-                medium_info.medium_tag = medium_tag;
                 auto medium_priority = def<uint>(0u);
-
                 pipeline().media().dispatch(medium_tag, [&](auto medium) {
                     medium_priority = medium->priority();
                 });
+                auto medium_info = make_medium_info(medium_priority, medium_tag);
+
                 // deal with medium tracker
                 auto surface_event = event(swl, it, time, -ray->direction(), ray->direction());
                 pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
@@ -171,6 +173,7 @@ protected:
         };
         $if(TEST_COND) {
             pipeline().printer().verbose_with_location("Final medium tracker size={}", medium_tracker.size());
+            pipeline().printer().verbose("");
         };
 
         ray = camera_ray;
@@ -190,6 +193,8 @@ protected:
 
             $if(TEST_COND) {
                 pipeline().printer().verbose_with_location("depth={}", depth + 1u);
+                pipeline().printer().verbose_with_location("before: medium tracker size={}, priority={}, tag={}",
+                                                           medium_tracker.size(), medium_tracker.current().priority, medium_tracker.current().medium_tag);
                 pipeline().printer().verbose_with_location("it->p(): ({}, {}, {})", it->p().x, it->p().y, it->p().z);
             };
 
@@ -252,11 +257,17 @@ protected:
                                     UInt medium_event = Medium::sample_event(pAbsorb, pScatter, pNull, um);
                                     // don't use switch-case here, because of local variable definition
                                     $if(medium_event == Medium::event_absorb) {
+                                        $if(TEST_COND) {
+                                            pipeline().printer().verbose_with_location("Absorb");
+                                        };
                                         // Handle absorption along ray path
                                         terminated = true;
                                         ans = false;
                                     }
                                     $elif(medium_event == Medium::event_scatter) {
+                                        $if(TEST_COND) {
+                                            pipeline().printer().verbose_with_location("Scatter");
+                                        };
                                         // Handle scattering along ray path
                                         // Stop path sampling if maximum depth has been reached
                                         depth += 1u;
@@ -278,7 +289,7 @@ protected:
                                                 auto u_light_surface = sampler()->generate_2d();
 
                                                 // sample one light
-                                                Interaction light_it;
+                                                Interaction light_it{};
                                                 auto light_sample = light_sampler()->sample(
                                                     light_it, u_light_selection, u_light_surface, swl, time);
 
@@ -373,6 +384,9 @@ protected:
                                         };
                                     }
                                     $elif(medium_event == Medium::event_null) {
+                                        $if(TEST_COND) {
+                                            pipeline().printer().verbose_with_location("Null");
+                                        };
                                         // Handle null scattering along ray path
                                         SampledSpectrum sigma_n = max(sigma_maj - closure_p->sigma_a() - closure_p->sigma_s(), 0.f);
                                         Float pdf = T_maj[0u] * sigma_n[0u];
@@ -466,8 +480,6 @@ protected:
 
                 auto medium_tag = it->shape().medium_tag();
                 auto medium_priority = def(0u);
-                auto medium_info = def<MediumInfo>();
-                medium_info.medium_tag = medium_tag;
                 auto eta_next = def(1.f);
                 pipeline().media().dispatch(medium_tag, [&](auto medium) {
                     auto closure = medium->closure(ray, swl, time);
@@ -482,6 +494,8 @@ protected:
                         };
                     });
                 };
+                auto medium_info = make_medium_info(medium_priority, medium_tag);
+                medium_info.medium_tag = medium_tag;
 
                 // evaluate material
                 auto surface_tag = it->shape().surface_tag();
@@ -498,7 +512,9 @@ protected:
                         u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
                     }
 
+                    UInt surface_event;
                     $if(alpha_skip | (medium_tag != medium_tracker.current().medium_tag)) {
+                        surface_event = event(swl, it, time, -ray->direction(), ray->direction());
                         ray = it->spawn_ray(ray->direction());
                         pdf_bsdf = 1e16f;
                     }
@@ -516,6 +532,7 @@ protected:
                         };
                         // sample material
                         auto surface_sample = closure->sample(wo, u_lobe, u_bsdf);
+                        surface_event = surface_sample.event;
 
                         ray = it->spawn_ray(surface_sample.wi);
                         pdf_bsdf = surface_sample.eval.pdf;
@@ -524,15 +541,24 @@ protected:
                         r_l = r_u * w;
                         // apply eta scale & update medium tracker
                         $if(has_medium) {
-                            $switch(surface_sample.event) {
+                            $switch(surface_event) {
                                 $case(Surface::event_enter) {
                                     eta_scale = sqr(eta_next / eta);
-                                    medium_tracker.enter(medium_priority, medium_info);
                                 };
                                 $case(Surface::event_exit) {
                                     eta_scale = sqr(eta / eta_next);
-                                    medium_tracker.exit(medium_priority, medium_info);
                                 };
+                            };
+                        };
+                    };
+
+                    $if(has_medium) {
+                        $switch(surface_event) {
+                            $case(Surface::event_enter) {
+                                medium_tracker.enter(medium_priority, medium_info);
+                            };
+                            $case(Surface::event_exit) {
+                                medium_tracker.exit(medium_priority, medium_info);
                             };
                         };
                     };
@@ -554,6 +580,8 @@ protected:
                 pipeline().printer().verbose_with_location(
                     "scattered={}, beta=({}, {}, {}), pdf_bsdf={}, Li: ({}, {}, {})",
                     scattered, beta[0u], beta[1u], beta[2u], pdf_bsdf, Li[0u], Li[1u], Li[2u]);
+                pipeline().printer().verbose_with_location("after: medium tracker size={}, priority={}, tag={}",
+                                                           medium_tracker.size(), medium_tracker.current().priority, medium_tracker.current().medium_tag);
                 pipeline().printer().verbose("");
             };
         };
@@ -566,6 +594,8 @@ luisa::unique_ptr<Integrator::Instance> MegakernelVolumePathTracing::build(
     return luisa::make_unique<MegakernelVolumePathTracingInstance>(
         pipeline, command_buffer, this);
 }
+
+#undef TEST_COND
 
 }// namespace luisa::render
 

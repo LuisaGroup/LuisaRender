@@ -22,9 +22,7 @@ Bool MediumTracker::true_hit(Expr<uint> priority) const noexcept {
 
 void MediumTracker::enter(Expr<uint> priority, Expr<MediumInfo> value) noexcept {
     $if(_size == capacity) {
-        $if(TEST_COND) {
-            printer().error_with_location("Medium stack overflow when trying to enter priority={}, medium_tag={}", priority, value.medium_tag);
-        };
+        printer().error_with_location("Medium stack overflow when trying to enter priority={}, medium_tag={}", priority, value.medium_tag);
     }
     $else {
         _size += 1u;
@@ -46,7 +44,7 @@ void MediumTracker::exit(Expr<uint> priority, Expr<MediumInfo> value) noexcept {
     auto remove_num = def(0u);
     for (auto i = 0u; i < capacity - 1u; i++) {
         auto p = _priority_list[i];
-        auto should_remove = (p == priority) & equal(_medium_list[i], value) & (remove_num == 0u);
+        auto should_remove = (p == priority) & _medium_list[i]->equal(value) & (remove_num == 0u);
         remove_num += ite(should_remove, 1u, 0u);
         _priority_list[i] = _priority_list[i + remove_num];
         _medium_list[i] = _medium_list[i + remove_num];
@@ -57,9 +55,7 @@ void MediumTracker::exit(Expr<uint> priority, Expr<MediumInfo> value) noexcept {
         _medium_list[_size] = def<MediumInfo>();
     }
     $else {
-        $if(TEST_COND) {
-            printer().error_with_location("Medium stack trying to exit nonexistent priority={}, medium_tag={}", priority, value.medium_tag);
-        };
+        printer().error_with_location("Medium stack trying to exit nonexistent priority={}, medium_tag={}", priority, value.medium_tag);
     };
 }
 
@@ -67,7 +63,7 @@ Bool MediumTracker::exist(Expr<uint> priority, Expr<MediumInfo> value) noexcept 
     auto exist = def(false);
     for (auto i = 0u; i < capacity - 1u; i++) {
         auto p = _priority_list[i];
-        exist |= (p == priority) & equal(_medium_list[i], value);
+        exist |= (p == priority) & _medium_list[i]->equal(value);
     }
     return exist;
 }
@@ -80,10 +76,6 @@ Var<MediumInfo> MediumTracker::current() const noexcept {
 
 Bool MediumTracker::vacuum() const noexcept {
     return _priority_list[0] == 0u;
-}
-
-Bool equal(Expr<MediumInfo> a, Expr<MediumInfo> b) noexcept {
-    return a.medium_tag == b.medium_tag;
 }
 
 }// namespace luisa::render

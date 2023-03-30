@@ -10,18 +10,16 @@
 
 namespace luisa::render {
 
-//#define TEST_COND all(dispatch_id().xy() == make_uint2(505, 90))
-#define TEST_COND false
-
 using compute::ArrayVar;
 using compute::Bool;
 using compute::Expr;
 using compute::Float4;
+using compute::Printer;
 using compute::UInt;
 using compute::Var;
-using compute::Printer;
 
 struct MediumInfo {
+    uint priority{0u};
     uint medium_tag{Medium::INVALID_TAG};
 };
 
@@ -57,4 +55,18 @@ public:
 
 }// namespace luisa::render
 
-LUISA_STRUCT(luisa::render::MediumInfo, medium_tag){};
+LUISA_STRUCT(
+    luisa::render::MediumInfo,
+    priority,
+    medium_tag) {
+
+    [[nodiscard]] luisa::compute::Bool equal(luisa::compute::Expr<luisa::render::MediumInfo> v) const noexcept {
+        return (this->medium_tag == v.medium_tag) &
+               (this->priority == v.priority);
+    }
+};
+
+[[nodiscard]] luisa::compute::Var<luisa::render::MediumInfo> make_medium_info(
+    luisa::compute::UInt priority, luisa::compute::UInt medium_tag) noexcept {
+    return luisa::compute::def<luisa::render::MediumInfo>(priority, medium_tag);
+}
