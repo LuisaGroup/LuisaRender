@@ -171,8 +171,8 @@ public:
                         // Call callback function for sample within segment
                         T_maj *= exp(-(t - t_min) * seg.sigma_maj);
                         Float3 p = ray()->origin() + ray()->direction() * t;
-                        auto closure_t = instance()->closure(compute::make_ray(p, ray()->direction()), swl(), time());
-                        $if(!callback(std::move(closure_t), p, seg.sigma_maj, T_maj)) {
+                        auto closure_t = instance()->closure(make_ray(p, ray()->direction()), swl(), time());
+                        $if(!callback(std::move(closure_t), seg.sigma_maj, T_maj)) {
                             // Returning out of doubly-nested while loop is not as good perf. wise
                             // on the GPU vs using "done" here.
                             done = true;

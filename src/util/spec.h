@@ -223,6 +223,8 @@ using luisa::compute::clamp;
 [[nodiscard]] SampledSpectrum clamp(const SampledSpectrum &v, const SampledSpectrum &l, Expr<float> r) noexcept;
 [[nodiscard]] SampledSpectrum clamp(const SampledSpectrum &v, Expr<float> l, const SampledSpectrum &r) noexcept;
 [[nodiscard]] SampledSpectrum clamp(const SampledSpectrum &v, const SampledSpectrum &l, const SampledSpectrum &r) noexcept;
+[[nodiscard]] Bool any(const SampledSpectrum &v) noexcept;
+[[nodiscard]] Bool all(const SampledSpectrum &v) noexcept;
 
 [[nodiscard]] SampledSpectrum zero_if_any_nan(const SampledSpectrum &t) noexcept;
 

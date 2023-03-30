@@ -81,12 +81,6 @@ protected:
                 Surface::event_enter));
     }
 
-    [[nodiscard]] SampledSpectrum Ld_medium(
-        Expr<Ray> ray, Expr<uint> frame_index, Expr<uint2> pixel_id, Expr<float> time,
-        const SampledWavelengths &swl) const noexcept {
-
-    }
-
     [[nodiscard]] Float3 Li(const Camera::Instance *camera, Expr<uint> frame_index,
                             Expr<uint2> pixel_id, Expr<float> time) const noexcept override {
         sampler()->start(pixel_id, frame_index);
@@ -102,7 +96,6 @@ protected:
         auto medium_tracker = MediumTracker(pipeline().printer());
 
         // functions
-        auto non_zero = [](auto b) noexcept { return b != 0.f; };
         auto le_zero = [](auto b) noexcept { return b <= 0.f; };
 
         // initialize medium tracker
@@ -118,7 +111,7 @@ protected:
             $if(!it->valid()) { $break; };
 
             $if(TEST_COND) {
-                pipeline().printer().verbose_with_location("depth={}", depth_track);
+                pipeline().printer().verbose_with_location("depth={}", depth_track + 1u);
             };
 
             $if(it->shape().has_medium()) {
@@ -195,6 +188,11 @@ protected:
             auto it = pipeline().geometry()->intersect(ray);
             auto has_medium = it->shape().has_medium();
 
+            $if(TEST_COND) {
+                pipeline().printer().verbose_with_location("depth={}", depth + 1u);
+                pipeline().printer().verbose_with_location("it->p(): ({}, {}, {})", it->p().x, it->p().y, it->p().z);
+            };
+
             // sample the participating medium
             $if(!medium_tracker.vacuum()) {
                 // Sample the participating medium
@@ -220,7 +218,7 @@ protected:
                         Bool terminated = def(false);
                         SampledSpectrum T_maj = closure->sampleT_maj(
                             t_max, u, rng,
-                            [&](luisa::unique_ptr<Medium::Closure> closure_p, Expr<float3> p,
+                            [&](luisa::unique_ptr<Medium::Closure> closure_p,
                                 SampledSpectrum sigma_maj, SampledSpectrum T_maj) -> Bool {
                                 Bool ans = def(false);
 
@@ -231,7 +229,7 @@ protected:
                                 }
                                 $else {
                                     // Add emission from medium scattering event
-                                    $if(depth < max_depth & closure_p->le().any(non_zero)) {
+                                    $if((depth < max_depth) & !closure_p->le().is_zero()) {
                                         // Compute beta' at new path vertex
                                         Float pdf = sigma_maj[0u] * T_maj[0u];
                                         SampledSpectrum betap = beta * T_maj / pdf;
@@ -241,7 +239,7 @@ protected:
 
                                         // Update Li for medium emission
                                         auto Le_medium = betap * closure_p->sigma_a() * closure_p->le() / r_e.average();
-                                        Li += ite(r_e.any(non_zero), Le_medium, 0.f);
+                                        Li += ite(!r_e.is_zero(), Le_medium, 0.f);
                                     };
 
                                     // Compute medium event probabilities for interaction
@@ -252,71 +250,139 @@ protected:
                                     // Sample medium scattering event type and update path
                                     Float um = rng.uniform_float();
                                     UInt medium_event = Medium::sample_event(pAbsorb, pScatter, pNull, um);
-                                    $switch(medium_event) {
-                                        $case(Medium::event_absorb) {
-                                            // Handle absorption along ray path
+                                    // don't use switch-case here, because of local variable definition
+                                    $if(medium_event == Medium::event_absorb) {
+                                        // Handle absorption along ray path
+                                        terminated = true;
+                                        ans = false;
+                                    }
+                                    $elif(medium_event == Medium::event_scatter) {
+                                        // Handle scattering along ray path
+                                        // Stop path sampling if maximum depth has been reached
+                                        depth += 1u;
+                                        $if(depth >= max_depth) {
                                             terminated = true;
                                             ans = false;
-                                            $break;
-                                        };
-                                        $case(Medium::event_scatter) {
-                                            // Handle scattering along ray path
-                                            // Stop path sampling if maximum depth has been reached
-                                            depth += 1u;
-                                            $if(depth >= max_depth) {
-                                                terminated = true;
-                                                ans = false;
-                                            }
-                                            $else {
-                                                // Update beta and r_u for real scattering event
-                                                Float pdf = T_maj[0u] * closure_p->sigma_s()[0u];
-                                                beta *= T_maj * closure_p->sigma_s() / pdf;
-                                                r_u *= T_maj * closure_p->sigma_s() / pdf;
+                                        }
+                                        $else {
+                                            // Update beta and r_u for real scattering event
+                                            Float pdf = T_maj[0u] * closure_p->sigma_s()[0u];
+                                            beta *= T_maj * closure_p->sigma_s() / pdf;
+                                            r_u *= T_maj * closure_p->sigma_s() / pdf;
 
-                                                $if(beta.any(non_zero) & r_u.any(non_zero)) {
-                                                    //                                                // TODO
-                                                    //                                                // Sample direct lighting at volume scattering event
-                                                    //                                                MediumInteraction intr(p, closure->ray()->direction(), closure->time(), ray.medium,
-                                                    //                                                                       closure->phase_function());
-                                                    //                                                Li += SampleLd(intr, nullptr, lambda, sampler, beta, r_u);
-                                                    //
+                                            Bool Ld_medium_zero = def(false);
+                                            $if(!beta.is_zero() & !r_u.is_zero()) {
+                                                // Sample direct lighting at volume scattering event
+                                                // generate uniform samples
+                                                auto u_light_selection = sampler()->generate_1d();
+                                                auto u_light_surface = sampler()->generate_2d();
 
-                                                    // Sample new direction at real scattering event
-                                                    Float2 u = sampler()->generate_2d();
-                                                    auto ps = closure->phase_function()->sample_p(-ray->direction(), u);
-                                                    $if(!ps.valid | (ps.pdf == 0.f)) {
-                                                        terminated = true;
-                                                    }
-                                                    $else {
-                                                        // Update ray path state for indirect volume scattering
-                                                        beta *= ps.p / ps.pdf;
-                                                        r_l = r_u / ps.pdf;
-                                                        scattered = true;
-                                                        ray = make_ray(p, ps.wi);
-                                                        $if(TEST_COND) {
-                                                            pipeline().printer().verbose_with_location(
-                                                                "Medium scattering event at depth={}, p=({}, {}, {})",
-                                                                depth, p.x, p.y, p.z);
+                                                // sample one light
+                                                Interaction light_it;
+                                                auto light_sample = light_sampler()->sample(
+                                                    light_it, u_light_selection, u_light_surface, swl, time);
+
+                                                // direct lighting
+                                                $if(light_sample.eval.pdf > 0.0f) {
+                                                    auto wo = closure->ray()->direction();
+                                                    auto wi = light_sample.shadow_ray->direction();
+
+                                                    auto light_ray = make_ray(closure->ray()->origin(), wi, 0.f, one_minus_epsilon);
+                                                    SampledSpectrum T_ray{swl.dimension(), 1.f}, r_l{swl.dimension(), 1.f}, r_u{swl.dimension(), 1.f};
+
+                                                    //                                                            PCG32 rng(U64(make_uint2(xxhash32(light_ray.origin()), xxhash32(light_ray.direction()))));
+
+                                                    $while(any(light_ray->direction() != 0.f)) {
+                                                        auto si = pipeline().geometry()->intersect(light_ray);
+                                                        $if(si->valid() & si->shape().has_surface()) {
+                                                            Ld_medium_zero = true;
+                                                            $break;
                                                         };
+                                                        Float t_max = ite(si->valid(), length(si->p() - light_ray->origin()), one_minus_epsilon);
+                                                        Float u = rng.uniform_float();
+                                                        SampledSpectrum T_maj = closure_p->sampleT_maj(
+                                                            t_max, u, rng,
+                                                            [&](luisa::unique_ptr<Medium::Closure> closure_p,
+                                                                SampledSpectrum sigma_maj, SampledSpectrum T_maj) -> Bool {
+                                                                // Update ray transmittance estimate at sampled point
+                                                                // Update T_ray and PDFs using ratio-tracking estimator
+                                                                SampledSpectrum sigma_n = max(sigma_maj - closure_p->sigma_a() - closure_p->sigma_s(), 0.f);
+                                                                Float pdf = T_maj[0u] * sigma_maj[0u];
+                                                                T_ray *= T_maj * sigma_n / pdf;
+                                                                r_l *= T_maj * sigma_maj / pdf;
+                                                                r_u *= T_maj * sigma_n / pdf;
+
+                                                                // Possibly terminate transmittance computation using
+                                                                // Russian roulette
+                                                                SampledSpectrum Tr = T_ray / (r_l + r_u).average();
+                                                                Float q = 0.75f;
+                                                                T_ray = ite(Tr.max() < 0.05f, ite(rng.uniform_float() < q, 0.f, T_ray / (1 - q)), T_ray);
+
+                                                                return ite(T_ray.is_zero(), false, true);
+                                                            });
+
+                                                        // Update transmittance estimate for final segment
+                                                        T_ray *= T_maj / T_maj[0u];
+                                                        r_l *= T_maj / T_maj[0u];
+                                                        r_u *= T_maj / T_maj[0u];
+
+                                                        // Generate next ray segment or return final transmittance
+                                                        $if(!T_ray.is_zero()) {
+                                                            Ld_medium_zero = true;
+                                                            $break;
+                                                        };
+                                                        $if (!si->valid()) {
+                                                            $break;
+                                                        };
+                                                        light_ray = si->spawn_ray_to(light_sample.shadow_ray->origin());
+                                                    };
+
+                                                    $if(!Ld_medium_zero) {
+                                                        auto phase_function = closure->phase_function();
+                                                        auto f_hat = phase_function->p(wo, wi);
+                                                        auto scatter_pdf = phase_function->pdf(wo ,wi);
+
+                                                        r_l *= r_u * light_sample.eval.pdf;
+                                                        r_u *= r_u * scatter_pdf;
+
+                                                        Li += beta * f_hat * T_ray * light_sample.eval.L / (r_l + r_u).average();
                                                     };
                                                 };
-                                                ans = false;
+
+                                                // Sample new direction at real scattering event
+                                                Float2 u = sampler()->generate_2d();
+                                                auto ps = closure->phase_function()->sample_p(-ray->direction(), u);
+                                                $if(!ps.valid | (ps.pdf == 0.f)) {
+                                                    terminated = true;
+                                                }
+                                                $else {
+                                                    // Update ray path state for indirect volume scattering
+                                                    beta *= ps.p / ps.pdf;
+                                                    r_l = r_u / ps.pdf;
+                                                    scattered = true;
+                                                    auto p = closure_p->ray()->origin();
+                                                    ray = make_ray(p, ps.wi);
+                                                    $if(TEST_COND) {
+                                                        pipeline().printer().verbose_with_location(
+                                                            "Medium scattering event at depth={}, p=({}, {}, {})",
+                                                            depth, p.x, p.y, p.z);
+                                                    };
+                                                };
                                             };
-                                            $break;
+                                            ans = false;
                                         };
-                                        $case(Medium::event_null) {
-                                            // Handle null scattering along ray path
-                                            SampledSpectrum sigma_n = max(sigma_maj - closure_p->sigma_a() - closure_p->sigma_s(), 0.f);
-                                            Float pdf = T_maj[0u] * sigma_n[0u];
-                                            beta *= T_maj * sigma_n / pdf;
-                                            $if(pdf == 0.f) {
-                                                beta = 0.f;
-                                            };
-                                            r_u *= T_maj * sigma_n / pdf;
-                                            r_l *= T_maj * sigma_maj / pdf;
-                                            ans = beta.any(non_zero) & r_u.any(non_zero);
-                                            $break;
+                                    }
+                                    $elif(medium_event == Medium::event_null) {
+                                        // Handle null scattering along ray path
+                                        SampledSpectrum sigma_n = max(sigma_maj - closure_p->sigma_a() - closure_p->sigma_s(), 0.f);
+                                        Float pdf = T_maj[0u] * sigma_n[0u];
+                                        beta *= T_maj * sigma_n / pdf;
+                                        $if(pdf == 0.f) {
+                                            beta = 0.f;
                                         };
+                                        r_u *= T_maj * sigma_n / pdf;
+                                        r_l *= T_maj * sigma_maj / pdf;
+                                        ans = !beta.is_zero() & !r_u.is_zero();
                                     };
                                 };
                                 return ans;
@@ -367,10 +433,12 @@ protected:
                             "eval.pdf={}, "
                             "eval.L=({}, {}, {}), "
                             "r_u=({}, {}, {}), "
-                            "r_l=({}, {}, {})",
+                            "r_l=({}, {}, {}),"
+                            "beta=({}, {}, {})",
                             eval.pdf, eval.L[0u], eval.L[1u], eval.L[2u],
                             r_u[0u], r_u[1u], r_u[2u],
-                            r_l[0u], r_l[1u], r_l[2u]);
+                            r_l[0u], r_l[1u], r_l[2u],
+                            beta[0u], beta[1u], beta[2u]);
                     };
                 };
             }
@@ -430,7 +498,7 @@ protected:
                         u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
                     }
 
-                    $if(alpha_skip) {
+                    $if(alpha_skip | (medium_tag != medium_tracker.current().medium_tag)) {
                         ray = it->spawn_ray(ray->direction());
                         pdf_bsdf = 1e16f;
                     }
@@ -472,12 +540,8 @@ protected:
             };
 
             beta = zero_if_any_nan(beta);
-            $if(TEST_COND) {
-                pipeline().printer().verbose_with_location("beta_before_break=({}, {}, {})", beta[0u], beta[1u], beta[2u]);
-            };
-            $if(beta.all([](auto b) noexcept { return b <= 0.f; })) {
-                $break;
-            };
+            $if(beta.all(le_zero)) { $break; };
+            // rr
             auto rr_threshold = node<MegakernelVolumePathTracing>()->rr_threshold();
             auto q = max(beta.max() * eta_scale, .05f);
             $if(depth + 1u >= rr_depth) {
@@ -487,10 +551,9 @@ protected:
             depth += 1u;
 
             $if(TEST_COND) {
-                //                pipeline().printer().verbose_with_location("it->p(): ({}, {}, {})", it->p().x, it->p().y, it->p().z);
                 pipeline().printer().verbose_with_location(
-                    "depth={}, scattered={}, beta=({}, {}, {}), pdf_bsdf={}, Li: ({}, {}, {})",
-                    depth, scattered, beta[0u], beta[1u], beta[2u], pdf_bsdf, Li[0u], Li[1u], Li[2u]);
+                    "scattered={}, beta=({}, {}, {}), pdf_bsdf={}, Li: ({}, {}, {})",
+                    scattered, beta[0u], beta[1u], beta[2u], pdf_bsdf, Li[0u], Li[1u], Li[2u]);
                 pipeline().printer().verbose("");
             };
         };

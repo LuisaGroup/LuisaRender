@@ -549,6 +549,14 @@ SampledSpectrum render::clamp(const SampledSpectrum &v, const SampledSpectrum &l
     return ans;
 }
 
+Bool any(const SampledSpectrum &v) noexcept {
+    return v.any([](auto x) noexcept { return x != 0.f; });
+}
+
+Bool all(const SampledSpectrum &v) noexcept {
+    return v.all([](auto x) noexcept { return x != 0.f; });
+}
+
 //SampledSpectrum fma(const SampledSpectrum &a, const SampledSpectrum &b, const SampledSpectrum &c) noexcept {
 //    auto n = std::max({a.dimension(), b.dimension(), c.dimension()});
 //    LUISA_ASSERT((a.dimension() == 1u || a.dimension() == n) &&
