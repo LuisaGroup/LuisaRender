@@ -201,8 +201,6 @@ protected:
             // sample the participating medium
             $if(!medium_tracker.vacuum()) {
                 // Sample the participating medium
-                // Normalize ray direction and update t_max accordingly
-                ray->set_direction(normalize(ray->direction()));
                 auto t_max = ite(it->valid(), length(it->p() - ray->origin()), Interaction::default_t_max);
 
                 // Initialize RNG for sampling the majorant transmittance
@@ -225,7 +223,7 @@ protected:
                             t_max, u, rng,
                             [&](luisa::unique_ptr<Medium::Closure> closure_p,
                                 SampledSpectrum sigma_maj, SampledSpectrum T_maj) -> Bool {
-                                Bool ans = def(false);
+                                Bool ans = def(true);
 
                                 // Handle medium scattering event for ray
                                 $if(beta.all([](auto b) noexcept { return b <= 0.f; })) {
@@ -429,7 +427,7 @@ protected:
                 if (pipeline().environment()) {
                     auto eval = light_sampler()->evaluate_miss(ray->direction(), swl, time);
                     // TODO: depth = 0
-                    r_l *= balance_heuristic(pdf_bsdf, eval.pdf);
+                    r_l /= balance_heuristic(pdf_bsdf, eval.pdf);
                     Li += beta * eval.L / (r_u + r_l).average();
                 }
                 $break;
@@ -440,7 +438,7 @@ protected:
                 $if(it->shape().has_light()) {
                     auto eval = light_sampler()->evaluate_hit(*it, ray->origin(), swl, time);
                     // TODO: depth = 0
-                    r_l *= balance_heuristic(pdf_bsdf, eval.pdf);
+                    r_l /= balance_heuristic(pdf_bsdf, eval.pdf);
                     Li += beta * eval.L / (r_u + r_l).average();
                     $if(TEST_COND) {
                         pipeline().printer().verbose_with_location(
@@ -457,14 +455,14 @@ protected:
                 };
             }
 
-            // hit normal surface
+            // hit ordinary surface
             $if(!it->shape().has_surface()) {
+                // TODO: if shape has no surface, we cannot get the right normal direction
+                //      so we cannot deal with medium tracker correctly (enter/exit)
                 ray = it->spawn_ray(ray->direction());
                 pdf_bsdf = 1e16f;
             }
             $else {
-                // TODO
-
                 // generate uniform samples
                 auto u_light_selection = sampler()->generate_1d();
                 auto u_light_surface = sampler()->generate_2d();
@@ -499,6 +497,7 @@ protected:
 
                 // evaluate material
                 auto surface_tag = it->shape().surface_tag();
+                auto surface_event_skip = event(swl, it, time, -ray->direction(), ray->direction());
                 pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
                     // create closure
                     auto wo = -ray->direction();
@@ -514,7 +513,7 @@ protected:
 
                     UInt surface_event;
                     $if(alpha_skip | (medium_tag != medium_tracker.current().medium_tag)) {
-                        surface_event = event(swl, it, time, -ray->direction(), ray->direction());
+                        surface_event = surface_event_skip;
                         ray = it->spawn_ray(ray->direction());
                         pdf_bsdf = 1e16f;
                     }
@@ -523,6 +522,7 @@ protected:
                             $if(*dispersive) { swl.terminate_secondary(); };
                         }
                         // direct lighting
+                        // TODO: add medium to direct lighting
                         $if(light_sample.eval.pdf > 0.0f & !occluded) {
                             auto wi = light_sample.shadow_ray->direction();
                             auto eval = closure->evaluate(wo, wi);

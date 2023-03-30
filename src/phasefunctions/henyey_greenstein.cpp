@@ -65,7 +65,7 @@ protected:
 public:
     HenyeyGreenstein(Scene *scene, const SceneNodeDesc *desc) noexcept
         : PhaseFunction{scene, desc},
-          _g{desc->property_float_or_default("g", 0.f)} {}
+          _g{clamp(desc->property_float_or_default("g", 0.f), -1.f, 1.f)} {}
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
 };
 

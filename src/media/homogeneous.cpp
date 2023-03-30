@@ -43,6 +43,54 @@ public:
     class HomogeneousMediumClosure : public Medium::Closure {
 
     public:
+        [[nodiscard]] Medium::Sample sample(Expr<float> t_max, PCG32 &rng) const noexcept override {
+            Medium::Sample sample_ans = Medium::Sample::zero(swl().dimension());
+            SampledSpectrum pdf_channels = SampledSpectrum{swl().dimension(), 0.f};
+            for (auto i = 0u; i < swl().dimension(); ++i) {
+                pdf_channels[i] = rng.uniform_float();
+            }
+            pdf_channels /= pdf_channels.sum();
+            auto channel = sample_discrete(pdf_channels, rng.uniform_float());
+            auto t = -log(max(1.f - rng.uniform_float(), 0.f)) / sigma_t()[channel];
+
+            // hit surface
+            $if(t > t_max) {
+                sample_ans.medium_event = Medium::event_hit_surface;
+                t = t_max;
+                sample_ans.t = t;
+                auto Tr = transmittance(t, rng);
+                sample_ans.ray = make_ray(ray()->origin() + ray()->direction() * t, ray()->direction());
+                auto pdf = pdf_channels * Tr;
+                sample_ans.eval.f = Tr / pdf.sum();
+            }
+            // scatter/absorb
+            $else {
+                auto p_absorb = sigma_a()[channel] / sigma_t()[channel];
+                auto p_scatter = 1.f - p_absorb;
+                auto sample_index = sample_discrete(make_float2(p_absorb, p_scatter), rng.uniform_float());
+
+                // absorb
+                $if(sample_index == 0u) {
+                    sample_ans.medium_event = Medium::event_absorb;
+                    sample_ans.t = 0.f;
+                    sample_ans.ray = ray();
+                    sample_ans.eval.f = SampledSpectrum{swl().dimension(), 0.f};
+                }
+                // scatter
+                $else {
+                    sample_ans.medium_event = Medium::event_scatter;
+                    sample_ans.t = t;
+                    auto Tr = transmittance(t, rng);
+                    auto pf_sample = phase_function()->sample_p(-ray()->direction(), make_float2(rng.uniform_float(), rng.uniform_float()));
+                    sample_ans.ray = make_ray(ray()->origin() + ray()->direction() * t, pf_sample.wi);
+                    auto pdf_distance = sigma_t() * Tr;
+                    auto pdf = pdf_channels * pdf_distance;
+                    sample_ans.eval.f = (Tr * sigma_s()) / pdf.sum();
+                };
+            };
+
+            return sample_ans;
+        }
         [[nodiscard]] SampledSpectrum transmittance(Expr<float> t, PCG32 &rng) const noexcept override {
             return analyticTransmittance(t, sigma_a() + sigma_s());
         }

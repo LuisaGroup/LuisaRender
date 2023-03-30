@@ -25,11 +25,14 @@ using compute::Var;
 class Medium : public SceneNode {
 
 public:
-    static uint constexpr INVALID_TAG = uint(0u) - uint(1u);
+    static constexpr uint INVALID_TAG = ~0u;
 
-    static constexpr auto event_absorb = 0x00u;
-    static constexpr auto event_scatter = 0x01u;
-    static constexpr auto event_null = 0x02u;
+    static constexpr uint event_absorb = 0u;
+    static constexpr uint event_scatter = 1u;
+    static constexpr uint event_null = 2u;
+    static constexpr uint event_hit_surface = 3u;
+
+    static constexpr uint event_invalid = ~0u;
 
 protected:
     uint _priority;
@@ -52,13 +55,13 @@ public:
     struct Sample {
         Evaluation eval;
         Var<Ray> ray;
-        Bool is_scattered;
+        UInt medium_event;
         Float t;
 
         [[nodiscard]] static auto zero(uint spec_dim) noexcept {
             return Sample{.eval = Evaluation::zero(spec_dim),
                           .ray = def<Ray>(),
-                          .is_scattered = false,
+                          .medium_event = event_invalid,
                           .t = 0.0f};
         }
     };
@@ -122,10 +125,11 @@ public:
         [[nodiscard]] auto eta() const noexcept { return _eta; }
         [[nodiscard]] auto sigma_a() const noexcept { return _sigma_a; }
         [[nodiscard]] auto sigma_s() const noexcept { return _sigma_s; }
+        [[nodiscard]] auto sigma_t() const noexcept { return _sigma_a + _sigma_s; }
         [[nodiscard]] auto le() const noexcept { return _le; }
         [[nodiscard]] auto phase_function() const noexcept { return _phase_function; }
 
-        //        [[nodiscard]] virtual Medium::Sample sample(Expr<float> t_max, PCG32 &rng) const noexcept = 0;
+        [[nodiscard]] virtual Medium::Sample sample(Expr<float> t_max, PCG32 &rng) const noexcept = 0;
         [[nodiscard]] virtual SampledSpectrum transmittance(Expr<float> t, PCG32 &rng) const noexcept = 0;
         [[nodiscard]] virtual luisa::unique_ptr<RayMajorantIterator> sample_iterator(Expr<float> t_max) const noexcept = 0;
         // from PBRT-v4

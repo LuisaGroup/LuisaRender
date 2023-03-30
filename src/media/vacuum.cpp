@@ -27,6 +27,9 @@ public:
 
     class VacuumMediumClosure : public Medium::Closure {
     public:
+        [[nodiscard]] Medium::Sample sample(Expr<float> t_max, PCG32 &rng) const noexcept override {
+            return Medium::Sample::zero(swl().dimension());
+        }
         [[nodiscard]] SampledSpectrum transmittance(Expr<float> t, PCG32 &rng) const noexcept override {
             return {swl().dimension(), 1.0f};
         }
