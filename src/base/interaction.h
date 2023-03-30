@@ -79,7 +79,7 @@ public:
                 Expr<uint> prim_id, Expr<float> prim_area, Expr<float3> p,
                 Expr<float3> ng, Expr<bool> back_facing) noexcept
         : _shape{std::move(shape)}, _pg{p}, _ng{ng}, _shading{Frame::make(_ng)}, _ps{p},
-          _inst_id{~0u}, _prim_id{prim_id}, _prim_area{prim_area}, _back_facing{back_facing} {}
+          _inst_id{inst_id}, _prim_id{prim_id}, _prim_area{prim_area}, _back_facing{back_facing} {}
 
     Interaction(Shape::Handle shape, Expr<uint> inst_id, Expr<uint> prim_id,
                 Expr<float> prim_area, Expr<float3> pg, Expr<float3> ng, Expr<float2> uv,
