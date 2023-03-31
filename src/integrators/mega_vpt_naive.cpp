@@ -84,6 +84,11 @@ protected:
                 Surface::event_enter));
     }
 
+    [[nodiscard]] SampledSpectrum transmittance(Expr<Ray> ray, Expr<uint> frame_index,
+                                                Expr<uint2> pixel_id, Expr<float> time) const noexcept {
+        // TODO
+    }
+
     [[nodiscard]] Float3 Li(const Camera::Instance *camera, Expr<uint> frame_index,
                             Expr<uint2> pixel_id, Expr<float> time) const noexcept override {
         sampler()->start(pixel_id, frame_index);
@@ -215,9 +220,12 @@ protected:
                     if (!closure->instance()->node()->is_vacuum()) {
                         medium_sample = closure->sample(t_max, rng);
 
+                        // direct light
+                        // TODO
+
                         ray = medium_sample.ray;
-                        beta *= medium_sample.eval.f;
-//                        pdf_bsdf = 1e16f;
+                        beta *= medium_sample.eval.f * balance_heuristic(pdf_bsdf, medium_sample.eval.pdf);
+                        pdf_bsdf = medium_sample.eval.pdf;
                     }
                 });
             };
@@ -260,7 +268,7 @@ protected:
                     // TODO: if shape has no surface, we cannot get the right normal direction
                     //      so we cannot deal with medium tracker correctly (enter/exit)
                     ray = it->spawn_ray(ray->direction());
-//                    pdf_bsdf = 1e16f;
+                    pdf_bsdf = 1e16f;
                 }
                 $else {
                     // generate uniform samples
@@ -312,7 +320,7 @@ protected:
                         $if(alpha_skip | (medium_tag != medium_tracker.current().medium_tag)) {
                             surface_event = surface_event_skip;
                             ray = it->spawn_ray(ray->direction());
-//                            pdf_bsdf = 1e16f;
+                            pdf_bsdf = 1e16f;
                         }
                         $else {
                             if (auto dispersive = closure->is_dispersive()) {
@@ -375,7 +383,6 @@ protected:
                     });
                 };
             };
-
 
             $if(TEST_COND) {
                 pipeline().printer().verbose_with_location(

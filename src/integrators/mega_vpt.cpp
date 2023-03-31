@@ -426,9 +426,13 @@ protected:
             $if(!it->valid()) {
                 if (pipeline().environment()) {
                     auto eval = light_sampler()->evaluate_miss(ray->direction(), swl, time);
-                    // TODO: depth = 0
-                    r_l /= balance_heuristic(pdf_bsdf, eval.pdf);
-                    Li += beta * eval.L / (r_u + r_l).average();
+                    $if(depth == 0u) {
+                        Li += beta * eval.L / r_u.average();
+                    }
+                    $else {
+                        r_l /= balance_heuristic(pdf_bsdf, eval.pdf);
+                        Li += beta * eval.L / (r_u + r_l).average();
+                    };
                 }
                 $break;
             };
@@ -437,20 +441,12 @@ protected:
             if (!pipeline().lights().empty()) {
                 $if(it->shape().has_light()) {
                     auto eval = light_sampler()->evaluate_hit(*it, ray->origin(), swl, time);
-                    // TODO: depth = 0
-                    r_l /= balance_heuristic(pdf_bsdf, eval.pdf);
-                    Li += beta * eval.L / (r_u + r_l).average();
-                    $if(TEST_COND) {
-                        pipeline().printer().verbose_with_location(
-                            "eval.pdf={}, "
-                            "eval.L=({}, {}, {}), "
-                            "r_u=({}, {}, {}), "
-                            "r_l=({}, {}, {}),"
-                            "beta=({}, {}, {})",
-                            eval.pdf, eval.L[0u], eval.L[1u], eval.L[2u],
-                            r_u[0u], r_u[1u], r_u[2u],
-                            r_l[0u], r_l[1u], r_l[2u],
-                            beta[0u], beta[1u], beta[2u]);
+                    $if(depth == 0u) {
+                        Li += beta * eval.L / r_u.average();
+                    }
+                    $else {
+                        r_l /= balance_heuristic(pdf_bsdf, eval.pdf);
+                        Li += beta * eval.L / (r_u + r_l).average();
                     };
                 };
             }

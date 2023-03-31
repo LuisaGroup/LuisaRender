@@ -51,7 +51,7 @@ public:
             }
             pdf_channels /= pdf_channels.sum();
             auto channel = sample_discrete(pdf_channels, rng.uniform_float());
-            auto t = -log(max(1.f - rng.uniform_float(), 0.f)) / sigma_t()[channel];
+            auto t = -log(max(1.f - rng.uniform_float(), std::numeric_limits<float>::min())) / sigma_t()[channel];
 
             // hit surface
             $if(t > t_max) {
@@ -61,7 +61,8 @@ public:
                 auto Tr = transmittance(t, rng);
                 sample_ans.ray = make_ray(ray()->origin() + ray()->direction() * t, ray()->direction());
                 auto pdf = pdf_channels * Tr;
-                sample_ans.eval.f = Tr / pdf.sum();
+                sample_ans.eval.f = Tr;
+                sample_ans.eval.pdf = pdf.sum();
             }
             // scatter/absorb
             $else {
@@ -75,6 +76,7 @@ public:
                     sample_ans.t = 0.f;
                     sample_ans.ray = ray();
                     sample_ans.eval.f = SampledSpectrum{swl().dimension(), 0.f};
+                    sample_ans.eval.pdf = 1e16f;
                 }
                 // scatter
                 $else {
@@ -85,14 +87,15 @@ public:
                     sample_ans.ray = make_ray(ray()->origin() + ray()->direction() * t, pf_sample.wi);
                     auto pdf_distance = sigma_t() * Tr;
                     auto pdf = pdf_channels * pdf_distance;
-                    sample_ans.eval.f = (Tr * sigma_s()) / pdf.sum();
+                    sample_ans.eval.f = Tr * sigma_s();
+                    sample_ans.eval.pdf = pdf.sum();
                 };
             };
 
             return sample_ans;
         }
         [[nodiscard]] SampledSpectrum transmittance(Expr<float> t, PCG32 &rng) const noexcept override {
-            return analyticTransmittance(t, sigma_a() + sigma_s());
+            return analytic_transmittance(t, sigma_a() + sigma_s());
         }
         [[nodiscard]] unique_ptr<RayMajorantIterator> sample_iterator(Expr<float> t_max) const noexcept override {
             return luisa::make_unique<HomogeneousMajorantIterator>(0.f, t_max, sigma_a() + sigma_s());
@@ -127,9 +130,10 @@ public:
         [[nodiscard]] luisa::unique_ptr<Closure> closure(
             Expr<Ray> ray, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
             Interaction it;
-            auto [sigma_a, strength_a] = _sigma_a->evaluate_albedo_spectrum(it, swl, time);
-            auto [sigma_s, strength_s] = _sigma_s->evaluate_albedo_spectrum(it, swl, time);
-            auto [Le, strength_Le] = _le != nullptr ? _le->evaluate_albedo_spectrum(it, swl, time) : Spectrum::Decode::zero(swl.dimension());
+            auto [sigma_a, strength_a] = _sigma_a->evaluate_unbounded_spectrum(it, swl, time);
+            auto [sigma_s, strength_s] = _sigma_s->evaluate_unbounded_spectrum(it, swl, time);
+            auto [Le, strength_Le] = _le != nullptr ? _le->evaluate_illuminant_spectrum(it, swl, time) :
+                                                      Spectrum::Decode::zero(swl.dimension());
             return luisa::make_unique<HomogeneousMediumClosure>(
                 this, ray, swl, time, node<HomogeneousMedium>()->_eta,
                 sigma_a, sigma_s, Le, _phase_function);

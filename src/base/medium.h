@@ -45,10 +45,12 @@ public:
 
     struct Evaluation {
         SampledSpectrum f;
+        Float pdf;
 
         [[nodiscard]] static auto zero(uint spec_dim) noexcept {
             return Evaluation{
-                .f = SampledSpectrum{spec_dim}};
+                .f = SampledSpectrum{spec_dim},
+                .pdf = 1e16f};
         }
     };
 
@@ -104,7 +106,7 @@ public:
         const PhaseFunction::Instance *_phase_function;
 
     protected:
-        [[nodiscard]] SampledSpectrum analyticTransmittance(
+        [[nodiscard]] SampledSpectrum analytic_transmittance(
             Expr<float> t,
             const SampledSpectrum &sigma) const noexcept {
             return exp(-sigma * t);
