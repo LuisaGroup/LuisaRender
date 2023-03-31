@@ -26,6 +26,7 @@ class Medium : public SceneNode {
 
 public:
     static constexpr uint INVALID_TAG = ~0u;
+    static constexpr uint VACUUM_PRIORITY = ~0u;
 
     static constexpr uint event_absorb = 0u;
     static constexpr uint event_scatter = 1u;

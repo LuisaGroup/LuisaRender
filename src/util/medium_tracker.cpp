@@ -11,13 +11,13 @@ using namespace luisa::compute;
 
 MediumTracker::MediumTracker(Printer &printer) noexcept : _size{0u}, _printer{printer} {
     for (auto i = 0u; i < capacity; i++) {
-        _priority_list[i] = 0u;
-        _medium_list[i] = def<MediumInfo>();
+        _priority_list[i] = Medium::VACUUM_PRIORITY;
+        _medium_list[i] = make_medium_info(Medium::VACUUM_PRIORITY, Medium::INVALID_TAG);
     }
 }
 
 Bool MediumTracker::true_hit(Expr<uint> priority) const noexcept {
-    return priority > _priority_list[0u];
+    return priority <= _priority_list[0u];
 }
 
 void MediumTracker::enter(Expr<uint> priority, Expr<MediumInfo> value) noexcept {
@@ -31,7 +31,7 @@ void MediumTracker::enter(Expr<uint> priority, Expr<MediumInfo> value) noexcept 
         for (auto i = 0u; i < capacity; i++) {
             auto p = _priority_list[i];
             auto m = _medium_list[i];
-            auto should_swap = p <= x;
+            auto should_swap = p > x;
             _priority_list[i] = ite(should_swap, x, p);
             _medium_list[i] = ite(should_swap, v, m);
             x = ite(should_swap, p, x);
@@ -51,8 +51,8 @@ void MediumTracker::exit(Expr<uint> priority, Expr<MediumInfo> value) noexcept {
     }
     $if(remove_num != 0u) {
         _size -= 1u;
-        _priority_list[_size] = 0u;
-        _medium_list[_size] = def<MediumInfo>();
+        _priority_list[_size] = Medium::VACUUM_PRIORITY;
+        _medium_list[_size] = make_medium_info(Medium::VACUUM_PRIORITY, Medium::INVALID_TAG);
     }
     $else {
         printer().error_with_location("Medium stack trying to exit nonexistent priority={}, medium_tag={}", priority, value.medium_tag);
@@ -69,13 +69,15 @@ Bool MediumTracker::exist(Expr<uint> priority, Expr<MediumInfo> value) noexcept 
 }
 
 Var<MediumInfo> MediumTracker::current() const noexcept {
-    auto m = def<MediumInfo>();
-    m.medium_tag = ite(vacuum(), 0u, _medium_list[0].medium_tag);
-    return m;
+    auto ans = _medium_list[0];
+    $if(vacuum()) {
+        ans = make_medium_info(Medium::VACUUM_PRIORITY, Medium::INVALID_TAG);
+    };
+    return ans;
 }
 
 Bool MediumTracker::vacuum() const noexcept {
-    return _priority_list[0] == 0u;
+    return _priority_list[0] == Medium::VACUUM_PRIORITY;
 }
 
 }// namespace luisa::render

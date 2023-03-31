@@ -12,7 +12,7 @@
 
 namespace luisa::render {
 
-//#define TEST_COND all(dispatch_id().xy() == make_uint2(70, 236))
+//#define TEST_COND all(dispatch_id().xy() == make_uint2(104, 253))
 #define TEST_COND false
 
 using namespace compute;
@@ -224,8 +224,15 @@ protected:
                         // TODO
 
                         ray = medium_sample.ray;
-                        beta *= medium_sample.eval.f * balance_heuristic(pdf_bsdf, medium_sample.eval.pdf);
+                        auto w = ite(medium_sample.eval.pdf > 0.f, 1.f / medium_sample.eval.pdf, 0.f);
+                        beta *= medium_sample.eval.f * w;
                         pdf_bsdf = medium_sample.eval.pdf;
+
+                        $if(TEST_COND) {
+                            pipeline().printer().verbose_with_location(
+                                "balance_heuristic(pdf_bsdf, medium_sample.eval.pdf)={}",
+                                balance_heuristic(pdf_bsdf, medium_sample.eval.pdf));
+                        };
                     }
                 });
             };
@@ -236,7 +243,7 @@ protected:
                 $if(!it->valid()) {
                     if (pipeline().environment()) {
                         auto eval = light_sampler()->evaluate_miss(ray->direction(), swl, time);
-                        Li += beta * eval.L / balance_heuristic(pdf_bsdf, eval.pdf);
+                        Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
                     }
                     $break;
                 };
@@ -317,7 +324,7 @@ protected:
                         }
 
                         UInt surface_event;
-                        $if(alpha_skip | (medium_tag != medium_tracker.current().medium_tag)) {
+                        $if(alpha_skip | !medium_tracker.true_hit(medium_info.medium_tag)) {
                             surface_event = surface_event_skip;
                             ray = it->spawn_ray(ray->direction());
                             pdf_bsdf = 1e16f;
@@ -326,6 +333,7 @@ protected:
                             if (auto dispersive = closure->is_dispersive()) {
                                 $if(*dispersive) { swl.terminate_secondary(); };
                             }
+
                             // direct lighting
                             // TODO: add medium to direct lighting
                             $if(light_sample.eval.pdf > 0.0f & !occluded) {
@@ -349,14 +357,16 @@ protected:
                                         beta[0u], beta[1u], beta[2u]);
                                 };
                             };
+
                             // sample material
                             auto surface_sample = closure->sample(wo, u_lobe, u_bsdf);
                             surface_event = surface_sample.event;
-
-                            ray = it->spawn_ray(surface_sample.wi);
-                            pdf_bsdf = surface_sample.eval.pdf;
                             auto w = ite(surface_sample.eval.pdf > 0.f, 1.f / surface_sample.eval.pdf, 0.f);
+
+                            pdf_bsdf = surface_sample.eval.pdf;
+                            ray = it->spawn_ray(surface_sample.wi);
                             beta *= w * surface_sample.eval.f;
+
                             // apply eta scale & update medium tracker
                             $if(has_medium) {
                                 $switch(surface_event) {
@@ -380,13 +390,19 @@ protected:
                                 };
                             };
                         };
+
+                        $if(TEST_COND) {
+                            pipeline().printer().verbose_with_location(
+                                "surface event={}, priority={}, tag={}",
+                                surface_event, medium_priority, medium_tag);
+                        };
                     });
                 };
             };
 
             $if(TEST_COND) {
                 pipeline().printer().verbose_with_location(
-                    "event={}, beta=({}, {}, {}), pdf_bsdf={}, Li: ({}, {}, {})",
+                    "medium event={}, beta=({}, {}, {}), pdf_bsdf={}, Li: ({}, {}, {})",
                     medium_sample.medium_event, beta[0u], beta[1u], beta[2u], pdf_bsdf, Li[0u], Li[1u], Li[2u]);
             };
 
@@ -401,9 +417,7 @@ protected:
             };
 
             $if(TEST_COND) {
-                pipeline().printer().verbose_with_location(
-                    "event={}, beta=({}, {}, {}), pdf_bsdf={}, Li: ({}, {}, {})",
-                    medium_sample.medium_event, beta[0u], beta[1u], beta[2u], pdf_bsdf, Li[0u], Li[1u], Li[2u]);
+                pipeline().printer().verbose_with_location("beta=({}, {}, {})", beta[0u], beta[1u], beta[2u]);
                 pipeline().printer().verbose_with_location("after: medium tracker size={}, priority={}, tag={}",
                                                            medium_tracker.size(), medium_tracker.current().priority, medium_tracker.current().medium_tag);
                 pipeline().printer().verbose("");

@@ -26,7 +26,7 @@ public:
 
         [[nodiscard]] RayMajorantSegment next() noexcept override {
             RayMajorantSegment seg = RayMajorantSegment::one(_seg.sigma_maj.dimension());
-            $if(!_called){
+            $if(!_called) {
                 seg = _seg;
                 _called = true;
             };
@@ -76,7 +76,8 @@ public:
                     sample_ans.t = 0.f;
                     sample_ans.ray = ray();
                     sample_ans.eval.f = SampledSpectrum{swl().dimension(), 0.f};
-                    sample_ans.eval.pdf = 1e16f;
+                    auto pdf = pdf_channels * sigma_t();
+                    sample_ans.eval.pdf = pdf.sum();
                 }
                 // scatter
                 $else {
@@ -89,16 +90,35 @@ public:
                     auto pdf = pdf_channels * pdf_distance;
                     sample_ans.eval.f = Tr * sigma_s();
                     sample_ans.eval.pdf = pdf.sum();
+
+//#define TEST_COND all(compute::dispatch_id().xy() == make_uint2(104, 253))
+//                    $if(TEST_COND) {
+//                        auto &printer = instance()->pipeline().printer();
+//                        printer.verbose_with_location(
+//                            "HomogeneousMediumClosure::sample::scatter\n"
+//                            "t={}, Tr=({}, {}, {}), \n"
+//                            "pdf_channels=({}, {}, {}), \n"
+//                            "pdf_distance=({}, {}, {}), \n"
+//                            "pdf=({}, {}, {}), \n"
+//                            "pdf_sum={}, f=({}, {}, {})",
+//                            t, Tr[0u], Tr[1u], Tr[2u],
+//                            pdf_channels[0u], pdf_channels[1u], pdf_channels[2u],
+//                            pdf_distance[0u], pdf_distance[1u], pdf_distance[2u],
+//                            pdf[0u], pdf[1u], pdf[2u],
+//                            sample_ans.eval.pdf,
+//                            sample_ans.eval.f[0u], sample_ans.eval.f[1u], sample_ans.eval.f[2u]);
+//                    };
+//#undef TEST_COND
                 };
             };
 
             return sample_ans;
         }
         [[nodiscard]] SampledSpectrum transmittance(Expr<float> t, PCG32 &rng) const noexcept override {
-            return analytic_transmittance(t, sigma_a() + sigma_s());
+            return analytic_transmittance(t, sigma_t());
         }
         [[nodiscard]] unique_ptr<RayMajorantIterator> sample_iterator(Expr<float> t_max) const noexcept override {
-            return luisa::make_unique<HomogeneousMajorantIterator>(0.f, t_max, sigma_a() + sigma_s());
+            return luisa::make_unique<HomogeneousMajorantIterator>(0.f, t_max, sigma_t());
         }
 
     public:
