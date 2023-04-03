@@ -32,10 +32,10 @@ public:
           _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)},
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 2u), 0u)},
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
-          _initial_radius{std::max(desc->property_float_or_default("initial_radius", -200.f), -10000.f)},//<0 for world_size/-radius
+          _initial_radius{std::max(desc->property_float_or_default("initial_radius", 0.06), -10000.f)},//<0 for world_size/-radius
           _photon_per_iter{std::max(desc->property_uint_or_default("photon_per_iter", 10000u), 1000u)},
-          _seperate_direct{true},//when false, use photon mapping for all flux. No use for releasing, just for debugging
-          _shared_radius{desc->property_bool_or_default("shared_radius", false)} {};//whether or not use the shared radius trick in SPPM paper. True is better in performance.
+          _seperate_direct{true},                                                   //when false, use photon mapping for all flux and gathering at first intersection. Just for debug
+          _shared_radius{desc->property_bool_or_default("shared_radius", true)} {};//whether or not use the shared radius trick in SPPM paper. True is better in performance.
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto photon_per_iter() const noexcept { return _photon_per_iter; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
@@ -69,7 +69,7 @@ public:
         Buffer<float> _grid_len;//the length of a single grid (float1)
 
     public:
-        Buffer<int> tot_test;
+        Buffer<uint> tot_test;
         PhotonMap(uint photon_count, const Spectrum::Instance *spectrum) {
             auto &&device = spectrum->pipeline().device();
             _grid_head = device.create_buffer<uint>(photon_count);
@@ -83,9 +83,11 @@ public:
             _grid_max = device.create_buffer<float>(3u);
             _size = photon_count;
             _spectrum = spectrum;
+
+            tot_test = device.create_buffer<uint>(1u);
         }
         auto tot_photon() const noexcept {
-            return _tot.read(0);
+            return _tot.read(0u);
         }
         auto grid_len() const noexcept {
             return _grid_len.read(0u);
@@ -113,33 +115,38 @@ public:
             return _grid_head.read(index);
         }
         void push(Expr<float3> position, SampledSpectrum power, Expr<float3> wi) {
-            auto index = _tot.atomic(0).fetch_add(1u);
-            auto dimension = _spectrum->node()->dimension();
-            _wi.write(index, wi);
-            _position.write(index, position);
-            for (auto i = 0u; i < dimension; ++i)
-                _beta.write(index * dimension + i, power[i]);
-            for (auto i = 0u; i < 3u; ++i)
-                _grid_min.atomic(i).fetch_min(position[i]);
-            for (auto i = 0u; i < 3u; ++i)
-                _grid_max.atomic(i).fetch_max(position[i]);
-            //_spectrum->pipeline().printer().info("pos:{},max:{}",position[2], _grid_max.read(2u));
-            _nxt.write(index, 0u);
+            $if(tot_photon() < size()) {
+                auto index = _tot.atomic(0u).fetch_add(1u);
+                auto dimension = _spectrum->node()->dimension();
+                _wi.write(index, wi);
+                _position.write(index, position);
+                for (auto i = 0u; i < dimension; ++i)
+                    _beta.write(index * dimension + i, power[i]);
+                for (auto i = 0u; i < 3u; ++i)
+                    _grid_min.atomic(i).fetch_min(position[i]);
+                for (auto i = 0u; i < 3u; ++i)
+                    _grid_max.atomic(i).fetch_max(position[i]);
+                //_spectrum->pipeline().printer().info("pos:{},max:{}",position[2], _grid_max.read(2u));
+                _nxt.write(index, 0u);
+            };
             
             
         }
         //from uint3 grid id to hash index of the grid
-        auto grid_to_index(Expr<uint3> p) const noexcept {
-            return ((p.x * 73856093) ^ (p.y * 19349663) ^
+        auto grid_to_index(Expr<int3> p) const noexcept {
+            auto hash=((p.x * 73856093) ^ (p.y * 19349663) ^
                     (p.z * 83492791)) %
                    (_size);
+            return (hash+_size)%_size;
         }
         //from float3 position to uint3 grid id
         auto point_to_grid(Expr<float3> p) const noexcept {
             Float3 grid_min = {_grid_min.read(0),
                         _grid_min.read(1),
                         _grid_min.read(2)};
-            return make_uint3((p - grid_min) / grid_len()) + make_uint3(2,2,2);
+            //_spectrum->pipeline().printer().info("grid_min:{} {} {}", _grid_min.read(0), _grid_min.read(1), _grid_min.read(2));
+            //_spectrum->pipeline().printer().info("grid_max:{} {} {}", _grid_max.read(0), _grid_max.read(1), _grid_max.read(2));
+            return make_int3((p - grid_min) / grid_len()) + make_int3(2,2,2);
         }
         auto point_to_index(Expr<float3> p) const noexcept {
             return grid_to_index(point_to_grid(p));
@@ -187,8 +194,9 @@ public:
         const Film::Instance *_film;
         const Spectrum::Instance *_spectrum;
         bool _shared_radius;
+        uint _photon_per_iter;
     public:
-        PixelIndirect( const Spectrum::Instance *spectrum, const Film::Instance *film,bool shared_radius){
+        PixelIndirect(uint photon_per_iter, const Spectrum::Instance *spectrum, const Film::Instance *film,bool shared_radius){
             _film = film;
             _spectrum = spectrum;
             auto device = spectrum->pipeline().device();
@@ -206,6 +214,7 @@ public:
             }
             _phi = device.create_buffer<float>(resolution.x * resolution.y*dimension);
             _tau = device.create_buffer<float>(resolution.x * resolution.y*dimension);
+            _photon_per_iter = photon_per_iter;
         }
         void write_radius(Expr<uint2> pixel_id, Expr<float> value) noexcept {
             if (!_shared_radius) {
@@ -245,17 +254,6 @@ public:
             for (auto i = 0u; i < dimension; ++i)
                 _tau.write(offset * dimension + i, 0.f);
         }
-        //tau=(tau+phi)*value, see pixel_info_update for useage
-        void update_tau(Expr<uint2> pixel_id, Expr<float> value) noexcept {
-            auto resolution = _film->node()->resolution();
-            auto offset = pixel_id.y * resolution.x + pixel_id.x;
-            auto dimension = _spectrum->node()->dimension();
-            for (auto i = 0u; i < dimension; ++i) {
-                auto old_tau = _tau.read(offset * dimension + i);
-                auto phi = _phi.read(offset * dimension + i);
-                _tau.write(offset * dimension + i, (old_tau+phi)*value);
-            }
-        }
         auto radius(Expr<uint2> pixel_id) const noexcept {
             if (!_shared_radius) {
                 auto resolution = _film->node()->resolution();
@@ -264,6 +262,19 @@ public:
                 return _radius.read(0u);
             }
         }
+        //tau=(tau+phi)*value, see pixel_info_update for useage
+        void update_tau(Expr<uint2> pixel_id, Expr<float> value) noexcept {
+            auto resolution = _film->node()->resolution();
+            auto offset = pixel_id.y * resolution.x + pixel_id.x;
+            auto dimension = _spectrum->node()->dimension();
+            for (auto i = 0u; i < dimension; ++i) {
+                auto old_tau = _tau.read(offset * dimension + i);
+                auto phi = _phi.read(offset * dimension + i);
+                phi = min(phi, 256.0f * _photon_per_iter * pi * radius(pixel_id) * radius(pixel_id));
+                _tau.write(offset * dimension + i, (old_tau+phi)*value);
+            }
+        }
+        
         auto n_photon(Expr<uint2> pixel_id) const noexcept {
             auto resolution = _film->node()->resolution();
             if (!_shared_radius) {
@@ -368,7 +379,6 @@ protected:
         sampler()->reset(command_buffer, make_uint2(resolution.x+add_x,resolution.y), pixel_count+add_x*resolution.y, spp);
         command_buffer << pipeline().printer().reset();
         command_buffer << compute::synchronize();
-
         LUISA_INFO(
             "Rendering to '{}' of resolution {}x{} at {}spp.",
             image_file.string(),
@@ -376,7 +386,8 @@ protected:
 
         using namespace luisa::compute;
         auto &&device = camera->pipeline().device();
-        PixelIndirect indirect(spectrum, camera->film(), node<MegakernelPhotonMapping>()->shared_radius());
+
+        PixelIndirect indirect(photon_per_iter, spectrum, camera->film(), node<MegakernelPhotonMapping>()->shared_radius());
         PhotonMap photons(photon_per_iter * node<MegakernelPhotonMapping>()->max_depth(), spectrum);
 
 
@@ -665,7 +676,7 @@ protected:
                         $for(x, grid.x - 1, grid.x + 2) {
                             $for(y, grid.y - 1, grid.y + 2) {
                                 $for(z, grid.z - 1, grid.z + 2) {
-                                    UInt3 check_grid{x, y, z};
+                                    Int3 check_grid{x, y, z};
                                     auto photon_index = photons.grid_head(photons.grid_to_index(check_grid));
                                     $while(photon_index != ~0u) {
                                         auto position = photons.position(photon_index);

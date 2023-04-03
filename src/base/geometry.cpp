@@ -11,6 +11,10 @@ namespace luisa::render {
 void Geometry::build(CommandBuffer &command_buffer, luisa::span<const Shape *const> shapes,
                      float init_time, AccelUsageHint hint) noexcept {
     _accel = _pipeline.device().create_accel(hint);
+    for (auto i = 0u; i < 3u; ++i) {
+        _world_max[i] = -std::numeric_limits<float>::max();
+        _world_min[i] = std::numeric_limits<float>::max();
+    }
     for (auto shape : shapes) { _process_shape(command_buffer, shape, init_time); }
     _instance_buffer = _pipeline.device().create_buffer<uint4>(_instances.size());
     command_buffer << _instance_buffer.copy_from(_instances.data())
@@ -96,6 +100,11 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
         if (!is_static) { _dynamic_transforms.emplace_back(inst_xform); }
         auto object_to_world = inst_xform.matrix(init_time);
         _accel.emplace_back(*mesh.resource, object_to_world, visible);
+        auto vertices = shape->mesh().vertices;
+        for (auto &v : vertices) {
+            _world_max = max(_world_max, make_float3(object_to_world * make_float4(v.position(), 1.f)));
+            _world_min = min(_world_min, make_float3(object_to_world * make_float4(v.position(), 1.f)));
+        }
 
         // create instance
         auto surface_tag = 0u;

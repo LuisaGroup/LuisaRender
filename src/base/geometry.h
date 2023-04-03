@@ -51,6 +51,8 @@ private:
     luisa::vector<uint4> _instances;
     luisa::vector<InstancedTransform> _dynamic_transforms;
     Buffer<uint4> _instance_buffer;
+    float3 _world_min;
+    float3 _world_max;
 
 private:
     void _process_shape(CommandBuffer &command_buffer, const Shape *shape, float init_time,
@@ -66,6 +68,8 @@ public:
     bool update(CommandBuffer &command_buffer, float time) noexcept;
     [[nodiscard]] auto instances() const noexcept { return luisa::span{_instances}; }
     [[nodiscard]] auto light_instances() const noexcept { return luisa::span{_instanced_lights}; }
+    [[nodiscard]] auto world_min() const noexcept { return _world_min; }
+    [[nodiscard]] auto world_max() const noexcept { return _world_max; }
     [[nodiscard]] Var<Hit> trace_closest(const Var<Ray> &ray) const noexcept;
     [[nodiscard]] Var<bool> trace_any(const Var<Ray> &ray) const noexcept;
     [[nodiscard]] luisa::shared_ptr<Interaction> interaction(const Var<Ray> &ray, const Var<Hit> &hit) const noexcept;
