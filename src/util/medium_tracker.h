@@ -18,6 +18,9 @@ using compute::Printer;
 using compute::UInt;
 using compute::Var;
 
+//#define TEST_COND all(compute::dispatch_id().xy() == make_uint2(144, 462))
+#define TEST_COND false
+
 struct MediumInfo {
     uint priority{0u};
     uint medium_tag{Medium::INVALID_TAG};
@@ -38,6 +41,7 @@ private:
 
 public:
     explicit MediumTracker(Printer &printer) noexcept;
+    MediumTracker(const MediumTracker &) = default;
 
 protected:
     [[nodiscard]] auto &printer() noexcept { return _printer; }

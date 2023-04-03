@@ -133,7 +133,7 @@ public:
         [[nodiscard]] auto phase_function() const noexcept { return _phase_function; }
 
         [[nodiscard]] virtual Medium::Sample sample(Expr<float> t_max, PCG32 &rng) const noexcept = 0;
-        [[nodiscard]] virtual SampledSpectrum transmittance(Expr<float> t, PCG32 &rng) const noexcept = 0;
+        [[nodiscard]] virtual Medium::Evaluation transmittance(Expr<float> t, PCG32 &rng) const noexcept = 0;
         [[nodiscard]] virtual luisa::unique_ptr<RayMajorantIterator> sample_iterator(Expr<float> t_max) const noexcept = 0;
         // from PBRT-v4
         template<typename F>

@@ -7,6 +7,8 @@
 #include <base/pipeline.h>
 #include <base/scene.h>
 
+#include <util/medium_tracker.h>
+
 namespace luisa::render {
 
 class HomogeneousMedium : public Medium {
@@ -58,7 +60,7 @@ public:
                 sample_ans.medium_event = Medium::event_hit_surface;
                 t = t_max;
                 sample_ans.t = t;
-                auto Tr = transmittance(t, rng);
+                auto Tr = analytic_transmittance(t, sigma_t());
                 sample_ans.ray = make_ray(ray()->origin() + ray()->direction() * t, ray()->direction());
                 auto pdf = pdf_channels * Tr;
                 sample_ans.eval.f = Tr;
@@ -67,7 +69,7 @@ public:
             // scatter/absorb
             $else {
                 auto p_absorb = sigma_a()[channel] / sigma_t()[channel];
-                auto p_scatter = 1.f - p_absorb;
+                auto p_scatter = sigma_s()[channel] / sigma_t()[channel];
                 auto sample_index = sample_discrete(make_float2(p_absorb, p_scatter), rng.uniform_float());
 
                 // absorb
@@ -83,7 +85,7 @@ public:
                 $else {
                     sample_ans.medium_event = Medium::event_scatter;
                     sample_ans.t = t;
-                    auto Tr = transmittance(t, rng);
+                    auto Tr = analytic_transmittance(t, sigma_t());
                     auto pf_sample = phase_function()->sample_p(-ray()->direction(), make_float2(rng.uniform_float(), rng.uniform_float()));
                     sample_ans.ray = make_ray(ray()->origin() + ray()->direction() * t, pf_sample.wi);
                     auto pdf_distance = sigma_t() * Tr;
@@ -91,31 +93,45 @@ public:
                     sample_ans.eval.f = Tr * sigma_s();
                     sample_ans.eval.pdf = pdf.sum();
 
-//#define TEST_COND all(compute::dispatch_id().xy() == make_uint2(104, 253))
-//                    $if(TEST_COND) {
-//                        auto &printer = instance()->pipeline().printer();
-//                        printer.verbose_with_location(
-//                            "HomogeneousMediumClosure::sample::scatter\n"
-//                            "t={}, Tr=({}, {}, {}), \n"
-//                            "pdf_channels=({}, {}, {}), \n"
-//                            "pdf_distance=({}, {}, {}), \n"
-//                            "pdf=({}, {}, {}), \n"
-//                            "pdf_sum={}, f=({}, {}, {})",
-//                            t, Tr[0u], Tr[1u], Tr[2u],
-//                            pdf_channels[0u], pdf_channels[1u], pdf_channels[2u],
-//                            pdf_distance[0u], pdf_distance[1u], pdf_distance[2u],
-//                            pdf[0u], pdf[1u], pdf[2u],
-//                            sample_ans.eval.pdf,
-//                            sample_ans.eval.f[0u], sample_ans.eval.f[1u], sample_ans.eval.f[2u]);
-//                    };
-//#undef TEST_COND
+                    $if(TEST_COND) {
+                        auto &printer = instance()->pipeline().printer();
+                        printer.verbose_with_location(
+                            "HomogeneousMediumClosure::sample::scatter\n"
+                            "t={}, Tr=({}, {}, {}), \n"
+                            "pdf_channels=({}, {}, {}), \n"
+                            "pdf_distance=({}, {}, {}), \n"
+                            "pdf=({}, {}, {}), \n"
+                            "pdf_sum={}, f=({}, {}, {})",
+                            t, Tr[0u], Tr[1u], Tr[2u],
+                            pdf_channels[0u], pdf_channels[1u], pdf_channels[2u],
+                            pdf_distance[0u], pdf_distance[1u], pdf_distance[2u],
+                            pdf[0u], pdf[1u], pdf[2u],
+                            sample_ans.eval.pdf,
+                            sample_ans.eval.f[0u], sample_ans.eval.f[1u], sample_ans.eval.f[2u]);
+                    };
                 };
             };
 
             return sample_ans;
         }
-        [[nodiscard]] SampledSpectrum transmittance(Expr<float> t, PCG32 &rng) const noexcept override {
-            return analytic_transmittance(t, sigma_t());
+        [[nodiscard]] Evaluation transmittance(Expr<float> t, PCG32 &rng) const noexcept override {
+            Medium::Evaluation evaluation_ans = Medium::Evaluation::zero(swl().dimension());
+            SampledSpectrum pdf_channels = SampledSpectrum{swl().dimension(), 0.f};
+            for (auto i = 0u; i < swl().dimension(); ++i) {
+                pdf_channels[i] = rng.uniform_float();
+            }
+            pdf_channels /= pdf_channels.sum();
+            auto channel = sample_discrete(pdf_channels, rng.uniform_float());
+
+            auto p_absorb = sigma_a()[channel] / sigma_t()[channel];
+            auto p_scatter = sigma_s()[channel] / sigma_t()[channel];
+
+            auto Tr = analytic_transmittance(t, sigma_t());
+            auto pdf = pdf_channels * Tr * (1.f - sigma_t());
+            evaluation_ans.f = Tr;
+            evaluation_ans.pdf = pdf.sum();
+
+            return evaluation_ans;
         }
         [[nodiscard]] unique_ptr<RayMajorantIterator> sample_iterator(Expr<float> t_max) const noexcept override {
             return luisa::make_unique<HomogeneousMajorantIterator>(0.f, t_max, sigma_t());

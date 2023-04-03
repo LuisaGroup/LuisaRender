@@ -30,8 +30,8 @@ public:
         [[nodiscard]] Medium::Sample sample(Expr<float> t_max, PCG32 &rng) const noexcept override {
             return Medium::Sample::zero(swl().dimension());
         }
-        [[nodiscard]] SampledSpectrum transmittance(Expr<float> t, PCG32 &rng) const noexcept override {
-            return {swl().dimension(), 1.0f};
+        [[nodiscard]] Evaluation transmittance(Expr<float> t, PCG32 &rng) const noexcept override {
+            return Medium::Evaluation::zero(swl().dimension());
         }
         [[nodiscard]] unique_ptr<RayMajorantIterator> sample_iterator(Expr<float> t_max) const noexcept override {
             return luisa::make_unique<VacuumMajorantIterator>(swl().dimension());

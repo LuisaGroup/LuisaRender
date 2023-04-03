@@ -23,7 +23,7 @@ public:
             auto g = node<HenyeyGreenstein>()->_g;
             auto cosTheta = dot(wo, wi);
             auto denom = 1.f + sqr(g) + 2.f * g * cosTheta;
-            return inv_pi / 4.f * (1.f - sqr(g)) / (denom * sqrt(max(0.f, denom)));
+            return inv_pi * 0.25f * (1.f - sqr(g)) / (denom * sqrt(max(0.f, denom)));
         }
         [[nodiscard]] PhaseFunctionSample sample_p(Expr<float3> wo, Expr<float2> u) const override {
             auto g = node<HenyeyGreenstein>()->_g;
