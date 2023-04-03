@@ -18,7 +18,7 @@ using compute::Printer;
 using compute::UInt;
 using compute::Var;
 
-//#define TEST_COND all(compute::dispatch_id().xy() == make_uint2(144, 462))
+//#define TEST_COND all(compute::dispatch_id().xy() == make_uint2(511, 89))
 #define TEST_COND false
 
 struct MediumInfo {

@@ -121,13 +121,9 @@ public:
                 pdf_channels[i] = rng.uniform_float();
             }
             pdf_channels /= pdf_channels.sum();
-            auto channel = sample_discrete(pdf_channels, rng.uniform_float());
-
-            auto p_absorb = sigma_a()[channel] / sigma_t()[channel];
-            auto p_scatter = sigma_s()[channel] / sigma_t()[channel];
 
             auto Tr = analytic_transmittance(t, sigma_t());
-            auto pdf = pdf_channels * Tr * (1.f - sigma_t());
+            auto pdf = pdf_channels * Tr;
             evaluation_ans.f = Tr;
             evaluation_ans.pdf = pdf.sum();
 

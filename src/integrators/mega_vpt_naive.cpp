@@ -199,7 +199,7 @@ protected:
             $if(!it->valid()) { $break; };
 
             $if(TEST_COND) {
-                pipeline().printer().verbose_with_location("depth={}", depth_track + 1u);
+                pipeline().printer().verbose_with_location("depth={}", depth_track);
             };
 
             $if(it->shape().has_medium()) {
@@ -276,7 +276,7 @@ protected:
             auto t_max = ite(it->valid(), length(it->p() - ray->origin()), Interaction::default_t_max);
 
             $if(TEST_COND) {
-                pipeline().printer().verbose_with_location("depth={}", depth + 1u);
+                pipeline().printer().verbose_with_location("depth={}", depth);
                 pipeline().printer().verbose_with_location("before: medium tracker size={}, priority={}, tag={}",
                                                            medium_tracker.size(), medium_tracker.current().priority, medium_tracker.current().medium_tag);
                 pipeline().printer().verbose_with_location(
@@ -357,139 +357,133 @@ protected:
                 }
 
                 // hit ordinary surface
-                $if(!it->shape().has_surface()) {
-                    // TODO: if shape has no surface, we cannot get the right normal direction
-                    //      so we cannot deal with medium tracker correctly (enter/exit)
-                    ray = it->spawn_ray(ray->direction());
-                    pdf_bsdf = 1e16f;
-                }
-                $else {
-                    // generate uniform samples
-                    auto u_light_selection = sampler()->generate_1d();
-                    auto u_light_surface = sampler()->generate_2d();
-                    auto u_lobe = sampler()->generate_1d();
-                    auto u_bsdf = sampler()->generate_2d();
+                $if(!it->shape().has_surface()) { $break; };
 
-                    // sample one light
-                    auto light_sample = light_sampler()->sample(
-                        *it, u_light_selection, u_light_surface, swl, time);
+                // generate uniform samples
+                auto u_light_selection = sampler()->generate_1d();
+                auto u_light_surface = sampler()->generate_2d();
+                auto u_lobe = sampler()->generate_1d();
+                auto u_bsdf = sampler()->generate_2d();
 
-                    // trace shadow ray
-                    //                    auto occluded = pipeline().geometry()->intersect_any(light_sample.shadow_ray);
-                    auto transmittance_evaluation = _transmittance(frame_index, pixel_id, time, swl, rng, medium_tracker, light_sample.shadow_ray);
+                // sample one light
+                auto light_sample = light_sampler()->sample(
+                    *it, u_light_selection, u_light_surface, swl, time);
 
-                    auto medium_tag = it->shape().medium_tag();
-                    auto medium_priority = def(Medium::VACUUM_PRIORITY);
-                    auto eta_next = def(1.f);
-                    $if(has_medium) {
-                        pipeline().media().dispatch(medium_tag, [&](auto medium) {
-                            auto closure = medium->closure(ray, swl, time);
-                            medium_priority = medium->priority();
-                            eta_next = closure->eta();
-                            $if(TEST_COND) {
-                                pipeline().printer().verbose_with_location("eta_next={}", eta_next);
-                            };
-                        });
-                    };
-                    auto medium_info = make_medium_info(medium_priority, medium_tag);
-                    medium_info.medium_tag = medium_tag;
+                // trace shadow ray
+                //                    auto occluded = pipeline().geometry()->intersect_any(light_sample.shadow_ray);
+                auto transmittance_evaluation = _transmittance(frame_index, pixel_id, time, swl, rng, medium_tracker, light_sample.shadow_ray);
 
-                    // evaluate material
-                    auto surface_tag = it->shape().surface_tag();
-                    auto surface_event_skip = _event(swl, it, time, -ray->direction(), ray->direction());
-                    pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
-                        // create closure
-                        auto wo = -ray->direction();
-                        auto closure = surface->closure(it, swl, wo, eta, time);
-
-                        // apply opacity map
-                        auto alpha_skip = def(false);
-                        if (auto o = closure->opacity()) {
-                            auto opacity = saturate(*o);
-                            alpha_skip = u_lobe >= opacity;
-                            u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
-                        }
-
-                        UInt surface_event;
-                        $if(alpha_skip | !medium_tracker.true_hit(medium_info.medium_tag)) {
-                            surface_event = surface_event_skip;
-                            ray = it->spawn_ray(ray->direction());
-                            pdf_bsdf = 1e16f;
-                        }
-                        $else {
-                            if (auto dispersive = closure->is_dispersive()) {
-                                $if(*dispersive) { swl.terminate_secondary(); };
-                            }
-
-                            // direct lighting
-                            $if(light_sample.eval.pdf > 0.0f) {
-                                auto wi = light_sample.shadow_ray->direction();
-                                auto eval = closure->evaluate(wo, wi);
-                                auto w = 1.f / (light_sample.eval.pdf + eval.pdf + transmittance_evaluation.pdf);
-                                Li += w * beta * eval.f * light_sample.eval.L * transmittance_evaluation.f;
-                                //                                auto w = 1.f / (light_sample.eval.pdf + eval.pdf);
-                                //                                Li += w * beta * eval.f * light_sample.eval.L;
-                                $if(TEST_COND) {
-                                    pipeline().printer().verbose_with_location(
-                                        "direct lighting: "
-                                        "eval.f=({}, {}, {}), "
-                                        "eval.pdf={}, "
-                                        "light_sample.eval.L=({}, {}, {}), "
-                                        "light_sample.eval.pdf={},"
-                                        "beta=({}, {}, {})",
-                                        eval.f[0u], eval.f[1u], eval.f[2u],
-                                        eval.pdf,
-                                        light_sample.eval.L[0u], light_sample.eval.L[1u], light_sample.eval.L[2u],
-                                        light_sample.eval.pdf,
-                                        beta[0u], beta[1u], beta[2u]);
-                                };
-                            };
-
-                            // sample material
-                            auto surface_sample = closure->sample(wo, u_lobe, u_bsdf);
-                            surface_event = surface_sample.event;
-                            auto w = ite(surface_sample.eval.pdf > 0.f, 1.f / surface_sample.eval.pdf, 0.f);
-
-                            pdf_bsdf = surface_sample.eval.pdf;
-                            ray = it->spawn_ray(surface_sample.wi);
-                            beta *= w * surface_sample.eval.f;
-
-                            // apply eta scale & update medium tracker
-                            $if(has_medium) {
-                                $switch(surface_event) {
-                                    $case(Surface::event_enter) {
-                                        eta_scale = sqr(eta_next / eta);
-                                    };
-                                    $case(Surface::event_exit) {
-                                        eta_scale = sqr(eta / eta_next);
-                                    };
-                                };
-                            };
-                        };
-
-                        $if(has_medium) {
-                            $switch(surface_event) {
-                                $case(Surface::event_enter) {
-                                    medium_tracker.enter(medium_priority, medium_info);
-                                };
-                                $case(Surface::event_exit) {
-                                    medium_tracker.exit(medium_priority, medium_info);
-                                };
-                            };
-                        };
-
+                auto medium_tag = it->shape().medium_tag();
+                auto medium_priority = def(Medium::VACUUM_PRIORITY);
+                auto eta_next = def(1.f);
+                $if(has_medium) {
+                    pipeline().media().dispatch(medium_tag, [&](auto medium) {
+                        auto closure = medium->closure(ray, swl, time);
+                        medium_priority = medium->priority();
+                        eta_next = closure->eta();
                         $if(TEST_COND) {
-                            pipeline().printer().verbose_with_location(
-                                "surface event={}, priority={}, tag={}",
-                                surface_event, medium_priority, medium_tag);
+                            pipeline().printer().verbose_with_location("eta_next={}", eta_next);
                         };
                     });
                 };
+                auto medium_info = make_medium_info(medium_priority, medium_tag);
+                medium_info.medium_tag = medium_tag;
+
+                // evaluate material
+                auto surface_tag = it->shape().surface_tag();
+                auto surface_event_skip = _event(swl, it, time, -ray->direction(), ray->direction());
+                pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
+                    // create closure
+                    auto wo = -ray->direction();
+                    auto closure = surface->closure(it, swl, wo, eta, time);
+
+                    // apply opacity map
+                    auto alpha_skip = def(false);
+                    if (auto o = closure->opacity()) {
+                        auto opacity = saturate(*o);
+                        alpha_skip = u_lobe >= opacity;
+                        u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
+                    }
+
+                    UInt surface_event;
+                    $if(alpha_skip | !medium_tracker.true_hit(medium_info.medium_tag)) {
+                        surface_event = surface_event_skip;
+                        ray = it->spawn_ray(ray->direction());
+                        pdf_bsdf = 1e16f;
+                    }
+                    $else {
+                        if (auto dispersive = closure->is_dispersive()) {
+                            $if(*dispersive) { swl.terminate_secondary(); };
+                        }
+
+                        // direct lighting
+                        $if(light_sample.eval.pdf > 0.0f) {
+                            auto wi = light_sample.shadow_ray->direction();
+                            auto eval = closure->evaluate(wo, wi);
+                            auto w = 1.f / (light_sample.eval.pdf + eval.pdf + transmittance_evaluation.pdf);
+                            Li += w * beta * eval.f * light_sample.eval.L * transmittance_evaluation.f;
+                            //                                auto w = 1.f / (light_sample.eval.pdf + eval.pdf);
+                            //                                Li += w * beta * eval.f * light_sample.eval.L;
+                            $if(TEST_COND) {
+                                pipeline().printer().verbose_with_location(
+                                    "direct lighting: "
+                                    "eval.f=({}, {}, {}), "
+                                    "eval.pdf={}, "
+                                    "light_sample.eval.L=({}, {}, {}), "
+                                    "light_sample.eval.pdf={},"
+                                    "beta=({}, {}, {})",
+                                    eval.f[0u], eval.f[1u], eval.f[2u],
+                                    eval.pdf,
+                                    light_sample.eval.L[0u], light_sample.eval.L[1u], light_sample.eval.L[2u],
+                                    light_sample.eval.pdf,
+                                    beta[0u], beta[1u], beta[2u]);
+                            };
+                        };
+
+                        // sample material
+                        auto surface_sample = closure->sample(wo, u_lobe, u_bsdf);
+                        surface_event = surface_sample.event;
+                        auto w = ite(surface_sample.eval.pdf > 0.f, 1.f / surface_sample.eval.pdf, 0.f);
+
+                        pdf_bsdf = surface_sample.eval.pdf;
+                        ray = it->spawn_ray(surface_sample.wi);
+                        beta *= w * surface_sample.eval.f;
+
+                        // apply eta scale & update medium tracker
+                        $if(has_medium) {
+                            $switch(surface_event) {
+                                $case(Surface::event_enter) {
+                                    eta_scale = sqr(eta_next / eta);
+                                };
+                                $case(Surface::event_exit) {
+                                    eta_scale = sqr(eta / eta_next);
+                                };
+                            };
+                        };
+                    };
+
+                    $if(has_medium) {
+                        $switch(surface_event) {
+                            $case(Surface::event_enter) {
+                                medium_tracker.enter(medium_priority, medium_info);
+                            };
+                            $case(Surface::event_exit) {
+                                medium_tracker.exit(medium_priority, medium_info);
+                            };
+                        };
+                    };
+
+                    $if(TEST_COND) {
+                        pipeline().printer().verbose_with_location(
+                            "surface event={}, priority={}, tag={}",
+                            surface_event, medium_priority, medium_tag);
+                    };
+                });
             };
 
             $if(TEST_COND) {
                 pipeline().printer().verbose_with_location(
-                    "medium event={}, beta=({}, {}, {}), pdf_bsdf={}, Li: ({}, {}, {})",
+                    "medium event={}, beta=({}, {}, {}), pdf_bsdf={}, Li=({}, {}, {})",
                     medium_sample.medium_event, beta[0u], beta[1u], beta[2u], pdf_bsdf, Li[0u], Li[1u], Li[2u]);
             };
 
