@@ -182,9 +182,7 @@ protected:
         auto medium_tracker = MediumTracker(pipeline().printer());
 
         // Initialize RNG for sampling the majorant transmittance
-        auto hash0 = U64(as<UInt2>(sampler()->generate_2d()));
-        auto hash1 = U64(as<UInt2>(sampler()->generate_2d()));
-        PCG32 rng(hash0, hash1);
+        PCG32 rng(U64(as<UInt2>(sampler()->generate_2d())));
 
         // initialize medium tracker
         auto env_medium_tag = pipeline().environment_medium_tag();
@@ -192,70 +190,70 @@ protected:
             medium_tracker.enter(medium->priority(), make_medium_info(medium->priority(), env_medium_tag));
         });
         auto ray = camera_ray;
-        // TODO: bug in initialization of medium tracker where the angle between shared edge is small
-        auto depth_track = def<uint>(0u);
-        $while(true) {
-            auto it = pipeline().geometry()->intersect(ray);
-            $if(!it->valid()) { $break; };
-
-            $if(TEST_COND) {
-                pipeline().printer().verbose_with_location("depth={}", depth_track);
-            };
-
-            $if(it->shape().has_medium()) {
-                auto surface_tag = it->shape().surface_tag();
-                auto medium_tag = it->shape().medium_tag();
-
-                auto medium_priority = def(Medium::VACUUM_PRIORITY);
-                pipeline().media().dispatch(medium_tag, [&](auto medium) {
-                    medium_priority = medium->priority();
-                });
-                auto medium_info = make_medium_info(medium_priority, medium_tag);
-
-                // deal with medium tracker
-                auto surface_event = _event(swl, it, time, -ray->direction(), ray->direction());
-                pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
-                    $if(TEST_COND) {
-                        pipeline().printer().verbose_with_location("surface event={}", surface_event);
-                    };
-                    // update medium tracker
-                    $switch(surface_event) {
-                        $case(Surface::event_enter) {
-                            medium_tracker.enter(medium_priority, medium_info);
-                            $if(TEST_COND) {
-                                pipeline().printer().verbose_with_location("enter: priority={}, medium_tag={}", medium_priority, medium_tag);
-                            };
-                        };
-                        $case(Surface::event_exit) {
-                            $if(medium_tracker.exist(medium_priority, medium_info)) {
-                                medium_tracker.exit(medium_priority, medium_info);
-                                $if(TEST_COND) {
-                                    pipeline().printer().verbose_with_location("exit exist: priority={}, medium_tag={}", medium_priority, medium_tag);
-                                };
-                            }
-                            $else {
-                                medium_tracker.enter(medium_priority, medium_info);
-                                $if(TEST_COND) {
-                                    pipeline().printer().verbose_with_location("exit nonexistent: priority={}, medium_tag={}", medium_priority, medium_tag);
-                                };
-                            };
-                        };
-                    };
-                });
-            };
-            $if(TEST_COND) {
-                pipeline().printer().verbose_with_location("medium tracker size={}", medium_tracker.size());
-                auto dir = ray->direction();
-                auto origin = ray->origin();
-                pipeline().printer().verbose_with_location("ray->origin()=({}, {}, {})", origin.x, origin.y, origin.z);
-                pipeline().printer().verbose_with_location("ray->direction()=({}, {}, {})", dir.x, dir.y, dir.z);
-                pipeline().printer().verbose_with_location("it->p()=({}, {}, {})", it->p().x, it->p().y, it->p().z);
-                pipeline().printer().verbose_with_location("it->shape().has_medium()={}", it->shape().has_medium());
-                pipeline().printer().verbose("");
-            };
-            ray = it->spawn_ray(ray->direction());
-            depth_track += 1u;
-        };
+//        // TODO: bug in initialization of medium tracker where the angle between shared edge is small
+//        auto depth_track = def<uint>(0u);
+//        $while(true) {
+//            auto it = pipeline().geometry()->intersect(ray);
+//            $if(!it->valid()) { $break; };
+//
+//            $if(TEST_COND) {
+//                pipeline().printer().verbose_with_location("depth={}", depth_track);
+//            };
+//
+//            $if(it->shape().has_medium()) {
+//                auto surface_tag = it->shape().surface_tag();
+//                auto medium_tag = it->shape().medium_tag();
+//
+//                auto medium_priority = def(Medium::VACUUM_PRIORITY);
+//                pipeline().media().dispatch(medium_tag, [&](auto medium) {
+//                    medium_priority = medium->priority();
+//                });
+//                auto medium_info = make_medium_info(medium_priority, medium_tag);
+//
+//                // deal with medium tracker
+//                auto surface_event = _event(swl, it, time, -ray->direction(), ray->direction());
+//                pipeline().surfaces().dispatch(surface_tag, [&](auto surface) {
+//                    $if(TEST_COND) {
+//                        pipeline().printer().verbose_with_location("surface event={}", surface_event);
+//                    };
+//                    // update medium tracker
+//                    $switch(surface_event) {
+//                        $case(Surface::event_enter) {
+//                            medium_tracker.enter(medium_priority, medium_info);
+//                            $if(TEST_COND) {
+//                                pipeline().printer().verbose_with_location("enter: priority={}, medium_tag={}", medium_priority, medium_tag);
+//                            };
+//                        };
+//                        $case(Surface::event_exit) {
+//                            $if(medium_tracker.exist(medium_priority, medium_info)) {
+//                                medium_tracker.exit(medium_priority, medium_info);
+//                                $if(TEST_COND) {
+//                                    pipeline().printer().verbose_with_location("exit exist: priority={}, medium_tag={}", medium_priority, medium_tag);
+//                                };
+//                            }
+//                            $else {
+//                                medium_tracker.enter(medium_priority, medium_info);
+//                                $if(TEST_COND) {
+//                                    pipeline().printer().verbose_with_location("exit nonexistent: priority={}, medium_tag={}", medium_priority, medium_tag);
+//                                };
+//                            };
+//                        };
+//                    };
+//                });
+//            };
+//            $if(TEST_COND) {
+//                pipeline().printer().verbose_with_location("medium tracker size={}", medium_tracker.size());
+//                auto dir = ray->direction();
+//                auto origin = ray->origin();
+//                pipeline().printer().verbose_with_location("ray->origin()=({}, {}, {})", origin.x, origin.y, origin.z);
+//                pipeline().printer().verbose_with_location("ray->direction()=({}, {}, {})", dir.x, dir.y, dir.z);
+//                pipeline().printer().verbose_with_location("it->p()=({}, {}, {})", it->p().x, it->p().y, it->p().z);
+//                pipeline().printer().verbose_with_location("it->shape().has_medium()={}", it->shape().has_medium());
+//                pipeline().printer().verbose("");
+//            };
+//            ray = it->spawn_ray(ray->direction());
+//            depth_track += 1u;
+//        };
         $if(TEST_COND) {
             pipeline().printer().verbose_with_location("Final medium tracker size={}", medium_tracker.size());
             pipeline().printer().verbose("");
@@ -289,22 +287,22 @@ protected:
             auto medium_sample = Medium::Sample::zero(swl.dimension());
             // sample the participating medium
             $if(!medium_tracker.vacuum()) {
-                // direct light
-                // generate uniform samples
-                auto u_light_selection = sampler()->generate_1d();
-                auto u_light_surface = sampler()->generate_2d();
-
-                // sample one light
-                auto it_medium = Interaction{ray->origin()};
-                auto light_sample = light_sampler()->sample(
-                    it_medium, u_light_selection, u_light_surface, swl, time);
-
-                // trace shadow ray
-                auto transmittance_evaluation = _transmittance(frame_index, pixel_id, time, swl, rng, medium_tracker, light_sample.shadow_ray);
-                $if(transmittance_evaluation.pdf > 0.f) {
-                    auto w = 1.f / (pdf_bsdf + transmittance_evaluation.pdf + light_sample.eval.pdf);
-                    Li += w * beta * transmittance_evaluation.f * light_sample.eval.L;
-                };
+                //                // direct light
+                //                // generate uniform samples
+                //                auto u_light_selection = sampler()->generate_1d();
+                //                auto u_light_surface = sampler()->generate_2d();
+                //
+                //                // sample one light
+                //                auto it_medium = Interaction{ray->origin()};
+                //                auto light_sample = light_sampler()->sample(
+                //                    it_medium, u_light_selection, u_light_surface, swl, time);
+                //
+                //                // trace shadow ray
+                //                auto transmittance_evaluation = _transmittance(frame_index, pixel_id, time, swl, rng, medium_tracker, light_sample.shadow_ray);
+                //                $if(transmittance_evaluation.pdf > 0.f) {
+                //                    auto w = 1.f / (pdf_bsdf + transmittance_evaluation.pdf + light_sample.eval.pdf);
+                //                    Li += w * beta * transmittance_evaluation.f * light_sample.eval.L;
+                //                };
 
                 auto medium_tag = medium_tracker.current().medium_tag;
                 pipeline().media().dispatch(medium_tag, [&](auto medium) {
@@ -370,7 +368,7 @@ protected:
                     *it, u_light_selection, u_light_surface, swl, time);
 
                 // trace shadow ray
-                //                    auto occluded = pipeline().geometry()->intersect_any(light_sample.shadow_ray);
+                auto occluded = pipeline().geometry()->intersect_any(light_sample.shadow_ray);
                 auto transmittance_evaluation = _transmittance(frame_index, pixel_id, time, swl, rng, medium_tracker, light_sample.shadow_ray);
 
                 auto medium_tag = it->shape().medium_tag();
@@ -417,13 +415,13 @@ protected:
                         }
 
                         // direct lighting
-                        $if(light_sample.eval.pdf > 0.0f) {
+                        $if(light_sample.eval.pdf > 0.0f & !occluded) {
                             auto wi = light_sample.shadow_ray->direction();
                             auto eval = closure->evaluate(wo, wi);
-                            auto w = 1.f / (light_sample.eval.pdf + eval.pdf + transmittance_evaluation.pdf);
-                            Li += w * beta * eval.f * light_sample.eval.L * transmittance_evaluation.f;
-                            //                                auto w = 1.f / (light_sample.eval.pdf + eval.pdf);
-                            //                                Li += w * beta * eval.f * light_sample.eval.L;
+                            //                            auto w = 1.f / (light_sample.eval.pdf + eval.pdf + transmittance_evaluation.pdf);
+                            //                            Li += w * beta * eval.f * light_sample.eval.L * transmittance_evaluation.f;
+                            auto w = 1.f / (light_sample.eval.pdf + eval.pdf);
+                            Li += w * beta * eval.f * light_sample.eval.L;
                             $if(TEST_COND) {
                                 pipeline().printer().verbose_with_location(
                                     "direct lighting: "
