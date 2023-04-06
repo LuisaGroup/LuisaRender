@@ -477,11 +477,11 @@ SampledSpectrum max(const SampledSpectrum &a, Expr<float> b) noexcept {
     return a.map([b](auto x) noexcept { return max(x, b); });
 }
 
-SampledSpectrum render::max(Expr<float> a, const SampledSpectrum &b) noexcept {
+SampledSpectrum max(Expr<float> a, const SampledSpectrum &b) noexcept {
     return b.map([a](auto x) noexcept { return max(a, x); });
 }
 
-SampledSpectrum render::max(const SampledSpectrum &a, const SampledSpectrum &b) noexcept {
+SampledSpectrum max(const SampledSpectrum &a, const SampledSpectrum &b) noexcept {
     auto n = std::max({a.dimension(), b.dimension()});
     LUISA_ASSERT((a.dimension() == 1u || a.dimension() == n) &&
                      (b.dimension() == 1u || b.dimension() == n),
@@ -496,11 +496,11 @@ SampledSpectrum min(const SampledSpectrum &a, Expr<float> b) noexcept {
     return a.map([b](auto x) noexcept { return min(x, b); });
 }
 
-SampledSpectrum render::min(Expr<float> a, const SampledSpectrum &b) noexcept {
+SampledSpectrum min(Expr<float> a, const SampledSpectrum &b) noexcept {
     return b.map([a](auto x) noexcept { return min(a, x); });
 }
 
-SampledSpectrum render::min(const SampledSpectrum &a, const SampledSpectrum &b) noexcept {
+SampledSpectrum min(const SampledSpectrum &a, const SampledSpectrum &b) noexcept {
     auto n = std::max({a.dimension(), b.dimension()});
     LUISA_ASSERT((a.dimension() == 1u || a.dimension() == n) &&
                      (b.dimension() == 1u || b.dimension() == n),
@@ -515,7 +515,7 @@ SampledSpectrum clamp(const SampledSpectrum &v, Expr<float> l, Expr<float> r) no
     return v.map([l, r](auto x) noexcept { return clamp(x, l, r); });
 }
 
-SampledSpectrum render::clamp(const SampledSpectrum &v, const SampledSpectrum &l, Expr<float> r) noexcept {
+SampledSpectrum clamp(const SampledSpectrum &v, const SampledSpectrum &l, Expr<float> r) noexcept {
     auto n = std::max(v.dimension(), l.dimension());
     LUISA_ASSERT((v.dimension() == 1u || v.dimension() == n) &&
                      (l.dimension() == 1u || l.dimension() == n),
@@ -526,7 +526,7 @@ SampledSpectrum render::clamp(const SampledSpectrum &v, const SampledSpectrum &l
     return ans;
 }
 
-SampledSpectrum render::clamp(const SampledSpectrum &v, Expr<float> l, const SampledSpectrum &r) noexcept {
+SampledSpectrum clamp(const SampledSpectrum &v, Expr<float> l, const SampledSpectrum &r) noexcept {
     auto n = std::max(v.dimension(), r.dimension());
     LUISA_ASSERT((v.dimension() == 1u || v.dimension() == n) &&
                      (r.dimension() == 1u || r.dimension() == n),
@@ -537,7 +537,7 @@ SampledSpectrum render::clamp(const SampledSpectrum &v, Expr<float> l, const Sam
     return ans;
 }
 
-SampledSpectrum render::clamp(const SampledSpectrum &v, const SampledSpectrum &l, const SampledSpectrum &r) noexcept {
+SampledSpectrum clamp(const SampledSpectrum &v, const SampledSpectrum &l, const SampledSpectrum &r) noexcept {
     auto n = std::max({v.dimension(), l.dimension(), r.dimension()});
     LUISA_ASSERT((v.dimension() == 1u || v.dimension() == n) &&
                      (l.dimension() == 1u || l.dimension() == n) &&
