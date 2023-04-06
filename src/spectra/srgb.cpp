@@ -15,6 +15,7 @@ struct SRGBSpectrum final : public Spectrum {
     [[nodiscard]] uint dimension() const noexcept override { return 3u; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
     [[nodiscard]] float4 encode_static_srgb_albedo(float3 rgb) const noexcept override { return make_float4(clamp(rgb, 0.f, 1.f), 1.f); }
+    [[nodiscard]] float4 encode_static_srgb_unbounded(float3 rgb) const noexcept override { return make_float4(rgb, 1.f); }
     [[nodiscard]] float4 encode_static_srgb_illuminant(float3 rgb) const noexcept override { return make_float4(max(rgb, 0.f), 1.f); }
 };
 
@@ -34,6 +35,13 @@ struct SRGBSpectrumInstance final : public Spectrum::Instance {
         const SampledWavelengths &swl, Expr<float4> v) const noexcept override {
         SampledSpectrum s{node()->dimension()};
         auto sv = saturate(v.xyz());
+        for (auto i = 0u; i < 3u; i++) { s[i] = sv[i]; }
+        return {.value = s, .strength = srgb_to_cie_y(sv)};
+    }
+    [[nodiscard]] Spectrum::Decode decode_unbounded(
+        const SampledWavelengths &swl, Expr<float4> v) const noexcept override {
+        SampledSpectrum s{node()->dimension()};
+        auto sv = v.xyz();
         for (auto i = 0u; i < 3u; i++) { s[i] = sv[i]; }
         return {.value = s, .strength = srgb_to_cie_y(sv)};
     }
@@ -61,6 +69,9 @@ struct SRGBSpectrumInstance final : public Spectrum::Instance {
     }
     [[nodiscard]] Float4 encode_srgb_albedo(Expr<float3> rgb) const noexcept override {
         return make_float4(clamp(rgb, 0.f, 1.f), 1.f);
+    }
+    [[nodiscard]] Float4 encode_srgb_unbounded(Expr<float3> rgb) const noexcept override {
+        return make_float4(rgb, 1.f);
     }
     [[nodiscard]] Float4 encode_srgb_illuminant(Expr<float3> rgb) const noexcept override {
         return make_float4(max(rgb, 0.f), 1.f);

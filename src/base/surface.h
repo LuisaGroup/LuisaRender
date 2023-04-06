@@ -52,7 +52,7 @@ public:
         [[nodiscard]] static auto zero(uint spec_dim) noexcept {
             return Sample{.eval = Evaluation::zero(spec_dim),
                           .wi = make_float3(0.f, 0.f, 1.f),
-                          .event = event_reflect};
+                          .event = Surface::event_reflect};
         }
     };
 

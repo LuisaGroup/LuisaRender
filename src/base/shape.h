@@ -14,13 +14,11 @@ namespace luisa::render {
 
 class Light;
 class Surface;
+class Transform;
+class Medium;
 
 using compute::AccelUsageHint;
 using compute::Triangle;
-
-class Light;
-class Surface;
-class Transform;
 
 struct MeshView {
     luisa::span<const Vertex> vertices;
@@ -42,12 +40,14 @@ public:
 private:
     const Surface *_surface;
     const Light *_light;
+    const Medium *_medium;
     const Transform *_transform;
 
 public:
     Shape(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] const Surface *surface() const noexcept;
     [[nodiscard]] const Light *light() const noexcept;
+    [[nodiscard]] const Medium *medium() const noexcept;
     [[nodiscard]] const Transform *transform() const noexcept;
     [[nodiscard]] virtual bool visible() const noexcept;
     [[nodiscard]] virtual float shadow_terminator_factor() const noexcept;
@@ -125,10 +125,15 @@ public:
 
     static constexpr auto buffer_base_max = (1u << (32u - property_flag_bits)) - 1u;
 
-    static constexpr auto light_tag_bits = 16u;
-    static constexpr auto surface_tag_bits = 32u - light_tag_bits;
+    static constexpr auto light_tag_bits = 12u;
+    static constexpr auto surface_tag_bits = 12u;
+    static constexpr auto medium_tag_bits = 32u - light_tag_bits - surface_tag_bits;
     static constexpr auto surface_tag_max = (1u << surface_tag_bits) - 1u;
-    static constexpr auto light_tag_mask = (1u << light_tag_bits) - 1u;
+    static constexpr auto light_tag_max = (1u << light_tag_bits) - 1u;
+    static constexpr auto medium_tag_max = (1u << medium_tag_bits) - 1u;
+    static constexpr auto light_tag_offset = 0u;
+    static constexpr auto surface_tag_offset = light_tag_offset + light_tag_bits;
+    static constexpr auto medium_tag_offset = surface_tag_offset + surface_tag_bits;
 
     static constexpr auto vertex_buffer_id_offset = 0u;
     static constexpr auto triangle_buffer_id_offset = 1u;
@@ -140,23 +145,24 @@ private:
     UInt _properties;
     UInt _surface_tag;
     UInt _light_tag;
+    UInt _medium_tag;
     UInt _triangle_count;
     Float _shadow_terminator;
     Float _intersection_offset;
 
 private:
     Handle(Expr<uint> buffer_base, Expr<uint> flags,
-           Expr<uint> surface_tag, Expr<uint> light_tag, Expr<uint> triangle_count,
-           Expr<float> shadow_terminator, Expr<float> intersection_offset) noexcept
+           Expr<uint> surface_tag, Expr<uint> light_tag, Expr<uint> medium_tag,
+           Expr<uint> triangle_count, Expr<float> shadow_terminator, Expr<float> intersection_offset) noexcept
         : _buffer_base{buffer_base}, _properties{flags},
-          _surface_tag{surface_tag}, _light_tag{light_tag},
+          _surface_tag{surface_tag}, _light_tag{light_tag}, _medium_tag{medium_tag},
           _triangle_count{triangle_count},
           _shadow_terminator{shadow_terminator},
           _intersection_offset{intersection_offset} {}
 
 public:
     Handle() noexcept = default;
-    [[nodiscard]] static uint4 encode(uint buffer_base, uint flags,
+    [[nodiscard]] static uint4 encode(uint buffer_base, uint flags, uint medium_tag,
                                       uint surface_tag, uint light_tag, uint tri_count,
                                       float shadow_terminator, float intersection_offset) noexcept;
     [[nodiscard]] static Shape::Handle decode(Expr<uint4> compressed) noexcept;
@@ -171,6 +177,7 @@ public:
     [[nodiscard]] auto pdf_buffer_id() const noexcept { return geometry_buffer_base() + luisa::render::Shape::Handle::pdf_buffer_id_offset; }
     [[nodiscard]] auto surface_tag() const noexcept { return _surface_tag; }
     [[nodiscard]] auto light_tag() const noexcept { return _light_tag; }
+    [[nodiscard]] auto medium_tag() const noexcept { return _medium_tag; }
     [[nodiscard]] auto test_property_flag(luisa::uint flag) const noexcept { return (property_flags() & flag) != 0u; }
     [[nodiscard]] auto has_vertex_normal() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_vertex_normal); }
     [[nodiscard]] auto has_vertex_uv() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_vertex_uv); }
