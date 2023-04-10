@@ -127,7 +127,7 @@ public:
         return make_float4(c, srgb_to_cie_y(rgb));
     }
 
-    [[nodiscard]] Float4 decode_unbound(
+    [[nodiscard]] Float4 decode_unbounded(
         const BindlessArray &array, Expr<uint> base_index, Expr<float3> rgb_in) const noexcept {
         auto rgb = max(rgb_in, 0.0f);
         auto m = max(max(rgb.x, rgb.y), rgb.z);
@@ -138,7 +138,7 @@ public:
         return make_float4(c.xyz(), scale);
     }
 
-    [[nodiscard]] float4 decode_unbound(float3 rgb) const noexcept {
+    [[nodiscard]] float4 decode_unbounded(float3 rgb) const noexcept {
         auto m = max(max(rgb.x, rgb.y), rgb.z);
         auto scale = 2.0f * m;
         auto c = decode_albedo(scale == 0.f ? make_float3() : rgb / scale);
@@ -225,8 +225,11 @@ public:
     [[nodiscard]] float4 encode_static_srgb_albedo(float3 rgb) const noexcept override {
         return RGB2SpectrumTable::srgb().decode_albedo(rgb);
     }
+    [[nodiscard]] float4 encode_static_srgb_unbounded(float3 rgb) const noexcept override {
+        return RGB2SpectrumTable::srgb().decode_unbounded(rgb);
+    }
     [[nodiscard]] float4 encode_static_srgb_illuminant(float3 rgb) const noexcept override {
-        return RGB2SpectrumTable::srgb().decode_unbound(rgb);
+        return RGB2SpectrumTable::srgb().decode_unbounded(rgb);
     }
 };
 
@@ -253,6 +256,15 @@ public:
         }
         return {.value = s, .strength = v.w};
     }
+    [[nodiscard]] Spectrum::Decode decode_unbounded(
+        const SampledWavelengths &swl, Expr<float4> v) const noexcept override {
+        auto spec = RGBAlbedoSpectrum{RGBSigmoidPolynomial{v.xyz()}};
+        SampledSpectrum s{node()->dimension()};
+        for (auto i = 0u; i < s.dimension(); i++) {
+            s[i] = spec.sample(swl.lambda(i));
+        }
+        return {.value = s, .strength = v.w};
+    }
     [[nodiscard]] Spectrum::Decode decode_illuminant(
         const SampledWavelengths &swl, Expr<float4> v) const noexcept override {
         auto spec = RGBIlluminantSpectrum{
@@ -266,8 +278,11 @@ public:
     [[nodiscard]] Float4 encode_srgb_albedo(Expr<float3> rgb) const noexcept override {
         return RGB2SpectrumTable::srgb().decode_albedo(pipeline().bindless_array(), _rgb2spec_t0, rgb);
     }
+    [[nodiscard]] Float4 encode_srgb_unbounded(Expr<float3> rgb) const noexcept override {
+        return RGB2SpectrumTable::srgb().decode_unbounded(pipeline().bindless_array(), _rgb2spec_t0, rgb);
+    }
     [[nodiscard]] Float4 encode_srgb_illuminant(Expr<float3> rgb) const noexcept override {
-        return RGB2SpectrumTable::srgb().decode_unbound(pipeline().bindless_array(), _rgb2spec_t0, rgb);
+        return RGB2SpectrumTable::srgb().decode_unbounded(pipeline().bindless_array(), _rgb2spec_t0, rgb);
     }
     [[nodiscard]] Float3 wavelength_mul(const SampledWavelengths &target_swl, const SampledSpectrum &target_sp,
                                         const SampledWavelengths &swl, const SampledSpectrum &sp) const noexcept override {

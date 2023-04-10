@@ -14,6 +14,7 @@ Float3 Interaction::p_robust(Expr<float3> w) const noexcept {
     auto offset_factor = _shape.intersection_offset_factor();
     auto front = dot(_shading.n(), w) > 0.f;
     auto n = ite(front, _ng, -_ng);
+//    return _pg + 1e-2f * normalize(n);
     return offset_ray_origin(_pg, offset_factor * n);
 }
 

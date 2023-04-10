@@ -4,6 +4,7 @@
 
 #include <util/sampling.h>
 #include <util/scattering.h>
+#include <dsl/sugar.h>
 
 namespace luisa::render {
 
@@ -155,6 +156,45 @@ Float balance_heuristic(Expr<float> fPdf, Expr<float> gPdf) noexcept {
 
 Float power_heuristic(Expr<float> fPdf, Expr<float> gPdf) noexcept {
     return power_heuristic(1u, fPdf, 1u, gPdf);
+}
+
+
+UInt sample_discrete(Expr<float2> weights, Expr<float> u) noexcept {
+    Float u_rescaled = u * (weights.x + weights.y);
+    auto ans = ite(u_rescaled <= weights.x, 0u, 1u);
+    return ans;
+}
+
+UInt sample_discrete(Expr<float3> weights, Expr<float> u) noexcept {
+    UInt ans = def<uint>(-1);
+    Float accum_sum = 0.0f;
+    Float u_rescaled = u * (weights.x + weights.y + weights.z);
+    $for(i, 3u) {
+        accum_sum += weights[i];
+        $if(u_rescaled <= accum_sum) {
+            ans = i;
+            $break;
+        };
+    };
+    return ans;
+}
+
+UInt sample_discrete(const SampledSpectrum &weights, Expr<float> u) noexcept {
+    UInt ans = def<uint>(-1);
+    Float accum_sum = 0.0f;
+    Float u_rescaled = u * weights.sum();
+    $for(i, weights.dimension()) {
+        accum_sum += weights[i];
+        $if(u_rescaled <= accum_sum) {
+            ans = i;
+            $break;
+        };
+    };
+    return ans;
+}
+
+Float sample_exponential(Expr<float> u, Expr<float> a) noexcept {
+    return -log(1.f - u) / a;
 }
 
 }// namespace luisa::render

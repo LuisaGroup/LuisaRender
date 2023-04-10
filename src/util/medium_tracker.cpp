@@ -3,54 +3,89 @@
 //
 
 #include <util/medium_tracker.h>
+#include <dsl/sugar.h>
 
 namespace luisa::render {
 
 using namespace luisa::compute;
 
-MediumTracker::MediumTracker() noexcept : _size{0u} {
+MediumTracker::MediumTracker(Printer &printer) noexcept : _size{0u}, _printer{printer} {
     for (auto i = 0u; i < capacity; i++) {
-        _priority_list[i] = 0u;
+        _priority_list[i] = Medium::VACUUM_PRIORITY;
+        _medium_list[i] = make_medium_info(Medium::VACUUM_PRIORITY, Medium::INVALID_TAG);
     }
 }
 
 Bool MediumTracker::true_hit(Expr<uint> priority) const noexcept {
-    return priority > _priority_list[0u];
+    return priority <= _priority_list[0u];
 }
 
 void MediumTracker::enter(Expr<uint> priority, Expr<MediumInfo> value) noexcept {
-    auto x = def(priority);
-    auto v = def(value);
-    for (auto i = 0u; i < capacity; i++) {
-        auto p = _priority_list[i];
-        auto m = _medium_list[i];
-        auto should_swap = p <= x;
-        _priority_list[i] = ite(should_swap, x, p);
-        _medium_list[i] = ite(should_swap, v, m);
-        x = ite(should_swap, p, x);
-        v = ite(should_swap, m, v);
+    $if(_size == capacity) {
+        $if(TEST_COND) {
+            printer().error_with_location(
+                "Medium stack overflow when trying to enter priority={}, medium_tag={}",
+                priority, value.medium_tag);
+        };
     }
+    $else {
+        _size += 1u;
+        auto x = def(priority);
+        auto v = def(value);
+        for (auto i = 0u; i < capacity; i++) {
+            auto p = _priority_list[i];
+            auto m = _medium_list[i];
+            auto should_swap = p > x;
+            _priority_list[i] = ite(should_swap, x, p);
+            _medium_list[i] = ite(should_swap, v, m);
+            x = ite(should_swap, p, x);
+            v = ite(should_swap, m, v);
+        }
+    };
 }
 
-void MediumTracker::exit(Expr<uint> priority) noexcept {
+void MediumTracker::exit(Expr<uint> priority, Expr<MediumInfo> value) noexcept {
+    auto remove_num = def(0u);
     for (auto i = 0u; i < capacity - 1u; i++) {
         auto p = _priority_list[i];
-        auto should_move = p <= priority;
-        auto index = ite(should_move, i + 1u, i);
-        _priority_list[i] = _priority_list[index];
-        _medium_list[i] = _medium_list[index];
+        auto should_remove = (p == priority) & _medium_list[i]->equal(value) & (remove_num == 0u);
+        remove_num += ite(should_remove, 1u, 0u);
+        _priority_list[i] = _priority_list[i + remove_num];
+        _medium_list[i] = _medium_list[i + remove_num];
     }
-    _priority_list[capacity - 1u] = 0u;
+    $if(remove_num != 0u) {
+        _size -= 1u;
+        _priority_list[_size] = Medium::VACUUM_PRIORITY;
+        _medium_list[_size] = make_medium_info(Medium::VACUUM_PRIORITY, Medium::INVALID_TAG);
+    }
+    $else {
+        $if(TEST_COND) {
+            printer().error_with_location(
+                "Medium stack trying to exit nonexistent priority={}, medium_tag={}",
+                priority, value.medium_tag);
+        };
+    };
+}
+
+Bool MediumTracker::exist(Expr<uint> priority, Expr<MediumInfo> value) noexcept {
+    auto exist = def(false);
+    for (auto i = 0u; i < capacity - 1u; i++) {
+        auto p = _priority_list[i];
+        exist |= (p == priority) & _medium_list[i]->equal(value);
+    }
+    return exist;
 }
 
 Var<MediumInfo> MediumTracker::current() const noexcept {
-    auto m = def<MediumInfo>();
-    m.eta = ite(vacuum(), 1.f, _medium_list[0].eta);
-    return m;
+    auto ans = _medium_list[0];
+    $if(vacuum()) {
+        ans = make_medium_info(Medium::VACUUM_PRIORITY, Medium::INVALID_TAG);
+    };
+    return ans;
 }
 
 Bool MediumTracker::vacuum() const noexcept {
-    return _priority_list[0] == 0u;
+    return _priority_list[0] == Medium::VACUUM_PRIORITY;
 }
 
 }// namespace luisa::render

@@ -58,8 +58,10 @@ public:
         // interfaces
         [[nodiscard]] virtual SampledWavelengths sample(Expr<float> u) const noexcept;
         [[nodiscard]] virtual Float4 encode_srgb_albedo(Expr<float3> rgb) const noexcept = 0;
+        [[nodiscard]] virtual Float4 encode_srgb_unbounded(Expr<float3> rgb) const noexcept = 0;
         [[nodiscard]] virtual Float4 encode_srgb_illuminant(Expr<float3> rgb) const noexcept = 0;
         [[nodiscard]] virtual Decode decode_albedo(const SampledWavelengths &swl, Expr<float4> v) const noexcept = 0;
+        [[nodiscard]] virtual Decode decode_unbounded(const SampledWavelengths &swl, Expr<float4> v) const noexcept = 0;
         [[nodiscard]] virtual Decode decode_illuminant(const SampledWavelengths &swl, Expr<float4> v) const noexcept = 0;
         [[nodiscard]] virtual Float cie_y(const SampledWavelengths &swl, const SampledSpectrum &sp) const noexcept;
         [[nodiscard]] virtual Float3 cie_xyz(const SampledWavelengths &swl, const SampledSpectrum &sp) const noexcept;
@@ -74,6 +76,7 @@ public:
     [[nodiscard]] virtual bool is_fixed() const noexcept = 0;
     [[nodiscard]] virtual uint dimension() const noexcept = 0;
     [[nodiscard]] virtual float4 encode_static_srgb_albedo(float3 rgb) const noexcept = 0;
+    [[nodiscard]] virtual float4 encode_static_srgb_unbounded(float3 rgb) const noexcept = 0;
     [[nodiscard]] virtual float4 encode_static_srgb_illuminant(float3 rgb) const noexcept = 0;
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
