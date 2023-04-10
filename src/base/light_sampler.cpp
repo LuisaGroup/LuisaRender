@@ -100,10 +100,11 @@ LightSampler::Sample LightSampler::Instance::sample_environment_le(
     auto cd = sample_uniform_disk_concentric(u_light);
     auto world_min = pipeline().geometry()->world_min();
     auto world_max = pipeline().geometry()->world_max();
-    auto world_radius = distance(world_min, world_max) * 0.5f;
+    auto world_radius = distance(world_min, world_max) * 0.501f;
     auto world_center = 0.5f * (world_max + world_min);
     Frame fr = Frame::make(s.wi);
-    auto origin =world_center+world_radius * (fr.local_to_world(make_float3(cd.x,cd.y,1.0f)));
+    auto to_world = cd.x * fr.s() + cd.y * fr.t() + 1.0f * fr.n();
+    auto origin =world_center+world_radius * to_world;
     s.eval.pdf *= 1 / (pi * world_radius * world_radius);
     return Sample{.eval = s.eval, .shadow_ray = make_ray(origin,-s.wi)};
 }

@@ -52,6 +52,7 @@ public:
     [[nodiscard]] auto resolution() const noexcept { return _resolution; }
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
+    [[nodiscard]] virtual float clamp() const noexcept { return 256.0f; }
 };
 
 }// namespace luisa::render

@@ -64,6 +64,9 @@ public:
         [[nodiscard]] virtual Float cie_y(const SampledWavelengths &swl, const SampledSpectrum &sp) const noexcept;
         [[nodiscard]] virtual Float3 cie_xyz(const SampledWavelengths &swl, const SampledSpectrum &sp) const noexcept;
         [[nodiscard]] virtual Float3 srgb(const SampledWavelengths &swl, const SampledSpectrum &sp) const noexcept;
+        //get target_sp*sp, in the wavelengths of target_swl
+        [[nodiscard]] virtual Float3 wavelength_mul(const SampledWavelengths &target_swl, const SampledSpectrum &target_sp,
+                                                             const SampledWavelengths &swl, const SampledSpectrum &sp) const noexcept;
     };
 
 public:

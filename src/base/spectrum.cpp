@@ -46,7 +46,29 @@ Float3 Spectrum::Instance::cie_xyz(const SampledWavelengths &swl, const SampledS
 SampledWavelengths Spectrum::Instance::sample(Expr<float> u) const noexcept {
     LUISA_ERROR_WITH_LOCATION("Spectrum::sample() is not implemented.");
 }
-
+//default impl: assuming |wavelength difference|<3nm is same wavelength and accumulate answer
+Float3 Spectrum::Instance::wavelength_mul(const SampledWavelengths& target_swl, const SampledSpectrum& target_sp,
+    const SampledWavelengths& swl, const SampledSpectrum& sp) const noexcept {
+    SampledSpectrum ret_sp{target_swl.dimension()};
+    SampledWavelengths ret_swl{target_swl.dimension()};
+    float error_bound = 3.0f;
+    for (auto i = 0u; i < target_swl.dimension(); ++i) {
+        auto target_lambda = target_swl.lambda(i);
+        ret_swl.set_lambda(i,target_lambda);
+        auto target_pdf = target_swl.pdf(i);
+        Float accum_pdf = 0.0f;
+        for (auto j = 0u; j < swl.dimension(); ++j) {
+            auto lambda = swl.lambda(j);
+            auto pdf = swl.pdf(j);
+            Bool is_same = (lambda < target_lambda + error_bound) & (lambda > target_lambda - error_bound);
+            accum_pdf += ite(is_same, target_pdf * pdf,0.0f);
+            ret_sp[i] += ite(is_same, target_sp[i] * sp[j],0.0f);
+        }
+        //The actual pdf(p(lambda)) is pdf*dimension
+        ret_swl.set_pdf(i, accum_pdf*swl.dimension()*2*error_bound);
+    }
+    return srgb(ret_swl, ret_sp);
+}
 Spectrum::Instance::Instance(Pipeline &pipeline, CommandBuffer &cb,
                              const Spectrum *spec) noexcept
     : _pipeline{pipeline}, _spectrum{spec},

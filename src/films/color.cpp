@@ -34,7 +34,7 @@ public:
         _clamp = std::max(1.f, desc->property_float_or_default("clamp", 256.f));
     }
     [[nodiscard]] auto scale() const noexcept { return make_float3(_scale[0], _scale[1], _scale[2]); }
-    [[nodiscard]] auto clamp() const noexcept { return _clamp; }
+    [[nodiscard]] float clamp() const noexcept override { return _clamp; }
     [[nodiscard]] auto warn_nan() const noexcept { return _warn_nan; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;

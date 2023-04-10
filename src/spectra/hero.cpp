@@ -269,6 +269,42 @@ public:
     [[nodiscard]] Float4 encode_srgb_illuminant(Expr<float3> rgb) const noexcept override {
         return RGB2SpectrumTable::srgb().decode_unbound(pipeline().bindless_array(), _rgb2spec_t0, rgb);
     }
+    [[nodiscard]] Float3 wavelength_mul(const SampledWavelengths &target_swl, const SampledSpectrum &target_sp,
+                                        const SampledWavelengths &swl, const SampledSpectrum &sp) const noexcept override {
+        auto m = node<HeroWavelengthSpectrum>()->sampling_method();
+        if (m == HeroWavelengthSpectrum::SamplingMethod::UNIFORM) {
+            SampledSpectrum ret_sp{target_swl.dimension()};
+            SampledWavelengths ret_swl{target_swl.dimension()};
+            float error_bound = 3.f;
+            Float3 res;
+            UInt rotate = -1;
+            auto hero_lambda = target_swl.lambda(0u);
+            for (auto i = 0u; i < target_swl.dimension(); ++i) {
+                auto lambda = swl.lambda(i);
+                Bool is_same = (lambda < hero_lambda + error_bound) & (lambda > hero_lambda - error_bound);
+                rotate = ite(is_same, i, rotate);
+            }
+            $if(rotate != -1) {
+                for (auto i = 0u; i < target_swl.dimension(); ++i) {
+                    auto target_lambda = target_swl.lambda(i);
+                    ret_swl.set_lambda(i, target_lambda);
+                    auto target_pdf = target_swl.pdf(i);
+                    auto index = ite(i + rotate >= target_swl.dimension(), i + rotate - target_swl.dimension(), i + rotate);
+                    auto lambda = swl.lambda(index);
+                    auto pdf = swl.pdf(index);
+                    ret_swl.set_pdf(i, target_pdf * pdf * swl.dimension() * 2 * error_bound);
+                    ret_sp[i] = target_sp[i] * sp[index];
+                }
+                res = srgb(ret_swl, ret_sp);
+            }
+            $else {
+                res = make_float3(0.0f, 0.0f, 0.0f);
+            };
+            return res;
+        } else {
+            return Spectrum::Instance::wavelength_mul(target_swl, target_sp, swl, sp);//the error bound is hard to control
+        }
+    }
 
 private:
     [[nodiscard]] auto _sample_uniform(Expr<float> u) const noexcept {
