@@ -704,7 +704,7 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
 
                                 // MIS between main and shifted
                                 auto new_denominator = main_lum_pdf + main_bsdf_pdf + previous_shifted_pdf_div_main_pdf * (shifted_bsdf_pdf + shifted_lum_pdf);
-                                main_contribution = main_bsdf_result.weight * main_light_sample.eval.L * main_previous_weight / new_denominator;
+                                main_contribution = main_bsdf_result.weight * main_emitter_radiance * main_previous_weight / new_denominator;
                                 shifted_contribution = (shifted_bsdf_value * shifted_emitter_radiance) * shifted_previous_weight * previous_shifted_pdf_div_main_pdf / new_denominator;
                             };
                         };
@@ -732,7 +732,7 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
 
                                 // MIS between main and shifted
                                 auto new_denominator = main_lum_pdf + main_bsdf_pdf + previous_shifted_pdf_div_main_pdf * (shifted_bsdf_pdf + shifted_lum_pdf);
-                                main_contribution = main_bsdf_result.weight * main_light_sample.eval.L * main_previous_weight / new_denominator;
+                                main_contribution = main_bsdf_result.weight * main_emitter_radiance * main_previous_weight / new_denominator;
                                 shifted_contribution = (shifted_bsdf_value * shifted_emitter_radiance) * shifted_previous_weight * previous_shifted_pdf_div_main_pdf / new_denominator;
                             };
                         };
