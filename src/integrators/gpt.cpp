@@ -709,7 +709,7 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                             };
                         };
                         $case((uint)RayConnection::RAY_RECENTLY_CONNECTED) {
-                            auto incoming_direction = normalize(shifted.it->p() - main.ray.ray->origin());
+                            auto incoming_direction = normalize(shifted.it->p() - previous_main_it.p());
                             Surface::Evaluation shifted_bsdf_eval{.f = SampledSpectrum{swl.dimension(), 0.f}, .pdf = 0.f};
                             pipeline().surfaces().dispatch(previous_main_it.shape().surface_tag(), [&](auto surface) noexcept {
                                 auto closure = surface->closure(make_shared<Interaction>(previous_main_it), swl, incoming_direction, 1.f, time);
@@ -740,13 +740,12 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                             auto shifted_vertex_type = get_vertex_type(shifted.it, swl, time);
                             $if(main_vertex_type == (uint)VertexType::VERTEX_TYPE_DIFFUSE & main_next_vertex_type == (uint)VertexType::VERTEX_TYPE_DIFFUSE & shifted_vertex_type == (uint)VertexType::VERTEX_TYPE_DIFFUSE) {
                                 // Reconnect shift
-                                shifted.alive = false;
                                 $if(!last_segment | main_hit_emitter /*| main.it has subsurface TODO*/) {
                                     ReconnectionShiftResult shift_result;
                                     auto environment_connection = def(false);
 
                                     $if(main.it->valid()) {
-                                        shift_result = reconnect_shift(main.ray.ray->origin(), main.it->p(), shifted.it->p(), main.it->ng());
+                                        shift_result = reconnect_shift(previous_main_it.p(), main.it->p(), shifted.it->p(), previous_main_it.ng());
                                     }
                                     $else {
                                         environment_connection = true;
