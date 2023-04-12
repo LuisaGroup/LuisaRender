@@ -74,3 +74,5 @@ using compute::sqrt;
 [[nodiscard]] Float3 clamp_shading_normal(Expr<float3> ns, Expr<float3> ng, Expr<float3> w) noexcept;
 
 }// namespace luisa::render
+
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::Frame)

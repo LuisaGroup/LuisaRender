@@ -74,7 +74,7 @@ public:
         [[nodiscard]] virtual Sample sample(Expr<uint> light_inst_id,
                                             Expr<float3> p_from,
                                             Expr<float2> u) const noexcept = 0;
-        [[nodiscard]] virtual std::pair<Sample,Float3> sample_le(Expr<uint> light_inst_id,
+        [[nodiscard]] virtual std::pair<Sample,Var<Ray>> sample_le(Expr<uint> light_inst_id,
                                             Expr<float2> u_light,
                                             Expr<float2> u_direction) const noexcept = 0;
     };
@@ -107,3 +107,8 @@ public:
 }// namespace luisa::render
 
 LUISA_STRUCT(luisa::render::Light::Handle, instance_id, light_tag){};
+
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::Light::Evaluation)
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::Light::Sample)
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::Light::Instance)
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::Light::Closure)

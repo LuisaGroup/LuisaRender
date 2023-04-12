@@ -31,6 +31,19 @@ Spectrum::Decode Texture::Instance::evaluate_albedo_spectrum(
     return pipeline().spectrum()->decode_albedo(swl, v);
 }
 
+Spectrum::Decode Texture::Instance::evaluate_unbounded_spectrum(
+    const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    // skip the expensive encoding/decoding if the texture is static
+    if (auto v = node()->evaluate_static()) {
+        return _evaluate_static_unbounded_spectrum(swl, *v);
+    }
+    // we have got no luck, do the expensive encoding/decoding
+    auto v = evaluate(it, swl, time);
+    v = pipeline().spectrum()->encode_srgb_unbounded(
+        extend_color_to_rgb(v.xyz(), node()->channels()));
+    return pipeline().spectrum()->decode_unbounded(swl, v);
+}
+
 Spectrum::Decode Texture::Instance::evaluate_illuminant_spectrum(
     const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept {
     // skip the expensive encoding/decoding if the texture is static
@@ -48,6 +61,13 @@ Spectrum::Decode Texture::Instance::_evaluate_static_albedo_spectrum(
     auto enc = pipeline().spectrum()->node()->encode_static_srgb_albedo(
         extend_color_to_rgb(v.xyz(), node()->channels()));
     return pipeline().spectrum()->decode_albedo(swl, enc);
+}
+
+Spectrum::Decode Texture::Instance::_evaluate_static_unbounded_spectrum(
+    const SampledWavelengths &swl, float4 v) const noexcept {
+    auto enc = pipeline().spectrum()->node()->encode_static_srgb_unbounded(
+        extend_color_to_rgb(v.xyz(), node()->channels()));
+    return pipeline().spectrum()->decode_unbounded(swl, enc);
 }
 
 Spectrum::Decode Texture::Instance::_evaluate_static_illuminant_spectrum(

@@ -28,7 +28,6 @@ public:
     [[nodiscard]] static auto load(std::filesystem::path path, uint subdiv_level,
                                    bool flip_uv, bool drop_normal, bool drop_uv) noexcept {
 
-        // TODO: static lifetime seems not good...
         static luisa::lru_cache<uint64_t, std::shared_future<MeshLoader>> loaded_meshes{256u};
         static std::mutex mutex;
 

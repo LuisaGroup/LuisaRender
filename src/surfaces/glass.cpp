@@ -187,12 +187,14 @@ private:
         auto ratio = _refl_prob(wo_local);
         auto wi = def(make_float3());
         $if(u_lobe < ratio) {// Reflection
-            f = _refl->sample(wo_local, &wi_local, u, &pdf, mode);
+            f = _refl->sample(wo_local, std::addressof(wi_local),
+                              u, std::addressof(pdf), mode);
             wi = it()->shading().local_to_world(wi_local);
             pdf *= ratio;
         }
         $else {// Transmission
-            f = _trans->sample(wo_local, &wi_local, u, &pdf, mode);
+            f = _trans->sample(wo_local, std::addressof(wi_local),
+                               u, std::addressof(pdf), mode);
             wi = it()->shading().local_to_world(wi_local);
             pdf *= (1.f - ratio);
             event = ite(cos_theta(wo_local) > 0.f, Surface::event_enter, Surface::event_exit);

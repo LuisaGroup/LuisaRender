@@ -19,6 +19,8 @@
 #include <base/environment.h>
 #include <base/texture.h>
 #include <base/geometry.h>
+#include <base/medium.h>
+#include <base/phase_function.h>
 
 namespace luisa::render {
 
@@ -64,14 +66,18 @@ private:
     luisa::vector<ResourceHandle> _resources;
     Polymorphic<Surface::Instance> _surfaces;
     Polymorphic<Light::Instance> _lights;
+    Polymorphic<Medium::Instance> _media;
     luisa::unordered_map<const Surface *, uint> _surface_tags;
     luisa::unordered_map<const Light *, uint> _light_tags;
+    luisa::unordered_map<const Medium *, uint> _medium_tags;
     luisa::unordered_map<const Texture *, luisa::unique_ptr<Texture::Instance>> _textures;
     luisa::unordered_map<const Filter *, luisa::unique_ptr<Filter::Instance>> _filters;
+    luisa::unordered_map<const PhaseFunction *, luisa::unique_ptr<PhaseFunction::Instance>> _phasefunctions;
     luisa::vector<luisa::unique_ptr<Camera::Instance>> _cameras;
     luisa::unique_ptr<Spectrum::Instance> _spectrum;
     luisa::unique_ptr<Integrator::Instance> _integrator;
     luisa::unique_ptr<Environment::Instance> _environment;
+    uint _environment_medium_tag{Medium::INVALID_TAG};
     luisa::unique_ptr<Geometry> _geometry;
     // registered transforms
     luisa::unordered_map<const Transform *, uint> _transform_to_id;
@@ -124,6 +130,7 @@ public:
 
     [[nodiscard]] uint register_surface(CommandBuffer &command_buffer, const Surface *surface) noexcept;
     [[nodiscard]] uint register_light(CommandBuffer &command_buffer, const Light *light) noexcept;
+    [[nodiscard]] uint register_medium(CommandBuffer &command_buffer, const Medium *medium) noexcept;
 
     template<typename Create>
     uint register_named_id(luisa::string_view identifier, Create &&create_id) noexcept {
@@ -180,13 +187,16 @@ public:
     [[nodiscard]] auto camera(size_t i) const noexcept { return _cameras[i].get(); }
     [[nodiscard]] auto &surfaces() const noexcept { return _surfaces; }
     [[nodiscard]] auto &lights() const noexcept { return _lights; }
+    [[nodiscard]] auto &media() const noexcept { return _media; }
     [[nodiscard]] auto environment() const noexcept { return _environment.get(); }
+    [[nodiscard]] auto environment_medium_tag() const noexcept { return _environment_medium_tag; }
     [[nodiscard]] auto integrator() const noexcept { return _integrator.get(); }
     [[nodiscard]] auto spectrum() const noexcept { return _spectrum.get(); }
     [[nodiscard]] auto geometry() const noexcept { return _geometry.get(); }
     [[nodiscard]] auto has_lighting() const noexcept { return !_lights.empty() || _environment != nullptr; }
     [[nodiscard]] const Texture::Instance *build_texture(CommandBuffer &command_buffer, const Texture *texture) noexcept;
     [[nodiscard]] const Filter::Instance *build_filter(CommandBuffer &command_buffer, const Filter *filter) noexcept;
+    [[nodiscard]] const PhaseFunction::Instance *build_phasefunction(CommandBuffer &command_buffer, const PhaseFunction *phasefunction) noexcept;
     bool update(CommandBuffer &command_buffer, float time) noexcept;
     void render(Stream &stream) noexcept;
     [[nodiscard]] auto &printer() noexcept { return *_printer; }

@@ -92,7 +92,9 @@ private:
                  light->node<DiffuseLight>()->scale();
         auto two_sided = light->node<DiffuseLight>()->two_sided();
         return Light::Evaluation{.L = L,
-                                 .pdf = pdf_area};
+                                 .pdf = pdf_area,
+                                 .p = it_light.p(),
+                                 .ng = it_light.ng()};
     }
 
 public:
@@ -121,7 +123,7 @@ public:
         DiffuseLightClosure closure{light, swl(), time()};
         return {.eval = closure._evaluate(it_light, p_from), .p = attrib.p};
     }
-    [[nodiscard]] std::pair<Light::Sample,Float3> sample_le(Expr<uint> light_inst_id,
+    [[nodiscard]] std::pair<Light::Sample,Var<Ray>> sample_le(Expr<uint> light_inst_id,
                                        Expr<float2> u_light,
                                        Expr<float2> u_direction) const noexcept override {
         auto light = instance<DiffuseLightInstance>();
@@ -150,7 +152,7 @@ public:
         }
         Interaction it_light{std::move(light_inst), light_inst_id,
                              triangle_id, attrib.area, attrib.p, attrib.n,
-                             true};
+                             false};
         auto we_world = it_light.shading().local_to_world(we);
         DiffuseLightClosure closure{light, swl(), time()};
         auto eval = closure._evaluate_pt(it_light);
@@ -161,9 +163,12 @@ public:
         //}
         //cancel out the cos term from outside le->beta
         if (two_sided) {
-            eval.pdf *= 0.5f;
+            eval.pdf *= 0.5f*inv_pi;
+        } else {
+            eval.pdf *=inv_pi;
         }
-        return std::make_pair(Light::Sample{.eval = eval, .p = attrib.p},we_world);
+        auto shadow_ray = it_light.spawn_ray(we_world);
+        return std::make_pair(Light::Sample{.eval = eval, .p = attrib.p},shadow_ray);
     }
 };
 

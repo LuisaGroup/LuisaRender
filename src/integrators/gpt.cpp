@@ -281,7 +281,10 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
             auto tangent_space_half_vector = normalize(tangent_space_half_vector_non_normalized_main);
 
             Float3 tangent_space_shifted_wo;
-            auto refract_not_internal = refract(tangent_space_shifted_wi, tangent_space_half_vector, shifted_eta, &tangent_space_shifted_wo);
+            auto refract_not_internal = refract(tangent_space_shifted_wi,
+                                                tangent_space_half_vector,
+                                                shifted_eta,
+                                                std::addressof(tangent_space_shifted_wo));
 
             $if(!refract_not_internal) {
                 result.success = false;

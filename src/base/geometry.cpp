@@ -11,19 +11,26 @@ namespace luisa::render {
 void Geometry::build(CommandBuffer &command_buffer, luisa::span<const Shape *const> shapes,
                      float init_time, AccelUsageHint hint) noexcept {
     _accel = _pipeline.device().create_accel(hint);
-    for (auto shape : shapes) { _process_shape(command_buffer, shape, init_time); }
+    for (auto i = 0u; i < 3u; ++i) {
+        _world_max[i] = -std::numeric_limits<float>::max();
+        _world_min[i] = std::numeric_limits<float>::max();
+    }for (auto shape : shapes) { _process_shape(command_buffer, shape, init_time, nullptr); }
     _instance_buffer = _pipeline.device().create_buffer<uint4>(_instances.size());
     command_buffer << _instance_buffer.copy_from(_instances.data())
                    << _accel.build();
 }
 
-void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape, float init_time,
-                              const Surface *overridden_surface, const Light *overridden_light,
-                              bool overriden_visible) noexcept {
+void Geometry::_process_shape(
+    CommandBuffer &command_buffer, const Shape *shape, float init_time,
+    const Surface *overridden_surface,
+    const Light *overridden_light,
+    const Medium *overridden_medium,
+    bool overridden_visible) noexcept {
 
     auto surface = overridden_surface == nullptr ? shape->surface() : overridden_surface;
     auto light = overridden_light == nullptr ? shape->light() : overridden_light;
-    auto visible = overriden_visible && shape->visible();
+    auto medium = overridden_medium == nullptr ? shape->medium() : overridden_medium;
+    auto visible = overridden_visible && shape->visible();
 
     if (shape->is_mesh()) {
         if (shape->deformable()) [[unlikely]] {
@@ -96,10 +103,16 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
         if (!is_static) { _dynamic_transforms.emplace_back(inst_xform); }
         auto object_to_world = inst_xform.matrix(init_time);
         _accel.emplace_back(*mesh.resource, object_to_world, visible);
+        auto vertices = shape->mesh().vertices;
+        for (auto &v : vertices) {
+            _world_max = max(_world_max, make_float3(object_to_world * make_float4(v.position(), 1.f)));
+            _world_min = min(_world_min, make_float3(object_to_world * make_float4(v.position(), 1.f)));
+        }
 
         // create instance
         auto surface_tag = 0u;
         auto light_tag = 0u;
+        auto medium_tag = 0u;
         auto properties = mesh.vertex_properties;
         if (surface != nullptr && !surface->is_null()) {
             surface_tag = _pipeline.register_surface(command_buffer, surface);
@@ -109,9 +122,13 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
             light_tag = _pipeline.register_light(command_buffer, light);
             properties |= Shape::property_flag_has_light;
         }
+        if (medium != nullptr && !medium->is_null()) {
+            medium_tag = _pipeline.register_medium(command_buffer, medium);
+            properties |= Shape::property_flag_has_medium;
+        }
         _instances.emplace_back(Shape::Handle::encode(
             mesh.geometry_buffer_id_base,
-            properties, surface_tag, light_tag,
+            properties, surface_tag, light_tag, medium_tag,
             mesh.resource->triangle_count(),
             static_cast<float>(mesh.shadow_term) / 65535.f,
             static_cast<float>(mesh.intersection_offset) / 65535.f));
@@ -124,7 +141,7 @@ void Geometry::_process_shape(CommandBuffer &command_buffer, const Shape *shape,
         _transform_tree.push(shape->transform());
         for (auto child : shape->children()) {
             _process_shape(command_buffer, child, init_time,
-                           surface, light, visible);
+                           surface, light, medium, visible);
         }
         _transform_tree.pop(shape->transform());
     }

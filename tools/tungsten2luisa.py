@@ -200,7 +200,7 @@ def rotateXYZ(R):
 
 
 def rotateYXZ(R):
-    return glm.rotate(R.z, (0, 0, 1)) * glm.rotate(R.x, (1, 0, 0)) * glm.rotate(R.y, (0, 1, 0))
+    return  glm.rotate(R.y, (0, 1, 0)) * glm.rotate(R.x, (1, 0, 0)) * glm.rotate(R.z, (0, 0, 1))
 
 
 def convert_transform(S, R, T):
@@ -208,6 +208,7 @@ def convert_transform(S, R, T):
 
 
 def convert_shape(out_file, index, shape: dict, materials: dict):
+  #Caution: Tungsten load from rotYXZ
     transform = shape["transform"]
     T = glm.vec3(transform.get("position", 0))
     R = glm.radians(glm.vec3(transform.get("rotation", 0)))
@@ -259,6 +260,7 @@ Env sky : Spherical {{
 ''', file=out_file)
         print(f"Warning: Skydome is not supported: {shape}")
     else:
+        power_scale = 100 * glm.pi()
         alpha = ""
         if impl == "mesh":
             file = shape["file"]
@@ -268,6 +270,7 @@ Env sky : Spherical {{
             file = "models/square.obj"
             M = M * rotateXYZ(glm.radians(glm.vec3(-90, 0, 0))
                               ) * glm.scale(glm.vec3(.5))
+            power_scale=S[0]*S[2]*glm.pi()
         elif impl == "cube":
             file = "models/cube.obj"
             M = M * rotateXYZ(glm.radians(glm.vec3(-90, 0, 0))) * glm.scale(glm.vec3(.5))
@@ -283,11 +286,12 @@ Env sky : Spherical {{
         material = shape["bsdf"]
         if not isinstance(material, str):
             material = "Null"
+        print(material)
         M0 = ", ".join(str(x) for x in glm.transpose(M)[0])
         M1 = ", ".join(str(x) for x in glm.transpose(M)[1])
         M2 = ", ".join(str(x) for x in glm.transpose(M)[2])
         M3 = ", ".join(str(x) for x in glm.transpose(M)[3])
-        power_scale = 100 * glm.pi()
+        
         emission = glm.vec3(shape.get("emission", glm.vec3(
             shape.get("power", 0)) / power_scale))
         if emission.x == emission.y == emission.z == 0:
@@ -361,7 +365,7 @@ def write_render(out_file, shapes):
     print(f'''
 render {{
   cameras {{ @camera }}
-  integrator : WavePath {{
+  integrator : MegaPath {{
     sampler : PMJ02BN {{}}
   }}
   shapes {{

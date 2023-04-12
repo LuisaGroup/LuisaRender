@@ -5,6 +5,7 @@
 #pragma once
 
 #include <dsl/syntax.h>
+#include <util/spec.h>
 
 namespace luisa::render {
 
@@ -68,6 +69,12 @@ template<typename ProbTable, typename AliasTable>
 [[nodiscard]] Float power_heuristic(Expr<uint> nf, Expr<float> fPdf, Expr<uint> ng, Expr<float> gPdf) noexcept;
 [[nodiscard]] Float balance_heuristic(Expr<float> fPdf, Expr<float> gPdf) noexcept;
 [[nodiscard]] Float power_heuristic(Expr<float> fPdf, Expr<float> gPdf) noexcept;
+
+
+[[nodiscard]] UInt sample_discrete(Expr<float2> weights, Expr<float> u) noexcept;
+[[nodiscard]] UInt sample_discrete(Expr<float3> weights, Expr<float> u) noexcept;
+[[nodiscard]] UInt sample_discrete(const SampledSpectrum &weights, Expr<float> u) noexcept;
+[[nodiscard]] Float sample_exponential(Expr<float> u, Expr<float> a) noexcept;
 
 }// namespace luisa::render
 

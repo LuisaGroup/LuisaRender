@@ -37,6 +37,8 @@ public:
     protected:
         [[nodiscard]] Spectrum::Decode _evaluate_static_albedo_spectrum(
             const SampledWavelengths &swl, float4 v) const noexcept;
+        [[nodiscard]] Spectrum::Decode _evaluate_static_unbounded_spectrum(
+            const SampledWavelengths &swl, float4 v) const noexcept;
         [[nodiscard]] Spectrum::Decode _evaluate_static_illuminant_spectrum(
             const SampledWavelengths &swl, float4 v) const noexcept;
 
@@ -51,6 +53,8 @@ public:
         [[nodiscard]] virtual Float4 evaluate(
             const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
         [[nodiscard]] virtual Spectrum::Decode evaluate_albedo_spectrum(
+            const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept;
+        [[nodiscard]] virtual Spectrum::Decode evaluate_unbounded_spectrum(
             const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept;
         [[nodiscard]] virtual Spectrum::Decode evaluate_illuminant_spectrum(
             const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept;
@@ -67,3 +71,5 @@ public:
 };
 
 }// namespace luisa::render
+
+LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::Texture::Instance)

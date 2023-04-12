@@ -473,6 +473,90 @@ SampledSpectrum exp(const SampledSpectrum &t) noexcept {
     return t.map([](auto x) noexcept { return exp(x); });
 }
 
+SampledSpectrum max(const SampledSpectrum &a, Expr<float> b) noexcept {
+    return a.map([b](auto x) noexcept { return max(x, b); });
+}
+
+SampledSpectrum max(Expr<float> a, const SampledSpectrum &b) noexcept {
+    return b.map([a](auto x) noexcept { return max(a, x); });
+}
+
+SampledSpectrum max(const SampledSpectrum &a, const SampledSpectrum &b) noexcept {
+    auto n = std::max({a.dimension(), b.dimension()});
+    LUISA_ASSERT((a.dimension() == 1u || a.dimension() == n) &&
+                     (b.dimension() == 1u || b.dimension() == n),
+                 "Invalid spectrum dimensions for max: (a = {}, b = {}).",
+                 a.dimension(), b.dimension());
+    auto ans = SampledSpectrum{n};
+    for (auto i = 0u; i < n; i++) { ans[i] = max(a[i], b[i]); }
+    return ans;
+}
+
+SampledSpectrum min(const SampledSpectrum &a, Expr<float> b) noexcept {
+    return a.map([b](auto x) noexcept { return min(x, b); });
+}
+
+SampledSpectrum min(Expr<float> a, const SampledSpectrum &b) noexcept {
+    return b.map([a](auto x) noexcept { return min(a, x); });
+}
+
+SampledSpectrum min(const SampledSpectrum &a, const SampledSpectrum &b) noexcept {
+    auto n = std::max({a.dimension(), b.dimension()});
+    LUISA_ASSERT((a.dimension() == 1u || a.dimension() == n) &&
+                     (b.dimension() == 1u || b.dimension() == n),
+                 "Invalid spectrum dimensions for min: (a = {}, b = {}).",
+                 a.dimension(), b.dimension());
+    auto ans = SampledSpectrum{n};
+    for (auto i = 0u; i < n; i++) { ans[i] = min(a[i], b[i]); }
+    return ans;
+}
+
+SampledSpectrum clamp(const SampledSpectrum &v, Expr<float> l, Expr<float> r) noexcept {
+    return v.map([l, r](auto x) noexcept { return clamp(x, l, r); });
+}
+
+SampledSpectrum clamp(const SampledSpectrum &v, const SampledSpectrum &l, Expr<float> r) noexcept {
+    auto n = std::max(v.dimension(), l.dimension());
+    LUISA_ASSERT((v.dimension() == 1u || v.dimension() == n) &&
+                     (l.dimension() == 1u || l.dimension() == n),
+                 "Invalid spectrum dimensions for clamp: (v = {}, l = {}, r = 1).",
+                 v.dimension(), l.dimension());
+    auto ans = SampledSpectrum{n};
+    for (auto i = 0u; i < n; i++) { ans[i] = clamp(v[i], l[i], r); }
+    return ans;
+}
+
+SampledSpectrum clamp(const SampledSpectrum &v, Expr<float> l, const SampledSpectrum &r) noexcept {
+    auto n = std::max(v.dimension(), r.dimension());
+    LUISA_ASSERT((v.dimension() == 1u || v.dimension() == n) &&
+                     (r.dimension() == 1u || r.dimension() == n),
+                 "Invalid spectrum dimensions for clamp: (v = {}, l = 1, r = {}).",
+                 v.dimension(), r.dimension());
+    auto ans = SampledSpectrum{n};
+    for (auto i = 0u; i < n; i++) { ans[i] = clamp(v[i], l, r[i]); }
+    return ans;
+}
+
+SampledSpectrum clamp(const SampledSpectrum &v, const SampledSpectrum &l, const SampledSpectrum &r) noexcept {
+    auto n = std::max({v.dimension(), l.dimension(), r.dimension()});
+    LUISA_ASSERT((v.dimension() == 1u || v.dimension() == n) &&
+                     (l.dimension() == 1u || l.dimension() == n) &&
+                     (r.dimension() == 1u || r.dimension() == n),
+                 "Invalid spectrum dimensions for clamp: (v = {}, l = {}, r = {}).",
+                 v.dimension(), l.dimension(), r.dimension());
+    auto ans = SampledSpectrum{n};
+    for (auto i = 0u; i < n; i++) { ans[i] = clamp(v[i], l[i], r[i]); }
+    return ans;
+}
+
+Bool any(const SampledSpectrum &v) noexcept {
+    return v.any([](auto x) noexcept { return x != 0.f; });
+}
+
+Bool all(const SampledSpectrum &v) noexcept {
+    return v.all([](auto x) noexcept { return x != 0.f; });
+}
+
 //SampledSpectrum fma(const SampledSpectrum &a, const SampledSpectrum &b, const SampledSpectrum &c) noexcept {
 //    auto n = std::max({a.dimension(), b.dimension(), c.dimension()});
 //    LUISA_ASSERT((a.dimension() == 1u || a.dimension() == n) &&
