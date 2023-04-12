@@ -563,37 +563,44 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                                 auto shifted_vertex_type = get_vertex_type(shifted.it, swl, time);
 
                                 $if(main_vertex_type == (uint)VertexType::VERTEX_TYPE_DIFFUSE & shifted_vertex_type == (uint)VertexType::VERTEX_TYPE_DIFFUSE) {
+                                    u_light_selection = sampler()->generate_1d();
+                                    u_light_surface = sampler()->generate_2d();
                                     auto shifted_light_sample = light_sampler()->sample(*shifted.it, u_light_selection, u_light_surface, swl, time);
                                     auto shifted_occluded = pipeline().geometry()->intersect_any(shifted_light_sample.shadow_ray);
+                                    $if(shifted_occluded) { // shifted failed, no light
+                                        shift_successful = false;
+                                    } $else {
+                                        auto shifted_emitter_radiance = shifted_light_sample.eval.L;
+                                        auto shifted_emitter_pdf = shifted_light_sample.eval.pdf;
 
-                                    auto shifted_emitter_radiance = shifted_light_sample.eval.L;
-                                    auto shifted_emitter_pdf = shifted_light_sample.eval.pdf;
+                                        auto shifted_distance_squared = length_squared(shifted.it->p() - shifted_light_sample.eval.p);
+                                        auto emitter_direction = (shifted.it->p() - shifted_light_sample.eval.p) / sqrt(shifted_distance_squared);
+                                        auto shifted_opposing_cosine = -dot(shifted_light_sample.eval.ng, emitter_direction);
 
-                                    auto shifted_distance_squared = length_squared(shifted.it->p() - shifted_light_sample.eval.p);
-                                    auto emitter_direction = (shifted.it->p() - shifted_light_sample.eval.p) / sqrt(shifted_distance_squared);
-                                    auto shifted_opposing_cosine = -dot(shifted_light_sample.eval.ng, emitter_direction);
+                                        // TODO: No strict normal here
+                                        auto shifted_surface_tag = shifted.it->shape().surface_tag();
+                                        Surface::Evaluation shifted_light_eval{.f = SampledSpectrum{swl.dimension(), 0.f}, .pdf = 0.f};
+                                        pipeline().surfaces().dispatch(shifted_surface_tag, [&](auto surface) noexcept {
+                                            auto closure = surface->closure(shifted.it, swl, -shifted.ray.ray->direction(), 1.f, time);
+                                            shifted_light_eval = closure->evaluate(-shifted.ray.ray->direction(), shifted_light_sample.shadow_ray->direction());
+                                        });
 
-                                    // TODO: No strict normal here
-                                    auto shifted_surface_tag = shifted.it->shape().surface_tag();
-                                    Surface::Evaluation shifted_light_eval{.f = SampledSpectrum{swl.dimension(), 0.f}, .pdf = 0.f};
-                                    pipeline().surfaces().dispatch(shifted_surface_tag, [&](auto surface) noexcept {
-                                        auto closure = surface->closure(shifted.it, swl, -shifted.ray.ray->direction(), 1.f, time);
-                                        shifted_light_eval = closure->evaluate(-shifted.ray.ray->direction(), -emitter_direction);
-                                    });
+                                        auto shifted_bsdf_value = shifted_light_eval.f;
+                                        auto shifted_bsdf_pdf = shifted_light_eval.pdf;
+                                        auto jacobian = abs(shifted_opposing_cosine * main_distance_squared) / abs(main_opposing_cosine * shifted_distance_squared);
 
-                                    auto shifted_bsdf_value = shifted_light_eval.f;
-                                    auto shifted_bsdf_pdf = ite(!shifted_occluded, shifted_light_eval.pdf, 0.f);
-                                    auto jacobian = abs(shifted_opposing_cosine * main_distance_squared) / (D_EPSILON + abs(main_opposing_cosine * shifted_distance_squared));
-
-                                    // MIS between main and shifted
-                                    auto new_denominator = main_light_sample.eval.pdf + main_bsdf_pdf + jacobian * shifted.pdf_div_main_pdf * (shifted_bsdf_pdf + shifted_emitter_pdf);
-                                    main_contribution = main_light_eval.f * main_light_sample.eval.L * main.weight / new_denominator;
-                                    shifted_contribution = jacobian * (shifted_bsdf_value * shifted_emitter_radiance) * shifted.weight * shifted.pdf_div_main_pdf / new_denominator;
+                                        // MIS between main and shifted
+                                        auto new_denominator = main_light_sample.eval.pdf + main_bsdf_pdf + jacobian * shifted.pdf_div_main_pdf * (shifted_bsdf_pdf + shifted_emitter_pdf);
+                                        main_contribution = main_light_eval.f * main_light_sample.eval.L * main.weight / new_denominator;
+                                        shifted_contribution = jacobian * (shifted_bsdf_value * shifted_emitter_radiance) * shifted.weight * shifted.pdf_div_main_pdf / new_denominator;
+                                    };
+                                } $else {
+                                    shift_successful = false;
                                 };
                             };
                         };
-                    }
-                    $else {// shift_successful == false
+                    };
+                    $if(!shift_successful) {// shift_successful == false, fall back to central radiance
                         main_contribution = main_weight * main_light_eval.f * main_light_sample.eval.L;
                         shifted_contribution = SampledSpectrum{swl.dimension(), 0.f};
                     };
@@ -616,7 +623,7 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
             };
             auto main_wo = main_bsdf_result.sample.wi;
 
-            auto main_wo_dot_ng = dot(main.it->ng(), main_wo);
+            auto main_wo_dot_ng = dot(main.it->shading().n(), main_wo);
             // TODO: strict normal
 
             auto previous_main_it = *main.it;
@@ -745,7 +752,7 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                                     auto environment_connection = def(false);
 
                                     $if(main.it->valid()) {
-                                        shift_result = reconnect_shift(previous_main_it.p(), main.it->p(), shifted.it->p(), previous_main_it.ng());
+                                        shift_result = reconnect_shift(previous_main_it.p(), main.it->p(), shifted.it->p(), previous_main_it.shading().n());
                                     }
                                     $else {
                                         environment_connection = true;

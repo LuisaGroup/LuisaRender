@@ -80,7 +80,7 @@ private:
         return Light::Evaluation{.L = ite(invalid, 0.f, L),
                                  .pdf = ite(invalid, 0.0f, pdf),
                                  .p = it_light.p(),
-                                 .ng = it_light.ng()};
+                                 .ng = it_light.shading().n()};
     }
     [[nodiscard]] auto _evaluate_pt(const Interaction &it_light) const noexcept {
         using namespace luisa::compute;
