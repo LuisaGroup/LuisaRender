@@ -19,9 +19,6 @@ using compute::Printer;
 using compute::UInt;
 using compute::Var;
 
-//#define TEST_COND all(compute::dispatch_id().xy() == make_uint2(430, 350))
-#define TEST_COND false
-
 struct MediumInfo {
     uint priority{0u};
     uint medium_tag{Medium::INVALID_TAG};
