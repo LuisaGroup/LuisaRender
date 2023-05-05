@@ -53,7 +53,9 @@ public:
             }
             pdf_channels /= pdf_channels.sum();
             auto channel = sample_discrete(pdf_channels, rng.uniform_float());
-            auto t = -log(max(1.f - rng.uniform_float(), std::numeric_limits<float>::min())) / sigma_t()[channel];
+            auto u = rng.uniform_float();
+            auto t = -log(max(1.f - u, std::numeric_limits<float>::min())) / sigma_t()[channel];
+            instance()->pipeline().printer().verbose_with_location("HomogeneousMediumClosure::sample: u={}, t={}", u, t);
 
             // hit surface
             $if(t > t_max) {
@@ -93,24 +95,24 @@ public:
                     sample_ans.eval.f = Tr * sigma_s();
                     sample_ans.eval.pdf = pdf.sum();
 
-                    $if(TEST_COND) {
-                        auto &printer = instance()->pipeline().printer();
-                        printer.verbose_with_location(
-                            "HomogeneousMediumClosure::sample::scatter\n"
-                            "t={}, Tr=({}, {}, {}), \n"
-                            "pdf_channels=({}, {}, {}), \n"
-                            "pdf_distance=({}, {}, {}), \n"
-                            "pdf=({}, {}, {}), \n"
-                            "pdf_sum={}, f=({}, {}, {})",
-                            t, Tr[0u], Tr[1u], Tr[2u],
-                            pdf_channels[0u], pdf_channels[1u], pdf_channels[2u],
-                            pdf_distance[0u], pdf_distance[1u], pdf_distance[2u],
-                            pdf[0u], pdf[1u], pdf[2u],
-                            sample_ans.eval.pdf,
-                            sample_ans.eval.f[0u], sample_ans.eval.f[1u], sample_ans.eval.f[2u]);
-                    };
+                    instance()->pipeline().printer().verbose_with_location(
+                        "HomogeneousMediumClosure::sample::scatter\n"
+                        "t={}, Tr=({}, {}, {}), \n"
+                        "pdf_channels=({}, {}, {}), \n"
+                        "pdf_distance=({}, {}, {}), \n"
+                        "pdf=({}, {}, {}), \n"
+                        "pdf_sum={}, f=({}, {}, {})",
+                        t, Tr[0u], Tr[1u], Tr[2u],
+                        pdf_channels[0u], pdf_channels[1u], pdf_channels[2u],
+                        pdf_distance[0u], pdf_distance[1u], pdf_distance[2u],
+                        pdf[0u], pdf[1u], pdf[2u],
+                        sample_ans.eval.pdf,
+                        sample_ans.eval.f[0u], sample_ans.eval.f[1u], sample_ans.eval.f[2u]);
                 };
             };
+
+            // add emission
+            // TODO
 
             return sample_ans;
         }
