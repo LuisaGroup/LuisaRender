@@ -161,4 +161,18 @@ uint Pipeline::named_id(luisa::string_view name) const noexcept {
     return iter->second;
 }
 
+std::pair<BufferView<float4>, uint> Pipeline::allocate_constant_slot() noexcept {
+    if (!_constant_buffer) {
+        _constant_buffer = device().create_buffer<float4>(constant_buffer_size);
+    }
+    auto slot = _constant_count++;
+    LUISA_ASSERT(slot < constant_buffer_size,
+                 "Constant buffer overflows.");
+    return {_constant_buffer.view(slot, 1u), slot};
+}
+
+Float4 Pipeline::constant(Expr<uint> index) const noexcept {
+    return _constant_buffer.read(index);
+}
+
 }// namespace luisa::render
