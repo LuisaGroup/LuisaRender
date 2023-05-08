@@ -92,7 +92,7 @@ protected:
             auto u_bsdf = sampler()->generate_2d();
             auto u_rr = def(0.f);
             auto rr_depth = node<MegakernelPathTracing>()->rr_depth();
-            $if (depth + 1u >= rr_depth) { u_rr = sampler()->generate_1d(); };
+            $if(depth + 1u >= rr_depth) { u_rr = sampler()->generate_1d(); };
 
             // sample one light
             auto light_sample = light_sampler()->sample(
@@ -104,13 +104,18 @@ protected:
             // evaluate material
             auto surface_tag = it->shape().surface_tag();
             auto eta_scale = def(1.f);
-            pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
-                // create closure
-                auto closure = surface->closure(it, swl, wo, 1.f, time);
 
+            PolymorphicClosure<Surface::Function> closure;
+            auto closure_tag = def(0u);
+
+            pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
+                closure_tag = surface->make_closure(closure, it, swl, wo, eta_scale, time);
+            });
+
+            closure.dispatch(closure_tag, [&](auto function, const std::any &ctx_wrapper) noexcept {
                 // apply opacity map
                 auto alpha_skip = def(false);
-                if (auto o = closure->opacity()) {
+                if (auto o = function->opacity(ctx_wrapper, swl, time)) {
                     auto opacity = saturate(*o);
                     alpha_skip = u_lobe >= opacity;
                     u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
@@ -121,31 +126,32 @@ protected:
                     pdf_bsdf = 1e16f;
                 }
                 $else {
-                    if (auto dispersive = closure->is_dispersive()) {
+                    if (auto dispersive = function->is_dispersive(ctx_wrapper, swl, time)) {
                         $if(*dispersive) { swl.terminate_secondary(); };
                     }
                     // direct lighting
                     $if(light_sample.eval.pdf > 0.0f & !occluded) {
                         auto wi = light_sample.shadow_ray->direction();
-                        auto eval = closure->evaluate(wo, wi);
+                        auto eval = function->evaluate(ctx_wrapper, swl, time, wo, wi);
                         auto w = balance_heuristic(light_sample.eval.pdf, eval.pdf) /
                                  light_sample.eval.pdf;
                         Li += w * beta * eval.f * light_sample.eval.L;
                     };
                     // sample material
-                    auto surface_sample = closure->sample(wo, u_lobe, u_bsdf);
+                    auto surface_sample = function->sample(ctx_wrapper, swl, time, wo, u_lobe, u_bsdf);
                     ray = it->spawn_ray(surface_sample.wi);
                     pdf_bsdf = surface_sample.eval.pdf;
                     auto w = ite(surface_sample.eval.pdf > 0.f, 1.f / surface_sample.eval.pdf, 0.f);
                     beta *= w * surface_sample.eval.f;
                     // apply eta scale
-                    auto eta = closure->eta().value_or(1.f);
+                    auto eta = function->eta(ctx_wrapper, swl, time).value_or(1.f);
                     $switch(surface_sample.event) {
                         $case(Surface::event_enter) { eta_scale = sqr(eta); };
                         $case(Surface::event_exit) { eta_scale = sqr(1.f / eta); };
                     };
                 };
             });
+
             beta = zero_if_any_nan(beta);
             $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
             auto rr_threshold = node<MegakernelPathTracing>()->rr_threshold();

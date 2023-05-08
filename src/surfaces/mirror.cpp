@@ -51,6 +51,9 @@ public:
     [[nodiscard]] auto roughness() const noexcept { return _roughness; }
 
 public:
+    [[nodiscard]] Local<float> data(
+        luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
+        Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept override;
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
         Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept override;
@@ -122,6 +125,17 @@ private:
                 .event = Surface::event_reflect};
     }
 };
+
+Local<float> MirrorInstance::data(
+    luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
+    Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept {
+    auto d = swl.dimension();
+    auto data_array = Local<float>(1);
+
+    data_array[0] = compute::as<float>(0u);
+
+    return data_array;
+}
 
 luisa::unique_ptr<Surface::Closure> MirrorInstance::closure(
     luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,

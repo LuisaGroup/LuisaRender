@@ -10,6 +10,7 @@
 #include <base/pipeline.h>
 
 #include <utility>
+#include "dsl/builtin.h"
 
 namespace luisa::render {
 
@@ -93,6 +94,8 @@ private:
     const Texture::Instance *_sheen{};
     const Texture::Instance *_sheen_tint{};
     const Texture::Instance *_clearcoat{};
+
+private:
     const Texture::Instance *_clearcoat_gloss{};
     const Texture::Instance *_specular_trans{};
     const Texture::Instance *_flatness{};
@@ -130,6 +133,9 @@ public:
     [[nodiscard]] auto diffuse_trans() const noexcept { return _diffuse_trans; }
 
 public:
+    [[nodiscard]] Local<float> data(
+        luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
+        Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept override;
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
         Expr<float3> wo, Expr<float> eta, Expr<float> time) const noexcept override;
@@ -933,6 +939,17 @@ public:
         }
     }
 };
+
+Local<float> DisneySurfaceInstance::data(
+    luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
+    Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept {
+    auto d = swl.dimension();
+    auto data_array = Local<float>(1);
+
+    data_array[0] = compute::as<float>(0u);
+
+    return data_array;
+}
 
 luisa::unique_ptr<Surface::Closure> DisneySurfaceInstance::closure(
     luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,

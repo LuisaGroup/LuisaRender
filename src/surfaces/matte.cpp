@@ -34,6 +34,13 @@ protected:
 
 class MatteInstance : public Surface::Instance {
 
+public:
+    struct MatteContext {
+        Interaction it;
+        SampledSpectrum kd;
+        Float sigma;
+    };
+
 private:
     const Texture::Instance *_kd;
     const Texture::Instance *_sigma;
@@ -45,7 +52,8 @@ public:
         : Surface::Instance{pipeline, surface}, _kd{Kd}, _sigma{sigma} {}
 
 public:
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
+    [[nodiscard]] virtual uint make_closure(
+        PolymorphicClosure<Surface::Function> &closure,
         luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
         Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept override;
 };
@@ -57,49 +65,52 @@ luisa::unique_ptr<Surface::Instance> MatteSurface::_build(
     return luisa::make_unique<MatteInstance>(pipeline, this, Kd, sigma);
 }
 
-class MatteClosure : public Surface::Closure {
-
-private:
-    luisa::unique_ptr<BxDF> _refl;
+class MatteFunction : public Surface::Function {
 
 public:
-    MatteClosure(const Surface::Instance *instance, luisa::shared_ptr<Interaction> it,
-                 const SampledWavelengths &swl, Expr<float> time,
-                 SampledSpectrum albedo, luisa::optional<Float> sigma) noexcept
-        : Surface::Closure{instance, std::move(it), swl, time} {
-        if (sigma) {
-            _refl = luisa::make_unique<OrenNayar>(albedo, *sigma);
-        } else {
-            _refl = luisa::make_unique<LambertianReflection>(std::move(albedo));
-        }
+    [[nodiscard]] static luisa::string identifier() noexcept { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] SampledSpectrum albedo(
+        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        auto ctx = std::any_cast<MatteInstance::MatteContext>(&ctx_wrapper);
+        auto refl = OrenNayar{ctx->kd, ctx->sigma};
+        return refl.albedo();
     }
-
-private:
-    [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _refl->albedo(); }
-    [[nodiscard]] Float2 roughness() const noexcept override { return make_float2(1.f); }
-    [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
-                                                TransportMode mode) const noexcept override {
-        auto wo_local = it()->shading().world_to_local(wo);
-        auto wi_local = it()->shading().world_to_local(wi);
-        auto f = _refl->evaluate(wo_local, wi_local, mode);
-        auto pdf = _refl->pdf(wo_local, wi_local, mode);
+    [[nodiscard]] Float2 roughness(
+        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        return make_float2(1.f);
+    }
+    [[nodiscard]] Surface::Evaluation evaluate(
+        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
+        Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
+        auto ctx = std::any_cast<MatteInstance::MatteContext>(&ctx_wrapper);
+        auto &it = ctx->it;
+        auto refl = OrenNayar{ctx->kd, ctx->sigma};
+        auto wo_local = it.shading().world_to_local(wo);
+        auto wi_local = it.shading().world_to_local(wi);
+        auto f = refl.evaluate(wo_local, wi_local, mode);
+        auto pdf = refl.pdf(wo_local, wi_local, mode);
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
-    [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float>, Expr<float2> u,
-                                          TransportMode mode) const noexcept override {
-        auto wo_local = it()->shading().world_to_local(wo);
+    [[nodiscard]] Surface::Sample sample(
+        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
+        Expr<float3> wo, Expr<float>, Expr<float2> u, TransportMode mode) const noexcept override {
+        auto ctx = std::any_cast<MatteInstance::MatteContext>(&ctx_wrapper);
+        auto &it = ctx->it;
+        auto refl = OrenNayar{ctx->kd, ctx->sigma};
+        auto wo_local = it.shading().world_to_local(wo);
         auto wi_local = def(make_float3(0.0f, 0.0f, 1.0f));
         auto pdf = def(0.f);
-        auto f = _refl->sample(wo_local, std::addressof(wi_local),
-                               u, std::addressof(pdf), mode);
-        auto wi = it()->shading().local_to_world(wi_local);
+        auto f = refl.sample(wo_local, std::addressof(wi_local),
+                             u, std::addressof(pdf), mode);
+        auto wi = it.shading().local_to_world(wi_local);
         return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf},
                 .wi = wi,
                 .event = Surface::event_reflect};
     }
 };
 
-luisa::unique_ptr<Surface::Closure> MatteInstance::closure(
+uint MatteInstance::make_closure(
+    PolymorphicClosure<Surface::Function> &closure,
     luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
     Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept {
     auto [Kd, _] = _kd ? _kd->evaluate_albedo_spectrum(*it, swl, time) :
@@ -107,13 +118,18 @@ luisa::unique_ptr<Surface::Closure> MatteInstance::closure(
     auto sigma = _sigma && !_sigma->node()->is_black() ?
                      luisa::make_optional(saturate(_sigma->evaluate(*it, swl, time).x) * 90.f) :
                      luisa::nullopt;
-    return luisa::make_unique<MatteClosure>(
-        this, std::move(it), swl, time, Kd, std::move(sigma));
+
+    auto ctx = MatteContext{
+        .it = *it,
+        .kd = Kd,
+        .sigma = sigma ? sigma.value() : 0.f};
+
+    return closure.register_instance<MatteFunction>(std::move(ctx));
 }
 
-using NormalMapOpacityMatteSurface = NormalMapWrapper<OpacitySurfaceWrapper<
-    MatteSurface, MatteInstance, MatteClosure>>;
+//using NormalMapOpacityMatteSurface = NormalMapWrapper<OpacitySurfaceWrapper<
+//    MatteSurface, MatteInstance, MatteClosure>>;
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::NormalMapOpacityMatteSurface)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::MatteSurface)

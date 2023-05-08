@@ -172,6 +172,9 @@ public:
     [[nodiscard]] auto albedo() const noexcept { return _albedo; }
 
 public:
+    [[nodiscard]] Local<float> data(
+        luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
+        Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept override;
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
         luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
         Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept override;
@@ -444,6 +447,17 @@ private:
                       (1.f - _bottom->opacity().value_or(1.f)));
     }
 };
+
+Local<float> LayeredSurfaceInstance::data(
+    luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
+    Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept {
+    auto d = swl.dimension();
+    auto data_array = Local<float>(1);
+
+    data_array[0] = compute::as<float>(0u);
+
+    return data_array;
+}
 
 luisa::unique_ptr<Surface::Closure> LayeredSurfaceInstance::closure(
     luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,

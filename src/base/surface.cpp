@@ -19,43 +19,40 @@ luisa::unique_ptr<Surface::Instance> Surface::build(
     return _build(pipeline, command_buffer);
 }
 
-Surface::Closure::Closure(const Surface::Instance *instance, luisa::shared_ptr<Interaction> it,
-                          const SampledWavelengths &swl, Expr<float> time) noexcept
-    : _instance{instance}, _it{std::move(it)}, _swl{swl}, _time{time} {}
+//luisa::optional<Float> Surface::Closure::opacity() const noexcept {
+//    // We do not allow transmissive surfaces to be non-opaque.
+//    return instance()->node()->is_transmissive() ? luisa::nullopt : _opacity();
+//}
+//
+//luisa::optional<Float> Surface::Closure::eta() const noexcept {
+//    // We do not care about eta of non-transmissive surfaces.
+//    if (instance()->node()->is_transmissive()) {
+//        auto eta = _eta();
+//        LUISA_ASSERT(eta.has_value(), "Transmissive surface must have eta.");
+//        return eta;
+//    }
+//    return luisa::nullopt;
+//}
+//
+//luisa::optional<Bool> Surface::Closure::is_dispersive() const noexcept {
+//    if (instance()->pipeline().spectrum()->node()->is_fixed()) { return nullopt; }
+//    return _is_dispersive();
+//}
 
-Surface::Evaluation Surface::Closure::evaluate(
-    Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept {
-    return _evaluate(wo, wi, mode);
+luisa::optional<Float> Surface::Function::opacity(
+    const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    return nullopt;
 }
 
-Surface::Sample Surface::Closure::sample(
-    Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u,
-    TransportMode mode) const noexcept {
-    return _sample(wo, u_lobe, u, mode);
+luisa::optional<Float> Surface::Function::eta(
+    const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    return nullopt;
 }
 
-luisa::optional<Float> Surface::Closure::_opacity() const noexcept { return luisa::nullopt; }
-luisa::optional<Bool> Surface::Closure::_is_dispersive() const noexcept { return luisa::nullopt; }
-luisa::optional<Float> Surface::Closure::_eta() const noexcept { return luisa::nullopt; }
-
-luisa::optional<Float> Surface::Closure::opacity() const noexcept {
-    // We do not allow transmissive surfaces to be non-opaque.
-    return instance()->node()->is_transmissive() ? luisa::nullopt : _opacity();
-}
-
-luisa::optional<Float> Surface::Closure::eta() const noexcept {
-    // We do not care about eta of non-transmissive surfaces.
-    if (instance()->node()->is_transmissive()) {
-        auto eta = _eta();
-        LUISA_ASSERT(eta.has_value(), "Transmissive surface must have eta.");
-        return eta;
-    }
-    return luisa::nullopt;
-}
-
-luisa::optional<Bool> Surface::Closure::is_dispersive() const noexcept {
-    if (instance()->pipeline().spectrum()->node()->is_fixed()) { return nullopt; }
-    return _is_dispersive();
+luisa::optional<Bool> Surface::Function::is_dispersive(
+    const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept {
+//    if (pipeline().spectrum()->node()->is_fixed()) { return nullopt; }
+    return nullopt;
 }
 
 }// namespace luisa::render
