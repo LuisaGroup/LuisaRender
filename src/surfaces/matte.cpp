@@ -24,8 +24,8 @@ public:
         : Surface{scene, desc},
           _kd{scene->load_texture(desc->property_node_or_default("Kd"))},
           _sigma{scene->load_texture(desc->property_node_or_default("sigma"))} {}
-    [[nodiscard]] luisa::string closure_identifier() const noexcept override { return luisa::string(impl_type()); }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] luisa::string closure_identifier() const noexcept override { return luisa::string(impl_type()); }
     [[nodiscard]] uint properties() const noexcept override { return property_reflective; }
 
 protected:

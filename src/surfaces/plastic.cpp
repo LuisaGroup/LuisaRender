@@ -60,6 +60,7 @@ public:
           _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {}
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] luisa::string closure_identifier() const noexcept override { return luisa::string(impl_type()); }
     [[nodiscard]] uint properties() const noexcept override { return property_reflective; }
 
 protected:
@@ -126,26 +127,26 @@ public:
 
     [[nodiscard]] SampledSpectrum albedo(
         const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
-        auto ctx = std::any_cast<PlasticInstance::PlasticContext>(ctx_wrapper);
-        auto substrate = LambertianReflection(ctx.kd);
+        auto ctx = ctx_wrapper->data<PlasticInstance::PlasticContext>();
+        auto substrate = LambertianReflection(ctx->kd);
         return substrate.albedo();
     }
     [[nodiscard]] Float2 roughness(
         const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
-        auto ctx = std::any_cast<PlasticInstance::PlasticContext>(ctx_wrapper);
-        auto distribution = TrowbridgeReitzDistribution(ctx.roughness);
+        auto ctx = ctx_wrapper->data<PlasticInstance::PlasticContext>();
+        auto distribution = TrowbridgeReitzDistribution(ctx->roughness);
         return TrowbridgeReitzDistribution::alpha_to_roughness(distribution.alpha());
     }
 
     [[nodiscard]] Surface::Evaluation evaluate(
         const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
         Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
-        auto ctx = std::any_cast<PlasticInstance::PlasticContext>(ctx_wrapper);
-        auto &it = ctx.it;
-        auto distribution = TrowbridgeReitzDistribution(ctx.roughness);
-        auto fresnel = FresnelDielectric(1.0f, ctx.eta);
+        auto ctx = ctx_wrapper->data<PlasticInstance::PlasticContext>();
+        auto &it = ctx->it;
+        auto distribution = TrowbridgeReitzDistribution(ctx->roughness);
+        auto fresnel = FresnelDielectric(1.0f, ctx->eta);
         auto coat = MicrofacetReflection(SampledSpectrum{swl.dimension(), 1.f}, &distribution, &fresnel);
-        auto substrate = LambertianReflection(ctx.kd);
+        auto substrate = LambertianReflection(ctx->kd);
 
         auto wo_local = it.shading().world_to_local(wo);
         auto sign = ite(cos_theta(wo_local) < 0.f,
@@ -160,11 +161,11 @@ public:
         auto eta = fresnel.eta_t();
         auto Fi = fresnel_dielectric(abs_cos_theta(wi_local), 1.f, eta);
         auto Fo = fresnel_dielectric(abs_cos_theta(wo_local), 1.f, eta);
-        auto a = exp(-(1.f / abs_cos_theta(wi_local) + 1.f / abs_cos_theta(wo_local)) * ctx.sigma_a);
+        auto a = exp(-(1.f / abs_cos_theta(wi_local) + 1.f / abs_cos_theta(wo_local)) * ctx->sigma_a);
         auto f_diffuse = (1.f - Fi) * (1.f - Fo) * sqr(1.f / eta) * a *
                          substrate.evaluate(wo_local, wi_local, mode);
         auto pdf_diffuse = substrate.pdf(wo_local, wi_local, mode);
-        auto substrate_weight = _substrate_weight(Fo, ctx.kd_weight);
+        auto substrate_weight = _substrate_weight(Fo, ctx->kd_weight);
         auto f = (f_coat + f_diffuse) * abs_cos_theta(wi_local);
         auto pdf = lerp(pdf_coat, pdf_diffuse, substrate_weight);
         return {.f = f, .pdf = pdf};
@@ -173,12 +174,12 @@ public:
     [[nodiscard]] Surface::Sample sample(
         const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
         Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u, TransportMode mode) const noexcept override {
-        auto ctx = std::any_cast<PlasticInstance::PlasticContext>(ctx_wrapper);
-        auto &it = ctx.it;
-        auto distribution = TrowbridgeReitzDistribution(ctx.roughness);
-        auto fresnel = FresnelDielectric(1.0f, ctx.eta);
+        auto ctx = ctx_wrapper->data<PlasticInstance::PlasticContext>();
+        auto &it = ctx->it;
+        auto distribution = TrowbridgeReitzDistribution(ctx->roughness);
+        auto fresnel = FresnelDielectric(1.0f, ctx->eta);
         auto coat = MicrofacetReflection(SampledSpectrum{swl.dimension(), 1.f}, &distribution, &fresnel);
-        auto substrate = LambertianReflection(ctx.kd);
+        auto substrate = LambertianReflection(ctx->kd);
 
         auto wo_local = it.shading().world_to_local(wo);
         auto sign = ite(cos_theta(wo_local) < 0.f,
@@ -187,7 +188,7 @@ public:
         wo_local *= sign;
         auto eta = fresnel.eta_t();
         auto Fo = fresnel_dielectric(abs_cos_theta(wo_local), 1.f, eta);
-        auto substrate_weight = _substrate_weight(Fo, ctx.kd_weight);
+        auto substrate_weight = _substrate_weight(Fo, ctx->kd_weight);
         BxDF::SampledDirection wi_sample;
         $if(u_lobe < substrate_weight) {// samples diffuse
             wi_sample = substrate.sample_wi(wo_local, u, mode);
@@ -205,7 +206,7 @@ public:
             auto pdf_coat = coat.pdf(wo_local, wi_local, mode);
             // diffuse
             auto Fi = fresnel_dielectric(abs_cos_theta(wi_local), 1.f, eta);
-            auto a = exp(-(1.f / abs_cos_theta(wi_local) + 1.f / abs_cos_theta(wo_local)) * ctx.sigma_a);
+            auto a = exp(-(1.f / abs_cos_theta(wi_local) + 1.f / abs_cos_theta(wo_local)) * ctx->sigma_a);
             auto ee = sqr(1.f / fresnel.eta_t());
             auto f_diffuse = (1.f - Fi) * (1.f - Fo) * sqr(1.f / eta) * a *
                              substrate.evaluate(wo_local, wi_local, mode);
@@ -255,7 +256,9 @@ uint PlasticInstance::make_closure(
         .roughness = roughness,
     };
 
-    return closure.register_instance<PlasticFunction>(std::move(ctx));
+    auto [tag, slot] = closure.register_instance<PlasticFunction>(node()->closure_identifier());
+    slot->create_data(std::move(ctx));
+    return tag;
 }
 
 //using NormalMapOpacityPlasticSurface = NormalMapWrapper<OpacitySurfaceWrapper<

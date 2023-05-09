@@ -152,6 +152,7 @@ public:
     [[nodiscard]] auto ior() const noexcept { return _ior; }
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] luisa::string closure_identifier() const noexcept override { return luisa::string(impl_type()); }
     [[nodiscard]] uint properties() const noexcept override { return property_reflective; }
 
 protected:
@@ -216,45 +217,43 @@ luisa::unique_ptr<Surface::Instance> MetalSurface::_build(
 class MetalFunction : public Surface::Function {
 
 public:
-    [[nodiscard]] static luisa::string identifier() noexcept { return LUISA_RENDER_PLUGIN_NAME; }
-
     [[nodiscard]] SampledSpectrum albedo(
         const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
-        auto ctx = std::any_cast<MetalInstance::MetalContext>(ctx_wrapper);
-        auto fresnel = FresnelConductor{ctx.eta_i, ctx.n, ctx.k};
-        auto distribute = TrowbridgeReitzDistribution{ctx.alpha};
+        auto ctx = ctx_wrapper->data<MetalInstance::MetalContext>();
+        auto fresnel = FresnelConductor{ctx->eta_i, ctx->n, ctx->k};
+        auto distribute = TrowbridgeReitzDistribution{ctx->alpha};
         auto lobe = MicrofacetReflection{SampledSpectrum{swl.dimension(), 1.f}, &distribute, &fresnel};
         return lobe.albedo();
     }
     [[nodiscard]] Float2 roughness(
         const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
-        auto ctx = std::any_cast<MetalInstance::MetalContext>(ctx_wrapper);
-        auto distribute = TrowbridgeReitzDistribution{ctx.alpha};
+        auto ctx = ctx_wrapper->data<MetalInstance::MetalContext>();
+        auto distribute = TrowbridgeReitzDistribution{ctx->alpha};
         return TrowbridgeReitzDistribution::alpha_to_roughness(distribute.alpha());
     }
     [[nodiscard]] Surface::Evaluation evaluate(
         const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
         Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
-        auto ctx = std::any_cast<MetalInstance::MetalContext>(ctx_wrapper);
-        auto &it = ctx.it;
-        auto fresnel = FresnelConductor{ctx.eta_i, ctx.n, ctx.k};
-        auto distribute = TrowbridgeReitzDistribution{ctx.alpha};
+        auto ctx = ctx_wrapper->data<MetalInstance::MetalContext>();
+        auto &it = ctx->it;
+        auto fresnel = FresnelConductor{ctx->eta_i, ctx->n, ctx->k};
+        auto distribute = TrowbridgeReitzDistribution{ctx->alpha};
         auto lobe = MicrofacetReflection{SampledSpectrum{swl.dimension(), 1.f}, &distribute, &fresnel};
 
         auto wo_local = it.shading().world_to_local(wo);
         auto wi_local = it.shading().world_to_local(wi);
         auto f = lobe.evaluate(wo_local, wi_local, mode);
-        f *= ctx.refl;
+        f *= ctx->refl;
         auto pdf = lobe.pdf(wo_local, wi_local, mode);
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
     [[nodiscard]] Surface::Sample sample(
         const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
         Expr<float3> wo, Expr<float>, Expr<float2> u, TransportMode mode) const noexcept override {
-        auto ctx = std::any_cast<MetalInstance::MetalContext>(ctx_wrapper);
-        auto &it = ctx.it;
-        auto fresnel = FresnelConductor{ctx.eta_i, ctx.n, ctx.k};
-        auto distribute = TrowbridgeReitzDistribution{ctx.alpha};
+        auto ctx = ctx_wrapper->data<MetalInstance::MetalContext>();
+        auto &it = ctx->it;
+        auto fresnel = FresnelConductor{ctx->eta_i, ctx->n, ctx->k};
+        auto distribute = TrowbridgeReitzDistribution{ctx->alpha};
         auto lobe = MicrofacetReflection{SampledSpectrum{swl.dimension(), 1.f}, &distribute, &fresnel};
 
         auto wo_local = it.shading().world_to_local(wo);
@@ -262,7 +261,7 @@ public:
         auto wi_local = def(make_float3(0.f, 0.f, 1.f));
         auto f = lobe.sample(wo_local, std::addressof(wi_local),
                                u, std::addressof(pdf), mode);
-        f *= ctx.refl;
+        f *= ctx->refl;
         auto wi = it.shading().local_to_world(wi_local);
         return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf},
                 .wi = wi,
@@ -303,7 +302,10 @@ uint MetalInstance::make_closure(
         .refl = refl,
         .alpha = alpha
     };
-    return closure.register_instance<MetalFunction>(std::move(ctx));
+
+    auto [tag, slot] = closure.register_instance<MetalFunction>(node()->closure_identifier());
+    slot->create_data(std::move(ctx));
+    return tag;
 }
 
 //using NormalMapOpacityMetalSurface = NormalMapWrapper<OpacitySurfaceWrapper<

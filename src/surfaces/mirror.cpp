@@ -28,6 +28,7 @@ public:
           _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {}
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] luisa::string closure_identifier() const noexcept override { return luisa::string(impl_type()); }
     [[nodiscard]] uint properties() const noexcept override { return property_reflective; }
 
 protected:
@@ -94,7 +95,7 @@ public:
 
     [[nodiscard]] SampledSpectrum albedo(
         const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
-        auto ctx = std::any_cast<MirrorInstance::MirrorContext>(&ctx_wrapper);
+        auto ctx = ctx_wrapper->data<MirrorInstance::MirrorContext>();
         auto fresnel = SchlickFresnel(ctx->refl);
         auto distribution = TrowbridgeReitzDistribution(ctx->alpha);
         auto refl = MicrofacetReflection(ctx->refl, &distribution, &fresnel);
@@ -102,7 +103,7 @@ public:
     }
     [[nodiscard]] Float2 roughness(
         const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
-        auto ctx = std::any_cast<MirrorInstance::MirrorContext>(&ctx_wrapper);
+        auto ctx = ctx_wrapper->data<MirrorInstance::MirrorContext>();
         auto distribution = TrowbridgeReitzDistribution(ctx->alpha);
         return TrowbridgeReitzDistribution::alpha_to_roughness(distribution.alpha());
     }
@@ -110,7 +111,7 @@ public:
     [[nodiscard]] Surface::Evaluation evaluate(
         const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
         Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
-        auto ctx = std::any_cast<MirrorInstance::MirrorContext>(&ctx_wrapper);
+        auto ctx = ctx_wrapper->data<MirrorInstance::MirrorContext>();
         auto &it = ctx->it;
         auto fresnel = SchlickFresnel(ctx->refl);
         auto distribution = TrowbridgeReitzDistribution(ctx->alpha);
@@ -125,7 +126,7 @@ public:
     [[nodiscard]] Surface::Sample sample(
         const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
         Expr<float3> wo, Expr<float>, Expr<float2> u, TransportMode mode) const noexcept override {
-        auto ctx = std::any_cast<MirrorInstance::MirrorContext>(&ctx_wrapper);
+        auto ctx = ctx_wrapper->data<MirrorInstance::MirrorContext>();
         auto &it = ctx->it;
         auto fresnel = SchlickFresnel(ctx->refl);
         auto distribution = TrowbridgeReitzDistribution(ctx->alpha);
@@ -165,7 +166,10 @@ uint MirrorInstance::make_closure(
         .refl = color,
         .alpha = alpha
     };
-    return closure.register_instance<MirrorFunction>(std::move(ctx));
+
+    auto [tag, slot] = closure.register_instance<MirrorFunction>(node()->closure_identifier());
+    slot->create_data(std::move(ctx));
+    return tag;
 }
 
 //using NormalMapOpacityMirrorSurface = NormalMapWrapper<OpacitySurfaceWrapper<
