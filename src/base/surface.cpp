@@ -39,20 +39,4 @@ luisa::unique_ptr<Surface::Instance> Surface::build(
 //    return _is_dispersive();
 //}
 
-luisa::optional<Float> Surface::Function::opacity(
-    const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    return nullopt;
-}
-
-luisa::optional<Float> Surface::Function::eta(
-    const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    return nullopt;
-}
-
-luisa::optional<Bool> Surface::Function::is_dispersive(
-    const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept {
-//    if (pipeline().spectrum()->node()->is_fixed()) { return nullopt; }
-    return nullopt;
-}
-
 }// namespace luisa::render

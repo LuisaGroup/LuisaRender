@@ -27,6 +27,8 @@ private:
 public:
     [[nodiscard]] auto empty() const noexcept { return _tags.empty(); }
     [[nodiscard]] auto size() const noexcept { return _tags.size(); }
+    [[nodiscard]] auto function(uint index) const noexcept { return _class_functions[index].get(); }
+    [[nodiscard]] auto data(uint index) const noexcept { return _class_data[index].get(); }
 
     template<typename Function, typename Data>
         requires std::derived_from<Function, BaseFunction>
@@ -120,11 +122,11 @@ public:
             const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
             Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u, TransportMode mode = TransportMode::RADIANCE) const = 0;
 
-        [[nodiscard]] luisa::optional<Float> opacity(const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept;     // nullopt if never possible to be non-opaque
-        [[nodiscard]] luisa::optional<Float> eta(const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept;         // nullopt if never possible to be transmissive
-        [[nodiscard]] luisa::optional<Bool> is_dispersive(const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept;// nullopt if never possible to be dispersive
-        [[nodiscard]] virtual SampledSpectrum albedo(const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept = 0; // albedo, might not be exact, for AOV only
-        [[nodiscard]] virtual Float2 roughness(const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;       // roughness, might not be exact, for AOV only
+        [[nodiscard]] virtual luisa::optional<Float> opacity(const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept { return nullopt; }     // nullopt if never possible to be non-opaque
+        [[nodiscard]] virtual luisa::optional<Float> eta(const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept { return nullopt; }         // nullopt if never possible to be transmissive
+        [[nodiscard]] virtual luisa::optional<Bool> is_dispersive(const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept { return nullopt; }// nullopt if never possible to be dispersive
+        [[nodiscard]] virtual SampledSpectrum albedo(const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;                            // albedo, might not be exact, for AOV only
+        [[nodiscard]] virtual Float2 roughness(const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;                                  // roughness, might not be exact, for AOV only
     };
 
     class Instance {
@@ -169,6 +171,7 @@ public:
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept;
 };
 
+// TODO: How to implement wrapper with closure context?
 template<typename BaseSurface,
          typename BaseInstance = typename BaseSurface::Instance,
          typename BaseClosure = typename BaseSurface::Closure>

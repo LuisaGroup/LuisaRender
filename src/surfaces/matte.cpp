@@ -52,7 +52,7 @@ public:
         : Surface::Instance{pipeline, surface}, _kd{Kd}, _sigma{sigma} {}
 
 public:
-    [[nodiscard]] virtual uint make_closure(
+    [[nodiscard]] uint make_closure(
         PolymorphicClosure<Surface::Function> &closure,
         luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
         Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept override;
@@ -79,6 +79,7 @@ public:
         const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         return make_float2(1.f);
     }
+
     [[nodiscard]] Surface::Evaluation evaluate(
         const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
         Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
@@ -128,7 +129,7 @@ uint MatteInstance::make_closure(
 }
 
 //using NormalMapOpacityMatteSurface = NormalMapWrapper<OpacitySurfaceWrapper<
-//    MatteSurface, MatteInstance, MatteClosure>>;
+//    MatteSurface, MatteInstance, MatteFunction>>;
 
 }// namespace luisa::render
 
