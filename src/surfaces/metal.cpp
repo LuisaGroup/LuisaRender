@@ -168,7 +168,6 @@ public:
         SampledSpectrum n;
         SampledSpectrum k;
         SampledSpectrum refl;
-        bool refl_exist;
         Float2 alpha;
     };
 
@@ -245,7 +244,7 @@ public:
         auto wo_local = it.shading().world_to_local(wo);
         auto wi_local = it.shading().world_to_local(wi);
         auto f = lobe.evaluate(wo_local, wi_local, mode);
-        if (ctx.refl_exist) { f *= ctx.refl; }
+        f *= ctx.refl;
         auto pdf = lobe.pdf(wo_local, wi_local, mode);
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
@@ -263,7 +262,7 @@ public:
         auto wi_local = def(make_float3(0.f, 0.f, 1.f));
         auto f = lobe.sample(wo_local, std::addressof(wi_local),
                                u, std::addressof(pdf), mode);
-        if (ctx.refl_exist) { f *= ctx.refl; }
+        f *= ctx.refl;
         auto wi = it.shading().local_to_world(wi_local);
         return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf},
                 .wi = wi,
@@ -291,9 +290,9 @@ uint MetalInstance::make_closure(
         eta[i] = _eta.sample(lambda);
         k[i] = _k.sample(lambda);
     }
-    luisa::optional<SampledSpectrum> refl;
+    SampledSpectrum refl{swl.dimension(), 1.f};
     if (_kd != nullptr) {
-        refl.emplace(_kd->evaluate_albedo_spectrum(*it, swl, time).value);
+        refl *= _kd->evaluate_albedo_spectrum(*it, swl, time).value;
     }
 
     auto ctx = MetalContext{
@@ -301,11 +300,9 @@ uint MetalInstance::make_closure(
         .eta_i = eta_i,
         .n = eta,
         .k = k,
-        .refl = SampledSpectrum{swl.dimension()},
-        .refl_exist = refl.has_value(),
+        .refl = refl,
         .alpha = alpha
     };
-    if (ctx.refl_exist) { ctx.refl = *refl; }
     return closure.register_instance<MetalFunction>(std::move(ctx));
 }
 
