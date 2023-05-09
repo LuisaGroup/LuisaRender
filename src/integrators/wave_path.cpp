@@ -80,7 +80,7 @@ public:
         }
         auto u_wl = _wl_sample.read(index);
         auto swl = _spectrum->sample(abs(u_wl));
-        $if (u_wl < 0.f) { swl.terminate_secondary(); };
+        $if(u_wl < 0.f) { swl.terminate_secondary(); };
         return std::make_pair(abs(u_wl), swl);
     }
     void write_wavelength_sample(Expr<uint> index, Expr<float> u_wl) noexcept {
@@ -379,13 +379,20 @@ void WavefrontPathTracingInstance::_render_one_camera(
             auto surface_tag = it->shape().surface_tag();
             auto eta_scale = def(1.f);
             auto wo = -ray->direction();
+
+            PolymorphicClosure<Surface::Function> closure;
+            auto closure_tag = def(0u);
+
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
-                // create closure
-                auto closure = surface->closure(it, swl, wo, 1.f, time);
+                closure_tag = surface->make_closure(closure, it, swl, wo, 1.f, time);
+            });
+
+            closure.dispatch(closure_tag, [&](const Surface::Function *function,
+                                              const Surface::FunctionContext *ctx) noexcept {
 
                 // apply opacity map
                 auto alpha_skip = def(false);
-                if (auto o = closure->opacity()) {
+                if (auto o = function->opacity(ctx, swl, time)) {
                     auto opacity = saturate(*o);
                     alpha_skip = u_lobe >= opacity;
                     u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
@@ -396,7 +403,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                     path_states.write_pdf_bsdf(path_id, 1e16f);
                 }
                 $else {
-                    if (auto dispersive = closure->is_dispersive()) {
+                    if (auto dispersive = function->is_dispersive(ctx, swl, time)) {
                         $if(*dispersive) {
                             swl.terminate_secondary();
                             path_states.terminate_secondary_wavelengths(path_id, u_wl);
@@ -406,7 +413,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
                     auto light_wi_and_pdf = light_samples.read_wi_and_pdf(queue_id);
                     auto pdf_light = light_wi_and_pdf.w;
                     $if(light_wi_and_pdf.w > 0.f) {
-                        auto eval = closure->evaluate(wo, light_wi_and_pdf.xyz());
+                        auto eval = function->evaluate(ctx, swl, time, wo, light_wi_and_pdf.xyz());
                         auto mis_weight = balance_heuristic(pdf_light, eval.pdf);
                         // update Li
                         auto Ld = light_samples.read_emission(queue_id);
@@ -415,13 +422,13 @@ void WavefrontPathTracingInstance::_render_one_camera(
                         path_states.write_radiance(path_id, Li);
                     };
                     // sample material
-                    auto surface_sample = closure->sample(wo, u_lobe, u_bsdf);
+                    auto surface_sample = function->sample(ctx, swl, time, wo, u_lobe, u_bsdf);
                     path_states.write_pdf_bsdf(path_id, surface_sample.eval.pdf);
                     ray = it->spawn_ray(surface_sample.wi);
                     auto w = ite(surface_sample.eval.pdf > 0.0f, 1.f / surface_sample.eval.pdf, 0.f);
                     beta *= w * surface_sample.eval.f;
                     // eta scale
-                    auto eta = closure->eta().value_or(1.f);
+                    auto eta = function->eta(ctx, swl, time).value_or(1.f);
                     $switch(surface_sample.event) {
                         $case(Surface::event_enter) { eta_scale = sqr(eta); };
                         $case(Surface::event_exit) { eta_scale = 1.f / sqr(eta); };
