@@ -93,7 +93,7 @@ public:
     [[nodiscard]] static luisa::string identifier() noexcept { return LUISA_RENDER_PLUGIN_NAME; }
 
     [[nodiscard]] SampledSpectrum albedo(
-        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         auto ctx = std::any_cast<MirrorInstance::MirrorContext>(&ctx_wrapper);
         auto fresnel = SchlickFresnel(ctx->refl);
         auto distribution = TrowbridgeReitzDistribution(ctx->alpha);
@@ -101,14 +101,14 @@ public:
         return refl.albedo();
     }
     [[nodiscard]] Float2 roughness(
-        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         auto ctx = std::any_cast<MirrorInstance::MirrorContext>(&ctx_wrapper);
         auto distribution = TrowbridgeReitzDistribution(ctx->alpha);
         return TrowbridgeReitzDistribution::alpha_to_roughness(distribution.alpha());
     }
 
     [[nodiscard]] Surface::Evaluation evaluate(
-        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
+        const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
         Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
         auto ctx = std::any_cast<MirrorInstance::MirrorContext>(&ctx_wrapper);
         auto &it = ctx->it;
@@ -123,7 +123,7 @@ public:
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
     [[nodiscard]] Surface::Sample sample(
-        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
+        const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
         Expr<float3> wo, Expr<float>, Expr<float2> u, TransportMode mode) const noexcept override {
         auto ctx = std::any_cast<MirrorInstance::MirrorContext>(&ctx_wrapper);
         auto &it = ctx->it;

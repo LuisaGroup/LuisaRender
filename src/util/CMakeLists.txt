@@ -18,7 +18,8 @@ add_library(luisa-render-util SHARED
         progress_bar.cpp progress_bar.h
         loop_subdiv.cpp loop_subdiv.h
         vertex.h
-        counter_buffer.cpp counter_buffer.h)
+        counter_buffer.cpp counter_buffer.h
+        polymorphic_closure.h)
 target_link_libraries(luisa-render-util PUBLIC
         luisa::compute
         luisa-render-include

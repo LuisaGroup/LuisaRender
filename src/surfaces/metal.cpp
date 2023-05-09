@@ -151,7 +151,7 @@ public:
     }
     [[nodiscard]] auto ior() const noexcept { return _ior; }
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
-    [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] uint properties() const noexcept override { return property_reflective; }
 
 protected:
@@ -219,7 +219,7 @@ public:
     [[nodiscard]] static luisa::string identifier() noexcept { return LUISA_RENDER_PLUGIN_NAME; }
 
     [[nodiscard]] SampledSpectrum albedo(
-        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         auto ctx = std::any_cast<MetalInstance::MetalContext>(ctx_wrapper);
         auto fresnel = FresnelConductor{ctx.eta_i, ctx.n, ctx.k};
         auto distribute = TrowbridgeReitzDistribution{ctx.alpha};
@@ -227,13 +227,13 @@ public:
         return lobe.albedo();
     }
     [[nodiscard]] Float2 roughness(
-        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         auto ctx = std::any_cast<MetalInstance::MetalContext>(ctx_wrapper);
         auto distribute = TrowbridgeReitzDistribution{ctx.alpha};
         return TrowbridgeReitzDistribution::alpha_to_roughness(distribute.alpha());
     }
     [[nodiscard]] Surface::Evaluation evaluate(
-        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
+        const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
         Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
         auto ctx = std::any_cast<MetalInstance::MetalContext>(ctx_wrapper);
         auto &it = ctx.it;
@@ -249,7 +249,7 @@ public:
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
     [[nodiscard]] Surface::Sample sample(
-        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
+        const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
         Expr<float3> wo, Expr<float>, Expr<float2> u, TransportMode mode) const noexcept override {
         auto ctx = std::any_cast<MetalInstance::MetalContext>(ctx_wrapper);
         auto &it = ctx.it;

@@ -297,7 +297,7 @@ public:
     [[nodiscard]] auto large_step_probability() const noexcept { return _large_step_probability; }
     [[nodiscard]] auto sigma() const noexcept { return _sigma; }
     [[nodiscard]] auto enable_statistics() const noexcept { return _statistics; }
-    [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };

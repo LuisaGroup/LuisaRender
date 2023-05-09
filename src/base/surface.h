@@ -11,62 +11,11 @@
 #include <base/sampler.h>
 #include <base/spectrum.h>
 #include <base/interaction.h>
+#include <util/polymorphic_closure.h>
 
 #include <utility>
 
 namespace luisa::render {
-
-template<typename BaseFunction>
-class PolymorphicClosure {
-
-private:
-    luisa::unordered_map<luisa::string, uint> _tags;
-    luisa::vector<luisa::unique_ptr<BaseFunction>> _class_functions;
-    luisa::vector<luisa::unique_ptr<std::any>> _class_data;
-
-public:
-    [[nodiscard]] auto empty() const noexcept { return _tags.empty(); }
-    [[nodiscard]] auto size() const noexcept { return _tags.size(); }
-    [[nodiscard]] auto function(uint index) const noexcept { return _class_functions[index].get(); }
-    [[nodiscard]] auto data(uint index) const noexcept { return _class_data[index].get(); }
-
-    template<typename Function, typename Data>
-        requires std::derived_from<Function, BaseFunction>
-    [[nodiscard]] uint register_instance(Data &&data) noexcept {
-        auto class_identifier = Function::identifier();
-        auto [iter, first] = _tags.try_emplace(std::move(class_identifier), _class_functions.size());
-        auto tag = iter->second;
-        if (first) {
-            _class_functions.emplace_back(luisa::make_unique<Function>());
-            _class_data.emplace_back(luisa::make_unique<std::any>(std::forward<Data>(data)));
-        } else {
-            auto slot = std::any_cast<Data>(_class_data[tag].get());
-            assert(slot != nullptr);
-            *slot = std::forward<Data>(data);
-        }
-        return tag;
-    }
-
-    template<typename Tag>
-        requires compute::is_integral_expr_v<Tag>
-    void dispatch(Tag &&tag, const luisa::function<void(const BaseFunction *, const std::any &)> &f) const noexcept {
-        if (empty()) [[unlikely]] {
-            LUISA_WARNING_WITH_LOCATION("No implementations registered.");
-        }
-        if (_tags.size() == 1u) {
-            f(_class_functions.front().get(), *_class_data.front());
-        } else {
-            compute::detail::SwitchStmtBuilder{std::forward<Tag>(tag)} % [&] {
-                for (auto i = 0u; i < _tags.size(); i++) {
-                    compute::detail::SwitchCaseStmtBuilder{i} % [&f, this, i] {
-                        f(_class_functions[i].get(), *_class_data[i]);
-                    };
-                }
-                compute::detail::SwitchDefaultStmtBuilder{} % compute::unreachable;
-            };
-        }
-    }
-};
 
 using compute::BindlessArray;
 using compute::Expr;
@@ -111,22 +60,25 @@ public:
                 .event = Surface::event_reflect};
         }
     };
+    
+    class Function;
+    using FunctionContext = PolymorphicClosure<Function>::Context;
 
     class Function {
 
     public:
         [[nodiscard]] virtual Evaluation evaluate(
-            const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
+            const FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
             Expr<float3> wo, Expr<float3> wi, TransportMode mode = TransportMode::RADIANCE) const = 0;
         [[nodiscard]] virtual Sample sample(
-            const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
+            const FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
             Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u, TransportMode mode = TransportMode::RADIANCE) const = 0;
 
-        [[nodiscard]] virtual luisa::optional<Float> opacity(const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept { return nullopt; }     // nullopt if never possible to be non-opaque
-        [[nodiscard]] virtual luisa::optional<Float> eta(const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept { return nullopt; }         // nullopt if never possible to be transmissive
-        [[nodiscard]] virtual luisa::optional<Bool> is_dispersive(const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept { return nullopt; }// nullopt if never possible to be dispersive
-        [[nodiscard]] virtual SampledSpectrum albedo(const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;                            // albedo, might not be exact, for AOV only
-        [[nodiscard]] virtual Float2 roughness(const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;                                  // roughness, might not be exact, for AOV only
+        [[nodiscard]] virtual luisa::optional<Float> opacity(const FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept { return nullopt; }     // nullopt if never possible to be non-opaque
+        [[nodiscard]] virtual luisa::optional<Float> eta(const FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept { return nullopt; }         // nullopt if never possible to be transmissive
+        [[nodiscard]] virtual luisa::optional<Bool> is_dispersive(const FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept { return nullopt; }// nullopt if never possible to be dispersive
+        [[nodiscard]] virtual SampledSpectrum albedo(const FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;                            // albedo, might not be exact, for AOV only
+        [[nodiscard]] virtual Float2 roughness(const FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;                                  // roughness, might not be exact, for AOV only
     };
 
     class Instance {
@@ -163,6 +115,7 @@ protected:
 
 public:
     Surface(Scene *scene, const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] virtual luisa::string closure_identifier() const noexcept = 0;
     [[nodiscard]] virtual uint properties() const noexcept = 0;
     [[nodiscard]] virtual bool is_null() const noexcept { return false; }
     [[nodiscard]] auto is_reflective() const noexcept { return static_cast<bool>(properties() & property_reflective); }

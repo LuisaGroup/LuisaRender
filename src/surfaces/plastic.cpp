@@ -59,7 +59,7 @@ public:
           _thickness{scene->load_texture(desc->property_node_or_default("thickness"))},
           _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {}
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
-    [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] uint properties() const noexcept override { return property_reflective; }
 
 protected:
@@ -125,20 +125,20 @@ public:
     [[nodiscard]] static luisa::string identifier() noexcept { return LUISA_RENDER_PLUGIN_NAME; }
 
     [[nodiscard]] SampledSpectrum albedo(
-        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         auto ctx = std::any_cast<PlasticInstance::PlasticContext>(ctx_wrapper);
         auto substrate = LambertianReflection(ctx.kd);
         return substrate.albedo();
     }
     [[nodiscard]] Float2 roughness(
-        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         auto ctx = std::any_cast<PlasticInstance::PlasticContext>(ctx_wrapper);
         auto distribution = TrowbridgeReitzDistribution(ctx.roughness);
         return TrowbridgeReitzDistribution::alpha_to_roughness(distribution.alpha());
     }
 
     [[nodiscard]] Surface::Evaluation evaluate(
-        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
+        const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
         Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
         auto ctx = std::any_cast<PlasticInstance::PlasticContext>(ctx_wrapper);
         auto &it = ctx.it;
@@ -171,7 +171,7 @@ public:
     }
 
     [[nodiscard]] Surface::Sample sample(
-        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
+        const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
         Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u, TransportMode mode) const noexcept override {
         auto ctx = std::any_cast<PlasticInstance::PlasticContext>(ctx_wrapper);
         auto &it = ctx.it;

@@ -37,7 +37,7 @@ public:
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto initial_radius() const noexcept { return _initial_radius; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
-    [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };

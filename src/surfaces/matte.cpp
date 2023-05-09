@@ -24,7 +24,8 @@ public:
         : Surface{scene, desc},
           _kd{scene->load_texture(desc->property_node_or_default("Kd"))},
           _sigma{scene->load_texture(desc->property_node_or_default("sigma"))} {}
-    [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] luisa::string closure_identifier() const noexcept override { return luisa::string(impl_type()); }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] uint properties() const noexcept override { return property_reflective; }
 
 protected:
@@ -68,25 +69,24 @@ luisa::unique_ptr<Surface::Instance> MatteSurface::_build(
 class MatteFunction : public Surface::Function {
 
 public:
-    [[nodiscard]] static luisa::string identifier() noexcept { return LUISA_RENDER_PLUGIN_NAME; }
-
     [[nodiscard]] SampledSpectrum albedo(
-        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
-        auto ctx = std::any_cast<MatteInstance::MatteContext>(&ctx_wrapper);
+        const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        auto ctx = ctx_wrapper->data<MatteInstance::MatteContext>();
         auto refl = OrenNayar{ctx->kd, ctx->sigma};
         return refl.albedo();
     }
     [[nodiscard]] Float2 roughness(
-        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         return make_float2(1.f);
     }
 
     [[nodiscard]] Surface::Evaluation evaluate(
-        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
+        const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
         Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
-        auto ctx = std::any_cast<MatteInstance::MatteContext>(&ctx_wrapper);
+        auto ctx = ctx_wrapper->data<MatteInstance::MatteContext>();
         auto &it = ctx->it;
         auto refl = OrenNayar{ctx->kd, ctx->sigma};
+
         auto wo_local = it.shading().world_to_local(wo);
         auto wi_local = it.shading().world_to_local(wi);
         auto f = refl.evaluate(wo_local, wi_local, mode);
@@ -94,11 +94,12 @@ public:
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
     [[nodiscard]] Surface::Sample sample(
-        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
+        const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
         Expr<float3> wo, Expr<float>, Expr<float2> u, TransportMode mode) const noexcept override {
-        auto ctx = std::any_cast<MatteInstance::MatteContext>(&ctx_wrapper);
+        auto ctx = ctx_wrapper->data<MatteInstance::MatteContext>();
         auto &it = ctx->it;
         auto refl = OrenNayar{ctx->kd, ctx->sigma};
+
         auto wo_local = it.shading().world_to_local(wo);
         auto wi_local = def(make_float3(0.0f, 0.0f, 1.0f));
         auto pdf = def(0.f);
@@ -126,7 +127,9 @@ uint MatteInstance::make_closure(
         .kd = Kd,
         .sigma = sigma ? sigma.value() : 0.f};
 
-    return closure.register_instance<MatteFunction>(std::move(ctx));
+    auto [tag, slot] = closure.register_instance<MatteFunction>(node()->closure_identifier());
+    slot->create_data(std::move(ctx));
+    return tag;
 }
 
 //using NormalMapOpacityMatteSurface = NormalMapWrapper<OpacitySurfaceWrapper<

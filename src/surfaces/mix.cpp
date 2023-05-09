@@ -30,6 +30,9 @@ public:
         LUISA_ASSERT(!((prop & property_thin) && (prop & property_transmissive)),
                      "MixSurface: Cannot mix thin and transmissive surfaces.");
     }
+    [[nodiscard]] luisa::string closure_identifier() const noexcept override {
+        return luisa::format("{}<{}, {}>", impl_type(), _a->closure_identifier(), _b->closure_identifier());
+    }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] uint properties() const noexcept override { return _a->properties() | _b->properties(); }
 };
@@ -38,10 +41,7 @@ class MixSurfaceInstance : public Surface::Instance {
 
 public:
     struct MixSurfaceContext {
-        Interaction it;
         Float ratio;
-        uint a_tag;
-        uint b_tag;
     };
 
 private:
@@ -77,7 +77,7 @@ class MixSurfaceFunction : public Surface::Function {
 
 private:
     [[nodiscard]] static auto _mix(const Surface::Evaluation &eval_a,
-                            const Surface::Evaluation &eval_b, Expr<float> ratio) noexcept {
+                                   const Surface::Evaluation &eval_b, Expr<float> ratio) noexcept {
         auto t = 1.f - ratio;
         return Surface::Evaluation{
             .f = lerp(eval_a.f, eval_b.f, t),
@@ -85,39 +85,72 @@ private:
     }
 
 public:
-    [[nodiscard]] static luisa::string identifier() noexcept { return LUISA_RENDER_PLUGIN_NAME; }
-    // TODO: structure of a/b
     [[nodiscard]] SampledSpectrum albedo(
-        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
-        auto ctx = std::any_cast<MixSurfaceInstance::MixSurfaceContext>(&ctx_wrapper);
+        const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        auto ctx = ctx_wrapper->data<MixSurfaceInstance::MixSurfaceContext>();
 
-        auto albedo_a = _a->albedo();
-        auto albedo_b = _b->albedo();
-        return albedo_a * _ratio + albedo_b * (1.f - _ratio);
+        auto function_a = ctx_wrapper->nested("a").function(0u);
+        auto ctx_wrapper_a = ctx_wrapper->nested("a").context(0u);
+        auto function_b = ctx_wrapper->nested("b").function(0u);
+        auto ctx_wrapper_b = ctx_wrapper->nested("b").context(0u);
+
+        auto albedo_a = function_a->albedo(ctx_wrapper_a, swl, time);
+        auto albedo_b = function_b->albedo(ctx_wrapper_b, swl, time);
+        return albedo_a * ctx->ratio + albedo_b * (1.f - ctx->ratio);
     }
-    [[nodiscard]] Float2 roughness() const noexcept override {
-        return _a->roughness() * _ratio + _b->roughness() * (1.f - _ratio);
+    [[nodiscard]] Float2 roughness(
+        const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        auto ctx = ctx_wrapper->data<MixSurfaceInstance::MixSurfaceContext>();
+
+        auto function_a = ctx_wrapper->nested("a").function(0u);
+        auto ctx_wrapper_a = ctx_wrapper->nested("a").context(0u);
+        auto function_b = ctx_wrapper->nested("b").function(0u);
+        auto ctx_wrapper_b = ctx_wrapper->nested("b").context(0u);
+
+        auto roughness_a = function_a->roughness(ctx_wrapper_a, swl, time);
+        auto roughness_b = function_b->roughness(ctx_wrapper_b, swl, time);
+
+        return lerp(roughness_b, roughness_a, ctx->ratio);
     }
 
     [[nodiscard]] luisa::optional<Float> opacity(
-        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
-        auto opacity_a = _a->opacity();
-        auto opacity_b = _b->opacity();
+        const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        auto ctx = ctx_wrapper->data<MixSurfaceInstance::MixSurfaceContext>();
+
+        auto function_a = ctx_wrapper->nested("a").function(0u);
+        auto ctx_wrapper_a = ctx_wrapper->nested("a").context(0u);
+        auto function_b = ctx_wrapper->nested("b").function(0u);
+        auto ctx_wrapper_b = ctx_wrapper->nested("b").context(0u);
+
+        auto opacity_a = function_a->opacity(ctx_wrapper_a, swl, time);
+        auto opacity_b = function_b->opacity(ctx_wrapper_b, swl, time);
         if (!opacity_a && !opacity_b) { return luisa::nullopt; }
-        return lerp(opacity_b.value_or(1.f), opacity_a.value_or(1.f), _ratio);
+        return lerp(opacity_b.value_or(1.f), opacity_a.value_or(1.f), ctx->ratio);
     }
     [[nodiscard]] luisa::optional<Float> eta(
-        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
-        auto eta_a = _a->eta();
-        auto eta_b = _b->eta();
+        const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        auto ctx = ctx_wrapper->data<MixSurfaceInstance::MixSurfaceContext>();
+
+        auto function_a = ctx_wrapper->nested("a").function(0u);
+        auto ctx_wrapper_a = ctx_wrapper->nested("a").context(0u);
+        auto function_b = ctx_wrapper->nested("b").function(0u);
+        auto ctx_wrapper_b = ctx_wrapper->nested("b").context(0u);
+
+        auto eta_a = function_a->eta(ctx_wrapper_a, swl, time);
+        auto eta_b = function_b->eta(ctx_wrapper_b, swl, time);
         if (!eta_a) { return eta_b; }
         if (!eta_b) { return eta_a; }
-        return lerp(*eta_b, *eta_a, _ratio);
+        return lerp(*eta_b, *eta_a, ctx->ratio);
     }
     [[nodiscard]] luisa::optional<Bool> is_dispersive(
-        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
-        auto a_dispersive = _a->is_dispersive();
-        auto b_dispersive = _b->is_dispersive();
+        const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        auto function_a = ctx_wrapper->nested("a").function(0u);
+        auto ctx_wrapper_a = ctx_wrapper->nested("a").context(0u);
+        auto function_b = ctx_wrapper->nested("b").function(0u);
+        auto ctx_wrapper_b = ctx_wrapper->nested("b").context(0u);
+
+        auto a_dispersive = function_a->is_dispersive(ctx_wrapper_a, swl, time);
+        auto b_dispersive = function_b->is_dispersive(ctx_wrapper_b, swl, time);
         if (!a_dispersive) { return b_dispersive; }
         if (!b_dispersive) { return a_dispersive; }
         return *a_dispersive | *b_dispersive;
@@ -125,27 +158,42 @@ public:
 
 private:
     [[nodiscard]] Surface::Evaluation evaluate(
-        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
+        const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
         Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
-        auto eval_a = _a->evaluate(wo, wi, mode);
-        auto eval_b = _b->evaluate(wo, wi, mode);
-        return _mix(eval_a, eval_b);
+        auto ctx = ctx_wrapper->data<MixSurfaceInstance::MixSurfaceContext>();
+
+        auto function_a = ctx_wrapper->nested("a").function(0u);
+        auto ctx_wrapper_a = ctx_wrapper->nested("a").context(0u);
+        auto eval_a = function_a->evaluate(ctx_wrapper_a, swl, time, wo, wi, mode);
+
+        auto function_b = ctx_wrapper->nested("b").function(0u);
+        auto ctx_wrapper_b = ctx_wrapper->nested("b").context(0u);
+        auto eval_b = function_b->evaluate(ctx_wrapper_b, swl, time, wo, wi, mode);
+
+        return _mix(eval_a, eval_b, ctx->ratio);
     }
     [[nodiscard]] Surface::Sample sample(
-        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
+        const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
         Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u, TransportMode mode) const noexcept override {
-        auto sample = Surface::Sample::zero(swl().dimension());
-        $if(u_lobe < _ratio) {// sample a
-            auto sample_a = _a->sample(wo, u_lobe / _ratio, u, mode);
-            auto eval_b = _b->evaluate(wo, sample_a.wi, mode);
-            sample.eval = _mix(sample_a.eval, eval_b);
+        auto ctx = ctx_wrapper->data<MixSurfaceInstance::MixSurfaceContext>();
+
+        auto function_a = ctx_wrapper->nested("a").function(0u);
+        auto ctx_wrapper_a = ctx_wrapper->nested("a").context(0u);
+        auto function_b = ctx_wrapper->nested("b").function(0u);
+        auto ctx_wrapper_b = ctx_wrapper->nested("b").context(0u);
+
+        auto sample = Surface::Sample::zero(swl.dimension());
+        $if(u_lobe < ctx->ratio) {// sample a
+            auto sample_a = function_a->sample(ctx_wrapper_a, swl, time, wo, u_lobe / ctx->ratio, u, mode);
+            auto eval_b = function_b->evaluate(ctx_wrapper_b, swl, time, wo, sample_a.wi, mode);
+            sample.eval = _mix(sample_a.eval, eval_b, ctx->ratio);
             sample.wi = sample_a.wi;
             sample.event = sample_a.event;
         }
         $else {// sample b
-            auto sample_b = _b->sample(wo, (u_lobe - _ratio) / (1.f - _ratio), u, mode);
-            auto eval_a = _a->evaluate(wo, sample_b.wi, mode);
-            sample.eval = _mix(eval_a, sample_b.eval);
+            auto sample_b = function_b->sample(ctx_wrapper_b, swl, time, wo, (u_lobe - ctx->ratio) / (1.f - ctx->ratio), u, mode);
+            auto eval_a = function_a->evaluate(ctx_wrapper_a, swl, time, wo, sample_b.wi, mode);
+            sample.eval = _mix(eval_a, sample_b.eval, ctx->ratio);
             sample.wi = sample_b.wi;
             sample.event = sample_b.event;
         };
@@ -158,15 +206,16 @@ uint MixSurfaceInstance::make_closure(
     luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
     Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept {
     auto ratio = _ratio == nullptr ? 0.5f : clamp(_ratio->evaluate(*it, swl, time).x, 0.f, 1.f);
-    auto a_tag = _a->make_closure(closure, it, swl, wo, eta_i, time);
-    auto b_tag = _b->make_closure(closure, it, swl, wo, eta_i, time);
     auto ctx = MixSurfaceContext{
-        .it = *it,
-        .ratio = ratio,
-        .a_tag = a_tag,
-        .b_tag = b_tag
-    };
-    return closure.register_instance<MixSurfaceFunction>(std::move(ctx));
+        .ratio = ratio};
+
+    auto [tag, slot] = closure.register_instance<MixSurfaceFunction>(node()->closure_identifier());
+    slot->create_data(std::move(ctx));
+    slot->create_nested("a");
+    slot->create_nested("b");
+    _a->make_closure(slot->nested("a"), it, swl, wo, eta_i, time);
+    _b->make_closure(slot->nested("b"), it, swl, wo, eta_i, time);
+    return tag;
 }
 
 //using NormalMapMixSurface = NormalMapWrapper<

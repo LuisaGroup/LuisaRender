@@ -27,7 +27,7 @@ public:
     [[nodiscard]] auto scale() const noexcept { return _scale; }
     [[nodiscard]] auto two_sided() const noexcept { return _two_sided; }
     [[nodiscard]] bool is_null() const noexcept override { return _scale == 0.0f || _emission->is_black(); }
-    [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };

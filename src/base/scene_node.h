@@ -51,7 +51,7 @@ public:
     virtual ~SceneNode() noexcept = default;
     [[nodiscard]] auto scene() const noexcept { return reinterpret_cast<const Scene *>(_scene); }
     [[nodiscard]] auto tag() const noexcept { return _tag; }
-    [[nodiscard]] virtual std::string_view impl_type() const noexcept = 0;
+    [[nodiscard]] virtual luisa::string_view impl_type() const noexcept = 0;
 };
 
 }// namespace luisa::render
