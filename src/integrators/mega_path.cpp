@@ -112,7 +112,8 @@ protected:
                 closure_tag = surface->make_closure(closure, it, swl, wo, 1.f, time);
             });
 
-            closure.dispatch(closure_tag, [&](const Surface::Function *function, const Surface::FunctionContext *ctx_wrapper) noexcept {
+            closure.dispatch(closure_tag, [&](const Surface::Function *function,
+                                              const Surface::FunctionContext *ctx_wrapper) noexcept {
                 // apply opacity map
                 auto alpha_skip = def(false);
                 if (auto o = function->opacity(ctx_wrapper, swl, time)) {

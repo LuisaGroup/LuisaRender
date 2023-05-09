@@ -123,9 +123,10 @@ public:
         DiffuseLightClosure closure{light, swl(), time()};
         return {.eval = closure._evaluate(it_light, p_from), .p = attrib.p};
     }
-    [[nodiscard]] std::pair<Light::Sample,Var<Ray>> sample_le(Expr<uint> light_inst_id,
-                                       Expr<float2> u_light,
-                                       Expr<float2> u_direction) const noexcept override {
+
+    [[nodiscard]] std::pair<Light::Sample, Var<Ray>> sample_le(Expr<uint> light_inst_id,
+                                                               Expr<float2> u_light,
+                                                               Expr<float2> u_direction) const noexcept override {
         auto light = instance<DiffuseLightInstance>();
         auto &&pipeline = light->pipeline();
         auto light_inst = pipeline.geometry()->instance(light_inst_id);
@@ -163,12 +164,12 @@ public:
         //}
         //cancel out the cos term from outside le->beta
         if (two_sided) {
-            eval.pdf *= 0.5f*inv_pi;
+            eval.pdf *= 0.5f * inv_pi;
         } else {
-            eval.pdf *=inv_pi;
+            eval.pdf *= inv_pi;
         }
         auto shadow_ray = it_light.spawn_ray(we_world);
-        return std::make_pair(Light::Sample{.eval = eval, .p = attrib.p},shadow_ray);
+        return std::make_pair(Light::Sample{.eval = eval, .p = attrib.p}, shadow_ray);
     }
 };
 
