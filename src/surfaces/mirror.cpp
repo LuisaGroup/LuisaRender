@@ -91,6 +91,7 @@ class MirrorFunction : public Surface::Function {
 
 public:
     [[nodiscard]] static luisa::string identifier() noexcept { return LUISA_RENDER_PLUGIN_NAME; }
+
     [[nodiscard]] SampledSpectrum albedo(
         const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         auto ctx = std::any_cast<MirrorInstance::MirrorContext>(&ctx_wrapper);
@@ -105,6 +106,7 @@ public:
         auto distribution = TrowbridgeReitzDistribution(ctx->alpha);
         return TrowbridgeReitzDistribution::alpha_to_roughness(distribution.alpha());
     }
+
     [[nodiscard]] Surface::Evaluation evaluate(
         const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
         Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {

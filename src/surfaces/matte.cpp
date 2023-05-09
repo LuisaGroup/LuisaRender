@@ -69,6 +69,7 @@ class MatteFunction : public Surface::Function {
 
 public:
     [[nodiscard]] static luisa::string identifier() noexcept { return LUISA_RENDER_PLUGIN_NAME; }
+
     [[nodiscard]] SampledSpectrum albedo(
         const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         auto ctx = std::any_cast<MatteInstance::MatteContext>(&ctx_wrapper);

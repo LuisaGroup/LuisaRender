@@ -69,6 +69,16 @@ protected:
 
 class PlasticInstance : public Surface::Instance {
 
+public:
+    struct PlasticContext {
+        Interaction it;
+        SampledSpectrum kd;
+        Float kd_weight;
+        SampledSpectrum sigma_a;
+        Float eta;
+        Float2 roughness;
+    };
+
 private:
     const Texture::Instance *_kd;
     const Texture::Instance *_roughness;
@@ -78,18 +88,16 @@ private:
 
 public:
     PlasticInstance(const Pipeline &pipeline, const Surface *surface,
-                      const Texture::Instance *Kd, const Texture::Instance *roughness,
-                      const Texture::Instance *sigma_a, const Texture::Instance *eta,
-                      const Texture::Instance *thickness) noexcept
+                    const Texture::Instance *Kd, const Texture::Instance *roughness,
+                    const Texture::Instance *sigma_a, const Texture::Instance *eta,
+                    const Texture::Instance *thickness) noexcept
         : Surface::Instance{pipeline, surface},
           _kd{Kd}, _roughness{roughness}, _sigma_a{sigma_a},
           _eta{eta}, _thickness{thickness} {}
 
 public:
-    [[nodiscard]] Local<float> data(
-        luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-        Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept override;
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
+    [[nodiscard]] uint make_closure(
+        PolymorphicClosure<Surface::Function> &closure,
         luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
         Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept override;
 };
@@ -105,97 +113,103 @@ luisa::unique_ptr<Surface::Instance> PlasticSurface::_build(
         pipeline, this, Kd, roughness, sigma_a, eta, thickness);
 }
 
-class PlasticClosure : public Surface::Closure {
+class PlasticFunction : public Surface::Function {
 
 private:
-    luisa::unique_ptr<TrowbridgeReitzDistribution> _distribution;
-    luisa::unique_ptr<FresnelDielectric> _fresnel;
-    luisa::unique_ptr<MicrofacetReflection> _coat;
-    luisa::unique_ptr<LambertianReflection> _substrate;
-    SampledSpectrum _sigma_a;
-    Float _kd_weight;
-
-public:
-    PlasticClosure(const Surface::Instance *instance, luisa::shared_ptr<Interaction> it,
-                     const SampledWavelengths &swl, Expr<float> time, const SampledSpectrum &Kd,
-                     Expr<float> Kd_weight, const SampledSpectrum &sigma_a,
-                     Expr<float> eta, Expr<float2> roughness) noexcept
-        : Surface::Closure{instance, std::move(it), swl, time},
-          _distribution{luisa::make_unique<TrowbridgeReitzDistribution>(roughness)},
-          _fresnel{luisa::make_unique<FresnelDielectric>(1.0f, eta)},
-          _coat{luisa::make_unique<MicrofacetReflection>(SampledSpectrum{swl.dimension(), 1.f},
-                                                         _distribution.get(), _fresnel.get())},
-          _substrate{luisa::make_unique<LambertianReflection>(Kd)},
-          _sigma_a{sigma_a}, _kd_weight{Kd_weight} {}
-
-    [[nodiscard]] auto _substrate_weight(Expr<float> Fo) const noexcept {
-        auto w = _kd_weight * (1.0f - Fo);
+    [[nodiscard]] static auto _substrate_weight(Expr<float> Fo, Expr<float> kd_weight) noexcept {
+        auto w = kd_weight * (1.0f - Fo);
         return ite(w == 0.f, 0.f, w / (w + Fo));
     }
 
-private:
-    [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _substrate->albedo(); }
-    [[nodiscard]] Float2 roughness() const noexcept override {
-        return TrowbridgeReitzDistribution::alpha_to_roughness(_distribution->alpha());
+public:
+    [[nodiscard]] static luisa::string identifier() noexcept { return LUISA_RENDER_PLUGIN_NAME; }
+
+    [[nodiscard]] SampledSpectrum albedo(
+        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        auto ctx = std::any_cast<PlasticInstance::PlasticContext>(ctx_wrapper);
+        auto substrate = LambertianReflection(ctx.kd);
+        return substrate.albedo();
+    }
+    [[nodiscard]] Float2 roughness(
+        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        auto ctx = std::any_cast<PlasticInstance::PlasticContext>(ctx_wrapper);
+        auto distribution = TrowbridgeReitzDistribution(ctx.roughness);
+        return TrowbridgeReitzDistribution::alpha_to_roughness(distribution.alpha());
     }
 
-    [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
-                                                TransportMode mode) const noexcept override {
-        auto wo_local = it()->shading().world_to_local(wo);
+    [[nodiscard]] Surface::Evaluation evaluate(
+        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
+        Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
+        auto ctx = std::any_cast<PlasticInstance::PlasticContext>(ctx_wrapper);
+        auto &it = ctx.it;
+        auto distribution = TrowbridgeReitzDistribution(ctx.roughness);
+        auto fresnel = FresnelDielectric(1.0f, ctx.eta);
+        auto coat = MicrofacetReflection(SampledSpectrum{swl.dimension(), 1.f}, &distribution, &fresnel);
+        auto substrate = LambertianReflection(ctx.kd);
+
+        auto wo_local = it.shading().world_to_local(wo);
         auto sign = ite(cos_theta(wo_local) < 0.f,
                         make_float3(1.f, 1.f, -1.f),
                         make_float3(1.f, 1.f, 1.f));
         wo_local *= sign;
-        auto wi_local = sign * it()->shading().world_to_local(wi);
+        auto wi_local = sign * it.shading().world_to_local(wi);
         // specular
-        auto f_coat = _coat->evaluate(wo_local, wi_local, mode);
-        auto pdf_coat = _coat->pdf(wo_local, wi_local, mode);
+        auto f_coat = coat.evaluate(wo_local, wi_local, mode);
+        auto pdf_coat = coat.pdf(wo_local, wi_local, mode);
         // diffuse
-        auto eta = _fresnel->eta_t();
+        auto eta = fresnel.eta_t();
         auto Fi = fresnel_dielectric(abs_cos_theta(wi_local), 1.f, eta);
         auto Fo = fresnel_dielectric(abs_cos_theta(wo_local), 1.f, eta);
-        auto a = exp(-(1.f / abs_cos_theta(wi_local) + 1.f / abs_cos_theta(wo_local)) * _sigma_a);
+        auto a = exp(-(1.f / abs_cos_theta(wi_local) + 1.f / abs_cos_theta(wo_local)) * ctx.sigma_a);
         auto f_diffuse = (1.f - Fi) * (1.f - Fo) * sqr(1.f / eta) * a *
-                         _substrate->evaluate(wo_local, wi_local, mode);
-        auto pdf_diffuse = _substrate->pdf(wo_local, wi_local, mode);
-        auto substrate_weight = _substrate_weight(Fo);
+                         substrate.evaluate(wo_local, wi_local, mode);
+        auto pdf_diffuse = substrate.pdf(wo_local, wi_local, mode);
+        auto substrate_weight = _substrate_weight(Fo, ctx.kd_weight);
         auto f = (f_coat + f_diffuse) * abs_cos_theta(wi_local);
         auto pdf = lerp(pdf_coat, pdf_diffuse, substrate_weight);
         return {.f = f, .pdf = pdf};
     }
 
-    [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u,
-                                          TransportMode mode) const noexcept override {
-        auto wo_local = it()->shading().world_to_local(wo);
+    [[nodiscard]] Surface::Sample sample(
+        const std::any &ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
+        Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u, TransportMode mode) const noexcept override {
+        auto ctx = std::any_cast<PlasticInstance::PlasticContext>(ctx_wrapper);
+        auto &it = ctx.it;
+        auto distribution = TrowbridgeReitzDistribution(ctx.roughness);
+        auto fresnel = FresnelDielectric(1.0f, ctx.eta);
+        auto coat = MicrofacetReflection(SampledSpectrum{swl.dimension(), 1.f}, &distribution, &fresnel);
+        auto substrate = LambertianReflection(ctx.kd);
+
+        auto wo_local = it.shading().world_to_local(wo);
         auto sign = ite(cos_theta(wo_local) < 0.f,
                         make_float3(1.f, 1.f, -1.f),
                         make_float3(1.f, 1.f, 1.f));
         wo_local *= sign;
-        auto eta = _fresnel->eta_t();
+        auto eta = fresnel.eta_t();
         auto Fo = fresnel_dielectric(abs_cos_theta(wo_local), 1.f, eta);
-        auto substrate_weight = _substrate_weight(Fo);
+        auto substrate_weight = _substrate_weight(Fo, ctx.kd_weight);
         BxDF::SampledDirection wi_sample;
         $if(u_lobe < substrate_weight) {// samples diffuse
-            wi_sample = _substrate->sample_wi(wo_local, u, mode);
+            wi_sample = substrate.sample_wi(wo_local, u, mode);
         }
         $else {// samples specular
-            wi_sample = _coat->sample_wi(wo_local, u, mode);
+            wi_sample = coat.sample_wi(wo_local, u, mode);
         };
-        SampledSpectrum f{swl().dimension(), 0.f};
+        SampledSpectrum f{swl.dimension(), 0.f};
         auto pdf = def(0.f);
         auto wi = def(make_float3(0.f, 0.f, 1.f));
         $if(wi_sample.valid) {
             auto wi_local = wi_sample.wi;
-            wi = it()->shading().local_to_world(wi_sample.wi * sign);
-            auto f_coat = _coat->evaluate(wo_local, wi_local, mode);
-            auto pdf_coat = _coat->pdf(wo_local, wi_local, mode);
+            wi = it.shading().local_to_world(wi_sample.wi * sign);
+            auto f_coat = coat.evaluate(wo_local, wi_local, mode);
+            auto pdf_coat = coat.pdf(wo_local, wi_local, mode);
             // diffuse
             auto Fi = fresnel_dielectric(abs_cos_theta(wi_local), 1.f, eta);
-            auto a = exp(-(1.f / abs_cos_theta(wi_local) + 1.f / abs_cos_theta(wo_local)) * _sigma_a);
-            auto ee = sqr(1.f / _fresnel->eta_t());
+            auto a = exp(-(1.f / abs_cos_theta(wi_local) + 1.f / abs_cos_theta(wo_local)) * ctx.sigma_a);
+            auto ee = sqr(1.f / fresnel.eta_t());
             auto f_diffuse = (1.f - Fi) * (1.f - Fo) * sqr(1.f / eta) * a *
-                             _substrate->evaluate(wo_local, wi_local, mode);
-            auto pdf_diffuse = _substrate->pdf(wo_local, wi_local, mode);
+                             substrate.evaluate(wo_local, wi_local, mode);
+            auto pdf_diffuse = substrate.pdf(wo_local, wi_local, mode);
             f = (f_coat + f_diffuse) * abs_cos_theta(wi_local);
             pdf = lerp(pdf_coat, pdf_diffuse, substrate_weight);
         };
@@ -205,18 +219,8 @@ private:
     }
 };
 
-Local<float> PlasticInstance::data(
-    luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-    Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept {
-    auto d = swl.dimension();
-    auto data_array = Local<float>(1);
-
-    data_array[0] = compute::as<float>(0u);
-
-    return data_array;
-}
-
-luisa::unique_ptr<Surface::Closure> PlasticInstance::closure(
+uint PlasticInstance::make_closure(
+    PolymorphicClosure<Surface::Function> &closure,
     luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
     Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept {
 
@@ -241,14 +245,22 @@ luisa::unique_ptr<Surface::Closure> PlasticInstance::closure(
     // We use the fitted polynomial to approximate the integrated
     // Fresnel reflectance, rather than compute it on the fly.
     auto diffuse_fresnel = fresnel_dielectric_integral(eta);
-    return luisa::make_unique<PlasticClosure>(
-        this, std::move(it), swl, time, Kd / (1.f - Kd * diffuse_fresnel),
-        Kd_lum * average_transmittance, sigma_a, eta, roughness);
+
+    auto ctx = PlasticContext{
+        .it = *it,
+        .kd = Kd / (1.f - Kd * diffuse_fresnel),
+        .kd_weight = Kd_lum * average_transmittance,
+        .sigma_a = sigma_a,
+        .eta = eta,
+        .roughness = roughness,
+    };
+
+    return closure.register_instance<PlasticFunction>(std::move(ctx));
 }
 
-using NormalMapOpacityPlasticSurface = NormalMapWrapper<OpacitySurfaceWrapper<
-    PlasticSurface, PlasticInstance, PlasticClosure>>;
+//using NormalMapOpacityPlasticSurface = NormalMapWrapper<OpacitySurfaceWrapper<
+//    PlasticSurface, PlasticInstance, PlasticClosure>>;
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::NormalMapOpacityPlasticSurface)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::PlasticSurface)
