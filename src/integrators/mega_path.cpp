@@ -109,7 +109,7 @@ protected:
             auto closure_tag = def(0u);
 
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
-                closure_tag = surface->make_closure(closure, it, swl, wo, eta_scale, time);
+                closure_tag = surface->make_closure(closure, it, swl, wo, 1.f, time);
             });
 
             closure.dispatch(closure_tag, [&](const Surface::Function *function, const Surface::FunctionContext *ctx_wrapper) noexcept {

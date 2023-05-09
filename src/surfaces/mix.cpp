@@ -206,6 +206,7 @@ uint MixSurfaceInstance::make_closure(
     luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
     Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept {
     auto ratio = _ratio == nullptr ? 0.5f : clamp(_ratio->evaluate(*it, swl, time).x, 0.f, 1.f);
+
     auto ctx = MixSurfaceContext{
         .ratio = ratio};
 
