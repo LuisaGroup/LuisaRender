@@ -284,9 +284,9 @@ void GlassInstance::populate_closure(Surface::Closure *closure, const Interactio
     closure->bind(std::move(ctx));
 }
 
-//using NormalMapGlassSurface = NormalMapWrapper<
-//    GlassSurface, GlassInstance>;
+using NormalMapGlassSurface = NormalMapWrapper<
+    GlassSurface, GlassInstance>;
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::GlassSurface)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::NormalMapGlassSurface)

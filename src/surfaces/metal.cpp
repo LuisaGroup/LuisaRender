@@ -309,9 +309,9 @@ void MetalInstance::populate_closure(Surface::Closure *closure, const Interactio
     closure->bind(std::move(ctx));
 }
 
-//using NormalMapOpacityMetalSurface = NormalMapWrapper<OpacitySurfaceWrapper<
-//    MetalSurface, MetalInstance, MetalClosure>>;
+using NormalMapOpacityMetalSurface = NormalMapWrapper<OpacitySurfaceWrapper<
+    MetalSurface, MetalInstance>>;
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::MetalSurface)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::NormalMapOpacityMetalSurface)

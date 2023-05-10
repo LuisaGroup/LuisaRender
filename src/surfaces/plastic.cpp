@@ -256,9 +256,9 @@ void PlasticInstance::populate_closure(Surface::Closure *closure, const Interact
     closure->bind(std::move(ctx));
 }
 
-//using NormalMapOpacityPlasticSurface = NormalMapWrapper<OpacitySurfaceWrapper<
-//    PlasticSurface, PlasticInstance, PlasticClosure>>;
+using NormalMapOpacityPlasticSurface = NormalMapWrapper<OpacitySurfaceWrapper<
+    PlasticSurface, PlasticInstance>>;
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::PlasticSurface)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::NormalMapOpacityPlasticSurface)

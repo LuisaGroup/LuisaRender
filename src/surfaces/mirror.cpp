@@ -169,9 +169,9 @@ void MirrorInstance::populate_closure(Surface::Closure *closure, const Interacti
     closure->bind(std::move(ctx));
 }
 
-//using NormalMapOpacityMirrorSurface = NormalMapWrapper<OpacitySurfaceWrapper<
-//    MirrorSurface, MirrorInstance, MirrorClosure>>;
+using NormalMapOpacityMirrorSurface = NormalMapWrapper<OpacitySurfaceWrapper<
+    MirrorSurface, MirrorInstance>>;
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::MirrorSurface)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::NormalMapOpacityMirrorSurface)

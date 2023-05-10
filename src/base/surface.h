@@ -141,164 +141,235 @@ public:
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept;
 };
 
-// TODO: How to implement wrapper with closure context?
-//template<typename BaseSurface,
-//         typename BaseInstance = typename BaseSurface::Instance,
-//         typename BaseClosure = typename BaseSurface::Closure>
-//class OpacitySurfaceWrapper : public BaseSurface {
-//
-//public:
-//    class Closure final : public BaseClosure {
-//
-//    private:
-//        luisa::optional<Float> _alpha;
-//        [[nodiscard]] luisa::optional<Float> _opacity() const noexcept override { return _alpha; }
-//
-//    public:
-//        [[nodiscard]] Closure(BaseClosure &&base, luisa::optional<Float> alpha) noexcept
-//            : BaseClosure{std::move(base)}, _alpha{std::move(alpha)} {}
-//    };
-//
-//    class Instance : public BaseInstance {
-//
-//    private:
-//        const Texture::Instance *_opacity;
-//
-//    public:
-//        Instance(BaseInstance &&base, const Texture::Instance *opacity) noexcept
-//            : BaseInstance{std::move(base)}, _opacity{opacity} {}
-//        [[nodiscard]] luisa::unique_ptr<Surface::Function> closure(
-//            luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-//            Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept override {
-//            auto alpha = _opacity ? luisa::make_optional(_opacity->evaluate(*it, swl, time).x) : luisa::nullopt;
-//            auto base = BaseInstance::closure(std::move(it), swl, wo, eta_i, time);
-//            return luisa::make_unique<Closure>(std::move(dynamic_cast<BaseClosure &>(*base)), std::move(alpha));
-//        }
-//    };
-//
-//private:
-//    const Texture *_opacity;
-//
-//public:
-//    OpacitySurfaceWrapper(Scene *scene, const SceneNodeDesc *desc) noexcept
-//        : BaseSurface{scene, desc},
-//          _opacity{[](auto scene, auto desc) noexcept {
-//              return scene->load_texture(desc->property_node_or_default(
-//                  "alpha", lazy_construct([desc] {
-//                      return desc->property_node_or_default("opacity");
-//                  })));
-//          }(scene, desc)} {}
-//
-//protected:
-//    [[nodiscard]] luisa::unique_ptr<Surface::Instance> _build(
-//        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
-//        auto base = BaseSurface::_build(pipeline, command_buffer);
-//        return luisa::make_unique<Instance>(
-//            std::move(dynamic_cast<BaseInstance &>(*base)),
-//            [this](auto &pipeline, auto &command_buffer) noexcept {
-//                return pipeline.build_texture(command_buffer, _opacity);
-//            }(pipeline, command_buffer));
-//    }
-//};
-//
-//template<typename BaseSurface,
-//         typename BaseInstance = typename BaseSurface::Instance>
-//class NormalMapWrapper : public BaseSurface {
-//
-//public:
-//    class Instance : public BaseInstance {
-//
-//    private:
-//        const Texture::Instance *_map;
-//        float _strength;
-//
-//    public:
-//        Instance(BaseInstance &&base, const Texture::Instance *normal, float strength) noexcept
-//            : BaseInstance{std::move(base)}, _map{normal}, _strength{strength} {}
-//        [[nodiscard]] luisa::unique_ptr<Surface::Function> closure(
-//            luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-//            Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept override {
-//            if (_map == nullptr) { return BaseInstance::closure(std::move(it), swl, wo, eta_i, time); }
-//            auto normal_local = 2.f * _map->evaluate(*it, swl, time).xyz() - 1.f;
-//            if (_strength != 1.f) { normal_local *= make_float3(_strength, _strength, 1.f); }
-//            auto mapped_it = luisa::make_shared<Interaction>(*it);
-//            auto normal = it->shading().local_to_world(normal_local);
-//            mapped_it->set_shading(Frame::make(clamp_shading_normal(normal, it->ng(), wo),
-//                                               it->shading().s()));
-//            return BaseInstance::closure(std::move(mapped_it), swl, wo, eta_i, time);
-//        }
-//    };
-//
-//private:
-//    const Texture *_normal_map;
-//    float _strength;
-//
-//public:
-//    NormalMapWrapper(Scene *scene, const SceneNodeDesc *desc) noexcept
-//        : BaseSurface{scene, desc},
-//          _normal_map{[](auto scene, auto desc) noexcept {
-//              return scene->load_texture(desc->property_node_or_default("normal_map"));
-//          }(scene, desc)},
-//          _strength{desc->property_float_or_default("normal_map_strength", 1.f)} {}
-//
-//protected:
-//    [[nodiscard]] luisa::unique_ptr<Surface::Instance> _build(
-//        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
-//        auto base = BaseSurface::_build(pipeline, command_buffer);
-//        return luisa::make_unique<Instance>(
-//            std::move(dynamic_cast<BaseInstance &>(*base)),
-//            [this](auto &pipeline, auto &command_buffer) noexcept {
-//                return pipeline.build_texture(command_buffer, _normal_map);
-//            }(pipeline, command_buffer),
-//            _strength);
-//    }
-//};
-//
-//template<typename BaseSurface,
-//         typename BaseInstance = typename BaseSurface::Instance>
-//class TwoSidedWrapper : public BaseSurface {
-//
-//public:
-//    class Instance : public BaseInstance {
-//
-//    private:
-//        bool _two_sided;
-//
-//    public:
-//        Instance(BaseInstance &&base, bool two_sided) noexcept
-//            : BaseInstance{std::move(base)}, _two_sided{two_sided} {}
-//        [[nodiscard]] luisa::unique_ptr<Surface::Function> closure(
-//            luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-//            Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept override {
-//            if (_two_sided) {
-//                auto it_copy = luisa::make_shared<Interaction>(*it);
-//                it_copy->shading().flip();
-//                return BaseInstance::closure(std::move(it_copy), swl, wo, eta_i, time);
-//            }
-//            return BaseInstance::closure(it, swl, wo, eta_i, time);
-//        }
-//    };
-//
-//private:
-//    bool _two_sided;
-//
-//public:
-//    TwoSidedWrapper(Scene *scene, const SceneNodeDesc *desc) noexcept
-//        : BaseSurface{scene, desc},
-//          _two_sided{desc->property_bool_or_default("two_sided", false)} {}
-//
-//protected:
-//    [[nodiscard]] luisa::unique_ptr<Surface::Instance> _build(
-//        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
-//        auto base = BaseSurface::_build(pipeline, command_buffer);
-//        return luisa::make_unique<Instance>(
-//            std::move(dynamic_cast<BaseInstance &>(*base)), _two_sided);
-//    }
-//    [[nodiscard]] uint properties() const noexcept override {
-//        auto p = BaseSurface::properties();
-//        return _two_sided ? p & (~Surface::property_transmissive) : p;
-//    }
-//};
+template<typename BaseSurface,
+         typename BaseInstance = typename BaseSurface::Instance>
+    requires std::derived_from<BaseSurface, Surface> &&
+             std::derived_from<BaseInstance, Surface::Instance>
+class OpacitySurfaceWrapper : public BaseSurface {
+
+public:
+    class Closure final : public Surface::Closure {
+
+    private:
+        luisa::unique_ptr<Surface::Closure> _base;
+
+    public:
+        struct Context {
+            Float opacity;
+        };
+
+    public:
+        Closure(const Pipeline &pipeline,
+                const SampledWavelengths &swl,
+                Expr<float> time,
+                luisa::unique_ptr<Surface::Closure> base) noexcept
+            : Surface::Closure{pipeline, swl, time},
+              _base{std::move(base)} {}
+        [[nodiscard]] auto base() const noexcept { return _base.get(); }
+
+    public:
+        [[nodiscard]] SampledSpectrum albedo() const noexcept override {
+            return _base->albedo();
+        }
+        [[nodiscard]] Float2 roughness() const noexcept override {
+            return _base->roughness();
+        }
+        [[nodiscard]] const Interaction &it() const noexcept override {
+            return _base->it();
+        }
+        [[nodiscard]] luisa::optional<Float> opacity() const noexcept override {
+            return context<Context>().opacity;
+        }
+        [[nodiscard]] optional<Float> eta() const noexcept override {
+            return _base->eta();
+        }
+        [[nodiscard]] optional<Bool> is_dispersive() const noexcept override {
+            return _base->is_dispersive();
+        }
+
+    public:
+        [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const override {
+            return _base->evaluate(wo, wi, mode);
+        }
+        [[nodiscard]] Surface::Sample sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u, TransportMode mode) const override {
+            return _base->sample(wo, u_lobe, u, mode);
+        }
+    };
+
+    class Instance : public BaseInstance {
+
+    private:
+        const Texture::Instance *_opacity;
+
+    public:
+        Instance(BaseInstance &&base, const Texture::Instance *opacity) noexcept
+            : BaseInstance{std::move(base)}, _opacity{opacity} {}
+
+    public:
+        [[nodiscard]] luisa::unique_ptr<Surface::Closure> create_closure(
+            const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+            auto base = BaseInstance::create_closure(swl, time);
+            if (_opacity == nullptr) { return base; }
+            Closure cls{this->pipeline(), swl, time, std::move(base)};
+            return luisa::make_unique<Closure>(std::move(cls));
+        }
+        void populate_closure(Surface::Closure *closure_in, const Interaction &it,
+                              Expr<float3> wo, Expr<float> eta_i) const noexcept override {
+            if (_opacity == nullptr) {
+                BaseInstance::populate_closure(closure_in, it, wo, eta_i);
+                return;
+            }
+            auto closure = static_cast<Closure *>(closure_in);
+            auto &swl = closure->swl();
+            auto time = closure->time();
+            BaseInstance::populate_closure(closure->base(), it, wo, eta_i);
+            auto o = _opacity->evaluate(it, swl, time).x;
+            typename Closure::Context ctx{.opacity = o};
+            closure->bind(std::move(ctx));
+        }
+    };
+
+private:
+    const Texture *_opacity;
+
+public:
+    OpacitySurfaceWrapper(Scene *scene, const SceneNodeDesc *desc) noexcept
+        : BaseSurface{scene, desc},
+          _opacity{[](auto scene, auto desc) noexcept {
+              return scene->load_texture(desc->property_node_or_default(
+                  "alpha", lazy_construct([desc] {
+                      return desc->property_node_or_default("opacity");
+                  })));
+          }(scene, desc)} {}
+    [[nodiscard]] luisa::string closure_identifier() const noexcept override {
+        if (_opacity == nullptr) { return BaseSurface::closure_identifier(); }
+        return luisa::format("Opacity<{}>", BaseSurface::closure_identifier());
+    }
+
+protected:
+    [[nodiscard]] luisa::unique_ptr<Surface::Instance> _build(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
+        auto base = BaseSurface::_build(pipeline, command_buffer);
+        return luisa::make_unique<Instance>(
+            std::move(dynamic_cast<BaseInstance &>(*base)),
+            [this](auto &pipeline, auto &command_buffer) noexcept {
+                return pipeline.build_texture(command_buffer, _opacity);
+            }(pipeline, command_buffer));
+    }
+};
+
+template<typename BaseSurface,
+         typename BaseInstance = typename BaseSurface::Instance>
+    requires std::derived_from<BaseSurface, Surface> &&
+             std::derived_from<BaseInstance, Surface::Instance>
+class NormalMapWrapper : public BaseSurface {
+
+public:
+    class Instance : public BaseInstance {
+
+    private:
+        const Texture::Instance *_map;
+        float _strength;
+
+    public:
+        Instance(BaseInstance &&base, const Texture::Instance *normal, float strength) noexcept
+            : BaseInstance{std::move(base)}, _map{normal}, _strength{strength} {}
+
+    public:
+        void populate_closure(Surface::Closure *closure, const Interaction &it,
+                              Expr<float3> wo, Expr<float> eta_i) const noexcept override {
+            if (_map == nullptr) {
+                BaseInstance::populate_closure(closure, it, wo, eta_i);
+                return;
+            }
+
+            auto &swl = closure->swl();
+            auto time = closure->time();
+
+            auto normal_local = 2.f * _map->evaluate(it, swl, time).xyz() - 1.f;
+            if (_strength != 1.f) { normal_local *= make_float3(_strength, _strength, 1.f); }
+            auto mapped_it = it;
+            auto normal = it.shading().local_to_world(normal_local);
+            mapped_it.set_shading(Frame::make(clamp_shading_normal(normal, it.ng(), wo),
+                                              it.shading().s()));
+
+            BaseInstance::populate_closure(closure, mapped_it, wo, eta_i);
+        }
+    };
+
+private:
+    const Texture *_normal_map;
+    float _strength;
+
+public:
+    NormalMapWrapper(Scene *scene, const SceneNodeDesc *desc) noexcept
+        : BaseSurface{scene, desc},
+          _normal_map{[](auto scene, auto desc) noexcept {
+              return scene->load_texture(desc->property_node_or_default("normal_map"));
+          }(scene, desc)},
+          _strength{desc->property_float_or_default("normal_map_strength", 1.f)} {}
+
+protected:
+    [[nodiscard]] luisa::unique_ptr<Surface::Instance> _build(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
+        auto base = BaseSurface::_build(pipeline, command_buffer);
+        return luisa::make_unique<Instance>(
+            std::move(dynamic_cast<BaseInstance &>(*base)),
+            [this](auto &pipeline, auto &command_buffer) noexcept {
+                return pipeline.build_texture(command_buffer, _normal_map);
+            }(pipeline, command_buffer),
+            _strength);
+    }
+};
+
+template<typename BaseSurface,
+         typename BaseInstance = typename BaseSurface::Instance>
+    requires std::derived_from<BaseSurface, Surface> &&
+             std::derived_from<BaseInstance, Surface::Instance>
+class TwoSidedWrapper : public BaseSurface {
+
+public:
+    class Instance : public BaseInstance {
+
+    private:
+        bool _two_sided;
+
+    public:
+        Instance(BaseInstance &&base, bool two_sided) noexcept
+            : BaseInstance{std::move(base)}, _two_sided{two_sided} {}
+
+    public:
+        void populate_closure(Surface::Closure *closure, const Interaction &it,
+                              Expr<float3> wo, Expr<float> eta_i) const noexcept override {
+            if (_two_sided) {
+                auto it_copy = it;
+                it_copy.shading().flip();
+                BaseInstance::populate_closure(closure, it_copy, wo, eta_i);
+            }
+            BaseInstance::populate_closure(closure, it, wo, eta_i);
+        }
+    };
+
+private:
+    bool _two_sided;
+
+public:
+    TwoSidedWrapper(Scene *scene, const SceneNodeDesc *desc) noexcept
+        : BaseSurface{scene, desc},
+          _two_sided{desc->property_bool_or_default("two_sided", false)} {}
+
+protected:
+    [[nodiscard]] luisa::unique_ptr<Surface::Instance> _build(
+        Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override {
+        auto base = BaseSurface::_build(pipeline, command_buffer);
+        return luisa::make_unique<Instance>(
+            std::move(dynamic_cast<BaseInstance &>(*base)), _two_sided);
+    }
+    [[nodiscard]] uint properties() const noexcept override {
+        auto p = BaseSurface::properties();
+        return _two_sided ? p & (~Surface::property_transmissive) : p;
+    }
+};
 
 }// namespace luisa::render
 

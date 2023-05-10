@@ -488,9 +488,9 @@ void LayeredSurfaceInstance::populate_closure(Surface::Closure *closure_in, cons
     _bottom->populate_closure(closure->bottom(), it, wo, eta_top.value_or(1.f));    // FIXME: eta_i is wrong
 }
 
-//using TwoSidedNormalMapOpacityLayeredSurface = TwoSidedWrapper<NormalMapWrapper<OpacitySurfaceWrapper<
-//    LayeredSurface, LayeredSurfaceInstance, LayeredSurfaceClosure>>>;
+using TwoSidedNormalMapOpacityLayeredSurface = TwoSidedWrapper<NormalMapWrapper<OpacitySurfaceWrapper<
+    LayeredSurface, LayeredSurfaceInstance>>>;
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::LayeredSurface)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::TwoSidedNormalMapOpacityLayeredSurface)

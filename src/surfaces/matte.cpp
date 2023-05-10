@@ -119,9 +119,9 @@ void MatteInstance::populate_closure(Surface::Closure *closure, const Interactio
     closure->bind(std::move(ctx));
 }
 
-//using NormalMapOpacityMatteSurface = NormalMapWrapper<OpacitySurfaceWrapper<
-//    MatteSurface, MatteInstance, MatteFunction>>;
+using NormalMapOpacityMatteSurface = NormalMapWrapper<OpacitySurfaceWrapper<
+    MatteSurface, MatteInstance>>;
 
 }// namespace luisa::render
 
-LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::MatteSurface)
+LUISA_RENDER_MAKE_SCENE_NODE_PLUGIN(luisa::render::NormalMapOpacityMatteSurface)
