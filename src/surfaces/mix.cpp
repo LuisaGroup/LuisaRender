@@ -98,6 +98,14 @@ public:
         : Surface::Closure(pipeline, swl, time), _a{std::move(a)}, _b{std::move(b)} {}
     [[nodiscard]] auto a() const noexcept { return _a.get(); }
     [[nodiscard]] auto b() const noexcept { return _b.get(); }
+    void before_evaluation() noexcept override {
+        _a->before_evaluation();
+        _b->before_evaluation();
+    }
+    void after_evaluation() noexcept override {
+        _a->after_evaluation();
+        _b->after_evaluation();
+    }
 
 public:
     [[nodiscard]] SampledSpectrum albedo() const noexcept override {

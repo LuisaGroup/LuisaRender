@@ -33,6 +33,14 @@ public:
         assert(ctx != nullptr);
         return *ctx;
     }
+
+    virtual void before_evaluation() noexcept {
+        /* prepare any persistent data within a single the dispatch */
+    }
+
+    virtual void after_evaluation() noexcept {
+        /* release any persistent data within a single dispatch */
+    }
 };
 
 template<typename Closure>
@@ -70,12 +78,16 @@ public:
     void execute(const ClosureEvaluator &f) const noexcept {
         if (empty()) [[unlikely]] { return; }
         if (size() == 1u) {
+            _closures.front()->before_evaluation();
             f(_closures.front().get());
+            _closures.front()->after_evaluation();
         } else {
             compute::detail::SwitchStmtBuilder{_tag} % [&] {
                 for (auto i = 0u; i < size(); i++) {
                     compute::detail::SwitchCaseStmtBuilder{i} % [&f, this, i] {
+                        _closures[i]->before_evaluation();
                         f(_closures[i].get());
+                        _closures[i]->after_evaluation();
                     };
                 }
                 compute::detail::SwitchDefaultStmtBuilder{} % compute::unreachable;

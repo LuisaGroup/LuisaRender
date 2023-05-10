@@ -195,10 +195,18 @@ public:
         }
 
     public:
-        [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const override {
+        void before_evaluation() noexcept override { _base->before_evaluation(); }
+        void after_evaluation() noexcept override { _base->after_evaluation(); }
+
+    public:
+        [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo,
+                                                   Expr<float3> wi,
+                                                   TransportMode mode) const noexcept override {
             return _base->evaluate(wo, wi, mode);
         }
-        [[nodiscard]] Surface::Sample sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u, TransportMode mode) const override {
+        [[nodiscard]] Surface::Sample sample(Expr<float3> wo,
+                                             Expr<float> u_lobe, Expr<float2> u,
+                                             TransportMode mode) const noexcept override {
             return _base->sample(wo, u_lobe, u, mode);
         }
     };

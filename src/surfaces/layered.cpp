@@ -209,14 +209,25 @@ private:
 public:
     using Surface::Closure::Closure;
 
-    explicit LayeredSurfaceClosure(
-        const Pipeline &pipeline,
-        const SampledWavelengths &swl,
-        Expr<float> time,
-        luisa::unique_ptr<Surface::Closure> top, luisa::unique_ptr<Surface::Closure> bottom) noexcept
-        : Surface::Closure(pipeline, swl, time), _top{std::move(top)}, _bottom{std::move(bottom)} {}
+    explicit LayeredSurfaceClosure(const Pipeline &pipeline,
+                                   const SampledWavelengths &swl,
+                                   Expr<float> time,
+                                   luisa::unique_ptr<Surface::Closure> top,
+                                   luisa::unique_ptr<Surface::Closure> bottom) noexcept
+        : Surface::Closure(pipeline, swl, time),
+          _top{std::move(top)}, _bottom{std::move(bottom)} {}
     [[nodiscard]] auto top() const noexcept { return _top.get(); }
     [[nodiscard]] auto bottom() const noexcept { return _bottom.get(); }
+
+public:
+    void before_evaluation() noexcept override {
+        _top->before_evaluation();
+        _bottom->before_evaluation();
+    }
+    void after_evaluation() noexcept override {
+        _top->after_evaluation();
+        _bottom->after_evaluation();
+    }
 
 public:
     // TODO: are these OK?
@@ -485,7 +496,7 @@ void LayeredSurfaceInstance::populate_closure(Surface::Closure *closure_in, cons
 
     _top->populate_closure(closure->top(), it, wo, eta_i);
     auto eta_top = closure->top()->eta();
-    _bottom->populate_closure(closure->bottom(), it, wo, eta_top.value_or(1.f));    // FIXME: eta_i is wrong
+    _bottom->populate_closure(closure->bottom(), it, wo, eta_top.value_or(1.f));// FIXME: eta_i is wrong
 }
 
 using TwoSidedNormalMapOpacityLayeredSurface = TwoSidedWrapper<NormalMapWrapper<OpacitySurfaceWrapper<
