@@ -131,19 +131,19 @@ TrowbridgeReitzDistribution::TrowbridgeReitzDistribution(Expr<float2> alpha) noe
     : MicrofacetDistribution{alpha} {}
 
 Float TrowbridgeReitzDistribution::roughness_to_alpha(Expr<float> roughness) noexcept {
-    return sqr(roughness);
+    return max(sqr(roughness), 1e-4f);
 }
 
 Float2 TrowbridgeReitzDistribution::roughness_to_alpha(Expr<float2> roughness) noexcept {
-    return sqr(roughness);
+    return max(sqr(roughness), 1e-4f);
 }
 
 Float TrowbridgeReitzDistribution::alpha_to_roughness(Expr<float> alpha) noexcept {
-    return sqrt(alpha);
+    return sqrt(max(alpha, 1e-4f));
 }
 
 Float2 TrowbridgeReitzDistribution::alpha_to_roughness(Expr<float2> alpha) noexcept {
-    return sqrt(alpha);
+    return sqrt(max(alpha, 1e-4f));
 }
 
 Float TrowbridgeReitzDistribution::D(Expr<float3> wh) const noexcept {
