@@ -42,14 +42,10 @@ luisa::unique_ptr<Surface::Instance> Surface::build(
 void Surface::Instance::closure(PolymorphicCall<Closure> &call,
                                 const Interaction &it, const SampledWavelengths &swl,
                                 Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept {
-    auto cls = call.collect(_closure_identifier(), [&] {
+    auto cls = call.collect(node()->closure_identifier(), [&] {
         return _create_closure(swl, time);
     });
     _populate_closure(cls, it, wo, eta_i);
-}
-
-luisa::string Surface::Instance::_closure_identifier() const noexcept {
-    return luisa::string{node()->impl_type()};
 }
 
 }// namespace luisa::render

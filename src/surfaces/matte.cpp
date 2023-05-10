@@ -65,12 +65,13 @@ public:
     };
 
 public:
+    using Surface::Closure::Closure;
+
     [[nodiscard]] SampledSpectrum albedo() const noexcept override { return context<Context>().Kd; }
     [[nodiscard]] Float2 roughness() const noexcept override { return make_float2(1.f); }
     [[nodiscard]] const Interaction &it() const noexcept override { return context<Context>().it; }
 
 public:
-    using Surface::Closure::Closure;
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const override {
         auto &&ctx = context<Context>();
         auto &it = ctx.it;
@@ -103,11 +104,12 @@ luisa::unique_ptr<Surface::Closure> MatteInstance::_create_closure(const Sampled
 
 void MatteInstance::_populate_closure(Surface::Closure *closure, const Interaction &it,
                                       Expr<float3> wo, Expr<float> eta_i) const noexcept {
-
-    auto [Kd, _] = _kd ? _kd->evaluate_albedo_spectrum(it, closure->swl(), closure->time()) :
-                         Spectrum::Decode::one(closure->swl().dimension());
+    auto &swl = closure->swl();
+    auto time = closure->time();
+    auto [Kd, _] = _kd ? _kd->evaluate_albedo_spectrum(it, swl, time) :
+                         Spectrum::Decode::one(swl.dimension());
     auto sigma = _sigma && !_sigma->node()->is_black() ?
-                     luisa::make_optional(saturate(_sigma->evaluate(it, closure->swl(), closure->time()).x) * 90.f) :
+                     luisa::make_optional(saturate(_sigma->evaluate(it, swl, time).x) * 90.f) :
                      luisa::nullopt;
 
     MatteClosure::Context ctx{

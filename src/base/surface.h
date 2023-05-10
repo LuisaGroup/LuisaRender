@@ -101,7 +101,6 @@ public:
         friend class Surface;
 
     protected:
-        [[nodiscard]] virtual luisa::string _closure_identifier() const noexcept;
         [[nodiscard]] virtual luisa::unique_ptr<Closure> _create_closure(
             const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
         virtual void _populate_closure(
@@ -138,6 +137,7 @@ public:
     [[nodiscard]] auto is_reflective() const noexcept { return static_cast<bool>(properties() & property_reflective); }
     [[nodiscard]] auto is_transmissive() const noexcept { return static_cast<bool>(properties() & property_transmissive); }
     [[nodiscard]] auto is_thin() const noexcept { return static_cast<bool>(properties() & property_thin); }
+    [[nodiscard]] virtual luisa::string closure_identifier() const noexcept { return luisa::string{impl_type()}; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept;
 };
 

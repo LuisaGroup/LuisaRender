@@ -155,9 +155,7 @@ public:
     [[nodiscard]] luisa::optional<Bool> is_dispersive() const noexcept override {
         return context<Context>().dispersive;
     }
-    [[nodiscard]] const Interaction &it() const noexcept override {
-        return context<Context>().it;
-    }
+    [[nodiscard]] const Interaction &it() const noexcept override { return context<Context>().it; }
 
 private:
     [[nodiscard]] auto _refl_prob(const FresnelDielectric &fresnel, Expr<float> kr_ratio, Expr<float3> wo) const noexcept {

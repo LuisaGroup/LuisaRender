@@ -130,10 +130,9 @@ public:
         return TrowbridgeReitzDistribution::alpha_to_roughness(
             context<Context>().roughness);
     }
-    [[nodiscard]] const Interaction &it() const noexcept override {
-        return context<Context>().it;
-    }
+    [[nodiscard]] const Interaction &it() const noexcept override { return context<Context>().it; }
 
+public:
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo, Expr<float3> wi,
                                                TransportMode mode) const noexcept override {
         auto &ctx = context<Context>();
@@ -222,22 +221,23 @@ luisa::unique_ptr<Surface::Closure> PlasticInstance::_create_closure(
 
 void PlasticInstance::_populate_closure(Surface::Closure *closure, const Interaction &it,
                                         Expr<float3> wo, Expr<float> eta_i) const noexcept {
-
+    auto &swl = closure->swl();
+    auto time = closure->time();
     auto roughness = def(make_float2(0.f));
     if (_roughness != nullptr) {
-        auto r = _roughness->evaluate(it, closure->swl(), closure->time());
+        auto r = _roughness->evaluate(it, swl, time);
         auto remap = node<PlasticSurface>()->remap_roughness();
         auto r2a = [](auto &&x) noexcept { return TrowbridgeReitzDistribution::roughness_to_alpha(x); };
         roughness = _roughness->node()->channels() == 1u ?
                         (remap ? make_float2(r2a(r.x)) : r.xx()) :
                         (remap ? r2a(r.xy()) : r.xy());
     }
-    auto eta = (_eta ? _eta->evaluate(it, closure->swl(), closure->time()).x : 1.5f) / eta_i;
-    auto [Kd, Kd_lum] = _kd ? _kd->evaluate_albedo_spectrum(it, closure->swl(), closure->time()) :
-                              Spectrum::Decode::one(closure->swl().dimension());
-    auto [sigma_a, sigma_a_lum] = _sigma_a ? _sigma_a->evaluate_albedo_spectrum(it, closure->swl(), closure->time()) :
-                                             Spectrum::Decode::zero(closure->swl().dimension());
-    auto thickness = _thickness ? _thickness->evaluate(it, closure->swl(), closure->time()).x : 1.f;
+    auto eta = (_eta ? _eta->evaluate(it, swl, time).x : 1.5f) / eta_i;
+    auto [Kd, Kd_lum] = _kd ? _kd->evaluate_albedo_spectrum(it, swl, time) :
+                              Spectrum::Decode::one(swl.dimension());
+    auto [sigma_a, sigma_a_lum] = _sigma_a ? _sigma_a->evaluate_albedo_spectrum(it, swl, time) :
+                                             Spectrum::Decode::zero(swl.dimension());
+    auto thickness = _thickness ? _thickness->evaluate(it, swl, time).x : 1.f;
     auto scaled_sigma_a = sigma_a * thickness;
     auto average_transmittance = exp(-2.f * sigma_a_lum * thickness);
     // Difference from the Tungsten renderer:

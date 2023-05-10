@@ -28,7 +28,6 @@ public:
           _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {}
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] luisa::string closure_identifier() const noexcept override { return luisa::string(impl_type()); }
     [[nodiscard]] uint properties() const noexcept override { return property_reflective; }
 
 protected:
@@ -37,13 +36,6 @@ protected:
 };
 
 class MirrorInstance : public Surface::Instance {
-
-public:
-    struct MirrorContext {
-        Interaction it;
-        SampledSpectrum refl;
-        Float2 alpha;
-    };
 
 private:
     const Texture::Instance *_color;
@@ -59,10 +51,8 @@ public:
     [[nodiscard]] auto roughness() const noexcept { return _roughness; }
 
 public:
-    [[nodiscard]] uint make_closure(
-        PolymorphicClosure<Surface::Function> &closure,
-        luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-        Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept override;
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _create_closure(const SampledWavelengths &swl, Expr<float> time) const noexcept override;
+    void _populate_closure(Surface::Closure *closure, const Interaction &it, Expr<float3> wo, Expr<float> eta_i) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> MirrorSurface::_build(
@@ -88,39 +78,40 @@ public:
     }
 };
 
-class MirrorFunction : public Surface::Function {
+class MirrorClosure : public Surface::Closure {
 
 public:
-    [[nodiscard]] static luisa::string identifier() noexcept { return LUISA_RENDER_PLUGIN_NAME; }
+    struct Context {
+        Interaction it;
+        SampledSpectrum refl;
+        Float2 alpha;
+    };
 
-    [[nodiscard]] SampledSpectrum albedo(
-        const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
-        auto ctx = ctx_wrapper->data<MirrorInstance::MirrorContext>();
-        auto fresnel = SchlickFresnel(ctx->refl);
-        auto distribution = TrowbridgeReitzDistribution(ctx->alpha);
-        auto refl = MicrofacetReflection(ctx->refl, &distribution, &fresnel);
+public:
+    using Surface::Closure::Closure;
+
+    [[nodiscard]] SampledSpectrum albedo() const noexcept override {
+        auto &&ctx = context<Context>();
+        auto fresnel = SchlickFresnel(ctx.refl);
+        auto distribution = TrowbridgeReitzDistribution(ctx.alpha);
+        auto refl = MicrofacetReflection(ctx.refl, &distribution, &fresnel);
         return refl.albedo();
     }
-    [[nodiscard]] Float2 roughness(
-        const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
-        auto ctx = ctx_wrapper->data<MirrorInstance::MirrorContext>();
-        auto distribution = TrowbridgeReitzDistribution(ctx->alpha);
+    [[nodiscard]] Float2 roughness() const noexcept override {
+        auto &&ctx = context<Context>();
+        auto distribution = TrowbridgeReitzDistribution(ctx.alpha);
         return TrowbridgeReitzDistribution::alpha_to_roughness(distribution.alpha());
     }
-    [[nodiscard]] const Interaction *it(
-        const Surface::FunctionContext *ctx_wrapper, Expr<float> time) const noexcept override {
-        auto ctx = ctx_wrapper->data<MirrorInstance::MirrorContext>();
-        return &ctx->it;
-    }
+    [[nodiscard]] const Interaction &it() const noexcept override { return context<Context>().it; }
 
-    [[nodiscard]] Surface::Evaluation evaluate(
-        const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
-        Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
-        auto ctx = ctx_wrapper->data<MirrorInstance::MirrorContext>();
-        auto &it = ctx->it;
-        auto fresnel = SchlickFresnel(ctx->refl);
-        auto distribution = TrowbridgeReitzDistribution(ctx->alpha);
-        auto refl = MicrofacetReflection(ctx->refl, &distribution, &fresnel);
+public:
+    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo, Expr<float3> wi,
+                                               TransportMode mode) const noexcept override {
+        auto &&ctx = context<Context>();
+        auto &it = ctx.it;
+        auto fresnel = SchlickFresnel(ctx.refl);
+        auto distribution = TrowbridgeReitzDistribution(ctx.alpha);
+        auto refl = MicrofacetReflection(ctx.refl, &distribution, &fresnel);
 
         auto wo_local = it.shading().world_to_local(wo);
         auto wi_local = it.shading().world_to_local(wi);
@@ -128,14 +119,13 @@ public:
         auto pdf = refl.pdf(wo_local, wi_local, mode);
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
-    [[nodiscard]] Surface::Sample sample(
-        const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
-        Expr<float3> wo, Expr<float>, Expr<float2> u, TransportMode mode) const noexcept override {
-        auto ctx = ctx_wrapper->data<MirrorInstance::MirrorContext>();
-        auto &it = ctx->it;
-        auto fresnel = SchlickFresnel(ctx->refl);
-        auto distribution = TrowbridgeReitzDistribution(ctx->alpha);
-        auto refl = MicrofacetReflection(ctx->refl, &distribution, &fresnel);
+    [[nodiscard]] Surface::Sample sample(Expr<float3> wo, Expr<float>, Expr<float2> u,
+                                         TransportMode mode) const noexcept override {
+        auto &&ctx = context<Context>();
+        auto &it = ctx.it;
+        auto fresnel = SchlickFresnel(ctx.refl);
+        auto distribution = TrowbridgeReitzDistribution(ctx.alpha);
+        auto refl = MicrofacetReflection(ctx.refl, &distribution, &fresnel);
 
         auto pdf = def(0.f);
         auto wi_local = def(make_float3(0.f, 0.f, 1.f));
@@ -149,13 +139,18 @@ public:
     }
 };
 
-uint MirrorInstance::make_closure(
-    PolymorphicClosure<Surface::Function> &closure,
-    luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-    Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept {
+luisa::unique_ptr<Surface::Closure> MirrorInstance::_create_closure(
+    const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    return luisa::make_unique<MirrorClosure>(pipeline(), swl, time);
+}
+
+void MirrorInstance::_populate_closure(Surface::Closure *closure, const Interaction &it,
+                                       Expr<float3> wo, Expr<float> eta_i) const noexcept {
     auto alpha = def(make_float2(0.f));
+    auto &swl = closure->swl();
+    auto time = closure->time();
     if (_roughness != nullptr) {
-        auto r = _roughness->evaluate(*it, swl, time);
+        auto r = _roughness->evaluate(it, swl, time);
         auto remap = node<MirrorSurface>()->remap_roughness();
         auto r2a = [](auto &&x) noexcept {
             return TrowbridgeReitzDistribution::roughness_to_alpha(x);
@@ -164,17 +159,14 @@ uint MirrorInstance::make_closure(
                     (remap ? make_float2(r2a(r.x)) : r.xx()) :
                     (remap ? r2a(r.xy()) : r.xy());
     }
-    auto [color, _] = _color ? _color->evaluate_albedo_spectrum(*it, swl, time) :
+    auto [color, _] = _color ? _color->evaluate_albedo_spectrum(it, swl, time) :
                                Spectrum::Decode::one(swl.dimension());
-    auto ctx = MirrorContext{
-        .it = *it,
+    MirrorClosure::Context ctx{
+        .it = it,
         .refl = color,
         .alpha = alpha
     };
-
-    auto [tag, slot] = closure.register_instance<MirrorFunction>(node()->closure_identifier());
-    slot->create_data(std::move(ctx));
-    return tag;
+    closure->bind(std::move(ctx));
 }
 
 //using NormalMapOpacityMirrorSurface = NormalMapWrapper<OpacitySurfaceWrapper<
