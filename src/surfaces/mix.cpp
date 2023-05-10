@@ -99,6 +99,7 @@ public:
     [[nodiscard]] auto a() const noexcept { return _a.get(); }
     [[nodiscard]] auto b() const noexcept { return _b.get(); }
 
+public:
     [[nodiscard]] SampledSpectrum albedo() const noexcept override {
         auto &&ctx = context<Context>();
 
@@ -182,19 +183,18 @@ luisa::unique_ptr<Surface::Closure> MixSurfaceInstance::create_closure(const Sam
 
 void MixSurfaceInstance::populate_closure(Surface::Closure *closure_in, const Interaction &it,
                                            Expr<float3> wo, Expr<float> eta_i) const noexcept {
-
     auto closure = static_cast<MixSurfaceClosure *>(closure_in);
     auto &swl = closure->swl();
     auto time = closure->time();
     auto ratio = _ratio == nullptr ? 0.5f : clamp(_ratio->evaluate(it, swl, time).x, 0.f, 1.f);
 
-    _a->populate_closure(closure->a(), it, wo, eta_i);
-    _b->populate_closure(closure->b(), it, wo, eta_i);
-
     MixSurfaceClosure::Context ctx{
         .it = it,
         .ratio = ratio};
     closure->bind(std::move(ctx));
+
+    _a->populate_closure(closure->a(), it, wo, eta_i);
+    _b->populate_closure(closure->b(), it, wo, eta_i);
 }
 
 //using NormalMapMixSurface = NormalMapWrapper<
