@@ -328,6 +328,15 @@ struct DisneyContext {
     Float diffuse_trans;
 };
 
+static constexpr auto disney_lobe_diffuse_bit = 1u << 0u;
+static constexpr auto disney_lobe_retro_bit = 1u << 1u;
+static constexpr auto disney_lobe_fake_ss_bit = 1u << 2u;
+static constexpr auto disney_lobe_sheen_bit = 1u << 3u;
+static constexpr auto disney_lobe_clearcoat_bit = 1u << 4u;
+static constexpr auto disney_lobe_specular_bit = 1u << 5u;
+static constexpr auto disney_lobe_diff_trans_bit = 1u << 6u;
+static constexpr auto disney_lobe_spec_trans_bit = 1u << 7u;
+
 class DisneyClosureImplBase {
 
 public:
@@ -366,37 +375,51 @@ private:
     luisa::unique_ptr<MicrofacetTransmission> _spec_trans;
     uint _sampling_technique_count;
     std::array<Float, max_sampling_technique_count> _sampling_weights;
+    std::bitset<max_sampling_technique_count> _enabled_sampling_techniques;
 
 public:
     DisneyClosureImpl(const DisneyContext &ctx,
+                      uint enabled_lobes,
                       bool is_transmissive) noexcept
         : _ctx{ctx},
           _sampling_technique_count{
               is_transmissive ?
                   max_sampling_technique_count :
                   max_sampling_technique_count - 1u} {
+
         auto diffuse_weight = (1.f - _ctx.metallic) * (1.f - _ctx.specular_trans);
         auto tint_weight = ite(_ctx.color_lum > 0.f, 1.f / _ctx.color_lum, 1.f);
         auto tint = saturate(_ctx.color * tint_weight);// normalize lum. to isolate hue+sat
         auto tint_lum = _ctx.color_lum * tint_weight;
 
-        static constexpr auto black_threshold = 1e-4f;
+        _enabled_sampling_techniques.reset();
 
         // diffuse-like lobes: diffuse, retro-reflection, and optionally fake subsurface scattering and sheen
-        auto Cdiff_weight = diffuse_weight * (1.f - _ctx.flatness);
-        auto Cdiff = _ctx.color * Cdiff_weight;
-        _diffuse = luisa::make_unique<DisneyDiffuse>(Cdiff);
-        _retro = luisa::make_unique<DisneyRetro>(Cdiff, _ctx.roughness);
+        auto diffuse_like_sampling_weight = diffuse_weight * _ctx.color_lum;
+        if ((enabled_lobes & disney_lobe_diffuse_bit) ||
+            (enabled_lobes & disney_lobe_retro_bit)) {
+            auto Cdiff_weight = diffuse_weight * (1.f - _ctx.flatness);
+            auto Cdiff = _ctx.color * Cdiff_weight;
+            _diffuse = luisa::make_unique<DisneyDiffuse>(Cdiff);
+            _retro = luisa::make_unique<DisneyRetro>(Cdiff, _ctx.roughness);
+            _enabled_sampling_techniques.set(diffuse_like_technique_index);
+        }
         // fake subsurface scattering
-        auto Css_weight = diffuse_weight * _ctx.flatness;
-        auto Css = Css_weight * _ctx.color;
-        _fake_ss = luisa::make_unique<DisneyFakeSS>(Css, _ctx.roughness);
+        if (enabled_lobes & disney_lobe_fake_ss_bit) {
+            auto Css_weight = diffuse_weight * _ctx.flatness;
+            auto Css = Css_weight * _ctx.color;
+            _fake_ss = luisa::make_unique<DisneyFakeSS>(Css, _ctx.roughness);
+            _enabled_sampling_techniques.set(diffuse_like_technique_index);
+        }
         // sheen
-        auto Csheen_weight = diffuse_weight * _ctx.sheen;
-        auto Csheen = Csheen_weight * lerp(1.f, tint, _ctx.sheen_tint);
-        _sheen = luisa::make_unique<DisneySheen>(Csheen);
-        auto sheen_lum = Csheen_weight * lerp(1.f, tint_lum, _ctx.sheen_tint);
-        auto diffuse_like_sampling_weight = diffuse_weight * _ctx.color_lum + sheen_lum * .1f;
+        if (enabled_lobes & disney_lobe_sheen_bit) {
+            auto Csheen_weight = diffuse_weight * _ctx.sheen;
+            auto Csheen = Csheen_weight * lerp(1.f, tint, _ctx.sheen_tint);
+            _sheen = luisa::make_unique<DisneySheen>(Csheen);
+            auto sheen_lum = Csheen_weight * lerp(1.f, tint_lum, _ctx.sheen_tint);
+            diffuse_like_sampling_weight += sheen_lum * .1f;
+            _enabled_sampling_techniques.set(diffuse_like_technique_index);
+        }
         _sampling_weights[diffuse_like_technique_index] = saturate(diffuse_like_sampling_weight);
 
         // specular lobes: clearcoat, microfacet reflection, and optionally microfacet transmission
@@ -419,31 +442,44 @@ public:
         auto Cspec0_lum = lerp(lerp(1.f, tint_lum, _ctx.specular_tint) * SchlickR0,
                                _ctx.color_lum, _ctx.metallic);
         _sampling_weights[specular_technique_index] = saturate(Cspec0_lum);
+        _enabled_sampling_techniques.set(specular_technique_index);
 
         // clearcoat
-        auto gloss = lerp(.1f, .001f, _ctx.clearcoat_gloss);
-        _clearcoat = luisa::make_unique<DisneyClearcoat>(_ctx.clearcoat, gloss);
-        // clearcoat sampling weight
-        _sampling_weights[clearcoat_technique_index] = saturate(_ctx.clearcoat * FrSchlick(.04f, 1.f));
+        if (enabled_lobes & disney_lobe_clearcoat_bit) {
+            auto gloss = lerp(.1f, .001f, _ctx.clearcoat_gloss);
+            _clearcoat = luisa::make_unique<DisneyClearcoat>(_ctx.clearcoat, gloss);
+            // clearcoat sampling weight
+            _sampling_weights[clearcoat_technique_index] = saturate(_ctx.clearcoat * FrSchlick(.04f, 1.f));
+            _enabled_sampling_techniques.set(clearcoat_technique_index);
+        }
 
         // specular transmission
         if (is_transmissive) {
-            auto Cst_weight = (1.f - _ctx.metallic) * _ctx.specular_trans;
-            auto Cst = Cst_weight * sqrt(_ctx.color);
-            _spec_trans = luisa::make_unique<MicrofacetTransmission>(
-                Cst, _distrib.get(), _ctx.eta_i, _ctx.eta_t);
-            auto Cst_lum = Cst_weight * sqrt(_ctx.color_lum);
-            // specular transmission sampling weight
-            _sampling_weights[spec_trans_technique_index] = saturate(Cst_lum);
+            if (enabled_lobes & disney_lobe_spec_trans_bit) {
+                auto Cst_weight = (1.f - _ctx.metallic) * _ctx.specular_trans;
+                auto Cst = Cst_weight * sqrt(_ctx.color);
+                _spec_trans = luisa::make_unique<MicrofacetTransmission>(
+                    Cst, _distrib.get(), _ctx.eta_i, _ctx.eta_t);
+                auto Cst_lum = Cst_weight * sqrt(_ctx.color_lum);
+                // specular transmission sampling weight
+                _sampling_weights[spec_trans_technique_index] = saturate(Cst_lum);
+                _enabled_sampling_techniques.set(spec_trans_technique_index);
+            }
         }
 
         // normalize sampling weights
         auto sum_weights = def(0.f);
         for (auto i = 0u; i < _sampling_technique_count; i++) {
-            sum_weights += _sampling_weights[i];
+            if (_enabled_sampling_techniques.test(i)) {
+                sum_weights += _sampling_weights[i];
+            }
         }
         auto inv_sum_weights = ite(sum_weights == 0.f, 0.f, 1.f / sum_weights);
-        for (auto &s : _sampling_weights) { s *= inv_sum_weights; }
+        for (auto i = 0u; i < _sampling_technique_count; i++) {
+            if (_enabled_sampling_techniques.test(i)) {
+                _sampling_weights[i] *= inv_sum_weights;
+            }
+        }
     }
 
 private:
@@ -453,30 +489,38 @@ private:
         SampledSpectrum f{_ctx.color.dimension(), 0.f};
         auto pdf = def(0.f);
         $if(same_hemisphere(wo_local, wi_local)) {// reflection
-            $if(_sampling_weights[diffuse_like_technique_index] > 0.f) {
-                f += _diffuse->evaluate(wo_local, wi_local, mode);
-                f += _retro->evaluate(wo_local, wi_local, mode);
-                f += _fake_ss->evaluate(wo_local, wi_local, mode);
-                f += _sheen->evaluate(wo_local, wi_local, mode);
-                pdf += _sampling_weights[diffuse_like_technique_index] *
-                       _diffuse->pdf(wo_local, wi_local, mode);
-            };
-            $if(_sampling_weights[specular_technique_index] > 0.f) {
-                f += _specular->evaluate(wo_local, wi_local, mode);
-                pdf += _sampling_weights[specular_technique_index] *
-                       _specular->pdf(wo_local, wi_local, mode);
-            };
-            $if(_sampling_weights[clearcoat_technique_index] > 0.f) {
-                f += _clearcoat->evaluate(wo_local, wi_local);
-                pdf += _sampling_weights[clearcoat_technique_index] *
-                       _clearcoat->pdf(wo_local, wi_local);
-            };
+            if (_diffuse) {
+                $if(_sampling_weights[diffuse_like_technique_index] > 0.f) {
+                    f += _diffuse->evaluate(wo_local, wi_local, mode);
+                    f += _retro->evaluate(wo_local, wi_local, mode);
+                    if (_fake_ss) { f += _fake_ss->evaluate(wo_local, wi_local, mode); }
+                    if (_sheen) { f += _sheen->evaluate(wo_local, wi_local, mode); }
+                    pdf += _sampling_weights[diffuse_like_technique_index] *
+                           _diffuse->pdf(wo_local, wi_local, mode);
+                };
+            }
+            if (_specular) {
+                $if(_sampling_weights[specular_technique_index] > 0.f) {
+                    f += _specular->evaluate(wo_local, wi_local, mode);
+                    pdf += _sampling_weights[specular_technique_index] *
+                           _specular->pdf(wo_local, wi_local, mode);
+                };
+            }
+            if (_clearcoat) {
+                $if(_sampling_weights[clearcoat_technique_index] > 0.f) {
+                    f += _clearcoat->evaluate(wo_local, wi_local);
+                    pdf += _sampling_weights[clearcoat_technique_index] *
+                           _clearcoat->pdf(wo_local, wi_local);
+                };
+            }
         }
         $else {// transmission
             if (_spec_trans) {
-                f = _spec_trans->evaluate(wo_local, wi_local, mode);
-                pdf = _sampling_weights[spec_trans_technique_index] *
-                      _spec_trans->pdf(wo_local, wi_local, mode);
+                $if(_sampling_weights[spec_trans_technique_index] > 0.f) {
+                    f += _spec_trans->evaluate(wo_local, wi_local, mode);
+                    pdf += _sampling_weights[spec_trans_technique_index] *
+                           _spec_trans->pdf(wo_local, wi_local, mode);
+                };
             }
         };
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
@@ -503,23 +547,31 @@ public:
         auto sampling_tech = def(0u);
         auto sum_weights = def(0.f);
         for (auto i = 0u; i < _sampling_technique_count; i++) {
-            sampling_tech = ite(u_lobe > sum_weights, i, sampling_tech);
-            sum_weights += _sampling_weights[i];
+            if (_enabled_sampling_techniques.test(i)) {
+                sampling_tech = ite(u_lobe > sum_weights, i, sampling_tech);
+                sum_weights += _sampling_weights[i];
+            }
         }
         // sample
         auto wo_local = _ctx.it.shading().world_to_local(wo);
         auto event = def(Surface::event_reflect);
         BxDF::SampledDirection wi_sample;
         $switch(sampling_tech) {
-            $case(diffuse_like_technique_index) {
-                wi_sample = _diffuse->sample_wi(wo_local, u, mode);
-            };
-            $case(specular_technique_index) {
-                wi_sample = _specular->sample_wi(wo_local, u, mode);
-            };
-            $case(clearcoat_technique_index) {
-                wi_sample = _clearcoat->sample_wi(wo_local, u);
-            };
+            if (_diffuse) {
+                $case(diffuse_like_technique_index) {
+                    wi_sample = _diffuse->sample_wi(wo_local, u, mode);
+                };
+            }
+            if (_specular) {
+                $case(specular_technique_index) {
+                    wi_sample = _specular->sample_wi(wo_local, u, mode);
+                };
+            }
+            if (_clearcoat) {
+                $case(clearcoat_technique_index) {
+                    wi_sample = _clearcoat->sample_wi(wo_local, u);
+                };
+            }
             if (_spec_trans) {
                 $case(spec_trans_technique_index) {
                     wi_sample = _spec_trans->sample_wi(wo_local, u, mode);
@@ -561,9 +613,11 @@ private:
     luisa::unique_ptr<LambertianTransmission> _diff_trans;
     luisa::unique_ptr<TrowbridgeReitzDistribution> _thin_distrib;
     std::array<Float, sampling_technique_count> _sampling_weights;
+    std::bitset<sampling_technique_count> _enabled_sampling_techniques;
 
 public:
-    explicit ThinDisneyClosureImpl(const DisneyContext &ctx) noexcept : _ctx{ctx} {
+    ThinDisneyClosureImpl(const DisneyContext &ctx,
+                          uint enabled_lobes) noexcept : _ctx{ctx} {
 
         auto diffuse_weight = (1.f - _ctx.metallic) * (1.f - _ctx.specular_trans);
         auto diff_refl_weight = diffuse_weight * (1.f - _ctx.diffuse_trans);
@@ -572,22 +626,35 @@ public:
         auto tint = saturate(_ctx.color * tint_weight);// normalize lum. to isolate hue+sat
         auto tint_lum = _ctx.color_lum * tint_weight;
 
+        _enabled_sampling_techniques.reset();
+
         // diffuse-like lobes: diffuse, retro-reflection, fake subsurface scattering and sheen
-        auto Cdiff_weight = diff_refl_weight * (1.f - _ctx.flatness);
-        auto Cdiff = _ctx.color * Cdiff_weight;
-        _diffuse = luisa::make_unique<DisneyDiffuse>(Cdiff);
-        _retro = luisa::make_unique<DisneyRetro>(Cdiff, _ctx.roughness);
-        auto Css_weight = diff_refl_weight * _ctx.flatness * (1.f - _ctx.diffuse_trans);
-        auto Css = Css_weight * _ctx.color;
-        _fake_ss = luisa::make_unique<DisneyFakeSS>(Css, _ctx.roughness);
+        auto diffuse_like_sampling_weight = diff_refl_weight * _ctx.color_lum;
+        if ((enabled_lobes & disney_lobe_diffuse_bit) ||
+            (enabled_lobes & disney_lobe_retro_bit)) {
+            auto Cdiff_weight = diff_refl_weight * (1.f - _ctx.flatness);
+            auto Cdiff = _ctx.color * Cdiff_weight;
+            _diffuse = luisa::make_unique<DisneyDiffuse>(Cdiff);
+            _retro = luisa::make_unique<DisneyRetro>(Cdiff, _ctx.roughness);
+            _enabled_sampling_techniques.set(diffuse_like_technique_index);
+        }
+
+        if (enabled_lobes & disney_lobe_fake_ss_bit) {
+            auto Css_weight = diff_refl_weight * _ctx.flatness * (1.f - _ctx.diffuse_trans);
+            auto Css = Css_weight * _ctx.color;
+            _fake_ss = luisa::make_unique<DisneyFakeSS>(Css, _ctx.roughness);
+            _enabled_sampling_techniques.set(diffuse_like_technique_index);
+        }
 
         // sheen
-        auto Csheen_weight = diff_refl_weight * _ctx.sheen * (1.f - _ctx.diffuse_trans);
-        auto Csheen = Csheen_weight * lerp(1.f, tint, _ctx.sheen_tint);
-        _sheen = luisa::make_unique<DisneySheen>(Csheen);
-        auto sheen_lum = Csheen_weight * lerp(1.f, tint_lum, _ctx.sheen_tint);
-        auto diffuse_like_weight = diff_refl_weight * _ctx.color_lum + sheen_lum * .1f;
-        _sampling_weights[diffuse_like_technique_index] = saturate(diffuse_like_weight);
+        if (enabled_lobes & disney_lobe_sheen_bit) {
+            auto Csheen_weight = diff_refl_weight * _ctx.sheen * (1.f - _ctx.diffuse_trans);
+            auto Csheen = Csheen_weight * lerp(1.f, tint, _ctx.sheen_tint);
+            _sheen = luisa::make_unique<DisneySheen>(Csheen);
+            auto sheen_lum = Csheen_weight * lerp(1.f, tint_lum, _ctx.sheen_tint);
+            diffuse_like_sampling_weight += sheen_lum * .1f;
+        }
+        _sampling_weights[diffuse_like_technique_index] = saturate(diffuse_like_sampling_weight);
 
         // specular lobes: clearcoat, microfacet reflection, and optionally microfacet transmission
         auto eta = _ctx.eta_t / _ctx.eta_i;
@@ -607,39 +674,55 @@ public:
         // specular reflection sampling weight
         auto Cspec0_lum = lerp(lerp(1.f, tint_lum, _ctx.specular_tint) * SchlickR0, _ctx.color_lum, _ctx.metallic);
         _sampling_weights[specular_technique_index] = saturate(Cspec0_lum);
+        _enabled_sampling_techniques.set(specular_technique_index);
 
         // clearcoat
-        auto gloss = lerp(.1f, .001f, ctx.clearcoat_gloss);
-        _clearcoat = luisa::make_unique<DisneyClearcoat>(_ctx.clearcoat, gloss);
-        // clearcoat sampling weight
-        _sampling_weights[clearcoat_technique_index] = saturate(_ctx.clearcoat * FrSchlick(.04f, 1.f));
+        if (enabled_lobes & disney_lobe_clearcoat_bit) {
+            auto gloss = lerp(.1f, .001f, ctx.clearcoat_gloss);
+            _clearcoat = luisa::make_unique<DisneyClearcoat>(_ctx.clearcoat, gloss);
+            // clearcoat sampling weight
+            _sampling_weights[clearcoat_technique_index] = saturate(_ctx.clearcoat * FrSchlick(.04f, 1.f));
+            _enabled_sampling_techniques.set(clearcoat_technique_index);
+        }
 
         // thin specular transmission distribution
-        auto rscaled = (.65f * eta - .35f) * _ctx.roughness;
-        auto ascaled = make_float2(max(.001f, rscaled / aspect),
-                                   max(.001f, rscaled * aspect));
-        _thin_distrib = luisa::make_unique<TrowbridgeReitzDistribution>(ascaled);
-        auto Cst_weight = (1.f - _ctx.metallic) * _ctx.specular_trans;
-        auto Cst = Cst_weight * _ctx.color;
-        _spec_trans = luisa::make_unique<MicrofacetTransmission>(
-            Cst, _thin_distrib.get(), _ctx.eta_i, _ctx.eta_t);
-        auto Cst_lum = Cst_weight * _ctx.color_lum;
-        // specular transmission sampling weight
-        _sampling_weights[spec_trans_technique_index] = saturate(Cst_lum);
+        if (enabled_lobes & disney_lobe_spec_trans_bit) {
+            auto rscaled = (.65f * eta - .35f) * _ctx.roughness;
+            auto ascaled = make_float2(max(.001f, rscaled / aspect),
+                                       max(.001f, rscaled * aspect));
+            _thin_distrib = luisa::make_unique<TrowbridgeReitzDistribution>(ascaled);
+            auto Cst_weight = (1.f - _ctx.metallic) * _ctx.specular_trans;
+            auto Cst = Cst_weight * _ctx.color;
+            _spec_trans = luisa::make_unique<MicrofacetTransmission>(
+                Cst, _thin_distrib.get(), _ctx.eta_i, _ctx.eta_t);
+            auto Cst_lum = Cst_weight * _ctx.color_lum;
+            // specular transmission sampling weight
+            _sampling_weights[spec_trans_technique_index] = saturate(Cst_lum);
+            _enabled_sampling_techniques.set(spec_trans_technique_index);
+        }
 
         // diffuse transmission
-        auto Cdt = diff_trans_weight * _ctx.color;
-        auto Cdt_lum = diff_trans_weight * _ctx.color_lum;
-        _diff_trans = luisa::make_unique<LambertianTransmission>(Cdt);
-        _sampling_weights[diff_trans_technique_index] = saturate(Cdt_lum);
+        if (enabled_lobes & disney_lobe_diff_trans_bit) {
+            auto Cdt = diff_trans_weight * _ctx.color;
+            auto Cdt_lum = diff_trans_weight * _ctx.color_lum;
+            _diff_trans = luisa::make_unique<LambertianTransmission>(Cdt);
+            _sampling_weights[diff_trans_technique_index] = saturate(Cdt_lum);
+            _enabled_sampling_techniques.set(diff_trans_technique_index);
+        }
 
         // normalize sampling weights
         auto sum_weights = def(0.f);
         for (auto i = 0u; i < sampling_technique_count; i++) {
-            sum_weights += _sampling_weights[i];
+            if (_enabled_sampling_techniques.test(i)) {
+                sum_weights += _sampling_weights[i];
+            }
         }
         auto inv_sum_weights = ite(sum_weights == 0.f, 0.f, 1.f / sum_weights);
-        for (auto &s : _sampling_weights) { s *= inv_sum_weights; }
+        for (auto i = 0u; i < sampling_technique_count; i++) {
+            if (_enabled_sampling_techniques.test(i)) {
+                _sampling_weights[i] *= inv_sum_weights;
+            }
+        }
     }
 
 private:
@@ -649,36 +732,46 @@ private:
         SampledSpectrum f{_ctx.color.dimension(), 0.f};
         auto pdf = def(0.f);
         $if(same_hemisphere(wo_local, wi_local)) {// reflection
-            $if(_sampling_weights[diffuse_like_technique_index] > 0.f) {
-                f += _diffuse->evaluate(wo_local, wi_local, mode);
-                f += _retro->evaluate(wo_local, wi_local, mode);
-                f += _fake_ss->evaluate(wo_local, wi_local, mode);
-                f += _sheen->evaluate(wo_local, wi_local, mode);
-                pdf += _sampling_weights[diffuse_like_technique_index] *
-                       _diffuse->pdf(wo_local, wi_local, mode);
-            };
-            $if(_sampling_weights[specular_technique_index] > 0.f) {
-                f += _specular->evaluate(wo_local, wi_local, mode);
-                pdf += _sampling_weights[specular_technique_index] *
-                       _specular->pdf(wo_local, wi_local, mode);
-            };
-            $if(_sampling_weights[clearcoat_technique_index] > 0.f) {
-                f += _clearcoat->evaluate(wo_local, wi_local);
-                pdf += _sampling_weights[clearcoat_technique_index] *
-                       _clearcoat->pdf(wo_local, wi_local);
-            };
+            if (_diffuse) {
+                $if(_sampling_weights[diffuse_like_technique_index] > 0.f) {
+                    f += _diffuse->evaluate(wo_local, wi_local, mode);
+                    f += _retro->evaluate(wo_local, wi_local, mode);
+                    if (_fake_ss) { f += _fake_ss->evaluate(wo_local, wi_local, mode); }
+                    if (_sheen) { f += _sheen->evaluate(wo_local, wi_local, mode); }
+                    pdf += _sampling_weights[diffuse_like_technique_index] *
+                           _diffuse->pdf(wo_local, wi_local, mode);
+                };
+            }
+            if (_specular) {
+                $if(_sampling_weights[specular_technique_index] > 0.f) {
+                    f += _specular->evaluate(wo_local, wi_local, mode);
+                    pdf += _sampling_weights[specular_technique_index] *
+                           _specular->pdf(wo_local, wi_local, mode);
+                };
+            }
+            if (_clearcoat) {
+                $if(_sampling_weights[clearcoat_technique_index] > 0.f) {
+                    f += _clearcoat->evaluate(wo_local, wi_local);
+                    pdf += _sampling_weights[clearcoat_technique_index] *
+                           _clearcoat->pdf(wo_local, wi_local);
+                };
+            }
         }
         $else {// transmission
-            $if(_sampling_weights[spec_trans_technique_index] > 0.f) {
-                f += _spec_trans->evaluate(wo_local, wi_local, mode);
-                pdf += _sampling_weights[spec_trans_technique_index] *
-                       _spec_trans->pdf(wo_local, wi_local, mode);
-            };
-            $if(_sampling_weights[diff_trans_technique_index] > 0.f) {
-                f += _diff_trans->evaluate(wo_local, wi_local, mode);
-                pdf += _sampling_weights[diff_trans_technique_index] *
-                       _diff_trans->pdf(wo_local, wi_local, mode);
-            };
+            if (_spec_trans) {
+                $if(_sampling_weights[spec_trans_technique_index] > 0.f) {
+                    f += _spec_trans->evaluate(wo_local, wi_local, mode);
+                    pdf += _sampling_weights[spec_trans_technique_index] *
+                           _spec_trans->pdf(wo_local, wi_local, mode);
+                };
+            }
+            if (_diff_trans) {
+                $if(_sampling_weights[diff_trans_technique_index] > 0.f) {
+                    f += _diff_trans->evaluate(wo_local, wi_local, mode);
+                    pdf += _sampling_weights[diff_trans_technique_index] *
+                           _diff_trans->pdf(wo_local, wi_local, mode);
+                };
+            }
         };
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
@@ -702,31 +795,43 @@ public:
         auto sampling_tech = def(0u);
         auto sum_weights = def(0.f);
         for (auto i = 0u; i < sampling_technique_count; i++) {
-            sampling_tech = ite(u_lobe > sum_weights, i, sampling_tech);
-            sum_weights += _sampling_weights[i];
+            if (_enabled_sampling_techniques.test(i)) {
+                sampling_tech = ite(u_lobe > sum_weights, i, sampling_tech);
+                sum_weights += _sampling_weights[i];
+            }
         }
         // sample
         auto wo_local = _ctx.it.shading().world_to_local(wo);
         auto event = def(Surface::event_reflect);
         BxDF::SampledDirection wi_sample;
         $switch(sampling_tech) {
-            $case(diffuse_like_technique_index) {
-                wi_sample = _diffuse->sample_wi(wo_local, u, mode);
-            };
-            $case(specular_technique_index) {
-                wi_sample = _specular->sample_wi(wo_local, u, mode);
-            };
-            $case(clearcoat_technique_index) {
-                wi_sample = _clearcoat->sample_wi(wo_local, u);
-            };
-            $case(spec_trans_technique_index) {
-                wi_sample = _spec_trans->sample_wi(wo_local, u, mode);
-                event = Surface::event_through;
-            };
-            $case(diff_trans_technique_index) {
-                wi_sample = _diff_trans->sample_wi(wo_local, u, mode);
-                event = Surface::event_through;
-            };
+            if (_diffuse) {
+                $case(diffuse_like_technique_index) {
+                    wi_sample = _diffuse->sample_wi(wo_local, u, mode);
+                };
+            }
+            if (_specular) {
+                $case(specular_technique_index) {
+                    wi_sample = _specular->sample_wi(wo_local, u, mode);
+                };
+            }
+            if (_clearcoat) {
+                $case(clearcoat_technique_index) {
+                    wi_sample = _clearcoat->sample_wi(wo_local, u);
+                };
+            }
+            if (_spec_trans) {
+                $case(spec_trans_technique_index) {
+                    wi_sample = _spec_trans->sample_wi(wo_local, u, mode);
+                    event = Surface::event_through;
+                };
+            }
+            if (_diff_trans) {
+                $case(diff_trans_technique_index) {
+                    wi_sample = _diff_trans->sample_wi(wo_local, u, mode);
+                    event = Surface::event_through;
+                };
+            }
             $default { unreachable(); };
         };
         auto eval = Surface::Evaluation::zero(_ctx.color.dimension());
@@ -743,6 +848,7 @@ class DisneySurfaceClosure : public Surface::Closure {
 private:
     bool _thin;
     bool _transmissive;
+    uint _enabled_lobes = 0u;
     luisa::unique_ptr<DisneyClosureImplBase> _impl;
 
 public:
@@ -756,12 +862,15 @@ public:
 public:
     void before_evaluation() noexcept override {
         if (_thin) {
-            _impl = luisa::make_unique<ThinDisneyClosureImpl>(context<DisneyContext>());
+            _impl = luisa::make_unique<ThinDisneyClosureImpl>(
+                context<DisneyContext>(), _enabled_lobes);
         } else {
-            _impl = luisa::make_unique<DisneyClosureImpl>(context<DisneyContext>(), _transmissive);
+            _impl = luisa::make_unique<DisneyClosureImpl>(
+                context<DisneyContext>(), _enabled_lobes, _transmissive);
         }
     }
     void after_evaluation() noexcept override { _impl = nullptr; }
+    void enable_lobes(uint lobe_mask) noexcept { _enabled_lobes |= lobe_mask; }
     [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _impl->albedo(); }
     [[nodiscard]] Float2 roughness() const noexcept override { return _impl->roughness(); }
     [[nodiscard]] luisa::optional<Float> eta() const noexcept override { return _impl->eta(); }
@@ -854,7 +963,33 @@ public:
             .flatness = flatness,
             .diffuse_trans = diffuse_trans};
 
-        closure->bind(std::move(ctx));
+        // find used lobes
+        auto lobes = 0u;
+        if (!_color || !_color->node()->is_black()) {
+            lobes |= disney_lobe_diffuse_bit;
+            lobes |= disney_lobe_retro_bit;
+            if (_sheen && !_sheen->node()->is_black()) {
+                lobes |= disney_lobe_sheen_bit;
+            }
+            if (_flatness && !_flatness->node()->is_black()) {
+                lobes |= disney_lobe_fake_ss_bit;
+            }
+        }
+        lobes |= disney_lobe_specular_bit;
+        if (_clearcoat && !_clearcoat->node()->is_black()) {
+            lobes |= disney_lobe_clearcoat_bit;
+        }
+        if (_specular_trans && !_specular_trans->node()->is_black()) {
+            lobes |= disney_lobe_spec_trans_bit;
+        }
+        if (_diffuse_trans && !_diffuse_trans->node()->is_black()) {
+            lobes |= disney_lobe_diff_trans_bit;
+        }
+
+        // update closure
+        auto disney_closure = dynamic_cast<DisneySurfaceClosure *>(closure);
+        disney_closure->bind(std::move(ctx));
+        disney_closure->enable_lobes(lobes);
     }
 
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> create_closure(
