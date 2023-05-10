@@ -77,6 +77,7 @@ public:
         [[nodiscard]] virtual luisa::optional<Float> opacity(const FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept { return nullopt; }     // nullopt if never possible to be non-opaque
         [[nodiscard]] virtual luisa::optional<Float> eta(const FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept { return nullopt; }         // nullopt if never possible to be transmissive
         [[nodiscard]] virtual luisa::optional<Bool> is_dispersive(const FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept { return nullopt; }// nullopt if never possible to be dispersive
+        [[nodiscard]] virtual const Interaction *it(const FunctionContext *ctx_wrapper, Expr<float> time) const noexcept = 0;
         [[nodiscard]] virtual SampledSpectrum albedo(const FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;                            // albedo, might not be exact, for AOV only
         [[nodiscard]] virtual Float2 roughness(const FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;                                  // roughness, might not be exact, for AOV only
     };

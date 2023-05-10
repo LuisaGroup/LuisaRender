@@ -231,6 +231,12 @@ public:
         auto distribute = TrowbridgeReitzDistribution{ctx->alpha};
         return TrowbridgeReitzDistribution::alpha_to_roughness(distribute.alpha());
     }
+    [[nodiscard]] const Interaction *it(
+        const Surface::FunctionContext *ctx_wrapper, Expr<float> time) const noexcept override {
+        auto ctx = ctx_wrapper->data<MetalInstance::MetalContext>();
+        return &ctx->it;
+    }
+
     [[nodiscard]] Surface::Evaluation evaluate(
         const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
         Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {

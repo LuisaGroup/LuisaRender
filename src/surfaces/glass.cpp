@@ -169,6 +169,11 @@ public:
         auto fresnel = FresnelDielectric{ctx->eta_i, ctx->eta_t};
         return fresnel.eta_t();
     }
+    [[nodiscard]] const Interaction *it(
+        const Surface::FunctionContext *ctx_wrapper, Expr<float> time) const noexcept override {
+        auto ctx = ctx_wrapper->data<GlassInstance::GlassContext>();
+        return &ctx->it;
+    }
     [[nodiscard]] luisa::optional<Bool> is_dispersive(
         const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         auto ctx = ctx_wrapper->data<GlassInstance::GlassContext>();

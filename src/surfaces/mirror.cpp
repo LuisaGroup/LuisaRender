@@ -107,6 +107,11 @@ public:
         auto distribution = TrowbridgeReitzDistribution(ctx->alpha);
         return TrowbridgeReitzDistribution::alpha_to_roughness(distribution.alpha());
     }
+    [[nodiscard]] const Interaction *it(
+        const Surface::FunctionContext *ctx_wrapper, Expr<float> time) const noexcept override {
+        auto ctx = ctx_wrapper->data<MirrorInstance::MirrorContext>();
+        return &ctx->it;
+    }
 
     [[nodiscard]] Surface::Evaluation evaluate(
         const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,

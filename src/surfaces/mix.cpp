@@ -41,6 +41,7 @@ class MixSurfaceInstance : public Surface::Instance {
 
 public:
     struct MixSurfaceContext {
+        Interaction it;
         Float ratio;
     };
 
@@ -113,6 +114,11 @@ public:
         return lerp(roughness_b, roughness_a, ctx->ratio);
     }
 
+    [[nodiscard]] const Interaction *it(
+        const Surface::FunctionContext *ctx_wrapper, Expr<float> time) const noexcept override {
+        auto ctx = ctx_wrapper->data<MixSurfaceInstance::MixSurfaceContext>();
+        return &ctx->it;
+    }
     [[nodiscard]] luisa::optional<Float> opacity(
         const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         auto ctx = ctx_wrapper->data<MixSurfaceInstance::MixSurfaceContext>();
@@ -156,7 +162,6 @@ public:
         return *a_dispersive | *b_dispersive;
     }
 
-private:
     [[nodiscard]] Surface::Evaluation evaluate(
         const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time,
         Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
@@ -208,6 +213,7 @@ uint MixSurfaceInstance::make_closure(
     auto ratio = _ratio == nullptr ? 0.5f : clamp(_ratio->evaluate(*it, swl, time).x, 0.f, 1.f);
 
     auto ctx = MixSurfaceContext{
+        .it = *it,
         .ratio = ratio};
 
     auto [tag, slot] = closure.register_instance<MixSurfaceFunction>(node()->closure_identifier());
