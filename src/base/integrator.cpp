@@ -30,7 +30,6 @@ ProgressiveIntegrator::Instance::Instance(Pipeline &pipeline,
                                           const ProgressiveIntegrator *node) noexcept
     : Integrator::Instance{pipeline, command_buffer, node} {
     if (node->display_enabled()) {
-        auto first_film = pipeline.camera(0u)->film()->node();
         _display = luisa::make_unique<Display>("Display");
     }
 }
@@ -116,7 +115,6 @@ void ProgressiveIntegrator::Instance::_render_one_camera(
                     command_buffer << [&progress, p] { progress.update(p); };
                 }
             }
-            command_buffer << pipeline().printer().retrieve();
         }
     }
     command_buffer << synchronize();

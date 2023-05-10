@@ -8,85 +8,76 @@
 
 namespace luisa::render {
 
-template<typename BaseFunction>
 class PolymorphicClosure {
 
-public:
-    using Self = PolymorphicClosure<BaseFunction>;
-
-    class Context {
-
-    private:
-        std::any _data;
-        luisa::unordered_map<luisa::string, luisa::unique_ptr<Self>> _nested;
-
-    public:
-        // for creation
-        template<typename Data>
-        void create_data(Data &&data) noexcept {
-            if (!_data.has_value()) {
-                _data = std::forward<Data>(data);
-            } else {
-                auto p_data = std::any_cast<Data>(&_data);
-                assert(p_data != nullptr);
-                *p_data = std::forward<Data>(data);
-            }
-        }
-
-        [[nodiscard]] auto &create_nested(luisa::string name) noexcept {
-            auto [iter, _] = _nested.try_emplace(
-                std::move(name),
-                luisa::lazy_construct([] { return luisa::make_unique<Self>(); }));
-            return *iter->second;
-        }
-
-        // for dispatching
-        template<typename Data>
-        [[nodiscard]] auto data() const noexcept {
-            return std::any_cast<Data>(&_data);
-        }
-
-        [[nodiscard]] auto &nested(luisa::string_view name) const noexcept {
-            return *_nested.at(name);
-        }
-    };
-
 private:
-    luisa::unordered_map<luisa::string, uint> _tags;
-    luisa::vector<luisa::unique_ptr<BaseFunction>> _functions;
-    luisa::vector<luisa::unique_ptr<Context>> _ctx_slots;
+    std::any _context;
 
 public:
-    [[nodiscard]] auto empty() const noexcept { return _tags.empty(); }
-    [[nodiscard]] auto size() const noexcept { return _tags.size(); }
-    [[nodiscard]] auto function(uint index) const noexcept { return _functions[index].get(); }
-    [[nodiscard]] auto context(uint index) const noexcept { return _ctx_slots[index].get(); }
+    virtual ~PolymorphicClosure() noexcept = default;
 
-    template<typename Function>
-        requires std::derived_from<Function, BaseFunction>
-    [[nodiscard]] std::pair<uint, Context *> register_instance(luisa::string_view class_identifier) noexcept {
-        auto [iter, first] = _tags.try_emplace(class_identifier, _tags.size());
-        auto tag = iter->second;
-        if (first) {
-            _functions.emplace_back(luisa::make_unique<Function>());
-            _ctx_slots.emplace_back(luisa::make_unique<Context>());
+    template<typename T>
+    void bind(T &&ctx) noexcept {
+        if (!_context.has_value()) {
+            _context = std::forward<T>(ctx);
+        } else {
+            auto p_data = std::any_cast<T>(&_context);
+            assert(p_data != nullptr);
+            *p_data = std::forward<T>(ctx);
         }
-        return std::make_pair(tag, _ctx_slots[tag].get());
     }
 
-    template<typename Tag>
-        requires compute::is_integral_expr_v<Tag>
-    void dispatch(Tag &&tag, const luisa::function<void(const BaseFunction *, const Context *)> &f) const noexcept {
-        if (empty()) [[unlikely]] {
-            LUISA_WARNING_WITH_LOCATION("No implementations registered.");
-        }
-        if (_tags.size() == 1u) {
-            f(_functions.front().get(), _ctx_slots.front().get());
+    template<typename T>
+    [[nodiscard]] const T &context() const noexcept {
+        auto ctx = std::any_cast<T>(&_context);
+        assert(ctx != nullptr);
+        return *ctx;
+    }
+};
+
+template<typename Closure>
+class PolymorphicCall {
+
+private:
+    UInt _tag;
+    luisa::unordered_map<luisa::string, uint> _closure_tags;
+    luisa::vector<luisa::unique_ptr<Closure>> _closures;
+
+public:
+    [[nodiscard]] auto tag() const noexcept { return _tag; }
+    [[nodiscard]] auto empty() const noexcept { return _closure_tags.empty(); }
+    [[nodiscard]] auto size() const noexcept { return _closure_tags.size(); }
+    [[nodiscard]] auto closure(uint index) const noexcept { return _closures[index].get(); }
+
+    using ClosureCreator = luisa::function<luisa::unique_ptr<Closure>()>;
+    using ClosureEvaluator = luisa::function<void(const Closure *)>;
+
+    template<typename T = Closure>
+        requires std::derived_from<T, Closure>
+    [[nodiscard]] T *collect(
+        luisa::string_view identifier,
+        const ClosureCreator &f = [] {
+            return luisa::make_unique<Closure>();
+        }) noexcept {
+
+        auto [iter, first] = _closure_tags.try_emplace(
+            identifier, static_cast<uint>(_closures.size()));
+        if (first) { _closures.emplace_back(f()); }
+        _tag = iter->second;
+        auto closure = dynamic_cast<T *>(_closures[iter->second].get());
+        assert(closure != nullptr);
+        return closure;
+    }
+
+    void execute(const ClosureEvaluator &f) const noexcept {
+        if (empty()) [[unlikely]] { return; }
+        if (size() == 1u) {
+            f(_closures.front().get());
         } else {
-            compute::detail::SwitchStmtBuilder{std::forward<Tag>(tag)} % [&] {
-                for (auto i = 0u; i < _tags.size(); i++) {
+            compute::detail::SwitchStmtBuilder{_tag} % [&] {
+                for (auto i = 0u; i < size(); i++) {
                     compute::detail::SwitchCaseStmtBuilder{i} % [&f, this, i] {
-                        f(_functions[i].get(), _ctx_slots[i].get());
+                        f(_closures[i].get());
                     };
                 }
                 compute::detail::SwitchDefaultStmtBuilder{} % compute::unreachable;
@@ -95,4 +86,4 @@ public:
     }
 };
 
-}
+}// namespace luisa::render
