@@ -78,10 +78,17 @@ public:
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
         [[nodiscard]] auto &swl() const noexcept { return _swl; }
         [[nodiscard]] auto time() const noexcept { return _time; }
-        [[nodiscard]] virtual Evaluation evaluate(Expr<float3> wo, Expr<float3> wi,
-                                                  TransportMode mode = TransportMode::RADIANCE) const = 0;
-        [[nodiscard]] virtual Sample sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u,
-                                            TransportMode mode = TransportMode::RADIANCE) const = 0;
+
+        [[nodiscard]] virtual Evaluation evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept = 0;
+        [[nodiscard]] virtual Sample sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u, TransportMode mode) const noexcept = 0;
+
+        [[nodiscard]] auto evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
+            return evaluate(wo, wi, TransportMode::RADIANCE);
+        }
+        [[nodiscard]] auto sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u) const noexcept {
+            return sample(wo, u_lobe, u, TransportMode::RADIANCE);
+        }
+
         // surface properties
         [[nodiscard]] virtual luisa::optional<Float> opacity() const noexcept { return nullopt; }     // nullopt if never possible to be non-opaque
         [[nodiscard]] virtual luisa::optional<Float> eta() const noexcept { return nullopt; }         // nullopt if never possible to be transmissive

@@ -72,7 +72,9 @@ public:
     [[nodiscard]] const Interaction &it() const noexcept override { return context<Context>().it; }
 
 public:
-    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const override {
+    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo,
+                                               Expr<float3> wi,
+                                               TransportMode mode) const noexcept override {
         auto &&ctx = context<Context>();
         auto &it = ctx.it;
         auto refl = OrenNayar{ctx.Kd, ctx.sigma};
@@ -82,7 +84,10 @@ public:
         auto pdf = refl.pdf(wo_local, wi_local, mode);
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
-    [[nodiscard]] Surface::Sample sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u, TransportMode mode) const override {
+
+    [[nodiscard]] Surface::Sample sample(Expr<float3> wo,
+                                         Expr<float> u_lobe, Expr<float2> u,
+                                         TransportMode mode) const noexcept override {
         auto &&ctx = context<Context>();
         auto &it = ctx.it;
         auto refl = OrenNayar{ctx.Kd, ctx.sigma};
