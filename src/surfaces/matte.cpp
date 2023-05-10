@@ -43,9 +43,9 @@ public:
                   const Texture::Instance *Kd, const Texture::Instance *sigma) noexcept
         : Surface::Instance{pipeline, surface}, _kd{Kd}, _sigma{sigma} {}
 
-protected:
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _create_closure(const SampledWavelengths &swl, Expr<float> time) const noexcept override;
-    void _populate_closure(Surface::Closure *closure, const Interaction &it, Expr<float3> wo, Expr<float> eta_i) const noexcept override;
+public:
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> create_closure(const SampledWavelengths &swl, Expr<float> time) const noexcept override;
+    void populate_closure(Surface::Closure *closure, const Interaction &it, Expr<float3> wo, Expr<float> eta_i) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> MatteSurface::_build(
@@ -98,11 +98,11 @@ public:
     }
 };
 
-luisa::unique_ptr<Surface::Closure> MatteInstance::_create_closure(const SampledWavelengths &swl, Expr<float> time) const noexcept {
+luisa::unique_ptr<Surface::Closure> MatteInstance::create_closure(const SampledWavelengths &swl, Expr<float> time) const noexcept {
     return luisa::make_unique<MatteClosure>(pipeline(), swl, time);
 }
 
-void MatteInstance::_populate_closure(Surface::Closure *closure, const Interaction &it,
+void MatteInstance::populate_closure(Surface::Closure *closure, const Interaction &it,
                                       Expr<float3> wo, Expr<float> eta_i) const noexcept {
     auto &swl = closure->swl();
     auto time = closure->time();

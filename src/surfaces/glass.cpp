@@ -109,10 +109,10 @@ public:
     [[nodiscard]] auto roughness() const noexcept { return _roughness; }
     [[nodiscard]] auto eta() const noexcept { return _eta; }
 
-protected:
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _create_closure(
+public:
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> create_closure(
         const SampledWavelengths &swl, Expr<float> time) const noexcept override;
-    void _populate_closure(Surface::Closure *closure, const Interaction &it,
+    void populate_closure(Surface::Closure *closure, const Interaction &it,
                            Expr<float3> wo, Expr<float> eta_i) const noexcept override;
 };
 
@@ -226,12 +226,12 @@ public:
     }
 };
 
-luisa::unique_ptr<Surface::Closure> GlassInstance::_create_closure(
+luisa::unique_ptr<Surface::Closure> GlassInstance::create_closure(
     const SampledWavelengths &swl, Expr<float> time) const noexcept {
     return luisa::make_unique<GlassClosure>(pipeline(), swl, time);
 }
 
-void GlassInstance::_populate_closure(Surface::Closure *closure, const Interaction &it,
+void GlassInstance::populate_closure(Surface::Closure *closure, const Interaction &it,
                                       Expr<float3> wo, Expr<float> eta_i) const noexcept {
 
     auto alpha = def(make_float2(0.f));

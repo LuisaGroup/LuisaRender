@@ -175,9 +175,9 @@ public:
           _roughness{roughness}, _kd{Kd}, _eta{eta}, _k{k} {}
     [[nodiscard]] auto Kd() const noexcept { return _kd; }
 
-protected:
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _create_closure(const SampledWavelengths &swl, Expr<float> time) const noexcept override;
-    void _populate_closure(Surface::Closure *closure, const Interaction &it, Expr<float3> wo, Expr<float> eta_i) const noexcept override;
+public:
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> create_closure(const SampledWavelengths &swl, Expr<float> time) const noexcept override;
+    void populate_closure(Surface::Closure *closure, const Interaction &it, Expr<float3> wo, Expr<float> eta_i) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> MetalSurface::_build(
@@ -267,12 +267,12 @@ public:
     }
 };
 
-luisa::unique_ptr<Surface::Closure> MetalInstance::_create_closure(
+luisa::unique_ptr<Surface::Closure> MetalInstance::create_closure(
     const SampledWavelengths &swl, Expr<float> time) const noexcept {
     return luisa::make_unique<MetalClosure>(pipeline(), swl, time);
 }
 
-void MetalInstance::_populate_closure(Surface::Closure *closure, const Interaction &it,
+void MetalInstance::populate_closure(Surface::Closure *closure, const Interaction &it,
                                       Expr<float3> wo, Expr<float> eta_i) const noexcept {
     auto &swl = closure->swl();
     auto time = closure->time();

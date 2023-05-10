@@ -56,9 +56,7 @@ public:
         requires std::derived_from<T, Closure>
     [[nodiscard]] T *collect(
         luisa::string_view identifier,
-        const ClosureCreator &f = [] {
-            return luisa::make_unique<Closure>();
-        }) noexcept {
+        const ClosureCreator &f = [] { return luisa::make_unique<Closure>(); }) noexcept {
 
         auto [iter, first] = _closure_tags.try_emplace(
             identifier, static_cast<uint>(_closures.size()));

@@ -100,12 +100,12 @@ public:
     private:
         friend class Surface;
 
-    protected:
-        [[nodiscard]] virtual luisa::unique_ptr<Closure> _create_closure(
-            const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
-        virtual void _populate_closure(
+    public:
+        virtual void populate_closure(
             Closure *closure, const Interaction &it,
             Expr<float3> wo, Expr<float> eta_i) const noexcept = 0;
+        [[nodiscard]] virtual luisa::unique_ptr<Closure> create_closure(
+            const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
 
     public:
         Instance(const Pipeline &pipeline, const Surface *surface) noexcept

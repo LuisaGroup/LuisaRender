@@ -53,8 +53,8 @@ public:
     [[nodiscard]] auto ratio() const noexcept { return _ratio; }
 
 public:
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _create_closure(const SampledWavelengths &swl, Expr<float> time) const noexcept override;
-    void _populate_closure(Surface::Closure *closure, const Interaction &it, Expr<float3> wo, Expr<float> eta_i) const noexcept override;
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> create_closure(const SampledWavelengths &swl, Expr<float> time) const noexcept override;
+    void populate_closure(Surface::Closure *closure, const Interaction &it, Expr<float3> wo, Expr<float> eta_i) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> MixSurface::_build(
@@ -67,6 +67,10 @@ luisa::unique_ptr<Surface::Instance> MixSurface::_build(
 }
 
 class MixSurfaceClosure : public Surface::Closure {
+
+private:
+    luisa::unique_ptr<Surface::Closure> _a;
+    luisa::unique_ptr<Surface::Closure> _b;
 
 public:
     struct Context {
@@ -86,29 +90,27 @@ private:
 public:
     using Surface::Closure::Closure;
 
+    explicit MixSurfaceClosure(
+        const Pipeline &pipeline,
+        const SampledWavelengths &swl,
+        Expr<float> time,
+        luisa::unique_ptr<Surface::Closure> a, luisa::unique_ptr<Surface::Closure> b) noexcept
+        : Surface::Closure(pipeline, swl, time), _a{std::move(a)}, _b{std::move(b)} {}
+    [[nodiscard]] auto a() const noexcept { return _a.get(); }
+    [[nodiscard]] auto b() const noexcept { return _b.get(); }
+
     [[nodiscard]] SampledSpectrum albedo() const noexcept override {
         auto &&ctx = context<Context>();
 
-        auto function_a = ctx_wrapper->nested("a").function(0u);
-        auto ctx_wrapper_a = ctx_wrapper->nested("a").context(0u);
-        auto function_b = ctx_wrapper->nested("b").function(0u);
-        auto ctx_wrapper_b = ctx_wrapper->nested("b").context(0u);
-
-        auto albedo_a = function_a->albedo(ctx_wrapper_a, swl, time);
-        auto albedo_b = function_b->albedo(ctx_wrapper_b, swl, time);
+        auto albedo_a = a()->albedo();
+        auto albedo_b = b()->albedo();
         return albedo_a * ctx.ratio + albedo_b * (1.f - ctx.ratio);
     }
-    [[nodiscard]] Float2 roughness(
-        const Surface::FunctionContext *ctx_wrapper, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+    [[nodiscard]] Float2 roughness() const noexcept override {
         auto &&ctx = context<Context>();
 
-        auto function_a = ctx_wrapper->nested("a").function(0u);
-        auto ctx_wrapper_a = ctx_wrapper->nested("a").context(0u);
-        auto function_b = ctx_wrapper->nested("b").function(0u);
-        auto ctx_wrapper_b = ctx_wrapper->nested("b").context(0u);
-
-        auto roughness_a = function_a->roughness(ctx_wrapper_a, swl, time);
-        auto roughness_b = function_b->roughness(ctx_wrapper_b, swl, time);
+        auto roughness_a = a()->roughness();
+        auto roughness_b = b()->roughness();
 
         return lerp(roughness_b, roughness_a, ctx.ratio);
     }
@@ -117,38 +119,23 @@ public:
     [[nodiscard]] luisa::optional<Float> opacity() const noexcept override {
         auto &&ctx = context<Context>();
 
-        auto function_a = ctx_wrapper->nested("a").function(0u);
-        auto ctx_wrapper_a = ctx_wrapper->nested("a").context(0u);
-        auto function_b = ctx_wrapper->nested("b").function(0u);
-        auto ctx_wrapper_b = ctx_wrapper->nested("b").context(0u);
-
-        auto opacity_a = function_a->opacity(ctx_wrapper_a, swl, time);
-        auto opacity_b = function_b->opacity(ctx_wrapper_b, swl, time);
+        auto opacity_a = a()->opacity();
+        auto opacity_b = b()->opacity();
         if (!opacity_a && !opacity_b) { return luisa::nullopt; }
         return lerp(opacity_b.value_or(1.f), opacity_a.value_or(1.f), ctx.ratio);
     }
     [[nodiscard]] luisa::optional<Float> eta() const noexcept override {
         auto &&ctx = context<Context>();
 
-        auto function_a = ctx_wrapper->nested("a").function(0u);
-        auto ctx_wrapper_a = ctx_wrapper->nested("a").context(0u);
-        auto function_b = ctx_wrapper->nested("b").function(0u);
-        auto ctx_wrapper_b = ctx_wrapper->nested("b").context(0u);
-
-        auto eta_a = function_a->eta(ctx_wrapper_a, swl, time);
-        auto eta_b = function_b->eta(ctx_wrapper_b, swl, time);
+        auto eta_a = a()->eta();
+        auto eta_b = b()->eta();
         if (!eta_a) { return eta_b; }
         if (!eta_b) { return eta_a; }
         return lerp(*eta_b, *eta_a, ctx.ratio);
     }
     [[nodiscard]] luisa::optional<Bool> is_dispersive() const noexcept override {
-        auto function_a = ctx_wrapper->nested("a").function(0u);
-        auto ctx_wrapper_a = ctx_wrapper->nested("a").context(0u);
-        auto function_b = ctx_wrapper->nested("b").function(0u);
-        auto ctx_wrapper_b = ctx_wrapper->nested("b").context(0u);
-
-        auto a_dispersive = function_a->is_dispersive(ctx_wrapper_a, swl, time);
-        auto b_dispersive = function_b->is_dispersive(ctx_wrapper_b, swl, time);
+        auto a_dispersive = a()->is_dispersive();
+        auto b_dispersive = b()->is_dispersive();
         if (!a_dispersive) { return b_dispersive; }
         if (!b_dispersive) { return a_dispersive; }
         return *a_dispersive | *b_dispersive;
@@ -159,13 +146,8 @@ public:
                                                TransportMode mode) const noexcept override {
         auto &&ctx = context<Context>();
 
-        auto function_a = ctx_wrapper->nested("a").function(0u);
-        auto ctx_wrapper_a = ctx_wrapper->nested("a").context(0u);
-        auto eval_a = function_a->evaluate(ctx_wrapper_a, swl, time, wo, wi, mode);
-
-        auto function_b = ctx_wrapper->nested("b").function(0u);
-        auto ctx_wrapper_b = ctx_wrapper->nested("b").context(0u);
-        auto eval_b = function_b->evaluate(ctx_wrapper_b, swl, time, wo, wi, mode);
+        auto eval_a = a()->evaluate(wo, wi, mode);
+        auto eval_b = b()->evaluate(wo, wi, mode);
 
         return _mix(eval_a, eval_b, ctx.ratio);
     }
@@ -173,22 +155,17 @@ public:
                                          TransportMode mode) const noexcept override {
         auto &&ctx = context<Context>();
 
-        auto function_a = ctx_wrapper->nested("a").function(0u);
-        auto ctx_wrapper_a = ctx_wrapper->nested("a").context(0u);
-        auto function_b = ctx_wrapper->nested("b").function(0u);
-        auto ctx_wrapper_b = ctx_wrapper->nested("b").context(0u);
-
-        auto sample = Surface::Sample::zero(swl.dimension());
+        auto sample = Surface::Sample::zero(swl().dimension());
         $if(u_lobe < ctx.ratio) {// sample a
-            auto sample_a = function_a->sample(ctx_wrapper_a, swl, time, wo, u_lobe / ctx.ratio, u, mode);
-            auto eval_b = function_b->evaluate(ctx_wrapper_b, swl, time, wo, sample_a.wi, mode);
+            auto sample_a = a()->sample(wo, u_lobe / ctx.ratio, u, mode);
+            auto eval_b = b()->evaluate(wo, sample_a.wi, mode);
             sample.eval = _mix(sample_a.eval, eval_b, ctx.ratio);
             sample.wi = sample_a.wi;
             sample.event = sample_a.event;
         }
         $else {// sample b
-            auto sample_b = function_b->sample(ctx_wrapper_b, swl, time, wo, (u_lobe - ctx.ratio) / (1.f - ctx.ratio), u, mode);
-            auto eval_a = function_a->evaluate(ctx_wrapper_a, swl, time, wo, sample_b.wi, mode);
+            auto sample_b = a()->sample(wo, (u_lobe - ctx.ratio) / (1.f - ctx.ratio), u, mode);
+            auto eval_a = b()->evaluate(wo, sample_b.wi, mode);
             sample.eval = _mix(eval_a, sample_b.eval, ctx.ratio);
             sample.wi = sample_b.wi;
             sample.event = sample_b.event;
@@ -197,15 +174,22 @@ public:
     }
 };
 
-luisa::unique_ptr<Surface::Closure> MixSurfaceInstance::_create_closure(const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    return luisa::make_unique<MixSurfaceClosure>(pipeline(), swl, time);
+luisa::unique_ptr<Surface::Closure> MixSurfaceInstance::create_closure(const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    auto a = _a->create_closure(swl, time);
+    auto b = _b->create_closure(swl, time);
+    return luisa::make_unique<MixSurfaceClosure>(pipeline(), swl, time, std::move(a), std::move(b));
 }
 
-void MixSurfaceInstance::_populate_closure(Surface::Closure *closure, const Interaction &it,
+void MixSurfaceInstance::populate_closure(Surface::Closure *closure_in, const Interaction &it,
                                            Expr<float3> wo, Expr<float> eta_i) const noexcept {
+
+    auto closure = static_cast<MixSurfaceClosure *>(closure_in);
     auto &swl = closure->swl();
     auto time = closure->time();
     auto ratio = _ratio == nullptr ? 0.5f : clamp(_ratio->evaluate(it, swl, time).x, 0.f, 1.f);
+
+    _a->populate_closure(closure->a(), it, wo, eta_i);
+    _b->populate_closure(closure->b(), it, wo, eta_i);
 
     MixSurfaceClosure::Context ctx{
         .it = it,

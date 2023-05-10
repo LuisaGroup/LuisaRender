@@ -51,8 +51,8 @@ public:
     [[nodiscard]] auto roughness() const noexcept { return _roughness; }
 
 public:
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _create_closure(const SampledWavelengths &swl, Expr<float> time) const noexcept override;
-    void _populate_closure(Surface::Closure *closure, const Interaction &it, Expr<float3> wo, Expr<float> eta_i) const noexcept override;
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> create_closure(const SampledWavelengths &swl, Expr<float> time) const noexcept override;
+    void populate_closure(Surface::Closure *closure, const Interaction &it, Expr<float3> wo, Expr<float> eta_i) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> MirrorSurface::_build(
@@ -139,12 +139,12 @@ public:
     }
 };
 
-luisa::unique_ptr<Surface::Closure> MirrorInstance::_create_closure(
+luisa::unique_ptr<Surface::Closure> MirrorInstance::create_closure(
     const SampledWavelengths &swl, Expr<float> time) const noexcept {
     return luisa::make_unique<MirrorClosure>(pipeline(), swl, time);
 }
 
-void MirrorInstance::_populate_closure(Surface::Closure *closure, const Interaction &it,
+void MirrorInstance::populate_closure(Surface::Closure *closure, const Interaction &it,
                                        Expr<float3> wo, Expr<float> eta_i) const noexcept {
     auto alpha = def(make_float2(0.f));
     auto &swl = closure->swl();

@@ -86,10 +86,10 @@ public:
           _kd{Kd}, _roughness{roughness}, _sigma_a{sigma_a},
           _eta{eta}, _thickness{thickness} {}
 
-protected:
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> _create_closure(
+public:
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> create_closure(
         const SampledWavelengths &swl, Expr<float> time) const noexcept override;
-    void _populate_closure(Surface::Closure *closure, const Interaction &it,
+    void populate_closure(Surface::Closure *closure, const Interaction &it,
                            Expr<float3> wo, Expr<float> eta_i) const noexcept override;
 };
 
@@ -214,12 +214,12 @@ public:
     }
 };
 
-luisa::unique_ptr<Surface::Closure> PlasticInstance::_create_closure(
+luisa::unique_ptr<Surface::Closure> PlasticInstance::create_closure(
     const SampledWavelengths &swl, Expr<float> time) const noexcept {
     return luisa::make_unique<PlasticClosure>(pipeline(), swl, time);
 }
 
-void PlasticInstance::_populate_closure(Surface::Closure *closure, const Interaction &it,
+void PlasticInstance::populate_closure(Surface::Closure *closure, const Interaction &it,
                                         Expr<float3> wo, Expr<float> eta_i) const noexcept {
     auto &swl = closure->swl();
     auto time = closure->time();

@@ -43,9 +43,9 @@ void Surface::Instance::closure(PolymorphicCall<Closure> &call,
                                 const Interaction &it, const SampledWavelengths &swl,
                                 Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept {
     auto cls = call.collect(node()->closure_identifier(), [&] {
-        return _create_closure(swl, time);
+        return create_closure(swl, time);
     });
-    _populate_closure(cls, it, wo, eta_i);
+    populate_closure(cls, it, wo, eta_i);
 }
 
 }// namespace luisa::render
