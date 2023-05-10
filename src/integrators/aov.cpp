@@ -145,52 +145,56 @@ class AuxiliaryBuffer {
 
 private:
     Pipeline &_pipeline;
-    Image<float> _image;
+    uint2 _resolution;
+    uint _channels;
+    Buffer<float> _buffer;
 
 private:
     static constexpr auto clear_shader_name = luisa::string_view{"__aux_buffer_clear_shader"};
 
 public:
     AuxiliaryBuffer(Pipeline &pipeline, uint2 resolution, uint channels, bool enabled = true) noexcept
-        : _pipeline{pipeline} {
-        _pipeline.register_shader<2u>(
-            clear_shader_name, [](ImageFloat image) noexcept {
-                image.write(dispatch_id().xy(), make_float4(0.f));
+        : _pipeline{pipeline}, _resolution{resolution},
+          _channels{std::clamp(channels == 2u ? 3u : channels, 1u, 4u)} {
+        _pipeline.register_shader<1u>(
+            clear_shader_name, [](BufferFloat buffer) noexcept {
+                buffer.write(dispatch_x(), 0.f);
             });
         if (enabled) {
-            _image = pipeline.device().create_image<float>(
-                channels == 1u ?// TODO: support FLOAT2
-                    PixelStorage::FLOAT1 :
-                    PixelStorage::FLOAT4,
-                resolution);
+            _buffer = pipeline.device().create_buffer<float>(
+                _resolution.x * _resolution.y * _channels);
         }
     }
     void clear(CommandBuffer &command_buffer) const noexcept {
-        if (_image) {
-            command_buffer << _pipeline.shader<2u, Image<float>>(clear_shader_name, _image)
-                                  .dispatch(_image.size());
+        if (_buffer) {
+            command_buffer << _pipeline.shader<1u, Buffer<float>>(clear_shader_name, _buffer)
+                                  .dispatch(_resolution.x * _resolution.y * _channels);
         }
     }
     [[nodiscard]] auto save(CommandBuffer &command_buffer,
                             std::filesystem::path path, uint total_samples) const noexcept
         -> luisa::function<void()> {
-        if (!_image) { return {}; }
+        if (!_buffer) { return {}; }
         auto host_image = luisa::make_shared<luisa::vector<float>>();
-        auto nc = pixel_storage_channel_count(_image.storage());
-        host_image->resize(_image.size().x * _image.size().y * nc);
-        command_buffer << _image.copy_to(host_image->data());
-        return [host_image, total_samples, nc, size = _image.size(), path = std::move(path)] {
+        host_image->resize(_resolution.x * _resolution.y * _channels);
+        command_buffer << _buffer.copy_to(host_image->data());
+        return [host_image, total_samples,
+                resolution = _resolution,
+                channels = _channels,
+                path = std::move(path)] {
             auto scale = static_cast<float>(1. / total_samples);
             for (auto &p : *host_image) { p *= scale; }
             LUISA_INFO("Saving auxiliary buffer to '{}'.", path.string());
-            save_image(path.string(), host_image->data(), size, nc);
+            save_image(path.string(), host_image->data(), resolution, channels);
         };
     }
     void accumulate(Expr<uint2> p, Expr<float4> value) noexcept {
-        if (_image) {
+        if (_buffer) {
             $if(!any(isnan(value))) {
-                auto old = _image.read(p);
-                _image.write(p, old + value);
+                auto index = p.x + p.y * _resolution.x;
+                for (auto i = 0u; i < _channels; i++) {
+                    _buffer.atomic(index * _channels + i).fetch_add(value[i]);
+                }
             };
         }
     }
@@ -265,9 +269,11 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                 auto p_ndc = make_float3((camera_sample.pixel / make_float2(resolution) * 2.f - 1.f) * make_float2(1.f, -1.f),
                                          depth / (ray->t_max() - ray->t_min()));
                 aux_buffers.at("ndc")->accumulate(dispatch_id().xy(), make_float4(p_ndc, 1.f));
+                PolymorphicCall<Surface::Closure> call;
                 pipeline().surfaces().dispatch(it->shape().surface_tag(), [&](auto surface) noexcept {
-                    // create closure
-                    auto closure = surface->closure(it, swl, wo, 1.f, time);
+                    surface->closure(call, *it, swl, wo, 1.f, time);
+                });
+                call.execute([&](auto closure) noexcept {
                     auto albedo = closure->albedo();
                     auto roughness = closure->roughness();
                     aux_buffers.at("albedo")->accumulate(dispatch_id().xy(), make_float4(spectrum->srgb(swl, albedo), 1.f));
@@ -316,10 +322,11 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
             auto u_bsdf = sampler()->generate_2d();
             auto eta_scale = def(1.f);
 
+            PolymorphicCall<Surface::Closure> call;
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
-
-                // create closure
-                auto closure = surface->closure(it, swl, wo, 1.f, time);
+                surface->closure(call, *it, swl, wo, 1.f, time);
+            });
+            call.execute([&](auto closure) noexcept {
                 if (auto dispersive = closure->is_dispersive()) {
                     $if(*dispersive) { swl.terminate_secondary(); };
                 }
@@ -367,16 +374,8 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                         $case(Surface::event_exit) { eta_scale = sqr(1.f / eta); };
                     };
                 };
+                specular_bounce = all(closure->roughness() < .05f);
             });
-
-            pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
-                auto closure = surface->closure(it, swl, wo, 1.f, time);
-                specular_bounce = false;
-                $if((closure->roughness().x < 0.05f) & (closure->roughness().y < 0.05f)) {
-                    specular_bounce = true;
-                };
-            });
-            // rr is closed for aov
         };
         aux_buffers.at("sample")->accumulate(pixel_id, make_float4(spectrum->srgb(swl, Li * shutter_weight), 1.f));
         aux_buffers.at("diffuse")->accumulate(pixel_id, make_float4(spectrum->srgb(swl, Li_diffuse * shutter_weight), 1.f));

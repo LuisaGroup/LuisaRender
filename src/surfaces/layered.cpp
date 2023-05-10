@@ -140,7 +140,6 @@ public:
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto samples() const noexcept { return _samples; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] luisa::string closure_identifier() const noexcept override { return luisa::string(impl_type()); }
     [[nodiscard]] uint properties() const noexcept override {
         auto p = 0u;
         if (_top->is_thin() && _bottom->is_thin()) { p |= property_thin; }
@@ -170,6 +169,11 @@ public:
     [[nodiscard]] auto albedo() const noexcept { return _albedo; }
 
 public:
+    [[nodiscard]] luisa::string closure_identifier() const noexcept override {
+        return luisa::format("layered<{}, {}>",
+                             _top->closure_identifier(),
+                             _bottom->closure_identifier());
+    }
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> create_closure(const SampledWavelengths &swl, Expr<float> time) const noexcept override;
     void populate_closure(Surface::Closure *closure, const Interaction &it, Expr<float3> wo, Expr<float> eta_i) const noexcept override;
 };

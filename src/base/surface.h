@@ -108,6 +108,7 @@ public:
         friend class Surface;
 
     public:
+        [[nodiscard]] virtual luisa::string closure_identifier() const noexcept;
         virtual void populate_closure(
             Closure *closure, const Interaction &it,
             Expr<float3> wo, Expr<float> eta_i) const noexcept = 0;
@@ -144,7 +145,6 @@ public:
     [[nodiscard]] auto is_reflective() const noexcept { return static_cast<bool>(properties() & property_reflective); }
     [[nodiscard]] auto is_transmissive() const noexcept { return static_cast<bool>(properties() & property_transmissive); }
     [[nodiscard]] auto is_thin() const noexcept { return static_cast<bool>(properties() & property_thin); }
-    [[nodiscard]] virtual luisa::string closure_identifier() const noexcept { return luisa::string{impl_type()}; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept;
 };
 
@@ -221,6 +221,11 @@ public:
             : BaseInstance{std::move(base)}, _opacity{opacity} {}
 
     public:
+        [[nodiscard]] luisa::string closure_identifier() const noexcept override {
+            auto base_identifier = BaseInstance::closure_identifier();
+            if (_opacity == nullptr) { return base_identifier; }
+            return luisa::format("opacity<{}>", base_identifier);
+        }
         [[nodiscard]] luisa::unique_ptr<Surface::Closure> create_closure(
             const SampledWavelengths &swl, Expr<float> time) const noexcept override {
             auto base = BaseInstance::create_closure(swl, time);
@@ -256,10 +261,6 @@ public:
                       return desc->property_node_or_default("opacity");
                   })));
           }(scene, desc)} {}
-    [[nodiscard]] luisa::string closure_identifier() const noexcept override {
-        if (_opacity == nullptr) { return BaseSurface::closure_identifier(); }
-        return luisa::format("Opacity<{}>", BaseSurface::closure_identifier());
-    }
 
 protected:
     [[nodiscard]] luisa::unique_ptr<Surface::Instance> _build(

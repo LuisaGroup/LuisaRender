@@ -31,9 +31,6 @@ public:
                      "MixSurface: Cannot mix thin and transmissive surfaces.");
     }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] luisa::string closure_identifier() const noexcept override {
-        return luisa::format("{}<{}, {}>", impl_type(), _a->closure_identifier(), _b->closure_identifier());
-    }
     [[nodiscard]] uint properties() const noexcept override { return _a->properties() | _b->properties(); }
 };
 
@@ -53,6 +50,9 @@ public:
     [[nodiscard]] auto ratio() const noexcept { return _ratio; }
 
 public:
+    [[nodiscard]] luisa::string closure_identifier() const noexcept override {
+        return luisa::format("mix<{}, {}>", _a->closure_identifier(), _b->closure_identifier());
+    }
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> create_closure(const SampledWavelengths &swl, Expr<float> time) const noexcept override;
     void populate_closure(Surface::Closure *closure, const Interaction &it, Expr<float3> wo, Expr<float> eta_i) const noexcept override;
 };

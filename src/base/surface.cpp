@@ -19,33 +19,17 @@ luisa::unique_ptr<Surface::Instance> Surface::build(
     return _build(pipeline, command_buffer);
 }
 
-//luisa::optional<Float> Surface::Closure::opacity() const noexcept {
-//    // We do not allow transmissive surfaces to be non-opaque.
-//    return instance()->node()->is_transmissive() ? luisa::nullopt : _opacity();
-//}
-//
-//luisa::optional<Float> Surface::Closure::eta() const noexcept {
-//    // We do not care about eta of non-transmissive surfaces.
-//    if (instance()->node()->is_transmissive()) {
-//        auto eta = _eta();
-//        LUISA_ASSERT(eta.has_value(), "Transmissive surface must have eta.");
-//        return eta;
-//    }
-//    return luisa::nullopt;
-//}
-//
-//luisa::optional<Bool> Surface::Closure::is_dispersive() const noexcept {
-//    if (instance()->pipeline().spectrum()->node()->is_fixed()) { return nullopt; }
-//    return _is_dispersive();
-//}
-
 void Surface::Instance::closure(PolymorphicCall<Closure> &call,
                                 const Interaction &it, const SampledWavelengths &swl,
                                 Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept {
-    auto cls = call.collect(node()->closure_identifier(), [&] {
+    auto cls = call.collect(closure_identifier(), [&] {
         return create_closure(swl, time);
     });
     populate_closure(cls, it, wo, eta_i);
+}
+
+luisa::string Surface::Instance::closure_identifier() const noexcept {
+    return luisa::string{node()->impl_type()};
 }
 
 }// namespace luisa::render

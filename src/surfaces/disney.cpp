@@ -60,11 +60,6 @@ public:
     [[nodiscard]] luisa::string_view impl_type() const noexcept override {
         return LUISA_RENDER_PLUGIN_NAME;
     }
-    [[nodiscard]] luisa::string closure_identifier() const noexcept override {
-        return is_thin()         ? "disney_thin" :
-               is_transmissive() ? "disney_trans" :
-                                   "disney";
-    }
     [[nodiscard]] uint properties() const noexcept override {
         auto properties = property_reflective;
         if (_thin) {
@@ -923,6 +918,13 @@ public:
           _diffuse_trans{diffuse_trans} {}
 
 public:
+    [[nodiscard]] luisa::string closure_identifier() const noexcept override {
+        auto s = node<DisneySurface>();
+        return s->is_thin()         ? "disney_thin" :
+               s->is_transmissive() ? "disney_trans" :
+                                      "disney";
+    }
+
     void populate_closure(Surface::Closure *closure, const Interaction &it,
                           Expr<float3> wo, Expr<float> eta_i) const noexcept override {
         auto &swl = closure->swl();
