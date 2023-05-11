@@ -54,6 +54,7 @@ class Pipeline {
 public:
     static constexpr auto bindless_array_capacity = 500'000u;// limitation of Metal
     static constexpr auto transform_matrix_buffer_size = 65536u;
+    static constexpr auto constant_buffer_size = 256u * 1024u;
     using ResourceHandle = luisa::unique_ptr<Resource>;
 
 private:
@@ -64,6 +65,8 @@ private:
     size_t _bindless_tex2d_count{0u};
     size_t _bindless_tex3d_count{0u};
     luisa::vector<ResourceHandle> _resources;
+    Buffer<float4> _constant_buffer;
+    size_t _constant_count{0u};
     Polymorphic<Surface::Instance> _surfaces;
     Polymorphic<Light::Instance> _lights;
     Polymorphic<Medium::Instance> _media;
@@ -176,6 +179,9 @@ public:
         return std::make_pair(view, buffer_id);
     }
 
+    [[nodiscard]] std::pair<BufferView<float4>, uint> allocate_constant_slot() noexcept;
+
+
 public:
     [[nodiscard]] auto &device() const noexcept { return _device; }
     [[nodiscard]] static luisa::unique_ptr<Pipeline> create(
@@ -219,6 +225,8 @@ public:
         return _bindless_array.tex3d(named_id(name));
     }
     [[nodiscard]] Float4x4 transform(const Transform *transform) const noexcept;
+
+    [[nodiscard]] Float4 constant(Expr<uint> index) const noexcept;
 
     template<uint dim, typename... Args, typename... CallArgs>
     [[nodiscard]] auto shader(luisa::string_view name, CallArgs &&...call_args) const noexcept {
