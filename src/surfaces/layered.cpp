@@ -224,13 +224,13 @@ public:
     [[nodiscard]] auto bottom() const noexcept { return _bottom.get(); }
 
 public:
-    void before_evaluation() noexcept override {
-        _top->before_evaluation();
-        _bottom->before_evaluation();
+    void pre_eval() noexcept override {
+        _top->pre_eval();
+        _bottom->pre_eval();
     }
-    void after_evaluation() noexcept override {
-        _top->after_evaluation();
-        _bottom->after_evaluation();
+    void post_eval() noexcept override {
+        _top->post_eval();
+        _bottom->post_eval();
     }
 
 public:

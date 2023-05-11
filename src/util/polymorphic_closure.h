@@ -34,11 +34,11 @@ public:
         return *ctx;
     }
 
-    virtual void before_evaluation() noexcept {
+    virtual void pre_eval() noexcept {
         /* prepare any persistent data within a single the dispatch */
     }
 
-    virtual void after_evaluation() noexcept {
+    virtual void post_eval() noexcept {
         /* release any persistent data within a single dispatch */
     }
 };
@@ -78,16 +78,16 @@ public:
     void execute(const ClosureEvaluator &f) const noexcept {
         if (empty()) [[unlikely]] { return; }
         if (size() == 1u) {
-            _closures.front()->before_evaluation();
+            _closures.front()->pre_eval();
             f(_closures.front().get());
-            _closures.front()->after_evaluation();
+            _closures.front()->post_eval();
         } else {
             compute::detail::SwitchStmtBuilder{_tag} % [&] {
                 for (auto i = 0u; i < size(); i++) {
                     compute::detail::SwitchCaseStmtBuilder{i} % [&f, this, i] {
-                        _closures[i]->before_evaluation();
+                        _closures[i]->pre_eval();
                         f(_closures[i].get());
-                        _closures[i]->after_evaluation();
+                        _closures[i]->post_eval();
                     };
                 }
                 compute::detail::SwitchDefaultStmtBuilder{} % compute::unreachable;

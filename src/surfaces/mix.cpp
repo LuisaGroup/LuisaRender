@@ -98,13 +98,13 @@ public:
         : Surface::Closure(pipeline, swl, time), _a{std::move(a)}, _b{std::move(b)} {}
     [[nodiscard]] auto a() const noexcept { return _a.get(); }
     [[nodiscard]] auto b() const noexcept { return _b.get(); }
-    void before_evaluation() noexcept override {
-        _a->before_evaluation();
-        _b->before_evaluation();
+    void pre_eval() noexcept override {
+        _a->pre_eval();
+        _b->pre_eval();
     }
-    void after_evaluation() noexcept override {
-        _a->after_evaluation();
-        _b->after_evaluation();
+    void post_eval() noexcept override {
+        _a->post_eval();
+        _b->post_eval();
     }
 
 public:

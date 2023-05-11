@@ -195,8 +195,8 @@ public:
         }
 
     public:
-        void before_evaluation() noexcept override { _base->before_evaluation(); }
-        void after_evaluation() noexcept override { _base->after_evaluation(); }
+        void pre_eval() noexcept override { _base->pre_eval(); }
+        void post_eval() noexcept override { _base->post_eval(); }
 
     public:
         [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo,

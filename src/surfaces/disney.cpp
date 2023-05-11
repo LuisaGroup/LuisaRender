@@ -855,7 +855,7 @@ public:
           _thin{is_thin}, _transmissive{is_transmissive} {}
 
 public:
-    void before_evaluation() noexcept override {
+    void pre_eval() noexcept override {
         if (_thin) {
             _impl = luisa::make_unique<ThinDisneyClosureImpl>(
                 context<DisneyContext>(), _enabled_lobes);
@@ -864,7 +864,7 @@ public:
                 context<DisneyContext>(), _enabled_lobes, _transmissive);
         }
     }
-    void after_evaluation() noexcept override { _impl = nullptr; }
+    void post_eval() noexcept override { _impl = nullptr; }
     void enable_lobes(uint lobe_mask) noexcept { _enabled_lobes |= lobe_mask; }
     [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _impl->albedo(); }
     [[nodiscard]] Float2 roughness() const noexcept override { return _impl->roughness(); }
