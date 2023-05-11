@@ -28,6 +28,9 @@ class Sampler;
 class Frame;
 class Interaction;
 
+template<typename BaseSurface, typename BaseInstance>
+class OpacitySurfaceWrapper;
+
 class Surface : public SceneNode {
 
 public:
@@ -68,26 +71,27 @@ public:
         const SampledWavelengths &_swl;
         Float _time;
 
+    private:
+        template<typename BS, typename BSI>
+        friend class OpacitySurfaceWrapper;
+        [[nodiscard]] virtual Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept = 0;
+        [[nodiscard]] virtual Sample _sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u, TransportMode mode) const noexcept = 0;
+
     public:
         Closure(const Pipeline &pipeline,
                 const SampledWavelengths &swl,
                 Expr<float> time) noexcept
             : _pipeline{pipeline},
               _swl{swl}, _time{time} {}
-        virtual ~Closure() noexcept = default;
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
         [[nodiscard]] auto &swl() const noexcept { return _swl; }
         [[nodiscard]] auto time() const noexcept { return _time; }
 
-        [[nodiscard]] virtual Evaluation evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept = 0;
-        [[nodiscard]] virtual Sample sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u, TransportMode mode) const noexcept = 0;
-
-        [[nodiscard]] auto evaluate(Expr<float3> wo, Expr<float3> wi) const noexcept {
-            return evaluate(wo, wi, TransportMode::RADIANCE);
-        }
-        [[nodiscard]] auto sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u) const noexcept {
-            return sample(wo, u_lobe, u, TransportMode::RADIANCE);
-        }
+        [[nodiscard]] Evaluation evaluate(Expr<float3> wo, Expr<float3> wi,
+                                          TransportMode mode = TransportMode::RADIANCE) const noexcept;
+        [[nodiscard]] Sample sample(Expr<float3> wo,
+                                    Expr<float> u_lobe, Expr<float2> u,
+                                    TransportMode mode = TransportMode::RADIANCE) const noexcept;
 
         // surface properties
         [[nodiscard]] virtual luisa::optional<Float> opacity() const noexcept { return nullopt; }     // nullopt if never possible to be non-opaque
@@ -150,9 +154,10 @@ public:
 
 template<typename BaseSurface,
          typename BaseInstance = typename BaseSurface::Instance>
-    requires std::derived_from<BaseSurface, Surface> &&
-             std::derived_from<BaseInstance, Surface::Instance>
 class OpacitySurfaceWrapper : public BaseSurface {
+
+    static_assert(std::derived_from<BaseSurface, Surface> &&
+                  std::derived_from<BaseInstance, Surface::Instance>);
 
 public:
     class Closure final : public Surface::Closure {
@@ -198,16 +203,16 @@ public:
         void pre_eval() noexcept override { _base->pre_eval(); }
         void post_eval() noexcept override { _base->post_eval(); }
 
-    public:
-        [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo,
-                                                   Expr<float3> wi,
-                                                   TransportMode mode) const noexcept override {
-            return _base->evaluate(wo, wi, mode);
+    private:
+        [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo,
+                                                    Expr<float3> wi,
+                                                    TransportMode mode) const noexcept override {
+            return _base->_evaluate(wo, wi, mode);
         }
-        [[nodiscard]] Surface::Sample sample(Expr<float3> wo,
-                                             Expr<float> u_lobe, Expr<float2> u,
-                                             TransportMode mode) const noexcept override {
-            return _base->sample(wo, u_lobe, u, mode);
+        [[nodiscard]] Surface::Sample _sample(Expr<float3> wo,
+                                              Expr<float> u_lobe, Expr<float2> u,
+                                              TransportMode mode) const noexcept override {
+            return _base->_sample(wo, u_lobe, u, mode);
         }
     };
 
@@ -276,9 +281,10 @@ protected:
 
 template<typename BaseSurface,
          typename BaseInstance = typename BaseSurface::Instance>
-    requires std::derived_from<BaseSurface, Surface> &&
-             std::derived_from<BaseInstance, Surface::Instance>
 class NormalMapWrapper : public BaseSurface {
+
+    static_assert(std::derived_from<BaseSurface, Surface> &&
+                  std::derived_from<BaseInstance, Surface::Instance>);
 
 public:
     class Instance : public BaseInstance {
@@ -340,9 +346,10 @@ protected:
 
 template<typename BaseSurface,
          typename BaseInstance = typename BaseSurface::Instance>
-    requires std::derived_from<BaseSurface, Surface> &&
-             std::derived_from<BaseInstance, Surface::Instance>
 class TwoSidedWrapper : public BaseSurface {
+
+    static_assert(std::derived_from<BaseSurface, Surface> &&
+                  std::derived_from<BaseInstance, Surface::Instance>);
 
 public:
     class Instance : public BaseInstance {

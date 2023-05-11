@@ -150,9 +150,9 @@ public:
         return *a_dispersive | *b_dispersive;
     }
 
-public:
-    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo, Expr<float3> wi,
-                                               TransportMode mode) const noexcept override {
+private:
+    [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
+                                                TransportMode mode) const noexcept override {
         auto &&ctx = context<Context>();
 
         auto eval_a = a()->evaluate(wo, wi, mode);
@@ -160,8 +160,9 @@ public:
 
         return _mix(eval_a, eval_b, ctx.ratio);
     }
-    [[nodiscard]] Surface::Sample sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u,
-                                         TransportMode mode) const noexcept override {
+    [[nodiscard]] Surface::Sample _sample(Expr<float3> wo,
+                                          Expr<float> u_lobe, Expr<float2> u,
+                                          TransportMode mode) const noexcept override {
         auto &&ctx = context<Context>();
 
         auto sample = Surface::Sample::zero(swl().dimension());
@@ -190,7 +191,7 @@ luisa::unique_ptr<Surface::Closure> MixSurfaceInstance::create_closure(const Sam
 }
 
 void MixSurfaceInstance::populate_closure(Surface::Closure *closure_in, const Interaction &it,
-                                           Expr<float3> wo, Expr<float> eta_i) const noexcept {
+                                          Expr<float3> wo, Expr<float> eta_i) const noexcept {
     auto closure = static_cast<MixSurfaceClosure *>(closure_in);
     auto &swl = closure->swl();
     auto time = closure->time();

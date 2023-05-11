@@ -870,12 +870,14 @@ public:
     [[nodiscard]] Float2 roughness() const noexcept override { return _impl->roughness(); }
     [[nodiscard]] luisa::optional<Float> eta() const noexcept override { return _impl->eta(); }
     [[nodiscard]] const Interaction &it() const noexcept override { return context<DisneyContext>().it; }
-    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo, Expr<float3> wi,
-                                               TransportMode mode) const noexcept override {
+
+private:
+    [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
+                                                TransportMode mode) const noexcept override {
         return _impl->evaluate(wo, wi, mode);
     }
-    [[nodiscard]] Surface::Sample sample(Expr<float3> wo, Expr<float> u_lobe,
-                                         Expr<float2> u, TransportMode mode) const noexcept override {
+    [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float> u_lobe,
+                                          Expr<float2> u, TransportMode mode) const noexcept override {
         return _impl->sample(wo, u_lobe, u, mode);
     }
 };

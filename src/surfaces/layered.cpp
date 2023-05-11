@@ -253,8 +253,9 @@ public:
                       (1.f - bottom_opacity.value_or(1.f)));
     }
 
-    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo, Expr<float3> wi,
-                                               TransportMode mode) const noexcept override {
+private:
+    [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
+                                                TransportMode mode) const noexcept override {
         auto &&ctx = context<Context>();
         auto &it = ctx.it;
 
@@ -395,8 +396,8 @@ public:
         return {.f = f / Float(ctx.samples),
                 .pdf = lerp(1.f / (4.f * pi), pdf_sum / Float(ctx.samples), 0.9f)};
     }
-    [[nodiscard]] Surface::Sample sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u,
-                                         TransportMode mode) const noexcept override {
+    [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u,
+                                          TransportMode mode) const noexcept override {
         auto &&ctx = context<Context>();
         auto &it = ctx.it;
 

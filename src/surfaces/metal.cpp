@@ -226,9 +226,9 @@ public:
     }
     [[nodiscard]] const Interaction &it() const noexcept override { return context<Context>().it; }
 
-public:
-    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo, Expr<float3> wi,
-                                               TransportMode mode) const noexcept override {
+private:
+    [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
+                                                TransportMode mode) const noexcept override {
         auto &&ctx = context<Context>();
         auto &it = ctx.it;
         auto fresnel = FresnelConductor{ctx.eta_i, ctx.n, ctx.k};
@@ -242,8 +242,8 @@ public:
         auto pdf = lobe.pdf(wo_local, wi_local, mode);
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
-    [[nodiscard]] Surface::Sample sample(Expr<float3> wo, Expr<float>, Expr<float2> u,
-                                         TransportMode mode) const noexcept override {
+    [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float>, Expr<float2> u,
+                                          TransportMode mode) const noexcept override {
         auto &&ctx = context<Context>();
         auto &it = ctx.it;
         auto fresnel = FresnelConductor{ctx.eta_i, ctx.n, ctx.k};
@@ -269,7 +269,7 @@ luisa::unique_ptr<Surface::Closure> MetalInstance::create_closure(
 }
 
 void MetalInstance::populate_closure(Surface::Closure *closure, const Interaction &it,
-                                      Expr<float3> wo, Expr<float> eta_i) const noexcept {
+                                     Expr<float3> wo, Expr<float> eta_i) const noexcept {
     auto &swl = closure->swl();
     auto time = closure->time();
     auto alpha = def(make_float2(.5f));

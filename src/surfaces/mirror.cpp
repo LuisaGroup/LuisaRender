@@ -98,9 +98,9 @@ public:
     }
     [[nodiscard]] const Interaction &it() const noexcept override { return context<Context>().it; }
 
-public:
-    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo, Expr<float3> wi,
-                                               TransportMode mode) const noexcept override {
+private:
+    [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
+                                                TransportMode mode) const noexcept override {
         auto &&ctx = context<Context>();
         auto &it = ctx.it;
         auto fresnel = SchlickFresnel(ctx.refl);
@@ -113,8 +113,8 @@ public:
         auto pdf = refl.pdf(wo_local, wi_local, mode);
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
-    [[nodiscard]] Surface::Sample sample(Expr<float3> wo, Expr<float>, Expr<float2> u,
-                                         TransportMode mode) const noexcept override {
+    [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float>, Expr<float2> u,
+                                          TransportMode mode) const noexcept override {
         auto &&ctx = context<Context>();
         auto &it = ctx.it;
         auto fresnel = SchlickFresnel(ctx.refl);
@@ -125,7 +125,7 @@ public:
         auto wi_local = def(make_float3(0.f, 0.f, 1.f));
         auto wo_local = it.shading().world_to_local(wo);
         auto f = refl.sample(wo_local, std::addressof(wi_local),
-                               u, std::addressof(pdf), mode);
+                             u, std::addressof(pdf), mode);
         auto wi = it.shading().local_to_world(wi_local);
         return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf},
                 .wi = wi,
@@ -139,7 +139,7 @@ luisa::unique_ptr<Surface::Closure> MirrorInstance::create_closure(
 }
 
 void MirrorInstance::populate_closure(Surface::Closure *closure, const Interaction &it,
-                                       Expr<float3> wo, Expr<float> eta_i) const noexcept {
+                                      Expr<float3> wo, Expr<float> eta_i) const noexcept {
     auto alpha = def(make_float2(0.f));
     auto &swl = closure->swl();
     auto time = closure->time();
@@ -158,8 +158,7 @@ void MirrorInstance::populate_closure(Surface::Closure *closure, const Interacti
     MirrorClosure::Context ctx{
         .it = it,
         .refl = color,
-        .alpha = alpha
-    };
+        .alpha = alpha};
     closure->bind(std::move(ctx));
 }
 

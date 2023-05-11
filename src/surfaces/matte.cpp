@@ -83,9 +83,10 @@ public:
         _refl = nullptr;
     }
 
-    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo,
-                                               Expr<float3> wi,
-                                               TransportMode mode) const noexcept override {
+private:
+    [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo,
+                                                Expr<float3> wi,
+                                                TransportMode mode) const noexcept override {
         auto &&ctx = context<Context>();
         auto wo_local = ctx.it.shading().world_to_local(wo);
         auto wi_local = ctx.it.shading().world_to_local(wi);
@@ -94,15 +95,15 @@ public:
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
 
-    [[nodiscard]] Surface::Sample sample(Expr<float3> wo,
-                                         Expr<float> u_lobe, Expr<float2> u,
-                                         TransportMode mode) const noexcept override {
+    [[nodiscard]] Surface::Sample _sample(Expr<float3> wo,
+                                          Expr<float> u_lobe, Expr<float2> u,
+                                          TransportMode mode) const noexcept override {
         auto &&ctx = context<Context>();
         auto wo_local = ctx.it.shading().world_to_local(wo);
         auto wi_local = def(make_float3(0.0f, 0.0f, 1.0f));
         auto pdf = def(0.f);
         auto f = _refl->sample(wo_local, std::addressof(wi_local),
-                             u, std::addressof(pdf), mode);
+                               u, std::addressof(pdf), mode);
         auto wi = ctx.it.shading().local_to_world(wi_local);
         return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf},
                 .wi = wi,
@@ -116,7 +117,7 @@ luisa::unique_ptr<Surface::Closure> MatteInstance::create_closure(
 }
 
 void MatteInstance::populate_closure(Surface::Closure *closure, const Interaction &it,
-                                      Expr<float3> wo, Expr<float> eta_i) const noexcept {
+                                     Expr<float3> wo, Expr<float> eta_i) const noexcept {
     auto &swl = closure->swl();
     auto time = closure->time();
     auto [Kd, _] = _kd ? _kd->evaluate_albedo_spectrum(it, swl, time) :

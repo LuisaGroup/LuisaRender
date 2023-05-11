@@ -113,7 +113,7 @@ public:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> create_closure(
         const SampledWavelengths &swl, Expr<float> time) const noexcept override;
     void populate_closure(Surface::Closure *closure, const Interaction &it,
-                           Expr<float3> wo, Expr<float> eta_i) const noexcept override;
+                          Expr<float3> wo, Expr<float> eta_i) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> GlassSurface::_build(
@@ -165,10 +165,10 @@ private:
         return ite(r == 0.f, 0.f, r / (r + t));
     }
 
-public:
-    [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo,
-                                               Expr<float3> wi,
-                                               TransportMode mode) const noexcept override {
+private:
+    [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo,
+                                                Expr<float3> wi,
+                                                TransportMode mode) const noexcept override {
         auto &ctx = context<Context>();
         auto &it = ctx.it;
         auto distribution = TrowbridgeReitzDistribution{ctx.alpha};
@@ -192,9 +192,9 @@ public:
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
 
-    [[nodiscard]] Surface::Sample sample(Expr<float3> wo,
-                                         Expr<float> u_lobe, Expr<float2> u,
-                                         TransportMode mode) const noexcept override {
+    [[nodiscard]] Surface::Sample _sample(Expr<float3> wo,
+                                          Expr<float> u_lobe, Expr<float2> u,
+                                          TransportMode mode) const noexcept override {
         auto &ctx = context<Context>();
         auto &it = ctx.it;
         auto distribution = TrowbridgeReitzDistribution{ctx.alpha};
@@ -232,7 +232,7 @@ luisa::unique_ptr<Surface::Closure> GlassInstance::create_closure(
 }
 
 void GlassInstance::populate_closure(Surface::Closure *closure, const Interaction &it,
-                                      Expr<float3> wo, Expr<float> eta_i) const noexcept {
+                                     Expr<float3> wo, Expr<float> eta_i) const noexcept {
 
     auto alpha = def(make_float2(0.f));
     auto &swl = closure->swl();
