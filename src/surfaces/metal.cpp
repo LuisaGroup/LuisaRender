@@ -217,16 +217,12 @@ public:
     using Surface::Closure::Closure;
 
     [[nodiscard]] SampledSpectrum albedo() const noexcept override {
-        auto &&ctx = context<Context>();
-        auto fresnel = FresnelConductor{ctx.eta_i, ctx.n, ctx.k};
-        auto distribute = TrowbridgeReitzDistribution{ctx.alpha};
-        auto lobe = MicrofacetReflection{SampledSpectrum{swl().dimension(), 1.f}, &distribute, &fresnel};
-        return lobe.albedo();
+        // TODO: consider conductor fresnel
+        return context<Context>().refl;
     }
     [[nodiscard]] Float2 roughness() const noexcept override {
-        auto &&ctx = context<Context>();
-        auto distribute = TrowbridgeReitzDistribution{ctx.alpha};
-        return TrowbridgeReitzDistribution::alpha_to_roughness(distribute.alpha());
+        return TrowbridgeReitzDistribution::alpha_to_roughness(
+            context<Context>().alpha);
     }
     [[nodiscard]] const Interaction &it() const noexcept override { return context<Context>().it; }
 

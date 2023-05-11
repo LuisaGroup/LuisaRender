@@ -71,17 +71,26 @@ public:
     [[nodiscard]] Float2 roughness() const noexcept override { return make_float2(1.f); }
     [[nodiscard]] const Interaction &it() const noexcept override { return context<Context>().it; }
 
+private:
+    luisa::unique_ptr<OrenNayar> _refl;
+
 public:
+    void pre_eval() noexcept override {
+        auto &ctx = context<Context>();
+        _refl = luisa::make_unique<OrenNayar>(ctx.Kd, ctx.sigma);
+    }
+    void post_eval() noexcept override {
+        _refl = nullptr;
+    }
+
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo,
                                                Expr<float3> wi,
                                                TransportMode mode) const noexcept override {
         auto &&ctx = context<Context>();
-        auto &it = ctx.it;
-        auto refl = OrenNayar{ctx.Kd, ctx.sigma};
-        auto wo_local = it.shading().world_to_local(wo);
-        auto wi_local = it.shading().world_to_local(wi);
-        auto f = refl.evaluate(wo_local, wi_local, mode);
-        auto pdf = refl.pdf(wo_local, wi_local, mode);
+        auto wo_local = ctx.it.shading().world_to_local(wo);
+        auto wi_local = ctx.it.shading().world_to_local(wi);
+        auto f = _refl->evaluate(wo_local, wi_local, mode);
+        auto pdf = _refl->pdf(wo_local, wi_local, mode);
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
 
@@ -89,21 +98,20 @@ public:
                                          Expr<float> u_lobe, Expr<float2> u,
                                          TransportMode mode) const noexcept override {
         auto &&ctx = context<Context>();
-        auto &it = ctx.it;
-        auto refl = OrenNayar{ctx.Kd, ctx.sigma};
-        auto wo_local = it.shading().world_to_local(wo);
+        auto wo_local = ctx.it.shading().world_to_local(wo);
         auto wi_local = def(make_float3(0.0f, 0.0f, 1.0f));
         auto pdf = def(0.f);
-        auto f = refl.sample(wo_local, std::addressof(wi_local),
+        auto f = _refl->sample(wo_local, std::addressof(wi_local),
                              u, std::addressof(pdf), mode);
-        auto wi = it.shading().local_to_world(wi_local);
+        auto wi = ctx.it.shading().local_to_world(wi_local);
         return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf},
                 .wi = wi,
                 .event = Surface::event_reflect};
     }
 };
 
-luisa::unique_ptr<Surface::Closure> MatteInstance::create_closure(const SampledWavelengths &swl, Expr<float> time) const noexcept {
+luisa::unique_ptr<Surface::Closure> MatteInstance::create_closure(
+    const SampledWavelengths &swl, Expr<float> time) const noexcept {
     return luisa::make_unique<MatteClosure>(pipeline(), swl, time);
 }
 

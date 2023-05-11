@@ -91,16 +91,10 @@ public:
     using Surface::Closure::Closure;
 
     [[nodiscard]] SampledSpectrum albedo() const noexcept override {
-        auto &&ctx = context<Context>();
-        auto fresnel = SchlickFresnel(ctx.refl);
-        auto distribution = TrowbridgeReitzDistribution(ctx.alpha);
-        auto refl = MicrofacetReflection(ctx.refl, &distribution, &fresnel);
-        return refl.albedo();
+        return context<Context>().refl;
     }
     [[nodiscard]] Float2 roughness() const noexcept override {
-        auto &&ctx = context<Context>();
-        auto distribution = TrowbridgeReitzDistribution(ctx.alpha);
-        return TrowbridgeReitzDistribution::alpha_to_roughness(distribution.alpha());
+        return TrowbridgeReitzDistribution::alpha_to_roughness(context<Context>().alpha);
     }
     [[nodiscard]] const Interaction &it() const noexcept override { return context<Context>().it; }
 
