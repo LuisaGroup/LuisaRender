@@ -217,8 +217,9 @@ public:
     using Surface::Closure::Closure;
 
     [[nodiscard]] SampledSpectrum albedo() const noexcept override {
-        // TODO: consider conductor fresnel
-        return context<Context>().refl;
+        auto &ctx = context<Context>();
+        auto F0 = fresnel_conductor(1.f, 1.f, ctx.n, ctx.k);
+        return F0 * ctx.refl;
     }
     [[nodiscard]] Float2 roughness() const noexcept override {
         return TrowbridgeReitzDistribution::alpha_to_roughness(
