@@ -20,7 +20,8 @@ add_library(luisa-render-util SHARED
         vertex.h
         counter_buffer.cpp counter_buffer.h
         polymorphic_closure.h
-        command_buffer.cpp command_buffer.h)
+        command_buffer.cpp command_buffer.h
+        thread_pool.cpp thread_pool.h)
 target_link_libraries(luisa-render-util PUBLIC
         luisa::compute
         luisa-render-include

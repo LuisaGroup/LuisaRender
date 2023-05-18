@@ -5,12 +5,11 @@
 #pragma once
 
 #include <dsl/syntax.h>
-#include <runtime/command_buffer.h>
+#include <util/command_buffer.h>
 #include <base/scene_node.h>
 
 namespace luisa::render {
 
-using compute::CommandBuffer;
 using compute::Float;
 using compute::Float2;
 

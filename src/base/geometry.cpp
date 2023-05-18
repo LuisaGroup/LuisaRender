@@ -3,18 +3,22 @@
 //
 
 #include <util/sampling.h>
+#include <util/thread_pool.h>
 #include <base/geometry.h>
 #include <base/pipeline.h>
 
 namespace luisa::render {
 
-void Geometry::build(CommandBuffer &command_buffer, luisa::span<const Shape *const> shapes,
-                     float init_time, AccelUsageHint hint) noexcept {
-    _accel = _pipeline.device().create_accel(hint);
+void Geometry::build(CommandBuffer &command_buffer,
+                     luisa::span<const Shape *const> shapes,
+                     float init_time) noexcept {
+    // TODO: AccelOption
+    _accel = _pipeline.device().create_accel({});
     for (auto i = 0u; i < 3u; ++i) {
         _world_max[i] = -std::numeric_limits<float>::max();
         _world_min[i] = std::numeric_limits<float>::max();
-    }for (auto shape : shapes) { _process_shape(command_buffer, shape, init_time, nullptr); }
+    }
+    for (auto shape : shapes) { _process_shape(command_buffer, shape, init_time, nullptr); }
     _instance_buffer = _pipeline.device().create_buffer<uint4>(_instances.size());
     command_buffer << _instance_buffer.copy_from(_instances.data())
                    << _accel.build();
@@ -44,8 +48,8 @@ void Geometry::_process_shape(
             auto mesh_geom = [&] {
                 auto [vertices, triangles] = shape->mesh();
                 LUISA_ASSERT(!vertices.empty() && !triangles.empty(), "Empty mesh.");
-                auto hash = luisa::detail::murmur2_hash64(vertices.data(), vertices.size_bytes(), Hash64::default_seed);
-                hash = luisa::detail::murmur2_hash64(triangles.data(), triangles.size_bytes(), hash);
+                auto hash = luisa::hash64(vertices.data(), vertices.size_bytes(), luisa::hash64_default_seed);
+                hash = luisa::hash64(triangles.data(), triangles.size_bytes(), hash);
                 if (auto mesh_iter = _mesh_cache.find(hash);
                     mesh_iter != _mesh_cache.end()) {
                     return mesh_iter->second;
@@ -53,7 +57,7 @@ void Geometry::_process_shape(
                 // create mesh
                 auto vertex_buffer = _pipeline.create<Buffer<Vertex>>(vertices.size());
                 auto triangle_buffer = _pipeline.create<Buffer<Triangle>>(triangles.size());
-                auto mesh = _pipeline.create<Mesh>(*vertex_buffer, *triangle_buffer, shape->build_hint());
+                auto mesh = _pipeline.create<Mesh>(*vertex_buffer, *triangle_buffer, shape->build_option());
                 command_buffer << vertex_buffer->copy_from(vertices.data())
                                << triangle_buffer->copy_from(triangles.data())
                                << compute::commit()
@@ -157,14 +161,14 @@ bool Geometry::update(CommandBuffer &command_buffer, float time) noexcept {
                     t.instance_id(), t.matrix(time));
             }
         } else {
-            ThreadPool::global().parallel(
+            global_thread_pool().parallel(
                 _dynamic_transforms.size(),
                 [this, time](auto i) noexcept {
                     auto t = _dynamic_transforms[i];
                     _accel.set_transform_on_update(
                         t.instance_id(), t.matrix(time));
                 });
-            ThreadPool::global().synchronize();
+            global_thread_pool().synchronize();
         }
         command_buffer << _accel.build();
     }
@@ -172,11 +176,12 @@ bool Geometry::update(CommandBuffer &command_buffer, float time) noexcept {
 }
 
 Var<Hit> Geometry::trace_closest(const Var<Ray> &ray) const noexcept {
-    return _accel.trace_closest(ray);
+    auto hit = _accel->trace_closest(ray);
+    return def<Hit>(hit.inst, hit.prim, hit.bary);
 }
 
 Var<bool> Geometry::trace_any(const Var<Ray> &ray) const noexcept {
-    return _accel.trace_any(ray);
+    return _accel->trace_any(ray);
 }
 
 luisa::shared_ptr<Interaction> Geometry::interaction(Expr<uint> inst_id, Expr<uint> prim_id,
@@ -202,11 +207,11 @@ luisa::shared_ptr<Interaction> Geometry::interaction(const Var<Ray> &ray, const 
 }
 
 Shape::Handle Geometry::instance(Expr<uint> index) const noexcept {
-    return Shape::Handle::decode(_instance_buffer.read(index));
+    return Shape::Handle::decode(_instance_buffer->read(index));
 }
 
 Float4x4 Geometry::instance_to_world(Expr<uint> index) const noexcept {
-    return _accel.instance_transform(index);
+    return _accel->instance_transform(index);
 }
 
 Var<Triangle> Geometry::triangle(const Shape::Handle &instance, Expr<uint> index) const noexcept {

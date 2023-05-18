@@ -4,7 +4,13 @@
 
 #pragma once
 
-#include <luisa-compute.h>
+#include <runtime/buffer.h>
+#include <runtime/buffer_arena.h>
+#include <runtime/image.h>
+#include <runtime/bindless_array.h>
+#include <runtime/rtx/mesh.h>
+#include <runtime/rtx/accel.h>
+
 #include <util/spec.h>
 #include <base/shape.h>
 #include <base/light.h>
@@ -25,7 +31,7 @@
 namespace luisa::render {
 
 using compute::Accel;
-using compute::AccelUsageHint;
+using compute::AccelOption;
 using compute::BindlessArray;
 using compute::BindlessBuffer;
 using compute::BindlessTexture2D;
@@ -35,7 +41,6 @@ using compute::BufferArena;
 using compute::BufferView;
 using compute::Callable;
 using compute::Device;
-using compute::Hit;
 using compute::Image;
 using compute::Mesh;
 using compute::PixelStorage;
@@ -106,7 +111,7 @@ public:
     template<typename T>
     [[nodiscard]] auto register_bindless(BufferView<T> buffer) noexcept {
         auto buffer_id = _bindless_buffer_count++;
-        _bindless_array.emplace(buffer_id, buffer);
+        _bindless_array.emplace_on_update(buffer_id, buffer);
         return static_cast<uint>(buffer_id);
     }
 
@@ -118,14 +123,14 @@ public:
     template<typename T>
     [[nodiscard]] auto register_bindless(const Image<T> &image, TextureSampler sampler) noexcept {
         auto tex2d_id = _bindless_tex2d_count++;
-        _bindless_array.emplace(tex2d_id, image, sampler);
+        _bindless_array.emplace_on_update(tex2d_id, image, sampler);
         return static_cast<uint>(tex2d_id);
     }
 
     template<typename T>
     [[nodiscard]] auto register_bindless(const Volume<T> &volume, TextureSampler sampler) noexcept {
         auto tex3d_id = _bindless_tex3d_count++;
-        _bindless_array.emplace(tex3d_id, volume, sampler);
+        _bindless_array.emplace_on_update(tex3d_id, volume, sampler);
         return static_cast<uint>(tex3d_id);
     }
 
@@ -209,20 +214,20 @@ public:
     [[nodiscard]] auto &printer() const noexcept { return *_printer; }
     [[nodiscard]] uint named_id(luisa::string_view name) const noexcept;
     template<typename T, typename I>
-    [[nodiscard]] auto buffer(I &&i) const noexcept { return _bindless_array.buffer<T>(std::forward<I>(i)); }
+    [[nodiscard]] auto buffer(I &&i) const noexcept { return _bindless_array->buffer<T>(std::forward<I>(i)); }
     template<typename I>
-    [[nodiscard]] auto tex2d(I &&i) const noexcept { return _bindless_array.tex2d(std::forward<I>(i)); }
+    [[nodiscard]] auto tex2d(I &&i) const noexcept { return _bindless_array->tex2d(std::forward<I>(i)); }
     template<typename I>
-    [[nodiscard]] auto tex3d(I &&i) const noexcept { return _bindless_array.tex3d(std::forward<I>(i)); }
+    [[nodiscard]] auto tex3d(I &&i) const noexcept { return _bindless_array->tex3d(std::forward<I>(i)); }
     template<typename T>
     [[nodiscard]] auto named_buffer(luisa::string_view name) const noexcept {
-        return _bindless_array.buffer<T>(named_id(name));
+        return _bindless_array->buffer<T>(named_id(name));
     }
     [[nodiscard]] auto named_tex2d(luisa::string_view name) const noexcept {
-        return _bindless_array.tex2d(named_id(name));
+        return _bindless_array->tex2d(named_id(name));
     }
     [[nodiscard]] auto named_tex3d(luisa::string_view name) const noexcept {
-        return _bindless_array.tex3d(named_id(name));
+        return _bindless_array->tex3d(named_id(name));
     }
     [[nodiscard]] Float4x4 transform(const Transform *transform) const noexcept;
 

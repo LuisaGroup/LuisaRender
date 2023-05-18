@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <runtime/command_buffer.h>
+#include <util/command_buffer.h>
 #include <base/scene_node.h>
 #include <base/sampler.h>
 #include <base/spectrum.h>
@@ -15,7 +15,6 @@ namespace luisa::render {
 
 class Pipeline;
 class Display;
-using compute::CommandBuffer;
 
 class Integrator : public SceneNode {
 

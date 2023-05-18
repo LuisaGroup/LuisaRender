@@ -4,8 +4,7 @@
 
 #pragma once
 
-#include "core/basic_types.h"
-#include <rtx/ray.h>
+#include <dsl/rtx/ray.h>
 #include <runtime/bindless_array.h>
 #include <util/spec.h>
 #include <base/scene_node.h>

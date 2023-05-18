@@ -19,7 +19,6 @@ class SampledWavelengths;
 
 using compute::Buffer;
 using compute::BufferView;
-using compute::CommandBuffer;
 using compute::Float4;
 using compute::Image;
 using compute::PixelStorage;

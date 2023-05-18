@@ -4,7 +4,7 @@
 
 #include <mutex>
 
-#include <core/thread_pool.h>
+#include <util/thread_pool.h>
 #include <sdl/scene_desc.h>
 #include <sdl/scene_node_desc.h>
 #include <base/camera.h>
@@ -70,7 +70,7 @@ namespace detail {
     if (auto iter = registry.find(name); iter != registry.end()) {
         return *iter->second;
     }
-    auto module = luisa::make_unique<DynamicModule>(runtime_dir, name);
+    auto module = luisa::make_unique<DynamicModule>(DynamicModule::load(runtime_dir, name));
     return *registry.emplace(name, std::move(module)).first->second;
 }
 
@@ -228,7 +228,7 @@ luisa::unique_ptr<Scene> Scene::create(const Context &ctx, const SceneDesc *desc
         scene->_config->shapes.emplace_back(
             scene->load_shape(s));
     }
-    ThreadPool::global().synchronize();
+    global_thread_pool().synchronize();
     return scene;
 }
 

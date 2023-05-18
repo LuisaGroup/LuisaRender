@@ -19,8 +19,40 @@ private:
     CommandList _list;
 
 public:
+    explicit CommandBuffer(Stream *stream) noexcept;
+    ~CommandBuffer() noexcept;
 
+    template<typename T>
+    CommandBuffer &operator<<(T &&cmd) noexcept {
+        if constexpr (requires { _list << std::forward<T>(cmd); }) {
+            _list << std::forward<T>(cmd);
+        } else {
+            *_stream << _list.commit()
+                     << std::forward<T>(cmd);
+        }
+        return *this;
+    }
 
+    CommandBuffer &operator<<(compute::Stream::Commit) noexcept {
+        if (!_list.empty()) { *_stream << _list.commit(); }
+        return *this;
+    }
+
+    CommandBuffer &operator<<(compute::Stream::Synchronize) noexcept {
+        if (!_list.empty()) { *_stream << _list.commit(); }
+        _stream->synchronize();
+        return *this;
+    }
+
+    template<typename... T>
+    CommandBuffer &operator<<(std::tuple<T...> cmds) noexcept {
+        std::apply(
+            [&]<typename... Cmd>(Cmd &&...cmd) noexcept {
+                ((*this) << ... << std::forward<Cmd>(cmd));
+            },
+            std::move(cmds));
+        return *this;
+    }
 };
 
 }// namespace luisa::render

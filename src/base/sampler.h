@@ -5,6 +5,7 @@
 #pragma once
 
 #include <dsl/syntax.h>
+#include <util/command_buffer.h>
 #include <base/scene_node.h>
 
 namespace luisa::render {

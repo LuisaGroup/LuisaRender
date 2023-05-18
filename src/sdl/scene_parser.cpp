@@ -7,7 +7,7 @@
 #include <fast_float/fast_float.h>
 
 #include <core/logging.h>
-#include <core/thread_pool.h>
+#include <util/thread_pool.h>
 #include <sdl/scene_parser.h>
 #include <sdl/scene_desc.h>
 #include <sdl/scene_parser_json.h>
@@ -77,7 +77,7 @@ inline void SceneParser::_parse_source() noexcept {
             _skip_blanks();
             std::filesystem::path path{_read_string()};
             if (!path.is_absolute()) { path = _location.file()->parent_path() / path; }
-            ThreadPool::global().async([path = std::move(path), &desc = _desc, &cli_macros = _cli_macros] {
+            global_thread_pool().async([path = std::move(path), &desc = _desc, &cli_macros = _cli_macros] {
                 SceneParser::_dispatch_parse(desc, path, cli_macros);
             });
         } else if (token == "define") {
@@ -402,7 +402,7 @@ luisa::unique_ptr<SceneDesc> SceneParser::parse(
     const std::filesystem::path &entry_file, const MacroMap &cli_macros) noexcept {
     auto desc = luisa::make_unique<SceneDesc>();
     _dispatch_parse(*desc, entry_file, cli_macros);
-    ThreadPool::global().synchronize();
+    global_thread_pool().synchronize();
     return desc;
 }
 

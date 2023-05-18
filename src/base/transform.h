@@ -6,7 +6,6 @@
 
 #include <core/basic_types.h>
 #include <core/stl.h>
-#include <rtx/accel.h>
 #include <runtime/buffer.h>
 #include <base/scene_node.h>
 

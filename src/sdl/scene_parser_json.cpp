@@ -6,7 +6,7 @@
 #include <streambuf>
 
 #include <nlohmann/json.hpp>
-#include <core/thread_pool.h>
+#include <util/thread_pool.h>
 #include <sdl/scene_desc.h>
 #include <sdl/scene_node_desc.h>
 #include <sdl/scene_parser.h>
@@ -127,7 +127,7 @@ void SceneParserJSON::_parse_import(const json &node) const noexcept {
     auto dispatch_parse = [this](auto file_name) {
         std::filesystem::path path{file_name};
         if (!path.is_absolute()) { path = _location.file()->parent_path() / path; }
-        ThreadPool::global().async([path = std::move(path), &desc = _desc, &cli_macros = _cli_macros] {
+        global_thread_pool().async([path = std::move(path), &desc = _desc, &cli_macros = _cli_macros] {
             SceneParser::_dispatch_parse(desc, path, cli_macros);
         });
     };

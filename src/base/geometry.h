@@ -4,7 +4,8 @@
 
 #pragma once
 
-#include <luisa-compute.h>
+#include <dsl/syntax.h>
+#include <runtime/rtx/accel.h>
 #include <base/transform.h>
 #include <base/light.h>
 #include <base/shape.h>
@@ -12,12 +13,27 @@
 
 namespace luisa::render {
 
+struct Hit {
+    uint inst;
+    uint prim;
+    float2 bary;
+};
+
+}// namespace luisa::render
+
+// clang-format off
+LUISA_STRUCT(luisa::render::Hit, inst, prim, bary) {
+    [[nodiscard]] auto miss() const noexcept { return inst == ~0u; }
+};
+// clang-format on
+
+namespace luisa::render {
+
 using compute::Accel;
+using compute::AccelOption;
 using compute::Buffer;
-using compute::CommandBuffer;
 using compute::Expr;
 using compute::Float4x4;
-using compute::Hit;
 using compute::Mesh;
 using compute::Var;
 
@@ -66,7 +82,7 @@ public:
     explicit Geometry(Pipeline &pipeline) noexcept : _pipeline{pipeline} {};
     void build(CommandBuffer &command_buffer,
                luisa::span<const Shape *const> shapes,
-               float init_time, AccelUsageHint hint) noexcept;
+               float init_time) noexcept;
     bool update(CommandBuffer &command_buffer, float time) noexcept;
     [[nodiscard]] auto instances() const noexcept { return luisa::span{_instances}; }
     [[nodiscard]] auto light_instances() const noexcept { return luisa::span{_instanced_lights}; }

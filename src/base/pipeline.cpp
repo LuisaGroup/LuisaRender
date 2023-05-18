@@ -2,7 +2,7 @@
 // Created by Mike on 2021/12/15.
 //
 
-#include <luisa-compute.h>
+#include <util/thread_pool.h>
 #include <util/sampling.h>
 #include <base/pipeline.h>
 #include <base/scene.h>
@@ -12,7 +12,7 @@ namespace luisa::render {
 inline Pipeline::Pipeline(Device &device) noexcept
     : _device{device},
       _bindless_array{device.create_bindless_array(bindless_array_capacity)},
-      _general_buffer_arena{luisa::make_unique<BufferArena>(device, 16_mb)},
+      _general_buffer_arena{luisa::make_unique<BufferArena>(device, 16_M)},
       _printer{luisa::make_unique<compute::Printer>(device)} {}
 
 Pipeline::~Pipeline() noexcept = default;
@@ -42,7 +42,7 @@ uint Pipeline::register_medium(CommandBuffer &command_buffer, const Medium *medi
 }
 
 luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, const Scene &scene) noexcept {
-    ThreadPool::global().synchronize();
+    global_thread_pool().synchronize();
     auto pipeline = luisa::make_unique<Pipeline>(device);
     stream << pipeline->printer().reset();
     auto initial_time = std::numeric_limits<float>::max();
@@ -55,13 +55,15 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     pipeline->_transform_matrices.resize(transform_matrix_buffer_size);
     pipeline->_transform_matrix_buffer = device.create_buffer<float4x4>(transform_matrix_buffer_size);
     pipeline->_cameras.reserve(scene.cameras().size());
-    auto command_buffer = stream.command_buffer();
+    CommandBuffer command_buffer{&stream};
     pipeline->_spectrum = scene.spectrum()->build(*pipeline, command_buffer);
     for (auto camera : scene.cameras()) {
         pipeline->_cameras.emplace_back(camera->build(*pipeline, command_buffer));
     }
     pipeline->_geometry = luisa::make_unique<Geometry>(*pipeline);
-    pipeline->_geometry->build(command_buffer, scene.shapes(), pipeline->_initial_time, AccelUsageHint::FAST_TRACE);
+    AccelOption accel_option;
+    accel_option.allow_update = pipeline->_any_dynamic_transforms;
+    pipeline->_geometry->build(command_buffer, scene.shapes(), pipeline->_initial_time);
     if (auto env = scene.environment(); env != nullptr && !env->is_black()) {
         pipeline->_environment = env->build(*pipeline, command_buffer);
     }
@@ -151,7 +153,7 @@ Float4x4 Pipeline::transform(const Transform *transform) const noexcept {
     if (transform->is_identity()) { return make_float4x4(1.f); }
     auto iter = _transform_to_id.find(transform);
     LUISA_ASSERT(iter != _transform_to_id.cend(), "Transform is not registered.");
-    return _transform_matrix_buffer.read(iter->second);
+    return _transform_matrix_buffer->read(iter->second);
 }
 
 uint Pipeline::named_id(luisa::string_view name) const noexcept {
@@ -172,7 +174,7 @@ std::pair<BufferView<float4>, uint> Pipeline::allocate_constant_slot() noexcept 
 }
 
 Float4 Pipeline::constant(Expr<uint> index) const noexcept {
-    return _constant_buffer.read(index);
+    return _constant_buffer->read(index);
 }
 
 }// namespace luisa::render
