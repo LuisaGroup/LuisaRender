@@ -144,8 +144,7 @@ public:
             }
             auto name = luisa::format(
                 "__custom_ior_{:016x}",
-                luisa::detail::murmur2_hash64(
-                    eta.data(), eta.size() * sizeof(float), 19980810u));
+                luisa::hash64(eta.data(), eta.size() * sizeof(float), 19980810u));
             _ior = register_eta_k(name, lut);
         }
     }

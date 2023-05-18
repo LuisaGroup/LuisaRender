@@ -3,9 +3,11 @@
 //
 
 #include <span>
+#include <iostream>
 
 #include <cxxopts.hpp>
 
+#include <core/stl/format.h>
 #include <sdl/scene_desc.h>
 #include <sdl/scene_parser.h>
 #include <base/scene.h>
@@ -119,8 +121,9 @@ int main(int argc, char *argv[]) {
     auto backend = options["backend"].as<luisa::string>();
     auto index = options["device"].as<uint32_t>();
     auto path = options["scene"].as<std::filesystem::path>();
-    auto device = context.create_device(
-        backend, luisa::format(R"({{"index": {}}})", index));
+    compute::DeviceConfig config;
+    config.device_index = index;
+    auto device = context.create_device(backend, &config);
 
     Clock clock;
     auto scene_desc = SceneParser::parse(path, macros);
@@ -129,7 +132,7 @@ int main(int argc, char *argv[]) {
     LUISA_INFO("Parsed scene description file '{}' in {} ms.",
                path.string(), parse_time);
     auto scene = Scene::create(context, scene_desc.get());
-    auto stream = device.create_stream(false);
+    auto stream = device.create_stream(StreamTag::COMPUTE);
     auto pipeline = Pipeline::create(device, stream, *scene);
     pipeline->render(stream);
     stream.synchronize();

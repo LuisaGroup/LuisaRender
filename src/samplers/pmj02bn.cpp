@@ -167,11 +167,11 @@ public:
         _sample_index.emplace(sample_index);
     }
     void save_state(Expr<uint> state_id) noexcept override {
-        _state_buffer.write(
+        _state_buffer->write(
             state_id, make_uint4(*_pixel, *_sample_index, *_dimension));
     }
     void load_state(Expr<uint> state_id) noexcept override {
-        auto state = _state_buffer.read(state_id);
+        auto state = _state_buffer->read(state_id);
         _pixel.emplace(state.xy());
         _sample_index.emplace(state.z);
         _dimension.emplace(state.w);
@@ -212,7 +212,7 @@ public:
     [[nodiscard]] Float2 generate_pixel_2d() noexcept override {
         auto p = *_pixel % _pixel_tile_size;
         auto offset = (p.x + p.y * _pixel_tile_size) * _spp;
-        return _pixel_samples.read(offset + *_sample_index);
+        return _pixel_samples->read(offset + *_sample_index);
     }
 };
 

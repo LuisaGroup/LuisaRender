@@ -59,11 +59,11 @@ void IndependentSamplerInstance::start(Expr<uint2> pixel, Expr<uint> index) noex
 }
 
 void IndependentSamplerInstance::save_state(Expr<uint> state_id) noexcept {
-    _states.write(state_id, *_state);
+    _states->write(state_id, *_state);
 }
 
 void IndependentSamplerInstance::load_state(Expr<uint> state_id) noexcept {
-    _state.emplace(_states.read(state_id));
+    _state.emplace(_states->read(state_id));
 }
 
 Float IndependentSamplerInstance::generate_1d() noexcept {

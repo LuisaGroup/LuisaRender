@@ -117,10 +117,10 @@ public:
     }
     void save_state(Expr<uint> state_id) noexcept override {
         auto state = make_uint4(*_pixel, *_sample_index, *_dimension);
-        _state_buffer.write(state_id, state);
+        _state_buffer->write(state_id, state);
     }
     void load_state(Expr<uint> state_id) noexcept override {
-        auto state = _state_buffer.read(state_id);
+        auto state = _state_buffer->read(state_id);
         _pixel.emplace(state.xy());
         _sample_index.emplace(state.z);
         _dimension.emplace(state.w);

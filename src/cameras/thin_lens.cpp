@@ -2,7 +2,7 @@
 // Created by Mike on 2022/1/7.
 //
 
-#include <rtx/ray.h>
+#include <dsl/rtx/ray.h>
 #include <util/sampling.h>
 #include <base/camera.h>
 #include <base/film.h>
@@ -91,7 +91,7 @@ public:
     [[nodiscard]] std::pair<Var<Ray>, Float> _generate_ray_in_camera_space(Expr<float2> pixel,
                                                                            Expr<float2> u_lens,
                                                                            Expr<float> /* time */) const noexcept override {
-        auto data = _device_data.read(0u);
+        auto data = _device_data->read(0u);
         auto coord_focal = (pixel - data.pixel_offset) * data.projected_pixel_size;
         auto p_focal = make_float3(coord_focal.x, -coord_focal.y, -data.focus_distance);
         auto coord_lens = sample_uniform_disk_concentric(u_lens) * data.lens_radius;

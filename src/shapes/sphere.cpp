@@ -2,6 +2,9 @@
 // Created by Mike Smith on 2022/11/8.
 //
 
+#include <future>
+
+#include <util/thread_pool.h>
 #include <base/shape.h>
 #include <util/loop_subdiv.h>
 
@@ -84,7 +87,7 @@ public:
         static std::mutex mutex;
         std::scoped_lock lock{mutex};
         if (auto g = cache.at(subdiv); g.valid()) { return g; }
-        auto future = ThreadPool::global().async([subdiv] {
+        auto future = global_thread_pool().async([subdiv] {
             auto [vertices, triangles, _] = loop_subdivide(base_vertices, sphere_base_triangles, subdiv);
             for (auto &v : vertices) {
                 auto p = normalize(v.position());

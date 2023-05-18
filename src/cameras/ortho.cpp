@@ -2,7 +2,7 @@
 // Created by Mike Smith on 2022/3/26.
 //
 
-#include <rtx/ray.h>
+#include <dsl/rtx/ray.h>
 #include <base/camera.h>
 #include <base/film.h>
 #include <base/pipeline.h>
@@ -51,7 +51,7 @@ public:
         const OrthoCamera *camera) noexcept;
     [[nodiscard]] std::pair<Var<Ray>, Float> _generate_ray_in_camera_space(
         Expr<float2> pixel, Expr<float2> /* u_lens */, Expr<float> /* time */) const noexcept override {
-        auto data = _device_data.read(0u);
+        auto data = _device_data->read(0u);
         auto p = (pixel * 2.0f - data.resolution) / data.resolution.y * data.scale;
         auto ray = make_ray(make_float3(p.x, -p.y, 0.f), make_float3(0.f, 0.f, -1.f));
         return std::make_pair(std::move(ray), 1.0f);

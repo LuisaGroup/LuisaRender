@@ -168,7 +168,7 @@ luisa::unique_ptr<Environment::Instance> Spherical::build(
                 };
             };
             auto pixel_id = pixel.y * sample_map_size.x + pixel.x;
-            scale_map_device.write(pixel_id, sum_scale / sum_weight);
+            scale_map_device->write(pixel_id, sum_scale / sum_weight);
         };
         auto generate_weight_map = device.compile(generate_weight_map_kernel);
         Clock clk;

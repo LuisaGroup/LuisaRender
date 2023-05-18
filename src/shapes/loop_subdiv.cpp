@@ -2,8 +2,10 @@
 // Created by Mike Smith on 2022/11/8.
 //
 
+#include <core/clock.h>
 #include <base/shape.h>
 #include <base/scene.h>
+#include <util/thread_pool.h>
 #include <util/loop_subdiv.h>
 
 namespace luisa::render {
@@ -32,7 +34,7 @@ public:
             LUISA_WARNING_WITH_LOCATION(
                 "LoopSubdiv level is 0, which is equivalent to no subdivision.");
         } else {
-            _geometry = ThreadPool::global().async([level, mesh = _mesh] {
+            _geometry = global_thread_pool().async([level, mesh = _mesh] {
                 auto m = mesh->mesh();
                 Clock clk;
                 auto [vertices, triangles, _] = loop_subdivide(m.vertices, m.triangles, level);
@@ -56,7 +58,7 @@ public:
                    Shape::property_flag_has_vertex_normal :
                    _mesh->vertex_properties();
     }
-    [[nodiscard]] AccelUsageHint build_hint() const noexcept override { return _mesh->build_hint(); }
+    [[nodiscard]] AccelOption build_option() const noexcept override { return _mesh->build_option(); }
 };
 
 using LoopSubdivWrapper =

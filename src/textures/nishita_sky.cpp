@@ -4,6 +4,7 @@
 
 #include <base/texture.h>
 #include <base/pipeline.h>
+#include <util/thread_pool.h>
 #include <textures/sky_precompute.h>
 
 namespace luisa::render {
@@ -46,7 +47,7 @@ public:
                             .dust_density = _dust_density,
                             .ozone_density = _ozone_density};
         _image = LoadedImage::create(resolution, PixelStorage::FLOAT4);
-        ThreadPool::global().parallel(
+        global_thread_pool().parallel(
             resolution.y / height_per_thread, [data, this](uint32_t y) noexcept {
                 SKY_nishita_skymodel_precompute_texture(
                     data, static_cast<float4 *>(_image.pixels()),

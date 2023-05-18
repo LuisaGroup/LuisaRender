@@ -2,8 +2,12 @@
 // Created by Mike Smith on 2022/11/8.
 //
 
+#include <fstream>
+
 #define LUISA_RENDER_PLUGIN_NAME "sphere"
 #include <shapes/sphere.cpp>
+#include <core/clock.h>
+#include <util/thread_pool.h>
 
 using namespace luisa;
 using namespace luisa::compute;
@@ -31,7 +35,7 @@ void dump_obj(MeshView m, uint level) noexcept {
 }
 
 int main() {
-    static_cast<void>(ThreadPool::global());
+    static_cast<void>(global_thread_pool());
     for (auto i = 0u; i <= sphere_max_subdivision_level; i++) {
         Clock clk;
         auto future = SphereGeometry::create(i);

@@ -3,7 +3,8 @@
 //
 
 #include <core/mathematics.h>
-#include <core/thread_pool.h>
+#include <core/logging.h>
+#include <util/thread_pool.h>
 #include <util/imageio.h>
 #include <textures/sky_precompute.h>
 
@@ -20,7 +21,7 @@ int main() {
                         .ozone_density = 2.783f};
     static constexpr auto resolution = make_uint2(2048u);
     luisa::vector<float4> image(resolution.x * resolution.y);
-    ThreadPool::global().parallel(resolution.y / 16u, [&](uint32_t y) noexcept {
+    global_thread_pool().parallel(resolution.y / 16u, [&](uint32_t y) noexcept {
         SKY_nishita_skymodel_precompute_texture(
             data, image.data(), resolution, make_uint2(y * 16u, (y + 1u) * 16u));
     });
@@ -28,7 +29,7 @@ int main() {
     LUISA_INFO("Sun: ({}, {}, {}) -> ({}, {}, {})",
                sun.bottom.x, sun.bottom.y, sun.bottom.z,
                sun.top.x, sun.top.y, sun.top.z);
-    ThreadPool::global().synchronize();
+    global_thread_pool().synchronize();
     save_image("sky_precompute_test.exr",
                reinterpret_cast<const float *>(image.data()),
                resolution);

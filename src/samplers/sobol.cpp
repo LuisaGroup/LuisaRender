@@ -136,10 +136,10 @@ public:
     }
     void save_state(Expr<uint> state_id) noexcept override {
         auto state = make_uint4(_sobol_index->bits(), *_dimension, (_pixel->y << 16u) | _pixel->x);
-        _state_buffer.write(state_id, state);
+        _state_buffer->write(state_id, state);
     }
     void load_state(Expr<uint> state_id) noexcept override {
-        auto state = _state_buffer.read(state_id);
+        auto state = _state_buffer->read(state_id);
         _sobol_index.emplace(state.xy());
         _dimension.emplace(state.z);
         _pixel.emplace(make_uint2(state.w >> 16u, state.w & 0xffffu));

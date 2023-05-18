@@ -193,7 +193,7 @@ public:
             $if(!any(isnan(value))) {
                 auto index = p.x + p.y * _resolution.x;
                 for (auto i = 0u; i < _channels; i++) {
-                    _buffer.atomic(index * _channels + i).fetch_add(value[i]);
+                    _buffer->atomic(index * _channels + i).fetch_add(value[i]);
                 }
             };
         }

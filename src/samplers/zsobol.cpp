@@ -72,7 +72,7 @@ public:
         std::array<uint2, max_dimension> sample_hash{};
         for (auto i = 0u; i < max_dimension; i++) {
             auto u = (static_cast<uint64_t>(s->seed()) << 32u) | i;
-            auto hash = hash64(u);
+            auto hash = hash_value(u);
             sample_hash[i] = luisa::make_uint2(
                 static_cast<uint>(hash & ~0u),
                 static_cast<uint>(hash >> 32u));
@@ -155,12 +155,12 @@ public:
     }
     void save_state(Expr<uint> state_id) noexcept override {
         auto state = make_uint3(_morton_index->bits(), *_dimension);
-        _state_buffer.write(state_id, state);
+        _state_buffer->write(state_id, state);
     }
     void load_state(Expr<uint> state_id) noexcept override {
         _dimension = luisa::nullopt;
         _morton_index = luisa::nullopt;
-        auto state = _state_buffer.read(state_id);
+        auto state = _state_buffer->read(state_id);
         _morton_index = U64{state.xy()};
         _dimension = state.z;
     }

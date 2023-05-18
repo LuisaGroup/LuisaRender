@@ -2,7 +2,7 @@
 // Created by Mike Smith on 2022/3/23.
 //
 
-#include <core/thread_pool.h>
+#include <util/thread_pool.h>
 #include <util/imageio.h>
 #include <util/half.h>
 #include <base/texture.h>
@@ -34,7 +34,7 @@ private:
 
 private:
     void _load_image(std::filesystem::path path) noexcept {
-        _image = ThreadPool::global().async([path = std::move(path)] {
+        _image = global_thread_pool().async([path = std::move(path)] {
             return LoadedImage::load(path);
         });
     }

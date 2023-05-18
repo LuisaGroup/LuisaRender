@@ -2,7 +2,7 @@
 // Created by Mike on 2022/1/7.
 //
 
-#include <rtx/ray.h>
+#include <dsl/rtx/ray.h>
 #include <base/camera.h>
 #include <base/film.h>
 #include <base/pipeline.h>
@@ -59,7 +59,7 @@ public:
     }
     [[nodiscard]] std::pair<Var<Ray>, Float> _generate_ray_in_camera_space(
         Expr<float2> pixel, Expr<float2> /* u_lens */, Expr<float> /* time */) const noexcept override {
-        auto data = _device_data.read(0u);
+        auto data = _device_data->read(0u);
         auto p = (pixel * 2.0f - data.resolution) * (data.tan_half_fov / data.resolution.y);
         auto direction = normalize(make_float3(p.x, -p.y, -1.f));
         auto ray = make_ray(make_float3(), direction);

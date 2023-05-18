@@ -11,17 +11,19 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
+#include <nlohmann/json.hpp>
+
 #include <stb/stb_image.h>
 #include <stb/stb_image_write.h>
 
 #include <core/stl.h>
 #include <core/logging.h>
-#include <core/json.h>
 #include <core/mathematics.h>
 
 using luisa::uint;
+using nlohmann::json;
 
-void replace(luisa::json::string_t &str, luisa::string_view from, luisa::string_view to) {
+void replace(json::string_t &str, luisa::string_view from, luisa::string_view to) {
     if (!from.empty()) {
         size_t start_pos = 0u;
         while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
@@ -72,11 +74,11 @@ int main(int argc, char *argv[]) {
     };
 
     // convert
-    luisa::json scene_materials;
-    luisa::json scene_geometry;
+    json scene_materials;
+    json scene_geometry;
 
     // textures
-    luisa::unordered_map<uint, luisa::json::string_t> embedded_textures;
+    luisa::unordered_map<uint, json::string_t> embedded_textures;
     std::filesystem::create_directories(folder / "lr_exported_textures");
     for (auto i = 0u; i < scene->mNumTextures; i++) {
         if (auto texture = scene->mTextures[i]; texture->mHeight == 0) {
@@ -105,18 +107,18 @@ int main(int argc, char *argv[]) {
     }
 
     // materials
-    luisa::unordered_map<uint64_t, luisa::json::string_t> loaded_textures;
-    luisa::unordered_map<uint, luisa::json::string_t> material_names;
-    luisa::unordered_map<uint, luisa::json::string_t> light_names;
+    luisa::unordered_map<uint64_t, json::string_t> loaded_textures;
+    luisa::unordered_map<uint, json::string_t> material_names;
+    luisa::unordered_map<uint, json::string_t> light_names;
     for (auto i = 0u; i < scene->mNumMaterials; i++) {
         auto m = scene->mMaterials[i];
-        luisa::json::string_t mat_name{luisa::format("Surface:{:05}:{}", i, m->GetName().C_Str())};
+        json::string_t mat_name{luisa::format("Surface:{:05}:{}", i, m->GetName().C_Str())};
         LUISA_INFO("Converting material '{}'...", mat_name);
         auto parse_texture = [&](auto key, auto type, auto index,
                                  luisa::string_view semantic) noexcept
-            -> luisa::optional<luisa::json::string_t> {
+            -> luisa::optional<json::string_t> {
             if (aiString s; m->Get(key, type, index, s) == AI_SUCCESS) {
-                luisa::json::string_t tex{s.C_Str(), s.length};
+                json::string_t tex{s.C_Str(), s.length};
                 for (auto &c : tex) {
                     if (c == '\\') { c = '/'; }
                 }
@@ -128,20 +130,20 @@ int main(int argc, char *argv[]) {
                     tex = embedded_textures.at(id);
                 }
                 // external texture
-                luisa::json::string_t name{luisa::format("Texture:{:05}:{}", loaded_textures.size(), tex)};
+                json::string_t name{luisa::format("Texture:{:05}:{}", loaded_textures.size(), tex)};
                 try {
                     auto rel_path = std::filesystem::relative(
                         std::filesystem::canonical(folder / tex), folder);
-                    auto hash = luisa::hash64(rel_path.string(), luisa::hash64(semantic, luisa::hash64("__external__")));
+                    auto hash = luisa::hash_value(rel_path.string(), luisa::hash_value(semantic, luisa::hash_value("__external__")));
                     if (auto it = loaded_textures.find(hash); it != loaded_textures.end()) {
-                        return luisa::json::string_t{luisa::format("@{}", it->second)};
+                        return json::string_t{luisa::format("@{}", it->second)};
                     }
                     scene_materials[name] = {
                         {"type", "Texture"},
                         {"impl", "Image"},
                         {"prop", {{"file", rel_path.string()}}}};
                     loaded_textures[hash] = name;
-                    return luisa::json::string_t{luisa::format("@{}", name)};
+                    return json::string_t{luisa::format("@{}", name)};
                 } catch (const std::exception &e) {
                     LUISA_WARNING_WITH_LOCATION(
                         "Failed to find texture '{}' for material '{}': {}.",
@@ -153,22 +155,22 @@ int main(int argc, char *argv[]) {
         auto parse_constant = [&](auto key, auto type, auto index,
                                   luisa::string_view semantic,
                                   bool force_value = false) noexcept
-            -> luisa::optional<luisa::json::string_t> {
+            -> luisa::optional<json::string_t> {
             if (aiColor3D c; (m->Get(key, type, index, c) == AI_SUCCESS &&
                               c != aiColor3D{0.f}) ||
                              force_value) {
-                auto hash = luisa::hash64(luisa::make_float4(c.r, c.g, c.b, 1.f),
-                                          luisa::hash64(semantic, luisa::hash64("__constant__")));
+                auto hash = luisa::hash_value(luisa::make_float4(c.r, c.g, c.b, 1.f),
+                                              luisa::hash_value(semantic, luisa::hash_value("__constant__")));
                 if (auto it = loaded_textures.find(hash); it != loaded_textures.end()) {
-                    return luisa::json::string_t{luisa::format("@{}", it->second)};
+                    return json::string_t{luisa::format("@{}", it->second)};
                 }
-                luisa::json::string_t name{luisa::format("Texture:{:05}", loaded_textures.size())};
+                json::string_t name{luisa::format("Texture:{:05}", loaded_textures.size())};
                 scene_materials[name] = {
                     {"type", "Texture"},
                     {"impl", "Constant"},
                     {"prop", {{"v", {c.r, c.g, c.b}}}}};
                 loaded_textures[hash] = name;
-                return luisa::json::string_t{luisa::format("@{}", name)};
+                return json::string_t{luisa::format("@{}", name)};
             }
             return luisa::nullopt;
         };
@@ -182,10 +184,10 @@ int main(int argc, char *argv[]) {
         // TODO: transparency & transmission
 
         // roughness
-        luisa::json::string_t rough_tex;
-        luisa::json::string_t metallic_tex;
-        luisa::json::string_t roughness_tex_name;
-        luisa::json::string_t metallic_tex_name;
+        json::string_t rough_tex;
+        json::string_t metallic_tex;
+        json::string_t roughness_tex_name;
+        json::string_t metallic_tex_name;
         auto metallic_factor = -1.f;
         auto rough_factor = -1.f;
         if (aiString ai_rough_tex; m->GetTexture(AI_MATKEY_ROUGHNESS_TEXTURE, &ai_rough_tex) == AI_SUCCESS) {
@@ -255,10 +257,10 @@ int main(int argc, char *argv[]) {
         }
         // transmission
         auto trans_factor = -1.f;
-        luisa::json::string_t trans_tex_name;
+        json::string_t trans_tex_name;
         if (aiString ai_trans_tex;
             m->GetTexture(AI_MATKEY_TRANSMISSION_TEXTURE, &ai_trans_tex) == AI_SUCCESS) {
-            luisa::json::string_t trans_tex = ai_trans_tex.C_Str();
+            json::string_t trans_tex = ai_trans_tex.C_Str();
             replace(trans_tex, "%20", " ");
             replace(trans_tex, "\\", "/");
             if (trans_tex.starts_with('*')) {
@@ -328,7 +330,7 @@ int main(int argc, char *argv[]) {
             m->Get(AI_MATKEY_TWOSIDED, two_sided);
             auto intensity = 1.f;
             m->Get(AI_MATKEY_COLOR_EMISSIVE, intensity);
-            luisa::json::string_t light_name{luisa::format("Light:{:05}:{}", i, m->GetName().C_Str())};
+            json::string_t light_name{luisa::format("Light:{:05}:{}", i, m->GetName().C_Str())};
             scene_materials[light_name] = {
                 {"type", "Light"},
                 {"impl", "Diffuse"},
@@ -345,7 +347,7 @@ int main(int argc, char *argv[]) {
     auto has_lights = false;
     size_t total_vertices = 0u;
     size_t total_faces = 0u;
-    std::vector<luisa::json::string_t> meshes;
+    std::vector<json::string_t> meshes;
     std::filesystem::create_directories(folder / "lr_exported_meshes");
     for (auto i = 0u; i < scene->mNumMeshes; i++) {
         auto m = scene->mMeshes[i];
@@ -420,8 +422,8 @@ int main(int argc, char *argv[]) {
             file << '\n';
         }
         auto mat_id = m->mMaterialIndex;
-        luisa::json::string_t mat_name{luisa::format("@{}", material_names.at(mat_id))};
-        luisa::json::string_t mesh_name{luisa::format("Mesh:{:05}:{}", i, m->mName.C_Str())};
+        json::string_t mat_name{luisa::format("@{}", material_names.at(mat_id))};
+        json::string_t mesh_name{luisa::format("Mesh:{:05}:{}", i, m->mName.C_Str())};
         scene_geometry[mesh_name] = {
             {"type", "Shape"},
             {"impl", "Mesh"},
@@ -441,7 +443,7 @@ int main(int argc, char *argv[]) {
     aiAABB aabb{aiVector3D{1e30f}, aiVector3D{-1e30f}};
     luisa::queue<const aiNode *> node_queue;
     node_queue.emplace(scene->mRootNode);
-    std::vector<luisa::json::string_t> groups;
+    std::vector<json::string_t> groups;
     while (!node_queue.empty()) {
         auto node = node_queue.front();
         node_queue.pop();
@@ -450,7 +452,7 @@ int main(int argc, char *argv[]) {
         }
         if (node->mNumMeshes != 0u) {
             LUISA_INFO("Processing node '{}'...", node->mName.C_Str());
-            std::vector<luisa::json::string_t> children;
+            std::vector<json::string_t> children;
             auto transform = node->mTransformation;
             for (auto n = node->mParent; n != nullptr; n = n->mParent) {
                 transform = n->mTransformation * transform;
@@ -472,7 +474,7 @@ int main(int argc, char *argv[]) {
             if (children.size() == 1u && transform.IsIdentity()) {
                 groups.emplace_back(children[0]);
             } else {
-                luisa::json::string_t group_name{luisa::format(
+                json::string_t group_name{luisa::format(
                     "Group:{:05}:{}", groups.size(), node->mName.C_Str())};
                 scene_geometry[group_name] = {{"type", "Shape"},
                                               {"impl", "Group"},
@@ -503,11 +505,11 @@ int main(int argc, char *argv[]) {
                aabb.mMax.x, aabb.mMax.y, aabb.mMax.z);
 
     // camera
-    auto scene_configs = luisa::json::object();
-    std::vector<luisa::json::string_t> cameras;
+    auto scene_configs = json::object();
+    std::vector<json::string_t> cameras;
     for (auto i = 0u; i < scene->mNumCameras; i++) {
         auto camera = scene->mCameras[i];
-        luisa::json::string_t name{luisa::format("Camera:{}:{}", i, camera->mName.C_Str())};
+        json::string_t name{luisa::format("Camera:{}:{}", i, camera->mName.C_Str())};
         LUISA_INFO("Processing camera '{}'...", name);
         auto front = (camera->mLookAt - camera->mPosition).NormalizeSafe();
         auto position = camera->mPosition + front * camera->mClipPlaneNear;

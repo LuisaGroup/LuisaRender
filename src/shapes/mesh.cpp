@@ -8,7 +8,8 @@
 #include <assimp/scene.h>
 #include <assimp/Subdivision.h>
 
-#include <core/thread_pool.h>
+#include <core/clock.h>
+#include <util/thread_pool.h>
 #include <base/shape.h>
 
 namespace luisa::render {
@@ -32,12 +33,13 @@ public:
         static std::mutex mutex;
 
         auto abs_path = std::filesystem::canonical(path).string();
-        auto key = luisa::hash64(abs_path, luisa::hash64(subdiv_level));
+        auto key = luisa::hash_value(abs_path, luisa::hash_value(subdiv_level));
+
 
         std::scoped_lock lock{mutex};
         if (auto m = loaded_meshes.at(key)) { return *m; }
 
-        auto future = ThreadPool::global().async([path = std::move(path), subdiv_level, flip_uv, drop_normal, drop_uv] {
+        auto future = global_thread_pool().async([path = std::move(path), subdiv_level, flip_uv, drop_normal, drop_uv] {
             Clock clock;
             auto path_string = path.string();
             Assimp::Importer importer;
