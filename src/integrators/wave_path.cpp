@@ -5,6 +5,7 @@
 #include <util/sampling.h>
 #include <util/medium_tracker.h>
 #include <util/progress_bar.h>
+#include <util/thread_pool.h>
 #include <base/pipeline.h>
 #include <base/integrator.h>
 #include <base/display.h>
@@ -12,6 +13,22 @@
 namespace luisa::render {
 
 using namespace compute;
+
+template<uint dim, typename F>
+[[nodiscard]] auto compile_async(Device &device, F &&f) noexcept {
+    auto kernel = [&] {
+        if constexpr (dim == 1u) {
+            return Kernel1D{f};
+        } else if constexpr (dim == 2u) {
+            return Kernel2D{f};
+        } else if constexpr (dim == 3u) {
+            return Kernel3D{f};
+        } else {
+            static_assert(always_false_v<F>, "Invalid dimension.");
+        }
+    }();
+    return global_thread_pool().async([&device, kernel] { return device.compile(kernel); });
+}
 
 class WavefrontPathTracing final : public ProgressiveIntegrator {
 
@@ -63,7 +80,7 @@ public:
         auto offset = index * dimension;
         SampledSpectrum s{dimension};
         for (auto i = 0u; i < dimension; i++) {
-            s[i] = _beta.read(offset + i);
+            s[i] = _beta->read(offset + i);
         }
         return s;
     }
@@ -71,26 +88,26 @@ public:
         auto dimension = _spectrum->node()->dimension();
         auto offset = index * dimension;
         for (auto i = 0u; i < dimension; i++) {
-            _beta.write(offset + i, beta[i]);
+            _beta->write(offset + i, beta[i]);
         }
     }
     [[nodiscard]] auto read_swl(Expr<uint> index) const noexcept {
         if (_spectrum->node()->is_fixed()) {
             return std::make_pair(def(0.f), _spectrum->sample(0.f));
         }
-        auto u_wl = _wl_sample.read(index);
+        auto u_wl = _wl_sample->read(index);
         auto swl = _spectrum->sample(abs(u_wl));
         $if(u_wl < 0.f) { swl.terminate_secondary(); };
         return std::make_pair(abs(u_wl), swl);
     }
     void write_wavelength_sample(Expr<uint> index, Expr<float> u_wl) noexcept {
         if (!_spectrum->node()->is_fixed()) {
-            _wl_sample.write(index, u_wl);
+            _wl_sample->write(index, u_wl);
         }
     }
     void terminate_secondary_wavelengths(Expr<uint> index, Expr<float> u_wl) noexcept {
         if (!_spectrum->node()->is_fixed()) {
-            _wl_sample.write(index, -u_wl);
+            _wl_sample->write(index, -u_wl);
         }
     }
     [[nodiscard]] auto read_radiance(Expr<uint> index) const noexcept {
@@ -98,7 +115,7 @@ public:
         auto offset = index * dimension;
         SampledSpectrum s{dimension};
         for (auto i = 0u; i < dimension; i++) {
-            s[i] = _radiance.read(offset + i);
+            s[i] = _radiance->read(offset + i);
         }
         return s;
     }
@@ -106,14 +123,14 @@ public:
         auto dimension = _spectrum->node()->dimension();
         auto offset = index * dimension;
         for (auto i = 0u; i < dimension; i++) {
-            _radiance.write(offset + i, s[i]);
+            _radiance->write(offset + i, s[i]);
         }
     }
     [[nodiscard]] auto read_pdf_bsdf(Expr<uint> index) const noexcept {
-        return _pdf_bsdf.read(index);
+        return _pdf_bsdf->read(index);
     }
     void write_pdf_bsdf(Expr<uint> index, Expr<float> pdf) noexcept {
-        _pdf_bsdf.write(index, pdf);
+        _pdf_bsdf->write(index, pdf);
     }
 };
 
@@ -137,7 +154,7 @@ public:
         auto offset = index * dimension;
         SampledSpectrum s{dimension};
         for (auto i = 0u; i < dimension; i++) {
-            s[i] = _emission.read(offset + i);
+            s[i] = _emission->read(offset + i);
         }
         return s;
     }
@@ -145,14 +162,14 @@ public:
         auto dimension = _spectrum->node()->dimension();
         auto offset = index * dimension;
         for (auto i = 0u; i < dimension; i++) {
-            _emission.write(offset + i, s[i]);
+            _emission->write(offset + i, s[i]);
         }
     }
     [[nodiscard]] auto read_wi_and_pdf(Expr<uint> index) const noexcept {
-        return _wi_and_pdf.read(index);
+        return _wi_and_pdf->read(index);
     }
     void write_wi_and_pdf(Expr<uint> index, Expr<float3> wi, Expr<float> pdf) noexcept {
-        _wi_and_pdf.write(index, make_float4(wi, pdf));
+        _wi_and_pdf->write(index, make_float4(wi, pdf));
     }
 };
 
@@ -173,7 +190,7 @@ public:
           _counter_buffer{device.create_buffer<uint>(counter_buffer_size)},
           _current_counter{counter_buffer_size} {
         _clear_counters = device.compile<1>([this] {
-            _counter_buffer.write(dispatch_x(), 0u);
+            _counter_buffer->write(dispatch_x(), 0u);
         });
     }
     [[nodiscard]] BufferView<uint> prepare_counter_buffer(CommandBuffer &command_buffer) noexcept {
@@ -235,8 +252,8 @@ void WavefrontPathTracingInstance::_render_one_camera(
 
     LUISA_INFO("Compiling ray generation kernel.");
     Clock clock_compile;
-    auto generate_rays_shader = device.compile_async<1>([&](BufferUInt path_indices, BufferRay rays,
-                                                            UInt base_sample_id, Float time) noexcept {
+    auto generate_rays_shader = compile_async<1>(device, [&](BufferUInt path_indices, BufferRay rays,
+                                                             UInt base_sample_id, Float time) noexcept {
         auto state_id = dispatch_x();
         auto pixel_id = state_id % pixel_count;
         auto sample_id = base_sample_id + state_id / pixel_count;
@@ -256,10 +273,10 @@ void WavefrontPathTracingInstance::_render_one_camera(
     });
 
     LUISA_INFO("Compiling intersection kernel.");
-    auto intersect_shader = device.compile_async<1>([&](BufferUInt ray_count, BufferRay rays, BufferHit hits,
-                                                        BufferUInt surface_queue, BufferUInt surface_queue_size,
-                                                        BufferUInt light_queue, BufferUInt light_queue_size,
-                                                        BufferUInt escape_queue, BufferUInt escape_queue_size) noexcept {
+    auto intersect_shader = compile_async<1>(device, [&](BufferUInt ray_count, BufferRay rays, BufferHit hits,
+                                                         BufferUInt surface_queue, BufferUInt surface_queue_size,
+                                                         BufferUInt light_queue, BufferUInt light_queue_size,
+                                                         BufferUInt escape_queue, BufferUInt escape_queue_size) noexcept {
         auto ray_id = dispatch_x();
         $if(ray_id < ray_count.read(0u)) {
             auto ray = rays.read(ray_id);
@@ -286,8 +303,8 @@ void WavefrontPathTracingInstance::_render_one_camera(
     });
 
     LUISA_INFO("Compiling environment evaluation kernel.");
-    auto evaluate_miss_shader = device.compile_async<1>([&](BufferUInt path_indices, BufferRay rays,
-                                                            BufferUInt queue, BufferUInt queue_size, Float time) noexcept {
+    auto evaluate_miss_shader = compile_async<1>(device, [&](BufferUInt path_indices, BufferRay rays,
+                                                             BufferUInt queue, BufferUInt queue_size, Float time) noexcept {
         if (pipeline().environment()) {
             auto queue_id = dispatch_x();
             $if(queue_id < queue_size.read(0u)) {
@@ -307,8 +324,8 @@ void WavefrontPathTracingInstance::_render_one_camera(
     });
 
     LUISA_INFO("Compiling light evaluation kernel.");
-    auto evaluate_light_shader = device.compile_async<1>([&](BufferUInt path_indices, BufferRay rays, BufferHit hits,
-                                                             BufferUInt queue, BufferUInt queue_size, Float time) noexcept {
+    auto evaluate_light_shader = compile_async<1>(device, [&](BufferUInt path_indices, BufferRay rays, BufferHit hits,
+                                                              BufferUInt queue, BufferUInt queue_size, Float time) noexcept {
         if (!pipeline().lights().empty()) {
             auto queue_id = dispatch_x();
             $if(queue_id < queue_size.read(0u)) {
@@ -330,8 +347,8 @@ void WavefrontPathTracingInstance::_render_one_camera(
     });
 
     LUISA_INFO("Compiling light sampling kernel.");
-    auto sample_light_shader = device.compile_async<1>([&](BufferUInt path_indices, BufferRay rays, BufferHit hits,
-                                                           BufferUInt queue, BufferUInt queue_size, Float time) noexcept {
+    auto sample_light_shader = compile_async<1>(device, [&](BufferUInt path_indices, BufferRay rays, BufferHit hits,
+                                                            BufferUInt queue, BufferUInt queue_size, Float time) noexcept {
         auto queue_id = dispatch_x();
         $if(queue_id < queue_size.read(0u)) {
             auto ray_id = queue.read(queue_id);
@@ -355,9 +372,9 @@ void WavefrontPathTracingInstance::_render_one_camera(
     });
 
     LUISA_INFO("Compiling surface evaluation kernel.");
-    auto evaluate_surface_shader = device.compile_async<1>([&](BufferUInt path_indices, UInt trace_depth, BufferUInt queue, BufferUInt queue_size,
-                                                               BufferRay in_rays, BufferHit in_hits, BufferRay out_rays,
-                                                               BufferUInt out_queue, BufferUInt out_queue_size, Float time) noexcept {
+    auto evaluate_surface_shader = compile_async<1>(device, [&](BufferUInt path_indices, UInt trace_depth, BufferUInt queue, BufferUInt queue_size,
+                                                                BufferRay in_rays, BufferHit in_hits, BufferRay out_rays,
+                                                                BufferUInt out_queue, BufferUInt out_queue_size, Float time) noexcept {
         auto queue_id = dispatch_x();
         $if(queue_id < queue_size.read(0u)) {
             auto ray_id = queue.read(queue_id);
@@ -386,7 +403,6 @@ void WavefrontPathTracingInstance::_render_one_camera(
             });
 
             call.execute([&](const Surface::Closure *closure) noexcept {
-
                 // apply opacity map
                 auto alpha_skip = def(false);
                 if (auto o = closure->opacity()) {
@@ -458,7 +474,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
     });
 
     LUISA_INFO("Compiling accumulation kernel.");
-    auto accumulate_shader = device.compile_async<1>([&](Float shutter_weight) noexcept {
+    auto accumulate_shader = compile_async<1>(device, [&](Float shutter_weight) noexcept {
         auto state_id = dispatch_x();
         auto pixel_id = state_id % pixel_count;
         auto pixel_coord = make_uint2(pixel_id % resolution.x, pixel_id / resolution.x);

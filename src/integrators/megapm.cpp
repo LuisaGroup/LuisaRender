@@ -100,61 +100,61 @@ public:
             tot_test = device.create_buffer<uint>(1u);
         }
         auto tot_photon() const noexcept {
-            return _tot.read(0u);
+            return _tot->read(0u);
         }
         auto grid_len() const noexcept {
-            return _grid_len.read(0u);
+            return _grid_len->read(0u);
         }
         auto size() const noexcept {
             return _size;
         }
         auto position(Expr<uint> index) const noexcept {
-            return _position.read(index);
+            return _position->read(index);
         }
         auto wi(Expr<uint> index) const noexcept {
-            return _wi.read(index);
+            return _wi->read(index);
         }
         auto beta(Expr<uint> index) const noexcept {
             auto dimension = _spectrum->node()->dimension();
             SampledSpectrum s{dimension};
             for (auto i = 0u; i < dimension; ++i)
-                s[i] = _beta.read(index * dimension + i);
+                s[i] = _beta->read(index * dimension + i);
             return s;
         }
         auto nxt(Expr<uint> index) const noexcept {
-            return _nxt.read(index);
+            return _nxt->read(index);
         }
         auto grid_head(Expr<uint> index) const noexcept {
-            return _grid_head.read(index);
+            return _grid_head->read(index);
         }
         auto swl(Expr<uint> index) const noexcept {
             auto dimension = _spectrum->node()->dimension();
             SampledWavelengths swl(dimension);
             for (auto i = 0u; i < dimension; ++i) {
-                swl.set_lambda(i, _swl_lambda.read(index * dimension + i));
-                swl.set_pdf(i, _swl_pdf.read(index * dimension + i));
+                swl.set_lambda(i, _swl_lambda->read(index * dimension + i));
+                swl.set_pdf(i, _swl_pdf->read(index * dimension + i));
             }
             return swl;
         }
         void push(Expr<float3> position, SampledWavelengths swl, SampledSpectrum power, Expr<float3> wi) {
             $if(tot_photon() < size()) {
-                auto index = _tot.atomic(0u).fetch_add(1u);
+                auto index = _tot->atomic(0u).fetch_add(1u);
                 auto dimension = _spectrum->node()->dimension();
                 if (!_spectrum->node()->is_fixed()) {
                     for (auto i = 0u; i < dimension; ++i) {
-                        _swl_lambda.write(index * dimension + i, swl.lambda(i));
-                        _swl_pdf.write(index * dimension + i, swl.pdf(i));
+                        _swl_lambda->write(index * dimension + i, swl.lambda(i));
+                        _swl_pdf->write(index * dimension + i, swl.pdf(i));
                     }
                 }
-                _wi.write(index, wi);
-                _position.write(index, position);
+                _wi->write(index, wi);
+                _position->write(index, position);
                 for (auto i = 0u; i < dimension; ++i)
-                    _beta.write(index * dimension + i, power[i]);
+                    _beta->write(index * dimension + i, power[i]);
                 for (auto i = 0u; i < 3u; ++i)
-                    _grid_min.atomic(i).fetch_min(position[i]);
+                    _grid_min->atomic(i).fetch_min(position[i]);
                 for (auto i = 0u; i < 3u; ++i)
-                    _grid_max.atomic(i).fetch_max(position[i]);
-                _nxt.write(index, 0u);
+                    _grid_max->atomic(i).fetch_max(position[i]);
+                _nxt->write(index, 0u);
             };
         }
         //from uint3 grid id to hash index of the grid
@@ -166,39 +166,39 @@ public:
         }
         //from float3 position to uint3 grid id
         auto point_to_grid(Expr<float3> p) const noexcept {
-            Float3 grid_min = {_grid_min.read(0),
-                               _grid_min.read(1),
-                               _grid_min.read(2)};
+            Float3 grid_min = {_grid_min->read(0),
+                               _grid_min->read(1),
+                               _grid_min->read(2)};
             return make_int3((p - grid_min) / grid_len()) + make_int3(2, 2, 2);
         }
         auto point_to_index(Expr<float3> p) const noexcept {
             return grid_to_index(point_to_grid(p));
         }
         void link(Expr<uint> index) {
-            auto p = _position.read(index);
+            auto p = _position->read(index);
             auto grid_index = point_to_index(p);
-            auto head = _grid_head.atomic(grid_index).exchange(index);
-            _nxt.write(index, head);
+            auto head = _grid_head->atomic(grid_index).exchange(index);
+            _nxt->write(index, head);
         }
         void reset(Expr<uint> index) {
-            _grid_head.write(index, ~0u);
-            _tot.write(0, 0u);
-            _nxt.write(index, ~0u);
+            _grid_head->write(index, ~0u);
+            _tot->write(0, 0u);
+            _nxt->write(index, ~0u);
             for (auto i = 0u; i < 3u; ++i) {
-                _grid_min.write(i, std::numeric_limits<float>::max());
-                _grid_max.write(i, -std::numeric_limits<float>::max());
+                _grid_min->write(i, std::numeric_limits<float>::max());
+                _grid_max->write(i, -std::numeric_limits<float>::max());
             }
         }
         void write_grid_len(Expr<float> len) {
-            _grid_len.write(0u, len);
+            _grid_len->write(0u, len);
         }
         auto split(Expr<float> grid_count) const noexcept {
-            /* Float3 grid_min = {_grid_min.read(0),
-                               _grid_min.read(1),
-                               _grid_min.read(2)};
-            Float3 grid_max = {_grid_max.read(0),
-                               _grid_max.read(1),
-                               _grid_max.read(2)};
+            /* Float3 grid_min = {_grid_min->read(0),
+                               _grid_min->read(1),
+                               _grid_min->read(2)};
+            Float3 grid_max = {_grid_max->read(0),
+                               _grid_max->read(1),
+                               _grid_max->read(2)};
             auto _grid_size = grid_max - grid_min;
             */
             auto _grid_size = _spectrum->pipeline().geometry()->world_max() - _spectrum->pipeline().geometry()->world_min();
@@ -243,25 +243,25 @@ public:
         void write_radius(Expr<uint2> pixel_id, Expr<float> value) noexcept {
             if (!_shared_radius) {
                 auto resolution = _film->node()->resolution();
-                _radius.write(pixel_id.y * resolution.x + pixel_id.x, value);
+                _radius->write(pixel_id.y * resolution.x + pixel_id.x, value);
             } else {
-                _radius.write(0u, value);
+                _radius->write(0u, value);
             }
         }
         void write_cur_n(Expr<uint2> pixel_id, Expr<uint> value) noexcept {
             if (!_shared_radius) {
                 auto resolution = _film->node()->resolution();
-                _cur_n.write(pixel_id.y * resolution.x + pixel_id.x, value);
+                _cur_n->write(pixel_id.y * resolution.x + pixel_id.x, value);
             } else {
-                _cur_n.write(0u, value);
+                _cur_n->write(0u, value);
             }
         }
         void write_n_photon(Expr<uint2> pixel_id, Expr<uint> value) noexcept {
             if (!_shared_radius) {
                 auto resolution = _film->node()->resolution();
-                _n_photon.write(pixel_id.y * resolution.x + pixel_id.x, value);
+                _n_photon->write(pixel_id.y * resolution.x + pixel_id.x, value);
             } else {
-                _n_photon.write(0u, value);
+                _n_photon->write(0u, value);
             }
         }
         void reset_phi(Expr<uint2> pixel_id) noexcept {
@@ -269,21 +269,21 @@ public:
             auto offset = pixel_id.y * resolution.x + pixel_id.x;
             auto dimension = 3u;
             for (auto i = 0u; i < dimension; ++i)
-                _phi.write(offset * dimension + i, 0.f);
+                _phi->write(offset * dimension + i, 0.f);
         }
         void reset_tau(Expr<uint2> pixel_id) noexcept {
             auto resolution = _film->node()->resolution();
             auto offset = pixel_id.y * resolution.x + pixel_id.x;
             auto dimension = 3u;
             for (auto i = 0u; i < dimension; ++i)
-                _tau.write(offset * dimension + i, 0.f);
+                _tau->write(offset * dimension + i, 0.f);
         }
         auto radius(Expr<uint2> pixel_id) const noexcept {
             if (!_shared_radius) {
                 auto resolution = _film->node()->resolution();
-                return _radius.read(pixel_id.y * resolution.x + pixel_id.x);
+                return _radius->read(pixel_id.y * resolution.x + pixel_id.x);
             } else {
-                return _radius.read(0u);
+                return _radius->read(0u);
             }
         }
         //tau=(tau+clamp(phi))*value, see pixel_info_update for useage
@@ -293,27 +293,27 @@ public:
             auto dimension = 3u;
             auto thershold = _clamp;
             for (auto i = 0u; i < dimension; ++i) {
-                auto old_tau = _tau.read(offset * dimension + i);
-                auto phi = _phi.read(offset * dimension + i);
+                auto old_tau = _tau->read(offset * dimension + i);
+                auto phi = _phi->read(offset * dimension + i);
                 phi = max(-thershold, min(phi, thershold));//-thershold for wavelength sampling
-                _tau.write(offset * dimension + i, (old_tau + phi) * value);
+                _tau->write(offset * dimension + i, (old_tau + phi) * value);
             }
         }
 
         auto n_photon(Expr<uint2> pixel_id) const noexcept {
             auto resolution = _film->node()->resolution();
             if (!_shared_radius) {
-                return _n_photon.read(pixel_id.y * resolution.x + pixel_id.x);
+                return _n_photon->read(pixel_id.y * resolution.x + pixel_id.x);
             } else {
-                return _n_photon.read(0u);
+                return _n_photon->read(0u);
             }
         }
         auto cur_n(Expr<uint2> pixel_id) const noexcept {
             if (!_shared_radius) {
                 auto resolution = _film->node()->resolution();
-                return _cur_n.read(pixel_id.y * resolution.x + pixel_id.x);
+                return _cur_n->read(pixel_id.y * resolution.x + pixel_id.x);
             } else {
-                return _cur_n.read(0u);
+                return _cur_n->read(0u);
             }
         }
         auto phi(Expr<uint2> pixel_id) const noexcept {
@@ -322,7 +322,7 @@ public:
             auto dimension = 3u;
             Float3 ret;
             for (auto i = 0u; i < dimension; ++i)
-                ret[i] = _phi.read(offset * dimension + i);
+                ret[i] = _phi->read(offset * dimension + i);
             return ret;
         }
         auto tau(Expr<uint2> pixel_id) const noexcept {
@@ -331,16 +331,16 @@ public:
             auto dimension = 3u;
             Float3 ret;
             for (auto i = 0u; i < dimension; ++i)
-                ret[i] = _tau.read(offset * dimension + i);
+                ret[i] = _tau->read(offset * dimension + i);
             return ret;
         }
         void add_cur_n(Expr<uint2> pixel_id, Expr<uint> value) noexcept {
             if (!_shared_radius) {
                 auto resolution = _film->node()->resolution();
                 auto offset = pixel_id.y * resolution.x + pixel_id.x;
-                _cur_n.atomic(offset).fetch_add(value);
+                _cur_n->atomic(offset).fetch_add(value);
             } else {
-                _cur_n.atomic(0u).fetch_add(value);
+                _cur_n->atomic(0u).fetch_add(value);
             }
         }
         void add_phi(Expr<uint2> pixel_id, Expr<float3> phi) noexcept {
@@ -348,7 +348,7 @@ public:
             auto offset = pixel_id.y * resolution.x + pixel_id.x;
             auto dimension = 3u;
             for (auto i = 0u; i < dimension; ++i)
-                _phi.atomic(offset * dimension + i).fetch_add(phi[i]);
+                _phi->atomic(offset * dimension + i).fetch_add(phi[i]);
         }
         void pixel_info_update(Expr<uint2> pixel_id) {
             $if(cur_n(pixel_id) > 0) {

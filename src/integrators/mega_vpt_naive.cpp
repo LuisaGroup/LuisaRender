@@ -60,8 +60,8 @@ protected:
                 "No lights in scene. Rendering aborted.");
             return;
         }
-        pipeline().printer().set_level_warning();
-        pipeline().printer().set_log_dispatch_id(make_uint2(430, 350));
+//        pipeline().printer().set_level_warning();
+//        pipeline().printer().set_log_dispatch_id(make_uint2(430, 350));
         Instance::_render_one_camera(command_buffer, camera);
     }
 
