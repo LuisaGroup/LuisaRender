@@ -5,7 +5,7 @@
 #include <fstream>
 #include <streambuf>
 
-#include <core/json.h>
+#include <nlohmann/json.hpp>
 #include <core/thread_pool.h>
 #include <sdl/scene_desc.h>
 #include <sdl/scene_node_desc.h>

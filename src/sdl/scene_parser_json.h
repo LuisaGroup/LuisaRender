@@ -9,10 +9,12 @@
 #include <future>
 
 #include <core/stl.h>
-#include <core/json_fwd.h>
+#include <nlohmann/json_fwd.hpp>
 #include <sdl/scene_node_desc.h>
 
 namespace luisa::render {
+
+using nlohmann::json;
 
 class SceneDesc;
 class SceneNodeDesc;

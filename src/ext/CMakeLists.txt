@@ -34,5 +34,5 @@ target_link_libraries(luisa-render-ext INTERFACE tinyexr)
 
 # nlohmann json
 add_library(nlohmann_json INTERFACE)
-target_include_directories(nlohmann_json INTERFACE nlohmann_json/single_include)
+target_include_directories(nlohmann_json INTERFACE json/single_include)
 target_link_libraries(luisa-render-ext INTERFACE nlohmann_json)

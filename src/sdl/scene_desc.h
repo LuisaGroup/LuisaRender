@@ -21,7 +21,7 @@ public:
         using is_transparent = void;
         template<typename T>
         [[nodiscard]] auto operator()(T &&node) const noexcept -> uint64_t {
-            return hash64(_node_identifier(std::forward<T>(node)));
+            return hash_value(_node_identifier(std::forward<T>(node)));
         }
     };
     struct NodeEqual {

@@ -2,6 +2,7 @@
 // Created by Mike on 2021/12/13.
 //
 
+#include <core/logging.h>
 #include <sdl/scene_desc.h>
 
 namespace luisa::render {

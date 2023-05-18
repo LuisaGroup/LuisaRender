@@ -7,7 +7,6 @@
 #include <string>
 #include <filesystem>
 
-#include <core/stl/hash.h>
 #include <core/stl.h>
 #include <core/logging.h>
 #include <core/basic_types.h>

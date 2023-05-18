@@ -47,9 +47,9 @@ bool SceneNodeDesc::has_property(luisa::string_view prop) const noexcept {
 const SceneNodeDesc *SceneNodeDesc::shared_default(SceneNodeTag tag, luisa::string impl) noexcept {
     static luisa::unordered_map<uint64_t, luisa::unique_ptr<SceneNodeDesc>> descriptions;
     static std::mutex mutex;
-    static thread_local const auto seed = hash64("__scene_node_tag_and_impl_type_hash");
+    static thread_local const auto seed = hash_value("__scene_node_tag_and_impl_type_hash");
     for (auto &c : impl) { c = static_cast<char>(tolower(c)); }
-    auto hash = hash64(impl, hash64(to_underlying(tag), seed));
+    auto hash = hash_value(impl, hash_value(to_underlying(tag), seed));
     std::scoped_lock lock{mutex};
     if (auto iter = descriptions.find(hash);
         iter != descriptions.cend()) { return iter->second.get(); }
