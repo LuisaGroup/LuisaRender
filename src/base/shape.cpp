@@ -19,7 +19,7 @@ Shape::Shape(Scene *scene, const SceneNodeDesc *desc) noexcept
       _transform{scene->load_transform(desc->property_node_or_default("transform"))},
       _medium{scene->load_medium(desc->property_node_or_default("medium"))} {}
 
-AccelUsageHint Shape::build_hint() const noexcept { return AccelUsageHint::FAST_TRACE; }
+AccelOption Shape::build_option() const noexcept { return {}; }
 
 bool Shape::visible() const noexcept { return true; }
 float Shape::shadow_terminator_factor() const noexcept { return 0.f; }

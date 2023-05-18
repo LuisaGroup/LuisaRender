@@ -5,12 +5,11 @@
 #pragma once
 
 #include <dsl/syntax.h>
-#include <runtime/command_buffer.h>
+#include <util/command_buffer.h>
 
 namespace luisa::render {
 
 class Pipeline;
-using compute::CommandBuffer;
 using compute::Float;
 using compute::Expr;
 

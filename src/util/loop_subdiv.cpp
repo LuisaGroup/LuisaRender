@@ -2,8 +2,9 @@
 // Created by Mike Smith on 2022/11/8.
 //
 
-#include <util/loop_subdiv.h>
+#include <core/pool.h>
 #include <core/logging.h>
+#include <util/loop_subdiv.h>
 
 namespace luisa::render {
 
@@ -90,7 +91,7 @@ struct SDEdge {
 
 struct SDEdgeHash {
     [[nodiscard]] auto operator()(SDEdge e) const noexcept {
-        return luisa::detail::murmur2_hash64(e.v, sizeof(e.v), 0x19980810u);
+        return luisa::hash64(e.v, sizeof(e.v), 0x19980810u);
     }
 };
 

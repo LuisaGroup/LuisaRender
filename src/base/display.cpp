@@ -3,7 +3,7 @@
 //
 
 #include <dsl/syntax.h>
-#include <runtime/command_buffer.h>
+#include <runtime/command_list.h>
 #include <base/display.h>
 #include <base/pipeline.h>
 #include <util/imageio.h>

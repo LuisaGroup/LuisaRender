@@ -13,16 +13,16 @@ CounterBuffer::CounterBuffer(Device &device, uint size) noexcept
 void CounterBuffer::record(Expr<uint> index, Expr<uint> count) noexcept {
     if (_buffer) {
         auto view = _buffer.view().as<uint>();
-        auto old = view.atomic(index * 2u + 0u).fetch_add(count);
-        $if(count != 0u & (old + count < old)) { view.atomic(index * 2u + 1u).fetch_add(1u); };
+        auto old = view->atomic(index * 2u + 0u).fetch_add(count);
+        $if(count != 0u & (old + count < old)) { view->atomic(index * 2u + 1u).fetch_add(1u); };
     }
 }
 
 void CounterBuffer::clear(Expr<uint> index) noexcept {
     if (_buffer) {
         auto view = _buffer.view().as<uint>();
-        view.write(index * 2u + 0u, 0u);
-        view.write(index * 2u + 1u, 0u);
+        view->write(index * 2u + 0u, 0u);
+        view->write(index * 2u + 1u, 0u);
     }
 }
 
@@ -30,7 +30,7 @@ size_t CounterBuffer::size() const noexcept {
     return _buffer ? _buffer.size() / 2u : 0u;
 }
 
-Command *CounterBuffer::copy_to(void *data) const noexcept {
+luisa::unique_ptr<Command> CounterBuffer::copy_to(void *data) const noexcept {
     return _buffer ? _buffer.copy_to(data) : nullptr;
 }
 

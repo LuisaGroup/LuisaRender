@@ -2,6 +2,8 @@
 // Created by Mike Smith on 2022/11/9.
 //
 
+#include <future>
+#include <core/clock.h>
 #include <base/film.h>
 #include <gui/window.h>
 #include <gui/framerate.h>

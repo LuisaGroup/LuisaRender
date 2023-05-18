@@ -6,8 +6,9 @@
 
 #include <core/basic_types.h>
 #include <core/stl.h>
+#include <core/logging.h>
 #include <dsl/syntax.h>
-#include <runtime/command_buffer.h>
+#include <util/command_buffer.h>
 #include <util/colorspace.h>
 
 namespace luisa::render {
@@ -33,7 +34,6 @@ LUISA_IMPORT_API const std::array<float, cie_sample_count> cie_d65_samples;
 using compute::ArrayVar;
 using compute::BindlessArray;
 using compute::Bool;
-using compute::CommandBuffer;
 using compute::Constant;
 using compute::Expr;
 using compute::Float;

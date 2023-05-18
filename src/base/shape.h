@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <rtx/mesh.h>
+#include <runtime/rtx/mesh.h>
 #include <util/half.h>
 #include <util/vertex.h>
 #include <base/scene_node.h>
@@ -17,7 +17,7 @@ class Surface;
 class Transform;
 class Medium;
 
-using compute::AccelUsageHint;
+using compute::AccelOption;
 using compute::Triangle;
 
 struct MeshView {
@@ -59,7 +59,7 @@ public:
     [[nodiscard]] virtual MeshView mesh() const noexcept;                           // empty if the shape is not a mesh
     [[nodiscard]] virtual luisa::span<const Shape *const> children() const noexcept;// empty if the shape is a mesh
     [[nodiscard]] virtual bool deformable() const noexcept;                         // true if the shape will not deform
-    [[nodiscard]] virtual AccelUsageHint build_hint() const noexcept;               // accel struct build quality, only considered for meshes
+    [[nodiscard]] virtual AccelOption build_option() const noexcept;                // accel struct build quality, only considered for meshes
 };
 
 template<typename BaseShape>

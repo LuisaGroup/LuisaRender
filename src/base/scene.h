@@ -7,7 +7,6 @@
 #include <span>
 #include <mutex>
 
-#include <core/hash.h>
 #include <core/stl.h>
 #include <core/dynamic_module.h>
 #include <core/basic_types.h>

@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <any>
 #include <utility>
 
 namespace luisa::render {

@@ -6,7 +6,6 @@
 
 #include <concepts>
 #include <dsl/syntax.h>
-#include <rtx/mesh.h>
 
 namespace luisa::render {
 

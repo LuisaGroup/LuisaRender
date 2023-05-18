@@ -5,7 +5,7 @@
 #pragma once
 
 #include <core/stl.h>
-#include <rtx/mesh.h>
+#include <runtime/rtx/triangle.h>
 #include <util/vertex.h>
 
 namespace luisa::render {

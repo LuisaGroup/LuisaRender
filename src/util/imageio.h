@@ -8,7 +8,7 @@
 
 #include <core/stl.h>
 #include <util/half.h>
-#include <runtime/pixel.h>
+#include <runtime/rhi/pixel.h>
 
 namespace luisa::render {
 

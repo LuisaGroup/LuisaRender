@@ -5,7 +5,7 @@
 #pragma once
 
 #include <dsl/syntax.h>
-#include <runtime/command_buffer.h>
+#include <util/command_buffer.h>
 #include <base/spd.h>
 #include <base/scene_node.h>
 #include <base/sampler.h>
@@ -68,7 +68,7 @@ public:
         [[nodiscard]] virtual Float3 srgb(const SampledWavelengths &swl, const SampledSpectrum &sp) const noexcept;
         //get target_sp*sp, in the wavelengths of target_swl
         [[nodiscard]] virtual Float3 wavelength_mul(const SampledWavelengths &target_swl, const SampledSpectrum &target_sp,
-                                                             const SampledWavelengths &swl, const SampledSpectrum &sp) const noexcept;
+                                                    const SampledWavelengths &swl, const SampledSpectrum &sp) const noexcept;
     };
 
 public:

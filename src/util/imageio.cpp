@@ -79,7 +79,7 @@ template<typename T>
     auto width = static_cast<uint>(exr_image.width);
     auto height = static_cast<uint>(exr_image.height);
     auto value_count = width * height * expected_channels;
-    auto pixels = luisa::allocate<T>(value_count);
+    auto pixels = luisa::allocate_with_allocator<T>(value_count);
     auto num_channels = static_cast<uint>(exr_image.num_channels);
     if (expected_channels == 1u) {
         if (num_channels != 1u) {
@@ -183,7 +183,7 @@ inline LoadedImage LoadedImage::_load_float(const std::filesystem::path &path, s
         return {
             pixels, storage, size,
             [](void *p) noexcept {
-                luisa::deallocate(static_cast<float *>(p));
+                luisa::deallocate_with_allocator(static_cast<float *>(p));
             }};
     }
     int w, h, nc;
@@ -213,7 +213,7 @@ LoadedImage LoadedImage::_load_half(const std::filesystem::path &path, LoadedIma
         return {
             pixels, storage, size,
             [](void *p) noexcept {
-                luisa::deallocate(static_cast<short *>(p));
+                luisa::deallocate_with_allocator(static_cast<short *>(p));
             }};
     }
     int w, h, nc;
@@ -223,7 +223,7 @@ LoadedImage LoadedImage::_load_half(const std::filesystem::path &path, LoadedIma
             "Failed to load HALF image '{}': {}.",
             filename, stbi_failure_reason());
     }
-    auto half_pixels = luisa::allocate<uint16_t>(w * h * expected_channels);
+    auto half_pixels = luisa::allocate_with_allocator<uint16_t>(w * h * expected_channels);
     for (auto i = 0u; i < w * h * expected_channels; i++) {
         half_pixels[i] = float_to_half(
             reinterpret_cast<const float *>(pixels)[i]);
@@ -232,7 +232,7 @@ LoadedImage LoadedImage::_load_half(const std::filesystem::path &path, LoadedIma
     return {
         half_pixels, storage, make_uint2(w, h),
         [](void *p) noexcept {
-            luisa::deallocate(static_cast<uint16_t *>(p));
+            luisa::deallocate_with_allocator(static_cast<uint16_t *>(p));
         }};
 }
 
@@ -296,7 +296,7 @@ LoadedImage LoadedImage::_load_int(const std::filesystem::path &path, LoadedImag
     return {
         pixels, storage, size,
         [](void *p) noexcept {
-            luisa::deallocate(static_cast<uint32_t *>(p));
+            luisa::deallocate_with_allocator(static_cast<uint32_t *>(p));
         }};
 }
 
@@ -426,7 +426,7 @@ LoadedImage LoadedImage::load(const std::filesystem::path &path) noexcept {
                 return std::make_tuple(
                     pixels, size, storage,
                     luisa::function<void(void *)>{[](void *p) noexcept {
-                        luisa::deallocate(static_cast<uint *>(p));
+                        luisa::deallocate_with_allocator(static_cast<uint *>(p));
                     }});
             }
             if (t == TINYEXR_PIXELTYPE_HALF) {
@@ -444,7 +444,7 @@ LoadedImage LoadedImage::load(const std::filesystem::path &path) noexcept {
                 return std::make_tuple(
                     pixels, size, storage,
                     luisa::function<void(void *)>{[](void *p) noexcept {
-                        luisa::deallocate(static_cast<uint16_t *>(p));
+                        luisa::deallocate_with_allocator(static_cast<uint16_t *>(p));
                     }});
             }
             auto expected_channels = 4u;
@@ -461,7 +461,7 @@ LoadedImage LoadedImage::load(const std::filesystem::path &path) noexcept {
             return std::make_tuple(
                 pixels, size, storage,
                 luisa::function<void(void *)>{[](void *p) noexcept {
-                    luisa::deallocate(static_cast<float *>(p));
+                    luisa::deallocate_with_allocator(static_cast<float *>(p));
                 }});
         };
         auto [pixels, size, storage, deleter] = load_image();
@@ -525,10 +525,10 @@ LoadedImage LoadedImage::load(const std::filesystem::path &path) noexcept {
 }
 
 LoadedImage LoadedImage::create(uint2 resolution, LoadedImage::storage_type storage) noexcept {
-    auto size_bytes = pixel_storage_size(storage) * resolution.x * resolution.y;
-    auto pixels = luisa::allocate<std::byte>(size_bytes);
+    auto size_bytes = pixel_storage_size(storage, make_uint3(resolution.x, resolution.y, 1u));
+    auto pixels = luisa::allocate_with_allocator<std::byte>(size_bytes);
     return {pixels, storage, resolution, luisa::function<void(void *)>{[](void *p) noexcept {
-                luisa::deallocate(static_cast<std::byte *>(p));
+                luisa::deallocate_with_allocator(static_cast<std::byte *>(p));
             }}};
 }
 

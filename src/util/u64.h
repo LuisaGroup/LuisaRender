@@ -134,10 +134,7 @@ public:
         auto hi_lo = _mul_u32(hi(), rhs);
         return U64{lo_lo.hi() + hi_lo.lo(), lo_lo.lo()};
     }
-    [[nodiscard]] auto operator%(uint rhs) const noexcept {
-        LUISA_ASSERT(rhs <= 0xffffu, "U64::operator% rhs must be <= 0xffff");
-        return ((hi() % rhs) * static_cast<uint>(0x1'0000'0000ull % rhs) + lo() % rhs) % rhs;
-    }
+    [[nodiscard]] compute::UInt operator%(uint rhs) const noexcept;
 
     // conversions
     [[nodiscard]] auto to_uint() const noexcept { return lo(); }

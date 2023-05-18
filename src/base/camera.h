@@ -5,7 +5,6 @@
 #pragma once
 
 #include <dsl/syntax.h>
-#include <rtx/ray.h>
 #include <base/scene_node.h>
 #include <base/sampler.h>
 #include <base/film.h>

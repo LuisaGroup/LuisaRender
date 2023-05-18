@@ -19,7 +19,6 @@ class CommandBuffer;
 
 namespace luisa::render {
 
-using compute::CommandBuffer;
 using compute::Device;
 using compute::Stream;
 
