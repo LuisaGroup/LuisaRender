@@ -177,7 +177,7 @@ bool Geometry::update(CommandBuffer &command_buffer, float time) noexcept {
 
 Var<Hit> Geometry::trace_closest(const Var<Ray> &ray) const noexcept {
     auto hit = _accel->trace_closest(ray);
-    return def<Hit>(hit.inst, hit.prim, hit.bary);
+    return Var<Hit>{hit.inst, hit.prim, hit.bary};
 }
 
 Var<bool> Geometry::trace_any(const Var<Ray> &ray) const noexcept {

@@ -65,7 +65,7 @@ protected:
                 ns = ns * .5f + .5f;
             }
         };
-        return path_weight * it->ng();
+        return path_weight * ns;
     }
 };
 
