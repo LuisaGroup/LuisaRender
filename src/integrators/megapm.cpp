@@ -524,18 +524,11 @@ protected:
                 if (node<MegakernelPhotonMapping>()->shared_radius()) {
                     command_buffer << shared_update().dispatch(1u);
                 }
-                auto dispatches_per_commit =
-                    display() && !display()->should_close() ?
-                        node<ProgressiveIntegrator>()->display_interval() :
-                        1024u;
+                auto dispatches_per_commit = 4u;
                 if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
                     dispatch_count = 0u;
                     auto p = sample_id / static_cast<double>(spp);
-                    if (display() && display()->update(command_buffer, sample_id)) {
-                        progress.update(p);
-                    } else {
-                        command_buffer << [&progress, p] { progress.update(p); };
-                    }
+                    command_buffer << [&progress, p] { progress.update(p); };
                 }
             }
             command_buffer << pipeline().printer().retrieve();

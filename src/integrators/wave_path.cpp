@@ -565,18 +565,11 @@ void WavefrontPathTracingInstance::_render_one_camera(
             }
             command_buffer << accumulate_shader.get()(s.point.weight).dispatch(launch_state_count);
             sample_id += launch_spp;
-            auto launches_per_commit =
-                display() && !display()->should_close() ?
-                    node<WavefrontPathTracing>()->display_interval() :
-                    16u;
+            auto launches_per_commit = 4u;
             if (sample_id - last_committed_sample_id >= launches_per_commit) {
                 last_committed_sample_id = sample_id;
                 auto p = sample_id / static_cast<double>(spp);
-                if (display() && display()->update(command_buffer, sample_id)) {
-                    progress_bar.update(p);
-                } else {
-                    command_buffer << [p, &progress_bar] { progress_bar.update(p); };
-                }
+                command_buffer << [p, &progress_bar] { progress_bar.update(p); };
             }
         }
     }

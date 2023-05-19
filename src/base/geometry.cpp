@@ -132,7 +132,7 @@ void Geometry::_process_shape(
         }
         _instances.emplace_back(Shape::Handle::encode(
             mesh.geometry_buffer_id_base,
-            properties, surface_tag, light_tag, medium_tag,
+            properties, medium_tag, surface_tag, light_tag,
             mesh.resource->triangle_count(),
             static_cast<float>(mesh.shadow_term) / 65535.f,
             static_cast<float>(mesh.intersection_offset) / 65535.f));

@@ -6,7 +6,6 @@
 #include <sdl/scene_node_desc.h>
 #include <util/progress_bar.h>
 #include <base/integrator.h>
-#include <base/display.h>
 #include <base/pipeline.h>
 
 namespace luisa::render {
@@ -28,11 +27,7 @@ Integrator::Instance::Instance(Pipeline &pipeline, CommandBuffer &command_buffer
 ProgressiveIntegrator::Instance::Instance(Pipeline &pipeline,
                                           CommandBuffer &command_buffer,
                                           const ProgressiveIntegrator *node) noexcept
-    : Integrator::Instance{pipeline, command_buffer, node} {
-    if (node->display_enabled()) {
-        _display = luisa::make_unique<Display>("Display");
-    }
-}
+    : Integrator::Instance{pipeline, command_buffer, node} {}
 
 ProgressiveIntegrator::Instance::~Instance() noexcept = default;
 
@@ -43,9 +38,7 @@ void ProgressiveIntegrator::Instance::render(Stream &stream) noexcept {
         auto resolution = camera->film()->node()->resolution();
         auto pixel_count = resolution.x * resolution.y;
         camera->film()->prepare(command_buffer);
-        if (_display) { _display->reset(command_buffer, camera->film()); }
         _render_one_camera(command_buffer, camera);
-        while (_display && _display->idle(command_buffer)) {}
         luisa::vector<float4> pixels(pixel_count);
         camera->film()->download(command_buffer, pixels.data());
         command_buffer << compute::synchronize();
@@ -57,7 +50,7 @@ void ProgressiveIntegrator::Instance::render(Stream &stream) noexcept {
 
 void ProgressiveIntegrator::Instance::_render_one_camera(
     CommandBuffer &command_buffer, Camera::Instance *camera) noexcept {
-    
+
     auto spp = camera->node()->spp();
     auto resolution = camera->film()->node()->resolution();
     auto image_file = camera->node()->file();
@@ -102,18 +95,11 @@ void ProgressiveIntegrator::Instance::_render_one_camera(
             if (auto &&p = pipeline().printer(); !p.empty()) {
                 command_buffer << p.retrieve();
             }
-            auto dispatches_per_commit =
-                _display && !_display->should_close() ?
-                    node<ProgressiveIntegrator>()->display_interval() :
-                    32u;
+            auto dispatches_per_commit = 4u;
             if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
                 dispatch_count = 0u;
                 auto p = sample_id / static_cast<double>(spp);
-                if (_display && _display->update(command_buffer, sample_id)) {
-                    progress.update(p);
-                } else {
-                    command_buffer << [&progress, p] { progress.update(p); };
-                }
+                command_buffer << [&progress, p] { progress.update(p); };
             }
         }
     }
@@ -130,9 +116,6 @@ Float3 ProgressiveIntegrator::Instance::Li(const Camera::Instance *camera, Expr<
 }
 
 ProgressiveIntegrator::ProgressiveIntegrator(Scene *scene, const SceneNodeDesc *desc) noexcept
-    : Integrator{scene, desc},
-      _display_interval{static_cast<uint16_t>(std::clamp(
-          desc->property_uint_or_default("display_interval", 1u), 1u, 65535u))},
-      _display{desc->property_bool_or_default("display")} {}
+    : Integrator{scene, desc} {}
 
 }// namespace luisa::render

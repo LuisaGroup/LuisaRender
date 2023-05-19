@@ -646,11 +646,7 @@ private:
                 command_buffer << propose(s.point.time, s.point.weight, static_cast<float>(b))
                                       .dispatch(chains_to_dispatch);
                 mutation_count += chains_to_dispatch;
-                auto dispatches_per_commit =
-                    display() && !display()->should_close() ?
-                        node<ProgressiveIntegrator>()->display_interval() *
-                            std::max(pixel_count / chains, 1u) :
-                        64u;
+                auto dispatches_per_commit = 16u;
                 if (++dispatch_count >= dispatches_per_commit) [[unlikely]] {
                     auto p = static_cast<double>(mutation_count) /
                              static_cast<double>(total_mutations);
@@ -670,11 +666,7 @@ private:
                                           };
                     }
                     dispatch_count = 0u;
-                    if (display() && display()->update(command_buffer, static_cast<uint>(effective_spp))) {
-                        progress.update(p);
-                    } else {
-                        command_buffer << [&progress, p] { progress.update(p); };
-                    }
+                    command_buffer << [&progress, p] { progress.update(p); };
                 }
             }
         }

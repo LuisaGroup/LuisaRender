@@ -2,6 +2,7 @@
 // Created by Mike on 2022/1/7.
 //
 
+#include <dsl/syntax.h>
 #include <util/rng.h>
 #include <base/pipeline.h>
 #include <base/integrator.h>
@@ -64,7 +65,7 @@ protected:
                 ns = ns * .5f + .5f;
             }
         };
-        return path_weight * ns;
+        return path_weight * it->ng();
     }
 };
 
