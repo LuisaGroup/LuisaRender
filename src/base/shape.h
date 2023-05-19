@@ -162,9 +162,9 @@ private:
 
 public:
     Handle() noexcept = default;
-    [[nodiscard]] static uint4 encode(uint buffer_base, uint flags, uint medium_tag,
-                                      uint surface_tag, uint light_tag, uint tri_count,
-                                      float shadow_terminator, float intersection_offset) noexcept;
+    [[nodiscard]] static uint4 encode(uint buffer_base, uint flags,
+                                      uint surface_tag, uint light_tag, uint medium_tag,
+                                      uint tri_count, float shadow_terminator, float intersection_offset) noexcept;
     [[nodiscard]] static Shape::Handle decode(Expr<uint4> compressed) noexcept;
 
 public:
