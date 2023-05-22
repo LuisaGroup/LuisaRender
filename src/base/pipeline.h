@@ -173,6 +173,8 @@ public:
 
     template<typename T>
     [[nodiscard]] BufferView<T> arena_buffer(size_t n) noexcept {
+        return create<Buffer<T>>(n)->view();
+        // FIXME: buffer arena is broken
         return _general_buffer_arena->allocate<T>(
             std::max(n, static_cast<size_t>(1u)));
     }

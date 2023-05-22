@@ -44,6 +44,8 @@ uint Pipeline::register_medium(CommandBuffer &command_buffer, const Medium *medi
 luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, const Scene &scene) noexcept {
     global_thread_pool().synchronize();
     auto pipeline = luisa::make_unique<Pipeline>(device);
+    pipeline->_transform_matrices.resize(transform_matrix_buffer_size);
+    pipeline->_transform_matrix_buffer = device.create_buffer<float4x4>(transform_matrix_buffer_size);
     stream << pipeline->printer().reset();
     auto initial_time = std::numeric_limits<float>::max();
     for (auto c : scene.cameras()) {
@@ -52,8 +54,6 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
         }
     }
     pipeline->_initial_time = initial_time;
-    pipeline->_transform_matrices.resize(transform_matrix_buffer_size);
-    pipeline->_transform_matrix_buffer = device.create_buffer<float4x4>(transform_matrix_buffer_size);
     pipeline->_cameras.reserve(scene.cameras().size());
     CommandBuffer command_buffer{&stream};
     pipeline->_spectrum = scene.spectrum()->build(*pipeline, command_buffer);
@@ -61,8 +61,6 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
         pipeline->_cameras.emplace_back(camera->build(*pipeline, command_buffer));
     }
     pipeline->_geometry = luisa::make_unique<Geometry>(*pipeline);
-    AccelOption accel_option;
-    accel_option.allow_update = pipeline->_any_dynamic_transforms;
     pipeline->_geometry->build(command_buffer, scene.shapes(), pipeline->_initial_time);
     if (auto env = scene.environment(); env != nullptr && !env->is_black()) {
         pipeline->_environment = env->build(*pipeline, command_buffer);
@@ -142,7 +140,7 @@ void Pipeline::register_transform(const Transform *transform) noexcept {
         LUISA_ASSERT(transform_id < transform_matrix_buffer_size,
                      "Transform matrix buffer overflows.");
         _transform_to_id.emplace(transform, transform_id);
-        _transforms.push_back(transform);
+        _transforms.emplace_back(transform);
         _any_dynamic_transforms |= !transform->is_static();
         _transform_matrices[transform_id] = transform->matrix(_initial_time);
     }
