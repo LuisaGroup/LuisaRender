@@ -116,7 +116,7 @@ public:
 
     void render(Stream &stream) noexcept override {
         auto pt = node<AuxiliaryBufferPathTracing>();
-        auto command_buffer = stream.command_buffer();
+        CommandBuffer command_buffer{&stream};
         for (auto i = 0u; i < pipeline().camera_count(); i++) {
             auto camera = pipeline().camera(i);
             auto resolution = camera->film()->node()->resolution();
@@ -128,9 +128,6 @@ public:
             _render_one_camera(command_buffer, camera);
             command_buffer << compute::synchronize();
             camera->film()->release();
-        }
-        while (_window && !_window->should_close()) {
-            _window->run_one_frame([] {});
         }
     }
 };

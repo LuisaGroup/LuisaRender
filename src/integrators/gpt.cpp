@@ -24,7 +24,6 @@
 #include <base/pipeline.h>
 #include <base/integrator.h>
 #include <base/scene.h>
-#include <base/display.h>
 
 namespace luisa::render {
 

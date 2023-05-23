@@ -7,7 +7,6 @@
 #include <util/progress_bar.h>
 #include <base/pipeline.h>
 #include <base/integrator.h>
-#include <base/display.h>
 
 namespace luisa::render {
 

@@ -19,7 +19,6 @@ set(LUISA_RENDER_BASE_SOURCES
         spectrum.cpp spectrum.h
         geometry.cpp geometry.h
         spd.cpp spd.h
-        display.cpp display.h
         medium.cpp medium.h
         phase_function.cpp phase_function.h)
 
