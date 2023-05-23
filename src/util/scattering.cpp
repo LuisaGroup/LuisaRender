@@ -27,10 +27,6 @@ Bool refract(Float3 wi, Float3 n, Float eta, Float3 *wt) noexcept {
     return v.w < 1.0f;
 }
 
-Float3 reflect(Float3 wo, Float3 n) noexcept {
-    return 2.f * dot(wo, n) * n - wo;
-}
-
 Float fresnel_dielectric(Float cosThetaI_in, Float etaI_in, Float etaT_in) noexcept {
     static Callable impl = [](Float cosThetaI_in, Float etaI_in, Float etaT_in) noexcept {
         using namespace compute;
@@ -309,7 +305,7 @@ SampledSpectrum MicrofacetReflection::evaluate(
 
 BxDF::SampledDirection MicrofacetReflection::sample_wi(Expr<float3> wo, Expr<float2> u, TransportMode mode) const noexcept {
     auto wh = _distribution->sample_wh(wo, u);
-    auto wi = reflect(wo, wh);
+    auto wi = reflect(-wo, wh);
     return {.wi = wi, .valid = same_hemisphere(wo, wi)};
 }
 
@@ -438,7 +434,7 @@ BxDF::SampledDirection FresnelBlend::sample_wi(Expr<float3> wo, Expr<float2> uOr
         u.x = (u.x - _rd_ratio) / (1.f - _rd_ratio);
         // Sample microfacet orientation $\wh$ and reflected direction $\wi$
         auto wh = _distribution->sample_wh(wo, u);
-        wi = reflect(wo, wh);
+        wi = reflect(-wo, wh);
     };
     return {.wi = wi, .valid = same_hemisphere(wo, wi)};
 }

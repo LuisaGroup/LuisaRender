@@ -17,7 +17,6 @@ using compute::Float2;
 using compute::Float3;
 using compute::Float4;
 
-[[nodiscard]] Float3 reflect(Float3 wo, Float3 n) noexcept;
 [[nodiscard]] Bool refract(Float3 wi, Float3 n, Float eta, Float3 *wt) noexcept;
 [[nodiscard]] Float3 face_forward(Float3 v, Float3 n) noexcept;
 

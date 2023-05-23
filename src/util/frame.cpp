@@ -47,7 +47,7 @@ void Frame::flip() noexcept {
 }
 
 Float3 clamp_shading_normal(Expr<float3> ns, Expr<float3> ng, Expr<float3> w) noexcept {
-    auto w_refl = reflect(w, ns);
+    auto w_refl = reflect(-w, ns);
     auto w_refl_clip = ite(dot(w_refl, ng) * dot(w, ng) > 0.f, w_refl,
                            normalize(w_refl - ng * dot(w_refl, ng)));
     return normalize(w_refl_clip + w);

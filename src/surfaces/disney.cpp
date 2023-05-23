@@ -254,7 +254,7 @@ public:
             auto phi = 2.f * pi * u[1];
             auto wh = spherical_direction(sinTheta, cosTheta, phi);
             wh = ite(same_hemisphere(wo, wh), wh, -wh);
-            return reflect(wo, wh);
+            return reflect(-wo, wh);
         };
         auto wi = impl(wo, u, gloss);
         return {.wi = wi, .valid = same_hemisphere(wo, wi)};

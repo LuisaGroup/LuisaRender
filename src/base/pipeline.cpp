@@ -55,13 +55,22 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     }
     pipeline->_initial_time = initial_time;
     pipeline->_cameras.reserve(scene.cameras().size());
+
     CommandBuffer command_buffer{&stream};
+    auto update_bindless_if_dirty = [&pipeline, &command_buffer] {
+        if (pipeline->_bindless_array.dirty()) {
+            command_buffer << pipeline->_bindless_array.update();
+        }
+    };
     pipeline->_spectrum = scene.spectrum()->build(*pipeline, command_buffer);
+    update_bindless_if_dirty();
     for (auto camera : scene.cameras()) {
         pipeline->_cameras.emplace_back(camera->build(*pipeline, command_buffer));
     }
+    update_bindless_if_dirty();
     pipeline->_geometry = luisa::make_unique<Geometry>(*pipeline);
     pipeline->_geometry->build(command_buffer, scene.shapes(), pipeline->_initial_time);
+    update_bindless_if_dirty();
     if (auto env = scene.environment(); env != nullptr && !env->is_black()) {
         pipeline->_environment = env->build(*pipeline, command_buffer);
     }
@@ -72,12 +81,13 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
         LUISA_WARNING_WITH_LOCATION(
             "No lights or environment found in the scene.");
     }
+    update_bindless_if_dirty();
     pipeline->_integrator = scene.integrator()->build(*pipeline, command_buffer);
-    command_buffer << pipeline->_bindless_array.update();
     if (!pipeline->_transforms.empty()) {
         command_buffer << pipeline->_transform_matrix_buffer.view(0u, pipeline->_transforms.size())
                               .copy_from(pipeline->_transform_matrices.data());
     }
+    update_bindless_if_dirty();
     command_buffer << compute::commit();
     LUISA_INFO("Created pipeline with {} camera(s), {} shape instance(s), "
                "{} surface instance(s), and {} light instance(s).",
