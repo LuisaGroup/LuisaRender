@@ -86,6 +86,7 @@ public:
     class RayMajorantIterator {
 
     public:
+        virtual ~RayMajorantIterator() noexcept = default;
         [[nodiscard]] virtual RayMajorantSegment next() noexcept = 0;
     };
 

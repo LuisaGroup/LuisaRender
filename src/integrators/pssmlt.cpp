@@ -297,7 +297,7 @@ public:
     [[nodiscard]] auto large_step_probability() const noexcept { return _large_step_probability; }
     [[nodiscard]] auto sigma() const noexcept { return _sigma; }
     [[nodiscard]] auto enable_statistics() const noexcept { return _statistics; }
-    [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
@@ -394,11 +394,11 @@ private:
             auto u_lobe = sampler.generate_1d();
             auto u_bsdf = sampler.generate_2d();
             auto eta_scale = def(1.f);
+            PolymorphicCall<Surface::Closure> call;
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
-
-                // create closure
-                auto closure = surface->closure(it, swl, wo, 1.f, time);
-
+                surface->closure(call, *it, swl, wo, 1.f, time);
+            });
+            call.execute([&](auto closure) noexcept {
                 // apply opacity map
                 auto alpha_skip = def(false);
                 if (auto o = closure->opacity()) {

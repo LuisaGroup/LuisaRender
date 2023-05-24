@@ -42,7 +42,7 @@ public:
         }
     }
     [[nodiscard]] auto importance_sampling() const noexcept { return _importance_sampling; }
-    [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
@@ -130,10 +130,11 @@ protected:
             if (samples_surfaces) { u_bsdf = sampler()->generate_2d(); }
             auto surface_sample = Surface::Sample::zero(swl.dimension());
             auto alpha_skip = def(false);
+            PolymorphicCall<Surface::Closure> call;
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
-                // create closure
-                auto closure = surface->closure(it, swl, wo, 1.f, time);
-
+                surface->closure(call, *it, swl, wo, 1.f, time);
+            });
+            call.execute([&](auto closure) noexcept {
                 // apply opacity map
                 if (auto o = closure->opacity()) {
                     auto opacity = saturate(*o);

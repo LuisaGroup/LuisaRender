@@ -151,7 +151,7 @@ public:
     }
     [[nodiscard]] auto ior() const noexcept { return _ior; }
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
-    [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] uint properties() const noexcept override { return property_reflective; }
 
 protected:
@@ -176,9 +176,8 @@ public:
     [[nodiscard]] auto Kd() const noexcept { return _kd; }
 
 public:
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
-        luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-        Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept override;
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> create_closure(const SampledWavelengths &swl, Expr<float> time) const noexcept override;
+    void populate_closure(Surface::Closure *closure, const Interaction &it, Expr<float3> wo, Expr<float> eta_i) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> MetalSurface::_build(
@@ -204,59 +203,79 @@ luisa::unique_ptr<Surface::Instance> MetalSurface::_build(
 
 class MetalClosure : public Surface::Closure {
 
-private:
-    luisa::optional<SampledSpectrum> _refl;
-    luisa::unique_ptr<FresnelConductor> _fresnel;
-    luisa::unique_ptr<TrowbridgeReitzDistribution> _distrib;
-    luisa::unique_ptr<MicrofacetReflection> _lobe;
+public:
+    struct Context {
+        Interaction it;
+        Float eta_i;
+        SampledSpectrum n;
+        SampledSpectrum k;
+        SampledSpectrum refl;
+        Float2 alpha;
+    };
 
 public:
-    MetalClosure(const Surface::Instance *instance, luisa::shared_ptr<Interaction> it,
-                 const SampledWavelengths &swl, Expr<float> time, Expr<float> eta_i,
-                 const SampledSpectrum &n, const SampledSpectrum &k,
-                 luisa::optional<SampledSpectrum> refl, Expr<float2> alpha) noexcept
-        : Surface::Closure{instance, std::move(it), swl, time}, _refl{std::move(refl)},
-          _fresnel{luisa::make_unique<FresnelConductor>(eta_i, n, k)},
-          _distrib{luisa::make_unique<TrowbridgeReitzDistribution>(alpha)},
-          _lobe{luisa::make_unique<MicrofacetReflection>(
-              SampledSpectrum{swl.dimension(), 1.f},
-              _distrib.get(), _fresnel.get())} {}
+    using Surface::Closure::Closure;
+
+    [[nodiscard]] SampledSpectrum albedo() const noexcept override {
+        auto &ctx = context<Context>();
+        auto F0 = fresnel_conductor(1.f, 1.f, ctx.n, ctx.k);
+        return F0 * ctx.refl;
+    }
+    [[nodiscard]] Float2 roughness() const noexcept override {
+        return TrowbridgeReitzDistribution::alpha_to_roughness(
+            context<Context>().alpha);
+    }
+    [[nodiscard]] const Interaction &it() const noexcept override { return context<Context>().it; }
 
 private:
-    [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _lobe->albedo(); }
-    [[nodiscard]] Float2 roughness() const noexcept override {
-        return TrowbridgeReitzDistribution::alpha_to_roughness(_distrib->alpha());
-    }
     [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
                                                 TransportMode mode) const noexcept override {
-        auto wo_local = it()->shading().world_to_local(wo);
-        auto wi_local = it()->shading().world_to_local(wi);
-        auto f = _lobe->evaluate(wo_local, wi_local, mode);
-        if (_refl) { f *= *_refl; }
-        auto pdf = _lobe->pdf(wo_local, wi_local, mode);
+        auto &&ctx = context<Context>();
+        auto &it = ctx.it;
+        auto fresnel = FresnelConductor{ctx.eta_i, ctx.n, ctx.k};
+        auto distribute = TrowbridgeReitzDistribution{ctx.alpha};
+        auto lobe = MicrofacetReflection{SampledSpectrum{swl().dimension(), 1.f}, &distribute, &fresnel};
+
+        auto wo_local = it.shading().world_to_local(wo);
+        auto wi_local = it.shading().world_to_local(wi);
+        auto f = lobe.evaluate(wo_local, wi_local, mode);
+        f *= ctx.refl;
+        auto pdf = lobe.pdf(wo_local, wi_local, mode);
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
     [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float>, Expr<float2> u,
                                           TransportMode mode) const noexcept override {
-        auto wo_local = it()->shading().world_to_local(wo);
+        auto &&ctx = context<Context>();
+        auto &it = ctx.it;
+        auto fresnel = FresnelConductor{ctx.eta_i, ctx.n, ctx.k};
+        auto distribute = TrowbridgeReitzDistribution{ctx.alpha};
+        auto lobe = MicrofacetReflection{SampledSpectrum{swl().dimension(), 1.f}, &distribute, &fresnel};
+
+        auto wo_local = it.shading().world_to_local(wo);
         auto pdf = def(0.f);
         auto wi_local = def(make_float3(0.f, 0.f, 1.f));
-        auto f = _lobe->sample(wo_local, std::addressof(wi_local),
-                               u, std::addressof(pdf), mode);
-        if (_refl) { f *= *_refl; }
-        auto wi = it()->shading().local_to_world(wi_local);
+        auto f = lobe.sample(wo_local, std::addressof(wi_local),
+                             u, std::addressof(pdf), mode);
+        f *= ctx.refl;
+        auto wi = it.shading().local_to_world(wi_local);
         return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf},
                 .wi = wi,
                 .event = Surface::event_reflect};
     }
 };
 
-luisa::unique_ptr<Surface::Closure> MetalInstance::closure(
-    luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-    Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept {
+luisa::unique_ptr<Surface::Closure> MetalInstance::create_closure(
+    const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    return luisa::make_unique<MetalClosure>(pipeline(), swl, time);
+}
+
+void MetalInstance::populate_closure(Surface::Closure *closure, const Interaction &it,
+                                     Expr<float3> wo, Expr<float> eta_i) const noexcept {
+    auto &swl = closure->swl();
+    auto time = closure->time();
     auto alpha = def(make_float2(.5f));
     if (_roughness != nullptr) {
-        auto r = _roughness->evaluate(*it, swl, time);
+        auto r = _roughness->evaluate(it, swl, time);
         auto remap = node<MetalSurface>()->remap_roughness();
         auto r2a = [](auto &&x) noexcept { return TrowbridgeReitzDistribution::roughness_to_alpha(x); };
         alpha = _roughness->node()->channels() == 1u ?
@@ -270,17 +289,25 @@ luisa::unique_ptr<Surface::Closure> MetalInstance::closure(
         eta[i] = _eta.sample(lambda);
         k[i] = _k.sample(lambda);
     }
-    luisa::optional<SampledSpectrum> refl;
+    SampledSpectrum refl{swl.dimension(), 1.f};
     if (_kd != nullptr) {
-        refl.emplace(_kd->evaluate_albedo_spectrum(*it, swl, time).value);
+        refl *= _kd->evaluate_albedo_spectrum(it, swl, time).value;
     }
-    return luisa::make_unique<MetalClosure>(
-        this, std::move(it), swl, time, eta_i,
-        eta, k, std::move(refl), alpha);
+
+    MetalClosure::Context ctx{
+        .it = it,
+        .eta_i = eta_i,
+        .n = eta,
+        .k = k,
+        .refl = refl,
+        .alpha = alpha,
+    };
+
+    closure->bind(std::move(ctx));
 }
 
 using NormalMapOpacityMetalSurface = NormalMapWrapper<OpacitySurfaceWrapper<
-    MetalSurface, MetalInstance, MetalClosure>>;
+    MetalSurface, MetalInstance>>;
 
 }// namespace luisa::render
 

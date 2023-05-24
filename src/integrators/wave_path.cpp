@@ -32,7 +32,7 @@ public:
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
     [[nodiscard]] auto samples_per_pass() const noexcept { return _samples_per_pass; }
-    [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
@@ -80,7 +80,7 @@ public:
         }
         auto u_wl = _wl_sample.read(index);
         auto swl = _spectrum->sample(abs(u_wl));
-        $if (u_wl < 0.f) { swl.terminate_secondary(); };
+        $if(u_wl < 0.f) { swl.terminate_secondary(); };
         return std::make_pair(abs(u_wl), swl);
     }
     void write_wavelength_sample(Expr<uint> index, Expr<float> u_wl) noexcept {
@@ -379,9 +379,13 @@ void WavefrontPathTracingInstance::_render_one_camera(
             auto surface_tag = it->shape().surface_tag();
             auto eta_scale = def(1.f);
             auto wo = -ray->direction();
+
+            PolymorphicCall<Surface::Closure> call;
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
-                // create closure
-                auto closure = surface->closure(it, swl, wo, 1.f, time);
+                surface->closure(call, *it, swl, wo, 1.f, time);
+            });
+
+            call.execute([&](const Surface::Closure *closure) noexcept {
 
                 // apply opacity map
                 auto alpha_skip = def(false);

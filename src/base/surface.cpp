@@ -19,43 +19,46 @@ luisa::unique_ptr<Surface::Instance> Surface::build(
     return _build(pipeline, command_buffer);
 }
 
-Surface::Closure::Closure(const Surface::Instance *instance, luisa::shared_ptr<Interaction> it,
-                          const SampledWavelengths &swl, Expr<float> time) noexcept
-    : _instance{instance}, _it{std::move(it)}, _swl{swl}, _time{time} {}
+void Surface::Instance::closure(PolymorphicCall<Closure> &call,
+                                const Interaction &it, const SampledWavelengths &swl,
+                                Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept {
+    auto cls = call.collect(closure_identifier(), [&] {
+        return create_closure(swl, time);
+    });
+    populate_closure(cls, it, wo, eta_i);
+}
+
+luisa::string Surface::Instance::closure_identifier() const noexcept {
+    return luisa::string{node()->impl_type()};
+}
+
+static auto validate_surface_sides(Expr<float3> ng, Expr<float3> ns,
+                                   Expr<float3> wo, Expr<float3> wi) noexcept {
+    static Callable is_valid = [](Float3 ng, Float3 ns, Float3 wo, Float3 wi) noexcept {
+        auto gs = dot(wo, ng) * dot(wi, ng) > 0.f;
+        auto ss = dot(wo, ns) * dot(wi, ns) > 0.f;
+        return gs == ss;
+    };
+    return is_valid(ng, ns, wo, wi);
+}
 
 Surface::Evaluation Surface::Closure::evaluate(
     Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept {
-    return _evaluate(wo, wi, mode);
+    auto eval = _evaluate(wo, wi, mode);
+    auto valid = validate_surface_sides(it().ng(), it().shading().n(), wo, wi);
+    eval.f = ite(valid, eval.f, 0.f);
+    eval.pdf = ite(valid, eval.pdf, 0.f);
+    return eval;
 }
 
-Surface::Sample Surface::Closure::sample(
-    Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u,
-    TransportMode mode) const noexcept {
-    return _sample(wo, u_lobe, u, mode);
-}
-
-luisa::optional<Float> Surface::Closure::_opacity() const noexcept { return luisa::nullopt; }
-luisa::optional<Bool> Surface::Closure::_is_dispersive() const noexcept { return luisa::nullopt; }
-luisa::optional<Float> Surface::Closure::_eta() const noexcept { return luisa::nullopt; }
-
-luisa::optional<Float> Surface::Closure::opacity() const noexcept {
-    // We do not allow transmissive surfaces to be non-opaque.
-    return instance()->node()->is_transmissive() ? luisa::nullopt : _opacity();
-}
-
-luisa::optional<Float> Surface::Closure::eta() const noexcept {
-    // We do not care about eta of non-transmissive surfaces.
-    if (instance()->node()->is_transmissive()) {
-        auto eta = _eta();
-        LUISA_ASSERT(eta.has_value(), "Transmissive surface must have eta.");
-        return eta;
-    }
-    return luisa::nullopt;
-}
-
-luisa::optional<Bool> Surface::Closure::is_dispersive() const noexcept {
-    if (instance()->pipeline().spectrum()->node()->is_fixed()) { return nullopt; }
-    return _is_dispersive();
+Surface::Sample Surface::Closure::sample(Expr<float3> wo,
+                                         Expr<float> u_lobe, Expr<float2> u,
+                                         TransportMode mode) const noexcept {
+    auto s = _sample(wo, u_lobe, u, mode);
+    auto valid = validate_surface_sides(it().ng(), it().shading().n(), wo, s.wi);
+    s.eval.f = ite(valid, s.eval.f, 0.f);
+    s.eval.pdf = ite(valid, s.eval.pdf, 0.f);
+    return s;
 }
 
 }// namespace luisa::render

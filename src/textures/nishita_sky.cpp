@@ -77,7 +77,7 @@ public:
     [[nodiscard]] bool is_black() const noexcept override { return _scale == 0.f; }
     [[nodiscard]] uint channels() const noexcept override { return 3u; }
     [[nodiscard]] bool is_constant() const noexcept override { return false; }
-    [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };

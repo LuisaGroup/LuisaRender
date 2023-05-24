@@ -29,7 +29,7 @@ private:
     float _rr_threshold;
     uint _photon_per_iter;
     float _initial_radius;
-    bool _seperate_direct;
+    bool _separate_direct;
     bool _shared_radius;
 
 public:
@@ -40,16 +40,16 @@ public:
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
           _initial_radius{std::max(desc->property_float_or_default("initial_radius", -200.f), -10000.f)},//<0 for world_size/-radius (-grid count)
           _photon_per_iter{std::max(desc->property_uint_or_default("photon_per_iter", 200000u), 10u)},
-          _seperate_direct{true},                                                   //when false, use photon mapping for all flux and gathering at first intersection. Just for debug
+          _separate_direct{true},                                                  //when false, use photon mapping for all flux and gathering at first intersection. Just for debug
           _shared_radius{desc->property_bool_or_default("shared_radius", true)} {};//whether or not use the shared radius trick in SPPM paper. True is better in performance.
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto photon_per_iter() const noexcept { return _photon_per_iter; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto initial_radius() const noexcept { return _initial_radius; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
-    [[nodiscard]] auto seperate_direct() const noexcept { return _seperate_direct; }
+    [[nodiscard]] auto separate_direct() const noexcept { return _separate_direct; }
     [[nodiscard]] auto shared_radius() const noexcept { return _shared_radius; }
-    [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
@@ -68,8 +68,8 @@ public:
         Buffer<float> _beta;
         Buffer<float3> _wi;
         Buffer<float3> _position;
-        Buffer<uint> _nxt; 
-        uint _size;//size of maximum length
+        Buffer<uint> _nxt;
+        uint _size;       //size of maximum length
         Buffer<uint> _tot;//current photon count
         const Spectrum::Instance *_spectrum;
         Buffer<float> _grid_min;//atomic float3
@@ -83,7 +83,7 @@ public:
         PhotonMap(uint photon_count, const Spectrum::Instance *spectrum) {
             auto &&device = spectrum->pipeline().device();
             _grid_head = device.create_buffer<uint>(photon_count);
-            _beta = device.create_buffer<float>(photon_count*spectrum->node()->dimension());
+            _beta = device.create_buffer<float>(photon_count * spectrum->node()->dimension());
             _wi = device.create_buffer<float3>(photon_count);
             _position = device.create_buffer<float3>(photon_count);
             _nxt = device.create_buffer<uint>(photon_count);
@@ -135,7 +135,6 @@ public:
                 swl.set_pdf(i, _swl_pdf.read(index * dimension + i));
             }
             return swl;
-
         }
         void push(Expr<float3> position, SampledWavelengths swl, SampledSpectrum power, Expr<float3> wi) {
             $if(tot_photon() < size()) {
@@ -157,22 +156,20 @@ public:
                     _grid_max.atomic(i).fetch_max(position[i]);
                 _nxt.write(index, 0u);
             };
-            
-            
         }
         //from uint3 grid id to hash index of the grid
         auto grid_to_index(Expr<int3> p) const noexcept {
-            auto hash=((p.x * 73856093) ^ (p.y * 19349663) ^
-                    (p.z * 83492791)) %
-                   (_size);
-            return (hash+_size)%_size;
+            auto hash = ((p.x * 73856093) ^ (p.y * 19349663) ^
+                         (p.z * 83492791)) %
+                        (_size);
+            return (hash + _size) % _size;
         }
         //from float3 position to uint3 grid id
         auto point_to_grid(Expr<float3> p) const noexcept {
             Float3 grid_min = {_grid_min.read(0),
-                        _grid_min.read(1),
-                        _grid_min.read(2)};
-            return make_int3((p - grid_min) / grid_len()) + make_int3(2,2,2);
+                               _grid_min.read(1),
+                               _grid_min.read(2)};
+            return make_int3((p - grid_min) / grid_len()) + make_int3(2, 2, 2);
         }
         auto point_to_index(Expr<float3> p) const noexcept {
             return grid_to_index(point_to_grid(p));
@@ -192,8 +189,8 @@ public:
                 _grid_max.write(i, -std::numeric_limits<float>::max());
             }
         }
-        void write_grid_len(Expr<float> len){
-            _grid_len.write(0u,len);
+        void write_grid_len(Expr<float> len) {
+            _grid_len.write(0u, len);
         }
         auto split(Expr<float> grid_count) const noexcept {
             /* Float3 grid_min = {_grid_min.read(0),
@@ -207,11 +204,9 @@ public:
             auto _grid_size = _spectrum->pipeline().geometry()->world_max() - _spectrum->pipeline().geometry()->world_min();
             return min(min(_grid_size.x / grid_count, _grid_size.y / grid_count), _grid_size.z / grid_count);
         }
-        
-        
     };
     //Store the information of pixel updates
-    class PixelIndirect{
+    class PixelIndirect {
         Buffer<float> _radius;
         Buffer<uint> _cur_n;
         Buffer<uint> _n_photon;
@@ -222,11 +217,12 @@ public:
         bool _shared_radius;
         uint _photon_per_iter;
         float _clamp;
+
     public:
-        PixelIndirect(uint photon_per_iter, const Spectrum::Instance *spectrum, const Film::Instance *film,float clamp, bool shared_radius){
+        PixelIndirect(uint photon_per_iter, const Spectrum::Instance *spectrum, const Film::Instance *film, float clamp, bool shared_radius) {
             _film = film;
             _spectrum = spectrum;
-            _clamp=clamp;
+            _clamp = clamp;
             auto device = spectrum->pipeline().device();
             auto resolution = film->node()->resolution();
             auto dimension = 3u;//always save rgb
@@ -240,8 +236,8 @@ public:
                 _cur_n = device.create_buffer<uint>(resolution.x * resolution.y);
                 _n_photon = device.create_buffer<uint>(resolution.x * resolution.y);
             }
-            _phi = device.create_buffer<float>(resolution.x * resolution.y*dimension);
-            _tau = device.create_buffer<float>(resolution.x * resolution.y*dimension);
+            _phi = device.create_buffer<float>(resolution.x * resolution.y * dimension);
+            _tau = device.create_buffer<float>(resolution.x * resolution.y * dimension);
             _photon_per_iter = photon_per_iter;
         }
         void write_radius(Expr<uint2> pixel_id, Expr<float> value) noexcept {
@@ -256,7 +252,7 @@ public:
             if (!_shared_radius) {
                 auto resolution = _film->node()->resolution();
                 _cur_n.write(pixel_id.y * resolution.x + pixel_id.x, value);
-            } else{
+            } else {
                 _cur_n.write(0u, value);
             }
         }
@@ -299,11 +295,11 @@ public:
             for (auto i = 0u; i < dimension; ++i) {
                 auto old_tau = _tau.read(offset * dimension + i);
                 auto phi = _phi.read(offset * dimension + i);
-                phi = max(-thershold,min(phi, thershold));//-thershold for wavelength sampling
-                _tau.write(offset * dimension + i, (old_tau+phi)*value);
+                phi = max(-thershold, min(phi, thershold));//-thershold for wavelength sampling
+                _tau.write(offset * dimension + i, (old_tau + phi) * value);
             }
         }
-        
+
         auto n_photon(Expr<uint2> pixel_id) const noexcept {
             auto resolution = _film->node()->resolution();
             if (!_shared_radius) {
@@ -334,7 +330,7 @@ public:
             auto offset = pixel_id.y * resolution.x + pixel_id.x;
             auto dimension = 3u;
             Float3 ret;
-            for (auto i=0u;i<dimension;++i)
+            for (auto i = 0u; i < dimension; ++i)
                 ret[i] = _tau.read(offset * dimension + i);
             return ret;
         }
@@ -353,7 +349,6 @@ public:
             auto dimension = 3u;
             for (auto i = 0u; i < dimension; ++i)
                 _phi.atomic(offset * dimension + i).fetch_add(phi[i]);
-            
         }
         void pixel_info_update(Expr<uint2> pixel_id) {
             $if(cur_n(pixel_id) > 0) {
@@ -362,7 +357,7 @@ public:
                 Float r_new = radius(pixel_id) * sqrt(n_new * gamma / (n_photon(pixel_id) * gamma + cur_n(pixel_id)));
                 //indirect.write_tau(pixel_id, (indirect.tau(pixel_id) + indirect.phi(pixel_id)) * (r_new * r_new) / (indirect.radius(pixel_id) * indirect.radius(pixel_id)));
                 update_tau(pixel_id, r_new * r_new / (radius(pixel_id) * radius(pixel_id)));
-                if (!_shared_radius) { 
+                if (!_shared_radius) {
                     write_n_photon(pixel_id, n_new);
                     write_cur_n(pixel_id, 0u);
                     write_radius(pixel_id, r_new);
@@ -383,8 +378,6 @@ public:
         }
     };
 
-
-
 protected:
     void _render_one_camera(CommandBuffer &command_buffer, Camera::Instance *camera) noexcept override {
         if (!pipeline().has_lighting()) [[unlikely]] {
@@ -395,12 +388,12 @@ protected:
         auto spp = camera->node()->spp();
         auto resolution = camera->film()->node()->resolution();
         auto image_file = camera->node()->file();
-        auto photon_per_iter = node<MegakernelPhotonMapping>()->photon_per_iter(); 
+        auto photon_per_iter = node<MegakernelPhotonMapping>()->photon_per_iter();
         auto pixel_count = resolution.x * resolution.y;
         auto spectrum = camera->pipeline().spectrum();
         //TODO: use sampler right
-        uint add_x = (photon_per_iter+resolution.y-1) / resolution.y;
-        sampler()->reset(command_buffer, make_uint2(resolution.x+add_x,resolution.y), pixel_count+add_x*resolution.y, spp);
+        uint add_x = (photon_per_iter + resolution.y - 1) / resolution.y;
+        sampler()->reset(command_buffer, make_uint2(resolution.x + add_x, resolution.y), pixel_count + add_x * resolution.y, spp);
         command_buffer << pipeline().printer().reset();
         command_buffer << compute::synchronize();
         LUISA_INFO(
@@ -416,13 +409,11 @@ protected:
             radius = min(min(_grid_size.x / -radius, _grid_size.y / -radius), _grid_size.z / -radius);
         }
         auto clamp = camera->film()->node()->clamp() * photon_per_iter * pi * radius * radius;
-        PixelIndirect indirect(photon_per_iter, spectrum, camera->film(), clamp , node<MegakernelPhotonMapping>()->shared_radius());
+        PixelIndirect indirect(photon_per_iter, spectrum, camera->film(), clamp, node<MegakernelPhotonMapping>()->shared_radius());
         PhotonMap photons(photon_per_iter * node<MegakernelPhotonMapping>()->max_depth(), spectrum);
-        
-            
 
         //initialize PixelIndirect
-        Kernel2D indirect_initialize_kernel = [&] ()noexcept {
+        Kernel2D indirect_initialize_kernel = [&]() noexcept {
             Buffer<float> _radius;
             Buffer<float> _cur_n;
             Buffer<float> _n_photon;
@@ -444,7 +435,7 @@ protected:
             indirect.reset_tau(index);
         };
         //reset PhotonMap every spp
-        Kernel1D photon_reset_kernel = [&] ()noexcept {
+        Kernel1D photon_reset_kernel = [&]() noexcept {
             auto index = static_cast<UInt>(dispatch_x());
             photons.reset(index);
         };
@@ -452,16 +443,15 @@ protected:
         Kernel1D photon_grid_kernel = [&]() noexcept {
             auto index = static_cast<UInt>(dispatch_x());
             auto radius = node<MegakernelPhotonMapping>()->initial_radius();
-            $if(photons.nxt(index)==0u) {
+            $if(photons.nxt(index) == 0u) {
                 photons.link(index);
             };
-
         };
         //emit photons
         Kernel2D photon_emit_kernel = [&](UInt frame_index, Float time) noexcept {
             auto pixel_id = dispatch_id().xy();
             auto sampler_id = UInt2(pixel_id.x + resolution.x, pixel_id.y);
-            $if (pixel_id.x * resolution.y + pixel_id.y< photon_per_iter) {
+            $if(pixel_id.x * resolution.y + pixel_id.y < photon_per_iter) {
                 photon_tracing(photons, camera, frame_index, sampler_id, time);
             };
         };
@@ -469,8 +459,8 @@ protected:
         Kernel2D render_kernel = [&](UInt frame_index, Float time, Float shutter_weight) noexcept {
             //set_block_size(16u, 16u, 1u);
             auto pixel_id = dispatch_id().xy();
-            auto L=Li(photons, indirect, camera, frame_index, pixel_id, time,shutter_weight);
-            camera->film()->accumulate(pixel_id, L,0.5f);
+            auto L = Li(photons, indirect, camera, frame_index, pixel_id, time, shutter_weight);
+            camera->film()->accumulate(pixel_id, L, 0.5f);
         };
         //update the radius/light information per pixel
         Kernel2D indirect_update_kernel = [&]() noexcept {
@@ -487,7 +477,7 @@ protected:
             set_block_size(16u, 16u, 1u);
             auto pixel_id = dispatch_id().xy();
             auto L = get_indirect(indirect, camera->pipeline().spectrum(), pixel_id, tot_photon);
-            camera->film()->accumulate(pixel_id,L,0.5f*spp);
+            camera->film()->accumulate(pixel_id, L, 0.5f * spp);
         };
         Clock clock_compile;
         auto render = pipeline().device().compile(render_kernel);
@@ -503,8 +493,7 @@ protected:
         LUISA_INFO("Integrator shader compile in {} ms.", integrator_shader_compilation_time);
         auto shutter_samples = camera->node()->shutter_samples();
         command_buffer << synchronize();
-        
-        
+
         LUISA_INFO("Rendering started.");
         Clock clock;
         ProgressBar progress;
@@ -523,13 +512,13 @@ protected:
                 command_buffer
                     << photon_reset().dispatch(photons.size());
                 command_buffer << emit(sample_id, s.point.time)
-                                      .dispatch(make_uint2(add_x,resolution.y));
+                                      .dispatch(make_uint2(add_x, resolution.y));
                 if (!initial_flag) {//wait for first world statistic
                     initial_flag = true;
                     command_buffer << indirect_initialize().dispatch(resolution);
                 }
                 command_buffer << photon_grid().dispatch(photons.size());
-                command_buffer << render(sample_id++, s.point.time,s.point.weight)
+                command_buffer << render(sample_id++, s.point.time, s.point.weight)
                                       .dispatch(resolution);
                 command_buffer << update().dispatch(resolution);
                 if (node<MegakernelPhotonMapping>()->shared_radius()) {
@@ -550,11 +539,10 @@ protected:
                 }
             }
             command_buffer << pipeline().printer().retrieve();
-
         }
         LUISA_INFO("total spp:{}", runtime_spp);
         //tot_photon is photon_per_iter not photon_per_iter*spp because of unnormalized samples
-        command_buffer << indirect_draw(node<MegakernelPhotonMapping>()->photon_per_iter(),runtime_spp).dispatch(resolution);
+        command_buffer << indirect_draw(node<MegakernelPhotonMapping>()->photon_per_iter(), runtime_spp).dispatch(resolution);
         command_buffer << synchronize();
         command_buffer << pipeline().printer().retrieve();
 
@@ -570,18 +558,17 @@ protected:
         Float3 L;
         L = tau / (tot_photon * pi * r * r);
         return L;
-
     }
 
     [[nodiscard]] Float3 Li(PhotonMap &photons, PixelIndirect &indirect, const Camera::Instance *camera, Expr<uint> frame_index,
-                            Expr<uint2> pixel_id, Expr<float> time,Expr<float> shutter_weight) noexcept {
+                            Expr<uint2> pixel_id, Expr<float> time, Expr<float> shutter_weight) noexcept {
         sampler()->start(pixel_id, frame_index);
         auto u_filter = sampler()->generate_pixel_2d();
         auto u_lens = camera->node()->requires_lens_sampling() ? sampler()->generate_2d() : make_float2(.5f);
         auto [camera_ray, _, camera_weight] = camera->generate_ray(pixel_id, time, u_filter, u_lens);
         auto spectrum = pipeline().spectrum();
         auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler()->generate_1d());
-        SampledSpectrum beta{swl.dimension(), shutter_weight*camera_weight};
+        SampledSpectrum beta{swl.dimension(), shutter_weight * camera_weight};
         SampledSpectrum Li{swl.dimension()};
         SampledSpectrum testbeta{swl.dimension()};
         auto ray = camera_ray;
@@ -593,7 +580,7 @@ protected:
             auto it = pipeline().geometry()->intersect(ray);
 
             // miss
-            if (node<MegakernelPhotonMapping>()->seperate_direct()) {
+            if (node<MegakernelPhotonMapping>()->separate_direct()) {
 
                 $if(!it->valid()) {
                     if (pipeline().environment()) {
@@ -628,7 +615,6 @@ protected:
                         };
                     }
                 };
-                
             }
 
             $if(!it->shape().has_surface()) { $break; };
@@ -656,12 +642,13 @@ protected:
             auto rr_threshold = node<MegakernelPhotonMapping>()->rr_threshold();
             auto q = max(beta.max() * eta_scale, .05f);
             $if(depth + 1u >= rr_depth) {
-                $if(q < rr_threshold & u_rr >= q) { stop_direct=true; };
+                $if(q < rr_threshold & u_rr >= q) { stop_direct = true; };
             };
+            PolymorphicCall<Surface::Closure> call;
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
-                // create closure
-                auto closure = surface->closure(it, swl, wo, 1.f, time);
-
+                surface->closure(call, *it, swl, wo, 1.f, time);
+            });
+            call.execute([&](auto closure) noexcept {
                 // apply opacity map
                 auto alpha_skip = def(false);
                 if (auto o = closure->opacity()) {
@@ -679,7 +666,7 @@ protected:
                         $if(*dispersive) { swl.terminate_secondary(); };
                     }
                     // direct lighting
-                    if (node<MegakernelPhotonMapping>()->seperate_direct()) {
+                    if (node<MegakernelPhotonMapping>()->separate_direct()) {
                         $if(light_sample.eval.pdf > 0.0f & !occluded) {
                             auto wi = light_sample.shadow_ray->direction();
                             auto eval = closure->evaluate(wo, wi);
@@ -691,8 +678,8 @@ protected:
                     //TODO: get this done
                     auto roughness = closure->roughness();
                     Bool stop_check;
-                    if (node<MegakernelPhotonMapping>()->seperate_direct()) {
-                        stop_check = (roughness.x*roughness.y > 0.16f)|stop_direct;
+                    if (node<MegakernelPhotonMapping>()->separate_direct()) {
+                        stop_check = (roughness.x * roughness.y > 0.16f) | stop_direct;
                     } else {
                         stop_check = true;//always stop at first intersection
                     }
@@ -719,7 +706,7 @@ protected:
                                                 auto photon_swl = photons.swl(photon_index);
                                                 Phi = spectrum->wavelength_mul(swl, beta * (eval_photon.f / abs_cos_theta(wi_local)), photon_swl, photon_beta);
                                             } else {
-                                                Phi = spectrum->srgb(swl,beta * photon_beta * eval_photon.f / abs_cos_theta(wi_local));
+                                                Phi = spectrum->srgb(swl, beta * photon_beta * eval_photon.f / abs_cos_theta(wi_local));
                                             }
                                             //testbeta += Phi;
                                             indirect.add_phi(pixel_id, Phi);
@@ -731,7 +718,7 @@ protected:
                                     };
                                 };
                             };
-                     };
+                        };
                     };
                     // sample material
                     auto surface_sample = closure->sample(wo, u_lobe, u_bsdf);
@@ -745,12 +732,11 @@ protected:
                         $case(Surface::event_enter) { eta_scale = sqr(eta); };
                         $case(Surface::event_exit) { eta_scale = sqr(1.f / eta); };
                     };
-                    
                 };
             });
             beta = zero_if_any_nan(beta);
             $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
-            if (node<MegakernelPhotonMapping>()->seperate_direct()) {
+            if (node<MegakernelPhotonMapping>()->separate_direct()) {
                 $if(stop_direct) {
                     auto it_next = pipeline().geometry()->intersect(ray);
 
@@ -785,7 +771,7 @@ protected:
     }
 
     void photon_tracing(PhotonMap &photons, const Camera::Instance *camera, Expr<uint> frame_index,
-                            Expr<uint2> pixel_id, Expr<float> time){
+                        Expr<uint2> pixel_id, Expr<float> time) {
 
         sampler()->start(pixel_id, frame_index);
         // generate uniform samples
@@ -797,7 +783,7 @@ protected:
         auto light_sample = light_sampler()->sample_le(
             u_light_selection, u_light_surface, u_direction, swl, time);
         //cos term canceled out in pdf
-        SampledSpectrum beta=light_sample.eval.L/light_sample.eval.pdf;
+        SampledSpectrum beta = light_sample.eval.L / light_sample.eval.pdf;
 
         auto ray = light_sample.shadow_ray;
         auto pdf_bsdf = def(1e16f);
@@ -820,22 +806,23 @@ protected:
             auto u_rr = def(0.f);
             auto rr_depth = node<MegakernelPhotonMapping>()->rr_depth();
             $if(depth + 1u >= rr_depth) { u_rr = sampler()->generate_1d(); };
-            if (node<MegakernelPhotonMapping>()->seperate_direct()) {
+            if (node<MegakernelPhotonMapping>()->separate_direct()) {
                 $if(depth > 0) {
-                    photons.push(it->p(),swl, beta, wi);
+                    photons.push(it->p(), swl, beta, wi);
                 };
             } else {
-                $if(depth >=0 ){//change this to 0 can get direct light
-                    photons.push(it->p(),swl, beta, wi);
+                $if(depth >= 0) {//change this to 0 can get direct light
+                    photons.push(it->p(), swl, beta, wi);
                 };
             }
             // evaluate material
             auto surface_tag = it->shape().surface_tag();
             auto eta_scale = def(1.f);
+            PolymorphicCall<Surface::Closure> call;
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
-                // create closure
-                auto closure = surface->closure(it, swl, wi, 1.f, time);
-
+                surface->closure(call, *it, swl, wi, 1.f, time);
+            });
+            call.execute([&](auto closure) noexcept {
                 // apply opacity map
                 auto alpha_skip = def(false);
                 if (auto o = closure->opacity()) {
@@ -852,20 +839,20 @@ protected:
                     if (auto dispersive = closure->is_dispersive()) {
                         $if(*dispersive) { swl.terminate_secondary(); };
                     }
-                    
+
                     // sample material
                     auto surface_sample = closure->sample(wi, u_lobe, u_bsdf, TransportMode::IMPORTANCE);
                     ray = it->spawn_ray(surface_sample.wi);
                     pdf_bsdf = surface_sample.eval.pdf;
                     auto w = ite(surface_sample.eval.pdf > 0.f, 1.f / surface_sample.eval.pdf, 0.f);
-                    auto bnew = beta* w * surface_sample.eval.f;
+                    auto bnew = beta * w * surface_sample.eval.f;
                     // apply eta scale
                     auto eta = closure->eta().value_or(1.f);
                     $switch(surface_sample.event) {
                         $case(Surface::event_enter) { eta_scale = sqr(eta); };
                         $case(Surface::event_exit) { eta_scale = sqr(1.f / eta); };
                     };
-                    eta_scale *= ite(beta.max() < bnew.max() , 1.f, bnew.max() / beta.max());
+                    eta_scale *= ite(beta.max() < bnew.max(), 1.f, bnew.max() / beta.max());
                     beta = bnew;
                 };
             });

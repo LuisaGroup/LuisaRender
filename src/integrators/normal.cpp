@@ -46,9 +46,12 @@ protected:
         $if(it->valid()) {
             if (node<NormalVisualizer>()->shading()) {
                 $if(it->shape().has_surface()) {
+                    PolymorphicCall<Surface::Closure> call;
                     pipeline().surfaces().dispatch(it->shape().surface_tag(), [&](auto surface) noexcept {
-                        auto closure = surface->closure(it, swl, wo, 1.f, time);
-                        ns = closure->it()->shading().n();
+                        surface->closure(call, *it, swl, wo, 1.f, time);
+                    });
+                    call.execute([&](auto closure) noexcept {
+                        ns = closure->it().shading().n();
                     });
                 }
                 $else {

@@ -26,7 +26,7 @@ public:
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
-    [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
@@ -92,7 +92,7 @@ protected:
             auto u_bsdf = sampler()->generate_2d();
             auto u_rr = def(0.f);
             auto rr_depth = node<MegakernelPathTracing>()->rr_depth();
-            $if (depth + 1u >= rr_depth) { u_rr = sampler()->generate_1d(); };
+            $if(depth + 1u >= rr_depth) { u_rr = sampler()->generate_1d(); };
 
             // sample one light
             auto light_sample = light_sampler()->sample(
@@ -104,10 +104,13 @@ protected:
             // evaluate material
             auto surface_tag = it->shape().surface_tag();
             auto eta_scale = def(1.f);
-            pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
-                // create closure
-                auto closure = surface->closure(it, swl, wo, 1.f, time);
 
+            PolymorphicCall<Surface::Closure> call;
+            pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
+                surface->closure(call, *it, swl, wo, 1.f, time);
+            });
+
+            call.execute([&](const Surface::Closure *closure) noexcept {
                 // apply opacity map
                 auto alpha_skip = def(false);
                 if (auto o = closure->opacity()) {
@@ -146,6 +149,7 @@ protected:
                     };
                 };
             });
+
             beta = zero_if_any_nan(beta);
             $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
             auto rr_threshold = node<MegakernelPathTracing>()->rr_threshold();

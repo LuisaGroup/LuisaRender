@@ -11,6 +11,7 @@
 #include <base/sampler.h>
 #include <base/spectrum.h>
 #include <base/interaction.h>
+#include <util/polymorphic_closure.h>
 
 #include <utility>
 
@@ -19,12 +20,16 @@ namespace luisa::render {
 using compute::BindlessArray;
 using compute::Expr;
 using compute::Float3;
+using compute::Local;
 using compute::Var;
 
 class Shape;
 class Sampler;
 class Frame;
 class Interaction;
+
+template<typename BaseSurface, typename BaseInstance>
+class OpacitySurfaceWrapper;
 
 class Surface : public SceneNode {
 
@@ -38,6 +43,7 @@ public:
     struct Evaluation {
         SampledSpectrum f;
         Float pdf;
+
         [[nodiscard]] static auto zero(uint spec_dim) noexcept {
             return Evaluation{
                 .f = SampledSpectrum{spec_dim},
@@ -49,55 +55,51 @@ public:
         Evaluation eval;
         Float3 wi;
         UInt event;
+
         [[nodiscard]] static auto zero(uint spec_dim) noexcept {
-            return Sample{.eval = Evaluation::zero(spec_dim),
-                          .wi = make_float3(0.f, 0.f, 1.f),
-                          .event = Surface::event_reflect};
+            return Sample{
+                .eval = Evaluation::zero(spec_dim),
+                .wi = make_float3(0.f, 0.f, 1.f),
+                .event = Surface::event_reflect};
         }
     };
 
-    class Instance;
-
-    class Closure {
+    class Closure : public PolymorphicClosure {
 
     private:
-        const Instance *_instance;
-
-    private:
-        luisa::shared_ptr<Interaction> _it;
+        const Pipeline &_pipeline;
         const SampledWavelengths &_swl;
         Float _time;
 
     private:
-        [[nodiscard]] virtual Evaluation _evaluate(Expr<float3> wo,
-                                                   Expr<float3> wi,
-                                                   TransportMode mode) const noexcept = 0;
-        [[nodiscard]] virtual Sample _sample(Expr<float3> wo, Expr<float> u_lobe,
-                                             Expr<float2> u, TransportMode mode) const noexcept = 0;
-
-    private:
-        [[nodiscard]] virtual luisa::optional<Float> _opacity() const noexcept;
-        [[nodiscard]] virtual luisa::optional<Bool> _is_dispersive() const noexcept;
-        [[nodiscard]] virtual luisa::optional<Float> _eta() const noexcept;
+        template<typename BS, typename BSI>
+        friend class OpacitySurfaceWrapper;
+        [[nodiscard]] virtual Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept = 0;
+        [[nodiscard]] virtual Sample _sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u, TransportMode mode) const noexcept = 0;
 
     public:
-        Closure(const Instance *instance, luisa::shared_ptr<Interaction> it,
-                const SampledWavelengths &swl, Expr<float> time) noexcept;
-        virtual ~Closure() noexcept = default;
-        template<typename T = Instance>
-            requires std::is_base_of_v<Instance, T>
-        [[nodiscard]] auto instance() const noexcept { return static_cast<const T *>(_instance); }
-        [[nodiscard]] Evaluation evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode = TransportMode::RADIANCE) const noexcept;
-        [[nodiscard]] Sample sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u, TransportMode mode = TransportMode::RADIANCE) const noexcept;
+        Closure(const Pipeline &pipeline,
+                const SampledWavelengths &swl,
+                Expr<float> time) noexcept
+            : _pipeline{pipeline},
+              _swl{swl}, _time{time} {}
+        [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
         [[nodiscard]] auto &swl() const noexcept { return _swl; }
-        [[nodiscard]] auto it() const noexcept { return _it.get(); }
-        [[nodiscard]] auto shared_it() const noexcept { return _it; }
-        [[nodiscard]] auto time() const noexcept { return _time; }         // time
-        [[nodiscard]] luisa::optional<Float> opacity() const noexcept;     // nullopt if never possible to be non-opaque
-        [[nodiscard]] luisa::optional<Float> eta() const noexcept;         // nullopt if never possible to be transmissive
-        [[nodiscard]] luisa::optional<Bool> is_dispersive() const noexcept;// nullopt if never possible to be dispersive
-        [[nodiscard]] virtual SampledSpectrum albedo() const noexcept = 0; // albedo, might not be exact, for AOV only
-        [[nodiscard]] virtual Float2 roughness() const noexcept = 0;       // roughness, might not be exact, for AOV only
+        [[nodiscard]] auto time() const noexcept { return _time; }
+
+        [[nodiscard]] Evaluation evaluate(Expr<float3> wo, Expr<float3> wi,
+                                          TransportMode mode = TransportMode::RADIANCE) const noexcept;
+        [[nodiscard]] Sample sample(Expr<float3> wo,
+                                    Expr<float> u_lobe, Expr<float2> u,
+                                    TransportMode mode = TransportMode::RADIANCE) const noexcept;
+
+        // surface properties
+        [[nodiscard]] virtual luisa::optional<Float> opacity() const noexcept { return nullopt; }     // nullopt if never possible to be non-opaque
+        [[nodiscard]] virtual luisa::optional<Float> eta() const noexcept { return nullopt; }         // nullopt if never possible to be transmissive
+        [[nodiscard]] virtual luisa::optional<Bool> is_dispersive() const noexcept { return nullopt; }// nullopt if never possible to be dispersive
+        [[nodiscard]] virtual const Interaction &it() const noexcept = 0;
+        [[nodiscard]] virtual SampledSpectrum albedo() const noexcept = 0;// albedo, might not be exact, for AOV only
+        [[nodiscard]] virtual Float2 roughness() const noexcept = 0;      // roughness, might not be exact, for AOV only
     };
 
     class Instance {
@@ -110,6 +112,14 @@ public:
         friend class Surface;
 
     public:
+        [[nodiscard]] virtual luisa::string closure_identifier() const noexcept;
+        virtual void populate_closure(
+            Closure *closure, const Interaction &it,
+            Expr<float3> wo, Expr<float> eta_i) const noexcept = 0;
+        [[nodiscard]] virtual luisa::unique_ptr<Closure> create_closure(
+            const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
+
+    public:
         Instance(const Pipeline &pipeline, const Surface *surface) noexcept
             : _pipeline{pipeline}, _surface{surface} {}
         virtual ~Instance() noexcept = default;
@@ -117,9 +127,10 @@ public:
             requires std::is_base_of_v<Surface, T>
         [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_surface); }
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
-        [[nodiscard]] virtual luisa::unique_ptr<Closure> closure(
-            luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-            Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept = 0;
+
+        void closure(PolymorphicCall<Closure> &call,
+                     const Interaction &it, const SampledWavelengths &swl,
+                     Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept;
     };
 
 public:
@@ -142,20 +153,67 @@ public:
 };
 
 template<typename BaseSurface,
-         typename BaseInstance = typename BaseSurface::Instance,
-         typename BaseClosure = typename BaseSurface::Closure>
+         typename BaseInstance = typename BaseSurface::Instance>
 class OpacitySurfaceWrapper : public BaseSurface {
 
+    static_assert(std::derived_from<BaseSurface, Surface> &&
+                  std::derived_from<BaseInstance, Surface::Instance>);
+
 public:
-    class Closure final : public BaseClosure {
+    class Closure final : public Surface::Closure {
 
     private:
-        luisa::optional<Float> _alpha;
-        [[nodiscard]] luisa::optional<Float> _opacity() const noexcept override { return _alpha; }
+        luisa::unique_ptr<Surface::Closure> _base;
 
     public:
-        [[nodiscard]] Closure(BaseClosure &&base, luisa::optional<Float> alpha) noexcept
-            : BaseClosure{std::move(base)}, _alpha{std::move(alpha)} {}
+        struct Context {
+            Float opacity;
+        };
+
+    public:
+        Closure(const Pipeline &pipeline,
+                const SampledWavelengths &swl,
+                Expr<float> time,
+                luisa::unique_ptr<Surface::Closure> base) noexcept
+            : Surface::Closure{pipeline, swl, time},
+              _base{std::move(base)} {}
+        [[nodiscard]] auto base() const noexcept { return _base.get(); }
+
+    public:
+        [[nodiscard]] SampledSpectrum albedo() const noexcept override {
+            return _base->albedo();
+        }
+        [[nodiscard]] Float2 roughness() const noexcept override {
+            return _base->roughness();
+        }
+        [[nodiscard]] const Interaction &it() const noexcept override {
+            return _base->it();
+        }
+        [[nodiscard]] luisa::optional<Float> opacity() const noexcept override {
+            return context<Context>().opacity;
+        }
+        [[nodiscard]] optional<Float> eta() const noexcept override {
+            return _base->eta();
+        }
+        [[nodiscard]] optional<Bool> is_dispersive() const noexcept override {
+            return _base->is_dispersive();
+        }
+
+    public:
+        void pre_eval() noexcept override { _base->pre_eval(); }
+        void post_eval() noexcept override { _base->post_eval(); }
+
+    private:
+        [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo,
+                                                    Expr<float3> wi,
+                                                    TransportMode mode) const noexcept override {
+            return _base->_evaluate(wo, wi, mode);
+        }
+        [[nodiscard]] Surface::Sample _sample(Expr<float3> wo,
+                                              Expr<float> u_lobe, Expr<float2> u,
+                                              TransportMode mode) const noexcept override {
+            return _base->_sample(wo, u_lobe, u, mode);
+        }
     };
 
     class Instance : public BaseInstance {
@@ -166,12 +224,33 @@ public:
     public:
         Instance(BaseInstance &&base, const Texture::Instance *opacity) noexcept
             : BaseInstance{std::move(base)}, _opacity{opacity} {}
-        [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
-            luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-            Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept override {
-            auto alpha = _opacity ? luisa::make_optional(_opacity->evaluate(*it, swl, time).x) : luisa::nullopt;
-            auto base = BaseInstance::closure(std::move(it), swl, wo, eta_i, time);
-            return luisa::make_unique<Closure>(std::move(dynamic_cast<BaseClosure &>(*base)), std::move(alpha));
+
+    public:
+        [[nodiscard]] luisa::string closure_identifier() const noexcept override {
+            auto base_identifier = BaseInstance::closure_identifier();
+            if (_opacity == nullptr) { return base_identifier; }
+            return luisa::format("opacity<{}>", base_identifier);
+        }
+        [[nodiscard]] luisa::unique_ptr<Surface::Closure> create_closure(
+            const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+            auto base = BaseInstance::create_closure(swl, time);
+            if (_opacity == nullptr) { return base; }
+            Closure cls{this->pipeline(), swl, time, std::move(base)};
+            return luisa::make_unique<Closure>(std::move(cls));
+        }
+        void populate_closure(Surface::Closure *closure_in, const Interaction &it,
+                              Expr<float3> wo, Expr<float> eta_i) const noexcept override {
+            if (_opacity == nullptr) {
+                BaseInstance::populate_closure(closure_in, it, wo, eta_i);
+                return;
+            }
+            auto closure = static_cast<Closure *>(closure_in);
+            auto &swl = closure->swl();
+            auto time = closure->time();
+            BaseInstance::populate_closure(closure->base(), it, wo, eta_i);
+            auto o = _opacity->evaluate(it, swl, time).x;
+            typename Closure::Context ctx{.opacity = o};
+            closure->bind(std::move(ctx));
         }
     };
 
@@ -204,6 +283,9 @@ template<typename BaseSurface,
          typename BaseInstance = typename BaseSurface::Instance>
 class NormalMapWrapper : public BaseSurface {
 
+    static_assert(std::derived_from<BaseSurface, Surface> &&
+                  std::derived_from<BaseInstance, Surface::Instance>);
+
 public:
     class Instance : public BaseInstance {
 
@@ -214,17 +296,26 @@ public:
     public:
         Instance(BaseInstance &&base, const Texture::Instance *normal, float strength) noexcept
             : BaseInstance{std::move(base)}, _map{normal}, _strength{strength} {}
-        [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
-            luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-            Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept override {
-            if (_map == nullptr) { return BaseInstance::closure(std::move(it), swl, wo, eta_i, time); }
-            auto normal_local = 2.f * _map->evaluate(*it, swl, time).xyz() - 1.f;
+
+    public:
+        void populate_closure(Surface::Closure *closure, const Interaction &it,
+                              Expr<float3> wo, Expr<float> eta_i) const noexcept override {
+            if (_map == nullptr) {
+                BaseInstance::populate_closure(closure, it, wo, eta_i);
+                return;
+            }
+
+            auto &swl = closure->swl();
+            auto time = closure->time();
+
+            auto normal_local = 2.f * _map->evaluate(it, swl, time).xyz() - 1.f;
             if (_strength != 1.f) { normal_local *= make_float3(_strength, _strength, 1.f); }
-            auto mapped_it = luisa::make_shared<Interaction>(*it);
-            auto normal = it->shading().local_to_world(normal_local);
-            mapped_it->set_shading(Frame::make(clamp_shading_normal(normal, it->ng(), wo),
-                                               it->shading().s()));
-            return BaseInstance::closure(std::move(mapped_it), swl, wo, eta_i, time);
+            auto mapped_it = it;
+            auto normal = it.shading().local_to_world(normal_local);
+            mapped_it.set_shading(Frame::make(clamp_shading_normal(normal, it.ng(), wo),
+                                              it.shading().s()));
+
+            BaseInstance::populate_closure(closure, mapped_it, wo, eta_i);
         }
     };
 
@@ -257,6 +348,9 @@ template<typename BaseSurface,
          typename BaseInstance = typename BaseSurface::Instance>
 class TwoSidedWrapper : public BaseSurface {
 
+    static_assert(std::derived_from<BaseSurface, Surface> &&
+                  std::derived_from<BaseInstance, Surface::Instance>);
+
 public:
     class Instance : public BaseInstance {
 
@@ -266,15 +360,16 @@ public:
     public:
         Instance(BaseInstance &&base, bool two_sided) noexcept
             : BaseInstance{std::move(base)}, _two_sided{two_sided} {}
-        [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
-            luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-            Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept override {
+
+    public:
+        void populate_closure(Surface::Closure *closure, const Interaction &it,
+                              Expr<float3> wo, Expr<float> eta_i) const noexcept override {
             if (_two_sided) {
-                auto it_copy = luisa::make_shared<Interaction>(*it);
-                it_copy->shading().flip();
-                return BaseInstance::closure(std::move(it_copy), swl, wo, eta_i, time);
+                auto it_copy = it;
+                it_copy.shading().flip();
+                BaseInstance::populate_closure(closure, it_copy, wo, eta_i);
             }
-            return BaseInstance::closure(it, swl, wo, eta_i, time);
+            BaseInstance::populate_closure(closure, it, wo, eta_i);
         }
     };
 

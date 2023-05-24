@@ -22,7 +22,7 @@ public:
             _children.emplace_back(scene->load_shape(shape));
         }
     }
-    [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] span<const Shape *const> children() const noexcept override { return _children; }
 };
 

@@ -61,7 +61,8 @@ namespace detail {
     return mutex;
 }
 
-[[nodiscard]] static auto &scene_plugin_load(const std::filesystem::path &runtime_dir, SceneNodeTag tag, std::string_view impl_type) noexcept {
+[[nodiscard]] static auto &scene_plugin_load(
+    const std::filesystem::path &runtime_dir, SceneNodeTag tag, luisa::string_view impl_type) noexcept {
     std::scoped_lock lock{detail::scene_plugin_registry_mutex()};
     auto name = luisa::format("luisa-render-{}-{}", scene_node_tag_description(tag), impl_type);
     for (auto &c : name) { c = static_cast<char>(std::tolower(c)); }

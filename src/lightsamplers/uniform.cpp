@@ -18,7 +18,7 @@ public:
         : LightSampler{scene, desc},
           _environment_weight{desc->property_float_or_default("environment_weight", 0.5f)} {}
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
-    [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] auto environment_weight() const noexcept { return _environment_weight; }
 };
 

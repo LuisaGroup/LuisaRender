@@ -80,7 +80,7 @@ public:
         }
     }
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
-    [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] uint properties() const noexcept override {
         return property_reflective | property_transmissive;
     }
@@ -92,6 +92,7 @@ protected:
 
 class GlassInstance : public Surface::Instance {
 
+public:
 private:
     const Texture::Instance *_kr;
     const Texture::Instance *_kt;
@@ -99,10 +100,9 @@ private:
     const Texture::Instance *_eta;
 
 public:
-    GlassInstance(
-        const Pipeline &pipeline, const Surface *surface,
-        const Texture::Instance *Kr, const Texture::Instance *Kt,
-        const Texture::Instance *roughness, const Texture::Instance *eta) noexcept
+    GlassInstance(const Pipeline &pipeline, const Surface *surface,
+                  const Texture::Instance *Kr, const Texture::Instance *Kt,
+                  const Texture::Instance *roughness, const Texture::Instance *eta) noexcept
         : Surface::Instance{pipeline, surface}, _kr{Kr}, _kt{Kt}, _roughness{roughness}, _eta{eta} {}
     [[nodiscard]] auto Kr() const noexcept { return _kr; }
     [[nodiscard]] auto Kt() const noexcept { return _kt; }
@@ -110,9 +110,10 @@ public:
     [[nodiscard]] auto eta() const noexcept { return _eta; }
 
 public:
-    [[nodiscard]] luisa::unique_ptr<Surface::Closure> closure(
-        luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-        Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept override;
+    [[nodiscard]] luisa::unique_ptr<Surface::Closure> create_closure(
+        const SampledWavelengths &swl, Expr<float> time) const noexcept override;
+    void populate_closure(Surface::Closure *closure, const Interaction &it,
+                          Expr<float3> wo, Expr<float> eta_i) const noexcept override;
 };
 
 luisa::unique_ptr<Surface::Instance> GlassSurface::_build(
@@ -124,96 +125,120 @@ luisa::unique_ptr<Surface::Instance> GlassSurface::_build(
     return luisa::make_unique<GlassInstance>(pipeline, this, Kr, Kt, roughness, eta);
 }
 
-class GlassClosure final : public Surface::Closure {
-
-private:
-    Bool _dispersive;
-    luisa::unique_ptr<TrowbridgeReitzDistribution> _distribution;
-    luisa::unique_ptr<FresnelDielectric> _fresnel;
-    luisa::unique_ptr<MicrofacetReflection> _refl;
-    luisa::unique_ptr<MicrofacetTransmission> _trans;
-    Float _kr_ratio;
+class GlassClosure : public Surface::Closure {
 
 public:
-    GlassClosure(
-        const Surface::Instance *instance, luisa::shared_ptr<Interaction> it,
-        const SampledWavelengths &swl, Expr<float> time, const SampledSpectrum &Kr,
-        const SampledSpectrum &Kt, Expr<float> eta_i, Expr<float> eta_t,
-        Expr<bool> dispersive, Expr<float2> alpha, Expr<float> Kr_ratio) noexcept
-        : Surface::Closure{instance, std::move(it), swl, time}, _dispersive{dispersive},
-          _distribution{luisa::make_unique<TrowbridgeReitzDistribution>(alpha)},
-          _fresnel{luisa::make_unique<FresnelDielectric>(eta_i, eta_t)},
-          _refl{luisa::make_unique<MicrofacetReflection>(Kr, _distribution.get(), _fresnel.get())},
-          _trans{luisa::make_unique<MicrofacetTransmission>(Kt, _distribution.get(), eta_i, eta_t)},
-          _kr_ratio{Kr_ratio} {}
-    [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _refl->albedo(); }
-    [[nodiscard]] Float2 roughness() const noexcept override {
-        return TrowbridgeReitzDistribution::alpha_to_roughness(_distribution->alpha());
-    }
+    struct Context {
+        Interaction it;
+        SampledSpectrum Kr;
+        SampledSpectrum Kt;
+        Float eta_i;
+        Float eta_t;
+        Bool dispersive;
+        Float2 alpha;
+        Float Kr_ratio;
+    };
 
-    [[nodiscard]] auto _refl_prob(Expr<float3> wo) const noexcept {
-        auto F = _fresnel->evaluate(cos_theta(wo))[0u];
-        auto r = _kr_ratio * F;
-        auto t = (1.f - _kr_ratio) * (1.f - F);
+public:
+    using Surface::Closure::Closure;
+
+    [[nodiscard]] SampledSpectrum albedo() const noexcept override {
+        return context<Context>().Kr;
+    }
+    [[nodiscard]] Float2 roughness() const noexcept override {
+        return TrowbridgeReitzDistribution::alpha_to_roughness(
+            context<Context>().alpha);
+    }
+    [[nodiscard]] optional<Float> eta() const noexcept override {
+        return context<Context>().eta_t;
+    }
+    [[nodiscard]] luisa::optional<Bool> is_dispersive() const noexcept override {
+        return context<Context>().dispersive;
+    }
+    [[nodiscard]] const Interaction &it() const noexcept override { return context<Context>().it; }
+
+private:
+    [[nodiscard]] auto _refl_prob(const FresnelDielectric &fresnel, Expr<float> kr_ratio, Expr<float3> wo) const noexcept {
+        auto F = fresnel.evaluate(cos_theta(wo))[0u];
+        auto r = kr_ratio * F;
+        auto t = (1.f - kr_ratio) * (1.f - F);
         return ite(r == 0.f, 0.f, r / (r + t));
     }
 
 private:
-    [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
+    [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo,
+                                                Expr<float3> wi,
                                                 TransportMode mode) const noexcept override {
-        auto wo_local = it()->shading().world_to_local(wo);
-        auto wi_local = it()->shading().world_to_local(wi);
+        auto &ctx = context<Context>();
+        auto &it = ctx.it;
+        auto distribution = TrowbridgeReitzDistribution{ctx.alpha};
+        auto fresnel = FresnelDielectric{ctx.eta_i, ctx.eta_t};
+        auto refl = MicrofacetReflection{ctx.Kr, &distribution, &fresnel};
+        auto trans = MicrofacetTransmission{ctx.Kt, &distribution, ctx.eta_i, ctx.eta_t};
+
+        auto wo_local = it.shading().world_to_local(wo);
+        auto wi_local = it.shading().world_to_local(wi);
         SampledSpectrum f{swl().dimension()};
         auto pdf = def(0.f);
-        auto ratio = _refl_prob(wo_local);
+        auto ratio = _refl_prob(fresnel, ctx.Kr_ratio, wo_local);
         $if(same_hemisphere(wo_local, wi_local)) {
-            f = _refl->evaluate(wo_local, wi_local, mode);
-            pdf = _refl->pdf(wo_local, wi_local, mode) * ratio;
+            f = refl.evaluate(wo_local, wi_local, mode);
+            pdf = refl.pdf(wo_local, wi_local, mode) * ratio;
         }
         $else {
-            f = _trans->evaluate(wo_local, wi_local, mode);
-            pdf = _trans->pdf(wo_local, wi_local, mode) * (1.f - ratio);
+            f = trans.evaluate(wo_local, wi_local, mode);
+            pdf = trans.pdf(wo_local, wi_local, mode) * (1.f - ratio);
         };
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
 
-    [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float> u_lobe,
-                                          Expr<float2> u, TransportMode mode) const noexcept override {
-        auto wo_local = it()->shading().world_to_local(wo);
+    [[nodiscard]] Surface::Sample _sample(Expr<float3> wo,
+                                          Expr<float> u_lobe, Expr<float2> u,
+                                          TransportMode mode) const noexcept override {
+        auto &ctx = context<Context>();
+        auto &it = ctx.it;
+        auto distribution = TrowbridgeReitzDistribution{ctx.alpha};
+        auto fresnel = FresnelDielectric{ctx.eta_i, ctx.eta_t};
+        auto refl = MicrofacetReflection{ctx.Kr, &distribution, &fresnel};
+        auto trans = MicrofacetTransmission{ctx.Kt, &distribution, ctx.eta_i, ctx.eta_t};
+
+        auto wo_local = it.shading().world_to_local(wo);
         auto pdf = def(0.f);
         auto f = SampledSpectrum{swl().dimension()};
         auto wi_local = def(make_float3(0.0f, 0.0f, 1.0f));
         auto event = def(Surface::event_reflect);
-        auto ratio = _refl_prob(wo_local);
+        auto ratio = _refl_prob(fresnel, ctx.Kr_ratio, wo_local);
         auto wi = def(make_float3());
         $if(u_lobe < ratio) {// Reflection
-            f = _refl->sample(wo_local, std::addressof(wi_local),
-                              u, std::addressof(pdf), mode);
-            wi = it()->shading().local_to_world(wi_local);
+            f = refl.sample(wo_local, std::addressof(wi_local),
+                            u, std::addressof(pdf), mode);
+            wi = it.shading().local_to_world(wi_local);
             pdf *= ratio;
         }
         $else {// Transmission
-            f = _trans->sample(wo_local, std::addressof(wi_local),
-                               u, std::addressof(pdf), mode);
-            wi = it()->shading().local_to_world(wi_local);
+            f = trans.sample(wo_local, std::addressof(wi_local),
+                             u, std::addressof(pdf), mode);
+            wi = it.shading().local_to_world(wi_local);
             pdf *= (1.f - ratio);
             event = ite(cos_theta(wo_local) > 0.f, Surface::event_enter, Surface::event_exit);
         };
         return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf}, .wi = wi, .event = event};
     }
-
-private:
-    [[nodiscard]] optional<Float> _eta() const noexcept override { return _fresnel->eta_t(); }
-    [[nodiscard]] luisa::optional<Bool> _is_dispersive() const noexcept override { return _dispersive; }
 };
 
-luisa::unique_ptr<Surface::Closure> GlassInstance::closure(
-    luisa::shared_ptr<Interaction> it, const SampledWavelengths &swl,
-    Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept {
-    // roughness
+luisa::unique_ptr<Surface::Closure> GlassInstance::create_closure(
+    const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    return luisa::make_unique<GlassClosure>(pipeline(), swl, time);
+}
+
+void GlassInstance::populate_closure(Surface::Closure *closure, const Interaction &it,
+                                     Expr<float3> wo, Expr<float> eta_i) const noexcept {
+
     auto alpha = def(make_float2(0.f));
+    auto &swl = closure->swl();
+    auto time = closure->time();
     if (_roughness != nullptr) {
-        auto r = _roughness->evaluate(*it, swl, time);
+        auto r = _roughness->evaluate(it, swl, time);
         auto remap = node<GlassSurface>()->remap_roughness();
         auto r2a = [](auto &&x) noexcept { return TrowbridgeReitzDistribution::roughness_to_alpha(x); };
         alpha = _roughness->node()->channels() == 1u ?
@@ -222,9 +247,9 @@ luisa::unique_ptr<Surface::Closure> GlassInstance::closure(
     }
 
     // Kr, Kt
-    auto [Kr, Kr_lum] = _kr ? _kr->evaluate_albedo_spectrum(*it, swl, time) :
+    auto [Kr, Kr_lum] = _kr ? _kr->evaluate_albedo_spectrum(it, swl, time) :
                               Spectrum::Decode::one(swl.dimension());
-    auto [Kt, Kt_lum] = _kt ? _kt->evaluate_albedo_spectrum(*it, swl, time) :
+    auto [Kt, Kt_lum] = _kt ? _kt->evaluate_albedo_spectrum(it, swl, time) :
                               Spectrum::Decode::one(swl.dimension());
     auto Kr_ratio = ite(Kr_lum == 0.f, 0.f, Kr_lum / (Kr_lum + Kt_lum));
 
@@ -234,9 +259,9 @@ luisa::unique_ptr<Surface::Closure> GlassInstance::closure(
     if (_eta != nullptr) {
         if (_eta->node()->channels() == 1u ||
             pipeline().spectrum()->node()->is_fixed()) {
-            eta = _eta->evaluate(*it, swl, time).x;
+            eta = _eta->evaluate(it, swl, time).x;
         } else {
-            auto e = _eta->evaluate(*it, swl, time).xyz();
+            auto e = _eta->evaluate(it, swl, time).xyz();
             auto inv_bb = sqr(1.f / fraunhofer_wavelengths);
             auto m = make_float3x3(make_float3(1.f), inv_bb, sqr(inv_bb));
             auto c = inverse(m) * e;
@@ -246,10 +271,17 @@ luisa::unique_ptr<Surface::Closure> GlassInstance::closure(
         }
     }
 
-    // fresnel
-    return luisa::make_unique<GlassClosure>(
-        this, std::move(it), swl, time, Kr, Kt,
-        eta_i, eta, dispersive, alpha, Kr_ratio);
+    GlassClosure::Context ctx{
+        .it = it,
+        .Kr = Kr,
+        .Kt = Kt,
+        .eta_i = eta_i,
+        .eta_t = eta,
+        .dispersive = dispersive,
+        .alpha = alpha,
+        .Kr_ratio = Kr_ratio};
+
+    closure->bind(std::move(ctx));
 }
 
 using NormalMapGlassSurface = NormalMapWrapper<

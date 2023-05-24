@@ -27,7 +27,7 @@ public:
         _u = normalize(cross(up, _w));
         _v = normalize(cross(_w, _u));
     }
-    [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] bool is_static() const noexcept override { return true; }
     [[nodiscard]] bool is_identity() const noexcept override {
         return all(_origin == 0.f) &&

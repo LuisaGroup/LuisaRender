@@ -30,7 +30,7 @@ public:
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
-    [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
@@ -55,9 +55,12 @@ protected:
                              Expr<float3> wo, Expr<float3> wi) const noexcept {
         Float3 wo_local, wi_local;
         $if(it->shape().has_surface()) {
+            PolymorphicCall<Surface::Closure> call;
             pipeline().surfaces().dispatch(it->shape().surface_tag(), [&](auto surface) noexcept {
-                auto closure = surface->closure(it, swl, wo, 1.f, time);
-                auto shading = closure->it()->shading();
+                surface->closure(call, *it, swl, wo, 1.f, time);
+            });
+            call.execute([&](auto closure) noexcept {
+                auto shading = closure->it().shading();
                 wo_local = shading.world_to_local(wo);
                 wi_local = shading.world_to_local(wi);
             });
@@ -463,11 +466,13 @@ protected:
                 // evaluate material
                 auto surface_tag = it->shape().surface_tag();
                 auto surface_event_skip = event(swl, it, time, -ray->direction(), ray->direction());
-                pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
-                    // create closure
-                    auto wo = -ray->direction();
-                    auto closure = surface->closure(it, swl, wo, eta, time);
+                auto wo = -ray->direction();
 
+                PolymorphicCall<Surface::Closure> call;
+                pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
+                    surface->closure(call, *it, swl, wo, eta, time);
+                });
+                call.execute([&](auto closure) noexcept {
                     // apply opacity map
                     auto alpha_skip = def(false);
                     if (auto o = closure->opacity()) {

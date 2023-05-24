@@ -1,21 +1,22 @@
-#include "base/geometry.h"
-#include "base/interaction.h"
-#include "base/sampler.h"
-#include "base/spectrum.h"
-#include "core/basic_traits.h"
-#include "core/basic_types.h"
-#include "core/mathematics.h"
-#include "core/stl.h"
-#include "dsl/builtin.h"
-#include "dsl/expr.h"
-#include "dsl/sugar.h"
-#include "dsl/var.h"
-#include "rtx/ray.h"
-#include "util/frame.h"
-#include "util/scattering.h"
-#include "util/spec.h"
 #include <cmath>
 #include <limits>
+
+#include <base/geometry.h>
+#include <base/interaction.h>
+#include <base/sampler.h>
+#include <base/spectrum.h>
+#include <core/basic_traits.h>
+#include <core/basic_types.h>
+#include <core/mathematics.h>
+#include <core/stl.h>
+#include <dsl/builtin.h>
+#include <dsl/expr.h>
+#include <dsl/sugar.h>
+#include <dsl/var.h>
+#include <rtx/ray.h>
+#include <util/frame.h>
+#include <util/scattering.h>
+#include <util/spec.h>
 #include <util/imageio.h>
 #include <util/medium_tracker.h>
 #include <util/progress_bar.h>
@@ -50,7 +51,7 @@ public:
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
     [[nodiscard]] auto shift_threshold() const noexcept { return _shift_threshold; }
     [[nodiscard]] auto central_radiance() const noexcept { return _central_radiance; }
-    [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
