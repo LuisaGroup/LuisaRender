@@ -461,9 +461,12 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
             auto surface_tag = it->shape().surface_tag();
             auto eta_scale = def(1.f);
             auto wo = -ray->direction();
+            PolymorphicCall<Surface::Closure> call;
             pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
-                // create closure
-                auto closure = surface->closure(it, swl, wo, 1.f, time);
+                surface->closure(call, *it, swl, wo, 1.f, time);
+            });
+
+            call.execute([&](const Surface::Closure *closure) noexcept {
 
                 // apply opacity map
                 auto alpha_skip = def(false);
