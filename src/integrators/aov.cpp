@@ -9,6 +9,8 @@
 #include <base/pipeline.h>
 #include <base/integrator.h>
 #include <base/scene.h>
+#include <gui/framerate.h>
+#include <gui/window.h>
 
 namespace luisa::render {
 

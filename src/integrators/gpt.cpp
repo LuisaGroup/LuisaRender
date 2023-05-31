@@ -13,7 +13,7 @@
 #include <dsl/expr.h>
 #include <dsl/sugar.h>
 #include <dsl/var.h>
-#include <rtx/ray.h>
+#include <runtime/rtx/ray.h>
 #include <util/frame.h>
 #include <util/scattering.h>
 #include <util/spec.h>
