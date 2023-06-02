@@ -123,6 +123,7 @@ int main(int argc, char *argv[]) {
     auto path = options["scene"].as<std::filesystem::path>();
     compute::DeviceConfig config;
     config.device_index = index;
+    config.inqueue_buffer_limit = false; // Do not limit the number of in-queue buffers --- we are doing offline rendering!
     auto device = context.create_device(backend, &config);
 
     Clock clock;
