@@ -70,7 +70,7 @@ LUISA_STRUCT(
 
 LUISA_DISABLE_DSL_ADDRESS_OF_OPERATOR(luisa::render::MediumTracker)
 
-[[nodiscard]] luisa::compute::Var<luisa::render::MediumInfo> make_medium_info(
+[[nodiscard]] inline luisa::compute::Var<luisa::render::MediumInfo> make_medium_info(
     luisa::compute::UInt priority, luisa::compute::UInt medium_tag) noexcept {
     return luisa::compute::def<luisa::render::MediumInfo>(priority, medium_tag);
 }
