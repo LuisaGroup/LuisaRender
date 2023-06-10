@@ -95,7 +95,7 @@ Float SPD::sample(Expr<float> lambda) const noexcept {
     auto i = cast<uint>(min(t, static_cast<float>(sample_count - 2u)));
     auto s0 = _pipeline.buffer<float>(_buffer_id).read(i);
     auto s1 = _pipeline.buffer<float>(_buffer_id).read(i + 1u);
-    return lerp(s0, s1, fract(t));
+    return lerp(s0, s1, t);
 }
 
 }// namespace luisa::render
