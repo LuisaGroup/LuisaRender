@@ -329,7 +329,7 @@ private:
     }
 
     [[nodiscard]] static auto _s(Expr<float3> L, Expr<bool> is_light) noexcept {
-        auto v = clamp(L, 0.f, ite(is_light, 1.f, 1e3f));
+        auto v = clamp(L, 0.f, ite(is_light, 1.f, 1e4f));
         return v.x + v.y + v.z;
     }
 
