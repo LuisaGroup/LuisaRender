@@ -95,8 +95,10 @@ void ProgressiveIntegrator::Instance::_render_one_camera(
             if (auto &&p = pipeline().printer(); !p.empty()) {
                 command_buffer << p.retrieve();
             }
+            dispatch_count++;
+            if (camera->film()->show(command_buffer)) { dispatch_count = 0u; }
             auto dispatches_per_commit = 4u;
-            if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
+            if (dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
                 dispatch_count = 0u;
                 auto p = sample_id / static_cast<double>(spp);
                 command_buffer << [&progress, p] { progress.update(p); };

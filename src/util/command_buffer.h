@@ -22,6 +22,8 @@ public:
     explicit CommandBuffer(Stream *stream) noexcept;
     ~CommandBuffer() noexcept;
 
+    [[nodiscard]] auto stream() const noexcept { return _stream; }
+
     template<typename T>
     CommandBuffer &operator<<(T &&cmd) noexcept {
         if constexpr (requires { _list << std::forward<T>(cmd); }) {

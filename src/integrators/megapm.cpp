@@ -508,8 +508,7 @@ protected:
             for (auto i = 0u; i < s.spp; i++) {
                 //emit phtons then calculate L
                 //TODO: accurate size reset
-                command_buffer
-                    << photon_reset().dispatch(photons.size());
+                command_buffer << photon_reset().dispatch(photons.size());
                 command_buffer << emit(sample_id, s.point.time)
                                       .dispatch(make_uint2(add_x, resolution.y));
                 if (!initial_flag) {//wait for first world statistic
@@ -523,8 +522,12 @@ protected:
                 if (node<MegakernelPhotonMapping>()->shared_radius()) {
                     command_buffer << shared_update().dispatch(1u);
                 }
+                dispatch_count++;
+                if (camera->film()->show(command_buffer)) {
+                    dispatch_count = 0u;
+                }
                 auto dispatches_per_commit = 4u;
-                if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
+                if (dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
                     dispatch_count = 0u;
                     auto p = sample_id / static_cast<double>(spp);
                     command_buffer << [&progress, p] { progress.update(p); };
