@@ -329,7 +329,7 @@ private:
     }
 
     [[nodiscard]] static auto _s(Expr<float3> L, Expr<bool> is_light) noexcept {
-        auto v = clamp(L, 0.f, ite(is_light, 1.f, 1e3f));
+        auto v = clamp(L, 0.f, ite(is_light, 1.f, 1e4f));
         return v.x + v.y + v.z;
     }
 
@@ -645,8 +645,10 @@ private:
                 command_buffer << propose(s.point.time, s.point.weight, static_cast<float>(b))
                                       .dispatch(chains_to_dispatch);
                 mutation_count += chains_to_dispatch;
+                dispatch_count++;
+                if (camera->film()->show(command_buffer)) { dispatch_count = 0u; }
                 auto dispatches_per_commit = 16u;
-                if (++dispatch_count >= dispatches_per_commit) [[unlikely]] {
+                if (dispatch_count >= dispatches_per_commit) [[unlikely]] {
                     auto p = static_cast<double>(mutation_count) /
                              static_cast<double>(total_mutations);
                     auto effective_spp = p * camera->node()->spp();

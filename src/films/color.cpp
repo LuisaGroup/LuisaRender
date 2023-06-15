@@ -17,6 +17,7 @@ using namespace luisa::compute;
 class ColorFilm final : public Film {
 
 private:
+    uint2 _resolution{};
     float _scale[3]{};
     float _clamp{};
     bool _warn_nan{};
@@ -24,6 +25,10 @@ private:
 public:
     ColorFilm(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Film{scene, desc},
+          _resolution{desc->property_uint2_or_default(
+              "resolution", lazy_construct([desc] {
+                  return make_uint2(desc->property_uint_or_default("resolution", 1024u));
+              }))},
           _warn_nan{desc->property_bool_or_default("warn_nan", false)} {
         auto exposure = desc->property_float3_or_default(
             "exposure", lazy_construct([desc] {
@@ -37,6 +42,7 @@ public:
     }
     [[nodiscard]] auto scale() const noexcept { return make_float3(_scale[0], _scale[1], _scale[2]); }
     [[nodiscard]] float clamp() const noexcept override { return _clamp; }
+    [[nodiscard]] uint2 resolution() const noexcept override { return _resolution; }
     [[nodiscard]] auto warn_nan() const noexcept { return _warn_nan; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
@@ -61,7 +67,7 @@ public:
     void prepare(CommandBuffer &command_buffer) noexcept override;
     void download(CommandBuffer &command_buffer, float4 *framebuffer) const noexcept override;
     [[nodiscard]] Film::Accumulation read(Expr<uint2> pixel) const noexcept override;
-    void release() const noexcept override;
+    void release() noexcept override;
     void clear(CommandBuffer &command_buffer) noexcept override;
 
 protected:
@@ -142,7 +148,7 @@ Film::Accumulation ColorFilmInstance::read(Expr<uint2> pixel) const noexcept {
     return {.average = scale * c.xyz(), .sample_count = c.w};
 }
 
-void ColorFilmInstance::release() const noexcept {
+void ColorFilmInstance::release() noexcept {
     _image = {};
     _converted = {};
 }

@@ -8,11 +8,7 @@
 namespace luisa::render {
 
 Film::Film(Scene *scene, const SceneNodeDesc *desc) noexcept
-    : SceneNode{scene, desc, SceneNodeTag::FILM},
-      _resolution{desc->property_uint2_or_default(
-          "resolution", lazy_construct([desc] {
-              return make_uint2(desc->property_uint_or_default("resolution", 1024u));
-          }))} {}
+    : SceneNode{scene, desc, SceneNodeTag::FILM} {}
 
 void Film::Instance::accumulate(Expr<uint2> pixel, Expr<float3> rgb,
                                 Expr<float> effective_spp) const noexcept {

@@ -178,7 +178,8 @@ std::pair<BufferView<float4>, uint> Pipeline::allocate_constant_slot() noexcept 
     auto slot = _constant_count++;
     LUISA_ASSERT(slot < constant_buffer_size,
                  "Constant buffer overflows.");
-    return {_constant_buffer.view(static_cast<uint>(slot), 1u), slot};
+    return {_constant_buffer.view(static_cast<uint>(slot), 1u),
+            static_cast<uint>(slot)};
 }
 
 Float4 Pipeline::constant(Expr<uint> index) const noexcept {

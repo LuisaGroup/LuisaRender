@@ -41,18 +41,16 @@ public:
         virtual void prepare(CommandBuffer &command_buffer) noexcept = 0;
         virtual void clear(CommandBuffer &command_buffer) noexcept = 0;
         virtual void download(CommandBuffer &command_buffer, float4 *framebuffer) const noexcept = 0;
-        virtual void release() const noexcept = 0;
+        virtual bool show(CommandBuffer &command_buffer) const noexcept { return false; }
+        virtual void release() noexcept = 0;
     };
-
-private:
-    uint2 _resolution;
 
 public:
     Film(Scene *scene, const SceneNodeDesc *desc) noexcept;
-    [[nodiscard]] auto resolution() const noexcept { return _resolution; }
+    [[nodiscard]] virtual uint2 resolution() const noexcept = 0;
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
-    [[nodiscard]] virtual float clamp() const noexcept { return 256.0f; }
+    [[nodiscard]] virtual float clamp() const noexcept { return 1024.0f; }
 };
 
 }// namespace luisa::render

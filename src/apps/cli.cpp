@@ -123,6 +123,7 @@ int main(int argc, char *argv[]) {
     auto path = options["scene"].as<std::filesystem::path>();
     compute::DeviceConfig config;
     config.device_index = index;
+    config.inqueue_buffer_limit = false; // Do not limit the number of in-queue buffers --- we are doing offline rendering!
     auto device = context.create_device(backend, &config);
 
     Clock clock;
@@ -132,7 +133,7 @@ int main(int argc, char *argv[]) {
     LUISA_INFO("Parsed scene description file '{}' in {} ms.",
                path.string(), parse_time);
     auto scene = Scene::create(context, scene_desc.get());
-    auto stream = device.create_stream(StreamTag::COMPUTE);
+    auto stream = device.create_stream(StreamTag::GRAPHICS);
     auto pipeline = Pipeline::create(device, stream, *scene);
     pipeline->render(stream);
     stream.synchronize();

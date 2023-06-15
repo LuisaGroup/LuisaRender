@@ -26,6 +26,7 @@ endif ()
 set(LUISA_COMPUTE_ENABLE_PYTHON OFF CACHE BOOL "" FORCE)
 set(LUISA_COMPUTE_ENABLE_UNITY_BUILD ${LUISA_RENDER_ENABLE_UNITY_BUILD} CACHE BOOL "" FORCE)
 add_subdirectory(compute)
+target_include_directories(luisa-render-include INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/compute/include/luisa)
 
 add_subdirectory(sdl)
 add_subdirectory(util)

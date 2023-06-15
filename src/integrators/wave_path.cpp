@@ -590,6 +590,7 @@ void WavefrontPathTracingInstance::_render_one_camera(
             }
             command_buffer << accumulate_shader.get()(s.point.weight).dispatch(launch_state_count);
             sample_id += launch_spp;
+            camera->film()->show(command_buffer);
             auto launches_per_commit = 4u;
             if (sample_id - last_committed_sample_id >= launches_per_commit) {
                 last_committed_sample_id = sample_id;

@@ -426,6 +426,7 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
         for (auto i = 0u; i < s.spp; i++) {
             command_buffer << render_auxiliary(sample_count++, s.point.time, s.point.weight)
                                   .dispatch(resolution);
+            camera->film()->show(command_buffer);
             if (should_dump(sample_count)) {
                 LUISA_INFO("Saving AOVs at sample #{}.", sample_count);
                 luisa::vector<luisa::function<void()>> savers;
