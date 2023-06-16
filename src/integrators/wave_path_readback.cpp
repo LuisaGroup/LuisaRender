@@ -43,7 +43,7 @@ public:
           _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)},
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
-          _samples_per_pass{std::max(desc->property_uint_or_default("samples_per_pass", 16u), 1u)} {}
+          _samples_per_pass{std::max(desc->property_uint_or_default("samples_per_pass", 4u), 1u)} {}
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
@@ -182,6 +182,7 @@ private:
     Buffer<uint> _counter_buffer;
     uint _current_counter;
     Shader1D<> _clear_counters;
+    uint _host_counter;
 
 public:
     RayQueue(Device &device, size_t size) noexcept
@@ -191,6 +192,12 @@ public:
         _clear_counters = device.compile<1>([this] {
             _counter_buffer->write(dispatch_x(), 0u);
         });
+    }
+    void catch_counter(CommandBuffer &command_buffer) noexcept {
+        command_buffer << _counter_buffer.view(0, 1).copy_to(&_host_counter);
+    }
+    [[nodiscard]] uint host_counter() const noexcept {
+        return _host_counter;
     }
     [[nodiscard]] BufferView<uint> prepare_counter_buffer(CommandBuffer &command_buffer) noexcept {
         if (_current_counter == counter_buffer_size) {
@@ -539,24 +546,41 @@ void WavefrontPathTracingInstance::_render_one_camera(
                 auto miss_count = miss_queue.prepare_counter_buffer(command_buffer);
                 auto out_path_indices = out_path_queue.prepare_index_buffer(command_buffer);
                 auto out_path_count = out_path_queue.prepare_counter_buffer(command_buffer);
-                command_buffer << intersect_shader.get()(path_count, rays, hits, surface_indices, surface_count,
-                                                         light_indices, light_count, miss_indices, miss_count)
-                                      .dispatch(launch_state_count);
+                uint launch_size = 0;
+                command_buffer << path_count.copy_to(&launch_size);
+                command_buffer << synchronize();
+                if (launch_size)
+                    command_buffer << intersect_shader.get()(path_count, rays, hits, surface_indices, surface_count,
+                                                             light_indices, light_count, miss_indices, miss_count)
+                                          .dispatch(launch_size);
                 if (pipeline().environment()) {
-                    command_buffer << evaluate_miss_shader.get()(path_indices, rays, miss_indices, miss_count, time)
-                                          .dispatch(launch_state_count);
+                    command_buffer << miss_count.copy_to(&launch_size);
+                    command_buffer << synchronize();
+                    if (launch_size)
+                        command_buffer << evaluate_miss_shader.get()(path_indices, rays, miss_indices, miss_count, time)
+                                              .dispatch(launch_size);
                 }
                 if (!pipeline().lights().empty()) {
-                    command_buffer << evaluate_light_shader.get()(path_indices, rays, hits,
-                                                                  light_indices, light_count, time)
-                                          .dispatch(launch_state_count);
+                    command_buffer << light_count.copy_to(&launch_size);
+                    command_buffer << synchronize();
+                    if (launch_size)
+                        command_buffer << evaluate_light_shader.get()(path_indices, rays, hits,
+                                                                      light_indices, light_count, time)
+                                              .dispatch(launch_size);
                 }
-                command_buffer << sample_light_shader.get()(path_indices, rays, hits, surface_indices, surface_count, time)
-                                      .dispatch(launch_state_count)
-                               << evaluate_surface_shader.get()(path_indices, depth, surface_indices,
-                                                                surface_count, rays, hits, out_rays,
-                                                                out_path_indices, out_path_count, time)
-                                      .dispatch(launch_state_count);
+                command_buffer << surface_count.copy_to(&launch_size);
+                command_buffer << synchronize();
+                if (launch_size)
+                    command_buffer << sample_light_shader.get()(path_indices, rays, hits, surface_indices, surface_count, time)
+                                          .dispatch(launch_size);
+                command_buffer << surface_count.copy_to(&launch_size);
+                command_buffer << synchronize();
+                if (launch_size)
+                    command_buffer
+                        << evaluate_surface_shader.get()(path_indices, depth, surface_indices,
+                                                         surface_count, rays, hits, out_rays,
+                                                         out_path_indices, out_path_count, time)
+                               .dispatch(launch_size);
                 path_indices = out_path_indices;
                 path_count = out_path_count;
                 std::swap(rays, out_rays);
