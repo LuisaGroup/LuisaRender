@@ -53,6 +53,7 @@ private:
     bool _gathering;
     bool _test_case;
     bool _compact;
+    bool _use_tag_sort;
 
 public:
     WavefrontPathTracingv2(Scene *scene, const SceneNodeDesc *desc) noexcept
@@ -62,10 +63,12 @@ public:
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
           _state_limit{std::max(desc->property_uint_or_default("state_limit", 1024*1024*32u), 1u)},
           _gathering{desc->property_bool_or_default("gathering", true)},
+          _use_tag_sort{desc->property_bool_or_default("use_tag_sort", true)},
           _test_case{desc->property_bool_or_default("test_case", false)},
           _compact{desc->property_bool_or_default("compact", true)} {}
           
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
+    [[nodiscard]] auto use_tag_sort() const noexcept { return _use_tag_sort; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
     [[nodiscard]] auto state_limit() const noexcept { return _state_limit; }
@@ -223,14 +226,27 @@ private:
     const Spectrum::Instance *_spectrum;
     Buffer<float> _emission;
     Buffer<float4> _wi_and_pdf;
+    Buffer<uint> _surface_tag;
+    Buffer<uint> _tag_counter;
+    bool _use_tag_sort;
 
 public:
-    LightSampleSOA(const Spectrum::Instance *spec, size_t size) noexcept
+    LightSampleSOA(const Spectrum::Instance *spec, size_t size, size_t tag_size) noexcept
         : _spectrum{spec} {
         auto &&device = spec->pipeline().device();
         auto dimension = spec->node()->dimension();
         _emission = device.create_buffer<float>(size * dimension);
         _wi_and_pdf = device.create_buffer<float4>(size);
+        if(tag_size>0){
+            _use_tag_sort=true;
+            _surface_tag = device.create_buffer<uint>(size);
+            _tag_counter = device.create_buffer<uint>(tag_size);
+        }
+        else{
+            _use_tag_sort=false;
+            _surface_tag = device.create_buffer<uint>(1u);
+            _tag_counter = device.create_buffer<uint>(1u);
+        }
     }
     [[nodiscard]] auto read_emission(Expr<uint> index) const noexcept {
         auto dimension = _spectrum->node()->dimension();
@@ -254,6 +270,21 @@ public:
     void write_wi_and_pdf(Expr<uint> index, Expr<float3> wi, Expr<float> pdf) noexcept {
         _wi_and_pdf->write(index, make_float4(wi, pdf));
     }
+    [[nodiscard]] auto read_surface_tag(Expr<uint> index) const noexcept {
+        return _surface_tag->read(index);
+    }
+    void write_surface_tag(Expr<uint> index, Expr<uint> tag) noexcept {
+        _surface_tag->write(index, tag);
+    }
+    void increase_tag(Expr<uint> index) noexcept {
+        _tag_counter->atomic(index).fetch_add(1u);
+    }
+    [[nodiscard]] BufferView<uint> tag_counter() const noexcept {
+        return _tag_counter;
+    }
+    [[nodiscard]] BufferView<uint> surface_tag() const noexcept {
+        return _surface_tag;
+    }
 #define MOVE(entry, from, to)             \
     {                                     \
         auto inst = read_##entry(from); \
@@ -261,6 +292,9 @@ public:
     }
     void move(Expr<uint> from, Expr<uint> to) noexcept {
 		MOVE(emission, from, to);
+        if(_use_tag_sort){
+            MOVE(surface_tag, from, to);
+        }
         auto inst = read_wi_and_pdf(from);
         write_wi_and_pdf(to, inst.xyz(), inst.w);
 	}
@@ -361,6 +395,7 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
     auto gathering = node<WavefrontPathTracingv2>()->gathering();
     auto test_case = node<WavefrontPathTracingv2>()->test_case();
     auto compact = node<WavefrontPathTracingv2>()->compact();
+    auto use_tag_sort = node<WavefrontPathTracingv2>()->use_tag_sort();
     bool use_sort = true;
     bool direct_launch  = false;
     LUISA_INFO("Wavefront path tracing configurations: "
@@ -369,7 +404,7 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
 
     auto spectrum = pipeline().spectrum();
     PathStateSOA path_states{spectrum, state_count,gathering};
-    LightSampleSOA light_samples{spectrum, state_count};
+    LightSampleSOA light_samples{spectrum, state_count,use_tag_sort?pipeline().surfaces().size():0};
     sampler()->reset(command_buffer, resolution, state_count, spp);
     command_buffer << synchronize();
     RayQueue queues[KERNEL_COUNT] = {{device, state_count}, {device, state_count}, {device, state_count}, {device, state_count}, {device, state_count}, {device, state_count}};
@@ -588,6 +623,11 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
         light_samples.write_emission(path_id, ite(occluded, 0.f, 1.f) * light_sample.eval.L);
         light_samples.write_wi_and_pdf(path_id, light_sample.shadow_ray->direction(),
                                        ite(occluded, 0.f, light_sample.eval.pdf));
+        if(use_tag_sort){
+            auto surface_tag = it->shape().surface_tag();
+            light_samples.write_surface_tag(path_id, surface_tag);
+            light_samples.increase_tag(surface_tag);
+        }
         auto queue_id = surface_queue_size.atomic(0u).fetch_add(1u);
         if (!gathering)
             surface_queue.write(queue_id, path_id);
@@ -751,6 +791,46 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
             };
         }
     });
+    auto sort_tag_gather_shader = compile_async<1>(device,[&](BufferUInt queue, BufferUInt tags, BufferUInt tag_counter, UInt kernel_id, UInt tag_size) noexcept {
+        if(gathering&&use_tag_sort){
+            auto path_id = dispatch_x();
+            $if(path_id<state_count) {
+                auto kernel = path_states.read_kernel_index(path_id);
+                auto tag = tags.read(path_id);
+                $if(kernel == kernel_id) {
+                    if(pipeline().surfaces().size()<=32){//not sure what is the proper threshold
+                        
+                        for(auto i=0u;i<pipeline().surfaces().size();++i){
+                            $if(tag==i){
+                                auto queue_id = tag_counter.atomic(i).fetch_add(1u);
+                                queue.write(queue_id, path_id);
+                            };
+                        }
+                    }
+                    else{
+                        auto queue_id = tag_counter.atomic(tag).fetch_add(1u);
+                        queue.write(queue_id, path_id);
+                    }
+                };
+            };
+        }
+        
+    });
+    auto bucket_update_shader = compile_async<1>(device, [&](BufferUInt tag_counter,UInt tag_size) noexcept {
+        if(use_tag_sort){
+            UInt prev = 0u;
+            $for(i,0u,tag_size) {
+
+                UInt now=tag_counter.read(i);
+                tag_counter.write(i,prev);
+                prev+=now;
+            };
+        }
+    });
+    auto bucket_reset_shader = compile_async<1>(device, [&](BufferUInt tag_counter) noexcept {
+        if(use_tag_sort)
+            tag_counter.write(dispatch_x(),0u);
+    });
     auto compact_shader = compile_async<1>(device,[&](UInt move_offset, BufferUInt invalid_queue, BufferUInt invalid_counter, BufferUInt queue, BufferUInt queue_size) noexcept {
         if (compact) {
             auto dispatch_id = dispatch_x();
@@ -815,7 +895,7 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
             //pipeline().printer().info("{} is a slot", path_id);
         };
     });
-
+    
     
     const uint block_size=64;
     auto test_shader = compile_async<1>(device,[&](BufferUInt queue, UInt queue_size,
@@ -889,6 +969,9 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
     compact_shader.wait();
     test_shader.wait();
     ordering_shader.wait();
+    bucket_update_shader.wait();
+    bucket_reset_shader.wait();
+    sort_tag_gather_shader.wait();
     auto integrator_shader_compilation_time = clock_compile.toc();
     LUISA_INFO("Integrator shader compile in {} ms.", integrator_shader_compilation_time);
 
@@ -903,6 +986,8 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
     progress_bar.update(0.0);
     auto launch_limit = state_count / (KERNEL_COUNT - 1);
     uint shutter_spp = 0;
+    auto iteration = 0;
+    auto gen_iter = 0;
     for (auto s : shutter_samples) {
 
         shutter_spp += s.spp;
@@ -915,8 +1000,7 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
         auto last_committed_state = launch_state_count;
         auto queues_empty = true;
         command_buffer << mark_invalid_shader.get()(queues[INVALID].index_buffer(command_buffer), queues[INVALID].counter_buffer(command_buffer)).dispatch(state_count);
-        auto iteration = 0;
-        auto gen_iter = 0;
+        
 
         //test case
         
@@ -1085,8 +1169,17 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
                 if (max_index != -1) {
 
                     if (gathering&&!direct_launch) {
-                        queues[max_index].clear_counter_buffer(command_buffer);
-                        command_buffer << gather_shader.get()(queues[max_index].index_buffer(command_buffer), queues[max_index].counter_buffer(command_buffer), max_index).dispatch(state_count);
+                        if(max_index==SURFACE &&use_tag_sort){
+                            auto tag_size = pipeline().surfaces().size();
+                            //LUISA_INFO("tag_size {}",tag_size);
+                            command_buffer << bucket_update_shader.get()(light_samples.tag_counter(),tag_size).dispatch(1u);
+                            command_buffer << sort_tag_gather_shader.get()(queues[max_index].index_buffer(command_buffer),light_samples.surface_tag(),light_samples.tag_counter(),max_index,tag_size).dispatch(state_count);
+                            command_buffer << bucket_reset_shader.get()(light_samples.tag_counter()).dispatch(tag_size);
+                        }
+                        else{//sorting kernel
+                            queues[max_index].clear_counter_buffer(command_buffer);
+                            command_buffer << gather_shader.get()(queues[max_index].index_buffer(command_buffer), queues[max_index].counter_buffer(command_buffer), max_index).dispatch(state_count);
+                        }
                     }
                     queues[max_index].clear_counter_buffer(command_buffer);
                     auto dispatch_size=queues[max_index].host_counter();
@@ -1137,10 +1230,13 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
                 }
             }
         }
-        LUISA_INFO("Total iteration {}, where {} of them are generation", iteration,gen_iter );
         
         
     }
+    LUISA_INFO("Total iteration {}, where {} of them are generation", iteration,gen_iter );
+    LUISA_INFO("Configuration: compact:{},gathering:{},\nuse_tag_sort:{},tot_surface_tag:{}\nuse_sort:{},direct_launch{}",
+                            compact, gathering, use_tag_sort, pipeline().surfaces().size(),use_sort, direct_launch);
+    
     command_buffer << synchronize();
     progress_bar.done();
 
