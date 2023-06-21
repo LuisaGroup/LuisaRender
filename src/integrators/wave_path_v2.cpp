@@ -1113,10 +1113,10 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
                     gen_iter += 1;
                     auto valid_count = state_count - queues[INVALID].host_counter();
                     if (gathering) {
-                            queues[INVALID].clear_counter_buffer(command_buffer);
-                            command_buffer << gather_shader.get()(path_indices, queues[INVALID].counter_buffer(command_buffer), INVALID).dispatch(state_count);
-                        }
                         queues[INVALID].clear_counter_buffer(command_buffer);
+                        command_buffer << gather_shader.get()(path_indices, queues[INVALID].counter_buffer(command_buffer), INVALID).dispatch(state_count);
+                    }
+                    queues[INVALID].clear_counter_buffer(command_buffer);
                     if (compact) {
                         empty_queue.clear_counter_buffer(command_buffer);
                         command_buffer << empty_gather_shader.get()(valid_count, queues[INVALID].index_buffer(command_buffer), queues[INVALID].host_counter(),
@@ -1153,21 +1153,8 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
                     queues_empty = false;
                     continue;
                 }
-                auto max_count = 0u;
-                auto max_index = -1;
-
-                for (auto i = 1u; i < KERNEL_COUNT; ++i) {
-                    //LUISA_INFO("kernel queue {} has size {}", KernelName[i], queues[i].host_counter());
-                    if (queues[i].host_counter() > 0) {
-                        queues_empty = false;
-                        if (queues[i].host_counter() > max_count) {
-                            max_count = queues[i].host_counter();
-                            max_index = i;
-                        }
-                    }
-                }
-                if (max_index != -1) {
-
+                
+                auto setup_workload= [&](uint max_index){
                     if (gathering&&!direct_launch) {
                         if(max_index==SURFACE &&use_tag_sort){
                             auto tag_size = pipeline().surfaces().size();
@@ -1182,6 +1169,8 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
                         }
                     }
                     queues[max_index].clear_counter_buffer(command_buffer);
+                };
+                auto launch_kernel = [&](uint max_index){
                     auto dispatch_size=queues[max_index].host_counter();
                     if(direct_launch)
                         dispatch_size=state_count;
@@ -1220,6 +1209,37 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
                             break;
                         default:
                             LUISA_INFO("UNEXPECTED KERNEL INDEX");
+                    }
+                };
+                
+                auto max_count = 0u;
+                auto max_index = -1;
+                /*for (auto i = 1u; i < KERNEL_COUNT; ++i) {
+                    //LUISA_INFO("kernel queue {} has size {}", KernelName[i], queues[i].host_counter());
+                    if (queues[i].host_counter() > 0) {
+                        queues_empty = false;
+                        if (queues[i].host_counter() > max_count) {
+                            max_count = queues[i].host_counter();
+                            max_index = i;
+                        }
+                    }
+                }
+                if (max_index != -1) {
+                    setup_workload(max_index);
+                    launch_kernel(max_index);
+                    
+                }*/
+                for (auto i = 1u; i < KERNEL_COUNT; ++i) {
+                    //LUISA_INFO("kernel queue {} has size {}", KernelName[i], queues[i].host_counter());
+                    if (queues[i].host_counter() > 0) {
+                        queues_empty = false;
+                        setup_workload(i);
+                    }
+                }
+                for (auto i = 1u; i < KERNEL_COUNT; ++i) {
+                    //LUISA_INFO("kernel queue {} has size {}", KernelName[i], queues[i].host_counter());
+                    if (queues[i].host_counter() > 0) {
+                        launch_kernel(i);
                     }
                 }
                 auto launches_per_commit = 16u;
