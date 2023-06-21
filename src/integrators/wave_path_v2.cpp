@@ -340,7 +340,6 @@ public:
         return _host_counter;
     }
     void catch_counter(CommandBuffer &command_buffer) noexcept {
-        
         command_buffer << _counter_buffer.view(0, 1).copy_to(&_host_counter);
     }
     
