@@ -387,6 +387,8 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
             auto pixel_id = (extra_sample_id + dispatch_id) % pixel_count;
             auto sample_id = base_spp + (extra_sample_id + dispatch_id) / pixel_count;
             pixel_coord = make_uint2(pixel_id % resolution.x, pixel_id / resolution.x);
+            camera->film()->accumulate(pixel_coord, make_float3(0.f), 1.f);
+
             if (compact) {
                 if (use_sort)
                     path_id = dispatch_id;
@@ -413,6 +415,7 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
             path_states.write_depth(path_id, 0u);
         };
 
+        // TODO: this could be entirely optimized out
         auto queue_id = def(0u);
         {
              Shared<uint> index{1u};
@@ -438,7 +441,6 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
              else {
                  path_states.write_kernel_index(path_id, (uint)INTERSECT);
              }
-             camera->film()->accumulate(pixel_coord, make_float3(0.f), 1.f);
         };
     });
 
