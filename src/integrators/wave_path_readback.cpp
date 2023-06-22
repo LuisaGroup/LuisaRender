@@ -490,13 +490,13 @@ void WavefrontPathTracingInstance::_render_one_camera(
     });
 
     // wait for the compilation of all shaders
-    generate_rays_shader.wait();
-    intersect_shader.wait();
-    evaluate_miss_shader.wait();
-    evaluate_surface_shader.wait();
-    evaluate_light_shader.wait();
-    sample_light_shader.wait();
-    accumulate_shader.wait();
+    generate_rays_shader.get().set_name("generate_rays");
+    intersect_shader.get().set_name("intersect");
+    evaluate_miss_shader.get().set_name("evaluate_miss");
+    evaluate_surface_shader.get().set_name("evaluate_surfaces");
+    evaluate_light_shader.get().set_name("evaluate_lights");
+    sample_light_shader.get().set_name("sample_lights");
+    accumulate_shader.get().set_name("accumulate");
     auto integrator_shader_compilation_time = clock_compile.toc();
     LUISA_INFO("Integrator shader compile in {} ms.", integrator_shader_compilation_time);
 
