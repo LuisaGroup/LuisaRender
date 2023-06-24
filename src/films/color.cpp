@@ -111,10 +111,14 @@ void ColorFilmInstance::_accumulate(Expr<uint2> pixel, Expr<float3> rgb, Expr<fl
         auto threshold = node<ColorFilm>()->clamp() * max(effective_spp, 1.f);
         auto strength = max(max(max(rgb.x, rgb.y), rgb.z), 0.f);
         auto c = rgb * (threshold / max(strength, threshold));
-        _image->atomic(pixel_id).x.fetch_add(c.x);
-        _image->atomic(pixel_id).y.fetch_add(c.y);
-        _image->atomic(pixel_id).z.fetch_add(c.z);
-        _image->atomic(pixel_id).w.fetch_add(effective_spp);
+        $if(any(c != 0.f)) {
+            _image->atomic(pixel_id).x.fetch_add(c.x);
+            _image->atomic(pixel_id).y.fetch_add(c.y);
+            _image->atomic(pixel_id).z.fetch_add(c.z);
+        };
+        $if(effective_spp != 0.f) {
+            _image->atomic(pixel_id).w.fetch_add(effective_spp);
+        };
     }
     $else {
         if (node<ColorFilm>()->warn_nan()) {
