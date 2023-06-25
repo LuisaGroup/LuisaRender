@@ -1255,8 +1255,7 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
                             }
                         }
                     }
-                    command_buffer<<synchronize();//Why?
-                    LUISA_INFO("start...");
+                    command_buffer<<synchronize();
                     command_buffer << generate_rays_shader.get()(aqueue.index_buffer(INVALID), valid_count, aqueue.index_buffer(INTERSECT), aqueue.counter_buffer(INTERSECT),
                                                                  shutter_spp - s.spp, s.spp * pixel_count - launch_state_count,
                                                                  time, s.point.weight, generate_count)
