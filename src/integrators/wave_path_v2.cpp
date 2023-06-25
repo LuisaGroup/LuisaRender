@@ -342,6 +342,64 @@ public:
     }
 };
 
+class AggregatedRayQueue {
+private:
+    Buffer<uint> _index_buffer;
+    Buffer<uint> _counter_buffer;
+    Shader1D<> _clear_counters;
+    uint _kernel_count;
+    luisa::vector<uint> _host_counter;
+    luisa::vector<uint> _offsets;
+    bool _gathering;
+    size_t _size;
+public:
+    AggregatedRayQueue(Device &device, size_t size, uint kernel_count,bool gathering) noexcept
+        : _index_buffer{device.create_buffer<uint>(gathering?size:kernel_count*size)},
+          _counter_buffer{device.create_buffer<uint>(kernel_count)},
+          _kernel_count{kernel_count},
+          _size{size},
+          _gathering{gathering}{
+        _host_counter.resize(kernel_count);
+        _offsets.resize(kernel_count);
+        _clear_counters = device.compile<1>([this] {
+            _counter_buffer->write(dispatch_x(), 0u);
+        });
+    }
+    void clear_counter_buffer(CommandBuffer &command_buffer,int index=-1) noexcept {
+        //if (_current_counter == counter_buffer_size-1) {
+        //   _current_counter = 0u;
+        if(index==-1){
+            command_buffer << _clear_counters().dispatch(_kernel_count);
+        }
+        else{
+            uint zero=0u;
+            command_buffer << counter_buffer(index).copy_from(&zero);
+        }
+        //} else
+        //    _current_counter++;
+    }
+    [[nodiscard]] BufferView<uint> counter_buffer(uint index) noexcept {
+        return _counter_buffer.view(index,1);
+    }
+    [[nodiscard]] BufferView<uint> index_buffer(uint index) noexcept {
+        if(_gathering)
+            return _index_buffer.view(_offsets[index],_host_counter[index]);
+        else return _index_buffer.view(index*_size,_size);
+    }
+    [[nodiscard]] uint host_counter(uint index) const noexcept {
+        return _host_counter[index];
+    }
+    void catch_counter(CommandBuffer &command_buffer) noexcept {
+        command_buffer << _counter_buffer.view(0, _kernel_count).copy_to(_host_counter.data());
+        command_buffer <<synchronize();
+        uint prev=0u;
+        for(auto i=0u;i<_kernel_count;++i){
+            uint now=_host_counter[i];
+            _offsets[i]=prev;
+            prev+=now;
+        }
+    }
+};
 class WavefrontPathTracingv2Instance final : public ProgressiveIntegrator::Instance {
 
 public:
@@ -403,7 +461,8 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
     LightSampleSOA light_samples{spectrum, state_count, use_tag_sort ? pipeline().surfaces().size() : 0};
     sampler()->reset(command_buffer, resolution, state_count, spp);
     command_buffer << synchronize();
-    RayQueue queues[KERNEL_COUNT] = {{device, state_count}, {device, state_count}, {device, state_count}, {device, state_count}, {device, state_count}, {device, state_count}};
+    AggregatedRayQueue aqueue{device,state_count,KERNEL_COUNT,gathering};
+    //RayQueue queues[KERNEL_COUNT] = {{device, state_count}, {device, state_count}, {device, state_count}, {device, state_count}, {device, state_count}, {device, state_count}};
     RayQueue empty_queue{device, state_count};
     LUISA_INFO("Compiling ray generation kernel.");
     Clock clock_compile;
@@ -488,18 +547,36 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
             auto kernel_index = path_states.read_kernel_index(path_id);
             condition = (kernel_index == (uint)INTERSECT);
         }
-        $if(condition){
-        auto ray = path_states.read_ray(path_id);
-        auto hit = pipeline().geometry()->trace_closest(ray);
-        path_states.write_hit(path_id, hit);
-        $if(!hit->miss()) {
-            auto shape = pipeline().geometry()->instance(hit.inst);
+        $if(condition) {
+            auto ray = path_states.read_ray(path_id);
+            auto hit = pipeline().geometry()->trace_closest(ray);
+            path_states.write_hit(path_id, hit);
+            $if(!hit->miss()) {
+                auto shape = pipeline().geometry()->instance(hit.inst);
 
-            $if(shape.has_light()) {
-                auto queue_id = light_queue_size.atomic(0u).fetch_add(1u);
-                if (!gathering)
-                    light_queue.write(queue_id, path_id);
-                else path_states.write_kernel_index(path_id, (uint)LIGHT);
+                $if(shape.has_light()) {
+                    auto queue_id = light_queue_size.atomic(0u).fetch_add(1u);
+                    if (!gathering)
+                        light_queue.write(queue_id, path_id);
+                    else
+                        path_states.write_kernel_index(path_id, (uint)LIGHT);
+                }
+                $else {
+                    $if(shape.has_surface()) {
+                        auto queue_id = surface_queue_size.atomic(0u).fetch_add(1u);
+                        if (!gathering)
+                            surface_queue.write(queue_id, path_id);
+                        else
+                            path_states.write_kernel_index(path_id, (uint)SAMPLE);
+                    }
+                    $else {
+                        auto queue_id = invalid_queue_size.atomic(0u).fetch_add(1u);
+                        if (!gathering)
+                            invalid_queue.write(queue_id, path_id);
+                        else
+                            path_states.write_kernel_index(path_id, (uint)INVALID);
+                    };
+                };
             }
             $else {
                 if (pipeline().environment()) {
@@ -516,7 +593,6 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
                         path_states.write_kernel_index(path_id, (uint)INVALID);
                 }
             };
-        };
         };
     });
 
@@ -610,13 +686,13 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
                                                            BufferUInt invalid_queue, BufferUInt invalid_queue_size, Float time) noexcept {
         auto dispatch_id = dispatch_x();
         auto path_id = sample_indices.read(dispatch_id);
-        Bool condition=true;
-        if(direct_launch){
+        Bool condition = true;
+        if(direct_launch) {
             path_id = dispatch_id;
             auto kernel_index = path_states.read_kernel_index(path_id);
             condition = (kernel_index == (uint)SAMPLE);
         }
-        $if(condition){
+        $if(condition) {
         sampler()->load_state(path_id);
         auto u_light_selection = sampler()->generate_1d();
         auto u_light_surface = sampler()->generate_2d();
@@ -632,6 +708,11 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
         light_samples.write_emission(path_id, ite(occluded, 0.f, 1.f) * light_sample.eval.L);
         light_samples.write_wi_and_pdf(path_id, light_sample.shadow_ray->direction(),
                                        ite(occluded, 0.f, light_sample.eval.pdf));
+        if (use_tag_sort) {
+            auto surface_tag = it->shape().surface_tag();
+            light_samples.write_surface_tag(path_id, surface_tag);
+            light_samples.increase_tag(surface_tag);
+        }
         auto queue_id = surface_queue_size.atomic(0u).fetch_add(1u);
         if (!gathering)
             surface_queue.write(queue_id, path_id);
@@ -792,6 +873,11 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
             $if (dispatch_x() < n) {
                 kernel = path_states.read_kernel_index(path_id);
             };
+            /*$if(kernel == kernel_id) {
+                auto slot = queue_size.atomic(0u).fetch_add(1u);
+                                queue.write(slot, path_id);
+            };*/
+            
             auto slot = def(0u);
             {
                 Shared<uint> index{1u};
@@ -813,6 +899,7 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
             $if(dispatch_x() < n & kernel == kernel_id) {
                 queue.write(slot, path_id);
             };
+
         }
     });
     auto sort_tag_gather_shader = compile_async<1>(device, [&](BufferUInt queue, BufferUInt tags, BufferUInt tag_counter, UInt kernel_id, UInt tag_size) noexcept {
@@ -1010,13 +1097,11 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
         shutter_spp += s.spp;
         auto time = s.point.time;
         pipeline().update(command_buffer, time);
-        for (auto &queue : queues) {
-            queue.clear_counter_buffer(command_buffer);
-        }
+        aqueue.clear_counter_buffer(command_buffer);
         auto launch_state_count = s.spp * pixel_count;
         auto last_committed_state = launch_state_count;
         auto queues_empty = true;
-        command_buffer << mark_invalid_shader.get()(queues[INVALID].index_buffer(command_buffer), queues[INVALID].counter_buffer(command_buffer)).dispatch(state_count);
+        command_buffer << mark_invalid_shader.get()(aqueue.index_buffer(INVALID), aqueue.counter_buffer(INVALID)).dispatch(state_count);
 
         //test case
 
@@ -1030,18 +1115,16 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
                 //command_buffer << pipeline().printer().retrieve();
                 //LUISA_INFO("get counters");
 
-                for (auto &queue : queues) {
-                    queue.catch_counter(command_buffer);
-                }
+                aqueue.catch_counter(command_buffer);
                 command_buffer << synchronize();//catch the queue counters
                 auto max_count = 0u;
                 auto max_index = -1;
                 for (auto i = 0u; i < KERNEL_COUNT; ++i) {
                     //LUISA_INFO("queue {} counter:{}", i, queues[i].host_counter());
-                    if (queues[i].host_counter() > 0) {
+                    if (aqueue.host_counter(i) > 0) {
 
-                        if (queues[i].host_counter() > max_count) {
-                            max_count = queues[i].host_counter();
+                        if (aqueue.host_counter(i) > max_count) {
+                            max_count = aqueue.host_counter(i);
                             max_index = i;
                         }
                     }
@@ -1050,7 +1133,7 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
                 auto test1 = max_index % KERNEL_COUNT;
                 auto test2 = (max_index + 1) % KERNEL_COUNT;
                 auto test3 = (max_index + 2) % KERNEL_COUNT;
-                queues[test1].clear_counter_buffer(command_buffer);
+                aqueue.clear_counter_buffer(command_buffer,test1);
                 auto gen = (test1 == 0);
                 if ((gen && local_iter >= 10) || it == 0) {
                     local_iter = 0;
@@ -1058,7 +1141,7 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
                 } else {
                     gen = false;
                 }
-                auto valid_count = state_count - queues[0].host_counter();
+                auto valid_count = state_count - aqueue.host_counter(0);
 
                 if (gen) {
                     //LUISA_INFO("generating");
@@ -1066,51 +1149,51 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
                     if (compact) {
                         empty_queue.clear_counter_buffer(command_buffer);
                         if (gathering) {
-                            command_buffer << gather_shader.get()(queues[0].index_buffer(command_buffer),
-                                                                  queues[0].counter_buffer(command_buffer),
+                            command_buffer << gather_shader.get()(aqueue.index_buffer(0),
+                                                                  aqueue.counter_buffer(0),
                                                                   0, state_count)
                                                   .dispatch(luisa::align(state_count, gather_shader.get().block_size().x));
                             //queues[0].catch_counter(command_buffer);
                             //command_buffer << synchronize();
                             //LUISA_INFO("gathering get {} of kernel {}", queues[0].host_counter(), 0);
-                            queues[0].clear_counter_buffer(command_buffer);
+                            aqueue.clear_counter_buffer(command_buffer,0);
                         }
-                        command_buffer << empty_gather_shader.get()(valid_count, queues[0].index_buffer(command_buffer), queues[0].host_counter(),
+                        command_buffer << empty_gather_shader.get()(valid_count, aqueue.index_buffer(0), aqueue.host_counter(0),
                                                                     empty_queue.index_buffer(command_buffer), empty_queue.counter_buffer(command_buffer))
-                                              .dispatch(queues[0].host_counter());//find all invalid with path_id<valid_count
+                                              .dispatch(aqueue.host_counter(0));//find all invalid with path_id<valid_count
                         empty_queue.clear_counter_buffer(command_buffer);
                         for (auto i = 1u; i < KERNEL_COUNT; ++i) {
-                            if (queues[i].host_counter()) {
+                            if (aqueue.host_counter(i)) {
                                 if (gathering) {
-                                    queues[i].clear_counter_buffer(command_buffer);
-                                    command_buffer << gather_shader.get()(queues[i].index_buffer(command_buffer),
-                                                                          queues[i].counter_buffer(command_buffer),
+                                    aqueue.clear_counter_buffer(command_buffer,i);
+                                    command_buffer << gather_shader.get()(aqueue.index_buffer(i),
+                                                                          aqueue.counter_buffer(i),
                                                                           i, state_count)
                                                           .dispatch(luisa::align(state_count, gather_shader.get().block_size().x));
                                 }
                                 command_buffer << compact_shader.get()(valid_count, empty_queue.index_buffer(command_buffer), empty_queue.counter_buffer(command_buffer),
-                                                                       queues[i].index_buffer(command_buffer), queues[i].counter_buffer(command_buffer))
-                                                      .dispatch(queues[i].host_counter());//move every id>=valid_count to [0,valid_count-1]
+                                                                       aqueue.index_buffer(i), aqueue.counter_buffer(i))
+                                                      .dispatch(aqueue.host_counter(i));//move every id>=valid_count to [0,valid_count-1]
                             }
                         }
                     }
                 }
-                LUISA_INFO("Launching test kernel {} with size {}", test1, queues[test1].host_counter());
-                auto size = (queues[test1].host_counter() + block_size - 1) / block_size * block_size;
+                LUISA_INFO("Launching test kernel {} with size {}", test1, aqueue.host_counter(test1));
+                auto size = (aqueue.host_counter(test1) + block_size - 1) / block_size * block_size;
                 if (gathering && !(gen & compact)) {
-                    command_buffer << gather_shader.get()(queues[test1].index_buffer(command_buffer),
-                                                          queues[test1].counter_buffer(command_buffer),
+                    command_buffer << gather_shader.get()(aqueue.index_buffer(test1),
+                                                          aqueue.counter_buffer(test1),
                                                           test1, state_count)
                                           .dispatch(luisa::align(state_count, gather_shader.get().block_size().x));
                     //queues[test1].catch_counter(command_buffer);
                     //command_buffer<< synchronize();
                     //LUISA_INFO("gathering get {} of kernel {}", queues[test1].host_counter(), test1);
-                    queues[test1].clear_counter_buffer(command_buffer);
+                    aqueue.clear_counter_buffer(command_buffer,test1);
                 }
 
-                command_buffer << test_shader.get()(queues[test1].index_buffer(command_buffer), queues[test1].host_counter(),
-                                                    queues[test2].index_buffer(command_buffer), queues[test2].counter_buffer(command_buffer),
-                                                    queues[test3].index_buffer(command_buffer), queues[test3].counter_buffer(command_buffer),
+                command_buffer << test_shader.get()(aqueue.index_buffer(test1), aqueue.host_counter(test1),
+                                                    aqueue.index_buffer(test2), aqueue.counter_buffer(test2),
+                                                    aqueue.index_buffer(test3), aqueue.counter_buffer(test3),
                                                     gen, valid_count, test2, test3)
                                       .dispatch(size);
             }
@@ -1120,64 +1203,61 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
                 iteration += 1;
                 //command_buffer << pipeline().printer().retrieve();
                 queues_empty = true;
-                for (auto &queue : queues) {
-                    queue.catch_counter(command_buffer);
-                }
-                command_buffer << synchronize();//catch the queue counters
+                aqueue.catch_counter(command_buffer);
 
                 for (auto i = 0u; i < KERNEL_COUNT; ++i) {
-                    //LUISA_INFO("kernel {} has size {}", KernelName[i], queues[i].host_counter());
+                    //LUISA_INFO("kernel {} has size {}", KernelName[i], aqueue.host_counter(i));
                 }
-                if (queues[INVALID].host_counter() > state_count / 2 && launch_state_count > 0) {//launch new kernel
-                    auto path_indices = queues[INVALID].index_buffer(command_buffer);
-                    auto intersect_indices = queues[INTERSECT].index_buffer(command_buffer);
-                    auto intersect_size = queues[INTERSECT].counter_buffer(command_buffer);
-                    auto generate_count = std::min(launch_state_count, queues[INVALID].host_counter());
+                if (aqueue.host_counter(INVALID) > state_count / 2 && launch_state_count > 0) {//launch new kernel
+
+                    auto generate_count = std::min(launch_state_count, aqueue.host_counter(INVALID));
                     auto zero = 0u;
                     //LUISA_INFO("Generate new kernel size {}", generate_count);
                     gen_iter += 1;
-                    auto valid_count = state_count - queues[INVALID].host_counter();
+                    auto valid_count = state_count - aqueue.host_counter(INVALID);
                     if (gathering) {
-                        queues[INVALID].clear_counter_buffer(command_buffer);
-                        command_buffer << gather_shader.get()(path_indices, queues[INVALID].counter_buffer(command_buffer), INVALID, state_count)
+                        aqueue.clear_counter_buffer(command_buffer,INVALID);
+                        command_buffer << gather_shader.get()(aqueue.index_buffer(INVALID), aqueue.counter_buffer(INVALID), INVALID, state_count)
                                                   .dispatch(luisa::align(state_count, gather_shader.get().block_size().x));
                     }
                     
-                    queues[INVALID].clear_counter_buffer(command_buffer);
+                    aqueue.clear_counter_buffer(command_buffer,INVALID);
                     if (compact) {
                         empty_queue.clear_counter_buffer(command_buffer);
-                        command_buffer << empty_gather_shader.get()(valid_count, queues[INVALID].index_buffer(command_buffer), queues[INVALID].host_counter(),
+                        command_buffer << empty_gather_shader.get()(valid_count, aqueue.index_buffer(INVALID), aqueue.host_counter(INVALID),
                                                                     empty_queue.index_buffer(command_buffer), empty_queue.counter_buffer(command_buffer))
-                                              .dispatch(queues[INVALID].host_counter());//find all invalid with path_id<valid_count
+                                              .dispatch(aqueue.host_counter(INVALID));//find all invalid with path_id<valid_count
                         empty_queue.clear_counter_buffer(command_buffer);
                         for (auto i = 1u; i < KERNEL_COUNT; ++i) {
-                            if (queues[i].host_counter()) {
+                            if (aqueue.host_counter(i)) {
                                 if (gathering) {
-                                    queues[i].clear_counter_buffer(command_buffer);
-                                    command_buffer << gather_shader.get()(queues[i].index_buffer(command_buffer),
-                                                                          queues[i].counter_buffer(command_buffer),
+                                    aqueue.clear_counter_buffer(command_buffer,i);
+                                    command_buffer << gather_shader.get()(aqueue.index_buffer(i),
+                                                                          aqueue.counter_buffer(i),
                                                                           i, state_count)
                                                           .dispatch(luisa::align(state_count, gather_shader.get().block_size().x));
                                 }
 
                                 command_buffer << compact_shader.get()(valid_count, empty_queue.index_buffer(command_buffer), empty_queue.counter_buffer(command_buffer),
-                                                                       queues[i].index_buffer(command_buffer), queues[i].counter_buffer(command_buffer))
-                                                      .dispatch(queues[i].host_counter());//move every id>=valid_count to [0,valid_count-1]
+                                                                       aqueue.index_buffer(i), aqueue.counter_buffer(i))
+                                                      .dispatch(aqueue.host_counter(i));//move every id>=valid_count to [0,valid_count-1]
                             }
                         }
                         if (use_sort) {
                             auto offset = state_count;
                             for (auto i = 1u; i < KERNEL_COUNT; ++i) {
-                                offset -= queues[i].host_counter();
-                                if (queues[i].host_counter() != 0) {
-                                    command_buffer << ordering_shader.get()(offset, queues[i].index_buffer(command_buffer),
-                                                                            queues[i].host_counter())
-                                                          .dispatch(queues[i].host_counter());
+                                offset -= aqueue.host_counter(i);
+                                if (aqueue.host_counter(i) != 0) {
+                                    command_buffer << ordering_shader.get()(offset, aqueue.index_buffer(i),
+                                                                            aqueue.host_counter(i))
+                                                          .dispatch(aqueue.host_counter(i));
                                 }
                             }
                         }
                     }
-                    command_buffer << generate_rays_shader.get()(path_indices, valid_count, intersect_indices, intersect_size,
+                    command_buffer<<synchronize();//Why?
+                    LUISA_INFO("start...");
+                    command_buffer << generate_rays_shader.get()(aqueue.index_buffer(INVALID), valid_count, aqueue.index_buffer(INTERSECT), aqueue.counter_buffer(INTERSECT),
                                                                  shutter_spp - s.spp, s.spp * pixel_count - launch_state_count,
                                                                  time, s.point.weight, generate_count)
                                           .dispatch(luisa::align(generate_count, generate_rays_shader.get().block_size().x));//generate rays in [valid_count,state_count)
@@ -1192,50 +1272,51 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
                             auto tag_size = pipeline().surfaces().size();
                             //LUISA_INFO("tag_size {}",tag_size);
                             command_buffer << bucket_update_shader.get()(light_samples.tag_counter(), tag_size).dispatch(1u);
-                            command_buffer << sort_tag_gather_shader.get()(queues[max_index].index_buffer(command_buffer), light_samples.surface_tag(), light_samples.tag_counter(), max_index, tag_size).dispatch(state_count);
+                            command_buffer << sort_tag_gather_shader.get()(aqueue.index_buffer(max_index), light_samples.surface_tag(), light_samples.tag_counter(), max_index, tag_size).dispatch(state_count);
                             command_buffer << bucket_reset_shader.get()(light_samples.tag_counter()).dispatch(tag_size);
                         } else {//sorting kernel
-                            queues[max_index].clear_counter_buffer(command_buffer);
-                            command_buffer << gather_shader.get()(queues[max_index].index_buffer(command_buffer), queues[max_index].counter_buffer(command_buffer), max_index,state_count)
+                            aqueue.clear_counter_buffer(command_buffer,max_index);
+                            command_buffer << gather_shader.get()(aqueue.index_buffer(max_index), aqueue.counter_buffer(max_index), max_index,state_count)
                                                   .dispatch(luisa::align(state_count, gather_shader.get().block_size().x));
                         }
                     }
+                    aqueue.clear_counter_buffer(command_buffer,max_index);
                 };
                 auto launch_kernel = [&](uint max_index) {
-                    auto dispatch_size = queues[max_index].host_counter();
+                    auto dispatch_size = aqueue.host_counter(max_index);
                     if (direct_launch)
                         dispatch_size = state_count;
                     //LUISA_INFO("Launch kernel {} for size {}", KernelName[max_index], queues[max_index].host_counter());
                     switch (max_index) {
                         case INTERSECT:
-                            command_buffer << intersect_shader.get()(queues[INTERSECT].index_buffer(command_buffer),
-                                                                     queues[SAMPLE].index_buffer(command_buffer), queues[SAMPLE].counter_buffer(command_buffer),
-                                                                     queues[LIGHT].index_buffer(command_buffer), queues[LIGHT].counter_buffer(command_buffer),
-                                                                     queues[MISS].index_buffer(command_buffer), queues[MISS].counter_buffer(command_buffer),
-                                                                     queues[INVALID].index_buffer(command_buffer), queues[INVALID].counter_buffer(command_buffer))
+                            command_buffer << intersect_shader.get()(aqueue.index_buffer(INTERSECT),
+                                                                     aqueue.index_buffer(SAMPLE), aqueue.counter_buffer(SAMPLE),
+                                                                     aqueue.index_buffer(LIGHT), aqueue.counter_buffer(LIGHT),
+                                                                     aqueue.index_buffer(MISS), aqueue.counter_buffer(MISS),
+                                                                     aqueue.index_buffer(INVALID), aqueue.counter_buffer(INVALID))
                                                   .dispatch(dispatch_size);
                             break;
                         case MISS:
-                            command_buffer << evaluate_miss_shader.get()(queues[MISS].index_buffer(command_buffer),
-                                                                         queues[INVALID].index_buffer(command_buffer), queues[INVALID].counter_buffer(command_buffer), time)
+                            command_buffer << evaluate_miss_shader.get()(aqueue.index_buffer(MISS),
+                                                                         aqueue.index_buffer(INVALID), aqueue.counter_buffer(INVALID), time)
                                                   .dispatch(dispatch_size);
                             break;
                         case LIGHT:
-                            command_buffer << evaluate_light_shader.get()(queues[LIGHT].index_buffer(command_buffer),
-                                                                          queues[SAMPLE].index_buffer(command_buffer), queues[SAMPLE].counter_buffer(command_buffer),
-                                                                          queues[INVALID].index_buffer(command_buffer), queues[INVALID].counter_buffer(command_buffer), time)
+                            command_buffer << evaluate_light_shader.get()(aqueue.index_buffer(LIGHT),
+                                                                          aqueue.index_buffer(SAMPLE), aqueue.counter_buffer(SAMPLE),
+                                                                          aqueue.index_buffer(INVALID), aqueue.counter_buffer(INVALID), time)
                                                   .dispatch(dispatch_size);
                             break;
                         case SAMPLE:
-                            command_buffer << sample_light_shader.get()(queues[SAMPLE].index_buffer(command_buffer),
-                                                                        queues[SURFACE].index_buffer(command_buffer), queues[SURFACE].counter_buffer(command_buffer),
-                                                                        queues[INVALID].index_buffer(command_buffer), queues[INVALID].counter_buffer(command_buffer), time)
+                            command_buffer << sample_light_shader.get()(aqueue.index_buffer(SAMPLE),
+                                                                        aqueue.index_buffer(SURFACE), aqueue.counter_buffer(SURFACE),
+                                                                        aqueue.index_buffer(INVALID), aqueue.counter_buffer(INVALID), time)
                                                   .dispatch(dispatch_size);
                             break;
                         case SURFACE:
-                            command_buffer << evaluate_surface_shader.get()(queues[SURFACE].index_buffer(command_buffer),
-                                                                            queues[INTERSECT].index_buffer(command_buffer), queues[INTERSECT].counter_buffer(command_buffer),
-                                                                            queues[INVALID].index_buffer(command_buffer), queues[INVALID].counter_buffer(command_buffer), time)
+                            command_buffer << evaluate_surface_shader.get()(aqueue.index_buffer(SURFACE),
+                                                                            aqueue.index_buffer(INTERSECT), aqueue.counter_buffer(INTERSECT),
+                                                                            aqueue.index_buffer(INVALID), aqueue.counter_buffer(INVALID), time)
                                                   .dispatch(dispatch_size);
                             break;
                         default:
@@ -1262,14 +1343,14 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
                 }*/
                 for (auto i = 1u; i < KERNEL_COUNT; ++i) {
                     //LUISA_INFO("kernel queue {} has size {}", KernelName[i], queues[i].host_counter());
-                    if (queues[i].host_counter() > 0) {
+                    if (aqueue.host_counter(i) > 0) {
                         queues_empty = false;
                         setup_workload(i);
                     }
                 }
                 for (auto i = 1u; i < KERNEL_COUNT; ++i) {
                     //LUISA_INFO("kernel queue {} has size {}", KernelName[i], queues[i].host_counter());
-                    if (queues[i].host_counter() > 0) {
+                    if (aqueue.host_counter(i) > 0) {
                         launch_kernel(i);
                     }
                 }
