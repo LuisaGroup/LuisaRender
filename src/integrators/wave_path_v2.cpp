@@ -41,7 +41,11 @@ template<uint dim, typename F>
             static_assert(always_false_v<F>, "Invalid dimension.");
         }
     }();
-    return global_thread_pool().async([&device, kernel] { return device.compile(kernel); });
+    ShaderOption o{};
+    o.enable_debug_info = true;
+    return global_thread_pool().async([&device, o, kernel] {
+        return device.compile(kernel, o);
+    });
 }
 class WavefrontPathTracingv2 final : public ProgressiveIntegrator {
 
@@ -1255,7 +1259,7 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
                             }
                         }
                     }
-                    command_buffer<<synchronize();
+//                    command_buffer<<synchronize();
                     command_buffer << generate_rays_shader.get()(aqueue.index_buffer(INVALID), valid_count, aqueue.index_buffer(INTERSECT), aqueue.counter_buffer(INTERSECT),
                                                                  shutter_spp - s.spp, s.spp * pixel_count - launch_state_count,
                                                                  time, s.point.weight, generate_count)
