@@ -376,7 +376,7 @@ public:
             command_buffer << _clear_counters().dispatch(_kernel_count);
         }
         else{
-            uint zero=0u;
+            static uint zero=0u;
             command_buffer << counter_buffer(index).copy_from(&zero);
         }
         //} else
@@ -474,7 +474,6 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
                                                             UInt base_spp, UInt extra_sample_id, Float time, Float shutter_weight, UInt n) noexcept {
         auto path_id = def(0u);
         auto pixel_coord = def(make_uint2(0u));
-
         $if (dispatch_x() < n) {
 
             auto dispatch_id = dispatch_x();
@@ -1215,7 +1214,6 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
                 if (aqueue.host_counter(INVALID) > state_count / 2 && launch_state_count > 0) {//launch new kernel
 
                     auto generate_count = std::min(launch_state_count, aqueue.host_counter(INVALID));
-                    auto zero = 0u;
                     //LUISA_INFO("Generate new kernel size {}", generate_count);
                     gen_iter += 1;
                     auto valid_count = state_count - aqueue.host_counter(INVALID);
