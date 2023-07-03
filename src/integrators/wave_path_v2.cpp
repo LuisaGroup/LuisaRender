@@ -65,7 +65,7 @@ public:
           _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)},
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
-          _state_limit{std::max(desc->property_uint_or_default("state_limit", 1024 * 1024 * 32u), 1u)},
+          _state_limit{std::max(desc->property_uint_or_default("state_limit", 1024 * 1024 * 8u), 1u)},
           _gathering{desc->property_bool_or_default("gathering", true)},
           _use_tag_sort{desc->property_bool_or_default("use_tag_sort", true)},
           _test_case{desc->property_bool_or_default("test_case", false)},
@@ -1101,7 +1101,7 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
         auto time = s.point.time;
         pipeline().update(command_buffer, time);
         aqueue.clear_counter_buffer(command_buffer);
-        auto launch_state_count = s.spp * pixel_count;
+        long long launch_state_count = s.spp * pixel_count;
         auto last_committed_state = launch_state_count;
         auto queues_empty = true;
         command_buffer << mark_invalid_shader.get()(aqueue.index_buffer(INVALID), aqueue.counter_buffer(INVALID)).dispatch(state_count);
@@ -1181,7 +1181,7 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
                         }
                     }
                 }
-                LUISA_INFO("Launching test kernel {} with size {}", test1, aqueue.host_counter(test1));
+                //LUISA_INFO("Launching test kernel {} with size {}", test1, aqueue.host_counter(test1));
                 auto size = (aqueue.host_counter(test1) + block_size - 1) / block_size * block_size;
                 if (gathering && !(gen & compact)) {
                     command_buffer << gather_shader.get()(aqueue.index_buffer(test1),
@@ -1213,7 +1213,7 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
                 }
                 if (aqueue.host_counter(INVALID) > state_count / 2 && launch_state_count > 0) {//launch new kernel
 
-                    auto generate_count = std::min(launch_state_count, aqueue.host_counter(INVALID));
+                    auto generate_count = std::min(launch_state_count, (long long)aqueue.host_counter(INVALID));
                     //LUISA_INFO("Generate new kernel size {}", generate_count);
                     gen_iter += 1;
                     auto valid_count = state_count - aqueue.host_counter(INVALID);
@@ -1257,9 +1257,9 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
                             }
                         }
                     }
-//                    command_buffer<<synchronize();
+                    //command_buffer<<synchronize();
                     command_buffer << generate_rays_shader.get()(aqueue.index_buffer(INVALID), valid_count, aqueue.index_buffer(INTERSECT), aqueue.counter_buffer(INTERSECT),
-                                                                 shutter_spp - s.spp, s.spp * pixel_count - launch_state_count,
+                                                                 shutter_spp - s.spp+(s.spp*(long long)pixel_count- launch_state_count)/pixel_count, (s.spp*(long long)pixel_count- launch_state_count)%pixel_count,
                                                                  time, s.point.weight, generate_count)
                                           .dispatch(luisa::align(generate_count, generate_rays_shader.get().block_size().x));//generate rays in [valid_count,state_count)
                     launch_state_count -= generate_count;
@@ -1287,7 +1287,7 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
                     auto dispatch_size = aqueue.host_counter(max_index);
                     if (direct_launch)
                         dispatch_size = state_count;
-                    //LUISA_INFO("Launch kernel {} for size {}", KernelName[max_index], queues[max_index].host_counter());
+                    //LUISA_INFO("Launch kernel {} for size {}", KernelName[max_index], aqueue.host_counter(max_index));
                     switch (max_index) {
                         case INTERSECT:
                             command_buffer << intersect_shader.get()(aqueue.index_buffer(INTERSECT),
@@ -1323,6 +1323,7 @@ void WavefrontPathTracingv2Instance::_render_one_camera(
                         default:
                             LUISA_INFO("UNEXPECTED KERNEL INDEX");
                     }
+                    //command_buffer << synchronize();
                 };
 
                 auto max_count = 0u;
