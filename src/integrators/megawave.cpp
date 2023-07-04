@@ -463,11 +463,11 @@ void MegakernelWaveFrontInstance::_render_one_camera(
 
     Clock clock_compile;
     //assume KERNEL_COUNT< block_size_x
-    auto launch_size = 1024u;
+    auto launch_size = 256u*256u;
     sampler()->reset(command_buffer, resolution, launch_size, spp);
     command_buffer << synchronize();
     auto render_shader = compile_async<1>(device, [&](BufferUInt samples, UInt tot_samples, UInt base_spp, Float time, Float shutter_weight) noexcept {
-        const uint fetch_size = 4;
+        const uint fetch_size = 128;
         auto dim = spectrum->node()->dimension();
         auto block_size = block_size_x();
         Shared<ThreadFrame> path_state{block_size};
@@ -489,9 +489,8 @@ void MegakernelWaveFrontInstance::_render_one_camera(
         rem_local[0] = false;
         //pipeline().printer().info("work counter {} of block {}: {}", -1, block_x(), -1);
         $while((rem_global[0] | rem_local[0])) {
-        //$while((rem_global | rem_local)&(count!=100)) {
             rem_local[0] = false;
-            count+=1;
+            count += 1;
             work_stat[0] = -1;
             work_stat[1] = 0;
             $if(thread_x() < (uint)KERNEL_COUNT) {//clear counter
@@ -508,18 +507,18 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                 };
             }
             sync_block();
-            
+
             $if(thread_x() == 0) {//calculate offset
                 auto prev = def(0u);
                 $for(i, 0u, (uint)KERNEL_COUNT) {
                     auto now = work_counter[i];
                     work_offset[i] = prev;
                     prev += now;
-                    pipeline().printer().info("work counter {} of block {}: {}", i, block_x(), work_counter[i]);
+                    //pipeline().printer().info("work counter {} of block {}: {}", i, block_x(), work_counter[i]);
                 };
             };
             $if(thread_x() == block_size - 1) {
-                $if(workload[0] == workload[1]) {//fetch new workload
+                $if((workload[0] >= workload[1]) & rem_global[0]) {//fetch new workload
                     workload[0] = samples.atomic(0u).fetch_add(block_size * fetch_size);
                     workload[1] = min(workload[0] + block_size * fetch_size, tot_samples);
                     $if(workload[0] >= tot_samples) {
@@ -527,7 +526,6 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                     };
                 };
                 //pipeline().printer().info("block :{}, count: {}workload: {}~{}",block_x(), count, workload[0], workload[1]);
-                workload[0] += min(work_counter[0], workload[1] - workload[0]);
             };
             sync_block();
             /*
@@ -538,7 +536,7 @@ void MegakernelWaveFrontInstance::_render_one_camera(
             };
             sync_block();
             */
-            
+
             for (int i = 0u; i < KERNEL_COUNT; ++i) {//sort the kernels
                 auto state = path_state[thread_x()];
                 $if(state.kernel_index == i) {
@@ -547,7 +545,7 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                 };
             }
             sync_block();
-            
+
             auto generate_ray_shader = [&](UInt path_id, UInt work_id) noexcept {//TODO: add fetch_state and set_state for sampler
                 auto pixel_id = work_id % pixel_count;
                 auto sample_id = base_spp + work_id / pixel_count;
@@ -582,7 +580,7 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                     }
                     $else {
                         $if(shape.has_surface()) {
-                            path_state[path_id].kernel_index = (uint)SURFACE;
+                            path_state[path_id].kernel_index = (uint)SAMPLE;
                         }
                         $else {
                             path_state[path_id].kernel_index = (uint)INVALID;
@@ -690,7 +688,7 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                 auto u_rr = def(0.f);
                 auto rr_depth = node<MegakernelWaveFront>()->rr_depth();
                 $if(depth + 1u >= rr_depth) { u_rr = sampler()->generate_1d(); };
-                sampler()->load_state(block_size_x() * block_x() + path_id);
+                sampler()->save_state(block_size_x() * block_x() + path_id);
 
                 auto ray = path_ray[path_id];
                 auto hit = path_hit[path_id];
@@ -805,12 +803,11 @@ void MegakernelWaveFrontInstance::_render_one_camera(
             };
 
             auto pid = path_id[thread_x()];
-            //pipeline().printer().info("loop {},block {} thread{},genwork {}~{}, processing pid {}, kernel {}", 
+            //pipeline().printer().info("loop {},block {} thread{},genwork {}~{}, processing pid {}, kernel {}",
             //    count , block_x(), thread_x(), workload[0],workload[1],pid, path_state[pid].kernel_index);
             $switch(path_state[pid].kernel_index) {
                 $case((uint)INVALID) {
                     $if(workload[0] + thread_x() < workload[1]) {
-                        //pipeline().printer().info("run pid {}",pid);
                         generate_ray_shader(pid, workload[0] + thread_x());
                     };
                 };
@@ -831,13 +828,7 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                 };
             };
             sync_block();
-            //check run or generate new
-            //if run run
-            //if generate
-            //if no enough
-            //fetch new item
-            //launch
-            //if finish
+            workload[0] = workload[0] + work_counter[0];
         };
     });
     render_shader.get().set_name("render");
@@ -859,15 +850,14 @@ void MegakernelWaveFrontInstance::_render_one_camera(
 
     for (auto s : shutter_samples) {
         uint host_sample_count = s.spp * pixel_count;
-        static uint zero= 0u;
+        static uint zero = 0u;
         auto time = s.point.time;
         pipeline().update(command_buffer, time);
         command_buffer << sample_count.copy_from(&zero)
                        << commit();
         command_buffer << render_shader.get()(sample_count, host_sample_count, shutter_spp, time, s.point.weight).dispatch(launch_size);
-        command_buffer << pipeline().printer().retrieve();
+        //command_buffer << pipeline().printer().retrieve();
         command_buffer << synchronize();
-
         shutter_spp += s.spp;
     }
 
