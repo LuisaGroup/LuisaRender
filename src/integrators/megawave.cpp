@@ -467,7 +467,7 @@ void MegakernelWaveFrontInstance::_render_one_camera(
     sampler()->reset(command_buffer, resolution, launch_size, spp);
     command_buffer << synchronize();
     auto render_shader = compile_async<1>(device, [&](BufferUInt samples, UInt tot_samples, UInt base_spp, Float time, Float shutter_weight) noexcept {
-        const uint fetch_size = 8;
+        const uint fetch_size = 4;
         auto dim = spectrum->node()->dimension();
         auto block_size = block_size_x();
         auto q_factor = 1u;
@@ -484,15 +484,17 @@ void MegakernelWaveFrontInstance::_render_one_camera(
         path_state[thread_x()].kernel_index = (uint)INVALID;
         workload[0] = 0;
         workload[1] = 0;
+        //Shared<uint> count{1u};
         auto count = def(0);
-        Shared<bool> rem_global{1};
-        Shared<bool> rem_local{1};
+        Shared<uint> rem_global{1};
+        Shared<uint> rem_local{1};
         rem_global[0] = true;
         rem_local[0] = false;
+        sync_block();
         //pipeline().printer().info("work counter {} of block {}: {}", -1, block_x(), -1);
-        auto count_limit = 1000000;
-        $while((rem_global[0] | rem_local[0])&(count!=count_limit)) {
-            rem_local[0] = false;
+        auto count_limit = 1000000u;
+        $while((rem_global[0] != 0u | rem_local[0] != 0u) & (count!= count_limit)) {
+            rem_local[0] = 0u;
             count += 1;
             work_stat[0] = 0;
             work_stat[1] = -1;
@@ -505,22 +507,23 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                     auto state = path_state[index*block_size+thread_x()];
                     $if(state.kernel_index == i) {
                         if (i != (uint)INVALID) {
-                            rem_local[0] = true;
+                            rem_local[0] = 1u;
                         } else {
                             $if(workload[0] < workload[1]) {
-                                rem_local[0] = true;
+                                rem_local[0] = 1u;
                             };
                         }
                         work_counter.atomic(i).fetch_add(1u);
                     };
                 }
             };
+            sync_block();
             $if(thread_x() == block_size - 1) {
-                $if((workload[0] >= workload[1]) & rem_global[0]) {//fetch new workload
+                $if((workload[0] >= workload[1]) & (rem_global[0]==1u)) {//fetch new workload
                     workload[0] = samples.atomic(0u).fetch_add(block_size * fetch_size);
                     workload[1] = min(workload[0] + block_size * fetch_size, tot_samples);
                     $if(workload[0] >= tot_samples) {
-                        rem_global[0] = false;
+                        rem_global[0] = 0u;
                     };
                 };
             };
@@ -529,7 +532,7 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                 $if((workload[0] < workload[1]) | (thread_x() != 0u)) {
                     work_stat.atomic(0).fetch_max(work_counter[thread_x()]);
                 };
-                pipeline().printer().info("work counter {} of block {}: {}", thread_x(), block_x(), work_counter[thread_x()]);
+                //pipeline().printer().info("work counter {} of block {}: {}", thread_x(), block_x(), work_counter[thread_x()]);
 
 			};
             
@@ -539,7 +542,6 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                     work_stat[1] = thread_x();
                 };
             };
-            
             sync_block();
             work_offset[0] = 0;
             $for(index, 0u, q_factor) {//collect indices
@@ -810,7 +812,7 @@ void MegakernelWaveFrontInstance::_render_one_camera(
             //pipeline().printer().info("loop {},block {} thread{},genwork {}~{}, processing pid {}, kernel {}",
             //    count , block_x(), thread_x(), workload[0],workload[1],pid, path_state[pid].kernel_index);
             auto gen_count = work_counter[0];
-            $if(thread_x() < work_stat[0]) {
+            $if(thread_x() < work_offset[0]) {
                 $switch(path_state[pid].kernel_index) {
                     $case((uint)INVALID) {
                         $if(workload[0] + thread_x() < workload[1]) {
@@ -871,6 +873,7 @@ void MegakernelWaveFrontInstance::_render_one_camera(
         pipeline().update(command_buffer, time);
         command_buffer << sample_count.copy_from(&zero)
                        << commit();
+        LUISA_ASSERT(launch_size % render_shader.get().block_size().x == 0u, "");
         command_buffer << render_shader.get()(sample_count, host_sample_count, shutter_spp, time, s.point.weight).dispatch(launch_size);
         command_buffer << pipeline().printer().retrieve();
         command_buffer << synchronize();
