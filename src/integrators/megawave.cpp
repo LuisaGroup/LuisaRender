@@ -463,15 +463,15 @@ void MegakernelWaveFrontInstance::_render_one_camera(
 
     Clock clock_compile;
     //assume KERNEL_COUNT< block_size_x
-    auto launch_size = 256u*128u;
+    auto launch_size = 128u*256u;
     sampler()->reset(command_buffer, resolution, launch_size, spp);
     command_buffer << synchronize();
     auto render_shader = compile_async<1>(device, [&](BufferUInt samples, UInt tot_samples, UInt base_spp, Float time, Float shutter_weight) noexcept {
-        const uint fetch_size = 4;
+        const uint fetch_size = 128;
         auto dim = spectrum->node()->dimension();
         auto block_size = block_size_x();
         auto q_factor = 1u;
-        auto queue_size = block_size* q_factor;
+        auto queue_size = block_size * q_factor;
         Shared<ThreadFrame> path_state{queue_size};
         Shared<Ray> path_ray{queue_size};
         Shared<Hit> path_hit{queue_size};
@@ -488,12 +488,13 @@ void MegakernelWaveFrontInstance::_render_one_camera(
         auto count = def(0);
         Shared<uint> rem_global{1};
         Shared<uint> rem_local{1};
-        rem_global[0] = true;
-        rem_local[0] = false;
+        rem_global[0] = 1u;
+        rem_local[0] = 0u;
         sync_block();
         //pipeline().printer().info("work counter {} of block {}: {}", -1, block_x(), -1);
         auto count_limit = 1000000u;
         $while((rem_global[0] != 0u | rem_local[0] != 0u) & (count!= count_limit)) {
+            sync_block();//very important, synchronize for condition
             rem_local[0] = 0u;
             count += 1;
             work_stat[0] = 0;
@@ -535,7 +536,6 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                 //pipeline().printer().info("work counter {} of block {}: {}", thread_x(), block_x(), work_counter[thread_x()]);
 
 			};
-            
             sync_block();
             $if(thread_x() < (uint)KERNEL_COUNT){//get argmax
                 $if((work_stat[0] == work_counter[thread_x()]) & ((workload[0] < workload[1]) | (thread_x() != 0u))) {
@@ -544,6 +544,7 @@ void MegakernelWaveFrontInstance::_render_one_camera(
             };
             sync_block();
             work_offset[0] = 0;
+            sync_block();
             $for(index, 0u, q_factor) {//collect indices
                 auto state = path_state[index * block_size + thread_x()];
                 $if(state.kernel_index == work_stat[1]) {
