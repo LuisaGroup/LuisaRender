@@ -463,22 +463,24 @@ void MegakernelWaveFrontInstance::_render_one_camera(
 
     Clock clock_compile;
     //assume KERNEL_COUNT< block_size_x
-    auto launch_size = 256u*256u;
+    auto launch_size = 256u*128u;
     sampler()->reset(command_buffer, resolution, launch_size, spp);
     command_buffer << synchronize();
     auto render_shader = compile_async<1>(device, [&](BufferUInt samples, UInt tot_samples, UInt base_spp, Float time, Float shutter_weight) noexcept {
-        const uint fetch_size = 128;
+        const uint fetch_size = 8;
         auto dim = spectrum->node()->dimension();
         auto block_size = block_size_x();
-        Shared<ThreadFrame> path_state{block_size};
-        Shared<Ray> path_ray{block_size};
-        Shared<Hit> path_hit{block_size};
-        Shared<DimensionalFrame> path_state_dim{block_size * dim};
-        Shared<uint> path_id{block_size};
+        auto q_factor = 1u;
+        auto queue_size = block_size* q_factor;
+        Shared<ThreadFrame> path_state{queue_size};
+        Shared<Ray> path_ray{queue_size};
+        Shared<Hit> path_hit{queue_size};
+        Shared<DimensionalFrame> path_state_dim{queue_size * dim};
+        Shared<uint> path_id{queue_size};
         Shared<uint> work_counter{KERNEL_COUNT};
-        Shared<uint> work_offset{KERNEL_COUNT};
+        Shared<uint> work_offset{1u};
         Shared<uint> workload{2};
-        Shared<uint> work_stat{3};//0 max_id,1 max_count
+        Shared<uint> work_stat{2};//0 max_count,1 max_id
         path_state[thread_x()].kernel_index = (uint)INVALID;
         workload[0] = 0;
         workload[1] = 0;
@@ -488,34 +490,30 @@ void MegakernelWaveFrontInstance::_render_one_camera(
         rem_global[0] = true;
         rem_local[0] = false;
         //pipeline().printer().info("work counter {} of block {}: {}", -1, block_x(), -1);
-        $while((rem_global[0] | rem_local[0])) {
+        auto count_limit = 1000000;
+        $while((rem_global[0] | rem_local[0])&(count!=count_limit)) {
             rem_local[0] = false;
             count += 1;
-            work_stat[0] = -1;
-            work_stat[1] = 0;
+            work_stat[0] = 0;
+            work_stat[1] = -1;
             $if(thread_x() < (uint)KERNEL_COUNT) {//clear counter
                 work_counter[thread_x()] = 0u;
             };
             sync_block();
-            for (auto i = 0u; i < KERNEL_COUNT; ++i) {//count the kernels
-                auto state = path_state[thread_x()];
-                $if(state.kernel_index == i) {
-                    if (i != (uint)INVALID) {
-                        rem_local[0] = true;
-                    }
-                    work_counter.atomic(i).fetch_add(1u);
-                };
-            }
-            sync_block();
-
-            $if(thread_x() == 0) {//calculate offset
-                auto prev = def(0u);
-                $for(i, 0u, (uint)KERNEL_COUNT) {
-                    auto now = work_counter[i];
-                    work_offset[i] = prev;
-                    prev += now;
-                    //pipeline().printer().info("work counter {} of block {}: {}", i, block_x(), work_counter[i]);
-                };
+            $for(index, 0u, q_factor) {
+                for (auto i = 0u; i < KERNEL_COUNT; ++i) {//count the kernels
+                    auto state = path_state[index*block_size+thread_x()];
+                    $if(state.kernel_index == i) {
+                        if (i != (uint)INVALID) {
+                            rem_local[0] = true;
+                        } else {
+                            $if(workload[0] < workload[1]) {
+                                rem_local[0] = true;
+                            };
+                        }
+                        work_counter.atomic(i).fetch_add(1u);
+                    };
+                }
             };
             $if(thread_x() == block_size - 1) {
                 $if((workload[0] >= workload[1]) & rem_global[0]) {//fetch new workload
@@ -525,27 +523,33 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                         rem_global[0] = false;
                     };
                 };
-                //pipeline().printer().info("block :{}, count: {}workload: {}~{}",block_x(), count, workload[0], workload[1]);
             };
             sync_block();
-            /*
-            $if(thread_x()<(uint)KERNEL_COUNT){
-                $if(work_stat[0]==work_counter[thread_x()]){
-                    work_stat[1]=work_counter[thread_x()];
+            $if(thread_x() < (uint)KERNEL_COUNT) {//get max
+                $if((workload[0] < workload[1]) | (thread_x() != 0u)) {
+                    work_stat.atomic(0).fetch_max(work_counter[thread_x()]);
+                };
+                pipeline().printer().info("work counter {} of block {}: {}", thread_x(), block_x(), work_counter[thread_x()]);
+
+			};
+            
+            sync_block();
+            $if(thread_x() < (uint)KERNEL_COUNT){//get argmax
+                $if((work_stat[0] == work_counter[thread_x()]) & ((workload[0] < workload[1]) | (thread_x() != 0u))) {
+                    work_stat[1] = thread_x();
+                };
+            };
+            
+            sync_block();
+            work_offset[0] = 0;
+            $for(index, 0u, q_factor) {//collect indices
+                auto state = path_state[index * block_size + thread_x()];
+                $if(state.kernel_index == work_stat[1]) {
+                    auto id=work_offset.atomic(0).fetch_add(1u);
+                    path_id[id]=index * block_size + thread_x();
                 };
             };
             sync_block();
-            */
-
-            for (int i = 0u; i < KERNEL_COUNT; ++i) {//sort the kernels
-                auto state = path_state[thread_x()];
-                $if(state.kernel_index == i) {
-                    auto id = work_offset.atomic(i).fetch_add(1u);
-                    path_id[id] = thread_x();
-                };
-            }
-            sync_block();
-
             auto generate_ray_shader = [&](UInt path_id, UInt work_id) noexcept {//TODO: add fetch_state and set_state for sampler
                 auto pixel_id = work_id % pixel_count;
                 auto sample_id = base_spp + work_id / pixel_count;
@@ -555,7 +559,7 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                 auto u_filter = sampler()->generate_pixel_2d();
                 auto u_lens = camera->node()->requires_lens_sampling() ? sampler()->generate_2d() : make_float2(.5f);
                 auto u_wavelength = spectrum->node()->is_fixed() ? 0.f : sampler()->generate_1d();
-                sampler()->save_state(block_size_x() * block_x() + path_id);
+                sampler()->save_state(queue_size * block_x() + path_id);
                 auto camera_sample = camera->generate_ray(pixel_coord, time, u_filter, u_lens);
                 path_ray[path_id] = camera_sample.ray;
                 path_state[path_id].wl_sample = u_wavelength;
@@ -655,10 +659,10 @@ void MegakernelWaveFrontInstance::_render_one_camera(
             };
 
             auto sample_light_shader = [&](UInt path_id) noexcept {
-                sampler()->load_state(block_size_x() * block_x() + path_id);
+                sampler()->load_state(queue_size * block_x() + path_id);
                 auto u_light_selection = sampler()->generate_1d();
                 auto u_light_surface = sampler()->generate_2d();
-                sampler()->save_state(block_size_x() * block_x() + path_id);
+                sampler()->save_state(queue_size * block_x() + path_id);
                 auto ray = path_ray[path_id];
                 auto hit = path_hit[path_id];
                 auto it = pipeline().geometry()->interaction(ray, hit);
@@ -681,14 +685,14 @@ void MegakernelWaveFrontInstance::_render_one_camera(
             };
 
             auto evaluate_surface_shader = [&](UInt path_id) noexcept {
-                sampler()->load_state(block_size_x() * block_x() + path_id);
+                sampler()->load_state(queue_size * block_x() + path_id);
                 auto depth = path_state[path_id].depth;
                 auto u_lobe = sampler()->generate_1d();
                 auto u_bsdf = sampler()->generate_2d();
                 auto u_rr = def(0.f);
                 auto rr_depth = node<MegakernelWaveFront>()->rr_depth();
                 $if(depth + 1u >= rr_depth) { u_rr = sampler()->generate_1d(); };
-                sampler()->save_state(block_size_x() * block_x() + path_id);
+                sampler()->save_state(queue_size * block_x() + path_id);
 
                 auto ray = path_ray[path_id];
                 auto hit = path_hit[path_id];
@@ -805,31 +809,43 @@ void MegakernelWaveFrontInstance::_render_one_camera(
             auto pid = path_id[thread_x()];
             //pipeline().printer().info("loop {},block {} thread{},genwork {}~{}, processing pid {}, kernel {}",
             //    count , block_x(), thread_x(), workload[0],workload[1],pid, path_state[pid].kernel_index);
-            $switch(path_state[pid].kernel_index) {
-                $case((uint)INVALID) {
-                    $if(workload[0] + thread_x() < workload[1]) {
-                        generate_ray_shader(pid, workload[0] + thread_x());
+            auto gen_count = work_counter[0];
+            $if(thread_x() < work_stat[0]) {
+                $switch(path_state[pid].kernel_index) {
+                    $case((uint)INVALID) {
+                        $if(workload[0] + thread_x() < workload[1]) {
+                            generate_ray_shader(pid, workload[0] + thread_x());
+                            //pipeline().printer().info("load {}, counter {},work_id {}", workload[0],gen_count,workload[0] + thread_x());
+                        };
                     };
-                };
-                $case((uint)INTERSECT) {
-                    intersect_shader(pid);
-                };
-                $case((uint)MISS) {
-                    evaluate_miss_shader(pid);
-                };
-                $case((uint)LIGHT) {
-                    evaluate_light_shader(pid);
-                };
-                $case((uint)SAMPLE) {
-                    sample_light_shader(pid);
-                };
-                $case((uint)SURFACE) {
-                    evaluate_surface_shader(pid);
+                    $case((uint)INTERSECT) {
+                        intersect_shader(pid);
+                    };
+                    $case((uint)MISS) {
+                        evaluate_miss_shader(pid);
+                    };
+                    $case((uint)LIGHT) {
+                        evaluate_light_shader(pid);
+                    };
+                    $case((uint)SAMPLE) {
+                        sample_light_shader(pid);
+                    };
+                    $case((uint)SURFACE) {
+                        evaluate_surface_shader(pid);
+                    };
                 };
             };
             sync_block();
-            workload[0] = workload[0] + work_counter[0];
+            $if((work_stat[1]==(uint)INVALID) & (thread_x() == 0)) {
+                workload[0] = workload[0] + gen_count;
+            };
         };
+        $if(count == count_limit) {
+            pipeline().printer().info("block_id{},thread_id {}, loop not break! local:{}, global:{}",block_x(),thread_x(), rem_local[0], rem_global[0]);
+            $if(thread_x() < (uint)KERNEL_COUNT){
+                pipeline().printer().info("work rem: id {}, size {}", thread_x(), work_counter[thread_x()]);
+            };
+		};
     });
     render_shader.get().set_name("render");
     auto integrator_shader_compilation_time = clock_compile.toc();
@@ -856,7 +872,7 @@ void MegakernelWaveFrontInstance::_render_one_camera(
         command_buffer << sample_count.copy_from(&zero)
                        << commit();
         command_buffer << render_shader.get()(sample_count, host_sample_count, shutter_spp, time, s.point.weight).dispatch(launch_size);
-        //command_buffer << pipeline().printer().retrieve();
+        command_buffer << pipeline().printer().retrieve();
         command_buffer << synchronize();
         shutter_spp += s.spp;
     }
