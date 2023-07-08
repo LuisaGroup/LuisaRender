@@ -111,7 +111,7 @@ public:
                 "Non power-of-two samples per pixel "
                 "is not optimal for Sobol' sampler.");
         }
-        if (!_state_buffer||_state_buffer.size() < state_count) {
+        if (!_state_buffer || _state_buffer.size() < state_count) {
             _state_buffer = pipeline().device().create_buffer<uint4>(
                 next_pow2(state_count));
         }
