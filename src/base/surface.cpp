@@ -35,9 +35,9 @@ luisa::string Surface::Instance::closure_identifier() const noexcept {
 static auto validate_surface_sides(Expr<float3> ng, Expr<float3> ns,
                                    Expr<float3> wo, Expr<float3> wi) noexcept {
     static Callable is_valid = [](Float3 ng, Float3 ns, Float3 wo, Float3 wi) noexcept {
-        auto gs = dot(wo, ng) * dot(wi, ng) > 0.f;
-        auto ss = dot(wo, ns) * dot(wi, ns) > 0.f;
-        return gs == ss;
+        auto flip = sign(dot(ng, ns));
+        return sign(flip * dot(wo, ns)) == sign(dot(wo, ng)) &
+               sign(flip * dot(wi, ns)) == sign(dot(wi, ng));
     };
     return is_valid(ng, ns, wo, wi);
 }
