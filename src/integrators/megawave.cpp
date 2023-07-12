@@ -313,12 +313,13 @@ void MegakernelWaveFrontInstance::_render_one_camera(
         set_block_size(block_size, 1, 1);
         const uint fetch_size = 128;
         auto dim = spectrum->node()->dimension();
-        auto queue_size = block_size * q_factor;
-        Shared<ThreadFrame> path_state{queue_size};
-        Shared<Ray> path_ray{queue_size};
-        Shared<Hit> path_hit{queue_size};
-        Shared<DimensionalFrame> path_state_dim{queue_size * dim};
-        Shared<uint> path_id{queue_size};
+        auto shared_queue_size = block_size * q_factor;
+        auto queue_size = block_size * (KERNEL_COUNT+1);
+        Shared<ThreadFrame> path_state{shared_queue_size};
+        Shared<Ray> path_ray{shared_queue_size};
+        Shared<Hit> path_hit{shared_queue_size};
+        Shared<DimensionalFrame> path_state_dim{shared_queue_size * dim};
+        Shared<uint> path_id{shared_queue_size};
         Shared<uint> work_counter{KERNEL_COUNT};
         Shared<uint> work_offset{2u};
         Shared<uint> workload{2};
@@ -343,6 +344,7 @@ void MegakernelWaveFrontInstance::_render_one_camera(
         sync_block();
         //pipeline().printer().info("work counter {} of block {}: {}", -1, block_x(), -1);
         auto count_limit = 1000000u;
+        
         $while((rem_global[0] != 0u | rem_local[0] != 0u) & (count!= count_limit)) {
             sync_block();//very important, synchronize for condition
             rem_local[0] = 0u;
@@ -428,6 +430,12 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                                         state_soa.write_dim_frame(soa_id * dim + i, path_state_dim[dst * dim + i]);
                                         path_state_dim[dst * dim + i] = dim_frame;
                                     }
+                                    sampler()->load_state(queue_size * block_x() + block_size*q_factor+index*block_size+thread_x());
+                                    sampler()->save_state(queue_size * block_x() + KERNEL_COUNT*block_size+thread_x());
+                                    sampler()->load_state(queue_size * block_x() + dst);
+                                    sampler()->save_state(queue_size * block_x() + block_size*q_factor+index*block_size+thread_x());
+                                    sampler()->load_state(queue_size * block_x() + KERNEL_COUNT*block_size+thread_x());
+                                    sampler()->save_state(queue_size * block_x() + dst);
                                 }
                                 $else {
                                     auto ray = state_soa.read_ray(soa_id);
@@ -438,6 +446,8 @@ void MegakernelWaveFrontInstance::_render_one_camera(
 										auto dim_frame = state_soa.read_dim_frame(soa_id * dim + i);
 										path_state_dim[dst * dim + i] = dim_frame;
 									}
+                                    sampler()->load_state(queue_size * block_x() + block_size * q_factor + index * block_size + thread_x());
+                                    sampler()->save_state(queue_size * block_x() + dst);
 								};
                             }
                             $else {
@@ -447,6 +457,8 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                                     for (auto i = 0u; i < dim; ++i) {
                                         state_soa.write_dim_frame(soa_id * dim + i, path_state_dim[dst * dim + i]);
                                     }
+                                    sampler()->load_state(queue_size * block_x() + dst);
+                                    sampler()->save_state(queue_size * block_x() + block_size * q_factor + index * block_size + thread_x());     
                                 };
                             };
                             state_soa.write_frame(soa_id, path_state[dst]);
