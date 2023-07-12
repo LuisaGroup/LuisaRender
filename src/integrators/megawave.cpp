@@ -89,223 +89,7 @@ public:
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
-class PathStateSOA {
 
-private:
-    const Spectrum::Instance *_spectrum;
-    Buffer<float> _wl_sample;
-    Buffer<float> _beta;
-    Buffer<float> _pdf_bsdf;
-    Buffer<uint> _kernel_index;
-    Buffer<uint> _depth;
-    Buffer<uint> _pixel_index;
-    //Buffer<uint> _kernel_count;
-    luisa::vector<uint> _host_count;
-    Buffer<Ray> _ray;
-    Buffer<Hit> _hit;
-    bool _gathering;
-
-public:
-    PathStateSOA(const Spectrum::Instance *spectrum, size_t size, bool gathering) noexcept
-        : _spectrum{spectrum} {
-        auto &&device = spectrum->pipeline().device();
-        auto dimension = spectrum->node()->dimension();
-        _beta = device.create_buffer<float>(size * dimension);
-        _pdf_bsdf = device.create_buffer<float>(size);
-        _gathering = gathering;
-        if (_gathering)
-            _kernel_index = device.create_buffer<uint>(size);
-        //_kernel_count = device.create_buffer<uint>(KERNEL_COUNT);
-        //_host_count.resize(KERNEL_COUNT);
-        _ray = device.create_buffer<Ray>(size);
-        _hit = device.create_buffer<Hit>(size);
-        _depth = device.create_buffer<uint>(size);
-        _pixel_index = device.create_buffer<uint>(size);
-        if (!spectrum->node()->is_fixed()) {
-            _wl_sample = device.create_buffer<float>(size);
-        }
-    }
-    [[nodiscard]] auto read_beta(Expr<uint> index) const noexcept {
-        auto dimension = _spectrum->node()->dimension();
-        auto offset = index * dimension;
-        SampledSpectrum s{dimension};
-        for (auto i = 0u; i < dimension; i++) {
-            s[i] = _beta->read(offset + i);
-        }
-        return s;
-    }
-    [[nodiscard]] auto read_kernel_index(Expr<uint> index) const noexcept {
-        return _kernel_index->read(index);
-    }
-    void write_kernel_index(Expr<uint> index, Expr<uint> kernel_index) noexcept {
-        _kernel_index->write(index, kernel_index);
-    }
-    [[nodiscard]] auto read_ray(Expr<uint> index) const noexcept {
-        return _ray->read(index);
-    }
-    [[nodiscard]] auto read_hit(Expr<uint> index) const noexcept {
-        return _hit->read(index);
-    }
-    void write_ray(Expr<uint> index, Expr<Ray> ray) noexcept {
-        _ray->write(index, ray);
-    }
-    void write_hit(Expr<uint> index, Expr<Hit> hit) noexcept {
-        _hit->write(index, hit);
-    }
-    [[nodiscard]] auto read_depth(Expr<uint> index) const noexcept {
-        return _depth->read(index);
-    }
-    [[nodiscard]] auto read_pixel_index(Expr<uint> index) const noexcept {
-        return _pixel_index->read(index);
-    }
-    void write_pixel_index(Expr<uint> index, Expr<uint> pixel_index) noexcept {
-        _pixel_index->write(index, pixel_index);
-    }
-    void write_depth(Expr<uint> index, Expr<uint> depth) noexcept {
-        _depth->write(index, depth);
-    }
-
-    void write_beta(Expr<uint> index, const SampledSpectrum &beta) noexcept {
-        auto dimension = _spectrum->node()->dimension();
-        auto offset = index * dimension;
-        for (auto i = 0u; i < dimension; i++) {
-            _beta->write(offset + i, beta[i]);
-        }
-    }
-    [[nodiscard]] auto read_swl(Expr<uint> index) const noexcept {
-        if (_spectrum->node()->is_fixed()) {
-            return std::make_pair(def(0.f), _spectrum->sample(0.f));
-        }
-        auto u_wl = _wl_sample->read(index);
-        auto swl = _spectrum->sample(abs(u_wl));
-        $if(u_wl < 0.f) { swl.terminate_secondary(); };
-        return std::make_pair(abs(u_wl), swl);
-    }
-    void write_wavelength_sample(Expr<uint> index, Expr<float> u_wl) noexcept {
-        if (!_spectrum->node()->is_fixed()) {
-            _wl_sample->write(index, u_wl);
-        }
-    }
-    auto read_wavelength_sample(Expr<uint> index) noexcept {
-        if (!_spectrum->node()->is_fixed()) {
-            return _wl_sample->read(index);
-        } else {
-            return def(0.f);
-        }
-    }
-    void terminate_secondary_wavelengths(Expr<uint> index, Expr<float> u_wl) noexcept {
-        if (!_spectrum->node()->is_fixed()) {
-            _wl_sample->write(index, -u_wl);
-        }
-    }
-
-    [[nodiscard]] auto read_pdf_bsdf(Expr<uint> index) const noexcept {
-        return _pdf_bsdf->read(index);
-    }
-    void write_pdf_bsdf(Expr<uint> index, Expr<float> pdf) noexcept {
-        _pdf_bsdf->write(index, pdf);
-    }
-#define MOVE(entry, from, to)           \
-    {                                   \
-        auto inst = read_##entry(from); \
-        write_##entry(to, inst);        \
-    }
-    void move(Expr<uint> from, Expr<uint> to) noexcept {
-        MOVE(beta, from, to);
-        MOVE(pdf_bsdf, from, to);
-        MOVE(ray, from, to);
-        MOVE(hit, from, to);
-        MOVE(depth, from, to);
-        MOVE(pixel_index, from, to);
-        if (_gathering) {
-            MOVE(kernel_index, from, to);
-        }
-        if (!_spectrum->node()->is_fixed()) {
-            MOVE(wavelength_sample, from, to);
-        }
-    }
-#undef MOVE
-};
-
-class LightSampleSOA {
-
-private:
-    const Spectrum::Instance *_spectrum;
-    Buffer<float> _emission;
-    Buffer<float4> _wi_and_pdf;
-    Buffer<uint> _surface_tag;
-    Buffer<uint> _tag_counter;
-    bool _use_tag_sort;
-
-public:
-    LightSampleSOA(const Spectrum::Instance *spec, size_t size, size_t tag_size) noexcept
-        : _spectrum{spec} {
-        auto &&device = spec->pipeline().device();
-        auto dimension = spec->node()->dimension();
-        _emission = device.create_buffer<float>(size * dimension);
-        _wi_and_pdf = device.create_buffer<float4>(size);
-        if (tag_size > 0) {
-            _use_tag_sort = true;
-            _surface_tag = device.create_buffer<uint>(size);
-            _tag_counter = device.create_buffer<uint>(tag_size);
-        } else {
-            _use_tag_sort = false;
-            _surface_tag = device.create_buffer<uint>(1u);
-            _tag_counter = device.create_buffer<uint>(1u);
-        }
-    }
-    [[nodiscard]] auto read_emission(Expr<uint> index) const noexcept {
-        auto dimension = _spectrum->node()->dimension();
-        auto offset = index * dimension;
-        SampledSpectrum s{dimension};
-        for (auto i = 0u; i < dimension; i++) {
-            s[i] = _emission->read(offset + i);
-        }
-        return s;
-    }
-    void write_emission(Expr<uint> index, const SampledSpectrum &s) noexcept {
-        auto dimension = _spectrum->node()->dimension();
-        auto offset = index * dimension;
-        for (auto i = 0u; i < dimension; i++) {
-            _emission->write(offset + i, s[i]);
-        }
-    }
-    [[nodiscard]] auto read_wi_and_pdf(Expr<uint> index) const noexcept {
-        return _wi_and_pdf->read(index);
-    }
-    void write_wi_and_pdf(Expr<uint> index, Expr<float3> wi, Expr<float> pdf) noexcept {
-        _wi_and_pdf->write(index, make_float4(wi, pdf));
-    }
-    [[nodiscard]] auto read_surface_tag(Expr<uint> index) const noexcept {
-        return _surface_tag->read(index);
-    }
-    void write_surface_tag(Expr<uint> index, Expr<uint> tag) noexcept {
-        _surface_tag->write(index, tag);
-    }
-    void increase_tag(Expr<uint> index) noexcept {
-        _tag_counter->atomic(index).fetch_add(1u);
-    }
-    [[nodiscard]] BufferView<uint> tag_counter() const noexcept {
-        return _tag_counter;
-    }
-    [[nodiscard]] BufferView<uint> surface_tag() const noexcept {
-        return _surface_tag;
-    }
-#define MOVE(entry, from, to)           \
-    {                                   \
-        auto inst = read_##entry(from); \
-        write_##entry(to, inst);        \
-    }
-    void move(Expr<uint> from, Expr<uint> to) noexcept {
-        MOVE(emission, from, to);
-        if (_use_tag_sort) {
-            MOVE(surface_tag, from, to);
-        }
-        auto inst = read_wi_and_pdf(from);
-        write_wi_and_pdf(to, inst.xyz(), inst.w);
-    }
-#undef MOVE
-};
 
 class RayQueue {
 
@@ -426,6 +210,60 @@ struct DimensionalFrame {
 LUISA_STRUCT(luisa::render::ThreadFrame, wl_sample, pdf_bsdf, kernel_index, depth, pixel_index, wi_and_pdf){};
 LUISA_STRUCT(luisa::render::DimensionalFrame, beta, emission){};
 namespace luisa::render {
+class StateSOA {
+
+private:
+    const Spectrum::Instance *_spectrum;
+    Buffer<ThreadFrame> _frame;
+    Buffer<DimensionalFrame> _dim_frame;
+    Buffer<Ray> _ray;
+    Buffer<Hit> _hit;
+
+public:
+    StateSOA(const Spectrum::Instance *spectrum,size_t size) noexcept
+        : _spectrum{spectrum} {
+        auto &&device = spectrum->pipeline().device();
+        auto dimension = spectrum->node()->dimension();
+        _dim_frame = device.create_buffer<DimensionalFrame>(size * dimension);
+        _frame = device.create_buffer<ThreadFrame>(size);
+        _ray = device.create_buffer<Ray>(size);
+        _hit = device.create_buffer<Hit>(size);
+    }
+    [[nodiscard]] auto read_ray(Expr<uint> index) const noexcept {
+        return _ray->read(index);
+    }
+    [[nodiscard]] auto read_hit(Expr<uint> index) const noexcept {
+        return _hit->read(index);
+    }
+    [[nodiscrad]] auto read_frame(Expr<uint> index) const noexcept {
+		return _frame->read(index);
+	}
+    [[nodiscard]] auto read_dim_frame(Expr<uint> index) const noexcept {
+		return _dim_frame->read(index);
+	}
+
+    void write_ray(Expr<uint> index, Expr<Ray> ray) noexcept {
+        _ray->write(index, ray);
+    }
+    void write_hit(Expr<uint> index, Expr<Hit> hit) noexcept {
+        _hit->write(index, hit);
+    }
+    void write_frame(Expr<uint> index, Expr<ThreadFrame> frame) noexcept {
+		_frame->write(index, frame);
+	}
+    void write_dim_frame(Expr<uint> index, Expr<DimensionalFrame> frame) noexcept {
+        _dim_frame->write(index, frame);
+    }
+    
+
+
+#define MOVE(entry, from, to)       \
+  {                                 \
+    auto inst = read_##entry(from); \
+    write_##entry(to, inst);        \
+  }
+#undef MOVE
+};
 class MegakernelWaveFrontInstance final : public ProgressiveIntegrator::Instance {
 
 public:
@@ -463,14 +301,18 @@ void MegakernelWaveFrontInstance::_render_one_camera(
 
     Clock clock_compile;
     //assume KERNEL_COUNT< block_size_x
-    auto launch_size = 128u*256u;
-    sampler()->reset(command_buffer, resolution, launch_size, spp);
+    auto block_size = 128u;
+    auto sm_count = 128u;
+    auto launch_size = sm_count*block_size;
+    auto q_factor = 1u;
+    auto g_factor = KERNEL_COUNT - q_factor;
+    StateSOA state_soa{spectrum, launch_size*g_factor};
+    sampler()->reset(command_buffer, resolution, (KERNEL_COUNT+1)*launch_size, spp);
     command_buffer << synchronize();
     auto render_shader = compile_async<1>(device, [&](BufferUInt samples, UInt tot_samples, UInt base_spp, Float time, Float shutter_weight) noexcept {
+        set_block_size(block_size, 1, 1);
         const uint fetch_size = 128;
         auto dim = spectrum->node()->dimension();
-        auto block_size = block_size_x();
-        auto q_factor = 1u;
         auto queue_size = block_size * q_factor;
         Shared<ThreadFrame> path_state{queue_size};
         Shared<Ray> path_ray{queue_size};
@@ -478,10 +320,18 @@ void MegakernelWaveFrontInstance::_render_one_camera(
         Shared<DimensionalFrame> path_state_dim{queue_size * dim};
         Shared<uint> path_id{queue_size};
         Shared<uint> work_counter{KERNEL_COUNT};
-        Shared<uint> work_offset{1u};
+        Shared<uint> work_offset{2u};
         Shared<uint> workload{2};
         Shared<uint> work_stat{2};//0 max_count,1 max_id
         path_state[thread_x()].kernel_index = (uint)INVALID;
+        $if(thread_x() < (uint)KERNEL_COUNT) {
+            $if(thread_x() == 0){
+                work_counter[thread_x()] = KERNEL_COUNT*block_size;
+            }
+            $else {
+                work_counter[thread_x()] = 0u;
+            };
+        };
         workload[0] = 0;
         workload[1] = 0;
         //Shared<uint> count{1u};
@@ -499,7 +349,7 @@ void MegakernelWaveFrontInstance::_render_one_camera(
             count += 1;
             work_stat[0] = 0;
             work_stat[1] = -1;
-            $if(thread_x() < (uint)KERNEL_COUNT) {//clear counter
+            /* $if(thread_x() < (uint)KERNEL_COUNT) {//clear counter
                 work_counter[thread_x()] = 0u;
             };
             sync_block();
@@ -517,7 +367,7 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                         work_counter.atomic(i).fetch_add(1u);
                     };
                 }
-            };
+            };*/
             sync_block();
             $if(thread_x() == block_size - 1) {
                 $if((workload[0] >= workload[1]) & (rem_global[0]==1u)) {//fetch new workload
@@ -531,7 +381,10 @@ void MegakernelWaveFrontInstance::_render_one_camera(
             sync_block();
             $if(thread_x() < (uint)KERNEL_COUNT) {//get max
                 $if((workload[0] < workload[1]) | (thread_x() != 0u)) {
-                    work_stat.atomic(0).fetch_max(work_counter[thread_x()]);
+                    $if(work_counter[thread_x()] != 0) {
+                        rem_local[0] = 1u;
+                        work_stat.atomic(0).fetch_max(work_counter[thread_x()]);
+                    };
                 };
                 //pipeline().printer().info("work counter {} of block {}: {}", thread_x(), block_x(), work_counter[thread_x()]);
 
@@ -544,15 +397,71 @@ void MegakernelWaveFrontInstance::_render_one_camera(
             };
             sync_block();
             work_offset[0] = 0;
+            work_offset[1] = 0;
             sync_block();
             $for(index, 0u, q_factor) {//collect indices
                 auto state = path_state[index * block_size + thread_x()];
-                $if(state.kernel_index == work_stat[1]) {
+                $if(state.kernel_index != work_stat[1]) {
                     auto id=work_offset.atomic(0).fetch_add(1u);
                     path_id[id]=index * block_size + thread_x();
                 };
             };
             sync_block();
+            $if(q_factor * block_size - work_offset[0] < block_size) {//no enough work
+                $for(index, 0u, g_factor) {//swap frames
+                    auto soa_id = block_x() * (block_size * g_factor) + index * block_size + thread_x();
+                    auto state = state_soa.read_frame(soa_id);
+                    $if(state.kernel_index == work_stat[1]) {
+                        auto id = work_offset.atomic(1).fetch_add(1u);
+                        $if(id < work_offset[0]) {
+                            auto dst = path_id[id];
+                            $if(state.kernel_index != (uint)INVALID) {
+                                $if(path_state[dst].kernel_index != (uint)INVALID) {
+                                    auto ray = state_soa.read_ray(soa_id);
+                                    state_soa.write_ray(soa_id, path_ray[dst]);
+                                    path_ray[dst] = ray;
+                                    auto hit = state_soa.read_hit(soa_id);
+                                    state_soa.write_hit(soa_id, path_hit[dst]);
+                                    path_hit[dst] = hit;
+                                    for (auto i = 0u; i < dim; ++i) {
+                                        auto dim_frame = state_soa.read_dim_frame(soa_id * dim + i);
+                                        state_soa.write_dim_frame(soa_id * dim + i, path_state_dim[dst * dim + i]);
+                                        path_state_dim[dst * dim + i] = dim_frame;
+                                    }
+                                }
+                                $else {
+                                    auto ray = state_soa.read_ray(soa_id);
+									path_ray[dst] = ray;
+									auto hit = state_soa.read_hit(soa_id);
+									path_hit[dst] = hit;
+                                    for (auto i = 0u; i < dim; ++i) {
+										auto dim_frame = state_soa.read_dim_frame(soa_id * dim + i);
+										path_state_dim[dst * dim + i] = dim_frame;
+									}
+								};
+                            }
+                            $else {
+                                $if(path_state[dst].kernel_index != (uint)INVALID){
+                                    state_soa.write_ray(soa_id, path_ray[dst]);
+                                    state_soa.write_hit(soa_id, path_hit[dst]);
+                                    for (auto i = 0u; i < dim; ++i) {
+                                        state_soa.write_dim_frame(soa_id * dim + i, path_state_dim[dst * dim + i]);
+                                    }
+                                };
+                            };
+                            state_soa.write_frame(soa_id, path_state[dst]);
+                            path_state[dst] = state;
+                            
+                            
+                        };
+                    };
+                };
+            };
+            auto save_kernel = [&](UInt path_id, KernelState src, KernelState dst) noexcept {
+                path_state[path_id].kernel_index = (uint)dst;
+                work_counter.atomic((uint)src).fetch_sub(1u);
+                work_counter.atomic((uint)dst).fetch_add(1u);
+			};
             auto generate_ray_shader = [&](UInt path_id, UInt work_id) noexcept {//TODO: add fetch_state and set_state for sampler
                 auto pixel_id = work_id % pixel_count;
                 auto sample_id = base_spp + work_id / pixel_count;
@@ -572,8 +481,9 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                 path_state[path_id].pdf_bsdf = 1e16f;
                 path_state[path_id].pixel_index = pixel_id;
                 path_state[path_id].depth = 0u;
-                //pipeline().printer().info("path id:{}", path_id);
-                path_state[path_id].kernel_index = (uint)INTERSECT;
+                //pipeline().printer().info("path id:{}, pixel:{}", path_id, work_id);
+                save_kernel(path_id, INVALID, INTERSECT);
+                workload.atomic(0).fetch_add(1u);
             };
 
             auto intersect_shader = [&](UInt path_id) noexcept {
@@ -583,26 +493,40 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                 $if(!hit->miss()) {
                     auto shape = pipeline().geometry()->instance(hit.inst);
                     $if(shape.has_light()) {
-                        path_state[path_id].kernel_index = (uint)LIGHT;
+                        save_kernel(path_id, INTERSECT,LIGHT);
                     }
                     $else {
                         $if(shape.has_surface()) {
-                            path_state[path_id].kernel_index = (uint)SAMPLE;
+                            save_kernel(path_id, INTERSECT, SAMPLE);
+
                         }
                         $else {
-                            path_state[path_id].kernel_index = (uint)INVALID;
+                            save_kernel(path_id, INTERSECT, INVALID);
+
                         };
                     };
                 }
                 $else {
                     if (pipeline().environment()) {
-                        path_state[path_id].kernel_index = (uint)MISS;
+                        save_kernel(path_id, INTERSECT, MISS);
+
+
                     } else {
-                        path_state[path_id].kernel_index = (uint)INVALID;
+                        save_kernel(path_id, INTERSECT, INVALID);
                     }
                 };
             };
-
+            auto test_shader = [&](UInt path_id) noexcept {
+                sampler()->load_state(queue_size * block_x() + path_id);
+                auto u_test = sampler()->generate_1d();
+                sampler()->save_state(queue_size * block_x() + path_id);
+                $if (u_test < 0.2f) {
+                    save_kernel(path_id, INTERSECT, INVALID);
+                } $else{
+					save_kernel(path_id, INTERSECT, INTERSECT);
+				};
+            };
+                
             auto evaluate_miss_shader = [&](UInt path_id) noexcept {
                 if (pipeline().environment()) {
                     auto wi = path_ray[path_id]->direction();
@@ -624,7 +548,8 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                     auto pixel_coord = make_uint2(pixel_id % resolution.x, pixel_id / resolution.x);
                     camera->film()->accumulate(pixel_coord, spectrum->srgb(swl, Li), 0.f);
                 }
-                path_state[path_id].kernel_index = (uint)INVALID;
+                save_kernel(path_id, MISS, INVALID);
+
             };
 
             auto evaluate_light_shader = [&](UInt path_id) noexcept {
@@ -651,13 +576,16 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                     camera->film()->accumulate(pixel_coord, spectrum->srgb(swl, Li), 0.f);
                     auto shape = pipeline().geometry()->instance(hit.inst);
                     $if(shape.has_surface()) {
-                        path_state[path_id].kernel_index = (uint)SAMPLE;
+                        save_kernel(path_id, LIGHT, SAMPLE);
+
                     }
                     $else {
-                        path_state[path_id].kernel_index = (uint)INVALID;
+                        save_kernel(path_id, LIGHT, INVALID);
+
                     };
                 } else {
-                    path_state[path_id].kernel_index = (uint)INVALID;
+                    save_kernel(path_id, LIGHT, INVALID);
+
                 }
             };
 
@@ -684,7 +612,8 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                 };
                 path_state[path_id].wi_and_pdf = make_float4(light_sample.shadow_ray->direction(),
                                                              ite(occluded, 0.f, light_sample.eval.pdf));
-                path_state[path_id].kernel_index = (uint)SURFACE;
+                save_kernel(path_id, SAMPLE, SURFACE);
+
             };
 
             auto evaluate_surface_shader = [&](UInt path_id) noexcept {
@@ -717,7 +646,6 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                 pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
                     surface->closure(call, *it, swl, wo, 1.f, time);
                 });
-
                 call.execute([&](const Surface::Closure *closure) noexcept {
                     // apply opacity map
                     auto alpha_skip = def(false);
@@ -802,22 +730,23 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                         path_state_dim[path_id * dim + i].beta = beta[i];
                     }
                     path_ray[path_id] = ray;
-                    path_state[path_id].kernel_index = (uint)INTERSECT;
+                    save_kernel(path_id, SURFACE, INTERSECT);
+
                 }
                 $else {
-                    path_state[path_id].kernel_index = (uint)INVALID;
+                    save_kernel(path_id, SURFACE, INVALID);
                 };
             };
-
-            auto pid = path_id[thread_x()];
+            auto gen_st = workload[0];
+            sync_block();
+            auto pid = thread_x();
             //pipeline().printer().info("loop {},block {} thread{},genwork {}~{}, processing pid {}, kernel {}",
-            //    count , block_x(), thread_x(), workload[0],workload[1],pid, path_state[pid].kernel_index);
-            auto gen_count = work_counter[0];
-            $if(thread_x() < work_offset[0]) {
+            //        count, block_x(), thread_x(), workload[0], workload[1], pid, path_state[pid].kernel_index);
+            $if(true) {
                 $switch(path_state[pid].kernel_index) {
                     $case((uint)INVALID) {
-                        $if(workload[0] + thread_x() < workload[1]) {
-                            generate_ray_shader(pid, workload[0] + thread_x());
+                        $if(gen_st + thread_x() < workload[1]) {
+                            generate_ray_shader(pid, gen_st + thread_x());//only work when kernel 0s are continue
                             //pipeline().printer().info("load {}, counter {},work_id {}", workload[0],gen_count,workload[0] + thread_x());
                         };
                     };
@@ -839,9 +768,6 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                 };
             };
             sync_block();
-            $if((work_stat[1]==(uint)INVALID) & (thread_x() == 0)) {
-                workload[0] = workload[0] + gen_count;
-            };
         };
         $if(count == count_limit) {
             pipeline().printer().info("block_id{},thread_id {}, loop not break! local:{}, global:{}",block_x(),thread_x(), rem_local[0], rem_global[0]);
@@ -850,7 +776,14 @@ void MegakernelWaveFrontInstance::_render_one_camera(
             };
 		};
     });
+    auto clear_global_shader = compile_async<1>(device, [&]() noexcept {
+        auto dispatch_id = dispatch_x();
+        auto frame= state_soa.read_frame(0u);
+        frame.kernel_index = (uint)INVALID;
+        state_soa.write_frame(dispatch_id,frame);
+    });
     render_shader.get().set_name("render");
+    clear_global_shader.get().set_name("clear_global");
     auto integrator_shader_compilation_time = clock_compile.toc();
     LUISA_INFO("Integrator shader compile in {} ms.", integrator_shader_compilation_time);
 
@@ -872,6 +805,7 @@ void MegakernelWaveFrontInstance::_render_one_camera(
         static uint zero = 0u;
         auto time = s.point.time;
         pipeline().update(command_buffer, time);
+        command_buffer << clear_global_shader.get()().dispatch(launch_size * g_factor);
         command_buffer << sample_count.copy_from(&zero)
                        << commit();
         LUISA_ASSERT(launch_size % render_shader.get().block_size().x == 0u, "");
