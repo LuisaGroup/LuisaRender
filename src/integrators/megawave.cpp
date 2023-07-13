@@ -59,10 +59,8 @@ private:
     uint _rr_depth;
     float _rr_threshold;
     uint _block_count;
-    bool _gathering;
-    bool _test_case;
-    bool _compact;
-    bool _use_tag_sort;
+    uint _block_size;
+    bool _use_global;
 
 public:
     MegakernelWaveFront(Scene *scene, const SceneNodeDesc *desc) noexcept
@@ -70,20 +68,15 @@ public:
           _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)},
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
-          _block_count{desc->property_uint_or_default("block_count", 4096u)},
-          _gathering{desc->property_bool_or_default("gathering", true)},
-          _use_tag_sort{desc->property_bool_or_default("use_tag_sort", true)},
-          _test_case{desc->property_bool_or_default("test_case", false)},
-          _compact{desc->property_bool_or_default("compact", true)} {}
-
+          _block_count{desc->property_uint_or_default("block_count", 256u)},
+          _block_size {desc->property_uint_or_default("block_size", 256u)},
+          _use_global{desc->property_bool_or_default("use_global", false)} {}
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
-    [[nodiscard]] auto use_tag_sort() const noexcept { return _use_tag_sort; }
+    [[nodiscard]] auto use_global() const noexcept { return _use_global; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
     [[nodiscard]] auto block_count() const noexcept { return _block_count; }
-    [[nodiscard]] auto gathering() const noexcept { return _gathering; }
-    [[nodiscard]] auto test_case() const noexcept { return _test_case; }
-    [[nodiscard]] auto compact() const noexcept { return _compact; }
+    [[nodiscard]] auto block_size() const noexcept { return _block_size; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
@@ -195,19 +188,19 @@ public:
     }
 };
 struct ThreadFrame {
+    float4 wi_and_pdf;
     float wl_sample;
     float pdf_bsdf;
     uint kernel_index;
     uint depth;
     uint pixel_index;
-    float4 wi_and_pdf;
 };
 struct DimensionalFrame {
     float beta;
     float emission;
 };
 }// namespace luisa::render
-LUISA_STRUCT(luisa::render::ThreadFrame, wl_sample, pdf_bsdf, kernel_index, depth, pixel_index, wi_and_pdf){};
+LUISA_STRUCT(luisa::render::ThreadFrame, wi_and_pdf, wl_sample, pdf_bsdf, kernel_index, depth, pixel_index){};
 LUISA_STRUCT(luisa::render::DimensionalFrame, beta, emission){};
 namespace luisa::render {
 class StateSOA {
@@ -290,10 +283,7 @@ void MegakernelWaveFrontInstance::_render_one_camera(
     auto spp = camera->node()->spp();
     auto resolution = camera->film()->node()->resolution();
     auto pixel_count = resolution.x * resolution.y;
-    auto gathering = node<MegakernelWaveFront>()->gathering();
-    auto test_case = node<MegakernelWaveFront>()->test_case();
-    auto compact = node<MegakernelWaveFront>()->compact();
-    auto use_tag_sort = node<MegakernelWaveFront>()->use_tag_sort();
+    auto use_global= node<MegakernelWaveFront>()->use_global();
     bool use_sort = true;
     bool direct_launch = false;
 
@@ -301,20 +291,20 @@ void MegakernelWaveFrontInstance::_render_one_camera(
 
     Clock clock_compile;
     //assume KERNEL_COUNT< block_size_x
-    auto block_size = 128u;
-    auto sm_count = 128u;
-    auto launch_size = sm_count*block_size;
+    auto block_size = node<MegakernelWaveFront>()->block_size();
+    auto block_count = node<MegakernelWaveFront>()->block_count();
+    auto launch_size = block_count*block_size;
     auto q_factor = 1u;
     auto g_factor = KERNEL_COUNT - q_factor;
-    StateSOA state_soa{spectrum, launch_size*g_factor};
-    sampler()->reset(command_buffer, resolution, (KERNEL_COUNT+1)*launch_size, spp);
+    StateSOA state_soa{spectrum, use_global ? launch_size * g_factor:1 };
+    sampler()->reset(command_buffer, resolution, use_global?(KERNEL_COUNT+1)*launch_size:launch_size, spp);
     command_buffer << synchronize();
     auto render_shader = compile_async<1>(device, [&](BufferUInt samples, UInt tot_samples, UInt base_spp, Float time, Float shutter_weight) noexcept {
         set_block_size(block_size, 1, 1);
         const uint fetch_size = 128;
         auto dim = spectrum->node()->dimension();
         auto shared_queue_size = block_size * q_factor;
-        auto queue_size = block_size * (KERNEL_COUNT+1);
+        auto queue_size = use_global?block_size * (KERNEL_COUNT+1):block_size;
         Shared<ThreadFrame> path_state{shared_queue_size};
         Shared<Ray> path_ray{shared_queue_size};
         Shared<Hit> path_hit{shared_queue_size};
@@ -327,7 +317,7 @@ void MegakernelWaveFrontInstance::_render_one_camera(
         path_state[thread_x()].kernel_index = (uint)INVALID;
         $if(thread_x() < (uint)KERNEL_COUNT) {
             $if(thread_x() == 0){
-                work_counter[thread_x()] = KERNEL_COUNT*block_size;
+                work_counter[thread_x()] = use_global?KERNEL_COUNT*block_size:block_size;
             }
             $else {
                 work_counter[thread_x()] = 0u;
@@ -343,7 +333,7 @@ void MegakernelWaveFrontInstance::_render_one_camera(
         rem_local[0] = 0u;
         sync_block();
         //pipeline().printer().info("work counter {} of block {}: {}", -1, block_x(), -1);
-        auto count_limit = 1000000u;
+        auto count_limit = (tot_samples*1.2f)/min(block_count,50u)/(use_global?block_size:block_size/KERNEL_COUNT);
         
         $while((rem_global[0] != 0u | rem_local[0] != 0u) & (count!= count_limit)) {
             sync_block();//very important, synchronize for condition
@@ -401,74 +391,82 @@ void MegakernelWaveFrontInstance::_render_one_camera(
             work_offset[0] = 0;
             work_offset[1] = 0;
             sync_block();
-            $for(index, 0u, q_factor) {//collect indices
-                auto state = path_state[index * block_size + thread_x()];
-                $if(state.kernel_index != work_stat[1]) {
-                    auto id=work_offset.atomic(0).fetch_add(1u);
-                    path_id[id]=index * block_size + thread_x();
+            if (use_global) {
+                $for(index, 0u, q_factor) {//collect indices
+                    auto state = path_state[index * block_size + thread_x()];
+                    $if(state.kernel_index != work_stat[1]) {
+                        auto id = work_offset.atomic(0).fetch_add(1u);
+                        path_id[id] = index * block_size + thread_x();
+                    };
                 };
-            };
-            sync_block();
-            $if(q_factor * block_size - work_offset[0] < block_size) {//no enough work
-                $for(index, 0u, g_factor) {//swap frames
-                    auto soa_id = block_x() * (block_size * g_factor) + index * block_size + thread_x();
-                    auto state = state_soa.read_frame(soa_id);
-                    $if(state.kernel_index == work_stat[1]) {
-                        auto id = work_offset.atomic(1).fetch_add(1u);
-                        $if(id < work_offset[0]) {
-                            auto dst = path_id[id];
-                            $if(state.kernel_index != (uint)INVALID) {
-                                $if(path_state[dst].kernel_index != (uint)INVALID) {
-                                    auto ray = state_soa.read_ray(soa_id);
-                                    state_soa.write_ray(soa_id, path_ray[dst]);
-                                    path_ray[dst] = ray;
-                                    auto hit = state_soa.read_hit(soa_id);
-                                    state_soa.write_hit(soa_id, path_hit[dst]);
-                                    path_hit[dst] = hit;
-                                    for (auto i = 0u; i < dim; ++i) {
-                                        auto dim_frame = state_soa.read_dim_frame(soa_id * dim + i);
-                                        state_soa.write_dim_frame(soa_id * dim + i, path_state_dim[dst * dim + i]);
-                                        path_state_dim[dst * dim + i] = dim_frame;
+                sync_block();
+                $if(q_factor * block_size - work_offset[0] < block_size) {//no enough work
+                    $for(index, 0u, g_factor) {                           //swap frames
+                        auto soa_id = block_x() * (block_size * g_factor) + index * block_size + thread_x();
+                        auto state = state_soa.read_frame(soa_id);
+                        $if(state.kernel_index == work_stat[1]) {
+                            auto id = work_offset.atomic(1).fetch_add(1u);
+                            $if(id < work_offset[0]) {
+                                auto dst = path_id[id];
+                                $if(state.kernel_index != (uint)INVALID) {
+                                    $if(path_state[dst].kernel_index != (uint)INVALID) {
+                                        auto ray = state_soa.read_ray(soa_id);
+                                        state_soa.write_ray(soa_id, path_ray[dst]);
+                                        path_ray[dst] = ray;
+                                        auto hit = state_soa.read_hit(soa_id);
+                                        state_soa.write_hit(soa_id, path_hit[dst]);
+                                        path_hit[dst] = hit;
+                                        for (auto i = 0u; i < dim; ++i) {
+                                            auto dim_frame = state_soa.read_dim_frame(soa_id * dim + i);
+                                            state_soa.write_dim_frame(soa_id * dim + i, path_state_dim[dst * dim + i]);
+                                            path_state_dim[dst * dim + i] = dim_frame;
+                                        }
+                                        sampler()->load_state(queue_size * block_x() + block_size * q_factor + index * block_size + thread_x());
+                                        sampler()->save_state(queue_size * block_x() + KERNEL_COUNT * block_size + thread_x());
+                                        sampler()->load_state(queue_size * block_x() + dst);
+                                        sampler()->save_state(queue_size * block_x() + block_size * q_factor + index * block_size + thread_x());
+                                        sampler()->load_state(queue_size * block_x() + KERNEL_COUNT * block_size + thread_x());
+                                        sampler()->save_state(queue_size * block_x() + dst);
                                     }
-                                    sampler()->load_state(queue_size * block_x() + block_size*q_factor+index*block_size+thread_x());
-                                    sampler()->save_state(queue_size * block_x() + KERNEL_COUNT*block_size+thread_x());
-                                    sampler()->load_state(queue_size * block_x() + dst);
-                                    sampler()->save_state(queue_size * block_x() + block_size*q_factor+index*block_size+thread_x());
-                                    sampler()->load_state(queue_size * block_x() + KERNEL_COUNT*block_size+thread_x());
-                                    sampler()->save_state(queue_size * block_x() + dst);
+                                    $else {
+                                        auto ray = state_soa.read_ray(soa_id);
+                                        path_ray[dst] = ray;
+                                        auto hit = state_soa.read_hit(soa_id);
+                                        path_hit[dst] = hit;
+                                        for (auto i = 0u; i < dim; ++i) {
+                                            auto dim_frame = state_soa.read_dim_frame(soa_id * dim + i);
+                                            path_state_dim[dst * dim + i] = dim_frame;
+                                        }
+                                        sampler()->load_state(queue_size * block_x() + block_size * q_factor + index * block_size + thread_x());
+                                        sampler()->save_state(queue_size * block_x() + dst);
+                                    };
                                 }
                                 $else {
-                                    auto ray = state_soa.read_ray(soa_id);
-									path_ray[dst] = ray;
-									auto hit = state_soa.read_hit(soa_id);
-									path_hit[dst] = hit;
-                                    for (auto i = 0u; i < dim; ++i) {
-										auto dim_frame = state_soa.read_dim_frame(soa_id * dim + i);
-										path_state_dim[dst * dim + i] = dim_frame;
-									}
-                                    sampler()->load_state(queue_size * block_x() + block_size * q_factor + index * block_size + thread_x());
-                                    sampler()->save_state(queue_size * block_x() + dst);
-								};
-                            }
-                            $else {
-                                $if(path_state[dst].kernel_index != (uint)INVALID){
-                                    state_soa.write_ray(soa_id, path_ray[dst]);
-                                    state_soa.write_hit(soa_id, path_hit[dst]);
-                                    for (auto i = 0u; i < dim; ++i) {
-                                        state_soa.write_dim_frame(soa_id * dim + i, path_state_dim[dst * dim + i]);
-                                    }
-                                    sampler()->load_state(queue_size * block_x() + dst);
-                                    sampler()->save_state(queue_size * block_x() + block_size * q_factor + index * block_size + thread_x());     
+                                    $if(path_state[dst].kernel_index != (uint)INVALID) {
+                                        state_soa.write_ray(soa_id, path_ray[dst]);
+                                        state_soa.write_hit(soa_id, path_hit[dst]);
+                                        for (auto i = 0u; i < dim; ++i) {
+                                            state_soa.write_dim_frame(soa_id * dim + i, path_state_dim[dst * dim + i]);
+                                        }
+                                        sampler()->load_state(queue_size * block_x() + dst);
+                                        sampler()->save_state(queue_size * block_x() + block_size * q_factor + index * block_size + thread_x());
+                                    };
                                 };
+                                state_soa.write_frame(soa_id, path_state[dst]);
+                                path_state[dst] = state;
                             };
-                            state_soa.write_frame(soa_id, path_state[dst]);
-                            path_state[dst] = state;
-                            
-                            
                         };
                     };
                 };
-            };
+            } else {
+                $for(index, 0u, q_factor) {//collect indices
+                    auto state = path_state[index * block_size + thread_x()];
+                    $if(state.kernel_index == work_stat[1]) {
+                        auto id = work_offset.atomic(0).fetch_add(1u);
+                        path_id[id] = index * block_size + thread_x();
+                    };
+                };
+            }
             auto save_kernel = [&](UInt path_id, KernelState src, KernelState dst) noexcept {
                 path_state[path_id].kernel_index = (uint)dst;
                 work_counter.atomic((uint)src).fetch_sub(1u);
@@ -751,10 +749,19 @@ void MegakernelWaveFrontInstance::_render_one_camera(
             };
             auto gen_st = workload[0];
             sync_block();
-            auto pid = thread_x();
+            auto pid = def(0u);
+            if (use_global) {
+                pid = thread_x();
+            } else {
+                pid = path_id[thread_x()];
+            }
             //pipeline().printer().info("loop {},block {} thread{},genwork {}~{}, processing pid {}, kernel {}",
             //        count, block_x(), thread_x(), workload[0], workload[1], pid, path_state[pid].kernel_index);
-            $if(true) {
+            auto launch_condition = def(true);
+            if (!use_global) {
+                launch_condition = (thread_x() < work_offset[0]);
+            }
+            $if(launch_condition) {
                 $switch(path_state[pid].kernel_index) {
                     $case((uint)INVALID) {
                         $if(gen_st + thread_x() < workload[1]) {
@@ -817,7 +824,8 @@ void MegakernelWaveFrontInstance::_render_one_camera(
         static uint zero = 0u;
         auto time = s.point.time;
         pipeline().update(command_buffer, time);
-        command_buffer << clear_global_shader.get()().dispatch(launch_size * g_factor);
+        if (use_global)
+            command_buffer << clear_global_shader.get()().dispatch(launch_size * g_factor);
         command_buffer << sample_count.copy_from(&zero)
                        << commit();
         LUISA_ASSERT(launch_size % render_shader.get().block_size().x == 0u, "");
