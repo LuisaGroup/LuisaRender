@@ -97,14 +97,15 @@ template<typename T>
         } else {
             std::array desc{"R"sv, "G"sv};
             for (auto channel = 0u; channel < desc.size(); channel++) {
-                auto found = false;
-                for (auto i = 0u; i < num_channels; i++) {
-                    if (exr_header.channels[i].name == desc[channel]) {
-                        swizzle[channel] = i;
-                        found = true;
-                        break;
+                auto found = [&] {
+                    for (auto i = 0u; i < num_channels; i++) {
+                        if (static_cast<const char *>(exr_header.channels[i].name) == desc[channel]) {
+                            swizzle[channel] = i;
+                            return true;
+                        }
                     }
-                }
+                    return false;
+                }();
                 if (!found) {
                     LUISA_ERROR_WITH_LOCATION(
                         "Channel '{}' not found in OpenEXR image '{}'.",
@@ -125,19 +126,21 @@ template<typename T>
         } else {
             using namespace std::string_view_literals;
             std::array desc{"R"sv, "G"sv, "B"sv, "A"sv};
+            // workaround for GCC internal compiler error
+            auto report_error = [filename](auto channel) noexcept {
+                LUISA_ERROR_WITH_LOCATION(
+                    "Channel '{}' not found in OpenEXR image '{}'.",
+                    channel, filename);
+            };
             std::transform(
                 desc.cbegin(), desc.cend(), swizzle.begin(),
                 [&](auto channel) noexcept {
                     for (auto i = 0u; i < num_channels; i++) {
-                        if (exr_header.channels[i].name == channel) {
+                        if (static_cast<const char *>(exr_header.channels[i].name) == channel) {
                             return i;
                         }
                     }
-                    if (channel != "A"sv) {
-                        LUISA_ERROR_WITH_LOCATION(
-                            "Channel '{}' not found in OpenEXR image '{}'.",
-                            channel, filename);
-                    }
+                    if (channel != "A"sv) { report_error(channel); }
                     return ~0u;
                 });
         }
