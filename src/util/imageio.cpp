@@ -96,18 +96,21 @@ template<typename T>
             swizzle = {0u, 0u};
         } else {
             std::array desc{"R"sv, "G"sv};
-            std::transform(
-                desc.cbegin(), desc.cend(), swizzle.begin(),
-                [&](auto channel) noexcept {
-                    for (auto i = 0u; i < num_channels; i++) {
-                        if (exr_header.channels[i].name == channel) {
-                            return i;
-                        }
+            for (auto channel = 0u; channel < desc.size(); channel++) {
+                auto found = false;
+                for (auto i = 0u; i < num_channels; i++) {
+                    if (exr_header.channels[i].name == desc[channel]) {
+                        swizzle[channel] = i;
+                        found = true;
+                        break;
                     }
+                }
+                if (!found) {
                     LUISA_ERROR_WITH_LOCATION(
                         "Channel '{}' not found in OpenEXR image '{}'.",
                         channel, filename);
-                });
+                }
+            }
         }
         for (auto i = 0u; i < width * height; i++) {
             for (auto c = 0u; c < 2u; c++) {
