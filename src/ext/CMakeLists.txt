@@ -7,7 +7,22 @@ add_library(fast_float INTERFACE)
 target_include_directories(fast_float INTERFACE fast_float/include)
 target_link_libraries(luisa-render-ext INTERFACE fast_float)
 
-set(ASSIMP_BUILD_ZLIB ${WIN32} CACHE BOOL "" FORCE)
+# shared by assimp and tinyexr
+find_package(ZLIB)
+
+# Assimp
+if (ZLIB_FOUND)
+    # work around assimp's broken install when using system zlib
+    if (NOT TARGET zlib)
+        add_library(zlib INTERFACE)
+    endif ()
+    if (NOT TARGET zlibstatic)
+        add_library(zlibstatic INTERFACE)
+    endif ()
+    set(ASSIMP_BUILD_ZLIB OFF CACHE BOOL "" FORCE)
+else ()
+    set(ASSIMP_BUILD_ZLIB ON CACHE BOOL "" FORCE)
+endif ()
 set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
 set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)
@@ -25,18 +40,16 @@ if (UNIX AND NOT APPLE) # TODO: fix this
 endif ()
 target_link_libraries(luisa-render-ext INTERFACE assimp::assimp)
 
-# tinyexr & miniz
+# tinyexr
 set(TINYEXR_BUILD_SAMPLE OFF CACHE BOOL "" FORCE)
-find_package(ZLIB)
 if (ZLIB_FOUND)
-    message(STATUS "Using system zlib for tinyexr: ${ZLIB_INCLUDE_DIRS} ${ZLIB_LIBRARIES}")
     add_library(tinyexr SHARED tinyexr.cpp)
     target_compile_definitions(tinyexr PUBLIC TINYEXR_USE_MINIZ=0)
-    target_link_libraries(tinyexr PUBLIC ZLIB::ZLIB)
+    target_link_libraries(tinyexr PRIVATE ZLIB::ZLIB)
 else ()
     add_library(tinyexr SHARED tinyexr.cpp tinyexr/deps/miniz/miniz.c)
     target_compile_definitions(tinyexr PUBLIC TINYEXR_USE_MINIZ=1)
-    target_include_directories(tinyexr PUBLIC tinyexr/deps/miniz)
+    target_include_directories(tinyexr PRIVATE tinyexr/deps/miniz)
 endif ()
 target_include_directories(tinyexr PUBLIC tinyexr)
 target_link_libraries(tinyexr PUBLIC ${CMAKE_DL_LIBS})
