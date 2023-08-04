@@ -13,7 +13,7 @@
 [submodule "src/compute"]
 	path = src/compute
 	url = https://github.com/LuisaGroup/LuisaCompute.git
-	branch = next
+	branch = stable
 [submodule "src/ext/json"]
 	path = src/ext/json
 	url = https://github.com/nlohmann/json.git
