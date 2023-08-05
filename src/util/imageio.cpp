@@ -100,7 +100,8 @@ template<typename T>
                 auto channel = desc[c];
                 auto found = [&] {
                     for (auto i = 0u; i < num_channels; i++) {
-                        if (channel == static_cast<const char *>(exr_header.channels[i].name)) {
+                        if (auto name = exr_header.channels[i].name;
+                            channel == luisa::string_view{name}) {
                             swizzle[c] = i;
                             return true;
                         }
@@ -131,8 +132,10 @@ template<typename T>
             for (auto c = 0u; c < desc.size(); c++) {
                 auto channel = desc[c];
                 auto s = [&] {
+                    // workaround for MSVC 19.29
                     for (auto i = 0u; i < num_channels; i++) {
-                        if (channel == static_cast<const char *>(exr_header.channels[i].name)) {
+                        if (auto name = exr_header.channels[i].name;
+                            channel == luisa::string_view{name}) {
                             return i;
                         }
                     }
