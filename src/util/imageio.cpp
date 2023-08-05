@@ -96,11 +96,12 @@ template<typename T>
             swizzle = {0u, 0u};
         } else {
             std::array desc{"R"sv, "G"sv};
-            for (auto channel = 0u; channel < desc.size(); channel++) {
+            for (auto c = 0u; c < desc.size(); c++) {
+                auto channel = desc[c];
                 auto found = [&] {
                     for (auto i = 0u; i < num_channels; i++) {
-                        if (static_cast<const char *>(exr_header.channels[i].name) == desc[channel]) {
-                            swizzle[channel] = i;
+                        if (channel == static_cast<const char *>(exr_header.channels[i].name)) {
+                            swizzle[c] = i;
                             return true;
                         }
                     }
@@ -127,22 +128,23 @@ template<typename T>
             using namespace std::string_view_literals;
             std::array desc{"R"sv, "G"sv, "B"sv, "A"sv};
             // workaround for GCC internal compiler error
-            auto report_error = [filename](auto channel) noexcept {
-                LUISA_ERROR_WITH_LOCATION(
-                    "Channel '{}' not found in OpenEXR image '{}'.",
-                    channel, filename);
-            };
-            std::transform(
-                desc.cbegin(), desc.cend(), swizzle.begin(),
-                [&](auto channel) noexcept {
+            for (auto c = 0u; c < desc.size(); c++) {
+                auto channel = desc[c];
+                auto s = [&] {
                     for (auto i = 0u; i < num_channels; i++) {
-                        if (static_cast<const char *>(exr_header.channels[i].name) == channel) {
+                        if (channel == static_cast<const char *>(exr_header.channels[i].name)) {
                             return i;
                         }
                     }
-                    if (channel != "A"sv) { report_error(channel); }
                     return ~0u;
-                });
+                }();
+                if (s == ~0u && desc[c] != "A"sv) {
+                    LUISA_ERROR_WITH_LOCATION(
+                        "Channel '{}' not found in OpenEXR image '{}'.",
+                        channel, filename);
+                }
+                swizzle[c] = s;
+            }
         }
         if (swizzle[3] != ~0u) {// has alpha channel
             for (auto i = 0u; i < width * height; i++) {
