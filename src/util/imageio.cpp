@@ -95,13 +95,14 @@ template<typename T>
         if (num_channels == 1u) {
             swizzle = {0u, 0u};
         } else {
-            std::array desc{"R"sv, "G"sv};
+            std::array<luisa::string_view, 2> desc{"R"sv, "G"sv};
             for (auto c = 0u; c < desc.size(); c++) {
                 auto channel = desc[c];
                 auto found = [&] {
                     for (auto i = 0u; i < num_channels; i++) {
                         if (auto name = exr_header.channels[i].name;
-                            channel == luisa::string_view{name}) {
+                            // go ask msvc why I need to write such code...
+                            luisa::string_view{channel} == luisa::string_view{name}) {
                             swizzle[c] = i;
                             return true;
                         }
@@ -127,7 +128,7 @@ template<typename T>
             swizzle = {0u, 0u, 0u, ~0u};
         } else {
             using namespace std::string_view_literals;
-            std::array desc{"R"sv, "G"sv, "B"sv, "A"sv};
+            std::array<luisa::string_view, 4> desc{"R"sv, "G"sv, "B"sv, "A"sv};
             // workaround for GCC internal compiler error
             for (auto c = 0u; c < desc.size(); c++) {
                 auto channel = desc[c];
@@ -135,7 +136,8 @@ template<typename T>
                     // workaround for MSVC 19.29
                     for (auto i = 0u; i < num_channels; i++) {
                         if (auto name = exr_header.channels[i].name;
-                            channel == luisa::string_view{name}) {
+                            // go ask msvc why I need to write such code...
+                            luisa::string_view{channel} == luisa::string_view{name}) {
                             return i;
                         }
                     }
