@@ -2,6 +2,7 @@
 // Created by Mike Smith on 2022/11/8.
 //
 
+#include <numeric>
 #include <core/pool.h>
 #include <core/logging.h>
 #include <util/loop_subdiv.h>

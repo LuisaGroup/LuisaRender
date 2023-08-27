@@ -2,8 +2,8 @@
 // Created by Mike on 2021/12/8.
 //
 
-#include "core/basic_types.h"
 #include <random>
+#include <numeric>
 
 #include <sdl/scene_node_desc.h>
 #include <base/filter.h>

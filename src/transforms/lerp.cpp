@@ -2,6 +2,8 @@
 // Created by Mike Smith on 2022/1/15.
 //
 
+#include <numeric>
+
 #include <util/xform.h>
 #include <base/transform.h>
 #include <base/scene.h>
