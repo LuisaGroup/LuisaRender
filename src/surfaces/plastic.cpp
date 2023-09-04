@@ -2,6 +2,7 @@
 // Created by Mike Smith on 2022/11/23.
 //
 
+#include "util/spec.h"
 #include <util/sampling.h>
 #include <util/scattering.h>
 #include <base/surface.h>
@@ -43,6 +44,7 @@ class PlasticSurface : public Surface {
 
 private:
     const Texture *_kd;
+    const Texture *_ks;
     const Texture *_roughness;
     const Texture *_sigma_a;
     const Texture *_eta;
@@ -53,6 +55,7 @@ public:
     PlasticSurface(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Surface{scene, desc},
           _kd{scene->load_texture(desc->property_node_or_default("Kd"))},
+          _ks{scene->load_texture(desc->property_node_or_default("Ks"))},
           _roughness{scene->load_texture(desc->property_node_or_default("roughness"))},
           _sigma_a{scene->load_texture(desc->property_node_or_default("sigma_a"))},
           _eta{scene->load_texture(desc->property_node_or_default("eta"))},
@@ -71,6 +74,7 @@ class PlasticInstance : public Surface::Instance {
 
 private:
     const Texture::Instance *_kd;
+    const Texture::Instance *_ks;
     const Texture::Instance *_roughness;
     const Texture::Instance *_sigma_a;
     const Texture::Instance *_eta;
@@ -78,11 +82,15 @@ private:
 
 public:
     PlasticInstance(const Pipeline &pipeline, const Surface *surface,
-                      const Texture::Instance *Kd, const Texture::Instance *roughness,
-                      const Texture::Instance *sigma_a, const Texture::Instance *eta,
-                      const Texture::Instance *thickness) noexcept
+                    const Texture::Instance *Kd,
+                    const Texture::Instance *Ks,
+                    const Texture::Instance *roughness,
+                    const Texture::Instance *sigma_a,
+                    const Texture::Instance *eta,
+                    const Texture::Instance *thickness) noexcept
         : Surface::Instance{pipeline, surface},
-          _kd{Kd}, _roughness{roughness}, _sigma_a{sigma_a},
+          _kd{Kd}, _ks{Ks},
+          _roughness{roughness}, _sigma_a{sigma_a},
           _eta{eta}, _thickness{thickness} {}
 
 public:
@@ -94,12 +102,13 @@ public:
 luisa::unique_ptr<Surface::Instance> PlasticSurface::_build(
     Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
     auto Kd = pipeline.build_texture(command_buffer, _kd);
+    auto Ks = pipeline.build_texture(command_buffer, _ks);
     auto roughness = pipeline.build_texture(command_buffer, _roughness);
     auto sigma_a = pipeline.build_texture(command_buffer, _sigma_a);
     auto eta = pipeline.build_texture(command_buffer, _eta);
     auto thickness = pipeline.build_texture(command_buffer, _thickness);
     return luisa::make_unique<PlasticInstance>(
-        pipeline, this, Kd, roughness, sigma_a, eta, thickness);
+        pipeline, this, Kd, Ks, roughness, sigma_a, eta, thickness);
 }
 
 class PlasticClosure : public Surface::Closure {
@@ -110,20 +119,22 @@ private:
     luisa::unique_ptr<MicrofacetReflection> _coat;
     luisa::unique_ptr<LambertianReflection> _substrate;
     SampledSpectrum _sigma_a;
+    SampledSpectrum _kd_scale;
     Float _kd_weight;
 
 public:
     PlasticClosure(const Surface::Instance *instance, luisa::shared_ptr<Interaction> it,
-                     const SampledWavelengths &swl, Expr<float> time, const SampledSpectrum &Kd,
-                     Expr<float> Kd_weight, const SampledSpectrum &sigma_a,
-                     Expr<float> eta, Expr<float2> roughness) noexcept
+                   const SampledWavelengths &swl, Expr<float> time,
+                   const SampledSpectrum &Kd, const SampledSpectrum &Kd_scale,
+                   const SampledSpectrum &Ks,
+                   Expr<float> Kd_weight, const SampledSpectrum &sigma_a,
+                   Expr<float> eta, Expr<float2> roughness) noexcept
         : Surface::Closure{instance, std::move(it), swl, time},
           _distribution{luisa::make_unique<TrowbridgeReitzDistribution>(roughness)},
           _fresnel{luisa::make_unique<FresnelDielectric>(1.0f, eta)},
-          _coat{luisa::make_unique<MicrofacetReflection>(SampledSpectrum{swl.dimension(), 1.f},
-                                                         _distribution.get(), _fresnel.get())},
+          _coat{luisa::make_unique<MicrofacetReflection>(Ks, _distribution.get(), _fresnel.get())},
           _substrate{luisa::make_unique<LambertianReflection>(Kd)},
-          _sigma_a{sigma_a}, _kd_weight{Kd_weight} {}
+          _sigma_a{sigma_a}, _kd_scale{Kd_scale}, _kd_weight{Kd_weight} {}
 
     [[nodiscard]] auto _substrate_weight(Expr<float> Fo) const noexcept {
         auto w = _kd_weight * (1.0f - Fo);
@@ -131,7 +142,9 @@ public:
     }
 
 private:
-    [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _substrate->albedo(); }
+    [[nodiscard]] SampledSpectrum albedo() const noexcept override {
+        return _substrate->albedo();
+    }
     [[nodiscard]] Float2 roughness() const noexcept override {
         return TrowbridgeReitzDistribution::alpha_to_roughness(_distribution->alpha());
     }
@@ -153,7 +166,7 @@ private:
         auto Fo = fresnel_dielectric(abs_cos_theta(wo_local), 1.f, eta);
         auto a = exp(-(1.f / abs_cos_theta(wi_local) + 1.f / abs_cos_theta(wo_local)) * _sigma_a);
         auto f_diffuse = (1.f - Fi) * (1.f - Fo) * sqr(1.f / eta) * a *
-                         _substrate->evaluate(wo_local, wi_local, mode);
+                         (_kd_scale * _substrate->evaluate(wo_local, wi_local, mode));
         auto pdf_diffuse = _substrate->pdf(wo_local, wi_local, mode);
         auto substrate_weight = _substrate_weight(Fo);
         auto f = (f_coat + f_diffuse) * abs_cos_theta(wi_local);
@@ -191,7 +204,7 @@ private:
             auto a = exp(-(1.f / abs_cos_theta(wi_local) + 1.f / abs_cos_theta(wo_local)) * _sigma_a);
             auto ee = sqr(1.f / _fresnel->eta_t());
             auto f_diffuse = (1.f - Fi) * (1.f - Fo) * sqr(1.f / eta) * a *
-                             _substrate->evaluate(wo_local, wi_local, mode);
+                             (_kd_scale * _substrate->evaluate(wo_local, wi_local, mode));
             auto pdf_diffuse = _substrate->pdf(wo_local, wi_local, mode);
             f = (f_coat + f_diffuse) * abs_cos_theta(wi_local);
             pdf = lerp(pdf_coat, pdf_diffuse, substrate_weight);
@@ -218,6 +231,8 @@ luisa::unique_ptr<Surface::Closure> PlasticInstance::closure(
     auto eta = (_eta ? _eta->evaluate(*it, swl, time).x : 1.5f) / eta_i;
     auto [Kd, Kd_lum] = _kd ? _kd->evaluate_albedo_spectrum(*it, swl, time) :
                               Spectrum::Decode::one(swl.dimension());
+    auto [Ks, Ks_lum] = _ks ? _ks->evaluate_albedo_spectrum(*it, swl, time) :
+                              Spectrum::Decode::one(swl.dimension());
     auto [sigma_a, sigma_a_lum] = _sigma_a ? _sigma_a->evaluate_albedo_spectrum(*it, swl, time) :
                                              Spectrum::Decode::zero(swl.dimension());
     auto thickness = _thickness ? _thickness->evaluate(*it, swl, time).x : 1.f;
@@ -227,9 +242,11 @@ luisa::unique_ptr<Surface::Closure> PlasticInstance::closure(
     // We use the fitted polynomial to approximate the integrated
     // Fresnel reflectance, rather than compute it on the fly.
     auto diffuse_fresnel = fresnel_dielectric_integral(eta);
+    auto Kd_weight = Kd_lum * average_transmittance;
     return luisa::make_unique<PlasticClosure>(
-        this, std::move(it), swl, time, Kd / (1.f - Kd * diffuse_fresnel),
-        Kd_lum * average_transmittance, sigma_a, eta, roughness);
+        this, std::move(it), swl, time,
+        Kd, 1.f / (1.f - Kd * diffuse_fresnel), Ks,
+        clamp(Kd_weight, .05f, .95f), sigma_a, eta, roughness);
 }
 
 using NormalMapOpacityPlasticSurface = NormalMapWrapper<OpacitySurfaceWrapper<
