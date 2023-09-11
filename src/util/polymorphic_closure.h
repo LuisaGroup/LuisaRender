@@ -91,7 +91,8 @@ public:
                         _closures[i]->post_eval();
                     };
                 }
-                compute::detail::SwitchDefaultStmtBuilder{} % compute::unreachable;
+                compute::detail::SwitchDefaultStmtBuilder{} %
+                    [] { compute::unreachable(); };
             };
         }
     }

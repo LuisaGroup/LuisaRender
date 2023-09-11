@@ -550,7 +550,7 @@ public:
         // sample
         auto wo_local = _ctx.it.shading().world_to_local(wo);
         auto event = def(Surface::event_reflect);
-        BxDF::SampledDirection wi_sample;
+        BxDF::SampledDirection wi_sample{.valid = false};
         $switch(sampling_tech) {
             if (_diffuse) {
                 $case(diffuse_like_technique_index) {
@@ -573,7 +573,6 @@ public:
                     event = ite(cos_theta(wo_local) > 0.f, Surface::event_enter, Surface::event_exit);
                 };
             }
-            $default { unreachable(); };
         };
         auto eval = Surface::Evaluation::zero(_ctx.color.dimension());
         auto wi = _ctx.it.shading().local_to_world(wi_sample.wi);
@@ -798,7 +797,7 @@ public:
         // sample
         auto wo_local = _ctx.it.shading().world_to_local(wo);
         auto event = def(Surface::event_reflect);
-        BxDF::SampledDirection wi_sample;
+        BxDF::SampledDirection wi_sample{.valid = false};
         $switch(sampling_tech) {
             if (_diffuse) {
                 $case(diffuse_like_technique_index) {
@@ -827,7 +826,6 @@ public:
                     event = Surface::event_through;
                 };
             }
-            $default { unreachable(); };
         };
         auto eval = Surface::Evaluation::zero(_ctx.color.dimension());
         auto wi = _ctx.it.shading().local_to_world(wi_sample.wi);
