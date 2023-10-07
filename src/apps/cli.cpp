@@ -16,7 +16,7 @@
 [[nodiscard]] auto parse_cli_options(int argc, const char *const *argv) noexcept {
     cxxopts::Options cli{"luisa-render-cli"};
     cli.add_option("", "b", "backend", "Compute backend name", cxxopts::value<luisa::string>(), "<backend>");
-    cli.add_option("", "d", "device", "Compute device index", cxxopts::value<uint32_t>()->default_value("0"), "<index>");
+    cli.add_option("", "d", "device", "Compute device index", cxxopts::value<int32_t>()->default_value("-1"), "<index>");
     cli.add_option("", "", "scene", "Path to scene description file", cxxopts::value<std::filesystem::path>(), "<file>");
     cli.add_option("", "D", "define", "Parameter definitions to override scene description macros.",
                    cxxopts::value<std::vector<luisa::string>>()->default_value("<none>"), "<key>=<value>");
@@ -119,7 +119,7 @@ int main(int argc, char *argv[]) {
 
     auto options = parse_cli_options(argc, argv);
     auto backend = options["backend"].as<luisa::string>();
-    auto index = options["device"].as<uint32_t>();
+    auto index = options["device"].as<int32_t>();
     auto path = options["scene"].as<std::filesystem::path>();
     compute::DeviceConfig config;
     config.device_index = index;
