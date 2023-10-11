@@ -483,40 +483,42 @@ private:
                                                       TransportMode mode) const noexcept {
         SampledSpectrum f{_ctx.color.dimension(), 0.f};
         auto pdf = def(0.f);
-        $if(same_hemisphere(wo_local, wi_local)) {// reflection
-            if (_diffuse) {
-                $if(_sampling_weights[diffuse_like_technique_index] > 0.f) {
-                    f += _diffuse->evaluate(wo_local, wi_local, mode);
-                    f += _retro->evaluate(wo_local, wi_local, mode);
-                    if (_fake_ss) { f += _fake_ss->evaluate(wo_local, wi_local, mode); }
-                    if (_sheen) { f += _sheen->evaluate(wo_local, wi_local, mode); }
-                    pdf += _sampling_weights[diffuse_like_technique_index] *
-                           _diffuse->pdf(wo_local, wi_local, mode);
-                };
+        $outline {
+            $if(same_hemisphere(wo_local, wi_local)) {// reflection
+                if (_diffuse) {
+                    $if(_sampling_weights[diffuse_like_technique_index] > 0.f) {
+                        f += _diffuse->evaluate(wo_local, wi_local, mode);
+                        f += _retro->evaluate(wo_local, wi_local, mode);
+                        if (_fake_ss) { f += _fake_ss->evaluate(wo_local, wi_local, mode); }
+                        if (_sheen) { f += _sheen->evaluate(wo_local, wi_local, mode); }
+                        pdf += _sampling_weights[diffuse_like_technique_index] *
+                               _diffuse->pdf(wo_local, wi_local, mode);
+                    };
+                }
+                if (_specular) {
+                    $if(_sampling_weights[specular_technique_index] > 0.f) {
+                        f += _specular->evaluate(wo_local, wi_local, mode);
+                        pdf += _sampling_weights[specular_technique_index] *
+                               _specular->pdf(wo_local, wi_local, mode);
+                    };
+                }
+                if (_clearcoat) {
+                    $if(_sampling_weights[clearcoat_technique_index] > 0.f) {
+                        f += _clearcoat->evaluate(wo_local, wi_local);
+                        pdf += _sampling_weights[clearcoat_technique_index] *
+                               _clearcoat->pdf(wo_local, wi_local);
+                    };
+                }
             }
-            if (_specular) {
-                $if(_sampling_weights[specular_technique_index] > 0.f) {
-                    f += _specular->evaluate(wo_local, wi_local, mode);
-                    pdf += _sampling_weights[specular_technique_index] *
-                           _specular->pdf(wo_local, wi_local, mode);
-                };
-            }
-            if (_clearcoat) {
-                $if(_sampling_weights[clearcoat_technique_index] > 0.f) {
-                    f += _clearcoat->evaluate(wo_local, wi_local);
-                    pdf += _sampling_weights[clearcoat_technique_index] *
-                           _clearcoat->pdf(wo_local, wi_local);
-                };
-            }
-        }
-        $else {// transmission
-            if (_spec_trans) {
-                $if(_sampling_weights[spec_trans_technique_index] > 0.f) {
-                    f += _spec_trans->evaluate(wo_local, wi_local, mode);
-                    pdf += _sampling_weights[spec_trans_technique_index] *
-                           _spec_trans->pdf(wo_local, wi_local, mode);
-                };
-            }
+            $else {// transmission
+                if (_spec_trans) {
+                    $if(_sampling_weights[spec_trans_technique_index] > 0.f) {
+                        f += _spec_trans->evaluate(wo_local, wi_local, mode);
+                        pdf += _sampling_weights[spec_trans_technique_index] *
+                               _spec_trans->pdf(wo_local, wi_local, mode);
+                    };
+                }
+            };
         };
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
     }
@@ -551,28 +553,30 @@ public:
         auto wo_local = _ctx.it.shading().world_to_local(wo);
         auto event = def(Surface::event_reflect);
         BxDF::SampledDirection wi_sample{.valid = false};
-        $switch(sampling_tech) {
-            if (_diffuse) {
-                $case(diffuse_like_technique_index) {
-                    wi_sample = _diffuse->sample_wi(wo_local, u, mode);
-                };
-            }
-            if (_specular) {
-                $case(specular_technique_index) {
-                    wi_sample = _specular->sample_wi(wo_local, u, mode);
-                };
-            }
-            if (_clearcoat) {
-                $case(clearcoat_technique_index) {
-                    wi_sample = _clearcoat->sample_wi(wo_local, u);
-                };
-            }
-            if (_spec_trans) {
-                $case(spec_trans_technique_index) {
-                    wi_sample = _spec_trans->sample_wi(wo_local, u, mode);
-                    event = ite(cos_theta(wo_local) > 0.f, Surface::event_enter, Surface::event_exit);
-                };
-            }
+        $outline {
+            $switch(sampling_tech) {
+                if (_diffuse) {
+                    $case(diffuse_like_technique_index) {
+                        wi_sample = _diffuse->sample_wi(wo_local, u, mode);
+                    };
+                }
+                if (_specular) {
+                    $case(specular_technique_index) {
+                        wi_sample = _specular->sample_wi(wo_local, u, mode);
+                    };
+                }
+                if (_clearcoat) {
+                    $case(clearcoat_technique_index) {
+                        wi_sample = _clearcoat->sample_wi(wo_local, u);
+                    };
+                }
+                if (_spec_trans) {
+                    $case(spec_trans_technique_index) {
+                        wi_sample = _spec_trans->sample_wi(wo_local, u, mode);
+                        event = ite(cos_theta(wo_local) > 0.f, Surface::event_enter, Surface::event_exit);
+                    };
+                }
+            };
         };
         auto eval = Surface::Evaluation::zero(_ctx.color.dimension());
         auto wi = _ctx.it.shading().local_to_world(wi_sample.wi);

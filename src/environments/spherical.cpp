@@ -88,48 +88,56 @@ public:
     [[nodiscard]] Environment::Evaluation evaluate(Expr<float3> wi,
                                                    const SampledWavelengths &swl,
                                                    Expr<float> time) const noexcept override {
-        auto world_to_env = transpose(transform_to_world());
-        auto wi_local = normalize(world_to_env * wi);
-        auto [theta, phi, uv] = Spherical::direction_to_uv(wi_local);
-        auto L = _evaluate(wi_local, uv, swl, time);
-        if (_texture->node()->is_constant()) {
-            return {.L = L, .pdf = uniform_sphere_pdf()};
-        }
-        auto size = make_float2(Spherical::sample_map_size);
-        auto ix = cast<uint>(clamp(uv.x * size.x, 0.f, size.x - 1.f));
-        auto iy = cast<uint>(clamp(uv.y * size.y, 0.f, size.y - 1.f));
-        auto pdf_buffer = pipeline().buffer<float>(*_pdf_buffer_id);
-        auto pdf = pdf_buffer.read(iy * Spherical::sample_map_size.x + ix);
-        return {.L = L, .pdf = _directional_pdf(pdf, theta)};
+        auto eval = Environment::Evaluation::zero(swl.dimension());
+        $outline {
+            auto world_to_env = transpose(transform_to_world());
+            auto wi_local = normalize(world_to_env * wi);
+            auto [theta, phi, uv] = Spherical::direction_to_uv(wi_local);
+            auto L = _evaluate(wi_local, uv, swl, time);
+            if (_texture->node()->is_constant()) {
+                eval = {.L = L, .pdf = uniform_sphere_pdf()};
+            }
+            auto size = make_float2(Spherical::sample_map_size);
+            auto ix = cast<uint>(clamp(uv.x * size.x, 0.f, size.x - 1.f));
+            auto iy = cast<uint>(clamp(uv.y * size.y, 0.f, size.y - 1.f));
+            auto pdf_buffer = pipeline().buffer<float>(*_pdf_buffer_id);
+            auto pdf = pdf_buffer.read(iy * Spherical::sample_map_size.x + ix);
+            eval = {.L = L, .pdf = _directional_pdf(pdf, theta)};
+        };
+        return eval;
     }
 
     [[nodiscard]] Environment::Sample sample(const SampledWavelengths &swl,
                                              Expr<float> time,
                                              Expr<float2> u) const noexcept override {
-        auto [wi, Li, pdf] = [&] {
-            if (_texture->node()->is_constant()) {
-                auto w = sample_uniform_sphere(u);
-                auto [theta, phi, uv] = Spherical::direction_to_uv(w);
+        auto s = Environment::Sample::zero(swl.dimension());
+        $outline {
+            auto [wi, Li, pdf] = [&] {
+                if (_texture->node()->is_constant()) {
+                    auto w = sample_uniform_sphere(u);
+                    auto [theta, phi, uv] = Spherical::direction_to_uv(w);
+                    auto L = _evaluate(w, uv, swl, time);
+                    return std::make_tuple(w, L, def(uniform_sphere_pdf()));
+                }
+                auto alias_buffer = pipeline().buffer<AliasEntry>(*_alias_buffer_id);
+                auto [iy, uy] = sample_alias_table(
+                    alias_buffer, Spherical::sample_map_size.y, u.y);
+                auto offset = Spherical::sample_map_size.y +
+                              iy * Spherical::sample_map_size.x;
+                auto [ix, ux] = sample_alias_table(
+                    alias_buffer, Spherical::sample_map_size.x, u.x, offset);
+                auto uv = make_float2(cast<float>(ix) + ux, cast<float>(iy) + uy) /
+                          make_float2(Spherical::sample_map_size);
+                auto index = iy * Spherical::sample_map_size.x + ix;
+                auto p = pipeline().buffer<float>(*_pdf_buffer_id).read(index);
+                auto [theta, phi, w] = Spherical::uv_to_direction(uv);
                 auto L = _evaluate(w, uv, swl, time);
-                return std::make_tuple(w, L, def(uniform_sphere_pdf()));
-            }
-            auto alias_buffer = pipeline().buffer<AliasEntry>(*_alias_buffer_id);
-            auto [iy, uy] = sample_alias_table(
-                alias_buffer, Spherical::sample_map_size.y, u.y);
-            auto offset = Spherical::sample_map_size.y +
-                          iy * Spherical::sample_map_size.x;
-            auto [ix, ux] = sample_alias_table(
-                alias_buffer, Spherical::sample_map_size.x, u.x, offset);
-            auto uv = make_float2(cast<float>(ix) + ux, cast<float>(iy) + uy) /
-                      make_float2(Spherical::sample_map_size);
-            auto index = iy * Spherical::sample_map_size.x + ix;
-            auto p = pipeline().buffer<float>(*_pdf_buffer_id).read(index);
-            auto [theta, phi, w] = Spherical::uv_to_direction(uv);
-            auto L = _evaluate(w, uv, swl, time);
-            return std::make_tuple(w, L, _directional_pdf(p, theta));
-        }();
-        return {.eval = {.L = Li, .pdf = pdf},
-                .wi = normalize(transform_to_world() * wi)};
+                return std::make_tuple(w, L, _directional_pdf(p, theta));
+            }();
+            s = {.eval = {.L = Li, .pdf = pdf},
+                 .wi = normalize(transform_to_world() * wi)};
+        };
+        return s;
     }
 };
 

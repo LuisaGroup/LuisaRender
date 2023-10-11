@@ -57,13 +57,17 @@ private:
 
 public:
     SampledSpectrum(uint n, Expr<float> value) noexcept : _samples{n} {
-        for (auto i = 0u; i < n; i++) { _samples[i] = value; }
+        compute::outline([&] {
+            for (auto i = 0u; i < n; i++) { _samples[i] = value; }
+        });
     }
     explicit SampledSpectrum(uint n) noexcept : SampledSpectrum{n, 0.f} {}
     explicit SampledSpectrum(Expr<float> value) noexcept : SampledSpectrum{1u, value} {}
     explicit SampledSpectrum(float value) noexcept : SampledSpectrum{1u, value} {}
     auto &operator=(Expr<float> value) noexcept {
-        for (auto i = 0u; i < dimension(); i++) { _samples[i] = value; }
+        compute::outline([&] {
+            for (auto i = 0u; i < dimension(); i++) { _samples[i] = value; }
+        });
         return *this;
     }
     [[nodiscard]] uint dimension() const noexcept {
@@ -73,7 +77,9 @@ public:
         LUISA_ASSERT(rhs.dimension() == 1u || dimension() == rhs.dimension(),
                      "Invalid spectrum dimensions for operator=: {} vs {}.",
                      dimension(), rhs.dimension());
-        for (auto i = 0u; i < dimension(); i++) { _samples[i] = rhs[i]; }
+        compute::outline([&] {
+            for (auto i = 0u; i < dimension(); i++) { _samples[i] = rhs[i]; }
+        });
         return *this;
     }
     [[nodiscard]] Local<float> &values() noexcept { return _samples; }
@@ -87,26 +93,30 @@ public:
     template<typename F>
     [[nodiscard]] auto map(F &&f) const noexcept {
         SampledSpectrum s{dimension()};
-        for (auto i = 0u; i < dimension(); i++) {
-            if constexpr (std::invocable<F, Expr<float>>) {
-                s[i] = f(Expr{(*this)[i]});
-            } else {
-                s[i] = f(i, Expr{(*this)[i]});
+        compute::outline([&] {
+            for (auto i = 0u; i < dimension(); i++) {
+                if constexpr (std::invocable<F, Expr<float>>) {
+                    s[i] = f(Expr{(*this)[i]});
+                } else {
+                    s[i] = f(i, Expr{(*this)[i]});
+                }
             }
-        }
+        });
         return s;
     }
     template<typename T, typename F>
     [[nodiscard]] auto reduce(T &&initial, F &&f) const noexcept {
         using compute::def;
         auto r = def(std::forward<T>(initial));
-        for (auto i = 0u; i < dimension(); i++) {
-            if constexpr (std::invocable<F, Expr<compute::expr_value_t<decltype(r)>>, Expr<float>>) {
-                r = f(r, Expr{(*this)[i]});
-            } else {
-                r = f(Expr{r}, i, Expr{(*this)[i]});
+        compute::outline([&] {
+            for (auto i = 0u; i < dimension(); i++) {
+                if constexpr (std::invocable<F, Expr<compute::expr_value_t<decltype(r)>>, Expr<float>>) {
+                    r = f(r, Expr{(*this)[i]});
+                } else {
+                    r = f(Expr{r}, i, Expr{(*this)[i]});
+                }
             }
-        }
+        });
         return r;
     }
     [[nodiscard]] auto sum() const noexcept {
@@ -155,14 +165,18 @@ public:
                      "Invalid sampled spectrum dimension for operator" #op ": {} vs {}.",          \
                      dimension(), rhs.dimension());                                                \
         SampledSpectrum s{std::max(dimension(), rhs.dimension())};                                 \
-        for (auto i = 0u; i < s.dimension(); i++) { s[i] = (*this)[i] op rhs[i]; }                 \
+        compute::outline([&] {                                                                     \
+            for (auto i = 0u; i < s.dimension(); i++) { s[i] = (*this)[i] op rhs[i]; }             \
+        });                                                                                        \
         return s;                                                                                  \
     }                                                                                              \
     [[nodiscard]] friend auto operator op(Expr<float> lhs, const SampledSpectrum &rhs) noexcept {  \
         return rhs.map([lhs](const auto &rvalue) noexcept { return lhs op rvalue; });              \
     }                                                                                              \
     auto &operator op##=(Expr<float> rhs) noexcept {                                               \
-        for (auto i = 0u; i < dimension(); i++) { (*this)[i] op## = rhs; }                         \
+        compute::outline([&] {                                                                     \
+            for (auto i = 0u; i < dimension(); i++) { (*this)[i] op## = rhs; }                     \
+        });                                                                                        \
         return *this;                                                                              \
     }                                                                                              \
     auto &operator op##=(const SampledSpectrum &rhs) noexcept {                                    \
@@ -170,7 +184,9 @@ public:
                      "Invalid sampled spectrum dimension for operator" #op "=: {} vs {}.",         \
                      dimension(), rhs.dimension());                                                \
         if (rhs.dimension() == 1u) { return *this op## = rhs[0u]; }                                \
-        for (auto i = 0u; i < dimension(); i++) { (*this)[i] op## = rhs[i]; }                      \
+        compute::outline([&] {                                                                     \
+            for (auto i = 0u; i < dimension(); i++) { (*this)[i] op## = rhs[i]; }                  \
+        });                                                                                        \
         return *this;                                                                              \
     }
     LUISA_RENDER_SAMPLED_SPECTRUM_MAKE_BINARY_OP(+)
@@ -198,13 +214,13 @@ public:
 };
 
 // functions
-using luisa::compute::ite;
-using luisa::min;
-using luisa::compute::min;
-using luisa::max;
-using luisa::compute::max;
 using luisa::clamp;
+using luisa::max;
+using luisa::min;
 using luisa::compute::clamp;
+using luisa::compute::ite;
+using luisa::compute::max;
+using luisa::compute::min;
 
 [[nodiscard]] SampledSpectrum ite(const SampledSpectrum &p, const SampledSpectrum &t, const SampledSpectrum &f) noexcept;
 [[nodiscard]] SampledSpectrum ite(const SampledSpectrum &p, Expr<float> t, const SampledSpectrum &f) noexcept;

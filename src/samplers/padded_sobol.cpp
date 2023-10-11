@@ -126,20 +126,26 @@ public:
         _dimension.emplace(state.w);
     }
     [[nodiscard]] Float generate_1d() noexcept override {
-        auto hash = xxhash32(make_uint4(*_pixel, *_sample_index ^ node()->seed(), *_dimension));
-        auto index = _permutation_element(*_sample_index, _spp, hash);
-        auto u = _sobol_sample(index, 0u, hash);
+        auto u = def(0.f);
+        $outline {
+            auto hash = xxhash32(make_uint4(*_pixel, *_sample_index ^ node()->seed(), *_dimension));
+            auto index = _permutation_element(*_sample_index, _spp, hash);
+            u = _sobol_sample(index, 0u, hash);
+        };
         *_dimension += 1u;
         return u;
     }
     [[nodiscard]] Float2 generate_2d() noexcept override {
-        auto hx = xxhash32(make_uint4(*_pixel, *_sample_index ^ node()->seed(), *_dimension));
-        auto hy = xxhash32(make_uint4(*_pixel, *_sample_index ^ node()->seed(), *_dimension + 1u));
-        auto index = _permutation_element(*_sample_index, _spp, hx);
-        auto ux = _sobol_sample(index, 0u, hx);
-        auto uy = _sobol_sample(index, 1u, hy);
+        auto u = def(make_float2(0.f));
+        $outline {
+            auto hx = xxhash32(make_uint4(*_pixel, *_sample_index ^ node()->seed(), *_dimension));
+            auto hy = xxhash32(make_uint4(*_pixel, *_sample_index ^ node()->seed(), *_dimension + 1u));
+            auto index = _permutation_element(*_sample_index, _spp, hx);
+            u.x = _sobol_sample(index, 0u, hx);
+            u.y = _sobol_sample(index, 1u, hy);
+        };
         *_dimension += 2u;
-        return make_float2(ux, uy);
+        return u;
     }
 };
 

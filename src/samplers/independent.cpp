@@ -67,13 +67,18 @@ void IndependentSamplerInstance::load_state(Expr<uint> state_id) noexcept {
 }
 
 Float IndependentSamplerInstance::generate_1d() noexcept {
-    return lcg(*_state);
+    auto u = def(0.f);
+    $outline { u = lcg(*_state); };
+    return u;
 }
 
 Float2 IndependentSamplerInstance::generate_2d() noexcept {
-    auto ux = generate_1d();
-    auto uy = generate_1d();
-    return make_float2(ux, uy);
+    auto u = def(make_float2());
+    $outline {
+        u.x = generate_1d();
+        u.y = generate_1d();
+    };
+    return u;
 }
 
 }// namespace luisa::render

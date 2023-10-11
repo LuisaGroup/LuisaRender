@@ -12,13 +12,15 @@ Film::Film(Scene *scene, const SceneNodeDesc *desc) noexcept
 
 void Film::Instance::accumulate(Expr<uint2> pixel, Expr<float3> rgb,
                                 Expr<float> effective_spp) const noexcept {
+    $outline {
 #ifndef NDEBUG
-    $if(all(pixel >= 0u && pixel < node()->resolution())) {
+        $if(all(pixel >= 0u && pixel < node()->resolution())) {
 #endif
-        _accumulate(pixel, rgb, effective_spp);
+            _accumulate(pixel, rgb, effective_spp);
 #ifndef NDEBUG
+        };
+#endif
     };
-#endif
 }
 
 }// namespace luisa::render

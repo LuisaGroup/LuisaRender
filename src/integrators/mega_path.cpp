@@ -77,26 +77,32 @@ protected:
 
             // hit light
             if (!pipeline().lights().empty()) {
-                $if(it->shape().has_light()) {
-                    auto eval = light_sampler()->evaluate_hit(*it, ray->origin(), swl, time);
-                    Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
+                $outline {
+                    $if(it->shape().has_light()) {
+                        auto eval = light_sampler()->evaluate_hit(*it, ray->origin(), swl, time);
+                        Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
+                    };
                 };
             }
 
             $if(!it->shape().has_surface()) { $break; };
 
-            // generate uniform samples
             auto u_light_selection = sampler()->generate_1d();
             auto u_light_surface = sampler()->generate_2d();
             auto u_lobe = sampler()->generate_1d();
             auto u_bsdf = sampler()->generate_2d();
+
             auto u_rr = def(0.f);
             auto rr_depth = node<MegakernelPathTracing>()->rr_depth();
             $if(depth + 1u >= rr_depth) { u_rr = sampler()->generate_1d(); };
 
-            // sample one light
-            auto light_sample = light_sampler()->sample(
-                *it, u_light_selection, u_light_surface, swl, time);
+            // generate uniform samples
+            auto light_sample = LightSampler::Sample::zero(swl.dimension());
+            $outline {
+                // sample one light
+                light_sample = light_sampler()->sample(
+                    *it, u_light_selection, u_light_surface, swl, time);
+            };
 
             // trace shadow ray
             auto occluded = pipeline().geometry()->intersect_any(light_sample.shadow_ray);
@@ -105,50 +111,51 @@ protected:
             auto surface_tag = it->shape().surface_tag();
             auto eta_scale = def(1.f);
 
-            PolymorphicCall<Surface::Closure> call;
-            pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
-                surface->closure(call, *it, swl, wo, 1.f, time);
-            });
-
-            call.execute([&](const Surface::Closure *closure) noexcept {
-                // apply opacity map
-                auto alpha_skip = def(false);
-                if (auto o = closure->opacity()) {
-                    auto opacity = saturate(*o);
-                    alpha_skip = u_lobe >= opacity;
-                    u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
-                }
-
-                $if(alpha_skip) {
-                    ray = it->spawn_ray(ray->direction());
-                    pdf_bsdf = 1e16f;
-                }
-                $else {
-                    if (auto dispersive = closure->is_dispersive()) {
-                        $if(*dispersive) { swl.terminate_secondary(); };
+            $outline {
+                PolymorphicCall<Surface::Closure> call;
+                pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
+                    surface->closure(call, *it, swl, wo, 1.f, time);
+                });
+                call.execute([&](const Surface::Closure *closure) noexcept {
+                    // apply opacity map
+                    auto alpha_skip = def(false);
+                    if (auto o = closure->opacity()) {
+                        auto opacity = saturate(*o);
+                        alpha_skip = u_lobe >= opacity;
+                        u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
                     }
-                    // direct lighting
-                    $if(light_sample.eval.pdf > 0.0f & !occluded) {
-                        auto wi = light_sample.shadow_ray->direction();
-                        auto eval = closure->evaluate(wo, wi);
-                        auto w = balance_heuristic(light_sample.eval.pdf, eval.pdf) /
-                                 light_sample.eval.pdf;
-                        Li += w * beta * eval.f * light_sample.eval.L;
+
+                    $if(alpha_skip) {
+                        ray = it->spawn_ray(ray->direction());
+                        pdf_bsdf = 1e16f;
+                    }
+                    $else {
+                        if (auto dispersive = closure->is_dispersive()) {
+                            $if(*dispersive) { swl.terminate_secondary(); };
+                        }
+                        // direct lighting
+                        $if(light_sample.eval.pdf > 0.0f & !occluded) {
+                            auto wi = light_sample.shadow_ray->direction();
+                            auto eval = closure->evaluate(wo, wi);
+                            auto w = balance_heuristic(light_sample.eval.pdf, eval.pdf) /
+                                     light_sample.eval.pdf;
+                            Li += w * beta * eval.f * light_sample.eval.L;
+                        };
+                        // sample material
+                        auto surface_sample = closure->sample(wo, u_lobe, u_bsdf);
+                        ray = it->spawn_ray(surface_sample.wi);
+                        pdf_bsdf = surface_sample.eval.pdf;
+                        auto w = ite(surface_sample.eval.pdf > 0.f, 1.f / surface_sample.eval.pdf, 0.f);
+                        beta *= w * surface_sample.eval.f;
+                        // apply eta scale
+                        auto eta = closure->eta().value_or(1.f);
+                        $switch(surface_sample.event) {
+                            $case(Surface::event_enter) { eta_scale = sqr(eta); };
+                            $case(Surface::event_exit) { eta_scale = sqr(1.f / eta); };
+                        };
                     };
-                    // sample material
-                    auto surface_sample = closure->sample(wo, u_lobe, u_bsdf);
-                    ray = it->spawn_ray(surface_sample.wi);
-                    pdf_bsdf = surface_sample.eval.pdf;
-                    auto w = ite(surface_sample.eval.pdf > 0.f, 1.f / surface_sample.eval.pdf, 0.f);
-                    beta *= w * surface_sample.eval.f;
-                    // apply eta scale
-                    auto eta = closure->eta().value_or(1.f);
-                    $switch(surface_sample.event) {
-                        $case(Surface::event_enter) { eta_scale = sqr(eta); };
-                        $case(Surface::event_exit) { eta_scale = sqr(1.f / eta); };
-                    };
-                };
-            });
+                });
+            };
 
             beta = zero_if_any_nan(beta);
             $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };

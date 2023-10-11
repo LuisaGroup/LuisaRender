@@ -139,68 +139,76 @@ public:
     [[nodiscard]] Surface::Evaluation evaluate(Expr<float3> wo,
                                                Expr<float3> wi,
                                                TransportMode mode) const noexcept {
-        auto wo_local = _ctx.it.shading().world_to_local(wo);
-        auto sign = ite(cos_theta(wo_local) < 0.f,
-                        make_float3(1.f, 1.f, -1.f),
-                        make_float3(1.f, 1.f, 1.f));
-        wo_local *= sign;
-        auto wi_local = sign * _ctx.it.shading().world_to_local(wi);
-        // specular
-        auto f_coat = _coat.evaluate(wo_local, wi_local, mode);
-        auto pdf_coat = _coat.pdf(wo_local, wi_local, mode);
-        // diffuse
-        auto eta = _fresnel.eta_t();
-        auto Fi = fresnel_dielectric(abs_cos_theta(wi_local), 1.f, eta);
-        auto Fo = fresnel_dielectric(abs_cos_theta(wo_local), 1.f, eta);
-        auto a = exp(-(1.f / abs_cos_theta(wi_local) + 1.f / abs_cos_theta(wo_local)) * _ctx.sigma_a);
-        auto f_diffuse = (1.f - Fi) * (1.f - Fo) * sqr(1.f / eta) * a *
-                         _substrate.evaluate(wo_local, wi_local, mode);
-        auto pdf_diffuse = _substrate.pdf(wo_local, wi_local, mode);
-        auto substrate_weight = _substrate_weight(Fo, _ctx.Kd_weight);
-        auto f = (f_coat + f_diffuse) * abs_cos_theta(wi_local);
-        auto pdf = lerp(pdf_coat, pdf_diffuse, substrate_weight);
-        return {.f = f, .pdf = pdf};
+        auto eval = Surface::Evaluation::zero(_ctx.Kd.dimension());
+        $outline {
+            auto wo_local = _ctx.it.shading().world_to_local(wo);
+            auto sign = ite(cos_theta(wo_local) < 0.f,
+                            make_float3(1.f, 1.f, -1.f),
+                            make_float3(1.f, 1.f, 1.f));
+            wo_local *= sign;
+            auto wi_local = sign * _ctx.it.shading().world_to_local(wi);
+            // specular
+            auto f_coat = _coat.evaluate(wo_local, wi_local, mode);
+            auto pdf_coat = _coat.pdf(wo_local, wi_local, mode);
+            // diffuse
+            auto eta = _fresnel.eta_t();
+            auto Fi = fresnel_dielectric(abs_cos_theta(wi_local), 1.f, eta);
+            auto Fo = fresnel_dielectric(abs_cos_theta(wo_local), 1.f, eta);
+            auto a = exp(-(1.f / abs_cos_theta(wi_local) + 1.f / abs_cos_theta(wo_local)) * _ctx.sigma_a);
+            auto f_diffuse = (1.f - Fi) * (1.f - Fo) * sqr(1.f / eta) * a *
+                             _substrate.evaluate(wo_local, wi_local, mode);
+            auto pdf_diffuse = _substrate.pdf(wo_local, wi_local, mode);
+            auto substrate_weight = _substrate_weight(Fo, _ctx.Kd_weight);
+            auto f = (f_coat + f_diffuse) * abs_cos_theta(wi_local);
+            auto pdf = lerp(pdf_coat, pdf_diffuse, substrate_weight);
+            eval = {.f = f, .pdf = pdf};
+        };
+        return eval;
     }
 
     [[nodiscard]] Surface::Sample sample(Expr<float3> wo,
                                          Expr<float> u_lobe, Expr<float2> u,
                                          TransportMode mode) const noexcept {
-        auto wo_local = _ctx.it.shading().world_to_local(wo);
-        auto sign = ite(cos_theta(wo_local) < 0.f,
-                        make_float3(1.f, 1.f, -1.f),
-                        make_float3(1.f, 1.f, 1.f));
-        wo_local *= sign;
-        auto eta = _fresnel.eta_t();
-        auto Fo = fresnel_dielectric(abs_cos_theta(wo_local), 1.f, eta);
-        auto substrate_weight = _substrate_weight(Fo, _ctx.Kd_weight);
-        BxDF::SampledDirection wi_sample;
-        $if(u_lobe < substrate_weight) {// samples diffuse
-            wi_sample = _substrate.sample_wi(wo_local, u, mode);
-        }
-        $else {// samples specular
-            wi_sample = _coat.sample_wi(wo_local, u, mode);
+        auto s = Surface::Sample::zero(_ctx.Kd.dimension());
+        $outline {
+            auto wo_local = _ctx.it.shading().world_to_local(wo);
+            auto sign = ite(cos_theta(wo_local) < 0.f,
+                            make_float3(1.f, 1.f, -1.f),
+                            make_float3(1.f, 1.f, 1.f));
+            wo_local *= sign;
+            auto eta = _fresnel.eta_t();
+            auto Fo = fresnel_dielectric(abs_cos_theta(wo_local), 1.f, eta);
+            auto substrate_weight = _substrate_weight(Fo, _ctx.Kd_weight);
+            BxDF::SampledDirection wi_sample;
+            $if(u_lobe < substrate_weight) {// samples diffuse
+                wi_sample = _substrate.sample_wi(wo_local, u, mode);
+            }
+            $else {// samples specular
+                wi_sample = _coat.sample_wi(wo_local, u, mode);
+            };
+            SampledSpectrum f{_ctx.Kd.dimension(), 0.f};
+            auto pdf = def(0.f);
+            auto wi = def(make_float3(0.f, 0.f, 1.f));
+            $if(wi_sample.valid) {
+                auto wi_local = wi_sample.wi;
+                wi = _ctx.it.shading().local_to_world(wi_sample.wi * sign);
+                auto f_coat = _coat.evaluate(wo_local, wi_local, mode);
+                auto pdf_coat = _coat.pdf(wo_local, wi_local, mode);
+                // diffuse
+                auto Fi = fresnel_dielectric(abs_cos_theta(wi_local), 1.f, eta);
+                auto a = exp(-(1.f / abs_cos_theta(wi_local) + 1.f / abs_cos_theta(wo_local)) * _ctx.sigma_a);
+                auto ee = sqr(1.f / _fresnel.eta_t());
+                auto f_diffuse = (1.f - Fi) * (1.f - Fo) * sqr(1.f / eta) * a *
+                                 _substrate.evaluate(wo_local, wi_local, mode);
+                auto pdf_diffuse = _substrate.pdf(wo_local, wi_local, mode);
+                f = (f_coat + f_diffuse) * abs_cos_theta(wi_local);
+                pdf = lerp(pdf_coat, pdf_diffuse, substrate_weight);
+            };
+            s = {.eval = {.f = f, .pdf = pdf},
+                    .wi = wi,
+                    .event = Surface::event_reflect};
         };
-        SampledSpectrum f{_ctx.Kd.dimension(), 0.f};
-        auto pdf = def(0.f);
-        auto wi = def(make_float3(0.f, 0.f, 1.f));
-        $if(wi_sample.valid) {
-            auto wi_local = wi_sample.wi;
-            wi = _ctx.it.shading().local_to_world(wi_sample.wi * sign);
-            auto f_coat = _coat.evaluate(wo_local, wi_local, mode);
-            auto pdf_coat = _coat.pdf(wo_local, wi_local, mode);
-            // diffuse
-            auto Fi = fresnel_dielectric(abs_cos_theta(wi_local), 1.f, eta);
-            auto a = exp(-(1.f / abs_cos_theta(wi_local) + 1.f / abs_cos_theta(wo_local)) * _ctx.sigma_a);
-            auto ee = sqr(1.f / _fresnel.eta_t());
-            auto f_diffuse = (1.f - Fi) * (1.f - Fo) * sqr(1.f / eta) * a *
-                             _substrate.evaluate(wo_local, wi_local, mode);
-            auto pdf_diffuse = _substrate.pdf(wo_local, wi_local, mode);
-            f = (f_coat + f_diffuse) * abs_cos_theta(wi_local);
-            pdf = lerp(pdf_coat, pdf_diffuse, substrate_weight);
-        };
-        return {.eval = {.f = f, .pdf = pdf},
-                .wi = wi,
-                .event = Surface::event_reflect};
+        return s;
     }
 };
 

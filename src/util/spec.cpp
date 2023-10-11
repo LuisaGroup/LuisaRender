@@ -414,7 +414,9 @@ SampledSpectrum ite(const SampledSpectrum &p, const SampledSpectrum &t, const Sa
                  "Invalid spectrum dimensions for ite: (p = {}, t = {}, f = {}).",
                  p.dimension(), t.dimension(), f.dimension());
     auto r = SampledSpectrum{n};
-    for (auto i = 0u; i < n; i++) { r[i] = ite(p[i] != 0.f, t[i], f[i]); }
+    compute::outline([&] {
+        for (auto i = 0u; i < n; i++) { r[i] = ite(p[i] != 0.f, t[i], f[i]); }
+    });
     return r;
 }
 
@@ -423,7 +425,9 @@ SampledSpectrum ite(const SampledSpectrum &p, Expr<float> t, const SampledSpectr
                  "Invalid spectrum dimensions for ite: (p = {}, t = 1, f = {}).",
                  p.dimension(), f.dimension());
     auto r = SampledSpectrum{std::max(f.dimension(), p.dimension())};
-    for (auto i = 0u; i < r.dimension(); i++) { r[i] = ite(p[i] != 0.f, t, f[i]); }
+    compute::outline([&] {
+        for (auto i = 0u; i < r.dimension(); i++) { r[i] = ite(p[i] != 0.f, t, f[i]); }
+    });
     return r;
 }
 
@@ -432,7 +436,9 @@ SampledSpectrum ite(const SampledSpectrum &p, const SampledSpectrum &t, Expr<flo
                  "Invalid spectrum dimensions for ite: (p = {}, t = {}, f = 1).",
                  p.dimension(), t.dimension());
     auto r = SampledSpectrum{std::max(t.dimension(), p.dimension())};
-    for (auto i = 0u; i < r.dimension(); i++) { r[i] = ite(p[i] != 0.f, t[i], f); }
+    compute::outline([&] {
+        for (auto i = 0u; i < r.dimension(); i++) { r[i] = ite(p[i] != 0.f, t[i], f); }
+    });
     return r;
 }
 
@@ -445,7 +451,9 @@ SampledSpectrum ite(Expr<bool> p, const SampledSpectrum &t, const SampledSpectru
                  "Invalid spectrum dimensions for ite: (p = 1, t = {}, f = {}).",
                  t.dimension(), f.dimension());
     auto r = SampledSpectrum{std::max(t.dimension(), f.dimension())};
-    for (auto i = 0u; i < r.dimension(); i++) { r[i] = ite(p, t[i], f[i]); }
+    compute::outline([&] {
+        for (auto i = 0u; i < r.dimension(); i++) { r[i] = ite(p, t[i], f[i]); }
+    });
     return r;
 }
 
@@ -488,7 +496,9 @@ SampledSpectrum max(const SampledSpectrum &a, const SampledSpectrum &b) noexcept
                  "Invalid spectrum dimensions for max: (a = {}, b = {}).",
                  a.dimension(), b.dimension());
     auto ans = SampledSpectrum{n};
-    for (auto i = 0u; i < n; i++) { ans[i] = max(a[i], b[i]); }
+    compute::outline([&] {
+        for (auto i = 0u; i < n; i++) { ans[i] = max(a[i], b[i]); }
+    });
     return ans;
 }
 
@@ -507,7 +517,9 @@ SampledSpectrum min(const SampledSpectrum &a, const SampledSpectrum &b) noexcept
                  "Invalid spectrum dimensions for min: (a = {}, b = {}).",
                  a.dimension(), b.dimension());
     auto ans = SampledSpectrum{n};
-    for (auto i = 0u; i < n; i++) { ans[i] = min(a[i], b[i]); }
+    compute::outline([&] {
+        for (auto i = 0u; i < n; i++) { ans[i] = min(a[i], b[i]); }
+    });
     return ans;
 }
 
@@ -522,7 +534,9 @@ SampledSpectrum clamp(const SampledSpectrum &v, const SampledSpectrum &l, Expr<f
                  "Invalid spectrum dimensions for clamp: (v = {}, l = {}, r = 1).",
                  v.dimension(), l.dimension());
     auto ans = SampledSpectrum{n};
-    for (auto i = 0u; i < n; i++) { ans[i] = clamp(v[i], l[i], r); }
+    compute::outline([&] {
+        for (auto i = 0u; i < n; i++) { ans[i] = clamp(v[i], l[i], r); }
+    });
     return ans;
 }
 
@@ -533,7 +547,9 @@ SampledSpectrum clamp(const SampledSpectrum &v, Expr<float> l, const SampledSpec
                  "Invalid spectrum dimensions for clamp: (v = {}, l = 1, r = {}).",
                  v.dimension(), r.dimension());
     auto ans = SampledSpectrum{n};
-    for (auto i = 0u; i < n; i++) { ans[i] = clamp(v[i], l, r[i]); }
+    compute::outline([&] {
+        for (auto i = 0u; i < n; i++) { ans[i] = clamp(v[i], l, r[i]); }
+    });
     return ans;
 }
 
@@ -545,7 +561,9 @@ SampledSpectrum clamp(const SampledSpectrum &v, const SampledSpectrum &l, const 
                  "Invalid spectrum dimensions for clamp: (v = {}, l = {}, r = {}).",
                  v.dimension(), l.dimension(), r.dimension());
     auto ans = SampledSpectrum{n};
-    for (auto i = 0u; i < n; i++) { ans[i] = clamp(v[i], l[i], r[i]); }
+    compute::outline([&] {
+        for (auto i = 0u; i < n; i++) { ans[i] = clamp(v[i], l[i], r[i]); }
+    });
     return ans;
 }
 
@@ -595,14 +613,16 @@ Bool all(const SampledSpectrum &v) noexcept {
 
 void SampledWavelengths::terminate_secondary() const noexcept {
     using namespace luisa::compute;
-    auto terminated = def(true);
-    for (auto i = 1u; i < dimension(); i++) {
-        terminated &= _pdfs[i] == 0.f;
-        _pdfs[i] = 0.f;
-    }
-    $if(!terminated) {
-        _pdfs[0] *= static_cast<float>(1. / dimension());
-    };
+    outline([&] {
+        auto terminated = def(true);
+        for (auto i = 1u; i < dimension(); i++) {
+            terminated &= _pdfs[i] == 0.f;
+            _pdfs[i] = 0.f;
+        }
+        $if(!terminated) {
+            _pdfs[0] *= static_cast<float>(1. / dimension());
+        };
+    });
 }
 
 }// namespace luisa::render
