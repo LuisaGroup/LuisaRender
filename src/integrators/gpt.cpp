@@ -1195,7 +1195,7 @@ void GradientPathTracingInstance::_render_one_camera(
         auto mean_x = camera->film()->read(pixel_id).average;       // mean(x)   = 1/n * sum(x)
         auto mean_x2 = image_buffers.at("variance")->read(pixel_id);// mean(x^2) = 1/n * sum(x^2)
         auto var = (mean_x2 - mean_x * mean_x) / (n - 1.f);         // var(x)    = 1/(n-1) * (sum(x^2) - n * mean(x)^2)
-        image_buffers.at("variance")->write(pixel_id, var);
+        image_buffers.at("variance")->write(pixel_id, max(var, 0.f));
     };
 
     Clock clock_compile;
