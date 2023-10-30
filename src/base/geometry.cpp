@@ -18,7 +18,9 @@ void Geometry::build(CommandBuffer &command_buffer,
         _world_max[i] = -std::numeric_limits<float>::max();
         _world_min[i] = std::numeric_limits<float>::max();
     }
+    _triangle_count = 0u;
     for (auto shape : shapes) { _process_shape(command_buffer, shape, init_time, nullptr); }
+    LUISA_INFO_WITH_LOCATION("Geometry built with {} triangles.", _triangle_count);
     _instance_buffer = _pipeline.device().create_buffer<uint4>(_instances.size());
     command_buffer << _instance_buffer.copy_from(_instances.data())
                    << _accel.build();
@@ -141,6 +143,7 @@ void Geometry::_process_shape(
                 .instance_id = instance_id,
                 .light_tag = light_tag});
         }
+        _triangle_count += mesh.resource->triangle_count();
     } else {
         _transform_tree.push(shape->transform());
         for (auto child : shape->children()) {

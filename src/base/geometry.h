@@ -70,6 +70,8 @@ private:
     float3 _world_min;
     float3 _world_max;
 
+    uint _triangle_count;   // for debug
+
 private:
     void _process_shape(
         CommandBuffer &command_buffer, const Shape *shape, float init_time,
