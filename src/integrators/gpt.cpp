@@ -1192,12 +1192,10 @@ void GradientPathTracingInstance::_render_one_camera(
         set_block_size(16u, 16u, 1u);
         auto pixel_id = dispatch_id().xy();
         auto n = static_cast<float>(spp);
-        auto mean_x = current_frame_buffer.read(pixel_id);          // mean(x)   = 1/n * sum(x)
+        auto mean_x = camera->film()->read(pixel_id).average;       // mean(x)   = 1/n * sum(x)
         auto mean_x2 = image_buffers.at("variance")->read(pixel_id);// mean(x^2) = 1/n * sum(x^2)
-        // var(x) = 1 / (n - 1) * (sum(x^2) - n * mean(x)^2)
-        // var(mean(x)) = var(x) / n = 1 / (n - 1) * (sum(x^2) / n - mean(x)^2)
-        auto variance_mean = max((mean_x2 / n - mean_x * mean_x) / (n - 1.f), 0.f);
-        image_buffers.at("variance")->write(pixel_id, variance_mean);
+        auto var = (mean_x2 - mean_x * mean_x) / (n - 1.f);         // var(x)    = 1/(n-1) * (sum(x^2) - n * mean(x)^2)
+        image_buffers.at("variance")->write(pixel_id, var);
     };
 
     Clock clock_compile;
