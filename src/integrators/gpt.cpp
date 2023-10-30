@@ -236,6 +236,16 @@ public:
         }
         return v;
     }
+
+    void write(Expr<uint2> p, Expr<float3> value, Expr<float> effective_spp = 1.f) noexcept {
+        if (_image) {
+            auto index = p.y * _resolution.x + p.x;
+            auto v = make_float4(value, effective_spp);
+            for (auto ch = 0u; ch < 4u; ch++) {
+                _image->write(index * 4u + ch, v[ch]);
+            }
+        }
+    }
 };
 
 luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
@@ -576,7 +586,7 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                 }
 
                 // strict normal not implemented TODO
-                $for(i, 4) {
+                for (auto &&i : dsl::dynamic_range(4u)) {
                     auto shifted = load_ray_state(i);
                     SampledSpectrum main_contribution{swl.dimension(), 0.f};
                     SampledSpectrum shifted_contribution{swl.dimension(), 0.f};
@@ -687,7 +697,7 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                     }
 
                     store_ray_state(i, shifted);
-                };
+                }
             };
 
             //
@@ -1178,9 +1188,22 @@ void GradientPathTracingInstance::_render_one_camera(
         image_buffers.at("variance")->accumulate(pixel_id, L * L);
     };
 
+    Kernel2D finalize_var_kernel = [&]() noexcept {
+        set_block_size(16u, 16u, 1u);
+        auto pixel_id = dispatch_id().xy();
+        auto n = static_cast<float>(spp);
+        auto mean_x = current_frame_buffer.read(pixel_id);          // mean(x)   = 1/n * sum(x)
+        auto mean_x2 = image_buffers.at("variance")->read(pixel_id);// mean(x^2) = 1/n * sum(x^2)
+        // var(x) = 1 / (n - 1) * (sum(x^2) - n * mean(x)^2)
+        // var(mean(x)) = var(x) / n = 1 / (n - 1) * (sum(x^2) / n - mean(x)^2)
+        auto variance_mean = max((mean_x2 / n - mean_x * mean_x) / (n - 1.f), 0.f);
+        image_buffers.at("variance")->write(pixel_id, variance_mean);
+    };
+
     Clock clock_compile;
     auto render = pipeline().device().compile(render_kernel);
     auto accumulate = pipeline().device().compile(accumulate_kernel);
+    auto finalize_var = pipeline().device().compile(finalize_var_kernel);
     auto integrator_shader_compilation_time = clock_compile.toc();
     LUISA_INFO("Integrator shader compile in {} ms.", integrator_shader_compilation_time);
     auto shutter_samples = camera->node()->shutter_samples();
@@ -1200,18 +1223,21 @@ void GradientPathTracingInstance::_render_one_camera(
             command_buffer << render(sample_id++, s.point.time, s.point.weight)
                                   .dispatch(resolution)
                            << accumulate().dispatch(resolution);
-            camera->film()->show(command_buffer);
-            auto dispatches_per_commit = 4u;
-            if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
+            constexpr auto dispatches_per_commit = 4u;
+            if (camera->film()->show(command_buffer) ||
+                ++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
                 dispatch_count = 0u;
                 auto p = sample_id / static_cast<double>(spp);
+                // This implicitly commits the command buffer.
+                command_buffer << [p, &progress] { progress.update(p); };
             }
         }
     }
     auto parent_path = camera->node()->file().parent_path();
     auto filename = camera->node()->file().stem().string();
     auto ext = camera->node()->file().extension().string();
-    command_buffer << synchronize();
+    command_buffer << finalize_var().dispatch(resolution)
+                   << synchronize();
     for (auto &[key, buffer] : image_buffers) {
         auto path = parent_path / fmt::format("{}_{}{}", filename, key, ext);
         command_buffer << buffer->save(command_buffer, path);
