@@ -647,11 +647,11 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                                 auto shifted_vertex_type = get_vertex_type(make_shared<Interaction>(shifted.it), swl, time);
 
                                 $if(main_vertex_type == (uint)VertexType::VERTEX_TYPE_DIFFUSE & shifted_vertex_type == (uint)VertexType::VERTEX_TYPE_DIFFUSE) {
-                                    u_light_selection = sampler()->generate_1d();
-                                    u_light_surface = sampler()->generate_2d();
+//                                    u_light_selection = sampler()->generate_1d();
+//                                    u_light_surface = sampler()->generate_2d();
                                     auto shifted_light_sample = light_sampler()->sample(shifted.it, u_light_selection, u_light_surface, swl, time);
                                     auto shifted_occluded = pipeline().geometry()->intersect_any(shifted_light_sample.shadow_ray);
-                                    $if(shifted_occluded) {// shifted failed, no light
+                                    $if(shifted_occluded | shifted_light_sample.eval.pdf <= 0.f) {// shifted failed, no light
                                         shift_successful = false;
                                     }
                                     $else {
