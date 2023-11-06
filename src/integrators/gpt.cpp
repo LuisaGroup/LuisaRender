@@ -197,15 +197,19 @@ public:
     }
 
     [[nodiscard]] auto save(CommandBuffer &command_buffer,
-                            std::filesystem::path path) const noexcept
+                            std::filesystem::path path, bool raw = false) const noexcept
         -> luisa::function<void()> {
         if (!_image) { return {}; }
         auto host_image = luisa::make_shared<luisa::vector<float4>>();
         host_image->resize(_resolution.x * _resolution.y);
         command_buffer << _image.copy_to(host_image->data());
-        return [host_image, size = _resolution, path = std::move(path)] {
+        return [host_image, size = _resolution, path = std::move(path), raw] {
             for (auto &p : *host_image) {
-                p = make_float4(p.xyz() / p.w, 1.f);
+                if (raw) {
+                    p = make_float4(p.xyz(), 1.f); // don't divide effective_spp
+                } else {
+                    p = make_float4(p.xyz() / p.w, 1.f);
+                }
             }
             LUISA_INFO("Saving auxiliary buffer to '{}'.", path.string());
             save_image(path.string(), reinterpret_cast<const float *>(host_image->data()), size, 4);
@@ -574,7 +578,7 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                 });
 
                 auto main_distance_squared = length_squared(main.it.p() - main_light_sample.eval.p);
-                auto main_opposing_cosine = dot(main_light_sample.eval.ng, main.it.p() - main_light_sample.eval.p) / sqrt(main_distance_squared);
+                auto main_opposing_cosine = dot(main_light_sample.eval.ng, normalize(main.it.p() - main_light_sample.eval.p));
 
                 auto main_bsdf_pdf = main_light_eval.pdf;
 
@@ -655,8 +659,8 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                                         auto shifted_emitter_pdf = shifted_light_sample.eval.pdf;
 
                                         auto shifted_distance_squared = length_squared(shifted.it.p() - shifted_light_sample.eval.p);
-                                        auto emitter_direction = (shifted.it.p() - shifted_light_sample.eval.p) / sqrt(shifted_distance_squared);
-                                        auto shifted_opposing_cosine = -dot(shifted_light_sample.eval.ng, emitter_direction);
+                                        auto emitter_direction = normalize(shifted.it.p() - shifted_light_sample.eval.p);
+                                        auto shifted_opposing_cosine = dot(shifted_light_sample.eval.ng, emitter_direction);
 
                                         // TODO: No strict normal here
                                         auto shifted_surface_tag = shifted.it.shape().surface_tag();
@@ -1120,6 +1124,9 @@ void GradientPathTracingInstance::_render_one_camera(
     }
     // This is sum(x^2)/spp. if Var(mean(x)) is need, it is sum(x^2)/(n(n-1)) - mean(x)^2/(n-1)
     image_buffers.emplace("variance", luisa::make_unique<ImageBuffer>(pipeline(), resolution));
+    image_buffers.emplace("variance_effective", luisa::make_unique<ImageBuffer>(pipeline(), resolution));
+    // Effective spps of G-PT
+    image_buffers.emplace("effective", luisa::make_unique<ImageBuffer>(pipeline(), resolution));
 
     auto clear_image_buffer = [&] {
         for (auto &[_, buffer] : image_buffers) {
@@ -1160,6 +1167,9 @@ void GradientPathTracingInstance::_render_one_camera(
                     auto L = pipeline().spectrum()->srgb(eval.swl, 2.f * eval.neighbor_throughput[i]);
                     // camera->film()->accumulate(current_pixel, shutter_weight * L, 1.f);
                     current_frame_buffer.accumulate(current_pixel, shutter_weight * L, 1.f);
+                    $if(eval.shift_success[i]) {
+                        image_buffers.at("effective")->accumulate(current_pixel, make_float3(1.f), 1.f);
+                    };
                 };
             }
             auto L = pipeline().spectrum()->srgb(eval.swl, 8.f * eval.very_direct + 2.f * eval.throughput);
@@ -1238,7 +1248,7 @@ void GradientPathTracingInstance::_render_one_camera(
                    << synchronize();
     for (auto &[key, buffer] : image_buffers) {
         auto path = parent_path / fmt::format("{}_{}{}", filename, key, ext);
-        command_buffer << buffer->save(command_buffer, path);
+        command_buffer << buffer->save(command_buffer, path, key == "effective");
     }
     command_buffer << synchronize();
     progress.done();
