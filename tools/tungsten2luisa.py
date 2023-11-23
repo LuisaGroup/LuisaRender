@@ -179,8 +179,11 @@ def convert_material(out_file, material: dict, alpha=""):
         convert_material(out_file, base_material, aa)
     elif impl == "null":
         convert_null_material(out_file, material)
+    elif impl == "thinsheet":
+        # TODO: Implement thinsheet, here we just use glass
+        convert_glass_material(out_file, material)
     else:
-        print(material)
+        print(f'Unsupported material {material}')
         print(f'''
 Surface mat_{material["name"]} : Matte {{
   Kd : Constant {{
