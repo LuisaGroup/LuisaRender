@@ -10,6 +10,11 @@ if (WIN32)
     endif ()
 endif ()
 
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND
+        CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 15.0)
+    add_compile_options(-Wno-deprecated-builtins)
+endif ()
+
 add_subdirectory(ext)
 
 add_library(luisa-render-include INTERFACE)
