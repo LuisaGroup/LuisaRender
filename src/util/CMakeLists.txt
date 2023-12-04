@@ -22,10 +22,13 @@ add_library(luisa-render-util SHARED
         polymorphic_closure.h
         command_buffer.cpp command_buffer.h
         thread_pool.cpp thread_pool.h)
-target_link_libraries(luisa-render-util PUBLIC
+target_link_libraries(luisa-render-util
+        PUBLIC
         luisa::compute
         luisa-render-include
-        luisa-render-ext)
+        luisa-render-ext
+        PRIVATE
+        luisa-render-ext-tinyexr)
 set_target_properties(luisa-render-util PROPERTIES
         WINDOWS_EXPORT_ALL_SYMBOLS ON
         UNITY_BUILD ${LUISA_RENDER_ENABLE_UNITY_BUILD})
