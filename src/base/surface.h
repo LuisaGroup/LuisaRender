@@ -244,7 +244,9 @@ public:
         [[nodiscard]] luisa::string closure_identifier() const noexcept override {
             auto base_identifier = BaseInstance::closure_identifier();
             if (_opacity == nullptr) { return base_identifier; }
-            return luisa::format("opacity<{}>", base_identifier);
+            return luisa::format("opacity<{}, {}>",
+                                 base_identifier,
+                                 Texture::Instance::diff_param_identifier(_opacity));
         }
         [[nodiscard]] luisa::unique_ptr<Surface::Closure> create_closure(
             const SampledWavelengths &swl, Expr<float> time) const noexcept override {

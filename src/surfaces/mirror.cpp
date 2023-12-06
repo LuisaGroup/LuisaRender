@@ -53,6 +53,11 @@ public:
 public:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> create_closure(const SampledWavelengths &swl, Expr<float> time) const noexcept override;
     void populate_closure(Surface::Closure *closure, const Interaction &it, Expr<float3> wo, Expr<float> eta_i) const noexcept override;
+    [[nodiscard]] luisa::string closure_identifier() const noexcept override {
+        return luisa::format("mirror<{}, {}>",
+                             Texture::Instance::diff_param_identifier(_color),
+                             Texture::Instance::diff_param_identifier(_roughness));
+    }
 };
 
 luisa::unique_ptr<Surface::Instance> MirrorSurface::_build(

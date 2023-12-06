@@ -68,6 +68,15 @@ public:
         void backward_unbounded_spectrum(
             const Interaction &it, const SampledWavelengths &swl,
             Expr<float> time, const SampledSpectrum &dSpec) const noexcept;
+
+    public:
+        inline static const luisa::string non_differrentiable_identifier = "nodiff";
+        [[nodiscard]] virtual luisa::string diff_param_identifier() const noexcept {
+            return non_differrentiable_identifier;
+        }
+        [[nodiscard]] static auto diff_param_identifier(const Texture::Instance *t) noexcept {
+            return t ? t->diff_param_identifier() : non_differrentiable_identifier;
+        }
     };
 
 private:

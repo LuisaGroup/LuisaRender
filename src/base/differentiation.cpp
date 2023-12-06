@@ -105,10 +105,12 @@ Differentiation::TexturedParameter Differentiation::parameter(const Image<float>
     auto grad_offset = _gradient_buffer_size;
     auto param_offset = _param_buffer_size;
     auto counter_offset = _counter_size;
+    auto param_index = static_cast<uint>(_textured_params.size());
     _counter_size = (_counter_size + pixel_count + 3u) & ~0b11u;
     _param_buffer_size = (_param_buffer_size + param_count + 3u) & ~0b11u;
     _gradient_buffer_size = (_gradient_buffer_size + param_count + 3u) & ~0b11u;
-    return _textured_params.emplace_back(TexturedParameter{image, s, grad_offset, param_offset, counter_offset, range});
+    return _textured_params.emplace_back(TexturedParameter{
+        param_index, image, s, grad_offset, param_offset, counter_offset, range});
 }
 
 void Differentiation::materialize(CommandBuffer &command_buffer) noexcept {

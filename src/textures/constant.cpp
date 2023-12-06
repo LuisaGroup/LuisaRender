@@ -115,6 +115,9 @@ public:
             pipeline().differentiation()->accumulate(*_diff_param, grad, slot_seed);
         }
     }
+    [[nodiscard]] luisa::string diff_param_identifier() const noexcept override {
+        return _diff_param ? _diff_param->identifier() : non_differrentiable_identifier;
+    }
 };
 
 luisa::unique_ptr<Texture::Instance> ConstantTexture::build(

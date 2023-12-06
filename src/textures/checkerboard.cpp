@@ -117,6 +117,16 @@ public:
             LUISA_ERROR_WITH_LOCATION("Not supported.");
         }
     }
+
+    [[nodiscard]] luisa::string diff_param_identifier() const noexcept override {
+        auto on_ident = Instance::diff_param_identifier(_on);
+        auto off_ident = Instance::diff_param_identifier(_off);
+        if (on_ident == non_differrentiable_identifier &&
+            off_ident == non_differrentiable_identifier) {
+            return non_differrentiable_identifier;
+        }
+        return luisa::format("diffcheckerboard<{}, {}>", on_ident, off_ident);
+    }
 };
 
 luisa::unique_ptr<Texture::Instance> CheckerboardTexture::build(

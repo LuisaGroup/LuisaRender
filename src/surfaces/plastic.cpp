@@ -91,6 +91,14 @@ public:
         const SampledWavelengths &swl, Expr<float> time) const noexcept override;
     void populate_closure(Surface::Closure *closure, const Interaction &it,
                           Expr<float3> wo, Expr<float> eta_i) const noexcept override;
+    [[nodiscard]] luisa::string closure_identifier() const noexcept override {
+        return luisa::format("plastic<{}, {}, {}, {}, {}>",
+                             Texture::Instance::diff_param_identifier(_kd),
+                             Texture::Instance::diff_param_identifier(_roughness),
+                             Texture::Instance::diff_param_identifier(_sigma_a),
+                             Texture::Instance::diff_param_identifier(_eta),
+                             Texture::Instance::diff_param_identifier(_thickness));
+    }
 };
 
 luisa::unique_ptr<Surface::Instance> PlasticSurface::_build(

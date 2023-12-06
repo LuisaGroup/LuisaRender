@@ -210,6 +210,9 @@ public:
             pipeline().differentiation()->accumulate(*_diff_param, uv, grad);
         }
     }
+    [[nodiscard]] luisa::string diff_param_identifier() const noexcept override {
+        return _diff_param ? _diff_param->identifier() : non_differrentiable_identifier;
+    }
 };
 
 luisa::unique_ptr<Texture::Instance> ImageTexture::build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {

@@ -170,9 +170,12 @@ public:
 
 public:
     [[nodiscard]] luisa::string closure_identifier() const noexcept override {
-        return luisa::format("layered<{}, {}>",
+        return luisa::format("layered<{}, {}, {}, {}, {}>",
                              _top->closure_identifier(),
-                             _bottom->closure_identifier());
+                             _bottom->closure_identifier(),
+                             Texture::Instance::diff_param_identifier(_thickness),
+                             Texture::Instance::diff_param_identifier(_g),
+                             Texture::Instance::diff_param_identifier(_albedo));
     }
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> create_closure(const SampledWavelengths &swl, Expr<float> time) const noexcept override;
     void populate_closure(Surface::Closure *closure, const Interaction &it, Expr<float3> wo, Expr<float> eta_i) const noexcept override;

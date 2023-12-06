@@ -53,12 +53,14 @@ public:
             : _index{index}, _channels{channels} {}
         [[nodiscard]] auto index() const noexcept { return _index; }
         [[nodiscard]] auto channels() const noexcept { return _channels; }
+        [[nodiscard]] auto identifier() const noexcept { return luisa::format("diffconst({})", _index); }
     };
 
     class TexturedParameter {
 
     private:
         const Image<float> &_image;
+        uint _index;
         TextureSampler _sampler;
         uint _grad_offset;
         uint _param_offset;
@@ -66,16 +68,21 @@ public:
         float2 _range;
 
     public:
-        TexturedParameter(const Image<float> &image, TextureSampler sampler, uint grad_offset, uint param_offset,
+        TexturedParameter(uint index,
+                          const Image<float> &image, TextureSampler sampler,
+                          uint grad_offset, uint param_offset,
                           uint counter_offset, float2 range) noexcept
-            : _image{image}, _sampler{sampler}, _grad_offset{grad_offset}, _param_offset{param_offset},
+            : _image{image}, _index{index}, _sampler{sampler},
+              _grad_offset{grad_offset}, _param_offset{param_offset},
               _counter_offset{counter_offset}, _range{range} {}
         [[nodiscard]] auto &image() const noexcept { return _image; }
+        [[nodiscard]] auto index() const noexcept { return _index; }
         [[nodiscard]] auto sampler() const noexcept { return _sampler; }
         [[nodiscard]] auto range() const noexcept { return _range; }
         [[nodiscard]] auto gradient_buffer_offset() const noexcept { return _grad_offset; }
         [[nodiscard]] auto param_offset() const noexcept { return _param_offset; }
         [[nodiscard]] auto counter_offset() const noexcept { return _counter_offset; }
+        [[nodiscard]] auto identifier() const noexcept { return luisa::format("difftex({})", _index); }
     };
 
 private:

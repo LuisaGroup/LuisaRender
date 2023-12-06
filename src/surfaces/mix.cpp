@@ -51,7 +51,10 @@ public:
 
 public:
     [[nodiscard]] luisa::string closure_identifier() const noexcept override {
-        return luisa::format("mix<{}, {}>", _a->closure_identifier(), _b->closure_identifier());
+        return luisa::format("mix<{}, {}, {}>",
+                             _a->closure_identifier(),
+                             _b->closure_identifier(),
+                             Texture::Instance::diff_param_identifier(_ratio));
     }
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> create_closure(const SampledWavelengths &swl, Expr<float> time) const noexcept override;
     void populate_closure(Surface::Closure *closure, const Interaction &it, Expr<float3> wo, Expr<float> eta_i) const noexcept override;

@@ -114,6 +114,13 @@ public:
         const SampledWavelengths &swl, Expr<float> time) const noexcept override;
     void populate_closure(Surface::Closure *closure, const Interaction &it,
                           Expr<float3> wo, Expr<float> eta_i) const noexcept override;
+    [[nodiscard]] luisa::string closure_identifier() const noexcept override {
+        return luisa::format("glass<{}, {}, {}, {}>",
+                             Texture::Instance::diff_param_identifier(_kr),
+                             Texture::Instance::diff_param_identifier(_kt),
+                             Texture::Instance::diff_param_identifier(_roughness),
+                             Texture::Instance::diff_param_identifier(_eta));
+    }
 };
 
 luisa::unique_ptr<Surface::Instance> GlassSurface::_build(

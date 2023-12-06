@@ -179,6 +179,11 @@ public:
 public:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> create_closure(const SampledWavelengths &swl, Expr<float> time) const noexcept override;
     void populate_closure(Surface::Closure *closure, const Interaction &it, Expr<float3> wo, Expr<float> eta_i) const noexcept override;
+    [[nodiscard]] luisa::string closure_identifier() const noexcept override {
+        return luisa::format("metal<{}, {}>",
+                             Texture::Instance::diff_param_identifier(_roughness),
+                             Texture::Instance::diff_param_identifier(_kd));
+    }
 };
 
 luisa::unique_ptr<Surface::Instance> MetalSurface::_build(

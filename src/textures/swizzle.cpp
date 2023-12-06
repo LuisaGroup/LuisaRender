@@ -111,6 +111,13 @@ public:
             _base->backward(it, swl, time, g);
         }
     }
+    [[nodiscard]] luisa::string diff_param_identifier() const noexcept override {
+        auto base_ident = Instance::diff_param_identifier(_base);
+        return base_ident == non_differrentiable_identifier ?
+                   non_differrentiable_identifier :
+                   luisa::format("diffswizzle<{}, {}>",
+                                 base_ident, node<SwizzleTexture>()->channels());
+    }
 };
 
 luisa::unique_ptr<Texture::Instance> SwizzleTexture::build(
