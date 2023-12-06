@@ -112,8 +112,8 @@ public:
     };
 
 private:
-    luisa::unique_ptr<Loss> _loss;
-    luisa::unique_ptr<Optimizer> _optimizer;
+    const Loss *_loss;
+    const Optimizer *_optimizer;
     uint _iterations;
     int _display_camera_index;
     bool _save_process;
@@ -122,8 +122,8 @@ public:
     DifferentiableIntegrator(Scene *scene, const SceneNodeDesc *desc) noexcept;
 
     [[nodiscard]] bool is_differentiable() const noexcept override { return true; }
-    [[nodiscard]] auto loss() const noexcept { return _loss.get(); }
-    [[nodiscard]] auto optimizer() const noexcept { return _optimizer.get(); }
+    [[nodiscard]] auto loss() const noexcept { return _loss; }
+    [[nodiscard]] auto optimizer() const noexcept { return _optimizer; }
     [[nodiscard]] auto iterations() const noexcept { return _iterations; }
     [[nodiscard]] int display_camera_index() const noexcept { return _display_camera_index; }
     [[nodiscard]] bool save_process() const noexcept { return _save_process; }

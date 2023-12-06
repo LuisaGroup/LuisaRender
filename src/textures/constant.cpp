@@ -68,7 +68,6 @@ public:
                             CommandBuffer &cmd_buffer,
                             luisa::optional<Differentiation::ConstantParameter> param) noexcept
         : Texture::Instance{p, t}, _diff_param{std::move(param)} {
-        LUISA_INFO("index {} prepared.", _diff_param->index());
         if (!t->should_inline()) {
             auto [buffer, buffer_id] = p.allocate_constant_slot();
             auto v = t->v();
@@ -104,8 +103,8 @@ public:
                   Expr<float>, Expr<float4> grad) const noexcept override {
         if (_diff_param) {
             $if(_diff_param->index() != 0u) {
-                device_log("ggggggggg ({}) , grad in accumulate: ({}, {}, {})",
-                           _diff_param->index(), grad[0u], grad[1u], grad[2u]);
+                // device_log("ggggggggg ({}) , grad in accumulate: ({}, {}, {})",
+                //            _diff_param->index(), grad[0u], grad[1u], grad[2u]);
             };
             auto slot_seed = xxhash32(as<uint3>(it.p()));
             // $if(_diff_param->index() == 1u) {
