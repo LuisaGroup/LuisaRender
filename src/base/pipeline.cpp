@@ -46,6 +46,10 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     auto pipeline = luisa::make_unique<Pipeline>(device);
     pipeline->_transform_matrices.resize(transform_matrix_buffer_size);
     pipeline->_transform_matrix_buffer = device.create_buffer<float4x4>(transform_matrix_buffer_size);
+    if (scene.integrator()->is_differentiable()) {
+        pipeline->_differentiation =
+            luisa::make_unique<Differentiation>(*pipeline);
+    }
     stream << pipeline->printer().reset();
     auto initial_time = std::numeric_limits<float>::max();
     for (auto c : scene.cameras()) {
@@ -83,11 +87,16 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
     }
     update_bindless_if_dirty();
     pipeline->_integrator = scene.integrator()->build(*pipeline, command_buffer);
+    if (auto &&diff = pipeline->_differentiation) {
+        diff->register_optimizer(dynamic_cast<DifferentiableIntegrator::Instance *>(pipeline->_integrator.get())->optimizer());
+        diff->materialize(command_buffer);
+    }
     if (!pipeline->_transforms.empty()) {
         command_buffer << pipeline->_transform_matrix_buffer.view(0u, pipeline->_transforms.size())
                               .copy_from(pipeline->_transform_matrices.data());
     }
     update_bindless_if_dirty();
+
     command_buffer << compute::commit();
     LUISA_INFO("Created pipeline with {} camera(s), {} shape instance(s), "
                "{} surface instance(s), and {} light instance(s).",
@@ -132,6 +141,16 @@ const Filter::Instance *Pipeline::build_filter(CommandBuffer &command_buffer, co
     }
     auto f = filter->build(*this, command_buffer);
     return _filters.emplace(filter, std::move(f)).first->second.get();
+}
+
+Differentiation *Pipeline::differentiation() noexcept {
+    LUISA_ASSERT(_differentiation, "Differentiation is not constructed.");
+    return _differentiation.get();
+}
+
+const Differentiation *Pipeline::differentiation() const noexcept {
+    LUISA_ASSERT(_differentiation, "Differentiation is not constructed.");
+    return _differentiation.get();
 }
 
 const PhaseFunction::Instance *Pipeline::build_phasefunction(CommandBuffer &command_buffer, const PhaseFunction *phasefunction) noexcept {

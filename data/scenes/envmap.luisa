@@ -1,0 +1,123 @@
+Film film : Color {
+  resolution { 1280, 720 }
+  exposure { 0 }
+}
+
+Camera camera : Pinhole {
+  position { 0, 0, 5 }
+  fov { 60 }
+  spp { 1024 }
+  zoom { -1 }
+  film { @film }
+  file { "../renders/envmap.exr" }
+  shutter_span { 0, 0 }
+  shutter_samples { 128 }
+  shutter_weights { 0, 0.2, 0.5, 3.5, 0.5, 0.2, 0 }
+  shutter_time_points { 0, 0.15, 0.25, 0.5, 0.75, 0.85, 1 }
+  filter : Gaussian {
+    radius { 1 }
+  }
+}
+
+Integrator normal : Normal {}
+
+Integrator pt : WavePath {
+  sampler : Independent {}
+  depth { 16 }
+  rr_depth { 3 }
+  spectrum : Hero {}
+  // display { true }
+}
+
+Shape teapot : Group {
+  shapes {
+    Mesh {
+      file { "../meshes/utah-teapot.obj" }
+      two_sided { false }
+      surface : Metal {
+        color : Constant {
+          v { 1 }
+        }
+        Kr : Constant {
+          // v { 0.3, 0.7, 1.0 }
+          v { 1.0 }
+        }
+        Kd : Constant {
+          v { 0.3, 0.7, 1.0 }
+        }
+        Kt : Constant {
+          v { 1.0 }
+        }
+        Ks : Constant {
+          v { 0.4 }
+          // v { 0.2, 0.3, 0.9 }
+          // v { 0.5, 0.5, 0.5 }
+        }
+        roughness : Constant {
+          v { 0.01 }
+        }
+        metallic : Constant {
+          v { 0.5 }
+        }
+        specular_trans : Constant {
+          v { 1 }
+        }
+        // remap_roughness { true }
+        // eta { 1.7 }
+        eta { "Sapphire" }
+        // eta { "Au" }
+        // eta : ConstGeneric {
+        //   v { 1.5, 1.52, 1.6 }
+        // }
+      }
+    }
+  }
+  transform : Lerp {
+    transforms {
+      SRT {
+        scale { 0.4 }
+        translate { 0, -1, 0 }
+        rotate { 1, 2, 1, 90 }
+      },
+      SRT {
+        scale { 0.4 }
+        translate { 0, -1, 0 }
+        rotate { 1, 2, 1, 100 }
+      }
+    }
+    time_points { 0, 1 }
+  }
+}
+
+Shape sphere : Mesh {
+  file { "../meshes/sphere.obj" }
+  surface : Mirror {}
+}
+
+import "../meshes/bingdwendwen.luisa"
+
+Shape scaled-bing : Instance {
+  shape { @bingdwendwen }
+  transform : SRT {
+    scale { 4 }
+    translate { 1, -2, 0 }
+    // rotate { 0, 1, 0, 180 }
+  }
+}
+
+render {
+  cameras { @camera }
+  shapes { @teapot }
+  integrator { @pt }
+  environment : Spherical {
+    emission : Image {
+      // file { "../envmaps/photo_studio_01_1k.hdr" }
+      // fp32 { true }
+      file { "../envmaps/envmap.exr" }
+      // file { "/Users/mike/Downloads/dreifaltigkeitsberg_8k.exr" }
+    }
+    transform : SRT {
+      rotate { 0, 1, 0, 45 }
+    }
+  }
+}

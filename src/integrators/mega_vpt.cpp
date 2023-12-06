@@ -30,6 +30,7 @@ public:
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
+    [[nodiscard]] bool is_differentiable() const noexcept override { return false; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
@@ -47,7 +48,7 @@ protected:
                 "No lights in scene. Rendering aborted.");
             return;
         }
-//        pipeline().printer().set_log_dispatch_id(make_uint2(330, 770));
+        //        pipeline().printer().set_log_dispatch_id(make_uint2(330, 770));
         Instance::_render_one_camera(command_buffer, camera);
     }
 

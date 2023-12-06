@@ -1,0 +1,182 @@
+// mat_cbox
+Surface cbox-white : Matte {
+  Kd : Constant {
+    //v { 0.725, 0.71, 0.68 }
+    v { 0.5, 0.5, 0.5 }
+    requires_grad { true }
+    range { 0.00001, 0.99999 }
+  }
+}
+
+Surface cbox-green : Matte {
+  Kd : Constant {
+    //v { 0.14, 0.45, 0.091 }
+    v { 0.5, 0.5, 0.5 }
+    requires_grad { true }
+    range { 0.00001, 0.99999 }
+  }
+}
+
+Surface cbox-red : Matte {
+  Kd : Constant {
+    //v { 0.63, 0.065, 0.05 }
+    v { 0.5, 0.5, 0.5 }
+    requires_grad { true }
+    range { 0.00001, 0.99999 }
+  }
+}
+
+
+// mat_paintings
+Surface mat_paintings_Landscape : Matte {
+  Kd : Image {
+    file { "./textures/landscape-with-a-lake.jpg" }
+
+  }
+  //Kd : Placeholder {
+  //  resolution { 1920, 1280 }
+  //  requires_grad { true }
+  //  range { 0.00001, 0.99999 }
+  //  uv_scale { 1, -1 }
+  //}
+}
+
+Surface mat_paintings_frame : Matte {
+  Kd : Constant {
+    //v { 0.258824, 0.207843, 0.145098 }
+    v { 0.5, 0.5, 0.5 }
+    requires_grad { true }
+    range { 0.00001, 0.99999 }
+  }
+}
+
+
+
+// shape_cbox
+Shape cbox-ceiling : Mesh {
+  file { "../../meshes/cbox-parts/ceiling.obj" }
+  surface { @cbox-white }
+}
+
+Shape cbox-floor : Mesh {
+  file { "../../meshes/cbox-parts/floor.obj" }
+  surface { @cbox-white }
+}
+
+Shape cbox-left-wall : Mesh {
+  file { "../../meshes/cbox-parts/left-wall.obj" }
+  surface { @cbox-red }
+}
+
+Shape cbox-right-wall : Mesh {
+  file { "../../meshes/cbox-parts/right-wall.obj" }
+  surface { @cbox-green }
+}
+
+Shape cbox-back-wall : Mesh {
+  file { "../../meshes/cbox-parts/back-wall.obj" }
+  surface { @cbox-white }
+}
+
+
+// shape_paintings
+Shape paintings_frame : Mesh {
+  file { "./models/paintings/Mesh_frame.obj" }
+  surface { @mat_paintings_frame }
+}
+Shape paintings_Landscape : Mesh {
+  file { "./models/paintings/Mesh_paintings.obj" }
+  surface { @mat_paintings_Landscape }
+}
+
+Shape paintings : Group {
+  shapes {
+    @paintings_frame,
+    @paintings_Landscape
+  }
+  transform : Stack {
+      transforms {
+          SRT {
+            translate { 2.8695, -2.2478, 2.6618 }
+          },
+          SRT {
+            scale { 0.75 }
+          },
+          SRT {
+            rotate { 0, 1, 0, -90 }
+          },
+          SRT {
+            translate { 0.0, 1.25, -1.0 }
+          }
+      }
+  }
+}
+
+
+Shape cbox-light : Mesh {
+  file { "../../meshes/cbox-parts/light.obj" }
+  light : Diffuse {
+    emission : Constant {
+      v { 45.0, 45.0, 45.0 }
+    }
+  }
+}
+
+
+Shape cbox : Group {
+  shapes {
+    @cbox-floor,
+    @cbox-ceiling,
+    @cbox-left-wall,
+    @cbox-right-wall,
+    @cbox-back-wall,
+    @cbox-light
+  }
+}
+
+Film film : Color {
+  resolution { 1024 }
+  exposure { 0 }
+}
+
+Camera camera : Pinhole {
+  position { 0.0, 1.0, 5.0 }
+  fov { 27.8 }
+  spp { 64 }
+  film { @film }
+  file { "../../renders/cbox-diff.exr" }
+  filter : Gaussian {
+    radius { 1 }
+  }
+  target : Image {
+    file { "../../renders/cbox-ref.exr" }
+  }
+}
+
+//Integrator pt : MegaRadiativeDiff {
+Integrator pt : MegaReplayDiff {
+  sampler : Independent {}
+  depth { 10 }
+  rr_depth { 5 }
+
+  display_camera_index { 0 }
+  save_process { true }
+  loss : L2 {}
+  iterations { 50 }
+
+  optimizer : Adam {
+    learning_rate { 0.003 }
+  }
+}
+
+render {
+  spectrum : sRGB {}
+  cameras {
+    @camera
+  }
+  shapes {
+    @cbox,
+    @paintings
+  }
+  integrator { @pt }
+}

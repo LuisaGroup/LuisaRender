@@ -113,6 +113,11 @@ private:
     SampledSpectrum R;
 
 public:
+    struct Gradient {
+        SampledSpectrum dR;
+    };
+
+public:
     explicit DisneyDiffuse(const SampledSpectrum &R) noexcept : R{R} {}
     [[nodiscard]] SampledSpectrum albedo() const noexcept override { return R; }
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override {
@@ -125,11 +130,22 @@ public:
         };
         return R * impl(wo, wi);
     }
+    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
+        auto Fo = SchlickWeight(abs_cos_theta(wo));
+        auto Fi = SchlickWeight(abs_cos_theta(wi));
+        return {.dR = df * inv_pi * (1.f - Fo * .5f) * (1.f - Fi * .5f)};
+    }
 };
 
 // "Fake" subsurface scattering lobe, based on the Hanrahan-Krueger BRDF
 // approximation of the BSSRDF.
 class DisneyFakeSS final : public BxDF {
+
+public:
+    struct Gradient {
+        SampledSpectrum dR;
+        Float dRoughness;
+    };
 
 private:
     SampledSpectrum R;
@@ -156,9 +172,19 @@ public:
         };
         return R * impl(wo, wi, roughness);
     }
+    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
+        // TODO
+        LUISA_ERROR_WITH_LOCATION("Not implemented.");
+    }
 };
 
 class DisneyRetro final : public BxDF {
+
+public:
+    struct Gradient {
+        SampledSpectrum dR;
+        Float dRoughness;
+    };
 
 private:
     SampledSpectrum R;
@@ -182,9 +208,18 @@ public:
         };
         return R * impl(wo, wi, roughness);
     }
+    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
+        // TODO
+        LUISA_ERROR_WITH_LOCATION("Not implemented.");
+    }
 };
 
 class DisneySheen final : public BxDF {
+
+public:
+    struct Gradient {
+        SampledSpectrum dR;
+    };
 
 private:
     SampledSpectrum R;
@@ -202,6 +237,10 @@ public:
         };
         return R * impl(wo, wi);
     }
+    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
+        // TODO
+        LUISA_ERROR_WITH_LOCATION("Not implemented.");
+    }
 };
 
 [[nodiscard]] inline Float GTR1(Float cosTheta, Float alpha) noexcept {
@@ -218,6 +257,12 @@ public:
 }
 
 class DisneyClearcoat final {
+
+public:
+    struct Gradient {
+        Float dWeight;
+        Float dGloss;
+    };
 
 private:
     Float weight;
@@ -273,6 +318,10 @@ public:
         };
         return impl(wo, wi, gloss);
     }
+    [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
+        // TODO
+        LUISA_ERROR_WITH_LOCATION("Not implemented.");
+    }
 };
 
 // Specialized Fresnel function used for the specular component, based on
@@ -300,6 +349,13 @@ public:
 struct DisneyMicrofacetDistribution final : public TrowbridgeReitzDistribution {
     explicit DisneyMicrofacetDistribution(Expr<float2> alpha) noexcept
         : TrowbridgeReitzDistribution{alpha} {}
+    [[nodiscard]] Float G(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+        return G1(wo) * G1(wi);
+    }
+    [[nodiscard]] Gradient grad_G(Expr<float3> wo, Expr<float3> wi) const noexcept override {
+        auto d_alpha = grad_G1(wo).dAlpha * G1(wi) + G1(wo) * grad_G1(wi).dAlpha;
+        return {.dAlpha = d_alpha};
+    }
 };
 
 }// namespace
@@ -839,51 +895,6 @@ public:
         return {.eval = eval, .wi = wi, .event = event};
     }
 };
-
-class DisneySurfaceClosure : public Surface::Closure {
-
-private:
-    bool _thin;
-    bool _transmissive;
-    uint _enabled_lobes = 0u;
-    luisa::unique_ptr<DisneyClosureImplBase> _impl;
-
-public:
-    DisneySurfaceClosure(const Pipeline &pipeline,
-                         const SampledWavelengths &swl,
-                         Expr<float> time,
-                         bool is_thin, bool is_transmissive) noexcept
-        : Surface::Closure{pipeline, swl, time},
-          _thin{is_thin}, _transmissive{is_transmissive} {}
-
-public:
-    void pre_eval() noexcept override {
-        if (_thin) {
-            _impl = luisa::make_unique<ThinDisneyClosureImpl>(
-                context<DisneyContext>(), _enabled_lobes);
-        } else {
-            _impl = luisa::make_unique<DisneyClosureImpl>(
-                context<DisneyContext>(), _enabled_lobes, _transmissive);
-        }
-    }
-    void post_eval() noexcept override { _impl = nullptr; }
-    void enable_lobes(uint lobe_mask) noexcept { _enabled_lobes |= lobe_mask; }
-    [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _impl->albedo(); }
-    [[nodiscard]] Float2 roughness() const noexcept override { return _impl->roughness(); }
-    [[nodiscard]] luisa::optional<Float> eta() const noexcept override { return _impl->eta(); }
-    [[nodiscard]] const Interaction &it() const noexcept override { return context<DisneyContext>().it; }
-
-private:
-    [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
-                                                TransportMode mode) const noexcept override {
-        return _impl->evaluate(wo, wi, mode);
-    }
-    [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float> u_lobe,
-                                          Expr<float2> u, TransportMode mode) const noexcept override {
-        return _impl->sample(wo, u_lobe, u, mode);
-    }
-};
-
 class DisneySurfaceInstance : public Surface::Instance {
 
 private:
@@ -930,82 +941,139 @@ public:
     }
 
     void populate_closure(Surface::Closure *closure, const Interaction &it,
-                          Expr<float3> wo, Expr<float> eta_i) const noexcept override {
-        auto &swl = closure->swl();
-        auto time = closure->time();
-        auto color_decode = _color ? _color->evaluate_albedo_spectrum(it, swl, time) :
-                                     Spectrum::Decode::one(swl.dimension());
-        auto metallic = _metallic ? _metallic->evaluate(it, swl, time).x : 0.f;
-        auto eta = _eta ? _eta->evaluate(it, swl, time).x : 1.5f;
-        auto roughness = _roughness ? _roughness->evaluate(it, swl, time).x : .5f;
-        if (node<DisneySurface>()->remap_roughness()) {
-            roughness = DisneyMicrofacetDistribution::roughness_to_alpha(roughness);
-        }
-        auto specular_tint = _specular_tint ? _specular_tint->evaluate(it, swl, time).x : 0.f;
-        auto anisotropic = _anisotropic ? _anisotropic->evaluate(it, swl, time).x : 0.f;
-        auto sheen = _sheen ? _sheen->evaluate(it, swl, time).x : 0.f;
-        auto sheen_tint = _sheen_tint ? _sheen_tint->evaluate(it, swl, time).x : 0.f;
-        auto clearcoat = _clearcoat ? _clearcoat->evaluate(it, swl, time).x : 0.f;
-        auto clearcoat_gloss = _clearcoat_gloss ? _clearcoat_gloss->evaluate(it, swl, time).x : 1.f;
-        auto specular_trans = _specular_trans ? _specular_trans->evaluate(it, swl, time).x : 0.f;
-        auto flatness = _flatness ? _flatness->evaluate(it, swl, time).x : 0.f;
-        auto diffuse_trans = _diffuse_trans ? _diffuse_trans->evaluate(it, swl, time).x : 0.f;
-
-        DisneyContext ctx{
-            .it = it,
-            .color = color_decode.value,
-            .color_lum = color_decode.strength,
-            .metallic = metallic,
-            .eta_i = eta_i,
-            .eta_t = eta,
-            .roughness = roughness,
-            .specular_tint = specular_tint,
-            .anisotropic = anisotropic,
-            .sheen = sheen,
-            .sheen_tint = sheen_tint,
-            .clearcoat = clearcoat,
-            .clearcoat_gloss = clearcoat_gloss,
-            .specular_trans = specular_trans,
-            .flatness = flatness,
-            .diffuse_trans = diffuse_trans};
-
-        // find used lobes
-        auto lobes = 0u;
-        if (!_color || !_color->node()->is_black()) {
-            lobes |= disney_lobe_diffuse_bit;
-            lobes |= disney_lobe_retro_bit;
-            if (_sheen && !_sheen->node()->is_black()) {
-                lobes |= disney_lobe_sheen_bit;
-            }
-            if (_flatness && !_flatness->node()->is_black()) {
-                lobes |= disney_lobe_fake_ss_bit;
-            }
-        }
-        lobes |= disney_lobe_specular_bit;
-        if (_clearcoat && !_clearcoat->node()->is_black()) {
-            lobes |= disney_lobe_clearcoat_bit;
-        }
-        if (_specular_trans && !_specular_trans->node()->is_black()) {
-            lobes |= disney_lobe_spec_trans_bit;
-        }
-        if (_diffuse_trans && !_diffuse_trans->node()->is_black()) {
-            lobes |= disney_lobe_diff_trans_bit;
-        }
-
-        // update closure
-        auto disney_closure = dynamic_cast<DisneySurfaceClosure *>(closure);
-        disney_closure->bind(std::move(ctx));
-        disney_closure->enable_lobes(lobes);
-    }
+                          Expr<float3> wo, Expr<float> eta_i) const noexcept override;
 
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> create_closure(
-        const SampledWavelengths &swl, Expr<float> time) const noexcept override {
-        return luisa::make_unique<DisneySurfaceClosure>(
-            pipeline(), swl, time,
-            node<DisneySurface>()->is_thin(),
-            node<DisneySurface>()->is_transmissive());
+        const SampledWavelengths &swl, Expr<float> time) const noexcept override;
+};
+
+class DisneySurfaceClosure : public Surface::Closure {
+
+private:
+    bool _thin;
+    bool _transmissive;
+    uint _enabled_lobes = 0u;
+    luisa::unique_ptr<DisneyClosureImplBase> _impl;
+
+public:
+    DisneySurfaceClosure(const DisneySurfaceInstance *instance,
+                         const Pipeline &pipeline,
+                         const SampledWavelengths &swl,
+                         Expr<float> time,
+                         bool is_thin, bool is_transmissive) noexcept
+        : Surface::Closure{instance, pipeline, swl, time},
+          _thin{is_thin}, _transmissive{is_transmissive} {}
+
+public:
+    void pre_eval() noexcept override {
+        if (_thin) {
+            _impl = luisa::make_unique<ThinDisneyClosureImpl>(
+                context<DisneyContext>(), _enabled_lobes);
+        } else {
+            _impl = luisa::make_unique<DisneyClosureImpl>(
+                context<DisneyContext>(), _enabled_lobes, _transmissive);
+        }
+    }
+    void post_eval() noexcept override { _impl = nullptr; }
+    void enable_lobes(uint lobe_mask) noexcept { _enabled_lobes |= lobe_mask; }
+    [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _impl->albedo(); }
+    [[nodiscard]] Float2 roughness() const noexcept override { return _impl->roughness(); }
+    [[nodiscard]] luisa::optional<Float> eta() const noexcept override { return _impl->eta(); }
+    [[nodiscard]] const Interaction &it() const noexcept override { return context<DisneyContext>().it; }
+
+private:
+    [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,
+                                                TransportMode mode) const noexcept override {
+        return _impl->evaluate(wo, wi, mode);
+    }
+    [[nodiscard]] Surface::Sample _sample(Expr<float3> wo, Expr<float> u_lobe,
+                                          Expr<float2> u, TransportMode mode) const noexcept override {
+        return _impl->sample(wo, u_lobe, u, mode);
+    }
+    void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df,
+                   TransportMode mode) const noexcept override {
+        // TODO
+        LUISA_WARNING_WITH_LOCATION("Not implemented.");
     }
 };
+
+void DisneySurfaceInstance::populate_closure(Surface::Closure *closure, const Interaction &it,
+                                             Expr<float3> wo, Expr<float> eta_i) const noexcept {
+    auto &swl = closure->swl();
+    auto time = closure->time();
+    auto color_decode = _color ? _color->evaluate_albedo_spectrum(it, swl, time) :
+                                 Spectrum::Decode::one(swl.dimension());
+    auto metallic = _metallic ? _metallic->evaluate(it, swl, time).x : 0.f;
+    auto eta = _eta ? _eta->evaluate(it, swl, time).x : 1.5f;
+    auto roughness = _roughness ? _roughness->evaluate(it, swl, time).x : .5f;
+    if (node<DisneySurface>()->remap_roughness()) {
+        roughness = DisneyMicrofacetDistribution::roughness_to_alpha(roughness);
+    }
+    auto specular_tint = _specular_tint ? _specular_tint->evaluate(it, swl, time).x : 0.f;
+    auto anisotropic = _anisotropic ? _anisotropic->evaluate(it, swl, time).x : 0.f;
+    auto sheen = _sheen ? _sheen->evaluate(it, swl, time).x : 0.f;
+    auto sheen_tint = _sheen_tint ? _sheen_tint->evaluate(it, swl, time).x : 0.f;
+    auto clearcoat = _clearcoat ? _clearcoat->evaluate(it, swl, time).x : 0.f;
+    auto clearcoat_gloss = _clearcoat_gloss ? _clearcoat_gloss->evaluate(it, swl, time).x : 1.f;
+    auto specular_trans = _specular_trans ? _specular_trans->evaluate(it, swl, time).x : 0.f;
+    auto flatness = _flatness ? _flatness->evaluate(it, swl, time).x : 0.f;
+    auto diffuse_trans = _diffuse_trans ? _diffuse_trans->evaluate(it, swl, time).x : 0.f;
+
+    DisneyContext ctx{
+        .it = it,
+        .color = color_decode.value,
+        .color_lum = color_decode.strength,
+        .metallic = metallic,
+        .eta_i = eta_i,
+        .eta_t = eta,
+        .roughness = roughness,
+        .specular_tint = specular_tint,
+        .anisotropic = anisotropic,
+        .sheen = sheen,
+        .sheen_tint = sheen_tint,
+        .clearcoat = clearcoat,
+        .clearcoat_gloss = clearcoat_gloss,
+        .specular_trans = specular_trans,
+        .flatness = flatness,
+        .diffuse_trans = diffuse_trans};
+
+    // find used lobes
+    auto lobes = 0u;
+    if (!_color || !_color->node()->is_black()) {
+        lobes |= disney_lobe_diffuse_bit;
+        lobes |= disney_lobe_retro_bit;
+        if (_sheen && !_sheen->node()->is_black()) {
+            lobes |= disney_lobe_sheen_bit;
+        }
+        if (_flatness && !_flatness->node()->is_black()) {
+            lobes |= disney_lobe_fake_ss_bit;
+        }
+    }
+    lobes |= disney_lobe_specular_bit;
+    if (_clearcoat && !_clearcoat->node()->is_black()) {
+        lobes |= disney_lobe_clearcoat_bit;
+    }
+    if (_specular_trans && !_specular_trans->node()->is_black()) {
+        lobes |= disney_lobe_spec_trans_bit;
+    }
+    if (_diffuse_trans && !_diffuse_trans->node()->is_black()) {
+        lobes |= disney_lobe_diff_trans_bit;
+    }
+
+    // update closure
+    auto disney_closure = dynamic_cast<DisneySurfaceClosure *>(closure);
+    disney_closure->bind(std::move(ctx));
+    disney_closure->enable_lobes(lobes);
+}
+
+[[nodiscard]] luisa::unique_ptr<Surface::Closure> DisneySurfaceInstance::create_closure(
+    const SampledWavelengths &swl, Expr<float> time) const noexcept {
+    return luisa::make_unique<DisneySurfaceClosure>(
+        this,
+        pipeline(), swl, time,
+        node<DisneySurface>()->is_thin(),
+        node<DisneySurface>()->is_transmissive());
+}
 
 luisa::unique_ptr<Surface::Instance> DisneySurface::_build(
     Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {

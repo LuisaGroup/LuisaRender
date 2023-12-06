@@ -22,6 +22,7 @@ public:
           _shading{desc->property_bool_or_default("shading", true)} {}
     [[nodiscard]] auto remap() const noexcept { return _remap; }
     [[nodiscard]] auto shading() const noexcept { return _shading; }
+    [[nodiscard]] bool is_differentiable() const noexcept override { return false; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(
         Pipeline &pipeline, CommandBuffer &cb) const noexcept override;

@@ -1,0 +1,63 @@
+Film film : Color {
+  resolution { 1024 }
+  exposure { -3.5 }
+}
+
+Camera camera : Pinhole {
+  position { -0.01, 0.995, 5.0 }
+  fov { 27.8 }
+  spp { 1024 }
+  film { @film }
+  file { "../renders/cbox-image-light.exr" }
+  filter : Mitchell {
+    radius { 1 }
+  }
+}
+
+import "../meshes/cbox.luisa"
+
+Integrator pt : MegaPath {
+  depth { 10 }
+}
+
+Shape image-light : Mesh {
+  file { "../meshes/square.obj" }
+  two_sided { true }
+  transform : SRT {
+    scale { 1.5, 1, 1 }
+    translate { 0, 1.2, -0.97 }
+  }
+  light : Diffuse {
+    emission : Image {
+      file {
+        // "/Users/mike/Downloads/_DSC9322.jpg" }
+        // "/Users/mike/Downloads/WechatIMG16.jpeg" }
+        "./staircase/color.png" }
+      uv_offset { 0, 0 }
+      uv_scale { 1 }
+      scale { 30 }
+      encoding { "gamma" }
+      address { "mirror" }
+      gamma { 1 }
+    }
+  }
+  surface : Null {}
+}
+
+render {
+  cameras { @camera }
+  shapes {
+    @cbox-left-wall,
+    @cbox-right-wall,
+    @cbox-ceiling,
+    @cbox-floor,
+    Instance {
+      shape { @cbox-back-wall }
+      surface { @cbox-brick }
+    },
+    @cbox-short-box,
+    // @cbox-tall-box,
+    @image-light
+  }
+  integrator { @pt }
+}

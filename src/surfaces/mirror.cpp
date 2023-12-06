@@ -28,7 +28,7 @@ public:
           _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {}
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] uint properties() const noexcept override { return property_reflective; }
+    [[nodiscard]] uint properties() const noexcept override { return property_reflective | property_differentiable; }
 
 protected:
     [[nodiscard]] luisa::unique_ptr<Instance> _build(
@@ -66,6 +66,12 @@ using namespace luisa::compute;
 
 class SchlickFresnel : public Fresnel {
 
+public:
+    struct Gradient : public Fresnel::Gradient {
+        SampledSpectrum dR0;
+        explicit Gradient(const SampledSpectrum &dR0) noexcept : dR0{dR0} {}
+    };
+
 private:
     SampledSpectrum R0;
 
@@ -75,6 +81,12 @@ public:
         auto m = saturate(1.f - cosI);
         auto weight = sqr(sqr(m)) * m;
         return (1.f - weight) * R0 + weight;
+    }
+    [[nodiscard]] luisa::unique_ptr<Fresnel::Gradient> backward(
+        Expr<float> cosI, const SampledSpectrum &df) const noexcept override {
+        auto m = saturate(1.f - cosI);
+        auto weight = sqr(sqr(m)) * m;
+        return luisa::make_unique<SchlickFresnel::Gradient>(df * weight);
     }
 };
 
@@ -131,11 +143,44 @@ private:
                 .wi = wi,
                 .event = Surface::event_reflect};
     }
+    void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df_in,
+                   TransportMode mode) const noexcept override {
+        auto _instance = instance<MirrorInstance>();
+        auto &&ctx = context<Context>();
+        auto &it = ctx.it;
+        auto fresnel = SchlickFresnel(ctx.refl);
+        auto distribution = TrowbridgeReitzDistribution(ctx.alpha);
+        auto refl = MicrofacetReflection(ctx.refl, &distribution, &fresnel);
+        auto wo_local = it.shading().world_to_local(wo);
+        auto wi_local = it.shading().world_to_local(wi);
+        auto df = df_in * abs_cos_theta(wi_local);
+        auto grad = refl.backward(wo_local, wi_local, df);
+        auto d_fresnel = dynamic_cast<SchlickFresnel::Gradient *>(grad.dFresnel.get());
+        if (auto color = _instance->color()) {
+            color->backward_albedo_spectrum(it, swl(), time(), zero_if_any_nan(grad.dR + d_fresnel->dR0));
+        }
+        if (auto roughness = _instance->roughness()) {
+            auto remap = _instance->node<MirrorSurface>()->remap_roughness();
+            auto r_f4 = roughness->evaluate(it, swl(), time());
+            auto r = roughness->node()->channels() == 1u ? r_f4.xx() : r_f4.xy();
+
+            auto grad_alpha_roughness = [](auto &&x) noexcept {
+                return TrowbridgeReitzDistribution::grad_alpha_roughness(x);
+            };
+            auto d_r = grad.dAlpha * (remap ? grad_alpha_roughness(r) : make_float2(1.f));
+            auto d_r_f4 = roughness->node()->channels() == 1u ?
+                              make_float4(d_r.x + d_r.y, 0.f, 0.f, 0.f) :
+                              make_float4(d_r, 0.f, 0.f);
+            auto roughness_grad_range = 5.f * (roughness->node()->range().y - roughness->node()->range().x);
+            roughness->backward(it, swl(), time(),
+                                ite(any(isnan(d_r_f4) || abs(d_r_f4) > roughness_grad_range), 0.f, d_r_f4));
+        }
+    }
 };
 
 luisa::unique_ptr<Surface::Closure> MirrorInstance::create_closure(
     const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    return luisa::make_unique<MirrorClosure>(pipeline(), swl, time);
+    return luisa::make_unique<MirrorClosure>(this, pipeline(), swl, time);
 }
 
 void MirrorInstance::populate_closure(Surface::Closure *closure, const Interaction &it,

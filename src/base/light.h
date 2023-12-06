@@ -73,9 +73,10 @@ public:
         [[nodiscard]] virtual Sample sample(Expr<uint> light_inst_id,
                                             Expr<float3> p_from,
                                             Expr<float2> u) const noexcept = 0;
-        [[nodiscard]] virtual std::pair<Sample,Var<Ray>> sample_le(Expr<uint> light_inst_id,
-                                            Expr<float2> u_light,
-                                            Expr<float2> u_direction) const noexcept = 0;
+        [[nodiscard]] virtual std::pair<Sample, Var<Ray>> sample_le(Expr<uint> light_inst_id,
+                                                                    Expr<float2> u_light,
+                                                                    Expr<float2> u_direction) const noexcept = 0;
+        virtual void backward(const Interaction &it_light, Expr<float3> p_from, const SampledSpectrum &df) const noexcept = 0;
     };
 
     class Instance {

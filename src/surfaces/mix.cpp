@@ -91,11 +91,12 @@ public:
     using Surface::Closure::Closure;
 
     explicit MixSurfaceClosure(
+        const MixSurfaceInstance *instance,
         const Pipeline &pipeline,
         const SampledWavelengths &swl,
         Expr<float> time,
         luisa::unique_ptr<Surface::Closure> a, luisa::unique_ptr<Surface::Closure> b) noexcept
-        : Surface::Closure(pipeline, swl, time), _a{std::move(a)}, _b{std::move(b)} {}
+        : Surface::Closure(instance, pipeline, swl, time), _a{std::move(a)}, _b{std::move(b)} {}
     [[nodiscard]] auto a() const noexcept { return _a.get(); }
     [[nodiscard]] auto b() const noexcept { return _b.get(); }
     void pre_eval() noexcept override {
@@ -182,12 +183,28 @@ private:
         };
         return sample;
     }
+    void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df,
+                   TransportMode mode) const noexcept override {
+        auto &&ctx = context<Context>();
+        using compute::isnan;
+        auto eval_a = _a->evaluate(wo, wi, mode);
+        auto eval_b = _b->evaluate(wo, wi, mode);
+        auto d_a = df * ctx.ratio;
+        auto d_b = df * (1.f - ctx.ratio);
+        _a->backward(wo, wi, zero_if_any_nan(d_a), mode);
+        _b->backward(wo, wi, zero_if_any_nan(d_a), mode);
+        if (auto ratio = instance<MixSurfaceInstance>()->ratio()) {
+            auto d_ratio = (df * (eval_a.f - eval_b.f)).sum();
+            ratio->backward(ctx.it, swl(), time(),
+                            make_float4(ite(isnan(d_ratio), 0.f, d_ratio), 0.f, 0.f, 0.f));
+        }
+    }
 };
 
 luisa::unique_ptr<Surface::Closure> MixSurfaceInstance::create_closure(const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto a = _a->create_closure(swl, time);
     auto b = _b->create_closure(swl, time);
-    return luisa::make_unique<MixSurfaceClosure>(pipeline(), swl, time, std::move(a), std::move(b));
+    return luisa::make_unique<MixSurfaceClosure>(this, pipeline(), swl, time, std::move(a), std::move(b));
 }
 
 void MixSurfaceInstance::populate_closure(Surface::Closure *closure_in, const Interaction &it,

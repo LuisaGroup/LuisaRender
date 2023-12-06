@@ -46,6 +46,7 @@ public:
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto initial_radius() const noexcept { return _initial_radius; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
+    [[nodiscard]] bool is_differentiable() const noexcept override { return false; }
     [[nodiscard]] auto separate_direct() const noexcept { return _separate_direct; }
     [[nodiscard]] auto shared_radius() const noexcept { return _shared_radius; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }

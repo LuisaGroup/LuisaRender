@@ -213,12 +213,13 @@ private:
 public:
     using Surface::Closure::Closure;
 
-    explicit LayeredSurfaceClosure(const Pipeline &pipeline,
+    explicit LayeredSurfaceClosure(const LayeredSurfaceInstance *instance,
+                                   const Pipeline &pipeline,
                                    const SampledWavelengths &swl,
                                    Expr<float> time,
                                    luisa::unique_ptr<Surface::Closure> top,
                                    luisa::unique_ptr<Surface::Closure> bottom) noexcept
-        : Surface::Closure(pipeline, swl, time),
+        : Surface::Closure(instance, pipeline, swl, time),
           _top{std::move(top)}, _bottom{std::move(bottom)} {}
     [[nodiscard]] auto top() const noexcept { return _top.get(); }
     [[nodiscard]] auto bottom() const noexcept { return _bottom.get(); }
@@ -471,12 +472,16 @@ private:
         };
         return s;
     }
+    void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df,
+                   TransportMode mode) const noexcept override {
+        LUISA_WARNING_WITH_LOCATION("LayeredSurfaceClosure::backward() ignored.");
+    }
 };
 
 luisa::unique_ptr<Surface::Closure> LayeredSurfaceInstance::create_closure(const SampledWavelengths &swl, Expr<float> time) const noexcept {
     auto top = _top->create_closure(swl, time);
     auto bottom = _bottom->create_closure(swl, time);
-    return luisa::make_unique<LayeredSurfaceClosure>(pipeline(), swl, time, std::move(top), std::move(bottom));
+    return luisa::make_unique<LayeredSurfaceClosure>(this, pipeline(), swl, time, std::move(top), std::move(bottom));
 }
 
 void LayeredSurfaceInstance::populate_closure(Surface::Closure *closure_in, const Interaction &it,

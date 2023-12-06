@@ -43,6 +43,7 @@ public:
     }
     [[nodiscard]] auto importance_sampling() const noexcept { return _importance_sampling; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] bool is_differentiable() const noexcept override { return false; }
     [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };

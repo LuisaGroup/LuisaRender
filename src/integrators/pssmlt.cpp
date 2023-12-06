@@ -291,6 +291,7 @@ public:
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
+    [[nodiscard]] bool is_differentiable() const noexcept override { return false; }
     [[nodiscard]] auto bootstrap_samples() const noexcept { return _bootstrap_samples; }
     [[nodiscard]] auto chains() const noexcept { return _chains; }
     [[nodiscard]] auto large_step_probability() const noexcept { return _large_step_probability; }

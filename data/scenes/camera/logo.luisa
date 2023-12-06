@@ -1,0 +1,200 @@
+
+Environment environment : Spherical {
+  // emission : Image {
+  //   file { "/Users/mike/Downloads/drakensberg_solitary_mountain_8k.exr" }
+  // }
+  emission : NishitaSky {
+    sun_elevation { 60 }
+    sun_angle { 2 }
+    altitude { 670 }
+    air_density { 1 }
+    dust_density { 0 }
+    ozone_density { 8 }
+    sun_disc { true }
+    sun_intensity { 0.2 }
+  }
+  transform : SRT {
+    rotate { 0, 1, 0, 220 }
+  }
+  scale { 0.1 }
+}
+
+
+Environment environment2 : Spherical {
+  emission : Image {
+    file { "textures/kiara_1_dawn_8k.exr" }
+    semantic { "illuminant" }
+  }
+  transform : SRT {
+    rotate { 0, 1, 0, -40 }
+  }
+  scale { 1.5 }
+}
+
+Camera camera : ThinLens {
+  position { -0.002, 0.4, 0.3 }
+  look_at { -0.002, 0.02, -0.01 }
+  aperture { 4 }
+  focal_length { 70 }
+  spp { 256 }
+  film : Color {
+    resolution { 1920, 1080 }
+    clamp { 128 }
+  }
+  file { "logo.exr" }
+  filter : Gaussian {
+    radius { 1 }
+  }
+}
+
+Camera camera2 : ThinLens {
+  position { 0.0, 0.12, 0.6 }
+  look_at { 0, 0.02, 0.018 }
+  aperture { 5.6 }
+  focal_length { 70 }
+  spp { 256 }
+  film : Color {
+    resolution { 1920, 1080 }
+    clamp { 128 }
+  }
+  file { "render-logo.exr" }
+  filter : Gaussian {
+    radius { 1 }
+  }
+}
+
+Integrator integrator : MegaPath {
+  sampler : PMJ02BN {}
+}
+
+Surface surface_backdrop : Disney {
+  // color : Image {
+  //   file { "textures/weathered_brown_planks_diff_16k.jpg" }
+  // }
+  color : Image {
+    file { "/Users/mike/Downloads/Unknown-2/textures/aerial_rocks_01_diff_4k.jpg" }
+    uv_scale { -8, 8 }
+    // uv_offset { 0, 1 }
+  }
+  roughness : Image {
+    file { "/Users/mike/Downloads/Unknown-2/textures/aerial_rocks_01_rough_4k.jpg" }
+    uv_scale { -8, 8 }
+    encoding { "linear" }
+  }
+  // clearcoat : Constant {
+  //   v { 0.5 }
+  // }
+  // clearcoat_gloss : Constant {
+  //   v { 1 }
+  // }
+  normal_map : Image {
+    file { "/Users/mike/Downloads/Unknown-2/textures/aerial_rocks_01_nor_gl_4k.exr" }
+    uv_scale { -8, 8 }
+    encoding { "linear" }
+  }
+}
+
+Shape shape_ground : Mesh {
+  // file { "floor.obj" }
+  file { "../../meshes/square.obj" }
+  surface { @surface_backdrop }
+  transform : SRT {
+    // scale { 2, 1, 3 }
+    scale { 0.5 }
+    // rotate { 0, 1, 0, -90 }
+    rotate { 1, 0, 0, -90 }
+  }
+}
+
+Shape logo-l : Mesh {
+  file { "luisa/L.obj" }
+  surface : Matte {
+    Kd : Constant {
+      v { 0, 0.18, 0.48888 }
+    }
+    eta { "Al" }
+    roughness : Constant {
+      v { 0.4 }
+    }
+  }
+}
+
+Shape logo-u : Mesh {
+  file { "luisa/U.obj" }
+  surface : Matte {
+    Kd : Constant {
+      v { 0, 0.41, 0.27 }
+    }
+    eta { "Al" }
+    roughness : Constant {
+      v { 0.4 }
+    }
+  }
+}
+
+Shape logo-i : Mesh {
+  file { "luisa/I.obj" }
+  surface : Matte {
+    Kd : Constant {
+      v { 0.7695, 0.5054, 0.0002 }
+    }
+    eta { "Al" }
+    roughness : Constant {
+      v { 0.4 }
+    }
+  }
+}
+
+Shape logo-s : Mesh {
+  file { "luisa/S.obj" }
+  surface : Matte {
+    Kd : Constant {
+      v { 0.7666, 0.2234, 0.0261 }
+    }
+    eta { "Al" }
+    roughness : Constant {
+      v { 0.4 }
+    }
+  }
+}
+
+Shape logo-a : Mesh {
+  file { "luisa/A.obj" }
+  surface : Matte {
+    Kd : Constant {
+      v { 0.6250, 0.0620, 0.0659 }
+    }
+    eta { "Al" }
+    roughness : Constant {
+      v { 0.4 }
+    }
+  }
+}
+
+Shape logo : Group {
+  shapes {
+    @logo-l,
+    @logo-u,
+    @logo-i,
+    @logo-s,
+    @logo-a
+  }
+  transform : SRT {
+    scale { 0.07 }
+    rotate { 1, 0, 0, 0 }
+    // translate { 0, 0.029, 0 }
+    // translate { -0.05, 0, 0 }
+    // translate { 0, 0, 0.1 }
+  }
+}
+
+render {
+  cameras { @camera }
+  spectrum : Hero {}
+  shapes {
+    @logo,
+    @shape_ground
+  }
+  integrator { @integrator }
+  environment { @environment }
+}

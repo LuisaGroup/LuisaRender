@@ -1,0 +1,268 @@
+{
+    "media": [],
+    "bsdfs": [
+        {
+            "name": "Backdrop",
+            "albedo": 0.578596,
+            "type": "rough_conductor",
+            "distribution": "ggx",
+            "roughness": 0.1,
+            "material": "V"
+        },
+        {
+            "name": "Floor",
+            "albedo": 0.578596,
+            "type": "rough_conductor",
+            "distribution": "ggx",
+            "roughness": 0.1,
+            "material": "Al"
+        },
+        {
+            "name": "WaterAir",
+            "albedo": 1.0,
+            "type": "dielectric",
+            "ior": 1.33,
+            "enable_refraction": true
+        },
+        {
+            "name": "IceAir",
+            "albedo": 1.0,
+            "type": "dielectric",
+            "ior": 1.31,
+            "enable_refraction": true
+        },
+        {
+            "name": "Glass",
+            "albedo": 1.0,
+            "type": "dielectric",
+            "ior": 1.5,
+            "enable_refraction": true
+        },
+        {
+            "name": "AirIce",
+            "albedo": 1.0,
+            "type": "dielectric",
+            "ior": 0.763,
+            "enable_refraction": true
+        }
+    ],
+    "primitives": [
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh008.wo3",
+            "bsdf": "WaterAir"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh005.wo3",
+            "bsdf": "WaterAir"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh004.wo3",
+            "bsdf": "IceAir"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh003.wo3",
+            "bsdf": "AirIce"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh010.wo3",
+            "bsdf": "IceAir"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh009.wo3",
+            "bsdf": "AirIce"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh012.wo3",
+            "bsdf": "AirIce"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh014.wo3",
+            "bsdf": "IceAir"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh015.wo3",
+            "bsdf": "AirIce"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh006.wo3",
+            "bsdf": "IceAir"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh002.wo3",
+            "bsdf": "AirIce"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh001.wo3",
+            "bsdf": "IceAir"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh007.wo3",
+            "bsdf": "Backdrop"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh011.wo3",
+            "bsdf": "Floor"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh013.wo3",
+            "bsdf": "Glass"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh000.wo3",
+            "bsdf": "WaterAir"
+        },
+        {
+            "transform": {
+                "position": [
+                    -0.03848215192556381,
+                    10.480899810791016,
+                    26.19253921508789
+                ],
+                "scale": 10.0,
+                "rotation": [
+                    -49.841678619384766,
+                    179.99998474121094,
+                    179.99998474121094
+                ]
+            },
+            "power": [
+                5000.0,
+                8500.0,
+                10000.0
+            ],
+            "type": "quad",
+            "bsdf": {
+                "albedo": 1.0,
+                "type": "null"
+            }
+        }
+    ],
+    "camera": {
+        "tonemap": "filmic",
+        "resolution": [
+            1280,
+            720
+        ],
+        "reconstruction_filter": "tent",
+        "transform": {
+            "position": [
+                -0.08935849368572235,
+                2.694121837615967,
+                25.672550201416016
+            ],
+            "look_at": [
+                0.006514795124530792,
+                3.1010689735412598,
+                0.010185359977185726
+            ],
+            "up": [
+                0.0,
+                1.0,
+                0.0
+            ]
+        },
+        "type": "pinhole",
+        "fov": 35.0
+    },
+    "integrator": {
+        "min_bounces": 0,
+        "max_bounces": 32,
+        "enable_consistency_checks": false,
+        "enable_two_sided_shading": true,
+        "type": "bidirectional_path_tracer"
+    },
+    "renderer": {
+        "overwrite_output_files": true,
+        "adaptive_sampling": false,
+        "enable_resume_render": false,
+        "stratified_sampler": false,
+        "scene_bvh": true,
+        "spp": 64,
+        "spp_step": 16,
+        "checkpoint_interval": "0",
+        "timeout": "0",
+        "output_file": "glass-of-water.png",
+        "resume_render_file": "TungstenRenderState.dat",
+        "hdr_output_file": "glass-of-water.exr"
+    }
+}

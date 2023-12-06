@@ -64,9 +64,12 @@ public:
         }
     };
 
+    class Instance;
     class Closure : public PolymorphicClosure {
 
     private:
+        const Instance *_instance;
+
         const Pipeline &_pipeline;
         const SampledWavelengths &_swl;
         Float _time;
@@ -76,22 +79,26 @@ public:
         friend class OpacitySurfaceWrapper;
         [[nodiscard]] virtual Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept = 0;
         [[nodiscard]] virtual Sample _sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u, TransportMode mode) const noexcept = 0;
+        virtual void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df, TransportMode mode) const noexcept = 0;
 
     public:
-        Closure(const Pipeline &pipeline,
-                const SampledWavelengths &swl,
-                Expr<float> time) noexcept
-            : _pipeline{pipeline},
+        Closure(const Instance *instance, const Pipeline &pipeline,
+                const SampledWavelengths &swl, Expr<float> time) noexcept
+            : _instance{instance}, _pipeline{pipeline},
               _swl{swl}, _time{time} {}
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
         [[nodiscard]] auto &swl() const noexcept { return _swl; }
         [[nodiscard]] auto time() const noexcept { return _time; }
 
+        template<typename T = Instance>
+            requires std::is_base_of_v<Instance, T>
+        [[nodiscard]] auto instance() const noexcept { return static_cast<const T *>(_instance); }
         [[nodiscard]] Evaluation evaluate(Expr<float3> wo, Expr<float3> wi,
                                           TransportMode mode = TransportMode::RADIANCE) const noexcept;
         [[nodiscard]] Sample sample(Expr<float3> wo,
                                     Expr<float> u_lobe, Expr<float2> u,
                                     TransportMode mode = TransportMode::RADIANCE) const noexcept;
+        void backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df, TransportMode mode = TransportMode::RADIANCE) const noexcept;
 
         // surface properties
         [[nodiscard]] virtual luisa::optional<Float> opacity() const noexcept { return nullopt; }     // nullopt if never possible to be non-opaque
@@ -137,6 +144,7 @@ public:
     static constexpr auto property_reflective = 1u << 0u;
     static constexpr auto property_transmissive = 1u << 1u;
     static constexpr auto property_thin = 1u << 2u;
+    static constexpr auto property_differentiable = 1u << 3u;
 
 protected:
     [[nodiscard]] virtual luisa::unique_ptr<Instance> _build(
@@ -148,6 +156,7 @@ public:
     [[nodiscard]] virtual bool is_null() const noexcept { return false; }
     [[nodiscard]] auto is_reflective() const noexcept { return static_cast<bool>(properties() & property_reflective); }
     [[nodiscard]] auto is_transmissive() const noexcept { return static_cast<bool>(properties() & property_transmissive); }
+    [[nodiscard]] auto is_differentiable() const noexcept { return static_cast<bool>(properties() & property_differentiable); }
     [[nodiscard]] auto is_thin() const noexcept { return static_cast<bool>(properties() & property_thin); }
     [[nodiscard]] luisa::unique_ptr<Instance> build(Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept;
 };
@@ -171,11 +180,12 @@ public:
         };
 
     public:
-        Closure(const Pipeline &pipeline,
+        Closure(const Surface::Instance *instance,
+                const Pipeline &pipeline,
                 const SampledWavelengths &swl,
                 Expr<float> time,
                 luisa::unique_ptr<Surface::Closure> base) noexcept
-            : Surface::Closure{pipeline, swl, time},
+            : Surface::Closure{instance, pipeline, swl, time},
               _base{std::move(base)} {}
         [[nodiscard]] auto base() const noexcept { return _base.get(); }
 
@@ -214,6 +224,11 @@ public:
                                               TransportMode mode) const noexcept override {
             return _base->_sample(wo, u_lobe, u, mode);
         }
+        void _backward(Expr<float3> wo,
+                       Expr<float3> wi, const SampledSpectrum &df,
+                       TransportMode mode) const noexcept override {
+            return _base->_backward(wo, wi, df, mode);
+        }
     };
 
     class Instance : public BaseInstance {
@@ -235,7 +250,7 @@ public:
             const SampledWavelengths &swl, Expr<float> time) const noexcept override {
             auto base = BaseInstance::create_closure(swl, time);
             if (_opacity == nullptr) { return base; }
-            Closure cls{this->pipeline(), swl, time, std::move(base)};
+            Closure cls{this, this->pipeline(), swl, time, std::move(base)};
             return luisa::make_unique<Closure>(std::move(cls));
         }
         void populate_closure(Surface::Closure *closure_in, const Interaction &it,

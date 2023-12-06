@@ -69,20 +69,19 @@ public:
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
           _block_count{desc->property_uint_or_default("block_count", 256u)},
-          _block_size {desc->property_uint_or_default("block_size", 256u)},
+          _block_size{desc->property_uint_or_default("block_size", 256u)},
           _use_global{desc->property_bool_or_default("use_global", false)} {}
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto use_global() const noexcept { return _use_global; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
+    [[nodiscard]] bool is_differentiable() const noexcept override { return false; }
     [[nodiscard]] auto block_count() const noexcept { return _block_count; }
     [[nodiscard]] auto block_size() const noexcept { return _block_size; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
-
-
 
 class RayQueue {
 
@@ -213,7 +212,7 @@ private:
     Buffer<Hit> _hit;
 
 public:
-    StateSOA(const Spectrum::Instance *spectrum,size_t size) noexcept
+    StateSOA(const Spectrum::Instance *spectrum, size_t size) noexcept
         : _spectrum{spectrum} {
         auto &&device = spectrum->pipeline().device();
         auto dimension = spectrum->node()->dimension();
@@ -229,11 +228,11 @@ public:
         return _hit->read(index);
     }
     [[nodiscrad]] auto read_frame(Expr<uint> index) const noexcept {
-		return _frame->read(index);
-	}
+        return _frame->read(index);
+    }
     [[nodiscard]] auto read_dim_frame(Expr<uint> index) const noexcept {
-		return _dim_frame->read(index);
-	}
+        return _dim_frame->read(index);
+    }
 
     void write_ray(Expr<uint> index, Expr<Ray> ray) noexcept {
         _ray->write(index, ray);
@@ -242,19 +241,17 @@ public:
         _hit->write(index, hit);
     }
     void write_frame(Expr<uint> index, Expr<ThreadFrame> frame) noexcept {
-		_frame->write(index, frame);
-	}
+        _frame->write(index, frame);
+    }
     void write_dim_frame(Expr<uint> index, Expr<DimensionalFrame> frame) noexcept {
         _dim_frame->write(index, frame);
     }
-    
 
-
-#define MOVE(entry, from, to)       \
-  {                                 \
-    auto inst = read_##entry(from); \
-    write_##entry(to, inst);        \
-  }
+#define MOVE(entry, from, to)           \
+    {                                   \
+        auto inst = read_##entry(from); \
+        write_##entry(to, inst);        \
+    }
 #undef MOVE
 };
 class MegakernelWaveFrontInstance final : public ProgressiveIntegrator::Instance {
@@ -283,7 +280,7 @@ void MegakernelWaveFrontInstance::_render_one_camera(
     auto spp = camera->node()->spp();
     auto resolution = camera->film()->node()->resolution();
     auto pixel_count = resolution.x * resolution.y;
-    auto use_global= node<MegakernelWaveFront>()->use_global();
+    auto use_global = node<MegakernelWaveFront>()->use_global();
     bool use_sort = true;
     bool direct_launch = false;
 
@@ -293,18 +290,18 @@ void MegakernelWaveFrontInstance::_render_one_camera(
     //assume KERNEL_COUNT< block_size_x
     auto block_size = node<MegakernelWaveFront>()->block_size();
     auto block_count = node<MegakernelWaveFront>()->block_count();
-    auto launch_size = block_count*block_size;
+    auto launch_size = block_count * block_size;
     auto q_factor = 1u;
     auto g_factor = KERNEL_COUNT - q_factor;
-    StateSOA state_soa{spectrum, use_global ? launch_size * g_factor:1 };
-    sampler()->reset(command_buffer, resolution, use_global?(KERNEL_COUNT+1)*launch_size:launch_size, spp);
+    StateSOA state_soa{spectrum, use_global ? launch_size * g_factor : 1};
+    sampler()->reset(command_buffer, resolution, use_global ? (KERNEL_COUNT + 1) * launch_size : launch_size, spp);
     command_buffer << synchronize();
     auto render_shader = compile_async<1>(device, [&](BufferUInt samples, UInt tot_samples, UInt base_spp, Float time, Float shutter_weight) noexcept {
         set_block_size(block_size, 1, 1);
         const uint fetch_size = 128;
         auto dim = spectrum->node()->dimension();
         auto shared_queue_size = block_size * q_factor;
-        auto queue_size = use_global?block_size * (KERNEL_COUNT+1):block_size;
+        auto queue_size = use_global ? block_size * (KERNEL_COUNT + 1) : block_size;
         Shared<ThreadFrame> path_state{shared_queue_size};
         Shared<Ray> path_ray{shared_queue_size};
         Shared<Hit> path_hit{shared_queue_size};
@@ -316,8 +313,8 @@ void MegakernelWaveFrontInstance::_render_one_camera(
         Shared<uint> work_stat{2};//0 max_count,1 max_id
         path_state[thread_x()].kernel_index = (uint)INVALID;
         $if(thread_x() < (uint)KERNEL_COUNT) {
-            $if(thread_x() == 0){
-                work_counter[thread_x()] = use_global?KERNEL_COUNT*block_size:block_size;
+            $if(thread_x() == 0) {
+                work_counter[thread_x()] = use_global ? KERNEL_COUNT * block_size : block_size;
             }
             $else {
                 work_counter[thread_x()] = 0u;
@@ -333,9 +330,9 @@ void MegakernelWaveFrontInstance::_render_one_camera(
         rem_local[0] = 0u;
         sync_block();
         //pipeline().printer().info("work counter {} of block {}: {}", -1, block_x(), -1);
-        auto count_limit = (tot_samples*1.2f)/min(block_count,50u)/(use_global?block_size:block_size/KERNEL_COUNT);
-        
-        $while((rem_global[0] != 0u | rem_local[0] != 0u) & (count!= count_limit)) {
+        auto count_limit = (tot_samples * 1.2f) / min(block_count, 50u) / (use_global ? block_size : block_size / KERNEL_COUNT);
+
+        $while((rem_global[0] != 0u | rem_local[0] != 0u) & (count != count_limit)) {
             sync_block();//very important, synchronize for condition
             rem_local[0] = 0u;
             count += 1;
@@ -362,7 +359,7 @@ void MegakernelWaveFrontInstance::_render_one_camera(
             };*/
             sync_block();
             $if(thread_x() == block_size - 1) {
-                $if((workload[0] >= workload[1]) & (rem_global[0]==1u)) {//fetch new workload
+                $if((workload[0] >= workload[1]) & (rem_global[0] == 1u)) {//fetch new workload
                     workload[0] = samples.atomic(0u).fetch_add(block_size * fetch_size);
                     workload[1] = min(workload[0] + block_size * fetch_size, tot_samples);
                     $if(workload[0] >= tot_samples) {
@@ -379,10 +376,9 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                     };
                 };
                 //pipeline().printer().info("work counter {} of block {}: {}", thread_x(), block_x(), work_counter[thread_x()]);
-
-			};
+            };
             sync_block();
-            $if(thread_x() < (uint)KERNEL_COUNT){//get argmax
+            $if(thread_x() < (uint)KERNEL_COUNT) {//get argmax
                 $if((work_stat[0] == work_counter[thread_x()]) & ((workload[0] < workload[1]) | (thread_x() != 0u))) {
                     work_stat[1] = thread_x();
                 };
@@ -471,7 +467,7 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                 path_state[path_id].kernel_index = (uint)dst;
                 work_counter.atomic((uint)src).fetch_sub(1u);
                 work_counter.atomic((uint)dst).fetch_add(1u);
-			};
+            };
             auto generate_ray_shader = [&](UInt path_id, UInt work_id) noexcept {//TODO: add fetch_state and set_state for sampler
                 auto pixel_id = work_id % pixel_count;
                 auto sample_id = base_spp + work_id / pixel_count;
@@ -503,23 +499,20 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                 $if(!hit->miss()) {
                     auto shape = pipeline().geometry()->instance(hit.inst);
                     $if(shape.has_light()) {
-                        save_kernel(path_id, INTERSECT,LIGHT);
+                        save_kernel(path_id, INTERSECT, LIGHT);
                     }
                     $else {
                         $if(shape.has_surface()) {
                             save_kernel(path_id, INTERSECT, SAMPLE);
-
                         }
                         $else {
                             save_kernel(path_id, INTERSECT, INVALID);
-
                         };
                     };
                 }
                 $else {
                     if (pipeline().environment()) {
                         save_kernel(path_id, INTERSECT, MISS);
-
 
                     } else {
                         save_kernel(path_id, INTERSECT, INVALID);
@@ -530,13 +523,14 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                 sampler()->load_state(queue_size * block_x() + path_id);
                 auto u_test = sampler()->generate_1d();
                 sampler()->save_state(queue_size * block_x() + path_id);
-                $if (u_test < 0.2f) {
+                $if(u_test < 0.2f) {
                     save_kernel(path_id, INTERSECT, INVALID);
-                } $else{
-					save_kernel(path_id, INTERSECT, INTERSECT);
-				};
+                }
+                $else {
+                    save_kernel(path_id, INTERSECT, INTERSECT);
+                };
             };
-                
+
             auto evaluate_miss_shader = [&](UInt path_id) noexcept {
                 if (pipeline().environment()) {
                     auto wi = path_ray[path_id]->direction();
@@ -559,7 +553,6 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                     camera->film()->accumulate(pixel_coord, spectrum->srgb(swl, Li), 0.f);
                 }
                 save_kernel(path_id, MISS, INVALID);
-
             };
 
             auto evaluate_light_shader = [&](UInt path_id) noexcept {
@@ -587,15 +580,12 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                     auto shape = pipeline().geometry()->instance(hit.inst);
                     $if(shape.has_surface()) {
                         save_kernel(path_id, LIGHT, SAMPLE);
-
                     }
                     $else {
                         save_kernel(path_id, LIGHT, INVALID);
-
                     };
                 } else {
                     save_kernel(path_id, LIGHT, INVALID);
-
                 }
             };
 
@@ -623,7 +613,6 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                 path_state[path_id].wi_and_pdf = make_float4(light_sample.shadow_ray->direction(),
                                                              ite(occluded, 0.f, light_sample.eval.pdf));
                 save_kernel(path_id, SAMPLE, SURFACE);
-
             };
 
             auto evaluate_surface_shader = [&](UInt path_id) noexcept {
@@ -741,7 +730,6 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                     }
                     path_ray[path_id] = ray;
                     save_kernel(path_id, SURFACE, INTERSECT);
-
                 }
                 $else {
                     save_kernel(path_id, SURFACE, INVALID);
@@ -789,17 +777,17 @@ void MegakernelWaveFrontInstance::_render_one_camera(
             sync_block();
         };
         $if(count == count_limit) {
-            pipeline().printer().info("block_id{},thread_id {}, loop not break! local:{}, global:{}",block_x(),thread_x(), rem_local[0], rem_global[0]);
-            $if(thread_x() < (uint)KERNEL_COUNT){
+            pipeline().printer().info("block_id{},thread_id {}, loop not break! local:{}, global:{}", block_x(), thread_x(), rem_local[0], rem_global[0]);
+            $if(thread_x() < (uint)KERNEL_COUNT) {
                 pipeline().printer().info("work rem: id {}, size {}", thread_x(), work_counter[thread_x()]);
             };
-		};
+        };
     });
     auto clear_global_shader = compile_async<1>(device, [&]() noexcept {
         auto dispatch_id = dispatch_x();
-        auto frame= state_soa.read_frame(0u);
+        auto frame = state_soa.read_frame(0u);
         frame.kernel_index = (uint)INVALID;
-        state_soa.write_frame(dispatch_id,frame);
+        state_soa.write_frame(dispatch_id, frame);
     });
     render_shader.get().set_name("render");
     clear_global_shader.get().set_name("clear_global");

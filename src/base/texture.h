@@ -51,16 +51,34 @@ public:
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
         [[nodiscard]] virtual Float4 evaluate(
             const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
+        virtual void backward(
+            const Interaction &it, const SampledWavelengths &swl, Expr<float> time, Expr<float4> grad) const noexcept = 0;
         [[nodiscard]] virtual Spectrum::Decode evaluate_albedo_spectrum(
             const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept;
         [[nodiscard]] virtual Spectrum::Decode evaluate_unbounded_spectrum(
             const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept;
         [[nodiscard]] virtual Spectrum::Decode evaluate_illuminant_spectrum(
             const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept;
+        void backward_albedo_spectrum(
+            const Interaction &it, const SampledWavelengths &swl,
+            Expr<float> time, const SampledSpectrum &dSpec) const noexcept;
+        void backward_illuminant_spectrum(
+            const Interaction &it, const SampledWavelengths &swl,
+            Expr<float> time, const SampledSpectrum &dSpec) const noexcept;
+        void backward_unbounded_spectrum(
+            const Interaction &it, const SampledWavelengths &swl,
+            Expr<float> time, const SampledSpectrum &dSpec) const noexcept;
     };
+
+private:
+    float2 _range;
+    bool _requires_grad;
 
 public:
     Texture(Scene *scene, const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] auto range() const noexcept { return _range; }
+    [[nodiscard]] virtual bool requires_gradients() const noexcept;
+    virtual void disable_gradients() noexcept;
     [[nodiscard]] virtual bool is_black() const noexcept = 0;
     [[nodiscard]] virtual bool is_constant() const noexcept = 0;
     [[nodiscard]] virtual luisa::optional<float4> evaluate_static() const noexcept;

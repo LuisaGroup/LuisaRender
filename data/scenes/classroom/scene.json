@@ -1,0 +1,1132 @@
+{
+    "media": [],
+    "bsdfs": [
+        {
+            "name": "Walls",
+            "albedo": [
+                0.6540709733963013,
+                0.6740800142288208,
+                0.800000011920929
+            ],
+            "type": "lambert"
+        },
+        {
+            "name": "Lectern",
+            "albedo": "textures/wood1.jpg",
+            "type": "lambert"
+        },
+        {
+            "name": "FlagRed",
+            "albedo": [
+                0.800000011920929,
+                0.008213999681174755,
+                0.0
+            ],
+            "type": "lambert"
+        },
+        {
+            "name": "FlagWhite",
+            "albedo": 1.0,
+            "type": "lambert"
+        },
+        {
+            "name": "FlagBase",
+            "albedo": [
+                0.7796609997749329,
+                0.6531620025634766,
+                0.3491879999637604
+            ],
+            "type": "lambert"
+        },
+        {
+            "name": "ChalkHolder",
+            "albedo": [
+                0.800000011920929,
+                0.6449009776115417,
+                0.4121190011501312
+            ],
+            "type": "lambert"
+        },
+        {
+            "name": "ProjectorScreen",
+            "albedo": 1.0,
+            "type": "lambert"
+        },
+        {
+            "name": "StickyNote1",
+            "albedo": 0.612066,
+            "type": "lambert"
+        },
+        {
+            "name": "Whiteboard",
+            "albedo": 1.0,
+            "type": "lambert"
+        },
+        {
+            "name": "StickyNote7",
+            "albedo": 0.612066,
+            "type": "lambert"
+        },
+        {
+            "name": "StickyNote8",
+            "albedo": 0.612066,
+            "type": "lambert"
+        },
+        {
+            "name": "Bin2",
+            "albedo": [
+                0.800000011920929,
+                0.7175089716911316,
+                0.19045600295066833
+            ],
+            "type": "lambert"
+        },
+        {
+            "name": "Boxes2",
+            "albedo": [
+                0.800000011920929,
+                0.7916420102119446,
+                0.38839900493621826
+            ],
+            "type": "lambert"
+        },
+        {
+            "name": "Boxes1",
+            "albedo": [
+                0.6399999856948853,
+                0.47218799591064453,
+                0.3192330002784729
+            ],
+            "type": "lambert"
+        },
+        {
+            "name": "StickyNote4",
+            "albedo": 0.612066,
+            "type": "lambert"
+        },
+        {
+            "name": "Whiteboard2",
+            "albedo": 0.79311,
+            "type": "lambert"
+        },
+        {
+            "name": "BluePencil",
+            "albedo": [
+                0.0,
+                0.030764000490307808,
+                0.800000011920929
+            ],
+            "type": "lambert"
+        },
+        {
+            "name": "GreenPencil",
+            "albedo": [
+                0.14567600190639496,
+                0.6399999856948853,
+                0.0
+            ],
+            "type": "lambert"
+        },
+        {
+            "name": "RedPencil",
+            "albedo": [
+                0.6266509890556335,
+                0.0,
+                0.0
+            ],
+            "type": "lambert"
+        },
+        {
+            "name": "Bookshelf",
+            "albedo": [
+                0.4913010001182556,
+                0.3051770031452179,
+                0.800000011920929
+            ],
+            "type": "lambert"
+        },
+        {
+            "name": "Hallway",
+            "albedo": 0.784314,
+            "type": "lambert"
+        },
+        {
+            "name": "CeilingLight",
+            "albedo": 0.647814,
+            "type": "rough_plastic",
+            "ior": 1.5,
+            "thickness": 1.0,
+            "sigma_a": 0.0,
+            "distribution": "ggx",
+            "roughness": 0.1
+        },
+        {
+            "name": "Black",
+            "albedo": 0.00631,
+            "type": "lambert"
+        },
+        {
+            "name": "BlackPlastic",
+            "albedo": 0.00631,
+            "type": "rough_plastic",
+            "ior": 1.5,
+            "thickness": 1.0,
+            "sigma_a": 0.0,
+            "distribution": "ggx",
+            "roughness": 0.1
+        },
+        {
+            "name": "Projector",
+            "albedo": 0.00631,
+            "type": "lambert"
+        },
+        {
+            "name": "ScreenEnds",
+            "albedo": 0.028991,
+            "type": "lambert"
+        },
+        {
+            "name": "FoamEraser",
+            "albedo": 0.684615,
+            "type": "lambert"
+        },
+        {
+            "name": "Whiteboard3",
+            "albedo": 1.0,
+            "type": "rough_plastic",
+            "ior": 1.5,
+            "thickness": 1.0,
+            "sigma_a": 0.0,
+            "distribution": "ggx",
+            "roughness": 0.05
+        },
+        {
+            "name": "ChairWood",
+            "albedo": "textures/wood2.jpg",
+            "type": "rough_plastic",
+            "ior": 1.5,
+            "thickness": 1.0,
+            "sigma_a": 0.0,
+            "distribution": "ggx",
+            "roughness": 0.05
+        },
+        {
+            "name": "ChairFrame",
+            "albedo": 0.751534,
+            "type": "rough_conductor",
+            "distribution": "ggx",
+            "roughness": 0.1,
+            "material": "Al"
+        },
+        {
+            "name": "ChairStainless",
+            "albedo": 1.0,
+            "type": "conductor",
+            "material": "Al"
+        },
+        {
+            "name": "Floor",
+            "albedo": [
+                0.6592240333557129,
+                0.5924380421638489,
+                0.517401397228241
+            ],
+            "type": "lambert"
+        },
+        {
+            "name": "WoodFrame",
+            "albedo": "textures/blackboard.jpg",
+            "type": "lambert"
+        },
+        {
+            "name": "WhiteboardFrame",
+            "albedo": 0.056173,
+            "type": "lambert"
+        },
+        {
+            "name": "StickyNote3",
+            "albedo": 0.612066,
+            "type": "lambert"
+        },
+        {
+            "name": "StickyNote5",
+            "albedo": 0.612066,
+            "type": "lambert"
+        },
+        {
+            "name": "StickyNote6",
+            "albedo": 0.612066,
+            "type": "lambert"
+        },
+        {
+            "name": "Speakers",
+            "albedo": 0.03598,
+            "type": "lambert"
+        },
+        {
+            "name": "Wall",
+            "albedo": [
+                0.4508373439311981,
+                0.4536627233028412,
+                0.49960458278656006
+            ],
+            "type": "lambert"
+        },
+        {
+            "name": "WindowFrame",
+            "albedo": 0.471008,
+            "type": "rough_conductor",
+            "distribution": "ggx",
+            "roughness": 0.1,
+            "material": "Al"
+        },
+        {
+            "name": "Bin1",
+            "albedo": [
+                0.32712534070014954,
+                0.5785964727401733,
+                0.2805613875389099
+            ],
+            "type": "lambert"
+        },
+        {
+            "name": "Rubber",
+            "albedo": [
+                0.6870308518409729,
+                0.7154654264450073,
+                0.5604991912841797
+            ],
+            "type": "lambert"
+        },
+        {
+            "name": "FluorescentTube",
+            "albedo": 0.612066,
+            "type": "plastic",
+            "ior": 1.5,
+            "thickness": 1.0,
+            "sigma_a": 0.0
+        },
+        {
+            "name": "StickyNote2",
+            "albedo": 0.612066,
+            "type": "lambert"
+        }
+    ],
+    "primitives": [
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh036.wo3",
+            "bsdf": "Walls"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh048.wo3",
+            "bsdf": "FluorescentTube"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh062.wo3",
+            "bsdf": "CeilingLight"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh038.wo3",
+            "bsdf": "FluorescentTube"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh054.wo3",
+            "bsdf": "Black"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh077.wo3",
+            "bsdf": "Black"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh052.wo3",
+            "bsdf": "BlackPlastic"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh061.wo3",
+            "bsdf": "Black"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh031.wo3",
+            "bsdf": "Projector"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh030.wo3",
+            "bsdf": "Projector"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh057.wo3",
+            "bsdf": "Black"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh023.wo3",
+            "bsdf": "Walls"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh027.wo3",
+            "bsdf": "Walls"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh047.wo3",
+            "bsdf": "Bin2"
+        },
+        {
+            "transform": {
+                "position": [
+                    0.0,
+                    -0.07342231273651123,
+                    0.0
+                ]
+            },
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh049.wo3",
+            "bsdf": "Boxes1"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh022.wo3",
+            "bsdf": "Black"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh029.wo3",
+            "bsdf": "Black"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh033.wo3",
+            "bsdf": "Whiteboard"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh040.wo3",
+            "bsdf": "Walls"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh028.wo3",
+            "bsdf": "Black"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh076.wo3",
+            "bsdf": "ProjectorScreen"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh050.wo3",
+            "bsdf": "ScreenEnds"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh055.wo3",
+            "bsdf": "FlagBase"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh053.wo3",
+            "bsdf": "FoamEraser"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh058.wo3",
+            "bsdf": "ChalkHolder"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh060.wo3",
+            "bsdf": "ChairWood"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh063.wo3",
+            "bsdf": "ChairStainless"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh064.wo3",
+            "bsdf": "ChairFrame"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh037.wo3",
+            "bsdf": "ChairWood"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh067.wo3",
+            "bsdf": "ChairWood"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh073.wo3",
+            "bsdf": "ChairWood"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh024.wo3",
+            "bsdf": "ChairWood"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh041.wo3",
+            "bsdf": "ChairWood"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh026.wo3",
+            "bsdf": "Rubber"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh069.wo3",
+            "bsdf": "ChairWood"
+        },
+        {
+            "transform": {
+                "scale": 11.651670455932617
+            },
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh035.wo3",
+            "bsdf": "Floor"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh043.wo3",
+            "bsdf": "WoodFrame"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh072.wo3",
+            "bsdf": "Whiteboard2"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh045.wo3",
+            "bsdf": "StickyNote1"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh044.wo3",
+            "bsdf": "StickyNote2"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh074.wo3",
+            "bsdf": "RedPencil"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh070.wo3",
+            "bsdf": "BluePencil"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh078.wo3",
+            "bsdf": "GreenPencil"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh021.wo3",
+            "bsdf": "Whiteboard3"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh018.wo3",
+            "bsdf": "WhiteboardFrame"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh017.wo3",
+            "bsdf": "Lectern"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh066.wo3",
+            "bsdf": "Lectern"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh056.wo3",
+            "bsdf": "Lectern"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh016.wo3",
+            "bsdf": "Lectern"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh015.wo3",
+            "bsdf": "Lectern"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh014.wo3",
+            "bsdf": "Hallway"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh025.wo3",
+            "bsdf": "WoodFrame"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh046.wo3",
+            "bsdf": "Whiteboard2"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh012.wo3",
+            "bsdf": "BluePencil"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh011.wo3",
+            "bsdf": "GreenPencil"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh010.wo3",
+            "bsdf": "GreenPencil"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh009.wo3",
+            "bsdf": "GreenPencil"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh008.wo3",
+            "bsdf": "BluePencil"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh059.wo3",
+            "bsdf": "RedPencil"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh065.wo3",
+            "bsdf": "Bookshelf"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh032.wo3",
+            "bsdf": "StickyNote3"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh007.wo3",
+            "bsdf": "StickyNote4"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh075.wo3",
+            "bsdf": "StickyNote5"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh071.wo3",
+            "bsdf": "StickyNote6"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh039.wo3",
+            "bsdf": "StickyNote7"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh006.wo3",
+            "bsdf": "StickyNote8"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh051.wo3",
+            "bsdf": "Black"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh013.wo3",
+            "bsdf": "FlagRed"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh005.wo3",
+            "bsdf": "FlagWhite"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh042.wo3",
+            "bsdf": "Walls"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh003.wo3",
+            "bsdf": "Speakers"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh020.wo3",
+            "bsdf": "FluorescentTube"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh002.wo3",
+            "bsdf": "CeilingLight"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh019.wo3",
+            "bsdf": "Wall"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh068.wo3",
+            "bsdf": "WindowFrame"
+        },
+        {
+            "transform": {},
+            "type": "mesh",
+            "smooth": true,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh001.wo3",
+            "bsdf": "Bin1"
+        },
+        {
+            "transform": {
+                "position": [
+                    0.0,
+                    -0.07342231273651123,
+                    0.0
+                ]
+            },
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh004.wo3",
+            "bsdf": "Boxes1"
+        },
+        {
+            "transform": {
+                "position": [
+                    0.0,
+                    -0.07342231273651123,
+                    0.0
+                ]
+            },
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh034.wo3",
+            "bsdf": "Boxes2"
+        },
+        {
+            "transform": {
+                "position": [
+                    0.0,
+                    -0.07342231273651123,
+                    0.0
+                ]
+            },
+            "type": "mesh",
+            "smooth": false,
+            "backface_culling": false,
+            "recompute_normals": false,
+            "file": "models/Mesh000.wo3",
+            "bsdf": "Boxes1"
+        },
+        {
+            "transform": {
+                "rotation": [
+                    -10.17397689819336,
+                    13.017423629760742,
+                    64.94903564453125
+                ]
+            },
+            "power": 10.0,
+            "type": "infinite_sphere_cap",
+            "sample": true,
+            "cap_angle": 5.0
+        },
+        {
+            "transform": {
+                "rotation": [
+                    -10.17397689819336,
+                    13.017423629760742,
+                    64.94903564453125
+                ]
+            },
+            "type": "skydome",
+            "temperature": 5777.0,
+            "gamma_scale": 1.0,
+            "turbidity": 3.0,
+            "intensity": 6.0,
+            "sample": false
+        }
+    ],
+    "camera": {
+        "tonemap": "filmic",
+        "resolution": [
+            1280,
+            720
+        ],
+        "reconstruction_filter": "tent",
+        "transform": {
+            "position": [
+                -1.690487027168274,
+                1.2715795040130615,
+                5.886528015136719
+            ],
+            "look_at": [
+                -0.7776312828063965,
+                1.4423744678497314,
+                -0.07520569860935211
+            ],
+            "up": [
+                0.0,
+                1.0,
+                0.0
+            ]
+        },
+        "type": "pinhole",
+        "fov": 60.0
+    },
+    "integrator": {
+        "min_bounces": 0,
+        "max_bounces": 16,
+        "enable_consistency_checks": false,
+        "enable_two_sided_shading": true,
+        "type": "path_tracer",
+        "enable_light_sampling": true,
+        "enable_volume_light_sampling": true
+    },
+    "renderer": {
+        "overwrite_output_files": true,
+        "adaptive_sampling": true,
+        "enable_resume_render": false,
+        "stratified_sampler": true,
+        "scene_bvh": true,
+        "spp": 64,
+        "spp_step": 16,
+        "checkpoint_interval": "0",
+        "timeout": "0",
+        "output_file": "classroom.png",
+        "resume_render_file": "TungstenRenderState.dat",
+        "hdr_output_file": "classroom.exr"
+    }
+}

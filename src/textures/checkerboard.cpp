@@ -24,6 +24,7 @@ public:
               "scale", lazy_construct([desc] {
                   return make_float2(desc->property_float_or_default("scale", 1.0f));
               }))} {}
+    [[nodiscard]] bool requires_gradients() const noexcept override { return false; }
     [[nodiscard]] bool is_black() const noexcept override {
         auto on_is_black = _on != nullptr && _on->is_black();   // on is default to all white
         auto off_is_black = _off == nullptr || _off->is_black();// off is default to all black
@@ -108,6 +109,13 @@ public:
                         _off->evaluate_illuminant_spectrum(it, swl, time);
         };
         return value;
+    }
+
+    void backward(const Interaction &, const SampledWavelengths &swl,
+                  Expr<float>, Expr<float4> grad) const noexcept override {
+        if (node()->requires_gradients()) {
+            LUISA_ERROR_WITH_LOCATION("Not supported.");
+        }
     }
 };
 

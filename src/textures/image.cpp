@@ -33,9 +33,44 @@ private:
     uint _mipmaps{0u};
 
 private:
+    [[nodiscard]] static inline auto _srgb_to_linear(float x) noexcept {
+        return x <= 0.04045f ?
+                   x * (1.f / 12.92f) :
+                   std::pow((x + 0.055f) * (1.0f / 1.055f), 2.4f);
+    }
+
+    [[nodiscard]] inline auto _linearize(float x) const noexcept {
+        switch (_encoding) {
+            case Encoding::LINEAR: return x * _scale;
+            case Encoding::SRGB: return _srgb_to_linear(x) * _scale;
+            case Encoding::GAMMA: return std::pow(x, _gamma) * _scale;
+        }
+        return 0.f;
+    }
+
+    [[nodiscard]] auto _load_image_for_diff(const std::filesystem::path &path, PixelStorage storage) const noexcept {
+        auto channels = pixel_storage_channel_count(storage);
+        auto image = [&] {
+            if (channels == 1u) { return LoadedImage::load(path, PixelStorage::FLOAT1); }
+            if (channels == 2u) { return LoadedImage::load(path, PixelStorage::FLOAT2); }
+            return LoadedImage::load(path, PixelStorage::FLOAT4);
+        }();
+        auto pixels = static_cast<float *>(image.pixels());
+        for (auto i = 0u; i < image.pixel_count(); ++i) {
+            pixels[i] = _linearize(pixels[i]);
+        }
+        return image;
+    }
+
+private:
     void _load_image(std::filesystem::path path) noexcept {
-        _image = global_thread_pool().async([path = std::move(path)] {
-            return LoadedImage::load(path);
+        _image = global_thread_pool().async([path = std::move(path), this] {
+            if (requires_gradients()) {
+                auto storage = LoadedImage::parse_storage(path);
+                return _load_image_for_diff(path, storage);
+            } else {
+                return LoadedImage::load(path);
+            }
         });
     }
 
@@ -126,6 +161,7 @@ public:
 class ImageTextureInstance final : public Texture::Instance {
 
 private:
+    luisa::optional<Differentiation::TexturedParameter> _diff_param;
     uint _texture_id;
 
 private:
@@ -140,6 +176,7 @@ private:
         auto texture = node<ImageTexture>();
         auto encoding = texture->encoding();
         auto scale = texture->scale();
+        if (_diff_param) { return rgba; }// already pre-processed
         if (encoding == ImageTexture::Encoding::SRGB) {
             auto linear = ite(
                 rgba <= 0.04045f,
@@ -157,14 +194,21 @@ private:
 public:
     ImageTextureInstance(const Pipeline &pipeline,
                          const Texture *texture,
-                         uint texture_id) noexcept
+                         uint texture_id, luisa::optional<Differentiation::TexturedParameter> param) noexcept
         : Texture::Instance{pipeline, texture},
-          _texture_id{texture_id} {}
+          _texture_id{texture_id}, _diff_param{std::move(param)} {}
     [[nodiscard]] Float4 evaluate(
         const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         auto uv = _compute_uv(it);
         auto v = pipeline().tex2d(_texture_id).sample(uv);// TODO: LOD
         return _decode(v);
+    }
+    void backward(const Interaction &it, const SampledWavelengths &swl,
+                  Expr<float> time, Expr<float4> grad) const noexcept override {
+        if (_diff_param) {
+            auto uv = _compute_uv(it);
+            pipeline().differentiation()->accumulate(*_diff_param, uv, grad);
+        }
     }
 };
 
@@ -173,6 +217,11 @@ luisa::unique_ptr<Texture::Instance> ImageTexture::build(Pipeline &pipeline, Com
     auto device_image = pipeline.create<Image<float>>(image.pixel_storage(), image.size(), _mipmaps);
     auto tex_id = pipeline.register_bindless(*device_image, _sampler);
     command_buffer << device_image->copy_from(image.pixels()) << compute::commit();
+    luisa::optional<Differentiation::TexturedParameter> param;
+    if (requires_gradients()) {
+        param.emplace(pipeline.differentiation()->parameter(
+            *device_image, _sampler, range()));
+    }
     if (device_image->mip_levels() > 1u) {
         switch (_encoding) {
             case Encoding::LINEAR: _generate_mipmaps_linear(pipeline, command_buffer, *device_image); break;
@@ -181,7 +230,7 @@ luisa::unique_ptr<Texture::Instance> ImageTexture::build(Pipeline &pipeline, Com
             default: LUISA_ERROR_WITH_LOCATION("Unknown texture encoding.");
         }
     }
-    return luisa::make_unique<ImageTextureInstance>(pipeline, this, tex_id);
+    return luisa::make_unique<ImageTextureInstance>(pipeline, this, tex_id, std::move(param));
 }
 
 void ImageTexture::_generate_mipmaps_gamma(Pipeline &pipeline, CommandBuffer &command_buffer, Image<float> &image) const noexcept {

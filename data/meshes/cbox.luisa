@@ -1,0 +1,110 @@
+Surface cbox-white : Matte {
+  Kd : Constant {
+    v { 0.725, 0.71, 0.68 }
+    semantic { "albedo" }
+  }
+  roughness : Constant {
+    v { 1 }
+  }
+}
+
+Surface cbox-red : Matte {
+  Kd : Constant {
+    v { 0.63, 0.065, 0.05 }
+    semantic { "albedo" }
+  }
+  roughness : Constant {
+    v { 1 }
+  }
+}
+
+Surface cbox-green : Matte {
+  Kd : Constant {
+    v { 0.14, 0.45, 0.091 }
+    semantic { "albedo" }
+  }
+  roughness : Constant {
+    v { 1 }
+  }
+}
+
+Shape cbox-ceiling : Mesh {
+  file { "cbox-parts/ceiling.obj" }
+  surface { @cbox-white }
+}
+
+Shape cbox-floor : Mesh {
+  file { "cbox-parts/floor.obj" }
+  surface { @cbox-white }
+}
+
+Shape cbox-left-wall : Mesh {
+  file { "cbox-parts/left-wall.obj" }
+  surface { @cbox-red }
+}
+
+Shape cbox-right-wall : Mesh {
+  file { "cbox-parts/right-wall.obj" }
+  surface { @cbox-green }
+}
+
+Surface cbox-brick : Matte {
+  Kd : Image {
+    file { "../textures/brickwall.jpg" }
+    gamma { 0.5 }
+    encoding { "gamma" }
+    semantic { "albedo" }
+  }
+  // sigma : Constant {
+  //   v { 10 }
+  // }
+  // normal : Image {
+  //   file { "../textures/brickwall_normal.jpg" }
+  //   encoding { "linear" }
+  // }
+}
+
+Surface cbox-metal : Metal {
+  eta { "Au" }
+  roughness : Constant {
+    v { 0.2 }
+  }
+}
+
+Shape cbox-back-wall : Mesh {
+  file { "cbox-parts/back-wall.obj" }
+  surface { @cbox-white }
+}
+
+Shape cbox-tall-box : Mesh {
+  file { "cbox-parts/tall-box.obj" }
+  surface { @cbox-white }
+}
+
+Shape cbox-short-box : Mesh {
+  file { "cbox-parts/short-box.obj" }
+  surface { @cbox-white }
+}
+
+Shape cbox-light : Mesh {
+  file { "cbox-parts/light.obj" }
+  light : Diffuse {
+    emission : Constant {
+      v { 17, 12, 4 }
+      semantic { "illuminant" }
+    }
+  }
+}
+
+Shape cbox : Group {
+  shapes {
+    @cbox-floor,
+    @cbox-ceiling,
+    @cbox-left-wall,
+    @cbox-right-wall,
+    @cbox-back-wall,
+    @cbox-tall-box,
+    @cbox-short-box,
+    @cbox-light
+  }
+}

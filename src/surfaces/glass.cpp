@@ -82,7 +82,7 @@ public:
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] uint properties() const noexcept override {
-        return property_reflective | property_transmissive;
+        return property_reflective | property_transmissive | property_differentiable;
     }
 
 protected:
@@ -224,11 +224,64 @@ private:
         };
         return {.eval = {.f = f * abs_cos_theta(wi_local), .pdf = pdf}, .wi = wi, .event = event};
     }
+
+    void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df_in,
+                   TransportMode mode) const noexcept override {
+        auto _instance = instance<GlassInstance>();
+
+        auto &ctx = context<Context>();
+        auto &it = ctx.it;
+        auto distribution = TrowbridgeReitzDistribution{ctx.alpha};
+        auto fresnel = FresnelDielectric{ctx.eta_i, ctx.eta_t};
+        auto refl = MicrofacetReflection{ctx.Kr, &distribution, &fresnel};
+        auto trans = MicrofacetTransmission{ctx.Kt, &distribution, ctx.eta_i, ctx.eta_t};
+
+        auto wo_local = it.shading().world_to_local(wo);
+        auto wi_local = it.shading().world_to_local(wi);
+        auto df = df_in * abs_cos_theta(wi_local);
+
+        Float2 d_alpha;
+
+        $if(same_hemisphere(wo_local, wi_local)) {
+            // Kr
+            if (_instance->Kr() && _instance->Kr()->node()->requires_gradients()) {
+                auto d_f = refl.backward(wo_local, wi_local, df);
+                d_alpha = d_f.dAlpha;
+                _instance->Kr()->backward_albedo_spectrum(it, swl(), time(), zero_if_any_nan(d_f.dR));
+            }
+        }
+        $else {
+            // Ks
+            if (_instance->Kt() && _instance->Kt()->node()->requires_gradients()) {
+                auto d_f = trans.backward(wo_local, wi_local, df, mode);
+                d_alpha = d_f.dAlpha;
+                _instance->Kt()->backward_albedo_spectrum(it, swl(), time(), zero_if_any_nan(d_f.dT));
+            }
+        };
+
+        // roughness
+        if (auto roughness = _instance->roughness();
+            roughness != nullptr && roughness->node()->requires_gradients()) {
+            auto remap = _instance->node<GlassSurface>()->remap_roughness();
+            auto r_f4 = roughness->evaluate(it, swl(), time());
+            auto r = roughness->node()->channels() == 1u ? r_f4.xx() : r_f4.xy();
+            auto grad_alpha_roughness = [](auto &&x) noexcept {
+                return TrowbridgeReitzDistribution::grad_alpha_roughness(x);
+            };
+            auto d_r = d_alpha * (remap ? grad_alpha_roughness(r) : make_float2(1.f));
+            auto d_r_f4 = roughness->node()->channels() == 1u ?
+                              make_float4(d_r.x + d_r.y, 0.f, 0.f, 0.f) :
+                              make_float4(d_r, 0.f, 0.f);
+            auto roughness_grad_range = 5.f * (roughness->node()->range().y - roughness->node()->range().x);
+            roughness->backward(it, swl(), time(),
+                                ite(any(isnan(d_r_f4) || abs(d_r_f4) > roughness_grad_range), 0.f, d_r_f4));
+        }
+    }
 };
 
 luisa::unique_ptr<Surface::Closure> GlassInstance::create_closure(
     const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    return luisa::make_unique<GlassClosure>(pipeline(), swl, time);
+    return luisa::make_unique<GlassClosure>(this, pipeline(), swl, time);
 }
 
 void GlassInstance::populate_closure(Surface::Closure *closure, const Interaction &it,

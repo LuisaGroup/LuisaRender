@@ -1,0 +1,58 @@
+{
+  "film": {
+    "type": "Film",
+    "impl": "Color",
+    "prop": {
+      "resolution": [
+        1024,
+        1024
+      ],
+      "exposure": 0
+    }
+  },
+  "camera": {
+    "type": "Camera",
+    "impl": "Pinhole",
+    "prop": {
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "fov": 27.8,
+      "spp": 1024,
+      "film": "@film",
+      "file": "../renders/cbox.exr",
+      "filter": {
+        "impl": "Gaussian",
+        "prop": {
+          "radius": 1
+        }
+      }
+    }
+  },
+  "import": [
+    "../meshes/cbox.luisa"
+  ],
+  "integrator": {
+    "type": "Integrator",
+    "impl": "WavePath",
+    "prop": {
+      "depth": 5,
+      "sampler": {
+        "impl": "Independent",
+        "prop": {
+          "seed": 0
+        }
+      }
+    }
+  },
+  "render": {
+    "cameras": "@camera",
+    "integrator": "@integrator",
+    "shapes": "@cbox",
+    "spectrum": {
+      "impl": "sRGB"
+    }
+  }
+}

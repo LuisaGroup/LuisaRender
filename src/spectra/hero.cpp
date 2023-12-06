@@ -217,11 +217,21 @@ public:
         }
     }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
+    [[nodiscard]] bool is_differentiable() const noexcept override { return false; }
     [[nodiscard]] bool is_fixed() const noexcept override { return false; }
     [[nodiscard]] uint dimension() const noexcept override { return _dimension; }
     [[nodiscard]] auto sampling_method() const noexcept { return _method; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
+    [[nodiscard]] float4 encode_srgb_albedo(float3 rgb) const noexcept override {
+        return RGB2SpectrumTable::srgb().decode_albedo(rgb);
+    }
+    [[nodiscard]] float4 encode_srgb_illuminant(float3 rgb) const noexcept override {
+        return RGB2SpectrumTable::srgb().decode_unbounded(rgb);
+    }
+    [[nodiscard]] float4 encode_srgb_unbounded(float3 rgb) const noexcept override {
+        return RGB2SpectrumTable::srgb().decode_unbounded(rgb);
+    }
     [[nodiscard]] float4 encode_static_srgb_albedo(float3 rgb) const noexcept override {
         return RGB2SpectrumTable::srgb().decode_albedo(rgb);
     }

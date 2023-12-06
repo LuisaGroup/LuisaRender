@@ -1,0 +1,346 @@
+
+Surface mat_Backdrop : Metal {
+  eta { "V" }
+  roughness : ConstGeneric {
+    v { 0.316 }
+  }
+}
+
+Surface mat_Floor : Metal {
+  eta { "Al" }
+  roughness : ConstGeneric {
+    v { 0.316 }
+  }
+}
+
+Surface mat_WaterAir : Glass {
+  Kr : ConstColor {
+    color { 1 }
+  }
+  Kt : ConstColor {
+    color { 1.0, 1.0, 1.0 }
+  }
+  eta : ConstGeneric {
+    v { 1.33 }
+  }
+  roughness : ConstGeneric {
+    v { 0.01 }
+  }
+}
+
+Surface mat_IceAir : Glass {
+  Kr : ConstColor {
+    color { 1 }
+  }
+  Kt : ConstColor {
+    color { 1.0, 1.0, 1.0 }
+  }
+  eta : ConstGeneric {
+    v { 1.31 }
+  }
+  roughness : ConstGeneric {
+    v { 0.01 }
+  }
+}
+
+Surface mat_Glass : Glass {
+  Kr : ConstColor {
+    color { 1 }
+  }
+  Kt : ConstColor {
+    color { 1.0, 1.0, 1.0 }
+  }
+  eta : ConstGeneric {
+    v { 1.5 }
+  }
+  roughness : ConstGeneric {
+    v { 0.01 }
+  }
+}
+
+Surface mat_AirIce : Glass {
+  Kr : ConstColor {
+    color { 1 }
+  }
+  Kt : ConstColor {
+    color { 1.0, 1.0, 1.0 }
+  }
+  eta : ConstGeneric {
+    v { 0.763 }
+  }
+  roughness : ConstGeneric {
+    v { 0.01 }
+  }
+}
+
+Surface mat_Null : Null {}
+
+Shape shape_0 : Mesh {
+  file { "models/Mesh008.obj" }
+  surface { @mat_WaterAir }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_1 : Mesh {
+  file { "models/Mesh005.obj" }
+  surface { @mat_WaterAir }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_2 : Mesh {
+  file { "models/Mesh004.obj" }
+  surface { @mat_IceAir }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_3 : Mesh {
+  file { "models/Mesh003.obj" }
+  surface { @mat_AirIce }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_4 : Mesh {
+  file { "models/Mesh010.obj" }
+  surface { @mat_IceAir }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_5 : Mesh {
+  file { "models/Mesh009.obj" }
+  surface { @mat_AirIce }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_6 : Mesh {
+  file { "models/Mesh012.obj" }
+  surface { @mat_AirIce }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_7 : Mesh {
+  file { "models/Mesh014.obj" }
+  surface { @mat_IceAir }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_8 : Mesh {
+  file { "models/Mesh015.obj" }
+  surface { @mat_AirIce }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_9 : Mesh {
+  file { "models/Mesh006.obj" }
+  surface { @mat_IceAir }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_10 : Mesh {
+  file { "models/Mesh002.obj" }
+  surface { @mat_AirIce }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_11 : Mesh {
+  file { "models/Mesh001.obj" }
+  surface { @mat_IceAir }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_12 : Mesh {
+  file { "models/Mesh007.obj" }
+  surface { @mat_Backdrop }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_13 : Mesh {
+  file { "models/Mesh011.obj" }
+  surface { @mat_Floor }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_14 : Mesh {
+  file { "models/Mesh013.obj" }
+  surface { @mat_Glass }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_15 : Mesh {
+  file { "models/Mesh000.obj" }
+  surface { @mat_WaterAir }
+  transform : Matrix {
+    m {
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    }
+  }
+}
+
+Shape shape_16 : Mesh {
+  file { "models/square.obj" }
+  surface { @mat_Null }
+  light : Diffuse {
+    emission : ConstIllum {
+      emission { 15.9155, 27.0563, 31.831 }
+    }
+  }
+  transform : Matrix {
+    m {
+      5, 4.86887e-007, 1.77975e-007, -0.0384822,
+      4.86887e-007, -3.82133, -3.22451, 10.4809,
+      -1.77975e-007, 3.22451, -3.82133, 26.1925,
+      0, 0, 0, 1
+    }
+  }
+}
+
+Camera camera : Pinhole {
+  position { -0.08935849368572235, 2.694121837615967, 25.672550201416016 }
+  front { 0.003735453588888049, 0.015855638310313225, -0.9998673796653748 }
+  up { 0.0, 1.0, 0.0 }
+  fov { 21.5 }
+  spp { 4096 }
+  filter : Gaussian {
+    radius { 1 }
+  }
+  film : Color {
+    file { "color.exr" }
+    resolution { 1280.0, 720.0 }
+  }
+}
+
+render {
+  cameras { @camera }
+  integrator : MegaPath {
+    rr_depth { 3 }
+    rr_threshold { 0.95 }
+    max_depth { 32 }
+  }
+  shapes {
+    @shape_0,
+    @shape_1,
+    @shape_2,
+    @shape_3,
+    @shape_4,
+    @shape_5,
+    @shape_6,
+    @shape_7,
+    @shape_8,
+    @shape_9,
+    @shape_10,
+    @shape_11,
+    @shape_12,
+    @shape_13,
+    @shape_14,
+    @shape_15,
+    @shape_16
+  }
+}
+

@@ -75,6 +75,7 @@ public:
         return _image;
     }
     [[nodiscard]] auto sun() const noexcept { return _sun; }
+    [[nodiscard]] bool requires_gradients() const noexcept override { return false; }
     [[nodiscard]] bool is_black() const noexcept override { return _scale == 0.f; }
     [[nodiscard]] uint channels() const noexcept override { return 3u; }
     [[nodiscard]] bool is_constant() const noexcept override { return false; }
@@ -169,6 +170,10 @@ public:
             _impl = luisa::make_unique<Callable<float3(float2)>>(_eval_impl());
         }
         return make_float4((*_impl)(it.uv()), 1.f);
+    }
+    void backward(const Interaction &it, const SampledWavelengths &swl,
+                  Expr<float> time, Expr<float4> grad) const noexcept override {
+        LUISA_WARNING_WITH_LOCATION("NishitaSkyInstance::backward() not implemented.");
     }
 };
 

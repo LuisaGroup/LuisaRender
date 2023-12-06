@@ -67,4 +67,12 @@ Surface::Sample Surface::Closure::sample(Expr<float3> wo,
     return s;
 }
 
+void Surface::Closure::backward(
+    Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df,
+    TransportMode mode) const noexcept {
+    if (instance()->node()->is_differentiable()) {
+        _backward(wo, wi, df, mode);
+    }
+}
+
 }// namespace luisa::render

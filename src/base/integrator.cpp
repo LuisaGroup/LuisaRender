@@ -7,6 +7,7 @@
 #include <util/progress_bar.h>
 #include <base/integrator.h>
 #include <base/pipeline.h>
+//#define LUISA_RENDER_PATH_REPLAY_DEBUG
 
 namespace luisa::render {
 
@@ -92,9 +93,6 @@ void ProgressiveIntegrator::Instance::_render_one_camera(
         for (auto i = 0u; i < s.spp; i++) {
             command_buffer << render(sample_id++, s.point.time, s.point.weight)
                                   .dispatch(resolution);
-            if (auto &&p = pipeline().printer(); !p.empty()) {
-                command_buffer << p.retrieve();
-            }
             dispatch_count++;
             if (camera->film()->show(command_buffer)) { dispatch_count = 0u; }
             auto dispatches_per_commit = 4u;
@@ -119,5 +117,21 @@ Float3 ProgressiveIntegrator::Instance::Li(const Camera::Instance *camera, Expr<
 
 ProgressiveIntegrator::ProgressiveIntegrator(Scene *scene, const SceneNodeDesc *desc) noexcept
     : Integrator{scene, desc} {}
+
+DifferentiableIntegrator::DifferentiableIntegrator(Scene *scene, const SceneNodeDesc *desc) noexcept
+    : Integrator(scene, desc),
+      _iterations{std::max(desc->property_uint_or_default("iterations", 100u), 1u)},
+      _display_camera_index{desc->property_int_or_default("display_camera_index", -1)},
+      _save_process{desc->property_bool_or_default("save_process", false)},
+      _loss{scene->load_loss(desc->property_node_or_default(
+          "loss", SceneNodeDesc::shared_default_loss("L2")))},
+      _optimizer{scene->load_optimizer(desc->property_node_or_default(
+          "optimizer", SceneNodeDesc::shared_default_optimizer("GD")))} {}
+
+DifferentiableIntegrator::Instance::Instance(
+    Pipeline &pipeline, CommandBuffer &command_buffer, const DifferentiableIntegrator *integrator) noexcept
+    : Integrator::Instance{pipeline, command_buffer, integrator},
+      _loss{node<DifferentiableIntegrator>()->loss()->build(pipeline, command_buffer)},
+      _optimizer{node<DifferentiableIntegrator>()->optimizer()->build(pipeline, command_buffer)} {}
 
 }// namespace luisa::render

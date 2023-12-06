@@ -40,6 +40,8 @@ function(luisa_render_add_plugin name)
     target_compile_definitions(${lib_name} PRIVATE LUISA_RENDER_PLUGIN_NAME="${name}")
     if (${PLUGIN_CATEGORY} STREQUAL "spectrum")
         set(plugin_lib_name luisa-render-spectra)
+    elseif (${PLUGIN_CATEGORY} STREQUAL "loss")
+        set(plugin_lib_name luisa-render-losses)
     elseif(${PLUGIN_CATEGORY} STREQUAL "medium")
         set(plugin_lib_name luisa-render-media)
     else ()
@@ -52,6 +54,7 @@ function(luisa_render_add_plugin name)
 endfunction()
 
 add_subdirectory(films)
+add_subdirectory(losses)
 add_subdirectory(media)
 add_subdirectory(shapes)
 add_subdirectory(lights)
@@ -61,6 +64,7 @@ add_subdirectory(filters)
 add_subdirectory(textures)
 add_subdirectory(samplers)
 add_subdirectory(surfaces)
+add_subdirectory(optimizers)
 add_subdirectory(transforms)
 add_subdirectory(integrators)
 add_subdirectory(environments)
@@ -75,6 +79,7 @@ target_link_libraries(luisa-render INTERFACE
         luisa-render-base
         luisa-render-util
         luisa-render-films
+        luisa-render-losses
         luisa-render-media
         luisa-render-shapes
         luisa-render-lights
@@ -84,6 +89,7 @@ target_link_libraries(luisa-render INTERFACE
         luisa-render-textures
         luisa-render-samplers
         luisa-render-surfaces
+        luisa-render-optimizers
         luisa-render-transforms
         luisa-render-integrators
         luisa-render-environments

@@ -1,0 +1,32 @@
+Film film : Color {
+  resolution { 1024 }
+  exposure { 0 }
+}
+
+Camera camera : Pinhole {
+  position { -0.01, 0.995, 5.0 }
+  fov { 27.8 }
+  spp { 16384 }
+  film { @film }
+  file { "../renders/cbox-procedural.exr" }
+  filter : Gaussian {
+    radius { 1 }
+  }
+}
+
+import "../meshes/cbox-procedural.luisa"
+
+Integrator pt : WavePath {
+  sampler : Independent {}
+  depth { 10 }
+  spectrum : Hero {}
+  // display { true }
+}
+
+Integrator normal : Normal {}
+
+render {
+  cameras { @camera }
+  shapes { @cbox }
+  integrator { @pt }
+}

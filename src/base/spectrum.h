@@ -44,6 +44,9 @@ public:
         SPD _cie_y;
         SPD _cie_z;
 
+    private:
+        [[noreturn]] void _report_backward_unsupported_or_not_implemented() const noexcept;
+
     public:
         Instance(Pipeline &pipeline, CommandBuffer &cb, const Spectrum *spec) noexcept;
         virtual ~Instance() noexcept = default;
@@ -69,12 +72,31 @@ public:
         //get target_sp*sp, in the wavelengths of target_swl
         [[nodiscard]] virtual Float3 wavelength_mul(const SampledWavelengths &target_swl, const SampledSpectrum &target_sp,
                                                     const SampledWavelengths &swl, const SampledSpectrum &sp) const noexcept;
+        [[nodiscard]] virtual Float4 backward_decode_albedo(
+            const SampledWavelengths &swl, Expr<float4> v, const SampledSpectrum &dSpec) const noexcept;
+        [[nodiscard]] virtual Float4 backward_decode_illuminant(
+            const SampledWavelengths &swl, Expr<float4> v, const SampledSpectrum &dSpec) const noexcept;
+        [[nodiscard]] virtual Float4 backward_decode_unbounded(
+            const SampledWavelengths &swl, Expr<float4> v, const SampledSpectrum &dSpec) const noexcept;
+        [[nodiscard]] virtual Float3 backward_encode_srgb_albedo(Expr<float4> dEnc) const noexcept;
+        [[nodiscard]] virtual Float3 backward_encode_srgb_illuminant(Expr<float4> dEnc) const noexcept;
+        [[nodiscard]] virtual Float3 backward_encode_srgb_unbounded(Expr<float4> dEnc) const noexcept;
+        [[nodiscard]] virtual SampledSpectrum backward_cie_y(
+            const SampledWavelengths &swl, const SampledSpectrum &sp, Expr<float> dY) const noexcept;
+        [[nodiscard]] virtual SampledSpectrum backward_cie_xyz(
+            const SampledWavelengths &swl, const SampledSpectrum &sp, Expr<float3> dXYZ) const noexcept;
+        [[nodiscard]] virtual SampledSpectrum backward_srgb(
+            const SampledWavelengths &swl, const SampledSpectrum &sp, Expr<float3> dSRGB) const noexcept;
     };
 
 public:
     Spectrum(Scene *scene, const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] virtual bool is_differentiable() const noexcept = 0;
     [[nodiscard]] virtual bool is_fixed() const noexcept = 0;
     [[nodiscard]] virtual uint dimension() const noexcept = 0;
+    [[nodiscard]] virtual float4 encode_srgb_albedo(float3 rgb) const noexcept = 0;
+    [[nodiscard]] virtual float4 encode_srgb_illuminant(float3 rgb) const noexcept = 0;
+    [[nodiscard]] virtual float4 encode_srgb_unbounded(float3 rgb) const noexcept = 0;
     [[nodiscard]] virtual float4 encode_static_srgb_albedo(float3 rgb) const noexcept = 0;
     [[nodiscard]] virtual float4 encode_static_srgb_unbounded(float3 rgb) const noexcept = 0;
     [[nodiscard]] virtual float4 encode_static_srgb_illuminant(float3 rgb) const noexcept = 0;

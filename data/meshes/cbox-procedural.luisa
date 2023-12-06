@@ -1,0 +1,119 @@
+Surface cbox-white : Matte {
+  color : Constant {
+    v { 0.725, 0.71, 0.68 }
+  }
+  Kd : Constant {
+    v { 0.725, 0.71, 0.68 }
+  }
+  roughness : Constant {
+    v { 1 }
+  }
+}
+
+Surface cbox-red : Matte {
+  color : Constant {
+    v { 0.63, 0.065, 0.05 }
+  }
+  Kd : Constant {
+    v { 0.63, 0.065, 0.05 }
+  }
+  roughness : Constant {
+    v { 1 }
+  }
+}
+
+Surface cbox-green : Matte {
+  Kd : Constant {
+    v { 0.14, 0.45, 0.091 }
+  }
+  roughness : Constant {
+    v { 1 }
+  }
+}
+
+Shape cbox-ceiling : Mesh {
+  file { "cbox-parts/ceiling.obj" }
+  surface { @cbox-white }
+}
+
+Shape cbox-floor : Mesh {
+  file { "cbox-parts/floor.obj" }
+  surface { @cbox-white }
+}
+
+Shape cbox-left-wall : Mesh {
+  file { "cbox-parts/left-wall.obj" }
+  surface { @cbox-red }
+}
+
+Shape cbox-right-wall : Mesh {
+  file { "cbox-parts/right-wall.obj" }
+  surface { @cbox-green }
+}
+
+Surface cbox-brick : Matte {
+  Kd : Image {
+    file { "../textures/brickwall.jpg" }
+    gamma { 0.5 }
+    encoding { "gamma" }
+  }
+  // sigma : Constant {
+  //   v { 10 }
+  // }
+  // normal : Image {
+  //   file { "../textures/brickwall_normal.jpg" }
+  //   encoding { "linear" }
+  // }
+}
+
+Surface cbox-metal : Metal {
+  eta { "Fe" }
+  roughness : Constant {
+    v { 0.3 }
+  }
+}
+
+Surface cbox-disney : Disney {
+  color : DemoSDF {}
+  roughness : Constant {
+    v { 1 }
+  }
+}
+
+Shape cbox-back-wall : Mesh {
+  file { "cbox-parts/back-wall.obj" }
+  surface { @cbox-disney }
+}
+
+Shape cbox-tall-box : Mesh {
+  file { "cbox-parts/tall-box.obj" }
+  surface { @cbox-white }
+}
+
+Shape cbox-short-box : Mesh {
+  file { "cbox-parts/short-box.obj" }
+  surface { @cbox-white }
+}
+
+Shape cbox-light : Mesh {
+  file { "cbox-parts/light.obj" }
+  light : Diffuse {
+    emission : Constant {
+      // v { 51.0, 36.0, 12.0 }
+      v { 75.0, 75.0, 75.0 }
+    }
+  }
+}
+
+Shape cbox : Group {
+  shapes {
+    @cbox-floor,
+    @cbox-ceiling,
+    @cbox-left-wall,
+    @cbox-right-wall,
+    @cbox-back-wall,
+    // @cbox-tall-box,
+    @cbox-short-box,
+    @cbox-light
+  }
+}

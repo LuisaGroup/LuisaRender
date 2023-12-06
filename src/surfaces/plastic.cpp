@@ -60,7 +60,7 @@ public:
           _remap_roughness{desc->property_bool_or_default("remap_roughness", true)} {}
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] uint properties() const noexcept override { return property_reflective; }
+    [[nodiscard]] uint properties() const noexcept override { return property_reflective | property_differentiable; }
 
 protected:
     [[nodiscard]] luisa::unique_ptr<Instance> _build(
@@ -205,8 +205,8 @@ public:
                 pdf = lerp(pdf_coat, pdf_diffuse, substrate_weight);
             };
             s = {.eval = {.f = f, .pdf = pdf},
-                    .wi = wi,
-                    .event = Surface::event_reflect};
+                 .wi = wi,
+                 .event = Surface::event_reflect};
         };
         return s;
     }
@@ -246,11 +246,16 @@ private:
                                           TransportMode mode) const noexcept override {
         return _impl->sample(wo, u_lobe, u, mode);
     }
+    void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df_in,
+                   TransportMode mode) const noexcept override {
+        // TODO
+        LUISA_ERROR_WITH_LOCATION("Not implemented.");
+    }
 };
 
 luisa::unique_ptr<Surface::Closure> PlasticInstance::create_closure(
     const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    return luisa::make_unique<PlasticClosure>(pipeline(), swl, time);
+    return luisa::make_unique<PlasticClosure>(this, pipeline(), swl, time);
 }
 
 void PlasticInstance::populate_closure(Surface::Closure *closure, const Interaction &it,

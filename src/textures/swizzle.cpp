@@ -74,6 +74,8 @@ public:
     [[nodiscard]] uint channels() const noexcept override { return _swizzle >> 16u; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
+    [[nodiscard]] bool requires_gradients() const noexcept override { return _base->requires_gradients(); }
+    void disable_gradients() noexcept override { _base->disable_gradients(); }
 };
 
 class SwizzleTextureInstance final : public Texture::Instance {
@@ -97,6 +99,17 @@ public:
             default: LUISA_ERROR_WITH_LOCATION("Unreachable");
         }
         return make_float4();
+    }
+    void backward(const Interaction &it, const SampledWavelengths &swl, Expr<float> time, Expr<float4> grad) const noexcept override {
+        if (node()->requires_gradients()) {
+            auto g = def(make_float4());
+            auto n = node<SwizzleTexture>();
+            for (auto i = 0u; i < n->channels(); i++) {
+                auto c = n->swizzle(i);
+                g[c] += grad[i];
+            }
+            _base->backward(it, swl, time, g);
+        }
     }
 };
 

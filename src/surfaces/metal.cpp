@@ -153,7 +153,7 @@ public:
     [[nodiscard]] auto ior() const noexcept { return _ior; }
     [[nodiscard]] auto remap_roughness() const noexcept { return _remap_roughness; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] uint properties() const noexcept override { return property_reflective; }
+    [[nodiscard]] uint properties() const noexcept override { return property_reflective | property_differentiable; }
 
 protected:
     [[nodiscard]] luisa::unique_ptr<Instance> _build(
@@ -263,11 +263,28 @@ private:
                 .wi = wi,
                 .event = Surface::event_reflect};
     }
+    void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df,
+                   TransportMode mode) const noexcept override {
+        if (auto Kd = instance<MetalInstance>()->Kd();
+            Kd != nullptr && Kd->node()->requires_gradients()) {
+            auto &&ctx = context<Context>();
+            auto &it = ctx.it;
+            auto fresnel = FresnelConductor{ctx.eta_i, ctx.n, ctx.k};
+            auto distribute = TrowbridgeReitzDistribution{ctx.alpha};
+            auto lobe = MicrofacetReflection{SampledSpectrum{swl().dimension(), 1.f}, &distribute, &fresnel};
+
+            auto wi_local = it.shading().world_to_local(wi);
+            auto eval = lobe.evaluate(wi_local, it.shading().world_to_local(wi), mode);
+            auto dKd = df * abs_cos_theta(wi_local) * eval;
+            Kd->backward_albedo_spectrum(it, swl(), time(), dKd);
+        }
+        // FIXME: differentiate roughness
+    }
 };
 
 luisa::unique_ptr<Surface::Closure> MetalInstance::create_closure(
     const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    return luisa::make_unique<MetalClosure>(pipeline(), swl, time);
+    return luisa::make_unique<MetalClosure>(this, pipeline(), swl, time);
 }
 
 void MetalInstance::populate_closure(Surface::Closure *closure, const Interaction &it,

@@ -24,6 +24,7 @@
 #include <base/light_sampler.h>
 #include <base/environment.h>
 #include <base/texture.h>
+#include <base/differentiation.h>
 #include <base/geometry.h>
 #include <base/medium.h>
 #include <base/phase_function.h>
@@ -86,6 +87,7 @@ private:
     luisa::unique_ptr<Integrator::Instance> _integrator;
     luisa::unique_ptr<Environment::Instance> _environment;
     uint _environment_medium_tag{Medium::INVALID_TAG};
+    luisa::unique_ptr<Differentiation> _differentiation;
     luisa::unique_ptr<Geometry> _geometry;
     // registered transforms
     luisa::unordered_map<const Transform *, uint> _transform_to_id;
@@ -188,11 +190,12 @@ public:
 
     [[nodiscard]] std::pair<BufferView<float4>, uint> allocate_constant_slot() noexcept;
 
-
 public:
     [[nodiscard]] auto &device() const noexcept { return _device; }
     [[nodiscard]] static luisa::unique_ptr<Pipeline> create(
         Device &device, Stream &stream, const Scene &scene) noexcept;
+    [[nodiscard]] Differentiation *differentiation() noexcept;
+    [[nodiscard]] const Differentiation *differentiation() const noexcept;
     [[nodiscard]] auto &bindless_array() noexcept { return _bindless_array; }
     [[nodiscard]] auto &bindless_array() const noexcept { return _bindless_array; }
     [[nodiscard]] auto camera_count() const noexcept { return _cameras.size(); }

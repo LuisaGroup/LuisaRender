@@ -123,6 +123,16 @@ Float MicrofacetDistribution::pdf(Expr<float3> wo, Expr<float3> wh) const noexce
 MicrofacetDistribution::MicrofacetDistribution(Expr<float2> alpha) noexcept
     : _alpha{compute::max(alpha, 1e-4f)} {}
 
+MicrofacetDistribution::Gradient MicrofacetDistribution::grad_G1(Expr<float3> w) const noexcept {
+    auto d_alpha = -grad_Lambda(w).dAlpha / sqr(1.0f + Lambda(w));
+    return {.dAlpha = d_alpha};
+}
+
+MicrofacetDistribution::Gradient MicrofacetDistribution::grad_G(Expr<float3> wo, Expr<float3> wi) const noexcept {
+    auto d_alpha = -(grad_Lambda(wo).dAlpha + grad_Lambda(wi).dAlpha) / sqr(1.0f + Lambda(wo) + Lambda(wi));
+    return {.dAlpha = d_alpha};
+}
+
 TrowbridgeReitzDistribution::TrowbridgeReitzDistribution(Expr<float2> alpha) noexcept
     : MicrofacetDistribution{alpha} {}
 
@@ -140,6 +150,10 @@ Float TrowbridgeReitzDistribution::alpha_to_roughness(Expr<float> alpha) noexcep
 
 Float2 TrowbridgeReitzDistribution::alpha_to_roughness(Expr<float2> alpha) noexcept {
     return sqrt(max(alpha, 1e-4f));
+}
+
+Float2 TrowbridgeReitzDistribution::grad_alpha_roughness(Expr<float2> roughness) noexcept {
+    return 2.f * roughness;
 }
 
 Float TrowbridgeReitzDistribution::D(Expr<float3> wh) const noexcept {
@@ -236,6 +250,40 @@ Float3 TrowbridgeReitzDistribution::sample_wh(Expr<float3> wo, Expr<float2> u) c
     return s * wh;
 }
 
+MicrofacetDistribution::Gradient TrowbridgeReitzDistribution::grad_Lambda(Expr<float3> w) const noexcept {
+    using compute::isinf;
+    auto absTanTheta = abs(tan_theta(w));
+
+    auto alpha2 = cos2_phi(w) * sqr(alpha().x) +
+                  sin2_phi(w) * sqr(alpha().y);
+    auto alpha2Tan2Theta = alpha2 * sqr(absTanTheta);
+
+    auto d_Lambda = ite(isinf(absTanTheta), 0.f, 1.f);
+    auto d_alpha2Tan2Theta = d_Lambda * .25f / sqrt(1.f + alpha2Tan2Theta);
+    auto d_alpha2 = d_alpha2Tan2Theta * sqr(absTanTheta);
+    auto d_alpha = d_alpha2 * make_float2(.5f * cos2_phi(w) / sqr(alpha().x),
+                                          .5f * sin2_phi(w) / sqr(alpha().y));
+
+    return {.dAlpha = d_alpha};
+}
+
+MicrofacetDistribution::Gradient TrowbridgeReitzDistribution::grad_D(Expr<float3> wh) const noexcept {
+    using compute::isinf;
+    auto tan2Theta = tan2_theta(wh);
+    auto cos4Theta = sqr(cos2_theta(wh));
+
+    auto e0 = tan2Theta * sqr(cos_phi(wh) / alpha().x);
+    auto e1 = tan2Theta * sqr(sin_phi(wh) / alpha().y);
+    auto e = e0 + e1;
+    auto D = 1.0f / (pi * alpha().x * alpha().y * cos4Theta * sqr(1.f + e));
+
+    auto d_D = ite(isinf(tan2Theta), 0.f, 1.f);
+    auto d_e = -d_D * 2.f / (1.f + e) * D;
+    auto d_alpha = -d_D * D + d_e * 2.f * make_float2(e0, e1) / alpha();
+
+    return {.dAlpha = d_alpha};
+}
+
 SampledSpectrum FresnelConductor::evaluate(Expr<float> cosThetaI) const noexcept {
     return fresnel_conductor(abs(cosThetaI), _eta_i, _eta_t, _k);
 }
@@ -268,6 +316,11 @@ SampledSpectrum LambertianReflection::evaluate(
     return _r * ite(same_hemisphere(wo, wi), inv_pi, 0.f);
 }
 
+LambertianReflection::Gradient LambertianReflection::backward(
+    Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
+    return {.dR = df * ite(same_hemisphere(wo, wi), inv_pi, 0.f)};
+}
+
 SampledSpectrum LambertianTransmission::evaluate(
     Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept {
     return _t * ite(!same_hemisphere(wo, wi), inv_pi, 0.f);
@@ -281,6 +334,11 @@ BxDF::SampledDirection LambertianTransmission::sample_wi(Expr<float3> wo, Expr<f
 
 Float LambertianTransmission::pdf(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept {
     return compute::ite(same_hemisphere(wo, wi), 0.0f, abs_cos_theta(wi) * inv_pi);
+}
+
+LambertianTransmission::Gradient LambertianTransmission::backward(
+    Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) noexcept {
+    return {.dT = df * ite(!same_hemisphere(wo, wi), inv_pi, 0.f)};
 }
 
 SampledSpectrum MicrofacetReflection::evaluate(
@@ -317,6 +375,36 @@ Float MicrofacetReflection::pdf(Expr<float3> wo, Expr<float3> wi, TransportMode 
         p = _distribution->pdf(wo, wh) / (4.f * dot(wo, wh));
     };
     return p;
+}
+
+MicrofacetReflection::Gradient MicrofacetReflection::backward(
+    Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
+    using compute::any;
+    using compute::normalize;
+    auto wh = wi + wo;
+    auto valid = same_hemisphere(wo, wi) & any(wh != 0.f);
+    wh = normalize(wh);
+    auto cosI_eval = dot(wi, face_forward(wh, make_float3(0.f, 0.f, 1.f)));
+    auto F = _fresnel->evaluate(cosI_eval);
+    auto D = _distribution->D(wh);
+    auto G = _distribution->G(wo, wi);
+    auto cos_o = cos_theta(wo);
+    auto cos_i = cos_theta(wi);
+    auto k0 = 0.25f / (cos_i * cos_o);
+    auto k1 = k0 * D * G;
+    auto h = abs(k1);
+
+    // backward
+    auto d_h = (df * _r * F).sum() * ite(valid, 1.f, 0.f);
+    auto d_F = df * _r * ite(valid, h, 0.f);
+    auto k2 = d_h * sign(k1) * k0;
+    auto d_D = k2 * G;
+    auto d_G = k2 * D;
+    auto d_alpha = d_D * _distribution->grad_D(wh).dAlpha +
+                   d_G * _distribution->grad_G(wo, wi).dAlpha;
+    auto d_r = df * F * ite(valid, h, 0.f);
+
+    return {.dR = d_r, .dAlpha = d_alpha, .dFresnel = _fresnel->backward(cosI_eval, d_F)};
 }
 
 SampledSpectrum MicrofacetTransmission::evaluate(
@@ -367,6 +455,42 @@ Float MicrofacetTransmission::pdf(Expr<float3> wo, Expr<float3> wi, TransportMod
     return pdf;
 }
 
+MicrofacetTransmission::Gradient MicrofacetTransmission::backward(
+    Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df, TransportMode mode) const noexcept {
+    auto cosThetaO = cos_theta(wo);
+    auto cosThetaI = cos_theta(wi);
+    auto refr = !same_hemisphere(wo, wi) & cosThetaO != 0.f & cosThetaI != 0.f;
+    auto e = ite(cosThetaO > 0.f, _eta_b / _eta_a, _eta_a / _eta_b);
+
+    auto G = _distribution->G(wo, wi);
+    auto grad_G = _distribution->grad_G(wo, wi);
+    auto d_t = SampledSpectrum{df.dimension(), 0.f};
+    auto wh = normalize(wo + wi * e);
+    wh = compute::sign(cos_theta(wh)) * wh;
+    auto valid = refr & dot(wo, wh) * dot(wi, wh) < 0.f;
+    auto sqrtDenom = dot(wo, wh) + e * dot(wi, wh);
+    auto factor = 1.f / e;
+
+    auto F = fresnel_dielectric(dot(wo, wh), _eta_a, _eta_b);
+    auto D = _distribution->D(wh);
+    auto k0 = dot(wi, wh) * dot(wo, wh) /
+              (cosThetaI * cosThetaO * sqr(sqrtDenom));
+    if (mode == TransportMode::IMPORTANCE) { k0 *= sqr(e); }
+    auto k1 = D * G * k0;
+    auto k2 = (1.f - F) * sqr(factor);
+    auto f = k2 * _t * abs(k1);
+
+    auto d_f = ite(valid, df, 0.f);
+    d_t = d_f * k2 * abs(k1);
+    auto grad_D = _distribution->grad_D(wh);
+    auto d_alpha = def(make_float2(0.f));
+    for (auto i = 0u; i < _t.dimension(); i++) {
+        d_alpha += d_f[i] * k2 * _t[i] * sign(k1) * k0 *
+                   (D * grad_G.dAlpha + G * grad_D.dAlpha);
+    }
+    return {.dT = d_t, .dAlpha = d_alpha};
+}
+
 OrenNayar::OrenNayar(const SampledSpectrum &R, Expr<float> sigma) noexcept
     : _r{R}, _sigma{sigma} {
     auto sigma2 = sqr(radians(sigma));
@@ -397,6 +521,39 @@ SampledSpectrum OrenNayar::evaluate(
         return (a + b * maxCos * sinAlpha * tanBeta);
     };
     return s * scale(wo, wi, _a, _b) * _r;
+}
+
+OrenNayar::Gradient OrenNayar::backward(
+    Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
+    auto sinThetaI = sin_theta(wi);
+    auto sinThetaO = sin_theta(wo);
+    // Compute cosine term of Oren-Nayar model
+    auto sinPhiI = sin_phi(wi);
+    auto cosPhiI = cos_phi(wi);
+    auto sinPhiO = sin_phi(wo);
+    auto cosPhiO = cos_phi(wo);
+    auto dCos = cosPhiI * cosPhiO + sinPhiI * sinPhiO;
+    auto maxCos = ite(sinThetaI > 1e-4f & sinThetaO > 1e-4f, max(0.f, dCos), 0.f);
+    // Compute sine and tangent terms of Oren-Nayar model
+    auto absCosThetaI = abs_cos_theta(wi);
+    auto absCosThetaO = abs_cos_theta(wo);
+    auto sinAlpha = ite(absCosThetaI > absCosThetaO, sinThetaO, sinThetaI);
+    auto tanBeta = ite(absCosThetaI > absCosThetaO,
+                       sinThetaI / absCosThetaI, sinThetaO / absCosThetaO);
+    auto sigma2 = sqr(radians(_sigma));
+
+    // backward
+    auto sigma2_sigma = radians(_sigma) * pi / 90.f;
+    auto a_sigma2 = -0.165f / sqr(sigma2 + 0.33f);
+    auto b_sigma2 = 0.0405f / sqr(sigma2 + 0.09f);
+    auto k0 = maxCos * sinAlpha * tanBeta;
+    auto d_r = df * inv_pi * (_a + _b * k0);
+    auto k1 = inv_pi * (df * _r).sum();
+    auto d_a = k1;
+    auto d_b = k1 * k0;
+    auto d_sigma2 = d_a * a_sigma2 + d_b * b_sigma2;
+    auto d_sigma = d_sigma2 * sigma2_sigma;
+    return {.dR = d_r, .dSigma = d_sigma};
 }
 
 SampledSpectrum FresnelBlend::Schlick(Expr<float> cosTheta) const noexcept {
@@ -444,6 +601,34 @@ Float FresnelBlend::pdf(Expr<float3> wo, Expr<float3> wi, TransportMode mode) co
     auto pdf_wh = _distribution->pdf(wo, wh);
     auto p = lerp(pdf_wh / (4.f * dot(wo, wh)), abs_cos_theta(wi) * inv_pi, _rd_ratio);
     return ite(same_hemisphere(wo, wi), p, 0.f);
+}
+
+FresnelBlend::Gradient FresnelBlend::backward(
+    Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
+
+    auto pow5 = [](auto &&v) noexcept { return sqr(sqr(v)) * v; };
+    auto absCosThetaI = abs_cos_theta(wi);
+    auto absCosThetaO = abs_cos_theta(wo);
+
+    auto wh = wi + wo;
+    auto valid = same_hemisphere(wo, wi) & any(wh != 0.f);
+    wh = normalize(wh);
+
+    auto k = (28.f / (23.f * pi)) *
+             (1.f - pow5(1.f - .5f * absCosThetaI)) *
+             (1.f - pow5(1.f - .5f * absCosThetaO));
+    auto dv = df * ite(valid, 1.f, 0.f);
+    auto diffuse_rd = (1.f - _rs) * k;
+    auto diffuse_rs = -_rd * k;
+    auto specular_rs = _distribution->D(wh) /
+                       (4.f * abs_dot(wi, wh) * max(absCosThetaI, absCosThetaO)) *
+                       (1 - pow5(1.f - dot(wi, wh)));
+
+    auto d_rd = dv * (diffuse_rd);
+    auto d_rs = dv * (diffuse_rs + specular_rs);
+    auto d_alpha = (dv * Schlick(dot(wi, wh))).sum() * _distribution->grad_D(wh).dAlpha /
+                   (4.f * abs_dot(wi, wh) * max(absCosThetaI, absCosThetaO));
+    return {.dRd = d_rd, .dRs = d_rs, .dAlpha = d_alpha};
 }
 
 }// namespace luisa::render

@@ -44,6 +44,7 @@ public:
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
+    [[nodiscard]] bool is_differentiable() const noexcept override { return false; }
     [[nodiscard]] auto shift_threshold() const noexcept { return _shift_threshold; }
     [[nodiscard]] auto central_radiance() const noexcept { return _central_radiance; }
     [[nodiscard]] string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
@@ -206,7 +207,7 @@ public:
         return [host_image, size = _resolution, path = std::move(path), raw] {
             for (auto &p : *host_image) {
                 if (raw) {
-                    p = make_float4(p.xyz(), 1.f); // don't divide effective_spp
+                    p = make_float4(p.xyz(), 1.f);// don't divide effective_spp
                 } else {
                     p = make_float4(p.xyz() / p.w, 1.f);
                 }
@@ -647,8 +648,8 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
                                 auto shifted_vertex_type = get_vertex_type(make_shared<Interaction>(shifted.it), swl, time);
 
                                 $if(main_vertex_type == (uint)VertexType::VERTEX_TYPE_DIFFUSE & shifted_vertex_type == (uint)VertexType::VERTEX_TYPE_DIFFUSE) {
-//                                    u_light_selection = sampler()->generate_1d();
-//                                    u_light_surface = sampler()->generate_2d();
+                                    //                                    u_light_selection = sampler()->generate_1d();
+                                    //                                    u_light_surface = sampler()->generate_2d();
                                     auto shifted_light_sample = light_sampler()->sample(shifted.it, u_light_selection, u_light_surface, swl, time);
                                     auto shifted_occluded = pipeline().geometry()->intersect_any(shifted_light_sample.shadow_ray);
                                     $if(shifted_occluded | shifted_light_sample.eval.pdf <= 0.f) {// shifted failed, no light

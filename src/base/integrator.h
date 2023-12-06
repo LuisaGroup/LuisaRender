@@ -10,6 +10,8 @@
 #include <base/spectrum.h>
 #include <base/light_sampler.h>
 #include <base/camera.h>
+#include "loss.h"
+#include "optimizer.h"
 
 namespace luisa::render {
 
@@ -52,6 +54,7 @@ public:
     Integrator(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] auto sampler() const noexcept { return _sampler; }
     [[nodiscard]] auto light_sampler() const noexcept { return _light_sampler; }
+    [[nodiscard]] virtual bool is_differentiable() const noexcept = 0;
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
 };
@@ -76,6 +79,54 @@ public:
 
 public:
     ProgressiveIntegrator(Scene *scene, const SceneNodeDesc *desc) noexcept;
+};
+
+class DifferentiableIntegrator : public Integrator {
+
+public:
+    class Instance : public Integrator::Instance {
+
+    private:
+        luisa::unique_ptr<Loss::Instance> _loss;
+        luisa::unique_ptr<Optimizer::Instance> _optimizer;
+        // luisa::vector<float4> _pixels;//store the rendered results for backward
+        // luisa::unordered_map<const Camera::Instance *, Shader<2, uint, float, float>>
+        //     _render_shaders;
+        // luisa::unordered_map<const Camera::Instance *, Shader<2, uint, float, float, Image<float>>> _bp_shaders, _render_1spp_shaders;
+        // luisa::unordered_map<const Camera::Instance *, Image<float>> _Li;
+
+        // protected:
+        // virtual void _render_one_camera(CommandBuffer &command_buffer, uint iteration,
+        //                                 Camera::Instance *camera) noexcept;
+        // virtual void _integrate_one_camera(CommandBuffer &command_buffer, uint iteration,
+        //                                    const Camera::Instance *camera) noexcept;
+        // [[nodiscard]] virtual Float3 Li(const Camera::Instance *camera, Expr<uint> frame_index,
+        //                                 Expr<uint2> pixel_id, Expr<float> time) const noexcept;
+
+    public:
+        explicit Instance(Pipeline &pipeline, CommandBuffer &command_buffer,
+                          const DifferentiableIntegrator *integrator) noexcept;
+        [[nodiscard]] auto loss() const noexcept { return _loss.get(); }
+        [[nodiscard]] auto optimizer() const noexcept { return _optimizer.get(); }
+        // void render(Stream &stream) noexcept override;
+    };
+
+private:
+    luisa::unique_ptr<Loss> _loss;
+    luisa::unique_ptr<Optimizer> _optimizer;
+    uint _iterations;
+    int _display_camera_index;
+    bool _save_process;
+
+public:
+    DifferentiableIntegrator(Scene *scene, const SceneNodeDesc *desc) noexcept;
+
+    [[nodiscard]] bool is_differentiable() const noexcept override { return true; }
+    [[nodiscard]] auto loss() const noexcept { return _loss.get(); }
+    [[nodiscard]] auto optimizer() const noexcept { return _optimizer.get(); }
+    [[nodiscard]] auto iterations() const noexcept { return _iterations; }
+    [[nodiscard]] int display_camera_index() const noexcept { return _display_camera_index; }
+    [[nodiscard]] bool save_process() const noexcept { return _save_process; }
 };
 
 }// namespace luisa::render

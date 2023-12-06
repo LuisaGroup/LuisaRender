@@ -37,6 +37,7 @@ public:
     [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(Pipeline &pipeline, CommandBuffer &cb) const noexcept override {
         return luisa::make_unique<GroupIntegratorInstance>(this, pipeline, cb);
     }
+    [[nodiscard]] bool is_differentiable() const noexcept override { return false; }
 };
 
 GroupIntegratorInstance::GroupIntegratorInstance(

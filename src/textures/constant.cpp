@@ -19,8 +19,11 @@ private:
 
 public:
     ConstantTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
-        : Texture{scene, desc},
-          _should_inline{desc->property_bool_or_default("inline", true)} {
+        : Texture{scene, desc} {
+        if (requires_gradients())
+            _should_inline = false;
+        else
+            _should_inline = desc->property_bool_or_default("inline", true);
         auto scale = desc->property_float_or_default("scale", 1.f);
         auto v = desc->property_float_list_or_default("v");
         if (v.empty()) [[unlikely]] {
@@ -57,12 +60,15 @@ class ConstantTextureInstance final : public Texture::Instance {
 
 private:
     uint _constant_slot{};
+    luisa::optional<Differentiation::ConstantParameter> _diff_param;
 
 public:
     ConstantTextureInstance(Pipeline &p,
                             const ConstantTexture *t,
-                            CommandBuffer &cmd_buffer) noexcept
-        : Texture::Instance{p, t} {
+                            CommandBuffer &cmd_buffer,
+                            luisa::optional<Differentiation::ConstantParameter> param) noexcept
+        : Texture::Instance{p, t}, _diff_param{std::move(param)} {
+        LUISA_INFO("index {} prepared.", _diff_param->index());
         if (!t->should_inline()) {
             auto [buffer, buffer_id] = p.allocate_constant_slot();
             auto v = t->v();
@@ -73,16 +79,51 @@ public:
     [[nodiscard]] Float4 evaluate(const Interaction &it,
                                   const SampledWavelengths &swl,
                                   Expr<float> time) const noexcept override {
+        if (_diff_param) { return pipeline().differentiation()->decode(*_diff_param); }
         if (auto texture = node<ConstantTexture>();
             texture->should_inline()) { return texture->v(); }
         return pipeline().constant(_constant_slot);
+    }
+    [[nodiscard]] Spectrum::Decode evaluate_albedo_spectrum(
+        const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        if (_diff_param) { return Instance::evaluate_albedo_spectrum(it, swl, time); }
+        auto tex = node<ConstantTexture>();
+        auto spec = pipeline().spectrum();
+        auto enc = spec->node()->encode_srgb_albedo(tex->v().xyz());
+        return spec->decode_albedo(swl, enc);
+    }
+    [[nodiscard]] Spectrum::Decode evaluate_illuminant_spectrum(
+        const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        if (_diff_param) { return Instance::evaluate_illuminant_spectrum(it, swl, time); }
+        auto tex = node<ConstantTexture>();
+        auto spec = pipeline().spectrum();
+        auto enc = spec->node()->encode_srgb_illuminant(tex->v().xyz());
+        return spec->decode_illuminant(swl, enc);
+    }
+    void backward(const Interaction &it, const SampledWavelengths &swl,
+                  Expr<float>, Expr<float4> grad) const noexcept override {
+        if (_diff_param) {
+            $if(_diff_param->index() != 0u) {
+                device_log("ggggggggg ({}) , grad in accumulate: ({}, {}, {})",
+                           _diff_param->index(), grad[0u], grad[1u], grad[2u]);
+            };
+            auto slot_seed = xxhash32(as<uint3>(it.p()));
+            // $if(_diff_param->index() == 1u) {
+            // device_log("diff param ({}) , grad in accumulate: ({}, {}, {})",
+            //            _diff_param->index(), grad[0u], grad[1u], grad[2u]);
+            // };
+            pipeline().differentiation()->accumulate(*_diff_param, grad, slot_seed);
+        }
     }
 };
 
 luisa::unique_ptr<Texture::Instance> ConstantTexture::build(
     Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
-    return luisa::make_unique<ConstantTextureInstance>(
-        pipeline, this, command_buffer);
+    luisa::optional<Differentiation::ConstantParameter> param;
+    if (requires_gradients()) {
+        param.emplace(pipeline.differentiation()->parameter(_v, _channels, range()));
+    }
+    return luisa::make_unique<ConstantTextureInstance>(pipeline, this, command_buffer, std::move(param));
 }
 
 }// namespace luisa::render

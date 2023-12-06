@@ -16,7 +16,10 @@ set(LUISA_RENDER_BASE_SOURCES
         light_sampler.cpp light_sampler.h
         texture.cpp texture.h
         texture_mapping.cpp texture_mapping.h
+        differentiation.cpp differentiation.h
         spectrum.cpp spectrum.h
+        loss.h loss.cpp
+        optimizer.cpp optimizer.h
         geometry.cpp geometry.h
         spd.cpp spd.h
         medium.cpp medium.h

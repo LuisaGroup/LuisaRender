@@ -2,6 +2,7 @@
 // Created by Mike Smith on 2022/1/9.
 //
 
+#include "core/logging.h"
 #include <util/sampling.h>
 #include <util/scattering.h>
 #include <base/surface.h>
@@ -25,7 +26,7 @@ public:
           _kd{scene->load_texture(desc->property_node_or_default("Kd"))},
           _sigma{scene->load_texture(desc->property_node_or_default("sigma"))} {}
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
-    [[nodiscard]] uint properties() const noexcept override { return property_reflective; }
+    [[nodiscard]] uint properties() const noexcept override { return property_reflective | property_differentiable; }
 
 protected:
     [[nodiscard]] luisa::unique_ptr<Instance> _build(
@@ -42,6 +43,8 @@ public:
     MatteInstance(const Pipeline &pipeline, const Surface *surface,
                   const Texture::Instance *Kd, const Texture::Instance *sigma) noexcept
         : Surface::Instance{pipeline, surface}, _kd{Kd}, _sigma{sigma} {}
+    [[nodiscard]] auto Kd() const noexcept { return _kd; }
+    [[nodiscard]] auto sigma() const noexcept { return _sigma; }
 
 public:
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> create_closure(const SampledWavelengths &swl, Expr<float> time) const noexcept override;
@@ -109,11 +112,29 @@ private:
                 .wi = wi,
                 .event = Surface::event_reflect};
     }
+
+    void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df_in,
+                   TransportMode mode) const noexcept override {
+        auto &&ctx = context<Context>();
+        auto _instance = instance<MatteInstance>();
+        auto wo_local = ctx.it.shading().world_to_local(wo);
+        auto wi_local = ctx.it.shading().world_to_local(wi);
+        auto df = df_in * abs_cos_theta(wi_local);
+        auto grad = _refl->backward(wo_local, wi_local, df);
+        // device_log("grad in matte: ({}, {}, {})", grad.dR[0u], grad.dR[1u], grad.dR[2u]);
+        if (auto kd = _instance->Kd()) {
+            kd->backward_albedo_spectrum(ctx.it, swl(), time(), zero_if_any_nan(grad.dR));
+        }
+        if (auto sigma = _instance->sigma()) {
+            auto dv = make_float4(ite(isnan(grad.dSigma), 0.f, grad.dSigma), 0.f, 0.f, 0.f);
+            sigma->backward(ctx.it, swl(), time(), dv);
+        }
+    }
 };
 
 luisa::unique_ptr<Surface::Closure> MatteInstance::create_closure(
     const SampledWavelengths &swl, Expr<float> time) const noexcept {
-    return luisa::make_unique<MatteClosure>(pipeline(), swl, time);
+    return luisa::make_unique<MatteClosure>(this, pipeline(), swl, time);
 }
 
 void MatteInstance::populate_closure(Surface::Closure *closure, const Interaction &it,

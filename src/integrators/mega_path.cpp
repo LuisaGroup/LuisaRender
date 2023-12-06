@@ -26,6 +26,7 @@ public:
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
+    [[nodiscard]] bool is_differentiable() const noexcept override { return false; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
@@ -137,8 +138,7 @@ protected:
                         $if(light_sample.eval.pdf > 0.0f & !occluded) {
                             auto wi = light_sample.shadow_ray->direction();
                             auto eval = closure->evaluate(wo, wi);
-                            auto w = balance_heuristic(light_sample.eval.pdf, eval.pdf) /
-                                     light_sample.eval.pdf;
+                            auto w = balance_heuristic(light_sample.eval.pdf, eval.pdf) / light_sample.eval.pdf;
                             Li += w * beta * eval.f * light_sample.eval.L;
                         };
                         // sample material

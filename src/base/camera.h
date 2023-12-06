@@ -46,6 +46,7 @@ public:
         const Camera *_camera;
         luisa::unique_ptr<Film::Instance> _film;
         const Filter::Instance *_filter;
+        const Texture::Instance *_target;
 
     private:
         // generate ray in camera space, should not consider _filter or _transform
@@ -71,6 +72,7 @@ public:
         [[nodiscard]] auto film() const noexcept { return _film.get(); }
         [[nodiscard]] auto filter() noexcept { return _filter; }
         [[nodiscard]] auto filter() const noexcept { return _filter; }
+        [[nodiscard]] auto target() const noexcept { return _target; }
         [[nodiscard]] Sample generate_ray(Expr<uint2> pixel_coord, Expr<float> time,
                                           Expr<float2> u_filter, Expr<float2> u_lens) const noexcept;
         [[nodiscard]] SampleDifferential generate_ray_differential(Expr<uint2> pixel_coord, Expr<float> time,
@@ -97,6 +99,7 @@ private:
     uint _spp;
     std::filesystem::path _file;
     luisa::vector<ShutterPoint> _shutter_points;
+    const Texture *_target;
 
 public:
     Camera(Scene *scene, const SceneNodeDesc *desc) noexcept;
@@ -108,6 +111,7 @@ public:
     [[nodiscard]] auto shutter_samples() const noexcept -> luisa::vector<ShutterSample>;
     [[nodiscard]] auto spp() const noexcept { return _spp; }
     [[nodiscard]] auto file() const noexcept { return _file; }
+    [[nodiscard]] auto target() const noexcept { return _target; }
     [[nodiscard]] virtual bool requires_lens_sampling() const noexcept = 0;
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
