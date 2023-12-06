@@ -800,6 +800,7 @@ void MegakernelReplayDiffInstance::_render_one_camera(
             command_buffer << render_shader(iteration * spp + sample_id++,
                                             s.point.time, s.point.weight)
                                   .dispatch(resolution);
+            camera->film()->show(command_buffer);
             if (++dispatch_count % dispatches_per_commit == 0u) [[unlikely]] {
                 dispatch_count = 0u;
                 auto p = sample_id / static_cast<double>(spp);

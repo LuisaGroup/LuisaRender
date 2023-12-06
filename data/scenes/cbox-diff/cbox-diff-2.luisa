@@ -124,11 +124,15 @@ Film film : Color {
   exposure { 0 }
 }
 
+FIlm display : Display {
+  base { @film }
+}
+
 Camera camera : Pinhole {
   position { 0.0, 1.0, 5.0 }
   fov { 27.8 }
-  spp { 1024 }
-  film { @film }
+  spp { 64 }
+  film { @display }
   file { "../../renders/cbox-diff.exr" }
   filter : Gaussian {
     radius { 1 }
@@ -147,10 +151,10 @@ Integrator pt : MegaReplayDiff {
   display_camera_index { 0 }
   save_process { true }
   loss : L2 {}
-  iterations { 100 }
+  iterations { 1000 }
 
   optimizer : Adam {
-    learning_rate { 0.003 }
+    learning_rate { 0.3 }
   }
 }
 
