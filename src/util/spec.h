@@ -55,6 +55,10 @@ class SampledSpectrum {
 private:
     Local<float> _samples;
 
+private:
+    explicit SampledSpectrum(Local<float> &&samples) noexcept
+        : _samples{std::move(samples)} {}
+
 public:
     SampledSpectrum(uint n, Expr<float> value) noexcept : _samples{n} {
         compute::outline([&] {
@@ -84,6 +88,12 @@ public:
     }
     [[nodiscard]] Local<float> &values() noexcept { return _samples; }
     [[nodiscard]] const Local<float> &values() const noexcept { return _samples; }
+
+    void requires_grad() const noexcept { _samples.requires_grad(); }
+    void backward() const noexcept { _samples.backward(); }
+    void backward(const SampledSpectrum &grad) const noexcept { _samples.backward(grad._samples); }
+    [[nodiscard]] auto grad() const noexcept { return SampledSpectrum{_samples.grad()}; }
+
     [[nodiscard]] Float &operator[](Expr<uint> i) noexcept {
         return dimension() == 1u ? _samples[0u] : _samples[i];
     }
@@ -179,7 +189,7 @@ public:
         });                                                                                        \
         return *this;                                                                              \
     }                                                                                              \
-    auto &operator op##=(const SampledSpectrum &rhs) noexcept {                                    \
+    auto &operator op##=(const SampledSpectrum & rhs) noexcept {                                   \
         LUISA_ASSERT(rhs.dimension() == 1u || dimension() == rhs.dimension(),                      \
                      "Invalid sampled spectrum dimension for operator" #op "=: {} vs {}.",         \
                      dimension(), rhs.dimension());                                                \
