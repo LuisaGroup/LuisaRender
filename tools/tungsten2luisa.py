@@ -179,8 +179,11 @@ def convert_material(out_file, material: dict, alpha=""):
         convert_material(out_file, base_material, aa)
     elif impl == "null":
         convert_null_material(out_file, material)
+    elif impl == "thinsheet":
+        # TODO: Implement thinsheet, here we just use glass
+        convert_glass_material(out_file, material)
     else:
-        print(material)
+        print(f'Unsupported material {material}')
         print(f'''
 Surface mat_{material["name"]} : Matte {{
   Kd : Constant {{
@@ -196,19 +199,42 @@ def convert_materials(out_file, materials):
 
 
 def rotateXYZ(R):
-    return glm.rotate(R.z, (0, 0, 1)) * glm.rotate(R.y, (0, 1, 0)) * glm.rotate(R.x, (1, 0, 0))
+    c = glm.cos(R)
+    s = glm.sin(R)
+    return glm.transpose(glm.mat3(
+        c[1] * c[2], -c[0] * s[2] + s[0] * s[1] * c[2], s[0] * s[2] + c[0] * s[1] * c[2],
+        c[1] * s[2], c[0] * c[2] + s[0] * s[1] * s[2], -s[0] * c[2] + c[0] * s[1] * s[2],
+        -s[1], s[0] * c[1], c[0] * c[1]))
 
 
 def rotateYXZ(R):
-    return  glm.rotate(R.y, (0, 1, 0)) * glm.rotate(R.x, (1, 0, 0)) * glm.rotate(R.z, (0, 0, 1))
+    c = glm.cos(R)
+    s = glm.sin(R)
+    return glm.transpose(glm.mat3(
+        c[1] * c[2] - s[1] * s[0] * s[2], -c[1] * s[2] - s[1] * s[0] * c[2], -s[1] * c[0],
+        c[0] * s[2], c[0] * c[2], -s[0],
+        s[1] * c[2] + c[1] * s[0] * s[2], -s[1] * s[2] + c[1] * s[0] * c[2], c[1] * c[0]))
 
 
 def convert_transform(S, R, T):
-    return glm.translate(T) * rotateYXZ(R) * glm.scale(S)
+    x = glm.vec3(1, 0, 0)
+    y = glm.vec3(0, 1, 0)
+    z = glm.vec3(0, 0, 1)
+    x = S.x * x
+    y = S.y * y
+    z = S.z * z
+    R = rotateYXZ(glm.vec3(R.x, R.y, R.z))
+    x = R * x
+    y = R * y
+    z = R * z
+    return glm.mat4(glm.vec4(x, 0),
+                    glm.vec4(y, 0),
+                    glm.vec4(z, 0),
+                    glm.vec4(T, 1))
 
 
 def convert_shape(out_file, index, shape: dict, materials: dict):
-  #Caution: Tungsten load from rotYXZ
+    # Caution: Tungsten load from rotYXZ
     transform = shape["transform"]
     T = glm.vec3(transform.get("position", 0))
     R = glm.radians(glm.vec3(transform.get("rotation", 0)))
@@ -261,37 +287,48 @@ Env sky : Spherical {{
         print(f"Warning: Skydome is not supported: {shape}")
     else:
         power_scale = 100 * glm.pi()
+        impl_name = "Mesh"
         alpha = ""
         if impl == "mesh":
             file = shape["file"]
             assert file.endswith(".wo3")
-            file = f"{file[:-4]}.obj"
+            prop = f'file {{ "{file[:-4]}.obj" }}'
         elif impl == "quad":
-            file = "models/square.obj"
-            M = M * rotateXYZ(glm.radians(glm.vec3(-90, 0, 0))
-                              ) * glm.scale(glm.vec3(.5))
-            power_scale=S[0]*S[2]*glm.pi()
+            impl_name = "InlineMesh"
+            prop = f"""positions {{ 1, 1, 0, -1, 1, 0, -1, -1, 0, 1, -1, 0 }}
+  indices {{ 0, 1, 2, 0, 2, 3 }}"""
+            # file = "models/square.obj"
+            # M = M * rotateXYZ(glm.radians(glm.vec3(-90, 0, 0))
+            #                   ) * glm.scale(glm.vec3(.5))
+            power_scale = S[0] * S[2] * glm.pi()
+            M = M * glm.mat4(rotateXYZ(glm.vec3(glm.radians(-90), 0, 0))) * glm.scale(glm.vec3(.5))
         elif impl == "cube":
-            file = "models/cube.obj"
+            prop = 'file { "models/cube.obj" }'
             M = M * rotateXYZ(glm.radians(glm.vec3(-90, 0, 0))) * glm.scale(glm.vec3(.5))
         elif impl == "disk":
-            file = "models/disk.obj"
+            prop = 'file { "models/disk.obj" }'
         elif impl == "sphere":
-            file = "models/sphere.obj"
+            prop = 'file { "models/sphere.obj" }'
         elif impl == "curves":
-            return
+            assert False
         else:
             print(f"Unsupported shape: {shape}")
             raise NotImplementedError()
         material = shape["bsdf"]
         if not isinstance(material, str):
-            material = "Null"
+            material = dict(material)
+            if material["type"] == "null":
+                material = "Null"
+            else:
+                material["name"] = f"shape_{index}"
+                convert_material(out_file, material)
+                material = material["name"]
         print(material)
         M0 = ", ".join(str(x) for x in glm.transpose(M)[0])
         M1 = ", ".join(str(x) for x in glm.transpose(M)[1])
         M2 = ", ".join(str(x) for x in glm.transpose(M)[2])
         M3 = ", ".join(str(x) for x in glm.transpose(M)[3])
-        
+
         emission = glm.vec3(shape.get("emission", glm.vec3(
             shape.get("power", 0)) / power_scale))
         if emission.x == emission.y == emission.z == 0:
@@ -304,8 +341,8 @@ Env sky : Spherical {{
     }}
   }}'''
         print(f'''
-Shape shape_{index} : Mesh {{
-  file {{ "{file}" }}
+Shape shape_{index} : {impl_name} {{
+  {prop}
   surface {{ @mat_{material} }}{light}{alpha}
   transform : Matrix {{
     m {{
@@ -327,7 +364,7 @@ def convert_camera(out_file, camera: dict, spp):
     resolution = glm.vec2(camera["resolution"])
     fov = glm.radians(camera["fov"])
     fov = glm.degrees(2 * glm.atan(resolution.y *
-                      glm.tan(0.5 * fov) / resolution.x))
+                                   glm.tan(0.5 * fov) / resolution.x))
     transform = camera["transform"]
     position = glm.vec3(transform["position"])
     look_at = glm.vec3(transform["look_at"])

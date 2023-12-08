@@ -10,6 +10,11 @@ if (WIN32)
     endif ()
 endif ()
 
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND
+        CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 15.0)
+    add_compile_options(-Wno-deprecated-builtins)
+endif ()
+
 add_subdirectory(ext)
 
 add_library(luisa-render-include INTERFACE)
@@ -23,6 +28,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
             /Zc:preprocessor)
 endif ()
 
+set(LUISA_COMPUTE_ENABLE_LTO OFF CACHE BOOL "" FORCE)
 set(LUISA_COMPUTE_ENABLE_PYTHON OFF CACHE BOOL "" FORCE)
 set(LUISA_COMPUTE_ENABLE_UNITY_BUILD ${LUISA_RENDER_ENABLE_UNITY_BUILD} CACHE BOOL "" FORCE)
 add_subdirectory(compute)
