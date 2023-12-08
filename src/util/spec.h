@@ -92,6 +92,7 @@ public:
     void requires_grad() const noexcept { _samples.requires_grad(); }
     void backward() const noexcept { _samples.backward(); }
     void backward(const SampledSpectrum &grad) const noexcept { _samples.backward(grad._samples); }
+    auto detach() const noexcept { return SampledSpectrum{_samples.detach()}; }
     [[nodiscard]] auto grad() const noexcept { return SampledSpectrum{_samples.grad()}; }
 
     [[nodiscard]] Float &operator[](Expr<uint> i) noexcept {
