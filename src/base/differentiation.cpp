@@ -50,7 +50,7 @@ Differentiation::Differentiation(Pipeline &pipeline) noexcept
 #ifdef LUISA_RENDER_USE_BP_TIMES_NORMALIZATION
         grad /= Float(max(count, 1u));
 #endif
-        device_log("grad accumulated: ({}, {}, {})", grad[0u], grad[1u], grad[2u]);
+        // device_log("grad accumulated: ({}, {}, {})", grad[0u], grad[1u], grad[2u]);
 
         auto param_offset = thread * 4u;
         param_gradients.write(param_offset + 0u, grad.x);
@@ -77,7 +77,6 @@ Differentiation::Differentiation(Pipeline &pipeline) noexcept
 
 Differentiation::ConstantParameter Differentiation::parameter(float4 x, uint channels, float2 range) noexcept {
     auto index = static_cast<uint>(_constant_params.size());
-    LUISA_INFO("index: {}", index);
     _constant_params.emplace_back(x);
     _constant_ranges.emplace_back(range);
     return {index, channels};

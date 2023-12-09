@@ -252,7 +252,7 @@ private:
         $if(same_hemisphere(wo_local, wi_local)) {
             // Kr
             if (_instance->Kr() && _instance->Kr()->node()->requires_gradients()) {
-                auto d_f = refl.backward(wo_local, wi_local, df);
+                auto d_f = refl.backward(wo_local, wi_local, df, mode);
                 d_alpha = d_f.dAlpha;
                 _instance->Kr()->backward_albedo_spectrum(it, swl(), time(), zero_if_any_nan(d_f.dR));
             }

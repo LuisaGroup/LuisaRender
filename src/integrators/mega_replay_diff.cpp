@@ -2,6 +2,7 @@
 // Created by ChenXin on 2022/2/23.
 //
 // #include <iostream>
+#include "core/logging.h"
 #include <luisa-compute.h>
 #include <util/imageio.h>
 #include <util/sampling.h>
@@ -14,7 +15,7 @@
 namespace luisa::render {
 
 // #define LUISA_RENDER_PATH_REPLAY_DEBUG
-#define LUISA_RENDER_PATH_REPLAY_DEBUG_2
+// #define LUISA_RENDER_PATH_REPLAY_DEBUG_2
 
 using namespace luisa::compute;
 

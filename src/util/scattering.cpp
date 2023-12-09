@@ -2,6 +2,9 @@
 // Created by Mike Smith on 2022/1/31.
 //
 
+#include "dsl/builtin.h"
+#include "dsl/stmt.h"
+#include "util/spec.h"
 #include <dsl/sugar.h>
 #include <util/frame.h>
 #include <util/sampling.h>
@@ -9,7 +12,10 @@
 
 namespace luisa::render {
 
+using compute::backward;
 using compute::Callable;
+using compute::grad;
+using compute::requires_grad;
 
 Bool refract(Float3 wi, Float3 n, Float eta, Float3 *wt) noexcept {
     static Callable impl = [](Float3 wi, Float3 n, Float eta) noexcept {
@@ -317,7 +323,7 @@ SampledSpectrum LambertianReflection::evaluate(
 }
 
 LambertianReflection::Gradient LambertianReflection::backward(
-    Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
+    Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df, TransportMode mode) const noexcept {
     return {.dR = df * ite(same_hemisphere(wo, wi), inv_pi, 0.f)};
 }
 
@@ -337,7 +343,7 @@ Float LambertianTransmission::pdf(Expr<float3> wo, Expr<float3> wi, TransportMod
 }
 
 LambertianTransmission::Gradient LambertianTransmission::backward(
-    Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) noexcept {
+    Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df, TransportMode mode) noexcept {
     return {.dT = df * ite(!same_hemisphere(wo, wi), inv_pi, 0.f)};
 }
 
@@ -378,7 +384,7 @@ Float MicrofacetReflection::pdf(Expr<float3> wo, Expr<float3> wi, TransportMode 
 }
 
 MicrofacetReflection::Gradient MicrofacetReflection::backward(
-    Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
+    Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df, TransportMode mode) const noexcept {
     using compute::any;
     using compute::normalize;
     auto wh = wi + wo;
@@ -500,6 +506,11 @@ OrenNayar::OrenNayar(const SampledSpectrum &R, Expr<float> sigma) noexcept
 
 SampledSpectrum OrenNayar::evaluate(
     Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept {
+    return forward_compute(wo, wi, mode, _a, _b, _r);
+}
+
+SampledSpectrum OrenNayar::forward_compute(
+    Expr<float3> wo, Expr<float3> wi, TransportMode mode, Float a, Float b, SampledSpectrum r) const noexcept {
     auto valid = same_hemisphere(wo, wi);
     auto s = ite(valid, inv_pi, 0.f);
     static Callable scale = [](Float3 wo, Float3 wi, Float a, Float b) noexcept {
@@ -520,39 +531,28 @@ SampledSpectrum OrenNayar::evaluate(
                            sinThetaI / absCosThetaI, sinThetaO / absCosThetaO);
         return (a + b * maxCos * sinAlpha * tanBeta);
     };
-    return s * scale(wo, wi, _a, _b) * _r;
+    return s * scale(wo, wi, a, b) * r;
 }
 
 OrenNayar::Gradient OrenNayar::backward(
-    Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
-    auto sinThetaI = sin_theta(wi);
-    auto sinThetaO = sin_theta(wo);
-    // Compute cosine term of Oren-Nayar model
-    auto sinPhiI = sin_phi(wi);
-    auto cosPhiI = cos_phi(wi);
-    auto sinPhiO = sin_phi(wo);
-    auto cosPhiO = cos_phi(wo);
-    auto dCos = cosPhiI * cosPhiO + sinPhiI * sinPhiO;
-    auto maxCos = ite(sinThetaI > 1e-4f & sinThetaO > 1e-4f, max(0.f, dCos), 0.f);
-    // Compute sine and tangent terms of Oren-Nayar model
-    auto absCosThetaI = abs_cos_theta(wi);
-    auto absCosThetaO = abs_cos_theta(wo);
-    auto sinAlpha = ite(absCosThetaI > absCosThetaO, sinThetaO, sinThetaI);
-    auto tanBeta = ite(absCosThetaI > absCosThetaO,
-                       sinThetaI / absCosThetaI, sinThetaO / absCosThetaO);
-    auto sigma2 = sqr(radians(_sigma));
-
-    // backward
-    auto sigma2_sigma = radians(_sigma) * pi / 90.f;
-    auto a_sigma2 = -0.165f / sqr(sigma2 + 0.33f);
-    auto b_sigma2 = 0.0405f / sqr(sigma2 + 0.09f);
-    auto k0 = maxCos * sinAlpha * tanBeta;
-    auto d_r = df * inv_pi * (_a + _b * k0);
-    auto k1 = inv_pi * (df * _r).sum();
-    auto d_a = k1;
-    auto d_b = k1 * k0;
-    auto d_sigma2 = d_a * a_sigma2 + d_b * b_sigma2;
-    auto d_sigma = d_sigma2 * sigma2_sigma;
+    Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df, TransportMode mode) const noexcept {
+    auto d_r = _r;
+    auto d_sigma = _sigma;
+    compute::device_log("ok till before backward");
+    $autodiff {
+        auto r = _r;
+        auto sigma = _sigma;
+        r.requires_grad();
+        requires_grad(sigma);
+        auto sigma2 = sqr(radians(sigma));
+        auto a = 1.f - (sigma2 / (2.f * sigma2 + 0.66f));
+        auto b = 0.45f * sigma2 / (sigma2 + 0.09f);
+        auto y = forward_compute(wo, wi, mode, a, b, r);
+        y.backward(df);
+        d_r = r.grad();
+        d_sigma = grad(sigma);
+    };
+    compute::device_log("ok after backward");
     return {.dR = d_r, .dSigma = d_sigma};
 }
 
@@ -604,7 +604,7 @@ Float FresnelBlend::pdf(Expr<float3> wo, Expr<float3> wi, TransportMode mode) co
 }
 
 FresnelBlend::Gradient FresnelBlend::backward(
-    Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df) const noexcept {
+    Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df, TransportMode mode) const noexcept {
 
     auto pow5 = [](auto &&v) noexcept { return sqr(sqr(v)) * v; };
     auto absCosThetaI = abs_cos_theta(wi);

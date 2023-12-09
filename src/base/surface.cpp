@@ -70,6 +70,7 @@ Surface::Sample Surface::Closure::sample(Expr<float3> wo,
 void Surface::Closure::backward(
     Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df,
     TransportMode mode) const noexcept {
+    compute::device_log("ok till before backward surface");
     if (instance()->node()->is_differentiable()) {
         _backward(wo, wi, df, mode);
     }

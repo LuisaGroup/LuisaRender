@@ -159,7 +159,7 @@ private:
         auto wo_local = it.shading().world_to_local(wo);
         auto wi_local = it.shading().world_to_local(wi);
         auto df = df_in * abs_cos_theta(wi_local);
-        auto grad = refl.backward(wo_local, wi_local, df);
+        auto grad = refl.backward(wo_local, wi_local, df, mode);
         auto d_fresnel = dynamic_cast<SchlickFresnel::Gradient *>(grad.dFresnel.get());
         if (auto color = _instance->color()) {
             color->backward_albedo_spectrum(it, swl(), time(), zero_if_any_nan(grad.dR + d_fresnel->dR0));

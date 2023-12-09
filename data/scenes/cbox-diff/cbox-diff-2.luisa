@@ -151,10 +151,10 @@ Integrator pt : MegaReplayDiff {
   display_camera_index { 0 }
   save_process { true }
   loss : L2 {}
-  iterations { 1000 }
+  iterations { 100 }
 
   optimizer : Adam {
-    learning_rate { 0.3 }
+    learning_rate { 0.03 }
   }
 }
 

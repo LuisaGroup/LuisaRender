@@ -299,6 +299,7 @@ CMakeSettings.json
 
 *.png
 /outputs/
+/outputs_ref/
 /imgui.ini
 /set_accel_kernel
 /results.txt
