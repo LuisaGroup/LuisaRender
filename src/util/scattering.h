@@ -51,6 +51,10 @@ public:
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wh) const noexcept;
     [[nodiscard]] auto alpha() const noexcept { return _alpha; }
 
+    [[nodiscard]] virtual Float forward_compute_Lambda(Expr<float3> w, Float2 alpha) const noexcept = 0;
+    [[nodiscard]] virtual Float forward_compute_D(Expr<float3> wh, Float2 alpha) const noexcept = 0;
+    [[nodiscard]] virtual Float forward_compute_G(Expr<float3> wo, Expr<float3> wi, Float2 alpha) const noexcept;
+
     [[nodiscard]] virtual Gradient grad_G1(Expr<float3> w) const noexcept;
     [[nodiscard]] virtual Gradient grad_G(Expr<float3> wo, Expr<float3> wi) const noexcept;
     [[nodiscard]] virtual Gradient grad_D(Expr<float3> wh) const noexcept = 0;
@@ -66,6 +70,9 @@ struct TrowbridgeReitzDistribution : public MicrofacetDistribution {
     [[nodiscard]] static Float2 roughness_to_alpha(Expr<float2> roughness) noexcept;
     [[nodiscard]] static Float alpha_to_roughness(Expr<float> alpha) noexcept;
     [[nodiscard]] static Float2 alpha_to_roughness(Expr<float2> alpha) noexcept;
+
+    [[nodiscard]] Float forward_compute_Lambda(Expr<float3> w, Float2 alpha) const noexcept override;
+    [[nodiscard]] Float forward_compute_D(Expr<float3> wh, Float2 alpha) const noexcept override;
 
     [[nodiscard]] Gradient grad_D(Expr<float3> wh) const noexcept override;
     [[nodiscard]] Gradient grad_Lambda(Expr<float3> w) const noexcept override;
@@ -195,6 +202,7 @@ public:
         : _r{R}, _distribution{d}, _fresnel{f} {}
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
     [[nodiscard]] SampledDirection sample_wi(Expr<float3> wo, Expr<float2> u, TransportMode mode) const noexcept override;
+    [[nodiscard]] SampledSpectrum forward_compute(Expr<float3> wo, Expr<float3> wi, TransportMode mode, SampledSpectrum r, Float2 alpha) const noexcept;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
     [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df, TransportMode mode) const noexcept;
     [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _r; }
@@ -222,6 +230,7 @@ public:
                            Expr<float> etaA, Expr<float> etaB) noexcept
         : _t{T}, _distribution{d}, _eta_a{etaA}, _eta_b{etaB} {}
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
+    [[nodiscard]] SampledSpectrum forward_compute(Expr<float3> wo, Expr<float3> wi, TransportMode mode, SampledSpectrum r, Float2 alpha) const noexcept;
     [[nodiscard]] SampledDirection sample_wi(Expr<float3> wo, Expr<float2> u, TransportMode mode) const noexcept override;
     [[nodiscard]] Float pdf(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
     [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df, TransportMode mode) const noexcept;
