@@ -11,7 +11,8 @@
 
 namespace luisa::render {
 
-//#define LUISA_RENDER_DIFFERENTIATION_DEBUG
+// #define LUISA_RENDER_DIFFERENTIATION_DEBUG
+#define LUISA_RENDER_DIFFERENTIATION_DEBUG_2
 #define LUISA_RENDER_USE_BP_TIMES_NORMALIZATION
 
 Differentiation::Differentiation(Pipeline &pipeline) noexcept
@@ -341,6 +342,21 @@ void Differentiation::dump(CommandBuffer &command_buffer, const std::filesystem:
         SaveEXR(pixels.data(), static_cast<int>(size.x), static_cast<int>(size.y),
                 static_cast<int>(channels), false, file_name.string().c_str(), nullptr);
     }
+#ifdef LUISA_RENDER_DIFFERENTIATION_DEBUG_2
+    if (auto n = _constant_params.size()) {
+        luisa::vector<float4> params_after(n);
+        command_buffer << _param_buffer->subview(0u, n * 4u).copy_to(params_after.data())
+                       << synchronize();
+
+        // DEBUG: print constant parameters
+        for (auto i = 0u; i < n; i++) {
+            auto p0 = params_after[i];
+            LUISA_INFO(
+                "\nParam #{}: ({}, {}, {}, {})",
+                i, p0.x, p0.y, p0.z, p0.w);
+        }
+    }
+#endif
 }
 
 void Differentiation::register_optimizer(Optimizer::Instance *optimizer) noexcept {

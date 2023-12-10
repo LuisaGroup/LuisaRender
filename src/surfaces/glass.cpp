@@ -258,7 +258,7 @@ private:
             }
         }
         $else {
-            // Ks
+            // Kt
             if (_instance->Kt() && _instance->Kt()->node()->requires_gradients()) {
                 auto d_f = trans.backward(wo_local, wi_local, df, mode);
                 d_alpha = d_f.dAlpha;

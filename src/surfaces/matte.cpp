@@ -3,6 +3,7 @@
 //
 
 #include "core/logging.h"
+#include "dsl/stmt.h"
 #include <util/sampling.h>
 #include <util/scattering.h>
 #include <base/surface.h>
@@ -125,7 +126,6 @@ private:
         auto wo_local = ctx.it.shading().world_to_local(wo);
         auto wi_local = ctx.it.shading().world_to_local(wi);
         auto df = df_in * abs_cos_theta(wi_local);
-        compute::device_log("ok till before backward matte");
         auto grad = _refl->backward(wo_local, wi_local, df, mode);
         // device_log("grad in matte: ({}, {}, {})", grad.dR[0u], grad.dR[1u], grad.dR[2u]);
         if (auto kd = _instance->Kd()) {

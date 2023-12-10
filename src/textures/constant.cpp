@@ -102,15 +102,11 @@ public:
     void backward(const Interaction &it, const SampledWavelengths &swl,
                   Expr<float>, Expr<float4> grad) const noexcept override {
         if (_diff_param) {
-            $if(_diff_param->index() != 0u) {
-                // device_log("ggggggggg ({}) , grad in accumulate: ({}, {}, {})",
-                //            _diff_param->index(), grad[0u], grad[1u], grad[2u]);
-            };
-            auto slot_seed = xxhash32(as<uint3>(it.p()));
             // $if(_diff_param->index() == 1u) {
             // device_log("diff param ({}) , grad in accumulate: ({}, {}, {})",
             //            _diff_param->index(), grad[0u], grad[1u], grad[2u]);
             // };
+            auto slot_seed = xxhash32(as<uint3>(it.p()));
             pipeline().differentiation()->accumulate(*_diff_param, grad, slot_seed);
         }
     }

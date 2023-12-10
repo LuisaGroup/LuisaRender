@@ -538,7 +538,6 @@ OrenNayar::Gradient OrenNayar::backward(
     Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df, TransportMode mode) const noexcept {
     auto d_r = _r;
     auto d_sigma = _sigma;
-    compute::device_log("ok till before backward");
     $autodiff {
         auto r = _r;
         auto sigma = _sigma;
@@ -552,7 +551,6 @@ OrenNayar::Gradient OrenNayar::backward(
         d_r = r.grad();
         d_sigma = grad(sigma);
     };
-    compute::device_log("ok after backward");
     return {.dR = d_r, .dSigma = d_sigma};
 }
 
