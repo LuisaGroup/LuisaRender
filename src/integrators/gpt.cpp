@@ -338,7 +338,7 @@ luisa::unique_ptr<Integrator::Instance> GradientPathTracing::build(
     $else {
         // Reflection
         auto tangent_space_half_vector = normalize(tangent_space_main_wi + tangent_space_main_wo);
-        auto tangent_space_shifted_wo = reflect(tangent_space_shifted_wi, tangent_space_half_vector);
+        auto tangent_space_shifted_wo = reflect(-tangent_space_shifted_wi, tangent_space_half_vector);
 
         auto wo_dot_h = abs(dot(tangent_space_shifted_wo, tangent_space_half_vector)) / abs(dot(tangent_space_main_wo, tangent_space_half_vector));
 
