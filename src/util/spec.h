@@ -81,9 +81,11 @@ public:
         LUISA_ASSERT(rhs.dimension() == 1u || dimension() == rhs.dimension(),
                      "Invalid spectrum dimensions for operator=: {} vs {}.",
                      dimension(), rhs.dimension());
-        compute::outline([&] {
+        if (rhs.dimension() == 1u) {
             for (auto i = 0u; i < dimension(); i++) { _samples[i] = rhs[i]; }
-        });
+        } else {
+            _samples = rhs._samples;
+        }
         return *this;
     }
     [[nodiscard]] Local<float> &values() noexcept { return _samples; }
