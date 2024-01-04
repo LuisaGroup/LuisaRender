@@ -17,7 +17,7 @@ namespace luisa::render {
 SceneParserJSON::SceneParserJSON(SceneDesc &desc, const std::filesystem::path &path,
                                  const MacroMap &cli_macros) noexcept
     : _desc{desc}, _cli_macros{cli_macros},
-      _location{desc.register_path(std::filesystem::canonical(path))} {}
+      _location{desc.register_path(LUISA_SCENE_PARSER_CHECKED_CANONICAL_PATH(path))} {}
 
 void SceneParserJSON::parse() const noexcept {
     auto root = [this] {

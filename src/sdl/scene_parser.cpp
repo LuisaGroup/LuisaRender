@@ -17,7 +17,7 @@ namespace luisa::render {
 inline SceneParser::SceneParser(SceneDesc &desc, const std::filesystem::path &path,
                                 const MacroMap &cli_macros) noexcept
     : _desc{desc}, _cli_macros{cli_macros},
-      _location{desc.register_path(std::filesystem::canonical(path))},
+      _location{desc.register_path(LUISA_SCENE_PARSER_CHECKED_CANONICAL_PATH(path))},
       _cursor{0u} {}
 
 void SceneParser::_dispatch_parse(SceneDesc &desc, const std::filesystem::path &path,

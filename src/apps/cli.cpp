@@ -13,6 +13,25 @@
 #include <base/scene.h>
 #include <base/pipeline.h>
 
+#ifdef LUISA_PLATFORM_WINDOWS
+[[nodiscard]] auto get_current_exe_path() noexcept {
+    constexpr auto max_path_length = static_cast<size_t>(4096);
+    std::filesystem::path::value_type path[max_path_length] = {};
+    auto nchar = GetModuleFileNameW(nullptr, path, max_path_length);
+    if (nchar == 0 ||
+        (nchar == MAX_PATH &&
+         ((GetLastError() == ERROR_INSUFFICIENT_BUFFER) ||
+          (path[MAX_PATH - 1] != 0)))) {
+        LUISA_ERROR_WITH_LOCATION("Failed to get current executable path.");
+    }
+    return std::filesystem::canonical(path).string();
+}
+#else
+[[nodiscard]] auto get_current_exe_path() noexcept {
+    LUISA_NOT_IMPLEMENTED();// TODO
+}
+#endif
+
 [[nodiscard]] auto parse_cli_options(int argc, const char *const *argv) noexcept {
     cxxopts::Options cli{"luisa-render-cli"};
     cli.add_option("", "b", "backend", "Compute backend name", cxxopts::value<luisa::string>(), "<backend>");
@@ -111,7 +130,9 @@ using namespace luisa::render;
 int main(int argc, char *argv[]) {
 
     log_level_info();
-    luisa::compute::Context context{argv[0]};
+
+    auto exe_path = get_current_exe_path();
+    luisa::compute::Context context{exe_path};
     auto macros = parse_cli_macros(argc, argv);
     for (auto &&[k, v] : macros) {
         LUISA_INFO("Found CLI Macro: {} = {}", k, v);
@@ -123,7 +144,7 @@ int main(int argc, char *argv[]) {
     auto path = options["scene"].as<std::filesystem::path>();
     compute::DeviceConfig config;
     config.device_index = index;
-    config.inqueue_buffer_limit = false; // Do not limit the number of in-queue buffers --- we are doing offline rendering!
+    config.inqueue_buffer_limit = false;// Do not limit the number of in-queue buffers --- we are doing offline rendering!
     auto device = context.create_device(backend, &config);
 
     Clock clock;

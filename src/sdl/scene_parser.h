@@ -11,6 +11,15 @@
 #include <core/stl.h>
 #include <sdl/scene_node_desc.h>
 
+#define LUISA_SCENE_PARSER_CHECKED_CANONICAL_PATH(...) ([&] { \
+    try {                                                     \
+        return std::filesystem::canonical(__VA_ARGS__);       \
+    } catch (const std::filesystem::filesystem_error &e) {    \
+        LUISA_ERROR_WITH_LOCATION(                            \
+            "Failed to open file: {}", e.what());             \
+    }                                                         \
+}())
+
 namespace luisa::render {
 
 class SceneDesc;
