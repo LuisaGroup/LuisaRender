@@ -13,10 +13,10 @@
 #include <base/scene.h>
 #include <base/pipeline.h>
 
-#ifdef LUISA_PLATFORM_WINDOWS
+#if defined(LUISA_PLATFORM_WINDOWS)
 #include <windows.h>
 [[nodiscard]] auto get_current_exe_path() noexcept {
-    constexpr auto max_path_length = static_cast<size_t>(4096);
+    constexpr auto max_path_length = std::max<size_t>(MAX_PATH, 4096);
     std::filesystem::path::value_type path[max_path_length] = {};
     auto nchar = GetModuleFileNameW(nullptr, path, max_path_length);
     if (nchar == 0 ||
@@ -27,18 +27,32 @@
     }
     return std::filesystem::canonical(path).string();
 }
-#else
+#elif defined(LUISA_PLATFORM_APPLE)
 #include <libproc.h>
 #include <unistd.h>
 [[nodiscard]] auto get_current_exe_path() noexcept {
-    char pathbuf[PROC_PIDPATHINFO_MAXSIZE];
+    char pathbuf[PROC_PIDPATHINFO_MAXSIZE] = {};
     auto pid = getpid();
-    if (proc_pidpath(pid, pathbuf, sizeof(pathbuf)) <= 0) {
-        LUISA_ERROR_WITH_LOCATION(
-            "Failed to get current executable path (PID = {}): {}.",
-            pid, strerror(errno));
+    if (auto size = proc_pidpath(pid, pathbuf, sizeof(pathbuf)); size > 0) {
+        luisa::string_view path{pathbuf, static_cast<size_t>(size)};
+        return std::filesystem::canonical(path).string();
     }
-    return std::filesystem::canonical(pathbuf).string();
+    LUISA_ERROR_WITH_LOCATION(
+        "Failed to get current executable path (PID = {}): {}.",
+        pid, strerror(errno));
+}
+#else
+#include <unistd.h>
+[[nodiscard]] auto get_current_exe_path() noexcept {
+    char pathbuf[PATH_MAX] = {};
+    for (auto p : {"/proc/self/exe", "/proc/curproc/file", "/proc/self/path/a.out"}) {
+        if (auto size = readlink(p, pathbuf, sizeof(pathbuf)); size > 0) {
+            luisa::string_view path{pathbuf, static_cast<size_t>(size)};
+            return std::filesystem::canonical(path).string();
+        }
+    }
+    LUISA_ERROR_WITH_LOCATION(
+        "Failed to get current executable path.");
 }
 #endif
 
