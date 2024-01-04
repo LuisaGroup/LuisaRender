@@ -80,6 +80,15 @@ public:
         };
         return value;
     }
+    [[nodiscard]] SampledSpectrum eval_grad(const Interaction &it,
+                                            const SampledWavelengths &swl,
+                                            Expr<float> time,
+                                            Expr<float4> grad) const noexcept override {
+        if (node()->requires_gradients()) {
+            LUISA_ERROR_WITH_LOCATION("Not supported.");
+        }
+        return {swl.dimension(), 0.f};
+    }
     [[nodiscard]] Spectrum::Decode evaluate_albedo_spectrum(
         const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         Spectrum::Decode value{SampledSpectrum{swl.dimension()}, 0.f};

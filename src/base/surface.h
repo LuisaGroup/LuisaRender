@@ -78,6 +78,7 @@ public:
         template<typename BS, typename BSI>
         friend class OpacitySurfaceWrapper;
         [[nodiscard]] virtual Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept = 0;
+        [[nodiscard]] virtual SampledSpectrum _eval_grad(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept = 0;
         [[nodiscard]] virtual Sample _sample(Expr<float3> wo, Expr<float> u_lobe, Expr<float2> u, TransportMode mode) const noexcept = 0;
         virtual void _backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df, TransportMode mode) const noexcept = 0;
 
@@ -95,6 +96,8 @@ public:
         [[nodiscard]] auto instance() const noexcept { return static_cast<const T *>(_instance); }
         [[nodiscard]] Evaluation evaluate(Expr<float3> wo, Expr<float3> wi,
                                           TransportMode mode = TransportMode::RADIANCE) const noexcept;
+        [[nodiscard]] SampledSpectrum eval_grad(Expr<float3> wo, Expr<float3> wi,
+                                                TransportMode mode = TransportMode::RADIANCE) const noexcept;
         [[nodiscard]] Sample sample(Expr<float3> wo,
                                     Expr<float> u_lobe, Expr<float2> u,
                                     TransportMode mode = TransportMode::RADIANCE) const noexcept;
@@ -218,6 +221,11 @@ public:
                                                     Expr<float3> wi,
                                                     TransportMode mode) const noexcept override {
             return _base->_evaluate(wo, wi, mode);
+        }
+        [[nodiscard]] SampledSpectrum _eval_grad(Expr<float3> wo,
+                                                 Expr<float3> wi,
+                                                 TransportMode mode) const noexcept override {
+            return _base->_eval_grad(wo, wi, mode);
         }
         [[nodiscard]] Surface::Sample _sample(Expr<float3> wo,
                                               Expr<float> u_lobe, Expr<float2> u,

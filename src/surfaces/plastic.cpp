@@ -249,6 +249,12 @@ private:
                                                 TransportMode mode) const noexcept override {
         return _impl->evaluate(wo, wi, mode);
     }
+    [[nodiscard]] SampledSpectrum _eval_grad(Expr<float3> wo, Expr<float3> wi,
+                                             TransportMode mode) const noexcept override {
+        // TODO
+        LUISA_WARNING_WITH_LOCATION("Not implemented.");
+        return {swl().dimension(), 0.f};
+    }
     [[nodiscard]] Surface::Sample _sample(Expr<float3> wo,
                                           Expr<float> u_lobe, Expr<float2> u,
                                           TransportMode mode) const noexcept override {

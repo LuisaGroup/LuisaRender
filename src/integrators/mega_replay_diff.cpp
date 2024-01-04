@@ -15,7 +15,6 @@
 namespace luisa::render {
 
 // #define LUISA_RENDER_PATH_REPLAY_DEBUG
-// #define LUISA_RENDER_PATH_REPLAY_DEBUG_2
 
 using namespace luisa::compute;
 
@@ -42,10 +41,11 @@ public:
 class MegakernelReplayDiffInstance final : public DifferentiableIntegrator::Instance {
 
 private:
-    luisa::unordered_map<const Camera::Instance *, Shader<2, uint, float, float>>
-        _render_shaders;
+    luisa::unordered_map<const Camera::Instance *, Shader<2, uint, float, float>> _render_shaders;
     luisa::unordered_map<const Camera::Instance *, Shader<2, uint, float, float, Image<float>>> _bp_shaders, _render_1spp_shaders;
+    luisa::unordered_map<const Camera::Instance *, Shader<2, uint, float, float>> _render_grad_map_shaders;
     luisa::unordered_map<const Camera::Instance *, Image<float>> replay_Li;
+    luisa::unordered_map<const Camera::Instance *, Buffer<float4>> last_time_rendered;
 
 private:
     void _render_one_camera(
@@ -65,6 +65,7 @@ public:
             auto camera = pipeline.camera(i);
             auto resolution = camera->film()->node()->resolution();
             replay_Li.emplace(camera, pipeline.device().create_image<float>(PixelStorage::FLOAT4, resolution));
+            last_time_rendered.emplace(camera, pipeline.device().create_buffer<float4>(resolution.x * resolution.y));
         }
 
         // handle output dir
@@ -81,10 +82,10 @@ public:
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
         command_buffer << pipeline().printer().reset();
 #endif
-#ifdef LUISA_RENDER_PATH_REPLAY_DEBUG_2
-        command_buffer << pipeline().printer().reset();
-#endif
         luisa::vector<float4> rendered;
+        luisa::vector<float4> rendered_last; // for computing finite-difference
+        luisa::vector<float4> rendered_delta;// for computing finite-difference
+        luisa::vector<float4> rendered_grad; // for grad_map
 
         auto iteration_num = pt->iterations();
 
@@ -94,9 +95,17 @@ public:
             // delete output buffer
             auto output_dir = std::filesystem::path("outputs") /
                               luisa::format("output_buffer_camera_{:03}", i);
+            auto output_dir_2 = std::filesystem::path("outputs") /
+                                luisa::format("output_finite_diff_camera_{:03}", i);
+            auto output_dir_3 = std::filesystem::path("outputs") /
+                                luisa::format("output_grad_map_camera_{:03}", i);
             // std::cout << "Current Path: " << output_dir << std::endl;
             std::filesystem::remove_all(output_dir);
+            std::filesystem::remove_all(output_dir_2);
+            std::filesystem::remove_all(output_dir_3);
             std::filesystem::create_directories(output_dir);
+            std::filesystem::create_directories(output_dir_2);
+            std::filesystem::create_directories(output_dir_3);
         }
 
         for (auto k = 0u; k < iteration_num; ++k) {
@@ -111,6 +120,12 @@ public:
                 auto output_path = std::filesystem::path("outputs") /
                                    luisa::format("output_buffer_camera_{:03}", i) /
                                    luisa::format("{:06}.exr", k);
+                auto output_path_gradmap = std::filesystem::path("outputs") /
+                                           luisa::format("output_grad_map_camera_{:03}", i) /
+                                           luisa::format("{:06}.exr", k);
+                auto output_path_finite_diff = std::filesystem::path("outputs") /
+                                               luisa::format("output_finite_diff_camera_{:03}", i) /
+                                               luisa::format("{:06}.exr", k);
 
                 LUISA_INFO("");
                 LUISA_INFO("Camera {}", i);
@@ -124,9 +139,115 @@ public:
                 if (pt->save_process()) {
                     // save image
                     rendered.resize(next_pow2(pixel_count));
+                    rendered_last.resize(next_pow2(pixel_count));
+                    rendered_delta.resize(next_pow2(pixel_count));
+                    rendered_grad.resize(next_pow2(pixel_count));
                     camera->film()->download(command_buffer, rendered.data());
                     command_buffer << synchronize();
                     save_image(output_path, (const float *)rendered.data(), resolution);
+                    if (pt->save_grad_map()) {
+                        camera->film_grad()->download(command_buffer, rendered_grad.data());
+
+                        float max = -1000;
+                        float min = 1000;
+                        for (int i = 0; i < pixel_count; i++) {
+                            if (rendered_grad[i].x > max)
+                                max = rendered_grad[i].x;
+                            if (rendered_grad[i].x < min)
+                                min = rendered_grad[i].x;
+                        }
+                        auto max_abs = max > 0.f ? max : -max;
+                        auto min_abs = min < 0.f ? -min : min;
+                        auto bound = max_abs > min_abs ? max_abs : min_abs;
+                        // LUISA_INFO("bound: {}", bound);
+                        float satuation_up = 0.75;
+                        float satuation_down = 0.1;
+
+                        float saturatin_delta = satuation_up - satuation_down;
+                        for (int i = 0; i < pixel_count; i++) {
+                            rendered_grad[i].x = rendered_grad[i].x / bound * 3 * saturatin_delta;// scaling
+                            if (rendered_grad[i].x < -saturatin_delta) {
+                                // blue
+                                rendered_grad[i].y = rendered_grad[i].x + satuation_up + saturatin_delta;
+                                if (rendered_grad[i].y < satuation_down)
+                                    rendered_grad[i].y = satuation_down;
+                                rendered_grad[i].x = satuation_down;
+                                rendered_grad[i].z = satuation_up;
+                            } else if (rendered_grad[i].x < 0) {
+                                // green
+                                rendered_grad[i].z = satuation_down - rendered_grad[i].x;
+                                rendered_grad[i].x = satuation_down;
+                                rendered_grad[i].y = satuation_up;
+                            } else if (rendered_grad[i].x < saturatin_delta) {
+                                // yellow
+                                rendered_grad[i].x = satuation_down + rendered_grad[i].x;
+                                rendered_grad[i].y = satuation_up;
+                                rendered_grad[i].z = satuation_down;
+                            } else {
+                                // red
+                                rendered_grad[i].y = satuation_up + saturatin_delta - rendered_grad[i].x;
+                                if (rendered_grad[i].y < satuation_down)
+                                    rendered_grad[i].y = satuation_down;
+                                rendered_grad[i].x = satuation_up;
+                                rendered_grad[i].z = satuation_down;
+                            }
+                            rendered_grad[i].w = 1;
+                        }
+                        save_image(output_path_gradmap, (const float *)rendered_grad.data(), resolution);
+                    }
+                    if (pt->save_finite_diff()) {
+                        // just toy case
+                        auto &&last_time = last_time_rendered[camera];
+                        if (k != 0) {
+                            command_buffer << last_time.copy_to(rendered_last.data());
+                            command_buffer << synchronize();
+                            // float max = -1500;
+                            // float min = 1500;
+                            for (int i = 0; i < pixel_count; i++) {
+                                auto pixel = rendered[i] - rendered_last[i];
+                                rendered_delta[i].x = 0;// use idx x as a temp buffer
+                                for (int j = 0; j < 3; j++) {
+                                    rendered_delta[i].x += (rendered[i][j] - rendered_last[i][j]);
+                                }
+                                // if (i > 1024 * 130) {
+                                //     if (rendered_delta[i].x > max)
+                                //         max = rendered_delta[i].x;
+                                //     if (rendered_delta[i].x < min)
+                                //         min = rendered_delta[i].x;
+                                // }
+                            }
+                            // LUISA_INFO("max: {}, min: {}", max, min);
+                            for (int i = 0; i < pixel_count; i++) {
+                                // if (rendered_delta[i].x > 20) {
+                                //     LUISA_INFO("maxindex: {},{}", int(i / resolution.x), i - int(i / resolution.x) * resolution.x);
+                                // }
+                                rendered_delta[i].x = rendered_delta[i].x * 4;// scaling
+                                if (rendered_delta[i].x < -1) {
+                                    // blue
+                                    rendered_delta[i].y = rendered_delta[i].x + 2;
+                                    rendered_delta[i].x = 0;
+                                    rendered_delta[i].z = 1;
+                                } else if (rendered_delta[i].x < 0) {
+                                    // green
+                                    rendered_delta[i].z = 0 - rendered_delta[i].x;
+                                    rendered_delta[i].x = 0;
+                                    rendered_delta[i].y = 1;
+                                } else if (rendered_delta[i].x < 1) {
+                                    // yellow
+                                    rendered_delta[i].y = 1;
+                                    rendered_delta[i].z = 0;
+                                } else {
+                                    // red
+                                    rendered_delta[i].y = 2 - rendered_delta[i].x;
+                                    rendered_delta[i].x = 1;
+                                    rendered_delta[i].z = 0;
+                                }
+                                rendered_delta[i].w = 1;
+                            }
+                            save_image(output_path_finite_diff, (const float *)rendered_delta.data(), resolution);
+                        }
+                        command_buffer << last_time.copy_from(rendered.data()) << synchronize();
+                    }
                 }
             }
 
@@ -148,6 +269,7 @@ public:
             auto pixel_count = resolution.x * resolution.y;
 
             _render_one_camera(command_buffer, iteration_num, camera);
+            // _render_grad_map(command_buffer, iteration_num, camera);
 
             rendered.resize(next_pow2(pixel_count));
             camera->film()->download(command_buffer, rendered.data());
@@ -157,9 +279,6 @@ public:
             save_image(film_path, (const float *)rendered.data(), resolution);
         }
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
-        command_buffer << pipeline().printer().retrieve() << synchronize();
-#endif
-#ifdef LUISA_RENDER_PATH_REPLAY_DEBUG_2
         command_buffer << pipeline().printer().retrieve() << synchronize();
 #endif
         LUISA_INFO("Finish saving results");
@@ -181,6 +300,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
 
     auto spp = camera->node()->spp();
     auto resolution = camera->node()->film()->resolution();
+    camera->film_grad()->prepare(command_buffer);
 
     LUISA_INFO("Start backward propagation.");
 
@@ -380,6 +500,9 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
             SampledSpectrum Li{swl.dimension(), 0.f};
             auto grad_weight = shutter_weight * static_cast<float>(pt->node<MegakernelReplayDiff>()->max_depth());
 
+            // for rendering grad map
+            SampledSpectrum grad_map{swl.dimension(), 0.f};
+
             auto Li_last_pass = Li_1spp.read(pixel_id);
             Li[0u] = Li_last_pass[0u];
             Li[1u] = Li_last_pass[1u];
@@ -394,33 +517,6 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
             Float3 rendered = camera->film()->read(pixel_id).average;
             auto pixel_uv_it = pixel_xy2uv(pixel_id, resolution);
             Float3 target = camera->target()->evaluate(pixel_uv_it, swl, 0.f).xyz();
-
-#ifdef LUISA_RENDER_PATH_REPLAY_DEBUG_2
-            $if(all(pixel_id == make_uint2(80, 280))) {
-                $if(frame_index % 800 == 0) {
-                    pipeline().printer().info(" ");
-                    pipeline().printer().info("dloss of (80, 280): delta = ({}, {}, {})", d_loss[0u], d_loss[1u], d_loss[2u]);
-                    pipeline().printer().info("rendered: delta = ({}, {}, {})", rendered[0u], rendered[1u], rendered[2u]);
-                    pipeline().printer().info("target: delta = ({}, {}, {})", target[0u], target[1u], target[2u]);
-                };
-            };
-            $if(all(pixel_id == make_uint2(600, 750))) {
-                $if(frame_index % 800 == 0) {
-                    pipeline().printer().info(" ");
-                    pipeline().printer().info("dloss of (600, 750): delta = ({}, {}, {})", d_loss[0u], d_loss[1u], d_loss[2u]);
-                    pipeline().printer().info("rendered: delta = ({}, {}, {})", rendered[0u], rendered[1u], rendered[2u]);
-                    pipeline().printer().info("target: delta = ({}, {}, {})", target[0u], target[1u], target[2u]);
-                };
-            };
-            $if(all(pixel_id == make_uint2(280, 80))) {
-                $if(frame_index % 800 == 0) {
-                    pipeline().printer().info(" ");
-                    pipeline().printer().info("dloss of (280, 80): delta = ({}, {}, {})", d_loss[0u], d_loss[1u], d_loss[2u]);
-                    pipeline().printer().info("rendered: delta = ({}, {}, {})", rendered[0u], rendered[1u], rendered[2u]);
-                    pipeline().printer().info("target: delta = ({}, {}, {})", target[0u], target[1u], target[2u]);
-                };
-            };
-#endif
 
             auto ray = camera_ray;
             auto pdf_bsdf = def(1e16f);
@@ -533,8 +629,9 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                                     pipeline().printer().info("after -direct: Li = ({}, {}, {})", Li[0u], Li[1u], Li[2u]);
                                 };
 #endif
-
                                 closure->backward(wo, wi, d_loss * weight * light_sample.eval.L);
+                                auto surface_grad = closure->eval_grad(wo, wi);
+                                grad_map += surface_grad * weight * light_sample.eval.L;
                             };
 
                             // sample material
@@ -546,8 +643,10 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                             // path replay bp
                             auto df = d_loss * grad_weight * Li;
                             df = ite(surface_sample.eval.f == 0.f, 0.f, df / surface_sample.eval.f);
-
                             closure->backward(wo, surface_sample.wi, df);
+
+                            auto surface_grad = closure->eval_grad(wo, surface_sample.wi);
+                            grad_map += ite(surface_sample.eval.f == 0.f, 0.f, surface_grad * Li / surface_sample.eval.f);
 
                             beta *= w * surface_sample.eval.f;
 
@@ -570,6 +669,7 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                     beta *= ite(q < rr_threshold, 1.0f / q, 1.f);
                 };
             };
+            camera->film_grad()->accumulate(pixel_id, spectrum->srgb(swl, grad_map * shutter_weight));
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
             $if(all(pixel_id == pixel_checked)) {
@@ -614,9 +714,6 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                 command_buffer << [&progress, p] { progress.update(p); };
             }
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
-            command_buffer << pipeline().printer().retrieve() << synchronize();
-#endif
-#ifdef LUISA_RENDER_PATH_REPLAY_DEBUG_2
             command_buffer << pipeline().printer().retrieve() << synchronize();
 #endif
         }

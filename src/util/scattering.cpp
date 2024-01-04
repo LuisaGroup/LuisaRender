@@ -535,6 +535,26 @@ SampledSpectrum OrenNayar::evaluate(
     return forward_compute(wo, wi, mode, _a, _b, _r);
 }
 
+OrenNayar::Gradient OrenNayar::eval_grad(
+    Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept {
+    auto d_r = _r;
+    auto d_sigma = _sigma;
+    $autodiff {
+        auto r = _r;
+        auto sigma = _sigma;
+        r.requires_grad();
+        requires_grad(sigma);
+        auto sigma2 = sqr(radians(sigma));
+        auto a = 1.f - (sigma2 / (2.f * sigma2 + 0.66f));
+        auto b = 0.45f * sigma2 / (sigma2 + 0.09f);
+        auto y = forward_compute(wo, wi, mode, a, b, r);
+        y.backward();
+        d_r = r.grad();
+        d_sigma = grad(sigma);
+    };
+    return {.dR = d_r, .dSigma = d_sigma};
+}
+
 SampledSpectrum OrenNayar::forward_compute(
     Expr<float3> wo, Expr<float3> wi, TransportMode mode, Float a, Float b, SampledSpectrum r) const noexcept {
     auto valid = same_hemisphere(wo, wi);

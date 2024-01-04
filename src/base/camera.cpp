@@ -16,6 +16,7 @@ namespace luisa::render {
 Camera::Camera(Scene *scene, const SceneNodeDesc *desc) noexcept
     : SceneNode{scene, desc, SceneNodeTag::CAMERA},
       _film{scene->load_film(desc->property_node("film"))},
+      _film_grad{scene->load_film(desc->property_node("film"))},
       _filter{scene->load_filter(desc->property_node_or_default(
           "filter", SceneNodeDesc::shared_default_filter("Box")))},
       _transform{scene->load_transform(desc->property_node_or_default("transform"))},
@@ -206,6 +207,7 @@ auto Camera::shutter_samples() const noexcept -> vector<ShutterSample> {
 Camera::Instance::Instance(Pipeline &pipeline, CommandBuffer &command_buffer, const Camera *camera) noexcept
     : _pipeline{&pipeline}, _camera{camera},
       _film{camera->film()->build(pipeline, command_buffer)},
+      _film_grad{camera->film_grad()->build(pipeline, command_buffer)},
       _filter{pipeline.build_filter(command_buffer, camera->filter())},
       _target{pipeline.build_texture(command_buffer, camera->target())} {
     pipeline.register_transform(camera->transform());

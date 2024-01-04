@@ -2,6 +2,7 @@
 // Created by Mike Smith on 2022/1/26.
 //
 
+#include "util/spec.h"
 #include <base/texture.h>
 #include <base/pipeline.h>
 #include <base/scene.h>
@@ -82,6 +83,24 @@ public:
         if (auto texture = node<ConstantTexture>();
             texture->should_inline()) { return texture->v(); }
         return pipeline().constant(_constant_slot);
+    }
+    [[nodiscard]] SampledSpectrum eval_grad(const Interaction &it,
+                                            const SampledWavelengths &swl,
+                                            Expr<float> time,
+                                            Expr<float4> grad) const noexcept override {
+        if (_diff_param) {
+            if (node()->render_grad_map()) {
+                // render grad map in a simple way:
+                // if texture param 3-dim, combine them. which means: add up each dim of grad, only eval_grad qualitatively.
+                // as for output: each dim of the sampledspectrum will be the same.
+                auto grads = (grad[0] + grad[1] + grad[2]);
+                return {swl.dimension(), ite(isnan(grads), 0.f, grads)};
+            } else {
+                return {swl.dimension(), 0.f};
+            }
+        } else {
+            return {swl.dimension(), 0.f};
+        }
     }
     [[nodiscard]] Spectrum::Decode evaluate_albedo_spectrum(
         const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept override {

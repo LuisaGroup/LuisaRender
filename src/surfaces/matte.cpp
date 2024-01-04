@@ -4,6 +4,7 @@
 
 #include "core/logging.h"
 #include "dsl/stmt.h"
+#include "util/spec.h"
 #include <util/sampling.h>
 #include <util/scattering.h>
 #include <base/surface.h>
@@ -102,6 +103,26 @@ private:
         auto f = _refl->evaluate(wo_local, wi_local, mode);
         auto pdf = _refl->pdf(wo_local, wi_local, mode);
         return {.f = f * abs_cos_theta(wi_local), .pdf = pdf};
+    }
+
+    [[nodiscard]] SampledSpectrum _eval_grad(Expr<float3> wo,
+                                             Expr<float3> wi,
+                                             TransportMode mode) const noexcept override {
+        auto &&ctx = context<Context>();
+        auto _instance = instance<MatteInstance>();
+        auto wo_local = ctx.it.shading().world_to_local(wo);
+        auto wi_local = ctx.it.shading().world_to_local(wi);
+        auto grad = _refl->eval_grad(wo_local, wi_local, mode);
+        SampledSpectrum spectrum_grad{swl().dimension(), 0.f};
+
+        if (auto kd = _instance->Kd()) {
+            spectrum_grad += kd->eval_grad_albedo_spectrum(ctx.it, swl(), time(), zero_if_any_nan(grad.dR));
+        }
+        if (auto sigma = _instance->sigma()) {
+            auto dv = make_float4(ite(isnan(grad.dSigma), 0.f, grad.dSigma), 0.f, 0.f, 0.f);
+            spectrum_grad += sigma->eval_grad(ctx.it, swl(), time(), dv);
+        }
+        return spectrum_grad;
     }
 
     [[nodiscard]] Surface::Sample _sample(Expr<float3> wo,

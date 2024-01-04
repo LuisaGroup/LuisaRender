@@ -171,6 +171,15 @@ public:
         }
         return make_float4((*_impl)(it.uv()), 1.f);
     }
+    [[nodiscard]] SampledSpectrum eval_grad(const Interaction &it,
+                                            const SampledWavelengths &swl,
+                                            Expr<float> time,
+                                            Expr<float4> grad) const noexcept override {
+        if (node()->requires_gradients()) {
+            LUISA_ERROR_WITH_LOCATION("Not supported.");
+        }
+        return {swl.dimension(), 0.f};
+    }
     void backward(const Interaction &it, const SampledWavelengths &swl,
                   Expr<float> time, Expr<float4> grad) const noexcept override {
         LUISA_WARNING_WITH_LOCATION("NishitaSkyInstance::backward() not implemented.");

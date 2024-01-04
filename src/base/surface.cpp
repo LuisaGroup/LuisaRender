@@ -2,6 +2,7 @@
 // Created by Mike on 2021/12/14.
 //
 
+#include "util/spec.h"
 #include <base/surface.h>
 #include <base/scene.h>
 #include <base/interaction.h>
@@ -52,6 +53,17 @@ Surface::Evaluation Surface::Closure::evaluate(
         eval.pdf = ite(valid, eval.pdf, 0.f);
     };
     return eval;
+}
+
+SampledSpectrum Surface::Closure::eval_grad(
+    Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept {
+    SampledSpectrum grad{swl().dimension()};
+    $outline {
+        grad = _eval_grad(wo, wi, mode);
+        auto valid = validate_surface_sides(it().ng(), it().shading().n(), wo, wi);
+        grad = ite(valid, grad, 0.f);
+    };
+    return grad;
 }
 
 Surface::Sample Surface::Closure::sample(Expr<float3> wo,

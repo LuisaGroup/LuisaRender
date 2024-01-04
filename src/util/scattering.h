@@ -254,6 +254,7 @@ private:
 public:
     OrenNayar(const SampledSpectrum &R, Expr<float> sigma) noexcept;
     [[nodiscard]] SampledSpectrum evaluate(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept override;
+    [[nodiscard]] Gradient eval_grad(Expr<float3> wo, Expr<float3> wi, TransportMode mode) const noexcept;
     [[nodiscard]] SampledSpectrum forward_compute(Expr<float3> wo, Expr<float3> wi, TransportMode mode, Float a, Float b, SampledSpectrum r) const noexcept;
     [[nodiscard]] Gradient backward(Expr<float3> wo, Expr<float3> wi, const SampledSpectrum &df, TransportMode mode) const noexcept;
     [[nodiscard]] SampledSpectrum albedo() const noexcept override { return _r; }

@@ -45,6 +45,7 @@ public:
         const Pipeline *_pipeline;
         const Camera *_camera;
         luisa::unique_ptr<Film::Instance> _film;
+        luisa::unique_ptr<Film::Instance> _film_grad;
         const Filter::Instance *_filter;
         const Texture::Instance *_target;
 
@@ -70,6 +71,8 @@ public:
         [[nodiscard]] auto &pipeline() const noexcept { return *_pipeline; }
         [[nodiscard]] auto film() noexcept { return _film.get(); }
         [[nodiscard]] auto film() const noexcept { return _film.get(); }
+        [[nodiscard]] auto film_grad() noexcept { return _film_grad.get(); }
+        [[nodiscard]] auto film_grad() const noexcept { return _film_grad.get(); }
         [[nodiscard]] auto filter() noexcept { return _filter; }
         [[nodiscard]] auto filter() const noexcept { return _filter; }
         [[nodiscard]] auto target() const noexcept { return _target; }
@@ -92,6 +95,7 @@ public:
 
 private:
     const Film *_film;
+    const Film *_film_grad;
     const Filter *_filter;
     const Transform *_transform;
     float2 _shutter_span;
@@ -104,6 +108,7 @@ private:
 public:
     Camera(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] auto film() const noexcept { return _film; }
+    [[nodiscard]] auto film_grad() const noexcept { return _film_grad; }
     [[nodiscard]] auto filter() const noexcept { return _filter; }
     [[nodiscard]] auto transform() const noexcept { return _transform; }
     [[nodiscard]] auto shutter_span() const noexcept { return _shutter_span; }

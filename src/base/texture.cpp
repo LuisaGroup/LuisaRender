@@ -2,6 +2,7 @@
 // Created by Mike Smith on 2022/1/25.
 //
 
+#include "util/spec.h"
 #include <base/texture.h>
 #include <base/pipeline.h>
 
@@ -12,9 +13,11 @@ Texture::Texture(Scene *scene, const SceneNodeDesc *desc) noexcept
       _range{desc->property_float2_or_default(
           "range", make_float2(std::numeric_limits<float>::min(),
                                std::numeric_limits<float>::max()))},
-      _requires_grad{desc->property_bool_or_default("requires_grad", false)} {}
+      _requires_grad{desc->property_bool_or_default("requires_grad", false)},
+      _render_grad_map{desc->property_bool_or_default("render_grad_map", false)} {}
 
 bool Texture::requires_gradients() const noexcept { return _requires_grad; }
+bool Texture::render_grad_map() const noexcept { return _render_grad_map; }
 void Texture::disable_gradients() noexcept { _requires_grad = false; }
 
 luisa::optional<float4> Texture::evaluate_static() const noexcept { return luisa::nullopt; }
@@ -91,6 +94,14 @@ void Texture::Instance::backward_albedo_spectrum(
     dEnc = make_float4(pipeline().spectrum()->backward_encode_srgb_albedo(dEnc), 1.f);
     // device_log("grad in texture_albedo: ({}, {}, {})", dEnc[0u], dEnc[1u], dEnc[2u]);
     backward(it, swl, time, dEnc);
+}
+
+SampledSpectrum Texture::Instance::eval_grad_albedo_spectrum(
+    const Interaction &it, const SampledWavelengths &swl,
+    Expr<float> time, const SampledSpectrum &dSpec) const noexcept {
+    auto dEnc = pipeline().spectrum()->backward_decode_albedo(swl, evaluate(it, swl, time), dSpec);
+    dEnc = make_float4(pipeline().spectrum()->backward_encode_srgb_albedo(dEnc), 1.f);
+    return eval_grad(it, swl, time, dEnc);
 }
 
 void Texture::Instance::backward_illuminant_spectrum(

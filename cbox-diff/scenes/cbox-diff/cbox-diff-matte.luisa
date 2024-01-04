@@ -20,6 +20,7 @@ Surface cbox-white-2 : Matte {
   Kd : Constant {
     v { 0.3, 0.3, 0.9 }
     requires_grad { true }
+    render_grad_map { true }
     range { 0.00001, 0.99999 }
   }
 }
@@ -150,6 +151,7 @@ Integrator pt : MegaReplayDiff {
 
   display_camera_index { 0 }
   save_process { true }
+  save_grad_map { true }
   loss : L2 {}
   iterations { 100 }
 

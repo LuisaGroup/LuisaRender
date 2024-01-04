@@ -203,6 +203,15 @@ public:
         auto v = pipeline().tex2d(_texture_id).sample(uv);// TODO: LOD
         return _decode(v);
     }
+    [[nodiscard]] SampledSpectrum eval_grad(const Interaction &it,
+                                            const SampledWavelengths &swl,
+                                            Expr<float> time,
+                                            Expr<float4> grad) const noexcept override {
+        if (node()->requires_gradients()) {
+            LUISA_ERROR_WITH_LOCATION("Not supported.");
+        }
+        return {swl.dimension(), 0.f};
+    }
     void backward(const Interaction &it, const SampledWavelengths &swl,
                   Expr<float> time, Expr<float4> grad) const noexcept override {
         if (_diff_param) {

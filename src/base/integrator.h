@@ -117,6 +117,8 @@ private:
     uint _iterations;
     int _display_camera_index;
     bool _save_process;
+    bool _save_grad_map;
+    bool _save_finite_diff;
 
 public:
     DifferentiableIntegrator(Scene *scene, const SceneNodeDesc *desc) noexcept;
@@ -127,6 +129,8 @@ public:
     [[nodiscard]] auto iterations() const noexcept { return _iterations; }
     [[nodiscard]] int display_camera_index() const noexcept { return _display_camera_index; }
     [[nodiscard]] bool save_process() const noexcept { return _save_process; }
+    [[nodiscard]] bool save_grad_map() const noexcept { return _save_grad_map; }
+    [[nodiscard]] bool save_finite_diff() const noexcept { return _save_finite_diff; }
 };
 
 }// namespace luisa::render

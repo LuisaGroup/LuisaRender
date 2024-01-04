@@ -123,6 +123,8 @@ DifferentiableIntegrator::DifferentiableIntegrator(Scene *scene, const SceneNode
       _iterations{std::max(desc->property_uint_or_default("iterations", 100u), 1u)},
       _display_camera_index{desc->property_int_or_default("display_camera_index", -1)},
       _save_process{desc->property_bool_or_default("save_process", false)},
+      _save_grad_map{desc->property_bool_or_default("save_grad_map", false)},
+      _save_finite_diff{desc->property_bool_or_default("save_finite_diff", false)},
       _loss{scene->load_loss(desc->property_node_or_default(
           "loss", SceneNodeDesc::shared_default_loss("L2")))},
       _optimizer{scene->load_optimizer(desc->property_node_or_default(
