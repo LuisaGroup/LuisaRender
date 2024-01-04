@@ -14,6 +14,7 @@
 #include <base/pipeline.h>
 
 #ifdef LUISA_PLATFORM_WINDOWS
+#include <windows.h>
 [[nodiscard]] auto get_current_exe_path() noexcept {
     constexpr auto max_path_length = static_cast<size_t>(4096);
     std::filesystem::path::value_type path[max_path_length] = {};
@@ -27,8 +28,17 @@
     return std::filesystem::canonical(path).string();
 }
 #else
+#include <libproc.h>
+#include <unistd.h>
 [[nodiscard]] auto get_current_exe_path() noexcept {
-    LUISA_NOT_IMPLEMENTED();// TODO
+    char pathbuf[PROC_PIDPATHINFO_MAXSIZE];
+    auto pid = getpid();
+    if (proc_pidpath(pid, pathbuf, sizeof(pathbuf)) <= 0) {
+        LUISA_ERROR_WITH_LOCATION(
+            "Failed to get current executable path (PID = {}): {}.",
+            pid, strerror(errno));
+    }
+    return std::filesystem::canonical(pathbuf).string();
 }
 #endif
 
