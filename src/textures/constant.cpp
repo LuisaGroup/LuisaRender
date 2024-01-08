@@ -119,7 +119,7 @@ public:
         return spec->decode_illuminant(swl, enc);
     }
     void backward(const Interaction &it, const SampledWavelengths &swl,
-                  Expr<float>, Expr<float4> grad) const noexcept override {
+                  Expr<float> time, Expr<float4> grad) const noexcept override {
         if (_diff_param) {
             // $if(_diff_param->index() == 1u) {
             // device_log("diff param ({}) , grad in accumulate: ({}, {}, {})",

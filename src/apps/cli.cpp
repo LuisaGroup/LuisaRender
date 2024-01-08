@@ -111,7 +111,7 @@ using namespace luisa::render;
 int main(int argc, char *argv[]) {
 
     log_level_info();
-    // luisa::log_level_verbose();
+    luisa::log_level_verbose();
     luisa::compute::Context context{argv[0]};
     auto macros = parse_cli_macros(argc, argv);
     for (auto &&[k, v] : macros) {

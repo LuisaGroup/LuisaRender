@@ -2,6 +2,7 @@
 // Created by Mike Smith on 2022/3/9.
 //
 
+#include "dsl/builtin.h"
 #include <tinyexr.h>
 
 #include <dsl/syntax.h>
@@ -109,8 +110,7 @@ Differentiation::TexturedParameter Differentiation::parameter(const Image<float>
     _counter_size = (_counter_size + pixel_count + 3u) & ~0b11u;
     _param_buffer_size = (_param_buffer_size + param_count + 3u) & ~0b11u;
     _gradient_buffer_size = (_gradient_buffer_size + param_count + 3u) & ~0b11u;
-    return _textured_params.emplace_back(TexturedParameter{
-        param_index, image, s, grad_offset, param_offset, counter_offset, range});
+    return _textured_params.emplace_back(param_index, image, s, grad_offset, param_offset, counter_offset, range);
 }
 
 void Differentiation::materialize(CommandBuffer &command_buffer) noexcept {
