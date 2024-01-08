@@ -64,6 +64,18 @@ public:
         return eval;
     }
 
+    void backward_hit(const Interaction &it, Expr<float3> p_from,
+                      const SampledWavelengths &swl, Expr<float> time,
+                      const SampledSpectrum &dlight) const noexcept override {
+        if (pipeline().lights().empty()) [[unlikely]] {// no lights
+            LUISA_WARNING_WITH_LOCATION("No lights in scene.");
+        }
+        pipeline().lights().dispatch(it.shape().light_tag(), [&](auto light) noexcept {
+            auto closure = light->closure(swl, time);
+            closure->backward(it, p_from, dlight);
+        });
+    }
+
     [[nodiscard]] Light::Evaluation evaluate_miss(
         Expr<float3> wi, const SampledWavelengths &swl, Expr<float> time) const noexcept override {
         if (_env_prob == 0.f) [[unlikely]] {// no environment
@@ -101,7 +113,6 @@ public:
         return {.tag = ite(is_env, LightSampler::selection_environment, tag),
                 .prob = ite(is_env, _env_prob, (1.f - _env_prob) / n)};
     }
-
 
 private:
     [[nodiscard]] auto _sample_area(Expr<float3> p_from,
@@ -144,17 +155,17 @@ private:
     }
     //sample single light for L_emit.
     [[nodiscard]] LightSampler::Sample _sample_light_le(
-                                              Expr<uint> tag, Expr<float2> u_light, Expr<float2> u_direction,
-                                              const SampledWavelengths &swl,
-                                              Expr<float> time) const noexcept override {
+        Expr<uint> tag, Expr<float2> u_light, Expr<float2> u_direction,
+        const SampledWavelengths &swl,
+        Expr<float> time) const noexcept override {
         LUISA_ASSERT(!pipeline().lights().empty(), "No lights in the scene.");
         auto handle = pipeline().buffer<Light::Handle>(_light_buffer_id).read(tag);
         auto light_inst = pipeline().geometry()->instance(handle.instance_id);
-        auto sp=Light::Sample::zero(swl.dimension());
+        auto sp = Light::Sample::zero(swl.dimension());
         Var<Ray> shadow_ray{};
         pipeline().lights().dispatch(light_inst.light_tag(), [&](auto light) noexcept {
             auto closure = light->closure(swl, time);
-            auto [sp_tp,ray_tp] = closure->sample_le(handle.instance_id, u_light, u_direction);
+            auto [sp_tp, ray_tp] = closure->sample_le(handle.instance_id, u_light, u_direction);
             sp = sp_tp;
             shadow_ray = ray_tp;
         });

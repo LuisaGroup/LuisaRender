@@ -52,9 +52,9 @@ public:
                                                                       const SampledWavelengths &swl,
                                                                       Expr<float> time) const noexcept = 0;
         [[nodiscard]] virtual LightSampler::Sample _sample_light_le(
-                                                          Expr<uint> tag, Expr<float2> u_light, Expr<float2> u_direction,
-                                                          const SampledWavelengths &swl,
-                                                          Expr<float> time) const noexcept = 0;
+            Expr<uint> tag, Expr<float2> u_light, Expr<float2> u_direction,
+            const SampledWavelengths &swl,
+            Expr<float> time) const noexcept = 0;
 
     public:
         explicit Instance(const Pipeline &pipeline, const LightSampler *light_dist) noexcept
@@ -68,6 +68,9 @@ public:
         [[nodiscard]] virtual Evaluation evaluate_hit(
             const Interaction &it, Expr<float3> p_from,
             const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
+        virtual void backward_hit(
+            const Interaction &it, Expr<float3> p_from,
+            const SampledWavelengths &swl, Expr<float> time, const SampledSpectrum &dlight) const noexcept = 0;
         [[nodiscard]] virtual Evaluation evaluate_miss(
             Expr<float3> wi, const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
         [[nodiscard]] virtual Selection select(

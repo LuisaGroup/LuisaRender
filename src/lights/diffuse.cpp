@@ -135,18 +135,15 @@ public:
         };
         return s;
     }
-    void backward(const Interaction &it_light, Expr<float3> p_from, const SampledSpectrum &df) const noexcept override {
-        // TODO
-        LUISA_ERROR_WITH_LOCATION("Not implemented.");
-
+    void backward(const Interaction &it_light, Expr<float3> p_from, const SampledSpectrum &dlight) const noexcept override {
         using namespace luisa::compute;
         auto light = instance<DiffuseLightInstance>();
-        auto d_L = df * ite(it_light.back_facing(), 0.f, 1.f);
+        auto d_L = dlight * ite(it_light.back_facing(), 0.f, 1.f);
         auto d_texture = d_L * light->node<DiffuseLight>()->scale();
         auto d_scale = (d_L * light->texture()->evaluate_illuminant_spectrum(it_light, swl(), time()).value).sum();
 
         light->texture()->backward_albedo_spectrum(it_light, swl(), time(), d_texture);
-        // TODO : backward scale
+        // TODO : backward scale. maybe the same as sigma in matte.cpp
     }
 
     [[nodiscard]] std::pair<Light::Sample, Var<Ray>> sample_le(Expr<uint> light_inst_id,

@@ -122,8 +122,9 @@ public:
                   Expr<float> time, Expr<float4> grad) const noexcept override {
         if (_diff_param) {
             // $if(_diff_param->index() == 1u) {
-            // device_log("diff param ({}) , grad in accumulate: ({}, {}, {})",
-            //            _diff_param->index(), grad[0u], grad[1u], grad[2u]);
+            // $if(grad[0] > 10.f) {
+            //     device_log("diff param ({}) , grad in accumulate: ({}, {}, {})",
+            //                _diff_param->index(), grad[0u], grad[1u], grad[2u]);
             // };
             auto slot_seed = xxhash32(as<uint3>(it.p()));
             pipeline().differentiation()->accumulate(*_diff_param, grad, slot_seed);

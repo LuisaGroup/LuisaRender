@@ -556,6 +556,8 @@ void MegakernelReplayDiffInstance::_integrate_one_camera(
                         auto eval = light_sampler->evaluate_hit(
                             *it, ray->origin(), swl, time);
                         Li -= beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
+                        auto dlight = d_loss * beta * balance_heuristic(pdf_bsdf, eval.pdf);
+                        light_sampler->backward_hit(*it, ray->origin(), swl, time, dlight);
 
 #ifdef LUISA_RENDER_PATH_REPLAY_DEBUG
                         $if(all(pixel_id == pixel_checked)) {
