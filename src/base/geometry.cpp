@@ -127,8 +127,8 @@ void Geometry::_process_shape(
         }
 
         // emplace instance here since we need to know the opaque property
-        _accel.emplace_back(*mesh.resource, object_to_world, visible, false);
-                            //(properties & Shape::property_flag_maybe_non_opaque) == 0u);
+        _accel.emplace_back(*mesh.resource, object_to_world, visible,
+                            (properties & Shape::property_flag_maybe_non_opaque) == 0u);
 
         auto light_tag = 0u;
         auto medium_tag = 0u;
