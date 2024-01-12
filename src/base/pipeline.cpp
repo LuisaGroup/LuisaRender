@@ -101,7 +101,7 @@ luisa::unique_ptr<Pipeline> Pipeline::create(Device &device, Stream &stream, con
 bool Pipeline::update(CommandBuffer &command_buffer, float time) noexcept {
     // TODO: support deformable meshes
     auto updated = _geometry->update(command_buffer, time);
-    if (_any_dynamic_transforms) {
+    if (_any_dynamic_transform) {
         updated = true;
         for (auto i = 0u; i < _transforms.size(); ++i) {
             _transform_matrices[i] = _transforms[i]->matrix(time);
@@ -151,7 +151,7 @@ void Pipeline::register_transform(const Transform *transform) noexcept {
                      "Transform matrix buffer overflows.");
         _transform_to_id.emplace(transform, transform_id);
         _transforms.emplace_back(transform);
-        _any_dynamic_transforms |= !transform->is_static();
+        _any_dynamic_transform |= !transform->is_static();
         _transform_matrices[transform_id] = transform->matrix(_initial_time);
     }
 }

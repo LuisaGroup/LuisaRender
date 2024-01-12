@@ -402,49 +402,35 @@ void WavefrontPathTracingInstance::_render_one_camera(
             });
 
             call.execute([&](const Surface::Closure *closure) noexcept {
-                // apply opacity map
-                auto alpha_skip = def(false);
-                if (auto o = closure->opacity()) {
-                    auto opacity = saturate(*o);
-                    alpha_skip = u_lobe >= opacity;
-                    u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
-                }
-
-                $if(alpha_skip) {
-                    ray = it->spawn_ray(ray->direction());
-                    path_states.write_pdf_bsdf(path_id, 1e16f);
-                }
-                $else {
-                    if (auto dispersive = closure->is_dispersive()) {
-                        $if(*dispersive) {
-                            swl.terminate_secondary();
-                            path_states.terminate_secondary_wavelengths(path_id, u_wl);
-                        };
-                    }
-                    // direct lighting
-                    auto light_wi_and_pdf = light_samples.read_wi_and_pdf(queue_id);
-                    auto pdf_light = light_wi_and_pdf.w;
-                    $if(light_wi_and_pdf.w > 0.f) {
-                        auto eval = closure->evaluate(wo, light_wi_and_pdf.xyz());
-                        auto mis_weight = balance_heuristic(pdf_light, eval.pdf);
-                        // update Li
-                        auto Ld = light_samples.read_emission(queue_id);
-                        auto Li = path_states.read_radiance(path_id);
-                        Li += mis_weight / pdf_light * beta * eval.f * Ld;
-                        path_states.write_radiance(path_id, Li);
+                if (auto dispersive = closure->is_dispersive()) {
+                    $if(*dispersive) {
+                        swl.terminate_secondary();
+                        path_states.terminate_secondary_wavelengths(path_id, u_wl);
                     };
-                    // sample material
-                    auto surface_sample = closure->sample(wo, u_lobe, u_bsdf);
-                    path_states.write_pdf_bsdf(path_id, surface_sample.eval.pdf);
-                    ray = it->spawn_ray(surface_sample.wi);
-                    auto w = ite(surface_sample.eval.pdf > 0.0f, 1.f / surface_sample.eval.pdf, 0.f);
-                    beta *= w * surface_sample.eval.f;
-                    // eta scale
-                    auto eta = closure->eta().value_or(1.f);
-                    $switch(surface_sample.event) {
-                        $case(Surface::event_enter) { eta_scale = sqr(eta); };
-                        $case(Surface::event_exit) { eta_scale = 1.f / sqr(eta); };
-                    };
+                }
+                // direct lighting
+                auto light_wi_and_pdf = light_samples.read_wi_and_pdf(queue_id);
+                auto pdf_light = light_wi_and_pdf.w;
+                $if(light_wi_and_pdf.w > 0.f) {
+                    auto eval = closure->evaluate(wo, light_wi_and_pdf.xyz());
+                    auto mis_weight = balance_heuristic(pdf_light, eval.pdf);
+                    // update Li
+                    auto Ld = light_samples.read_emission(queue_id);
+                    auto Li = path_states.read_radiance(path_id);
+                    Li += mis_weight / pdf_light * beta * eval.f * Ld;
+                    path_states.write_radiance(path_id, Li);
+                };
+                // sample material
+                auto surface_sample = closure->sample(wo, u_lobe, u_bsdf);
+                path_states.write_pdf_bsdf(path_id, surface_sample.eval.pdf);
+                ray = it->spawn_ray(surface_sample.wi);
+                auto w = ite(surface_sample.eval.pdf > 0.0f, 1.f / surface_sample.eval.pdf, 0.f);
+                beta *= w * surface_sample.eval.f;
+                // eta scale
+                auto eta = closure->eta().value_or(1.f);
+                $switch(surface_sample.event) {
+                    $case(Surface::event_enter) { eta_scale = sqr(eta); };
+                    $case(Surface::event_exit) { eta_scale = 1.f / sqr(eta); };
                 };
             });
 

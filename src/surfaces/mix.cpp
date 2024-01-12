@@ -55,6 +55,10 @@ public:
     }
     [[nodiscard]] luisa::unique_ptr<Surface::Closure> create_closure(const SampledWavelengths &swl, Expr<float> time) const noexcept override;
     void populate_closure(Surface::Closure *closure, const Interaction &it, Expr<float3> wo, Expr<float> eta_i) const noexcept override;
+
+    [[nodiscard]] bool maybe_non_opaque() const noexcept override {
+        return _a->maybe_non_opaque() || _b->maybe_non_opaque();
+    }
 };
 
 luisa::unique_ptr<Surface::Instance> MixSurface::_build(

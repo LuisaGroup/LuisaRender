@@ -128,6 +128,8 @@ public:
         [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_surface); }
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
 
+        [[nodiscard]] virtual bool maybe_non_opaque() const noexcept { return false; }
+
         void closure(PolymorphicCall<Closure> &call,
                      const Interaction &it, const SampledWavelengths &swl,
                      Expr<float3> wo, Expr<float> eta_i, Expr<float> time) const noexcept;
@@ -251,6 +253,12 @@ public:
             auto o = _opacity->evaluate(it, swl, time).x;
             typename Closure::Context ctx{.opacity = o};
             closure->bind(std::move(ctx));
+        }
+
+        [[nodiscard]] bool maybe_non_opaque() const noexcept override {
+            if (BaseInstance::maybe_non_opaque()) { return true; }
+            return _opacity != nullptr &&
+                   _opacity->node()->evaluate_static().value_or(make_float4(0.f)).x < 1.f;
         }
     };
 

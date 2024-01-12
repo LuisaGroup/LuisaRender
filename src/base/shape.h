@@ -36,6 +36,7 @@ public:
     static constexpr auto property_flag_has_surface = 1u << 2u;
     static constexpr auto property_flag_has_light = 1u << 3u;
     static constexpr auto property_flag_has_medium = 1u << 4u;
+    static constexpr auto property_flag_maybe_non_opaque = 1u << 5u;
 
 private:
     const Surface *_surface;
@@ -153,7 +154,8 @@ private:
 private:
     Handle(Expr<uint> buffer_base, Expr<uint> flags,
            Expr<uint> surface_tag, Expr<uint> light_tag, Expr<uint> medium_tag,
-           Expr<uint> triangle_count, Expr<float> shadow_terminator, Expr<float> intersection_offset) noexcept
+           Expr<uint> triangle_count,
+           Expr<float> shadow_terminator, Expr<float> intersection_offset) noexcept
         : _buffer_base{buffer_base}, _properties{flags},
           _surface_tag{surface_tag}, _light_tag{light_tag}, _medium_tag{medium_tag},
           _triangle_count{triangle_count},
@@ -184,6 +186,7 @@ public:
     [[nodiscard]] auto has_light() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_light); }
     [[nodiscard]] auto has_surface() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_surface); }
     [[nodiscard]] auto has_medium() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_has_medium); }
+    [[nodiscard]] auto maybe_non_opaque() const noexcept { return test_property_flag(luisa::render::Shape::property_flag_maybe_non_opaque); }
     [[nodiscard]] auto shadow_terminator_factor() const noexcept { return _shadow_terminator; }
     [[nodiscard]] auto intersection_offset_factor() const noexcept { return _intersection_offset; }
 };
