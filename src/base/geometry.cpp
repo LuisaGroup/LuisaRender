@@ -163,36 +163,33 @@ void Geometry::_process_shape(
 }
 
 void Geometry::_alpha_skip(SurfaceCandidate &c) const noexcept {
-    $outline {
-        auto hit = c.hit();
-        auto ray = c.ray();
-        auto bary = make_float3(1.f - hit.bary.x - hit.bary.y, hit.bary);
-        auto it = interaction(hit.inst, hit.prim, bary, -ray->direction());
-        $if(it->shape().maybe_non_opaque() & it->shape().has_surface()) {
-            auto h = xxhash32(make_uint4(hit.inst, hit.prim, compute::as<uint2>(hit.bary)));
-            auto u = min(h * 0x1p-32f, one_minus_epsilon);
-            $switch(it->shape().surface_tag()) {
-                for (auto i = 0u; i < _pipeline.surfaces().size(); i++) {
-                    if (auto surface = _pipeline.surfaces().impl(i);
-                        surface->maybe_non_opaque()) {
-                        $case(i) {
-                            // TODO: pass the correct swl and time
-                            if (auto opacity = surface->evaluate_opacity(*it, _pipeline.spectrum()->sample(.5f), 0.f)) {
-                                $if (u < *opacity) {
-                                    c.commit();
-                                };
-                            } else {
+    auto hit = c.hit();
+    auto ray = c.ray();
+    auto bary = make_float3(1.f - hit.bary.x - hit.bary.y, hit.bary);
+    auto it = interaction(hit.inst, hit.prim, bary, -ray->direction());
+    $if(it->shape().maybe_non_opaque() & it->shape().has_surface()) {
+        auto u = xxhash32(make_uint4(hit.inst, hit.prim, compute::as<uint2>(hit.bary))) * 0x1p-32f;
+        $switch(it->shape().surface_tag()) {
+            for (auto i = 0u; i < _pipeline.surfaces().size(); i++) {
+                if (auto surface = _pipeline.surfaces().impl(i);
+                    surface->maybe_non_opaque()) {
+                    $case(i) {
+                        // TODO: pass the correct swl and time
+                        if (auto opacity = surface->evaluate_opacity(*it, _pipeline.spectrum()->sample(.5f), 0.f)) {
+                            $if(u < *opacity) {
                                 c.commit();
-                            }
-                        };
-                    }
+                            };
+                        } else {
+                            c.commit();
+                        }
+                    };
                 }
-                $default { compute::unreachable(); };
-            };
-        }
-        $else {
-            c.commit();
+            }
+            $default { compute::unreachable(); };
         };
+    }
+    $else {
+        c.commit();
     };
 }
 
