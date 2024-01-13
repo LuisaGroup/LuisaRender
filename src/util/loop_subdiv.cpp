@@ -143,13 +143,13 @@ SubdivMesh loop_subdivide(luisa::span<const Vertex> vertices,
     luisa::vector<SDVertex *> vs;
     luisa::vector<SDFace *> faces;
     // Allocate _LoopSubdiv_ vertices and faces
-    auto verts = luisa::make_unique<SDVertex[]>(vertices.size());
+    luisa::vector<SDVertex> verts(vertices.size());
     for (auto i = 0u; i < vertices.size(); ++i) {
         verts[i] = SDVertex{vertices[i].position()};
         vs.emplace_back(&verts[i]);
     }
     auto nFaces = triangles.size();
-    auto fs = luisa::make_unique<SDFace[]>(nFaces);
+    luisa::vector<SDFace> fs(nFaces);
     for (int i = 0; i < nFaces; ++i) {
         fs[i].baseTriangle = i;
         faces.emplace_back(&fs[i]);
