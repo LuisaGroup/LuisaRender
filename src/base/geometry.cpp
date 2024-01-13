@@ -169,7 +169,8 @@ void Geometry::_alpha_skip(SurfaceCandidate &c) const noexcept {
         auto bary = make_float3(1.f - hit.bary.x - hit.bary.y, hit.bary);
         auto it = interaction(hit.inst, hit.prim, bary, -ray->direction());
         $if(it->shape().maybe_non_opaque() & it->shape().has_surface()) {
-            auto u = xxhash32(make_uint4(hit.inst, hit.prim, compute::as<uint2>(hit.bary))) * 0x1p-32f;
+            auto h = xxhash32(make_uint4(hit.inst, hit.prim, compute::as<uint2>(hit.bary)));
+            auto u = min(h * 0x1p-32f, one_minus_epsilon);
             $switch(it->shape().surface_tag()) {
                 for (auto i = 0u; i < _pipeline.surfaces().size(); i++) {
                     if (auto surface = _pipeline.surfaces().impl(i);
