@@ -47,7 +47,7 @@ protected:
                 "No lights in scene. Rendering aborted.");
             return;
         }
-//        pipeline().printer().set_log_dispatch_id(make_uint2(330, 770));
+        //        pipeline().printer().set_log_dispatch_id(make_uint2(330, 770));
         Instance::_render_one_camera(command_buffer, camera);
     }
 
@@ -474,15 +474,8 @@ protected:
                 });
                 call.execute([&](auto closure) noexcept {
                     // apply opacity map
-                    auto alpha_skip = def(false);
-                    if (auto o = closure->opacity()) {
-                        auto opacity = saturate(*o);
-                        alpha_skip = u_lobe >= opacity;
-                        u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
-                    }
-
                     UInt surface_event;
-                    $if(alpha_skip | (medium_tag != medium_tracker.current().medium_tag)) {
+                    $if(medium_tag != medium_tracker.current().medium_tag) {
                         surface_event = surface_event_skip;
                         ray = it->spawn_ray(ray->direction());
                         pdf_bsdf = 1e16f;

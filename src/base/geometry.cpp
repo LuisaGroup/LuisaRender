@@ -162,6 +162,39 @@ void Geometry::_process_shape(
     }
 }
 
+void Geometry::_alpha_skip(SurfaceCandidate &c) const noexcept {
+    $outline {
+        auto hit = c.hit();
+        auto ray = c.ray();
+        auto bary = make_float3(1.f - hit.bary.x - hit.bary.y, hit.bary);
+        auto it = interaction(hit.inst, hit.prim, bary, -ray->direction());
+        $if(it->shape().maybe_non_opaque() & it->shape().has_surface()) {
+            auto u = xxhash32(make_uint4(hit.inst, hit.prim, compute::as<uint2>(hit.bary))) * 0x1p-32f;
+            $switch(it->shape().surface_tag()) {
+                for (auto i = 0u; i < _pipeline.surfaces().size(); i++) {
+                    if (auto surface = _pipeline.surfaces().impl(i);
+                        surface->maybe_non_opaque()) {
+                        $case(i) {
+                            // TODO: pass the correct swl and time
+                            if (auto opacity = surface->evaluate_opacity(*it, _pipeline.spectrum()->sample(.5f), 0.f)) {
+                                $if (u < *opacity) {
+                                    c.commit();
+                                };
+                            } else {
+                                c.commit();
+                            }
+                        };
+                    }
+                }
+                $default { compute::unreachable(); };
+            };
+        }
+        $else {
+            c.commit();
+        };
+    };
+}
+
 bool Geometry::update(CommandBuffer &command_buffer, float time) noexcept {
     auto updated = false;
     if (!_dynamic_transforms.empty()) {
@@ -195,35 +228,7 @@ Var<Hit> Geometry::trace_closest(const Var<Ray> &ray) const noexcept {
     auto rq_hit =
         _accel->traverse(ray, {})
             .on_surface_candidate([&](compute::SurfaceCandidate &c) noexcept {
-                auto hit = c.hit();
-                auto bary = make_float3(1.f - hit.bary.x - hit.bary.y, hit.bary);
-                auto it = interaction(hit.inst, hit.prim, bary, -ray->direction());
-                $if(it->shape().maybe_non_opaque() & it->shape().has_surface()) {
-                    PolymorphicCall<Surface::Closure> call;
-                    _pipeline.surfaces().dispatch(it->shape().surface_tag(), [&](auto surface) noexcept {
-                        if (surface->maybe_non_opaque()) {
-                            // TODO: pass the correct time
-                            surface->closure(call, *it, _pipeline.spectrum()->sample(.5f), -ray->direction(), 1.f, 0.f);
-                        } else {
-                            compute::unreachable();
-                        }
-                    });
-                    auto u = xxhash32(make_uint4(hit.inst, hit.prim, compute::as<uint2>(hit.bary))) * 0x1p-32f;
-                    call.execute([&](const Surface::Closure *closure) noexcept {
-                        // apply opacity map
-                        auto alpha_skip = def(false);
-                        if (auto o = closure->opacity()) {
-                            auto opacity = saturate(*o);
-                            alpha_skip = u >= opacity;
-                        }
-                        $if(!alpha_skip) {
-                            c.commit();
-                        };
-                    });
-                }
-                $else {
-                    c.commit();
-                };
+                this->_alpha_skip(c);
             })
             .trace();
     return Var<Hit>{rq_hit.inst, rq_hit.prim, rq_hit.bary};
@@ -237,35 +242,7 @@ Var<bool> Geometry::trace_any(const Var<Ray> &ray) const noexcept {
     auto rq_hit =
         _accel->traverse_any(ray, {})
             .on_surface_candidate([&](compute::SurfaceCandidate &c) noexcept {
-                auto hit = c.hit();
-                auto bary = make_float3(1.f - hit.bary.x - hit.bary.y, hit.bary);
-                auto it = interaction(hit.inst, hit.prim, bary, -ray->direction());
-                $if(it->shape().maybe_non_opaque() & it->shape().has_surface()) {
-                    PolymorphicCall<Surface::Closure> call;
-                    _pipeline.surfaces().dispatch(it->shape().surface_tag(), [&](auto surface) noexcept {
-                        if (surface->maybe_non_opaque()) {
-                            // TODO: pass the correct time
-                            surface->closure(call, *it, _pipeline.spectrum()->sample(.5f), -ray->direction(), 1.f, 0.f);
-                        } else {
-                            compute::unreachable();
-                        }
-                    });
-                    auto u = xxhash32(make_uint4(hit.inst, hit.prim, compute::as<uint2>(hit.bary))) * 0x1p-32f;
-                    call.execute([&](const Surface::Closure *closure) noexcept {
-                        // apply opacity map
-                        auto alpha_skip = def(false);
-                        if (auto o = closure->opacity()) {
-                            auto opacity = saturate(*o);
-                            alpha_skip = u >= opacity;
-                        }
-                        $if(!alpha_skip) {
-                            c.commit();
-                        };
-                    });
-                }
-                $else {
-                    c.commit();
-                };
+                this->_alpha_skip(c);
             })
             .trace();
     return !rq_hit->miss();

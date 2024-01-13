@@ -250,12 +250,6 @@ public:
         return *top_dispersive | *bottom_dispersive;
     }
     [[nodiscard]] luisa::optional<Float> eta() const noexcept override { return _bottom->eta(); }
-    [[nodiscard]] luisa::optional<Float> opacity() const noexcept override {
-        auto top_opacity = _top->opacity();
-        auto bottom_opacity = _bottom->opacity();
-        return 1.f - ((1.f - top_opacity.value_or(1.f)) *
-                      (1.f - bottom_opacity.value_or(1.f)));
-    }
 
 private:
     [[nodiscard]] Surface::Evaluation _evaluate(Expr<float3> wo, Expr<float3> wi,

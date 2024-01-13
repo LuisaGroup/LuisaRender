@@ -644,89 +644,75 @@ protected:
                 surface->closure(call, *it, swl, wo, 1.f, time);
             });
             call.execute([&](auto closure) noexcept {
-                // apply opacity map
-                auto alpha_skip = def(false);
-                if (auto o = closure->opacity()) {
-                    auto opacity = saturate(*o);
-                    alpha_skip = u_lobe >= opacity;
-                    u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
+                if (auto dispersive = closure->is_dispersive()) {
+                    $if(*dispersive) { swl.terminate_secondary(); };
                 }
-
-                $if(alpha_skip) {
-                    ray = it->spawn_ray(ray->direction());
-                    pdf_bsdf = 1e16f;
+                // direct lighting
+                if (node<MegakernelPhotonMapping>()->separate_direct()) {
+                    $if(light_sample.eval.pdf > 0.0f & !occluded) {
+                        auto wi = light_sample.shadow_ray->direction();
+                        auto eval = closure->evaluate(wo, wi);
+                        auto w = balance_heuristic(light_sample.eval.pdf, eval.pdf) /
+                                 light_sample.eval.pdf;
+                        Li += w * beta * eval.f * light_sample.eval.L;
+                    };
                 }
-                $else {
-                    if (auto dispersive = closure->is_dispersive()) {
-                        $if(*dispersive) { swl.terminate_secondary(); };
-                    }
-                    // direct lighting
-                    if (node<MegakernelPhotonMapping>()->separate_direct()) {
-                        $if(light_sample.eval.pdf > 0.0f & !occluded) {
-                            auto wi = light_sample.shadow_ray->direction();
-                            auto eval = closure->evaluate(wo, wi);
-                            auto w = balance_heuristic(light_sample.eval.pdf, eval.pdf) /
-                                     light_sample.eval.pdf;
-                            Li += w * beta * eval.f * light_sample.eval.L;
-                        };
-                    }
-                    //TODO: get this done
-                    auto roughness = closure->roughness();
-                    Bool stop_check;
-                    if (node<MegakernelPhotonMapping>()->separate_direct()) {
-                        stop_check = (roughness.x * roughness.y > 0.16f) | stop_direct;
-                    } else {
-                        stop_check = true;//always stop at first intersection
-                    }
-                    $if(stop_check) {
-                        stop_direct = true;
-                        auto grid = photons.point_to_grid(it->p());
-                        $for(x, grid.x - 1, grid.x + 2) {
-                            $for(y, grid.y - 1, grid.y + 2) {
-                                $for(z, grid.z - 1, grid.z + 2) {
-                                    Int3 check_grid{x, y, z};
-                                    auto photon_index = photons.grid_head(photons.grid_to_index(check_grid));
-                                    $while(photon_index != ~0u) {
-                                        auto position = photons.position(photon_index);
-                                        auto dis = distance(position, it->p());
-                                        //pipeline().printer().info("check_grid:{},{},{};test_grid:{},{},{}; limit:{}", x, y, z, test_grid[0], test_grid[1], test_grid[2], indirect.radius(pixel_id));
-                                        $if(dis <= indirect.radius(pixel_id)) {
-                                            auto photon_wi = photons.wi(photon_index);
-                                            auto photon_beta = photons.beta(photon_index);
-                                            auto test_grid = photons.point_to_grid(position);
-                                            auto eval_photon = closure->evaluate(wo, photon_wi);
-                                            auto wi_local = it->shading().world_to_local(photon_wi);
-                                            Float3 Phi;
-                                            if (!spectrum->node()->is_fixed()) {
-                                                auto photon_swl = photons.swl(photon_index);
-                                                Phi = spectrum->wavelength_mul(swl, beta * (eval_photon.f / abs_cos_theta(wi_local)), photon_swl, photon_beta);
-                                            } else {
-                                                Phi = spectrum->srgb(swl, beta * photon_beta * eval_photon.f / abs_cos_theta(wi_local));
-                                            }
-                                            //testbeta += Phi;
-                                            indirect.add_phi(pixel_id, Phi);
-                                            indirect.add_cur_n(pixel_id, 1u);
-                                            //pipeline().printer().info("render:{}", indirect.cur_n(pixel_id));
-                                        };
-
-                                        photon_index = photons.nxt(photon_index);
+                //TODO: get this done
+                auto roughness = closure->roughness();
+                Bool stop_check;
+                if (node<MegakernelPhotonMapping>()->separate_direct()) {
+                    stop_check = (roughness.x * roughness.y > 0.16f) | stop_direct;
+                } else {
+                    stop_check = true;//always stop at first intersection
+                }
+                $if(stop_check) {
+                    stop_direct = true;
+                    auto grid = photons.point_to_grid(it->p());
+                    $for(x, grid.x - 1, grid.x + 2) {
+                        $for(y, grid.y - 1, grid.y + 2) {
+                            $for(z, grid.z - 1, grid.z + 2) {
+                                Int3 check_grid{x, y, z};
+                                auto photon_index = photons.grid_head(photons.grid_to_index(check_grid));
+                                $while(photon_index != ~0u) {
+                                    auto position = photons.position(photon_index);
+                                    auto dis = distance(position, it->p());
+                                    //pipeline().printer().info("check_grid:{},{},{};test_grid:{},{},{}; limit:{}", x, y, z, test_grid[0], test_grid[1], test_grid[2], indirect.radius(pixel_id));
+                                    $if(dis <= indirect.radius(pixel_id)) {
+                                        auto photon_wi = photons.wi(photon_index);
+                                        auto photon_beta = photons.beta(photon_index);
+                                        auto test_grid = photons.point_to_grid(position);
+                                        auto eval_photon = closure->evaluate(wo, photon_wi);
+                                        auto wi_local = it->shading().world_to_local(photon_wi);
+                                        Float3 Phi;
+                                        if (!spectrum->node()->is_fixed()) {
+                                            auto photon_swl = photons.swl(photon_index);
+                                            Phi = spectrum->wavelength_mul(swl, beta * (eval_photon.f / abs_cos_theta(wi_local)), photon_swl, photon_beta);
+                                        } else {
+                                            Phi = spectrum->srgb(swl, beta * photon_beta * eval_photon.f / abs_cos_theta(wi_local));
+                                        }
+                                        //testbeta += Phi;
+                                        indirect.add_phi(pixel_id, Phi);
+                                        indirect.add_cur_n(pixel_id, 1u);
+                                        //pipeline().printer().info("render:{}", indirect.cur_n(pixel_id));
                                     };
+
+                                    photon_index = photons.nxt(photon_index);
                                 };
                             };
                         };
                     };
-                    // sample material
-                    auto surface_sample = closure->sample(wo, u_lobe, u_bsdf);
-                    ray = it->spawn_ray(surface_sample.wi);
-                    pdf_bsdf = surface_sample.eval.pdf;
-                    auto w = ite(surface_sample.eval.pdf > 0.f, 1.f / surface_sample.eval.pdf, 0.f);
-                    beta *= w * surface_sample.eval.f;
-                    // apply eta scale
-                    auto eta = closure->eta().value_or(1.f);
-                    $switch(surface_sample.event) {
-                        $case(Surface::event_enter) { eta_scale = sqr(eta); };
-                        $case(Surface::event_exit) { eta_scale = sqr(1.f / eta); };
-                    };
+                };
+                // sample material
+                auto surface_sample = closure->sample(wo, u_lobe, u_bsdf);
+                ray = it->spawn_ray(surface_sample.wi);
+                pdf_bsdf = surface_sample.eval.pdf;
+                auto w = ite(surface_sample.eval.pdf > 0.f, 1.f / surface_sample.eval.pdf, 0.f);
+                beta *= w * surface_sample.eval.f;
+                // apply eta scale
+                auto eta = closure->eta().value_or(1.f);
+                $switch(surface_sample.event) {
+                    $case(Surface::event_enter) { eta_scale = sqr(eta); };
+                    $case(Surface::event_exit) { eta_scale = sqr(1.f / eta); };
                 };
             });
             beta = zero_if_any_nan(beta);
@@ -818,38 +804,24 @@ protected:
                 surface->closure(call, *it, swl, wi, 1.f, time);
             });
             call.execute([&](auto closure) noexcept {
-                // apply opacity map
-                auto alpha_skip = def(false);
-                if (auto o = closure->opacity()) {
-                    auto opacity = saturate(*o);
-                    alpha_skip = u_lobe >= opacity;
-                    u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
+                if (auto dispersive = closure->is_dispersive()) {
+                    $if(*dispersive) { swl.terminate_secondary(); };
                 }
 
-                $if(alpha_skip) {
-                    ray = it->spawn_ray(ray->direction());
-                    pdf_bsdf = 1e16f;
-                }
-                $else {
-                    if (auto dispersive = closure->is_dispersive()) {
-                        $if(*dispersive) { swl.terminate_secondary(); };
-                    }
-
-                    // sample material
-                    auto surface_sample = closure->sample(wi, u_lobe, u_bsdf, TransportMode::IMPORTANCE);
-                    ray = it->spawn_ray(surface_sample.wi);
-                    pdf_bsdf = surface_sample.eval.pdf;
-                    auto w = ite(surface_sample.eval.pdf > 0.f, 1.f / surface_sample.eval.pdf, 0.f);
-                    auto bnew = beta * w * surface_sample.eval.f;
-                    // apply eta scale
-                    auto eta = closure->eta().value_or(1.f);
-                    $switch(surface_sample.event) {
-                        $case(Surface::event_enter) { eta_scale = sqr(eta); };
-                        $case(Surface::event_exit) { eta_scale = sqr(1.f / eta); };
-                    };
-                    eta_scale *= ite(beta.max() < bnew.max(), 1.f, bnew.max() / beta.max());
-                    beta = bnew;
+                // sample material
+                auto surface_sample = closure->sample(wi, u_lobe, u_bsdf, TransportMode::IMPORTANCE);
+                ray = it->spawn_ray(surface_sample.wi);
+                pdf_bsdf = surface_sample.eval.pdf;
+                auto w = ite(surface_sample.eval.pdf > 0.f, 1.f / surface_sample.eval.pdf, 0.f);
+                auto bnew = beta * w * surface_sample.eval.f;
+                // apply eta scale
+                auto eta = closure->eta().value_or(1.f);
+                $switch(surface_sample.event) {
+                    $case(Surface::event_enter) { eta_scale = sqr(eta); };
+                    $case(Surface::event_exit) { eta_scale = sqr(1.f / eta); };
                 };
+                eta_scale *= ite(beta.max() < bnew.max(), 1.f, bnew.max() / beta.max());
+                beta = bnew;
             });
             beta = zero_if_any_nan(beta);
             $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };

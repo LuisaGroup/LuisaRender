@@ -60,8 +60,8 @@ protected:
                 "No lights in scene. Rendering aborted.");
             return;
         }
-//        pipeline().printer().set_level_warning();
-//        pipeline().printer().set_log_dispatch_id(make_uint2(430, 350));
+        //        pipeline().printer().set_level_warning();
+        //        pipeline().printer().set_log_dispatch_id(make_uint2(430, 350));
         Instance::_render_one_camera(command_buffer, camera);
     }
 
@@ -151,19 +151,9 @@ protected:
                     surface->closure(call, *it, swl, wo, 1.f, time);
                 });
                 call.execute([&](auto closure) noexcept {
-                    // alpha skip
-                    if (auto o = closure->opacity()) {
-                        auto opacity = saturate(*o);
-                        auto completely_opaque = opacity == 1.f;
-                        transmittance.f = ite(completely_opaque, 0.f, transmittance.f);
-                        transmittance.pdf = ite(completely_opaque, 1e16f, transmittance.pdf + 1.f / (1.f - opacity));
-                    }
-                    // surface transmit
-                    else {
-                        auto surface_evaluation = closure->evaluate(wo, wi);
-                        transmittance.f *= surface_evaluation.f;
-                        transmittance.pdf += surface_evaluation.pdf;
-                    }
+                    auto surface_evaluation = closure->evaluate(wo, wi);
+                    transmittance.f *= surface_evaluation.f;
+                    transmittance.pdf += surface_evaluation.pdf;
                 });
             };
 
@@ -393,16 +383,8 @@ protected:
                     surface->closure(call, *it, swl, wo, eta, time);
                 });
                 call.execute([&](auto closure) noexcept {
-                    // apply opacity map
-                    auto alpha_skip = def(false);
-                    if (auto o = closure->opacity()) {
-                        auto opacity = saturate(*o);
-                        alpha_skip = u_lobe >= opacity;
-                        u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
-                    }
-
                     UInt surface_event;
-                    $if(alpha_skip | !medium_tracker.true_hit(medium_info.medium_tag)) {
+                    $if(!medium_tracker.true_hit(medium_info.medium_tag)) {
                         surface_event = surface_event_skip;
                         ray = it->spawn_ray(ray->direction());
                         pdf_bsdf = 1e16f;

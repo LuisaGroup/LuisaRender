@@ -657,55 +657,41 @@ void MegakernelWaveFrontInstance::_render_one_camera(
                     surface->closure(call, *it, swl, wo, 1.f, time);
                 });
                 call.execute([&](const Surface::Closure *closure) noexcept {
-                    // apply opacity map
-                    auto alpha_skip = def(false);
-                    if (auto o = closure->opacity()) {
-                        auto opacity = saturate(*o);
-                        alpha_skip = u_lobe >= opacity;
-                        u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
-                    }
-
-                    $if(alpha_skip) {
-                        ray = it->spawn_ray(ray->direction());
-                        path_state[path_id].pdf_bsdf = 1e16f;
-                    }
-                    $else {
-                        if (auto dispersive = closure->is_dispersive()) {
-                            $if(*dispersive) {
-                                swl.terminate_secondary();
-                                if (!spectrum->node()->is_fixed()) {
-                                    path_state[path_id].wl_sample = -u_wl;
-                                }
-                            };
-                        }
-                        // direct lighting
-                        auto light_wi_and_pdf = path_state[path_id].wi_and_pdf;
-                        auto pdf_light = light_wi_and_pdf.w;
-                        $if(light_wi_and_pdf.w > 0.f) {
-                            auto eval = closure->evaluate(wo, light_wi_and_pdf.xyz());
-                            auto mis_weight = balance_heuristic(pdf_light, eval.pdf);
-                            // update Li
-                            SampledSpectrum Ld{dim};
-                            for (auto i = 0u; i < dim; ++i) {
-                                Ld[i] = path_state_dim[path_id * dim + i].emission;
+                    if (auto dispersive = closure->is_dispersive()) {
+                        $if(*dispersive) {
+                            swl.terminate_secondary();
+                            if (!spectrum->node()->is_fixed()) {
+                                path_state[path_id].wl_sample = -u_wl;
                             }
-                            auto Li = mis_weight / pdf_light * beta * eval.f * Ld;
-                            auto pixel_id = path_state[path_id].pixel_index;
-                            auto pixel_coord = make_uint2(pixel_id % resolution.x, pixel_id / resolution.x);
-                            camera->film()->accumulate(pixel_coord, spectrum->srgb(swl, Li), 0.f);
                         };
-                        // sample material
-                        auto surface_sample = closure->sample(wo, u_lobe, u_bsdf);
-                        path_state[path_id].pdf_bsdf = surface_sample.eval.pdf;
-                        ray = it->spawn_ray(surface_sample.wi);
-                        auto w = ite(surface_sample.eval.pdf > 0.0f, 1.f / surface_sample.eval.pdf, 0.f);
-                        beta *= w * surface_sample.eval.f;
-                        // eta scale
-                        auto eta = closure->eta().value_or(1.f);
-                        $switch(surface_sample.event) {
-                            $case(Surface::event_enter) { eta_scale = sqr(eta); };
-                            $case(Surface::event_exit) { eta_scale = 1.f / sqr(eta); };
-                        };
+                    }
+                    // direct lighting
+                    auto light_wi_and_pdf = path_state[path_id].wi_and_pdf;
+                    auto pdf_light = light_wi_and_pdf.w;
+                    $if(light_wi_and_pdf.w > 0.f) {
+                        auto eval = closure->evaluate(wo, light_wi_and_pdf.xyz());
+                        auto mis_weight = balance_heuristic(pdf_light, eval.pdf);
+                        // update Li
+                        SampledSpectrum Ld{dim};
+                        for (auto i = 0u; i < dim; ++i) {
+                            Ld[i] = path_state_dim[path_id * dim + i].emission;
+                        }
+                        auto Li = mis_weight / pdf_light * beta * eval.f * Ld;
+                        auto pixel_id = path_state[path_id].pixel_index;
+                        auto pixel_coord = make_uint2(pixel_id % resolution.x, pixel_id / resolution.x);
+                        camera->film()->accumulate(pixel_coord, spectrum->srgb(swl, Li), 0.f);
+                    };
+                    // sample material
+                    auto surface_sample = closure->sample(wo, u_lobe, u_bsdf);
+                    path_state[path_id].pdf_bsdf = surface_sample.eval.pdf;
+                    ray = it->spawn_ray(surface_sample.wi);
+                    auto w = ite(surface_sample.eval.pdf > 0.0f, 1.f / surface_sample.eval.pdf, 0.f);
+                    beta *= w * surface_sample.eval.f;
+                    // eta scale
+                    auto eta = closure->eta().value_or(1.f);
+                    $switch(surface_sample.event) {
+                        $case(Surface::event_enter) { eta_scale = sqr(eta); };
+                        $case(Surface::event_exit) { eta_scale = 1.f / sqr(eta); };
                     };
                 });
 

@@ -329,49 +329,33 @@ void AuxiliaryBufferPathTracingInstance::_render_one_camera(
                 if (auto dispersive = closure->is_dispersive()) {
                     $if(*dispersive) { swl.terminate_secondary(); };
                 }
-
-                // apply opacity map
-                auto alpha_skip = def(false);
-                if (auto o = closure->opacity()) {
-                    auto opacity = saturate(*o);
-                    alpha_skip = u_lobe >= opacity;
-                    u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
-                }
-
-                $if(alpha_skip) {
-                    ray = it->spawn_ray(ray->direction());
-                    pdf_bsdf = 1e16f;
-                }
-                $else {
-
-                    // direct lighting
-                    $if(light_sample.eval.pdf > 0.0f & !occluded) {
-                        auto wi = light_sample.shadow_ray->direction();
-                        auto eval = closure->evaluate(wo, wi);
-                        auto w = balance_heuristic(light_sample.eval.pdf, eval.pdf) /
-                                 light_sample.eval.pdf;
-                        Li += w * beta * eval.f * light_sample.eval.L;
-                        $if(!specular_bounce) {
-                            Li_diffuse += w * beta_diffuse * eval.f * light_sample.eval.L;
-                        };
-                    };
-
-                    // sample material
-                    auto sample = closure->sample(wo, u_lobe, u_bsdf);
-                    ray = it->spawn_ray(sample.wi);
-                    pdf_bsdf = sample.eval.pdf;
-                    auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
-                    beta *= w * sample.eval.f;
+                // direct lighting
+                $if(light_sample.eval.pdf > 0.0f & !occluded) {
+                    auto wi = light_sample.shadow_ray->direction();
+                    auto eval = closure->evaluate(wo, wi);
+                    auto w = balance_heuristic(light_sample.eval.pdf, eval.pdf) /
+                             light_sample.eval.pdf;
+                    Li += w * beta * eval.f * light_sample.eval.L;
                     $if(!specular_bounce) {
-                        beta_diffuse *= w * sample.eval.f;
+                        Li_diffuse += w * beta_diffuse * eval.f * light_sample.eval.L;
                     };
+                };
 
-                    // apply eta scale
-                    auto eta = closure->eta().value_or(1.f);
-                    $switch(sample.event) {
-                        $case(Surface::event_enter) { eta_scale = sqr(eta); };
-                        $case(Surface::event_exit) { eta_scale = sqr(1.f / eta); };
-                    };
+                // sample material
+                auto sample = closure->sample(wo, u_lobe, u_bsdf);
+                ray = it->spawn_ray(sample.wi);
+                pdf_bsdf = sample.eval.pdf;
+                auto w = ite(sample.eval.pdf > 0.f, 1.f / sample.eval.pdf, 0.f);
+                beta *= w * sample.eval.f;
+                $if(!specular_bounce) {
+                    beta_diffuse *= w * sample.eval.f;
+                };
+
+                // apply eta scale
+                auto eta = closure->eta().value_or(1.f);
+                $switch(sample.event) {
+                    $case(Surface::event_enter) { eta_scale = sqr(eta); };
+                    $case(Surface::event_exit) { eta_scale = sqr(1.f / eta); };
                 };
                 specular_bounce = all(closure->roughness() < .05f);
             });

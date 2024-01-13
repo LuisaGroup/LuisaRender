@@ -57,6 +57,8 @@ public:
 
     static_assert(sizeof(MeshData) == 16u);
 
+    using SurfaceCandidate = compute::SurfaceCandidate;
+
 private:
     Pipeline &_pipeline;
     Accel _accel;
@@ -69,7 +71,7 @@ private:
     Buffer<uint4> _instance_buffer;
     float3 _world_min;
     float3 _world_max;
-    uint _triangle_count;// for debug
+    uint _triangle_count{};// for debug
     bool _any_non_opaque{false};
 
 private:
@@ -79,6 +81,8 @@ private:
         const Light *overridden_light = nullptr,
         const Medium *overridden_medium = nullptr,
         bool overridden_visible = true) noexcept;
+
+    void _alpha_skip(SurfaceCandidate &c) const noexcept;
 
 public:
     explicit Geometry(Pipeline &pipeline) noexcept : _pipeline{pipeline} {};

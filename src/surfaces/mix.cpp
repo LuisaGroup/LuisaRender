@@ -59,6 +59,15 @@ public:
     [[nodiscard]] bool maybe_non_opaque() const noexcept override {
         return _a->maybe_non_opaque() || _b->maybe_non_opaque();
     }
+
+    [[nodiscard]] luisa::optional<Float> evaluate_opacity(const Interaction &it,
+                                                          const SampledWavelengths &swl,
+                                                          Expr<float> time) const noexcept override {
+        if (!maybe_non_opaque()) { return luisa::nullopt; }
+        auto opacity_a = _a->evaluate_opacity(it, swl, time).value_or(1.f);
+        auto opacity_b = _b->evaluate_opacity(it, swl, time).value_or(1.f);
+        return opacity_a * opacity_b;
+    }
 };
 
 luisa::unique_ptr<Surface::Instance> MixSurface::_build(
@@ -129,14 +138,6 @@ public:
     }
 
     [[nodiscard]] const Interaction &it() const noexcept override { return context<Context>().it; }
-    [[nodiscard]] luisa::optional<Float> opacity() const noexcept override {
-        auto &&ctx = context<Context>();
-
-        auto opacity_a = a()->opacity();
-        auto opacity_b = b()->opacity();
-        if (!opacity_a && !opacity_b) { return luisa::nullopt; }
-        return lerp(opacity_b.value_or(1.f), opacity_a.value_or(1.f), ctx.ratio);
-    }
     [[nodiscard]] luisa::optional<Float> eta() const noexcept override {
         auto &&ctx = context<Context>();
 

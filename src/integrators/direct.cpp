@@ -135,41 +135,28 @@ protected:
                 surface->closure(call, *it, swl, wo, 1.f, time);
             });
             call.execute([&](auto closure) noexcept {
-                // apply opacity map
-                if (auto o = closure->opacity()) {
-                    auto opacity = saturate(*o);
-                    alpha_skip = u_lobe >= opacity;
-                    u_lobe = ite(alpha_skip, (u_lobe - opacity) / (1.f - opacity), u_lobe / opacity);
+                // some preparations
+                if (auto dispersive = closure->is_dispersive()) {
+                    $if(*dispersive) { swl.terminate_secondary(); };
                 }
-
-                $if(alpha_skip) {
-                    ray = it->spawn_ray(ray->direction());
-                }
-                $else {
-                    // some preparations
-                    if (auto dispersive = closure->is_dispersive()) {
-                        $if(*dispersive) { swl.terminate_secondary(); };
-                    }
-                    // direct lighting
-                    if (samples_lights) {
-                        $if(light_sample.eval.pdf > 0.0f & !occluded) {
-                            auto wi = light_sample.shadow_ray->direction();
-                            auto eval = closure->evaluate(wo, wi);
-                            $if(eval.pdf > 0.f) {
-                                auto w = def(1.f);
-                                // MIS if sampling surfaces as well
-                                if (samples_surfaces) { w = balance_heuristic(light_sample.eval.pdf, eval.pdf); }
-                                Li += w * cs.weight * eval.f * light_sample.eval.L / light_sample.eval.pdf;
-                            };
+                // direct lighting
+                if (samples_lights) {
+                    $if(light_sample.eval.pdf > 0.0f & !occluded) {
+                        auto wi = light_sample.shadow_ray->direction();
+                        auto eval = closure->evaluate(wo, wi);
+                        $if(eval.pdf > 0.f) {
+                            auto w = def(1.f);
+                            // MIS if sampling surfaces as well
+                            if (samples_surfaces) { w = balance_heuristic(light_sample.eval.pdf, eval.pdf); }
+                            Li += w * cs.weight * eval.f * light_sample.eval.L / light_sample.eval.pdf;
                         };
-                    }
-
-                    // sample material
-                    if (samples_surfaces) {
-                        surface_sample = closure->sample(wo, u_lobe, u_bsdf);
-                        ray = it->spawn_ray(surface_sample.wi);
-                    }
-                };
+                    };
+                }
+                // sample material
+                if (samples_surfaces) {
+                    surface_sample = closure->sample(wo, u_lobe, u_bsdf);
+                    ray = it->spawn_ray(surface_sample.wi);
+                }
             });
 
             $if(!alpha_skip) {
