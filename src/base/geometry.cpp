@@ -127,8 +127,8 @@ void Geometry::_process_shape(
         }
 
         // emplace instance here since we need to know the opaque property
-        _accel.emplace_back(*mesh.resource, object_to_world, visible, false);
-        //(properties & Shape::property_flag_maybe_non_opaque) == 0u);
+        _accel.emplace_back(*mesh.resource, object_to_world, visible,
+                            (properties & Shape::property_flag_maybe_non_opaque) == 0u);
 
         auto light_tag = 0u;
         auto medium_tag = 0u;
@@ -201,7 +201,7 @@ Var<Hit> Geometry::trace_closest(const Var<Ray> &ray) const noexcept {
                 $if(it->shape().maybe_non_opaque() & it->shape().has_surface()) {
                     PolymorphicCall<Surface::Closure> call;
                     _pipeline.surfaces().dispatch(it->shape().surface_tag(), [&](auto surface) noexcept {
-                        if(surface->maybe_non_opaque()) {
+                        if (surface->maybe_non_opaque()) {
                             // TODO: pass the correct time
                             surface->closure(call, *it, _pipeline.spectrum()->sample(.5f), -ray->direction(), 1.f, 0.f);
                         } else {
@@ -243,7 +243,7 @@ Var<bool> Geometry::trace_any(const Var<Ray> &ray) const noexcept {
                 $if(it->shape().maybe_non_opaque() & it->shape().has_surface()) {
                     PolymorphicCall<Surface::Closure> call;
                     _pipeline.surfaces().dispatch(it->shape().surface_tag(), [&](auto surface) noexcept {
-                        if(surface->maybe_non_opaque()) {
+                        if (surface->maybe_non_opaque()) {
                             // TODO: pass the correct time
                             surface->closure(call, *it, _pipeline.spectrum()->sample(.5f), -ray->direction(), 1.f, 0.f);
                         } else {
