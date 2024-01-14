@@ -167,6 +167,7 @@ void Geometry::_alpha_skip(SurfaceCandidate &c) const noexcept {
     auto ray = c.ray();
     auto bary = make_float3(1.f - hit.bary.x - hit.bary.y, hit.bary);
     auto it = interaction(hit.inst, hit.prim, bary, -ray->direction());
+    auto committed = def(false);
     $if(it->shape().maybe_non_opaque() & it->shape().has_surface()) {
         auto u = xxhash32(make_uint4(hit.inst, hit.prim, compute::as<uint2>(hit.bary))) * 0x1p-32f;
         $switch(it->shape().surface_tag()) {
@@ -176,20 +177,22 @@ void Geometry::_alpha_skip(SurfaceCandidate &c) const noexcept {
                     $case(i) {
                         // TODO: pass the correct swl and time
                         if (auto opacity = surface->evaluate_opacity(*it, _pipeline.spectrum()->sample(.5f), 0.f)) {
-                            $if(u < *opacity) {
-                                c.commit();
-                            };
+                            committed = u <= *opacity;
                         } else {
-                            c.commit();
+                            committed = true;
                         }
                     };
-                }
+                    }
             }
             $default { compute::unreachable(); };
         };
     }
     $else {
+        committed = true;
+    };
+    $if(committed) {
         c.commit();
+        // $if (terminate_on_any) { c.terminate(); };
     };
 }
 
