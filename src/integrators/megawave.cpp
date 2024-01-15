@@ -2,7 +2,6 @@
 // Created by Mike Smith on 2022/1/10.
 //
 
-#include "compute/src/backends/common/hlsl/hlsl_codegen.h"
 #include "dsl/builtin.h"
 #include "dsl/struct.h"
 #include "runtime/rtx/ray.h"
