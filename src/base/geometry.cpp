@@ -162,12 +162,10 @@ void Geometry::_process_shape(
     }
 }
 
-void Geometry::_alpha_skip(SurfaceCandidate &c) const noexcept {
-    auto hit = c.hit();
-    auto ray = c.ray();
+Bool Geometry::_alpha_skip(const Var<Ray> &ray, const Var<SurfaceHit> &hit) const noexcept {
     auto bary = make_float3(1.f - hit.bary.x - hit.bary.y, hit.bary);
     auto it = interaction(hit.inst, hit.prim, bary, -ray->direction());
-    auto committed = def(false);
+    auto skip = def(true);
     $if(it->shape().maybe_non_opaque() & it->shape().has_surface()) {
         auto u = xxhash32(make_uint4(hit.inst, hit.prim, compute::as<uint2>(hit.bary))) * 0x1p-32f;
         $switch(it->shape().surface_tag()) {
@@ -177,23 +175,20 @@ void Geometry::_alpha_skip(SurfaceCandidate &c) const noexcept {
                     $case(i) {
                         // TODO: pass the correct swl and time
                         if (auto opacity = surface->evaluate_opacity(*it, _pipeline.spectrum()->sample(.5f), 0.f)) {
-                            committed = u <= *opacity;
+                            skip = u > *opacity;
                         } else {
-                            committed = true;
+                            skip = false;
                         }
                     };
-                    }
+                }
             }
             $default { compute::unreachable(); };
         };
     }
     $else {
-        committed = true;
+        skip = false;
     };
-    $if(committed) {
-        c.commit();
-        // $if (terminate_on_any) { c.terminate(); };
-    };
+    return skip;
 }
 
 bool Geometry::update(CommandBuffer &command_buffer, float time) noexcept {
@@ -220,16 +215,42 @@ bool Geometry::update(CommandBuffer &command_buffer, float time) noexcept {
     return updated;
 }
 
-Var<Hit> Geometry::trace_closest(const Var<Ray> &ray) const noexcept {
+Var<Hit> Geometry::trace_closest(const Var<Ray> &ray_in) const noexcept {
     if (!_any_non_opaque) {
         // happy path
-        auto hit = _accel->intersect(ray, {});
+        auto hit = _accel->intersect(ray_in, {});
         return Var<Hit>{hit.inst, hit.prim, hit.bary};
     }
+    // TODO: DirectX has bug with ray query, so we manually march the ray here
+    if (_pipeline.device().backend_name() == "dx") {
+        auto ray = ray_in;
+        auto hit = _accel->intersect(ray, {});
+        constexpr auto max_iterations = 100u;
+        constexpr auto epsilone = 1e-5f;
+        $for(i [[maybe_unused]], max_iterations) {
+            $if(hit->miss()) { $break; };
+            $if(!this->_alpha_skip(ray, hit)) { $break; };
+#ifndef NDEBUG
+            $if(i == max_iterations - 1u) {
+                compute::device_log(luisa::format(
+                    "ERROR: max iterations ({}) exceeded in trace closest",
+                    max_iterations));
+            };
+#endif
+            ray = compute::make_ray(ray->origin(), ray->direction(),
+                                    hit.committed_ray_t + epsilone,
+                                    ray->t_max());
+            hit = _accel->intersect(ray, {});
+        };
+        return Var<Hit>{hit.inst, hit.prim, hit.bary};
+    }
+    // use ray query
     auto rq_hit =
-        _accel->traverse(ray, {})
+        _accel->traverse(ray_in, {})
             .on_surface_candidate([&](compute::SurfaceCandidate &c) noexcept {
-                this->_alpha_skip(c);
+                $if(!this->_alpha_skip(c.ray(), c.hit())) {
+                    c.commit();
+                };
             })
             .trace();
     return Var<Hit>{rq_hit.inst, rq_hit.prim, rq_hit.bary};
@@ -243,7 +264,9 @@ Var<bool> Geometry::trace_any(const Var<Ray> &ray) const noexcept {
     auto rq_hit =
         _accel->traverse_any(ray, {})
             .on_surface_candidate([&](compute::SurfaceCandidate &c) noexcept {
-                this->_alpha_skip(c);
+                $if(!this->_alpha_skip(c.ray(), c.hit())) {
+                    c.commit();
+                };
             })
             .trace();
     return !rq_hit->miss();

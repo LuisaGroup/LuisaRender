@@ -35,6 +35,8 @@ using compute::Buffer;
 using compute::Expr;
 using compute::Float4x4;
 using compute::Mesh;
+using compute::Ray;
+using compute::SurfaceHit;
 using compute::Var;
 
 class Pipeline;
@@ -82,7 +84,8 @@ private:
         const Medium *overridden_medium = nullptr,
         bool overridden_visible = true) noexcept;
 
-    void _alpha_skip(SurfaceCandidate &c) const noexcept;
+    [[nodiscard]] Bool _alpha_skip(const Var<Ray> &ray,
+                                   const Var<SurfaceHit> &hit) const noexcept;
 
 public:
     explicit Geometry(Pipeline &pipeline) noexcept : _pipeline{pipeline} {};
