@@ -245,15 +245,18 @@ Var<Hit> Geometry::trace_closest(const Var<Ray> &ray_in) const noexcept {
         return Var<Hit>{hit.inst, hit.prim, hit.bary};
     }
     // use ray query
-    auto rq_hit =
-        _accel->traverse(ray_in, {})
-            .on_surface_candidate([&](compute::SurfaceCandidate &c) noexcept {
-                $if(!this->_alpha_skip(c.ray(), c.hit())) {
-                    c.commit();
-                };
-            })
-            .trace();
-    return Var<Hit>{rq_hit.inst, rq_hit.prim, rq_hit.bary};
+    Callable impl = [this](Var<Ray> ray) noexcept {
+        auto rq_hit =
+            _accel->traverse(ray, {})
+                .on_surface_candidate([&](compute::SurfaceCandidate &c) noexcept {
+                    $if(!this->_alpha_skip(c.ray(), c.hit())) {
+                        c.commit();
+                    };
+                })
+                .trace();
+        return Var<Hit>{rq_hit.inst, rq_hit.prim, rq_hit.bary};
+    };
+    return impl(ray_in);
 }
 
 Var<bool> Geometry::trace_any(const Var<Ray> &ray) const noexcept {
@@ -261,15 +264,18 @@ Var<bool> Geometry::trace_any(const Var<Ray> &ray) const noexcept {
         // happy path
         return _accel->intersect_any(ray, {});
     }
-    auto rq_hit =
-        _accel->traverse_any(ray, {})
-            .on_surface_candidate([&](compute::SurfaceCandidate &c) noexcept {
-                $if(!this->_alpha_skip(c.ray(), c.hit())) {
-                    c.commit();
-                };
-            })
-            .trace();
-    return !rq_hit->miss();
+    Callable impl = [this](Var<Ray> ray) noexcept {
+        auto rq_hit =
+            _accel->traverse_any(ray, {})
+                .on_surface_candidate([&](compute::SurfaceCandidate &c) noexcept {
+                    $if(!this->_alpha_skip(c.ray(), c.hit())) {
+                        c.commit();
+                    };
+                })
+                .trace();
+        return !rq_hit->miss();
+    };
+    return impl(ray);
 }
 
 luisa::shared_ptr<Interaction> Geometry::interaction(Expr<uint> inst_id, Expr<uint> prim_id,
