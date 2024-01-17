@@ -61,7 +61,6 @@ using namespace luisa::render;
 
 [[nodiscard]] auto parse_cli_macros(int &argc, char *argv[]) {
     SceneParser::MacroMap macros;
-
     auto parse_macro = [&macros](luisa::string_view d) noexcept {
         if (auto p = d.find('='); p == luisa::string::npos) [[unlikely]] {
             LUISA_WARNING_WITH_LOCATION(
@@ -108,33 +107,4 @@ using namespace luisa::render;
     return macros;
 }
 
-int main(int argc, char *argv[]) {
 
-    log_level_verbose();
-    luisa::compute::Context context{argv[0]};
-    auto macros = parse_cli_macros(argc, argv);
-    for (auto &&[k, v] : macros) {
-        LUISA_INFO("Found CLI Macro: {} = {}", k, v);
-    }
-
-    auto options = parse_cli_options(argc, argv);
-    auto backend = options["backend"].as<luisa::string>();
-    auto index = options["device"].as<int32_t>();
-    auto path = options["scene"].as<std::filesystem::path>();
-    compute::DeviceConfig config;
-    config.device_index = index;
-    config.inqueue_buffer_limit = false; // Do not limit the number of in-queue buffers --- we are doing offline rendering!
-    auto device = context.create_device(backend, &config);
-
-    Clock clock;
-    auto scene_desc = SceneParser::parse(path, macros);
-    auto parse_time = clock.toc();
-
-    LUISA_INFO("Parsed scene description file '{}' in {} ms.",
-               path.string(), parse_time);
-    auto scene = Scene::create(context, scene_desc.get());
-    auto stream = device.create_stream(StreamTag::GRAPHICS);
-    auto pipeline = Pipeline::create(device, stream, *scene);
-    pipeline->render(stream);
-    stream.synchronize();
-}

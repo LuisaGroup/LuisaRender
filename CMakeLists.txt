@@ -58,4 +58,22 @@ endif ()
 set(CMAKE_FIND_PACKAGE_SORT_ORDER NATURAL)
 set(CMAKE_FIND_PACKAGE_SORT_DIRECTION DEC)
 
+if (SKBUILD)
+    set(CMAKE_INSTALL_INCLUDEDIR ${SKBUILD_NULL_DIR})
+    set(CMAKE_INSTALL_DOCDIR ${SKBUILD_NULL_DIR})
+    if (WIN32)
+        set(CMAKE_INSTALL_LIBDIR ${SKBUILD_NULL_DIR})
+    else ()
+        set(CMAKE_INSTALL_LIBDIR ${SKBUILD_PLATLIB_DIR}/luisarender/dylibs)
+    endif ()
+    set(CMAKE_INSTALL_BINDIR ${SKBUILD_PLATLIB_DIR}/luisarender/dylibs)
+else ()
+    include(GNUInstallDirs)
+endif ()
+
+if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+    add_compile_options("/wd4996")
+endif ()
+
 add_subdirectory(src)
+

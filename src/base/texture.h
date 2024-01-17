@@ -30,8 +30,8 @@ public:
     class Instance {
 
     private:
-        const Pipeline &_pipeline;
         const Texture *_texture;
+        const Pipeline &_pipeline;
 
     protected:
         [[nodiscard]] Spectrum::Decode _evaluate_static_albedo_spectrum(
@@ -57,6 +57,10 @@ public:
             const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept;
         [[nodiscard]] virtual Spectrum::Decode evaluate_illuminant_spectrum(
             const Interaction &it, const SampledWavelengths &swl, Expr<float> time) const noexcept;
+        virtual void update_by_buffer(Stream &stream, float4 texture_buffer){
+            LUISA_WARNING_WITH_LOCATION(
+                "Texture::update_by_buffer() is not implemented for this texture type.");
+        }
     };
 
 public:

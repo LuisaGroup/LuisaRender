@@ -20,7 +20,7 @@ private:
 public:
     ConstantTexture(Scene *scene, const SceneNodeDesc *desc) noexcept
         : Texture{scene, desc},
-          _should_inline{desc->property_bool_or_default("inline", true)} {
+          _should_inline{desc->property_bool_or_default("inline", false)} {
         auto scale = desc->property_float_or_default("scale", 1.f);
         auto v = desc->property_float_list_or_default("v");
         if (v.empty()) [[unlikely]] {
@@ -76,6 +76,11 @@ public:
         if (auto texture = node<ConstantTexture>();
             texture->should_inline()) { return texture->v(); }
         return pipeline().constant(_constant_slot);
+    }
+
+    [[nodiscard]] void update_by_buffer(Stream &stream, float4 new_value){
+        LUISA_INFO("Constant::update_by_buffer {}", _constant_slot);
+        pipeline().update_constant(stream, _constant_slot, new_value);
     }
 };
 

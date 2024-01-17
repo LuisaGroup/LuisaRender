@@ -42,6 +42,10 @@ public:
         [[nodiscard]] auto light_sampler() noexcept { return _light_sampler.get(); }
         [[nodiscard]] auto light_sampler() const noexcept { return _light_sampler.get(); }
         virtual void render(Stream &stream) noexcept = 0;
+        virtual luisa::vector<void*> render_with_return(Stream &stream) {
+            LUISA_INFO("Not implemented!");
+            return luisa::vector<void *>{};
+        }
     };
 
 private:
@@ -72,6 +76,7 @@ public:
                  const ProgressiveIntegrator *node) noexcept;
         ~Instance() noexcept override;
         void render(Stream &stream) noexcept override;
+        luisa::vector<void*> render_with_return(Stream &stream) noexcept override;
     };
 
 public:

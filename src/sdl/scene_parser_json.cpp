@@ -19,6 +19,12 @@ SceneParserJSON::SceneParserJSON(SceneDesc &desc, const std::filesystem::path &p
     : _desc{desc}, _cli_macros{cli_macros},
       _location{desc.register_path(std::filesystem::canonical(path))} {}
 
+
+// SceneParserJSON::SceneParserJSON(SceneDesc &desc, std::string json_source,
+//                                  const MacroMap &cli_macros) noexcept
+//     : _desc{desc}, _cli_macros{cli_macros},
+//       json_source{json_source} {}
+
 void SceneParserJSON::parse() const noexcept {
     auto root = [this] {
         std::ifstream ifs{*_location.file()};
@@ -28,6 +34,20 @@ void SceneParserJSON::parse() const noexcept {
     }();
     _parse_root(root);
 }
+
+// void SceneParserJSON::parse() const noexcept {
+//     auto root = [this] {
+//         if(_location.file()== nullptr) {
+//             return json::parse(json_source, nullptr, false, true);
+//         }
+//         std::ifstream ifs{*_location.file()};
+//         std::string src{std::istreambuf_iterator<char>{ifs},
+//                         std::istreambuf_iterator<char>{}};
+//         return json::parse(src, nullptr, false, true);
+//     }();
+//     _parse_root(root);
+// }
+
 
 void SceneParserJSON::_parse_node(SceneNodeDesc &desc, const json &node) const noexcept {
 

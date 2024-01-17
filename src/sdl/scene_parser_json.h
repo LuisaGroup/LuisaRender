@@ -30,6 +30,7 @@ private:
     SceneDesc &_desc;
     const MacroMap &_cli_macros;
     SceneNodeDesc::SourceLocation _location;
+    std::string json_source;
 
 private:
     void _parse_root(const json &root) const noexcept;
@@ -40,6 +41,11 @@ private:
 public:
     SceneParserJSON(SceneDesc &desc, const std::filesystem::path &path,
                     const MacroMap &cli_macros) noexcept;
+    
+    
+    // SceneParserJSON(SceneDesc &desc, const std::string json_source,
+    //                 const MacroMap &cli_macros) noexcept;
+
     void parse() const noexcept;
 };
 

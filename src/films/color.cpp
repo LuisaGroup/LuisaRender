@@ -65,6 +65,14 @@ private:
 public:
     ColorFilmInstance(Device &device, Pipeline &pipeline, const ColorFilm *film) noexcept;
     void prepare(CommandBuffer &command_buffer) noexcept override;
+    void* export_image(CommandBuffer &command_buffer) override {
+        _check_prepared();
+        auto resolution = node()->resolution();
+        auto pixel_count = resolution.x * resolution.y;
+        command_buffer << _convert_image.get()(_image, _converted).dispatch(pixel_count);
+        command_buffer << compute::synchronize();
+        return _converted.native_handle();
+    }
     void download(CommandBuffer &command_buffer, float4 *framebuffer) const noexcept override;
     [[nodiscard]] Film::Accumulation read(Expr<uint2> pixel) const noexcept override;
     void release() noexcept override;
@@ -76,14 +84,12 @@ protected:
 
 ColorFilmInstance::ColorFilmInstance(Device &device, Pipeline &pipeline, const ColorFilm *film) noexcept
     : Film::Instance{pipeline, film} {
-
     Kernel1D clear_image_kernel = [](BufferFloat4 image) noexcept {
         image.write(dispatch_x(), make_float4(0.f));
     };
     _clear_image = global_thread_pool().async([&device, clear_image_kernel] {
         return device.compile(clear_image_kernel);
     });
-
     Kernel1D convert_image_kernel = [this](BufferFloat4 accum, BufferFloat4 output) noexcept {
         auto i = dispatch_x();
         auto c = accum.read(i);

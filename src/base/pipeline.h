@@ -211,7 +211,10 @@ public:
     [[nodiscard]] const Filter::Instance *build_filter(CommandBuffer &command_buffer, const Filter *filter) noexcept;
     [[nodiscard]] const PhaseFunction::Instance *build_phasefunction(CommandBuffer &command_buffer, const PhaseFunction *phasefunction) noexcept;
     bool update(CommandBuffer &command_buffer, float time) noexcept;
+    void update_texture(Stream &stream, uint texture_id, float4 new_value) noexcept;
+    void update_mesh(uint mesh_id, uint64_t vertex_buffer) noexcept;
     void render(Stream &stream) noexcept;
+    luisa::vector<void*> render_with_return(Stream &stream) noexcept;
     [[nodiscard]] auto &printer() noexcept { return *_printer; }
     [[nodiscard]] auto &printer() const noexcept { return *_printer; }
     [[nodiscard]] uint named_id(luisa::string_view name) const noexcept;
@@ -234,6 +237,7 @@ public:
     [[nodiscard]] Float4x4 transform(const Transform *transform) const noexcept;
 
     [[nodiscard]] Float4 constant(Expr<uint> index) const noexcept;
+    void update_constant(Stream &stream, uint index, float4 new_value) const noexcept;
 
     template<uint dim, typename... Args, typename... CallArgs>
     [[nodiscard]] auto shader(luisa::string_view name, CallArgs &&...call_args) const noexcept {
