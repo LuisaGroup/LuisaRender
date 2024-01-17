@@ -159,6 +159,11 @@ public:
     [[nodiscard]] bool is_mesh() const noexcept override { return true; }
     [[nodiscard]] MeshView mesh() const noexcept override { return _loader.get().mesh(); }
     [[nodiscard]] uint vertex_properties() const noexcept override { return _loader.get().properties(); }
+    // [[nodiscard]] void update(SceneNodeDesc *desc ) {
+    //     _loader.update(desc->property_path("vertex_position"),
+    //                     desc->property_path("vertex_normal"),
+    //                     desc->property_path("vertex_uv"));
+    // }
 };
 
 using MeshWrapper =

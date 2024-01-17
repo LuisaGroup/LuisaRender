@@ -121,8 +121,27 @@ bool Pipeline::update(CommandBuffer &command_buffer, float time) noexcept {
     return updated;
 }
 
+
+void Pipeline::update_texture(Stream &stream, uint texture_id, float4 new_texture) noexcept {
+    auto device_float = make_float4(new_texture);
+    LUISA_INFO("LuisaRender Create device_buffer");
+    _textures.begin()->second->update_by_buffer(stream, device_float);
+}
+
+void Pipeline::update_mesh(uint mesh_id, uint64_t vertex_buffer) noexcept {
+    // if (auto iter = _geometry->instances().find(mesh_id); iter != _geometry->instances().end()) {
+    //     iter->second->update(vertex_buffer);
+    //     //return true;
+    // }
+    //return false;
+}
+
 void Pipeline::render(Stream &stream) noexcept {
     _integrator->render(stream);
+}
+
+luisa::vector<void*> Pipeline::render_with_return(Stream &stream) noexcept {
+    return _integrator->render_with_return(stream);
 }
 
 const Texture::Instance *Pipeline::build_texture(CommandBuffer &command_buffer, const Texture *texture) noexcept {
@@ -204,5 +223,17 @@ std::pair<BufferView<float4>, uint> Pipeline::allocate_constant_slot() noexcept 
 Float4 Pipeline::constant(Expr<uint> index) const noexcept {
     return _constant_buffer->read(index);
 }
+
+void Pipeline::update_constant(Stream &stream, uint index, float4 new_value) const noexcept {
+    if(!_constant_buffer) {
+        LUISA_INFO("Pipeline::update_constant: constant_buffer is nullptr");
+        return;
+    }
+    LUISA_INFO("{} {} {}",index, new_value, _constant_buffer.size());
+    stream << _constant_buffer.view(index, 1u).copy_from(&new_value) << compute::commit();
+    LUISA_INFO("Pipeline::update_constant");
+}
+
+
 
 }// namespace luisa::render

@@ -133,6 +133,10 @@ public:
     [[nodiscard]] luisa::string diff_param_identifier() const noexcept override {
         return _diff_param ? _diff_param->identifier() : non_differrentiable_identifier;
     }
+    [[nodiscard]] void update_by_buffer(Stream &stream, float4 new_value){
+        LUISA_INFO("Constant::update_by_buffer {}", _constant_slot);
+        pipeline().update_constant(stream, _constant_slot, new_value);
+    }
 };
 
 luisa::unique_ptr<Texture::Instance> ConstantTexture::build(

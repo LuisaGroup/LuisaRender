@@ -17,3 +17,9 @@
 [submodule "src/ext/json"]
 	path = src/ext/json
 	url = https://github.com/nlohmann/json.git
+[submodule "src/ext/pybind11"]
+	path = src/ext/pybind11
+	url = https://github.com/pybind/pybind11.git
+[submodule "src/ext/dlpack"]
+	path = src/ext/dlpack
+	url = https://github.com/dmlc/dlpack.git

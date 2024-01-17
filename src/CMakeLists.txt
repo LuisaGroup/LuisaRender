@@ -31,7 +31,12 @@ endif ()
 set(LUISA_COMPUTE_ENABLE_LTO OFF CACHE BOOL "" FORCE)
 set(LUISA_COMPUTE_ENABLE_PYTHON OFF CACHE BOOL "" FORCE)
 set(LUISA_COMPUTE_ENABLE_UNITY_BUILD ${LUISA_RENDER_ENABLE_UNITY_BUILD} CACHE BOOL "" FORCE)
+
+set(SKBUILD_OLD ${SKBUILD})
+set(SKBUILD OFF)
 add_subdirectory(compute)
+set(SKBUILD ${SKBUILD_OLD})
+
 target_include_directories(luisa-render-include INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/compute/include/luisa)
 
 add_subdirectory(sdl)
@@ -57,6 +62,10 @@ function(luisa_render_add_plugin name)
     set_target_properties(${lib_name} PROPERTIES
             UNITY_BUILD OFF
             DEBUG_POSTFIX "")
+    install(TARGETS ${lib_name}
+            LIBRARY DESTINATION ${CMAKE_INSTALL_BINDIR}
+            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endfunction()
 
 add_subdirectory(films)
@@ -108,4 +117,8 @@ add_subdirectory(apps)
 
 if (LUISA_RENDER_BUILD_TESTS)
     add_subdirectory(tests)
+endif ()
+
+if (SKBUILD)
+    add_subdirectory(python)
 endif ()

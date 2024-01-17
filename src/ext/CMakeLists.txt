@@ -7,6 +7,11 @@ add_library(fast_float INTERFACE)
 target_include_directories(fast_float INTERFACE fast_float/include)
 target_link_libraries(luisa-render-ext INTERFACE fast_float)
 
+install(TARGETS luisa-render-ext
+        LIBRARY DESTINATION ${CMAKE_INSTALL_BINDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 # shared by assimp and tinyexr
 find_package(ZLIB)
 
@@ -23,6 +28,8 @@ if (ZLIB_FOUND)
 else ()
     set(ASSIMP_BUILD_ZLIB ON CACHE BOOL "" FORCE)
 endif ()
+
+set(ASSIMP_BIN_INSTALL_DIR ${CMAKE_INSTALL_BINDIR})
 set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
 set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(ASSIMP_INSTALL ON CACHE BOOL "" FORCE)
@@ -52,6 +59,11 @@ else ()
     target_compile_definitions(tinyexr PUBLIC TINYEXR_USE_MINIZ=1)
     target_include_directories(tinyexr PRIVATE tinyexr/deps/miniz)
 endif ()
+
+install(TARGETS tinyexr
+    LIBRARY DESTINATION ${CMAKE_INSTALL_BINDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 target_include_directories(tinyexr PUBLIC tinyexr)
 target_link_libraries(tinyexr PUBLIC ${CMAKE_DL_LIBS})
 set_target_properties(tinyexr PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
@@ -61,3 +73,13 @@ target_link_libraries(luisa-render-ext INTERFACE tinyexr)
 add_library(nlohmann_json INTERFACE)
 target_include_directories(nlohmann_json INTERFACE json/single_include)
 target_link_libraries(luisa-render-ext INTERFACE nlohmann_json)
+
+
+install(TARGETS nlohmann_json
+    LIBRARY DESTINATION ${CMAKE_INSTALL_BINDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+if (SKBUILD OR LUISA_COMPUTE_FORCE_PYTHON_BINDINGS)
+    add_subdirectory(pybind11)
+endif ()

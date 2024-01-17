@@ -49,6 +49,22 @@ void ProgressiveIntegrator::Instance::render(Stream &stream) noexcept {
     }
 }
 
+luisa::vector<void*> ProgressiveIntegrator::Instance::render_with_return(Stream &stream) noexcept {
+    CommandBuffer command_buffer{&stream};
+    luisa::vector<void*> result;
+    for (auto i = 0u; i < pipeline().camera_count(); i++) {
+        auto camera = pipeline().camera(i);
+        auto resolution = camera->film()->node()->resolution();
+        auto pixel_count = resolution.x * resolution.y;
+        camera->film()->prepare(command_buffer);
+        _render_one_camera(command_buffer, camera);
+        command_buffer << compute::synchronize();
+        result.push_back(camera->film()->export_image(command_buffer));
+    }
+    return result;
+}
+
+
 void ProgressiveIntegrator::Instance::_render_one_camera(
     CommandBuffer &command_buffer, Camera::Instance *camera) noexcept {
 
