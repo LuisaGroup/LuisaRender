@@ -1,7 +1,8 @@
 // mat_cbox
 Surface cbox-white : Matte {
-  Kd : Constant {
-    v { 0.725, 0.71, 0.68 }
+  Kd : Image {
+    file { "picture1.jpg" }
+    semantic { "albedo" }
   }
 }
 
@@ -53,15 +54,6 @@ Shape cbox-light : Mesh {
   }
 }
 
-Shape cbox-tall-box : Mesh {
-  file { "../../meshes/cbox-parts/tall-box.obj" }
-  surface { @cbox-white }
-}
-
-Shape cbox-short-box : Mesh {
-  file { "../../meshes/cbox-parts/short-box.obj" }
-  surface { @cbox-white }
-}
 
 
 Shape cbox : Group {
@@ -71,8 +63,6 @@ Shape cbox : Group {
     @cbox-left-wall,
     @cbox-right-wall,
     @cbox-back-wall,
-    @cbox-tall-box,
-    @cbox-short-box,
     @cbox-light
   }
 }
@@ -81,6 +71,11 @@ Film film : Color {
   resolution { 1024 }
   exposure { 0 }
 }
+
+FIlm display : Display {
+  base { @film }
+}
+
 
 Camera camera : Pinhole {
   position { 0.0, 1.0, 5.0 }
@@ -97,6 +92,8 @@ Integrator pt : MegaPath {
   sampler : Independent {}
   depth { 10 }
   rr_depth { 5 }
+
+  display_camera_index { 0 }
 }
 
 render {

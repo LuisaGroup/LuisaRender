@@ -44,6 +44,9 @@ public:
         [[nodiscard]] auto light_sampler() noexcept { return _light_sampler.get(); }
         [[nodiscard]] auto light_sampler() const noexcept { return _light_sampler.get(); }
         virtual void render(Stream &stream) noexcept = 0;
+        virtual void render_backward(Stream &stream, luisa::vector<Buffer<float>> &grad_in) {
+            LUISA_INFO("Not implemented!");
+        };
         virtual luisa::vector<void*> render_with_return(Stream &stream) {
             LUISA_INFO("Not implemented!");
             return luisa::vector<void *>{};
@@ -86,14 +89,12 @@ public:
     ProgressiveIntegrator(Scene *scene, const SceneNodeDesc *desc) noexcept;
 };
 
-class DifferentiableIntegrator : public Integrator {
+class DifferentiableIntegrator : public ProgressiveIntegrator {
 
 public:
-    class Instance : public Integrator::Instance {
+    class Instance : public ProgressiveIntegrator::Instance {
 
     private:
-        luisa::unique_ptr<Loss::Instance> _loss;
-        luisa::unique_ptr<Optimizer::Instance> _optimizer;
         // luisa::vector<float4> _pixels;//store the rendered results for backward
         // luisa::unordered_map<const Camera::Instance *, Shader<2, uint, float, float>>
         //     _render_shaders;
@@ -107,10 +108,23 @@ public:
         //                                    const Camera::Instance *camera) noexcept;
         // [[nodiscard]] virtual Float3 Li(const Camera::Instance *camera, Expr<uint> frame_index,
         //                                 Expr<uint2> pixel_id, Expr<float> time) const noexcept;
+    protected:
+        luisa::unique_ptr<Loss::Instance> _loss;
+        luisa::unique_ptr<Optimizer::Instance> _optimizer;
+
+        luisa::unordered_map<const Camera::Instance *, Shader<2, uint, float, float>> _render_shaders;
+        luisa::unordered_map<const Camera::Instance *, Shader<2, uint, float, float, Image<float>>> _render_1spp_shaders;
+        luisa::unordered_map<const Camera::Instance *, Shader<2, uint, float, float, Image<float>, Buffer<float>>> _bp_shaders;
+        luisa::unordered_map<const Camera::Instance *, Shader<2, uint, float, float>> _render_grad_map_shaders;
+        luisa::unordered_map<const Camera::Instance *, Image<float>> replay_Li;
+        luisa::unordered_map<const Camera::Instance *, Buffer<float4>> last_time_rendered;
+        virtual void _render_one_camera_backward(CommandBuffer &command_buffer, uint iteration, Camera::Instance *camera, Buffer<float> & grad_in) noexcept;
 
     public:
-        explicit Instance(Pipeline &pipeline, CommandBuffer &command_buffer,
+        void render_backward(Stream &stream, luisa::vector<Buffer<float>> &grad_in) noexcept override;
+        Instance(Pipeline &pipeline, CommandBuffer &command_buffer,
                           const DifferentiableIntegrator *integrator) noexcept;
+        ~Instance() noexcept override;
         [[nodiscard]] auto loss() const noexcept { return _loss.get(); }
         [[nodiscard]] auto optimizer() const noexcept { return _optimizer.get(); }
         // void render(Stream &stream) noexcept override;
@@ -127,7 +141,6 @@ private:
 
 public:
     DifferentiableIntegrator(Scene *scene, const SceneNodeDesc *desc) noexcept;
-
     [[nodiscard]] bool is_differentiable() const noexcept override { return true; }
     [[nodiscard]] auto loss() const noexcept { return _loss; }
     [[nodiscard]] auto optimizer() const noexcept { return _optimizer; }

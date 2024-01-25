@@ -7,7 +7,9 @@
 #include <runtime/buffer.h>
 #include <runtime/image.h>
 #include <runtime/shader.h>
+#include <base/geometry.h>
 #include <util/command_buffer.h>
+#include <util/vertex.h>
 #include <base/optimizer.h>
 
 namespace luisa::render {
@@ -56,6 +58,31 @@ public:
         [[nodiscard]] auto identifier() const noexcept { return luisa::format("diffconst({})", _index); }
     };
 
+    class GeometryParameter {
+        uint _index;
+        uint _instance_id;
+        uint _grad_offset;
+        uint _param_offset;
+        uint _counter_offset;
+        float2 _range;
+        BufferView<Vertex> _buffer_view;
+        uint _length;
+        uint _buffer_id;
+    public:
+        GeometryParameter(uint index, uint instance_id, uint grad_offset, uint param_offset,
+                          uint counter_offset, BufferView<Vertex> buffer_view, uint length, uint buffer_id) noexcept
+            : _index(index), _instance_id{instance_id}, _grad_offset{grad_offset}, _param_offset{param_offset},
+              _counter_offset{counter_offset}, _buffer_view{_buffer_view}, _length(length), _buffer_id(buffer_id) {}
+        [[nodiscard]] auto index() const noexcept { return _index; }
+        [[nodiscard]] auto buffer() const noexcept { return _buffer_view; }
+        [[nodiscard]] auto buffer_id() const noexcept { return _buffer_id; }
+        [[nodiscard]] auto instance_id() const noexcept { return _instance_id; }
+        [[nodiscard]] auto gradient_buffer_offset() const noexcept { return _grad_offset; }
+        [[nodiscard]] auto param_offset() const noexcept { return _param_offset; }
+        [[nodiscard]] auto counter_offset() const noexcept { return _counter_offset; }
+        [[nodiscard]] auto identifier() const noexcept { return luisa::format("diff_geom({})", _index); }
+    };
+
     class TexturedParameter {
 
     private:
@@ -93,6 +120,8 @@ private:
     luisa::vector<float4> _constant_params;
     luisa::vector<float2> _constant_ranges;
     luisa::vector<TexturedParameter> _textured_params;
+    
+    luisa::vector<GeometryParameter> _geometry_params;
 
     uint _gradient_buffer_size;
     luisa::optional<BufferView<float>> _grad_buffer;
@@ -109,6 +138,7 @@ private:
     Shader1D<Buffer<float>> _clear_float_buffer;
     Shader1D<Buffer<float>, Buffer<float>, Buffer<uint>> _accumulate_grad_const;
     Shader1D<Buffer<float>, uint, Buffer<uint>, uint, Buffer<float>, uint, uint> _accumulate_grad_tex;
+    Shader1D<Buffer<float>, uint, Buffer<uint>, uint, Buffer<float>, uint> _accumulate_grad_geom;
 
 private:
     auto &pipeline() noexcept { return _pipeline; }
@@ -116,23 +146,39 @@ private:
 public:
     explicit Differentiation(Pipeline &pipeline) noexcept;
     void register_optimizer(Optimizer::Instance *optimizer) noexcept;
+    void register_geometry_parameter(const CommandBuffer &command_buffer, Shape &shape, Geometry::MeshData &mesh, Accel &accel, uint instance_id) noexcept;
     [[nodiscard]] ConstantParameter parameter(float x, float2 range) noexcept;
     [[nodiscard]] ConstantParameter parameter(float2 x, float2 range) noexcept;
     [[nodiscard]] ConstantParameter parameter(float3 x, float2 range) noexcept;
     [[nodiscard]] ConstantParameter parameter(float4 x, float2 range) noexcept;
     [[nodiscard]] ConstantParameter parameter(float4 x, uint channels, float2 range) noexcept;
     [[nodiscard]] TexturedParameter parameter(const Image<float> &image, TextureSampler s, float2 range) noexcept;
+    // geom
+    [[nodiscard]] luisa::vector<GeometryParameter> geometry_parameters(){return _geometry_params;}
     void materialize(CommandBuffer &command_buffer) noexcept;
     void clear_gradients(CommandBuffer &command_buffer) noexcept;
     void apply_gradients(CommandBuffer &command_buffer) noexcept;
+    void accum_gradients(CommandBuffer &command_buffer) noexcept;
     /// Apply then clear the gradients
     void step(CommandBuffer &command_buffer) noexcept;
     void dump(CommandBuffer &command_buffer, const std::filesystem::path &folder) const noexcept;
+    // check dirty
+    bool _is_dirty;
+    bool is_dirty(){return _is_dirty;}
+    void update_parameter_from_external(Stream &stream, luisa::vector<uint> &constants_id, luisa::vector<float4> &constants, luisa::vector<uint> &textures_id, 
+    luisa::vector<Buffer<float4>> &textures, luisa::vector<uint> &geoms_id, luisa::vector<Buffer<float>> &geoms) noexcept;
 
 public:
     [[nodiscard]] Float4 decode(const ConstantParameter &param) const noexcept;
     void accumulate(const ConstantParameter &param, Expr<float4> grad, Expr<uint> slot_seed) const noexcept;
     void accumulate(const TexturedParameter &param, Expr<float2> p, Expr<float4> grad) const noexcept;
+    void accumulate(const GeometryParameter &param, Expr<float2> p, Expr<float4> grad) const noexcept;
+
+    void set_parameter(CommandBuffer &command_buffer, const ConstantParameter &param, BufferView<float> value) noexcept;
+    void set_parameter(CommandBuffer &command_buffer, const TexturedParameter &param, BufferView<float> value) noexcept;
+    void set_parameter(CommandBuffer &command_buffer, const GeometryParameter &param, BufferView<float> value) noexcept;
+
+    std::tuple<luisa::vector<void*>,luisa::vector<void*>> get_gradients(Stream &stream);
 };
 
 }// namespace luisa::render

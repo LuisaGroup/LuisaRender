@@ -1,41 +1,14 @@
 // mat_cbox
 Surface cbox-white : Matte {
   Kd : Constant {
-    //v { 0.725, 0.71, 0.68 }
-    v { 0.1, 0.1, 0.1 }
-    requires_grad { true }
-    range { 0.00001, 0.99999 }
+    v { 0.725, 0.71, 0.68 }
   }
 }
 
-Surface cbox-white-1 : Matte {
-  Kd : Constant {
-    v { 0.2, 0.8, 0.2 }
-    requires_grad { true }
-    range { 0.00001, 0.99999 }
-  }
-}
-
-Surface cbox-white-2 : Matte {
-  Kd : Constant {
-    v { 0.3, 0.3, 0.9 }
-    requires_grad { true }
-    render_grad_map { true }
-    range { 0.00001, 0.99999 }
-  }
-}
-
-Surface cbox-white-3 : Matte {
-  Kd : Constant {
-    v { 0.4, 0.4, 0.4 }
-    requires_grad { true }
-    range { 0.00001, 0.99999 }
-  }
-}
-
-Surface cbox-white-4 : Matte {
-  Kd : Constant {
-    v { 0.5, 0.3, 0.3 }
+Surface cbox-tex : Matte {
+   Kd : Image {
+    file { "picture1.jpg" }
+    semantic { "albedo" }
     requires_grad { true }
     range { 0.00001, 0.99999 }
   }
@@ -43,19 +16,13 @@ Surface cbox-white-4 : Matte {
 
 Surface cbox-green : Matte {
   Kd : Constant {
-    //v { 0.14, 0.45, 0.091 }
-    v { 0.8, 0.5, 0.1 }
-    requires_grad { true }
-    range { 0.00001, 0.99999 }
+    v { 0.14, 0.45, 0.091 }
   }
 }
 
 Surface cbox-red : Matte {
   Kd : Constant {
-    //v { 0.63, 0.065, 0.05 }
-    v { 0.9, 0.9, 0.9 }
-    requires_grad { true }
-    range { 0.00001, 0.99999 }
+    v { 0.63, 0.065, 0.05 }
   }
 }
 
@@ -67,7 +34,7 @@ Shape cbox-ceiling : Mesh {
 
 Shape cbox-floor : Mesh {
   file { "../../meshes/cbox-parts/floor.obj" }
-  surface { @cbox-white-1 }
+  surface { @cbox-white }
 }
 
 Shape cbox-left-wall : Mesh {
@@ -82,7 +49,7 @@ Shape cbox-right-wall : Mesh {
 
 Shape cbox-back-wall : Mesh {
   file { "../../meshes/cbox-parts/back-wall.obj" }
-  surface { @cbox-white-2 }
+  surface { @cbox-tex }
 }
 
 
@@ -90,32 +57,20 @@ Shape cbox-light : Mesh {
   file { "../../meshes/cbox-parts/light.obj" }
   light : Diffuse {
     emission : Constant {
-      //v { 10, 10, 10 }
       v { 45.0, 45.0, 45.0 }
     }
   }
 }
 
-Shape cbox-tall-box : Mesh {
-  file { "../../meshes/cbox-parts/tall-box.obj" }
-  surface { @cbox-white-3 }
-}
-
-Shape cbox-short-box : Mesh {
-  file { "../../meshes/cbox-parts/short-box.obj" }
-  surface { @cbox-white-4 }
-}
 
 
 Shape cbox : Group {
   shapes {
-    @cbox-left-wall,
-    @cbox-ceiling,
     @cbox-floor,
+    @cbox-ceiling,
+    @cbox-left-wall,
     @cbox-right-wall,
     @cbox-back-wall,
-    @cbox-tall-box,
-    @cbox-short-box,
     @cbox-light
   }
 }
@@ -132,8 +87,8 @@ FIlm display : Display {
 Camera camera : Pinhole {
   position { 0.0, 1.0, 5.0 }
   fov { 27.8 }
-  spp { 64 }
-  film { @display }
+  spp { 16 }
+  film { @film }
   file { "../../renders/cbox-diff.exr" }
   filter : Gaussian {
     radius { 1 }
@@ -143,7 +98,6 @@ Camera camera : Pinhole {
   }
 }
 
-//Integrator pt : MegaRadiativeDiff {
 Integrator pt : MegaReplayDiff {
   sampler : Independent {}
   depth { 10 }

@@ -109,6 +109,12 @@ void Geometry::_process_shape(
         if (!is_static) { _dynamic_transforms.emplace_back(inst_xform); }
         auto object_to_world = inst_xform.matrix(init_time);
         _accel.emplace_back(*mesh.resource, object_to_world, visible);
+
+        //Todo: Register mesh parameter.
+        /*if (shape->requires_grad()) {
+            _pipeline.differentiation()->register_geometry_parameter(command_buffer, shape, mesh, _accel, instance_id);
+        }*/
+
         auto vertices = shape->mesh().vertices;
         for (auto &v : vertices) {
             _world_max = max(_world_max, make_float3(object_to_world * make_float4(v.position(), 1.f)));
@@ -132,6 +138,7 @@ void Geometry::_process_shape(
             medium_tag = _pipeline.register_medium(command_buffer, medium);
             properties |= Shape::property_flag_has_medium;
         }
+    
         _instances.emplace_back(Shape::Handle::encode(
             mesh.geometry_buffer_id_base,
             properties, surface_tag, light_tag, medium_tag,
@@ -175,6 +182,15 @@ bool Geometry::update(CommandBuffer &command_buffer, float time) noexcept {
         }
         command_buffer << _accel.build();
     }
+    // if(_pipeline.differentiable())
+    // {
+    //     // if (_pipeline.differentiation()->is_dirty()) {
+    //     //     updated = true;
+    //     //     for (auto t : _pipeline.differentiation()->geometry_parameters()) {
+    //     //         _accel.set_prim_handle(t.instance_id(), (uint64_t)t.buffer().native_handle());
+    //     //     }
+    //     // }
+    // }
     return updated;
 }
 

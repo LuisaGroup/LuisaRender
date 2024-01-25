@@ -55,10 +55,10 @@ private:
             if (channels == 2u) { return LoadedImage::load(path, PixelStorage::FLOAT2); }
             return LoadedImage::load(path, PixelStorage::FLOAT4);
         }();
-        auto pixels = static_cast<float *>(image.pixels());
-        for (auto i = 0u; i < image.pixel_count(); ++i) {
-            pixels[i] = _linearize(pixels[i]);
-        }
+        // auto pixels = static_cast<float *>(image.pixels());
+        // for (auto i = 0u; i < image.pixel_count()*channels; ++i) {
+        //     pixels[i] = _linearize(pixels[i]);
+        // }
         return image;
     }
 

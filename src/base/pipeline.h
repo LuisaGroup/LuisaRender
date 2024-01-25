@@ -195,6 +195,7 @@ public:
     [[nodiscard]] static luisa::unique_ptr<Pipeline> create(
         Device &device, Stream &stream, const Scene &scene) noexcept;
     [[nodiscard]] Differentiation *differentiation() noexcept;
+    [[nodiscard]] bool differentiable() {return _differentiation!=nullptr;}
     [[nodiscard]] const Differentiation *differentiation() const noexcept;
     [[nodiscard]] auto &bindless_array() noexcept { return _bindless_array; }
     [[nodiscard]] auto &bindless_array() const noexcept { return _bindless_array; }
@@ -217,6 +218,7 @@ public:
     void update_texture(Stream &stream, uint texture_id, float4 new_value) noexcept;
     void update_mesh(uint mesh_id, uint64_t vertex_buffer) noexcept;
     void render(Stream &stream) noexcept;
+    void render_diff(Stream &stream, luisa::vector<Buffer<float>> &grads) noexcept;
     luisa::vector<void*> render_with_return(Stream &stream) noexcept;
     [[nodiscard]] auto &printer() noexcept { return *_printer; }
     [[nodiscard]] auto &printer() const noexcept { return *_printer; }

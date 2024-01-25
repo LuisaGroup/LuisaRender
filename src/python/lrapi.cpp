@@ -9,6 +9,7 @@
 #include <span>
 #include <random>
 #include <vector>
+#include <string>
 #include <fstream>
 #include <iostream>
 #include <filesystem>
@@ -140,6 +141,25 @@ public:
     luisa::unique_ptr<Stream> _stream;
 }scene_python;
 
+class ParamStruct{
+public:
+    std::string type;
+    uint id;
+    uint size;
+    uint64_t buffer_ptr;
+    float4 value;
+    ParamStruct(){
+        type = "unknown";
+        id = 0;
+        size = 0;
+        buffer_ptr = 0;
+        value = float4(0.0f, 0.0f, 0.0f, 0.0f);
+    };
+    ParamStruct(std::string type, uint id, uint size, uint64_t buffer_ptr, float4 value): 
+    type(type), id(id), size(size), 
+    buffer_ptr(buffer_ptr), value(value){}
+};
+
 PYBIND11_MODULE(_lrapi, m) {
     m.doc() = "LuisaRender API";// optional module docstring
     // log
@@ -153,7 +173,7 @@ PYBIND11_MODULE(_lrapi, m) {
         log_level_info();
         LUISA_INFO("LuisaRender API init");
     });
-    m.def("load_scene", [](std::vector<string> &argvs){
+    m.def("load_scene", [](std::vector<std::string> &argvs){
         int argc = argvs.size();
         LUISA_INFO("Argc: {}", argc);
         vector<char*> pointerVec(argc);
@@ -198,20 +218,76 @@ PYBIND11_MODULE(_lrapi, m) {
         return res_vec;
     });
 
-    m.def("update_texture", [](uint tex_id, float4 texture_buffer) {
-        LUISA_INFO("LuisaRender Update Texture");
-        scene_python._pipeline->update_texture(*scene_python._stream, tex_id, texture_buffer);
-    });
+    // m.def("update_texture", [](uint tex_id, float4 texture_buffer) {
+    //     LUISA_INFO("LuisaRender Update Texture");
+    //     scene_python._pipeline->update_texture(*scene_python._stream, tex_id, texture_buffer);
+    // });
 
 
-    m.def("update_mesh", [](uint mesh_id, uint64_t vertex_buffer) {
-        LUISA_INFO("LuisaRender Update Mesh");
-        scene_python._pipeline->update_mesh(mesh_id, vertex_buffer);
+    m.def("update_scene", [](std::vector<ParamStruct> params) {
+        LUISA_INFO("LuisaRender Update Scene");
+        luisa::vector<float4> constants{};
+        luisa::vector<Buffer<float4>> textures{};
+        luisa::vector<Buffer<float>> geoms{};
+        luisa::vector<uint> constants_id{};
+        luisa::vector<uint> textures_id{};
+        luisa::vector<uint> geoms_id{};
+        for (auto param: params) {
+            LUISA_INFO("Param: {} {} {} {} {}", param.type, param.id, param.size, param.buffer_ptr, param.value);
+            if(param.type == "constant") {
+                constants_id.push_back(param.id);
+                constants.push_back(param.value);
+            }
+            else if(param.type == "texture") {
+                textures_id.push_back(param.id);
+                auto buffer = scene_python._pipeline->device().import_external_buffer<float4>(reinterpret_cast<void *>(param.buffer_ptr),param.size);
+                LUISA_INFO("Param buffer created");
+                textures.push_back(std::move(buffer));
+            }
+            else if(param.type == "geom") {
+                geoms_id.push_back(param.id);
+                auto buffer = scene_python._pipeline->device().import_external_buffer<float>(reinterpret_cast<void *>(param.buffer_ptr),param.size);
+                geoms.push_back(std::move(buffer));
+            }
+        }
+        scene_python._pipeline->differentiation()->update_parameter_from_external(*scene_python._stream, constants_id, constants, textures_id, textures, geoms_id, geoms);
     });
 
-    m.def("render_backward" [](uint64_t grad_ptr){
-        
+    m.def("render_backward", [](std::vector<uint64_t> grad_ptr,std::vector<uint> sizes){
+        LUISA_INFO("LuisaRender API render_backward");
+        //scene_python._pipeline->differentiation()->clear_gradients(*scene_python._stream);
+        luisa::vector<Buffer<float>> grad_buffer{grad_ptr.size()};
+        for (int i = 0; i < grad_ptr.size(); i++) {
+            auto buffer = scene_python._pipeline->device().import_external_buffer<float>(reinterpret_cast<void *>(grad_ptr[i]),sizes[i]);
+            grad_buffer[i] = std::move(buffer);
+        }
+        scene_python._pipeline->render_diff(*scene_python._stream, grad_buffer);
     });
+
+    m.def("get_gradients", [](){
+        //luisa::vector<void*> tex_grad;
+        //luisa::vector<void*> geom_grad;
+        auto [tex_grad, geom_grad] = scene_python._pipeline->differentiation()->get_gradients(*scene_python._stream);
+        LUISA_INFO("LuisaRender API get_gradients");
+        std::vector<uint64_t> tex_res(tex_grad.size());
+        std::vector<uint64_t> geom_res(geom_grad.size());
+        for (int i = 0; i < tex_res.size(); i++) {
+            tex_res[i] = reinterpret_cast<uint64_t>(tex_grad[i]);
+        }
+        for (int i = 0; i < geom_res.size(); i++) {
+            geom_res[i] = reinterpret_cast<uint64_t>(geom_grad[i]);
+        }
+        return std::make_pair(tex_res, geom_res);
+    });
+    
+    py::class_<ParamStruct>(m, "ParamStruct")
+        .def(py::init<>())
+        .def(py::init<std::string, uint, uint, uint64_t, float4>())
+        .def_readwrite("type", &ParamStruct::type)
+        .def_readwrite("id", &ParamStruct::id)
+        .def_readwrite("size", &ParamStruct::size)
+        .def_readwrite("buffer_ptr", &ParamStruct::buffer_ptr)
+        .def_readwrite("value", &ParamStruct::value);
     
     // py::class_<SceneDesc>(m, "SceneDesc")
     //     .def(py::init<>())

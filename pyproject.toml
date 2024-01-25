@@ -27,11 +27,11 @@ license = { file = "LICENSE" }
 [tool.scikit-build]
 cmake.minimum-version = "3.18"
 cmake.build-type = "Release"
-cmake.args = ["-GNinja","-Wno-dev"]
+cmake.args = ["-GNinja"]
 sdist.reproducible = false
 wheel.expand-macos-universal-tags = true
 wheel.packages = []
-build-dir = "build/{wheel_tag}"
+build-dir = "build/{wheel_tag}-ninja"
 
 [project.optional-dependencies]
 test = ["pytest"]

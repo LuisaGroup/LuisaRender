@@ -140,7 +140,12 @@ void Pipeline::render(Stream &stream) noexcept {
     _integrator->render(stream);
 }
 
+void Pipeline::render_diff(Stream &stream, luisa::vector<Buffer<float>> &grads) noexcept {
+    _integrator->render_backward(stream, grads);
+}
+
 luisa::vector<void*> Pipeline::render_with_return(Stream &stream) noexcept {
+    //return textures[0].second->image()->render_with_return(stream);
     return _integrator->render_with_return(stream);
 }
 

@@ -4,16 +4,10 @@
 import torch
 import cupy
 import numpy as np
-import luisa
-from luisa import *
-from luisa.builtin import *
-from luisa.types import *
-from luisa.util import *
 import luisarender
-
-luisa.init('cuda')
+import matplotlib.pyplot as plt
+import cv2
 luisarender.init()
-
 def cu_device_ptr_to_torch_tensor(ptr, shape, dtype=cupy.float32):
     """
     Convert a CUdeviceptr to a PyTorch tensor.
@@ -39,18 +33,18 @@ def cu_device_ptr_to_torch_tensor(ptr, shape, dtype=cupy.float32):
     # Convert the CuPy ndarray to a DLPack tensor and then to a PyTorch tensor
     return torch.utils.dlpack.from_dlpack(array.toDlpack())
 
-def torch_to_lc_buffer(tensor):
-    assert tensor.dtype is torch.float32  # TODO
-    size = np.prod(tensor.shape)
-    buf = luisa.Buffer.import_external_memory(
-        tensor.contiguous().data_ptr(),
-        size, dtype=float)
-    return buf
+# def torch_to_lc_buffer(tensor):
+#     assert tensor.dtype is torch.float32  # TODO
+#     size = np.prod(tensor.shape)
+#     buf = luisa.Buffer.import_external_memory(
+#         tensor.contiguous().data_ptr(),
+#         size, dtype=float)
+#     return buf
 
-def lc_buffer_to_torch(buf):
-    assert buf.dtype is float  # TODO
-    shape = (buf.size,)
-    return cu_device_ptr_to_torch_tensor(buf.native_handle, shape)
+# def lc_buffer_to_torch(buf):
+#     assert buf.dtype is float  # TODO
+#     shape = (buf.size,)
+#     return cu_device_ptr_to_torch_tensor(buf.native_handle, shape)
 
 def is_torch_tensor(a):
     return getattr(a, '__module__', None) == 'torch' \
@@ -62,8 +56,8 @@ def torch_ensure_grad_shape(a, b):
     else:
         return a
 
-def torch_to_luisa_scene(args):
-    return tuple(torch_to_lc_buffer(a) if is_torch_tensor(a) else a for a in args)    
+# def torch_to_luisa_scene(args):
+#     return tuple(torch_to_lc_buffer(a) if is_torch_tensor(a) else a for a in args)    
 
 class RenderWithLuisa(torch.autograd.Function):
     @staticmethod
@@ -86,7 +80,13 @@ class RenderWithLuisa(torch.autograd.Function):
 
 
 
-gt_args = ["C:/Users/jiankai/anaconda3/Lib/site-packages/luisarender/dylibs","-b","cuda", "D:/cbox/cbox.luisa"]
+# string param_type;
+#     uint param_id;
+#     uint param_size;
+#     uint64_t param_buffer_ptr;
+#     float4 param_value;
+
+gt_args = ["C:/Users/jiankai/anaconda3/Lib/site-packages/luisarender/dylibs","-b","cuda", "D:/Code/LuisaRender2/cbox-diff/scenes/cbox-diff/cbox-diff-matte.luisa"]
 init_args = ["C:/Users/jiankai/anaconda3/Lib/site-packages/luisarender/dylibs","-b","cuda", "C:/Users/jiankai/Downloads/bathroom/scene.luisa"]
 differentiable_params_list = [
     #{"type":"mesh","idx":0,"param":"vertex_position"},
@@ -96,28 +96,57 @@ scene_torch = [#torch.tensor([[-1.01, 0.00,  0.99]]),
                torch.tensor([[0.9, 0.9, 0.9]])
                ]
 
-grad = torch.ones((1024*1024,4),device='cuda')
-grad_luisa = torch_to_lc_buffer(grad)
-luisarender.render_backward(grad_luisa.native_handle)
-exit()
-wall = torch.tensor([0.0, 0.0, 1.0, 0.0],device='cuda',requires_grad=True)
-wall_lc = torch_to_lc_buffer(wall)
 luisarender.load_scene(gt_args)
-luisarender.update_texture(0,float4(0.0,0.0,1.0,0.0))
-img = luisarender.render() 
-print(img[0])
-torch_tensor = cu_device_ptr_to_torch_tensor(img[0], (1024*1024,4))
+target_img = cu_device_ptr_to_torch_tensor(luisarender.render()[0], (1024, 1024,4)).clone()
 
-img = torch_tensor.cpu().numpy().reshape((1024,1024,4))
-import matplotlib.pyplot as plt
-import cv2
-print(img.shape)
-# cv2.imshow('image',img[...,:3])
-# cv2.waitKey(0)
-imgplot = plt.imshow(img)
-plt.show()
-print(torch_tensor)
-luisa.synchronize()
+tex = torch.zeros((853,656,4),device='cuda',requires_grad=True)
+tex_ptr = tex.contiguous().data_ptr()
+tex_size = np.prod(tex.shape)
+tex_dtype=float
+optimizer = torch.optim.Adam([tex], lr=0.05)
+for i in range(500):
+    x = luisarender.ParamStruct()
+    x.type = 'texture'
+    x.id = 0
+    x.size = tex_size
+    x.buffer_ptr = tex_ptr
+    luisarender.update_scene([x])
+    render_img = cu_device_ptr_to_torch_tensor(luisarender.render()[0], (1024, 1024,4))
+    render_img.requires_grad_()
+    loss = torch.nn.MSELoss()(render_img,target_img)
+    loss.backward()
+    grad = render_img.grad
+    # print(grad)
+    # grad_np = grad[...,1].detach().cpu().numpy()  # Convert the tensor to numpy for visualization
+    # plt.imshow(grad_np, cmap='viridis')  # Use the 'viridis' color map
+    # plt.colorbar()
+    # plt.show()
+    # exit()
+    #visualize grad with a color map
+
+    # imgplot = plt.imshow(np.hstack([target_img.detach().cpu().numpy()[...,:3],render_img.detach().cpu().numpy()[...,:3],grad.detach().cpu().numpy()[...,:3]]))
+    # plt.show()
+    # exit()
+    # img = luisarender.render() 
+    # torch_tensor = cu_device_ptr_to_torch_tensor(img[0], (1024*1024,4))
+    # img = torch_tensor.cpu().numpy().reshape((1024, 1024,4))
+    # imgplot = plt.imshow(img[...,:3])
+    # plt.show()
+    #print(grad,torch.nonzero(torch.isnan(grad.view(-1))))
+    luisarender.render_backward([grad.contiguous().data_ptr()],[np.prod(grad.shape)])
+    tex_grad, geom_grad = luisarender.get_gradients()
+    tex_grad_torch = cu_device_ptr_to_torch_tensor(tex_grad[0], tex.shape, dtype=cupy.float32)
+    optimizer.zero_grad()
+    tex.grad = tex_grad_torch
+    optimizer.step()    
+    cv2.imshow("texture", cv2.cvtColor(tex.detach().cpu().numpy()[...,:3], cv2.COLOR_BGR2RGB))
+    cv2.imshow("render", cv2.cvtColor(render_img.detach().cpu().numpy()[...,:3], cv2.COLOR_BGR2RGB))
+    cv2.waitKey(100)
+cv2.waitKey(0)
+# img = tex_grad_torch.cpu().numpy().reshape(tex.shape)
+# imgplot = plt.imshow(img[...,:3])
+# print(tex_grad_torch)
+# plt.show()
 
 #gt_img = lc_buffer_to_torch(luisarender.render_scene())
 #

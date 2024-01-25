@@ -49,9 +49,9 @@ void ProgressiveIntegrator::Instance::render(Stream &stream) noexcept {
     }
 }
 
-luisa::vector<void*> ProgressiveIntegrator::Instance::render_with_return(Stream &stream) noexcept {
+luisa::vector<void *> ProgressiveIntegrator::Instance::render_with_return(Stream &stream) noexcept {
     CommandBuffer command_buffer{&stream};
-    luisa::vector<void*> result;
+    luisa::vector<void *> result;
     for (auto i = 0u; i < pipeline().camera_count(); i++) {
         auto camera = pipeline().camera(i);
         auto resolution = camera->film()->node()->resolution();
@@ -63,7 +63,6 @@ luisa::vector<void*> ProgressiveIntegrator::Instance::render_with_return(Stream 
     }
     return result;
 }
-
 
 void ProgressiveIntegrator::Instance::_render_one_camera(
     CommandBuffer &command_buffer, Camera::Instance *camera) noexcept {
@@ -135,7 +134,7 @@ ProgressiveIntegrator::ProgressiveIntegrator(Scene *scene, const SceneNodeDesc *
     : Integrator{scene, desc} {}
 
 DifferentiableIntegrator::DifferentiableIntegrator(Scene *scene, const SceneNodeDesc *desc) noexcept
-    : Integrator(scene, desc),
+    : ProgressiveIntegrator(scene, desc),
       _iterations{std::max(desc->property_uint_or_default("iterations", 100u), 1u)},
       _display_camera_index{desc->property_int_or_default("display_camera_index", -1)},
       _save_process{desc->property_bool_or_default("save_process", false)},
@@ -146,10 +145,49 @@ DifferentiableIntegrator::DifferentiableIntegrator(Scene *scene, const SceneNode
       _optimizer{scene->load_optimizer(desc->property_node_or_default(
           "optimizer", SceneNodeDesc::shared_default_optimizer("GD")))} {}
 
+
 DifferentiableIntegrator::Instance::Instance(
     Pipeline &pipeline, CommandBuffer &command_buffer, const DifferentiableIntegrator *integrator) noexcept
-    : Integrator::Instance{pipeline, command_buffer, integrator},
+    : ProgressiveIntegrator::Instance{pipeline, command_buffer, integrator},
       _loss{node<DifferentiableIntegrator>()->loss()->build(pipeline, command_buffer)},
-      _optimizer{node<DifferentiableIntegrator>()->optimizer()->build(pipeline, command_buffer)} {}
+      _optimizer{node<DifferentiableIntegrator>()->optimizer()->build(pipeline, command_buffer)} {
+        // save Li of the 2nd pass
+    for (auto i = 0; i < pipeline.camera_count(); ++i) {
+        auto camera = pipeline.camera(i);
+        auto resolution = camera->film()->node()->resolution();
+        replay_Li.emplace(camera, pipeline.device().create_image<float>(PixelStorage::FLOAT4, resolution));
+        last_time_rendered.emplace(camera, pipeline.device().create_buffer<float4>(resolution.x * resolution.y));
+    }
 
-}// namespace luisa::render
+    // handle output dir
+    std::filesystem::path output_dir{"outputs"};
+    std::filesystem::remove_all(output_dir);
+    std::filesystem::create_directories(output_dir);
+
+    command_buffer << synchronize();
+}
+
+DifferentiableIntegrator::Instance::~Instance() noexcept = default;
+
+void DifferentiableIntegrator::Instance::render_backward(Stream &stream, luisa::vector<Buffer<float>> &grad_in) noexcept {
+    CommandBuffer command_buffer{&stream};
+    pipeline().differentiation()->clear_gradients(command_buffer);
+    LUISA_INFO("Gradients cleared.");
+    assert(grad_in.size() == pipeline().camera_count());
+    for (auto i = 0u; i < pipeline().camera_count(); i++) {
+        auto camera = pipeline().camera(i);
+        auto resolution = camera->film()->node()->resolution();
+        auto pixel_count = resolution.x * resolution.y;
+        camera->film()->prepare(command_buffer);
+        _render_one_camera_backward(command_buffer, 0,  camera, grad_in[i]);
+    }
+}
+
+void DifferentiableIntegrator::Instance::_render_one_camera_backward(
+    CommandBuffer &command_buffer,uint iteration,  Camera::Instance *camera, Buffer<float> &grad_in) noexcept {
+   LUISA_INFO("Not implemented for abstract class DifferentiableIntegrator::Instance::_render_one_camera_backward");
+}
+
+}
+
+
