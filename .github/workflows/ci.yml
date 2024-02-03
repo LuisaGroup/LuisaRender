@@ -69,6 +69,12 @@ jobs:
         if: matrix.config == 'Release'
         run: |
           sudo cmake --install build --prefix dist -v
+      - name: "Upload Artifact"
+        if: matrix.config == 'Release'
+        uses: actions/upload-artifact@v2
+        with:
+          path: dist
+          name: LuisaRender-${{ matrix.os }}-${{ matrix.compiler.name }}-${{ matrix.compiler.version }}
 
   build-macos:
     strategy:
@@ -103,6 +109,12 @@ jobs:
         if: matrix.config == 'Release'
         run: |
           sudo cmake --install build --prefix dist -v
+      - name: "Upload Artifact"
+        if: matrix.config == 'Release'
+        uses: actions/upload-artifact@v2
+        with:
+          path: dist
+          name: LuisaRender-${{ matrix.os }}-${{ matrix.compiler }}
 
   build-windows:
     strategy:
@@ -143,3 +155,9 @@ jobs:
         if: matrix.config == 'Release'
         run: |
           cmake --install build --prefix dist -v
+      - name: "Upload Artifact"
+        if: matrix.config == 'Release'
+        uses: actions/upload-artifact@v2
+        with:
+          path: dist
+          name: LuisaRender-windows-${{ matrix.os }}-${{ matrix.compiler }}
