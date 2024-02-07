@@ -56,6 +56,9 @@ function(luisa_render_add_plugin name)
     set_target_properties(${lib_name} PROPERTIES
             UNITY_BUILD OFF
             DEBUG_POSTFIX "")
+    install(TARGETS ${lib_name}
+            LIBRARY DESTINATION ${CMAKE_INSTALL_BINDIR}
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endfunction()
 
 add_subdirectory(films)
@@ -74,8 +77,8 @@ add_subdirectory(environments)
 add_subdirectory(lightsamplers)
 add_subdirectory(phasefunctions)
 add_subdirectory(texturemappings)
-add_library(luisa-render INTERFACE)
 
+add_library(luisa-render INTERFACE)
 target_link_libraries(luisa-render INTERFACE
         luisa-render-ext
         luisa-render-sdl

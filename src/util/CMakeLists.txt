@@ -29,3 +29,6 @@ target_link_libraries(luisa-render-util PUBLIC
 set_target_properties(luisa-render-util PROPERTIES
         WINDOWS_EXPORT_ALL_SYMBOLS ON
         UNITY_BUILD ${LUISA_RENDER_ENABLE_UNITY_BUILD})
+install(TARGETS luisa-render-util
+        LIBRARY DESTINATION ${CMAKE_INSTALL_BINDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

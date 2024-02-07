@@ -55,6 +55,30 @@ else ()
     endif ()
 endif ()
 
+# rpath
+set(CMAKE_MACOSX_RPATH ON)
+set(CMAKE_SKIP_BUILD_RPATH OFF)
+set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
+set(CMAKE_BUILD_WITH_INSTALL_RPATH ON)
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
+
+if (APPLE)
+    set(CMAKE_INSTALL_RPATH "@loader_path;@loader_path/../bin;@loader_path/../lib")
+elseif (UNIX)
+    set(CMAKE_INSTALL_RPATH "$ORIGIN;$ORIGIN/../bin;$ORIGIN/../lib")
+endif ()
+
+if (NOT CMAKE_INSTALL_PREFIX)
+    set(CMAKE_INSTALL_PREFIX "dist")
+endif ()
+
+# set up install directories
+include(GNUInstallDirs)
+if (NOT WIN32)
+    # DLLs are installed in the same directory as executables
+    set(CMAKE_INSTALL_LIBDIR ${CMAKE_INSTALL_BINDIR})
+endif ()
+
 set(CMAKE_FIND_PACKAGE_SORT_ORDER NATURAL)
 set(CMAKE_FIND_PACKAGE_SORT_DIRECTION DEC)
 
