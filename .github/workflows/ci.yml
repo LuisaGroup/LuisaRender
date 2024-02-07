@@ -73,7 +73,7 @@ jobs:
         if: matrix.config == 'Release'
         uses: actions/upload-artifact@v2
         with:
-          path: dist
+          path: "dist/bin"
           name: LuisaRender-${{ matrix.os }}-${{ matrix.compiler.name }}-${{ matrix.compiler.version }}
 
   build-macos:
@@ -113,7 +113,7 @@ jobs:
         if: matrix.config == 'Release'
         uses: actions/upload-artifact@v2
         with:
-          path: dist
+          path: "dist/bin"
           name: LuisaRender-${{ matrix.os }}-${{ matrix.compiler }}
 
   build-windows:
@@ -159,5 +159,5 @@ jobs:
         if: matrix.config == 'Release'
         uses: actions/upload-artifact@v2
         with:
-          path: dist
+          path: "dist/bin"
           name: LuisaRender-windows-${{ matrix.os }}-${{ matrix.compiler }}
