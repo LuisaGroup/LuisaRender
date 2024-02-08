@@ -35,7 +35,9 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND
     add_compile_options(-Wno-deprecated-non-prototype)
 endif ()
 add_subdirectory(assimp)
-set_target_properties(assimp PROPERTIES UNITY_BUILD OFF)
+set_target_properties(assimp PROPERTIES
+        UNITY_BUILD OFF
+        OUTPUT_NAME "luisa-render-ext-assimp")
 if (UNIX AND NOT APPLE) # TODO: fix this
     target_compile_definitions(assimp PRIVATE USE_FILE32API=1)
 endif ()
@@ -54,8 +56,13 @@ else ()
 endif ()
 target_include_directories(tinyexr PUBLIC tinyexr)
 target_link_libraries(tinyexr PUBLIC ${CMAKE_DL_LIBS})
-set_target_properties(tinyexr PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+set_target_properties(tinyexr PROPERTIES
+        WINDOWS_EXPORT_ALL_SYMBOLS ON
+        OUTPUT_NAME "luisa-render-ext-tinyexr")
 target_link_libraries(luisa-render-ext INTERFACE tinyexr)
+install(TARGETS tinyexr
+        LIBRARY DESTINATION ${CMAKE_INSTALL_BINDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # nlohmann json
 add_library(nlohmann_json INTERFACE)
