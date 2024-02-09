@@ -41,6 +41,16 @@ set_target_properties(assimp PROPERTIES
 if (UNIX AND NOT APPLE) # TODO: fix this
     target_compile_definitions(assimp PRIVATE USE_FILE32API=1)
 endif ()
+if (ASSIMP_BUILD_ZLIB)
+    if (TARGET zlib)
+        set_target_properties(zlib PROPERTIES
+                WINDOWS_EXPORT_ALL_SYMBOLS ON
+                OUTPUT_NAME "luisa-render-ext-zlib")
+        install(TARGETS zlib
+                LIBRARY DESTINATION ${CMAKE_INSTALL_BINDIR}
+                RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    endif ()
+endif ()
 target_link_libraries(luisa-render-ext INTERFACE assimp::assimp)
 
 # tinyexr
