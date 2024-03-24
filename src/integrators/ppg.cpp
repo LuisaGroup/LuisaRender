@@ -66,10 +66,10 @@ protected:
             dnode=device.create_buffer<DTreeNode>(max_size);
             counter=device.create_buffer<uint>(1);
         }
-        auto child(Expr<float2> pos) noexcept{
+        auto child(Expr<float2> pos) noexcept{//get the child index pos belong
             return ite(pos.x<0.5f,def(0u),def(2u))+ite(pos.y<0.5f,def(0u),def(1u));
         }
-        Float2 subspace(Expr<float2> pos) noexcept{
+        Float2 subspace(Expr<float2> pos) noexcept{//rescale pos to [0,1] in son
             return make_float2(ite(pos.x<0.5f,pos.x,pos.x-.5f),ite(pos.y<0.5f,pos.x,pos.x-.5f))*2.f;
         }
 
@@ -82,7 +82,7 @@ protected:
         void insert(Expr<uint> id, Expr<Sample> sample) {
             auto pos=def(sample.dir);
             auto cur=def(id);
-            $while(id!=-1){
+            $while(cur!=-1u){
                 auto node=dnode->read(cur);
                 auto child_id=child(pos);
                 node.sum[child_id]+=sample.val;
@@ -139,9 +139,10 @@ protected:
 
             return node;
         }
-        auto update_node(Expr<uint> dst,Expr<uint> src) noexcept{
+        auto update_node(Expr<uint> dst,Expr<uint> src,Expr<uint> last_counter) noexcept{
             auto node=dnode->read(src);
             auto res=dnode->read(dst);
+            res.children=ite(dst<last_counter,res.children,make_uint4(-1u));
             auto bit=make_uint4(ite((node.children.x!=-1)&(res.children.x==-1),1u,0u),
                                 ite((node.children.y!=-1)&(res.children.y==-1),1u,0u),
                                 ite((node.children.z!=-1)&(res.children.z==-1),1u,0u),
@@ -150,8 +151,8 @@ protected:
             auto bit_sum=make_uint4(0u,bit.x,prev,prev+bit.z);
             auto new_id=counter->atomic(0u).fetch_add(bit_sum.w+bit.w);
             auto ans=new_id+bit_sum;
-            node.children=make_uint4(ite(bit.x==1u,ans.x,node.children.x),ite(bit.y==1u,ans.y,node.children.y),
-                                    ite(bit.z==1u,ans.z,node.children.z),ite(bit.w==1u,ans.w,node.children.w));
+            node.children=make_uint4(ite(bit.x==1u,ans.x,res.children.x),ite(bit.y==1u,ans.y,res.children.y),
+                                    ite(bit.z==1u,ans.z,res.children.z),ite(bit.w==1u,ans.w,res.children.w));
             return node;
         }
         auto empty_node() noexcept{
@@ -164,7 +165,7 @@ protected:
         }
         void refine(Expr<uint> id) noexcept{
             ArrayUInt3<MAX_DEPTH> stack;//(src_id,dst_id,child)
-            uint top=1;
+            auto top=def(1u);
             stack[0]=make_uint3(id,id,0u);
             auto sum=dnode->read(id).sum;
             auto tot=sum.x+sum.y+sum.z+sum.w;
@@ -174,7 +175,8 @@ protected:
                 auto son=prev_src.children[now.z];
                 stack[top-1].z+=1;
                 $if(son==-1){//consider split
-                    $if(prev_src.sum[now.z] > tot * SPLIT_THRESHOLD) {
+                    //device_log("dnode {}: {}, cur son:{}",now.x,prev_src,now.z);
+                    $if((prev_src.sum[now.z] > tot * SPLIT_THRESHOLD)&(top<MAX_DEPTH)) {
                         auto new_id = counter->atomic(0u).fetch_add(1u);
                         auto new_node = def<DTreeNode>();
                         new_node.sum = make_float4(prev_src.sum[now.z]/4);
@@ -199,11 +201,11 @@ protected:
                 };
             };
         }
-        void update(Expr<uint> dst, Expr<uint> src) noexcept{
+        void update(Expr<uint> dst, Expr<uint> src,Expr<uint> last_counter) noexcept{
             ArrayUInt3<MAX_DEPTH> stack;//(src_id,dst_id,child)
-            uint top=1;
+            auto top=def(1u);
             stack[0]=make_uint3(src,dst,0u);
-            auto node=update_node(dst,src);
+            auto node=update_node(dst,src,last_counter);
             dnode->write(dst,node);
             $while(top!=0){
                 auto now=stack[top-1];
@@ -212,13 +214,21 @@ protected:
                 auto src_son=prev_src.children[now.z];
                 auto dst_son=prev_dst.children[now.z];
                 stack[top-1].z+=1;
+//                $if((src_son!=-1)&(dst_son==-1)){
+//                    device_log("WRONG!!!!top:{}, now:{}, prev_src:{}, prev_dst:{}",top,now,prev_src,prev_dst);
+//                    $break;
+//                };
                 $if(src_son!=-1) {
                     auto new_node=def<DTreeNode>();
-                    $if(dst_son!=-1){
-                        new_node = update_node(dst_son, src_son);
-                    }$else {
-                        new_node = copy_node(src_son);
-                    };
+                    new_node = update_node(dst_son, src_son,last_counter);
+//                    $if((new_node.children.x==-1)&(new_node.children.y==-1)&(new_node.children.z==-1)&(new_node.children.w==-1)){
+//                        auto test=dnode->read(src_son);
+//                        $if((test.children.x==-1)&(test.children.y==-1)&(test.children.z==-1)&(test.children.w==-1)){
+//
+//                        }$else {
+//                            device_log("WAAAA!!!!top:{}, now:{}, prev_src:{}, prev_dst:{}, now_src {}, now_dst {}", top, now, prev_src, prev_dst,test,new_node);
+//                        };
+//                    };
                     dnode->write(dst_son, new_node);
                     stack[top] = make_uint3(src_son, dst_son, 0u);
                     top += 1;
@@ -238,7 +248,7 @@ protected:
             auto cur=def(id);
             auto new_cur=def(new_id);
             ArrayUInt3<MAX_DEPTH> stack;//(src_id,dst_id,child)
-            uint top=1;
+            auto top=def(1u);
             stack[0]=make_uint3(id,new_id,0u);
             auto node=copy_node(id);
             dnode->write(new_id,node);
@@ -248,8 +258,13 @@ protected:
                 auto prev_dst=dnode->read(now.y);
                 auto src_son=prev_src.children[now.z];
                 auto dst_son=prev_dst.children[now.z];
+
                 stack[top-1].z+=1;
-                $if(dst_son!=-1) {
+                $if(src_son!=-1) {
+//                    $if(dst_son==-1){
+//                        device_log("ERROR!!!!");
+//                        $break;
+//                    };
                     auto new_node = copy_node(src_son);
                     dnode->write(dst_son, new_node);
                     stack[top] = make_uint3(src_son, dst_son, 0u);
@@ -293,7 +308,7 @@ protected:
             return node.children;
         }
         auto is_leaf(Expr<STreeNode> node){
-            return (node.data&4u)==4u;
+            return (node.data>>2)!=0u;
         }
         auto weight(Expr<STreeNode> node){
             return node.weight;
@@ -301,12 +316,15 @@ protected:
         auto axis(Expr<STreeNode> node){
             return node.data&3u;
         }
+        auto next_axis(Expr<uint> axis){
+            return ite(axis+1u>2u,0u,axis+1u);
+        }
         auto build_data(Expr<uint> axis,Expr<uint> is_leaf){
             return axis|(is_leaf<<2);
         }
         auto create_node(Expr<uint> data){
             auto node=def<STreeNode>(make_uint2(-1u,-1u),data,0.0f);
-            $if(data!=3u){
+            $if(!is_leaf(node)){
                 auto id=counter->atomic(0u).fetch_add(2u);
                 node.children=make_uint2(id,id+1);
             }$else{
@@ -319,7 +337,7 @@ protected:
             counter->atomic(0u).fetch_add(1u);
             auto new_id=0u;
             ArrayUInt2<MAX_DEPTH> stack;//(src_id,dst_id,child)
-            uint top=1;
+            auto top=def(1u);
             stack[0]=make_uint2(new_id,0u);
             auto node=create_node(0u);
             snode->write(new_id,node);
@@ -328,9 +346,8 @@ protected:
                 auto prev=snode->read(now.x);
                 auto son=prev.children[now.y];
                 stack[top-1].y+=1;
-                device_log("traverse depth:{}, now id:{}, son {} id:{}",depth,now.x,now.y,son);
                 $if(!is_leaf(prev)) {
-                    auto new_node = create_node(ite(top<=depth,ite(prev.data==2u,0u,prev.data+1u),3u));
+                    auto new_node = create_node(build_data(next_axis(axis(prev)),ite(top<depth,0u,1u)));
                     snode->write(son, new_node);
                     stack[top] = make_uint2(son, 0u);
                     top += 1;
@@ -350,7 +367,6 @@ protected:
             auto node=snode->read(id);
             auto pos=(sample.pos.xyz()-_aabb->read(0u))/(_aabb->read(1u)-_aabb->read(0u));
             $while(!is_leaf(node)){
-                snode->write(id,node);
                 auto ax=axis(node);
                 id=ite(pos[ax]<0.5f,node.children.x,node.children.y);
                 pos=ite(pos[ax]<0.5f,pos*2.f,(pos-0.5f)*2.f);
@@ -361,35 +377,37 @@ protected:
             auto d_id=train_id(node);
             dtree.insert(d_id,sample);
         }
-        void refine(Expr<uint> id,Expr<float> threshold){
+        void refine(Expr<uint> id,Expr<float> threshold,Expr<uint> last_counter){
             auto node=snode->read(id);
             $if((is_leaf(node))){
-                dtree.update(node.children.x,node.children.y);//update sample with train
+                dtree.update(sample_id(node),train_id(node),last_counter);//update sample with train
+                //device_log("id {}, node {}, weight {}",id,node,weight(node));
                 $if(weight(node)>threshold){
                     auto new_id = counter->atomic(0u).fetch_add(2u);
-                    auto new_dtree = dtree.copy(sample_id(node));
-                    node.children = make_uint2(new_dtree, id);
                     auto new_node = def<STreeNode>();
                     //new middle
                     new_node.children = make_uint2(new_id, new_id + 1);
-                    new_node.data = build_data(axis(node),1u);
+                    new_node.data = build_data(axis(node),0u);
                     snode->write(id, new_node);
                     //new_left
                     new_node.children = dtrees(node);
-                    new_node.data = ite(node.data == 2u, 0u, node.data + 1u);
+                    new_node.data = build_data(next_axis(axis(node)),1u);
                     new_node.weight = weight(node) / 2;
                     snode->write(new_id, new_node);
                     //new_right
-                    new_node.children = dtrees(node);
-                    new_node.data = ite(node.data == 0u, 2u, node.data + 1u);
+                    new_node.children = make_uint2(dtree.copy(sample_id(node)),dtree.copy(train_id(node)));
+                    new_node.data = build_data(next_axis(axis(node)),1u);
                     snode->write(new_id + 1, new_node);
                 }$else{
-                    snode->write(id,node);
+                    //snode->write(id,node);
                 };
             };
         }
         void dtree_refine(Expr<uint> id){
-            dtree.refine(id);
+            auto node=snode->read(id);
+            $if((is_leaf(node))){
+                dtree.refine(train_id(node));
+            };
         }
         auto sample(Expr<float3> p,Sampler::Instance &sampler){
             auto id=def(0u);
@@ -431,7 +449,7 @@ protected:
             resolution.x, resolution.y, spp);
 
         using namespace luisa::compute;
-        _stree=SDTree(pipeline().device(),10000000);
+        _stree=SDTree(pipeline().device(),20000000);
         _sec_mom=pipeline().device().create_buffer<float3>(pixel_count);
         _samples=pipeline().device().create_buffer<Sample>(pixel_count*node<PPGPathTracing>()->max_depth());
         _dbeta=pipeline().device().create_buffer<float>(pixel_count*node<PPGPathTracing>()->max_depth()*pipeline().spectrum()->node()->dimension());
@@ -443,9 +461,11 @@ protected:
             auto L = Li(camera, frame_index, pixel_id, time);
             camera->film()->accumulate(pixel_id, shutter_weight * L);
         };
-        LUISA_INFO("kernel build finish!");
-        Kernel1D clear_float3_kernel = [&](Var<Buffer<float3>> buffer) noexcept {
-            buffer.write(dispatch_x(),make_float3(0.0f));
+        Kernel1D clear_float3_kernel = [&](BufferFloat3 buffer) noexcept {
+            $if(dispatch_x()==0u){
+                buffer.write(dispatch_x(),make_float3(0.0f));
+            };
+            //buffer.write(dispatch_x(),make_float3(0.0f));
         };
         Kernel2D variance_kernel = [&]() noexcept{
             auto pixel=dispatch_id().xy();
@@ -464,10 +484,10 @@ protected:
         Kernel1D dtree_refine_kernel = [&]() noexcept {
             _stree.dtree_refine(dispatch_x());
         };
-        Kernel1D stree_refine_kernel = [&](Float threshold) noexcept {
-            _stree.refine(dispatch_x(),threshold);
+        Kernel1D stree_refine_kernel = [&](Float threshold,UInt last_counter) noexcept {
+            _stree.refine(dispatch_x(),threshold,last_counter);
         };
-        Kernel1D clear_uint_kernel = [&](Var<Buffer<uint>> buffer) noexcept {
+        Kernel1D clear_uint_kernel = [&](BufferUInt buffer) noexcept {
             buffer.write(dispatch_x(), 0u);
         };
         Clock clock_compile;
@@ -498,28 +518,30 @@ protected:
         command_buffer<<clear_uint(_stree.dtree.counter).dispatch(1u);
         command_buffer<<synchronize();
         LUISA_INFO("finish build tree");
-        command_buffer<<build_initial(5u).dispatch(1u)<<synchronize();
+        command_buffer<<build_initial(15u).dispatch(1u)<<synchronize();
         for (auto s : shutter_samples) {
             pipeline().update(command_buffer, s.point.time);
             auto rem_spp=s.spp;
             auto prev_var=1e20f;
-            for (auto k=1;k<= s.spp;k<<=1){
-                LUISA_INFO("running {} samples for training...");
+            for (auto k=1;k<= rem_spp;k<<=1){
+                camera->film()->clear(command_buffer);
+                LUISA_INFO("running {} samples for training...", k);
                 //switch radiance cache
                 rem_spp-=k;
                 for(int j=0;j<k;j++){
                     command_buffer << render(sample_id++, s.point.time, s.point.weight)
                                           .dispatch(resolution);
                 }
+                command_buffer<<synchronize();
                 LUISA_INFO("render finish, start training...");
                 //build tree
                 uint dtree_counter, stree_counter;
                 command_buffer<<_stree.dtree.counter.copy_to(&dtree_counter)
                               <<_stree.counter.copy_to(&stree_counter)
                               <<synchronize();
-                LUISA_INFO("counter read back finish! start refining...");
-                command_buffer<<dtree_refine().dispatch(dtree_counter)
-                              <<stree_refine(200*std::sqrt(k)).dispatch(stree_counter);
+                LUISA_INFO("counter read back finish! dtree node: {}, stree node: {}, start refining...",dtree_counter,stree_counter);
+                command_buffer<<dtree_refine().dispatch(stree_counter);
+                command_buffer<<stree_refine(2000*std::sqrt(k),dtree_counter).dispatch(stree_counter)<<synchronize();
                 LUISA_INFO("refine finish!");
                 //get variance
                 float3 spec_var=float3(0.f);
@@ -528,18 +550,19 @@ protected:
                 command_buffer<<clear_float3(_var).dispatch(1u);
                 command_buffer<<calc_variance().dispatch(resolution);
                 command_buffer<<_var.copy_to(&spec_var)<<synchronize();
-                img_var=spec_var.x+spec_var.y+spec_var.z;
+                img_var=(spec_var.x+spec_var.y+spec_var.z)/(3*resolution.x*resolution.y);
                 if(isnan(img_var)){
                     img_var=1e20f;
                 }
                 //multiply contribution with varaince
                 auto target_var=img_var*k/rem_spp;
                 LUISA_INFO("variance: {} expected final variance: {}, previous variance: {}",img_var,target_var, prev_var);
-                if(target_var>prev_var){
+                if((k!=1)&&(target_var>prev_var)){
                     break;
                 }
                 prev_var=target_var;
             }
+            LUISA_INFO("running {} samples for final rendering...",rem_spp);
             for(int j=0;j<rem_spp;j++){
                 command_buffer << render(sample_id++, s.point.time, s.point.weight)
                                       .dispatch(resolution);
@@ -582,15 +605,20 @@ protected:
         }
         return ans;
     }
-    void update_sample(Expr<uint> id, Expr<uint> depth, SampledWavelengths swl, SampledSpectrum Li){
+    void update_sample(Expr<uint> id, Expr<uint> depth, SampledWavelengths swl, SampledSpectrum Li,Expr<bool> first){
+        $if(first) {
+            auto first_id = id * node<PPGPathTracing>()->max_depth() + depth;
+            auto v=pipeline().spectrum()->cie_y(swl,Li);
+            _samples->atomic(first_id).val.fetch_add(v);
+        };
         auto i=def<int>(depth-1);
         auto val=Li;
         $while(i>=0){
             auto buffer_id=id*node<PPGPathTracing>()->max_depth()+i;
             auto dbeta=read_spec(buffer_id,_dbeta);
             auto bsdf=read_spec(buffer_id,_bsdf);
-            val*=dbeta;
             auto v=pipeline().spectrum()->cie_y(swl,val*bsdf);
+            val*=dbeta;
             _samples->atomic(buffer_id).val.fetch_add(v);
             i-=1;
         };
@@ -611,7 +639,7 @@ protected:
     }
     [[nodiscard]] Float3 Li(const Camera::Instance *camera, Expr<uint> frame_index,
                             Expr<uint2> pixel_id, Expr<float> time)noexcept{
-
+        auto alpha=0.8f;
         sampler()->start(pixel_id, frame_index);
         auto u_filter = sampler()->generate_pixel_2d();
         auto u_lens = camera->node()->requires_lens_sampling() ? sampler()->generate_2d() : make_float2(.5f);
@@ -625,6 +653,7 @@ protected:
         auto ray = camera_ray;
         auto pdf_bsdf = def(1e16f);
         auto path_length= def(0u);
+        auto count=def(0u);
         $for(depth, node<PPGPathTracing>()->max_depth()) {
 
             // trace
@@ -636,7 +665,7 @@ protected:
                 if (pipeline().environment()) {
                     auto eval = light_sampler()->evaluate_miss(ray->direction(), swl, time);
                     Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
-                    update_sample(pid,depth,swl, eval.L * balance_heuristic(pdf_bsdf, eval.pdf));
+                    update_sample(pid,depth,swl, eval.L * balance_heuristic(pdf_bsdf, eval.pdf),false);
                 }
                 $break;
             };
@@ -647,7 +676,7 @@ protected:
                     $if(it->shape().has_light()) {
                         auto eval = light_sampler()->evaluate_hit(*it, ray->origin(), swl, time);
                         Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
-                        update_sample(pid,depth,swl,eval.L * balance_heuristic(pdf_bsdf, eval.pdf));
+                        update_sample(pid,depth,swl,eval.L * balance_heuristic(pdf_bsdf, eval.pdf),false);
                     };
                 };
             }
@@ -694,7 +723,7 @@ protected:
                         auto w = balance_heuristic(light_sample.eval.pdf, eval.pdf) /
                                  light_sample.eval.pdf;
                         Li += w * beta * eval.f * light_sample.eval.L;
-                        update_sample(pid,depth+1,swl, w * eval.f * light_sample.eval.L);
+                        update_sample(pid,depth,swl, w * light_sample.eval.L,true);//TODO:fix
                     };
                     // sample material
                     auto surface_sample = closure->sample(wo, u_lobe, u_bsdf);
@@ -720,9 +749,17 @@ protected:
                 $if(q < rr_threshold & u_rr >= q) { $break; };
                 beta *= ite(q < rr_threshold, 1.0f / q, 1.f);
             };
-            add_sample(pid,depth,ray,time,ite(q < rr_threshold, 1.0f / q, 1.f)*bsdf,bsdf);
+            $if(depth!=node<PPGPathTracing>()->max_depth()-1) {
+                add_sample(pid, depth, ray, time, ite(q < rr_threshold, 1.0f / q, 1.f) * bsdf, bsdf);
+                count+=1;
+            };
             //auto sample=def<Sample>(ray->origin(),ray->direction(),Li,1.0f);
             //_stree.insert(sample);
+        };
+        $for(i,count){
+            auto sample=_samples->read(pid*node<PPGPathTracing>()->max_depth()+i);
+            //device_log("res:{},tot:{}, depth:{}, sample {}", dispatch_id().xy(),count,i,sample);
+            _stree.insert(sample);
         };
         auto res=spectrum->srgb(swl,Li);
         _sec_mom->atomic(pid).x.fetch_add(res.x*res.x);
