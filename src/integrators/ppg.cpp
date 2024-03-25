@@ -70,7 +70,7 @@ protected:
             return ite(pos.x<0.5f,def(0u),def(2u))+ite(pos.y<0.5f,def(0u),def(1u));
         }
         Float2 subspace(Expr<float2> pos) noexcept{//rescale pos to [0,1] in son
-            return make_float2(ite(pos.x<0.5f,pos.x,pos.x-.5f),ite(pos.y<0.5f,pos.x,pos.x-.5f))*2.f;
+            return make_float2(ite(pos.x<0.5f,pos.x,pos.x-.5f),ite(pos.y<0.5f,pos.y,pos.y-.5f))*2.f;
         }
 
         auto sph2vec(Expr<float2> pos) {
@@ -95,16 +95,19 @@ protected:
         auto get_child(Expr<float4> sum, Expr<float> u) noexcept{
             auto total=sum.x+sum.y+sum.z+sum.w;
             auto half=sum.x+sum.y;
-            return ite(u<half,ite(u<sum.x,def(0u),def(1u)),ite(u<half+sum.z,def(2u),def(3u)));
+            auto v=total*u;
+            return ite(v<half,ite(v<sum.x,def(0u),def(1u)),ite(v<half+sum.z,def(2u),def(3u)));
         }
         auto sample(Expr<uint> id, Sampler::Instance &sampler) noexcept {
             auto cur=def(id);
             auto pos=def<float2>(.0f,.0f);
             auto size=def(1.f);
             auto pdf=def(1.f/(4.f*pi));
-            $while(id!=-1){
+            $while(cur!=-1){
                 auto node=dnode->read(cur);
-                auto child_id=get_child(node.sum,sampler.generate_1d());
+                auto u=sampler.generate_1d();
+                auto child_id=get_child(node.sum,u);
+                //device_log("pdf{},sum{},sampler.generate_1d(){},child{}",pdf,node.sum,u,child_id);
                 pdf=pdf*4.f*node.sum[child_id]/(node.sum[0]+node.sum[1]+node.sum[2]+node.sum[3]);
                 size*=0.5f;
                 pos=pos+make_float2(ite((child_id&2u)==2u,size,def(0.f)),ite((child_id&1u)==1u,size,def(0.f)));
@@ -117,7 +120,7 @@ protected:
             auto pos=def(dir);
             auto cur=def(id);
             auto pdf=def(1.f/(4.f*pi));
-            $while(id!=-1){
+            $while(cur!=-1){
                 auto node=dnode->read(cur);
                 auto child_id=child(pos);
                 cur=node.children[child_id];
@@ -369,13 +372,26 @@ protected:
             $while(!is_leaf(node)){
                 auto ax=axis(node);
                 id=ite(pos[ax]<0.5f,node.children.x,node.children.y);
-                pos=ite(pos[ax]<0.5f,pos*2.f,(pos-0.5f)*2.f);
+                pos[ax]=ite(pos[ax]<0.5f,pos[ax]*2.f,(pos[ax]-0.5f)*2.f);
                 node=snode->read(id);
             };
             node.weight+=1.f;
             snode->write(id,node);
             auto d_id=train_id(node);
             dtree.insert(d_id,sample);
+        }
+        auto pdf(Expr<float3> p,Expr<float2> dir) noexcept{
+            auto id=def(0u);
+            auto node=snode->read(id);
+            auto pos=(p-_aabb->read(0u))/(_aabb->read(1u)-_aabb->read(0u));
+            $while(!is_leaf(node)){
+                auto ax=axis(node);
+                id=ite(pos[ax]<0.5f,node.children.x,node.children.y);
+                pos[ax]=ite(pos[ax]<0.5f,pos[ax]*2.f,(pos[ax]-0.5f)*2.f);
+                node=snode->read(id);
+            };
+            auto d_id=sample_id(node);
+            return dtree.pdf(d_id,dir);
         }
         void refine(Expr<uint> id,Expr<float> threshold,Expr<uint> last_counter){
             auto node=snode->read(id);
@@ -417,7 +433,7 @@ protected:
                 snode->write(id,node);
                 auto ax=axis(node);
                 id=ite(pos[ax]<0.5f,node.children.x,node.children.y);
-                pos=ite(pos[ax]<0.5f,pos*2.f,(pos-0.5f)*2.f);
+                pos[ax]=ite(pos[ax]<0.5f,pos[ax]*2.f,(pos[ax]-0.5f)*2.f);
                 node=snode->read(id);
             };
             auto d_id=sample_id(node);
@@ -518,7 +534,7 @@ protected:
         command_buffer<<clear_uint(_stree.dtree.counter).dispatch(1u);
         command_buffer<<synchronize();
         LUISA_INFO("finish build tree");
-        command_buffer<<build_initial(15u).dispatch(1u)<<synchronize();
+        command_buffer<<build_initial(10u).dispatch(1u)<<synchronize();
         for (auto s : shutter_samples) {
             pipeline().update(command_buffer, s.point.time);
             auto rem_spp=s.spp;
@@ -558,7 +574,7 @@ protected:
                 auto target_var=img_var*k/rem_spp;
                 LUISA_INFO("variance: {} expected final variance: {}, previous variance: {}",img_var,target_var, prev_var);
                 if((k!=1)&&(target_var>prev_var)){
-                    break;
+                    //break;
                 }
                 prev_var=target_var;
             }
@@ -606,20 +622,24 @@ protected:
         return ans;
     }
     void update_sample(Expr<uint> id, Expr<uint> depth, SampledWavelengths swl, SampledSpectrum Li,Expr<bool> first){
-        $if(first) {
+        /*$if(first) {
             auto first_id = id * node<PPGPathTracing>()->max_depth() + depth;
             auto v=pipeline().spectrum()->cie_y(swl,Li);
             _samples->atomic(first_id).val.fetch_add(v);
-        };
+        };*/
         auto i=def<int>(depth-1);
         auto val=Li;
+        Bool flag=first;
         $while(i>=0){
             auto buffer_id=id*node<PPGPathTracing>()->max_depth()+i;
             auto dbeta=read_spec(buffer_id,_dbeta);
             auto bsdf=read_spec(buffer_id,_bsdf);
-            auto v=pipeline().spectrum()->cie_y(swl,val*bsdf);
+            $if(flag) {
+                auto v = pipeline().spectrum()->cie_y(swl, val * bsdf);
+                _samples->atomic(buffer_id).val.fetch_add(v);
+            };
+            flag=true;
             val*=dbeta;
-            _samples->atomic(buffer_id).val.fetch_add(v);
             i-=1;
         };
     }
@@ -639,7 +659,7 @@ protected:
     }
     [[nodiscard]] Float3 Li(const Camera::Instance *camera, Expr<uint> frame_index,
                             Expr<uint2> pixel_id, Expr<float> time)noexcept{
-        auto alpha=0.8f;
+        auto alpha=0.70f;
         sampler()->start(pixel_id, frame_index);
         auto u_filter = sampler()->generate_pixel_2d();
         auto u_lens = camera->node()->requires_lens_sampling() ? sampler()->generate_2d() : make_float2(.5f);
@@ -685,8 +705,6 @@ protected:
 
             auto u_light_selection = sampler()->generate_1d();
             auto u_light_surface = sampler()->generate_2d();
-            auto u_lobe = sampler()->generate_1d();
-            auto u_bsdf = sampler()->generate_2d();
 
             auto u_rr = def(0.f);
             auto rr_depth = node<PPGPathTracing>()->rr_depth();
@@ -720,13 +738,35 @@ protected:
                     $if(light_sample.eval.pdf > 0.0f & !occluded) {
                         auto wi = light_sample.shadow_ray->direction();
                         auto eval = closure->evaluate(wo, wi);
+                        auto pg_pdf = _stree.pdf(light_sample.shadow_ray->origin(),vec2sph(wi));
+                        eval.pdf=pg_pdf*alpha+eval.pdf*(1.f-alpha);
                         auto w = balance_heuristic(light_sample.eval.pdf, eval.pdf) /
                                  light_sample.eval.pdf;
                         Li += w * beta * eval.f * light_sample.eval.L;
-                        update_sample(pid,depth,swl, w * light_sample.eval.L,true);//TODO:fix
+                        update_sample(pid,depth,swl, w * light_sample.eval.L,true);
                     };
                     // sample material
-                    auto surface_sample = closure->sample(wo, u_lobe, u_bsdf);
+                    auto u_lobe = sampler()->generate_1d();
+                    auto surface_sample=Surface::Sample::zero(swl.dimension());
+                    $if(u_lobe<alpha){
+                        u_lobe/=alpha;
+                        auto wi_sample=_stree.sample(it->p(),*sampler());
+                        surface_sample.wi=normalize(wi_sample.xyz());
+                        surface_sample.eval= closure->evaluate(wo, surface_sample.wi);
+                        surface_sample.event=-1;
+
+                        $if((dispatch_x()==200)&(dispatch_y()==200)){
+                            device_log("depth:{}. sample bsdfpdf {}, pgpdf {}",depth,surface_sample.eval.pdf,wi_sample.w);
+                        };
+                        surface_sample.eval.pdf=wi_sample.w*alpha+surface_sample.eval.pdf*(1.f-alpha);
+                    }
+                    $else{
+                        auto u_bsdf = sampler()->generate_2d();
+                        u_lobe=(u_lobe-alpha)/(1.f-alpha);
+                        surface_sample = closure->sample(wo, u_lobe, u_bsdf);
+                        auto pg_pdf=_stree.pdf(it->p(),vec2sph(surface_sample.wi));
+                        surface_sample.eval.pdf=pg_pdf*alpha+surface_sample.eval.pdf*(1.f-alpha);
+                    };
                     ray = it->spawn_ray(surface_sample.wi);
                     pdf_bsdf = surface_sample.eval.pdf;
                     auto w = ite(surface_sample.eval.pdf > 0.f, 1.f / surface_sample.eval.pdf, 0.f);
