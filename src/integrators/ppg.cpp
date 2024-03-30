@@ -21,7 +21,7 @@ struct DTreeNode{
 };
 struct STreeNode{
     uint2 children;//if is_leaf--> children, else dtree id
-    uint data;// &3 == 0,1,2  axis, 3 is_leaf, >>2== weight
+    uint data;// &3 == 0,1,2  axis, 4 is_leaf
     float weight;
 };
 }
@@ -35,16 +35,18 @@ private:
     uint _max_depth;
     uint _rr_depth;
     float _rr_threshold;
-
+    bool _visualize;
 public:
     PPGPathTracing(Scene *scene, const SceneNodeDesc *desc) noexcept
         : ProgressiveIntegrator{scene, desc},
           _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)},
-          _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 0u), 0u)},
-          _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)} {}
+          _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 3u), 0u)},
+          _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
+          _visualize{desc->property_bool_or_default("visualize", false)} {}
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
+    [[nodiscard]] auto visualize() const noexcept { return _visualize; }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Integrator::Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
@@ -59,6 +61,7 @@ protected:
         Buffer<DTreeNode> dnode;
         static constexpr uint MAX_DEPTH=20u;
         static constexpr float SPLIT_THRESHOLD=0.01f;
+        bool clear_on_update=true;
     public:
         Buffer<uint> counter;
         Dtree(){}
@@ -82,13 +85,17 @@ protected:
         void insert(Expr<uint> id, Expr<Sample> sample) {
             auto pos=def(sample.dir);
             auto cur=def(id);
-            $while(cur!=-1u){
-                auto node=dnode->read(cur);
-                auto child_id=child(pos);
-                node.sum[child_id]+=sample.val;
-                dnode->write(cur,node);
-                cur=node.children[child_id];
-                pos=subspace(pos);
+            $if(!(isnan(sample.val)|isinf(sample.val))){
+                $while(cur != -1u) {
+                    auto node = dnode->read(cur);
+                    auto child_id = child(pos);
+                    //node.sum[child_id]+=sample.val;
+                    //
+                    //device_log("id {}, node {}, son {}, v {}",cur,node,child_id,sample.val);
+                    dnode->atomic(cur).sum[child_id].fetch_add(sample.val);
+                    cur = node.children[child_id];
+                    pos = subspace(pos);
+                };
             };
         }
 
@@ -103,15 +110,18 @@ protected:
             auto pos=def<float2>(.0f,.0f);
             auto size=def(1.f);
             auto pdf=def(1.f/(4.f*pi));
-            $while(cur!=-1){
-                auto node=dnode->read(cur);
-                auto u=sampler.generate_1d();
-                auto child_id=get_child(node.sum,u);
-                //device_log("pdf{},sum{},sampler.generate_1d(){},child{}",pdf,node.sum,u,child_id);
-                pdf=pdf*4.f*node.sum[child_id]/(node.sum[0]+node.sum[1]+node.sum[2]+node.sum[3]);
-                size*=0.5f;
-                pos=pos+make_float2(ite((child_id&2u)==2u,size,def(0.f)),ite((child_id&1u)==1u,size,def(0.f)));
-                cur=node.children[child_id];
+            auto node=dnode->read(cur);
+            $if(node.sum[0]+node.sum[1]+node.sum[2]+node.sum[3]!=0.f) {
+                $while(cur != -1) {
+                    node = dnode->read(cur);
+                    auto u = sampler.generate_1d();
+                    auto child_id = get_child(node.sum, u);
+                    //device_log("pdf{},sum{},sampler.generate_1d(){},child{}",pdf,node.sum,u,child_id);
+                    pdf = pdf * 4.f * node.sum[child_id] / (node.sum[0] + node.sum[1] + node.sum[2] + node.sum[3]);
+                    size *= 0.5f;
+                    pos = pos + make_float2(ite((child_id & 2u) == 2u, size, def(0.f)), ite((child_id & 1u) == 1u, size, def(0.f)));
+                    cur = node.children[child_id];
+                };
             };
             pos+=sampler.generate_2d()*size;
             return make_float4(sph2vec(pos),pdf);
@@ -120,12 +130,15 @@ protected:
             auto pos=def(dir);
             auto cur=def(id);
             auto pdf=def(1.f/(4.f*pi));
-            $while(cur!=-1){
-                auto node=dnode->read(cur);
-                auto child_id=child(pos);
-                cur=node.children[child_id];
-                pdf=pdf*4.f*node.sum[child_id]/(node.sum[0]+node.sum[1]+node.sum[2]+node.sum[3]);
-                pos=subspace(pos);
+            auto node=dnode->read(cur);
+            $if(node.sum[0]+node.sum[1]+node.sum[2]+node.sum[3]!=0.f) {
+                $while(cur != -1) {
+                    node = dnode->read(cur);
+                    auto child_id = child(pos);
+                    cur = node.children[child_id];
+                    pdf = ite(node.sum[child_id]==0.f,0.f,pdf * 4.f * node.sum[child_id] / (node.sum[0] + node.sum[1] + node.sum[2] + node.sum[3]));
+                    pos = subspace(pos);
+                };
             };
             return pdf;
         }
@@ -144,6 +157,11 @@ protected:
         }
         auto update_node(Expr<uint> dst,Expr<uint> src,Expr<uint> last_counter) noexcept{
             auto node=dnode->read(src);
+            if(clear_on_update){
+                auto new_node=node;
+                new_node.sum=make_float4(0.0000f);
+                dnode->write(src,new_node);
+            }
             auto res=dnode->read(dst);
             res.children=ite(dst<last_counter,res.children,make_uint4(-1u));
             auto bit=make_uint4(ite((node.children.x!=-1)&(res.children.x==-1),1u,0u),
@@ -161,7 +179,7 @@ protected:
         auto empty_node() noexcept{
             auto id=counter->atomic(0u).fetch_add(1u);
             auto node=def<DTreeNode>();
-            node.sum=make_float4(0.1f);
+            node.sum=make_float4(0.0001f);
             node.children=make_uint4(-1u);
             dnode->write(id,node);
             return id;
@@ -172,34 +190,35 @@ protected:
             stack[0]=make_uint3(id,id,0u);
             auto sum=dnode->read(id).sum;
             auto tot=sum.x+sum.y+sum.z+sum.w;
-            $while(top!=0){
-                auto now=stack[top-1];
-                auto prev_src=dnode->read(now.x);
-                auto son=prev_src.children[now.z];
-                stack[top-1].z+=1;
-                $if(son==-1){//consider split
-                    //device_log("dnode {}: {}, cur son:{}",now.x,prev_src,now.z);
-                    $if((prev_src.sum[now.z] > tot * SPLIT_THRESHOLD)&(top<MAX_DEPTH)) {
-                        auto new_id = counter->atomic(0u).fetch_add(1u);
-                        auto new_node = def<DTreeNode>();
-                        new_node.sum = make_float4(prev_src.sum[now.z]/4);
-                        new_node.children= make_uint4(-1u);
-                        prev_src.children[now.z] = new_id;
-                        dnode->write(now.x,prev_src);
-                        dnode->write(new_id, new_node);
-                        son = new_id;
+            $if(tot>0.0f) {
+                $while(top != 0) {
+                    auto now = stack[top - 1];
+                    auto prev_src = dnode->read(now.x);
+                    auto son = prev_src.children[now.z];
+                    stack[top - 1].z += 1;
+                    $if(son == -1) {//consider split
+                        $if((prev_src.sum[now.z] > tot * SPLIT_THRESHOLD) & (top < MAX_DEPTH)) {
+                            auto new_id = counter->atomic(0u).fetch_add(1u);
+                            auto new_node = def<DTreeNode>();
+                            new_node.sum = make_float4(prev_src.sum[now.z] / 4);
+                            new_node.children = make_uint4(-1u);
+                            prev_src.children[now.z] = new_id;
+                            dnode->write(now.x, prev_src);
+                            dnode->write(new_id, new_node);
+                            son = new_id;
+                        };
                     };
-                };
-                $if(son!=-1) {// not leaf
-                    stack[top] = make_uint3(son, son, 0u);
-                    top += 1;
-                };
-                $while((top!=0)){
-                    $if(stack[top-1].z>3u){
-                        top -= 1;
-                    }
-                    $else{
-                        $break;
+                    $if(son != -1) {// not leaf
+                        stack[top] = make_uint3(son, son, 0u);
+                        top += 1;
+                    };
+                    $while((top != 0)) {
+                        $if(stack[top - 1].z > 3u) {
+                            top -= 1;
+                        }
+                        $else {
+                            $break;
+                        };
                     };
                 };
             };
@@ -217,21 +236,9 @@ protected:
                 auto src_son=prev_src.children[now.z];
                 auto dst_son=prev_dst.children[now.z];
                 stack[top-1].z+=1;
-//                $if((src_son!=-1)&(dst_son==-1)){
-//                    device_log("WRONG!!!!top:{}, now:{}, prev_src:{}, prev_dst:{}",top,now,prev_src,prev_dst);
-//                    $break;
-//                };
                 $if(src_son!=-1) {
                     auto new_node=def<DTreeNode>();
                     new_node = update_node(dst_son, src_son,last_counter);
-//                    $if((new_node.children.x==-1)&(new_node.children.y==-1)&(new_node.children.z==-1)&(new_node.children.w==-1)){
-//                        auto test=dnode->read(src_son);
-//                        $if((test.children.x==-1)&(test.children.y==-1)&(test.children.z==-1)&(test.children.w==-1)){
-//
-//                        }$else {
-//                            device_log("WAAAA!!!!top:{}, now:{}, prev_src:{}, prev_dst:{}, now_src {}, now_dst {}", top, now, prev_src, prev_dst,test,new_node);
-//                        };
-//                    };
                     dnode->write(dst_son, new_node);
                     stack[top] = make_uint3(src_son, dst_son, 0u);
                     top += 1;
@@ -264,10 +271,6 @@ protected:
 
                 stack[top-1].z+=1;
                 $if(src_son!=-1) {
-//                    $if(dst_son==-1){
-//                        device_log("ERROR!!!!");
-//                        $break;
-//                    };
                     auto new_node = copy_node(src_son);
                     dnode->write(dst_son, new_node);
                     stack[top] = make_uint3(src_son, dst_son, 0u);
@@ -375,8 +378,7 @@ protected:
                 pos[ax]=ite(pos[ax]<0.5f,pos[ax]*2.f,(pos[ax]-0.5f)*2.f);
                 node=snode->read(id);
             };
-            node.weight+=1.f;
-            snode->write(id,node);
+            snode->atomic(id).weight.fetch_add(1.f);
             auto d_id=train_id(node);
             dtree.insert(d_id,sample);
         }
@@ -408,20 +410,22 @@ protected:
                     //new_left
                     new_node.children = dtrees(node);
                     new_node.data = build_data(next_axis(axis(node)),1u);
-                    new_node.weight = weight(node) / 2;
+                    new_node.weight = 0.f;
                     snode->write(new_id, new_node);
                     //new_right
                     new_node.children = make_uint2(dtree.copy(sample_id(node)),dtree.copy(train_id(node)));
                     new_node.data = build_data(next_axis(axis(node)),1u);
                     snode->write(new_id + 1, new_node);
                 }$else{
-                    //snode->write(id,node);
+                    node.weight=0.f;
+                    snode->write(id,node);
                 };
             };
         }
         void dtree_refine(Expr<uint> id){
             auto node=snode->read(id);
             $if((is_leaf(node))){
+                //device_log("start_refine {}",node);
                 dtree.refine(train_id(node));
             };
         }
@@ -445,6 +449,9 @@ protected:
     Buffer<float> _bsdf;
     Buffer<float3> _sec_mom;
     Buffer<float3> _var;
+    Buffer<float4> _prev_film;
+    vector<float> _prev_var;
+    uint2 debug_pixel=uint2(778u,990u);
     void _render_one_camera(CommandBuffer &command_buffer, Camera::Instance *camera) noexcept override {
         if (!pipeline().has_lighting()) [[unlikely]] {
             LUISA_WARNING_WITH_LOCATION(
@@ -465,17 +472,35 @@ protected:
             resolution.x, resolution.y, spp);
 
         using namespace luisa::compute;
+        auto prev_count=4u;
         _stree=SDTree(pipeline().device(),20000000);
         _sec_mom=pipeline().device().create_buffer<float3>(pixel_count);
         _samples=pipeline().device().create_buffer<Sample>(pixel_count*node<PPGPathTracing>()->max_depth());
         _dbeta=pipeline().device().create_buffer<float>(pixel_count*node<PPGPathTracing>()->max_depth()*pipeline().spectrum()->node()->dimension());
         _bsdf=pipeline().device().create_buffer<float>(pixel_count*node<PPGPathTracing>()->max_depth()*pipeline().spectrum()->node()->dimension());
         _var=pipeline().device().create_buffer<float3>(1u);
-        Kernel2D render_kernel = [&](UInt frame_index, Float time, Float shutter_weight) noexcept {
+        _prev_film=pipeline().device().create_buffer<float4>(pixel_count*prev_count);
+        _prev_var.resize(prev_count);
+        for(auto i=0u;i<prev_count;i++){
+            _prev_var[i]=-1;
+        }
+        Kernel2D render_kernel = [&](UInt frame_index, Float time, Float shutter_weight,BufferFloat4 film) noexcept {
             set_block_size(16u, 16u, 1u);
             auto pixel_id = dispatch_id().xy();
+            auto pid=dispatch_id().x*dispatch_size().y+dispatch_id().y;
             auto L = Li(camera, frame_index, pixel_id, time);
-            camera->film()->accumulate(pixel_id, shutter_weight * L);
+            L*=shutter_weight;
+            L=min(L,camera->film()->node()->clamp());
+            //camera->film()->accumulate(pixel_id, shutter_weight * L);
+            $if(!any(isnan(L) || isinf(L))) {
+                film.atomic(pid).x.fetch_add(L.x);
+                film.atomic(pid).y.fetch_add(L.y);
+                film.atomic(pid).z.fetch_add(L.z);
+                film.atomic(pid).w.fetch_add(1.f);
+                _sec_mom->atomic(pid).x.fetch_add(L.x * L.x);
+                _sec_mom->atomic(pid).y.fetch_add(L.y * L.y);
+                _sec_mom->atomic(pid).z.fetch_add(L.z * L.z);
+            };
         };
         Kernel1D clear_float3_kernel = [&](BufferFloat3 buffer) noexcept {
             $if(dispatch_x()==0u){
@@ -483,16 +508,24 @@ protected:
             };
             //buffer.write(dispatch_x(),make_float3(0.0f));
         };
-        Kernel2D variance_kernel = [&]() noexcept{
+        Kernel2D variance_kernel = [&](BufferFloat4 film) noexcept{
             auto pixel=dispatch_id().xy();
             auto pid=dispatch_id().x*dispatch_size().y+dispatch_id().y;
             auto smom=_sec_mom->read(pid);
-            auto accum=camera->film()->read(pixel);
-            auto var=(smom-accum.sample_count*accum.average*accum.average)/(accum.sample_count-1);
-            _var->atomic(0u).x.fetch_add(var.x);
-            _var->atomic(0u).y.fetch_add(var.y);
-            _var->atomic(0u).z.fetch_add(var.z);
-            _sec_mom->write(pid,make_float3(0.f));
+            auto accum=film->read(pid);
+            auto var=(smom-(accum.xyz()*accum.xyz())/accum.w)/(accum.w-1);
+            $if(!any(isnan(var) || isinf(var))){
+                _var->atomic(0u).x.fetch_add(var.x);
+                _var->atomic(0u).y.fetch_add(var.y);
+                _var->atomic(0u).z.fetch_add(var.z);
+            };
+            _sec_mom->write(pid, make_float3(0.f));
+        };
+        Kernel2D final_accum_kernel = [&](BufferFloat4 film,Float weight) noexcept{
+            auto pixel=dispatch_id().xy();
+            auto pid=dispatch_id().x*dispatch_size().y+dispatch_id().y;
+            auto accum=film->read(pid);
+            camera->film()->accumulate(pixel, accum.xyz()/accum.w*weight,weight);
         };
         Kernel1D initial_kernel = [&](UInt depth) noexcept {
             _stree.build(depth);
@@ -506,6 +539,25 @@ protected:
         Kernel1D clear_uint_kernel = [&](BufferUInt buffer) noexcept {
             buffer.write(dispatch_x(), 0u);
         };
+        Kernel1D clear_float4_kernel = [&](BufferFloat4 buffer) noexcept {
+            buffer.write(dispatch_x(), make_float4(0.f));
+        };
+        Kernel2D visualize_kernel = [&](UInt2 pos) noexcept {
+            auto u_filter = make_float2(.5f);
+            auto u_lens = make_float2(.5f);
+            auto [camera_ray, _, camera_weight] = camera->generate_ray(pos, 0.0f, u_filter, u_lens);
+            auto ray = camera_ray;
+            auto it = pipeline().geometry()->intersect(ray);
+            $if(dispatch_x()+dispatch_y()==0){
+                device_log("evaluating pos:{}",it->p());
+            };
+            auto dir=def<float2>(dispatch_id().xy())/def<float2>(dispatch_size().xy());
+            auto pdf=_stree.pdf(it->p(),dir);
+            sampler()->start(dispatch_id().xy(), 233u);
+            auto sample=_stree.sample(it->p(),*sampler());
+            //device_log("sample:{}",sample);
+            camera->film()->accumulate(dispatch_id().xy(),make_float3(pdf));
+        };
         Clock clock_compile;
         auto render = pipeline().device().compile(render_kernel);
         auto build_initial = pipeline().device().compile(initial_kernel);
@@ -514,6 +566,9 @@ protected:
         auto calc_variance= pipeline().device().compile(variance_kernel);
         auto clear_float3 = pipeline().device().compile(clear_float3_kernel);
         auto clear_uint = pipeline().device().compile(clear_uint_kernel);
+        auto final_accum = pipeline().device().compile(final_accum_kernel);
+        auto clear_float4= pipeline().device().compile(clear_float4_kernel);
+        auto visualize = pipeline().device().compile(visualize_kernel);
         auto integrator_shader_compilation_time = clock_compile.toc();
         LUISA_INFO("Integrator shader compile in {} ms.", integrator_shader_compilation_time);
         auto shutter_samples = camera->node()->shutter_samples();
@@ -534,18 +589,24 @@ protected:
         command_buffer<<clear_uint(_stree.dtree.counter).dispatch(1u);
         command_buffer<<synchronize();
         LUISA_INFO("finish build tree");
-        command_buffer<<build_initial(10u).dispatch(1u)<<synchronize();
+        command_buffer<<build_initial(12u).dispatch(1u)<<synchronize();
         for (auto s : shutter_samples) {
             pipeline().update(command_buffer, s.point.time);
             auto rem_spp=s.spp;
             auto prev_var=1e20f;
-            for (auto k=1;k<= rem_spp;k<<=1){
-                camera->film()->clear(command_buffer);
-                LUISA_INFO("running {} samples for training...", k);
+            auto now_film=0;
+            for (auto k=1;rem_spp!=0;k<<=1){
+                now_film=(now_film+1)%prev_count;
+                //camera->film()->clear(command_buffer);
+                command_buffer<<clear_float4(_prev_film.view(now_film*pixel_count,pixel_count)).dispatch(pixel_count);
                 //switch radiance cache
+                if(rem_spp<k){
+                    k=rem_spp;
+                }
                 rem_spp-=k;
+                LUISA_INFO("running {} samples for training...", k);
                 for(int j=0;j<k;j++){
-                    command_buffer << render(sample_id++, s.point.time, s.point.weight)
+                    command_buffer << render(sample_id++, s.point.time, s.point.weight,_prev_film.view(now_film*pixel_count,pixel_count))
                                           .dispatch(resolution);
                 }
                 command_buffer<<synchronize();
@@ -556,32 +617,42 @@ protected:
                               <<_stree.counter.copy_to(&stree_counter)
                               <<synchronize();
                 LUISA_INFO("counter read back finish! dtree node: {}, stree node: {}, start refining...",dtree_counter,stree_counter);
-                command_buffer<<dtree_refine().dispatch(stree_counter);
-                command_buffer<<stree_refine(2000*std::sqrt(k),dtree_counter).dispatch(stree_counter)<<synchronize();
+                if(rem_spp!=0) {
+                    command_buffer << dtree_refine().dispatch(stree_counter) << synchronize();
+                    command_buffer << stree_refine(5000 * std::sqrt(k), dtree_counter).dispatch(stree_counter) << synchronize();
+                }
                 LUISA_INFO("refine finish!");
                 //get variance
                 float3 spec_var=float3(0.f);
                 auto img_var=1.0f;
                 LUISA_INFO("read back variance...");
                 command_buffer<<clear_float3(_var).dispatch(1u);
-                command_buffer<<calc_variance().dispatch(resolution);
+                command_buffer<<calc_variance(_prev_film.view(now_film*pixel_count,pixel_count)).dispatch(resolution);
                 command_buffer<<_var.copy_to(&spec_var)<<synchronize();
-                img_var=(spec_var.x+spec_var.y+spec_var.z)/(3*resolution.x*resolution.y);
+                LUISA_INFO("spec_var {}",spec_var);
+                img_var=(spec_var.x+spec_var.y+spec_var.z)/(3*pixel_count);
+                _prev_var[now_film]=img_var/k;
                 if(isnan(img_var)){
                     img_var=1e20f;
                 }
-                //multiply contribution with varaince
-                auto target_var=img_var*k/rem_spp;
+                //multiply contribution with variance
+                auto target_var=img_var/rem_spp;
                 LUISA_INFO("variance: {} expected final variance: {}, previous variance: {}",img_var,target_var, prev_var);
-                if((k!=1)&&(target_var>prev_var)){
-                    //break;
-                }
                 prev_var=target_var;
             }
-            LUISA_INFO("running {} samples for final rendering...",rem_spp);
-            for(int j=0;j<rem_spp;j++){
-                command_buffer << render(sample_id++, s.point.time, s.point.weight)
-                                      .dispatch(resolution);
+            auto tot_weight=0.0f;
+            for(int i=0;i<prev_count;++i){
+                LUISA_INFO("var {}",_prev_var[i]);
+                if(_prev_var[i]>1e-6f){
+                    tot_weight+=1.0f/_prev_var[i];
+                }
+            }
+            for(int i=0;i<prev_count;++i){
+                if(_prev_var[i]>1e-6f){
+                    auto weight=1.0f/_prev_var[i]/tot_weight;
+                    LUISA_INFO("final accumulate film {}, variance:{}, weight {}",i,_prev_var[i],weight);
+                    command_buffer<<final_accum(_prev_film.view(i*pixel_count,pixel_count),weight).dispatch(resolution);
+                }
             }
             //            for (auto i = 0u; i < s.spp; i++) {
             //                command_buffer << render(sample_id++, s.point.time, s.point.weight)
@@ -598,6 +669,10 @@ protected:
             //                    command_buffer << [&progress, p] { progress.update(p); };
             //                }
             //            }
+        }
+        if(node<PPGPathTracing>()->visualize()) {
+            camera->film()->clear(command_buffer);
+            command_buffer << visualize(debug_pixel).dispatch(resolution);
         }
         command_buffer << synchronize();
         progress.done();
@@ -622,18 +697,23 @@ protected:
         return ans;
     }
     void update_sample(Expr<uint> id, Expr<uint> depth, SampledWavelengths swl, SampledSpectrum Li,Expr<bool> first){
-        /*$if(first) {
+        bool direct=false;
+        $if(first&direct) {
             auto first_id = id * node<PPGPathTracing>()->max_depth() + depth;
             auto v=pipeline().spectrum()->cie_y(swl,Li);
             _samples->atomic(first_id).val.fetch_add(v);
-        };*/
+        };
         auto i=def<int>(depth-1);
         auto val=Li;
-        Bool flag=first;
+        Bool flag=first|direct;
         $while(i>=0){
             auto buffer_id=id*node<PPGPathTracing>()->max_depth()+i;
             auto dbeta=read_spec(buffer_id,_dbeta);
             auto bsdf=read_spec(buffer_id,_bsdf);
+//            $if(all(dispatch_id().xy()==debug_pixel)){
+//                device_log("depth:{},i:{},val:{} {} {},sample:{},bsdf:{} {} {},dbeta:{} {} {}",depth,i,val[0u],val[1u],val[2u],
+//                           _samples->read(buffer_id),bsdf[0u],bsdf[1u],bsdf[2u],dbeta[0u],dbeta[1u],dbeta[2u]);
+//            };
             $if(flag) {
                 auto v = pipeline().spectrum()->cie_y(swl, val * bsdf);
                 _samples->atomic(buffer_id).val.fetch_add(v);
@@ -659,7 +739,7 @@ protected:
     }
     [[nodiscard]] Float3 Li(const Camera::Instance *camera, Expr<uint> frame_index,
                             Expr<uint2> pixel_id, Expr<float> time)noexcept{
-        auto alpha=0.70f;
+        auto alpha=0.80f;
         sampler()->start(pixel_id, frame_index);
         auto u_filter = sampler()->generate_pixel_2d();
         auto u_lens = camera->node()->requires_lens_sampling() ? sampler()->generate_2d() : make_float2(.5f);
@@ -700,7 +780,9 @@ protected:
                     };
                 };
             }
-
+//            $if(all(dispatch_id().xy()==debug_pixel)) {
+//                device_log("fid {}, depth:{}. hit point:{}, direction:{}, Li {} {} {}, beta {} {} {}",frame_index, depth,it->p(),-wo, Li[0u],Li[1u],Li[2u],beta[0u],beta[1u],beta[2u]);
+//            };
             $if(!it->shape().has_surface()) { $break; };
 
             auto u_light_selection = sampler()->generate_1d();
@@ -735,37 +817,57 @@ protected:
                         $if(*dispersive) { swl.terminate_secondary(); };
                     }
                     // direct lighting
+
+                    auto roughness=closure->roughness();
+                    auto is_glossy=(roughness.x * roughness.y < 0.16f);
                     $if(light_sample.eval.pdf > 0.0f & !occluded) {
                         auto wi = light_sample.shadow_ray->direction();
                         auto eval = closure->evaluate(wo, wi);
-                        auto pg_pdf = _stree.pdf(light_sample.shadow_ray->origin(),vec2sph(wi));
-                        eval.pdf=pg_pdf*alpha+eval.pdf*(1.f-alpha);
+                        $if(!is_glossy) {
+                            auto pg_pdf = _stree.pdf(light_sample.shadow_ray->origin(), vec2sph(wi));
+                            eval.pdf = pg_pdf * alpha + eval.pdf * (1.f - alpha);
+                        };
                         auto w = balance_heuristic(light_sample.eval.pdf, eval.pdf) /
                                  light_sample.eval.pdf;
                         Li += w * beta * eval.f * light_sample.eval.L;
-                        update_sample(pid,depth,swl, w * light_sample.eval.L,true);
+//                        $if(all(dispatch_id().xy()==make_uint2(902,970))) {
+//                            device_log("depth:{}. sample beta:{} {} {}, eval.f{} {} {}, light_sample.eval.L{} {} {}, w{},lspdf{},eval.pdf {}",
+//                                       depth,beta[0u],beta[1u],beta[2u],eval.f[0u],eval.f[1u],eval.f[2u],light_sample.eval.L[0u],light_sample.eval.L[1u],light_sample.eval.L[2u],w,light_sample.eval.pdf,eval.pdf);
+//                        };
+                        update_sample(pid,depth,swl, w * eval.f*light_sample.eval.L,true);
                     };
                     // sample material
                     auto u_lobe = sampler()->generate_1d();
                     auto surface_sample=Surface::Sample::zero(swl.dimension());
-                    $if(u_lobe<alpha){
-                        u_lobe/=alpha;
-                        auto wi_sample=_stree.sample(it->p(),*sampler());
-                        surface_sample.wi=normalize(wi_sample.xyz());
-                        surface_sample.eval= closure->evaluate(wo, surface_sample.wi);
-                        surface_sample.event=-1;
+                    $if(!is_glossy) {
+                        $if((u_lobe < alpha)) {
+                            u_lobe /= alpha;
+                            auto wi_sample = _stree.sample(it->p(), *sampler());
+                            surface_sample.wi = normalize(wi_sample.xyz());
+                            surface_sample.eval = closure->evaluate(wo, surface_sample.wi);
+                            surface_sample.event = -1;
 
-                        $if((dispatch_x()==200)&(dispatch_y()==200)){
-                            device_log("depth:{}. sample bsdfpdf {}, pgpdf {}",depth,surface_sample.eval.pdf,wi_sample.w);
+//                            $if(all(dispatch_id().xy()==debug_pixel)){
+//                                device_log("pg sample! fid:{} depth:{}. sample bsdfpdf {}, pgpdf {}, wi {} {} {}",frame_index, depth,surface_sample.eval.pdf,wi_sample.w,
+//                                surface_sample.wi,vec2sph(surface_sample.wi),_stree.dtree.sph2vec(vec2sph(surface_sample.wi)));
+//                            };
+                            surface_sample.eval.pdf = wi_sample.w * alpha + surface_sample.eval.pdf * (1.f - alpha);
+                        }
+                        $else {
+                            auto u_bsdf = sampler()->generate_2d();
+                            u_lobe = (u_lobe - alpha) / (1.f - alpha);
+                            surface_sample = closure->sample(wo, u_lobe, u_bsdf);
+                            auto pg_pdf = _stree.pdf(it->p(), vec2sph(surface_sample.wi));
+                            surface_sample.eval.pdf = pg_pdf * alpha + surface_sample.eval.pdf * (1.f - alpha);
+//                            $if(all(dispatch_id().xy()==debug_pixel)){
+//                                device_log("bsdf sample! fid:{} depth:{}. sample bsdfpdf {}, pgpdf {}, wi {} {} {}",frame_index, depth,surface_sample.eval.pdf,pg_pdf,
+//                                           surface_sample.wi,vec2sph(surface_sample.wi),_stree.dtree.sph2vec(vec2sph(surface_sample.wi)));
+//                            };
                         };
-                        surface_sample.eval.pdf=wi_sample.w*alpha+surface_sample.eval.pdf*(1.f-alpha);
                     }
                     $else{
                         auto u_bsdf = sampler()->generate_2d();
-                        u_lobe=(u_lobe-alpha)/(1.f-alpha);
                         surface_sample = closure->sample(wo, u_lobe, u_bsdf);
-                        auto pg_pdf=_stree.pdf(it->p(),vec2sph(surface_sample.wi));
-                        surface_sample.eval.pdf=pg_pdf*alpha+surface_sample.eval.pdf*(1.f-alpha);
                     };
                     ray = it->spawn_ray(surface_sample.wi);
                     pdf_bsdf = surface_sample.eval.pdf;
@@ -785,12 +887,14 @@ protected:
             $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
             auto rr_threshold = node<PPGPathTracing>()->rr_threshold();
             auto q = max(beta.max() * eta_scale, .05f);
+            auto rr_fact=def(1.f);
             $if(depth + 1u >= rr_depth) {
                 $if(q < rr_threshold & u_rr >= q) { $break; };
-                beta *= ite(q < rr_threshold, 1.0f / q, 1.f);
+                rr_fact=ite(q < rr_threshold, 1.0f / q, 1.f);
+                beta *= rr_fact;
             };
             $if(depth!=node<PPGPathTracing>()->max_depth()-1) {
-                add_sample(pid, depth, ray, time, ite(q < rr_threshold, 1.0f / q, 1.f) * bsdf, bsdf);
+                add_sample(pid, depth, ray, time, rr_fact * bsdf, bsdf);
                 count+=1;
             };
             //auto sample=def<Sample>(ray->origin(),ray->direction(),Li,1.0f);
@@ -802,9 +906,6 @@ protected:
             _stree.insert(sample);
         };
         auto res=spectrum->srgb(swl,Li);
-        _sec_mom->atomic(pid).x.fetch_add(res.x*res.x);
-        _sec_mom->atomic(pid).y.fetch_add(res.y*res.y);
-        _sec_mom->atomic(pid).z.fetch_add(res.z*res.z);
         return res;
     }
 };
