@@ -104,6 +104,8 @@ tex_ptr = tex.contiguous().data_ptr()
 tex_size = np.prod(tex.shape)
 tex_dtype=float
 optimizer = torch.optim.Adam([tex], lr=0.05)
+
+
 for i in range(500):
     x = luisarender.ParamStruct()
     x.type = 'texture'
@@ -143,16 +145,15 @@ for i in range(500):
     cv2.imshow("render", cv2.cvtColor(render_img.detach().cpu().numpy()[...,:3], cv2.COLOR_BGR2RGB))
     cv2.waitKey(100)
 cv2.waitKey(0)
+
 # img = tex_grad_torch.cpu().numpy().reshape(tex.shape)
 # imgplot = plt.imshow(img[...,:3])
 # print(tex_grad_torch)
 # plt.show()
-
 #gt_img = lc_buffer_to_torch(luisarender.render_scene())
 #
 #luisarender.load_scene(init_args)
 #init_img = lc_buffer_to_torch(luisarender.render_scene())
-
 # luisarender.regist_differentiable(differentiable_params_list)
 
 # optimizer = torch.optim.Adam(scene_torch, lr=0.01)

@@ -32,7 +32,7 @@ private:
     bool _shared_radius;
 
 public:
-    MegakernelPhotonMapping(Scene *scene, const SceneNodeDesc *desc) noexcept
+    MegakernelPhotonMappingDiff(Scene *scene, const SceneNodeDesc *desc) noexcept
         : DifferentiableIntegrator{scene, desc},
           _max_depth{std::max(desc->property_uint_or_default("depth", 10u), 1u)},
           _rr_depth{std::max(desc->property_uint_or_default("rr_depth", 2u), 0u)},
@@ -54,7 +54,7 @@ public:
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept override;
 };
 
-class MegakernelPhotonMappingInstance final : public ProgressiveIntegrator::Instance {
+class MegakernelPhotonMappingDiffInstance final : public ProgressiveIntegrator::Instance {
 
 public:
     using ProgressiveIntegrator::Instance::Instance;
@@ -377,8 +377,16 @@ public:
             };
         }
     };
-
+    
 protected:
+    void _render_one_camera_backward(CommandBuffer &command_buffer, uint iteration,  Camera::Instance *camera, Buffer<float> &grad_in) noexcept { 
+        Kernel1D grad = [&]() noexcept {
+            auto index = static_cast<UInt>(dispatch_x());
+            //read pixel gradients
+            grad_pixel = grad_in.read(index); 
+            EPSM_compute_gradients(pathlogger, index, grad_pixel);
+        }; 
+    }
     void _render_one_camera(CommandBuffer &command_buffer, Camera::Instance *camera) noexcept override {
         if (!pipeline().has_lighting()) [[unlikely]] {
             LUISA_WARNING_WITH_LOCATION(
@@ -388,7 +396,7 @@ protected:
         auto spp = camera->node()->spp();
         auto resolution = camera->film()->node()->resolution();
         auto image_file = camera->node()->file();
-        auto photon_per_iter = node<MegakernelPhotonMapping>()->photon_per_iter();
+        auto photon_per_iter = node<MegakernelPhotonMappingDiff>()->photon_per_iter();
         auto pixel_count = resolution.x * resolution.y;
         auto spectrum = camera->pipeline().spectrum();
         //TODO: use sampler right
@@ -403,28 +411,29 @@ protected:
 
         using namespace luisa::compute;
         auto &&device = camera->pipeline().device();
-        auto radius = node<MegakernelPhotonMapping>()->initial_radius();
+        auto radius = node<MegakernelPhotonMappingDiff>()->initial_radius();
         if (radius < 0) {
             auto _grid_size = spectrum->pipeline().geometry()->world_max() - spectrum->pipeline().geometry()->world_min();
             radius = min(min(_grid_size.x / -radius, _grid_size.y / -radius), _grid_size.z / -radius);
         }
         auto clamp = camera->film()->node()->clamp() * photon_per_iter * pi * radius * radius;
-        PixelIndirect indirect(photon_per_iter, spectrum, camera->film(), clamp, node<MegakernelPhotonMapping>()->shared_radius());
-        PhotonMap photons(photon_per_iter * node<MegakernelPhotonMapping>()->max_depth(), spectrum);
+        PixelIndirect indirect(photon_per_iter, spectrum, camera->film(), clamp, node<MegakernelPhotonMappingDiff>()->shared_radius());
+        PhotonMap photons(photon_per_iter * node<MegakernelPhotonMappingDiff>()->max_depth(), spectrum);
 
+        pathlogger = make_unique<PathLogger>(node<MegakernelPhotonMappingDiff>()->max_depth(), node<MegakernelPhotonMappingDiff>()->photon_per_iter(), spectrum);
         //initialize PixelIndirect
         Kernel2D indirect_initialize_kernel = [&]() noexcept {
-            Buffer<float> _radius;
-            Buffer<float> _cur_n;
-            Buffer<float> _n_photon;
-            Buffer<float> _phi;
-            Buffer<float> _tau;
+            // Buffer<float> _radius;
+            // Buffer<float> _cur_n;
+            // Buffer<float> _n_photon;
+            // Buffer<float> _phi;
+            // Buffer<float> _tau;
             auto index = dispatch_id().xy();
-            auto radius = node<MegakernelPhotonMapping>()->initial_radius();
+            auto radius = node<MegakernelPhotonMappingDiff>()->initial_radius();
             if (radius < 0)
                 photons.write_grid_len(photons.split(-radius));
             else
-                photons.write_grid_len(node<MegakernelPhotonMapping>()->initial_radius());
+                photons.write_grid_len(node<MegakernelPhotonMappingDiff>()->initial_radius());
             //camera->pipeline().printer().info("grid:{}", photons.grid_len());
             indirect.write_radius(index, photons.grid_len());
             //camera->pipeline().printer().info("rad:{}", indirect.radius(index));
@@ -442,7 +451,7 @@ protected:
         //put the photons into hash table
         Kernel1D photon_grid_kernel = [&]() noexcept {
             auto index = static_cast<UInt>(dispatch_x());
-            auto radius = node<MegakernelPhotonMapping>()->initial_radius();
+            auto radius = node<MegakernelPhotonMappingDiff>()->initial_radius();
             $if(photons.nxt(index) == 0u) {
                 photons.link(index);
             };
@@ -452,7 +461,7 @@ protected:
             auto pixel_id = dispatch_id().xy();
             auto sampler_id = UInt2(pixel_id.x + resolution.x, pixel_id.y);
             $if(pixel_id.x * resolution.y + pixel_id.y < photon_per_iter) {
-                photon_tracing(photons, camera, frame_index, sampler_id, time);
+                photon_tracing(photons, camera, frame_index, sampler_id, time, pixel_id.x * resolution.y + pixel_id.y, pathlogger);
             };
         };
         //check for direct and indirect(photon gathering)
@@ -520,7 +529,7 @@ protected:
                 command_buffer << render(sample_id++, s.point.time, s.point.weight)
                                       .dispatch(resolution);
                 command_buffer << update().dispatch(resolution);
-                if (node<MegakernelPhotonMapping>()->shared_radius()) {
+                if (node<MegakernelPhotonMappingDiff>()->shared_radius()) {
                     command_buffer << shared_update().dispatch(1u);
                 }
                 dispatch_count++;
@@ -538,7 +547,7 @@ protected:
         }
         LUISA_INFO("total spp:{}", runtime_spp);
         //tot_photon is photon_per_iter not photon_per_iter*spp because of unnormalized samples
-        command_buffer << indirect_draw(node<MegakernelPhotonMapping>()->photon_per_iter(), runtime_spp).dispatch(resolution);
+        command_buffer << indirect_draw(node<MegakernelPhotonMappingDiff>()->photon_per_iter(), runtime_spp).dispatch(resolution);
         command_buffer << synchronize();
         command_buffer << pipeline().printer().retrieve();
 
@@ -569,14 +578,15 @@ protected:
         SampledSpectrum testbeta{swl.dimension()};
         auto ray = camera_ray;
         auto pdf_bsdf = def(1e16f);
-        $for(depth, node<MegakernelPhotonMapping>()->max_depth()) {
+
+        $for(depth, node<MegakernelPhotonMappingDiff>()->max_depth()) {
 
             // trace
             auto wo = -ray->direction();
             auto it = pipeline().geometry()->intersect(ray);
 
             // miss
-            if (node<MegakernelPhotonMapping>()->separate_direct()) {
+            if (node<MegakernelPhotonMappingDiff>()->separate_direct()) {
 
                 $if(!it->valid()) {
                     if (pipeline().environment()) {
@@ -621,7 +631,7 @@ protected:
             auto u_lobe = sampler()->generate_1d();
             auto u_bsdf = sampler()->generate_2d();
             auto u_rr = def(0.f);
-            auto rr_depth = node<MegakernelPhotonMapping>()->rr_depth();
+            auto rr_depth = node<MegakernelPhotonMappingDiff>()->rr_depth();
             $if(depth + 1u >= rr_depth) { u_rr = sampler()->generate_1d(); };
 
             // sample one light
@@ -635,7 +645,7 @@ protected:
             auto surface_tag = it->shape().surface_tag();
             auto eta_scale = def(1.f);
             Bool stop_direct = false;
-            auto rr_threshold = node<MegakernelPhotonMapping>()->rr_threshold();
+            auto rr_threshold = node<MegakernelPhotonMappingDiff>()->rr_threshold();
             auto q = max(beta.max() * eta_scale, .05f);
             $if(depth + 1u >= rr_depth) {
                 $if(q < rr_threshold & u_rr >= q) { stop_direct = true; };
@@ -662,7 +672,7 @@ protected:
                         $if(*dispersive) { swl.terminate_secondary(); };
                     }
                     // direct lighting
-                    if (node<MegakernelPhotonMapping>()->separate_direct()) {
+                    if (node<MegakernelPhotonMappingDiff>()->separate_direct()) {
                         $if(light_sample.eval.pdf > 0.0f & !occluded) {
                             auto wi = light_sample.shadow_ray->direction();
                             auto eval = closure->evaluate(wo, wi);
@@ -674,7 +684,7 @@ protected:
                     //TODO: get this done
                     auto roughness = closure->roughness();
                     Bool stop_check;
-                    if (node<MegakernelPhotonMapping>()->separate_direct()) {
+                    if (node<MegakernelPhotonMappingDiff>()->separate_direct()) {
                         stop_check = (roughness.x * roughness.y > 0.16f) | stop_direct;
                     } else {
                         stop_check = true;//always stop at first intersection
@@ -732,7 +742,7 @@ protected:
             });
             beta = zero_if_any_nan(beta);
             $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
-            if (node<MegakernelPhotonMapping>()->separate_direct()) {
+            if (node<MegakernelPhotonMappingDiff>()->separate_direct()) {
                 $if(stop_direct) {
                     auto it_next = pipeline().geometry()->intersect(ray);
 
@@ -767,7 +777,7 @@ protected:
     }
 
     void photon_tracing(PhotonMap &photons, const Camera::Instance *camera, Expr<uint> frame_index,
-                        Expr<uint2> pixel_id, Expr<float> time) {
+                        Expr<uint2> pixel_id, Expr<float> time, Expr<uint> photon_id, luisa::unique_ptr<PathLogger> pathlogger) {
 
         sampler()->start(pixel_id, frame_index);
         // generate uniform samples
@@ -786,13 +796,14 @@ protected:
         auto ray = light_sample.shadow_ray;
         auto pdf_bsdf = def(1e16f);
 
-        
-        $for(depth, node<MegakernelPhotonMapping>()->max_depth()) {
+        $for(depth, node<MegakernelPhotonMappingDiff>()->max_depth()) {
 
             // trace
             auto wi = -ray->direction();
             auto it = pipeline().geometry()->intersect(ray);
+            
 
+            
             // miss
             $if(!it->valid()) {
                 $break;
@@ -806,9 +817,9 @@ protected:
             auto u_lobe = sampler()->generate_1d();
             auto u_bsdf = sampler()->generate_2d();
             auto u_rr = def(0.f);
-            auto rr_depth = node<MegakernelPhotonMapping>()->rr_depth();
+            auto rr_depth = node<MegakernelPhotonMappingDiff>()->rr_depth();
             $if(depth + 1u >= rr_depth) { u_rr = sampler()->generate_1d(); };
-            if (node<MegakernelPhotonMapping>()->separate_direct()) {
+            if (node<MegakernelPhotonMappingDiff>()->separate_direct()) {
                 $if(depth > 0) {
                     photons.push(it->p(), swl, beta, wi);
                 };
@@ -822,6 +833,15 @@ protected:
             // evaluate material
             auto surface_tag = it->shape().surface_tag();
             auto eta_scale = def(1.f);
+
+            
+            auto p = it->p();
+            auto n = it->ng();
+            auto uv = it->uv();
+            auto instance_id = it->instance_id();
+            auto triangle_id = it->triangle_id();
+            
+            pathlogger->add(photon_id, p, n, uv, instance_id, triangle_id, surface_tag);
 
             PolymorphicCall<Surface::Closure> call;
 
@@ -865,7 +885,7 @@ protected:
             });
             beta = zero_if_any_nan(beta);
             $if(beta.all([](auto b) noexcept { return b <= 0.f; })) { $break; };
-            auto rr_threshold = node<MegakernelPhotonMapping>()->rr_threshold();
+            auto rr_threshold = node<MegakernelPhotonMappingDiff>()->rr_threshold();
             auto q = max(eta_scale, .05f);
             $if(depth + 1u >= rr_depth) {
                 $if(q < rr_threshold & u_rr >= q) { $break; };
@@ -875,9 +895,9 @@ protected:
     }
 };
 
-luisa::unique_ptr<Integrator::Instance> MegakernelPhotonMapping::build(
+luisa::unique_ptr<Integrator::Instance> MegakernelPhotonMappingDiff::build(
     Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept {
-    return luisa::make_unique<MegakernelPhotonMappingInstance>(
+    return luisa::make_unique<MegakernelPhotonMappingDiffInstance>(
         pipeline, command_buffer, this);
 }
 

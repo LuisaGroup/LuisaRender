@@ -93,7 +93,7 @@ public:
                 const ShadingAttribute &attrib, Expr<bool> back_facing) noexcept
         : Interaction{std::move(shape), inst_id, prim_id, attrib.g.area, attrib.g.p, attrib.g.n,
                       attrib.uv, attrib.ps, attrib.ns, attrib.dpdu, back_facing} {}
-
+    
     [[nodiscard]] auto p() const noexcept { return _pg; }
     [[nodiscard]] auto p_shading() const noexcept { return _ps; }
     [[nodiscard]] auto ng() const noexcept { return _ng; }

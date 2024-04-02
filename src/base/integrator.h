@@ -129,7 +129,7 @@ public:
         [[nodiscard]] auto optimizer() const noexcept { return _optimizer.get(); }
         // void render(Stream &stream) noexcept override;
     };
-
+    
 private:
     const Loss *_loss;
     const Optimizer *_optimizer;
