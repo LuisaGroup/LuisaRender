@@ -71,10 +71,11 @@ public:
     private:
         Buffer<float3> vertexes;
         Buffer<float3> normals;
+        Buffer<float3> colors;
         Buffer<float2> uvs;
         Buffer<uint> inst_ids;
         Buffer<uint> triangle_ids;
-        Buffer<uint> surface_tags;
+        Buffer<uint> surface_tags;//Currently not use
         Buffer<uint> _size;
     
         bool has_end;
@@ -109,16 +110,13 @@ public:
             light = beta*L*pdf;
         }
 
-        
-
         float3x3 create_local_frame(float3 normal){
             auto tangent = normalize(cross(normal, float3(0,1,0)));
             auto bitangent = normalize(cross(normal, tangent));
             return float3x3(tangent, bitangent, normal);
         }
         void inverse_mat(Expr<uint2> pixel_id){
-            //Get matrix
-            mat->inverse();
+            
         }
         void compute_gradients(Buffer<float> &grad_in)
         {
@@ -175,59 +173,117 @@ public:
 
                         auto res = normalize(wi_local+wo_local*etas[id]);   
                     //Todo Clear Grad
-                        backward(res[0]);
-                        auto grad_uv_pre = grad(uv_pre);
-                        auto grad_uv_cur = grad(uv_cur);
-                        auto grad_uv_nxt = grad(uv_nxt);
-                        mat->set(id*2-2, 2*id-2, grad_uv_pre[0]);
-                        mat->set(id*2-2, 2*id-1, grad_uv_pre[1]);
-                        mat->set(id*2-2, 2*id-0, grad_uv_cur[0]);
-                        mat->set(id*2-2, 2*id+1, grad_uv_cur[1]);
-                        mat->set(id*2-2, 2*id+2, grad_uv_nxt[0]);
-                        mat->set(id*2-2, 2*id+3, grad_uv_nxt[1]);
-                        auto vertexes_grad = grad(vertexes);
-                        //change _size into local_size
-                        for(int i=0;i<_size;i++)
+                        for(int j=0;j<2;j++)
                         {
-                            auto grad_vi = vertexes_grad.read(i);
-                            mat_param->set(id*2-2, 3*i+0, grad_vi[0]);
-                            mat_param->set(id*2-2, 3*i+1, grad_vi[1]);
-                            mat_param->set(id*2-2, 3*i+2, grad_vi[2]);
-                        }
-                        //Todo Clear Grad
-                        backward(res[1]);
-                        grad_uv_pre = uvs[id-1].grad();
-                        grad_uv_cur = uvs[id+0].grad();
-                        grad_uv_nxt = uvs[id+1].grad();
-                        mat->set(id*2-1, 2*id-2, grad_uv_pre[0]);
-                        mat->set(id*2-1, 2*id-1, grad_uv_pre[1]);
-                        mat->set(id*2-1, 2*id-0, grad_uv_cur[0]);
-                        mat->set(id*2-1, 2*id+1, grad_uv_cur[1]);
-                        mat->set(id*2-1, 2*id+2, grad_uv_nxt[0]);
-                        mat->set(id*2-1, 2*id+3, grad_uv_nxt[1]);
-                        vertexes_grad = grad(vertexes);
-                        for(int i=0;i<_size;i++)
-                        {
-                            auto grad_vi = vertexes_grad.read(i);
-                            mat_param->set(id*2-1, 3*i+0, grad_vi[0]);
-                            mat_param->set(id*2-1, 3*i+1, grad_vi[1]);
-                            mat_param->set(id*2-1, 3*i+2, grad_vi[2]);
+                            backward(res[j]);
+                            auto grad_uv_pre = grad(uv_pre);
+                            auto grad_uv_cur = grad(uv_cur);
+                            auto grad_uv_nxt = grad(uv_nxt);
+                            mat->set(pixel_id, id*2-2+j, 2*id-2, grad_uv_pre[0]);
+                            mat->set(pixel_id, id*2-2+j, 2*id-1, grad_uv_pre[1]);
+                            mat->set(pixel_id, id*2-2+j, 2*id-0, grad_uv_cur[0]);
+                            mat->set(pixel_id, id*2-2+j, 2*id+1, grad_uv_cur[1]);
+                            mat->set(pixel_id, id*2-2+j, 2*id+2, grad_uv_nxt[0]);
+                            mat->set(pixel_id, id*2-2+j, 2*id+3, grad_uv_nxt[1]);
+                            auto point_pre_0_grad = grad(point_pre_0);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id-1)+0, point_pre_0_grad[0]);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id-1)+1, point_pre_0_grad[1]);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id-1)+2, point_pre_0_grad[2]);
+                            auto point_pre_1_grad = grad(point_pre_1);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id-1)+3, point_pre_1_grad[0]);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id-1)+4, point_pre_1_grad[1]);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id-1)+5, point_pre_1_grad[2]);
+                            auto point_pre_2_grad = grad(point_pre_2);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id-1)+6, point_pre_2_grad[0]);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id-1)+7, point_pre_2_grad[1]);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id-1)+8, point_pre_2_grad[2]);
+
+                            
+                            auto point_nxt_0_grad = grad(point_nxt_0);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id+1)+0, point_nxt_0_grad[0]);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id+1)+1, point_nxt_0_grad[1]);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id+1)+2, point_nxt_0_grad[2]);
+                            auto point_nxt_1_grad = grad(point_nxt_1);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id+1)+3, point_nxt_1_grad[0]);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id+1)+4, point_nxt_1_grad[1]);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id+1)+5, point_nxt_1_grad[2]);
+                            auto point_nxt_2_grad = grad(point_nxt_2);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id+1)+6, point_nxt_2_grad[0]);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id+1)+7, point_nxt_2_grad[1]);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id+1)+8, point_nxt_2_grad[2]);
+
+                            auto point_cur_0_grad = grad(point_cur_0);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id)+0, point_cur_0_grad[0]);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id)+1, point_cur_0_grad[1]);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id)+2, point_cur_0_grad[2]);
+                            auto point_cur_1_grad = grad(point_cur_1);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id)+3, point_cur_1_grad[0]);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id)+4, point_cur_1_grad[1]);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id)+5, point_cur_1_grad[2]);
+                            auto point_cur_2_grad = grad(point_cur_2);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id)+6, point_cur_2_grad[0]);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id)+7, point_cur_2_grad[1]);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id)+8, point_cur_2_grad[2]);
+                            
+                            auto normal_cur_0_grad = grad(point_cur_0);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id)+9, normal_cur_0_grad[0]);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id)+10, normal_cur_0_grad[1]);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id)+11, normal_cur_0_grad[2]);
+                            auto normal_cur_1_grad = grad(point_cur_1);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id)+12, normal_cur_1_grad[0]);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id)+13, normal_cur_1_grad[1]);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id)+14, normal_cur_1_grad[2]);
+                            auto normal_cur_2_grad = grad(point_cur_2);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id)+15, normal_cur_2_grad[0]);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id)+16, normal_cur_2_grad[1]);
+                            mat_param->set(pixel_id, id*2-2+j, 18*(id)+17, normal_cur_2_grad[2]);
                         }
                     }
-
-                    
-
-                    uv_pre = uvs->read(id-1);
-                    auto point_cur = get_point(id);
-                    auto normal_cur = get_normal(id);
-                    auto point_nxt = get_point(id+1);
-
-
-                    
                 }
-                inverse_mat(mat);
-                matmul_param(grad_in, mat, mat_param);
-                scatter_grad();
+            };
+            Kernel2D inverse_matrix = [&](UInt pixel_id) noexcept {
+                //inverse a matrix which mat->read(i,j) gives the (i,j) element
+                auto n = sizes->read(pixel_id);
+                $for (auto i = 0; i < n*2; i++) {
+                    mat->write_adj(pixel_id, i, i, 1);
+                }
+                $for (auto i = 0; i < n; i++) {
+                    $if (mat->read(pixel_id, i, i) == 0) {
+                        auto j=0,k=0;
+                        $for (j = i + 1; j < n; ++j) {
+                            $if (mat->read(pixel_id, j, i) != 0) {
+                                break;
+                            }
+                        }
+                        if (j == n) {
+                            invalid->write(pixel_id, true);
+                        }
+                        // 交换行
+                        for(k=0;k<n;k++)
+                        {
+                            auto t = mat->read(pixel_id, i, k);
+                            mat->write(pixel_id, i, k, mat->read(pixel_id, j,k));
+                            mat->write(pixel_id, j, k, t);
+                            auto t = mat->read_adj(pixel_id, i, k);
+                            mat->write_adj(pixel_id, i, k, mat->read_adj(pixel_id, j,k));
+                            mat->write_adj(pixel_id, j, k, t);
+                        }
+                    }
+                    for (size_t j = i + 1; j < n; ++j) {
+                        double factor = mat->read(pixel_id, j, i) / result->read(pixel_id, i, i);
+                        for (size_t k = i; k < n; ++k) {
+                            mat->write(pixel_id, j, k, mat->read(pixel_id, j, k) - factor * mat->read(pixel_id, i, k));
+                        }
+                        for (size_t k = 0; k < n; ++k) {
+                            mat->write_adj(pixel_id, j, k, mat->read_adj(pixel_id, j, k) - factor * mat->read_adj(i, k));
+                        }
+                    }
+                }
+            };
+
+            Kernel2D compute_gradient() = [&]{
+                grad_in_real
+            };
         }
         void reset() {
             sizes->clear();
