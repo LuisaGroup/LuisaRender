@@ -15,7 +15,8 @@ Integrator::Integrator(Scene *scene, const SceneNodeDesc *desc) noexcept
       _sampler{scene->load_sampler(desc->property_node_or_default(
           "sampler", SceneNodeDesc::shared_default_sampler("independent")))},
       _light_sampler{scene->load_light_sampler(desc->property_node_or_default(
-          "light_sampler", SceneNodeDesc::shared_default_light_sampler("uniform")))} {}
+          "light_sampler", SceneNodeDesc::shared_default_light_sampler("uniform")))},
+      _video{desc->property_bool_or_default("video", false)} {}
 
 Integrator::Instance::Instance(Pipeline &pipeline, CommandBuffer &command_buffer, const Integrator *integrator) noexcept
     : _pipeline{pipeline}, _integrator{integrator},
@@ -79,6 +80,11 @@ void ProgressiveIntegrator::Instance::_render_one_camera(
     auto integrator_shader_compilation_time = clock_compile.toc();
     LUISA_INFO("Integrator shader compile in {} ms.", integrator_shader_compilation_time);
     auto shutter_samples = camera->node()->shutter_samples();
+    luisa::vector<float4> local_pixels;
+    if(node()->video()){
+        shutter_samples= camera->node()->uniform_shutter_samples();
+        local_pixels.resize(pixel_count);
+    }
     command_buffer << synchronize();
 
     LUISA_INFO("Rendering started.");
@@ -87,6 +93,8 @@ void ProgressiveIntegrator::Instance::_render_one_camera(
     progress.update(0.);
     auto dispatch_count = 0u;
     auto sample_id = 0u;
+
+    auto shutter_id= 0u;
     for (auto s : shutter_samples) {
         pipeline().update(command_buffer, s.point.time);
         for (auto i = 0u; i < s.spp; i++) {
@@ -103,6 +111,18 @@ void ProgressiveIntegrator::Instance::_render_one_camera(
                 auto p = sample_id / static_cast<double>(spp);
                 command_buffer << [&progress, p] { progress.update(p); };
             }
+        }
+        if(node()->video()) {
+            command_buffer << synchronize();
+            camera->film()->download(command_buffer, local_pixels.data());
+            command_buffer << compute::synchronize();
+            camera->film()->clear(command_buffer);
+            auto film_path = camera->node()->file();
+            //film_path is a std::filesystem::path, add number to its name
+            auto new_name= film_path.stem().string()+std::to_string(shutter_id)+film_path.extension().string();
+            auto new_film_path= film_path.replace_filename(new_name);
+            save_image(new_film_path, reinterpret_cast<const float *>(local_pixels.data()), resolution);
+            shutter_id++;
         }
     }
     command_buffer << synchronize();
