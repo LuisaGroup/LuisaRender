@@ -52,16 +52,19 @@ public:
     class Matrix{
         private:
             Buffer<float> pool;
+            uint size, height, width;
+            uint single_mat_size;
         public:
-            Matrix(uint size, Pipeline &pipeline){
+            Matrix(uint batch, uint height, uint width, Pipeline &pipeline):height(height), size(batch), width(width){
                 auto &&device = pipeline().device();
-                pool = device.create_buffer<float>(size*size);
+                pool = device.create_buffer<float>(batch*size*width);
+                single_mat_size = height*width;
             }
-            void set(uint x, uint y, float value){
-                pool.write(x*size+y, value);
+            void set(uint id, uint x, uint y, float value){
+                pool.write(id*single_mat_size+x*width+y, value);
             }
-            void get(uint x, uint y){
-                return pool.read(x*size+y);
+            void get(uint id, uint x, uint y){
+                return pool.read(id*single_mat_size+x*width+y);
             }
             void inverse(){
                 //inverse the matrix in place
@@ -76,14 +79,17 @@ public:
         Buffer<uint> inst_ids;
         Buffer<uint> triangle_ids;
         Buffer<uint> surface_tags;//Currently not use
-        Buffer<uint> _size;
+        Buffer<uint> path_sizes;
     
-        bool has_end;
+        Buffer<bool> has_end;
         Buffer<float3> light;
         unique_ptr<Matrix> mat, mat_param;
-        
+        Buffer<float> param_grad;
+        float3 light_grad;
+        uint max_size, max_depth;
+
     public:
-        PathLogger(uint max_size, uint max_depth, Pipeline &pipeline){
+        PathLogger(uint max_size, uint max_depth, Pipeline &pipeline):max_size(max_size), max_depth(max_depth){
             auto &&device = pipeline.device();
             vertexes = device.create_buffer<float3>(max_size*max_depth*3);
             normals = device.create_buffer<float3>(max_size*max_depth*3);
@@ -91,9 +97,15 @@ public:
             inst_ids = device.create_buffer<uint>(max_size*max_depth);
             triangle_ids = device.create_buffer<uint>(max_size*max_depth);
             surface_tags = device.create_buffer<uint>(max_size*max_depth);
-            sizes = device.create_buffer<uint>(max_size);
-            mat = luisa::make_unique<Matrix>(max_size, max_depth, pipeline);
-            mat_param = luisa::make_unique<Matrix>(max_size, max_depth, pipeline);
+            path_sizes = device.create_buffer<uint>(max_size);
+            
+            has_end = device.create_buffer<bool>(max_size);
+            light = device.create_buffer<float3>(max_size*max_depth);
+
+            param_grad = device.create_buffer<float>(max_size*max_depth*18);
+            mat = luisa::make_unique<Matrix>(max_size, max_depth*2, max_depth*4, pipeline);//for adjoint matrix
+            mat_param = luisa::make_unique<Matrix>(max_size, max_depth*2, max_depth*18, pipeline);
+
         }
         void add_vertex(Expr<uint> pixel_id, Expr<float3> vertex, Expr<float3> normal, Expr<float2> uv, Expr<uint> inst_id, Expr<uint> triangle_id, Expr<uint> surface_tag){
             auto cur_size = sizes->read(pixel_id);
@@ -109,14 +121,40 @@ public:
             has_end = true
             light = beta*L*pdf;
         }
-
         float3x3 create_local_frame(float3 normal){
             auto tangent = normalize(cross(normal, float3(0,1,0)));
             auto bitangent = normalize(cross(normal, tangent));
             return float3x3(tangent, bitangent, normal);
         }
-        void inverse_mat(Expr<uint2> pixel_id){
-            
+        void matMulti(Expr<uint> pixel_id, Buffer<float2> grad_uv, Buffer<float> mat, Buffer<float> mat_param){
+            auto path_size = sizes->read(pixel_id);
+            auto res = make_float2(0,0);
+            for(int i=0;i<path_size;i++){
+                auto dLdm = 0.0;
+                for(int j=0;j<path_size;j++)
+                    dLdm+=grad_uv->read(pixel_id) * mat->read_adj(pixel_id, i, j);
+                for(int j=0;j<path_param_size;j++)
+                    param_grad->write(pixel_id, i,j, dLdm*mat_param->read(pixel_id, i, j)+param_grad->read(pixel_id, i, j));
+            }
+        }
+        uint get_indx(Expr<uint> pixel_id, Expr<uint> i, Expr<uint> j){
+            return pixel_id*max_size*3+i*3+j;
+        }
+        void scatter_grad(Expr<uint> pixel_id, luisa::vector<Buffer<float>> &grad_buffer, luisa::vector<Int> &pos_mapping, luisa::vector<Int> &normal_mapping)
+        {
+            auto path_size = param_sizes->read(pixel_id);
+            for(int i=0;i<path_size;i++){
+                auto pos_grad_idx = pos_mapping[inst_ids->read(pixel_id,i)];
+                auto normal_grad_idx = normal_mapping[inst_ids->read(pixel_id,i)];
+                if (pos_grad_idx!=-1){
+                    for(int j=0;j<3;j++)
+                        grad_buffer[pos_grad_idx].write(get_indx(pixel_id, i, j), make_float3(param_grad->read(pixel_id*max_size*18+i*18+j*3+0), param_grad->read(pixel_id*max_size*18+i*18+j*3+1),param_grad->read(pixel_id*max_size*18+i*18+j*3+2)));
+                }
+                if (normal_grad_idx!=-1){
+                    for(int j=0;j<3;j++)
+                        grad_buffer[normal_grad_idx].write(get_indx(pixel_id, i, j), make_float3(param_grad->read(pixel_id*max_size*18+i*18+j*3+9), param_grad->read(pixel_id*max_size*18+i*18+j*3+10),param_grad->read(pixel_id*max_size*18+i*18+j*3+11)));
+                }
+            }
         }
         void compute_gradients(Buffer<float> &grad_in)
         {
@@ -281,8 +319,14 @@ public:
                 }
             };
 
-            Kernel2D compute_gradient() = [&]{
-                grad_in_real
+
+            Kernel2D compute_gradient_kernel = [&](UInt frame_index, Buffer<float> grad_in, UInt grad_type) noexcept {
+                auto pixel_id = dispatch_id().xy();
+                auto grad_pos = make_float2(grad_in->read(pixel_id*5+3),grad_in->read(pixel_id*5+4));
+                auto grad_color = make_float3(grad_in->read(pixel_id*5+0),grad_in->read(pixel_id*5+1),grad_in->read(pixel_id*5+2));
+                matMulti(pixel_id, grad_uv, mat, mat_param);
+                scatter_grad(pixel_id);
+                //auto color2theta = 
             };
         }
         void reset() {
@@ -440,12 +484,13 @@ void MegakernelPathSpaceDiffInstance::_render_one_camera_backward(
     auto gradient_compute_kernel = compute_kernels.find(camera);
     if (gradient_compute_kernel == compute_kernels.end()) {
         using namespace luisa::compute;
-        Kernel2D _gradient_compute_kernel = [&](UInt frame_index, Float time, Float shutter_weight, ImageFloat Li_1spp) noexcept {
+        Kernel2D _tracing_and_logging_kernel = [&](UInt frame_index, Float time, Float shutter_weight, ImageFloat Li_1spp) noexcept {
 
             auto pathLogger = PathLogger(node<MegakernelPathSpaceDiff>()->max_depth(), pipeline());
 
             set_block_size(16u, 16u, 1u);
             auto pixel_id = dispatch_id().xy();
+            auto pixel_id_1d = pixel_id.y * resolution.x + pixel_id.x;
             sampler->start(pixel_id, frame_index);
             auto u_filter = sampler->generate_pixel_2d();
             auto u_lens = camera->node()->requires_lens_sampling() ? sampler->generate_2d() : make_float2(.5f);
@@ -478,12 +523,12 @@ void MegakernelPathSpaceDiffInstance::_render_one_camera_backward(
                     $if(it->shape().has_light()) {
                         auto eval = light_sampler->evaluate_hit(*it, ray->origin(), swl, time);
                         Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
-                        pathLogger.add_surface_light_end(it->p(), it->n(), it->uv(), it->inst_id(), it->triangle_id(), it->shape().surface_tag());
+                        pathLogger.add_surface_light_end(pixel_id_1d, it->p(), it->n(), it->uv(), it->inst_id(), it->triangle_id(), it->shape().surface_tag());
                         $break;
                     };
                 }
 
-                pathLogger.add_vertex(it->p(), it->n(), it->uv(), it->inst_id(), it->triangle_id(), it->shape().surface_tag());
+                pathLogger.add_vertex(pixel_id_1d, it->p(), it->n(), it->uv(), it->inst_id(), it->triangle_id(), it->shape().surface_tag());
 
                 // sample one light
                 auto u_light_selection = sampler->generate_1d();
