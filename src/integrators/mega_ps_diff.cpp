@@ -88,6 +88,11 @@ public:
         float3 light_grad;
         uint max_size, max_depth;
 
+        Pipeline &_pipeline;
+
+        Buffer<Triangle> triangle_ids;
+        Buffer<uint> inst_ids;
+
     public:
         PathLogger(uint max_size, uint max_depth, Pipeline &pipeline):max_size(max_size), max_depth(max_depth){
             auto &&device = pipeline.device();
@@ -106,16 +111,48 @@ public:
             mat = luisa::make_unique<Matrix>(max_size, max_depth*2, max_depth*4, pipeline);//for adjoint matrix
             mat_param = luisa::make_unique<Matrix>(max_size, max_depth*2, max_depth*18, pipeline);
 
+            _pipeline = pipeline;
+
         }
         void add_vertex(Expr<uint> pixel_id, Expr<float3> vertex, Expr<float3> normal, Expr<float2> uv, Expr<uint> inst_id, Expr<uint> triangle_id, Expr<uint> surface_tag){
-            auto cur_size = sizes->read(pixel_id);
-            vertexes->write(cur_size, vertex);
-            normals->write(cur_size, normal);
-            uvs->write(cur_size, uv);
-            inst_ids->write(cur_size, inst_id);
-            triangle_ids->write(cur_size, triangle_id);
-            surface_tags->write(cur_size, surface_tag);
-            sizes->write(pixel_id, cur_size+1);
+            
+            auto cur_size = path_sizes->read(pixel_id);
+            auto st_point = pixel_id*max_depth+cur_size;
+            inst_ids->write(st_point, inst_id);
+            triangle_ids->write(st_point, triangle_id);
+
+            // compute dpdu and dpdv
+            // auto duv0 = uv1 - uv0;
+            // auto duv1 = uv2 - uv0;
+            // auto det = duv0.x * duv1.y - duv0.y * duv1.x;
+            // auto inv_det = 1.f / det;
+            // auto dp0_local = p1_local - p0_local;
+            // auto dp1_local = p2_local - p0_local;
+            // auto dpdu_local = (dp0_local * duv1.y - dp1_local * duv0.y) * inv_det;
+            // auto dpdv_local = (dp1_local * duv0.x - dp0_local * duv1.x) * inv_det;
+
+            // // world space
+            // auto m = make_float3x3(shape_to_world);
+            // auto t = make_float3(shape_to_world[3]);
+            // auto p = m * interpolate(bary, p0_local, p1_local, p2_local) + t;
+
+            // auto c = cross(m * dp0_local, m * dp1_local);
+            // auto area = length(c) * .5f;
+            // auto ng = normalize(c);
+            // auto fallback_frame = Frame::make(ng);
+            // auto dpdu = ite(det == 0.f, fallback_frame.s(), m * dpdu_local);
+            // auto dpdv = ite(det == 0.f, fallback_frame.t(), m * dpdv_local);
+            // auto mn = transpose(inverse(m));
+            // auto ns = ite(instance.has_vertex_normal(), normalize(mn * ns_local), ng);
+            // auto uv = ite(instance.has_vertex_uv(), interpolate(bary, uv0, uv1, uv2), bary.yz());
+            // return {.g = {.p = p,
+            //             .n = ng,
+            //             .area = area},
+            //         .ps = p,
+            //         .ns = face_forward(ns, ng),
+            //         .dpdu = dpdu,
+            //         .dpdv = dpdv,
+            //         .uv = uv};
         }
         void add_envlight_end(Expr<float3> beta, Expr<float3> L, Expr<float> pdf){
             has_end = true
@@ -161,7 +198,7 @@ public:
             Kernel2D build_matrix = [&](UInt pixel_id) noexcept {
                 auto grad = grad_in.read(pixel_id);
                 $if(!has_end) return;
-                auto _size = sizes->read(pixel_id);
+                auto _size = path_sizes->read(pixel_id);
                 for(uint id = 1; id < _size-1; id++){
                     float3 point_nxt_0, point_nxt_1, point_nxt_2;
                     float3 point_pre_0, point_pre_1, point_pre_2;
@@ -169,6 +206,21 @@ public:
                     float3 normal_cur, normal_cur_0, normal_cur_1, normal_cur_2;
                     float2 uv_pre, uv_cur, uv_nxt;
 
+                    auto instance = _pipeline.geometry()->instance(inst_id);
+                    auto triangle = _pipeline.geometry()->triangle(instance, triangle_id);
+                    auto v_buffer = instance.vertex_buffer_id();
+                    auto v0 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i0);
+                    auto v1 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i1);
+                    auto v2 = _pipeline.buffer<Vertex>(v_buffer).read(triangle.i2);
+                    
+                    auto p0_local = v0->position();
+                    auto p1_local = v1->position();
+                    auto p2_local = v2->position();
+                    auto ns_local = interpolate(bary, v0->normal(), v1->normal(), v2->normal());
+
+                    auto uv0 = v0->uv();
+                    auto uv1 = v1->uv();
+                    auto uv2 = v2->uv();
 
                     float2 uv_pre = readuv(uvs, id-1, pixel_id);
                     float2 uv_cur = readuv(uvs, id, pixel_id);
@@ -471,6 +523,7 @@ void MegakernelPathSpaceDiffInstance::_render_one_camera_backward(
     LUISA_INFO("Start backward propagation.");
 
     
+
     auto pt = this;
     auto sampler = pt->sampler();
     auto env = pipeline().environment();
@@ -480,14 +533,15 @@ void MegakernelPathSpaceDiffInstance::_render_one_camera_backward(
     sampler->reset(command_buffer, resolution, pixel_count, spp);
     command_buffer << commit() << synchronize();
     auto pt_exact = pt->node<MegakernelReplayDiff>();
+    
+    
+    auto pathLogger = PathLogger(pixel_count, node<MegakernelPathSpaceDiff>()->max_depth(), pipeline());
 
     auto gradient_compute_kernel = compute_kernels.find(camera);
     if (gradient_compute_kernel == compute_kernels.end()) {
         using namespace luisa::compute;
         Kernel2D _tracing_and_logging_kernel = [&](UInt frame_index, Float time, Float shutter_weight, ImageFloat Li_1spp) noexcept {
-
-            auto pathLogger = PathLogger(node<MegakernelPathSpaceDiff>()->max_depth(), pipeline());
-
+            //Todo:check block size
             set_block_size(16u, 16u, 1u);
             auto pixel_id = dispatch_id().xy();
             auto pixel_id_1d = pixel_id.y * resolution.x + pixel_id.x;
@@ -511,24 +565,21 @@ void MegakernelPathSpaceDiffInstance::_render_one_camera_backward(
                     if (pipeline().environment()) {
                         auto eval = light_sampler->evaluate_miss(ray->direction(), swl, time);
                         Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
-                        pathLogger.add_envlight_end(beta, eval.L, balance_heuristic(pdf_bsdf, eval.pdf));
+                        pathLogger.add_envlight_end(pixel_id_1d, ray->direction(), eval.L, balance_heuristic(pdf_bsdf, eval.pdf));
                     }
                     $break;
                 };
-
                 $if(!it->shape().has_surface()) { $break; };
-
                 // hit light
                 if (!pipeline().lights().empty()) {
                     $if(it->shape().has_light()) {
                         auto eval = light_sampler->evaluate_hit(*it, ray->origin(), swl, time);
                         Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
-                        pathLogger.add_surface_light_end(pixel_id_1d, it->p(), it->n(), it->uv(), it->inst_id(), it->triangle_id(), it->shape().surface_tag());
+                        pathLogger.add_surface_light_end(pixel_id_1d, it);
                         $break;
                     };
                 }
 
-                pathLogger.add_vertex(pixel_id_1d, it->p(), it->n(), it->uv(), it->inst_id(), it->triangle_id(), it->shape().surface_tag());
 
                 // sample one light
                 auto u_light_selection = sampler->generate_1d();
@@ -545,6 +596,7 @@ void MegakernelPathSpaceDiffInstance::_render_one_camera_backward(
                     // sample one light
                     light_sample = light_sampler->sample(
                         *it, u_light_selection, u_light_surface, swl, time);
+                    
                 };
 
                 // trace shadow ray
@@ -589,6 +641,7 @@ void MegakernelPathSpaceDiffInstance::_render_one_camera_backward(
                                 {
                                     Li += mis_weight * beta * eval.f * light_sample.eval.L;
                                 }
+                                pathLogger.add_light(pixel_id_1d, light_sample, closure);
                             };
 
                             // sample material
@@ -604,6 +657,7 @@ void MegakernelPathSpaceDiffInstance::_render_one_camera_backward(
                                 $case(Surface::event_enter) { eta_scale = sqr(eta); };
                                 $case(Surface::event_exit) { eta_scale = sqr(1.f / eta); };
                             };
+                            pathLogger.add_vertex(pixel_id_1d, it, closure);
                         };
                     });
                 };
