@@ -17,7 +17,8 @@ Shape::Shape(Scene *scene, const SceneNodeDesc *desc) noexcept
       _surface{scene->load_surface(desc->property_node_or_default("surface"))},
       _light{scene->load_light(desc->property_node_or_default("light"))},
       _transform{scene->load_transform(desc->property_node_or_default("transform"))},
-      _medium{scene->load_medium(desc->property_node_or_default("medium"))} {}
+      _medium{scene->load_medium(desc->property_node_or_default("medium"))},
+      _requires_grad(desc->property_bool_or_default("requires_grad", false)) {}
 
 AccelOption Shape::build_option() const noexcept { return {}; }
 

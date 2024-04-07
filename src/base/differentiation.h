@@ -140,13 +140,15 @@ private:
     Shader1D<Buffer<float>, uint, Buffer<uint>, uint, Buffer<float>, uint, uint> _accumulate_grad_tex;
     Shader1D<Buffer<float>, uint, Buffer<uint>, uint, Buffer<float>, uint> _accumulate_grad_geom;
 
+    luisa::optional<BufferView<uint>> instance2offset;
+
 private:
     auto &pipeline() noexcept { return _pipeline; }
 
 public:
     explicit Differentiation(Pipeline &pipeline) noexcept;
     void register_optimizer(Optimizer::Instance *optimizer) noexcept;
-    void register_geometry_parameter(const CommandBuffer &command_buffer, Shape &shape, Geometry::MeshData &mesh, Accel &accel, uint instance_id) noexcept;
+    void register_geometry_parameter(const CommandBuffer &command_buffer, Geometry::MeshData &mesh, Accel &accel, uint instance_id) noexcept;
     [[nodiscard]] ConstantParameter parameter(float x, float2 range) noexcept;
     [[nodiscard]] ConstantParameter parameter(float2 x, float2 range) noexcept;
     [[nodiscard]] ConstantParameter parameter(float3 x, float2 range) noexcept;
@@ -159,12 +161,15 @@ public:
     void clear_gradients(CommandBuffer &command_buffer) noexcept;
     void apply_gradients(CommandBuffer &command_buffer) noexcept;
     void accum_gradients(CommandBuffer &command_buffer) noexcept;
+
+    void add_geom_gradients(Float grad, UInt inst_id, UInt triangle_id, UInt offset) noexcept;
     /// Apply then clear the gradients
     void step(CommandBuffer &command_buffer) noexcept;
     void dump(CommandBuffer &command_buffer, const std::filesystem::path &folder) const noexcept;
     // check dirty
     bool _is_dirty;
     bool is_dirty(){return _is_dirty;}
+    bool clear_dirty(){return _is_dirty = false;}
     void update_parameter_from_external(Stream &stream, luisa::vector<uint> &constants_id, luisa::vector<float4> &constants, luisa::vector<uint> &textures_id, 
     luisa::vector<Buffer<float4>> &textures, luisa::vector<uint> &geoms_id, luisa::vector<Buffer<float>> &geoms) noexcept;
 

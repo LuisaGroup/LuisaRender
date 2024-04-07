@@ -84,9 +84,6 @@ Differentiation::Differentiation(Pipeline &pipeline) noexcept
         auto index = dispatch_x();
         auto grad = gradients.read(grad_offset + index);
         auto count = counter.read(counter_offset + index);
-#ifdef LUISA_RENDER_USE_BP_TIMES_NORMALIZATION
-        grad /= Float(max(count, 1u));
-#endif
         param_gradients.write(param_offset + index, grad);
     };
     _accumulate_grad_geom = _pipeline.device().compile(accumulate_grad_geom_kernel);
@@ -136,6 +133,7 @@ void Differentiation::materialize(CommandBuffer &command_buffer) noexcept {
     _param_grad_buffer.emplace(pipeline().create<Buffer<float>>(std::max(_param_buffer_size, 1u))->view());
     _grad_buffer.emplace(pipeline().create<Buffer<float>>(std::max(_gradient_buffer_size, 1u))->view());
     _counter.emplace(pipeline().create<Buffer<uint>>(std::max(_counter_size, 1u))->view());
+    instance2offset.emplace(pipeline().create<Buffer<uint>>(256u)->view());
     clear_gradients(command_buffer);
 
     if (auto n = _constant_params.size()) {
@@ -171,7 +169,6 @@ void Differentiation::materialize(CommandBuffer &command_buffer) noexcept {
                        << textured_params_range_shader(*_param_range_buffer, p.range(), param_offset).dispatch(length);
     }
     //Todo: add buffer parameters(mesh vertex or sth) to _param_buffer
-
     for (auto &&p : _geometry_params) {
         auto buffer = p.buffer();
         auto param_offset = p.param_offset();
@@ -192,6 +189,7 @@ void Differentiation::clear_gradients(CommandBuffer &command_buffer) noexcept {
     if (auto n = _counter_size) {
         command_buffer << _clear_uint_buffer(*_counter).dispatch(_counter->size());
     }
+    command_buffer << _clear_uint_buffer(*instance2offset).dispatch(256);
 }
 
 void Differentiation::accum_gradients(CommandBuffer &command_buffer) noexcept {
@@ -260,10 +258,9 @@ void Differentiation::accum_gradients(CommandBuffer &command_buffer) noexcept {
                               *_param_grad_buffer, param_offset,
                               channels)
                               .dispatch(length);
-        
     }
 
-    // accumulate textured parameters
+    // accumulate geometry parameters
     for (auto &&p : _geometry_params) {
         auto buffer = p.buffer();
         auto param_offset = p.param_offset();
@@ -277,6 +274,8 @@ void Differentiation::accum_gradients(CommandBuffer &command_buffer) noexcept {
                               ).dispatch(length);
     }
 }
+
+
 
 void Differentiation::apply_gradients(CommandBuffer &command_buffer) noexcept {
     _optimizer->step(command_buffer);
@@ -306,7 +305,6 @@ void Differentiation::apply_gradients(CommandBuffer &command_buffer) noexcept {
         command_buffer << image.copy_from(_param_buffer->subview(param_offset, length));
     }
 
-    
     // apply geometry parameters
     for (auto &&p : _geometry_params) {
         auto param_offset = p.param_offset();
@@ -315,9 +313,7 @@ void Differentiation::apply_gradients(CommandBuffer &command_buffer) noexcept {
         auto length = buffer_view.size();
         command_buffer << buffer_view.copy_from(_param_buffer->subview(param_offset, length).as<Vertex>());
     }
-
     command_buffer << synchronize();
-
     _is_dirty = true;
 }
 
@@ -379,6 +375,13 @@ void Differentiation::accumulate(const Differentiation::TexturedParameter &param
     write_grad(map_uv(p), grad);
 }
 
+void Differentiation::add_geom_gradients(Float grad, UInt inst_id, UInt triangle_id, UInt offset) noexcept {
+    auto gradient_offset = instance2offset.value()->read(inst_id)-1u;
+    $if(gradient_offset < 0) { return; };
+    _grad_buffer.value()->atomic(gradient_offset + triangle_id * 8 + offset).fetch_add(grad);
+    _counter.value()->atomic(gradient_offset + triangle_id * 8 + offset).fetch_add(UInt(1));
+}
+
 void Differentiation::step(CommandBuffer &command_buffer) noexcept {
     //accum_gradients(command_buffer);
     apply_gradients(command_buffer);
@@ -419,7 +422,7 @@ void Differentiation::register_optimizer(Optimizer::Instance *optimizer) noexcep
     _optimizer = optimizer;
 }
 
-void Differentiation::register_geometry_parameter(const CommandBuffer &command_buffer, Shape &shape, Geometry::MeshData& mesh, Accel& accel, uint instance_id) noexcept {
+void Differentiation::register_geometry_parameter(const CommandBuffer &command_buffer, Geometry::MeshData& mesh, Accel& accel, uint instance_id) noexcept {
     auto param_offset = _param_buffer_size;
     auto counter_offset = _counter_size;
     auto grad_offset = _gradient_buffer_size;
@@ -433,6 +436,7 @@ void Differentiation::register_geometry_parameter(const CommandBuffer &command_b
     _param_buffer_size = (_param_buffer_size + length + 3u) & ~0b11u;
     _gradient_buffer_size = (_gradient_buffer_size + length + 3u) & ~0b11u;
     _geometry_params.emplace_back(param_index, instance_id, grad_offset, param_offset, counter_offset, buffer_view, length, buffer_id);
+    instance2offset.value()->write(instance_id, grad_offset+1u);
     //command_buffer << buffer.copy_to(_param_buffer->subview(param_offset, length));
 }
 
@@ -442,14 +446,9 @@ void Differentiation::update_parameter_from_external(Stream &stream, luisa::vect
     // apply texture parameters
     for (auto i = 0u; i < textures_id.size(); i++) {
         auto image = _textured_params[textures_id[i]].image().view();
-        LUISA_INFO("image size: {}", image.size());
         auto channels = compute::pixel_format_channel_count(image.format());
         auto length = image.size().x * image.size().y * channels;
-        
-        LUISA_INFO("image copy start");
-        LUISA_INFO("size:{} pointer:{}",textures[textures_id[i]].size(),textures[textures_id[i]].native_handle());
         stream << image.copy_from(textures[textures_id[i]]);
-        LUISA_INFO("image copy finish");
     }
 
     // apply geometry parameters
@@ -460,8 +459,8 @@ void Differentiation::update_parameter_from_external(Stream &stream, luisa::vect
         auto [buffer_view, bindlessbuffer_id] = _pipeline.bindless_arena_buffer<Vertex>(buffer_id);
         auto length = buffer_view.size();
         stream << buffer_view.copy_from(geoms[geoms_id[i]].view().as<Vertex>());
+        _is_dirty = true;
     }
-
     stream << synchronize();
 }
  
@@ -476,8 +475,8 @@ std::tuple<luisa::vector<void *>, luisa::vector<void *>> Differentiation::get_gr
         LUISA_INFO("{} {} {}", image.size().x , image.size().y , channels);
         auto tex_grad_buf_view = _param_grad_buffer->subview(param_offset, length);
         texture_res.push_back(reinterpret_cast<void*>(reinterpret_cast<uint64_t>(tex_grad_buf_view.native_handle())+tex_grad_buf_view.offset_bytes()));
-        auto tex_buf_view = _param_buffer->subview(param_offset, length);
-        geom_res.push_back(reinterpret_cast<void*>(reinterpret_cast<uint64_t>(tex_buf_view.native_handle())+tex_buf_view.offset_bytes()));
+        // auto tex_buf_view = _param_buffer->subview(param_offset, length);
+        // geom_res.push_back(reinterpret_cast<void*>(reinterpret_cast<uint64_t>(tex_buf_view.native_handle())+tex_buf_view.offset_bytes()));
         // auto size = image.size();
         // luisa::vector<float> pixels(size.x * size.y * channels);
         // stream << image.copy_to(pixels.data()) << compute::synch ronize();

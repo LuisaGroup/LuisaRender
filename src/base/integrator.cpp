@@ -188,26 +188,4 @@ void DifferentiableIntegrator::Instance::_render_one_camera_backward(
    LUISA_INFO("Not implemented for abstract class DifferentiableIntegrator::Instance::_render_one_camera_backward");
 }
 
-void DifferentiableIntegrator::Instance::compute_gradients(PathLogger &pathlogger, uint index, float3 grad_pixel) noexcept {
-    auto size = pathlogger.sizes->read(index);
-    //build matrix
-    
-    //inverse matrix 
-
-    //apply gradients
-    auto A = make_float3x3(0.f);
-    auto vertex = pathlogger.vertexes->read(index);
-    auto normal = pathlogger.normals->read(index);
-    auto uv = pathlogger.uvs->read(index);
-    auto inst_id = pathlogger.inst_ids->read(index);
-    auto triangle_id = pathlogger.triangle_ids->read(index);
-    auto surface_tag = pathlogger.surface_tags->read(index);
-    auto grad_vertex = grad_pixel;
-    auto grad_normal = grad_pixel;
-    auto grad_uv = grad_pixel;
-    auto grad_inst_id = grad_pixel;
-    auto grad_triangle_id = grad_pixel;
-    auto grad_surface_tag = grad_pixel;
-}
-
 }

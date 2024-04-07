@@ -105,15 +105,23 @@ tex_size = np.prod(tex.shape)
 tex_dtype=float
 optimizer = torch.optim.Adam([tex], lr=0.05)
 
+x = luisarender.ParamStruct()
+x.type = 'texture'
+x.id = 0
+x.size = tex_size
+x.buffer_ptr = tex_ptr
+
+y = luisarender.ParamStruct()
+y.type = 'geometry'
+y.id = 0
+#x.size = sphere_size
+#x.buffer_ptr = tex_ptr
 
 for i in range(500):
-    x = luisarender.ParamStruct()
-    x.type = 'texture'
-    x.id = 0
-    x.size = tex_size
-    x.buffer_ptr = tex_ptr
-    luisarender.update_scene([x])
+    luisarender.update_scene([x, y])
     render_img = cu_device_ptr_to_torch_tensor(luisarender.render()[0], (1024, 1024,4))
+    cv2.imshow("render", cv2.cvtColor(render_img.detach().cpu().numpy()[...,:3], cv2.COLOR_BGR2RGB))
+    cv2.waitKey(0)
     render_img.requires_grad_()
     loss = torch.nn.MSELoss()(render_img,target_img)
     loss.backward()
@@ -142,8 +150,6 @@ for i in range(500):
     tex.grad = tex_grad_torch
     optimizer.step()    
     cv2.imshow("texture", cv2.cvtColor(tex.detach().cpu().numpy()[...,:3], cv2.COLOR_BGR2RGB))
-    cv2.imshow("render", cv2.cvtColor(render_img.detach().cpu().numpy()[...,:3], cv2.COLOR_BGR2RGB))
-    cv2.waitKey(100)
 cv2.waitKey(0)
 
 # img = tex_grad_torch.cpu().numpy().reshape(tex.shape)

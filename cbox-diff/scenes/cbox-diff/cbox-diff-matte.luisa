@@ -26,6 +26,12 @@ Surface cbox-red : Matte {
   }
 }
 
+Surface cbox-blue : Matte {
+  Kd : Constant {
+    v { 0.05, 0.05, 0.95 }
+  }
+}
+
 // shape_cbox
 Shape cbox-ceiling : Mesh {
   file { "../../meshes/cbox-parts/ceiling.obj" }
@@ -62,6 +68,12 @@ Shape cbox-light : Mesh {
   }
 }
 
+Shape cbox-short-box : Mesh {
+  file { "../../meshes/cbox-parts/short-box.obj" }
+  surface { @cbox-blue }
+  requires_grad { true }
+}
+
 
 
 Shape cbox : Group {
@@ -71,7 +83,8 @@ Shape cbox : Group {
     @cbox-left-wall,
     @cbox-right-wall,
     @cbox-back-wall,
-    @cbox-light
+    @cbox-light,
+    @cbox-short-box
   }
 }
 
@@ -98,7 +111,7 @@ Camera camera : Pinhole {
   }
 }
 
-Integrator pt : MegaReplayDiff {
+Integrator pt : MegaPathSpaceDiff {
   sampler : Independent {}
   depth { 10 }
   rr_depth { 5 }

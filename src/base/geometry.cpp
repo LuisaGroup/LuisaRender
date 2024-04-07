@@ -110,10 +110,10 @@ void Geometry::_process_shape(
         auto object_to_world = inst_xform.matrix(init_time);
         _accel.emplace_back(*mesh.resource, object_to_world, visible);
 
-        //Todo: Register mesh parameter.
-        /*if (shape->requires_grad()) {
-            _pipeline.differentiation()->register_geometry_parameter(command_buffer, shape, mesh, _accel, instance_id);
-        }*/
+
+        if (shape->requires_grad()) {
+            _pipeline.differentiation()->register_geometry_parameter(command_buffer, mesh, _accel, instance_id);
+        }
 
         auto vertices = shape->mesh().vertices;
         for (auto &v : vertices) {
@@ -182,15 +182,16 @@ bool Geometry::update(CommandBuffer &command_buffer, float time) noexcept {
         }
         command_buffer << _accel.build();
     }
-    // if(_pipeline.differentiable())
-    // {
-    //     // if (_pipeline.differentiation()->is_dirty()) {
-    //     //     updated = true;
-    //     //     for (auto t : _pipeline.differentiation()->geometry_parameters()) {
-    //     //         _accel.set_prim_handle(t.instance_id(), (uint64_t)t.buffer().native_handle());
-    //     //     }
-    //     // }
-    // }
+    if(_pipeline.differentiable())
+    {
+        if (_pipeline.differentiation()->is_dirty()) {
+            for (auto t : _pipeline.differentiation()->geometry_parameters()) {
+                _accel.set_prim_handle(t.instance_id(), (uint64_t)t.buffer().native_handle());
+            }
+            _pipeline.differentiation()->clear_dirty();
+        }
+        command_buffer << _accel.build();
+    }
     return updated;
 }
 

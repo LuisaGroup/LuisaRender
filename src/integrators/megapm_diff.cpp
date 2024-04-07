@@ -378,14 +378,91 @@ public:
         }
     };
     
+    class PhotonMappingLogger{
+    public:
+
+        Buffer<UInt> photon_inst_ids, photon_triangle_ids, photon_scatter_events;
+        Buffer<UInt> path_inst_ids, path_triangle_ids, path_scatter_events, path_end_type;
+        Buffer<Float> photon_etas, path_etas;
+        Buffer<Float3> path_light_ends;
+        Buffer<Float3> photon_light_starts, photon_colors;
+
+        Buffer<UInt> path_photon_connections;
+        unique_ptr<Matrix> photon_matrix, photon_matrix_param, path_matrix, path_matrix_param;
+        
+        
+        Pipeline _pipeline;
+
+        UInt photon_per_iter, max_photon_depth, path_per_iter, max_path_depth, max_photon_per_path;
+        PhotonMappingLogger(UInt photon_per_iter, UInt max_photon_depth, UInt path_per_iter, UInt max_path_depth, UInt max_photon_per_path, Pipeline &pipeline):
+            photon_per_iter(photon_per_iter), max_photon_depth(max_photon_depth), path_per_iter(path_per_iter), max_path_depth(max_path_depth), max_photon_per_path(max_photon_per_path){
+            _pipeline=pipeline;
+            auto &&device = pipeline.device();
+            photon_inst_ids = pipeline.create<Buffer<UInt>>(photon_per_iter * max_photon_depth);
+            photon_triangle_ids = pipeline.create<Buffer<UInt>>(photon_per_iter * max_photon_depth);
+            path_inst_ids = pipeline.create<Buffer<UInt>>(path_per_iter * max_path_depth);
+            path_triangle_ids = pipeline.create<Buffer<UInt>>(path_per_iter * max_path_depth);
+            photon_etas = pipeline.create<Buffer<Float>>(photon_per_iter * max_photon_depth);
+            path_etas = pipeline.create<Buffer<Float>>(path_per_iter * max_path_depth);
+            path_light_ends = pipeline.create<Buffer<Float3>>(path_per_iter*max_path_depth);
+            photon_light_starts = pipeline.create<Buffer<Float3>>(photon_per_iter);
+            photon_colors = pipeline.create<Buffer<Float3>>(photon_per_iter*max_photon_depth);
+            path_photon_connections = pipeline.create<Buffer<UInt>>(path_per_iter * max_photon_per_path);
+        }
+
+        void add_start_light(UInt photon_id, UInt path_size, LightSampler::Sample &light_sample){
+            auto index = photon_id * max_photon_depth + path_size; 
+            auto beta = light_sample.eval.L / light_sample.eval.pdf;
+            auto start = light_sample.shadow_ray.origin;
+            photon_light_starts->write(index, start);
+        }
+
+        void add_photon_vertex(UInt photon_id, UInt path_size, Interaction* it, Surface::Sample &s, Float eta){
+            auto index = photon_id * max_photon_depth + path_size;
+            photon_inst_ids->write(index, it->instance_id());
+            photon_triangle_ids->write(index, it->triangle_id());
+            photon_etas->write(index, eta);
+            photon_colors->write(index, s.eval.f);
+            photon_scatter_events->write(index, s.eval.events);
+        }
+
+        void add_path_vertex(UInt path_id, UInt path_size, Interaction* it, Surface::Sample &s, Float eta){
+            auto index = path_id * max_path_depth + path_size;
+            path_inst_ids->write(index, it->instance_id());
+            path_triangle_ids->write(index, it->triangle_id());
+            path_etas->write(index, eta);
+            path_scatter_events->write(index, s.eval.events);
+        }
+
+        void add_light_end(UInt path_id, UInt path_size, Interaction* it){
+            auto index = path_id * max_path_depth + path_size;
+            path_light_ends->write(index, end);
+            path_end_type->write(index, 1u);
+        }
+
+        void add_envlight_end(UInt path_id, UInt path_size, Float3 end){
+            auto index = path_id * max_path_depth + path_size;
+            path_light_ends->write(index, end);
+            path_end_type->write(index, 2u);
+        }
+
+        void connect_path_photon(UInt path_id, UInt photon_id, UInt path_photon_size, Float3 dis, Float3 Phi){
+            auto index = path_id * max_photon_per_path + path_photon_size;
+            path_photon_connections->write(index, photon_id);
+        }
+
+    };
+
+    PhotonMappingLogger logger;
+
 protected:
     void _render_one_camera_backward(CommandBuffer &command_buffer, uint iteration,  Camera::Instance *camera, Buffer<float> &grad_in) noexcept { 
-        Kernel1D grad = [&]() noexcept {
-            auto index = static_cast<UInt>(dispatch_x());
-            //read pixel gradients
-            grad_pixel = grad_in.read(index); 
-            EPSM_compute_gradients(pathlogger, index, grad_pixel);
-        }; 
+        // Kernel1D grad = [&]() noexcept {
+        //     auto index = static_cast<UInt>(dispatch_x());
+        //     //read pixel gradients
+        //     grad_pixel = grad_in.read(index); 
+        //     EPSM_compute_gradients(pathlogger, index, grad_pixel);
+        // }; 
     }
     void _render_one_camera(CommandBuffer &command_buffer, Camera::Instance *camera) noexcept override {
         if (!pipeline().has_lighting()) [[unlikely]] {
@@ -420,7 +497,7 @@ protected:
         PixelIndirect indirect(photon_per_iter, spectrum, camera->film(), clamp, node<MegakernelPhotonMappingDiff>()->shared_radius());
         PhotonMap photons(photon_per_iter * node<MegakernelPhotonMappingDiff>()->max_depth(), spectrum);
 
-        pathlogger = make_unique<PathLogger>(node<MegakernelPhotonMappingDiff>()->max_depth(), node<MegakernelPhotonMappingDiff>()->photon_per_iter(), spectrum);
+        //pathlogger = make_unique<PathLogger>(node<MegakernelPhotonMappingDiff>()->max_depth(), node<MegakernelPhotonMappingDiff>()->photon_per_iter(), spectrum);
         //initialize PixelIndirect
         Kernel2D indirect_initialize_kernel = [&]() noexcept {
             // Buffer<float> _radius;
@@ -461,7 +538,7 @@ protected:
             auto pixel_id = dispatch_id().xy();
             auto sampler_id = UInt2(pixel_id.x + resolution.x, pixel_id.y);
             $if(pixel_id.x * resolution.y + pixel_id.y < photon_per_iter) {
-                photon_tracing(photons, camera, frame_index, sampler_id, time, pixel_id.x * resolution.y + pixel_id.y, pathlogger);
+                photon_tracing(photons, camera, frame_index, sampler_id, time, pixel_id.x * resolution.y + pixel_id.y);
             };
         };
         //check for direct and indirect(photon gathering)
@@ -579,6 +656,10 @@ protected:
         auto ray = camera_ray;
         auto pdf_bsdf = def(1e16f);
 
+        auto pixel_id_1d = pixel_id.x*resolution.y+pixel_id.y;
+        auto path_size = 0u;
+        pathlogger->add_start_camera(pixel_id_1d, path_size, ray, camera_weight);
+        path_size+=1;
         $for(depth, node<MegakernelPhotonMappingDiff>()->max_depth()) {
 
             // trace
@@ -592,6 +673,7 @@ protected:
                     if (pipeline().environment()) {
                         auto eval = light_sampler()->evaluate_miss(ray->direction(), swl, time);
                         Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
+                        pathlogger->add_envlight_end(pixel_id_1d, path_size, ray->direction(), eval);
                     }
                     $break;
                 };
@@ -601,6 +683,7 @@ protected:
                     $if(it->shape().has_light()) {
                         auto eval = light_sampler()->evaluate_hit(*it, ray->origin(), swl, time);
                         Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
+                        pathlogger->add_light_end(pixel_id_1d, path_size, it, eval);
                     };
                 }
             } else {
@@ -609,6 +692,7 @@ protected:
                         if (pipeline().environment()) {
                             auto eval = light_sampler()->evaluate_miss(ray->direction(), swl, time);
                             Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
+                            pathlogger->add_envlight_end(pixel_id_1d, path_size, ray->direction(), eval);
                         }
                         $break;
                     };
@@ -618,6 +702,7 @@ protected:
                         $if(it->shape().has_light()) {
                             auto eval = light_sampler()->evaluate_hit(*it, ray->origin(), swl, time);
                             Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
+                            pathlogger->add_light_end(pixel_id_1d, path_size, it, eval);
                         };
                     }
                 };
@@ -671,6 +756,7 @@ protected:
                     if (auto dispersive = closure->is_dispersive()) {
                         $if(*dispersive) { swl.terminate_secondary(); };
                     }
+                    
                     // direct lighting
                     if (node<MegakernelPhotonMappingDiff>()->separate_direct()) {
                         $if(light_sample.eval.pdf > 0.0f & !occluded) {
@@ -692,6 +778,7 @@ protected:
                     $if(stop_check) {
                         stop_direct = true;
                         auto grid = photons.point_to_grid(it->p());
+                        auto near_photonS = 0u;
                         $for(x, grid.x - 1, grid.x + 2) {
                             $for(y, grid.y - 1, grid.y + 2) {
                                 $for(z, grid.z - 1, grid.z + 2) {
@@ -715,11 +802,13 @@ protected:
                                                 Phi = spectrum->srgb(swl, beta * photon_beta * eval_photon.f / abs_cos_theta(wi_local));
                                             }
                                             //testbeta += Phi;
+                                            //pipeline().printer().info("render:{}", indirect.cur_n(pixel_id));
                                             indirect.add_phi(pixel_id, Phi);
                                             indirect.add_cur_n(pixel_id, 1u);
-                                            //pipeline().printer().info("render:{}", indirect.cur_n(pixel_id));
-                                        };
 
+                                            logger.connect_path_photon(pixel_id_1d, photon_index, near_photons, dis, Phi);
+                                            near_photons+=1;
+                                        };
                                         photon_index = photons.nxt(photon_index);
                                     };
                                 };
@@ -734,6 +823,9 @@ protected:
                     beta *= w * surface_sample.eval.f;
                     // apply eta scale
                     auto eta = closure->eta().value_or(1.f);
+                    
+                    logger.add_path_vertex(pixel_id_1d, path_size, it, surface_sample, eta);
+                    path_size+=1;
                     $switch(surface_sample.event) {
                         $case(Surface::event_enter) { eta_scale = sqr(eta); };
                         $case(Surface::event_exit) { eta_scale = sqr(1.f / eta); };
@@ -751,6 +843,7 @@ protected:
                         if (pipeline().environment()) {
                             auto eval = light_sampler()->evaluate_miss(ray->direction(), swl, time);
                             Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
+                            logger.add_envlight_end(pixel_id_1d, path_size, ray->direction(), eval);
                         }
                     };
 
@@ -759,6 +852,7 @@ protected:
                         $if(it_next->shape().has_light()) {
                             auto eval = light_sampler()->evaluate_hit(*it_next, ray->origin(), swl, time);
                             Li += beta * eval.L * balance_heuristic(pdf_bsdf, eval.pdf);
+                            logger.add_light_end(pixel_id_1d, path_size, it_next, eval);
                         };
                     }
                     $break;
@@ -777,7 +871,7 @@ protected:
     }
 
     void photon_tracing(PhotonMap &photons, const Camera::Instance *camera, Expr<uint> frame_index,
-                        Expr<uint2> pixel_id, Expr<float> time, Expr<uint> photon_id, luisa::unique_ptr<PathLogger> pathlogger) {
+                        Expr<uint2> pixel_id, Expr<float> time, Expr<uint> photon_id) {
 
         sampler()->start(pixel_id, frame_index);
         // generate uniform samples
@@ -796,6 +890,11 @@ protected:
         auto ray = light_sample.shadow_ray;
         auto pdf_bsdf = def(1e16f);
 
+        auto pixel_id_1d = pixel_id.x*resolution.y + pixel_id.y;
+
+        auto path_size = 0u; 
+        logger.add_start_light(pixel_id_1d, path_size, light_sample);
+        path_size+=1;
         $for(depth, node<MegakernelPhotonMappingDiff>()->max_depth()) {
 
             // trace
@@ -803,7 +902,6 @@ protected:
             auto it = pipeline().geometry()->intersect(ray);
             
 
-            
             // miss
             $if(!it->valid()) {
                 $break;
@@ -824,24 +922,11 @@ protected:
                     photons.push(it->p(), swl, beta, wi);
                 };
             } else {
-                $if(depth >= 0) {//change this to 0 can get direct light
-                    photons.push(it->p(), swl, beta, wi);
-                };
+                photons.push(it->p(), swl, beta, wi);
             }
             
-            //PathLogger.add(it);
-            // evaluate material
             auto surface_tag = it->shape().surface_tag();
             auto eta_scale = def(1.f);
-
-            
-            auto p = it->p();
-            auto n = it->ng();
-            auto uv = it->uv();
-            auto instance_id = it->instance_id();
-            auto triangle_id = it->triangle_id();
-            
-            pathlogger->add(photon_id, p, n, uv, instance_id, triangle_id, surface_tag);
 
             PolymorphicCall<Surface::Closure> call;
 
@@ -875,6 +960,11 @@ protected:
                     auto bnew = beta * w * surface_sample.eval.f;
                     // apply eta scale
                     auto eta = closure->eta().value_or(1.f);
+                    
+
+                    logger.add_photon_vertex(pixel_id_1d, path_size, it, closure, surface_sample);
+                    path_size+=1;
+
                     $switch(surface_sample.event) {
                         $case(Surface::event_enter) { eta_scale = sqr(eta); };
                         $case(Surface::event_exit) { eta_scale = sqr(1.f / eta); };
