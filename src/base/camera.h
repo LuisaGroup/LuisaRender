@@ -106,6 +106,7 @@ public:
     [[nodiscard]] auto shutter_span() const noexcept { return _shutter_span; }
     [[nodiscard]] auto shutter_weight(float time) const noexcept -> float;
     [[nodiscard]] auto shutter_samples() const noexcept -> luisa::vector<ShutterSample>;
+    [[nodiscard]] auto uniform_shutter_samples() const noexcept -> luisa::vector<ShutterSample>;
     [[nodiscard]] auto spp() const noexcept { return _spp; }
     [[nodiscard]] auto file() const noexcept { return _file; }
     [[nodiscard]] virtual bool requires_lens_sampling() const noexcept = 0;

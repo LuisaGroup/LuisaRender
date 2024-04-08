@@ -201,7 +201,48 @@ auto Camera::shutter_samples() const noexcept -> vector<ShutterSample> {
     }
     return buckets;
 }
-
+auto Camera::uniform_shutter_samples() const noexcept -> vector<ShutterSample> {
+    if (_shutter_span.x == _shutter_span.y) {
+        ShutterPoint sp{_shutter_span.x, 1.0f};
+        return {ShutterSample{sp, _spp}};
+    }
+    auto duration = _shutter_span.y - _shutter_span.x;
+    auto inv_n = 1.0f / static_cast<float>(_shutter_samples);
+    std::uniform_real_distribution<float> dist{};
+    std::default_random_engine random{std::random_device{}()};
+    luisa::vector<ShutterSample> buckets(_shutter_samples);
+    for (auto bucket = 0u; bucket < _shutter_samples; bucket++) {
+        auto ts = static_cast<float>(bucket) * inv_n * duration;
+        auto te = static_cast<float>(bucket + 1u) * inv_n * duration;
+        auto a = 0.5f;
+        auto t = std::lerp(ts, te, a);
+        auto w = shutter_weight(t);
+        buckets[bucket].point = ShutterPoint{t, w};
+    }
+    luisa::vector<uint> indices(_shutter_samples);
+    std::iota(indices.begin(), indices.end(), 0u);
+    std::shuffle(indices.begin(), indices.end(), random);
+    auto remainder = _spp % _shutter_samples;
+    LUISA_WARNING("spp cannot uniformly distribute to shutter samples!, random shuffle spp to shutter samples");
+    auto samples_per_bucket = _spp / _shutter_samples;
+    for (auto i = 0u; i < remainder; i++) { buckets[indices[i]].spp = samples_per_bucket + 1u; }
+    for (auto i = remainder; i < _shutter_samples; i++) { buckets[indices[i]].spp = samples_per_bucket; }
+    auto sum_weights = std::accumulate(buckets.cbegin(), buckets.cend(), 0.0, [](auto lhs, auto rhs) noexcept {
+        return lhs + rhs.point.weight * rhs.spp;
+    });
+    if (sum_weights == 0.0) [[unlikely]] {
+        LUISA_WARNING_WITH_LOCATION(
+            "Invalid shutter samples generated. "
+            "Falling back to uniform shutter curve.");
+        for (auto &s : buckets) { s.point.weight = 1.0f; }
+    } else {
+        auto scale = _spp / sum_weights;
+        for (auto &s : buckets) {
+            s.point.weight = static_cast<float>(s.point.weight * scale);
+        }
+    }
+    return buckets;
+}
 Camera::Instance::Instance(Pipeline &pipeline, CommandBuffer &command_buffer, const Camera *camera) noexcept
     : _pipeline{&pipeline}, _camera{camera},
       _film{camera->film()->build(pipeline, command_buffer)},
