@@ -81,8 +81,8 @@ void ProgressiveIntegrator::Instance::_render_one_camera(
     LUISA_INFO("Integrator shader compile in {} ms.", integrator_shader_compilation_time);
     auto shutter_samples = camera->node()->shutter_samples();
     luisa::vector<float4> local_pixels;
-    if(node()->video()){
-        shutter_samples= camera->node()->uniform_shutter_samples();
+    if (node()->video()) {
+        shutter_samples = camera->node()->uniform_shutter_samples();
         local_pixels.resize(pixel_count);
     }
     command_buffer << synchronize();
@@ -94,7 +94,7 @@ void ProgressiveIntegrator::Instance::_render_one_camera(
     auto dispatch_count = 0u;
     auto sample_id = 0u;
 
-    auto shutter_id= 0u;
+    auto shutter_id = 0u;
     for (auto s : shutter_samples) {
         pipeline().update(command_buffer, s.point.time);
         for (auto i = 0u; i < s.spp; i++) {
@@ -112,15 +112,15 @@ void ProgressiveIntegrator::Instance::_render_one_camera(
                 command_buffer << [&progress, p] { progress.update(p); };
             }
         }
-        if(node()->video()) {
+        if (node()->video()) {
             command_buffer << synchronize();
             camera->film()->download(command_buffer, local_pixels.data());
             command_buffer << compute::synchronize();
             camera->film()->clear(command_buffer);
             auto film_path = camera->node()->file();
             //film_path is a std::filesystem::path, add number to its name
-            auto new_name= film_path.stem().string()+std::to_string(shutter_id)+film_path.extension().string();
-            auto new_film_path= film_path.replace_filename(new_name);
+            auto new_name = film_path.stem().string() + std::format("{:05}", shutter_id) + film_path.extension().string();
+            auto new_film_path = film_path.replace_filename(new_name);
             save_image(new_film_path, reinterpret_cast<const float *>(local_pixels.data()), resolution);
             shutter_id++;
         }

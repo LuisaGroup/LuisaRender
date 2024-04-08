@@ -9,6 +9,7 @@
 #include <assimp/Importer.hpp>
 #include <assimp/material.h>
 #include <assimp/scene.h>
+#include <assimp/matrix4x4.h>
 #include <assimp/postprocess.h>
 
 #include <nlohmann/json.hpp>
@@ -137,6 +138,10 @@ int main(int argc, char *argv[]) {
                     auto hash = luisa::hash_value(rel_path.string(), luisa::hash_value(semantic, luisa::hash_value("__external__")));
                     if (auto it = loaded_textures.find(hash); it != loaded_textures.end()) {
                         return json::string_t{luisa::format("@{}", it->second)};
+                    }
+                    if (rel_path.extension().string() == ".dds") {
+                        LUISA_WARNING("find image file:{} not supported, please convert it to other format (default png)!", rel_path.string());
+                        rel_path.replace_extension("png");
                     }
                     scene_materials[name] = {
                         {"type", "Texture"},
@@ -329,6 +334,8 @@ int main(int argc, char *argv[]) {
             auto two_sided = false;
             m->Get(AI_MATKEY_TWOSIDED, two_sided);
             auto intensity = 1.f;
+            aiColor4D c;
+            m->Get(AI_MATKEY_COLOR_EMISSIVE, c);
             m->Get(AI_MATKEY_COLOR_EMISSIVE, intensity);
             json::string_t light_name{luisa::format("Light:{:05}:{}", i, m->GetName().C_Str())};
             scene_materials[light_name] = {
@@ -336,7 +343,7 @@ int main(int argc, char *argv[]) {
                 {"impl", "Diffuse"},
                 {"prop",
                  {{"emission", emission},
-                  {"scale", intensity},
+                  {"scale", intensity * 100.f},
                   {"two_sided", two_sided}}}};
             LUISA_INFO("Found light '{}'.", light_name);
             light_names[i] = light_name;
@@ -438,7 +445,108 @@ int main(int argc, char *argv[]) {
         }
         meshes.emplace_back(std::move(mesh_name));
     }
-
+    //animations
+    double anime_start = 1e20f, anime_end = -1e20f;
+    luisa::unordered_map<luisa::string, json::string_t> animation_names;
+    for (auto i = 0u; i < scene->mNumAnimations; ++i) {
+        auto animation = scene->mAnimations[i];
+        for (auto j = 0u; j < animation->mNumChannels; ++j) {
+            auto channel = animation->mChannels[j];
+            json::string_t name{luisa::format("Animation:{}:{}", scene->mAnimations[i]->mName.C_Str(), channel->mNodeName.C_Str())};
+            animation_names[luisa::string(channel->mNodeName.C_Str())] = name;
+            LUISA_INFO("Processing animation '{}'...", name);
+            json::object_t anime_s, anime_r, anime_t;
+            std::vector<float> scale_times, rotate_times, translate_times;
+            std::vector<json::object_t> scales, rotates, translates;
+            aiMatrix4x4 transform;
+            for (auto k = 0u; k < channel->mNumPositionKeys; ++k) {
+                auto position = channel->mPositionKeys[k].mValue;
+                auto time = channel->mPositionKeys[k].mTime;
+                anime_start = std::min(anime_start, time);
+                anime_end = std::max(anime_end, time);
+                translate_times.emplace_back(time);
+                aiMatrix4x4::Translation(position, transform);
+                translates.emplace_back(json::object_t{
+                    {"impl", "Matrix"},
+                    {"prop",
+                     {{"m",
+                       {transform[0][0], transform[0][1], transform[0][2], transform[0][3],
+                        transform[1][0], transform[1][1], transform[1][2], transform[1][3],
+                        transform[2][0], transform[2][1], transform[2][2], transform[2][3],
+                        transform[3][0], transform[3][1], transform[3][2], transform[3][3]}}}}});
+            }
+            for (auto k = 0u; k < channel->mNumScalingKeys; ++k) {
+                auto scale = channel->mScalingKeys[k].mValue;
+                auto time = channel->mScalingKeys[k].mTime;
+                anime_start = std::min(anime_start, time);
+                anime_end = std::max(anime_end, time);
+                scale_times.emplace_back(time);
+                aiMatrix4x4::Scaling(scale, transform);
+                scales.emplace_back(json::object_t{
+                    {"impl", "Matrix"},
+                    {"prop",
+                     {{"m",
+                       {transform[0][0], transform[0][1], transform[0][2], transform[0][3],
+                        transform[1][0], transform[1][1], transform[1][2], transform[1][3],
+                        transform[2][0], transform[2][1], transform[2][2], transform[2][3],
+                        transform[3][0], transform[3][1], transform[3][2], transform[3][3]}}}}});
+            }
+            for (auto k = 0u; k < channel->mNumRotationKeys; ++k) {
+                auto rotation = channel->mRotationKeys[k].mValue;
+                auto time = channel->mRotationKeys[k].mTime;
+                anime_start = std::min(anime_start, time);
+                anime_end = std::max(anime_end, time);
+                rotate_times.emplace_back(time);
+                auto r = rotation.GetMatrix();
+                transform = aiMatrix4x4(r);
+                rotates.emplace_back(json::object_t{
+                    {"impl", "Matrix"},
+                    {"prop",
+                     {{"m",
+                       {transform[0][0], transform[0][1], transform[0][2], transform[0][3],
+                        transform[1][0], transform[1][1], transform[1][2], transform[1][3],
+                        transform[2][0], transform[2][1], transform[2][2], transform[2][3],
+                        transform[3][0], transform[3][1], transform[3][2], transform[3][3]}}}}});
+            }
+            if (scales.empty()) {
+                anime_s = {
+                    {"type", "Transform"},
+                    {"impl", "Identity"},
+                    {"prop", {}}};
+            } else {
+                anime_s = {
+                    {"type", "Transform"},
+                    {"impl", "Lerp"},
+                    {"prop", {{"transforms", scales}, {"time_points", scale_times}}}};
+            }
+            if (rotates.empty()) {
+                anime_r = {
+                    {"type", "Transform"},
+                    {"impl", "Identity"},
+                    {"prop", {}}};
+            } else {
+                anime_r = {
+                    {"type", "Transform"},
+                    {"impl", "Lerp"},
+                    {"prop", {{"transforms", rotates}, {"time_points", rotate_times}}}};
+            }
+            if (translates.empty()) {
+                anime_t = {
+                    {"type", "Transform"},
+                    {"impl", "Identity"},
+                    {"prop", {}}};
+            } else {
+                anime_t = {
+                    {"type", "Transform"},
+                    {"impl", "Lerp"},
+                    {"prop", {{"transforms", translates}, {"time_points", translate_times}}}};
+            }
+            scene_geometry[name] = {
+                {"type", "Transform"},
+                {"impl", "Stack"},
+                {"prop", {{"transforms", std::vector{anime_s, anime_r, anime_t}}}}};
+        }
+    }
     // process scene graph
     aiAABB aabb{aiVector3D{1e30f}, aiVector3D{-1e30f}};
     luisa::queue<const aiNode *> node_queue;
@@ -471,7 +579,7 @@ int main(int argc, char *argv[]) {
                 aabb.mMax.y = std::max(aabb.mMax.y, mesh_aabb.mMax.y);
                 aabb.mMax.z = std::max(aabb.mMax.z, mesh_aabb.mMax.z);
             }
-            if (children.size() == 1u && transform.IsIdentity()) {
+            if (children.size() == 1u && transform.IsIdentity() && !scene->HasAnimations()) {
                 groups.emplace_back(children[0]);
             } else {
                 json::string_t group_name{luisa::format(
@@ -479,7 +587,9 @@ int main(int argc, char *argv[]) {
                 scene_geometry[group_name] = {{"type", "Shape"},
                                               {"impl", "Group"},
                                               {"prop", {{"shapes", children}}}};
-                if (!transform.IsIdentity()) {
+                ///animation
+                auto iter = animation_names.find(luisa::string(node->mName.C_Str()));
+                if ((iter == animation_names.end()) && !transform.IsIdentity()) {
                     scene_geometry[group_name]["prop"]["transform"] = {
                         {"impl", "Matrix"},
                         {"prop",
@@ -488,6 +598,10 @@ int main(int argc, char *argv[]) {
                             transform[1][0], transform[1][1], transform[1][2], transform[1][3],
                             transform[2][0], transform[2][1], transform[2][2], transform[2][3],
                             transform[3][0], transform[3][1], transform[3][2], transform[3][3]}}}}};
+                } else {
+                    if (iter != animation_names.end()) {
+                        scene_geometry[group_name]["prop"]["transform"] = luisa::format("@{}", iter->second);
+                    }
                 }
                 groups.emplace_back(luisa::format("@{}", group_name));
             }
@@ -507,6 +621,10 @@ int main(int argc, char *argv[]) {
     // camera
     auto scene_configs = json::object();
     std::vector<json::string_t> cameras;
+    json::object_t film = {{"impl", "Color"}, {"prop", {{"resolution", {1920, 1080}}, {"filter", {{"impl", "Gaussian"}}}}}};
+    if (scene->HasAnimations()) {
+        film = {{"impl", "Display"}, {"prop", {{"base", film}}}};
+    }
     for (auto i = 0u; i < scene->mNumCameras; i++) {
         auto camera = scene->mCameras[i];
         json::string_t name{luisa::format("Camera:{}:{}", i, camera->mName.C_Str())};
@@ -522,18 +640,18 @@ int main(int argc, char *argv[]) {
              {{"fov", luisa::degrees(vertical_fov)},
               {"spp", 256u},
               {"clip", camera->mClipPlaneNear},
+              {"shutter_span", {anime_start, anime_end}},
               {"file", luisa::format("render-view-{:02}.exr", cameras.size())},
-              {"film",
-               {{"impl", "Color"},
-                {"prop",
-                 {{"resolution", {1920, height}},
-                  {"filter", {{"impl", "Gaussian"}}}}}}},
+              {"film", film},
               {"transform",
                {{"impl", "View"},
                 {"prop",
                  {{"position", {position.x, position.y, position.z}},
                   {"front", {front.x, front.y, front.z}},
                   {"up", {camera->mUp.x, camera->mUp.y, camera->mUp.z}}}}}}}}};
+        if (auto iter = animation_names.find(luisa::string(camera->mName.C_Str())); iter != animation_names.end()) {
+            scene_configs[name]["prop"]["transform"] = luisa::format("@{}", iter->second);
+        }
         cameras.emplace_back(luisa::format("@{}", name));
     }
     // create default camera if non-existent
@@ -542,7 +660,7 @@ int main(int argc, char *argv[]) {
         LUISA_INFO("Creating default camera '{}'...", name);
         auto center = (aabb.mMin + aabb.mMax) * .5f;
         auto size = (aabb.mMax - aabb.mMin) * .5f;
-        auto position = center + aiVector3D{0.f, 0.f, size.z};
+        auto position = center + aiVector3D{0.f, 0.f, 2 * size.z};
         scene_configs[name] = {
             {"type", "Camera"},
             {"impl", "Pinhole"},
@@ -550,39 +668,43 @@ int main(int argc, char *argv[]) {
              {{"fov", 50},
               {"spp", 256u},
               {"file", "render.exr"},
-              {"film",
-               {{"impl", "Color"},
-                {"prop",
-                 {{"resolution", {1920, 1080}},
-                  {"filter", {{"impl", "Gaussian"}}}}}}},
+              {"shutter_span", {anime_start, anime_end}},
+              {"film", film},
               {"transform",
                {{"impl", "View"},
                 {"prop",
                  {{"position", {position.x, position.y, position.z}},
-                  {"front", {0, 0, -1}},
+                  {"front", {0, 0, -size.z}},
                   {"up", {0, 1, 0}}}}}}}}};
         cameras.emplace_back(luisa::format("@{}", name));
     }
     scene_configs["import"] = {"lr_exported_materials.json", "lr_exported_geometry.json"};
     scene_configs["render"] = {{"cameras", std::move(cameras)},
                                {"shapes", {"@lr_exported_geometry"}},
-                               {"integrator", {{"impl", "WavePath"}, {"prop", {{"sampler", {{"impl", "PMJ02BN"}}}}}}}};
+                               {"integrator", {{"impl", "MegaPath"}, {"prop", {{"video", scene->HasAnimations()}, {"sampler", {{"impl", "PMJ02BN"}}}}}}}};
     if (!has_lights) {
+        //        scene_configs["render"]["environment"] = {
+        //            {"impl", "Spherical"},
+        //            {"prop",
+        //             {{"emission",
+        //               {{"impl", "NishitaSky"},
+        //                {"prop",
+        //                 {{"sun_elevation", 60},
+        //                  {"sun_angle", 1},
+        //                  {"altitude", 500},
+        //                  {"air_density", 1},
+        //                  {"dust_density", 1},
+        //                  {"ozone_density", 2},
+        //                  {"sun_disc", true},
+        //                  {"sun_intensity", 0.2}}}}},
+        //              {"scale", 0.1}}}};
         scene_configs["render"]["environment"] = {
             {"impl", "Spherical"},
             {"prop",
              {{"emission",
-               {{"impl", "NishitaSky"},
+               {{"impl", "Image"},
                 {"prop",
-                 {{"sun_elevation", 60},
-                  {"sun_angle", 1},
-                  {"altitude", 500},
-                  {"air_density", 1},
-                  {"dust_density", 1},
-                  {"ozone_density", 2},
-                  {"sun_disc", true},
-                  {"sun_intensity", 0.2}}}}},
-              {"scale", 0.1}}}};
+                 {{"file", "textures/spaichingen_hill_2k.exr"}}}}}}}};
     }
 
     // save
