@@ -92,12 +92,15 @@ public:
             requires std::is_base_of_v<Light, T>
         [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_light); }
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
+        [[nodiscard]] virtual float emission_power() const noexcept = 0;
         [[nodiscard]] virtual luisa::unique_ptr<Closure> closure(
             const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
     };
 
 public:
     Light(Scene *scene, const SceneNodeDesc *desc) noexcept;
+    [[nodiscard]] virtual float scale() const noexcept { return 1.f; }
+    [[nodiscard]] virtual bool two_sided() const noexcept { return false; }
     [[nodiscard]] virtual bool is_null() const noexcept { return false; }
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
