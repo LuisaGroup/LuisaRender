@@ -47,6 +47,9 @@ public:
         }
     }
 
+    // assume that the number of light instances is constant, hence no need to update the buffer.
+    void update() noexcept override {}
+
     [[nodiscard]] Light::Evaluation evaluate_hit(
         const Interaction &it, Expr<float3> p_from,
         const SampledWavelengths &swl, Expr<float> time) const noexcept override {
