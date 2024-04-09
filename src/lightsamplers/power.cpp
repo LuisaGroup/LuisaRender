@@ -38,16 +38,16 @@ public:
     PowerLightSamplerInstance(const PowerLightSampler *sampler, Pipeline &pipeline, CommandBuffer &command_buffer) noexcept
         : LightSampler::Instance{pipeline, sampler} {
         if (!pipeline.lights().empty()) {
+            auto num_inst = static_cast<uint>(pipeline.geometry()->instances().size());
             auto num_light_inst = static_cast<uint>(pipeline.geometry()->light_instances().size());
-            auto num_instance = static_cast<uint>(pipeline.geometry()->instances().size());
             auto [light_handle_buffer_view, light_handle_buffer_id] = pipeline.bindless_arena_buffer<Light::Handle>(num_light_inst);
             _light_handle_buffer_id = light_handle_buffer_id;
-            auto [tag_lut_buffer_view, tag_lut_buffer_id] = pipeline.bindless_arena_buffer<uint>(num_instance);
+            auto [tag_lut_buffer_view, tag_lut_buffer_id] = pipeline.bindless_arena_buffer<uint>(num_inst);
             _tag_lut_buffer_id = tag_lut_buffer_id;
             _alias_table_buffer = pipeline.device().create_buffer<AliasEntry>(num_light_inst);
             _pdf_buffer = pipeline.device().create_buffer<float>(num_light_inst);
             command_buffer << light_handle_buffer_view.copy_from(pipeline.geometry()->light_instances().data()) << commit();
-            luisa::vector<uint> tag_lut(num_instance);
+            luisa::vector<uint> tag_lut(num_inst);
             for (auto i = 0u; i < num_light_inst; i++) {
                 auto const &handle = pipeline.geometry()->light_instances()[i];
                 tag_lut[handle.instance_id] = i;
