@@ -547,6 +547,39 @@ int main(int argc, char *argv[]) {
                 {"prop", {{"transforms", std::vector{anime_s, anime_r, anime_t}}}}};
         }
     }
+    auto get_animation = [&](auto node, bool reverse) noexcept -> json::object_t {
+        std::vector<json::string_t> transforms;
+        for (auto n = node; n != nullptr; n = n->mParent) {
+            auto transform = n->mTransformation;
+            auto iter = animation_names.find(luisa::string(n->mName.C_Str()));
+            if ((iter == animation_names.end()) && !transform.IsIdentity()) {
+                auto name = json::string_t{luisa::format("Transform:{}", n->mName.C_Str())};
+                scene_geometry[name] = {{"type", "Transform"},
+                                        {"impl", "Matrix"},
+                                        {"prop",
+                                         {{"m",
+                                           {transform[0][0], transform[0][1], transform[0][2], transform[0][3],
+                                            transform[1][0], transform[1][1], transform[1][2], transform[1][3],
+                                            transform[2][0], transform[2][1], transform[2][2], transform[2][3],
+                                            transform[3][0], transform[3][1], transform[3][2], transform[3][3]}}}}};
+                transforms.emplace_back(luisa::format("@{}", name));
+            } else {
+                if (iter != animation_names.end()) {
+                    transforms.emplace_back(luisa::format("@{}", iter->second));
+                }
+            }
+        }
+        if (reverse)
+            std::reverse(transforms.begin(), transforms.end());
+        if (transforms.empty()) {
+            return json::object_t{
+                {"impl", "Identity"},
+                {"prop", {}}};
+        }
+        return json::object_t{
+            {"impl", "stack"},
+            {"prop", {{"transforms", transforms}}}};
+    };
     // process scene graph
     aiAABB aabb{aiVector3D{1e30f}, aiVector3D{-1e30f}};
     luisa::queue<const aiNode *> node_queue;
@@ -588,21 +621,8 @@ int main(int argc, char *argv[]) {
                                               {"impl", "Group"},
                                               {"prop", {{"shapes", children}}}};
                 ///animation
-                auto iter = animation_names.find(luisa::string(node->mName.C_Str()));
-                if ((iter == animation_names.end()) && !transform.IsIdentity()) {
-                    scene_geometry[group_name]["prop"]["transform"] = {
-                        {"impl", "Matrix"},
-                        {"prop",
-                         {{"m",
-                           {transform[0][0], transform[0][1], transform[0][2], transform[0][3],
-                            transform[1][0], transform[1][1], transform[1][2], transform[1][3],
-                            transform[2][0], transform[2][1], transform[2][2], transform[2][3],
-                            transform[3][0], transform[3][1], transform[3][2], transform[3][3]}}}}};
-                } else {
-                    if (iter != animation_names.end()) {
-                        scene_geometry[group_name]["prop"]["transform"] = luisa::format("@{}", iter->second);
-                    }
-                }
+                auto transform = get_animation(node, false);
+                scene_geometry[group_name]["prop"]["transform"] = transform;
                 groups.emplace_back(luisa::format("@{}", group_name));
             }
         }
@@ -681,7 +701,7 @@ int main(int argc, char *argv[]) {
     scene_configs["import"] = {"lr_exported_materials.json", "lr_exported_geometry.json"};
     scene_configs["render"] = {{"cameras", std::move(cameras)},
                                {"shapes", {"@lr_exported_geometry"}},
-                               {"integrator", {{"impl", "MegaPath"}, {"prop", {{"video", scene->HasAnimations()}, {"sampler", {{"impl", "PMJ02BN"}}}}}}}};
+                               {"integrator", {{"impl", "normal"}, {"prop", {{"video", scene->HasAnimations()}, {"sampler", {{"impl", "PMJ02BN"}}}}}}}};
     if (!has_lights) {
         //        scene_configs["render"]["environment"] = {
         //            {"impl", "Spherical"},
