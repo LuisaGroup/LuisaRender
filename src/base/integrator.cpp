@@ -16,7 +16,8 @@ Integrator::Integrator(Scene *scene, const SceneNodeDesc *desc) noexcept
           "sampler", SceneNodeDesc::shared_default_sampler("independent")))},
       _light_sampler{scene->load_light_sampler(desc->property_node_or_default(
           "light_sampler", SceneNodeDesc::shared_default_light_sampler("uniform")))},
-      _video{desc->property_bool_or_default("video", false)} {}
+      _video{desc->property_bool_or_default("video", false)},
+      _save{desc->property_bool_or_default("save", true)} {}
 
 Integrator::Instance::Instance(Pipeline &pipeline, CommandBuffer &command_buffer, const Integrator *integrator) noexcept
     : _pipeline{pipeline}, _integrator{integrator},
@@ -45,7 +46,9 @@ void ProgressiveIntegrator::Instance::render(Stream &stream) noexcept {
         command_buffer << compute::synchronize();
         camera->film()->release();
         auto film_path = camera->node()->file();
-        save_image(film_path, reinterpret_cast<const float *>(pixels.data()), resolution);
+        if (node()->save()) {
+            save_image(film_path, reinterpret_cast<const float *>(pixels.data()), resolution);
+        }
     }
 }
 
@@ -117,11 +120,13 @@ void ProgressiveIntegrator::Instance::_render_one_camera(
             camera->film()->download(command_buffer, local_pixels.data());
             command_buffer << compute::synchronize();
             camera->film()->clear(command_buffer);
-            auto film_path = camera->node()->file();
-            //film_path is a std::filesystem::path, add number to its name
-            auto new_name = film_path.stem().string() + std::format("{:05}", shutter_id) + film_path.extension().string();
-            auto new_film_path = film_path.replace_filename(new_name);
-            save_image(new_film_path, reinterpret_cast<const float *>(local_pixels.data()), resolution);
+            if (node()->save()) {
+                auto film_path = camera->node()->file();
+                //film_path is a std::filesystem::path, add number to its name
+                auto new_name = film_path.stem().string() + std::format("{:05}", shutter_id) + film_path.extension().string();
+                auto new_film_path = film_path.replace_filename(new_name);
+                save_image(new_film_path, reinterpret_cast<const float *>(local_pixels.data()), resolution);
+            }
             shutter_id++;
         }
     }

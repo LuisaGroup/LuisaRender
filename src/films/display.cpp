@@ -181,6 +181,9 @@ public:
     void release() noexcept override {
         while (_window && !_window->should_close()) {
             _window->poll_events();
+            if (_window->is_key_down(Key::KEY_ESCAPE)) {
+                _window->set_should_close();
+            }
         }
         _framebuffer = {};
         _swapchain = {};
@@ -194,6 +197,9 @@ public:
             current_time - _last_frame_time >= interval) {
             _last_frame_time = current_time;
             _window->poll_events();
+            if (_window->is_key_down(Key::KEY_ESCAPE)) {
+                _window->set_should_close();
+            }
             if (_window->should_close()) {
                 command_buffer << synchronize();
                 exit(0);// FIXME: exit gracefully
