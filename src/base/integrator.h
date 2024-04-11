@@ -48,11 +48,13 @@ private:
     const Sampler *_sampler;
     const LightSampler *_light_sampler;
     const bool _video;
+    const bool _save;
 public:
     Integrator(Scene *scene, const SceneNodeDesc *desc) noexcept;
     [[nodiscard]] auto sampler() const noexcept { return _sampler; }
     [[nodiscard]] auto light_sampler() const noexcept { return _light_sampler; }
     [[nodiscard]] auto video() const noexcept { return _video; }
+    [[nodiscard]] auto save() const noexcept { return _save; }
     [[nodiscard]] virtual luisa::unique_ptr<Instance> build(
         Pipeline &pipeline, CommandBuffer &command_buffer) const noexcept = 0;
 };
