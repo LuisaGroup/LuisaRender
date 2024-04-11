@@ -50,6 +50,24 @@ public:
     // assume that the number of light instances is constant, hence no need to update the buffer.
     void update(CommandBuffer &command_buffer) noexcept override {}
 
+    [[nodiscard]] Float evaluate_selection(
+        Expr<uint> tag, Expr<float3> p_from,
+        const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        auto prob = def(0.f);
+        $if(tag == LightSampler::selection_environment) {
+            prob = _env_prob;
+        } $else {
+            if (pipeline().lights().empty()) [[unlikely]] {// no lights
+                LUISA_WARNING_WITH_LOCATION("No lights in scene.");
+                prob = 0.f;
+            } else {
+                auto n = static_cast<float>(pipeline().lights().size());
+                prob = (1.f - _env_prob) / n;
+            }
+        };
+        return prob;
+    }
+
     [[nodiscard]] Light::Evaluation evaluate_hit(
         const Interaction &it, Expr<float3> p_from,
         const SampledWavelengths &swl, Expr<float> time) const noexcept override {

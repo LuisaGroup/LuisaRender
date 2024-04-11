@@ -359,6 +359,39 @@ public:
         }
     }
 
+    [[nodiscard]] Float evaluate_selection(
+        Expr<uint> tag, Expr<float3> p_from,
+        const SampledWavelengths &swl, Expr<float> time) const noexcept override {
+        auto prob = def(0.f);
+        $if(tag == LightSampler::selection_environment) {
+            prob = _env_prob;
+        } $else {
+            if (pipeline().lights().empty()) [[unlikely]] {// no lights
+                LUISA_WARNING_WITH_LOCATION("No lights in scene.");
+                prob = 0.f;
+            } else {
+                auto current_node_index = _bvh_lut_buffer->read(tag);
+                auto current_node_pdf = def(1.f - _env_prob);
+                $while(current_node_index != 0u) {
+                    auto current_node = BVHNode::decode(
+                        _bvh_bounds_buffer->read(current_node_index),
+                        _bvh_cone_buffer->read(current_node_index),
+                        _world_min, _world_max);
+                    auto sibling_node_index = ite((current_node_index % 2u) == 1u, current_node_index + 1u, current_node_index - 1u);
+                    auto sibling_node = BVHNode::decode(
+                        _bvh_bounds_buffer->read(sibling_node_index),
+                        _bvh_cone_buffer->read(sibling_node_index),
+                        _world_min, _world_max);
+                    auto w1 = current_node.compute_weight(p_from), w2 = sibling_node.compute_weight(p_from);
+                    current_node_pdf *= w1 / (w1 + w2 + 1e-6f);
+                    current_node_index = (current_node_index - 1u) >> 1u;
+                };
+                prob = current_node_pdf;
+            }
+        };
+        return prob;
+    }
+
     [[nodiscard]] Light::Evaluation evaluate_hit(
         const Interaction &it, Expr<float3> p_from,
         const SampledWavelengths &swl, Expr<float> time) const noexcept override {

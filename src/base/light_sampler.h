@@ -66,6 +66,9 @@ public:
         [[nodiscard]] auto node() const noexcept { return static_cast<const T *>(_sampler); }
         [[nodiscard]] auto &pipeline() const noexcept { return _pipeline; }
         virtual void update(CommandBuffer &command_buffer) noexcept = 0;
+        [[nodiscard]] virtual Float evaluate_selection(
+            Expr<uint> tag, Expr<float3> p_from,
+            const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;
         [[nodiscard]] virtual Evaluation evaluate_hit(
             const Interaction &it, Expr<float3> p_from,
             const SampledWavelengths &swl, Expr<float> time) const noexcept = 0;

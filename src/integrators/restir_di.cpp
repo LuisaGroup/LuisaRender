@@ -75,7 +75,8 @@ protected:
             resolution.x, resolution.y, spp);
 
         using namespace luisa::compute;
-
+        // Kernel2D temporal_reuse_kernel
+        // Kernel2D spatial_reuse_kernel
         Kernel2D render_kernel = [&](UInt frame_index, Float time, Float shutter_weight) noexcept {
             set_block_size(16u, 16u, 1u);
             auto pixel_id = dispatch_id().xy();
@@ -150,6 +151,62 @@ protected:
         auto spectrum = pipeline().spectrum();
         auto swl = spectrum->sample(spectrum->node()->is_fixed() ? 0.f : sampler()->generate_1d());
         SampledSpectrum Li{swl.dimension(), 0.f};
+
+        auto ray = cs.ray;
+
+        $loop {
+            // trace
+            auto wo = -ray->direction();
+            auto it = pipeline().geometry()->intersect(ray);
+
+            // miss
+            $if(!it->valid()) {
+                if (pipeline().environment()) {
+                    auto eval = light_sampler()->evaluate_miss(ray->direction(), swl, time);
+                    Li += cs.weight * eval.L;
+                }
+                $break;
+            };
+
+            // hit light
+            if (!pipeline().lights().empty()) {
+                $if(it->shape().has_light()) {
+                    auto eval = light_sampler()->evaluate_hit(*it, ray->origin(), swl, time);
+                    Li += cs.weight * eval.L;
+                };
+            }
+
+            // compute direct lighting
+            $if(!it->shape().has_surface()) { $break; };
+            auto u_light_selection = sampler()->generate_1d();
+            auto u_light_surface = sampler()->generate_2d();
+            auto sel = light_sampler()->select(*it, u_light_selection, swl, time);
+            auto light_sample = light_sampler()->sample_light(*it, sel, u_light_surface, swl, time);
+            auto occluded = def(false);
+            $if(light_sample.eval.pdf > 0.f) {
+                occluded = pipeline().geometry()->intersect_any(light_sample.shadow_ray);
+            };
+
+            // evaluate material
+            auto surface_tag = it->shape().surface_tag();
+            PolymorphicCall<Surface::Closure> call;
+            pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
+                surface->closure(call, *it, swl, wo, 1.f, time);
+            });
+            call.execute([&](auto closure) noexcept {
+                if (auto dispersive = closure->is_dispersive()) {
+                    $if(*dispersive) { swl.terminate_secondary(); };
+                }
+                $if(light_sample.eval.pdf > 0.0f & !occluded) {
+                    auto wi = light_sample.shadow_ray->direction();
+                    auto eval = closure->evaluate(wo, wi);
+                    $if(eval.pdf > 0.f) {
+                        Li += cs.weight * eval.f * light_sample.eval.L / light_sample.eval.pdf;
+                    };
+                };
+            });
+            $break;
+        };
         return spectrum->srgb(swl, Li);
     }
 };
