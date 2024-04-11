@@ -670,7 +670,10 @@ int main(int argc, char *argv[]) {
                   {"front", {front.x, front.y, front.z}},
                   {"up", {camera->mUp.x, camera->mUp.y, camera->mUp.z}}}}}}}}};
         if (auto iter = animation_names.find(luisa::string(camera->mName.C_Str())); iter != animation_names.end()) {
-            scene_configs[name]["prop"]["transform"] = luisa::format("@{}", iter->second);
+
+            auto transform = json::string_t(luisa::format("@{}", iter->second));
+            scene_configs[name]["prop"]["transform"] = {{"impl", "stack"},
+                                                        {"prop", {{"transforms", {{{"impl", "View"}, {"prop", {{"position", {position.x, position.y, position.z}}, {"front", {-front.x, front.y, front.z}}, {"up", {camera->mUp.x, camera->mUp.y, camera->mUp.z}}}}}, transform}}}}};
         }
         cameras.emplace_back(luisa::format("@{}", name));
     }
