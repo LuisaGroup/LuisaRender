@@ -125,11 +125,13 @@ protected:
                 camera->film()->download(command_buffer, local_pixels.data());
                 command_buffer << compute::synchronize();
                 camera->film()->clear(command_buffer);
-                auto film_path = camera->node()->file();
-                //film_path is a std::filesystem::path, add number to its name
-                auto new_name = film_path.stem().string() + std::format("{:05}", shutter_id) + film_path.extension().string();
-                auto new_film_path = film_path.replace_filename(new_name);
-                save_image(new_film_path, reinterpret_cast<const float *>(local_pixels.data()), resolution);
+                if (node()->save()) {
+                    auto film_path = camera->node()->file();
+                    //film_path is a std::filesystem::path, add number to its name
+                    auto new_name = film_path.stem().string() + std::format("{:05}", shutter_id) + film_path.extension().string();
+                    auto new_film_path = film_path.replace_filename(new_name);
+                    save_image(new_film_path, reinterpret_cast<const float *>(local_pixels.data()), resolution);
+                }
                 shutter_id++;
             }
         }
