@@ -140,6 +140,7 @@ int main(int argc, char *argv[]) {
                         return json::string_t{luisa::format("@{}", it->second)};
                     }
                     if (rel_path.extension().string() == ".dds") {
+                        //Enforce convert of dds to png, need external tool like Texconv to convert
                         LUISA_WARNING("find image file:{} not supported, please convert it to other format (default png)!", rel_path.string());
                         rel_path.replace_extension("png");
                     }
@@ -670,7 +671,10 @@ int main(int argc, char *argv[]) {
                   {"front", {front.x, front.y, front.z}},
                   {"up", {camera->mUp.x, camera->mUp.y, camera->mUp.z}}}}}}}}};
         if (auto iter = animation_names.find(luisa::string(camera->mName.C_Str())); iter != animation_names.end()) {
-
+            //Currently only target for fbx format. several problems:
+            // 1. assimp doc says animation should cover the node transformation, but actually it replace the whole hierarchy for camera.
+            //2. Even without that, the camera could reverse its direction. It is also observed in blender fbx import.
+            //3. Assimp's fbx format is frequently updating, so these observations might change for later version.
             auto transform = json::string_t(luisa::format("@{}", iter->second));
             scene_configs[name]["prop"]["transform"] = {{"impl", "stack"},
                                                         {"prop", {{"transforms", {{{"impl", "View"}, {"prop", {{"position", {position.x, position.y, position.z}}, {"front", {-front.x, front.y, front.z}}, {"up", {camera->mUp.x, camera->mUp.y, camera->mUp.z}}}}}, transform}}}}};
@@ -706,6 +710,7 @@ int main(int argc, char *argv[]) {
                                {"shapes", {"@lr_exported_geometry"}},
                                {"integrator", {{"impl", "normal"}, {"prop", {{"video", scene->HasAnimations()}, {"sampler", {{"impl", "PMJ02BN"}}}}}}}};
     if (!has_lights) {
+        //Currently Nishita sky have bugs
         //        scene_configs["render"]["environment"] = {
         //            {"impl", "Spherical"},
         //            {"prop",
@@ -727,7 +732,7 @@ int main(int argc, char *argv[]) {
              {{"emission",
                {{"impl", "Image"},
                 {"prop",
-                 {{"file", "textures/spaichingen_hill_2k.exr"}}}}}}}};
+                 {{"file", "textures/sky.exr"}}}}}}}};
     }
 
     // save
