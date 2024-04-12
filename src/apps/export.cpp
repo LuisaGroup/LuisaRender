@@ -140,6 +140,7 @@ int main(int argc, char *argv[]) {
                         return json::string_t{luisa::format("@{}", it->second)};
                     }
                     if (rel_path.extension().string() == ".dds") {
+                        //Enforce convert of dds to png, need external tool like Texconv to convert
                         LUISA_WARNING("find image file:{} not supported, please convert it to other format (default png)!", rel_path.string());
                         rel_path.replace_extension("png");
                     }
@@ -547,6 +548,39 @@ int main(int argc, char *argv[]) {
                 {"prop", {{"transforms", std::vector{anime_s, anime_r, anime_t}}}}};
         }
     }
+    auto get_animation = [&](auto node, bool reverse) noexcept -> json::object_t {
+        std::vector<json::string_t> transforms;
+        for (auto n = node; n != nullptr; n = n->mParent) {
+            auto transform = n->mTransformation;
+            auto iter = animation_names.find(luisa::string(n->mName.C_Str()));
+            if ((iter == animation_names.end()) && !transform.IsIdentity()) {
+                auto name = json::string_t{luisa::format("Transform:{}", n->mName.C_Str())};
+                scene_geometry[name] = {{"type", "Transform"},
+                                        {"impl", "Matrix"},
+                                        {"prop",
+                                         {{"m",
+                                           {transform[0][0], transform[0][1], transform[0][2], transform[0][3],
+                                            transform[1][0], transform[1][1], transform[1][2], transform[1][3],
+                                            transform[2][0], transform[2][1], transform[2][2], transform[2][3],
+                                            transform[3][0], transform[3][1], transform[3][2], transform[3][3]}}}}};
+                transforms.emplace_back(luisa::format("@{}", name));
+            } else {
+                if (iter != animation_names.end()) {
+                    transforms.emplace_back(luisa::format("@{}", iter->second));
+                }
+            }
+        }
+        if (reverse)
+            std::reverse(transforms.begin(), transforms.end());
+        if (transforms.empty()) {
+            return json::object_t{
+                {"impl", "Identity"},
+                {"prop", {}}};
+        }
+        return json::object_t{
+            {"impl", "stack"},
+            {"prop", {{"transforms", transforms}}}};
+    };
     // process scene graph
     aiAABB aabb{aiVector3D{1e30f}, aiVector3D{-1e30f}};
     luisa::queue<const aiNode *> node_queue;
@@ -588,21 +622,8 @@ int main(int argc, char *argv[]) {
                                               {"impl", "Group"},
                                               {"prop", {{"shapes", children}}}};
                 ///animation
-                auto iter = animation_names.find(luisa::string(node->mName.C_Str()));
-                if ((iter == animation_names.end()) && !transform.IsIdentity()) {
-                    scene_geometry[group_name]["prop"]["transform"] = {
-                        {"impl", "Matrix"},
-                        {"prop",
-                         {{"m",
-                           {transform[0][0], transform[0][1], transform[0][2], transform[0][3],
-                            transform[1][0], transform[1][1], transform[1][2], transform[1][3],
-                            transform[2][0], transform[2][1], transform[2][2], transform[2][3],
-                            transform[3][0], transform[3][1], transform[3][2], transform[3][3]}}}}};
-                } else {
-                    if (iter != animation_names.end()) {
-                        scene_geometry[group_name]["prop"]["transform"] = luisa::format("@{}", iter->second);
-                    }
-                }
+                auto transform = get_animation(node, false);
+                scene_geometry[group_name]["prop"]["transform"] = transform;
                 groups.emplace_back(luisa::format("@{}", group_name));
             }
         }
@@ -650,7 +671,13 @@ int main(int argc, char *argv[]) {
                   {"front", {front.x, front.y, front.z}},
                   {"up", {camera->mUp.x, camera->mUp.y, camera->mUp.z}}}}}}}}};
         if (auto iter = animation_names.find(luisa::string(camera->mName.C_Str())); iter != animation_names.end()) {
-            scene_configs[name]["prop"]["transform"] = luisa::format("@{}", iter->second);
+            //Currently only target for fbx format. several problems:
+            // 1. assimp doc says animation should cover the node transformation, but actually it replace the whole hierarchy for camera.
+            //2. Even without that, the camera could reverse its direction. It is also observed in blender fbx import.
+            //3. Assimp's fbx format is frequently updating, so these observations might change for later version.
+            auto transform = json::string_t(luisa::format("@{}", iter->second));
+            scene_configs[name]["prop"]["transform"] = {{"impl", "stack"},
+                                                        {"prop", {{"transforms", {{{"impl", "View"}, {"prop", {{"position", {position.x, position.y, position.z}}, {"front", {-front.x, front.y, front.z}}, {"up", {camera->mUp.x, camera->mUp.y, camera->mUp.z}}}}}, transform}}}}};
         }
         cameras.emplace_back(luisa::format("@{}", name));
     }
@@ -681,8 +708,9 @@ int main(int argc, char *argv[]) {
     scene_configs["import"] = {"lr_exported_materials.json", "lr_exported_geometry.json"};
     scene_configs["render"] = {{"cameras", std::move(cameras)},
                                {"shapes", {"@lr_exported_geometry"}},
-                               {"integrator", {{"impl", "MegaPath"}, {"prop", {{"video", scene->HasAnimations()}, {"sampler", {{"impl", "PMJ02BN"}}}}}}}};
+                               {"integrator", {{"impl", "normal"}, {"prop", {{"video", scene->HasAnimations()}, {"sampler", {{"impl", "PMJ02BN"}}}}}}}};
     if (!has_lights) {
+        //Currently Nishita sky have bugs
         //        scene_configs["render"]["environment"] = {
         //            {"impl", "Spherical"},
         //            {"prop",
@@ -704,7 +732,7 @@ int main(int argc, char *argv[]) {
              {{"emission",
                {{"impl", "Image"},
                 {"prop",
-                 {{"file", "textures/spaichingen_hill_2k.exr"}}}}}}}};
+                 {{"file", "textures/sky.exr"}}}}}}}};
     }
 
     // save
