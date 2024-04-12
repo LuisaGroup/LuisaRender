@@ -154,8 +154,7 @@ public:
             eval = closure->evaluate(it, p_from);
         });
         auto tag = pipeline().buffer<uint>(_tag_lut_buffer_id).read(it.instance_id());
-        auto pdf_light = _pdf_buffer->read(tag);
-        eval.pdf *= (1.f - _env_prob) * pdf_light;
+        eval.pdf *= evaluate_selection(tag, p_from, swl, time);
         return eval;
     }
 

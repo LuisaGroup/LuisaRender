@@ -405,23 +405,7 @@ public:
             eval = closure->evaluate(it, p_from);
         });
         auto tag = pipeline().buffer<uint>(_tag_lut_buffer_id).read(it.instance_id());
-        auto current_node_index = _bvh_lut_buffer->read(tag);
-        auto current_node_pdf = def(1.f - _env_prob);
-        $while(current_node_index != 0u) {
-            auto current_node = BVHNode::decode(
-                _bvh_bounds_buffer->read(current_node_index),
-                _bvh_cone_buffer->read(current_node_index),
-                _world_min, _world_max);
-            auto sibling_node_index = ite((current_node_index % 2u) == 1u, current_node_index + 1u, current_node_index - 1u);
-            auto sibling_node = BVHNode::decode(
-                _bvh_bounds_buffer->read(sibling_node_index),
-                _bvh_cone_buffer->read(sibling_node_index),
-                _world_min, _world_max);
-            auto w1 = current_node.compute_weight(p_from), w2 = sibling_node.compute_weight(p_from);
-            current_node_pdf *= w1 / (w1 + w2 + 1e-6f);
-            current_node_index = (current_node_index - 1u) >> 1u;
-        };
-        eval.pdf *= current_node_pdf;
+        eval.pdf *= evaluate_selection(tag, p_from, swl, time);
         return eval;
     }
 
