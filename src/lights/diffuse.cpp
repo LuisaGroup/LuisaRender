@@ -24,8 +24,8 @@ public:
               "emission", SceneNodeDesc::shared_default_texture("Constant")))},
           _scale{std::max(desc->property_float_or_default("scale", 1.0f), 0.0f)},
           _two_sided{desc->property_bool_or_default("two_sided", false)} {}
-    [[nodiscard]] auto scale() const noexcept { return _scale; }
-    [[nodiscard]] auto two_sided() const noexcept { return _two_sided; }
+    [[nodiscard]] float scale() const noexcept override { return _scale; }
+    [[nodiscard]] bool two_sided() const noexcept override { return _two_sided; }
     [[nodiscard]] bool is_null() const noexcept override { return _scale == 0.0f || _emission->is_black(); }
     [[nodiscard]] luisa::string_view impl_type() const noexcept override { return LUISA_RENDER_PLUGIN_NAME; }
     [[nodiscard]] luisa::unique_ptr<Instance> build(
@@ -43,6 +43,13 @@ public:
         const Texture::Instance *texture) noexcept
         : Light::Instance{ppl, light}, _texture{texture} {}
     [[nodiscard]] auto texture() const noexcept { return _texture; }
+    [[nodiscard]] float emission_power() const noexcept override {
+        auto emission_power = node<DiffuseLight>()->scale();
+        $if(node<DiffuseLight>()->two_sided()) {
+            emission_power *= 2.0f;
+        };
+        return emission_power;
+    }
     [[nodiscard]] luisa::unique_ptr<Light::Closure> closure(
         const SampledWavelengths &swl, Expr<float> time) const noexcept override;
 };

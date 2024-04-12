@@ -109,6 +109,9 @@ bool Pipeline::update(CommandBuffer &command_buffer, float time) noexcept {
         command_buffer << _transform_matrix_buffer.view(0u, _transforms.size())
                               .copy_from(_transform_matrices.data());
     }
+    if (updated) {
+        _integrator->light_sampler()->update(command_buffer);
+    }
     return updated;
 }
 
