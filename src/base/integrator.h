@@ -119,23 +119,7 @@ public:
         luisa::unordered_map<const Camera::Instance *, Image<float>> replay_Li;
         luisa::unordered_map<const Camera::Instance *, Buffer<float4>> last_time_rendered;
         virtual void _render_one_camera_backward(CommandBuffer &command_buffer, uint iteration, Camera::Instance *camera, Buffer<float> & grad_in) noexcept;
-        class Matrix{
-            private:
-                BufferView<float> pool;
-                uint size, height, width;
-                uint single_mat_size;
-            public:
-                Matrix(uint batch, uint height, uint width, Pipeline &pipeline):height(height), size(batch), width(width){
-                    pool = pipeline.create<Buffer<float>>(std::max(batch * height * width, 1u))->view();
-                    single_mat_size = height*width;
-                }
-                void set(UInt id, UInt x, UInt y, Float value) {
-                    pool->write(id*single_mat_size+x*width+y, value);
-                }
-                Var<float> get(UInt id, UInt x, UInt y) {
-                    return pool->read(id*single_mat_size+x*width+y);
-                }
-        };
+        
     public:
         void render_backward(Stream &stream, luisa::vector<Buffer<float>> &grad_in) noexcept override;
         Instance(Pipeline &pipeline, CommandBuffer &command_buffer,

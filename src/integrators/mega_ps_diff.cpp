@@ -32,7 +32,23 @@ public:
           _rr_threshold{std::max(desc->property_float_or_default("rr_threshold", 0.95f), 0.05f)},
           _max_EPSM_length{std::max(desc->property_uint_or_default("max_EPSM_length", 6u), 6u)} {
           }
-    
+    class Matrix{
+    private:
+        BufferView<float> pool;
+        uint size, height, width;
+        uint single_mat_size;
+    public:
+        Matrix(uint batch, uint height, uint width, Pipeline &pipeline):height(height), size(batch), width(width){
+            pool = pipeline.create<Buffer<float>>(std::max(batch * height * width, 1u))->view();
+            single_mat_size = height*width;
+        }
+        void set(UInt id, UInt x, UInt y, Float value) {
+            pool->write(id*single_mat_size+x*width+y, value);
+        }
+        Var<float> get(UInt id, UInt x, UInt y) {
+            return pool->read(id*single_mat_size+x*width+y);
+        }
+};
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
     [[nodiscard]] auto rr_threshold() const noexcept { return _rr_threshold; }
