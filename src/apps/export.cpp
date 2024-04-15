@@ -261,6 +261,25 @@ int main(int argc, char *argv[]) {
             roughness_tex_name = swizzle_rough_name;
             metallic_tex_name = swizzle_metal_name;
         }
+        if (rough_tex.empty() && metallic_tex.empty() && specular_map.has_value()) {// assume fbx
+            json::string_t specular_tex_name = *specular_map;
+            auto swizzle_rough_name = specular_tex_name + ":Roughness";
+            auto swizzle_metal_name = specular_tex_name + ":Metallic";
+            scene_materials[swizzle_rough_name] = {
+                {"type", "Texture"},
+                {"impl", "Swizzle"},
+                {"prop",
+                 {{"base", luisa::format("{}", specular_tex_name)},
+                  {"swizzle", "y"}}}};
+            scene_materials[swizzle_metal_name] = {
+                {"type", "Texture"},
+                {"impl", "Swizzle"},
+                {"prop",
+                 {{"base", luisa::format("{}", specular_tex_name)},
+                  {"swizzle", "z"}}}};
+            roughness_tex_name = swizzle_rough_name;
+            metallic_tex_name = swizzle_metal_name;
+        }
         // transmission
         auto trans_factor = -1.f;
         json::string_t trans_tex_name;
