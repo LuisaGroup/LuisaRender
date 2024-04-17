@@ -598,7 +598,6 @@ protected:
 
         auto viewpoints_per_iter = resolution.x * resolution.y;
         
-        
         logger = make_unique<PhotonMappingLogger>(pixel_count, node<MegakernelPhotonMappingDiff>()->max_depth(), spectrum);
         indirect = make_unique<PixelIndirect>(viewpoints_per_iter, spectrum, camera->film(), clamp, node<MegakernelPhotonMappingDiff>()->shared_radius());
         viewpoints = make_unique<ViewPointMap>(viewpoints_per_iter, spectrum);
@@ -709,21 +708,14 @@ protected:
                 command_buffer << viewpoint_reset().dispatch(viewpoints->size());
                 command_buffer << viewpath_construct(sample_id++, s.point.time, s.point.weight).dispatch(resolution);
                 command_buffer << build_grid().dispatch(viewpoints->size());
-                LUISA_INFO("iteration {} emit", i);
                 command_buffer << emit_photon(sample_id++, s.point.time).dispatch(make_uint2(add_x, resolution.y));
-                LUISA_INFO("iteration {} update", i);
                 command_buffer << indirect_update().dispatch(viewpoints_per_iter);
                 if (node<MegakernelPhotonMappingDiff>()->shared_radius()) {
                     command_buffer << shared_update().dispatch(1u);
                 }
-                command_buffer << synchronize();
             }
         }
-        // command_buffer << synchronize();
-        // LUISA_INFO("Finishi core");
-        // command_buffer << pipeline().printer().retrieve();
-        // LUISA_INFO("Finishi printer");
-        // tot_photon is photon_per_iter not photon_per_iter*spp because of unnormalized samples
+
         command_buffer << indirect_draw(node<MegakernelPhotonMappingDiff>()->photon_per_iter(), runtime_spp).dispatch(resolution);
         LUISA_INFO("Finishi indirect_draw");
         command_buffer << synchronize();

@@ -367,7 +367,7 @@ SampledSpectrum MicrofacetReflection::forward_compute(
     SampledSpectrum f{_r.dimension()};
     // TODO: autodiff do not support $if ?
     $if(same_hemisphere(wo, wi) & any(wh != 0.f)) {
-        //     wh = normalize(wh);
+        wh = normalize(wh);
         // For the Fresnel call, make sure that wh is in the same hemisphere
         // as the surface normal, so that TIR is handled correctly.
         auto F = _fresnel->evaluate(dot(wi, face_forward(wh, make_float3(0.f, 0.f, 1.f))));
