@@ -162,7 +162,7 @@ public:
     void apply_gradients(CommandBuffer &command_buffer) noexcept;
     void accum_gradients(CommandBuffer &command_buffer) noexcept;
 
-    void add_geom_gradients(Float grad, UInt inst_id, UInt triangle_id, UInt offset) noexcept;
+    void add_geom_gradients(Float3 grad_v, Float3 grad_n, Float3 weight, UInt inst_id, UInt triangle_id) noexcept;
     /// Apply then clear the gradients
     void step(CommandBuffer &command_buffer) noexcept;
     void dump(CommandBuffer &command_buffer, const std::filesystem::path &folder) const noexcept;

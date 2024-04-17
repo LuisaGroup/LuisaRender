@@ -375,11 +375,39 @@ void Differentiation::accumulate(const Differentiation::TexturedParameter &param
     write_grad(map_uv(p), grad);
 }
 
-void Differentiation::add_geom_gradients(Float grad, UInt inst_id, UInt triangle_id, UInt offset) noexcept {
+void Differentiation::add_geom_gradients(Float3 grad_v, Float3 grad_n, Float3 weight, UInt inst_id, UInt triangle_id) noexcept {
     auto gradient_offset = instance2offset.value()->read(inst_id)-1u;
     $if(gradient_offset < 0) { return; };
-    _grad_buffer.value()->atomic(gradient_offset + triangle_id * 8 + offset).fetch_add(grad);
-    _counter.value()->atomic(gradient_offset + triangle_id * 8 + offset).fetch_add(UInt(1));
+
+    auto instance = pipeline().geometry()->instance(inst_id);
+    auto triangle = pipeline().geometry()->triangle(instance, triangle_id);
+    _grad_buffer.value()->atomic(gradient_offset + triangle.i0 * 8 + 0).fetch_add(grad_v[0] * weight[0]);
+    _grad_buffer.value()->atomic(gradient_offset + triangle.i0 * 8 + 1).fetch_add(grad_v[1] * weight[0]);
+    _grad_buffer.value()->atomic(gradient_offset + triangle.i0 * 8 + 2).fetch_add(grad_v[2] * weight[0]);
+    _grad_buffer.value()->atomic(gradient_offset + triangle.i0 * 8 + 3).fetch_add(grad_n[0] * weight[0]);
+    _grad_buffer.value()->atomic(gradient_offset + triangle.i0 * 8 + 4).fetch_add(grad_n[1] * weight[0]);
+    _grad_buffer.value()->atomic(gradient_offset + triangle.i0 * 8 + 5).fetch_add(grad_n[2] * weight[0]);
+    
+    _grad_buffer.value()->atomic(gradient_offset + triangle.i1 * 8 + 0).fetch_add(grad_v[0] * weight[1]);
+    _grad_buffer.value()->atomic(gradient_offset + triangle.i1 * 8 + 1).fetch_add(grad_v[1] * weight[1]);
+    _grad_buffer.value()->atomic(gradient_offset + triangle.i1 * 8 + 2).fetch_add(grad_v[2] * weight[1]);
+    _grad_buffer.value()->atomic(gradient_offset + triangle.i1 * 8 + 3).fetch_add(grad_n[0] * weight[1]);
+    _grad_buffer.value()->atomic(gradient_offset + triangle.i1 * 8 + 4).fetch_add(grad_n[1] * weight[1]);
+    _grad_buffer.value()->atomic(gradient_offset + triangle.i1 * 8 + 5).fetch_add(grad_n[2] * weight[1]);
+
+    _grad_buffer.value()->atomic(gradient_offset + triangle.i2 * 8 + 0).fetch_add(grad_v[0] * weight[2]);
+    _grad_buffer.value()->atomic(gradient_offset + triangle.i2 * 8 + 1).fetch_add(grad_v[1] * weight[2]);
+    _grad_buffer.value()->atomic(gradient_offset + triangle.i2 * 8 + 2).fetch_add(grad_v[2] * weight[2]);
+    _grad_buffer.value()->atomic(gradient_offset + triangle.i2 * 8 + 3).fetch_add(grad_n[0] * weight[2]);
+    _grad_buffer.value()->atomic(gradient_offset + triangle.i2 * 8 + 4).fetch_add(grad_n[1] * weight[2]);
+    _grad_buffer.value()->atomic(gradient_offset + triangle.i2 * 8 + 5).fetch_add(grad_n[2] * weight[2]);
+    
+    for(uint i=0;i<6;i++)
+    {
+        _counter.value()->atomic(gradient_offset + triangle.i0 * 8 + i).fetch_add(UInt(1));
+        _counter.value()->atomic(gradient_offset + triangle.i1 * 8 + i).fetch_add(UInt(1));
+        _counter.value()->atomic(gradient_offset + triangle.i2 * 8 + i).fetch_add(UInt(1));
+    }
 }
 
 void Differentiation::step(CommandBuffer &command_buffer) noexcept {

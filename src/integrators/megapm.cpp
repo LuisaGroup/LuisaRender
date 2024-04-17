@@ -40,7 +40,7 @@ public:
           _initial_radius{std::max(desc->property_float_or_default("initial_radius", -200.f), -10000.f)},//<0 for world_size/-radius (-grid count)
           _photon_per_iter{std::max(desc->property_uint_or_default("photon_per_iter", 200000u), 10u)},
           _separate_direct{true},                                                  //when false, use photon mapping for all flux and gathering at first intersection. Just for debug
-          _shared_radius{desc->property_bool_or_default("shared_radius", true)} {};//whether or not use the shared radius trick in SPPM paper. True is better in performance.
+          _shared_radius{true} {};//whether or not use the shared radius trick in SPPM paper. True is better in performance.
     [[nodiscard]] auto max_depth() const noexcept { return _max_depth; }
     [[nodiscard]] auto photon_per_iter() const noexcept { return _photon_per_iter; }
     [[nodiscard]] auto rr_depth() const noexcept { return _rr_depth; }
@@ -538,7 +538,7 @@ protected:
         }
         LUISA_INFO("total spp:{}", runtime_spp);
         //tot_photon is photon_per_iter not photon_per_iter*spp because of unnormalized samples
-        command_buffer << indirect_draw(node<MegakernelPhotonMapping>()->photon_per_iter(), runtime_spp).dispatch(resolution);
+        command_buffer << indirect_draw(node<MegakernelPhotonMapping>()->photon_per_iter(), 1).dispatch(resolution);
         command_buffer << synchronize();
         command_buffer << pipeline().printer().retrieve();
 
