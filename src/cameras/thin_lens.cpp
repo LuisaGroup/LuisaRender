@@ -101,10 +101,8 @@ public:
     }
 
     [[nodiscard]] Float2 project(Expr<float3> p) const noexcept override {
-        auto view_matrix = inverse(camera_to_world());
-        auto p_view = make_float3(view_matrix * make_float4(p, 1.f));
         auto data = _device_data->read(0u);
-        auto p_focal = p_view * (data.focus_distance / p_view.z);
+        auto p_focal = p * (data.focus_distance / p.z);
         return (make_float2(p_focal.x, -p_focal.y) / data.projected_pixel_size + data.pixel_offset) / data.resolution;
     }
 };

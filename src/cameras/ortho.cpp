@@ -57,12 +57,10 @@ public:
         return std::make_pair(std::move(ray), 1.0f);
     }
     [[nodiscard]] Float2 project(Expr<float3> p) const noexcept override {
-        auto view_matrix = inverse(camera_to_world());
-        auto p_view = make_float3(view_matrix * make_float4(p, 1.f));
         auto data = _device_data->read(0u);
         auto aspect = data.resolution.x / data.resolution.y;
-        auto x = p_view.x / (aspect * data.scale);
-        auto y = -p_view.y / data.scale;
+        auto x = p.x / (aspect * data.scale);
+        auto y = -p.y / data.scale;
         return .5f * make_float2(x, y) + .5f;
     }
 };
