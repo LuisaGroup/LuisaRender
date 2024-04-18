@@ -47,7 +47,7 @@ public:
 
     struct ReservoirSample {
         UInt tag;
-        Float2 u_light_selection;
+        Float2 u_light_surface;
     };
     struct ReservoirWeight {
         Float m;
@@ -85,27 +85,49 @@ public:
         }
     };
 private:
-    [[nodiscard]] std::pair<SampledSpectrum, Float> _evaluate_reservoir_sample(const ReservoirSample &sample, const Interaction &it, Expr<float3> wo,
+    [[nodiscard]] std::pair<SampledSpectrum, Float> _evaluate_without_occlusion(const ReservoirSample &sample, const Interaction &it, Expr<float3> wo,
                                                                                const SampledWavelengths &swl, Expr<float> time) const noexcept {
         auto L = SampledSpectrum{swl.dimension(), 0.f};
         auto pdf = def(0.f);
         auto prob = light_sampler()->evaluate_selection(sample.tag, it.p(), swl, time);
         auto sel = LightSampler::Selection{sample.tag, prob};
-        auto light_sample = light_sampler()->sample_light(it, sel, sample.u_light_selection, swl, time);
-        auto occluded = pipeline().geometry()->intersect_any(light_sample.shadow_ray);
-        $if(light_sample.eval.pdf > 0.f & !occluded) {
-            auto surface_tag = it.shape().surface_tag();
-            PolymorphicCall<Surface::Closure> call;
-            pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
-                surface->closure(call, it, swl, wo, 1.f, time);
-            });
-            call.execute([&](auto closure) noexcept {
+        auto light_sample = light_sampler()->sample_light(it, sel, sample.u_light_surface, swl, time);
+        auto surface_tag = it.shape().surface_tag();
+        PolymorphicCall<Surface::Closure> call;
+        pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
+            surface->closure(call, it, swl, wo, 1.f, time);
+        });
+        call.execute([&](auto closure) noexcept {
+            $if(light_sample.eval.pdf > 0.f) {
                 auto wi = light_sample.shadow_ray->direction();
                 auto eval = closure->evaluate(wo, wi);
                 pdf = light_sample.eval.pdf;
                 L = eval.f * light_sample.eval.L;
-            });
-        };
+            };
+        });
+        return std::make_pair(L, pdf);
+    }
+    [[nodiscard]] std::pair<SampledSpectrum, Float> _evaluate_with_occlusion(const ReservoirSample &sample, const Interaction &it, Expr<float3> wo,
+                                                                                const SampledWavelengths &swl, Expr<float> time) const noexcept {
+        auto L = SampledSpectrum{swl.dimension(), 0.f};
+        auto pdf = def(0.f);
+        auto prob = light_sampler()->evaluate_selection(sample.tag, it.p(), swl, time);
+        auto sel = LightSampler::Selection{sample.tag, prob};
+        auto light_sample = light_sampler()->sample_light(it, sel, sample.u_light_surface, swl, time);
+        auto occluded = pipeline().geometry()->intersect_any(light_sample.shadow_ray);
+        auto surface_tag = it.shape().surface_tag();
+        PolymorphicCall<Surface::Closure> call;
+        pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
+            surface->closure(call, it, swl, wo, 1.f, time);
+        });
+        call.execute([&](auto closure) noexcept {
+            $if(light_sample.eval.pdf > 0.f & !occluded) {
+                auto wi = light_sample.shadow_ray->direction();
+                auto eval = closure->evaluate(wo, wi);
+                pdf = light_sample.eval.pdf;
+                L = eval.f * light_sample.eval.L;
+            };
+        });
         return std::make_pair(L, pdf);
     }
 public:
@@ -157,12 +179,12 @@ public:
         [[nodiscard]] auto read(Expr<uint2> pixel_id) const noexcept {
             auto sample = _sample->read(pixel_id.x + pixel_id.y * _resolution.x);
             auto weight = _weight->read(pixel_id.x + pixel_id.y * _resolution.x);
-            auto reservoir_sample = ReservoirSample{sample.x, weight.xy().as<float2>()};
+            auto reservoir_sample = ReservoirSample{sample.x, sample.yz().as<float2>()};
             auto reservoir_weight = ReservoirWeight{weight.x, weight.y, weight.z};
             return Reservoir{reservoir_sample, reservoir_weight};
         }
         void write(const Reservoir &r, Expr<uint2> pixel_id) noexcept {
-            auto sample = make_uint3(r.sample.tag, r.sample.u_light_selection.as<uint2>());
+            auto sample = make_uint3(r.sample.tag, r.sample.u_light_surface.as<uint2>());
             auto weight = make_float3(r.weight.m, r.weight.total_weight, r.weight.target_pdf);
             _sample->write(pixel_id.x + pixel_id.y * _resolution.x, sample);
             _weight->write(pixel_id.x + pixel_id.y * _resolution.x, weight);
@@ -184,6 +206,7 @@ private:
         v_buffer.set_ray(ray, pixel_id);
         auto hit = pipeline().geometry()->trace_closest(ray);
         v_buffer.set_hit(hit, pixel_id);
+        auto reservoir = Reservoir::zero();
         $loop {
             auto wo = -ray->direction();
             auto it = pipeline().geometry()->interaction(ray, hit);
@@ -191,40 +214,24 @@ private:
             $if(!it->valid() | !it->shape().has_surface()) { $break; };
             // RIS over light samples
             $outline {
-                auto reservoir = Reservoir::zero();
-                auto surface_tag = it->shape().surface_tag();
-                auto light_sample = LightSampler::Sample::zero(swl.dimension());
                 $for(_, num_initial_sample) {
                     auto u_sel = sampler()->generate_1d();
                     auto sel = light_sampler()->select(*it, u_sel, swl, time);
                     auto u_light_selection = sampler()->generate_2d();
-                    auto reservoir_sample = ReservoirSample{sel.tag, u_light_selection};
                     auto target_pdf = def(0.f), total_weight = def(0.f);
-                    light_sample = light_sampler()->sample_light(*it, sel, u_light_selection, swl, time);
-                    PolymorphicCall<Surface::Closure> call;
-                    pipeline().surfaces().dispatch(surface_tag, [&](auto surface) noexcept {
-                        surface->closure(call, *it, swl, wo, 1.f, time);
-                    });
-                    call.execute([&](auto closure) noexcept {
-                        $if (light_sample.eval.pdf > 0.f) {
-                            auto wi = light_sample.shadow_ray->direction();
-                            auto eval = closure->evaluate(wo, wi);
-                            target_pdf = (light_sample.eval.L * eval.f).sum();
-                            total_weight = target_pdf / light_sample.eval.pdf;
-                        };
-                    });
                     Reservoir candidate {
-                        reservoir_sample,
-                        ReservoirWeight{
-                            1.f, total_weight, target_pdf
-                        }
+                        ReservoirSample{sel.tag, u_light_selection},
+                        ReservoirWeight{1.f, total_weight, target_pdf}
                     };
+                    auto [L, pdf] = _evaluate_with_occlusion(candidate.sample, *it, wo, swl, time);
+                    candidate.weight.target_pdf = L.sum();
+                    candidate.weight.total_weight = ite(pdf == 0.f, 0.f, candidate.weight.target_pdf / pdf);
                     reservoir.update(candidate, sampler()->generate_1d());
                 };
-                r_buffer.write(reservoir, pixel_id);
             };
             $break;
         };
+        r_buffer.write(reservoir, pixel_id);
     }
     void _temporal_reuse(const ReservoirBuffer &history, ReservoirBuffer &r_buffer, VisibilityBuffer &v_buffer,
                          const Camera::Instance *camera, Expr<uint> frame_index,
@@ -291,7 +298,7 @@ private:
                         $if(abs(neighbor_pixel_depth - current_pixel_depth) < 0.1f * abs(current_pixel_depth) &
                             dot(it->ng(), neighbor_it->ng()) > 0.9f) {
                             auto neighbor_reservoir = src.read(neighbor_id);
-                            auto [L, pdf] = _evaluate_reservoir_sample(neighbor_reservoir.sample, *it, wo, swl, time);
+                            auto [L, pdf] = _evaluate_without_occlusion(neighbor_reservoir.sample, *it, wo, swl, time);
                             $if(neighbor_reservoir.weight.target_pdf > 0.f) {
                                 auto neighbor_target_pdf = L.sum();
                                 auto neighbor_total_weight = neighbor_reservoir.weight.total_weight * neighbor_target_pdf / neighbor_reservoir.weight.target_pdf;
@@ -471,7 +478,7 @@ protected:
             // compute direct lighting
             $if(!it->shape().has_surface()) { $break; };
             auto reservoir = r_buffer.read(pixel_id);
-            auto [L, _] = _evaluate_reservoir_sample(reservoir.sample, *it, wo, swl, time);
+            auto [L, _] = _evaluate_with_occlusion(reservoir.sample, *it, wo, swl, time);
             auto contribution_weight = reservoir.contribution_weight();
             Li += weight * contribution_weight * L;
             $break;
